@@ -1,5 +1,26 @@
-module Main where
+module Test where
 
+import Lang
+import AD
+
+splus, stimes :: Fun
+splus = Simple "+"
+stimes = Simple "*"
+
+sf :: Fun
+sf = Simple "f"
+
+sx, sy :: Var
+sx = Simple "x"
+sy = Simple "y"
+
+ex1 :: Def
+ex1 = Def sf sx $
+      Let sy (Call stimes [Var sx, Var sx]) $
+      Call splus [Var sx, Var sy]
+    
+      
+{-
 ------ Driver ---------
 
 process :: String -> IO ()
@@ -19,3 +40,4 @@ main = runInputT defaultSettings loop
     case minput of
       Nothing -> outputStrLn "Goodbye."
       Just input -> (liftIO $ process input) >> loop
+-}

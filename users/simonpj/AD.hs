@@ -11,16 +11,23 @@ gradV :: Var -> Var
 gradV (Simple x) = Grad x
 gradv (Grad x)   = error ("Can't grad twice: " ++ x)
 
-gradE :: Var -> Expr -> Expr
-gradE _ (Const k) = lmZero
-gradE _ (Var v)   = Var (gradV v)
-gradE x (Call fun arg) = Call (gradF fun) [Var x]
+gradE :: Expr -> Expr
+gradE (Konst k) = lmZero
+gradE (Var v)   = Var (gradV v)
+gradE (Call fun args) = Call (gradF fun) args
                            `lmCompose`
-                         gradE x arg
-gradE x (Let v e1 e2) = Let (gradV v) (gradE x e1) (gradE x e2)
+                        gradEs args
+gradE (Let v e1 e2) = Let v e1                 $
+                      Let (gradV v) (gradE e1) $
+                      gradE e2
 
-gradD :: Bind -> Bind
-gradD (Bind fun var rhs)
-  = Bind (gradF fun) var $
+gradEs :: [Expr] -> Expr
+gradEs []      = lmZero
+gradEs [e]     = gradE e
+gradEs [e1,e2] = gradE e1 `lmPair` gradE e2
+
+gradD :: Def -> Def
+gradD (Def fun var rhs)
+  = Def (gradF fun) var $
     Let (gradV var) lmOne $
-    gradE var rhs
+    gradE rhs

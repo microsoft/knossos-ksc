@@ -10,3 +10,6 @@ lmOne = Call (Simple "lmOne") []      -- :: LM a a
 
 lmCompose :: Expr -> Expr -> Expr
 lmCompose f g = Call (Simple "lmCompose") [f,g]
+
+lmPair :: Expr -> Expr -> Expr
+lmPair f g = Call (Simple "lmPair") [f,g]

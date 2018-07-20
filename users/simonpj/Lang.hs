@@ -1,7 +1,9 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Lang where
 
-import Text.PrettyPrint (Doc, (<>), (<+>))
-import qualified Text.PrettyPrint as PP
+-- import Text.PrettyPrint (Doc, (<>), (<+>))
+import Text.PrettyPrint as PP
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
@@ -30,58 +32,74 @@ type FunId = String  -- For now
 
 type Fun = Name FunId
 type Var = Name String
-type Const = Integer
 
-data Bind = Bind Fun Var Expr  -- f x = e
+data Konst = KInteger Integer
+           | KFloat   Float
+           deriving( Eq, Show )
+
+data Def = Def Fun Var Expr  -- f x = e
 
 data Expr
-  = Let Var Expr Expr  -- let x = e1 in e2  (non-recursive)
-  | Const Const
+  = Konst Konst
   | Var Var
-  | Call Fun Expr
+  | Call Fun [Expr]    -- f( e1, ..., en )
+  | Let Var Expr Expr  -- let x = e1 in e2  (non-recursive)
   | If Expr Expr Expr
   deriving (Eq, Show)
 
-data Value = VConst Const
+data Value = VKonst Konst
 
 mkInfixCall :: Fun -> Expr -> Expr -> Expr
-mkInfixCall f a b = Call f [a,b]
+mkInfixCall f a b = Call f [a, b]
 
-{-
-data FunValue = FunValue Env Var Expr
 
 ------ Pretty printer ------
 
 parensIf ::  Bool -> Doc -> Doc
-parensIf True = PP.parens
+parensIf True  = PP.parens
 parensIf False = id
 
 class Pretty p where
-  ppr :: Int -> p -> Doc
+  ppr :: p -> Doc
 
+instance Pretty (Name String) where
+  ppr (Simple s) = PP.text s
+  ppr (Grad s)   = PP.text ('D' : s)
+
+instance Pretty Konst where
+  ppr (KInteger i) = PP.integer i
+  ppr (KFloat f)   = PP.float f
+  
 instance Pretty Expr where
-  ppr _ (Var v)     = PP.text v
-  ppr _ (Const k)   = PP.int k
-  ppr _ (Call f es) = PP.text f <> parens (pprWithCommas es)
-  ppr p (Let b e) = sep [ PP.text "let"
-                        , nest 2 (ppr b)
-                        , PP.text "in" <+> ppr p e ]
-  ppr p (If a b c)
-      = sep [ PP.text "if"   <+> ppr p a
-            , PP.text "then" <+> ppr p b
-            , PP.text "else" <+> ppr p c ]
+  ppr (Var v)       = ppr v
+  ppr (Konst k)     = ppr k
+  ppr (Call f es)   = ppr f <> PP.parens (pprWithCommas es)
+  ppr (Let v e1 e2) = PP.sep [ PP.text "let" <+>
+                                PP.sep [ ppr v
+                                       , PP.nest 2 (PP.text "=" <+> ppr e1) ]
+                             , PP.text "in" <+> ppr e2 ]
+--  ppr p (If a b c)
+--      = sep [ PP.text "if"   <+> ppr p a
+--            , PP.text "then" <+> ppr p b
+--            , PP.text "else" <+> ppr p c ]
 
-ppexpr :: Expr -> String
-ppexpr = PP.render . ppr 0
+instance Pretty Def where
+  ppr (Def f x rhs) = PP.sep [ PP.text "fun" <+> ppr f <> parens (ppr x)
+                             , PP.nest 2 (PP.text "=" <+> ppr rhs) ]
+                          
 
-pprWithCommas :: Pretty p => [p] -> p
-pprWithCommas ps = sep (add_commas ps)
+display :: Pretty p => p -> IO ()
+display p = putStrLn (PP.render (ppr p))
+
+pprWithCommas :: Pretty p => [p] -> Doc
+pprWithCommas ps = PP.sep (add_commas ps)
   where
      add_commas []     = []
-     add_commas [p]    = [p]
-     add_commas (p:ps) = p <> PP.comma : add_commas ps
+     add_commas [p]    = [ppr p]
+     add_commas (p:ps) = ppr p <> PP.comma : add_commas ps
 
 
+{-
 ------- Parser -------
 langDef :: Tok.LanguageDef ()
 langDef = Tok.LanguageDef
@@ -166,7 +184,7 @@ opExpr = Ex.buildExpressionParser table aexpr
             ]
 
 aexpr :: Parser Expr
-aexpr =     liftM Const integer
+aexpr =     liftM KInteger integer
         <|> liftM Var identifier
         <|> parens expr
 
