@@ -4,10 +4,12 @@ import Lang
 import Prim
 import Text.PrettyPrint as PP
 import qualified Data.Set as S
+import qualified Data.Map as M
 
 ---------------
 optD :: Def -> Def
-optD (Def f as r) = Def f as (fst (dropDeadE (optE r)))
+-- optD (Def f as r) = Def f as (substE (dropDeadE (optE r)))
+optD (Def f as r) = Def f as (substE (optE r))
 
 ---------------
 optE :: TExpr a -> TExpr a
@@ -30,34 +32,40 @@ optE (Call fun arg)     = case optCall fun opt_arg of
 optCall :: Fun
         -> Expr   -- Argument, already optimised
         -> Maybe Expr
-optCall (LMFun lm)        arg = optLM lm arg
-optCall (Fun f)           arg = optFun f arg
-optCall (GradFun f False) arg = optGradFun f arg
+optCall (LMFun lm)      arg = optLM lm arg
+optCall (Fun f)         arg = optFun f arg
+optCall (GradFun f Fwd) arg = optGradFun f arg
 optCall _ _ = Nothing
 
 -----------------------
-optFun :: String -> Expr -> Maybe Expr
-optFun "fst" (Tuple [x,_]) = Just x
-optFun "snd" (Tuple [_,y]) = Just y
-optFun "+" (Tuple [x, Konst KZero]) = Just x
-optFun "+" (Tuple [Konst KZero, y]) = Just y
+optFun :: FunId -> Expr -> Maybe Expr
+optFun (SelFun i _) (Tuple es)
+  | i <= length es = Just (es !! (i-1))
+optFun (SFun "+") (Tuple [x, Konst KZero]) = Just x
+optFun (SFun "+") (Tuple [Konst KZero, y]) = Just y
+optFun (SFun "*") (Tuple [x, Konst KZero]) = Just (Konst KZero)
+optFun (SFun "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
 
 optFun fun arg = Nothing
 
 
 -----------------------
-optGradFun :: String -> Expr -> Maybe Expr
-optGradFun "*" (Tuple [x,y])
-  = Just (lmFloat y `lmCross` lmFloat x)
+optGradFun :: FunId -> Expr -> Maybe Expr
+optGradFun (SFun "*") (Tuple [x,y])
+  = Just (lmCross [lmFloat y, lmFloat x])
+
+optGradFun (SFun "/") (Tuple [x,y])
+  = Just (lmCross [ lmFloat (pDiv (kInt 1) y)
+                  , lmFloat (pNeg (pDiv x (pMul y y)))])
 
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
-optGradFun "+" _ = Just (lmOne `lmCross` lmOne)
+optGradFun (SFun "+") _ = Just (lmCross [lmOne, lmOne])
 
 -- fst :: (a,b) -> a
 -- Dfst(x,y) :: (a,b) -o a
-optGradFun "fst" _ = Just (lmOne  `lmCross` lmZero)
-optGradFun "snd" _ = Just (lmZero `lmCross` lmOne)
+optGradFun (SelFun i n) _ = Just (lmCross [ if i == j then lmOne else lmZero
+                                          | j <- [1..n] ])
 
 optGradFun _ _ = Nothing
 
@@ -74,19 +82,19 @@ optLM "lmCompose" (Tuple [f,g])
   | isLMZero f = Just lmZero
   | isLMZero g = Just lmZero
 
-optLM "lmPair" (Tuple [f,g])
-  | isLMOne  f, isLMOne  g = Just lmOne
-  | isLMZero f, isLMZero g = Just lmZero
+optLM "lmPair" (Tuple es)
+  | all isLMZero es = Just lmZero
 
 optLM fun arg = Nothing
 
 
 ---------------
 optApply :: TExpr (LM a b) -> TExpr a -> Maybe (TExpr b)
-optApply (Var (Grad n fr)) (Var (Delta _x))
-  = -- Suspicious to ingore the 'x'
+optApply (Var (Grad n Fwd)) _
+  = -- Suspicious to ignore the argument!!
+    -- Correct only for forward
     Just $
-    Var (Drv n fr)
+    Var (Drv n Fwd)
 
 optApply (Konst k) dx
   = error ("applyToDx " ++ show k)
@@ -117,10 +125,18 @@ optApplyCall (LMFun "lmZero") _  dx = Just (Konst KZero)
 optApplyCall (LMFun "lmOne")  _ dx = Just dx
 optApplyCall (LMFun "lmCompose") (Tuple [f,g]) dx
   = Just (lmApply f (lmApply g dx))
+
 optApplyCall (LMFun "lmPair") (Tuple es) dx
   = Just (Tuple [lmApply e dx | e <- es])
-optApplyCall (LMFun "lmCross") (Tuple [a,b]) dx
-  = Just (pAdd (lmApply a (pFst dx)) (lmApply b (pSnd dx)))
+
+optApplyCall (LMFun "lmCross") (Tuple es) dx
+  = Just (foldr add (Konst KZero) (es `zip` [1..]))
+  where
+    n = length es
+
+    add :: (Expr, Int) -> Expr -> Expr
+    add (e,i) z = pAdd (lmApply e (pSel i n dx)) z
+
 optApplyCall (LMFun "lmFloat") x dx
   = Just (pMul x dx)
 optApplyCall fun arg dx
@@ -129,10 +145,10 @@ optApplyCall fun arg dx
 
 ----------------------
 optTrans :: TExpr (LM a b) -> Maybe (TExpr (LM b a))
-optTrans (Var (Grad n d)) = Just (Var (Grad n (not d)))
+optTrans (Var (Grad n d)) = Just (Var (Grad n (flipMode d)))
 optTrans (Call f a)       = optTransCall f a
 optTrans (Let (Grad n d) rhs body)
-  = Just $ Let (Grad n (not d)) (lmTranspose rhs) $
+  = Just $ Let (Grad n (flipMode d)) (lmTranspose rhs) $
     lmTranspose body
 optTrans (Let var rhs body)
   = Just $ Let var rhs $
@@ -147,10 +163,10 @@ optTransCall (LMFun "lmFloat") e = Just (lmFloat e)
 optTransCall (LMFun "lmTranspose") e = Just e
 optTransCall (LMFun "lmCompose") (Tuple [f,g])
   = Just (lmCompose (lmTranspose g) (lmTranspose f))
-optTransCall (LMFun "lmPair") (Tuple [a,b])
-  = Just (lmCross (lmTranspose a) (lmTranspose b))
-optTransCall (LMFun "lmCross") (Tuple [a,b])
-  = Just (lmPair (lmTranspose a) (lmTranspose b))
+optTransCall (LMFun "lmPair") (Tuple es)
+  = Just (lmCross (map lmTranspose es))
+optTransCall (LMFun "lmCross") (Tuple es)
+  = Just (lmPair (map lmTranspose es))
 
 optTransCall f a = Nothing
 
@@ -159,23 +175,54 @@ optTransCall f a = Nothing
 ----------------------
 
 dropDeadD :: Def -> Def
-dropDeadD (Def f as rhs) = Def f as (fst (dropDeadE rhs))
+dropDeadD (Def f as rhs) = Def f as (dropDeadE rhs)
 
-dropDeadE :: Expr -> (Expr, S.Set Var)
-dropDeadE (Var v) = (Var v, S.singleton v)
-dropDeadE (Konst k) = (Konst k, S.empty)
-dropDeadE (Call f e) = (Call f e', vs)
-                     where
-                       (e',vs) = dropDeadE e
-dropDeadE (Tuple es) = (Tuple es', S.unions vs)
-                     where
-                       (es', vs) = unzip (map dropDeadE es)
-dropDeadE (Let var rhs body)
+dropDeadE :: Expr -> Expr
+dropDeadE e = fst (dropDeadE' e)
+
+dropDeadE' :: Expr -> (Expr, S.Set Var)
+dropDeadE' (Var v) = (Var v, S.singleton v)
+dropDeadE' (Konst k) = (Konst k, S.empty)
+dropDeadE' (Call f e) = (Call f e', vs)
+                      where
+                        (e',vs) = dropDeadE' e
+dropDeadE' (Tuple es) = (Tuple es', S.unions vs)
+                      where
+                        (es', vs) = unzip (map dropDeadE' es)
+dropDeadE' (Let var rhs body)
   | var `S.member` vsb
   = (Let var rhs' body', vs)
   | otherwise
   = (body', vsb)
   where
-    (rhs',  vsr) = dropDeadE rhs
-    (body', vsb) = dropDeadE body
+    (rhs',  vsr) = dropDeadE' rhs
+    (body', vsb) = dropDeadE' body
     vs = (var `S.delete` vsb) `S.union` vsr
+
+
+-------------------------
+-- Substitute trivials
+-------------------------
+substE :: Expr -> Expr
+substE e = go M.empty e
+  where
+    go :: M.Map Var Expr -> Expr -> Expr
+    go subst (Let v r b)
+      | isTrivial r' = go (M.insert v r' subst) b
+      | otherwise    = Let v r' (go subst b)
+      where
+        r' = go subst r
+    go subst (Var v)
+      = case M.lookup v subst of
+          Just e  -> e
+          Nothing -> Var v
+    go subst (Konst k) = Konst k
+    go subst (Call f e) = Call f (go subst e)
+    go subst (Tuple es) = Tuple (map (go subst) es)
+
+isTrivial :: Expr -> Bool
+isTrivial (Tuple [])          = True
+isTrivial (Var {})            = True
+isTrivial (Konst {})          = True
+isTrivial (Call _ (Tuple [])) = True
+isTrivial e = False

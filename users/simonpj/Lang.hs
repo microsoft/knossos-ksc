@@ -24,24 +24,34 @@ import Data.Map
 ------ Data types ---------
 
 
-type FunId = String  -- For now
+data FunId = SelFun     -- Selector function: fst, snd etc
+               Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
+               Int      -- Arity
+           | SFun String  -- For now
+           deriving( Eq, Show )
 
+data ADMode = Fwd | Rev
+            deriving( Eq, Ord, Show )
 
-data Fun = Fun     String       -- The function              f(x)
-         | GradFun String Bool  -- Full Jacobian Df(x)
-                                --   True <=> transposed  Rf(x)
-         | DrvFun  String Bool  -- Derivative derivative f'(x,dx)
-                                --   True <=> reverse mode f`(x,dr)
-         | LMFun      String  -- Linear map
+flipMode :: ADMode -> ADMode
+flipMode Fwd = Rev
+flipMode Rev = Fwd
+
+data Fun = Fun     FunId         -- The function              f(x)
+         | GradFun FunId ADMode  -- Full Jacobian Df(x)
+                                 --   Rev <=> transposed  Rf(x)
+         | DrvFun  FunId ADMode  -- Derivative derivative f'(x,dx)
+                                 --   Rev <=> reverse mode f`(x,dr)
+         | LMFun   String        -- Linear map
          deriving( Eq, Show )
 
 data Var
-  = Simple  String       -- x
-  | Delta   String       -- The 'dx' or 'dr' argument to fwd
-                         -- or backward versions of f
-  | Grad    String Bool  -- \nabla x
-                         --   True <=> transposed \bowtie x
-  | Drv     String Bool  -- Let-bound variations (\nabla v `apply` dx)
+  = Simple  String         -- x
+  | Delta   String         -- The 'dx' or 'dr' argument to fwd
+                           -- or backward versions of f
+  | Grad    String ADMode  -- \nabla x
+                           --   True <=> transposed \bowtie x
+  | Drv     String ADMode  -- Let-bound variations (\nabla v `apply` dx)
   deriving( Show, Eq, Ord )
 
 data Konst = KZero  -- Of any type
@@ -70,6 +80,16 @@ data Value = VKonst Konst
 mkInfixCall :: Fun -> Expr -> Expr -> Expr
 mkInfixCall f a b = Call f (Tuple [a, b])
 
+mkLets :: [(Var,Expr)] -> Expr -> Expr
+mkLets [] e = e
+mkLets ((v,r):bs) e = Let v r (mkLets bs e)
+
+mkTuple :: [Expr] -> Expr
+mkTuple [e] = e   -- One-tuples are always flattened
+mkTuple es  = Tuple es
+
+kInt :: Integer -> Expr
+kInt i = Konst (KInteger i)
 
 ------ Pretty printer ------
 
@@ -83,18 +103,22 @@ class Pretty p where
 instance Pretty Var where
   ppr (Simple s)     = PP.text s
   ppr (Delta s)      = PP.text ('d' : s)
-  ppr (Grad s False) = PP.text ('D' : s)
-  ppr (Grad s True)  = PP.text ('R' : s)
-  ppr (Drv s False)  = PP.text ('v' : s)
-  ppr (Drv s True)   = PP.text ('r' : s)
+  ppr (Grad s Fwd) = PP.text ('D' : s)
+  ppr (Grad s Rev) = PP.text ('R' : s)
+  ppr (Drv s Fwd)  = PP.text ('v' : s)
+  ppr (Drv s Rev)  = PP.text ('r' : s)
+
+instance Pretty FunId where
+  ppr (SFun s)     = PP.text s
+  ppr (SelFun i n) = PP.text "sel_" <> PP.int i <> PP.char '_' <> PP.int n
 
 instance Pretty Fun where
-  ppr (Fun s)           = PP.text s
-  ppr (GradFun s False) = PP.text ('D' : s)
-  ppr (GradFun s True)  = PP.text ('R' : s)
-  ppr (DrvFun s False)  = PP.text s <> PP.char '\''
-  ppr (DrvFun s True)   = PP.text s <> PP.char '`'
-  ppr (LMFun s)         = PP.text s
+  ppr (Fun s)           = ppr s
+  ppr (GradFun s Fwd) = PP.char 'D' <> ppr s
+  ppr (GradFun s Rev) = PP.char 'R' <> ppr s
+  ppr (DrvFun s Fwd)  = ppr s <> PP.char '\''
+  ppr (DrvFun s Rev)  = ppr s <> PP.char '`'
+  ppr (LMFun s)        = PP.text s
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
