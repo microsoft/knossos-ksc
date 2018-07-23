@@ -23,26 +23,44 @@ import Data.Map
 
 ------ Data types ---------
 
-data Name x = Simple x   -- x
-            | Grad x     -- \nabla x
-            deriving( Show, Eq )
 
 type FunId = String  -- For now
 
 
-type Fun = Name FunId
-type Var = Name String
+data Fun = Fun     String       -- The function              f(x)
+         | GradFun String Bool  -- Full Jacobian Df(x)
+                                --   True <=> transposed  Rf(x)
+         | DrvFun  String Bool  -- Derivative derivative f'(x,dx) 
+                                --   True <=> reverse mode f`(x,dr)
+         | LMFun      String  -- Linear map
+         deriving( Eq, Show )
 
-data Konst = KInteger Integer
+data Var
+  = Simple  String       -- x
+  | Delta   String       -- The 'dx' or 'dr' argument to fwd
+                         -- or backward versions of f
+  | Grad    String Bool  -- \nabla x
+                         --   True <=> transposed \bowtie x
+  | Drv     String Bool  -- Let-bound variations (\nabla v `apply` dx)
+  deriving( Show, Eq, Ord )
+
+data Konst = KZero  -- Of any type
+           | KInteger Integer
            | KFloat   Float
            deriving( Eq, Show )
 
-data Def = Def Fun Var Expr  -- f x = e
+data Def = Def Fun [Var] Expr  -- f x = e
 
+
+type TExpr ty = Expr
+  -- The phantom parameter gives the type of
+  -- the expresssion, for documentation purposes
+  
 data Expr
   = Konst Konst
   | Var Var
-  | Call Fun [Expr]    -- f( e1, ..., en )
+  | Call Fun Expr      -- f e
+  | Tuple [Expr]       -- (e1, ..., en)
   | Let Var Expr Expr  -- let x = e1 in e2  (non-recursive)
   | If Expr Expr Expr
   deriving (Eq, Show)
@@ -50,7 +68,7 @@ data Expr
 data Value = VKonst Konst
 
 mkInfixCall :: Fun -> Expr -> Expr -> Expr
-mkInfixCall f a b = Call f [a, b]
+mkInfixCall f a b = Call f (Tuple [a, b])
 
 
 ------ Pretty printer ------
@@ -62,9 +80,21 @@ parensIf False = id
 class Pretty p where
   ppr :: p -> Doc
 
-instance Pretty (Name String) where
-  ppr (Simple s) = PP.text s
-  ppr (Grad s)   = PP.text ('D' : s)
+instance Pretty Var where
+  ppr (Simple s)     = PP.text s
+  ppr (Delta s)      = PP.text ('d' : s)
+  ppr (Grad s False) = PP.text ('D' : s)
+  ppr (Grad s True)  = PP.text ('R' : s)
+  ppr (Drv s False)  = PP.text ('v' : s)
+  ppr (Drv s True)   = PP.text ('r' : s)
+
+instance Pretty Fun where
+  ppr (Fun s)           = PP.text s
+  ppr (GradFun s False) = PP.text ('D' : s)
+  ppr (GradFun s True)  = PP.text ('R' : s)
+  ppr (DrvFun s False)  = PP.text s <> PP.char '\''
+  ppr (DrvFun s True)   = PP.text s <> PP.char '`'
+  ppr (LMFun s)         = PP.text s
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
@@ -73,7 +103,9 @@ instance Pretty Konst where
 instance Pretty Expr where
   ppr (Var v)       = ppr v
   ppr (Konst k)     = ppr k
-  ppr (Call f es)   = ppr f <> PP.parens (pprWithCommas es)
+  ppr (Call f e@(Tuple _)) = ppr f <> ppr e
+  ppr (Call f e)           = ppr f <> parens (ppr e)
+  ppr (Tuple es)    = PP.parens (pprWithCommas es)
   ppr (Let v e1 e2) = PP.sep [ PP.text "let" <+>
                                 PP.sep [ ppr v
                                        , PP.nest 2 (PP.text "=" <+> ppr e1) ]
@@ -84,8 +116,10 @@ instance Pretty Expr where
 --            , PP.text "else" <+> ppr p c ]
 
 instance Pretty Def where
-  ppr (Def f x rhs) = PP.sep [ PP.text "fun" <+> ppr f <> parens (ppr x)
-                             , PP.nest 2 (PP.text "=" <+> ppr rhs) ]
+  ppr (Def f vs rhs)
+    = PP.sep [ PP.text "fun" <+> ppr f
+                 <> parens (pprWithCommas vs)
+             , PP.nest 2 (PP.text "=" <+> ppr rhs) ]
                           
 
 display :: Pretty p => p -> IO ()

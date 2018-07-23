@@ -1,25 +1,75 @@
-module Test where
+module Test( ex1, gradD, gradE, display ) where
 
 import Lang
+import Prim
 import AD
-
-splus, stimes :: Fun
-splus = Simple "+"
-stimes = Simple "*"
-
-sf :: Fun
-sf = Simple "f"
-
-sx, sy :: Var
-sx = Simple "x"
-sy = Simple "y"
+import Opt
 
 ex1 :: Def
-ex1 = Def sf sx $
-      Let sy (Call stimes [Var sx, Var sx]) $
-      Call splus [Var sx, Var sy]
-    
-      
+-- f x = let y = x*x in x + y
+ex1 = Def (Fun "f") [sx] $
+      Let sy (stimes (Var sx) (Var sx)) $
+      splus (Var sx) (Var sy)
+
+-- f' x dx = dx + 2*x*dx
+-- f` x dr = 
+
+ex2 :: Def
+-- g x = let y = x*x in
+--       let z = x + y
+--       in y*z
+ex2 = Def (Fun "g") [sx] $
+      Let sy (stimes (Var sx) (Var sx)) $
+      Let sz (splus (Var sx) (Var sy))  $
+      stimes (Var sy) (Var sz)
+
+sx, sy, sz :: Var
+sx = Simple "x"
+sy = Simple "y"
+sz = Simple "z"
+
+
+tryDef :: Def -> IO ()
+tryDef def
+  = do { banner "Original definition"
+       ; display def
+
+       ; banner "The full Jacobian"
+       ; let grad_def = gradD def
+       ; display grad_def
+
+       ; banner "Forward derivative (unoptimised)"
+       ; let der_fwd = applyD grad_def
+       ; display der_fwd
+       
+       ; banner "Forward-mode derivative (optimised)"
+       ; let opt_der_fwd = optD der_fwd
+       ; display opt_der_fwd
+
+       ; banner "Transposed Jacobian"
+       ; let trans_grad_def = transD grad_def
+       ; display trans_grad_def
+
+       ; banner "Optimised transposed Jacobian"
+       ; let opt_trans_grad_def = optD trans_grad_def
+       ; display opt_trans_grad_def
+
+       ; banner "Reverse-mode derivative (unoptimised)"
+       ; let der_rev = applyD opt_trans_grad_def
+       ; display der_rev
+
+       ; banner "Reverse-mode derivative (optimised)"
+       ; let opt_der_rev = optD der_rev
+       ; display opt_der_rev
+       }
+
+
+banner :: String -> IO ()
+banner s
+  = do { putStrLn "\n----------------------------"
+       ; putStrLn s
+       ; putStrLn "----------------------------\n" }
+       
 {-
 ------ Driver ---------
 
