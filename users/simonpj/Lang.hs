@@ -2,7 +2,6 @@
 
 module Lang where
 
--- import Text.PrettyPrint (Doc, (<>), (<+>))
 import Text.PrettyPrint as PP
 
 import Text.Parsec
@@ -110,14 +109,14 @@ instance Pretty Var where
 
 instance Pretty FunId where
   ppr (SFun s)     = PP.text s
-  ppr (SelFun i n) = PP.text "sel_" <> PP.int i <> PP.char '_' <> PP.int n
+  ppr (SelFun i n) = PP.text "sel_" PP.<> PP.int i PP.<> PP.char '_' PP.<> PP.int n
 
 instance Pretty Fun where
   ppr (Fun s)           = ppr s
-  ppr (GradFun s Fwd) = PP.char 'D' <> ppr s
-  ppr (GradFun s Rev) = PP.char 'R' <> ppr s
-  ppr (DrvFun s Fwd)  = ppr s <> PP.char '\''
-  ppr (DrvFun s Rev)  = ppr s <> PP.char '`'
+  ppr (GradFun s Fwd) = PP.char 'D' PP.<> ppr s
+  ppr (GradFun s Rev) = PP.char 'R' PP.<> ppr s
+  ppr (DrvFun s Fwd)  = ppr s PP.<> PP.char '\''
+  ppr (DrvFun s Rev)  = ppr s PP.<> PP.char '`'
   ppr (LMFun s)        = PP.text s
 
 instance Pretty Konst where
@@ -128,40 +127,40 @@ instance Pretty Konst where
 instance Pretty Expr where
   ppr (Var v)       = ppr v
   ppr (Konst k)     = ppr k
-  ppr (Call f e@(Tuple _)) = ppr f <> ppr e
-  ppr (Call f e)           = ppr f <> parensSp (ppr e)
+  ppr (Call f e@(Tuple _)) = ppr f PP.<> ppr e
+  ppr (Call f e)           = ppr f PP.<> parensSp (ppr e)
   ppr (Tuple es)    = parens (pprWithCommas es)
-  ppr (Let v e1 e2) = PP.vcat [ PP.text "let" <+>
+  ppr (Let v e1 e2) = PP.vcat [ PP.text "let" PP.<+>
                                (bracesSp $ PP.sep [ ppr v
-                                                  , PP.nest 2 (PP.text "=" <+> ppr e1) ])
+                                                  , PP.nest 2 (PP.text "=" PP.<+> ppr e1) ])
                              , ppr e2 ]
 --  ppr p (If a b c)
---      = sep [ PP.text "if"   <+> ppr p a
---            , PP.text "then" <+> ppr p b
---            , PP.text "else" <+> ppr p c ]
+--      = sep [ PP.text "if"   PP.<+> ppr p a
+--            , PP.text "then" PP.<+> ppr p b
+--            , PP.text "else" PP.<+> ppr p c ]
 
 instance Pretty Def where
   ppr (Def f vs rhs)
-    = PP.sep [ PP.text "fun" <+> ppr f
-                 <> parens (pprWithCommas vs)
-             , PP.nest 2 (PP.text "=" <+> ppr rhs) ]
+    = PP.sep [ PP.text "fun" PP.<+> ppr f
+                 PP.<> parens (pprWithCommas vs)
+             , PP.nest 2 (PP.text "=" PP.<+> ppr rhs) ]
 
 
 display :: Pretty p => p -> IO ()
 display p = putStrLn (PP.render (ppr p))
 
 bracesSp :: Doc -> Doc
-bracesSp d = PP.char '{' <+> d <+> PP.char '}'
+bracesSp d = PP.char '{' PP.<+> d PP.<+> PP.char '}'
 
 parensSp :: Doc -> Doc
-parensSp d = PP.char '(' <+> d <+> PP.char ')'
+parensSp d = PP.char '(' PP.<+> d PP.<+> PP.char ')'
 
 pprWithCommas :: Pretty p => [p] -> Doc
 pprWithCommas ps = PP.sep (add_commas ps)
   where
      add_commas []     = []
      add_commas [p]    = [ppr p]
-     add_commas (p:ps) = ppr p <> PP.comma : add_commas ps
+     add_commas (p:ps) = ppr p PP.<> PP.comma : add_commas ps
 
 
 {-
