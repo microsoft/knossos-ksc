@@ -1,4 +1,4 @@
-module Test( ex1, gradD, gradE, display ) where
+module Main where
 
 import Lang
 import Prim
@@ -8,29 +8,40 @@ import Opt
 ex1 :: Def
 -- f x = let y = x*x in x + y
 ex1 = Def (Fun "f") [sx] $
-      Let sy (stimes (Var sx) (Var sx)) $
-      splus (Var sx) (Var sy)
+      Let sy (pMul (Var sx) (Var sx)) $
+      pAdd (Var sx) (Var sy)
 
 -- f' x dx = dx + 2*x*dx
--- f` x dr = 
+-- f` x dr =
 
 ex2 :: Def
 -- g x = let y = x*x in
 --       let z = x + y
 --       in y*z
 ex2 = Def (Fun "g") [sx] $
-      Let sy (stimes (Var sx) (Var sx)) $
-      Let sz (splus (Var sx) (Var sy))  $
-      stimes (Var sy) (Var sz)
+      Let sy (pMul (Var sx) (Var sx)) $
+      Let sz (pAdd (Var sx) (Var sy))  $
+      pMul (Var sy) (Var sz)
+
+ex3 :: Def
+-- h (x,y) = let z = x + y
+--           in y*z
+ex3 = Def (Fun "g") [sp] $
+      Let sx (pFst (Var sp))    $
+      Let sy (pSnd (Var sp))    $
+      Let sz (pAdd (Var sx) (Var sy))  $
+      pMul (Var sy) (Var sz)
+
 
 sx, sy, sz :: Var
 sx = Simple "x"
 sy = Simple "y"
 sz = Simple "z"
+sp = Simple "p"
 
 
-tryDef :: Def -> IO ()
-tryDef def
+demo :: Def -> IO ()
+demo def
   = do { banner "Original definition"
        ; display def
 
@@ -41,7 +52,7 @@ tryDef def
        ; banner "Forward derivative (unoptimised)"
        ; let der_fwd = applyD grad_def
        ; display der_fwd
-       
+
        ; banner "Forward-mode derivative (optimised)"
        ; let opt_der_fwd = optD der_fwd
        ; display opt_der_fwd
@@ -69,7 +80,11 @@ banner s
   = do { putStrLn "\n----------------------------"
        ; putStrLn s
        ; putStrLn "----------------------------\n" }
-       
+
+
+main :: IO ()
+main = return ()  -- To keep GHC quiet
+
 {-
 ------ Driver ---------
 

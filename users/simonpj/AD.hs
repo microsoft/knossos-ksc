@@ -46,12 +46,11 @@ applyD (Def (GradFun f d) [Simple x] rhs)
   where
     s | d         = "r"  -- Reverse mode
       | otherwise = x
-      
 
 ---------------------------------
 -- Traanspose
 
-transD :: Def -> Def
-transD (Def (GradFun f d) args rhs)
+transposeD :: Def -> Def
+transposeD (Def (GradFun f d) args rhs)
   = Def (GradFun f (not d)) args $
     lmTranspose rhs

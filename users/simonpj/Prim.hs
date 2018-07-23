@@ -30,9 +30,17 @@ lmTranspose m = Call (LMFun "lmTranspose") m
 lmApply :: TExpr (LM a b) -> TExpr a -> TExpr b
 lmApply lm arg = Call (LMFun "lmApply") (Tuple [lm, arg])
 
------------------------
+isLMOne, isLMZero :: Expr -> Bool
+isLMOne (Call (LMFun "lmOne") _) = True
+isLMOne _ = False
 
-splus, stimes :: TExpr Float -> TExpr Float -> TExpr Float
-splus  a b = Call (Fun "+") (Tuple [a,b])
-stimes a b = Call (Fun "*") (Tuple [a,b])
+isLMZero (Call (LMFun "lmZero") _) = True
+isLMZero _ = False
+
+-----------------------
+pAdd, pMul :: TExpr Float -> TExpr Float -> TExpr Float
+pAdd a b = Call (Fun "+") (Tuple [a,b])
+pMul a b = Call (Fun "*") (Tuple [a,b])
+pFst x   = Call (Fun "fst") x
+pSnd x   = Call (Fun "snd") x
 

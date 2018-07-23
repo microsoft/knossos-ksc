@@ -30,7 +30,7 @@ type FunId = String  -- For now
 data Fun = Fun     String       -- The function              f(x)
          | GradFun String Bool  -- Full Jacobian Df(x)
                                 --   True <=> transposed  Rf(x)
-         | DrvFun  String Bool  -- Derivative derivative f'(x,dx) 
+         | DrvFun  String Bool  -- Derivative derivative f'(x,dx)
                                 --   True <=> reverse mode f`(x,dr)
          | LMFun      String  -- Linear map
          deriving( Eq, Show )
@@ -55,7 +55,7 @@ data Def = Def Fun [Var] Expr  -- f x = e
 type TExpr ty = Expr
   -- The phantom parameter gives the type of
   -- the expresssion, for documentation purposes
-  
+
 data Expr
   = Konst Konst
   | Var Var
@@ -99,17 +99,18 @@ instance Pretty Fun where
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
   ppr (KFloat f)   = PP.float f
-  
+  ppr KZero        = text "KZero"
+
 instance Pretty Expr where
   ppr (Var v)       = ppr v
   ppr (Konst k)     = ppr k
   ppr (Call f e@(Tuple _)) = ppr f <> ppr e
-  ppr (Call f e)           = ppr f <> parens (ppr e)
-  ppr (Tuple es)    = PP.parens (pprWithCommas es)
-  ppr (Let v e1 e2) = PP.sep [ PP.text "let" <+>
-                                PP.sep [ ppr v
-                                       , PP.nest 2 (PP.text "=" <+> ppr e1) ]
-                             , PP.text "in" <+> ppr e2 ]
+  ppr (Call f e)           = ppr f <> parensSp (ppr e)
+  ppr (Tuple es)    = parens (pprWithCommas es)
+  ppr (Let v e1 e2) = PP.vcat [ PP.text "let" <+>
+                               (bracesSp $ PP.sep [ ppr v
+                                                  , PP.nest 2 (PP.text "=" <+> ppr e1) ])
+                             , ppr e2 ]
 --  ppr p (If a b c)
 --      = sep [ PP.text "if"   <+> ppr p a
 --            , PP.text "then" <+> ppr p b
@@ -120,10 +121,16 @@ instance Pretty Def where
     = PP.sep [ PP.text "fun" <+> ppr f
                  <> parens (pprWithCommas vs)
              , PP.nest 2 (PP.text "=" <+> ppr rhs) ]
-                          
+
 
 display :: Pretty p => p -> IO ()
 display p = putStrLn (PP.render (ppr p))
+
+bracesSp :: Doc -> Doc
+bracesSp d = PP.char '{' <+> d <+> PP.char '}'
+
+parensSp :: Doc -> Doc
+parensSp d = PP.char '(' <+> d <+> PP.char ')'
 
 pprWithCommas :: Pretty p => [p] -> Doc
 pprWithCommas ps = PP.sep (add_commas ps)
