@@ -6,10 +6,16 @@ import Text.PrettyPrint as PP
 import qualified Data.Set as S
 import qualified Data.Map as M
 
+import Debug.Trace
+
 ---------------
 optD :: Def -> Def
--- optD (Def f as r) = Def f as (substE (dropDeadE (optE r)))
-optD (Def f as r) = Def f as (substE (optE r))
+optD (Def f as r) = Def f as (simplify r)
+
+simplify :: Expr -> Expr
+simplify = dropDeadE . substE . optE . substE
+  -- Note the extra substE, which gets simple things,
+  -- notably lmOne, to their use sites
 
 ---------------
 optE :: TExpr a -> TExpr a
@@ -52,11 +58,11 @@ optFun fun arg = Nothing
 -----------------------
 optGradFun :: FunId -> Expr -> Maybe Expr
 optGradFun (SFun "*") (Tuple [x,y])
-  = Just (lmCross [lmFloat y, lmFloat x])
+  = Just (lmCross [lmScalar y, lmScalar x])
 
 optGradFun (SFun "/") (Tuple [x,y])
-  = Just (lmCross [ lmFloat (pDiv (kInt 1) y)
-                  , lmFloat (pNeg (pDiv x (pMul y y)))])
+  = Just (lmCross [ lmScalar (pDiv (kInt 1) y)
+                  , lmScalar (pNeg (pDiv x (pMul y y)))])
 
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
@@ -82,8 +88,20 @@ optLM "lmCompose" (Tuple [f,g])
   | isLMZero f = Just lmZero
   | isLMZero g = Just lmZero
 
+  | Call (LMFun "lmCross") (Tuple [p1,p2]) <- f
+  , Call (LMFun "lmPair")  (Tuple [q1,q2]) <- g
+  = Just (lmAdd (lmCompose p1 q1) (lmCompose p2 q2))
+
 optLM "lmPair" (Tuple es)
   | all isLMZero es = Just lmZero
+
+optLM "lmAdd" (Tuple [p,q])
+  | isKZero p = Just q
+  | isKZero q = Just p
+
+  | Call (LMFun "lmScalar") x <- p
+  , Call (LMFun "lmScalar") y <- p
+  = Just (lmScalar (pAdd x y))
 
 optLM fun arg = Nothing
 
@@ -123,6 +141,8 @@ optApplyCall :: Fun -> Expr      -- f args :: s -o t
 -- Optimise (lmApply (fun arg) dx)
 optApplyCall (LMFun "lmZero") _  dx = Just (Konst KZero)
 optApplyCall (LMFun "lmOne")  _ dx = Just dx
+optApplyCall (LMFun "lmAdd")  (Tuple [f,g]) dx
+  = Just (pAdd (lmApply f dx) (lmApply g dx))
 optApplyCall (LMFun "lmCompose") (Tuple [f,g]) dx
   = Just (lmApply f (lmApply g dx))
 
@@ -137,7 +157,7 @@ optApplyCall (LMFun "lmCross") (Tuple es) dx
     add :: (Expr, Int) -> Expr -> Expr
     add (e,i) z = pAdd (lmApply e (pSel i n dx)) z
 
-optApplyCall (LMFun "lmFloat") x dx
+optApplyCall (LMFun "lmScalar") x dx
   = Just (pMul x dx)
 optApplyCall fun arg dx
   = Nothing
@@ -158,7 +178,7 @@ optTrans e = error ("optTrans: " ++ PP.render (ppr e))
 optTransCall :: Fun -> Expr -> Maybe Expr
 optTransCall (LMFun "lmZero") _  = Just lmZero
 optTransCall (LMFun "lmOne")  _  = Just lmOne
-optTransCall (LMFun "lmFloat") e = Just (lmFloat e)
+optTransCall (LMFun "lmScalar") e = Just (lmScalar e)
 
 optTransCall (LMFun "lmTranspose") e = Just e
 optTransCall (LMFun "lmCompose") (Tuple [f,g])

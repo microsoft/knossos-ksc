@@ -10,8 +10,11 @@ lmZero = Call (LMFun "lmZero") (Tuple [])
 lmOne :: TExpr (LM a a)
 lmOne = Call (LMFun "lmOne") (Tuple [])
 
-lmFloat :: TExpr Float -> TExpr (LM Float Float)
-lmFloat f = Call (LMFun "lmFloat") f
+lmAdd :: TExpr (LM a b) -> TExpr (LM a b) -> TExpr (LM a b)
+lmAdd f g = Call (LMFun "lmAdd") (Tuple [f,g])
+
+lmScalar :: TExpr Float -> TExpr (LM Float Float)
+lmScalar f = Call (LMFun "lmScalar") f
 
 lmCompose :: TExpr (LM b c) -> TExpr (LM a b) -> TExpr (LM a c)
 lmCompose f g = Call (LMFun "lmCompose") (Tuple [f,g])

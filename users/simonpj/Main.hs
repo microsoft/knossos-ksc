@@ -68,12 +68,16 @@ demo def
   = do { banner "Original definition"
        ; display def
 
-       ; banner "The full Jacobian"
+       ; banner "The full Jacobian (unoptimised)"
        ; let grad_def = gradD def
        ; display grad_def
 
+       ; banner "The full Jacobian (optimised)"
+       ; let opt_grad_def = optD grad_def
+       ; display opt_grad_def
+
        ; banner "Forward derivative (unoptimised)"
-       ; let der_fwd = applyD grad_def
+       ; let der_fwd = applyD opt_grad_def
        ; display der_fwd
 
        ; banner "Forward-mode derivative (optimised)"
@@ -81,7 +85,7 @@ demo def
        ; display opt_der_fwd
 
        ; banner "Transposed Jacobian"
-       ; let trans_grad_def = transposeD grad_def
+       ; let trans_grad_def = transposeD opt_grad_def
        ; display trans_grad_def
 
        ; banner "Optimised transposed Jacobian"

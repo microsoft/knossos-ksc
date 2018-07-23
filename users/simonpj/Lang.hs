@@ -20,6 +20,8 @@ import System.Console.Haskeline
 
 import Data.Map
 
+infixr 0 `seqExpr`
+
 ------ Data types ---------
 
 
@@ -58,6 +60,10 @@ data Konst = KZero  -- Of any type
            | KFloat   Float
            deriving( Eq, Show )
 
+isKZero :: Expr -> Bool
+isKZero (Konst KZero) = True
+isKZero _             = False
+
 data Def = Def Fun [Var] Expr  -- f x = e
 
 
@@ -89,6 +95,13 @@ mkTuple es  = Tuple es
 
 kInt :: Integer -> Expr
 kInt i = Konst (KInteger i)
+
+seqExpr :: Expr -> a -> a
+seqExpr (Var v) x = v `seq` x
+seqExpr (Call fun e) x = fun `seq` e `seqExpr` x
+seqExpr (Konst k) x = k `seq` x
+seqExpr (Let v r b) x = v `seq` r `seqExpr` b `seqExpr` x
+seqExpr (Tuple es) x = Prelude.foldr seqExpr x es
 
 ------ Pretty printer ------
 
