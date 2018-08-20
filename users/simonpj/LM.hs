@@ -29,7 +29,7 @@ data LM a b where
 class Addable a where
   add  :: a -> a -> a
   zero :: a
-  
+
 lmApply :: LM p q -> p -> q
 lmApply Id           x     = x
 lmApply (Leaf f)     x     = f * x
@@ -38,7 +38,6 @@ lmApply (Unpair ar br) (a,b) = lmApply ar a `add` lmApply br b
 lmApply (Pair ab ac) a    = (lmApply ab a, lmApply ac a)
   -- ab :: LM a b
   -- ac :: LM a c
-  -- 
 
 lmTranspose :: LM a b -> LM b a
 lmTranspose Id             = Id
