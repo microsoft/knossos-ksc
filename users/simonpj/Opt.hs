@@ -88,16 +88,31 @@ optLM "lmCompose" (Tuple [f,g])
   | isLMZero f = Just lmZero
   | isLMZero g = Just lmZero
 
-  | Call (LMFun "lmCross") (Tuple [p1,p2]) <- f
-  , Call (LMFun "lmPair")  (Tuple [q1,q2]) <- g
-  = Just (lmAdd (lmCompose p1 q1) (lmCompose p2 q2))
+  -- Scalar(x) . Scalar(y) = Scalar( xy )
+  | Call (LMFun "lmScalar") x <- f
+  , Call (LMFun "lmScalar") y <- g
+  = Just (lmScalar (pMul x y))
+
+  -- (f . g) . h   =>   f . (g . h)
+  | Call (LMFun "lmCompose") (Tuple [p1,p2]) <- f
+  = optLM "lmCompose" (Tuple [p1, lmCompose p2 g])
+
+  -- f . (g x h)   =>  (f . g) x (f . h)
+  -- This duplicates f; we might want to take care
+  | Call (LMFun "lmCross") (Tuple qs) <- g
+  = Just (lmCross (map (lmCompose f) qs))
+
+  | Call (LMFun "lmCross") (Tuple ps) <- f
+  , Call (LMFun "lmPair")  (Tuple qs) <- g
+  , length ps == length qs
+  = Just (lmAdds (zipWith lmCompose ps qs))
 
 optLM "lmPair" (Tuple es)
   | all isLMZero es = Just lmZero
 
 optLM "lmAdd" (Tuple [p,q])
-  | isKZero p = Just q
-  | isKZero q = Just p
+  | isLMZero p = Just q
+  | isLMZero q = Just p
 
   | Call (LMFun "lmScalar") x <- p
   , Call (LMFun "lmScalar") y <- p

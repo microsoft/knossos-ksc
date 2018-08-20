@@ -13,6 +13,11 @@ lmOne = Call (LMFun "lmOne") (Tuple [])
 lmAdd :: TExpr (LM a b) -> TExpr (LM a b) -> TExpr (LM a b)
 lmAdd f g = Call (LMFun "lmAdd") (Tuple [f,g])
 
+lmAdds :: [TExpr (LM a b)]-> TExpr (LM a b)
+lmAdds [] = lmZero
+lmAdds [x] = x
+lmAdds (x:xs) = lmAdd x (lmAdds xs)
+
 lmScalar :: TExpr Float -> TExpr (LM Float Float)
 lmScalar f = Call (LMFun "lmScalar") f
 
@@ -41,6 +46,8 @@ isLMZero (Call (LMFun "lmZero") _) = True
 isLMZero _ = False
 
 gradSelFun :: Int -> Int -> Expr
+-- (gradSelFun i n) selects the i'th component of a n-tuple
+-- Special case for 1-tuples
 -- Result expr has type (t1, ..., tn) -o ti
 gradSelFun i 1 = lmOne
 gradSelFun i n = Call (GradFun (SelFun i n) Fwd) (Tuple [])
