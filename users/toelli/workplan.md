@@ -84,7 +84,7 @@ proposed order in which they are to be accomplished.
 * Input programs
 
   Implementations of the following in "Source language" can be
-  successfully compiled and run
+  successfully differentiated, compiled and run
 
   1. Gaussian mixture model
   2. GMM, bundle adjustment
