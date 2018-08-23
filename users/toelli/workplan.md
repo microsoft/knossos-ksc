@@ -51,7 +51,7 @@ All the milestones require that the IR is implemented.
 
 * Input programs: GMM
 * Source language: embedded IR
-* IR serialisation: not defined
+* IR concrete syntax: not defined
 * Rewrite rules: with Haskell/F# pattern matching
 * Rewrite engine: none
 * Target language: interpreter
@@ -60,7 +60,7 @@ All the milestones require that the IR is implemented.
 
 * Input programs: GMM, BA, HT, LSTM
 * Source language: F#
-* IR serialisation: defined
+* IR concrete syntax: defined
 * Rewrite rules: with Haskell/F# pattern matching
 * Rewrite engine: hand coded
 * Target language: `.c`
@@ -69,7 +69,7 @@ All the milestones require that the IR is implemented.
 
 * Input programs: GMM, BA, HT, LSTM
 * Source language: F#
-* IR serialisation: defined
+* IR concrete syntax: defined
 * Rewrite rules: with Haskell/F# pattern matching
 * Rewrite engine: machine learned
 * Target language: `.c` in destination passing style
@@ -96,7 +96,7 @@ proposed order in which they are to be accomplished.
   The source language is
 
   1. the embedded IR
-  2. a well defined serialisation of IR (`.ks`, "Knossos file") (see below)
+  2. a well defined concrete syntax for the IR (`.ks`, "Knossos file") (see below)
   3. Subset of Haskell (no easier than subset of F# but less desirable
   so most likely will be skipped)
   4. F# (or rather a subset called "[F
@@ -113,9 +113,9 @@ proposed order in which they are to be accomplished.
   * lambda
   * array map
 
-* IR serialisation
+* IR concrete syntax
 
-  The serialisation format of the intermediate representation,
+  The concrete syntax format of the intermediate representation,
   i.e. the concrete syntax of `.ks` source files, is
 
   1. not defined
