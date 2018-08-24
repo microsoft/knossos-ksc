@@ -1,0 +1,143 @@
+\documentclass{article}
+
+\usepackage{color}
+\usepackage{listings}
+\lstset{
+  mathescape=true
+}
+\usepackage{amssymb}
+
+\renewcommand{\to}{\rightarrow}    % ->
+\newcommand{\linto}{\multimap}   % -o
+\newcommand{\grad}[1]{\nabla\! f}  % Full Jacobian
+\newcommand{\fwdD}[1]{f'}  % Forward derivative, f'
+\newcommand{\revD}[1]{f`}  % Reverse derivative, f`
+
+
+\begin{document}
+
+
+\section{Basic setup}
+
+$$
+\begin{array}{lrcl}
+  \mbox{Original function}   & f        & : & S \to T \\
+  \mbox{Full Jacobian}       & \grad{f} & : & S \to (S \linto T) \\
+  \mbox{Forward derivative}  & \fwdD{f} & : & S \to S \to T \\
+  \mbox{Reverse derivative}  & \revD{f} & : & S \to T \to S \\
+\end{array}
+$$
+
+\begin{lstlisting}
+  f x = x
+  g y = let v = 3 $\circ$ 7
+            w = 4
+            t = 7
+        in wueble
+\end{lstlisting}
+\end{document}
+
+
+"The full Jacobian"If           f : S→T
+then  ∇f :S→(S⊸T)
+
+Forward mode:
+f^′:S→S→T
+f^′ x dx=∇f(x)⋆dx
+
+Backward mode
+f` :S→T→S
+f` x dr=(∇f(x))^⊤⋆dr
+
+The API of linear maps S⊸T
+Apply:      (⋆)  :(s⊸t)→s→t
+Compose:(∘)  : (s⊸t)→(r⊸s)→(r⊸t)
+Transpose:  ∎^⊤  :  (s⊸t)→(t⊸s)
+Pairing:       ( ,)  :Field s⇒ (s⊸t_1 )→(s⊸t_2 )→(s⊸(t_1, t_2 ))    -- vertical concat [J1; J2]Joining:      (⋈)  :Field t⇒ (s_1⊸t)→(s_2⊸t)→((s_1,s_2)⊸t))   -- horizontal concat [J1 | J2]Adding:      (+)  :Field t⇒(s⊸t)→ (s⊸t)→ (s⊸t)
+Zero:  0 :Field t⇒ s⊸t
+Unit:  1 :s⊸s
+Scalar:   Scalar :Field s⇒s→(s⊸s)
+
+Conal says
+	• (,) is what he calls "fork", and Control.Arrow calls (&&&).Moreover, if you think of the realisation of linear maps as matrices, then (,) is vertical juxtaposition
+	
+	• (⋈)  is what he calls "join", and Control.Arrow calls (|||).Moreoer, in the matrix interpretation, (⋈)  is horizontal juxatposition.
+
+I am not sure if "Field" is the right term here, but let's write down the operations we need.  Tom thinks we do not need (*):
+	class Field a where
+		  zero∷a
+		  one∷a
+		  (+)∷a→a→a
+		  (∗)∷a→a→a
+		  fromInteger∷Integer →a
+		
+
+Laws of linear maps
+Scalar(a)⋆x=a∗x
+(m_1 〖∘m〗_2 )⋆x= m_1⋆ (m_2⋆x)
+(m_1, m_2 )⋆x=(m_1⋆x, m_2⋆x)
+(m_1⋈m_2 )⋆p=〖(m〗_1⋆fst(p))+(m_2⋆snd(p))
+(m_1 〖+ m〗_2 )⋆x=〖(m〗_1⋆x)+(m_2⋆x)
+
+0⋆x=0
+1⋆x=x
+
+0∘m=m∘0=0
+1∘m=m∘1=m
+
+m ∘ (n_1⋈ n_2 )=(m∘n_1 )⋈(m∘n_2 )
+(m_1⋈m_2 )  ∘ (n_1,n_2 )=(m_1 〖∘n〗_1 )+(m_2 〖∘n〗_2 )
+	This one seems to come up in practice, and led us to add (+) on linear maps
+	
+Scalar(x)+Scalar(y)=Scalar(x+y)
+Scalar(x)∘Scalar(y)=Scalar( x∗y )
+
+(0,0)=0
+
+0^⊤=0
+1^⊤=1
+(Scalar(f))^⊤=Scalar(f)
+(m_1 〖,m〗_2 )^⊤= 〖m_1〗^⊤⋈〖m_2〗^⊤
+(m_1 〖⋈m〗_2 )^⊤=(m_1^⊤,m_2^⊤ )
+(m_1 〖∘m〗_2 )^⊤= m_2^⊤  ∘m_1^⊤
+〖(m^⊤)〗^⊤=m
+
+
+Primitives
+∇ +  :(Float,Float)→((Float,Float)  ⊸Float)
+∇+(p,q)=1⋈1
+
+∇∗  :(Float,Float)→((Float,Float)  ⊸Float)
+∇∗(p,q)=Scalar(q)⋈Scalar(p)
+
+∇"fst" :(S,T)→((S,T)⊸S)
+∇fst(p,q)= 1⋈0
+
+Syntax of the language
+
+f, g, h∷=names of functions
+x,y,x∷=names of variables
+∇f, ∇x∷=names of gradified versions of f,x
+k∷=literal constants
+
+pgm∷=def_1… def_n
+def∷=fun f(x)=e
+e∷=k        | x         | f(e)           | (e_1 〖, e〗_2)
+         | let x=e_1  in e_2
+
+
+Computing grad
+
+Definitions
+∇⟦fun f(x)=e⟧=      fun ∇f(x)=let ∇x=1 in ∇⟦e⟧
+
+Expressions
+Invariant: If e :T, and there exists S that for each free variable p:P in e, we have ∇p :S ⊸P
+ then ∇⟦e⟧  :S⊸T, 
+
+∇⟦k⟧=0
+∇⟦x⟧=∇x
+∇⟦(e_1 〖, e〗_2)⟧=(∇⟦e_1 ⟧ 〖,∇ ⟦e_2 ⟧〗_ )
+∇⟦f(e)⟧=∇f(e)∘ ∇⟦e⟧
+∇⟦let y=e_1  in e_2 ⟧=  let y=e_(1 )  in                                          let ∇y=∇⟦e_1 ⟧  in
+                                          ∇⟦e_2 ⟧
