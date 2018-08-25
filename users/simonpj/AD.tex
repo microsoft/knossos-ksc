@@ -1,143 +1,195 @@
-\documentclass{article}
+\documentclass[sigplan]{acmart}
 
 \usepackage{color}
+\usepackage{stmaryrd}  % double brackets
 \usepackage{listings}
 \lstset{
   mathescape=true
 }
 \usepackage{amssymb}
 
+\renewcommand{\arraystretch}{1.2}
+
 \renewcommand{\to}{\rightarrow}    % ->
-\newcommand{\linto}{\multimap}   % -o
-\newcommand{\grad}[1]{\nabla\! f}  % Full Jacobian
-\newcommand{\fwdD}[1]{f'}  % Forward derivative, f'
-\newcommand{\revD}[1]{f`}  % Reverse derivative, f`
+\newcommand{\linto}{\multimap}     % -o
+\newcommand{\grad}[1]{\nabla\lb \, #1 \, \rb}  % grad[#1]
+\newcommand{\gradf}[1]{\nabla\! #1}  % Full Jacobian
+\newcommand{\fwdDf}[1]{f'}  % Forward derivative, f'
+\newcommand{\revDf}[1]{f`}  % Reverse derivative, f`
+\newcommand{\lb}{\llbracket}
+\newcommand{\rb}{\rrbracket}
 
 
+\newcommand{\typ}[2]{#1 \! : \! #2}  % x:S, with less horizontal whitespace
+
+\renewcommand{\dot}{.\,}               % dot with some space after
+\newcommand{\real}{\mathbb{R}}       % R, the reals
+\newcommand{\nat}{\mathbb{N}}        % N, the natural numbers
+\newcommand{\darrow}{\Rightarrow}    % =>
+
+% Linear maps
+\newcommand{\lmapply}{\odot}   % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
+\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
+\newcommand{\lmtrans}[1]{#1^{\top}}   % Trnaspose (takes an argument)
+\newcommand{\lmpair}{\times}         % Infix pairing
+\newcommand{\lmjoin}{\bowtie}        % Infix join
+\newcommand{\lmzero}{\mathbf{0}}     % 0
+\newcommand{\lmone}{\mathbf{1}}      % 1
+\newcommand{\lmscalar}[1]{{\mathcal S}(#1)}      % S(k)
+\newcommand{\lmlam}[1]{{\mathcal L}(#1)}      % L(k)
+
+\newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 \begin{document}
 
 
-\section{Basic setup}
+% ------------------------------------
+\section{Linear maps}
+
+\begin{figure}
+\fbox{\begin{minipage}{\textwidth}
+{\bf Operations over linear maps}
+  $$
+  \begin{array}{rr@{\hspace{2mm}}c@{\hspace{2mm}}ll}
+                 & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
+\hline
+    \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t) \\
+    \mbox{Compose} & (\lmcomp) & : & (s \linto t) \to (r \linto s) \to (r \linto t) \\
+    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1) \to (s \linto t_2) \to (s \linto (t_1,t_2)
+           & \mbox{Vertical juxtaposition} \\
+    \mbox{Join}  & (\lmjoin) & : & Field\; t \darrow (s_1 \linto t) \to (s_2 \linto t) \to ((s_1,s_2) \linto t) \\
+    \mbox{Sum}   & (+) & : & Field\; t \darrow (s \linto t) \to (s \linto t) \to (s \linto t) \\
+    \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
+    \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix}\\
+    \mbox{Scalar} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
+    \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
+    \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
+  \end{array}
+  $$
+  \vspace{2mm} \\
+{\bf Rules for application of linear maps}
+  $$
+  \begin{array}{rcl}
+    (m_1 \lmcomp m_2) \lmapply x  & = & m_1 \lmapply (m_2 \lmapply x) \\
+    (m_1 \lmpair m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
+    (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m \lmapply x_1) + (m \lmapply x_2) \\
+    (m_1 + m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
+    \lmzero \lmapply x  & = & 0 \\
+    \lmone \lmapply x & = & x \\
+    \lmscalar{k} \lmapply x & = & k * x \\
+    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
+   \end{array}    
+  $$    
+  \vspace{2mm} \\
+
+  {\bf Rules for transposition of linear maps}
+  $$
+  \begin{array}{rcl}
+    \lmtrans{m_1 \lmcomp m_2} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} \\
+    \lmtrans{m_1 \lmpair m_2} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
+    \lmtrans{m_1 \lmjoin m_2} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
+    \lmtrans{m_1 + m_2} & = & \lmtrans{m_1} + \lmtrans{m_2} \\
+    \lmtrans{\lmzero} & = & \lmzero \\
+    \lmtrans{\lmone} & = & \lmone \\
+    \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
+    \lmtrans{(\lmtrans{m})} & = & m \\
+    \lmtrans{\lmlam{f}} & = & ??? \\
+  \end{array}
+  $$
+%   \vspace{2mm} \\
+% 
+%   {\bf Laws for linear maps}
+%   $$
+%   \begin{array}{rcl}
+%     \lmzero \lmcomp m & = & \lmzero \\
+%     \lmone \lmcomp m & = & m \\
+%     m \lmcomp \lmzero & = & \lmzero \\
+%     m \lmcomp \lmone & = & m \\
+%     m \lmcomp (n_1 \lmjoin n_2) & = & (m \lmcomp n_1) \lmjoin (m \lmcomp n_2) \\
+%     (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) + (m_2 \lmcomp n_2) \\
+%     \lmscalar(k_1) \lmcomp \lmscalar(k_2) & = & lmscalar( k_1 * k_2 ) \\
+%     \lmscalar(k_1) + \lmscalar(k_2) & = & lmscalar( k_1 + k_2 ) \\
+%   \end{array}
+%   $$
+\end{minipage}}
+  \caption{Linear maps} \label{fig:linear-maps}
+\end{figure}
+
+A \emph{linear map}, $m : S \linto T$, is a function from $S$ to $T$,
+which can be applied to an argument of type $S$ with the $(\lmapply)$ operator
+(see Figure~\ref{fig:linear-maps}).
+
+Any function with these two properties is a linear map:
+$$
+\begin{array}{rrcl}
+  \forall \typ{x,y}{S} &  m \lmapply ((x+y) & = & m \lmapply x + m \lmapply y \\
+  \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
+\end{array}
+$$
+\simon{Do these fully define linear maps?}
+
+% ------------------------------------
+\section{The language}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\textwidth}
+$$
+      \begin{array}{rcll}
+        f,g,h & ::= & \multicolumn{2}{l}{\mbox{Function}} \\
+        x,y,z & ::= & \multicolumn{2}{l}{\mbox{Local variable (lambda-bound or let-bound)}} \\
+        k & ::= & \multicolumn{2}{l}{\mbox{Literal constants}} \\
+        \\
+        \mathit{pgm} & ::= & \mathit{def}_1 \ldots \mathit{def}_n \\
+        \mathit{def} & ::= & f\; x = e \\
+        e & ::= & k & \mbox{Constant} \\
+          & |   & x & \mbox{Local variable} \\
+          & |   & f \; e & \mbox{Function call} \\
+        & |   & (e_1,e_2) & \mbox{Pair} \\
+        & |   & \lambda x \dot e & \mbox{Lambda} \\
+        & |   & \lstinline|let $x$ = $e_1$ in $\;e_2$| \\
+      \end{array}
+ $$
+\end{minipage}}
+\caption{Syntax of the language} \label{fig:syntax}
+\end{figure}
+The syntax of our intermediate language is given in Figure~\ref{fig:syntax}.
+
+\simon{It's a bit odd to put in lambda without application;
+  but our lambdas are pretty restircted to just $\nat \to T$ functions.}
+
+
+\section{Automatic differentiation}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\textwidth}
+$$
+      \begin{array}{rcll}
+        \grad{k} & = & \lmzero \\
+        \grad{x} \rb & = & \gradf{x} \\
+        \grad{(e_1,e_2)} \rb & = & \grad{e_1} \lmpair \grad{e_2} \\
+        \grad{\lambda x \dot e} & = & \lmlam{\lambda x\dot \grad{e}} \\
+        \grad{f\;e} & = & \gradf{f} \lmcomp \grad{e} \\
+        \grad{\lstinline|let $x$ = $e_1$ in $\;e_2$|}
+        & = & \begin{array}[t]{l}
+           \lstinline|let $x\;$ = $\;e_1\;$ in| \\
+           \lstinline|let $\gradf{x}\;$ = $\;\grad{e_1}\;$ in| \\
+           \lstinline|$\grad{e_2}$|
+           \end{array}
+      \end{array}
+ $$
+\end{minipage}}
+\caption{Automatic differentiation} \label{fig:ad}
+\end{figure}
 
 $$
 \begin{array}{lrcl}
   \mbox{Original function}   & f        & : & S \to T \\
-  \mbox{Full Jacobian}       & \grad{f} & : & S \to (S \linto T) \\
-  \mbox{Forward derivative}  & \fwdD{f} & : & S \to S \to T \\
-  \mbox{Reverse derivative}  & \revD{f} & : & S \to T \to S \\
+  \mbox{Full Jacobian}       & \gradf{f} & : & S \to (S \linto T) \\
+  \mbox{Forward derivative}  & \fwdDf{f} & : & S \to S \to T \\
+  \mbox{Reverse derivative}  & \revDf{f} & : & S \to T \to S \\
 \end{array}
 $$
 
-\begin{lstlisting}
-  f x = x
-  g y = let v = 3 $\circ$ 7
-            w = 4
-            t = 7
-        in wueble
-\end{lstlisting}
 \end{document}
 
 
-"The full Jacobian"If           f : S→T
-then  ∇f :S→(S⊸T)
 
-Forward mode:
-f^′:S→S→T
-f^′ x dx=∇f(x)⋆dx
-
-Backward mode
-f` :S→T→S
-f` x dr=(∇f(x))^⊤⋆dr
-
-The API of linear maps S⊸T
-Apply:      (⋆)  :(s⊸t)→s→t
-Compose:(∘)  : (s⊸t)→(r⊸s)→(r⊸t)
-Transpose:  ∎^⊤  :  (s⊸t)→(t⊸s)
-Pairing:       ( ,)  :Field s⇒ (s⊸t_1 )→(s⊸t_2 )→(s⊸(t_1, t_2 ))    -- vertical concat [J1; J2]Joining:      (⋈)  :Field t⇒ (s_1⊸t)→(s_2⊸t)→((s_1,s_2)⊸t))   -- horizontal concat [J1 | J2]Adding:      (+)  :Field t⇒(s⊸t)→ (s⊸t)→ (s⊸t)
-Zero:  0 :Field t⇒ s⊸t
-Unit:  1 :s⊸s
-Scalar:   Scalar :Field s⇒s→(s⊸s)
-
-Conal says
-	• (,) is what he calls "fork", and Control.Arrow calls (&&&).Moreover, if you think of the realisation of linear maps as matrices, then (,) is vertical juxtaposition
-	
-	• (⋈)  is what he calls "join", and Control.Arrow calls (|||).Moreoer, in the matrix interpretation, (⋈)  is horizontal juxatposition.
-
-I am not sure if "Field" is the right term here, but let's write down the operations we need.  Tom thinks we do not need (*):
-	class Field a where
-		  zero∷a
-		  one∷a
-		  (+)∷a→a→a
-		  (∗)∷a→a→a
-		  fromInteger∷Integer →a
-		
-
-Laws of linear maps
-Scalar(a)⋆x=a∗x
-(m_1 〖∘m〗_2 )⋆x= m_1⋆ (m_2⋆x)
-(m_1, m_2 )⋆x=(m_1⋆x, m_2⋆x)
-(m_1⋈m_2 )⋆p=〖(m〗_1⋆fst(p))+(m_2⋆snd(p))
-(m_1 〖+ m〗_2 )⋆x=〖(m〗_1⋆x)+(m_2⋆x)
-
-0⋆x=0
-1⋆x=x
-
-0∘m=m∘0=0
-1∘m=m∘1=m
-
-m ∘ (n_1⋈ n_2 )=(m∘n_1 )⋈(m∘n_2 )
-(m_1⋈m_2 )  ∘ (n_1,n_2 )=(m_1 〖∘n〗_1 )+(m_2 〖∘n〗_2 )
-	This one seems to come up in practice, and led us to add (+) on linear maps
-	
-Scalar(x)+Scalar(y)=Scalar(x+y)
-Scalar(x)∘Scalar(y)=Scalar( x∗y )
-
-(0,0)=0
-
-0^⊤=0
-1^⊤=1
-(Scalar(f))^⊤=Scalar(f)
-(m_1 〖,m〗_2 )^⊤= 〖m_1〗^⊤⋈〖m_2〗^⊤
-(m_1 〖⋈m〗_2 )^⊤=(m_1^⊤,m_2^⊤ )
-(m_1 〖∘m〗_2 )^⊤= m_2^⊤  ∘m_1^⊤
-〖(m^⊤)〗^⊤=m
-
-
-Primitives
-∇ +  :(Float,Float)→((Float,Float)  ⊸Float)
-∇+(p,q)=1⋈1
-
-∇∗  :(Float,Float)→((Float,Float)  ⊸Float)
-∇∗(p,q)=Scalar(q)⋈Scalar(p)
-
-∇"fst" :(S,T)→((S,T)⊸S)
-∇fst(p,q)= 1⋈0
-
-Syntax of the language
-
-f, g, h∷=names of functions
-x,y,x∷=names of variables
-∇f, ∇x∷=names of gradified versions of f,x
-k∷=literal constants
-
-pgm∷=def_1… def_n
-def∷=fun f(x)=e
-e∷=k        | x         | f(e)           | (e_1 〖, e〗_2)
-         | let x=e_1  in e_2
-
-
-Computing grad
-
-Definitions
-∇⟦fun f(x)=e⟧=      fun ∇f(x)=let ∇x=1 in ∇⟦e⟧
-
-Expressions
-Invariant: If e :T, and there exists S that for each free variable p:P in e, we have ∇p :S ⊸P
- then ∇⟦e⟧  :S⊸T, 
-
-∇⟦k⟧=0
-∇⟦x⟧=∇x
-∇⟦(e_1 〖, e〗_2)⟧=(∇⟦e_1 ⟧ 〖,∇ ⟦e_2 ⟧〗_ )
-∇⟦f(e)⟧=∇f(e)∘ ∇⟦e⟧
-∇⟦let y=e_1  in e_2 ⟧=  let y=e_(1 )  in                                          let ∇y=∇⟦e_1 ⟧  in
-                                          ∇⟦e_2 ⟧
