@@ -1,4 +1,6 @@
-\documentclass[sigplan]{acmart}
+
+\documentclass[sigplan,review]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \usepackage{color}
 \usepackage{stmaryrd}  % double brackets
@@ -41,22 +43,29 @@
 \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 \begin{document}
 
+\title{Autommatic differentation in Coconut}
+\author{Tom Ellis}
+\author{Simon Peyton Jones}
+\author{Andrew Fitzbiggon}
+
+\maketitle
 
 % ------------------------------------
 \section{Linear maps}
 
-\begin{figure}
+\begin{figure*}
 \fbox{\begin{minipage}{\textwidth}
-{\bf Operations over linear maps}
   $$
   \begin{array}{rr@{\hspace{2mm}}c@{\hspace{2mm}}ll}
                  & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
 \hline
     \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t) \\
     \mbox{Compose} & (\lmcomp) & : & (s \linto t) \to (r \linto s) \to (r \linto t) \\
-    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1) \to (s \linto t_2) \to (s \linto (t_1,t_2)
+           & \mbox{Matrix multiplication} \\
+    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1) \to (s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
-    \mbox{Join}  & (\lmjoin) & : & Field\; t \darrow (s_1 \linto t) \to (s_2 \linto t) \to ((s_1,s_2) \linto t) \\
+    \mbox{Join}  & (\lmjoin) & : & Field\; t \darrow (s_1 \linto t) \to (s_2 \linto t) \to ((s_1,s_2) \linto t)
+           & \mbox{Horizontal juxtaposition} \\
     \mbox{Sum}   & (+) & : & Field\; t \darrow (s \linto t) \to (s \linto t) \to (s \linto t) \\
     \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
     \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix}\\
@@ -65,7 +74,12 @@
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
   \end{array}
   $$
-  \vspace{2mm} \\
+\end{minipage}}
+  \caption{Operations over linear maps} \label{fig:linear-maps}
+\end{figure*}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
 {\bf Rules for application of linear maps}
   $$
   \begin{array}{rcl}
@@ -79,15 +93,14 @@
     \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
    \end{array}    
   $$    
-  \vspace{2mm} \\
-
+\\[3mm]
   {\bf Rules for transposition of linear maps}
   $$
   \begin{array}{rcl}
-    \lmtrans{m_1 \lmcomp m_2} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} \\
-    \lmtrans{m_1 \lmpair m_2} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
-    \lmtrans{m_1 \lmjoin m_2} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
-    \lmtrans{m_1 + m_2} & = & \lmtrans{m_1} + \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} \\
+    \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
+    \lmtrans{(m_1 + m_2)} & = & \lmtrans{m_1} + \lmtrans{m_2} \\
     \lmtrans{\lmzero} & = & \lmzero \\
     \lmtrans{\lmone} & = & \lmone \\
     \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
@@ -95,23 +108,23 @@
     \lmtrans{\lmlam{f}} & = & ??? \\
   \end{array}
   $$
-%   \vspace{2mm} \\
-% 
-%   {\bf Laws for linear maps}
-%   $$
-%   \begin{array}{rcl}
-%     \lmzero \lmcomp m & = & \lmzero \\
-%     \lmone \lmcomp m & = & m \\
-%     m \lmcomp \lmzero & = & \lmzero \\
-%     m \lmcomp \lmone & = & m \\
-%     m \lmcomp (n_1 \lmjoin n_2) & = & (m \lmcomp n_1) \lmjoin (m \lmcomp n_2) \\
-%     (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) + (m_2 \lmcomp n_2) \\
-%     \lmscalar(k_1) \lmcomp \lmscalar(k_2) & = & lmscalar( k_1 * k_2 ) \\
-%     \lmscalar(k_1) + \lmscalar(k_2) & = & lmscalar( k_1 + k_2 ) \\
-%   \end{array}
-%   $$
-\end{minipage}}
-  \caption{Linear maps} \label{fig:linear-maps}
+\\[3mm]
+  {\bf Laws for linear maps}
+  $$
+  \begin{array}{rcl}
+    \lmzero \lmcomp m & = & \lmzero \\
+    \lmone \lmcomp m & = & m \\
+    m \lmcomp \lmzero & = & \lmzero \\
+    m \lmcomp \lmone & = & m \\
+    m \lmcomp (n_1 \lmjoin n_2) & = & (m \lmcomp n_1) \lmjoin (m \lmcomp n_2) \\
+    (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) + (m_2 \lmcomp n_2) \\
+    \lmscalar{k_1} \lmcomp \lmscalar{k_2} & = & \lmscalar{ k_1 * k_2 } \\
+    \lmscalar{k_1} + \lmscalar{k_2} & = & \lmscalar{ k_1 + k_2 } \\
+  \end{array}
+  $$
+    \end{minipage}
+    }
+    \caption{Laws for linear maps} \label{fig:lm-laws}
 \end{figure}
 
 A \emph{linear map}, $m : S \linto T$, is a function from $S$ to $T$,
@@ -125,13 +138,21 @@ $$
   \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
 \end{array}
 $$
-\simon{Do these fully define linear maps?}
+Questions
+\begin{itemize}
+\item Do we need $\lmone$; after all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float.
+\item Do these fully define linear maps?
+\end{itemize}
+Notes
+\begin{itemize}
+\item In practice we allow n-ary versions of $m \lmjoin n$ and $m \lmpair n$.
+\end{itemize}
 
 % ------------------------------------
 \section{The language}
 
 \begin{figure}
-  \fbox{\begin{minipage}{\textwidth}
+  \fbox{\begin{minipage}{\columnwidth}
 $$
       \begin{array}{rcll}
         f,g,h & ::= & \multicolumn{2}{l}{\mbox{Function}} \\
@@ -139,10 +160,10 @@ $$
         k & ::= & \multicolumn{2}{l}{\mbox{Literal constants}} \\
         \\
         \mathit{pgm} & ::= & \mathit{def}_1 \ldots \mathit{def}_n \\
-        \mathit{def} & ::= & f\; x = e \\
+        \mathit{def} & ::= & f(x) = e \\
         e & ::= & k & \mbox{Constant} \\
           & |   & x & \mbox{Local variable} \\
-          & |   & f \; e & \mbox{Function call} \\
+          & |   & f(e) & \mbox{Function call} \\
         & |   & (e_1,e_2) & \mbox{Pair} \\
         & |   & \lambda x \dot e & \mbox{Lambda} \\
         & |   & \lstinline|let $x$ = $e_1$ in $\;e_2$| \\
@@ -153,21 +174,25 @@ $$
 \end{figure}
 The syntax of our intermediate language is given in Figure~\ref{fig:syntax}.
 
-\simon{It's a bit odd to put in lambda without application;
+\begin{itemize}
+  \item \simon{It's a bit odd to put in lambda without application;
   but our lambdas are pretty restircted to just $\nat \to T$ functions.}
+  \item In practice we allow n-ary tuples, not just 2-tuples.
+\end{itemize}
 
 
 \section{Automatic differentiation}
 
 \begin{figure}
-  \fbox{\begin{minipage}{\textwidth}
+  \fbox{\begin{minipage}{\columnwidth}
+\bf{Dfferentiation of an expression} \\
 $$
       \begin{array}{rcll}
         \grad{k} & = & \lmzero \\
-        \grad{x} \rb & = & \gradf{x} \\
-        \grad{(e_1,e_2)} \rb & = & \grad{e_1} \lmpair \grad{e_2} \\
+        \grad{x} & = & \gradf{x} \\
+        \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
+        \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
         \grad{\lambda x \dot e} & = & \lmlam{\lambda x\dot \grad{e}} \\
-        \grad{f\;e} & = & \gradf{f} \lmcomp \grad{e} \\
         \grad{\lstinline|let $x$ = $e_1$ in $\;e_2$|}
         & = & \begin{array}[t]{l}
            \lstinline|let $x\;$ = $\;e_1\;$ in| \\
@@ -175,21 +200,55 @@ $$
            \lstinline|$\grad{e_2}$|
            \end{array}
       \end{array}
- $$
+      $$
+      \vspace{2mm}
+      \bf{Built-in functions}
+      $$
+      \begin{array}{rcl}
+        \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\
+        \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\
+        \ldots
+        \end{array}
+      $$
 \end{minipage}}
 \caption{Automatic differentiation} \label{fig:ad}
 \end{figure}
 
+Automatic differentiation is described by Figure~\ref{fig:ad}.
 $$
-\begin{array}{lrcl}
-  \mbox{Original function}   & f        & : & S \to T \\
-  \mbox{Full Jacobian}       & \gradf{f} & : & S \to (S \linto T) \\
-  \mbox{Forward derivative}  & \fwdDf{f} & : & S \to S \to T \\
-  \mbox{Reverse derivative}  & \revDf{f} & : & S \to T \to S \\
+\begin{array}{ll}
+  \mbox{Original function}   & f : S \to T \\
+  & f(x) = e \\[2mm]
+  \mbox{Full Jacobian}       & \gradf{f}  :  S \to (S \linto T) \\
+  & \lstinline|$\gradf{f}(x)$ = let $\gradf{x}$ = $\lmone$ in $\grad{e}$| \\[2mm]
+  \mbox{Forward derivative}  & \fwdDf{f} : S \to S \to T \\
+  & \fwdDf{f}(x,dx) = \gradf{f} \lmapply  dx \\[2mm]
+  \mbox{Reverse derivative}  & \revDf{f} : S \to T \to S \\
+  & \revDf{f}(x,dr) = \lmtrans{(\gradf{f}(x))} \lmapply dr
 \end{array}
 $$
-
+Notes
+\begin{itemize}
+\item We must ANF-ise the fucntion before AD to avoid gratuitous duplication.
+  E.g.
+$$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{\grad{sqrt(x+(y*z))}} \\
+      & = & \gradf{sqrt}(x+(y*z)) \lmcomp \grad{x+(y*z)} \\
+      & = & \gradf{sqrt}(x+(y*z)) \lmcomp  \gradf{+}(x, y*z) \lmcomp (\grad{x} \lmpair \grad{y*z}) \\
+    & = & \gradf{sqrt}(x+(y*z)) \lmcomp \gradf{+}(x, y*z) \\
+    & & \lmcomp (\gradf{x} \lmpair (\gradf{*}(y,z) \lmcomp (\gradf{y} \lmpair \gradf{z}))) \\
+  \end{array}
+  $$
+  Note the duplication of $y*z$ in the result.
+\end{itemize}
 \end{document}
 
+do  C( s -o t) -> s -o C(t)
+un             -> C(s) -o t
 
+Given    m :: s -o (N -> t)
+Wanted   mt :: (N -> t) -o s
 
+L  :: (N -> (s -o t)) -> s -o (N -> t)
+Lt ::                 -> (N -> s) -o t
