@@ -18,19 +18,21 @@ lmAdds [] = lmZero
 lmAdds [x] = x
 lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
-lmScalar :: TExpr Float -> TExpr (LM Float Float)
-lmScalar f = Call (LMFun "lmScalar") f
+lmScale :: TExpr Float -> TExpr (LM Float Float)
+lmScale f = Call (LMFun "lmScale") f
 
 lmCompose :: TExpr (LM b c) -> TExpr (LM a b) -> TExpr (LM a c)
 lmCompose f g = Call (LMFun "lmCompose") (Tuple [f,g])
 
-lmPair :: [Expr] -> Expr
+lmVCat :: [Expr] -> Expr
+-- Written as "x" in the paper
 -- TExpr (LM a b1) -> TExpr (LM a b2) -> TExpr (LM a (b1,b2))
-lmPair fs = Call (LMFun "lmPair") (Tuple fs)
+lmVCat fs = Call (LMFun "lmVCat") (Tuple fs)
 
-lmCross :: [Expr] -> Expr
+lmHCat :: [Expr] -> Expr
+-- Written as "bow-tie" in the paper
 -- TExpr (LM a1 b) -> TExpr (LM a2 b) -> TExpr (LM (a1,a2) b)
-lmCross fs = Call (LMFun "lmCross") (Tuple fs)
+lmHCat fs = Call (LMFun "lmHCat") (Tuple fs)
 
 lmTranspose :: TExpr (LM a b) -> TExpr (LM b a)
 lmTranspose m = Call (LMFun "lmTranspose") m

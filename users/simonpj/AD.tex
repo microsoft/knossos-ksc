@@ -14,12 +14,13 @@
 
 \renewcommand{\to}{\rightarrow}    % ->
 \newcommand{\linto}{\multimap}     % -o
-\newcommand{\grad}[1]{\nabla\lb \, #1 \, \rb}  % grad[#1]
-\newcommand{\gradf}[1]{\nabla\! #1}  % Full Jacobian
+\newcommand{\grad}[1]{\nabla\lb #1 \rb}  % grad[#1]
+\newcommand{\gradf}[1]{\nabla\! \mathit{#1}}  % Full Jacobian
 \newcommand{\fwdDf}[1]{f'}  % Forward derivative, f'
 \newcommand{\revDf}[1]{f`}  % Reverse derivative, f`
 \newcommand{\lb}{\llbracket}
 \newcommand{\rb}{\rrbracket}
+\newcommand{\fst}{\mathit{fst}}
 
 
 \newcommand{\typ}[2]{#1 \! : \! #2}  % x:S, with less horizontal whitespace
@@ -46,7 +47,7 @@
 \title{Autommatic differentation in Coconut}
 \author{Tom Ellis}
 \author{Simon Peyton Jones}
-\author{Andrew Fitzbiggon}
+\author{Andrew Fitzgibbon}
 
 \maketitle
 
@@ -60,7 +61,7 @@
                  & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
 \hline
     \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t) \\
-    \mbox{Compose} & (\lmcomp) & : & (s \linto t) \to (r \linto s) \to (r \linto t) \\
+    \mbox{Compose} & (\lmcomp) & : & (s \linto t) \to (r \linto s) \to (r \linto t)
            & \mbox{Matrix multiplication} \\
     \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1) \to (s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
@@ -69,7 +70,7 @@
     \mbox{Sum}   & (+) & : & Field\; t \darrow (s \linto t) \to (s \linto t) \to (s \linto t) \\
     \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
     \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix}\\
-    \mbox{Scalar} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
+    \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
     \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
   \end{array}
@@ -85,19 +86,19 @@
   \begin{array}{rcl}
     (m_1 \lmcomp m_2) \lmapply x  & = & m_1 \lmapply (m_2 \lmapply x) \\
     (m_1 \lmpair m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
-    (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m \lmapply x_1) + (m \lmapply x_2) \\
+    (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
     (m_1 + m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
     \lmzero \lmapply x  & = & 0 \\
     \lmone \lmapply x & = & x \\
     \lmscalar{k} \lmapply x & = & k * x \\
     \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
-   \end{array}    
-  $$    
+   \end{array}
+  $$
 \\[3mm]
   {\bf Rules for transposition of linear maps}
   $$
-  \begin{array}{rcl}
-    \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} \\
+  \begin{array}{rcll}
+    \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
     \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
     \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
     \lmtrans{(m_1 + m_2)} & = & \lmtrans{m_1} + \lmtrans{m_2} \\
@@ -138,9 +139,12 @@ $$
   \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
 \end{array}
 $$
+
+A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n \times m}$ with $n$ rows and $m$ columns.
+
 Questions
 \begin{itemize}
-\item Do we need $\lmone$; after all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float.
+\item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float.
 \item Do these fully define linear maps?
 \end{itemize}
 Notes
@@ -164,9 +168,9 @@ $$
         e & ::= & k & \mbox{Constant} \\
           & |   & x & \mbox{Local variable} \\
           & |   & f(e) & \mbox{Function call} \\
-        & |   & (e_1,e_2) & \mbox{Pair} \\
-        & |   & \lambda x \dot e & \mbox{Lambda} \\
-        & |   & \lstinline|let $x$ = $e_1$ in $\;e_2$| \\
+          & |   & (e_1,e_2) & \mbox{Pair} \\
+          & |   & \lambda x \dot e & \mbox{Lambda} \\
+          & |   & \mbox{\lstinline|let $x$ = $e_1$ in $\;e_2$|} \\
       \end{array}
  $$
 \end{minipage}}
@@ -185,7 +189,7 @@ The syntax of our intermediate language is given in Figure~\ref{fig:syntax}.
 
 \begin{figure}
   \fbox{\begin{minipage}{\columnwidth}
-\bf{Dfferentiation of an expression} \\
+\bf{Differentiation of an expression} \\
 $$
       \begin{array}{rcll}
         \grad{k} & = & \lmzero \\
@@ -193,11 +197,11 @@ $$
         \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
         \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
         \grad{\lambda x \dot e} & = & \lmlam{\lambda x\dot \grad{e}} \\
-        \grad{\lstinline|let $x$ = $e_1$ in $\;e_2$|}
+        \grad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
         & = & \begin{array}[t]{l}
-           \lstinline|let $x\;$ = $\;e_1\;$ in| \\
-           \lstinline|let $\gradf{x}\;$ = $\;\grad{e_1}\;$ in| \\
-           \lstinline|$\grad{e_2}$|
+           \mbox{\lstinline|let $\;x\;$ = $\;e_1\;$ in|} \\
+           \mbox{\lstinline|let $\;\gradf{x}\;$ = $\;\grad{e_1}\;$ in|} \\
+           \mbox{\lstinline|$\grad{e_2}$|}
            \end{array}
       \end{array}
       $$
@@ -205,11 +209,15 @@ $$
       \bf{Built-in functions}
       $$
       \begin{array}{rcl}
+        \gradf{+}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
         \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\
+        \gradf{*}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
         \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\
+        \gradf{\fst}      & :: & (t,t) \to ((t,t) \linto t) \\
+        \gradf{\fst}(x) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\
         \ldots
         \end{array}
-      $$
+$$
 \end{minipage}}
 \caption{Automatic differentiation} \label{fig:ad}
 \end{figure}
@@ -220,10 +228,10 @@ $$
   \mbox{Original function}   & f : S \to T \\
   & f(x) = e \\[2mm]
   \mbox{Full Jacobian}       & \gradf{f}  :  S \to (S \linto T) \\
-  & \lstinline|$\gradf{f}(x)$ = let $\gradf{x}$ = $\lmone$ in $\grad{e}$| \\[2mm]
-  \mbox{Forward derivative}  & \fwdDf{f} : S \to S \to T \\
-  & \fwdDf{f}(x,dx) = \gradf{f} \lmapply  dx \\[2mm]
-  \mbox{Reverse derivative}  & \revDf{f} : S \to T \to S \\
+  & \mbox{\lstinline|$\gradf{f}(x)$ = let $\;\gradf{x}$ = $\lmone\;$ in $\;\grad{e}$|} \\[2mm]
+  \mbox{Forward derivative}  & \fwdDf{f} : (S,S) \to T \\
+  & \fwdDf{f}(x,dx) = \gradf{f}(x) \lmapply  dx \\[2mm]
+  \mbox{Reverse derivative}  & \revDf{f} : (S,T) \to S \\
   & \revDf{f}(x,dr) = \lmtrans{(\gradf{f}(x))} \lmapply dr
 \end{array}
 $$
@@ -235,7 +243,8 @@ $$
   \begin{array}{rcl}
     \multicolumn{3}{l}{\grad{sqrt(x+(y*z))}} \\
       & = & \gradf{sqrt}(x+(y*z)) \lmcomp \grad{x+(y*z)} \\
-      & = & \gradf{sqrt}(x+(y*z)) \lmcomp  \gradf{+}(x, y*z) \lmcomp (\grad{x} \lmpair \grad{y*z}) \\
+    & = & \gradf{sqrt}(x+(y*z)) \lmcomp  \gradf{+}(x, y*z) \\
+     && \lmcomp (\grad{x} \lmpair \grad{y*z}) \\
     & = & \gradf{sqrt}(x+(y*z)) \lmcomp \gradf{+}(x, y*z) \\
     & & \lmcomp (\gradf{x} \lmpair (\gradf{*}(y,z) \lmcomp (\gradf{y} \lmpair \gradf{z}))) \\
   \end{array}

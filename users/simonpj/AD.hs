@@ -23,7 +23,7 @@ gradE (Let v e1 e2) = Let v e1                 $
                       Let (gradV v) (gradE e1) $
                       gradE e2
 
-gradE (Tuple es) = lmPair (map gradE es)
+gradE (Tuple es) = lmVCat (map gradE es)
 
 gradD :: Def -> Def
 gradD (Def fun vars rhs)

@@ -23,6 +23,18 @@ ex2 = Def (Fun (SFun "f2")) [sx] $
       Let sz (pAdd (Var sx) (Var sy))  $
       pMul (Var sy) (Var sz)
 
+ex2a :: Def
+-- f2a x = let zt = let y1 = x*x in (y1, x + y1)
+--         let y2 = fst zt
+--         let z = snd zt
+--         in y * z
+ex2a = Def (Fun (SFun "f2")) [sx] $
+      Let szt (Let sy1 (pMul (Var sx) (Var sx)) $
+               Tuple [Var sy1, pAdd (Var sx) (Var sy1)]) $
+      Let sy2 (pFst (Var szt)) $
+      Let sz (pSnd (Var szt)) $
+      pMul (Var sy) (Var sz)
+
 ex3 :: Def
 -- h (x,y) = let z = x + y
 --           in y*z
@@ -60,7 +72,10 @@ sr = Simple "r"
 sv = Simple "v"
 sx = Simple "x"
 sy = Simple "y"
+sy1 = Simple "y1"
+sy2 = Simple "y2"
 sz = Simple "z"
+szt = Simple "zt"
 
 
 demo :: Def -> IO ()

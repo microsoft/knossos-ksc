@@ -64,21 +64,24 @@ isKZero :: Expr -> Bool
 isKZero (Konst KZero) = True
 isKZero _             = False
 
-data Def = Def Fun [Var] Expr  -- f x = e
+data DefX b = Def Fun [Var] (ExprX b)  -- f x = e
+
+type Def = DefX Var
 
 
 type TExpr ty = Expr
   -- The phantom parameter gives the type of
   -- the expresssion, for documentation purposes
 
-data Expr
+data ExprX b
   = Konst Konst
   | Var Var
-  | Call Fun Expr      -- f e
-  | Tuple [Expr]       -- (e1, ..., en)
-  | Let Var Expr Expr  -- let x = e1 in e2  (non-recursive)
-  | If Expr Expr Expr
+  | Call Fun (ExprX b)         -- f e
+  | Tuple [ExprX b]            -- (e1, ..., en)
+  | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
   deriving (Eq, Show)
+
+type Expr = ExprX Var
 
 data Value = VKonst Konst
 
@@ -104,10 +107,6 @@ seqExpr (Let v r b) x = v `seq` r `seqExpr` b `seqExpr` x
 seqExpr (Tuple es) x = Prelude.foldr seqExpr x es
 
 ------ Pretty printer ------
-
-parensIf ::  Bool -> Doc -> Doc
-parensIf True  = PP.parens
-parensIf False = id
 
 class Pretty p where
   ppr :: p -> Doc
@@ -137,16 +136,51 @@ instance Pretty Konst where
   ppr (KFloat f)   = PP.float f
   ppr KZero        = text "KZero"
 
+type Prec = Int
+ -- 0 => no need for parens
+ -- high => parenthesise everything
+
+precZero = 0
+precOne  = 1
+
 instance Pretty Expr where
-  ppr (Var v)       = ppr v
-  ppr (Konst k)     = ppr k
-  ppr (Call f e@(Tuple _)) = ppr f PP.<> ppr e
-  ppr (Call f e)           = ppr f PP.<> parensSp (ppr e)
-  ppr (Tuple es)    = parens (pprWithCommas es)
-  ppr (Let v e1 e2) = PP.vcat [ PP.text "let" PP.<+>
-                               (bracesSp $ PP.sep [ ppr v
-                                                  , PP.nest 2 (PP.text "=" PP.<+> ppr e1) ])
-                             , ppr e2 ]
+  ppr expr = pprExpr 0 expr
+
+pprExpr :: Prec -> Expr -> Doc
+pprExpr _  (Var v)   = ppr v
+pprExpr _ (Konst k)  = ppr k
+pprExpr p (Call f e) = pprCall p f e
+pprExpr _ (Tuple es) = parens (pprWithCommas es)
+pprExpr p (Let v e1 e2)
+  = parensIf p precZero $
+    PP.vcat [ PP.text "let" PP.<+>
+                (bracesSp $ PP.sep [ ppr v
+                                   , PP.nest 2 (PP.text "=" PP.<+> ppr e1) ])
+           , ppr e2 ]
+
+
+pprCall :: Prec -> Fun -> Expr -> Doc
+pprCall prec f (Tuple [e1,e2])
+  | Just prec' <- isInfix f
+  = parensIf prec prec' $
+    sep [ pprExpr prec' e1, ppr f <+> pprExpr prec' e2 ]
+
+pprCall _ f e@(Tuple {}) = ppr f PP.<> ppr e
+pprCall _ f e            = ppr f PP.<> parensSp (ppr e)
+
+isInfix :: Fun -> Maybe Prec
+isInfix (Fun (SFun s))
+  | s == "+" = Just precZero
+  | s == "-" = Just precZero
+  | s == "*" = Just precOne
+  | s == "/" = Just precOne
+isInfix _ = Nothing
+
+parensIf :: Prec -> Prec -> Doc -> Doc
+parensIf ctxt inner doc
+  | ctxt > inner = parens doc
+  | otherwise    = doc
+
 --  ppr p (If a b c)
 --      = sep [ PP.text "if"   PP.<+> ppr p a
 --            , PP.text "then" PP.<+> ppr p b
@@ -175,6 +209,8 @@ pprWithCommas ps = PP.sep (add_commas ps)
      add_commas [p]    = [ppr p]
      add_commas (p:ps) = ppr p PP.<> PP.comma : add_commas ps
 
+instance Pretty a => Pretty [a] where
+  ppr xs = PP.char '[' <> pprWithCommas xs <> PP.char ']'
 
 {-
 ------- Parser -------
