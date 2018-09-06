@@ -49,6 +49,9 @@ optFun (SelFun i _) (Tuple es)
   | i <= length es = Just (es !! (i-1))
 optFun (SFun "+") (Tuple [x, Konst KZero]) = Just x
 optFun (SFun "+") (Tuple [Konst KZero, y]) = Just y
+optFun (SFun "+") (Tuple [Tuple es1, Tuple es2])
+  | length es1 == length es2 = Just (Tuple (zipWith pAdd es1 es2))
+
 optFun (SFun "*") (Tuple [x, Konst KZero]) = Just (Konst KZero)
 optFun (SFun "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
 
@@ -125,28 +128,13 @@ optLM fun arg = Nothing
 
 ---------------
 optApply :: TExpr (LM a b) -> TExpr a -> Maybe (TExpr b)
-optApply (Var (Grad n Fwd)) _
-  = -- Suspicious to ignore the argument!!
-    -- Correct only for forward
-    Just $
-    Var (Drv n Fwd)
-
-optApply (Konst k) dx
-  = error ("applyToDx " ++ show k)
-
-optApply (Let (Simple n) rhs body) dx
-  = Just $
-    Let (Simple n) rhs $
-    lmApply body dx
-
-optApply (Let (Grad n fr) rhs body) dx
-  = Just $
-    Let (Grad n fr) rhs $
-    Let (Drv n fr)  (lmApply rhs dx) $
-    lmApply body dx
-
 optApply (Call f es) dx
   = optApplyCall f es dx
+
+optApply (Let v rhs body) dx
+  = Just $
+    Let v rhs $
+    lmApply body dx
 
 optApply e dx
   = Nothing
@@ -250,19 +238,28 @@ substE e = go M.empty e
   where
     go :: M.Map Var Expr -> ExprX (Int,Var) -> Expr
     go subst (Let (n,v) r b)
-      | n == 0                 = go subst b
-      | isTrivial r' || n == 1 = go (M.insert v r' subst) b
-      | otherwise              = Let v r' (go subst b)
+      | inline_me n v r' = go (M.insert v r' subst) b
+      | otherwise        = Let v r' (go subst b)
       where
         r' = go subst r
+
     go subst (Var v)
       = case M.lookup v subst of
           Just e  -> e
           Nothing -> Var v
+
     go subst (Konst k) = Konst k
     go subst (Call f e) = Call f (go subst e)
     go subst (Tuple es) = Tuple (map (go subst) es)
 
+inline_me :: Int -> Var -> Expr -> Bool
+inline_me n bndr rhs
+  | n==0            = True
+  | n==1            = True
+  | isTrivial rhs   = True
+  | Grad {} <- bndr = True
+  | otherwise       = False
+  
 isTrivial :: Expr -> Bool
 isTrivial (Tuple [])          = True
 isTrivial (Var {})            = True

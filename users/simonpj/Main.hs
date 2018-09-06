@@ -3,7 +3,9 @@ module Main where
 import Lang
 import Prim
 import AD
+import ANF
 import Opt
+import CSE
 
 ex1 :: Def
 -- f x = let y = x*x in x + y
@@ -83,8 +85,12 @@ demo def
   = do { banner "Original definition"
        ; display def
 
+       ; banner "Anf-ised original definition"
+       ; let (u1, anf_def) = anfD initialUniq def
+       ; display anf_def
+       
        ; banner "The full Jacobian (unoptimised)"
-       ; let grad_def = gradD def
+       ; let grad_def = gradD anf_def
        ; display grad_def
 
        ; banner "The full Jacobian (optimised)"
@@ -98,6 +104,12 @@ demo def
        ; banner "Forward-mode derivative (optimised)"
        ; let opt_der_fwd = optD der_fwd
        ; display opt_der_fwd
+
+       ; banner "Forward-mode derivative (CSE'd)"
+       ; let (_, anf_fwd) = anfD u1 opt_der_fwd
+             cse_fwd      = cseD anf_fwd
+             opt_cse_fwd  = optD cse_fwd
+       ; display opt_cse_fwd
 
        ; banner "Transposed Jacobian"
        ; let trans_grad_def = transposeD opt_grad_def
@@ -114,6 +126,12 @@ demo def
        ; banner "Reverse-mode derivative (optimised)"
        ; let opt_der_rev = optD der_rev
        ; display opt_der_rev
+
+       ; banner "Reverse-mode derivative (CSE'd)"
+       ; let (_, anf_rev) = anfD u1 opt_der_rev
+             cse_rev      = cseD anf_rev
+             opt_cse_rev  = optD cse_rev
+       ; display opt_cse_rev
        }
 
 

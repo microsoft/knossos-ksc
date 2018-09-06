@@ -29,7 +29,7 @@ data FunId = SelFun     -- Selector function: fst, snd etc
                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                Int      -- Arity
            | SFun String  -- For now
-           deriving( Eq, Show )
+           deriving( Eq, Ord, Show )
 
 data ADMode = Fwd | Rev
             deriving( Eq, Ord, Show )
@@ -44,7 +44,7 @@ data Fun = Fun     FunId         -- The function              f(x)
          | DrvFun  FunId ADMode  -- Derivative derivative f'(x,dx)
                                  --   Rev <=> reverse mode f`(x,dr)
          | LMFun   String        -- Linear map
-         deriving( Eq, Show )
+         deriving( Eq, Ord, Show )
 
 data Var
   = Simple  String         -- x
@@ -52,13 +52,12 @@ data Var
                            -- or backward versions of f
   | Grad    String ADMode  -- \nabla x
                            --   True <=> transposed \bowtie x
-  | Drv     String ADMode  -- Let-bound variations (\nabla v `apply` dx)
   deriving( Show, Eq, Ord )
 
 data Konst = KZero  -- Of any type
            | KInteger Integer
            | KFloat   Float
-           deriving( Eq, Show )
+           deriving( Eq, Ord, Show )
 
 isKZero :: Expr -> Bool
 isKZero (Konst KZero) = True
@@ -79,7 +78,7 @@ data ExprX b
   | Call Fun (ExprX b)         -- f e
   | Tuple [ExprX b]            -- (e1, ..., en)
   | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 type Expr = ExprX Var
 
@@ -112,12 +111,10 @@ class Pretty p where
   ppr :: p -> Doc
 
 instance Pretty Var where
-  ppr (Simple s)     = PP.text s
-  ppr (Delta s)      = PP.text ('d' : s)
+  ppr (Simple s)   = PP.text s
+  ppr (Delta s)    = PP.text ('d' : s)
   ppr (Grad s Fwd) = PP.text ('D' : s)
   ppr (Grad s Rev) = PP.text ('R' : s)
-  ppr (Drv s Fwd)  = PP.text ('v' : s)
-  ppr (Drv s Rev)  = PP.text ('r' : s)
 
 instance Pretty FunId where
   ppr (SFun s)     = PP.text s
@@ -140,8 +137,9 @@ type Prec = Int
  -- 0 => no need for parens
  -- high => parenthesise everything
 
-precZero = 0
-precOne  = 1
+precZero = 0  -- Base
+precOne  = 1  -- +
+precTwo  = 2  -- *
 
 instance Pretty Expr where
   ppr expr = pprExpr 0 expr
@@ -170,16 +168,17 @@ pprCall _ f e            = ppr f PP.<> parensSp (ppr e)
 
 isInfix :: Fun -> Maybe Prec
 isInfix (Fun (SFun s))
-  | s == "+" = Just precZero
-  | s == "-" = Just precZero
-  | s == "*" = Just precOne
-  | s == "/" = Just precOne
+  | s == "+" = Just precOne
+  | s == "-" = Just precOne
+  | s == "*" = Just precTwo
+  | s == "/" = Just precTwo
 isInfix _ = Nothing
 
 parensIf :: Prec -> Prec -> Doc -> Doc
 parensIf ctxt inner doc
-  | ctxt > inner = parens doc
-  | otherwise    = doc
+  | ctxt == precZero = doc
+  | ctxt >= inner    = parens doc
+  | otherwise        = doc
 
 --  ppr p (If a b c)
 --      = sep [ PP.text "if"   PP.<+> ppr p a
