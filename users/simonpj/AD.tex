@@ -14,14 +14,17 @@
 
 \renewcommand{\to}{\rightarrow}    % ->
 \newcommand{\linto}{\multimap}     % -o
-\newcommand{\grad}[1]{\nabla\lb #1 \rb}  % grad[#1]
+\newcommand{\grad}[1]{\nabla_S\lb #1 \rb}  % grad[#1]
 \newcommand{\gradf}[1]{\nabla\! \mathit{#1}}  % Full Jacobian
+\newcommand{\gradft}[1]{\Delta\mathit{#1}}  % Full Jacobian
 \newcommand{\fwdDf}[1]{f'}  % Forward derivative, f'
 \newcommand{\revDf}[1]{f`}  % Reverse derivative, f`
 \newcommand{\lb}{\llbracket}
 \newcommand{\rb}{\rrbracket}
-\newcommand{\fst}{\mathit{fst}}
-
+\newcommand{\sel}[2]{\pi_{#1,#2}}
+\newcommand{\iffun}{\mathit{if}}
+\newcommand{\buildfun}{\mathit{build}}
+\renewcommand{\vector}[1]{Vec\;#1}
 
 \newcommand{\typ}[2]{#1 \! : \! #2}  % x:S, with less horizontal whitespace
 
@@ -40,11 +43,13 @@
 \newcommand{\lmone}{\mathbf{1}}      % 1
 \newcommand{\lmscalar}[1]{{\mathcal S}(#1)}      % S(k)
 \newcommand{\lmlam}[1]{{\mathcal L}(#1)}      % L(k)
+\newcommand{\lmlamt}[1]{{\mathcal M}(#1)}     % Transposed lambda
+\newcommand{\lmbuild}{\mathcal B}             % Build linear map
 
 \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 \begin{document}
 
-\title{Autommatic differentation in Coconut}
+\title{Automatic differentation in Coconut}
 \author{Tom Ellis}
 \author{Simon Peyton Jones}
 \author{Andrew Fitzgibbon}
@@ -65,14 +70,16 @@
            & \mbox{Matrix multiplication} \\
     \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1) \to (s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
-    \mbox{Join}  & (\lmjoin) & : & Field\; t \darrow (s_1 \linto t) \to (s_2 \linto t) \to ((s_1,s_2) \linto t)
+    \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s) \to (t_2 \linto s) \to ((t_1,t_2) \linto s)
            & \mbox{Horizontal juxtaposition} \\
     \mbox{Sum}   & (+) & : & Field\; t \darrow (s \linto t) \to (s \linto t) \to (s \linto t) \\
     \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
     \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix}\\
     \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
-    \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
+    \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
+    \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
+    \mbox{Build}   & \lmbuild  & : & \nat \to (s \linto (\nat \to t)) \to (s \linto \vector{t}) \\
   \end{array}
   $$
 \end{minipage}}
@@ -92,6 +99,8 @@
     \lmone \lmapply x & = & x \\
     \lmscalar{k} \lmapply x & = & k * x \\
     \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
+    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
+    \lmbuild(n,m) \lmapply x & = & build(n, m \lmapply x) \\
    \end{array}
   $$
 \\[3mm]
@@ -106,7 +115,8 @@
     \lmtrans{\lmone} & = & \lmone \\
     \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
     \lmtrans{(\lmtrans{m})} & = & m \\
-    \lmtrans{\lmlam{f}} & = & ??? \\
+    \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
+    \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
   \end{array}
   $$
 \\[3mm]
@@ -129,23 +139,26 @@
 \end{figure}
 
 A \emph{linear map}, $m : S \linto T$, is a function from $S$ to $T$,
-which can be applied to an argument of type $S$ with the $(\lmapply)$ operator
-(see Figure~\ref{fig:linear-maps}).
-
-Any function with these two properties is a linear map:
+which can be applied to an argument of type $S$ with the $(\lmapply)$ operator,
+satisfying these two properties:
 $$
 \begin{array}{rrcl}
   \forall \typ{x,y}{S} &  m \lmapply ((x+y) & = & m \lmapply x + m \lmapply y \\
   \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
 \end{array}
 $$
+Linear maps can be built using the operators in (see Figure~\ref{fig:linear-maps}).
+
+\subsection{Matrix interpretation of linear maps}
 
 A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n \times m}$ with $n$ rows and $m$ columns.
 
-Questions
+\subsection{Questions about linear maps}
+
 \begin{itemize}
 \item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float.
-\item Do these fully define linear maps?
+\item Do these laws fully define linear maps?
+\item How do we transpose $\lmbuild$?
 \end{itemize}
 Notes
 \begin{itemize}
@@ -177,25 +190,60 @@ $$
 \caption{Syntax of the language} \label{fig:syntax}
 \end{figure}
 The syntax of our intermediate language is given in Figure~\ref{fig:syntax}.
-
+Note that
 \begin{itemize}
-  \item \simon{It's a bit odd to put in lambda without application;
-  but our lambdas are pretty restircted to just $\nat \to T$ functions.}
-  \item In practice we allow n-ary tuples, not just 2-tuples.
-\end{itemize}
+\item  Variables are divided into \emph{functions}, $f,g,h$; and \emph{local variables}, $x,y,z$,
+  which are either function arguments or let-bound.
+\item 
+  The language is first order.  Functions are defined at top level; functions always appear in a call, never (say) as an argument to a vunction; in a call $f(e)$, the function $f$ is always a top-level-defined function, never a local variable.
 
+\item Functions have exactly one argument. If you want more than one, pass a pair.
+
+  \item Conditionals are handled by a function $\iffun$.
+
+\item Pairs are built-in, with selectors $\sel{1}{2}, \sel{2}{2}$.
+  (In the real implementation, pairs are generalised to $n$-tuples.)
+
+\item Let-bindings are non-recursive. For now, at least, top-level
+  functions are also non-recursive.  \simon{I think that top-level
+    recursive functions might be OK, but I don't want to think about
+    that yet.}
+
+\item Lambda expressions are present, but without applications.
+  If you can't apply a lambda, how can it be useful?  Answer: (only) as the
+  argument to \lstinline|build| or \lstinline|fold|.
+  \end{itemize}
+\simon{But the rules for appliction in Figure~\ref{fig:lm-laws} involve applying those lambdas.  Ugh.}
 
 \section{Automatic differentiation}
 
 \begin{figure}
   \fbox{\begin{minipage}{\columnwidth}
-\bf{Differentiation of an expression} \\
+$$
+\begin{array}{ll}
+  \mbox{\bf Original function}   & f : S \to T \\
+  & f(x) = e \\[2mm]
+  \mbox{\bf Full Jacobian}       & \gradf{f}  :  S \to (S \linto T) \\
+  & \mbox{\lstinline|$\gradf{f}(x)$ = let $\;\gradf{x}$ = $\lmone\;$ in $\;\grad{e}$|} \\[2mm]
+  \mbox{\bf Transposed Jacobian}   & \gradft{f}  :  S \to (T \linto S) \\
+  & \mbox{\lstinline|$\gradft{f}(x)$ =  $\lmtrans{(\gradf{f}(x))}$|}  \\[2mm]
+  \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,S) \to T \\
+  & \fwdDf{f}(x,dx) = \gradf{f}(x) \lmapply  dx \\[2mm]
+  \mbox{\bf Reverse derivative}  & \revDf{f} : (S,T) \to S \\
+  & \revDf{f}(x,dr) = \gradft{f}(x) \lmapply dr
+\end{array}
+$$
+      {\bf Differentiation of an expression} \\
+      \begin{center}
+        If $e :: T$ then $\grad{e} :: S \linto T$
+      \end{center}
 $$
       \begin{array}{rcll}
         \grad{k} & = & \lmzero \\
         \grad{x} & = & \gradf{x} \\
         \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
         \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
+        \grad{\buildfun(e_n,e)} & = & \lmbuild(e_n, \grad{e}) \\
         \grad{\lambda x \dot e} & = & \lmlam{\lambda x\dot \grad{e}} \\
         \grad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
         & = & \begin{array}[t]{l}
@@ -210,11 +258,14 @@ $$
       $$
       \begin{array}{rcl}
         \gradf{+}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
-        \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\
+        \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\[1mm]
         \gradf{*}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
-        \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\
-        \gradf{\fst}      & :: & (t,t) \to ((t,t) \linto t) \\
-        \gradf{\fst}(x) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\
+        \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\[1mm]
+        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
+        \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[1mm]
+        \gradf{\iffun} & :: & (Bool,r,r) \to (((Bool,r,r) \linto r)) \\
+        \gradf{\iffun}(True,t,f) & = & \lmzero \lmjoin \lmone \lmjoin \lmzero \\
+        \gradf{\iffun}(False,t,f) & = & \lmzero \lmjoin \lmzero \lmjoin \lmone \\
         \ldots
         \end{array}
 $$
@@ -222,22 +273,41 @@ $$
 \caption{Automatic differentiation} \label{fig:ad}
 \end{figure}
 
-Automatic differentiation is described by Figure~\ref{fig:ad}.
-$$
-\begin{array}{ll}
-  \mbox{Original function}   & f : S \to T \\
-  & f(x) = e \\[2mm]
-  \mbox{Full Jacobian}       & \gradf{f}  :  S \to (S \linto T) \\
-  & \mbox{\lstinline|$\gradf{f}(x)$ = let $\;\gradf{x}$ = $\lmone\;$ in $\;\grad{e}$|} \\[2mm]
-  \mbox{Forward derivative}  & \fwdDf{f} : (S,S) \to T \\
-  & \fwdDf{f}(x,dx) = \gradf{f}(x) \lmapply  dx \\[2mm]
-  \mbox{Reverse derivative}  & \revDf{f} : (S,T) \to S \\
-  & \revDf{f}(x,dr) = \lmtrans{(\gradf{f}(x))} \lmapply dr
-\end{array}
-$$
-Notes
+To perform source-to-source AD of a function $f$, we follow the plan
+outlined in Figure~\ref{fig:ad}.  Specifically, starting with a
+function definition \lstinline|f(x) = e|:
+
 \begin{itemize}
-\item We must ANF-ise the fucntion before AD to avoid gratuitous duplication.
+\item Construct the full Jacobian $\gradf{f}$, and transposed full Jacobian $\gradft{f}$,
+  using the tranformations in Figure~\ref{fig:ad}.
+\item Optimise these two definitions, using the laws of linear maps
+  in Figure~\ref{fig:lm-laws}.
+\item Construct the forward derivative $\fwdDf{f}$ and reverse derivative $\revDf{f}$,
+  as shown in Figure~\ref{fig:ad}.
+\item Optimise these two definitions, to eliminate all linear maps. Specifically:
+  \begin{itemize}
+    \item Rather than \emph{calling} $\gradf{f}$ (in, say, $\fwdDf{f}$), instead \emph{inline} it.
+    \item Similarly, for each local let-binding for a linear map, of form \lstinline|let $\;\gradf{x}$ = $e\;$ in $b$|,
+      inline $\gradf{x}$ at each of its occurrences in $b$. This may duplicate $e$; but $\gradf{x}$ is a function
+      that may be applied (via $\lmapply$) to many different arguments, and we want to specialise it for each
+      such call.  (I think.)
+    \item Optimise using the rules of $(\lmapply)$ in Figure~\ref{fig:lm-laws}.
+    \item Use standard Common Subexpression Elimination (CSE)to recover any lost sharing.
+  \end{itemize}
+\end{itemize}
+
+Note that
+\begin{itemize}
+\item The transformation is fully compositional; each function can be AD'd independently.
+  For example, if a user-defined
+  fuction $f$ calls another user-defined function $g$, we construct $\gradf{g}$ as
+  described; and then construct $\gradf{f}$. The latter simply calls $\gradf{g}$.
+  
+\item We give the full Jacobian for some built-in functions in Figure~\ref{fig:ad}, including
+  for conditionals ($\gradf{\iffun}$).
+\end{itemize}
+
+We may want to ANF-ise before AD to avoid gratuitous duplication.
   E.g.
 $$
   \begin{array}{rcl}
@@ -249,8 +319,39 @@ $$
     & & \lmcomp (\gradf{x} \lmpair (\gradf{*}(y,z) \lmcomp (\gradf{y} \lmpair \gradf{z}))) \\
   \end{array}
   $$
-  Note the duplication of $y*z$ in the result.
+Note the duplication of $y*z$ in the result.
+Of course, CSE may recover it.
+
+\section{Implementation}
+
+The implementation differs from this document as follows:
+\begin{itemize}
+\item Rather than pairs, the implementation supports $n$-ary tuples.
+  Similary the linear maps $(\lmpair)$ and $\lmjoin$ are $n$-ary.
+\item Functions definitions can take $n$ arguments, thus
+  \begin{lstlisting}
+   f(x,y,z) = e
+  \end{lstlisting}
+  This is treated as equivalent to
+  \begin{lstlisting}
+    f(t) = let x = $\sel{1}{3}$(t)
+               y = $\sel{2}{3}$(t)
+               z = $\sel{3}{3}$(t)
+           in e
+  \end{lstlisting}
 \end{itemize}
+
+\section{Questions}
+
+\begin{itemize}
+\item Do we need to add $\buildfun$ and array indexing?  Why can't we just work in terms of
+  addition and multiplcation of vectors; and then use standard fusion to
+  optimise the forward and reverse derivative?
+
+\item We'll need sum/product of vectors.  What is $\gradf{sum}$ etc?
+
+\end{itemize}  
+
 \end{document}
 
 do  C( s -o t) -> s -o C(t)
