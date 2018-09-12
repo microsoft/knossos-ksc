@@ -139,7 +139,6 @@
 \end{figure}
 
 A \emph{linear map}, $m : S \linto T$, is a function from $S$ to $T$,
-which can be applied to an argument of type $S$ with the $(\lmapply)$ operator,
 satisfying these two properties:
 $$
 \begin{array}{rrcl}
@@ -147,6 +146,9 @@ $$
   \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
 \end{array}
 $$
+Here $(\lmapply) :: (s \linto t) \to (s \to t)$ is an operator that takes a linear map $(s \linto t)$,
+and an argument of type $s$, and applies the former to the latter.
+
 Linear maps can be built using the operators in (see Figure~\ref{fig:linear-maps}).
 
 \subsection{Matrix interpretation of linear maps}
@@ -305,9 +307,8 @@ Note that
   
 \item We give the full Jacobian for some built-in functions in Figure~\ref{fig:ad}, including
   for conditionals ($\gradf{\iffun}$).
-\end{itemize}
 
-We may want to ANF-ise before AD to avoid gratuitous duplication.
+\item We may want to ANF-ise before AD to avoid gratuitous duplication.
   E.g.
 $$
   \begin{array}{rcl}
@@ -321,6 +322,28 @@ $$
   $$
 Note the duplication of $y*z$ in the result.
 Of course, CSE may recover it.
+\end{itemize}
+
+\subsection{Build and lambda}
+
+I'm not happy with the story for build and lambda.
+
+It started well:
+\begin{itemize}
+\item The AD for build looks sensible.
+  Albeit I put a special case for $\grad{\buildfun(e_n,e)}$; and I did
+  an ad-hoc thing of not AD'ing the first argument to build, which
+  seems very arbitrary.  The AD's version of build uses $\lmbuild$, whose
+  signature is in Figure~\ref{fig:linear-maps}; and whose semantics is
+  defined by how it behaves when applied (Figure~\ref{fig:lm-laws}).
+  
+\item The AD for lambda (Figure~\ref{fig:ad}) looks sensible.  It generates
+  a new linear map $\lmlam$, whose
+  signature is in Figure~\ref{fig:linear-maps}; and whose semantics is
+  defined by how it behaves when applied (Figure~\ref{fig:lm-laws}).
+  
+\item
+\end{itemize}
 
 \section{Implementation}
 
