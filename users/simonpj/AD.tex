@@ -328,6 +328,9 @@ It has built-in functions (Figure~\ref{fig:built-in}):
 \item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
 \item $\indexfun{\cdot}{\cdot} :: (\vector{t},\; \nat) \to t$ for indexing.
 \item $\sumfun :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
+  \tom{I believe that for a vector $v$ of size $n$, $\sumfun v$ is the
+    same as $\lmbuildt(n, const~ id)~ v$.  This may or may not be useful
+    in reducing the size of the base language, should we want to do that.}
 \item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
 \item Arithmetic, $(*), (+)$ etc is overloaded to work over vectors, always elementwise.
 \end{itemize}
@@ -425,7 +428,11 @@ left-associated compositions, reverse-mode AD; and for all other associations, v
 But the forward/reverse difference shows up quite differently here: it has nothing to do
 with \emph{right-vs-left association}, and everything to do with \emph{transposition}.
 
-This is mysterious.  Conal is not usually wrong.  I would like to understand this better.
+This is mysterious.  Conal is not usually wrong.  I would like to
+understand this better.
+\tom{I was also puzzled by this.  Conal's claim is suspicious to me,
+  but firstly it's very cool and secondly it's Conal, so I want it to
+  be true and I still hope it is.}
 
 \subsection{Avoiding duplication}
 
@@ -443,6 +450,12 @@ $$
   $$
 Note the duplication of $y*z$ in the result.
 Of course, CSE may recover it.
+
+\tom{Yes, although when I say ``AD'' I mean something that is distinct
+  from what I mean by ``symbolic differentiation''.  In particular by
+  ``AD'' I mean something that preserves sharing in a way that
+  symbolic differentation doesn't.  Perhaps between us we should pin
+  down some terminology.}
 
 \subsection{AD for vectors}
 
@@ -659,6 +672,8 @@ $$
 where $i$ is a variable (of type $\nat$) that scopes over $e$.
 So $\buildfun(n)~ i~ e$ is what we have been writing $\buildfun(n, \lambda i.e)$.
 This looks simpler and more direct to me.
+\tom{Is there something to stop me writing $let f = \lambda i.e~ in~
+  \buildfun(n)~ i~ f(i)$ in an attempt to resurrect original behaviour?}
 
 \end{document}
 
