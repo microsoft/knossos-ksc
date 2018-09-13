@@ -461,6 +461,13 @@ Of course, CSE may recover it.
   down some terminology.} \simon{I don't understand this. Perhaps you can make
   it precise?}
 
+\tom{Consider $exp(exp(x))$.  I consider its ``symbolic derivative''
+  to be $exp(exp(x)) exp(x)$ and its ``forward automatic derivative''
+  to be $let~ y = exp(x)~ in~ exp(y) y$.  In other words, taking
+  proper care of sharing is what makes AD AD and not just any old form
+  of symbolic differentiation, in my personal nomenclature at least.
+  Does that make it any clearer what I mean?}
+
 \subsection{AD for vectors}
 
 Like other built-in functions, each built-in function for vectors
