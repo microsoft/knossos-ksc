@@ -331,6 +331,9 @@ It has built-in functions (Figure~\ref{fig:built-in}):
   \tom{I believe that for a vector $v$ of size $n$, $\sumfun v$ is the
     same as $\lmbuildt(n, const~ id)~ v$.  This may or may not be useful
     in reducing the size of the base language, should we want to do that.}
+  \simon{I don't think so!  $\lmbuildt$ is a linear map, so you can't apply it to $v$.
+    Maybe you mean $\lmbuildt(n, const~ id) \lmapply v$?  But that (Figure~\ref{fig:lm-laws}) is
+    defined using $\sumfun$!}
 \item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
 \item Arithmetic, $(*), (+)$ etc is overloaded to work over vectors, always elementwise.
 \end{itemize}
@@ -455,7 +458,8 @@ Of course, CSE may recover it.
   from what I mean by ``symbolic differentiation''.  In particular by
   ``AD'' I mean something that preserves sharing in a way that
   symbolic differentation doesn't.  Perhaps between us we should pin
-  down some terminology.}
+  down some terminology.} \simon{I don't understand this. Perhaps you can make
+  it precise?}
 
 \subsection{AD for vectors}
 
@@ -674,7 +678,10 @@ So $\buildfun(n)~ i~ e$ is what we have been writing $\buildfun(n, \lambda i.e)$
 This looks simpler and more direct to me.
 \tom{Is there something to stop me writing $let f = \lambda i.e~ in~
   \buildfun(n)~ i~ f(i)$ in an attempt to resurrect original behaviour?}
-
+\simon{Yes: $f(i)$ requires $f$ to be top level -- see Section 2.  But
+  the solution I adopted was not to have a new language construct, but
+  rather to differentiate only $\buildfun(n, \lambda i.e)$.  Any other
+  use of $\buildfun$ will fail.}
 \end{document}
 
 do  C( s -o t) -> s -o C(t)
