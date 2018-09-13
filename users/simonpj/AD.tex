@@ -297,7 +297,7 @@ $$
 \caption{Built-in functions} \label{fig:built-in}
 \end{figure}
 
-We assume built-in functions shown in Figure~\ref{fig:built-in}.
+The language has built-in functions shown in Figure~\ref{fig:built-in}.
 
 We allow ourselves to write functions infix where it is convenient.
 Thus $e_1 + e_2$ means the call $+(e1,e2)$, which applies the function $+$ to
@@ -316,6 +316,21 @@ $$
   & = & 0 & \mbox{otherwise}
 \end{array}
 $$
+
+\subsection{Vectors}
+
+The language supposts one-dimensional vectors, of type $\vector{T}$,
+whose elements have type $T$ (Figure~\ref{fig:syntax}).
+It has built-in functions (Figure~\ref{fig:built-in}):
+\begin{itemize}
+\item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
+\item $\indexfun{\cdot}{\cdot} :: (\vector{t},\; \nat) \to t$ for indexing.
+\item $\sumfun :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
+\item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
+\item Arithmetic, $(*), (+)$ etc is overloaded to work over vectors, always elementwise.
+\end{itemize}
+
+% --------------------------------------
 \section{Automatic differentiation}
 
 \begin{figure}
@@ -397,6 +412,19 @@ Note that
   for conditionals ($\gradf{\iffun}$).
 \end{itemize}
 
+\subsection{Forward and reverse AD}
+
+In \emph{``The essence of automatic differentiation''} Conal says (Section 12)
+\begin{quote}
+The AD algorithm derived in Section 4 and generalized in Figure 6 can be thought of as a family
+of algorithms. For fully right-associated compositions, it becomes forward mode AD; for fully
+left-associated compositions, reverse-mode AD; and for all other associations, various mixed modes.
+\end{quote}
+But the forward/reverse difference shows up quite differently here: it has nothing to do
+with \emph{right-vs-left association}, and everything to do with \emph{transposition}.
+
+This is mysterious.  Conal is not usually wrong.  I would like to understand this better.
+
 \subsection{Avoiding duplication}
 
 We may want to ANF-ise before AD to avoid gratuitous duplication.
@@ -414,27 +442,17 @@ $$
 Note the duplication of $y*z$ in the result.
 Of course, CSE may recover it.
 
-\subsection{Vectors}
+\subsection{AD for vectors}
 
-The language supposts one-dimensional vectors, of type $\vector{T}$,
-whose elements have type $T$ (Figure~\ref{fig:syntax}).
-It has built-in functions (Figure~\ref{fig:built-in}):
-\begin{itemize}
-\item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
-\item $\indexfun{\cdot}{\cdot} :: (\vector{t},\; \nat) \to t$ for indexing.
-\item $\sumfun :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
-\item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
-\item Arithmetic, $(*), (+)$ etc is overloaded to work over vectors, always elementwise.
-\end{itemize}
-All of these function have their full Jacobian versions, which are also
-defined in Figure~\ref{fig:built-in}.  
+Like other built-in functions, each built-in function for vectors
+has has its full Jacobian versions, defined in Figure~\ref{fig:built-in}.
 You may enjoy checking that $\gradf{\sumfun}$ and
 $\gradf{\indexfun{\cdot}{\cdot}}$ are correct!  I did think about having
 a specialised linear map for indexing, rather than using $\lmbuildt$,
 but then I needed its transposition, and that needed $\deltafun$ anyway.
 
 But $\buildfun$ is an exception!  It is handled specially
-by the AD transformation in Figure~\ref{fig:ad}; there is no $\gradfun{\buildfun}$.
+by the AD transformation in Figure~\ref{fig:ad}; there is no $\gradf{\buildfun}$.
 Moreover the AD transformation only works if the second argument of the build is
 a lambda, thus $\buildfun(e_n, \lambda i.e)$.  I tried dealing with build and
 lambdas separately, but failed (see Section~\ref{sec:build-lam-fail}).
@@ -464,6 +482,7 @@ This gives the clue that taking the derivative of $\mathit{fold}$ is
 not going to be easy, maybe infeasible!  Much depends on the
 particular lambda it appears.  So I have left out product, and made
 no attempt to do general folds.
+
 
 \section{Implementation}
 
