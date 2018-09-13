@@ -67,133 +67,6 @@
 \maketitle
 
 % ------------------------------------
-\section{Linear maps}
-
-\begin{figure*}
-\fbox{\begin{minipage}{\textwidth}
-  $$
-  \begin{array}{rr@{\hspace{2mm}}c@{\hspace{2mm}}ll}
-      & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
-      & &&& \mbox{where $s = \real^m$, and $t = \real^n$} \\
-\hline
-    \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t)
-           & \mbox{Matrix/vector multiplication} \\
-    \mbox{Compose} & (\lmcomp) & : & (s \linto t,\; r \linto s) \to (r \linto t)
-           & \mbox{Matrix/matrix multiplication} \\
-    \mbox{Sum}   & (\lmadd) & : & Field\; t \darrow (s \linto t,\; s \linto t) \to (s \linto t)
-           & \mbox{Matrix addition } \\
-    \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
-    \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix (square)}\\
-    \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
-    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
-           & \mbox{Vertical juxtaposition} \\
-    \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
-           & \mbox{Horizontal juxtaposition} \\
-    \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
-%     \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
-%     \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
-    \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{t}) \\
-    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) \\
-  \end{array}
-  $$
-\end{minipage}}
-  \caption{Operations over linear maps} \label{fig:linear-maps}
-\end{figure*}
-
-\begin{figure}
-  \fbox{\begin{minipage}{\columnwidth}
-{\bf Semantics of linear maps}
-  $$
-  \begin{array}{rcl}
-    (m_1 \lmcomp m_2) \lmapply x  & = & m_1 \lmapply (m_2 \lmapply x) \\
-    (m_1 \lmpair m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
-    (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
-    (m_1 \lmadd m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
-    \lmzero \lmapply x  & = & 0 \\
-    \lmone \lmapply x & = & x \\
-    \lmscalar{k} \lmapply x & = & k * x \\
-%    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
-%    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
-    \lmbuild(n,f) \lmapply x & = & build(n, \lambda i. (f\; i) \lmapply x) \\
-    \lmbuildt(n,f) \lmapply x & = & \sumfun\, \buildfun(n,\; \lambda i. (f\; i) \lmapply x[i] ) \\
-   \end{array}
-  $$
-\\[3mm]
-  {\bf Rules for transposition of linear maps}
-  $$
-  \begin{array}{rcll}
-    \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
-    \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
-    \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
-    \lmtrans{(m_1 \lmadd m_2)} & = & \lmtrans{m_1} \lmadd \lmtrans{m_2} \\
-    \lmtrans{\lmzero} & = & \lmzero \\
-    \lmtrans{\lmone} & = & \lmone \\
-    \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
-    \lmtrans{(\lmtrans{m})} & = & m \\
-    \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
-    \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
-%    \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
-%    \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
-  \end{array}
-  $$
-\\[3mm]
-  {\bf Laws for linear maps}
-  $$
-  \begin{array}{rcl}
-    \lmzero \lmcomp m & = & \lmzero \\
-    m \lmcomp \lmzero & = & \lmzero \\
-    \lmone \lmcomp m & = & m \\
-    m \lmcomp \lmone & = & m \\
-    m \lmadd \lmzero & = & m \\
-    \lmzero \lmadd m & = & m \\
-    m \lmcomp (n_1 \lmjoin n_2) & = & (m \lmcomp n_1) \lmjoin (m \lmcomp n_2) \\
-    (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
-    \lmscalar{k_1} \lmcomp \lmscalar{k_2} & = & \lmscalar{ k_1 * k_2 } \\
-    \lmscalar{k_1} \lmadd \lmscalar{k_2} & = & \lmscalar{ k_1 + k_2 } \\
-  \end{array}
-  $$
-    \end{minipage}
-    }
-    \caption{Laws for linear maps} \label{fig:lm-laws}
-\end{figure}
-
-A \emph{linear map}, $m : S \linto T$, is a function from $S$ to $T$,
-satisfying these two properties:
-$$
-\begin{array}{rrcl}
-  \forall \typ{x,y}{S} &  m \lmapply (x+y) & = & m \lmapply x + m \lmapply y \\
-  \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
-\end{array}
-$$
-Here $(\lmapply) :: (s \linto t) \to (s \to t)$ is an operator that applies a linear map $(s \linto t)$
-to an argument of type $s$.
-
-\begin{itemize}
-  \item Linear maps can be \emph{built} using the operators in (see Figure~\ref{fig:linear-maps}).
-  \item The \emph{semantics} of a linear map is completely specified by saying
-    what ordinary function it corresponds to; or, equivalently, by how it behaves when applied
-    to an argument by $(\lmapply)$.  The semantics of each form of linear map are given in Figure~\ref{fig:lm-laws}
-  \item Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.  Note that $(\lmcomp)$ and $\lmadd$ behave
-    like multiplication and addition respectively.
-\end{itemize}
-
-\subsection{Matrix interpretation of linear maps}
-
-A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n \times m}$ with $n$ rows and $m$ columns.
-
-\subsection{Questions about linear maps}
-
-\begin{itemize}
-\item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float.
-\item Do these laws fully define linear maps?
-\item How do we transpose $\lmbuild$?
-\end{itemize}
-Notes
-\begin{itemize}
-\item In practice we allow n-ary versions of $m \lmjoin n$ and $m \lmpair n$.
-\end{itemize}
-
-% ------------------------------------
 \section{The language}
 
 \begin{figure}
@@ -338,6 +211,140 @@ It has built-in functions (Figure~\ref{fig:built-in}):
 \item Arithmetic, $(*), (+)$ etc is overloaded to work over vectors, always elementwise.
 \end{itemize}
 
+% ------------------------------------
+\section{Linear maps}
+
+\begin{figure*}
+\fbox{\begin{minipage}{\textwidth}
+  $$
+  \begin{array}{rr@{\hspace{2mm}}c@{\hspace{2mm}}ll}
+      & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
+      & &&& \mbox{where $s = \real^m$, and $t = \real^n$} \\
+\hline
+    \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t)
+           & \mbox{Matrix/vector multiplication} \\
+    \mbox{Compose} & (\lmcomp) & : & (s \linto t,\; r \linto s) \to (r \linto t)
+           & \mbox{Matrix/matrix multiplication} \\
+    \mbox{Sum}   & (\lmadd) & : & Field\; t \darrow (s \linto t,\; s \linto t) \to (s \linto t)
+           & \mbox{Matrix addition } \\
+    \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
+    \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix (square)}\\
+    \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
+    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
+           & \mbox{Vertical juxtaposition} \\
+    \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
+           & \mbox{Horizontal juxtaposition} \\
+    \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
+%     \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
+%     \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
+    \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{t}) \\
+    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) \\
+  \end{array}
+  $$
+\end{minipage}}
+  \caption{Operations over linear maps} \label{fig:linear-maps}
+\end{figure*}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+{\bf Semantics of linear maps}
+  $$
+  \begin{array}{rcl}
+    (m_1 \lmcomp m_2) \lmapply x  & = & m_1 \lmapply (m_2 \lmapply x) \\
+    (m_1 \lmpair m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
+    (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
+    (m_1 \lmadd m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
+    \lmzero \lmapply x  & = & 0 \\
+    \lmone \lmapply x & = & x \\
+    \lmscalar{k} \lmapply x & = & k * x \\
+%    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
+%    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
+    \lmbuild(n,f) \lmapply x & = & build(n, \lambda i. (f\; i) \lmapply x) \\
+    \lmbuildt(n,f) \lmapply x & = & \sumfun\, \buildfun(n,\; \lambda i. (f\; i) \lmapply x[i] ) \\
+   \end{array}
+  $$
+\\[3mm]
+  {\bf Rules for transposition of linear maps}
+  $$
+  \begin{array}{rcll}
+    \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
+    \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmadd m_2)} & = & \lmtrans{m_1} \lmadd \lmtrans{m_2} \\
+    \lmtrans{\lmzero} & = & \lmzero \\
+    \lmtrans{\lmone} & = & \lmone \\
+    \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
+    \lmtrans{(\lmtrans{m})} & = & m \\
+    \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
+    \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
+%    \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
+%    \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
+  \end{array}
+  $$
+\\[3mm]
+  {\bf Laws for linear maps}
+  $$
+  \begin{array}{rcl}
+    \lmzero \lmcomp m & = & \lmzero \\
+    m \lmcomp \lmzero & = & \lmzero \\
+    \lmone \lmcomp m & = & m \\
+    m \lmcomp \lmone & = & m \\
+    m \lmadd \lmzero & = & m \\
+    \lmzero \lmadd m & = & m \\
+    m \lmcomp (n_1 \lmjoin n_2) & = & (m \lmcomp n_1) \lmjoin (m \lmcomp n_2) \\
+    (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
+    \lmscalar{k_1} \lmcomp \lmscalar{k_2} & = & \lmscalar{ k_1 * k_2 } \\
+    \lmscalar{k_1} \lmadd \lmscalar{k_2} & = & \lmscalar{ k_1 + k_2 } \\
+  \end{array}
+  $$
+    \end{minipage}
+    }
+    \caption{Laws for linear maps} \label{fig:lm-laws}
+\end{figure}
+
+A \emph{linear map}, $m : S \linto T$, is a function from $S$ to $T$,
+satisfying these two properties:
+$$
+\begin{array}{rrcl}
+  \forall \typ{x,y}{S} &  m \lmapply (x+y) & = & m \lmapply x + m \lmapply y \\
+  \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
+\end{array}
+$$
+Here $(\lmapply) :: (s \linto t) \to (s \to t)$ is an operator that applies a linear map $(s \linto t)$
+to an argument of type $s$.
+
+\begin{itemize}
+\item The type $s \linto t$ is a type in the language (Figure~\ref{fig:syntax}).
+\item Linear maps can be \emph{built and consumed} using the
+  operators in (see Figure~\ref{fig:linear-maps}).
+\item 
+  You should think of linear maps as an \emph{abstract type}; that is,
+  you can \emph{only} build or consume linear maps with
+  the operators in Figure~\ref{fig:linear-maps}.  We might \emph{represent} a linear map in a variety
+  of ways, one of which is as a matrix (Section~\ref{sec:matrix-rep}).
+  \item The \emph{semantics} of a linear map is completely specified by saying
+    what ordinary function it corresponds to; or, equivalently, by how it behaves when applied
+    to an argument by $(\lmapply)$.  The semantics of each form of linear map are given in Figure~\ref{fig:lm-laws}
+  \item Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.  Note that $(\lmcomp)$ and $\lmadd$ behave
+    like multiplication and addition respectively.
+\end{itemize}
+
+\subsection{Matrix interpretation of linear maps} \label{sec:matrix-rep}
+
+A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n \times m}$ with $n$ rows and $m$ columns.
+
+\subsection{Questions about linear maps}
+
+\begin{itemize}
+\item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float.
+\item Do these laws fully define linear maps?
+\item How do we transpose $\lmbuild$?
+\end{itemize}
+Notes
+\begin{itemize}
+\item In practice we allow n-ary versions of $m \lmjoin n$ and $m \lmpair n$.
+\end{itemize}
+
 % --------------------------------------
 \section{Automatic differentiation}
 
@@ -413,7 +420,7 @@ Note that
 
 \item The AD transformation is \emph{partial}; that is, it does not work for every
   program. In particular, it fails when applield to a lambda, or an application; and,
-  as we will see in Seciton~\ref{sec:vectors}, it requires that $\buildfun$ appears
+  as we will see in Section~\ref{sec:ad-vectors}, it requires that $\buildfun$ appears
   applied to a lambda.
 
 \item We give the full Jacobian for some built-in functions in Figure~\ref{fig:ad}, including
@@ -468,7 +475,7 @@ Of course, CSE may recover it.
   of symbolic differentiation, in my personal nomenclature at least.
   Does that make it any clearer what I mean?}
 
-\subsection{AD for vectors}
+\subsection{AD for vectors} \label{sec:ad-vectors}
 
 Like other built-in functions, each built-in function for vectors
 has has its full Jacobian versions, defined in Figure~\ref{fig:built-in}.
