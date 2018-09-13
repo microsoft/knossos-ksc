@@ -24,6 +24,8 @@
 \newcommand{\sel}[2]{\pi_{#1,#2}}
 \newcommand{\iffun}{\mathit{if}}
 \newcommand{\buildfun}{\mathit{build}}
+\newcommand{\sumfun}{\Sigma}
+\newcommand{\indexfun}[2]{#1[#2]}   % Vector indexing
 \renewcommand{\vector}[1]{\mathit{Vec}\;#1}
 
 \newcommand{\typ}[2]{#1 \! : \! #2}  % x:S, with less horizontal whitespace
@@ -45,6 +47,7 @@
 \newcommand{\lmlam}[1]{{\mathcal L}(#1)}      % L(k)
 \newcommand{\lmlamt}[1]{{\mathcal M}(#1)}     % Transposed lambda
 \newcommand{\lmbuild}{\mathcal B}             % Build linear map
+\newcommand{\lmbuildt}{\mathcal C}             % Transposed Build linear map
 
 \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 \begin{document}
@@ -66,20 +69,21 @@
                  & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
 \hline
     \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t) \\
-    \mbox{Compose} & (\lmcomp) & : & (s \linto t, r \linto s) \to (r \linto t)
+    \mbox{Compose} & (\lmcomp) & : & (s \linto t,\; r \linto s) \to (r \linto t)
            & \mbox{Matrix multiplication} \\
-    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1, s \linto t_2) \to (s \linto (t_1,t_2))
+    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
-    \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s, t_2 \linto s) \to ((t_1,t_2) \linto s)
+    \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
            & \mbox{Horizontal juxtaposition} \\
     \mbox{Sum}   & (+) & : & Field\; t \darrow (s \linto t) \to (s \linto t) \to (s \linto t) \\
     \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
     \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix}\\
     \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
-    \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
-    \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
-    \mbox{Build}   & \lmbuild  & : & \nat \to (s \linto (\nat \to t)) \to (s \linto \vector{t}) \\
+%     \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
+%     \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
+    \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{t}) \\
+    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) \\
   \end{array}
   $$
 \end{minipage}}
@@ -95,12 +99,14 @@
     (m_1 \lmpair m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
     (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
     (m_1 + m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
+    \sigma(m) \lmapply x & = & \sum_{i=1}^{size(x)} (m_1 \lmapply x)[i] \\
     \lmzero \lmapply x  & = & 0 \\
     \lmone \lmapply x & = & x \\
     \lmscalar{k} \lmapply x & = & k * x \\
-    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
-    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
-    \lmbuild(n,m) \lmapply x & = & build(n, m \lmapply x) \\
+%    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
+%    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
+    \lmbuild(n,f) \lmapply x & = & build(n, \lambda i. (f\; i) \lmapply x) \\
+    \lmbuildt(n,f) \lmapply x & = & \sum_{i=1}^n (f\; i) \lmapply x[i]
    \end{array}
   $$
 \\[3mm]
@@ -115,8 +121,10 @@
     \lmtrans{\lmone} & = & \lmone \\
     \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
     \lmtrans{(\lmtrans{m})} & = & m \\
-    \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
-    \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
+    \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
+    \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
+%    \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
+%    \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
   \end{array}
   $$
 \\[3mm]
@@ -180,10 +188,12 @@ Notes
   \fbox{\begin{minipage}{\columnwidth}
 $$
       \begin{array}{rcll}
+        \multicolumn{4}{l}{\mbox{\bf Atoms}} \\
         f,g,h & ::= & \multicolumn{2}{l}{\mbox{Function}} \\
         x,y,z & ::= & \multicolumn{2}{l}{\mbox{Local variable (lambda-bound or let-bound)}} \\
         k & ::= & \multicolumn{2}{l}{\mbox{Literal constants}} \\
         \\
+        \multicolumn{4}{l}{\mbox{\bf Terms}} \\
         \mathit{pgm} & ::= & \mathit{def}_1 \ldots \mathit{def}_n \\
         \mathit{def} & ::= & f(x) = e \\
         e & ::= & k & \mbox{Constant} \\
@@ -191,7 +201,16 @@ $$
           & |   & f(e) & \mbox{Function call} \\
           & |   & (e_1,e_2) & \mbox{Pair} \\
           & |   & \lambda x \dot e & \mbox{Lambda} \\
+          & |   & e_1 \; e_2 & \mbox{Application} \\
           & |   & \mbox{\lstinline|let $x$ = $e_1$ in $\;e_2$|} \\
+        \\
+        \multicolumn{4}{l}{\mbox{\bf Types}} \\
+        \tau & ::= & \nat & \mbox{Natural numbers} \\
+        & | & \real & \mbox{Real numbers} \\
+        & | & (\tau_1, \tau_2) & \mbox{Pairs} \\
+        & | & \vector{\tau} & \mbox{Vectors} \\
+        & | & \tau_1 \to \tau_2 & \mbox{Functions} \\
+        & | & \tau_1 \linto \tau_2 & \mbox{Linear maps} \\
       \end{array}
  $$
 \end{minipage}}
@@ -203,14 +222,12 @@ Note that
 \item  Variables are divided into \emph{functions}, $f,g,h$; and \emph{local variables}, $x,y,z$,
   which are either function arguments or let-bound.
 \item 
-  The language is first order.  Functions are defined at top level; functions always appear in a call, never (say) as an argument to a vunction; in a call $f(e)$, the function $f$ is always a top-level-defined function, never a local variable.
+  The language has a first order sub-language.  Functions are defined at top level;
+  functions always appear in a call, never (say) as an argument to a
+  vunction; in a call $f(e)$, the function $f$ is always a
+  top-level-defined function, never a local variable.
 
 \item Functions have exactly one argument. If you want more than one, pass a pair.
-
-\item We allow ourselves to write functions infix where it is convenient.
-  Thus $e_1 + e_2$ means the call $+(e1,e2)$, which applies the function $+$ to
-  the pair $(e_1,e_2)$.  (So, like all other functions, $(+)$ has one argument.)
-  Similarly the linear map $m_1 \lmpair m_2$ is short for $\lmpair(e_1,e_2)$.
 
 \item Pairs are built-in, with selectors $\sel{1}{2}, \sel{2}{2}$.
   (In the real implementation, pairs are generalised to $n$-tuples.)
@@ -222,11 +239,64 @@ Note that
     recursive functions might be OK, but I don't want to think about
     that yet.}
 
-\item Lambda expressions are present, but without applications.
-  If you can't apply a lambda, how can it be useful?  Answer: (only) as the
-  argument to \lstinline|build| or \lstinline|fold|.
+\item Lambda expressions and applicatons are are present, so the language
+  is higher order.  AD will only accept a subset of the language, in
+  which lambdas appear only as an arguemnt to $\buildfun$.  But the
+  \emph{output} of AD may include lambdas and application, as we shall see.
   \end{itemize}
-\simon{But the rules for appliction in Figure~\ref{fig:lm-laws} involve applying those lambdas.  Ugh.}
+
+\subsection{Built in functions}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+{\bf Built-in functions}
+$$
+\begin{array}{rcll}
+  (+) & :: & Field \; t \darrow (t,t) \to t \\
+  (*) & :: & Field \; t \darrow (t,t) \to t \\
+  \sel{1}{2} & :: & (t_1,t_2) \to t_1 & \mbox{Selection} \\
+  \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
+  \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
+  \indexfun{\cdot}{\cdot} & :: & (\vector{t},\; \nat) \to t & \mbox {Indexing} \\
+  \sumfun & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
+  \iffun & :: & Bool \to r \to r \to r \\
+\end{array}
+$$
+\\[3mm]
+{\bf Derivatives of built-in functions} \\
+      $$
+      \begin{array}{rcl}
+        \gradf{+}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
+        \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\[2mm]
+        \gradf{*}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
+        \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\[2mm]
+        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
+        \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
+        \gradf{\indexfun{\cdot}{\cdot}} & :: & (\vector{t},\; \nat) \to ((\vector{t},\; \nat) \linto t) \\
+        \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & ??? \\[2mm]
+        \gradf{\sumfun} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
+        \gradf{\sumfun}(v) & = & \lmbuildt( size(v),\; \lambda i. \lmone ) \\[2mm]
+        \gradf{\iffun} & :: & (Bool,r,r) \to (((Bool,r,r) \linto r)) \\
+        \gradf{\iffun}(True,t,f) & = & \lmzero \lmjoin \lmone \lmjoin \lmzero \\
+        \gradf{\iffun}(False,t,f) & = & \lmzero \lmjoin \lmzero \lmjoin \lmone \\
+        \ldots
+        \end{array}
+$$
+\end{minipage}}
+\caption{Built-in functions} \label{fig:built-in}
+\end{figure}
+
+We assume built-in functions shown in Figure~\ref{fig:built-in}.
+
+We allow ourselves to write functions infix where it is convenient.
+Thus $e_1 + e_2$ means the call $+(e1,e2)$, which applies the function $+$ to
+the pair $(e_1,e_2)$.  (So, like all other functions, $(+)$ has one argument.)
+Similarly the linear map $m_1 \lmpair m_2$ is short for $\lmpair(e_1,e_2)$.
+
+We allow ourselves to write vector indexing using square brackets, thus $a[i]$.
+
+Multiplication and addition are overloaded to work on any suitable type.
+On vectors they work element-wise; if you want dot-product you have to program it.
 
 \section{Automatic differentiation}
 
@@ -256,8 +326,8 @@ $$
         \grad{x} & = & \gradf{x} \\
         \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
         \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
-        \grad{\buildfun(e_n,e)} & = & \lmbuild(e_n, \grad{e}) \\
-        \grad{\lambda x \dot e} & = & \lmlam{\lambda x\dot \grad{e}} \\
+        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e}) \\
+%         \grad{\lambda x \dot e} & = & \lmlam{\lambda x\dot \grad{e}} \\
         \grad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
         & = & \begin{array}[t]{l}
            \mbox{\lstinline|let $\;x\;$ = $\;e_1\;$ in|} \\
@@ -266,22 +336,6 @@ $$
            \end{array}
       \end{array}
       $$
-      \vspace{2mm}
-      \bf{Built-in functions}
-      $$
-      \begin{array}{rcl}
-        \gradf{+}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
-        \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\[1mm]
-        \gradf{*}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
-        \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\[1mm]
-        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
-        \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[1mm]
-        \gradf{\iffun} & :: & (Bool,r,r) \to (((Bool,r,r) \linto r)) \\
-        \gradf{\iffun}(True,t,f) & = & \lmzero \lmjoin \lmone \lmjoin \lmzero \\
-        \gradf{\iffun}(False,t,f) & = & \lmzero \lmjoin \lmzero \lmjoin \lmone \\
-        \ldots
-        \end{array}
-$$
 \end{minipage}}
 \caption{Automatic differentiation} \label{fig:ad}
 \end{figure}
@@ -335,44 +389,6 @@ Note the duplication of $y*z$ in the result.
 Of course, CSE may recover it.
 \end{itemize}
 
-\subsection{Build and lambda}
-
-I'm not happy with the story for build and lambda. It started well:
-\begin{itemize}
-\item For a start, the treatment of lambda is very special: it works only
-  for $(\nat \to t)$, which seems oddly assymetrical.
-
-\item The AD for build (Fig~\ref{fig:ad}) looks sensible.
-  But not great:  rather than use the generic case for a call $f(e)$,
-  I used a special case for $\grad{\buildfun(e_n,e)}$; and I did
-  an ad-hoc thing of not AD'ing the first argument to build, which
-  seems very arbitrary.  The AD's version of build uses $\lmbuild$, whose
-  signature is in Figure~\ref{fig:linear-maps}; and whose semantics is
-  defined by how it behaves when applied (Figure~\ref{fig:lm-laws}).
-
-\item The AD for lambda (Figure~\ref{fig:ad}) looks sensible.  It generates
-  a new linear map $\lmlam$, whose
-  signature is in Figure~\ref{fig:linear-maps}; and whose semantics is
-  defined by how it behaves when applied (Figure~\ref{fig:lm-laws}).
-
-\item But then things get trickier.  What is the transose of $\lmlam$?
-  I invented $\lmlamt$ (Figure~\ref{fig:linear-maps}) as its transpose.
-  There is a nice pattern here: $\lmpair$ and $\lmjoin$ are related
-  in just the same way as $\lmlam$ and $\lmlamt$.
-
-\item But I got stuck: what is the semantics of $\lmlamt$?
-  There is a stab in Figure~\ref{fig:lm-laws}, but the $\Sigma_i$ is deeply
-  suspicious, because it doesn't give the range of $i$.  That range comes
-  from the enclosing build.
-\end{itemize}
-
-An alternative is to replace lambda with
-$$
-e ::= \ldots | \buildfun(n) i e
-$$
-where $i$ is a variable (of type $\nat$) that scopes over $e$.
-So $\buildfun(n)~ i~ e$ is what we have been writing $\buildfun(n, \lambda i.e)$.
-This looks simpler and more direct to me.
 
 \subsection{Vectors}
 
@@ -418,6 +434,121 @@ The implementation differs from this document as follows:
   \end{lstlisting}
 \end{itemize}
 
+\section{Demo}
+
+You can run the prototype by saying {\tt ghci Main}.
+
+The function {\tt demo :: Def -> IO ()} runs the
+prototype on the function provided as example.
+Thus:
+{\small
+\begin{verbatim}
+bash$ ghci Main
+
+*Main> demo ex2
+
+----------------------------
+Original definition
+----------------------------
+fun f2(x)
+  = let { y = x * x }
+    let { z = x + y }
+    y * z
+
+----------------------------
+Anf-ised original definition
+----------------------------
+fun f2(x)
+  = let { y = x * x }
+    let { z = x + y }
+    y * z
+
+----------------------------
+The full Jacobian (unoptimised)
+----------------------------
+fun Df2(x)
+  = let { Dx = lmOne() }
+    let { y = x * x }
+    let { Dy = lmCompose(D*(x, x), lmVCat(Dx, Dx)) }
+    let { z = x + y }
+    let { Dz = lmCompose(D+(x, y), lmVCat(Dx, Dy)) }
+    lmCompose(D*(y, z), lmVCat(Dy, Dz))
+
+----------------------------
+The full Jacobian (optimised)
+----------------------------
+fun Df2(x)
+  = let { y = x * x }
+    lmScale( (x + y) * (x + x) + (x + y) * (x + x) )
+
+----------------------------
+Forward derivative (unoptimised)
+----------------------------
+fun f2'(x, dx)
+  = lmApply(let { y = x * x }
+            lmScale( (x + y) * (x + x) +
+                     (x + y) * (x + x) ),
+            dx)
+
+----------------------------
+Forward-mode derivative (optimised)
+----------------------------
+fun f2'(x, dx)
+  = let { y = x * x }
+    ((x + y) * (x + x) + (x + y) * (x + x)) * dx
+
+----------------------------
+Forward-mode derivative (CSE'd)
+----------------------------
+fun f2'(x, dx)
+  = let { t1 = x + x * x }
+    let { t2 = x + x }
+    (t1 * t2 + t1 * t2) * dx
+
+----------------------------
+Transposed Jacobian
+----------------------------
+fun Rf2(x)
+  = lmTranspose( let { y = x * x }
+                 lmScale( (x + y) * (x + x) +
+                         (x + y) * (x + x) ) )
+
+----------------------------
+Optimised transposed Jacobian
+----------------------------
+fun Rf2(x)
+  = let { y = x * x }
+    lmScale( (x + y) * (x + x) +
+             (x + y) * (x + x) )
+
+----------------------------
+Reverse-mode derivative (unoptimised)
+----------------------------
+fun f2`(x, dr)
+  = lmApply(let { y = x * x }
+            lmScale( (x + y) * (x + x) +
+                     (x + y) * (x + x) ),
+            dr)
+
+----------------------------
+Reverse-mode derivative (optimised)
+----------------------------
+fun f2`(x, dr)
+  = let { y = x * x }
+    ((x + y) * (x + x) +
+     (x + y) * (x + x)) * dr
+
+----------------------------
+Reverse-mode derivative (CSE'd)
+----------------------------
+
+fun f2`(x, dr)
+  = let { t1 = x + x * x }
+    let { t2 = x + x }
+    (t1 * t2 + t1 * t2) * dr
+\end{verbatim}
+}
+
 \section{Questions}
 
 \begin{itemize}
@@ -428,6 +559,45 @@ The implementation differs from this document as follows:
 \item We'll need sum/product of vectors.  What is $\gradf{sum}$ etc?
 
 \end{itemize}  
+
+\section{Old stuff about Build and lambda}
+
+I'm not happy with the story for build and lambda. It started well:
+\begin{itemize}
+\item For a start, the treatment of lambda is very special: it works only
+  for $(\nat \to t)$, which seems oddly assymetrical.
+
+\item The AD for build (Fig~\ref{fig:ad}) looks sensible.
+  But not great:  rather than use the generic case for a call $f(e)$,
+  I used a special case for $\grad{\buildfun(e_n,e)}$; and I did
+  an ad-hoc thing of not AD'ing the first argument to build, which
+  seems very arbitrary.  The AD's version of build uses $\lmbuild$, whose
+  signature is in Figure~\ref{fig:linear-maps}; and whose semantics is
+  defined by how it behaves when applied (Figure~\ref{fig:lm-laws}).
+
+\item The AD for lambda (Figure~\ref{fig:ad}) looks sensible.  It generates
+  a new linear map $\lmlam$, whose
+  signature is in Figure~\ref{fig:linear-maps}; and whose semantics is
+  defined by how it behaves when applied (Figure~\ref{fig:lm-laws}).
+
+\item But then things get trickier.  What is the transose of $\lmlam$?
+  I invented $\lmlamt$ (Figure~\ref{fig:linear-maps}) as its transpose.
+  There is a nice pattern here: $\lmpair$ and $\lmjoin$ are related
+  in just the same way as $\lmlam$ and $\lmlamt$.
+
+\item But I got stuck: what is the semantics of $\lmlamt$?
+  There is a stab in Figure~\ref{fig:lm-laws}, but the $\Sigma_i$ is deeply
+  suspicious, because it doesn't give the range of $i$.  That range comes
+  from the enclosing build.
+\end{itemize}
+
+An alternative is to replace lambda with
+$$
+e ::= \ldots | \buildfun(n) i e
+$$
+where $i$ is a variable (of type $\nat$) that scopes over $e$.
+So $\buildfun(n)~ i~ e$ is what we have been writing $\buildfun(n, \lambda i.e)$.
+This looks simpler and more direct to me.
 
 \end{document}
 
