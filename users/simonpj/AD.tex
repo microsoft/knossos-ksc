@@ -9,6 +9,8 @@
   mathescape=true
 }
 \usepackage{amssymb}
+\usepackage{enumitem}
+\setlist[itemize,1]{itemsep=4pt}
 
 \renewcommand{\arraystretch}{1.2}
 
@@ -25,6 +27,8 @@
 \newcommand{\iffun}{\mathit{if}}
 \newcommand{\buildfun}{\mathit{build}}
 \newcommand{\sumfun}{\Sigma}
+\newcommand{\sizefun}{size}
+\newcommand{\deltafun}{\delta}
 \newcommand{\indexfun}[2]{#1[#2]}   % Vector indexing
 \renewcommand{\vector}[1]{\mathit{Vec}\;#1}
 
@@ -41,6 +45,7 @@
 \newcommand{\lmtrans}[1]{#1^{\top}}   % Trnaspose (takes an argument)
 \newcommand{\lmpair}{\times}         % Infix pairing
 \newcommand{\lmjoin}{\bowtie}        % Infix join
+\newcommand{\lmadd}{\oplus}        % Infix join
 \newcommand{\lmzero}{\mathbf{0}}     % 0
 \newcommand{\lmone}{\mathbf{1}}      % 1
 \newcommand{\lmscalar}[1]{{\mathcal S}(#1)}      % S(k)
@@ -66,19 +71,22 @@
 \fbox{\begin{minipage}{\textwidth}
   $$
   \begin{array}{rr@{\hspace{2mm}}c@{\hspace{2mm}}ll}
-                 & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
+      & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
+      & &&& \mbox{where $s = \real^m$, and $t = \real^n$} \\
 \hline
-    \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t) \\
+    \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t)
+           & \mbox{Matrix/vector multiplication} \\
     \mbox{Compose} & (\lmcomp) & : & (s \linto t,\; r \linto s) \to (r \linto t)
-           & \mbox{Matrix multiplication} \\
+           & \mbox{Matrix/matrix multiplication} \\
+    \mbox{Sum}   & (\lmadd) & : & Field\; t \darrow (s \linto t,\; s \linto t) \to (s \linto t)
+           & \mbox{Matrix addition } \\
+    \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
+    \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix (square)}\\
+    \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
     \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
     \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
            & \mbox{Horizontal juxtaposition} \\
-    \mbox{Sum}   & (+) & : & Field\; t \darrow (s \linto t) \to (s \linto t) \to (s \linto t) \\
-    \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
-    \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix}\\
-    \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
 %     \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
 %     \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
@@ -98,15 +106,14 @@
     (m_1 \lmcomp m_2) \lmapply x  & = & m_1 \lmapply (m_2 \lmapply x) \\
     (m_1 \lmpair m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
     (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
-    (m_1 + m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
-    \sigma(m) \lmapply x & = & \sum_{i=1}^{size(x)} (m_1 \lmapply x)[i] \\
+    (m_1 \lmadd m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
     \lmzero \lmapply x  & = & 0 \\
     \lmone \lmapply x & = & x \\
     \lmscalar{k} \lmapply x & = & k * x \\
 %    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
 %    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
     \lmbuild(n,f) \lmapply x & = & build(n, \lambda i. (f\; i) \lmapply x) \\
-    \lmbuildt(n,f) \lmapply x & = & \sum_{i=1}^n (f\; i) \lmapply x[i]
+    \lmbuildt(n,f) \lmapply x & = & \sumfun\, \buildfun(n,\; \lambda i. (f\; i) \lmapply x[i] ) \\
    \end{array}
   $$
 \\[3mm]
@@ -116,7 +123,7 @@
     \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
     \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
     \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
-    \lmtrans{(m_1 + m_2)} & = & \lmtrans{m_1} + \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmadd m_2)} & = & \lmtrans{m_1} \lmadd \lmtrans{m_2} \\
     \lmtrans{\lmzero} & = & \lmzero \\
     \lmtrans{\lmone} & = & \lmone \\
     \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
@@ -132,13 +139,15 @@
   $$
   \begin{array}{rcl}
     \lmzero \lmcomp m & = & \lmzero \\
-    \lmone \lmcomp m & = & m \\
     m \lmcomp \lmzero & = & \lmzero \\
+    \lmone \lmcomp m & = & m \\
     m \lmcomp \lmone & = & m \\
+    m \lmadd \lmzero & = & m \\
+    \lmzero \lmadd m & = & m \\
     m \lmcomp (n_1 \lmjoin n_2) & = & (m \lmcomp n_1) \lmjoin (m \lmcomp n_2) \\
-    (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) + (m_2 \lmcomp n_2) \\
+    (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
     \lmscalar{k_1} \lmcomp \lmscalar{k_2} & = & \lmscalar{ k_1 * k_2 } \\
-    \lmscalar{k_1} + \lmscalar{k_2} & = & \lmscalar{ k_1 + k_2 } \\
+    \lmscalar{k_1} \lmadd \lmscalar{k_2} & = & \lmscalar{ k_1 + k_2 } \\
   \end{array}
   $$
     \end{minipage}
@@ -162,7 +171,8 @@ to an argument of type $s$.
   \item The \emph{semantics} of a linear map is completely specified by saying
     what ordinary function it corresponds to; or, equivalently, by how it behaves when applied
     to an argument by $(\lmapply)$.  The semantics of each form of linear map are given in Figure~\ref{fig:lm-laws}
-  \item Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.
+  \item Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.  Note that $(\lmcomp)$ and $\lmadd$ behave
+    like multiplication and addition respectively.
 \end{itemize}
 
 \subsection{Matrix interpretation of linear maps}
@@ -256,6 +266,7 @@ $$
   (*) & :: & Field \; t \darrow (t,t) \to t \\
   \sel{1}{2} & :: & (t_1,t_2) \to t_1 & \mbox{Selection} \\
   \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
+  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
   \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
   \indexfun{\cdot}{\cdot} & :: & (\vector{t},\; \nat) \to t & \mbox {Indexing} \\
   \sumfun & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
@@ -263,7 +274,7 @@ $$
 \end{array}
 $$
 \\[3mm]
-{\bf Derivatives of built-in functions} \\
+{\bf Derivatives of built-in functions}
       $$
       \begin{array}{rcl}
         \gradf{+}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
@@ -273,9 +284,9 @@ $$
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
         \gradf{\indexfun{\cdot}{\cdot}} & :: & (\vector{t},\; \nat) \to ((\vector{t},\; \nat) \linto t) \\
-        \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & ??? \\[2mm]
+        \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & \lmbuildt( \sizefun(v), \lambda j. \deltafun(i,j)) \lmjoin \lmzero \\[2mm]
         \gradf{\sumfun} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
-        \gradf{\sumfun}(v) & = & \lmbuildt( size(v),\; \lambda i. \lmone ) \\[2mm]
+        \gradf{\sumfun}(v) & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
         \gradf{\iffun} & :: & (Bool,r,r) \to (((Bool,r,r) \linto r)) \\
         \gradf{\iffun}(True,t,f) & = & \lmzero \lmjoin \lmone \lmjoin \lmzero \\
         \gradf{\iffun}(False,t,f) & = & \lmzero \lmjoin \lmzero \lmjoin \lmone \\
@@ -298,6 +309,13 @@ We allow ourselves to write vector indexing using square brackets, thus $a[i]$.
 Multiplication and addition are overloaded to work on any suitable type.
 On vectors they work element-wise; if you want dot-product you have to program it.
 
+The delta-function $\deltafun$ is defined thus:
+$$
+\begin{array}{rcll}
+  \deltafun(i,j) & = & 1 & \mbox{if $i=j$} \\
+  & = & 0 & \mbox{otherwise}
+\end{array}
+$$
 \section{Automatic differentiation}
 
 \begin{figure}
@@ -369,11 +387,19 @@ Note that
   For example, if a user-defined
   fuction $f$ calls another user-defined function $g$, we construct $\gradf{g}$ as
   described; and then construct $\gradf{f}$. The latter simply calls $\gradf{g}$.
-  
+
+\item The AD transformation is \emph{partial}; that is, it does not work for every
+  program. In particular, it fails when applield to a lambda, or an application; and,
+  as we will see in Seciton~\ref{sec:vectors}, it requires that $\buildfun$ appears
+  applied to a lambda.
+
 \item We give the full Jacobian for some built-in functions in Figure~\ref{fig:ad}, including
   for conditionals ($\gradf{\iffun}$).
+\end{itemize}
 
-\item We may want to ANF-ise before AD to avoid gratuitous duplication.
+\subsection{Avoiding duplication}
+
+We may want to ANF-ise before AD to avoid gratuitous duplication.
   E.g.
 $$
   \begin{array}{rcl}
@@ -387,21 +413,44 @@ $$
   $$
 Note the duplication of $y*z$ in the result.
 Of course, CSE may recover it.
-\end{itemize}
-
 
 \subsection{Vectors}
 
-Suppose we have $sum :: \vector{\real} \to \real$.  What is $\gradf{sum}$?
-We may define its semantics, at least, by applying it:
+The language supposts one-dimensional vectors, of type $\vector{T}$,
+whose elements have type $T$ (Figure~\ref{fig:syntax}).
+It has built-in functions (Figure~\ref{fig:built-in}):
+\begin{itemize}
+\item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
+\item $\indexfun{\cdot}{\cdot} :: (\vector{t},\; \nat) \to t$ for indexing.
+\item $\sumfun :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
+\item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
+\item Arithmetic, $(*), (+)$ etc is overloaded to work over vectors, always elementwise.
+\end{itemize}
+All of these function have their full Jacobian versions, which are also
+defined in Figure~\ref{fig:built-in}.  
+You may enjoy checking that $\gradf{\sumfun}$ and
+$\gradf{\indexfun{\cdot}{\cdot}}$ are correct!  I did think about having
+a specialised linear map for indexing, rather than using $\lmbuildt$,
+but then I needed its transposition, and that needed $\deltafun$ anyway.
+
+But $\buildfun$ is an exception!  It is handled specially
+by the AD transformation in Figure~\ref{fig:ad}; there is no $\gradfun{\buildfun}$.
+Moreover the AD transformation only works if the second argument of the build is
+a lambda, thus $\buildfun(e_n, \lambda i.e)$.  I tried dealing with build and
+lambdas separately, but failed (see Section~\ref{sec:build-lam-fail}).
+
+\subsection{General folds}
+
+We have $\sumfun :: \vector{\real} \to \real$.  What is $\gradf{\sumfun}$?
+One way to define its semantics is by applying it:
 $$
 \begin{array}{rcl}
-  \gradf{sum} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
-  \gradf{sum}(v) \lmapply dv & = & sum(dv)
+  \gradf{\sumfun} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
+  \gradf{\sumfun}(v) \lmapply dv & = & \sumfun(dv)
 \end{array}
 $$
-That seem OK.  But what about product, which multiplies all the elements
-of a vector together. If the vector had three elements we might have
+That is OK.  But what about product, which multiplies all the elements
+of a vector together? If the vector had three elements we might have
 $$
 \begin{array}{l}
   \gradf{product}([x_1,x_2,x_3]) \lmapply [dx_1, dx_2, dx_3] \\
@@ -413,7 +462,8 @@ to use product?
 
 This gives the clue that taking the derivative of $\mathit{fold}$ is
 not going to be easy, maybe infeasible!  Much depends on the
-particular lambda it appears.
+particular lambda it appears.  So I have left out product, and made
+no attempt to do general folds.
 
 \section{Implementation}
 
@@ -549,18 +599,8 @@ fun f2`(x, dr)
 \end{verbatim}
 }
 
-\section{Questions}
 
-\begin{itemize}
-\item Do we need to add $\buildfun$ and array indexing?  Why can't we just work in terms of
-  addition and multiplcation of vectors; and then use standard fusion to
-  optimise the forward and reverse derivative?
-
-\item We'll need sum/product of vectors.  What is $\gradf{sum}$ etc?
-
-\end{itemize}  
-
-\section{Old stuff about Build and lambda}
+\section{Old stuff about Build and lambda} \label{sec:build-lam-fail}
 
 I'm not happy with the story for build and lambda. It started well:
 \begin{itemize}
