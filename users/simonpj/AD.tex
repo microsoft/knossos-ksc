@@ -18,7 +18,7 @@
 \newcommand{\linto}{\multimap}     % -o
 \newcommand{\grad}[1]{\nabla_S\lb #1 \rb}  % grad[#1]
 \newcommand{\gradf}[1]{\nabla\! \mathit{#1}}  % Full Jacobian
-\newcommand{\gradft}[1]{\Delta\mathit{#1}}  % Full Jacobian
+\newcommand{\gradft}[1]{\nabla^{\top}\!\mathit{#1}}  % Full Jacobian
 \newcommand{\fwdDf}[1]{f'}  % Forward derivative, f'
 \newcommand{\revDf}[1]{f`}  % Reverse derivative, f`
 \newcommand{\lb}{\llbracket}
@@ -26,7 +26,8 @@
 \newcommand{\sel}[2]{\pi_{#1,#2}}
 \newcommand{\iffun}{\mathit{if}}
 \newcommand{\buildfun}{\mathit{build}}
-\newcommand{\sumfun}{\Sigma}
+\newcommand{\sumfunname}{\mathit{sum}}   % Wanted to allow either \Sigma e or sum(e)
+\newcommand{\sumfun}[1]{\sumfunname(#1)}   % Wanted to allow either \Sigma e or sum(e)
 \newcommand{\sizefun}{size}
 \newcommand{\deltafun}{\delta}
 \newcommand{\indexfun}[2]{#1[#2]}   % Vector indexing
@@ -145,7 +146,7 @@ $$
   \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
   \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
   \indexfun{\cdot}{\cdot} & :: & (\vector{t},\; \nat) \to t & \mbox {Indexing} \\
-  \sumfun & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
+  \sumfunname & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
   \iffun & :: & Bool \to r \to r \to r \\
 \end{array}
 $$
@@ -161,8 +162,8 @@ $$
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
         \gradf{\indexfun{\cdot}{\cdot}} & :: & (\vector{t},\; \nat) \to ((\vector{t},\; \nat) \linto t) \\
         \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & \lmbuildt( \sizefun(v), \lambda j. \deltafun(i,j)) \lmjoin \lmzero \\[2mm]
-        \gradf{\sumfun} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
-        \gradf{\sumfun}(v) & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
+        \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
+        \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
         \gradf{\iffun} & :: & (Bool,r,r) \to (((Bool,r,r) \linto r)) \\
         \gradf{\iffun}(True,t,f) & = & \lmzero \lmjoin \lmone \lmjoin \lmzero \\
         \gradf{\iffun}(False,t,f) & = & \lmzero \lmjoin \lmzero \lmjoin \lmone \\
@@ -196,21 +197,28 @@ $$
 \subsection{Vectors}
 
 The language supports one-dimensional vectors, of type $\vector{T}$,
-whose elements have type $T$ (Figure~\ref{fig:syntax}).  \awf{Mention whether we can have matrix as vec of vec}
-It has built-in functions (Figure~\ref{fig:built-in}):
+whose elements have type $T$ (Figure~\ref{fig:syntax}).
+A matrix can be represented as a vector of vectors.
+
+Vectors are supported by the following built-in functions (Figure~\ref{fig:built-in}):
 \begin{itemize}
 \item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
 \item $\indexfun{\cdot}{\cdot} :: (\vector{t},\; \nat) \to t$ for indexing.
-\item $\sumfun :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
-  \tom{I believe that for a vector $v$ of size $n$, $\sumfun v$ is the
+\item $\sumfunname :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
+We specifically do not have a general, higher order, fold operator;
+we say why in Section~\ref{sec:gen-fold}.
+  \tom{I believe that for a vector $v$ of size $n$, $\sumfun{v}$ is the
     same as $\lmbuildt(n, const~ id)~ v$.  This may or may not be useful
     in reducing the size of the base language, should we want to do that.}
   \simon{I don't think so!  $\lmbuildt$ is a linear map, so you can't apply it to $v$.
     Maybe you mean $\lmbuildt(n, const~ id) \lmapply v$?  But that (Figure~\ref{fig:lm-laws}) is
-    defined using $\sumfun$!}\awf{note mainly to self, better to have general fold here?}
+    defined using $\sumfunname$!}
 \item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
 \item Arithmetic functions $(*), (+)$ etc are overloaded to work over vectors, always elementwise.
 \end{itemize}
+
+
+\simon{Do we need scan?  Or (specialising to $(+)$) cumulative sum?}
 
 % ------------------------------------
 \section{Linear maps}
@@ -261,7 +269,7 @@ It has built-in functions (Figure~\ref{fig:built-in}):
 %    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
 %    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
     \lmbuild(n,f) \lmapply x & = & build(n, \lambda i. (f\; i) \lmapply x) \\
-    \lmbuildt(n,f) \lmapply x & = & \sumfun\, \buildfun(n,\; \lambda i. (f\; i) \lmapply x[i] ) \\
+    \lmbuildt(n,f) \lmapply x & = & \sumfun{\buildfun(n,\; \lambda i. (f\; i) \lmapply x[i] )} \\
    \end{array}
   $$
 \\[3mm]
@@ -331,18 +339,28 @@ to an argument of type $s$.
 \end{itemize}
 
 \subsection{Matrix interpretation of linear maps} \label{sec:matrix-rep}
+
 \def\lmtomat{\mathcal M}% awf: define macros when first introduced in text, not at top of file
+
 A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n \times m}$ with $n$ rows and $m$ columns.
+
+Many of the operators over linear maps then have simple matrix interpetations; for example, composition of
+linear maps $(\lmcomp)$ is matrix multiplication, pairing $(\lmpair)$ is vetical juxtaposition, and so on.
+These matrix interpretations are all tiven in the final column of Figure~\ref{fig:linear-maps}.
+
 \awf{possibly good to get this right up front here:
 The operations $\lmjoin$ and $\lmpair$ defined below then become horizontal and vertical matrix concatenation.
 I.e., if $\lmtomat a$ is the matrix representation of linear map $a$, then  $\lmtomat (p \lmjoin q) = [\lmtomat p \mid \lmtomat q]$
 AHA: just found figure 3 -- when doc settles down, might be good to get that figure earlier.
-}
+}\simon{I've added the previous para; we can sort out figure placement later.  OK?  If so, delete comments.}
 
 \subsection{Questions about linear maps}
 
 \begin{itemize}
-\item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float. \awf{No, perfectly fine to ask if a float is 1 --- the nearby floats are far away, and there's no other float $f$ such that $\lmscalar f = \lmone$.}
+\item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.
+  But asking if $k=1$ is dodgy when $k$ is a float. \awf{No, perfectly fine to ask if a
+    float is 1 --- the nearby floats are far away, and there's no other float $f$ such that $\lmscalar f = \lmone$.}
+  \simon{For the purposes of this paper I prefer having $\lmone$ as well; unity plays such a key role!}
 \item Do these laws fully define linear maps?
 \item How do we transpose $\lmbuild$?
 \end{itemize}
@@ -400,11 +418,14 @@ function definition \lstinline|f(x) = e|:
 
 \begin{itemize}
 \item Construct the full Jacobian $\gradf{f}$, and transposed full Jacobian $\gradft{f}$,
-  using the tranformations in Figure~\ref{fig:ad}. \awf{gradft cute, but $\nabla^\top\!\! f$ is more conventional}
+  using the tranformations in Figure~\ref{fig:ad}\footnote{
+    We consider $\gradf{f}$ and $\gradft{f}$ to be the names of two new functions.
+    These names are derived from, but distinctd from $f$, rather like $f'$ or $f_1$ in mathematics.
+}.
 \item Optimise these two definitions, using the laws of linear maps
   in Figure~\ref{fig:lm-laws}.
 \item Construct the forward derivative $\fwdDf{f}$ and reverse derivative $\revDf{f}$,
-  as shown in Figure~\ref{fig:ad}.
+  as shown in Figure~\ref{fig:ad}\footnote{Again $\fwdDf{f}$ and $\revDf{f}$ are new names, derived from $f$}.
 \item Optimise these two definitions, to eliminate all linear maps. Specifically:
   \begin{itemize}
     \item Rather than \emph{calling} $\gradf{f}$ (in, say, $\fwdDf{f}$), instead \emph{inline} it.
@@ -486,7 +507,7 @@ Of course, CSE may recover it.
 
 Like other built-in functions, each built-in function for vectors
 has has its full Jacobian versions, defined in Figure~\ref{fig:built-in}.
-You may enjoy checking that $\gradf{\sumfun}$ and
+You may enjoy checking that $\gradf{\sumfunname}$ and
 $\gradf{\indexfun{\cdot}{\cdot}}$ are correct!  I did think about having
 a specialised linear map for indexing, rather than using $\lmbuildt$,
 but then I needed its transposition, and that needed $\deltafun$ anyway.
@@ -497,14 +518,14 @@ Moreover the AD transformation only works if the second argument of the build is
 a lambda, thus $\buildfun(e_n, \lambda i.e)$.  I tried dealing with build and
 lambdas separately, but failed (see Section~\ref{sec:build-lam-fail}).
 
-\subsection{General folds}
+o\subsection{General folds} \label{sec:gen-fold}
 
-We have $\sumfun :: \vector{\real} \to \real$.  What is $\gradf{\sumfun}$?
+We have $\sumfunname :: \vector{\real} \to \real$.  What is $\gradf{\sumfunname}$?
 One way to define its semantics is by applying it:
 $$
 \begin{array}{rcl}
-  \gradf{\sumfun} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
-  \gradf{\sumfun}(v) \lmapply dv & = & \sumfun(dv)
+  \gradf{\sumfunname} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
+  \gradf{\sumfunname}(v) \lmapply dv & = & \sumfun{dv}
 \end{array}
 $$
 That is OK.  But what about product, which multiplies all the elements
