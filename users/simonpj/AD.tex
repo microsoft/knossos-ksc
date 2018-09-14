@@ -31,11 +31,12 @@
 \newcommand{\deltafun}{\delta}
 \newcommand{\indexfun}[2]{#1[#2]}   % Vector indexing
 \renewcommand{\vector}[1]{\mathit{Vec}\;#1}
+\def\RR{\mathbb R}
 
 \newcommand{\typ}[2]{#1 \! : \! #2}  % x:S, with less horizontal whitespace
 
 \renewcommand{\dot}{.\,}               % dot with some space after
-\newcommand{\real}{\mathbb{R}}       % R, the reals
+\newcommand{\real}{\mathbb{R}}       % R, the reals11
 \newcommand{\nat}{\mathbb{N}}        % N, the natural numbers
 \newcommand{\darrow}{\Rightarrow}    % =>
 
@@ -56,7 +57,7 @@
 
 \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 \newcommand{\tom}[1]{{\color{red}TE: #1}}
-\newcommand{\andrew}[1]{{\color{red}AWF: #1}}
+\newcommand{\awf}[1]{{\color{teal}AWF: #1}}
 \begin{document}
 
 \title{Automatic differentation in Coconut}
@@ -109,8 +110,8 @@ Note that
 \item 
   The language has a first order sub-language.  Functions are defined at top level;
   functions always appear in a call, never (say) as an argument to a
-  vunction; in a call $f(e)$, the function $f$ is always a
-  top-level-defined function, never a local variable.
+  function; in a call $f(e)$, the function $f$ is always a
+  top-level-defined function, never a local variable.  \awf{at some point we should say where this restriction is needed}
 
 \item Functions have exactly one argument. If you want more than one, pass a pair.
 
@@ -124,9 +125,9 @@ Note that
     recursive functions might be OK, but I don't want to think about
     that yet.}
 
-\item Lambda expressions and applicatons are are present, so the language
+\item Lambda expressions and applications are are present, so the language
   is higher order.  AD will only accept a subset of the language, in
-  which lambdas appear only as an arguemnt to $\buildfun$.  But the
+  which lambdas appear only as an argument to $\buildfun$.  But the
   \emph{output} of AD may include lambdas and application, as we shall see.
   \end{itemize}
 
@@ -184,7 +185,7 @@ We allow ourselves to write vector indexing using square brackets, thus $a[i]$.
 Multiplication and addition are overloaded to work on any suitable type.
 On vectors they work element-wise; if you want dot-product you have to program it.
 
-The delta-function $\deltafun$ is defined thus:
+The Kronecker delta $\deltafun$ is defined thus:
 $$
 \begin{array}{rcll}
   \deltafun(i,j) & = & 1 & \mbox{if $i=j$} \\
@@ -194,8 +195,8 @@ $$
 
 \subsection{Vectors}
 
-The language supposts one-dimensional vectors, of type $\vector{T}$,
-whose elements have type $T$ (Figure~\ref{fig:syntax}).
+The language supports one-dimensional vectors, of type $\vector{T}$,
+whose elements have type $T$ (Figure~\ref{fig:syntax}).  \awf{Mention whether we can have matrix as vec of vec}
 It has built-in functions (Figure~\ref{fig:built-in}):
 \begin{itemize}
 \item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
@@ -206,9 +207,9 @@ It has built-in functions (Figure~\ref{fig:built-in}):
     in reducing the size of the base language, should we want to do that.}
   \simon{I don't think so!  $\lmbuildt$ is a linear map, so you can't apply it to $v$.
     Maybe you mean $\lmbuildt(n, const~ id) \lmapply v$?  But that (Figure~\ref{fig:lm-laws}) is
-    defined using $\sumfun$!}
+    defined using $\sumfun$!}\awf{note mainly to self, better to have general fold here?}
 \item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
-\item Arithmetic, $(*), (+)$ etc is overloaded to work over vectors, always elementwise.
+\item Arithmetic functions $(*), (+)$ etc are overloaded to work over vectors, always elementwise.
 \end{itemize}
 
 % ------------------------------------
@@ -330,13 +331,18 @@ to an argument of type $s$.
 \end{itemize}
 
 \subsection{Matrix interpretation of linear maps} \label{sec:matrix-rep}
-
+\def\lmtomat{\mathcal M}% awf: define macros when first introduced in text, not at top of file
 A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n \times m}$ with $n$ rows and $m$ columns.
+\awf{possibly good to get this right up front here:
+The operations $\lmjoin$ and $\lmpair$ defined below then become horizontal and vertical matrix concatenation.
+I.e., if $\lmtomat a$ is the matrix representation of linear map $a$, then  $\lmtomat (p \lmjoin q) = [\lmtomat p \mid \lmtomat q]$
+AHA: just found figure 3 -- when doc settles down, might be good to get that figure earlier.
+}
 
 \subsection{Questions about linear maps}
 
 \begin{itemize}
-\item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float.
+\item Do we need $\lmone$? After all $\lmscalar{1}$ does the same job.  But asking if $k=1$ is dodgy when $k$ is a float. \awf{No, perfectly fine to ask if a float is 1 --- the nearby floats are far away, and there's no other float $f$ such that $\lmscalar f = \lmone$.}
 \item Do these laws fully define linear maps?
 \item How do we transpose $\lmbuild$?
 \end{itemize}
@@ -394,7 +400,7 @@ function definition \lstinline|f(x) = e|:
 
 \begin{itemize}
 \item Construct the full Jacobian $\gradf{f}$, and transposed full Jacobian $\gradft{f}$,
-  using the tranformations in Figure~\ref{fig:ad}.
+  using the tranformations in Figure~\ref{fig:ad}. \awf{gradft cute, but $\nabla^\top\!\! f$ is more conventional}
 \item Optimise these two definitions, using the laws of linear maps
   in Figure~\ref{fig:lm-laws}.
 \item Construct the forward derivative $\fwdDf{f}$ and reverse derivative $\revDf{f}$,
@@ -407,7 +413,7 @@ function definition \lstinline|f(x) = e|:
       that may be applied (via $\lmapply$) to many different arguments, and we want to specialise it for each
       such call.  (I think.)
     \item Optimise using the rules of $(\lmapply)$ in Figure~\ref{fig:lm-laws}.
-    \item Use standard Common Subexpression Elimination (CSE)to recover any lost sharing.
+    \item Use standard Common Subexpression Elimination (CSE) to recover any lost sharing.
   \end{itemize}
 \end{itemize}
 
@@ -415,7 +421,7 @@ Note that
 \begin{itemize}
 \item The transformation is fully compositional; each function can be AD'd independently.
   For example, if a user-defined
-  fuction $f$ calls another user-defined function $g$, we construct $\gradf{g}$ as
+  function~$f$ calls another user-defined function~$g$, we construct $\gradf{g}$ as
   described; and then construct $\gradf{f}$. The latter simply calls $\gradf{g}$.
 
 \item The AD transformation is \emph{partial}; that is, it does not work for every
@@ -474,6 +480,7 @@ Of course, CSE may recover it.
   proper care of sharing is what makes AD AD and not just any old form
   of symbolic differentiation, in my personal nomenclature at least.
   Does that make it any clearer what I mean?}
+  \awf{For me, ``AD'' very specifically implies a second argument to the function.   That's how you detect it's AD.  I.e.  $f'(x,dx) = ....$ is forward mode, and $f`(x,df) = ...$ is reverse mode.  There's a lot of chat about what AD really is, and those who want to avoid such chat often now say ``algorithmic differentiation'', to mean ``all this stuff''.  The real claim we want to explore is this: ``Forward mode is good for functions with small inputs and large outputs, e.g. $\RR \mapsto \RR^n$, and reverse mode is for $\RR^n \mapsto \RR$.}
 
 \subsection{AD for vectors} \label{sec:ad-vectors}
 
@@ -651,6 +658,7 @@ fun f2`(x, dr)
 \end{verbatim}
 }
 
+\end{document}
 
 \section{Old stuff about Build and lambda} \label{sec:build-lam-fail}
 
