@@ -22,12 +22,15 @@ cseE cse_env subst (Let v r b)
 
 cseE _ subst e = substE subst e
 
+------------------------
 substE :: M.Map Var Expr -> Expr -> Expr
+-- Substitution
 substE subst (Konst k)   = Konst k
 substE subst (Var v)     = case M.lookup v subst of
                             Just e  -> e
                             Nothing -> Var v
 substE subst (Call f e)  = Call f (substE subst e)
+substE subst (If b t e)  = If (substE subst b) (substE subst t) (substE subst e)
 substE subst (Tuple es)  = Tuple (map (substE subst) es)
 substE subst (App e1 e2) = App (substE subst e1) (substE subst e2)
 substE subst (Lam v e)   = Lam v (substE (v `M.delete` subst) e)

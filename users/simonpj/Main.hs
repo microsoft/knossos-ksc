@@ -68,10 +68,19 @@ ex5 = Def (Fun (SFun "f5")) [sx,sy] $
       Var sv
 
 ex6 :: Def
+-- f6 x y = sum (x * y)
 ex6 = Def (Fun (SFun "dot")) [sx, sy] $
       pSum (pMul (Var sx) (Var sy))
 
-sp, sq, sr, sv, sx, sy, sz :: Var
+ex7 :: Def
+-- f7 x y = sum (build (size x) (\i -> x[i] * y[i]))
+ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
+      pSum (pBuild (pSize (Var sx))
+                   (Lam si (pMul (pIndex (Var sx) (Var si))
+                                 (pIndex (Var sy) (Var si)))))
+
+si, sp, sq, sr, sv, sx, sy, sz :: Var
+si = Simple "i"
 sp = Simple "p"
 sq = Simple "q"
 sr = Simple "r"

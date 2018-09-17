@@ -90,6 +90,7 @@ $$
           & |   & \lambda x \dot e & \mbox{Lambda} \\
           & |   & e_1 \; e_2 & \mbox{Application} \\
           & |   & \mbox{\lstinline|let $x$ = $e_1$ in $\;e_2$|} \\
+          & |   & \mbox{\lstinline|if $b$ then $e_1$ else $e_2$|} \\
         \\
         \multicolumn{4}{l}{\mbox{\bf Types}} \\
         \tau & ::= & \nat & \mbox{Natural numbers} \\
@@ -119,7 +120,10 @@ Note that
 \item Pairs are built-in, with selectors $\sel{1}{2}, \sel{2}{2}$.
   (In the real implementation, pairs are generalised to $n$-tuples.)
 
-\item Conditionals are handled by a function $\iffun$.
+\item Conditionals are are a language construct. \simon{Treating ``if'' as a function
+  just didn't work; in particular $\gradf{if}$ needed a linear-map version of
+  ``if'' and once we have that we might as well build ``if'' in.  Anyway,
+  conditionals are very fundamental, so it's unsurprising.}
 
 \item Let-bindings are non-recursive. For now, at least, top-level
   functions are also non-recursive.  \simon{I think that top-level
@@ -143,11 +147,11 @@ $$
   (*) & :: & Field \; t \darrow (t,t) \to t \\
   \sel{1}{2} & :: & (t_1,t_2) \to t_1 & \mbox{Selection} \\
   \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
-  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
+%  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
   \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
   \indexfun{\cdot}{\cdot} & :: & (\vector{t},\; \nat) \to t & \mbox {Indexing} \\
   \sumfunname & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
-  \iffun & :: & Bool \to r \to r \to r \\
+  \sizefun & :: & \vector{t} \to \nat & \mbox{Size of a vector} \\
 \end{array}
 $$
 \\[3mm]
@@ -161,12 +165,10 @@ $$
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
         \gradf{\indexfun{\cdot}{\cdot}} & :: & (\vector{t},\; \nat) \to ((\vector{t},\; \nat) \linto t) \\
-        \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & \lmbuildt( \sizefun(v), \lambda j. \deltafun(i,j)) \lmjoin \lmzero \\[2mm]
+        \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & \lmbuildt( \sizefun(v),
+               \lambda j. \lstinline|if|\, i=j \,\lstinline|then|\, \lmone  \, \lstinline|else|\, \lmzero ) \lmjoin \lmzero \\[2mm]
         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
-        \gradf{\iffun} & :: & (Bool,r,r) \to (((Bool,r,r) \linto r)) \\
-        \gradf{\iffun}(True,t,f) & = & \lmzero \lmjoin \lmone \lmjoin \lmzero \\
-        \gradf{\iffun}(False,t,f) & = & \lmzero \lmjoin \lmzero \lmjoin \lmone \\
         \ldots
         \end{array}
 $$
@@ -186,13 +188,13 @@ We allow ourselves to write vector indexing using square brackets, thus $a[i]$.
 Multiplication and addition are overloaded to work on any suitable type.
 On vectors they work element-wise; if you want dot-product you have to program it.
 
-The Kronecker delta $\deltafun$ is defined thus:
-$$
-\begin{array}{rcll}
-  \deltafun(i,j) & = & 1 & \mbox{if $i=j$} \\
-  & = & 0 & \mbox{otherwise}
-\end{array}
-$$
+% The Kronecker delta $\deltafun$ is defined thus:
+% $$
+% \begin{array}{rcll}
+%   \deltafun(i,j) & = & 1 & \mbox{if $i=j$} \\
+%  & = & 0 & \mbox{otherwise}
+% \end{array}
+% $$
 
 \subsection{Vectors}
 
@@ -268,8 +270,8 @@ we say why in Section~\ref{sec:gen-fold}.
     \lmscalar{k} \lmapply x & = & k * x \\
 %    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
 %    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
-    \lmbuild(n,f) \lmapply x & = & build(n, \lambda i. (f\; i) \lmapply x) \\
-    \lmbuildt(n,f) \lmapply x & = & \sumfun{\buildfun(n,\; \lambda i. (f\; i) \lmapply x[i] )} \\
+    \lmbuild(n,\lambda i.\, m) \lmapply x & = & build(n, \lambda i.\, m \lmapply x) \\
+    \lmbuildt(n,\lambda i.\, m) \lmapply x & = & \sumfun{\buildfun(n,\; \lambda i.\, m \lmapply x[i] )} \\
    \end{array}
   $$
 \\[3mm]
@@ -508,9 +510,7 @@ Of course, CSE may recover it.
 Like other built-in functions, each built-in function for vectors
 has has its full Jacobian versions, defined in Figure~\ref{fig:built-in}.
 You may enjoy checking that $\gradf{\sumfunname}$ and
-$\gradf{\indexfun{\cdot}{\cdot}}$ are correct!  I did think about having
-a specialised linear map for indexing, rather than using $\lmbuildt$,
-but then I needed its transposition, and that needed $\deltafun$ anyway.
+$\gradf{\indexfun{\cdot}{\cdot}}$ are correct! 
 
 But $\buildfun$ is an exception!  It is handled specially
 by the AD transformation in Figure~\ref{fig:ad}; there is no $\gradf{\buildfun}$.
@@ -518,7 +518,23 @@ Moreover the AD transformation only works if the second argument of the build is
 a lambda, thus $\buildfun(e_n, \lambda i.e)$.  I tried dealing with build and
 lambdas separately, but failed (see Section~\ref{sec:build-lam-fail}).
 
-o\subsection{General folds} \label{sec:gen-fold}
+I did think about having a specialised linear map for indexing, rather
+than using $\lmbuildt$, but then I needed its transposition, so just
+using $\lmbuildt$ seemed more economical.  On the other hand, with the
+fucntions as I have them, I need the grotesquely delicate optimisation
+rule
+$$
+\begin{array}{l}
+\sumfun{\buildfun( n, \lambda i.\, \lstinline|if| \, i == e_i \,
+     \lstinline|then| \, e \, 
+     \lstinline|else| \, 0 )} \\
+\quad = \;\; \lstinline|let|\, i = e_i \, \lstinline|in|\, b \\
+\mbox{if} \; i \not\in e_i
+\end{array}
+$$
+I hate this!
+
+\subsection{General folds} \label{sec:gen-fold}
 
 We have $\sumfunname :: \vector{\real} \to \real$.  What is $\gradf{\sumfunname}$?
 One way to define its semantics is by applying it:

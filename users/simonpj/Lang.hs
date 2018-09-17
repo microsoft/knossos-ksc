@@ -57,6 +57,7 @@ data Var
 data Konst = KZero  -- Of any type
            | KInteger Integer
            | KFloat   Float
+           | KBool    Bool
            deriving( Eq, Ord, Show )
 
 isKZero :: Expr -> Bool
@@ -80,6 +81,7 @@ data ExprX b
   | Lam b (ExprX b)
   | App (ExprX b) (ExprX b)
   | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
+  | If (ExprX b) (ExprX b) (ExprX b)
   deriving (Eq, Ord, Show)
 
 type Expr = ExprX Var
@@ -106,6 +108,18 @@ seqExpr (Call fun e) x = fun `seq` e `seqExpr` x
 seqExpr (Konst k) x = k `seq` x
 seqExpr (Let v r b) x = v `seq` r `seqExpr` b `seqExpr` x
 seqExpr (Tuple es) x = Prelude.foldr seqExpr x es
+
+--------------
+notFreeIn :: Var -> Expr -> Bool
+notFreeIn v e = go e
+ where
+   go (Var v2) = v /= v2
+   go (Konst _) = True
+   go (Tuple es) = all go es
+   go (If b t e) = go b && go t && go e
+   go (App f a)  = go f && go a
+   go (Let v2 r b) = go r && (v == v2 || go b)
+   go (Lam v2 e)   = v == v2 || go e
 
 ------ Pretty printer ------
 
@@ -159,7 +173,11 @@ pprExpr p (Let v e1 e2)
                 (bracesSp $ PP.sep [ ppr v
                                    , PP.nest 2 (PP.text "=" PP.<+> ppr e1) ])
            , ppr e2 ]
-
+pprExpr p (If e1 e2 e3)
+  = parensIf p precZero $
+    PP.sep [ PP.text "if" PP.<+> ppr e1
+           , PP.text "then" PP.<+> ppr e2
+           , PP.text "else" PP.<+> ppr e3 ]
 
 pprCall :: Prec -> Fun -> Expr -> Doc
 pprCall prec f (Tuple [e1,e2])

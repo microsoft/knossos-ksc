@@ -16,14 +16,20 @@ gradV v          = error ("gradV: bad varaible: " ++ PP.render (ppr v))
 gradE :: Expr -> Expr
 gradE (Konst k)       = lmZero
 gradE (Var v)         = Var (gradV v)
+
+gradE (Call (Fun (SFun "build")) (Tuple [n, Lam i b]))
+  = lmBuild n (Lam i (gradE b))
+
 gradE (Call fun arg) = Call (gradF fun) arg
                            `lmCompose`
                        gradE arg
+
 gradE (Let v e1 e2) = Let v e1                 $
                       Let (gradV v) (gradE e1) $
                       gradE e2
 
 gradE (Tuple es) = lmVCat (map gradE es)
+gradE (If b t e) = If b (gradE t) (gradE e)
 
 gradD :: Def -> Def
 gradD (Def fun vars rhs)

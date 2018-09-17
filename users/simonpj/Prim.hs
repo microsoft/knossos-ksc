@@ -51,6 +51,9 @@ lmBuild e f = Call (LMFun "lmBuild") (Tuple [e, f])
 lmBuildT :: TExpr Int -> TExpr (Int -> LM t s) -> TExpr (LM (Vector t) s)
 lmBuildT e f = Call (LMFun "lmBuildT") (Tuple [e, f])
 
+lmDelta :: TExpr Nat -> TExpr Nat -> TExpr (LM a a)
+lmDelta i j = If (pEqual i j) lmOne lmZero
+
 isLMOne, isLMZero :: Expr -> Bool
 isLMOne (Call (LMFun "lmOne") _) = True
 isLMOne _ = False
@@ -71,6 +74,10 @@ pAdd a b = Call (Fun (SFun "+")) (Tuple [a,b])
 pMul a b = Call (Fun (SFun "*")) (Tuple [a,b])
 pDiv a b = Call (Fun (SFun "/")) (Tuple [a,b])
 pNeg x   = Call (Fun (SFun "neg")) x
+pEqual a b = Call (Fun (SFun "==")) (Tuple [a,b])
+
+pBuild :: TExpr Nat -> TExpr (Nat -> t) -> TExpr (Vector t)
+pBuild n f = Call (Fun (SFun "build")) (Tuple [n,f])
 
 pIndex :: TExpr (Vector a) -> TExpr Int -> TExpr a
 pIndex e i = Call (Fun (SFun "index")) (Tuple [e,i])
@@ -80,12 +87,6 @@ pSum e = Call (Fun (SFun "sum")) e
 
 pSize :: TExpr (Vector Float) -> TExpr Nat
 pSize e = Call (Fun (SFun "size")) e
-
-pDelta :: TExpr Nat -> TExpr Nat -> TExpr Float
-pDelta i j = Call (Fun (SFun "delta")) (Tuple [i,j])
-
-pIf :: TExpr Bool -> TExpr t -> TExpr t -> TExpr t
-pIf b t e = Call (Fun (SFun "if")) (Tuple [b,t,e])
 
 pSel :: Int -> Int -> Expr -> Expr
 pSel i n x = Call (Fun (SelFun i n)) x
