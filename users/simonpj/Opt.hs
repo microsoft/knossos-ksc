@@ -22,6 +22,8 @@ optE :: TExpr a -> TExpr a
 optE (Tuple es)         = Tuple (map optE es)
 optE (Var v)            = Var v
 optE (Konst k)          = Konst k
+optE (Lam v e)          = Lam v (optE e)
+optE (App e1 e2)        = App (optE e1) (optE e2)  -- ToDo!
 optE (Let var rhs body) = Let var (optE rhs) (optE body)
 optE (Call fun arg)     = case optCall fun opt_arg of
                             Nothing -> Call fun opt_arg
@@ -66,17 +68,19 @@ optGradFun :: FunId -> Expr -> Maybe Expr
 -- (D+)(x,y) :: (F,F) -o F
 optGradFun (SFun "+") _ = Just (lmHCat [lmOne, lmOne])
 
--- fst :: (a,b) -> a
--- Dfst(x,y) :: (a,b) -o a
-optGradFun (SelFun i n) _ = Just (lmHCat [ if i == j then lmOne else lmZero
-                                          | j <- [1..n] ])
-
 optGradFun (SFun "*") (Tuple [x,y])
   = Just (lmHCat [lmScale y, lmScale x])
 
 optGradFun (SFun "/") (Tuple [x,y])
   = Just (lmHCat [ lmScale (pDiv (kInt 1) y)
                  , lmScale (pNeg (pDiv x (pMul y y)))])
+-- fst :: (a,b) -> a
+-- Dfst(x,y) :: (a,b) -o a
+optGradFun (SelFun i n) _ = Just (lmHCat [ if i == j then lmOne else lmZero
+                                          | j <- [1..n] ])
+
+optGradFun (SFun "sum") e
+  = Just (lmBuildT (pSize e) (Lam (Simple "i") lmOne))
 
 optGradFun _ _ = Nothing
 
@@ -207,6 +211,20 @@ occAnal e = fst (occAnalE e)
 occAnalE :: Expr -> (ExprX (Int,Var), M.Map Var Int)
 occAnalE (Var v)   = (Var v, M.singleton v 1)
 occAnalE (Konst k) = (Konst k, M.empty)
+occAnalE (App e1 e2)
+  = (App e1' e2', M.union vs1 vs2)
+  where
+    (e1', vs1) = occAnalE e1
+    (e2', vs2) = occAnalE e2
+
+occAnalE (Lam v e)
+  = (Lam (n,v) e', v `M.delete` vs)
+  where
+    (e', vs) = occAnalE e
+    n = case v `M.lookup` vs of
+          Just n  -> n
+          Nothing -> 0
+
 occAnalE (Call f e) = (Call f e', vs)
                       where
                         (e',vs) = occAnalE e
@@ -248,9 +266,11 @@ substE e = go M.empty e
           Just e  -> e
           Nothing -> Var v
 
-    go subst (Konst k) = Konst k
-    go subst (Call f e) = Call f (go subst e)
-    go subst (Tuple es) = Tuple (map (go subst) es)
+    go subst (Konst k)     = Konst k
+    go subst (Call f e)    = Call f (go subst e)
+    go subst (Tuple es)    = Tuple (map (go subst) es)
+    go subst (App e1 e2)   = App (go subst e1) (go subst e2)
+    go subst (Lam (_,v) e) = Lam v (go (v `M.delete` subst) e)
 
 inline_me :: Int -> Var -> Expr -> Bool
 inline_me n bndr rhs
@@ -259,7 +279,7 @@ inline_me n bndr rhs
   | isTrivial rhs   = True
   | Grad {} <- bndr = True
   | otherwise       = False
-  
+
 isTrivial :: Expr -> Bool
 isTrivial (Tuple [])          = True
 isTrivial (Var {})            = True

@@ -67,6 +67,10 @@ ex5 = Def (Fun (SFun "f5")) [sx,sy] $
                    (pMul (kInt 3) (Var sr))) $
       Var sv
 
+ex6 :: Def
+ex6 = Def (Fun (SFun "dot")) [sx, sy] $
+      pSum (pMul (Var sx) (Var sy))
+
 sp, sq, sr, sv, sx, sy, sz :: Var
 sp = Simple "p"
 sq = Simple "q"
@@ -88,7 +92,7 @@ demo def
        ; banner "Anf-ised original definition"
        ; let (u1, anf_def) = anfD initialUniq def
        ; display anf_def
-       
+
        ; banner "The full Jacobian (unoptimised)"
        ; let grad_def = gradD anf_def
        ; display grad_def

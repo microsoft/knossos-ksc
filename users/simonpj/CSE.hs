@@ -29,5 +29,7 @@ substE subst (Var v)     = case M.lookup v subst of
                             Nothing -> Var v
 substE subst (Call f e)  = Call f (substE subst e)
 substE subst (Tuple es)  = Tuple (map (substE subst) es)
+substE subst (App e1 e2) = App (substE subst e1) (substE subst e2)
+substE subst (Lam v e)   = Lam v (substE (v `M.delete` subst) e)
 substE subst (Let v r b) = Let v (substE subst r) $
                            substE (v `M.delete` subst) b

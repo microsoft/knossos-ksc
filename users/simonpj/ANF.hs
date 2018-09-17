@@ -16,6 +16,11 @@ anfE (Var v)       = return (Var v)
 anfE (Let v r e)   = do { r' <- anfE r
                         ; emit v r'
                         ; anfE e }
+anfE (App e1 e2)   = do { f <- anfE e1
+                        ; a <- anfE1 e2
+                        ; return (App f a) }
+anfE (Lam v e)     = do { e' <- wrapLets (anfE e)
+                        ; return (Lam v e') }
 
 anfE1 :: Expr -> AnfM Expr
 -- Returns an atomic expression
@@ -38,13 +43,13 @@ type FloatDef = (Var, Expr)
 
 runAnf :: Uniq -> AnfM a -> (Uniq, a)
 runAnf u (AnfM f) = case f u of (u', _, r) -> (u', r)
-                    
+
 newtype AnfM a = AnfM (Uniq -> (Uniq, [FloatDef], a))
 
 instance Applicative AnfM where
   pure  = return
   (<*>) = ap
-  
+
 instance Functor AnfM where
   fmap f m = do { x <- m; return (f x) }
 

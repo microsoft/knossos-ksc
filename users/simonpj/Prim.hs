@@ -1,6 +1,11 @@
 module Prim where
 
+import Data.Array
+
 import Lang
+
+type Nat = Int
+type Vector t = Array Nat t
 
 data LM a b   -- Linear maps
 
@@ -40,6 +45,12 @@ lmTranspose m = Call (LMFun "lmTranspose") m
 lmApply :: TExpr (LM a b) -> TExpr a -> TExpr b
 lmApply lm arg = Call (LMFun "lmApply") (Tuple [lm, arg])
 
+lmBuild :: TExpr Int -> TExpr (Int -> LM s t) -> TExpr (LM s (Vector t))
+lmBuild e f = Call (LMFun "lmBuild") (Tuple [e, f])
+
+lmBuildT :: TExpr Int -> TExpr (Int -> LM t s) -> TExpr (LM (Vector t) s)
+lmBuildT e f = Call (LMFun "lmBuildT") (Tuple [e, f])
+
 isLMOne, isLMZero :: Expr -> Bool
 isLMOne (Call (LMFun "lmOne") _) = True
 isLMOne _ = False
@@ -60,6 +71,21 @@ pAdd a b = Call (Fun (SFun "+")) (Tuple [a,b])
 pMul a b = Call (Fun (SFun "*")) (Tuple [a,b])
 pDiv a b = Call (Fun (SFun "/")) (Tuple [a,b])
 pNeg x   = Call (Fun (SFun "neg")) x
+
+pIndex :: TExpr (Vector a) -> TExpr Int -> TExpr a
+pIndex e i = Call (Fun (SFun "index")) (Tuple [e,i])
+
+pSum :: TExpr (Vector Float) -> TExpr Float
+pSum e = Call (Fun (SFun "sum")) e
+
+pSize :: TExpr (Vector Float) -> TExpr Nat
+pSize e = Call (Fun (SFun "size")) e
+
+pDelta :: TExpr Nat -> TExpr Nat -> TExpr Float
+pDelta i j = Call (Fun (SFun "delta")) (Tuple [i,j])
+
+pIf :: TExpr Bool -> TExpr t -> TExpr t -> TExpr t
+pIf b t e = Call (Fun (SFun "if")) (Tuple [b,t,e])
 
 pSel :: Int -> Int -> Expr -> Expr
 pSel i n x = Call (Fun (SelFun i n)) x

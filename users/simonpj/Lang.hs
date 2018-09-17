@@ -77,6 +77,8 @@ data ExprX b
   | Var Var
   | Call Fun (ExprX b)         -- f e
   | Tuple [ExprX b]            -- (e1, ..., en)
+  | Lam b (ExprX b)
+  | App (ExprX b) (ExprX b)
   | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
   deriving (Eq, Ord, Show)
 
@@ -149,6 +151,8 @@ pprExpr _  (Var v)   = ppr v
 pprExpr _ (Konst k)  = ppr k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = parens (pprWithCommas es)
+pprExpr p (Lam v e)  = parensIf p precZero $
+                       PP.char '\\' <> ppr v <> PP.char '.' <+> ppr e
 pprExpr p (Let v e1 e2)
   = parensIf p precZero $
     PP.vcat [ PP.text "let" PP.<+>
