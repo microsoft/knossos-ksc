@@ -166,9 +166,9 @@ $$
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
         \gradf{\indexfun{\cdot}{\cdot}} & :: & (\vector{t},\; \nat) \to ((\vector{t},\; \nat) \linto t) \\
         \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & \lmbuildt( \sizefun(v),
-               \lambda j. \lstinline|if|\, i=j \,\lstinline|then|\, \lmone  \, \lstinline|else|\, \lmzero ) \lmjoin \lmzero \\[2mm]
-        \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
-        \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
+               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \lmjoin \lmzero \\[2mm]
+         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
+         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
         \ldots
         \end{array}
 $$
@@ -245,9 +245,11 @@ we say why in Section~\ref{sec:gen-fold}.
            & \mbox{Vertical juxtaposition} \\
     \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
            & \mbox{Horizontal juxtaposition} \\
-    \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\
-%     \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
-%     \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
+    \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\[2mm]
+%    \\
+    \multicolumn{5}{l}{\mbox{\bf NB: We expect to have only $\lmlam{\cdot} / \lmlamt{\cdot}$ or $\lmbuild / \lmbuildt$, but not both}} \\
+    \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
+    \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
     \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{t}) \\
     \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) \\
   \end{array}
@@ -268,8 +270,8 @@ we say why in Section~\ref{sec:gen-fold}.
     \lmzero \lmapply x  & = & 0 \\
     \lmone \lmapply x & = & x \\
     \lmscalar{k} \lmapply x & = & k * x \\
-%    \lmlam{f} \lmapply x & = & \lambda n\dot (f n) \lmapply x \\
-%    \lmlamt{f} \lmapply g & = & \Sigma_i f(i) \lmapply g(i) \\
+   \lmlam{f} \lmapply x & = & \lambda i\dot (f\; i) \lmapply x \\
+   \lmlamt{f} \lmapply g & = & \Sigma_i (f \;i) \lmapply g(i) \\
     \lmbuild(n,\lambda i.\, m) \lmapply x & = & build(n, \lambda i.\, m \lmapply x) \\
     \lmbuildt(n,\lambda i.\, m) \lmapply x & = & \sumfun{\buildfun(n,\; \lambda i.\, m \lmapply x[i] )} \\
    \end{array}
@@ -288,8 +290,8 @@ we say why in Section~\ref{sec:gen-fold}.
     \lmtrans{(\lmtrans{m})} & = & m \\
     \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
     \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
-%    \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
-%    \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
+   \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
+   \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
   \end{array}
   $$
 \\[3mm]
@@ -401,7 +403,7 @@ $$
         \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
         \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
         \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e}) \\
-%         \grad{\lambda x \dot e} & = & \lmlam{\lambda x\dot \grad{e}} \\
+        \grad{\lambda i \dot e} & = & \lmlam{\lambda i\dot \grad{e}} \\
         \grad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
         & = & \begin{array}[t]{l}
            \mbox{\lstinline|let $\;x\;$ = $\;e_1\;$ in|} \\
@@ -525,10 +527,10 @@ fucntions as I have them, I need the grotesquely delicate optimisation
 rule
 $$
 \begin{array}{l}
-\sumfun{\buildfun( n, \lambda i.\, \lstinline|if| \, i == e_i \,
-     \lstinline|then| \, e \, 
-     \lstinline|else| \, 0 )} \\
-\quad = \;\; \lstinline|let|\, i = e_i \, \lstinline|in|\, b \\
+\sumfun{\buildfun( n, \lambda i.\, \mbox{\lstinline|if|} \, i == e_i \,
+     \mbox{\lstinline|then|} \, e \,
+     \mbox{\lstinline|else|} \, 0 )} \\
+\quad = \;\; \mbox{\lstinline|let|}\, i = e_i \, \mbox{\lstinline|in|}\, b \\
 \mbox{if} \; i \not\in e_i
 \end{array}
 $$
