@@ -80,10 +80,9 @@ optFun (SFun "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
 -- size (build (n, _)) = n
 optFun (SFun "size") (Call (Fun (SFun "build")) (Tuple [n,_]))
   = Just n
-  
--- index (build n f) j = f j
-optFun (SFun "index") (Tuple [ Call (Fun (SFun "build")) (Tuple [_, f])
-                             , ei ])
+
+-- index j (build n f) = f j
+optFun (SFun "index") (Tuple [ ei, Call (Fun (SFun "build")) (Tuple [_, f]) ])
   = Just (App f ei)
 
 -- sum (build n (\i. if (i==e) then v else 0)
@@ -98,8 +97,8 @@ optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [_,bb]))
 
 -- sum (build n (\i. (e1,e2)))
 --  = (sum (build n (\i.e1)), sum (build n (\i.e2)))
--- optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
---   = Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
+optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
+   = Just (Tuple (map (\e -> pSum (pBuild n (Lam i e))) es))
 
 optFun fun arg = Nothing
 
@@ -126,9 +125,9 @@ optGradFun (SelFun i n) _ = Just (lmHCat [ if i == j then lmOne else lmZero
 optGradFun (SFun "sum") e
   = Just (lmBuildT (pSize e) (Lam (Simple "i") lmOne))
 
-optGradFun (SFun "index") (Tuple [v,i])
-  = Just (lmHCat [ lmBuildT (pSize v) (Lam (Simple "j") (lmDelta (Var (Simple "j")) i))
-                 , lmZero ])
+optGradFun (SFun "index") (Tuple [i,v])
+  = Just (lmHCat [ lmZero
+                 , lmBuildT (pSize v) (Lam (Simple "j") (lmDelta (Var (Simple "j")) i)) ])
 
 optGradFun _ _ = Nothing
 
@@ -225,7 +224,7 @@ optApplyCall (LMFun "lmBuild") (Tuple [n, Lam i m]) dx
   = Just (pBuild n (Lam i (lmApply m dx)))
 
 optApplyCall (LMFun "lmBuildT") (Tuple [n, Lam i m]) dx
-  = Just (pSum (pBuild n (Lam i (lmApply m (pIndex dx (Var i))))))
+  = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
 
 optApplyCall fun arg dx
   = Nothing

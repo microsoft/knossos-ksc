@@ -79,8 +79,8 @@ pEqual a b = Call (Fun (SFun "==")) (Tuple [a,b])
 pBuild :: TExpr Nat -> TExpr (Nat -> t) -> TExpr (Vector t)
 pBuild n f = Call (Fun (SFun "build")) (Tuple [n,f])
 
-pIndex :: TExpr (Vector a) -> TExpr Int -> TExpr a
-pIndex e i = Call (Fun (SFun "index")) (Tuple [e,i])
+pIndex :: TExpr Int -> TExpr (Vector a) -> TExpr a
+pIndex i e = Call (Fun (SFun "index")) (Tuple [i,e])
 
 pSum :: TExpr (Vector Float) -> TExpr Float
 pSum e = Call (Fun (SFun "sum")) e

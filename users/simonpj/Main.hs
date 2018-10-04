@@ -76,8 +76,8 @@ ex7 :: Def
 -- f7 x y = sum (build (size x) (\i -> x[i] * y[i]))
 ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
       pSum (pBuild (pSize (Var sx))
-                   (Lam si (pMul (pIndex (Var sx) (Var si))
-                                 (pIndex (Var sy) (Var si)))))
+                   (Lam si (pMul (pIndex (Var si) (Var sx))
+                                 (pIndex (Var si) (Var sy)))))
 
 si, sp, sq, sr, sv, sx, sy, sz :: Var
 si = Simple "i"

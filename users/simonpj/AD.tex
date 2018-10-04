@@ -165,7 +165,7 @@ $$
         \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\[2mm]
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
-        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\vector{t},\; \nat) \linto t) \\
+        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
         \gradf{\indexfunname}(i,v) & = & \lmzero \lmjoin \lmbuildt( \sizefun(v),
                \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
          \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
@@ -251,9 +251,9 @@ we say why in Section~\ref{sec:gen-fold}.
 %    \\
     \multicolumn{5}{l}{\mbox{\bf NB: We expect to have only $\lmlam / \lmlamt$ or $\lmbuild / \lmbuildt$, but not both}} \\
     \mbox{Lambda} & \lmlam & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
-    \mbox{TLambda} & \lmlamt & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
+    \mbox{TLambda} & \lmlamt & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) & \mbox{Transpose of $\lmlam$} \\
     \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{t}) \\
-    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) \\
+    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) & \mbox{Transpose of $\lmbuild$} \\
   \end{array}
   $$
 \end{minipage}}
@@ -360,12 +360,6 @@ A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n 
 Many of the operators over linear maps then have simple matrix interpetations; for example, composition of
 linear maps $(\lmcomp)$ is matrix multiplication, pairing $(\lmpair)$ is vetical juxtaposition, and so on.
 These matrix interpretations are all tiven in the final column of Figure~\ref{fig:linear-maps}.
-
-\awf{possibly good to get this right up front here:
-The operations $\lmjoin$ and $\lmpair$ defined below then become horizontal and vertical matrix concatenation.
-I.e., if $\lmtomat a$ is the matrix representation of linear map $a$, then  $\lmtomat (p \lmjoin q) = [\lmtomat p \mid \lmtomat q]$
-AHA: just found figure 3 -- when doc settles down, might be good to get that figure earlier.
-}\simon{I've added the previous para; we can sort out figure placement later.  OK?  If so, delete comments.}
 
 \subsection{Lambdas and linear maps}
 
@@ -483,6 +477,25 @@ Note that
 \end{itemize}
 
 \subsection{Forward and reverse AD}
+
+Consider
+\begin{lstlisting}
+  f(x) = p( q( r( x )))
+\end{lstlisting}
+Just running the algorithm above on $f$ gives
+$$
+\begin{array}{rcl}
+  f(x)  & = & p( q( r( x ))) \\
+  \gradf{f}(x) & = & \gradf{p} \lmcomp (\gradf{q} \lmcomp \gradf{r}) \\
+  \fwdDf{f}(x,dx) & = & (\gradf{p} \lmcomp (\gradf{q} \lmcomp \gradf{r})) \lmapply dx \\
+  & = & \gradf{p} \lmapply ((\gradf{q} \lmcomp \gradf{r}) \lmapply dx) \\
+  & = & \gradf{p} \lmapply (\gradf{q} \lmapply (\gradf{r} \lmapply dx)) \\
+  \gradft{f}(x) & = & (\gradft{r} \lmcomp \gradft{q}) \lmcomp \gradft{p} \\
+  \revDf{f}(x,dr) & = & ((\gradft{r} \lmcomp \gradft{q}) \lmcomp \gradft{p}) \lmapply dr \\
+     & = & (\gradft{r} \lmcomp \gradft{q}) \lmapply (\gradft{p} \lmapply dr) \\
+     & = & \gradft{r} \lmapply (\gradft{q} \lmapply (\gradft{p} \lmapply dr)) \\
+\end{array}
+$$
 
 In \emph{``The essence of automatic differentiation''} Conal says (Section 12)
 \begin{quote}
