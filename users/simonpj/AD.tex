@@ -30,7 +30,8 @@
 \newcommand{\sumfun}[1]{\sumfunname(#1)}   % Wanted to allow either \Sigma e or sum(e)
 \newcommand{\sizefun}{size}
 \newcommand{\deltafun}{\delta}
-\newcommand{\indexfun}[2]{#1[#2]}   % Vector indexing
+\newcommand{\indexfunname}{\mathit{index}}  
+\newcommand{\indexfun}[2]{\indexfunname(#2,#1)} % Vector indexing  \indexfun{v}{i}
 \renewcommand{\vector}[1]{\mathit{Vec}\;#1}
 \def\RR{\mathbb R}
 
@@ -51,10 +52,10 @@
 \newcommand{\lmzero}{\mathbf{0}}     % 0
 \newcommand{\lmone}{\mathbf{1}}      % 1
 \newcommand{\lmscalar}[1]{{\mathcal S}(#1)}      % S(k)
-\newcommand{\lmlam}[1]{{\mathcal L}(#1)}      % L(k)
-\newcommand{\lmlamt}[1]{{\mathcal M}(#1)}     % Transposed lambda
+\newcommand{\lmlam}{{\mathcal L}}      % L(k)
+\newcommand{\lmlamt}{{\mathcal L'}}     % Transposed lambda
 \newcommand{\lmbuild}{\mathcal B}             % Build linear map
-\newcommand{\lmbuildt}{\mathcal C}             % Transposed Build linear map
+\newcommand{\lmbuildt}{\mathcal B'}             % Transposed Build linear map
 
 \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 \newcommand{\tom}[1]{{\color{red}TE: #1}}
@@ -90,7 +91,7 @@ $$
           & |   & \lambda x \dot e & \mbox{Lambda} \\
           & |   & e_1 \; e_2 & \mbox{Application} \\
           & |   & \mbox{\lstinline|let $x$ = $e_1$ in $\;e_2$|} \\
-          & |   & \mbox{\lstinline|if $b$ then $e_1$ else $e_2$|} \\
+          & |   & \mbox{\lstinline|if $\;b\;$ then $\;e_1\;$ else $\;e_2$|} \\
         \\
         \multicolumn{4}{l}{\mbox{\bf Types}} \\
         \tau & ::= & \nat & \mbox{Natural numbers} \\
@@ -149,7 +150,7 @@ $$
   \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
 %  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
   \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
-  \indexfun{\cdot}{\cdot} & :: & (\vector{t},\; \nat) \to t & \mbox {Indexing} \\
+  \indexfunname & :: & (\nat, \; \vector{t}) \to t & \mbox {Indexing} \\
   \sumfunname & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
   \sizefun & :: & \vector{t} \to \nat & \mbox{Size of a vector} \\
 \end{array}
@@ -164,9 +165,9 @@ $$
         \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\[2mm]
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
-        \gradf{\indexfun{\cdot}{\cdot}} & :: & (\vector{t},\; \nat) \to ((\vector{t},\; \nat) \linto t) \\
-        \gradf{\indexfun{\cdot}{\cdot}}(v,i) & = & \lmbuildt( \sizefun(v),
-               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \lmjoin \lmzero \\[2mm]
+        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\vector{t},\; \nat) \linto t) \\
+        \gradf{\indexfunname}(i,v) & = & \lmzero \lmjoin \lmbuildt( \sizefun(v),
+               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
          \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
          \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
         \ldots
@@ -205,7 +206,8 @@ A matrix can be represented as a vector of vectors.
 Vectors are supported by the following built-in functions (Figure~\ref{fig:built-in}):
 \begin{itemize}
 \item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
-\item $\indexfun{\cdot}{\cdot} :: (\vector{t},\; \nat) \to t$ for indexing.
+\item $\indexfunname :: (\nat,\; \vector{t}) \to t$ for indexing.  Informally we allow ourselves to write
+  $v[i]$ instead of $\indexfun{v}{i}$.
 \item $\sumfunname :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
 We specifically do not have a general, higher order, fold operator;
 we say why in Section~\ref{sec:gen-fold}.
@@ -247,9 +249,9 @@ we say why in Section~\ref{sec:gen-fold}.
            & \mbox{Horizontal juxtaposition} \\
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\[2mm]
 %    \\
-    \multicolumn{5}{l}{\mbox{\bf NB: We expect to have only $\lmlam{\cdot} / \lmlamt{\cdot}$ or $\lmbuild / \lmbuildt$, but not both}} \\
-    \mbox{Lambda} & \lmlam{\cdot} & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
-    \mbox{TLambda} & \lmlamt{\cdot} & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
+    \multicolumn{5}{l}{\mbox{\bf NB: We expect to have only $\lmlam / \lmlamt$ or $\lmbuild / \lmbuildt$, but not both}} \\
+    \mbox{Lambda} & \lmlam & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
+    \mbox{TLambda} & \lmlamt & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) \\
     \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{t}) \\
     \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) \\
   \end{array}
@@ -270,8 +272,8 @@ we say why in Section~\ref{sec:gen-fold}.
     \lmzero \lmapply x  & = & 0 \\
     \lmone \lmapply x & = & x \\
     \lmscalar{k} \lmapply x & = & k * x \\
-   \lmlam{f} \lmapply x & = & \lambda i\dot (f\; i) \lmapply x \\
-   \lmlamt{f} \lmapply g & = & \Sigma_i (f \;i) \lmapply g(i) \\
+   \lmlam(f) \lmapply x & = & \lambda i\dot (f\; i) \lmapply x \\
+   \lmlamt(f) \lmapply g & = & \Sigma_i (f \;i) \lmapply g(i) \\
     \lmbuild(n,\lambda i.\, m) \lmapply x & = & build(n, \lambda i.\, m \lmapply x) \\
     \lmbuildt(n,\lambda i.\, m) \lmapply x & = & \sumfun{\buildfun(n,\; \lambda i.\, m \lmapply x[i] )} \\
    \end{array}
@@ -290,8 +292,8 @@ we say why in Section~\ref{sec:gen-fold}.
     \lmtrans{(\lmtrans{m})} & = & m \\
     \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
     \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
-   \lmtrans{\lmlam{\lambda i. m}} & = & \lmlamt{\lambda i. \lmtrans{m}} \\
-   \lmtrans{\lmlamt{\lambda i. m}} & = & \lmlam{\lambda i. \lmtrans{m}} \\
+   \lmtrans{\lmlam(\lambda i. m)} & = & \lmlamt(\lambda i. \lmtrans{m}) \\
+   \lmtrans{\lmlamt(\lambda i. m)} & = & \lmlam(\lambda i. \lmtrans{m}) \\
   \end{array}
   $$
 \\[3mm]
@@ -341,10 +343,11 @@ to an argument of type $s$.
   \item Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.  Note that $(\lmcomp)$ and $\lmadd$ behave
     like multiplication and addition respectively.
 
-\item Theorem: $\forall (m :: S \linto T).\, m \lmapply 0 = 0$.  That is, all linear maps
-pass through the origin.  Proof: property (LM2) with $k=0$.  Note that the function
+\item {\bf Theorem}: $\forall (m :: S \linto T).\, m \lmapply 0 = 0$.  That is, all linear maps
+pass through the origin.  {\bf Proof}: property (LM2) with $k=0$.  Note that the function
 $\lambda x. x+4$ is not a linear map; its graph is a staight line, but it does not
 go through the origin.
+
 \end{itemize}
 
 
@@ -364,6 +367,22 @@ I.e., if $\lmtomat a$ is the matrix representation of linear map $a$, then  $\lm
 AHA: just found figure 3 -- when doc settles down, might be good to get that figure earlier.
 }\simon{I've added the previous para; we can sort out figure placement later.  OK?  If so, delete comments.}
 
+\subsection{Lambdas and linear maps}
+
+Notice the similarity between the type of $(\lmpair)$ and the type of $\lmlam$; the latter is really
+just an infinite version of the latter.
+Their semantics in Figure~\ref{fig:lm-laws} are equally closely  related.
+
+The tranpsositions of these two linear maps, $(\lmjoin)$ and $\lmlamt$, are
+similarly related. \emph{But}, there is a problem with the semantics of
+$\lmlamt$:
+$$
+   \lmlamt(f) \lmapply g \quad = \quad \Sigma_i (f \;i) \lmapply g(i) \\
+$$
+This is an \emph{infinite sum}, so there is something fishy about this as a semantics.
+
+For this reason
+
 \subsection{Questions about linear maps}
 
 \begin{itemize}
@@ -372,7 +391,6 @@ AHA: just found figure 3 -- when doc settles down, might be good to get that fig
     float is 1 --- the nearby floats are far away, and there's no other float $f$ such that $\lmscalar f = \lmone$.}
   \simon{For the purposes of this paper I prefer having $\lmone$ as well; unity plays such a key role!}
 \item Do these laws fully define linear maps?
-\item How do we transpose $\lmbuild$?
 \end{itemize}
 Notes
 \begin{itemize}
@@ -409,7 +427,7 @@ $$
         \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
         \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
         \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e}) \\
-        \grad{\lambda i \dot e} & = & \lmlam{\lambda i\dot \grad{e}} \\
+        \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e}) \\
         \grad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
         & = & \begin{array}[t]{l}
            \mbox{\lstinline|let $\;x\;$ = $\;e_1\;$ in|} \\
@@ -518,8 +536,14 @@ Of course, CSE may recover it.
 Like other built-in functions, each built-in function for vectors
 has has its full Jacobian versions, defined in Figure~\ref{fig:built-in}.
 You may enjoy checking that $\gradf{\sumfunname}$ and
-$\gradf{\indexfun{\cdot}{\cdot}}$ are correct! 
+$\gradf{\indexfunname}$ are correct! 
 
+For $\buildfun$ there are two possible paths, and it's not yet clear
+which is best
+\begin{description}
+\item[Direct path.]  Figure~\ref{fig:ad} includes a rule
+  for $\grad{\buildfun(e_n, \lambda i.e)}$.
+\end{description}
 But $\buildfun$ is an exception!  It is handled specially
 by the AD transformation in Figure~\ref{fig:ad}; there is no $\gradf{\buildfun}$.
 Moreover the AD transformation only works if the second argument of the build is

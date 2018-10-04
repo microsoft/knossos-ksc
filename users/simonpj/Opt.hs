@@ -96,6 +96,11 @@ optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [_,bb]))
   , i `notFreeIn` ej
   = Just (Let i ej v)
 
+-- sum (build n (\i. (e1,e2)))
+--  = (sum (build n (\i.e1)), sum (build n (\i.e2)))
+-- optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
+--   = Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
+
 optFun fun arg = Nothing
 
 
