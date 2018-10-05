@@ -2,6 +2,8 @@
 
 module Lang where
 
+import Prelude hiding( (<>) )
+
 import Text.PrettyPrint as PP
 
 import Text.Parsec
