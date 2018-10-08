@@ -81,12 +81,16 @@ optFun (SFun "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
 optFun (SFun "size") (Call (Fun (SFun "build")) (Tuple [n,_]))
   = Just n
 
+-- size (x * y) = size(x)
+optFun (SFun "size") (Call (Fun (SFun "*")) (Tuple [x,_]))
+  = Just (Call (Fun (SFun "size")) x)
+
 -- index j (build n f) = f j
 optFun (SFun "index") (Tuple [ ei, Call (Fun (SFun "build")) (Tuple [_, f]) ])
   = Just (App f ei)
 
--- sum (build n (\i. if (i==e) then v else 0)
---  = v[i := e]
+-- sum (build n (\i. if (i==ej) then v else 0)
+--  = let i = ej in v
 optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [_,bb]))
   | Lam i (If (Call (Fun (SFun "==")) (Tuple [Var i2, ej]))
               v
@@ -95,8 +99,8 @@ optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [_,bb]))
   , i `notFreeIn` ej
   = Just (Let i ej v)
 
--- sum (build n (\i. (e1,e2)))
---  = (sum (build n (\i.e1)), sum (build n (\i.e2)))
+-- sum (build n (\i. (e1,e2,...)))
+--  = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
 optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
    = Just (Tuple (map (\e -> pSum (pBuild n (Lam i e))) es))
 
@@ -173,6 +177,11 @@ optLM "lmAdd" (Tuple [p,q])
   | Call (LMFun "lmScale") x <- p
   , Call (LMFun "lmScale") y <- p
   = Just (lmScale (pAdd x y))
+
+-- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
+optLM "lmAdd" (Tuple [Call (LMFun "lmHCat") (Tuple ps), Call (LMFun "lmHCat") (Tuple qs)])
+  = let adds = zipWith (\ pi qi -> Call (LMFun "lmAdd") (Tuple [pi, qi])) ps qs
+    in Just (Call (LMFun "lmHCat") (Tuple adds))  
 
 optLM fun arg = Nothing
 
