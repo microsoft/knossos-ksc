@@ -11,7 +11,7 @@ gradF f       = error ("gradF: bad function: " ++ show f)
 
 gradV :: Var -> Var
 gradV (Simple x) = Grad x Fwd
-gradV v          = error ("gradV: bad varaible: " ++ PP.render (ppr v))
+gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
 
 gradE :: Expr -> Expr
 gradE (Konst k)       = lmZero
