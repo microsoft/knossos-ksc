@@ -179,16 +179,24 @@ optLM "lmAdd" (Tuple [p,q])
   , Call (LMFun "lmScale") y <- q
   = Just (lmScale (pAdd x y))
 
-{- how do I do inline unit tests?
- - I much prefer them at the definition site
- TestEqual (optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4])) 
-           (Just (lmScale (mkInfixCall (Fun (SFun "+")) (kFloat 1.3) (kFloat 0.4))))
+{- Paste to test
+  let have = (optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4])) in
+  let want = (Just (lmScale (mkSCall2 "+" (kFloat 1.3) (kFloat 0.4)))) in
+   have == want
 -}
+-- Q: how do I do inline unit tests? I much prefer them at the definition site
 
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
 optLM "lmAdd" (Tuple [Call (LMFun "lmHCat") (Tuple ps), Call (LMFun "lmHCat") (Tuple qs)])
-  = let adds = zipWith (\ pi qi -> Call (LMFun "lmAdd") (Tuple [pi, qi])) ps qs
-    in Just (Call (LMFun "lmHCat") (Tuple adds))
+  = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
+
+{- Paste to test
+    let ps = map kInt [1,2,3] in
+    let qs = map kInt [11,22,33] in
+    let have = show $ ppr (optE (lmAdd (lmHCat ps) (lmHCat qs))) in
+    let want = "lmHCat(lmAdd(1, 11), lmAdd(2, 22), lmAdd(3, 33))" in
+      have == want
+-}
 
 optLM fun arg = Nothing
 

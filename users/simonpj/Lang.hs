@@ -94,6 +94,12 @@ type Expr = ExprX Var
 mkInfixCall :: Fun -> Expr -> Expr -> Expr
 mkInfixCall f a b = Call f (Tuple [a, b])
 
+mkSCall1 :: String -> Expr -> Expr
+mkSCall1 fname a = Call (Fun (SFun fname)) a
+
+mkSCall2 :: String -> Expr -> Expr -> Expr
+mkSCall2 fname a b = Call (Fun (SFun fname)) (Tuple [a, b])
+
 mkLets :: [(Var,Expr)] -> Expr -> Expr
 mkLets [] e = e
 mkLets ((v,r):bs) e = Let v r (mkLets bs e)
@@ -107,6 +113,8 @@ kInt i = Konst (KInteger i)
 
 kFloat :: Float -> Expr
 kFloat f = Konst (KFloat f)
+
+
 
 seqExpr :: Expr -> a -> a
 seqExpr (Var v) x = v `seq` x
