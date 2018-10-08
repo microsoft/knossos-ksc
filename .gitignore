@@ -6,6 +6,12 @@
 *.lo
 *.o
 *.obj
+obj/
+Debug/
+Release/
+
+# nuget packages
+/packages/
 
 # Precompiled Headers
 *.gch
@@ -58,3 +64,11 @@
 *.depend*
 *.dyn_o
 *.dyn_hi
+
+# TeX
+users/simonpj/AD.dvi
+users/simonpj/AD.log
+users/simonpj/AD.pdf
+*.synctex(busy)
+*.synctex.gz
+*.xcp
