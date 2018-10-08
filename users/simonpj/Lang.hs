@@ -88,7 +88,8 @@ data ExprX b
 
 type Expr = ExprX Var
 
-data Value = VKonst Konst
+-- awf: is this needed?
+-- data Value = VKonst Konst
 
 mkInfixCall :: Fun -> Expr -> Expr -> Expr
 mkInfixCall f a b = Call f (Tuple [a, b])
@@ -103,6 +104,9 @@ mkTuple es  = Tuple es
 
 kInt :: Integer -> Expr
 kInt i = Konst (KInteger i)
+
+kFloat :: Float -> Expr
+kFloat f = Konst (KFloat f)
 
 seqExpr :: Expr -> a -> a
 seqExpr (Var v) x = v `seq` x

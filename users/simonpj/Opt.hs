@@ -170,18 +170,25 @@ optLM "lmCompose" (Tuple [f,g])
 optLM "lmVCat" (Tuple es)
   | all isLMZero es = Just lmZero
 
+-- Add(0, x) = x = Add(x, 0)
 optLM "lmAdd" (Tuple [p,q])
   | isLMZero p = Just q
   | isLMZero q = Just p
-
+-- Add(Scale(x), Scale(y)) = Scale(Add(x,y))
   | Call (LMFun "lmScale") x <- p
-  , Call (LMFun "lmScale") y <- p
+  , Call (LMFun "lmScale") y <- q
   = Just (lmScale (pAdd x y))
+
+{- how do I do inline unit tests?
+ - I much prefer them at the definition site
+ TestEqual (optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4])) 
+           (Just (lmScale (mkInfixCall (Fun (SFun "+")) (kFloat 1.3) (kFloat 0.4))))
+-}
 
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
 optLM "lmAdd" (Tuple [Call (LMFun "lmHCat") (Tuple ps), Call (LMFun "lmHCat") (Tuple qs)])
   = let adds = zipWith (\ pi qi -> Call (LMFun "lmAdd") (Tuple [pi, qi])) ps qs
-    in Just (Call (LMFun "lmHCat") (Tuple adds))  
+    in Just (Call (LMFun "lmHCat") (Tuple adds))
 
 optLM fun arg = Nothing
 
