@@ -83,7 +83,7 @@ optFun (SFun "size") (Call (Fun (SFun "build")) (Tuple [n,_]))
 
 -- size (x * y) = size(x)
 optFun (SFun "size") (Call (Fun (SFun "*")) (Tuple [x,_]))
-  = Just (Call (Fun (SFun "size")) x)
+  = Just (mkSCall1 "size" x)
 
 -- index j (build n f) = f j
 optFun (SFun "index") (Tuple [ ei, Call (Fun (SFun "build")) (Tuple [_, f]) ])
@@ -109,7 +109,7 @@ optFun fun arg = Nothing
 
 -----------------------
 optGradFun :: FunId -> Expr -> Maybe Expr
--- Inline the definitions for grad(+), gran(*) etc
+-- Inline the definitions for grad(+), grad(*) etc
 
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F

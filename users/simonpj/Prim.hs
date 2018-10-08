@@ -70,23 +70,23 @@ gradSelFun i n = Call (GradFun (SelFun i n) Fwd) (Tuple [])
 
 -----------------------
 pAdd, pMul :: TExpr Float -> TExpr Float -> TExpr Float
-pAdd a b = Call (Fun (SFun "+")) (Tuple [a,b])
-pMul a b = Call (Fun (SFun "*")) (Tuple [a,b])
-pDiv a b = Call (Fun (SFun "/")) (Tuple [a,b])
-pNeg x   = Call (Fun (SFun "neg")) x
-pEqual a b = Call (Fun (SFun "==")) (Tuple [a,b])
+pAdd a b = mkSCall2 "+" a b
+pMul a b = mkSCall2 "*" a b
+pDiv a b = mkSCall2 "/" a b
+pNeg x   = mkSCall1 "neg" x
+pEqual a b = mkSCall2 "==" a b
 
 pBuild :: TExpr Nat -> TExpr (Nat -> t) -> TExpr (Vector t)
-pBuild n f = Call (Fun (SFun "build")) (Tuple [n,f])
+pBuild n f = mkSCall2 "build" n f
 
 pIndex :: TExpr Int -> TExpr (Vector a) -> TExpr a
-pIndex i e = Call (Fun (SFun "index")) (Tuple [i,e])
+pIndex i e = mkSCall2 "index" i e
 
 pSum :: TExpr (Vector Float) -> TExpr Float
-pSum e = Call (Fun (SFun "sum")) e
+pSum e = mkSCall1 "sum" e
 
 pSize :: TExpr (Vector Float) -> TExpr Nat
-pSize e = Call (Fun (SFun "size")) e
+pSize e = mkSCall1 "size" e
 
 pSel :: Int -> Int -> Expr -> Expr
 pSel i n x = Call (Fun (SelFun i n)) x

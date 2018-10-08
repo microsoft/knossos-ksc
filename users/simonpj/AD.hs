@@ -64,7 +64,7 @@ applyD (Def (GradFun f d) vars rhs)
     dr = Delta "r"
 
 ---------------------------------
--- Traanspose
+-- Transpose
 
 transposeD :: Def -> Def
 transposeD (Def (GradFun f d) args rhs)
