@@ -18,20 +18,23 @@ anfE (Call fun (Tuple es))
        ; return (Call fun (Tuple [n, e'])) }
   | otherwise
   = (Call fun . Tuple) <$> mapM anfE1 es
-anfE (Call fun e)          = Call fun <$> anfE1 e
-anfE (Konst k)     = return (Konst k)
-anfE (Var v)       = return (Var v)
-anfE (Let v r e)   = do { r' <- anfE r
-                        ; emit v r'
-                        ; anfE e }
-anfE (If b t e)    = do { t' <- wrapLets (anfE t)
-                        ; e' <- wrapLets (anfE e)
-                        ; return (If b t' e') }
-anfE (App e1 e2)   = do { f <- anfE e1
-                        ; a <- anfE1 e2
-                        ; return (App f a) }
-anfE (Lam v e)     = do { e' <- wrapLets (anfE e)
-                        ; return (Lam v e') }
+anfE (Konst k)      = return (Konst k)
+anfE (Var v)        = return (Var v)
+anfE (Call fun e)   = Call fun <$> anfE1 e
+anfE (Let v r e)    = do { r' <- anfE r
+                         ; emit v r'
+                         ; anfE e }
+anfE (If b t e)     = do { t' <- wrapLets (anfE t)
+                         ; e' <- wrapLets (anfE e)
+                         ; return (If b t' e') }
+anfE (App e1 e2)    = do { f <- anfE e1
+                         ; a <- anfE1 e2
+                         ; return (App f a) }
+anfE (Lam v e)      = do { e' <- wrapLets (anfE e)
+                         ; return (Lam v e') }
+anfE (Assert e1 e2) = do { e1' <- anfE e1
+                         ; e2' <- wrapLets (anfE e2)
+                         ; return (Assert e1' e2') }
 
 anfE1 :: Expr -> AnfM Expr
 -- Returns an atomic expression

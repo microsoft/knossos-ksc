@@ -25,6 +25,12 @@ occAnalE (App e1 e2)
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
+occAnalE (Assert e1 e2)
+  = (Assert e1' e2', M.union vs1 vs2)
+  where
+    (e1', vs1) = occAnalE e1
+    (e2', vs2) = occAnalE e2
+
 occAnalE (Lam v e)
   = (Lam (n,v) e', v `M.delete` vs)
   where
@@ -81,12 +87,13 @@ optLetsE e = go M.empty e
           Just e  -> e
           Nothing -> Var v
 
-    go subst (Konst k)     = Konst k
-    go subst (Call f e)    = Call f (go subst e)
-    go subst (If b t e)    = If (go subst b) (go subst t) (go subst e)
-    go subst (Tuple es)    = Tuple (map (go subst) es)
-    go subst (App e1 e2)   = App (go subst e1) (go subst e2)
-    go subst (Lam (_,v) e) = Lam v (go (v `M.delete` subst) e)
+    go subst (Konst k)      = Konst k
+    go subst (Call f e)     = Call f (go subst e)
+    go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)
+    go subst (Tuple es)     = Tuple (map (go subst) es)
+    go subst (App e1 e2)    = App (go subst e1) (go subst e2)
+    go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
+    go subst (Lam (_,v) e)  = Lam v (go (v `M.delete` subst) e)
 
 inline_me :: Int -> Var -> Expr -> Bool
 inline_me n bndr rhs
@@ -101,4 +108,5 @@ isTrivial (Tuple [])          = True
 isTrivial (Var {})            = True
 isTrivial (Konst {})          = True
 isTrivial (Call _ (Tuple [])) = True
+isTrivial (Assert e1 e2)      = isTrivial e2
 isTrivial e = False

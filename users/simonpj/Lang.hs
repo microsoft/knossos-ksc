@@ -21,6 +21,7 @@ import Control.Monad.Trans
 import System.Console.Haskeline
 
 import Data.Map
+import Debug.Trace( trace )
 
 infixr 0 `seqExpr`
 
@@ -84,6 +85,7 @@ data ExprX b
   | App (ExprX b) (ExprX b)
   | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
   | If (ExprX b) (ExprX b) (ExprX b)
+  | Assert (ExprX b) (ExprX b)
   deriving (Eq, Ord, Show)
 
 type Expr = ExprX Var
@@ -134,6 +136,7 @@ notFreeIn v e = go e
    go (App f a)  = go f && go a
    go (Let v2 r b) = go r && (v == v2 || go b)
    go (Lam v2 e)   = v == v2 || go e
+   go (Assert e1 e2) = go e1 && go e2
 
 ------ Pretty printer ------
 
@@ -167,12 +170,16 @@ type Prec = Int
  -- 0 => no need for parens
  -- high => parenthesise everything
 
-precZero = 0  -- Base
-precOne  = 1  -- +
-precTwo  = 2  -- *
+precZero  = 0  -- Base
+precOne   = 1  -- ==
+precTwo   = 2  -- +
+precThree = 3  -- *
 
 instance Pretty Expr where
   ppr expr = pprExpr 0 expr
+
+pprParendExpr :: Expr -> Doc
+pprParendExpr = pprExpr precTwo
 
 pprExpr :: Prec -> Expr -> Doc
 pprExpr _  (Var v)   = ppr v
@@ -192,6 +199,10 @@ pprExpr p (If e1 e2 e3)
     PP.sep [ PP.text "if" PP.<+> ppr e1
            , PP.text "then" PP.<+> ppr e2
            , PP.text "else" PP.<+> ppr e3 ]
+pprExpr p (Assert e1 e2)
+  = parensIf p precZero $
+    PP.sep [ PP.text "assert" PP.<+> pprParendExpr e1
+           , ppr e2 ]
 
 pprCall :: Prec -> Fun -> Expr -> Doc
 pprCall prec f (Tuple [e1,e2])
@@ -204,10 +215,11 @@ pprCall _ f e            = ppr f PP.<> parensSp (ppr e)
 
 isInfix :: Fun -> Maybe Prec
 isInfix (Fun (SFun s))
-  | s == "+" = Just precOne
-  | s == "-" = Just precOne
-  | s == "*" = Just precTwo
-  | s == "/" = Just precTwo
+  | s == "==" = Just precOne
+  | s == "+"  = Just precTwo
+  | s == "-"  = Just precTwo
+  | s == "*"  = Just precThree
+  | s == "/"  = Just precThree
 isInfix _ = Nothing
 
 parensIf :: Prec -> Prec -> Doc -> Doc
@@ -246,6 +258,10 @@ pprWithCommas ps = PP.sep (add_commas ps)
 
 instance Pretty a => Pretty [a] where
   ppr xs = PP.char '[' <> pprWithCommas xs <> PP.char ']'
+
+pprTrace :: String -> Doc -> a -> a
+pprTrace str doc v
+  = trace (PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v
 
 {-
 ------- Parser -------

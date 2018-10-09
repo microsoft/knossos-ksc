@@ -75,6 +75,7 @@ ex6 = Def (Fun (SFun "dot")) [sx, sy] $
 ex7 :: Def
 -- f7 x y = sum (build (size x) (\i -> x[i] * y[i]))
 ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
+      assertEqual (pSize (Var sx)) (pSize (Var sy)) $
       pSum (pBuild (pSize (Var sx))
                    (Lam si (pMul (pIndex (Var si) (Var sx))
                                  (pIndex (Var si) (Var sy)))))

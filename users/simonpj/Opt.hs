@@ -1,9 +1,8 @@
-module Opt where
+module Opt( optLets, optD ) where
 
 import Lang
 import Prim
 import OptLet
-import CSE
 import Text.PrettyPrint as PP
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -26,6 +25,7 @@ optE (Var v)            = Var v
 optE (Konst k)          = Konst k
 optE (Lam v e)          = Lam v (optE e)
 optE (App e1 e2)        = optApp (optE e1) (optE e2)
+optE (Assert e1 e2)     = Assert (optE e1) (optE e2)
 optE (Let var rhs body) = Let var (optE rhs) (optE body)
 optE (If b t e)         = optIf (optE b) (optE t) (optE e)
 optE (Call fun arg)     = case optCall fun opt_arg of
@@ -36,8 +36,7 @@ optE (Call fun arg)     = case optCall fun opt_arg of
 
 --------------
 optApp :: TExpr (a->b) -> TExpr a -> TExpr b
-optApp (Lam v e) a = optE (substE (M.singleton v a) e)
-                     -- Or, better? let v = a in e
+optApp (Lam v e) a = Let v (optE a) (optE e)
 optApp f a         = App f a
 
 --------------
@@ -203,6 +202,9 @@ optLM fun arg = Nothing
 
 ---------------
 optApply :: TExpr (LM a b) -> TExpr a -> Maybe (TExpr b)
+optApply (Assert e1 e2) dx
+  = Just (Assert e1 (lmApply e2 dx))
+
 optApply (Call f es) dx
   = optApplyCall f es dx
 
@@ -256,8 +258,10 @@ optApplyCall fun arg dx
 
 ----------------------
 optTrans :: TExpr (LM a b) -> Maybe (TExpr (LM b a))
+-- Transpose an expression
 optTrans (Var (Grad n d)) = Just (Var (Grad n (flipMode d)))
 optTrans (Call f a)       = optTransCall f a
+optTrans (Assert e1 e2)   = fmap (Assert e1) (optTrans e2)
 optTrans (Let (Grad n d) rhs body)
   = Just $ Let (Grad n (flipMode d)) (lmTranspose rhs) $
     lmTranspose body

@@ -69,6 +69,13 @@ gradSelFun i 1 = lmOne
 gradSelFun i n = Call (GradFun (SelFun i n) Fwd) (Tuple [])
 
 -----------------------
+-- Assertion
+
+assertEqual :: TExpr a -> TExpr a -> TExpr b -> TExpr b
+assertEqual x y body
+  = Assert (mkSCall2 "==" x y) body
+  
+-----------------------
 pAdd, pMul :: TExpr Float -> TExpr Float -> TExpr Float
 pAdd a b = mkSCall2 "+" a b
 pMul a b = mkSCall2 "*" a b
