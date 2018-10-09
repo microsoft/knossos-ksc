@@ -60,6 +60,7 @@ optIf b                     t e = If b t e
 optCall :: Fun
         -> Expr   -- Argument, already optimised
         -> Maybe Expr
+optCall fun (Let v r arg)   = Just (Let v r (Call fun arg))
 optCall (LMFun lm)      arg = optLM lm arg
 optCall (Fun f)         arg = optFun f arg
 optCall (GradFun f Fwd) arg = optGradFun f arg
@@ -67,34 +68,35 @@ optCall _ _ = Nothing
 
 -----------------------
 optFun :: FunId -> Expr -> Maybe Expr
+-- RULE:  sel_i_n (..., ei, ...)  ==>  ei
 optFun (SelFun i _) (Tuple es)
   | i <= length es = Just (es !! (i-1))
 
--- x+0 = 0+x = x
+-- RULE: x+0 = 0+x = x
 optFun (SFun "+") (Tuple [x, Konst KZero]) = Just x
 optFun (SFun "+") (Tuple [Konst KZero, y]) = Just y
 
--- (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
+-- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optFun (SFun "+") (Tuple [Tuple es1, Tuple es2])
   | length es1 == length es2 = Just (Tuple (zipWith pAdd es1 es2))
 
--- x*0 = 0*x = 0
+-- RULE: x*0 = 0*x = 0
 optFun (SFun "*") (Tuple [x, Konst KZero]) = Just (Konst KZero)
 optFun (SFun "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
 
--- size (build (n, _)) = n
+-- RULE: size (build (n, _)) = n
 optFun (SFun "size") (Call (Fun (SFun "build")) (Tuple [n,_]))
   = Just n
 
--- size (x * y) = size(x)
+-- RULE: size (x * y) = size(x)
 optFun (SFun "size") (Call (Fun (SFun "*")) (Tuple [x,_]))
   = Just (mkSCall1 "size" x)
 
--- index j (build n f) = f j
+-- RULE: index j (build n f) = f j
 optFun (SFun "index") (Tuple [ ei, Call (Fun (SFun "build")) (Tuple [_, f]) ])
   = Just (App f ei)
 
--- sum (build n (\i. if (i==ej) then v else 0)
+-- RULLE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
 optFun (SFun "sum")   arg = optSum arg
 optFun (SFun "build") (Tuple [sz, Lam i e2]) = optBuild sz i e2
@@ -117,17 +119,20 @@ optSum (Call (Fun (SFun "diag")) (Tuple [sz, f]))
 optSum (Call (Fun (SFun "deltaVec")) (Tuple [_, _, e]))
   = Just e
 
-optSum _ = Nothing
+optSum e = Nothing
 
 -----------------------
 optBuild :: TExpr Int -> Var -> TExpr a -> Maybe (TExpr (Vector a))
 
--- build sz (\i. delta i ex eb)  =  deltaVec sz ex eb
+-- build sz (\i. delta i ex eb)  =  let i = ex in
+--                                  deltaVec sz i eb
+--     (if i is not free in ex)
+-- NB: however, i might be free in eb
 optBuild sz i e
   | Call (Fun (SFun "delta")) (Tuple [e1,e2,eb]) <- e
   , Just ex <- ok_eq e1 e2
   , i `notFreeIn` ex
-  = Just (pDeltaVec sz ex eb)
+  = Just $ Let i ex $ pDeltaVec sz (Var i) eb
   where
     -- We want this to work for both (\i. delta i j e)
     --                           and (\j. delta i j e)

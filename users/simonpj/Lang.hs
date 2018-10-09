@@ -213,8 +213,11 @@ pprCall prec f (Tuple [e1,e2])
   = parensIf prec prec' $
     sep [ pprExpr prec' e1, ppr f <+> pprExpr prec' e2 ]
 
-pprCall _ f e@(Tuple {}) = ppr f PP.<> ppr e
-pprCall _ f e            = ppr f PP.<> parensSp (ppr e)
+pprCall _ f e = ppr f PP.<> parensSp pp_args
+  where
+    pp_args = case e of
+                Tuple es -> pprWithCommas es
+                _        -> ppr e
 
 isInfix :: Fun -> Maybe Prec
 isInfix (Fun (SFun s))
