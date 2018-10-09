@@ -1,4 +1,4 @@
-module Opt( optLets, optD ) where
+module Opt( optLets, optD, optE, simplify ) where
 
 import Lang
 import Prim
@@ -43,6 +43,12 @@ optApp f a         = App f a
 optIf :: TExpr Bool -> TExpr r -> TExpr r -> TExpr r
 optIf (Konst (KBool True))  t e = t
 optIf (Konst (KBool False)) t e = e
+optIf (Let v r b)           t e = Let v r   (optIf b t e)
+optIf (Assert e1 e2)        t e = Assert e1 (optIf e2 t e)
+optIf e_cond e_then e_else
+  | Just (ei, ej) <- isEqualityCall e_cond
+  , Konst KZero   <- e_else
+  = pDelta ei ej e_then
 optIf b                     t e = If b t e
 
 --------------
@@ -90,21 +96,53 @@ optFun (SFun "index") (Tuple [ ei, Call (Fun (SFun "build")) (Tuple [_, f]) ])
 
 -- sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
-optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [_,bb]))
-  | Lam i (If (Call (Fun (SFun "==")) (Tuple [Var i2, ej]))
-              v
-              (Konst KZero)) <- bb
-  , i == i2
-  , i `notFreeIn` ej
-  = Just (Let i ej v)
+optFun (SFun "sum")   arg = optSum arg
+optFun (SFun "build") (Tuple [sz, Lam i e2]) = optBuild sz i e2
+
+optFun _ _ = Nothing
+
+-----------------------
+optSum :: TExpr (Vector a) -> Maybe (TExpr a)
 
 -- sum (build n (\i. (e1,e2,...)))
 --  = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
-optFun (SFun "sum") (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
-   = Just (Tuple (map (\e -> pSum (pBuild n (Lam i e))) es))
+optSum (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
+   = Just $ Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
 
-optFun fun arg = Nothing
+-- sum (diag sz f)  =  build sz f
+optSum (Call (Fun (SFun "diag")) (Tuple [sz, f]))
+  = Just $ pBuild sz f
 
+-- sum (deltaVec sz i e) = e
+optSum (Call (Fun (SFun "deltaVec")) (Tuple [_, _, e]))
+  = Just e
+
+optSum _ = Nothing
+
+-----------------------
+optBuild :: TExpr Int -> Var -> TExpr a -> Maybe (TExpr (Vector a))
+
+-- build sz (\i. delta i ex eb)  =  deltaVec sz ex eb
+optBuild sz i e
+  | Call (Fun (SFun "delta")) (Tuple [e1,e2,eb]) <- e
+  , Just ex <- ok_eq e1 e2
+  , i `notFreeIn` ex
+  = Just (pDeltaVec sz ex eb)
+  where
+    -- We want this to work for both (\i. delta i j e)
+    --                           and (\j. delta i j e)
+    ok_eq (Var v) e2 | v == i = Just e2
+    ok_eq e1 (Var v) | v == i = Just e1
+    ok_eq _ _ = Nothing
+
+-- build sz (\i. deltaVec sz i e)   = diag sz (\i. e)
+optBuild sz i build_e
+  | Call (Fun (SFun "deltaVec")) (Tuple [sz2, Var i2, e]) <- build_e
+  , sz == sz2
+  , i  == i2
+  = Just $ pDiag sz (Lam i e)
+
+optBuild _ _ _ = Nothing
 
 -----------------------
 optGradFun :: FunId -> Expr -> Maybe Expr

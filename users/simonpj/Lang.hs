@@ -102,6 +102,9 @@ mkSCall1 fname a = Call (Fun (SFun fname)) a
 mkSCall2 :: String -> Expr -> Expr -> Expr
 mkSCall2 fname a b = Call (Fun (SFun fname)) (Tuple [a, b])
 
+mkSCall3 :: String -> Expr -> Expr -> Expr -> Expr
+mkSCall3 fname a b c = Call (Fun (SFun fname)) (Tuple [a, b, c])
+
 mkLets :: [(Var,Expr)] -> Expr -> Expr
 mkLets [] e = e
 mkLets ((v,r):bs) e = Let v r (mkLets bs e)
