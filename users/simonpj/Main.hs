@@ -6,6 +6,7 @@ import AD
 import ANF
 import Opt
 import CSE
+import Parse
 
 ex1 :: Def
 -- f x = let y = x*x in x + y
@@ -93,7 +94,14 @@ sy2 = Simple "y2"
 sz = Simple "z"
 szt = Simple "zt"
 
-
+demoF :: String -> IO ()
+-- String is the file name
+demoF file
+  = do { cts <- readFile file
+       ; case runParser parseDef cts of
+            Left err  -> putStrLn ("Failed parse: " ++ show err)
+            Right def -> demo def }
+  
 demo :: Def -> IO ()
 demo def
   = do { banner "Original definition"
