@@ -15,10 +15,30 @@ optD :: Def -> Def
 optD (Def f as r) = Def f as (simplify r)
 
 simplify :: Expr -> Expr
-simplify =  optLets . optE . optLets
+simplify =  optE . optLets . optE . optLets
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
     
+{- with that extra optE:
+  
+fun logsumexp`(x, dr)
+  = assert (size( x ) == size( y ))
+    build( size( x ),
+           \i. exp( index( i, x ) )
+               * ((1.0 / sum( build( size( x ), \i. exp( index( i, x ) ) ) ))
+                  * dr) )
+
+  and without
+fun logsumexp`(x, dr)
+  = assert (size( x ) == size( y ))
+    sum( build( size( x ),
+                \i. deltaVec( size( x ),
+                              i,
+                              exp( index( i, x ) )
+                              * ((1.0 / sum( build( size( x ), \i. exp( index( i, x ) ) ) ))
+                                 * dr) ) ) )
+
+  -}
 ---------------
 optE :: TExpr a -> TExpr a
 optE (Tuple es)         = Tuple (map optE es)
@@ -147,6 +167,21 @@ optBuild sz i build_e
   , sz == sz2
   , i  == i2
   = Just $ pDiag sz (Lam i e)
+
+-- build sz (\i. f e1 ... eN ...)  =
+--    let tN = eN in
+--    build sz (\i. f e1 .. tN ... )
+-- { if i is not free in eN }
+optBuild sz i e
+  | Call (Fun (SFun f)) (Tuple [e1,e2]) <- e
+  , is_expensive e2 -- try to apply only to "expensive" operations
+  , i `notFreeIn` e2
+  = Just $ Let tmp e2 $ pBuild sz (Lam i (Call (Fun (SFun f)) (Tuple [e1, (Var tmp)])))
+  where
+    tmp = newVarNotIn (pBuild sz (Lam i e)) -- slightly inefficient to reassemble outer expr here
+    is_expensive (Var _) = False
+    is_expensive (Konst _) = False
+    is_expensive _ = True
 
 optBuild _ _ _ = Nothing
 

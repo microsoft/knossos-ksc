@@ -15,6 +15,7 @@ import System.Console.Haskeline
 
 import Data.Map
 import Debug.Trace( trace )
+import Test.Hspec
 
 infixr 0 `seqExpr`
 
@@ -134,6 +135,32 @@ notFreeIn v e = go e
    go (Let v2 r b) = go r && (v == v2 || go b)
    go (Lam v2 e)   = v == v2 || go e
    go (Assert e1 e2) = go e1 && go e2
+
+-----------------
+newVarNotIn :: Expr -> Var
+newVarNotIn e = go e 1 -- FIXME start with hash of e to reduce retries
+  where go e n =
+          let v = Simple ("_t" ++ show n) in
+            if v `notFreeIn` e then
+              v
+            else
+              trace ("newVarNotIn: Var " ++ show v ++ "was bound in E, retry") (
+              go e (n + 1))
+
+test_FreeIn () =
+  hspec $ do 
+    let e = Call (Fun (SFun "f")) (Var (Simple "i"))
+    let e2 = Call (Fun (SFun "f")) (Var (Simple "_t1"))
+    describe "notFreeIn" $ do
+      it ("i notFreeIn " ++ show (ppr (e::Expr))) $
+        (Simple "i" `notFreeIn` e) `shouldBe` False
+      it ("x not notFreeIn " ++ show (ppr (e::Expr))) $
+        (Simple "x" `notFreeIn` e) `shouldBe` True
+    describe "newVarNotIn" $ do
+      it "not in, so new var is _t1..." $
+        newVarNotIn e `shouldBe` (Simple "_t1")
+      it "in, so new var is _t2..." $
+        newVarNotIn e2 `shouldBe` (Simple "_t2")
 
 ------ Pretty printer ------
 
