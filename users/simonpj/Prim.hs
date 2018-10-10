@@ -68,6 +68,33 @@ gradSelFun :: Int -> Int -> Expr
 gradSelFun i 1 = lmOne
 gradSelFun i n = Call (GradFun (SelFun i n) Fwd) (Tuple [])
 
+-----------------------
+-- Assertion
+
+assertEqual :: TExpr a -> TExpr a -> TExpr b -> TExpr b
+assertEqual x y body
+  = Assert (mkSCall2 "==" x y) body
+
+isEqualityCall :: TExpr Bool -> Maybe (TExpr a, TExpr a)
+isEqualityCall (Call (Fun (SFun "==")) (Tuple [e1,e2]))
+  = Just (e1,e2)
+isEqualityCall _ = Nothing
+
+-----------------------
+-- Delta and diag
+
+pDelta :: TExpr a -> TExpr a -> TExpr b -> TExpr b
+-- delta i j e  =  if i==j then e else zero
+pDelta ei ej e = mkSCall3 "delta" ei ej e
+
+pDeltaVec :: TExpr Int -> TExpr Int -> TExpr a -> TExpr (Vector a)
+-- deltaVec size i e = build size (\j. delta i j e)
+pDeltaVec sz ei e = mkSCall3 "deltaVec" sz ei e
+
+pDiag :: TExpr Int -> (TExpr (Int -> a)) -> TExpr (Vector (Vector a))
+-- diag sz (\i. e) = build sz (\i. deltaVec sz i e)
+pDiag sz d = mkSCall2 "diag" sz d
+
 ---------------------------
 -- "User-defined" functions
 ---------------------------

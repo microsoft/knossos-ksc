@@ -6,13 +6,6 @@ import Prelude hiding( (<>) )
 
 import Text.PrettyPrint as PP
 
-import Text.Parsec
-import Text.Parsec.String (Parser)
-import Text.Parsec.Language (emptyDef)
-
-import qualified Text.Parsec.Expr as Ex
-import qualified Text.Parsec.Token as Tok
-
 import Data.Functor.Identity
 import Data.Maybe
 import Data.Functor
@@ -21,6 +14,7 @@ import Control.Monad.Trans
 import System.Console.Haskeline
 
 import Data.Map
+import Debug.Trace( trace )
 
 infixr 0 `seqExpr`
 
@@ -84,6 +78,7 @@ data ExprX b
   | App (ExprX b) (ExprX b)
   | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
   | If (ExprX b) (ExprX b) (ExprX b)
+  | Assert (ExprX b) (ExprX b)
   deriving (Eq, Ord, Show)
 
 type Expr = ExprX Var
@@ -99,6 +94,9 @@ mkSCall1 fname a = Call (Fun (SFun fname)) a
 
 mkSCall2 :: String -> Expr -> Expr -> Expr
 mkSCall2 fname a b = Call (Fun (SFun fname)) (Tuple [a, b])
+
+mkSCall3 :: String -> Expr -> Expr -> Expr -> Expr
+mkSCall3 fname a b c = Call (Fun (SFun fname)) (Tuple [a, b, c])
 
 mkLets :: [(Var,Expr)] -> Expr -> Expr
 mkLets [] e = e
@@ -134,6 +132,7 @@ notFreeIn v e = go e
    go (App f a)  = go f && go a
    go (Let v2 r b) = go r && (v == v2 || go b)
    go (Lam v2 e)   = v == v2 || go e
+   go (Assert e1 e2) = go e1 && go e2
 
 ------ Pretty printer ------
 
@@ -167,12 +166,16 @@ type Prec = Int
  -- 0 => no need for parens
  -- high => parenthesise everything
 
-precZero = 0  -- Base
-precOne  = 1  -- +
-precTwo  = 2  -- *
+precZero  = 0  -- Base
+precOne   = 1  -- ==
+precTwo   = 2  -- +
+precThree = 3  -- *
 
 instance Pretty Expr where
   ppr expr = pprExpr 0 expr
+
+pprParendExpr :: Expr -> Doc
+pprParendExpr = pprExpr precTwo
 
 pprExpr :: Prec -> Expr -> Doc
 pprExpr _  (Var v)   = ppr v
@@ -192,6 +195,10 @@ pprExpr p (If e1 e2 e3)
     PP.sep [ PP.text "if" PP.<+> ppr e1
            , PP.text "then" PP.<+> ppr e2
            , PP.text "else" PP.<+> ppr e3 ]
+pprExpr p (Assert e1 e2)
+  = parensIf p precZero $
+    PP.sep [ PP.text "assert" PP.<+> pprParendExpr e1
+           , ppr e2 ]
 
 pprCall :: Prec -> Fun -> Expr -> Doc
 pprCall prec f (Tuple [e1,e2])
@@ -199,15 +206,19 @@ pprCall prec f (Tuple [e1,e2])
   = parensIf prec prec' $
     sep [ pprExpr prec' e1, ppr f <+> pprExpr prec' e2 ]
 
-pprCall _ f e@(Tuple {}) = ppr f PP.<> ppr e
-pprCall _ f e            = ppr f PP.<> parensSp (ppr e)
+pprCall _ f e = ppr f PP.<> parensSp pp_args
+  where
+    pp_args = case e of
+                Tuple es -> pprWithCommas es
+                _        -> ppr e
 
 isInfix :: Fun -> Maybe Prec
 isInfix (Fun (SFun s))
-  | s == "+" = Just precOne
-  | s == "-" = Just precOne
-  | s == "*" = Just precTwo
-  | s == "/" = Just precTwo
+  | s == "==" = Just precOne
+  | s == "+"  = Just precTwo
+  | s == "-"  = Just precTwo
+  | s == "*"  = Just precThree
+  | s == "/"  = Just precThree
 isInfix _ = Nothing
 
 parensIf :: Prec -> Prec -> Doc -> Doc
@@ -247,115 +258,6 @@ pprWithCommas ps = PP.sep (add_commas ps)
 instance Pretty a => Pretty [a] where
   ppr xs = PP.char '[' <> pprWithCommas xs <> PP.char ']'
 
-{-
-------- Parser -------
-langDef :: Tok.LanguageDef ()
-langDef = Tok.LanguageDef
-  { Tok.commentStart    = "{-"
-  , Tok.commentEnd      = "-}"
-  , Tok.commentLine     = "--"
-  , Tok.nestedComments  = True
-  , Tok.identStart      = letter
-  , Tok.identLetter     = alphaNum <|> oneOf "_'"
-  , Tok.opStart         = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Tok.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Tok.reservedNames   = ["let", "in"]
-  , Tok.reservedOpNames = []
-  , Tok.caseSensitive   = True
-  }
-
-lexer :: Tok.TokenParser ()
-lexer = Tok.makeTokenParser langDef
-
-parens :: Parser a -> Parser a
-parens = Tok.parens lexer
-
-reserved :: String -> Parser ()
-reserved = Tok.reserved lexer
-
-semiSep :: Parser a -> Parser [a]
-semiSep = Tok.semiSep lexer
-
-integer :: Parser Integer
-integer = Tok.integer lexer
-
-identifier :: Parser String
-identifier = Tok.identifier lexer
-
-reservedOp :: String -> Parser ()
-reservedOp = Tok.reservedOp lexer
-
-prefixOp :: String -> (a -> a) -> Ex.Operator String () Identity a
-prefixOp s f = Ex.Prefix (reservedOp s >> return f)
-
-infixOp :: String -> (a -> a -> a) -> Ex.Operator String () Identity a
-infixOp s f = Ex.Prefix (reservedOp s >> return f)
-
--- If/then/else
-iteExpr :: Parser Expr
-iteExpr = do { reserved "if"
-            ; cond <- expr
-            ; reservedOp "then"
-            ; tr <- expr
-            ; reserved "else"
-            ; fl <- expr
-            ; return (If cond tr fl) }
-
-letExpr :: Parser Expr
-letExpr = do { reserved "let"
-             ; b <- parseBind
-             ; reserved "in"
-             ; e <- expr
-             ; return (Let b e) }
-
-parseBind :: Parser Bind
-parseBind = do { fun <- identifier
-               ; arg <- identifier
-               ; reservedOp "="
-               ; rhs <- expr
-               ; return (Bind fun arg rhs) }
-
--- Constants
-true, false, zero :: Parser Expr
-true  = reserved "true"  >> return Tr
-false = reserved "false" >> return Fl
-zero  = reservedOp "0"   >> return Zero
-
--- Operator expressions
-opExpr :: Parser Expr  -- Arithmetic expressions
-opExpr = Ex.buildExpressionParser table aexpr
-  where
-    table :: Ex.OperatorTable String () Identity Expr
-    table = [ [
-                infixOp "+" (mkInfixCall "+")
-              ]
-            ]
-
-aexpr :: Parser Expr
-aexpr =     liftM KInteger integer
-        <|> liftM Var identifier
-        <|> parens expr
-
-expr :: Parser Expr
-expr =     iteExpr
-       <|> letExpr
-       <|> opExpr
-       <|> aexpr
-
-contents :: Parser a -> Parser a
-contents p = do
-  Tok.whiteSpace lexer
-  r <- p
-  eof
-  return r
-
-toplevel :: Parser [Expr]
-toplevel = semiSep expr
-
-parseExpr :: String -> Either ParseError Expr
-parseExpr s = parse (contents expr) "<stdin>" s
-
-
-
-
--}
+pprTrace :: String -> Doc -> a -> a
+pprTrace str doc v
+  = trace (PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v

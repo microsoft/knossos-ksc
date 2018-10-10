@@ -6,6 +6,7 @@ import AD
 import ANF
 import Opt
 import CSE
+import Parse
 
 ex1 :: Def
 -- f x = let y = x*x in x + y
@@ -75,6 +76,7 @@ ex6 = Def (Fun (SFun "dot")) [sx, sy] $
 ex7 :: Def
 -- f7 x y = sum (build (size x) (\i -> x[i] * y[i]))
 ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
+      assertEqual (pSize (Var sx)) (pSize (Var sy)) $
       pSum (pBuild (pSize (Var sx))
                    (Lam si (pMul (pIndex (Var si) (Var sx))
                                  (pIndex (Var si) (Var sy)))))
@@ -99,7 +101,14 @@ sy2 = Simple "y2"
 sz = Simple "z"
 szt = Simple "zt"
 
-
+demoF :: String -> IO ()
+-- String is the file name
+demoF file
+  = do { cts <- readFile file
+       ; case runParser parseDef cts of
+            Left err  -> putStrLn ("Failed parse: " ++ show err)
+            Right def -> demo def }
+  
 demo :: Def -> IO ()
 demo def
   = do { banner "Original definition"
@@ -126,10 +135,8 @@ demo def
        ; display opt_der_fwd
 
        ; banner "Forward-mode derivative (CSE'd)"
-       ; let (_, anf_fwd) = anfD u1 opt_der_fwd
-             cse_fwd      = cseD anf_fwd
-             opt_cse_fwd  = optD cse_fwd
-       ; display opt_cse_fwd
+       ; let (u2, cse_fwd) = cseD u1 opt_der_fwd
+       ; display cse_fwd
 
        ; banner "Transposed Jacobian"
        ; let trans_grad_def = transposeD opt_grad_def
@@ -148,10 +155,8 @@ demo def
        ; display opt_der_rev
 
        ; banner "Reverse-mode derivative (CSE'd)"
-       ; let (_, anf_rev) = anfD u1 opt_der_rev
-             cse_rev      = cseD anf_rev
-             opt_cse_rev  = optD cse_rev
-       ; display opt_cse_rev
+       ; let (_, cse_rev) = cseD u2 opt_der_rev
+       ; display cse_rev
        }
 
 

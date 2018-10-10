@@ -16,6 +16,7 @@ gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
 gradE :: Expr -> Expr
 gradE (Konst k)       = lmZero
 gradE (Var v)         = Var (gradV v)
+gradE (Assert e1 e2)  = Assert e1 (gradE e2)
 
 gradE (Call (Fun (SFun "build")) (Tuple [n, Lam i b]))
   = lmBuild n (Lam i (gradE b))

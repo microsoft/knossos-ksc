@@ -5,7 +5,10 @@ import Control.Monad( ap )
 
 anfD :: Uniq -> Def -> (Uniq, Def)
 anfD u (Def fun args rhs)
-  = runAnf u (Def fun args <$> wrapLets (anfE rhs))
+  = runAnf u (Def fun args <$> anfExpr rhs)
+
+anfExpr :: Expr -> AnfM Expr
+anfExpr e = wrapLets (anfE e)
 
 anfE :: Expr -> AnfM Expr
 anfE (Tuple es)            = Tuple <$> mapM anfE1 es
@@ -18,20 +21,23 @@ anfE (Call fun (Tuple es))
        ; return (Call fun (Tuple [n, e'])) }
   | otherwise
   = (Call fun . Tuple) <$> mapM anfE1 es
-anfE (Call fun e)          = Call fun <$> anfE1 e
-anfE (Konst k)     = return (Konst k)
-anfE (Var v)       = return (Var v)
-anfE (Let v r e)   = do { r' <- anfE r
-                        ; emit v r'
-                        ; anfE e }
-anfE (If b t e)    = do { t' <- wrapLets (anfE t)
-                        ; e' <- wrapLets (anfE e)
-                        ; return (If b t' e') }
-anfE (App e1 e2)   = do { f <- anfE e1
-                        ; a <- anfE1 e2
-                        ; return (App f a) }
-anfE (Lam v e)     = do { e' <- wrapLets (anfE e)
-                        ; return (Lam v e') }
+anfE (Konst k)      = return (Konst k)
+anfE (Var v)        = return (Var v)
+anfE (Call fun e)   = Call fun <$> anfE1 e
+anfE (Let v r e)    = do { r' <- anfE r
+                         ; emit v r'
+                         ; anfE e }
+anfE (If b t e)     = do { t' <- anfExpr t
+                         ; e' <- anfExpr e
+                         ; return (If b t' e') }
+anfE (App e1 e2)    = do { f <- anfE e1
+                         ; a <- anfE1 e2
+                         ; return (App f a) }
+anfE (Lam v e)      = do { e' <- anfExpr e
+                         ; return (Lam v e') }
+anfE (Assert e1 e2) = do { e1' <- anfE e1
+                         ; e2' <- anfExpr e2
+                         ; return (Assert e1' e2') }
 
 anfE1 :: Expr -> AnfM Expr
 -- Returns an atomic expression
@@ -71,7 +77,7 @@ instance Monad AnfM where
                    case k x   of { AnfM m2 ->
                    case m2 u1 of { (u2, fs2, r) ->
                    (u2, fs1 ++ fs2, r) } } }
-  
+
 wrapLets :: AnfM Expr -> AnfM Expr
 wrapLets (AnfM f) = AnfM $ \u ->
                     case f u of
