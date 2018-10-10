@@ -129,6 +129,7 @@ notFreeIn v e = go e
    go (Konst _) = True
    go (Tuple es) = all go es
    go (If b t e) = go b && go t && go e
+   go (Call (Fun f) e) = go e
    go (App f a)  = go f && go a
    go (Let v2 r b) = go r && (v == v2 || go b)
    go (Lam v2 e)   = v == v2 || go e
