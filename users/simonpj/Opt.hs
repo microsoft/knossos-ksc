@@ -1,4 +1,4 @@
-module Opt( optLets, optD, optE, simplify ) where
+module Opt( optLets, optD, optE, simplify, test_opt ) where
 
 import Lang
 import Prim
@@ -8,16 +8,17 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 import Debug.Trace
+import Test.Hspec
 
 ---------------
 optD :: Def -> Def
 optD (Def f as r) = Def f as (simplify r)
 
 simplify :: Expr -> Expr
-simplify = optLets . optE . optLets
+simplify =  optLets . optE . optLets
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
-
+    
 ---------------
 optE :: TExpr a -> TExpr a
 optE (Tuple es)         = Tuple (map optE es)
@@ -96,7 +97,7 @@ optFun (SFun "size") (Call (Fun (SFun "*")) (Tuple [x,_]))
 optFun (SFun "index") (Tuple [ ei, Call (Fun (SFun "build")) (Tuple [_, f]) ])
   = Just (App f ei)
 
--- RULLE: sum (build n (\i. if (i==ej) then v else 0)
+-- RULE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
 optFun (SFun "sum")   arg = optSum arg
 optFun (SFun "build") (Tuple [sz, Lam i e2]) = optBuild sz i e2
@@ -148,6 +149,7 @@ optBuild sz i build_e
   = Just $ pDiag sz (Lam i e)
 
 optBuild _ _ _ = Nothing
+
 
 -----------------------
 optGradFun :: FunId -> Expr -> Maybe Expr
@@ -227,34 +229,25 @@ optLM "lmAdd" (Tuple [p,q])
   , Call (LMFun "lmScale") y <- q
   = Just (lmScale (pAdd x y))
 
-optLM "$TEST$lmAdd" _ =
-      let have = optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4]) in
-      let want = lmScale (mkSCall2 "+" (kFloat 1.3) (kFloat 0.4)) in
-      assert_equal have want
-      
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
 optLM "lmAdd" (Tuple [Call (LMFun "lmHCat") (Tuple ps), Call (LMFun "lmHCat") (Tuple qs)])
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
 
-optLM "$TEST$lmAddHCat" _ =
-    let have = Just (optE (lmAdd (lmHCat (map kInt [1,2,3])) (lmHCat (map kInt [11,22,33])))) in
-    let want = lmHCat [lmAdd (kInt 1) (kInt 11), lmAdd (kInt 2) (kInt 22), lmAdd (kInt 3) (kInt 33)] in
-    assert_equal have want
-
 optLM fun arg = Nothing
 
-assert_equal (Just have) want =
-  if have /= want then
-    error ("assert_equal\n" ++ (show $ ppr have) ++ "\n != \n" ++ (show $ ppr want))
-  else
-    Nothing
+--test_optLM :: () -> IO ()
+test_opt () =
+  hspec $ do
+    describe "optLM tests" $ do
+      it "lmAdd(S(x),S(y)) -> S(x+y)" $
+        optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4])
+        `shouldBe`
+        Just (lmScale (mkSCall2 "+" (kFloat 1.3) (kFloat 0.4)))
 
-
-test_optLM () =
-    map (\ n -> optLM n (Konst KZero)) [
-      "$TEST$lmAdd", 
-      "$TEST$lmAddHCat"
-    ]
+      it "lmAdd(HCat) = HCat(lmAdd)" $
+        optE (lmAdd (lmHCat (map kInt [1,2,3])) (lmHCat (map kInt [11,22,33])))
+        `shouldBe`
+        lmHCat [lmAdd (kInt 1) (kInt 11), lmAdd (kInt 2) (kInt 22), lmAdd (kInt 3) (kInt 33)]
 
 ---------------
 optApply :: TExpr (LM a b) -> TExpr a -> Maybe (TExpr b)
