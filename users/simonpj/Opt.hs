@@ -133,6 +133,12 @@ optGradFun (SFun "index") (Tuple [i,v])
   = Just (lmHCat [ lmZero
                  , lmBuildT (pSize v) (Lam (Simple "j") (lmDelta (Var (Simple "j")) i)) ])
 
+optGradFun (SFun "neg") e = Just (lmScale (kFloat $ -1.0))
+
+optGradFun (SFun "exp") e = Just (lmScale (pExp e))
+
+optGradFun (SFun "log") e = Just (lmScale (pDiv (kFloat 1.0) e))
+
 optGradFun _ _ = Nothing
 
 
@@ -179,27 +185,34 @@ optLM "lmAdd" (Tuple [p,q])
   , Call (LMFun "lmScale") y <- q
   = Just (lmScale (pAdd x y))
 
-{- Paste to test
-  let have = (optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4])) in
-  let want = (Just (lmScale (mkSCall2 "+" (kFloat 1.3) (kFloat 0.4)))) in
-   have == want
--}
--- Q: how do I do inline unit tests? I much prefer them at the definition site
-
+optLM "$TEST$lmAdd" _ =
+      let have = optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4]) in
+      let want = lmScale (mkSCall2 "+" (kFloat 1.3) (kFloat 0.4)) in
+      assert_equal have want
+      
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
 optLM "lmAdd" (Tuple [Call (LMFun "lmHCat") (Tuple ps), Call (LMFun "lmHCat") (Tuple qs)])
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
 
-{- Paste to test
-    let ps = map kInt [1,2,3] in
-    let qs = map kInt [11,22,33] in
-    let have = show $ ppr (optE (lmAdd (lmHCat ps) (lmHCat qs))) in
-    let want = "lmHCat(lmAdd(1, 11), lmAdd(2, 22), lmAdd(3, 33))" in
-      have == want
--}
+optLM "$TEST$lmAddHCat" _ =
+    let have = Just (optE (lmAdd (lmHCat (map kInt [1,2,3])) (lmHCat (map kInt [11,22,33])))) in
+    let want = lmHCat [lmAdd (kInt 1) (kInt 11), lmAdd (kInt 2) (kInt 22), lmAdd (kInt 3) (kInt 33)] in
+    assert_equal have want
 
 optLM fun arg = Nothing
 
+assert_equal (Just have) want =
+  if have /= want then
+    error ("assert_equal\n" ++ (show $ ppr have) ++ "\n != \n" ++ (show $ ppr want))
+  else
+    Nothing
+
+
+test_optLM () =
+    map (\ n -> optLM n (Konst KZero)) [
+      "$TEST$lmAdd", 
+      "$TEST$lmAddHCat"
+    ]
 
 ---------------
 optApply :: TExpr (LM a b) -> TExpr a -> Maybe (TExpr b)

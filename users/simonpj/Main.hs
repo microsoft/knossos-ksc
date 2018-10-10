@@ -79,6 +79,13 @@ ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
                    (Lam si (pMul (pIndex (Var si) (Var sx))
                                  (pIndex (Var si) (Var sy)))))
 
+ex8 :: Def
+-- f7 x y = sum (build (size x) (\i -> -x[i]))
+ex8 = Def (Fun (SFun "map_neg")) [sx] $
+      pSum (pBuild (pSize (Var sx))
+                   (Lam si (pNeg (pIndex (Var si) (Var sx)))))
+
+
 si, sp, sq, sr, sv, sx, sy, sz :: Var
 si = Simple "i"
 sp = Simple "p"

@@ -68,12 +68,16 @@ gradSelFun :: Int -> Int -> Expr
 gradSelFun i 1 = lmOne
 gradSelFun i n = Call (GradFun (SelFun i n) Fwd) (Tuple [])
 
------------------------
+---------------------------
+-- "User-defined" functions
+---------------------------
 pAdd, pMul :: TExpr Float -> TExpr Float -> TExpr Float
 pAdd a b = mkSCall2 "+" a b
 pMul a b = mkSCall2 "*" a b
 pDiv a b = mkSCall2 "/" a b
 pNeg x   = mkSCall1 "neg" x
+pExp x   = mkSCall1 "exp" x
+pLog x   = mkSCall1 "log" x
 pEqual a b = mkSCall2 "==" a b
 
 pBuild :: TExpr Nat -> TExpr (Nat -> t) -> TExpr (Vector t)
