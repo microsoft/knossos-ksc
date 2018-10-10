@@ -3,7 +3,7 @@ module Opt( optLets, optD, optE, simplify ) where
 import Lang
 import Prim
 import OptLet
-import Text.PrettyPrint as PP
+import Text.PrettyPrint
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -28,9 +28,12 @@ optE (App e1 e2)        = optApp (optE e1) (optE e2)
 optE (Assert e1 e2)     = Assert (optE e1) (optE e2)
 optE (Let var rhs body) = Let var (optE rhs) (optE body)
 optE (If b t e)         = optIf (optE b) (optE t) (optE e)
-optE (Call fun arg)     = case optCall fun opt_arg of
+optE e@(Call fun arg)   = case optCall fun opt_arg of
                             Nothing -> Call fun opt_arg
-                            Just r  -> optE r
+                            Just r  -> -- pprTrace "optCall"
+                                       --   (vcat [ text "Before:" <+> ppr e
+                                       --         , text "After: " <+> ppr r])
+                                       optE r
                         where
                           opt_arg = optE arg
 
@@ -93,8 +96,10 @@ optFun (SFun "size") (Call (Fun (SFun "*")) (Tuple [x,_]))
   = Just (mkSCall1 "size" x)
 
 -- RULE: index j (build n f) = f j
-optFun (SFun "index") (Tuple [ ei, Call (Fun (SFun "build")) (Tuple [_, f]) ])
-  = Just (App f ei)
+optFun (SFun "index") (Tuple [ ei, arr ])
+  | Call (Fun (SFun "build")) (Tuple [_, f]) <- arr
+  , Lam i e <- f
+  = Just (Let i ei e)
 
 -- RULLE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
@@ -124,9 +129,9 @@ optSum e = Nothing
 -----------------------
 optBuild :: TExpr Int -> Var -> TExpr a -> Maybe (TExpr (Vector a))
 
--- build sz (\i. delta i ex eb)  =  let i = ex in
---                                  deltaVec sz i eb
---     (if i is not free in ex)
+-- RULE: build sz (\i. delta i ex eb)  =  let i = ex in
+--                                        deltaVec sz i eb
+--       (if i is not free in ex)
 -- NB: however, i might be free in eb
 optBuild sz i e
   | Call (Fun (SFun "delta")) (Tuple [e1,e2,eb]) <- e
@@ -140,14 +145,14 @@ optBuild sz i e
     ok_eq e1 (Var v) | v == i = Just e1
     ok_eq _ _ = Nothing
 
--- build sz (\i. deltaVec sz i e)   = diag sz (\i. e)
+-- RULE: build sz (\i. deltaVec sz i e)   = diag sz (\i. e)
 optBuild sz i build_e
   | Call (Fun (SFun "deltaVec")) (Tuple [sz2, Var i2, e]) <- build_e
   , sz == sz2
   , i  == i2
   = Just $ pDiag sz (Lam i e)
 
-optBuild _ _ _ = Nothing
+optBuild sz i e = Nothing
 
 -----------------------
 optGradFun :: FunId -> Expr -> Maybe Expr
@@ -169,11 +174,11 @@ optGradFun (SelFun i n) _ = Just (lmHCat [ if i == j then lmOne else lmZero
                                           | j <- [1..n] ])
 
 optGradFun (SFun "sum") e
-  = Just (lmBuildT (pSize e) (Lam (Simple "i") lmOne))
+  = Just (lmBuildT (pSize e) (Lam (Simple "si") lmOne))
 
 optGradFun (SFun "index") (Tuple [i,v])
   = Just (lmHCat [ lmZero
-                 , lmBuildT (pSize v) (Lam (Simple "j") (lmDelta (Var (Simple "j")) i)) ])
+                 , lmBuildT (pSize v) (Lam (Simple "ii") (lmDelta (Var (Simple "ii")) i)) ])
 
 optGradFun (SFun "neg") e = Just (lmScale (kFloat $ -1.0))
 
@@ -326,7 +331,7 @@ optTrans (Let var rhs body)
     lmTranspose body
 optTrans (If b t e)
   = Just $ If b (lmTranspose t) (lmTranspose e)
-optTrans e = error ("optTrans: " ++ PP.render (ppr e))
+optTrans e = error ("optTrans: " ++ render (ppr e))
 
 optTransCall :: Fun -> Expr -> Maybe Expr
 optTransCall (LMFun "lmZero") _  = Just lmZero
