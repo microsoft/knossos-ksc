@@ -101,62 +101,69 @@ sy2 = Simple "y2"
 sz = Simple "z"
 szt = Simple "zt"
 
+-------------------------------------
+--  The demo driver
+-------------------------------------
+
 demoF :: String -> IO ()
 -- String is the file name
 demoF file
   = do { cts <- readFile file
-       ; case runParser parseDef cts of
-            Left err  -> putStrLn ("Failed parse: " ++ show err)
-            Right def -> demo def }
+       ; case runParser pDefs cts of
+            Left err   -> putStrLn ("Failed parse: " ++ show err)
+            Right defs -> demoN defs }
   
 demo :: Def -> IO ()
-demo def
+demo d = demoN [d]
+
+demoN :: [Def] -> IO ()
+demoN def
   = do { banner "Original definition"
-       ; display def
+       ; displayN def
 
        ; banner "Anf-ised original definition"
-       ; let (u1, anf_def) = anfD initialUniq def
-       ; display anf_def
+       ; let (u1, anf_def) = anfDefs initialUniq def
+       ; displayN anf_def
 
        ; banner "The full Jacobian (unoptimised)"
-       ; let grad_def = gradD anf_def
-       ; display grad_def
+       ; let grad_def = gradDefs anf_def
+       ; displayN grad_def
 
        ; banner "The full Jacobian (optimised)"
-       ; let opt_grad_def = optD grad_def
-       ; display opt_grad_def
+       ; let opt_grad_def = optDefs grad_def
+       ; displayN opt_grad_def
 
        ; banner "Forward derivative (unoptimised)"
-       ; let der_fwd = applyD opt_grad_def
-       ; display der_fwd
+       ; let der_fwd = map applyD opt_grad_def
+       ; displayN der_fwd
 
        ; banner "Forward-mode derivative (optimised)"
-       ; let opt_der_fwd = optD der_fwd
-       ; display opt_der_fwd
+       ; let opt_der_fwd = optDefs der_fwd
+       ; displayN opt_der_fwd
 
        ; banner "Forward-mode derivative (CSE'd)"
-       ; let (u2, cse_fwd) = cseD u1 opt_der_fwd
-       ; display cse_fwd
+       ; let (u2, cse_fwd) = cseDefs u1 opt_der_fwd
+       ; displayN cse_fwd
 
        ; banner "Transposed Jacobian"
-       ; let trans_grad_def = transposeD opt_grad_def
-       ; display trans_grad_def
+       ; let trans_grad_def = map transposeD opt_grad_def
+       ; displayN trans_grad_def
 
        ; banner "Optimised transposed Jacobian"
-       ; let opt_trans_grad_def = optD trans_grad_def
-       ; display opt_trans_grad_def
+       ; let opt_trans_grad_def = optDefs trans_grad_def
+       ; displayN opt_trans_grad_def
 
        ; banner "Reverse-mode derivative (unoptimised)"
-       ; let der_rev = applyD opt_trans_grad_def
-       ; display der_rev
+       ; let der_rev = map applyD opt_trans_grad_def
+       ; displayN der_rev
 
        ; banner "Reverse-mode derivative (optimised)"
-       ; let opt_der_rev = optD der_rev
-       ; display opt_der_rev
+       ; let opt_der_rev = optDefs der_rev
+       ; displayN opt_der_rev
 
        ; banner "Reverse-mode derivative (CSE'd)"
-       ; let (_, cse_rev) = cseD u2 opt_der_rev
-       ; display cse_rev
+       ; let (_, cse_rev) = cseDefs u2 opt_der_rev
+       ; displayN cse_rev
        }
 
 
@@ -169,25 +176,3 @@ banner s
 
 main :: IO ()
 main = return ()  -- To keep GHC quiet
-
-{-
------- Driver ---------
-
-process :: String -> IO ()
-process line = do
-  let res = parseExpr line
-  case res of
-    Left err -> print err
-    Right ex -> case eval ex of
-      Nothing -> putStrLn "Cannot evaluate"
-      Just result -> putStrLn $ ppexpr result
-
-main :: IO ()
-main = runInputT defaultSettings loop
-  where
-  loop = do
-    minput <- getInputLine "Arith> "
-    case minput of
-      Nothing -> outputStrLn "Goodbye."
-      Just input -> (liftIO $ process input) >> loop
--}

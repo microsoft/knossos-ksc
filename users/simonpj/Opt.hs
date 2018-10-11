@@ -1,4 +1,4 @@
-module Opt( optLets, optD, optE, simplify, test_opt ) where
+module Opt( optLets, optDef, optDefs, optE, simplify, test_opt ) where
 
 import Lang
 import Prim
@@ -11,8 +11,11 @@ import Debug.Trace
 import Test.Hspec
 
 ---------------
-optD :: Def -> Def
-optD (Def f as r) = Def f as (simplify r)
+optDefs :: [Def] -> [Def]
+optDefs defs = map optDef defs
+
+optDef :: Def -> Def
+optDef (Def f as r) = Def f as (simplify r)
 
 simplify :: Expr -> Expr
 simplify =  optE . optLets . optE . optLets

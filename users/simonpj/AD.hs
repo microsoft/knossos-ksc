@@ -32,8 +32,11 @@ gradE (Let v e1 e2) = Let v e1                 $
 gradE (Tuple es) = lmVCat (map gradE es)
 gradE (If b t e) = If b (gradE t) (gradE e)
 
-gradD :: Def -> Def
-gradD (Def fun vars rhs)
+gradDefs :: [Def] -> [Def]
+gradDefs = map gradDef
+
+gradDef :: Def -> Def
+gradDef (Def fun vars rhs)
   = Def (gradF fun) vars $
     mkLets [ (gradV v, gradSelFun i n)
            | (v, i) <- vars `zip` [1..] ] $

@@ -6,17 +6,23 @@ import ANF
 import Opt
 import qualified Data.Map as M
 
-cseD :: Uniq -> Def -> (Uniq, Def)
-cseD u1 (Def f args rhs)
-  = (u2, Def f args opt_rhs)
-  where
-    (u2, anf_rhs) = runAnf u1 (anfExpr rhs)
-    cse_rhs = cseE M.empty anf_rhs
-    opt_rhs = simplify cse_rhs
-    -- cseE turns   let x = e in ..let y = e in ...
-    --      into    let x = e in ..let y = x in ...
-    -- Then optLets substitutes x for y
+cseDefs :: Uniq -> [Def] -> (Uniq, [Def])
+cseDefs u defs = runAnf u (mapM cseD defs)
 
+cseDef :: Uniq -> Def -> (Uniq, Def)
+cseDef u def = runAnf u (cseD def)
+
+---------------------------------
+cseD :: Def -> AnfM Def
+cseD (Def f args rhs)
+  = do { anf_rhs <- anfExpr rhs
+       ; let cse_rhs = cseE M.empty anf_rhs
+             opt_rhs = simplify cse_rhs
+             -- cseE turns   let x = e in ..let y = e in ...
+             --      into    let x = e in ..let y = x in ...
+            -- Then optLets substitutes x for y
+       ; return (Def f args opt_rhs) }
+  
 cseE :: M.Map Expr Expr -> Expr -> Expr
 cseE cse_env (Let v rhs body)
   | Just rhs'' <- M.lookup rhs' cse_env

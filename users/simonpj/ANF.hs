@@ -3,9 +3,15 @@ module ANF where
 import Lang
 import Control.Monad( ap )
 
-anfD :: Uniq -> Def -> (Uniq, Def)
-anfD u (Def fun args rhs)
-  = runAnf u (Def fun args <$> anfExpr rhs)
+anfDefs :: Uniq -> [Def] -> (Uniq, [Def])
+anfDefs u defs = runAnf u (mapM anfD defs)
+
+anfDef :: Uniq -> Def -> (Uniq, Def)
+anfDef u def = runAnf u (anfD def)
+
+-----------------------------------------------
+anfD :: Def -> AnfM Def
+anfD (Def fun args rhs) = Def fun args <$> anfExpr rhs
 
 anfExpr :: Expr -> AnfM Expr
 anfExpr e = wrapLets (anfE e)

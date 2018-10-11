@@ -184,10 +184,13 @@ pLet = do { pReseerved "let"
           ; e <- pExpr
           ; return (foldr (\(v,r) e -> Let v r e) e pairs) }
 
-parseDef :: Parser Def
+pDef :: Parser Def
 -- (def f (x, y, z) rhs)
-parseDef = parens $ do { pReseerved "def"
-                       ; f <- pIdentifier
-                       ; xs <- parens (many pIdentifier)
-                       ; rhs <- pExpr
-                       ; return (Def (Fun (SFun f)) (map Simple xs) rhs) }
+pDef = parens $ do { pReseerved "def"
+                   ; f <- pIdentifier
+                   ; xs <- parens (many pIdentifier)
+                   ; rhs <- pExpr
+                   ; return (Def (Fun (SFun f)) (map Simple xs) rhs) }
+
+pDefs :: Parser [Def]
+pDefs = many pDef

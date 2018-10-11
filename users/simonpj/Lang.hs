@@ -274,6 +274,13 @@ instance Pretty Def where
 display :: Pretty p => p -> IO ()
 display p = putStrLn (PP.render (ppr p))
 
+displayN :: Pretty p => [p] -> IO ()
+displayN ps = putStrLn (PP.render (go ps))
+  where
+    go []     = PP.empty
+    go [p]    = ppr p
+    go (p:ps) = vcat [ ppr p, text "", go ps ]
+
 bracesSp :: Doc -> Doc
 bracesSp d = PP.char '{' PP.<+> d PP.<+> PP.char '}'
 
