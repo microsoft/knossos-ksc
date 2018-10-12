@@ -1,4 +1,3 @@
-(def logsumexp( x )
- (assert (== (size(x)) (size(y)))
-  (log (sum (build (size x)
-                  (lam i (exp (index i x))))))))
+(def logsumexp( v )
+  (log (sum (build (size v)
+                  (lam i (exp (index i v)))))))
