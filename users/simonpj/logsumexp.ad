@@ -1,3 +1,0 @@
-(def logsumexp( v )
-  (log (sum (build (size v)
-                  (lam i (exp (index i v)))))))

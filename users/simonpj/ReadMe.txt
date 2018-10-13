@@ -31,4 +31,5 @@ Do 'ghci Main', and then try
    demo ex1
    demo ex2
    demo ex3
+   demoF "Test.ks"
 
