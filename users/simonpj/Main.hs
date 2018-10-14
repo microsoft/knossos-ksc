@@ -31,12 +31,12 @@ ex2a :: Def
 --         let y2 = fst zt
 --         let z = snd zt
 --         in y * z
-ex2a = Def (Fun (SFun "f2")) [sx] $
+ex2a = Def (Fun (SFun "f2a")) [sx] $
       Let szt (Let sy1 (pMul (Var sx) (Var sx)) $
                Tuple [Var sy1, pAdd (Var sx) (Var sy1)]) $
       Let sy2 (pFst (Var szt)) $
       Let sz (pSnd (Var szt)) $
-      pMul (Var sy) (Var sz)
+      pMul (Var sy2) (Var sz)
 
 ex3 :: Def
 -- h (x,y) = let z = x + y
@@ -82,7 +82,7 @@ ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
                                  (pIndex (Var si) (Var sy)))))
 
 ex8 :: Def
--- f7 x y = sum (build (size x) (\i -> -x[i]))
+-- f8 x = sum (build (size x) (\i -> -x[i]))
 ex8 = Def (Fun (SFun "map_neg")) [sx] $
       pSum (pBuild (pSize (Var sx))
                    (Lam si (pNeg (pIndex (Var si) (Var sx)))))
