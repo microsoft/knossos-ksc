@@ -83,7 +83,7 @@ ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
 
 ex8 :: Def
 -- f8 x = sum (build (size x) (\i -> -x[i]))
-ex8 = Def (Fun (SFun "map_neg")) [sx] $
+ex8 = Def (Fun (SFun "f8")) [sx] $
       pSum (pBuild (pSize (Var sx))
                    (Lam si (pNeg (pIndex (Var si) (Var sx)))))
 
