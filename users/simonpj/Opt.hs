@@ -21,9 +21,9 @@ simplify :: Expr -> Expr
 simplify =  optE . optLets . optE . optLets
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
-    
+
 {- with that extra optE:
-  
+
 fun logsumexp`(x, dr)
   = assert (size( x ) == size( y ))
     build( size( x ),
@@ -87,7 +87,9 @@ optIf b                     t e = If b t e
 optCall :: Fun
         -> Expr   -- Argument, already optimised
         -> Maybe Expr
+-- RULE: f( let x = e in b )  =  let x = e in f(b)
 optCall fun (Let v r arg)   = Just (Let v r (Call fun arg))
+
 optCall (LMFun lm)      arg = optLM lm arg
 optCall (Fun f)         arg = optFun f arg
 optCall (GradFun f Fwd) arg = optGradFun f arg
@@ -135,16 +137,16 @@ optFun _ _ = Nothing
 -----------------------
 optSum :: TExpr (Vector a) -> Maybe (TExpr a)
 
--- sum (build n (\i. (e1,e2,...)))
---  = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
+-- RULE: sum (build n (\i. (e1,e2,...)))
+--       = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
 optSum (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
    = Just $ Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
 
--- sum (diag sz f)  =  build sz f
+-- RULE: sum (diag sz f)  =  build sz f
 optSum (Call (Fun (SFun "diag")) (Tuple [sz, f]))
   = Just $ pBuild sz f
 
--- sum (deltaVec sz i e) = e
+-- RULE: sum (deltaVec sz i e) = e
 optSum (Call (Fun (SFun "deltaVec")) (Tuple [_, _, e]))
   = Just e
 
@@ -176,9 +178,9 @@ optBuild sz i build_e
   , i  == i2
   = Just $ pDiag sz (Lam i e)
 
--- build sz (\i. f e1 ... eN ...)  =
---    let tN = eN in
---    build sz (\i. f e1 .. tN ... )
+-- RULE: build sz (\i. f e1 ... eN ...)  =
+--         let tN = eN in
+--         build sz (\i. f e1 .. tN ... )
 -- { if i is not free in eN }
 optBuild sz i e
   | Call (Fun (SFun f)) (Tuple [e1,e2]) <- e
@@ -289,8 +291,8 @@ optLM "lmAdd" (Tuple [Call (LMFun "lmHCat") (Tuple ps), Call (LMFun "lmHCat") (T
 
 optLM fun arg = Nothing
 
---test_optLM :: () -> IO ()
-test_opt () =
+test_opt:: IO ()
+test_opt =
   hspec $ do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
