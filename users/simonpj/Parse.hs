@@ -108,8 +108,8 @@ lexer = Tok.makeTokenParser langDef
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
 
-pReseerved :: String -> Parser ()
-pReseerved = Tok.reserved lexer
+pReserved :: String -> Parser ()
+pReserved = Tok.reserved lexer
 
 pInteger :: Parser Integer
 pInteger = Tok.integer lexer
@@ -151,7 +151,7 @@ pCall = do { f <- pIdentifier
 
 pIfThenElse :: Parser Expr
 -- (if e1 e2 e3)
-pIfThenElse = do { pReseerved "if"
+pIfThenElse = do { pReserved "if"
                  ; cond <- pExpr
                  ; tr   <- pExpr
                  ; fl   <- pExpr
@@ -159,20 +159,20 @@ pIfThenElse = do { pReseerved "if"
 
 pAssert :: Parser Expr
 -- (assert e1 e2)
-pAssert = do { pReseerved "assert"
+pAssert = do { pReserved "assert"
              ; e1 <- pExpr
              ; e2 <- pExpr
              ; return (Assert e1 e2) }
 
 pTuple :: Parser Expr
 -- (assert e1 e2)
-pTuple = do { pReseerved "tuple"
+pTuple = do { pReserved "tuple"
             ; es <- many pExpr
             ; return (Tuple es) }
 
 pLam :: Parser Expr
 -- (lam i e)
-pLam = do { pReseerved "lam"
+pLam = do { pReserved "lam"
           ; i <- pIdentifier
           ; e <- pExpr
           ; return (Lam (Simple i) e) }
@@ -185,7 +185,7 @@ pBind = do { v <- pIdentifier
 
 pLet :: Parser Expr
 -- (let (x r) b)
-pLet = do { pReseerved "let"
+pLet = do { pReserved "let"
           ; pairs <- parens $ do { b <- pBind
                                  ; return [b] }
                           <|> many (parens pBind)
@@ -194,7 +194,7 @@ pLet = do { pReseerved "let"
 
 pDef :: Parser Def
 -- (def f (x, y, z) rhs)
-pDef = parens $ do { pReseerved "def"
+pDef = parens $ do { pReserved "def"
                    ; f <- pIdentifier
                    ; xs <- parens (many pIdentifier)
                    ; rhs <- pExpr
