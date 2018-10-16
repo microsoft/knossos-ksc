@@ -110,11 +110,15 @@ pReseerved = Tok.reserved lexer
 pInteger :: Parser Integer
 pInteger = Tok.integer lexer
 
+pDouble :: Parser Double
+pDouble = Tok.float lexer
+
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
 pKonst :: Parser Expr
-pKonst = (Konst . KInteger) <$> pInteger
+pKonst =   try ((Konst . KFloat) <$> pDouble)
+       <|> ((Konst . KInteger) <$> pInteger)
 
 pExpr :: Parser Expr
 pExpr = pKonst
@@ -193,4 +197,4 @@ pDef = parens $ do { pReseerved "def"
                    ; return (Def (Fun (SFun f)) (map Simple xs) rhs) }
 
 pDefs :: Parser [Def]
-pDefs = many pDef
+pDefs = spaces >> many pDef

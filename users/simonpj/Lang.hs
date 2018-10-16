@@ -53,7 +53,7 @@ data Var
 
 data Konst = KZero  -- Of any type
            | KInteger Integer
-           | KFloat   Float
+           | KFloat   Double
            | KBool    Bool
            deriving( Eq, Ord, Show )
 
@@ -110,7 +110,7 @@ mkTuple es  = Tuple es
 kInt :: Integer -> Expr
 kInt i = Konst (KInteger i)
 
-kFloat :: Float -> Expr
+kFloat :: Double -> Expr
 kFloat f = Konst (KFloat f)
 
 
@@ -187,7 +187,7 @@ instance Pretty Fun where
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
-  ppr (KFloat f)   = PP.float f
+  ppr (KFloat f)   = PP.double f
   ppr KZero        = text "KZero"
 
 type Prec = Int
@@ -266,7 +266,7 @@ parensIf ctxt inner doc
 
 instance Pretty Def where
   ppr (Def f vs rhs)
-    = PP.sep [ PP.text "fun" PP.<+> ppr f
+    = PP.sep [ PP.text "def" PP.<+> ppr f
                  PP.<> parens (pprWithCommas vs)
              , PP.nest 2 (PP.text "=" PP.<+> ppr rhs) ]
 
