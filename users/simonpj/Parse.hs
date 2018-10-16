@@ -30,6 +30,10 @@ An example
    ))))))
 
 
+We have comments, thus
+   -- Comment to end of line
+   {- block comment -}
+
 Notes:
 
 * (f e1 e2)  means the call    f (e1,e2)
