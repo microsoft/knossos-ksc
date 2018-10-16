@@ -231,7 +231,7 @@ pprExpr p (Assert e1 e2)
 pprExpr _ (App e1 e2)
   = parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
-  
+
 pprCall :: Prec -> Fun -> Expr -> Doc
 pprCall prec f (Tuple [e1,e2])
   | Just prec' <- isInfix f
