@@ -44,10 +44,11 @@ data Fun = Fun     FunId         -- The function              f(x)
          deriving( Eq, Ord, Show )
 
 data Var
-  = Simple  String         -- x
-  | Delta   String         -- The 'dx' or 'dr' argument to fwd
+  = Simple   String         -- x
+  | StopGrad String         -- const x with derivative 0
+  | Delta    String         -- The 'dx' or 'dr' argument to fwd
                            -- or backward versions of f
-  | Grad    String ADMode  -- \nabla x
+  | Grad     String ADMode  -- \nabla x
                            --   True <=> transposed \bowtie x
   deriving( Show, Eq, Ord )
 
@@ -260,6 +261,7 @@ class Pretty p where
 
 instance Pretty Var where
   ppr (Simple s)   = PP.text s
+  ppr (StopGrad s) = PP.text s
   ppr (Delta s)    = PP.text ('d' : s)
   ppr (Grad s Fwd) = PP.text ('D' : s)
   ppr (Grad s Rev) = PP.text ('R' : s)

@@ -97,7 +97,7 @@ langDef = Tok.LanguageDef
   , Tok.identLetter     = alphaNum <|> oneOf "_':!#$%&*+./<=>?@\\^|-~"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
-  , Tok.reservedNames   = [ "def", "let", "if", "assert", "call", "tuple" ]
+  , Tok.reservedNames   = [ "def", "let", "if", "assert", "call", "tuple", "const" ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -119,6 +119,13 @@ pDouble = Tok.float lexer
 
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
+
+pParam :: Parser Var
+pParam = Simple <$> pIdentifier
+    <|> parens (do {
+          pReserved "const" ;
+          StopGrad <$> pIdentifier
+        })
 
 pKonst :: Parser Expr
 pKonst =   try ((Konst . KFloat) <$> pDouble)
@@ -193,12 +200,12 @@ pLet = do { pReserved "let"
           ; return (foldr (\(v,r) e -> Let v r e) e pairs) }
 
 pDef :: Parser Def
--- (def f (x, y, z) rhs)
+-- (def f (x1 x2 x3) rhs)
 pDef = parens $ do { pReserved "def"
                    ; f <- pIdentifier
-                   ; xs <- parens (many pIdentifier)
+                   ; xs <- parens (many pParam)
                    ; rhs <- pExpr
-                   ; return (Def (Fun (SFun f)) (map Simple xs) rhs) }
+                   ; return (Def (Fun (SFun f)) xs rhs) }
 
 pDefs :: Parser [Def]
 pDefs = spaces >> many pDef
