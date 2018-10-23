@@ -7,7 +7,7 @@ Modules
 
 * Prim: helper functions to build calls to primitives
 
-* Opt: An optimiser for the languag
+* Opt: An optimiser for the language
 
 * AD: Automatic differentiator
 
