@@ -2,8 +2,8 @@
 
 module CppGen where
 
-import           Data.List                      ( intercalate )
-import qualified Lang                          as L
+import Data.List ( intercalate )
+import qualified Lang as L
 import qualified Main
 
 genDef :: L.Def -> String
@@ -66,8 +66,8 @@ typeof (L.Konst k) = case k of
                         L.KFloat   f -> "double"
                         L.KBool    b -> "bool"
 typeof (L.Call (L.Fun (L.SFun "build")) (L.Tuple [n, L.Lam i b])) = "vec<" ++ typeof b ++ ">" 
+typeof (L.Var v) = "typeof(" ++ genVar v ++ ")"
 {-
-typeof (L.Var v) = "(typeof (" ++ genVar v ++ "))"
 typeof (L.Tuple es) = "tuple<" ++ intercalate ", " (map typeof es) ++ ">"
 typeof (L.Lam v2 e) =  "std::function<"++ typeof e++"(int)>"
 typeof (L.App f a) = error "App"
@@ -76,7 +76,6 @@ typeof (L.Assert e1 e2) = typeof e2
 typeof e = "typeof (" ++ genExpr e ++ ")"
 -}
 typeof _ = "double"
-
 
 example = do
     let lines = [ 
