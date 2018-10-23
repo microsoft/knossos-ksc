@@ -4,31 +4,39 @@ import Lang
 import Text.PrettyPrint
 import ANF
 import Opt
+import KMonad
 import qualified Data.Map as M
 
-cseDefs :: Uniq -> [Def] -> (Uniq, [Def])
-cseDefs u defs = runAnf u (mapM cseD defs)
+cseDefs :: [Def] -> KM [Def]
+cseDefs defs
+  = do { anf_defs <- anfDefs defs
+--       ; banner "ANF'd"
+--       ; displayN anf_defs
 
-cseDef :: Uniq -> Def -> (Uniq, Def)
-cseDef u def = runAnf u (cseD def)
+       ; let cse_defs = map cseD anf_defs
+--       ; banner "CSE'd"
+--       ; displayN anf_defs
 
----------------------------------
-cseD :: Def -> AnfM Def
-cseD (Def f args rhs)
-  = do { anf_rhs <- anfExpr rhs
-       ; let cse_rhs = cseE M.empty anf_rhs
-             opt_rhs = simplify cse_rhs
              -- cseE turns   let x = e in ..let y = e in ...
              --      into    let x = e in ..let y = x in ...
-            -- Then optLets substitutes x for y
-       ; return (Def f args opt_rhs) }
-  
+            -- Then optDefs substitutes x for y
+
+       ; let simpl_defs = optDefs cse_defs
+       ; return simpl_defs }
+
+--cseDef :: Uniq -> Def -> (Uniq, Def)
+--cseDef u def = runAnf u (cseD def)
+
+---------------------------------
+cseD :: Def -> Def
+cseD (Def f args rhs) = Def f args (cseE M.empty rhs)
+
 cseE :: M.Map Expr Expr -> Expr -> Expr
 cseE cse_env (Let v rhs body)
   | Just rhs'' <- M.lookup rhs' cse_env
-  = Let v rhs'' (cseE cse_env body)
+  = Let v rhs'' (cseE_check cse_env body)
   | otherwise
-  = Let v rhs'  (cseE cse_env' body)
+  = Let v rhs'  (cseE_check cse_env' body)
   where
     rhs' = cseE cse_env rhs
     cse_env' = M.insert rhs' (Var v) cse_env
@@ -43,7 +51,9 @@ cseE cse_env (Assert e1 e2)
    e1' = cseE cse_env e1
 
 cseE cse_env (If e1 e2 e3)
-  = If (cseE cse_env e1) (cseE cse_env e2) (cseE cse_env e3)
+  = If (cseE_check cse_env e1)
+       (cseE_check cse_env e2)
+       (cseE_check cse_env e3)
 
 cseE cse_env (Call f e)  = Call f (cseE_check cse_env e)
 cseE cse_env (Tuple es)  = Tuple (map (cseE_check cse_env) es)

@@ -1,13 +1,15 @@
 module ANF where
 
 import Lang
+import KMonad
 import Control.Monad( ap )
 
-anfDefs :: Uniq -> [Def] -> (Uniq, [Def])
-anfDefs u defs = runAnf u (mapM anfD defs)
-
-anfDef :: Uniq -> Def -> (Uniq, Def)
-anfDef u def = runAnf u (anfD def)
+anfDefs :: [Def] -> KM [Def]
+anfDefs defs
+  = do { u <- getUniq
+       ; let (u', defs') = runAnf u (mapM anfD defs)
+       ; setUniq u'
+       ; return defs' }
 
 -----------------------------------------------
 anfD :: Def -> AnfM Def
@@ -56,11 +58,6 @@ atomise (Konst k) = return (Konst k)
 atomise e         = do { v <- newVar
                        ; emit v e
                        ; return (Var v) }
-
-type Uniq = Int
-
-initialUniq :: Uniq
-initialUniq = 1
 
 type FloatDef = (Var, Expr)
 

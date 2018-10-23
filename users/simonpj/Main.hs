@@ -7,6 +7,7 @@ import ANF
 import Opt
 import CSE
 import Parse
+import KMonad
 
 ex1 :: Def
 -- f x = let y = x*x in x + y
@@ -111,18 +112,18 @@ demoF file
   = do { cts <- readFile file
        ; case runParser pDefs cts of
             Left err   -> putStrLn ("Failed parse: " ++ show err)
-            Right defs -> demoN defs }
-  
-demo :: Def -> IO ()
-demo d = demoN [d]
+            Right defs -> runKM (demoN defs) }
 
-demoN :: [Def] -> IO ()
+demo :: Def -> IO ()
+demo d = runKM (demoN [d])
+
+demoN :: [Def] -> KM ()
 demoN def
   = do { banner "Original definition"
        ; displayN def
 
        ; banner "Anf-ised original definition"
-       ; let (u1, anf_def) = anfDefs initialUniq def
+       ; anf_def <- anfDefs def
        ; displayN anf_def
 
        ; banner "The full Jacobian (unoptimised)"
@@ -142,7 +143,7 @@ demoN def
        ; displayN opt_der_fwd
 
        ; banner "Forward-mode derivative (CSE'd)"
-       ; let (u2, cse_fwd) = cseDefs u1 opt_der_fwd
+       ; cse_fwd <- cseDefs opt_der_fwd
        ; displayN cse_fwd
 
        ; banner "Transposed Jacobian"
@@ -161,17 +162,10 @@ demoN def
        ; let opt_der_rev = optDefs der_rev
        ; displayN opt_der_rev
 
+       ; cse_rev <- cseDefs opt_der_rev
        ; banner "Reverse-mode derivative (CSE'd)"
-       ; let (_, cse_rev) = cseDefs u2 opt_der_rev
        ; displayN cse_rev
        }
-
-
-banner :: String -> IO ()
-banner s
-  = do { putStrLn "\n----------------------------"
-       ; putStrLn s
-       ; putStrLn "----------------------------\n" }
 
 
 main :: IO ()

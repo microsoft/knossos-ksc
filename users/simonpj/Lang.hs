@@ -5,15 +5,15 @@ module Lang where
 import Prelude hiding( (<>) )
 
 import Text.PrettyPrint as PP
+import KMonad
 
 import Data.Functor.Identity
 import Data.Maybe
 import Data.Functor
 
-import Control.Monad.Trans
 import System.Console.Haskeline
 
-import Data.Map
+import Data.Map as M
 import Debug.Trace( trace )
 import Test.Hspec
 
@@ -80,7 +80,7 @@ data ExprX b
   | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
   | If (ExprX b) (ExprX b) (ExprX b)
   | Assert (ExprX b) (ExprX b)
-  deriving (Eq, Ord, Show)
+  deriving (Show)
 
 type Expr = ExprX Var
 
@@ -148,7 +148,7 @@ newVarNotIn e = go e 1 -- FIXME start with hash of e to reduce retries
               go e (n + 1))
 
 test_FreeIn () =
-  hspec $ do 
+  hspec $ do
     let e = Call (Fun (SFun "f")) (Var (Simple "i"))
     let e2 = Call (Fun (SFun "f")) (Var (Simple "_t1"))
     describe "notFreeIn" $ do
@@ -161,6 +161,97 @@ test_FreeIn () =
         newVarNotIn e `shouldBe` (Simple "_t1")
       it "in, so new var is _t2..." $
         newVarNotIn e2 `shouldBe` (Simple "_t2")
+
+------ Equality modulo alpha --------
+
+instance Eq Expr where
+  e1 == e2 = case e1 `cmpExpr` e2 of
+               EQ -> True
+               _  -> False
+
+instance Ord Expr where
+  compare = cmpExpr
+
+thenCmp :: Ordering -> Ordering -> Ordering
+EQ `thenCmp` o = o
+o  `thenCmp` _ = o
+
+cmpExpr :: Expr -> Expr -> Ordering
+cmpExpr e1 e2
+ = go e1 M.empty e2
+ where
+   go :: Expr -> Map Var Var -> Expr -> Ordering
+   go (Konst k1) subst e2
+     = case e2 of
+         Konst k2 -> k1 `compare` k2
+         _        -> LT
+
+   go (Var v1) subst e2
+     = case e2 of
+         Konst {} -> GT
+         Var v2   -> v1 `compare` M.findWithDefault v2 v2 subst
+         _        -> LT
+
+   go (Call f1 e1) subst e2
+     = case e2 of
+         Konst {} -> GT
+         Var {} -> GT
+         Call f2 e2 -> (f1 `compare` f2) `thenCmp`
+                       (go e1 subst e2)
+         _ -> LT
+
+   go (Tuple es1) subst e2
+     = case e2 of
+         Konst {} -> GT
+         Var {}  -> GT
+         Call {} -> GT
+         Tuple es2 -> gos es1 subst es2
+         _        -> LT
+
+   go (Lam b1 e1) subst e2
+      = case e2 of
+         Konst {} -> GT
+         Var {}   -> GT
+         Call {}  -> GT
+         Tuple es -> GT
+         Lam b2 e2 -> go e1 (M.insert b2 b1 subst) e2
+         _         -> LT
+
+   go (App e1a e1b) subst e2
+     = case e2 of
+         Konst {} -> GT
+         Var {}   -> GT
+         Call {}  -> GT
+         Tuple {} -> GT
+         Lam {}   -> GT
+         App e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
+         _           -> LT
+
+   go (Let b1 r1 e1) subst e2
+     = case e2 of
+         If {}     -> LT
+         Assert {} -> LT
+         Let b2 r2 e2 -> go r1 subst r2 `thenCmp`
+                         go e1 (M.insert b2 b1 subst) e2
+         _ -> GT
+
+   go (If e1a e1b e1c) subst e2
+      = case e2 of
+          Assert {} -> LT
+          If e2a e2b e2c -> go e1a subst e2a `thenCmp`
+                            go e1b subst e2b `thenCmp`
+                            go e1c subst e2c
+          _ -> GT
+
+   go (Assert e1a e1b) subst e2
+      = case e2 of
+          Assert e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
+          _              -> GT
+
+   gos [] subst [] = EQ
+   gos [] subst (_:_) = LT
+   gos (_:_) subst [] = GT
+   gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
 
 ------ Pretty printer ------
 
@@ -271,11 +362,11 @@ instance Pretty Def where
              , PP.nest 2 (PP.text "=" PP.<+> ppr rhs) ]
 
 
-display :: Pretty p => p -> IO ()
-display p = putStrLn (PP.render (ppr p))
+display :: Pretty p => p -> KM ()
+display p = liftIO $ putStrLn (PP.render (ppr p))
 
-displayN :: Pretty p => [p] -> IO ()
-displayN ps = putStrLn (PP.render (go ps))
+displayN :: Pretty p => [p] -> KM ()
+displayN ps = liftIO $ putStrLn (PP.render (go ps))
   where
     go []     = PP.empty
     go [p]    = ppr p
