@@ -193,16 +193,16 @@ optBuild sz i e
     is_expensive (Konst _) = False
     is_expensive _ = False
 
--- build sz (\i. e1 * e2)  = (build sz (\i.e1)) *v e2
+-- build sz (\i. e1 * e2)  = (build sz (\i.e1)) * e2
 -- { if i is not free in e2 }
 optBuild sz i e
   | Call (Fun (SFun "*")) (Tuple [e1,e2]) <- e
   , i `notFreeIn` e2
-  =
-    if show (ppr e2) == "(1.0 / sum( build( size( v ), \\i. exp( index( i, v ) ) ) )) * dr" then
-      Just (Call (Fun (SFun "*v")) (Tuple [pBuild sz (Lam i e1), e2]))
-    else
-      Nothing
+  , is_expensive e2
+  = Just (Call (Fun (SFun "mul$Vec<R>$R")) (Tuple [pBuild sz (Lam i e1), e2]))
+  where
+      is_expensive (Call _ _) = True
+      is_expensive _ = False
 
 optBuild sz i e = Nothing
 
