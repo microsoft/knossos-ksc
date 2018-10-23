@@ -38,6 +38,7 @@ genKonst = \case
 genVar :: L.Var -> String
 genVar = \case
   L.Simple s -> s
+  L.StopGrad s -> s
   L.Delta  d -> "d$" ++ d
   L.Grad g m ->
     "g"
