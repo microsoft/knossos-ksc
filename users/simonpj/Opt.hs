@@ -373,7 +373,7 @@ optTrans (Let var rhs body)
     lmTranspose body
 optTrans (If b t e)
   = Just $ If b (lmTranspose t) (lmTranspose e)
-optTrans e = error ("optTrans: " ++ render (ppr e))
+optTrans e = error ("optTrans: " ++  show e)
 
 optTransCall :: Fun -> Expr -> Maybe Expr
 optTransCall (LMFun "lmZero") _  = Just lmZero
