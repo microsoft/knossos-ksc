@@ -19,7 +19,12 @@ cppF file
         
         let lines = [ 
                       "#include <stdio.h>"
-                      , "#include \"knossos.h\""
+                    , "#include \"knossos.h\""
+                    ]
+        let tail = [ 
+                      "int main() {"
+                    , "  tmain();"
+                    , "}"
                     ]
         writeFile "tmp1.cpp" (intercalate "\n" (lines ++ lls))
         readFile "tmp1.cpp" >>= putStrLn;
@@ -31,9 +36,20 @@ cppF file
 genDef :: L.Def -> String
 genDef (L.Def f vars expr) = 
           let vs = map genVar vars in
-          "template <" ++ intercalate "," (map ((++) "typename ty$") vs) ++ ">\n" ++
-          "auto " ++ genFun f ++ "(" ++ intercalate ", " (map (\v -> "ty$" ++ v ++ " " ++ v) vs) ++ ") -> auto\n" ++
+          if vs == [] then
+            (typeof expr) ++ " " ++ genFun f ++ "() \n" ++
             "{\n" ++ "  return " ++ genExpr (expr) ++ ";\n}\n"
+          else
+            "template <" ++ intercalate "," (map ((++) "typename ty$") vs) ++ ">\n" ++
+            "auto " ++ genFun f ++ "(" ++ intercalate ", " (map (\v -> "ty$" ++ v ++ " " ++ v) vs) ++ ") -> auto\n" ++
+              "{\n" ++ "  return " ++ genExpr (expr) ++ ";\n}\n" ++
+            "template <" ++ intercalate "," (map ((++) "typename ty$") vs) ++ ">\n" ++
+            "auto " ++ genFun f ++ "(std::tuple<" ++ intercalate ", " (map (\v -> "ty$" ++ v ) vs) ++ "> t) -> auto\n" ++
+              "{\n" ++ "  return " ++ genFun f ++ "(" ++ genGets (length vs) ++ ");\n}\n"
+            where 
+              genGets 1 = "std::get<0>(t)"
+              genGets n = (genGets (n-1)) ++ ", std::get<" ++ show n ++ ">(t)"
+  
 
 
 genExpr :: L.Expr -> String
@@ -78,6 +94,7 @@ genFun = \case
       "*" -> "mul"
       "+" -> "add"
       "/" -> "div"
+      "-" -> "sub"
       "<" -> "ks_less"
       "==" -> "ks_equals"
       s   -> s

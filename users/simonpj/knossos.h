@@ -2,6 +2,7 @@
 
 #include <tuple>
 #include <functional>
+#include <cmath>
 
 using std::make_tuple;
 using std::tuple;
@@ -13,10 +14,22 @@ struct vec {
     T* data; 
 };
 
+
+
 double mul(tuple<double,double> arg) { return get<0>(arg) * get<1>(arg); }
 double add(tuple<double,double> arg) { return get<0>(arg) + get<1>(arg); }
 double div(tuple<double,double> arg) { return get<0>(arg) / get<1>(arg); }
+double sub(tuple<double,double> arg) { return get<0>(arg) - get<1>(arg); }
 double neg(double d) { return -d; }
+double exp(double d) { return std::exp(d); }
+double log(double d) { return std::log(d); }
+
+template <typename T1, typename T2>
+bool ks_equals(tuple<T1,T2> t) { return get<0>(t) == get<1>(t); }
+
+template <typename T1, typename T2>
+bool ks_less(tuple<T1,T2> t) { return get<0>(t) < get<1>(t); }
+
 
 double sum(vec<double> v) { 
     double ret = 0.0;
