@@ -32,6 +32,7 @@ gradE (Let v e1 e2) = Let v e1                 $
 
 gradE (Tuple es) = lmVCat (map gradE es)
 gradE (If b t e) = If b (gradE t) (gradE e)
+gradE e@(Lam {}) = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 
 gradDefs :: [Def] -> [Def]
 gradDefs = map gradDef

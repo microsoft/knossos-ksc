@@ -331,7 +331,7 @@ pprCall prec f (Tuple [e1,e2])
   = parensIf prec prec' $
     sep [ pprExpr prec' e1, ppr f <+> pprExpr prec' e2 ]
 
-pprCall _ f e = ppr f PP.<> parensSp pp_args
+pprCall _ f e = PP.cat [ppr f, nest 2 (parensSp pp_args)]
   where
     pp_args = case e of
                 Tuple es -> pprWithCommas es
@@ -393,3 +393,7 @@ instance Pretty a => Pretty [a] where
 pprTrace :: String -> Doc -> a -> a
 pprTrace str doc v
   = trace (PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v
+
+pprPanic :: String -> Doc -> a
+pprPanic str doc
+  = error (PP.render (PP.sep [PP.text str, PP.nest 2 doc]))
