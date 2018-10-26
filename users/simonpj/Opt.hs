@@ -365,6 +365,7 @@ optApplyCall fun arg dx
 optTrans :: TExpr (LM a b) -> Maybe (TExpr (LM b a))
 -- Transpose an expression
 optTrans (Var (Grad n d)) = Just (Var (Grad n (flipMode d)))
+optTrans (Var (Simple v)) = Nothing
 optTrans (Call f a)       = optTransCall f a
 optTrans (Assert e1 e2)   = fmap (Assert e1) (optTrans e2)
 optTrans (Let (Grad n d) rhs body)
