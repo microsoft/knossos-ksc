@@ -5,6 +5,28 @@ module CppGen where
 import Data.List ( intercalate )
 import qualified Lang as L
 import qualified Main
+import Parse
+
+cppF :: String -> IO ()
+-- String is the file name
+cppF file
+  = do  
+        cts <- readFile file
+        ;
+        let lls = case runParser pDefs cts of
+                    Left err   -> error ("Failed parse: " ++ show err)
+                    Right defs -> map genDef defs
+        
+        let lines = [ 
+                      "#include <stdio.h>"
+                      , "#include \"knossos.h\""
+                    ]
+        writeFile "tmp1.cpp" (intercalate "\n" (lines ++ lls))
+        readFile "tmp1.cpp" >>= putStrLn;
+        putStrLn "^^^^^^---- Written to tmp1.cpp ----^^^^^^^^^"
+
+        
+
 
 genDef :: L.Def -> String
 genDef (L.Def f vars expr) = 
@@ -56,6 +78,8 @@ genFun = \case
       "*" -> "mul"
       "+" -> "add"
       "/" -> "div"
+      "<" -> "ks_less"
+      "==" -> "ks_equals"
       s   -> s
     L.SelFun i n -> "get<(" ++ show i ++ ")>" 
 
