@@ -19,8 +19,13 @@ gradE (Konst k)       = lmZero
 gradE (Var v)         = Var (gradV v)
 gradE (Assert e1 e2)  = Assert e1 (gradE e2)
 
+-- grad[ build (\i.e ]
+--  = B (\i. let Di = 0 in grad[e])
+-- We need the Di binding in case 'i' is mentioned in
+-- grad[e], e.g. build (\i. power(x, i))
 gradE (Call (Fun (SFun "build")) (Tuple [n, Lam i b]))
-  = lmBuild n (Lam i (gradE b))
+  = lmBuild n (Lam i (Let (gradV i) lmZero
+                      (gradE b)))
 
 gradE (Call fun arg) = Call (gradF fun) arg
                            `lmCompose`
