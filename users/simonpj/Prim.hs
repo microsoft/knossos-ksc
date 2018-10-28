@@ -73,10 +73,10 @@ gradSelFun i n = Call (GradFun (SelFun i n) Fwd) (Tuple [])
 
 assertEqual :: TExpr a -> TExpr a -> TExpr b -> TExpr b
 assertEqual x y body
-  = Assert (mkSCall2 "==" x y) body
+  = Assert (mkSCall2 TypeBool "==" x y) body
 
 isEqualityCall :: TExpr Bool -> Maybe (TExpr a, TExpr a)
-isEqualityCall (Call (Fun (SFun "==")) (Tuple [e1,e2]))
+isEqualityCall (Call (Fun (SFun TypeBool "==")) (Tuple [e1,e2]))
   = Just (e1,e2)
 isEqualityCall _ = Nothing
 
@@ -85,39 +85,39 @@ isEqualityCall _ = Nothing
 
 pDelta :: TExpr a -> TExpr a -> TExpr b -> TExpr b
 -- delta i j e  =  if i==j then e else zero
-pDelta ei ej e = mkSCall3 "delta" ei ej e
+pDelta ei ej e = mkSCall3 (typeof e) "delta" ei ej e
 
 pDeltaVec :: TExpr Int -> TExpr Int -> TExpr a -> TExpr (Vector a)
 -- deltaVec size i e = build size (\j. delta i j e)
-pDeltaVec sz ei e = mkSCall3 "deltaVec" sz ei e
+pDeltaVec sz ei e = mkSCall3 (TypeVec (typeof e)) "deltaVec" sz ei e
 
 pDiag :: TExpr Int -> (TExpr (Int -> a)) -> TExpr (Vector (Vector a))
 -- diag sz (\i. e) = build sz (\i. deltaVec sz i e)
-pDiag sz d = mkSCall2 "diag" sz d
+pDiag sz d = mkSCall2 (TypeVec (TypeVec (typeof d))) "diag" sz d
 
 ---------------------------
 -- "User-defined" functions
 ---------------------------
 pAdd, pMul :: TExpr Float -> TExpr Float -> TExpr Float
-pAdd a b = mkSCall2 "+" a b
-pMul a b = mkSCall2 "*" a b
-pDiv a b = mkSCall2 "/" a b
-pNeg x   = mkSCall1 "neg" x
-pExp x   = mkSCall1 "exp" x
-pLog x   = mkSCall1 "log" x
-pEqual a b = mkSCall2 "==" a b
+pAdd a b = mkSCall2 (typeof a) "+" a b
+pMul a b = mkSCall2 (typeof a) "*" a b
+pDiv a b = mkSCall2 (typeof a) "/" a b
+pNeg x   = mkSCall1 (typeof x) "neg" x
+pExp x   = mkSCall1 (typeof x) "exp" x
+pLog x   = mkSCall1 (typeof x) "log" x
+pEqual a b = mkSCall2 TypeBool "==" a b
 
 pBuild :: TExpr Nat -> TExpr (Nat -> t) -> TExpr (Vector t)
-pBuild n f = mkSCall2 "build" n f
+pBuild n (Lam i e) = mkSCall2 (TypeVec (typeof e)) "build" n (Lam i e)
 
 pIndex :: TExpr Int -> TExpr (Vector a) -> TExpr a
-pIndex i e = mkSCall2 "index" i e
+pIndex i e = mkSCall2 TypeUnknown "index" i e
 
 pSum :: TExpr (Vector Float) -> TExpr Float
-pSum e = mkSCall1 "sum" e
+pSum e = mkSCall1 TypeFloat "sum" e
 
 pSize :: TExpr (Vector Float) -> TExpr Nat
-pSize e = mkSCall1 "size" e
+pSize e = mkSCall1 TypeInteger "size" e
 
 pSel :: Int -> Int -> Expr -> Expr
 pSel i n x = Call (Fun (SelFun i n)) x

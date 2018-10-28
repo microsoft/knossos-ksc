@@ -42,7 +42,7 @@ cseE cse_env (Let v rhs body)
     cse_env' = M.insert rhs' (Var v) cse_env
 
 cseE cse_env (Assert e1 e2)
- | Call (Fun (SFun "==")) (Tuple [e1a, e1b]) <- e1'
+ | Call (Fun (SFun ty "==")) (Tuple [e1a, e1b]) <- e1'
  , let cse_env' = M.map (substAssert e1a e1b) cse_env
  = Assert e1' (cseE cse_env' e2)
  | otherwise

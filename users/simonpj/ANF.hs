@@ -21,7 +21,7 @@ anfExpr e = wrapLets (anfE e)
 anfE :: Expr -> AnfM Expr
 anfE (Tuple es)            = Tuple <$> mapM anfE1 es
 anfE (Call fun (Tuple es))
-  | Fun (SFun "build") <- fun
+  | Fun (SFun _ "build") <- fun
   , [n,e] <- es
   = -- Don't bother to ANF the first arr
     -- and leave the second arg in place
@@ -55,7 +55,7 @@ anfE1 e = do { e' <- anfE e
 atomise :: Expr -> AnfM Expr
 atomise (Var v)   = return (Var v)
 atomise (Konst k) = return (Konst k)
-atomise e         = do { v <- newVar
+atomise e         = do { v <- newVar (typeof e)
                        ; emit v e
                        ; return (Var v) }
 
@@ -92,5 +92,5 @@ wrap fs e = foldr (\(v,r) b -> Let v r b) e fs
 emit :: Var -> Expr -> AnfM ()
 emit v r = AnfM (\u -> (u, [(v,r)], ()))
 
-newVar :: AnfM Var
-newVar = AnfM (\u -> (u+1, [], Simple ('t' : show u)))
+newVar :: Type -> AnfM Var
+newVar ty = AnfM (\u -> (u+1, [], Simple ty ('t' : show u)))
