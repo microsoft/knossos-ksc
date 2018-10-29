@@ -120,18 +120,11 @@ pDouble = Tok.float lexer
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
-makeTypedSimple :: String -> String -> Var
-makeTypedSimple "Int" v = Simple TypeInteger v
-makeTypedSimple "R" v = Simple TypeFloat v
-makeTypedSimple "Vec<R>" v = Simple (TypeVec TypeFloat) v
-makeTypedSimple s v = error ("Unknown type [" ++ s ++ "]") 
-
 pParam :: Parser Var
-pParam = Simple TypeFloat <$> pIdentifier
+pParam = Simple <$> pIdentifier
     <|> parens (do {
-                    ty <- pIdentifier;
-                    v <- pIdentifier;
-                    return (makeTypedSimple ty v)
+          pReserved "const" ;
+          StopGrad <$> pIdentifier
         })
 
 pKonst :: Parser Expr
@@ -140,7 +133,7 @@ pKonst =   try ((Konst . KFloat) <$> pDouble)
 
 pExpr :: Parser Expr
 pExpr = pKonst
-   <|> (Var . Ref) <$> pIdentifier
+   <|> (Var . Simple) <$> pIdentifier
    <|> parens pKExpr
 
 pKExpr :: Parser Expr
@@ -159,9 +152,9 @@ pCall :: Parser Expr
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
-               []  -> return (Var (Ref f))
-               [e] -> return (Call (Fun (RefFun f)) e)
-               _   -> return (Call (Fun (RefFun f)) (Tuple es)) }
+               []  -> return (Var (Simple f))
+               [e] -> return (Call (Fun (SFun f)) e)
+               _   -> return (Call (Fun (SFun f)) (Tuple es)) }
 
 pIfThenElse :: Parser Expr
 -- (if e1 e2 e3)
@@ -189,13 +182,13 @@ pLam :: Parser Expr
 pLam = do { pReserved "lam"
           ; i <- pIdentifier
           ; e <- pExpr
-          ; return (Lam (Simple TypeInteger i) e) }
+          ; return (Lam (Simple i) e) }
 
 pBind :: Parser (Var, Expr)
 -- var rhs
 pBind = do { v <- pIdentifier
            ; e <- pExpr
-          ; return (Simple TypeUnknown v,e) }
+          ; return (Simple v,e) }
 
 pLet :: Parser Expr
 -- (let (x r) b)
@@ -212,7 +205,7 @@ pDef = parens $ do { pReserved "def"
                    ; f <- pIdentifier
                    ; xs <- parens (many pParam)
                    ; rhs <- pExpr
-                   ; return (Def (Fun (SFun (typeof rhs) f)) xs rhs) }
+                   ; return (Def (Fun (SFun f)) xs rhs) }
 
 pDefs :: Parser [Def]
 pDefs = spaces >> many pDef

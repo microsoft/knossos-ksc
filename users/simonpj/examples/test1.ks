@@ -1,7 +1,7 @@
-(def a ((R x))
-    (* 3.0 x))
+(def a (x)
+    (* 3 x))
 
-(def b ((Int y))
+(def b (y)
     (* 2 y))
 
 (def f (x y)

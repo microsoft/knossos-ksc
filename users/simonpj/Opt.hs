@@ -102,35 +102,35 @@ optFun (SelFun i _) (Tuple es)
   | i <= length es = Just (es !! (i-1))
 
 -- RULE: x+0 = 0+x = x
-optFun (SFun _ "+") (Tuple [x, Konst KZero]) = Just x
-optFun (SFun _ "+") (Tuple [Konst KZero, y]) = Just y
+optFun (SFun "+") (Tuple [x, Konst KZero]) = Just x
+optFun (SFun "+") (Tuple [Konst KZero, y]) = Just y
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
-optFun (SFun _ "+") (Tuple [Tuple es1, Tuple es2])
+optFun (SFun "+") (Tuple [Tuple es1, Tuple es2])
   | length es1 == length es2 = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x*0 = 0*x = 0
-optFun (SFun _ "*") (Tuple [x, Konst KZero]) = Just (Konst KZero)
-optFun (SFun _ "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
+optFun (SFun "*") (Tuple [x, Konst KZero]) = Just (Konst KZero)
+optFun (SFun "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
 
 -- RULE: size (build (n, _)) = n
-optFun (SFun _ "size") (Call (Fun (SFun _ "build")) (Tuple [n,_]))
+optFun (SFun "size") (Call (Fun (SFun "build")) (Tuple [n,_]))
   = Just n
 
 -- RULE: size (x * y) = size(x)
-optFun (SFun _ "size") (Call (Fun (SFun _ "*")) (Tuple [x,_]))
-  = Just (mkSCall1 TypeInteger "size" x)
+optFun (SFun "size") (Call (Fun (SFun "*")) (Tuple [x,_]))
+  = Just (mkSCall1 "size" x)
 
 -- RULE: index j (build n f) = f j
-optFun (SFun _ "index") (Tuple [ ei, arr ])
-  | Call (Fun (SFun _ "build")) (Tuple [_, f]) <- arr
+optFun (SFun "index") (Tuple [ ei, arr ])
+  | Call (Fun (SFun "build")) (Tuple [_, f]) <- arr
   , Lam i e <- f
   = Just (Let i ei e)
 
 -- RULE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
-optFun (SFun _ "sum")   arg = optSum arg
-optFun (SFun (TypeVec _) "build") (Tuple [sz, Lam i e2]) = optBuild sz i e2
+optFun (SFun "sum")   arg = optSum arg
+optFun (SFun "build") (Tuple [sz, Lam i e2]) = optBuild sz i e2
 
 optFun _ _ = Nothing
 
@@ -139,15 +139,15 @@ optSum :: TExpr (Vector a) -> Maybe (TExpr a)
 
 -- RULE: sum (build n (\i. (e1,e2,...)))
 --       = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
-optSum (Call (Fun (SFun _ "build")) (Tuple [n, Lam i (Tuple es)]))
+optSum (Call (Fun (SFun "build")) (Tuple [n, Lam i (Tuple es)]))
    = Just $ Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
 
 -- RULE: sum (diag sz f)  =  build sz f
-optSum (Call (Fun (SFun _ "diag")) (Tuple [sz, f]))
+optSum (Call (Fun (SFun "diag")) (Tuple [sz, f]))
   = Just $ pBuild sz f
 
 -- RULE: sum (deltaVec sz i e) = e
-optSum (Call (Fun (SFun _ "deltaVec")) (Tuple [_, _, e]))
+optSum (Call (Fun (SFun "deltaVec")) (Tuple [_, _, e]))
   = Just e
 
 optSum e = Nothing
@@ -160,7 +160,7 @@ optBuild :: TExpr Int -> Var -> TExpr a -> Maybe (TExpr (Vector a))
 --       (if i is not free in ex)
 -- NB: however, i might be free in eb
 optBuild sz i e
-  | Call (Fun (SFun _ "delta")) (Tuple [e1,e2,eb]) <- e
+  | Call (Fun (SFun "delta")) (Tuple [e1,e2,eb]) <- e
   , Just ex <- ok_eq e1 e2
   , i `notFreeIn` ex
   = Just $ Let i ex $ pDeltaVec sz (Var i) eb
@@ -173,7 +173,7 @@ optBuild sz i e
 
 -- RULE: build sz (\i. deltaVec sz i e)   = diag sz (\i. e)
 optBuild sz i build_e
-  | Call (Fun (SFun _ "deltaVec")) (Tuple [sz2, Var i2, e]) <- build_e
+  | Call (Fun (SFun "deltaVec")) (Tuple [sz2, Var i2, e]) <- build_e
   , sz == sz2
   , i  == i2
   = Just $ pDiag sz (Lam i e)
@@ -183,24 +183,23 @@ optBuild sz i build_e
 --         build sz (\i. f e1 .. tN ... )
 -- { if i is not free in eN }
 optBuild sz i e
-  | Call (Fun (SFun ty f)) (Tuple [e1,e2]) <- e
+  | Call (Fun (SFun f)) (Tuple [e1,e2]) <- e
   , is_expensive e2 -- try to apply only to "expensive" operations
   , i `notFreeIn` e2
-  = let tmp = mktmp e2 in 
-    Just $ Let tmp e2 $ pBuild sz (Lam i (Call (Fun (SFun ty f)) (Tuple [e1, (Var tmp)])))
-      where
-        mktmp v = newVarNotIn (typeof v) (pBuild sz (Lam i e)) -- slightly inefficient to reassemble outer expr here
-        is_expensive (Var _) = False
-        is_expensive (Konst _) = False
-        is_expensive _ = False
+  = Just $ Let tmp e2 $ pBuild sz (Lam i (Call (Fun (SFun f)) (Tuple [e1, (Var tmp)])))
+  where
+    tmp = newVarNotIn (pBuild sz (Lam i e)) -- slightly inefficient to reassemble outer expr here
+    is_expensive (Var _) = False
+    is_expensive (Konst _) = False
+    is_expensive _ = False
 
 -- build sz (\i. e1 * e2)  = (build sz (\i.e1)) * e2
 -- { if i is not free in e2 }
 optBuild sz i e
-  | Call (Fun (SFun _ "*")) (Tuple [e1,e2]) <- e
+  | Call (Fun (SFun "*")) (Tuple [e1,e2]) <- e
   , i `notFreeIn` e2
   , is_expensive e2
-  = Just (Call (Fun (SFun (TypeVec TypeFloat) "mul$Vec<R>$R")) (Tuple [pBuild sz (Lam i e1), e2]))
+  = Just (Call (Fun (SFun "mul$Vec<R>$R")) (Tuple [pBuild sz (Lam i e1), e2]))
   where
       is_expensive (Call _ _) = True
       is_expensive _ = False
@@ -214,12 +213,12 @@ optGradFun :: FunId -> Expr -> Maybe Expr
 
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
-optGradFun (SFun _ "+") _ = Just (lmHCat [lmOne, lmOne])
+optGradFun (SFun "+") _ = Just (lmHCat [lmOne, lmOne])
 
-optGradFun (SFun _ "*") (Tuple [x,y])
+optGradFun (SFun "*") (Tuple [x,y])
   = Just (lmHCat [lmScale y, lmScale x])
 
-optGradFun (SFun _ "/") (Tuple [x,y])
+optGradFun (SFun "/") (Tuple [x,y])
   = Just (lmHCat [ lmScale (pDiv (kInt 1) y)
                  , lmScale (pNeg (pDiv x (pMul y y)))])
 -- fst :: (a,b) -> a
@@ -227,18 +226,18 @@ optGradFun (SFun _ "/") (Tuple [x,y])
 optGradFun (SelFun i n) _ = Just (lmHCat [ if i == j then lmOne else lmZero
                                           | j <- [1..n] ])
 
-optGradFun (SFun _ "sum") e
-  = Just (lmBuildT (pSize e) (Lam (Simple TypeInteger "si") lmOne))
+optGradFun (SFun "sum") e
+  = Just (lmBuildT (pSize e) (Lam (Simple "si") lmOne))
 
-optGradFun (SFun _ "index") (Tuple [i,v])
+optGradFun (SFun "index") (Tuple [i,v])
   = Just (lmHCat [ lmZero
-                 , lmBuildT (pSize v) (Lam (Simple TypeInteger "ii") (lmDelta (Var (Simple TypeInteger "ii")) i)) ])
+                 , lmBuildT (pSize v) (Lam (Simple "ii") (lmDelta (Var (Simple "ii")) i)) ])
 
-optGradFun (SFun _ "neg") e = Just (lmScale (kFloat $ -1.0))
+optGradFun (SFun "neg") e = Just (lmScale (kFloat $ -1.0))
 
-optGradFun (SFun _ "exp") e = Just (lmScale (pExp e))
+optGradFun (SFun "exp") e = Just (lmScale (pExp e))
 
-optGradFun (SFun _ "log") e = Just (lmScale (pDiv (kFloat 1.0) e))
+optGradFun (SFun "log") e = Just (lmScale (pDiv (kFloat 1.0) e))
 
 optGradFun _ _ = Nothing
 
@@ -299,7 +298,7 @@ test_opt =
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
         optLM "lmAdd" (Tuple [lmScale $ kFloat 1.3, lmScale $ kFloat 0.4])
         `shouldBe`
-        Just (lmScale (mkSCall2 TypeFloat "+" (kFloat 1.3) (kFloat 0.4)))
+        Just (lmScale (mkSCall2 "+" (kFloat 1.3) (kFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd)" $
         optE (lmAdd (lmHCat (map kInt [1,2,3])) (lmHCat (map kInt [11,22,33])))
@@ -366,7 +365,7 @@ optApplyCall fun arg dx
 optTrans :: TExpr (LM a b) -> Maybe (TExpr (LM b a))
 -- Transpose an expression
 optTrans (Var (Grad n d)) = Just (Var (Grad n (flipMode d)))
-optTrans (Var (Simple _ v)) = Nothing
+optTrans (Var (Simple v)) = Nothing
 optTrans (Call f a)       = optTransCall f a
 optTrans (Assert e1 e2)   = fmap (Assert e1) (optTrans e2)
 optTrans (Let (Grad n d) rhs body)

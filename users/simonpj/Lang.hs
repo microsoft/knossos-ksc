@@ -31,8 +31,7 @@ data Type = TypeBool
 data FunId = SelFun     -- Selector function: fst, snd etc
                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                Int      -- Arity
-           | SFun Type String  -- For now
-           | RefFun String  -- For now
+           | SFun String  -- For now
            deriving( Eq, Ord, Show )
 
 data ADMode = Fwd | Rev
@@ -51,11 +50,11 @@ data Fun = Fun     FunId         -- The function              f(x)
          deriving( Eq, Ord, Show )
 
 data Var
-  = Simple   Type String   -- x, with declared type
-  | Ref      String        -- reference to x in expression, needs an env to find type
-  | Delta    String        -- The 'dx' or 'dr' argument to fwd
+  = Simple   String         -- x
+  | StopGrad String         -- const x with derivative 0
+  | Delta    String         -- The 'dx' or 'dr' argument to fwd
                            -- or backward versions of f
-  | Grad     String ADMode -- \nabla x
+  | Grad     String ADMode  -- \nabla x
                            --   True <=> transposed \bowtie x
   deriving( Show, Eq, Ord )
 
@@ -73,7 +72,10 @@ data DefX b = Def Fun [Var] (ExprX b)  -- f x = e
 
 type Def = DefX Var
 
+
 type TExpr ty = Expr
+  -- The phantom parameter gives the type of
+  -- the expresssion, for documentation purposes
 
 data ExprX b
   = Konst Konst
@@ -89,40 +91,20 @@ data ExprX b
 
 type Expr = ExprX Var
 
-typeof :: Expr -> Type
-typeof (Konst k) = case k of
-                        KInteger i -> TypeInteger
-                        KBool    b -> TypeBool
-                        _          -> TypeFloat
-typeof (Call (Fun (SFun ty "build")) (Tuple [n, Lam i b])) = 
-  trace("Typeof build = [" ++ show ty ++ "]") (TypeVec (typeof b))
-typeof (Call (Fun (RefFun _)) _) = TypeUnknown
-typeof (Var (Simple ty v)) = ty
-typeof (Var (Ref v)) = TypeUnknown
-typeof (Tuple es) = TypeTuple (Prelude.map typeof es)
-typeof (Let v e1 e2) = typeof e2
-typeof (Lam v2 e) = error "Lam"
-typeof (App f a) = error "App"
-typeof (If c t f) = typeof t
-typeof (Assert e1 e2) = typeof e2
-typeof e = error ("Cannot get type of [" ++ show e ++ "]")
-
-
-
 -- awf: is this needed?
 -- data Value = VKonst Konst
 
 mkInfixCall :: Fun -> Expr -> Expr -> Expr
 mkInfixCall f a b = Call f (Tuple [a, b])
 
-mkSCall1 :: Type -> String -> Expr -> Expr
-mkSCall1 ty fname a = Call (Fun (SFun ty fname)) a
+mkSCall1 :: String -> Expr -> Expr
+mkSCall1 fname a = Call (Fun (SFun fname)) a
 
-mkSCall2 :: Type -> String -> Expr -> Expr -> Expr
-mkSCall2 ty fname a b = Call (Fun (SFun ty fname)) (Tuple [a, b])
+mkSCall2 :: String -> Expr -> Expr -> Expr
+mkSCall2 fname a b = Call (Fun (SFun fname)) (Tuple [a, b])
 
-mkSCall3 :: Type -> String -> Expr -> Expr -> Expr -> Expr
-mkSCall3 ty fname a b c = Call (Fun (SFun ty fname)) (Tuple [a, b, c])
+mkSCall3 :: String -> Expr -> Expr -> Expr -> Expr
+mkSCall3 fname a b c = Call (Fun (SFun fname)) (Tuple [a, b, c])
 
 mkLets :: [(Var,Expr)] -> Expr -> Expr
 mkLets [] e = e
@@ -151,45 +133,41 @@ seqExpr (Tuple es) x = Prelude.foldr seqExpr x es
 notFreeIn :: Var -> Expr -> Bool
 notFreeIn v e = go e
  where
-   isMatch (Simple _ v1) (Ref v2) = v1 == v2
-   isMatch (Ref v1) (Simple _ v2) = v1 == v2
-   isMatch v1 v2 = v1 == v2
-
-   go (Var v2) = not (isMatch v v2)
+   go (Var v2) = v /= v2
    go (Konst _) = True
    go (Tuple es) = all go es
    go (If b t e) = go b && go t && go e
    go (Call (Fun f) e) = go e
    go (App f a)  = go f && go a
-   go (Let v2 r b) = go r && (isMatch v v2 || go b)
-   go (Lam v2 e)   = isMatch v v2 || go e
+   go (Let v2 r b) = go r && (v == v2 || go b)
+   go (Lam v2 e)   = v == v2 || go e
    go (Assert e1 e2) = go e1 && go e2
 
 -----------------
-newVarNotIn :: Type -> Expr -> Var
-newVarNotIn ty e = go e 1 -- FIXME start with hash of e to reduce retries
+newVarNotIn :: Expr -> Var
+newVarNotIn e = go e 1 -- FIXME start with hash of e to reduce retries
   where go e n =
-          let v = Simple ty ("_t" ++ show n) in
+          let v = Simple ("_t" ++ show n) in
             if v `notFreeIn` e then
               v
             else
               trace ("newVarNotIn: Var " ++ show v ++ "was bound in E, retry") (
               go e (n + 1))
 
-test_FreeIn =
+test_FreeIn () =
   hspec $ do
-    let e = Call (Fun (SFun TypeInteger "f")) (Var (Simple TypeInteger "i"))
-    let e2 = Call (Fun (SFun TypeInteger "f")) (Var (Simple TypeInteger "_t1"))
+    let e = Call (Fun (SFun "f")) (Var (Simple "i"))
+    let e2 = Call (Fun (SFun "f")) (Var (Simple "_t1"))
     describe "notFreeIn" $ do
       it ("i notFreeIn " ++ show (ppr (e::Expr))) $
-        (Simple TypeInteger "i" `notFreeIn` e) `shouldBe` False
+        (Simple "i" `notFreeIn` e) `shouldBe` False
       it ("x not notFreeIn " ++ show (ppr (e::Expr))) $
-        (Simple TypeInteger "x" `notFreeIn` e) `shouldBe` True
+        (Simple "x" `notFreeIn` e) `shouldBe` True
     describe "newVarNotIn" $ do
       it "not in, so new var is _t1..." $
-        newVarNotIn TypeInteger e `shouldBe` (Simple TypeInteger "_t1")
+        newVarNotIn e `shouldBe` (Simple "_t1")
       it "in, so new var is _t2..." $
-        newVarNotIn TypeInteger e2 `shouldBe` (Simple TypeInteger "_t2")
+        newVarNotIn e2 `shouldBe` (Simple "_t2")
 
 ------ Equality modulo alpha --------
 
@@ -288,13 +266,14 @@ class Pretty p where
   ppr :: p -> Doc
 
 instance Pretty Var where
-  ppr (Simple t s) = PP.text s
+  ppr (Simple s)   = PP.text s
+  ppr (StopGrad s) = PP.text s
   ppr (Delta s)    = PP.text ('d' : s)
   ppr (Grad s Fwd) = PP.text ('D' : s)
   ppr (Grad s Rev) = PP.text ('R' : s)
 
 instance Pretty FunId where
-  ppr (SFun _ s)   = PP.text s
+  ppr (SFun s)     = PP.text s
   ppr (SelFun i n) = PP.text "sel_" PP.<> PP.int i PP.<> PP.char '_' PP.<> PP.int n
 
 instance Pretty Fun where
@@ -365,7 +344,7 @@ pprCall _ f e = PP.cat [ppr f, nest 2 (parensSp pp_args)]
                 _        -> ppr e
 
 isInfix :: Fun -> Maybe Prec
-isInfix (Fun (SFun _ s))
+isInfix (Fun (SFun s))
   | s == "==" = Just precOne
   | s == "+"  = Just precTwo
   | s == "-"  = Just precTwo

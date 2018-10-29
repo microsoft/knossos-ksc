@@ -10,9 +10,9 @@ gradF (Fun f) = GradFun f Fwd
 gradF f       = error ("gradF: bad function: " ++ show f)
 
 gradV :: Var -> Var
-gradV (Simple _ x) = Grad x Fwd
-gradV (Ref x)      = Grad x Fwd
-gradV v            = error ("gradV: bad variable: " ++ PP.render (ppr v))
+gradV (Simple x) = Grad x Fwd
+gradV (StopGrad x) = Grad x Fwd
+gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
 
 gradE :: Expr -> Expr
 gradE (Konst k)       = lmZero
@@ -23,7 +23,7 @@ gradE (Assert e1 e2)  = Assert e1 (gradE e2)
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE (Call (Fun (SFun _ "build")) (Tuple [n, Lam i b]))
+gradE (Call (Fun (SFun "build")) (Tuple [n, Lam i b]))
   = lmBuild n (Lam i (Let (gradV i) lmZero
                       (gradE b)))
 
@@ -50,7 +50,7 @@ gradDef (Def fun params rhs)
     gradE rhs
   where
     n = length params
-    gradParam (Simple TypeInteger _) _ _= lmZero
+    gradParam (StopGrad _) _ _= lmZero
     gradParam _ i n = gradSelFun i n 
 
 ---------------------------------
@@ -72,7 +72,8 @@ applyD (Def (GradFun f d) vars rhs)
   where
     dvars = map to_delta vars
 
-    to_delta (Simple _ x) = Delta x
+    to_delta (Simple x) = Delta x
+    to_delta (StopGrad x) = Delta x
 
     dr = Delta "r"
 
