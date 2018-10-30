@@ -205,6 +205,7 @@ cgenVar = \case
            L.Rev -> "r"
          )
 
+example :: IO ()
 example = do
   mapM_
     putStrLn
@@ -228,4 +229,5 @@ example = do
     ++ "}"
     ]
 
+printFloat :: String -> String
 printFloat s = "printf(\"%f\\n\", " ++ s ++ ");\n"
