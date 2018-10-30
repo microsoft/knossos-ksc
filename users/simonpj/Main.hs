@@ -130,7 +130,7 @@ cppF file
                     , "  ks_main();"
                     , "}"
                     ]
-        writeFile "tmp1.cpp" (intercalate "\n" (lines ++ lls))
+        writeFile "tmp1.cpp" (intercalate "\n" (lines ++ lls ++ tail))
         readFile "tmp1.cpp" >>= putStrLn;
         putStrLn "^^^^^^---- Written to tmp1.cpp ----^^^^^^^^^"
 

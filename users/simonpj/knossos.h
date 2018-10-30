@@ -8,35 +8,27 @@ using std::make_tuple;
 using std::tuple;
 using std::get;
 
+// Functions defined polymorphically by Cgen.typeofFun
+template <class T1, class T2> T1 add(tuple<T1, T2> t) { return get<0>(t) + get<1>(t);}
+template <class T1, class T2> T1 sub(tuple<T1, T2> t) { return get<0>(t) - get<1>(t);}
+template <class T1, class T2> T1 mul(tuple<T1, T2> t) { return get<0>(t) * get<1>(t);}
+template <class T1, class T2> T1 div(tuple<T1, T2> t) { return get<0>(t) / get<1>(t);}
+template <class T1, class T2> T1  eq(tuple<T1, T2> t) { return get<0>(t) == get<1>(t);}
+template <class T1, class T2> T1  lt(tuple<T1, T2> t) { return get<0>(t) < get<1>(t);}
+
+double neg(double d) { return -d; }
+double exp(double d) { return std::exp(d); }
+double log(double d) { return std::log(d); }
+
+// ASSERT
+#define ASSERT(expr) if (expr) ; else { throw ("Assert failed [" #expr "]");} 
+
+// Vector builtins
 template <class T> 
 struct vec { 
     int size; 
     T* data; 
 };
-
-
-
-double mul(tuple<double,double> arg) { return get<0>(arg) * get<1>(arg); }
-double add(tuple<double,double> arg) { return get<0>(arg) + get<1>(arg); }
-double div(tuple<double,double> arg) { return get<0>(arg) / get<1>(arg); }
-double sub(tuple<double,double> arg) { return get<0>(arg) - get<1>(arg); }
-double neg(double d) { return -d; }
-double exp(double d) { return std::exp(d); }
-double log(double d) { return std::log(d); }
-
-template <typename T1, typename T2>
-bool ks_equals(tuple<T1,T2> t) { return get<0>(t) == get<1>(t); }
-
-template <typename T1, typename T2>
-bool ks_less(tuple<T1,T2> t) { return get<0>(t) < get<1>(t); }
-
-
-double sum(vec<double> v) { 
-    double ret = 0.0;
-    for(int i = 0; i < v.size; ++i)
-        ret += v.data[i];
-    return ret; 
-}
 
 template <class T> 
 int size(vec<T> v) { return v.size; }
@@ -60,3 +52,13 @@ vec<T> build(tuple<int, std::function<T(int)>> t)
 { 
     return build0(get<0>(t), get<1>(t)); 
 }
+
+// Additional Vec functions
+
+double sum(vec<double> v) { 
+    double ret = 0.0;
+    for(int i = 0; i < v.size; ++i)
+        ret += v.data[i];
+    return ret; 
+}
+

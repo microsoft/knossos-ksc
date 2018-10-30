@@ -120,12 +120,21 @@ pDouble = Tok.float lexer
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
+-- FIXME parse this properly
+makeTVar :: String -> String -> Var
+makeTVar "Integer" v = TVar TypeInteger (Simple v)
+makeTVar "Float" v = TVar TypeFloat (Simple v)
+makeTVar "Vec<Float>" v = TVar (TypeVec TypeFloat) (Simple v) 
+makeTVar "Vec<Vec<Float>>" v = TVar (TypeVec (TypeVec TypeFloat)) (Simple v) 
+makeTVar s v = error ("Unknown type [" ++ s ++ "]") 
+
 pParam :: Parser Var
-pParam = Simple <$> pIdentifier
-    <|> parens (do {
-          pReserved "const" ;
-          StopGrad <$> pIdentifier
-        })
+pParam = Simple <$> pIdentifier -- FIXME: this should error or at least return TypeUnknown
+     <|> parens (do {
+                    ty <- pIdentifier;
+                    v <- pIdentifier;
+                    return (makeTVar ty v)
+         })
 
 pKonst :: Parser Expr
 pKonst =   try ((Konst . KFloat) <$> pDouble)
@@ -180,9 +189,9 @@ pTuple = do { pReserved "tuple"
 pLam :: Parser Expr
 -- (lam i e)
 pLam = do { pReserved "lam"
-          ; i <- pIdentifier
+          ; i <- pParam
           ; e <- pExpr
-          ; return (Lam (Simple i) e) }
+          ; return (Lam i e) }
 
 pBind :: Parser (Var, Expr)
 -- var rhs

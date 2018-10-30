@@ -20,11 +20,13 @@ import Test.Hspec
 infixr 0 `seqExpr`
 
 ------ Data types ---------
-data Type = TypeBool 
+data Type = TypeZero               -- Polyamorous zero
+          | TypeBool 
           | TypeInteger 
           | TypeFloat
           | TypeTuple [Type] 
-          | TypeVec Type 
+          | TypeVec Type
+          | TypeLambda Type Type   -- Domain -> Range 
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
@@ -51,11 +53,12 @@ data Fun = Fun     FunId         -- The function              f(x)
 
 data Var
   = Simple   String         -- x
-  | StopGrad String         -- const x with derivative 0
+  | StopGrad String
   | Delta    String         -- The 'dx' or 'dr' argument to fwd
                            -- or backward versions of f
   | Grad     String ADMode  -- \nabla x
                            --   True <=> transposed \bowtie x
+  | TVar     Type Var
   deriving( Show, Eq, Ord )
 
 data Konst = KZero  -- Of any type
@@ -71,7 +74,6 @@ isKZero _             = False
 data DefX b = Def Fun [Var] (ExprX b)  -- f x = e
 
 type Def = DefX Var
-
 
 type TExpr ty = Expr
   -- The phantom parameter gives the type of
