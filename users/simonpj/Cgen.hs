@@ -72,7 +72,17 @@ anfSPJ = snd . ANF.runAnf 0 . ANF.anfE
 
 cgenDef :: L.Def -> M String
 cgenDef (L.Def f vars expr) = do
-  let typeEnv = Map.fromList (map (\v -> (v, Double)) vars) -- FIXME: do this properly!
+  -- FIXME: We don't find the types of function arguments properly.
+  -- They should really be attached to the function definition.  For
+  -- the moment I'm just fixing the type of function arguments based
+  -- on my domain expertise.
+  let typeEnvList :: [(L.Var, Type)]
+      typeEnvList = case f of
+        L.Fun (L.SFun "f3") -> map (\v -> (v, Tuple 2)) vars
+        _                   -> map (\v -> (v, Double)) vars
+
+      typeEnv :: Map.Map L.Var Type
+      typeEnv = Map.fromList typeEnvList
 
   (cExpr, cVar, _) <- cgenExpr typeEnv expr
 
@@ -80,7 +90,11 @@ cgenDef (L.Def f vars expr) = do
     (  "double "
     ++ cgenFun f
     ++ "("
-    ++ intercalate ", " (map (("double " ++) . cgenVar) vars)
+    ++ intercalate
+         ", "
+         (map (\(var, type_) -> cgenType type_ ++ " " ++ cgenVar var)
+              typeEnvList
+         )
     ++ ") {\n"
     ++ cExpr
     ++ "return "
@@ -219,12 +233,14 @@ example = do
     , runM (cgenDef Main.ex1)
     , runM (cgenDef Main.ex2)
     , runM (cgenDef Main.ex2a)
+    , runM (cgenDef Main.ex3)
     , runM (cgenDef Main.ex4)
     , runM (cgenDef Main.ex5)
     , "int main(void) { "
     ++ printFloat "f1(2)"
     ++ printFloat "f2(2)"
     ++ printFloat "f2a(2)"
+    ++ printFloat "f3((struct tuple2) { .field1_2 = 2, .field2_2 = 3 })"
     ++ printFloat "f4(2, 3)"
     ++ printFloat "f5(2, 3)"
     ++ "}"
