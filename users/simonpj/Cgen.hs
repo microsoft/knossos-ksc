@@ -218,12 +218,13 @@ example = do
     , "double selfun_2_2(struct tuple2 arg) { return arg.field2_2; }"
     , runM (cgenDef Main.ex1)
     , runM (cgenDef Main.ex2)
-    -- , runM (cgenDef Main.ex2a) -- the definition of y seems to be missing
+    , runM (cgenDef Main.ex2a)
     , runM (cgenDef Main.ex4)
     , runM (cgenDef Main.ex5)
     , "int main(void) { "
     ++ printFloat "f1(2)"
     ++ printFloat "f2(2)"
+    ++ printFloat "f2a(2)"
     ++ printFloat "f4(2, 3)"
     ++ printFloat "f5(2, 3)"
     ++ "}"
