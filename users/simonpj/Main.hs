@@ -31,7 +31,7 @@ ex2a :: Def
 -- f2a x = let zt = let y1 = x*x in (y1, x + y1)
 --         let y2 = fst zt
 --         let z = snd zt
---         in y * z
+--         in y2 * z
 ex2a = Def (Fun (SFun "f2a")) [sx] $
       Let szt (Let sy1 (pMul (Var sx) (Var sx)) $
                Tuple [Var sy1, pAdd (Var sx) (Var sy1)]) $
