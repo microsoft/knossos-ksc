@@ -8,6 +8,7 @@ import qualified ANF                           as ANF
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
 import           Data.List                      ( intercalate )
+import           Data.Maybe                     ( fromJust )
 import qualified Main
 
 type M = S.State Int
@@ -29,8 +30,20 @@ freshVar = do
 
 anf :: L.Expr -> M L.Expr
 anf = \case
-  L.Konst k    -> return (L.Konst k)
-  L.Var   v    -> return (L.Var v)
+  L.Konst k -> return (L.Konst k)
+  L.Var   v -> return (L.Var v)
+  -- We treat "call of build with lambda argument" as a language
+  -- primitive
+  L.Call (L.Fun (L.SFun "build")) (L.Tuple [n, L.Lam var body]) -> do
+    anfArg  <- anf n
+    anfBody <- anf body
+    v       <- freshVar
+    return
+      (L.Let
+        v
+        anfArg
+        (L.Call (L.Fun (L.SFun "build")) (L.Tuple [L.Var v, L.Lam var anfBody]))
+      )
   L.Call f arg -> do
     (let_, var) <- do
       anfArg <- anf arg
@@ -62,7 +75,10 @@ anf = \case
     anfift  <- anf ift
     anfiff  <- anf iff
     return (L.If anfcond anfift anfiff)
-  L.Assert{} -> error "Assert"
+  L.Assert cond body -> do
+    anfcond <- anf cond
+    anfbody <- anf body
+    return (L.Assert anfcond anfbody)
 
 -- NB SPJ's ANF doesn't actually seem to replace function arguments
 -- with variables
@@ -77,8 +93,9 @@ cgenDef (L.Def f vars expr) = do
   -- on my domain expertise.
   let typeEnvList :: [(L.Var, Type)]
       typeEnvList = case f of
-        L.Fun (L.SFun "f3") -> map (\v -> (v, Tuple 2)) vars
-        _                   -> map (\v -> (v, Double)) vars
+        L.Fun (L.SFun "f3"  ) -> map (\v -> (v, Tuple [Double, Double])) vars
+        L.Fun (L.SFun "dot2") -> map (\v -> (v, Vector)) vars
+        _                     -> map (\v -> (v, Double)) vars
 
       typeEnv :: Map.Map L.Var Type
       typeEnv = Map.fromList typeEnvList
@@ -101,13 +118,16 @@ cgenDef (L.Def f vars expr) = do
     ++ ";\n}\n"
     )
 
-data Type = Double | Tuple Int
+data Type = Double | Tuple [Type] | Int | Vector deriving Show
 
 cgenType :: Type -> String
 cgenType = \case
-  Double  -> "double"
-  Tuple 2 -> "struct tuple2"
-  Tuple _ -> error "Don't support that size of tuple"
+  Double                 -> "double"
+  Tuple [Double, Double] -> "struct tuple2"
+  Tuple [Int   , Vector] -> "struct tuple_int_vector"
+  Tuple ts -> error ("Don't support that size of tuple: " ++ show ts)
+  Int                    -> "int"
+  Vector                 -> "struct vector"
 
 cgenExpr :: Map.Map L.Var Type -> L.Expr -> M (String, String, Type)
 cgenExpr env = cgenExprR env <=< anf
@@ -129,19 +149,50 @@ cgenExprR env = \case
       Just a  -> a
       Nothing -> error ("Couldn't find " ++ show v)
     )
+  L.Call (L.Fun (L.SFun "build")) arg -> case arg of
+    L.Tuple [L.Var n, L.Lam var body] -> do
+      (cbody, cbodyVar, _ty) <- cgenExprR (Map.insert var Int env) body
+      let i = cgenVar var
+
+      let forBody = unlines
+            [ "struct vector vector;" -- FIXME: Need to choose the name uniquely!
+            , "vector.length = " ++ cgenVar n ++ ";"
+            , "vector.data = malloc(" ++ cgenVar n ++ " * sizeof(double));"
+            , "for (int "
+            ++ i
+            ++ " = 0; "
+            ++ i
+            ++ " < "
+            ++ cgenVar n
+            ++ "; "
+            ++ i
+            ++ "++) {"
+            , cbody
+            , "vector.data[" ++ i ++ "] = " ++ cbodyVar ++ ";"
+            , "}"
+            ]
+
+      return (forBody, "vector", Vector)
+
+
+    _ -> error "Need a lambda for build"
+
   L.Call f x -> case x of
     L.Var xv -> do
       v <- freshCVar
       let ty = case f of
-            L.Fun (L.SFun "+"  ) -> Double
-            L.Fun (L.SFun "*"  ) -> Double
-            L.Fun (L.SFun "/"  ) -> Double
-            L.Fun (L.SFun other) -> error ("Call of " ++ other)
-            L.Fun (L.SelFun{}  ) -> Double -- FIXME: This is probably not
+            L.Fun (L.SFun "+"    ) -> Double
+            L.Fun (L.SFun "*"    ) -> Double
+            L.Fun (L.SFun "/"    ) -> Double
+            L.Fun (L.SFun "size" ) -> Int
+            L.Fun (L.SFun "index") -> Double
+            L.Fun (L.SFun "sum"  ) -> Double
+            L.Fun (L.SFun other  ) -> error ("Call of " ++ other)
+            L.Fun (L.SelFun{}    ) -> Double -- FIXME: This is probably not
                                    -- quite right since an unstated
                                    -- assumption is that SelFuns are
                                    -- polymorphic
-            _                    -> error "Call"
+            _                      -> error "Call"
       return
         ( cgenType ty
         ++ " "
@@ -154,7 +205,8 @@ cgenExprR env = \case
         , v
         , ty
         )
-    _ -> error "Function arguments should be Var in ANF"
+    _ -> error
+      ("Function arguments should be Var in ANF.  Function was " ++ show f)
   L.Let v e1 e2 -> do
     (cE1, vE1, t1) <- cgenExprR env e1
     (cE2, vE2, t2) <- cgenExprR (Map.insert v t1 env) e2
@@ -174,29 +226,33 @@ cgenExprR env = \case
 
         vars = map unVar ts
 
+        ty   = Tuple (map (fromJust . flip Map.lookup env) vars)
+
     return
-      ( "struct tuple2 "
+      ( cgenType ty
+      ++ " "
       ++ cT
       ++ " = {"
       ++ intercalate "," (map cgenVar vars)
       ++ "};\n"
       , cT
-      , Tuple (length ts)
+      , ty
       )
 
-  L.Lam{}    -> error "Lam"
-  L.App{}    -> error "App"
-  L.If{}     -> error "If"
-  L.Assert{} -> error "Assert"
+  L.Lam{}             -> error "Lam"
+  L.App{}             -> error "App"
+  L.If{}              -> error "If"
+  L.Assert _cond body -> cgenExprR env body
 
 cgenFun :: L.Fun -> String
 cgenFun = \case
   L.Fun funId -> case funId of
     L.SFun fun -> case fun of
-      "*" -> "mul_double_double"
-      "+" -> "add_double_double"
-      "/" -> "div_double_double"
-      s   -> s
+      "*"     -> "mul_double_double"
+      "+"     -> "add_double_double"
+      "/"     -> "div_double_double"
+      "index" -> "vindex"
+      s       -> s
     L.SelFun i n -> "selfun_" ++ show i ++ "_" ++ show n
   _ -> error "cgenFun"
 
@@ -226,18 +282,33 @@ example = do
   mapM_
     putStrLn
     [ "#include <stdio.h>"
+    , "#include <stdlib.h>"
+    , "struct vector { int length; double *data; };"
     , "struct tuple2 { double field1_2; double field2_2; };\n\n"
+    , "struct tuple_int_vector { int field1_2; struct vector field2_2; };"
     , "double mul_double_double(struct tuple2 arg) { return arg.field1_2 * arg.field2_2; }"
     , "double add_double_double(struct tuple2 arg) { return arg.field1_2 + arg.field2_2; }"
     , "double div_double_double(struct tuple2 arg) { return arg.field1_2 + arg.field2_2; }"
     , "double selfun_1_2(struct tuple2 arg) { return arg.field1_2; }"
     , "double selfun_2_2(struct tuple2 arg) { return arg.field2_2; }"
+    , "int size(struct vector arg) { return arg.length; }"
+    , "int vindex(struct tuple_int_vector arg) { return arg.field2_2.data[arg.field1_2]; }"
+    , "double sum(struct vector arg) { "
+    ++ "double sum = 0;"
+    ++ "for (int i = 0; i < arg.length; i++) {"
+    ++ "sum += arg.data[i];"
+    ++ "}"
+    ++ "return sum;"
+    ++ "}"
+    , "struct vector v1 = { 2, (double []) {2, 3} };"
+    , "struct vector v2 = { 2, (double []) {4, 5} };"
     , runM (cgenDef Main.ex1)
     , runM (cgenDef Main.ex2)
     , runM (cgenDef Main.ex2a)
     , runM (cgenDef Main.ex3)
     , runM (cgenDef Main.ex4)
     , runM (cgenDef Main.ex5)
+    , runM (cgenDef Main.ex7)
     , "int main(void) { "
     ++ printFloat "f1(2)"
     ++ printFloat "f2(2)"
@@ -245,8 +316,10 @@ example = do
     ++ printFloat "f3((struct tuple2) { .field1_2 = 2, .field2_2 = 3 })"
     ++ printFloat "f4(2, 3)"
     ++ printFloat "f5(2, 3)"
+    ++ printFloat "dot2(v1, v2)"
     ++ "}"
     ]
 
 printFloat :: String -> String
-printFloat s = "printf(\"%f\\n\", " ++ s ++ ");\n"
+printFloat s = unlines
+  ["printf(\"%s\\n\", \"" ++ s ++ "\");", "printf(\"%f\\n\\n\", " ++ s ++ ");"]
