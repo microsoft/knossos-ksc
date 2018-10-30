@@ -5,9 +5,7 @@ module Cgen where
 import qualified Data.Map                      as Map
 import qualified Lang                          as L
 import qualified ANF                           as ANF
-import           Control.Monad                  ( (>=>)
-                                                , (<=<)
-                                                )
+import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
 import           Data.List                      ( intercalate )
 import qualified Main
@@ -64,6 +62,7 @@ anf = \case
     anfift  <- anf ift
     anfiff  <- anf iff
     return (L.If anfcond anfift anfiff)
+  L.Assert{} -> error "Assert"
 
 -- NB SPJ's ANF doesn't actually seem to replace function arguments
 -- with variables
@@ -137,7 +136,8 @@ cgenExprR env = \case
             L.Fun (L.SFun "+"  ) -> Double
             L.Fun (L.SFun "*"  ) -> Double
             L.Fun (L.SFun "/"  ) -> Double
-            L.Fun (L.SelFun i n) -> Double -- FIXME: This is probably not
+            L.Fun (L.SFun other) -> error ("Call of " ++ other)
+            L.Fun (L.SelFun{}  ) -> Double -- FIXME: This is probably not
                                    -- quite right since an unstated
                                    -- assumption is that SelFuns are
                                    -- polymorphic
@@ -184,10 +184,10 @@ cgenExprR env = \case
       , Tuple (length ts)
       )
 
-  L.Lam{} -> error "Lam"
-  L.App{} -> error "App"
-  L.If{}  -> error "If"
-
+  L.Lam{}    -> error "Lam"
+  L.App{}    -> error "App"
+  L.If{}     -> error "If"
+  L.Assert{} -> error "Assert"
 
 cgenFun :: L.Fun -> String
 cgenFun = \case
@@ -198,6 +198,7 @@ cgenFun = \case
       "/" -> "div_double_double"
       s   -> s
     L.SelFun i n -> "selfun_" ++ show i ++ "_" ++ show n
+  _ -> error "cgenFun"
 
 cgenKonst :: L.Konst -> String
 cgenKonst = \case
@@ -218,6 +219,7 @@ cgenVar = \case
            L.Fwd -> "f"
            L.Rev -> "r"
          )
+  _ -> error "cgenVar"
 
 example :: IO ()
 example = do
