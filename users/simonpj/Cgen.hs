@@ -138,28 +138,6 @@ cgenExprR env expr = case expr of
       )
 
 
-  Tuple ts -> do
-    cT <- freshCVar
-
-    let unVar :: Expr -> (Var, L.Type)
-        unVar = \case
-          Var v -> (v, stLookup v env)
-          _     -> error "Tuple: Expected arguments to be Vars"
-
-        vars = map unVar ts
-
-    let tupleType = TypeTuple (map (\ (v,t) -> t) vars)
-
-    return
-      ( ""
-      , "std::make_tuple(" ++ intercalate "," (map (\ (v,t) -> cgenVar v) vars) ++ ")"
-      , tupleType
-      )
-
-  App{} -> error "App"
-
-
-
 
 -}
 
@@ -250,38 +228,6 @@ typeofKonst = \case
   L.KFloat   _ -> L.TypeFloat
   L.KBool    _ -> L.TypeBool
 
--- A single place for "domain knowledge" about functions -- to be dumped when we get symtabs
-typeofFun env f ts =
-  case (f,ts) of
-    (L.Fun (L.SFun "build"), [tsize, L.TypeLambda L.TypeInteger t]) -> L.TypeVec t
-    (L.Fun (L.SFun "index"), [tind, (L.TypeVec t)]) -> t
-    (L.Fun (L.SFun "size"), [(L.TypeVec t)]) -> L.TypeInteger
-    (L.Fun (L.SFun "sum"), [(L.TypeVec t)]) -> t
-    (L.Fun (L.SFun "exp"), [(L.TypeFloat)]) -> L.TypeFloat
-    (L.Fun (L.SFun "+"  ), (t:ts)) -> t
-    (L.Fun (L.SFun "/"  ), (t:ts)) -> t
-    (L.Fun (L.SFun "*"  ), (t:ts)) -> t
-    (L.Fun (L.SFun "-"  ), (t:ts)) -> t
-    (L.Fun (L.SFun "=="  ), _) -> L.TypeBool
-    (L.Fun (L.SFun "<"  ), _) -> L.TypeBool
-    (L.Fun (L.SelFun i n), [t]) -> case t of
-                        L.TypeTuple ts -> ts!!i
-                        L.TypeVec t -> t
-                        _ -> error ("oiks[" ++ show (t:ts) ++ "]")
-    (L.Fun (L.SFun f), _) ->   case Map.lookup (L.Simple f) env of
-                                Just a  -> a
-                                Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]") L.TypeUnknown
-    _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]" in
-                          trace emsg L.TypeUnknown 
-
-translateFun = \case
-  "*" -> "mul"    
-  "+" -> "add"    
-  "/" -> "div"    
-  "-" -> "sub"    
-  "==" -> "eq"    
-  "<" -> "lt"    
-  s -> s
 
 -- CGenResult is (C declaration, C expression, L.Type)
 -- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
@@ -353,13 +299,8 @@ cgenExprR env = \case
         ty   = L.TypeTuple (map (flip stLookup env) vars)
 
     return
-      ( cgenType ty
-      ++ " "
-      ++ cT
-      ++ " = {"
-      ++ intercalate "," (map cgenVar vars)
-      ++ "};\n"
-      , cT
+      ( ""
+      , "std::make_tuple(" ++ intercalate "," (map cgenVar vars) ++ ")"
       , ty
       )
 
@@ -435,3 +376,36 @@ cgenVar = \case
            L.Rev -> "r"
          )
   _ -> error "cgenVar"
+
+-- A single place for "domain knowledge" about functions -- to be dumped when we get symtabs
+typeofFun env f ts =
+  case (f,ts) of
+    (L.Fun (L.SFun "build"), [tsize, L.TypeLambda L.TypeInteger t]) -> L.TypeVec t
+    (L.Fun (L.SFun "index"), [tind, (L.TypeVec t)]) -> t
+    (L.Fun (L.SFun "size"), [(L.TypeVec t)]) -> L.TypeInteger
+    (L.Fun (L.SFun "sum"), [(L.TypeVec t)]) -> t
+    (L.Fun (L.SFun "exp"), [(L.TypeFloat)]) -> L.TypeFloat
+    (L.Fun (L.SFun "+"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "/"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "*"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "-"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "=="  ), _) -> L.TypeBool
+    (L.Fun (L.SFun "<"  ), _) -> L.TypeBool
+    (L.Fun (L.SelFun i n), [t]) -> case t of
+                        L.TypeTuple ts -> ts!!i
+                        L.TypeVec t -> t
+                        _ -> error ("oiks[" ++ show (t:ts) ++ "]")
+    (L.Fun (L.SFun f), _) ->   case Map.lookup (L.Simple f) env of
+                                Just a  -> a
+                                Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]") L.TypeUnknown
+    _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]" in
+                          trace emsg L.TypeUnknown 
+
+translateFun = \case
+  "*" -> "mul"    
+  "+" -> "add"    
+  "/" -> "div"    
+  "-" -> "sub"    
+  "==" -> "eq"    
+  "<" -> "lt"    
+  s -> s
