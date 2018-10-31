@@ -36,14 +36,13 @@ freshVar = do
   s <- freshCVar
   return (L.Simple s)
   
-{-
-type ST = Map.Map Var L.Type
-stInsert:: Var -> L.Type -> ST -> ST
-stInsert (TVar ty v) t env = stInsert v (assertEqualThen t ty) env
+type ST = Map.Map L.Var L.Type
+stInsert:: L.Var -> L.Type -> ST -> ST
+stInsert (L.TVar ty v) t env = stInsert v (assertEqualThen t ty) env
 stInsert v t env = Map.insert v t env
 
-stLookup:: Var -> ST -> L.Type
-stLookup (TVar ty v) env = assertEqualThen ty (stLookup v env)
+stLookup:: L.Var -> ST -> L.Type
+stLookup (L.TVar ty v) env = assertEqualThen ty (stLookup v env)
 stLookup v env = 
   case Map.lookup v env of
     Just a  -> a
@@ -52,7 +51,8 @@ stLookup v env =
 stCreate::ST
 stCreate = Map.empty
 
-
+{-
+awf code:
 -------------------- C++ generation
 
 cgenDef :: Def -> String
@@ -101,53 +101,6 @@ cgenDefM env (Def f vars expr) = do
     )
 
 
-cgenExpr :: ST -> Expr -> M CGenResult
-cgenExpr env  = cgenExprR env <=< anf
-
-typeof :: ST -> Expr -> L.Type 
-typeof env expr = case expr of
-  Konst (KZero     ) -> TypeZero
-  Konst (KInteger i) -> TypeInteger
-  Konst (KFloat   f) -> TypeFloat
-  Konst (KBool    b) -> TypeBool
-  Var v -> stLookup v env
-  Call f (Var xv) -> let traceMsg = show (ppr expr) in
-                     case stLookup xv env of
-                     TypeTuple ts -> typeofFun traceMsg env f ts
-                     t -> typeofFun traceMsg env f [t]
-  _ -> error "typeof"
-
-typeofFun msg env f ts =
-  case (f,ts) of
-    (Fun (SFun "build"), [tsize, TypeLambda TypeInteger t]) -> TypeVec t
-    (Fun (SFun "index"), [tind, (TypeVec t)]) -> t
-    (Fun (SFun "size"), [(TypeVec t)]) -> TypeInteger
-    (Fun (SFun "sum"), [(TypeVec t)]) -> t
-    (Fun (SFun "exp"), [(TypeFloat)]) -> TypeFloat
-    (Fun (SFun "+"  ), (t:ts)) -> t
-    (Fun (SFun "/"  ), (t:ts)) -> t
-    (Fun (SFun "*"  ), (t:ts)) -> t
-    (Fun (SFun "-"  ), (t:ts)) -> t
-    (Fun (SFun "=="  ), _) -> TypeBool
-    (Fun (SFun "<"  ), _) -> TypeBool
-    (Fun (SelFun i n), [t]) -> case t of
-                        TypeTuple ts -> ts!!i
-                        TypeVec t -> t
-                        _ -> error ("oiks[" ++ show (t:ts) ++ "]")
-    (Fun (SFun f), _) ->   case Map.lookup (Simple f) env of
-                            Just a  -> a
-                            Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "], in ["++msg++"]") TypeUnknown
-    _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "], in ["++msg++"]" in
-                          trace emsg TypeUnknown 
-
-translateFun = \case
-  "*" -> "mul"    
-  "+" -> "add"    
-  "/" -> "div"    
-  "-" -> "sub"    
-  "==" -> "eq"    
-  "<" -> "lt"    
-  s -> s
 
 -- The input expression must be in ANF
 cgenExprR :: ST -> Expr -> M CGenResult
@@ -184,20 +137,6 @@ cgenExprR env expr = case expr of
       , t2
       )
 
-  Lam v body -> do
-    case v of
-      TVar tv v -> do
-        l <- freshCVar
-        let body_env = stInsert v tv env
-        (cE, vE, t) <- cgenExprR body_env body
-        let tret = TypeLambda tv t
-        return (
-            cgenType tret `spc` l ++ " = [&](" ++ cgenType tv `spc` cgenVar v ++ ") { " ++ cE ++ 
-            "   return "++ vE ++"; };\n"
-            , l
-            , tret
-            )
-      _ -> error $ "Bad Lambda ["++show v++"] ["++show body++"] -- need type declarations on parameters"
 
   Tuple ts -> do
     cT <- freshCVar
@@ -249,34 +188,6 @@ cgenExprR env expr = case expr of
 
 
 
-cgenFun :: Fun -> String
-cgenFun = \case
-  Fun funId -> case funId of
-    SFun fun -> translateFun fun
-    SelFun i n -> "selfun_" ++ show i ++ "_" ++ show n
-
-cgenKonst :: Konst -> String
-cgenKonst = \case
-  KZero      -> "0"
-  KInteger i -> show i
-  KFloat   f -> show f
-  KBool    b -> if b then "TRUE" else "FALSE"
-
-cgenVar :: Var -> String
-cgenVar = \case
-  TVar _ v -> "/*T*/" ++ cgenVar v
-  Simple s -> "s_" ++ s
-  Delta  d -> "d_" ++ d
-  Grad g m ->
-    "g_"
-      ++ g
-      ++ "_"
-      ++ (case m of
-           Fwd -> "f"
-           Rev -> "r"
-         )
-
-
 -}
 
 
@@ -284,16 +195,6 @@ anf :: L.Expr -> M L.Expr
 anf = \case
   L.Konst k -> return (L.Konst k)
   L.Var   v -> return (L.Var v)
-  -- We treat "call of build with lambda argument" as a language
-  -- primitive
-  L.Call (L.Fun (L.SFun "build")) (L.Tuple [n, L.Lam var body]) -> do
-    (letn, vn) <- letAnf n
-    anfBody    <- anf body
-    return
-      (letn
-        (L.Call (L.Fun (L.SFun "build")) (L.Tuple [L.Var vn, L.Lam var anfBody])
-        )
-      )
   L.Call f arg -> do
     (let_, var) <- letAnf arg
     return (let_ (L.Call f (L.Var var)))
@@ -339,31 +240,20 @@ cgenDefs defs =
 
 cgenDef :: L.Def -> M String
 cgenDef (L.Def f vars expr) = do
-  -- FIXME: We don't find the types of function arguments properly.
-  -- They should really be attached to the function definition.  For
-  -- the moment I'm just fixing the type of function arguments based
-  -- on my domain expertise.
-  let typeEnvList :: [(L.Var, L.Type)]
-      typeEnvList = case f of
-        L.Fun (L.SFun "f3"  ) -> map (\v -> (v, L.TypeTuple [L.TypeFloat, L.TypeFloat])) vars
-        L.Fun (L.SFun "dot2") -> map (\v -> (v, L.TypeVec L.TypeFloat)) vars
-        L.Fun (L.SFun "f8"  ) -> map (\v -> (v, L.TypeVec L.TypeFloat)) vars
-        _                     -> map (\v -> (v, L.TypeFloat)) vars
-
-      typeEnv :: Map.Map L.Var L.Type
-      typeEnv = Map.fromList typeEnvList
-
-  (cExpr, cVar, _) <- cgenExpr typeEnv expr
+  let env = stCreate -- Later, accumulate 
+  let body_env = foldr addVarToEnv env vars
+        where addVarToEnv :: L.Var -> ST -> ST
+              addVarToEnv (L.TVar ty v) env = stInsert v ty env
+              addVarToEnv v _ = error $ "Untyped parameter [" ++ show v ++ "] in def " ++ show f 
+  
+  (cExpr, cVar, cType) <- cgenExpr body_env expr
 
   return
-    (  "double "
-    ++ cgenFun f
+    (  cgenType cType `spc` cgenFun f
     ++ "("
     ++ intercalate
          ", "
-         (map (\(var, type_) -> cgenType type_ ++ " " ++ cgenVar var)
-              typeEnvList
-         )
+         (map (\(L.TVar ty var) -> cgenType ty `spc` cgenVar var) vars)
     ++ ") {\n"
     ++ cExpr
     ++ "return "
@@ -381,6 +271,44 @@ cgenType = \case
   L.TypeUnknown  -> "auto"
   L.TypeLambda from to -> "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
 
+typeofKonst = \case
+  L.KZero      -> L.TypeZero
+  L.KInteger _ -> L.TypeInteger
+  L.KFloat   _ -> L.TypeFloat
+  L.KBool    _ -> L.TypeBool
+
+-- A single place for "domain knowledge" about functions -- to be dumped when we get symtabs
+typeofFun env f ts =
+  case (f,ts) of
+    (L.Fun (L.SFun "build"), [tsize, L.TypeLambda L.TypeInteger t]) -> L.TypeVec t
+    (L.Fun (L.SFun "index"), [tind, (L.TypeVec t)]) -> t
+    (L.Fun (L.SFun "size"), [(L.TypeVec t)]) -> L.TypeInteger
+    (L.Fun (L.SFun "sum"), [(L.TypeVec t)]) -> t
+    (L.Fun (L.SFun "exp"), [(L.TypeFloat)]) -> L.TypeFloat
+    (L.Fun (L.SFun "+"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "/"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "*"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "-"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "=="  ), _) -> L.TypeBool
+    (L.Fun (L.SFun "<"  ), _) -> L.TypeBool
+    (L.Fun (L.SelFun i n), [t]) -> case t of
+                        L.TypeTuple ts -> ts!!i
+                        L.TypeVec t -> t
+                        _ -> error ("oiks[" ++ show (t:ts) ++ "]")
+    (L.Fun (L.SFun f), _) ->   case Map.lookup (L.Simple f) env of
+                                Just a  -> a
+                                Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]") L.TypeUnknown
+    _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]" in
+                          trace emsg L.TypeUnknown 
+
+translateFun = \case
+  "*" -> "mul"    
+  "+" -> "add"    
+  "/" -> "div"    
+  "-" -> "sub"    
+  "==" -> "eq"    
+  "<" -> "lt"    
+  s -> s
 
 -- CGenResult is (C declaration, C expression, L.Type)
 -- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
@@ -391,71 +319,31 @@ cgenType = \case
 --       TypeFloat)  -- and this is the type of the occurrence
 type CGenResult = (String, String, L.Type)
 
-cgenExpr :: Map.Map L.Var L.Type -> L.Expr -> M CGenResult
+cgenExpr :: ST -> L.Expr -> M CGenResult
 cgenExpr env = cgenExprR env <=< anf
 
 -- The input expression must be in ANF
-cgenExprR :: Map.Map L.Var L.Type -> L.Expr -> M CGenResult
+cgenExprR :: ST -> L.Expr -> M CGenResult
 cgenExprR env = \case
   L.Konst k -> do
-    v <- freshCVar
     return
-      ( "double " ++ v ++ " = " ++ cgenKonst k ++ ";\n"
-      , v
-      , L.TypeFloat {- FIXME we need to deal with polymorphism -}
+      ( ""
+      , cgenKonst k
+      , typeofKonst k
       )
   L.Var v -> return
     ( ""
     , cgenVar v
-    , case Map.lookup v env of
-      Just a  -> a
-      Nothing -> error ("Couldn't find " ++ show v)
+    , stLookup v env 
     )
-  L.Call (L.Fun (L.SFun "build")) arg -> case arg of
-    L.Tuple [L.Var n, L.Lam var body] -> do
-      (cbody, cbodyVar, _ty) <- cgenExprR (Map.insert var L.TypeInteger env) body
-      let i = cgenVar var
-
-      let forBody = unlines
-            [ "struct vector vector;" -- FIXME: Need to choose the name uniquely!
-            , "vector.length = " ++ cgenVar n ++ ";"
-            , "vector.data = malloc(" ++ cgenVar n ++ " * sizeof(double));"
-            , "for (int "
-            ++ i
-            ++ " = 0; "
-            ++ i
-            ++ " < "
-            ++ cgenVar n
-            ++ "; "
-            ++ i
-            ++ "++) {"
-            , cbody
-            , "vector.data[" ++ i ++ "] = " ++ cbodyVar ++ ";"
-            , "}"
-            ]
-
-      return (forBody, "vector", L.TypeVec L.TypeFloat)
-
-
-    _ -> error "Need a lambda for build"
-
+  
   L.Call f x -> case x of
     L.Var xv -> do
       v <- freshCVar
-      let ty = case f of
-            L.Fun (L.SFun "+"    ) -> L.TypeFloat
-            L.Fun (L.SFun "*"    ) -> L.TypeFloat
-            L.Fun (L.SFun "/"    ) -> L.TypeFloat
-            L.Fun (L.SFun "size" ) -> L.TypeInteger
-            L.Fun (L.SFun "index") -> L.TypeFloat
-            L.Fun (L.SFun "sum"  ) -> L.TypeFloat
-            L.Fun (L.SFun "neg"  ) -> L.TypeFloat
-            L.Fun (L.SFun other  ) -> error ("Call of " ++ other)
-            L.Fun L.SelFun{}       -> L.TypeFloat -- FIXME: This is probably not
-                                   -- quite right since an unstated
-                                   -- assumption is that SelFuns are
-                                   -- polymorphic
-            fother                 -> error ("Call: " ++ show fother)
+      let ty = case stLookup xv env of
+                    L.TypeTuple ts -> typeofFun env f ts
+                    t -> typeofFun env f [t]
+      
       return
         ( cgenType ty
         ++ " "
@@ -468,11 +356,11 @@ cgenExprR env = \case
         , v
         , ty
         )
-    _ -> error
-      ("Function arguments should be Var in ANF.  Function was " ++ show f)
+    _ -> error $ "Function arguments should be Var in ANF, not" ++ show x ++ " in call to " ++ show f
+
   L.Let v e1 e2 -> do
     (cE1, vE1, t1) <- cgenExprR env e1
-    (cE2, vE2, t2) <- cgenExprR (Map.insert v t1 env) e2
+    (cE2, vE2, t2) <- cgenExprR (stInsert v t1 env) e2
     return
       ( cE1 ++ cgenType t1 ++ " " ++ cgenVar v ++ " = " ++ vE1 ++ ";\n" ++ cE2
       , vE2
@@ -489,7 +377,7 @@ cgenExprR env = \case
 
         vars = map unVar ts
 
-        ty   = L.TypeTuple (map (fromJust . flip Map.lookup env) vars)
+        ty   = L.TypeTuple (map (flip stLookup env) vars)
 
     return
       ( cgenType ty
@@ -502,7 +390,20 @@ cgenExprR env = \case
       , ty
       )
 
-  L.Lam{}             -> error "Lam"
+  L.Lam v body -> do
+    case v of
+      L.TVar tv v -> do
+        l <- freshCVar
+        let body_env = stInsert v tv env
+        (cE, vE, t) <- cgenExprR body_env body
+        let tret = L.TypeLambda tv t
+        return (
+            cgenType tret `spc` l ++ " = [&](" ++ cgenType tv `spc` cgenVar v ++ ") { " ++ cE ++ 
+            "   return "++ vE ++"; };\n"
+            , l
+            , tret
+            )
+      _ -> error $ "Bad Lambda ["++show v++"] ["++show body++"] -- need type declarations on parameters"
   L.App{}             -> error "App"
   L.If{}              -> error "If"
   L.Assert _cond body -> cgenExprR env body
@@ -510,12 +411,7 @@ cgenExprR env = \case
 cgenFun :: L.Fun -> String
 cgenFun = \case
   L.Fun funId -> case funId of
-    L.SFun fun -> case fun of
-      "*"     -> "mul_double_double"
-      "+"     -> "add_double_double"
-      "/"     -> "div_double_double"
-      "index" -> "vindex"
-      s       -> s
+    L.SFun fun -> translateFun fun
     L.SelFun i n -> "selfun_" ++ show i ++ "_" ++ show n
   f -> error ("cgenFun: " ++ show f)
 
@@ -528,6 +424,7 @@ cgenKonst = \case
 
 cgenVar :: L.Var -> String
 cgenVar = \case
+  L.TVar _ v -> "/*T*/" ++ cgenVar v
   L.Simple s -> "s_" ++ s
   L.Delta  d -> "d_" ++ d
   L.Grad g m ->

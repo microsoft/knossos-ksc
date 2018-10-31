@@ -88,23 +88,24 @@ ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
 
 ex8 :: Def
 -- f8 x = sum (build (size x) (\i -> -x[i]))
-ex8 = Def (Fun (SFun "f8")) [sx] $
-      pSum (pBuild (pSize (Var sx))
+ex8 = Def (Fun (SFun "f8")) [svx] $
+      pSum (pBuild (pSize (Var svx))
                    (Lam si (pNeg (pIndex (Var si) (Var sx)))))
 
 
 si, sp, sq, sr, sv, sx, sy, sz :: Var
-si = Simple "i"
-sp = Simple "p"
-sq = Simple "q"
-sr = Simple "r"
-sv = Simple "v"
-sx = Simple "x"
-sy = Simple "y"
-sy1 = Simple "y1"
-sy2 = Simple "y2"
-sz = Simple "z"
-szt = Simple "zt"
+si = TVar TypeInteger (Simple "i")
+sp = TVar TypeFloat   (Simple "p")
+sq = TVar TypeFloat   (Simple "q")
+sr = TVar TypeFloat   (Simple "r")
+sv = TVar TypeFloat   (Simple "v")
+sx = TVar TypeFloat   (Simple "x")
+svx = TVar (TypeVec TypeFloat)   (Simple "vx")
+sy = TVar TypeFloat   (Simple "y")
+sy1 = TVar TypeFloat  (Simple "y1")
+sy2 = TVar TypeFloat  (Simple "y2")
+sz = TVar TypeFloat   (Simple "z")
+szt = TVar TypeFloat  (Simple "zt")
 
 
 
@@ -144,35 +145,15 @@ cppExample = do
     mapM_
       putStrLn
       [ "#include <stdio.h>"
-      , "#include <stdlib.h>"
-      , "struct vector { int length; double *data; };"
-      , "struct tuple2 { double field1_2; double field2_2; };\n\n"
-      , "struct tuple_int_vector { int field1_2; struct vector field2_2; };"
-      , "double mul_double_double(struct tuple2 arg) { return arg.field1_2 * arg.field2_2; }"
-      , "double add_double_double(struct tuple2 arg) { return arg.field1_2 + arg.field2_2; }"
-      , "double div_double_double(struct tuple2 arg) { return arg.field1_2 + arg.field2_2; }"
-      , "double selfun_1_2(struct tuple2 arg) { return arg.field1_2; }"
-      , "double selfun_2_2(struct tuple2 arg) { return arg.field2_2; }"
-      , "int size(struct vector arg) { return arg.length; }"
-      , "int vindex(struct tuple_int_vector arg) { return arg.field2_2.data[arg.field1_2]; }"
-      , "double neg(double x) { return -x; }"
-      , "double sum(struct vector arg) { "
-      ++ "double sum = 0;"
-      ++ "for (int i = 0; i < arg.length; i++) {"
-      ++ "sum += arg.data[i];"
-      ++ "}"
-      ++ "return sum;"
-      ++ "}"
-      , "struct vector v1 = { 2, (double []) {2, 3} };"
-      , "struct vector v2 = { 2, (double []) {4, 5} };"
+      , "#include \"knossos.h\""
       , r Main.ex1
-      , r Main.ex2
-      , r Main.ex2a
-      , r Main.ex3
-      , r Main.ex4
-      , r Main.ex5
-      , r Main.ex7
-      , r Main.ex8
+      -- , r Main.ex2
+      -- , r Main.ex2a
+      -- , r Main.ex3
+      -- , r Main.ex4
+      -- , r Main.ex5
+      -- , r Main.ex7
+      -- , r Main.ex8
       , "int main(void) { "
       ++ printFloat "f1(2)"
       ++ printFloat "f2(2)"
