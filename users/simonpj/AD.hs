@@ -11,7 +11,6 @@ gradF f       = error ("gradF: bad function: " ++ show f)
 
 gradV :: Var -> Var
 gradV (Simple x) = Grad x Fwd
-gradV (StopGrad x) = Grad x Fwd
 gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
 
 gradE :: Expr -> Expr
@@ -50,7 +49,7 @@ gradDef (Def fun params rhs)
     gradE rhs
   where
     n = length params
-    gradParam (StopGrad _) _ _= lmZero
+    gradParam (TVar TypeInteger _) _ _= lmZero
     gradParam _ i n = gradSelFun i n 
 
 ---------------------------------
@@ -73,7 +72,6 @@ applyD (Def (GradFun f d) vars rhs)
     dvars = map to_delta vars
 
     to_delta (Simple x) = Delta x
-    to_delta (StopGrad x) = Delta x
 
     dr = Delta "r"
 

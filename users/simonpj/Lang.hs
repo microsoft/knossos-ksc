@@ -53,7 +53,6 @@ data Fun = Fun     FunId         -- The function              f(x)
 
 data Var
   = Simple   String         -- x
-  | StopGrad String
   | Delta    String         -- The 'dx' or 'dr' argument to fwd
                            -- or backward versions of f
   | Grad     String ADMode  -- \nabla x
@@ -270,7 +269,6 @@ class Pretty p where
 instance Pretty Var where
   ppr (Simple s)   = PP.text s
   ppr (TVar ty v)  = parens (PP.text (show ty) PP.<> (ppr v))
-  ppr (StopGrad s) = PP.text s
   ppr (Delta s)    = PP.text ('d' : s)
   ppr (Grad s Fwd) = PP.text ('D' : s)
   ppr (Grad s Rev) = PP.text ('R' : s)
