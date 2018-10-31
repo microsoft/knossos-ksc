@@ -2,16 +2,16 @@
 
 module Cgen where
 
-import Debug.Trace (trace, traceM, traceShowId)
-import           Data.List                      ( intercalate )
-import           Data.Maybe                     ( fromJust  )
 import qualified Data.Map                      as Map
-import           Control.Monad                  ( (>=>)
-                                                , (<=<)
-                                                )
+import qualified Lang                          as L
+import qualified ANF
+import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
-import qualified ANF                           as ANF
-import qualified Lang as L 
+import           Data.List                      ( intercalate )
+import           Data.Maybe                     ( fromJust )
+import qualified Main
+ 
+import Debug.Trace (trace, traceM, traceShowId)
 
 type M = S.State Int
 
