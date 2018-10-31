@@ -252,7 +252,7 @@ cgenFun = \case
       "index" -> "vindex"
       s       -> s
     L.SelFun i n -> "selfun_" ++ show i ++ "_" ++ show n
-  _ -> error "cgenFun"
+  f -> error ("cgenFun: " ++ show f)
 
 cgenKonst :: L.Konst -> String
 cgenKonst = \case
