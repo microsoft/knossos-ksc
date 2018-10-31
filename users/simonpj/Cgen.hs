@@ -95,6 +95,7 @@ cgenDef (L.Def f vars expr) = do
       typeEnvList = case f of
         L.Fun (L.SFun "f3"  ) -> map (\v -> (v, Tuple [Double, Double])) vars
         L.Fun (L.SFun "dot2") -> map (\v -> (v, Vector)) vars
+        L.Fun (L.SFun "f8"  ) -> map (\v -> (v, Vector)) vars
         _                     -> map (\v -> (v, Double)) vars
 
       typeEnv :: Map.Map L.Var Type
@@ -187,6 +188,7 @@ cgenExprR env = \case
             L.Fun (L.SFun "size" ) -> Int
             L.Fun (L.SFun "index") -> Double
             L.Fun (L.SFun "sum"  ) -> Double
+            L.Fun (L.SFun "neg"  ) -> Double
             L.Fun (L.SFun other  ) -> error ("Call of " ++ other)
             L.Fun (L.SelFun{}    ) -> Double -- FIXME: This is probably not
                                    -- quite right since an unstated
@@ -293,6 +295,7 @@ example = do
     , "double selfun_2_2(struct tuple2 arg) { return arg.field2_2; }"
     , "int size(struct vector arg) { return arg.length; }"
     , "int vindex(struct tuple_int_vector arg) { return arg.field2_2.data[arg.field1_2]; }"
+    , "double neg(double x) { return -x; }"
     , "double sum(struct vector arg) { "
     ++ "double sum = 0;"
     ++ "for (int i = 0; i < arg.length; i++) {"
@@ -309,6 +312,7 @@ example = do
     , runM (cgenDef Main.ex4)
     , runM (cgenDef Main.ex5)
     , runM (cgenDef Main.ex7)
+    , runM (cgenDef Main.ex8)
     , "int main(void) { "
     ++ printFloat "f1(2)"
     ++ printFloat "f2(2)"
@@ -317,6 +321,7 @@ example = do
     ++ printFloat "f4(2, 3)"
     ++ printFloat "f5(2, 3)"
     ++ printFloat "dot2(v1, v2)"
+    ++ printFloat "f8(v1)"
     ++ "}"
     ]
 
