@@ -157,13 +157,6 @@ cgenExprR env expr = case expr of
       )
 
   App{} -> error "App"
-  Assert c e -> do
-    (cc, vc, tc) <- cgenExprR env c
-    (ce, ve, te) <- cgenExprR env e
-    return ( cc `spc` "ASSERT(" ++ vc ++ ");\n" ++ ce
-      , ve
-      , te
-      )
 
 
 
@@ -404,8 +397,15 @@ cgenExprR env = \case
               , cret
               , tret
           )
+
+  L.Assert _cond body -> do
+    (cc, vc, tyc) <- cgenExprR env _cond
+    (ce, ve, tye) <- cgenExprR env body
+    return ( cc `spc` "ASSERT(" ++ vc ++ ");\n" ++ ce
+      , ve
+      , tye
+      )
   L.App{}             -> error "App"
-  L.Assert _cond body -> cgenExprR env body
 
 cgenFun :: L.Fun -> String
 cgenFun = \case
