@@ -68,6 +68,10 @@ Release/
 # TeX
 users/simonpj/AD.dvi
 users/simonpj/AD.log
+users/simonpj/AD.aux
+users/simonpj/AD.fdb*
+users/simonpj/AD.fls
+users/simonpj/AD.xdv
 users/simonpj/AD.pdf
 *.synctex(busy)
 *.synctex.gz

@@ -10,7 +10,7 @@ import ANF
 import Opt
 import CSE
 import Parse
-import Cgen
+import Cgen (runM, cgenDef, cgenDefs)
 import KMonad
 
 ex1 :: Def
@@ -35,7 +35,7 @@ ex2a :: Def
 -- f2a x = let zt = let y1 = x*x in (y1, x + y1)
 --         let y2 = fst zt
 --         let z = snd zt
---         in y * z
+--         in y2 * z
 ex2a = Def (Fun (SFun "f2a")) [sx] $
       Let szt (Let sy1 (pMul (Var sx) (Var sx)) $
                Tuple [Var sy1, pAdd (Var sx) (Var sy1)]) $
@@ -139,29 +139,56 @@ cppV file = do
       readFile "tmp1.cpp" >>= putStrLn;
       putStrLn "^^^^^^---- Written to tmp1.cpp ----^^^^^^^^^"
 
-
+cppExample :: IO ()
 cppExample = do
-    let lines = [ 
-                  "#include <stdio.h>"
-                  , "#include \"knossos.h\""
-                  , "double v_data [] = {1.1, 2.2, 3.3};"
-                  , "vec<double> v { 3, v_data };"
-                  ,  (cgenDef Main.ex2)
-                  -- ,  (cgenDef Main.ex2)
-                  -- ,  (cgenDef Main.ex2a) -- the definition of y seems to be missing
-                  -- ,  (cgenDef Main.ex4)
-                  -- ,  (cgenDef Main.ex8)
-                  , "int main(void) {\n"
-                  ++ printFloat "f1(2)"
-                  ++ printFloat "f8(v)"
-                  ++ "}"
-                ]
-    writeFile "tmp1.cpp" (intercalate "\n" lines)
-    readFile "tmp1.cpp" >>= putStrLn
-    putStrLn "^^^^^^---- Written to tmp1.cpp ----^^^^^^^^^"
-
-printFloat s = "printf(\"%f\\n\", " ++ s ++ ");\n"
-
+    mapM_
+      putStrLn
+      [ "#include <stdio.h>"
+      , "#include <stdlib.h>"
+      , "struct vector { int length; double *data; };"
+      , "struct tuple2 { double field1_2; double field2_2; };\n\n"
+      , "struct tuple_int_vector { int field1_2; struct vector field2_2; };"
+      , "double mul_double_double(struct tuple2 arg) { return arg.field1_2 * arg.field2_2; }"
+      , "double add_double_double(struct tuple2 arg) { return arg.field1_2 + arg.field2_2; }"
+      , "double div_double_double(struct tuple2 arg) { return arg.field1_2 + arg.field2_2; }"
+      , "double selfun_1_2(struct tuple2 arg) { return arg.field1_2; }"
+      , "double selfun_2_2(struct tuple2 arg) { return arg.field2_2; }"
+      , "int size(struct vector arg) { return arg.length; }"
+      , "int vindex(struct tuple_int_vector arg) { return arg.field2_2.data[arg.field1_2]; }"
+      , "double neg(double x) { return -x; }"
+      , "double sum(struct vector arg) { "
+      ++ "double sum = 0;"
+      ++ "for (int i = 0; i < arg.length; i++) {"
+      ++ "sum += arg.data[i];"
+      ++ "}"
+      ++ "return sum;"
+      ++ "}"
+      , "struct vector v1 = { 2, (double []) {2, 3} };"
+      , "struct vector v2 = { 2, (double []) {4, 5} };"
+      , r Main.ex1
+      , r Main.ex2
+      , r Main.ex2a
+      , r Main.ex3
+      , r Main.ex4
+      , r Main.ex5
+      , r Main.ex7
+      , r Main.ex8
+      , "int main(void) { "
+      ++ printFloat "f1(2)"
+      ++ printFloat "f2(2)"
+      ++ printFloat "f2a(2)"
+      ++ printFloat "f3((struct tuple2) { .field1_2 = 2, .field2_2 = 3 })"
+      ++ printFloat "f4(2, 3)"
+      ++ printFloat "f5(2, 3)"
+      ++ printFloat "dot2(v1, v2)"
+      ++ printFloat "f8(v1)"
+      ++ "}"
+      ]
+    where r = runM . cgenDef
+  
+printFloat :: String -> String
+printFloat s = unlines
+  ["printf(\"%s\\n\", \"" ++ s ++ "\");", "printf(\"%f\\n\\n\", " ++ s ++ ");"]
 
 
 -------------------------------------
