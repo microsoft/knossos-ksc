@@ -190,7 +190,7 @@ cgenExprR env = \case
                                    -- quite right since an unstated
                                    -- assumption is that SelFuns are
                                    -- polymorphic
-            _                      -> error "Call"
+            fother                 -> error ("Call: " ++ show fother)
       return
         ( cgenType ty
         ++ " "
