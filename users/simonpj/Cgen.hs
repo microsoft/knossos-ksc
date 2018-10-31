@@ -165,26 +165,6 @@ cgenExprR env expr = case expr of
       , te
       )
 
-  If c t f  -> do
-    cret <- freshCVar
-
-    (cc, vc, tc) <- cgenExprR env c
-    (ct, vt, tt) <- cgenExprR env t
-    (cf, vf, tf) <- cgenExprR env f
-    let tret = tt
-
-    return (   cc -- emit condition generation
-            ++ cgenType tret ++ "/* Should = " ++ cgenType tf ++ "*/" `spc` cret ++ ";\n" -- emit decl for "return" type
-            ++ "if ("++vc++") {" 
-            ++ "  " ++ ct ++ ";\n" -- compute true value
-            ++ "  " ++ cret ++ "=" ++ vc ++ ";\n" -- assign to "return"
-            ++ "} else {\n" -- else
-            ++ "  " ++ cf ++ ";\n" -- compute false value
-            ++ "  " ++ cret ++ "=" ++ vf ++ ";\n" -- assign to "return"
-            ++ "}\n" -- phew
-              , cret
-              , tret
-          )
 
 
 
@@ -404,8 +384,27 @@ cgenExprR env = \case
             , tret
             )
       _ -> error $ "Bad Lambda ["++show v++"] ["++show body++"] -- need type declarations on parameters"
+  L.If c texpr fexpr  -> do
+    cret <- freshCVar
+
+    (cc, vc, tyc) <- cgenExprR env c
+    (ct, vt, tyt) <- cgenExprR env texpr
+    (cf, vf, tyf) <- cgenExprR env fexpr
+    let tret = tyt
+
+    return (   cc -- emit condition generation
+            ++ cgenType tret ++ "/* Should = " ++ cgenType tyf ++ "*/" `spc` cret ++ ";\n" -- emit decl for "return" type
+            ++ "if ("++vc++") {" 
+            ++ "  " ++ ct ++ ";\n" -- compute true value
+            ++ "  " ++ cret ++ "=" ++ vc ++ ";\n" -- assign to "return"
+            ++ "} else {\n" -- else
+            ++ "  " ++ cf ++ ";\n" -- compute false value
+            ++ "  " ++ cret ++ "=" ++ vf ++ ";\n" -- assign to "return"
+            ++ "}\n" -- phew
+              , cret
+              , tret
+          )
   L.App{}             -> error "App"
-  L.If{}              -> error "If"
   L.Assert _cond body -> cgenExprR env body
 
 cgenFun :: L.Fun -> String
