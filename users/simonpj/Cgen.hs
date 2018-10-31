@@ -301,14 +301,14 @@ example = do
     ++ "}"
     , "struct vector v1 = { 2, (double []) {2, 3} };"
     , "struct vector v2 = { 2, (double []) {4, 5} };"
-    , runM (cgenDef Main.ex1)
-    , runM (cgenDef Main.ex2)
-    , runM (cgenDef Main.ex2a)
-    , runM (cgenDef Main.ex3)
-    , runM (cgenDef Main.ex4)
-    , runM (cgenDef Main.ex5)
-    , runM (cgenDef Main.ex7)
-    , runM (cgenDef Main.ex8)
+    , r Main.ex1
+    , r Main.ex2
+    , r Main.ex2a
+    , r Main.ex3
+    , r Main.ex4
+    , r Main.ex5
+    , r Main.ex7
+    , r Main.ex8
     , "int main(void) { "
     ++ printFloat "f1(2)"
     ++ printFloat "f2(2)"
@@ -320,6 +320,7 @@ example = do
     ++ printFloat "f8(v1)"
     ++ "}"
     ]
+  where r = runM . cgenDef
 
 printFloat :: String -> String
 printFloat s = unlines
