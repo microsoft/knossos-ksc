@@ -35,37 +35,27 @@ anf = \case
   -- We treat "call of build with lambda argument" as a language
   -- primitive
   L.Call (L.Fun (L.SFun "build")) (L.Tuple [n, L.Lam var body]) -> do
-    anfArg  <- anf n
-    anfBody <- anf body
-    v       <- freshVar
+    (letn, vn) <- letAnf n
+    anfBody    <- anf body
     return
-      (L.Let
-        v
-        anfArg
-        (L.Call (L.Fun (L.SFun "build")) (L.Tuple [L.Var v, L.Lam var anfBody]))
+      (letn
+        (L.Call (L.Fun (L.SFun "build")) (L.Tuple [L.Var vn, L.Lam var anfBody])
+        )
       )
   L.Call f arg -> do
-    (let_, var) <- do
-      anfArg <- anf arg
-      v      <- freshVar
-      return (L.Let v anfArg, v)
+    (let_, var) <- letAnf arg
     return (let_ (L.Call f (L.Var var)))
   L.Tuple ts -> do
-    anfArgs <- flip mapM ts $ \t -> do
-      anft <- anf t
-      v    <- freshVar
-      return (L.Let v anft, v)
+    anfArgs <- mapM letAnf ts
     return
       (foldr (.) id (map fst anfArgs) (L.Tuple (map (L.Var . snd) anfArgs)))
   L.Lam x e -> do
     anfe <- anf e
     return (L.Lam x anfe)
   L.App f x -> do
-    anff <- anf f
-    anfx <- anf x
-    vf   <- freshVar
-    vx   <- freshVar
-    return (L.Let vf anff (L.Let vx anfx (L.App (L.Var vf) (L.Var vx))))
+    (letf, vf) <- letAnf f
+    (letx, vx) <- letAnf x
+    return (letf (letx (L.App (L.Var vf) (L.Var vx))))
   L.Let x e body -> do
     anfe    <- anf e
     anfbody <- anf body
@@ -79,6 +69,12 @@ anf = \case
     anfcond <- anf cond
     anfbody <- anf body
     return (L.Assert anfcond anfbody)
+
+letAnf :: L.Expr -> M (L.Expr -> L.Expr, L.Var)
+letAnf e = do
+  anfe <- anf e
+  ve   <- freshVar
+  return (L.Let ve anfe, ve)
 
 -- NB SPJ's ANF doesn't actually seem to replace function arguments
 -- with variables
