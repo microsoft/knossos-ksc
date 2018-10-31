@@ -2,6 +2,7 @@ module Main where
 
 import Data.List (intercalate)
 
+
 import Lang
 import Prim
 import AD
@@ -116,23 +117,28 @@ cppF :: String -> IO ()
 cppF file
   = do  
         cts <- readFile file
-        ;
-        let lls = case runParser pDefs cts of
-                    Left err   -> error ("Failed parse: " ++ show err)
-                    Right defs -> cgenDefs defs
-        
+
         let lines = [ 
                       "#include <stdio.h>"
                     , "#include \"knossos.h\""
                     ]
+
+        let lls = case runParser pDefs cts of
+                    Left err   -> error ("Failed parse: " ++ show err)
+                    Right defs -> cgenDefs defs
+        
         let tail = [ 
                       "int main() {"
                     , "  ks_main();"
                     , "}"
                     ]
         writeFile "tmp1.cpp" (intercalate "\n" (lines ++ lls ++ tail))
-        readFile "tmp1.cpp" >>= putStrLn;
-        putStrLn "^^^^^^---- Written to tmp1.cpp ----^^^^^^^^^"
+
+cppV file = do
+      cppF file
+      readFile "tmp1.cpp" >>= putStrLn;
+      putStrLn "^^^^^^---- Written to tmp1.cpp ----^^^^^^^^^"
+
 
 cppExample = do
     let lines = [ 

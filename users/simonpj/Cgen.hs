@@ -2,7 +2,7 @@
 
 module Cgen where
 
-import Debug.Trace (trace)
+import Debug.Trace (trace, traceM, traceShowId)
 import           Data.List                      ( intercalate )
 import qualified Data.Map                      as Map
 import           Control.Monad                  ( (>=>)
@@ -32,6 +32,9 @@ stLookup v env =
     Just a  -> a
     Nothing -> error ("Couldn't find " ++ show v ++ " in " ++ show env)
 
+stCreate::ST
+stCreate = Map.empty
+
 runM :: M a -> a
 runM = flip S.evalState 0
 
@@ -47,67 +50,40 @@ freshVar = do
   s <- freshCVar
   return (Simple s)
 
-anf :: Expr -> M Expr
-anf = \case
-  Konst k    -> return (Konst k)
-  Var   v    -> return (Var v)
-  Call f arg -> do
-    (let_, var) <- do
-      anfArg <- anf arg
-      v      <- freshVar
-      return (Let v anfArg, v)
-    return (let_ (Call f (Var var)))
-  Tuple ts -> do
-    anfArgs <- flip mapM ts $ \t -> do
-      anft <- anf t
-      v    <- freshVar
-      return (Let v anft, v)
-    return
-      (foldr (.) id (map fst anfArgs) (Tuple (map (Var . snd) anfArgs)))
-  Lam x e -> do
-    anfe <- anf e
-    return (Lam x anfe)
-  App f x -> do
-    anff <- anf f
-    anfx <- anf x
-    vf   <- freshVar
-    vx   <- freshVar
-    return (Let vf anff (Let vx anfx (App (Var vf) (Var vx))))
-  Let x e body -> do
-    anfe    <- anf e
-    anfbody <- anf body
-    return (Let x anfe anfbody)
-  If cond ift iff -> do
-    anfcond <- anf cond
-    anfift  <- anf ift
-    anfiff  <- anf iff
-    return (If anfcond anfift anfiff)
-  Assert cond e -> do
-    anfcond <- anf cond
-    anfe  <- anf e
-    return (Assert anfcond anfe)
-
--- NB SPJ's ANF doesn't actually seem to replace function arguments
--- with variables
-anfSPJ :: Expr -> Expr
-anfSPJ = snd . ANF.runAnf 0 . ANF.anfE
-
-cgenDefs :: [Def] -> [String]
-cgenDefs defs = map (runM <$> cgenDefM) defs  
+-------------------- C++ generation
 
 cgenDef :: Def -> String
-cgenDef = runM <$> cgenDefM  
+cgenDef def = let (str,env) = (runM <$> (cgenDefM stCreate)) def in str
 
-cgenDefM :: Def -> M String
-cgenDefM (Def f vars expr) = do
-  let env = foldr addVarToEnv Map.empty vars
+xcgenDefs :: [Def] -> [String]
+xcgenDefs defs =
+  let env = stCreate in
+  fst $ foldr strenvAddDef ([],env) defs
+  where strenvAddDef:: Def -> ([String], ST) -> ([String], ST)
+        strenvAddDef def (strs, env) = 
+          let (strdef, newenv) = (runM <$> (cgenDefM env)) def in
+            (strs ++ [strdef], newenv)
+
+cgenDefs :: [Def] -> [String]
+cgenDefs defs =
+   let env = Map.empty in
+   fst $ foldr go ([],env) defs
+   where go def (strs,env) = 
+            let (newstr,newenv) = (runM <$> (cgenDefM env)) def in
+               (newstr:strs, trace("NEWENV = " ++ show newenv) newenv)
+
+cgenDefM :: ST -> Def -> M (String, ST)
+cgenDefM env (Def f vars expr) = do
+  let body_env = foldr addVarToEnv env vars
         where addVarToEnv :: Var -> ST -> ST
               addVarToEnv (TVar ty v) env = stInsert v ty env
               addVarToEnv v _ = error $ "Untyped parameter [" ++ show v ++ "] in def " ++ show f 
   
-  (cExpr, cVar, cType) <- cgenExpr env expr
+  (cExpr, cVar, cType) <- cgenExpr body_env expr
 
-  return
+  let newenv = stInsert (Simple (cgenFun f)) cType env 
+
+  return 
     (  "\n"
     ++ cgenType cType `spc` cgenFun f
     ++ "("
@@ -117,6 +93,8 @@ cgenDefM (Def f vars expr) = do
     ++ "return "
     ++ cVar
     ++ ";\n}\n"
+    ,
+    newenv
     )
 
 -- CGenResult is (C declaration, C expression, Type)
@@ -138,12 +116,13 @@ typeof env expr = case expr of
   Konst (KFloat   f) -> TypeFloat
   Konst (KBool    b) -> TypeBool
   Var v -> stLookup v env
-  Call f (Var xv) -> case stLookup xv env of
-                     TypeTuple ts -> typeofFun (show (ppr expr)) f ts
-                     t -> typeofFun (show (ppr expr)) f [t]
+  Call f (Var xv) -> let traceMsg = show (ppr expr) in
+                     case stLookup xv env of
+                     TypeTuple ts -> typeofFun traceMsg env f ts
+                     t -> typeofFun traceMsg env f [t]
   _ -> error "typeof"
 
-typeofFun msg f ts =
+typeofFun msg env f ts =
   case (f,ts) of
     (Fun (SFun "build"), [tsize, TypeLambda TypeInteger t]) -> TypeVec t
     (Fun (SFun "index"), [tind, (TypeVec t)]) -> t
@@ -160,6 +139,9 @@ typeofFun msg f ts =
                         TypeTuple ts -> ts!!i
                         TypeVec t -> t
                         _ -> error ("oiks[" ++ show (t:ts) ++ "]")
+    (Fun (SFun f), _) ->   case Map.lookup (Simple f) env of
+                            Just a  -> a
+                            Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "], in ["++msg++"]") TypeUnknown
     _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "], in ["++msg++"]" in
                           trace emsg TypeUnknown 
 
@@ -309,3 +291,48 @@ cgenType = \case
   TypeVec t -> "vec<" ++ (cgenType t) ++ ">"
   TypeLambda from to -> "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
 
+
+anf :: Expr -> M Expr
+anf = \case
+  Konst k    -> return (Konst k)
+  Var   v    -> return (Var v)
+  Call f arg -> do
+    (let_, var) <- do
+      anfArg <- anf arg
+      v      <- freshVar
+      return (Let v anfArg, v)
+    return (let_ (Call f (Var var)))
+  Tuple ts -> do
+    anfArgs <- flip mapM ts $ \t -> do
+      anft <- anf t
+      v    <- freshVar
+      return (Let v anft, v)
+    return
+      (foldr (.) id (map fst anfArgs) (Tuple (map (Var . snd) anfArgs)))
+  Lam x e -> do
+    anfe <- anf e
+    return (Lam x anfe)
+  App f x -> do
+    anff <- anf f
+    anfx <- anf x
+    vf   <- freshVar
+    vx   <- freshVar
+    return (Let vf anff (Let vx anfx (App (Var vf) (Var vx))))
+  Let x e body -> do
+    anfe    <- anf e
+    anfbody <- anf body
+    return (Let x anfe anfbody)
+  If cond ift iff -> do
+    anfcond <- anf cond
+    anfift  <- anf ift
+    anfiff  <- anf iff
+    return (If anfcond anfift anfiff)
+  Assert cond e -> do
+    anfcond <- anf cond
+    anfe  <- anf e
+    return (Assert anfcond anfe)
+
+-- NB SPJ's ANF doesn't actually seem to replace function arguments
+-- with variables
+anfSPJ :: Expr -> Expr
+anfSPJ = snd . ANF.runAnf 0 . ANF.anfE

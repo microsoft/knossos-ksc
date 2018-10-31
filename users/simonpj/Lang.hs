@@ -269,6 +269,7 @@ class Pretty p where
 
 instance Pretty Var where
   ppr (Simple s)   = PP.text s
+  ppr (TVar ty v)  = parens (PP.text (show ty) PP.<> (ppr v))
   ppr (StopGrad s) = PP.text s
   ppr (Delta s)    = PP.text ('d' : s)
   ppr (Grad s Fwd) = PP.text ('D' : s)

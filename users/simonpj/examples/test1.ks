@@ -1,9 +1,9 @@
-(def a (x)
+(def a ((Float x))
     (* 3 x))
 
-(def b (y)
+(def b ((Float y))
     (* 2 y))
 
-(def f (x y)
+(def f ((Float x) (Float y))
     (let (z (* 5 x))
         (/ (a z) (b y))))

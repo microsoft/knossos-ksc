@@ -20,7 +20,7 @@
 {-
 
 (def logsumexp ((Vec<Float> v))
-    (log (sum (exp$Vec<Float> v))))
+    (log (sum (exp$VecR v))))
 
 (def gmm_knossos_gmm_objective 
       ((Vec<Vec<Float>> x) 
