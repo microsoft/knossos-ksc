@@ -4,7 +4,7 @@ module Cgen where
 
 import qualified Data.Map                      as Map
 import qualified Lang                          as L
-import qualified ANF                           as ANF
+import qualified ANF
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
 import           Data.List                      ( intercalate )
@@ -190,7 +190,7 @@ cgenExprR env = \case
             L.Fun (L.SFun "sum"  ) -> Double
             L.Fun (L.SFun "neg"  ) -> Double
             L.Fun (L.SFun other  ) -> error ("Call of " ++ other)
-            L.Fun (L.SelFun{}    ) -> Double -- FIXME: This is probably not
+            L.Fun L.SelFun{}       -> Double -- FIXME: This is probably not
                                    -- quite right since an unstated
                                    -- assumption is that SelFuns are
                                    -- polymorphic
