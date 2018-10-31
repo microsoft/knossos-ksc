@@ -276,61 +276,6 @@ cgenVar = \case
            Rev -> "r"
          )
 
-cgenType :: L.Type -> String
-cgenType = \case
-  TypeInteger  -> "int"
-  TypeBool  -> "bool"
-  TypeFloat  -> "double"
-  TypeUnknown  -> "auto"
-  TypeTuple ts -> "std::tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
-  TypeVec t -> "vec<" ++ (cgenType t) ++ ">"
-  TypeLambda from to -> "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
-
-
-anf :: Expr -> M Expr
-anf = \case
-  Konst k    -> return (Konst k)
-  Var   v    -> return (Var v)
-  Call f arg -> do
-    (let_, var) <- do
-      anfArg <- anf arg
-      v      <- freshVar
-      return (Let v anfArg, v)
-    return (let_ (Call f (Var var)))
-  Tuple ts -> do
-    anfArgs <- flip mapM ts $ \t -> do
-      anft <- anf t
-      v    <- freshVar
-      return (Let v anft, v)
-    return
-      (foldr (.) id (map fst anfArgs) (Tuple (map (Var . snd) anfArgs)))
-  Lam x e -> do
-    anfe <- anf e
-    return (Lam x anfe)
-  App f x -> do
-    anff <- anf f
-    anfx <- anf x
-    vf   <- freshVar
-    vx   <- freshVar
-    return (Let vf anff (Let vx anfx (App (Var vf) (Var vx))))
-  Let x e body -> do
-    anfe    <- anf e
-    anfbody <- anf body
-    return (Let x anfe anfbody)
-  If cond ift iff -> do
-    anfcond <- anf cond
-    anfift  <- anf ift
-    anfiff  <- anf iff
-    return (If anfcond anfift anfiff)
-  Assert cond e -> do
-    anfcond <- anf cond
-    anfe  <- anf e
-    return (Assert anfcond anfe)
-
--- NB SPJ's ANF doesn't actually seem to replace function arguments
--- with variables
-anfSPJ :: Expr -> Expr
-anfSPJ = snd . ANF.runAnf 0 . ANF.anfE
 
 -}
 
@@ -428,10 +373,14 @@ cgenDef (L.Def f vars expr) = do
 
 cgenType :: L.Type -> String
 cgenType = \case
-  L.TypeFloat   -> "double"
+  L.TypeFloat    -> "double"
   L.TypeInteger  -> "int"
   L.TypeTuple ts -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
   L.TypeVec t    -> "vec<" ++ cgenType t ++ ">"
+  L.TypeBool     -> "bool"
+  L.TypeUnknown  -> "auto"
+  L.TypeLambda from to -> "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
+
 
 -- CGenResult is (C declaration, C expression, L.Type)
 -- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
