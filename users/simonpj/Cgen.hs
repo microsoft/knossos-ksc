@@ -2,17 +2,19 @@
 
 module Cgen where
 
-import qualified Data.Map                      as Map
-import qualified Lang                          as L
-import qualified ANF
-import           Control.Monad                  ( (<=<) )
-import qualified Control.Monad.State           as S
-import           Data.List                      ( intercalate )
-import           Data.Maybe                     ( fromJust )
-import qualified Main
- 
 import Debug.Trace (trace, traceM, traceShowId)
 
+import qualified Data.Map                      as Map
+import           Data.List                      ( intercalate )
+import           Data.Maybe                     ( fromJust )
+
+import           Control.Monad                  ( (<=<) )
+import qualified Control.Monad.State           as S
+
+import qualified Lang                          as L
+import qualified ANF
+import qualified Main
+ 
 type M = S.State Int
 
 spc:: String -> String -> String
