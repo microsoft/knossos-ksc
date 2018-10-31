@@ -4,9 +4,13 @@ module Parse  where
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Here's the BNF for our language:
 
-<def> ::= ( def <var> <vars> <expr> )
+<def> ::= ( def <var> <params> <expr> )
 
 <expr> ::= <atom> | ( <kexpr> )
+
+<param> ::= <var> | (<var> ":" <type>)
+
+<type> ::= "Integer" | "Float" | "Vec" <type> | "Tuple" (<types>)
 
 <kexpr> ::= let <bind>                <expr>
         |   let (<bind>1 ... <bind>n) <epxr>      n >= 0
@@ -22,7 +26,7 @@ atom ::= <konst> | <var>
 <binds> ::= (<var> <expr>)
 
 An example
-  (def f7 (x y )
+  (def f7 ((x : Vec Float) (y : Vec Float))
        (assert (== (size(x)) (size(y)))
          (sum (build (size x)
                      (lam i (* (index i x)
@@ -97,7 +101,7 @@ langDef = Tok.LanguageDef
   , Tok.identLetter     = alphaNum <|> oneOf "_':!#$%&*+./<=>?@\\^|-~"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
-  , Tok.reservedNames   = [ "def", "let", "if", "assert", "call", "tuple", "const" ]
+  , Tok.reservedNames   = [ "def", "let", "if", "assert", "call", "tuple", ":" ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -120,20 +124,13 @@ pDouble = Tok.float lexer
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
--- FIXME parse this properly
-makeTVar :: String -> String -> Var
-makeTVar "Integer" v = TVar TypeInteger (Simple v)
-makeTVar "Float" v = TVar TypeFloat (Simple v)
-makeTVar "Vec<Float>" v = TVar (TypeVec TypeFloat) (Simple v) 
-makeTVar "Vec<Vec<Float>>" v = TVar (TypeVec (TypeVec TypeFloat)) (Simple v) 
-makeTVar s v = error ("Unknown type [" ++ s ++ "]") 
-
 pParam :: Parser Var
-pParam = Simple <$> pIdentifier -- FIXME: this should error or at least return TypeUnknown
+pParam = Simple <$> pIdentifier -- FIXME: this should probably error or at least return TypeUnknown
      <|> parens (do {
-                    ty <- pIdentifier;
                     v <- pIdentifier;
-                    return (makeTVar ty v)
+                    pReserved ":";
+                    ty <- pType;
+                    return (TVar ty (Simple v))
          })
 
 pKonst :: Parser Expr
@@ -155,6 +152,16 @@ pKExpr =    pIfThenElse
        <|> pTuple
        <|> pKonst
 
+pType :: Parser Type
+pType = do {
+          id <- pIdentifier;
+          case id of
+          "Integer" -> return TypeInteger
+          "Float" -> return TypeFloat
+          "Vec" -> TypeVec <$> pType
+          "Tuple" -> TypeTuple <$> parens (many pType) 
+          _ -> error $ "Unknown type [" ++ id ++ "]"
+        }
 
 pCall :: Parser Expr
 -- (f e)
