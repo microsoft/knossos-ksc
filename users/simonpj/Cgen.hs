@@ -37,12 +37,12 @@ freshVar = do
   return (L.Simple s)
   
 {-
-type ST = Map.Map Var Type
-stInsert:: Var -> Type -> ST -> ST
+type ST = Map.Map Var L.Type
+stInsert:: Var -> L.Type -> ST -> ST
 stInsert (TVar ty v) t env = stInsert v (assertEqualThen t ty) env
 stInsert v t env = Map.insert v t env
 
-stLookup:: Var -> ST -> Type
+stLookup:: Var -> ST -> L.Type
 stLookup (TVar ty v) env = assertEqualThen ty (stLookup v env)
 stLookup v env = 
   case Map.lookup v env of
@@ -100,19 +100,11 @@ cgenDefM env (Def f vars expr) = do
     newenv
     )
 
--- CGenResult is (C declaration, C expression, Type)
--- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
---       "r",
---       TypeFloat)
--- e.g. ("",         -- simple constant needs no pre-declaration
---       "1.0",      -- this is what we use at the occurrence
---       TypeFloat)  -- and this is the type of the occurrence
-type CGenResult = (String, String, Type)
 
 cgenExpr :: ST -> Expr -> M CGenResult
 cgenExpr env  = cgenExprR env <=< anf
 
-typeof :: ST -> Expr -> Type 
+typeof :: ST -> Expr -> L.Type 
 typeof env expr = case expr of
   Konst (KZero     ) -> TypeZero
   Konst (KInteger i) -> TypeInteger
@@ -210,7 +202,7 @@ cgenExprR env expr = case expr of
   Tuple ts -> do
     cT <- freshCVar
 
-    let unVar :: Expr -> (Var, Type)
+    let unVar :: Expr -> (Var, L.Type)
         unVar = \case
           Var v -> (v, stLookup v env)
           _     -> error "Tuple: Expected arguments to be Vars"
@@ -284,7 +276,7 @@ cgenVar = \case
            Rev -> "r"
          )
 
-cgenType :: Type -> String
+cgenType :: L.Type -> String
 cgenType = \case
   TypeInteger  -> "int"
   TypeBool  -> "bool"
@@ -406,14 +398,14 @@ cgenDef (L.Def f vars expr) = do
   -- They should really be attached to the function definition.  For
   -- the moment I'm just fixing the type of function arguments based
   -- on my domain expertise.
-  let typeEnvList :: [(L.Var, Type)]
+  let typeEnvList :: [(L.Var, L.Type)]
       typeEnvList = case f of
-        L.Fun (L.SFun "f3"  ) -> map (\v -> (v, Tuple [Double, Double])) vars
-        L.Fun (L.SFun "dot2") -> map (\v -> (v, Vector)) vars
-        L.Fun (L.SFun "f8"  ) -> map (\v -> (v, Vector)) vars
-        _                     -> map (\v -> (v, Double)) vars
+        L.Fun (L.SFun "f3"  ) -> map (\v -> (v, L.TypeTuple [L.TypeFloat, L.TypeFloat])) vars
+        L.Fun (L.SFun "dot2") -> map (\v -> (v, L.TypeVec L.TypeFloat)) vars
+        L.Fun (L.SFun "f8"  ) -> map (\v -> (v, L.TypeVec L.TypeFloat)) vars
+        _                     -> map (\v -> (v, L.TypeFloat)) vars
 
-      typeEnv :: Map.Map L.Var Type
+      typeEnv :: Map.Map L.Var L.Type
       typeEnv = Map.fromList typeEnvList
 
   (cExpr, cVar, _) <- cgenExpr typeEnv expr
@@ -434,29 +426,34 @@ cgenDef (L.Def f vars expr) = do
     ++ ";\n}\n"
     )
 
-data Type = Double | Tuple [Type] | Int | Vector deriving Show
-
-cgenType :: Type -> String
+cgenType :: L.Type -> String
 cgenType = \case
-  Double                 -> "double"
-  Tuple [Double, Double] -> "struct tuple2"
-  Tuple [Int   , Vector] -> "struct tuple_int_vector"
-  Tuple ts -> error ("Don't support that size of tuple: " ++ show ts)
-  Int                    -> "int"
-  Vector                 -> "struct vector"
+  L.TypeFloat   -> "double"
+  L.TypeInteger  -> "int"
+  L.TypeTuple ts -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
+  L.TypeVec t    -> "vec<" ++ cgenType t ++ ">"
 
-cgenExpr :: Map.Map L.Var Type -> L.Expr -> M (String, String, Type)
+-- CGenResult is (C declaration, C expression, L.Type)
+-- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
+--       "r",
+--       TypeFloat)
+-- e.g. ("",         -- simple constant needs no pre-declaration
+--       "1.0",      -- this is what we use at the occurrence
+--       TypeFloat)  -- and this is the type of the occurrence
+type CGenResult = (String, String, L.Type)
+
+cgenExpr :: Map.Map L.Var L.Type -> L.Expr -> M CGenResult
 cgenExpr env = cgenExprR env <=< anf
 
 -- The input expression must be in ANF
-cgenExprR :: Map.Map L.Var Type -> L.Expr -> M (String, String, Type)
+cgenExprR :: Map.Map L.Var L.Type -> L.Expr -> M CGenResult
 cgenExprR env = \case
   L.Konst k -> do
     v <- freshCVar
     return
       ( "double " ++ v ++ " = " ++ cgenKonst k ++ ";\n"
       , v
-      , Double {- FIXME we need to deal with polymorphism -}
+      , L.TypeFloat {- FIXME we need to deal with polymorphism -}
       )
   L.Var v -> return
     ( ""
@@ -467,7 +464,7 @@ cgenExprR env = \case
     )
   L.Call (L.Fun (L.SFun "build")) arg -> case arg of
     L.Tuple [L.Var n, L.Lam var body] -> do
-      (cbody, cbodyVar, _ty) <- cgenExprR (Map.insert var Int env) body
+      (cbody, cbodyVar, _ty) <- cgenExprR (Map.insert var L.TypeInteger env) body
       let i = cgenVar var
 
       let forBody = unlines
@@ -488,7 +485,7 @@ cgenExprR env = \case
             , "}"
             ]
 
-      return (forBody, "vector", Vector)
+      return (forBody, "vector", L.TypeVec L.TypeFloat)
 
 
     _ -> error "Need a lambda for build"
@@ -497,15 +494,15 @@ cgenExprR env = \case
     L.Var xv -> do
       v <- freshCVar
       let ty = case f of
-            L.Fun (L.SFun "+"    ) -> Double
-            L.Fun (L.SFun "*"    ) -> Double
-            L.Fun (L.SFun "/"    ) -> Double
-            L.Fun (L.SFun "size" ) -> Int
-            L.Fun (L.SFun "index") -> Double
-            L.Fun (L.SFun "sum"  ) -> Double
-            L.Fun (L.SFun "neg"  ) -> Double
+            L.Fun (L.SFun "+"    ) -> L.TypeFloat
+            L.Fun (L.SFun "*"    ) -> L.TypeFloat
+            L.Fun (L.SFun "/"    ) -> L.TypeFloat
+            L.Fun (L.SFun "size" ) -> L.TypeInteger
+            L.Fun (L.SFun "index") -> L.TypeFloat
+            L.Fun (L.SFun "sum"  ) -> L.TypeFloat
+            L.Fun (L.SFun "neg"  ) -> L.TypeFloat
             L.Fun (L.SFun other  ) -> error ("Call of " ++ other)
-            L.Fun L.SelFun{}       -> Double -- FIXME: This is probably not
+            L.Fun L.SelFun{}       -> L.TypeFloat -- FIXME: This is probably not
                                    -- quite right since an unstated
                                    -- assumption is that SelFuns are
                                    -- polymorphic
@@ -543,7 +540,7 @@ cgenExprR env = \case
 
         vars = map unVar ts
 
-        ty   = Tuple (map (fromJust . flip Map.lookup env) vars)
+        ty   = L.TypeTuple (map (fromJust . flip Map.lookup env) vars)
 
     return
       ( cgenType ty
