@@ -13,7 +13,6 @@ import qualified Control.Monad.State           as S
 
 import qualified Lang                          as L
 import qualified ANF
-import qualified Main
  
 type M = S.State Int
 
@@ -287,7 +286,6 @@ cgenVar = \case
            L.Fwd -> "f"
            L.Rev -> "r"
          )
-  _ -> error "cgenVar"
 
 -- A single place for "domain knowledge" about functions -- to be dumped when we get symtabs
 typeofFun env f ts =
