@@ -4,8 +4,8 @@ module Cgen where
 
 import Debug.Trace (trace, traceM, traceShowId)
 
-import qualified Data.Map                      as Map
-import           Data.List                      ( intercalate )
+import qualified Data.Map.Strict                      as Map
+import           Data.List                      ( intercalate, reverse )
 import           Data.Maybe                     ( fromJust )
 
 import           Control.Monad                  ( (<=<) )
@@ -15,6 +15,8 @@ import qualified Lang                          as L
 import qualified ANF
  
 type M = S.State Int
+
+dbtrace msg e = e
 
 spc:: String -> String -> String
 spc x y = x ++ " " ++ y
@@ -40,7 +42,7 @@ freshVar = do
 type ST = Map.Map L.Var L.Type
 stInsert:: L.Var -> L.Type -> ST -> ST
 stInsert (L.TVar ty v) t env = stInsert v (assertEqualThen t ty) env
-stInsert v t env = Map.insert v t env
+stInsert v t env = dbtrace("Inserting " ++ show v ++ " = " ++ show t ++ " in " ++ show env ++ "\n") (Map.insert v t env)
 
 stLookup:: L.Var -> ST -> L.Type
 stLookup (L.TVar ty v) env = assertEqualThen ty (stLookup v env)
@@ -96,31 +98,43 @@ letAnf e = do
 anfSPJ :: L.Expr -> L.Expr
 anfSPJ = snd . ANF.runAnf 0 . ANF.anfE
 
+cgenDef :: L.Def -> String
+cgenDef def = let (line,vf,tf)  = cgenDefE stCreate def in line
+
 cgenDefs :: [L.Def] -> [String]
 cgenDefs defs =
-    map (runM <$> cgenDef) defs
+  let env = stCreate in
+  reverse $ snd $ foldl accum (Map.empty,[]) defs
+    where accum :: (ST, [String]) -> L.Def -> (ST, [String])
+          accum (env, ls) def = let (l,vf,tf) = go env def in 
+                                (stInsert (L.Simple vf) tf env, l:ls)
+                                  where go :: ST -> L.Def -> CGenResult 
+                                        go env def =
+                                          cgenDefE (dbtrace ("Passing ENV[" ++ show env ++ "]" ++ " to " ++ (show $ L.ppr def) ++ "\n") env) def
 
-cgenDef :: L.Def -> M String
-cgenDef (L.Def f vars expr) = do
-  let env = stCreate -- Later, accumulate 
+cgenDefE :: ST -> L.Def -> CGenResult
+cgenDefE env (L.Def f vars expr) =
+  let _ = trace ("Def " ++ show f ++ "\n") () in
   let body_env = foldr addVarToEnv env vars
         where addVarToEnv :: L.Var -> ST -> ST
               addVarToEnv (L.TVar ty v) env = stInsert v ty env
-              addVarToEnv v _ = error $ "Untyped parameter [" ++ show v ++ "] in def " ++ show f 
-  
-  (cExpr, cVar, cType) <- cgenExpr body_env expr
+              addVarToEnv v _ = error $ "Untyped parameter [" ++ show v ++ "] in def " ++ show f
+        in 
+  let (cExpr, cVar, cType) = runM $ cgenExpr body_env expr in
 
-  return
     (  cgenType cType `spc` cgenFun f
-    ++ "("
+    ++ "(tuple<"
     ++ intercalate
          ", "
-         (map (\(L.TVar ty var) -> cgenType ty `spc` cgenVar var) vars)
-    ++ ") {\n"
+         (map (\(L.TVar ty var) -> cgenType ty) vars)
+    ++ "> _p) {\n"
+    ++ snd (let accum (n, str) (L.TVar ty var) = (n+1, str ++ "  " ++ cgenType ty `spc` cgenVar var ++ " = std::get<" ++ show n ++ ">(_p);\n") in foldl accum (0, "") vars)
     ++ cExpr
     ++ "return "
     ++ cVar
     ++ ";\n}\n"
+    , cgenFun f
+    , cType
     )
 
 cgenType :: L.Type -> String
@@ -286,7 +300,7 @@ cgenVar = \case
            L.Fwd -> "f"
            L.Rev -> "r"
          )
-
+ 
 -- A single place for "domain knowledge" about functions -- to be dumped when we get symtabs
 typeofFun env f ts =
   case (f,ts) of
@@ -295,6 +309,7 @@ typeofFun env f ts =
     (L.Fun (L.SFun "size"), [(L.TypeVec t)]) -> L.TypeInteger
     (L.Fun (L.SFun "sum"), [(L.TypeVec t)]) -> t
     (L.Fun (L.SFun "exp"), [(L.TypeFloat)]) -> L.TypeFloat
+    (L.Fun (L.SFun "log"), [(L.TypeFloat)]) -> L.TypeFloat
     (L.Fun (L.SFun "+"  ), (t:ts)) -> t
     (L.Fun (L.SFun "/"  ), (t:ts)) -> t
     (L.Fun (L.SFun "*"  ), (t:ts)) -> t

@@ -130,7 +130,7 @@ cppF file
         
         let tail = [ 
                       "int main() {"
-                    , "  ks_main();"
+                    , "  ks_main(tuple<>{});"
                     , "}"
                     ]
         writeFile "tmp1.cpp" (intercalate "\n" (lines ++ lls ++ tail))
@@ -165,7 +165,7 @@ cppExample = do
       ++ printFloat "f8(v1)"
       ++ "}"
       ]
-    where r = runM . cgenDef
+    where r = cgenDef
   
 printFloat :: String -> String
 printFloat s = unlines

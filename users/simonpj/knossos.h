@@ -17,8 +17,6 @@ template <class T1, class T2> T1  eq(tuple<T1, T2> t) { return get<0>(t) == get<
 template <class T1, class T2> T1  lt(tuple<T1, T2> t) { return get<0>(t) < get<1>(t);}
 
 double neg(double d) { return -d; }
-double exp(double d) { return std::exp(d); }
-double log(double d) { return std::log(d); }
 
 // ASSERT
 #define ASSERT(expr) if (expr) ; else { throw ("Assert failed [" #expr "]");} 
@@ -61,4 +59,3 @@ double sum(vec<double> v) {
         ret += v.data[i];
     return ret; 
 }
-
