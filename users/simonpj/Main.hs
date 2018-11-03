@@ -1,7 +1,9 @@
 module Main where
 
 import Data.List (intercalate)
+import System.Process (callCommand)
 
+import Text.Regex (subRegex, mkRegex)
 
 import Lang
 import Prim
@@ -36,6 +38,7 @@ ex2a :: Def
 --         let y2 = fst zt
 --         let z = snd zt
 --         in y2 * z
+k1 = Konst (KFloat 1.2)
 ex2a = Def (Fun (SFun "f2a")) [sx] $
       Let szt (Let sy1 (pMul (Var sx) (Var sx)) $
                Tuple [Var sy1, pAdd (Var sx) (Var sy1)]) $
@@ -66,46 +69,48 @@ ex5 :: Def
 --          let v = (2*p*q) + (3*r)
 --          in v
 ex5 = Def (Fun (SFun "f5")) [sx,sy] $
-      Let sp (pMul (kInt 7) (Var sx)) $
-      Let sr (pDiv (kInt 1) (Var sy)) $
-      Let sq (pMul (Var sp) (pMul (Var sx) (kInt 5))) $
-      Let sv (pAdd (pMul (kInt 2) (pMul (Var sp) (Var sq)))
-                   (pMul (kInt 3) (Var sr))) $
+      Let sq (pMul (kFloat 7) (Var sx)) $
+      Let sr (pDiv (kFloat   1) (Var sy)) $
+      Let st (pMul (Var sq) (pMul (Var sx) (kFloat   5))) $
+      Let sv (pAdd (pMul (kFloat   2) (pMul (Var sq) (Var sr)))
+                   (pMul (kFloat   3) (Var sr))) $
       Var sv
 
 ex6 :: Def
 -- f6 x y = sum (x * y)
-ex6 = Def (Fun (SFun "dot")) [sx, sy] $
-      pSum (pMul (Var sx) (Var sy))
+ex6 = Def (Fun (SFun "dot")) [svx, svy] $
+      pSum (pMul (Var svx) (Var svy))
 
 ex7 :: Def
 -- f7 x y = sum (build (size x) (\i -> x[i] * y[i]))
-ex7 = Def (Fun (SFun "dot2")) [sx, sy] $
-      assertEqual (pSize (Var sx)) (pSize (Var sy)) $
-      pSum (pBuild (pSize (Var sx))
-                   (Lam si (pMul (pIndex (Var si) (Var sx))
-                                 (pIndex (Var si) (Var sy)))))
+ex7 = Def (Fun (SFun "dot2")) [svx, svy] $
+      assertEqual (pSize (Var svx)) (pSize (Var svy)) $
+      pSum (pBuild (pSize (Var svx))
+                   (Lam si (pMul (pIndex (Var si) (Var svx))
+                                 (pIndex (Var si) (Var svy)))))
 
 ex8 :: Def
 -- f8 x = sum (build (size x) (\i -> -x[i]))
 ex8 = Def (Fun (SFun "f8")) [svx] $
       pSum (pBuild (pSize (Var svx))
-                   (Lam si (pNeg (pIndex (Var si) (Var sx)))))
+                   (Lam si (pNeg (pIndex (Var si) (Var svx)))))
 
 
 si, sp, sq, sr, sv, sx, sy, sz :: Var
 si = TVar TypeInteger (Simple "i")
-sp = TVar TypeFloat   (Simple "p")
+sp = TVar (TypeTuple [TypeFloat, TypeFloat])   (Simple "p")
 sq = TVar TypeFloat   (Simple "q")
 sr = TVar TypeFloat   (Simple "r")
+st = TVar TypeFloat   (Simple "t")
 sv = TVar TypeFloat   (Simple "v")
 sx = TVar TypeFloat   (Simple "x")
 svx = TVar (TypeVec TypeFloat)   (Simple "vx")
+svy = TVar (TypeVec TypeFloat)   (Simple "vy")
 sy = TVar TypeFloat   (Simple "y")
 sy1 = TVar TypeFloat  (Simple "y1")
 sy2 = TVar TypeFloat  (Simple "y2")
 sz = TVar TypeFloat   (Simple "z")
-szt = TVar TypeFloat  (Simple "zt")
+szt = TVar (TypeTuple [TypeFloat, TypeFloat])  (Simple "zt")
 
 
 
@@ -122,6 +127,7 @@ cppF file
         let lines = [ 
                       "#include <stdio.h>"
                     , "#include \"knossos.h\""
+                    , "namespace ks {\n"
                     ]
 
         let lls = case runParser pDefs cts of
@@ -129,16 +135,23 @@ cppF file
                     Right defs -> cgenDefs defs
         
         let tail = [ 
-                      "int main() {"
-                    , "  ks_main(tuple<>{});"
+                      "}"
+                    , "int main() {"
+                    , "  ks::main();"
+                    , "  return 0;"
                     , "}"
                     ]
-        writeFile "tmp1.cpp" (intercalate "\n" (lines ++ lls ++ tail))
-
-cppV file = do
-      cppF file
-      readFile "tmp1.cpp" >>= putStrLn;
-      putStrLn "^^^^^^---- Written to tmp1.cpp ----^^^^^^^^^"
+        let re = mkRegex "\\.ks$"
+        let cppfile = "obj\\" ++ (subRegex re file ".cpp")
+        let exefile = "obj\\" ++ (subRegex re file ".exe")
+        putStrLn $ "Writing to " ++ cppfile
+        writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
+        let compcmd = "g++ -I. -O -g " ++ cppfile ++ " -o " ++ exefile
+        putStrLn $ "Compiling: " ++ compcmd
+        callCommand $ compcmd
+        putStrLn "Running"
+        callCommand exefile
+        putStrLn "Done"
 
 cppExample :: IO ()
 cppExample = do
@@ -147,13 +160,13 @@ cppExample = do
       [ "#include <stdio.h>"
       , "#include \"knossos.h\""
       , r Main.ex1
-      -- , r Main.ex2
-      -- , r Main.ex2a
-      -- , r Main.ex3
-      -- , r Main.ex4
-      -- , r Main.ex5
-      -- , r Main.ex7
-      -- , r Main.ex8
+      , r Main.ex2
+      , r Main.ex2a
+      , r Main.ex3
+      , r Main.ex4
+      , r Main.ex5
+      , r Main.ex7
+      , r Main.ex8
       , "int main(void) { "
       ++ printFloat "f1(2)"
       ++ printFloat "f2(2)"
