@@ -4,7 +4,7 @@ module Cgen where
 
 import Debug.Trace (trace, traceM, traceShowId)
 
-import qualified Data.Map.Strict                      as Map
+import qualified Data.Map                      as Map
 import           Data.List                      ( intercalate, reverse )
 import           Data.Maybe                     ( fromJust )
 
@@ -21,8 +21,8 @@ dbtrace msg e = e
 spc:: String -> String -> String
 spc x y = x ++ " " ++ y
 
-assertEqualThen t1 t2 =
-  if t1 == t2 then t1 else error ("Asserts unequal " ++ show t1 ++ " == " ++ show t2)
+assertEqualThen msg t1 t2 =
+  if t1 == t2 then t1 else error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2)
 
 runM :: M a -> a
 runM = flip S.evalState 0
@@ -41,11 +41,11 @@ freshVar = do
   
 type ST = Map.Map L.Var L.Type
 stInsert:: L.Var -> L.Type -> ST -> ST
-stInsert (L.TVar ty v) t env = stInsert v (assertEqualThen t ty) env
+stInsert (L.TVar ty v) t env = stInsert v (assertEqualThen ("putting " ++ show v ++ " into " ++ show env) t ty) env
 stInsert v t env = dbtrace("Inserting " ++ show v ++ " = " ++ show t ++ " in " ++ show env ++ "\n") (Map.insert v t env)
 
 stLookup:: L.Var -> ST -> L.Type
-stLookup (L.TVar ty v) env = assertEqualThen ty (stLookup v env)
+stLookup (L.TVar ty v) env = assertEqualThen ("getting " ++ show v ++ " from " ++ show env) ty (stLookup v env)
 stLookup v env = 
   case Map.lookup v env of
     Just a  -> a
@@ -59,9 +59,13 @@ anf :: L.Expr -> M L.Expr
 anf = \case
   L.Konst k -> return (L.Konst k)
   L.Var   v -> return (L.Var v)
-  L.Call f arg -> do
-    (let_, var) <- letAnf arg
-    return (let_ (L.Call f (L.Var var)))
+  L.Call f (L.Tuple ts) -> do
+    anfArgs <- mapM letAnf ts
+    return
+      (foldr (.) id (map fst anfArgs) (L.Call f (L.Tuple (map (L.Var . snd) anfArgs))))
+  L.Call f e -> do
+    (lete, ve) <- letAnf e
+    return (lete (L.Call f (L.Var ve)))
   L.Tuple ts -> do
     anfArgs <- mapM letAnf ts
     return
@@ -123,12 +127,11 @@ cgenDefE env (L.Def f vars expr) =
   let (cExpr, cVar, cType) = runM $ cgenExpr body_env expr in
 
     (  cgenType cType `spc` cgenFun f
-    ++ "(tuple<"
+    ++ "("
     ++ intercalate
          ", "
-         (map (\(L.TVar ty var) -> cgenType ty) vars)
-    ++ "> _p) {\n"
-    ++ snd (let accum (n, str) (L.TVar ty var) = (n+1, str ++ "  " ++ cgenType ty `spc` cgenVar var ++ " = std::get<" ++ show n ++ ">(_p);\n") in foldl accum (0, "") vars)
+         (map (\(L.TVar ty var) -> cgenType ty `spc` cgenVar var) vars)
+    ++ ") {\n"
     ++ cExpr
     ++ "return "
     ++ cVar
@@ -182,11 +185,13 @@ cgenExprR env = \case
     )
   
   L.Call f x -> case x of
-    L.Var xv -> do
+    L.Tuple vs -> do
       v <- freshCVar
-      let ty = case stLookup xv env of
-                    L.TypeTuple ts -> typeofFun env f ts
-                    t -> typeofFun env f [t]
+      let cgresults = map (runM <$> cgenExprR env) vs
+      let decls = map (\ (d,_,_) -> d) cgresults
+      let exprs = map (\ (_,d,_) -> d) cgresults
+      let types = map (\ (_,_,d) -> d) cgresults
+      let ty = typeofFun env f types
       
       return
         ( cgenType ty
@@ -195,11 +200,22 @@ cgenExprR env = \case
         ++ " = "
         ++ cgenFun f
         ++ "("
-        ++ cgenVar xv
+        ++ intercalate "," exprs
         ++ ");\n"
         , v
         , ty
         )
+    L.Var v -> do
+      vf <- freshCVar
+      let ty = typeofFun env f [(stLookup v env)]
+      
+      return
+        ( cgenType ty `spc` vf ++ " = "
+        ++ cgenFun f ++ "(" ++ cgenVar v ++ ");\n"
+        , vf
+        , ty
+        )
+    
     _ -> error $ "Function arguments should be Var in ANF, not" ++ show x ++ " in call to " ++ show f
 
   L.Let v e1 e2 -> do
@@ -302,28 +318,28 @@ cgenVar = \case
          )
  
 -- A single place for "domain knowledge" about functions -- to be dumped when we get symtabs
-typeofFun env f ts =
-  case (f,ts) of
-    (L.Fun (L.SFun "build"), [tsize, L.TypeLambda L.TypeInteger t]) -> L.TypeVec t
+typeofFun env f tys =
+  case (f,tys) of
+    (L.Fun (L.SFun "build"), [tysize, L.TypeLambda L.TypeInteger t]) -> L.TypeVec t
     (L.Fun (L.SFun "index"), [tind, (L.TypeVec t)]) -> t
     (L.Fun (L.SFun "size"), [(L.TypeVec t)]) -> L.TypeInteger
     (L.Fun (L.SFun "sum"), [(L.TypeVec t)]) -> t
     (L.Fun (L.SFun "exp"), [(L.TypeFloat)]) -> L.TypeFloat
     (L.Fun (L.SFun "log"), [(L.TypeFloat)]) -> L.TypeFloat
-    (L.Fun (L.SFun "+"  ), (t:ts)) -> t
-    (L.Fun (L.SFun "/"  ), (t:ts)) -> t
-    (L.Fun (L.SFun "*"  ), (t:ts)) -> t
-    (L.Fun (L.SFun "-"  ), (t:ts)) -> t
+    (L.Fun (L.SFun "+"  ), (t:tys)) -> t
+    (L.Fun (L.SFun "/"  ), (t:tys)) -> t
+    (L.Fun (L.SFun "*"  ), (t:tys)) -> t
+    (L.Fun (L.SFun "-"  ), (t:tys)) -> t
     (L.Fun (L.SFun "=="  ), _) -> L.TypeBool
     (L.Fun (L.SFun "<"  ), _) -> L.TypeBool
     (L.Fun (L.SelFun i n), [t]) -> case t of
-                        L.TypeTuple ts -> ts!!i
+                        L.TypeTuple tys -> tys!!(i-1)
                         L.TypeVec t -> t
-                        _ -> error ("oiks[" ++ show (t:ts) ++ "]")
+                        _ -> error ("SelFun" ++ show i ++ " " ++ show n ++ "[" ++ show t ++ "]")
     (L.Fun (L.SFun f), _) ->   case Map.lookup (L.Simple f) env of
                                 Just a  -> a
-                                Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]") L.TypeUnknown
-    _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show ts ++ "]" in
+                                Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show tys ++ "]") L.TypeUnknown
+    _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show tys ++ "]" in
                           trace emsg L.TypeUnknown 
 
 translateFun = \case
