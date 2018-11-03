@@ -1,9 +1,6 @@
 module Main where
 
 import Data.List (intercalate)
-import System.Process (callCommand)
-
-import Text.Regex (subRegex, mkRegex)
 
 import Lang
 import Prim
@@ -11,8 +8,8 @@ import AD
 import ANF
 import Opt
 import CSE
-import Parse
-import Cgen (runM, cgenDef, cgenDefs)
+import Parse (runParser, pDefs)
+import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
 
 ex1 :: Def
@@ -118,40 +115,6 @@ szt = TVar (TypeTuple [TypeFloat, TypeFloat])  (Simple "zt")
 -- C++ generation
 -------------------------------------
 
-cppF :: String -> IO ()
--- String is the file name
-cppF file
-  = do  
-        cts <- readFile file
-
-        let lines = [ 
-                      "#include <stdio.h>"
-                    , "#include \"knossos.h\""
-                    , "namespace ks {\n"
-                    ]
-
-        let lls = case runParser pDefs cts of
-                    Left err   -> error ("Failed parse: " ++ show err)
-                    Right defs -> cgenDefs defs
-        
-        let tail = [ 
-                      "}"
-                    , "int main() {"
-                    , "  ks::main();"
-                    , "  return 0;"
-                    , "}"
-                    ]
-        let re = mkRegex "\\.ks$"
-        let cppfile = "obj\\" ++ (subRegex re file ".cpp")
-        let exefile = "obj\\" ++ (subRegex re file ".exe")
-        putStrLn $ "Writing to " ++ cppfile
-        writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
-        let compcmd = "g++ -I. -O -g " ++ cppfile ++ " -o " ++ exefile
-        putStrLn $ "Compiling: " ++ compcmd
-        callCommand $ compcmd
-        putStrLn "Running"
-        callCommand exefile
-        putStrLn "Done"
 
 cppExample :: IO ()
 cppExample = do

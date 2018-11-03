@@ -4,14 +4,15 @@ module Cgen where
 
 import Debug.Trace (trace, traceM, traceShowId)
 
-import qualified Data.Map                      as Map
-import           Data.List                      ( intercalate, reverse )
-import           Data.Maybe                     ( fromJust )
-
-import           Control.Monad                  ( (<=<) )
-import qualified Control.Monad.State           as S
-
-import qualified Lang                          as L
+import qualified Data.Map             as Map
+import           Data.List             ( intercalate, reverse )
+import           Data.Maybe            ( fromJust )
+import           Control.Monad         ( (<=<) )
+import qualified Control.Monad.State  as S
+import System.Process (callCommand)
+import Text.Regex (subRegex, mkRegex)
+import Parse (runParser, pDefs)
+import qualified Lang                 as L
 import qualified ANF
  
 type M = S.State Int
@@ -350,3 +351,38 @@ translateFun = \case
   "==" -> "eq"    
   "<" -> "lt"    
   s -> s
+
+cppF :: String -> IO ()
+-- String is the file name
+cppF file
+  = do  
+        cts <- readFile file
+
+        let lines = [ 
+                      "#include <stdio.h>"
+                    , "#include \"knossos.h\""
+                    , "namespace ks {\n"
+                    ]
+
+        let lls = case runParser pDefs cts of
+                    Left err   -> error ("Failed parse: " ++ show err)
+                    Right defs -> cgenDefs defs
+        
+        let tail = [ 
+                      "}"
+                    , "int main() {"
+                    , "  ks::main();"
+                    , "  return 0;"
+                    , "}"
+                    ]
+        let re = mkRegex "\\.ks$"
+        let cppfile = "obj\\" ++ (subRegex re file ".cpp")
+        let exefile = "obj\\" ++ (subRegex re file ".exe")
+        putStrLn $ "Writing to " ++ cppfile
+        writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
+        let compcmd = "g++ -I. -O -g " ++ cppfile ++ " -o " ++ exefile
+        putStrLn $ "Compiling: " ++ compcmd
+        callCommand $ compcmd
+        putStrLn "Running"
+        callCommand exefile
+        putStrLn "Done"
