@@ -22,8 +22,8 @@ dbtrace msg e = e
 spc:: String -> String -> String
 spc x y = x ++ " " ++ y
 
-assertEqualThen msg t1 t2 =
-  if t1 == t2 then t1 else error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2)
+assertEqualThen msg t1 t2 e =
+  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2)
 
 runM :: M a -> a
 runM = flip S.evalState 0
@@ -42,11 +42,13 @@ freshVar = do
   
 type ST = Map.Map L.Var L.Type
 stInsert:: L.Var -> L.Type -> ST -> ST
-stInsert (L.TVar ty v) t env = stInsert v (assertEqualThen ("putting " ++ show v ++ " into " ++ show env) t ty) env
+stInsert (L.TVar ty v) t env = assertEqualThen ("putting " ++ show v ++ " into " ++ show env) t ty $ 
+                               stInsert v t env
 stInsert v t env = dbtrace("Inserting " ++ show v ++ " = " ++ show t ++ " in " ++ show env ++ "\n") (Map.insert v t env)
 
 stLookup:: L.Var -> ST -> L.Type
-stLookup (L.TVar ty v) env = assertEqualThen ("getting " ++ show v ++ " from " ++ show env) ty (stLookup v env)
+stLookup (L.TVar ty v) env = assertEqualThen ("getting " ++ show v ++ " from " ++ show env) ty (stLookup v env) $ 
+                             stLookup v env
 stLookup v env = 
   case Map.lookup v env of
     Just a  -> a
@@ -127,7 +129,7 @@ cgenDefE env (L.Def f vars expr) =
         in 
   let (cExpr, cVar, cType) = runM $ cgenExpr body_env expr in
 
-    (  cgenType cType `spc` cgenFun f
+    (  cgenType cType `spc` cgenFun f cType
     ++ "("
     ++ intercalate
          ", "
@@ -137,19 +139,23 @@ cgenDefE env (L.Def f vars expr) =
     ++ "return "
     ++ cVar
     ++ ";\n}\n"
-    , cgenFun f
+    , cgenFun f cType
     , cType
     )
 
 cgenType :: L.Type -> String
 cgenType = \case
+  L.TypeZero     -> "zero_t"
   L.TypeFloat    -> "double"
   L.TypeInteger  -> "int"
+  L.TypeTuple [t] -> cgenType t
   L.TypeTuple ts -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
   L.TypeVec t    -> "vec<" ++ cgenType t ++ ">"
   L.TypeBool     -> "bool"
   L.TypeUnknown  -> "auto"
   L.TypeLambda from to -> "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
+  L.TypeLM from to -> "LM::lm<" ++ cgenType from ++ "," ++ cgenType to ++ ">"
+  x -> error $ "Bad cgenType" ++ show x
 
 typeofKonst = \case
   L.KZero      -> L.TypeZero
@@ -199,7 +205,7 @@ cgenExprR env = \case
         ++ " "
         ++ v
         ++ " = "
-        ++ cgenFun f
+        ++ cgenFun f ty
         ++ "("
         ++ intercalate "," exprs
         ++ ");\n"
@@ -208,11 +214,11 @@ cgenExprR env = \case
         )
     L.Var v -> do
       vf <- freshCVar
-      let ty = typeofFun env f [(stLookup v env)]
+      let ty = typeofFun env f [stLookup v env]
       
       return
         ( cgenType ty `spc` vf ++ " = "
-        ++ cgenFun f ++ "(" ++ cgenVar v ++ ");\n"
+        ++ cgenFun f ty ++ "(" ++ cgenVar v ++ ");\n"
         , vf
         , ty
         )
@@ -228,6 +234,7 @@ cgenExprR env = \case
       , t2
       )
 
+  L.Tuple [t] -> cgenExpr env t
   L.Tuple ts -> do
     cT <- freshCVar
 
@@ -290,12 +297,22 @@ cgenExprR env = \case
       )
   L.App{}             -> error "App"
 
-cgenFun :: L.Fun -> String
-cgenFun = \case
-  L.Fun funId -> case funId of
+cgenFunId :: L.FunId -> String
+cgenFunId = \case
     L.SFun fun -> translateFun fun
     L.SelFun i n -> "selfun_" ++ show i ++ "_" ++ show n
-  f -> error ("cgenFun: " ++ show f)
+
+cgenFun :: L.Fun -> L.Type -> String
+cgenFun f ty = case f of
+  L.Fun funId -> cgenFunId funId
+  L.GradFun s L.Fwd -> "D$" ++ cgenFunId s
+  L.GradFun s L.Rev -> "R$" ++ cgenFunId s
+  L.DrvFun s L.Fwd  -> "fwd$" ++ cgenFunId s
+  L.DrvFun s L.Rev  -> "rev$" ++ cgenFunId s
+  L.LMFun s -> case ty of
+    L.TypeLM t1 t2 -> "LM::" ++ s ++ "<" ++ cgenType t1 ++ "," ++ cgenType t2 ++ ">"
+    L.TypeUnknown -> "auto"
+  _ -> error $ "Bad fun " ++ show f
 
 cgenKonst :: L.Konst -> String
 cgenKonst = \case
@@ -317,10 +334,24 @@ cgenVar = \case
            L.Fwd -> "f"
            L.Rev -> "r"
          )
- 
+
+typeofLMFun:: String -> [L.Type] -> L.Type
+typeofLMFun f tys = case (f,tys) of
+  ("lmOne", []) -> L.TypeLM L.TypeFloat L.TypeFloat
+  ("lmZero", []) -> L.TypeLM L.TypeFloat L.TypeFloat
+  ("lmVCat", [L.TypeLM a b, L.TypeLM a1 c]) -> assertEqualThen "lmVCat" a a1 $
+                                               L.TypeLM a (L.TypeTuple [b, c])
+  ("lmCompose", [L.TypeLM b c, L.TypeLM a b1]) -> assertEqualThen "lmCompose" b b1 $
+                                               L.TypeLM a c
+  _ -> flip trace L.TypeUnknown $ "Failed to type LMfun [" ++ show f ++ "], types [" ++ show tys ++ "]"
+
+
 -- A single place for "domain knowledge" about functions -- to be dumped when we get symtabs
+typeofFun:: ST -> L.Fun -> [L.Type] -> L.Type
 typeofFun env f tys =
   case (f,tys) of
+    (L.Fun (L.SFun "pr"  ), _) -> L.TypeUnknown
+    (L.GradFun (L.SFun "pr") _, _) -> L.TypeUnknown
     (L.Fun (L.SFun "build"), [tysize, L.TypeLambda L.TypeInteger t]) -> L.TypeVec t
     (L.Fun (L.SFun "index"), [tind, (L.TypeVec t)]) -> t
     (L.Fun (L.SFun "size"), [(L.TypeVec t)]) -> L.TypeInteger
@@ -330,6 +361,7 @@ typeofFun env f tys =
     (L.Fun (L.SFun "+"  ), (t:tys)) -> t
     (L.Fun (L.SFun "/"  ), (t:tys)) -> t
     (L.Fun (L.SFun "*"  ), (t:tys)) -> t
+    (L.GradFun (L.SFun "*") L.Fwd, (t:tys)) -> L.TypeLM (L.TypeTuple (t:tys)) t 
     (L.Fun (L.SFun "-"  ), (t:tys)) -> t
     (L.Fun (L.SFun "=="  ), _) -> L.TypeBool
     (L.Fun (L.SFun "<"  ), _) -> L.TypeBool
@@ -340,8 +372,14 @@ typeofFun env f tys =
     (L.Fun (L.SFun f), _) ->   case Map.lookup (L.Simple f) env of
                                 Just a  -> a
                                 Nothing -> trace("Failed to type fun [" ++ show f ++ "], types [" ++ show tys ++ "]") L.TypeUnknown
-    _                -> let emsg = "Failed to type fun [" ++ show f ++ "], types [" ++ show tys ++ "]" in
-                          trace emsg L.TypeUnknown 
+    (L.LMFun f, tys) -> typeofLMFun f tys
+    (L.GradFun (L.SFun f) _, [tfrom]) -> let ty = stLookup (L.Simple f) env in
+                                       L.TypeLM tfrom ty 
+    (L.GradFun (L.SFun f) _, t:tys) -> let tfrom = L.TypeTuple (t:tys) in
+                                       let ty = stLookup (L.Simple f) env in
+                                       L.TypeLM tfrom ty 
+    _                -> let emsg = "EFailed to type fun [" ++ show f ++ "], types [" ++ show tys ++ "], env" ++ show env in
+                          trace (error emsg) L.TypeUnknown 
 
 translateFun = \case
   "*" -> "mul"    
@@ -352,21 +390,17 @@ translateFun = \case
   "<" -> "lt"    
   s -> s
 
-cppF :: String -> IO ()
+cppF :: String -> [L.Def] -> IO ()
 -- String is the file name
-cppF file
+cppF outfile defs
   = do  
-        cts <- readFile file
-
         let lines = [ 
                       "#include <stdio.h>"
                     , "#include \"knossos.h\""
                     , "namespace ks {\n"
                     ]
 
-        let lls = case runParser pDefs cts of
-                    Left err   -> error ("Failed parse: " ++ show err)
-                    Right defs -> cgenDefs defs
+        let lls = cgenDefs defs
         
         let tail = [ 
                       "}"
@@ -375,11 +409,11 @@ cppF file
                     , "  return 0;"
                     , "}"
                     ]
-        let re = mkRegex "\\.ks$"
-        let cppfile = "obj\\" ++ (subRegex re file ".cpp")
-        let exefile = "obj\\" ++ (subRegex re file ".exe")
+        let cppfile = outfile ++ ".cpp"
+        let exefile = outfile ++ ".exe"
         putStrLn $ "Writing to " ++ cppfile
         writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
+        callCommand $ "clang-format -i " ++ cppfile
         let compcmd = "g++ -I. -O -g " ++ cppfile ++ " -o " ++ exefile
         putStrLn $ "Compiling: " ++ compcmd
         callCommand $ compcmd

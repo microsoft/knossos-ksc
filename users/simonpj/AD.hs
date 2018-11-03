@@ -11,10 +11,12 @@ gradF f       = error ("gradF: bad function: " ++ show f)
 
 gradV :: Var -> Var
 gradV (Simple x) = Grad x Fwd
+gradV (TVar _ v) = gradV v
 gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
 
 gradE :: Expr -> Expr
 gradE (Konst k)       = lmZero
+gradE (Var (TVar TypeInteger _)) = lmZero
 gradE (Var v)         = Var (gradV v)
 gradE (Assert e1 e2)  = Assert e1 (gradE e2)
 
@@ -72,6 +74,7 @@ applyD (Def (GradFun f d) vars rhs)
     dvars = map to_delta vars
 
     to_delta (Simple x) = Delta x
+    to_delta (TVar ty x) = TVar ty $ to_delta x
 
     dr = Delta "r"
 

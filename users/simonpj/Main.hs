@@ -8,7 +8,7 @@ import AD
 import ANF
 import Opt
 import CSE
-import Parse (runParser, pDefs)
+import Parse (runParser, pDefs, parseF)
 import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
 
@@ -109,8 +109,6 @@ sy2 = TVar TypeFloat  (Simple "y2")
 sz = TVar TypeFloat   (Simple "z")
 szt = TVar (TypeTuple [TypeFloat, TypeFloat])  (Simple "zt")
 
-
-
 -------------------------------------
 -- C++ generation
 -------------------------------------
@@ -142,7 +140,10 @@ cppExample = do
       ++ "}"
       ]
     where r = cgenDef
-  
+
+cppF2F:: String -> IO ()
+cppF2F file = parseF (file ++ ".ks") >>= cppF ("obj\\" ++ file)
+
 printFloat :: String -> String
 printFloat s = unlines
   ["printf(\"%s\\n\", \"" ++ s ++ "\");", "printf(\"%f\\n\\n\", " ++ s ++ ");"]
@@ -213,6 +214,31 @@ demoN def
        ; displayN cse_rev
        }
 
+-------------------------------------
+-- GMM derivatives
+-------------------------------------
+
+removeMain :: [Def] -> [Def]
+removeMain [] = []
+removeMain (Def (Fun (SFun "main")) _ _:defs) = removeMain defs
+removeMain (def:defs) = def:removeMain defs
+
+doall :: String -> IO ()
+doall file = runKM $
+  do {
+     defs <- liftIO (parseF (file ++ ".ks"))
+  ;  anf <- anfDefs defs
+  ;  let grad = gradDefs (removeMain defs)
+  ;  let opt = optDefs grad
+  ;  let fwd = map applyD opt
+  ;  let optfwd = optDefs fwd
+  ;  csefwd <- cseDefs optfwd 
+  ;  liftIO (cppF ("obj\\" ++ file) (defs ++ grad ++ optfwd))
+  }
+
+gmm :: IO ()
+gmm = doall "examples\\gmm"
 
 main :: IO ()
 main = return ()  -- To keep GHC quiet
+

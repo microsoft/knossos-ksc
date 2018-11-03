@@ -27,6 +27,7 @@ data Type = TypeZero               -- Polyamorous zero
           | TypeTuple [Type] 
           | TypeVec Type
           | TypeLambda Type Type   -- Domain -> Range 
+          | TypeLM Type Type -- Linear map
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
@@ -268,7 +269,7 @@ class Pretty p where
 
 instance Pretty Var where
   ppr (Simple s)   = PP.text s
-  ppr (TVar ty v)  = parens (PP.text (show ty) PP.<> (ppr v))
+  ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> PP.text (show ty))
   ppr (Delta s)    = PP.text ('d' : s)
   ppr (Grad s Fwd) = PP.text ('D' : s)
   ppr (Grad s Rev) = PP.text ('R' : s)
@@ -283,7 +284,7 @@ instance Pretty Fun where
   ppr (GradFun s Rev) = PP.char 'R' PP.<> ppr s
   ppr (DrvFun s Fwd)  = ppr s PP.<> PP.char '\''
   ppr (DrvFun s Rev)  = ppr s PP.<> PP.char '`'
-  ppr (LMFun s)        = PP.text s
+  ppr (LMFun s)   = PP.text s
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i

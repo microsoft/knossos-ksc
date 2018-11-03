@@ -77,6 +77,10 @@ import Control.Monad.Trans
 import Control.Monad
 import qualified Text.PrettyPrint as PP
 
+import Debug.Trace
+
+
+
 
 ---------------------
 testParse :: Pretty a => Parser a -> String -> IO ()
@@ -86,6 +90,13 @@ testParse  p s = case runParser p s of
 
 runParser :: Parser a -> String -> Either ParseError a
 runParser p s = parse p "" s
+
+parseF :: String -> IO [Def]
+parseF file = do
+        cts <- readFile file
+        case runParser pDefs cts of
+                    Left err   -> error ("Failed parse: " ++ show err)
+                    Right defs -> return defs
 
 ------- Parser -------
 langDef :: Tok.LanguageDef ()

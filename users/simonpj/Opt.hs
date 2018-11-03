@@ -227,11 +227,12 @@ optGradFun (SelFun i n) _ = Just (lmHCat [ if i == j then lmOne else lmZero
                                           | j <- [1..n] ])
 
 optGradFun (SFun "sum") e
-  = Just (lmBuildT (pSize e) (Lam (Simple "si") lmOne))
+  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "si") lmOne))
 
 optGradFun (SFun "index") (Tuple [i,v])
   = Just (lmHCat [ lmZero
-                 , lmBuildT (pSize v) (Lam (Simple "ii") (lmDelta (Var (Simple "ii")) i)) ])
+                 , lmBuildT (pSize v) (Lam (TVar TypeInteger $ Simple "ii") 
+                                           (lmDelta (Var (Simple "ii")) i)) ])
 
 optGradFun (SFun "neg") e = Just (lmScale (kFloat $ -1.0))
 
