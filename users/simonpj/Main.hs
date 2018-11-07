@@ -1,16 +1,18 @@
 module Main where
 
-import Data.List (intercalate)
-
 import Lang
-import Prim
-import AD
-import ANF
-import Opt
-import CSE
 import Parse (runParser, pDefs, parseF)
-import Cgen (cppF, runM, cgenDef, cgenDefs)
-import KMonad
+import Annotate
+
+-- import Prim
+-- import AD
+-- import ANF
+-- import Opt
+-- import CSE
+-- import Cgen (cppF, runM, cgenDef, cgenDefs)
+-- import KMonad
+
+{-
 
 ex1 :: Def
 -- f x = let y = x*x in x + y
@@ -238,6 +240,10 @@ doall file = runKM $
 
 gmm :: IO ()
 gmm = doall "examples\\gmm"
+
+-}
+
+go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . annotDefs
 
 main :: IO ()
 main = return ()  -- To keep GHC quiet

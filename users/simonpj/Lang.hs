@@ -18,9 +18,11 @@ import Debug.Trace( trace )
 import Test.Hspec
 
 ------ Debugging utilities ---------
+assertEqual msg t1 t2 =
+  if t1 /= t2 then error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2) else ()
+
 assertEqualThen msg t1 t2 e =
   if t1 == t2 then e else error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2)
-
 
 ------ Data types ---------
 data Type = TypeZero               -- Polyamorous zero
@@ -75,6 +77,12 @@ data Konst = KZero  -- Of any type
            | KBool    Bool
            deriving( Eq, Ord, Show )
 
+typeofKonst :: Konst -> Type
+typeofKonst KZero = TypeZero
+typeofKonst (KInteger _) = TypeInteger
+typeofKonst (KFloat _) = TypeFloat
+typeofKonst (KBool _) = TypeBool
+
 isKZero :: ExprX -> Bool
 isKZero (Konst KZero) = True
 isKZero _             = False
@@ -93,7 +101,7 @@ data ExprX
   | Lam TVar Expr
   | App Expr Expr
   | Let TVar Expr Expr    -- let x = e1 in e2  (non-recursive)
-  | If Expr Expr Expr 
+  | If Expr Expr Expr  -- FIXME make cond ExprX?
   | Assert Expr Expr
   deriving( Show )
 
@@ -296,12 +304,12 @@ class Pretty p where
 
 instance Pretty Var where
   ppr (Simple s)   = PP.text s
-  ppr (Delta s)    = PP.text ('d' : s)
-  ppr (Grad s Fwd) = PP.text ('D' : s)
-  ppr (Grad s Rev) = PP.text ('R' : s)
+  ppr (Delta s)    = PP.text ("d$" ++ s)
+  ppr (Grad s Fwd) = PP.text ("D$" ++ s)
+  ppr (Grad s Rev) = PP.text ("R$" ++ s)
 
 instance Pretty TVar where
-  ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> PP.text (show ty))
+  ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> ppr ty)
 
 instance Pretty FunId where
   ppr (SFun s)     = PP.text s
@@ -316,12 +324,21 @@ instance Pretty Fun where
   ppr (LMFun s)   = PP.text s
 
 instance Pretty TFun where
-  ppr (TFun ty f) = ppr f
+  ppr (TFun ty f) = parens (ppr f PP.<> PP.text " : " PP.<> ppr ty)
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
   ppr (KFloat f)   = PP.double f
   ppr KZero        = text "KZero"
+
+instance Pretty Type where
+  ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")" 
+  ppr (TypeTuple tys) = PP.text "(Tuple " PP.<> pprWithCommas tys PP.<> PP.text ")" 
+  ppr TypeFloat = PP.text "Float"
+  ppr TypeInteger = PP.text "Integer"
+  ppr TypeBool = PP.text "Bool"
+  ppr TypeUnknown = PP.text "UNKNOWN"
+
 
 type Prec = Int
  -- 0 => no need for parens
