@@ -60,4 +60,4 @@
 (def main ()
   (let (x (build 10 (lam (i : Integer) (build 3 (lam (j : Integer) (* 2.0 j))))))
     (let (alphas (build 10 (lam (i : Integer) 7.0)))
-      (gmm_knossos_gmm_objective x alphas x x x 1.3 1.2))))
+      (pr (gmm_knossos_gmm_objective x alphas x x x 1.3 1.2)))))

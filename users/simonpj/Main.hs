@@ -3,6 +3,7 @@ module Main where
 import Lang
 import Parse (runParser, pDefs, parseF)
 import Annotate
+import Cgen
 
 -- import Prim
 -- import AD
@@ -10,7 +11,7 @@ import Annotate
 -- import Opt
 -- import CSE
 -- import Cgen (cppF, runM, cgenDef, cgenDefs)
--- import KMonad
+import KMonad
 
 {-
 
@@ -216,32 +217,32 @@ demoN def
        ; displayN cse_rev
        }
 
+-}
+
 -------------------------------------
 -- GMM derivatives
 -------------------------------------
 
 removeMain :: [Def] -> [Def]
 removeMain [] = []
-removeMain (Def (Fun (SFun "main")) _ _:defs) = removeMain defs
+removeMain (Def (TFun ty (Fun (SFun "main"))) _ _:defs) = removeMain defs
 removeMain (def:defs) = def:removeMain defs
 
 doall :: String -> IO ()
 doall file = runKM $
   do {
      defs <- liftIO (parseF (file ++ ".ks"))
-  ;  anf <- anfDefs defs
-  ;  let grad = gradDefs (removeMain defs)
-  ;  let opt = optDefs grad
-  ;  let fwd = map applyD opt
-  ;  let optfwd = optDefs fwd
-  ;  csefwd <- cseDefs optfwd 
-  ;  liftIO (cppF ("obj\\" ++ file) (defs ++ grad ++ optfwd))
+  ;  let anf = annotDefs defs
+  --;  let grad = gradDefs (removeMain defs)
+  --;  let opt = optDefs grad
+  --;  let fwd = map applyD opt
+  --;  let optfwd = optDefs fwd
+  --;  csefwd <- cseDefs optfwd 
+  ;  liftIO (cppF ("obj\\" ++ file) (anf))
   }
 
 gmm :: IO ()
 gmm = doall "examples\\gmm"
-
--}
 
 go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . annotDefs
 

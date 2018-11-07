@@ -334,11 +334,13 @@ instance Pretty Konst where
 instance Pretty Type where
   ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")" 
   ppr (TypeTuple tys) = PP.text "(Tuple " PP.<> pprWithCommas tys PP.<> PP.text ")" 
+  ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")" 
+  ppr (TypeLM from to) = PP.text "(LM " PP.<> ppr from PP.<> PP.text " -o " PP.<> ppr to PP.<> PP.text ")" 
+  ppr TypeZero = PP.text "zero_t"
   ppr TypeFloat = PP.text "Float"
   ppr TypeInteger = PP.text "Integer"
   ppr TypeBool = PP.text "Bool"
   ppr TypeUnknown = PP.text "UNKNOWN"
-
 
 type Prec = Int
  -- 0 => no need for parens
