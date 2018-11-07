@@ -13,11 +13,14 @@ import Data.Functor
 
 import System.Console.Haskeline
 
-import Data.Map as M
+import qualified Data.Map as M
 import Debug.Trace( trace )
 import Test.Hspec
 
-infixr 0 `seqExpr`
+------ Debugging utilities ---------
+assertEqualThen msg t1 t2 e =
+  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2)
+
 
 ------ Data types ---------
 data Type = TypeZero               -- Polyamorous zero
@@ -31,18 +34,18 @@ data Type = TypeZero               -- Polyamorous zero
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
-data FunId = SelFun     -- Selector function: fst, snd etc
-               Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
-               Int      -- Arity
-           | SFun String  -- For now
-           deriving( Eq, Ord, Show )
-
 data ADMode = Fwd | Rev
             deriving( Eq, Ord, Show )
 
 flipMode :: ADMode -> ADMode
 flipMode Fwd = Rev
 flipMode Rev = Fwd
+
+data FunId = SelFun     -- Selector function: fst, snd etc
+               Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
+               Int      -- Arity
+           | SFun String  -- For now
+           deriving( Eq, Ord, Show )
 
 data Fun = Fun     FunId         -- The function              f(x)
          | GradFun FunId ADMode  -- Full Jacobian Df(x)
@@ -52,14 +55,19 @@ data Fun = Fun     FunId         -- The function              f(x)
          | LMFun   String        -- Linear map
          deriving( Eq, Ord, Show )
 
+data TFun = TFun Type Fun
+            deriving( Eq, Ord, Show )
+
 data Var
   = Simple   String         -- x
   | Delta    String         -- The 'dx' or 'dr' argument to fwd
-                           -- or backward versions of f
+                            -- or backward versions of f
   | Grad     String ADMode  -- \nabla x
-                           --   True <=> transposed \bowtie x
-  | TVar     Type Var
+                            --   True <=> transposed \bowtie x
   deriving( Show, Eq, Ord )
+
+data TVar = TVar Type Var
+            deriving( Show, Eq, Ord )
 
 data Konst = KZero  -- Of any type
            | KInteger Integer
@@ -67,129 +75,104 @@ data Konst = KZero  -- Of any type
            | KBool    Bool
            deriving( Eq, Ord, Show )
 
-isKZero :: Expr -> Bool
+isKZero :: ExprX -> Bool
 isKZero (Konst KZero) = True
 isKZero _             = False
 
-data DefX b = Def Fun [Var] (ExprX b)  -- f x = e
-
-type Def = DefX Var
+data Def = Def TFun [TVar] Expr  -- f x = e
 
 type TExpr ty = Expr
   -- The phantom parameter gives the type of
   -- the expresssion, for documentation purposes
 
-data ExprX b
+data ExprX
   = Konst Konst
   | Var Var
-  | Call Fun (ExprX b)         -- f e
-  | Tuple [ExprX b]            -- (e1, ..., en)
-  | Lam b (ExprX b)
-  | App (ExprX b) (ExprX b)
-  | Let b (ExprX b) (ExprX b)  -- let x = e1 in e2  (non-recursive)
-  | If (ExprX b) (ExprX b) (ExprX b)
-  | Assert (ExprX b) (ExprX b)
-  deriving (Show)
+  | Call TFun Expr         -- f e
+  | Tuple [Expr]            -- (e1, ..., en)
+  | Lam TVar Expr
+  | App Expr Expr
+  | Let TVar Expr Expr    -- let x = e1 in e2  (non-recursive)
+  | If Expr Expr Expr 
+  | Assert Expr Expr
+  deriving( Show )
 
-type Expr = ExprX Var
+data Expr = Expr Type ExprX 
+  deriving(Eq, Ord, Show)
 
--- awf: is this needed?
--- data Value = VKonst Konst
+typeOf :: Expr -> Type
+typeOf (Expr ty _) = ty
 
-mkInfixCall :: Fun -> Expr -> Expr -> Expr
-mkInfixCall f a b = Call f (Tuple [a, b])
+bodyOf :: Expr -> ExprX
+bodyOf (Expr _ e) = e
 
-mkSCall1 :: String -> Expr -> Expr
-mkSCall1 fname a = Call (Fun (SFun fname)) a
+-- mkInfixCall :: Fun -> Expr -> Expr -> Expr
+-- mkInfixCall f a b = Call f (Tuple [a, b])
 
-mkSCall2 :: String -> Expr -> Expr -> Expr
-mkSCall2 fname a b = Call (Fun (SFun fname)) (Tuple [a, b])
-
-mkSCall3 :: String -> Expr -> Expr -> Expr -> Expr
-mkSCall3 fname a b c = Call (Fun (SFun fname)) (Tuple [a, b, c])
-
-mkLets :: [(Var,Expr)] -> Expr -> Expr
-mkLets [] e = e
-mkLets ((v,r):bs) e = Let v r (mkLets bs e)
+mkTFun :: Type -> String -> TFun
+mkTFun ty fname = TFun ty (Fun (SFun fname))
 
 mkTuple :: [Expr] -> Expr
-mkTuple [e] = e   -- One-tuples are always flattened
-mkTuple es  = Tuple es
+mkTuple es  = Expr (TypeTuple $ map typeOf es) $ Tuple es
+
+mkCall ty fname [e] = Expr ty $ Call (mkTFun ty fname) e
+mkCall ty fname es = Expr ty $ Call (mkTFun ty fname) (mkTuple es)
+
+mkLet :: TVar -> Expr -> Expr -> Expr
+mkLet v@(TVar ty _) e1@(Expr ty1 _) e2@(Expr ty2 _) = assertEqualThen "mkLet" ty ty1 $ Expr ty2 $ Let v e1 e2
+
+mkLets :: [(TVar,Expr)] -> Expr -> Expr
+mkLets [] e = e
+mkLets ((v,e1):bs) e2 = mkLet v e1 (mkLets bs e2)
+
+mkSCall1 :: Type -> String -> Expr -> Expr
+mkSCall1 ty fname a = mkCall ty fname [a]
+
+mkSCall2 :: Type -> String -> Expr -> Expr -> Expr
+mkSCall2 ty fname a b = mkCall ty fname [a, b]
+
+mkSCall3 :: Type -> String -> Expr -> Expr -> Expr -> Expr
+mkSCall3 ty fname a b c = mkCall ty fname [a, b, c]
 
 kInt :: Integer -> Expr
-kInt i = Konst (KInteger i)
+kInt i = Expr TypeInteger $ Konst (KInteger i)
 
 kFloat :: Double -> Expr
-kFloat f = Konst (KFloat f)
+kFloat f = Expr TypeFloat $ Konst (KFloat f)
 
+{-
+infixr 0 `seqExpr`
 
+seqExprX :: ExprX -> a -> a
+seqExprX (Var v) x = v `seq` x
+seqExprX (Call fun e) x = fun `seq` e `seqExprX` x
+seqExprX (Konst k) x = k `seq` x
+seqExprX (Let v r b) x = v `seq` r `seqExprX` b `seqExprX` x
+seqExprX (Tuple es) x = Prelude.foldr seqExprX x es
 
-seqExpr :: Expr -> a -> a
-seqExpr (Var v) x = v `seq` x
-seqExpr (Call fun e) x = fun `seq` e `seqExpr` x
-seqExpr (Konst k) x = k `seq` x
-seqExpr (Let v r b) x = v `seq` r `seqExpr` b `seqExpr` x
-seqExpr (Tuple es) x = Prelude.foldr seqExpr x es
-
---------------
-notFreeIn :: Var -> Expr -> Bool
-notFreeIn v e = go e
- where
-   go (Var v2) = v /= v2
-   go (Konst _) = True
-   go (Tuple es) = all go es
-   go (If b t e) = go b && go t && go e
-   go (Call (Fun f) e) = go e
-   go (App f a)  = go f && go a
-   go (Let v2 r b) = go r && (v == v2 || go b)
-   go (Lam v2 e)   = v == v2 || go e
-   go (Assert e1 e2) = go e1 && go e2
-
------------------
-newVarNotIn :: Expr -> Var
-newVarNotIn e = go e 1 -- FIXME start with hash of e to reduce retries
-  where go e n =
-          let v = Simple ("_t" ++ show n) in
-            if v `notFreeIn` e then
-              v
-            else
-              trace ("newVarNotIn: Var " ++ show v ++ "was bound in E, retry") (
-              go e (n + 1))
-
-test_FreeIn () =
-  hspec $ do
-    let e = Call (Fun (SFun "f")) (Var (Simple "i"))
-    let e2 = Call (Fun (SFun "f")) (Var (Simple "_t1"))
-    describe "notFreeIn" $ do
-      it ("i notFreeIn " ++ show (ppr (e::Expr))) $
-        (Simple "i" `notFreeIn` e) `shouldBe` False
-      it ("x not notFreeIn " ++ show (ppr (e::Expr))) $
-        (Simple "x" `notFreeIn` e) `shouldBe` True
-    describe "newVarNotIn" $ do
-      it "not in, so new var is _t1..." $
-        newVarNotIn e `shouldBe` (Simple "_t1")
-      it "in, so new var is _t2..." $
-        newVarNotIn e2 `shouldBe` (Simple "_t2")
+seqExpr:: Expr -> a -> a
+seqExpr (Expr ty e) = ty `seq` e
+-}
 
 ------ Equality modulo alpha --------
 
-instance Eq Expr where
+instance Eq ExprX where
   e1 == e2 = case e1 `cmpExpr` e2 of
                EQ -> True
                _  -> False
 
-instance Ord Expr where
+instance Ord ExprX where
   compare = cmpExpr
 
 thenCmp :: Ordering -> Ordering -> Ordering
 EQ `thenCmp` o = o
 o  `thenCmp` _ = o
 
-cmpExpr :: Expr -> Expr -> Ordering
+cmpExpr :: ExprX -> ExprX -> Ordering
 cmpExpr e1 e2
  = go e1 M.empty e2
  where
-   go :: Expr -> Map Var Var -> Expr -> Ordering
+   go :: ExprX -> M.Map Var Var -> ExprX -> Ordering
    go (Konst k1) subst e2
      = case e2 of
          Konst k2 -> k1 `compare` k2
@@ -201,12 +184,11 @@ cmpExpr e1 e2
          Var v2   -> v1 `compare` M.findWithDefault v2 v2 subst
          _        -> LT
 
-   go (Call f1 e1) subst e2
+   go (Call f1 (Expr _ e1)) subst e2
      = case e2 of
          Konst {} -> GT
          Var {} -> GT
-         Call f2 e2 -> (f1 `compare` f2) `thenCmp`
-                       (go e1 subst e2)
+         Call f2 (Expr _ e2) -> (f1 `compare` f2) `thenCmp` (go e1 subst e2)
          _ -> LT
 
    go (Tuple es1) subst e2
@@ -217,62 +199,109 @@ cmpExpr e1 e2
          Tuple es2 -> gos es1 subst es2
          _        -> LT
 
-   go (Lam b1 e1) subst e2
+   go (Lam (TVar _ b1) (Expr _ e1)) subst e2
       = case e2 of
          Konst {} -> GT
          Var {}   -> GT
          Call {}  -> GT
          Tuple es -> GT
-         Lam b2 e2 -> go e1 (M.insert b2 b1 subst) e2
+         Lam (TVar _ b2) (Expr _ e2) -> go e1 (M.insert b2 b1 subst) e2
          _         -> LT
 
-   go (App e1a e1b) subst e2
+   go (App (Expr _ e1a) (Expr _ e1b)) subst e2
      = case e2 of
          Konst {} -> GT
          Var {}   -> GT
          Call {}  -> GT
          Tuple {} -> GT
          Lam {}   -> GT
-         App e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
+         App (Expr _ e2a) (Expr _ e2b) -> go e1a subst e2a `thenCmp` go e1b subst e2b
          _           -> LT
 
-   go (Let b1 r1 e1) subst e2
+   go (Let (TVar _ b1) (Expr _ r1) (Expr _ e1)) subst e2
      = case e2 of
          If {}     -> LT
          Assert {} -> LT
-         Let b2 r2 e2 -> go r1 subst r2 `thenCmp`
-                         go e1 (M.insert b2 b1 subst) e2
+         Let (TVar _ b2) (Expr _ r2) (Expr _ e2) -> 
+                go r1 subst r2 `thenCmp` go e1 (M.insert b2 b1 subst) e2
          _ -> GT
 
-   go (If e1a e1b e1c) subst e2
+   go (If (Expr _ e1c) (Expr _ e1t) (Expr _ e1f)) subst e2
       = case e2 of
           Assert {} -> LT
-          If e2a e2b e2c -> go e1a subst e2a `thenCmp`
-                            go e1b subst e2b `thenCmp`
-                            go e1c subst e2c
+          If (Expr _ e2c) (Expr _ e2t) (Expr _ e2f) -> go e1c subst e2c `thenCmp`
+                                                       go e1t subst e2t `thenCmp`
+                                                       go e1f subst e2f
           _ -> GT
 
-   go (Assert e1a e1b) subst e2
+   go (Assert (Expr _ e1a) (Expr _ e1b)) subst e2
       = case e2 of
-          Assert e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
+          Assert (Expr _ e2a) (Expr _ e2b) -> go e1a subst e2a `thenCmp` go e1b subst e2b
           _              -> GT
 
    gos [] subst [] = EQ
    gos [] subst (_:_) = LT
    gos (_:_) subst [] = GT
-   gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
+   gos (Expr _ e1:es1) subst (Expr _ e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
+
+
+--------------
+notFreeIn :: Var -> Expr -> Bool
+notFreeIn v e = go e
+ where
+   go::Expr -> Bool
+   go (Expr _ e) = goX e
+   goX::ExprX -> Bool
+   goX (Var v2) = v /= v2
+   goX (Konst _) = True
+   goX (Tuple es) = all go es
+   goX (If b t e) = go b && go t && go e
+   goX (Call _ e) = go e
+   goX (App f a)  = go f && go a
+   goX (Let (TVar _ v2) r b) = go r && (v == v2 || go b)
+   goX (Lam (TVar _ v2) e)   = v == v2 || go e
+   goX (Assert e1 e2) = go e1 && go e2
+
+-----------------
+newVarNotIn :: Expr -> Var
+newVarNotIn e = go e 1 -- FIXME start with hash of e to reduce retries
+  where go e n =
+          let v = Simple ("_t" ++ show n) in
+            if v `notFreeIn` e then
+              v
+            else
+              trace ("newVarNotIn: Var " ++ show v ++ " was bound in E, retry") (
+              go e (n + 1))
+
+test_FreeIn =
+  hspec $ do
+    let ty = TypeFloat
+    let var s = Expr ty (Var (Simple s))
+    let e = mkSCall1 ty "f" (var "i")
+    let e2 = mkSCall2 ty "f" (var "_t1") (kInt 5)
+    describe "notFreeIn" $ do
+      it ("i notFreeIn " ++ show (ppr (e::Expr))) $
+        (Simple "i" `notFreeIn` e) `shouldBe` False
+      it ("x not notFreeIn " ++ show (ppr (e::Expr))) $
+        (Simple "x" `notFreeIn` e) `shouldBe` True
+    describe "newVarNotIn" $ do
+      it "not in, so new var is _t1..." $
+        newVarNotIn e `shouldBe` (Simple "_t1")
+      it "in, so new var is _t2..." $
+        newVarNotIn e2 `shouldBe` (Simple "_t2")
 
 ------ Pretty printer ------
-
 class Pretty p where
   ppr :: p -> Doc
 
 instance Pretty Var where
   ppr (Simple s)   = PP.text s
-  ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> PP.text (show ty))
   ppr (Delta s)    = PP.text ('d' : s)
   ppr (Grad s Fwd) = PP.text ('D' : s)
   ppr (Grad s Rev) = PP.text ('R' : s)
+
+instance Pretty TVar where
+  ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> PP.text (show ty))
 
 instance Pretty FunId where
   ppr (SFun s)     = PP.text s
@@ -285,6 +314,9 @@ instance Pretty Fun where
   ppr (DrvFun s Fwd)  = ppr s PP.<> PP.char '\''
   ppr (DrvFun s Rev)  = ppr s PP.<> PP.char '`'
   ppr (LMFun s)   = PP.text s
+
+instance Pretty TFun where
+  ppr (TFun ty f) = ppr f
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
@@ -300,41 +332,47 @@ precOne   = 1  -- ==
 precTwo   = 2  -- +
 precThree = 3  -- *
 
+instance Pretty ExprX where
+  ppr expr = pprExprX 0 expr
+
 instance Pretty Expr where
-  ppr expr = pprExpr 0 expr
+  ppr (Expr ty expr) = ppr expr
 
 pprParendExpr :: Expr -> Doc
 pprParendExpr = pprExpr precTwo
 
 pprExpr :: Prec -> Expr -> Doc
-pprExpr _  (Var v)   = ppr v
-pprExpr _ (Konst k)  = ppr k
-pprExpr p (Call f e) = pprCall p f e
-pprExpr _ (Tuple es) = parens (pprWithCommas es)
-pprExpr p (Lam v e)  = parensIf p precZero $
+pprExpr p (Expr _ e) = pprExprX p e
+
+pprExprX :: Prec -> ExprX -> Doc
+pprExprX _  (Var v)   = ppr v
+pprExprX _ (Konst k)  = ppr k
+pprExprX p (Call f e) = pprCall p f e
+pprExprX _ (Tuple es) = parens (pprWithCommas es)
+pprExprX p (Lam v e)  = parensIf p precZero $
                        PP.char '\\' <> ppr v <> PP.char '.' <+> ppr e
-pprExpr p (Let v e1 e2)
+pprExprX p (Let v e1 e2)
   = parensIf p precZero $
     PP.vcat [ PP.text "let" PP.<+>
                 (bracesSp $ PP.sep [ ppr v
                                    , PP.nest 2 (PP.text "=" PP.<+> ppr e1) ])
            , ppr e2 ]
-pprExpr p (If e1 e2 e3)
+pprExprX p (If e1 e2 e3)
   = parensIf p precZero $
     PP.sep [ PP.text "if" PP.<+> ppr e1
            , PP.text "then" PP.<+> ppr e2
            , PP.text "else" PP.<+> ppr e3 ]
-pprExpr p (Assert e1 e2)
+pprExprX p (Assert e1 e2)
   = parensIf p precZero $
     PP.sep [ PP.text "assert" PP.<+> pprParendExpr e1
            , ppr e2 ]
 
-pprExpr _ (App e1 e2)
+pprExprX _ (App e1 e2)
   = parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
 
-pprCall :: Prec -> Fun -> Expr -> Doc
-pprCall prec f (Tuple [e1,e2])
+pprCall :: Prec -> TFun -> Expr -> Doc
+pprCall prec (TFun _ f) (Expr _ (Tuple [e1,e2]))
   | Just prec' <- isInfix f
   = parensIf prec prec' $
     sep [ pprExpr prec' e1, ppr f <+> pprExpr prec' e2 ]
@@ -342,7 +380,7 @@ pprCall prec f (Tuple [e1,e2])
 pprCall _ f e = PP.cat [ppr f, nest 2 (parensSp pp_args)]
   where
     pp_args = case e of
-                Tuple es -> pprWithCommas es
+                (Expr _ (Tuple es)) -> pprWithCommas es
                 _        -> ppr e
 
 isInfix :: Fun -> Maybe Prec
@@ -405,3 +443,15 @@ pprTrace str doc v
 pprPanic :: String -> Doc -> a
 pprPanic str doc
   = error (PP.render (PP.sep [PP.text str, PP.nest 2 doc]))
+
+test_Pretty =
+  hspec $ do
+    let ty = TypeFloat
+    let var s = Expr ty (Var (Simple s))
+    let e = mkSCall1 ty "g" (var "i")
+    let e2 = mkSCall3 ty "f" e (var "_t1") (kInt 5)
+    describe "Pretty" $ do
+      it "ppr" $
+        (show $ ppr e) `shouldBe` "g( i )"
+      it "ppr" $
+        (show $ ppr e2) `shouldBe` "f( g( i ), _t1, 5 )"
