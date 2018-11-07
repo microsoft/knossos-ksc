@@ -77,10 +77,15 @@ import Control.Monad.Trans
 import Control.Monad
 import qualified Text.PrettyPrint as PP
 
+import Test.Hspec
 import Debug.Trace
 
 
+mkTunk:: ExprX -> Expr
+mkTunk e = Expr TypeUnknown e
 
+mkFunk :: String -> TFun
+mkFunk f = TFun TypeUnknown (Fun (SFun f)) 
 
 ---------------------
 testParse :: Pretty a => Parser a -> String -> IO ()
@@ -135,22 +140,24 @@ pDouble = Tok.float lexer
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
-pParam :: Parser Var
-pParam = Simple <$> pIdentifier -- FIXME: this should probably error or at least return TypeUnknown
-     <|> parens (do {
-                    v <- pIdentifier;
+pVar :: Parser Var
+pVar = Simple <$> pIdentifier 
+
+pParam :: Parser TVar
+pParam = parens (do {
+                    v <- pVar;
                     pReserved ":";
                     ty <- pType;
-                    return (TVar ty (Simple v))
+                    return (TVar ty v)
          })
 
 pKonst :: Parser Expr
-pKonst =   try ((Konst . KFloat) <$> pDouble)
-       <|> ((Konst . KInteger) <$> pInteger)
+pKonst =   try ((Expr TypeFloat . Konst . KFloat) <$> pDouble)
+       <|> ((Expr TypeInteger . Konst . KInteger) <$> pInteger)
 
 pExpr :: Parser Expr
 pExpr = pKonst
-   <|> (Var . Simple) <$> pIdentifier
+   <|> (mkTunk . Var . Simple) <$> pIdentifier
    <|> parens pKExpr
 
 pKExpr :: Parser Expr
@@ -179,9 +186,10 @@ pCall :: Parser Expr
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
-               []  -> return (Var (Simple f))
-               [e] -> return (Call (Fun (SFun f)) e)
-               _   -> return (Call (Fun (SFun f)) (Tuple es)) }
+               []  -> return (mkTunk $ Var (Simple f))
+               [e] -> return (mkTunk $ Call (mkFunk f) e)
+               _   -> return (mkTunk $ Call (mkFunk f) (mkTuple es))
+        }
 
 pIfThenElse :: Parser Expr
 -- (if e1 e2 e3)
@@ -189,33 +197,33 @@ pIfThenElse = do { pReserved "if"
                  ; cond <- pExpr
                  ; tr   <- pExpr
                  ; fl   <- pExpr
-                 ; return (If cond tr fl) }
+                 ; return $ mkTunk $ If cond tr fl }
 
 pAssert :: Parser Expr
 -- (assert e1 e2)
 pAssert = do { pReserved "assert"
              ; e1 <- pExpr
              ; e2 <- pExpr
-             ; return (Assert e1 e2) }
+             ; return $ mkTunk $ Assert e1 e2 }
 
 pTuple :: Parser Expr
 -- (assert e1 e2)
 pTuple = do { pReserved "tuple"
             ; es <- many pExpr
-            ; return (Tuple es) }
+            ; return $ mkTunk $ Tuple es }
 
 pLam :: Parser Expr
 -- (lam i e)
 pLam = do { pReserved "lam"
           ; i <- pParam
           ; e <- pExpr
-          ; return (Lam i e) }
+          ; return $ mkTunk $ Lam i e }
 
-pBind :: Parser (Var, Expr)
+pBind :: Parser (TVar, Expr)
 -- var rhs
 pBind = do { v <- pIdentifier
            ; e <- pExpr
-          ; return (Simple v,e) }
+          ; return (TVar TypeUnknown $ Simple v, e) }
 
 pLet :: Parser Expr
 -- (let (x r) b)
@@ -224,7 +232,7 @@ pLet = do { pReserved "let"
                                  ; return [b] }
                           <|> many (parens pBind)
           ; e <- pExpr
-          ; return (foldr (\(v,r) e -> Let v r e) e pairs) }
+          ; return $ foldr (\(v,r) e -> mkTunk $ Let v r e) e pairs }
 
 pDef :: Parser Def
 -- (def f (x1 x2 x3) rhs)
@@ -232,7 +240,24 @@ pDef = parens $ do { pReserved "def"
                    ; f <- pIdentifier
                    ; xs <- parens (many pParam)
                    ; rhs <- pExpr
-                   ; return (Def (Fun (SFun f)) xs rhs) }
+                   ; return (Def (mkFunk f) xs rhs) }
 
 pDefs :: Parser [Def]
 pDefs = spaces >> many pDef
+
+
+---------------------- Tests ------------------
+
+toStr :: Pretty a => Parser a -> String -> String
+toStr p s = case runParser p s of
+                   Left err -> error ("Failed: " ++ show err)
+                   Right r  -> show (PP.render (ppr r))
+
+test p src expected = it src $ (toStr p src) `shouldBe` (show expected)
+
+test_Parser =
+  hspec $ do
+    describe "Parser" $ do
+      test pExpr "(f 1)" "f( 1 )" ;
+      test pExpr "(if (f 1 2 3) (let (v (+ 2 3)) (* v 7)) 0.7)" $
+                    "if f( 1, 2, 3 )\nthen let { (v : TypeUnknown) = 2 + 3 }\n     v * 7\nelse 0.7"
