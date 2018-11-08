@@ -16,8 +16,6 @@ type M = S.State Int
 spc :: String -> String -> String
 spc x y = x ++ " " ++ y
 
-dbtrace _ e = e
-
 runM :: M a -> a
 runM = flip S.evalState 0
 
