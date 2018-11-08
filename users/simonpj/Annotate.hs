@@ -205,12 +205,11 @@ typeofLMFun f tys = case (f, tys) of
     assertEqualThen "lmHCat" c c1 $ TypeLM (TypeTuple [a, b]) c
   ("lmCompose", [TypeLM b c, TypeLM a b1]) ->
     assertEqualThen "lmCompose" b b1 $ TypeLM a c
-  ("lmApply", [TypeLM a b, c]) ->
-    assertEqualThen
-        ("lmApply LM " ++ show a ++ " -o " ++ show b ++ " * " ++ show c)
-        a
-        c
-      $ b
+  ("lmApply", [TypeLM a b, c]) -> assertEqualThen
+    ("lmApply LM " ++ show a ++ " -o " ++ show b ++ " * " ++ show c)
+    a
+    c
+    b
   _ ->
     flip trace TypeUnknown
       $  "Failed to type LMfun ("
