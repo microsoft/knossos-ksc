@@ -2,25 +2,13 @@
 
 module Cgen where
 
-import           Debug.Trace                    ( trace
-                                                , traceM
-                                                , traceShowId
-                                                )
+import           Debug.Trace                    ( trace )
 
-import qualified Data.Map                      as Map
-import           Data.List                      ( intercalate
-                                                , reverse
-                                                )
-import           Data.Maybe                     ( fromJust )
+import           Data.List                      ( intercalate )
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
 import           System.Process                 ( callCommand )
-import           Text.Regex                     ( subRegex
-                                                , mkRegex
-                                                )
-import           Parse                          ( runParser
-                                                , pDefs
-                                                )
+
 import qualified Lang                          as L
 
 type M = S.State Int
