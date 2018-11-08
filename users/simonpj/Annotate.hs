@@ -47,12 +47,12 @@ annotDefs defs =
   accum (env, tdefs) def =
     let tdef@(Def (TFun tf f) _ _) = annotDefE env $ dbg env def
     in  (stInsertFun f tf env, tdef : tdefs)
-   where
-    dbg :: ST -> Def -> Def
-    dbg env def = -- returns def
-                  dbtrace
-      ("Passing ENV[" ++ show env ++ "]" ++ " to " ++ (show $ ppr def) ++ "\n")
-      def
+
+  dbg :: ST -> Def -> Def
+  dbg env def = -- returns def
+                dbtrace
+    ("Passing ENV[" ++ show env ++ "]" ++ " to " ++ (show $ ppr def) ++ "\n")
+    def
 
 annotDefE :: ST -> Def -> Def
 annotDefE env (Def (TFun _ f) vars expr) =
@@ -131,7 +131,7 @@ typeofFun env f (TypeTuple tys) = typeofFunTys env f tys
 typeofFun env f ty              = typeofFunTys env f [ty]
 
 typeofFunTys :: ST -> Fun -> [Type] -> Type
-typeofFunTys env f tys = case (f, tys) of
+typeofFunTys env tf ttys = case (tf, ttys) of
   (Fun (SFun "pr")       , _                            ) -> TypeUnknown
   (GradFun (SFun "pr") _ , _                            ) -> TypeUnknown
   (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
@@ -168,7 +168,7 @@ typeofFunTys env f tys = case (f, tys) of
       (  "Failed to type fun ["
       ++ show f
       ++ "], types ["
-      ++ show tys
+      ++ show ttys
       ++ "], env"
       ++ show env
       )
@@ -183,9 +183,9 @@ typeofFunTys env f tys = case (f, tys) of
   _ ->
     let emsg =
           "EFailed to type ("
-            ++ show f
+            ++ show tf
             ++ ", "
-            ++ show tys
+            ++ show ttys
             ++ "), env"
             ++ show env
     in  trace (error emsg) TypeUnknown
