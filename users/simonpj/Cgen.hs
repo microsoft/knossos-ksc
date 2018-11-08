@@ -52,18 +52,18 @@ anf :: L.Expr -> M L.Expr
 anf (L.Expr tye ex) = case ex of
   L.Call f (L.Expr ty (L.Tuple ts)) -> do
     anfArgs <- mapM letAnf ts
-    return
-      $ (foldr (.)
-               id
-               (map fst anfArgs)
-               (L.Expr tye (L.Call f (L.Expr ty (L.Tuple (map snd anfArgs)))))
-        )
+    return $ foldr
+      (.)
+      id
+      (map fst anfArgs)
+      (L.Expr tye (L.Call f (L.Expr ty (L.Tuple (map snd anfArgs)))))
+
   L.Call f e -> do
     (lete, ve) <- letAnf e
     return $ lete $ L.Expr tye $ L.Call f ve
   L.Tuple ts -> do
     anfArgs <- mapM letAnf ts
-    return $ (foldr (.) id (map fst anfArgs)) $ L.Expr tye $ L.Tuple
+    return $ foldr (.) id (map fst anfArgs) $ L.Expr tye $ L.Tuple
       (map snd anfArgs)
   L.Lam x e -> do
     anfe <- anf e
