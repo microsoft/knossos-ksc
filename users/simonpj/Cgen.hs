@@ -316,6 +316,7 @@ cgenVar = \case
            L.Rev -> "r"
          )
 
+translateFun :: String -> String
 translateFun = \case
   "*"  -> "mul"
   "+"  -> "add"
