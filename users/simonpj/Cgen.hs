@@ -355,7 +355,7 @@ cppF outfile defs = do
   callCommand $ "clang-format -i " ++ cppfile
   let compcmd = "g++ -fmax-errors=5 -I. -O -g " ++ cppfile ++ " -o " ++ exefile
   putStrLn $ "Compiling: " ++ compcmd
-  callCommand $ compcmd
+  callCommand compcmd
   putStrLn "Running"
   callCommand exefile
   putStrLn "Done"
