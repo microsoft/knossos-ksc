@@ -94,11 +94,17 @@ T1 mul(T1 t1, T2 t2) { return t1 * t2; }
 template <class T1, class T2>
 LM::lm<tuple<T1, T2>, T1> D$mul(T1 t1, T2 t2)
 {
-    return LM::lmHCat<tuple<T1, T2>, T1>(LM::lmScale(t2), LM::lmScale(t1));
+    return LM::lmHCat<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(t2), LM::lmScale<T2,T1>(t1));
 }
 
 template <class T1, class T2>
 T1 div(T1 t1, T2 t2) { return t1 / t2; }
+template <class T1, class T2>
+LM::lm<tuple<T1, T2>, T1> D$div(T1 t1, T2 t2)
+{
+    return LM::lmHCat<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(1/t2), LM::lmScale<T2,T1>(-1.0/(t1*t1)));
+}
+
 template <class T1, class T2>
 T1 eq(T1 t1, T2 t2) { return t1 == t2; }
 template <class T1, class T2>
@@ -157,6 +163,17 @@ double sum(vec<double> v)
     for (int i = 0; i < v.size; ++i)
         ret += v.data[i];
     return ret;
+}
+
+template <class T, int i, int n>
+T selfun() {
+  return 1.0;  
+}
+
+template <int i, int n>
+LM::lm<double, double> D$selfun()
+{
+    return LM::lmOne<double,double>();
 }
 
 } // namespace ks

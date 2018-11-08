@@ -233,7 +233,7 @@ cgenExprR (L.Expr ty ex) = case ex of
 cgenFunId :: L.FunId -> String
 cgenFunId = \case
     L.SFun fun -> translateFun fun
-    L.SelFun i n -> "selfun_" ++ show i ++ "_" ++ show n
+    L.SelFun i n -> "selfun<" ++ show i ++ "," ++ show n ++ ">"
 
 cgenFun :: L.TFun -> String
 cgenFun (L.TFun ty f) = case f of
