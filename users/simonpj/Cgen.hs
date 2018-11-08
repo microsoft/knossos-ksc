@@ -279,6 +279,7 @@ cgenFun (L.TFun ty f) = case f of
     L.TypeLM t1 t2 ->
       "LM::" ++ s ++ "<" ++ cgenType t1 ++ "," ++ cgenType t2 ++ ">"
     L.TypeUnknown -> "auto"
+    unexpected    -> error ("Unexpected type in LMFun: " ++ show unexpected)
 
 
 cgenType :: L.Type -> String
