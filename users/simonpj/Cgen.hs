@@ -16,7 +16,7 @@ type M = S.State Int
 spc :: String -> String -> String
 spc x y = x ++ " " ++ y
 
-dbtrace msg e = e
+dbtrace _ e = e
 
 runM :: M a -> a
 runM = flip S.evalState 0
@@ -77,12 +77,11 @@ anf (L.Expr tye ex) = case ex of
 
 -- letAnf of (+ a b) is (\body -> let c17 = (+ a b) in body, c17)
 letAnf :: L.Expr -> M (L.Expr -> L.Expr, L.Expr)
-letAnf e@(L.Expr tye ex) = do
+letAnf e@(L.Expr tye _) = do
   ve   <- freshVar
   anfe <- anf e
   return
-    ( \body@(L.Expr tybody bodyx) ->
-      L.Expr tybody (L.Let (L.TVar tye ve) anfe body)
+    ( \body@(L.Expr tybody _) -> L.Expr tybody (L.Let (L.TVar tye ve) anfe body)
     , L.Expr (L.typeOf anfe) (L.Var ve)
     )
 
@@ -132,11 +131,11 @@ cgenExpr = cgenExprR <=< anf
 -- The input expression must be in ANF
 cgenExprR :: L.Expr -> M CGenResult
 cgenExprR (L.Expr ty ex) = case ex of
-  L.Konst k               -> return ("", cgenKonst k)
+  L.Konst k             -> return ("", cgenKonst k)
 
-  L.Var   v               -> return ("", cgenVar v)
+  L.Var   v             -> return ("", cgenVar v)
 
-  L.Call f (L.Expr tyx x) -> case x of
+  L.Call f (L.Expr _ x) -> case x of
     L.Tuple vs -> do
       v         <- freshCVar
       cgresults <- mapM cgenExprR vs
@@ -194,8 +193,6 @@ cgenExprR (L.Expr ty ex) = case ex of
 
   L.Tuple [t] -> cgenExpr t
   L.Tuple ts  -> do
-    cT <- freshCVar
-
     let unVar :: L.ExprX -> L.Var
         unVar = \case
           L.Var v -> v
