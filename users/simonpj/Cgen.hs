@@ -280,7 +280,6 @@ cgenFun (L.TFun ty f) = case f of
     L.TypeLM t1 t2 ->
       "LM::" ++ s ++ "<" ++ cgenType t1 ++ "," ++ cgenType t2 ++ ">"
     L.TypeUnknown -> "auto"
-  _ -> error $ "Bad fun " ++ show f
 
 
 cgenType :: L.Type -> String
@@ -296,7 +295,6 @@ cgenType = \case
   L.TypeLambda from to ->
     "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
   L.TypeLM from to -> "LM::lm<" ++ cgenType from ++ "," ++ cgenType to ++ ">"
-  x                -> error $ "Bad cgenType" ++ show x
 
 cgenKonst :: L.Konst -> String
 cgenKonst = \case
