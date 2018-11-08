@@ -255,7 +255,7 @@ cgenExprR (L.Expr ty ex) = case ex of
       ++    "  "
       ++    cret
       ++    "="
-      ++    vc
+      ++    vt
       ++    ";\n" -- assign to "return"
       ++    "} else {\n" -- else
       ++    "  "
