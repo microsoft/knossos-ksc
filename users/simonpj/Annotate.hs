@@ -7,7 +7,7 @@ import qualified Data.Map                      as Map
 
 import           Lang
 
-dbtrace msg e = e -- trace msg e
+dbtrace _ e = e -- trace msg e
 
 ------------------ ST (SymTab) ------------------
 
@@ -55,7 +55,7 @@ annotDefs defs =
       def
 
 annotDefE :: ST -> Def -> Def
-annotDefE env (Def (TFun ty f) vars expr) =
+annotDefE env (Def (TFun _ f) vars expr) =
   let _ = trace ("Def " ++ show f ++ "\n") ()
   in  let body_env = foldr addVarToEnv env vars
       in  let te@(Expr ty _) = annotExpr body_env expr
@@ -65,9 +65,9 @@ annotDefE env (Def (TFun ty f) vars expr) =
   addVarToEnv (TVar ty v) = stInsert v ty
 
 annotExpr :: ST -> Expr -> Expr
-annotExpr env (Expr ty ex) = annotExprX env ex
+annotExpr env (Expr _ ex) = annotExprX env ex
 
-chUnk TypeUnknown ty val = val
+chUnk TypeUnknown _  val = val
 chUnk ty0         ty val = if ty0 == ty
   then trace "Types matched" val
   else error ("Declared types mismatched: " ++ show ty0 ++ " /= " ++ show ty)
@@ -134,18 +134,18 @@ typeofFunTys :: ST -> Fun -> [Type] -> Type
 typeofFunTys env f tys = case (f, tys) of
   (Fun (SFun "pr")       , _                            ) -> TypeUnknown
   (GradFun (SFun "pr") _ , _                            ) -> TypeUnknown
-  (Fun (SFun "build"), [tysize, TypeLambda TypeInteger t]) -> TypeVec t
-  (Fun (SFun "index")    , [tind, TypeVec t]            ) -> t
-  (Fun (SFun "size" )    , [TypeVec t]                  ) -> TypeInteger
+  (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
+  (Fun (SFun "index")    , [_, TypeVec t]               ) -> t
+  (Fun (SFun "size" )    , [TypeVec _]                  ) -> TypeInteger
   (Fun (SFun "sum"  )    , [TypeVec t]                  ) -> t
 
   (Fun (SFun "exp"  )    , [TypeFloat]                  ) -> TypeFloat
   (Fun (SFun "log"  )    , [TypeFloat]                  ) -> TypeFloat
-  (Fun (SFun "+"    )    , t : tys                      ) -> t
-  (Fun (SFun "/"    )    , t : tys                      ) -> t
-  (Fun (SFun "*"    )    , t : tys                      ) -> t
+  (Fun (SFun "+"    )    , t : _                        ) -> t
+  (Fun (SFun "/"    )    , t : _                        ) -> t
+  (Fun (SFun "*"    )    , t : _                        ) -> t
   (GradFun (SFun "*") Fwd, t : tys) -> TypeLM (TypeTuple (t : tys)) t
-  (Fun (SFun "-"    )    , t : tys                      ) -> t
+  (Fun (SFun "-"    )    , t : _                        ) -> t
 
   (Fun (SFun "=="   )    , _                            ) -> TypeBool
   (Fun (SFun "!="   )    , _                            ) -> TypeBool
@@ -154,15 +154,15 @@ typeofFunTys env f tys = case (f, tys) of
 
   (Fun (SFun "delta")    , [TypeInteger, TypeInteger, t]) -> t
 
-  (Fun (SelFun i n  )    , [TypeTuple tys]              ) -> tys !! (i - 1)
-  (GradFun (SelFun i n) _, [TypeTuple tys]) ->
+  (Fun (SelFun i _  )    , [TypeTuple tys]              ) -> tys !! (i - 1)
+  (GradFun (SelFun i _) _, [TypeTuple tys]) ->
     TypeLM (TypeTuple tys) (tys !! (i - 1))
 
-  (Fun (SelFun i n)      , [TypeVec t]) -> t
-  (GradFun (SelFun i n) _, [TypeVec t]) -> TypeLM (TypeVec t) t
-  (GradFun (SelFun i n) _, ts         ) -> TypeUnknown
+  (Fun (SelFun{})      , [TypeVec t]) -> t
+  (GradFun (SelFun{}) _, [TypeVec t]) -> TypeLM (TypeVec t) t
+  (GradFun (SelFun{}) _, _          ) -> TypeUnknown
 
-  (Fun (SFun f)          , _          ) -> case Map.lookup (Simple f) env of
+  (Fun (SFun f)        , _          ) -> case Map.lookup (Simple f) env of
     Just a  -> a
     Nothing -> trace
       (  "Failed to type fun ["
