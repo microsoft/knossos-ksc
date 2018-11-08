@@ -2,6 +2,10 @@
 
 module Cgen where
 
+import           Prelude                 hiding ( lines
+                                                , tail
+                                                )
+
 import           Debug.Trace                    ( trace )
 
 import           Data.List                      ( intercalate )
