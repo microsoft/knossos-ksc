@@ -22,7 +22,7 @@ stInsert v ty env = dbtrace
   (Map.insert v ty env)
 
 stInsertFun :: Fun -> Type -> ST -> ST
-stInsertFun f ty env = stInsert (Simple (show $ ppr f)) ty env
+stInsertFun f = stInsert (Simple (show $ ppr f))
 
 stLookup :: String -> Var -> ST -> Type
 stLookup msg v env = case Map.lookup v env of
@@ -32,12 +32,12 @@ stLookup msg v env = case Map.lookup v env of
     TypeUnknown
 
 stLookupFun :: String -> Fun -> ST -> Type
-stLookupFun msg (Fun (SFun v)) env = stLookup msg (Simple v) env
+stLookupFun msg (Fun (SFun v)) = stLookup msg (Simple v)
 
 --------------------------
 
 annotDef :: Def -> Def
-annotDef def = annotDefE stCreate def
+annotDef = annotDefE stCreate
 
 annotDefs :: [Def] -> [Def]
 annotDefs defs =
@@ -62,7 +62,7 @@ annotDefE env (Def (TFun ty f) vars expr) =
           in  Def (TFun ty f) vars te
  where
   addVarToEnv :: TVar -> ST -> ST
-  addVarToEnv (TVar ty v) env = stInsert v ty env
+  addVarToEnv (TVar ty v) = stInsert v ty
 
 annotExpr :: ST -> Expr -> Expr
 annotExpr env (Expr ty ex) = annotExprX env ex
