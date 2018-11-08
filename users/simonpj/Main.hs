@@ -4,9 +4,8 @@ import Lang
 import Parse (runParser, pDefs, parseF)
 import Annotate
 import Cgen
+import AD
 
--- import Prim
--- import AD
 -- import ANF
 -- import Opt
 -- import CSE
@@ -223,22 +222,27 @@ demoN def
 -- GMM derivatives
 -------------------------------------
 
-removeMain :: [Def] -> [Def]
-removeMain [] = []
-removeMain (Def (TFun ty (Fun (SFun "main"))) _ _:defs) = removeMain defs
-removeMain (def:defs) = def:removeMain defs
+moveMain :: [Def] -> ([Def],[Def])
+moveMain [] = ([],[])
+moveMain (def:main@(Def (TFun ty (Fun (SFun "main"))) _ _):defs) = ([main],def:defs)
+moveMain (def:defs) = let (m,t) = moveMain defs in (m,def:t)
 
 doall :: String -> IO ()
 doall file = runKM $
   do {
-     defs <- liftIO (parseF (file ++ ".ks"))
-  ;  let anf = annotDefs defs
-  --;  let grad = gradDefs (removeMain defs)
+     alldefs <- liftIO (parseF (file ++ ".ks"))
+  ;  liftIO $ putStrLn "read defs"
+  ;  let (main,defs) = moveMain alldefs
+  ;  liftIO $ putStrLn ("found main " ++ show (ppr main))
+  ;  let ann = annotDefs defs
+  ;  liftIO $ putStrLn "annotated defs"
+  ;  let grad = gradDefs ann
   --;  let opt = optDefs grad
   --;  let fwd = map applyD opt
   --;  let optfwd = optDefs fwd
   --;  csefwd <- cseDefs optfwd 
-  ;  liftIO (cppF ("obj\\" ++ file) (anf))
+  ;  let ann2 =  (ann ++ grad ++ main)
+  ;  liftIO (cppF ("obj\\" ++ file) ann2)
   }
 
 gmm :: IO ()

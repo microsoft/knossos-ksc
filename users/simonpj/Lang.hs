@@ -21,8 +21,9 @@ import Test.Hspec
 assertEqual msg t1 t2 =
   if t1 /= t2 then error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2) else ()
 
+assertEqualThen :: HasCallStack => Eq a => Show a => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e =
-  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] " ++ show t1 ++ " == " ++ show t2)
+  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n")
 
 ------ Data types ---------
 data Type = TypeZero               -- Polyamorous zero
@@ -114,6 +115,9 @@ typeOf (Expr ty _) = ty
 bodyOf :: Expr -> ExprX
 bodyOf (Expr _ e) = e
 
+typeOfDst (Expr (TypeLM _ dst) _) = dst
+typeOfSrc (Expr (TypeLM src _) _) = src
+
 -- mkInfixCall :: Fun -> Expr -> Expr -> Expr
 -- mkInfixCall f a b = Call f (Tuple [a, b])
 
@@ -123,13 +127,18 @@ mkTFun ty fname = TFun ty (Fun (SFun fname))
 mkTuple :: [Expr] -> Expr
 mkTuple es  = Expr (TypeTuple $ map typeOf es) $ Tuple es
 
+mkCall::Type->String->[Expr]->Expr
 mkCall ty fname [e] = Expr ty $ Call (mkTFun ty fname) e
 mkCall ty fname es = Expr ty $ Call (mkTFun ty fname) (mkTuple es)
 
-mkLet :: TVar -> Expr -> Expr -> Expr
+mkCallF::Type->Fun->[Expr]->Expr
+mkCallF ty f [e] = Expr ty $ Call (TFun ty f) e
+mkCallF ty f es = Expr ty $ Call (TFun ty f) (mkTuple es)
+
+mkLet :: HasCallStack => TVar -> Expr -> Expr -> Expr
 mkLet v@(TVar ty _) e1@(Expr ty1 _) e2@(Expr ty2 _) = assertEqualThen "mkLet" ty ty1 $ Expr ty2 $ Let v e1 e2
 
-mkLets :: [(TVar,Expr)] -> Expr -> Expr
+mkLets :: HasCallStack => [(TVar,Expr)] -> Expr -> Expr
 mkLets [] e = e
 mkLets ((v,e1):bs) e2 = mkLet v e1 (mkLets bs e2)
 
@@ -141,6 +150,15 @@ mkSCall2 ty fname a b = mkCall ty fname [a, b]
 
 mkSCall3 :: Type -> String -> Expr -> Expr -> Expr -> Expr
 mkSCall3 ty fname a b c = mkCall ty fname [a, b, c]
+
+mkIf:: HasCallStack => Expr -> Expr -> Expr -> Expr
+mkIf c@(Expr tyc _) t@(Expr tyt _) f@(Expr tyf _) = assertEqualThen "if" tyt tyf $ Expr tyt (If c t f)
+
+mkLam :: TVar -> Expr -> Expr
+mkLam v@(TVar tyv _) body@(Expr tybody _) = Expr (TypeLambda tyv tybody) $ Lam v body
+
+mkAssert::Expr -> Expr -> Expr
+mkAssert c@(Expr TypeBool _) body@(Expr tybody _)= Expr tybody (Assert c body)
 
 kInt :: Integer -> Expr
 kInt i = Expr TypeInteger $ Konst (KInteger i)

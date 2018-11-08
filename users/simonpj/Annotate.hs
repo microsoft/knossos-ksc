@@ -20,7 +20,7 @@ stInsert:: Var -> Type -> ST -> ST
 stInsert v ty env = dbtrace("Inserting " ++ show v ++ " = " ++ show ty ++ " in " ++ show env ++ "\n") (Map.insert v ty env)
 
 stInsertFun:: Fun -> Type -> ST -> ST
-stInsertFun (Fun (SFun v)) ty env = stInsert (Simple v) ty env
+stInsertFun f ty env = stInsert (Simple (show $ ppr f)) ty env
 
 stLookup:: String -> Var -> ST -> Type
 stLookup msg v env = 

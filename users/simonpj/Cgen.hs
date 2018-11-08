@@ -171,7 +171,7 @@ cgenExprR (L.Expr ty ex) = case ex of
     (declbody, vbody) <- cgenExprR body
     return
       (  decle1
-      ++ cgenType tyv ++ " " ++ cgenVar v ++ " /***PP "++(show e1)++"**/ = " ++ ve1 ++ ";\n" 
+      ++ cgenType tyv ++ " " ++ cgenVar v ++ " = " ++ ve1 ++ ";\n" 
       ++ declbody
       , vbody
       )
