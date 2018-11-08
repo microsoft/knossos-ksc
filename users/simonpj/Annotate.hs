@@ -135,17 +135,17 @@ typeofFunTys env f tys = case (f, tys) of
   (Fun (SFun "pr")       , _                            ) -> TypeUnknown
   (GradFun (SFun "pr") _ , _                            ) -> TypeUnknown
   (Fun (SFun "build"), [tysize, TypeLambda TypeInteger t]) -> TypeVec t
-  (Fun (SFun "index")    , [tind, (TypeVec t)]          ) -> t
-  (Fun (SFun "size" )    , [(TypeVec t)]                ) -> TypeInteger
-  (Fun (SFun "sum"  )    , [(TypeVec t)]                ) -> t
+  (Fun (SFun "index")    , [tind, TypeVec t]            ) -> t
+  (Fun (SFun "size" )    , [TypeVec t]                  ) -> TypeInteger
+  (Fun (SFun "sum"  )    , [TypeVec t]                  ) -> t
 
-  (Fun (SFun "exp"  )    , [(TypeFloat)]                ) -> TypeFloat
-  (Fun (SFun "log"  )    , [(TypeFloat)]                ) -> TypeFloat
-  (Fun (SFun "+"    )    , (t : tys)                    ) -> t
-  (Fun (SFun "/"    )    , (t : tys)                    ) -> t
-  (Fun (SFun "*"    )    , (t : tys)                    ) -> t
-  (GradFun (SFun "*") Fwd, (t : tys)) -> TypeLM (TypeTuple (t : tys)) t
-  (Fun (SFun "-"    )    , (t : tys)                    ) -> t
+  (Fun (SFun "exp"  )    , [TypeFloat]                  ) -> TypeFloat
+  (Fun (SFun "log"  )    , [TypeFloat]                  ) -> TypeFloat
+  (Fun (SFun "+"    )    , t : tys                      ) -> t
+  (Fun (SFun "/"    )    , t : tys                      ) -> t
+  (Fun (SFun "*"    )    , t : tys                      ) -> t
+  (GradFun (SFun "*") Fwd, t : tys) -> TypeLM (TypeTuple (t : tys)) t
+  (Fun (SFun "-"    )    , t : tys                      ) -> t
 
   (Fun (SFun "=="   )    , _                            ) -> TypeBool
   (Fun (SFun "!="   )    , _                            ) -> TypeBool
