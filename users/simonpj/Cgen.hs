@@ -99,7 +99,7 @@ letAnf e@(L.Expr tye ex) = do
     )
 
 anfDefs :: [L.Def] -> [L.Def]
-anfDefs defs = map anfDef defs
+anfDefs = map anfDef
 
 anfDef :: L.Def -> L.Def
 anfDef (L.Def (L.TFun ty f) vars expr) =
@@ -115,7 +115,7 @@ anfDef (L.Def (L.TFun ty f) vars expr) =
 type CGenResult = (String, String)
 
 cgenDefs :: [L.Def] -> [String]
-cgenDefs defs = map cgenDef defs
+cgenDefs = map cgenDef
 
 cgenDef :: L.Def -> String
 cgenDef def = fst $ cgenDefE def
