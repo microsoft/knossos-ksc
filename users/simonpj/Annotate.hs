@@ -7,6 +7,7 @@ import qualified Data.Map                      as Map
 
 import           Lang
 
+dbtrace :: String -> a -> a
 dbtrace _ e = e -- trace msg e
 
 ------------------ ST (SymTab) ------------------
@@ -67,11 +68,13 @@ annotDefE env (Def (TFun _ f) vars expr) =
 annotExpr :: ST -> Expr -> Expr
 annotExpr env (Expr _ ex) = annotExprX env ex
 
+chUnk :: Type -> Type -> a -> a
 chUnk TypeUnknown _  val = val
 chUnk ty0         ty val = if ty0 == ty
   then trace "Types matched" val
   else error ("Declared types mismatched: " ++ show ty0 ++ " /= " ++ show ty)
 
+checkLookup :: String -> Type -> Var -> ST -> Type
 checkLookup msg ty0 v env = let ty = stLookup msg v env in chUnk ty0 ty ty
 
 annotExprX :: ST -> ExprX -> Expr
