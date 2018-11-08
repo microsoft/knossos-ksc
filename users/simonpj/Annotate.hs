@@ -41,11 +41,11 @@ annotDef = annotDefE stCreate
 
 annotDefs :: [Def] -> [Def]
 annotDefs defs =
-  let env = stCreate in reverse $ snd $ foldl accum (Map.empty, []) defs
+  let env = stCreate in reverse $ snd $ foldl accum (env, []) defs
  where
   accum :: (ST, [Def]) -> Def -> (ST, [Def])
   accum (env, tdefs) def =
-    let tdef@(Def (TFun tf f) vars e) = annotDefE env $ dbg env def
+    let tdef@(Def (TFun tf f) _ _) = annotDefE env $ dbg env def
     in  (stInsertFun f tf env, tdef : tdefs)
    where
     dbg :: ST -> Def -> Def
