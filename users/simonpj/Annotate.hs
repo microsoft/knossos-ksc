@@ -34,8 +34,8 @@ stLookup msg v env = case Map.lookup v env of
 
 stLookupFun :: String -> Fun -> ST -> Type
 stLookupFun msg (Fun (SFun v)) = stLookup msg (Simple v)
-stLookup msg unexpected =
-  error "Unexpected stLookupFun: " ++ show unexpected ++ ": " ++ msg
+stLookupFun msg unexpected =
+  error $ "Unexpected stLookupFun: " ++ show unexpected ++ ": " ++ msg
 
 --------------------------
 
