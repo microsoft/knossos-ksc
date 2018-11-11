@@ -81,12 +81,6 @@ import Test.Hspec
 import Debug.Trace
 
 
-mkTunk:: ExprX -> Expr
-mkTunk e = Expr TypeUnknown e
-
-mkFunk :: String -> TFun
-mkFunk f = TFun TypeUnknown (Fun (SFun f)) 
-
 ---------------------
 testParse :: Pretty a => Parser a -> String -> IO ()
 testParse  p s = case runParser p s of
@@ -96,7 +90,7 @@ testParse  p s = case runParser p s of
 runParser :: Parser a -> String -> Either ParseError a
 runParser p s = parse p "" s
 
-parseF :: String -> IO [Def]
+parseF :: String -> IO [Def Fun Var]
 parseF file = do
         cts <- readFile file
         case runParser pDefs cts of
@@ -143,7 +137,7 @@ pIdentifier = Tok.identifier lexer
 pVar :: Parser Var
 pVar = Simple <$> pIdentifier 
 
-pParam :: Parser TVar
+pParam :: Parser (TVar Var)
 pParam = parens (do {
                     v <- pVar;
                     pReserved ":";
@@ -151,16 +145,16 @@ pParam = parens (do {
                     return (TVar ty v)
          })
 
-pKonst :: Parser Expr
-pKonst =   try ((Expr TypeFloat . Konst . KFloat) <$> pDouble)
-       <|> ((Expr TypeInteger . Konst . KInteger) <$> pInteger)
+pKonst :: Parser (ExprX Fun Var)
+pKonst =   try (( Konst . KFloat) <$> pDouble)
+       <|> ((Konst . KInteger) <$> pInteger)
 
-pExpr :: Parser Expr
+pExpr :: Parser (ExprX Fun Var)
 pExpr = pKonst
-   <|> (mkTunk . Var . Simple) <$> pIdentifier
+   <|> (Var . Simple) <$> pIdentifier
    <|> parens pKExpr
 
-pKExpr :: Parser Expr
+pKExpr :: Parser (ExprX Fun Var)
 -- Al these start with a keyword
 pKExpr =    pIfThenElse
        <|> pLet
@@ -181,68 +175,68 @@ pType = do {
           _ -> error $ "Unknown type [" ++ id ++ "]"
         }
 
-pCall :: Parser Expr
+pCall :: Parser (ExprX Fun Var)
 -- (f e)
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
-               []  -> return (mkTunk $ Var (Simple f))
-               [e] -> return (mkTunk $ Call (mkFunk f) e)
-               _   -> return (mkTunk $ Call (mkFunk f) (mkTuple es))
+               []  -> return (Var (Simple f))
+               [e] -> return (Call (mkFun f) e)
+               _   -> return (Call (mkFun f) (mkTuple es))
         }
 
-pIfThenElse :: Parser Expr
+pIfThenElse :: Parser (ExprX Fun Var)
 -- (if e1 e2 e3)
 pIfThenElse = do { pReserved "if"
                  ; cond <- pExpr
                  ; tr   <- pExpr
                  ; fl   <- pExpr
-                 ; return $ mkTunk $ If cond tr fl }
+                 ; return $ If cond tr fl }
 
-pAssert :: Parser Expr
+pAssert :: Parser (ExprX Fun Var)
 -- (assert e1 e2)
 pAssert = do { pReserved "assert"
              ; e1 <- pExpr
              ; e2 <- pExpr
-             ; return $ mkTunk $ Assert e1 e2 }
+             ; return $ Assert e1 e2 }
 
-pTuple :: Parser Expr
+pTuple :: Parser (ExprX Fun Var)
 -- (assert e1 e2)
 pTuple = do { pReserved "tuple"
             ; es <- many pExpr
-            ; return $ mkTunk $ Tuple es }
+            ; return $ Tuple es }
 
-pLam :: Parser Expr
+pLam :: Parser (ExprX Fun Var)
 -- (lam i e)
 pLam = do { pReserved "lam"
           ; i <- pParam
           ; e <- pExpr
-          ; return $ mkTunk $ Lam i e }
+          ; return $ Lam i e }
 
-pBind :: Parser (TVar, Expr)
+pBind :: Parser (Var, ExprX Fun Var)
 -- var rhs
 pBind = do { v <- pIdentifier
            ; e <- pExpr
-          ; return (TVar TypeUnknown $ Simple v, e) }
+          ; return (Simple v, e) }
 
-pLet :: Parser Expr
+pLet :: Parser (ExprX Fun Var)
 -- (let (x r) b)
 pLet = do { pReserved "let"
           ; pairs <- parens $ do { b <- pBind
                                  ; return [b] }
                           <|> many (parens pBind)
           ; e <- pExpr
-          ; return $ foldr (\(v,r) e -> mkTunk $ Let v r e) e pairs }
+          ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
 
-pDef :: Parser Def
+pDef :: Parser (Def Fun Var)
 -- (def f (x1 x2 x3) rhs)
 pDef = parens $ do { pReserved "def"
                    ; f <- pIdentifier
                    ; xs <- parens (many pParam)
                    ; rhs <- pExpr
-                   ; return (Def (mkFunk f) xs rhs) }
+                   ; return (Def (mkFun f) xs rhs) }
 
-pDefs :: Parser [Def]
+pDefs :: Parser [Def Fun Var]
 pDefs = spaces >> many pDef
 
 
@@ -253,11 +247,12 @@ toStr p s = case runParser p s of
                    Left err -> error ("Failed: " ++ show err)
                    Right r  -> show (PP.render (ppr r))
 
-test p src expected = it src $ (toStr p src) `shouldBe` (show expected)
-
 test_Parser =
   hspec $ do
     describe "Parser" $ do
       test pExpr "(f 1)" "f( 1 )" ;
       test pExpr "(if (f 1 2 3) (let (v (+ 2 3)) (* v 7)) 0.7)" $
-                    "if f( 1, 2, 3 )\nthen let { (v : TypeUnknown) = 2 + 3 }\n     v * 7\nelse 0.7"
+                    "if f( 1, 2, 3 )\nthen let { v = 2 + 3 }\n     v * 7\nelse 0.7"
+      test pDef "(def f ((x : Integer)) (lam (y : Float) (+ x y)))" $
+                "def f((x : Integer)) = \\(y : Float). x + y" ;
+  where test p src expected = it src $ (toStr p src) `shouldBe` (show expected)

@@ -84,7 +84,7 @@ isKZero :: ExprX f b -> Bool
 isKZero (Konst KZero) = True
 isKZero _             = False
 
-data Def = Def TFun [TVar Var] Expr  -- f x = e
+data Def f b = Def f [TVar b] (ExprX f b)  -- f x = e
 
 data ExprX f b
   = Konst Konst
@@ -444,7 +444,7 @@ parensIf ctxt inner doc
 --            , PP.text "then" PP.<+> ppr p b
 --            , PP.text "else" PP.<+> ppr p c ]
 
-instance Pretty Def where
+instance (Pretty f, Pretty b, HasInfix f) => Pretty (Def f b) where
   ppr (Def f vs rhs)
     = PP.sep [ PP.text "def" PP.<+> ppr f
                  PP.<> parens (pprWithCommas vs)
