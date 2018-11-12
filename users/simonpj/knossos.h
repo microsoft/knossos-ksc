@@ -104,13 +104,13 @@ lm<A, C> lmCompose(lm<B, C> const &lm1, lm<A, B> const &lm2)
 template <class tupVecTT, class VecT, class T>
 lm<tupVecTT, VecT> lmBuild(int v, std::function<lm<tupVecTT, T>(int)> t)
 {
-    return lm<tupVecTT, VecT> {"Build(" + str(v) + "," + t(v).ty + ")"};
+    return lm<tupVecTT, VecT> {"Build(" + str(v) + "," + t(0).ty + ")"};
 }
 
 template <class VecT, class tupVecTT, class T>
 lm<VecT, tupVecTT> lmBuildT(int v, std::function<lm<tupVecTT, T>(int)> t)
 {
-    return lm<VecT, tupVecTT> {"BuildT(" + str(v) + "," + t(v).ty + ")"};
+    return lm<VecT, tupVecTT> {"BuildT(" + str(v) + "," + t(0).ty + ")"};
 }
 
 } // namespace LM
