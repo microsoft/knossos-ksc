@@ -34,7 +34,9 @@ lmAdds [x] = x
 lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
 lmScale :: Type -> TExpr -> TExpr
-lmScale t f = lm "lmScale" t t [f]
+lmScale t f = 
+  -- FIXME assertEqualThen "lmScale" (typeof f) (TypeFloat) $
+  lm "lmScale" t t [f]
 
 lmCompose :: HasCallStack => TExpr -> TExpr -> TExpr
 lmCompose f g = 

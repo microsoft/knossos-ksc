@@ -7,6 +7,6 @@
     (+ 1 (if (< 2 3) 4 5)))
 
 (def main ()
-    (let (v1 (build 3 (lam (i : Integer) (* 3.0 i))))
+    (let (v1 (build 3 (lam (i : Integer) (* 3.0 (to_float i)))))
         (pr (f7 v1 v1)
             (D$f7 v1 v1))))

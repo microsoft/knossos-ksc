@@ -207,7 +207,7 @@ optGradFun :: HasCallStack => Type -> Type -> FunId -> TExpr -> Maybe TExpr
 optGradFun s t (SFun "+") _ = Just (lmHCat (lmOne t) (lmOne t))
 
 optGradFun s t (SFun "*") (Tuple [x,y])
-  = Just (lmHCats [lmScale (typeof x) y, lmScale (typeof y) x])
+  = Just (lmHCats [lmScale t y, lmScale t x])
 
 optGradFun s t (SFun "/") (Tuple [x,y])
   = Just (lmHCats [ lmScale t (pDiv (kTFloat 1.0) y)
@@ -250,10 +250,10 @@ optLM s t "lmCompose" (Tuple [f,g])
   | isLMZero f = Just $ lmZero s t
   | isLMZero g = Just $ lmZero s t
 
-  -- Scalar(x) . Scalar(y) = Scalar( xy )
+  -- Scale(x) . Scale(y) = Scale( xy )
   | Call (TFun tyf (LMFun "lmScale")) x <- f
   , Call (TFun tyg (LMFun "lmScale")) y <- g
-  = Just (lmScale s (pMul x y))
+  = Just (lmScale t (pMul x y))
 
   -- (f . g) . h   =>   f . (g . h)
   | Call (TFun tyc (LMFun "lmCompose")) (Tuple [p1,p2]) <- f
@@ -379,7 +379,7 @@ optTrans e = error ("optTrans: " ++  show e)
 optTransCallLM :: Type -> Type -> String -> TExpr -> Maybe TExpr
 optTransCallLM s t "lmZero" _  = Just $ lmZero t s
 optTransCallLM s t "lmOne"  _  = Just $ lmOne s
-optTransCallLM s t "lmScale" e = Just $ lmScale t e
+optTransCallLM s t "lmScale" e = Just $ lmScale s e
 
 optTransCallLM s t "lmTranspose" e = Just e
 optTransCallLM s t "lmCompose" (Tuple [f,g])

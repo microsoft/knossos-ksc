@@ -70,6 +70,6 @@
       (pr (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           (gmm_knossos_gmm_objective x alphas mus qs ls 1.3 1.2)
           (D$gmm_knossos_gmm_objective x alphas mus qs ls 1.3 1.2)
-          --(fwd$gmm_knossos_gmm_objective x alphas mus qs ls 1.3 1.2
-          --                               x alphas mus qs ls 1.3 1.2)
+          (fwd$gmm_knossos_gmm_objective x alphas mus qs ls 1.3 1.2
+                                         x alphas mus qs ls 1.3 1.2)
           ))))

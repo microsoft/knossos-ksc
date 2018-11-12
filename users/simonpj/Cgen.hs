@@ -129,7 +129,7 @@ cgenDefE :: L.TDef -> CGenResult
 cgenDefE (L.DefX f@(L.TFun tyf _) vars expr) =
   let _ = trace ("Def " ++ show f ++ "\n") ()
   in  let (cDecl, cVar) = runM $ cgenExpr expr
-      in  ( cgenType tyf
+      in  ( "auto"--cgenType tyf
           `spc` cgenFun f
           ++    "("
           ++    intercalate
@@ -144,7 +144,7 @@ cgenDefE (L.DefX f@(L.TFun tyf _) vars expr) =
           )
 
 cgenExpr :: L.TExpr -> M CGenResult
-cgenExpr = cgenExprR <=< anf
+cgenExpr = cgenExprR -- <=< anf
 
 -- The input expression must be in ANF
 cgenExprR :: L.TExpr -> M CGenResult
@@ -153,7 +153,7 @@ cgenExprR ex = case ex of
 
   L.Var (L.TVar _ v)    -> return ("", cgenVar v)
 
-  L.Call tf@(L.TFun ty _) x -> case x of
+  L.Call tf@(L.TFun ty f) x -> case x of
     L.Tuple vs -> do
       cgresults <- mapM cgenExprR vs
       let decls = map fst cgresults
@@ -163,7 +163,7 @@ cgenExprR ex = case ex of
       return
         ( "/**Call**/"
         ++ intercalate ";\n" decls
-        ++ cgenType ty
+        ++ "auto"--cgenType ty
         ++ " "
         ++ v
         ++ " = "
@@ -173,27 +173,22 @@ cgenExprR ex = case ex of
         ++ ");\n"
         , v
         )
-    L.Var (L.TVar tyv v) -> do
+    ex -> do
       vf <- freshCVar
-
+      (cgdecl, cgexpr) <- cgenExprR ex
+      
       return
-        ( "/**Var**/"
-        ++    cgenType ty 
+        ( "/**Ex**/"
+        ++    cgdecl
+        ++    "auto"--cgenType ty 
         `spc` vf
         ++    " = "
         ++    cgenFun tf
         ++    "("
-        ++    cgenVar v
+        ++    cgexpr
         ++    ");\n"
         , vf
         )
-
-    _ ->
-      error
-        $  "Function arguments should be Var in ANF, not"
-        ++ show x
-        ++ " in call to "
-        ++ show tf
 
   L.Let (L.TVar tyv v) e1 body -> do
     (decle1  , ve1  ) <- cgenExprR e1
@@ -201,7 +196,7 @@ cgenExprR ex = case ex of
     return
       (  "/**Let**/"
       ++ decle1
-      ++ cgenType tyv
+      ++ "auto"--cgenType tyv
       ++ " "
       ++ cgenVar v
       ++ " = "
@@ -228,7 +223,7 @@ cgenExprR ex = case ex of
     (cE, vE) <- cgenExprR body
     return
       ( "/**Lam**/"
-      ++ cgenType (L.TypeLambda tv (L.typeof body)) 
+      ++ "auto" -- cgenType (L.TypeLambda tv (L.typeof body)) 
       `spc` l
       ++    " = [&]("
       ++    cgenType tv
@@ -291,14 +286,19 @@ cgenFunId = \case
 
 cgenFun :: HasCallStack => L.TFun -> String
 cgenFun tf@(L.TFun ty f) = case f of
+  L.Fun (L.SFun "build") -> "build<"++ cgenType t ++ ">" where (L.TypeVec t) = ty
   L.Fun funId       -> cgenFunId funId
   L.GradFun s L.Fwd -> "D$" ++ cgenFunId s
   L.GradFun s L.Rev -> "R$" ++ cgenFunId s
   L.DrvFun  s L.Fwd -> "fwd$" ++ cgenFunId s
   L.DrvFun  s L.Rev -> "rev$" ++ cgenFunId s
   L.LMFun s         -> case ty of
-    L.TypeLM t1 t2 ->
-      "LM::" ++ s ++ "<" ++ cgenType t1 ++ "," ++ cgenType t2 ++ ">"
+    L.TypeLM t1 t2 -> 
+      let tys = cgenType t1 ++ "," ++ cgenType t2 in
+      case s of
+      "lmBuild" -> "LM::lmBuild" ++ "<" ++ tys ++ "," ++ cgenType t ++ ">" where (L.TypeVec t) = t2
+      "lmBuildT" -> "LM::lmBuildT" ++ "<" ++ tys ++ "," ++ cgenType t ++ ">" where (L.TypeVec t) = t1
+      s -> "LM::" ++ s ++ "<" ++ tys ++ ">"
     t -> "LM::/* " ++ show t ++ "*/" ++ s
 
 cgenTypeOf :: L.TExpr -> String
@@ -352,7 +352,7 @@ cppF outfile defs = do
   putStrLn $ "Writing to " ++ cppfile
   writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
   callCommand $ "clang-format -i " ++ cppfile
-  let compcmd = "g++ -fmax-errors=5 -I. -O -g " ++ cppfile ++ " -o " ++ exefile
+  let compcmd = "g++ -fmax-errors=5 -I. -O -g -std=c++17 " ++ cppfile ++ " -o " ++ exefile
   putStrLn $ "Compiling: " ++ compcmd
   callCommand compcmd
   putStrLn "Running"

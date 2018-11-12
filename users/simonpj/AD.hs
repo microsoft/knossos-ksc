@@ -4,6 +4,13 @@ import Lang
 import Prim
 import Text.PrettyPrint as PP
 
+typeofCheckLM :: Type -> Type -> TExpr -> Type
+typeofCheckLM s t e = 
+  let ty = typeof e in
+  case ty of
+  TypeLM s t -> ty
+  _ -> error $ "Bad LM type"
+
 gradDefs :: [TDef] -> [TDef]
 gradDefs = map gradDef
 
@@ -13,12 +20,13 @@ gradDef (DefX (TFun ty f) params rhs) =
   assertEqualThen ("gradDef " ++ show f) ty (typeof rhs) $
   DefX gradf params $
     mkLets [ gradParam param i n | (param, i) <- params `zip` [1..] ] $
-    gradE tys rhs
+    grhs
 
   where
     n = length params
     tys = tysOfParams params
-    tylm = TypeLM tys ty
+    grhs = gradE tys rhs
+    tylm = typeofCheckLM tys ty grhs
 
     tysOfParams [] = TypeUnknown
     tysOfParams [TVar ty _] = ty
@@ -26,6 +34,7 @@ gradDef (DefX (TFun ty f) params rhs) =
 
     gradParam (TVar TypeInteger v) _ _ = 
       (TVar (TypeLM tys TypeInteger) (gradV v), lmZero tys TypeInteger)
+
     gradParam (TVar tyv v) i n =
       (TVar (TypeLM tys tyv) (gradV v), gradSelFun tys i n params) 
 
