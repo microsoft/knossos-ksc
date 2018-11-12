@@ -1,15 +1,16 @@
 module Main where
 
+import Data.Hashable
+
 import Lang
 import Parse (runParser, pDefs, parseF)
 import Annotate
 import Cgen
 import AD
 import Opt
+import CSE
 
-import Data.Hashable
 -- import ANF
--- import CSE
 -- import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
 
@@ -230,7 +231,8 @@ moveMain (def:defs) = let (m,t) = moveMain defs in (m,def:t)
 
 doall :: String -> IO ()
 doall file =
-  let dd defs = liftIO $ putStrLn ("---" ++ (take 1000 $ show (ppr defs) ++ (show $ hash (show $ ppr defs))))
+  let tl s = reverse (take 1000 $ reverse s)
+      dd defs = liftIO $ putStrLn ("---" ++ (tl $ show (ppr defs)))
       dd1 :: Pretty p => [p] -> KM ()
       dd1 = displayN in
   runKM $
@@ -252,10 +254,9 @@ doall file =
   ;  dd opt
   ;  let fwd = map applyD opt
   ;  let optfwd = optDefs fwd
-  --;  csefwd <- cseDefs optfwd
   ;  let alldefs = ann ++ opt ++ optfwd
-  ;  let annotmain = annotDefs alldefs main
-  ;  let ann2 =  alldefs ++ annotmain
+  ;  cse <- cseDefs alldefs
+  ;  let ann2 =  cse ++ (annotDefs cse main)
   ;  banner "all"
   ;  dd ann2
   ;  liftIO (cppF ("obj\\" ++ file) ann2)
@@ -267,5 +268,4 @@ gmm = doall "examples\\gmm"
 go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . (annotDefs [])
 
 main :: IO ()
-main = return ()  -- To keep GHC quiet
-
+main = gmm

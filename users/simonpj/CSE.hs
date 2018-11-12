@@ -7,7 +7,10 @@ import Opt
 import KMonad
 import qualified Data.Map as M
 
-cseDefs :: [Def] -> KM [Def]
+type CSEf = TFun
+type CSEb = TVar Var
+
+cseDefs :: [DefX CSEf CSEb] -> KM [DefX CSEf CSEb]
 cseDefs defs
   = do { anf_defs <- anfDefs defs
 --       ; banner "ANF'd"
@@ -28,10 +31,10 @@ cseDefs defs
 --cseDef u def = runAnf u (cseD def)
 
 ---------------------------------
-cseD :: Def -> Def
-cseD (Def f args rhs) = Def f args (cseE M.empty rhs)
+cseD :: DefX CSEf CSEb -> DefX CSEf CSEb
+cseD (DefX f1 args rhs) = DefX f1 args (cseE M.empty rhs)
 
-cseE :: M.Map Expr Expr -> Expr -> Expr
+cseE :: M.Map (ExprX CSEf CSEb) (ExprX CSEf CSEb) -> ExprX CSEf CSEb -> ExprX CSEf CSEb
 cseE cse_env (Let v rhs body)
   | Just rhs'' <- M.lookup rhs' cse_env
   = Let v rhs'' (cseE_check cse_env body)
@@ -42,7 +45,7 @@ cseE cse_env (Let v rhs body)
     cse_env' = M.insert rhs' (Var v) cse_env
 
 cseE cse_env (Assert e1 e2)
- | Call (Fun (SFun "==")) (Tuple [e1a, e1b]) <- e1'
+ | Call (TFun TypeBool (Fun (SFun "=="))) (Tuple [e1a, e1b]) <- e1'
  , let cse_env' = M.map (substAssert e1a e1b) cse_env
  = Assert e1' (cseE cse_env' e2)
  | otherwise
@@ -60,12 +63,12 @@ cseE cse_env (Tuple es)  = Tuple (map (cseE_check cse_env) es)
 cseE cse_env (App e1 e2) = App (cseE_check cse_env e1)
                                (cseE_check cse_env e2)
 
-cseE cse_env (Lam v e) = Lam v (cseE cse_env e)
+cseE cse_env (Lam v ty e) = Lam v ty (cseE cse_env e)
   -- Watch out: the variable might capture things in cse_env
 
 cseE _ e = e  -- For now: lambda, app, const, var
 
-cseE_check :: M.Map Expr Expr -> Expr -> Expr
+cseE_check :: M.Map (ExprX CSEf CSEb) (ExprX CSEf CSEb) -> ExprX CSEf CSEb -> ExprX CSEf CSEb
 -- Look up the entire expression in the envt
 cseE_check cse_env e
   | Just e'' <- M.lookup e' cse_env
@@ -80,7 +83,7 @@ substAssert e1a (Var v) = substE (M.insert v e1a M.empty)
 substAssert _ _ = \e -> e
 
 ------------------------
-substE :: M.Map Var Expr -> Expr -> Expr
+substE :: M.Map CSEb (ExprX CSEf CSEb) -> ExprX CSEf CSEb -> ExprX CSEf CSEb
 -- Substitution
 substE subst (Konst k)      = Konst k
 substE subst (Var v)        = case M.lookup v subst of
@@ -91,6 +94,6 @@ substE subst (If b t e)     = If (substE subst b) (substE subst t) (substE subst
 substE subst (Tuple es)     = Tuple (map (substE subst) es)
 substE subst (App e1 e2)    = App (substE subst e1) (substE subst e2)
 substE subst (Assert e1 e2) = Assert (substE subst e1) (substE subst e2)
-substE subst (Lam v e)      = Lam v (substE (v `M.delete` subst) e)
+substE subst (Lam v ty e)   = Lam v ty (substE (v `M.delete` subst) e)
 substE subst (Let v r b)    = Let v (substE subst r) $
                               substE (v `M.delete` subst) b

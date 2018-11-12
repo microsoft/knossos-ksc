@@ -1,10 +1,12 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module ANF where
 
 import Lang
 import KMonad
 import Control.Monad( ap )
 
-anfDefs :: [Def] -> KM [Def]
+anfDefs :: (CmkVar b, Typeable b, TypeableFun f) => [DefX f b] -> KM [DefX f b]
 anfDefs defs
   = do { u <- getUniq
        ; let (u', defs') = runAnf u (mapM anfD defs)
@@ -12,22 +14,22 @@ anfDefs defs
        ; return defs' }
 
 -----------------------------------------------
-anfD :: Def -> AnfM Def
-anfD (Def fun args rhs) = Def fun args <$> anfExpr rhs
+anfD :: (CmkVar b, Typeable b, TypeableFun f) => DefX f b -> AnfM f b (DefX f b)
+anfD (DefX fun args rhs) = DefX fun args <$> anfExpr rhs
 
-anfExpr :: Expr -> AnfM Expr
+anfExpr :: (CmkVar b, Typeable b, TypeableFun f) => ExprX f b -> AnfM f b (ExprX f b)
 anfExpr e = wrapLets (anfE e)
 
-anfE :: Expr -> AnfM Expr
+anfE :: (CmkVar b, Typeable b, TypeableFun f) => ExprX f b -> AnfM f b (ExprX f b)
 anfE (Tuple es)            = Tuple <$> mapM anfE1 es
-anfE (Call fun (Tuple es))
+anfE (Call fun (Tuple es)) {- FIXME anf build
   | Fun (SFun "build") <- fun
   , [n,e] <- es
   = -- Don't bother to ANF the first arr
     -- and leave the second arg in place
     do { e' <- anfE e
        ; return (Call fun (Tuple [n, e'])) }
-  | otherwise
+  | otherwise -}
   = (Call fun . Tuple) <$> mapM anfE1 es
 anfE (Konst k)      = return (Konst k)
 anfE (Var v)        = return (Var v)
@@ -41,39 +43,39 @@ anfE (If b t e)     = do { t' <- anfExpr t
 anfE (App e1 e2)    = do { f <- anfE e1
                          ; a <- anfE1 e2
                          ; return (App f a) }
-anfE (Lam v e)      = do { e' <- anfExpr e
-                         ; return (Lam v e') }
+anfE (Lam v ty e)      = do { e' <- anfExpr e
+                         ; return (Lam v ty e') }
 anfE (Assert e1 e2) = do { e1' <- anfE e1
                          ; e2' <- anfExpr e2
                          ; return (Assert e1' e2') }
 
-anfE1 :: Expr -> AnfM Expr
+anfE1 :: (CmkVar b, Typeable b, TypeableFun f) => (ExprX f b) -> AnfM f b (ExprX f b)
 -- Returns an atomic expression
 anfE1 e = do { e' <- anfE e
              ; atomise e' }
 
-atomise :: Expr -> AnfM Expr
+atomise :: (CmkVar b, Typeable b, TypeableFun f) => (ExprX f b) -> AnfM f b (ExprX f b)
 atomise (Var v)   = return (Var v)
 atomise (Konst k) = return (Konst k)
-atomise e         = do { v <- newVar
+atomise e         = do { v <- newVar (typeof e)
                        ; emit v e
                        ; return (Var v) }
 
-type FloatDef = (Var, Expr)
+type FloatDef f b = (b, ExprX f b)
 
-runAnf :: Uniq -> AnfM a -> (Uniq, a)
-runAnf u (AnfM f) = case f u of (u', _, r) -> (u', r)
+runAnf :: Uniq -> AnfM f b a -> (Uniq, a)
+runAnf u (AnfM f1) = case f1 u of (u', _, r) -> (u', r)
 
-newtype AnfM a = AnfM (Uniq -> (Uniq, [FloatDef], a))
+newtype AnfM f b a = AnfM (Uniq -> (Uniq, [FloatDef f b], a))
 
-instance Applicative AnfM where
+instance Applicative (AnfM f b) where
   pure  = return
   (<*>) = ap
 
-instance Functor AnfM where
+instance Functor (AnfM f b) where
   fmap f m = do { x <- m; return (f x) }
 
-instance Monad AnfM where
+instance Monad (AnfM f b) where
   return x = AnfM (\u -> (u, [], x))
   AnfM m1 >>= k  = AnfM $ \u ->
                    case m1 u  of { (u1, fs1, x) ->
@@ -81,16 +83,16 @@ instance Monad AnfM where
                    case m2 u1 of { (u2, fs2, r) ->
                    (u2, fs1 ++ fs2, r) } } }
 
-wrapLets :: AnfM Expr -> AnfM Expr
-wrapLets (AnfM f) = AnfM $ \u ->
-                    case f u of
+wrapLets :: AnfM f b (ExprX f b) -> AnfM f b (ExprX f b)
+wrapLets (AnfM f1) = AnfM $ \u ->
+                    case f1 u of
                        (u', fs, e) -> (u', [], wrap fs e)
 
-wrap :: [FloatDef] -> Expr -> Expr
+wrap :: [FloatDef f b] -> ExprX f b -> ExprX f b
 wrap fs e = foldr (\(v,r) b -> Let v r b) e fs
 
-emit :: Var -> Expr -> AnfM ()
+emit :: b -> ExprX f b -> AnfM f b ()
 emit v r = AnfM (\u -> (u, [(v,r)], ()))
 
-newVar :: AnfM Var
-newVar = AnfM (\u -> (u+1, [], Simple ('t' : show u)))
+newVar :: CmkVar b => Type -> AnfM f b b
+newVar ty = AnfM (\u -> (u+1, [], mkVar ty ('t' : show u)))

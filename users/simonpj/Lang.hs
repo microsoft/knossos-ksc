@@ -96,9 +96,17 @@ instance Show Var where
       ++ "$"
       ++ g
 
-
 data TVar b = TVar Type b
   deriving( Show, Eq, Ord )
+
+class CmkVar b where
+  mkVar :: Type -> String -> b
+
+instance CmkVar Var where
+  mkVar ty s = Simple s
+
+instance CmkVar (TVar Var) where
+  mkVar ty s = TVar ty $ Simple s
 
 data Konst = KZero  -- Of any type
            | KInteger Integer
@@ -350,20 +358,11 @@ notFreeIn v e = go v e
    go v (Assert e1 e2) = go v e1 && go v e2
 
 -----------------
-newVarNotIn :: Expr -> Var
-newVarNotIn e = go e 1 -- FIXME start with hash of e to reduce retries
-  where go e n =
-          let v = Simple ("_t" ++ show n) in
-            if v `notFreeIn` e then
-              v
-            else
-              trace ("newVarNotIn: Var " ++ show v ++ " was bound in E, retry") (
-              go e (n + 1))
 
-newVarNotInT :: Type -> TExpr -> TVar Var
-newVarNotInT ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
+newVarNotIn :: (CmkVar b, Eq b, Show b) => Type -> ExprX f b -> b
+newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
   where go ty e n =
-          let v = TVar ty $ Simple ("_t" ++ show n) in
+          let v = mkVar ty ("_t" ++ show n) in
             if v `notFreeIn` e then
               v
             else
@@ -382,9 +381,9 @@ test_FreeIn =
         (Simple "x" `notFreeIn` e) `shouldBe` True
     describe "newVarNotIn" $ do
       it "not in, so new var is _t1..." $
-        newVarNotIn e `shouldBe` (Simple "_t1")
+        newVarNotIn TypeFloat e `shouldBe` (Simple "_t1")
       it "in, so new var is _t2..." $
-        newVarNotIn e2 `shouldBe` (Simple "_t2")
+        newVarNotIn TypeFloat e2 `shouldBe` (Simple "_t2")
 
 ------ Pretty printer ------
 class Pretty p where
