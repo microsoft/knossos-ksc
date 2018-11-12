@@ -189,15 +189,16 @@ typeofLMFun f tys = case (f, tys) of
   ("lmBuildT", [TypeInteger, TypeLambda TypeInteger (TypeLM a b)]) ->
     TypeLM (TypeVec a) b
   ("lmVCat", [TypeLM a b, TypeLM a1 c]) ->
-    assertEqualThen "lmVCat" a a1 $ TypeLM a (TypeTuple [b, c])
+    assertEqualThen "lmVCat" a a1 $ 
+    TypeLM a (TypeTuple [b, c])
   ("lmHCat", [TypeLM a c, TypeLM b c1]) ->
-    assertEqualThen "lmHCat" c c1 $ TypeLM (TypeTuple [a, b]) c
+    assertEqualThen "lmHCat" c c1 $ 
+    TypeLM (TypeTuple [a, b]) c
   ("lmCompose", [TypeLM b c, TypeLM a b1]) ->
-    assertEqualThen "lmCompose" b b1 $ TypeLM a c
-  ("lmApply", [TypeLM a b, c]) -> assertEqualThen
-    ("lmApply LM " ++ show a ++ " -o " ++ show b ++ " * " ++ show c)
-    a
-    c
+    assertEqualThen "lmCompose" b b1 $ 
+    TypeLM a c
+  ("lmApply", [TypeLM a b, c]) -> 
+    assertEqualThen ("lmApply LM " ++ show a ++ " -o " ++ show b ++ " * " ++ show c) a c $
     b
   _ ->
     flip trace TypeUnknown
@@ -205,8 +206,7 @@ typeofLMFun f tys = case (f, tys) of
       ++ show f
       ++ ", "
       ++ show tys
-      ++ ") -> ?"
-
+      ++ ")"
 
 --------------------------------------
 

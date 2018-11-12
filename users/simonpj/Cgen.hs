@@ -201,7 +201,7 @@ cgenExprR ex = case ex of
     return
       (  "/**Let**/"
       ++ decle1
-      ++ "auto/*" ++ cgenType tyv ++ "*/"
+      ++ cgenType tyv
       ++ " "
       ++ cgenVar v
       ++ " = "
