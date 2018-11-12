@@ -3,7 +3,9 @@
 #include <tuple>
 #include <functional>
 #include <sstream>
+#include <iostream>
 #include <cmath>
+#include <string>
 
 using std::get;
 using std::make_tuple;
@@ -16,10 +18,30 @@ namespace ks
 namespace LM
 {
 
+struct Nop {};
+
 template <class From, class To>
 struct lm
 {
     std::string ty;
+};
+
+template <class From, class To>
+To lmApply(lm<From, To>, From)
+{
+    return To {};
+}
+
+template <class From, class To>
+struct One
+{
+    To Apply(From& f) { return f; }
+};
+
+template <class From, class To>
+struct Zero
+{
+    To Apply(From& f) { return To { 0 }; }
 };
 
 template <class From, class To>
@@ -53,11 +75,25 @@ lm<From, tuple<To1, To2>> lmVCat(lm<From, To1> const &lm1, lm<From, To2> const &
     return lm<From, tuple<To1, To2>>{"VCat(" + lm1.ty + "," + lm2.ty + ")"};
 }
 
+template <class _, class To, class From>
+lm<From, To> lmAdd(lm<From, To> const &lm1, lm<From, To> const &lm2)
+{
+    return lm<From, To>{"Add(" + lm1.ty + "," + lm2.ty + ")"};
+}
+
 template <class _, class To, class From1, class From2>
 lm<tuple<From1, From2>, To> lmHCat(lm<From1, To> const &lm1, lm<From2, To> const &lm2)
 {
     return lm<tuple<From1, From2>, To>{"HCat(" + lm1.ty + "," + lm2.ty + ")"};
 }
+
+#define A(n) lm<F##n, To> const&lm##n
+template <class _, class To, class F1, class F2, class F3, class F4, class F5, class F6, class F7>
+lm<tuple<F1, F2, F3, F4, F5, F6, F7>, To> lmHCat(A(1), A(2), A(3), A(4), A(5), A(6), A(7))
+{
+    return lm<tuple<F1, F2, F3, F4, F5, F6, F7>, To>{"HCat(" + lm1.ty + "," + lm2.ty + ")"};
+}
+#undef A
 
 template <class A, class C, class B>
 lm<A, C> lmCompose(lm<B, C> const &lm1, lm<A, B> const &lm2)
@@ -81,13 +117,21 @@ lm<VecT, tupVecTT> lmBuildT(int v, std::function<lm<tupVecTT, T>(int)> t)
 
 struct zero_t
 {
+    operator double() { return 0.0; }
 };
 
 // Functions defined polymorphically by Cgen.typeofFun
 template <class T1, class T2>
 T1 add(T1 t1, T2 t2) { return t1 + t2; }
+
 template <class T1, class T2>
 T1 sub(T1 t1, T2 t2) { return t1 - t2; }
+template <class T1, class T2>
+LM::lm<tuple<T1, T2>, T1> D$sub(T1 t1, T2 t2)
+{
+    return LM::lmHCat<tuple<T1, T2>, T1>(LM::lmOne<T1,T1>(), LM::lmScale<T2,T1>(-1.0));
+}
+
 
 template <class T1, class T2>
 T1 mul(T1 t1, T2 t2) { return t1 * t2; }
@@ -121,14 +165,20 @@ T delta(int i, int j, T)
 
 double neg(double d) { return -d; }
 
+double to_float(int d) { return d; }
+auto D$to_float(int d) { return LM::lmScale<int,double>(d); }
+
 // ASSERT
 #define ASSERT(expr)                        \
     if (expr)                               \
         ;                                   \
     else                                    \
-    {                                       \
-        throw("Assert failed [" #expr "]"); \
-    }
+        ks::fail(__FILE__, __LINE__, #expr);
+
+void fail(char const* file, int line, char const* expr)
+{
+    std::cerr << file << ":" << line << ":Assert failed [" << expr << "]\n";
+}
 
 // Vector builtins
 template <class T>
@@ -165,21 +215,30 @@ double sum(vec<double> v)
     return ret;
 }
 
-template <class T, int i, int n>
-T selfun() {
-  return 1.0;  
+// TODO: parameter packs for these
+template <typename T1, typename T2>
+T1 selfun$2_1(tuple<T1,T2> ts) {
+  return get<0>(ts);  
 }
 
-template <int i, int n>
-LM::lm<double, double> D$selfun()
+template <typename T1, typename T2>
+T2 selfun$2_2(tuple<T1,T2> ts) {
+  return get<1>(ts);  
+}
+
+template <typename T1, typename T2>
+LM::lm<tuple<T1,T2>, T1> D$selfun$2_1(T1,T2)
 {
-    return LM::lmOne<double,double>();
+    return LM::lmHCat<tuple<T1,T2>, T1>(LM::lmOne<T1,T1>(), LM::lmZero<T2,T1>());
+}
+
+template <typename T1, typename T2>
+LM::lm<tuple<T1,T2>, T2> D$selfun$2_2(T1,T2)
+{
+    return LM::lmHCat<tuple<T1,T2>, T2>(LM::lmZero<T1,T2>(), LM::lmOne<T2,T2>());
 }
 
 } // namespace ks
-
-#include <iostream>
-#include <string>
 
 template <class T1, class T2>
 std::ostream &operator<<(std::ostream &s, tuple<T1, T2> const &ts)
@@ -203,6 +262,21 @@ struct type_to_string<tuple<T1, T2>>
     static std::string name()
     {
         return "tuple<" + type_to_string<T1>::name() + "," + type_to_string<T2>::name() + ">";
+    }
+};
+
+template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
+struct type_to_string<tuple<T1, T2, T3, T4, T5, T6, T7>>
+{
+    static std::string name()
+    {
+        return "tuple<" + type_to_string<T1>::name() + ","
+                        + type_to_string<T2>::name() + ","
+                        + type_to_string<T3>::name() + ","
+                        + type_to_string<T4>::name() + ","
+                        + type_to_string<T5>::name() + ","
+                        + type_to_string<T6>::name() + ","
+                        + type_to_string<T7>::name() + ">";
     }
 };
 
@@ -230,6 +304,14 @@ std::ostream &operator<<(std::ostream &s, ks::LM::lm<T1, T2> const &l)
     return s << type_to_string<ks::LM::lm<T1, T2>>::name() << "(" + l.ty + ")";
 }
 
+template <class T>
+std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
+{
+    for (int i = 0; i < v.size; ++i)
+      s << (i == 0 ? "[" : ", ") << v.data[i];
+    return s << "]";
+}
+
 template <class T1>
 ks::zero_t pr(T1 a)
 {
@@ -237,11 +319,22 @@ ks::zero_t pr(T1 a)
     std::cout << "A= " << a << std::endl;
     return ks::zero_t{};
 }
+
 template <class T1, class T2>
 ks::zero_t pr(T1 a, T2 b)
 {
     std::cout << "----\n";
     std::cout << "A= " << a << std::endl;
     std::cout << "B= " << b << std::endl;
+    return ks::zero_t{};
+}
+
+template <class T1, class T2, class T3>
+ks::zero_t pr(T1 a, T2 b, T3 c)
+{
+    std::cout << "----\n";
+    std::cout << "A= " << a << std::endl;
+    std::cout << "B= " << b << std::endl;
+    std::cout << "C= " << c << std::endl;
     return ks::zero_t{};
 }

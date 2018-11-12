@@ -4,71 +4,77 @@ import Lang
 import Prim
 import Text.PrettyPrint as PP
 
+gradDefs :: [TDef] -> [TDef]
+gradDefs = map gradDef
+
+gradDef :: TDef -> TDef
+gradDef (DefX (TFun ty f) params rhs) =
+  let gradf = TFun tylm $ gradF f in
+  assertEqualThen ("gradDef " ++ show f) ty (typeof rhs) $
+  DefX gradf params $
+    mkLets [ gradParam param i n | (param, i) <- params `zip` [1..] ] $
+    gradE tys rhs
+
+  where
+    n = length params
+    tys = tysOfParams params
+    tylm = TypeLM tys ty
+
+    tysOfParams [] = TypeUnknown
+    tysOfParams [TVar ty _] = ty
+    tysOfParams ps = TypeTuple (map (\(TVar ty v) -> ty) ps)
+
+    gradParam (TVar TypeInteger v) _ _ = 
+      (TVar (TypeLM tys TypeInteger) (gradV v), lmZero tys TypeInteger)
+    gradParam (TVar tyv v) i n =
+      (TVar (TypeLM tys tyv) (gradV v), gradSelFun tys i n params) 
+
+gradSelFun :: Type -> Int -> Int -> [TVar Var] -> TExpr
+-- (gradSelFun i n) selects the i'th component of a n-tuple
+-- Special case for 1-tuples
+-- Result expr has type (t1, ..., tn) -o ti
+gradSelFun tyt@(TypeTuple ts) i n params = 
+   mkTCall (TypeLM tyt (ts!!(i-1))) (GradFun (SelFun i n) Fwd) (map Var params)
+gradSelFun t i 1 params = lmOne t
+
 
 gradF :: Fun -> Fun
 gradF (Fun f) = GradFun f Fwd
 gradF f       = error ("gradF: bad function: " ++ show f)
 
-gradTF :: TFun -> TFun
-gradTF (TFun ty f) = TFun (TypeLM ty ty) $ gradF f
-
 gradV :: Var -> Var
 gradV (Simple x) = Grad x Fwd
 gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
 
-gradTV :: TVar -> TVar
-gradTV (TVar ty v) = TVar (TypeLM ty ty) (gradV v)
+gradTV :: Type -> TVar Var -> TVar Var
+gradTV s (TVar ty v) = TVar (TypeLM s ty) (gradV v)
 
-gradE :: Expr -> Expr
-gradE (Expr ty ex) = gradEX ty ex
-
-gradEX :: Type -> ExprX -> Expr
-gradEX TypeInteger _   = lmZero TypeInteger TypeInteger
-gradEX ty (Konst k)    = lmZero ty ty
-gradEX ty (Var v)         = Expr (TypeLM ty ty) $ Var (gradV v)
-gradEX ty (Assert e1 e2)  = mkAssert e1 (gradE e2)
+-- s -> Expr :: t -> Expr LM s -o t
+gradE :: Type -> TExpr -> TExpr
+gradE s (Konst k)         = lmZero s (typeofKonst k)
+gradE s (Var v) = Var $ gradTV s v
+gradE s (Assert e1 e2)    = Assert e1 (gradE s e2)
 
 -- grad[ build (\i.e ]
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradEX tyv (Call (TFun _ (Fun (SFun "build"))) (Expr _ (Tuple [n, Expr (TypeLambda TypeInteger ty) (Lam i b)])))
-  = lmBuild n $ mkLam i (mkLet (gradTV i) (lmZero TypeInteger TypeInteger) (gradE b))
+gradE s (Call (TFun _ (Fun (SFun "build"))) (Tuple [n, (Lam i TypeInteger b)]))
+  = lmBuild n $ Lam i TypeInteger (Let (gradTV s i) (lmZero  s TypeInteger) (gradE s b))
 
-gradEX ty (Call (TFun tyf fun) arg@(Expr tyarg _))
-  = assertEqualThen "gradEXFun" ty tyf $
-    mkCallF (TypeLM tyarg ty) (gradF fun) [arg]
-    `lmCompose`
-    gradE arg
+gradE s (Call (TFun tyf fun) arg) =
+  let tyarg = typeof arg in
+  mkTCall (TypeLM tyarg tyf) (gradF fun) [arg]
+  `lmCompose`
+  gradE s arg
 
-gradEX ty (Let v e1 e2) = mkLet v e1                 $
-                          mkLet (gradTV v) (gradE e1)   $
-                          gradE e2
+gradE s (Let v e1 e2) = Let v e1                        $
+                        Let (gradTV s v) (gradE s e1)   $
+                        gradE s e2
 
-gradEX ty (Tuple es) = lmVCats (map gradE es)
-gradEX ty (If b t e) = mkIf b (gradE t) (gradE e)
-gradEX ty e@(Lam {}) = pprPanic "gradE: can't deal with lambda yet" (ppr e)
-
-gradDefs :: [Def] -> [Def]
-gradDefs = map gradDef
-
-gradDef :: Def -> Def
-gradDef (Def fun params rhs)
-  = Def (gradTF fun) params $
-    mkLets [ (gradTV param, gradParam param i n)
-           | (param, i) <- params `zip` [1..] ] $
-    gradE rhs
-  where
-    n = length params
-    gradParam (TVar TypeInteger _) _ _= lmZero TypeInteger TypeInteger
-    gradParam _ i n = gradSelFun (TypeTuple $ map (\(TVar ty _) -> ty) params) i n 
-
-gradSelFun :: Type -> Int -> Int -> Expr
--- (gradSelFun i n) selects the i'th component of a n-tuple
--- Special case for 1-tuples
--- Result expr has type (t1, ..., tn) -o ti
-gradSelFun (TypeTuple [t]) i 1 = lmOne t
-gradSelFun tyt@(TypeTuple ts) i n =  mkCallF (TypeLM (ts!!(i-1)) (ts!!(i-1))) (GradFun (SelFun i n) Fwd) []
+gradE s (Tuple es) = lmVCats (map (gradE s) es)
+gradE s (If b t e) = If b (gradE s t) (gradE s e)
+gradE s e@(Lam {}) = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 
 
 ---------------------------------
@@ -78,15 +84,15 @@ gradSelFun tyt@(TypeTuple ts) i n =  mkCallF (TypeLM (ts!!(i-1)) (ts!!(i-1))) (G
 -- Local bindings of type (S -o T)
 -- are transformed to ones of type T
 
-applyD :: Def -> Def
-applyD (Def (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
-  = Def (TFun s (DrvFun f Rev)) (vars ++ [TVar t dr]) $
-    lmApply rhs $ Expr t (Var dr)
-    where dr = Delta "r"
+applyD :: TDef -> TDef
+applyD (DefX (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
+  = DefX (TFun s (DrvFun f Rev)) (vars ++ [dr]) $
+    lmApply rhs $ Var dr
+    where dr = TVar t $ Delta "r"
 
-applyD (Def (TFun (TypeLM s t) (GradFun f Fwd)) vars rhs)
-  = Def (TFun t (DrvFun f Fwd)) (vars ++ dvars) $
-    lmApply rhs (mkTuple $ map (\(TVar ty v) -> Expr ty $ Var v) dvars)
+applyD (DefX (TFun (TypeLM s t) (GradFun f Fwd)) vars rhs)
+  = DefX (TFun t (DrvFun f Fwd)) (vars ++ dvars) $
+    lmApply rhs (mkTuple $ map Var dvars)
   where
     dvars = map to_delta vars
 
@@ -95,7 +101,7 @@ applyD (Def (TFun (TypeLM s t) (GradFun f Fwd)) vars rhs)
 ---------------------------------
 -- Transpose
 
-transposeD :: Def -> Def
-transposeD (Def (TFun (TypeLM s t) (GradFun f d)) args rhs)
-  = Def (TFun (TypeLM t s) (GradFun f (flipMode d))) args $
+transposeD :: TDef -> TDef
+transposeD (DefX (TFun (TypeLM s t) (GradFun f d)) args rhs)
+  = DefX (TFun (TypeLM t s) (GradFun f (flipMode d))) args $
     lmTranspose rhs

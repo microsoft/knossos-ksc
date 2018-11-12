@@ -90,7 +90,7 @@ testParse  p s = case runParser p s of
 runParser :: Parser a -> String -> Either ParseError a
 runParser p s = parse p "" s
 
-parseF :: String -> IO [Def Fun Var]
+parseF :: String -> IO [Def]
 parseF file = do
         cts <- readFile file
         case runParser pDefs cts of
@@ -209,9 +209,9 @@ pTuple = do { pReserved "tuple"
 pLam :: Parser (ExprX Fun Var)
 -- (lam i e)
 pLam = do { pReserved "lam"
-          ; i <- pParam
+          ; (TVar ty v) <- pParam
           ; e <- pExpr
-          ; return $ Lam i e }
+          ; return $ Lam v ty e }
 
 pBind :: Parser (Var, ExprX Fun Var)
 -- var rhs
@@ -228,15 +228,15 @@ pLet = do { pReserved "let"
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
 
-pDef :: Parser (Def Fun Var)
+pDef :: Parser (Def)
 -- (def f (x1 x2 x3) rhs)
 pDef = parens $ do { pReserved "def"
                    ; f <- pIdentifier
                    ; xs <- parens (many pParam)
                    ; rhs <- pExpr
-                   ; return (Def (mkFun f) xs rhs) }
+                   ; return (DefX (mkFun f) xs rhs) }
 
-pDefs :: Parser [Def Fun Var]
+pDefs :: Parser [Def]
 pDefs = spaces >> many pDef
 
 
@@ -254,5 +254,5 @@ test_Parser =
       test pExpr "(if (f 1 2 3) (let (v (+ 2 3)) (* v 7)) 0.7)" $
                     "if f( 1, 2, 3 )\nthen let { v = 2 + 3 }\n     v * 7\nelse 0.7"
       test pDef "(def f ((x : Integer)) (lam (y : Float) (+ x y)))" $
-                "def f((x : Integer)) = \\(y : Float). x + y" ;
+                "def f((x : Integer)) = (lam (y : Float)  x + y)" ;
   where test p src expected = it src $ (toStr p src) `shouldBe` (show expected)

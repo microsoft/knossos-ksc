@@ -6,18 +6,18 @@ import Text.PrettyPrint as PP
 import qualified Data.Set as S
 import qualified Data.Map as M
 
-optLets :: Expr -> Expr
+optLets :: TExpr -> TExpr
 optLets = optLetsE . occAnal
 
 ----------------------
--- Dead code elimination
+-- Dead code elimination - occurrence analysis
 ----------------------
 
-occAnal :: Expr -> ExprX (Int,Var)
+occAnal :: TExpr -> ExprX TFun (Int,TVar Var)
 occAnal e = fst (occAnalE e)
 
-occAnalE :: Expr -> (ExprX (Int,Var), M.Map Var Int)
-occAnalE (Var v)   = (Var v, M.singleton v 1)
+occAnalE :: TExpr -> (ExprX TFun (Int,TVar Var), M.Map (TVar Var) Int)
+occAnalE (Var v)   = (Var (1,v), M.singleton v 1)
 occAnalE (Konst k) = (Konst k, M.empty)
 occAnalE (App e1 e2)
   = (App e1' e2', M.union vs1 vs2)
@@ -31,8 +31,8 @@ occAnalE (Assert e1 e2)
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
-occAnalE (Lam v e)
-  = (Lam (n,v) e', v `M.delete` vs)
+occAnalE (Lam v ty e)
+  = (Lam (n,v) ty e', v `M.delete` vs)
   where
     (e', vs) = occAnalE e
     n = case v `M.lookup` vs of
@@ -63,26 +63,26 @@ occAnalE (If b t e)
     (t', vst) = occAnalE t
     (e', vse) = occAnalE e
 
-union :: M.Map Var Int -> M.Map Var Int -> M.Map Var Int
+union :: Ord b => M.Map b Int -> M.Map b Int -> M.Map b Int
 union = M.unionWith (+)
 
-unions :: [M.Map Var Int] -> M.Map Var Int
+unions :: Ord b => [M.Map b Int] -> M.Map b Int
 unions = foldr union M.empty
 
 -------------------------
 -- Substitute trivials
 -------------------------
-optLetsE :: ExprX (Int,Var) -> Expr
+optLetsE :: ExprX TFun (Int,TVar Var) -> TExpr
 optLetsE e = go M.empty e
   where
-    go :: M.Map Var Expr -> ExprX (Int,Var) -> Expr
-    go subst (Let (n,v) r b)
-      | inline_me n v r' = go (M.insert v r' subst) b
-      | otherwise        = Let v r' (go subst b)
+    go :: M.Map (TVar Var) TExpr -> ExprX TFun (Int,TVar Var) -> TExpr
+    go subst (Let (n,TVar ty v) r b)
+      | inline_me n v r' = go (M.insert (TVar ty v) r' subst) b
+      | otherwise        = Let (TVar ty v) r' (go subst b)
       where
         r' = go subst r
 
-    go subst (Var v)
+    go subst (Var (_,v))
       = case M.lookup v subst of
           Just e  -> e
           Nothing -> Var v
@@ -93,9 +93,9 @@ optLetsE e = go M.empty e
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
     go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
-    go subst (Lam (_,v) e)  = Lam v (go (v `M.delete` subst) e)
+    go subst (Lam (_,v) ty e)  = Lam v ty (go (v `M.delete` subst) e)
 
-inline_me :: Int -> Var -> Expr -> Bool
+inline_me :: Int -> Var -> TExpr -> Bool
 inline_me n bndr rhs
   | n==0            = True
   | n==1            = True
@@ -103,7 +103,7 @@ inline_me n bndr rhs
   | Grad {} <- bndr = True
   | otherwise       = False
 
-isTrivial :: Expr -> Bool
+isTrivial :: TExpr -> Bool
 isTrivial (Tuple [])          = True
 isTrivial (Var {})            = True
 isTrivial (Konst {})          = True

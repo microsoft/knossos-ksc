@@ -4,6 +4,10 @@
 (def b ((y : Float))
     (* 2.0 y))
 
+(def g ((x : Float) (y : Float))
+    (* x y))
+
+
 (def f ((x : Float) (y : Float))
     (let (z (* 5.0 x))
         (/ (a z) (b y))))

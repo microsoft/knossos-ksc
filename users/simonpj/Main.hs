@@ -5,9 +5,10 @@ import Parse (runParser, pDefs, parseF)
 import Annotate
 import Cgen
 import AD
+import Opt
 
+import Data.Hashable
 -- import ANF
--- import Opt
 -- import CSE
 -- import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
@@ -224,31 +225,46 @@ demoN def
 
 moveMain :: [Def] -> ([Def],[Def])
 moveMain [] = ([],[])
-moveMain (def:main@(Def (TFun ty (Fun (SFun "main"))) _ _):defs) = ([main],def:defs)
+moveMain (def:main@(DefX (Fun (SFun "main")) _ _):defs) = ([main],def:defs)
 moveMain (def:defs) = let (m,t) = moveMain defs in (m,def:t)
 
 doall :: String -> IO ()
-doall file = runKM $
+doall file =
+  let dd defs = liftIO $ putStrLn ("---" ++ (take 1000 $ show (ppr defs) ++ (show $ hash (show $ ppr defs))))
+      dd1 :: Pretty p => [p] -> KM ()
+      dd1 = displayN in
+  runKM $
   do {
      alldefs <- liftIO (parseF (file ++ ".ks"))
   ;  liftIO $ putStrLn "read defs"
   ;  let (main,defs) = moveMain alldefs
   ;  liftIO $ putStrLn ("found main " ++ show (ppr main))
-  ;  let ann = annotDefs defs
-  ;  liftIO $ putStrLn "annotated defs"
+  ;  banner "defs"
+  ;  dd defs
+  ;  let ann = annotDefs [] defs
+  ;  banner "annotated defs"
+  ;  dd ann
   ;  let grad = gradDefs ann
-  --;  let opt = optDefs grad
-  --;  let fwd = map applyD opt
-  --;  let optfwd = optDefs fwd
-  --;  csefwd <- cseDefs optfwd 
-  ;  let ann2 =  (ann ++ grad ++ main)
+  ;  banner "grad"
+  ;  dd grad
+  ;  let opt = optDefs grad
+  ;  banner "opt"
+  ;  dd opt
+  ;  let fwd = map applyD opt
+  ;  let optfwd = optDefs fwd
+  --;  csefwd <- cseDefs optfwd
+  ;  let alldefs = ann ++ opt ++ optfwd
+  ;  let annotmain = annotDefs alldefs main
+  ;  let ann2 =  alldefs ++ annotmain
+  ;  banner "all"
+  ;  dd ann2
   ;  liftIO (cppF ("obj\\" ++ file) ann2)
   }
 
 gmm :: IO ()
 gmm = doall "examples\\gmm"
 
-go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . annotDefs
+go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . (annotDefs [])
 
 main :: IO ()
 main = return ()  -- To keep GHC quiet

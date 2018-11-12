@@ -1,7 +1,8 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, FlexibleInstances, TypeApplications  #-}
 
 module Cgen where
 
+import GHC.Stack
 import           Prelude                 hiding ( lines
                                                 , tail
                                                 )
@@ -29,70 +30,85 @@ freshCVar = do
   S.put (s + 1)
   return ("c$" ++ show s)
 
-freshVar :: M L.Var
-freshVar = do
-  -- This doesn't communicate very well but is quick (and dirty)
-  s <- S.get
-  S.put (s + 1)
-  return $ L.Simple $ "v$" ++ show s
+class CfreshVar b where
+  freshVar :: L.Type -> M b
+
+instance CfreshVar L.Var where  
+  freshVar _ = do
+    -- This doesn't communicate very well but is quick (and dirty)
+    s <- S.get
+    S.put (s + 1)
+    return $ L.Simple $ "v$" ++ show s
+
+instance CfreshVar (L.TVar L.Var) where  
+  freshVar ty = do
+                 v <- freshVar @L.Var ty
+                 return $ L.TVar ty v
 
 ------------ Administrative normal form
 
-anf :: L.Expr -> M L.Expr
-anf (L.Expr tye ex) = case ex of
-  L.Call f (L.Expr ty (L.Tuple ts)) -> do
+anf :: (L.TypeableFun f, L.Typeable b,  CfreshVar b) => L.ExprX f b -> M (L.ExprX f b)
+anf = \case
+  L.Call f (L.Tuple ts) -> do
     anfArgs <- mapM letAnf ts
     return $ foldr
       (.)
       id
       (map fst anfArgs)
-      (L.Expr tye (L.Call f (L.Expr ty (L.Tuple (map snd anfArgs)))))
+      $ L.Call f (L.Tuple (map snd anfArgs))
 
   L.Call f e -> do
     (lete, ve) <- letAnf e
-    return $ lete $ L.Expr tye $ L.Call f ve
+    return $ lete $ L.Call f ve
+
   L.Tuple ts -> do
     anfArgs <- mapM letAnf ts
-    return $ foldr (.) id (map fst anfArgs) $ L.Expr tye $ L.Tuple
-      (map snd anfArgs)
-  L.Lam x e -> do
+    return $ foldr (.) id (map fst anfArgs) $
+           L.Tuple (map snd anfArgs)
+  
+  L.Lam x ty e -> do
     anfe <- anf e
-    return $ L.Expr tye $ L.Lam x anfe
+    return $ L.Lam x ty anfe
+  
   L.App f x -> do
     (letf, vf) <- letAnf f
     (letx, vx) <- letAnf x
-    return $ letf $ letx $ L.Expr tye $ L.App vf vx
+    return $ letf $ letx $ L.App vf vx
+  
   L.Let x e body -> do
     anfe    <- anf e
     anfbody <- anf body
-    return $ L.Expr tye $ L.Let x anfe anfbody
+    return $ L.Let x anfe anfbody
+    
   L.If cond ift iff -> do
     anfcond <- anf cond
     anfift  <- anf ift
     anfiff  <- anf iff
-    return $ L.Expr tye $ L.If anfcond anfift anfiff
+    return $ L.If anfcond anfift anfiff
+
   L.Assert cond body -> do
     anfcond <- anf cond
     anfbody <- anf body
-    return $ L.Expr tye $ L.Assert anfcond anfbody
-  _ -> return $ L.Expr tye ex
+    return $ L.Assert anfcond anfbody
+
+  ex -> return ex
 
 -- letAnf of (+ a b) is (\body -> let c17 = (+ a b) in body, c17)
-letAnf :: L.Expr -> M (L.Expr -> L.Expr, L.Expr)
-letAnf e@(L.Expr tye _) = do
-  ve   <- freshVar
+letAnf :: (L.TypeableFun f, L.Typeable b, CfreshVar b) => L.ExprX f b -> M (L.ExprX f b -> L.ExprX f b, L.ExprX f b)
+letAnf e = do
+  ve   <- freshVar (L.typeof e)
   anfe <- anf e
   return
-    ( \body@(L.Expr tybody _) -> L.Expr tybody (L.Let (L.TVar tye ve) anfe body)
-    , L.Expr (L.typeOf anfe) (L.Var ve)
+    ( \body -> L.Let ve anfe body
+    , L.Var ve
     )
 
-anfDefs :: [L.Def] -> [L.Def]
+anfDefs :: (L.TypeableFun f, L.Typeable b, CfreshVar b) => [L.DefX f b] -> [L.DefX f b]
 anfDefs = map anfDef
 
-anfDef :: L.Def -> L.Def
-anfDef (L.Def (L.TFun ty f) vars expr) =
-  L.Def (L.TFun ty f) vars $ runM $ anf expr
+anfDef :: (L.TypeableFun f, L.Typeable b, CfreshVar b) => L.DefX f b -> L.DefX f b
+anfDef (L.DefX f vars expr) =
+  L.DefX f vars $ runM $ anf expr
 
 -------------------- Cgen
 
@@ -103,14 +119,14 @@ anfDef (L.Def (L.TFun ty f) vars expr) =
 --       "1.0")      -- this is what we use at the occurrence
 type CGenResult = (String, String)
 
-cgenDefs :: [L.Def] -> [String]
+cgenDefs :: [L.TDef] -> [String]
 cgenDefs = map cgenDef
 
-cgenDef :: L.Def -> String
+cgenDef :: L.TDef -> String
 cgenDef def = fst $ cgenDefE def
 
-cgenDefE :: L.Def -> CGenResult
-cgenDefE (L.Def f@(L.TFun tyf _) vars expr) =
+cgenDefE :: L.TDef -> CGenResult
+cgenDefE (L.DefX f@(L.TFun tyf _) vars expr) =
   let _ = trace ("Def " ++ show f ++ "\n") ()
   in  let (cDecl, cVar) = runM $ cgenExpr expr
       in  ( cgenType tyf
@@ -127,44 +143,45 @@ cgenDefE (L.Def f@(L.TFun tyf _) vars expr) =
           , cgenFun f
           )
 
-cgenExpr :: L.Expr -> M CGenResult
+cgenExpr :: L.TExpr -> M CGenResult
 cgenExpr = cgenExprR <=< anf
 
 -- The input expression must be in ANF
-cgenExprR :: L.Expr -> M CGenResult
-cgenExprR (L.Expr ty ex) = case ex of
+cgenExprR :: L.TExpr -> M CGenResult
+cgenExprR ex = case ex of
   L.Konst k             -> return ("", cgenKonst k)
 
-  L.Var   v             -> return ("", cgenVar v)
+  L.Var (L.TVar _ v)    -> return ("", cgenVar v)
 
-  L.Call f (L.Expr _ x) -> case x of
+  L.Call tf@(L.TFun ty _) x -> case x of
     L.Tuple vs -> do
-      v         <- freshCVar
       cgresults <- mapM cgenExprR vs
       let decls = map fst cgresults
       let exprs = map snd cgresults
 
+      v <- freshCVar
       return
-        ( "/****/"
+        ( "/**Call**/"
         ++ intercalate ";\n" decls
         ++ cgenType ty
         ++ " "
         ++ v
         ++ " = "
-        ++ cgenFun f
+        ++ cgenFun tf
         ++ "("
         ++ intercalate "," exprs
         ++ ");\n"
         , v
         )
-    L.Var v -> do
+    L.Var (L.TVar tyv v) -> do
       vf <- freshCVar
 
       return
-        ( cgenType ty
+        ( "/**Var**/"
+        ++    cgenType ty 
         `spc` vf
         ++    " = "
-        ++    cgenFun f
+        ++    cgenFun tf
         ++    "("
         ++    cgenVar v
         ++    ");\n"
@@ -176,14 +193,15 @@ cgenExprR (L.Expr ty ex) = case ex of
         $  "Function arguments should be Var in ANF, not"
         ++ show x
         ++ " in call to "
-        ++ show f
+        ++ show tf
 
   L.Let (L.TVar tyv v) e1 body -> do
     (decle1  , ve1  ) <- cgenExprR e1
     (declbody, vbody) <- cgenExprR body
     return
-      ( decle1
-      ++ cgenType tyv
+      (  "/**Let**/"
+      ++ decle1
+      ++ "auto/*" ++ cgenType tyv ++ "*/"
       ++ " "
       ++ cgenVar v
       ++ " = "
@@ -195,20 +213,22 @@ cgenExprR (L.Expr ty ex) = case ex of
 
   L.Tuple [t] -> cgenExpr t
   L.Tuple ts  -> do
-    let unVar :: L.ExprX -> L.Var
+    let unVar :: L.TExpr -> L.Var
         unVar = \case
-          L.Var v -> v
+          L.Var (L.TVar ty v) -> v
           _       -> error "Tuple: Expected arguments to be Vars"
 
-        vars = map (unVar . L.bodyOf) ts
+        vars = map unVar ts
 
     return ("", "std::make_tuple(" ++ intercalate "," (map cgenVar vars) ++ ")")
 
-  L.Lam (L.TVar tv v) body -> do
+  L.Lam (L.TVar tv v) ty1 body -> do
+    let _ = L.assertEqual "CGLam" tv ty1
     l        <- freshCVar
     (cE, vE) <- cgenExprR body
     return
-      ( cgenType ty
+      ( "/**Lam**/"
+      ++ cgenType (L.TypeLambda tv (L.typeof body)) 
       `spc` l
       ++    " = [&]("
       ++    cgenType tv
@@ -227,6 +247,7 @@ cgenExprR (L.Expr ty ex) = case ex of
     (declc, vc) <- cgenExprR c
     (declt, vt) <- cgenExprR texpr
     (declf, vf) <- cgenExprR fexpr
+    let ty = L.typeof texpr
 
     return
       ( declc -- emit condition generation
@@ -266,10 +287,10 @@ cgenExprR (L.Expr ty ex) = case ex of
 cgenFunId :: L.FunId -> String
 cgenFunId = \case
   L.SFun fun   -> translateFun fun
-  L.SelFun i n -> "selfun<" ++ show i ++ "," ++ show n ++ ">"
+  L.SelFun i n -> "selfun$" ++ show n ++ "_" ++ show i
 
-cgenFun :: L.TFun -> String
-cgenFun (L.TFun ty f) = case f of
+cgenFun :: HasCallStack => L.TFun -> String
+cgenFun tf@(L.TFun ty f) = case f of
   L.Fun funId       -> cgenFunId funId
   L.GradFun s L.Fwd -> "D$" ++ cgenFunId s
   L.GradFun s L.Rev -> "R$" ++ cgenFunId s
@@ -278,9 +299,10 @@ cgenFun (L.TFun ty f) = case f of
   L.LMFun s         -> case ty of
     L.TypeLM t1 t2 ->
       "LM::" ++ s ++ "<" ++ cgenType t1 ++ "," ++ cgenType t2 ++ ">"
-    L.TypeUnknown -> "auto"
-    unexpected    -> error ("Unexpected type in LMFun: " ++ show unexpected)
+    t -> "LM::/* " ++ show t ++ "*/" ++ s
 
+cgenTypeOf :: L.TExpr -> String
+cgenTypeOf = cgenType . L.typeof
 
 cgenType :: L.Type -> String
 cgenType = \case
@@ -304,17 +326,7 @@ cgenKonst = \case
   L.KBool    b -> if b then "TRUE" else "FALSE"
 
 cgenVar :: L.Var -> String
-cgenVar = \case
-  L.Simple s -> "s_" ++ s
-  L.Delta  d -> "d_" ++ d
-  L.Grad g m ->
-    "g_"
-      ++ g
-      ++ "_"
-      ++ (case m of
-           L.Fwd -> "f"
-           L.Rev -> "r"
-         )
+cgenVar v = show v
 
 translateFun :: String -> String
 translateFun = \case
@@ -326,7 +338,7 @@ translateFun = \case
   "<"  -> "lt"
   s    -> s
 
-cppF :: String -> [L.Def] -> IO ()
+cppF :: String -> [L.TDef] -> IO ()
 -- String is the file name
 cppF outfile defs = do
   let lines =

@@ -2,7 +2,9 @@
 
 module Annotate where
 
-import           Debug.Trace                    ( trace )
+import GHC.Stack
+import Debug.Trace                    ( trace )
+
 import qualified Data.Map                      as Map
 
 import           Lang
@@ -23,7 +25,7 @@ stInsert v ty env = dbtrace
   (Map.insert v ty env)
 
 stInsertFun :: Fun -> Type -> ST -> ST
-stInsertFun f = stInsert (Simple (show $ ppr f))
+stInsertFun f = stInsert (Simple $ show f)
 
 stLookup :: String -> Var -> ST -> Type
 stLookup msg v env = case Map.lookup v env of
@@ -39,17 +41,21 @@ stLookupFun msg unexpected =
 
 --------------------------
 
-annotDef :: Def -> Def
+annotDef :: Def -> TDef
 annotDef = annotDefE stCreate
 
-annotDefs :: [Def] -> [Def]
-annotDefs defs =
-  let env = stCreate in reverse $ snd $ foldl accum (env, []) defs
+annotDefs :: [TDef] -> [Def] -> [TDef]
+annotDefs predefs defs =
+  let env = foldl add_predef stCreate predefs in
+  reverse $ snd $ foldl accum (env, []) defs
  where
-  accum :: (ST, [Def]) -> Def -> (ST, [Def])
+  accum :: (ST, [TDef]) -> Def -> (ST, [TDef])
   accum (env, tdefs) def =
-    let tdef@(Def (TFun tf f) _ _) = annotDefE env $ dbg env def
-    in  (stInsertFun f tf env, tdef : tdefs)
+    let tdef@(DefX (TFun tf f) _ _) = annotDefE env $ dbg env def in
+    (stInsertFun f tf env, tdef : tdefs)
+
+  add_predef :: ST -> TDef -> ST
+  add_predef env (DefX (TFun ty f) _ _) = stInsertFun f ty env
 
   dbg :: ST -> Def -> Def
   dbg env def = -- returns def
@@ -57,85 +63,72 @@ annotDefs defs =
     ("Passing ENV[" ++ show env ++ "]" ++ " to " ++ (show $ ppr def) ++ "\n")
     def
 
-annotDefE :: ST -> Def -> Def
-annotDefE env (Def (TFun _ f) vars expr) =
+annotDefE :: ST -> Def -> TDef
+annotDefE env (DefX f vars expr) =
   let _ = trace ("Def " ++ show f ++ "\n") ()
   in  let body_env = foldr addVarToEnv env vars
-      in  let te@(Expr ty _) = annotExpr body_env expr
-          in  Def (TFun ty f) vars te
+      in  let (ty,e) = annotExpr body_env expr
+          in  DefX (TFun ty f) vars e
  where
-  addVarToEnv :: TVar -> ST -> ST
+  addVarToEnv :: TVar Var -> ST -> ST
   addVarToEnv (TVar ty v) = stInsert v ty
 
-annotExpr :: ST -> Expr -> Expr
-annotExpr env (Expr _ ex) = annotExprX env ex
-
-chUnk :: Type -> Type -> a -> a
-chUnk TypeUnknown _  val = val
-chUnk ty0         ty val = if ty0 == ty
-  then trace "Types matched" val
-  else error ("Declared types mismatched: " ++ show ty0 ++ " /= " ++ show ty)
-
-checkLookup :: String -> Type -> Var -> ST -> Type
-checkLookup msg ty0 v env = let ty = stLookup msg v env in chUnk ty0 ty ty
-
-annotExprX :: ST -> ExprX -> Expr
-annotExprX env = \case
+annotExpr :: ST -> Expr -> (Type, TExpr)
+annotExpr env = \case
   -- Naming conventions in this function:
   --  e   Expr [TypeUnkown]
   --  ae  Expr [Annotated]
   --  tye Type of e
   --  xe  ExprX part of e
-  Var   v -> Expr (stLookup "Var" v env) $ Var v
+  Var   v -> let ty = stLookup "Var" v env in
+             (ty, Var $ TVar ty v)
 
-  Konst k -> Expr (typeofKonst k) $ Konst k
+  Konst k -> (typeofKonst k, Konst k)
 
-  Call (TFun ty0 f) es ->
-    let aes@(Expr tyes _) = annotExpr env es
-    in  let stty = stLookupFun "Call" f env
-        in  let ty = typeofFun env f tyes
-            in  let _ = chUnk ty0 ty ()
-                in  let _ = chUnk stty ty () in Expr ty (Call (TFun ty f) aes)
+  Call f es ->
+    let (tyes,aes) = annotExpr env es in
+    let stty = stLookupFun "Call" f env in
+    let ty = typeofFunTy env f tyes in
+    (ty, Call (TFun ty f) aes)
 
-  Let (TVar ty0 v) e1 body ->
-    let ae1@(Expr tyv _) = annotExpr env e1
-    in  let body_env = stInsert v tyv env
-        in  let abody@(Expr tybody _) = annotExpr body_env body
-            in  let _ = chUnk ty0 tyv
-                in  Expr tybody $ Let (TVar tyv v) ae1 abody
+  Let v e1 body ->
+    let (tyv,ae1) = annotExpr env e1 in
+    let body_env = stInsert v tyv env in
+    let (tybody,abody) = annotExpr body_env body in
+    (tybody, Let (TVar tyv v) ae1 abody)
 
   Tuple es ->
-    let aes = map (annotExpr env) es
-    in  Expr (TypeTuple $ map typeOf aes) (Tuple aes)
+    let (tys,aes) = unzip $ map (annotExpr env) es in
+    (TypeTuple tys, Tuple aes)
 
-  Lam av@(TVar tyv v) body ->
-    let body_env = stInsert v tyv env
-    in  let abody@(Expr tybody _) = annotExpr body_env body
-        in  Expr (TypeLambda tyv tybody) $ Lam av abody
+  Lam v tyv body ->
+    let body_env = stInsert v tyv env in
+    let (tybody,abody) = annotExpr body_env body in
+    (TypeLambda tyv tybody, Lam (TVar tyv v) tyv abody)
 
   If cond texpr fexpr ->
-    let acond@(Expr tycond _) = annotExpr env cond
-    in  let atexpr@(Expr tytexpr _) = annotExpr env texpr
-        in  let afexpr@(Expr tyfexpr _) = annotExpr env fexpr
-            in  let _ = assertEqual "tycond" tycond TypeBool
-                in  let _ = assertEqual "ttexpr" tytexpr tyfexpr
-                    in  Expr tytexpr $ If acond atexpr afexpr
+    let (tycond,acond) = annotExpr env cond
+        (tytexpr,atexpr) = annotExpr env texpr
+        (tyfexpr,afexpr) = annotExpr env fexpr in
+    assertEqualThen "tycond" tycond TypeBool $
+    assertEqualThen "ttexpr" tytexpr tyfexpr $
+    (tytexpr, If acond atexpr afexpr)
 
   Assert cond body ->
-    let acond@(Expr tycond _) = annotExpr env cond
-    in  let abody@(Expr tybody _) = annotExpr env body
-        in  let _ = assertEqual "Assert" tycond TypeBool
-            in  Expr tybody $ Assert acond abody
+    let (tycond,acond) = annotExpr env cond 
+        (tybody,abody) = annotExpr env body in
+    assertEqualThen "Assert" tycond TypeBool $
+    (tybody, Assert acond abody)
 
   e -> error $ "Cannot annotate " ++ (show $ ppr e)
 
 
 -- A single place for "domain knowledge" about polymorphic functions -- to be pruned when we get primdefs
-typeofFun :: ST -> Fun -> Type -> Type
-typeofFun env f (TypeTuple tys) = typeofFunTys env f tys
-typeofFun env f ty              = typeofFunTys env f [ty]
+typeofFunTy :: HasCallStack => ST -> Fun -> Type -> Type
+typeofFunTy env f (TypeTuple tys) = typeofFunTys env f tys
+typeofFunTy env f ty              = typeofFunTys env f [ty]
 
-typeofFunTys :: ST -> Fun -> [Type] -> Type
+typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
 typeofFunTys env tf ttys = case (tf, ttys) of
   (Fun (SFun "pr")       , _                            ) -> TypeUnknown
   (GradFun (SFun "pr") _ , _                            ) -> TypeUnknown
@@ -144,13 +137,13 @@ typeofFunTys env tf ttys = case (tf, ttys) of
   (Fun (SFun "size" )    , [TypeVec _]                  ) -> TypeInteger
   (Fun (SFun "sum"  )    , [TypeVec t]                  ) -> t
 
+  (Fun (SFun "to_float") , [TypeInteger]                ) -> TypeFloat
   (Fun (SFun "exp"  )    , [TypeFloat]                  ) -> TypeFloat
   (Fun (SFun "log"  )    , [TypeFloat]                  ) -> TypeFloat
-  (Fun (SFun "+"    )    , t : _                        ) -> t
-  (Fun (SFun "/"    )    , t : _                        ) -> t
-  (Fun (SFun "*"    )    , t : _                        ) -> t
-  (GradFun (SFun "*") Fwd, t : tys) -> TypeLM (TypeTuple (t : tys)) t
-  (Fun (SFun "-"    )    , t : _                        ) -> t
+  (Fun (SFun "+"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
+  (Fun (SFun "/"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
+  (Fun (SFun "*"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
+  (Fun (SFun "-"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
 
   (Fun (SFun "=="   )    , _                            ) -> TypeBool
   (Fun (SFun "!="   )    , _                            ) -> TypeBool
@@ -169,15 +162,7 @@ typeofFunTys env tf ttys = case (tf, ttys) of
 
   (Fun (SFun f)        , _          ) -> case Map.lookup (Simple f) env of
     Just a  -> a
-    Nothing -> trace
-      (  "Failed to type fun ["
-      ++ show f
-      ++ "], types ["
-      ++ show ttys
-      ++ "], env"
-      ++ show env
-      )
-      TypeUnknown
+    Nothing -> error emsg
 
   (LMFun f, tys) -> typeofLMFun f tys
   (GradFun (SFun f) _, [tfrom]) ->
@@ -185,15 +170,14 @@ typeofFunTys env tf ttys = case (tf, ttys) of
   (GradFun (SFun f) _, t : tys) ->
     let tfrom = TypeTuple (t : tys)
     in  let ty = stLookup "GradFun2" (Simple f) env in TypeLM tfrom ty
-  _ ->
-    let emsg =
-          "EFailed to type ("
-            ++ show tf
-            ++ ", "
-            ++ show ttys
-            ++ "), env"
-            ++ show env
-    in  trace (error emsg) TypeUnknown
+  _ -> trace (error emsg) TypeUnknown
+  where emsg = "EFailed to type ("
+                ++ show tf
+                ++ ", "
+                ++ show ttys
+                ++ "), env"
+                ++ show env
+
 
 typeofLMFun :: String -> [Type] -> Type
 typeofLMFun f tys = case (f, tys) of
@@ -223,3 +207,24 @@ typeofLMFun f tys = case (f, tys) of
       ++ show tys
       ++ ") -> ?"
 
+
+--------------------------------------
+
+stripAnnots :: [TDef] -> [Def]
+stripAnnots = map stripAnnot
+
+stripAnnot :: TDef -> Def
+stripAnnot (DefX (TFun ty f) tvars texpr) =
+  DefX f tvars (stripAnnotExpr texpr)
+
+stripAnnotExpr :: TExpr -> Expr
+stripAnnotExpr = \case
+  Konst k -> Konst k
+  Var (TVar _ v) -> Var v
+  Call (TFun _ f) e -> Call f $ stripAnnotExpr e
+  Tuple es -> Tuple $ map stripAnnotExpr es
+  Lam (TVar _ v) ty e -> Lam v ty $ stripAnnotExpr e
+  App e1 e2 -> App (stripAnnotExpr e1) (stripAnnotExpr e2)
+  Let (TVar _ v) e1 e2 -> Let v (stripAnnotExpr e1) (stripAnnotExpr e2)
+  If c t f -> If (stripAnnotExpr c) (stripAnnotExpr t) (stripAnnotExpr f)
+  Assert c e -> Assert (stripAnnotExpr c) (stripAnnotExpr e)

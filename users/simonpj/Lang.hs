@@ -48,7 +48,11 @@ data FunId = SelFun     -- Selector function: fst, snd etc
                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                Int      -- Arity
            | SFun String  -- For now
-           deriving( Eq, Ord, Show )
+           deriving( Eq, Ord )
+
+instance Show FunId where
+  show (SFun s) = s
+  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
 
 data Fun = Fun     FunId         -- The function              f(x)
          | GradFun FunId ADMode  -- Full Jacobian Df(x)
@@ -56,9 +60,18 @@ data Fun = Fun     FunId         -- The function              f(x)
          | DrvFun  FunId ADMode  -- Derivative derivative f'(x,dx)
                                  --   Rev <=> reverse mode f`(x,dr)
          | LMFun   String        -- Linear map
-         deriving( Eq, Ord, Show )
+         deriving( Eq, Ord )
+
+instance Show Fun where
+  show (Fun s) = show s
+  show (GradFun s Fwd) = "D$" ++ show s
+  show (GradFun s Rev) = "R$" ++ show s
+  show (DrvFun  s Fwd) = "fwd$" ++ show s
+  show (DrvFun  s Rev) = "rev$" ++ show s
+  show (LMFun s) = "LM$" ++ s
 
 data TFun = TFun Type Fun
+  deriving (Eq, Ord)
 
 instance Show TFun where
   show (TFun ty f) = show f ++ "<" ++ show ty ++ ">"
@@ -69,7 +82,20 @@ data Var
                             -- or backward versions of f
   | Grad     String ADMode  -- \nabla x
                             --   True <=> transposed \bowtie x
-  deriving( Show, Eq, Ord )
+  deriving( Eq, Ord )
+
+instance Show Var where
+  show v = case v of
+    Simple s -> "s$" ++ s
+    Delta  d -> "d$" ++ d
+    Grad g m ->
+      "g"
+      ++ (case m of
+            Fwd -> "f"
+            Rev -> "r")
+      ++ "$"
+      ++ g
+
 
 data TVar b = TVar Type b
   deriving( Show, Eq, Ord )
@@ -84,14 +110,16 @@ isKZero :: ExprX f b -> Bool
 isKZero (Konst KZero) = True
 isKZero _             = False
 
-data Def f b = Def f [TVar b] (ExprX f b)  -- f x = e
+data DefX f b = DefX f [TVar Var] (ExprX f b)  -- f x = e
+type Def = DefX Fun Var
+type TDef = DefX TFun (TVar Var)
 
 data ExprX f b
   = Konst Konst
   | Var b
   | Call f (ExprX f b)      -- f e
   | Tuple [ExprX f b]            -- (e1, ..., en)
-  | Lam (TVar b) (ExprX f b)
+  | Lam b Type (ExprX f b)
   | App (ExprX f b) (ExprX f b)
   | Let b (ExprX f b) (ExprX f b)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX f b) (ExprX f b) (ExprX f b)  -- FIXME make cond ExprX?
@@ -126,10 +154,10 @@ instance (Typeable b, TypeableFun f) =>
   typeof (Call f e) = typeofFun f (typeof e)
   typeof (App f e) = TypeUnknown
   typeof (Tuple es) = TypeTuple $ map typeof es
-  typeof (Lam tv e) = typeof e
+  typeof (Lam v tyv e) = TypeLambda tyv $ typeof e
   typeof (Let b e1 e2) = typeof e2
   typeof (If c t f) = typeof t
-  typeof e = trace "BAD TY" $ TypeUnknown
+  typeof (Assert c e) = typeof e
 
 typeofKonst :: Konst -> Type
 typeofKonst KZero = TypeZero
@@ -137,8 +165,13 @@ typeofKonst (KInteger _) = TypeInteger
 typeofKonst (KFloat _) = TypeFloat
 typeofKonst (KBool _) = TypeBool
 
-typeOfDst (TypeLM _ dst) = dst
-typeOfSrc (TypeLM src _) = src
+typeofLMDst (TypeLM _ dst) = dst
+typeofLMSrc (TypeLM src _) = src
+
+typeofDst :: Typeable e => e -> Type
+typeofDst = typeofLMDst . typeof
+typeofSrc :: Typeable e => e -> Type
+typeofSrc = typeofLMSrc . typeof
 
 -- mkInfixCall :: Fun -> Expr -> Expr -> Expr
 -- mkInfixCall f a b = Call f (Tuple [a, b])
@@ -153,7 +186,12 @@ mkCall :: String->[Expr]->Expr
 mkCall fname [e] = Call (mkFun fname) e
 mkCall fname es = Call (mkFun fname) (mkTuple es)
 
-mkTuple :: [Expr] -> Expr
+mkTCall :: Type -> Fun -> [TExpr] -> TExpr
+mkTCall ty f [e] = Call (TFun ty f) e
+mkTCall ty f es = Call (TFun ty f) (mkTuple es)
+
+mkTuple :: [ExprX f b] -> ExprX f b
+mkTuple [e] = e
 mkTuple es = Tuple es
 
 mkSCall1 :: String -> Expr -> Expr
@@ -165,11 +203,30 @@ mkSCall2 fname a b = mkCall fname [a, b]
 mkSCall3 :: String -> Expr -> Expr -> Expr -> Expr
 mkSCall3 fname a b c = mkCall fname [a, b, c]
 
+mkTCall1 :: Type -> Fun -> TExpr -> TExpr
+mkTCall1 ty f a = mkTCall ty f [a]
+
+mkTCall2 :: Type -> Fun -> TExpr -> TExpr -> TExpr
+mkTCall2 ty f a b = mkTCall ty f [a, b]
+
+mkTCall3 :: Type -> Fun -> TExpr -> TExpr -> TExpr -> TExpr
+mkTCall3 ty f a b c = mkTCall ty f [a, b, c]
+
+mkLets :: [(TVar Var,TExpr)] -> TExpr -> TExpr
+mkLets [] e = e
+mkLets ((TVar ty v,rhs):bs) e = Let (TVar ty v) rhs (mkLets bs e)
+
 kInt :: Integer -> Expr
 kInt i = Konst (KInteger i)
 
+kTInt :: Integer -> TExpr
+kTInt i = Konst (KInteger i)
+
 kFloat :: Double -> Expr
 kFloat f = Konst (KFloat f)
+
+kTFloat :: Double -> TExpr
+kTFloat f = Konst (KFloat f)
 
 {-
 infixr 0 `seqExpr`
@@ -230,13 +287,13 @@ cmpExpr e1 e2
          Tuple es2 -> gos es1 subst es2
          _        -> LT
 
-   go (Lam (TVar _ b1) e1) subst e2
+   go (Lam b1 _ e1) subst e2
       = case e2 of
          Konst {} -> GT
          Var {}   -> GT
          Call {}  -> GT
          Tuple es -> GT
-         Lam (TVar _ b2) e2 -> go e1 (M.insert b2 b1 subst) e2
+         Lam b2 _ e2 -> go e1 (M.insert b2 b1 subst) e2
          _         -> LT
 
    go (App e1a e1b) subst e2
@@ -278,19 +335,19 @@ cmpExpr e1 e2
 
 
 --------------
-notFreeIn :: Var -> Expr -> Bool
-notFreeIn v e = go e
+notFreeIn :: Eq b => b -> ExprX f b -> Bool
+notFreeIn v e = go v e
  where
-   go::Expr -> Bool
-   go (Var v2) = v /= v2
-   go (Konst _) = True
-   go (Tuple es) = all go es
-   go (If b t e) = go b && go t && go e
-   go (Call _ e) = go e
-   go (App f a)  = go f && go a
-   go (Let v2 r b) = go r && (v == v2 || go b)
-   go (Lam (TVar _ v2) e)   = v == v2 || go e
-   go (Assert e1 e2) = go e1 && go e2
+   go:: Eq b => b -> ExprX f b -> Bool
+   go v (Var v2) = v /= v2
+   go v (Konst _) = True
+   go v (Tuple es) = all (go v) es
+   go v (If b t e) = go v b && go v t && go v e
+   go v (Call _ e) = go v e
+   go v (App f a)  = go v f && go v a
+   go v (Let v2 r b) = go v r && (v == v2 || go v b)
+   go v (Lam v2 _ e)   = v == v2 || go v e
+   go v (Assert e1 e2) = go v e1 && go v e2
 
 -----------------
 newVarNotIn :: Expr -> Var
@@ -302,6 +359,16 @@ newVarNotIn e = go e 1 -- FIXME start with hash of e to reduce retries
             else
               trace ("newVarNotIn: Var " ++ show v ++ " was bound in E, retry") (
               go e (n + 1))
+
+newVarNotInT :: Type -> TExpr -> TVar Var
+newVarNotInT ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
+  where go ty e n =
+          let v = TVar ty $ Simple ("_t" ++ show n) in
+            if v `notFreeIn` e then
+              v
+            else
+              trace ("newVarNotIn: Var " ++ show v ++ " was bound in E, retry") (
+              go ty e (n + 1))
 
 test_FreeIn =
   hspec $ do
@@ -324,10 +391,7 @@ class Pretty p where
   ppr :: p -> Doc
 
 instance Pretty Var where
-  ppr (Simple s)   = PP.text s
-  ppr (Delta s)    = PP.text ("d$" ++ s)
-  ppr (Grad s Fwd) = PP.text ("D$" ++ s)
-  ppr (Grad s Rev) = PP.text ("R$" ++ s)
+  ppr v   = PP.text $ show v
 
 instance Pretty b => Pretty (TVar b) where
   ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> ppr ty)
@@ -354,7 +418,7 @@ instance Pretty Konst where
 
 instance Pretty Type where
   ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")" 
-  ppr (TypeTuple tys) = PP.text "(Tuple " PP.<> pprWithCommas tys PP.<> PP.text ")" 
+  ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas tys PP.<> PP.text "))" 
   ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")" 
   ppr (TypeLM from to) = PP.text "(LM " PP.<> ppr from PP.<> PP.text " -o " PP.<> ppr to PP.<> PP.text ")" 
   ppr TypeZero = PP.text "zero_t"
@@ -384,8 +448,8 @@ pprExpr _  (Var v)   = ppr v
 pprExpr _ (Konst k)  = ppr k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = parens (pprWithCommas es)
-pprExpr p (Lam v e)  = parensIf p precZero $
-                      PP.char '\\' <> ppr v <> PP.char '.' <+> ppr e
+pprExpr p (Lam v ty e)  = parensIf p precZero $
+                      PP.text "(lam (" <> ppr v <> PP.text " : " <> ppr ty <> text ") " <+> ppr e <> PP.char ')'
 pprExpr p (Let v e1 e2)
   = parensIf p precZero $
     PP.vcat [ PP.text "let" PP.<+>
@@ -444,8 +508,8 @@ parensIf ctxt inner doc
 --            , PP.text "then" PP.<+> ppr p b
 --            , PP.text "else" PP.<+> ppr p c ]
 
-instance (Pretty f, Pretty b, HasInfix f) => Pretty (Def f b) where
-  ppr (Def f vs rhs)
+instance (Pretty f, Pretty b, HasInfix f) => Pretty (DefX f b) where
+  ppr (DefX f vs rhs)
     = PP.sep [ PP.text "def" PP.<+> ppr f
                  PP.<> parens (pprWithCommas vs)
              , PP.nest 2 (PP.text "=" PP.<+> ppr rhs) ]

@@ -38,6 +38,7 @@
 (def logsumexp ((v : Vec Float))
     (log (sum (exp$VecR v))))
 
+
 (def gmm_knossos_gmm_objective 
       ((x : Vec Vec Float) 
        (alphas : Vec Float) (means : Vec Vec Float) (qs : Vec Vec Float) (ls : Vec Vec Float) 
@@ -52,12 +53,23 @@
                                           (sub$VecR$VecR (index i x) (index k means))))
                   (- (+ (index k alphas) (sum (index k qs)))
                     (* 0.500000 (sqnorm mahal_vec)))))))))) 
-            (* n (logsumexp alphas))) 
+            (* (to_float n) (logsumexp alphas))) 
          (* 0.5 (sum (build K (lam (k : Integer)
                                             (+ (sqnorm (exp$VecR (index k qs))) 
                                                 (sqnorm (index k ls))))))))))))
 
+(def mkvec ((n : Integer))
+    (build n (lam (j : Integer) (* 2.0 (+ 1.0 (to_float j))))))
+
 (def main ()
-  (let (x (build 10 (lam (i : Integer) (build 3 (lam (j : Integer) (* 2.0 j))))))
-    (let (alphas (build 10 (lam (i : Integer) 7.0)))
-      (pr (gmm_knossos_gmm_objective x alphas x x x 1.3 1.2)))))
+  (let (x (build 10 (lam (i : Integer) (mkvec 3))))
+    (let ((alphas (build 10 (lam (i : Integer) 7.0)))
+          (mus    (build 10 (lam (i : Integer) (mkvec 3))))
+          (qs     (build 10 (lam (i : Integer) (mkvec 3))))
+          (ls     (build 10 (lam (i : Integer) (mkvec 3)))))
+      (pr (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
+          (gmm_knossos_gmm_objective x alphas mus qs ls 1.3 1.2)
+          (D$gmm_knossos_gmm_objective x alphas mus qs ls 1.3 1.2)
+          --(fwd$gmm_knossos_gmm_objective x alphas mus qs ls 1.3 1.2
+          --                               x alphas mus qs ls 1.3 1.2)
+          ))))
