@@ -41,12 +41,12 @@ assertEqual msg t1 t2 =
 
 assertEqualThen :: HasCallStack => Match a => Show a => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e =
-  if isMatch t1 t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n")
+  if isMatch t1 t2 then e else trace ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
 
 assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
 assertAllEqualThen msg es e =
   if allEq es then e else
-     error ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
+     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
   where
     allEq [] = True
     allEq (a:as) = allEqa a as

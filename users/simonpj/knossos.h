@@ -304,7 +304,7 @@ std::ostream &operator<<(std::ostream &s, Add<T1,T2> const &t)
 
 // ---------------- HCat ------------------
 template <class LM1, class LM2>
-struct HCat {
+struct HCat2 {
     LM1 lm1;
     LM2 lm2;
 
@@ -319,7 +319,7 @@ struct HCat {
     typedef tuple<From1,From2> From;
     typedef To1 To;
 
-    static HCat mk(LM1 lm1, LM2 lm2) { return HCat { lm1, lm2}; }
+    static HCat2 mk(LM1 lm1, LM2 lm2) { return HCat2 { lm1, lm2}; }
 
     To Apply(From f) const { return add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); }
 
@@ -327,11 +327,51 @@ struct HCat {
 
 
 template <class T1, class T2>
-std::ostream &operator<<(std::ostream &s, HCat<T1,T2> const &t)
+std::ostream &operator<<(std::ostream &s, HCat2<T1,T2> const &t)
 {
-    return s << "HCat" << 
+    return s << "HCat2" << 
         //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
         "(" << t.lm1 << "," << t.lm2 << ")";
+}
+
+template <class LM1, class LM2, class LM3>
+struct HCat3 {
+    LM1 lm1;
+    LM2 lm2;
+    LM3 lm3;
+
+    typedef typename LM1::From From1;
+    typedef typename LM1::To To1;
+
+    typedef typename LM2::From From2;
+    typedef typename LM2::To To2;
+
+    typedef typename LM3::From From3;
+    typedef typename LM3::To To3;
+
+    static_assert(std::is_same<To1, To2>::value, "To1==To2");
+    static_assert(std::is_same<To1, To3>::value, "To1==To2");
+
+    typedef tuple<From1,From2,From3> From;
+    typedef To1 To;
+
+    static HCat3 mk(LM1 lm1, LM2 lm2, LM3 lm3) { return HCat3 { lm1, lm2, lm3}; }
+
+    To Apply(From f) const { 
+        To ret = add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); 
+        ret = add(ret, lm3.Apply(std::get<2>(f)));
+        return ret; 
+    }
+
+};
+
+
+template <class T1, class T2, class T3>
+std::ostream &operator<<(std::ostream &s, HCat3<T1,T2,T3> const &t)
+{
+    return s << "HCat3" << 
+        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+        "(" << t.lm1 << "," << t.lm2 << "," << t.lm3 << ")";
 }
 
 // ---------------- VCat ------------------
@@ -520,7 +560,7 @@ DECLARE_TYPE_TO_STRING2(LM::Zero,From,To);
 DECLARE_TYPE_TO_STRING(LM::Scale,T);
 DECLARE_TYPE_TO_STRING(LM::Build,L);
 DECLARE_TYPE_TO_STRING(LM::BuildT, L);
-DECLARE_TYPE_TO_STRING2(LM::HCat,From,To);
+DECLARE_TYPE_TO_STRING2(LM::HCat2,From,To);
 DECLARE_TYPE_TO_STRING2(LM::VCat,From,To);
 DECLARE_TYPE_TO_STRING2(LM::Compose,From,To);
 DECLARE_TYPE_TO_STRING2(LM::Variant,From,To);
@@ -546,7 +586,7 @@ auto D$mul(T1 t1, T2 t2)
 {
     typedef LM::Scale<T1> M1;
     typedef LM::Scale<T2> M2;
-    return LM::HCat<M1,M2>::mk(M1::mk(t2), M2::mk(t1));
+    return LM::HCat2<M1,M2>::mk(M1::mk(t2), M2::mk(t1));
 }
 
 template <class T1, class T2>
@@ -554,7 +594,7 @@ T1 div(T1 t1, T2 t2) { return t1 / t2; }
 template <class T1, class T2>
 auto D$div(T1 t1, T2 t2)
 {
-    return 1;//LM::lmHCat<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(1/t2), LM::lmScale<T2,T1>(-1.0/(t1*t1)));
+    return 1;//LM::lmHCat2<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(1/t2), LM::lmScale<T2,T1>(-1.0/(t1*t1)));
 }
 
 template <class T1, class T2>
@@ -604,7 +644,7 @@ auto D$selfun$2_1(T1,T2)
 {
     typedef LM::One<T1> L1;
     typedef LM::Zero<T2,T1> L2;
-    return LM::HCat<L1,L2>::mk(L1::mk(), L2::mk());
+    return LM::HCat2<L1,L2>::mk(L1::mk(), L2::mk());
 }
 
 template <typename T1, typename T2>
@@ -612,7 +652,7 @@ auto D$selfun$2_2(T1,T2)
 {
     typedef LM::Zero<T1,T2> L1;
     typedef LM::One<T2> L2;
-    return LM::HCat<L1,L2>::mk(L1::mk(), L2::mk());
+    return LM::HCat2<L1,L2>::mk(L1::mk(), L2::mk());
 }
 
 } // namespace ks

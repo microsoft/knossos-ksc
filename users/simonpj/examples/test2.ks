@@ -1,14 +1,11 @@
 
 
 
-(def f1 ((x :  Float) (y :  Float) ) 
-        (let ((i 1))
-        (* (if (< i 3) (+ x 1.0) 7.0) y))
-)
+(def f1 ((x :  Float) (y :  Float) (i : Integer)) 
+        (* (if (< i 3) (+ x 1.0) (* 7.0 (to_float i))) y))
 
-(def f2 ((x : Vec Float) (y : Vec Float) ) 
-        (let ((i 1))
-        (* (if (< i 3) (index i x) 7.0) (index i y)))
+(def f2 ((x : Vec Float) (y : Vec Float) (i : Integer) ) 
+        (* (if (< i 3) (index i x) 7.0) (index i y))
 )
 
 (def f7 ((x : Vec Float) (y : Vec Float) ) 
@@ -23,6 +20,6 @@
     (let (v1 (build 3 (lam (i : Integer) (* 3.0 (to_float i)))))
         (pr (f7 v1 v1)
             (D$f7 v1 v1)
-            (D$f1 1.1 2.3)
-            (fwd$f1 1.1 2.3 1.0 0.0)
+            (D$f1 1.1 2.3 2)
+            (fwd$f1 1.1 2.3 3 1.0 0.0 0)
             )))

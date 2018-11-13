@@ -328,7 +328,7 @@ cgenTypeLM = \case
   L.LMCompose bc ab-> "LM::Compose<" ++ cgenTypeLM bc ++ "," ++ cgenTypeLM ab ++ ">"
   L.LMAdd a b-> "LM::Add<" ++ cgenTypeLM a ++ "," ++ cgenTypeLM b ++ ">"
   L.LMVCat lms-> "LM::VCat<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
-  L.LMHCat lms-> "LM::HCat<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
+  L.LMHCat lms-> "LM::HCat" ++ show (length lms) ++ "<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
   L.LMBuild lm-> "LM::Build<" ++ cgenTypeLM lm ++ ">"
   L.LMBuildT lm-> "LM::BuildT<" ++ cgenTypeLM lm ++ ">"
   L.LMVariant lms-> "LM::Variant<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
