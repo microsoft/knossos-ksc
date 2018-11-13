@@ -12,33 +12,6 @@ import           Lang
 dbtrace :: String -> a -> a
 dbtrace _ e = e -- trace msg e
 
------------------- ST (SymTab) ------------------
-
-type ST = Map.Map Var Type
-
-stCreate :: ST
-stCreate = Map.empty
-
-stInsert :: Var -> Type -> ST -> ST
-stInsert v ty env = dbtrace
-  ("Inserting " ++ show v ++ " = " ++ show ty ++ " in " ++ show env ++ "\n")
-  (Map.insert v ty env)
-
-stInsertFun :: Fun -> Type -> ST -> ST
-stInsertFun f = stInsert (Simple $ show f)
-
-stLookup :: String -> Var -> ST -> Type
-stLookup msg v env = case Map.lookup v env of
-  Just a  -> a
-  Nothing -> trace
-    ("Couldn't find " ++ show v ++ " in " ++ msg ++ ", env = " ++ show env)
-    TypeUnknown
-
-stLookupFun :: String -> Fun -> ST -> Type
-stLookupFun msg (Fun (SFun v)) = stLookup msg (Simple v)
-stLookupFun msg unexpected =
-  error $ "Unexpected stLookupFun: " ++ show unexpected ++ ": " ++ msg
-
 --------------------------
 
 annotDef :: Def -> TDef
@@ -123,92 +96,7 @@ annotExpr env = \case
   e -> error $ "Cannot annotate " ++ (show $ ppr e)
 
 
--- A single place for "domain knowledge" about polymorphic functions -- to be pruned when we get primdefs
-typeofFunTy :: HasCallStack => ST -> Fun -> Type -> Type
-typeofFunTy env f (TypeTuple tys) = typeofFunTys env f tys
-typeofFunTy env f ty              = typeofFunTys env f [ty]
-
-typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
-typeofFunTys env tf ttys = case (tf, ttys) of
-  (Fun (SFun "pr")       , _                            ) -> TypeUnknown
-  (GradFun (SFun "pr") _ , _                            ) -> TypeUnknown
-  (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
-  (Fun (SFun "index")    , [_, TypeVec t]               ) -> t
-  (Fun (SFun "size" )    , [TypeVec _]                  ) -> TypeInteger
-  (Fun (SFun "sum"  )    , [TypeVec t]                  ) -> t
-
-  (Fun (SFun "to_float") , [TypeInteger]                ) -> TypeFloat
-  (Fun (SFun "exp"  )    , [TypeFloat]                  ) -> TypeFloat
-  (Fun (SFun "log"  )    , [TypeFloat]                  ) -> TypeFloat
-  (Fun (SFun "+"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
-  (Fun (SFun "/"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
-  (Fun (SFun "*"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
-  (Fun (SFun "-"    )    , [t1, t2]                     ) -> assertEqualThen emsg t1 t2 $ t1
-
-  (Fun (SFun "=="   )    , _                            ) -> TypeBool
-  (Fun (SFun "!="   )    , _                            ) -> TypeBool
-  (Fun (SFun "<"    )    , _                            ) -> TypeBool
-  (Fun (SFun ">"    )    , _                            ) -> TypeBool
-
-  (Fun (SFun "delta")    , [TypeInteger, TypeInteger, t]) -> t
-
-  (Fun (SelFun i _  )    , [TypeTuple tys]              ) -> tys !! (i - 1)
-  (GradFun (SelFun i _) _, [TypeTuple tys]) ->
-    TypeLM (TypeTuple tys) (tys !! (i - 1))
-
-  (Fun (SelFun{})      , [TypeVec t]) -> t
-  (GradFun (SelFun{}) _, [TypeVec t]) -> TypeLM (TypeVec t) t
-  (GradFun (SelFun{}) _, _          ) -> TypeUnknown
-
-  (Fun (SFun f)        , _          ) -> case Map.lookup (Simple f) env of
-    Just a  -> a
-    Nothing -> error emsg
-
-  (LMFun f, tys) -> typeofLMFun f tys
-  (GradFun (SFun f) _, [tfrom]) ->
-    let ty = stLookup "GradFun" (Simple f) env in TypeLM tfrom ty
-  (GradFun (SFun f) _, t : tys) ->
-    let tfrom = TypeTuple (t : tys)
-    in  let ty = stLookup "GradFun2" (Simple f) env in TypeLM tfrom ty
-  _ -> trace (error emsg) TypeUnknown
-  where emsg = "EFailed to type ("
-                ++ show tf
-                ++ ", "
-                ++ show ttys
-                ++ "), env"
-                ++ show env
-
-
-typeofLMFun :: String -> [Type] -> Type
-typeofLMFun f tys = case (f, tys) of
-  ("lmOne"  , [t]   ) -> TypeLM t t
-  ("lmZero" , [a, b]) -> TypeLM a b
-  ("lmScale", [t]   ) -> TypeLM t t
-  ("lmBuild", [TypeInteger, TypeLambda TypeInteger (TypeLM a b)]) ->
-    TypeLM a (TypeVec b)
-  ("lmBuildT", [TypeInteger, TypeLambda TypeInteger (TypeLM a b)]) ->
-    TypeLM (TypeVec a) b
-  ("lmVCat", [TypeLM a b, TypeLM a1 c]) ->
-    assertEqualThen "lmVCat" a a1 $ 
-    TypeLM a (TypeTuple [b, c])
-  ("lmHCat", [TypeLM a c, TypeLM b c1]) ->
-    assertEqualThen "lmHCat" c c1 $ 
-    TypeLM (TypeTuple [a, b]) c
-  ("lmCompose", [TypeLM b c, TypeLM a b1]) ->
-    assertEqualThen "lmCompose" b b1 $ 
-    TypeLM a c
-  ("lmApply", [TypeLM a b, c]) -> 
-    assertEqualThen ("lmApply LM " ++ show a ++ " -o " ++ show b ++ " * " ++ show c) a c $
-    b
-  _ ->
-    flip trace TypeUnknown
-      $  "Failed to type LMfun ("
-      ++ show f
-      ++ ", "
-      ++ show tys
-      ++ ")"
-
---------------------------------------
+    --------------------------------------
 
 stripAnnots :: [TDef] -> [Def]
 stripAnnots = map stripAnnot
@@ -228,3 +116,5 @@ stripAnnotExpr = \case
   Let (TVar _ v) e1 e2 -> Let v (stripAnnotExpr e1) (stripAnnotExpr e2)
   If c t f -> If (stripAnnotExpr c) (stripAnnotExpr t) (stripAnnotExpr f)
   Assert c e -> Assert (stripAnnotExpr c) (stripAnnotExpr e)
+
+--------------------------------------

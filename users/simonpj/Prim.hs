@@ -7,27 +7,27 @@ import Data.Array
 
 import Lang
 
-type Nat = Int
-type Vector t = Array Nat t
+-- Call to a LMFun, with given return type 
+lmf :: TypeLM -> String -> [TExpr] -> TExpr
+lmf t name args = mkTCall (TypeLM t) (LMFun $ name) args
 
-data LM a b   -- Linear maps
-
-lm :: String -> Type -> Type -> [TExpr] -> TExpr
-lm f s t args = mkTCall (TypeLM s t) (LMFun f) args
+-- Call to a LMFun, name derived from the return type
+lm :: TypeLM -> [TExpr] -> TExpr
+lm t args = lmf t "mk" args
 
 lmZero :: Type -> Type -> TExpr
-lmZero s t = lm "lmZero" s t []
+lmZero s t = lm (LMZero s t) []
 
 lmOne :: Type -> TExpr
-lmOne t = lm "lmOne" t t []
+lmOne t = lm (LMOne t) []
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = 
-  let (TypeLM s1 t1) = typeof f
-      (TypeLM s2 t2) = typeof g in
-  assertEqualThen "lmAdd s" s1 s2 $ 
-  assertEqualThen ("lmAdd(\n" ++ (show $ ppr f) ++ ",\n\n\n\n\n " ++ (show $ ppr g) ++ ")")   t1 t2 $ 
-  lm "lmAdd" s1 t1 [f,g]
+  let (TypeLM tyf) = typeof f
+      (TypeLM tyg) = typeof g in
+  assertEqualThen "lmAdd s" (typeofSrc tyf) (typeofSrc tyg) $ 
+  assertEqualThen "lmAdd t" (typeofDst tyf) (typeofDst tyg) $ 
+  lm (LMAdd tyf tyg) [f,g]
 
 lmAdds :: HasCallStack => [TExpr]-> TExpr
 lmAdds [x] = x
@@ -36,63 +36,63 @@ lmAdds (x:xs) = lmAdd x (lmAdds xs)
 lmScale :: Type -> TExpr -> TExpr
 lmScale t f = 
   -- FIXME assertEqualThen "lmScale" (typeof f) (TypeFloat) $
-  lm "lmScale" t t [f]
+  lm (LMScale t) [f]
 
 lmCompose :: HasCallStack => TExpr -> TExpr -> TExpr
 lmCompose f g = 
-  let (TypeLM b c) = typeof f
-      (TypeLM a b1) = typeof g in
-  assertEqualThen ("lmCompose(" ++ show (ppr f) ++ ", " ++ show (ppr g)) b1 b $ 
-  lm "lmCompose" a c [f,g]
+  let (TypeLM tyf) = typeof f
+      (TypeLM tyg) = typeof g in
+  assertEqualThen ("lmCompose(" ++ show (ppr f) ++ ", " ++ show (ppr g)) (typeofDst tyg) (typeofSrc tyf) $ 
+  lm (LMCompose tyf tyg) [f,g]
 
-lmVCat :: TExpr -> TExpr -> TExpr
-lmVCat f g = 
-  let (TypeLM a b1) = typeof f
-      (TypeLM a' b2) = typeof g in
-  assertEqualThen "lmVCat" a a' $
-  lm "lmVCat" a (TypeTuple [b1, b2]) [f,g]
+getLM :: HasCallStack => Type -> TypeLM
+getLM (TypeLM ty) = ty
+getLM t = error $ "Wanted TypeLM, got " ++ (show $ ppr t)
 
-lmVCats :: [TExpr] -> TExpr
-lmVCats es = lm "lmVCat" (typeofSrc $ head es) (TypeTuple $ map typeofDst es) es
+lmVCat :: HasCallStack => [TExpr] -> TExpr
+lmVCat es =
+  assertAllEqualThen  "lmVCat" (map typeofSrc tys) $ 
+  lm (LMVCat tys) es
+  where 
+    tys = map getLM $ map typeof $ es
 
-lmHCat :: TExpr -> TExpr -> TExpr 
-lmHCat f g =
-  let (TypeLM a1 b) = typeof f
-      (TypeLM a2 b') = typeof g in
-  assertEqualThen "lmHCat" b b' $
-  lm "lmHCat" (TypeTuple [a1, a2]) b [f,g]
-
-lmHCats :: [TExpr] -> TExpr 
-lmHCats es = lm "lmHCat" (TypeTuple $ map typeofSrc es) (typeofDst $ head es) es
+lmHCat :: [TExpr] -> TExpr 
+lmHCat es = 
+  assertAllEqualThen "lmHCat" (map typeofDst tys) $ 
+  lm (LMHCat tys) es
+  where 
+    tys = map getLM $ map typeof $ es
 
 lmTranspose :: TExpr -> TExpr 
-lmTranspose m = lm "lmTranspose" (typeofDst m) (typeofSrc m) [m]
+lmTranspose m = lm (LMTranspose ty) [m]
+  where (TypeLM ty) = typeof m
 
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApply m arg = 
-  let (TypeLM a b) = typeof m in
-  assertEqualThen ("lmApply " ++ (show $ ppr m) ) a (typeof arg) $ 
-  mkTCall b (LMFun "lmApply") [m, arg]
+  let (TypeLM tym) = typeof m in
+  assertEqualThen ("lmApply " ++ (show $ ppr m) ) (typeofSrc tym) (typeof arg) $ 
+  mkTCall (typeofDst tym) (LMFun "lmApply") [m, arg]
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuild e f = 
-  case typeof f of
-  TypeLambda TypeInteger (TypeLM s t) -> lm "lmBuild" s (TypeVec t) [e, f]
-  ty -> error $ "uexpected " ++ show ty ++ "\n" ++ (show $ ppr f)
+lmBuild n f = 
+    case typeof f of
+    TypeLambda TypeInteger (TypeLM tyf) -> lm (LMBuild tyf) [n, f]
+    ty -> error $ "uexpected " ++ show ty ++ "\n" ++ (show $ ppr f)
 
 lmBuildT :: TExpr -> TExpr -> TExpr 
-lmBuildT e f = 
-  let (TypeLambda TypeInteger (TypeLM t s)) = typeof f in
-  lm "lmBuildT" (TypeVec t) s [e, f]
+lmBuildT n f = 
+  case typeof f of
+  TypeLambda TypeInteger (TypeLM tyf) -> lm (LMBuildT tyf) [n, f]
+  ty -> error $ "uexpected " ++ show ty ++ "\n" ++ (show $ ppr f)
 
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmOne t) (lmZero t t)
+lmDelta t i j = If (pEqual i j) (lmScale t $ kTFloat 1.0) (lmScale t $ kTFloat 0.0)
 
 isLMOne, isLMZero :: TExpr -> Bool
-isLMOne (Call (TFun ty (LMFun "lmOne")) _) = True
+isLMOne (Call (TFun (TypeLM (LMOne _)) _) _) = True
 isLMOne _ = False
 
-isLMZero (Call (TFun ty (LMFun "lmOne")) _) = True
+isLMZero (Call (TFun (TypeLM (LMZero _ _)) _) _) = True
 isLMZero _ = False
 
 -----------------------

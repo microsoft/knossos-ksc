@@ -14,6 +14,13 @@ using std::tuple;
 
 namespace ks
 {
+// Functions defined polymorphically by Cgen.typeofFun
+template <class T1, class T2>
+T1 add(T1 t1, T2 t2) { return t1 + t2; }
+
+template <class T1, class T2>
+T1 sub(T1 t1, T2 t2) { return t1 - t2; }
+
 // Tuple utils
 template < typename T, typename... Ts >
 auto head(std::tuple<T, Ts...> t)
@@ -165,44 +172,27 @@ double sum(vec<double> v)
 namespace LM
 {
 // LM operators
-template <class From, class To>
-struct Nop 
-{
-    To Apply(From f) const { return To {}; }
-};
-
-template <class From, class To>
+template <class T>
 struct One
 {
+    typedef T To;
+    typedef T From;
+
+    static One mk() { return One { }; }
+
     To Apply(From f) const { return f; }
 };
 
-template <class From, class To>
+template <class From_t, class To_t>
 struct Zero
 {
+    typedef To_t To;
+    typedef From_t From;
+
+    static Zero mk() { return Zero { }; }
+
     To Apply(From f) const { return To { 0 }; }
 };
-
-template <class From, class To, class Opab, class Opbc>
-struct Compose
-{
-    Opbc opbc;
-    Opab opab;
-    To Apply(From f) const { return opbc.Apply(opab.Apply(f)); }
-};
-}
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::Nop<From,To>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::One<From,To>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::Zero<From,To>);
-
-
-namespace LM {
 
 // Scale
 template <class T>
@@ -237,155 +227,121 @@ T Scale_aux(T t, double val)
 	return t * val;
 }
 
-template <class From, class To>
+template <class T>
 struct Scale
 {
     double val;
 
+    typedef T To;
+    typedef T From;
+
+    static Scale mk(double val) { return Scale { val }; }
+
 	To Apply(From f) const { return To { Scale_aux(f, val) }; }
 };
 
+template <class LM1, class LM2>
+struct HCat {
+    LM1 lm1;
+    LM2 lm2;
 
-template <class From, class To, class Op1, class Op2>
-struct VariantOp
-{
-    union {
-        Op1 op1;
-        Op2 op2;
-    } ops;
-    int which;
+    typedef typename LM1::From From1;
+    typedef typename LM1::To To1;
 
-    VariantOp() {
-        which = 0;
-    }
+    typedef typename LM2::From From2;
+    typedef typename LM2::To To2;
 
-    VariantOp& operator=(Op1 const& o) {
-        which = 1;
-        ops.op1 = o;
-    }
-    VariantOp& operator=(Op2 const& o) {
-        which = 2;
-        ops.op2 = o;
-    }
+    static_assert(std::is_same<To1, To2>::value, "To1==To2");
 
-	To Apply(From f) const 
-    { 
-        if (which == 1) return ops.op1.Apply(f); 
-        if (which == 2) return ops.op2.Apply(f); 
-        throw std::exception("zoiks");
-    }
+    typedef tuple<From1,From2> From;
+    typedef To1 To;
+
+    static HCat mk(LM1 lm1, LM2 lm2) { return HCat { lm1, lm2}; }
+
+    To Apply(From f) const { return add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); }
+
 };
 
-template <class From, class To, class Op>
-struct lm
-{
-    std::string ty;
-	Op op;
+template <class LM1, class LM2>
+struct VCat {
+    LM1 lm1;
+    LM2 lm2;
 
-    typedef lm<From,To,Op> this_t;
-    template <class U>
-    this_t& operator=(U that){
-        ty = that.ty;
-        op = that.op;
-    }
+    typedef typename LM1::From From1;
+    typedef typename LM1::To To1;
+
+    typedef typename LM2::From From2;
+    typedef typename LM2::To To2;
+
+    static_assert(std::is_same<From1, From2>::value, "To1==To2");
+
+    typedef From1 From;
+    typedef tuple<To1,To2>  To;
+
+    static VCat mk(LM1 lm1, LM2 lm2) { return VCat { lm1, lm2}; }
+
+    To Apply(From f) const { return std::make_tuple(lm1.Apply(f), lm2.Apply(f)); }
+
 };
 
-template <class From, class To, class Op>
-To lmApply(lm<From,To,Op> m, From f)
+template <class Lbc, class Lab>
+struct Compose
 {
-    return m.op.Apply(f);
-}
+    Lbc bc;
+    Lab ab;
 
-template <class From, class To>
-auto lmOne()
-{
-    return lm<From, To, One<From, To>>{"1"};
-}
+    typedef typename Lbc::From B1;
+    typedef typename Lbc::To C;
 
-template <class From, class To>
-auto lmZero()
-{
-    return lm<From, To, Zero<From, To>>{"0"};
-}
+    typedef typename Lab::From A;
+    typedef typename Lab::To B2;
 
-template <class T1, class T2>
-auto lmScale(double val)
-{
-    return lm<T1, T2, Scale<T1,T2>>{"Scale(" + str(val) + ")", val};
-}
+    static_assert(std::is_same<B1, B2>::value, "To1==To2");
 
-template <class From, class To, class Op1, class To1, class Op2, class To2>
-auto lmVCat(lm<From, To1, Op1> const &lm1, lm<From, To2, Op2> const &lm2)
-{
-    return lm<From, tuple<To1, To2>, Nop<From,To>>{"VCat(" + lm1.ty + "," + lm2.ty + ")"};
-}
+    typedef A From;
+    typedef C To;
 
-template <class From, class To, class Op1, class Op2>
-auto lmAdd(lm<From, To, Op1> const &lm1, lm<From, To, Op2> const &lm2)
-{
-    return lm<From, To, Nop<From, To>>{"Add(" + lm1.ty + "," + lm2.ty + ")"};
-}
+    static Compose mk(Lbc bc, Lab ab) { return Compose { bc, ab }; }
 
-template <class From, class To, class From1, class Op1, class From2, class Op2>
-auto lmHCat(lm<From1, To, Op1> const &lm1, lm<From2, To, Op2> const &lm2)
-{
-    return lm<tuple<From1, From2>, To, Nop<From,To>>{"HCat(" + lm1.ty + "," + lm2.ty + ")"};
-}
+    To Apply(From f) const { return bc.Apply(ab.Apply(f)); }
+};
 
-template <class From, class To, class F1, class... Fs>
-auto lmHCat(Fs... as)
+template <typename Tuple, typename Ti>
+struct SelFun
 {
-    return lm<From, To, Nop<From,To>>{"HCat(...)"};
-}
+    typedef Tuple From;
+    typedef Ti To;
 
-template <class A, class C, class B, class OpBC, class OpAB>
-auto lmCompose(lm<B, C, OpBC> const &lmbc, lm<A, B, OpAB> const &lmab)
-{
-    typedef Compose<A,C,OpAB,OpBC> Op_t;
-    return lm<A, C, Op_t>{"Compose(" + lmbc.ty + "," + lmab.ty + ")", {lmbc.op, lmab.op} };
-}
-/*
-template <class A, class C, class B, class OpBC>
-auto lmCompose(lm<B, C, OpBC> const &lm1, lm<A, B, Zero<A, B>> const &lm2)
-{
-    return lmZero<A, C>();
-}
+    int index;
 
-template <class A, class C, class B, class OpAB>
-auto lmCompose(lm<B, C, Zero<B,C>> const &lm1, lm<A, B, OpAB> const &lm2)
-{
-    return lmZero<A, C>();
-}
-*/
-template <class tupVecTT, class VecT, class T, class Functor>
-auto lmBuild(int v, Functor t)
-{
-    return lm<tupVecTT, VecT, Nop<tupVecTT, VecT>> {"Build(" + str(v) + "," + t(0).ty + ")"};
-}
+    static SelFun mk(int index, int n) { return SelFun { index }; }
 
-template <class VecT, class tupVecTT, class T, class Functor>
-auto lmBuildT(int v, Functor t)
-{
-    return lm<VecT, tupVecTT, Nop<VecT, tupVecTT>> {"BuildT(" + str(v) + "," + t(0).ty + ")"};
+    To Apply(From f) const { return std::get(f,index); }
+};
+
+template <class LM, class A>
+auto lmApply(LM lm, A a) {
+    return lm.Apply(a);
 }
 
 } // namespace LM
+
+template <class T>
+DECLARE_TYPE_TO_STRING(LM::One<T>);
+
+template <class From, class To>
+DECLARE_TYPE_TO_STRING2(LM::Zero<From,To>);
 
 struct zero_t
 {
     operator double() { return 0.0; }
 };
 
-// Functions defined polymorphically by Cgen.typeofFun
-template <class T1, class T2>
-T1 add(T1 t1, T2 t2) { return t1 + t2; }
-
-template <class T1, class T2>
-T1 sub(T1 t1, T2 t2) { return t1 - t2; }
+// Gradients of standard fns
 template <class T1, class T2>
 auto D$sub(T1 t1, T2 t2)
 {
-    return LM::lmHCat<tuple<T1, T2>, T1>(LM::lmOne<T1,T1>(), LM::lmScale<T2,T1>(-1.0));
+    return 1;// LM::HCat<tuple<T1, T2>, T1>(LM::lmOne<T1,T1>(), LM::lmScale<T2,T1>(-1.0));
 }
 
 
@@ -394,7 +350,9 @@ T1 mul(T1 t1, T2 t2) { return t1 * t2; }
 template <class T1, class T2>
 auto D$mul(T1 t1, T2 t2)
 {
-    return LM::lmHCat<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(t2), LM::lmScale<T2,T1>(t1));
+    typedef LM::Scale<T1> M1;
+    typedef LM::Scale<T2> M2;
+    return LM::HCat<M1,M2>::mk(M1::mk(t2), M2::mk(t1));
 }
 
 template <class T1, class T2>
@@ -402,7 +360,7 @@ T1 div(T1 t1, T2 t2) { return t1 / t2; }
 template <class T1, class T2>
 auto D$div(T1 t1, T2 t2)
 {
-    return LM::lmHCat<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(1/t2), LM::lmScale<T2,T1>(-1.0/(t1*t1)));
+    return 1;//LM::lmHCat<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(1/t2), LM::lmScale<T2,T1>(-1.0/(t1*t1)));
 }
 
 template <class T1, class T2>
@@ -422,7 +380,7 @@ T delta(int i, int j, T)
 double neg(double d) { return -d; }
 
 double to_float(int d) { return d; }
-auto D$to_float(int d) { return LM::lmScale<int,double>(d); }
+auto D$to_float(int d) { return LM::Zero<int,double>(); }
 
 // ASSERT
 #define ASSERT(expr)                        \
@@ -450,13 +408,17 @@ T2 selfun$2_2(tuple<T1,T2> ts) {
 template <typename T1, typename T2>
 auto D$selfun$2_1(T1,T2)
 {
-    return LM::lmHCat<tuple<T1,T2>, T1>(LM::lmOne<T1,T1>(), LM::lmZero<T2,T1>());
+    typedef LM::One<T1> L1;
+    typedef LM::Zero<T2,T1> L2;
+    return LM::HCat<L1,L2>::mk(L1::mk(), L2::mk());
 }
 
 template <typename T1, typename T2>
 auto D$selfun$2_2(T1,T2)
 {
-    return LM::lmHCat<tuple<T1,T2>, T2>(LM::lmZero<T1,T2>(), LM::lmOne<T2,T2>());
+    typedef LM::Zero<T1,T2> L1;
+    typedef LM::One<T2> L2;
+    return LM::HCat<L1,L2>::mk(L1::mk(), L2::mk());
 }
 
 } // namespace ks
@@ -465,21 +427,6 @@ template <class T1, class T2>
 std::ostream &operator<<(std::ostream &s, tuple<T1, T2> const &ts)
 {
     return s << "tuple<" << std::get<0>(ts) << "," << std::get<1>(ts) << ">";
-}
-
-template <typename T1, typename T2, typename Op>
-struct ks::type_to_string<ks::LM::lm<T1, T2, Op>>
-{
-    static std::string name()
-    {
-        return "LM<" + type_to_string<T1>::name() + "," + type_to_string<T2>::name() + "," + type_to_string<Op>::name() + ">";
-    }
-};
-
-template <class T1, class T2, class Op>
-std::ostream &operator<<(std::ostream &s, ks::LM::lm<T1, T2, Op> const &l)
-{
-    return s << ks::type_to_string<ks::LM::lm<T1, T2, Op>>::name() << "\n   (" + l.ty + ")";
 }
 
 template <class T>

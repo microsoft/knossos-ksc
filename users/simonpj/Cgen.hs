@@ -3,12 +3,10 @@
 module Cgen where
 
 import GHC.Stack
+import           Debug.Trace                    ( trace )
 import           Prelude                 hiding ( lines
                                                 , tail
                                                 )
-
-import           Debug.Trace                    ( trace )
-
 import           Data.List                      ( intercalate )
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
@@ -129,7 +127,7 @@ cgenDefE :: L.TDef -> CGenResult
 cgenDefE (L.DefX f@(L.TFun tyf _) vars expr) =
   let _ = trace ("Def " ++ show f ++ "\n") ()
   in  let (cDecl, cVar) = runM $ cgenExpr expr
-      in  ( "auto"--cgenType tyf
+      in  (     cgenType tyf
           `spc` cgenFun f
           ++    "("
           ++    intercalate
@@ -147,7 +145,7 @@ cgenExpr :: L.TExpr -> M CGenResult
 cgenExpr = cgenExprR -- <=< anf
 
 -- The input expression must be in ANF
-cgenExprR :: L.TExpr -> M CGenResult
+cgenExprR :: HasCallStack => L.TExpr -> M CGenResult
 cgenExprR ex = case ex of
   L.Konst k             -> return ("", cgenKonst k)
 
@@ -162,7 +160,7 @@ cgenExprR ex = case ex of
       v <- freshCVar
       return
         ( "/**Call**/"
-        ++ intercalate ";\n" decls
+        ++ intercalate "\n" decls
         ++ "auto"--cgenType ty
         ++ " "
         ++ v
@@ -293,12 +291,7 @@ cgenFun tf@(L.TFun ty f) = case f of
   L.DrvFun  s L.Fwd -> "fwd$" ++ cgenFunId s
   L.DrvFun  s L.Rev -> "rev$" ++ cgenFunId s
   L.LMFun s         -> case ty of
-    L.TypeLM t1 t2 -> 
-      let tys = cgenType t1 ++ "," ++ cgenType t2 in
-      case s of
-      "lmBuild" -> "LM::lmBuild" ++ "<" ++ tys ++ "," ++ cgenType t ++ ">" where (L.TypeVec t) = t2
-      "lmBuildT" -> "LM::lmBuildT" ++ "<" ++ tys ++ "," ++ cgenType t ++ ">" where (L.TypeVec t) = t1
-      s -> "LM::" ++ s ++ "<" ++ tys ++ ">"
+    L.TypeLM ty -> cgenTypeLM ty ++ "::" ++ s
     t -> "LM::/* " ++ show t ++ "*/" ++ s
 
 cgenTypeOf :: L.TExpr -> String
@@ -316,7 +309,25 @@ cgenType = \case
   L.TypeUnknown   -> "auto"
   L.TypeLambda from to ->
     "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
-  L.TypeLM from to -> "LM::lm<" ++ cgenType from ++ "," ++ cgenType to ++ ">"
+  L.TypeLM ty -> cgenTypeLM ty
+
+cgenTypeLM :: HasCallStack => L.TypeLM -> String
+cgenTypeLM = \case
+  L.LM s t -> "LM::Base" ++ angle s t
+  L.LMZero s t -> "LM::Zero" ++ angle s t
+  L.LMOne t-> "LM::One" ++ angle1 t
+  L.LMScale t-> "LM::Scale" ++ angle1 t
+  L.LMSelFun s t -> "LM::SelFun" ++ angle s t
+  L.LMTranspose lm-> "LM::Transpose<" ++ cgenTypeLM lm ++ ">"
+  L.LMCompose bc ab-> "LM::Compose<" ++ cgenTypeLM bc ++ "," ++ cgenTypeLM ab ++ ">"
+  L.LMAdd a b-> "LM::Add<" ++ cgenTypeLM a ++ "," ++ cgenTypeLM b ++ ">"
+  L.LMVCat lms-> "LM::VCat<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
+  L.LMHCat lms-> "LM::HCat<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
+  L.LMBuild lm-> "LM::Build<" ++ cgenTypeLM lm ++ ">"
+  L.LMBuildT lm-> "LM::BuildT<" ++ cgenTypeLM lm ++ ">"
+  where
+   angle s t = "<" ++ cgenType s ++ "," ++ cgenType t ++ ">"
+   angle1 t = "<" ++ cgenType t ++ ">"
 
 cgenKonst :: L.Konst -> String
 cgenKonst = \case
