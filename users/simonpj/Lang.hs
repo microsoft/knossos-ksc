@@ -55,6 +55,9 @@ assertAllEqualThen msg es e =
     allEqa a0 [a] = a0 == a
     allEqa a0 (a:as) = a0 == a && allEqa a0 as
 
+assertAllEqualRet :: HasCallStack => Eq a => Show a => String -> [a] -> a
+assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
+
 typeofCheckLM :: HasCallStack => TypeLM -> TExpr -> TypeLM
 typeofCheckLM tylm e = 
   let ty = typeof e in
@@ -89,7 +92,7 @@ data TypeLM
           | LMAdd TypeLM TypeLM
           | LMVCat [TypeLM]
           | LMHCat [TypeLM]
-          | LMVariant TypeLM TypeLM  -- One of the arg types, to be selected by another boolean
+          | LMVariant [TypeLM]        -- One of the arg types, to be selected by another boolean
           | LMBuild TypeLM
           | LMBuildT TypeLM
         deriving (Show, Eq, Ord)
@@ -223,8 +226,14 @@ instance (Typeable b, TypeableFun f) =>
   typeof (Tuple es) = TypeTuple $ map typeof es
   typeof (Lam v tyv e) = TypeLambda tyv $ typeof e
   typeof (Let b e1 e2) = typeof e2
-  typeof (If c t f) = typeof t
+  typeof (If c t f) = makeUnionType (typeof t) (typeof f)
   typeof (Assert c e) = typeof e
+
+
+makeUnionType :: Type -> Type -> Type
+makeUnionType (TypeLM lm1) (TypeLM lm2) = TypeLM $ if lm1 == lm2 then lm1 else LMVariant [lm1, lm2]
+makeUnionType t1 t2 = assertEqualThen "makeUnionType" t1 t2 $ 
+                      t1
 
 typeofKonst :: Konst -> Type
 typeofKonst KZero = TypeZero
@@ -505,6 +514,7 @@ nameOfType (LMVCat lms) = "LMVCat<" ++ intercalate "," (map nameOf lms) ++ ">"
 nameOfType (LMHCat lms) = "LMHCat<" ++ intercalate "," (map nameOf lms) ++ ">"
 nameOfType (LMBuild lm) = "LMBuild<" ++ nameOf lm ++ ">"
 nameOfType (LMBuildT lm) = "LMBuildT<" ++ nameOf lm ++ ">"
+nameOfType (LMVariant lms) = "LMVariant<" ++ intercalate "," (map nameOf lms) ++ ">"
 
 nameOf :: TypeLM -> String
 nameOf (LM s t) = "lmBase"
@@ -519,6 +529,7 @@ nameOf (LMVCat lms) = "lmVCat"
 nameOf (LMHCat lms) = "lmHCat"
 nameOf (LMBuild lm) = "lmBuild"
 nameOf (LMBuildT lm) = "lmBuildT"
+nameOf (LMVariant lms) = "lmVariant"
 
 typeofSrc :: TypeLM -> Type
 typeofSrc (LM s t) = s
@@ -531,8 +542,9 @@ typeofSrc (LMCompose bc ab) = typeofSrc ab
 typeofSrc (LMAdd a b) = typeofSrc a
 typeofSrc (LMVCat (lm:lms)) = typeofSrc lm
 typeofSrc (LMHCat lms) = TypeTuple $ map typeofSrc lms
-typeofSrc (LMBuild lm) = trace("FIXME?") $ typeofSrc lm
-typeofSrc (LMBuildT lm) = trace("FIXME?") $ TypeVec (typeofDst lm)
+typeofSrc (LMBuild lm) = typeofSrc lm
+typeofSrc (LMBuildT lm) = TypeVec (typeofSrc lm)
+typeofSrc (LMVariant lms) = assertAllEqualRet "lmvariant" (map typeofSrc lms) 
 
 typeofDst :: TypeLM -> Type
 typeofDst (LM s t) = t
@@ -545,8 +557,9 @@ typeofDst (LMCompose bc ab) = typeofDst bc
 typeofDst (LMAdd a b) = typeofDst a
 typeofDst (LMVCat lms) = TypeTuple $ map typeofDst lms
 typeofDst (LMHCat (l:lms)) = typeofDst l
-typeofDst (LMBuild lm) = trace("FIXME?") $ TypeVec (typeofDst lm)
-typeofDst (LMBuildT lm) = trace("FIXME?") $ typeofSrc lm
+typeofDst (LMBuild lm) = TypeVec (typeofDst lm)
+typeofDst (LMBuildT lm) = typeofDst lm
+typeofDst (LMVariant lms) = assertAllEqualRet "lmvariant/dst" (map typeofDst lms) 
 
 transpose :: TypeLM -> TypeLM
 transpose = \case
@@ -562,6 +575,7 @@ transpose = \case
     LMHCat lms      -> LMVCat (map transpose lms)
     LMBuild lm      -> LMBuildT lm
     LMBuildT lm     -> LMBuild lm
+    LMVariant lms   -> LMVariant (map transpose lms) 
    
   
 type Prec = Int

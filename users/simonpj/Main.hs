@@ -254,7 +254,7 @@ doall file =
   ;  dd optgrad
   ;  let fwd = map applyD optgrad
   ;  let (env''', optfwd) = optDefs env'' fwd
-  ;  let alldefs = ann ++ optfwd
+  ;  let alldefs = ann ++ optgrad ++ optfwd
   ;  cse <- cseDefs alldefs
   ;  let ann2 =  cse ++ (snd $ annotDefs env''' main)
   ;  banner "all"

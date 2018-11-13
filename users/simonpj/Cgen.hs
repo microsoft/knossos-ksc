@@ -161,7 +161,7 @@ cgenExprR ex = case ex of
       return
         ( "/**Call**/"
         ++ intercalate "\n" decls
-        ++ "auto"--cgenType ty
+        ++ cgenType ty
         ++ " "
         ++ v
         ++ " = "
@@ -194,7 +194,7 @@ cgenExprR ex = case ex of
     return
       (  "/**Let**/"
       ++ decle1
-      ++ "auto"--cgenType tyv
+      ++ cgenType tyv
       ++ " "
       ++ cgenVar v
       ++ " = "
@@ -244,7 +244,9 @@ cgenExprR ex = case ex of
     (declc, vc) <- cgenExprR c
     (declt, vt) <- cgenExprR texpr
     (declf, vf) <- cgenExprR fexpr
-    let ty = L.typeof texpr
+    let ty1 = L.typeof texpr
+    let ty2 = L.typeof fexpr
+    let ty = L.makeUnionType ty1 ty2
 
     return
       ( declc -- emit condition generation
@@ -329,6 +331,7 @@ cgenTypeLM = \case
   L.LMHCat lms-> "LM::HCat<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
   L.LMBuild lm-> "LM::Build<" ++ cgenTypeLM lm ++ ">"
   L.LMBuildT lm-> "LM::BuildT<" ++ cgenTypeLM lm ++ ">"
+  L.LMVariant lms-> "LM::Variant<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
   where
    angle s t = "<" ++ cgenType s ++ "," ++ cgenType t ++ ">"
    angle1 t = "<" ++ cgenType t ++ ">"

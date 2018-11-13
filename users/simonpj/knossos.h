@@ -280,14 +280,15 @@ struct Add {
     typedef typename LM2::From From2;
     typedef typename LM2::To To2;
 
+    static_assert(std::is_same<From1, From2>::value, "To1==To2");
     static_assert(std::is_same<To1, To2>::value, "To1==To2");
 
-    typedef tuple<From1,From2> From;
+    typedef From1 From;
     typedef To1 To;
 
     static Add mk(LM1 lm1, LM2 lm2) { return Add { lm1, lm2}; }
 
-    To Apply(From f) const { return add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); }
+    To Apply(From f) const { return add(lm1.Apply(f), lm2.Apply(f)); }
 };
 
 template <class T1, class T2>
@@ -406,13 +407,117 @@ struct SelFun
     To Apply(From f) const { return std::get(f,index); }
 };
 
-
-template <class T1, class T2>
-std::ostream &operator<<(std::ostream &s, SelFun<T1,T2> const &t)
+template <class Tuple, class Ti>
+std::ostream &operator<<(std::ostream &s, SelFun<Tuple, Ti> const &t)
 {
     return s << "SelFun"<<
     //  "<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
         "(" << t.index << ")";
+}
+
+
+// ---------------- Build ------------------
+template <typename L>
+struct Build
+{
+    typedef typename L::To LTo;
+    
+    typedef typename L::From From;
+    typedef vec<LTo> To;
+
+    int n;
+    std::function<L(int)> f;
+
+    template <class Functor>
+    static Build mk(int n, Functor f) { return Build { n, f }; }
+
+    To Apply(From x) const { return build<LTo>(n, [&](int i) { return lmApply(f(i), x); }); }
+};
+
+template <class L>
+std::ostream &operator<<(std::ostream &s, Build<L> const &t)
+{
+    return s << "Build"<<
+        "<" << type_to_string<L>::name() << ">" <<
+        "(" << t.n << ", <ftype>)";
+}
+
+// ---------------- BuildT ------------------
+template <typename L>
+struct BuildT
+{
+    typedef typename L::From LFrom;
+    
+    typedef vec<typename L::From> From;
+    typedef typename L::To To;
+
+    int n;
+    std::function<L(int)> f;
+
+    template <class Functor>
+    static BuildT mk(int n, Functor f) { return BuildT { n, f }; }
+
+    To Apply(From x) const { return sum(build<LFrom>(n, [&](int i) { return lmApply(f(i), x.data[i]); })); }
+};
+
+template <class L>
+std::ostream &operator<<(std::ostream &s, BuildT<L> const &t)
+{
+    return s << "BuildT"<<
+        "<" << type_to_string<L>::name() << ">" <<
+        "(" << t.n << ", <ftype>)";
+}
+
+// ---------------- Variant ------------------
+template <class L1, class L2>
+struct Variant
+{
+    union V {
+        L1 l1;
+        L2 l2;
+
+        V() {}
+        ~V() {}
+    };
+
+    V v;
+    int which;
+
+    Variant():which(0) {}
+    Variant(const L1& l1):which(1) { v.l1 = l1; }
+    Variant(const L2& l2):which(2) { v.l2 = l2; }
+    Variant(const Variant& that):which(that.which) { 
+        if (which == 1) v.l1 = that.v.l1;
+        if (which == 2) v.l2 = that.v.l2;
+    }
+    ~Variant() {
+        std::cerr << "FIX007";
+    }
+
+    typedef typename L1::From From;
+    typedef typename L1::To To;
+
+    static_assert(std::is_same<typename L1::From, typename L2::From>::value, "To1==To2");
+    static_assert(std::is_same<typename L1::To, typename L2::To>::value, "To1==To2");
+
+    Variant& operator=(const L1& l1) { which = 1; v.l1 = l1; }
+    Variant& operator=(const L2& l2) { which = 2; v.l2 = l2; }
+
+    //static Variant mk(L1 bc, Lab ab) { return Compose { bc, ab }; }
+
+    To Apply(From f) const { 
+        if (which == 1) return v.l1.Apply(f); 
+        if (which == 2) return v.l2.Apply(f);
+        throw std::string("Bad Variant"); 
+    }
+};
+
+template <class T1, class T2>
+std::ostream &operator<<(std::ostream &s, Variant<T1,T2> const &t)
+{
+    return s << "Variant" <<
+        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+        "(" << t.v.l1 << "," << t.v.l2 << ")";
 }
 
 // ---------------- lmApply ------------------
@@ -432,6 +537,9 @@ DECLARE_TYPE_TO_STRING2(LM::Zero<From,To>);
 template <class T>
 DECLARE_TYPE_TO_STRING(LM::Scale<T>);
 
+template <class L>
+DECLARE_TYPE_TO_STRING(LM::Build<L>);
+
 template <class From, class To>
 DECLARE_TYPE_TO_STRING2(LM::HCat<From,To>);
 
@@ -440,6 +548,15 @@ DECLARE_TYPE_TO_STRING2(LM::VCat<From,To>);
 
 template <class From, class To>
 DECLARE_TYPE_TO_STRING2(LM::Compose<From,To>);
+
+template <class From, class To>
+DECLARE_TYPE_TO_STRING2(LM::Variant<From,To>);
+
+template <class From, class To>
+DECLARE_TYPE_TO_STRING2(LM::Add<From,To>);
+
+template <class L>
+DECLARE_TYPE_TO_STRING(LM::BuildT<L>);
 
 struct zero_t
 {
