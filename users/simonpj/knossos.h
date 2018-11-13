@@ -303,26 +303,67 @@ std::ostream &operator<<(std::ostream &s, Add<T1,T2> const &t)
 }
 
 // ---------------- HCat ------------------
-template <class LM1, class LM2>
+struct tuple_prepend_tag_t;
+
+template <class L, class X>
+struct tuple_prepend {
+	typedef tuple_prepend_tag_t type;
+};
+
+template <class L, class... Ls>
+struct tuple_prepend<L, tuple<Ls...>> {
+	typedef tuple<L, Ls...> type;
+};
+
+template <class L>
+struct tuple_prepend<L, tuple_prepend_tag_t> {
+	typedef tuple<L> type;
+};
+
+template <class L, class... Ls>
+struct collect_froms {
+	typedef typename L::From From;
+	typedef typename collect_froms<Ls...>::type tail_t;
+    typedef typename tuple_prepend<From, tail_t>::type type;
+};
+
+template <class L>
+struct collect_froms<L> {
+    typedef tuple<L::From> type;
+};
+
+template <class T, class From, class Tup, int I, int N>
+struct add_help {
+    T go(T const& partial, From const& f, Tup const & lms) 
+    {
+        To toi = std::get<I>(lms).Apply(std::get<I>(f));
+        To result = add(partial, toi);
+        if (I+1 < N)
+            return add_help<T, From, Tup, I+1, N>::go(result, f, lms);
+        else
+            return result;
+     }
+};
+
+template <class L, class... Ls>
 struct HCat {
-    LM1 lm1;
-    LM2 lm2;
+    typedef tuple<L, Ls...> Tup;
+    Tup lms;
 
-    typedef typename LM1::From From1;
-    typedef typename LM1::To To1;
+    typedef typename L::To To;
 
-    typedef typename LM2::From From2;
-    typedef typename LM2::To To2;
+    typedef typename collect_froms<Tup>::type From;
 
-    static_assert(std::is_same<To1, To2>::value, "To1==To2");
+    static HCat mk(Ls... lms) { return HCat { {lms} }; }
 
-    typedef tuple<From1,From2> From;
-    typedef To1 To;
-
-    static HCat mk(LM1 lm1, LM2 lm2) { return HCat { lm1, lm2}; }
-
-    To Apply(From f) const { return add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); }
-
+    To Apply(From f) const 
+    { 
+        To to0 = std::get<0>(lms).Apply(std::get<0>(f));
+        To to1 = std::get<1>(lms).Apply(std::get<1>(f));
+        To ret = add(to0, to1);
+        constexpr n = std::tuple_size<Tup>::value;
+        return add_help<To,From,Tup,2,n>::add(ret, f, lms);
+    }
 };
 
 
