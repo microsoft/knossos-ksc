@@ -1,5 +1,6 @@
 module Main where
 
+import GHC.Stack;
 import Data.Hashable
 
 import Lang
@@ -229,7 +230,7 @@ moveMain [] = ([],[])
 moveMain (def:main@(DefX (Fun (SFun "main")) _ _):defs) = ([main],def:defs)
 moveMain (def:defs) = let (m,t) = moveMain defs in (m,def:t)
 
-doall :: String -> IO ()
+doall :: HasCallStack => String -> IO ()
 doall file =
   let tl s = reverse (take 100 $ reverse s)
       dd defs = liftIO $ putStrLn ("---" ++ (tl $ show (ppr defs)))
@@ -251,11 +252,17 @@ doall file =
   ;  dd grad
   ;  let (env'', optgrad) = optDefs env' grad
   ;  banner "optgrad"
+  ;  banner $ show env'' 
   ;  dd optgrad
   ;  let fwd = map applyD optgrad
+  ;  banner "fwd"
+  ;  dd fwd 
   ;  let (env''', optfwd) = optDefs env'' fwd
-  ;  let alldefs = ann 
+  ;  banner "optfwd"
+  ;  dd optfwd 
+  ;  let alldefs = ann ++ optgrad ++ optfwd
   ;  cse <- cseDefs alldefs
+  ;  dd cse
   ;  let ann2 =  cse ++ (snd $ annotDefs env''' main)
   ;  banner "all"
   ;  dd ann2

@@ -161,7 +161,7 @@ cgenExprR ex = case ex of
       return
         ( "/**Call**/"
         ++ intercalate "\n" decls
-        ++ cgenType ty
+        ++ "auto" --cgenType ty
         ++ " "
         ++ v
         ++ " = "

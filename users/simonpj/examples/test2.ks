@@ -23,5 +23,6 @@
     (let (v1 (build 3 (lam (i : Integer) (* 3.0 (to_float i)))))
         (pr (f7 v1 v1)
             (D$f7 v1 v1)
-            --(fwd$f7 v1 v1 v1 v1)
+            (D$f1 1.1 2.3)
+            (fwd$f1 1.1 2.3 1.0 0.0)
             )))

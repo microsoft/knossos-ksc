@@ -13,10 +13,10 @@ import Test.Hspec
 optTrace msg t = t -- trace msg t
 
 ---------------
-optDefs :: ST -> [TDef] -> (ST, [TDef])
+optDefs :: HasCallStack => ST -> [TDef] -> (ST, [TDef])
 optDefs env defs = foldll optDef env defs
 
-optDef :: ST -> TDef -> (ST, TDef)
+optDef :: HasCallStack => ST -> TDef -> (ST, TDef)
 optDef env (DefX (TFun ty f) args r) =
   let sr = simplify env r
       sty = typeof sr in
@@ -247,6 +247,7 @@ optGradFun _ f _ = optTrace("No opt for " ++ (show $ ppr f) ) $ Nothing
 --------------
 optLM :: HasCallStack => TypeLM -> String -> TExpr -> Maybe TExpr
 optLM ty "lmApply" (Tuple [f,a]) = optApplyLM ty f a
+optLM ty "lmApply" e = error $ "lma" ++ (show e)
 
 optLM ty "lmTranspose" m = optTrans m
 
@@ -334,7 +335,7 @@ optApplyLM ty (If b et ef) dx
   = Just $ If b (lmApply et dx) (lmApply ef dx)
 
 optApplyLM ty e dx
-  = Nothing
+  = trace ("Apply not optimized: " ++ (show $ppr e) ++ "\n to " ++ (show $ppr dx)) Nothing
 
 ------------------
 optApplyLMCall :: TypeLM -> TypeLM    -- s t
@@ -371,7 +372,7 @@ optApplyLMCall ty tylm "lmBuildT" (Tuple [n, Lam i tyi m]) dx
   = Just (pSum (pBuild n (Lam i tyi (lmApply m (pIndex (Var i) dx)))))
 
 optApplyLMCall ty tylm fun arg dx
-  = optTrace ("No opt for " ++ (show fun) ++ "(" ++ show (ppr arg) ++ ".") Nothing
+  = trace ("No opt for " ++ (show fun) ++ "(" ++ show (ppr arg) ++ ".") Nothing
 
 
 ----------------------

@@ -123,20 +123,23 @@ struct type_to_string<ks::vec<T>>
     }
 };
 
-#define DECLARE_TYPE_TO_STRING(T) \
-    struct type_to_string<T>  \
+#define DECLARE_TYPE_TO_STRING(Tmpl,T) \
+	template <class T> \
+    struct type_to_string<Tmpl<T>>  \
     {                             \
         static std::string name() \
         {                         \
-            return #T;            \
+            return std::string(#Tmpl) + "<" + type_to_string<T>::name() + ">";            \
         }                         \
     };
-#define DECLARE_TYPE_TO_STRING2(T1,T2) \
-    struct type_to_string<T1,T2>  \
+
+#define DECLARE_TYPE_TO_STRING2(Tmpl, T1,T2) \
+	template <class T1, class T2> \
+    struct type_to_string<Tmpl<T1,T2>>  \
     {                             \
         static std::string name() \
         {                         \
-            return #T1 "," #T2;            \
+            return std::string(#Tmpl) + "<" + type_to_string<T1>::name() + "," + type_to_string<T2>::name() + ">"; \
         }                         \
     };
 
@@ -472,27 +475,11 @@ std::ostream &operator<<(std::ostream &s, BuildT<L> const &t)
 template <class L1, class L2>
 struct Variant
 {
-    union V {
-        L1 l1;
-        L2 l2;
+	std::variant<L1, L2> v;
 
-        V() {}
-        ~V() {}
-    };
-
-    V v;
-    int which;
-
-    Variant():which(0) {}
-    Variant(const L1& l1):which(1) { v.l1 = l1; }
-    Variant(const L2& l2):which(2) { v.l2 = l2; }
-    Variant(const Variant& that):which(that.which) { 
-        if (which == 1) v.l1 = that.v.l1;
-        if (which == 2) v.l2 = that.v.l2;
-    }
-    ~Variant() {
-        std::cerr << "FIX007";
-    }
+    Variant() {}
+    Variant(const L1& l1):v(l1) { }
+    Variant(const L2& l2):v(l2) { }
 
     typedef typename L1::From From;
     typedef typename L1::To To;
@@ -500,15 +487,15 @@ struct Variant
     static_assert(std::is_same<typename L1::From, typename L2::From>::value, "To1==To2");
     static_assert(std::is_same<typename L1::To, typename L2::To>::value, "To1==To2");
 
-    Variant& operator=(const L1& l1) { which = 1; v.l1 = l1; }
-    Variant& operator=(const L2& l2) { which = 2; v.l2 = l2; }
+	Variant& operator=(const L1& l1) { v = l1; return *this; }
+    Variant& operator=(const L2& l2) { v = l2; return *this; }
 
     //static Variant mk(L1 bc, Lab ab) { return Compose { bc, ab }; }
 
     To Apply(From f) const { 
-        if (which == 1) return v.l1.Apply(f); 
-        if (which == 2) return v.l2.Apply(f);
-        throw std::string("Bad Variant"); 
+		if (v.index() == 0) return std::get<0>(v).Apply(f);
+		if (v.index() == 1) return std::get<1>(v).Apply(f);
+		throw std::string("Bad Variant"); 
     }
 };
 
@@ -517,7 +504,7 @@ std::ostream &operator<<(std::ostream &s, Variant<T1,T2> const &t)
 {
     return s << "Variant" <<
         //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-        "(" << t.v.l1 << "," << t.v.l2 << ")";
+        "(" << t.v.index() << ")";
 }
 
 // ---------------- lmApply ------------------
@@ -528,35 +515,16 @@ auto lmApply(LM lm, A a) {
 
 } // namespace LM
 
-template <class T>
-DECLARE_TYPE_TO_STRING(LM::One<T>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::Zero<From,To>);
-
-template <class T>
-DECLARE_TYPE_TO_STRING(LM::Scale<T>);
-
-template <class L>
-DECLARE_TYPE_TO_STRING(LM::Build<L>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::HCat<From,To>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::VCat<From,To>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::Compose<From,To>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::Variant<From,To>);
-
-template <class From, class To>
-DECLARE_TYPE_TO_STRING2(LM::Add<From,To>);
-
-template <class L>
-DECLARE_TYPE_TO_STRING(LM::BuildT<L>);
+DECLARE_TYPE_TO_STRING(LM::One, T);
+DECLARE_TYPE_TO_STRING2(LM::Zero,From,To);
+DECLARE_TYPE_TO_STRING(LM::Scale,T);
+DECLARE_TYPE_TO_STRING(LM::Build,L);
+DECLARE_TYPE_TO_STRING(LM::BuildT, L);
+DECLARE_TYPE_TO_STRING2(LM::HCat,From,To);
+DECLARE_TYPE_TO_STRING2(LM::VCat,From,To);
+DECLARE_TYPE_TO_STRING2(LM::Compose,From,To);
+DECLARE_TYPE_TO_STRING2(LM::Variant,From,To);
+DECLARE_TYPE_TO_STRING2(LM::Add,From,To);
 
 struct zero_t
 {
