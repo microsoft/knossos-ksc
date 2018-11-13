@@ -171,30 +171,50 @@ double sum(vec<double> v)
 // Linear maps
 namespace LM
 {
+
 // LM operators
+
+// ---------------- One  ------------------
 template <class T>
 struct One
 {
     typedef T To;
     typedef T From;
 
-    static One mk() { return One { }; }
+    static One mk(T) { return One { }; }
 
     To Apply(From f) const { return f; }
 };
 
+template <class T>
+std::ostream &operator<<(std::ostream &s, One<T> const &t)
+{
+    return s << "One"<<
+        //"<" << type_to_string<T>::name() << ">"
+        "";
+}
+
+// ---------------- Zero  ------------------
 template <class From_t, class To_t>
 struct Zero
 {
     typedef To_t To;
     typedef From_t From;
 
-    static Zero mk() { return Zero { }; }
+    static Zero mk(From,To) { return Zero { }; }
 
     To Apply(From f) const { return To { 0 }; }
 };
 
-// Scale
+template <class From, class To>
+std::ostream &operator<<(std::ostream &s, Zero<From,To> const &t)
+{
+    return s << "Zero"<<
+        //"<" << type_to_string<From>::name() << "," << type_to_string<From>::name() << ">"
+        "";
+}
+
+// ---------------- Scale  ------------------
 template <class T>
 T Scale_aux(T t, double);
 
@@ -235,11 +255,50 @@ struct Scale
     typedef T To;
     typedef T From;
 
-    static Scale mk(double val) { return Scale { val }; }
+    static Scale mk(To, double val) { return Scale { val }; }
 
 	To Apply(From f) const { return To { Scale_aux(f, val) }; }
 };
 
+template <class T>
+std::ostream &operator<<(std::ostream &s, Scale<T> const &t)
+{
+    return s << "Scale" <<
+        "<" << type_to_string<T>::name() << ">" <<
+        "(" << t.val << ")";
+}
+
+// ---------------- Add ------------------
+template <class LM1, class LM2>
+struct Add {
+    LM1 lm1;
+    LM2 lm2;
+
+    typedef typename LM1::From From1;
+    typedef typename LM1::To To1;
+
+    typedef typename LM2::From From2;
+    typedef typename LM2::To To2;
+
+    static_assert(std::is_same<To1, To2>::value, "To1==To2");
+
+    typedef tuple<From1,From2> From;
+    typedef To1 To;
+
+    static Add mk(LM1 lm1, LM2 lm2) { return Add { lm1, lm2}; }
+
+    To Apply(From f) const { return add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); }
+};
+
+template <class T1, class T2>
+std::ostream &operator<<(std::ostream &s, Add<T1,T2> const &t)
+{
+    return s << "Add" << 
+        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+        "(" << t.lm1 << "," << t.lm2 << ")";
+}
+
+// ---------------- HCat ------------------
 template <class LM1, class LM2>
 struct HCat {
     LM1 lm1;
@@ -262,6 +321,16 @@ struct HCat {
 
 };
 
+
+template <class T1, class T2>
+std::ostream &operator<<(std::ostream &s, HCat<T1,T2> const &t)
+{
+    return s << "HCat" << 
+        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+        "(" << t.lm1 << "," << t.lm2 << ")";
+}
+
+// ---------------- VCat ------------------
 template <class LM1, class LM2>
 struct VCat {
     LM1 lm1;
@@ -284,6 +353,15 @@ struct VCat {
 
 };
 
+template <class T1, class T2>
+std::ostream &operator<<(std::ostream &s, VCat<T1,T2> const &t)
+{
+    return s << "VCat" << 
+        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+        "(" << t.lm1 << "," << t.lm2 << ")";
+}
+
+// ---------------- Compose ------------------
 template <class Lbc, class Lab>
 struct Compose
 {
@@ -306,6 +384,15 @@ struct Compose
     To Apply(From f) const { return bc.Apply(ab.Apply(f)); }
 };
 
+template <class T1, class T2>
+std::ostream &operator<<(std::ostream &s, Compose<T1,T2> const &t)
+{
+    return s << "Compose" <<
+        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+        "(" << t.bc << "," << t.ab << ")";
+}
+
+// ---------------- SelFun ------------------
 template <typename Tuple, typename Ti>
 struct SelFun
 {
@@ -319,6 +406,16 @@ struct SelFun
     To Apply(From f) const { return std::get(f,index); }
 };
 
+
+template <class T1, class T2>
+std::ostream &operator<<(std::ostream &s, SelFun<T1,T2> const &t)
+{
+    return s << "SelFun"<<
+    //  "<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+        "(" << t.index << ")";
+}
+
+// ---------------- lmApply ------------------
 template <class LM, class A>
 auto lmApply(LM lm, A a) {
     return lm.Apply(a);
@@ -331,6 +428,18 @@ DECLARE_TYPE_TO_STRING(LM::One<T>);
 
 template <class From, class To>
 DECLARE_TYPE_TO_STRING2(LM::Zero<From,To>);
+
+template <class T>
+DECLARE_TYPE_TO_STRING(LM::Scale<T>);
+
+template <class From, class To>
+DECLARE_TYPE_TO_STRING2(LM::HCat<From,To>);
+
+template <class From, class To>
+DECLARE_TYPE_TO_STRING2(LM::VCat<From,To>);
+
+template <class From, class To>
+DECLARE_TYPE_TO_STRING2(LM::Compose<From,To>);
 
 struct zero_t
 {

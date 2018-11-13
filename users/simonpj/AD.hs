@@ -29,14 +29,15 @@ gradSelFun t i 1 params = lmOne t
 
 -------------------------------------------------
 
-gradDefs :: [TDef] -> [TDef]
-gradDefs defs =
-  reverse $ snd $ foldl add_def_to_env (stCreate,[]) defs
+gradDefs :: ST -> [TDef] -> (ST, [TDef])
+gradDefs env defs =
+  let (env', gdefs) = foldl add_def_to_env (env,[]) defs in
+  (env', gdefs) 
   where
     add_def_to_env :: (ST, [TDef]) -> TDef -> (ST,[TDef])
     add_def_to_env (env, gdefs) def = 
       let gdef@(DefX (TFun ty g) params rhs) = gradDef env def in
-          (stInsertFun g ty env, gdef:gdefs) 
+          (stInsertFun g ty env, gdefs ++ [gdef]) 
 
 gradDef :: ST -> TDef -> TDef
 gradDef env (DefX (TFun ty f) params rhs) =
@@ -79,9 +80,14 @@ gradE env s (Assert e1 e2)    = Assert e1 (gradE env s e2)
 -- grad[e], e.g. build (\i. power(x, i))
 gradE env s (Call (TFun _ (Fun (SFun "build"))) (Tuple [n, (Lam ti@(TVar TypeInteger i) TypeInteger b)]))
   = lmBuild n $ 
-    Lam ti TypeInteger $
-        (mkLet (TVar (typeof gi) (gradV i)) gi (gradE env s b)) 
-    where gi = lmZero s TypeInteger
+    Lam ti TypeInteger $ 
+        mkLetE (gradV i) (lmZero s TypeInteger) b
+    where 
+      mkLetE :: Var -> TExpr -> TExpr -> TExpr
+      mkLetE v rhs body = let tv = typeof rhs
+                              env' = stInsert v tv env in 
+                          mkLet (TVar tv v) rhs (gradE env' s body)
+
 
 gradE env s (Call (TFun tyf fun) arg) =
   let gfun = gradF fun
@@ -96,8 +102,8 @@ gradE env s (Let (TVar ty v) e1 e2) =
       ty1 = typeof ge1
       env' = stInsert (gradV v) ty1 env
       ge2 = gradE env' s e2 in
-    Let (TVar ty v) e1                        $                        
-    Let (TVar ty1 (gradV v)) ge1   $
+    mkLet (TVar ty v) e1             $                        
+    mkLet (TVar ty1 (gradV v)) ge1   $
     ge2
 
 gradE env s (Tuple es) = lmVCat (map (gradE env s) es)

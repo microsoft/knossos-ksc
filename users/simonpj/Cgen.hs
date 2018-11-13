@@ -149,7 +149,7 @@ cgenExprR :: HasCallStack => L.TExpr -> M CGenResult
 cgenExprR ex = case ex of
   L.Konst k             -> return ("", cgenKonst k)
 
-  L.Var (L.TVar _ v)    -> return ("", cgenVar v)
+  L.Var v    -> return ("", cgenTVar v)
 
   L.Call tf@(L.TFun ty f) x -> case x of
     L.Tuple vs -> do
@@ -168,7 +168,7 @@ cgenExprR ex = case ex of
         ++ cgenFun tf
         ++ "("
         ++ intercalate "," exprs
-        ++ ");\n"
+        ++ ");\n/**eCall**/\n"
         , v
         )
     ex -> do
@@ -176,7 +176,7 @@ cgenExprR ex = case ex of
       (cgdecl, cgexpr) <- cgenExprR ex
       
       return
-        ( "/**Ex**/"
+        ( "/**Ex**/\n"
         ++    cgdecl
         ++    "auto"--cgenType ty 
         `spc` vf
@@ -184,7 +184,7 @@ cgenExprR ex = case ex of
         ++    cgenFun tf
         ++    "("
         ++    cgexpr
-        ++    ");\n"
+        ++    ");\n/**eEx*/\n"
         , vf
         )
 
@@ -205,15 +205,19 @@ cgenExprR ex = case ex of
       )
 
   L.Tuple [t] -> cgenExpr t
-  L.Tuple ts  -> do
-    let unVar :: L.TExpr -> L.Var
-        unVar = \case
-          L.Var (L.TVar ty v) -> v
-          _       -> error "Tuple: Expected arguments to be Vars"
+  L.Tuple vs  -> do
+      cgresults <- mapM cgenExprR vs
+      let decls = map fst cgresults
+      let exprs = map snd cgresults
 
-        vars = map unVar ts
-
-    return ("", "std::make_tuple(" ++ intercalate "," (map cgenVar vars) ++ ")")
+      return
+        ( "/**Tuple**/"
+        ++ intercalate "\n" decls
+        ,
+        "std::make_tuple("
+        ++ intercalate "," exprs
+        ++ ")\n/**eTuple**/\n"
+        )
 
   L.Lam (L.TVar tv v) ty1 body -> do
     let _ = L.assertEqual "CGLam" tv ty1
@@ -291,7 +295,7 @@ cgenFun tf@(L.TFun ty f) = case f of
   L.DrvFun  s L.Fwd -> "fwd$" ++ cgenFunId s
   L.DrvFun  s L.Rev -> "rev$" ++ cgenFunId s
   L.LMFun s         -> case ty of
-    L.TypeLM ty -> cgenTypeLM ty ++ "::" ++ s
+    L.TypeLM ty -> cgenTypeLM ty ++ "::" ++ "mk"
     t -> "LM::/* " ++ show t ++ "*/" ++ s
 
 cgenTypeOf :: L.TExpr -> String
@@ -338,6 +342,11 @@ cgenKonst = \case
 
 cgenVar :: L.Var -> String
 cgenVar v = show v
+
+cgenTVar :: L.TVar L.Var -> String
+cgenTVar (L.TVar ty L.Dummy) = cgenType ty ++ "{}"
+cgenTVar (L.TVar _ v) = show v
+
 
 translateFun :: String -> String
 translateFun = \case

@@ -14,37 +14,21 @@ dbtrace _ e = e -- trace msg e
 
 --------------------------
 
-annotDef :: Def -> TDef
+annotDef :: Def -> (ST, TDef)
 annotDef = annotDefE stCreate
 
-annotDefs :: [TDef] -> [Def] -> [TDef]
-annotDefs predefs defs =
-  let env = foldl add_predef stCreate predefs in
-  reverse $ snd $ foldl accum (env, []) defs
- where
-  accum :: (ST, [TDef]) -> Def -> (ST, [TDef])
-  accum (env, tdefs) def =
-    let tdef@(DefX (TFun tf f) _ _) = annotDefE env $ dbg env def in
-    (stInsertFun f tf env, tdef : tdefs)
+annotDefs :: ST -> [Def] -> (ST, [TDef])
+annotDefs env defs = foldll annotDefE env defs
 
-  add_predef :: ST -> TDef -> ST
-  add_predef env (DefX (TFun ty f) _ _) = stInsertFun f ty env
-
-  dbg :: ST -> Def -> Def
-  dbg env def = -- returns def
-                dbtrace
-    ("Passing ENV[" ++ show env ++ "]" ++ " to " ++ (show $ ppr def) ++ "\n")
-    def
-
-annotDefE :: ST -> Def -> TDef
+annotDefE :: ST -> Def -> (ST, TDef)
 annotDefE env (DefX f vars expr) =
   let _ = trace ("Def " ++ show f ++ "\n") ()
-  in  let body_env = foldr addVarToEnv env vars
-      in  let (ty,e) = annotExpr body_env expr
-          in  DefX (TFun ty f) vars e
- where
-  addVarToEnv :: TVar Var -> ST -> ST
-  addVarToEnv (TVar ty v) = stInsert v ty
+      body_env = foldr addVarToEnv env vars
+      (ty,e) = annotExpr body_env expr
+  in  (stInsertFun f ty env, DefX (TFun ty f) vars e)
+  where
+    addVarToEnv :: TVar Var -> ST -> ST
+    addVarToEnv (TVar ty v) = stInsert v ty
 
 annotExpr :: ST -> Expr -> (Type, TExpr)
 annotExpr env = \case

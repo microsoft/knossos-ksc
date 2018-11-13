@@ -7,19 +7,22 @@ import Data.Array
 
 import Lang
 
+dummyVar :: Type -> TExpr
+dummyVar t = Var $ TVar t (Dummy)
+
 -- Call to a LMFun, with given return type 
 lmf :: TypeLM -> String -> [TExpr] -> TExpr
 lmf t name args = mkTCall (TypeLM t) (LMFun $ name) args
 
 -- Call to a LMFun, name derived from the return type
 lm :: TypeLM -> [TExpr] -> TExpr
-lm t args = lmf t "mk" args
+lm t args = lmf t (nameOf t) args
 
 lmZero :: Type -> Type -> TExpr
-lmZero s t = lm (LMZero s t) []
+lmZero s t = lm (LMZero s t) [dummyVar s, dummyVar t]
 
 lmOne :: Type -> TExpr
-lmOne t = lm (LMOne t) []
+lmOne t = lm (LMOne t) [dummyVar t]
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = 
@@ -33,10 +36,10 @@ lmAdds :: HasCallStack => [TExpr]-> TExpr
 lmAdds [x] = x
 lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
-lmScale :: Type -> TExpr -> TExpr
+lmScale :: HasCallStack => Type -> TExpr -> TExpr
 lmScale t f = 
-  -- FIXME assertEqualThen "lmScale" (typeof f) (TypeFloat) $
-  lm (LMScale t) [f]
+  --assertEqualThen "lmScale second arg should be TypeFloat" (typeof f) TypeFloat $
+  lm (LMScale t) [dummyVar t, f]
 
 lmCompose :: HasCallStack => TExpr -> TExpr -> TExpr
 lmCompose f g = 
@@ -45,10 +48,6 @@ lmCompose f g =
   assertEqualThen ("lmCompose(" ++ show (ppr f) ++ ", " ++ show (ppr g)) (typeofDst tyg) (typeofSrc tyf) $ 
   lm (LMCompose tyf tyg) [f,g]
 
-getLM :: HasCallStack => Type -> TypeLM
-getLM (TypeLM ty) = ty
-getLM t = error $ "Wanted TypeLM, got " ++ (show $ ppr t)
-
 lmVCat :: HasCallStack => [TExpr] -> TExpr
 lmVCat es =
   assertAllEqualThen  "lmVCat" (map typeofSrc tys) $ 
@@ -56,7 +55,7 @@ lmVCat es =
   where 
     tys = map getLM $ map typeof $ es
 
-lmHCat :: [TExpr] -> TExpr 
+lmHCat :: HasCallStack => [TExpr] -> TExpr 
 lmHCat es = 
   assertAllEqualThen "lmHCat" (map typeofDst tys) $ 
   lm (LMHCat tys) es
@@ -94,6 +93,13 @@ isLMOne _ = False
 
 isLMZero (Call (TFun (TypeLM (LMZero _ _)) _) _) = True
 isLMZero _ = False
+
+primDindex :: TExpr -> TExpr -> TExpr
+primDindex i v = lmHCat [ lmZero TypeInteger t
+                    , lmBuildT (pSize v) (Lam ii TypeInteger (lmDelta t (Var ii) i)) ]
+            where ii = TVar TypeInteger $ Simple "ii"
+                  (TypeVec t) = typeof v
+
 
 -----------------------
 -- Assertion

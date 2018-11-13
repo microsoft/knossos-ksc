@@ -24,7 +24,7 @@ cseDefs defs
              --      into    let x = e in ..let y = x in ...
             -- Then optDefs substitutes x for y
 
-       ; let simpl_defs = optDefs cse_defs
+       ; let (env, simpl_defs) = optDefs stCreate cse_defs
        ; return simpl_defs }
 
 --cseDef :: Uniq -> Def -> (Uniq, Def)

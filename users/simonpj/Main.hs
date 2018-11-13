@@ -231,7 +231,7 @@ moveMain (def:defs) = let (m,t) = moveMain defs in (m,def:t)
 
 doall :: String -> IO ()
 doall file =
-  let tl s = reverse (take 1000 $ reverse s)
+  let tl s = reverse (take 100 $ reverse s)
       dd defs = liftIO $ putStrLn ("---" ++ (tl $ show (ppr defs)))
       dd1 :: Pretty p => [p] -> KM ()
       dd1 = displayN in
@@ -243,20 +243,20 @@ doall file =
   ;  liftIO $ putStrLn ("found main " ++ show (ppr main))
   ;  banner "defs"
   ;  dd defs
-  ;  let ann = annotDefs [] defs
+  ;  let (env, ann) = annotDefs stCreate defs
   ;  banner "annotated defs"
   ;  dd ann
-  ;  let grad = gradDefs ann
+  ;  let (env', grad) = gradDefs env ann
   ;  banner "grad"
   ;  dd grad
-  ;  let opt = optDefs grad
-  ;  banner "opt"
-  ;  dd opt
-  ;  let fwd = map applyD opt
-  ;  let optfwd = optDefs fwd
-  ;  let alldefs = ann ++ opt ++ optfwd
+  ;  let (env'', optgrad) = optDefs env' grad
+  ;  banner "optgrad"
+  ;  dd optgrad
+  ;  let fwd = map applyD optgrad
+  ;  let (env''', optfwd) = optDefs env'' fwd
+  ;  let alldefs = ann ++ optfwd
   ;  cse <- cseDefs alldefs
-  ;  let ann2 =  cse ++ (annotDefs cse main)
+  ;  let ann2 =  cse ++ (snd $ annotDefs env''' main)
   ;  banner "all"
   ;  dd ann2
   ;  liftIO (cppF ("obj\\" ++ file) ann2)
@@ -265,7 +265,7 @@ doall file =
 gmm :: IO ()
 gmm = doall "examples\\gmm"
 
-go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . (annotDefs [])
+go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . snd . annotDefs stCreate
 
 main :: IO ()
 main = gmm

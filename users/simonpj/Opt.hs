@@ -10,41 +10,49 @@ import qualified Data.Map as M
 import Debug.Trace
 import Test.Hspec
 
+optTrace msg t = t -- trace msg t
+
 ---------------
-optDefs :: [TDef] -> [TDef]
-optDefs defs = map optDef defs
+optDefs :: ST -> [TDef] -> (ST, [TDef])
+optDefs env defs = foldll optDef env defs
 
-optDef :: TDef -> TDef
-optDef (DefX f as r) = DefX f as (simplify r)
+optDef :: ST -> TDef -> (ST, TDef)
+optDef env (DefX (TFun ty f) args r) =
+  let sr = simplify env r
+      sty = typeof sr in
+  (stInsertFun f sty env, DefX (TFun sty f) args (simplify env r))
 
-simplify :: TExpr -> TExpr
-simplify =  optE . optLets . optE . optLets
+simplify :: ST -> TExpr -> TExpr
+simplify env =  optE env . optLets . optE env . optLets
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
 
 ---------------
-optE :: TExpr -> TExpr
-optE (Tuple es)         = Tuple (map optE es)
-optE (Var v)            = Var v
-optE (Konst k)          = Konst k
-optE (Lam v ty e)        = Lam v ty (optE e)
-optE (App e1 e2)        = optApp (optE e1) (optE e2)
-optE (Assert e1 e2)     = Assert (optE e1) (optE e2)
-optE (Let var rhs body) = Let var (optE rhs) (optE body)
-optE (If b t e)         = optIf (optE b) (optE t) (optE e)
-optE e@(Call tfun arg)   = case optCall tfun opt_arg of
-                            Nothing -> Call tfun opt_arg
-                            Just r  -> -- pprTrace "optCall"
-                                       --   (vcat [ text "Before:" <+> ppr e
-                                       --         , text "After: " <+> ppr r])
-                                       optE r
+optE :: HasCallStack => ST -> TExpr -> TExpr
+optE env e = 
+  let go = optE env in
+  case e of
+  Tuple es          -> Tuple (map go es)
+  Var v             -> Var v
+  Konst k           -> Konst k
+  Lam v ty e        -> Lam v ty (go e)
+  App e1 e2         -> optApp env (go e1) (go e2)
+  Assert e1 e2      -> Assert (go e1) (go e2)
+  Let var rhs body  -> mkLet var (go rhs) (go body)
+  If b t e          -> optIf (go b) (go t) (go e)
+  e@(Call (TFun ty f) arg) ->
+                          case optCall (TFun opt_ty f) opt_arg of
+                            Nothing -> Call (TFun opt_ty f) opt_arg
+                            Just r  -> go r
                           where
-                            opt_arg = optE arg
+                            opt_arg = go arg
+                            ty_arg = typeof opt_arg
+                            opt_ty = typeofFunTy env f ty_arg
 
 --------------
-optApp :: TExpr -> TExpr -> TExpr
-optApp (Lam v ty e) a = Let v (optE a) (optE e)
-optApp f a            = App f a
+optApp :: ST -> TExpr -> TExpr -> TExpr
+optApp env (Lam v ty e) a = Let v (optE env a) (optE env e)
+optApp env f a            = App f a
 
 --------------
 optIf :: TExpr -> TExpr -> TExpr -> TExpr
@@ -225,10 +233,7 @@ optGradFun ty (SFun "size") e
   = Just $ lmZero (typeofSrc ty) (typeofDst ty)
 
 optGradFun ty (SFun "index") (Tuple [i,v])
-  = Just (lmHCat [ lmZero TypeInteger t
-                 , lmBuildT (pSize v) (Lam ii TypeInteger (lmDelta t (Var ii) i)) ])
-    where ii = TVar TypeInteger $ Simple "ii"
-          t = typeofDst ty
+  = Just (primDindex i v) 
 
 optGradFun ty (SFun "neg") e = Just (lmScale t (kTFloat $ -1.0)) where t = typeofDst ty
 
@@ -236,7 +241,7 @@ optGradFun ty (SFun "exp") e = Just (lmScale t (pExp e)) where t = typeofDst ty
 
 optGradFun ty (SFun "log") e = Just (lmScale t (pDiv (kTFloat 1.0) e)) where t = typeofDst ty
 
-optGradFun _ f _ = trace("No opt for " ++ (show $ ppr f) ) $ Nothing
+optGradFun _ f _ = optTrace("No opt for " ++ (show $ ppr f) ) $ Nothing
 
 
 --------------
@@ -252,9 +257,9 @@ optLM ty "lmCompose" (Tuple [f,g])
   | isLMZero g = Just $ lmZero s t
 
   -- Scale(x) . Scale(y) = Scale( xy )
-  | Call (TFun tyf (LMFun "lmScale")) x <- f
-  , Call (TFun tyg (LMFun "lmScale")) y <- g
-  = Just (lmScale t (pMul x y))
+  | Call (TFun tyf (LMFun "lmScale")) (Tuple [t1,x]) <- f
+  , Call (TFun tyg (LMFun "lmScale")) (Tuple [t2,y]) <- g
+  = Just $ lmScale t (pMul x y)
 
   -- (f . g) . h   =>   f . (g . h)
   | Call (TFun tyc (LMFun "lmCompose")) (Tuple [p1,p2]) <- f
@@ -285,8 +290,8 @@ optLM ty "lmAdd" (Tuple [p,q])
   | isLMZero p = Just q
   | isLMZero q = Just p
 -- Add(Scale(x), Scale(y)) = Scale(Add(x,y))
-  | Call (TFun typ (LMFun "lmScale")) x <- p
-  , Call (TFun tyq (LMFun "lmScale")) y <- q
+  | Call (TFun typ (LMFun "lmScale")) (Tuple [t1, x]) <- p
+  , Call (TFun tyq (LMFun "lmScale")) (Tuple [t2, y]) <- q
   = Just $ lmScale t (pAdd x y)
   where 
     s = typeofSrc ty
@@ -296,7 +301,7 @@ optLM ty "lmAdd" (Tuple [p,q])
 optLM ty "lmAdd" (Tuple [Call (TFun _ (LMFun "lmHCat")) (Tuple ps), Call (TFun _ (LMFun "lmHCat")) (Tuple qs)])
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
 
-optLM ty fun arg = Nothing
+optLM ty fun arg = optTrace("No optLM for " ++ fun ++ "(" ++ show (ppr arg) ++ ")" ) $ Nothing
 
 test_opt:: IO ()
 test_opt =
@@ -308,7 +313,7 @@ test_opt =
         Just (lmScale TypeFloat (mkTCall2 TypeFloat (Fun (SFun "+")) (kTFloat 1.3) (kTFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd)" $
-        optE (lmAdd (lmHCat (map kTInt [1,2,3])) (lmHCat (map kTInt [11,22,33])))
+        optE stCreate (lmAdd (lmHCat (map kTInt [1,2,3])) (lmHCat (map kTInt [11,22,33])))
         `shouldBe`
         lmHCat [lmAdd (kTInt 1) (kTInt 11), lmAdd (kTInt 2) (kTInt 22), lmAdd (kTInt 3) (kTInt 33)]
 
@@ -356,7 +361,7 @@ optApplyLMCall ty tylm "lmHCat" (Tuple es) dx
     add :: (TExpr, Int) -> TExpr -> TExpr
     add (e,i) z = pAdd (lmApply e (pSel i n dx)) z
 
-optApplyLMCall ty tylm "lmScale" x dx
+optApplyLMCall ty tylm "lmScale" (Tuple [t,x]) dx
   = Just (pMul x dx)
 
 optApplyLMCall ty tylm "lmBuild" (Tuple [n, Lam i tyi m]) dx
@@ -366,7 +371,7 @@ optApplyLMCall ty tylm "lmBuildT" (Tuple [n, Lam i tyi m]) dx
   = Just (pSum (pBuild n (Lam i tyi (lmApply m (pIndex (Var i) dx)))))
 
 optApplyLMCall ty tylm fun arg dx
-  = trace ("No opt for " ++ (show fun) ++ "(" ++ show (ppr arg) ++ ".") Nothing
+  = optTrace ("No opt for " ++ (show fun) ++ "(" ++ show (ppr arg) ++ ".") Nothing
 
 
 ----------------------
@@ -390,7 +395,7 @@ optTrans e = error ("optTrans: " ++  show e)
 optTransCallLM :: TypeLM -> String -> TExpr -> Maybe TExpr
 optTransCallLM ty "lmZero" e  = Just $ lm (transpose ty) [e]
 optTransCallLM ty "lmOne"  e  = Just $ lm (transpose ty) [e]
-optTransCallLM ty "lmScale" e = Just $ lm (transpose ty) [e]
+optTransCallLM ty "lmScale" (Tuple [t,e]) = Just $ lm (transpose ty) [t,e]
 
 optTransCallLM ty "lmTranspose" e = Just e
 optTransCallLM ty "lmCompose" (Tuple [f,g])
