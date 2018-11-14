@@ -366,33 +366,26 @@ std::ostream &operator<<(std::ostream &s, HCat2<T1,T2> const &t)
         "(" << t.lm1 << "," << t.lm2 << ")";
 }
 
-template <class LM1, class LM2, class LM3>
+template <class LM0, class LM1, class LM2>
 struct HCat3 {
-    LM1 lm1;
-    LM2 lm2;
-    LM3 lm3;
+    tuple<LM0,LM1,LM2> lms;
+    
+	typedef typename LM0::To To;
 
-    typedef typename LM1::From From1;
-    typedef typename LM1::To To1;
+	typedef typename LM0::From From0;
+	typedef typename LM1::From From1;
+	typedef typename LM2::From From2;
 
-    typedef typename LM2::From From2;
-    typedef typename LM2::To To2;
+    typedef tuple<From0,From1,From2> From;
 
-    typedef typename LM3::From From3;
-    typedef typename LM3::To To3;
-
-    static_assert(std::is_same<To1, To2>::value, "To1==To2");
-    static_assert(std::is_same<To1, To3>::value, "To1==To2");
-
-    typedef tuple<From1,From2,From3> From;
-    typedef To1 To;
-
-    static HCat3 mk(LM1 lm1, LM2 lm2, LM3 lm3) { return HCat3 { lm1, lm2, lm3}; }
+	static HCat3 mk(LM0 lm0, LM1 lm1, LM2 lm2) { return HCat3{ { lm0, lm1, lm2 } }; }
 
     To Apply(From f) const { 
-        To ret = add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); 
-        ret = add(ret, lm3.Apply(std::get<2>(f)));
+#define APP(i) std::get<i>(lms).Apply(std::get<i>(f))
+        To ret = add(APP(0), APP(1));
+        ret = add(ret, APP(2));
         return ret; 
+#undef APP
     }
 
 };
@@ -401,9 +394,11 @@ struct HCat3 {
 template <class T1, class T2, class T3>
 std::ostream &operator<<(std::ostream &s, HCat3<T1,T2,T3> const &t)
 {
+#define APP(i) std::get<i>(t.lms)
     return s << "HCat3" << 
         //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-        "(" << t.lm1 << "," << t.lm2 << "," << t.lm3 << ")";
+        "(" << APP(0) << "," << APP(1) << "," << APP(2) << ")";
+#undef APP
 }
 
 // ---------------- VCat ------------------
@@ -571,12 +566,37 @@ struct Variant
     }
 };
 
+template <size_t n, class T, class... Ts>
+struct variant_print {
+	static std::ostream& go(std::ostream &s, std::variant<T, Ts...> const & v)
+	{
+		if (v.index() == n-1) 
+			s << std::get<n-1>(v);
+		return variant_print<n - 1,T,Ts...>::go(s,v);
+	}
+};
+
+template <class T, class... Ts>
+struct variant_print<0,T,Ts...> {
+	static std::ostream& go(std::ostream &s, std::variant<T,Ts...> const & v)
+	{
+		return s;
+	}
+};
+
+template <class T, class... Ts>
+std::ostream &operator<<(std::ostream &s, std::variant<T, Ts...> const & v)
+{
+	constexpr size_t n = std::variant_size<std::variant<T, Ts...>>::value;
+	return variant_print<n,T,Ts...>::go(s, v);
+}
+
 template <class T1, class T2>
 std::ostream &operator<<(std::ostream &s, Variant<T1,T2> const &t)
 {
-    return s << "Variant" <<
-        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-        "(" << t.v.index() << ")";
+	return s << "Variant" <<
+		//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+		"{" << t.v << "}";
 }
 
 // ---------------- lmApply ------------------
