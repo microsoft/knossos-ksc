@@ -260,7 +260,7 @@ doall file =
   ;  let (env''', optfwd) = optDefs env'' fwd
   ;  banner "optfwd"
   ;  dd optfwd 
-  ;  let alldefs = ann ++ optgrad ++ optfwd
+  ;  let alldefs = ann 
   ;  cse <- cseDefs alldefs
   ;  dd cse
   ;  let ann2 =  cse ++ (snd $ annotDefs env''' main)
