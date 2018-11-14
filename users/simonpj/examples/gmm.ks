@@ -41,8 +41,12 @@
 
 (def gmm_knossos_gmm_objective 
       ((x : Vec Vec Float) 
-       (alphas : Vec Float) (means : Vec Vec Float) (qs : Vec Vec Float) (ls : Vec Vec Float) 
-       (wishart_gamma : Float) (wishart_m : Float))
+       (alphas : Vec Float) 
+       (means : Vec Vec Float) 
+       (qs : Vec Vec Float) 
+       (ls : Vec Vec Float) 
+       (wishart_gamma : Float) 
+       (wishart_m : Float))
   (let (n (size x))
   (let (d (size (index 0 x)))
   (let (K (size alphas))

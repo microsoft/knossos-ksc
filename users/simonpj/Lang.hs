@@ -27,6 +27,9 @@ foldll f a0 xs = foldl (\(a,xs) x -> let (a',x') = f a x in (a', xs ++ [x'])) (a
 class Match a where
   isMatch :: a -> a -> Bool
 
+instance Match Int where
+  isMatch a b = a == b
+
 instance Match TypeLM where
   isMatch (LM s t) lm = -- dbtrace("[isMatch LM]") $ 
                         s == typeofSrc lm && t == typeofDst lm

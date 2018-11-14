@@ -607,12 +607,16 @@ struct zero_t
 template <class T1, class T2>
 auto D$sub(T1 t1, T2 t2)
 {
-    return 1;// LM::HCat<tuple<T1, T2>, T1>(LM::lmOne<T1,T1>(), LM::lmScale<T2,T1>(-1.0));
+    return LM::HCat2<tuple<T1, T2>, T1>::mk(LM::One<T1>::mk(), LM::Scale<T1>::mk(-1.0));
 }
 
 
 template <class T1, class T2>
-T1 mul(T1 t1, T2 t2) { return t1 * t2; }
+T1 mul(T1 t1, T2 t2) 
+{ 
+    return t1 * t2; 
+}
+
 template <class T1, class T2>
 auto D$mul(T1 t1, T2 t2)
 {
@@ -622,17 +626,28 @@ auto D$mul(T1 t1, T2 t2)
 }
 
 template <class T1, class T2>
-T1 div(T1 t1, T2 t2) { return t1 / t2; }
-template <class T1, class T2>
-auto D$div(T1 t1, T2 t2)
+T1 div(T1 t1, T2 t2) 
 {
-    return 1;//LM::lmHCat2<tuple<T1, T2>, T1>(LM::lmScale<T1,T1>(1/t2), LM::lmScale<T2,T1>(-1.0/(t1*t1)));
+    return t1 / t2;
 }
 
 template <class T1, class T2>
-T1 eq(T1 t1, T2 t2) { return t1 == t2; }
+auto D$div(T1 t1, T2 t2)
+{
+    return LM::HCat2<tuple<T1, T2>, T1>::mk(LM::Scale<T1>::mk(T1{}, 1.0/t2), LM::Scale<T1>::mk(T1{}, -1.0/(t1*t1)));
+}
+
 template <class T1, class T2>
-T1 lt(T1 t1, T2 t2) { return t1 < t2; }
+T1 eq(T1 t1, T2 t2)
+{
+    return t1 == t2;
+}
+
+template <class T1, class T2>
+T1 lt(T1 t1, T2 t2) 
+{
+    return t1 < t2;
+}
 
 template <typename T>
 T delta(int i, int j, T)
@@ -706,15 +721,14 @@ std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
 template <class T>
 ks::zero_t pr(T a)
 {
-    std::cout << "A= " << a << std::endl;
+    std::cout << a << std::endl;
     return ks::zero_t{};
 }
 
 template <class T, class... Ts>
 ks::zero_t pr(T a, Ts... t)
 {
-    std::cout << "----\n";
     pr(a);
+    std::cout << "----\n";
     return pr(t...);
 }
-

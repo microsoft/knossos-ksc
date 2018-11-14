@@ -273,8 +273,8 @@ optLM ty "lmCompose" (Tuple [f,g])
 
   | Call (TFun tyf (LMFun "lmHCat")) (Tuple ps) <- f
   , Call (TFun tyg (LMFun "lmVCat")) (Tuple qs) <- g
-  , length ps == length qs
-  = Just (lmAdds (zipWith lmCompose ps qs))
+  = assertEqualThen "H o V" (length ps) (length qs) $
+    Just (lmAdds (zipWith lmCompose ps qs))
 
   where 
     s = typeofSrc ty
