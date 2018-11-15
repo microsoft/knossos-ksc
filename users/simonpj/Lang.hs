@@ -756,8 +756,8 @@ typeofFunTys env tf tys =
   case (tf, tys) of
   (LMFun "lmApply",  [TypeLM tylm, s]) -> assertEqualThen "lmApply" (typeofSrc tylm) s $ typeofDst tylm
   (LMFun f, tys) -> TypeLM $ typeofLMFun f tys
-  (Fun (SFun "pr")       , _                            ) -> TypeUnknown
-  (GradFun (SFun "pr") _ , _                            ) -> TypeUnknown
+  (Fun (SFun "pr")       , _                            ) -> TypeInteger
+  (GradFun (SFun "pr") _ , _                            ) -> TypeInteger
   (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
   (Fun (SFun "index")    , [_, TypeVec t]               ) -> t
   (GradFun (SFun "index") _, [_, TypeVec t]               ) -> TypeLM $ LMHCat [LMZero TypeInteger t, LMBuildT (LMScale t)]

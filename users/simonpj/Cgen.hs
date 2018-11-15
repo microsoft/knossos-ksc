@@ -125,26 +125,25 @@ cgenDef def = fst $ cgenDefE def
 
 cgenDefE :: L.TDef -> CGenResult
 cgenDefE (L.DefX f@(L.TFun tyf _) vars expr) =
-  let _ = trace ("Def " ++ show f ++ "\n") ()
-  in  let (cDecl, cVar) = runM $ cgenExpr expr
-      in  (     cgenType tyf
-          `spc` cgenFun f
-          ++    "("
-          ++    intercalate
-                  ", "
-                  (map (\(L.TVar ty var) -> cgenType ty `spc` cgenVar var) vars)
-          ++    ") {\n"
-          ++    cDecl
-          ++    "return "
-          ++    cVar
-          ++    ";\n}\n"
-          , cgenFun f
-          )
+  let (cDecl, cVar) = runM $ cgenExpr expr
+      tyfstr = cgenType tyf
+  in  (     tyfstr
+      `spc` cgenFun f
+      ++    "("
+      ++    intercalate
+              ", "
+              (map (\(L.TVar ty var) -> cgenType ty `spc` cgenVar var) vars)
+      ++    ") {\n"
+      ++    cDecl
+      ++    "return static_cast<" ++ tyfstr ++ ">"  -- In order to concretize tag types like zero_t
+      ++    "(" ++ cVar ++ ")"
+      ++    ";\n}\n"
+      , cgenFun f
+      )
 
 cgenExpr :: L.TExpr -> M CGenResult
 cgenExpr = cgenExprR -- <=< anf
 
--- The input expression must be in ANF
 cgenExprR :: HasCallStack => L.TExpr -> M CGenResult
 cgenExprR ex = case ex of
   L.Konst k             -> return ("", cgenKonst k)
@@ -216,7 +215,7 @@ cgenExprR ex = case ex of
         ,
         "std::make_tuple("
         ++ intercalate "," exprs
-        ++ ")\n/**eTuple**/\n"
+        ++ ")/**eTuple**/"
         )
 
   L.Lam (L.TVar tv v) ty1 body -> do
@@ -227,7 +226,7 @@ cgenExprR ex = case ex of
       ( "/**Lam**/"
       ++ "auto" -- cgenType (L.TypeLambda tv (L.typeof body)) 
       `spc` l
-      ++    " = [&]("
+      ++    " = [=]("
       ++    cgenType tv
       `spc` cgenVar v
       ++    ") { "
@@ -247,6 +246,9 @@ cgenExprR ex = case ex of
     let ty1 = L.typeof texpr
     let ty2 = L.typeof fexpr
     let ty = L.makeUnionType ty1 ty2
+    let dotv = case ty of
+                L.TypeLM (L.LMVariant ts) -> ".v"
+                _ -> ""
 
     return
       ( declc -- emit condition generation
@@ -260,7 +262,7 @@ cgenExprR ex = case ex of
       ++    declt
       ++    ";\n" -- compute true value
       ++    "  "
-      ++    cret
+      ++    cret ++ dotv
       ++    "="
       ++    vt
       ++    ";\n" -- assign to "return"
@@ -269,7 +271,7 @@ cgenExprR ex = case ex of
       ++    declf
       ++    ";\n" -- compute false value
       ++    "  "
-      ++    cret
+      ++    cret ++ dotv
       ++    "="
       ++    vf
       ++    ";\n" -- assign to "return"
@@ -312,7 +314,7 @@ cgenType = \case
   L.TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
   L.TypeVec   t   -> "vec<" ++ cgenType t ++ ">"
   L.TypeBool      -> "bool"
-  L.TypeUnknown   -> "auto"
+  L.TypeUnknown   -> "unk"
   L.TypeLambda from to ->
     "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
   L.TypeLM ty -> cgenTypeLM ty
