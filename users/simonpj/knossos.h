@@ -46,6 +46,18 @@ auto prepend(T t, tuple<Ts...> tup)
 	return std::tuple_cat(std::make_tuple(t), tup);
 }
 
+// Prepend at the type level, e.g. 
+// decltype(prepend(A{}, B{}))
+template <class A, class B>
+struct tuple_prepend {
+};
+
+template <class T, class... Ts>
+struct tuple_prepend<T, tuple<Ts...>> {
+	typedef tuple<T, Ts...> type;
+};
+
+
 // val to string
 template <class T>
 std::string str(T val) {  
@@ -112,6 +124,8 @@ struct vec
 {
     int size;
     T *data;
+
+	static vec<T> create(int size);
 };
 
 template <typename T>
@@ -142,6 +156,19 @@ struct type_to_string<ks::vec<T>>
             return std::string(#Tmpl) + "<" + type_to_string<T1>::name() + "," + type_to_string<T2>::name() + ">"; \
         }                         \
     };
+
+#define DECLARE_TYPE_TO_STRING_Pack(Tmpl) \
+	template <class... Ts> \
+    struct type_to_string<Tmpl<Ts...>>  \
+    {                             \
+        static std::string name() \
+        {                         \
+			typedef typename Tmpl<Ts...>::Tup Tup; \
+			typedef typename std::tuple_element<0, Tup>::type T0; \
+            return std::string(#Tmpl) + "<" + type_to_string<T0>::name() + ", ...FIXME...>";            \
+        }                         \
+    };
+
 
 template <class T>
 int size(vec<T> v) { return v.size; }
@@ -180,26 +207,45 @@ struct allocator {
     }
 };
 
-allocator g_alloc { 1000000 };
+allocator g_alloc { 10000000 };
+
+template <class T>
+vec<T> vec<T>::create(int size)
+{
+	void *storage = g_alloc.alloc(sizeof(T) * size);
+	return vec<T> { size, new (storage) T[size] }; // To be replaced with DPS as appropriate
+}
 
 template <class T, class F>
 vec<T> build(int size, F f)
 {
-    void *storage = g_alloc.alloc(sizeof (T) * size);
-    vec<T> ret{size, new (storage) T[size]}; // To be replaced with DPS as appropriate
+	vec<T> ret = vec<T>::create(size);
 
-    for (int i = 0; i < size; ++i)
-        ret.data[i] = f(i);
-    return ret;
+	for (int i = 0; i < size; ++i)
+		ret.data[i] = f(i);
+	return ret;
 }
 
 // Additional Vec functions
-double sum(vec<double> v)
+template <class T>
+vec<T> add(vec<T> a, vec<T> b)
 {
-    double ret = 0.0;
-    for (int i = 0; i < v.size; ++i)
-        ret += v.data[i];
-    return ret;
+	vec<T> ret = vec<T>::create(a.size);
+	for (int i = 0; i < a.size; ++i)
+		ret.data[i] = add(a.data[i], b.data[i]);
+	return ret;
+}
+
+// Additional Vec functions
+template <class T>
+T sum(vec<T> v)
+{
+	if (v.size == 0) throw(std::string("oik"));
+	if (v.size == 1) return v.data[0];
+	T ret = add(v.data[0], v.data[1]);
+	for (int i = 2; i < v.size; ++i)
+		ret = add(ret, v.data[i]);
+	return ret;
 }
 
 
@@ -335,70 +381,89 @@ std::ostream &operator<<(std::ostream &s, Add<T1,T2> const &t)
 }
 
 // ---------------- HCat ------------------
-template <class LM1, class LM2>
-struct HCat2 {
-    LM1 lm1;
-    LM2 lm2;
 
-    typedef typename LM1::From From1;
-    typedef typename LM1::To To1;
-
-    typedef typename LM2::From From2;
-    typedef typename LM2::To To2;
-
-    static_assert(std::is_same<To1, To2>::value, "To1==To2");
-
-    typedef tuple<From1,From2> From;
-    typedef To1 To;
-
-    static HCat2 mk(LM1 lm1, LM2 lm2) { return HCat2 { lm1, lm2}; }
-
-    To Apply(From f) const { return add(lm1.Apply(std::get<0>(f)), lm2.Apply(std::get<1>(f))); }
-
+template <class T>
+struct HCat_infer_From {
 };
 
+template <>
+struct HCat_infer_From<tuple<>> {
+	typedef tuple<> type;
+};
 
-template <class T1, class T2>
-std::ostream &operator<<(std::ostream &s, HCat2<T1,T2> const &t)
+template <class T, class... Ts>
+struct HCat_infer_From<tuple<T, Ts...>> {
+	typedef typename T::From From;
+	typedef typename HCat_infer_From<tuple<Ts...>>::type Froms;
+	typedef typename tuple_prepend<From, Froms>::type type;
+};
+
+namespace test_HCat_infer_From {
+	struct A {
+		typedef int From;
+	};
+	struct B {
+		typedef float From;
+	};
+	typedef typename HCat_infer_From<tuple<A, B, A>>::type ABA;
+	static_assert(std::is_same<ABA, tuple<int, float, int>>::value);
+};
+
+template <class T>
+struct HCat_infer_To {
+	typedef typename std::tuple_element<0, T>::type T0;
+	typedef typename T0::To type;
+};
+
+template <class... LMs>
+struct HCat {
+	static constexpr size_t n = sizeof...(LMs);
+
+    typedef tuple<LMs...> Tup;
+    
+    Tup lms;
+    
+	typedef typename HCat_infer_To<Tup>::type To;
+    typedef typename HCat_infer_From<Tup>::type From;
+
+	static HCat mk(LMs... lm) { return HCat { { lm... } }; }
+
+#define APP(i) std::get<i>(lms).Apply(std::get<i>(f))
+
+	template <size_t i>
+	To Apply_aux(To accum, From const& f) const {
+		if constexpr (i < n)
+			return Apply_aux<i + 1>(add(accum, APP(i)), f);
+		else 
+            return accum;
+	}
+
+    To Apply(From const& f) const {
+		static_assert(n > 1);
+		return Apply_aux<1>(APP(0), f);
+    }
+#undef APP
+};
+
+template <size_t i, class... Ts>
+std::ostream& tuple_print(std::ostream& s, tuple<Ts...> const& t)
 {
-    return s << "HCat2" << 
-        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-        "(" << t.lm1 << "," << t.lm2 << ")";
+	if constexpr(i < sizeof...(Ts)) 
+	{
+		s << std::get<i>(t);
+		if (i+1 < sizeof...(Ts)) s << ",";
+		return tuple_print<i + 1>(s, t);
+	}
+	return s;
 }
 
-template <class LM0, class LM1, class LM2>
-struct HCat3 {
-    tuple<LM0,LM1,LM2> lms;
-    
-	typedef typename LM0::To To;
-
-	typedef typename LM0::From From0;
-	typedef typename LM1::From From1;
-	typedef typename LM2::From From2;
-
-    typedef tuple<From0,From1,From2> From;
-
-	static HCat3 mk(LM0 lm0, LM1 lm1, LM2 lm2) { return HCat3{ { lm0, lm1, lm2 } }; }
-
-    To Apply(From f) const { 
-#define APP(i) std::get<i>(lms).Apply(std::get<i>(f))
-        To ret = add(APP(0), APP(1));
-        ret = add(ret, APP(2));
-        return ret; 
-#undef APP
-    }
-
-};
-
-
-template <class T1, class T2, class T3>
-std::ostream &operator<<(std::ostream &s, HCat3<T1,T2,T3> const &t)
+template <class... Ts>
+std::ostream &operator<<(std::ostream &s, HCat<Ts...> const &t)
 {
-#define APP(i) std::get<i>(t.lms)
-    return s << "HCat3" << 
-        //"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-        "(" << APP(0) << "," << APP(1) << "," << APP(2) << ")";
-#undef APP
+	return s << "HCat" <<
+		//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+		"(";
+	return tuple_print<0>(s, t.lms) << ")";
 }
 
 // ---------------- VCat ------------------
@@ -527,7 +592,10 @@ struct BuildT
     template <class Functor>
     static BuildT mk(int n, Functor f) { return BuildT { n, f }; }
 
-    To Apply(From x) const { return sum(build<LFrom>(n, [&](int i) { return lmApply(f(i), x.data[i]); })); }
+    To Apply(From x) const 
+	{ 
+		return sum(build<LFrom>(n, [&](int i) { return lmApply(f(i), x.data[i]); })); 
+	}
 };
 
 template <class L>
@@ -612,7 +680,7 @@ DECLARE_TYPE_TO_STRING2(LM::Zero,From,To);
 DECLARE_TYPE_TO_STRING(LM::Scale,T);
 DECLARE_TYPE_TO_STRING(LM::Build,L);
 DECLARE_TYPE_TO_STRING(LM::BuildT, L);
-DECLARE_TYPE_TO_STRING2(LM::HCat2,From,To);
+DECLARE_TYPE_TO_STRING_Pack(LM::HCat);
 DECLARE_TYPE_TO_STRING2(LM::VCat,From,To);
 DECLARE_TYPE_TO_STRING2(LM::Compose,From,To);
 DECLARE_TYPE_TO_STRING2(LM::Variant,From,To);
@@ -627,7 +695,7 @@ struct zero_t
 template <class T1, class T2>
 auto D$sub(T1 t1, T2 t2)
 {
-    return LM::HCat2<tuple<T1, T2>, T1>::mk(LM::One<T1>::mk(), LM::Scale<T1>::mk(-1.0));
+	return LM::HCat<LM::Scale<T1>, LM::Scale<T1>>::mk({1.0}, { -1.0 });
 }
 
 
@@ -642,7 +710,7 @@ auto D$mul(T1 t1, T2 t2)
 {
     typedef LM::Scale<T1> M1;
     typedef LM::Scale<T2> M2;
-    return LM::HCat2<M1,M2>::mk(M1::mk(t2), M2::mk(t1));
+    return LM::HCat<M1,M2>::mk(M1::mk(t2), M2::mk(t1));
 }
 
 template <class T1, class T2>
@@ -654,7 +722,7 @@ T1 div(T1 t1, T2 t2)
 template <class T1, class T2>
 auto D$div(T1 t1, T2 t2)
 {
-    return LM::HCat2<tuple<T1, T2>, T1>::mk(LM::Scale<T1>::mk(T1{}, 1.0/t2), LM::Scale<T1>::mk(T1{}, -1.0/(t1*t1)));
+    return LM::HCat<tuple<T1, T2>, T1>::mk(LM::Scale<T1>::mk(T1{}, 1.0/t2), LM::Scale<T1>::mk(T1{}, -1.0/(t1*t1)));
 }
 
 template <class T1, class T2>
@@ -711,7 +779,7 @@ auto D$selfun$2_1(T1,T2)
 {
     typedef LM::One<T1> L1;
     typedef LM::Zero<T2,T1> L2;
-    return LM::HCat2<L1,L2>::mk(L1::mk(), L2::mk());
+    return LM::HCat<L1,L2>::mk(L1::mk(), L2::mk());
 }
 
 template <typename T1, typename T2>
@@ -719,7 +787,7 @@ auto D$selfun$2_2(T1,T2)
 {
     typedef LM::Zero<T1,T2> L1;
     typedef LM::One<T2> L2;
-    return LM::HCat2<L1,L2>::mk(L1::mk(), L2::mk());
+    return LM::HCat<L1,L2>::mk(L1::mk(), L2::mk());
 }
 
 } // namespace ks
