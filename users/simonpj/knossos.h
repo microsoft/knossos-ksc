@@ -41,7 +41,7 @@ std::set<void*> objects;
 
 namespace ks
 {
-	// Allocator
+	// ===============================  Allocator  ==================================
 	struct allocator {
 		size_t max_size;
 		unsigned char* buf;
@@ -72,7 +72,7 @@ namespace ks
 
 	allocator g_alloc{ 10000000 };
 
-	// Zero
+	// ===============================  Zero  ==================================
 	struct zero_t
 	{
 		// Be alert for "double to int" warnings on this type -- they can mask things like a vector constructor's size argument
@@ -80,20 +80,6 @@ namespace ks
 		explicit operator int() { return 0; }
 	};
 
-
-
-	// Functions defined polymorphically by Cgen.typeofFun
-	template <class T1, class T2>
-	T1 add(T1 t1, T2 t2) { return t1 + t2; }
-
-	template <class T2>
-	T2 add(zero_t t1, T2 t2) { return t2; }
-
-	template <class T1>
-	T1 add(T1 t1, zero_t t2) { return t1; }
-
-	template <class T1, class T2>
-	T1 sub(T1 t1, T2 t2) { return t1 - t2; }
 
 	// ===============================  Tuple utils  ==================================
 
@@ -137,12 +123,20 @@ namespace ks
 	{
 		if constexpr(i < sizeof...(Ts))
 		{
-			s << std::get<i>(t);
 			if (i > 0) s << ",";
-			return tuple_print<i + 1>(s, t);
+			s << std::get<i>(t);
+			tuple_print<i + 1>(s, t);
 		}
 		return s;
 	}
+
+	template <class... Ts>
+	std::ostream& operator<<(std::ostream& s, tuple<Ts...> const& t)
+	{
+		return tuple_print<0>(t);
+	}
+
+	// ===============================  String utils  ==================================
 
 	// val to string
 	template <class T>
@@ -152,7 +146,8 @@ namespace ks
 		return s.str();
 	}
 
-	// Type to string
+
+	// ===============================  Type to string  ==================================
 
 	template <class T>
 	struct type_to_string
@@ -238,7 +233,22 @@ namespace ks
 		}                                                         \
 	};
 
-	// Vector builtins
+	// ===============================  Addition ==================================
+	// Adding is special because it needs to be defined before linear maps,
+	// And needs to be defined before any primitives are used in linear maps.
+	// ... At least for gcc, which seems to require more info at template decl time.
+
+	template <class T1, class T2>
+	T1 add(T1 t1, T2 t2) { return t1 + t2; }
+
+	template <class T2>
+	T2 add(zero_t t1, T2 t2) { return t2; }
+
+	template <class T1>
+	T1 add(T1 t1, zero_t t2) { return t1; }
+
+	// ===============================  Vector class ==================================
+
 	template <class T>
 	class vec
 	{
@@ -267,16 +277,6 @@ namespace ks
 
 		static vec<T> create(size_t size);
 	};
-
-	template <typename T>
-	struct type_to_string<ks::vec<T>>
-	{
-		static std::string name()
-		{
-			return "vec<" + type_to_string<T>::name() + ">";
-		}
-	};
-
 
 	template <class T>
 	int size(vec<T> const & v)
@@ -317,7 +317,16 @@ namespace ks
 		return ret;
 	}
 
-	// Additional Vec functions
+	template <typename T>
+	struct type_to_string<ks::vec<T>>
+	{
+		static std::string name()
+		{
+			return "vec<" + type_to_string<T>::name() + ">";
+		}
+	};
+
+	// Elemetwise addition
 	template <class T>
 	vec<T> add(vec<T> const& a, vec<T> const& b)
 	{
@@ -329,7 +338,19 @@ namespace ks
 		return ret;
 	}
 
-	// Additional Vec functions
+	// Addition of a scalar
+	template <class T>
+	vec<T> add(vec<T> const& a, T const& b)
+	{
+		ASSERT(a.size() == b.size());
+		vec<T> ret = vec<T>::create(a.size());
+
+		for (int i = 0; i < a.size(); ++i)
+			ret[i] = add(a[i], b);
+		return ret;
+	}
+
+	// sum of elements
 	template <class T>
 	T sum(vec<T> const& v)
 	{
@@ -341,13 +362,18 @@ namespace ks
 		return ret;
 	}
 
+	template <class T>
+	std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
+	{
+		s << "[";
+		for (int i = 0; i < v.size(); ++i)
+			s << (i > 0 ? ", " : "") << v[i];
+		return s << "]";
+	}
 
-	// Linear maps
+	// ===============================  Linear maps ==================================
 	namespace LM
 	{
-
-		// LM operators
-
 		// ---------------- One  ------------------
 		template <class T>
 		struct One
@@ -481,6 +507,7 @@ namespace ks
 
 		// ---------------- HCat ------------------
 
+		// Helper to gather "From" information from the incoming types
 		template <class T>
 		struct HCat_infer_From {
 		};
@@ -508,9 +535,10 @@ namespace ks
 			static_assert(std::is_same<ABA, tuple<int, float, int>>::value);
 		};
 
-		template <class T>
+		template <class Tuple>
 		struct HCat_infer_To {
-			typedef typename std::tuple_element<0, T>::type T0;
+			// Will fail if Tuple doesn't have at least one element
+			typedef typename std::tuple_element<0, Tuple>::type T0;
 			typedef typename T0::To type;
 		};
 
@@ -527,36 +555,41 @@ namespace ks
 
 			static HCat mk(LMs... lm) { return HCat{ { lm... } }; }
 
-#define APP(i) std::get<i>(lms).Apply(std::get<i>(f))
+			To Apply(From const& f) const {
+				static_assert(n > 1);
+				auto a0 = std::get<0>(lms).Apply(std::get<0>(f));
+				return Apply_aux<1>(a0, f);
+			}
 
 			template <size_t i>
 			To Apply_aux(To accum, From const& f) const {
-				if constexpr (i < n)
-					return Apply_aux<i + 1>(add(accum, APP(i)), f);
+				if constexpr (i < n) {
+					auto ai = std::get<i>(lms).Apply(std::get<i>(f));
+					return Apply_aux<i + 1>(add(accum, ai), f);
+				}
 				else
+					// Tail case, just return the accumulator
 					return accum;
 			}
 
 			template <size_t i>
 			To Apply_aux(zero_t accum, From const& f) const {
-				if constexpr (i < n)
-					return Apply_aux<i + 1>(/*add zero to ..*/ APP(i), f);
+				if constexpr (i < n) {
+					// Accumulator could be zero if first terms are zero,
+					// just move on to case 1
+					auto ai = std::get<i>(lms).Apply(std::get<i>(f));
+					return Apply_aux<i + 1>(ai, f);
+				}
 				else
 					return accum;
 			}
 
-			To Apply(From const& f) const {
-				static_assert(n > 1);
-				return Apply_aux<1>(APP(0), f);
-			}
-#undef APP
 		};
-
 		
 		template <class T, class... Ts>
 		std::ostream &operator<<(std::ostream &s, HCat<T, Ts...> const &t)
 		{
-			return s << "HCat"
+			s << "HCat";
 				//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
 				;
 			return tuple_print<0>(s << "(", t.lms) << ")";
@@ -782,7 +815,7 @@ namespace ks
 			static std::ostream& go(std::ostream &s, std::variant<T, Ts...> const & v)
 			{
 				if (v.index() == n - 1)
-					s << std::get<n - 1>(v);
+					s << (n-1) << ":" << std::get<n - 1>(v);
 				return variant_print<n - 1, T, Ts...>::go(s, v);
 			}
 		};
@@ -829,7 +862,12 @@ namespace ks
 	DECLARE_TYPE_TO_STRING2(LM::Variant, From, To);
 	DECLARE_TYPE_TO_STRING2(LM::Add, From, To);
 
-	// Gradients of standard fns
+	// ===============================  Primitives  ==================================
+
+	template <class T1, class T2>
+	T1 sub(T1 t1, T2 t2) { return t1 - t2; }
+
+
 	template <class T1, class T2>
 	auto D$sub(T1 t1, T2 t2)
 	{
@@ -887,10 +925,12 @@ namespace ks
 	}
 
 	double neg(double d) { return -d; }
+	auto D$neg(double d) { return LM::Scale<double>::mk(double{}, -1.0); }
 
 	double to_float(int d) { return d; }
 	auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
+	// ------------ SelFun --------------
 	// TODO: parameter packs for these
 	template <typename T1, typename T2>
 	T1 selfun$2_1(tuple<T1, T2> ts) {
@@ -918,28 +958,20 @@ namespace ks
 		return LM::HCat<L1, L2>::mk(L1::mk(), L2::mk());
 	}
 
+
+	// ========================= Printing primitive for KS files ===============
+	template <class T>
+	ks::zero_t pr(T a)
+	{
+		std::cout << a << std::endl;
+		return ks::zero_t{};
+	}
+
+	template <class T, class... Ts>
+	ks::zero_t pr(T a, Ts... t)
+	{
+		pr(a);
+		std::cout << "----\n";
+		return pr(t...);
+	}
 } // namespace ks
-
-template <class T>
-std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
-{
-	s << "[";
-	for (int i = 0; i < v.size(); ++i)
-		s << (i > 0 ? ", " : "") << v[i];
-	return s << "]";
-}
-
-template <class T>
-ks::zero_t pr(T a)
-{
-	std::cout << a << std::endl;
-	return ks::zero_t{};
-}
-
-template <class T, class... Ts>
-ks::zero_t pr(T a, Ts... t)
-{
-	pr(a);
-	std::cout << "----\n";
-	return pr(t...);
-}
