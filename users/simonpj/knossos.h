@@ -75,11 +75,23 @@ namespace ks
 	// ===============================  Zero  ==================================
 	struct zero_t
 	{
-		// Be alert for "double to int" warnings on this type -- they can mask things like a vector constructor's size argument
+		// These need to be explicit.  To get a zero of type T, use T { zero_t {} }
 		explicit operator double() { return 0.0; }
 		explicit operator int() { return 0; }
 	};
 
+
+	template <class T>
+	bool is_zero(T)
+	{
+		return false;   // It might be tempting to put a runtime check in here, but beware of lost static optimization opportunities
+	}
+
+	template <>
+	bool is_zero(zero_t)
+	{
+		return true;
+	}
 
 	// ===============================  Tuple utils  ==================================
 
@@ -136,6 +148,7 @@ namespace ks
 		return tuple_print<0>(t);
 	}
 
+	
 	// ===============================  String utils  ==================================
 
 	// val to string
@@ -152,13 +165,10 @@ namespace ks
 	template <class T>
 	struct type_to_string
 	{
-	};
-	template <>
-	struct type_to_string<double>
-	{
-		static std::string name() { return "double"; }
+		static std::string name() { return typeid(T).name(); }
 	};
 
+	// Specialize for some types we use
 	template <>
 	struct type_to_string<tuple<>>
 	{
@@ -233,6 +243,13 @@ namespace ks
 		}                                                         \
 	};
 
+	inline void
+	test_type_to_string()
+	{
+		auto s = type_to_string<tuple<int, float>>::name();
+		ASSERT(s == "tuple<int,float>");
+	}
+
 	// ===============================  Addition ==================================
 	// Adding is special because it needs to be defined before linear maps,
 	// And needs to be defined before any primitives are used in linear maps.
@@ -259,11 +276,19 @@ namespace ks
 #else
 		std::vector<T> data_;
 #endif
+		// Runtime flag indicating this is an all-zero vector.  
+		// TODO: Ideally this would propagate nicely through the type system, 
+		// without a runtime flag but, need to pass initializer lists through
+		// zero_t {}
+		// As is, many instances are collapsed statically and the remainder 
+		// come throug here.
+		bool is_zero_ = false;  
 
 		// Private ctor -- use create
-		vec(size_t  size) : data_(size) {}
+		vec(size_t  size) : data_(size), is_zero_(false) {}
 
 	public:
+
 #ifdef BUMPY
 		vec() :size_(0), data_(0) {}
 		int size() const { return size_; }
@@ -271,11 +296,25 @@ namespace ks
 		vec() {}
 		int size() const { return data_.size(); }
 #endif
+		vec(zero_t):
+			is_zero_ (true)
+		{
+		}
+
+		vec& operator=(const vec<T>& that) 
+		{
+			ASSERT(that.size() != 0 || that.is_zero_);
+			data_ = that.data_;
+			is_zero_ = that.is_zero_;
+			return *this;
+		}
 
 		T& operator[](int i) { return data_[i]; }
 		T const& operator[](int i) const { return data_[i]; }
 
 		static vec<T> create(size_t size);
+
+		bool is_zero() const { return is_zero_; }
 	};
 
 	template <class T>
@@ -301,6 +340,7 @@ namespace ks
 		void *storage = g_alloc.alloc(sizeof(T) * size);
 		ret.size_ = size;
 		ret.data_ = (T*)storage;
+		ret.is_zero_ = false;
 		return ret;
 #else
 		return vec{ size };
@@ -317,6 +357,14 @@ namespace ks
 		return ret;
 	}
 
+	// -- Specialize is_zero
+	template <class T>
+	bool is_zero(vec<T> const& v)
+	{
+		return v.is_zero();
+	}
+
+	// -- Specialize type_to_string
 	template <typename T>
 	struct type_to_string<ks::vec<T>>
 	{
@@ -328,8 +376,15 @@ namespace ks
 
 	// Elemetwise addition
 	template <class T>
-	vec<T> add(vec<T> const& a, vec<T> const& b)
+	vec<T> operator+(vec<T> const& a, vec<T> const& b)
 	{
+		if (is_zero(a))
+			return b;
+
+		if (is_zero(b))
+			return a;
+
+		ASSERT(a.size() != 0);
 		ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(a.size());
 
@@ -340,9 +395,13 @@ namespace ks
 
 	// Addition of a scalar
 	template <class T>
-	vec<T> add(vec<T> const& a, T const& b)
+	vec<T> operator+(vec<T> const& a, T const& b)
 	{
-		ASSERT(a.size() == b.size());
+		ASSERT(false); // Can't handle zero_t + const
+		if (is_zero(a))
+			return a;
+	
+		ASSERT(a.size() != 0);
 		vec<T> ret = vec<T>::create(a.size());
 
 		for (int i = 0; i < a.size(); ++i)
@@ -350,10 +409,30 @@ namespace ks
 		return ret;
 	}
 
+	// Scale a vec
+	template <class T>
+	vec<T> operator*(vec<T> const& v, double val)
+	{
+		if (is_zero(v))
+			return v;
+
+		ASSERT(v.size() != 0);
+		int size = v.size();
+		vec<T> ret = vec<T>::create(size); 
+		for (int i = 0; i < size; ++i)
+			ret[i] = v[i] * val;
+		return ret;
+	}
+
 	// sum of elements
 	template <class T>
 	T sum(vec<T> const& v)
 	{
+		if (is_zero(v))
+			return T { zero_t {} };
+
+		ASSERT(v.size() != 0);
+
 		if (v.size() == 0) throw std::string("oik");
 		if (v.size() == 1) return v[0];
 		T ret = add(v[0], v[1]);
@@ -366,11 +445,11 @@ namespace ks
 	std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
 	{
 		s << "[";
+		if (v.is_zero()) return s << "ZERO]";
 		for (int i = 0; i < v.size(); ++i)
 			s << (i > 0 ? ", " : "") << v[i];
 		return s << "]";
 	}
-
 	// ===============================  Linear maps ==================================
 	namespace LM
 	{
@@ -433,17 +512,6 @@ namespace ks
 		tuple<> Scale_aux(tuple<> t, double val)
 		{
 			return t;
-		}
-
-		// Scale a vec
-		template <class T>
-		vec<T> Scale_aux(vec<T> const& v, double val)
-		{
-			int size = v.size();
-			vec<T> ret = vec<T>::create(size); // To be replaced with DPS as appropriate
-			for (int i = 0; i < size; ++i)
-				ret[i] = Scale_aux(v[i], val);
-			return ret;
 		}
 
 		// Scale anything else
@@ -596,34 +664,93 @@ namespace ks
 		}
 
 		// ---------------- VCat ------------------
-		template <class LM1, class LM2>
-		struct VCat {
-			LM1 lm1;
-			LM2 lm2;
 
-			typedef typename LM1::From From1;
-			typedef typename LM1::To To1;
-
-			typedef typename LM2::From From2;
-			typedef typename LM2::To To2;
-
-			static_assert(std::is_same<From1, From2>::value, "To1==To2");
-
-			typedef From1 From;
-			typedef tuple<To1, To2>  To;
-
-			static VCat mk(LM1 lm1, LM2 lm2) { return VCat { lm1, lm2 }; }
-
-			To Apply(From f) const { return std::make_tuple(lm1.Apply(f), lm2.Apply(f)); }
-
+		// Helper to gather "From" information from the incoming types
+		template <class T>
+		struct VCat_infer_To {
 		};
 
-		template <class T1, class T2>
-		std::ostream &operator<<(std::ostream &s, VCat<T1, T2> const &t)
+		template <>
+		struct VCat_infer_To<tuple<>> {
+			typedef tuple<> type;
+		};
+
+		template <class T, class... Ts>
+		struct VCat_infer_To<tuple<T, Ts...>> {
+			typedef typename T::To To;
+			typedef typename VCat_infer_To<tuple<Ts...>>::type Tos;
+			typedef typename tuple_prepend<To, Tos>::type type;
+		};
+
+		namespace test_VCat_infer_To {
+			struct A {
+				typedef int To;
+			};
+			struct B {
+				typedef float To;
+			};
+			typedef typename VCat_infer_To<tuple<A, B, A>>::type ABA;
+			static_assert(std::is_same<ABA, tuple<int, float, int>>::value);
+		};
+
+		template <class Tuple>
+		struct VCat_infer_From {
+			// Will fail if Tuple doesn't have at least one element
+			typedef typename std::tuple_element<0, Tuple>::type T0;
+			typedef typename T0::From type;
+		};
+
+		template <class... LMs>
+		struct VCat {
+			static constexpr size_t n = sizeof...(LMs);
+
+			typedef tuple<LMs...> Tup;
+
+			Tup lms;
+
+			typedef typename VCat_infer_To<Tup>::type To;
+			typedef typename VCat_infer_From<Tup>::type From;
+
+			static VCat mk(LMs... lm) { return VCat{ { lm... } }; }
+
+			To Apply(From const& f) const {
+				static_assert(n > 1);
+				To ret;
+				Apply_aux<0>(f, &ret);
+				return ret;
+			}
+
+			template <size_t i>
+			void Apply_aux(From const& f, To* ret) const 
+			{
+				if constexpr (i < n) {
+					auto ai = std::get<i>(lms).Apply(f);
+					std::get<i>(*ret) = ai;
+					Apply_aux<i + 1>(f, ret);
+				}
+			}
+/*
+			template <size_t i>
+			To Apply_aux(zero_t accum, From const& f) const {
+				if constexpr (i < n) {
+					// Accumulator could be zero if first terms are zero,
+					// just move on to case 1
+					auto ai = std::get<i>(lms).Apply(std::get<i>(f));
+					return Apply_aux<i + 1>(ai, f);
+				}
+				else
+					return accum;
+			}
+*/
+		};
+		
+		template <class T, class... Ts>
+		std::ostream &operator<<(std::ostream &s, VCat<T, Ts...> const &t)
 		{
-			return s << "VCat" <<
+			s << "VCat";
 				//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-				"(" << t.lm1 << "," << t.lm2 << ")";
+				;
+			return tuple_print<0>(s << "(", t.lms) << ")";
 		}
 
 		// ---------------- Compose ------------------
@@ -771,6 +898,8 @@ namespace ks
 
 			To Apply(From x) const
 			{
+				if (is_zero(x)) return To{ zero_t{} };
+
 				if (n != x.size())
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
 				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
@@ -857,6 +986,7 @@ namespace ks
 	DECLARE_TYPE_TO_STRING(LM::Build, L);
 	DECLARE_TYPE_TO_STRING(LM::BuildT, L);
 	DECLARE_TYPE_TO_STRING_Pack(LM::HCat);
+	DECLARE_TYPE_TO_STRING_Pack(LM::VCat);
 	DECLARE_TYPE_TO_STRING2(LM::VCat, From, To);
 	DECLARE_TYPE_TO_STRING2(LM::Compose, From, To);
 	DECLARE_TYPE_TO_STRING2(LM::Variant, From, To);

@@ -27,19 +27,21 @@ namespace ks {
 		auto x = LM::BuildT<LM::One<double>>::mk(7, c$3);
 
 		if (1)
-			ret = x;
+			ret.v = x;
 		else
-			ret = LM::Zero<vec<double>, double>::mk(vec<double>{}, double{});
+			ret.v = LM::Zero<vec<double>, double>::mk(vec<double>{}, double{});
 		return ret;
 	}
 
 
 	auto main() {
+
 		return D$f();
 	}
 
 }
 int main() {
+	ks::test_type_to_string();
 	ks::main();
 	return 0;
 }
