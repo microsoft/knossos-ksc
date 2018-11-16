@@ -291,10 +291,10 @@ namespace ks
 
 #ifdef BUMPY
 		vec() :size_(0), data_(0) {}
-		int size() const { return size_; }
+		size_t size() const { return size_; }
 #else
 		vec() {}
-		int size() const { return data_.size(); }
+		size_t size() const { return data_.size(); }
 #endif
 		vec(zero_t):
 			is_zero_ (true)
@@ -309,8 +309,8 @@ namespace ks
 			return *this;
 		}
 
-		T& operator[](int i) { return data_[i]; }
-		T const& operator[](int i) const { return data_[i]; }
+		T& operator[](size_t i) { return data_[i]; }
+		T const& operator[](size_t i) const { return data_[i]; }
 
 		static vec<T> create(size_t size);
 
@@ -318,13 +318,13 @@ namespace ks
 	};
 
 	template <class T>
-	int size(vec<T> const & v)
+	size_t size(vec<T> const & v)
 	{
 		return v.size(); 
 	}
 
 	template <class T>
-	T const &index(int i, vec<T> const & v)
+	T const &index(size_t i, vec<T> const & v)
 	{
 		ASSERT(i >= 0);
 		ASSERT(i < v.size());
@@ -388,7 +388,7 @@ namespace ks
 		ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(a.size());
 
-		for (int i = 0; i < a.size(); ++i)
+		for (size_t i = 0; i < a.size(); ++i)
 			ret[i] = add(a[i], b[i]);
 		return ret;
 	}
@@ -404,7 +404,7 @@ namespace ks
 		ASSERT(a.size() != 0);
 		vec<T> ret = vec<T>::create(a.size());
 
-		for (int i = 0; i < a.size(); ++i)
+		for (size_t i = 0; i < a.size(); ++i)
 			ret[i] = add(a[i], b);
 		return ret;
 	}
@@ -417,9 +417,9 @@ namespace ks
 			return v;
 
 		ASSERT(v.size() != 0);
-		int size = v.size();
+		size_t size = v.size();
 		vec<T> ret = vec<T>::create(size); 
-		for (int i = 0; i < size; ++i)
+		for (size_t i = 0; i < size; ++i)
 			ret[i] = v[i] * val;
 		return ret;
 	}
@@ -436,7 +436,7 @@ namespace ks
 		if (v.size() == 0) throw std::string("oik");
 		if (v.size() == 1) return v[0];
 		T ret = add(v[0], v[1]);
-		for (int i = 2; i < v.size(); ++i)
+		for (size_t i = 2; i < v.size(); ++i)
 			ret = add(ret, v[i]);
 		return ret;
 	}
@@ -446,7 +446,7 @@ namespace ks
 	{
 		s << "[";
 		if (v.is_zero()) return s << "ZERO]";
-		for (int i = 0; i < v.size(); ++i)
+		for (size_t i = 0; i < v.size(); ++i)
 			s << (i > 0 ? ", " : "") << v[i];
 		return s << "]";
 	}
@@ -794,9 +794,9 @@ namespace ks
 			typedef Tuple From;
 			typedef Ti To;
 
-			int index;
+			size_t index;
 
-			static SelFun mk(int index, int n) { return SelFun{ index }; }
+			static SelFun mk(size_t index, size_t n) { return SelFun{ index }; }
 
 			To Apply(From f) const { return std::get(f, index); }
 		};
@@ -831,7 +831,7 @@ namespace ks
 			To Apply(From x) const 
 			{ 
 				std::function<L(size_t)> f1 = f;
-				return build<LTo>(n, [x,f1](int i) {
+				return build<LTo>(n, [x,f1](size_t i) {
 													 auto lm = f1(i);
 													 return lmApply(lm, x);
 												   }); 
@@ -875,7 +875,6 @@ namespace ks
 				n = that.n;
 				f = that.f;
 				return *this;
-				NOTE("copy");
 			}
 
 			template <class Functor>
@@ -904,7 +903,7 @@ namespace ks
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
 				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
 				std::function<L(size_t)> f_local = f;
-				return sum(build<LFrom>(n, [f_local,x](int i) { return lmApply(f_local(i), x[i]); }));
+				return sum(build<LFrom>(n, [f_local,x](size_t i) { return lmApply(f_local(i), x[i]); }));
 			}
 		};
 

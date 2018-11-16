@@ -1,0 +1,8 @@
+*.dvi
+*.aux
+*.fls
+*.fdb_*
+*.out
+*.synctex*
+*.xcp
+*.xdv
