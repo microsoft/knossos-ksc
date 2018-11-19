@@ -145,7 +145,7 @@ data Var
   | Delta    String         -- The 'dx' or 'dr' argument to fwd
                             -- or backward versions of f
   | Grad     String ADMode  -- \nabla x
-                            --   True <=> transposed \bowtie x
+                           --   True <=> transposed \bowtie x
   deriving( Eq, Ord )
 
 instance Show Var where
@@ -193,6 +193,8 @@ data ExprX f b
   | Call f (ExprX f b)      -- f e
   | Tuple [ExprX f b]            -- (e1, ..., en)
   | Lam b Type (ExprX f b)
+       -- ToDo: Simon says: what is this Type?
+
   | App (ExprX f b) (ExprX f b)
   | Let b (ExprX f b) (ExprX f b)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX f b) (ExprX f b) (ExprX f b)  -- FIXME make cond ExprX?
@@ -284,9 +286,10 @@ mkTCall3 :: Type -> Fun -> TExpr -> TExpr -> TExpr -> TExpr
 mkTCall3 ty f a b c = mkTCall ty f [a, b, c]
 
 mkLet :: HasCallStack => TVar Var -> TExpr -> TExpr -> TExpr
-mkLet (TVar ty v) rhs body =
-  assertEqualThen ("mkLet " ++ show v ++ " = " ++ (show $ ppr rhs))  ty (typeof rhs) $
-  Let (TVar ty v) rhs body
+mkLet (TVar ty v) rhs body
+  = assertEqualThen ("mkLet " ++ show v ++ " = " ++ (show $ ppr rhs))
+                    ty (typeof rhs) $
+    Let (TVar ty v) rhs body
 
 mkLets :: HasCallStack => [(TVar Var,TExpr)] -> TExpr -> TExpr
 mkLets [] e = e
@@ -317,6 +320,23 @@ seqExprX (Tuple es) x = Prelude.foldr seqExprX x es
 seqExpr:: Expr -> a -> a
 seqExpr (Expr ty e) = ty `seq` e
 -}
+
+
+------ Substitution --------
+
+substE :: Ord b => M.Map b (ExprX f b) -> ExprX f b -> ExprX f b
+substE subst (Konst k)      = Konst k
+substE subst (Var v)        = case M.lookup v subst of
+                               Just e  -> e
+                               Nothing -> Var v
+substE subst (Call f e)     = Call f (substE subst e)
+substE subst (If b t e)     = If (substE subst b) (substE subst t) (substE subst e)
+substE subst (Tuple es)     = Tuple (map (substE subst) es)
+substE subst (App e1 e2)    = App (substE subst e1) (substE subst e2)
+substE subst (Assert e1 e2) = Assert (substE subst e1) (substE subst e2)
+substE subst (Lam v ty e)   = Lam v ty (substE (v `M.delete` subst) e)
+substE subst (Let v r b)    = Let v (substE subst r) $
+                              substE (v `M.delete` subst) b
 
 ------ Equality modulo alpha --------
 

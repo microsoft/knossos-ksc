@@ -2,6 +2,7 @@ module Opt( optLets, optDef, optDefs, optE, simplify, test_opt ) where
 
 import Lang
 import Prim
+import Rules
 import OptLet
 import Text.PrettyPrint
 import qualified Data.Set as S
@@ -29,18 +30,23 @@ simplify env =  optE env . optLets . optE env . optLets
 
 ---------------
 optE :: HasCallStack => ST -> TExpr -> TExpr
-optE env e = 
-  let go = optE env in
-  case e of
-  Tuple es          -> Tuple (map go es)
-  Var v             -> Var v
-  Konst k           -> Konst k
-  Lam v ty e        -> Lam v ty (go e)
-  App e1 e2         -> optApp env (go e1) (go e2)
-  Assert e1 e2      -> Assert (go e1) (go e2)
-  Let var rhs body  -> mkLet var (go rhs) (go body)
-  If b t e          -> optIf (go b) (go t) (go e)
-  e@(Call (TFun ty f) arg) ->
+optE env e
+  = go e
+  where
+    go :: TExpr -> TExpr
+    go e | Just e' <- tryRules e = go e'
+
+    go (Tuple es)          = Tuple (map go es)
+    go (Var v)             = Var v
+    go (Konst k)           = Konst k
+    go (Lam v ty e)        = Lam v ty (go e)
+    go (App e1 e2)         = optApp env (go e1) (go e2)
+    go (Assert e1 e2)      = Assert (go e1) (go e2)
+    go (Let var rhs body)  = mkLet var (go rhs) (go body)
+    go (If b t e)          = optIf (go b) (go t) (go e)
+
+    -- ToDo: Simon asks: what is going on here?
+    go (e@(Call (TFun ty f) arg)) =
                           case optCall (TFun opt_ty f) opt_arg of
                             Nothing -> Call (TFun opt_ty f) opt_arg
                             Just r  -> go r
@@ -75,7 +81,7 @@ optIf b                     t e = If b t e
 optCall :: HasCallStack => TFun -> TExpr -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
-optCall fun (Let v r arg) = 
+optCall fun (Let v r arg) =
   Just (Let v r (Call fun arg))
 
 optCall (TFun ty (Fun f)) arg =
@@ -86,7 +92,7 @@ optCall (TFun (TypeLM ty) (LMFun lm)) arg =
   Just e -> Just e
   Nothing -> Nothing
 
-optCall (TFun (TypeLM ty) (GradFun f Fwd)) arg = 
+optCall (TFun (TypeLM ty) (GradFun f Fwd)) arg =
   case optGradFun ty f arg of
   Just e -> Just e
   Nothing -> Nothing
@@ -233,7 +239,7 @@ optGradFun ty (SFun "size") e
   = Just $ lmZero (typeofSrc ty) (typeofDst ty)
 
 optGradFun ty (SFun "index") (Tuple [i,v])
-  = Just (primDindex i v) 
+  = Just (primDindex i v)
 
 optGradFun ty (SFun "neg") e = Just (lmScale t (kTFloat $ -1.0)) where t = typeofDst ty
 
@@ -254,7 +260,7 @@ optLM ty "lmTranspose" m = optTrans m
 optLM ty "lmCompose" (Tuple [f,g])
   | isLMOne f  = Just g
   | isLMOne g  = Just f
-  | isLMZero f = Just $ lmZero s t 
+  | isLMZero f = Just $ lmZero s t
   | isLMZero g = Just $ lmZero s t
 
   -- Scale(x) . Scale(y) = Scale( xy )
@@ -276,13 +282,13 @@ optLM ty "lmCompose" (Tuple [f,g])
   = assertEqualThen "H o V" (length ps) (length qs) $
     Just (lmAdds (zipWith lmCompose ps qs))
 
-  where 
+  where
     s = typeofSrc ty
     t = typeofDst ty
 
 optLM ty "lmVCat" (Tuple es)
   | all isLMZero es = Just $ lmZero s t
-  where 
+  where
     s = typeofSrc ty
     t = typeofDst ty
 
@@ -294,7 +300,7 @@ optLM ty "lmAdd" (Tuple [p,q])
   | Call (TFun typ (LMFun "lmScale")) (Tuple [t1, x]) <- p
   , Call (TFun tyq (LMFun "lmScale")) (Tuple [t2, y]) <- q
   = Just $ lmScale t (pAdd x y)
-  where 
+  where
     s = typeofSrc ty
     t = typeofDst ty
 
@@ -413,4 +419,3 @@ optTransCallLM ty "lmBuildT" (Tuple [n, Lam i tyi b])
   = Just (lmBuild n (Lam i tyi (lmTranspose b)))
 
 optTransCallLM ty f a = Nothing
-
