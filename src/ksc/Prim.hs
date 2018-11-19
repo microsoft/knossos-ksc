@@ -11,87 +11,85 @@ dummyVar :: Type -> TExpr
 dummyVar t = Var $ TVar t (Dummy)
 
 -- Call to a LMFun, with given return type 
-lmf :: TypeLM -> String -> [TExpr] -> TExpr
-lmf t name args = mkTCall (TypeLM t) (LMFun $ name) args
-
--- Call to a LMFun, name derived from the return type
-lm :: TypeLM -> [TExpr] -> TExpr
-lm t args = lmf t (nameOf t) args
+lm :: Type -> Type -> String -> [TExpr] -> TExpr
+lm s t name args = mkTCall (TypeLM s t) (LMFun name) args
 
 lmZero :: Type -> Type -> TExpr
-lmZero s t = lm (LMZero s t) [dummyVar s, dummyVar t]
+lmZero s t = lm s t "lmZero" [dummyVar s, dummyVar t]
 
 lmOne :: Type -> TExpr
-lmOne t = lm (LMOne t) [dummyVar t]
+lmOne t = lm t t "lmOne" [dummyVar t]
+
+lmScale :: HasCallStack => Type -> TExpr -> TExpr
+lmScale t f = 
+  assertEqualThen "lmScale second arg should be TypeFloat" (typeof f) TypeFloat $
+  lm t t "lmScale" [dummyVar t, f]
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = 
-  let (TypeLM tyf) = typeof f
-      (TypeLM tyg) = typeof g in
-  assertEqualThen "lmAdd s" (typeofSrc tyf) (typeofSrc tyg) $ 
-  assertEqualThen "lmAdd t" (typeofDst tyf) (typeofDst tyg) $ 
-  lm (LMAdd tyf tyg) [f,g]
+  let (TypeLM s1 t1) = typeof f
+      (TypeLM s2 t2) = typeof g in
+  assertEqualThen "lmAdd s" s1 s2 $
+  assertEqualThen "lmAdd t" t1 t2 $
+  lm s1 t1 "lmAdd" [f,g]
 
 lmAdds :: HasCallStack => [TExpr]-> TExpr
 lmAdds [x] = x
 lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
-lmScale :: HasCallStack => Type -> TExpr -> TExpr
-lmScale t f = 
-  --assertEqualThen "lmScale second arg should be TypeFloat" (typeof f) TypeFloat $
-  lm (LMScale t) [dummyVar t, f]
-
 lmCompose :: HasCallStack => TExpr -> TExpr -> TExpr
 lmCompose f g = 
-  let (TypeLM tyf) = typeof f
-      (TypeLM tyg) = typeof g in
-  assertEqualThen ("lmCompose(" ++ show (ppr f) ++ ", " ++ show (ppr g)) (typeofDst tyg) (typeofSrc tyf) $ 
-  lm (LMCompose tyf tyg) [f,g]
+  let (TypeLM t r) = typeof f
+      (TypeLM s t1) = typeof g in
+  assertEqualThen ("lmCompose(" ++ pps f ++ ", " ++ pps g) t t1 $ 
+  lm s r "lmCompose" [f,g]
 
 lmVCat :: HasCallStack => [TExpr] -> TExpr
 lmVCat es =
-  assertAllEqualThen  "lmVCat" (map typeofSrc tys) $ 
-  lm (LMVCat tys) es
+  let s = assertAllEqualRet "lmVCat" (map typeofLMs tys) 
+      t = TypeTuple $ map typeofLMt tys in
+  lm s t "lmVCat" es
   where 
     tys = map getLM $ map typeof $ es
 
 lmHCat :: HasCallStack => [TExpr] -> TExpr 
 lmHCat es = 
-  assertAllEqualThen "lmHCat" (map typeofDst tys) $ 
-  lm (LMHCat tys) es
+  let t = assertAllEqualRet "lmHCat" (map typeofLMt tys) 
+      s = TypeTuple $ map typeofLMs tys in
+  lm s t "lmHCat" es
   where 
     tys = map getLM $ map typeof $ es
 
 lmTranspose :: TExpr -> TExpr 
-lmTranspose m = lm (LMTranspose ty) [m]
-  where (TypeLM ty) = typeof m
+lmTranspose m = lm t s "lmTranspose" [m]
+  where (TypeLM s t) = typeof m
 
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApply m arg = 
-  let (TypeLM tym) = typeof m in
-  assertEqualThen ("lmApply " ++ (show $ ppr m) ) (typeofSrc tym) (typeof arg) $ 
-  mkTCall (typeofDst tym) (LMFun "lmApply") [m, arg]
+  let (TypeLM s t) = typeof m in
+  assertEqualThen ("lmApply " ++ pps m ) s (typeof arg) $ 
+  mkTCall t (LMFun "lmApply") [m, arg]
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuild n f = 
     case typeof f of
-    TypeLambda TypeInteger (TypeLM tyf) -> lm (LMBuild tyf) [n, f]
-    ty -> error $ "uexpected " ++ show ty ++ "\n" ++ (show $ ppr f)
+    TypeLambda TypeInteger (TypeLM s t) -> lm s (TypeVec t) "lmBuild" [n, f]
+    ty -> error $ "uexpected " ++ show ty ++ "\n" ++ pps f
 
 lmBuildT :: TExpr -> TExpr -> TExpr 
 lmBuildT n f = 
   case typeof f of
-  TypeLambda TypeInteger (TypeLM tyf) -> lm (LMBuildT tyf) [n, f]
-  ty -> error $ "uexpected " ++ show ty ++ "\n" ++ (show $ ppr f)
+  TypeLambda TypeInteger (TypeLM s t) -> lm (TypeVec s) t "lmBuildT" [n, f]
+  ty -> error $ "uexpected " ++ show ty ++ "\n" ++ pps f
 
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
 lmDelta t i j = If (pEqual i j) (lmScale t $ kTFloat 1.0) (lmScale t $ kTFloat 0.0)
 
 isLMOne, isLMZero :: TExpr -> Bool
-isLMOne (Call (TFun (TypeLM (LMOne _)) _) _) = True
+isLMOne (Call (TFun (TypeLM _ _) (LMFun "lmOne")) _) = True
 isLMOne _ = False
 
-isLMZero (Call (TFun (TypeLM (LMZero _ _)) _) _) = True
+isLMZero (Call (TFun (TypeLM _ _) (LMFun "lmZero")) _) = True
 isLMZero _ = False
 
 primDindex :: TExpr -> TExpr -> TExpr

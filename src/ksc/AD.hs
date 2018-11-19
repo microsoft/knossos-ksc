@@ -5,6 +5,11 @@ import Lang
 import Prim
 import Text.PrettyPrint as PP
 
+-- for unit test
+import Test.Hspec
+import Parse 
+import Annotate
+
 --------------- Generate names for gradded indentifiers
 
 gradF :: Fun -> Fun
@@ -118,13 +123,14 @@ gradE env s e@(Lam {}) = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 -- are transformed to ones of type T
 
 applyD :: TDef -> TDef
-applyD (DefX (TFun (TypeLM tylm) (GradFun f Rev)) vars rhs)
-  = DefX (TFun (typeofSrc tylm) (DrvFun f Rev)) (vars ++ [dr]) $
+applyD (DefX (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
+  = DefX (TFun s (DrvFun f Rev)) (vars ++ [dr]) $
     lmApply rhs $ Var dr
-    where dr = TVar (typeofDst tylm) $ Delta "r"
+    where dr = TVar t $ Delta "r"
 
-applyD (DefX (TFun (TypeLM tylm) (GradFun f Fwd)) vars rhs)
-  = DefX (TFun (typeofDst tylm) (DrvFun f Fwd)) (vars ++ dvars) $
+applyD (DefX (TFun (TypeLM s t) (GradFun f Fwd)) vars rhs)
+  = --assertEqualThen "applyD'" s (typeof (mkTuple (map Var vars)))
+    DefX (TFun t (DrvFun f Fwd)) (vars ++ dvars) $
     lmApply rhs (mkTuple $ map Var dvars)
   where
     dvars = map to_delta vars
@@ -135,6 +141,21 @@ applyD (DefX (TFun (TypeLM tylm) (GradFun f Fwd)) vars rhs)
 -- Transpose
 
 transposeD :: TDef -> TDef
-transposeD (DefX (TFun (TypeLM tylm) (GradFun f d)) args rhs)
-  = DefX (TFun (TypeLM (LMTranspose tylm)) (GradFun f (flipMode d))) args $
+transposeD (DefX (TFun (TypeLM s t) (GradFun f d)) args rhs)
+  = DefX (TFun (TypeLM t s) (GradFun f (flipMode d))) args $
     lmTranspose rhs
+
+----------------------------------
+--- Unit test
+
+-- TODO make this work
+test_AD =
+  hspec $ do
+    let e1 = runParserOrPanic pDef "(def f ((x : Float)) (* x 2.0))"
+    let (env,ae1) = annotDef e1
+    let de1_expected = runParserOrPanic pDef "(def D$f ((x : Float)) (lmScale 2.0))"
+    let (env1,ade1_expected) = annotDef de1_expected
+    let ade1 = gradDef stCreate ae1
+    describe "AD" $ do
+      it "AD" $
+        ade1 `shouldBe` ade1_expected

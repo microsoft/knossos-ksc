@@ -95,7 +95,7 @@ data TFun = TFun Type Fun
   deriving (Eq, Ord)
 
 instance Show TFun where
-  show (TFun ty f) = show f ++ "<" ++ show ty ++ ">"
+  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
 
 data Var
   = Dummy
@@ -142,6 +142,7 @@ isKZero (Konst KZero) = True
 isKZero _             = False
 
 data DefX f b = DefX f [TVar Var] (ExprX f b)  -- f x = e
+                    deriving( Eq, Ord, Show )
 type Def = DefX Fun Var
 type TDef = DefX TFun (TVar Var)
 
@@ -192,6 +193,15 @@ instance (Typeable b, TypeableFun f) =>
   typeof (If c t f) = assertEqualThen "If" (typeof t) (typeof f) (typeof t)
   typeof (Assert c e) = typeof e
 
+getLM :: HasCallStack => Type -> Type
+getLM (TypeLM s t) = TypeLM s t
+getLM t = error $ "Wanted TypeLM, got " ++ pps t
+
+typeofLMs:: HasCallStack => Type -> Type
+typeofLMs (TypeLM s _) = s
+typeofLMs t = error $ "Wanted TypeLM, got " ++ pps t
+typeofLMt:: HasCallStack =>Type -> Type
+typeofLMt (TypeLM _ t) = t
 
 typeofKonst :: Konst -> Type
 typeofKonst KZero = TypeZero
@@ -240,7 +250,7 @@ mkTCall3 ty f a b c = mkTCall ty f [a, b, c]
 
 mkLet :: HasCallStack => TVar Var -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
-  = assertEqualThen ("mkLet " ++ show v ++ " = " ++ (show $ ppr rhs))
+  = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs)
                     ty (typeof rhs) $
     Let (TVar ty v) rhs body
 
@@ -460,7 +470,7 @@ instance Pretty Type where
   ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")" 
   ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas tys PP.<> PP.text "))" 
   ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")" 
-  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> ppr t PP.<> PP.text ")" 
+  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> PP.char ' ' PP.<> ppr t PP.<> PP.text ")" 
   ppr TypeZero = PP.text "zero_t"
   ppr TypeFloat = PP.text "Float"
   ppr TypeInteger = PP.text "Integer"
@@ -590,9 +600,12 @@ pprPanic :: String -> Doc -> a
 pprPanic str doc
   = error (PP.render (PP.sep [PP.text str, PP.nest 2 doc]))
 
+pps :: Pretty a => a -> String
+pps a = show $ ppr a
+
 test_Pretty =
   hspec $ do
-    let test e s = it s $ (show $ ppr e) `shouldBe` s
+    let test e s = it s $ pps e `shouldBe` s
 
     let var s = Var (Simple s)
     let e = mkSCall1 "g" (var "i")
@@ -641,6 +654,8 @@ typeofFunTy env f ty              = typeofFunTys env f [ty]
 typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
 typeofFunTys env tf tys = 
   case (tf, tys) of
+  (GradFun f Fwd, tys) -> TypeLM (TypeTuple tys) (typeofFunTys env (Fun f) tys)
+  (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (TypeTuple tys)
   (LMFun "lmApply",  [TypeLM s t, s1]) -> assertEqualThen "lmApply" s1 s $ t
   (LMFun f, tys) -> error $ "When?"
   (Fun (SFun "pr")       , _                            ) -> TypeInteger
@@ -667,7 +682,6 @@ typeofFunTys env tf tys =
 
   (Fun (SelFun i _  )    , [TypeTuple tys]              ) -> tys !! (i - 1)
   (Fun (SelFun{})      , [TypeVec t]) -> t
-
   (f        , _          ) -> case Map.lookup (Simple $ show f) env of
                                   Just a  -> a
                                   Nothing -> error $ "LOOKUP: " ++ emsg
@@ -678,4 +692,3 @@ typeofFunTys env tf tys =
                 ++ show tys
                 ++ ".    Env:\n"
                 ++ show env
-

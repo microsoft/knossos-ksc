@@ -233,7 +233,7 @@ moveMain (def:defs) = let (m,t) = moveMain defs in (m,def:t)
 doall :: HasCallStack => String -> IO ()
 doall file =
   let tl s = reverse (take 100 $ reverse s)
-      dd defs = liftIO $ putStrLn ("---" ++ (tl $ show (ppr defs)))
+      dd defs = liftIO $ putStrLn ("---" ++ (tl $ pps defs))
       dd1 :: Pretty p => [p] -> KM ()
       dd1 = displayN in
   runKM $
@@ -241,7 +241,7 @@ doall file =
      alldefs <- liftIO (parseF (file ++ ".ks"))
   ;  liftIO $ putStrLn "read defs"
   ;  let (main,defs) = moveMain alldefs
-  ;  liftIO $ putStrLn ("found main " ++ show (ppr main))
+  ;  liftIO $ putStrLn ("found main " ++ pps main)
   ;  banner "defs"
   ;  dd defs
   ;  let (env, ann) = annotDefs stCreate defs

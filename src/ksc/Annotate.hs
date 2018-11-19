@@ -77,7 +77,7 @@ annotExpr env = \case
     assertEqualThen "Assert" tycond TypeBool $
     (tybody, Assert acond abody)
 
-  e -> error $ "Cannot annotate " ++ (show $ ppr e)
+  e -> error $ "Cannot annotate " ++ pps e
 
 
     --------------------------------------

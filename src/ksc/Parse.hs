@@ -90,6 +90,11 @@ testParse  p s = case runParser p s of
 runParser :: Parser a -> String -> Either ParseError a
 runParser p s = parse p "" s
 
+runParserOrPanic :: Parser a -> String -> a
+runParserOrPanic p s = case runParser p s of
+                        Left err -> error $ show err
+                        Right r -> r
+
 parseF :: String -> IO [Def]
 parseF file = do
         cts <- readFile file

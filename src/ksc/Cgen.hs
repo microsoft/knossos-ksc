@@ -62,10 +62,6 @@ data TypeLM
 
 ------------------------- TypeLM methods ------------------------
 
-getLM :: HasCallStack => Type -> TypeLM
-getLM (TypeLM ty) = ty
-getLM t = error $ "Wanted TypeLM, got " ++ (show $ ppr t)
-
 
 nameOfType :: TypeLM -> String
 nameOfType (LM s t) = "LM**"
@@ -164,31 +160,10 @@ typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty)
       ++ ")"
 
 
-  (GradFun (SFun "pr") _ , _                            ) -> TypeInteger
-  (GradFun (SFun "index") _, [_, TypeVec t]               ) -> TypeLM $ LMHCat [LMZero TypeInteger t, LMBuildT (LMScale t)]
-  (GradFun (SFun "size" )   _ , [TypeVec t]                  ) -> TypeLM $ LMZero (TypeVec t) TypeInteger
-  (GradFun (SFun "sum") _, [TypeVec t]                  ) -> TypeLM $ LMBuildT (LMOne t)
-  (GradFun (SFun "to_float"  ) _   , [TypeInteger]                  ) -> TypeLM $ LMZero TypeInteger TypeFloat
-  (GradFun (SFun "exp"  ) _   , [TypeFloat]                  ) -> TypeLM $ LMScale TypeFloat
-  (GradFun (SFun "log"  ) _   , [TypeFloat]                  ) -> TypeLM $ LMScale TypeFloat
-  (GradFun (SFun "*") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
-  (GradFun (SFun "/") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
-  (GradFun (SFun "-") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
-  (GradFun (SFun "+") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
 
-  -- (GradFun (SFun "*") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
-  -- (GradFun (SFun "/") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
-  -- (GradFun (SFun "-") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
-  -- (GradFun (SFun "+") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
-
-  --fixme(GradFun (SelFun i _) _, [TypeTuple tys]) ->    TypeLM (TypeTuple tys) (tys !! (i - 1))
-  --(GradFun (SelFun{}) _, [TypeVec t]) -> TypeLM (TypeVec t) t
-  --(GradFun (SelFun{}) _, _          ) -> TypeUnknown
-  -- (GradFun (SFun f) _, [tfrom]) -> let ty = stLookup "GradFun" (Simple f) env in TypeLM tfrom ty
-  -- (GradFun (SFun f) _, t : tys) ->
-  --   let tfrom = TypeTuple (t : tys)
-  --   in  let ty = stLookup "GradFun2" (Simple f) env in TypeLM tfrom ty
-
+-- Call to a LMFun, name derived from the return type
+zlm :: TypeLM -> [TExpr] -> TExpr
+zlm t args = lmf t (nameOf t) args
 
 
 ------------ Administrative normal form
