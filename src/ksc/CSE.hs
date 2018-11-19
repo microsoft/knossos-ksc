@@ -81,19 +81,3 @@ cseE_check cse_env e
 substAssert (Var v) e1b = substE (M.insert v e1b M.empty)
 substAssert e1a (Var v) = substE (M.insert v e1a M.empty)
 substAssert _ _ = \e -> e
-
-------------------------
-substE :: M.Map CSEb (ExprX CSEf CSEb) -> ExprX CSEf CSEb -> ExprX CSEf CSEb
--- Substitution
-substE subst (Konst k)      = Konst k
-substE subst (Var v)        = case M.lookup v subst of
-                               Just e  -> e
-                               Nothing -> Var v
-substE subst (Call f e)     = Call f (substE subst e)
-substE subst (If b t e)     = If (substE subst b) (substE subst t) (substE subst e)
-substE subst (Tuple es)     = Tuple (map (substE subst) es)
-substE subst (App e1 e2)    = App (substE subst e1) (substE subst e2)
-substE subst (Assert e1 e2) = Assert (substE subst e1) (substE subst e2)
-substE subst (Lam v ty e)   = Lam v ty (substE (v `M.delete` subst) e)
-substE subst (Let v r b)    = Let v (substE subst r) $
-                              substE (v `M.delete` subst) b
