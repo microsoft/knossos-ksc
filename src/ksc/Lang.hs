@@ -24,27 +24,12 @@ foldll f a0 xs = foldl (\(a,xs) x -> let (a',x') = f a x in (a', xs ++ [x'])) (a
 
 
 ------ Debugging utilities ---------
-class Match a where
-  isMatch :: a -> a -> Bool
-
-instance Match Int where
-  isMatch a b = a == b
-
-instance Match TypeLM where
-  isMatch (LM s t) lm = -- dbtrace("[isMatch LM]") $ 
-                        s == typeofSrc lm && t == typeofDst lm
-  isMatch lm1 lm2 = lm1 == lm2
-
-instance Match Type where
-  isMatch (TypeLM t1) (TypeLM t2) = isMatch t1 t2
-  isMatch t1 t2 = t1 == t2
-
 assertEqual msg t1 t2 =
   assertEqualThen msg t1 t2 ()
 
-assertEqualThen :: HasCallStack => Match a => Show a => String -> a -> a -> b -> b
+assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e =
-  if isMatch t1 t2 then e else trace ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
+  if t1 == t2 then e else trace ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
 
 assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
 assertAllEqualThen msg es e =
