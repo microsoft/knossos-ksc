@@ -46,7 +46,6 @@ gradDef env (DefX (TFun ty f) params rhs) =
       lets = [ gradParam tys param i n | (param, i) <- params `zip` [1..] ]
       env' = foldl add_let_to_env env lets 
       grhs = gradE env' tys rhs
-      tylm = typeofCheckLM (LM tys ty) grhs
   in
     DefX (TFun (typeof grhs) (gradF f)) params (mkLets lets grhs)
 

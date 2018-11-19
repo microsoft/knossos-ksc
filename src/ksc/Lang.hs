@@ -46,17 +46,6 @@ assertAllEqualThen msg es e =
 assertAllEqualRet :: HasCallStack => Eq a => Show a => String -> [a] -> a
 assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
 
-typeofCheckLM :: HasCallStack => TypeLM -> TExpr -> TypeLM
-typeofCheckLM tylm e = 
-  let ty = typeof e in
-  case ty of
-  TypeLM tylm1 ->
-     assertEqualThen "CheckLM" (typeofSrc tylm) (typeofSrc tylm1) $ 
-     assertEqualThen "CheckLM" (typeofDst tylm) (typeofDst tylm1) $ 
-     tylm
-  _ -> error $ "Bad LM type"
-
-
 ------ Data types ---------
 data Type = TypeZero               -- Polyamorous zero
           | TypeBool 
@@ -65,25 +54,9 @@ data Type = TypeZero               -- Polyamorous zero
           | TypeTuple [Type] 
           | TypeVec Type
           | TypeLambda Type Type   -- Domain -> Range 
-          | TypeLM TypeLM  -- Linear map
+          | TypeLM Type Type       -- Linear map  Src -o Target
           | TypeUnknown
           deriving (Show, Eq, Ord)
-
-data TypeLM
-          = LM Type Type             -- Generic linear map
-          | LMZero Type Type         -- Zeros may be rectangular 
-          | LMOne Type               -- Ones must be square
-          | LMScale Type             -- Scalar will always be of TypeFloat, Type is the type being scaled
-          | LMSelFun Type Type
-          | LMTranspose TypeLM
-          | LMCompose TypeLM TypeLM
-          | LMAdd TypeLM TypeLM
-          | LMVCat [TypeLM]
-          | LMHCat [TypeLM]
-          | LMVariant [TypeLM]        -- One of the arg types, to be selected by another boolean
-          | LMBuild TypeLM
-          | LMBuildT TypeLM
-        deriving (Show, Eq, Ord)
 
 data ADMode = Fwd | Rev
             deriving( Eq, Ord, Show )
@@ -216,14 +189,9 @@ instance (Typeable b, TypeableFun f) =>
   typeof (Tuple es) = TypeTuple $ map typeof es
   typeof (Lam v tyv e) = TypeLambda tyv $ typeof e
   typeof (Let b e1 e2) = typeof e2
-  typeof (If c t f) = makeUnionType (typeof t) (typeof f)
+  typeof (If c t f) = assertEqualThen "If" (typeof t) (typeof f) (typeof t)
   typeof (Assert c e) = typeof e
 
-
-makeUnionType :: Type -> Type -> Type
-makeUnionType (TypeLM lm1) (TypeLM lm2) = TypeLM $ if lm1 == lm2 then lm1 else LMVariant [lm1, lm2]
-makeUnionType t1 t2 = assertEqualThen "makeUnionType" t1 t2 $ 
-                      t1
 
 typeofKonst :: Konst -> Type
 typeofKonst KZero = TypeZero
@@ -492,99 +460,13 @@ instance Pretty Type where
   ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")" 
   ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas tys PP.<> PP.text "))" 
   ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")" 
-  ppr (TypeLM ty) = PP.text "(LM " PP.<> ppr ty PP.<> PP.text ")" 
+  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> ppr t PP.<> PP.text ")" 
   ppr TypeZero = PP.text "zero_t"
   ppr TypeFloat = PP.text "Float"
   ppr TypeInteger = PP.text "Integer"
   ppr TypeBool = PP.text "Bool"
   ppr TypeUnknown = PP.text "UNKNOWN"
 
-instance Pretty TypeLM where
-  ppr lm = PP.text (nameOf lm) <> text " " <> ppr (typeofSrc lm) <> text " -o " <> ppr (typeofDst lm)
-
-------------------------- TypeLM methods ------------------------
-
-getLM :: HasCallStack => Type -> TypeLM
-getLM (TypeLM ty) = ty
-getLM t = error $ "Wanted TypeLM, got " ++ (show $ ppr t)
-
-
-nameOfType :: TypeLM -> String
-nameOfType (LM s t) = "LM**"
-nameOfType (LMZero s t) = "LMZero"
-nameOfType (LMOne t) = "LMOne"
-nameOfType (LMScale t) = "LMScale"
-nameOfType (LMSelFun s t) = "LMSelFun"
-nameOfType (LMTranspose lm) = "LMTranspose<" ++ nameOf lm ++ ">"
-nameOfType (LMCompose bc ab) = "LMCompose<" ++ nameOf bc ++ "," ++ nameOf ab ++ ">"
-nameOfType (LMAdd a b) = "LMAdd<" ++ nameOf a ++ "," ++ nameOf b ++ ">"
-nameOfType (LMVCat lms) = "LMVCat<" ++ intercalate "," (map nameOf lms) ++ ">"
-nameOfType (LMHCat lms) = "LMHCat<" ++ intercalate "," (map nameOf lms) ++ ">"
-nameOfType (LMBuild lm) = "LMBuild<" ++ nameOf lm ++ ">"
-nameOfType (LMBuildT lm) = "LMBuildT<" ++ nameOf lm ++ ">"
-nameOfType (LMVariant lms) = "LMVariant<" ++ intercalate "," (map nameOf lms) ++ ">"
-
-nameOf :: TypeLM -> String
-nameOf (LM s t) = "lmBase"
-nameOf (LMZero s t) = "lmZero"
-nameOf (LMOne t) = "lmOne"
-nameOf (LMScale t) = "lmScale"
-nameOf (LMSelFun s t) = "lmSelFun"
-nameOf (LMTranspose lm) = "lmTranspose"
-nameOf (LMCompose bc ab) = "lmCompose"
-nameOf (LMAdd a b) = "lmAdd"
-nameOf (LMVCat lms) = "lmVCat"
-nameOf (LMHCat lms) = "lmHCat"
-nameOf (LMBuild lm) = "lmBuild"
-nameOf (LMBuildT lm) = "lmBuildT"
-nameOf (LMVariant lms) = "lmVariant"
-
-typeofSrc :: TypeLM -> Type
-typeofSrc (LM s t) = s
-typeofSrc (LMZero s t) = s
-typeofSrc (LMOne t) = t
-typeofSrc (LMScale t) = t
-typeofSrc (LMSelFun s t) = s
-typeofSrc (LMTranspose lm) = typeofDst lm
-typeofSrc (LMCompose bc ab) = typeofSrc ab
-typeofSrc (LMAdd a b) = typeofSrc a
-typeofSrc (LMVCat (lm:lms)) = typeofSrc lm
-typeofSrc (LMHCat lms) = TypeTuple $ map typeofSrc lms
-typeofSrc (LMBuild lm) = typeofSrc lm
-typeofSrc (LMBuildT lm) = TypeVec (typeofSrc lm)
-typeofSrc (LMVariant lms) = assertAllEqualRet "lmvariant" (map typeofSrc lms) 
-
-typeofDst :: TypeLM -> Type
-typeofDst (LM s t) = t
-typeofDst (LMZero s t) = t
-typeofDst (LMOne t) = t
-typeofDst (LMScale t) = t
-typeofDst (LMSelFun s t) = t
-typeofDst (LMTranspose lm) = typeofSrc lm
-typeofDst (LMCompose bc ab) = typeofDst bc
-typeofDst (LMAdd a b) = typeofDst a
-typeofDst (LMVCat lms) = TypeTuple $ map typeofDst lms
-typeofDst (LMHCat (l:lms)) = typeofDst l
-typeofDst (LMBuild lm) = TypeVec (typeofDst lm)
-typeofDst (LMBuildT lm) = typeofDst lm
-typeofDst (LMVariant lms) = assertAllEqualRet "lmvariant/dst" (map typeofDst lms) 
-
-transpose :: TypeLM -> TypeLM
-transpose = \case
-    LM s t          -> LM t s
-    LMZero s t      -> LMZero t s
-    LMOne t         -> LMOne t
-    LMScale t       -> LMScale t
-    LMSelFun s t    -> LM t s
-    LMTranspose lm  -> lm
-    LMCompose bc ab -> LMCompose (transpose ab) (transpose bc)
-    LMAdd a b       -> LMAdd (transpose a) (transpose b)
-    LMVCat lms      -> LMHCat (map transpose lms)
-    LMHCat lms      -> LMVCat (map transpose lms)
-    LMBuild lm      -> LMBuildT lm
-    LMBuildT lm     -> LMBuild lm
-    LMVariant lms   -> LMVariant (map transpose lms) 
-   
   
 type Prec = Int
  -- 0 => no need for parens
@@ -717,8 +599,8 @@ test_Pretty =
     let e2 = mkSCall3 "f" e (var "_t1") (kInt 5)
 
     describe "Pretty" $ do
-      test e "g( i )"
-      test e2 "f( g( i ), _t1, 5 )"
+      test e "g( s$i )"
+      test e2 "f( g( s$i ), s$_t1, 5 )"
 
 ------------------ ST (SymTab) ------------------
 
@@ -759,40 +641,22 @@ typeofFunTy env f ty              = typeofFunTys env f [ty]
 typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
 typeofFunTys env tf tys = 
   case (tf, tys) of
-  (LMFun "lmApply",  [TypeLM tylm, s]) -> assertEqualThen "lmApply" (typeofSrc tylm) s $ typeofDst tylm
-  (LMFun f, tys) -> TypeLM $ typeofLMFun f tys
+  (LMFun "lmApply",  [TypeLM s t, s1]) -> assertEqualThen "lmApply" s1 s $ t
+  (LMFun f, tys) -> error $ "When?"
   (Fun (SFun "pr")       , _                            ) -> TypeInteger
-  (GradFun (SFun "pr") _ , _                            ) -> TypeInteger
   (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
   (Fun (SFun "index")    , [_, TypeVec t]               ) -> t
-  (GradFun (SFun "index") _, [_, TypeVec t]               ) -> TypeLM $ LMHCat [LMZero TypeInteger t, LMBuildT (LMScale t)]
   (Fun (SFun "size" )    , [TypeVec _]                  ) -> TypeInteger
-  (GradFun (SFun "size" )   _ , [TypeVec t]                  ) -> TypeLM $ LMZero (TypeVec t) TypeInteger
   (Fun (SFun "sum"  )    , [TypeVec t]                  ) -> t
-  (GradFun (SFun "sum") _, [TypeVec t]                  ) -> TypeLM $ LMBuildT (LMOne t)
-
   (Fun (SFun "to_float") , [TypeInteger]                ) -> TypeFloat
-  (GradFun (SFun "to_float"  ) _   , [TypeInteger]                  ) -> TypeLM $ LMZero TypeInteger TypeFloat
   (Fun (SFun "neg"  )    , [t]                          ) -> t
   (Fun (SFun "exp"  )    , [TypeFloat]                  ) -> TypeFloat
-  (GradFun (SFun "exp"  ) _   , [TypeFloat]                  ) -> TypeLM $ LMScale TypeFloat
   (Fun (SFun "log"  )    , [TypeFloat]                  ) -> TypeFloat
-  (GradFun (SFun "log"  ) _   , [TypeFloat]                  ) -> TypeLM $ LMScale TypeFloat
   (Fun (SFun "*"    )    , [t1, TypeFloat]              ) -> t1
   (Fun (SFun "+"    )    , [t1, t2]                     ) -> t1
   (Fun (SFun "/"    )    , [t1, t2]                     ) -> t1
   (Fun (SFun "*"    )    , [t1, t2]                     ) -> t1
   (Fun (SFun "-"    )    , [t1, t2]                     ) -> t1
-
-  (GradFun (SFun "*") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
-  (GradFun (SFun "/") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
-  (GradFun (SFun "-") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
-  (GradFun (SFun "+") Fwd, [t1, t2]                     ) -> TypeLM $ LMHCat [LMScale t1, LMScale t2]
-
-  -- (GradFun (SFun "*") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
-  -- (GradFun (SFun "/") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
-  -- (GradFun (SFun "-") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
-  -- (GradFun (SFun "+") Fwd, [TypeInteger, t2]                     ) -> TypeLM $ LMZero (TypeTuple [TypeInteger, t2]) TypeInteger
 
   (Fun (SFun "=="   )    , _                            ) -> TypeBool
   (Fun (SFun "!="   )    , _                            ) -> TypeBool
@@ -803,18 +667,10 @@ typeofFunTys env tf tys =
 
   (Fun (SelFun i _  )    , [TypeTuple tys]              ) -> tys !! (i - 1)
   (Fun (SelFun{})      , [TypeVec t]) -> t
-  --fixme(GradFun (SelFun i _) _, [TypeTuple tys]) ->    TypeLM (TypeTuple tys) (tys !! (i - 1))
-  --(GradFun (SelFun{}) _, [TypeVec t]) -> TypeLM (TypeVec t) t
-  --(GradFun (SelFun{}) _, _          ) -> TypeUnknown
 
   (f        , _          ) -> case Map.lookup (Simple $ show f) env of
                                   Just a  -> a
                                   Nothing -> error $ "LOOKUP: " ++ emsg
-
-  -- (GradFun (SFun f) _, [tfrom]) -> let ty = stLookup "GradFun" (Simple f) env in TypeLM tfrom ty
-  -- (GradFun (SFun f) _, t : tys) ->
-  --   let tfrom = TypeTuple (t : tys)
-  --   in  let ty = stLookup "GradFun2" (Simple f) env in TypeLM tfrom ty
 
   where emsg = "Failed to find type for Function\n"
                 ++ show tf
@@ -823,22 +679,3 @@ typeofFunTys env tf tys =
                 ++ ".    Env:\n"
                 ++ show env
 
-typeofLMFun :: HasCallStack => String -> [Type] -> TypeLM
-typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty) 
-                        (f, ty) of
-  ("lmZero" , [s, t])   -> LMZero s t
-  ("lmOne" ,  [t])      -> LMOne t
-  ("lmScale", [t, TypeFloat]) -> LMScale t
-  ("lmBuild", [TypeInteger, TypeLambda TypeInteger (TypeLM ty)]) -> LMBuild ty
-  ("lmBuildT", [TypeInteger, TypeLambda TypeInteger (TypeLM ty)]) -> LMBuildT ty
-  ("lmVCat",  lms) -> LMVCat $ map getLM lms 
-  ("lmHCat",  lms) -> LMHCat $ map getLM lms 
-  ("lmCompose", [TypeLM lm1, TypeLM lm2]) -> LMCompose lm1 lm2
-  ("lmAdd",  [TypeLM lm1, TypeLM lm2]) -> LMAdd lm1 lm2
-  _ ->
-    error -- flip trace (LM TypeUnknown TypeUnknown)
-      $  "Failed to type LMfun ("
-      ++ show f
-      ++ ", "
-      ++ show ty
-      ++ ")"
