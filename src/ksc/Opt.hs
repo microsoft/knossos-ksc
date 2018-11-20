@@ -14,23 +14,22 @@ import Test.Hspec
 optTrace msg t = t -- trace msg t
 
 ---------------
-optDefs :: HasCallStack => ST -> [TDef] -> [TDef]
-optDefs env defs = map (optDef env) defs
+optDefs :: HasCallStack => [TDef] -> [TDef]
+optDefs defs = map (optDef) defs
 
-optDef :: HasCallStack => ST -> TDef -> TDef
-optDef env (DefX (TFun ty f) args r) = 
+optDef :: HasCallStack => TDef -> TDef
+optDef (DefX (TFun ty f) args r) = 
             DefX (TFun ty f) args $
-            simplify env r
+            simplify r
 
-simplify :: ST -> TExpr -> TExpr
-simplify env =  -- optE env . optLets . optE env .
-                optE env . optLets
+simplify :: TExpr -> TExpr
+simplify = optE . optLets . optE . optLets
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
 
 ---------------
-optE :: HasCallStack => ST -> TExpr -> TExpr
-optE env e
+optE :: HasCallStack => TExpr -> TExpr
+optE e
   = go e
   where
     go :: TExpr -> TExpr
@@ -40,7 +39,7 @@ optE env e
     go (Var v)             = Var v
     go (Konst k)           = Konst k
     go (Lam v ty e)        = Lam v ty (go e)
-    go (App e1 e2)         = optApp env (go e1) (go e2)
+    go (App e1 e2)         = optApp (go e1) (go e2)
     go (Assert e1 e2)      = Assert (go e1) (go e2)
     go (Let var rhs body)  = mkLet var (go rhs) (go body)
     go (If b t e)          = optIf (go b) (go t) (go e)
@@ -52,9 +51,9 @@ optE env e
                             opt_arg = go arg
 
 --------------
-optApp :: ST -> TExpr -> TExpr -> TExpr
-optApp env (Lam v ty e) a = Let v (optE env a) (optE env e)
-optApp env f a            = App f a
+optApp :: TExpr -> TExpr -> TExpr
+optApp (Lam v ty e) a = Let v (optE a) (optE e)
+optApp f a            = App f a
 
 --------------
 optIf :: TExpr -> TExpr -> TExpr -> TExpr
@@ -318,7 +317,7 @@ optApplyLM ty e dx
   = trace ("Apply not optimized: " ++ (take 20 $ show $ ppr e) ++ "...") Nothing
 
 ------------------
-optApplyLMCall :: 
+optApplyLMCall ::
                 String -> TExpr   -- f args :: s -o t
              -> TExpr             -- :: S
              -> Maybe (TExpr)     -- :: T
@@ -410,7 +409,7 @@ test_opt =
             f2 = kTFloat 2.0
             l2 = lmScale TypeFloat f2 
         in 
-            optE stCreate (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
+            optE (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
             lmHCat [lmAdd l1 l2, lmScale TypeFloat (pAdd f2 f2)]
 

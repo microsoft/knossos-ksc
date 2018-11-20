@@ -11,7 +11,7 @@ import Opt
 import CSE
 
 -- import ANF
--- import Cgen (cppF, runM, cgenDef, cgenDefs)
+--import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
 
 {-
@@ -251,7 +251,7 @@ doall file =
   ;  banner "grad"
   ;  dd grad
 
-  ;  let optgrad = optDefs env' grad
+  ;  let optgrad = optDefs grad
   ;  banner "optgrad"
   ;  dd optgrad
 
@@ -259,7 +259,7 @@ doall file =
   ;  banner "fwd"
   ;  dd fwd 
 
-  ;  let optfwd = optDefs env'' fwd
+  ;  let optfwd = optDefs fwd
   ;  banner "optfwd"
   ;  dd optfwd 
 
@@ -271,7 +271,7 @@ doall file =
   ;  banner "all"
   ;  dd ann2
 
-  --;  liftIO (cppF ("obj\\" ++ file) ann2)
+--  ;  liftIO (cppF ("obj\\" ++ file) ann2)
   }
 
 gmm :: IO ()
