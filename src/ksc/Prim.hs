@@ -12,6 +12,7 @@ dummyVar t = Var $ TVar t (Dummy)
 
 -- Call to a LMFun, with given return type 
 lm :: Type -> Type -> String -> [TExpr] -> TExpr
+lm (TypeTuple [s]) t name args = error $ "Tupled {" ++ name ++ "}"
 lm s t name args = mkTCall (TypeLM s t) (LMFun name) args
 
 lmZero :: Type -> Type -> TExpr
@@ -41,10 +42,11 @@ lmCompose :: HasCallStack => TExpr -> TExpr -> TExpr
 lmCompose f g = 
   let (TypeLM t r) = typeof f
       (TypeLM s t1) = typeof g in
-  assertEqualThen ("lmCompose(" ++ pps f ++ ", " ++ pps g) t t1 $ 
+  assertEqualThen ("lmCompose:\n\n" ++ pps f ++ "\n\n" ++ pps g) t t1 $ 
   lm s r "lmCompose" [f,g]
 
 lmVCat :: HasCallStack => [TExpr] -> TExpr
+lmVCat [e] = error "unexpected"
 lmVCat es =
   let s = assertAllEqualRet "lmVCat" (map typeofLMs tys) 
       t = TypeTuple $ map typeofLMt tys in
@@ -53,6 +55,7 @@ lmVCat es =
     tys = map getLM $ map typeof $ es
 
 lmHCat :: HasCallStack => [TExpr] -> TExpr 
+lmHCat [e] = error "unexpected"
 lmHCat es = 
   let t = assertAllEqualRet "lmHCat" (map typeofLMt tys) 
       s = TypeTuple $ map typeofLMs tys in

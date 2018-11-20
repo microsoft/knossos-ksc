@@ -137,6 +137,14 @@ applyD (DefX (TFun (TypeLM s t) (GradFun f Fwd)) vars rhs)
 
     to_delta (TVar ty (Simple x)) = TVar ty (Delta x)
 
+applyDefs :: ST -> [TDef] -> (ST, [TDef])
+applyDefs env defs =
+  foldll add_def_to_env env defs
+  where
+    add_def_to_env env def = 
+      let gdef@(DefX (TFun ty f) params rhs) = applyD def in
+          (stInsertFun f ty env, gdef)
+
 ---------------------------------
 -- Transpose
 

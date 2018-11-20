@@ -6,7 +6,6 @@ import Data.Hashable
 import Lang
 import Parse (runParser, pDefs, parseF)
 import Annotate
-import Cgen
 import AD
 import Opt
 import CSE
@@ -234,8 +233,8 @@ doall :: HasCallStack => String -> IO ()
 doall file =
   let tl s = reverse (take 100 $ reverse s)
       dd defs = liftIO $ putStrLn ("---" ++ (tl $ pps defs))
-      dd1 :: Pretty p => [p] -> KM ()
-      dd1 = displayN in
+      ddx :: Pretty p => [p] -> KM ()
+      ddx = displayN in
   runKM $
   do {
      alldefs <- liftIO (parseF (file ++ ".ks"))
@@ -247,30 +246,36 @@ doall file =
   ;  let (env, ann) = annotDefs stCreate defs
   ;  banner "annotated defs"
   ;  dd ann
+
   ;  let (env', grad) = gradDefs env ann
   ;  banner "grad"
   ;  dd grad
-  ;  let (env'', optgrad) = optDefs env' grad
+
+  ;  let optgrad = optDefs env' grad
   ;  banner "optgrad"
-  ;  banner $ show env'' 
   ;  dd optgrad
-  ;  let fwd = map applyD optgrad
+
+  ;  let (env'',fwd) = applyDefs env' optgrad
   ;  banner "fwd"
   ;  dd fwd 
-  ;  let (env''', optfwd) = optDefs env'' fwd
+
+  ;  let optfwd = optDefs env'' fwd
   ;  banner "optfwd"
   ;  dd optfwd 
+
   ;  let alldefs = ann ++ optgrad ++ optfwd
   ;  cse <- cseDefs alldefs
   ;  dd cse
-  ;  let ann2 =  cse ++ (snd $ annotDefs env''' main)
+
+  ;  let ann2 =  cse ++ (snd $ annotDefs env'' main)
   ;  banner "all"
   ;  dd ann2
-  ;  liftIO (cppF ("obj\\" ++ file) ann2)
+
+  --;  liftIO (cppF ("obj\\" ++ file) ann2)
   }
 
 gmm :: IO ()
-gmm = doall "examples\\gmm"
+gmm = doall "test\\ksc\\gmm"
 
 go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . snd . annotDefs stCreate
 

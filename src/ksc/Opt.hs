@@ -315,7 +315,7 @@ optApplyLM ty (If b et ef) dx
   = Just $ If b (lmApply et dx) (lmApply ef dx)
 
 optApplyLM ty e dx
-  = trace ("Apply not optimized: " ++ (show $ppr e) ++ "\n to " ++ (show $ppr dx)) Nothing
+  = trace ("Apply not optimized: " ++ (take 20 $ show $ ppr e) ++ "...") Nothing
 
 ------------------
 optApplyLMCall :: 

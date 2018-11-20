@@ -29,7 +29,7 @@ assertEqual msg t1 t2 =
 
 assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e =
-  if t1 == t2 then e else trace ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
+  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
 
 assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
 assertAllEqualThen msg es e =
@@ -190,8 +190,18 @@ instance (Typeable b, TypeableFun f) =>
   typeof (Tuple es) = TypeTuple $ map typeof es
   typeof (Lam v tyv e) = TypeLambda tyv $ typeof e
   typeof (Let b e1 e2) = typeof e2
-  typeof (If c t f) = assertEqualThen "If" (typeof t) (typeof f) (typeof t)
+  typeof (If c t f) = makeIfType (typeof t) (typeof f) 
   typeof (Assert c e) = typeof e
+
+-- ToDo:
+-- The type of an If statement is a sort of union of the types on the branches
+-- This occurs because of types like TypeZero which intersect both Float and Integer
+-- We could make our constants more strongly typed, which might be better, but
+-- the Zero vector can be a useful optimization concept.
+makeIfType :: Type -> Type -> Type
+makeIfType TypeZero ty = ty
+makeIfType ty TypeZero = ty
+makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $ ty2
 
 getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
@@ -645,6 +655,9 @@ stLookupFun msg f = stLookup msg (Simple $ show f)
 
 ------------------------------------------------------------------------------
 
+mkTypeTuple :: [Type] -> Type
+mkTypeTuple [ty] = ty
+mkTypeTuple tys = TypeTuple tys
 
 -- A single place for "domain knowledge" about polymorphic functions -- to be pruned when we get primdefs
 typeofFunTy :: HasCallStack => ST -> Fun -> Type -> Type
@@ -654,8 +667,8 @@ typeofFunTy env f ty              = typeofFunTys env f [ty]
 typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
 typeofFunTys env tf tys = 
   case (tf, tys) of
-  (GradFun f Fwd, tys) -> TypeLM (TypeTuple tys) (typeofFunTys env (Fun f) tys)
-  (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (TypeTuple tys)
+  (GradFun f Fwd, tys) -> TypeLM (mkTypeTuple tys) (typeofFunTys env (Fun f) tys)
+  (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (mkTypeTuple tys)
   (LMFun "lmApply",  [TypeLM s t, s1]) -> assertEqualThen "lmApply" s1 s $ t
   (LMFun f, tys) -> error $ "When?"
   (Fun (SFun "pr")       , _                            ) -> TypeInteger
