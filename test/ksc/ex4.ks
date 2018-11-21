@@ -1,0 +1,6 @@
+(def f5 ( (x : Float) (y : Float) )
+        (let ((p (* 7 x))
+              (r (/ 1 y))
+              (q (* p (* x 5)))
+              (v (+ (* 2 (* p q)) (* 3 r))))
+        v))

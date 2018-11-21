@@ -97,7 +97,7 @@ isLMZero _ = False
 
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
-                    , lmBuildT (pSize v) (Lam ii TypeInteger (lmDelta t (Var ii) i)) ]
+                    , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
             where ii = TVar TypeInteger $ Simple "ii"
                   (TypeVec t) = typeof v
 

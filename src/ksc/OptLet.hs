@@ -31,8 +31,8 @@ occAnalE (Assert e1 e2)
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
-occAnalE (Lam v ty e)
-  = (Lam (n,v) ty e', v `M.delete` vs)
+occAnalE (Lam v e)
+  = (Lam v e', v `M.delete` vs)
   where
     (e', vs) = occAnalE e
     n = case v `M.lookup` vs of
@@ -93,7 +93,7 @@ optLetsE e = go M.empty e
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
     go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
-    go subst (Lam (_,v) ty e)  = Lam v ty (go (v `M.delete` subst) e)
+    go subst (Lam v e)      = Lam v (go (v `M.delete` subst) e)
 
 inline_me :: Int -> Var -> TExpr -> Bool
 inline_me n bndr rhs

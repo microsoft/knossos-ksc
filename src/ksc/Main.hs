@@ -4,18 +4,20 @@ import GHC.Stack;
 import Data.Hashable
 
 import Lang
-import Parse (runParser, pDefs, parseF)
+import Parse (runParser, pDecls, parseF )
+import Rules
 import Annotate
 import AD
 import Opt
 import CSE
 
--- import ANF
+import ANF
 -- import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
+import Data.List( partition )
+
 
 {-
-
 ex1 :: Def
 -- f x = let y = x*x in x + y
 ex1 = Def (Fun (SFun "f1")) [sx] $
@@ -152,6 +154,7 @@ printFloat :: String -> String
 printFloat s = unlines
   ["printf(\"%s\\n\", \"" ++ s ++ "\");", "printf(\"%f\\n\\n\", " ++ s ++ ");"]
 
+-}
 
 -------------------------------------
 --  The demo driver
@@ -161,73 +164,85 @@ demoF :: String -> IO ()
 -- String is the file name
 demoF file
   = do { cts <- readFile file
-       ; case runParser pDefs cts of
+       ; case runParser pDecls cts of
             Left err   -> putStrLn ("Failed parse: " ++ show err)
             Right defs -> runKM (demoN defs) }
 
-demo :: Def -> IO ()
+demo :: Decl -> IO ()
 demo d = runKM (demoN [d])
 
-demoN :: [Def] -> KM ()
-demoN def
-  = do { banner "Original definition"
-       ; displayN def
+demoN :: [Decl] -> KM ()
+demoN decls
+  = do { banner "Original declarations"
+       ; displayN decls
+
+       ; banner "Typechecked declarations"
+       ; let (env, tc_decls) = annotDecls emptyST decls
+       ; let (rules, defs)   = partitionDecls tc_decls
+             rulebase        = mkRuleBase rules
+
+       ; displayN tc_decls
+
+       ; banner "Optimised original definition"
+       ; let opt_defs = optDefs rulebase env defs
+       ; displayN opt_defs
 
        ; banner "Anf-ised original definition"
-       ; anf_def <- anfDefs def
-       ; displayN anf_def
+       ; anf_defs <- anfDefs opt_defs
+       ; displayN anf_defs
 
        ; banner "The full Jacobian (unoptimised)"
-       ; let grad_def = gradDefs anf_def
-       ; displayN grad_def
+       ; let (env1, grad_defs) = gradDefs env anf_defs
+       ; displayN grad_defs
 
        ; banner "The full Jacobian (optimised)"
-       ; let opt_grad_def = optDefs grad_def
-       ; displayN opt_grad_def
+       ; let opt_grad_defs = optDefs rulebase env1 grad_defs
+       ; displayN opt_grad_defs
 
        ; banner "Forward derivative (unoptimised)"
-       ; let der_fwd = map applyD opt_grad_def
+       ; let der_fwd = map applyD opt_grad_defs
        ; displayN der_fwd
 
        ; banner "Forward-mode derivative (optimised)"
-       ; let opt_der_fwd = optDefs der_fwd
+       ; let opt_der_fwd = optDefs rulebase env1 der_fwd
        ; displayN opt_der_fwd
 
        ; banner "Forward-mode derivative (CSE'd)"
-       ; cse_fwd <- cseDefs opt_der_fwd
+       ; cse_fwd <- cseDefs rulebase opt_der_fwd
        ; displayN cse_fwd
 
        ; banner "Transposed Jacobian"
-       ; let trans_grad_def = map transposeD opt_grad_def
-       ; displayN trans_grad_def
+       ; let trans_grad_defs = map transposeD opt_grad_defs
+       ; displayN trans_grad_defs
 
        ; banner "Optimised transposed Jacobian"
-       ; let opt_trans_grad_def = optDefs trans_grad_def
-       ; displayN opt_trans_grad_def
+       ; let opt_trans_grad_defs = optDefs rulebase env1 trans_grad_defs
+       ; displayN opt_trans_grad_defs
 
        ; banner "Reverse-mode derivative (unoptimised)"
-       ; let der_rev = map applyD opt_trans_grad_def
+       ; let der_rev = map applyD opt_trans_grad_defs
        ; displayN der_rev
 
        ; banner "Reverse-mode derivative (optimised)"
-       ; let opt_der_rev = optDefs der_rev
+       ; let opt_der_rev = optDefs rulebase env1 der_rev
        ; displayN opt_der_rev
 
-       ; cse_rev <- cseDefs opt_der_rev
+       ; cse_rev <- cseDefs rulebase opt_der_rev
        ; banner "Reverse-mode derivative (CSE'd)"
        ; displayN cse_rev
        }
-
--}
 
 -------------------------------------
 -- GMM derivatives
 -------------------------------------
 
-moveMain :: [Def] -> ([Def],[Def])
-moveMain [] = ([],[])
-moveMain (def:main@(DefX (Fun (SFun "main")) _ _):defs) = ([main],def:defs)
-moveMain (def:defs) = let (m,t) = moveMain defs in (m,def:t)
+moveMain :: [TDef]
+         -> ( [TDef]    -- Singleton 'main' def, or empty
+            , [TDef])   -- All the rest
+moveMain = partition isMain
+  where
+    isMain (DefX (TFun _ (Fun (SFun "main"))) _ _) = True
+    isMain _ = False
 
 doall :: HasCallStack => String -> IO ()
 doall file =
@@ -236,22 +251,25 @@ doall file =
       ddx :: Pretty p => [p] -> KM ()
       ddx = displayN in
   runKM $
-  do {
-     alldefs <- liftIO (parseF (file ++ ".ks"))
-  ;  liftIO $ putStrLn "read defs"
-  ;  let (main,defs) = moveMain alldefs
+  do { decls <- liftIO (parseF (file ++ ".ks"))
+  ;  liftIO $ putStrLn "read decls"
+
+  ;  banner "annotated defs"
+  ;  let (env, ann_decls) = annotDecls emptyST decls
+  ;  dd ann_decls
+
+  ;  let (rules, alldefs) = partitionDecls ann_decls
+         rulebase         = mkRuleBase rules
+         (main, defs)     = moveMain alldefs
   ;  liftIO $ putStrLn ("found main " ++ pps main)
   ;  banner "defs"
   ;  dd defs
-  ;  let (env, ann) = annotDefs stCreate defs
-  ;  banner "annotated defs"
-  ;  dd ann
 
-  ;  let (env', grad) = gradDefs env ann
+  ;  let (env', grad) = gradDefs env defs
   ;  banner "grad"
   ;  dd grad
 
-  ;  let optgrad = optDefs env' grad
+  ;  let optgrad = optDefs rulebase env' grad
   ;  banner "optgrad"
   ;  dd optgrad
 
@@ -259,15 +277,15 @@ doall file =
   ;  banner "fwd"
   ;  dd fwd
 
-  ;  let optfwd = optDefs env'' fwd
+  ;  let optfwd = optDefs rulebase env'' fwd
   ;  banner "optfwd"
   ;  dd optfwd
 
-  ;  let alldefs = ann ++ optgrad ++ optfwd
-  ;  cse <- cseDefs alldefs
+  ;  let alldefs = defs ++ optgrad ++ optfwd
+  ;  cse <- cseDefs rulebase alldefs
   ;  dd cse
 
-  ;  let ann2 =  cse ++ (snd $ annotDefs env'' main)
+  ;  let ann2 =  cse ++ main
   ;  banner "all"
   ;  dd ann2
 
@@ -275,9 +293,7 @@ doall file =
   }
 
 gmm :: IO ()
-gmm = doall "test\\ksc\\gmm"
-
-go = parseF "examples\\test.ks"  >>= putStrLn . show . ppr . snd . annotDefs stCreate
+gmm = doall "../../test/ksc/gmm"
 
 main :: IO ()
 main = gmm

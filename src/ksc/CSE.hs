@@ -1,6 +1,7 @@
 module CSE where
 
 import Lang
+import Rules
 import Text.PrettyPrint
 import ANF
 import Opt
@@ -10,8 +11,8 @@ import qualified Data.Map as M
 type CSEf = TFun
 type CSEb = TVar
 
-cseDefs :: [DefX CSEf CSEb] -> KM [DefX CSEf CSEb]
-cseDefs defs
+cseDefs :: RuleBase -> [DefX CSEf CSEb] -> KM [DefX CSEf CSEb]
+cseDefs rb defs
   = do { anf_defs <- anfDefs defs
 --       ; banner "ANF'd"
 --       ; displayN anf_defs
@@ -24,7 +25,7 @@ cseDefs defs
              --      into    let x = e in ..let y = x in ...
             -- Then optDefs substitutes x for y
 
-       ; return $ optDefs stCreate cse_defs
+       ; return $ optDefs rb emptyST cse_defs
       }
 
 --cseDef :: Uniq -> Def -> (Uniq, Def)
@@ -63,7 +64,7 @@ cseE cse_env (Tuple es)  = Tuple (map (cseE_check cse_env) es)
 cseE cse_env (App e1 e2) = App (cseE_check cse_env e1)
                                (cseE_check cse_env e2)
 
-cseE cse_env (Lam v ty e) = Lam v ty (cseE cse_env e)
+cseE cse_env (Lam v e) = Lam v (cseE cse_env e)
   -- Watch out: the variable might capture things in cse_env
 
 cseE _ e = e  -- For now: lambda, app, const, var

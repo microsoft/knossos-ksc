@@ -1,26 +1,33 @@
-module Rules( Rules, tryRules ) where
+module Rules( RuleBase, tryRules, mkRuleBase ) where
 
 import Lang
 import Control.Monad( guard )
 import Data.Map as M
+import Text.PrettyPrint
 
-newtype Rules = Rules [Rule]
+newtype RuleBase = Rules [TRule]
+        -- Rule is defined in Lang
 
 type TSubst = M.Map TVar TExpr -- Substitution for fv(lhs)
 type VSubst = M.Map TVar TVar  -- Substitution for bv(lhs)
 
-theRules :: Rules
-theRules = Rules []
+mkRuleBase :: [TRule] -> RuleBase
+mkRuleBase rs = Rules rs
 
-tryRules :: TExpr -> Maybe TExpr
-tryRules e
-  = case matchRules theRules e of
+tryRules :: RuleBase -> TExpr -> Maybe TExpr
+tryRules rules e
+  = case matchRules rules e of
       []               -> Nothing
-      ((rule,subst):_) -> Just (substE subst (ru_rhs rule))
+      ((rule,subst):_) -> -- pprTrace ("Rule fired: " ++ ru_name rule)
+                          --   (vcat [ text "Before:" <+> ppr e
+                          --         , text "After: " <+> ppr e' ]) $
+                          Just e'
+        where
+         e' = substE subst (ru_rhs rule)
          -- For now, arbitrarily pick the first rule that matches
          -- One could imagine priority schemes (e.g. best-match)
 
-matchRules :: Rules -> TExpr -> [(Rule, TSubst)]
+matchRules :: RuleBase -> TExpr -> [(TRule, TSubst)]
 matchRules (Rules rules) e
    = [ (rule, subst)
      | rule <- rules
@@ -66,12 +73,14 @@ match_e vsubst tsubst (If e1a e1b e1c) (If e2a e2b e2c)
 match_e vsubst tsubst (Tuple es1) (Tuple es2)
   = match_es vsubst tsubst es1 es2
 
-match_e vsubst tsubst (Lam v1 _ e1) (Lam v2 _ e2)
+match_e vsubst tsubst (Lam v1 e1) (Lam v2 e2)
   = match_e (M.insert v1 v2 vsubst) tsubst e1 e2
 
 match_e vsubst tsubst (Let v1 e1 b1) (Let v2 e2 b2)
   = do { tsubst1 <- match_e vsubst tsubst e1 e2
        ; match_e (M.insert v1 v2 vsubst) tsubst1 b1 b2 }
+
+match_e _ _ _ _ = Nothing
 
 match_es :: VSubst -> TSubst -> [TExpr] -> [TExpr] -> Maybe TSubst
 match_es vs ts []       []       = return ts

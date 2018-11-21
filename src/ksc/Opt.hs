@@ -13,33 +13,34 @@ import Test.Hspec
 
 optTrace msg t = t -- trace msg t
 
+type OptEnv = (RuleBase, ST)
+
 ---------------
-optDefs :: HasCallStack => ST -> [TDef] -> [TDef]
-optDefs env defs = map (optDef env) defs
+optDefs :: HasCallStack => RuleBase -> ST -> [TDef] -> [TDef]
+optDefs rb st defs = map (optDef (rb, st)) defs
 
-optDef :: HasCallStack => ST -> TDef -> TDef
-optDef env (DefX (TFun ty f) args r) =
-            DefX (TFun ty f) args $
-            simplify env r
+optDef :: HasCallStack => OptEnv -> TDef -> TDef
+optDef env (DefX (TFun ty f) args r)
+  = DefX (TFun ty f) args (simplify env r)
 
-simplify :: ST -> TExpr -> TExpr
+simplify :: OptEnv -> TExpr -> TExpr
 simplify env =  -- optE env . optLets . optE env .
                 optE env . optLets
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
 
 ---------------
-optE :: HasCallStack => ST -> TExpr -> TExpr
-optE env e
+optE :: HasCallStack => OptEnv -> TExpr -> TExpr
+optE env@(rb,_) e
   = go e
   where
     go :: TExpr -> TExpr
-    go e | Just e' <- tryRules e = go e'
+    go e | Just e' <- tryRules rb e = go e'
 
     go (Tuple es)          = Tuple (map go es)
     go (Var v)             = Var v
     go (Konst k)           = Konst k
-    go (Lam v ty e)        = Lam v ty (go e)
+    go (Lam v e)           = Lam v (go e)
     go (App e1 e2)         = optApp env (go e1) (go e2)
     go (Assert e1 e2)      = Assert (go e1) (go e2)
     go (Let var rhs body)  = mkLet var (go rhs) (go body)
@@ -52,9 +53,9 @@ optE env e
                             opt_arg = go arg
 
 --------------
-optApp :: ST -> TExpr -> TExpr -> TExpr
-optApp env (Lam v ty e) a = Let v (optE env a) (optE env e)
-optApp env f a            = App f a
+optApp :: OptEnv -> TExpr -> TExpr -> TExpr
+optApp env (Lam v e) a = Let v (optE env a) (optE env e)
+optApp env f a         = App f a
 
 --------------
 optIf :: TExpr -> TExpr -> TExpr -> TExpr
@@ -128,13 +129,13 @@ optFun ty (SFun "size") (Call (TFun _ (Fun (SFun "*"))) (Tuple [x,_]))
 -- RULE: index j (build n f) = f j
 optFun ty (SFun "index") (Tuple [ ei, arr ])
   | Call (TFun tyv (Fun (SFun "build"))) (Tuple [_, f]) <- arr
-  , Lam i ty2 e <- f
+  , Lam i e <- f
   = Just (Let i ei e)
 
 -- RULE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
 optFun ty (SFun "sum")   arg = optSum ty arg
-optFun ty (SFun "build") (Tuple [sz, Lam i tyi e2]) = optBuild ty sz i tyi e2
+optFun ty (SFun "build") (Tuple [sz, Lam i e2]) = optBuild ty sz i e2
 
 optFun _ _ _ = Nothing
 
@@ -143,8 +144,8 @@ optSum :: Type -> TExpr -> Maybe TExpr
 
 -- RULE: sum (build n (\i. (e1,e2,...)))
 --       = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
-optSum ty (Call (TFun _ (Fun (SFun "build"))) (Tuple [n, Lam i tyi (Tuple es)]))
-   = Just $ Tuple (map (\e -> pSum (pBuild n (Lam i tyi e))) es)
+optSum ty (Call (TFun _ (Fun (SFun "build"))) (Tuple [n, Lam i (Tuple es)]))
+   = Just $ Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
 
 -- RULE: sum (diag sz f)  =  build sz f
 optSum ty (Call (TFun _ (Fun (SFun "diag"))) (Tuple [sz, f]))
@@ -157,13 +158,13 @@ optSum ty (Call (TFun _ (Fun (SFun "deltaVec"))) (Tuple [_, _, e]))
 optSum ty e = Nothing
 
 -----------------------
-optBuild :: Type -> TExpr -> TVar -> Type -> TExpr -> Maybe TExpr
+optBuild :: Type -> TExpr -> TVar -> TExpr -> Maybe TExpr
 
 -- RULE: build sz (\i. delta i ex eb)  =  let i = ex in
 --                                        deltaVec sz i eb
 --       (if i is not free in ex)
 -- NB: however, i might be free in eb
-optBuild ty sz i tyi e
+optBuild ty sz i e
   | Call (TFun _ (Fun (SFun "delta"))) (Tuple [e1,e2,eb]) <- e
   , Just ex <- ok_eq e1 e2
   , i `notFreeIn` ex
@@ -176,23 +177,23 @@ optBuild ty sz i tyi e
     ok_eq _ _ = Nothing
 
 -- RULE: build sz (\i. deltaVec sz i e)   = diag sz (\i. e)
-optBuild ty sz i tyi build_e
+optBuild ty sz i build_e
   | Call (TFun _ (Fun (SFun "deltaVec"))) (Tuple [sz2, Var i2, e]) <- build_e
   , i  == i2
-  = Just $ pDiag sz sz2 (Lam i tyi e)
+  = Just $ pDiag sz sz2 (Lam i e)
 
 {-
 -- RULE: build sz (\i. f e1 ... eN ...)  =
 --         let tN = eN in
 --         build sz (\i. f e1 .. tN ... )
 -- { if i is not free in eN }
-optBuild ty sz i tyi e
+optBuild ty sz i e
   | Call tf@(TFun _ (Fun (SFun f))) (Tuple [e1,e2]) <- e
   , is_expensive e2 -- try to apply only to "expensive" operations
   , i `notFreeIn` e2
-  = Just $ Let tmp e2 $ pBuild sz (Lam i tyi (Call tf (Tuple [e1, Var tmp])))
+  = Just $ Let tmp e2 $ pBuild sz (Lam i (Call tf (Tuple [e1, Var tmp])))
   where
-    tmp = newVarNotInT (typeof e2) (pBuild sz (Lam i tyi e)) -- slightly inefficient to reassemble outer expr here
+    tmp = newVarNotInT (typeof e2) (pBuild sz (Lam i e)) -- slightly inefficient to reassemble outer expr here
     is_expensive (Var _) = False
     is_expensive (Konst _) = False
     is_expensive _ = False
@@ -200,16 +201,16 @@ optBuild ty sz i tyi e
 
 -- build sz (\i. e1 * e2)  = (build sz (\i.e1)) * e2
 -- { if i is not free in e2 }
-optBuild ty sz i tyi e
+optBuild ty sz i e
   | Call (TFun _ (Fun (SFun "*"))) (Tuple [e1,e2]) <- e
   , i `notFreeIn` e2
   , is_expensive e2
-  = Just (Call (TFun ty (Fun (SFun "mul$Vec<R>$R"))) (Tuple [pBuild sz (Lam i tyi e1), e2]))
+  = Just (Call (TFun ty (Fun (SFun "mul$Vec<R>$R"))) (Tuple [pBuild sz (Lam i e1), e2]))
   where
       is_expensive (Call _ _) = True
       is_expensive _ = False
 
-optBuild ty sz i tyi e = Nothing
+optBuild ty sz i e = Nothing
 
 
 -----------------------
@@ -232,7 +233,7 @@ optGradFun s t (SelFun i n) (Tuple es) = Just (lmHCat [ if i == j then lmOne t e
                                                        | j <- [1..n] ])
 
 optGradFun s t (SFun "sum") e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "si") TypeInteger (lmOne t)))
+  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "si") (lmOne t)))
 
 
 optGradFun s t (SFun "size") e
@@ -345,11 +346,11 @@ optApplyLMCall "lmHCat" (Tuple es) dx
 optApplyLMCall "lmScale" (Tuple [t'',x]) dx
   = Just (pMul x dx)
 
-optApplyLMCall "lmBuild" (Tuple [n, Lam i tyi m]) dx
-  = Just (pBuild n (Lam i tyi (lmApply m dx)))
+optApplyLMCall "lmBuild" (Tuple [n, Lam i m]) dx
+  = Just (pBuild n (Lam i (lmApply m dx)))
 
-optApplyLMCall "lmBuildT" (Tuple [n, Lam i tyi m]) dx
-  = Just (pSum (pBuild n (Lam i tyi (lmApply m (pIndex (Var i) dx)))))
+optApplyLMCall "lmBuildT" (Tuple [n, Lam i m]) dx
+  = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
 
 optApplyLMCall fun arg dx
   = trace ("No opt for " ++ (show fun) ++ "(" ++ pps arg ++ ".") Nothing
@@ -388,10 +389,10 @@ optTransCallLM s t "lmVCat" (Tuple es)
   = Just (lmHCat (map lmTranspose es))
 optTransCallLM s t "lmHCat" (Tuple es)
   = Just (lmVCat (map lmTranspose es))
-optTransCallLM s t "lmBuild" (Tuple [n, Lam i tyi b])
-  = Just (lmBuildT n (Lam i tyi (lmTranspose b)))
-optTransCallLM s t "lmBuildT" (Tuple [n, Lam i tyi b])
-  = Just (lmBuild n (Lam i tyi (lmTranspose b)))
+optTransCallLM s t "lmBuild" (Tuple [n, Lam i b])
+  = Just (lmBuildT n (Lam i (lmTranspose b)))
+optTransCallLM s t "lmBuildT" (Tuple [n, Lam i b])
+  = Just (lmBuild n (Lam i (lmTranspose b)))
 
 optTransCallLM s t f a = Nothing
 
@@ -410,6 +411,7 @@ test_opt =
             f2 = kTFloat 2.0
             l2 = lmScale TypeFloat f2
         in
-            optE stCreate (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
+            optE (mkRuleBase [], emptyST)
+                 (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
             lmHCat [lmAdd l1 l2, lmScale TypeFloat (pAdd f2 f2)]

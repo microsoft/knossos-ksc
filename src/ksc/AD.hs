@@ -44,6 +44,7 @@ gradDefs env defs =
     add_def_to_env (env, gdefs) def =
       let gdef@(DefX (TFun ty g) params rhs) = gradDef env def in
           (stInsertFun g ty env, gdefs ++ [gdef])
+ -- Simon says: is the returned 'defs' always same as argument 'defs'?
 
 gradDef :: ST -> TDef -> TDef
 gradDef env (DefX (TFun ty f) params rhs) =
@@ -77,16 +78,16 @@ gradDef env (DefX (TFun ty f) params rhs) =
 gradE :: ST -> Type -> TExpr -> TExpr
 gradE env s (Konst k)         = lmZero s (typeofKonst k)
 gradE env s (Var (TVar ty v)) = Var (TVar (stLookup "var" gv env) gv) where gv = gradV v
+  -- Simon says: why are we looking up here?
 gradE env s (Assert e1 e2)    = Assert e1 (gradE env s e2)
 
 -- grad[ build (\i.e ]
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE env s (Call (TFun _ (Fun (SFun "build"))) (Tuple [n, (Lam ti@(TVar TypeInteger i) TypeInteger b)]))
-  = lmBuild n $
-    Lam ti TypeInteger $
-        mkLetE (gradV i) (lmZero s TypeInteger) b
+gradE env s (Call (TFun _ (Fun (SFun "build"))) (Tuple [n, (Lam ti@(TVar TypeInteger i) b)]))
+  = lmBuild n $ Lam ti $
+    mkLetE (gradV i) (lmZero s TypeInteger) b
     where
       mkLetE :: Var -> TExpr -> TExpr -> TExpr
       mkLetE v rhs body = let tv = typeof rhs
@@ -157,6 +158,8 @@ transposeD (DefX (TFun (TypeLM s t) (GradFun f d)) args rhs)
 ----------------------------------
 --- Unit test
 
+{-
+
 -- TODO make this work
 test_AD =
   hspec $ do
@@ -164,7 +167,8 @@ test_AD =
     let (env,ae1) = annotDef e1
     let de1_expected = runParserOrPanic pDef "(def D$f ((x : Float)) (lmScale 2.0))"
     let (env1,ade1_expected) = annotDef de1_expected
-    let ade1 = gradDef stCreate ae1
+    let ade1 = gradDef emptyST ae1
     describe "AD" $ do
       it "AD" $
         ade1 `shouldBe` ade1_expected
+-}
