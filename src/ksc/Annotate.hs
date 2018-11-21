@@ -33,7 +33,7 @@ annotDefE env (DefX f vars expr) =
 annotExpr :: ST -> Expr -> (Type, TExpr)
 annotExpr env = \case
   -- Naming conventions in this function:
-  --  e   Expr [TypeUnkown]
+  --  e   Expr [TypeUnknown]
   --  ae  Expr [Annotated]
   --  tye Type of e
   --  xe  ExprX part of e
