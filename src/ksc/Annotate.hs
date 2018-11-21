@@ -27,7 +27,7 @@ annotDefE env (DefX f vars expr) =
       (ty,e) = annotExpr body_env expr
   in  (stInsertFun f ty env, DefX (TFun ty f) vars e)
   where
-    addVarToEnv :: TVar Var -> ST -> ST
+    addVarToEnv :: TVar -> ST -> ST
     addVarToEnv (TVar ty v) = stInsert v ty
 
 annotExpr :: ST -> Expr -> (Type, TExpr)

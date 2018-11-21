@@ -5,8 +5,8 @@ module Lang where
 import Prelude hiding( (<>) )
 
 import Data.List ( intercalate )
-import qualified Data.Map                      as Map
-import Text.PrettyPrint as PP
+import qualified Data.Map as Map
+import Text.PrettyPrint   as PP
 import KMonad
 
 import Data.Functor.Identity
@@ -19,7 +19,38 @@ import qualified Data.Map as M
 import Debug.Trace( trace )
 import Test.Hspec
 
------- Data types ---------
+-----------------------------------------------
+--  The main data types
+-----------------------------------------------
+
+type Decl = DeclX TFun TVar
+
+data DeclX f b = RuleDecl Rule
+               | DefDefl  (DefX f b)
+
+data DefX f b = DefX f [TVar] (ExprX f b)  -- f x = e
+              deriving( Eq, Ord, Show )
+
+type Def  = DefX Fun Var
+type TDef = DefX TFun TVar
+
+data ExprX f b
+  = Konst Konst
+  | Var b
+  | Call f (ExprX f b)      -- f e
+  | Tuple [ExprX f b]       -- (e1, ..., en)
+  | Lam b Type (ExprX f b)
+       -- ToDo: Simon says: what is this Type?
+
+  | App (ExprX f b) (ExprX f b)
+  | Let b (ExprX f b) (ExprX f b)    -- let x = e1 in e2  (non-recursive)
+  | If (ExprX f b) (ExprX f b) (ExprX f b)  -- FIXME make cond ExprX?
+  | Assert (ExprX f b) (ExprX f b)
+  deriving( Show )
+
+type Expr  = ExprX Fun Var
+type TExpr = ExprX TFun TVar
+
 data Type = TypeZero               -- Polyamorous zero
           | TypeBool
           | TypeInteger
@@ -31,22 +62,11 @@ data Type = TypeZero               -- Polyamorous zero
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
-data ADMode = Fwd | Rev
-            deriving( Eq, Ord, Show )
-
-flipMode :: ADMode -> ADMode
-flipMode Fwd = Rev
-flipMode Rev = Fwd
-
 data FunId = SelFun     -- Selector function: fst, snd etc
                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                Int      -- Arity
            | SFun String  -- For now
            deriving( Eq, Ord )
-
-instance Show FunId where
-  show (SFun s) = s
-  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
 
 data Fun = Fun     FunId         -- The function              f(x)
          | GradFun FunId ADMode  -- Full Jacobian Df(x)
@@ -56,19 +76,11 @@ data Fun = Fun     FunId         -- The function              f(x)
          | LMFun   String        -- Linear map
          deriving( Eq, Ord )
 
-instance Show Fun where
-  show (Fun s) = show s
-  show (GradFun s Fwd) = "D$" ++ show s
-  show (GradFun s Rev) = "R$" ++ show s
-  show (DrvFun  s Fwd) = "fwd$" ++ show s
-  show (DrvFun  s Rev) = "rev$" ++ show s
-  show (LMFun s) = "LM$" ++ s
+data ADMode = Fwd | Rev
+            deriving( Eq, Ord, Show )
 
-data TFun = TFun Type Fun
+data TFun = TFun Type Fun  -- Typed functions
   deriving (Eq, Ord)
-
-instance Show TFun where
-  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
 
 data Var
   = Dummy
@@ -79,30 +91,8 @@ data Var
                            --   True <=> transposed \bowtie x
   deriving( Eq, Ord )
 
-instance Show Var where
-  show v = case v of
-    Dummy -> "/*dummy*/"
-    Simple s -> "s$" ++ s
-    Delta  d -> "d$" ++ d
-    Grad g m ->
-      "g"
-      ++ (case m of
-            Fwd -> "f"
-            Rev -> "r")
-      ++ "$"
-      ++ g
-
-data TVar b = TVar Type b
+data TVar = TVar Type Var
   deriving( Show, Eq, Ord )
-
-class CmkVar b where
-  mkVar :: Type -> String -> b
-
-instance CmkVar Var where
-  mkVar ty s = Simple s
-
-instance CmkVar (TVar Var) where
-  mkVar ty s = TVar ty $ Simple s
 
 data Konst = KZero  -- Of any type
            | KInteger Integer
@@ -110,31 +100,44 @@ data Konst = KZero  -- Of any type
            | KBool    Bool
            deriving( Eq, Ord, Show )
 
+data Rule = Rule { ru_lhs :: TExpr
+                 , ru_rhs :: TExpr }
+          -- See Note [Rules]
+
+{- Note [Rules]
+~~~~~~~~~~~~~~~
+The rule is implicitly quantified over the free Vars of ru_lhs.
+That is:
+  * When matching may bind any of the Vars, but not Funs
+    in ru_lhs to make ru_rhs
+  * There are no "global, in-scope" Vars. If we want them we'll have
+    to add a field to identify the Vars over which we are quantifying
+-}
+
+-----------------------------------------------
+--  Simple functions over these types
+-----------------------------------------------
+
+flipMode :: ADMode -> ADMode
+flipMode Fwd = Rev
+flipMode Rev = Fwd
+
 isKZero :: ExprX f b -> Bool
 isKZero (Konst KZero) = True
 isKZero _             = False
 
-data DefX f b = DefX f [TVar Var] (ExprX f b)  -- f x = e
-                    deriving( Eq, Ord, Show )
-type Def = DefX Fun Var
-type TDef = DefX TFun (TVar Var)
+-----------------------------------------------
+--  Finding the type of an expression
+-----------------------------------------------
 
-data ExprX f b
-  = Konst Konst
-  | Var b
-  | Call f (ExprX f b)      -- f e
-  | Tuple [ExprX f b]            -- (e1, ..., en)
-  | Lam b Type (ExprX f b)
-       -- ToDo: Simon says: what is this Type?
+class CmkVar b where
+  mkVar :: Type -> String -> b
 
-  | App (ExprX f b) (ExprX f b)
-  | Let b (ExprX f b) (ExprX f b)    -- let x = e1 in e2  (non-recursive)
-  | If (ExprX f b) (ExprX f b) (ExprX f b)  -- FIXME make cond ExprX?
-  | Assert (ExprX f b) (ExprX f b)
-  deriving( Show )
+instance CmkVar Var where
+  mkVar ty s = Simple s
 
-type Expr = ExprX Fun Var
-type TExpr = ExprX TFun (TVar Var)
+instance CmkVar TVar where
+  mkVar ty s = TVar ty $ Simple s
 
 class TypeableFun f where
   typeofFun :: f -> Type -> Type
@@ -151,7 +154,7 @@ class Typeable b where
 instance Typeable Var where
   typeof v = TypeUnknown
 
-instance Typeable (TVar b) where
+instance Typeable TVar where
   typeof (TVar ty _) = ty
 
 instance (Typeable b, TypeableFun f) =>
@@ -192,8 +195,42 @@ typeofKonst (KInteger _) = TypeInteger
 typeofKonst (KFloat _) = TypeFloat
 typeofKonst (KBool _) = TypeBool
 
--- mkInfixCall :: Fun -> Expr -> Expr -> Expr
--- mkInfixCall f a b = Call f (Tuple [a, b])
+-----------------------------------------------
+--       Show instances
+-----------------------------------------------
+
+instance Show FunId where
+  show (SFun s) = s
+  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
+
+instance Show Fun where
+  show (Fun s) = show s
+  show (GradFun s Fwd) = "D$" ++ show s
+  show (GradFun s Rev) = "R$" ++ show s
+  show (DrvFun  s Fwd) = "fwd$" ++ show s
+  show (DrvFun  s Rev) = "rev$" ++ show s
+  show (LMFun s) = "LM$" ++ s
+
+instance Show TFun where
+  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
+
+instance Show Var where
+  show v = case v of
+    Dummy -> "/*dummy*/"
+    Simple s -> "s$" ++ s
+    Delta  d -> "d$" ++ d
+    Grad g m ->
+      "g"
+      ++ (case m of
+            Fwd -> "f"
+            Rev -> "r")
+      ++ "$"
+      ++ g
+
+
+-----------------------------------------------
+--       Building values
+-----------------------------------------------
 
 mkFun :: String -> Fun
 mkFun fname = Fun (SFun fname)
@@ -231,13 +268,13 @@ mkTCall2 ty f a b = mkTCall ty f [a, b]
 mkTCall3 :: Type -> Fun -> TExpr -> TExpr -> TExpr -> TExpr
 mkTCall3 ty f a b c = mkTCall ty f [a, b, c]
 
-mkLet :: HasCallStack => TVar Var -> TExpr -> TExpr -> TExpr
+mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
   = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs)
                     ty (typeof rhs) $
     Let (TVar ty v) rhs body
 
-mkLets :: HasCallStack => [(TVar Var,TExpr)] -> TExpr -> TExpr
+mkLets :: HasCallStack => [(TVar,TExpr)] -> TExpr -> TExpr
 mkLets [] e = e
 mkLets ((v,rhs):bs) e = mkLet v rhs (mkLets bs e)
 
@@ -268,7 +305,9 @@ seqExpr (Expr ty e) = ty `seq` e
 -}
 
 
------- Substitution --------
+-----------------------------------------------
+--     Substitution
+-----------------------------------------------
 
 substE :: Ord b => M.Map b (ExprX f b) -> ExprX f b -> ExprX f b
 substE subst (Konst k)      = Konst k
@@ -284,7 +323,9 @@ substE subst (Lam v ty e)   = Lam v ty (substE (v `M.delete` subst) e)
 substE subst (Let v r b)    = Let v (substE subst r) $
                               substE (v `M.delete` subst) b
 
------- Equality modulo alpha --------
+-----------------------------------------------
+--     Equality modulo alpha
+-----------------------------------------------
 
 instance (Ord f, Ord b) => Eq (ExprX f b) where
   e1 == e2 = case e1 `cmpExpr` e2 of
@@ -376,7 +417,10 @@ cmpExpr e1 e2
    gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
 
 
---------------
+-----------------------------------------------
+--     Free variables
+-----------------------------------------------
+
 notFreeIn :: Eq b => b -> ExprX f b -> Bool
 notFreeIn v e = go v e
  where
@@ -419,14 +463,17 @@ test_FreeIn =
       it "in, so new var is _t2..." $
         newVarNotIn TypeFloat e2 `shouldBe` (Simple "_t2")
 
------- Pretty printer ------
+-----------------------------------------------
+--     Pretty printer
+-----------------------------------------------
+
 class Pretty p where
   ppr :: p -> Doc
 
 instance Pretty Var where
   ppr v   = PP.text $ show v
 
-instance Pretty b => Pretty (TVar b) where
+instance Pretty TVar where
   ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> ppr ty)
 
 instance Pretty FunId where
@@ -598,7 +645,9 @@ test_Pretty =
       test e "g( s$i )"
       test e2 "f( g( s$i ), s$_t1, 5 )"
 
------------------- ST (SymTab) ------------------
+-----------------------------------------------
+--     Symbol table, ST, maps variables to types
+-----------------------------------------------
 
 type ST = Map.Map Var Type
 
@@ -679,7 +728,10 @@ typeofFunTys env tf tys =
                 ++ ".    Env:\n"
                 ++ show env
 
------- Debugging utilities ---------
+-----------------------------------------------
+--     Debugging utilities
+-----------------------------------------------
+
 assertEqual msg t1 t2 =
   assertEqualThen msg t1 t2 ()
 

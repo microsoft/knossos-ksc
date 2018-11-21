@@ -6,16 +6,8 @@ import Data.Map as M
 
 newtype Rules = Rules [Rule]
 
-data Rule = Rule { ru_lhs :: TExpr
-                 , ru_rhs :: TExpr }
-  -- You may bind any of the Vars, but not Funs
-  -- in ru_lhs to make ru_rhs
-  -- That is, there are no "global, in-scope" Vars
-  -- If we want them we'll have to add a field to
-  -- identify the Vars over which we are quantifying
-
-type TSubst = M.Map (TVar Var) TExpr       -- Substitution for fv(lhs)
-type VSubst = M.Map (TVar Var) (TVar Var)  -- Substitution for bv(lhs)
+type TSubst = M.Map TVar TExpr -- Substitution for fv(lhs)
+type VSubst = M.Map TVar TVar  -- Substitution for bv(lhs)
 
 theRules :: Rules
 theRules = Rules []

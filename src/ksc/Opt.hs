@@ -157,7 +157,7 @@ optSum ty (Call (TFun _ (Fun (SFun "deltaVec"))) (Tuple [_, _, e]))
 optSum ty e = Nothing
 
 -----------------------
-optBuild :: Type -> TExpr -> TVar Var -> Type -> TExpr -> Maybe TExpr
+optBuild :: Type -> TExpr -> TVar -> Type -> TExpr -> Maybe TExpr
 
 -- RULE: build sz (\i. delta i ex eb)  =  let i = ex in
 --                                        deltaVec sz i eb

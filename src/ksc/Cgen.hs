@@ -38,7 +38,7 @@ instance CfreshVar Var where
     S.put (s + 1)
     return $ Simple $ "v$" ++ show s
 
-instance CfreshVar (TVar Var) where
+instance CfreshVar TVar where
   freshVar ty = do
                  v <- freshVar @Var ty
                  return $ TVar ty v
@@ -471,7 +471,7 @@ cgenKonst = \case
 cgenVar :: Var -> String
 cgenVar v = show v
 
-cgenTVar :: TVar Var -> String
+cgenTVar :: TVar -> String
 cgenTVar (TVar ty Dummy) = cgenType ty ++ "{}"
 cgenTVar (TVar _ v) = show v
 

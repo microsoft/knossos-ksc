@@ -8,7 +8,7 @@ import KMonad
 import qualified Data.Map as M
 
 type CSEf = TFun
-type CSEb = TVar Var
+type CSEb = TVar
 
 cseDefs :: [DefX CSEf CSEb] -> KM [DefX CSEf CSEb]
 cseDefs defs

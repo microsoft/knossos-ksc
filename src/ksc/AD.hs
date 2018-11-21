@@ -21,7 +21,7 @@ gradV :: Var -> Var
 gradV (Simple x) = Grad x Fwd
 gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
 
-gradSelFun :: Type -> Int -> Int -> [TVar Var] -> TExpr
+gradSelFun :: Type -> Int -> Int -> [TVar] -> TExpr
 -- (gradSelFun i n) selects the i'th component of a n-tuple
 -- Special case for 1-tuples
 -- Result expr has type (t1, ..., tn) -o ti
@@ -58,14 +58,14 @@ gradDef env (DefX (TFun ty f) params rhs) =
   where
     n = length params
 
-    add_let_to_env :: ST -> (TVar Var, TExpr) -> ST
+    add_let_to_env :: ST -> (TVar, TExpr) -> ST
     add_let_to_env env (TVar ty v, e) = stInsert v ty env
 
     tysOfParams [] = TypeUnknown
     tysOfParams [TVar ty _] = ty
     tysOfParams ps = TypeTuple (map (\(TVar ty v) -> ty) ps)
 
-    gradParam :: Type -> TVar Var -> Int -> Int -> (TVar Var, TExpr)
+    gradParam :: Type -> TVar -> Int -> Int -> (TVar, TExpr)
     gradParam tys (TVar TypeInteger v) _ _ =
       (TVar (typeof g) (gradV v), g) where g = lmZero tys TypeInteger
 

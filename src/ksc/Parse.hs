@@ -142,7 +142,7 @@ pIdentifier = Tok.identifier lexer
 pVar :: Parser Var
 pVar = Simple <$> pIdentifier 
 
-pParam :: Parser (TVar Var)
+pParam :: Parser TVar
 pParam = parens (do {
                     v <- pVar;
                     pReserved ":";
