@@ -257,11 +257,11 @@ doall file =
 
   ;  let (env'',fwd) = applyDefs env' optgrad
   ;  banner "fwd"
-  ;  dd fwd 
+  ;  dd fwd
 
   ;  let optfwd = optDefs env'' fwd
   ;  banner "optfwd"
-  ;  dd optfwd 
+  ;  dd optfwd
 
   ;  let alldefs = ann ++ optgrad ++ optfwd
   ;  cse <- cseDefs alldefs

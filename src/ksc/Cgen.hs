@@ -31,22 +31,22 @@ freshCVar = do
 class CfreshVar b where
   freshVar :: Type -> M b
 
-instance CfreshVar Var where  
+instance CfreshVar Var where
   freshVar _ = do
     -- This doesn't communicate very well but is quick (and dirty)
     s <- S.get
     S.put (s + 1)
     return $ Simple $ "v$" ++ show s
 
-instance CfreshVar (TVar Var) where  
+instance CfreshVar (TVar Var) where
   freshVar ty = do
                  v <- freshVar @Var ty
                  return $ TVar ty v
 
------------- Specialist linear map types 
+------------ Specialist linear map types
 data TypeLM
           = LM Type Type             -- Generic linear map
-          | LMZero Type Type         -- Zeros may be rectangular 
+          | LMZero Type Type         -- Zeros may be rectangular
           | LMOne Type               -- Ones must be square
           | LMScale Type             -- Scalar will always be of TypeFloat, Type is the type being scaled
           | LMSelFun Type Type
@@ -106,7 +106,7 @@ typeofSrc (LMVCat (lm:lms)) = typeofSrc lm
 typeofSrc (LMHCat lms) = TypeTuple $ map typeofSrc lms
 typeofSrc (LMBuild lm) = typeofSrc lm
 typeofSrc (LMBuildT lm) = TypeVec (typeofSrc lm)
-typeofSrc (LMVariant lms) = assertAllEqualRet "lmvariant" (map typeofSrc lms) 
+typeofSrc (LMVariant lms) = assertAllEqualRet "lmvariant" (map typeofSrc lms)
 
 typeofDst :: TypeLM -> Type
 typeofDst (LM s t) = t
@@ -121,7 +121,7 @@ typeofDst (LMVCat lms) = TypeTuple $ map typeofDst lms
 typeofDst (LMHCat (l:lms)) = typeofDst l
 typeofDst (LMBuild lm) = TypeVec (typeofDst lm)
 typeofDst (LMBuildT lm) = typeofDst lm
-typeofDst (LMVariant lms) = assertAllEqualRet "lmvariant/dst" (map typeofDst lms) 
+typeofDst (LMVariant lms) = assertAllEqualRet "lmvariant/dst" (map typeofDst lms)
 
 transpose :: TypeLM -> TypeLM
 transpose = \case
@@ -137,18 +137,18 @@ transpose = \case
     LMHCat lms      -> LMVCat (map transpose lms)
     LMBuild lm      -> LMBuildT lm
     LMBuildT lm     -> LMBuild lm
-    LMVariant lms   -> LMVariant (map transpose lms) 
-   
+    LMVariant lms   -> LMVariant (map transpose lms)
+
 typeofLMFun :: HasCallStack => String -> [Type] -> TypeLM
-typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty) 
+typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty)
                         (f, ty) of
   ("lmZero" , [s, t])   -> LMZero s t
   ("lmOne" ,  [t])      -> LMOne t
   ("lmScale", [t, TypeFloat]) -> LMScale t
   ("lmBuild", [TypeInteger, TypeLambda TypeInteger (TypeLM ty)]) -> LMBuild ty
   ("lmBuildT", [TypeInteger, TypeLambda TypeInteger (TypeLM ty)]) -> LMBuildT ty
-  ("lmVCat",  lms) -> LMVCat $ map getLM lms 
-  ("lmHCat",  lms) -> LMHCat $ map getLM lms 
+  ("lmVCat",  lms) -> LMVCat $ map getLM lms
+  ("lmHCat",  lms) -> LMHCat $ map getLM lms
   ("lmCompose", [TypeLM lm1, TypeLM lm2]) -> LMCompose lm1 lm2
   ("lmAdd",  [TypeLM lm1, TypeLM lm2]) -> LMAdd lm1 lm2
   _ ->
@@ -186,21 +186,21 @@ anf = \case
     anfArgs <- mapM letAnf ts
     return $ foldr (.) id (map fst anfArgs) $
            Tuple (map snd anfArgs)
-  
+
   Lam x ty e -> do
     anfe <- anf e
     return $ Lam x ty anfe
-  
+
   App f x -> do
     (letf, vf) <- letAnf f
     (letx, vx) <- letAnf x
     return $ letf $ letx $ App vf vx
-  
+
   Let x e body -> do
     anfe    <- anf e
     anfbody <- anf body
     return $ Let x anfe anfbody
-    
+
   If cond ift iff -> do
     anfcond <- anf cond
     anfift  <- anf ift
@@ -296,11 +296,11 @@ cgenExprR ex = case ex of
     ex -> do
       vf <- freshCVar
       (cgdecl, cgexpr) <- cgenExprR ex
-      
+
       return
         ( "/**Ex**/\n"
         ++    cgdecl
-        ++    "auto"--cgenType ty 
+        ++    "auto"--cgenType ty
         `spc` vf
         ++    " = "
         ++    cgenFun tf
@@ -347,7 +347,7 @@ cgenExprR ex = case ex of
     (cE, vE) <- cgenExprR body
     return
       ( "/**Lam**/"
-      ++ "auto" -- cgenType (TypeLambda tv (typeof body)) 
+      ++ "auto" -- cgenType (TypeLambda tv (typeof body))
       `spc` l
       ++    " = [=]("
       ++    cgenType tv

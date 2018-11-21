@@ -2,12 +2,12 @@
 
 module Annotate where
 
+import Lang
+import qualified Data.Map   as Map
+import Data.List( mapAccumL )
 import GHC.Stack
-import Debug.Trace                    ( trace )
+import Debug.Trace( trace )
 
-import qualified Data.Map                      as Map
-
-import           Lang
 
 dbtrace :: String -> a -> a
 dbtrace _ e = e -- trace msg e
@@ -18,7 +18,7 @@ annotDef :: Def -> (ST, TDef)
 annotDef = annotDefE stCreate
 
 annotDefs :: ST -> [Def] -> (ST, [TDef])
-annotDefs env defs = foldll annotDefE env defs
+annotDefs env defs = mapAccumL annotDefE env defs
 
 annotDefE :: ST -> Def -> (ST, TDef)
 annotDefE env (DefX f vars expr) =

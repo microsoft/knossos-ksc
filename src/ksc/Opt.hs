@@ -18,7 +18,7 @@ optDefs :: HasCallStack => ST -> [TDef] -> [TDef]
 optDefs env defs = map (optDef env) defs
 
 optDef :: HasCallStack => ST -> TDef -> TDef
-optDef env (DefX (TFun ty f) args r) = 
+optDef env (DefX (TFun ty f) args r) =
             DefX (TFun ty f) args $
             simplify env r
 
@@ -44,7 +44,7 @@ optE env e
     go (Assert e1 e2)      = Assert (go e1) (go e2)
     go (Let var rhs body)  = mkLet var (go rhs) (go body)
     go (If b t e)          = optIf (go b) (go t) (go e)
-    go (Call (TFun ty f) arg) = 
+    go (Call (TFun ty f) arg) =
                           case optCall (TFun ty f) opt_arg of
                             Nothing -> Call (TFun ty f) opt_arg
                             Just r  -> go r
@@ -80,22 +80,22 @@ optCall :: HasCallStack => TFun -> TExpr -> Maybe TExpr
 optCall fun (Let v r arg) =
   Just (Let v r (Call fun arg))
 
-optCall (TFun ty (LMFun "lmApply")) (Tuple [f,a]) = 
+optCall (TFun ty (LMFun "lmApply")) (Tuple [f,a]) =
   optApplyLM ty f a
 
-optCall (TFun _  (LMFun "lmApply")) other_args = 
+optCall (TFun _  (LMFun "lmApply")) other_args =
   error $ "lmApply to unexpected args " ++ (show other_args)
 
 optCall (TFun ty (Fun f)) arg =
   optFun ty f arg
 
 optCall (TFun (TypeLM s t) (LMFun lm)) arg =
-  optLM s t lm arg 
+  optLM s t lm arg
 
 optCall (TFun (TypeLM s t) (GradFun f Fwd)) arg =
   optGradFun s t f arg
-  
-optCall f _ = 
+
+optCall f _ =
   trace ("NOTE: Unmatched call {" ++ show f ++ "}") $
   Nothing
 
@@ -229,11 +229,11 @@ optGradFun s t (SFun "/") (Tuple [x,y])
 -- fst :: (a,b) -> a
 -- Dfst(x,y) :: (a,b) -o a
 optGradFun s t (SelFun i n) (Tuple es) = Just (lmHCat [ if i == j then lmOne t else lmZero (typeof (es!!(j-1))) t
-                                                       | j <- [1..n] ]) 
+                                                       | j <- [1..n] ])
 
 optGradFun s t (SFun "sum") e
   = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "si") TypeInteger (lmOne t)))
-   
+
 
 optGradFun s t (SFun "size") e
   = Just $ lmZero s t
@@ -318,7 +318,7 @@ optApplyLM ty e dx
   = trace ("Apply not optimized: " ++ (take 20 $ show $ ppr e) ++ "...") Nothing
 
 ------------------
-optApplyLMCall :: 
+optApplyLMCall ::
                 String -> TExpr   -- f args :: s -o t
              -> TExpr             -- :: S
              -> Maybe (TExpr)     -- :: T
@@ -376,7 +376,7 @@ optTrans e = error ("optTrans: " ++  show e)
 optTransCallLM :: Type -> Type -> String -> TExpr -> Maybe TExpr
 optTransCallLM s t "lmZero" e  = Just $ lmZero t s
 optTransCallLM s t "lmOne"  e  = Just $ lmOne t
-optTransCallLM s t "lmScale" (Tuple [t'',e]) = assertEqualThen "otc" t (typeof t'') $ 
+optTransCallLM s t "lmScale" (Tuple [t'',e]) = assertEqualThen "otc" t (typeof t'') $
                                                Just $ lmScale t e
 
 optTransCallLM s t "lmTranspose" e = Just e
@@ -408,9 +408,8 @@ test_opt =
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat
             f2 = kTFloat 2.0
-            l2 = lmScale TypeFloat f2 
-        in 
+            l2 = lmScale TypeFloat f2
+        in
             optE stCreate (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
             lmHCat [lmAdd l1 l2, lmScale TypeFloat (pAdd f2 f2)]
-

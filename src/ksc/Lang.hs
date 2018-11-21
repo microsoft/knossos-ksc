@@ -19,41 +19,14 @@ import qualified Data.Map as M
 import Debug.Trace( trace )
 import Test.Hspec
 
-foldll :: (a -> x -> (a,x')) -> a -> [x] -> (a,[x'])
-foldll f a0 xs = foldl (\(a,xs) x -> let (a',x') = f a x in (a', xs ++ [x'])) (a0,[]) xs
-
-
------- Debugging utilities ---------
-assertEqual msg t1 t2 =
-  assertEqualThen msg t1 t2 ()
-
-assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
-assertEqualThen msg t1 t2 e =
-  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
-
-assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
-assertAllEqualThen msg es e =
-  if allEq es then e else
-     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
-  where
-    allEq [] = True
-    allEq (a:as) = allEqa a as
-
-    allEqa a0 [] = True
-    allEqa a0 [a] = a0 == a
-    allEqa a0 (a:as) = a0 == a && allEqa a0 as
-
-assertAllEqualRet :: HasCallStack => Eq a => Show a => String -> [a] -> a
-assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
-
 ------ Data types ---------
 data Type = TypeZero               -- Polyamorous zero
-          | TypeBool 
-          | TypeInteger 
+          | TypeBool
+          | TypeInteger
           | TypeFloat
-          | TypeTuple [Type] 
+          | TypeTuple [Type]
           | TypeVec Type
-          | TypeLambda Type Type   -- Domain -> Range 
+          | TypeLambda Type Type   -- Domain -> Range
           | TypeLM Type Type       -- Linear map  Src -o Target
           | TypeUnknown
           deriving (Show, Eq, Ord)
@@ -170,7 +143,7 @@ instance TypeableFun Fun where
   typeofFun v arg = TypeUnknown
 
 instance TypeableFun TFun where
-  typeofFun (TFun ty f) argtype = ty 
+  typeofFun (TFun ty f) argtype = ty
 
 class Typeable b where
   typeof :: b -> Type
@@ -181,7 +154,7 @@ instance Typeable Var where
 instance Typeable (TVar b) where
   typeof (TVar ty _) = ty
 
-instance (Typeable b, TypeableFun f) => 
+instance (Typeable b, TypeableFun f) =>
          Typeable (ExprX f b) where
   typeof (Konst k) = typeofKonst k
   typeof (Var b) = typeof b
@@ -190,7 +163,7 @@ instance (Typeable b, TypeableFun f) =>
   typeof (Tuple es) = TypeTuple $ map typeof es
   typeof (Lam v tyv e) = TypeLambda tyv $ typeof e
   typeof (Let b e1 e2) = typeof e2
-  typeof (If c t f) = makeIfType (typeof t) (typeof f) 
+  typeof (If c t f) = makeIfType (typeof t) (typeof f)
   typeof (Assert c e) = typeof e
 
 -- ToDo:
@@ -379,7 +352,7 @@ cmpExpr e1 e2
      = case e2 of
          If {}     -> LT
          Assert {} -> LT
-         Let b2 r2 e2 -> 
+         Let b2 r2 e2 ->
                 go r1 subst r2 `thenCmp` go e1 (M.insert b2 b1 subst) e2
          _ -> GT
 
@@ -477,17 +450,17 @@ instance Pretty Konst where
   ppr KZero        = text "KZero"
 
 instance Pretty Type where
-  ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")" 
-  ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas tys PP.<> PP.text "))" 
-  ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")" 
-  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> PP.char ' ' PP.<> ppr t PP.<> PP.text ")" 
+  ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")"
+  ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas tys PP.<> PP.text "))"
+  ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")"
+  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> PP.char ' ' PP.<> ppr t PP.<> PP.text ")"
   ppr TypeZero = PP.text "zero_t"
   ppr TypeFloat = PP.text "Float"
   ppr TypeInteger = PP.text "Integer"
   ppr TypeBool = PP.text "Bool"
   ppr TypeUnknown = PP.text "UNKNOWN"
 
-  
+
 type Prec = Int
  -- 0 => no need for parens
  -- high => parenthesise everything
@@ -665,7 +638,7 @@ typeofFunTy env f (TypeTuple tys) = typeofFunTys env f tys
 typeofFunTy env f ty              = typeofFunTys env f [ty]
 
 typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
-typeofFunTys env tf tys = 
+typeofFunTys env tf tys =
   case (tf, tys) of
   (GradFun f Fwd, tys) -> TypeLM (mkTypeTuple tys) (typeofFunTys env (Fun f) tys)
   (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (mkTypeTuple tys)
@@ -705,3 +678,26 @@ typeofFunTys env tf tys =
                 ++ show tys
                 ++ ".    Env:\n"
                 ++ show env
+
+------ Debugging utilities ---------
+assertEqual msg t1 t2 =
+  assertEqualThen msg t1 t2 ()
+
+assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
+assertEqualThen msg t1 t2 e =
+  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
+
+assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
+assertAllEqualThen msg es e =
+  if allEq es then e else
+     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
+  where
+    allEq [] = True
+    allEq (a:as) = allEqa a as
+
+    allEqa a0 [] = True
+    allEqa a0 [a] = a0 == a
+    allEqa a0 (a:as) = a0 == a && allEqa a0 as
+
+assertAllEqualRet :: HasCallStack => Eq a => Show a => String -> [a] -> a
+assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
