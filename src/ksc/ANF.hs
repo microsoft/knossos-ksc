@@ -43,8 +43,8 @@ anfE (If b t e)     = do { t' <- anfExpr t
 anfE (App e1 e2)    = do { f <- anfE e1
                          ; a <- anfE1 e2
                          ; return (App f a) }
-anfE (Lam v ty e)      = do { e' <- anfExpr e
-                         ; return (Lam v ty e') }
+anfE (Lam v e)      = do { e' <- anfExpr e
+                         ; return (Lam v e') }
 anfE (Assert e1 e2) = do { e1' <- anfE e1
                          ; e2' <- anfExpr e2
                          ; return (Assert e1' e2') }

@@ -2,33 +2,37 @@
 
 module Annotate where
 
+import Lang
+import qualified Data.Map   as Map
+import Data.List( mapAccumL )
 import GHC.Stack
-import Debug.Trace                    ( trace )
+import Debug.Trace( trace )
 
-import qualified Data.Map                      as Map
-
-import           Lang
 
 dbtrace :: String -> a -> a
 dbtrace _ e = e -- trace msg e
 
 --------------------------
 
-annotDef :: Def -> (ST, TDef)
-annotDef = annotDefE stCreate
+annotDecls :: ST -> [Decl] -> (ST, [TDecl])
+annotDecls env defs = mapAccumL annotDeclX env defs
 
-annotDefs :: ST -> [Def] -> (ST, [TDef])
-annotDefs env defs = foldll annotDefE env defs
-
-annotDefE :: ST -> Def -> (ST, TDef)
-annotDefE env (DefX f vars expr) =
-  let _ = trace ("Def " ++ show f ++ "\n") ()
-      body_env = foldr addVarToEnv env vars
-      (ty,e) = annotExpr body_env expr
-  in  (stInsertFun f ty env, DefX (TFun ty f) vars e)
+annotDeclX :: ST -> Decl -> (ST, TDecl)
+annotDeclX env (DefDecl (DefX f vars expr))
+  = (stInsertFun f ty env, DefDecl (DefX (TFun ty f) vars e))
   where
-    addVarToEnv :: TVar Var -> ST -> ST
-    addVarToEnv (TVar ty v) = stInsert v ty
+    body_env = stBindParams env vars
+    (ty,e)    = annotExpr body_env expr
+
+annotDeclX env (RuleDecl (Rule { ru_name = name, ru_qvars = qvars
+                               , ru_lhs = lhs, ru_rhs = rhs }))
+  = assertEqualThen "Rule types" lhs_ty rhs_ty $
+    (env, RuleDecl (Rule { ru_name = name, ru_qvars = qvars
+                         , ru_lhs = lhs', ru_rhs = rhs' }))
+  where
+    body_env = stBindParams env qvars
+    (lhs_ty, lhs')    = annotExpr body_env lhs
+    (rhs_ty, rhs')    = annotExpr body_env rhs
 
 annotExpr :: ST -> Expr -> (Type, TExpr)
 annotExpr env = \case
@@ -58,10 +62,10 @@ annotExpr env = \case
     let (tys,aes) = unzip $ map (annotExpr env) es in
     (TypeTuple tys, Tuple aes)
 
-  Lam v tyv body ->
+  Lam tv@(TVar tyv v) body ->
     let body_env = stInsert v tyv env in
     let (tybody,abody) = annotExpr body_env body in
-    (TypeLambda tyv tybody, Lam (TVar tyv v) tyv abody)
+    (TypeLambda tyv tybody, Lam tv abody)
 
   If cond texpr fexpr ->
     let (tycond,acond) = annotExpr env cond
@@ -72,7 +76,7 @@ annotExpr env = \case
     (tytexpr, If acond atexpr afexpr)
 
   Assert cond body ->
-    let (tycond,acond) = annotExpr env cond 
+    let (tycond,acond) = annotExpr env cond
         (tybody,abody) = annotExpr env body in
     assertEqualThen "Assert" tycond TypeBool $
     (tybody, Assert acond abody)
@@ -95,7 +99,7 @@ stripAnnotExpr = \case
   Var (TVar _ v) -> Var v
   Call (TFun _ f) e -> Call f $ stripAnnotExpr e
   Tuple es -> Tuple $ map stripAnnotExpr es
-  Lam (TVar _ v) ty e -> Lam v ty $ stripAnnotExpr e
+  Lam tv e -> Lam tv $ stripAnnotExpr e
   App e1 e2 -> App (stripAnnotExpr e1) (stripAnnotExpr e2)
   Let (TVar _ v) e1 e2 -> Let v (stripAnnotExpr e1) (stripAnnotExpr e2)
   If c t f -> If (stripAnnotExpr c) (stripAnnotExpr t) (stripAnnotExpr f)

@@ -10,7 +10,7 @@ import Lang
 dummyVar :: Type -> TExpr
 dummyVar t = Var $ TVar t (Dummy)
 
--- Call to a LMFun, with given return type 
+-- Call to a LMFun, with given return type
 lm :: Type -> Type -> String -> [TExpr] -> TExpr
 lm (TypeTuple [s]) t name args = error $ "Tupled {" ++ name ++ "}"
 lm s t name args = mkTCall (TypeLM s t) (LMFun name) args
@@ -22,12 +22,12 @@ lmOne :: Type -> TExpr
 lmOne t = lm t t "lmOne" [dummyVar t]
 
 lmScale :: HasCallStack => Type -> TExpr -> TExpr
-lmScale t f = 
+lmScale t f =
   assertEqualThen "lmScale second arg should be TypeFloat" (typeof f) TypeFloat $
   lm t t "lmScale" [dummyVar t, f]
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
-lmAdd f g = 
+lmAdd f g =
   let (TypeLM s1 t1) = typeof f
       (TypeLM s2 t2) = typeof g in
   assertEqualThen "lmAdd s" s1 s2 $
@@ -39,48 +39,48 @@ lmAdds [x] = x
 lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
 lmCompose :: HasCallStack => TExpr -> TExpr -> TExpr
-lmCompose f g = 
+lmCompose f g =
   let (TypeLM t r) = typeof f
       (TypeLM s t1) = typeof g in
-  assertEqualThen ("lmCompose:\n\n" ++ pps f ++ "\n\n" ++ pps g) t t1 $ 
+  assertEqualThen ("lmCompose:\n\n" ++ pps f ++ "\n\n" ++ pps g) t t1 $
   lm s r "lmCompose" [f,g]
 
 lmVCat :: HasCallStack => [TExpr] -> TExpr
 lmVCat [e] = error "unexpected"
 lmVCat es =
-  let s = assertAllEqualRet "lmVCat" (map typeofLMs tys) 
+  let s = assertAllEqualRet "lmVCat" (map typeofLMs tys)
       t = TypeTuple $ map typeofLMt tys in
   lm s t "lmVCat" es
-  where 
+  where
     tys = map getLM $ map typeof $ es
 
-lmHCat :: HasCallStack => [TExpr] -> TExpr 
+lmHCat :: HasCallStack => [TExpr] -> TExpr
 lmHCat [e] = error "unexpected"
-lmHCat es = 
-  let t = assertAllEqualRet "lmHCat" (map typeofLMt tys) 
+lmHCat es =
+  let t = assertAllEqualRet "lmHCat" (map typeofLMt tys)
       s = TypeTuple $ map typeofLMs tys in
   lm s t "lmHCat" es
-  where 
+  where
     tys = map getLM $ map typeof $ es
 
-lmTranspose :: TExpr -> TExpr 
+lmTranspose :: TExpr -> TExpr
 lmTranspose m = lm t s "lmTranspose" [m]
   where (TypeLM s t) = typeof m
 
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
-lmApply m arg = 
+lmApply m arg =
   let (TypeLM s t) = typeof m in
-  assertEqualThen ("lmApply " ++ pps m ) s (typeof arg) $ 
+  assertEqualThen ("lmApply " ++ pps m ) s (typeof arg) $
   mkTCall t (LMFun "lmApply") [m, arg]
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuild n f = 
+lmBuild n f =
     case typeof f of
     TypeLambda TypeInteger (TypeLM s t) -> lm s (TypeVec t) "lmBuild" [n, f]
     ty -> error $ "uexpected " ++ show ty ++ "\n" ++ pps f
 
-lmBuildT :: TExpr -> TExpr -> TExpr 
-lmBuildT n f = 
+lmBuildT :: TExpr -> TExpr -> TExpr
+lmBuildT n f =
   case typeof f of
   TypeLambda TypeInteger (TypeLM s t) -> lm (TypeVec s) t "lmBuildT" [n, f]
   ty -> error $ "uexpected " ++ show ty ++ "\n" ++ pps f
@@ -97,7 +97,7 @@ isLMZero _ = False
 
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
-                    , lmBuildT (pSize v) (Lam ii TypeInteger (lmDelta t (Var ii) i)) ]
+                    , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
             where ii = TVar TypeInteger $ Simple "ii"
                   (TypeVec t) = typeof v
 
@@ -123,7 +123,7 @@ pDeltaVec sz ei e = mkTCall (TypeVec $ typeof e) (mkFun "deltaVec") [sz, ei, e]
 
 pDiag :: TExpr -> TExpr -> TExpr -> TExpr
 -- diag rows cols (\i. e) = build row (\i. deltaVec cols i e)
-pDiag rows cols d = 
+pDiag rows cols d =
   let (TypeLambda TypeInteger a) = typeof d in
   mkTCall (TypeVec (TypeVec a)) (mkFun "diag") [rows, cols, d]
 
@@ -142,8 +142,8 @@ pEqual a b = mkTCall2 TypeBool (mkFun "==") a b
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild n f =
   let (TypeLambda TypeInteger t) = typeof f in
-  mkTCall2 (TypeVec t) (mkFun "build") n f 
-            
+  mkTCall2 (TypeVec t) (mkFun "build") n f
+
 pIndex :: TExpr -> TExpr -> TExpr
 pIndex i e = mkTCall2 t (mkFun "index") i e where (TypeVec t) = typeof e
 
@@ -159,4 +159,3 @@ pSel i n e = Call (TFun (ts!!(i-1)) (Fun (SelFun i n))) e where (TypeTuple ts) =
 pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
 pSnd   = pSel 2 2
-

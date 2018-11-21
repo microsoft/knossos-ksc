@@ -1,17 +1,18 @@
-{-# LANGUAGE FlexibleInstances,LambdaCase #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase #-}
 
 module Lang where
 
 import Prelude hiding( (<>) )
 
 import Data.List ( intercalate )
-import qualified Data.Map                      as Map
-import Text.PrettyPrint as PP
+import qualified Data.Map as Map
+import Text.PrettyPrint   as PP
 import KMonad
 
 import Data.Functor.Identity
 import Data.Maybe
 import Data.Functor
+import Data.Either( partitionEithers )
 
 import System.Console.Haskeline
 
@@ -19,61 +20,53 @@ import qualified Data.Map as M
 import Debug.Trace( trace )
 import Test.Hspec
 
-foldll :: (a -> x -> (a,x')) -> a -> [x] -> (a,[x'])
-foldll f a0 xs = foldl (\(a,xs) x -> let (a',x') = f a x in (a', xs ++ [x'])) (a0,[]) xs
+-----------------------------------------------
+--  The main data types
+-----------------------------------------------
 
+data DeclX f b = RuleDecl (RuleX f b)
+               | DefDecl  (DefX f b)
 
------- Debugging utilities ---------
-assertEqual msg t1 t2 =
-  assertEqualThen msg t1 t2 ()
+type Decl  = DeclX Fun  Var
+type TDecl = DeclX TFun TVar
 
-assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
-assertEqualThen msg t1 t2 e =
-  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
+data DefX f b = DefX f [TVar] (ExprX f b)  -- f x = e
+              deriving( Show )
 
-assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
-assertAllEqualThen msg es e =
-  if allEq es then e else
-     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
-  where
-    allEq [] = True
-    allEq (a:as) = allEqa a as
+type Def  = DefX Fun Var
+type TDef = DefX TFun TVar
 
-    allEqa a0 [] = True
-    allEqa a0 [a] = a0 == a
-    allEqa a0 (a:as) = a0 == a && allEqa a0 as
+data ExprX f b
+  = Konst Konst
+  | Var b
+  | Call f (ExprX f b)      -- f e
+  | Tuple [ExprX f b]       -- (e1, ..., en)
+  | Lam TVar (ExprX f b)    -- Lambda-bound variable is typed from birth
+  | App (ExprX f b) (ExprX f b)
+  | Let b (ExprX f b) (ExprX f b)    -- let x = e1 in e2  (non-recursive)
+  | If (ExprX f b) (ExprX f b) (ExprX f b)  -- FIXME make cond ExprX?
+  | Assert (ExprX f b) (ExprX f b)
+  deriving( Show )
 
-assertAllEqualRet :: HasCallStack => Eq a => Show a => String -> [a] -> a
-assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
+type Expr  = ExprX Fun Var
+type TExpr = ExprX TFun TVar
 
------- Data types ---------
 data Type = TypeZero               -- Polyamorous zero
-          | TypeBool 
-          | TypeInteger 
+          | TypeBool
+          | TypeInteger
           | TypeFloat
-          | TypeTuple [Type] 
+          | TypeTuple [Type]
           | TypeVec Type
-          | TypeLambda Type Type   -- Domain -> Range 
+          | TypeLambda Type Type   -- Domain -> Range
           | TypeLM Type Type       -- Linear map  Src -o Target
           | TypeUnknown
           deriving (Show, Eq, Ord)
-
-data ADMode = Fwd | Rev
-            deriving( Eq, Ord, Show )
-
-flipMode :: ADMode -> ADMode
-flipMode Fwd = Rev
-flipMode Rev = Fwd
 
 data FunId = SelFun     -- Selector function: fst, snd etc
                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                Int      -- Arity
            | SFun String  -- For now
            deriving( Eq, Ord )
-
-instance Show FunId where
-  show (SFun s) = s
-  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
 
 data Fun = Fun     FunId         -- The function              f(x)
          | GradFun FunId ADMode  -- Full Jacobian Df(x)
@@ -83,19 +76,11 @@ data Fun = Fun     FunId         -- The function              f(x)
          | LMFun   String        -- Linear map
          deriving( Eq, Ord )
 
-instance Show Fun where
-  show (Fun s) = show s
-  show (GradFun s Fwd) = "D$" ++ show s
-  show (GradFun s Rev) = "R$" ++ show s
-  show (DrvFun  s Fwd) = "fwd$" ++ show s
-  show (DrvFun  s Rev) = "rev$" ++ show s
-  show (LMFun s) = "LM$" ++ s
+data ADMode = Fwd | Rev
+            deriving( Eq, Ord, Show )
 
-data TFun = TFun Type Fun
+data TFun = TFun Type Fun  -- Typed functions
   deriving (Eq, Ord)
-
-instance Show TFun where
-  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
 
 data Var
   = Dummy
@@ -106,30 +91,8 @@ data Var
                            --   True <=> transposed \bowtie x
   deriving( Eq, Ord )
 
-instance Show Var where
-  show v = case v of
-    Dummy -> "/*dummy*/"
-    Simple s -> "s$" ++ s
-    Delta  d -> "d$" ++ d
-    Grad g m ->
-      "g"
-      ++ (case m of
-            Fwd -> "f"
-            Rev -> "r")
-      ++ "$"
-      ++ g
-
-data TVar b = TVar Type b
+data TVar = TVar Type Var
   deriving( Show, Eq, Ord )
-
-class CmkVar b where
-  mkVar :: Type -> String -> b
-
-instance CmkVar Var where
-  mkVar ty s = Simple s
-
-instance CmkVar (TVar Var) where
-  mkVar ty s = TVar ty $ Simple s
 
 data Konst = KZero  -- Of any type
            | KInteger Integer
@@ -137,31 +100,46 @@ data Konst = KZero  -- Of any type
            | KBool    Bool
            deriving( Eq, Ord, Show )
 
+data RuleX f b = Rule { ru_name  :: String   -- Just for logging
+                      , ru_qvars :: [TVar]
+                      , ru_lhs   :: ExprX f b
+                      , ru_rhs   :: ExprX f b }
+  -- When matching may bind any of the ru_qvars, which are typed,
+  -- just like any other lambda-bound variable
+
+type Rule  = RuleX Fun Var
+type TRule = RuleX TFun TVar
+
+-----------------------------------------------
+--  Simple functions over these types
+-----------------------------------------------
+
+flipMode :: ADMode -> ADMode
+flipMode Fwd = Rev
+flipMode Rev = Fwd
+
 isKZero :: ExprX f b -> Bool
 isKZero (Konst KZero) = True
 isKZero _             = False
 
-data DefX f b = DefX f [TVar Var] (ExprX f b)  -- f x = e
-                    deriving( Eq, Ord, Show )
-type Def = DefX Fun Var
-type TDef = DefX TFun (TVar Var)
+partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
+partitionDecls decls
+  = partitionEithers $
+    map (\case { RuleDecl r -> Left r; DefDecl d -> Right d }) $
+    decls
 
-data ExprX f b
-  = Konst Konst
-  | Var b
-  | Call f (ExprX f b)      -- f e
-  | Tuple [ExprX f b]            -- (e1, ..., en)
-  | Lam b Type (ExprX f b)
-       -- ToDo: Simon says: what is this Type?
+-----------------------------------------------
+--  Finding the type of an expression
+-----------------------------------------------
 
-  | App (ExprX f b) (ExprX f b)
-  | Let b (ExprX f b) (ExprX f b)    -- let x = e1 in e2  (non-recursive)
-  | If (ExprX f b) (ExprX f b) (ExprX f b)  -- FIXME make cond ExprX?
-  | Assert (ExprX f b) (ExprX f b)
-  deriving( Show )
+class CmkVar b where
+  mkVar :: Type -> String -> b
 
-type Expr = ExprX Fun Var
-type TExpr = ExprX TFun (TVar Var)
+instance CmkVar Var where
+  mkVar ty s = Simple s
+
+instance CmkVar TVar where
+  mkVar ty s = TVar ty $ Simple s
 
 class TypeableFun f where
   typeofFun :: f -> Type -> Type
@@ -170,7 +148,7 @@ instance TypeableFun Fun where
   typeofFun v arg = TypeUnknown
 
 instance TypeableFun TFun where
-  typeofFun (TFun ty f) argtype = ty 
+  typeofFun (TFun ty f) argtype = ty
 
 class Typeable b where
   typeof :: b -> Type
@@ -178,19 +156,19 @@ class Typeable b where
 instance Typeable Var where
   typeof v = TypeUnknown
 
-instance Typeable (TVar b) where
+instance Typeable TVar where
   typeof (TVar ty _) = ty
 
-instance (Typeable b, TypeableFun f) => 
+instance (Typeable b, TypeableFun f) =>
          Typeable (ExprX f b) where
   typeof (Konst k) = typeofKonst k
   typeof (Var b) = typeof b
   typeof (Call f e) = typeofFun f (typeof e)
   typeof (App f e) = TypeUnknown
   typeof (Tuple es) = TypeTuple $ map typeof es
-  typeof (Lam v tyv e) = TypeLambda tyv $ typeof e
+  typeof (Lam (TVar tyv v) e) = TypeLambda tyv $ typeof e
   typeof (Let b e1 e2) = typeof e2
-  typeof (If c t f) = makeIfType (typeof t) (typeof f) 
+  typeof (If c t f) = makeIfType (typeof t) (typeof f)
   typeof (Assert c e) = typeof e
 
 -- ToDo:
@@ -219,8 +197,42 @@ typeofKonst (KInteger _) = TypeInteger
 typeofKonst (KFloat _) = TypeFloat
 typeofKonst (KBool _) = TypeBool
 
--- mkInfixCall :: Fun -> Expr -> Expr -> Expr
--- mkInfixCall f a b = Call f (Tuple [a, b])
+-----------------------------------------------
+--       Show instances
+-----------------------------------------------
+
+instance Show FunId where
+  show (SFun s) = s
+  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
+
+instance Show Fun where
+  show (Fun s) = show s
+  show (GradFun s Fwd) = "D$" ++ show s
+  show (GradFun s Rev) = "R$" ++ show s
+  show (DrvFun  s Fwd) = "fwd$" ++ show s
+  show (DrvFun  s Rev) = "rev$" ++ show s
+  show (LMFun s) = "LM$" ++ s
+
+instance Show TFun where
+  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
+
+instance Show Var where
+  show v = case v of
+    Dummy -> "/*dummy*/"
+    Simple s -> "s$" ++ s
+    Delta  d -> "d$" ++ d
+    Grad g m ->
+      "g"
+      ++ (case m of
+            Fwd -> "f"
+            Rev -> "r")
+      ++ "$"
+      ++ g
+
+
+-----------------------------------------------
+--       Building values
+-----------------------------------------------
 
 mkFun :: String -> Fun
 mkFun fname = Fun (SFun fname)
@@ -258,17 +270,17 @@ mkTCall2 ty f a b = mkTCall ty f [a, b]
 mkTCall3 :: Type -> Fun -> TExpr -> TExpr -> TExpr -> TExpr
 mkTCall3 ty f a b c = mkTCall ty f [a, b, c]
 
-mkLet :: HasCallStack => TVar Var -> TExpr -> TExpr -> TExpr
+mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
   = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs)
                     ty (typeof rhs) $
     Let (TVar ty v) rhs body
 
-mkLets :: HasCallStack => [(TVar Var,TExpr)] -> TExpr -> TExpr
+mkLets :: HasCallStack => [(TVar,TExpr)] -> TExpr -> TExpr
 mkLets [] e = e
 mkLets ((v,rhs):bs) e = mkLet v rhs (mkLets bs e)
 
-kInt :: Integer -> Expr
+kInt :: Integer -> ExprX f b
 kInt i = Konst (KInteger i)
 
 kTInt :: Integer -> TExpr
@@ -295,9 +307,11 @@ seqExpr (Expr ty e) = ty `seq` e
 -}
 
 
------- Substitution --------
+-----------------------------------------------
+--     Substitution
+-----------------------------------------------
 
-substE :: Ord b => M.Map b (ExprX f b) -> ExprX f b -> ExprX f b
+substE :: M.Map TVar TExpr -> TExpr -> TExpr
 substE subst (Konst k)      = Konst k
 substE subst (Var v)        = case M.lookup v subst of
                                Just e  -> e
@@ -307,29 +321,31 @@ substE subst (If b t e)     = If (substE subst b) (substE subst t) (substE subst
 substE subst (Tuple es)     = Tuple (map (substE subst) es)
 substE subst (App e1 e2)    = App (substE subst e1) (substE subst e2)
 substE subst (Assert e1 e2) = Assert (substE subst e1) (substE subst e2)
-substE subst (Lam v ty e)   = Lam v ty (substE (v `M.delete` subst) e)
+substE subst (Lam v e)      = Lam v (substE (v `M.delete` subst) e)
 substE subst (Let v r b)    = Let v (substE subst r) $
                               substE (v `M.delete` subst) b
 
------- Equality modulo alpha --------
+-----------------------------------------------
+--     Equality modulo alpha
+-----------------------------------------------
 
-instance (Ord f, Ord b) => Eq (ExprX f b) where
+instance Eq TExpr where
   e1 == e2 = case e1 `cmpExpr` e2 of
                EQ -> True
                _  -> False
 
-instance (Ord f, Ord b) => Ord (ExprX f b) where
+instance Ord TExpr where
   compare = cmpExpr
 
 thenCmp :: Ordering -> Ordering -> Ordering
 EQ `thenCmp` o = o
 o  `thenCmp` _ = o
 
-cmpExpr :: (Ord f, Ord b) => ExprX f b -> ExprX f b -> Ordering
+cmpExpr :: TExpr -> TExpr -> Ordering
 cmpExpr e1 e2
  = go e1 M.empty e2
  where
-   go :: (Ord f, Ord b) => ExprX f b -> M.Map b b -> ExprX f b -> Ordering
+   go :: TExpr -> M.Map TVar TVar -> TExpr -> Ordering
    go (Konst k1) subst e2
      = case e2 of
          Konst k2 -> k1 `compare` k2
@@ -356,13 +372,13 @@ cmpExpr e1 e2
          Tuple es2 -> gos es1 subst es2
          _        -> LT
 
-   go (Lam b1 _ e1) subst e2
+   go (Lam b1 e1) subst e2
       = case e2 of
-         Konst {} -> GT
-         Var {}   -> GT
-         Call {}  -> GT
-         Tuple es -> GT
-         Lam b2 _ e2 -> go e1 (M.insert b2 b1 subst) e2
+         Konst {}  -> GT
+         Var {}    -> GT
+         Call {}   -> GT
+         Tuple es  -> GT
+         Lam b2 e2 -> go e1 (M.insert b2 b1 subst) e2
          _         -> LT
 
    go (App e1a e1b) subst e2
@@ -379,7 +395,7 @@ cmpExpr e1 e2
      = case e2 of
          If {}     -> LT
          Assert {} -> LT
-         Let b2 r2 e2 -> 
+         Let b2 r2 e2 ->
                 go r1 subst r2 `thenCmp` go e1 (M.insert b2 b1 subst) e2
          _ -> GT
 
@@ -396,18 +412,21 @@ cmpExpr e1 e2
           Assert e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
           _              -> GT
 
-   gos :: (Ord f, Ord b) => [ExprX f b] -> M.Map b b -> [ExprX f b] -> Ordering
+   gos :: [TExpr] -> M.Map TVar TVar -> [TExpr] -> Ordering
    gos [] subst [] = EQ
    gos [] subst (_:_) = LT
    gos (_:_) subst [] = GT
    gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
 
 
---------------
-notFreeIn :: Eq b => b -> ExprX f b -> Bool
+-----------------------------------------------
+--     Free variables
+-----------------------------------------------
+
+notFreeIn :: TVar -> TExpr -> Bool
 notFreeIn v e = go v e
  where
-   go:: Eq b => b -> ExprX f b -> Bool
+   go:: TVar -> TExpr -> Bool
    go v (Var v2) = v /= v2
    go v (Konst _) = True
    go v (Tuple es) = all (go v) es
@@ -415,12 +434,12 @@ notFreeIn v e = go v e
    go v (Call _ e) = go v e
    go v (App f a)  = go v f && go v a
    go v (Let v2 r b) = go v r && (v == v2 || go v b)
-   go v (Lam v2 _ e)   = v == v2 || go v e
+   go v (Lam v2 e)   = v == v2 || go v e
    go v (Assert e1 e2) = go v e1 && go v e2
 
 -----------------
 
-newVarNotIn :: (CmkVar b, Eq b, Show b) => Type -> ExprX f b -> b
+newVarNotIn :: Type -> TExpr -> TVar
 newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
   where go ty e n =
           let v = mkVar ty ("_t" ++ show n) in
@@ -432,29 +451,36 @@ newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
 
 test_FreeIn =
   hspec $ do
-    let var s = Var (Simple s)
-    let e = mkSCall1 "f" (var "i")
-    let e2 = mkSCall2 "f" (var "_t1") (kInt 5)
+    let var :: String -> TVar
+        var s = TVar TypeFloat (Simple s)
+        fun :: String -> TFun
+        fun s = TFun TypeFloat (mkFun s)
+        e  = Call (fun "f") (Var (var "i"))
+        e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
     describe "notFreeIn" $ do
-      it ("i notFreeIn " ++ show (ppr (e::Expr))) $
-        (Simple "i" `notFreeIn` e) `shouldBe` False
-      it ("x not notFreeIn " ++ show (ppr (e::Expr))) $
-        (Simple "x" `notFreeIn` e) `shouldBe` True
+      it ("i notFreeIn " ++ show (ppr (e::TExpr))) $
+        (var "i" `notFreeIn` e) `shouldBe` False
+      it ("x not notFreeIn " ++ show (ppr (e::TExpr))) $
+        (var "x" `notFreeIn` e) `shouldBe` True
     describe "newVarNotIn" $ do
       it "not in, so new var is _t1..." $
-        newVarNotIn TypeFloat e `shouldBe` (Simple "_t1")
+        newVarNotIn TypeFloat e `shouldBe` (var "_t1")
       it "in, so new var is _t2..." $
-        newVarNotIn TypeFloat e2 `shouldBe` (Simple "_t2")
+        newVarNotIn TypeFloat e2 `shouldBe` (var "_t2")
 
------- Pretty printer ------
+-----------------------------------------------
+--     Pretty printer
+-----------------------------------------------
+
 class Pretty p where
-  ppr :: p -> Doc
+  ppr     :: p -> Doc
+  ppr = pprPrec precZero
+
+  pprPrec :: Prec -> p -> Doc
+  pprPrec _ = ppr
 
 instance Pretty Var where
   ppr v   = PP.text $ show v
-
-instance Pretty b => Pretty (TVar b) where
-  ppr (TVar ty v)  = parens (ppr v PP.<> PP.text " : " PP.<> ppr ty)
 
 instance Pretty FunId where
   ppr (SFun s)     = PP.text s
@@ -468,8 +494,11 @@ instance Pretty Fun where
   ppr (DrvFun s Rev)  = ppr s PP.<> PP.char '`'
   ppr (LMFun s)   = PP.text s
 
+instance Pretty TVar where
+  pprPrec p (TVar ty v) = ppr v  -- Don't print the type at every occurrence
+
 instance Pretty TFun where
-  ppr (TFun ty f) = parens (ppr f PP.<> PP.text " : " PP.<> ppr ty)
+  ppr (TFun ty f) = ppr f
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
@@ -477,17 +506,17 @@ instance Pretty Konst where
   ppr KZero        = text "KZero"
 
 instance Pretty Type where
-  ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")" 
-  ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas tys PP.<> PP.text "))" 
-  ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")" 
-  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> PP.char ' ' PP.<> ppr t PP.<> PP.text ")" 
+  ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")"
+  ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas ppr tys PP.<> PP.text "))"
+  ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")"
+  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> PP.char ' ' PP.<> ppr t PP.<> PP.text ")"
   ppr TypeZero = PP.text "zero_t"
   ppr TypeFloat = PP.text "Float"
   ppr TypeInteger = PP.text "Integer"
   ppr TypeBool = PP.text "Bool"
   ppr TypeUnknown = PP.text "UNKNOWN"
 
-  
+
 type Prec = Int
  -- 0 => no need for parens
  -- high => parenthesise everything
@@ -504,13 +533,17 @@ pprParendExpr :: (HasInfix f, Pretty f, Pretty b) =>
                 ExprX f b -> Doc
 pprParendExpr = pprExpr precTwo
 
+pprTVar :: TVar -> Doc
+pprTVar (TVar ty v) = ppr v <> PP.text ":" <> ppr ty
+
 pprExpr :: (HasInfix f, Pretty f, Pretty b) => Prec -> ExprX f b -> Doc
 pprExpr _  (Var v)   = ppr v
 pprExpr _ (Konst k)  = ppr k
 pprExpr p (Call f e) = pprCall p f e
-pprExpr _ (Tuple es) = parens (pprWithCommas es)
-pprExpr p (Lam v ty e)  = parensIf p precZero $
-                      PP.text "(lam (" <> ppr v <> PP.text " : " <> ppr ty <> text ") " <+> ppr e <> PP.char ')'
+pprExpr _ (Tuple es) = parens (pprWithCommas ppr es)
+pprExpr p (Lam v e)
+  = parensIf p precZero $
+    PP.text "lam" <+> parens (pprTVar v) <+> ppr e
 pprExpr p (Let v e1 e2)
   = parensIf p precZero $
     PP.vcat [ PP.text "let" PP.<+>
@@ -540,7 +573,7 @@ pprCall prec f (Tuple [e1,e2])
 pprCall _ f e = PP.cat [ppr f, nest 2 (parensSp pp_args)]
   where
     pp_args = case e of
-                (Tuple es) -> pprWithCommas es
+                (Tuple es) -> pprWithCommas ppr es
                 _        -> ppr e
 
 class HasInfix f where
@@ -569,12 +602,22 @@ parensIf ctxt inner doc
 --            , PP.text "then" PP.<+> ppr p b
 --            , PP.text "else" PP.<+> ppr p c ]
 
+instance (Pretty f, Pretty b, HasInfix f) => Pretty (DeclX f b) where
+  ppr (DefDecl d)  = ppr d
+  ppr (RuleDecl r) = ppr r
+
 instance (Pretty f, Pretty b, HasInfix f) => Pretty (DefX f b) where
   ppr (DefX f vs rhs)
     = PP.sep [ PP.text "def" PP.<+> ppr f
-                 PP.<> parens (pprWithCommas vs)
+                 PP.<> parens (pprWithCommas pprTVar vs)
              , PP.nest 2 (PP.text "=" PP.<+> ppr rhs) ]
 
+instance (Pretty f, Pretty b, HasInfix f) => Pretty (RuleX f b) where
+  ppr (Rule { ru_name = name, ru_qvars = qvars
+            , ru_lhs = lhs, ru_rhs = rhs })
+    = PP.sep [ PP.text "rule" PP.<+> PP.doubleQuotes (text name)
+                 PP.<+> parens (pprWithCommas pprTVar qvars)
+             , PP.nest 2 (PP.sep [ ppr lhs, PP.nest 2 (PP.text "=" PP.<+> ppr rhs)]) ]
 
 display :: Pretty p => p -> KM ()
 display p = liftIO $ putStrLn (PP.render (ppr p))
@@ -592,15 +635,15 @@ bracesSp d = PP.char '{' PP.<+> d PP.<+> PP.char '}'
 parensSp :: Doc -> Doc
 parensSp d = PP.char '(' PP.<+> d PP.<+> PP.char ')'
 
-pprWithCommas :: Pretty p => [p] -> Doc
-pprWithCommas ps = PP.sep (add_commas ps)
+pprWithCommas :: (p -> Doc) -> [p] -> Doc
+pprWithCommas ppr ps = PP.sep (add_commas ps)
   where
      add_commas []     = []
      add_commas [p]    = [ppr p]
      add_commas (p:ps) = ppr p PP.<> PP.comma : add_commas ps
 
 instance Pretty a => Pretty [a] where
-  ppr xs = PP.char '[' <> pprWithCommas xs <> PP.char ']'
+  ppr xs = PP.char '[' <> pprWithCommas ppr xs <> PP.char ']'
 
 pprTrace :: String -> Doc -> a -> a
 pprTrace str doc v
@@ -625,15 +668,24 @@ test_Pretty =
       test e "g( s$i )"
       test e2 "f( g( s$i ), s$_t1, 5 )"
 
------------------- ST (SymTab) ------------------
+-----------------------------------------------
+--     Symbol table, ST, maps variables to types
+-----------------------------------------------
 
 type ST = Map.Map Var Type
 
 sttrace :: String -> a -> a
 sttrace _ e = e -- trace msg e
 
-stCreate :: ST
-stCreate = Map.empty
+emptyST :: ST
+emptyST = Map.empty
+
+stBindParams :: ST -> [TVar] -> ST
+stBindParams st params
+  = foldl add st params
+  where
+    add :: ST -> TVar -> ST
+    add env (TVar ty v) = stInsert v ty env
 
 stInsert :: Var -> Type -> ST -> ST
 stInsert v ty env = sttrace
@@ -642,6 +694,7 @@ stInsert v ty env = sttrace
 
 stInsertFun :: Fun -> Type -> ST -> ST
 stInsertFun f = stInsert (Simple $ show f)
+  -- Simon says: bizarre
 
 stLookup :: HasCallStack => String -> Var -> ST -> Type
 stLookup msg v env = case Map.lookup v env of
@@ -665,7 +718,7 @@ typeofFunTy env f (TypeTuple tys) = typeofFunTys env f tys
 typeofFunTy env f ty              = typeofFunTys env f [ty]
 
 typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
-typeofFunTys env tf tys = 
+typeofFunTys env tf tys =
   case (tf, tys) of
   (GradFun f Fwd, tys) -> TypeLM (mkTypeTuple tys) (typeofFunTys env (Fun f) tys)
   (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (mkTypeTuple tys)
@@ -685,6 +738,7 @@ typeofFunTys env tf tys =
   (Fun (SFun "/"    )    , [t1, t2]                     ) -> t1
   (Fun (SFun "*"    )    , [t1, t2]                     ) -> t1
   (Fun (SFun "-"    )    , [t1, t2]                     ) -> t1
+  (Fun (SFun "square")   , [t1]                         ) -> t1
 
   (Fun (SFun "=="   )    , _                            ) -> TypeBool
   (Fun (SFun "!="   )    , _                            ) -> TypeBool
@@ -705,3 +759,29 @@ typeofFunTys env tf tys =
                 ++ show tys
                 ++ ".    Env:\n"
                 ++ show env
+
+-----------------------------------------------
+--     Debugging utilities
+-----------------------------------------------
+
+assertEqual msg t1 t2 =
+  assertEqualThen msg t1 t2 ()
+
+assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
+assertEqualThen msg t1 t2 e =
+  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
+
+assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
+assertAllEqualThen msg es e =
+  if allEq es then e else
+     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
+  where
+    allEq [] = True
+    allEq (a:as) = allEqa a as
+
+    allEqa a0 [] = True
+    allEqa a0 [a] = a0 == a
+    allEqa a0 (a:as) = a0 == a && allEqa a0 as
+
+assertAllEqualRet :: HasCallStack => Eq a => Show a => String -> [a] -> a
+assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e

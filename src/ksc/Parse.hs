@@ -4,6 +4,10 @@ module Parse  where
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Here's the BNF for our language:
 
+<decl> ::= <def> | <rule>
+
+<rule> ::= ( rule <string> <params> <expr> <expr> )
+
 <def> ::= ( def <var> <params> <expr> )
 
 <expr> ::= <atom> | ( <kexpr> )
@@ -95,12 +99,12 @@ runParserOrPanic p s = case runParser p s of
                         Left err -> error $ show err
                         Right r -> r
 
-parseF :: String -> IO [Def]
+parseF :: String -> IO [Decl]
 parseF file = do
         cts <- readFile file
-        case runParser pDefs cts of
-                    Left err   -> error ("Failed parse: " ++ show err)
-                    Right defs -> return defs
+        case runParser pDecls cts of
+                    Left err    -> error ("Failed parse: " ++ show err)
+                    Right decls -> return decls
 
 ------- Parser -------
 langDef :: Tok.LanguageDef ()
@@ -116,7 +120,7 @@ langDef = Tok.LanguageDef
   , Tok.identLetter     = alphaNum <|> oneOf "_':!#$%&*+./<=>?@\\^|-~"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
-  , Tok.reservedNames   = [ "def", "let", "if", "assert", "call", "tuple", ":" ]
+  , Tok.reservedNames   = [ "def", "rule", "let", "if", "assert", "call", "tuple", ":" ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -136,19 +140,25 @@ pInteger = Tok.integer lexer
 pDouble :: Parser Double
 pDouble = Tok.float lexer
 
+pString :: Parser String
+pString = Tok.stringLiteral lexer
+
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
 pVar :: Parser Var
-pVar = Simple <$> pIdentifier 
+pVar = Simple <$> pIdentifier
 
-pParam :: Parser (TVar Var)
-pParam = parens (do {
-                    v <- pVar;
-                    pReserved ":";
-                    ty <- pType;
-                    return (TVar ty v)
-         })
+pParam :: Parser TVar
+pParam = do { v <- pVar
+            ; pReserved ":"
+            ; ty <- pType
+            ; return (TVar ty v) }
+
+pParams :: Parser [TVar]
+pParams = parens $ do { b <- pParam
+                      ; return [b] }
+               <|> many (parens pParam)
 
 pKonst :: Parser (ExprX Fun Var)
 pKonst =   try (( Konst . KFloat) <$> pDouble)
@@ -176,7 +186,7 @@ pType = do {
           "Integer" -> return TypeInteger
           "Float" -> return TypeFloat
           "Vec" -> TypeVec <$> pType
-          "Tuple" -> TypeTuple <$> parens (many pType) 
+          "Tuple" -> TypeTuple <$> parens (many pType)
           _ -> error $ "Unknown type [" ++ id ++ "]"
         }
 
@@ -214,9 +224,9 @@ pTuple = do { pReserved "tuple"
 pLam :: Parser (ExprX Fun Var)
 -- (lam i e)
 pLam = do { pReserved "lam"
-          ; (TVar ty v) <- pParam
+          ; TVar ty v <- parens pParam
           ; e <- pExpr
-          ; return $ Lam v ty e }
+          ; return $ Lam (TVar ty v) e }
 
 pBind :: Parser (Var, ExprX Fun Var)
 -- var rhs
@@ -235,14 +245,27 @@ pLet = do { pReserved "let"
 
 pDef :: Parser (Def)
 -- (def f (x1 x2 x3) rhs)
-pDef = parens $ do { pReserved "def"
-                   ; f <- pIdentifier
-                   ; xs <- parens (many pParam)
-                   ; rhs <- pExpr
-                   ; return (DefX (mkFun f) xs rhs) }
+pDef = do { pReserved "def"
+          ; f <- pIdentifier
+          ; xs <- pParams
+          ; rhs <- pExpr
+          ; return (DefX (mkFun f) xs rhs) }
 
-pDefs :: Parser [Def]
-pDefs = spaces >> many pDef
+pRule :: Parser Rule
+pRule = do { pReserved "rule"
+           ; name <- pString
+           ; qvars <- pParams
+           ; lhs <- pExpr
+           ; rhs <- pExpr
+           ; return (Rule { ru_name = name, ru_qvars = qvars
+                          , ru_lhs = lhs, ru_rhs = rhs }) }
+
+pDecl :: Parser Decl
+pDecl = parens ( (DefDecl  <$> pDef)
+                 <|>  (RuleDecl <$> pRule ))
+
+pDecls :: Parser [Decl]
+pDecls = spaces >> many pDecl
 
 
 ---------------------- Tests ------------------
@@ -252,6 +275,7 @@ toStr p s = case runParser p s of
                    Left err -> error ("Failed: " ++ show err)
                    Right r  -> show (PP.render (ppr r))
 
+{-
 test_Parser =
   hspec $ do
     describe "Parser" $ do
@@ -261,3 +285,4 @@ test_Parser =
       test pDef "(def f ((x : Integer)) (lam (y : Float) (+ x y)))" $
                 "def f((x : Integer)) = (lam (y : Float)  x + y)" ;
   where test p src expected = it src $ (toStr p src) `shouldBe` (show expected)
+-}

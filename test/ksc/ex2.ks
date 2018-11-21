@@ -1,0 +1,6 @@
+(def f2a (x : Float)
+     (let ((zt (let (y1 (* x x))
+                   (tuple y1 (+ x y1))))
+           (y2 (fst zt))
+           (z  (snd zt)))
+     (* y2 z)))

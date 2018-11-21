@@ -14,7 +14,7 @@ main = do
     putStrLn $ pps d
     let (env,ad) = annotDef d
     putStrLn $ pps ad
-    let dd = applyD $ gradDef stCreate $ ad
+    let dd = applyD $ gradDef emptyST $ ad
     putStrLn $ pps dd
     let oo = optDef env dd
     putStrLn $ pps $ stripAnnot oo

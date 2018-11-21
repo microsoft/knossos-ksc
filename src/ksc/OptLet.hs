@@ -13,10 +13,10 @@ optLets = optLetsE . occAnal
 -- Dead code elimination - occurrence analysis
 ----------------------
 
-occAnal :: TExpr -> ExprX TFun (Int,TVar Var)
+occAnal :: TExpr -> ExprX TFun (Int,TVar)
 occAnal e = fst (occAnalE e)
 
-occAnalE :: TExpr -> (ExprX TFun (Int,TVar Var), M.Map (TVar Var) Int)
+occAnalE :: TExpr -> (ExprX TFun (Int,TVar), M.Map TVar Int)
 occAnalE (Var v)   = (Var (1,v), M.singleton v 1)
 occAnalE (Konst k) = (Konst k, M.empty)
 occAnalE (App e1 e2)
@@ -31,8 +31,8 @@ occAnalE (Assert e1 e2)
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
-occAnalE (Lam v ty e)
-  = (Lam (n,v) ty e', v `M.delete` vs)
+occAnalE (Lam v e)
+  = (Lam v e', v `M.delete` vs)
   where
     (e', vs) = occAnalE e
     n = case v `M.lookup` vs of
@@ -72,10 +72,10 @@ unions = foldr union M.empty
 -------------------------
 -- Substitute trivials
 -------------------------
-optLetsE :: ExprX TFun (Int,TVar Var) -> TExpr
+optLetsE :: ExprX TFun (Int,TVar) -> TExpr
 optLetsE e = go M.empty e
   where
-    go :: M.Map (TVar Var) TExpr -> ExprX TFun (Int,TVar Var) -> TExpr
+    go :: M.Map TVar TExpr -> ExprX TFun (Int,TVar) -> TExpr
     go subst (Let (n,TVar ty v) r b)
       | inline_me n v r' = go (M.insert (TVar ty v) r' subst) b
       | otherwise        = Let (TVar ty v) r' (go subst b)
@@ -93,7 +93,7 @@ optLetsE e = go M.empty e
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
     go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
-    go subst (Lam (_,v) ty e)  = Lam v ty (go (v `M.delete` subst) e)
+    go subst (Lam v e)      = Lam v (go (v `M.delete` subst) e)
 
 inline_me :: Int -> Var -> TExpr -> Bool
 inline_me n bndr rhs
