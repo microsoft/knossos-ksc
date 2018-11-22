@@ -495,8 +495,9 @@ instance Pretty Fun where
   ppr (LMFun s)   = PP.text s
 
 instance Pretty TVar where
-  pprPrec p (TVar ty v) = ppr v  -- Don't print the type at every occurrence
-
+  pprPrec p (TVar ty Dummy) = ppr ty -- For dummy vars, print the type
+  pprPrec p (TVar ty v) = ppr v
+  
 instance Pretty TFun where
   ppr (TFun ty f) = ppr f
 

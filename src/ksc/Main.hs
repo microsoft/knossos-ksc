@@ -287,7 +287,7 @@ doall file =
 
   ;  let ann2 =  cse ++ main
   ;  banner "all"
-  ;  dd ann2
+  ;  displayN ann2
 
   --;  liftIO (cppF ("obj\\" ++ file) ann2)
   }
