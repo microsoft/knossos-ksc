@@ -12,7 +12,9 @@ Here's the BNF for our language:
 
 <expr> ::= <atom> | ( <kexpr> )
 
-<param> ::= <var> | (<var> ":" <type>)
+<params> ::= <param> | ( <param1> ... <param>n )
+
+<param>  ::= ( <var> ":" <type> )
 
 <type> ::= "Integer" | "Float" | "Vec" <type> | "Tuple" (<types>)
 

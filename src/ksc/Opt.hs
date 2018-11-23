@@ -37,20 +37,23 @@ optE env@(rb,_) e
     go :: TExpr -> TExpr
     go e | Just e' <- tryRules rb e = go e'
 
-    go (Tuple es)          = Tuple (map go es)
-    go (Var v)             = Var v
-    go (Konst k)           = Konst k
-    go (Lam v e)           = Lam v (go e)
-    go (App e1 e2)         = optApp env (go e1) (go e2)
-    go (Assert e1 e2)      = Assert (go e1) (go e2)
-    go (Let var rhs body)  = mkLet var (go rhs) (go body)
-    go (If b t e)          = optIf (go b) (go t) (go e)
-    go (Call (TFun ty f) arg) =
-                          case optCall (TFun ty f) opt_arg of
-                            Nothing -> Call (TFun ty f) opt_arg
-                            Just r  -> go r
-                          where
-                            opt_arg = go arg
+    go (Tuple es)         = Tuple (map go es)
+    go (Var v)            = Var v
+    go (Konst k)          = Konst k
+    go (Lam v e)          = Lam v (go e)
+    go (App e1 e2)        = optApp env (go e1) (go e2)
+    go (Assert e1 e2)     = Assert (go e1) (go e2)
+    go (Let var rhs body) = mkLet var (go rhs) (go body)
+    go (If b t e)         = optIf (go b) (go t) (go e)
+    go (Call f arg)       = optCall env f (go arg)
+
+--------------
+optCall :: OptEnv -> TFun -> TExpr -> TExpr
+optCall env fun opt_arg
+  | Just new_e <- rewriteCall fun opt_arg
+  = optE env new_e
+  | otherwise
+  = Call fun opt_arg
 
 --------------
 optApp :: OptEnv -> TExpr -> TExpr -> TExpr
@@ -70,35 +73,35 @@ optIf e_cond e_then e_else
 optIf b                     t e = If b t e
 
 --------------
--- 'optCall' performs one rewrite, returning (Just e) if
+-- 'rewriteCall' performs one rewrite, returning (Just e) if
 -- it succeeds in rewriting, and Nothing if not
 --
 -- The same goes for optFun, optGradFun, etc
 
-optCall :: HasCallStack => TFun -> TExpr -> Maybe TExpr
+rewriteCall :: HasCallStack => TFun -> TExpr -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
-optCall fun (Let v r arg) =
-  Just (Let v r (Call fun arg))
+rewriteCall fun (Let v r arg)
+  = Just (Let v r (Call fun arg))
 
-optCall (TFun ty (LMFun "lmApply")) (Tuple [f,a]) =
-  optApplyLM ty f a
+rewriteCall (TFun ty (LMFun "lmApply")) (Tuple [f,a])
+  = optApplyLM ty f a
 
-optCall (TFun _  (LMFun "lmApply")) other_args =
-  error $ "lmApply to unexpected args " ++ (show other_args)
+rewriteCall (TFun _  (LMFun "lmApply")) other_args
+  = error $ "lmApply to unexpected args " ++ (show other_args)
 
-optCall (TFun ty (Fun f)) arg =
-  optFun ty f arg
+rewriteCall (TFun ty (Fun f)) arg
+  = optFun ty f arg
 
-optCall (TFun (TypeLM s t) (LMFun lm)) arg =
-  optLM s t lm arg
+rewriteCall (TFun (TypeLM s t) (LMFun lm)) arg
+  = optLM s t lm arg
 
-optCall (TFun (TypeLM s t) (GradFun f Fwd)) arg =
-  optGradFun s t f arg
+rewriteCall (TFun (TypeLM s t) (GradFun f Fwd)) arg
+  = optGradFun s t f arg
 
-optCall f _ =
-  trace ("NOTE: Unmatched call {" ++ show f ++ "}") $
-  Nothing
+rewriteCall f _
+  = trace ("NOTE: Unmatched call {" ++ show f ++ "}") $
+    Nothing
 
 -----------------------
 optFun :: Type -> FunId -> TExpr -> Maybe TExpr

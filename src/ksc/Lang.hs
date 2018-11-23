@@ -79,8 +79,8 @@ data Fun = Fun     FunId         -- The function              f(x)
 data ADMode = Fwd | Rev
             deriving( Eq, Ord, Show )
 
-data TFun = TFun Type Fun  -- Typed functions
-  deriving (Eq, Ord)
+data TFun = TFun Type Fun  -- Typed functions.  These are used at
+  deriving (Eq, Ord)       -- /occurrence/ sites only, not binding site
 
 data Var
   = Dummy
@@ -123,6 +123,7 @@ isKZero (Konst KZero) = True
 isKZero _             = False
 
 partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
+-- Separate the Rules from the Defs
 partitionDecls decls
   = partitionEithers $
     map (\case { RuleDecl r -> Left r; DefDecl d -> Right d }) $
@@ -497,7 +498,7 @@ instance Pretty Fun where
 instance Pretty TVar where
   pprPrec p (TVar ty Dummy) = ppr ty -- For dummy vars, print the type
   pprPrec p (TVar ty v) = ppr v
-  
+
 instance Pretty TFun where
   ppr (TFun ty f) = ppr f
 
