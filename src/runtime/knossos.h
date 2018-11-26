@@ -1,13 +1,14 @@
 // C++ "runtime" for Knossos
 
+#include <type_traits>
+#include <variant>
 #include <tuple>
-#include <functional>
 #include <set>
+#include <functional>
 #include <sstream>
 #include <iostream>
 #include <cmath>
 #include <string>
-#include <variant>
 
 using std::get;
 using std::make_tuple;
@@ -75,6 +76,11 @@ namespace ks
 	// ===============================  Zero  ==================================
 	struct zero_t
 	{
+		template <typename T>
+		zero_t(T) { }
+		
+		zero_t() { }
+
 		// These need to be explicit.  To get a zero of type T, use T { zero_t {} }
 		explicit operator double() { return 0.0; }
 		explicit operator int() { return 0; }
@@ -424,6 +430,13 @@ namespace ks
 		return ret;
 	}
 
+	// Scale a vec
+	template <class T>
+	vec<T> operator*(double val, vec<T> const& v)
+	{
+		return v * val;
+	}
+
 	// sum of elements
 	template <class T>
 	T sum(vec<T> const& v)
@@ -521,15 +534,15 @@ namespace ks
 			return t * val;
 		}
 
-		template <class T>
+		template <class T, class scale_t = double>
 		struct Scale
 		{
-			double val;
+			scale_t val;
 
 			typedef T To;
 			typedef T From;
 
-			static Scale mk(To, double val) { return Scale{ val }; }
+			static Scale mk(To, scale_t val) { return Scale{ val }; }
 
 			To Apply(From f) const { return To{ Scale_aux(f, val) }; }
 		};
@@ -811,26 +824,28 @@ namespace ks
 
 
 		// ---------------- Build ------------------
-		template <typename L>
+		template <typename Functor>
 		struct Build
 		{
+			typedef typename std::invoke_result<Functor, size_t>::type L;
+
 			typedef typename L::To LTo;
 
 			typedef typename L::From From;
 			typedef vec<LTo> To;
 
 			size_t n;
-			std::function<L(size_t)> f;
+			Functor/*std::function<L(size_t)>*/ f;
 
-			template <class Functor>
-			static Build mk(size_t n, Functor f) { 
+			template <class Functor2>
+			static Build mk(size_t n, Functor2 f) { 
 				ASSERT(n != 0);
 				return Build{ n, f }; 
 			}
 
 			To Apply(From x) const 
 			{ 
-				std::function<L(size_t)> f1 = f;
+				Functor/*std::function<L(size_t)>*/ f1 = f;
 				return build<LTo>(n, [x,f1](size_t i) {
 													 auto lm = f1(i);
 													 return lmApply(lm, x);
@@ -847,16 +862,18 @@ namespace ks
 		}
 
 		// ---------------- BuildT ------------------
-		template <typename L>
+		template <typename Functor>
 		struct BuildT
 		{
+			typedef typename std::invoke_result<Functor, size_t>::type L;
+
 			typedef typename L::From LFrom;
 
 			typedef vec<typename L::From> From;
 			typedef typename L::To To;
 
 			size_t n;
-			std::function<L(size_t)> f;
+			Functor /*std::function<L(size_t)>*/ f;
 
 			BuildT() : n{ 0 }
 			{
@@ -877,8 +894,8 @@ namespace ks
 				return *this;
 			}
 
-			template <class Functor>
-			BuildT(size_t n, Functor f) :
+			template <class Functor2>
+			BuildT(size_t n, Functor2 f) :
 				n(n),
 				f(f)
 			{
@@ -892,8 +909,8 @@ namespace ks
 				//std::cerr << std::string(3+ --indent, '.') << "[~build " << this << "]\n";
 			}
 
-			template <class Functor>
-			static BuildT mk(size_t n, Functor f) { return BuildT{ n, f }; }
+			template <class Functor2>
+			static BuildT mk(size_t n, Functor2 f) { return BuildT{ n, f }; }
 
 			To Apply(From x) const
 			{

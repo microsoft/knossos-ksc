@@ -14,14 +14,14 @@ dbtrace _ e = e -- trace msg e
 
 --------------------------
 
-annotDecls :: ST -> [Decl] -> (ST, [TDecl])
+annotDecls :: HasCallStack => ST -> [Decl] -> (ST, [TDecl])
 annotDecls env defs = mapAccumL annotDeclX env defs
 
-annotDeclX :: ST -> Decl -> (ST, TDecl)
+annotDeclX :: HasCallStack => ST -> Decl -> (ST, TDecl)
 annotDeclX env (DefDecl (DefX f vars expr))
   = (stInsertFun f ty env, DefDecl (DefX (TFun ty f) vars e))
   where
-    body_env = stBindParams env vars
+    body_env  = stBindParams env vars
     (ty,e)    = annotExpr body_env expr
 
 annotDeclX env (RuleDecl (Rule { ru_name = name, ru_qvars = qvars
@@ -34,7 +34,7 @@ annotDeclX env (RuleDecl (Rule { ru_name = name, ru_qvars = qvars
     (lhs_ty, lhs')    = annotExpr body_env lhs
     (rhs_ty, rhs')    = annotExpr body_env rhs
 
-annotExpr :: ST -> Expr -> (Type, TExpr)
+annotExpr :: HasCallStack => ST -> Expr -> (Type, TExpr)
 annotExpr env = \case
   -- Naming conventions in this function:
   --  e   Expr [TypeUnknown]

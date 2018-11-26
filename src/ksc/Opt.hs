@@ -344,7 +344,7 @@ optApplyLMCall "lmHCat" (Tuple es) dx
     add (e,i) z = pAdd (lmApply e (pSel i n dx)) z
 
 optApplyLMCall "lmScale" (Tuple [t'',x]) dx
-  = Just (pMul x dx)
+  = Just (pMul dx x)
 
 optApplyLMCall "lmBuild" (Tuple [n, Lam i m]) dx
   = Just (pBuild n (Lam i (lmApply m dx)))

@@ -5,5 +5,6 @@
 
 (def main ()
     (let (v1 (build 4 (lam (i : Integer) 3.0)))
-        (pr (D$f v1 v1)
+        (pr 1
+            (D$f v1 v1)
             )))

@@ -7,7 +7,8 @@ import           Debug.Trace                    ( trace )
 import           Prelude                 hiding ( lines
                                                 , tail
                                                 )
-import           Data.List                      ( intercalate )
+import qualified Data.Map as Map
+import           Data.List                      ( intercalate, isPrefixOf )
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
 import           System.Process                 ( callCommand )
@@ -43,6 +44,7 @@ instance CfreshVar TVar where
                  v <- freshVar @Var ty
                  return $ TVar ty v
 
+{-
 ------------ Specialist linear map types
 data TypeLM
           = LM Type Type             -- Generic linear map
@@ -139,17 +141,18 @@ transpose = \case
     LMBuildT lm     -> LMBuild lm
     LMVariant lms   -> LMVariant (map transpose lms)
 
+{-
 typeofLMFun :: HasCallStack => String -> [Type] -> TypeLM
 typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty)
                         (f, ty) of
   ("lmZero" , [s, t])   -> LMZero s t
   ("lmOne" ,  [t])      -> LMOne t
   ("lmScale", [t, TypeFloat]) -> LMScale t
-  ("lmBuild", [TypeInteger, TypeLambda TypeInteger (TypeLM ty)]) -> LMBuild ty
-  ("lmBuildT", [TypeInteger, TypeLambda TypeInteger (TypeLM ty)]) -> LMBuildT ty
+  ("lmBuild", [TypeInteger, TypeLambda TypeInteger ty]) -> LMBuild ty
+  ("lmBuildT", [TypeInteger, TypeLambda TypeInteger ty]) -> LMBuildT ty
   ("lmVCat",  lms) -> LMVCat $ map getLM lms
   ("lmHCat",  lms) -> LMHCat $ map getLM lms
-  ("lmCompose", [TypeLM lm1, TypeLM lm2]) -> LMCompose lm1 lm2
+  ("lmCompose", [TypeLM s t, TypeLM r s]) -> LMCompose lm1 lm2
   ("lmAdd",  [TypeLM lm1, TypeLM lm2]) -> LMAdd lm1 lm2
   _ ->
     error -- flip trace (LM TypeUnknown TypeUnknown)
@@ -158,224 +161,201 @@ typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty)
       ++ ", "
       ++ show ty
       ++ ")"
+-}
+-}
 
-
-
--- Call to a LMFun, name derived from the return type
-zlm :: TypeLM -> [TExpr] -> TExpr
-zlm t args = lmf t (nameOf t) args
-
-
------------- Administrative normal form
-
-anf :: (TypeableFun f, Typeable b,  CfreshVar b) => ExprX f b -> M (ExprX f b)
-anf = \case
-  Call f (Tuple ts) -> do
-    anfArgs <- mapM letAnf ts
-    return $ foldr
-      (.)
-      id
-      (map fst anfArgs)
-      $ Call f (Tuple (map snd anfArgs))
-
-  Call f e -> do
-    (lete, ve) <- letAnf e
-    return $ lete $ Call f ve
-
-  Tuple ts -> do
-    anfArgs <- mapM letAnf ts
-    return $ foldr (.) id (map fst anfArgs) $
-           Tuple (map snd anfArgs)
-
-  Lam x ty e -> do
-    anfe <- anf e
-    return $ Lam x ty anfe
-
-  App f x -> do
-    (letf, vf) <- letAnf f
-    (letx, vx) <- letAnf x
-    return $ letf $ letx $ App vf vx
-
-  Let x e body -> do
-    anfe    <- anf e
-    anfbody <- anf body
-    return $ Let x anfe anfbody
-
-  If cond ift iff -> do
-    anfcond <- anf cond
-    anfift  <- anf ift
-    anfiff  <- anf iff
-    return $ If anfcond anfift anfiff
-
-  Assert cond body -> do
-    anfcond <- anf cond
-    anfbody <- anf body
-    return $ Assert anfcond anfbody
-
-  ex -> return ex
-
--- letAnf of (+ a b) is (\body -> let c17 = (+ a b) in body, c17)
-letAnf :: (TypeableFun f, Typeable b, CfreshVar b) => ExprX f b -> M (ExprX f b -> ExprX f b, ExprX f b)
-letAnf e = do
-  ve   <- freshVar (typeof e)
-  anfe <- anf e
-  return
-    ( \body -> Let ve anfe body
-    , Var ve
-    )
-
-anfDefs :: (TypeableFun f, Typeable b, CfreshVar b) => [DefX f b] -> [DefX f b]
-anfDefs = map anfDef
-
-anfDef :: (TypeableFun f, Typeable b, CfreshVar b) => DefX f b -> DefX f b
-anfDef (DefX f vars expr) =
-  DefX f vars $ runM $ anf expr
+makeUnionType :: HasCallStack => String -> String -> String
+makeUnionType ty1 ty2 = 
+  if ty1 == ty2 then
+    ty1
+  else
+    if "LM::" `isPrefixOf` ty1 then
+      "LM::Variant<" ++ ty1 ++ ", " ++ ty2 ++ ">"
+    else case (ty1,ty2) of 
+      ("double", "zero_t") -> "double"
+      ("zero_t", "double") -> "double"
+      _ -> trace("GENVAR["++ty1 ++ "," ++ ty2++"]") $ "std::variant<" ++ ty1 ++ ", " ++ ty2 ++ ">"
 
 -------------------- Cgen
 
 -- CGenResult is (C declaration, C expression, Type)
 -- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
---       "r")
+--       "r",
+--       "double")
 -- e.g. ("",         -- simple constant needs no pre-declaration
---       "1.0")      -- this is what we use at the occurrence
-type CGenResult = (String, String)
+--       "1.0",      -- this is what we use at the occurrence
+--       "double")
+-- e.g. ("typedef LM::HCat<LM::VCat<LM::One, LM::Zero>,LM::Zero> v12_t;
+--        v12_t v12 = v12_t::mk(a,b);",
+--       "v12",      -- this is what we use at the occurrence
+--       "v12_t")
+data CGenResult = CG String String String
+getDecl (CG dc _ _) = dc
+getExpr (CG _ ex _) = ex
+getType (CG _ _ ty) = ty
+
+type CST = Map.Map String String
+cstEmpty = Map.empty
+
+cstInsert:: String -> String -> CST -> CST
+cstInsert f ty env = -- trace ("cstInsert " ++ show f ++ " = " ++ show ty ++ "\n" ++ show env) $
+         Map.insert f ty env
+
+cstLookup :: HasCallStack => String -> CST -> String
+cstLookup v env = case Map.lookup v env of
+  Just e -> e
+  Nothing -> error $ "Failed lookup [" ++ v ++ "] in\n" ++ (intercalate "\n" (map show (Map.toList env)))
+
+cComment:: String -> String
+cComment s = "/* " ++ s ++ " */"
 
 cgenDefs :: [TDef] -> [String]
-cgenDefs = map cgenDef
+cgenDefs defs = 
+  snd $ foldl go (cstEmpty, []) defs
+  where
+    go :: (CST, [String]) -> TDef -> (CST, [String])
+    go (env, strs) def = 
+      let (CG cdecl cexpr ctype) = cgenDefE env def
+      in (cstInsert cexpr ctype env, strs ++ [cdecl])
 
 cgenDef :: TDef -> String
-cgenDef def = fst $ cgenDefE def
+cgenDef def = getDecl $ cgenDefE cstEmpty def
 
-cgenDefE :: TDef -> CGenResult
-cgenDefE (DefX f@(TFun tyf _) vars expr) =
-  let (cDecl, cVar) = runM $ cgenExpr expr
-      tyfstr = cgenType tyf
-  in  (     tyfstr
-      `spc` cgenFun f
-      ++    "("
-      ++    intercalate
-              ", "
-              (map (\(TVar ty var) -> cgenType ty `spc` cgenVar var) vars)
-      ++    ") {\n"
-      ++    cDecl
-      ++    "return static_cast<" ++ tyfstr ++ ">"  -- In order to concretize tag types like zero_t
-      ++    "(" ++ cVar ++ ")"
+cgenDefE :: CST -> TDef -> CGenResult
+cgenDefE env (DefX f vars expr) =
+  let CG cdecl cexpr ctype = runM $ cgenExpr env expr
+      cf = cgenFun f ctype
+      mkvar (TVar ty var) = cgenType ty `spc` cgenVar var
+      cvars = map mkvar vars
+      cftypealias = "ty$" ++ cf
+  in  CG 
+      (  "typedef " ++ ctype `spc` cftypealias ++ ";\n"
+      ++     cftypealias `spc` cf
+      ++    "(" ++ intercalate ", " cvars ++ ") {\n"
+      ++    cdecl
+      ++    "return static_cast<" ++ ctype ++ ">"  -- In order to concretize tag types like zero_t
+      ++    "(" ++ cexpr ++ ")"
       ++    ";\n}\n"
-      , cgenFun f
       )
+      cf
+      cftypealias
 
-cgenExpr :: TExpr -> M CGenResult
-cgenExpr = cgenExprR -- <=< anf
+cgenExpr :: CST -> TExpr -> M CGenResult
+cgenExpr = cgenExprR
 
-cgenExprR :: HasCallStack => TExpr -> M CGenResult
-cgenExprR ex = case ex of
-  Konst k             -> return ("", cgenKonst k)
-
-  Var v    -> return ("", cgenTVar v)
+cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
+cgenExprR env = \case
+  Konst k  -> return $ CG "" (cgenKonst k) (cgenType $ typeofKonst k)
+  Var (TVar ty Dummy) -> let cty = cgenType ty in return $ CG "" (cty ++ "{}") cty
+  Var (TVar ty v) -> return $ CG "" (show v) ( 
+                          case (Map.lookup (show v) env) of
+                          Just e -> "/*vv "++show v++"*/" ++ e
+                          Nothing -> cgenType ty)
 
   Call tf@(TFun ty f) x -> case x of
     Tuple vs -> do
-      cgresults <- mapM cgenExprR vs
-      let decls = map fst cgresults
-      let exprs = map snd cgresults
+      cgresults <- mapM (cgenExprR env) vs
+      let cdecls = map getDecl cgresults
+      let cexprs = map getExpr cgresults
+      let ctypes = map getType cgresults
+
+      let cftype = ctypeofFun env ty f ctypes
 
       v <- freshCVar
-      return
+      return $ 
+        CG
         ( "/**Call**/"
-        ++ intercalate "\n" decls
-        ++ "auto" --cgenType ty
+        ++ intercalate "\n" cdecls
+        ++ cftype
         ++ " "
         ++ v
         ++ " = "
-        ++ cgenFun tf
+        ++ cgenFun tf cftype
         ++ "("
-        ++ intercalate "," exprs
+        ++ intercalate "," cexprs
         ++ ");\n/**eCall**/\n"
-        , v
         )
+        v
+        cftype
+        
     ex -> do
       vf <- freshCVar
-      (cgdecl, cgexpr) <- cgenExprR ex
+      (CG cdecl cexpr ctype) <- cgenExprR env ex
 
-      return
+      let cftype = ctypeofFun env ty f [ctype]
+
+      return $
+        CG
         ( "/**Ex**/\n"
-        ++    cgdecl
-        ++    "auto"--cgenType ty
+        ++    cdecl
+        ++    cftype
         `spc` vf
         ++    " = "
-        ++    cgenFun tf
+        ++    cgenFun tf cftype
         ++    "("
-        ++    cgexpr
-        ++    ");\n/**eEx*/\n"
-        , vf
-        )
+        ++    cexpr
+        ++    ");\n/**eEx*/\n" )
+        vf
+        cftype
 
   Let (TVar tyv v) e1 body -> do
-    (decle1  , ve1  ) <- cgenExprR e1
-    (declbody, vbody) <- cgenExprR body
-    return
+    (CG decle1 ve1 type1) <- cgenExprR env e1
+    (CG declbody vbody tybody) <- cgenExprR (cstInsert (show v) type1 env) body
+    return $ CG
       (  "/**Let**/"
       ++ decle1
-      ++ cgenType tyv
+      ++ "\n"
+      ++ type1
       ++ " "
       ++ cgenVar v
       ++ " = "
       ++ ve1
       ++ ";\n"
-      ++ declbody
-      , vbody
-      )
+      ++ declbody )
+      vbody
+      tybody
 
-  Tuple [t] -> cgenExpr t
+  Tuple [t] -> cgenExpr env t
   Tuple vs  -> do
-      cgresults <- mapM cgenExprR vs
-      let decls = map fst cgresults
-      let exprs = map snd cgresults
+      cgresults <- mapM (cgenExprR env) vs
+      let cdecls = map getDecl cgresults
+      let cexprs = map getExpr cgresults
+      let ctypes = map getType cgresults
 
-      return
-        ( "/**Tuple**/"
-        ++ intercalate "\n" decls
-        ,
-        "std::make_tuple("
-        ++ intercalate "," exprs
-        ++ ")/**eTuple**/"
-        )
+      return $ CG
+        (intercalate "\n" cdecls)
+        ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
+        ("std::tuple<" ++ intercalate "," ctypes ++ ">")
 
-  Lam (TVar tv v) ty1 body -> do
-    let _ = assertEqual "CGLam" tv ty1
-    l        <- freshCVar
-    (cE, vE) <- cgenExprR body
-    return
+  Lam (TVar tv v) body -> do
+    lvar        <- freshCVar
+    let vtype = cgenType tv
+    (CG cdecl cexpr ctype) <- cgenExprR (cstInsert (show v) vtype env) body
+    return $ CG
       ( "/**Lam**/"
-      ++ "auto" -- cgenType (TypeLambda tv (typeof body))
-      `spc` l
-      ++    " = [=]("
-      ++    cgenType tv
-      `spc` cgenVar v
-      ++    ") { "
-      ++    cE
-      ++    "   return "
-      ++    vE
-      ++    "; };\n"
-      , l
-      )
+      ++ "auto" 
+      `spc` lvar
+      ++    " = [=](" ++ vtype `spc` cgenVar v ++ ") { "  -- TODO: capture only freeVars here
+      ++    cdecl
+      ++    "   return static_cast<" ++ ctype ++ ">"  -- In order to concretize tag types like zero_t
+      ++    "(" ++ cexpr ++ ");"
+      ++    "};\n" )
+      lvar
+      ("std::function<" ++ ctype ++ "(" ++ vtype ++ ")>")
+
 
   If c texpr fexpr -> do
     cret        <- freshCVar
 
-    (declc, vc) <- cgenExprR c
-    (declt, vt) <- cgenExprR texpr
-    (declf, vf) <- cgenExprR fexpr
-    let ty1 = typeof texpr
-    let ty2 = typeof fexpr
-    let ty = makeUnionType ty1 ty2
-    let dotv = case ty of
-                TypeLM (LMVariant ts) -> ".v"
-                _ -> ""
+    (CG declc vc tyc) <- cgenExprR env c
+    (CG declt vt tyt) <- cgenExprR env texpr
+    (CG declf vf tyf) <- cgenExprR env fexpr
+    let crettype = makeUnionType tyt tyf
+    let dotv = if "LM::Variant<" `isPrefixOf` crettype then ".v" else "" -- Ugh.
 
-    return
+    return $ CG
       ( declc -- emit condition generation
-      ++    cgenType ty
+      ++    crettype
       `spc` cret
       ++    ";\n" -- emit decl for "return" type
       ++    "if ("
@@ -399,13 +379,18 @@ cgenExprR ex = case ex of
       ++    vf
       ++    ";\n" -- assign to "return"
       ++    "}\n" -- phew
-      , cret
       )
+      cret
+      crettype
 
   Assert cond body -> do
-    (declcond, vcond) <- cgenExprR cond
-    (declbody, vbody) <- cgenExprR body
-    return (declcond `spc` "ASSERT(" ++ vcond ++ ");\n" ++ declbody, vbody)
+    (CG declcond vcond tycond) <- cgenExprR env cond
+    (CG declbody vbody tybody) <- cgenExprR env body
+    return $ CG 
+      (declcond `spc` "ASSERT(" ++ vcond ++ ");\n" ++ declbody)
+      vbody
+      tybody
+
   App{} -> error "App"
 
 cgenFunId :: FunId -> String
@@ -413,22 +398,21 @@ cgenFunId = \case
   SFun fun   -> translateFun fun
   SelFun i n -> "selfun$" ++ show n ++ "_" ++ show i
 
-cgenFun :: HasCallStack => TFun -> String
-cgenFun tf@(TFun ty f) = case f of
-  Fun (SFun "build") -> "build<"++ cgenType t ++ ">" where (TypeVec t) = ty
+cgenFun :: HasCallStack => TFun -> String -> String
+cgenFun tf@(TFun ty f) ctype = case f of
+  Fun (SFun "build") -> let (TypeVec t) = ty in "build<"++ cgenType t ++ ">"
   Fun funId       -> cgenFunId funId
   GradFun s Fwd -> "D$" ++ cgenFunId s
   GradFun s Rev -> "R$" ++ cgenFunId s
   DrvFun  s Fwd -> "fwd$" ++ cgenFunId s
   DrvFun  s Rev -> "rev$" ++ cgenFunId s
-  LMFun s         -> case ty of
-    TypeLM ty -> cgenTypeLM ty ++ "::" ++ "mk"
-    t -> "LM::/* " ++ show t ++ "*/" ++ s
+  LMFun "lmApply" -> "lmApply"
+  LMFun s       -> ctype ++ "::mk"
 
 cgenTypeOf :: TExpr -> String
 cgenTypeOf = cgenType . typeof
 
-cgenType :: Type -> String
+cgenType :: HasCallStack => Type -> String
 cgenType = \case
   TypeZero      -> "zero_t"
   TypeFloat     -> "double"
@@ -440,26 +424,38 @@ cgenType = \case
   TypeUnknown   -> "unk"
   TypeLambda from to ->
     "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
-  TypeLM ty -> cgenTypeLM ty
+  TypeLM s t -> error $ "LM<" ++ cgenType s ++ "," ++ cgenType t ++ ">"
 
-cgenTypeLM :: HasCallStack => TypeLM -> String
-cgenTypeLM = \case
-  LM s t -> "LM::Base" ++ angle s t
-  LMZero s t -> "LM::Zero" ++ angle s t
-  LMOne t-> "LM::One" ++ angle1 t
-  LMScale t-> "LM::Scale" ++ angle1 t
-  LMSelFun s t -> "LM::SelFun" ++ angle s t
-  LMTranspose lm-> "LM::Transpose<" ++ cgenTypeLM lm ++ ">"
-  LMCompose bc ab-> "LM::Compose<" ++ cgenTypeLM bc ++ "," ++ cgenTypeLM ab ++ ">"
-  LMAdd a b-> "LM::Add<" ++ cgenTypeLM a ++ "," ++ cgenTypeLM b ++ ">"
-  LMVCat lms-> "LM::VCat<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
-  LMHCat lms-> "LM::HCat" ++ "<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
-  LMBuild lm-> "LM::Build<" ++ cgenTypeLM lm ++ ">"
-  LMBuildT lm-> "LM::BuildT<" ++ cgenTypeLM lm ++ ">"
-  LMVariant lms-> "LM::Variant<" ++ intercalate "," (map cgenTypeLM lms) ++ ">"
+ctypeofFun :: HasCallStack => CST -> Type -> Fun -> [String] -> String
+ctypeofFun env ty f ctys = case Map.lookup (show f) env of
+    Just ctype -> trace ("Found fun " ++ show f) ctype
+    Nothing -> ctypeofFun1 env ty f ctys
+
+ctypeofFun1 :: HasCallStack => CST -> Type -> Fun -> [String] -> String
+ctypeofFun1 env ty (LMFun "lmApply") ctys = cgenType ty
+ctypeofFun1 env ty (LMFun name) ctys = ctypeofLMFun name ctys
+ctypeofFun1 env (TypeLM s t) (GradFun f Fwd) ctys = ctypeofGradBuiltin (show f) ctys
+ctypeofFun1 env (TypeLM s t) f ctys = error $ "Did not match [" ++  show f ++ "]@\n  " ++ intercalate "\n  " ctys
+ctypeofFun1 env ty f ctys = cgenType ty
+
+ctypeofLMFun :: HasCallStack => String -> [String] -> String
+ctypeofLMFun s arg_types = case s of
+  "lmBuild" -> "LM::Build<" ++ arg_types!!1 ++ ">"
+  "lmBuildT" -> "LM::BuildT<" ++ arg_types!!1 ++ ">"
+  ('l':'m':s) -> "LM::" ++ s ++ angle arg_types
+  s -> error ("Not LM Fun! [" ++ s ++ "]") 
+      -- "LM::" ++ s ++ angle arg_types
   where
-   angle s t = "<" ++ cgenType s ++ "," ++ cgenType t ++ ">"
-   angle1 t = "<" ++ cgenType t ++ ">"
+   angle [t] = "<" ++ t ++ ">"
+   angle ts = "<" ++ intercalate ","  ts ++ ">"
+
+ctypeofGradBuiltin :: HasCallStack => String -> [String] -> String
+ctypeofGradBuiltin f ctys = case f of
+  "-" -> hcatscales
+  "/" -> hcatscales
+  "*" -> hcatscales
+  _ -> error $ "Don't know grad of [" ++ f ++ "]@\n  " ++ intercalate "\n  " ctys
+  where hcatscales = "LM::HCat</*" ++ show ctys ++ "*/LM::Scale<double>, LM::Scale<double>>"
 
 cgenKonst :: Konst -> String
 cgenKonst = \case
@@ -470,10 +466,6 @@ cgenKonst = \case
 
 cgenVar :: Var -> String
 cgenVar v = show v
-
-cgenTVar :: TVar -> String
-cgenTVar (TVar ty Dummy) = cgenType ty ++ "{}"
-cgenTVar (TVar _ v) = show v
 
 
 translateFun :: String -> String
