@@ -59,6 +59,7 @@ data Type = TypeZero               -- Polyamorous zero
           | TypeVec Type
           | TypeLambda Type Type   -- Domain -> Range
           | TypeLM Type Type       -- Linear map  Src -o Target
+--          | TypeUnion Type Type    -- Tagged union of types
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
@@ -725,7 +726,7 @@ typeofFunTys env tf tys =
   (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (mkTypeTuple tys)
   (LMFun "lmApply",  [TypeLM s t, s1]) -> assertEqualThen "lmApply" s1 s $ t
   (LMFun f, tys) -> error $ "When?"
-  (Fun (SFun "pr")       , _                            ) -> TypeInteger
+  (Fun (SFun "pr")       , _                            ) -> TypeZero
   (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
   (Fun (SFun "index")    , [_, TypeVec t]               ) -> t
   (Fun (SFun "size" )    , [TypeVec _]                  ) -> TypeInteger
@@ -758,8 +759,9 @@ typeofFunTys env tf tys =
                 ++ show tf
                 ++ " @ "
                 ++ show tys
-                ++ ".    Env:\n"
-                ++ show env
+                ++ ".    Env:\n  "
+                ++ intercalate "\n  " (map (\ (v, t) -> show v ++ " = " ++ show t) (M.toList env))
+                ++ "\n"
 
 -----------------------------------------------
 --     Debugging utilities
