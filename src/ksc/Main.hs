@@ -12,7 +12,7 @@ import Opt
 import CSE
 
 import ANF
--- import Cgen (cppF, runM, cgenDef, cgenDefs)
+import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
 import Data.List( partition )
 
@@ -246,7 +246,7 @@ moveMain = partition isMain
 
 doall :: HasCallStack => String -> IO ()
 doall file =
-  let tl s = reverse (take 100 $ reverse s)
+  let tl s = reverse (take 400 $ reverse s)
       dd defs = liftIO $ putStrLn ("---" ++ (tl $ pps defs))
       ddx :: Pretty p => [p] -> KM ()
       ddx = displayN in
@@ -287,13 +287,13 @@ doall file =
 
   ;  let ann2 =  cse ++ main
   ;  banner "all"
-  ;  displayN ann2
+  ;  dd ann2
 
-  --;  liftIO (cppF ("obj\\" ++ file) ann2)
+  ;  liftIO (cppF ("obj\\" ++ file) ann2)
   }
 
 gmm :: IO ()
-gmm = doall "../../test/ksc/gmm"
+gmm = doall "test\\ksc\\gmm"
 
 main :: IO ()
 main = gmm
