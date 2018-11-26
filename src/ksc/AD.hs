@@ -27,11 +27,11 @@ gradSelFun :: Type -> Int -> Int -> [TVar] -> TExpr
 -- Result expr has type (t1, ..., tn) -o ti
 -- gradSelFun tyt@(TypeTuple ts) i n params =
 --    mkTCall (TypeLM (LMSelFun tyt (ts!!(i-1)))) (GradFun (SelFun i n) Fwd) (map Var params)
+gradSelFun t i 1 params = lmOne t
 gradSelFun tyt@(TypeTuple ts) i n params =
    let es = (map Var params) in
     lmHCat [ if i == j then lmOne t else lmZero (ts!!(j-1)) t  |   j <- [1..n] ]
    where t = ts!!(i-1)
-gradSelFun t i 1 params = lmOne t
 
 -------------------------------------------------
 
