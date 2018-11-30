@@ -177,7 +177,7 @@ demoN decls
        ; displayN decls
 
        ; banner "Typechecked declarations"
-       ; let (env, tc_decls) = annotDecls emptyST decls
+       ; let (env, tc_decls) = annotDecls emptyGST decls
        ; let (rules, defs)   = partitionDecls tc_decls
              rulebase        = mkRuleBase rules
 
@@ -192,7 +192,8 @@ demoN decls
        ; displayN anf_defs
 
        ; banner "The full Jacobian (unoptimised)"
-       ; let (env1, grad_defs) = gradDefs env anf_defs
+       ; let grad_defs = gradDefs anf_defs
+             env1      = env `extendGblSymTab` grad_defs
        ; displayN grad_defs
 
        ; banner "The full Jacobian (optimised)"
@@ -208,7 +209,7 @@ demoN decls
        ; displayN opt_der_fwd
 
        ; banner "Forward-mode derivative (CSE'd)"
-       ; cse_fwd <- cseDefs rulebase opt_der_fwd
+       ; cse_fwd <- cseDefs rulebase env1 opt_der_fwd
        ; displayN cse_fwd
 
        ; banner "Transposed Jacobian"
@@ -227,7 +228,7 @@ demoN decls
        ; let opt_der_rev = optDefs rulebase env1 der_rev
        ; displayN opt_der_rev
 
-       ; cse_rev <- cseDefs rulebase opt_der_rev
+       ; cse_rev <- cseDefs rulebase env1 opt_der_rev
        ; banner "Reverse-mode derivative (CSE'd)"
        ; displayN cse_rev
        }
@@ -241,7 +242,7 @@ moveMain :: [TDef]
             , [TDef])   -- All the rest
 moveMain = partition isMain
   where
-    isMain (DefX (TFun _ (Fun (SFun "main"))) _ _) = True
+    isMain (DefX (TFun _ (Fun (UserFun "main"))) _ _) = True
     isMain _ = False
 
 doall :: HasCallStack => String -> IO ()
@@ -255,7 +256,7 @@ doall file =
   ;  liftIO $ putStrLn "read decls"
 
   ;  banner "annotated defs"
-  ;  let (env, ann_decls) = annotDecls emptyST decls
+  ;  let (env, ann_decls) = annotDecls emptyGST decls
   ;  dd ann_decls
 
   ;  let (rules, alldefs) = partitionDecls ann_decls
@@ -265,24 +266,26 @@ doall file =
   ;  banner "defs"
   ;  dd defs
 
-  ;  let (env', grad) = gradDefs env defs
+  ;  let grad = gradDefs defs
   ;  banner "grad"
   ;  dd grad
 
-  ;  let optgrad = optDefs rulebase env' grad
+  ;  let optgrad = optDefs rulebase env grad
+         env1    = env `extendGblSymTab` optgrad
   ;  banner "optgrad"
   ;  dd optgrad
 
-  ;  let (env'',fwd) = applyDefs env' optgrad
+  ;  let fwd  = applyDefs optgrad
   ;  banner "fwd"
   ;  dd fwd
 
-  ;  let optfwd = optDefs rulebase env'' fwd
+  ;  let optfwd = optDefs rulebase env1 fwd
+         env2   = env1 `extendGblSymTab` optfwd
   ;  banner "optfwd"
   ;  dd optfwd
 
   ;  let alldefs = defs ++ optgrad ++ optfwd
-  ;  cse <- cseDefs rulebase alldefs
+  ;  cse <- cseDefs rulebase env2 alldefs
   ;  dd cse
 
   ;  let ann2 =  cse ++ main

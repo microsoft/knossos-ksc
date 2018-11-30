@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 
 module ANF where
 
@@ -6,7 +6,7 @@ import Lang
 import KMonad
 import Control.Monad( ap )
 
-anfDefs :: (CmkVar b, Typeable b, TypeableFun f) => [DefX f b] -> KM [DefX f b]
+anfDefs :: (GenBndr f b) => [DefX f b] -> KM [DefX f b]
 anfDefs defs
   = do { u <- getUniq
        ; let (u', defs') = runAnf u (mapM anfD defs)
@@ -14,13 +14,13 @@ anfDefs defs
        ; return defs' }
 
 -----------------------------------------------
-anfD :: (CmkVar b, Typeable b, TypeableFun f) => DefX f b -> AnfM f b (DefX f b)
+anfD :: (GenBndr f b) => DefX f b -> AnfM f b (DefX f b)
 anfD (DefX fun args rhs) = DefX fun args <$> anfExpr rhs
 
-anfExpr :: (CmkVar b, Typeable b, TypeableFun f) => ExprX f b -> AnfM f b (ExprX f b)
+anfExpr :: (GenBndr f b) => ExprX f b -> AnfM f b (ExprX f b)
 anfExpr e = wrapLets (anfE e)
 
-anfE :: (CmkVar b, Typeable b, TypeableFun f) => ExprX f b -> AnfM f b (ExprX f b)
+anfE :: (GenBndr f b) => ExprX f b -> AnfM f b (ExprX f b)
 anfE (Tuple es)            = Tuple <$> mapM anfE1 es
 anfE (Call fun (Tuple es)) {- FIXME anf build
   | Fun (SFun "build") <- fun
@@ -49,15 +49,15 @@ anfE (Assert e1 e2) = do { e1' <- anfE e1
                          ; e2' <- anfExpr e2
                          ; return (Assert e1' e2') }
 
-anfE1 :: (CmkVar b, Typeable b, TypeableFun f) => (ExprX f b) -> AnfM f b (ExprX f b)
+anfE1 :: (GenBndr f b) => (ExprX f b) -> AnfM f b (ExprX f b)
 -- Returns an atomic expression
 anfE1 e = do { e' <- anfE e
              ; atomise e' }
 
-atomise :: (CmkVar b, Typeable b, TypeableFun f) => (ExprX f b) -> AnfM f b (ExprX f b)
+atomise :: (GenBndr f b) => (ExprX f b) -> AnfM f b (ExprX f b)
 atomise (Var v)   = return (Var v)
 atomise (Konst k) = return (Konst k)
-atomise e         = do { v <- newVar (typeof e)
+atomise e         = do { v <- newVar e
                        ; emit v e
                        ; return (Var v) }
 
@@ -94,5 +94,17 @@ wrap fs e = foldr (\(v,r) b -> Let v r b) e fs
 emit :: b -> ExprX f b -> AnfM f b ()
 emit v r = AnfM (\u -> (u, [(v,r)], ()))
 
-newVar :: CmkVar b => Type -> AnfM f b b
-newVar ty = AnfM (\u -> (u+1, [], mkVar ty ('t' : show u)))
+---------------------------------
+class GenBndr f b where
+  mkNewVar :: Uniq -> ExprX f b -> b
+
+instance GenBndr Fun Var where
+  mkNewVar u _ = mkVar ("t" ++ show u)
+  
+instance GenBndr TFun TVar where
+  mkNewVar u e = mkTVar (typeof e) ("t" ++ show u)
+
+newVar :: GenBndr f b => ExprX f b -> AnfM f b b
+newVar e = AnfM (\u -> (u+1, [], mkNewVar u e))
+
+

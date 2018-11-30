@@ -62,10 +62,13 @@ data Type = TypeZero               -- Polyamorous zero
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
-data FunId = SelFun     -- Selector function: fst, snd etc
-               Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
-               Int      -- Arity
-           | SFun String  -- For now
+type PrimFun = String
+
+data FunId = UserFun String
+           | PrimFun PrimFun
+           | SelFun 
+                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
+                Int      -- Arity
            deriving( Eq, Ord )
 
 data Fun = Fun     FunId         -- The function              f(x)
@@ -73,7 +76,6 @@ data Fun = Fun     FunId         -- The function              f(x)
                                  --   Rev <=> transposed  Rf(x)
          | DrvFun  FunId ADMode  -- Derivative derivative f'(x,dx)
                                  --   Rev <=> reverse mode f`(x,dr)
-         | LMFun   String        -- Linear map
          deriving( Eq, Ord )
 
 data ADMode = Fwd | Rev
@@ -130,146 +132,20 @@ partitionDecls decls
     decls
 
 -----------------------------------------------
---  Finding the type of an expression
------------------------------------------------
-
-class CmkVar b where
-  mkVar :: Type -> String -> b
-
-instance CmkVar Var where
-  mkVar ty s = Simple s
-
-instance CmkVar TVar where
-  mkVar ty s = TVar ty $ Simple s
-
-class TypeableFun f where
-  typeofFun :: f -> Type -> Type
-
-instance TypeableFun Fun where
-  typeofFun v arg = TypeUnknown
-
-instance TypeableFun TFun where
-  typeofFun (TFun ty f) argtype = ty
-
-class Typeable b where
-  typeof :: b -> Type
-
-instance Typeable Var where
-  typeof v = TypeUnknown
-
-instance Typeable TVar where
-  typeof (TVar ty _) = ty
-
-instance (Typeable b, TypeableFun f) =>
-         Typeable (ExprX f b) where
-  typeof (Konst k) = typeofKonst k
-  typeof (Var b) = typeof b
-  typeof (Call f e) = typeofFun f (typeof e)
-  typeof (App f e) = TypeUnknown
-  typeof (Tuple es) = TypeTuple $ map typeof es
-  typeof (Lam (TVar tyv v) e) = TypeLambda tyv $ typeof e
-  typeof (Let b e1 e2) = typeof e2
-  typeof (If c t f) = makeIfType (typeof t) (typeof f)
-  typeof (Assert c e) = typeof e
-
--- ToDo:
--- The type of an If statement is a sort of union of the types on the branches
--- This occurs because of types like TypeZero which intersect both Float and Integer
--- We could make our constants more strongly typed, which might be better, but
--- the Zero vector can be a useful optimization concept.
-makeIfType :: Type -> Type -> Type
-makeIfType TypeZero ty = ty
-makeIfType ty TypeZero = ty
-makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $ ty2
-
-getLM :: HasCallStack => Type -> Type
-getLM (TypeLM s t) = TypeLM s t
-getLM t = error $ "Wanted TypeLM, got " ++ pps t
-
-typeofLMs:: HasCallStack => Type -> Type
-typeofLMs (TypeLM s _) = s
-typeofLMs t = error $ "Wanted TypeLM, got " ++ pps t
-typeofLMt:: HasCallStack =>Type -> Type
-typeofLMt (TypeLM _ t) = t
-
-typeofKonst :: Konst -> Type
-typeofKonst KZero = TypeZero
-typeofKonst (KInteger _) = TypeInteger
-typeofKonst (KFloat _) = TypeFloat
-typeofKonst (KBool _) = TypeBool
-
------------------------------------------------
---       Show instances
------------------------------------------------
-
-instance Show FunId where
-  show (SFun s) = s
-  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
-
-instance Show Fun where
-  show (Fun s) = show s
-  show (GradFun s Fwd) = "D$" ++ show s
-  show (GradFun s Rev) = "R$" ++ show s
-  show (DrvFun  s Fwd) = "fwd$" ++ show s
-  show (DrvFun  s Rev) = "rev$" ++ show s
-  show (LMFun s) = "LM$" ++ s
-
-instance Show TFun where
-  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
-
-instance Show Var where
-  show v = case v of
-    Dummy -> "/*dummy*/"
-    Simple s -> "s$" ++ s
-    Delta  d -> "d$" ++ d
-    Grad g m ->
-      "g"
-      ++ (case m of
-            Fwd -> "f"
-            Rev -> "r")
-      ++ "$"
-      ++ g
-
-
------------------------------------------------
 --       Building values
 -----------------------------------------------
 
-mkFun :: String -> Fun
-mkFun fname = Fun (SFun fname)
+mkPrimFun :: String -> Fun
+mkPrimFun fname = Fun (PrimFun fname)
 
-mkTFun :: Type -> String -> TFun
-mkTFun ty fname = TFun ty $ mkFun fname
+mkPrimTFun :: Type -> String -> TFun
+mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
 
-mkCall :: String->[Expr]->Expr
-mkCall fname [e] = Call (mkFun fname) e
-mkCall fname es = Call (mkFun fname) (mkTuple es)
+mkVar :: String -> Var  -- Just a Simple var
+mkVar s = Simple s
 
-mkTCall :: Type -> Fun -> [TExpr] -> TExpr
-mkTCall ty f [e] = Call (TFun ty f) e
-mkTCall ty f es = Call (TFun ty f) (mkTuple es)
-
-mkTuple :: [ExprX f b] -> ExprX f b
-mkTuple [e] = e
-mkTuple es = Tuple es
-
-mkSCall1 :: String -> Expr -> Expr
-mkSCall1 fname a = mkCall fname [a]
-
-mkSCall2 :: String -> Expr -> Expr -> Expr
-mkSCall2 fname a b = mkCall fname [a, b]
-
-mkSCall3 :: String -> Expr -> Expr -> Expr -> Expr
-mkSCall3 fname a b c = mkCall fname [a, b, c]
-
-mkTCall1 :: Type -> Fun -> TExpr -> TExpr
-mkTCall1 ty f a = mkTCall ty f [a]
-
-mkTCall2 :: Type -> Fun -> TExpr -> TExpr -> TExpr
-mkTCall2 ty f a b = mkTCall ty f [a, b]
-
-mkTCall3 :: Type -> Fun -> TExpr -> TExpr -> TExpr -> TExpr
-mkTCall3 ty f a b c = mkTCall ty f [a, b, c]
+mkTVar :: Type -> String -> TVar
+mkTVar ty s = TVar ty (mkVar s)
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
@@ -293,184 +169,153 @@ kFloat f = Konst (KFloat f)
 kTFloat :: Double -> TExpr
 kTFloat f = Konst (KFloat f)
 
-{-
-infixr 0 `seqExpr`
+mkTuple :: [ExprX f b] -> ExprX f b
+mkTuple [e] = e
+mkTuple es = Tuple es
 
-seqExprX :: ExprX -> a -> a
-seqExprX (Var v) x = v `seq` x
-seqExprX (Call fun e) x = fun `seq` e `seqExprX` x
-seqExprX (Konst k) x = k `seq` x
-seqExprX (Let v r b) x = v `seq` r `seqExprX` b `seqExprX` x
-seqExprX (Tuple es) x = Prelude.foldr seqExprX x es
+-----------------------------------------------
+--     Building types
+-----------------------------------------------
 
-seqExpr:: Expr -> a -> a
-seqExpr (Expr ty e) = ty `seq` e
--}
+mkTypeTuple :: [Type] -> Type
+mkTypeTuple [ty] = ty
+mkTypeTuple tys = TypeTuple tys
 
 
 -----------------------------------------------
---     Substitution
+--  Finding the type of an expression
 -----------------------------------------------
 
-substE :: M.Map TVar TExpr -> TExpr -> TExpr
-substE subst (Konst k)      = Konst k
-substE subst (Var v)        = case M.lookup v subst of
-                               Just e  -> e
-                               Nothing -> Var v
-substE subst (Call f e)     = Call f (substE subst e)
-substE subst (If b t e)     = If (substE subst b) (substE subst t) (substE subst e)
-substE subst (Tuple es)     = Tuple (map (substE subst) es)
-substE subst (App e1 e2)    = App (substE subst e1) (substE subst e2)
-substE subst (Assert e1 e2) = Assert (substE subst e1) (substE subst e2)
-substE subst (Lam v e)      = Lam v (substE (v `M.delete` subst) e)
-substE subst (Let v r b)    = Let v (substE subst r) $
-                              substE (v `M.delete` subst) b
+class HasType b where
+  typeof :: b -> Type
+
+instance HasType TVar where
+  typeof (TVar ty _) = ty
+
+instance HasType TFun where
+  typeof (TFun ty _) = ty
+
+instance (HasType b, HasType f,
+          HasInfix f, Pretty f, Pretty b)
+      =>  HasType (ExprX f b) where
+  typeof (Konst k)     = typeofKonst k
+  typeof (Var b)       = typeof b
+  typeof (Call f e)    = typeof f
+  typeof e@(App f _)   = case typeof f of
+                            TypeLambda _ res -> res
+                            _ -> pprPanic "typeof:app " (ppr f $$ ppr (typeof f))
+  typeof (Tuple es)    = TypeTuple $ map typeof es
+  typeof (Lam b e)     = TypeLambda (typeof b) (typeof e)
+  typeof (Let b e1 e2) = typeof e2
+  typeof (Assert c e)  = typeof e
+  typeof (If c t f)    = assertEqualThen "typeof:if" tt tf tt
+                       where
+                         tt = typeof t
+                         tf = typeof f
+
+-- ToDo:
+-- The type of an If statement is a sort of union of the types on the branches
+-- This occurs because of types like TypeZero which intersect both Float and Integer
+-- We could make our constants more strongly typed, which might be better, but
+-- the Zero vector can be a useful optimization concept.
+makeIfType :: Type -> Type -> Type
+makeIfType TypeZero ty = ty
+makeIfType ty TypeZero = ty
+makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $ ty2
+
+getLM :: HasCallStack => Type -> Type
+getLM (TypeLM s t) = TypeLM s t
+getLM t = error $ "Wanted TypeLM, got " ++ pps t
+
+typeofLMs:: HasCallStack => Type -> Type
+typeofLMs (TypeLM s _) = s
+typeofLMs t = error $ "Wanted TypeLM, got " ++ pps t
+
+typeofLMt:: HasCallStack => Type -> Type
+typeofLMt (TypeLM _ t) = t
+
+unzipLMTypes :: HasCallStack => [Type] -> ([Type], [Type])
+unzipLMTypes [] = ([], [])
+unzipLMTypes (TypeLM s t : lmts) = case unzipLMTypes lmts of
+                                     (ss, ts) -> (s:ss, t:ts)
+unzipLMTypes lmts = pprPanic "unzipLMTypes" (ppr lmts)
+
+typeofKonst :: Konst -> Type
+typeofKonst KZero = TypeZero
+typeofKonst (KInteger _) = TypeInteger
+typeofKonst (KFloat _) = TypeFloat
+typeofKonst (KBool _) = TypeBool
 
 -----------------------------------------------
---     Equality modulo alpha
+--     Debugging utilities
 -----------------------------------------------
 
-instance Eq TExpr where
-  e1 == e2 = case e1 `cmpExpr` e2 of
-               EQ -> True
-               _  -> False
+assert :: HasCallStack => Doc -> Bool -> b -> b
+assert doc True  x = x
+assert doc False x = error (show doc)
 
-instance Ord TExpr where
-  compare = cmpExpr
+assertBool :: Bool -> Bool
+assertBool x = x    -- To remove check, return True always
 
-thenCmp :: Ordering -> Ordering -> Ordering
-EQ `thenCmp` o = o
-o  `thenCmp` _ = o
+assertEqual msg t1 t2 =
+  assertEqualThen msg t1 t2 ()
 
-cmpExpr :: TExpr -> TExpr -> Ordering
-cmpExpr e1 e2
- = go e1 M.empty e2
- where
-   go :: TExpr -> M.Map TVar TVar -> TExpr -> Ordering
-   go (Konst k1) subst e2
-     = case e2 of
-         Konst k2 -> k1 `compare` k2
-         _        -> LT
+assertEqualThen :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
+assertEqualThen msg t1 t2 e =
+  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
 
-   go (Var v1) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var v2   -> v1 `compare` M.findWithDefault v2 v2 subst
-         _        -> LT
+assertAllEqualThen :: (HasCallStack, Eq a, Show a) => String -> [a] -> b -> b
+assertAllEqualThen msg es e =
+  if allEq es then e else
+     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
+  where
+    allEq [] = True
+    allEq (a:as) = allEqa a as
 
-   go (Call f1 e1) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var {} -> GT
-         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (go e1 subst e2)
-         _ -> LT
+    allEqa a0 [] = True
+    allEqa a0 [a] = a0 == a
+    allEqa a0 (a:as) = a0 == a && allEqa a0 as
 
-   go (Tuple es1) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var {}  -> GT
-         Call {} -> GT
-         Tuple es2 -> gos es1 subst es2
-         _        -> LT
+assertAllEqualRet :: (HasCallStack, Eq a, Show a) => String -> [a] -> a
+assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
 
-   go (Lam b1 e1) subst e2
-      = case e2 of
-         Konst {}  -> GT
-         Var {}    -> GT
-         Call {}   -> GT
-         Tuple es  -> GT
-         Lam b2 e2 -> go e1 (M.insert b2 b1 subst) e2
-         _         -> LT
-
-   go (App e1a e1b) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var {}   -> GT
-         Call {}  -> GT
-         Tuple {} -> GT
-         Lam {}   -> GT
-         App e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
-         _           -> LT
-
-   go (Let b1 r1 e1) subst e2
-     = case e2 of
-         If {}     -> LT
-         Assert {} -> LT
-         Let b2 r2 e2 ->
-                go r1 subst r2 `thenCmp` go e1 (M.insert b2 b1 subst) e2
-         _ -> GT
-
-   go (If e1c e1t e1f) subst e2
-      = case e2 of
-          Assert {} -> LT
-          If e2c e2t e2f -> go e1c subst e2c `thenCmp`
-                            go e1t subst e2t `thenCmp`
-                            go e1f subst e2f
-          _ -> GT
-
-   go (Assert e1a e1b) subst e2
-      = case e2 of
-          Assert e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
-          _              -> GT
-
-   gos :: [TExpr] -> M.Map TVar TVar -> [TExpr] -> Ordering
-   gos [] subst [] = EQ
-   gos [] subst (_:_) = LT
-   gos (_:_) subst [] = GT
-   gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
 
 
 -----------------------------------------------
---     Free variables
+--       Show instances
 -----------------------------------------------
 
-notFreeIn :: TVar -> TExpr -> Bool
-notFreeIn v e = go v e
- where
-   go:: TVar -> TExpr -> Bool
-   go v (Var v2) = v /= v2
-   go v (Konst _) = True
-   go v (Tuple es) = all (go v) es
-   go v (If b t e) = go v b && go v t && go v e
-   go v (Call _ e) = go v e
-   go v (App f a)  = go v f && go v a
-   go v (Let v2 r b) = go v r && (v == v2 || go v b)
-   go v (Lam v2 e)   = v == v2 || go v e
-   go v (Assert e1 e2) = go v e1 && go v e2
+instance Show FunId where
+  show (UserFun s)  = s
+  show (PrimFun p)  = p
+  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
 
------------------
+instance Show Fun where
+  show (Fun s) = show s
+  show (GradFun s Fwd) = "D$" ++ show s
+  show (GradFun s Rev) = "R$" ++ show s
+  show (DrvFun  s Fwd) = "fwd$" ++ show s
+  show (DrvFun  s Rev) = "rev$" ++ show s
 
-newVarNotIn :: Type -> TExpr -> TVar
-newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
-  where go ty e n =
-          let v = mkVar ty ("_t" ++ show n) in
-            if v `notFreeIn` e then
-              v
-            else
-              trace ("newVarNotIn: Var " ++ show v ++ " was bound in E, retry") (
-              go ty e (n + 1))
+instance Show TFun where
+  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
 
-test_FreeIn =
-  hspec $ do
-    let var :: String -> TVar
-        var s = TVar TypeFloat (Simple s)
-        fun :: String -> TFun
-        fun s = TFun TypeFloat (mkFun s)
-        e  = Call (fun "f") (Var (var "i"))
-        e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
-    describe "notFreeIn" $ do
-      it ("i notFreeIn " ++ show (ppr (e::TExpr))) $
-        (var "i" `notFreeIn` e) `shouldBe` False
-      it ("x not notFreeIn " ++ show (ppr (e::TExpr))) $
-        (var "x" `notFreeIn` e) `shouldBe` True
-    describe "newVarNotIn" $ do
-      it "not in, so new var is _t1..." $
-        newVarNotIn TypeFloat e `shouldBe` (var "_t1")
-      it "in, so new var is _t2..." $
-        newVarNotIn TypeFloat e2 `shouldBe` (var "_t2")
+instance Show Var where
+  show v = case v of
+    Dummy -> "/*dummy*/"
+    Simple s -> "s$" ++ s
+    Delta  d -> "d$" ++ d
+    Grad g m ->
+      "g"
+      ++ (case m of
+            Fwd -> "f"
+            Rev -> "r")
+      ++ "$"
+      ++ g
+
 
 -----------------------------------------------
---     Pretty printer
+--     Pretty printer for the KS langauge
 -----------------------------------------------
 
 class Pretty p where
@@ -484,16 +329,14 @@ instance Pretty Var where
   ppr v   = PP.text $ show v
 
 instance Pretty FunId where
-  ppr (SFun s)     = PP.text s
-  ppr (SelFun i n) = PP.text "sel_" PP.<> PP.int i PP.<> PP.char '_' PP.<> PP.int n
+  ppr f = text (show f)
 
 instance Pretty Fun where
-  ppr (Fun s)           = ppr s
+  ppr (Fun s)         = ppr s
   ppr (GradFun s Fwd) = PP.char 'D' PP.<> ppr s
   ppr (GradFun s Rev) = PP.char 'R' PP.<> ppr s
   ppr (DrvFun s Fwd)  = ppr s PP.<> PP.char '\''
   ppr (DrvFun s Rev)  = ppr s PP.<> PP.char '`'
-  ppr (LMFun s)   = PP.text s
 
 instance Pretty TVar where
   pprPrec p (TVar ty Dummy) = ppr ty -- For dummy vars, print the type
@@ -585,7 +428,7 @@ instance HasInfix TFun where
   isInfix (TFun _ f) = isInfix f
 
 instance HasInfix Fun where
-  isInfix (Fun (SFun s))
+  isInfix (Fun (PrimFun s))
     | s == "==" = Just precOne
     | s == "+"  = Just precTwo
     | s == "-"  = Just precTwo
@@ -663,127 +506,9 @@ test_Pretty =
     let test e s = it s $ pps e `shouldBe` s
 
     let var s = Var (Simple s)
-    let e = mkSCall1 "g" (var "i")
-    let e2 = mkSCall3 "f" e (var "_t1") (kInt 5)
+    let e  = Call (Fun (UserFun "g")) (var "i")
+    let e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
     describe "Pretty" $ do
       test e "g( s$i )"
       test e2 "f( g( s$i ), s$_t1, 5 )"
-
------------------------------------------------
---     Symbol table, ST, maps variables to types
------------------------------------------------
-
-type ST = Map.Map Var Type
-
-sttrace :: String -> a -> a
-sttrace _ e = e -- trace msg e
-
-emptyST :: ST
-emptyST = Map.empty
-
-stBindParams :: ST -> [TVar] -> ST
-stBindParams st params
-  = foldl add st params
-  where
-    add :: ST -> TVar -> ST
-    add env (TVar ty v) = stInsert v ty env
-
-stInsert :: Var -> Type -> ST -> ST
-stInsert v ty env = sttrace
-  ("Inserting " ++ show v ++ " = " ++ show ty ++ " in " ++ show env ++ "\n")
-  (Map.insert v ty env)
-
-stInsertFun :: Fun -> Type -> ST -> ST
-stInsertFun f = stInsert (Simple $ show f)
-  -- Simon says: bizarre
-
-stLookup :: HasCallStack => String -> Var -> ST -> Type
-stLookup msg v env = case Map.lookup v env of
-  Just a  -> a
-  Nothing -> error
-    ("Couldn't find " ++ show v ++ " in " ++ msg ++ ", env = " ++ show env)
-    TypeUnknown
-
-stLookupFun :: HasCallStack => String -> Fun -> ST -> Type
-stLookupFun msg f = stLookup msg (Simple $ show f)
-
-------------------------------------------------------------------------------
-
-mkTypeTuple :: [Type] -> Type
-mkTypeTuple [ty] = ty
-mkTypeTuple tys = TypeTuple tys
-
--- A single place for "domain knowledge" about polymorphic functions -- to be pruned when we get primdefs
-typeofFunTy :: HasCallStack => ST -> Fun -> Type -> Type
-typeofFunTy env f (TypeTuple tys) = typeofFunTys env f tys
-typeofFunTy env f ty              = typeofFunTys env f [ty]
-
-typeofFunTys :: HasCallStack => ST -> Fun -> [Type] -> Type
-typeofFunTys env tf tys =
-  case (tf, tys) of
-  (GradFun f Fwd, tys) -> TypeLM (mkTypeTuple tys) (typeofFunTys env (Fun f) tys)
-  (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (mkTypeTuple tys)
-  (LMFun "lmApply",  [TypeLM s t, s1]) -> assertEqualThen "lmApply" s1 s $ t
-  (LMFun f, tys) -> error $ "When?"
-  (Fun (SFun "pr")       , _                            ) -> TypeInteger
-  (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
-  (Fun (SFun "index")    , [_, TypeVec t]               ) -> t
-  (Fun (SFun "size" )    , [TypeVec _]                  ) -> TypeInteger
-  (Fun (SFun "sum"  )    , [TypeVec t]                  ) -> t
-  (Fun (SFun "to_float") , [TypeInteger]                ) -> TypeFloat
-  (Fun (SFun "neg"  )    , [t]                          ) -> t
-  (Fun (SFun "exp"  )    , [TypeFloat]                  ) -> TypeFloat
-  (Fun (SFun "log"  )    , [TypeFloat]                  ) -> TypeFloat
-  (Fun (SFun "*"    )    , [t1, TypeFloat]              ) -> t1
-  (Fun (SFun "+"    )    , [t1, t2]                     ) -> t1
-  (Fun (SFun "/"    )    , [t1, t2]                     ) -> t1
-  (Fun (SFun "*"    )    , [t1, t2]                     ) -> t1
-  (Fun (SFun "-"    )    , [t1, t2]                     ) -> t1
-  (Fun (SFun "square")   , [t1]                         ) -> t1
-
-  (Fun (SFun "=="   )    , _                            ) -> TypeBool
-  (Fun (SFun "!="   )    , _                            ) -> TypeBool
-  (Fun (SFun "<"    )    , _                            ) -> TypeBool
-  (Fun (SFun ">"    )    , _                            ) -> TypeBool
-
-  (Fun (SFun "delta")    , [TypeInteger, TypeInteger, t]) -> t
-
-  (Fun (SelFun i _  )    , [TypeTuple tys]              ) -> tys !! (i - 1)
-  (Fun (SelFun{})      , [TypeVec t]) -> t
-  (f        , _          ) -> case Map.lookup (Simple $ show f) env of
-                                  Just a  -> a
-                                  Nothing -> error $ "LOOKUP: " ++ emsg
-
-  where emsg = "Failed to find type for Function\n"
-                ++ show tf
-                ++ " @ "
-                ++ show tys
-                ++ ".    Env:\n"
-                ++ show env
-
------------------------------------------------
---     Debugging utilities
------------------------------------------------
-
-assertEqual msg t1 t2 =
-  assertEqualThen msg t1 t2 ()
-
-assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
-assertEqualThen msg t1 t2 e =
-  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
-
-assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
-assertAllEqualThen msg es e =
-  if allEq es then e else
-     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
-  where
-    allEq [] = True
-    allEq (a:as) = allEqa a as
-
-    allEqa a0 [] = True
-    allEqa a0 [a] = a0 == a
-    allEqa a0 (a:as) = a0 == a && allEqa a0 as
-
-assertAllEqualRet :: HasCallStack => Eq a => Show a => String -> [a] -> a
-assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
