@@ -13,6 +13,7 @@
                     (lam (i : Integer) (* (if (< i 3) (index i x) 7.0) (index i y))))))
 )
 
+
 (def test_tuple ((x : Tuple (Vec Float Vec Vec Float Integer)))
     (+ 1 (if (< 2 3) 4 5)))
 

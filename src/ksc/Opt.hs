@@ -65,7 +65,7 @@ optIf (Let v r b)           t e = Let v r   (optIf b t e)
 optIf (Assert e1 e2)        t e = Assert e1 (optIf e2 t e)
 optIf e_cond e_then e_else
   | Just (ei, ej) <- isEqualityCall e_cond
-  , Konst KZero   <- e_else
+  , Konst (KZero _)  <- e_else
   = pDelta ei ej e_then
 optIf b                     t e = If b t e
 
@@ -106,17 +106,28 @@ optFun :: Type -> FunId -> TExpr -> Maybe TExpr
 optFun _ (SelFun i _) (Tuple es)
   | i <= length es = Just (es !! (i-1))
 
--- RULE: x+0 = 0+x = x
-optFun _ (SFun "+") (Tuple [x, Konst KZero]) = Just x
-optFun _ (SFun "+") (Tuple [Konst KZero, y]) = Just y
-
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optFun _ (SFun "+") (Tuple [Tuple es1, Tuple es2])
   | length es1 == length es2 = Just (Tuple (zipWith pAdd es1 es2))
 
+-- RULE: x+0 = 0+x = x
+optFun _ (SFun "+") (Tuple [x, y]) = 
+    if isKZero y then 
+      Just x 
+    else if isKZero x then
+      Just y
+    else
+      Nothing 
+
 -- RULE: x*0 = 0*x = 0
-optFun _ (SFun "*") (Tuple [x, Konst KZero]) = Just (Konst KZero)
-optFun _ (SFun "*") (Tuple [Konst KZero, y]) = Just (Konst KZero)
+optFun _ (SFun "*") (Tuple [x, y]) =
+    if isKZero y then 
+      Just $ Konst $ KZero $ typeof x 
+    else if isKZero x then
+      Just $ Konst $ KZero $ typeof y
+    else
+      Nothing 
+
 
 -- RULE: size (build (n, _)) = n
 optFun _ (SFun "size") (Call (TFun _ (Fun (SFun "build"))) (Tuple [n,_]))
@@ -205,7 +216,7 @@ optBuild ty sz i e
   | Call (TFun _ (Fun (SFun "*"))) (Tuple [e1,e2]) <- e
   , i `notFreeIn` e2
   , is_expensive e2
-  = Just (Call (TFun ty (Fun (SFun "mul$Vec<R>$R"))) (Tuple [pBuild sz (Lam i e1), e2]))
+  = Just (Call (TFun ty (Fun (SFun "*"))) (Tuple [pBuild sz (Lam i e1), e2]))
   where
       is_expensive (Call _ _) = True
       is_expensive _ = False
@@ -305,7 +316,8 @@ optApplyLM ty (Assert e1 e2) dx
   = Just (Assert e1 (lmApply e2 dx))
 
 optApplyLM ty (Call (TFun (TypeLM s' t') (LMFun f)) es) dx
-  = optApplyLMCall f es dx
+  = assertEqualThen "ApplyLM" ty t' $ 
+    optApplyLMCall f es dx
 
 optApplyLM ty (Let v rhs body) dx
   = Just $
@@ -324,8 +336,14 @@ optApplyLMCall ::
              -> TExpr             -- :: S
              -> Maybe (TExpr)     -- :: T
 -- Optimise (lmApply (fun arg) dx)
-optApplyLMCall "lmZero" _ dx = Just (Konst KZero)
-optApplyLMCall "lmOne"  _ dx = Just dx
+optApplyLMCall "lmZero" (Tuple [s, t]) dx 
+  = assertTypesEqualThen "Apply lmZero" (typeof s) (typeof dx) $
+    Just (Konst $ KZero $ typeof t)
+
+optApplyLMCall "lmOne" t dx 
+  = assertTypesEqualThen "Apply lmOne" (typeof t) (typeof dx) $
+    Just dx
+
 optApplyLMCall "lmAdd"  (Tuple [f,g]) dx
   = Just (pAdd (lmApply f dx) (lmApply g dx))
 
@@ -336,7 +354,7 @@ optApplyLMCall "lmVCat" (Tuple es) dx
   = Just (Tuple [lmApply e dx | e <- es])
 
 optApplyLMCall "lmHCat" (Tuple es) dx
-  = Just (foldr add (Konst KZero) (es `zip` [1..]))
+  = Just (foldr add (Konst $ KZero $ typeof dx) (es `zip` [1..]))
   where
     n = length es
 

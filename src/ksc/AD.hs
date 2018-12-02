@@ -25,8 +25,6 @@ gradSelFun :: Type -> Int -> Int -> [TVar] -> TExpr
 -- (gradSelFun i n) selects the i'th component of a n-tuple
 -- Special case for 1-tuples
 -- Result expr has type (t1, ..., tn) -o ti
--- gradSelFun tyt@(TypeTuple ts) i n params =
---    mkTCall (TypeLM (LMSelFun tyt (ts!!(i-1)))) (GradFun (SelFun i n) Fwd) (map Var params)
 gradSelFun t i 1 params = lmOne t
 gradSelFun tyt@(TypeTuple ts) i n params =
    let es = (map Var params) in

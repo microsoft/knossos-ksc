@@ -181,7 +181,7 @@ demoN decls
        ; let (rules, defs)   = partitionDecls tc_decls
              rulebase        = mkRuleBase rules
 
-       ; displayN tc_decls
+       ; displayN $! tc_decls
 
        ; banner "Optimised original definition"
        ; let opt_defs = optDefs rulebase env defs
@@ -236,32 +236,36 @@ demoN decls
 -- GMM derivatives
 -------------------------------------
 
-moveMain :: [TDef]
-         -> ( [TDef]    -- Singleton 'main' def, or empty
-            , [TDef])   -- All the rest
+moveMain :: [DeclX Fun b]
+         -> ( [DeclX Fun b]    -- Singleton 'main' decl, or empty
+            , [DeclX Fun b])   -- All the rest
 moveMain = partition isMain
   where
-    isMain (DefX (TFun _ (Fun (SFun "main"))) _ _) = True
+    isMain (DefDecl (DefX (Fun (SFun "main")) _ _)) = True
     isMain _ = False
 
 doall :: HasCallStack => String -> IO ()
 doall file =
   let tl s = reverse (take 400 $ reverse s)
-      dd defs = liftIO $ putStrLn ("---" ++ (tl $ pps defs))
+      dd defs = liftIO $ putStrLn ("..." ++ (tl $! pps defs))
       ddx :: Pretty p => [p] -> KM ()
       ddx = displayN in
   runKM $
-  do { decls <- liftIO (parseF (file ++ ".ks"))
+  do { decls0 <- liftIO (parseF (file ++ ".ks"))
   ;  liftIO $ putStrLn "read decls"
+
+  ;  let (main, decls)    = moveMain decls0
 
   ;  banner "annotated defs"
   ;  let (env, ann_decls) = annotDecls emptyST decls
   ;  dd ann_decls
 
-  ;  let (rules, alldefs) = partitionDecls ann_decls
+  ;  let (rules, defs) = partitionDecls ann_decls
          rulebase         = mkRuleBase rules
-         (main, defs)     = moveMain alldefs
-  ;  liftIO $ putStrLn ("found main " ++ pps main)
+
+  ;  banner "main"
+  ;  dd main
+  
   ;  banner "defs"
   ;  dd defs
 
@@ -281,11 +285,12 @@ doall file =
   ;  banner "optfwd"
   ;  dd optfwd
 
-  ;  let alldefs = defs ++ optgrad ++ optfwd
+  ;  let annot_main = map (\ (DefDecl x) -> x) $ snd $ annotDecls env'' main
+  ;  let alldefs = defs ++ optgrad ++ optfwd ++ annot_main
   ;  cse <- cseDefs rulebase alldefs
   ;  dd cse
 
-  ;  let ann2 =  cse ++ main
+  ;  let ann2 =  cse
   ;  banner "all"
   ;  dd ann2
 

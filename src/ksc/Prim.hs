@@ -48,8 +48,8 @@ lmCompose f g =
 lmVCat :: HasCallStack => [TExpr] -> TExpr
 lmVCat [e] = error "unexpected"
 lmVCat es =
-  let s = assertAllEqualRet "lmVCat" (map typeofLMs tys)
-      t = TypeTuple $ map typeofLMt tys in
+  let s = assertAllEqualRet "lmVCat" (map typeofSrcLM tys)
+      t = TypeTuple $ map typeofDstLM tys in
   lm s t "lmVCat" es
   where
     tys = map getLM $ map typeof $ es
@@ -57,8 +57,8 @@ lmVCat es =
 lmHCat :: HasCallStack => [TExpr] -> TExpr
 lmHCat [e] = error "unexpected"
 lmHCat es =
-  let t = assertAllEqualRet "lmHCat" (map typeofLMt tys)
-      s = TypeTuple $ map typeofLMs tys in
+  let t = assertAllEqualRet "lmHCat" (map typeofDstLM tys)
+      s = TypeTuple $ map typeofSrcLM tys in
   lm s t "lmHCat" es
   where
     tys = map getLM $ map typeof $ es
@@ -70,7 +70,7 @@ lmTranspose m = lm t s "lmTranspose" [m]
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApply m arg =
   let (TypeLM s t) = typeof m in
-  assertEqualThen ("lmApply " ++ pps m ) s (typeof arg) $
+  --assertEqualThen ("lmApply(" ++ pps m ++ "," ++ pps arg ++ ")" ) s (typeof arg) $
   mkTCall t (LMFun "lmApply") [m, arg]
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
@@ -86,7 +86,7 @@ lmBuildT n f =
   ty -> error $ "uexpected " ++ show ty ++ "\n" ++ pps f
 
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmScale t $ kTFloat 1.0) (lmScale t $ kTFloat 0.0)
+lmDelta t i j = If (pEqual i j) (lmOne t) (lmZero t t)
 
 isLMOne, isLMZero :: TExpr -> Bool
 isLMOne (Call (TFun (TypeLM _ _) (LMFun "lmOne")) _) = True

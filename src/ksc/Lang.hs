@@ -51,7 +51,7 @@ data ExprX f b
 type Expr  = ExprX Fun Var
 type TExpr = ExprX TFun TVar
 
-data Type = TypeZero               -- Polyamorous zero
+data Type = TypeZero Type
           | TypeBool
           | TypeInteger
           | TypeFloat
@@ -59,7 +59,6 @@ data Type = TypeZero               -- Polyamorous zero
           | TypeVec Type
           | TypeLambda Type Type   -- Domain -> Range
           | TypeLM Type Type       -- Linear map  Src -o Target
---          | TypeUnion Type Type    -- Tagged union of types
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
@@ -95,7 +94,7 @@ data Var
 data TVar = TVar Type Var
   deriving( Show, Eq, Ord )
 
-data Konst = KZero  -- Of any type
+data Konst = KZero Type
            | KInteger Integer
            | KFloat   Double
            | KBool    Bool
@@ -119,9 +118,12 @@ flipMode :: ADMode -> ADMode
 flipMode Fwd = Rev
 flipMode Rev = Fwd
 
-isKZero :: ExprX f b -> Bool
-isKZero (Konst KZero) = True
-isKZero _             = False
+isZero :: Type -> Bool
+isZero (TypeZero _) = True
+isZero _ = False
+
+isKZero :: TExpr -> Bool
+isKZero = isZero . typeof
 
 partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
 partitionDecls decls
@@ -175,25 +177,25 @@ instance (Typeable b, TypeableFun f) =>
 -- ToDo:
 -- The type of an If statement is a sort of union of the types on the branches
 -- This occurs because of types like TypeZero which intersect both Float and Integer
--- We could make our constants more strongly typed, which might be better, but
--- the Zero vector can be a useful optimization concept.
-makeIfType :: Type -> Type -> Type
-makeIfType TypeZero ty = ty
-makeIfType ty TypeZero = ty
-makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $ ty2
+makeIfType :: HasCallStack => Type -> Type -> Type
+makeIfType (TypeZero ty1) ty2 = makeIfType ty1 ty2
+makeIfType ty1 (TypeZero ty2) = makeIfType ty1 ty2
+makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $
+                     ty2
 
 getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
 getLM t = error $ "Wanted TypeLM, got " ++ pps t
 
-typeofLMs:: HasCallStack => Type -> Type
-typeofLMs (TypeLM s _) = s
-typeofLMs t = error $ "Wanted TypeLM, got " ++ pps t
-typeofLMt:: HasCallStack =>Type -> Type
-typeofLMt (TypeLM _ t) = t
+typeofSrcLM:: HasCallStack => Type -> Type
+typeofSrcLM (TypeLM s _) = s
+typeofSrcLM t = error $ "Wanted TypeLM, got " ++ pps t
+
+typeofDstLM:: HasCallStack =>Type -> Type
+typeofDstLM (TypeLM _ t) = t
 
 typeofKonst :: Konst -> Type
-typeofKonst KZero = TypeZero
+typeofKonst (KZero t) = TypeZero t
 typeofKonst (KInteger _) = TypeInteger
 typeofKonst (KFloat _) = TypeFloat
 typeofKonst (KBool _) = TypeBool
@@ -505,14 +507,14 @@ instance Pretty TFun where
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
   ppr (KFloat f)   = PP.double f
-  ppr KZero        = text "KZero"
+  ppr (KZero t)    = text "(KZero " <> ppr t <> char ')'
 
 instance Pretty Type where
   ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")"
   ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas ppr tys PP.<> PP.text "))"
   ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")"
   ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> PP.char ' ' PP.<> ppr t PP.<> PP.text ")"
-  ppr TypeZero = PP.text "zero_t"
+  ppr (TypeZero t) = text "zero_t@" <> ppr t
   ppr TypeFloat = PP.text "Float"
   ppr TypeInteger = PP.text "Integer"
   ppr TypeBool = PP.text "Bool"
@@ -726,7 +728,7 @@ typeofFunTys env tf tys =
   (GradFun f Rev, tys) -> TypeLM (typeofFunTys env (Fun f) tys) (mkTypeTuple tys)
   (LMFun "lmApply",  [TypeLM s t, s1]) -> assertEqualThen "lmApply" s1 s $ t
   (LMFun f, tys) -> error $ "When?"
-  (Fun (SFun "pr")       , _                            ) -> TypeZero
+  (Fun (SFun "pr")       , _                            ) -> TypeInteger
   (Fun (SFun "build")    , [_, TypeLambda TypeInteger t]) -> TypeVec t
   (Fun (SFun "index")    , [_, TypeVec t]               ) -> t
   (Fun (SFun "size" )    , [TypeVec _]                  ) -> TypeInteger
@@ -773,6 +775,16 @@ assertEqual msg t1 t2 =
 assertEqualThen :: HasCallStack => (Eq a, Show a) => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e =
   if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
+
+assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
+assertTypesEqualThen msg t1 (TypeZero t2) e = assertTypesEqualThen msg t1 t2 e
+assertTypesEqualThen msg (TypeZero t1) t2 e = assertTypesEqualThen msg t1 t2 e
+assertTypesEqualThen msg t1 t2 e =
+  if t1 == t2 then 
+    e
+  else
+    error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ 
+    e
 
 assertAllEqualThen :: HasCallStack => Eq a => Show a => String -> [a] -> b -> b
 assertAllEqualThen msg es e =

@@ -164,17 +164,22 @@ typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty)
 -}
 -}
 
+cgenIsZero s = "zero_t<" `isPrefixOf` s
+cgenIsLM s = "LM::" `isPrefixOf` s
+
 makeUnionType :: HasCallStack => String -> String -> String
 makeUnionType ty1 ty2 = 
   if ty1 == ty2 then
     ty1
-  else
-    if "LM::" `isPrefixOf` ty1 then
-      "LM::Variant<" ++ ty1 ++ ", " ++ ty2 ++ ">"
-    else case (ty1,ty2) of 
-      ("double", "zero_t") -> "double"
-      ("zero_t", "double") -> "double"
-      _ -> trace("GENVAR["++ty1 ++ "," ++ ty2++"]") $ "std::variant<" ++ ty1 ++ ", " ++ ty2 ++ ">"
+  else if cgenIsZero ty1 then
+    ty2
+  else if cgenIsZero ty2 then
+    ty1
+  else if cgenIsLM ty1 then
+    "LM::Variant<" ++ ty1 ++ ", " ++ ty2 ++ ">"
+  else 
+    error("GENVAR["++ty1 ++ "," ++ ty2++"]") 
+    -- $ "std::variant<" ++ ty1 ++ ", " ++ ty2 ++ ">"
 
 -------------------- Cgen
 
@@ -233,8 +238,7 @@ cgenDefE env (DefX f vars expr) =
       ++     cftypealias `spc` cf
       ++    "(" ++ intercalate ", " cvars ++ ") {\n"
       ++    cdecl
-      ++    "return static_cast<" ++ ctype ++ ">"  -- In order to concretize tag types like zero_t
-      ++    "(" ++ cexpr ++ ")"
+      ++    "return (" ++ cexpr ++ ")"
       ++    ";\n}\n"
       )
       cf
@@ -337,8 +341,7 @@ cgenExprR env = \case
       `spc` lvar
       ++    " = [=](" ++ vtype `spc` cgenVar v ++ ") { "  -- TODO: capture only freeVars here
       ++    cdecl
-      ++    "   return static_cast<" ++ ctype ++ ">"  -- In order to concretize tag types like zero_t
-      ++    "(" ++ cexpr ++ ");"
+      ++    "   return (" ++ cexpr ++ ");"
       ++    "};\n" )
       lvar
       ("std::function<" ++ ctype ++ "(" ++ vtype ++ ")>")
@@ -414,21 +417,21 @@ cgenTypeOf = cgenType . typeof
 
 cgenType :: HasCallStack => Type -> String
 cgenType = \case
-  TypeZero      -> "zero_t"
+  TypeZero t    -> "zero_t<" ++ cgenType t ++ ">"
   TypeFloat     -> "double"
   TypeInteger   -> "int"
   TypeTuple [t] -> cgenType t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
   TypeVec   t   -> "vec<" ++ cgenType t ++ ">"
   TypeBool      -> "bool"
-  TypeUnknown   -> "unk"
+  TypeUnknown   -> "void"
   TypeLambda from to ->
     "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenType s ++ "," ++ cgenType t ++ ">"
 
 ctypeofFun :: HasCallStack => CST -> Type -> Fun -> [String] -> String
 ctypeofFun env ty f ctys = case Map.lookup (show f) env of
-    Just ctype -> trace ("Found fun " ++ show f) ctype
+    Just ctype -> ctype -- trace ("Found fun " ++ show f) 
     Nothing -> ctypeofFun1 env ty f ctys
 
 ctypeofFun1 :: HasCallStack => CST -> Type -> Fun -> [String] -> String
@@ -459,7 +462,9 @@ ctypeofGradBuiltin f ctys = case f of
 
 cgenKonst :: Konst -> String
 cgenKonst = \case
-  KZero      -> "0"
+  KZero TypeInteger -> "0"
+  KZero TypeFloat -> "0.0"
+  KZero t    -> "zero_t<" ++ cgenType t ++ "> {}"
   KInteger i -> show i
   KFloat   f -> show f
   KBool    b -> if b then "TRUE" else "FALSE"

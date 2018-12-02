@@ -74,9 +74,9 @@ namespace ks
 	allocator g_alloc{ 10000000 };
 
 	// ===============================  Zero  ==================================
+	template <typename T>
 	struct zero_t
 	{
-		template <typename T>
 		zero_t(T) { }
 		
 		zero_t() { }
@@ -93,8 +93,8 @@ namespace ks
 		return false;   // It might be tempting to put a runtime check in here, but beware of lost static optimization opportunities
 	}
 
-	template <>
-	bool is_zero(zero_t)
+	template <typename T>
+	bool is_zero(zero_t<T>)
 	{
 		return true;
 	}
@@ -265,10 +265,10 @@ namespace ks
 	T1 add(T1 t1, T2 t2) { return t1 + t2; }
 
 	template <class T2>
-	T2 add(zero_t t1, T2 t2) { return t2; }
+	T2 add(zero_t<T2> t1, T2 t2) { return t2; }
 
 	template <class T1>
-	T1 add(T1 t1, zero_t t2) { return t1; }
+	T1 add(T1 t1, zero_t<T1> t2) { return t1; }
 
 	// ===============================  Vector class ==================================
 
@@ -302,7 +302,7 @@ namespace ks
 		vec() {}
 		size_t size() const { return data_.size(); }
 #endif
-		vec(zero_t):
+		vec(zero_t<vec<T>>):
 			is_zero_ (true)
 		{
 		}
@@ -359,7 +359,7 @@ namespace ks
 		vec<T> ret = vec<T>::create(size);
 
 		for (size_t i = 0; i < size; ++i)
-			ret[i] = T{ f(i) }; // Explicit ctor for zero_t
+			ret[i] = f(i); 
 		return ret;
 	}
 
@@ -415,6 +415,41 @@ namespace ks
 		return ret;
 	}
 
+	// Elemetwise subtraction
+	template <class T>
+	vec<T> operator-(vec<T> const& a, vec<T> const& b)
+	{
+		ASSERT(!is_zero(a));
+			// return -b;
+
+		if (is_zero(b))
+			return a;
+
+		ASSERT(a.size() != 0);
+		ASSERT(a.size() == b.size());
+		vec<T> ret = vec<T>::create(a.size());
+
+		for (size_t i = 0; i < a.size(); ++i)
+			ret[i] = a[i] - b[i];
+		return ret;
+	}
+
+	// Subtraction of a scalar
+	template <class T>
+	vec<T> operator-(vec<T> const& a, T const& b)
+	{
+		ASSERT(false); // Can't handle zero_t - const
+		if (is_zero(a))
+			return a;
+	
+		ASSERT(a.size() != 0);
+		vec<T> ret = vec<T>::create(a.size());
+
+		for (size_t i = 0; i < a.size(); ++i)
+			ret[i] = a[i] - b;
+		return ret;
+	}
+
 	// Scale a vec
 	template <class T>
 	vec<T> operator*(vec<T> const& v, double val)
@@ -442,7 +477,7 @@ namespace ks
 	T sum(vec<T> const& v)
 	{
 		if (is_zero(v))
-			return T { zero_t {} };
+			return T { zero_t<T> {} };
 
 		ASSERT(v.size() != 0);
 
@@ -495,8 +530,8 @@ namespace ks
 
 			static Zero mk(From, To) { return Zero{}; }
 
-			zero_t Apply(From f) const { 
-				return zero_t { }; 
+			zero_t<To> Apply(From f) const { 
+				return { }; 
 			}
 		};
 
@@ -654,7 +689,7 @@ namespace ks
 			}
 
 			template <size_t i>
-			To Apply_aux(zero_t accum, From const& f) const {
+			To Apply_aux(zero_t<To> accum, From const& f) const {
 				if constexpr (i < n) {
 					// Accumulator could be zero if first terms are zero,
 					// just move on to case 1
@@ -744,7 +779,7 @@ namespace ks
 			}
 /*
 			template <size_t i>
-			To Apply_aux(zero_t accum, From const& f) const {
+			To Apply_aux(zero_t<To> accum, From const& f) const {
 				if constexpr (i < n) {
 					// Accumulator could be zero if first terms are zero,
 					// just move on to case 1
@@ -857,7 +892,7 @@ namespace ks
 		std::ostream &operator<<(std::ostream &s, Build<L> const &t)
 		{
 			return s << "Build" <<
-				"<" << type_to_string<L>::name() << ">" <<
+				"<" << type_to_string<typename Build<L>::To>::name() << ">" <<
 				"(" << t.n << ", <ftype>)";
 		}
 
@@ -914,7 +949,7 @@ namespace ks
 
 			To Apply(From x) const
 			{
-				if (is_zero(x)) return To{ zero_t{} };
+				if (is_zero(x)) return To{ zero_t<To> {} };
 
 				if (n != x.size())
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
@@ -928,7 +963,7 @@ namespace ks
 		std::ostream &operator<<(std::ostream &s, BuildT<L> const &t)
 		{
 			return s << "BuildT" <<
-				"<" << type_to_string<L>::name() << ">" <<
+				"<" << type_to_string<typename BuildT<L>::To>::name() << ">" <<
 				"(" << t.n << ", <ftype>)";
 		}
 
@@ -1107,17 +1142,17 @@ namespace ks
 
 	// ========================= Printing primitive for KS files ===============
 	template <class T>
-	ks::zero_t pr(T a)
+	int pr(T a)
 	{
 		std::cout << a << std::endl;
-		return ks::zero_t{};
+		return 0;
 	}
 
 	template <class T, class... Ts>
-	ks::zero_t pr(T a, Ts... t)
+	int pr(T a, Ts... t)
 	{
 		pr(a);
 		std::cout << "----\n";
-		return pr(t...);
+		return 1 + pr(t...);
 	}
 } // namespace ks
