@@ -7,7 +7,7 @@ import Data.Array
 import Text.PrettyPrint
 
 --------------------------------------------
---  Simple call construction 
+--  Simple call construction
 --------------------------------------------
 
 primCall :: PrimFun -> Type -> TExpr -> TExpr
@@ -19,7 +19,7 @@ mkPrimCall fun arg
   = primCall fun res_ty arg
   where
     res_ty = primCallResultTy fun (typeof arg)
-    
+
 mkPrimCall2 :: String -> TExpr -> TExpr -> TExpr
 mkPrimCall2 f a b = mkPrimCall f (Tuple [a, b])
 
@@ -175,7 +175,7 @@ selCallResultTy i arg_ty
   = case arg_ty of
       TypeTuple tys -> tys !! (i - 1)
       TypeVec t     -> t
-      
+
 lmApplyResultTy, lmTransposeResultTy, lmScaleResultTy,
   lmHCatResultTy, lmVCatResultTy, lmBuildResultTy,
   lmBuildTResultTy, lmComposeResultTy, lmAddResultTy
@@ -236,6 +236,7 @@ lmHCatResultTy ty
 simplePrimResultTy :: String -> Type -> Maybe Type
 simplePrimResultTy fun arg_ty
   = case (fun, arg_ty) of
+      ("inline"   , t                                      ) -> Just t
       ("pr"       , _                                      ) -> Just TypeInteger
       ("build"    , TypeTuple [_, TypeLambda TypeInteger t]) -> Just (TypeVec t)
       ("index"    , TypeTuple [_, TypeVec t]               ) -> Just t
@@ -249,7 +250,7 @@ simplePrimResultTy fun arg_ty
       ("/"        , TypeTuple [t1, t2]                     ) -> Just t1
       ("*"        , TypeTuple [t1, t2]                     ) -> Just t1
       ("-"        , TypeTuple [t1, t2]                     ) -> Just t1
-      ("square"   , t1                                     ) -> Just t1   
+      ("square"   , t1                                     ) -> Just t1
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool
       ("<"        , _                                      ) -> Just TypeBool
@@ -261,8 +262,8 @@ simplePrimResultTy fun arg_ty
       _ -> Nothing
 
 isPrimFun :: String -> Bool
-isPrimFun f = f `elem` [ "pr", "build", "index", "size", "sum", "to_float", "neg"
-                       , "exp", "log", "+", "-", "*", "/", "square", "==", "!="
-                       , "<", ">", "delta", "deltaVec", "diag"
+isPrimFun f = f `elem` [ "inline", "pr", "build", "index", "size", "sum", "to_float"
+                       , "neg", "exp", "log", "+", "-", "*", "/", "square"
+                       , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
-                       , "lmCopose", "lmAdd", "lmScale", "lmBuild" ]
+                       , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT" ]

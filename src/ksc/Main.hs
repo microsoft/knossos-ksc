@@ -177,14 +177,14 @@ demoN decls
        ; displayN decls
 
        ; banner "Typechecked declarations"
-       ; let (env, tc_decls) = annotDecls emptyGST decls
+       ; let (env, tc_decls) = annotDecls emptyGblST decls
        ; let (rules, defs)   = partitionDecls tc_decls
              rulebase        = mkRuleBase rules
 
        ; displayN $! tc_decls
 
        ; banner "Optimised original definition"
-       ; let opt_defs = optDefs rulebase env defs
+       ; let (env1, opt_defs) = optDefs rulebase env defs
        ; displayN opt_defs
 
        ; banner "Anf-ised original definition"
@@ -193,11 +193,11 @@ demoN decls
 
        ; banner "The full Jacobian (unoptimised)"
        ; let grad_defs = gradDefs anf_defs
-             env1      = env `extendGblSymTab` grad_defs
+             env2      = env1 `extendGblST` grad_defs
        ; displayN grad_defs
 
        ; banner "The full Jacobian (optimised)"
-       ; let opt_grad_defs = optDefs rulebase env1 grad_defs
+       ; let (env3, opt_grad_defs) = optDefs rulebase env2 grad_defs
        ; displayN opt_grad_defs
 
        ; banner "Forward derivative (unoptimised)"
@@ -205,11 +205,11 @@ demoN decls
        ; displayN der_fwd
 
        ; banner "Forward-mode derivative (optimised)"
-       ; let opt_der_fwd = optDefs rulebase env1 der_fwd
+       ; let (env4, opt_der_fwd) = optDefs rulebase env3 der_fwd
        ; displayN opt_der_fwd
 
        ; banner "Forward-mode derivative (CSE'd)"
-       ; cse_fwd <- cseDefs rulebase env1 opt_der_fwd
+       ; (env5, cse_fwd) <- cseDefs rulebase env4 opt_der_fwd
        ; displayN cse_fwd
 
        ; banner "Transposed Jacobian"
@@ -217,7 +217,7 @@ demoN decls
        ; displayN trans_grad_defs
 
        ; banner "Optimised transposed Jacobian"
-       ; let opt_trans_grad_defs = optDefs rulebase env1 trans_grad_defs
+       ; let (env6, opt_trans_grad_defs) = optDefs rulebase env5 trans_grad_defs
        ; displayN opt_trans_grad_defs
 
        ; banner "Reverse-mode derivative (unoptimised)"
@@ -225,10 +225,10 @@ demoN decls
        ; displayN der_rev
 
        ; banner "Reverse-mode derivative (optimised)"
-       ; let opt_der_rev = optDefs rulebase env1 der_rev
+       ; let (env7, opt_der_rev) = optDefs rulebase env6 der_rev
        ; displayN opt_der_rev
 
-       ; cse_rev <- cseDefs rulebase env1 opt_der_rev
+       ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
        ; banner "Reverse-mode derivative (CSE'd)"
        ; displayN cse_rev
        }
@@ -258,7 +258,7 @@ doall file =
   ;  let (main, decls)    = moveMain decls0
 
   ;  banner "annotated defs"
-  ;  let (env, ann_decls) = annotDecls emptyGST decls
+  ;  let (env, ann_decls) = annotDecls emptyGblST decls
   ;  dd ann_decls
 
   ;  let (rules, defs) = partitionDecls ann_decls
@@ -274,8 +274,7 @@ doall file =
   ;  banner "grad"
   ;  dd grad
 
-  ;  let optgrad = optDefs rulebase env grad
-         env1    = env `extendGblSymTab` optgrad
+  ;  let (env1, optgrad) = optDefs rulebase env grad
   ;  banner "optgrad"
   ;  dd optgrad
 
@@ -283,14 +282,14 @@ doall file =
   ;  banner "fwd"
   ;  dd fwd
 
-  ;  let optfwd = optDefs rulebase env1 fwd
-         env2   = env1 `extendGblSymTab` optfwd
+  ;  let (env2, optfwd) = optDefs rulebase env1 fwd
   ;  banner "optfwd"
   ;  dd optfwd
 
   ;  let annot_main = map (\ (DefDecl x) -> x) $ snd $ annotDecls env2 main
+
   ;  let alldefs = defs ++ optgrad ++ optfwd ++ annot_main
-  ;  cse <- cseDefs rulebase env2 alldefs
+  ;  (env3, cse) <- cseDefs rulebase env2 alldefs
   ;  dd cse
 
   ;  let ann2 =  cse

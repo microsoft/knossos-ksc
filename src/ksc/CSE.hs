@@ -14,7 +14,9 @@ import qualified Data.Map as M
 type CSEf = TFun
 type CSEb = TVar
 
-cseDefs :: RuleBase -> GblSymTab -> [DefX CSEf CSEb] -> KM [DefX CSEf CSEb]
+cseDefs :: RuleBase -> GblSymTab -> [DefX CSEf CSEb]
+        -> KM (GblSymTab, [DefX CSEf CSEb])
+-- The returned GblSymTab contains the CSE'd definitions
 cseDefs rb gst defs
   = do { anf_defs <- anfDefs defs
 --       ; banner "ANF'd"
@@ -30,9 +32,6 @@ cseDefs rb gst defs
 
        ; return $ optDefs rb gst cse_defs
       }
-
---cseDef :: Uniq -> Def -> (Uniq, Def)
---cseDef u def = runAnf u (cseD def)
 
 ---------------------------------
 cseD :: DefX CSEf CSEb -> DefX CSEf CSEb
