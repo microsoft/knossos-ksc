@@ -199,12 +199,9 @@ pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
                []  -> return (Var (Simple f))
-               [e] -> return (Call (mk_fun f) e)
-               _   -> return (Call (mk_fun f) (Tuple es))
+               [e] -> return (Call (mkFun f) e)
+               _   -> return (Call (mkFun f) (Tuple es))
         }
-  where
-    mk_fun f | isPrimFun f = Fun (PrimFun f)
-             | otherwise   = Fun (UserFun f)
       
 pIfThenElse :: Parser (ExprX Fun Var)
 -- (if e1 e2 e3)

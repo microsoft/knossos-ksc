@@ -55,6 +55,9 @@ annotExpr env = \case
 
   Konst k -> (typeofKonst k, Konst k)
 
+  Call t@(Fun (PrimFun "$trace")) (Tuple [Var (Simple f), e]) -> annotExpr env (Call t (Call (mkFun f) e))
+  Call t@(Fun (PrimFun "$trace")) (Tuple (Var (Simple f):es)) -> annotExpr env (Call t (Call (mkFun f) (Tuple es)))
+
   Call f es -> (ty, Call (TFun ty f) aes)
     where
       (tyes,aes) = annotExpr env es

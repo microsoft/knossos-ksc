@@ -237,6 +237,7 @@ simplePrimResultTy :: String -> Type -> Maybe Type
 simplePrimResultTy fun arg_ty
   = case (fun, arg_ty) of
       ("inline"   , t                                      ) -> Just t
+      ("$trace"   , t                                      ) -> Just t
       ("pr"       , _                                      ) -> Just TypeInteger
       ("build"    , TypeTuple [_, TypeLambda TypeInteger t]) -> Just (TypeVec t)
       ("index"    , TypeTuple [_, TypeVec t]               ) -> Just t
@@ -262,8 +263,12 @@ simplePrimResultTy fun arg_ty
       _ -> Nothing
 
 isPrimFun :: String -> Bool
-isPrimFun f = f `elem` [ "inline", "pr", "build", "index", "size", "sum", "to_float"
+isPrimFun f = f `elem` [ "inline", "$trace", "pr", "build", "index", "size", "sum", "to_float"
                        , "neg", "exp", "log", "+", "-", "*", "/", "square"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT" ]
+
+mkFun :: String -> Fun
+mkFun f | isPrimFun f = Fun (PrimFun f)
+        | otherwise   = Fun (UserFun f)

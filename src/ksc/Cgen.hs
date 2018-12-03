@@ -331,6 +331,7 @@ ctypeofGradBuiltin f ctys = case f of
   "-" -> hcatscales
   "/" -> hcatscales
   "*" -> hcatscales
+  "$trace" -> "LM::One<" ++ intercalate "," ctys ++ ">"
   _ -> error $ "Don't know grad of [" ++ f ++ "]@\n  " ++ intercalate "\n  " ctys
   where hcatscales = "LM::HCat</*" ++ show ctys ++ "*/LM::Scale<double>, LM::Scale<double>>"
 

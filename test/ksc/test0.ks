@@ -1,10 +1,10 @@
 (def f ((x : Float))
-    (* x x)
+    ($trace * x x)
 )
 
 (def main() 
     (pr (D$f 9.0)
-        --(f 9.0)
-        --(fwd$f 9.0 1.0)
+        (f 9.0)
+        (fwd$f 9.0 1.0)
         )
     )

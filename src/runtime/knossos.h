@@ -1139,6 +1139,21 @@ namespace ks
 		return LM::HCat<L1, L2>::mk(L1::mk(), L2::mk());
 	}
 
+	// ========================= Trace primitive ===============
+	template <class T>
+	T $trace(T const& a)
+	{
+		std::cout << "Trace[" << a << "]" << std::endl;
+		return a;
+	}
+
+	// ========================= Trace primitive ===============
+	template <class T>
+	LM::One<T> D$$trace(T const& a)
+	{
+		std::cout << "Grad Trace[" << a << "]" << std::endl;
+		return LM::One<T>::mk(a);
+	}
 
 	// ========================= Printing primitive for KS files ===============
 	template <class T>
