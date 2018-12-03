@@ -1,7 +1,10 @@
 module CSE where
 
 import Lang
+import Prim
+import LangUtils( substE )
 import Rules
+import Annotate( GblSymTab )
 import Text.PrettyPrint
 import ANF
 import Opt
@@ -11,8 +14,8 @@ import qualified Data.Map as M
 type CSEf = TFun
 type CSEb = TVar
 
-cseDefs :: RuleBase -> [DefX CSEf CSEb] -> KM [DefX CSEf CSEb]
-cseDefs rb defs
+cseDefs :: RuleBase -> GblSymTab -> [DefX CSEf CSEb] -> KM [DefX CSEf CSEb]
+cseDefs rb gst defs
   = do { anf_defs <- anfDefs defs
 --       ; banner "ANF'd"
 --       ; displayN anf_defs
@@ -25,7 +28,7 @@ cseDefs rb defs
              --      into    let x = e in ..let y = x in ...
             -- Then optDefs substitutes x for y
 
-       ; return $ optDefs rb emptyST cse_defs
+       ; return $ optDefs rb gst cse_defs
       }
 
 --cseDef :: Uniq -> Def -> (Uniq, Def)
@@ -46,7 +49,8 @@ cseE cse_env (Let v rhs body)
     cse_env' = M.insert rhs' (Var v) cse_env
 
 cseE cse_env (Assert e1 e2)
- | Call (TFun TypeBool (Fun (SFun "=="))) (Tuple [e1a, e1b]) <- e1'
+ | Call eq (Tuple [e1a, e1b]) <- e1'
+ , eq `isThePrimFun` "=="
  , let cse_env' = M.map (substAssert e1a e1b) cse_env
  = Assert e1' (cseE cse_env' e2)
  | otherwise

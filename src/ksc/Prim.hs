@@ -1,161 +1,258 @@
 module Prim where
 
+import Lang
 import GHC.Stack
 import Debug.Trace
-
 import Data.Array
+import Text.PrettyPrint
 
-import Lang
+--------------------------------------------
+--  Simple call construction 
+--------------------------------------------
 
-dummyVar :: Type -> TExpr
-dummyVar t = Var $ TVar t (Dummy)
+primCall :: PrimFun -> Type -> TExpr -> TExpr
+primCall fun res_ty arg
+  = Call (TFun res_ty (Fun (PrimFun fun))) arg
 
--- Call to a LMFun, with given return type
-lm :: Type -> Type -> String -> [TExpr] -> TExpr
-lm (TypeTuple [s]) t name args = error $ "Tupled {" ++ name ++ "}"
-lm s t name args = mkTCall (TypeLM s t) (LMFun name) args
+mkPrimCall :: PrimFun -> TExpr -> TExpr
+mkPrimCall fun arg
+  = primCall fun res_ty arg
+  where
+    res_ty = primCallResultTy fun (typeof arg)
+    
+mkPrimCall2 :: String -> TExpr -> TExpr -> TExpr
+mkPrimCall2 f a b = mkPrimCall f (Tuple [a, b])
+
+mkPrimCall3 :: String -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall3 f a b c = mkPrimCall f (Tuple [a, b, c])
+
+--------------------------------------------
+--  Building simple calls
+--------------------------------------------
 
 lmZero :: Type -> Type -> TExpr
-lmZero s t = lm s t "lmZero" [dummyVar s, dummyVar t]
+lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [])
 
 lmOne :: Type -> TExpr
-lmOne t = lm t t "lmOne" [dummyVar t]
+lmOne t = primCall "lmOne" (TypeLM t t) (Tuple [])
 
-lmScale :: HasCallStack => Type -> TExpr -> TExpr
-lmScale t f =
-  assertEqualThen "lmScale second arg should be TypeFloat" (typeof f) TypeFloat $
-  lm t t "lmScale" [dummyVar t, f]
+lmScale :: HasCallStack => TExpr -> TExpr
+lmScale e = mkPrimCall "lmScale" e
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
-lmAdd f g =
-  let (TypeLM s1 t1) = typeof f
-      (TypeLM s2 t2) = typeof g in
-  assertEqualThen "lmAdd s" s1 s2 $
-  assertEqualThen "lmAdd t" t1 t2 $
-  lm s1 t1 "lmAdd" [f,g]
+lmAdd f g = mkPrimCall2 "lmAdd" f g
 
 lmAdds :: HasCallStack => [TExpr]-> TExpr
 lmAdds [x] = x
 lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
-lmCompose :: HasCallStack => TExpr -> TExpr -> TExpr
-lmCompose f g =
-  let (TypeLM t r) = typeof f
-      (TypeLM s t1) = typeof g in
-  assertEqualThen ("lmCompose:\n\n" ++ pps f ++ "\n\n" ++ pps g) t t1 $
-  lm s r "lmCompose" [f,g]
+lmHCat :: HasCallStack => [TExpr] -> TExpr
+lmHCat es = mkPrimCall "lmHCat" (Tuple es)
 
 lmVCat :: HasCallStack => [TExpr] -> TExpr
-lmVCat [e] = error "unexpected"
-lmVCat es =
-  let s = assertAllEqualRet "lmVCat" (map typeofSrcLM tys)
-      t = TypeTuple $ map typeofDstLM tys in
-  lm s t "lmVCat" es
-  where
-    tys = map getLM $ map typeof $ es
-
-lmHCat :: HasCallStack => [TExpr] -> TExpr
-lmHCat [e] = error "unexpected"
-lmHCat es =
-  let t = assertAllEqualRet "lmHCat" (map typeofDstLM tys)
-      s = TypeTuple $ map typeofSrcLM tys in
-  lm s t "lmHCat" es
-  where
-    tys = map getLM $ map typeof $ es
+lmVCat es = mkPrimCall "lmVCat" (Tuple es)
 
 lmTranspose :: TExpr -> TExpr
-lmTranspose m = lm t s "lmTranspose" [m]
-  where (TypeLM s t) = typeof m
+lmTranspose m = mkPrimCall "lmTranspose" m
+
+lmCompose :: TExpr -> TExpr -> TExpr
+lmCompose f g = mkPrimCall2 "lmCompose" f g
 
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
-lmApply m arg =
-  let (TypeLM s t) = typeof m in
-  --assertEqualThen ("lmApply(" ++ pps m ++ "," ++ pps arg ++ ")" ) s (typeof arg) $
-  mkTCall t (LMFun "lmApply") [m, arg]
+lmApply f x = mkPrimCall2 "lmApply" f x
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuild n f =
-    case typeof f of
-    TypeLambda TypeInteger (TypeLM s t) -> lm s (TypeVec t) "lmBuild" [n, f]
-    ty -> error $ "uexpected " ++ show ty ++ "\n" ++ pps f
+lmBuild n f = mkPrimCall2 "lmBuild" n f
 
-lmBuildT :: TExpr -> TExpr -> TExpr
-lmBuildT n f =
-  case typeof f of
-  TypeLambda TypeInteger (TypeLM s t) -> lm (TypeVec s) t "lmBuildT" [n, f]
-  ty -> error $ "uexpected " ++ show ty ++ "\n" ++ pps f
+lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
+lmBuildT n f = mkPrimCall2 "lmBuildT" n f
 
-lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmOne t) (lmZero t t)
+isThePrimFun :: TFun -> String -> Bool
+isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
+isThePrimFun _ _ = False
 
 isLMOne, isLMZero :: TExpr -> Bool
-isLMOne (Call (TFun (TypeLM _ _) (LMFun "lmOne")) _) = True
+isLMOne (Call f e) = f `isThePrimFun` "lmOne"
 isLMOne _ = False
 
-isLMZero (Call (TFun (TypeLM _ _) (LMFun "lmZero")) _) = True
+isLMZero (Call f e) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
 
-primDindex :: TExpr -> TExpr -> TExpr
-primDindex i v = lmHCat [ lmZero TypeInteger t
-                    , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
-            where ii = TVar TypeInteger $ Simple "ii"
-                  (TypeVec t) = typeof v
-
-
------------------------
--- Assertion
-
 isEqualityCall :: TExpr -> Maybe (TExpr, TExpr)
-isEqualityCall (Call (TFun TypeBool (Fun (SFun "=="))) (Tuple [e1,e2]))
-  = Just (e1,e2)
-isEqualityCall _ = Nothing
+isEqualityCall (Call f (Tuple [e1,e2]))
+  | f `isThePrimFun` "==" = Just (e1,e2)
+isEqualityCall _          = Nothing
 
 -----------------------
 -- Delta and diag
 
 pDelta :: TExpr -> TExpr -> TExpr -> TExpr
 -- delta i j e  =  if i==j then e else zero
-pDelta ei ej e = mkTCall (typeof e) (mkFun "delta") [ei, ej, e]
+pDelta ei ej e = mkPrimCall3 "delta" ei ej e
 
 pDeltaVec :: TExpr -> TExpr -> TExpr -> TExpr
 -- deltaVec size i e = build size (\j. delta i j e)
-pDeltaVec sz ei e = mkTCall (TypeVec $ typeof e) (mkFun "deltaVec") [sz, ei, e]
+pDeltaVec sz ei e = mkPrimCall3 "deltaVec" sz ei e
 
 pDiag :: TExpr -> TExpr -> TExpr -> TExpr
 -- diag rows cols (\i. e) = build row (\i. deltaVec cols i e)
-pDiag rows cols d =
-  let (TypeLambda TypeInteger a) = typeof d in
-  mkTCall (TypeVec (TypeVec a)) (mkFun "diag") [rows, cols, d]
+pDiag rows cols d = mkPrimCall3 "diag" rows cols d
 
 ---------------------------
 -- "User-defined" functions
 ---------------------------
 pAdd, pMul, pDiv, pEqual :: TExpr -> TExpr -> TExpr
-pAdd a b =   mkTCall2 (typeof a) (mkFun "+") a b
-pMul a b =   mkTCall2 (typeof a) (mkFun "*") a b
-pDiv a b =   mkTCall2 (typeof a) (mkFun "/") a b
-pNeg x   =   mkTCall1 (typeof x) (mkFun "neg") x
-pExp x   =   mkTCall1 (typeof x) (mkFun "exp") x
-pLog x   =   mkTCall1 (typeof x) (mkFun "log") x
-pEqual a b = mkTCall2 TypeBool (mkFun "==") a b
+pAdd a b   = mkPrimCall2 "+" a b
+pMul a b   = mkPrimCall2 "*" a b
+pDiv a b   = mkPrimCall2 "/" a b
+pEqual a b = mkPrimCall2 "==" a b
+pNeg x     = mkPrimCall "neg" x
+pExp x     = mkPrimCall "exp" x
+pLog x     = mkPrimCall "log" x
 
 pBuild :: TExpr -> TExpr -> TExpr
-pBuild n f =
-  let (TypeLambda TypeInteger t) = typeof f in
-  mkTCall2 (TypeVec t) (mkFun "build") n f
+pBuild n f = mkPrimCall2 "build" n f
 
 pIndex :: TExpr -> TExpr -> TExpr
-pIndex i e = mkTCall2 t (mkFun "index") i e where (TypeVec t) = typeof e
+pIndex i e = mkPrimCall2 "index" i e
 
 pSum :: TExpr -> TExpr
-pSum e = mkTCall1 t (mkFun "sum") e where (TypeVec t) = typeof e
+pSum e = mkPrimCall "sum" e
 
 pSize :: TExpr -> TExpr
-pSize e = mkTCall1 TypeInteger (mkFun "size") e
+pSize e = mkPrimCall "size" e
 
 pSel :: Int -> Int -> TExpr -> TExpr
-pSel i n e = Call (TFun (ts!!(i-1)) (Fun (SelFun i n))) e where (TypeTuple ts) = typeof e
+pSel i n e = Call (TFun (ts !! (i-1))
+                        (Fun (SelFun i n))) e
+           where
+             TypeTuple ts = typeof e
 
 pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
 pSnd   = pSel 2 2
+
+
+---------------------------------------------
+--       Types of primitive functions
+--
+--  For each primitve, we give its type
+--  And this is the /only/ place we do this
+---------------------------------------------
+
+primCallResultTy :: PrimFun -> Type -> Type
+primCallResultTy fun arg_ty
+  = case primCallResultTy_maybe fun arg_ty of
+      Just res_ty -> res_ty
+      Nothing -> pprPanic "primCallResultTy" (text fun <+> ppr arg_ty)
+
+primCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
+primCallResultTy_maybe fun
+  = case fun of
+      "lmApply"     -> lmApplyResultTy
+      "lmVCat"      -> lmVCatResultTy
+      "lmHCat"      -> lmHCatResultTy
+      "lmTranspose" -> lmTransposeResultTy
+      "lmCompose"   -> lmComposeResultTy
+      "lmAdd"       -> lmAddResultTy
+      "lmScale"     -> lmScaleResultTy
+      "lmBuild"     -> lmBuildResultTy
+      "lmBuildT"    -> lmBuildTResultTy
+      _             -> simplePrimResultTy fun
+
+selCallResultTy :: Int -> Type -> Type
+selCallResultTy i arg_ty
+  = case arg_ty of
+      TypeTuple tys -> tys !! (i - 1)
+      TypeVec t     -> t
+      
+lmApplyResultTy, lmTransposeResultTy, lmScaleResultTy,
+  lmHCatResultTy, lmVCatResultTy, lmBuildResultTy,
+  lmBuildTResultTy, lmComposeResultTy, lmAddResultTy
+  :: Type -> Maybe Type
+
+lmApplyResultTy ty
+  | (TypeTuple [TypeLM s t, s1]) <- ty
+  , assertBool (s == s1)
+  = Just t
+  | otherwise = Nothing
+
+lmTransposeResultTy ty
+  | TypeLM s t <- ty
+  = Just (TypeLM t s)
+  | otherwise = Nothing
+
+lmBuildResultTy ty
+  | TypeTuple [TypeInteger, TypeLambda TypeInteger (TypeLM s t)] <- ty
+  = Just (TypeLM s (TypeVec t))
+  | otherwise = Nothing
+
+lmBuildTResultTy ty
+  | TypeTuple [TypeInteger, TypeLambda TypeInteger (TypeLM s t)] <- ty
+  = Just (TypeLM (TypeVec s) t)
+  | otherwise = Nothing
+
+lmComposeResultTy ty
+  | TypeTuple [TypeLM b1 c, TypeLM a b2] <- ty
+  , assertBool (b1 == b2)
+  = Just (TypeLM a c)
+  | otherwise = Nothing
+
+lmAddResultTy ty
+  | TypeTuple [TypeLM s1 t1, TypeLM s2 t2] <- ty
+  , assertBool (s1 == s2)
+  , assertBool (t1 == t2)
+  = Just (TypeLM s1 t1)
+  | otherwise = Nothing
+
+lmScaleResultTy s = Just (TypeLM s s)
+
+lmVCatResultTy ty
+  | TypeTuple tys <- ty
+  , (ss, ts) <- unzipLMTypes tys
+  , (s1:ss1) <- ss
+  , assertBool $ all (== s1) ss1
+  = Just (TypeLM s1 (TypeTuple ts))
+  | otherwise = Nothing
+
+lmHCatResultTy ty
+  | TypeTuple tys <- ty
+  , (ss, ts) <- unzipLMTypes tys
+  , (t1:ts1) <- ts
+  , assertBool $ all (== t1) ts1
+  = Just (TypeLM (TypeTuple ss) t1)
+  | otherwise = Nothing
+
+simplePrimResultTy :: String -> Type -> Maybe Type
+simplePrimResultTy fun arg_ty
+  = case (fun, arg_ty) of
+      ("pr"       , _                                      ) -> Just TypeInteger
+      ("build"    , TypeTuple [_, TypeLambda TypeInteger t]) -> Just (TypeVec t)
+      ("index"    , TypeTuple [_, TypeVec t]               ) -> Just t
+      ("size"     , TypeVec _                              ) -> Just TypeInteger
+      ("sum"      , TypeVec t                              ) -> Just t
+      ("to_float" , TypeInteger                            ) -> Just TypeFloat
+      ("neg"      , t                                      ) -> Just t
+      ("exp"      , TypeFloat                              ) -> Just TypeFloat
+      ("log"      , TypeFloat                              ) -> Just TypeFloat
+      ("+"        , TypeTuple [t1, t2]                     ) -> Just t1
+      ("/"        , TypeTuple [t1, t2]                     ) -> Just t1
+      ("*"        , TypeTuple [t1, t2]                     ) -> Just t1
+      ("-"        , TypeTuple [t1, t2]                     ) -> Just t1
+      ("square"   , t1                                     ) -> Just t1   
+      ("=="       , _                                      ) -> Just TypeBool
+      ("!="       , _                                      ) -> Just TypeBool
+      ("<"        , _                                      ) -> Just TypeBool
+      (">"        , _                                      ) -> Just TypeBool
+      ("delta"    , TypeTuple [TypeInteger, TypeInteger, t]) -> Just t
+      ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeVec t)
+      ("diag"     , TypeTuple [ TypeInteger, TypeInteger
+                              , TypeLambda TypeInteger t ])  -> Just (TypeVec (TypeVec t))
+      _ -> Nothing
+
+isPrimFun :: String -> Bool
+isPrimFun f = f `elem` [ "pr", "build", "index", "size", "sum", "to_float", "neg"
+                       , "exp", "log", "+", "-", "*", "/", "square", "==", "!="
+                       , "<", ">", "delta", "deltaVec", "diag"
+                       , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
+                       , "lmCopose", "lmAdd", "lmScale", "lmBuild" ]

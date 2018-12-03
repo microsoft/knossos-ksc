@@ -12,7 +12,9 @@ Here's the BNF for our language:
 
 <expr> ::= <atom> | ( <kexpr> )
 
-<param> ::= <var> | (<var> ":" <type>)
+<params> ::= <param> | ( <param1> ... <param>n )
+
+<param>  ::= ( <var> ":" <type> )
 
 <type> ::= "Integer" | "Float" | "Vec" <type> | "Tuple" (<types>)
 
@@ -67,6 +69,7 @@ Notes:
 
 
 import Lang
+import Prim
 
 import Text.Parsec( (<|>), try, many, parse, ParseError )
 import Text.Parsec.Char
@@ -196,10 +199,13 @@ pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
                []  -> return (Var (Simple f))
-               [e] -> return (Call (mkFun f) e)
-               _   -> return (Call (mkFun f) (mkTuple es))
+               [e] -> return (Call (mk_fun f) e)
+               _   -> return (Call (mk_fun f) (Tuple es))
         }
-
+  where
+    mk_fun f | isPrimFun f = Fun (PrimFun f)
+             | otherwise   = Fun (UserFun f)
+      
 pIfThenElse :: Parser (ExprX Fun Var)
 -- (if e1 e2 e3)
 pIfThenElse = do { pReserved "if"
@@ -249,7 +255,7 @@ pDef = do { pReserved "def"
           ; f <- pIdentifier
           ; xs <- pParams
           ; rhs <- pExpr
-          ; return (DefX (mkFun f) xs rhs) }
+          ; return (DefX (Fun (UserFun f)) xs rhs) }
 
 pRule :: Parser Rule
 pRule = do { pReserved "rule"
