@@ -143,9 +143,6 @@ instance Pretty SymTab where
            , hang (text "Local symbol table:")
                 2 (ppr lcl_env) ]
 
-instance Pretty Char where
-  ppr s = char s
-
 sttrace :: String -> a -> a
 sttrace _ e = e -- trace msg e
 
@@ -183,8 +180,11 @@ userCallResultTy f env
   | Just (DefX (TFun ret_ty _) _ _) <- lookupGblST f env
   = ret_ty
   | otherwise
-  = pprPanic ("Couldn't find fun" ++ show f)
-             (text "Gbl env =" <+> ppr env)
+  = pprPanic ("Couldn't find global fun: " ++ show f)
+             (vcat [ text "Gbl env =" <+> ppr env
+                   , ppr (map ((== f) . fst) (Map.toList env))
+                   , ppr (map ((> f) . fst)  (Map.toList env))
+                   , ppr (map ((< f) . fst)  (Map.toList env)) ])
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
 extendGblST env defs = foldl add env defs

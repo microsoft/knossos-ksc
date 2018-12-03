@@ -2,7 +2,7 @@
     (* x x)
 )
 
-(def main() 
+(def main()
     (pr (D$f 9.0)
         --(f 9.0)
         --(fwd$f 9.0 1.0)

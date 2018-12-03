@@ -37,7 +37,7 @@ lmOne :: Type -> TExpr
 lmOne t = primCall "lmOne" (TypeLM t t) (Var $ mkDummy t)
 
 lmScale :: HasCallStack => Type -> TExpr -> TExpr
-lmScale t e = primCall "lmScale" (TypeLM t t) (Tuple [Var $ mkDummy t, e])
+lmScale t e = primCall "lmScale" (TypeLM t t) e
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = mkPrimCall2 "lmAdd" f g
@@ -81,7 +81,7 @@ isLMZero _ = False
 
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
 lmDelta t i j = If (pEqual i j) (lmScale t $ kTFloat 1.0) (lmScale t $ kTFloat 0.0)
- 
+
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
                         , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]

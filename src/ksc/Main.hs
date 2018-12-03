@@ -262,11 +262,11 @@ doall file =
   ;  dd ann_decls
 
   ;  let (rules, defs) = partitionDecls ann_decls
-         rulebase         = mkRuleBase rules
+         rulebase      = mkRuleBase rules
 
   ;  banner "main"
   ;  dd main
-  
+
   ;  banner "defs"
   ;  dd defs
 
