@@ -118,7 +118,7 @@ stripAnnotExpr = \case
 -----------------------------------------------
 
 -- Global symbol table
-type GblSymTab = Map.Map Fun Type
+type GblSymTab = Map.Map String Type
    -- The type is the /return type/ of the function
    -- ignoring its argument types
    
@@ -140,6 +140,9 @@ instance Pretty SymTab where
                 2 (ppr gbl_env)
            , hang (text "Local symbol table:")
                 2 (ppr lcl_env) ]
+
+instance Pretty Char where
+  ppr s = char s
 
 sttrace :: String -> a -> a
 sttrace _ e = e -- trace msg e
@@ -164,17 +167,18 @@ stLookupVar :: HasCallStack => Var -> SymTab -> Type
 stLookupVar v env
   = case Map.lookup v (lclST env) of
       Just a  -> a
-      Nothing -> pprPanic ("Couldn't find var" ++ show v)
+      Nothing -> pprPanic ("Couldn't find var " ++ show v)
                           (text "Lcl env =" <+> ppr (lclST env))
 
 stInsertFun :: Fun -> Type -> GblSymTab -> GblSymTab
-stInsertFun f ty env = Map.insert f ty env
+stInsertFun f ty env = -- trace ("stInsertFun [" ++ show f ++ " :-> " ++ pps ty ++ "]")
+                       Map.insert (show f) ty env
 
 stLookupFun :: HasCallStack => Fun -> GblSymTab -> Type
 stLookupFun f env
-  = case Map.lookup f env of
+  = case Map.lookup (show f) env of
       Just a  -> a
-      Nothing -> pprPanic ("Couldn't find fun" ++ show f)
+      Nothing -> pprPanic ("Couldn't find fun " ++ pps f)
                           (text "Gbl env =" <+> ppr env)
 
 extendGblSymTab :: GblSymTab -> [TDef] -> GblSymTab

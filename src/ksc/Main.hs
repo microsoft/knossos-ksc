@@ -237,12 +237,12 @@ demoN decls
 -- GMM derivatives
 -------------------------------------
 
-moveMain :: [DeclX Fun b]
-         -> ( [DeclX Fun b]    -- Singleton 'main' decl, or empty
-            , [DeclX Fun b])   -- All the rest
+moveMain :: [Decl]
+         -> ( [Decl]    -- Singleton 'main' decl, or empty
+            , [Decl])   -- All the rest
 moveMain = partition isMain
   where
-    isMain (DefDecl (DefX (TFun _ (Fun (UserFun "main"))) _ _)) = True
+    isMain (DefDecl (DefX (Fun (UserFun "main")) _ _)) = True
     isMain _ = False
 
 doall :: HasCallStack => String -> IO ()
@@ -288,7 +288,7 @@ doall file =
   ;  banner "optfwd"
   ;  dd optfwd
 
-  ;  let annot_main = map (\ (DefDecl x) -> x) $ snd $ annotDecls env'' main
+  ;  let annot_main = map (\ (DefDecl x) -> x) $ snd $ annotDecls env2 main
   ;  let alldefs = defs ++ optgrad ++ optfwd ++ annot_main
   ;  cse <- cseDefs rulebase env2 alldefs
   ;  dd cse

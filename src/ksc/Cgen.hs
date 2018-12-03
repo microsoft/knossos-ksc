@@ -29,141 +29,6 @@ freshCVar = do
   S.put (s + 1)
   return ("c$" ++ show s)
 
-class CfreshVar b where
-  freshVar :: Type -> M b
-
-instance CfreshVar Var where
-  freshVar _ = do
-    -- This doesn't communicate very well but is quick (and dirty)
-    s <- S.get
-    S.put (s + 1)
-    return $ Simple $ "v$" ++ show s
-
-instance CfreshVar TVar where
-  freshVar ty = do
-                 v <- freshVar @Var ty
-                 return $ TVar ty v
-
-{-
------------- Specialist linear map types
-data TypeLM
-          = LM Type Type             -- Generic linear map
-          | LMZero Type Type         -- Zeros may be rectangular
-          | LMOne Type               -- Ones must be square
-          | LMScale Type             -- Scalar will always be of TypeFloat, Type is the type being scaled
-          | LMSelFun Type Type
-          | LMTranspose TypeLM
-          | LMCompose TypeLM TypeLM
-          | LMAdd TypeLM TypeLM
-          | LMVCat [TypeLM]
-          | LMHCat [TypeLM]
-          | LMVariant [TypeLM]        -- One of the arg types, to be selected by another boolean
-          | LMBuild TypeLM
-          | LMBuildT TypeLM
-        deriving (Show, Eq, Ord)
-
-------------------------- TypeLM methods ------------------------
-
-
-nameOfType :: TypeLM -> String
-nameOfType (LM s t) = "LM**"
-nameOfType (LMZero s t) = "LMZero"
-nameOfType (LMOne t) = "LMOne"
-nameOfType (LMScale t) = "LMScale"
-nameOfType (LMSelFun s t) = "LMSelFun"
-nameOfType (LMTranspose lm) = "LMTranspose<" ++ nameOf lm ++ ">"
-nameOfType (LMCompose bc ab) = "LMCompose<" ++ nameOf bc ++ "," ++ nameOf ab ++ ">"
-nameOfType (LMAdd a b) = "LMAdd<" ++ nameOf a ++ "," ++ nameOf b ++ ">"
-nameOfType (LMVCat lms) = "LMVCat<" ++ intercalate "," (map nameOf lms) ++ ">"
-nameOfType (LMHCat lms) = "LMHCat<" ++ intercalate "," (map nameOf lms) ++ ">"
-nameOfType (LMBuild lm) = "LMBuild<" ++ nameOf lm ++ ">"
-nameOfType (LMBuildT lm) = "LMBuildT<" ++ nameOf lm ++ ">"
-nameOfType (LMVariant lms) = "LMVariant<" ++ intercalate "," (map nameOf lms) ++ ">"
-
-nameOf :: TypeLM -> String
-nameOf (LM s t) = "lmBase"
-nameOf (LMZero s t) = "lmZero"
-nameOf (LMOne t) = "lmOne"
-nameOf (LMScale t) = "lmScale"
-nameOf (LMSelFun s t) = "lmSelFun"
-nameOf (LMTranspose lm) = "lmTranspose"
-nameOf (LMCompose bc ab) = "lmCompose"
-nameOf (LMAdd a b) = "lmAdd"
-nameOf (LMVCat lms) = "lmVCat"
-nameOf (LMHCat lms) = "lmHCat"
-nameOf (LMBuild lm) = "lmBuild"
-nameOf (LMBuildT lm) = "lmBuildT"
-nameOf (LMVariant lms) = "lmVariant"
-
-typeofSrc :: TypeLM -> Type
-typeofSrc (LM s t) = s
-typeofSrc (LMZero s t) = s
-typeofSrc (LMOne t) = t
-typeofSrc (LMScale t) = t
-typeofSrc (LMSelFun s t) = s
-typeofSrc (LMTranspose lm) = typeofDst lm
-typeofSrc (LMCompose bc ab) = typeofSrc ab
-typeofSrc (LMAdd a b) = typeofSrc a
-typeofSrc (LMVCat (lm:lms)) = typeofSrc lm
-typeofSrc (LMHCat lms) = TypeTuple $ map typeofSrc lms
-typeofSrc (LMBuild lm) = typeofSrc lm
-typeofSrc (LMBuildT lm) = TypeVec (typeofSrc lm)
-typeofSrc (LMVariant lms) = assertAllEqualRet "lmvariant" (map typeofSrc lms)
-
-typeofDst :: TypeLM -> Type
-typeofDst (LM s t) = t
-typeofDst (LMZero s t) = t
-typeofDst (LMOne t) = t
-typeofDst (LMScale t) = t
-typeofDst (LMSelFun s t) = t
-typeofDst (LMTranspose lm) = typeofSrc lm
-typeofDst (LMCompose bc ab) = typeofDst bc
-typeofDst (LMAdd a b) = typeofDst a
-typeofDst (LMVCat lms) = TypeTuple $ map typeofDst lms
-typeofDst (LMHCat (l:lms)) = typeofDst l
-typeofDst (LMBuild lm) = TypeVec (typeofDst lm)
-typeofDst (LMBuildT lm) = typeofDst lm
-typeofDst (LMVariant lms) = assertAllEqualRet "lmvariant/dst" (map typeofDst lms)
-
-transpose :: TypeLM -> TypeLM
-transpose = \case
-    LM s t          -> LM t s
-    LMZero s t      -> LMZero t s
-    LMOne t         -> LMOne t
-    LMScale t       -> LMScale t
-    LMSelFun s t    -> LM t s
-    LMTranspose lm  -> lm
-    LMCompose bc ab -> LMCompose (transpose ab) (transpose bc)
-    LMAdd a b       -> LMAdd (transpose a) (transpose b)
-    LMVCat lms      -> LMHCat (map transpose lms)
-    LMHCat lms      -> LMVCat (map transpose lms)
-    LMBuild lm      -> LMBuildT lm
-    LMBuildT lm     -> LMBuild lm
-    LMVariant lms   -> LMVariant (map transpose lms)
-
-{-
-typeofLMFun :: HasCallStack => String -> [Type] -> TypeLM
-typeofLMFun f ty = case --trace ("typeofLMFun " ++ show f ++ " @ " ++ show ty)
-                        (f, ty) of
-  ("lmZero" , [s, t])   -> LMZero s t
-  ("lmOne" ,  [t])      -> LMOne t
-  ("lmScale", [t, TypeFloat]) -> LMScale t
-  ("lmBuild", [TypeInteger, TypeLambda TypeInteger ty]) -> LMBuild ty
-  ("lmBuildT", [TypeInteger, TypeLambda TypeInteger ty]) -> LMBuildT ty
-  ("lmVCat",  lms) -> LMVCat $ map getLM lms
-  ("lmHCat",  lms) -> LMHCat $ map getLM lms
-  ("lmCompose", [TypeLM s t, TypeLM r s]) -> LMCompose lm1 lm2
-  ("lmAdd",  [TypeLM lm1, TypeLM lm2]) -> LMAdd lm1 lm2
-  _ ->
-    error -- flip trace (LM TypeUnknown TypeUnknown)
-      $  "Failed to type LMfun ("
-      ++ show f
-      ++ ", "
-      ++ show ty
-      ++ ")"
--}
--}
-
 cgenIsZero s = "zero_t<" `isPrefixOf` s
 cgenIsLM s = "LM::" `isPrefixOf` s
 
@@ -202,14 +67,30 @@ getType (CG _ _ ty) = ty
 type CST = Map.Map String String
 cstEmpty = Map.empty
 
-cstInsert:: String -> String -> CST -> CST
-cstInsert f ty env = -- trace ("cstInsert " ++ show f ++ " = " ++ show ty ++ "\n" ++ show env) $
-         Map.insert f ty env
+cstMaybeLookup0 :: HasCallStack => String -> CST -> Maybe String
+cstMaybeLookup0 s env = Map.lookup s env
 
-cstLookup :: HasCallStack => String -> CST -> String
-cstLookup v env = case Map.lookup v env of
+cstLookup0 :: HasCallStack => String -> CST -> String
+cstLookup0 v env = case cstMaybeLookup0 v env of
   Just e -> e
   Nothing -> error $ "Failed lookup [" ++ v ++ "] in\n" ++ (intercalate "\n" (map show (Map.toList env)))
+
+cstInsertVar:: Var -> String -> CST -> CST
+cstInsertVar v ty env = -- trace ("cstInsertVar [" ++ show v ++ "] = [" ++ show ty ++ "]\n" ++ show env) $
+         Map.insert (show v) ty env
+
+cstInsertFun:: Fun -> String -> CST -> CST
+cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
+         Map.insert (show f) ctype env
+
+cstLookupVar :: HasCallStack => Var -> CST -> String
+cstLookupVar v env = cstLookup0 (show v) env
+
+cstLookupFun :: HasCallStack => Fun -> CST -> String
+cstLookupFun f env = cstLookup0 (show f) env
+
+cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe String
+cstMaybeLookupFun f env = cstMaybeLookup0 (show f) env
 
 cComment:: String -> String
 cComment s = "/* " ++ s ++ " */"
@@ -219,27 +100,31 @@ cgenDefs defs =
   snd $ foldl go (cstEmpty, []) defs
   where
     go :: (CST, [String]) -> TDef -> (CST, [String])
-    go (env, strs) def = 
-      let (CG cdecl cexpr ctype) = cgenDefE env def
-      in (cstInsert cexpr ctype env, strs ++ [cdecl])
+    go (env, strs) def@(DefX (TFun _ f) _ _) = 
+      let (CG cdecl cfun ctype) = cgenDefE env def
+      in (cstInsertFun f ctype env, strs ++ [cdecl])
 
 cgenDef :: TDef -> String
 cgenDef def = getDecl $ cgenDefE cstEmpty def
 
 cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (DefX f vars expr) =
-  let CG cdecl cexpr ctype = runM $ cgenExpr env expr
-      cf = cgenFun f ctype
-      mkvar (TVar ty var) = cgenType ty `spc` cgenVar var
-      cvars = map mkvar vars
+cgenDefE env (DefX (TFun _ f) params body) =
+  let addParam env (TVar ty v) = cstInsertVar v (cgenType ty) env
+      env' = foldl addParam env params
+      
+      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
+      cf = cgenUserFun f
+      
+      mkVar (TVar ty var) = cgenType ty `spc` cgenVar var
+      cvars = map mkVar params
       cftypealias = "ty$" ++ cf
   in  CG 
-      (  "typedef " ++ ctype `spc` cftypealias ++ ";\n"
-      ++     cftypealias `spc` cf
+      (     "typedef " ++ cbodytype `spc` cftypealias ++ ";\n"
+      ++    cftypealias `spc` cf
       ++    "(" ++ intercalate ", " cvars ++ ") {\n"
-      ++    cdecl
-      ++    "return (" ++ cexpr ++ ")"
-      ++    ";\n}\n"
+      ++    cbodydecl
+      ++    "return (" ++ cbodyexpr ++ ");\n"
+      ++    "}\n"
       )
       cf
       cftypealias
@@ -251,19 +136,16 @@ cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
 cgenExprR env = \case
   Konst k  -> return $ CG "" (cgenKonst k) (cgenType $ typeofKonst k)
   Var (TVar ty Dummy) -> let cty = cgenType ty in return $ CG "" (cty ++ "{}") cty
-  Var (TVar ty v) -> return $ CG "" (show v) ( 
-                          case (Map.lookup (show v) env) of
-                          Just e -> "/*vv "++show v++"*/" ++ e
-                          Nothing -> cgenType ty)
+  Var (TVar ty v) -> return $ CG "" (show v) (cstLookupVar v env) 
 
-  Call tf@(TFun ty f) x -> case x of
-    Tuple vs -> do
-      cgresults <- mapM (cgenExprR env) vs
-      let cdecls = map getDecl cgresults
-      let cexprs = map getExpr cgresults
-      let ctypes = map getType cgresults
+  Call tf@(TFun ty f) (Tuple vs) -> do
+      -- Untuple argument for C++ call
+      cgvs <- mapM (cgenExprR env) vs
+      let cdecls = map getDecl cgvs
+      let cexprs = map getExpr cgvs
+      let ctypes = map getType cgvs
 
-      let cftype = ctypeofFun env ty f ctypes
+      let cftype = ctypeofFun env tf ctypes
 
       v <- freshCVar
       return $ 
@@ -274,7 +156,7 @@ cgenExprR env = \case
         ++ " "
         ++ v
         ++ " = "
-        ++ cgenFun tf cftype
+        ++ cgenAnyFun tf cftype
         ++ "("
         ++ intercalate "," cexprs
         ++ ");\n/**eCall**/\n"
@@ -282,29 +164,11 @@ cgenExprR env = \case
         v
         cftype
         
-    ex -> do
-      vf <- freshCVar
-      (CG cdecl cexpr ctype) <- cgenExprR env ex
-
-      let cftype = ctypeofFun env ty f [ctype]
-
-      return $
-        CG
-        ( "/**Ex**/\n"
-        ++    cdecl
-        ++    cftype
-        `spc` vf
-        ++    " = "
-        ++    cgenFun tf cftype
-        ++    "("
-        ++    cexpr
-        ++    ");\n/**eEx*/\n" )
-        vf
-        cftype
+  Call tf@(TFun ty f) v -> cgenExprR env $ Call tf (Tuple [v]) 
 
   Let (TVar tyv v) e1 body -> do
     (CG decle1 ve1 type1) <- cgenExprR env e1
-    (CG declbody vbody tybody) <- cgenExprR (cstInsert (show v) type1 env) body
+    (CG declbody vbody tybody) <- cgenExprR (cstInsertVar v type1 env) body
     return $ CG
       (  "/**Let**/"
       ++ decle1
@@ -321,20 +185,20 @@ cgenExprR env = \case
 
   Tuple [t] -> cgenExpr env t
   Tuple vs  -> do
-      cgresults <- mapM (cgenExprR env) vs
-      let cdecls = map getDecl cgresults
-      let cexprs = map getExpr cgresults
-      let ctypes = map getType cgresults
+      cgvs <- mapM (cgenExprR env) vs
+      let cdecls = map getDecl cgvs
+      let cexprs = map getExpr cgvs
+      let ctypes = map getType cgvs
 
       return $ CG
         (intercalate "\n" cdecls)
         ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
         ("std::tuple<" ++ intercalate "," ctypes ++ ">")
 
-  Lam (TVar tv v) body -> do
+  Lam (TVar tyv v) body -> do
     lvar        <- freshCVar
-    let vtype = cgenType tv
-    (CG cdecl cexpr ctype) <- cgenExprR (cstInsert (show v) vtype env) body
+    let vtype = cgenType tyv
+    (CG cdecl cexpr ctype) <- cgenExprR (cstInsertVar v vtype env) body
     return $ CG
       ( "/**Lam**/"
       ++ "auto" 
@@ -398,19 +262,24 @@ cgenExprR env = \case
 
 cgenFunId :: FunId -> String
 cgenFunId = \case
-  SFun fun   -> translateFun fun
-  SelFun i n -> "selfun$" ++ show n ++ "_" ++ show i
+  UserFun fun -> fun
+  PrimFun fun -> translateFun fun
+  SelFun i n  -> "selfun$" ++ show n ++ "_" ++ show i
 
-cgenFun :: HasCallStack => TFun -> String -> String
-cgenFun tf@(TFun ty f) ctype = case f of
-  Fun (SFun "build") -> let (TypeVec t) = ty in "build<"++ cgenType t ++ ">"
+cgenUserFun :: HasCallStack => Fun -> String
+cgenUserFun f = case f of
   Fun funId       -> cgenFunId funId
   GradFun s Fwd -> "D$" ++ cgenFunId s
   GradFun s Rev -> "R$" ++ cgenFunId s
   DrvFun  s Fwd -> "fwd$" ++ cgenFunId s
   DrvFun  s Rev -> "rev$" ++ cgenFunId s
-  LMFun "lmApply" -> "lmApply"
-  LMFun s       -> ctype ++ "::mk"
+
+cgenAnyFun :: HasCallStack => TFun -> String -> String
+cgenAnyFun tf cftype = case tf of
+  -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
+  TFun (TypeLM s t) (Fun (PrimFun _)) -> cftype ++ "::mk"
+  TFun ty (Fun (PrimFun "build")) -> let TypeVec t = ty in "build<"++ cgenType t ++ ">"
+  TFun _ f -> cgenUserFun f 
 
 cgenTypeOf :: TExpr -> String
 cgenTypeOf = cgenType . typeof
@@ -429,28 +298,33 @@ cgenType = \case
     "std::function<" ++ cgenType to ++ "(" ++ cgenType from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenType s ++ "," ++ cgenType t ++ ">"
 
-ctypeofFun :: HasCallStack => CST -> Type -> Fun -> [String] -> String
-ctypeofFun env ty f ctys = case Map.lookup (show f) env of
-    Just ctype -> ctype -- trace ("Found fun " ++ show f) 
-    Nothing -> ctypeofFun1 env ty f ctys
+ctypeofFun :: HasCallStack => CST -> TFun -> [String] -> String
+ctypeofFun env tf@(TFun ty f) ctys = case cstMaybeLookupFun f env of
+    Just ctype -> -- trace ("Found fun " ++ show f) $
+                  ctype 
+    Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
+               ctypeofFun1 env ty f ctys
 
 ctypeofFun1 :: HasCallStack => CST -> Type -> Fun -> [String] -> String
-ctypeofFun1 env ty (LMFun "lmApply") ctys = cgenType ty
-ctypeofFun1 env ty (LMFun name) ctys = ctypeofLMFun name ctys
+ctypeofFun1 env ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
 ctypeofFun1 env (TypeLM s t) (GradFun f Fwd) ctys = ctypeofGradBuiltin (show f) ctys
 ctypeofFun1 env (TypeLM s t) f ctys = error $ "Did not match [" ++  show f ++ "]@\n  " ++ intercalate "\n  " ctys
 ctypeofFun1 env ty f ctys = cgenType ty
 
-ctypeofLMFun :: HasCallStack => String -> [String] -> String
-ctypeofLMFun s arg_types = case s of
+ctypeofPrimFun :: HasCallStack => Type -> String -> [String] -> String
+ctypeofPrimFun ty s arg_types = case s of
+  "lmApply" -> cgenType ty
   "lmBuild" -> "LM::Build<" ++ arg_types!!1 ++ ">"
   "lmBuildT" -> "LM::BuildT<" ++ arg_types!!1 ++ ">"
+  "lmOne" -> "LM::One<" ++ src ty ++">"
+  "lmZero" -> "LM::Zero<" ++ src ty ++ "," ++ dst ty ++">"
   ('l':'m':s) -> "LM::" ++ s ++ angle arg_types
-  s -> error ("Not LM Fun! [" ++ s ++ "]") 
-      -- "LM::" ++ s ++ angle arg_types
+  _ -> cgenType ty
   where
    angle [t] = "<" ++ t ++ ">"
    angle ts = "<" ++ intercalate ","  ts ++ ">"
+   src (TypeLM s t) = cgenType s
+   dst (TypeLM s t) = cgenType t
 
 ctypeofGradBuiltin :: HasCallStack => String -> [String] -> String
 ctypeofGradBuiltin f ctys = case f of

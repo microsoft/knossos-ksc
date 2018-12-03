@@ -31,13 +31,13 @@ mkPrimCall3 f a b c = mkPrimCall f (Tuple [a, b, c])
 --------------------------------------------
 
 lmZero :: Type -> Type -> TExpr
-lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [])
+lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [Var $ mkDummy s, Var $ mkDummy t])
 
 lmOne :: Type -> TExpr
-lmOne t = primCall "lmOne" (TypeLM t t) (Tuple [])
+lmOne t = primCall "lmOne" (TypeLM t t) (Var $ mkDummy t)
 
-lmScale :: HasCallStack => TExpr -> TExpr
-lmScale e = mkPrimCall "lmScale" e
+lmScale :: HasCallStack => Type -> TExpr -> TExpr
+lmScale t e = primCall "lmScale" (TypeLM t t) (Tuple [Var $ mkDummy t, e])
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = mkPrimCall2 "lmAdd" f g
@@ -77,6 +77,16 @@ isLMOne _ = False
 
 isLMZero (Call f e) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
+
+
+lmDelta :: Type -> TExpr -> TExpr -> TExpr
+lmDelta t i j = If (pEqual i j) (lmScale t $ kTFloat 1.0) (lmScale t $ kTFloat 0.0)
+ 
+primDindex :: TExpr -> TExpr -> TExpr
+primDindex i v = lmHCat [ lmZero TypeInteger t
+                        , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
+             where ii = TVar TypeInteger $ Simple "ii"
+                   TypeVec t = typeof v
 
 isEqualityCall :: TExpr -> Maybe (TExpr, TExpr)
 isEqualityCall (Call f (Tuple [e1,e2]))
@@ -140,7 +150,7 @@ pSnd   = pSel 2 2
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy :: PrimFun -> Type -> Type
+primCallResultTy :: HasCallStack => PrimFun -> Type -> Type
 primCallResultTy fun arg_ty
   = case primCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
@@ -205,7 +215,7 @@ lmAddResultTy ty
   = Just (TypeLM s1 t1)
   | otherwise = Nothing
 
-lmScaleResultTy s = Just (TypeLM s s)
+lmScaleResultTy (TypeTuple [s, TypeFloat]) = Just (TypeLM s s)
 
 lmVCatResultTy ty
   | TypeTuple tys <- ty

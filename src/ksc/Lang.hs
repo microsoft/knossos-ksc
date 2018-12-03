@@ -150,6 +150,9 @@ mkVar s = Simple s
 mkTVar :: Type -> String -> TVar
 mkTVar ty s = TVar ty (mkVar s)
 
+mkDummy :: Type -> TVar
+mkDummy ty = TVar ty Dummy
+
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
   = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs)
@@ -211,10 +214,7 @@ instance (HasType b, HasType f,
   typeof (Lam b e)     = TypeLambda (typeof b) (typeof e)
   typeof (Let b e1 e2) = typeof e2
   typeof (Assert c e)  = typeof e
-  typeof (If c t f)    = assertEqualThen "typeof:if" tt tf tt
-                       where
-                         tt = typeof t
-                         tf = typeof f
+  typeof (If c t f)    = makeIfType (typeof t) (typeof f)
 
 -- ToDo:
 -- The type of an If statement is a sort of union of the types on the branches
@@ -228,13 +228,6 @@ makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $
 getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
 getLM t = error $ "Wanted TypeLM, got " ++ pps t
-
-typeofSrcLM:: HasCallStack => Type -> Type
-typeofSrcLM (TypeLM s _) = s
-typeofSrcLM t = error $ "Wanted TypeLM, got " ++ pps t
-
-typeofDstLM:: HasCallStack => Type -> Type
-typeofDstLM (TypeLM _ t) = t
 
 unzipLMTypes :: HasCallStack => [Type] -> ([Type], [Type])
 unzipLMTypes [] = ([], [])
@@ -261,6 +254,16 @@ assertBool x = x    -- To remove check, return True always
 
 assertEqual msg t1 t2 =
   assertEqualThen msg t1 t2 ()
+
+assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
+assertTypesEqualThen msg t1 (TypeZero t2) e = assertTypesEqualThen msg t1 t2 e
+assertTypesEqualThen msg (TypeZero t1) t2 e = assertTypesEqualThen msg t1 t2 e
+assertTypesEqualThen msg t1 t2 e =
+  if t1 == t2 then 
+    e
+  else
+    error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ 
+    e
 
 assertEqualThen :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e =
@@ -334,11 +337,11 @@ instance Pretty FunId where
   ppr f = text (show f)
 
 instance Pretty Fun where
-  ppr (Fun s)         = ppr s
-  ppr (GradFun s Fwd) = PP.char 'D' PP.<> ppr s
-  ppr (GradFun s Rev) = PP.char 'R' PP.<> ppr s
-  ppr (DrvFun s Fwd)  = ppr s PP.<> PP.char '\''
-  ppr (DrvFun s Rev)  = ppr s PP.<> PP.char '`'
+  ppr f         = text $ show f -- need show and ppr consistent for debugging
+--  ppr (GradFun s Fwd) = text "D$" <> ppr s
+--  ppr (GradFun s Rev) = text "R$" <> ppr s
+--  ppr (DrvFun s Fwd)  = ppr s <> char '\''
+--  ppr (DrvFun s Rev)  = ppr s <> char '`'
 
 instance Pretty TVar where
   pprPrec p (TVar ty Dummy) = ppr ty -- For dummy vars, print the type
@@ -496,7 +499,7 @@ pprTrace :: String -> Doc -> a -> a
 pprTrace str doc v
   = trace (PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v
 
-pprPanic :: String -> Doc -> a
+pprPanic :: HasCallStack => String -> Doc -> a
 pprPanic str doc
   = error (PP.render (PP.sep [PP.text str, PP.nest 2 doc]))
 
