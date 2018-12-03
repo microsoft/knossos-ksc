@@ -5,13 +5,14 @@ import LangUtils
 import Prim
 import Rules
 import OptLet
-import Annotate( GblSymTab, emptyGST )
+import Annotate( GblSymTab, lookupGblST, extendGblST, emptyGblST )
 import Text.PrettyPrint
 import qualified Data.Set as S
 import qualified Data.Map as M
 
 import Debug.Trace
 import Test.Hspec
+import Data.List( mapAccumL )
 
 optTrace msg t = t -- trace msg t
 
@@ -19,17 +20,22 @@ data OptEnv = OptEnv { optRuleBase :: RuleBase
                      , optGblST    :: GblSymTab }
 
 emptyOptEnv :: OptEnv
-emptyOptEnv = OptEnv { optRuleBase = mkRuleBase [], optGblST = emptyGST }
+emptyOptEnv = OptEnv { optRuleBase = mkRuleBase []
+                     , optGblST    = emptyGblST }
 
 ---------------
-optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef] -> [TDef]
-optDefs rb st defs = map (optDef env) defs
-  where
-    env = OptEnv { optRuleBase = rb, optGblST = st }
+optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
+                        -> (GblSymTab, [TDef])
+-- Returned GblSymTab contains the optimised definitions
+optDefs rb gst defs = mapAccumL (optDef rb) gst defs
 
-optDef :: HasCallStack => OptEnv -> TDef -> TDef
-optDef env (DefX (TFun ty f) args r)
-  = DefX (TFun ty f) args (simplify env r)
+optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
+                       -> (GblSymTab, TDef)
+optDef rb gst (DefX (TFun ty f) args r)
+  = (extendGblST gst [def'], def')
+  where
+    def' = DefX (TFun ty f) args (simplify env r)
+    env = OptEnv { optRuleBase = rb, optGblST = gst }
 
 simplify :: OptEnv -> TExpr -> TExpr
 simplify env =  -- optE env . optLets . optE env .
@@ -58,7 +64,7 @@ optE env e
 --------------
 optCall :: OptEnv -> TFun -> TExpr -> TExpr
 optCall env fun opt_arg
-  | Just new_e <- rewriteCall fun opt_arg
+  | Just new_e <- rewriteCall env fun opt_arg
   = optE env new_e
   | otherwise
   = Call fun opt_arg
@@ -86,32 +92,37 @@ optIf b                     t e = If b t e
 --
 -- The same goes for optFun, optGradFun, etc
 
-rewriteCall :: HasCallStack => TFun -> TExpr -> Maybe TExpr
+rewriteCall :: HasCallStack => OptEnv -> TFun -> TExpr -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
-rewriteCall fun (Let v r arg)
+rewriteCall _ fun (Let v r arg)
   = Just (Let v r (Call fun arg))
 
-rewriteCall (TFun ty (Fun fun)) arg
-  = optFun fun arg
+rewriteCall env (TFun ty (Fun fun)) arg
+  = optFun env fun arg
 
-rewriteCall (TFun _ (GradFun f Fwd)) arg
+rewriteCall _ (TFun _ (GradFun f Fwd)) arg
   = optGradFun f arg
 
-rewriteCall f _
+rewriteCall _ f _
   = trace ("NOTE: Unmatched call {" ++ show f ++ "}") $
     Nothing
 
 -----------------------
-optFun :: FunId -> TExpr -> Maybe TExpr
+optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
-optFun (SelFun i _) (Tuple es)
+optFun _ (SelFun i _) (Tuple es)
   | i <= length es = Just (es !! (i-1))
 
-optFun (PrimFun f) e
+optFun env (PrimFun "inline") arg
+  | Call (TFun _ fun) inner_arg <- arg
+  , Just fun_def <- lookupGblST fun (optGblST env)
+  = inlineCall fun_def inner_arg
+
+optFun _ (PrimFun f) e
   = optPrimFun f e
 
-optFun (UserFun {}) _
+optFun _ (UserFun {}) _
   = Nothing
 
 -----------------------
@@ -185,8 +196,6 @@ optPrimFun "lmCompose" (Tuple [f,g])
   , vcat `isThePrimFun` "lmVCat"
   = assertEqualThen "H o V" (length ps) (length qs) $
     Just (lmAdds (zipWith lmCompose ps qs))
-  where
-    
 
 optPrimFun "lmVCat" (Tuple es)
   | all isLMZero es
@@ -214,6 +223,17 @@ optPrimFun "lmAdd" (Tuple [ Call hcat1 (Tuple ps)
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
 
 optPrimFun _ _ = Nothing
+
+-----------------------
+inlineCall :: TDef -> TExpr -> Maybe TExpr
+inlineCall def@(DefX _ bndrs body) arg
+  | [bndr] <- bndrs
+  = Just $ Let bndr arg body
+  | Tuple args <- arg
+  = assert (ppr def $$ ppr arg) (length args == length bndrs) $
+    Just (mkLets (bndrs `zip` args) body)
+  | otherwise
+  = Nothing
 
 -----------------------
 optSum :: TExpr -> Maybe TExpr
@@ -344,7 +364,7 @@ optGradPrim "neg" e = Just (lmScale (kTFloat $ -1.0))
 optGradPrim "exp" e = Just (lmScale (pExp e))
 optGradPrim "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))
 
-optGradPrim f _ = optTrace("No opt for " ++ f ) $ Nothing
+optGradPrim f _ = optTrace("No opt for grad of " ++ f) $ Nothing
 
 ---------------
 optApplyLM :: TExpr -> TExpr -> Maybe TExpr

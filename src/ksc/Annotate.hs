@@ -2,11 +2,11 @@
 
 module Annotate (
   annotDecls,
-  
-  GblSymTab, extendGblSymTab, emptyGST,
-  
+
+  GblSymTab, extendGblST, lookupGblST, emptyGblST,
+
   callResultTy
-  
+
   ) where
 
 import Lang
@@ -27,10 +27,11 @@ annotDecls env defs = mapAccumL annotDeclX env defs
 
 annotDeclX :: GblSymTab -> Decl -> (GblSymTab, TDecl)
 annotDeclX env (DefDecl (DefX f vars expr))
-  = (stInsertFun f ty env, DefDecl (DefX (TFun ty f) vars e))
+  = (stInsertFun f def' env, DefDecl def')
   where
     body_env = stBindParams env vars
     (ty,e)   = annotExpr body_env expr
+    def' = DefX (TFun ty f) vars e
 
 annotDeclX env (RuleDecl (Rule { ru_name = name, ru_qvars = qvars
                                , ru_lhs = lhs, ru_rhs = rhs }))
@@ -58,7 +59,7 @@ annotExpr env = \case
     where
       (tyes,aes) = annotExpr env es
       ty = callResultTy env f tyes
-    
+
   Let v e1 body ->
     let (tyv,ae1) = annotExpr env e1 in
     let body_env = stInsertVar v tyv env in
@@ -118,14 +119,15 @@ stripAnnotExpr = \case
 -----------------------------------------------
 
 -- Global symbol table
-type GblSymTab = Map.Map Fun Type
-   -- The type is the /return type/ of the function
-   -- ignoring its argument types
-   
+type GblSymTab = Map.Map Fun TDef
+   -- Maps the function to its definition, which lets us
+   --   * Find its return type
+   --   * Inline it
+
 -- Local symbol table
 type LclSymTab = Map.Map Var Type
    -- The Type is the type of the variable
-   
+
 -- Entire symbol table
 data SymTab = ST { gblST :: GblSymTab
                  , lclST :: LclSymTab }
@@ -144,8 +146,8 @@ instance Pretty SymTab where
 sttrace :: String -> a -> a
 sttrace _ e = e -- trace msg e
 
-emptyGST :: GblSymTab
-emptyGST = Map.empty
+emptyGblST :: GblSymTab
+emptyGblST = Map.empty
 
 stBindParams :: GblSymTab -> [TVar] -> SymTab
 stBindParams gbl_env params
@@ -167,25 +169,29 @@ stLookupVar v env
       Nothing -> pprPanic ("Couldn't find var" ++ show v)
                           (text "Lcl env =" <+> ppr (lclST env))
 
-stInsertFun :: Fun -> Type -> GblSymTab -> GblSymTab
+stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
 stInsertFun f ty env = Map.insert f ty env
 
-stLookupFun :: HasCallStack => Fun -> GblSymTab -> Type
-stLookupFun f env
-  = case Map.lookup f env of
-      Just a  -> a
-      Nothing -> pprPanic ("Couldn't find fun" ++ show f)
-                          (text "Gbl env =" <+> ppr env)
+lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
+lookupGblST f env = Map.lookup f env
 
-extendGblSymTab :: GblSymTab -> [TDef] -> GblSymTab
-extendGblSymTab env defs = foldl add env defs
+userCallResultTy :: HasCallStack => Fun -> GblSymTab -> Type
+userCallResultTy f env
+  | Just (DefX (TFun ret_ty _) _ _) <- lookupGblST f env
+  = ret_ty
+  | otherwise
+  = pprPanic ("Couldn't find fun" ++ show f)
+             (text "Gbl env =" <+> ppr env)
+
+extendGblST :: GblSymTab -> [TDef] -> GblSymTab
+extendGblST env defs = foldl add env defs
   where
-    add env (DefX (TFun ty f) _ _) = stInsertFun f ty env
-    
+    add env def@(DefX (TFun _ f) _ _) = stInsertFun f def env
+
 ------------------------------------------------------------------------------
 -- callResultTy is given a (global) function and the type of its
 -- argument, and returns the type of its result.
--- 
+--
 -- It has special cases for a bunch of built-in functions with polymorphic
 -- types; that is, where the result type is a function of the argument types
 -- Otherwise it just looks in the global symbol table.
@@ -193,9 +199,8 @@ callResultTy :: HasCallStack => SymTab -> Fun -> Type -> Type
 callResultTy env fun arg_ty
   = case fun of
       Fun (PrimFun f)  -> primCallResultTy f arg_ty
-      Fun (UserFun f)  -> stLookupFun fun (gblST env)
+      Fun (UserFun f)  -> userCallResultTy fun (gblST env)
       Fun (SelFun i _) -> selCallResultTy i arg_ty
       GradFun f Fwd    -> TypeLM arg_ty (callResultTy env (Fun f) arg_ty)
       GradFun f Rev    -> TypeLM (callResultTy env (Fun f) arg_ty) arg_ty
       DrvFun {}        -> pprPanic "callResultTy" (ppr fun)  -- Do this later
-

@@ -66,7 +66,7 @@ type PrimFun = String
 
 data FunId = UserFun String
            | PrimFun PrimFun
-           | SelFun 
+           | SelFun
                 Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                 Int      -- Arity
            deriving( Eq, Ord )
