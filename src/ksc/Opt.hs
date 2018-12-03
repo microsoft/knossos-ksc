@@ -398,7 +398,8 @@ optApplyLM (Call (TFun _ (Fun (UserFun f))) _) _
   = Nothing -- Don't complain about not optimizing UserFuns
 
 optApplyLM e dx
-  = trace ("Apply not optimized: " ++ (take 20 $ show $ ppr e) ++ "...") Nothing
+  = pprTrace "Apply not optimized:" (ppr e)
+    Nothing
 
 ------------------
 optApplyLMCall :: String -> TExpr   -- f args :: s -o t
@@ -430,8 +431,8 @@ optApplyLMCall "lmHCat" (Tuple es) dx
     add :: (TExpr, Int) -> TExpr -> TExpr
     add (e,i) z = pAdd (lmApply e (pSel i n dx)) z
 
-optApplyLMCall "lmScale" (Tuple [t'',x]) dx
-  = Just (pMul dx x)
+optApplyLMCall "lmScale" x dx
+  = Just (pMul x dx)
 
 optApplyLMCall "lmBuild" (Tuple [n, Lam i m]) dx
   = Just (pBuild n (Lam i (lmApply m dx)))
@@ -440,7 +441,9 @@ optApplyLMCall "lmBuildT" (Tuple [n, Lam i m]) dx
   = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
 
 optApplyLMCall fun arg dx
-  = trace ("No opt for " ++ (show fun) ++ "(" ++ pps arg ++ ".") Nothing
+  = pprTrace ("No opt for LM apply of " ++ show fun)
+             (ppr arg)
+             Nothing
 
 
 ----------------------
@@ -449,17 +452,18 @@ optLMTrans :: TExpr -> Maybe TExpr
 optLMTrans (Var (TVar (TypeLM s t) (Grad n d)))
    = Just (Var (TVar (TypeLM t s) (Grad n (flipMode d))))
 
--- Transposing Zero flips the type over
+-- Special cases for lmZero/lmOne because they
+-- (uniquely) need the result type of the call
+-- We could pass that type to optTransPrim, I suppose
 optLMTrans e@(Call (TFun ty (Fun (PrimFun fun))) arg)
-  | "lmZero" <- fun
+  | "lmZero" <- fun  -- Transposing 'lmZero' flips the type over
   , TypeLM s t <- ty
   = Just (lmZero t s)
 
--- Ttransposing One gives us One
-  | "lmOne" <- fun
+  | "lmOne" <- fun   -- Transposing one gives us one
   = Just e
 
-  | otherwise
+optLMTrans (Call (TFun ty (Fun (PrimFun fun))) arg)
   = optTransPrim fun arg
 
 optLMTrans (Assert e1 e2)
