@@ -216,7 +216,8 @@ lmAddResultTy ty
   = Just (TypeLM s1 t1)
   | otherwise = Nothing
 
-lmScaleResultTy (TypeTuple [s, TypeFloat]) = Just (TypeLM s s)
+lmScaleResultTy arg_ty
+  = Just (TypeLM arg_ty arg_ty)
 
 lmVCatResultTy ty
   | TypeTuple tys <- ty

@@ -111,8 +111,12 @@ rewriteCall _ f _
 -----------------------
 optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
-optFun _ (SelFun i _) (Tuple es)
-  | i <= length es = Just (es !! (i-1))
+optFun _ (SelFun i _) arg
+  | Tuple es <- arg
+  , i <= length es
+  = Just (es !! (i-1))
+  | otherwise
+  = Nothing
 
 optFun env (PrimFun "inline") arg
   | Call (TFun _ fun) inner_arg <- arg
