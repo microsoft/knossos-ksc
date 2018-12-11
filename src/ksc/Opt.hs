@@ -112,8 +112,12 @@ rewriteCall _ f _
 -----------------------
 optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
-optFun _ (SelFun i _) (Tuple es)
-  | i <= length es = Just (es !! (i-1))
+optFun _ (SelFun i _) arg
+  | Tuple es <- arg
+  , i <= length es
+  = Just (es !! (i-1))
+  | otherwise
+  = Nothing
 
 optFun env (PrimFun "inline") arg
   | Call (TFun _ fun) inner_arg <- arg
@@ -428,7 +432,8 @@ optApplyLM (Call (TFun (TypeLM s t) (GradFun (UserFun f) Fwd)) e) dx
   -}
 
 optApplyLM e dx
-  = trace ("Apply not optimized: " ++ (take 40 $ show e) ++ "...") Nothing
+  = pprTrace "Apply not optimized:" (ppr e)
+    Nothing
 
 ------------------
 -- Optimise (lmApply (fun arg) dx)
@@ -473,7 +478,9 @@ optApplyLMCall "lmBuildT" (Tuple [n, Lam i m]) dx
   = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
 
 optApplyLMCall fun arg dx
-  = trace ("No opt for " ++ (show fun) ++ "(" ++ pps arg ++ ".") Nothing
+  = pprTrace ("No opt for LM apply of " ++ show fun)
+             (ppr arg)
+             Nothing
 
 
 ----------------------
@@ -482,17 +489,18 @@ optLMTrans :: TExpr -> Maybe TExpr
 optLMTrans (Var (TVar (TypeLM s t) (Grad n d)))
    = Just (Var (TVar (TypeLM t s) (Grad n (flipMode d))))
 
--- Transposing Zero flips the type over
+-- Special cases for lmZero/lmOne because they
+-- (uniquely) need the result type of the call
+-- We could pass that type to optTransPrim, I suppose
 optLMTrans e@(Call (TFun ty (Fun (PrimFun fun))) arg)
-  | "lmZero" <- fun
+  | "lmZero" <- fun  -- Transposing 'lmZero' flips the type over
   , TypeLM s t <- ty
   = Just (lmZero t s)
 
--- Ttransposing One gives us One
-  | "lmOne" <- fun
+  | "lmOne" <- fun   -- Transposing one gives us one
   = Just e
 
-  | otherwise
+optLMTrans (Call (TFun ty (Fun (PrimFun fun))) arg)
   = optTransPrim fun arg
 
 optLMTrans (Assert e1 e2)

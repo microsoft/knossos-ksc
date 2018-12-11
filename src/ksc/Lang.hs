@@ -333,6 +333,13 @@ class Pretty p where
   pprPrec :: Prec -> p -> Doc
   pprPrec _ = ppr
 
+instance Pretty Char where
+  ppr s = char s
+
+instance Pretty Bool where
+  ppr True  = text "True"
+  ppr False = text "False"
+
 instance Pretty Var where
   ppr v   = PP.text $ show v
 
@@ -340,11 +347,7 @@ instance Pretty FunId where
   ppr f = text (show f)
 
 instance Pretty Fun where
-  ppr f         = text $ show f -- need show and ppr consistent for debugging
---  ppr (GradFun s Fwd) = text "D$" <> ppr s
---  ppr (GradFun s Rev) = text "R$" <> ppr s
---  ppr (DrvFun s Fwd)  = ppr s <> char '\''
---  ppr (DrvFun s Rev)  = ppr s <> char '`'
+  ppr f = text $ show f -- need show and ppr consistent for debugging
 
 instance Pretty TVar where
   pprPrec p (TVar ty Dummy) = ppr ty -- For dummy vars, print the type

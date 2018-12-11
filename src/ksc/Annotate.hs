@@ -124,7 +124,7 @@ stripAnnotExpr = \case
 -----------------------------------------------
 
 -- Global symbol table
-type GblSymTab = Map.Map String TDef
+type GblSymTab = Map.Map Fun TDef
    -- Maps the function to its definition, which lets us
    --   * Find its return type
    --   * Inline it
@@ -147,9 +147,6 @@ instance Pretty SymTab where
                 2 (ppr gbl_env)
            , hang (text "Local symbol table:")
                 2 (ppr lcl_env) ]
-
-instance Pretty Char where
-  ppr s = char s
 
 sttrace :: String -> a -> a
 sttrace _ e = e -- trace msg e
@@ -178,18 +175,21 @@ stLookupVar v env
                           (text "Lcl env =" <+> ppr (lclST env))
 
 stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
-stInsertFun f ty env = Map.insert (show f) ty env
+stInsertFun f ty env = Map.insert f ty env
 
 lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
-lookupGblST f env = Map.lookup (show f) env
+lookupGblST f env = Map.lookup f env
 
 userCallResultTy :: HasCallStack => Fun -> GblSymTab -> Type
 userCallResultTy f env
   | Just (DefX (TFun ret_ty _) _ _) <- lookupGblST f env
   = ret_ty
   | otherwise
-  = pprPanic ("Couldn't find fun" ++ show f)
-             (text "Gbl env =" <+> ppr env)
+  = pprPanic ("Couldn't find global fun: " ++ show f)
+             (vcat [ text "Gbl env =" <+> ppr env
+                   , ppr (map ((== f) . fst) (Map.toList env))
+                   , ppr (map ((> f) . fst)  (Map.toList env))
+                   , ppr (map ((< f) . fst)  (Map.toList env)) ])
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
 extendGblST env defs = foldl add env defs

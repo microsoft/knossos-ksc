@@ -1,4 +1,4 @@
-(rule "sqr" (v : Float) (* v v) (square v))
+(rule "mul2" (v : Float) (* v 2) (+ v v))
 
 (def f( x : Float )
-     (let (y (* x x)) (+ x y)))
+     (let (y (* x 2)) (+ x y)))

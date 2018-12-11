@@ -149,6 +149,29 @@ pString = Tok.stringLiteral lexer
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
+mk_fun :: String -> Fun
+-- Parses the print-name of a top-level function into a Fun
+-- In particular,
+--
+--   * Recognises D$f as (Grad f Fwd) etc
+--     Keep this in sync with 'instance Show Fun' in Lang.hs
+--
+--   * Distinguishes PrimFun from UserFun
+mk_fun f = case find_dollar f of
+             Just ("D",   s) -> GradFun (mk_fun_id s) Fwd
+             Just ("R",   s) -> GradFun (mk_fun_id s) Rev
+             Just ("fwd", s) -> DrvFun  (mk_fun_id s) Fwd
+             Just ("rev", s) -> DrvFun  (mk_fun_id s) Rev
+             _               -> Fun     (mk_fun_id f)
+  where
+    mk_fun_id f | isPrimFun f = PrimFun f
+                | otherwise   = UserFun f
+    find_dollar f = case break (== '$') f of
+                       (_, [])  -> Nothing  -- No $
+                       (_, [_]) -> Nothing  -- Trailing $
+                       (prefix, _ : suffix) -> Just (prefix, suffix)
+                       
+
 pVar :: Parser Var
 pVar = Simple <$> pIdentifier
 
@@ -174,7 +197,7 @@ pExpr = pKonst
 
 pKExpr :: Parser (ExprX Fun Var)
 -- Al these start with a keyword
-pKExpr =    pIfThenElse
+pKExpr =   pIfThenElse
        <|> pLet
        <|> pLam
        <|> pAssert
@@ -194,7 +217,8 @@ pType = do {
         }
 
 pCall :: Parser (ExprX Fun Var)
--- (f e)
+-- Calls (f e), (f e1 e2), etc
+-- Deals with plain variables (Var v), which look like nullay calls
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
@@ -252,7 +276,7 @@ pDef = do { pReserved "def"
           ; f <- pIdentifier
           ; xs <- pParams
           ; rhs <- pExpr
-          ; return (DefX (Fun (UserFun f)) xs rhs) }
+          ; return (DefX (mk_fun f) xs rhs) }
 
 pRule :: Parser Rule
 pRule = do { pReserved "rule"
