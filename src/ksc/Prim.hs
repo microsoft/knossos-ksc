@@ -36,8 +36,8 @@ lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [Var $ mkDummy s, Var $ mkDum
 lmOne :: Type -> TExpr
 lmOne t = primCall "lmOne" (TypeLM t t) (Var $ mkDummy t)
 
-lmScale :: HasCallStack => Type -> TExpr -> TExpr
-lmScale t e = primCall "lmScale" (TypeLM t t) e
+lmScale :: HasCallStack => TExpr -> TExpr
+lmScale e = mkPrimCall "lmScale" e
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = mkPrimCall2 "lmAdd" f g
@@ -79,12 +79,12 @@ isLMZero (Call f e) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
 
 
-lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmScale t $ kTFloat 1.0) (lmScale t $ kTFloat 0.0)
+lmDelta :: TExpr -> TExpr -> TExpr
+lmDelta i j = If (pEqual i j) (lmScale $ kTFloat 1.0) (lmScale$ kTFloat 0.0)
 
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
-                        , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
+                        , lmBuildT (pSize v) (Lam ii (lmDelta (Var ii) i)) ]
              where ii = TVar TypeInteger $ Simple "ii"
                    TypeVec t = typeof v
 
@@ -154,7 +154,8 @@ primCallResultTy :: HasCallStack => PrimFun -> Type -> Type
 primCallResultTy fun arg_ty
   = case primCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
-      Nothing -> pprPanic "primCallResultTy" (text fun <+> ppr arg_ty)
+      Nothing -> pprTrace "primCallResultTy" (text fun <+> ppr arg_ty) $
+                 TypeUnknown
 
 primCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
 primCallResultTy_maybe fun

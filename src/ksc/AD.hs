@@ -100,7 +100,7 @@ applyD :: TDef -> TDef
 applyD (DefX (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
   = DefX (TFun s (DrvFun f Rev)) (vars ++ [dr]) $
     lmApply rhs $ Var dr
-    where dr = TVar t $ Delta "r"
+    where dr = TVar s $ Delta "r"
 
 applyD (DefX (TFun (TypeLM s t) (GradFun f Fwd)) vars rhs)
   = --assertEqualThen "applyD'" s (typeof (mkTuple (map Var vars)))

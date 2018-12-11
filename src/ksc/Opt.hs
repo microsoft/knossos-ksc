@@ -188,7 +188,7 @@ optPrimFun "lmCompose" (Tuple [f,g])
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
   = assertTypesEqualThen "Scale" (typeof t1) (typeof t2) 
-    Just $ lmScale (typeof t1) (pMul x y)
+    Just $ lmScale (pMul x y)
 
   -- (f . g) . h   =>   f . (g . h)
   | Call lmcomp (Tuple [p1,p2]) <- f
@@ -225,7 +225,7 @@ optPrimFun "lmAdd" (Tuple [p,q])
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
   = assertTypesEqualThen "AddScale" (typeof t1) (typeof t2) 
-    Just $ lmScale (typeof t1) (pAdd x y)
+    Just $ lmScale (pAdd x y)
 
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
 optPrimFun "lmAdd" (Tuple [ Call hcat1 (Tuple ps)
@@ -355,11 +355,11 @@ optGradPrim "+" arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
 optGradPrim "*" (Tuple [x,y])
-  = Just (lmHCat [lmScale (typeof x) y, lmScale (typeof y) x])
+  = Just (lmHCat [lmScale y, lmScale x])
 
 optGradPrim "/" (Tuple [x,y])
-  = Just (lmHCat [ lmScale (typeof x) (pDiv (kTFloat 1.0) y)
-                 , lmScale (typeof y) (pNeg (pDiv x (pMul y y)))])
+  = Just (lmHCat [ lmScale (pDiv (kTFloat 1.0) y)
+                 , lmScale (pNeg (pDiv x (pMul y y)))])
 
 optGradPrim "sum" e
   | TypeVec t <- typeof e
@@ -372,9 +372,9 @@ optGradPrim "size" e
 optGradPrim "index" (Tuple [i,v])
   = Just (primDindex i v)
 
-optGradPrim "neg" e = Just (lmScale (typeof e) (kTFloat $ -1.0))
-optGradPrim "exp" e = Just (lmScale (typeof e) (pExp e))
-optGradPrim "log" e = Just (lmScale (typeof e) (pDiv (kTFloat 1.0) e))
+optGradPrim "neg" e = Just (lmScale (kTFloat $ -1.0))
+optGradPrim "exp" e = Just (lmScale (pExp e))
+optGradPrim "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))
 
 optGradPrim f _ = optTrace("No opt for grad of " ++ f) $ Nothing
 
@@ -483,7 +483,7 @@ optLMTrans (If b t e)
 optLMTrans e = Nothing
 
 optTransPrim :: String -> TExpr -> Maybe TExpr
-optTransPrim "lmScale"     (Tuple [t,e])        = Just $ lmScale (typeof t) e
+optTransPrim "lmScale"     e                    = Just $ lmScale e
 optTransPrim "lmTranspose" e                    = Just e
 optTransPrim "lmCompose"   (Tuple [f,g])        = Just (lmCompose (lmTranspose g) (lmTranspose f))
 optTransPrim "lmAdd"       (Tuple [f,g])        = Just (lmAdd (lmTranspose f) (lmTranspose g))
@@ -499,16 +499,16 @@ test_opt =
   hspec $ do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
-        optPrimFun "lmAdd" (Tuple [lmScale TypeFloat $ kTFloat 1.3, lmScale TypeFloat $ kTFloat 0.4])
+        optPrimFun "lmAdd" (Tuple [lmScale $ kTFloat 1.3, lmScale $ kTFloat 0.4])
         `shouldBe`
-        Just (lmScale TypeFloat (mkPrimCall2 "+" (kTFloat 1.3) (kTFloat 0.4)))
+        Just (lmScale (mkPrimCall2 "+" (kTFloat 1.3) (kTFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat
             f2 = kTFloat 2.0
-            l2 = lmScale TypeFloat f2
+            l2 = lmScale f2
         in
             optE emptyOptEnv
                  (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
-            lmHCat [lmAdd l1 l2, lmScale TypeFloat  (pAdd f2 f2)]
+            lmHCat [lmAdd l1 l2, lmScale (pAdd f2 f2)]
