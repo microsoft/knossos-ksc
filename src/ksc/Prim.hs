@@ -87,7 +87,7 @@ lmDelta t i j = If (pEqual i j) (lmScale t t $ kTFloat 1.0) (lmScale t t $ kTFlo
  
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
-                        , lmBuildT (pSize v) (Lam ii (lmDelta (Var ii) i)) ]
+                        , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
              where ii = TVar TypeInteger $ Simple "ii"
                    TypeVec t = typeof v
 
