@@ -262,10 +262,10 @@ assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
 assertTypesEqualThen msg t1 (TypeZero t2) e = assertTypesEqualThen msg t1 t2 e
 assertTypesEqualThen msg (TypeZero t1) t2 e = assertTypesEqualThen msg t1 t2 e
 assertTypesEqualThen msg t1 t2 e =
-  if t1 == t2 then 
+  if t1 == t2 then
     e
   else
-    error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ 
+    error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $
     e
 
 assertEqualThen :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
