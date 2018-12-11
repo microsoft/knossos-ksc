@@ -63,20 +63,33 @@
                                                 (sqnorm (index k ls))))))))))))
 
 (def mkvec ((n : Integer))
-    (build n (lam (j : Integer) (* 2.0 (+ 1.0 (to_float j))))))
+    (build n (lam (j : Integer) ($rand 1.0))))
 
 (def f ((x : Vec Vec Float)
         (gamma : Float)
+        (alphas : Vec Float)
+        (means : Vec Vec Float)
+        (qs : Vec Vec Float)
+        (ls : Vec Vec Float)
         (m : Float))
-    (let ((alphas (build 10 (lam (i : Integer) 7.0)))
-          (mus    (build 10 (lam (i : Integer) (mkvec 3))))
-          (qs     (build 10 (lam (i : Integer) (mkvec 3))))
-          (ls     (build 10 (lam (i : Integer) (mkvec 3)))))
-        (gmm_knossos_gmm_objective x alphas mus qs ls gamma m)
-        --(mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
+    (let ((K 10)
+          (i      1)
+          
+          )
+
+          (logsumexp (build K (lam (k : Integer)
+                (let ((Q (gmm_knossos_makeQ (index k qs) (index k ls)))
+                      (mahal_vec (mul$Mat$Vec Q 
+                                          (sub$VecR$VecR (index i x) (index k means)))))
+                  (- (+ (index k alphas) (sum (index k qs)))
+                    (* gamma (sqnorm mahal_vec)))))))
         ))
         
-    
+(def zerov ((x : Vec Float))
+  (* 0.0000001 x))
+
+(def zerovv ((x : Vec Vec Float))
+  (* 0.0000001 x))
 
 (def main ()
   (let (x (build 18 (lam (i : Integer) (mkvec 3))))
@@ -84,19 +97,20 @@
           (mus     (build 10 (lam (i : Integer) (mkvec 3))))
           (qs      (build 10 (lam (i : Integer) (mkvec 3))))
           (ls      (build 10 (lam (i : Integer) (mkvec 3))))
-          (z10x3   (* mus 0))
-          (zeros_x (* x 0))
-          (delta 0.001)
+          (z10x3   (* 0.000001 mus))
+          (zeros_x (zerovv x))
+          (delta 0.1)
           (gamma 3.5))
       (pr x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
-          (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
-          (f x gamma 1.2)
-          (fwd$f x        gamma     1.2
-                 zeros_x  delta     0.0)
-          (- (f x (+ gamma delta) 1.2)
-             (f x gamma 1.2))
+          -- (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
+          (f x gamma alphas mus qs ls 1.2)
+          (f x (+ gamma delta) alphas mus qs ls 1.2)
+          (fwd$f x        gamma     alphas mus qs ls 1.2
+                 zeros_x  delta     (zerov alphas) (zerovv mus) (zerovv qs) (zerovv ls) 0.0)
+          (- (f x (+ gamma delta) alphas mus qs ls 1.2)
+             (f x gamma alphas mus qs ls 1.2))
 
           ))))

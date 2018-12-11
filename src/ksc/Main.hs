@@ -245,10 +245,9 @@ moveMain = partition isMain
     isMain (DefDecl (DefX (Fun (UserFun "main")) _ _)) = True
     isMain _ = False
 
-doall :: HasCallStack => String -> IO ()
-doall file =
-  let tl s = reverse (take 400 $ reverse s)
-      dd defs = liftIO $ putStrLn ("..." ++ (tl $! pps defs))
+doall :: HasCallStack => Int -> String -> IO ()
+doall verbosity file =
+  let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity $! defs))
       ddx :: Pretty p => [p] -> KM ()
       ddx = displayN in
   runKM $
@@ -300,7 +299,7 @@ doall file =
   }
 
 gmm :: IO ()
-gmm = doall "test\\ksc\\gmm"
+gmm = doall 400 "test\\ksc\\gmm"
 
 main :: IO ()
 main = gmm

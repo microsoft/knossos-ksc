@@ -36,8 +36,10 @@ lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [Var $ mkDummy s, Var $ mkDum
 lmOne :: Type -> TExpr
 lmOne t = primCall "lmOne" (TypeLM t t) (Var $ mkDummy t)
 
-lmScale :: HasCallStack => Type -> TExpr -> TExpr
-lmScale t e = primCall "lmScale" (TypeLM t t) (Tuple [Var $ mkDummy t, e])
+lmScale :: HasCallStack => Type -> Type -> TExpr -> TExpr
+lmScale (TypeLM _ _) t e = error "lmScale: Arg1 is TypeLM" 
+lmScale _ (TypeLM _ _) e = error "lmScale: Arg2 is TypeLM" 
+lmScale s t e = primCall "lmScale" (TypeLM s t) (Tuple [Var $ mkDummy s, Var $ mkDummy t, e])
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = mkPrimCall2 "lmAdd" f g
@@ -79,8 +81,9 @@ isLMZero (Call f e) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
 
 
+--TODO: make this work with lmone lmzero again
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmScale t $ kTFloat 1.0) (lmScale t $ kTFloat 0.0)
+lmDelta t i j = If (pEqual i j) (lmScale t t $ kTFloat 1.0) (lmScale t t $ kTFloat 0.0)
  
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
@@ -111,7 +114,7 @@ pDiag rows cols d = mkPrimCall3 "diag" rows cols d
 ---------------------------
 -- "User-defined" functions
 ---------------------------
-pAdd, pMul, pDiv, pEqual :: TExpr -> TExpr -> TExpr
+pAdd, pMul, pDiv, pEqual :: HasCallStack => TExpr -> TExpr -> TExpr
 pAdd a b   = mkPrimCall2 "+" a b
 pMul a b   = mkPrimCall2 "*" a b
 pDiv a b   = mkPrimCall2 "/" a b
@@ -154,7 +157,7 @@ primCallResultTy :: HasCallStack => PrimFun -> Type -> Type
 primCallResultTy fun arg_ty
   = case primCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
-      Nothing -> pprPanic "primCallResultTy" (text fun <+> ppr arg_ty)
+      Nothing -> pprPanic "primCallResultTy: Could not determine result type for" (text fun <+> text " @ " <+> ppr arg_ty)
 
 primCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
 primCallResultTy_maybe fun
@@ -215,7 +218,7 @@ lmAddResultTy ty
   = Just (TypeLM s1 t1)
   | otherwise = Nothing
 
-lmScaleResultTy (TypeTuple [s, TypeFloat]) = Just (TypeLM s s)
+lmScaleResultTy (TypeTuple [s, t, TypeFloat]) = Just (TypeLM s t)
 
 lmVCatResultTy ty
   | TypeTuple tys <- ty
@@ -229,7 +232,7 @@ lmHCatResultTy ty
   | TypeTuple tys <- ty
   , (ss, ts) <- unzipLMTypes tys
   , (t1:ts1) <- ts
-  , assertBool $ all (== t1) ts1
+  -- TODO: cope with mixtures of T and Zero T, assertBool $ all (== t1) ts1
   = Just (TypeLM (TypeTuple ss) t1)
   | otherwise = Nothing
 
@@ -238,6 +241,7 @@ simplePrimResultTy fun arg_ty
   = case (fun, arg_ty) of
       ("inline"   , t                                      ) -> Just t
       ("$trace"   , t                                      ) -> Just t
+      ("$rand"    , TypeFloat                              ) -> Just TypeFloat
       ("pr"       , _                                      ) -> Just TypeInteger
       ("build"    , TypeTuple [_, TypeLambda TypeInteger t]) -> Just (TypeVec t)
       ("index"    , TypeTuple [_, TypeVec t]               ) -> Just t
@@ -248,9 +252,12 @@ simplePrimResultTy fun arg_ty
       ("exp"      , TypeFloat                              ) -> Just TypeFloat
       ("log"      , TypeFloat                              ) -> Just TypeFloat
       ("+"        , TypeTuple [t1, t2]                     ) -> Just t1
-      ("/"        , TypeTuple [t1, t2]                     ) -> Just t1
-      ("*"        , TypeTuple [t1, t2]                     ) -> Just t1
       ("-"        , TypeTuple [t1, t2]                     ) -> Just t1
+      ("/"        , TypeTuple [TypeFloat, TypeFloat]       ) -> Just TypeFloat  -- Not known to work for non-float types
+      ("/"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+      ("*"        , TypeTuple [TypeFloat, t2]              ) -> Just t2
+      ("*"        , TypeTuple [t1, TypeFloat]              ) -> Just t1
+      ("*"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
       ("square"   , t1                                     ) -> Just t1
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool
@@ -263,7 +270,7 @@ simplePrimResultTy fun arg_ty
       _ -> Nothing
 
 isPrimFun :: String -> Bool
-isPrimFun f = f `elem` [ "inline", "$trace", "pr", "build", "index", "size", "sum", "to_float"
+isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "index", "size", "sum", "to_float"
                        , "neg", "exp", "log", "+", "-", "*", "/", "square"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"

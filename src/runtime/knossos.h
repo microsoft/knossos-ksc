@@ -7,12 +7,15 @@
 #include <functional>
 #include <sstream>
 #include <iostream>
+#include <random>
 #include <cmath>
 #include <string>
 
 using std::get;
 using std::make_tuple;
 using std::tuple;
+
+#define COMMENT(x)
 
 // ASSERT
 #define ASSERT(expr)                        \
@@ -42,6 +45,123 @@ std::set<void*> objects;
 
 namespace ks
 {
+		// ===============================  String utils  ==================================
+
+	// val to string
+	template <class T>
+	std::string str(T val) {
+		std::ostringstream s;
+		s << val;
+		return s.str();
+	}
+
+
+	// ===============================  Type to string  ==================================
+
+	template <class T>
+	struct type_to_string
+	{
+		static std::string name() { return typeid(T).name(); }
+	};
+
+	template <>
+	struct type_to_string<double>
+	{
+		static std::string name() { return "double"; }
+	};
+
+	// Specialize for some types we use
+	template <>
+	struct type_to_string<tuple<>>
+	{
+		static std::string name()
+		{
+			return "tuple<>";
+		}
+	};
+
+	template <typename T>
+	struct type_to_string_aux {};
+
+	template <typename T, typename... Ts>
+	struct type_to_string_aux<tuple<T, Ts...>>
+	{
+		static std::string name()
+		{
+			return type_to_string<T>::name() + "," + type_to_string_aux<tuple<Ts...>>::name();
+		}
+
+	};
+	template <typename T>
+	struct type_to_string_aux<tuple<T>>
+	{
+		static std::string name()
+		{
+			return type_to_string<T>::name();
+		}
+
+	};
+
+	template <typename... Ts>
+	struct type_to_string<tuple<Ts...>>
+	{
+		static std::string name()
+		{
+			return "tuple<" + type_to_string_aux<tuple<Ts...>>::name() + ">";
+		}
+	};
+
+#define DECLARE_TYPE_TO_STRING(Tmpl, T)                                        \
+	template <class T>                                                         \
+	struct type_to_string<Tmpl<T>>                                             \
+	{                                                                          \
+		static std::string name()                                              \
+		{                                                                      \
+			return std::string(#Tmpl) + "<" + type_to_string<T>::name() + ">"; \
+		}                                                                      \
+	};
+
+#define DECLARE_TYPE_TO_STRING2(Tmpl, T1, T2)                                                                      \
+	template <class T1, class T2>                                                                                  \
+	struct type_to_string<Tmpl<T1, T2>>                                                                            \
+	{                                                                                                              \
+		static std::string name()                                                                                  \
+		{                                                                                                          \
+			return std::string(#Tmpl) + "<" + type_to_string<T1>::name() + "," + type_to_string<T2>::name() + ">"; \
+		}                                                                                                          \
+	};
+
+#define DECLARE_TYPE_TO_STRING3(Tmpl, T1, T2, T3)                                                                      \
+	template <class T1, class T2, class T3>                                                                                  \
+	struct type_to_string<Tmpl<T1, T2, T3>>                                                                            \
+	{                                                                                                              \
+		static std::string name()                                                                                  \
+		{                                                                                                          \
+			return std::string(#Tmpl) + "<" + type_to_string<T1>::name() + "," + type_to_string<T2>::name() + type_to_string<T3>::name() + ">"; \
+		}                                                                                                          \
+	};
+
+#define DECLARE_TYPE_TO_STRING_Pack(Tmpl)                         \
+	template <class... Ts>                                        \
+	struct type_to_string<Tmpl<Ts...>>                            \
+	{                                                             \
+		static std::string name()                                 \
+		{                                                         \
+			typedef typename Tmpl<Ts...>::Tup Tup;                \
+			std::ostringstream s;                                 \
+			s << #Tmpl << "<" <<                                    \
+			ks::type_to_string<Tup>::name() << ">"; \
+			return s.str(); \
+		}                                                         \
+	};
+
+	inline void
+	test_type_to_string()
+	{
+		auto s = type_to_string<tuple<int, float>>::name();
+		ASSERT(s == "tuple<int,float>");
+	}
+
 	// ===============================  Allocator  ==================================
 	struct allocator {
 		size_t max_size;
@@ -86,6 +206,22 @@ namespace ks
 		explicit operator int() { return 0; }
 	};
 
+	template <>
+	struct zero_t<double>
+	{
+		zero_t(double) { }
+
+		zero_t() { }
+
+		operator double() { return 0.0; }
+	};
+
+
+	template <class T>
+	std::ostream &operator<<(std::ostream &s, ks::zero_t<T> const &v)
+	{
+		return s << "zero_t<" << type_to_string<T>::name() << ">{}";
+	}
 
 	template <class T>
 	bool is_zero(T)
@@ -155,106 +291,6 @@ namespace ks
 	}
 
 	
-	// ===============================  String utils  ==================================
-
-	// val to string
-	template <class T>
-	std::string str(T val) {
-		std::ostringstream s;
-		s << val;
-		return s.str();
-	}
-
-
-	// ===============================  Type to string  ==================================
-
-	template <class T>
-	struct type_to_string
-	{
-		static std::string name() { return typeid(T).name(); }
-	};
-
-	// Specialize for some types we use
-	template <>
-	struct type_to_string<tuple<>>
-	{
-		static std::string name()
-		{
-			return "tuple<>";
-		}
-	};
-
-	template <typename T>
-	struct type_to_string_aux {};
-
-	template <typename T, typename... Ts>
-	struct type_to_string_aux<tuple<T, Ts...>>
-	{
-		static std::string name()
-		{
-			return type_to_string<T>::name() + "," + type_to_string_aux<tuple<Ts...>>::name();
-		}
-
-	};
-	template <typename T>
-	struct type_to_string_aux<tuple<T>>
-	{
-		static std::string name()
-		{
-			return type_to_string<T>::name();
-		}
-
-	};
-
-	template <typename... Ts>
-	struct type_to_string<tuple<Ts...>>
-	{
-		static std::string name()
-		{
-			return "tuple<" + type_to_string_aux<tuple<Ts...>>::name() + ">";
-		}
-	};
-
-#define DECLARE_TYPE_TO_STRING(Tmpl, T)                                        \
-	template <class T>                                                         \
-	struct type_to_string<Tmpl<T>>                                             \
-	{                                                                          \
-		static std::string name()                                              \
-		{                                                                      \
-			return std::string(#Tmpl) + "<" + type_to_string<T>::name() + ">"; \
-		}                                                                      \
-	};
-
-#define DECLARE_TYPE_TO_STRING2(Tmpl, T1, T2)                                                                      \
-	template <class T1, class T2>                                                                                  \
-	struct type_to_string<Tmpl<T1, T2>>                                                                            \
-	{                                                                                                              \
-		static std::string name()                                                                                  \
-		{                                                                                                          \
-			return std::string(#Tmpl) + "<" + type_to_string<T1>::name() + "," + type_to_string<T2>::name() + ">"; \
-		}                                                                                                          \
-	};
-
-#define DECLARE_TYPE_TO_STRING_Pack(Tmpl)                         \
-	template <class... Ts>                                        \
-	struct type_to_string<Tmpl<Ts...>>                            \
-	{                                                             \
-		static std::string name()                                 \
-		{                                                         \
-			typedef typename Tmpl<Ts...>::Tup Tup;                \
-			std::ostringstream s;                                 \
-			s << #Tmpl << "<" <<                                    \
-			ks::type_to_string<Tup>::name() << ">"; \
-			return s.str(); \
-		}                                                         \
-	};
-
-	inline void
-	test_type_to_string()
-	{
-		auto s = type_to_string<tuple<int, float>>::name();
-		ASSERT(s == "tuple<int,float>");
-	}
 
 	// ===============================  Addition ==================================
 	// Adding is special because it needs to be defined before linear maps,
@@ -294,6 +330,8 @@ namespace ks
 		vec(size_t  size) : data_(size), is_zero_(false) {}
 
 	public:
+
+		typedef T value_type;
 
 #ifdef BUMPY
 		vec() :size_(0), data_(0) {}
@@ -359,7 +397,7 @@ namespace ks
 		vec<T> ret = vec<T>::create(size);
 
 		for (size_t i = 0; i < size; ++i)
-			ret[i] = f(i); 
+			ret[i] = T { f(i) }; 
 		return ret;
 	}
 
@@ -380,7 +418,7 @@ namespace ks
 		}
 	};
 
-	// Elemetwise addition
+	// Elementwise addition
 	template <class T>
 	vec<T> operator+(vec<T> const& a, vec<T> const& b)
 	{
@@ -544,49 +582,52 @@ namespace ks
 		}
 
 		// ---------------- Scale  ------------------
-		template <class T>
-		T Scale_aux(T t, double);
+		template <class scale_t, class From, class To>
+		To Scale_aux(scale_t val, From const&);
 
 		// General case for Scale_aux<tuple>.
 		// Scale first element, then scale tail.
-		template <class... Ts>
-		tuple<Ts...> Scale_aux(tuple<Ts...> t, double val)
+		template <class scale_t, class... Ts>
+		tuple<Ts...> Scale_aux(scale_t val, tuple<Ts...> const& t)
 		{
-			return prepend(Scale_aux(std::get<0>(t), val),
-		  				   Scale_aux(tail(t), val));
+			return prepend(Scale_aux(val, std::get<0>(t)),
+		  				   Scale_aux(val, tail(t)));
 		}
 
 		// Base case for Scale_aux<Tuple>.  Empty tuple * val = empty tuple.
-		tuple<> Scale_aux(tuple<> t, double val)
+		template <class scale_t>
+		tuple<> Scale_aux(scale_t val, tuple<> const& t)
 		{
 			return t;
 		}
 
 		// Scale anything else
-		template <class T>
-		T Scale_aux(T t, double val)
+		template <class scale_t, class From, class To>
+		To Scale_aux(scale_t val, From const& t)
 		{
-			return t * val;
+			return To { val * t };
 		}
 
-		template <class T, class scale_t = double>
+		template <class From_t, class To_t, class scale_t>
 		struct Scale
 		{
 			scale_t val;
 
-			typedef T To;
-			typedef T From;
+			typedef To_t To;
+			typedef From_t From;
 
-			static Scale mk(To, scale_t val) { return Scale{ val }; }
+			static Scale mk(From, To, scale_t val) { return Scale{ val }; }
 
-			To Apply(From f) const { return To{ Scale_aux(f, val) }; }
+			To Apply(From f) const { return Scale_aux<scale_t, From, To>(val, f); }
 		};
 
-		template <class T>
-		std::ostream &operator<<(std::ostream &s, Scale<T> const &t)
+		template <class scale_t, class From, class To>
+		std::ostream &operator<<(std::ostream &s, Scale<scale_t,From,To> const &t)
 		{
 			return s << "Scale" <<
-				"<" << type_to_string<T>::name() << ">" <<
+				"<" << type_to_string<scale_t>::name() << 
+				"," << type_to_string<From>::name() <<
+				"," << type_to_string<To>::name() << ">" <<
 				"(" << t.val << ")";
 		}
 
@@ -673,19 +714,19 @@ namespace ks
 
 			To Apply(From const& f) const {
 				static_assert(n > 1);
-				auto a0 = std::get<0>(lms).Apply(std::get<0>(f));
+				typedef typename std::tuple_element<0, Tup>::type T0;
+				To a0 = std::get<0>(lms).Apply(typename T0::From{ std::get<0>(f) });
 				return Apply_aux<1>(a0, f);
 			}
 
 			template <size_t i>
 			To Apply_aux(To accum, From const& f) const {
-				if constexpr (i < n) {
-					auto ai = std::get<i>(lms).Apply(std::get<i>(f));
+				typedef typename std::tuple_element<i, Tup>::type T0;
+				To ai = std::get<i>(lms).Apply(typename T0::From{ std::get<i>(f) });
+				if constexpr (i + 1 < n)
 					return Apply_aux<i + 1>(add(accum, ai), f);
-				}
 				else
-					// Tail case, just return the accumulator
-					return accum;
+					return add(accum, ai);
 			}
 
 			template <size_t i>
@@ -769,11 +810,13 @@ namespace ks
 			}
 
 			template <size_t i>
-			void Apply_aux(From const& f, To* ret) const 
+			void Apply_aux(From const& f, To* ret) const
 			{
-				if constexpr (i < n) {
-					auto ai = std::get<i>(lms).Apply(f);
-					std::get<i>(*ret) = ai;
+				typedef typename std::tuple_element<i, Tup>::type LM;
+				typedef typename LM::To type;
+				type ai = std::get<i>(lms).Apply(f);
+				std::get<i>(*ret) = type{ ai };
+				if constexpr (i + 1 < n) {
 					Apply_aux<i + 1>(f, ret);
 				}
 			}
@@ -814,7 +857,7 @@ namespace ks
 			typedef typename Lab::From A;
 			typedef typename Lab::To B2;
 
-			static_assert(std::is_same<B1, B2>::value, "To1==To2");
+			static_assert(std::is_same<B1, B2>::value, "LM::Compose: From2 != To1");
 
 			typedef A From;
 			typedef C To;
@@ -984,8 +1027,8 @@ namespace ks
 			//Variant& operator=(const L2& l2) { v = l2; return *this; }
 
 			To Apply(From f) const {
-				if (v.index() == 0) return To { std::get<0>(v).Apply(f) };
-				if (v.index() == 1) return To { std::get<1>(v).Apply(f) };
+				if (v.index() == 0) return std::get<0>(v).Apply(f);
+				if (v.index() == 1) return std::get<1>(v).Apply(f);
 				throw std::string("Bad Variant");
 			}
 		};
@@ -1024,8 +1067,8 @@ namespace ks
 		}
 
 		// ---------------- lmApply ------------------
-		template <class LM, class A>
-		auto lmApply(LM lm, A a) {
+		template <class LM>
+		typename LM::To lmApply(LM lm, typename LM::From a) {
 			return lm.Apply(a);
 		}
 
@@ -1033,7 +1076,7 @@ namespace ks
 
 	DECLARE_TYPE_TO_STRING(LM::One, T);
 	DECLARE_TYPE_TO_STRING2(LM::Zero, From, To);
-	DECLARE_TYPE_TO_STRING(LM::Scale, T);
+	DECLARE_TYPE_TO_STRING3(LM::Scale, scale_t, From, To);
 	DECLARE_TYPE_TO_STRING(LM::Build, L);
 	DECLARE_TYPE_TO_STRING(LM::BuildT, L);
 	DECLARE_TYPE_TO_STRING_Pack(LM::HCat);
@@ -1048,16 +1091,33 @@ namespace ks
 	template <class T1, class T2>
 	T1 sub(T1 t1, T2 t2) { return t1 - t2; }
 
-
 	template <class T1, class T2>
 	auto D$sub(T1 t1, T2 t2)
 	{
-		return LM::HCat<LM::Scale<T1>, LM::Scale<T1>>::mk({ 1.0 }, { -1.0 });
+		typedef decltype(sub(t1,t2)) T;
+		typedef LM::Scale<T1, T, double> M1;
+		typedef LM::Scale<T2, T, double> M2;
+		return LM::HCat<M1, M2>::mk(M1::mk(T1{}, T{}, 1.0), M2::mk(T2{}, T{}, -1.0));
 	}
 
+	template <class T2>
+	T2 mul(double t1, T2 const& t2)
+	{
+		return t1 * t2;
+	}
 
-	template <class T1, class T2>
-	T1 mul(T1 t1, T2 t2)
+	template <class T1>
+	T1 mul(T1 const& t1, double t2)
+	{
+		return t1 * t2;
+	}
+
+	double mul(double t1, double t2)
+	{
+		return t1 * t2;
+	}
+
+	int mul(int const& t1, int const& t2) 
 	{
 		return t1 * t2;
 	}
@@ -1065,9 +1125,10 @@ namespace ks
 	template <class T1, class T2>
 	auto D$mul(T1 t1, T2 t2)
 	{
-		typedef LM::Scale<T1> M1;
-		typedef LM::Scale<T2> M2;
-		return LM::HCat<M1, M2>::mk(M1::mk(t2), M2::mk(t1));
+		typedef decltype(t1*t2) To;
+		typedef LM::Scale<T1, To, T2> M1;
+		typedef LM::Scale<T2, To, T1> M2;
+		return LM::HCat<M1, M2>::mk(M1::mk(T1{}, To{}, t2), M2::mk(T2{}, To{}, t1));
 	}
 
 	template <class T1, class T2>
@@ -1078,10 +1139,13 @@ namespace ks
 
 	auto D$div(double t1, double t2)
 	{
+		typedef decltype(t1*t2) To;
 		typedef double T1;
 		typedef double T2;
 		// TODO: Not sure this is correct for anything other than scalars
-		return LM::HCat<LM::Scale<T1>, LM::Scale<T2>>::mk(LM::Scale<T1>::mk(T1{}, 1.0 / t2), LM::Scale<T1>::mk(T1{}, -1.0 / (t1*t1)));
+		return LM::HCat<LM::Scale<T1,To,T2>, LM::Scale<T2,To,T1>>::
+					mk(LM::Scale<T1,To,T2>::mk(T1{}, To{}, 1.0 / t2), 
+					   LM::Scale<T2,To,T1>::mk(T2{}, To{}, -1.0 / (t1*t1)));
 	}
 
 	template <class T1, class T2>
@@ -1096,20 +1160,28 @@ namespace ks
 		return t1 < t2;
 	}
 
-	template <typename T>
-	T delta(int i, int j, T)
-	{
-		if (i == j)
-			return T{ 1 };
-		else
-			return T{ 0 };
-	}
-
 	double neg(double d) { return -d; }
-	auto D$neg(double d) { return LM::Scale<double>::mk(double{}, -1.0); }
+	auto D$neg(double d) { return LM::Scale<double,double,double>::mk(double{}, double{}, -1.0); }
 
 	double to_float(int d) { return d; }
 	auto D$to_float(int d) { return LM::Zero<int, double>(); }
+
+	template <class I, class Vec>
+	using D_t$index = LM::HCat<LM::Zero<I, typename Vec::value_type>,
+			 				   LM::Build<std::function<LM::Scale<typename Vec::value_type, 
+																 typename Vec::value_type, double>(I)>>>;
+
+	template <class I, class Vec>
+	D_t$index<I, Vec>
+	D$index(I i, Vec const & v)
+	{
+		typedef typename Vec::value_type T;
+		auto di = LM::Zero<I, T>::mk();
+		auto delta = [i](I ii) { return LM::Scale<T,T,double>::mk(T{}, T{}, ii == i ? 1.0 : 0.0); };
+		auto df = LM::Build<std::function<LM::Scale<T,T,double>(I)>>::mk(delta);
+		return D_t$index<I, Vec>::mk(di, df);
+	}
+
 
 	// ------------ SelFun --------------
 	// TODO: parameter packs for these
@@ -1140,6 +1212,15 @@ namespace ks
 	}
 
 	// ========================= Trace primitive ===============
+	inline double $rand(double max)
+	{
+		static std::mt19937 rng(42);
+  		std::uniform_real_distribution<double> dist(0, max);
+	
+		return dist(rng);
+	}
+
+	// ========================= Trace primitive ===============
 	template <class T>
 	T $trace(T const& a)
 	{
@@ -1147,7 +1228,6 @@ namespace ks
 		return a;
 	}
 
-	// ========================= Trace primitive ===============
 	template <class T>
 	LM::One<T> D$$trace(T const& a)
 	{

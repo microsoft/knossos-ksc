@@ -125,7 +125,11 @@ isZero (TypeZero _) = True
 isZero _ = False
 
 isKZero :: TExpr -> Bool
-isKZero = isZero . typeof
+isKZero = \case
+    Konst (KZero _) -> True
+    Konst (KInteger 0) -> True
+    Konst (KFloat 0.0) -> True
+    e -> isZero (typeof e)
 
 partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
 -- Separate the Rules from the Defs
@@ -155,8 +159,7 @@ mkDummy ty = TVar ty Dummy
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
-  = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs)
-                    ty (typeof rhs) $
+  = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs) ty (typeof rhs) $
     Let (TVar ty v) rhs body
 
 mkLets :: HasCallStack => [(TVar,TExpr)] -> TExpr -> TExpr

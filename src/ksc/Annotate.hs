@@ -55,6 +55,8 @@ annotExpr env = \case
 
   Konst k -> (typeofKonst k, Konst k)
 
+  -- Trace has "fake" higher-order call pattern (trace f args), 
+  -- transform to (trace (f args)), later we'll add strings, and this hackery will allow us to also add useful context annotations
   Call t@(Fun (PrimFun "$trace")) (Tuple [Var (Simple f), e]) -> annotExpr env (Call t (Call (mkFun f) e))
   Call t@(Fun (PrimFun "$trace")) (Tuple (Var (Simple f):es)) -> annotExpr env (Call t (Call (mkFun f) (Tuple es)))
 

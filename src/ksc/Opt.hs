@@ -38,7 +38,8 @@ optDef rb gst (DefX (TFun ty f) args r)
     env = OptEnv { optRuleBase = rb, optGblST = gst }
 
 simplify :: OptEnv -> TExpr -> TExpr
-simplify env =  -- optE env . optLets . optE env .
+simplify env =  -- id 
+                -- optE env . optLets . optE env
                 optE env . optLets
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
@@ -48,7 +49,7 @@ optE :: HasCallStack => OptEnv -> TExpr -> TExpr
 optE env e
   = go e
   where
-    go :: TExpr -> TExpr
+    go :: HasCallStack => TExpr -> TExpr
     go e | Just e' <- tryRules (optRuleBase env) e = go e'
 
     go (Tuple es)         = Tuple (map go es)
@@ -82,7 +83,7 @@ optIf (Let v r b)           t e = Let v r   (optIf b t e)
 optIf (Assert e1 e2)        t e = Assert e1 (optIf e2 t e)
 optIf e_cond e_then e_else
   | Just (ei, ej) <- isEqualityCall e_cond
-  , Konst (KZero _)  <- e_else
+  , isKZero e_else
   = pDelta ei ej e_then
 optIf b                     t e = If b t e
 
@@ -101,8 +102,8 @@ rewriteCall _ fun (Let v r arg)
 rewriteCall env (TFun ty (Fun fun)) arg
   = optFun env fun arg
 
-rewriteCall _ (TFun _ (GradFun f Fwd)) arg
-  = optGradFun f arg
+rewriteCall _ (TFun ty (GradFun f Fwd)) arg
+  = optGradFun ty f arg
 
 rewriteCall _ f _
   = trace ("NOTE: Unmatched call {" ++ show f ++ "}") $
@@ -171,6 +172,7 @@ optPrimFun "index" (Tuple [ ei, arr ])
 --  = let i = ej in v
 optPrimFun "sum"         arg                    = optSum arg
 optPrimFun "build"       (Tuple [sz, Lam i e2]) = optBuild sz i e2
+optPrimFun "lmBuild"     (Tuple [sz, Lam i e2]) = optLMBuild sz i e2
 optPrimFun "lmApply"     (Tuple [e1,e2])        = optApplyLM e1 e2
 optPrimFun "lmTranspose" arg                    = optLMTrans arg
 
@@ -183,12 +185,12 @@ optPrimFun "lmCompose" (Tuple [f,g])
   = Just $ lmZero s t
 
   -- Scale(x) . Scale(y) = Scale( xy )
-  | Call scale1 (Tuple [t1,x]) <- f
-  , Call scale2 (Tuple [t2,y]) <- g
+  | Call scale1 (Tuple [f2,t2,x]) <- f
+  , Call scale2 (Tuple [f1,t1,y]) <- g
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
-  = assertTypesEqualThen "Scale" (typeof t1) (typeof t2) 
-    Just $ lmScale (typeof t1) (pMul x y)
+  = assertTypesEqualThen "Scale.Scale" (typeof t1) (typeof f2) $
+    Just $ lmScale (typeof f1) (typeof t2) (pMul x y)
 
   -- (f . g) . h   =>   f . (g . h)
   | Call lmcomp (Tuple [p1,p2]) <- f
@@ -220,12 +222,13 @@ optPrimFun "lmAdd" (Tuple [p,q])
   | isLMZero p = Just q
   | isLMZero q = Just p
 -- Add(Scale(x), Scale(y)) = Scale(Add(x,y))
-  | Call scale1 (Tuple [t1, x]) <- p
-  , Call scale2 (Tuple [t2, y]) <- q
+  | Call scale1 (Tuple [f1,t1, x]) <- p
+  , Call scale2 (Tuple [f2,t2, y]) <- q
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
-  = assertTypesEqualThen "AddScale" (typeof t1) (typeof t2) 
-    Just $ lmScale (typeof t1) (pAdd x y)
+  = assertTypesEqualThen "AddScale" (typeof t1) (typeof t2) $
+    assertTypesEqualThen "AddScale" (typeof f1) (typeof f2) $
+    Just $ lmScale (typeof f1) (typeof t1) (pAdd x y)
 
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
 optPrimFun "lmAdd" (Tuple [ Call hcat1 (Tuple ps)
@@ -270,6 +273,16 @@ optSum e = Nothing
 
 -----------------------
 optBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
+
+-- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
+optBuild sz i e
+  | TypeZero ty <- typeof e
+  = Just $ Konst $ KZero $ TypeVec ty
+
+-- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
+optBuild sz i e
+  | isKZero e
+  = Just $ Konst $ KZero $ TypeVec (typeof e)
 
 -- RULE: build sz (\i. delta i ex eb)  =  let i = ex in
 --                                        deltaVec sz i eb
@@ -316,6 +329,7 @@ optBuild sz i e
 
 -- build sz (\i. e1 * e2)  = (build sz (\i.e1)) * e2
 -- { if i is not free in e2 }
+{-  TODO: once decided on amount of polymorphism in *
 optBuild sz i e
   | Call f (Tuple [e1,e2]) <- e
   , f `isThePrimFun` "*"
@@ -325,16 +339,28 @@ optBuild sz i e
   where
       is_expensive (Call _ _) = True
       is_expensive _ = False
+--}
 
 optBuild sz i e = Nothing
 
+-----------------------
+optLMBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
+
+-- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
+optLMBuild sz i e
+  | isLMZero e
+  , TypeLM s t <- typeof e
+  = Just $ lmZero s (TypeVec t)
+
+optLMBuild sz i e = Nothing
+
 
 -----------------------
-optGradFun :: HasCallStack => FunId -> TExpr -> Maybe TExpr
+optGradFun :: HasCallStack => Type -> FunId -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun (UserFun {}) _   = Nothing
-optGradFun (PrimFun f)  arg = optGradPrim f arg
-optGradFun (SelFun i n) arg = optGradSel i n arg
+optGradFun _ (UserFun {}) _   = Nothing
+optGradFun ty (PrimFun f)  arg = optGradPrim ty f arg
+optGradFun _ (SelFun i n) arg = optGradSel i n arg
 
 optGradSel :: Int -> Int -> TExpr -> Maybe TExpr
 -- fst :: (a,b) -> a
@@ -347,42 +373,43 @@ optGradSel i n arg
 
 optGradSel _ _ _ = Nothing
 
-optGradPrim :: HasCallStack => PrimFun -> TExpr -> Maybe TExpr
+optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
-optGradPrim "+" arg
+optGradPrim (TypeLM _ to) "+" arg
   | TypeTuple [t1, t2] <- typeof arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
-optGradPrim "*" (Tuple [x,y])
-  = Just (lmHCat [lmScale (typeof x) y, lmScale (typeof y) x])
+optGradPrim (TypeLM _ to) "*" (Tuple [x,y])
+  = Just (lmHCat [lmScale (typeof x) to y, lmScale (typeof y) to x])
 
-optGradPrim "/" (Tuple [x,y])
-  = Just (lmHCat [ lmScale (typeof x) (pDiv (kTFloat 1.0) y)
-                 , lmScale (typeof y) (pNeg (pDiv x (pMul y y)))])
+optGradPrim (TypeLM _ to) "/" (Tuple [x,y])
+  = Just (lmHCat [ lmScale (typeof x) to (pDiv (kTFloat 1.0) y)
+                 , lmScale (typeof y) to (pNeg (pDiv x (pMul y y)))])
 
-optGradPrim "sum" e
+optGradPrim _ "sum" e
   | TypeVec t <- typeof e
   = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "si")
                                   (lmOne t)))
 
-optGradPrim "size" e
+optGradPrim _ "size" e
   = Just $ lmZero (typeof e) TypeInteger
 
-optGradPrim "index" (Tuple [i,v])
+optGradPrim _ "index" (Tuple [i,v])
   = Just (primDindex i v)
 
-optGradPrim "neg" e = Just (lmScale (typeof e) (kTFloat $ -1.0))
-optGradPrim "exp" e = Just (lmScale (typeof e) (pExp e))
-optGradPrim "log" e = Just (lmScale (typeof e) (pDiv (kTFloat 1.0) e))
-
-optGradPrim f _ = optTrace("No opt for grad of " ++ f) $ Nothing
+optGradPrim (TypeLM s t) "neg" e = Just (lmScale s t (kTFloat $ -1.0))
+optGradPrim (TypeLM s t) "exp" e = Just (lmScale s t (pExp e))
+optGradPrim (TypeLM s t) "log" e = Just (lmScale s t (pDiv (kTFloat 1.0) e))
+optGradPrim ty f _ = optTrace("No opt for grad of " ++ f) $ Nothing
 
 ---------------
+-- Called for (lmApply lm dx)
 optApplyLM :: TExpr -> TExpr -> Maybe TExpr
 optApplyLM (Assert e1 e2) dx
   = Just (Assert e1 (lmApply e2 dx))
 
+-- Called for (lmApply (lm* es) dx)
 optApplyLM (Call (TFun _ (Fun (PrimFun f))) es) dx
   = optApplyLMCall f es dx
 
@@ -394,23 +421,28 @@ optApplyLM (Let v rhs body) dx
 optApplyLM (If b et ef) dx
   = Just $ If b (lmApply et dx) (lmApply ef dx)
 
-optApplyLM (Call (TFun _ (Fun (UserFun f))) _) _
-  = Nothing -- Don't complain about not optimizing UserFuns
+{-
+optApplyLM (Call (TFun (TypeLM s t) (GradFun (UserFun f) Fwd)) e) dx
+  = trace ("User Grad->Der [" ++ f ++ "]") 
+    Just $ Call (TFun (TypeLM s t) (DrvFun (UserFun f) Fwd)) (Tuple [e, dx])
+  -}
 
 optApplyLM e dx
-  = trace ("Apply not optimized: " ++ (take 20 $ show $ ppr e) ++ "...") Nothing
+  = trace ("Apply not optimized: " ++ (take 40 $ show e) ++ "...") Nothing
 
 ------------------
-optApplyLMCall :: String -> TExpr   -- f args :: s -o t
+-- Optimise (lmApply (fun arg) dx)
+optApplyLMCall :: HasCallStack => 
+                  String -> TExpr   -- f args :: s -o t
                -> TExpr             -- :: S
                -> Maybe (TExpr)     -- :: T
--- Optimise (lmApply (fun arg) dx)
+
 optApplyLMCall "lmZero" (Tuple [s, t]) dx 
   = assertTypesEqualThen "Apply lmZero" (typeof s) (typeof dx) $
     Just (Konst $ KZero $ typeof t)
 
 optApplyLMCall "lmOne" t dx 
-  = assertTypesEqualThen "Apply lmOne" (typeof t) (typeof dx) $
+  = -- assertTypesEqualThen "Apply lmOne" (typeof t) (typeof dx) $
     Just dx
 
 optApplyLMCall "lmAdd"  (Tuple [f,g]) dx
@@ -430,8 +462,9 @@ optApplyLMCall "lmHCat" (Tuple es) dx
     add :: (TExpr, Int) -> TExpr -> TExpr
     add (e,i) z = pAdd (lmApply e (pSel i n dx)) z
 
-optApplyLMCall "lmScale" (Tuple [t'',x]) dx
-  = Just (pMul dx x)
+optApplyLMCall "lmScale" (Tuple [from,_,x]) dx
+  = assertTypesEqualThen "lmScale" (typeof dx) (typeof from) 
+    Just (pMul x dx)
 
 optApplyLMCall "lmBuild" (Tuple [n, Lam i m]) dx
   = Just (pBuild n (Lam i (lmApply m dx)))
@@ -479,7 +512,7 @@ optLMTrans (If b t e)
 optLMTrans e = Nothing
 
 optTransPrim :: String -> TExpr -> Maybe TExpr
-optTransPrim "lmScale"     (Tuple [t,e])        = Just $ lmScale (typeof t) e
+optTransPrim "lmScale"     (Tuple [f,t,e])      = Just $ lmScale (typeof t) (typeof f) e
 optTransPrim "lmTranspose" e                    = Just e
 optTransPrim "lmCompose"   (Tuple [f,g])        = Just (lmCompose (lmTranspose g) (lmTranspose f))
 optTransPrim "lmAdd"       (Tuple [f,g])        = Just (lmAdd (lmTranspose f) (lmTranspose g))
@@ -495,16 +528,16 @@ test_opt =
   hspec $ do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
-        optPrimFun "lmAdd" (Tuple [lmScale TypeFloat $ kTFloat 1.3, lmScale TypeFloat $ kTFloat 0.4])
+        optPrimFun "lmAdd" (Tuple [lmScale TypeFloat TypeFloat $ kTFloat 1.3, lmScale TypeFloat TypeFloat $ kTFloat 0.4])
         `shouldBe`
-        Just (lmScale TypeFloat (mkPrimCall2 "+" (kTFloat 1.3) (kTFloat 0.4)))
+        Just (lmScale TypeFloat TypeFloat (mkPrimCall2 "+" (kTFloat 1.3) (kTFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat
             f2 = kTFloat 2.0
-            l2 = lmScale TypeFloat f2
+            l2 = lmScale TypeFloat TypeFloat f2
         in
             optE emptyOptEnv
                  (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
-            lmHCat [lmAdd l1 l2, lmScale TypeFloat  (pAdd f2 f2)]
+            lmHCat [lmAdd l1 l2, lmScale TypeFloat TypeFloat  (pAdd f2 f2)]
