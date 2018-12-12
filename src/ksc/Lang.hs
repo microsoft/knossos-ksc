@@ -503,11 +503,11 @@ instance Pretty a => Pretty [a] where
 
 pprTrace :: String -> Doc -> a -> a
 pprTrace str doc v
-  = trace (PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v
+  = trace (take 100 $ PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v
 
 pprPanic :: HasCallStack => String -> Doc -> a
 pprPanic str doc
-  = error (PP.render (PP.sep [PP.text str, PP.nest 2 doc]))
+  = error (take 1000 $ PP.render (PP.sep [PP.text str, PP.nest 2 doc]))
 
 pps :: Pretty a => a -> String
 pps a = show $ ppr a
