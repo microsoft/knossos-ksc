@@ -370,8 +370,10 @@ namespace ks
 	template <class T>
 	T const &index(size_t i, vec<T> const & v)
 	{
-		ASSERT(i >= 0);
-		ASSERT(i < v.size());
+		if (i >= v.size()) {
+			std::cerr << "ERROR: Accessing element " << i << " of vec of length " << v.size() << std::endl;
+			throw "oiks";
+		} 
 		return v[i];
 	}
 
@@ -400,6 +402,16 @@ namespace ks
 			ret[i] = T { f(i) }; 
 		return ret;
 	}
+
+	double delta(int i, int j, double val)
+	{
+		return (i == j) ? val : 0.0;
+	}
+
+	vec<double> deltaVec(size_t n, size_t i, double val)
+	{
+		return build<double>(n, [i,val](size_t ii) { return (i == ii) ? val : 0.0; });
+	} 
 
 	// -- Specialize is_zero
 	template <class T>
