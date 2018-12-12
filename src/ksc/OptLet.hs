@@ -98,7 +98,7 @@ optLetsE e = go M.empty e
 inline_me :: Int -> Var -> TExpr -> Bool
 inline_me n bndr rhs
   | n==0            = True
-  | n==1            = True
+  | n==1            = False
   | isTrivial rhs   = True
   | Grad {} <- bndr = True
   | otherwise       = False

@@ -1081,7 +1081,7 @@ namespace ks
 		// ---------------- lmApply ------------------
 		template <class LM>
 		typename LM::To lmApply(LM lm, typename LM::From a) {
-			return lm.Apply(a);
+			return typename LM::To{ lm.Apply(a) };
 		}
 
 	} // namespace LM

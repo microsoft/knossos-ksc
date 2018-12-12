@@ -61,60 +61,63 @@
          (* 0.5 (sum (build K (lam (k : Integer)
                                             (+ (sqnorm (exp$VecR (index k qs))) 
                                                 (sqnorm (index k ls))))))))))))
-
+                                                
 (def mkvec ((n : Integer))
     (build n (lam (j : Integer) ($rand 1.0))))
 
-(def f ((x : Vec Vec Float)
-        (alphas : Vec Float)
-        (means : Vec Vec Float)
-        (qs : Vec Vec Float)
-        (ls : Vec Vec Float)
-        (wishart_gamma : Float)
-        (wishart_m : Float))
-  (let (n (size x))
-  (let (d (size (index 0 x)))
-  (let (K (size alphas))
-        --(let (i 1) -- (+ (- 
-          (sum (build n (lam (i : Integer)
-              (logsumexp (build K (lam (k : Integer)
-                (let ((Q (gmm_knossos_makeQ (index k qs) (index k ls)))
-                      (mahal_vec (mul$Mat$Vec Q 
-                                          (sub$VecR$VecR (index i x) (index k means)))))
-                  (- (+ (index k alphas) (sum (index k qs)))
-                    (* wishart_gamma  {- just here to test, should be 0.500000-}(sqnorm mahal_vec))))))))))))))
-                    -- )))))
-            --(* (to_float n) (logsumexp alphas))) 
---         (* 0.5 (sum (build K (lam (k : Integer)
-  --                                          (+ (sqnorm (exp$VecR (index k qs))) 
-    --                                            (sqnorm (index k ls))))))))))))
-        
 (def zerov ((x : Vec Float))
-  (* 0.0000001 x))
+  (* (- 1.0 1.0) x))
 
 (def zerovv ((x : Vec Vec Float))
-  (* 0.0000001 x))
+  (* (- 1.0 1.0) x))
+
+(def mkdeltav ((n : Integer)
+               (i : Integer)
+               (val : Float))
+    (build n (lam (ii : Integer)
+                (if (== i ii)
+                    val
+                    0.0))))
+
+(def mkdeltavv ((x : Vec Vec Float)
+                (i : Integer)
+                (j : Integer)
+                (val : Float))
+    (build (size x) (lam (ii : Integer)
+        (build (size (index ii x)) (lam (jj : Integer)
+            (if (== i ii)
+                (if (== j jj)
+                    val
+                    0.0)
+                0.0))))))
 
 (def main ()
-  (let (x (build 18 (lam (i : Integer) (mkvec 3))))
+  (let ((d 4)
+        (x (build 18 (lam (i : Integer) (mkvec d)))))
     (let ((alphas  (build 10 (lam (i : Integer) ($rand 1.0))))
-          (mus     (build 10 (lam (i : Integer) (mkvec 3))))
-          (qs      (build 10 (lam (i : Integer) (mkvec 3))))
-          (ls      (build 10 (lam (i : Integer) (mkvec 3))))
-          (z10x3   (* 0.000001 mus))
-          (zeros_x (zerovv x))
-          (delta 0.1)
-          (gamma 3.5))
+          (mus     (build 10 (lam (i : Integer) (mkvec d))))
+          (qs      (build 10 (lam (i : Integer) (mkvec d))))
+          (ls      (build 10 (lam (i : Integer) (mkvec (gmm_knossos_tri d)))))
+          (gamma 3.5)
+
+          (delta 0.001)
+          (del (mkdeltavv qs 2 1 delta))
+        )
       (pr x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
-          -- (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
-          (f x alphas mus qs ls gamma 1.2 )
-          (f x alphas mus qs ls (+ gamma delta) 1.2)
-          (fwd$f x          alphas          mus           qs          ls          gamma 1.2
-                 (zerovv x) (zerov alphas)  (zerovv mus)  (zerovv qs) (zerovv ls) delta 0.0)
-          (- (f x alphas mus qs ls (+ gamma delta) 1.2)
-             (f x alphas mus qs ls gamma 1.2))
+          del
+          (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
+
+          (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2 )
+          (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
+          (fwd$gmm_knossos_gmm_objective x          alphas          mus           qs          ls          gamma 1.2
+                 (zerovv x) (zerov alphas)  (zerovv mus)  del         (zerovv ls) 0.0   0.0)
+          (- (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
+             (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2))
 
           ))))
+
+{-
+-}

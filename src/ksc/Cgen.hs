@@ -413,6 +413,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   ("/", [CType RR, CType RR]) -> LMHCat [LMScale RR RR RR, LMScale RR RR RR] 
   ("*", [CType RR, CType RR]) -> LMHCat [LMScale RR RR RR, LMScale RR RR RR] 
   ("*", [CType RR, CType VecR]) -> LMHCat [LMScale RR VecR VecR, LMScale VecR VecR RR] 
+  ("to_float", [CType TypeInteger]) -> LMZero TypeInteger TypeFloat
   ("$trace", [CType ty]) -> LMOne ty
   ("$rand", [CType ty]) -> LMZero ty ty
   ("size", [CType ty]) -> LMZero ty TypeInteger

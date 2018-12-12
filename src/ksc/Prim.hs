@@ -253,11 +253,14 @@ simplePrimResultTy fun arg_ty
       ("log"      , TypeFloat                              ) -> Just TypeFloat
       ("+"        , TypeTuple [t1, t2]                     ) -> Just t1
       ("-"        , TypeTuple [t1, t2]                     ) -> Just t1
+
       ("/"        , TypeTuple [TypeFloat, TypeFloat]       ) -> Just TypeFloat  -- Not known to work for non-float types
       ("/"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+
       ("*"        , TypeTuple [TypeFloat, t2]              ) -> Just t2
       ("*"        , TypeTuple [t1, TypeFloat]              ) -> Just t1
       ("*"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+
       ("square"   , t1                                     ) -> Just t1
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool

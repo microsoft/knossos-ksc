@@ -387,9 +387,13 @@ optGradPrim (TypeLM _ to) "+" arg
 optGradPrim (TypeLM _ to) "*" (Tuple [x,y])
   = Just (lmHCat [lmScale (typeof x) to y, lmScale (typeof y) to x])
 
-optGradPrim (TypeLM _ to) "/" (Tuple [x,y])
-  = Just (lmHCat [ lmScale (typeof x) to (pDiv (kTFloat 1.0) y)
-                 , lmScale (typeof y) to (pNeg (pDiv x (pMul y y)))])
+-- Any function with integer output must be 
+optGradPrim (TypeLM from TypeInteger) "/" (Tuple [x,y])
+  = Just $ lmZero from TypeInteger
+  
+optGradPrim (TypeLM _ TypeFloat) "/" (Tuple [x,y])
+  = Just (lmHCat [ lmScale (typeof x) TypeFloat (pDiv (kTFloat 1.0) y)
+                 , lmScale (typeof y) TypeFloat (pNeg (pDiv x (pMul y y)))])
 
 optGradPrim _ "sum" e
   | TypeVec t <- typeof e
