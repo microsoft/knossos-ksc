@@ -362,15 +362,17 @@ instance Pretty Konst where
   ppr (KZero t)    = text "(KZero " <> ppr t <> char ')'
 
 instance Pretty Type where
-  ppr (TypeVec ty) = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")"
-  ppr (TypeTuple tys) = PP.text "(Tuple (" PP.<> pprWithCommas ppr tys PP.<> PP.text "))"
-  ppr (TypeLambda from to) = PP.text "(Lambda " PP.<> ppr from PP.<> PP.text " -> " PP.<> ppr to PP.<> PP.text ")"
-  ppr (TypeLM s t) = PP.text "(LM " PP.<> ppr s PP.<> PP.char ' ' PP.<> ppr t PP.<> PP.text ")"
-  ppr (TypeZero t) = text "zero_t@" <> ppr t
-  ppr TypeFloat = PP.text "Float"
-  ppr TypeInteger = PP.text "Integer"
-  ppr TypeBool = PP.text "Bool"
-  ppr TypeUnknown = PP.text "UNKNOWN"
+  ppr (TypeVec ty)         = PP.text "(Vec " PP.<> ppr ty PP.<> PP.text ")"
+  ppr (TypeTuple tys)      = PP.text "(Tuple (" PP.<> pprWithCommas ppr tys
+                             PP.<> PP.text "))"
+  ppr (TypeLambda from to) = PP.text "(Lambda" PP.<+> ppr from
+                             PP.<+> PP.text "->" PP.<+> ppr to PP.<> PP.text ")"
+  ppr (TypeLM s t)         = PP.text "(LM" PP.<+> ppr s PP.<+> ppr t PP.<> PP.text ")"
+  ppr (TypeZero t)         = text "zero_t@" <> ppr t
+  ppr TypeFloat            = PP.text "Float"
+  ppr TypeInteger          = PP.text "Integer"
+  ppr TypeBool             = PP.text "Bool"
+  ppr TypeUnknown          = PP.text "UNKNOWN"
 
 
 type Prec = Int

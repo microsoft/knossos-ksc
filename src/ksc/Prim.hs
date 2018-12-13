@@ -31,10 +31,10 @@ mkPrimCall3 f a b c = mkPrimCall f (Tuple [a, b, c])
 --------------------------------------------
 
 lmZero :: Type -> Type -> TExpr
-lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [Var $ mkDummy s, Var $ mkDummy t])
+lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [])
 
 lmOne :: Type -> TExpr
-lmOne t = primCall "lmOne" (TypeLM t t) (Var $ mkDummy t)
+lmOne t = primCall "lmOne" (TypeLM t t) (Tuple [])
 
 lmScale :: HasCallStack => Type -> Type -> TExpr -> TExpr
 lmScale (TypeLM _ _) t e = error "lmScale: Arg1 is TypeLM" 
@@ -261,7 +261,6 @@ simplePrimResultTy fun arg_ty
       ("*"        , TypeTuple [t1, TypeFloat]              ) -> Just t1
       ("*"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
-      ("square"   , t1                                     ) -> Just t1
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool
       ("<"        , _                                      ) -> Just TypeBool
@@ -274,7 +273,7 @@ simplePrimResultTy fun arg_ty
 
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "index", "size", "sum", "to_float"
-                       , "neg", "exp", "log", "+", "-", "*", "/", "square"
+                       , "neg", "exp", "log", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT" ]

@@ -212,3 +212,95 @@ callResultTy env fun arg_ty
       GradFun f Fwd    -> TypeLM arg_ty (callResultTy env (Fun f) arg_ty)
       GradFun f Rev    -> TypeLM (callResultTy env (Fun f) arg_ty) arg_ty
       DrvFun {}        -> pprPanic "callResultTy" (ppr fun)  -- Do this later
+
+
+{-
+-----------------------------------------------
+--     A Lint function to do type checking
+-----------------------------------------------
+
+lintDecls :: [Decl] -> [Doc]
+-- Retuns a list of error messages
+lintDecls decls = runLint (foldlM lintDecl emptyGST decls)
+
+lintDecl :: GblSymTab -> Decl -> LintM GblSymTab
+lintDecl env (DefDecl (DefX (TFun res_ty fun) vars expr))
+  = do { let env' = stBindParams env vars
+       ; res_ty' <- lintExpr env' expr
+       ; checkTypes res_ty res_ty' $
+         (text "Function result type mis-match for" <+> ppr fun)
+       ; return (stInsertFun fun def) }
+
+lintExpr :: SymTabl -> LintM Type
+
+lintExpr env (Var tv@(TVar ty v))
+  = case Map.lookup v (lclST env) of
+      Nothing  -> do { addErr (text "Out of scope variable:" <+> ppr tv
+                     ; return TypeUnknown }
+      Just exp_ty -> do { checkTypes exp_ty ty $
+                          text "Variable occurrence mis-match for" <+> ppr v
+                        ; return ty }
+
+lintExpr env (Konst k) = return (typeofKonst k)
+
+lintExpr env e@(Call (TFun ty fun) arg)
+  = case lookupGST fun (gblST env) of
+      Nothing  -> do { addErr (text "Out of scope function:" <+> ppr fun
+                     ; return TypeUnknown }
+
+      Just (DefX (TFun res_ty _)
+        -> do { arg_ty <- lintExpr env arg
+              ; let exp_res_ty = callResultTy env fun arg-ty
+                    -- ToDo: callResult can fail, and we should
+                    -- produce a proper error message if so
+              ; checkTypes exp_res-ty res_ty $
+                text "Bad result type in call:" <+> ppr e
+              ; return res_ty }
+
+lintExpr env (Let (TVar ty v) rhs body)
+  = do { rhs_ty <- lintExpr env body
+       ; checkTypes ty rhs_ty $
+         text "Let binding mis-match for" <+> ppr v
+       ; lintExpr (stInsertVar v ty env) body }
+
+lintExpr env (Tuple es)
+  = do { tys <- mapM (lintExpr env) es
+       ; return (TypeTuple tys) }
+
+ling Lam tv@(TVar tyv v) body ->
+    let body_env = stInsertVar v tyv env in
+    let (tybody,abody) = annotExpr body_env body in
+    (TypeLambda tyv tybody, Lam tv abody)
+
+----------------
+newtype LintM a = LM { unLint :: [Doc] -> (a, [Doc]) }
+-- Just a writer monad on [Doc]
+
+instance Functor LintM where
+  fmap f (LM m) = LM (\ds -> case m ds of
+                                (r, ds') -> (f r, ds'))
+
+instance Applicative LintM where
+  pure  = return
+  (<*>) = ap
+
+instance Monad LintM where
+  return v = LM (\ds -> (v, ds))
+  LM m >> k = LM (\ds -> case m ds of
+                              (r1, ds') -> unLint (k r) ds')
+
+runLint :: LintM () -> [Doc]
+runLint (LM m) = reverse (snd (m []))
+
+addErr :: SDoc -> LintM ()
+addErr d = LM (\ds -> (d:ds, ()))
+
+checkTys :: Type -> Type -> SDoc -> LintM ()
+checkTys exp_ty act_ty herald
+  | exp_ty == act_ty
+  = return ()
+  | otherwise
+  = addErr $ hang herald 2 $
+    vcat [ text "Expected type:" <+> ppr exp_ty
+         , text "Actual type:  " <+> ppr act_ty ]
+-}
