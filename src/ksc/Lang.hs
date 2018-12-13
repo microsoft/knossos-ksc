@@ -30,8 +30,24 @@ data DeclX f b = RuleDecl (RuleX f b)
 type Decl  = DeclX Fun  Var
 type TDecl = DeclX TFun TVar
 
-data DefX f b = DefX f [TVar] (ExprX f b)  -- f x = e
-              deriving( Show )
+data DefX f b  -- f x = e
+  = DefX { def_fun  :: f
+         , def_args :: [TVar]  -- See Note [Function arity]
+         , def_rhs  :: ExprX f b }
+  deriving( Show )
+
+{- Note [Function arity]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Top level functions with exactly one argument expect a call
+    Call f e
+and bind the argument to e
+
+Top level functions with zero, or two or more arguments expect a call
+   Call f (Tuple [e1, .. en])
+and bind the arugments to e1.. en respectively.
+
+That is, arity-1 is treated specially. We do not have 1-tuples.
+-}
 
 type Def  = DefX Fun Var
 type TDef = DefX TFun TVar
