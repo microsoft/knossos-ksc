@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 module Annotate (
-  annotDecls,
+  annotDecls, lintDecls, lintDefs,
 
   GblSymTab, extendGblST, lookupGblST, emptyGblST,
 
@@ -14,6 +14,8 @@ import Prim
 import qualified Data.Map   as Map
 import Data.List( mapAccumL )
 import GHC.Stack
+import Data.Foldable( foldlM )
+import Control.Monad( ap )
 import Debug.Trace( trace )
 import Text.PrettyPrint
 
@@ -55,8 +57,9 @@ annotExpr env = \case
 
   Konst k -> (typeofKonst k, Konst k)
 
-  -- Trace has "fake" higher-order call pattern (trace f args), 
-  -- transform to (trace (f args)), later we'll add strings, and this hackery will allow us to also add useful context annotations
+  -- Trace has "fake" higher-order call pattern (trace f args),
+  -- transform to (trace (f args)), later we'll add strings,
+  -- and this hackery will allow us to also add useful context annotations
   Call t@(Fun (PrimFun "$trace")) (Tuple [Var (Simple f), e]) -> annotExpr env (Call t (Call (mkFun f) e))
   Call t@(Fun (PrimFun "$trace")) (Tuple (Var (Simple f):es)) -> annotExpr env (Call t (Call (mkFun f) (Tuple es)))
 
@@ -124,10 +127,11 @@ stripAnnotExpr = \case
 -----------------------------------------------
 
 -- Global symbol table
-type GblSymTab = Map.Map String TDef
-   -- Maps the function to its definition, which lets us
+type GblSymTab = Map.Map Fun TDef
+   -- Maps a function to its definition, which lets us
    --   * Find its return type
    --   * Inline it
+   -- Domain is UserFun, and perhaps the Grad of PrimFuns
 
 -- Local symbol table
 type LclSymTab = Map.Map Var Type
@@ -175,21 +179,17 @@ stLookupVar v env
                           (text "Lcl env =" <+> ppr (lclST env))
 
 stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
-stInsertFun f ty env = Map.insert (show f) ty env
+stInsertFun f ty env = Map.insert f ty env
 
 lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
-lookupGblST f env = Map.lookup (show f) env
+lookupGblST f env = Map.lookup f env
 
-userCallResultTy :: HasCallStack => Fun -> GblSymTab -> Type
-userCallResultTy f env
+userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab -> Maybe Type
+userCallResultTy_maybe f env
   | Just (DefX (TFun ret_ty _) _ _) <- lookupGblST f env
-  = ret_ty
+  = Just ret_ty
   | otherwise
-  = pprPanic ("Couldn't find global fun: " ++ show f)
-             (vcat [ text "Gbl env =" <+> ppr env {-
-                   , ppr (map ((== f) . fst) (Map.toList env))
-                   , ppr (map ((> f) . fst)  (Map.toList env))
-                   , ppr (map ((< f) . fst)  (Map.toList env)) -} ])
+  = Nothing
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
 extendGblST env defs = foldl add env defs
@@ -205,37 +205,75 @@ extendGblST env defs = foldl add env defs
 -- Otherwise it just looks in the global symbol table.
 callResultTy :: HasCallStack => SymTab -> Fun -> Type -> Type
 callResultTy env fun arg_ty
+  = case callResultTy_maybe env fun arg_ty of
+      Just res_ty -> res_ty
+      Nothing     -> pprPanic "callResultTy" $
+                     vcat [ (ppr fun <+> ppr arg_ty)
+                          , text "Env =" <+> ppr env
+                          , ppr (map (== fun) gbl_env_keys)
+                          , ppr (map (> fun)  gbl_env_keys)
+                          , ppr (map (< fun)  gbl_env_keys) ]
+  where
+    gbl_env_keys = map fst $ Map.toList $ gblST env
+
+callResultTy_maybe :: SymTab -> Fun -> Type -> Maybe Type
+callResultTy_maybe env fun arg_ty
   = case fun of
-      Fun (PrimFun f)  -> primCallResultTy f arg_ty
-      Fun (UserFun f)  -> userCallResultTy fun (gblST env)
-      Fun (SelFun i _) -> selCallResultTy i arg_ty
-      GradFun f Fwd    -> TypeLM arg_ty (callResultTy env (Fun f) arg_ty)
-      GradFun f Rev    -> TypeLM (callResultTy env (Fun f) arg_ty) arg_ty
-      DrvFun {}        -> pprPanic "callResultTy" (ppr fun)  -- Do this later
+      Fun (PrimFun f)  -> primCallResultTy_maybe f arg_ty
+      Fun (UserFun _)  -> userCallResultTy_maybe fun (gblST env)
+      Fun (SelFun i _) -> selCallResultTy_maybe i arg_ty
+      GradFun f Fwd
+        | Just res_ty <- callResultTy_maybe env (Fun f) arg_ty
+        -> Just (TypeLM arg_ty res_ty)
+
+      GradFun f Rev
+        | Just res_ty <- callResultTy_maybe env (Fun f) arg_ty
+        -> Just (TypeLM res_ty arg_ty)
+
+      _ -> Nothing
 
 
-{-
 -----------------------------------------------
 --     A Lint function to do type checking
 -----------------------------------------------
 
-lintDecls :: [Decl] -> [Doc]
+lintDecls :: GblSymTab -> [TDecl] -> [Doc]
 -- Retuns a list of error messages
-lintDecls decls = runLint (foldlM lintDecl emptyGST decls)
+lintDecls env decls = runLint (mapM (lintDecl env) decls)
 
-lintDecl :: GblSymTab -> Decl -> LintM GblSymTab
-lintDecl env (DefDecl (DefX (TFun res_ty fun) vars expr))
+lintDefs :: GblSymTab -> [TDef] -> [Doc]
+-- Retuns a list of error messages
+lintDefs env decls = runLint (mapM (lintDef env) decls)
+
+lintDecl :: GblSymTab -> TDecl -> LintM ()
+lintDecl env (DefDecl def)   = lintDef  env def
+lintDecl env (RuleDecl rule) = lintRule env rule
+
+lintDef :: GblSymTab -> TDef -> LintM ()
+lintDef env def@(DefX (TFun res_ty fun) vars expr)
   = do { let env' = stBindParams env vars
        ; res_ty' <- lintExpr env' expr
        ; checkTypes res_ty res_ty' $
          (text "Function result type mis-match for" <+> ppr fun)
-       ; return (stInsertFun fun def) }
+       ; return () }
 
-lintExpr :: SymTabl -> LintM Type
+lintRule :: GblSymTab -> TRule -> LintM ()
+lintRule env rule@(Rule { ru_qvars = qvars, ru_lhs = lhs, ru_rhs = rhs })
+ = do { let env' = stBindParams env qvars
+      ; ty_l <- lintExpr env' lhs
+      ; ty_r <- lintExpr env' rhs
+      ; checkTypes ty_l ty_r $
+        text "Rule lhs/rhs mis-match" <+> ppr rule
+      ; return () }
+
+lintExpr :: SymTab -> TExpr -> LintM Type
 
 lintExpr env (Var tv@(TVar ty v))
+  | isDummy v   -- Type arguments are not real variables
+  = return ty
+  | otherwise
   = case Map.lookup v (lclST env) of
-      Nothing  -> do { addErr (text "Out of scope variable:" <+> ppr tv
+      Nothing  -> do { addErr (text "Out of scope variable:" <+> ppr tv)
                      ; return TypeUnknown }
       Just exp_ty -> do { checkTypes exp_ty ty $
                           text "Variable occurrence mis-match for" <+> ppr v
@@ -243,22 +281,29 @@ lintExpr env (Var tv@(TVar ty v))
 
 lintExpr env (Konst k) = return (typeofKonst k)
 
-lintExpr env e@(Call (TFun ty fun) arg)
-  = case lookupGST fun (gblST env) of
-      Nothing  -> do { addErr (text "Out of scope function:" <+> ppr fun
-                     ; return TypeUnknown }
-
-      Just (DefX (TFun res_ty _)
-        -> do { arg_ty <- lintExpr env arg
-              ; let exp_res_ty = callResultTy env fun arg-ty
-                    -- ToDo: callResult can fail, and we should
-                    -- produce a proper error message if so
-              ; checkTypes exp_res-ty res_ty $
-                text "Bad result type in call:" <+> ppr e
-              ; return res_ty }
+lintExpr env e@(Call tf@(TFun exp_res_ty fun) arg)
+  | tf `isThePrimFun` "lmZero"
+  , TypeLM _ _ <- exp_res_ty
+  , Tuple [] <- arg  -- Really we only need that the arg has type ()
+  = return exp_res_ty
+  
+  | tf `isThePrimFun` "lmOne"
+  , TypeLM s t <- exp_res_ty
+  , s == t
+  , Tuple [] <- arg
+  = return exp_res_ty
+  
+  | otherwise
+  = do { arg_ty <- lintExpr env arg
+       ; case callResultTy_maybe env fun arg_ty of
+           Just res_ty -> do { checkTypes exp_res_ty res_ty $
+                               text "Bad result type in call:" <+> ppr e
+                             ; return res_ty }
+           Nothing     -> do { addErr (text "Out of scope or ill-typed function:" <+> ppr e)
+                             ; return TypeUnknown } }
 
 lintExpr env (Let (TVar ty v) rhs body)
-  = do { rhs_ty <- lintExpr env body
+  = do { rhs_ty <- lintExpr env rhs
        ; checkTypes ty rhs_ty $
          text "Let binding mis-match for" <+> ppr v
        ; lintExpr (stInsertVar v ty env) body }
@@ -267,10 +312,29 @@ lintExpr env (Tuple es)
   = do { tys <- mapM (lintExpr env) es
        ; return (TypeTuple tys) }
 
-ling Lam tv@(TVar tyv v) body ->
-    let body_env = stInsertVar v tyv env in
-    let (tybody,abody) = annotExpr body_env body in
-    (TypeLambda tyv tybody, Lam tv abody)
+lintExpr env (Lam tv@(TVar tyv v) body)
+  = do { let body_env = stInsertVar v tyv env
+       ; body_ty <- lintExpr body_env body
+       ; return (TypeLambda tyv body_ty) }
+
+lintExpr env e@(If cond tex fex)
+  = do { cond_ty <- lintExpr env cond
+       ; checkTypes TypeBool cond_ty $
+         text "Boolean condition mis-match" <+> ppr e
+       ; t_ty <- lintExpr env tex
+       ; f_ty <- lintExpr env fex
+       ; checkTypes t_ty f_ty $
+         text "If-branch mis-match" <+> ppr e
+       ; return t_ty }
+
+lintExpr env e@(Assert cond body)
+  = do { cond_ty <- lintExpr env cond
+       ; checkTypes TypeBool cond_ty $
+         text "Assert condition mis-match" <+> ppr e
+       ; lintExpr env body }
+
+lintExpr env e@(App _ _)
+  = pprPanic "ToDo: lintExpr: App" (ppr e)
 
 ----------------
 newtype LintM a = LM { unLint :: [Doc] -> (a, [Doc]) }
@@ -286,21 +350,20 @@ instance Applicative LintM where
 
 instance Monad LintM where
   return v = LM (\ds -> (v, ds))
-  LM m >> k = LM (\ds -> case m ds of
-                              (r1, ds') -> unLint (k r) ds')
+  LM m >>= k = LM (\ds -> case m ds of
+                              (r1, ds') -> unLint (k r1) ds')
 
-runLint :: LintM () -> [Doc]
+runLint :: LintM a -> [Doc]
 runLint (LM m) = reverse (snd (m []))
 
-addErr :: SDoc -> LintM ()
-addErr d = LM (\ds -> (d:ds, ()))
+addErr :: Doc -> LintM ()
+addErr d = LM (\ds -> ((), d:ds))
 
-checkTys :: Type -> Type -> SDoc -> LintM ()
-checkTys exp_ty act_ty herald
+checkTypes :: Type -> Type -> Doc -> LintM ()
+checkTypes exp_ty act_ty herald
   | exp_ty == act_ty
   = return ()
   | otherwise
   = addErr $ hang herald 2 $
     vcat [ text "Expected type:" <+> ppr exp_ty
          , text "Actual type:  " <+> ppr act_ty ]
--}

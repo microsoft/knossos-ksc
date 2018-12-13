@@ -76,7 +76,7 @@ optLetsE :: ExprX TFun (Int,TVar) -> TExpr
 optLetsE e = go M.empty e
   where
     go :: M.Map TVar TExpr -> ExprX TFun (Int,TVar) -> TExpr
-    go subst (Let (n,TVar ty v) r b)
+    go subst (Let (n, tv@(TVar ty v)) r b)
       | inline_me n v r' = go (M.insert (TVar ty v) r' subst) b
       | otherwise        = Let (TVar ty v) r' (go subst b)
       where
@@ -98,7 +98,7 @@ optLetsE e = go M.empty e
 inline_me :: Int -> Var -> TExpr -> Bool
 inline_me n bndr rhs
   | n==0            = True
-  | n==1            = False
+  | n==1            = True  -- ToDo: AWF wrote False, oddly
   | isTrivial rhs   = True
   | Grad {} <- bndr = True
   | otherwise       = False

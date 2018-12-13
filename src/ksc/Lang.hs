@@ -67,7 +67,7 @@ data ExprX f b
 type Expr  = ExprX Fun Var
 type TExpr = ExprX TFun TVar
 
-data Type = TypeZero Type
+data Type = TypeZero Type  -- What is this and why do we need it?
           | TypeBool
           | TypeInteger
           | TypeFloat
@@ -80,8 +80,8 @@ data Type = TypeZero Type
 
 type PrimFun = String
 
-data FunId = UserFun String
-           | PrimFun PrimFun
+data FunId = UserFun String   -- UserFuns have a Def
+           | PrimFun PrimFun  -- PrimFuns do not have a Def
            | SelFun
                 Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                 Int      -- Arity
@@ -101,12 +101,12 @@ data TFun = TFun Type Fun  -- Typed functions.  These are used at
   deriving (Eq, Ord)       -- /occurrence/ sites only, not binding site
 
 data Var
-  = Dummy
+  = Dummy                   -- Used for type arguments
   | Simple   String         -- x
   | Delta    String         -- The 'dx' or 'dr' argument to fwd
                             -- or backward versions of f
   | Grad     String ADMode  -- \nabla x
-                           --   True <=> transposed \bowtie x
+                            --   True <=> transposed \bowtie x
   deriving( Eq, Ord )
 
 data TVar = TVar Type Var
@@ -170,8 +170,12 @@ mkVar s = Simple s
 mkTVar :: Type -> String -> TVar
 mkTVar ty s = TVar ty (mkVar s)
 
-mkDummy :: Type -> TVar
-mkDummy ty = TVar ty Dummy
+isDummy :: Var -> Bool
+isDummy Dummy = True
+isDummy _     = False
+
+mkDummy :: Type -> TExpr
+mkDummy ty = Var (TVar ty Dummy)
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
@@ -221,7 +225,7 @@ instance HasType TFun where
   typeof (TFun ty _) = ty
 
 instance (HasType b, HasType f,
-          HasInfix f, Pretty f, Pretty b)
+          HasInfix f, PrettyVar f, PrettyVar b)
       =>  HasType (ExprX f b) where
   typeof (Konst k)     = typeofKonst k
   typeof (Var b)       = typeof b
@@ -248,17 +252,18 @@ getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
 getLM t = error $ "Wanted TypeLM, got " ++ pps t
 
-unzipLMTypes :: HasCallStack => [Type] -> ([Type], [Type])
-unzipLMTypes [] = ([], [])
+unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
+unzipLMTypes [] = Just ([], [])
 unzipLMTypes (TypeLM s t : lmts) = case unzipLMTypes lmts of
-                                     (ss, ts) -> (s:ss, t:ts)
-unzipLMTypes lmts = pprPanic "unzipLMTypes" (ppr lmts)
+                                     Just (ss, ts) -> Just (s:ss, t:ts)
+                                     Nothing       -> Nothing
+unzipLMTypes lmts = Nothing
 
 typeofKonst :: Konst -> Type
-typeofKonst (KZero t) = TypeZero t
+typeofKonst (KZero t)    = t   -- Was: TypeZero t
 typeofKonst (KInteger _) = TypeInteger
-typeofKonst (KFloat _) = TypeFloat
-typeofKonst (KBool _) = TypeBool
+typeofKonst (KFloat _)   = TypeFloat
+typeofKonst (KBool _)    = TypeBool
 
 -----------------------------------------------
 --     Debugging utilities
@@ -329,18 +334,20 @@ instance Show Var where
     Dummy -> "/*dummy*/"
     Simple s -> "s$" ++ s
     Delta  d -> "d$" ++ d
-    Grad g m ->
-      "g"
-      ++ (case m of
-            Fwd -> "f"
-            Rev -> "r")
-      ++ "$"
-      ++ g
+    Grad g m -> "g" ++ (case m of
+                          Fwd -> "f"
+                          Rev -> "r")
+                    ++ "$"
+                    ++ g
 
 
 -----------------------------------------------
 --     Pretty printer for the KS langauge
 -----------------------------------------------
+
+class PrettyVar v where
+  pprVar  :: v -> Doc  -- Just print it
+  pprBndr :: v -> Doc  -- Print with its type
 
 class Pretty p where
   ppr     :: p -> Doc
@@ -366,11 +373,27 @@ instance Pretty Fun where
   ppr f = text $ show f -- need show and ppr consistent for debugging
 
 instance Pretty TVar where
-  pprPrec p (TVar ty Dummy) = ppr ty -- For dummy vars, print the type
-  pprPrec p (TVar ty v) = ppr v
+  pprPrec p (TVar ty Dummy) = text "_:" <> ppr ty
+  pprPrec p (TVar ty v)     = ppr v
+
+instance PrettyVar TVar where
+  pprVar  v = ppr v
+  pprBndr v = pprTVar v
+
+instance PrettyVar Var where
+  pprVar v  = ppr v
+  pprBndr v = ppr v
 
 instance Pretty TFun where
   ppr (TFun ty f) = ppr f
+
+instance PrettyVar Fun where
+  pprVar  f = ppr f
+  pprBndr f = ppr f
+
+instance PrettyVar TFun where
+  pprVar  f = ppr f
+  pprBndr (TFun ty f) = ppr f <> PP.text ":" <> ppr ty
 
 instance Pretty Konst where
   ppr (KInteger i) = PP.integer i
@@ -400,18 +423,20 @@ precOne   = 1  -- ==
 precTwo   = 2  -- +
 precThree = 3  -- *
 
-instance (HasInfix f, Pretty f, Pretty b) => Pretty (ExprX f b) where
+instance (HasInfix f, PrettyVar f, PrettyVar b)
+      => Pretty (ExprX f b) where
   ppr expr = pprExpr 0 expr
 
-pprParendExpr :: (HasInfix f, Pretty f, Pretty b) =>
-                ExprX f b -> Doc
+pprParendExpr :: (HasInfix f, PrettyVar f, PrettyVar b)
+              => ExprX f b -> Doc
 pprParendExpr = pprExpr precTwo
 
 pprTVar :: TVar -> Doc
 pprTVar (TVar ty v) = ppr v <> PP.text ":" <> ppr ty
 
-pprExpr :: (HasInfix f, Pretty f, Pretty b) => Prec -> ExprX f b -> Doc
-pprExpr _  (Var v)   = ppr v
+pprExpr :: (HasInfix f, PrettyVar f, PrettyVar b)
+        => Prec -> ExprX f b -> Doc
+pprExpr _  (Var v)   = pprVar v
 pprExpr _ (Konst k)  = ppr k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = parens (pprWithCommas ppr es)
@@ -421,7 +446,7 @@ pprExpr p (Lam v e)
 pprExpr p (Let v e1 e2)
   = parensIf p precZero $
     PP.vcat [ PP.text "let" PP.<+>
-                (bracesSp $ PP.sep [ ppr v
+                (bracesSp $ PP.sep [ pprBndr v
                                    , PP.nest 2 (PP.text "=" PP.<+> ppr e1) ])
            , ppr e2 ]
 pprExpr p (If e1 e2 e3)
@@ -438,13 +463,14 @@ pprExpr _ (App e1 e2)
   = parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
 
-pprCall :: (Pretty f, Pretty b, HasInfix f) => Prec -> f -> ExprX f b -> Doc
+pprCall :: (PrettyVar f, PrettyVar b, HasInfix f)
+        => Prec -> f -> ExprX f b -> Doc
 pprCall prec f (Tuple [e1,e2])
   | Just prec' <- isInfix f
   = parensIf prec prec' $
-    sep [ pprExpr prec' e1, ppr f <+> pprExpr prec' e2 ]
+    sep [ pprExpr prec' e1, pprVar f <+> pprExpr prec' e2 ]
 
-pprCall _ f e = PP.cat [ppr f, nest 2 (parensSp pp_args)]
+pprCall _ f e = PP.cat [pprVar f, nest 2 (parensSp pp_args)]
   where
     pp_args = case e of
                 (Tuple es) -> pprWithCommas ppr es
@@ -476,17 +502,18 @@ parensIf ctxt inner doc
 --            , PP.text "then" PP.<+> ppr p b
 --            , PP.text "else" PP.<+> ppr p c ]
 
-instance (Pretty f, Pretty b, HasInfix f) => Pretty (DeclX f b) where
+instance (PrettyVar f, PrettyVar b, HasInfix f)
+      => Pretty (DeclX f b) where
   ppr (DefDecl d)  = ppr d
   ppr (RuleDecl r) = ppr r
 
-instance (Pretty f, Pretty b, HasInfix f) => Pretty (DefX f b) where
+instance (PrettyVar f, PrettyVar b, HasInfix f) => Pretty (DefX f b) where
   ppr (DefX f vs rhs)
-    = PP.sep [ PP.text "def" PP.<+> ppr f
-                 PP.<> parens (pprWithCommas pprTVar vs)
+    = PP.sep [ hang (PP.text "def" PP.<+> pprBndr f)
+                  2 (parens (pprWithCommas pprTVar vs))
              , PP.nest 2 (PP.text "=" PP.<+> ppr rhs) ]
 
-instance (Pretty f, Pretty b, HasInfix f) => Pretty (RuleX f b) where
+instance (PrettyVar f, PrettyVar b, HasInfix f) => Pretty (RuleX f b) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
             , ru_lhs = lhs, ru_rhs = rhs })
     = PP.sep [ PP.text "rule" PP.<+> PP.doubleQuotes (text name)
@@ -521,7 +548,7 @@ instance Pretty a => Pretty [a] where
 
 pprTrace :: String -> Doc -> a -> a
 pprTrace str doc v
-  = trace (take 100 $ PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v
+  = trace (PP.render (PP.sep [PP.text str, PP.nest 2 doc])) v
 
 pprPanic :: HasCallStack => String -> Doc -> a
 pprPanic str doc

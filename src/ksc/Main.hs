@@ -14,7 +14,9 @@ import CSE
 import ANF
 import Cgen (cppF, runM, cgenDef, cgenDefs)
 import KMonad
+import Text.PrettyPrint as PP
 import Data.List( partition )
+import Control.Monad( unless )
 
 
 -------------------------------------
@@ -38,62 +40,64 @@ demoN decls
   = do { banner "Original declarations"
        ; displayN decls
 
-       ; banner "Typechecked declarations"
        ; let (env, tc_decls) = annotDecls emptyGblST decls
        ; let (rules, defs)   = partitionDecls tc_decls
              rulebase        = mkRuleBase rules
 
-       ; displayN $! tc_decls
+       ; displayPass "Typechecked declarations" env defs
 
-       ; banner "Optimised original definition"
        ; let (env1, opt_defs) = optDefs rulebase env defs
-       ; displayN opt_defs
+       ; displayPass "Optimised original definition" env1 opt_defs
 
-       ; banner "Anf-ised original definition"
        ; anf_defs <- anfDefs opt_defs
-       ; displayN anf_defs
+       ; displayPass "Anf-ised original definition" env1 anf_defs
 
-       ; banner "The full Jacobian (unoptimised)"
        ; let grad_defs = gradDefs anf_defs
              env2      = env1 `extendGblST` grad_defs
-       ; displayN grad_defs
+       ; displayPass "The full Jacobian (unoptimised)" env2 grad_defs
 
-       ; banner "The full Jacobian (optimised)"
        ; let (env3, opt_grad_defs) = optDefs rulebase env2 grad_defs
-       ; displayN opt_grad_defs
+       ; displayPass "The full Jacobian (optimised)" env3 opt_grad_defs
 
-       ; banner "Forward derivative (unoptimised)"
        ; let der_fwd = map applyD opt_grad_defs
-       ; displayN der_fwd
+       ; displayPass "Forward derivative (unoptimised)" env3 der_fwd
 
-       ; banner "Forward-mode derivative (optimised)"
        ; let (env4, opt_der_fwd) = optDefs rulebase env3 der_fwd
-       ; displayN opt_der_fwd
+       ; displayPass "Forward-mode derivative (optimised)" env4 opt_der_fwd
 
-       ; banner "Forward-mode derivative (CSE'd)"
        ; (env5, cse_fwd) <- cseDefs rulebase env4 opt_der_fwd
-       ; displayN cse_fwd
+       ; displayPass "Forward-mode derivative (CSE'd)" env5 cse_fwd
 
-       ; banner "Transposed Jacobian"
        ; let trans_grad_defs = map transposeD opt_grad_defs
-       ; displayN trans_grad_defs
+       ; displayPass "Transposed Jacobian" env5 trans_grad_defs
 
-       ; banner "Optimised transposed Jacobian"
        ; let (env6, opt_trans_grad_defs) = optDefs rulebase env5 trans_grad_defs
-       ; displayN opt_trans_grad_defs
+       ; displayPass "Optimised transposed Jacobian" env6 opt_trans_grad_defs
 
-       ; banner "Reverse-mode derivative (unoptimised)"
        ; let der_rev = map applyD opt_trans_grad_defs
-       ; displayN der_rev
+       ; displayPass "Reverse-mode derivative (unoptimised)" env6 der_rev
 
-       ; banner "Reverse-mode derivative (optimised)"
        ; let (env7, opt_der_rev) = optDefs rulebase env6 der_rev
-       ; displayN opt_der_rev
+       ; displayPass "Reverse-mode derivative (optimised)" env7 opt_der_rev
 
        ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
-       ; banner "Reverse-mode derivative (CSE'd)"
-       ; displayN cse_rev
+       ; displayPass "Reverse-mode derivative (CSE'd)" env8 cse_rev
        }
+
+displayPass :: String -> GblSymTab -> [TDef] -> KM ()
+displayPass what env decls
+  = do { banner what
+       ; displayN decls
+       ; let errs = lintDefs env decls
+       ; unless (null errs) $
+         liftIO $ putStrLn $ PP.render $
+         vcat [ text ""
+              , text "Lint errors in" <+> text what
+              , nest 2 (vcat errs)
+              , text "End of errors"
+              , text "" ]
+    }
+
 
 -------------------------------------
 -- GMM derivatives

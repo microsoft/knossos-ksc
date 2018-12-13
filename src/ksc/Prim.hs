@@ -31,15 +31,13 @@ mkPrimCall3 f a b c = mkPrimCall f (Tuple [a, b, c])
 --------------------------------------------
 
 lmZero :: Type -> Type -> TExpr
-lmZero s t = primCall "lmZero" (TypeLM s t) (Tuple [])
+lmZero s t = mkPrimCall2 "lmZero" (mkDummy s) (mkDummy t)
 
 lmOne :: Type -> TExpr
-lmOne t = primCall "lmOne" (TypeLM t t) (Tuple [])
+lmOne t = mkPrimCall "lmOne" (mkDummy t)
 
-lmScale :: HasCallStack => Type -> Type -> TExpr -> TExpr
-lmScale (TypeLM _ _) t e = error "lmScale: Arg1 is TypeLM" 
-lmScale _ (TypeLM _ _) e = error "lmScale: Arg2 is TypeLM" 
-lmScale s t e = primCall "lmScale" (TypeLM s t) (Tuple [Var $ mkDummy s, Var $ mkDummy t, e])
+lmScale :: HasCallStack => TExpr -> TExpr
+lmScale e = mkPrimCall "lmScale" e
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = mkPrimCall2 "lmAdd" f g
@@ -83,7 +81,7 @@ isLMZero _ = False
 
 --TODO: make this work with lmone lmzero again
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmScale t t $ kTFloat 1.0) (lmScale t t $ kTFloat 0.0)
+lmDelta t i j = If (pEqual i j) (lmScale $ kTFloat 1.0) (lmScale $ kTFloat 0.0)
  
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
@@ -157,11 +155,15 @@ primCallResultTy :: HasCallStack => PrimFun -> Type -> Type
 primCallResultTy fun arg_ty
   = case primCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
-      Nothing -> pprPanic "primCallResultTy: Could not determine result type for" (text fun <+> text " @ " <+> ppr arg_ty)
+      Nothing -> pprTrace "primCallResultTy: Could not determine result type for"
+                          (text fun <+> text " @ " <+> ppr arg_ty) $
+                 TypeUnknown
 
 primCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
 primCallResultTy_maybe fun
   = case fun of
+      "lmZero"      -> lmZeroResultTy
+      "lmOne"       -> lmOneResultTy
       "lmApply"     -> lmApplyResultTy
       "lmVCat"      -> lmVCatResultTy
       "lmHCat"      -> lmHCatResultTy
@@ -173,19 +175,29 @@ primCallResultTy_maybe fun
       "lmBuildT"    -> lmBuildTResultTy
       _             -> simplePrimResultTy fun
 
-selCallResultTy :: Int -> Type -> Type
-selCallResultTy i arg_ty
+selCallResultTy_maybe :: Int -> Type -> Maybe Type
+selCallResultTy_maybe i arg_ty
   = case arg_ty of
-      TypeTuple tys -> tys !! (i - 1)
-      TypeVec t     -> t
+      TypeTuple tys -> Just (tys !! (i - 1))
+      TypeVec t     -> Just t
+      _             -> Nothing
 
 lmApplyResultTy, lmTransposeResultTy, lmScaleResultTy,
   lmHCatResultTy, lmVCatResultTy, lmBuildResultTy,
-  lmBuildTResultTy, lmComposeResultTy, lmAddResultTy
+  lmBuildTResultTy, lmComposeResultTy, lmAddResultTy,
+  lmZeroResultTy, lmOneResultTy
   :: Type -> Maybe Type
 
+lmZeroResultTy ty
+  | TypeTuple [s, t] <- ty
+  = Just (TypeLM s t)
+  | otherwise = Nothing
+
+lmOneResultTy ty
+  = Just (TypeLM ty ty)
+
 lmApplyResultTy ty
-  | (TypeTuple [TypeLM s t, s1]) <- ty
+  | TypeTuple [TypeLM s t, s1] <- ty
   , assertBool (s == s1)
   = Just t
   | otherwise = Nothing
@@ -218,11 +230,15 @@ lmAddResultTy ty
   = Just (TypeLM s1 t1)
   | otherwise = Nothing
 
-lmScaleResultTy (TypeTuple [s, t, TypeFloat]) = Just (TypeLM s t)
+lmScaleResultTy ty
+  | TypeFloat <- ty
+  = Just (TypeLM TypeFloat TypeFloat)
+  | otherwise
+  = Nothing
 
 lmVCatResultTy ty
   | TypeTuple tys <- ty
-  , (ss, ts) <- unzipLMTypes tys
+  , Just (ss, ts) <- unzipLMTypes tys
   , (s1:ss1) <- ss
   , assertBool $ all (== s1) ss1
   = Just (TypeLM s1 (TypeTuple ts))
@@ -230,7 +246,7 @@ lmVCatResultTy ty
 
 lmHCatResultTy ty
   | TypeTuple tys <- ty
-  , (ss, ts) <- unzipLMTypes tys
+  , Just (ss, ts) <- unzipLMTypes tys
   , (t1:ts1) <- ts
   -- TODO: cope with mixtures of T and Zero T, assertBool $ all (== t1) ts1
   = Just (TypeLM (TypeTuple ss) t1)
@@ -248,18 +264,21 @@ simplePrimResultTy fun arg_ty
       ("size"     , TypeVec _                              ) -> Just TypeInteger
       ("sum"      , TypeVec t                              ) -> Just t
       ("to_float" , TypeInteger                            ) -> Just TypeFloat
+
+      -- Addition is special: it can add any two things of the same type
+      ("+"        , TypeTuple [t1, t2]                     )
+                  | t1 == t2                                 -> Just t2
+
+      -- Multiplication is special: it takes a Float on the left,
+      -- but anything on the right
+      ("*"        , TypeTuple [TypeFloat, t2]              ) -> Just t2
+      ("*"        , TypeTuple [TypeInteger, t2]            ) -> Just t2
+
       ("neg"      , t                                      ) -> Just t
       ("exp"      , TypeFloat                              ) -> Just TypeFloat
       ("log"      , TypeFloat                              ) -> Just TypeFloat
-      ("+"        , TypeTuple [t1, t2]                     ) -> Just t1
       ("-"        , TypeTuple [t1, t2]                     ) -> Just t1
-
       ("/"        , TypeTuple [TypeFloat, TypeFloat]       ) -> Just TypeFloat  -- Not known to work for non-float types
-      ("/"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
-
-      ("*"        , TypeTuple [TypeFloat, t2]              ) -> Just t2
-      ("*"        , TypeTuple [t1, TypeFloat]              ) -> Just t1
-      ("*"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool
