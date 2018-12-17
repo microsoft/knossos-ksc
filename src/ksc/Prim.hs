@@ -311,6 +311,8 @@ simplePrimResultTy fun arg_ty
       ("!="       , _                                      ) -> Just TypeBool
       ("<"        , _                                      ) -> Just TypeBool
       (">"        , _                                      ) -> Just TypeBool
+      ("abs"      , _                                      ) -> Just TypeFloat
+      ("max"      , _                                      ) -> Just TypeFloat
       ("delta"    , TypeTuple [TypeInteger, TypeInteger, t]) -> Just t
       ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeVec t)
       ("diag"     , TypeTuple [ TypeInteger, TypeInteger
@@ -322,7 +324,8 @@ isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "index", "s
                        , "neg", "exp", "log", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
-                       , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT" ]
+                       , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT"
+                       , "abs", "max" ]
 
 mkFun :: String -> Fun
 mkFun f | isPrimFun f = Fun (PrimFun f)
