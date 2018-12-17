@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import           Data.List                      ( intercalate, isPrefixOf )
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
-import           System.Process                 ( callProcess )
+import           System.Process                 ( readProcess )
 
 import Lang
 
@@ -436,9 +436,8 @@ cgenVar :: Var -> String
 cgenVar v = show v
 
 
-cppF :: String -> [TDef] -> IO ()
--- String is the file name
-cppF outfile defs = do
+cppFG :: String -> [TDef] -> IO String
+cppFG outfile defs = do
   let lines = ["#include <stdio.h>", "#include \"knossos.h\"", "namespace ks {\n"]
 
   let lls = cgenDefs defs
@@ -457,7 +456,13 @@ cppF outfile defs = do
   --callCommand $ "clang-format -i " ++ cppfile
   let compcmd = ("g++-7", ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
-  uncurry callProcess compcmd
+  uncurry readProcess compcmd ""
   putStrLn "Running"
-  callProcess exefile []
+  readProcess exefile [] ""
+
+cppF :: String -> [TDef] -> IO ()
+-- String is the file name
+cppF outfile defs = do
+  output <- cppFG outfile defs
   putStrLn "Done"
+  putStr output
