@@ -161,11 +161,11 @@ doall verbosity file =
   ;  banner "all"
   ;  dd ann2
 
-  ;  liftIO (cppF ("obj\\" ++ file) ann2)
+  ;  liftIO (cppF ("obj/" ++ file) ann2)
   }
 
 gmm :: IO ()
-gmm = doall 400 "test\\ksc\\gmm"
+gmm = doall 400 "test/ksc/gmm"
 
 main :: IO ()
 main = gmm

@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import           Data.List                      ( intercalate, isPrefixOf )
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
-import           System.Process                 ( callCommand )
+import           System.Process                 ( callProcess )
 
 import Lang
 
@@ -450,9 +450,9 @@ cppF outfile defs = do
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
-  let compcmd = "g++ -fmax-errors=5 -Wall -Isrc/runtime -O -g -std=c++17 " ++ cppfile ++ " -o " ++ exefile
-  putStrLn $ "Compiling: " ++ compcmd
-  callCommand compcmd
+  let compcmd = ("g++", ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
+  putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
+  uncurry callProcess compcmd
   putStrLn "Running"
-  callCommand exefile
+  callProcess exefile []
   putStrLn "Done"
