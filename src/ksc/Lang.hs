@@ -6,6 +6,7 @@ import Prelude hiding( (<>) )
 
 import qualified Text.PrettyPrint   as PP
 import Text.PrettyPrint (Doc)
+import Data.List ( intersperse )
 import KMonad
 
 import Data.Either( partitionEithers )
@@ -591,11 +592,7 @@ display :: Pretty p => p -> KM ()
 display p = liftIO $ putStrLn (render (ppr p))
 
 displayN :: Pretty p => [p] -> KM ()
-displayN ps = liftIO $ putStrLn (render (go ps))
-  where
-    go []     = empty
-    go [p]    = ppr p
-    go (p:ps) = vcat [ ppr p, text "", go ps ]
+displayN = liftIO . putStrLn . render . vcat . intersperse (text "") . map ppr
 
 bracesSp :: SDoc -> SDoc
 bracesSp d = char '{' <+> d <+> char '}'
