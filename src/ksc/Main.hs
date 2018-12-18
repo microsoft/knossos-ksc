@@ -40,7 +40,7 @@ demoN decls
   = do { banner "Original declarations"
        ; displayN decls
 
-       ; let (env, tc_decls) = annotDecls emptyGblST decls
+       ; (env, tc_decls) <- annotDecls emptyGblST decls
        ; let (rules, defs)   = partitionDecls tc_decls
              rulebase        = mkRuleBase rules
 
@@ -88,14 +88,7 @@ displayPass :: String -> GblSymTab -> [TDef] -> KM ()
 displayPass what env decls
   = do { banner what
        ; displayN decls
-       ; let errs = lintDefs env decls
-       ; unless (null errs) $
-         liftIO $ putStrLn $ PP.render $
-         vcat [ text ""
-              , text "Lint errors in" <+> text what
-              , nest 2 (vcat errs)
-              , text "End of errors"
-              , text "" ]
+       ; lintDefs what env decls
     }
 
 
@@ -114,20 +107,17 @@ moveMain = partition isMain
 doall :: HasCallStack => Int -> String -> IO ()
 doall verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity $! defs))
-      ddx :: Pretty p => [p] -> KM ()
-      ddx = displayN in
+  in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))
   ;  liftIO $ putStrLn "read decls"
 
   ;  let (main, decls)    = moveMain decls0
 
-  ;  banner "annotated defs"
-  ;  let (env, ann_decls) = annotDecls emptyGblST decls
-  ;  dd ann_decls
-
+  ;  (env, ann_decls) <- annotDecls emptyGblST decls
   ;  let (rules, defs) = partitionDecls ann_decls
          rulebase      = mkRuleBase rules
+  ; displayPass "Typechecked defs" env defs
 
   ;  banner "main"
   ;  dd main
@@ -137,29 +127,25 @@ doall verbosity file =
 
   ;  let grad = gradDefs defs
   ;  banner "grad"
-  ;  dd grad
+  ;  displayPass "Grad" env grad
 
   ;  let (env1, optgrad) = optDefs rulebase env grad
-  ;  banner "optgrad"
-  ;  dd optgrad
+  ;  displayPass "Optgrad" env1 optgrad
 
   ;  let fwd  = applyDefs optgrad
-  ;  banner "fwd"
-  ;  dd fwd
+  ;  displayPass "Fwd" env1 fwd
 
   ;  let (env2, optfwd) = optDefs rulebase env1 fwd
-  ;  banner "optfwd"
-  ;  dd optfwd
+  ;  displayPass "OptFwd" env2 optfwd
 
-  ;  let annot_main = map (\ (DefDecl x) -> x) $ snd $ annotDecls env2 main
+  ; (_, [DefDecl annot_main]) <- annotDecls env2 main
 
-  ;  let alldefs = defs ++ optgrad ++ optfwd ++ annot_main
+  ;  let alldefs = defs ++ optgrad ++ optfwd ++ [annot_main]
   ;  (env3, cse) <- cseDefs rulebase env2 alldefs
-  ;  dd cse
+  ;  displayPass "CSE" env3 cse
 
   ;  let ann2 =  cse
-  ;  banner "all"
-  ;  dd ann2
+  ;  displayPass "All" env3 ann2
 
   ;  liftIO (cppF ("obj/" ++ file) ann2)
   }
