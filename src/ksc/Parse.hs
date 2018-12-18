@@ -170,7 +170,6 @@ mk_fun f = case find_dollar f of
                        (_, [])  -> Nothing  -- No $
                        (_, [_]) -> Nothing  -- Trailing $
                        (prefix, _ : suffix) -> Just (prefix, suffix)
-                       
 
 pVar :: Parser Var
 pVar = Simple <$> pIdentifier
@@ -223,10 +222,10 @@ pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
                []  -> return (Var (Simple f))
-               [e] -> return (Call (mkFun f) e)
-               _   -> return (Call (mkFun f) (Tuple es))
+               [e] -> return (Call (mk_fun f) e)
+               _   -> return (Call (mk_fun f) (Tuple es))
         }
-      
+
 pIfThenElse :: Parser (ExprX Fun Var)
 -- (if e1 e2 e3)
 pIfThenElse = do { pReserved "if"

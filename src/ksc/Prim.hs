@@ -18,7 +18,7 @@ mkPrimCall :: PrimFun -> TExpr -> TExpr
 mkPrimCall fun arg
   = primCall fun res_ty arg
   where
-    res_ty = primCallResultTy fun (typeof arg)
+    res_ty = primFunCallResultTy fun (typeof arg)
 
 mkPrimCall2 :: String -> TExpr -> TExpr -> TExpr
 mkPrimCall2 f a b = mkPrimCall f (Tuple [a, b])
@@ -79,9 +79,8 @@ isLMZero (Call f e) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
 
 
---TODO: make this work with lmone lmzero again
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmScale $ kTFloat 1.0) (lmScale $ kTFloat 0.0)
+lmDelta t i j = If (pEqual i j) (lmOne t) (lmZero t t)
 
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
@@ -151,16 +150,45 @@ pSnd   = pSel 2 2
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy :: HasCallStack => PrimFun -> Type -> Type
-primCallResultTy fun arg_ty
-  = case primCallResultTy_maybe fun arg_ty of
+primCallResultTy_maybe :: Fun -> Type -> Maybe Type
+primCallResultTy_maybe fun arg_ty
+  = case fun of
+      Fun (PrimFun f)  -> primFunCallResultTy_maybe f arg_ty
+      Fun (SelFun i _) -> selCallResultTy_maybe i arg_ty
+
+      GradFun f dir
+        | Just res_ty <- primCallResultTy_maybe (Fun f) arg_ty
+        -> case dir of
+             Fwd -> Just (TypeLM arg_ty res_ty)
+             Rev -> Just (TypeLM res_ty arg_ty)
+
+      DrvFun f Fwd    -- f :: S -> T, then fwd$f :: (S,S) -> T
+        | TypeTuple ss <- arg_ty
+        , let n_s = length ss
+        , even n_s
+        , let s_ty = case ss of
+                       [s1,s2] -> s2
+                       _       -> TypeTuple (take (n_s `div` 2) ss)
+        , Just res_ty <- primCallResultTy_maybe (Fun f) s_ty
+        -> Just res_ty
+
+      DrvFun f Rev    -- f :: S -> T, then ref$f :: (S,T) -> T
+        -> pprPanic "primFunCallResultTy" (ppr fun <+> ppr arg_ty)
+           -- How do we split up that tuple?
+
+      _ -> Nothing
+
+
+primFunCallResultTy :: HasCallStack => PrimFun -> Type -> Type
+primFunCallResultTy fun arg_ty
+  = case primFunCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
       Nothing -> pprTrace "primCallResultTy: Could not determine result type for"
                           (text fun <+> text " @ " <+> ppr arg_ty) $
                  TypeUnknown
 
-primCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
-primCallResultTy_maybe fun
+primFunCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
+primFunCallResultTy_maybe fun
   = case fun of
       "lmZero"      -> lmZeroResultTy
       "lmOne"       -> lmOneResultTy

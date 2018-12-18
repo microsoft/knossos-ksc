@@ -378,20 +378,30 @@ optGradSel _ _ _ = Nothing
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
-optGradPrim (TypeLM _ to) "+" arg
+optGradPrim _ "+" arg
   | TypeTuple [t1, t2] <- typeof arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
-optGradPrim (TypeLM _ to) "*" (Tuple [x,y])
+optGradPrim _ "*" (Tuple [x,y])
+  | TypeFloat <- typeof x
+  , TypeFloat <- typeof y
   = Just (lmHCat [lmScale y, lmScale x])
 
--- Any function with integer output must be
-optGradPrim (TypeLM from TypeInteger) "/" (Tuple [x,y])
-  = Just $ lmZero from TypeInteger
-
-optGradPrim (TypeLM _ TypeFloat) "/" (Tuple [x,y])
+optGradPrim _ "/"  (Tuple [x,y])
+  | TypeFloat <- typeof x
+  , TypeFloat <- typeof y
   = Just (lmHCat [ lmScale (pDiv (kTFloat 1.0) y)
                  , lmScale (pNeg (pDiv x (pMul y y)))])
+
+optGradPrim _ "*" arg
+  | let arg_ty = typeof arg
+  , TypeTuple [TypeInteger, TypeInteger] <- arg_ty
+  = Just (lmZero arg_ty TypeInteger)
+
+optGradPrim _  "/" arg
+  | let arg_ty = typeof arg
+  , TypeTuple [TypeInteger, TypeInteger] <- arg_ty
+  = Just $ lmZero arg_ty TypeInteger
 
 optGradPrim _ "sum" e
   | TypeVec t <- typeof e
@@ -404,10 +414,10 @@ optGradPrim _ "size" e
 optGradPrim _ "index" (Tuple [i,v])
   = Just (primDindex i v)
 
-optGradPrim (TypeLM s t) "neg" e = Just (lmScale (kTFloat $ -1.0))
-optGradPrim (TypeLM s t) "exp" e = Just (lmScale (pExp e))
-optGradPrim (TypeLM s t) "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))
-optGradPrim ty f _ = optTrace("No opt for grad of " ++ f) $ Nothing
+optGradPrim _ "neg" e = Just (lmScale (kTFloat $ -1.0))
+optGradPrim _ "exp" e = Just (lmScale (pExp e))
+optGradPrim _ "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))
+optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) $ Nothing
 
 ---------------
 -- Called for (lmApply lm dx)
