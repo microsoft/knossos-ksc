@@ -4,7 +4,7 @@
         
 (def test_inline (x : Vec Float)
   (let (n (size x))
-    (build 4 (lam (x : Integer) n))))
+    (build 4 (lam (i : Integer) n))))
 
 (def test_inline2 (x : Vec Float)
   (let (n (size x))

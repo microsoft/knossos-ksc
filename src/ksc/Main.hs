@@ -87,10 +87,9 @@ demoN decls
 displayPass :: String -> GblSymTab -> [TDef] -> KM ()
 displayPass what env decls
   = do { banner what
-       ; displayN decls
+       ; displayN (take 4 $! decls)
        ; lintDefs what env decls
     }
-
 
 -------------------------------------
 -- GMM derivatives

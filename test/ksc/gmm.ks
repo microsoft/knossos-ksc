@@ -62,7 +62,8 @@
                       (mahal_vec (mul$Mat$Vec Q
                                           (sub$VecR$VecR (index i x) (index k means)))))
                   (- (+ (index k alphas) (sum (index k qs)))
-                    (* wishart_gamma  {- just here to test, should be 0.500000-}(sqnorm mahal_vec))))))))))
+                    (* wishart_gamma 1.0) -- (* 0.500000 (sqnorm mahal_vec))
+                    ))))))))
             (* (to_float n) (logsumexp alphas)))
          (* 0.5 (sum (build K (lam (k : Integer)
                                             (+ (sqnorm (exp$VecR (index k qs)))
@@ -118,8 +119,9 @@
 
           (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2 )
           (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
-          (fwd$gmm_knossos_gmm_objective x          alphas          mus           qs          ls          gamma 1.2
-                 (zerovv x) (zerov alphas)  (zerovv mus)  del         (zerovv ls) 0.0   0.0)
+          (fwd$gmm_knossos_gmm_objective 
+                x          alphas          mus           qs      ls            gamma    1.2
+                (zerovv x) (zerov alphas)  (zerovv mus)  del     (zerovv ls)   0.0      0.0)
           (- (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
              (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2))
 

@@ -405,7 +405,7 @@ optGradPrim _  "/" arg
 
 optGradPrim _ "sum" e
   | TypeVec t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "si")
+  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "sum$i")
                                   (lmOne t)))
 
 optGradPrim _ "size" e

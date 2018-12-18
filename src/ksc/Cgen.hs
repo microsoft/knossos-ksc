@@ -22,7 +22,7 @@ data CType =  CType Type
             | TypeDef String CType
             | LMZero Type Type
             | LMOne Type
-            | LMScale Type Type Type
+            | LMScale
             | LMHCat [CType]
             | LMVCat [CType]
             | LMBuild CType
@@ -181,8 +181,7 @@ cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
 cgenExprR env = \case
   Konst k  -> return $ CG "" (cgenKonst k) (CType $ typeofKonst k)
   Var (TVar ty Dummy) -> let cty = CType ty in return $ CG "" (cgenType cty ++ "{}") cty
-  Var (TVar ty v) -> return -- $ assertTypesEqualThen "cgenExprR" ty (getTypeFromCType (cstLookupVar v env))
-                            $ CG "" (show v) (cstLookupVar v env)
+  Var (TVar ty v) -> return $ CG "" (show v) (cstLookupVar v env)
 
   Call tf@(TFun ty f) (Tuple vs) -> do
       -- Untuple argument for C++ call
@@ -215,8 +214,12 @@ cgenExprR env = \case
   Let (TVar tyv v) e1 body -> do
     (CG decle1 ve1 type1) <- cgenExprR env e1
     (CG declbody vbody tybody) <- cgenExprR (cstInsertVar v type1 env) body
+    lvar        <- freshCVar
+
     return $ CG
       (  "/**Let**/"
+      ++ cgenType tybody ++ " " ++ lvar ++ ";\n"
+      ++ "{\n"
       ++ decle1
       ++ "\n"
       ++ cgenType type1
@@ -225,8 +228,11 @@ cgenExprR env = \case
       ++ " = "
       ++ ve1
       ++ ";\n"
-      ++ declbody )
-      vbody
+      ++ declbody ++ "\n"
+      ++ lvar  ++ " = " ++ vbody ++ ";\n" 
+      ++ "}\n"
+      )
+      lvar
       tybody
 
   Tuple [t] -> cgenExpr env t
@@ -348,7 +354,7 @@ cgenType = \case
   TypeDef s ty -> s
   LMZero s t -> lmt "Zero" [s, t]
   LMOne t -> lmt "One" [t]
-  LMScale s t scale_t -> lmt "Scale" [s, t, scale_t]
+  LMScale -> "LM::Scale"
   LMHCat ts -> lm "HCat" ts
   LMVCat ts -> lm "VCat" ts
   LMBuild t -> lm "Build" [t]
@@ -382,7 +388,7 @@ ctypeofFun env tf@(TFun ty f) ctys = case cstMaybeLookupFun f env of
 
 ctypeofFun1 :: HasCallStack => CST -> Type -> Fun -> [CType] -> CType
 ctypeofFun1 env ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
-ctypeofFun1 env (TypeLM s t) (GradFun f Fwd) ctys = ctypeofGradBuiltin (show f) ctys
+ctypeofFun1 env (TypeLM s t) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 env (TypeLM s t) f ctys = error $ "Did not match [" ++  show f ++ "]@\n  " ++ intercalate "\n  " (map show ctys)
 ctypeofFun1 env ty f ctys = CType ty
 
@@ -393,7 +399,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
   ("lmBuildT", [_, lam]) -> LMBuildT lam
   ("lmOne", [CType t]) -> LMOne t
   ("lmZero", [CType s, CType t]) -> LMZero s t
-  ("lmScale", [CType s, CType t, CType scale_t]) -> LMScale s t scale_t
+  ("lmScale", [CType TypeFloat]) -> LMScale
   ("lmHCat", _) -> LMHCat arg_types
   ("lmVCat", _) -> LMVCat arg_types
   ("lmCompose", [lm1, lm2]) -> LMCompose lm1 lm2
@@ -406,19 +412,18 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
 pattern RR = TypeFloat
 pattern VecR = TypeVec TypeFloat
 
-ctypeofGradBuiltin :: HasCallStack => String -> [CType] -> CType
+ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  ("-", [CType RR, CType RR]) -> LMHCat [LMScale RR RR RR, LMScale RR RR RR]
-  ("+", [CType RR, CType RR]) -> LMHCat [LMScale RR RR RR, LMScale RR RR RR]
-  ("/", [CType RR, CType RR]) -> LMHCat [LMScale RR RR RR, LMScale RR RR RR]
-  ("*", [CType RR, CType RR]) -> LMHCat [LMScale RR RR RR, LMScale RR RR RR]
-  ("*", [CType RR, CType VecR]) -> LMHCat [LMScale RR VecR VecR, LMScale VecR VecR RR]
-  ("to_float", [CType TypeInteger]) -> LMZero TypeInteger TypeFloat
-  ("$trace", [CType ty]) -> LMOne ty
-  ("$rand", [CType ty]) -> LMZero ty ty
-  ("size", [CType ty]) -> LMZero ty TypeInteger
-  ("index", [CType (TypeVec t)]) -> LMHCat [LMZero TypeInteger t, LMBuild (LMScale  t t RR)]
-  _ -> error $ "Don't know grad of [" ++ f ++ "]@\n  " ++ intercalate "\n  " (map (show . stripTypeDef) ctys)
+  (PrimFun "-", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "+", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "/", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "*", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "to_float", [CType TypeInteger]) -> LMZero TypeInteger TypeFloat
+  (PrimFun "$trace", [CType ty]) -> LMOne ty
+  (PrimFun "$rand", [CType ty]) -> LMZero ty ty
+  (PrimFun "size", [CType ty]) -> LMZero ty TypeInteger
+  (PrimFun "index", [CType (TypeVec t)]) -> LMHCat [LMZero TypeInteger t, LMBuild (LMScale)]
+  _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate "\n  " (map (show . stripTypeDef) ctys)
 
 cgenKonst :: Konst -> String
 cgenKonst = \case
