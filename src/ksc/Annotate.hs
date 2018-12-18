@@ -219,19 +219,16 @@ callResultTy env fun arg_ty
 
 callResultTy_maybe :: SymTab -> Fun -> Type -> Maybe Type
 callResultTy_maybe env fun arg_ty
-  = case fun of
-      Fun (PrimFun f)  -> primCallResultTy_maybe f arg_ty
-      Fun (UserFun _)  -> userCallResultTy_maybe fun (gblST env)
-      Fun (SelFun i _) -> selCallResultTy_maybe i arg_ty
-      GradFun f Fwd
-        | Just res_ty <- callResultTy_maybe env (Fun f) arg_ty
-        -> Just (TypeLM arg_ty res_ty)
+  | is_user_fun fun
+  = userCallResultTy_maybe fun (gblST env)
+  | otherwise
+  = primCallResultTy_maybe fun arg_ty
+  where
+    is_user_fun (Fun     (UserFun{}))    = True
+    is_user_fun (GradFun (UserFun {}) _) = True
+    is_user_fun (DrvFun  (UserFun {}) _) = True
+    is_user_fun _                        = False
 
-      GradFun f Rev
-        | Just res_ty <- callResultTy_maybe env (Fun f) arg_ty
-        -> Just (TypeLM res_ty arg_ty)
-
-      _ -> Nothing
 
 
 -----------------------------------------------
@@ -426,7 +423,8 @@ lookupGblTc :: Fun -> Type -> TcM Type
 lookupGblTc fun arg_ty
   = do { st <- getSymTabTc
        ; case callResultTy_maybe st fun arg_ty of
-           Nothing -> do { addErr $ hang (text "Out of scope or ill-typed function:" <+> ppr fun)
-                                       2 (text "Arg type:" <+> ppr arg_ty)
+           Nothing -> do { addErr $ hang (text "Out of scope or ill-typed function:" <+> ppr fun <+> text (show fun))
+                                       2 (vcat [ text "Arg type:" <+> ppr arg_ty
+                                               , ppr (Map.lookup fun (gblST st)) ])
                          ; return TypeUnknown }
            Just res_ty -> return res_ty }

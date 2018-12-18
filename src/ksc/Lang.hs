@@ -85,20 +85,20 @@ data FunId = UserFun String   -- UserFuns have a Def
            | SelFun
                 Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                 Int      -- Arity
-           deriving( Eq, Ord )
+           deriving( Eq, Ord, Show )
 
 data Fun = Fun     FunId         -- The function              f(x)
          | GradFun FunId ADMode  -- Full Jacobian Df(x)
                                  --   Rev <=> transposed  Rf(x)
          | DrvFun  FunId ADMode  -- Derivative derivative f'(x,dx)
                                  --   Rev <=> reverse mode f`(x,dr)
-         deriving( Eq, Ord )
+         deriving( Eq, Ord, Show )
 
 data ADMode = Fwd | Rev
             deriving( Eq, Ord, Show )
 
-data TFun = TFun Type Fun  -- Typed functions.  These are used at
-  deriving (Eq, Ord)       -- /occurrence/ sites only, not binding site
+data TFun = TFun Type Fun   -- Typed functions.  These are used at
+  deriving (Eq, Ord, Show)  -- /occurrence/ sites only, not binding site
 
 data Var
   = Dummy                   -- Used for type arguments
@@ -314,21 +314,6 @@ assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
 --       Show instances
 -----------------------------------------------
 
-instance Show FunId where
-  show (UserFun s)  = s
-  show (PrimFun p)  = p
-  show (SelFun i n) = "selfun<" ++ show i ++ "," ++ show n ++ ">"
-
-instance Show Fun where
-  show (Fun s) = show s
-  show (GradFun s Fwd) = "D$" ++ show s
-  show (GradFun s Rev) = "R$" ++ show s
-  show (DrvFun  s Fwd) = "fwd$" ++ show s
-  show (DrvFun  s Rev) = "rev$" ++ show s
-
-instance Show TFun where
-  show (TFun ty f) = "(TFun " ++ show f ++ " : " ++ show ty ++ ")"
-
 instance Show Var where
   show v = case v of
     Dummy -> "/*dummy*/"
@@ -363,14 +348,30 @@ instance Pretty Bool where
   ppr True  = text "True"
   ppr False = text "False"
 
+instance Pretty a => Pretty (Maybe a) where
+  ppr Nothing  = text "Nothing"
+  ppr (Just x) = text "Just" <+> ppr x
+
 instance Pretty Var where
   ppr v   = PP.text $ show v
 
 instance Pretty FunId where
-  ppr f = text (show f)
+  ppr f = pprFunId f
 
 instance Pretty Fun where
-  ppr f = text $ show f -- need show and ppr consistent for debugging
+  ppr f = pprFun f
+
+pprFunId :: FunId -> Doc
+pprFunId (UserFun s)  = text s
+pprFunId (PrimFun p)  = text p
+pprFunId (SelFun i n) = text "selfun<" <> int i <> comma <> int n <> char '>'
+
+pprFun :: Fun -> Doc
+pprFun (Fun s)         = ppr s
+pprFun (GradFun s Fwd) = text "D$"   <> ppr s
+pprFun (GradFun s Rev) = text "R$"   <> ppr s
+pprFun (DrvFun  s Fwd) = text "fwd$" <> ppr s
+pprFun (DrvFun  s Rev) = text "rev$" <> ppr s
 
 instance Pretty TVar where
   pprPrec p (TVar ty Dummy) = text "_:" <> ppr ty
@@ -502,14 +503,14 @@ parensIf ctxt inner doc
 --            , PP.text "then" PP.<+> ppr p b
 --            , PP.text "else" PP.<+> ppr p c ]
 
-instance (PrettyVar f, PrettyVar b, HasInfix f)
+instance (Show f, PrettyVar f, PrettyVar b, HasInfix f)
       => Pretty (DeclX f b) where
   ppr (DefDecl d)  = ppr d
   ppr (RuleDecl r) = ppr r
 
-instance (PrettyVar f, PrettyVar b, HasInfix f) => Pretty (DefX f b) where
+instance (Show f, PrettyVar f, PrettyVar b, HasInfix f) => Pretty (DefX f b) where
   ppr (DefX f vs rhs)
-    = PP.sep [ hang (PP.text "def" PP.<+> pprBndr f)
+    = PP.sep [ hang (PP.text "def" PP.<+> pprBndr f PP.<+> (PP.brackets (PP.text (show f))))
                   2 (parens (pprWithCommas pprTVar vs))
              , PP.nest 2 (PP.text "=" PP.<+> ppr rhs) ]
 

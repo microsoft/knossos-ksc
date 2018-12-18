@@ -59,7 +59,7 @@ demoN decls
        ; let (env3, opt_grad_defs) = optDefs rulebase env2 grad_defs
        ; displayPass "The full Jacobian (optimised)" env3 opt_grad_defs
 
-       ; let der_fwd = map applyD opt_grad_defs
+       ; let der_fwd = applyDefs opt_grad_defs
        ; displayPass "Forward derivative (unoptimised)" env3 der_fwd
 
        ; let (env4, opt_der_fwd) = optDefs rulebase env3 der_fwd
@@ -74,7 +74,7 @@ demoN decls
        ; let (env6, opt_trans_grad_defs) = optDefs rulebase env5 trans_grad_defs
        ; displayPass "Optimised transposed Jacobian" env6 opt_trans_grad_defs
 
-       ; let der_rev = map applyD opt_trans_grad_defs
+       ; let der_rev = applyDefs opt_trans_grad_defs
        ; displayPass "Reverse-mode derivative (unoptimised)" env6 der_rev
 
        ; let (env7, opt_der_rev) = optDefs rulebase env6 der_rev
@@ -126,27 +126,26 @@ doall verbosity file =
   ;  dd defs
 
   ;  let grad = gradDefs defs
-  ;  banner "grad"
-  ;  displayPass "Grad" env grad
+         env1 = env `extendGblST` grad
+  ;  displayPass "Grad" env1 grad
 
-  ;  let (env1, optgrad) = optDefs rulebase env grad
-  ;  displayPass "Optgrad" env1 optgrad
+  ;  let (env2, optgrad) = optDefs rulebase env1 grad
+  ;  displayPass "Optgrad" env2 optgrad
 
-  ;  let fwd  = applyDefs optgrad
-  ;  displayPass "Fwd" env1 fwd
+  ;  let fwd = applyDefs optgrad
+  ;  displayPass "Fwd" env2 fwd
 
-  ;  let (env2, optfwd) = optDefs rulebase env1 fwd
+  ;  let (env3, optfwd) = optDefs rulebase env2 fwd
   ;  displayPass "OptFwd" env2 optfwd
 
-  ; (_, [DefDecl annot_main]) <- annotDecls env2 main
+  ; (env4, ann_main) <- annotDecls env3 main
 
-  ;  let alldefs = defs ++ optgrad ++ optfwd ++ [annot_main]
-  ;  (env3, cse) <- cseDefs rulebase env2 alldefs
+  ;  let (_rules, main_tdef) = partitionDecls ann_main
+         alldefs = defs ++ optgrad ++ optfwd ++ main_tdef
+  ;  (env5, cse) <- cseDefs rulebase env4 alldefs
   ;  displayPass "CSE" env3 cse
 
   ;  let ann2 =  cse
-  ;  displayPass "All" env3 ann2
-
   ;  liftIO (cppF ("obj/" ++ file) ann2)
   }
 
