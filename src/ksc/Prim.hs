@@ -85,7 +85,7 @@ lmDelta t i j = If (pEqual i j) (lmOne t) (lmZero t t)
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
                         , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
-             where ii = TVar TypeInteger $ Simple "ii"
+             where ii = TVar TypeInteger $ Simple "primDindex$i"
                    TypeVec t = typeof v
 
 isEqualityCall :: TExpr -> Maybe (TExpr, TExpr)

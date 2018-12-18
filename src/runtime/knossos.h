@@ -217,6 +217,16 @@ namespace ks
 	};
 
 
+	template <>
+	struct zero_t<int>
+	{
+		zero_t(int) { }
+
+		zero_t() { }
+
+		operator int() { return 0; }
+	};
+
 	template <class T>
 	std::ostream &operator<<(std::ostream &s, ks::zero_t<T> const &v)
 	{
@@ -620,26 +630,22 @@ namespace ks
 			return To { val * t };
 		}
 
-		template <class From_t, class To_t, class scale_t>
 		struct Scale
 		{
+			typedef double scale_t;
 			scale_t val;
 
-			typedef To_t To;
-			typedef From_t From;
+			typedef double To;
+			typedef double From;
 
-			static Scale mk(From, To, scale_t val) { return Scale{ val }; }
+			static Scale mk(scale_t val) { return Scale{ val }; }
 
-			To Apply(From f) const { return Scale_aux<scale_t, From, To>(val, f); }
+			To Apply(From f) const { return val * f; }
 		};
 
-		template <class scale_t, class From, class To>
-		std::ostream &operator<<(std::ostream &s, Scale<scale_t,From,To> const &t)
+		std::ostream &operator<<(std::ostream &s, Scale const &t)
 		{
 			return s << "Scale" <<
-				"<" << type_to_string<scale_t>::name() << 
-				"," << type_to_string<From>::name() <<
-				"," << type_to_string<To>::name() << ">" <<
 				"(" << t.val << ")";
 		}
 
@@ -1088,7 +1094,6 @@ namespace ks
 
 	DECLARE_TYPE_TO_STRING(LM::One, T);
 	DECLARE_TYPE_TO_STRING2(LM::Zero, From, To);
-	DECLARE_TYPE_TO_STRING3(LM::Scale, scale_t, From, To);
 	DECLARE_TYPE_TO_STRING(LM::Build, L);
 	DECLARE_TYPE_TO_STRING(LM::BuildT, L);
 	DECLARE_TYPE_TO_STRING_Pack(LM::HCat);
@@ -1100,16 +1105,11 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
-	template <class T1, class T2>
-	T1 sub(T1 t1, T2 t2) { return t1 - t2; }
-
-	template <class T1, class T2>
-	auto D$sub(T1 t1, T2 t2)
-	{
-		typedef decltype(sub(t1,t2)) T;
-		typedef LM::Scale<T1, T, double> M1;
-		typedef LM::Scale<T2, T, double> M2;
-		return LM::HCat<M1, M2>::mk(M1::mk(T1{}, T{}, 1.0), M2::mk(T2{}, T{}, -1.0));
+	double sub(double t1, double t2) { return t1 - t2; }
+	auto D$sub(double, double) {
+		typedef LM::Scale M1;
+		typedef LM::Scale M2;
+		return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
 	}
 
 	template <class T2>
@@ -1137,10 +1137,9 @@ namespace ks
 	template <class T1, class T2>
 	auto D$mul(T1 t1, T2 t2)
 	{
-		typedef decltype(t1*t2) To;
-		typedef LM::Scale<T1, To, T2> M1;
-		typedef LM::Scale<T2, To, T1> M2;
-		return LM::HCat<M1, M2>::mk(M1::mk(T1{}, To{}, t2), M2::mk(T2{}, To{}, t1));
+		typedef LM::Scale M1;
+		typedef LM::Scale M2;
+		return LM::HCat<M1, M2>::mk(M1::mk(t2), M2::mk(t1));
 	}
 
 	template <class T1, class T2>
@@ -1151,13 +1150,7 @@ namespace ks
 
 	auto D$div(double t1, double t2)
 	{
-		typedef decltype(t1*t2) To;
-		typedef double T1;
-		typedef double T2;
-		// TODO: Not sure this is correct for anything other than scalars
-		return LM::HCat<LM::Scale<T1,To,T2>, LM::Scale<T2,To,T1>>::
-					mk(LM::Scale<T1,To,T2>::mk(T1{}, To{}, 1.0 / t2), 
-					   LM::Scale<T2,To,T1>::mk(T2{}, To{}, -1.0 / (t1*t1)));
+		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(1.0 / t2), LM::Scale::mk(-1.0 / (t1*t1)));
 	}
 
 	template <class T1, class T2>
@@ -1173,15 +1166,15 @@ namespace ks
 	}
 
 	double neg(double d) { return -d; }
-	auto D$neg(double d) { return LM::Scale<double,double,double>::mk(double{}, double{}, -1.0); }
+	auto D$neg(double d) { return LM::Scale::mk(-1.0); }
 
 	double to_float(int d) { return d; }
 	auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
+/*
 	template <class I, class Vec>
 	using D_t$index = LM::HCat<LM::Zero<I, typename Vec::value_type>,
-			 				   LM::Build<std::function<LM::Scale<typename Vec::value_type, 
-																 typename Vec::value_type, double>(I)>>>;
+			 				   LM::Build<std::function<LM::Scale(I)>>>;
 
 	template <class I, class Vec>
 	D_t$index<I, Vec>
@@ -1194,6 +1187,7 @@ namespace ks
 		return D_t$index<I, Vec>::mk(di, df);
 	}
 
+*/
 
 	// ------------ SelFun --------------
 	// TODO: parameter packs for these

@@ -2,6 +2,9 @@
     (if (< 2 3) (index 1 x) 7.0)
 )
 
+(def mul_R_VecR ((r : Float) (a : Vec Float))
+    (build (size a) (lam (i : Integer) (* r (index i a)))))
+
 (def mkvec (n : Integer)
     (build n (lam (j : Integer) (to_float j))))
 
@@ -9,13 +12,14 @@
   (sum (build (size v) (lam (i : Integer) (let (vi (index i v)) (* vi vi)))))) 
 
 {-
+
 (def g1 (gamma : Float)
     (let (ls     (build 10 (lam (i : Integer) (mkvec 3 gamma))))
          (sqnorm (index 0 ls))))
 -}
 
 (def g (gamma : Float)
-    (let (v     (* gamma (mkvec 3)))
+    (let (v     (mul_R_VecR gamma (mkvec 3)))
          (sqnorm v)))
 
 (def main ()
