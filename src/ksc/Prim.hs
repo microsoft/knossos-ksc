@@ -82,7 +82,7 @@ isLMZero _ = False
 --TODO: make this work with lmone lmzero again
 lmDelta :: Type -> TExpr -> TExpr -> TExpr
 lmDelta t i j = If (pEqual i j) (lmScale $ kTFloat 1.0) (lmScale $ kTFloat 0.0)
- 
+
 primDindex :: TExpr -> TExpr -> TExpr
 primDindex i v = lmHCat [ lmZero TypeInteger t
                         , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
@@ -269,16 +269,15 @@ simplePrimResultTy fun arg_ty
       ("+"        , TypeTuple [t1, t2]                     )
                   | t1 == t2                                 -> Just t2
 
-      -- Multiplication is special: it takes a Float on the left,
-      -- but anything on the right
-      ("*"        , TypeTuple [TypeFloat, t2]              ) -> Just t2
-      ("*"        , TypeTuple [TypeInteger, t2]            ) -> Just t2
+      ("*"        , TypeTuple [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
+      ("*"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+      ("/"        , TypeTuple [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
+      ("/"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
       ("neg"      , t                                      ) -> Just t
       ("exp"      , TypeFloat                              ) -> Just TypeFloat
       ("log"      , TypeFloat                              ) -> Just TypeFloat
       ("-"        , TypeTuple [t1, t2]                     ) -> Just t1
-      ("/"        , TypeTuple [TypeFloat, TypeFloat]       ) -> Just TypeFloat  -- Not known to work for non-float types
 
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool
