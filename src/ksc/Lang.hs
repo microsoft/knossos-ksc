@@ -292,9 +292,7 @@ assertAllEqualThen msg es e =
     allEq [] = True
     allEq (a:as) = allEqa a as
 
-    allEqa a0 [] = True
-    allEqa a0 [a] = a0 == a
-    allEqa a0 (a:as) = a0 == a && allEqa a0 as
+    allEqa a0 = all (a0 ==)
 
 assertAllEqualRet :: (HasCallStack, Eq a, Show a) => String -> [a] -> a
 assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
