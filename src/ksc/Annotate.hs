@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 module Annotate (
-  annotDecls, lintDecls, lintDefs,
+  annotDecls, lintDefs,
 
   GblSymTab, extendGblST, lookupGblST, emptyGblST,
 
@@ -26,9 +26,13 @@ dbtrace _ e = e -- trace msg e
 
 --------------------------
 
+-----------------------------------------------
+--     The type inference pass
+-----------------------------------------------
+
 annotDecls :: GblSymTab -> [Decl] -> KM (GblSymTab, [TDecl])
-annotDecls env decls
-  = runTc "Type checking" env (go decls)
+annotDecls gbl_env decls
+  = runTc "Type checking" init_env (go decls)
   where
     go [] = do { st <- getSymTabTc
                ; return (gblST st, []) }
@@ -38,64 +42,102 @@ annotDecls env decls
            ; (env', tdecls) <- extendGblEnv tdecl (go decls)
            ; return (env', tdecl:tdecls) }
 
-tcDeclX :: Decl -> TcM TDecl
-tcDeclX (DefDecl (DefX { def_fun = f, def_args = vars
-                       , def_rhs = expr }))
-  = addCtxt (text "In the definition of" <+> ppr f) $
-    extendLclEnv vars $
-    do { (ty,e) <- tcExpr expr
-       ; return (DefDecl (DefX (TFun ty f) vars e)) }
+    init_env = TCE { tce_ctxt = []
+                   , tce_st = newSymTab gbl_env
+                   , tce_fun = \fun -> (fun, Nothing)
+                   , tce_var = \var -> (var, Nothing) }
 
-tcDeclX (RuleDecl (Rule { ru_name = name, ru_qvars = qvars
-                        , ru_lhs = lhs, ru_rhs = rhs }))
+-----------------------------------------------
+--     A Lint function to do type checking
+-----------------------------------------------
+
+lintDefs :: String -> GblSymTab -> [TDef] -> KM ()
+-- Retuns a list of error messages
+lintDefs what gbl_env defs
+  = runTc what init_env (mapM_ tcDef defs)
+  where
+    init_env = TCE { tce_ctxt = []
+                   , tce_st = newSymTab gbl_env
+                   , tce_fun = \(TFun ty fun) -> (fun, Just ty)
+                   , tce_var = \(TVar ty var) -> (var, Just ty) }
+
+
+-----------------------------------------------
+--     Guts of the type checker
+-----------------------------------------------
+
+tcDeclX :: (PrettyVar f, PrettyVar b, HasInfix f)
+        => DeclX f b -> TcM f b TDecl
+tcDeclX (DefDecl def)   = do { def' <- tcDef def
+                             ; return (DefDecl def') }
+tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
+                             ; return (RuleDecl rule') }
+
+tcDef :: (PrettyVar f, PrettyVar b, HasInfix f)
+      => DefX f b -> TcM f b TDef
+tcDef (DefX { def_fun = f, def_args = vars, def_rhs = expr })
+  = extendLclEnv vars $
+    do { (fun, mb_ty) <- getFunTc f
+       ; (ty,e) <- addCtxt (text "In the definition of" <+> ppr fun) $
+                   tcExpr expr
+       ; checkTypes_maybe mb_ty ty $
+         text "Function result type mis-match for" <+> ppr fun
+       ; return (DefX (TFun ty fun) vars e) }
+
+tcRule :: (PrettyVar f, PrettyVar b, HasInfix f)
+       => RuleX f b -> TcM f b TRule
+tcRule (Rule { ru_name = name, ru_qvars = qvars
+             , ru_lhs = lhs, ru_rhs = rhs })
   = addCtxt (text "In the rule with lhs:" <+> ppr lhs) $
     extendLclEnv qvars $
     do { (lhs_ty, lhs') <- tcExpr lhs
        ; (rhs_ty, rhs') <- tcExpr rhs
        ; checkTypes lhs_ty rhs_ty $
          text "LHS and RHS of a rule have different types"
-       ; return (RuleDecl (Rule { ru_name = name, ru_qvars = qvars
-                          , ru_lhs = lhs', ru_rhs = rhs' })) }
+       ; return (Rule { ru_name = name, ru_qvars = qvars
+                      , ru_lhs = lhs', ru_rhs = rhs' }) }
 
-tcExpr :: Expr -> TcM (Type, TExpr)
-tcExpr = \case
+tcExpr :: ExprX f b -> TcM f b (Type, TExpr)
   -- Naming conventions in this function:
   --  e   Expr [TypeUnknown]
   --  ae  Expr [Annotated]
   --  tye Type of e
   --  xe  ExprX part of e
-  Var   v -> do { ty <- lookupLclTc v
-                ; return (ty, Var $ TVar ty v) }
+tcExpr (Var v)
+  = do { (var, mb_ty) <- getVarTc v
+       ; ty <- tcVar var mb_ty
+       ; return (ty, Var $ TVar ty var) }
 
-  Konst k -> return (typeofKonst k, Konst k)
+tcExpr (Konst k)
+  = return (typeofKonst k, Konst k)
 
-  -- Trace has "fake" higher-order call pattern (trace f args),
-  -- transform to (trace (f args)), later we'll add strings,
-  -- and this hackery will allow us to also add useful context annotations
-  Call t@(Fun (PrimFun "$trace")) (Tuple [Var (Simple f), e]) -> tcExpr (Call t (Call (mkFun f) e))
-  Call t@(Fun (PrimFun "$trace")) (Tuple (Var (Simple f):es)) -> tcExpr (Call t (Call (mkFun f) (Tuple es)))
+tcExpr (Call f es)
+  = do { (fun, mb_ty) <- getFunTc f
+       ; (tyes, aes) <- addCtxt (text "In the call of:" <+> ppr fun) $
+                        tcExpr es
+       ; ty <- lookupGblTc fun tyes
+       ; return (ty, Call (TFun ty fun) aes) }
 
-  Call f es -> addCtxt (text "In the call of:" <+> ppr f) $
-               do { (tyes, aes) <- tcExpr es
-                  ; ty <- lookupGblTc f tyes
-                  ; return (ty, Call (TFun ty f) aes) }
+tcExpr (Let v rhs body)
+  = do { (rhs_ty, arhs) <- tcExpr rhs
+       ; (var, mb_ty)   <- getVarTc v
+       ; checkTypes_maybe mb_ty rhs_ty $
+         text "Let binding mis-match for" <+> ppr var
+       ; let tvar = TVar rhs_ty var
+       ; (tybody,abody) <- extendLclEnv [tvar] (tcExpr body)
+       ; return (tybody, Let tvar arhs abody) }
 
-  Let v e1 body
-    -> do { (tyv,ae1) <- tcExpr e1
-          ; let tvar = TVar tyv v
-          ; (tybody,abody) <- extendLclEnv [tvar] (tcExpr body)
-          ; return (tybody, Let tvar ae1 abody) }
+tcExpr (Tuple es)
+  = do { pairs <- mapM tcExpr es
+       ; let (tys,aes) = unzip pairs
+       ; return (TypeTuple tys, Tuple aes) }
 
-  Tuple es -> do { pairs <- mapM tcExpr es
-                 ; let (tys,aes) = unzip pairs
-                 ; return (TypeTuple tys, Tuple aes) }
+tcExpr (Lam tv@(TVar tyv v) body)
+  = do { (tybody,abody) <- extendLclEnv [tv] (tcExpr body)
+       ; return (TypeLambda tyv tybody, Lam tv abody) }
 
-  Lam tv@(TVar tyv v) body
-    -> do { (tybody,abody) <- extendLclEnv [tv] (tcExpr body)
-          ; return (TypeLambda tyv tybody, Lam tv abody) }
-
-  If cond texpr fexpr ->
-    do { (tycond,acond)   <- tcExpr cond
+tcExpr (If cond texpr fexpr)
+  = do { (tycond,acond)   <- tcExpr cond
        ; (tytexpr,atexpr) <- tcExpr texpr
        ; (tyfexpr,afexpr) <- tcExpr fexpr
        ; checkTypes TypeBool tycond $
@@ -104,14 +146,38 @@ tcExpr = \case
          text "Branches of 'if' have different types"
        ; return (tytexpr, If acond atexpr afexpr) }
 
-  Assert cond body ->
-    do { (tycond,acond) <- tcExpr cond
+tcExpr (Assert cond body)
+  = do { (tycond,acond) <- tcExpr cond
        ; (tybody,abody) <- tcExpr body
        ; checkTypes TypeBool tycond $
          text "Predicate of 'assert' has non-boolean type"
        ; return (tybody, Assert acond abody) }
 
-  e -> error $ "Cannot annotate " ++ pps e
+tcExpr (App fun arg)
+  = do { (fun_ty, afun) <- tcExpr fun
+       ; (arg_ty, aarg) <- tcExpr arg
+       ; res_ty <- case fun_ty of
+           TypeLambda ty1 ty2
+              -> do { checkTypes ty1 arg_ty $
+                      text "Function application mis-match"
+                    ; return ty2 }
+           _ -> do { addErr (text "Function does not have function type" <+> ppr fun_ty)
+                   ; return TypeUnknown }
+       ; return (res_ty, App afun aarg) }
+
+tcVar :: Var -> Maybe Type -> TcM f b Type
+tcVar var mb_ty
+  | isDummy var
+  = case mb_ty of
+      Just ty -> return ty
+      Nothing -> do { addErr (text "Dummy var in untyped code")
+                    ; return TypeUnknown }
+
+  | otherwise
+  = do { ty <- lookupLclTc var
+       ; checkTypes_maybe mb_ty ty $
+         text "Variable occurrence mis-match for" <+> ppr var
+       ; return ty }
 
 
  --------------------------------------
@@ -232,127 +298,34 @@ callResultTy_maybe env fun arg_ty
 
 
 -----------------------------------------------
---     A Lint function to do type checking
+--     The typecheck monad
 -----------------------------------------------
 
-lintDecls :: String -> GblSymTab -> [TDecl] -> KM ()
--- Retuns a list of error messages
-lintDecls what env decls = runTc what env (mapM_ lintDecl decls)
+data TcEnv f b
+  = TCE { tce_ctxt :: [Doc]   -- Context, innermost first
+        , tce_st   :: SymTab
+        , tce_fun  :: f -> (Fun, Maybe Type)
+        , tce_var  :: b -> (Var, Maybe Type) }
 
-lintDefs :: String -> GblSymTab -> [TDef] -> KM ()
--- Retuns a list of error messages
-lintDefs what env decls = runTc what env (mapM_ lintDef decls)
-
-lintDecl :: TDecl -> TcM ()
-lintDecl (DefDecl def)   = lintDef  def
-lintDecl (RuleDecl rule) = lintRule rule
-
-lintDef :: TDef -> TcM ()
-lintDef def@(DefX (TFun res_ty fun) vars expr)
-  = addCtxt (text "In the definition of" <+> ppr fun) $
-    extendLclEnv vars $
-    do { res_ty' <- lintExpr expr
-       ; checkTypes res_ty res_ty' $
-         (text "Function result type mis-match for" <+> ppr fun)
-       ; return () }
-
-lintRule :: TRule -> TcM ()
-lintRule rule@(Rule { ru_qvars = qvars, ru_lhs = lhs, ru_rhs = rhs })
-  = addCtxt (text "In the rule with lhs:" <+> ppr lhs) $
-    extendLclEnv qvars $
-    do { ty_l <- lintExpr lhs
-       ; ty_r <- lintExpr rhs
-       ; checkTypes ty_l ty_r $
-         text "Rule lhs/rhs mis-match" <+> ppr rule
-       ; return () }
-
-lintExpr :: TExpr -> TcM Type
-lintExpr (Var tv@(TVar ty v))
-  | isDummy v   -- Type arguments are not real variables
-  = return ty
-  | otherwise
-  = do { exp_ty <- lookupLclTc v
-       ; checkTypes exp_ty ty $
-         text "Variable occurrence mis-match for" <+> ppr v
-       ; return ty }
-
-lintExpr (Konst k) = return (typeofKonst k)
-
-lintExpr e@(Call tf@(TFun exp_res_ty fun) arg)
-  | tf `isThePrimFun` "lmZero"
-  , TypeLM _ _ <- exp_res_ty
-  , Tuple [] <- arg  -- Really we only need that the arg has type ()
-  = return exp_res_ty
-
-  | tf `isThePrimFun` "lmOne"
-  , TypeLM s t <- exp_res_ty
-  , s == t
-  , Tuple [] <- arg
-  = return exp_res_ty
-
-  | otherwise
-  = do { arg_ty <- lintExpr arg
-       ; res_ty <- lookupGblTc fun arg_ty
-       ; checkTypes exp_res_ty res_ty $
-         text "Bad result type in call:" <+> ppr e
-       ; return res_ty }
-
-lintExpr (Let tv@(TVar ty v) rhs body)
-  = do { rhs_ty <- lintExpr rhs
-       ; checkTypes ty rhs_ty $
-         text "Let binding mis-match for" <+> ppr v
-       ; extendLclEnv [tv] (lintExpr body) }
-
-lintExpr (Tuple es)
-  = do { tys <- mapM lintExpr es
-       ; return (TypeTuple tys) }
-
-lintExpr (Lam tv@(TVar tyv v) body)
-  = do { body_ty <- extendLclEnv [tv] (lintExpr body)
-       ; return (TypeLambda tyv body_ty) }
-
-lintExpr e@(If cond tex fex)
-  = do { cond_ty <- lintExpr cond
-       ; checkTypes TypeBool cond_ty $
-         text "Boolean condition mis-match" <+> ppr e
-       ; t_ty <- lintExpr tex
-       ; f_ty <- lintExpr fex
-       ; checkTypes t_ty f_ty $
-         text "If-branch mis-match" <+> ppr e
-       ; return t_ty }
-
-lintExpr e@(Assert cond body)
-  = do { cond_ty <- lintExpr cond
-       ; checkTypes TypeBool cond_ty $
-         text "Assert condition mis-match" <+> ppr e
-       ; lintExpr body }
-
-lintExpr e@(App _ _)
-  = pprPanic "ToDo: lintExpr: App" (ppr e)
-
-----------------
-data TcEnv = TCE { tce_ctxt :: [Doc]   -- Context, innermost first
-                 , tce_st   :: SymTab }
-
-newtype TcM a = TCM { unTc :: TcEnv -> [Doc] -> (a, [Doc]) }
+newtype TcM f b a = TCM { unTc :: TcEnv f b -> [Doc] -> (a, [Doc]) }
 -- Just a writer monad on [Doc]
 
-instance Functor TcM where
+instance Functor (TcM f b) where
   fmap f (TCM m) = TCM (\ctxt ds -> case m ctxt ds of
                                      (r, ds') -> (f r, ds'))
 
-instance Applicative TcM where
+instance Applicative (TcM f b) where
   pure  = return
   (<*>) = ap
 
-instance Monad TcM where
+instance Monad (TcM f b) where
   return v = TCM (\ctxt ds -> (v, ds))
   TCM m >>= k = TCM $ \ctxt ds ->
                 case m ctxt ds of
                   (r1, ds') -> unTc (k r1) ctxt ds'
 
-runTc :: String -> GblSymTab -> TcM a -> KM a
-runTc what gbl_env (TCM m)
+runTc :: String -> TcEnv f b -> TcM f b a -> KM a
+runTc what init_env (TCM m)
   | null rev_errs
   = return result
 
@@ -369,19 +342,29 @@ runTc what gbl_env (TCM m)
        ; error "Exiting" }
   where
     (result, rev_errs) = m init_env []
-    init_env = TCE { tce_ctxt = []
-                   , tce_st = newSymTab gbl_env }
 
-addErr :: Doc -> TcM ()
+addErr :: Doc -> TcM f b ()
 addErr d = TCM (\env ds -> ((), mk_err env d : ds))
   where
     mk_err env d = d $$ vcat (tce_ctxt env)
 
-addCtxt :: Doc -> TcM a -> TcM a
+addCtxt :: Doc -> TcM f b a -> TcM f b a
 addCtxt cd (TCM m) = TCM $ \env@(TCE { tce_ctxt = cds }) ds ->
                      m (env { tce_ctxt = cd : cds }) ds
 
-checkTypes :: Type -> Type -> Doc -> TcM ()
+getFunTc :: f -> TcM f b (Fun, Maybe Type)
+getFunTc f = TCM (\env ds -> (tce_fun env f, ds))
+
+getVarTc :: b -> TcM f b (Var, Maybe Type)
+getVarTc v = TCM (\env ds -> (tce_var env v, ds))
+
+checkTypes_maybe :: Maybe Type -> Type -> Doc -> TcM f b ()
+checkTypes_maybe mb_ty1 ty2 herald
+  = case mb_ty1 of
+      Nothing  -> return ()
+      Just ty1 -> checkTypes ty1 ty2 herald
+
+checkTypes :: Type -> Type -> Doc -> TcM f b ()
 checkTypes exp_ty act_ty herald
   | exp_ty == act_ty
   = return ()
@@ -390,28 +373,28 @@ checkTypes exp_ty act_ty herald
     vcat [ text "Expected type:" <+> ppr exp_ty
          , text "Actual type:  " <+> ppr act_ty ]
 
-extendLclEnv :: [TVar] -> TcM a -> TcM a
+extendLclEnv :: [TVar] -> TcM f b a -> TcM f b a
 extendLclEnv vars = modifyEnvTc add_vars
   where
     add_vars st = st { lclST = foldl add (lclST st) vars }
     add :: LclSymTab -> TVar -> LclSymTab
     add env (TVar ty v) = Map.insert v ty env
 
-extendGblEnv :: TDecl -> TcM a -> TcM a
+extendGblEnv :: TDecl -> TcM f b a -> TcM f b a
 extendGblEnv (RuleDecl {}) thing_inside
   = thing_inside
 extendGblEnv (DefDecl tdef@(DefX { def_fun = TFun _ f })) thing_inside
   = modifyEnvTc (\env -> env { gblST = stInsertFun f tdef (gblST env) })
                 thing_inside
 
-modifyEnvTc :: (SymTab -> SymTab) -> TcM a -> TcM a
+modifyEnvTc :: (SymTab -> SymTab) -> TcM f b a -> TcM f b a
 modifyEnvTc extend (TCM f)
   = TCM (\env ds -> f (env { tce_st = extend (tce_st env) }) ds)
 
-getSymTabTc :: TcM SymTab
+getSymTabTc :: TcM f b SymTab
 getSymTabTc = TCM (\env ds -> (tce_st env, ds))
 
-lookupLclTc :: Var -> TcM Type
+lookupLclTc :: Var -> TcM f b Type
 lookupLclTc v
   = do { st <- getSymTabTc
        ; case Map.lookup v (lclST st) of
@@ -419,7 +402,7 @@ lookupLclTc v
                          ; return TypeUnknown }
            Just ty -> return ty }
 
-lookupGblTc :: Fun -> Type -> TcM Type
+lookupGblTc :: Fun -> Type -> TcM f b Type
 lookupGblTc fun arg_ty
   = do { st <- getSymTabTc
        ; case callResultTy_maybe st fun arg_ty of
