@@ -130,7 +130,9 @@ pSum :: TExpr -> TExpr
 pSum e = mkPrimCall "sum" e
 
 pSize :: TExpr -> TExpr
-pSize e = mkPrimCall "size" e
+pSize e = case typeof e of
+          TypeVec _ -> mkPrimCall "size" e
+          _ -> error $ "Size of non-vector " ++ pps e
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun (ts !! (i-1))
@@ -142,6 +144,15 @@ pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
 pSnd   = pSel 2 2
 
+ensureTuple :: TExpr -> TExpr
+ensureTuple x = case typeof x of
+    TypeTuple _ -> x
+    _ -> Tuple [x]
+
+pConcat :: HasCallStack => TExpr -> TExpr -> TExpr
+pConcat (Tuple as) (Tuple bs) = Tuple $ as ++ bs
+pConcat a b = --trace ("pConcat\n" ++ show a ++ "\n" ++ show b) $
+              mkPrimCall2 "concat" (ensureTuple a) (ensureTuple b)
 
 ---------------------------------------------
 --       Types of primitive functions
@@ -183,7 +194,7 @@ primFunCallResultTy :: HasCallStack => PrimFun -> Type -> Type
 primFunCallResultTy fun arg_ty
   = case primFunCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
-      Nothing -> pprTrace "primCallResultTy: Could not determine result type for"
+      Nothing -> pprPanic "primCallResultTy: Could not determine result type for"
                           (text fun <+> text " @ " <+> ppr arg_ty) $
                  TypeUnknown
 
@@ -287,6 +298,7 @@ simplePrimResultTy fun arg_ty
       ("$trace"   , t                                      ) -> Just t
       ("$rand"    , TypeFloat                              ) -> Just TypeFloat
       ("pr"       , _                                      ) -> Just TypeInteger
+      ("concat"   , TypeTuple [TypeTuple as, TypeTuple bs] ) -> Just (TypeTuple (as ++ bs))
       ("build"    , TypeTuple [_, TypeLambda TypeInteger t]) -> Just (TypeVec t)
       ("index"    , TypeTuple [_, TypeVec t]               ) -> Just t
       ("size"     , TypeVec _                              ) -> Just TypeInteger
@@ -318,7 +330,7 @@ simplePrimResultTy fun arg_ty
       _ -> Nothing
 
 isPrimFun :: String -> Bool
-isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "index", "size", "sum", "to_float"
+isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "concat", "build", "index", "size", "sum", "to_float"
                        , "neg", "exp", "log", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"

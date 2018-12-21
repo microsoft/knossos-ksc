@@ -108,9 +108,12 @@ rewriteCall env (TFun ty (Fun fun)) arg
 rewriteCall _ (TFun ty (GradFun f Fwd)) arg
   = optGradFun ty f arg
 
-rewriteCall _ f _
-  = trace ("NOTE: Unmatched call {" ++ show f ++ "}") $
+rewriteCall _ f@(TFun (TypeLM _ _) _) _
+  = trace ("NOTE: Unmatched LM call {" ++ show f ++ "}") $
     Nothing
+
+rewriteCall _ f _
+  = Nothing
 
 -----------------------
 optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
@@ -135,6 +138,14 @@ optFun _ (UserFun {}) _
 
 -----------------------
 optPrimFun :: PrimFun -> TExpr -> Maybe TExpr
+
+-- RULE: index j Zero = 0
+optPrimFun "index" (Tuple [ ei, arr ])
+  | TypeVec (TypeZero t) <- typeof arr
+  = Just $ mkZero t
+
+-- RULE: concat((as...), (bs...))
+optPrimFun "concat" (Tuple [Tuple es1, Tuple es2]) = Just (Tuple (es1 ++ es2))
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optPrimFun "+" (Tuple [Tuple es1, Tuple es2])
@@ -382,6 +393,10 @@ optGradPrim _ "+" arg
   | TypeTuple [t1, t2] <- typeof arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
+optGradPrim _ "-" arg
+  | TypeTuple [t1, t2] <- typeof arg
+  = Just (lmHCat [lmOne t1, lmScale $ kTFloat (-1.0)])
+
 optGradPrim _ "*" (Tuple [x,y])
   | TypeFloat <- typeof x
   , TypeFloat <- typeof y
@@ -437,11 +452,13 @@ optApplyLM (Let v rhs body) dx
 optApplyLM (If b et ef) dx
   = Just $ If b (lmApply et dx) (lmApply ef dx)
 
-{-
-optApplyLM (Call (TFun (TypeLM s t) (GradFun (UserFun f) Fwd)) e) dx
+optApplyLM (Call (TFun (TypeLM s t) (GradFun (UserFun f) mode)) e) dx
   = trace ("User Grad->Der [" ++ f ++ "]")
-    Just $ Call (TFun (TypeLM s t) (DrvFun (UserFun f) Fwd)) (Tuple [e, dx])
-  -}
+    Just $ Call (TFun t (DrvFun (UserFun f) mode)) (pConcat e dx)
+
+optApplyLM (Call (TFun (TypeLM s t) (GradFun (PrimFun f) mode)) e) dx
+  = trace ("Prim Grad->Der [" ++ f ++ "]")
+    Just $ Call (TFun t (DrvFun (PrimFun f) mode)) (Tuple [e, dx])
 
 optApplyLM e dx
   = pprTrace "Apply not optimized:" (ppr e)
