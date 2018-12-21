@@ -419,12 +419,13 @@ lookupLclTc v
                          ; return TypeUnknown }
            Just ty -> return ty }
 
-lookupGblTc :: Fun -> Type -> TcM Type
+lookupGblTc :: HasCallStack => Fun -> Type -> TcM Type
 lookupGblTc fun arg_ty
   = do { st <- getSymTabTc
        ; case callResultTy_maybe st fun arg_ty of
            Nothing -> do { addErr $ hang (text "Out of scope or ill-typed function:" <+> ppr fun <+> text (show fun))
                                        2 (vcat [ text "Arg type:" <+> ppr arg_ty
-                                               , ppr (Map.lookup fun (gblST st)) ])
+                                               , text "Lookup:" <+> ppr (Map.lookup fun (gblST st))
+                                               , text "gblST:" <+> ppr (gblST st) ])
                          ; return TypeUnknown }
            Just res_ty -> return res_ty }
