@@ -380,6 +380,10 @@ namespace ks
 	template <class T>
 	T const &index(size_t i, vec<T> const & v)
 	{
+		static T z{ zero_t<T> {} };
+		if (v.is_zero())
+			return z;
+
 		if (i >= v.size()) {
 			std::cerr << "ERROR: Accessing element " << i << " of vec of length " << v.size() << std::endl;
 			throw "oiks";
