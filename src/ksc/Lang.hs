@@ -177,6 +177,9 @@ isDummy _     = False
 mkDummy :: Type -> TExpr
 mkDummy ty = Var (TVar ty Dummy)
 
+mkZero :: Type -> TExpr
+mkZero = mkDummy . TypeZero
+
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
   = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs) ty (typeof rhs) $
