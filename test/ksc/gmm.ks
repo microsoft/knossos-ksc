@@ -62,7 +62,7 @@
                       (mahal_vec (mul$Mat$Vec Q
                                           (sub$VecR$VecR (index i x) (index k means)))))
                   (- (+ (index k alphas) (sum (index k qs)))
-                    (* wishart_gamma 1.0) -- (* 0.500000 (sqnorm mahal_vec))
+                    (* wishart_gamma 1.0) -- should be (* 0.500000  (sqnorm mahal_vec))
                     ))))))))
             (* (to_float n) (logsumexp alphas)))
          (* 0.5 (sum (build K (lam (k : Integer)
@@ -73,10 +73,10 @@
     (build n (lam (j : Integer) ($rand 1.0))))
 
 (def zerov ((x : Vec Float))
-  (mul$R$VecR (- 1.0 1.0) x))
+  (mul$R$VecR 0.0 x))
 
 (def zerovv ((x : Vec Vec Float))
-  (mul$R$VecVecR (- 1.0 1.0) x))
+  (mul$R$VecVecR 0.0 x))
 
 (def mkdeltav ((n : Integer)
                (i : Integer)
