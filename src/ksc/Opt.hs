@@ -429,6 +429,7 @@ optGradPrim _ "size" e
 optGradPrim _ "index" (Tuple [i,v])
   = Just (primDindex i v)
 
+optGradPrim _ "$trace" e = Just (lmOne $ typeof e)
 optGradPrim _ "neg" e = Just (lmScale (kTFloat $ -1.0))
 optGradPrim _ "exp" e = Just (lmScale (pExp e))
 optGradPrim _ "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))
