@@ -26,7 +26,7 @@ dbtrace _ e = e -- trace msg e
 
 --------------------------
 
-annotDecls :: GblSymTab -> [Decl] -> KM (GblSymTab, [TDecl])
+annotDecls :: HasCallStack => GblSymTab -> [Decl] -> KM (GblSymTab, [TDecl])
 annotDecls env decls
   = runTc "Type checking" env (go decls)
   where
@@ -351,7 +351,7 @@ instance Monad TcM where
                 case m ctxt ds of
                   (r1, ds') -> unTc (k r1) ctxt ds'
 
-runTc :: String -> GblSymTab -> TcM a -> KM a
+runTc :: HasCallStack => String -> GblSymTab -> TcM a -> KM a
 runTc what gbl_env (TCM m)
   | null rev_errs
   = return result
@@ -426,6 +426,6 @@ lookupGblTc fun arg_ty
            Nothing -> do { addErr $ hang (text "Out of scope or ill-typed function:" <+> ppr fun <+> text (show fun))
                                        2 (vcat [ text "Arg type:" <+> ppr arg_ty
                                                , text "Lookup:" <+> ppr (Map.lookup fun (gblST st))
-                                               , text "gblST:" <+> ppr (gblST st) ])
+                                               , text "gblST:" <+> ppr (Map.keys $ gblST st) ])
                          ; return TypeUnknown }
            Just res_ty -> return res_ty }
