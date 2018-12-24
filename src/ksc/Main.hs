@@ -19,6 +19,7 @@ import Text.PrettyPrint as PP
 import Data.List( partition )
 import Control.Monad( unless )
 import System.Process( callProcess )
+import qualified System.Directory
 
 
 -------------------------------------
@@ -165,7 +166,7 @@ main = gmm
 
 test :: IO ()
 test = do
-  callProcess "mkdir" ["-p", "obj/test/ksc"]
+  System.Directory.createDirectoryIfMissing True "obj/test/ksc"
   output <- doallG 0 "test/ksc/gmm"
   let impossiblyGoodS:_:everythingWorksAsExpectedS:_ = reverse (lines output)
 
