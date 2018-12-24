@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import           Data.List                      ( intercalate, isPrefixOf )
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
-import           System.Process                 ( readProcess )
+import           System.Process                 ( readProcessWithExitCode )
 
 import Lang
 
@@ -456,9 +456,16 @@ cppFG outfile defs = do
   --callCommand $ "clang-format -i " ++ cppfile
   let compcmd = ("g++-7", ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
-  uncurry readProcess compcmd ""
+  uncurry readProcessPrintStderr compcmd
   putStrLn "Running"
-  readProcess exefile [] ""
+  readProcessPrintStderr exefile []
+
+readProcessPrintStderr :: FilePath -> [String] -> IO String
+readProcessPrintStderr executable args = do
+  let stdin = ""
+  (_, stdout, stderr) <- readProcessWithExitCode executable args stdin
+  putStr stderr
+  return stdout
 
 cppF :: String -> [TDef] -> IO ()
 -- String is the file name
