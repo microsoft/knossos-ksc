@@ -136,8 +136,8 @@
           del
           (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
 
-          (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2 )
-          (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
+          gmm_at_qs
+          gmm_at_qs_plus_del
           gmm_fwd
           gmm_fd
 
