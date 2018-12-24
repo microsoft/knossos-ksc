@@ -168,17 +168,18 @@ test :: IO ()
 test = do
   System.Directory.createDirectoryIfMissing True "obj/test/ksc"
   output <- doallG 0 "test/ksc/gmm"
-  let impossiblyGoodS:_:everythingWorksAsExpectedS:_ = reverse (lines output)
 
-      boolOfIntString s = case s of
-        "0" -> False
-        "1" -> True
-        _   -> error ("boolOfIntString: Unexpected " ++ s)
+  let success = case reverse (lines output) of
+        impossiblyGoodS:_:everythingWorksAsExpectedS:_ ->
+          let boolOfIntString s = case s of
+                "0" -> False
+                "1" -> True
+                _   -> error ("boolOfIntString: Unexpected " ++ s)
 
-      impossiblyGood = boolOfIntString impossiblyGoodS
-      everythingWorksAsExpected = boolOfIntString everythingWorksAsExpectedS
-
-      success = everythingWorksAsExpected && not impossiblyGood
+              impossiblyGood = boolOfIntString impossiblyGoodS
+              everythingWorksAsExpected = boolOfIntString everythingWorksAsExpectedS
+          in everythingWorksAsExpected && not impossiblyGood
+        _ -> False
 
   if success
     then do
