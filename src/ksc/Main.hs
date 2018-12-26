@@ -2,6 +2,7 @@ module Main where
 
 import GHC.Stack;
 import Data.Hashable
+import qualified System.Exit
 
 import Lang
 import Parse (runParser, pDecls, parseF )
@@ -12,11 +13,13 @@ import Opt
 import CSE
 
 import ANF
-import Cgen (cppF, runM, cgenDef, cgenDefs)
+import Cgen (cppF, cppFG, runM, cgenDef, cgenDefs)
 import KMonad
 import Text.PrettyPrint as PP
 import Data.List( partition )
 import Control.Monad( unless )
+import System.Process( callProcess )
+import qualified System.Directory
 
 
 -------------------------------------
@@ -89,7 +92,7 @@ displayPass :: Int -> String -> GblSymTab -> [TDef] -> KM ()
 displayPass verbosity what env decls
   = do { banner what
        ; displayN (take verbosity $! decls)
-       ; lintDefs what (env `extendGblST` decls) decls
+       ; lintDefs what env decls
     }
 
 -------------------------------------
@@ -105,14 +108,26 @@ moveMain = partition isMain
     isMain _ = False
 
 doall :: HasCallStack => Int -> String -> IO ()
-doall verbosity file =
+doall verbosity file = do
+  { output <- doallG verbosity file
+  ; putStrLn "Done"
+  ; putStr output
+  }
+
+doallG :: HasCallStack => Int -> String -> IO String
+doallG verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity $! defs))
   in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))
-  ; liftIO $ putStrLn "read decls"
+  ;  liftIO $ putStrLn "read decls"
 
-  ; let (main, decls)    = moveMain decls0
+  ;  let (main, decls)    = moveMain decls0
+
+  ;  (env, ann_decls) <- annotDecls emptyGblST decls
+  ;  let (rules, defs) = partitionDecls ann_decls
+         rulebase      = mkRuleBase rules
+  ; displayPass verbosity "Typechecked defs" env defs
 
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
@@ -135,7 +150,7 @@ doall verbosity file =
   ; displayPass verbosity "Fwd" env2 fwd
 
   ; let (env3, optfwd) = optDefs rulebase env2 fwd
-  ; displayPass verbosity "OptFwd" env2 optfwd
+  ; displayPass verbosity "OptFwd" env3 optfwd
 
   ; (env4, ann_main) <- annotDecls env3 main
 
@@ -147,7 +162,7 @@ doall verbosity file =
   ; displayPass verbosity "CSE" env3 cse
 
   ; let ann2 =  cse
-  ; liftIO (cppF ("obj/" ++ file) ann2)
+  ; liftIO (cppFG ("obj/" ++ file) ann2)
   }
 
 gmm :: IO ()
@@ -155,3 +170,28 @@ gmm = doall 400 "test/ksc/gmm"
 
 main :: IO ()
 main = gmm
+
+test :: IO ()
+test = do
+  System.Directory.createDirectoryIfMissing True "obj/test/ksc"
+  output <- doallG 0 "test/ksc/gmm"
+
+  let success = case reverse (lines output) of
+        impossiblyGoodS:_:everythingWorksAsExpectedS:_ ->
+          let boolOfIntString s = case s of
+                "0" -> False
+                "1" -> True
+                _   -> error ("boolOfIntString: Unexpected " ++ s)
+
+              impossiblyGood = boolOfIntString impossiblyGoodS
+              everythingWorksAsExpected = boolOfIntString everythingWorksAsExpectedS
+          in everythingWorksAsExpected && not impossiblyGood
+        _ -> False
+
+  if success
+    then do
+    putStrLn "Success"
+    System.Exit.exitWith System.Exit.ExitSuccess
+    else do
+    putStrLn "FAILURE!"
+    System.Exit.exitWith (System.Exit.ExitFailure 1)

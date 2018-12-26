@@ -1338,4 +1338,22 @@ namespace ks
 		std::cout << "----\n";
 		return 1 + pr(t...);
 	}
+
+        float abs(float a)
+        {
+          if (a > 0) {
+            return a;
+          } else {
+            return -a;
+          }
+        }
+
+        float max(float a, float b)
+        {
+          if (a > b) {
+            return a;
+          } else {
+            return b;
+          }
+        }
 } // namespace ks

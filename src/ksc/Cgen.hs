@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import           Data.List                      ( intercalate, isPrefixOf, map )
 import           Control.Monad                  ( (<=<) )
 import qualified Control.Monad.State           as S
-import           System.Process                 ( callProcess )
+import           System.Process                 ( readProcessWithExitCode )
 
 import Lang
 
@@ -457,9 +457,8 @@ cgenVar :: Var -> String
 cgenVar v = show v
 
 
-cppF :: String -> [TDef] -> IO ()
--- String is the file name
-cppF outfile defs = do
+cppFG :: String -> [TDef] -> IO String
+cppFG outfile defs = do
   let lines = ["#include <stdio.h>", "#include \"knossos.h\"", "namespace ks {\n"]
 
   let lls = cgenDefs defs
@@ -476,9 +475,22 @@ cppF outfile defs = do
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
-  let compcmd = ("g++", ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
+  let compcmd = ("g++-7", ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
-  uncurry callProcess compcmd
+  uncurry readProcessPrintStderr compcmd
   putStrLn "Running"
-  callProcess exefile []
+  readProcessPrintStderr exefile []
+
+readProcessPrintStderr :: FilePath -> [String] -> IO String
+readProcessPrintStderr executable args = do
+  let stdin = ""
+  (_, stdout, stderr) <- readProcessWithExitCode executable args stdin
+  putStr stderr
+  return stdout
+
+cppF :: String -> [TDef] -> IO ()
+-- String is the file name
+cppF outfile defs = do
+  output <- cppFG outfile defs
   putStrLn "Done"
+  putStr output

@@ -109,23 +109,39 @@
 
           (delta 0.001)
           (del (mkdeltavv qs 2 1 delta))
+          (gmm_at_qs (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2))
+          (gmm_at_qs_plus_del (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2))
+          (gmm_fd (- gmm_at_qs_plus_del gmm_at_qs))
+          (gmm_fwd (fwd$gmm_knossos_gmm_objective
+                    x          alphas          mus           qs      ls            gamma    1.2
+                    (zerovv x) (zerov alphas)  (zerovv mus)  del     (zerovv ls)   0.0      0.0))
+
+          (everything_works_as_expected
+           -- I would like to pull out a function called something
+           -- like `floating_point_numbers_are_close` but I would have
+           -- to implement the derivtives of abs and max for that, and
+           -- I can't be bothered right now.
+           (let ((tolerance 0.001)
+                 (actual gmm_fd)
+                 (expected gmm_fwd))
+             (< (abs (- actual expected))
+                (max (* (abs expected) tolerance)
+                     tolerance))))
+          (impossibly_good (== gmm_fd gmm_fwd))
         )
       (pr x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
-          (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
-          del
           (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2)
 
-          (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2 )
-          (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
-          (fwd$gmm_knossos_gmm_objective 
-                x          alphas          mus           qs      ls            gamma    1.2
-                (zerovv x) (zerov alphas)  (zerovv mus)  del     (zerovv ls)   0.0      0.0)
-          (- (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
-             (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2))
+          (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2 )          
+          (rev$gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2 1.0)
 
-          (rev$gmm_knossos_gmm_objective 
-            x alphas mus qs ls gamma 1.2 1.0)
+          gmm_at_qs
+          gmm_at_qs_plus_del
+          gmm_fwd
+          gmm_fd
+
+          everything_works_as_expected
+          impossibly_good
           ))))
-
