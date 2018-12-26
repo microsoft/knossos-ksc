@@ -383,12 +383,18 @@ addCtxt cd (TCM m) = TCM $ \env@(TCE { tce_ctxt = cds }) ds ->
 
 checkTypes :: Type -> Type -> Doc -> TcM ()
 checkTypes exp_ty act_ty herald
-  | exp_ty == act_ty
+  | promoteZero exp_ty == promoteZero act_ty
   = return ()
   | otherwise
   = addErr $ hang herald 2 $
     vcat [ text "Expected type:" <+> ppr exp_ty
          , text "Actual type:  " <+> ppr act_ty ]
+  where promoteZero = \case
+                      TypeZero t -> t
+                      TypeTuple ts -> TypeTuple $ map promoteZero ts
+                      TypeVec t -> TypeVec $ promoteZero t
+                      TypeLambda from t -> TypeLambda from $ promoteZero t
+                      t -> t
 
 extendLclEnv :: [TVar] -> TcM a -> TcM a
 extendLclEnv vars = modifyEnvTc add_vars
