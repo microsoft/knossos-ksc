@@ -14,16 +14,16 @@ primCall :: PrimFun -> Type -> TExpr -> TExpr
 primCall fun res_ty arg
   = Call (TFun res_ty (Fun (PrimFun fun))) arg
 
-mkPrimCall :: PrimFun -> TExpr -> TExpr
+mkPrimCall :: HasCallStack => PrimFun -> TExpr -> TExpr
 mkPrimCall fun arg
   = primCall fun res_ty arg
   where
     res_ty = primFunCallResultTy fun (typeof arg)
 
-mkPrimCall2 :: String -> TExpr -> TExpr -> TExpr
+mkPrimCall2 :: HasCallStack => String -> TExpr -> TExpr -> TExpr
 mkPrimCall2 f a b = mkPrimCall f (Tuple [a, b])
 
-mkPrimCall3 :: String -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall3 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall3 f a b c = mkPrimCall f (Tuple [a, b, c])
 
 --------------------------------------------
@@ -292,6 +292,16 @@ lmHCatResultTy ty
   | otherwise = Nothing
 
 simplePrimResultTy :: String -> Type -> Maybe Type
+-- Addition is special: it can add any two things of the same type
+simplePrimResultTy "+" (TypeTuple [t1, t2]) =
+    Just $ add t1 t2
+  where 
+    add t1 (TypeZero t2) = t1
+    add (TypeZero t1) t2 = t2
+    add (TypeTuple t1s) (TypeTuple t2s) = TypeTuple $ zipWith add t1s t2s
+    add t1 t2 = assertEqualThen "sprimadd" t1 t2 $
+                t1
+
 simplePrimResultTy fun arg_ty
   = case (fun, arg_ty) of
       ("inline"   , t                                      ) -> Just t
@@ -303,11 +313,8 @@ simplePrimResultTy fun arg_ty
       ("index"    , TypeTuple [_, TypeVec t]               ) -> Just t
       ("size"     , TypeVec _                              ) -> Just TypeInteger
       ("sum"      , TypeVec t                              ) -> Just t
+      ("sum"      , TypeZero (TypeVec t)                   ) -> Just (TypeZero t)
       ("to_float" , TypeInteger                            ) -> Just TypeFloat
-
-      -- Addition is special: it can add any two things of the same type
-      ("+"        , TypeTuple [t1, t2]                     )
-                  | t1 == t2                                 -> Just t2
 
       ("*"        , TypeTuple [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
       ("*"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger

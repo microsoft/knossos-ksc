@@ -201,9 +201,7 @@ namespace ks
 		
 		zero_t() { }
 
-		// These need to be explicit.  To get a zero of type T, use T { zero_t {} }
-		explicit operator double() { return 0.0; }
-		explicit operator int() { return 0; }
+		// operator T() { return T {}; }
 	};
 
 	template <>
@@ -297,10 +295,53 @@ namespace ks
 	template <class... Ts>
 	std::ostream& operator<<(std::ostream& s, tuple<Ts...> const& t)
 	{
-		return tuple_print<0>(t);
+		return tuple_print<0>(s, t);
 	}
 
-	
+	// =============================== Type conversion ============================
+	template <class T>
+	struct convert {
+		template <class U>
+		static T go(U const& u) {
+			return static_cast<T>(u);
+		}
+	};
+
+	template <>
+	struct convert<double> {
+		static double go(zero_t<double> const&) {
+			return 0.0;
+		}
+	};
+
+	template <>
+	struct convert<int> {
+		static int go(zero_t<int> const&) {
+			return 0;
+		}
+	};
+
+	template<>
+	struct convert<tuple<>> {
+		static tuple<> go(zero_t<tuple<>> const&) {
+			return tuple<>{};
+		}
+	};
+
+	template <class T0, class... Ts>
+	struct convert<tuple<T0, Ts...>> {
+		template <class U0, class... Us>
+		static tuple<T0, Ts...> go(zero_t<tuple<U0, Us...>> const& u)
+		{
+			return prepend(convert<T0>::go(U0{}), convert<tuple<Ts...>>::go(zero_t<tuple<Us...>>{}));
+		}
+
+		template <class U0, class... Us>
+		static tuple<T0, Ts...> go(tuple<U0, Us...> const& u)
+		{
+			return prepend(convert<T0>::go(U0{}), convert<tuple<Ts...>>::go(tuple<Us...>{}));
+		}
+	};
 
 	// ===============================  Addition ==================================
 	// Adding is special because it needs to be defined before linear maps,
@@ -315,6 +356,19 @@ namespace ks
 
 	template <class T1>
 	T1 add(T1 t1, zero_t<T1> t2) { return t1; }
+
+	template <>
+	tuple<> add(tuple<> t1, tuple<> t2)
+	{
+		return tuple<>{};
+	}
+
+	template <class T0, class... Ts, class U0, class... Us>
+	auto add(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
+	{
+		return prepend(add(std::get<0>(t1), std::get<0>(t2)),
+			add(tail(t1), tail(t2)));
+	}
 
 	// ===============================  Vector class ==================================
 
@@ -417,15 +471,32 @@ namespace ks
 		return ret;
 	}
 
-	double delta(int i, int j, double val)
+	template <class T>
+	T delta(int i, int j, T val)
 	{
-		return (i == j) ? val : 0.0;
+		return (i == j) ? val : convert<T>::go(zero_t<T>{});
 	}
 
-	vec<double> deltaVec(size_t n, size_t i, double val)
+	template <class T>
+	vec<T> deltaVec(size_t n, size_t i, T val)
 	{
-		return build<double>(n, [i,val](size_t ii) { return (i == ii) ? val : 0.0; });
+		return build<T>(n, [i,val](size_t ii) { 
+			return (i == ii) ? val : convert<T>::go(zero_t<T>{}); 
+		});
 	} 
+	
+	template <class F>
+	auto diag(size_t rows, size_t cols, F f)
+	{
+		ASSERT(rows == cols);
+		typedef decltype(f(size_t{})) T;
+		return build<vec<T>>(rows, [cols,f](size_t i) { 
+					return build<T>(cols, [f](size_t j) {
+						return f(j);
+					});
+		});
+	}
+
 
 	// -- Specialize is_zero
 	template <class T>
@@ -541,7 +612,7 @@ namespace ks
 	T sum(vec<T> const& v)
 	{
 		if (is_zero(v))
-			return T { zero_t<T> {} };
+			return convert<T>::go(zero_t<T>{});
 
 		ASSERT(v.size() != 0);
 
@@ -551,6 +622,13 @@ namespace ks
 		for (size_t i = 2; i < v.size(); ++i)
 			ret = add(ret, v[i]);
 		return ret;
+	}
+
+	// sum of elements
+	template <class T>
+	zero_t<T> sum(zero_t<vec<T>> const& v)
+	{
+		return zero_t<T>{};
 	}
 
 	template <class T>

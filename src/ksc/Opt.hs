@@ -105,7 +105,7 @@ rewriteCall _ fun (Let v r arg)
 rewriteCall env (TFun ty (Fun fun)) arg
   = optFun env fun arg
 
-rewriteCall _ (TFun ty (GradFun f Fwd)) arg
+rewriteCall _ (TFun ty (GradFun f _)) arg
   = optGradFun ty f arg
 
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
@@ -521,6 +521,9 @@ optLMTrans :: TExpr -> Maybe TExpr
 optLMTrans (Var (TVar (TypeLM s t) (Grad n d)))
    = Just (Var (TVar (TypeLM t s) (Grad n (flipMode d))))
 
+optLMTrans (Call (TFun (TypeLM s t) (GradFun f mode)) arg)
+   = Just (Call (TFun (TypeLM t s) (GradFun f (flipMode mode))) arg)
+
 optLMTrans (Call (TFun ty (Fun (PrimFun fun))) arg)
   = optTransPrim fun arg
 
@@ -538,7 +541,8 @@ optLMTrans (Let var rhs body)
 optLMTrans (If b t e)
   = Just $ If b (lmTranspose t) (lmTranspose e)
 
-optLMTrans e = Nothing
+optLMTrans e = error ("Missed lmTranspose " ++ show e) $
+               Nothing
 
 optTransPrim :: String -> TExpr -> Maybe TExpr
 optTransPrim "lmZero"      (Tuple [s,t])        = Just $ lmZero (typeof t) (typeof s)

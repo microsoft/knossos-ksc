@@ -248,6 +248,7 @@ instance (HasType b, HasType f,
 makeIfType :: HasCallStack => Type -> Type -> Type
 makeIfType (TypeZero ty1) ty2 = makeIfType ty1 ty2
 makeIfType ty1 (TypeZero ty2) = makeIfType ty1 ty2
+makeIfType (TypeTuple t1s) (TypeTuple t2s) = TypeTuple $ zipWith makeIfType t1s t2s
 makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $
                      ty2
 
@@ -263,7 +264,7 @@ unzipLMTypes (TypeLM s t : lmts) = case unzipLMTypes lmts of
 unzipLMTypes lmts = Nothing
 
 typeofKonst :: Konst -> Type
-typeofKonst (KZero t)    = t   -- Was: TypeZero t
+typeofKonst (KZero t)    = TypeZero t
 typeofKonst (KInteger _) = TypeInteger
 typeofKonst (KFloat _)   = TypeFloat
 typeofKonst (KBool _)    = TypeBool

@@ -125,5 +125,7 @@
           (- (gmm_knossos_gmm_objective x alphas mus (+ qs del) ls gamma 1.2)
              (gmm_knossos_gmm_objective x alphas mus qs ls gamma 1.2))
 
+          (rev$gmm_knossos_gmm_objective 
+            x alphas mus qs ls gamma 1.2 1.0)
           ))))
 

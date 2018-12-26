@@ -110,43 +110,44 @@ doall verbosity file =
   in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))
-  ;  liftIO $ putStrLn "read decls"
+  ; liftIO $ putStrLn "read decls"
 
-  ;  let (main, decls)    = moveMain decls0
+  ; let (main, decls)    = moveMain decls0
 
-  ;  (env, ann_decls) <- annotDecls emptyGblST decls
-  ;  let (rules, defs) = partitionDecls ann_decls
-         rulebase      = mkRuleBase rules
+  ; (env, ann_decls) <- annotDecls emptyGblST decls
+  ; let (rules, defs) = partitionDecls ann_decls
+  ; let rulebase      = mkRuleBase rules
   ; displayPass verbosity "Typechecked defs" env defs
 
-  ;  banner "main"
-  ;  dd main
+  ; banner "main"
+  ; dd main
 
-  ;  banner "defs"
-  ;  dd defs
+  ; let grad_defs = gradDefs defs
+        env1 = env `extendGblST` grad_defs
+  ; displayPass verbosity "Grad" env1 grad_defs
 
-  ;  let grad = gradDefs defs
-         env1 = env `extendGblST` grad
-  ;  displayPass verbosity "Grad" env1 grad
+  ; let trans_grad_defs = map transposeD grad_defs
 
-  ;  let (env2, optgrad) = optDefs rulebase env1 grad
-  ;  displayPass verbosity "Optgrad" env2 optgrad
+  ; let (env2, optgrad) = optDefs rulebase env1 (grad_defs ++ trans_grad_defs)
+  ; displayPass verbosity "Optgrad" env2 optgrad
 
-  ;  let fwd = applyDefs optgrad
-  ;  displayPass verbosity "Fwd" env2 fwd
+  ; let fwd = applyDefs optgrad
+  ; displayPass verbosity "Fwd" env2 fwd
 
-  ;  let (env3, optfwd) = optDefs rulebase env2 fwd
-  ;  displayPass verbosity "OptFwd" env2 optfwd
+  ; let (env3, optfwd) = optDefs rulebase env2 fwd
+  ; displayPass verbosity "OptFwd" env2 optfwd
 
   ; (env4, ann_main) <- annotDecls env3 main
 
-  ;  let (_rules, main_tdef) = partitionDecls ann_main
-         alldefs = defs ++ optgrad ++ optfwd ++ main_tdef
-  ;  (env5, cse) <- cseDefs rulebase env4 alldefs
-  ;  displayPass verbosity "CSE" env3 cse
+  ; let (_rules, main_tdef) = partitionDecls ann_main
+  
+  ; let alldefs = defs ++ optgrad ++ optfwd ++ main_tdef
+  
+  ; (env5, cse) <- cseDefs rulebase env4 alldefs
+  ; displayPass verbosity "CSE" env3 cse
 
-  ;  let ann2 =  cse
-  ;  liftIO (cppF ("obj/" ++ file) ann2)
+  ; let ann2 =  cse
+  ; liftIO (cppF ("obj/" ++ file) ann2)
   }
 
 gmm :: IO ()
