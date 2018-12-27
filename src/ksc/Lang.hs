@@ -224,7 +224,7 @@ instance (HasType b, HasType f,
   typeof (Call f e)    = typeof f
   typeof e@(App f _)   = case typeof f of
                             TypeLambda _ res -> res
-                            _ -> pprPanic "typeof:app " (ppr f $$ ppr (typeof f))
+                            _ -> pprPanic "typeof:app " (vcat [ppr f, ppr (typeof f)])
   typeof (Tuple es)    = TypeTuple $ map typeof es
   typeof (Lam b e)     = TypeLambda (typeof b) (typeof e)
   typeof (Let b e1 e2) = typeof e2

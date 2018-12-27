@@ -308,7 +308,7 @@ runTc what init_env (TCM m)
 addErr :: Doc -> TcM f b ()
 addErr d = TCM (\env ds -> ((), mk_err env d : ds))
   where
-    mk_err env d = d $$ vcat (tce_ctxt env)
+    mk_err env d =  vcat (d:tce_ctxt env)
 
 addCtxt :: Doc -> TcM f b a -> TcM f b a
 addCtxt cd (TCM m) = TCM $ \env@(TCE { tce_ctxt = cds }) ds ->

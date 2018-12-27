@@ -246,7 +246,7 @@ inlineCall def@(DefX _ bndrs body) arg
   | [bndr] <- bndrs
   = Just $ Let bndr arg body
   | Tuple args <- arg
-  = assert (ppr def $$ ppr arg) (length args == length bndrs) $
+  = assert (vcat [ppr def, ppr arg]) (length args == length bndrs) $
     Just (mkLets (bndrs `zip` args) body)
   | otherwise
   = Nothing
