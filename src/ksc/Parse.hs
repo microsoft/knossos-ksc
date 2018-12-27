@@ -68,7 +68,7 @@ Notes:
 -}
 
 
-import Lang
+import Lang hiding (parens)
 import Prim
 
 import Text.Parsec( (<|>), try, many, parse, ParseError )
@@ -78,7 +78,6 @@ import Text.Parsec.String (Parser)
 import qualified Text.Parsec.Token as Tok
 
 import Control.Monad
-import qualified Text.PrettyPrint as PP
 
 --import Test.Hspec
 
@@ -87,7 +86,7 @@ import qualified Text.PrettyPrint as PP
 testParse :: Pretty a => Parser a -> String -> IO ()
 testParse  p s = case runParser p s of
                    Left err -> putStrLn ("Failed: " ++ show err)
-                   Right r  -> putStrLn (PP.render (ppr r))
+                   Right r  -> putStrLn (render (ppr r))
 
 runParser :: Parser a -> String -> Either ParseError a
 runParser p s = parse p "" s
@@ -309,7 +308,7 @@ pDecls = spaces >> many pDecl
 toStr :: Pretty a => Parser a -> String -> String
 toStr p s = case runParser p s of
                    Left err -> error ("Failed: " ++ show err)
-                   Right r  -> show (PP.render (ppr r))
+                   Right r  -> show (render (ppr r))
 
 {-
 test_Parser =

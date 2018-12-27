@@ -2,7 +2,6 @@ module Prim where
 
 import Lang
 import GHC.Stack
-import Text.PrettyPrint
 
 --------------------------------------------
 --  Simple call construction

@@ -2,7 +2,6 @@ module AD where
 
 import Lang
 import Prim
-import Text.PrettyPrint as PP
 
 -- for unit test
 --import Test.Hspec
@@ -15,7 +14,7 @@ gradF f       = error ("gradF: bad function: " ++ show f)
 
 gradV :: Var -> Var
 gradV (Simple x) = Grad x Fwd
-gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
+gradV v          = error ("gradV: bad variable: " ++ render (ppr v))
 
 gradSelFun :: [TVar] -> TVar -> Int -> TExpr
 -- (gradSelFun i n) selects the i'th component of a n-tuple

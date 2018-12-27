@@ -6,7 +6,6 @@ import Prim
 import Rules
 import OptLet
 import Annotate( GblSymTab, lookupGblST, extendGblST, emptyGblST )
-import Text.PrettyPrint
 
 import Debug.Trace
 import Test.Hspec

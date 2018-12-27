@@ -15,7 +15,6 @@ import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
 import Control.Monad( ap )
-import Text.PrettyPrint as PP
 import Data.List( intersperse )
 
 -----------------------------------------------
@@ -264,13 +263,13 @@ callResultTy_maybe env fun arg_ty
 -----------------------------------------------
 
 data TcEnv f b
-  = TCE { tce_ctxt :: [Doc]   -- Context, innermost first
+  = TCE { tce_ctxt :: [SDoc]   -- Context, innermost first
         , tce_st   :: SymTab
         , tce_fun  :: f -> (Fun, Maybe Type)
         , tce_var  :: b -> (Var, Maybe Type) }
 
-newtype TcM f b a = TCM { unTc :: TcEnv f b -> [Doc] -> (a, [Doc]) }
--- Just a writer monad on [Doc]
+newtype TcM f b a = TCM { unTc :: TcEnv f b -> [SDoc] -> (a, [SDoc]) }
+-- Just a writer monad on [SDoc]
 
 instance Functor (TcM f b) where
   fmap f (TCM m) = TCM (\ctxt ds -> case m ctxt ds of
@@ -290,9 +289,8 @@ runTc :: String -> TcEnv f b -> TcM f b a -> KM a
 runTc what init_env (TCM m)
   | null rev_errs
   = return result
-
   | otherwise
-  = do { liftIO $ putStrLn $ PP.render $
+  = do { liftIO $ putStrLn $ render $
          vcat [ text ""
               , text "--------------------------"
               , text "Type errors in" <+> text what
@@ -305,12 +303,12 @@ runTc what init_env (TCM m)
   where
     (result, rev_errs) = m init_env []
 
-addErr :: Doc -> TcM f b ()
+addErr :: SDoc -> TcM f b ()
 addErr d = TCM (\env ds -> ((), mk_err env d : ds))
   where
     mk_err env d =  vcat (d:tce_ctxt env)
 
-addCtxt :: Doc -> TcM f b a -> TcM f b a
+addCtxt :: SDoc -> TcM f b a -> TcM f b a
 addCtxt cd (TCM m) = TCM $ \env@(TCE { tce_ctxt = cds }) ds ->
                      m (env { tce_ctxt = cd : cds }) ds
 
@@ -320,13 +318,13 @@ getFunTc f = TCM (\env ds -> (tce_fun env f, ds))
 getVarTc :: b -> TcM f b (Var, Maybe Type)
 getVarTc v = TCM (\env ds -> (tce_var env v, ds))
 
-checkTypes_maybe :: Maybe Type -> Type -> Doc -> TcM f b ()
+checkTypes_maybe :: Maybe Type -> Type -> SDoc -> TcM f b ()
 checkTypes_maybe mb_ty1 ty2 herald
   = case mb_ty1 of
       Nothing  -> return ()
       Just ty1 -> checkTypes ty1 ty2 herald
 
-checkTypes :: Type -> Type -> Doc -> TcM f b ()
+checkTypes :: Type -> Type -> SDoc -> TcM f b ()
 checkTypes exp_ty act_ty herald
   | exp_ty == act_ty
   = return ()
