@@ -106,15 +106,18 @@ moveMain = partition isMain
     isMain (DefDecl (DefX (Fun (UserFun "main")) _ _)) = True
     isMain _ = False
 
-doall :: HasCallStack => Int -> String -> IO ()
-doall verbosity file = do
-  { output <- doallG verbosity file
+doallC :: HasCallStack => String -> Int -> String -> IO ()
+doallC compiler verbosity file = do
+  { output <- doallG compiler verbosity file
   ; putStrLn "Done"
   ; putStr output
   }
 
-doallG :: HasCallStack => Int -> String -> IO String
-doallG verbosity file =
+doall :: HasCallStack => Int -> String -> IO ()
+doall = doallC "g++-7"
+
+doallG :: HasCallStack => String -> Int -> String -> IO String
+doallG compiler verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity $! defs))
   in
   runKM $
@@ -155,7 +158,7 @@ doallG verbosity file =
   ;  displayPass "CSE" env3 cse
 
   ;  let ann2 =  cse
-  ;  liftIO (cppFG ("obj/" ++ file) ann2)
+  ;  liftIO (cppFG compiler ("obj/" ++ file) ann2)
   }
 
 gmm :: IO ()
@@ -167,7 +170,7 @@ main = gmm
 test :: IO ()
 test = do
   System.Directory.createDirectoryIfMissing True "obj/test/ksc"
-  output <- doallG 0 "test/ksc/gmm"
+  output <- doallG "g++-7" 0 "test/ksc/gmm"
 
   let success = case reverse (lines output) of
         impossiblyGoodS:_:everythingWorksAsExpectedS:_ ->

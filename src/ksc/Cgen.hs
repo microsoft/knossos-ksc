@@ -436,8 +436,8 @@ cgenVar :: Var -> String
 cgenVar v = show v
 
 
-cppFG :: String -> [TDef] -> IO String
-cppFG outfile defs = do
+cppFG :: String -> String -> [TDef] -> IO String
+cppFG compiler outfile defs = do
   let lines = ["#include <stdio.h>", "#include \"knossos.h\"", "namespace ks {\n"]
 
   let lls = cgenDefs defs
@@ -454,7 +454,7 @@ cppFG outfile defs = do
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
-  let compcmd = ("g++-7", ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
+  let compcmd = (compiler, ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
   putStrLn "Running"
@@ -470,6 +470,6 @@ readProcessPrintStderr executable args = do
 cppF :: String -> [TDef] -> IO ()
 -- String is the file name
 cppF outfile defs = do
-  output <- cppFG outfile defs
+  output <- cppFG "g++-7" outfile defs
   putStrLn "Done"
   putStr output
