@@ -268,10 +268,6 @@ assert doc False x = error (show doc)
 assertBool :: Bool -> Bool
 assertBool x = x    -- To remove check, return True always
 
-assertEqual :: (Eq a, Show a) => String -> a -> a -> ()
-assertEqual msg t1 t2 =
-  assertEqualThen msg t1 t2 ()
-
 assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
 assertTypesEqualThen msg t1 (TypeZero t2) e = assertTypesEqualThen msg t1 t2 e
 assertTypesEqualThen msg (TypeZero t1) t2 e = assertTypesEqualThen msg t1 t2 e
