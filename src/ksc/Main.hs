@@ -4,6 +4,7 @@ import GHC.Stack;
 import qualified System.Exit
 
 import Lang
+import LangUtils (hspec)
 import Parse (runParser, pDecls, parseF )
 import Rules
 import Annotate
@@ -16,6 +17,7 @@ import Cgen (cppFG)
 import KMonad
 import Data.List( partition )
 import qualified System.Directory
+import Test.Hspec (hspec, Spec)
 
 
 -------------------------------------
@@ -163,8 +165,16 @@ gmm = doall 400 "test/ksc/gmm"
 main :: IO ()
 main = gmm
 
+hspec :: Spec
+hspec = do
+    Opt.hspec
+    Lang.hspec
+    LangUtils.hspec
+
 test :: IO ()
 test = do
+  Test.Hspec.hspec Main.hspec
+
   System.Directory.createDirectoryIfMissing True "obj/test/ksc"
   output <- doallG "g++-7" 0 "test/ksc/gmm"
 

@@ -548,9 +548,8 @@ pprPanic str doc
 pps :: Pretty a => a -> String
 pps a = show $ ppr a
 
-test_Pretty :: IO ()
-test_Pretty =
-  hspec $ do
+hspec :: Spec
+hspec = do
     let test e s = it s $ pps e `shouldBe` s
 
     let var s = Var (Simple s)
@@ -560,3 +559,6 @@ test_Pretty =
     describe "Pretty" $ do
       test e "g( s$i )"
       test e2 "f( g( s$i ), s$_t1, 5 )"
+
+test_Pretty :: IO ()
+test_Pretty = Test.Hspec.hspec Lang.hspec
