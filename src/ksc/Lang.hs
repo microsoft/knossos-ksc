@@ -320,82 +320,82 @@ instance Show Var where
 --     SDoc abstraction over expression display style
 -----------------------------------------------
 
-type SDoc = Bool -> Doc -- True = S-expressions, False = infix style
+newtype SDoc = SDoc(Bool -> Doc) -- True = S-expressions, False = infix style
 
 (<>) :: SDoc -> SDoc -> SDoc
-d1 <> d2 = \s -> (d1 s) PP.<> (d2 s)
+(SDoc d1) <> (SDoc d2) = SDoc(\s -> (d1 s) PP.<> (d2 s))
 
 (<+>) :: SDoc -> SDoc -> SDoc
-d1 <+> d2 = \s -> (d1 s) PP.<+> (d2 s)
+(SDoc d1) <+> (SDoc d2) = SDoc(\s -> (d1 s) PP.<+> (d2 s))
 
 text :: String -> SDoc
-text s _ = PP.text s
+text s = SDoc (\_ -> PP.text s)
 
 char :: Char -> SDoc
-char c _ = PP.char c
+char c  = SDoc (\_ -> PP.char c)
 
 int :: Int -> SDoc
-int i _ = PP.int i
+int i = SDoc (\_ -> PP.int i)
 
 integer :: Integer -> SDoc
-integer i _ = PP.integer i
+integer i = SDoc (\_ -> PP.integer i)
 
 double :: Double -> SDoc
-double d _ = PP.double d
+double d = SDoc (\_ -> PP.double d)
 
 parens :: SDoc -> SDoc
-parens d m = PP.parens (d m)
+parens (SDoc d) = SDoc (\m -> PP.parens $ d m)
 
 cat :: [SDoc] -> SDoc
-cat ss m = PP.cat $ map (\s -> s m) ss
+cat ss = SDoc (\m -> PP.cat $ map (\case SDoc s -> s m) ss)
 
 sep :: [SDoc] -> SDoc
-sep ss m = PP.sep $ map (\s -> s m) ss
+sep ss = SDoc (\m -> PP.sep $ map (\case SDoc s -> s m) ss)
 
 mode :: SDoc -> SDoc -> SDoc
-mode se inf m = if m then se m else inf m
+mode (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
 
 nest :: Int -> SDoc -> SDoc
-nest i d m = PP.nest i (d m)
+nest i (SDoc d) = SDoc (\m -> PP.nest i (d m))
 
 vcat :: [SDoc] -> SDoc
-vcat ss m = PP.vcat $ map (\s -> s m) ss
+vcat ss = SDoc (\m -> PP.vcat $ map (\case SDoc s -> s m) ss)
 
 hang :: SDoc -> Int -> SDoc -> SDoc
-hang d1 i d2 m = PP.hang (d1 m) i (d2 m)
+hang (SDoc d1) i (SDoc d2) = SDoc (\m -> PP.hang (d1 m) i (d2 m))
 
 braces :: SDoc -> SDoc
-braces d m = PP.braces (d m)
+braces (SDoc d) = SDoc (\m -> PP.braces $ d m)
 
 brackets :: SDoc -> SDoc
-brackets d m = PP.brackets (d m)
+brackets (SDoc d) = SDoc (\m -> PP.brackets $ d m)
 
 doubleQuotes :: SDoc -> SDoc
-doubleQuotes d m = PP.doubleQuotes (d m)
+doubleQuotes (SDoc d) = SDoc (\m -> PP.doubleQuotes $ d m)
 
 fsep :: [SDoc] -> SDoc
-fsep ss m = PP.fsep $ map (\s -> s m) ss
+fsep ss = SDoc (\m -> PP.fsep $ map (\case SDoc s -> s m) ss)
 
 punctuate :: SDoc -> [SDoc] -> [SDoc]
-punctuate p ss = let
-    ts = PP.punctuate (p True) $ map (\s -> s True) ss
-    fs = PP.punctuate (p False) $ map (\s -> s False) ss
-    in map (\(t,f) -> \m -> if m then t else f) (zip ts fs)
+punctuate (SDoc p) ss = let
+    ts = PP.punctuate (p True) $ map (\case SDoc s -> s True) ss
+    fs = PP.punctuate (p False) $ map (\case SDoc s -> s False) ss
+    in map (\(t,f) -> SDoc (\m -> if m then t else f)) (zip ts fs)
 
 comma :: SDoc
 comma = text ","
 
 empty :: SDoc
-empty m = PP.empty
+empty = SDoc (\m -> PP.empty)
 
 default_display_style :: Bool
 default_display_style = False
 
 render :: SDoc -> String
-render s = PP.render (s default_display_style)
+render (SDoc s) = PP.render (s default_display_style)
 
 instance Show SDoc where
-  show s = show (s default_display_style)
+  show (SDoc s) = show (s default_display_style)
 
 -----------------------------------------------
 --     Pretty printer for the KS language
