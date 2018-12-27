@@ -32,9 +32,6 @@ occAnalE (Lam v e)
   = (Lam v e', v `M.delete` vs)
   where
     (e', vs) = occAnalE e
-    n = case v `M.lookup` vs of
-          Just n  -> n
-          Nothing -> 0
 
 occAnalE (Call f e) = (Call f e', vs)
                       where
