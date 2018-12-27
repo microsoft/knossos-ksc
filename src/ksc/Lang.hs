@@ -528,11 +528,7 @@ parensSp :: Doc -> Doc
 parensSp d = PP.char '(' PP.<+> d PP.<+> PP.char ')'
 
 pprWithCommas :: (p -> Doc) -> [p] -> Doc
-pprWithCommas ppr ps = PP.sep (add_commas ps)
-  where
-     add_commas []     = []
-     add_commas [p]    = [ppr p]
-     add_commas (p:ps) = ppr p PP.<> PP.comma : add_commas ps
+pprWithCommas ppr ps = PP.sep $ PP.punctuate PP.comma $ map ppr ps
 
 instance Pretty a => Pretty [a] where
   ppr xs = PP.char '[' <> pprWithCommas ppr xs <> PP.char ']'
