@@ -7,8 +7,6 @@ import Rules
 import OptLet
 import Annotate( GblSymTab, lookupGblST, extendGblST, emptyGblST )
 import Text.PrettyPrint
-import qualified Data.Set as S
-import qualified Data.Map as M
 
 import Debug.Trace
 import Test.Hspec

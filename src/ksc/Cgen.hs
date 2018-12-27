@@ -3,14 +3,12 @@
 module Cgen where
 
 import GHC.Stack
-import           Debug.Trace                    ( trace )
 import           Prelude                 hiding ( lines
                                                 , tail
                                                 )
 
 import qualified Data.Map as Map
-import           Data.List                      ( intercalate, isPrefixOf )
-import           Control.Monad                  ( (<=<) )
+import           Data.List                      ( intercalate )
 import qualified Control.Monad.State           as S
 import           System.Process                 ( readProcessWithExitCode )
 

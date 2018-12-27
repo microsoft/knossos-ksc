@@ -1,9 +1,6 @@
 module OptLet( optLets )  where
 
 import Lang
-import Prim
-import Text.PrettyPrint as PP
-import qualified Data.Set as S
 import qualified Data.Map as M
 
 optLets :: TExpr -> TExpr

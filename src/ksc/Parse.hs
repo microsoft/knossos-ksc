@@ -74,18 +74,13 @@ import Prim
 import Text.Parsec( (<|>), try, many, parse, ParseError )
 import Text.Parsec.Char
 import Text.Parsec.String (Parser)
-import Text.Parsec.Language (emptyDef)
 
-import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
-import Data.Functor.Identity
-import Control.Monad.Trans
 import Control.Monad
 import qualified Text.PrettyPrint as PP
 
-import Test.Hspec
-import Debug.Trace
+--import Test.Hspec
 
 
 ---------------------

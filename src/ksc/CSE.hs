@@ -5,7 +5,6 @@ import Prim
 import LangUtils( substE )
 import Rules
 import Annotate( GblSymTab )
-import Text.PrettyPrint
 import ANF
 import Opt
 import KMonad

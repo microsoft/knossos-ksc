@@ -4,19 +4,11 @@ module Lang where
 
 import Prelude hiding( (<>) )
 
-import Data.List ( intercalate )
-import qualified Data.Map as Map
 import Text.PrettyPrint   as PP
 import KMonad
 
-import Data.Functor.Identity
-import Data.Maybe
-import Data.Functor
 import Data.Either( partitionEithers )
 
-import System.Console.Haskeline
-
-import qualified Data.Map as M
 import Debug.Trace( trace )
 import Test.Hspec
 

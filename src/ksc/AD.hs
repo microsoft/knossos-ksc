@@ -1,15 +1,11 @@
 module AD where
 
-import GHC.Stack
 import Lang
 import Prim
 import Text.PrettyPrint as PP
-import Data.List( mapAccumL )
 
 -- for unit test
-import Test.Hspec
-import Parse
-import Annotate
+--import Test.Hspec
 
 --------------- Generate names for gradded indentifiers
 

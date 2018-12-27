@@ -13,11 +13,8 @@ import Lang
 import KMonad
 import Prim
 import qualified Data.Map   as Map
-import Data.List( mapAccumL )
 import GHC.Stack
-import Data.Foldable( foldlM )
 import Control.Monad( ap )
-import Debug.Trace( trace )
 import Text.PrettyPrint as PP
 import Data.List( intersperse )
 

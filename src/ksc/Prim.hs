@@ -2,8 +2,6 @@ module Prim where
 
 import Lang
 import GHC.Stack
-import Debug.Trace
-import Data.Array
 import Text.PrettyPrint
 
 --------------------------------------------

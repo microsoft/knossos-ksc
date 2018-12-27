@@ -1,7 +1,6 @@
 module Main where
 
 import GHC.Stack;
-import Data.Hashable
 import qualified System.Exit
 
 import Lang
@@ -13,12 +12,9 @@ import Opt
 import CSE
 
 import ANF
-import Cgen (cppF, cppFG, runM, cgenDef, cgenDefs)
+import Cgen (cppFG)
 import KMonad
-import Text.PrettyPrint as PP
 import Data.List( partition )
-import Control.Monad( unless )
-import System.Process( callProcess )
 import qualified System.Directory
 
 
