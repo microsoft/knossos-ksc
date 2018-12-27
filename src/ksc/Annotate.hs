@@ -18,11 +18,6 @@ import Control.Monad( ap )
 import Text.PrettyPrint as PP
 import Data.List( intersperse )
 
-dbtrace :: String -> a -> a
-dbtrace _ e = e -- trace msg e
-
---------------------------
-
 -----------------------------------------------
 --     The type inference pass
 -----------------------------------------------
@@ -176,29 +171,6 @@ tcVar var mb_ty
          text "Variable occurrence mis-match for" <+> ppr var
        ; return ty }
 
-
- --------------------------------------
-
-stripAnnots :: [TDef] -> [Def]
-stripAnnots = map stripAnnot
-
-stripAnnot :: TDef -> Def
-stripAnnot (DefX (TFun ty f) tvars texpr) =
-  DefX f tvars (stripAnnotExpr texpr)
-
-stripAnnotExpr :: TExpr -> Expr
-stripAnnotExpr = \case
-  Konst k -> Konst k
-  Var (TVar _ v) -> Var v
-  Call (TFun _ f) e -> Call f $ stripAnnotExpr e
-  Tuple es -> Tuple $ map stripAnnotExpr es
-  Lam tv e -> Lam tv $ stripAnnotExpr e
-  App e1 e2 -> App (stripAnnotExpr e1) (stripAnnotExpr e2)
-  Let (TVar _ v) e1 e2 -> Let v (stripAnnotExpr e1) (stripAnnotExpr e2)
-  If c t f -> If (stripAnnotExpr c) (stripAnnotExpr t) (stripAnnotExpr f)
-  Assert c e -> Assert (stripAnnotExpr c) (stripAnnotExpr e)
-
-
 -----------------------------------------------
 --     Symbol table, ST, maps variables to types
 -----------------------------------------------
@@ -229,18 +201,11 @@ instance Pretty SymTab where
            , hang (text "Local symbol table:")
                 2 (ppr lcl_env) ]
 
-sttrace :: String -> a -> a
-sttrace _ e = e -- trace msg e
-
 emptyGblST :: GblSymTab
 emptyGblST = Map.empty
 
 newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = Map.empty }
-
-stInsertVar :: Var -> Type -> SymTab -> SymTab
-stInsertVar v ty env
-  = env { lclST = Map.insert v ty (lclST env) }
 
 stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
 stInsertFun f ty env = Map.insert f ty env

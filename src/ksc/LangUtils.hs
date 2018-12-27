@@ -8,8 +8,10 @@ module LangUtils (
   cmpExpr,
 
   -- Free vars
-  notFreeIn, newVarNotIn
+  notFreeIn, newVarNotIn,
 
+  -- Tests
+  test_FreeIn
   ) where
   
 import Lang
