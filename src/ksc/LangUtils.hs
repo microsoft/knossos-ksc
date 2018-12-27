@@ -161,6 +161,7 @@ newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
       where
          v = mkTVar ty ("_t" ++ show n)
 
+test_FreeIn :: IO ()
 test_FreeIn =
   hspec $ do
     let var :: String -> TVar

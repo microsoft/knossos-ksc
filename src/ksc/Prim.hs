@@ -114,9 +114,11 @@ pAdd a b   = mkPrimCall2 "+" a b
 pMul a b   = mkPrimCall2 "*" a b
 pDiv a b   = mkPrimCall2 "/" a b
 pEqual a b = mkPrimCall2 "==" a b
-pNeg x     = mkPrimCall "neg" x
-pExp x     = mkPrimCall "exp" x
-pLog x     = mkPrimCall "log" x
+
+pNeg, pExp, pLog :: HasCallStack => TExpr -> TExpr
+pNeg x = mkPrimCall "neg" x
+pExp x = mkPrimCall "exp" x
+pLog x = mkPrimCall "log" x
 
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild n f = mkPrimCall2 "build" n f

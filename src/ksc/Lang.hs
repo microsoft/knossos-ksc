@@ -268,6 +268,7 @@ assert doc False x = error (show doc)
 assertBool :: Bool -> Bool
 assertBool x = x    -- To remove check, return True always
 
+assertEqual :: (Eq a, Show a) => String -> a -> a -> ()
 assertEqual msg t1 t2 =
   assertEqualThen msg t1 t2 ()
 
@@ -411,6 +412,7 @@ type Prec = Int
  -- 0 => no need for parens
  -- high => parenthesise everything
 
+precZero, precOne, precTwo, precThree :: Int
 precZero  = 0  -- Base
 precOne   = 1  -- ==
 precTwo   = 2  -- +
@@ -550,6 +552,7 @@ pprPanic str doc
 pps :: Pretty a => a -> String
 pps a = show $ ppr a
 
+test_Pretty :: IO ()
 test_Pretty =
   hspec $ do
     let test e s = it s $ pps e `shouldBe` s

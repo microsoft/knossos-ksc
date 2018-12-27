@@ -12,6 +12,7 @@ import Debug.Trace
 import Test.Hspec
 import Data.List( mapAccumL )
 
+optTrace :: msg -> a -> a
 optTrace msg t = t -- trace msg t
 
 data OptEnv = OptEnv { optRuleBase :: RuleBase

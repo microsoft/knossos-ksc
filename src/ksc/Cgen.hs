@@ -35,6 +35,7 @@ getTypeFromCType = \case
   CType t -> t
   t -> error $ "getTypeFromCType @ " ++ show t
 
+promoteZero :: CType -> CType
 promoteZero = \case
   CType (TypeZero ty) -> CType ty
   ty -> ty
@@ -102,11 +103,19 @@ freshCVar = do
 --       LMHCat [LMVCat [LMOne, LMZero], LMZero]
 --       "v12_t")
 data CGenResult = CG String String CType
+
+getDecl :: CGenResult -> String
 getDecl (CG dc _ _) = dc
+
+getExpr :: CGenResult -> String
 getExpr (CG _ ex _) = ex
+
+getType :: CGenResult -> CType
 getType (CG _ _ ty) = ty
 
 type CST = Map.Map String CType
+
+cstEmpty :: CST
 cstEmpty = Map.empty
 
 cstMaybeLookup0 :: HasCallStack => String -> CST -> Maybe CType
