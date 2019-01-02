@@ -175,7 +175,7 @@ test :: IO ()
 test = testC "g++-7"
 
 testWindows :: IO ()
-testWindows = testC "g++"
+testWindows = testC "C:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin/g++"
 
 testC :: String -> IO ()
 testC compiler = do
