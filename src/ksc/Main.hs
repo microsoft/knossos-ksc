@@ -172,11 +172,17 @@ hspec = do
     LangUtils.hspec
 
 test :: IO ()
-test = do
+test = testC "g++-7"
+
+testWindows :: IO ()
+testWindows = testC "g++"
+
+testC :: String -> IO ()
+testC compiler = do
   Test.Hspec.hspec Main.hspec
 
   System.Directory.createDirectoryIfMissing True "obj/test/ksc"
-  output <- doallG "g++-7" 0 "test/ksc/gmm"
+  output <- doallG compiler 0 "test/ksc/gmm"
 
   let success = case reverse (lines output) of
         impossiblyGoodS:_:everythingWorksAsExpectedS:_ ->
