@@ -445,7 +445,7 @@ cgenVar v = show v
 
 cppFG :: String -> String -> [TDef] -> IO String
 cppFG compiler outfile defs = do
-  let lines = ["#include <stdio.h>", "#include \"knossos.h\"", "namespace ks {\n"]
+  let lines = ["#include \"knossos.h\"", "namespace ks {\n"]
 
   let lls = cgenDefs defs
 
