@@ -8,7 +8,7 @@ import           Prelude                 hiding ( lines
                                                 )
 
 import qualified Data.Map as Map
-import           Data.List                      ( intercalate, isPrefixOf )
+import           Data.List                      ( intercalate )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import           System.Process                 ( readProcessWithExitCode )
