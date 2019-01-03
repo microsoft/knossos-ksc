@@ -445,11 +445,21 @@ cgenVar v = show v
 
 cppFG :: String -> String -> [TDef] -> IO String
 cppFG compiler outfile defs = do
-  let lines = ["#include \"knossos.h\"", "namespace ks {\n"]
+  let lines = [
+         "#include \"knossos.h\"", 
+         "namespace ks {\n"
+       ]
 
   let lls = cgenDefs defs
 
-  let tail = ["}", "int main() {", "  ks::main();", "  return 0;", "}"]
+  let tail = [
+         "}",
+         "#include \"knossos.cpp\"",  
+         "int main() {", 
+         "  ks::main();", 
+         "  return 0;", 
+         "}"
+       ]
   let ksofile = outfile ++ ".kso"
   putStrLn $ "Writing to " ++ ksofile
   writeFile ksofile (show $ ppr defs)
