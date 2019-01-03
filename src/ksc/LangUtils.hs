@@ -8,8 +8,11 @@ module LangUtils (
   cmpExpr,
 
   -- Free vars
-  notFreeIn, newVarNotIn
+  notFreeIn, newVarNotIn,
 
+  -- Tests
+  LangUtils.hspec,
+  test_FreeIn
   ) where
   
 import Lang
@@ -159,8 +162,8 @@ newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
       where
          v = mkTVar ty ("_t" ++ show n)
 
-test_FreeIn =
-  hspec $ do
+hspec :: Spec
+hspec = do
     let var :: String -> TVar
         var s = TVar TypeFloat (Simple s)
         fun :: String -> TFun
@@ -177,3 +180,6 @@ test_FreeIn =
         newVarNotIn TypeFloat e `shouldBe` (var "_t1")
       it "in, so new var is _t2..." $
         newVarNotIn TypeFloat e2 `shouldBe` (var "_t2")
+
+test_FreeIn :: IO ()
+test_FreeIn = Test.Hspec.hspec LangUtils.hspec

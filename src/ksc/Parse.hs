@@ -68,31 +68,25 @@ Notes:
 -}
 
 
-import Lang
+import Lang hiding (parens)
 import Prim
 
 import Text.Parsec( (<|>), try, many, parse, ParseError )
 import Text.Parsec.Char
 import Text.Parsec.String (Parser)
-import Text.Parsec.Language (emptyDef)
 
-import qualified Text.Parsec.Expr as Ex
 import qualified Text.Parsec.Token as Tok
 
-import Data.Functor.Identity
-import Control.Monad.Trans
 import Control.Monad
-import qualified Text.PrettyPrint as PP
 
-import Test.Hspec
-import Debug.Trace
+--import Test.Hspec
 
 
 ---------------------
 testParse :: Pretty a => Parser a -> String -> IO ()
 testParse  p s = case runParser p s of
                    Left err -> putStrLn ("Failed: " ++ show err)
-                   Right r  -> putStrLn (PP.render (ppr r))
+                   Right r  -> putStrLn (render (ppr r))
 
 runParser :: Parser a -> String -> Either ParseError a
 runParser p s = parse p "" s
@@ -149,7 +143,7 @@ pString = Tok.stringLiteral lexer
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
-mk_fun :: HasCallStack => String -> Fun
+mk_fun :: String -> Fun
 -- Parses the print-name of a top-level function into a Fun
 -- In particular,
 --
@@ -317,7 +311,7 @@ pDecls = spaces >> many pDecl
 toStr :: Pretty a => Parser a -> String -> String
 toStr p s = case runParser p s of
                    Left err -> error ("Failed: " ++ show err)
-                   Right r  -> show (PP.render (ppr r))
+                   Right r  -> show (render (ppr r))
 
 {-
 test_Parser =

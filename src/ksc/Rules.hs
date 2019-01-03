@@ -4,7 +4,6 @@ import Lang
 import LangUtils
 import Control.Monad( guard )
 import Data.Map as M
-import Text.PrettyPrint
 
 newtype RuleBase = Rules [TRule]
         -- Rule is defined in Lang

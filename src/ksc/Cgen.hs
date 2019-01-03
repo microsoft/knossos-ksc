@@ -3,14 +3,13 @@
 module Cgen where
 
 import GHC.Stack
-import           Debug.Trace                    ( trace )
 import           Prelude                 hiding ( lines
                                                 , tail
                                                 )
 
 import qualified Data.Map as Map
 import           Data.List                      ( intercalate, isPrefixOf )
-import           Control.Monad                  ( (<=<), when )
+import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import           System.Process                 ( readProcessWithExitCode )
 import           System.Exit                 ( ExitCode(ExitSuccess) )
@@ -125,11 +124,19 @@ freshCVar = do
 --       LMHCat [LMVCat [LMOne, LMZero], LMZero]
 --       "v12_t")
 data CGenResult = CG String String CType
+
+getDecl :: CGenResult -> String
 getDecl (CG dc _ _) = dc
+
+getExpr :: CGenResult -> String
 getExpr (CG _ ex _) = ex
+
+getType :: CGenResult -> CType
 getType (CG _ _ ty) = ty
 
 type CST = Map.Map String CType
+
+cstEmpty :: CST
 cstEmpty = Map.empty
 
 cstMaybeLookup0 :: HasCallStack => String -> CST -> Maybe CType
@@ -458,9 +465,9 @@ cgenVar :: Var -> String
 cgenVar v = show v
 
 
-cppFG :: String -> [TDef] -> IO String
-cppFG outfile defs = do
-  let lines = ["#include <stdio.h>", "#include \"knossos.h\"", "namespace ks {\n"]
+cppFG :: String -> String -> [TDef] -> IO String
+cppFG compiler outfile defs = do
+  let lines = ["#include \"knossos.h\"", "namespace ks {\n"]
 
   let lls = cgenDefs defs
 
@@ -476,7 +483,7 @@ cppFG outfile defs = do
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
-  let compcmd = ("g++-7", ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
+  let compcmd = (compiler, ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
   putStrLn "Running"
@@ -493,6 +500,6 @@ readProcessPrintStderr executable args = do
 cppF :: String -> [TDef] -> IO ()
 -- String is the file name
 cppF outfile defs = do
-  output <- cppFG outfile defs
+  output <- cppFG "g++-7" outfile defs
   putStrLn "Done"
   putStr output

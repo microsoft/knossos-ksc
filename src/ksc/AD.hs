@@ -1,15 +1,10 @@
 module AD where
 
-import GHC.Stack
 import Lang
 import Prim
-import Text.PrettyPrint as PP
-import Data.List( mapAccumL )
 
 -- for unit test
-import Test.Hspec
-import Parse
-import Annotate
+--import Test.Hspec
 
 --------------- Generate names for gradded indentifiers
 
@@ -19,7 +14,7 @@ gradF f       = error ("gradF: bad function: " ++ show f)
 
 gradV :: Var -> Var
 gradV (Simple x) = Grad x Fwd
-gradV v          = error ("gradV: bad variable: " ++ PP.render (ppr v))
+gradV v          = error ("gradV: bad variable: " ++ render (ppr v))
 
 gradSelFun :: [TVar] -> TVar -> Int -> TExpr
 -- (gradSelFun i n) selects the i'th component of a n-tuple

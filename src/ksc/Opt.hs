@@ -1,4 +1,4 @@
-module Opt( optLets, optDef, optDefs, optE, simplify, test_opt ) where
+module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
 
 import Lang
 import LangUtils
@@ -6,14 +6,12 @@ import Prim
 import Rules
 import OptLet
 import Annotate( GblSymTab, lookupGblST, extendGblST, emptyGblST )
-import Text.PrettyPrint
-import qualified Data.Set as S
-import qualified Data.Map as M
 
 import Debug.Trace
 import Test.Hspec
 import Data.List( mapAccumL )
 
+optTrace :: msg -> a -> a
 optTrace msg t = t -- trace msg t
 
 data OptEnv = OptEnv { optRuleBase :: RuleBase
@@ -258,7 +256,7 @@ inlineCall def@(DefX _ bndrs body) arg
   | [bndr] <- bndrs
   = Just $ Let bndr arg body
   | Tuple args <- arg
-  = assert (ppr def $$ ppr arg) (length args == length bndrs) $
+  = assert (vcat [ppr def, ppr arg]) (length args == length bndrs) $
     Just (mkLets (bndrs `zip` args) body)
   | otherwise
   = Nothing
@@ -559,9 +557,8 @@ optTransPrim "lmBuildT"    (Tuple [n, Lam i b]) = Just (lmBuild n (Lam i (lmTran
 optTransPrim f a = Nothing
 
 --------------------------------------
-test_opt:: IO ()
-test_opt =
-  hspec $ do
+hspec :: Spec
+hspec = do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
         optPrimFun "lmAdd" (Tuple [lmScale $ kTFloat 1.3, lmScale $ kTFloat 0.4])
@@ -577,3 +574,6 @@ test_opt =
                  (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
             lmHCat [lmAdd l1 l2, lmScale (pAdd f2 f2)]
+
+test_opt:: IO ()
+test_opt = Test.Hspec.hspec Opt.hspec

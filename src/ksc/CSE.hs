@@ -5,7 +5,6 @@ import Prim
 import LangUtils( substE )
 import Rules
 import Annotate( GblSymTab )
-import Text.PrettyPrint
 import ANF
 import Opt
 import KMonad
@@ -82,6 +81,7 @@ cseE_check cse_env e
   where
     e' = cseE cse_env e
 
+substAssert :: ExprX TFun TVar -> TExpr -> TExpr -> TExpr
 substAssert (Var v) e1b = substE (M.insert v e1b M.empty)
 substAssert e1a (Var v) = substE (M.insert v e1a M.empty)
 substAssert _ _ = \e -> e

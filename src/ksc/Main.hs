@@ -1,10 +1,10 @@
 module Main where
 
 import GHC.Stack;
-import Data.Hashable
 import qualified System.Exit
 
 import Lang
+import LangUtils (hspec)
 import Parse (runParser, pDecls, parseF )
 import Rules
 import Annotate
@@ -13,13 +13,11 @@ import Opt
 import CSE
 
 import ANF
-import Cgen (cppF, cppFG, runM, cgenDef, cgenDefs)
+import Cgen (cppFG)
 import KMonad
-import Text.PrettyPrint as PP
 import Data.List( partition, intercalate )
-import Control.Monad( unless )
-import System.Process( callProcess )
 import qualified System.Directory
+import Test.Hspec (hspec, Spec)
 
 
 -------------------------------------
@@ -107,15 +105,18 @@ moveMain = partition isMain
     isMain (DefDecl (DefX (Fun (UserFun "main")) _ _)) = True
     isMain _ = False
 
-doall :: HasCallStack => Int -> String -> IO ()
-doall verbosity file = do
-  { output <- doallG verbosity file
+doallC :: HasCallStack => String -> Int -> String -> IO ()
+doallC compiler verbosity file = do
+  { output <- doallG compiler verbosity file
   ; putStrLn "Done"
   ; putStr output
   }
 
-doallG :: HasCallStack => Int -> String -> IO String
-doallG verbosity file =
+doall :: HasCallStack => Int -> String -> IO ()
+doall = doallC "g++-7"
+
+doallG :: HasCallStack => String -> Int -> String -> IO String
+doallG compiler verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity $! defs))
   in
   runKM $
@@ -157,7 +158,7 @@ doallG verbosity file =
   ; displayPass verbosity "CSE" env3 cse
 
   ; let ann2 =  cse
-  ; liftIO (cppFG ("obj/" ++ file) ann2)
+  ; liftIO (cppFG compiler ("obj/" ++ file) ann2)
   }
 
 gmm :: IO ()
@@ -166,10 +167,24 @@ gmm = doall 400 "test/ksc/gmm"
 main :: IO ()
 main = gmm
 
+hspec :: Spec
+hspec = do
+    Opt.hspec
+    Lang.hspec
+    LangUtils.hspec
+
 test :: IO ()
-test = do
+test = testC "g++-7"
+
+testWindows :: IO ()
+testWindows = testC "C:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin/g++"
+
+testC :: String -> IO ()
+testC compiler = do
+  Test.Hspec.hspec Main.hspec
+
   System.Directory.createDirectoryIfMissing True "obj/test/ksc"
-  output <- doallG 0 "test/ksc/gmm"
+  output <- doallG compiler 0 "test/ksc/gmm"
 
   let success = case reverse (lines output) of
         impossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->

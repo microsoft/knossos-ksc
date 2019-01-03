@@ -13,18 +13,9 @@ import Lang
 import KMonad
 import Prim
 import qualified Data.Map   as Map
-import Data.List( mapAccumL )
 import GHC.Stack
-import Data.Foldable( foldlM )
 import Control.Monad( ap )
-import Debug.Trace( trace )
-import Text.PrettyPrint as PP
 import Data.List( intersperse )
-
-dbtrace :: String -> a -> a
-dbtrace _ e = e -- trace msg e
-
---------------------------
 
 -----------------------------------------------
 --     The type inference pass
@@ -179,29 +170,6 @@ tcVar var mb_ty
          text "Variable occurrence mis-match for" <+> ppr var
        ; return ty }
 
-
- --------------------------------------
-
-stripAnnots :: [TDef] -> [Def]
-stripAnnots = map stripAnnot
-
-stripAnnot :: TDef -> Def
-stripAnnot (DefX (TFun ty f) tvars texpr) =
-  DefX f tvars (stripAnnotExpr texpr)
-
-stripAnnotExpr :: TExpr -> Expr
-stripAnnotExpr = \case
-  Konst k -> Konst k
-  Var (TVar _ v) -> Var v
-  Call (TFun _ f) e -> Call f $ stripAnnotExpr e
-  Tuple es -> Tuple $ map stripAnnotExpr es
-  Lam tv e -> Lam tv $ stripAnnotExpr e
-  App e1 e2 -> App (stripAnnotExpr e1) (stripAnnotExpr e2)
-  Let (TVar _ v) e1 e2 -> Let v (stripAnnotExpr e1) (stripAnnotExpr e2)
-  If c t f -> If (stripAnnotExpr c) (stripAnnotExpr t) (stripAnnotExpr f)
-  Assert c e -> Assert (stripAnnotExpr c) (stripAnnotExpr e)
-
-
 -----------------------------------------------
 --     Symbol table, ST, maps variables to types
 -----------------------------------------------
@@ -232,18 +200,11 @@ instance Pretty SymTab where
            , hang (text "Local symbol table:")
                 2 (ppr lcl_env) ]
 
-sttrace :: String -> a -> a
-sttrace _ e = e -- trace msg e
-
 emptyGblST :: GblSymTab
 emptyGblST = Map.empty
 
 newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = Map.empty }
-
-stInsertVar :: Var -> Type -> SymTab -> SymTab
-stInsertVar v ty env
-  = env { lclST = Map.insert v ty (lclST env) }
 
 stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
 stInsertFun f ty env = Map.insert f ty env
@@ -302,13 +263,13 @@ callResultTy_maybe env fun arg_ty
 -----------------------------------------------
 
 data TcEnv f b
-  = TCE { tce_ctxt :: [Doc]   -- Context, innermost first
+  = TCE { tce_ctxt :: [SDoc]   -- Context, innermost first
         , tce_st   :: SymTab
         , tce_fun  :: f -> (Fun, Maybe Type)
         , tce_var  :: b -> (Var, Maybe Type) }
 
-newtype TcM f b a = TCM { unTc :: TcEnv f b -> [Doc] -> (a, [Doc]) }
--- Just a writer monad on [Doc]
+newtype TcM f b a = TCM { unTc :: TcEnv f b -> [SDoc] -> (a, [SDoc]) }
+-- Just a writer monad on [SDoc]
 
 instance Functor (TcM f b) where
   fmap f (TCM m) = TCM (\ctxt ds -> case m ctxt ds of
@@ -328,9 +289,8 @@ runTc :: String -> TcEnv f b -> TcM f b a -> KM a
 runTc what init_env (TCM m)
   | null rev_errs
   = return result
-
   | otherwise
-  = do { liftIO $ putStrLn $ PP.render $
+  = do { liftIO $ putStrLn $ render $
          vcat [ text ""
               , text "--------------------------"
               , text "Type errors in" <+> text what
@@ -343,12 +303,12 @@ runTc what init_env (TCM m)
   where
     (result, rev_errs) = m init_env []
 
-addErr :: Doc -> TcM f b ()
+addErr :: SDoc -> TcM f b ()
 addErr d = TCM (\env ds -> ((), mk_err env d : ds))
   where
-    mk_err env d = d $$ vcat (tce_ctxt env)
+    mk_err env d =  vcat (d:tce_ctxt env)
 
-addCtxt :: Doc -> TcM f b a -> TcM f b a
+addCtxt :: SDoc -> TcM f b a -> TcM f b a
 addCtxt cd (TCM m) = TCM $ \env@(TCE { tce_ctxt = cds }) ds ->
                      m (env { tce_ctxt = cd : cds }) ds
 
@@ -358,13 +318,13 @@ getFunTc f = TCM (\env ds -> (tce_fun env f, ds))
 getVarTc :: b -> TcM f b (Var, Maybe Type)
 getVarTc v = TCM (\env ds -> (tce_var env v, ds))
 
-checkTypes_maybe :: Maybe Type -> Type -> Doc -> TcM f b ()
+checkTypes_maybe :: Maybe Type -> Type -> SDoc -> TcM f b ()
 checkTypes_maybe mb_ty1 ty2 herald
   = case mb_ty1 of
       Nothing  -> return ()
       Just ty1 -> checkTypes ty1 ty2 herald
 
-checkTypes :: Type -> Type -> Doc -> TcM f b ()
+checkTypes :: Type -> Type -> SDoc -> TcM f b ()
 checkTypes exp_ty act_ty herald
   | promoteZero exp_ty == promoteZero act_ty
   = return ()
