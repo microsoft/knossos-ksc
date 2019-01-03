@@ -402,16 +402,16 @@ optGradPrim _ "*" (Tuple [x,y])
   , TypeFloat <- typeof y
   = Just (lmHCat [lmScale y, lmScale x])
 
+optGradPrim _ "*" arg
+  | let arg_ty = typeof arg
+  , TypeTuple [TypeInteger, TypeInteger] <- arg_ty
+  = Just (lmZero arg_ty TypeInteger)
+
 optGradPrim _ "/"  (Tuple [x,y])
   | TypeFloat <- typeof x
   , TypeFloat <- typeof y
   = Just (lmHCat [ lmScale (pDiv (kTFloat 1.0) y)
                  , lmScale (pNeg (pDiv x (pMul y y)))])
-
-optGradPrim _ "*" arg
-  | let arg_ty = typeof arg
-  , TypeTuple [TypeInteger, TypeInteger] <- arg_ty
-  = Just (lmZero arg_ty TypeInteger)
 
 optGradPrim _  "/" arg
   | let arg_ty = typeof arg
@@ -430,6 +430,7 @@ optGradPrim _ "index" (Tuple [i,v])
   = Just (primDindex i v)
 
 optGradPrim _ "$trace" e = Just (lmOne $ typeof e)
+optGradPrim _ "$rand" e = Just (lmZero TypeFloat TypeFloat)
 optGradPrim _ "neg" e = Just (lmScale (kTFloat $ -1.0))
 optGradPrim _ "exp" e = Just (lmScale (pExp e))
 optGradPrim _ "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))

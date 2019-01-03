@@ -491,10 +491,7 @@ namespace ks
 		ASSERT(rows == cols);
 		typedef decltype(f(size_t{})) T;
 		return build<vec<T>>(rows, [cols,f](size_t i) { 
-					return build<T>(cols, [f](size_t j) {
-						return f(j);
-					});
-		});
+					return deltaVec(cols, i, f(i)); });
 	}
 
 
@@ -614,9 +611,8 @@ namespace ks
 		if (is_zero(v))
 			return convert<T>::go(zero_t<T>{});
 
-		ASSERT(v.size() != 0);
+		if (v.size() == 0) { return convert<T>::go(zero_t<T>{}); }
 
-		if (v.size() == 0) throw std::string("oik");
 		if (v.size() == 1) return v[0];
 		T ret = add(v[0], v[1]);
 		for (size_t i = 2; i < v.size(); ++i)
@@ -1194,21 +1190,29 @@ namespace ks
 		return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
 	}
 
-	template <class T2>
-	T2 mul(double t1, T2 const& t2)
+	template <class T>
+	T mul(double s, T const& t)
 	{
-		return t1 * t2;
+		return s * t;
 	}
 
-	template <class T1>
-	T1 mul(T1 const& t1, double t2)
+	template <class T>
+	zero_t<T> mul(double s, zero_t<T> const& t)
 	{
-		return t1 * t2;
+		return t;
 	}
 
-	double mul(double t1, double t2)
+	template <>
+	tuple<> mul(double s, tuple<> const& t)
 	{
-		return t1 * t2;
+		return t;
+	}
+
+	template <class U0, class... Us>
+	auto mul(double s, tuple<U0, Us...> const& t)
+	{
+		return prepend(mul(s, std::get<0>(t)),
+					   mul(s, tail(t)));
 	}
 
 	int mul(int const& t1, int const& t2) 
@@ -1270,34 +1274,6 @@ namespace ks
 	}
 
 */
-
-	// ------------ SelFun --------------
-	// TODO: parameter packs for these
-	template <typename T1, typename T2>
-	T1 selfun$2_1(tuple<T1, T2> ts) {
-		return get<0>(ts);
-	}
-
-	template <typename T1, typename T2>
-	T2 selfun$2_2(tuple<T1, T2> ts) {
-		return get<1>(ts);
-	}
-
-	template <typename T1, typename T2>
-	auto D$selfun$2_1(T1, T2)
-	{
-		typedef LM::One<T1> L1;
-		typedef LM::Zero<T2, T1> L2;
-		return LM::HCat<L1, L2>::mk(L1::mk(), L2::mk());
-	}
-
-	template <typename T1, typename T2>
-	auto D$selfun$2_2(T1, T2)
-	{
-		typedef LM::Zero<T1, T2> L1;
-		typedef LM::One<T2> L2;
-		return LM::HCat<L1, L2>::mk(L1::mk(), L2::mk());
-	}
 
 	// ========================= Trace primitive ===============
 	inline double $rand(double max)

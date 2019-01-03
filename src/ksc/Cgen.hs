@@ -9,10 +9,11 @@ import           Prelude                 hiding ( lines
                                                 )
 
 import qualified Data.Map as Map
-import           Data.List                      ( intercalate, isPrefixOf, map )
-import           Control.Monad                  ( (<=<) )
+import           Data.List                      ( intercalate, isPrefixOf )
+import           Control.Monad                  ( (<=<), when )
 import qualified Control.Monad.State           as S
 import           System.Process                 ( readProcessWithExitCode )
+import           System.Exit                 ( ExitCode(ExitSuccess) )
 
 import Lang
 
@@ -335,7 +336,7 @@ cgenFunId :: FunId -> String
 cgenFunId = \case
   UserFun fun -> fun
   PrimFun fun -> translateFun fun
-  SelFun i n  -> "selfun$" ++ show n ++ "_" ++ show i
+  SelFun i n  -> "std::get<" ++ show (i - 1) ++ ">"
   where
     translateFun :: String -> String
     translateFun = \case
@@ -484,8 +485,9 @@ cppFG outfile defs = do
 readProcessPrintStderr :: FilePath -> [String] -> IO String
 readProcessPrintStderr executable args = do
   let stdin = ""
-  (_, stdout, stderr) <- readProcessWithExitCode executable args stdin
+  (exitCode, stdout, stderr) <- readProcessWithExitCode executable args stdin
   putStr stderr
+  when (exitCode /= ExitSuccess) $ error "Compilation failed"
   return stdout
 
 cppF :: String -> [TDef] -> IO ()

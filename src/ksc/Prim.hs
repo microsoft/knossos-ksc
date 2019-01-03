@@ -161,7 +161,7 @@ pConcat a b = --trace ("pConcat\n" ++ show a ++ "\n" ++ show b) $
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: Fun -> Type -> Maybe Type
+primCallResultTy_maybe :: HasCallStack => Fun -> Type -> Maybe Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
       Fun (PrimFun f)  -> primFunCallResultTy_maybe f arg_ty
@@ -309,22 +309,24 @@ simplePrimResultTy fun arg_ty
       ("$rand"    , TypeFloat                              ) -> Just TypeFloat
       ("pr"       , _                                      ) -> Just TypeInteger
       ("concat"   , TypeTuple [TypeTuple as, TypeTuple bs] ) -> Just (TypeTuple (as ++ bs))
-      ("build"    , TypeTuple [_, TypeLambda TypeInteger t]) -> Just (TypeVec t)
-      ("index"    , TypeTuple [_, TypeVec t]               ) -> Just t
+      ("build"    , TypeTuple [TypeInteger, TypeLambda TypeInteger t]) -> Just (TypeVec t)
+      ("index"    , TypeTuple [TypeInteger, TypeVec t]     ) -> Just t
       ("size"     , TypeVec _                              ) -> Just TypeInteger
       ("sum"      , TypeVec t                              ) -> Just t
       ("sum"      , TypeZero (TypeVec t)                   ) -> Just (TypeZero t)
       ("to_float" , TypeInteger                            ) -> Just TypeFloat
 
-      ("*"        , TypeTuple [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
+      -- arithmetic ops.   See special case for "+" above
+      ("*"        , TypeTuple [TypeFloat,   t]             ) -> Just t
       ("*"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
       ("/"        , TypeTuple [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
       ("/"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+      ("-"        , TypeTuple [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
+      ("-"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
       ("neg"      , t                                      ) -> Just t
       ("exp"      , TypeFloat                              ) -> Just TypeFloat
       ("log"      , TypeFloat                              ) -> Just TypeFloat
-      ("-"        , TypeTuple [t1, t2]                     ) -> Just t1
 
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool

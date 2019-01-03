@@ -368,7 +368,7 @@ instance Pretty Fun where
 pprFunId :: FunId -> Doc
 pprFunId (UserFun s)  = text s
 pprFunId (PrimFun p)  = text p
-pprFunId (SelFun i n) = text "selfun<" <> int i <> comma <> int n <> char '>'
+pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> Doc
 pprFun (Fun s)         = ppr s

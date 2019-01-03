@@ -16,7 +16,7 @@ import ANF
 import Cgen (cppF, cppFG, runM, cgenDef, cgenDefs)
 import KMonad
 import Text.PrettyPrint as PP
-import Data.List( partition )
+import Data.List( partition, intercalate )
 import Control.Monad( unless )
 import System.Process( callProcess )
 import qualified System.Directory
@@ -120,14 +120,9 @@ doallG verbosity file =
   in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))
-  ;  liftIO $ putStrLn "read decls"
+  ; liftIO $ putStrLn "read decls"
 
-  ;  let (main, decls)    = moveMain decls0
-
-  ;  (env, ann_decls) <- annotDecls emptyGblST decls
-  ;  let (rules, defs) = partitionDecls ann_decls
-         rulebase      = mkRuleBase rules
-  ; displayPass verbosity "Typechecked defs" env defs
+  ; let (main, decls)    = moveMain decls0
 
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
@@ -177,15 +172,16 @@ test = do
   output <- doallG 0 "test/ksc/gmm"
 
   let success = case reverse (lines output) of
-        impossiblyGoodS:_:everythingWorksAsExpectedS:_ ->
+        impossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->
           let boolOfIntString s = case s of
                 "0" -> False
                 "1" -> True
                 _   -> error ("boolOfIntString: Unexpected " ++ s)
 
-              impossiblyGood = boolOfIntString impossiblyGoodS
+              everythingWorksAsExpectedReverse = boolOfIntString everythingWorksAsExpectedReverseS
               everythingWorksAsExpected = boolOfIntString everythingWorksAsExpectedS
-          in everythingWorksAsExpected && not impossiblyGood
+              impossiblyGood = boolOfIntString impossiblyGoodS
+          in everythingWorksAsExpectedReverse && everythingWorksAsExpected && not impossiblyGood
         _ -> False
 
   if success
@@ -193,5 +189,5 @@ test = do
     putStrLn "Success"
     System.Exit.exitWith System.Exit.ExitSuccess
     else do
-    putStrLn "FAILURE!"
+    putStrLn ("FAILURE!" ++ intercalate "\n" (take 5 (reverse (lines output))))
     System.Exit.exitWith (System.Exit.ExitFailure 1)

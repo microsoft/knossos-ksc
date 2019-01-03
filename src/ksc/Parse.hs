@@ -149,7 +149,7 @@ pString = Tok.stringLiteral lexer
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
 
-mk_fun :: String -> Fun
+mk_fun :: HasCallStack => String -> Fun
 -- Parses the print-name of a top-level function into a Fun
 -- In particular,
 --
@@ -162,6 +162,7 @@ mk_fun f = case find_dollar f of
              Just ("R",   s) -> GradFun (mk_fun_id s) Rev
              Just ("fwd", s) -> DrvFun  (mk_fun_id s) Fwd
              Just ("rev", s) -> DrvFun  (mk_fun_id s) Rev
+             Just ("get", s) -> Fun     (mk_sel_fun s) 
              _               -> Fun     (mk_fun_id f)
   where
     mk_fun_id f | isPrimFun f = PrimFun f
@@ -170,6 +171,8 @@ mk_fun f = case find_dollar f of
                        (_, [])  -> Nothing  -- No $
                        (_, [_]) -> Nothing  -- Trailing $
                        (prefix, _ : suffix) -> Just (prefix, suffix)
+    mk_sel_fun s = let (i,_:n) = break (== '$') s
+                   in SelFun (read i :: Int) (read n :: Int)
 
 pVar :: Parser Var
 pVar = Simple <$> pIdentifier
