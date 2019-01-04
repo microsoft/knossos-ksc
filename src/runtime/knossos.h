@@ -297,7 +297,8 @@ namespace ks
 
 	// =============================== Type conversion ============================
 	template <class T>
-	struct convert {
+	struct convert 
+	{
 		template <class U>
 		static T go(U const& u) {
 			return static_cast<T>(u);
@@ -305,38 +306,50 @@ namespace ks
 	};
 
 	template <>
-	struct convert<double> {
+	struct convert<double> 
+	{
 		static double go(zero_t<double> const&) {
 			return 0.0;
 		}
 	};
 
 	template <>
-	struct convert<int> {
+	struct convert<int> 
+	{
 		static int go(zero_t<int> const&) {
 			return 0;
 		}
 	};
 
 	template<>
-	struct convert<tuple<>> {
+	struct convert<tuple<>> 
+	{
 		static tuple<> go(zero_t<tuple<>> const&) {
 			return tuple<>{};
 		}
 	};
 
+	template <class T>
+	struct convert<zero_t<T>> 
+	{
+		static zero_t<T> go(zero_t<zero_t<T>> const& u) {
+			return zero_t<T>{};
+		}
+	};
+
 	template <class T0, class... Ts>
-	struct convert<tuple<T0, Ts...>> {
+	struct convert<tuple<T0, Ts...>> 
+	{
 		template <class U0, class... Us>
 		static tuple<T0, Ts...> go(zero_t<tuple<U0, Us...>> const& u)
 		{
-			return prepend(convert<T0>::go(U0{}), convert<tuple<Ts...>>::go(zero_t<tuple<Us...>>{}));
+			return prepend(convert<T0>::go(zero_t<U0>{}), convert<tuple<Ts...>>::go(zero_t<tuple<Us...>>{}));
 		}
 
 		template <class U0, class... Us>
 		static tuple<T0, Ts...> go(tuple<U0, Us...> const& u)
 		{
-			return prepend(convert<T0>::go(U0{}), convert<tuple<Ts...>>::go(tuple<Us...>{}));
+			return prepend(convert<T0>::go(head(u)), convert<tuple<Ts...>>::go(tail(u)));
 		}
 	};
 
@@ -355,7 +368,7 @@ namespace ks
 	T1 add(T1 t1, zero_t<T1> t2) { return t1; }
 
 	template <>
-	tuple<> add(tuple<> t1, tuple<> t2)
+	inline tuple<> add(tuple<> t1, tuple<> t2)
 	{
 		return tuple<>{};
 	}
@@ -363,7 +376,7 @@ namespace ks
 	template <class T0, class... Ts, class U0, class... Us>
 	auto add(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
 	{
-		return prepend(add(std::get<0>(t1), std::get<0>(t2)),
+		return prepend(add(head(t1), head(t2)),
 			add(tail(t1), tail(t2)));
 	}
 
@@ -482,19 +495,19 @@ namespace ks
 	}
 
 	template <class T>
-	vec<T> deltaVec(size_t n, size_t i, T val)
+	vec<T> deltaVec(int n, int i, T val)
 	{
-		return build<T>(n, [i,val](size_t ii) { 
+		return build<T>(n, [i,val](int ii) { 
 			return (i == ii) ? val : convert<T>::go(zero_t<T>{}); 
 		});
 	} 
 	
 	template <class F>
-	auto diag(size_t rows, size_t cols, F f)
+	auto diag(int rows, int cols, F f)
 	{
 		ASSERT(rows == cols);
-		typedef decltype(f(size_t{})) T;
-		return build<vec<T>>(rows, [cols,f](size_t i) { 
+		typedef decltype(f(int{})) T;
+		return build<vec<T>>(rows, [cols,f](int i) { 
 					return deltaVec(cols, i, f(i)); });
 	}
 
@@ -694,7 +707,7 @@ namespace ks
 		template <class scale_t, class... Ts>
 		tuple<Ts...> Scale_aux(scale_t val, tuple<Ts...> const& t)
 		{
-			return prepend(Scale_aux(val, std::get<0>(t)),
+			return prepend(Scale_aux(val, head(t)),
 		  				   Scale_aux(val, tail(t)));
 		}
 
@@ -815,7 +828,7 @@ namespace ks
 			To Apply(From const& f) const {
 				static_assert(n > 1);
 				typedef typename std::tuple_element<0, Tup>::type T0;
-				To a0 = std::get<0>(lms).Apply(typename T0::From{ std::get<0>(f) });
+				To a0 = head(lms).Apply(typename T0::From{ head(f) });
 				return Apply_aux<1>(a0, f);
 			}
 
@@ -1211,7 +1224,7 @@ namespace ks
 	}
 
 	template <>
-	tuple<> mul(double s, tuple<> const& t)
+	inline tuple<> mul(double s, tuple<> const& t)
 	{
 		return t;
 	}
@@ -1219,7 +1232,7 @@ namespace ks
 	template <class U0, class... Us>
 	auto mul(double s, tuple<U0, Us...> const& t)
 	{
-		return prepend(mul(s, std::get<0>(t)),
+		return prepend(mul(s, head(t)),
 					   mul(s, tail(t)));
 	}
 

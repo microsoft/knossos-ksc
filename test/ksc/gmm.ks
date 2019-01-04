@@ -61,11 +61,11 @@
   (let (K (size alphas))
         (+ (- (sum (build N (lam (i : Integer)
               (logsumexp (build K (lam (k : Integer)
-                (let ((Q (gmm_knossos_makeQ (index k qs) (index k ls)))
+                (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
                       (mahal_vec (mul$Mat$Vec Q
                                           (sub$VecR$VecR (index i x) (index k means)))))
                   (- (+ (index k alphas) (sum (index k qs)))
-                    (* wishart_gamma 1.0) -- should be (* 0.500000  (sqnorm mahal_vec))
+                    (* 0.500000  (sqnorm mahal_vec))
                     ))))))))
             (* (to_float N) (logsumexp alphas)))
          (* 0.5 (sum (build K (lam (k : Integer)
