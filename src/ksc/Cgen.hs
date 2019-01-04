@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE LambdaCase, FlexibleInstances, TypeApplications, PatternSynonyms  #-}
 
 module Cgen where

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unused-matches #-}
+
 module KMonad where
 
 import Data.IORef

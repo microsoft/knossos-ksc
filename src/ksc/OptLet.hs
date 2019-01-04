@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 module OptLet( optLets )  where
 
 import Lang

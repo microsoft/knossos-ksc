@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 module LangUtils (

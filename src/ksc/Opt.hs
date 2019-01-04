@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
 
 import Lang
