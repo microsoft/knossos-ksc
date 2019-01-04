@@ -1,4 +1,5 @@
 // C++ "runtime" for Knossos
+#pragma once
 
 #include <type_traits>
 #include <variant>
@@ -25,27 +26,26 @@ using std::tuple;
         ks::fail(__FILE__, __LINE__, #expr);
 
 namespace ks {
-	void fail(char const* file, int line, char const* expr)
+	inline void fail(char const* file, int line, char const* expr)
 	{
 		std::cerr << file << ":" << line << ":Assert failed [" << expr << "]\n";
 		throw expr;
 	}
 };
 
-static int log_indent = 8;
-static bool do_log = false;
+namespace ks
+{
+	extern int log_indent;
+	extern bool do_log;
 #define LOG(msg, n) if (!do_log) ; else { std::cerr << std::string((n), ' ') << msg << ":" << __FUNCTION__ << " " << this << std::endl; }
 
-std::set<void*> objects;
+	extern std::set<void*> objects;
 #define FIND (objects.find(this) != objects.end())
 #define ENTER { objects.insert(this); LOG("ctor", log_indent++); }
 #define NOTE { LOG("note " << (FIND ? (void*)this : (void*)0), log_indent); }
 #define LEAVE { LOG("dtor " << FIND, --log_indent);  objects.erase(this); }
 
-
-namespace ks
-{
-		// ===============================  String utils  ==================================
+	// ===============================  String utils  ==================================
 
 	// val to string
 	template <class T>
@@ -54,7 +54,6 @@ namespace ks
 		s << val;
 		return s.str();
 	}
-
 
 	// ===============================  Type to string  ==================================
 
@@ -190,8 +189,6 @@ namespace ks
 			top = 0;
 		}
 	};
-
-	allocator g_alloc{ 10000000 };
 
 	// ===============================  Zero  ==================================
 	template <typename T>
@@ -399,11 +396,14 @@ namespace ks
 
 #ifdef BUMPY
 		vec() :size_(0), data_(0) {}
-		size_t size() const { return size_; }
+		int size() const { return size_; }
 #else
 		vec() {}
-		size_t size() const { return data_.size(); }
+		int size() const { return static_cast<int>(data_.size()); }
+
+		vec(std::vector<T> const& that) :data_{ that } {}
 #endif
+
 		vec(zero_t<vec<T>>):
 			is_zero_ (true)
 		{
@@ -417,22 +417,22 @@ namespace ks
 			return *this;
 		}
 
-		T& operator[](size_t i) { return data_[i]; }
-		T const& operator[](size_t i) const { return data_[i]; }
-
+		T& operator[](int i) { return data_[i]; }
+		T const& operator[](int i) const { return data_[i]; }
+	
 		static vec<T> create(size_t size);
 
 		bool is_zero() const { return is_zero_; }
 	};
 
 	template <class T>
-	size_t size(vec<T> const & v)
+	int size(vec<T> const & v)
 	{
 		return v.size(); 
 	}
 
 	template <class T>
-	T const &index(size_t i, vec<T> const & v)
+	T const &index(int i, vec<T> const & v)
 	{
 		static T z{ zero_t<T> {} };
 		if (v.is_zero())
@@ -444,6 +444,10 @@ namespace ks
 		} 
 		return v[i];
 	}
+
+#ifdef BUMPY
+	extern ks::allocator g_alloc;
+#endif
 
 	template <class T>
 	vec<T> vec<T>::create(size_t size)
@@ -462,11 +466,11 @@ namespace ks
 	}
 
 	template <class T, class F>
-	vec<T> build(size_t size, F f)
+	vec<T> build(int size, F f)
 	{
 		vec<T> ret = vec<T>::create(size);
 
-		for (size_t i = 0; i < size; ++i)
+		for (int i = 0; i < size; ++i)
 			ret[i] = T { f(i) }; 
 		return ret;
 	}
@@ -526,7 +530,7 @@ namespace ks
 		ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(a.size());
 
-		for (size_t i = 0; i < a.size(); ++i)
+		for (int i = 0; i < a.size(); ++i)
 			ret[i] = add(a[i], b[i]);
 		return ret;
 	}
@@ -542,7 +546,7 @@ namespace ks
 		ASSERT(a.size() != 0);
 		vec<T> ret = vec<T>::create(a.size());
 
-		for (size_t i = 0; i < a.size(); ++i)
+		for (int i = 0; i < a.size(); ++i)
 			ret[i] = add(a[i], b);
 		return ret;
 	}
@@ -561,7 +565,7 @@ namespace ks
 		ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(a.size());
 
-		for (size_t i = 0; i < a.size(); ++i)
+		for (int i = 0; i < a.size(); ++i)
 			ret[i] = a[i] - b[i];
 		return ret;
 	}
@@ -577,7 +581,7 @@ namespace ks
 		ASSERT(a.size() != 0);
 		vec<T> ret = vec<T>::create(a.size());
 
-		for (size_t i = 0; i < a.size(); ++i)
+		for (int i = 0; i < a.size(); ++i)
 			ret[i] = a[i] - b;
 		return ret;
 	}
@@ -590,9 +594,9 @@ namespace ks
 			return v;
 
 		ASSERT(v.size() != 0);
-		size_t size = v.size();
+		int size = v.size();
 		vec<T> ret = vec<T>::create(size); 
-		for (size_t i = 0; i < size; ++i)
+		for (int i = 0; i < size; ++i)
 			ret[i] = v[i] * val;
 		return ret;
 	}
@@ -615,7 +619,7 @@ namespace ks
 
 		if (v.size() == 1) return v[0];
 		T ret = add(v[0], v[1]);
-		for (size_t i = 2; i < v.size(); ++i)
+		for (int i = 2; i < v.size(); ++i)
 			ret = add(ret, v[i]);
 		return ret;
 	}
@@ -632,7 +636,7 @@ namespace ks
 	{
 		s << "[";
 		if (v.is_zero()) return s << "ZERO]";
-		for (size_t i = 0; i < v.size(); ++i)
+		for (int i = 0; i < v.size(); ++i)
 			s << (i > 0 ? ", " : "") << v[i];
 		return s << "]";
 	}
@@ -721,7 +725,7 @@ namespace ks
 			To Apply(From f) const { return val * f; }
 		};
 
-		std::ostream &operator<<(std::ostream &s, Scale const &t)
+		inline std::ostream &operator<<(std::ostream &s, Scale const &t)
 		{
 			return s << "Scale" <<
 				"(" << t.val << ")";
@@ -981,9 +985,9 @@ namespace ks
 			typedef Tuple From;
 			typedef Ti To;
 
-			size_t index;
+			int index;
 
-			static SelFun mk(size_t index, size_t n) { return SelFun{ index }; }
+			static SelFun mk(int index, int n) { return SelFun{ index }; }
 
 			To Apply(From f) const { return std::get(f, index); }
 		};
@@ -1001,26 +1005,26 @@ namespace ks
 		template <typename Functor>
 		struct Build
 		{
-			typedef typename std::invoke_result<Functor, size_t>::type L;
+			typedef typename std::invoke_result<Functor, int>::type L;
 
 			typedef typename L::To LTo;
 
 			typedef typename L::From From;
 			typedef vec<LTo> To;
 
-			size_t n;
-			Functor/*std::function<L(size_t)>*/ f;
+			int n;
+			Functor/*std::function<L(int)>*/ f;
 
 			template <class Functor2>
-			static Build mk(size_t n, Functor2 f) { 
+			static Build mk(int n, Functor2 f) { 
 				ASSERT(n != 0);
 				return Build{ n, f }; 
 			}
 
 			To Apply(From x) const 
 			{ 
-				Functor/*std::function<L(size_t)>*/ f1 = f;
-				return build<LTo>(n, [x,f1](size_t i) {
+				Functor/*std::function<L(int)>*/ f1 = f;
+				return build<LTo>(n, [x,f1](int i) {
 													 auto lm = f1(i);
 													 return lmApply(lm, x);
 												   }); 
@@ -1039,15 +1043,15 @@ namespace ks
 		template <typename Functor>
 		struct BuildT
 		{
-			typedef typename std::invoke_result<Functor, size_t>::type L;
+			typedef typename std::invoke_result<Functor, int>::type L;
 
 			typedef typename L::From LFrom;
 
 			typedef vec<typename L::From> From;
 			typedef typename L::To To;
 
-			size_t n;
-			Functor /*std::function<L(size_t)>*/ f;
+			int n;
+			Functor /*std::function<L(int)>*/ f;
 
 			BuildT() : n{ 0 }
 			{
@@ -1069,7 +1073,7 @@ namespace ks
 			}
 
 			template <class Functor2>
-			BuildT(size_t n, Functor2 f) :
+			BuildT(int n, Functor2 f) :
 				n(n),
 				f(f)
 			{
@@ -1084,7 +1088,7 @@ namespace ks
 			}
 
 			template <class Functor2>
-			static BuildT mk(size_t n, Functor2 f) { return BuildT{ n, f }; }
+			static BuildT mk(int n, Functor2 f) { return BuildT{ n, f }; }
 
 			To Apply(From x) const
 			{
@@ -1093,8 +1097,8 @@ namespace ks
 				if (n != x.size())
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
 				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
-				std::function<L(size_t)> f_local = f;
-				return sum(build<LFrom>(n, [f_local,x](size_t i) { return lmApply(f_local(i), x[i]); }));
+				std::function<L(int)> f_local = f;
+				return sum(build<LFrom>(n, [f_local,x](int i) { return lmApply(f_local(i), x[i]); }));
 			}
 		};
 
@@ -1183,12 +1187,16 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
+	inline 
 	double sub(double t1, double t2) { return t1 - t2; }
+	inline 
 	auto D$sub(double, double) {
 		typedef LM::Scale M1;
 		typedef LM::Scale M2;
 		return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
 	}
+	inline 
+	int sub(int t1, int t2) { return t1 - t2; }
 
 	template <class T>
 	T mul(double s, T const& t)
@@ -1215,7 +1223,8 @@ namespace ks
 					   mul(s, tail(t)));
 	}
 
-	int mul(int const& t1, int const& t2) 
+	inline
+	int mul(int const& t1, int const& t2)
 	{
 		return t1 * t2;
 	}
@@ -1234,6 +1243,7 @@ namespace ks
 		return t1 / t2;
 	}
 
+	inline
 	auto D$div(double t1, double t2)
 	{
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(1.0 / t2), LM::Scale::mk(-1.0 / (t1*t1)));
@@ -1251,11 +1261,20 @@ namespace ks
 		return t1 < t2;
 	}
 
-	double neg(double d) { return -d; }
-	auto D$neg(double d) { return LM::Scale::mk(-1.0); }
+	inline double abs(double d) { return d > 0 ? d : -d; }
+	inline auto D$abs(double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
 
-	double to_float(int d) { return d; }
-	auto D$to_float(int d) { return LM::Zero<int, double>(); }
+	inline double max(double a, double b) { return a > b ? a : b; }
+	inline auto D$max(double a, double b) {
+		double s = a > b ? 1.0 : 0.0;
+		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(s), LM::Scale::mk(1.0 - s));
+	}
+
+	inline double neg(double d) { return -d; }
+	inline auto D$neg(double d) { return LM::Scale::mk(-1.0); }
+
+	inline double to_float(int d) { return d; }
+	inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
 /*
 	template <class I, class Vec>
@@ -1315,21 +1334,4 @@ namespace ks
 		return 1 + pr(t...);
 	}
 
-        float abs(float a)
-        {
-          if (a > 0) {
-            return a;
-          } else {
-            return -a;
-          }
-        }
-
-        float max(float a, float b)
-        {
-          if (a > b) {
-            return a;
-          } else {
-            return b;
-          }
-        }
 } // namespace ks

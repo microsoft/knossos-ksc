@@ -1,1 +1,1 @@
-:set -isrc/ksc
+:set -isrc/ksc -Wunused-imports -Wunused-top-binds -Wmissing-signatures 
