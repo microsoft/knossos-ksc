@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 module AD where
 
 import Lang
@@ -61,7 +60,7 @@ gradE s (Var tv)       = Var (gradTVar s tv)
 gradE s (Assert e1 e2) = Assert e1 (gradE s e2)
 gradE s (Tuple es)     = lmVCat (map (gradE s) es)
 gradE s (If b t e)     = If b (gradE s t) (gradE s e)
-gradE s e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
+gradE _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 gradE s (Let v e1 e2)  = mkLet v e1                       $
                          mkLet (gradTVar s v) (gradE s e1) $
                          gradE s e2
@@ -70,7 +69,7 @@ gradE s (Let v e1 e2)  = mkLet v e1                       $
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE s (Call f (Tuple [n, Lam ti@(TVar TypeInteger i) body]))
+gradE s (Call f (Tuple [n, Lam ti@(TVar TypeInteger _i) body]))
   | f `isThePrimFun` "build"
   = lmBuild n $ Lam ti $
     mkLet (gradTVar s ti) (lmZero s TypeInteger) $
@@ -99,7 +98,7 @@ applyD (DefX (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
   where
     dr = TVar s $ Delta "r"
 
-applyD (DefX (TFun (TypeLM s t) (GradFun f Fwd)) vars rhs)
+applyD (DefX (TFun (TypeLM _ t) (GradFun f Fwd)) vars rhs)
   = DefX (TFun t (DrvFun f Fwd)) (vars ++ dvars) $
     lmApply rhs (mkTuple $ map Var dvars)
   where
