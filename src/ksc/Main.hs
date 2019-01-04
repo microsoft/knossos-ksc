@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 module Main where
 
 import GHC.Stack
@@ -155,9 +154,9 @@ doallG compiler verbosity file =
   
   ; let alldefs = defs ++ optgrad ++ optfwd ++ main_tdef
   
-  -- ; (env5, cse) <- cseDefs rulebase env4 alldefs
+  -- ; (_env5, cse) <- cseDefs rulebase env4 alldefs
   -- ; displayPass verbosity "CSE" env3 cse
-  ; let (env5, cse) = (env4, alldefs)
+  ; let (_env5, cse) = (env4, alldefs)
 
   ; let ann2 =  cse
   ; liftIO (cppFG compiler ("obj/" ++ file) ann2)
