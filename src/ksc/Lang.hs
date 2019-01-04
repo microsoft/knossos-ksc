@@ -6,6 +6,7 @@ import Prelude hiding( (<>) )
 
 import qualified Text.PrettyPrint   as PP
 import Text.PrettyPrint (Doc)
+import Data.List ( intersperse )
 import KMonad
 
 import Data.Either( partitionEithers )
@@ -295,9 +296,7 @@ assertAllEqualThen msg es e =
     allEq [] = True
     allEq (a:as) = allEqa a as
 
-    allEqa a0 [] = True
-    allEqa a0 [a] = a0 == a
-    allEqa a0 (a:as) = a0 == a && allEqa a0 as
+    allEqa a0 = all (a0 ==)
 
 assertAllEqualRet :: (HasCallStack, Eq a, Show a) => String -> [a] -> a
 assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
@@ -595,11 +594,7 @@ display :: Pretty p => p -> KM ()
 display p = liftIO $ putStrLn (render (ppr p))
 
 displayN :: Pretty p => [p] -> KM ()
-displayN ps = liftIO $ putStrLn (render (go ps))
-  where
-    go []     = empty
-    go [p]    = ppr p
-    go (p:ps) = vcat [ ppr p, text "", go ps ]
+displayN = liftIO . putStrLn . render . vcat . intersperse (text "") . map ppr
 
 bracesSp :: SDoc -> SDoc
 bracesSp d = char '{' <+> d <+> char '}'
