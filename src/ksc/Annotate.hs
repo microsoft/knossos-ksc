@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Annotate (
@@ -104,7 +103,7 @@ tcExpr (Konst k)
   = return (typeofKonst k, Konst k)
 
 tcExpr (Call f es)
-  = do { (fun, mb_ty) <- getFunTc f
+  = do { (fun, _mb_ty) <- getFunTc f
        ; (tyes, aes) <- addCtxt (text "In the call of:" <+> ppr fun) $
                         tcExpr es
        ; ty <- lookupGblTc fun tyes
@@ -124,7 +123,7 @@ tcExpr (Tuple es)
        ; let (tys,aes) = unzip pairs
        ; return (TypeTuple tys, Tuple aes) }
 
-tcExpr (Lam tv@(TVar tyv v) body)
+tcExpr (Lam tv@(TVar tyv _v) body)
   = do { (tybody,abody) <- extendLclEnv [tv] (tcExpr body)
        ; return (TypeLambda tyv tybody, Lam tv abody) }
 
@@ -281,7 +280,7 @@ instance Applicative (TcM f b) where
   (<*>) = ap
 
 instance Monad (TcM f b) where
-  return v = TCM (\ctxt ds -> (v, ds))
+  return v = TCM (\_ ds -> (v, ds))
   TCM m >>= k = TCM $ \ctxt ds ->
                 case m ctxt ds of
                   (r1, ds') -> unTc (k r1) ctxt ds'
