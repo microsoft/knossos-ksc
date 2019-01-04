@@ -493,7 +493,7 @@ cppFG compiler outfile defs = do
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
-  let compcmd = (compiler, ["-fmax-errors=5", "-Wall", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
+  let compcmd = (compiler, ["-fmax-errors=5", "-Wall", "-Wno-unused", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
   putStrLn "Running"
