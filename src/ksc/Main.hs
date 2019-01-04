@@ -89,7 +89,7 @@ demoN decls
 displayPass :: Int -> String -> GblSymTab -> [TDef] -> KM ()
 displayPass verbosity what env decls
   = do { banner what
-       ; displayN (take verbosity $! decls)
+       ; displayN (take verbosity decls)
        ; lintDefs what env decls
     }
 
@@ -117,7 +117,7 @@ doall = doallC "g++-7"
 
 doallG :: HasCallStack => String -> Int -> String -> IO String
 doallG compiler verbosity file =
-  let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity $! defs))
+  let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity defs))
   in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))
