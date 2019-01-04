@@ -1,6 +1,6 @@
 module Main where
 
-import GHC.Stack;
+import GHC.Stack
 import qualified System.Exit
 
 import Lang
