@@ -174,7 +174,7 @@ cgenDefs defs =
   where
     go :: (CST, [String]) -> TDef -> (CST, [String])
     go (env, strs) def@(DefX (TFun _ f) _ _) =
-      let (CG cdecl cfun ctype) = cgenDefE env def
+      let (CG cdecl _cfun ctype) = cgenDefE env def
       in (cstInsertFun f ctype env, strs ++ [cdecl])
 
 cgenDef :: TDef -> String
