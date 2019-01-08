@@ -62,7 +62,7 @@ data ExprX f b
 type Expr  = ExprX Fun Var
 type TExpr = ExprX TFun TVar
 
-data Type = TypeZero Type  -- What is this and why do we need it?
+data Type = TypeZero Type          -- See Note [Zeros]
           | TypeBool
           | TypeInteger
           | TypeFloat
@@ -72,6 +72,20 @@ data Type = TypeZero Type  -- What is this and why do we need it?
           | TypeLM Type Type       -- Linear map  Src -o Target
           | TypeUnknown
           deriving (Show, Eq, Ord)
+
+{- Note [Zeros]
+~~~~~~~~~~~~~~~
+  Zeros occur frequently in AD, so we keep track of them using TypeZero, to make it easier 
+  for rules of the form (* v 0) -> 0 for non-scalar types v.  
+  Without, we would need to represent such rules something like this:
+    (* (build N (lam i 0)) x) -> (build N (lam i 0))
+
+  On the other hand, it is a slightly odd Type -- TypeZero@T is an element of T.
+  When we have decent benchmarks, we can try to delete it and see if it has a big effect 
+  on speed.  Today, numerous zero_t's appear in the generated C++, meaning they would incur 
+  cost if not handled.
+-}
+
 
 type PrimFun = String
 
@@ -148,6 +162,9 @@ partitionDecls decls
   = partitionEithers $
     map (\case { RuleDecl r -> Left r; DefDecl d -> Right d }) $
     decls
+
+tVarVar :: TVar -> Var
+tVarVar (TVar _ v) = v
 
 -----------------------------------------------
 --       Building values
@@ -311,7 +328,7 @@ assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
 instance Show Var where
   show v = case v of
     Dummy -> "/*dummy*/"
-    Simple s -> "s$" ++ s
+    Simple s -> s
     Delta  d -> "d$" ++ d
     Grad g m -> "g" ++ (case m of
                           Fwd -> "f"
@@ -577,12 +594,10 @@ instance (Show f, PrettyVar f, PrettyVar b, HasInfix f)
 
 instance (Show f, PrettyVar f, PrettyVar b, HasInfix f) => Pretty (DefX f b) where
   ppr (DefX f vs rhs) = mode
-      (parens $ sep [ text "def", bndr, parens (sep (map pprTVar vs)), ppr rhs])
-      (sep [ hang (text "def" <+> bndr)
+      (parens $ sep [ text "def", pprBndr f, parens (sep (map pprTVar vs)), ppr rhs])
+      (sep [ hang (text "def" <+> pprBndr f)
              2 (parens (pprList pprTVar vs))
            , nest 2 (text "=" <+> ppr rhs) ])
-        where
-          bndr = pprBndr f <+> (brackets (text (show f)))
 
 instance (PrettyVar f, PrettyVar b, HasInfix f) => Pretty (RuleX f b) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
@@ -630,8 +645,8 @@ hspec = do
     let e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
     describe "Pretty" $ do
-      test e "g( s$i )"
-      test e2 "f( g( s$i ), s$_t1, 5 )"
+      test e "g( i )"
+      test e2 "f( g( i ), _t1, 5 )"
 
 test_Pretty :: IO ()
 test_Pretty = Test.Hspec.hspec Lang.hspec

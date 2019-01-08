@@ -49,7 +49,7 @@ demoN decls
        ; disp "Typechecked declarations" env defs
 
        ; let (env1, opt_defs) = optDefs rulebase env defs
-       ; disp "Optimised original definition" env1 opt_defs
+       ; disp "Optimized original definition" env1 opt_defs
 
        ; anf_defs <- anfDefs opt_defs
        ; disp "Anf-ised original definition" env1 anf_defs
@@ -154,9 +154,8 @@ doallG compiler verbosity file =
   
   ; let alldefs = defs ++ optgrad ++ optfwd ++ main_tdef
   
-  -- ; (_env5, cse) <- cseDefs rulebase env4 alldefs
-  -- ; displayPass verbosity "CSE" env3 cse
-  ; let (_env5, cse) = (env4, alldefs)
+  ; (env5, cse) <- cseDefs rulebase env4 alldefs
+  ; displayPass verbosity "CSE" env5 cse
 
   ; let ann2 =  cse
   ; liftIO (cppFG compiler ("obj/" ++ file) ann2)

@@ -30,16 +30,17 @@ optDefs rb gst defs = mapAccumL (optDef rb) gst defs
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> (GblSymTab, TDef)
-optDef rb gst (DefX (TFun ty f) args r)
+optDef rb gst (DefX (TFun ty f) args rhs)
   = (extendGblST gst [def'], def')
   where
-    def' = DefX (TFun ty f) args (simplify env r)
+    def' = DefX (TFun ty f) args (simplify env args rhs)
     env = OptEnv { optRuleBase = rb, optGblST = gst }
 
-simplify :: OptEnv -> TExpr -> TExpr
-simplify env =  -- id
-                -- optE env . optLets . optE env
-                optE env . optLets
+simplify :: OptEnv -> [TVar] -> TExpr -> TExpr
+simplify env args rhs
+  =  -- id
+     -- optE env . optLets . optE env
+     optE env (optLets args rhs)
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
 
@@ -138,10 +139,11 @@ optFun _ (UserFun {}) _
 -----------------------
 optPrimFun :: PrimFun -> TExpr -> Maybe TExpr
 
--- RULE: index j Zero = 0
+
+-- RULE: index(j, Vec of Zero of T) = Zero of T
 optPrimFun "index" (Tuple [ ei, arr ])
-  | TypeVec (TypeZero t) <- typeof arr
-  = Just $ mkZero t
+ | TypeVec (TypeZero t) <- typeof arr
+ = Just $ mkZero t
 
 -- RULE: concat((as...), (bs...))
 optPrimFun "concat" (Tuple [Tuple es1, Tuple es2]) = Just (Tuple (es1 ++ es2))
@@ -280,6 +282,10 @@ optSum (Call diag (Tuple [sz, f]))
 optSum (Call deltaVec (Tuple [_, _, e]))
   | deltaVec `isThePrimFun` "deltaVec"
   = Just e
+
+optSum e 
+  | TypeZero (TypeVec t) <- typeof e 
+  = Just $ mkDummy (TypeZero t)
 
 optSum e = Nothing
 

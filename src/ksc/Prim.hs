@@ -292,11 +292,11 @@ lmHCatResultTy ty
   = Just (TypeLM (TypeTuple ss) t1)
   | otherwise = Nothing
 
-simplePrimResultTy :: String -> Type -> Maybe Type
+simplePrimResultTy :: HasCallStack => String -> Type -> Maybe Type
 -- Addition is special: it can add any two things of the same type
 simplePrimResultTy "+" (TypeTuple [t1, t2]) =
     Just $ add t1 t2
-  where 
+  where
     add t1 (TypeZero t2) = t1
     add (TypeZero t1) t2 = t2
     add (TypeTuple t1s) (TypeTuple t2s) = TypeTuple $ zipWith add t1s t2s

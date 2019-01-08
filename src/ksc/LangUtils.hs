@@ -3,7 +3,7 @@
 
 module LangUtils (
   -- Substitution 
-  substE,
+  substEMayCapture,
 
   -- Equality
   cmpExpr,
@@ -25,19 +25,23 @@ import Debug.Trace( trace )
 --     Substitution
 -----------------------------------------------
 
-substE :: M.Map TVar TExpr -> TExpr -> TExpr
-substE subst (Konst k)      = Konst k
-substE subst (Var v)        = case M.lookup v subst of
+substEMayCapture :: M.Map TVar TExpr -> TExpr -> TExpr
+-- NOT YET using capture-avoiding substitution
+-- But substEMayCapture is not really used
+-- The heavy lifting is done by OptLets.optLetsE, which /does/
+-- do capture-avoiding substitution.
+substEMayCapture subst (Konst k)      = Konst k
+substEMayCapture subst (Var v)        = case M.lookup v subst of
                                Just e  -> e
                                Nothing -> Var v
-substE subst (Call f e)     = Call f (substE subst e)
-substE subst (If b t e)     = If (substE subst b) (substE subst t) (substE subst e)
-substE subst (Tuple es)     = Tuple (map (substE subst) es)
-substE subst (App e1 e2)    = App (substE subst e1) (substE subst e2)
-substE subst (Assert e1 e2) = Assert (substE subst e1) (substE subst e2)
-substE subst (Lam v e)      = Lam v (substE (v `M.delete` subst) e)
-substE subst (Let v r b)    = Let v (substE subst r) $
-                              substE (v `M.delete` subst) b
+substEMayCapture subst (Call f e)     = Call f (substEMayCapture subst e)
+substEMayCapture subst (If b t e)     = If (substEMayCapture subst b) (substEMayCapture subst t) (substEMayCapture subst e)
+substEMayCapture subst (Tuple es)     = Tuple (map (substEMayCapture subst) es)
+substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEMayCapture subst e2)
+substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (substEMayCapture subst e2)
+substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
+substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
+                                          substEMayCapture (v `M.delete` subst) b
 
 -----------------------------------------------
 --     Equality modulo alpha

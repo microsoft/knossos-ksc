@@ -2,7 +2,7 @@
 module Rules( RuleBase, tryRules, mkRuleBase ) where
 
 import Lang
-import LangUtils
+import LangUtils ()
 import Control.Monad( guard )
 import Data.Map as M
 
@@ -24,9 +24,12 @@ tryRules rules e
                           --         , text "After: " <+> ppr e' ]) $
                           Just e'
         where
-         e' = substE subst (ru_rhs rule)
+         e' = mkLets (M.toList subst) (ru_rhs rule)
          -- For now, arbitrarily pick the first rule that matches
          -- One could imagine priority schemes (e.g. best-match)
+         --
+         -- Use lets, not substE, so that optLetsE will guarantee
+         -- capture-avoiding substitution
 
 matchRules :: RuleBase -> TExpr -> [(TRule, TSubst)]
 matchRules (Rules rules) e
