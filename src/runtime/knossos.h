@@ -465,7 +465,6 @@ namespace ks
 	template <class T>
 	vec<T> vec<T>::create(size_t size)
 	{
-		ASSERT(size < 1000); // Quick sanity check -- later we may well have larger vecs
 #ifdef BUMPY
 		vec<T> ret;
 		void *storage = g_alloc.alloc(sizeof(T) * size);
