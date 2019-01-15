@@ -3,6 +3,7 @@
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \usepackage{color}
+\usepackage{url}
 \usepackage{stmaryrd}  % double brackets
 \usepackage{listings}
 \lstset{
@@ -29,13 +30,15 @@
 \newcommand{\sumfunname}{\mathit{sum}}   % Wanted to allow either \Sigma e or sum(e)
 \newcommand{\sumfun}[1]{\sumfunname(#1)}   % Wanted to allow either \Sigma e or sum(e)
 \newcommand{\sizefun}{size}
-\newcommand{\deltafun}{\delta}
-\newcommand{\indexfunname}{\mathit{indexREVERSED}} %% Reversed from current code  
+\newcommand{\deltafun}[2]{\delta(#1,#2)}
+\newcommand{\indexfunname}{\mathit{ixR}} %% Reversed from current code  
 \newcommand{\indexfun}[2]{\indexfunname(#2,#1)} % Vector indexing  \indexfun{v}{i}
+\renewcommand{\d}[1]{\delta_{\mathit{#1}}}   % delta_x etc
 \renewcommand{\vector}[1]{\mathit{Vec}\;#1}
 \def\RR{\mathbb R}
 
-\newcommand{\typ}[2]{#1 \! : \! #2}  % x:S, with less horizontal whitespace
+\newcommand{\tcolon}{\!:\!}
+\newcommand{\typ}[2]{#1 \tcolon #2}  % x:S, with less horizontal whitespace
 
 \renewcommand{\dot}{.\,}               % dot with some space after
 \newcommand{\real}{\mathbb{R}}       % R, the reals11
@@ -43,9 +46,10 @@
 \newcommand{\darrow}{\Rightarrow}    % =>
 
 % Linear maps
-\newcommand{\lmapply}{\odot}   % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
+\newcommand{\dotprod}{\bullet}    % Dot-product of vectors
+\newcommand{\lmapply}{\odot}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
 \newcommand{\lmcomp}{\,\circ\,}   % Infix composition
-\newcommand{\lmtrans}[1]{#1^{\top}}   % Trnaspose (takes an argument)
+\newcommand{\lmtrans}[1]{#1^{\top}}   % Transpose (takes an argument)
 \newcommand{\lmpair}{\times}         % Infix pairing
 \newcommand{\lmjoin}{\bowtie}        % Infix join
 \newcommand{\lmadd}{\oplus}        % Infix join
@@ -105,7 +109,10 @@ $$
 \end{minipage}}
 \caption{Syntax of the language} \label{fig:syntax}
 \end{figure}
-The syntax of our intermediate language is given in Figure~\ref{fig:syntax}.
+This paper is about automatic differentiation of functions, so we must be precise about
+the language in which those functions are written.
+
+The syntax of our language is given in Figure~\ref{fig:syntax}.
 Note that
 \begin{itemize}
 \item  Variables are divided into \emph{functions}, $f,g,h$; and \emph{local variables}, $x,y,z$,
@@ -119,7 +126,7 @@ Note that
 \item Functions have exactly one argument. If you want more than one, pass a pair.
 
 \item Pairs are built-in, with selectors $\sel{1}{2}, \sel{2}{2}$.
-  (In the real implementation, pairs are generalised to $n$-tuples.)
+  In the real implementation, pairs are generalised to $n$-tuples, and we often do so informally here.
 
 \item Conditionals are are a language construct. \simon{Treating ``if'' as a function
   just didn't work; in particular $\gradf{if}$ needed a linear-map version of
@@ -150,7 +157,7 @@ $$
   \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
 %  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
   \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
-  \indexfunname & :: & (\nat, \; \vector{t}) \to t & \mbox {Indexing} \\
+  \indexfunname & :: & (\nat, \; \vector{t}) \to t & \mbox {Indexing (NB arg order)} \\
   \sumfunname & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
   \sizefun & :: & \vector{t} \to \nat & \mbox{Size of a vector} \\
 \end{array}
@@ -184,10 +191,11 @@ Thus $e_1 + e_2$ means the call $+(e1,e2)$, which applies the function $+$ to
 the pair $(e_1,e_2)$.  (So, like all other functions, $(+)$ has one argument.)
 Similarly the linear map $m_1 \lmpair m_2$ is short for $\lmpair(e_1,e_2)$.
 
-We allow ourselves to write vector indexing using square brackets, thus $a[i]$.
+We allow ourselves to write vector indexing $\indexfun{a}{i}$ using square brackets, thus $a[i]$.
 
 Multiplication and addition are overloaded to work on any suitable type.
 On vectors they work element-wise; if you want dot-product you have to program it.
+
 
 % The Kronecker delta $\deltafun$ is defined thus:
 % $$
@@ -225,7 +233,32 @@ we say why in Section~\ref{sec:gen-fold}.
 \simon{Do we need scan?  Or (specialising to $(+)$) cumulative sum?}
 
 % ------------------------------------
-\section{Linear maps}
+\section{Linear maps and differentiation}
+
+If $f : S \to T$, then its derivative $\gradf{f}$ has type
+$$\gradf{f} : S \to (S \linto T)$$
+where $S \linto T$ is the type of \emph{linear maps} from $S$ to $T$.
+That is, at some point $p:S$, $\gradf{f}(p)$ is a linear map
+that is a good approximation of $f$ at $p$.
+
+By ``a good approximation of $f$ at $p$'' we mean this:
+$$
+\forall p:S.\; f( p + \d{p} ) \approx f(p) + \gradf{f}(p) \lmapply \d{p}
+$$
+Here the operation $(\lmapply)$ is linear-map application: it takes a
+linear map $S \linto T$ and applies it to an argument of type $S$,
+giving a result of type $T$ (Figure~\ref{fig:linear-maps}).
+
+The linear maps from $S$ to $T$ are a subset of the
+functions from $S$ to $T$.  We characterise linear maps more precisely
+in Section~\ref{sec:lin-maps}, but
+a good intuition can be had for functions $g : \real^2 \to \real$.
+This function defines a curvy surface $z = g(x,y)$.  Then a linear map
+of type $\real^s \linto \real$ is a plane, and $\gradf{g}(p_x,p_y)$ is
+the plane that best approximates $g$ near $(p_x,p_y)$, that is a tangent plane
+passing through $z = g(p_x, p_y)$
+
+\subsection{Linear maps} \label{sec:lin-maps}
 
 \begin{figure*}
 \fbox{\begin{minipage}{\textwidth}
@@ -279,24 +312,6 @@ we say why in Section~\ref{sec:gen-fold}.
    \end{array}
   $$
 \\[3mm]
-  {\bf Rules for transposition of linear maps}
-  $$
-  \begin{array}{rcll}
-    \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
-    \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
-    \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
-    \lmtrans{(m_1 \lmadd m_2)} & = & \lmtrans{m_1} \lmadd \lmtrans{m_2} \\
-    \lmtrans{\lmzero} & = & \lmzero \\
-    \lmtrans{\lmone} & = & \lmone \\
-    \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
-    \lmtrans{(\lmtrans{m})} & = & m \\
-    \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
-    \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
-   \lmtrans{\lmlam(\lambda i. m)} & = & \lmlamt(\lambda i. \lmtrans{m}) \\
-   \lmtrans{\lmlamt(\lambda i. m)} & = & \lmlam(\lambda i. \lmtrans{m}) \\
-  \end{array}
-  $$
-\\[3mm]
   {\bf Laws for linear maps}
   $$
   \begin{array}{rcl}
@@ -317,7 +332,7 @@ we say why in Section~\ref{sec:gen-fold}.
     \caption{Laws for linear maps} \label{fig:lm-laws}
 \end{figure}
 
-A \emph{linear map}, $m : S \linto T$, is a function from $S$ to $T$,
+A \emph{linear map}, $m \tcolon S \linto T$, is a function from $S$ to $T$,
 satisfying these two properties:
 $$
 \begin{array}{lrrcl}
@@ -325,41 +340,199 @@ $$
 (LM2) & \forall \typ{k}{\real}, \typ{x}{S} & k * (m \lmapply x) & = & m \lmapply (k * x)
 \end{array}
 $$
-Here $(\lmapply) :: (s \linto t) \to (s \to t)$ is an operator that applies a linear map $(s \linto t)$
+Here $(\lmapply) : (s \linto t) \to (s \to t)$ is an operator that applies a linear map $(s \linto t)$
 to an argument of type $s$.
 
-\begin{itemize}
-\item The type $s \linto t$ is a type in the language (Figure~\ref{fig:syntax}).
-\item Linear maps can be \emph{built and consumed} using the
-  operators in (see Figure~\ref{fig:linear-maps}).
-\item 
-  You should think of linear maps as an \emph{abstract type}; that is,
-  you can \emph{only} build or consume linear maps with
-  the operators in Figure~\ref{fig:linear-maps}.  We might \emph{represent} a linear map in a variety
-  of ways, one of which is as a matrix (Section~\ref{sec:matrix-rep}).
-  \item The \emph{semantics} of a linear map is completely specified by saying
-    what ordinary function it corresponds to; or, equivalently, by how it behaves when applied
-    to an argument by $(\lmapply)$.  The semantics of each form of linear map are given in Figure~\ref{fig:lm-laws}
-  \item Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.  Note that $(\lmcomp)$ and $\lmadd$ behave
-    like multiplication and addition respectively.
+The type $s \linto t$ is a type in the language (Figure~\ref{fig:syntax}).
 
-\item {\bf Theorem}: $\forall (m :: S \linto T).\, m \lmapply 0 = 0$.  That is, all linear maps
+Linear maps can be \emph{built and consumed} using the
+operators in (see Figure~\ref{fig:linear-maps}).
+Indeed, you should think of linear maps as an \emph{abstract type}; that is,
+you can \emph{only} build or consume linear maps with
+the operators in Figure~\ref{fig:linear-maps}.  We might \emph{represent} a linear map in a variety
+of ways, one of which is as a matrix (Section~\ref{sec:matrix-rep}).
+
+\subsubsection{Semantics}
+
+The \emph{semantics} of a linear map is completely specified by saying
+what ordinary function it corresponds to; or, equivalently, by how it
+behaves when applied to an argument by $(\lmapply)$.  The semantics of
+each form of linear map are given in Figure~\ref{fig:lm-laws}
+
+\subsubsection{Laws}
+
+Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.
+Note that $(\lmcomp)$ and $\lmadd$ behave like multiplication and
+addition respectively.
+
+These laws can readily be proved from the semantics.  To prove two linear maps are equal,
+we must simply prove that they give the same result when applied to any argument.
+So, to prove that $\lmzero \lmcomp m = m$, we choose an arbitrary $x$ and reason thus:
+$$\begin{array}{cll}
+  \multicolumn{3}{l}{(\lmzero \lmcomp m) \lmapply x} \\
+  = & \lmzero \lmapply (m \lmapply x) &  \mbox{\{semantics of $(\lmcomp$)\}} \\
+  = & 0                  & \mbox{\{semantics of $\lmzero$\}} \\
+  = & \lmzero \lmapply x & \mbox{\{semantics of $\lmzero$ backwards\}}
+\end{array}
+$$
+
+{\bf Theorem}: $\forall (m \tcolon S \linto T).\, m \lmapply 0 = 0$.  That is, all linear maps
 pass through the origin.  {\bf Proof}: property (LM2) with $k=0$.  Note that the function
 $\lambda x. x+4$ is not a linear map; its graph is a staight line, but it does not
 go through the origin.
 
-\end{itemize}
+\subsection{Vector spaces}
 
+Given a linear map $m \tcolon S \linto T$, we expect both $S$ and $T$ to be
+a \emph{vector space with dot product} (aka inner product space\footnote{\url{https://en.wikipedia.org/wiki/Vector_space}}).
+A vector space with dot product $V$ has:
+\begin{itemize}
+\item \emph{Vector addition} $(+_V) : V \to V \to V$.
+\item \emph{Zero vector} $0_V : V$.
+\item \emph{Scalar multiplication} $(*_V) : \real \to V \to V$
+\item \emph{Dot-product} $(\dotprod_V) : V \to V \to \real$.
+\end{itemize}
+We omit the $V$ subscripts when it is clear which $(*)$, $(+)$, $(\dotprod)$ or $0$ is intended.
+
+These operations must obey the laws of vector spaces
+$$
+\begin{array}{rcl}
+v_1 + (v_2 + v_3) & = & (v_1 + v_2) + v_3 \\
+v_1 + v_2 & = & v_2 + v_1 \\
+v + 0 & = & 0 \\
+0 * v & = & 0 \\
+1 * v & = & v \\
+r_1 * ( r_2 * v) & = & (r_1 * r_2) * v \\
+r * (v_1 + v_2) & = & (r * v_1) + (r * v_2) \\
+(r_1 + r_2) * v & = & (r_1 * v) + (r_2 * v) \\
+\end{array}
+$$
+
+\subsection{Transposition}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+  {\bf Laws for transposition of linear maps}
+  $$
+  \begin{array}{rcll}
+    \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
+    \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmadd m_2)} & = & \lmtrans{m_1} \lmadd \lmtrans{m_2} \\
+    \lmtrans{\lmzero} & = & \lmzero \\
+    \lmtrans{\lmone} & = & \lmone \\
+    \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
+    \lmtrans{(\lmtrans{m})} & = & m \\
+    \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
+    \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
+   \lmtrans{\lmlam(\lambda i. m)} & = & \lmlamt(\lambda i. \lmtrans{m}) \\
+   \lmtrans{\lmlamt(\lambda i. m)} & = & \lmlam(\lambda i. \lmtrans{m}) \\
+  \end{array}
+  $$
+    \end{minipage}
+    }
+    \caption{Laws for transposition} \label{fig:lm-trans}
+\end{figure}
+
+For any linear map $m \tcolon S \linto T$ we can produce its transpose $\lmtrans{m} : T \linto S$.
+Despite its suggestive type, the transpose is \emph{not} the inverse of $m$!  (In the world of matrices,
+the transpose of a matrix is not the same as its inverse.)
+
+\begin{definition}
+Given a linear map $m : S \linto T$, its \emph{transpose} $\lmtrans{m} : T \linto S$
+is defined by the following property:
+$$
+(TP)\quad \forall s\tcolon S,\, t \tcolon T.\;\;  (\lmtrans{m} \lmapply t) \dotprod s =  t \dotprod (m \lmapply s)
+$$
+\end{definition}
+\noindent
+This property \emph{uniquely} defines the transpose, as the following theorem shows:
+\begin{theorem} \label{thm:trans-eq}
+  If $m_1$ and $m_2$ are linear maps satisfying
+  $$\forall s\, t.\; (m_1 \lmapply s) \dotprod t
+                              = (m_2 \lmapply s) \dotprod t$$
+  then $m_1$ = $m_2$
+\end{theorem}
+\begin{proof}
+  It is a property of dot-product that if $v_1 \dotprod x = v_2 \dotprod x$ for every
+  $x$, then $v_1 = v_2$.  (Just use a succession of one-hot vectors for $x$,
+  to pick out successive components of $v_1$ and $v_2$.) So
+  (for every $t$):
+$$
+\begin{array}{ll}
+\forall s\, t.\; (m_1 \lmapply s) \dotprod t
+                              = (m_2 \lmapply s) \dotprod t \\
+\Rightarrow \;\; \forall s. \; m_1 \lmapply s = m_2 \lmapply s
+\end{array}
+$$
+and that is the definition of extensional equality. So $m_1$ and $m_2$ are the same linear maps.
+\end{proof}
+Figure~\ref{fig:lm-trans} has a collection of laws about transposition.
+These identies are readily proved using the above definition. For example, to prove that
+$\lmtrans{(m_1 \lmcomp m_2)}  =  \lmtrans{m_2} \lmcomp \lmtrans{m_1}$ we may reason as follows:
+$$
+\begin{array}{ll}
+  ((\lmtrans{m_2} \lmcomp \lmtrans{m_1}) \lmapply t) \dotprod s \\
+  = (\lmtrans{m_2} \lmapply (\lmtrans{m_1} \lmapply t)) \dotprod s  & \mbox{Semantics of $(\lmcomp)$} \\
+  = (\lmtrans{m_1} \lmapply t) \dotprod (m_2 \lmapply s)  & \mbox{Use (TP)} \\
+  = t \dotprod (m_1 \lmapply (m_2 \lmapply s))  & \mbox{Use (TP) again} \\
+  = t \dotprod ((m_1 \lmcomp m_1) \lmapply s)  & \mbox{Semantics of $(\lmcomp)$} \\
+\end{array}
+$$
+And now the property follows by Theorem~\ref{thm:trans-eq}.
 
 \subsection{Matrix interpretation of linear maps} \label{sec:matrix-rep}
 
-\def\lmtomat{\mathcal M}% awf: define macros when first introduced in text, not at top of file
-
-A linear map $m :: \real^m \linto \real^n$ is isomorphic to an matrix $\real^{n \times m}$ with $n$ rows and $m$ columns.
+A linear map $m \tcolon \real^M \linto \real^N$ is isomorphic to a matrix $\real^{N \times M}$ with $N$ rows and $M$ columns.
 
 Many of the operators over linear maps then have simple matrix interpetations; for example, composition of
 linear maps $(\lmcomp)$ is matrix multiplication, pairing $(\lmpair)$ is vetical juxtaposition, and so on.
-These matrix interpretations are all tiven in the final column of Figure~\ref{fig:linear-maps}.
+These matrix interpretations are all given in the final column of Figure~\ref{fig:linear-maps}.
+
+You might like to check that matrix transposition satisfies property (TP).
+
+When it comes to implementation, we do not want to \emph{represent} a linear map by a matrix,
+becuase a linear map $\real^M \linto \real^N$ is an $N \times M$ matrix, which is
+enormous if $N = M = 10^6$, say.  The function might be very simple (perhaps even the identity
+function) and taking $10^{12}$ numbers to represent it is plain silly.  So our goal will be
+to \emph{avoid realising linear maps as matrices}.
+
+\subsection{Optimisation}
+
+In optimisation we are usually given a function $f : \real^N \to \real$, where $N$ can be large,
+and asked to
+find values of the input that maximises the output.  One way to do this is by \emph{gradient descent}:
+start with a point $p$, make a small change to $p+\d{p}$, and so on.  From $p$ we want
+to move in the direction of maximum slope.  (How \emph{far} to move in that
+direction is another matter --- indeed no one knows ---
+but we will concentrate on the \emph{direction} in which to move.)
+
+Suppose $\deltafun i N$ is the one-hot N-vector with 1 in the $i$'th position and zeros elsewhere.
+Then $\d{p}[i] = \gradf{f}(p) \lmapply \deltafun i N$ describes how fast the output of $f$ changes
+for a change in the $i$'th input.  The direction of maximum slope is just the vector
+$$\d{p} = (\d{p}[1]\; \d{p}[2] \; \ldots \; \d{p}[N])$$
+How can we compute this vector?  We can simply evaluate $\gradf{f}(p) \lmapply \deltafun i N$ for each $i$.
+But that amounts to running $f$ $N$ times, which is bad if N is large (say $10^6$).
+
+Suppose that we somehow had access to $\gradft{f}$.  Then we can use property $(TP)$, setting $\d{f} = 1$
+to get
+$$
+\forall \d{p}.\; \gradf{f}(p) \lmapply \d{p} = (\gradft{f}(p) \lmapply 1) \dotprod \d{p}
+$$
+Then
+$$
+\begin{array}{rcl}
+  \d{p}[i] & = & \gradf{f}(p) \lmapply \deltafun i N \\
+  & = & (\gradft{f}(p) \lmapply 1) \dotprod \deltafun i N \\
+  & = & (\gradft{f}(p) \lmapply 1)[i]
+\end{array}
+$$
+That is $\d{p}[i]$ is the $i$'th component of $\gradft{f}(p) \lmapply 1$,
+so $\d{p} = \gradft{f}(p) \lmapply 1$.
+
+That is, $\gradft{f}(p) \lmapply 1$ is the N-vector of maximum slope, the direction in which to
+move if we want to do gradient descent starting at $p$.  And \emph{that} is why the transpose
+is important.
 
 \subsection{Lambdas and linear maps}
 
@@ -375,7 +548,6 @@ $$
 $$
 This is an \emph{infinite sum}, so there is something fishy about this as a semantics.
 
-For this reason
 
 \subsection{Questions about linear maps}
 
@@ -392,7 +564,8 @@ Notes
 \end{itemize}
 
 % --------------------------------------
-\section{Automatic differentiation}
+\section{AD as a source-to-source transformation}
+
 
 \begin{figure}
   \fbox{\begin{minipage}{\columnwidth}
@@ -412,7 +585,7 @@ $$
 $$
       {\bf Differentiation of an expression} \\
       \begin{center}
-        If $e :: T$ then $\grad{e} :: S \linto T$
+        If $e : T$ then $\grad{e} : S \linto T$
       \end{center}
 $$
       \begin{array}{rcll}
