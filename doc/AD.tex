@@ -18,13 +18,26 @@
 \renewcommand{\to}{\rightarrow}    % ->
 \newcommand{\linto}{\multimap}     % -o
 \newcommand{\grad}[1]{\nabla_S\lb #1 \rb}  % grad[#1]
-\newcommand{\gradf}[1]{\nabla\! \mathit{#1}}  % Full Jacobian
-\newcommand{\gradft}[1]{\nabla^{\top}\!\mathit{#1}}  % Full Jacobian
+\newcommand{\gradf}[1]{\nabla\! #1}  % Full Jacobian
+\newcommand{\gradft}[1]{\nabla^{\top}\!#1}  % Full Jacobian
+
+% Overline versions
+\newcommand{\oarg}[1]{\overline{#1}}
+\newcommand{\ograd}[1]{\overline{\nabla}_a\lb #1 \rb}  % grad[#1]
+\newcommand{\ogradf}[1]{\overline{\gradf{#1}}}  % Full Jacobian
+\newcommand{\ogradft}[1]{\overline{\gradft{#1}}}  % Full Jacobian
+\newcommand{\olmtrans}[1]{#1^{\overline{\top}}}   % Transpose (takes an argument)
+\newcommand{\olmapply}{\;\overline{\odot}\;}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
+\newcommand{\olmpair}{\;\overline{\lmpair}\;}         % Infix pairing
+\newcommand{\olmjoin}{\;\overline{\lmjoin}\;}         % Infix pairing
+
 \newcommand{\fwdDf}[1]{f'}  % Forward derivative, f'
-\newcommand{\revDf}[1]{f`}  % Reverse derivative, f`
+\newcommand{\revDf}[1]{f'_R}  % Reverse derivative, f`
 \newcommand{\lb}{\llbracket}
 \newcommand{\rb}{\rrbracket}
 \newcommand{\sel}[2]{\pi_{#1,#2}}
+\newcommand{\fst}{\pi_{1,2}}
+\newcommand{\snd}{\pi_{2,2}}
 \newcommand{\iffun}{\mathit{if}}
 \newcommand{\buildfun}{\mathit{build}}
 \newcommand{\sumfunname}{\mathit{sum}}   % Wanted to allow either \Sigma e or sum(e)
@@ -35,7 +48,6 @@
 \newcommand{\indexfun}[2]{\indexfunname(#2,#1)} % Vector indexing  \indexfun{v}{i}
 \renewcommand{\d}[1]{\delta_{\mathit{#1}}}   % delta_x etc
 \renewcommand{\vector}[1]{\mathit{Vec}\;#1}
-\def\RR{\mathbb R}
 
 \newcommand{\tcolon}{\!:\!}
 \newcommand{\typ}[2]{#1 \tcolon #2}  % x:S, with less horizontal whitespace
@@ -47,12 +59,12 @@
 
 % Linear maps
 \newcommand{\dotprod}{\bullet}    % Dot-product of vectors
-\newcommand{\lmapply}{\odot}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
 \newcommand{\lmcomp}{\,\circ\,}   % Infix composition
-\newcommand{\lmtrans}[1]{#1^{\top}}   % Transpose (takes an argument)
 \newcommand{\lmpair}{\times}         % Infix pairing
 \newcommand{\lmjoin}{\bowtie}        % Infix join
+\newcommand{\lmapply}{\,\odot\,}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
 \newcommand{\lmadd}{\oplus}        % Infix join
+\newcommand{\lmtrans}[1]{#1^{\top}}   % Transpose (takes an argument)
 \newcommand{\lmzero}{\mathbf{0}}     % 0
 \newcommand{\lmone}{\mathbf{1}}      % 1
 \newcommand{\lmscalar}[1]{{\mathcal S}(#1)}      % S(k)
@@ -61,12 +73,16 @@
 \newcommand{\lmbuild}{\mathcal B}             % Build linear map
 \newcommand{\lmbuildt}{\mathcal B'}             % Transposed Build linear map
 
-\newcommand{\simon}[1]{{\color{red}SPJ: #1}}
-\newcommand{\tom}[1]{{\color{red}TE: #1}}
-\newcommand{\awf}[1]{{\color{teal}AWF: #1}}
-\begin{document}
+% \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
+% \newcommand{\tom}[1]{{\color{red}TE: #1}}
+% \newcommand{\awf}[1]{{\color{teal}AWF: #1}}
+\newcommand{\simon}[1]{}
+\newcommand{\tom}[1]{}
+\newcommand{\awf}[1]{}
 
-\title{Automatic differentation in Coconut}
+\begin{document}
+\title{Working notes on Automatic differentation}
+\subtitle{\today{} --- not for circulation}
 \author{Tom Ellis}
 \author{Simon Peyton Jones}
 \author{Andrew Fitzgibbon}
@@ -94,7 +110,7 @@ $$
           & |   & (e_1,e_2) & \mbox{Pair} \\
           & |   & \lambda x \dot e & \mbox{Lambda} \\
           & |   & e_1 \; e_2 & \mbox{Application} \\
-          & |   & \mbox{\lstinline|let $x$ = $e_1$ in $\;e_2$|} \\
+          & |   & \mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|} \\
           & |   & \mbox{\lstinline|if $\;b\;$ then $\;e_1\;$ else $\;e_2$|} \\
         \\
         \multicolumn{4}{l}{\mbox{\bf Types}} \\
@@ -151,14 +167,14 @@ Note that
 {\bf Built-in functions}
 $$
 \begin{array}{rcll}
-  (+) & :: & Field \; t \darrow (t,t) \to t \\
-  (*) & :: & Field \; t \darrow (t,t) \to t \\
+  (+) & :: & (\real,\real) \to \real \\
+  (*) & :: & (\real,\real) \to \real \\
   \sel{1}{2} & :: & (t_1,t_2) \to t_1 & \mbox{Selection} \\
   \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
 %  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
   \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
   \indexfunname & :: & (\nat, \; \vector{t}) \to t & \mbox {Indexing (NB arg order)} \\
-  \sumfunname & :: & Field \; t \darrow \vector{t} \to t & \mbox{Sum a vector} \\
+  \sumfunname & :: & \vector{t} \to t & \mbox{Sum a vector} \\
   \sizefun & :: & \vector{t} \to \nat & \mbox{Size of a vector} \\
 \end{array}
 $$
@@ -166,16 +182,16 @@ $$
 {\bf Derivatives of built-in functions}
       $$
       \begin{array}{rcl}
-        \gradf{+}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
+        \gradf{+}      & :: & (\real,\real) \to ((\real,\real) \linto \real) \\
         \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\[2mm]
-        \gradf{*}      & :: & Field\; t \darrow (t,t) \to ((t,t) \linto t) \\
+        \gradf{*}      & :: & (\real,\real) \to ((\real,\real) \linto \real) \\
         \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\[2mm]
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
         \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
         \gradf{\indexfunname}(i,v) & = & \lmzero \lmjoin \lmbuildt( \sizefun(v),
                \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
-         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
+         \gradf{\sumfunname} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
          \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
         \ldots
         \end{array}
@@ -216,7 +232,7 @@ Vectors are supported by the following built-in functions (Figure~\ref{fig:built
 \item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
 \item $\indexfunname :: (\nat,\; \vector{t}) \to t$ for indexing.  Informally we allow ourselves to write
   $v[i]$ instead of $\indexfun{v}{i}$.
-\item $\sumfunname :: Field \; t \darrow \vector{t} \to t$ to add up the elements of a vector.
+\item $\sumfunname :: \vector{\real} \to \real$ to add up the elements of a vector.
 We specifically do not have a general, higher order, fold operator;
 we say why in Section~\ref{sec:gen-fold}.
   \tom{I believe that for a vector $v$ of size $n$, $\sumfun{v}$ is the
@@ -271,14 +287,14 @@ passing through $z = g(p_x, p_y)$
            & \mbox{Matrix/vector multiplication} \\
     \mbox{Compose} & (\lmcomp) & : & (s \linto t,\; r \linto s) \to (r \linto t)
            & \mbox{Matrix/matrix multiplication} \\
-    \mbox{Sum}   & (\lmadd) & : & Field\; t \darrow (s \linto t,\; s \linto t) \to (s \linto t)
+    \mbox{Sum}   & (\lmadd) & : & (s \linto t,\; s \linto t) \to (s \linto t)
            & \mbox{Matrix addition } \\
-    \mbox{Zero}  & \lmzero & : & Field\; t \darrow s \linto t & \mbox{Zero matrix}\\
+    \mbox{Zero}  & \lmzero & : & s \linto t & \mbox{Zero matrix}\\
     \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix (square)}\\
-    \mbox{Scale} & \lmscalar{\cdot} & : & Field\; s \darrow s \to (s \linto s) \\
-    \mbox{Pair}      & (\lmpair) & : & Field\; s \darrow (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
+    \mbox{Scale} & \lmscalar{\cdot} & : & \real \to (s \linto s) \\
+    \mbox{Pair}      & (\lmpair) & : & (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
-    \mbox{Join}  & (\lmjoin) & : & Field\; s \darrow (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
+    \mbox{Join}  & (\lmjoin) & : & (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
            & \mbox{Horizontal juxtaposition} \\
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\[2mm]
 %    \\
@@ -312,7 +328,7 @@ passing through $z = g(p_x, p_y)$
    \end{array}
   $$
 \\[3mm]
-  {\bf Laws for linear maps}
+  {\bf Properties of linear maps}
   $$
   \begin{array}{rcl}
     \lmzero \lmcomp m & = & \lmzero \\
@@ -329,7 +345,7 @@ passing through $z = g(p_x, p_y)$
   $$
     \end{minipage}
     }
-    \caption{Laws for linear maps} \label{fig:lm-laws}
+    \caption{Linear maps: semantics and properties} \label{fig:lm-laws}
 \end{figure}
 
 A \emph{linear map}, $m \tcolon S \linto T$, is a function from $S$ to $T$,
@@ -342,7 +358,6 @@ $$
 $$
 Here $(\lmapply) : (s \linto t) \to (s \to t)$ is an operator that applies a linear map $(s \linto t)$
 to an argument of type $s$.
-
 The type $s \linto t$ is a type in the language (Figure~\ref{fig:syntax}).
 
 Linear maps can be \emph{built and consumed} using the
@@ -352,20 +367,20 @@ you can \emph{only} build or consume linear maps with
 the operators in Figure~\ref{fig:linear-maps}.  We might \emph{represent} a linear map in a variety
 of ways, one of which is as a matrix (Section~\ref{sec:matrix-rep}).
 
-\subsubsection{Semantics}
+\subsubsection{Semantics of linear maps}
 
 The \emph{semantics} of a linear map is completely specified by saying
 what ordinary function it corresponds to; or, equivalently, by how it
 behaves when applied to an argument by $(\lmapply)$.  The semantics of
 each form of linear map are given in Figure~\ref{fig:lm-laws}
 
-\subsubsection{Laws}
+\subsubsection{Properties of linear maps}
 
-Linear maps satisfy \emph{laws} given in Figure~\ref{fig:lm-laws}.
+Linear maps satisfy \emph{properties} given in Figure~\ref{fig:lm-laws}.
 Note that $(\lmcomp)$ and $\lmadd$ behave like multiplication and
 addition respectively.
 
-These laws can readily be proved from the semantics.  To prove two linear maps are equal,
+These properties can readily be proved from the semantics.  To prove two linear maps are equal,
 we must simply prove that they give the same result when applied to any argument.
 So, to prove that $\lmzero \lmcomp m = m$, we choose an arbitrary $x$ and reason thus:
 $$\begin{array}{cll}
@@ -375,6 +390,12 @@ $$\begin{array}{cll}
   = & \lmzero \lmapply x & \mbox{\{semantics of $\lmzero$ backwards\}}
 \end{array}
 $$
+
+Note that the property
+$$
+(m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) \; = \;  (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
+$$
+is the only reason we need the linear map $(\lmadd)$.
 
 {\bf Theorem}: $\forall (m \tcolon S \linto T).\, m \lmapply 0 = 0$.  That is, all linear maps
 pass through the origin.  {\bf Proof}: property (LM2) with $k=0$.  Note that the function
@@ -407,6 +428,27 @@ r * (v_1 + v_2) & = & (r * v_1) + (r * v_2) \\
 (r_1 + r_2) * v & = & (r_1 * v) + (r_2 * v) \\
 \end{array}
 $$
+
+\subsubsection{Building vector spaces}
+
+What types are vector spaces?  Look the syntax of types in Figure~\ref{fig:syntax}.
+\begin{itemize}
+  \item The real numbers $\real$ is a vector space, using the standard $+$ and $*$ for reals; and $\dotprod_{\real} = *$.
+  \item If $V$ is a vector space then $\vector{V}$ is a vector space, with
+    \begin{itemize}
+      \item $v_1 + v_2$ is vector addittion
+      \item $r * v$ multiplies each element of the vector $v$ by the real $r$.
+      \item $v_1 \dotprod v_2$ is a the usual vector dot-product.
+    \end{itemize}
+    We often write $\vector{\real}$ as $\real^N$.
+  \item If $V_1$ and $V_2$ are vector spaces, then the product space $(V_1, V_2)$ is a vector space
+    \begin{itemize}
+      \item $(v_1,v_2) +(w_1,w_2) = (v_1 + w_1, v_2 + w_2)$.
+      \item $r * (v_1,v_2) = (r*v_1, r*v_2)$
+      \item $(v_1,v_2) \dotprod (w_1,w_2) = (v_1 \dotprod w_1) + (v_2 \dotprod w_2)$.
+    \end{itemize}
+\end{itemize}    
+In all cases the necessary properties of the operations (associativity, distribution etc) are easy to prove.
 
 \subsection{Transposition}
 
@@ -593,14 +635,14 @@ $$
         \grad{x} & = & \gradf{x} \\
         \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
         \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
-        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e}) \\
-        \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e}) \\
         \grad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
         & = & \begin{array}[t]{l}
            \mbox{\lstinline|let $\;x\;$ = $\;e_1\;$ in|} \\
            \mbox{\lstinline|let $\;\gradf{x}\;$ = $\;\grad{e_1}\;$ in|} \\
            \mbox{\lstinline|$\grad{e_2}$|}
-           \end{array}
+           \end{array} \\
+        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e})  \\
+        \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e})
       \end{array}
       $$
 \end{minipage}}
@@ -685,39 +727,7 @@ understand this better.
   but firstly it's very cool and secondly it's Conal, so I want it to
   be true and I still hope it is.}
 
-\subsection{Avoiding duplication}
-
-We may want to ANF-ise before AD to avoid gratuitous duplication.
-  E.g.
-$$
-  \begin{array}{rcl}
-    \multicolumn{3}{l}{\grad{sqrt(x+(y*z))}} \\
-      & = & \gradf{sqrt}(x+(y*z)) \lmcomp \grad{x+(y*z)} \\
-    & = & \gradf{sqrt}(x+(y*z)) \lmcomp  \gradf{+}(x, y*z) \\
-     && \lmcomp (\grad{x} \lmpair \grad{y*z}) \\
-    & = & \gradf{sqrt}(x+(y*z)) \lmcomp \gradf{+}(x, y*z) \\
-    & & \lmcomp (\gradf{x} \lmpair (\gradf{*}(y,z) \lmcomp (\gradf{y} \lmpair \gradf{z}))) \\
-  \end{array}
-  $$
-Note the duplication of $y*z$ in the result.
-Of course, CSE may recover it.
-
-\tom{Yes, although when I say ``AD'' I mean something that is distinct
-  from what I mean by ``symbolic differentiation''.  In particular by
-  ``AD'' I mean something that preserves sharing in a way that
-  symbolic differentation doesn't.  Perhaps between us we should pin
-  down some terminology.} \simon{I don't understand this. Perhaps you can make
-  it precise?}
-
-\tom{Consider $exp(exp(x))$.  I consider its ``symbolic derivative''
-  to be $exp(exp(x)) exp(x)$ and its ``forward automatic derivative''
-  to be $let~ y = exp(x)~ in~ exp(y) y$.  In other words, taking
-  proper care of sharing is what makes AD AD and not just any old form
-  of symbolic differentiation, in my personal nomenclature at least.
-  Does that make it any clearer what I mean?}
-  \awf{For me, ``AD'' very specifically implies a second argument to the function.   That's how you detect it's AD.  I.e.  $f'(x,dx) = ....$ is forward mode, and $f`(x,df) = ...$ is reverse mode.  There's a lot of chat about what AD really is, and those who want to avoid such chat often now say ``algorithmic differentiation'', to mean ``all this stuff''.  The real claim we want to explore is this: ``Forward mode is good for functions with small inputs and large outputs, e.g. $\RR \mapsto \RR^n$, and reverse mode is for $\RR^n \mapsto \RR$.}
-
-\subsection{AD for vectors} \label{sec:ad-vectors}
+\section{AD for vectors} \label{sec:ad-vectors}
 
 Like other built-in functions, each built-in function for vectors
 has has its full Jacobian versions, defined in Figure~\ref{fig:built-in}.
@@ -778,6 +788,128 @@ not going to be easy, maybe infeasible!  Much depends on the
 particular lambda it appears.  So I have left out product, and made
 no attempt to do general folds.
 
+
+\section{Avoiding duplication}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+$$
+\begin{array}{ll}
+  \mbox{\bf Original function}   & f : S \to T \\
+  & f(x) = e \\[2mm]
+  \mbox{\bf Full Jacobian}       & \ogradf{f}  :  \forall a. (a \linto S, S) \to (a \linto T, T) \\
+  & \mbox{\lstinline|$\ogradf{f}(\oarg{x})\;$ = $\;\ograd{e}$|} \\[2mm]
+  \mbox{\bf Transposed Jacobian}   & \ogradft{f}  :  (S \linto a, S) \to (T \linto a, T) \\
+  & \mbox{\lstinline|$\ogradft{f}(\oarg{x})\;$ =  $\;\olmtrans{(\ogradf{f}(\oarg{x}))}$|}  \\[2mm]
+  \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,S) \to (T,T) \\
+   & \fwdDf{f}(x,dx) = \ogradf{f}(x,\lmone) \olmapply  dx \\[2mm]
+  \mbox{\bf Reverse derivative}  & \revDf{f} : (S,T) \to (T,S) \\
+  & \revDf{f}(x,dr) = \ogradft{f}(x,\lmone) \olmapply dr
+\end{array}
+$$
+      {\bf Differentiation of an expression}
+      \begin{center}
+        If $e : T$ then $\ograd{e} : (a \linto T, T)$
+      \end{center}
+$$
+      \begin{array}{rcll}
+        \ograd{k} & = & (\lmzero, k) \\
+        \ograd{x} & = & \oarg{x} \\
+        \ograd{f(e)} & = & \ogradf{f}(\ograd{e}) \\
+        \ograd{(e_1,e_2)} & = & \ograd{e_1} \olmpair \ograd{e_2} \\
+        \ograd{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
+        & = & \mbox{\lstinline|let $\;\oarg{x}$ = $\ograd{e_1}\;$ in $\; \ograd{e_2}$|} \\
+%
+%        build( n, \i.e )
+%        (x) :: ((t1, s -o t1), (t2, s -o t2)) -> ((t1,t2), s -o (t1,t2))
+
+%        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e}) \\
+%         \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e}) \\
+      \end{array}
+      $$
+\\
+      {\bf Modified linear-map operations} \\
+$$
+ \begin{array}{rcl}
+   (\olmapply) & : & (s \linto t, t) \to (s \to t) \\
+   (m,v) \olmapply ds & = & m \lmapply ds \\[2mm]
+   (\olmpair) & : & ((s \linto t_1,t_1),\; (s \linto t_2,t_2)) \\
+                 && \to (s \linto (t_1,t_2),\; (t_1,t_2)) \\
+    (m_1,t_1) \olmpair (m_2,t_2) & = & (m_1 \lmpair m_2, (t_1,t_2)) \\[2mm]
+   (\olmjoin) & : & ((t_1 \linto s),t_1),\; (t_2 \linto s,t_2)) \\
+                 && \to ((t_1,t_2) \linto s, \; (t_1,t_2)) \\
+    (m_1,t_1) \olmjoin (m_2,t_2) & = & (m_1 \lmjoin m_2, t_1 + t_2) \\[2mm]
+    \olmtrans{\cdot} & : & (s \linto t, t) \to (t \linto s, t)
+%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{t}, \vector{t})
+ \end{array}
+$$
+ \\
+   {\bf Derivatives of built-in functions}
+$$
+      \begin{array}{rcl}
+        \ogradf{+}      & :: & \forall a. ((\real,\real), a \linto (\real,\real)) \to (\real, a \linto \real) \\
+        \ogradf{+}(m, (x,y)) & = & ((\lmone \lmjoin \lmone) \lmcomp m, \,x+y  ) \\[2mm]
+        \ogradf{*}      & :: & \forall a. ((\real,\real), a \linto (\real,\real)) \to (\real, a \linto \real) \\
+        \ogradf{*}(m, (x,y)) & = & ((\lmscalar{y} \lmjoin \lmscalar{x}) \lmcomp m, \, x*y)  \\[2mm]
+%        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
+%        \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
+%        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
+%        \gradf{\indexfunname}(i,v) & = & \lmzero \lmjoin \lmbuildt( \sizefun(v),
+%               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
+%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
+%         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
+%        \ldots
+        \end{array}
+$$
+\end{minipage}}
+\caption{Automatic differentiation: version 2} \label{fig:ad2}
+\end{figure}
+
+\subsection{ANF and CSE}
+
+We may want to ANF-ise before AD to avoid gratuitous duplication.
+  E.g.
+$$
+  \begin{array}{rcl}
+    \multicolumn{3}{l}{\grad{sqrt(x+(y*z))}} \\
+      & = & \gradf{sqrt}(x+(y*z)) \lmcomp \grad{x+(y*z)} \\
+    & = & \gradf{sqrt}(x+(y*z)) \lmcomp  \gradf{+}(x, y*z) \\
+     && \lmcomp (\grad{x} \lmpair \grad{y*z}) \\
+    & = & \gradf{sqrt}(x+(y*z)) \lmcomp \gradf{+}(x, y*z) \\
+    & & \lmcomp (\gradf{x} \lmpair (\gradf{*}(y,z) \lmcomp (\gradf{y} \lmpair \gradf{z}))) \\
+  \end{array}
+  $$
+Note the duplication of $y*z$ in the result.
+Of course, CSE may recover it.
+
+\tom{Yes, although when I say ``AD'' I mean something that is distinct
+  from what I mean by ``symbolic differentiation''.  In particular by
+  ``AD'' I mean something that preserves sharing in a way that
+  symbolic differentation doesn't.  Perhaps between us we should pin
+  down some terminology.} \simon{I don't understand this. Perhaps you can make
+  it precise?}
+
+\tom{Consider $exp(exp(x))$.  I consider its ``symbolic derivative''
+  to be $exp(exp(x)) exp(x)$ and its ``forward automatic derivative''
+  to be $let~ y = exp(x)~ in~ exp(y) y$.  In other words, taking
+  proper care of sharing is what makes AD AD and not just any old form
+  of symbolic differentiation, in my personal nomenclature at least.
+  Does that make it any clearer what I mean?}
+  \awf{For me, ``AD'' very specifically implies a second argument to the function.   That's how you detect it's AD.  I.e.  $f'(x,dx) = ....$ is forward mode, and $f`(x,df) = ...$ is reverse mode.  There's a lot of chat about what AD really is, and those who want to avoid such chat often now say ``algorithmic differentiation'', to mean ``all this stuff''.  The real claim we want to explore is this: ``Forward mode is good for functions with small inputs and large outputs, e.g. $\real \mapsto \real^n$, and reverse mode is for $\real^n \mapsto \real$.}
+
+\subsection{Pairing}
+
+A better (and well-established) path is to modify $\gradf{f} : S \to (S \linto T)$ so that
+it returns a pair:
+$$
+   \ogradf{f}  :  \forall a. (a \linto S, S) \to (a \linto T, T)
+$$
+That is $\ogradf{f}$ returns the ``normal result'' $T$ as well as a linear map.
+Somewhat mysteriously, everything works much more compositionally if $\ogradf{f}$ also \emph{takes} a linear map as its input.
+
+The new transform is shown in Figure~\ref{fig:ad2}. Note that there is no longer any code duplications, even without ANF or CSE.
+
+In exchange, though, all the types are a bit more complicated.  So we regard Figure~\ref{fig:ad} as canonical, to be used when working thiungs out, and Figure~\ref{fig:ad2} as a (crucial) implementation strategy.
 
 \section{Implementation}
 
