@@ -1,6 +1,7 @@
 // C++ "runtime" for Knossos
 #pragma once
 
+#include <assert.h>
 #include <type_traits>
 #include <variant>
 #include <tuple>
@@ -11,10 +12,14 @@
 #include <random>
 #include <cmath>
 #include <string>
+#include <chrono>
 
 using std::get;
 using std::make_tuple;
 using std::tuple;
+
+// Enable bump allocator.  See mark/reset below.
+#define BUMPY
 
 #define COMMENT(x)
 
@@ -162,6 +167,7 @@ namespace ks
 	}
 
 	// ===============================  Allocator  ==================================
+#ifdef BUMPY
 	struct allocator {
 		size_t max_size;
 		unsigned char* buf;
@@ -177,18 +183,31 @@ namespace ks
 		}
 		void* alloc(size_t size)
 		{
-			ASSERT(size < 1000);
+			ASSERT(size < 1000000);
 			void* ret = buf + top;
 			top += ((size + 15) / 16) * 16;
 			ASSERT(top < max_size);
 			return ret;
 		}
 
-		void reset()
+		size_t mark() { return top;  }
+
+		void reset(size_t top_ = 0)
 		{
-			top = 0;
+			top = top_;
 		}
 	};
+
+	extern allocator g_alloc;
+	typedef size_t alloc_mark_t;
+	inline alloc_mark_t mark_bump_allocator_if_present() { return g_alloc.mark(); }
+	inline void reset_bump_allocator_if_present(alloc_mark_t top) { g_alloc.reset(top); }
+#else
+	typedef size_t alloc_mark_t;
+	inline alloc_mark_t mark_bump_allocator_if_present() { return 0; }
+	inline void reset_bump_allocator_if_present(alloc_mark_t top) { }
+#endif
+
 
 	// ===============================  Zero  ==================================
 	template <typename T>
@@ -400,34 +419,78 @@ namespace ks
 		// come throug here.
 		bool is_zero_ = false;  
 
-		// Private ctor -- use create
-		vec(size_t  size) : data_(size), is_zero_(false) {}
-
 	public:
 
 		typedef T value_type;
 
 #ifdef BUMPY
-		vec() :size_(0), data_(0) {}
-		int size() const { return size_; }
-#else
-		vec() {}
-		int size() const { return static_cast<int>(data_.size()); }
-
-		vec(std::vector<T> const& that) :data_{ that } {}
-#endif
-
-		vec(zero_t<vec<T>>):
-			is_zero_ (true)
+		vec(): 
+			size_{ 0 },
+			data_{ nullptr },
+			is_zero_{ true }
 		{
 		}
 
-		vec& operator=(const vec<T>& that) 
+		vec(size_t  size) {
+			void *storage = g_alloc.alloc(sizeof(T) * size);
+			this->size_ = size;
+			this->data_ = (T*)storage;
+			this->is_zero_ = false;
+		}
+
+		template <class U>
+		vec(vec<U> const& that) : vec{ that.size() }
+		{
+			if (that.is_zero_)
+				this->is_zero = true;
+			else {
+				assert(!this->is_zero_);
+				for (int i = 0; i < that.size(); ++i)
+					this->data_[i] = that[i];
+			}
+		}
+
+		vec(std::vector<T> const& that) : vec{ that.size() }
+		{
+			for (int i = 0; i < that.size(); ++i)
+				data_[i] = that[i];
+		}
+
+		int size() const { return int(size_); }
+
+		vec& operator=(const vec<T>& that)
+		{
+			ASSERT(that.size() != 0 || that.is_zero_);
+			this->size_ = that.size_;
+			this->data_ = that.data_; // Yes, this will alias, but there is no mutation, and no deletion.
+			this->is_zero_ = that.is_zero_;
+			return *this;
+		}
+
+#else
+		vec() {}
+
+		vec(size_t  size) : data_(size), is_zero_(false) {}
+
+		vec(std::vector<T> const& that) :data_{ that } {}
+
+		int size() const { return static_cast<int>(data_.size()); }
+
+		vec& operator=(const vec<T>& that)
 		{
 			ASSERT(that.size() != 0 || that.is_zero_);
 			data_ = that.data_;
 			is_zero_ = that.is_zero_;
 			return *this;
+		}
+
+#endif
+
+		vec(zero_t<vec<T>>):
+			size_ {0},
+			data_ {0},
+			is_zero_ {true}
+		{
 		}
 
 		T& operator[](int i) { return data_[i]; }
@@ -451,30 +514,20 @@ namespace ks
 		if (v.is_zero())
 			return z;
 
+#ifndef xxx_NDEBUG
 		if (i >= v.size()) {
 			std::cerr << "ERROR: Accessing element " << i << " of vec of length " << v.size() << std::endl;
 			throw "oiks";
 		} 
+#endif
+
 		return v[i];
 	}
-
-#ifdef BUMPY
-	extern ks::allocator g_alloc;
-#endif
 
 	template <class T>
 	vec<T> vec<T>::create(size_t size)
 	{
-#ifdef BUMPY
-		vec<T> ret;
-		void *storage = g_alloc.alloc(sizeof(T) * size);
-		ret.size_ = size;
-		ret.data_ = (T*)storage;
-		ret.is_zero_ = false;
-		return ret;
-#else
 		return vec{ size };
-#endif
 	}
 
 	template <class T, class F>
@@ -556,7 +609,7 @@ namespace ks
 			return a;
 	
 		ASSERT(a.size() != 0);
-		vec<T> ret = vec<T>::create(a.size());
+		vec<T> ret{ a.size() };
 
 		for (int i = 0; i < a.size(); ++i)
 			ret[i] = add(a[i], b);
@@ -1346,4 +1399,26 @@ namespace ks
 		return 1 + pr(t...);
 	}
 
+	// =========================== Timing ===============================
+	template <class Functor>
+	std::function<void(int)> repeat(Functor const& f) {
+		return [=](int n) {
+			for (int i = 0; i < n; ++i)
+				f();
+		};
+	}
+
+
+	// BENCHMARK
+	// Call with e.g. 
+	// benchmark(repeat([&]() { ... my code ... ; }));
+	void benchmark(std::function<void(int)> f);
+#define BENCHMARK(CODE) ks::benchmark(ks::repeat([&]() { CODE; }))
+	/* e.g:
+		alloc_mark_t mark = mark_bump_allocator_if_present();
+		BENCHMARK(
+			reset_bump_allocator_if_present(mark);
+			c$68 = gmm_knossos_gmm_objective(c$62, c$63, c$64, c$65, c$66, c$67)
+		);
+	*/
 } // namespace ks

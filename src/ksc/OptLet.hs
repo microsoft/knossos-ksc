@@ -165,7 +165,7 @@ notInScope v in_scope
 
 optLetsE :: [TVar] -> ExprX TFun (Int,TVar) -> TExpr
 -- This function inline let-bindings that are only used once
--- or whose RHS is trivial (see inline_me for eaxctly what.
+-- or whose RHS is trivial (see inline_me for exactly what.
 -- Take care: see Note [Capture-avoiding substitution]
 optLetsE args e = go (mkEmptySubst args) e
   where
