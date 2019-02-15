@@ -368,6 +368,7 @@ cgenAnyFun :: HasCallStack => TFun -> CType -> String
 cgenAnyFun tf cftype = case tf of
   TFun ty (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) -> let TypeVec t = ty in "build<"++ cgenType (mkCType t) ++ ">"
+  TFun ty (Fun (PrimFun "sumbuild")) -> "sumbuild<"++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM s t) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _ f -> cgenUserFun f

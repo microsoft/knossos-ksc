@@ -386,6 +386,9 @@ namespace ks
 	template <class T1>
 	T1 add(T1 t1, zero_t<T1> t2) { return t1; }
 
+	template <class T1>
+        zero_t<T1> add(zero_t<T1> t1, zero_t<T1> t2) { return t1; }
+
 	template <>
 	inline tuple<> add(tuple<> t1, tuple<> t2)
 	{
@@ -537,6 +540,19 @@ namespace ks
 
 		for (int i = 0; i < size; ++i)
 			ret[i] = T { f(i) }; 
+		return ret;
+	}
+
+	template <class T, class F>
+	T sumbuild(int size, F f)
+	{
+		if (size == 0) { return convert<T>::go(zero_t<T>{}); }
+
+                if (size == 1) return T { f(0) };
+
+                T ret = add(T { f(0) }, T { f(1) });
+		for (int i = 2; i < size; ++i)
+                  ret = add(ret, T { f(i) }); 
 		return ret;
 	}
 

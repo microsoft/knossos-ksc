@@ -273,6 +273,11 @@ optSum (Call build (Tuple [n, Lam i (Tuple es)]))
   | build `isThePrimFun` "build"
   = Just $ Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
 
+-- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
+optSum (Call build (Tuple [n, Lam i e]))
+  | build `isThePrimFun` "build"
+  = Just $ pSumBuild n (Lam i e)
+
 -- RULE: sum (diag sz f)  =  build sz f
 optSum (Call diag (Tuple [sz, f]))
   | diag `isThePrimFun` "diag"

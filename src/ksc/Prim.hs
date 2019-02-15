@@ -130,6 +130,9 @@ pIndex i e = mkPrimCall2 "index" i e
 pSum :: TExpr -> TExpr
 pSum e = mkPrimCall "sum" e
 
+pSumBuild :: TExpr -> TExpr -> TExpr
+pSumBuild n f = mkPrimCall2 "sumbuild" n f
+
 pSize :: TExpr -> TExpr
 pSize e = case typeof e of
           TypeVec _ -> mkPrimCall "size" e
@@ -311,6 +314,7 @@ simplePrimResultTy fun arg_ty
       ("pr"       , _                                      ) -> Just TypeInteger
       ("concat"   , TypeTuple [TypeTuple as, TypeTuple bs] ) -> Just (TypeTuple (as ++ bs))
       ("build"    , TypeTuple [TypeInteger, TypeLambda TypeInteger t]) -> Just (TypeVec t)
+      ("sumbuild" , TypeTuple [TypeInteger, TypeLambda TypeInteger t]) -> Just t
       ("index"    , TypeTuple [TypeInteger, TypeVec t]     ) -> Just t
       ("size"     , TypeVec _                              ) -> Just TypeInteger
       ("sum"      , TypeVec t                              ) -> Just t
@@ -342,7 +346,8 @@ simplePrimResultTy fun arg_ty
       _ -> Nothing
 
 isPrimFun :: String -> Bool
-isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "concat", "build", "index", "size", "sum", "to_float"
+isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "concat", "build", "sumbuild"
+                       , "index", "size", "sum", "to_float"
                        , "neg", "exp", "log", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
