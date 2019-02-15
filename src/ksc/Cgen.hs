@@ -33,6 +33,23 @@ data CType =  CType Type
             | LMVariant [CType]
             deriving (Eq, Ord, Show)
 
+isScalar :: CType -> Bool
+isScalar = \case
+  CType t       -> Lang.isScalar t
+  CTuple ts     -> all Cgen.isScalar ts
+  CFunction _ _ -> False
+  TypeDef _ t   -> Cgen.isScalar t
+  LMZero _ _    -> False
+  LMOne _       -> False
+  LMScale       -> False
+  LMHCat _      -> False
+  LMVCat _      -> False
+  LMBuild _     -> False
+  LMBuildT _    -> False
+  LMCompose _ _ -> False
+  LMAdd _       -> False
+  LMVariant _   -> False
+
 mkCType :: Type -> CType
 mkCType (TypeTuple ts) = CTuple $ map mkCType ts
 mkCType ty = CType ty
@@ -222,10 +239,16 @@ cgenExprR env = \case
       let cftype = ctypeofFun env tf ctypes
 
       v <- freshCVar
+      bumpmark <- freshCVar
       return $
         CG
         ( "/**Call**/"
         ++ intercalate "\n" cdecls
+        ++ (if Cgen.isScalar cftype
+             then "alloc_mark_t "
+                  ++ bumpmark
+                  ++ " = mark_bump_allocator_if_present();\n"
+             else "")
         ++ cgenType cftype
         ++ " "
         ++ v
@@ -234,6 +257,11 @@ cgenExprR env = \case
         ++ "("
         ++ intercalate "," cexprs
         ++ ");\n/**eCall**/\n"
+        ++ (if Cgen.isScalar cftype
+            then "reset_bump_allocator_if_present("
+             ++ bumpmark
+             ++ ");\n"
+            else "")
         )
         v
         cftype

@@ -73,6 +73,18 @@ data Type = TypeZero Type          -- See Note [Zeros]
           | TypeUnknown
           deriving (Show, Eq, Ord)
 
+isScalar :: Type -> Bool
+isScalar = \case
+  TypeZero _     -> False
+  TypeBool       -> True
+  TypeInteger    -> True
+  TypeFloat      -> True
+  TypeTuple ts   -> all isScalar ts
+  TypeVec _      -> False
+  TypeLambda _ _ -> False
+  TypeLM _ _     -> error "Shouldn't see TypeLM at this stage of codegen"
+  TypeUnknown    -> error "Shouldn't see TypeUnknown at this stage of codegen"
+
 {- Note [Zeros]
 ~~~~~~~~~~~~~~~
   Zeros occur frequently in AD, so we keep track of them using TypeZero, to make it easier 
