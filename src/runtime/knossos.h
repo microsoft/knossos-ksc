@@ -50,6 +50,14 @@ namespace ks
 #define NOTE { LOG("note " << (FIND ? (void*)this : (void*)0), log_indent); }
 #define LEAVE { LOG("dtor " << FIND, --log_indent);  objects.erase(this); }
 
+        // Inplace add requires a couple of forward declarations.
+        // This seemed to be the minimal we could get away with.
+        template <class T>
+        class vec;
+        template <class T>
+        void inplace_add(vec<T> *t1, const vec<T> &t2);
+        void inplace_add(double *t1, const double &t2);
+
 	// ===============================  String utils  ==================================
 
 	// val to string
@@ -502,7 +510,45 @@ namespace ks
 		static vec<T> create(size_t size);
 
 		bool is_zero() const { return is_zero_; }
+
+                friend void inplace_add <>(vec<T> *t1, const vec<T> &t2);
 	};
+
+	// ===============================  Inplace add ==================================
+        void inplace_add(double *t1, const double &t2) { *t1 += t2; }
+
+        inline void inplace_add(tuple<> *t1, const tuple<> &t2)
+	{
+            return;
+	}
+
+	template <class T0, class... Ts, class U0, class... Us>
+	void inplace_add(tuple<T0, Ts...> *t1, const tuple<U0, Us...> &t2)
+	{
+            auto ht1 = head(*t1);
+            auto tt1 = tail(*t1);
+            inplace_add(&ht1, head(t2));
+            inplace_add(&tt1, tail(t2));
+	}
+
+	template <class T2>
+        void inplace_add(zero_t<T2> *t1, const zero_t<T2> &t2) { return; }
+
+        template <class T>
+        void inplace_add(vec<T> *t1, const vec<T> &t2)
+        {
+            ASSERT(t2.size() != 0 || t2.is_zero_);
+            ASSERT(t1->size() == t2.size()
+                   || t1->is_zero()
+                   || t2.is_zero());
+
+            if (t2.is_zero_) return;
+
+            if (t1->is_zero_) *t1 = t2;
+
+            for (int i = 0; i < t2.size(); ++i)
+              ks::inplace_add(&t1->data_[i], t2[i]);
+        }
 
 	template <class T>
 	int size(vec<T> const & v)
@@ -551,8 +597,11 @@ namespace ks
                 if (size == 1) return T { f(0) };
 
                 T ret = add(T { f(0) }, T { f(1) });
-		for (int i = 2; i < size; ++i)
-                  ret = add(ret, T { f(i) }); 
+		for (int i = 2; i < size; ++i) {
+	          auto mark = mark_bump_allocator_if_present();
+                  inplace_add(&ret, T { f(i) });
+	          reset_bump_allocator_if_present(mark);
+                }
 		return ret;
 	}
 
