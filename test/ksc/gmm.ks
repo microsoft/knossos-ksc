@@ -1,38 +1,38 @@
-(def gmm_knossos_tri ((n : Integer))
+(def gmm_knossos_tri Integer ((n : Integer))
   (/ (* n (- n 1)) 2))
 
-(def exp$VecR ((v : Vec Float))
+(def exp$VecR (Vec Float) ((v : Vec Float))
   (build (size v) (lam (i : Integer) (exp (index i v)))))
 
-(def mul$R$VecR ((r : Float) (a : Vec Float))
+(def mul$R$VecR (Vec Float) ((r : Float) (a : Vec Float))
     (build (size a) (lam (i : Integer) (* r (index i a)))))
 
-(def mul$R$VecVecR ((r : Float) (a : Vec Vec Float))
+(def mul$R$VecVecR (Vec (Vec Float)) ((r : Float) (a : Vec (Vec Float)))
     (build (size a) (lam (i : Integer) (mul$R$VecR r (index i a)))))
 
-(def mul$VecR$VecR ((a : Vec Float) (b : Vec Float))
+(def mul$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
   (assert (== (size a) (size b))
     (build (size a) (lam (i : Integer) (* (index i a) (index i b))))))
 
-(def sub$VecR$VecR ((a : Vec Float) (b : Vec Float))
+(def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
   (assert (== (size a) (size b))
     (build (size a) (lam (i : Integer) (- (index i a) (index i b))))))
 
-(def dotv ((a : Vec Float) (b : Vec Float))
+(def dotv Float ((a : Vec Float) (b : Vec Float))
   (sum (mul$VecR$VecR a b)))
 
-(def dotvv ((a : Vec Vec Float) (b : Vec Vec Float))
+(def dotvv Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dotv (index i a) (index i b)))))
   )
 
-(def sqnorm ((v : Vec Float))
+(def sqnorm Float ((v : Vec Float))
   (dotv v v))
 
 -- M is vector of rows
-(def mul$Mat$Vec ((M : Vec Vec Float) (v : Vec Float))
+(def mul$Mat$Vec (Vec Float) ((M : Vec (Vec Float)) (v : Vec Float))
   (build (size M) (lam (i : Integer) (dotv (index i M) v))))
 
-(def gmm_knossos_makeQ ((q : Vec Float) (l : Vec Float))
+(def gmm_knossos_makeQ (Vec (Vec Float)) ((q : Vec Float) (l : Vec Float))
     (let (D
       (size q))
     (build D (lam (i : Integer)
@@ -45,16 +45,16 @@
            )
            ))))))
 
-(def logsumexp ((v : Vec Float))
+(def logsumexp Float ((v : Vec Float))
     (log (sum (exp$VecR v))))
 
 
-(def gmm_knossos_gmm_objective
-      ((x : Vec Vec Float)
+(def gmm_knossos_gmm_objective Float
+      ((x : Vec (Vec Float))
        (alphas : Vec Float)
-       (means : Vec Vec Float)
-       (qs : Vec Vec Float)
-       (ls : Vec Vec Float)
+       (means : Vec (Vec Float))
+       (qs : Vec (Vec Float))
+       (ls : Vec (Vec Float))
        (wishart_gamma : Float))
   (let (N (size x))
   (let (D (size (index 0 x)))
@@ -72,16 +72,17 @@
                                             (+ (sqnorm (exp$VecR (index k qs)))
                                                 (sqnorm (index k ls))))))))))))
 
-(def mkvec ((N : Integer) (scale : Float))
+(def mkvec (Vec Float) ((N : Integer) (scale : Float))
     (build N (lam (j : Integer) ($rand scale))))
 
-(def zerov ((x : Vec Float))
+(def zerov (Vec Float) ((x : Vec Float))
   (mul$R$VecR 0.0 x))
 
-(def zerovv ((x : Vec Vec Float))
+(def zerovv (Vec (Vec Float)) ((x : Vec (Vec Float)))
   (mul$R$VecVecR 0.0 x))
 
-(def mkdeltav ((n : Integer)
+(def mkdeltav (Vec Float)
+              ((n : Integer)
                (i : Integer)
                (val : Float))
     (build n (lam (ii : Integer)
@@ -89,7 +90,8 @@
                     val
                     0.0))))
 
-(def mkdeltavv ((x : Vec Vec Float)
+(def mkdeltavv (Vec (Vec Float))
+               ((x : Vec (Vec Float))
                 (i : Integer)
                 (j : Integer)
                 (val : Float))
@@ -101,7 +103,7 @@
                     0.0)
                 0.0))))))
 
-(def main ()
+(def main Integer ()
     (let ((D 4)
           (N 5)
           (K 10)
@@ -124,7 +126,7 @@
           (dgamma   ($rand delta))
 
           (dtheta   (tuple dx dalphas dmus dqs dls dgamma))
-          
+
           (dq12 (mkdeltavv qs 2 1 delta))
 
           (gmm_at_theta (gmm_knossos_gmm_objective x alphas mus qs ls gamma))
@@ -156,7 +158,7 @@
           (grad_gmm_qs         (get$4$6 grad_gmm))
           (grad_gmm_ls         (get$5$6 grad_gmm))
           (grad_gmm_gamma      (get$6$6 grad_gmm))
-          
+
           (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (+ x dx) (+ alphas dalphas) (+ mus dmus) (+ qs dqs) (+ ls dls) (+ gamma dgamma)))
 
           (dot_at_x          (dotvv grad_gmm_x dx))
@@ -165,7 +167,7 @@
           (dot_at_qs         (dotvv grad_gmm_qs dqs))
           (dot_at_ls         (dotvv grad_gmm_ls dls))
           (dot_at_gamma      (* grad_gmm_gamma dgamma))
-          
+
           (grad_gmm_dot_dtheta (+      dot_at_x
                                 (+     dot_at_alphas
                                  (+    dot_at_mus
@@ -193,7 +195,7 @@
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma)
 
-          (gmm_knossos_gmm_objective x alphas mus qs ls gamma)          
+          (gmm_knossos_gmm_objective x alphas mus qs ls gamma)
           gmm_at_theta
           gmm_at_theta_plus_dq12
           gmm_fwd

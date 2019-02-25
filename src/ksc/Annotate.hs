@@ -33,8 +33,16 @@ annotDecls gbl_env decls
            ; (env', tdecls) <- extendGblEnv tdecl (go decls)
            ; return (env', tdecl:tdecls) }
 
+    -- rec_gbl_env: extend the global env with the
+    -- user-specified types for each top-level function
+    -- We don't have a type-checked body yet, but that
+    -- doesn't matter because we aren't doing inlinin
+    rec_gbl_env = extendGblST gbl_env $
+                  [ DefX { def_fun = fun, def_args = args
+                         , def_rhs = pprPanic "Rec body of" (ppr fun) }
+                  | DefDecl (DefX { def_fun = fun, def_args = args }) <- decls ]
     init_env = TCE { tce_ctxt = []
-                   , tce_st = newSymTab gbl_env
+                   , tce_st = newSymTab rec_gbl_env
                    , tce_fun = \fun -> (fun, Nothing)
                    , tce_var = \var -> (var, Nothing) }
 
@@ -45,7 +53,8 @@ annotDecls gbl_env decls
 lintDefs :: String -> GblSymTab -> [TDef] -> KM ()
 -- Retuns a list of error messages
 lintDefs what gbl_env defs
-  = runTc what init_env (mapM_ tcDef defs)
+  = do { runTc what init_env (mapM_ tcDef defs)
+       ; printK (text "Linted" <+> text what) }
   where
     init_env = TCE { tce_ctxt = []
                    , tce_st = newSymTab gbl_env
@@ -66,14 +75,15 @@ tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
 
 tcDef :: (PrettyVar f, PrettyVar b, HasInfix f)
       => DefX f b -> TcM f b TDef
-tcDef (DefX { def_fun = f, def_args = vars, def_rhs = expr })
+tcDef (DefX { def_fun = tf@(TFun fun_ty fun)
+            , def_args = vars
+            , def_rhs = expr })
   = extendLclEnv vars $
-    do { (fun, mb_ty) <- getFunTc f
-       ; (ty,e) <- addCtxt (text "In the definition of" <+> ppr fun) $
-                   tcExpr expr
-       ; checkTypes_maybe mb_ty ty $
+    do { (rhs_ty,e) <- addCtxt (text "In the definition of" <+> ppr fun) $
+                       tcExpr expr
+       ; checkTypes fun_ty rhs_ty $
          text "Function result type mis-match for" <+> ppr fun
-       ; return (DefX (TFun ty fun) vars e) }
+       ; return (DefX tf vars e) }
 
 tcRule :: (PrettyVar f, PrettyVar b, HasInfix f)
        => RuleX f b -> TcM f b TRule
@@ -103,10 +113,12 @@ tcExpr (Konst k)
   = return (typeofKonst k, Konst k)
 
 tcExpr (Call f es)
-  = do { (fun, _mb_ty) <- getFunTc f
+  = do { (fun, mb_ty) <- getFunTc f
        ; (tyes, aes) <- addCtxt (text "In the call of:" <+> ppr fun) $
                         tcExpr es
        ; ty <- lookupGblTc fun tyes
+       ; checkTypes_maybe mb_ty ty $
+         text "Function call type mismatch for" <+> ppr fun
        ; return (ty, Call (TFun ty fun) aes) }
 
 tcExpr (Let v rhs body)
@@ -212,13 +224,6 @@ stInsertFun f ty env = Map.insert f ty env
 lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
 lookupGblST f env = Map.lookup f env
 
-userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab -> Maybe Type
-userCallResultTy_maybe f env
-  | Just (DefX (TFun ret_ty _) _ _) <- lookupGblST f env
-  = Just ret_ty
-  | otherwise
-  = Nothing
-
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
 extendGblST env defs = foldl add env defs
   where
@@ -234,20 +239,22 @@ extendGblST env defs = foldl add env defs
 callResultTy :: HasCallStack => SymTab -> Fun -> Type -> Type
 callResultTy env fun arg_ty
   = case callResultTy_maybe env fun arg_ty of
-      Just res_ty -> res_ty
-      Nothing     -> pprPanic "callResultTy" $
-                     vcat [ (ppr fun <+> ppr arg_ty)
-                          , text "Env =" <+> ppr env
-                          , ppr (map (== fun) gbl_env_keys)
-                          , ppr (map (> fun)  gbl_env_keys)
-                          , ppr (map (< fun)  gbl_env_keys) ]
+      Right res_ty -> res_ty
+      Left msg     -> pprPanic "callResultTy" $
+                      vcat [ (ppr fun <+> ppr arg_ty)
+                           , msg
+                           , text "Env =" <+> ppr env
+                           , ppr (map (== fun) gbl_env_keys)
+                           , ppr (map (> fun)  gbl_env_keys)
+                           , ppr (map (< fun)  gbl_env_keys) ]
   where
     gbl_env_keys = map fst $ Map.toList $ gblST env
 
-callResultTy_maybe :: SymTab -> Fun -> Type -> Maybe Type
+callResultTy_maybe :: SymTab -> Fun -> Type
+                   -> Either SDoc Type
 callResultTy_maybe env fun arg_ty
   | is_user_fun fun
-  = userCallResultTy_maybe fun (gblST env)
+  = userCallResultTy_maybe fun (gblST env) arg_ty
   | otherwise
   = primCallResultTy_maybe fun arg_ty
   where
@@ -256,6 +263,32 @@ callResultTy_maybe env fun arg_ty
     is_user_fun (DrvFun  (UserFun {}) _) = True
     is_user_fun _                        = False
 
+userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
+                       -> Type -> Either SDoc Type
+userCallResultTy_maybe f env arg_ty
+  | Just def <- lookupGblST f env
+  , DefX { def_fun = TFun ret_ty _, def_args = params } <- def
+  = case params of
+      [_] -> check_args ret_ty 1 params [arg_ty]
+      _ | TypeTuple arg_tys <- arg_ty
+        -> check_args ret_ty 1 params arg_tys
+        | otherwise
+        -> Left (text "Argument should be a tuple but has type" <+> ppr arg_ty)
+
+  | otherwise
+  = Left (text "Not in scope:" <+> ppr f)
+
+  where
+    check_args ret_ty _ [] [] = Right ret_ty
+    check_args ret_ty n (TVar param_ty _ : params) (arg_ty : arg_tys)
+      | param_ty `eqType` arg_ty
+      = check_args ret_ty (n+1) params arg_tys
+      | otherwise
+      = Left (hang (text "Type mis-match in argument" <+> int n)
+                 2 (vcat [ text "Expected:" <+> ppr param_ty
+                         , text "Actual:  " <+> ppr arg_ty ]))
+    check_args _ _ [] _ = Left (text "Too many arguments")
+    check_args _ _ _ [] = Left (text "Too few arguments")
 
 
 -----------------------------------------------
@@ -326,18 +359,12 @@ checkTypes_maybe mb_ty1 ty2 herald
 
 checkTypes :: Type -> Type -> SDoc -> TcM f b ()
 checkTypes exp_ty act_ty herald
-  | promoteZero exp_ty == promoteZero act_ty
+  | exp_ty `eqType` act_ty
   = return ()
   | otherwise
   = addErr $ hang herald 2 $
     vcat [ text "Expected type:" <+> ppr exp_ty
          , text "Actual type:  " <+> ppr act_ty ]
-  where promoteZero = \case
-                      TypeZero t -> t
-                      TypeTuple ts -> TypeTuple $ map promoteZero ts
-                      TypeVec t -> TypeVec $ promoteZero t
-                      TypeLambda from t -> TypeLambda from $ promoteZero t
-                      t -> t
 
 extendLclEnv :: [TVar] -> TcM f b a -> TcM f b a
 extendLclEnv vars = modifyEnvTc add_vars
@@ -372,9 +399,13 @@ lookupGblTc :: Fun -> Type -> TcM f b Type
 lookupGblTc fun arg_ty
   = do { st <- getSymTabTc
        ; case callResultTy_maybe st fun arg_ty of
-           Nothing -> do { addErr $ hang (text "Out of scope or ill-typed function:" <+> ppr fun <+> text (show fun))
-                                       2 (vcat [ text " Arg type:" <+> ppr arg_ty
-                                               , text "ST lookup:" <+> ppr (Map.lookup fun (gblST st))
-                                               , text "ST keys:" <+> vcat (map (text . show) (Map.keys (gblST st))) ])
-                         ; return TypeUnknown }
-           Just res_ty -> return res_ty }
+           Left err -> do { addErr $ hang err 2 (mk_extra st)
+                          ; return TypeUnknown }
+           Right res_ty -> return res_ty }
+  where
+    mk_extra st
+      = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
+             , text " Arg type:" <+> ppr arg_ty
+             , text "ST lookup:" <+> ppr (Map.lookup fun (gblST st))
+             , text "ST keys:" <+> vcat (map (text . show) (Map.keys (gblST st))) ]
+

@@ -8,16 +8,25 @@ Here's the BNF for our language:
 
 <rule> ::= ( rule <string> <params> <expr> <expr> )
 
-<def> ::= ( def <var> <params> <expr> )
+<def> ::= ( def <var> <type> <params> <expr> )
+-- (def f Float ( (x : Float) (y : Vec Float) ) (...) )
 
-<expr> ::= <atom> | ( <kexpr> )
-
-<params> ::= <param> | ( <param1> ... <param>n )
-
+<params> ::= <param> | ( <param_1> ... <param_n> )
 <param>  ::= ( <var> ":" <type> )
 
-<type> ::= "Integer" | "Float" | "Vec" <type> | "Tuple" (<types>)
+-- <type> is atomic; <ktype> is compound
+<type>   ::= "Integer" | "Float" | ( <ktype> )
+<ktype>  ::= "Vec" <type>
+           | "Tuple" <type_1> .. <type_n>
+           | <type>
 
+{-
+x : Vec Float
+x : Vec (Vec Float)
+-}
+
+-- <expr> is atomic; <kexpr> is compound
+<expr> ::= <konst> | <var> | ( <kexpr> )
 <kexpr> ::= let <bind>                <expr>
         |   let (<bind>1 ... <bind>n) <epxr>      n >= 0
         |   assert <expr> <expr>
@@ -25,9 +34,7 @@ Here's the BNF for our language:
         |   if <expr> <expr> <expr>
         |   tuple <expr>1 ... <expr>n      n >= 0
         |   <var> <exrp>1 ... <expr>n      calls, n >= 1
-        |   atom
-
-atom ::= <konst> | <var>
+        |   <expr>
 
 <binds> ::= (<var> <expr>)
 
@@ -117,7 +124,8 @@ langDef = Tok.LanguageDef
   , Tok.identLetter     = alphaNum <|> oneOf "_':!#$%&*+./<=>?@\\^|-~"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
-  , Tok.reservedNames   = [ "def", "rule", "let", "if", "assert", "call", "tuple", ":" ]
+  , Tok.reservedNames   = [ "def", "rule", "let", "if", "assert", "call", "tuple", ":"
+                          , "Integer", "Float", "Vec" ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -156,7 +164,7 @@ mk_fun f = case find_dollar f of
              Just ("R",   s) -> GradFun (mk_fun_id s) Rev
              Just ("fwd", s) -> DrvFun  (mk_fun_id s) Fwd
              Just ("rev", s) -> DrvFun  (mk_fun_id s) Rev
-             Just ("get", s) -> Fun     (mk_sel_fun s) 
+             Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
     mk_fun_id f | isPrimFun f = PrimFun f
@@ -174,7 +182,7 @@ pVar = Simple <$> pIdentifier
 pParam :: Parser TVar
 pParam = do { v <- pVar
             ; pReserved ":"
-            ; ty <- pType
+            ; ty <- pKType
             ; return (TVar ty v) }
 
 pParams :: Parser [TVar]
@@ -202,15 +210,15 @@ pKExpr =   pIfThenElse
        <|> pKonst
 
 pType :: Parser Type
-pType = do {
-          id <- pIdentifier;
-          case id of
-          "Integer" -> return TypeInteger
-          "Float" -> return TypeFloat
-          "Vec" -> TypeVec <$> pType
-          "Tuple" -> TypeTuple <$> parens (many pType)
-          _ -> error $ "Unknown type [" ++ id ++ "]"
-        }
+pType = (pReserved "Integer" >> return TypeInteger)
+    <|> (pReserved "Float"   >> return TypeFloat)
+    <|> parens pKType
+
+
+pKType :: Parser Type
+pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
+       <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
+       <|> pType
 
 pCall :: Parser (ExprX Fun Var)
 -- Calls (f e), (f e1 e2), etc
@@ -225,7 +233,7 @@ pCall = do { f <- pIdentifier
                    , let g_arg = case es1 of [e1] -> e1
                                              _    -> Tuple es1
                    -> return (Call (mk_fun f) (Call (mk_fun g) g_arg))
-                   
+
                    | otherwise
                    -> return (Call (mk_fun f) (Tuple es))
         }
@@ -285,9 +293,11 @@ pDef :: Parser (Def)
 -- (def f (x1 x2 x3) rhs)
 pDef = do { pReserved "def"
           ; f <- pIdentifier
+          ; ty <- pType
           ; xs <- pParams
           ; rhs <- pExpr
-          ; return (DefX (mk_fun f) xs rhs) }
+          ; let fun = TFun ty (mk_fun f)
+          ; return (DefX fun xs rhs) }
 
 pRule :: Parser Rule
 pRule = do { pReserved "rule"

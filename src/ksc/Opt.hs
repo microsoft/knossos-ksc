@@ -465,12 +465,12 @@ optApplyLM (If b et ef) dx
   = Just $ If b (lmApply et dx) (lmApply ef dx)
 
 optApplyLM (Call (TFun (TypeLM s t) (GradFun (UserFun f) mode)) e) dx
-  = trace ("User Grad->Der [" ++ f ++ "]")
-    Just $ Call (TFun t (DrvFun (UserFun f) mode)) (pConcat e dx)
+  = -- trace ("User Grad->Der [" ++ f ++ "]")
+    Just $ Call (TFun (tangentType t) (DrvFun (UserFun f) mode)) (pConcat e dx)
 
 optApplyLM (Call (TFun (TypeLM s t) (GradFun (PrimFun f) mode)) e) dx
-  = trace ("Prim Grad->Der [" ++ f ++ "]")
-    Just $ Call (TFun t (DrvFun (PrimFun f) mode)) (Tuple [e, dx])
+  = -- trace ("Prim Grad->Der [" ++ f ++ "]")
+    Just $ Call (TFun (tangentType t) (DrvFun (PrimFun f) mode)) (Tuple [e, dx])
 
 optApplyLM e dx
   = pprTrace "Apply not optimized:" (ppr e)
@@ -483,13 +483,13 @@ optApplyLMCall :: HasCallStack =>
                -> TExpr             -- :: S
                -> Maybe (TExpr)     -- :: T
 
--- (lmZero :: s -o t) `apply` (x :: s)  = 0 :: t
+-- (lmZero :: s -o t) `apply` (x :: T(s))  = 0 :: T(t)
 optApplyLMCall "lmZero" (Tuple [s, t]) dx
-  = assertTypesEqualThen "Apply lmZero" (typeof s) (typeof dx) $
-    Just (Konst $ KZero $ typeof t)
+  = assertTypesEqualThen "Apply lmZero" (tangentType (typeof s)) (typeof dx) $
+    Just (Konst $ KZero $ tangentType $ typeof t)
 
-optApplyLMCall "lmOne" _ dx
-  = -- assertTypesEqualThen "Apply lmOne" (typeof t) (typeof dx) $
+optApplyLMCall "lmOne" t dx
+  = assertTypesEqualThen "Apply lmOne" (tangentType (typeof t)) (typeof dx) $
     Just dx
 
 optApplyLMCall "lmAdd"  (Tuple [f,g]) dx
@@ -521,8 +521,8 @@ optApplyLMCall "lmBuildT" (Tuple [n, Lam i m]) dx
   = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
 
 optApplyLMCall fun arg dx
-  = pprTrace ("No opt for LM apply of " ++ show fun)
-             (ppr arg)
+  = -- pprTrace ("No opt for LM apply of " ++ show fun)
+    --         (ppr arg)
              Nothing
 
 

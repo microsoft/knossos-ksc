@@ -93,18 +93,18 @@ gradTVar s (TVar ty v) = TVar (TypeLM s ty) (gradV v)
 
 applyD :: TDef -> TDef
 applyD (DefX (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
-  = DefX (TFun t (DrvFun f Rev)) (vars ++ [dr]) $
+  = DefX (TFun (tangentType t) (DrvFun f Rev)) (vars ++ [dr]) $
     lmApply rhs $ Var dr
   where
-    dr = TVar s $ Delta "r"
+    dr = TVar (tangentType s) $ Delta "r"
 
 applyD (DefX (TFun (TypeLM _ t) (GradFun f Fwd)) vars rhs)
-  = DefX (TFun t (DrvFun f Fwd)) (vars ++ dvars) $
+  = DefX (TFun (tangentType t) (DrvFun f Fwd)) (vars ++ dvars) $
     lmApply rhs (mkTuple $ map Var dvars)
   where
     dvars = map to_delta vars
 
-    to_delta (TVar ty (Simple x)) = TVar ty (Delta x)
+    to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
 
 applyDefs :: [TDef] -> [TDef]
 applyDefs defs = map applyD defs

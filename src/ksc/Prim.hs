@@ -4,6 +4,7 @@ module Prim where
 
 import Lang
 import GHC.Stack
+import Control.Monad( zipWithM )
 
 --------------------------------------------
 --  Simple call construction
@@ -165,17 +166,24 @@ pConcat a b = --trace ("pConcat\n" ++ show a ++ "\n" ++ show b) $
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: HasCallStack => Fun -> Type -> Maybe Type
+primCallResultTy_maybe :: HasCallStack => Fun -> Type
+                       -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
-      Fun (PrimFun f)  -> primFunCallResultTy_maybe f arg_ty
+      Fun (PrimFun f)
+         | Just ty <- primFunCallResultTy_maybe f arg_ty
+         -> Right ty
+         | otherwise
+         -> Left (text "Ill-typed call to:" <+> ppr fun)
+
       Fun (SelFun i _) -> selCallResultTy_maybe i arg_ty
 
       GradFun f dir
-        | Just res_ty <- primCallResultTy_maybe (Fun f) arg_ty
-        -> case dir of
-             Fwd -> Just (TypeLM arg_ty res_ty)
-             Rev -> Just (TypeLM res_ty arg_ty)
+        -> case primCallResultTy_maybe (Fun f) arg_ty of
+            Right res_ty -> case dir of
+                              Fwd -> Right (TypeLM arg_ty res_ty)
+                              Rev -> Right (TypeLM res_ty arg_ty)
+            Left err -> Left err
 
       DrvFun f Fwd    -- f :: S -> T, then fwd$f :: (S,S) -> T
         | TypeTuple ss <- arg_ty
@@ -184,22 +192,24 @@ primCallResultTy_maybe fun arg_ty
         , let s_ty = case ss of
                        [s1,s2] -> s2
                        _       -> TypeTuple (take (n_s `div` 2) ss)
-        , Just res_ty <- primCallResultTy_maybe (Fun f) s_ty
-        -> Just res_ty
+        , Right res_ty <- primCallResultTy_maybe (Fun f) s_ty
+        -> Right res_ty
+        | otherwise
+        -> Left (text "Ill-typed call to:" <+> ppr fun)
 
       DrvFun f Rev    -- f :: S -> T, then ref$f :: (S,T) -> T
         -> pprPanic "primFunCallResultTy" (ppr fun <+> ppr arg_ty)
            -- How do we split up that tuple?
 
-      _ -> Nothing
+      _ -> Left (text "Not in scope:" <+> ppr fun)
 
 
 primFunCallResultTy :: HasCallStack => PrimFun -> Type -> Type
 primFunCallResultTy fun arg_ty
   = case primFunCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
-      Nothing -> pprPanic "primCallResultTy: Could not determine result type for"
-                          (text fun <+> text " @ " <+> ppr arg_ty) $
+      Nothing -> -- pprTrace "primCallResultTy: Could not determine result type for"
+                 --         (text fun <+> text " @ " <+> ppr arg_ty) $
                  TypeUnknown
 
 primFunCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
@@ -218,12 +228,12 @@ primFunCallResultTy_maybe fun
       "lmBuildT"    -> lmBuildTResultTy
       _             -> simplePrimResultTy fun
 
-selCallResultTy_maybe :: Int -> Type -> Maybe Type
+selCallResultTy_maybe :: Int -> Type -> Either SDoc Type
 selCallResultTy_maybe i arg_ty
   = case arg_ty of
-      TypeTuple tys -> Just (tys !! (i - 1))
-      TypeVec t     -> Just t
-      _             -> Nothing
+      TypeTuple tys -> Right (tys !! (i - 1))
+      TypeVec t     -> Right t
+      _             -> Left (text "Bad argument to selector")
 
 lmApplyResultTy, lmTransposeResultTy, lmScaleResultTy,
   lmHCatResultTy, lmVCatResultTy, lmBuildResultTy,
@@ -241,8 +251,8 @@ lmOneResultTy ty
 
 lmApplyResultTy ty
   | TypeTuple [TypeLM s t, s1] <- ty
-  , assertBool (s == s1)
-  = Just t
+  , assertBool (tangentType s `eqType` s1)
+  = Just (tangentType t)
   | otherwise = Nothing
 
 lmTransposeResultTy ty
@@ -297,14 +307,19 @@ lmHCatResultTy ty
 
 simplePrimResultTy :: HasCallStack => String -> Type -> Maybe Type
 -- Addition is special: it can add any two things of the same type
-simplePrimResultTy "+" (TypeTuple [t1, t2]) =
-    Just $ add t1 t2
+simplePrimResultTy "+" (TypeTuple [t1, t2])
+   = add t1 t2
   where
-    add t1 (TypeZero t2) = t1
-    add (TypeZero t1) t2 = t2
-    add (TypeTuple t1s) (TypeTuple t2s) = TypeTuple $ zipWith add t1s t2s
-    add t1 t2 = assertEqualThen "sprimadd" t1 t2 $
-                t1
+    add :: Type -> Type -> Maybe Type
+    add TypeInteger TypeInteger   = Just TypeInteger
+    add TypeFloat   TypeFloat     = Just TypeFloat
+    add (TypeVec t1) (TypeVec t2) = do { tr <- add t1 t2
+                                       ; return (TypeVec tr) }
+    add t1 (TypeZero t2) = Just t1
+    add (TypeZero t1) t2 = Just t2
+    add (TypeTuple t1s) (TypeTuple t2s) = do { ts <- zipWithM add t1s t2s
+                                             ; return (TypeTuple ts) }
+    add t1 t2 = Nothing
 
 simplePrimResultTy fun arg_ty
   = case (fun, arg_ty) of

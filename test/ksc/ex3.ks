@@ -1,3 +1,3 @@
-(def h ( (x : Float) (y : Float))
+(def h Float ( (x : Float) (y : Float))
        (let (z (+ x y))
             (* y z)))

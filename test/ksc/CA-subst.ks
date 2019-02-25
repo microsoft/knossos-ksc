@@ -1,5 +1,5 @@
 
-(def f ( (y : Integer) (p : Integer))
+(def f Integer ( (y : Integer) (p : Integer))
     (let (y (+ y y))
     (let (z (+ y y))
     (let (y (* p p))

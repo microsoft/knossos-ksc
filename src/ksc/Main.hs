@@ -102,7 +102,7 @@ moveMain :: [Decl]
             , [Decl])   -- All the rest
 moveMain = partition isMain
   where
-    isMain (DefDecl (DefX (Fun (UserFun "main")) _ _)) = True
+    isMain (DefDecl (DefX (TFun _ (Fun (UserFun "main"))) _ _)) = True
     isMain _ = False
 
 doallC :: HasCallStack => String -> Int -> String -> IO ()
@@ -151,9 +151,9 @@ doallG compiler verbosity file =
   ; (env4, ann_main) <- annotDecls env3 main
 
   ; let (_rules, main_tdef) = partitionDecls ann_main
-  
+
   ; let alldefs = defs ++ optgrad ++ optfwd ++ main_tdef
-  
+
   ; (env5, cse) <- cseDefs rulebase env4 alldefs
   ; displayPass verbosity "CSE" env5 cse
 

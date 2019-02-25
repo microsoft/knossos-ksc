@@ -1,4 +1,4 @@
-(def f5 ( (x : Float) (y : Float) )
+(def f5 Float ( (x : Float) (y : Float) )
         (let ((p (* 7.0 x))
               (r (/ 1.0 y))
               (q (* p (* x 5.0)))

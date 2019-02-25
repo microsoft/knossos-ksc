@@ -26,10 +26,12 @@ type Decl  = DeclX Fun  Var
 type TDecl = DeclX TFun TVar
 
 data DefX f b  -- f x = e
-  = DefX { def_fun  :: f
+  = DefX { def_fun  :: TFun
          , def_args :: [TVar]  -- See Note [Function arity]
          , def_rhs  :: ExprX f b }
   deriving( Show )
+  -- Definitions are user-annotated with argument types
+  -- (via TVar) and result types (via TFun)
 
 {- Note [Function arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,16 +87,41 @@ isScalar = \case
   TypeLM _ _     -> error "Shouldn't see TypeLM at this stage of codegen"
   TypeUnknown    -> error "Shouldn't see TypeUnknown at this stage of codegen"
 
+----------------------------------
+--- Tangent space
+
+tangentType :: Type -> Type
+-- We can't differentiate Integer, Bool etc.
+tangentType TypeFloat      = TypeFloat
+tangentType (TypeZero t)   = tangentType t
+tangentType (TypeVec t)    = TypeVec (tangentType t)
+tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
+tangentType TypeInteger    = TypeTuple []
+tangentType TypeBool       = TypeTuple []
+tangentType TypeUnknown    = TypeUnknown
+tangentType t              = pprPanic "tangentType" (ppr t)
+                               -- TypeLM, TypeLambda
+
+promoteZero :: Type -> Type
+promoteZero (TypeZero t)        = t
+promoteZero (TypeTuple ts)      = TypeTuple $ map promoteZero ts
+promoteZero (TypeVec t)         = TypeVec $ promoteZero t
+promoteZero (TypeLambda from t) = TypeLambda from $ promoteZero t
+promoteZero t = t
+
+eqType :: Type -> Type -> Bool
+eqType t1 t2 = promoteZero t1 == promoteZero t2
+
 {- Note [Zeros]
 ~~~~~~~~~~~~~~~
-  Zeros occur frequently in AD, so we keep track of them using TypeZero, to make it easier 
-  for rules of the form (* v 0) -> 0 for non-scalar types v.  
+  Zeros occur frequently in AD, so we keep track of them using TypeZero, to make it easier
+  for rules of the form (* v 0) -> 0 for non-scalar types v.
   Without, we would need to represent such rules something like this:
     (* (build N (lam i 0)) x) -> (build N (lam i 0))
 
   On the other hand, it is a slightly odd Type -- TypeZero@T is an element of T.
-  When we have decent benchmarks, we can try to delete it and see if it has a big effect 
-  on speed.  Today, numerous zero_t's appear in the generated C++, meaning they would incur 
+  When we have decent benchmarks, we can try to delete it and see if it has a big effect
+  on speed.  Today, numerous zero_t's appear in the generated C++, meaning they would incur
   cost if not handled.
 -}
 
@@ -118,8 +145,8 @@ data Fun = Fun     FunId         -- The function              f(x)
 data ADMode = Fwd | Rev
             deriving( Eq, Ord, Show )
 
-data TFun = TFun Type Fun   -- Typed functions.  These are used at
-  deriving (Eq, Ord, Show)  -- /occurrence/ sites only, not binding site
+data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
+  deriving (Eq, Ord, Show)  -- type of the function.
 
 data Var
   = Dummy                   -- Used for type arguments
@@ -501,21 +528,23 @@ instance PrettyVar TFun where
   pprBndr (TFun ty f) = ppr f <> text ":" <> ppr ty
 
 instance Pretty Konst where
-  ppr (KInteger i) = integer i
-  ppr (KFloat f)   = double f
-  ppr (KZero t)    = text "(KZero " <> ppr t <> char ')'
+  pprPrec _ (KInteger i) = integer i
+  pprPrec _ (KFloat f)   = double f
+  pprPrec p (KZero t)    = parensIf p precZero (text "KZero " <> ppr t)
 
 instance Pretty Type where
-  ppr (TypeVec ty)         = text "(Vec " <> ppr ty <> text ")"
-  ppr (TypeTuple tys)      = text "(Tuple (" <> pprList ppr tys <> text "))"
-  ppr (TypeLambda from to) = text "(Lambda" <+> ppr from <+> text "->" <+> ppr to <> text ")"
-  ppr (TypeLM s t)         = text "(LM" <+> ppr s <+> ppr t <> text ")"
-  ppr (TypeZero t)         = text "zero_t@" <> ppr t
-  ppr TypeFloat            = text "Float"
-  ppr TypeInteger          = text "Integer"
-  ppr TypeBool             = text "Bool"
-  ppr TypeUnknown          = text "UNKNOWN"
-
+  pprPrec p (TypeVec ty)         = parensIf p precZero $
+                                   text "(Vec " <> ppr ty
+  pprPrec p (TypeTuple tys)      = parensIf p precZero $
+                                   text "Tuple" <> parens (pprList ppr tys)
+  pprPrec p (TypeLambda from to) = parensIf p precZero $
+                                   text "Lambda" <+> ppr from <+> text "->" <+> ppr to
+  pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> ppr s <+> ppr t
+  pprPrec p (TypeZero t)         = text "zero_t@" <> ppr t
+  pprPrec p TypeFloat            = text "Float"
+  pprPrec p TypeInteger          = text "Integer"
+  pprPrec p TypeBool             = text "Bool"
+  pprPrec p TypeUnknown          = text "UNKNOWN"
 
 type Prec = Int
  -- 0 => no need for parens
@@ -529,7 +558,7 @@ precThree = 3  -- *
 
 instance (HasInfix f, PrettyVar f, PrettyVar b)
       => Pretty (ExprX f b) where
-  ppr expr = pprExpr 0 expr
+  pprPrec = pprExpr
 
 pprParendExpr :: (HasInfix f, PrettyVar f, PrettyVar b)
               => ExprX f b -> SDoc
@@ -541,7 +570,7 @@ pprTVar (TVar ty v) = ppr v <> text ":" <> ppr ty
 pprExpr :: (HasInfix f, PrettyVar f, PrettyVar b)
         => Prec -> ExprX f b -> SDoc
 pprExpr _  (Var v)   = pprVar v
-pprExpr _ (Konst k)  = ppr k
+pprExpr p (Konst k)  = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = parens (mode (text "tuple" <+> rest) rest)
     where rest = pprList ppr es
@@ -618,11 +647,14 @@ instance (PrettyVar f, PrettyVar b, HasInfix f) => Pretty (RuleX f b) where
                  <+> parens (pprList pprTVar qvars)
              , nest 2 (sep [ ppr lhs, nest 2 (text "=" <+> ppr rhs)]) ]
 
+printK :: SDoc -> KM ()
+printK d = liftIO (putStrLn (render d))
+
 display :: Pretty p => p -> KM ()
-display p = liftIO $ putStrLn (render (ppr p))
+display p = printK (ppr p)
 
 displayN :: Pretty p => [p] -> KM ()
-displayN = liftIO . putStrLn . render . vcat . intersperse (text "") . map ppr
+displayN ps = printK (vcat $ intersperse (text "") $ map ppr ps)
 
 bracesSp :: SDoc -> SDoc
 bracesSp d = char '{' <+> d <+> char '}'
