@@ -495,8 +495,8 @@ cgenVar :: Var -> String
 cgenVar v = show v
 
 
-cppFG :: String -> String -> [TDef] -> IO String
-cppFG compiler outfile defs = do
+cppGen :: String -> [TDef] -> IO (String, String)
+cppGen outfile defs = do
   let lines = [
          "#include \"knossos.h\"", 
          "namespace ks {\n"
@@ -520,6 +520,11 @@ cppFG compiler outfile defs = do
   putStrLn $ "Writing to " ++ cppfile
   writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
 
+  return (ksofile, cppfile)
+
+cppFG :: String -> String -> [TDef] -> IO String
+cppFG compiler outfile defs = do
+  (_, cppfile) <- cppGen outfile defs
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
