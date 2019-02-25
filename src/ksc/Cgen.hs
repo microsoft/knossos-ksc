@@ -501,10 +501,8 @@ cppGen outfile defs = do
          "#include \"knossos.h\"", 
          "namespace ks {\n"
        ]
-
-  let lls = cgenDefs defs
-
-  let tail = [
+      lls = cgenDefs defs
+      tail = [
          "}",
          "#include \"knossos.cpp\"",  
          "int main() {", 
@@ -512,11 +510,12 @@ cppGen outfile defs = do
          "  return 0;", 
          "}"
        ]
-  let ksofile = outfile ++ ".kso"
+      ksofile = outfile ++ ".kso"
+      cppfile = outfile ++ ".cpp"
+
   putStrLn $ "Writing to " ++ ksofile
   writeFile ksofile (show $ ppr defs)
 
-  let cppfile = outfile ++ ".cpp"
   putStrLn $ "Writing to " ++ cppfile
   writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
 
