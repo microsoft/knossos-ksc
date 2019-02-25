@@ -573,12 +573,24 @@ cppGen outfile defs = do
 
   return (ksofile, cppfile)
 
-cppGenAndCompile :: [Char] -> String -> [TDef] -> IO [Char]
+cppGenAndCompile
+  :: (String -> String -> IO String) -> String -> [TDef] -> IO String
 cppGenAndCompile compiler outfile defs = do
   (_, cppfile) <- cppGen outfile defs
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
+  compiler cppfile exefile
+
+compile :: String -> String -> String -> IO String
+compile = compileWithOpts []
+
+compileWithProfiling :: String -> String -> String -> IO String
+compileWithProfiling =
+  compileWithOpts ["-Wl,--no-as-needed,-lprofiler,--as-needed"]
+
+compileWithOpts :: [String] -> String -> String -> String -> IO String
+compileWithOpts opts compiler cppfile exefile = do
   let compcmd =
         ( compiler
         , [ "-fmax-errors=5"
@@ -588,10 +600,11 @@ cppGenAndCompile compiler outfile defs = do
           , "-O3"
           , "-g"
           , "-std=c++17"
-          , cppfile
           , "-o"
           , exefile
           ]
+          ++ opts
+          ++ [cppfile]
         )
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
@@ -599,7 +612,7 @@ cppGenAndCompile compiler outfile defs = do
 
 cppFG :: String -> String -> [TDef] -> IO String
 cppFG compiler outfile defs = do
-  exefile <- cppGenAndCompile compiler outfile defs
+  exefile <- cppGenAndCompile (compile compiler) outfile defs
   runExe exefile
 
 runExe :: String -> IO String
