@@ -22,11 +22,11 @@
     (let (v     (mul_R_VecR gamma (mkvec 3)))
          (sqnorm v)))
 
-(def main Float ()
+(def main Integer ()
     (let (v1 (build 4 (lam (i : Integer) 3.0)))
         (pr 1
-            (D$f v1 v1)
-            --(D$g 1.1)
+            -- (D$f v1 v1)
+            -- (D$g 1.1)
             (fwd$g 1.1 0.001)
             (rev$g 1.1 0.001)
             (- (g 1.1001) (g 1.1))

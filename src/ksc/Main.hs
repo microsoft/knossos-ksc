@@ -152,7 +152,10 @@ doallG compiler verbosity file =
 
   ; let (_rules, main_tdef) = partitionDecls ann_main
 
-  ; let alldefs = defs ++ optgrad ++ optfwd ++ main_tdef
+  -- Note optgrad removed from below as we can not currently 
+  -- codegen the optgrad for recursive functions 
+  -- [see https://github.com/awf/knossos/issues/281]
+  ; let alldefs = defs ++ optfwd ++ main_tdef     
 
   ; (env5, cse) <- cseDefs rulebase env4 alldefs
   ; displayPass verbosity "CSE" env5 cse

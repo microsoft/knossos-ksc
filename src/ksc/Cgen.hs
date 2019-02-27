@@ -21,6 +21,7 @@ data CType =  CType Type
             | CTuple [CType]
             | CFunction CType CType
             | TypeDef String CType
+            | UseTypeDef String
             | LMZero Type Type
             | LMOne Type
             | LMScale
@@ -39,6 +40,7 @@ isScalar = \case
   CTuple ts     -> all Cgen.isScalar ts
   CFunction _ _ -> False
   TypeDef _ t   -> Cgen.isScalar t
+  UseTypeDef _  -> False
   LMZero _ _    -> False
   LMOne _       -> False
   LMScale       -> False
@@ -54,7 +56,7 @@ mkCType :: Type -> CType
 mkCType (TypeTuple ts) = CTuple $ map mkCType ts
 mkCType ty = CType ty
 
-stripTypeDef :: CType -> CType
+stripTypeDef :: HasCallStack => CType -> CType
 stripTypeDef (TypeDef _ t) = stripTypeDef t
 stripTypeDef t = t
 
@@ -78,6 +80,7 @@ cgenIsLM = \case
   CTuple ts -> any cgenIsLM ts
   CFunction s t -> False
   TypeDef s ty -> cgenIsLM ty
+  UseTypeDef s -> error "Don't know; it's a UseTypeDef"
   _ -> True
 
 makeUnionType :: HasCallStack => CType -> CType -> (CType, String)
@@ -190,9 +193,12 @@ cgenDefs defs =
   snd $ foldl go (cstEmpty, []) defs
   where
     go :: (CST, [String]) -> TDef -> (CST, [String])
-    go (env, strs) def@(DefX (TFun _ f) _ _) =
-      let (CG cdecl _cfun ctype) = cgenDefE env def
-      in (cstInsertFun f ctype env, strs ++ [cdecl])
+    go (env, strs) def@(DefX (TFun ty f) _ _) =
+      let 
+          env' = cstInsertFun f (UseTypeDef ("ty$" ++ cgenUserFun f)) env
+          (CG cdecl _cfun _ctype) = cgenDefE env' def
+      in (env', strs ++ [cdecl])
+
 
 cgenDef :: TDef -> String
 cgenDef def = getDecl $ cgenDefE cstEmpty def
@@ -409,7 +415,8 @@ cgenType = \case
   CType ty -> cgenTypeLang ty
   CTuple ts  -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
   CFunction s t  -> "std::function<" ++ (cgenType t) ++ "(" ++ (cgenType s) ++ ")>"
-  TypeDef s ty -> s
+  TypeDef s _ -> s
+  UseTypeDef s -> s
   LMZero s t -> lmt "Zero" [s, t]
   LMOne t -> lmt "One" [t]
   LMScale -> "LM::Scale"
@@ -451,13 +458,14 @@ ctypeofFun1 env (TypeLM s t) f ctys = error $ "Did not match [" ++  show f ++ "]
 ctypeofFun1 env ty f ctys = mkCType ty
 
 ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
-ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
+ctypeofPrimFun ty s arg_types = 
+  case (s, map stripTypeDef arg_types) of
   ("lmApply", _) -> mkCType ty
   ("lmBuild", [_, lam]) -> LMBuild lam
   ("lmBuildT", [_, lam]) -> LMBuildT lam
   ("lmOne", [ct]) -> LMOne (stripCType ct)
   ("lmZero", [cs, ct]) -> LMZero (stripCType cs) (stripCType ct)
-  ("lmScale", [CType TypeFloat]) -> LMScale
+  ("lmScale", _) -> LMScale
   ("lmHCat", _) -> LMHCat arg_types
   ("lmVCat", _) -> LMVCat arg_types
   ("lmCompose", [lm1, lm2]) -> LMCompose lm1 lm2

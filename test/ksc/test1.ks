@@ -15,10 +15,10 @@
 (def f Float ((x : Float) (y : Float))
     (/ x y))
 
-(def main Float ()
+(def main Integer ()
     (pr (f (a 3.0) (b 2.3))
         (f 0.0 1.0)
-        (D$f 1.1 2.2 )
+        -- See https://github.com/awf/knossos/issues/281 (D$f 1.1 2.2 )
         (g 1.1 2.2)
         (let ((x 1.1)
               (y 2.2)

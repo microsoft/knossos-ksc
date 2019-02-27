@@ -14,14 +14,14 @@
 )
 
 
-(def test_tuple Integer ((x : Tuple (Vec Float Vec Vec Float Integer)))
+(def test_tuple Integer ((x : Tuple (Vec Float) (Vec (Vec Float)) Integer))
     (+ 1 (if (< 2 3) 4 5)))
 
-(def main Float ()
+(def main Integer ()
     (let (v1 (build 3 (lam (i : Integer) (* 3.0 (to_float i)))))
         (pr (f7 v1 v1)
-            (D$f7 v1 v1)
-            (D$f1 1.1 2.3 2)
-            (fwd$f1 1.1 2.3 3 0.0 1.0 0)
-            (fwd$f1 1.1 2.3 3 1.0 0.0 0)
+            -- See https://github.com/awf/knossos/issues/281 (D$f7 v1 v1)
+            -- See https://github.com/awf/knossos/issues/281 (D$f1 1.1 2.3 2)
+            (fwd$f1 1.1 2.3 3 0.0 1.0 (tuple))
+            (fwd$f1 1.1 2.3 3 1.0 0.0 (tuple))
             )))

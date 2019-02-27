@@ -249,6 +249,16 @@ namespace ks
 		operator int() { return 0; }
 	};
 
+	template <>
+	struct zero_t<tuple<>>
+	{
+		zero_t(tuple<>) { }
+
+		zero_t() { }
+
+		operator tuple<>() { return tuple<>{}; }
+	};
+
 	template <class T>
 	std::ostream &operator<<(std::ostream &s, ks::zero_t<T> const &v)
 	{

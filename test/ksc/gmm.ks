@@ -193,7 +193,7 @@
       (pr x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
-          (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma)
+          -- see https://github.com/awf/knossos/issues/281 (D$gmm_knossos_gmm_objective x alphas mus qs ls gamma)
 
           (gmm_knossos_gmm_objective x alphas mus qs ls gamma)
           gmm_at_theta
