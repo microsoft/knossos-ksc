@@ -11,7 +11,7 @@ import qualified Data.Map                      as Map
 import           Data.List                      ( intercalate )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
-import           System.Process                 ( readProcessWithExitCode )
+import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
 import           Lang
@@ -607,13 +607,20 @@ runExe exefile = do
   putStrLn "Running"
   readProcessPrintStderr exefile []
 
-readProcessPrintStderr :: FilePath -> [String] -> IO String
-readProcessPrintStderr executable args = do
+readProcessEnvPrintStderr
+  :: FilePath -> [String] -> Maybe [(String, String)] -> IO String
+readProcessEnvPrintStderr executable args env = do
   let stdin = ""
-  (exitCode, stdout, stderr) <- readProcessWithExitCode executable args stdin
+  (exitCode, stdout, stderr) <- System.Process.readCreateProcessWithExitCode
+    (System.Process.proc executable args) { System.Process.env = env }
+    stdin
   putStr stderr
   when (exitCode /= ExitSuccess) $ error "Compilation failed"
   return stdout
+
+readProcessPrintStderr :: FilePath -> [String] -> IO String
+readProcessPrintStderr executable args =
+  readProcessEnvPrintStderr executable args Nothing
 
 cppF :: String -> [TDef] -> IO ()
 -- String is the file name
