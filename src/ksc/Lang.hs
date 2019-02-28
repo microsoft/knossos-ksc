@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE FlexibleInstances, LambdaCase #-}
 
 module Lang where
@@ -283,15 +282,15 @@ instance (HasType b, HasType f,
       =>  HasType (ExprX f b) where
   typeof (Konst k)     = typeofKonst k
   typeof (Var b)       = typeof b
-  typeof (Call f e)    = typeof f
-  typeof e@(App f _)   = case typeof f of
+  typeof (Call f _)    = typeof f
+  typeof (App f _)     = case typeof f of
                             TypeLambda _ res -> res
                             _ -> pprPanic "typeof:app " (vcat [ppr f, ppr (typeof f)])
   typeof (Tuple es)    = TypeTuple $ map typeof es
   typeof (Lam b e)     = TypeLambda (typeof b) (typeof e)
-  typeof (Let b e1 e2) = typeof e2
-  typeof (Assert c e)  = typeof e
-  typeof (If c t f)    = makeIfType (typeof t) (typeof f)
+  typeof (Let _ _ e2)  = typeof e2
+  typeof (Assert _ e)  = typeof e
+  typeof (If _ t f)    = makeIfType (typeof t) (typeof f)
 
 -- ToDo:
 -- The type of an If statement is a sort of union of the types on the branches
@@ -312,7 +311,7 @@ unzipLMTypes [] = Just ([], [])
 unzipLMTypes (TypeLM s t : lmts) = case unzipLMTypes lmts of
                                      Just (ss, ts) -> Just (s:ss, t:ts)
                                      Nothing       -> Nothing
-unzipLMTypes lmts = Nothing
+unzipLMTypes _ = Nothing
 
 typeofKonst :: Konst -> Type
 typeofKonst (KZero t)    = TypeZero t
@@ -325,8 +324,8 @@ typeofKonst (KBool _)    = TypeBool
 -----------------------------------------------
 
 assert :: HasCallStack => SDoc -> Bool -> b -> b
-assert doc True  x = x
-assert doc False x = error (show doc)
+assert _   True  x = x
+assert doc False _ = error (show doc)
 
 assertBool :: Bool -> Bool
 assertBool x = x    -- To remove check, return True always
@@ -446,7 +445,7 @@ comma :: SDoc
 comma = text ","
 
 empty :: SDoc
-empty = SDoc (\m -> PP.empty)
+empty = SDoc (\_ -> PP.empty)
 
 default_display_style :: Bool
 default_display_style = False
@@ -505,8 +504,8 @@ pprFun (DrvFun  s Fwd) = text "fwd$" <> ppr s
 pprFun (DrvFun  s Rev) = text "rev$" <> ppr s
 
 instance Pretty TVar where
-  pprPrec p (TVar ty Dummy) = text "_:" <> ppr ty
-  pprPrec p (TVar ty v)     = ppr v
+  pprPrec _ (TVar ty Dummy) = text "_:" <> ppr ty
+  pprPrec _ (TVar _ v)     = ppr v
 
 instance PrettyVar TVar where
   pprVar  v = ppr v
@@ -517,7 +516,7 @@ instance PrettyVar Var where
   pprBndr v = ppr v
 
 instance Pretty TFun where
-  ppr (TFun ty f) = ppr f
+  ppr (TFun _ f) = ppr f
 
 instance PrettyVar Fun where
   pprVar  f = ppr f
@@ -540,11 +539,11 @@ instance Pretty Type where
   pprPrec p (TypeLambda from to) = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
   pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> ppr s <+> ppr t
-  pprPrec p (TypeZero t)         = text "zero_t@" <> ppr t
-  pprPrec p TypeFloat            = text "Float"
-  pprPrec p TypeInteger          = text "Integer"
-  pprPrec p TypeBool             = text "Bool"
-  pprPrec p TypeUnknown          = text "UNKNOWN"
+  pprPrec _ (TypeZero t)         = text "zero_t@" <> ppr t
+  pprPrec _ TypeFloat            = text "Float"
+  pprPrec _ TypeInteger          = text "Integer"
+  pprPrec _ TypeBool             = text "Bool"
+  pprPrec _ TypeUnknown          = text "UNKNOWN"
 
 type Prec = Int
  -- 0 => no need for parens
