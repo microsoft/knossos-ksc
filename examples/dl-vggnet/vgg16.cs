@@ -43,11 +43,11 @@ class MyRetrainApplication
     //  etc
     static void Train(string[] images)
     {
-        vgg_weights ws = deserialize<vgg_weights>("vgg_weights.onnx");
+        vgg_weights weights = deserialize<vgg_weights>("vgg_weights.onnx");
         
         // Replace last fully-connected layer with a 10xN matrix:
-        int last_layer_index = Wfull.Length-1;
-        Wfull[last_layer_index] = rand(10, Wfull[last_layer_index].NumCols);
+        int last_layer_index = weights.Wfull.Length-1;
+        weights.Wfull[last_layer_index] = rand(10, weights.Wfull.Last().NumCols);
 
         // And retrain on our examples [* Note 2 *]
         // 1. Define loss.
@@ -56,7 +56,7 @@ class MyRetrainApplication
             foreach(var image in images) {  // [* Note 3 *] 
                 Image img = imread(image);
                 int label = int.Parse(readlines(replace_suffix(image, ".label"))[0]);
-                Vec prediction = vgg16(ws, img2vec(img));
+                Vec prediction = vgg16(ws, img2tensor(img));
                 sum += crossentropy(prediction, label);
             }
             return sum;
@@ -73,7 +73,8 @@ class MyRetrainApplication
 }
 
 // [* Note 2 *]
-// Initially, maybe we can't provide these ergonomics, and the user needs to move this training code to F#.
+// Initially, maybe we can't provide these ergonomics in C#, 
+// so the user needs to move this training code to F#.
 
 // [* Note 3 *]
 // This Zip is recognized and data-parallelized.   
