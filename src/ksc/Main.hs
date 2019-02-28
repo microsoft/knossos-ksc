@@ -207,5 +207,5 @@ testC compiler = do
     putStrLn "Success"
     System.Exit.exitWith System.Exit.ExitSuccess
     else do
-    putStrLn ("FAILURE!" ++ unlines (take 5 (reverse (lines output))))
+    putStrLn ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output)))))
     System.Exit.exitWith (System.Exit.ExitFailure 1)
