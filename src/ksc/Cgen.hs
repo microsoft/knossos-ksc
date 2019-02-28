@@ -2,19 +2,19 @@
 
 module Cgen where
 
-import GHC.Stack
+import           GHC.Stack
 import           Prelude                 hiding ( lines
                                                 , tail
                                                 )
 
-import qualified Data.Map as Map
+import qualified Data.Map                      as Map
 import           Data.List                      ( intercalate )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import           System.Process                 ( readProcessWithExitCode )
-import           System.Exit                 ( ExitCode(ExitSuccess) )
+import           System.Exit                    ( ExitCode(ExitSuccess) )
 
-import Lang
+import           Lang
 
 data CType =  CType Type
             | CTuple [CType]
@@ -35,79 +35,77 @@ data CType =  CType Type
 
 isScalar :: CType -> Bool
 isScalar = \case
-  CType t       -> Lang.isScalar t
+  CType  t      -> Lang.isScalar t
   CTuple ts     -> all Cgen.isScalar ts
   CFunction _ _ -> False
-  TypeDef _ t   -> Cgen.isScalar t
+  TypeDef   _ t -> Cgen.isScalar t
   UseTypeDef _  -> False
   LMZero _ _    -> False
   LMOne _       -> False
   LMScale       -> False
-  LMHCat _      -> False
-  LMVCat _      -> False
-  LMBuild _     -> False
+  LMHCat   _    -> False
+  LMVCat   _    -> False
+  LMBuild  _    -> False
   LMBuildT _    -> False
   LMCompose _ _ -> False
-  LMAdd _       -> False
+  LMAdd     _   -> False
   LMVariant _   -> False
 
 mkCType :: Type -> CType
 mkCType (TypeTuple ts) = CTuple $ map mkCType ts
-mkCType ty = CType ty
+mkCType ty             = CType ty
 
 stripTypeDef :: HasCallStack => CType -> CType
 stripTypeDef (TypeDef _ t) = stripTypeDef t
-stripTypeDef t = t
+stripTypeDef t             = t
 
 stripCType :: CType -> Type
 stripCType = \case
-  CType ty -> ty
-  CTuple tys -> TypeTuple $ map stripCType tys 
+  CType  ty     -> ty
+  CTuple tys    -> TypeTuple $ map stripCType tys
   TypeDef _ cty -> stripCType cty
-  _ -> error "LM/Function type in stripCType"
+  _             -> error "LM/Function type in stripCType"
 
 cgenIsZero :: CType -> Bool
 cgenIsZero = \case
-  CType (TypeZero _) -> True
-  CTuple ts -> all cgenIsZero ts
-  _ -> False
+  CType  (TypeZero _) -> True
+  CTuple ts           -> all cgenIsZero ts
+  _                   -> False
 
 cgenIsLM :: CType -> Bool
 cgenIsLM = \case
-  CType (TypeLM _ _) -> True
-  CType _ -> False
-  CTuple ts -> any cgenIsLM ts
-  CFunction _ _ -> False
-  TypeDef _ ty -> cgenIsLM ty
-  UseTypeDef s -> error ("Don't know; it's a UseTypeDef: " ++ s)
-  _ -> True
+  CType  (TypeLM _ _) -> True
+  CType  _            -> False
+  CTuple ts           -> any cgenIsLM ts
+  CFunction _ _       -> False
+  TypeDef   _ ty      -> cgenIsLM ty
+  UseTypeDef s        -> error ("Don't know; it's a UseTypeDef: " ++ s)
+  _                   -> True
 
 makeUnionType :: HasCallStack => CType -> CType -> (CType, String)
-makeUnionType (CTuple ts) (CTuple us) = 
-  if ts == us then
-    (CTuple ts, "")
+makeUnionType (CTuple ts) (CTuple us) = if ts == us
+  then (CTuple ts, "")
   else
-    let ty = CTuple $ map fst $ zipWith makeUnionType ts us in
-    (ty, "convert<" ++ cgenType ty ++ ">::go")
-    
-makeUnionType ty1 ty2 =
-  if ty1 == ty2 then
-    (ty1, "")
-  else if cgenIsZero ty1 then
-    (ty2, "convert<" ++ cgenType ty2 ++ ">::go")
-  else if cgenIsZero ty2 then
-    (ty1, "convert<" ++ cgenType ty1 ++ ">::go")
-  else if cgenIsLM ty1 then
-    -- trace ("***Making variant from \n" ++ show ty1 ++ "\n" ++ show ty2)
-    (LMVariant [ty1, ty2], "")
-  else
-    let sty1 = stripCType ty1 
-        sty2 = stripCType ty2
-    in
-        if sty1 == sty2 then
-          (mkCType sty1, "")
+    let ty = CTuple $ map fst $ zipWith makeUnionType ts us
+    in  (ty, "convert<" ++ cgenType ty ++ ">::go")
+
+makeUnionType ty1 ty2 = if ty1 == ty2
+  then (ty1, "")
+  else if cgenIsZero ty1
+    then (ty2, "convert<" ++ cgenType ty2 ++ ">::go")
+    else if cgenIsZero ty2
+      then (ty1, "convert<" ++ cgenType ty1 ++ ">::go")
+      else if cgenIsLM ty1
+        then
+-- trace ("***Making variant from \n" ++ show ty1 ++ "\n" ++ show ty2)
+             (LMVariant [ty1, ty2], "")
         else
-          error("GENVAR[\n"++ show ty1 ++ "\n" ++ show ty2++"\n]")
+          let sty1 = stripCType ty1
+              sty2 = stripCType ty2
+          in  if sty1 == sty2
+                then (mkCType sty1, "")
+                else error
+                  ("GENVAR[\n" ++ show ty1 ++ "\n" ++ show ty2 ++ "\n]")
 
 -------------- String utils
 
@@ -165,15 +163,20 @@ cstMaybeLookup0 s env = Map.lookup s env
 cstLookup0 :: HasCallStack => String -> CST -> CType
 cstLookup0 v env = case cstMaybeLookup0 v env of
   Just e -> e
-  Nothing -> error $ "Failed lookup [" ++ v ++ "] in\n" ++ (intercalate "\n" (map show (Map.toList env)))
+  Nothing ->
+    error
+      $  "Failed lookup ["
+      ++ v
+      ++ "] in\n"
+      ++ (intercalate "\n" (map show (Map.toList env)))
 
-cstInsertVar:: Var -> CType -> CST -> CST
+cstInsertVar :: Var -> CType -> CST -> CST
 cstInsertVar v ty env = -- trace ("cstInsertVar [" ++ show v ++ "] = [" ++ show ty ++ "]\n" ++ show env) $
-         Map.insert (show v) ty env
+  Map.insert (show v) ty env
 
-cstInsertFun:: Fun -> CType -> CST -> CST
+cstInsertFun :: Fun -> CType -> CST -> CST
 cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
-         Map.insert (show f) ctype env
+  Map.insert (show f) ctype env
 
 cstLookupVar :: HasCallStack => Var -> CST -> CType
 cstLookupVar v env = cstLookup0 (show v) env
@@ -184,19 +187,17 @@ cstLookupFun f env = cstLookup0 (show f) env
 cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe CType
 cstMaybeLookupFun f env = cstMaybeLookup0 (show f) env
 
-cComment:: String -> String
+cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
 cgenDefs :: [TDef] -> [String]
-cgenDefs defs =
-  snd $ foldl go (cstEmpty, []) defs
-  where
-    go :: (CST, [String]) -> TDef -> (CST, [String])
-    go (env, strs) def@(DefX (TFun _ f) _ _) =
-      let 
-          env' = cstInsertFun f (UseTypeDef ("ty$" ++ cgenUserFun f)) env
-          (CG cdecl _cfun _ctype) = cgenDefE env' def
-      in (env', strs ++ [cdecl])
+cgenDefs defs = snd $ foldl go (cstEmpty, []) defs
+ where
+  go :: (CST, [String]) -> TDef -> (CST, [String])
+  go (env, strs) def@(DefX (TFun _ f) _ _) =
+    let env' = cstInsertFun f (UseTypeDef ("ty$" ++ cgenUserFun f)) env
+        (CG cdecl _cfun _ctype) = cgenDefE env' def
+    in  (env', strs ++ [cdecl])
 
 
 cgenDef :: TDef -> String
@@ -205,82 +206,94 @@ cgenDef def = getDecl $ cgenDefE cstEmpty def
 cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (DefX (TFun _ f) params body) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      env' = foldl addParam env params
+      env'                             = foldl addParam env params
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
-      cf = cgenUserFun f
+      cf                               = cgenUserFun f
 
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      cvars = map mkVar params
+      cvars       = map mkVar params
 
       cftypealias = "ty$" ++ cf
   in  CG
-      (     "typedef " ++ cgenType cbodytype `spc` cftypealias ++ ";\n"
-      ++    cftypealias `spc` cf
-      ++    "(" ++ intercalate ", " cvars ++ ") {\n"
-      ++    cbodydecl
-      ++    "return (" ++ cbodyexpr ++ ");\n"
-      ++    "}\n"
-      )
-      cf
-      (TypeDef cftypealias cbodytype)
+        (     "typedef "
+        ++    cgenType cbodytype
+        `spc` cftypealias
+        ++    ";\n"
+        ++    cftypealias
+        `spc` cf
+        ++    "("
+        ++    intercalate ", " cvars
+        ++    ") {\n"
+        ++    cbodydecl
+        ++    "return ("
+        ++    cbodyexpr
+        ++    ");\n"
+        ++    "}\n"
+        )
+        cf
+        (TypeDef cftypealias cbodytype)
 
 cgenExpr :: CST -> TExpr -> M CGenResult
 cgenExpr = cgenExprR
 
 cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
 cgenExprR env = \case
-  Konst k  -> return $ CG "" (cgenKonst k) (mkCType $ typeofKonst k)
-  Var (TVar ty Dummy) -> let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
-  Var (TVar _ v) -> return $ CG "" (show v) (cstLookupVar v env)
+  Konst k -> return $ CG "" (cgenKonst k) (mkCType $ typeofKonst k)
+  Var (TVar ty Dummy) ->
+    let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
+  Var (TVar _ v)                -> return $ CG "" (show v) (cstLookupVar v env)
 
   Call tf@(TFun _ _) (Tuple vs) -> do
       -- Untuple argument for C++ call
-      cgvs <- mapM (cgenExprR env) vs
-      let cdecls = map getDecl cgvs
-      let cexprs = map getExpr cgvs
-      let ctypes = map getType cgvs
+    cgvs <- mapM (cgenExprR env) vs
+    let cdecls = map getDecl cgvs
+    let cexprs = map getExpr cgvs
+    let ctypes = map getType cgvs
 
-      let cftype = ctypeofFun env tf ctypes
+    let cftype = ctypeofFun env tf ctypes
 
-      v <- freshCVar
-      bumpmark <- freshCVar
-      return $
-        CG
-        ( "/**Call**/"
-        ++ intercalate "\n" cdecls
-        ++ (if Cgen.isScalar cftype
-             then "alloc_mark_t "
-                  ++ bumpmark
-                  ++ " = mark_bump_allocator_if_present();\n"
-             else "")
-        ++ cgenType cftype
-        ++ " "
-        ++ v
-        ++ " = "
-        ++ cgenAnyFun tf cftype
-        ++ "("
-        ++ intercalate "," cexprs
-        ++ ");\n/**eCall**/\n"
-        ++ (if Cgen.isScalar cftype
-            then "reset_bump_allocator_if_present("
+    v        <- freshCVar
+    bumpmark <- freshCVar
+    return $ CG
+      (  "/**Call**/"
+      ++ intercalate "\n" cdecls
+      ++ (if Cgen.isScalar cftype
+           then
+             "alloc_mark_t "
              ++ bumpmark
-             ++ ");\n"
-            else "")
-        )
-        v
-        cftype
+             ++ " = mark_bump_allocator_if_present();\n"
+           else ""
+         )
+      ++ cgenType cftype
+      ++ " "
+      ++ v
+      ++ " = "
+      ++ cgenAnyFun tf cftype
+      ++ "("
+      ++ intercalate "," cexprs
+      ++ ");\n/**eCall**/\n"
+      ++ (if Cgen.isScalar cftype
+           then "reset_bump_allocator_if_present(" ++ bumpmark ++ ");\n"
+           else ""
+         )
+      )
+      v
+      cftype
 
-  Call tf@(TFun _ _) v -> cgenExprR env $ Call tf (Tuple [v])
+  Call tf@(TFun _ _) v   -> cgenExprR env $ Call tf (Tuple [v])
 
   Let (TVar _ v) e1 body -> do
-    (CG decle1 ve1 type1) <- cgenExprR env e1
+    (CG decle1   ve1   type1 ) <- cgenExprR env e1
     (CG declbody vbody tybody) <- cgenExprR (cstInsertVar v type1 env) body
-    lvar        <- freshCVar
+    lvar                       <- freshCVar
 
     return $ CG
       (  "/**Let**/"
-      ++ cgenType tybody ++ " " ++ lvar ++ ";\n"
+      ++ cgenType tybody
+      ++ " "
+      ++ lvar
+      ++ ";\n"
       ++ "{\n"
       ++ decle1
       ++ "\n"
@@ -290,8 +303,12 @@ cgenExprR env = \case
       ++ " = "
       ++ ve1
       ++ ";\n"
-      ++ declbody ++ "\n"
-      ++ lvar  ++ " = " ++ vbody ++ ";\n" 
+      ++ declbody
+      ++ "\n"
+      ++ lvar
+      ++ " = "
+      ++ vbody
+      ++ ";\n"
       ++ "}\n"
       )
       lvar
@@ -299,46 +316,51 @@ cgenExprR env = \case
 
   Tuple [t] -> cgenExpr env t
   Tuple vs  -> do
-      cgvs <- mapM (cgenExprR env) vs
-      let cdecls = map getDecl cgvs
-      let cexprs = map getExpr cgvs
-      let ctypes = map getType cgvs
-      let ctype = CTuple ctypes
+    cgvs <- mapM (cgenExprR env) vs
+    let cdecls = map getDecl cgvs
+    let cexprs = map getExpr cgvs
+    let ctypes = map getType cgvs
+    let ctype  = CTuple ctypes
 
-      return $ CG
-        (intercalate "\n" cdecls)
-        ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
-        ctype
+    return $ CG (intercalate "\n" cdecls)
+                ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
+                ctype
 
   Lam (TVar tyv v) body -> do
-    lvar        <- freshCVar
+    lvar <- freshCVar
     let vtype = mkCType tyv
     (CG cdecl cexpr ctype) <- cgenExprR (cstInsertVar v vtype env) body
     return $ CG
-      ( "/**Lam**/"
-      ++ "auto"
+      (     "/**Lam**/"
+      ++    "auto"
       `spc` lvar
-      ++    " = [=](" ++ cgenType vtype `spc` cgenVar v ++ ") { "  -- TODO: capture only freeVars here
+      ++    " = [=]("
+      ++    cgenType vtype
+      `spc` cgenVar v
+      ++    ") { "  -- TODO: capture only freeVars here
       ++    cdecl
-      ++    "   return (" ++ cexpr ++ ");"
-      ++    "};\n" )
+      ++    "   return ("
+      ++    cexpr
+      ++    ");"
+      ++    "};\n"
+      )
       lvar
       (CFunction vtype ctype)
 
 
   If c texpr fexpr -> do
-    cret        <- freshCVar
+    cret              <- freshCVar
 
-    (CG declc vc _) <- cgenExprR env c
+    (CG declc vc _  ) <- cgenExprR env c
     (CG declt vt tyt) <- cgenExprR env texpr
     (CG declf vf tyf) <- cgenExprR env fexpr
     let (crettype, cretcast) = makeUnionType tyt tyf
     let dotv = case crettype of
-                LMVariant _ -> ".v"  -- TODO: Ugh. Fix c++ to not require this.
-                _ -> "" -- Ugh.
+          LMVariant _ -> ".v"  -- TODO: Ugh. Fix c++ to not require this.
+          _           -> "" -- Ugh.
 
     return $ CG
-      ( declc -- emit condition generation
+      (     declc -- emit condition generation
       ++    cgenType crettype
       `spc` cret
       ++    ";\n" -- emit decl for "return" type
@@ -349,15 +371,25 @@ cgenExprR env = \case
       ++    declt
       ++    ";\n" -- compute true value
       ++    "  "
-      ++    cret ++ dotv
-      ++    "= " ++ cretcast ++ "(" ++ vt ++ ");\n" -- assign to "return"
+      ++    cret
+      ++    dotv
+      ++    "= "
+      ++    cretcast
+      ++    "("
+      ++    vt
+      ++    ");\n" -- assign to "return"
       ++    "} else {\n" -- else
       ++    "  "
       ++    declf
       ++    ";\n" -- compute false value
       ++    "  "
-      ++    cret ++ dotv
-      ++    "= " ++ cretcast ++ "(" ++ vf ++ ");\n" -- assign to "return"
+      ++    cret
+      ++    dotv
+      ++    "= "
+      ++    cretcast
+      ++    "("
+      ++    vf
+      ++    ");\n" -- assign to "return"
       ++    "}\n" -- phew
       )
       cret
@@ -365,11 +397,10 @@ cgenExprR env = \case
 
   Assert cond body -> do
     (CG declcond vcond (CType TypeBool)) <- cgenExprR env cond
-    (CG declbody vbody tybody) <- cgenExprR env body
-    return $ CG
-      (declcond `spc` "ASSERT(" ++ vcond ++ ");\n" ++ declbody)
-      vbody
-      tybody
+    (CG declbody vbody tybody          ) <- cgenExprR env body
+    return $ CG (declcond `spc` "ASSERT(" ++ vcond ++ ");\n" ++ declbody)
+                vbody
+                tybody
 
   App{} -> error "App"
 
@@ -378,20 +409,20 @@ cgenFunId = \case
   UserFun fun -> fun
   PrimFun fun -> translateFun fun
   SelFun i _  -> "std::get<" ++ show (i - 1) ++ ">"
-  where
-    translateFun :: String -> String
-    translateFun = \case
-      "*"  -> "mul"
-      "+"  -> "add"
-      "/"  -> "div"
-      "-"  -> "sub"
-      "==" -> "eq"
-      "<"  -> "lt"
-      s    -> s
+ where
+  translateFun :: String -> String
+  translateFun = \case
+    "*"  -> "mul"
+    "+"  -> "add"
+    "/"  -> "div"
+    "-"  -> "sub"
+    "==" -> "eq"
+    "<"  -> "lt"
+    s    -> s
 
 cgenUserFun :: HasCallStack => Fun -> String
 cgenUserFun f = case f of
-  Fun funId       -> cgenFunId funId
+  Fun funId     -> cgenFunId funId
   GradFun s Fwd -> "D$" ++ cgenFunId s
   GradFun s Rev -> "R$" ++ cgenFunId s
   DrvFun  s Fwd -> "fwd$" ++ cgenFunId s
@@ -400,35 +431,38 @@ cgenUserFun f = case f of
 cgenAnyFun :: HasCallStack => TFun -> CType -> String
 cgenAnyFun tf cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
-  TFun ty (Fun (PrimFun "build")) -> let TypeVec t = ty in "build<"++ cgenType (mkCType t) ++ ">"
-  TFun ty (Fun (PrimFun "sumbuild")) -> "sumbuild<"++ cgenType (mkCType ty) ++ ">"
+  TFun ty (Fun (PrimFun "build")) ->
+    let TypeVec t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
+  TFun ty (Fun (PrimFun "sumbuild")) ->
+    "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
-  TFun _ f -> cgenUserFun f
+  TFun _            f                 -> cgenUserFun f
 
 cgenTypeOf :: TExpr -> String
 cgenTypeOf = cgenType . mkCType . typeof
 
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
-  CType ty -> cgenTypeLang ty
-  CTuple ts  -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
-  CFunction s t  -> "std::function<" ++ (cgenType t) ++ "(" ++ (cgenType s) ++ ")>"
-  TypeDef s _ -> s
-  UseTypeDef s -> s
-  LMZero s t -> lmt "Zero" [s, t]
-  LMOne t -> lmt "One" [t]
-  LMScale -> "LM::Scale"
-  LMHCat ts -> lm "HCat" ts
-  LMVCat ts -> lm "VCat" ts
-  LMBuild t -> lm "Build" [t]
-  LMBuildT t -> lm "BuildT" [t]
+  CType  ty -> cgenTypeLang ty
+  CTuple ts -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
+  CFunction s t ->
+    "std::function<" ++ (cgenType t) ++ "(" ++ (cgenType s) ++ ")>"
+  TypeDef s _     -> s
+  UseTypeDef s    -> s
+  LMZero s t      -> lmt "Zero" [s, t]
+  LMOne t         -> lmt "One" [t]
+  LMScale         -> "LM::Scale"
+  LMHCat   ts     -> lm "HCat" ts
+  LMVCat   ts     -> lm "VCat" ts
+  LMBuild  t      -> lm "Build" [t]
+  LMBuildT t      -> lm "BuildT" [t]
   LMCompose m1 m2 -> lm "Compose" [m1, m2]
-  LMAdd ms -> lm "Add" ms
-  LMVariant ts -> lm "Variant" ts
-  where
-    lm s ts = "LM::" ++ s ++ "<" ++ intercalate "," (map cgenType ts) ++ ">"
-    lmt s ts = "LM::" ++ s ++ "<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
+  LMAdd     ms    -> lm "Add" ms
+  LMVariant ts    -> lm "Variant" ts
+ where
+  lm s ts = "LM::" ++ s ++ "<" ++ intercalate "," (map cgenType ts) ++ ">"
+  lmt s ts = "LM::" ++ s ++ "<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
 
 cgenTypeLang :: HasCallStack => Type -> String
 cgenTypeLang = \case
@@ -440,61 +474,74 @@ cgenTypeLang = \case
   TypeVec   t   -> "vec<" ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
-  TypeLambda from to -> "std::function<" ++ (cgenTypeLang to) ++ "(" ++ (cgenTypeLang from) ++ ")>"
+  TypeLambda from to ->
+    "std::function<" ++ (cgenTypeLang to) ++ "(" ++ (cgenTypeLang from) ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
 ctypeofFun :: HasCallStack => CST -> TFun -> [CType] -> CType
 ctypeofFun env (TFun ty f) ctys = case cstMaybeLookupFun f env of
-    Just ctype -> -- trace ("Found fun " ++ show f) $
-                  ctype
-    Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
-               ctypeofFun1 env ty f ctys
+  Just ctype -> -- trace ("Found fun " ++ show f) $
+    ctype
+  Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
+    ctypeofFun1 env ty f ctys
 
 -- NB cst is not used!
 ctypeofFun1 :: HasCallStack => cst -> Type -> Fun -> [CType] -> CType
 ctypeofFun1 _ ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
 ctypeofFun1 _ (TypeLM _ _) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
-ctypeofFun1 _ (TypeLM _ _) f ctys = error $ "Did not match [" ++  show f ++ "]@\n  " ++ intercalate "\n  " (map show ctys)
+ctypeofFun1 _ (TypeLM _ _) f ctys =
+  error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
+    "\n  "
+    (map show ctys)
 ctypeofFun1 _ ty _ _ = mkCType ty
 
 ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
-ctypeofPrimFun ty s arg_types = 
-  case (s, map stripTypeDef arg_types) of
-  ("lmApply", _) -> mkCType ty
-  ("lmBuild", [_, lam]) -> LMBuild lam
-  ("lmBuildT", [_, lam]) -> LMBuildT lam
-  ("lmOne", [ct]) -> LMOne (stripCType ct)
-  ("lmZero", [cs, ct]) -> LMZero (stripCType cs) (stripCType ct)
-  ("lmScale", _) -> LMScale
-  ("lmHCat", _) -> LMHCat arg_types
-  ("lmVCat", _) -> LMVCat arg_types
+ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
+  ("lmApply"  , _         ) -> mkCType ty
+  ("lmBuild"  , [_, lam]  ) -> LMBuild lam
+  ("lmBuildT" , [_, lam]  ) -> LMBuildT lam
+  ("lmOne"    , [ct]      ) -> LMOne (stripCType ct)
+  ("lmZero"   , [cs, ct]  ) -> LMZero (stripCType cs) (stripCType ct)
+  ("lmScale"  , _         ) -> LMScale
+  ("lmHCat"   , _         ) -> LMHCat arg_types
+  ("lmVCat"   , _         ) -> LMVCat arg_types
   ("lmCompose", [lm1, lm2]) -> LMCompose lm1 lm2
-  ("lmAdd", _) -> LMAdd arg_types
-  ("lmVariant", _) -> LMVariant arg_types
-  _ -> case ty of
-        TypeLM _ _ -> error ("Unmatched prim [" ++ s ++ "] " ++ show ty ++ " @\n"++
-                             "  " ++ intercalate "\n  " (map show arg_types))
-        _ -> mkCType ty
+  ("lmAdd"    , _         ) -> LMAdd arg_types
+  ("lmVariant", _         ) -> LMVariant arg_types
+  _                         -> case ty of
+    TypeLM _ _ -> error
+      (  "Unmatched prim ["
+      ++ s
+      ++ "] "
+      ++ show ty
+      ++ " @\n"
+      ++ "  "
+      ++ intercalate "\n  " (map show arg_types)
+      )
+    _ -> mkCType ty
 
 pattern RR = TypeFloat
 pattern VecR = TypeVec TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "-", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
-  (PrimFun "+", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
-  (PrimFun "/", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
-  (PrimFun "*", [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
-  (PrimFun "to_float", [CType TypeInteger]) -> LMZero TypeInteger TypeFloat
-  (PrimFun "$trace", [CType ty]) -> LMOne ty
-  (PrimFun "$rand", [CType ty]) -> LMZero ty ty
-  (PrimFun "size", [CType ty]) -> LMZero ty TypeInteger
-  (PrimFun "index", [CType (TypeVec t)]) -> LMHCat [LMZero TypeInteger t, LMBuild (LMScale)]
-  _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate "\n  " (map (show . stripTypeDef) ctys)
+  (PrimFun "-"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "+"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "/"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "*"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "to_float", [CType TypeInteger] ) -> LMZero TypeInteger TypeFloat
+  (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
+  (PrimFun "$rand"   , [CType ty]          ) -> LMZero ty ty
+  (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
+  (PrimFun "index", [CType (TypeVec t)]) ->
+    LMHCat [LMZero TypeInteger t, LMBuild (LMScale)]
+  _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
+    "\n  "
+    (map (show . stripTypeDef) ctys)
 
 cgenKonst :: Konst -> String
 cgenKonst = \case
-  KZero t    -> "zero_t<" ++ cgenTypeLang t ++ "> {}"
+  KZero    t -> "zero_t<" ++ cgenTypeLang t ++ "> {}"
   KInteger i -> show i
   KFloat   f -> show f
   KBool    b -> if b then "TRUE" else "FALSE"
@@ -505,19 +552,16 @@ cgenVar v = show v
 
 cppGen :: String -> [TDef] -> IO (String, String)
 cppGen outfile defs = do
-  let lines = [
-         "#include \"knossos.h\"", 
-         "namespace ks {\n"
-       ]
-      lls = cgenDefs defs
-      tail = [
-         "}",
-         "#include \"knossos.cpp\"",  
-         "int main() {", 
-         "  ks::main();", 
-         "  return 0;", 
-         "}"
-       ]
+  let lines = ["#include \"knossos.h\"", "namespace ks {\n"]
+      lls   = cgenDefs defs
+      tail =
+        [ "}"
+        , "#include \"knossos.cpp\""
+        , "int main() {"
+        , "  ks::main();"
+        , "  return 0;"
+        , "}"
+        ]
       ksofile = outfile ++ ".kso"
       cppfile = outfile ++ ".cpp"
 
@@ -535,7 +579,20 @@ cppFG compiler outfile defs = do
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
-  let compcmd = (compiler, ["-fmax-errors=5", "-Wall", "-Wno-unused", "-Isrc/runtime", "-O", "-g", "-std=c++17", cppfile, "-o", exefile])
+  let compcmd =
+        ( compiler
+        , [ "-fmax-errors=5"
+          , "-Wall"
+          , "-Wno-unused"
+          , "-Isrc/runtime"
+          , "-O"
+          , "-g"
+          , "-std=c++17"
+          , cppfile
+          , "-o"
+          , exefile
+          ]
+        )
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
   putStrLn "Running"
