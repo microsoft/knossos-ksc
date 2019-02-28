@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# LANGUAGE LambdaCase, FlexibleInstances, TypeApplications, PatternSynonyms  #-}
 
 module Cgen where
@@ -69,7 +68,7 @@ stripCType = \case
 
 cgenIsZero :: CType -> Bool
 cgenIsZero = \case
-  CType (TypeZero t) -> True
+  CType (TypeZero _) -> True
   CTuple ts -> all cgenIsZero ts
   _ -> False
 
@@ -78,9 +77,9 @@ cgenIsLM = \case
   CType (TypeLM _ _) -> True
   CType _ -> False
   CTuple ts -> any cgenIsLM ts
-  CFunction s t -> False
-  TypeDef s ty -> cgenIsLM ty
-  UseTypeDef s -> error "Don't know; it's a UseTypeDef"
+  CFunction _ _ -> False
+  TypeDef _ ty -> cgenIsLM ty
+  UseTypeDef s -> error ("Don't know; it's a UseTypeDef: " ++ s)
   _ -> True
 
 makeUnionType :: HasCallStack => CType -> CType -> (CType, String)
@@ -193,7 +192,7 @@ cgenDefs defs =
   snd $ foldl go (cstEmpty, []) defs
   where
     go :: (CST, [String]) -> TDef -> (CST, [String])
-    go (env, strs) def@(DefX (TFun ty f) _ _) =
+    go (env, strs) def@(DefX (TFun _ f) _ _) =
       let 
           env' = cstInsertFun f (UseTypeDef ("ty$" ++ cgenUserFun f)) env
           (CG cdecl _cfun _ctype) = cgenDefE env' def
@@ -233,9 +232,9 @@ cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
 cgenExprR env = \case
   Konst k  -> return $ CG "" (cgenKonst k) (mkCType $ typeofKonst k)
   Var (TVar ty Dummy) -> let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
-  Var (TVar ty v) -> return $ CG "" (show v) (cstLookupVar v env)
+  Var (TVar _ v) -> return $ CG "" (show v) (cstLookupVar v env)
 
-  Call tf@(TFun ty f) (Tuple vs) -> do
+  Call tf@(TFun _ _) (Tuple vs) -> do
       -- Untuple argument for C++ call
       cgvs <- mapM (cgenExprR env) vs
       let cdecls = map getDecl cgvs
@@ -272,9 +271,9 @@ cgenExprR env = \case
         v
         cftype
 
-  Call tf@(TFun ty f) v -> cgenExprR env $ Call tf (Tuple [v])
+  Call tf@(TFun _ _) v -> cgenExprR env $ Call tf (Tuple [v])
 
-  Let (TVar tyv v) e1 body -> do
+  Let (TVar _ v) e1 body -> do
     (CG decle1 ve1 type1) <- cgenExprR env e1
     (CG declbody vbody tybody) <- cgenExprR (cstInsertVar v type1 env) body
     lvar        <- freshCVar
@@ -330,7 +329,7 @@ cgenExprR env = \case
   If c texpr fexpr -> do
     cret        <- freshCVar
 
-    (CG declc vc tyc) <- cgenExprR env c
+    (CG declc vc _) <- cgenExprR env c
     (CG declt vt tyt) <- cgenExprR env texpr
     (CG declf vf tyf) <- cgenExprR env fexpr
     let (crettype, cretcast) = makeUnionType tyt tyf
@@ -378,7 +377,7 @@ cgenFunId :: FunId -> String
 cgenFunId = \case
   UserFun fun -> fun
   PrimFun fun -> translateFun fun
-  SelFun i n  -> "std::get<" ++ show (i - 1) ++ ">"
+  SelFun i _  -> "std::get<" ++ show (i - 1) ++ ">"
   where
     translateFun :: String -> String
     translateFun = \case
@@ -400,11 +399,11 @@ cgenUserFun f = case f of
 
 cgenAnyFun :: HasCallStack => TFun -> CType -> String
 cgenAnyFun tf cftype = case tf of
-  TFun ty (Fun (PrimFun "lmApply")) -> "lmApply"
+  TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) -> let TypeVec t = ty in "build<"++ cgenType (mkCType t) ++ ">"
   TFun ty (Fun (PrimFun "sumbuild")) -> "sumbuild<"++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
-  TFun (TypeLM s t) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
+  TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _ f -> cgenUserFun f
 
 cgenTypeOf :: TExpr -> String
@@ -445,17 +444,18 @@ cgenTypeLang = \case
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
 ctypeofFun :: HasCallStack => CST -> TFun -> [CType] -> CType
-ctypeofFun env tf@(TFun ty f) ctys = case cstMaybeLookupFun f env of
+ctypeofFun env (TFun ty f) ctys = case cstMaybeLookupFun f env of
     Just ctype -> -- trace ("Found fun " ++ show f) $
                   ctype
     Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
                ctypeofFun1 env ty f ctys
 
-ctypeofFun1 :: HasCallStack => CST -> Type -> Fun -> [CType] -> CType
-ctypeofFun1 env ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
-ctypeofFun1 env (TypeLM s t) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
-ctypeofFun1 env (TypeLM s t) f ctys = error $ "Did not match [" ++  show f ++ "]@\n  " ++ intercalate "\n  " (map show ctys)
-ctypeofFun1 env ty f ctys = mkCType ty
+-- NB cst is not used!
+ctypeofFun1 :: HasCallStack => cst -> Type -> Fun -> [CType] -> CType
+ctypeofFun1 _ ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
+ctypeofFun1 _ (TypeLM _ _) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
+ctypeofFun1 _ (TypeLM _ _) f ctys = error $ "Did not match [" ++  show f ++ "]@\n  " ++ intercalate "\n  " (map show ctys)
+ctypeofFun1 _ ty _ _ = mkCType ty
 
 ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
 ctypeofPrimFun ty s arg_types = 
