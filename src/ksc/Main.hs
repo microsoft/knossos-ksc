@@ -13,7 +13,7 @@ import Opt
 import CSE
 
 import ANF
-import Cgen (cppFG)
+import qualified Cgen
 import KMonad
 import Data.List( partition )
 import qualified System.Directory
@@ -161,7 +161,8 @@ doallG compiler verbosity file =
   ; displayPass verbosity "CSE" env5 cse
 
   ; let ann2 =  cse
-  ; liftIO (cppFG compiler ("obj/" ++ file) ann2)
+  ; exefile <- liftIO (Cgen.cppGenAndCompile compiler ("obj/" ++ file) ann2)
+  ; liftIO (Cgen.runExe exefile)
   }
 
 gmm :: IO ()
