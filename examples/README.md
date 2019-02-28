@@ -8,3 +8,4 @@ Examples are in several categories:
 * MF: Model fitting (other than DL training...)
 * CV: Computer Vision
 * EC: Economics
+* KO: Knossos Optimizers

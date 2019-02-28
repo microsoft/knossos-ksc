@@ -12,7 +12,7 @@
 obj/
 Debug/
 Release/
-test/ksc/cmake-build/
+cmake-build/
 
 # nuget packages
 /packages/

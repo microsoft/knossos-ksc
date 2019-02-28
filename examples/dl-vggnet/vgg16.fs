@@ -19,23 +19,34 @@ let foldr (f: 'y -> 'x -> 'x ) (ys: 'y[]) (x : 'x) =  Array.foldBack f ys x
 let (<||) f g x y = f (g x y)         // >
 let repeat n f = seq { yield (f 1) }
 
+// The parameters of a VGG network.
+// Normally this will just be filled with pretrained weights 
+// loaded from a file, but see vgg16_init for a typical architecture.
 type vgg_weights = { 
-  Wconv: Mat[][]   // Weight matrices for convolutional layers
-  Wfull: Mat[]     // Weight matrices for fully connected layers
+  Wconv: Tensor[][]  // Weight tensors for convolutional layers
+  Wfull: Mat[]       // Weight matrices for fully connected layers
 }
 
-// A vgg16 network (applied wlog to 1D images).  
-// Apply weights to image x
-let vgg16 weights x =
-    let vggblk Ws x = foldr (relu <|| conv2) Ws x |> max_pooling_2d
+// Apply the VGG16 network with parameters "weights" to an image "x"
+let vgg16 (weights : vgg_weights) (x : Tensor) =
+    // Local function to run one conv block
+    let vggblk (Ws : Tensor[]) (x : Tensor) =
+       foldr (relu <|| conv2) Ws x |> max_pooling_2d
+    
+    // Apply all conv blocks to x, and pipe into...
     foldr vggblk weights.Wconv x |>
+    
+    // fully-connected layers 
     mmul weights.Wfull.[0] |> relu |> dropout |>
     mmul weights.Wfull.[1] |> relu |> dropout |>
     softmax
 
-// Network "architecture" is defined by the
-// function 'vgg16' and shapes of the weight matrices
-let vggblk_init n_channels n_convs =
+// Network "architecture" is defined by the function 'vgg16' 
+// and the shapes of the weight matrices/tensors with which
+// it was trained.
+let vgg16_init =
+  // Helper function to make a VGG "conv block"
+  let vggblk_init n_channels n_convs =
     seq { 
       yield rand (W*H, n_channels, 3, 1, 1)
       yield rand (n_channels, n_channels, 3, 1, 1) 
@@ -43,7 +54,8 @@ let vggblk_init n_channels n_convs =
         yield rand (n_channels, n_channels, 3, 1, 1)
     } |> Seq.toArray
 
-let vgg16_init x_size = {
+  // Construct a vgg_weights record type
+  {
     Wconv = [|
       vggblk_init  64 2
       vggblk_init 128 2
@@ -57,6 +69,3 @@ let vgg16_init x_size = {
       rand (4096, 4096)
     |]
   }
-
-
-
