@@ -483,17 +483,17 @@ ctypeofFun env (TFun ty f) ctys = case cstMaybeLookupFun f env of
   Just ctype -> -- trace ("Found fun " ++ show f) $
     ctype
   Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
-    ctypeofFun1 env ty f ctys
+    ctypeofFun1 ty f ctys
 
 -- NB cst is not used!
-ctypeofFun1 :: HasCallStack => cst -> Type -> Fun -> [CType] -> CType
-ctypeofFun1 _ ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
-ctypeofFun1 _ (TypeLM _ _) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
-ctypeofFun1 _ (TypeLM _ _) f ctys =
+ctypeofFun1 :: HasCallStack => Type -> Fun -> [CType] -> CType
+ctypeofFun1 ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
+ctypeofFun1 (TypeLM _ _) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
+ctypeofFun1 (TypeLM _ _) f ctys =
   error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map show ctys)
-ctypeofFun1 _ ty _ _ = mkCType ty
+ctypeofFun1 ty _ _ = mkCType ty
 
 ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
 ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
