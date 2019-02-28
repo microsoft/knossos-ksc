@@ -115,8 +115,8 @@ doallC compiler verbosity file = do
 doall :: HasCallStack => Int -> String -> IO ()
 doall = doallC "g++-7"
 
-doallG :: HasCallStack => String -> Int -> String -> IO String
-doallG compiler verbosity file =
+doallE :: HasCallStack => String -> Int -> String -> IO String
+doallE compiler verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity defs))
   in
   runKM $
@@ -161,8 +161,13 @@ doallG compiler verbosity file =
   ; displayPass verbosity "CSE" env5 cse
 
   ; let ann2 =  cse
-  ; exefile <- liftIO (Cgen.cppGenAndCompile compiler ("obj/" ++ file) ann2)
-  ; liftIO (Cgen.runExe exefile)
+  ; liftIO (Cgen.cppGenAndCompile compiler ("obj/" ++ file) ann2)
+  }
+
+doallG :: HasCallStack => String -> Int -> String -> IO String
+doallG compiler verbosity file = do
+  { exefile <- doallE compiler verbosity file
+  ; Cgen.runExe exefile
   }
 
 gmm :: IO ()
