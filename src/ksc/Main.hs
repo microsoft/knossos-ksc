@@ -15,7 +15,7 @@ import CSE
 import ANF
 import Cgen (cppFG)
 import KMonad
-import Data.List( partition, intercalate )
+import Data.List( partition )
 import qualified System.Directory
 import Test.Hspec (hspec, Spec)
 
@@ -207,5 +207,5 @@ testC compiler = do
     putStrLn "Success"
     System.Exit.exitWith System.Exit.ExitSuccess
     else do
-    putStrLn ("FAILURE!" ++ intercalate "\n" (take 5 (reverse (lines output))))
+    putStrLn ("FAILURE!" ++ unlines (take 5 (reverse (lines output))))
     System.Exit.exitWith (System.Exit.ExitFailure 1)
