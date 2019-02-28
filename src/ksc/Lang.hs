@@ -2,17 +2,17 @@
 
 module Lang where
 
-import Prelude hiding( (<>) )
+import           Prelude                 hiding ( (<>) )
 
-import qualified Text.PrettyPrint   as PP
-import Text.PrettyPrint (Doc)
-import Data.List ( intersperse )
-import KMonad
+import qualified Text.PrettyPrint              as PP
+import           Text.PrettyPrint               ( Doc )
+import           Data.List                      ( intersperse )
+import           KMonad
 
-import Data.Either( partitionEithers )
+import           Data.Either                    ( partitionEithers )
 
-import Debug.Trace( trace )
-import Test.Hspec
+import           Debug.Trace                    ( trace )
+import           Test.Hspec
 
 -----------------------------------------------
 --  The main data types
@@ -81,9 +81,9 @@ isScalar = \case
   TypeInteger    -> True
   TypeFloat      -> True
   TypeTuple ts   -> all isScalar ts
-  TypeVec _      -> False
+  TypeVec   _    -> False
   TypeLambda _ _ -> False
-  TypeLM _ _     -> error "Shouldn't see TypeLM at this stage of codegen"
+  TypeLM     _ _ -> error "Shouldn't see TypeLM at this stage of codegen"
   TypeUnknown    -> error "Shouldn't see TypeUnknown at this stage of codegen"
 
 ----------------------------------
@@ -92,8 +92,8 @@ isScalar = \case
 tangentType :: Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
-tangentType (TypeZero t)   = tangentType t
-tangentType (TypeVec t)    = TypeVec (tangentType t)
+tangentType (TypeZero  t ) = tangentType t
+tangentType (TypeVec   t ) = TypeVec (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
 tangentType TypeInteger    = TypeTuple []
 tangentType TypeBool       = TypeTuple []
@@ -102,11 +102,11 @@ tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLambda
 
 promoteZero :: Type -> Type
-promoteZero (TypeZero t)        = t
-promoteZero (TypeTuple ts)      = TypeTuple $ map promoteZero ts
-promoteZero (TypeVec t)         = TypeVec $ promoteZero t
+promoteZero (TypeZero  t      ) = t
+promoteZero (TypeTuple ts     ) = TypeTuple $ map promoteZero ts
+promoteZero (TypeVec   t      ) = TypeVec $ promoteZero t
 promoteZero (TypeLambda from t) = TypeLambda from $ promoteZero t
-promoteZero t = t
+promoteZero t                   = t
 
 eqType :: Type -> Type -> Bool
 eqType t1 t2 = promoteZero t1 == promoteZero t2
@@ -185,21 +185,25 @@ flipMode Rev = Fwd
 
 isZero :: Type -> Bool
 isZero (TypeZero _) = True
-isZero _ = False
+isZero _            = False
 
 isKZero :: TExpr -> Bool
 isKZero = \case
-    Konst (KZero _) -> True
-    Konst (KInteger 0) -> True
-    Konst (KFloat 0.0) -> True
-    e -> isZero (typeof e)
+  Konst (KZero    _  ) -> True
+  Konst (KInteger 0  ) -> True
+  Konst (KFloat   0.0) -> True
+  e                    -> isZero (typeof e)
 
 partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
 -- Separate the Rules from the Defs
-partitionDecls decls
-  = partitionEithers $
-    map (\case { RuleDecl r -> Left r; DefDecl d -> Right d }) $
-    decls
+partitionDecls decls =
+  partitionEithers
+    $ map
+        (\case
+          RuleDecl r -> Left r
+          DefDecl  d -> Right d
+        )
+    $ decls
 
 tVarVar :: TVar -> Var
 tVarVar (TVar _ v) = v
@@ -231,13 +235,13 @@ mkZero :: Type -> TExpr
 mkZero = mkDummy . TypeZero
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
-mkLet (TVar ty v) rhs body
-  = assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs) ty (typeof rhs) $
-    Let (TVar ty v) rhs body
+mkLet (TVar ty v) rhs body =
+  assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs) ty (typeof rhs)
+    $ Let (TVar ty v) rhs body
 
-mkLets :: HasCallStack => [(TVar,TExpr)] -> TExpr -> TExpr
-mkLets [] e = e
-mkLets ((v,rhs):bs) e = mkLet v rhs (mkLets bs e)
+mkLets :: HasCallStack => [(TVar, TExpr)] -> TExpr -> TExpr
+mkLets []              e = e
+mkLets ((v, rhs) : bs) e = mkLet v rhs (mkLets bs e)
 
 kInt :: Integer -> ExprX f b
 kInt i = Konst (KInteger i)
@@ -253,7 +257,7 @@ kTFloat f = Konst (KFloat f)
 
 mkTuple :: [ExprX f b] -> ExprX f b
 mkTuple [e] = e
-mkTuple es = Tuple es
+mkTuple es  = Tuple es
 
 -----------------------------------------------
 --     Building types
@@ -261,7 +265,7 @@ mkTuple es = Tuple es
 
 mkTypeTuple :: [Type] -> Type
 mkTypeTuple [ty] = ty
-mkTypeTuple tys = TypeTuple tys
+mkTypeTuple tys  = TypeTuple tys
 
 
 -----------------------------------------------
@@ -296,28 +300,28 @@ instance (HasType b, HasType f,
 -- The type of an If statement is a sort of union of the types on the branches
 -- This occurs because of types like TypeZero which intersect both Float and Integer
 makeIfType :: HasCallStack => Type -> Type -> Type
-makeIfType (TypeZero ty1) ty2 = makeIfType ty1 ty2
-makeIfType ty1 (TypeZero ty2) = makeIfType ty1 ty2
-makeIfType (TypeTuple t1s) (TypeTuple t2s) = TypeTuple $ zipWith makeIfType t1s t2s
-makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $
-                     ty2
+makeIfType (TypeZero ty1) ty2            = makeIfType ty1 ty2
+makeIfType ty1            (TypeZero ty2) = makeIfType ty1 ty2
+makeIfType (TypeTuple t1s) (TypeTuple t2s) =
+  TypeTuple $ zipWith makeIfType t1s t2s
+makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $ ty2
 
 getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
-getLM t = error $ "Wanted TypeLM, got " ++ pps t
+getLM t            = error $ "Wanted TypeLM, got " ++ pps t
 
 unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
-unzipLMTypes [] = Just ([], [])
+unzipLMTypes []                  = Just ([], [])
 unzipLMTypes (TypeLM s t : lmts) = case unzipLMTypes lmts of
-                                     Just (ss, ts) -> Just (s:ss, t:ts)
-                                     Nothing       -> Nothing
+  Just (ss, ts) -> Just (s : ss, t : ts)
+  Nothing       -> Nothing
 unzipLMTypes _ = Nothing
 
 typeofKonst :: Konst -> Type
-typeofKonst (KZero t)    = TypeZero t
+typeofKonst (KZero    t) = TypeZero t
 typeofKonst (KInteger _) = TypeInteger
-typeofKonst (KFloat _)   = TypeFloat
-typeofKonst (KBool _)    = TypeBool
+typeofKonst (KFloat   _) = TypeFloat
+typeofKonst (KBool    _) = TypeBool
 
 -----------------------------------------------
 --     Debugging utilities
@@ -333,29 +337,49 @@ assertBool x = x    -- To remove check, return True always
 assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
 assertTypesEqualThen msg t1 (TypeZero t2) e = assertTypesEqualThen msg t1 t2 e
 assertTypesEqualThen msg (TypeZero t1) t2 e = assertTypesEqualThen msg t1 t2 e
-assertTypesEqualThen msg t1 t2 e =
-  if t1 == t2 then
-    e
+assertTypesEqualThen msg t1 t2 e = if t1 == t2
+  then e
   else
-    error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $
-    e
+    error
+        (  "Asserts unequal ["
+        ++ msg
+        ++ "] \n T1 = "
+        ++ show t1
+        ++ "\n T2 = "
+        ++ show t2
+        ++ "\n"
+        )
+      $ e
 
 assertEqualThen :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
-assertEqualThen msg t1 t2 e =
-  if t1 == t2 then e else error ("Asserts unequal ["++msg++"] \n T1 = " ++ show t1 ++ "\n T2 = " ++ show t2 ++ "\n") $ e
+assertEqualThen msg t1 t2 e = if t1 == t2
+  then e
+  else
+    error
+        (  "Asserts unequal ["
+        ++ msg
+        ++ "] \n T1 = "
+        ++ show t1
+        ++ "\n T2 = "
+        ++ show t2
+        ++ "\n"
+        )
+      $ e
 
 assertAllEqualThen :: (HasCallStack, Eq a, Show a) => String -> [a] -> b -> b
-assertAllEqualThen msg es e =
-  if allEq es then e else
-     flip trace e $ ("Assert failed: ["++msg++"] not all equal  \n " ++ show es ++ "\n")
-  where
-    allEq [] = True
-    allEq (a:as) = allEqa a as
+assertAllEqualThen msg es e = if allEq es
+  then e
+  else
+    flip trace e
+      $ ("Assert failed: [" ++ msg ++ "] not all equal  \n " ++ show es ++ "\n")
+ where
+  allEq []       = True
+  allEq (a : as) = allEqa a as
 
-    allEqa a0 = all (a0 ==)
+  allEqa a0 = all (a0 ==)
 
 assertAllEqualRet :: (HasCallStack, Eq a, Show a) => String -> [a] -> a
-assertAllEqualRet msg (e:es) = assertAllEqualThen msg (e:es) e
+assertAllEqualRet msg (e : es) = assertAllEqualThen msg (e : es) e
 
 
 
@@ -382,16 +406,16 @@ instance Show Var where
 newtype SDoc = SDoc(Bool -> Doc) -- True = S-expressions, False = infix style
 
 (<>) :: SDoc -> SDoc -> SDoc
-(SDoc d1) <> (SDoc d2) = SDoc(\s -> (d1 s) PP.<> (d2 s))
+(SDoc d1) <> (SDoc d2) = SDoc (\s -> (d1 s) PP.<> (d2 s))
 
 (<+>) :: SDoc -> SDoc -> SDoc
-(SDoc d1) <+> (SDoc d2) = SDoc(\s -> (d1 s) PP.<+> (d2 s))
+(SDoc d1) <+> (SDoc d2) = SDoc (\s -> (d1 s) PP.<+> (d2 s))
 
 text :: String -> SDoc
 text s = SDoc (\_ -> PP.text s)
 
 char :: Char -> SDoc
-char c  = SDoc (\_ -> PP.char c)
+char c = SDoc (\_ -> PP.char c)
 
 int :: Int -> SDoc
 int i = SDoc (\_ -> PP.int i)
@@ -406,10 +430,22 @@ parens :: SDoc -> SDoc
 parens (SDoc d) = SDoc (\m -> PP.parens $ d m)
 
 cat :: [SDoc] -> SDoc
-cat ss = SDoc (\m -> PP.cat $ map (\case SDoc s -> s m) ss)
+cat ss = SDoc
+  (\m -> PP.cat $ map
+    (\case
+      SDoc s -> s m
+    )
+    ss
+  )
 
 sep :: [SDoc] -> SDoc
-sep ss = SDoc (\m -> PP.sep $ map (\case SDoc s -> s m) ss)
+sep ss = SDoc
+  (\m -> PP.sep $ map
+    (\case
+      SDoc s -> s m
+    )
+    ss
+  )
 
 mode :: SDoc -> SDoc -> SDoc
 mode (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
@@ -418,7 +454,13 @@ nest :: Int -> SDoc -> SDoc
 nest i (SDoc d) = SDoc (\m -> PP.nest i (d m))
 
 vcat :: [SDoc] -> SDoc
-vcat ss = SDoc (\m -> PP.vcat $ map (\case SDoc s -> s m) ss)
+vcat ss = SDoc
+  (\m -> PP.vcat $ map
+    (\case
+      SDoc s -> s m
+    )
+    ss
+  )
 
 hang :: SDoc -> Int -> SDoc -> SDoc
 hang (SDoc d1) i (SDoc d2) = SDoc (\m -> PP.hang (d1 m) i (d2 m))
@@ -433,13 +475,27 @@ doubleQuotes :: SDoc -> SDoc
 doubleQuotes (SDoc d) = SDoc (\m -> PP.doubleQuotes $ d m)
 
 fsep :: [SDoc] -> SDoc
-fsep ss = SDoc (\m -> PP.fsep $ map (\case SDoc s -> s m) ss)
+fsep ss = SDoc
+  (\m -> PP.fsep $ map
+    (\case
+      SDoc s -> s m
+    )
+    ss
+  )
 
 punctuate :: SDoc -> [SDoc] -> [SDoc]
-punctuate (SDoc p) ss = let
-    ts = PP.punctuate (p True) $ map (\case SDoc s -> s True) ss
-    fs = PP.punctuate (p False) $ map (\case SDoc s -> s False) ss
-    in map (\(t,f) -> SDoc (\m -> if m then t else f)) (zip ts fs)
+punctuate (SDoc p) ss =
+  let ts = PP.punctuate (p True) $ map
+        (\case
+          SDoc s -> s True
+        )
+        ss
+      fs = PP.punctuate (p False) $ map
+        (\case
+          SDoc s -> s False
+        )
+        ss
+  in  map (\(t, f) -> SDoc (\m -> if m then t else f)) (zip ts fs)
 
 comma :: SDoc
 comma = text ","
@@ -492,14 +548,14 @@ instance Pretty Fun where
   ppr f = pprFun f
 
 pprFunId :: FunId -> SDoc
-pprFunId (UserFun s)  = text s
-pprFunId (PrimFun p)  = text p
+pprFunId (UserFun s ) = text s
+pprFunId (PrimFun p ) = text p
 pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> SDoc
-pprFun (Fun s)         = ppr s
-pprFun (GradFun s Fwd) = text "D$"   <> ppr s
-pprFun (GradFun s Rev) = text "R$"   <> ppr s
+pprFun (Fun s        ) = ppr s
+pprFun (GradFun s Fwd) = text "D$" <> ppr s
+pprFun (GradFun s Rev) = text "R$" <> ppr s
 pprFun (DrvFun  s Fwd) = text "fwd$" <> ppr s
 pprFun (DrvFun  s Rev) = text "rev$" <> ppr s
 
@@ -550,61 +606,68 @@ type Prec = Int
  -- high => parenthesise everything
 
 precZero, precOne, precTwo, precThree :: Int
-precZero  = 0  -- Base
-precOne   = 1  -- ==
-precTwo   = 2  -- +
+precZero = 0  -- Base
+precOne = 1  -- ==
+precTwo = 2  -- +
 precThree = 3  -- *
 
 instance (HasInfix f, PrettyVar f, PrettyVar b)
       => Pretty (ExprX f b) where
   pprPrec = pprExpr
 
-pprParendExpr :: (HasInfix f, PrettyVar f, PrettyVar b)
-              => ExprX f b -> SDoc
+pprParendExpr :: (HasInfix f, PrettyVar f, PrettyVar b) => ExprX f b -> SDoc
 pprParendExpr = pprExpr precTwo
 
 pprTVar :: TVar -> SDoc
 pprTVar (TVar ty v) = ppr v <> text ":" <> ppr ty
 
-pprExpr :: (HasInfix f, PrettyVar f, PrettyVar b)
-        => Prec -> ExprX f b -> SDoc
-pprExpr _  (Var v)   = pprVar v
-pprExpr p (Konst k)  = pprPrec p k
+pprExpr :: (HasInfix f, PrettyVar f, PrettyVar b) => Prec -> ExprX f b -> SDoc
+pprExpr _ (Var   v ) = pprVar v
+pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = parens (mode (text "tuple" <+> rest) rest)
-    where rest = pprList ppr es
-pprExpr p (Lam v e)
-  = parensIf p precZero $
-    text "lam" <+> parens (pprTVar v) <+> ppr e
-pprExpr p (Let v e1 e2)
-  = mode (parens $ sep [text "let", pprBndr v, ppr e1, ppr e2])
-         (parensIf p precZero (vcat
-            [ text "let" <+> (bracesSp $ sep [ pprBndr v, nest 2 (text "=" <+> ppr e1)])
-            , ppr e2]))
+  where rest = pprList ppr es
+pprExpr p (Lam v e) =
+  parensIf p precZero $ text "lam" <+> parens (pprTVar v) <+> ppr e
+pprExpr p (Let v e1 e2) = mode
+  (parens $ sep [text "let", pprBndr v, ppr e1, ppr e2])
+  (parensIf
+    p
+    precZero
+    (vcat
+      [ text "let"
+        <+> (bracesSp $ sep [pprBndr v, nest 2 (text "=" <+> ppr e1)])
+      , ppr e2
+      ]
+    )
+  )
 pprExpr p (If e1 e2 e3) = mode
-    (parens (sep [text "if", ppr e1, ppr e2, ppr e3]))
-    (parensIf p precZero (sep [ text "if" <+> ppr e1
-                        , text "then" <+> ppr e2
-                        , text "else" <+> ppr e3 ]))
-pprExpr p (Assert e1 e2)
-  = parensIf p precZero $
-    sep [ text "assert" <+> pprParendExpr e1, ppr e2 ]
+  (parens (sep [text "if", ppr e1, ppr e2, ppr e3]))
+  (parensIf
+    p
+    precZero
+    (sep [text "if" <+> ppr e1, text "then" <+> ppr e2, text "else" <+> ppr e3])
+  )
+pprExpr p (Assert e1 e2) =
+  parensIf p precZero $ sep [text "assert" <+> pprParendExpr e1, ppr e2]
 
-pprExpr _ (App e1 e2)
-  = parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
+pprExpr _ (App e1 e2) =
+  parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
 
-pprCall :: (PrettyVar f, PrettyVar b, HasInfix f)
-        => Prec -> f -> ExprX f b -> SDoc
-pprCall prec f e = mode (parens $ (pprVar f) <+> pp_args)
+pprCall
+  :: (PrettyVar f, PrettyVar b, HasInfix f) => Prec -> f -> ExprX f b -> SDoc
+pprCall prec f e = mode
+  (parens $ (pprVar f) <+> pp_args)
   (case (e, isInfix f) of
-      (Tuple [e1, e2], Just prec') -> parensIf prec prec' $
-          sep [ pprExpr prec' e1, pprVar f <+> pprExpr prec' e2 ]
-      _                            -> cat [pprVar f, nest 2 (parensSp pp_args)])
-  where
-    pp_args = case e of
-                (Tuple es) -> pprList ppr es
-                _        -> ppr e
+    (Tuple [e1, e2], Just prec') -> parensIf prec prec'
+      $ sep [pprExpr prec' e1, pprVar f <+> pprExpr prec' e2]
+    _ -> cat [pprVar f, nest 2 (parensSp pp_args)]
+  )
+ where
+  pp_args = case e of
+    (Tuple es) -> pprList ppr es
+    _          -> ppr e
 
 class HasInfix f where
   isInfix :: f -> Maybe Prec
@@ -622,10 +685,9 @@ instance HasInfix Fun where
   isInfix _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
-parensIf ctxt inner doc
-  | ctxt == precZero = doc
-  | ctxt >= inner    = parens doc
-  | otherwise        = doc
+parensIf ctxt inner doc | ctxt == precZero = doc
+                        | ctxt >= inner    = parens doc
+                        | otherwise        = doc
 
 instance (Show f, PrettyVar f, PrettyVar b, HasInfix f)
       => Pretty (DeclX f b) where
@@ -662,34 +724,32 @@ parensSp :: SDoc -> SDoc
 parensSp d = char '(' <+> d <+> char ')'
 
 pprList :: (p -> SDoc) -> [p] -> SDoc
-pprList ppr ps = let pps = map ppr ps in
-    mode (sep pps) (sep $ punctuate comma pps)
+pprList ppr ps =
+  let pps = map ppr ps in mode (sep pps) (sep $ punctuate comma pps)
 
 instance Pretty a => Pretty [a] where
   ppr xs = char '[' <> pprList ppr xs <> char ']'
 
 pprTrace :: String -> SDoc -> a -> a
-pprTrace str doc v
-  = trace (render (sep [text str, nest 2 doc])) v
+pprTrace str doc v = trace (render (sep [text str, nest 2 doc])) v
 
 pprPanic :: HasCallStack => String -> SDoc -> a
-pprPanic str doc
-  = error (take 1000 $ render (sep [text str, nest 2 doc]))
+pprPanic str doc = error (take 1000 $ render (sep [text str, nest 2 doc]))
 
 pps :: Pretty a => a -> String
 pps a = show $ ppr a
 
 hspec :: Spec
 hspec = do
-    let test e s = it s $ pps e `shouldBe` s
+  let test e s = it s $ pps e `shouldBe` s
 
-    let var s = Var (Simple s)
-    let e  = Call (Fun (UserFun "g")) (var "i")
-    let e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
+  let var s = Var (Simple s)
+  let e  = Call (Fun (UserFun "g")) (var "i")
+  let e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
-    describe "Pretty" $ do
-      test e "g( i )"
-      test e2 "f( g( i ), _t1, 5 )"
+  describe "Pretty" $ do
+    test e  "g( i )"
+    test e2 "f( g( i ), _t1, 5 )"
 
 test_Pretty :: IO ()
 test_Pretty = Test.Hspec.hspec Lang.hspec
