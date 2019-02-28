@@ -573,8 +573,8 @@ cppGen outfile defs = do
 
   return (ksofile, cppfile)
 
-cppFG :: String -> String -> [TDef] -> IO String
-cppFG compiler outfile defs = do
+cppGenAndCompile :: [Char] -> String -> [TDef] -> IO [Char]
+cppGenAndCompile compiler outfile defs = do
   (_, cppfile) <- cppGen outfile defs
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
@@ -595,6 +595,11 @@ cppFG compiler outfile defs = do
         )
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
+  return exefile
+
+cppFG :: String -> String -> [TDef] -> IO String
+cppFG compiler outfile defs = do
+  exefile <- cppGenAndCompile compiler outfile defs
   putStrLn "Running"
   readProcessPrintStderr exefile []
 
