@@ -600,6 +600,10 @@ cppGenAndCompile compiler outfile defs = do
 cppFG :: String -> String -> [TDef] -> IO String
 cppFG compiler outfile defs = do
   exefile <- cppGenAndCompile compiler outfile defs
+  runExe exefile
+
+runExe :: String -> IO String
+runExe exefile = do
   putStrLn "Running"
   readProcessPrintStderr exefile []
 
