@@ -107,13 +107,6 @@ moveMain = partition isMain
     isMain (DefDecl (DefX (TFun _ (Fun (UserFun "main"))) _ _)) = True
     isMain _ = False
 
-displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Int -> String -> IO ()
-displayCppGenCompileAndRunWithOutput compiler verbosity file = do
-  { output <- displayCppGenCompileAndRun compiler verbosity file
-  ; putStrLn "Done"
-  ; putStr output
-  }
-
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
 displayCppGenAndCompile compile verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity defs))
@@ -167,6 +160,13 @@ displayCppGenCompileAndRun :: HasCallStack => String -> Int -> String -> IO Stri
 displayCppGenCompileAndRun compiler verbosity file = do
   { exefile <- displayCppGenAndCompile (Cgen.compile compiler) verbosity file
   ; Cgen.runExe exefile
+  }
+
+displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Int -> String -> IO ()
+displayCppGenCompileAndRunWithOutput compiler verbosity file = do
+  { output <- displayCppGenCompileAndRun compiler verbosity file
+  ; putStrLn "Done"
+  ; putStr output
   }
 
 displayCppGenCompileAndRunWithOutputGpp7 :: HasCallStack => Int -> String -> IO ()
