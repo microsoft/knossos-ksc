@@ -18,6 +18,7 @@ import KMonad
 import Data.List( partition )
 import qualified System.Environment
 import qualified System.Process
+import System.Process (createProcess, proc, std_out)
 import qualified System.IO
 import Test.Hspec (hspec, Spec)
 
@@ -235,18 +236,13 @@ profileArgs source proffile proffunctions proflines = do
 
   exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) 0 source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
-  withOutputFileStream proffunctions $ \std_out ->
-    System.Process.createProcess
-      (System.Process.proc "google-pprof" ["--text", "--lines", exe, proffile])
-        { System.Process.std_out = std_out
-        }
+  withOutputFileStream proffunctions $ \std_out -> createProcess
+    (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
+                                                               }
   withOutputFileStream proflines $ \std_out ->
-    System.Process.createProcess
-      (System.Process.proc "google-pprof"
-                           ["--text", "--functions", exe, proffile]
-        )
-        { System.Process.std_out = std_out
-        }
+    createProcess (proc "google-pprof" ["--text", "--functions", exe, proffile])
+      { std_out = std_out
+      }
   return ()
 
 withOutputFileStream
