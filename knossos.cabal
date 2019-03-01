@@ -9,6 +9,7 @@ executable ksc
   hs-source-dirs: src/ksc
   build-depends: base >= 4.9,
                  pretty >= 1.1,
+                 filepath >= 1.4.1.1,
                  hspec >= 2.5,
                  hashable >= 1.2,
                  mtl >= 2.2,

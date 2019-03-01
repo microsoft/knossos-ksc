@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
 module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
 
 import Lang
@@ -13,7 +12,7 @@ import Test.Hspec
 import Data.List( mapAccumL )
 
 optTrace :: msg -> a -> a
-optTrace msg t = t -- trace msg t
+optTrace _msg t = t -- trace msg t
 
 data OptEnv = OptEnv { optRuleBase :: RuleBase
                      , optGblST    :: GblSymTab }
@@ -73,12 +72,12 @@ optCall env fun opt_arg
 --------------
 optApp :: OptEnv -> TExpr -> TExpr -> TExpr
 optApp env (Lam v e) a = Let v (optE env a) (optE env e)
-optApp env f a         = App f a
+optApp _ f a         = App f a
 
 --------------
 optIf :: TExpr -> TExpr -> TExpr -> TExpr
-optIf (Konst (KBool True))  t e = t
-optIf (Konst (KBool False)) t e = e
+optIf (Konst (KBool True))  t _ = t
+optIf (Konst (KBool False)) _ e = e
 optIf (Let v r b)           t e = Let v r   (optIf b t e)
 optIf (Assert e1 e2)        t e = Assert e1 (optIf e2 t e)
 optIf e_cond e_then e_else
@@ -102,7 +101,7 @@ rewriteCall _ fun (Let v r arg)
   | not (fun `isThePrimFun` "lmTranspose")
   = Just (Let v r (Call fun arg))
 
-rewriteCall env (TFun ty (Fun fun)) arg
+rewriteCall env (TFun _ (Fun fun)) arg
   = optFun env fun arg
 
 rewriteCall _ (TFun ty (GradFun f _)) arg
@@ -112,7 +111,7 @@ rewriteCall _ f@(TFun (TypeLM _ _) _) _
   = trace ("NOTE: Unmatched LM call {" ++ show f ++ "}") $
     Nothing
 
-rewriteCall _ f _
+rewriteCall _ _ _
   = Nothing
 
 -----------------------
@@ -141,7 +140,7 @@ optPrimFun :: PrimFun -> TExpr -> Maybe TExpr
 
 
 -- RULE: index(j, Vec of Zero of T) = Zero of T
-optPrimFun "index" (Tuple [ ei, arr ])
+optPrimFun "index" (Tuple [ _, arr ])
  | TypeVec (TypeZero t) <- typeof arr
  = Just $ mkZero t
 
@@ -162,7 +161,7 @@ optPrimFun "+" (Tuple [x, y]) =
       Nothing
 
 -- RULE: x*0 = 0*x = 0
-optPrimFun "*" arg@(Tuple [x, y])
+optPrimFun "*" (Tuple [x, y])
   | isKZero x || isKZero y
   = Just $ Konst $ KZero $ typeof y
   | otherwise
@@ -292,18 +291,18 @@ optSum e
   | TypeZero (TypeVec t) <- typeof e 
   = Just $ mkDummy (TypeZero t)
 
-optSum e = Nothing
+optSum _ = Nothing
 
 -----------------------
 optBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
 
 -- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
-optBuild sz i e
+optBuild _ _ e
   | TypeZero ty <- typeof e
   = Just $ Konst $ KZero $ TypeVec ty
 
 -- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
-optBuild sz i e
+optBuild _ _ e
   | isKZero e
   = Just $ Konst $ KZero $ TypeVec (typeof e)
 
@@ -364,18 +363,18 @@ optBuild sz i e
       is_expensive _ = False
 --}
 
-optBuild sz i e = Nothing
+optBuild _ _ _ = Nothing
 
 -----------------------
 optLMBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
 
 -- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
-optLMBuild sz i e
+optLMBuild _ _ e
   | isLMZero e
   , TypeLM s t <- typeof e
   = Just $ lmZero s (TypeVec t)
 
-optLMBuild sz i e = Nothing
+optLMBuild _ _ _ = Nothing
 
 
 -----------------------
@@ -404,7 +403,7 @@ optGradPrim _ "+" arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
 optGradPrim _ "-" arg
-  | TypeTuple [t1, t2] <- typeof arg
+  | TypeTuple [t1, _] <- typeof arg
   = Just (lmHCat [lmOne t1, lmScale $ kTFloat (-1.0)])
 
 optGradPrim _ "*" (Tuple [x,y])
@@ -440,8 +439,8 @@ optGradPrim _ "index" (Tuple [i,v])
   = Just (primDindex i v)
 
 optGradPrim _ "$trace" e = Just (lmOne $ typeof e)
-optGradPrim _ "$rand" e = Just (lmZero TypeFloat TypeFloat)
-optGradPrim _ "neg" e = Just (lmScale (kTFloat $ -1.0))
+optGradPrim _ "$rand" _ = Just (lmZero TypeFloat TypeFloat)
+optGradPrim _ "neg" _ = Just (lmScale (kTFloat $ -1.0))
 optGradPrim _ "exp" e = Just (lmScale (pExp e))
 optGradPrim _ "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) $ Nothing
@@ -464,15 +463,15 @@ optApplyLM (Let v rhs body) dx
 optApplyLM (If b et ef) dx
   = Just $ If b (lmApply et dx) (lmApply ef dx)
 
-optApplyLM (Call (TFun (TypeLM s t) (GradFun (UserFun f) mode)) e) dx
+optApplyLM (Call (TFun (TypeLM _ t) (GradFun (UserFun f) mode)) e) dx
   = -- trace ("User Grad->Der [" ++ f ++ "]")
     Just $ Call (TFun (tangentType t) (DrvFun (UserFun f) mode)) (pConcat e dx)
 
-optApplyLM (Call (TFun (TypeLM s t) (GradFun (PrimFun f) mode)) e) dx
+optApplyLM (Call (TFun (TypeLM _ t) (GradFun (PrimFun f) mode)) e) dx
   = -- trace ("Prim Grad->Der [" ++ f ++ "]")
     Just $ Call (TFun (tangentType t) (DrvFun (PrimFun f) mode)) (Tuple [e, dx])
 
-optApplyLM e dx
+optApplyLM e _
   = pprTrace "Apply not optimized:" (ppr e)
     Nothing
 
@@ -520,7 +519,7 @@ optApplyLMCall "lmBuild" (Tuple [n, Lam i m]) dx
 optApplyLMCall "lmBuildT" (Tuple [n, Lam i m]) dx
   = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
 
-optApplyLMCall fun arg dx
+optApplyLMCall _ _ _
   = -- pprTrace ("No opt for LM apply of " ++ show fun)
     --         (ppr arg)
              Nothing
@@ -535,13 +534,13 @@ optLMTrans (Var (TVar (TypeLM s t) (Grad n d)))
 optLMTrans (Call (TFun (TypeLM s t) (GradFun f mode)) arg)
    = Just (Call (TFun (TypeLM t s) (GradFun f (flipMode mode))) arg)
 
-optLMTrans (Call (TFun ty (Fun (PrimFun fun))) arg)
+optLMTrans (Call (TFun _ (Fun (PrimFun fun))) arg)
   = optTransPrim fun arg
 
 optLMTrans (Assert e1 e2)
   = fmap (Assert e1) (optLMTrans e2)
 
-optLMTrans (Let var@(TVar (TypeLM s t) (Grad n d)) rhs body)
+optLMTrans (Let (TVar (TypeLM s t) (Grad n d)) rhs body)
   = Just $ Let (TVar (TypeLM t s) (Grad n (flipMode d))) (lmTranspose rhs) $
     lmTranspose body
 
@@ -566,7 +565,7 @@ optTransPrim "lmVCat"      (Tuple es)           = Just (lmHCat (map lmTranspose 
 optTransPrim "lmHCat"      (Tuple es)           = Just (lmVCat (map lmTranspose es))
 optTransPrim "lmBuild"     (Tuple [n, Lam i b]) = Just (lmBuildT n (Lam i (lmTranspose b)))
 optTransPrim "lmBuildT"    (Tuple [n, Lam i b]) = Just (lmBuild n (Lam i (lmTranspose b)))
-optTransPrim f a = Nothing
+optTransPrim _ _ = Nothing
 
 --------------------------------------
 hspec :: Spec

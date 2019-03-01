@@ -11,6 +11,8 @@ import qualified Data.Map                      as Map
 import           Data.List                      ( intercalate )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
+import qualified System.Directory
+import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
@@ -549,6 +551,16 @@ cgenKonst = \case
 cgenVar :: Var -> String
 cgenVar v = show v
 
+makeDirectoryForFile :: FilePath -> IO ()
+makeDirectoryForFile =
+  System.Directory.createDirectoryIfMissing True
+  . fst
+  . System.FilePath.splitFileName
+
+createDirectoryWriteFile :: FilePath -> String -> IO ()
+createDirectoryWriteFile filepath contents = do
+  makeDirectoryForFile filepath
+  writeFile filepath contents
 
 cppGen :: String -> [TDef] -> IO (String, String)
 cppGen outfile defs = do
@@ -566,40 +578,54 @@ cppGen outfile defs = do
       cppfile = outfile ++ ".cpp"
 
   putStrLn $ "Writing to " ++ ksofile
-  writeFile ksofile (show $ ppr defs)
+  createDirectoryWriteFile ksofile (show $ ppr defs)
 
   putStrLn $ "Writing to " ++ cppfile
-  writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
+  createDirectoryWriteFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
 
   return (ksofile, cppfile)
 
-cppGenAndCompile :: [Char] -> String -> [TDef] -> IO [Char]
+cppGenAndCompile
+  :: (String -> String -> IO String) -> String -> [TDef] -> IO String
 cppGenAndCompile compiler outfile defs = do
   (_, cppfile) <- cppGen outfile defs
   let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
+  compiler cppfile exefile
+
+compile :: String -> String -> String -> IO String
+compile = compileWithOpts []
+
+compileWithProfiling :: String -> String -> String -> IO String
+compileWithProfiling =
+  compileWithOpts ["-Wl,--no-as-needed,-lprofiler,--as-needed"]
+
+compileWithOpts :: [String] -> String -> String -> String -> IO String
+compileWithOpts opts compiler cppfile exefile = do
   let compcmd =
         ( compiler
         , [ "-fmax-errors=5"
           , "-Wall"
           , "-Wno-unused"
           , "-Isrc/runtime"
-          , "-O"
+          , "-O3"
           , "-g"
           , "-std=c++17"
-          , cppfile
           , "-o"
           , exefile
           ]
+          ++ opts
+          ++ [cppfile]
         )
+  makeDirectoryForFile exefile
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
   return exefile
 
 cppFG :: String -> String -> [TDef] -> IO String
 cppFG compiler outfile defs = do
-  exefile <- cppGenAndCompile compiler outfile defs
+  exefile <- cppGenAndCompile (compile compiler) outfile defs
   runExe exefile
 
 runExe :: String -> IO String

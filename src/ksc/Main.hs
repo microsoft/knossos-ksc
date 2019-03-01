@@ -16,7 +16,10 @@ import ANF
 import qualified Cgen
 import KMonad
 import Data.List( partition )
-import qualified System.Directory
+import qualified System.Environment
+import qualified System.Process
+import System.Process (createProcess, proc, std_out)
+import qualified System.IO
 import Test.Hspec (hspec, Spec)
 
 
@@ -105,18 +108,8 @@ moveMain = partition isMain
     isMain (DefDecl (DefX (TFun _ (Fun (UserFun "main"))) _ _)) = True
     isMain _ = False
 
-doallC :: HasCallStack => String -> Int -> String -> IO ()
-doallC compiler verbosity file = do
-  { output <- doallG compiler verbosity file
-  ; putStrLn "Done"
-  ; putStr output
-  }
-
-doall :: HasCallStack => Int -> String -> IO ()
-doall = doallC "g++-7"
-
-doallE :: HasCallStack => String -> Int -> String -> IO String
-doallE compiler verbosity file =
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
+displayCppGenAndCompile compile verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity defs))
   in
   runKM $
@@ -161,17 +154,39 @@ doallE compiler verbosity file =
   ; displayPass verbosity "CSE" env5 cse
 
   ; let ann2 =  cse
-  ; liftIO (Cgen.cppGenAndCompile compiler ("obj/" ++ file) ann2)
+  ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
   }
 
-doallG :: HasCallStack => String -> Int -> String -> IO String
-doallG compiler verbosity file = do
-  { exefile <- doallE compiler verbosity file
+displayCppGenCompileAndRun :: HasCallStack => String -> Int -> String -> IO String
+displayCppGenCompileAndRun compiler verbosity file = do
+  { exefile <- displayCppGenAndCompile (Cgen.compile compiler) verbosity file
   ; Cgen.runExe exefile
   }
 
+displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Int -> String -> IO ()
+displayCppGenCompileAndRunWithOutput compiler verbosity file = do
+  { output <- displayCppGenCompileAndRun compiler verbosity file
+  ; putStrLn "Done"
+  ; putStr output
+  }
+
+displayCppGenCompileAndRunWithOutputGpp7 :: HasCallStack => Int -> String -> IO ()
+displayCppGenCompileAndRunWithOutputGpp7 = displayCppGenCompileAndRunWithOutput "g++-7"
+
+doall :: HasCallStack => Int -> String -> IO ()
+doall = displayCppGenCompileAndRunWithOutputGpp7
+
+doallE :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
+doallE = displayCppGenAndCompile
+
+doallC :: HasCallStack => String -> Int -> String -> IO ()
+doallC = displayCppGenCompileAndRunWithOutput
+
+doallG :: HasCallStack => String -> Int -> String -> IO String
+doallG = displayCppGenCompileAndRun
+
 gmm :: IO ()
-gmm = doall 400 "test/ksc/gmm"
+gmm = displayCppGenCompileAndRunWithOutputGpp7 400 "test/ksc/gmm"
 
 main :: IO ()
 main = gmm
@@ -192,8 +207,7 @@ testC :: String -> IO ()
 testC compiler = do
   Test.Hspec.hspec Main.hspec
 
-  System.Directory.createDirectoryIfMissing True "obj/test/ksc"
-  output <- doallG compiler 0 "test/ksc/gmm"
+  output <- displayCppGenCompileAndRun compiler 0 "test/ksc/gmm"
 
   let success = case reverse (lines output) of
         impossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->
@@ -215,3 +229,31 @@ testC compiler = do
     else do
     putStrLn ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output)))))
     System.Exit.exitWith (System.Exit.ExitFailure 1)
+
+profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
+profileArgs source proffile proffunctions proflines = do
+  let compiler = "g++-7"
+
+  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) 0 source
+  Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
+  withOutputFileStream proffunctions $ \std_out -> createProcess
+    (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
+                                                               }
+  withOutputFileStream proflines $ \std_out ->
+    createProcess (proc "google-pprof" ["--text", "--functions", exe, proffile])
+      { std_out = std_out
+      }
+  return ()
+
+withOutputFileStream
+  :: FilePath -> (System.Process.StdStream -> IO r) -> IO r
+withOutputFileStream filename handle =
+  System.IO.withBinaryFile
+    filename
+    System.IO.WriteMode
+    (handle . System.Process.UseHandle)
+
+profile :: IO ()
+profile = do
+  [source, proffile, proffunctions, proflines] <- System.Environment.getArgs
+  profileArgs source proffile proffunctions proflines
