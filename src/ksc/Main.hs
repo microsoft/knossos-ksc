@@ -16,7 +16,6 @@ import ANF
 import qualified Cgen
 import KMonad
 import Data.List( partition )
-import qualified System.Directory
 import qualified System.Environment
 import qualified System.Process
 import qualified System.IO
@@ -195,7 +194,6 @@ testC :: String -> IO ()
 testC compiler = do
   Test.Hspec.hspec Main.hspec
 
-  System.Directory.createDirectoryIfMissing True "obj/test/ksc"
   output <- doallG compiler 0 "test/ksc/gmm"
 
   let success = case reverse (lines output) of
@@ -222,7 +220,6 @@ testC compiler = do
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
-  System.Directory.createDirectoryIfMissing True "obj/test/ksc"
 
   exe <- doallE (Cgen.compileWithProfiling compiler) 0 source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])

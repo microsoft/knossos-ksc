@@ -11,6 +11,8 @@ import qualified Data.Map                      as Map
 import           Data.List                      ( intercalate )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
+import qualified System.Directory
+import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
@@ -549,6 +551,16 @@ cgenKonst = \case
 cgenVar :: Var -> String
 cgenVar v = show v
 
+makeDirectoryForFile :: FilePath -> IO ()
+makeDirectoryForFile =
+  System.Directory.createDirectoryIfMissing True
+  . fst
+  . System.FilePath.splitFileName
+
+createDirectoryWriteFile :: FilePath -> String -> IO ()
+createDirectoryWriteFile filepath contents = do
+  makeDirectoryForFile filepath
+  writeFile filepath contents
 
 cppGen :: String -> [TDef] -> IO (String, String)
 cppGen outfile defs = do
@@ -566,10 +578,10 @@ cppGen outfile defs = do
       cppfile = outfile ++ ".cpp"
 
   putStrLn $ "Writing to " ++ ksofile
-  writeFile ksofile (show $ ppr defs)
+  createDirectoryWriteFile ksofile (show $ ppr defs)
 
   putStrLn $ "Writing to " ++ cppfile
-  writeFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
+  createDirectoryWriteFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
 
   return (ksofile, cppfile)
 
@@ -606,6 +618,7 @@ compileWithOpts opts compiler cppfile exefile = do
           ++ opts
           ++ [cppfile]
         )
+  makeDirectoryForFile exefile
   putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
   return exefile
