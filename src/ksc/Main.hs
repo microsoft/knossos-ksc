@@ -107,18 +107,15 @@ moveMain = partition isMain
     isMain (DefDecl (DefX (TFun _ (Fun (UserFun "main"))) _ _)) = True
     isMain _ = False
 
-doallC :: HasCallStack => String -> Int -> String -> IO ()
-doallC compiler verbosity file = do
-  { output <- doallG compiler verbosity file
+displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Int -> String -> IO ()
+displayCppGenCompileAndRunWithOutput compiler verbosity file = do
+  { output <- displayCppGenCompileAndRun compiler verbosity file
   ; putStrLn "Done"
   ; putStr output
   }
 
-doall :: HasCallStack => Int -> String -> IO ()
-doall = doallC "g++-7"
-
-doallE :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
-doallE compile verbosity file =
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
+displayCppGenAndCompile compile verbosity file =
   let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity defs))
   in
   runKM $
@@ -166,14 +163,29 @@ doallE compile verbosity file =
   ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
   }
 
-doallG :: HasCallStack => String -> Int -> String -> IO String
-doallG compiler verbosity file = do
-  { exefile <- doallE (Cgen.compile compiler) verbosity file
+displayCppGenCompileAndRun :: HasCallStack => String -> Int -> String -> IO String
+displayCppGenCompileAndRun compiler verbosity file = do
+  { exefile <- displayCppGenAndCompile (Cgen.compile compiler) verbosity file
   ; Cgen.runExe exefile
   }
 
+displayCppGenCompileAndRunWithOutputGpp7 :: HasCallStack => Int -> String -> IO ()
+displayCppGenCompileAndRunWithOutputGpp7 = displayCppGenCompileAndRunWithOutput "g++-7"
+
+doall :: HasCallStack => Int -> String -> IO ()
+doall = displayCppGenCompileAndRunWithOutputGpp7
+
+doallE :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
+doallE = displayCppGenAndCompile
+
+doallC :: HasCallStack => String -> Int -> String -> IO ()
+doallC = displayCppGenCompileAndRunWithOutput
+
+doallG :: HasCallStack => String -> Int -> String -> IO String
+doallG = displayCppGenCompileAndRun
+
 gmm :: IO ()
-gmm = doall 400 "test/ksc/gmm"
+gmm = displayCppGenCompileAndRunWithOutputGpp7 400 "test/ksc/gmm"
 
 main :: IO ()
 main = gmm
@@ -194,7 +206,7 @@ testC :: String -> IO ()
 testC compiler = do
   Test.Hspec.hspec Main.hspec
 
-  output <- doallG compiler 0 "test/ksc/gmm"
+  output <- displayCppGenCompileAndRun compiler 0 "test/ksc/gmm"
 
   let success = case reverse (lines output) of
         impossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->
@@ -221,7 +233,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  exe <- doallE (Cgen.compileWithProfiling compiler) 0 source
+  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) 0 source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proffunctions $ \std_out ->
     System.Process.createProcess
