@@ -223,19 +223,27 @@ profileArgs source proffile proffunctions proflines = do
 
   exe <- doallE (Cgen.compileWithProfiling compiler) 0 source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
-  System.IO.withBinaryFile proffunctions System.IO.WriteMode $ \out ->
+  withOutputFileStream proffunctions $ \std_out ->
     System.Process.createProcess
       (System.Process.proc "google-pprof" ["--text", "--lines", exe, proffile])
-        { System.Process.std_out = System.Process.UseHandle out
+        { System.Process.std_out = std_out
         }
-  System.IO.withBinaryFile proflines System.IO.WriteMode $ \out ->
+  withOutputFileStream proflines $ \std_out ->
     System.Process.createProcess
       (System.Process.proc "google-pprof"
                            ["--text", "--functions", exe, proffile]
         )
-        { System.Process.std_out = System.Process.UseHandle out
+        { System.Process.std_out = std_out
         }
   return ()
+
+withOutputFileStream
+  :: FilePath -> (System.Process.StdStream -> IO r) -> IO r
+withOutputFileStream filename handle =
+  System.IO.withBinaryFile
+    filename
+    System.IO.WriteMode
+    (handle . System.Process.UseHandle)
 
 profile :: IO ()
 profile = do
