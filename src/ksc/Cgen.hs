@@ -585,7 +585,7 @@ cppGenAndCompile compiler outfile defs = do
           , "-Wall"
           , "-Wno-unused"
           , "-Isrc/runtime"
-          , "-O"
+          , "-O3"
           , "-g"
           , "-std=c++17"
           , cppfile
