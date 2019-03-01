@@ -17,6 +17,9 @@ import qualified Cgen
 import KMonad
 import Data.List( partition )
 import qualified System.Directory
+import qualified System.Environment
+import qualified System.Process
+import qualified System.IO
 import Test.Hspec (hspec, Spec)
 
 
@@ -215,3 +218,29 @@ testC compiler = do
     else do
     putStrLn ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output)))))
     System.Exit.exitWith (System.Exit.ExitFailure 1)
+
+profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
+profileArgs source proffile proffunctions proflines = do
+  let compiler = "g++-7"
+  System.Directory.createDirectoryIfMissing True "obj/test/ksc"
+
+  exe <- doallE (Cgen.compileWithProfiling compiler) 0 source
+  Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
+  System.IO.withBinaryFile proffunctions System.IO.WriteMode $ \out ->
+    System.Process.createProcess
+      (System.Process.proc "google-pprof" ["--text", "--lines", exe, proffile])
+        { System.Process.std_out = System.Process.UseHandle out
+        }
+  System.IO.withBinaryFile proflines System.IO.WriteMode $ \out ->
+    System.Process.createProcess
+      (System.Process.proc "google-pprof"
+                           ["--text", "--functions", exe, proffile]
+        )
+        { System.Process.std_out = System.Process.UseHandle out
+        }
+  return ()
+
+profile :: IO ()
+profile = do
+  [source, proffile, proffunctions, proflines] <- System.Environment.getArgs
+  profileArgs source proffile proffunctions proflines
