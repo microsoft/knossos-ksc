@@ -200,7 +200,7 @@ pExpr = pKonst
    <|> parens pKExpr
 
 pKExpr :: Parser (ExprX Fun Var)
--- Al these start with a keyword
+-- All these start with a keyword
 pKExpr =   pIfThenElse
        <|> pLet
        <|> pLam
@@ -222,7 +222,7 @@ pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
 
 pCall :: Parser (ExprX Fun Var)
 -- Calls (f e), (f e1 e2), etc
--- Deals with plain variables (Var v), which look like nullay calls
+-- Deals with plain variables (Var v), which look like nullary calls
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
@@ -290,7 +290,7 @@ pLet = do { pReserved "let"
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
 
 pDef :: Parser (Def)
--- (def f (x1 x2 x3) rhs)
+-- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
 pDef = do { pReserved "def"
           ; f <- pIdentifier
           ; ty <- pType
