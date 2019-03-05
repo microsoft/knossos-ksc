@@ -16,7 +16,9 @@ import ANF
 import qualified Cgen
 import KMonad
 import Data.List( partition )
+import qualified System.Directory
 import qualified System.Environment
+import qualified System.FilePath
 import qualified System.Process
 import System.Process (createProcess, proc, std_out)
 import qualified System.IO
@@ -203,9 +205,30 @@ test = testC "g++-7"
 testWindows :: IO ()
 testWindows = testC "g++"
 
+compileKscTestPrograms :: String -> IO ()
+compileKscTestPrograms compiler = do
+  let last n xs = drop (length xs - n) xs
+      testDir = "test/ksc/"
+
+      naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList
+        = ["ex0.ks", "ex2.ks", "ex7.ks", "CA-subst.ks", "inline.ks", "logsumexp.ks", "test_stopgrad.ks"]
+
+  ksFiles <- fmap (filter (not . (`elem` naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList))
+                    . filter ((== ".ks") . last 3))
+             (System.Directory.listDirectory testDir)
+
+  let ksTests = map ((testDir ++) . System.FilePath.dropExtension) ksFiles
+
+  putStrLn ("Testing " ++ show ksTests)
+
+  flip mapM_ ksTests $ \ksTest -> do
+    putStrLn ksTest
+    (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) 0) ksTest
+
 testC :: String -> IO ()
 testC compiler = do
   Test.Hspec.hspec Main.hspec
+  compileKscTestPrograms compiler
 
   output <- displayCppGenCompileAndRun compiler 0 "test/ksc/gmm"
 
