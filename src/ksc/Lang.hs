@@ -590,6 +590,7 @@ instance Pretty Konst where
   pprPrec _ (KInteger i) = integer i
   pprPrec _ (KFloat f)   = double f
   pprPrec _ (KString s)  = text (show s)
+  pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
   pprPrec p (KZero t)    = parensIf p precZero (text "KZero " <> ppr t)
 
 instance Pretty Type where

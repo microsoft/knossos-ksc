@@ -125,7 +125,7 @@ langDef = Tok.LanguageDef
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "rule", "let", "if", "assert", "call", "tuple", ":"
-                          , "Integer", "Float", "Vec", "String" ]
+                          , "Integer", "Float", "Vec", "String", "true", "false" ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -150,6 +150,10 @@ pString = Tok.stringLiteral lexer
 
 pIdentifier :: Parser String
 pIdentifier = Tok.identifier lexer
+
+pBool :: Parser Bool
+pBool = (True <$ pReserved "true")
+        <|> (False <$ pReserved "false")
 
 mk_fun :: String -> Fun
 -- Parses the print-name of a top-level function into a Fun
@@ -194,6 +198,7 @@ pKonst :: Parser (ExprX Fun Var)
 pKonst =   try (( Konst . KFloat) <$> pDouble)
        <|> ((Konst . KInteger) <$> pInteger)
        <|> ((Konst . KString) <$> pString)
+       <|> ((Konst . KBool) <$> pBool)
 
 pExpr :: Parser (ExprX Fun Var)
 pExpr = pKonst
