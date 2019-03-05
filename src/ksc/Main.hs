@@ -159,6 +159,9 @@ displayCppGenAndCompile compile verbosity file =
   ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
   }
 
+displayCppGenAndCompileS :: HasCallStack => String -> Int -> String -> IO String
+displayCppGenAndCompileS compiler = displayCppGenAndCompile (Cgen.compile compiler)
+
 displayCppGenCompileAndRun :: HasCallStack => String -> Int -> String -> IO String
 displayCppGenCompileAndRun compiler verbosity file = do
   { exefile <- displayCppGenAndCompile (Cgen.compile compiler) verbosity file
