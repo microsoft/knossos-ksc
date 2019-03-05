@@ -1,11 +1,11 @@
 (def exp. (Vec Float) (v : Vec Float)
-    (build (size v) (lam i (exp (index i v)))))
+    (build (size v) (lam (i : Integer) (exp (index i v)))))
 
 (def logsumexp Float (v : Vec Float)
     (log (sum (exp. v))))
 
 (def logsumexp_inlined Float (v : Vec Float)
-    (log (sum (build (size v) (lam i (exp (index i v)))))))
+    (log (sum (build (size v) (lam (i : Integer) (exp (index i v)))))))
 
 (def logsumexp_safe Float ( a : Vec Float)
   (let (mx (max a))
