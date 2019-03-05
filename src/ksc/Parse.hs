@@ -15,7 +15,7 @@ Here's the BNF for our language:
 <param>  ::= ( <var> ":" <type> )
 
 -- <type> is atomic; <ktype> is compound
-<type>   ::= "Integer" | "Float" | ( <ktype> )
+<type>   ::= "Integer" | "Float" | "String" | ( <ktype> )
 <ktype>  ::= "Vec" <type>
            | "Tuple" <type_1> .. <type_n>
            | <type>
@@ -125,7 +125,7 @@ langDef = Tok.LanguageDef
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "rule", "let", "if", "assert", "call", "tuple", ":"
-                          , "Integer", "Float", "Vec" ]
+                          , "Integer", "Float", "Vec", "String" ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -193,6 +193,7 @@ pParams = parens $ do { b <- pParam
 pKonst :: Parser (ExprX Fun Var)
 pKonst =   try (( Konst . KFloat) <$> pDouble)
        <|> ((Konst . KInteger) <$> pInteger)
+       <|> ((Konst . KString) <$> pString)
 
 pExpr :: Parser (ExprX Fun Var)
 pExpr = pKonst
@@ -212,6 +213,7 @@ pKExpr =   pIfThenElse
 pType :: Parser Type
 pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
+    <|> (pReserved "String"  >> return TypeString)
     <|> parens pKType
 
 

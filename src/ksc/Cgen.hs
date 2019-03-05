@@ -471,6 +471,7 @@ cgenTypeLang = \case
   TypeZero t    -> "zero_t<" ++ cgenTypeLang t ++ ">"
   TypeFloat     -> "double"
   TypeInteger   -> "int"
+  TypeString    -> "string"
   TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
   TypeVec   t   -> "vec<" ++ cgenTypeLang t ++ ">"
@@ -546,6 +547,7 @@ cgenKonst = \case
   KZero    t -> "zero_t<" ++ cgenTypeLang t ++ "> {}"
   KInteger i -> show i
   KFloat   f -> show f
+  KString  s -> show s
   KBool    b -> if b then "TRUE" else "FALSE"
 
 cgenVar :: Var -> String

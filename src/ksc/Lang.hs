@@ -67,6 +67,7 @@ data Type = TypeZero Type          -- See Note [Zeros]
           | TypeBool
           | TypeInteger
           | TypeFloat
+          | TypeString
           | TypeTuple [Type]
           | TypeVec Type
           | TypeLambda Type Type   -- Domain -> Range
@@ -80,6 +81,7 @@ isScalar = \case
   TypeBool       -> True
   TypeInteger    -> True
   TypeFloat      -> True
+  TypeString     -> True
   TypeTuple ts   -> all isScalar ts
   TypeVec   _    -> False
   TypeLambda _ _ -> False
@@ -163,6 +165,7 @@ data Konst = KZero Type
            | KInteger Integer
            | KFloat   Double
            | KBool    Bool
+           | KString  String
            deriving( Eq, Ord, Show )
 
 data RuleX f b = Rule { ru_name  :: String   -- Just for logging
@@ -322,6 +325,7 @@ typeofKonst (KZero    t) = TypeZero t
 typeofKonst (KInteger _) = TypeInteger
 typeofKonst (KFloat   _) = TypeFloat
 typeofKonst (KBool    _) = TypeBool
+typeofKonst (KString  _) = TypeString
 
 -----------------------------------------------
 --     Debugging utilities
@@ -585,6 +589,7 @@ instance PrettyVar TFun where
 instance Pretty Konst where
   pprPrec _ (KInteger i) = integer i
   pprPrec _ (KFloat f)   = double f
+  pprPrec _ (KString s)  = text (show s)
   pprPrec p (KZero t)    = parensIf p precZero (text "KZero " <> ppr t)
 
 instance Pretty Type where
@@ -598,6 +603,7 @@ instance Pretty Type where
   pprPrec _ (TypeZero t)         = text "zero_t@" <> ppr t
   pprPrec _ TypeFloat            = text "Float"
   pprPrec _ TypeInteger          = text "Integer"
+  pprPrec _ TypeString           = text "String"
   pprPrec _ TypeBool             = text "Bool"
   pprPrec _ TypeUnknown          = text "UNKNOWN"
 
