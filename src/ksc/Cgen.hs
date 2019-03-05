@@ -170,7 +170,7 @@ cstLookup0 v env = case cstMaybeLookup0 v env of
       $  "Failed lookup ["
       ++ v
       ++ "] in\n"
-      ++ (intercalate "\n" (map show (Map.toList env)))
+      ++ (unlines (map show (Map.toList env)))
 
 cstInsertVar :: Var -> CType -> CST -> CST
 cstInsertVar v ty env = -- trace ("cstInsertVar [" ++ show v ++ "] = [" ++ show ty ++ "]\n" ++ show env) $
@@ -259,7 +259,7 @@ cgenExprR env = \case
     bumpmark <- freshCVar
     return $ CG
       (  "/**Call**/"
-      ++ intercalate "\n" cdecls
+      ++ unlines cdecls
       ++ (if Cgen.isScalar cftype
            then
              "alloc_mark_t "
@@ -324,7 +324,7 @@ cgenExprR env = \case
     let ctypes = map getType cgvs
     let ctype  = CTuple ctypes
 
-    return $ CG (intercalate "\n" cdecls)
+    return $ CG (unlines cdecls)
                 ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
                 ctype
 
@@ -581,7 +581,7 @@ cppGen outfile defs = do
   createDirectoryWriteFile ksofile (show $ ppr defs)
 
   putStrLn $ "Writing to " ++ cppfile
-  createDirectoryWriteFile cppfile (intercalate "\n" (lines ++ lls ++ tail))
+  createDirectoryWriteFile cppfile (unlines (lines ++ lls ++ tail))
 
   return (ksofile, cppfile)
 
