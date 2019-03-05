@@ -525,7 +525,7 @@ namespace ks
 	};
 
 	// ===============================  Inplace add ==================================
-        void inplace_add(int *t1, const double &t2) { *t1 += t2; }
+        void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 
         void inplace_add(double *t1, const double &t2) { *t1 += t2; }
 
