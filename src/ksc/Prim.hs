@@ -43,6 +43,7 @@ lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = mkPrimCall2 "lmAdd" f g
 
 lmAdds :: HasCallStack => [TExpr]-> TExpr
+lmAdds [] = error "lmAdds of empty list (perhaps this should return lmZero?)"
 lmAdds [x] = x
 lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
