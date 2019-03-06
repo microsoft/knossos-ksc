@@ -1436,7 +1436,7 @@ namespace ks
 
 */
 
-	// ========================= Trace primitive ===============
+	// ========================= Rand primitive ===============
 	inline double $rand(double max)
 	{
 		static std::mt19937 rng(42);
