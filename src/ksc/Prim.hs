@@ -198,7 +198,7 @@ primCallResultTy_maybe fun arg_ty
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
-      DrvFun f Rev    -- f :: S -> T, then ref$f :: (S,T) -> T
+      DrvFun f Rev    -- f :: S -> T, then rev$f :: (S,T) -> T
         -> pprPanic "primFunCallResultTy" (ppr fun <+> ppr arg_ty)
            -- How do we split up that tuple?
 
