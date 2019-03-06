@@ -257,28 +257,24 @@ cgenExprR env = \case
 
     v        <- freshCVar
     bumpmark <- freshCVar
+
+    let gc tag =  if Cgen.isScalar cftype
+                    then tag ++ "(" ++ bumpmark ++ ");\n"
+                    else ""
+
     return $ CG
-      (  "/**Call**/"
-      ++ unlines cdecls
-      ++ (if Cgen.isScalar cftype
-           then
-             "alloc_mark_t "
-             ++ bumpmark
-             ++ " = mark_bump_allocator_if_present();\n"
-           else ""
-         )
+      (  unlines cdecls
       ++ cgenType cftype
       ++ " "
       ++ v
-      ++ " = "
+      ++ ";\n"
+      ++ gc "$MRK"
+      ++ v ++ " = "
       ++ cgenAnyFun tf cftype
       ++ "("
       ++ intercalate "," cexprs
-      ++ ");\n/**eCall**/\n"
-      ++ (if Cgen.isScalar cftype
-           then "reset_bump_allocator_if_present(" ++ bumpmark ++ ");\n"
-           else ""
-         )
+      ++ ");\n"
+      ++ gc "$REL"
       )
       v
       cftype
