@@ -467,7 +467,7 @@ cgenTypeLang = \case
   TypeZero t    -> "zero_t<" ++ cgenTypeLang t ++ ">"
   TypeFloat     -> "double"
   TypeInteger   -> "int"
-  TypeString    -> "string"
+  TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
   TypeVec   t   -> "vec<" ++ cgenTypeLang t ++ ">"

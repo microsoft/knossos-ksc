@@ -99,6 +99,7 @@ tangentType (TypeVec   t ) = TypeVec (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
 tangentType TypeInteger    = TypeTuple []
 tangentType TypeBool       = TypeTuple []
+tangentType TypeString     = TypeTuple []
 tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLambda
