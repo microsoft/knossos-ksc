@@ -592,22 +592,26 @@ instance Pretty Konst where
   pprPrec _ (KFloat f)   = double f
   pprPrec _ (KString s)  = text (show s)
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
-  pprPrec p (KZero t)    = parensIf p precZero (text "KZero " <> ppr t)
+  pprPrec p (KZero t)    = parensIf p precZero $
+                           text "KZero " <> pprParendType t
 
 instance Pretty Type where
   pprPrec p (TypeVec ty)         = parensIf p precZero $
-                                   text "(Vec " <> ppr ty
+                                   text "Vec " <> pprParendType ty
   pprPrec p (TypeTuple tys)      = parensIf p precZero $
                                    text "Tuple" <> parens (pprList ppr tys)
   pprPrec p (TypeLambda from to) = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
-  pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> ppr s <+> ppr t
-  pprPrec _ (TypeZero t)         = text "zero_t@" <> ppr t
+  pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> pprParendType s <+> ppr t
+  pprPrec _ (TypeZero t)         = text "zero_t@" <> pprParendType t
   pprPrec _ TypeFloat            = text "Float"
   pprPrec _ TypeInteger          = text "Integer"
   pprPrec _ TypeString           = text "String"
   pprPrec _ TypeBool             = text "Bool"
   pprPrec _ TypeUnknown          = text "UNKNOWN"
+
+pprParendType :: Type -> SDoc
+pprParendType = pprPrec  precTwo
 
 type Prec = Int
  -- 0 => no need for parens
