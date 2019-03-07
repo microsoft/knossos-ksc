@@ -155,10 +155,6 @@ ensureTuple x = case typeof x of
     TypeTuple _ -> x
     _ -> Tuple [x]
 
-pConcat :: HasCallStack => TExpr -> TExpr -> TExpr
-pConcat (Tuple as) (Tuple bs) = Tuple $ as ++ bs
-pConcat a b = --trace ("pConcat\n" ++ show a ++ "\n" ++ show b) $
-              mkPrimCall2 "concat" (ensureTuple a) (ensureTuple b)
 
 ---------------------------------------------
 --       Types of primitive functions
@@ -328,7 +324,6 @@ simplePrimResultTy fun arg_ty
       ("$trace"   , t                                      ) -> Just t
       ("$rand"    , TypeFloat                              ) -> Just TypeFloat
       ("pr"       , _                                      ) -> Just TypeInteger
-      ("concat"   , TypeTuple [TypeTuple as, TypeTuple bs] ) -> Just (TypeTuple (as ++ bs))
       ("build"    , TypeTuple [TypeInteger, TypeLambda TypeInteger t]) -> Just (TypeVec t)
       ("sumbuild" , TypeTuple [TypeInteger, TypeLambda TypeInteger t]) -> Just t
       ("index"    , TypeTuple [TypeInteger, TypeVec t]     ) -> Just t
@@ -362,7 +357,7 @@ simplePrimResultTy fun arg_ty
       _ -> Nothing
 
 isPrimFun :: String -> Bool
-isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "concat", "build", "sumbuild"
+isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "sumbuild"
                        , "index", "size", "sum", "to_float"
                        , "neg", "exp", "log", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"

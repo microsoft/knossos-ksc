@@ -144,9 +144,6 @@ optPrimFun "index" (Tuple [ _, arr ])
  | TypeVec (TypeZero t) <- typeof arr
  = Just $ mkZero t
 
--- RULE: concat((as...), (bs...))
-optPrimFun "concat" (Tuple [Tuple es1, Tuple es2]) = Just (Tuple (es1 ++ es2))
-
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optPrimFun "+" (Tuple [Tuple es1, Tuple es2])
   | length es1 == length es2 = Just (Tuple (zipWith pAdd es1 es2))
@@ -296,15 +293,12 @@ optSum _ = Nothing
 -----------------------
 optBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
 
--- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
-optBuild _ _ e
-  | TypeZero ty <- typeof e
-  = Just $ Konst $ KZero $ TypeVec ty
-
--- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
+-- RULE: build sz (\i. <zero>)  =  <zero>
+{-
 optBuild _ _ e
   | isKZero e
   = Just $ Konst $ KZero $ TypeVec (typeof e)
+-}
 
 -- RULE: build sz (\i. delta i ex eb)  =  let i = ex in
 --                                        deltaVec sz i eb
@@ -368,11 +362,13 @@ optBuild _ _ _ = Nothing
 -----------------------
 optLMBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
 
+{-
 -- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
 optLMBuild _ _ e
   | isLMZero e
   , TypeLM s t <- typeof e
   = Just $ lmZero s (TypeVec t)
+-}
 
 optLMBuild _ _ _ = Nothing
 
@@ -464,13 +460,20 @@ optApplyLM (Let v rhs body) dx
 optApplyLM (If b et ef) dx
   = Just $ If b (lmApply et dx) (lmApply ef dx)
 
-optApplyLM (Call (TFun (TypeLM _ t) (GradFun (UserFun f) mode)) e) dx
-  = -- trace ("User Grad->Der [" ++ f ++ "]")
-    Just $ Call (TFun (tangentType t) (DrvFun (UserFun f) mode)) (pConcat e dx)
+optApplyLM (Call (TFun (TypeLM _ t) (GradFun f mode)) e) dx
+  = Just (Call grad_fun (Tuple (flatten e ++ flatten dx)))
+    -- Both e and dx may be tuples, and we want to concatenate them
+    -- into a single argument for the grad function
+  where
+    grad_fun = TFun (tangentType t) (DrvFun f mode)
+    flatten (Tuple es) = es
+    flatten e          = [e]
 
+{-
 optApplyLM (Call (TFun (TypeLM _ t) (GradFun (PrimFun f) mode)) e) dx
   = -- trace ("Prim Grad->Der [" ++ f ++ "]")
     Just $ Call (TFun (tangentType t) (DrvFun (PrimFun f) mode)) (Tuple [e, dx])
+-}
 
 optApplyLM e _
   = pprTrace "Apply not optimized:" (ppr e)

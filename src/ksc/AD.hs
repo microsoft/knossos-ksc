@@ -44,16 +44,10 @@ gradDef (DefX f params rhs)
           _           -> TypeTuple (map typeof params)
 
     lets = case params of
-             [p] -> [ (gradTVar s p, gradParamRhs p (lmOne (typeof p))) ]
-             _   -> [ (gradTVar s p, gradParamRhs p (gradSelFun params p i))
+             [p] -> [ (gradTVar s p, lmOne (typeof p)) ]
+             _   -> [ (gradTVar s p, gradSelFun params p i)
                     | (p,i) <- params `zip` [1..] ]
 
-
-    gradParamRhs :: TVar -> TExpr -> TExpr
-    gradParamRhs tv grad_rhs
-      = case typeof tv of
-          TypeInteger -> lmZero s TypeInteger
-          _           -> grad_rhs
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
 gradE :: Type -> TExpr -> TExpr
