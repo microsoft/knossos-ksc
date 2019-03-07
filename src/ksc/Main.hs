@@ -214,7 +214,7 @@ compileKscTestPrograms compiler = do
       testDir = "test/ksc/"
 
       naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList
-        = ["ex2.ks", "inline.ks", "logsumexp.ks"]
+        = ["inline.ks", "logsumexp.ks"]
 
   ksFiles <- fmap (filter (not . (`elem` naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList))
                     . filter ((== ".ks") . last 3))
