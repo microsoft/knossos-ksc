@@ -91,12 +91,16 @@ demoN decls
        ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
        }
 
-displayPass :: Int -> String -> GblSymTab -> [TDef] -> KM ()
-displayPass verbosity what env decls
-  = do { banner what
-       ; displayN (take verbosity decls)
+displayPassM :: Maybe Int -> String -> GblSymTab -> [TDef] -> KM ()
+displayPassM mverbosity what env decls
+  = do { flip mapM_ mverbosity $ \verbosity -> do
+           banner what
+           displayN (take verbosity decls)
        ; lintDefs what env decls
     }
+
+displayPass :: Int -> String -> GblSymTab -> [TDef] -> KM ()
+displayPass = displayPassM . Just
 
 -------------------------------------
 -- GMM derivatives
@@ -110,9 +114,9 @@ moveMain = partition isMain
     isMain (DefDecl (DefX (TFun _ (Fun (UserFun "main"))) _ _)) = True
     isMain _ = False
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
 displayCppGenAndCompile compile verbosity file =
-  let dd defs = liftIO $ putStrLn ("...\n" ++ (pps $ take verbosity defs))
+  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . (flip take defs)) verbosity
   in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))
@@ -123,25 +127,25 @@ displayCppGenAndCompile compile verbosity file =
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
   ; let rulebase      = mkRuleBase rules
-  ; displayPass verbosity "Typechecked defs" env defs
+  ; displayPassM verbosity "Typechecked defs" env defs
 
   ; banner "main"
   ; dd main
 
   ; let grad_defs = gradDefs defs
         env1 = env `extendGblST` grad_defs
-  ; displayPass verbosity "Grad" env1 grad_defs
+  ; displayPassM verbosity "Grad" env1 grad_defs
 
   ; let trans_grad_defs = map transposeD grad_defs
 
   ; let (env2, optgrad) = optDefs rulebase env1 (grad_defs ++ trans_grad_defs)
-  ; displayPass verbosity "Optgrad" env2 optgrad
+  ; displayPassM verbosity "Optgrad" env2 optgrad
 
   ; let fwd = applyDefs optgrad
-  ; displayPass verbosity "Fwd" env2 fwd
+  ; displayPassM verbosity "Fwd" env2 fwd
 
   ; let (env3, optfwd) = optDefs rulebase env2 fwd
-  ; displayPass verbosity "OptFwd" env3 optfwd
+  ; displayPassM verbosity "OptFwd" env3 optfwd
 
   ; (env4, ann_main) <- annotDecls env3 main
 
@@ -153,45 +157,45 @@ displayCppGenAndCompile compile verbosity file =
   ; let alldefs = defs ++ optfwd ++ main_tdef     
 
   ; (env5, cse) <- cseDefs rulebase env4 alldefs
-  ; displayPass verbosity "CSE" env5 cse
+  ; displayPassM verbosity "CSE" env5 cse
 
   ; let ann2 =  cse
   ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
   }
 
-displayCppGenAndCompileS :: HasCallStack => String -> Int -> String -> IO String
+displayCppGenAndCompileS :: HasCallStack => String -> Maybe Int -> String -> IO String
 displayCppGenAndCompileS compiler = displayCppGenAndCompile (Cgen.compile compiler)
 
-displayCppGenCompileAndRun :: HasCallStack => String -> Int -> String -> IO String
+displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
 displayCppGenCompileAndRun compiler verbosity file = do
   { exefile <- displayCppGenAndCompile (Cgen.compile compiler) verbosity file
   ; Cgen.runExe exefile
   }
 
-displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Int -> String -> IO ()
+displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> String -> IO ()
 displayCppGenCompileAndRunWithOutput compiler verbosity file = do
   { output <- displayCppGenCompileAndRun compiler verbosity file
   ; putStrLn "Done"
   ; putStr output
   }
 
-displayCppGenCompileAndRunWithOutputGpp7 :: HasCallStack => Int -> String -> IO ()
+displayCppGenCompileAndRunWithOutputGpp7 :: HasCallStack => Maybe Int -> String -> IO ()
 displayCppGenCompileAndRunWithOutputGpp7 = displayCppGenCompileAndRunWithOutput "g++-7"
 
 doall :: HasCallStack => Int -> String -> IO ()
-doall = displayCppGenCompileAndRunWithOutputGpp7
+doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
 
 doallE :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
-doallE = displayCppGenAndCompile
+doallE compile = displayCppGenAndCompile compile . Just
 
 doallC :: HasCallStack => String -> Int -> String -> IO ()
-doallC = displayCppGenCompileAndRunWithOutput
+doallC compiler = displayCppGenCompileAndRunWithOutput compiler . Just
 
 doallG :: HasCallStack => String -> Int -> String -> IO String
-doallG = displayCppGenCompileAndRun
+doallG compiler = displayCppGenCompileAndRun compiler . Just
 
 gmm :: IO ()
-gmm = displayCppGenCompileAndRunWithOutputGpp7 400 "test/ksc/gmm"
+gmm = displayCppGenCompileAndRunWithOutputGpp7 (Just 400) "test/ksc/gmm"
 
 main :: IO ()
 main = gmm
@@ -226,14 +230,14 @@ compileKscTestPrograms compiler = do
 
   flip mapM_ ksTests $ \ksTest -> do
     putStrLn ksTest
-    (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) 0) ksTest
+    (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing) ksTest
 
 testC :: String -> IO ()
 testC compiler = do
   Test.Hspec.hspec Main.hspec
   compileKscTestPrograms compiler
 
-  output <- displayCppGenCompileAndRun compiler 0 "test/ksc/gmm"
+  output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
 
   let success = case reverse (lines output) of
         impossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->
@@ -260,7 +264,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) 0 source
+  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) Nothing source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proffunctions $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
