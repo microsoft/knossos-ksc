@@ -244,8 +244,7 @@ mkLet (TVar ty v) rhs body =
     $ Let (TVar ty v) rhs body
 
 mkLets :: HasCallStack => [(TVar, TExpr)] -> TExpr -> TExpr
-mkLets []              e = e
-mkLets ((v, rhs) : bs) e = mkLet v rhs (mkLets bs e)
+mkLets xs e = foldr (uncurry mkLet) e xs
 
 kInt :: Integer -> ExprX f b
 kInt i = Konst (KInteger i)
