@@ -296,7 +296,7 @@ pLet = do { pReserved "let"
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
 
-pDef :: Parser (Def)
+pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
 pDef = do { pReserved "def"
           ; f <- pIdentifier
