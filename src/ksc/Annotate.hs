@@ -382,7 +382,7 @@ extendGblEnv (DefDecl tdef@(DefX { def_fun = TFun _ f })) thing_inside
 
 modifyEnvTc :: (SymTab -> SymTab) -> TcM f b a -> TcM f b a
 modifyEnvTc extend (TCM f)
-  = TCM (\env ds -> f (env { tce_st = extend (tce_st env) }) ds)
+  = TCM (\env -> f (env { tce_st = extend (tce_st env) }))
 
 getSymTabTc :: TcM f b SymTab
 getSymTabTc = TCM (\env ds -> (tce_st env, ds))
