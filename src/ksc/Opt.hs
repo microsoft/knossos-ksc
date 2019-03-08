@@ -443,6 +443,7 @@ optGradPrim _ "$rand" _ = Just (lmZero TypeFloat TypeFloat)
 optGradPrim _ "neg" _ = Just (lmScale (kTFloat $ -1.0))
 optGradPrim _ "exp" e = Just (lmScale (pExp e))
 optGradPrim _ "log" e = Just (lmScale (pDiv (kTFloat 1.0) e))
+optGradPrim _ "to_float" _ = Just (lmZero TypeFloat TypeFloat)
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) $ Nothing
 
 ---------------
