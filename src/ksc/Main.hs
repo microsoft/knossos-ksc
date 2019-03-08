@@ -5,7 +5,7 @@ import qualified System.Exit
 
 import Lang
 import LangUtils (hspec)
-import Parse (runParser, pDecls, parseF )
+import Parse (parseF)
 import Rules
 import Annotate
 import AD
@@ -32,11 +32,9 @@ import Test.Hspec (hspec, Spec)
 demoF :: String -> IO ()
 -- Read source code from specified input file, optimise,
 -- differentiate, optimise, and display results of each step
-demoF file
-  = do { cts <- readFile file
-       ; case runParser pDecls cts of
-            Left err   -> putStrLn ("Failed parse: " ++ show err)
-            Right defs -> runKM (demoN defs) }
+demoF file = do
+  defs <- parseF file
+  runKM (demoN defs)
 
 demo :: Decl -> IO ()
 demo d = runKM (demoN [d])
