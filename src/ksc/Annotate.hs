@@ -229,6 +229,9 @@ extendGblST env defs = foldl add env defs
   where
     add env def@(DefX (TFun _ f) _ _) = stInsertFun f def env
 
+modifygblST :: (GblSymTab -> GblSymTab) -> SymTab -> SymTab
+modifygblST g = \env -> env { gblST = g (gblST env) }
+
 ------------------------------------------------------------------------------
 -- callResultTy is given a (global) function and the type of its
 -- argument, and returns the type of its result.
@@ -374,11 +377,9 @@ extendLclEnv vars = modifyEnvTc add_vars
     add env (TVar ty v) = Map.insert v ty env
 
 extendGblEnv :: TDecl -> TcM f b a -> TcM f b a
-extendGblEnv (RuleDecl {}) thing_inside
-  = thing_inside
-extendGblEnv (DefDecl tdef@(DefX { def_fun = TFun _ f })) thing_inside
-  = modifyEnvTc (\env -> env { gblST = stInsertFun f tdef (gblST env) })
-                thing_inside
+extendGblEnv (RuleDecl {}) = id
+extendGblEnv (DefDecl tdef@(DefX { def_fun = TFun _ f }))
+  = modifyEnvTc (modifygblST (stInsertFun f tdef))
 
 modifyEnvTc :: (SymTab -> SymTab) -> TcM f b a -> TcM f b a
 modifyEnvTc extend (TCM f)
