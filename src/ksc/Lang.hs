@@ -113,11 +113,14 @@ data FunId = UserFun String   -- UserFuns have a Def
                 Int      -- Arity
            deriving( Eq, Ord, Show )
 
-data Fun = Fun     FunId         -- The function              f(x)
-         | GradFun FunId ADMode  -- Full Jacobian Df(x)
-                                 --   Rev <=> transposed  Rf(x)
-         | DrvFun  FunId ADMode  -- Derivative derivative f'(x,dx)
-                                 --   Rev <=> reverse mode f`(x,dr)
+data Fun = Fun      FunId         -- The function              f(x)
+         | GradFun  FunId ADMode  -- Full Jacobian Df(x)
+                                  --   Rev <=> transposed  Rf(x)
+         | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
+                                  --   Rev <=> reverse mode f`(x,dr)
+         | CheckFun FunId         -- The function that is generated
+                                  -- to check that the reverse mode
+                                  -- code generated for f is correct.
          deriving( Eq, Ord, Show )
 
 data ADMode = Fwd | Rev
@@ -528,11 +531,12 @@ pprFunId (PrimFun p ) = text p
 pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> SDoc
-pprFun (Fun s        ) = ppr s
-pprFun (GradFun s Fwd) = text "D$" <> ppr s
-pprFun (GradFun s Rev) = text "R$" <> ppr s
-pprFun (DrvFun  s Fwd) = text "fwd$" <> ppr s
-pprFun (DrvFun  s Rev) = text "rev$" <> ppr s
+pprFun (Fun s         ) = ppr s
+pprFun (GradFun  s Fwd) = text "D$" <> ppr s
+pprFun (GradFun  s Rev) = text "R$" <> ppr s
+pprFun (DrvFun   s Fwd) = text "fwd$" <> ppr s
+pprFun (DrvFun   s Rev) = text "rev$" <> ppr s
+pprFun (CheckFun s    ) = text "check$" <> ppr s
 
 instance Pretty TVar where
   pprPrec _ (TVar ty Dummy) = parens $ text "_ : " <> ppr ty

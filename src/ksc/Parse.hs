@@ -169,6 +169,7 @@ mk_fun f = case find_dollar f of
              Just ("fwd", s) -> DrvFun  (mk_fun_id s) Fwd
              Just ("rev", s) -> DrvFun  (mk_fun_id s) Rev
              Just ("get", s) -> Fun     (mk_sel_fun s)
+             Just ("check", s) -> CheckFun (mk_fun_id s)
              _               -> Fun     (mk_fun_id f)
   where
     mk_fun_id f | isPrimFun f = PrimFun f

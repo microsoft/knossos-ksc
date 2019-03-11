@@ -270,7 +270,7 @@ cgenExprR env = \case
       ++ ";\n"
       ++ gc "$MRK"
       ++ v ++ " = "
-      ++ cgenAnyFun tf cftype
+      ++ cgenAnyFun tf cftype ctypes
       ++ "("
       ++ intercalate "," cexprs
       ++ ");\n"
@@ -417,13 +417,14 @@ cgenFunId = \case
 cgenUserFun :: HasCallStack => Fun -> String
 cgenUserFun f = case f of
   Fun funId     -> cgenFunId funId
-  GradFun s Fwd -> "D$" ++ cgenFunId s
-  GradFun s Rev -> "R$" ++ cgenFunId s
-  DrvFun  s Fwd -> "fwd$" ++ cgenFunId s
-  DrvFun  s Rev -> "rev$" ++ cgenFunId s
+  GradFun  s Fwd -> "D$" ++ cgenFunId s
+  GradFun  s Rev -> "R$" ++ cgenFunId s
+  DrvFun   s Fwd -> "fwd$" ++ cgenFunId s
+  DrvFun   s Rev -> "rev$" ++ cgenFunId s
+  CheckFun s     -> "check$" ++ cgenFunId s
 
-cgenAnyFun :: HasCallStack => TFun -> CType -> String
-cgenAnyFun tf cftype = case tf of
+cgenAnyFun :: HasCallStack => TFun -> CType -> [CType] -> String
+cgenAnyFun tf cftype ctypes = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
     let TypeVec t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
@@ -431,6 +432,10 @@ cgenAnyFun tf cftype = case tf of
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
+  TFun _ (Fun (PrimFun "to_tangent")) ->
+    case ctypes of
+      [ctype] -> "to_tangent<" ++ cgenType cftype ++ "," ++ cgenType ctype ++ ">"
+      _       -> error "Expected one argument to to_tangent"
   TFun _            f                 -> cgenUserFun f
 
 cgenTypeOf :: TExpr -> String

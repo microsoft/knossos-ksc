@@ -89,6 +89,10 @@ demoN decls
 
        ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
        ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
+
+       ; let checks = map checkD opt_defs
+             env9   = env8 `extendGblST` checks
+       ; disp "Checks" env9 checks
        }
 
 displayPassM :: Maybe Int -> String -> GblSymTab -> [TDef] -> KM ()
@@ -147,14 +151,18 @@ displayCppGenAndCompile compile verbosity file =
   ; let (env3, optfwd) = optDefs rulebase env2 fwd
   ; displayPassM verbosity "OptFwd" env3 optfwd
 
-  ; (env4, ann_main) <- annotDecls env3 main
+  ; let checks = map checkD defs
+        env3_1 = env3 `extendGblST` checks
+  ; displayPassM verbosity "Checks" env3_1 checks
+
+  ; (env4, ann_main) <- annotDecls env3_1 main
 
   ; let (_rules, main_tdef) = partitionDecls ann_main
 
   -- Note optgrad removed from below as we can not currently 
   -- codegen the optgrad for recursive functions 
   -- [see https://github.com/awf/knossos/issues/281]
-  ; let alldefs = defs ++ optfwd ++ main_tdef     
+  ; let alldefs = defs ++ optfwd ++ checks ++ main_tdef
 
   ; (env5, cse) <- cseDefs rulebase env4 alldefs
   ; displayPassM verbosity "CSE" env5 cse

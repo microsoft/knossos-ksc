@@ -1452,6 +1452,11 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 	inline double neg(double d) { return -d; }
 	inline auto D$neg(double d) { return LM::Scale::mk(-1.0); }
 
+        inline tuple<> neg(tuple<> d) { return d; }
+
+        template <class T>
+        inline vec<T> neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return neg(v[i]); }); }
+
 	inline double to_float(int d) { return d; }
 	inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
@@ -1535,4 +1540,89 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 			c$68 = gmm_knossos_gmm_objective(c$62, c$63, c$64, c$65, c$66, c$67)
 		);
 	*/
+
+	// ===============================  Dot ===========================================
+        inline double dot(double t1, double t2) { return t1 * t2; }
+
+	inline double dot(tuple<> t1, tuple<> t2)
+	{
+		return 0.0;
+	}
+
+	template <class T0, class... Ts, class U0, class... Us>
+	inline double dot(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
+	{
+		return dot(head(t1), head(t2)) + dot(tail(t1), tail(t2));
+	}
+
+        template <class T>
+        inline double dot(vec<T> t1, vec<T> t2)
+        {
+          double ret = 0;
+
+          // FIXME Assert sizes equal
+
+          for (int i = 0; i < t1.size(); i++)
+          {
+            ret += dot(t1[i], t2[i]);
+          }
+
+          return ret;
+        }
+
+        template <class T> inline double norm(T t1) { return sqrt(dot(t1, t1)); }
+
+	// ===============================  Tangent add ====================================
+
+	double tangent_add(double t1, double t2) { return t1 + t2; }
+	int tangent_add(int t1, tuple<> t2) { return t1; }
+
+	inline tuple<> tangent_add(tuple<> t1, tuple<> t2)
+	{
+		return tuple<>{};
+	}
+
+	template <class T0, class... Ts, class U0, class... Us>
+	inline auto tangent_add(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
+	{
+		return prepend(tangent_add(head(t1), head(t2)),
+			tangent_add(tail(t1), tail(t2)));
+	}
+
+        template <class T, class U>
+        inline vec<T> tangent_add(vec<T> t1, vec<U> t2)
+        {
+          // FIXME: Assert the sizes are equal
+          return build<T>(t1.size(), [t1, t2](int i) { return tangent_add(t1[i], t2[i]); });
+        }
+
+        inline std::string tangent_add(std::string s, tuple<> t) { return s; }
+
+	// ===============================  To tangent  ====================================
+
+        template <class R, class T>
+        inline R to_tangent(T t1)
+        {
+          // Dummy value to avoid compiler warning.  This template
+          // should never be instantiated.  It needs to exist so its
+          // specialisations below can exist.  I don't know if there's
+          // a more official way to mark it as "abstract".
+          return 0;
+        }
+
+        template <class R, class T>
+        inline vec<R> to_tangent(vec<T> t1)
+        {
+          // FIXME: Assert the sizes are equal
+          return build<R>(t1.size(), [t1](int i) { return to_tangent<R,T>(t1[i]); });
+        }
+
+        template <>
+        double to_tangent<double, double>(double t1) { return t1; }
+
+        template <>
+        tuple<> to_tangent<tuple<>, int>(int t1) { return tuple<>{}; }
+
+        template <>
+        tuple<> to_tangent<tuple<>, std::string>(std::string s) { return tuple<>{}; }
 } // namespace ks

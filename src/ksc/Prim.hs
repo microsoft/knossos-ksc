@@ -127,10 +127,11 @@ pDiag rows cols d = mkPrimCall3 "diag" rows cols d
 ---------------------------
 -- "User-defined" functions
 ---------------------------
-pAdd, pMul, pDiv, pEqual :: HasCallStack => TExpr -> TExpr -> TExpr
+pAdd, pMul, pDiv, pSub, pEqual :: HasCallStack => TExpr -> TExpr -> TExpr
 pAdd a b   = mkPrimCall2 "+" a b
 pMul a b   = mkPrimCall2 "*" a b
 pDiv a b   = mkPrimCall2 "/" a b
+pSub a b   = mkPrimCall2 "-" a b
 pEqual a b = mkPrimCall2 "==" a b
 
 pNeg, pExp, pLog, pZero, pTangentZero :: HasCallStack => TExpr -> TExpr
@@ -166,6 +167,18 @@ pSel i n e = Call (TFun (ts !! (i-1))
 pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
 pSnd   = pSel 2 2
+
+pDot :: TExpr -> TExpr -> TExpr
+pDot = mkPrimCall2 "dot"
+
+pNorm :: TExpr -> TExpr
+pNorm = mkPrimCall1 "norm"
+
+pTangentAdd :: TExpr -> TExpr -> TExpr
+pTangentAdd = mkPrimCall2 "tangent_add"
+
+pToTangent :: TExpr -> TExpr
+pToTangent = mkPrimCall1 "to_tangent"
 
 ensureTuple :: TExpr -> TExpr
 ensureTuple x = case typeof x of
@@ -211,6 +224,8 @@ primCallResultTy_maybe fun arg_ty
       DrvFun f Rev    -- f :: S1 S2 -> T, then rev$f :: S1 S2 T_t -> (S1_t, S2_t)
         | let s_tys = dropLast arg_ty
         -> Right (tangentType (mkTupleTy s_tys))
+
+      CheckFun f -> return TypeFloat
 
       Fun (UserFun _) -> Left (text "Not in scope:" <+> ppr fun)
 
@@ -329,6 +344,10 @@ simplePrimResultTy fun arg_tys
       ("size"     , [TypeVec _]                            ) -> Just TypeInteger
       ("sum"      , [TypeVec t]                            ) -> Just t
       ("to_float" , [TypeInteger]                          ) -> Just TypeFloat
+      ("dot"      , [t, t']                                ) | t == t' -> Just TypeFloat
+      ("norm"     , [t]                                    ) -> Just TypeFloat
+      ("tangent_add", [t, t']                              ) | tangentType t == t' -> Just t
+      ("to_tangent",  [t]                                  ) -> Just (tangentType t)
 
       -- arithmetic ops.   See special case for "+" above
       ("*"        , [TypeFloat,   t]             ) -> Just t
@@ -365,4 +384,17 @@ isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "sumbuild"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT"
-                       , "abs", "max" ]
+                       , "abs", "max"
+                       -- The dot-product, also known as inner-product
+                       -- of vectors (not just TypeVecs)
+                       , "dot"
+                       -- The Euclidean (L2) norm of a vector (not
+                       -- just a TypeVec), i.e. norm(x) = sqrt(dot(x, x))
+                       , "norm"
+                       -- If x :: s then dx :: tangentType t.
+                       -- tangent_add allows us to add them to get
+                       -- something of type s.
+                       , "tangent_add"
+                       -- Maps x :: s its tangent space (tangentType s)
+                       , "to_tangent"
+                       ]

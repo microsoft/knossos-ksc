@@ -3,6 +3,7 @@
 module AD where
 
 import Lang
+import qualified LangUtils
 import Prim
 
 -- for unit test
@@ -121,6 +122,53 @@ transposeD :: TDef -> TDef
 transposeD (DefX (TFun (TypeLM s t) (GradFun f d)) args rhs)
   = DefX (TFun (TypeLM t s) (GradFun f (flipMode d))) args $
     lmTranspose rhs
+
+---------------------------------
+-- Check
+--
+-- Generates code for
+--
+-- f$check(x_1, .., x_n, d$x_1, .., d$x_n, d$r)
+--   = (<(d$x_1, ..., d$x_n), rev$f(x_1, ..., x_n, d$r)>
+--      - <f(x_1 + d$x_1, ..., x_n + d$x_n) - f(x_1, ..., x_n), d$r>)
+--     / norm(d$x_1, .., d$x_n)
+--
+-- i.e. what should be small (when (d$x_1, .., d$x_n) is) if our
+-- reverse mode generated code is correct.
+
+checkD :: TDef -> TDef
+checkD (DefX tf@(TFun retType (Fun f_id)) vars _)
+  = DefX (TFun TypeFloat (CheckFun f_id)) checkVars checkRhs
+  where
+    checkRhs  = pDiv (pSub (pDot dxs (Call frev xs_dr))
+                           (pDot (myPSub (pToTangent (Call tf xs_plus_dxs))
+                                         (pToTangent (Call tf xs)))
+                                 (Var dr)))
+                     (pNorm dxs)
+    checkVars = vars ++ dvars ++ [dr]
+
+    myPSub x y = pAdd x (pNeg y)
+
+    frev = TFun frevRetType (DrvFun f_id Rev)
+
+    frevRetType = let typeOfTVar (TVar t _) = t
+                  in tangentType $ case map typeOfTVar vars of
+                    [tvar] -> tvar
+                    tvars  -> TypeTuple tvars
+
+    dxs_l    = map Var dvars
+    xs_l     = map Var vars
+
+    dxs         = mkTuple dxs_l
+    xs_plus_dxs = zipWith pTangentAdd xs_l dxs_l
+    xs          = xs_l
+    xs_dr       = xs_l ++ [Var dr]
+
+
+    -- NB These have duplication with applyD
+    dvars = map to_delta vars
+    dr = LangUtils.newVarNotIn (tangentType retType) (Tuple dxs_l)
+    to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
 
 ----------------------------------
 --- Unit test

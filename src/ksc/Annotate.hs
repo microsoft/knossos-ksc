@@ -267,6 +267,7 @@ callResultTy_maybe env fun arg_ty
       Fun     f   -> f
       GradFun f _ -> f
       DrvFun  f _ -> f
+      CheckFun f  -> f
 
     isUserFunConstructor = \case
       UserFun{} -> True
