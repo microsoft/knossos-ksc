@@ -198,7 +198,7 @@ primCallResultTy_maybe fun arg_ty
         -> pprPanic "primFunCallResultTy" (ppr fun <+> ppr arg_ty)
            -- How do we split up that tuple?
 
-      _ -> Left (text "Not in scope:" <+> ppr fun)
+      Fun (UserFun _) -> Left (text "Not in scope:" <+> ppr fun)
 
 
 primFunCallResultTy :: HasCallStack => PrimFun -> Type -> Type
