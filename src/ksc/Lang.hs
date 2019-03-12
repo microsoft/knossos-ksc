@@ -514,6 +514,9 @@ default_display_style = False
 render :: SDoc -> String
 render (SDoc s) = PP.render (s default_display_style)
 
+renderSexp :: SDoc -> String
+renderSexp (SDoc s) = PP.render (s True)
+
 instance Show SDoc where
   show (SDoc s) = show (s default_display_style)
 
@@ -565,7 +568,7 @@ pprFun (DrvFun  s Fwd) = text "fwd$" <> ppr s
 pprFun (DrvFun  s Rev) = text "rev$" <> ppr s
 
 instance Pretty TVar where
-  pprPrec _ (TVar ty Dummy) = text "_:" <> ppr ty
+  pprPrec _ (TVar ty Dummy) = parens $ text "_ : " <> ppr ty
   pprPrec _ (TVar _ v)     = ppr v
 
 instance PrettyVar TVar where
@@ -585,7 +588,7 @@ instance PrettyVar Fun where
 
 instance PrettyVar TFun where
   pprVar  f = ppr f
-  pprBndr (TFun ty f) = ppr f <> text ":" <> ppr ty
+  pprBndr (TFun ty f) = ppr f <+> text ":" <+> ppr ty
 
 instance Pretty Konst where
   pprPrec _ (KInteger i) = integer i
@@ -597,9 +600,9 @@ instance Pretty Konst where
 
 instance Pretty Type where
   pprPrec p (TypeVec ty)         = parensIf p precZero $
-                                   text "Vec " <> pprParendType ty
+                                   text "Vec" <+> pprParendType ty
   pprPrec p (TypeTuple tys)      = parensIf p precZero $
-                                   text "Tuple" <> parens (pprList ppr tys)
+                                   text "Tuple" <+> parens (pprList ppr tys)
   pprPrec p (TypeLambda from to) = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
   pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> pprParendType s <+> ppr t
@@ -631,18 +634,18 @@ pprParendExpr :: (HasInfix f, PrettyVar f, PrettyVar b) => ExprX f b -> SDoc
 pprParendExpr = pprExpr precTwo
 
 pprTVar :: TVar -> SDoc
-pprTVar (TVar ty v) = ppr v <> text ":" <> ppr ty
+pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
 pprExpr :: (HasInfix f, PrettyVar f, PrettyVar b) => Prec -> ExprX f b -> SDoc
 pprExpr _ (Var   v ) = pprVar v
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
-pprExpr _ (Tuple es) = parens (mode (text "tuple" <+> rest) rest)
+pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
   where rest = pprList ppr es
-pprExpr p (Lam v e) =
-  parensIf p precZero $ text "lam" <+> parens (pprTVar v) <+> ppr e
+pprExpr p (Lam v e) =  mode (parensIf p precZero $ text "lam" <+> parens (pprTVar v) <+> ppr e)
+                            (parens $ text "lam" <+> (vcat [parens (pprTVar v), ppr e]))
 pprExpr p (Let v e1 e2) = mode
-  (parens $ sep [text "let", pprBndr v, ppr e1, ppr e2])
+  (pprLetSexp v e1 e2)
   (parensIf
     p
     precZero
@@ -681,6 +684,18 @@ pprCall prec f e = mode
     (Tuple es) -> pprList ppr es
     _          -> ppr e
 
+pprLetSexp :: (PrettyVar f, PrettyVar b, HasInfix f) =>
+           b -> ExprX f b -> ExprX f b -> SDoc
+pprLetSexp v e body =
+      go [(v,e)] body
+    where
+      go binds (Let v1 e1 body) = go ((v1,e1):binds) body
+      go binds body =
+            parens $ sep [text "let", (parens $ vcat (map parenBind $ reverse binds)),
+                        ppr body]
+      parenBind (v,e) = parens $ pprVar v <+> ppr e
+
+
 class HasInfix f where
   isInfix :: f -> Maybe Prec
 
@@ -708,7 +723,7 @@ instance (Show f, PrettyVar f, PrettyVar b, HasInfix f)
 
 instance (Show f, PrettyVar f, PrettyVar b, HasInfix f) => Pretty (DefX f b) where
   ppr (DefX f vs rhs) = mode
-      (parens $ sep [ text "def", pprBndr f, parens (sep (map pprTVar vs)), ppr rhs])
+      (parens $ sep [ text "def", pprBndr f, parens (sep (map (parens . pprTVar) vs)), ppr rhs])
       (sep [ hang (text "def" <+> pprBndr f)
              2 (parens (pprList pprTVar vs))
            , nest 2 (text "=" <+> ppr rhs) ])
