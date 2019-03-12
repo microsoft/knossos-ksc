@@ -486,7 +486,6 @@ ctypeofFun env (TFun ty f) ctys = case cstMaybeLookupFun f env of
   Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
 
--- NB cst is not used!
 ctypeofFun1 :: HasCallStack => Type -> Fun -> [CType] -> CType
 ctypeofFun1 ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
 ctypeofFun1 (TypeLM _ _) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
