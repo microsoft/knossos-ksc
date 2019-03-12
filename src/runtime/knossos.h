@@ -466,8 +466,8 @@ namespace ks
 		template <class U>
 		vec(vec<U> const& that) : vec{ that.size() }
 		{
-			if (that.is_zero_)
-				this->is_zero = true;
+                        if (that.is_zero())
+				this->is_zero_ = true;
 			else {
 				assert(!this->is_zero_);
 				for (int i = 0; i < that.size(); ++i)
