@@ -3,8 +3,8 @@
 open FP      // Functional programming primitives: polymorphic zip, fold, etc
 open Tensor  // Vector/Matrix/Tensor, as plain-ol-data types
 
-type Mat = Matrix<double>
-type Vec = Vector<double>
+type Mat = double
+type Vec = double
 
 // Pretend that Tensor didn't define relu
 let relu x = max x 0.0
@@ -17,12 +17,12 @@ let dnn (weights : Mat list) (x : Vec) =
     for W in weights do
         ret <- relu (W * ret)
     ret
- 
+
 // Alternative, more F#y/LINQy rendition.  
 // Both are good, and it's important that we can do both
 let dnn2 (weights : Mat list) (x : Vec) =
     foldr (fun W x -> relu (W * x)) weights x
- 
+
 // Autoencoder loss for one example
 let autoencoder_loss weights x = sqnorm (x - dnn weights x)
  
