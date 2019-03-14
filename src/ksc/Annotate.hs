@@ -35,8 +35,9 @@ annotDecls gbl_env decls
 
     -- rec_gbl_env: extend the global env with the
     -- user-specified types for each top-level function
-    -- We don't have a type-checked body yet, but that
-    -- doesn't matter because we aren't doing inlinin
+    -- TODO: this comment still current?
+    -- We don't have a type-checked body yet, but that 
+    -- doesn't matter because we aren't doing inlining
     rec_gbl_env = extendGblST gbl_env $
                   [ DefX { def_fun = fun, def_args = args
                          , def_rhs = pprPanic "Rec body of" (ppr fun) }
@@ -51,7 +52,7 @@ annotDecls gbl_env decls
 -----------------------------------------------
 
 lintDefs :: String -> GblSymTab -> [TDef] -> KM ()
--- Retuns a list of error messages
+-- Returns a list of error messages
 lintDefs what gbl_env defs
   = do { runTc what init_env (mapM_ tcDef defs)
        ; printK (text "Linted" <+> text what) }
@@ -408,5 +409,6 @@ lookupGblTc fun arg_ty
       = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
              , text " Arg type:" <+> ppr arg_ty
              , text "ST lookup:" <+> ppr (Map.lookup fun (gblST st))
-             , text "ST keys:" <+> vcat (map (text . show) (Map.keys (gblST st))) ]
+             -- , text "ST keys:" <+> vcat (map (text . show) (Map.keys (gblST st))) 
+             ]
 

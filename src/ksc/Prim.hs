@@ -310,6 +310,7 @@ simplePrimResultTy "+" (TypeTuple [t1, t2])
     add :: Type -> Type -> Maybe Type
     add TypeInteger TypeInteger   = Just TypeInteger
     add TypeFloat   TypeFloat     = Just TypeFloat
+    add t  (TypeTuple [])   = Just t
     add (TypeVec t1) (TypeVec t2) = do { tr <- add t1 t2
                                        ; return (TypeVec tr) }
     add t1 (TypeZero t2) = Just t1
@@ -320,7 +321,7 @@ simplePrimResultTy "+" (TypeTuple [t1, t2])
 
 simplePrimResultTy fun arg_ty
   = case (fun, arg_ty) of
-      ("inline"   , t                                      ) -> Just t
+      ("$inline"  , t                                      ) -> Just t
       ("$trace"   , t                                      ) -> Just t
       ("$rand"    , TypeFloat                              ) -> Just TypeFloat
       ("pr"       , _                                      ) -> Just TypeInteger
@@ -343,6 +344,8 @@ simplePrimResultTy fun arg_ty
       ("neg"      , t                                      ) -> Just t
       ("exp"      , TypeFloat                              ) -> Just TypeFloat
       ("log"      , TypeFloat                              ) -> Just TypeFloat
+      ("lgamma"   , TypeFloat                              ) -> Just TypeFloat
+      ("digamma"  , TypeFloat                              ) -> Just TypeFloat
 
       ("=="       , _                                      ) -> Just TypeBool
       ("!="       , _                                      ) -> Just TypeBool
@@ -359,7 +362,7 @@ simplePrimResultTy fun arg_ty
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "sumbuild"
                        , "index", "size", "sum", "to_float"
-                       , "neg", "exp", "log", "+", "-", "*", "/"
+                       , "neg", "exp", "log", "lgamma", "digamma", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT"

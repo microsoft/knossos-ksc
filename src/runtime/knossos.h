@@ -1,7 +1,6 @@
 // C++ "runtime" for Knossos
 #pragma once
 
-#include <assert.h>
 #include <type_traits>
 #include <variant>
 #include <tuple>
@@ -19,12 +18,12 @@ using std::make_tuple;
 using std::tuple;
 
 // Enable bump allocator.  See mark/reset below.
-#define BUMPY
+#define xBUMPY
 
 #define COMMENT(x)
 
-// ASSERT
-#define ASSERT(expr)                        \
+// KS_ASSERT
+#define KS_ASSERT(expr)                     \
     if (expr)                               \
         ;                                   \
     else                                    \
@@ -38,6 +37,13 @@ namespace ks {
 	}
 };
 
+// ======================== Exrta math =====================
+double digamma(double x)
+{
+	std::cerr << "digamma";
+	return 1.0;
+}
+
 namespace ks
 {
 	extern int log_indent;
@@ -50,13 +56,61 @@ namespace ks
 #define NOTE { LOG("note " << (FIND ? (void*)this : (void*)0), log_indent); }
 #define LEAVE { LOG("dtor " << FIND, --log_indent);  objects.erase(this); }
 
-        // Inplace add requires a couple of forward declarations.
-        // This seemed to be the minimal we could get away with.
-        template <class T>
-        class vec;
-        template <class T>
-        void inplace_add(vec<T> *t1, const vec<T> &t2);
-        void inplace_add(double *t1, const double &t2);
+	// Inplace add requires a couple of forward declarations.
+	// This seemed to be the minimal we could get away with.
+	template <class T>
+	class vec;
+	template <class T>
+	void inplace_add(vec<T> *t1, const vec<T> &t2);
+	void inplace_add(double *t1, const double &t2);
+
+	// ===============================  Allocator  ==================================
+#ifdef BUMPY
+	struct allocator {
+		size_t max_size;
+		unsigned char* buf;
+		size_t top;
+
+		allocator(size_t max_size) :
+			max_size(max_size),
+			buf(new unsigned char[max_size]),
+			top(0)
+		{}
+		~allocator() {
+			delete[] buf;
+		}
+		void* alloc(size_t size)
+		{
+			KS_ASSERT(size < 1000000);
+			void* ret = buf + top;
+			top += ((size + 15) / 16) * 16;
+			KS_ASSERT(top < max_size);
+			return ret;
+		}
+
+		size_t mark() { return top; }
+
+		void* top_ptr() { return buf + top; }
+
+		void reset(size_t top_ = 0)
+		{
+			top = top_;
+		}
+	};
+
+	extern allocator g_alloc;
+	typedef size_t alloc_mark_t;
+	inline alloc_mark_t mark_bump_allocator_if_present() { return g_alloc.mark(); }
+	inline void reset_bump_allocator_if_present(alloc_mark_t top) { g_alloc.reset(top); }
+#define $MRK(var) alloc_mark_t var = mark_bump_allocator_if_present()
+#define $REL(var) reset_bump_allocator_if_present(var)
+#else
+	typedef size_t alloc_mark_t;
+	inline alloc_mark_t mark_bump_allocator_if_present() { return 0; }
+	inline void reset_bump_allocator_if_present(alloc_mark_t top) { }
+#define $MRK(var)
+#define $REL(var)
+#endif
 
 	// ===============================  String utils  ==================================
 
@@ -168,57 +222,12 @@ namespace ks
 	};
 
 	inline void
-	test_type_to_string()
+		test_type_to_string()
 	{
 		auto s = type_to_string<tuple<int, float>>::name();
-		ASSERT(s == "tuple<int,float>");
+		KS_ASSERT(s == "tuple<int,float>");
 	}
 
-	// ===============================  Allocator  ==================================
-#ifdef BUMPY
-	struct allocator {
-		size_t max_size;
-		unsigned char* buf;
-		size_t top;
-
-		allocator(size_t max_size) :
-			max_size(max_size),
-			buf(new unsigned char[max_size]),
-			top(0)
-		{}
-		~allocator() {
-			delete[] buf;
-		}
-		void* alloc(size_t size)
-		{
-			ASSERT(size < 1000000);
-			void* ret = buf + top;
-			top += ((size + 15) / 16) * 16;
-			ASSERT(top < max_size);
-			return ret;
-		}
-
-		size_t mark() { return top;  }
-
-		void reset(size_t top_ = 0)
-		{
-			top = top_;
-		}
-	};
-
-	extern allocator g_alloc;
-	typedef size_t alloc_mark_t;
-	inline alloc_mark_t mark_bump_allocator_if_present() { return g_alloc.mark(); }
-	inline void reset_bump_allocator_if_present(alloc_mark_t top) { g_alloc.reset(top); }
-#define $MRK(var) alloc_mark_t var = mark_bump_allocator_if_present()
-#define $REL(var) reset_bump_allocator_if_present(var)
-#else
-	typedef size_t alloc_mark_t;
-	inline alloc_mark_t mark_bump_allocator_if_present() { return 0; }
-	inline void reset_bump_allocator_if_present(alloc_mark_t top) { }
-#define $MRK(var)
-#define $REL(var)
-#endif
 
 
 	// ===============================  Zero  ==================================
@@ -226,7 +235,7 @@ namespace ks
 	struct zero_t
 	{
 		zero_t(T) { }
-		
+
 		zero_t() { }
 
 		// operator T() { return T {}; }
@@ -252,17 +261,6 @@ namespace ks
 
 		operator int() { return 0; }
 	};
-
-	template <>
-	struct zero_t<tuple<>>
-	{
-		zero_t(tuple<>) { }
-
-		zero_t() { }
-
-		operator tuple<>() { return tuple<>{}; }
-	};
-
 	template <class T>
 	std::ostream &operator<<(std::ostream &s, ks::zero_t<T> const &v)
 	{
@@ -282,6 +280,12 @@ namespace ks
 	}
 
 	// ===============================  Tuple utils  ==================================
+
+	template < size_t N, typename... Ts >
+	auto ks_get(std::tuple<Ts...> t)
+	{
+		return  std::get<N>(t);
+	}
 
 	template < typename T, typename... Ts >
 	auto head(std::tuple<T, Ts...> t)
@@ -321,7 +325,7 @@ namespace ks
 	template <size_t i, class... Ts>
 	std::ostream& tuple_print(std::ostream& s, tuple<Ts...> const& t)
 	{
-		if constexpr(i < sizeof...(Ts))
+		if constexpr (i < sizeof...(Ts))
 		{
 			if (i > 0) s << ",";
 			s << std::get<i>(t);
@@ -338,7 +342,7 @@ namespace ks
 
 	// =============================== Type conversion ============================
 	template <class T>
-	struct convert 
+	struct convert
 	{
 		template <class U>
 		static T go(U const& u) {
@@ -347,7 +351,7 @@ namespace ks
 	};
 
 	template <>
-	struct convert<double> 
+	struct convert<double>
 	{
 		static double go(zero_t<double> const&) {
 			return 0.0;
@@ -355,7 +359,7 @@ namespace ks
 	};
 
 	template <>
-	struct convert<int> 
+	struct convert<int>
 	{
 		static int go(zero_t<int> const&) {
 			return 0;
@@ -363,7 +367,7 @@ namespace ks
 	};
 
 	template<>
-	struct convert<tuple<>> 
+	struct convert<tuple<>>
 	{
 		static tuple<> go(zero_t<tuple<>> const&) {
 			return tuple<>{};
@@ -371,7 +375,7 @@ namespace ks
 	};
 
 	template <class T>
-	struct convert<zero_t<T>> 
+	struct convert<zero_t<T>>
 	{
 		static zero_t<T> go(zero_t<zero_t<T>> const& u) {
 			return zero_t<T>{};
@@ -379,7 +383,7 @@ namespace ks
 	};
 
 	template <class T0, class... Ts>
-	struct convert<tuple<T0, Ts...>> 
+	struct convert<tuple<T0, Ts...>>
 	{
 		template <class U0, class... Us>
 		static tuple<T0, Ts...> go(zero_t<tuple<U0, Us...>> const& u)
@@ -391,6 +395,36 @@ namespace ks
 		static tuple<T0, Ts...> go(tuple<U0, Us...> const& u)
 		{
 			return prepend(convert<T0>::go(head(u)), convert<tuple<Ts...>>::go(tail(u)));
+		}
+	};
+
+	template < size_t N, typename... Ts >
+	auto ks_get(zero_t<tuple<Ts...>> t)
+	{
+		return std::get<N>(convert<tuple<Ts...>>::go(t));
+	}
+
+
+	template <>
+	struct zero_t<tuple<>>
+	{
+		zero_t(tuple<>) { }
+
+		zero_t() { }
+
+		operator tuple<>() { return tuple<>{}; }
+	};
+
+	template <class T0, class... Ts>
+	struct zero_t<tuple<T0, Ts...>>
+	{
+		zero_t(tuple<T0, Ts...>) { }
+
+		zero_t() { }
+
+		operator tuple<T0, Ts...>()
+		{
+			return convert<tuple<T0, Ts...>>::go(*this);
 		}
 	};
 
@@ -409,7 +443,10 @@ namespace ks
 	T1 add(T1 t1, zero_t<T1> t2) { return t1; }
 
 	template <class T1>
-        zero_t<T1> add(zero_t<T1> t1, zero_t<T1> t2) { return t1; }
+	T1 add(T1 t1, tuple<> t2) { return t1; }
+
+	template <class T1>
+	zero_t<T1> add(zero_t<T1> t1, zero_t<T1> t2) { return t1; }
 
 	template <>
 	inline tuple<> add(tuple<> t1, tuple<> t2)
@@ -430,7 +467,7 @@ namespace ks
 	class vec
 	{
 #ifdef BUMPY
-//TODO Full set of 5 ctors/assigners
+		//TODO Full set of 5 ctors/assigners
 		size_t size_;
 		T* data_;
 #else
@@ -441,15 +478,15 @@ namespace ks
 		// without a runtime flag but, need to pass initializer lists through
 		// zero_t {}
 		// As is, many instances are collapsed statically and the remainder 
-		// come throug here.
-		bool is_zero_ = false;  
+		// come through here.
+		bool is_zero_ = false;
 
 	public:
 
 		typedef T value_type;
 
 #ifdef BUMPY
-		vec(): 
+		vec() :
 			size_{ 0 },
 			data_{ nullptr },
 			is_zero_{ true }
@@ -463,13 +500,25 @@ namespace ks
 			this->is_zero_ = false;
 		}
 
+		vec(vec<T> const& that) = default; // Just copy the pointer.
+
+		vec& operator=(const vec<T>& that)
+		{
+			KS_ASSERT(that.size() != 0 || that.is_zero_);
+			this->size_ = that.size_;
+			this->data_ = that.data_; // Yes, this will alias, but there is no mutation, and no deletion.
+			this->is_zero_ = that.is_zero_;
+			return *this;
+		}
+
 		template <class U>
 		vec(vec<U> const& that) : vec{ that.size() }
 		{
-                        if (that.is_zero())
-				this->is_zero_ = true;
+			// Copying from another type - allocate.
+			if (that.is_zero())
+				this->is_zero = true;
 			else {
-				assert(!this->is_zero_);
+				KS_ASSERT(!this->is_zero_);
 				for (int i = 0; i < that.size(); ++i)
 					this->data_[i] = that[i];
 			}
@@ -477,19 +526,18 @@ namespace ks
 
 		vec(std::vector<T> const& that) : vec{ that.size() }
 		{
+			// Copying from std vector - allocate.
 			for (int i = 0; i < that.size(); ++i)
 				data_[i] = that[i];
 		}
 
 		int size() const { return int(size_); }
 
-		vec& operator=(const vec<T>& that)
+		vec(zero_t<vec<T>>) :
+			size_{ 0 },
+			data_{ 0 },
+			is_zero_{ true }
 		{
-			ASSERT(that.size() != 0 || that.is_zero_);
-			this->size_ = that.size_;
-			this->data_ = that.data_; // Yes, this will alias, but there is no mutation, and no deletion.
-			this->is_zero_ = that.is_zero_;
-			return *this;
 		}
 
 #else
@@ -499,11 +547,17 @@ namespace ks
 
 		vec(std::vector<T> const& that) :data_{ that } {}
 
+		vec(zero_t<vec<T>>) :
+			data_(0),
+			is_zero_{ true }
+		{
+		}
+
 		int size() const { return static_cast<int>(data_.size()); }
 
 		vec& operator=(const vec<T>& that)
 		{
-			ASSERT(that.size() != 0 || that.is_zero_);
+			KS_ASSERT(that.size() != 0 || that.is_zero_);
 			data_ = that.data_;
 			is_zero_ = that.is_zero_;
 			return *this;
@@ -511,65 +565,81 @@ namespace ks
 
 #endif
 
-		vec(zero_t<vec<T>>):
-			size_ {0},
-			data_ {0},
-			is_zero_ {true}
-		{
-		}
-
 		T& operator[](int i) { return data_[i]; }
 		T const& operator[](int i) const { return data_[i]; }
-	
+
 		static vec<T> create(size_t size);
 
 		bool is_zero() const { return is_zero_; }
 
-                friend void inplace_add <>(vec<T> *t1, const vec<T> &t2);
+		friend void inplace_add <>(vec<T> *t1, const vec<T> &t2);
 	};
 
-	// ===============================  Inplace add ==================================
-        void inplace_add(int *t1, const int &t2) { *t1 += t2; }
-
-        void inplace_add(double *t1, const double &t2) { *t1 += t2; }
-
-        inline void inplace_add(tuple<> *t1, const tuple<> &t2)
+	template <class T>
+	bool is_zero(vec<T> const& v)
 	{
-            return;
+		return v.is_zero();
 	}
 
-	template <class T0, class... Ts, class U0, class... Us>
-	void inplace_add(tuple<T0, Ts...> *t1, const tuple<U0, Us...> &t2)
+	// ===============================  Inplace add ==================================
+	void inplace_add(int *t1, const int &t2) { *t1 += t2; }
+
+	void inplace_add(double *t1, const double &t2) { *t1 += t2; }
+
+	inline void inplace_add(tuple<> *t1, const tuple<> &t2)
 	{
-            auto ht1 = head(*t1);
-            auto tt1 = tail(*t1);
-            inplace_add(&ht1, head(t2));
-            inplace_add(&tt1, tail(t2));
+		return;
+	}
+
+	template <size_t i, class... Ts, class... Us>
+	void inplace_add_aux(tuple<Ts...> *t1, const tuple<Us...> &t2);
+
+	template <class... Ts, class... Us>
+	void inplace_add(tuple<Ts...> *t1, const tuple<Us...> &t2)
+	{
+		inplace_add_aux<0>(t1, t2);
+	}
+
+	template <size_t i, class... Ts, class... Us>
+	void inplace_add_aux(tuple<Ts...> *t1, const tuple<Us...> &t2)
+	{
+		static constexpr size_t n = sizeof...(Ts);
+
+		inplace_add(&std::get<i>(*t1), std::get<i>(t2));
+		if constexpr (i + 1 < n)
+			inplace_add_aux<i + 1>(t1, t2);
 	}
 
 	template <class T2>
-        void inplace_add(zero_t<T2> *t1, const zero_t<T2> &t2) { return; }
+	void inplace_add(zero_t<T2> *t1, const zero_t<T2> &t2) { return; }
 
-        template <class T>
-        void inplace_add(vec<T> *t1, const vec<T> &t2)
-        {
-            ASSERT(t2.size() != 0 || t2.is_zero_);
-            ASSERT(t1->size() == t2.size()
-                   || t1->is_zero()
-                   || t2.is_zero());
 
-            if (t2.is_zero_) return;
+	template <class T>
+	void inplace_add(vec<T> *t1, const vec<T> &t2)
+	{
+		KS_ASSERT(t2.size() != 0 || t2.is_zero_);
+		KS_ASSERT(t1->size() == t2.size()
+				|| t1->is_zero()
+				|| t2.is_zero());
 
-            if (t1->is_zero_) *t1 = t2;
+		if (t2.is_zero()) return;
 
-            for (int i = 0; i < t2.size(); ++i)
-              ks::inplace_add(&t1->data_[i], t2[i]);
-        }
+		if (t1->is_zero()) {
+#ifdef BUMPY
+			std::cerr << "aliasing: " << t2.data_ << ", mark at " << (char*)g_alloc.top_ptr() - (char*)t2.data_ << std::endl;
+#endif
+			*t1 = t2; // TODO: memory aliasing here?   When we free, this will get lost.  We need another heap....
+			return;
+		}
+
+		for (int i = 0; i < t2.size(); ++i)
+			ks::inplace_add(&t1->data_[i], t2[i]);
+	}
 
 	template <class T>
 	int size(vec<T> const & v)
 	{
-		return v.size(); 
+		return v.size();
 	}
 
 	template <class T>
@@ -583,7 +653,7 @@ namespace ks
 		if (i >= v.size()) {
 			std::cerr << "ERROR: Accessing element " << i << " of vec of length " << v.size() << std::endl;
 			throw "oiks";
-		} 
+		}
 #endif
 
 		return v[i];
@@ -601,7 +671,7 @@ namespace ks
 		vec<T> ret = vec<T>::create(size);
 
 		for (int i = 0; i < size; ++i)
-			ret[i] = T { f(i) }; 
+			ret[i] = T{ f(i) };
 		return ret;
 	}
 
@@ -610,14 +680,26 @@ namespace ks
 	{
 		if (size == 0) { return convert<T>::go(zero_t<T>{}); }
 
-                if (size == 1) return T { f(0) };
+		if (size == 1) return T{ f(0) };
 
-                T ret = add(T { f(0) }, T { f(1) });
-		for (int i = 2; i < size; ++i) {
-	          auto mark = mark_bump_allocator_if_present();
-                  inplace_add(&ret, T { f(i) });
-	          reset_bump_allocator_if_present(mark);
-                }
+		// Wait until we get a non-zero to start accumulating
+		T ret = f(0);
+		int i = 1;
+		if (is_zero(ret))
+			for (; i < size; ++i) {
+				auto mark = mark_bump_allocator_if_present();
+				ret = f(i);
+				if (is_zero(ret))
+					break;
+				reset_bump_allocator_if_present(mark);
+			}
+
+		for (; i < size; ++i) {
+			auto mark = mark_bump_allocator_if_present();
+			T fi = f(i);
+			inplace_add(&ret, fi);
+			reset_bump_allocator_if_present(mark);
+		}
 		return ret;
 	}
 
@@ -630,27 +712,20 @@ namespace ks
 	template <class T>
 	vec<T> deltaVec(int n, int i, T val)
 	{
-		return build<T>(n, [i,val](int ii) { 
-			return (i == ii) ? val : convert<T>::go(zero_t<T>{}); 
+		return build<T>(n, [i, val](int ii) {
+			return (i == ii) ? val : convert<T>::go(zero_t<T>{});
 		});
-	} 
-	
+	}
+
 	template <class F>
 	auto diag(int rows, int cols, F f)
 	{
-		ASSERT(rows == cols);
+		KS_ASSERT(rows == cols);
 		typedef decltype(f(int{})) T;
-		return build<vec<T>>(rows, [cols,f](int i) { 
-					return deltaVec(cols, i, f(i)); });
+		return build<vec<T>>(rows, [cols, f](int i) {
+			return deltaVec(cols, i, f(i)); });
 	}
 
-
-	// -- Specialize is_zero
-	template <class T>
-	bool is_zero(vec<T> const& v)
-	{
-		return v.is_zero();
-	}
 
 	// -- Specialize type_to_string
 	template <typename T>
@@ -672,8 +747,8 @@ namespace ks
 		if (is_zero(b))
 			return a;
 
-		ASSERT(a.size() != 0);
-		ASSERT(a.size() == b.size());
+		KS_ASSERT(a.size() != 0);
+		KS_ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(a.size());
 
 		for (int i = 0; i < a.size(); ++i)
@@ -685,11 +760,11 @@ namespace ks
 	template <class T>
 	vec<T> operator+(vec<T> const& a, T const& b)
 	{
-		ASSERT(false); // Can't handle zero_t + const
+		KS_ASSERT(false); // Can't handle zero_t + const
 		if (is_zero(a))
 			return a;
-	
-		ASSERT(a.size() != 0);
+
+		KS_ASSERT(a.size() != 0);
 		vec<T> ret{ a.size() };
 
 		for (int i = 0; i < a.size(); ++i)
@@ -701,14 +776,14 @@ namespace ks
 	template <class T>
 	vec<T> operator-(vec<T> const& a, vec<T> const& b)
 	{
-		ASSERT(!is_zero(a));
-			// return -b;
+		KS_ASSERT(!is_zero(a));
+		// return -b;
 
 		if (is_zero(b))
 			return a;
 
-		ASSERT(a.size() != 0);
-		ASSERT(a.size() == b.size());
+		KS_ASSERT(a.size() != 0);
+		KS_ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(a.size());
 
 		for (int i = 0; i < a.size(); ++i)
@@ -720,11 +795,11 @@ namespace ks
 	template <class T>
 	vec<T> operator-(vec<T> const& a, T const& b)
 	{
-		ASSERT(false); // Can't handle zero_t - const
+		KS_ASSERT(false); // Can't handle zero_t - const
 		if (is_zero(a))
 			return a;
-	
-		ASSERT(a.size() != 0);
+
+		KS_ASSERT(a.size() != 0);
 		vec<T> ret = vec<T>::create(a.size());
 
 		for (int i = 0; i < a.size(); ++i)
@@ -739,9 +814,9 @@ namespace ks
 		if (is_zero(v))
 			return v;
 
-		ASSERT(v.size() != 0);
+		KS_ASSERT(v.size() != 0);
 		int size = v.size();
-		vec<T> ret = vec<T>::create(size); 
+		vec<T> ret = vec<T>::create(size);
 		for (int i = 0; i < size; ++i)
 			ret[i] = v[i] * val;
 		return ret;
@@ -818,8 +893,8 @@ namespace ks
 
 			static Zero mk(From, To) { return Zero{}; }
 
-			zero_t<To> Apply(From f) const { 
-				return { }; 
+			zero_t<To> Apply(From f) const {
+				return { };
 			}
 		};
 
@@ -841,7 +916,7 @@ namespace ks
 		tuple<Ts...> Scale_aux(scale_t val, tuple<Ts...> const& t)
 		{
 			return prepend(Scale_aux(val, head(t)),
-		  				   Scale_aux(val, tail(t)));
+				Scale_aux(val, tail(t)));
 		}
 
 		// Base case for Scale_aux<Tuple>.  Empty tuple * val = empty tuple.
@@ -855,7 +930,7 @@ namespace ks
 		template <class scale_t, class From, class To>
 		To Scale_aux(scale_t val, From const& t)
 		{
-			return To { val * t };
+			return To{ val * t };
 		}
 
 		struct Scale
@@ -988,13 +1063,13 @@ namespace ks
 			}
 
 		};
-		
+
 		template <class T, class... Ts>
 		std::ostream &operator<<(std::ostream &s, HCat<T, Ts...> const &t)
 		{
 			s << "HCat";
-				//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-				;
+			//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+			;
 			return tuple_print<0>(s << "(", t.lms) << ")";
 		}
 
@@ -1066,27 +1141,27 @@ namespace ks
 					Apply_aux<i + 1>(f, ret);
 				}
 			}
-/*
-			template <size_t i>
-			To Apply_aux(zero_t<To> accum, From const& f) const {
-				if constexpr (i < n) {
-					// Accumulator could be zero if first terms are zero,
-					// just move on to case 1
-					auto ai = std::get<i>(lms).Apply(std::get<i>(f));
-					return Apply_aux<i + 1>(ai, f);
-				}
-				else
-					return accum;
-			}
-*/
+			/*
+						template <size_t i>
+						To Apply_aux(zero_t<To> accum, From const& f) const {
+							if constexpr (i < n) {
+								// Accumulator could be zero if first terms are zero,
+								// just move on to case 1
+								auto ai = std::get<i>(lms).Apply(std::get<i>(f));
+								return Apply_aux<i + 1>(ai, f);
+							}
+							else
+								return accum;
+						}
+			*/
 		};
-		
+
 		template <class T, class... Ts>
 		std::ostream &operator<<(std::ostream &s, VCat<T, Ts...> const &t)
 		{
 			s << "VCat";
-				//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-				;
+			//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
+			;
 			return tuple_print<0>(s << "(", t.lms) << ")";
 		}
 
@@ -1112,7 +1187,7 @@ namespace ks
 
 			To Apply(From f) const {
 				auto g = ab.Apply(f);
-				return bc.Apply(g); 
+				return bc.Apply(g);
 			}
 		};
 
@@ -1162,18 +1237,18 @@ namespace ks
 			Functor/*std::function<L(int)>*/ f;
 
 			template <class Functor2>
-			static Build mk(int n, Functor2 f) { 
-				ASSERT(n != 0);
-				return Build{ n, f }; 
+			static Build mk(int n, Functor2 f) {
+				KS_ASSERT(n != 0);
+				return Build{ n, f };
 			}
 
-			To Apply(From x) const 
-			{ 
+			To Apply(From x) const
+			{
 				Functor/*std::function<L(int)>*/ f1 = f;
-				return build<LTo>(n, [x,f1](int i) {
-													 auto lm = f1(i);
-													 return lmApply(lm, x);
-												   }); 
+				return build<LTo>(n, [x, f1](int i) {
+					auto lm = f1(i);
+					return lmApply(lm, x);
+				});
 			}
 		};
 
@@ -1242,9 +1317,9 @@ namespace ks
 
 				if (n != x.size())
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
-				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
+				KS_ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
 				std::function<L(int)> f_local = f;
-				return sum(build<LFrom>(n, [f_local,x](int i) { return lmApply(f_local(i), x[i]); }));
+				return sum(build<LFrom>(n, [f_local, x](int i) { return lmApply(f_local(i), x[i]); }));
 			}
 		};
 
@@ -1284,7 +1359,7 @@ namespace ks
 			static std::ostream& go(std::ostream &s, std::variant<T, Ts...> const & v)
 			{
 				if (v.index() == n - 1)
-					s << (n-1) << ":" << std::get<n - 1>(v);
+					s << (n - 1) << ":" << std::get<n - 1>(v);
 				return variant_print<n - 1, T, Ts...>::go(s, v);
 			}
 		};
@@ -1333,16 +1408,16 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
-	inline 
-	double sub(double t1, double t2) { return t1 - t2; }
-	inline 
-	auto D$sub(double, double) {
+	inline
+		double sub(double t1, double t2) { return t1 - t2; }
+	inline
+		auto D$sub(double, double) {
 		typedef LM::Scale M1;
 		typedef LM::Scale M2;
 		return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
 	}
-	inline 
-	int sub(int t1, int t2) { return t1 - t2; }
+	inline
+		int sub(int t1, int t2) { return t1 - t2; }
 
 	template <class T>
 	T mul(double s, T const& t)
@@ -1366,11 +1441,11 @@ namespace ks
 	auto mul(double s, tuple<U0, Us...> const& t)
 	{
 		return prepend(mul(s, head(t)),
-					   mul(s, tail(t)));
+			mul(s, tail(t)));
 	}
 
 	inline
-	int mul(int const& t1, int const& t2)
+		int mul(int const& t1, int const& t2)
 	{
 		return t1 * t2;
 	}
@@ -1390,7 +1465,7 @@ namespace ks
 	}
 
 	inline
-	auto D$div(double t1, double t2)
+		auto D$div(double t1, double t2)
 	{
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(1.0 / t2), LM::Scale::mk(-1.0 / (t1*t1)));
 	}
@@ -1422,30 +1497,30 @@ namespace ks
 	inline double to_float(int d) { return d; }
 	inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
-/*
-	template <class I, class Vec>
-	using D_t$index = LM::HCat<LM::Zero<I, typename Vec::value_type>,
-			 				   LM::Build<std::function<LM::Scale(I)>>>;
+	/*
+		template <class I, class Vec>
+		using D_t$index = LM::HCat<LM::Zero<I, typename Vec::value_type>,
+								   LM::Build<std::function<LM::Scale(I)>>>;
 
-	template <class I, class Vec>
-	D_t$index<I, Vec>
-	D$index(I i, Vec const & v)
-	{
-		typedef typename Vec::value_type T;
-		auto di = LM::Zero<I, T>::mk();
-		auto delta = [i](I ii) { return LM::Scale<T,T,double>::mk(T{}, T{}, ii == i ? 1.0 : 0.0); };
-		auto df = LM::Build<std::function<LM::Scale<T,T,double>(I)>>::mk(delta);
-		return D_t$index<I, Vec>::mk(di, df);
-	}
+		template <class I, class Vec>
+		D_t$index<I, Vec>
+		D$index(I i, Vec const & v)
+		{
+			typedef typename Vec::value_type T;
+			auto di = LM::Zero<I, T>::mk();
+			auto delta = [i](I ii) { return LM::Scale<T,T,double>::mk(T{}, T{}, ii == i ? 1.0 : 0.0); };
+			auto df = LM::Build<std::function<LM::Scale<T,T,double>(I)>>::mk(delta);
+			return D_t$index<I, Vec>::mk(di, df);
+		}
 
-*/
+	*/
 
 	// ========================= Rand primitive ===============
 	inline double $rand(double max)
 	{
 		static std::mt19937 rng(42);
-  		std::uniform_real_distribution<double> dist(0, max);
-	
+		std::uniform_real_distribution<double> dist(0, max);
+
 		return dist(rng);
 	}
 

@@ -2,6 +2,9 @@
     ($trace * x x)
 )
 
+(def g Float ((n : Integer))
+  (to_float n))
+
 (def test_inline (Vec Integer) (x : Vec Float)
   (let (n (size x))
     (build 4 (lam (i : Integer) n))))

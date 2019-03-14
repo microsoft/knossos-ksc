@@ -16,6 +16,8 @@ import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
+import Debug.Trace
+
 import           Lang
 
 data CType =  CType Type
@@ -89,7 +91,7 @@ makeUnionType (CTuple ts) (CTuple us) = if ts == us
   then (CTuple ts, "")
   else
     let ty = CTuple $ map fst $ zipWith makeUnionType ts us
-    in  (ty, "convert<" ++ cgenType ty ++ ">::go")
+    in  (ty, "convert<" ++ cgenType ty ++ ">::go")  -- TODO: remove unnecessary convert<>s, now that zero_t auto-casts
 
 makeUnionType ty1 ty2 = if ty1 == ty2
   then (ty1, "")
@@ -396,7 +398,7 @@ cgenExprR env = \case
   Assert cond body -> do
     (CG declcond vcond (CType TypeBool)) <- cgenExprR env cond
     (CG declbody vbody tybody          ) <- cgenExprR env body
-    return $ CG (declcond `spc` "ASSERT(" ++ vcond ++ ");\n" ++ declbody)
+    return $ CG (declcond `spc` "KS_ASSERT(" ++ vcond ++ ");\n" ++ declbody)
                 vbody
                 tybody
 
@@ -406,7 +408,7 @@ cgenFunId :: FunId -> String
 cgenFunId = \case
   UserFun fun -> fun
   PrimFun fun -> translateFun fun
-  SelFun i _  -> "std::get<" ++ show (i - 1) ++ ">"
+  SelFun i _  -> "ks_get<" ++ show (i - 1) ++ ">"  -- TODO: rename to ks::get
  where
   translateFun :: String -> String
   translateFun = \case
@@ -530,10 +532,9 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "*"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
   (PrimFun "to_float", [CType TypeInteger] ) -> LMZero TypeInteger TypeFloat
   (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
-  (PrimFun "$rand"   , [CType ty]          ) -> LMZero ty ty
+  (PrimFun "$rand"   , [CType ty]          ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
   (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index", [CType (TypeVec t)]) ->
-    LMHCat [LMZero TypeInteger t, LMBuild (LMScale)]
+  (PrimFun "index"   , [CType (TypeVec t)] ) -> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
