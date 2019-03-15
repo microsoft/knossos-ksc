@@ -219,6 +219,12 @@
              (< (abs (- actual expected))
                 (max (* (abs expected) tolerance)
                      tolerance))))
+
+          (checked (check$gmm_knossos_gmm_objective
+                    x  alphas  mus  qs  ls  wishart
+                    dx dalphas dmus dqs dls dwishart
+                    1.0))
+
         )
       (pr x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
@@ -235,6 +241,8 @@
           grad_gmm
           dtheta
           rev_ok
+
+          (tuple "Checked, should be small:" checked)
 
           everything_works_as_expected_reverse
           everything_works_as_expected
