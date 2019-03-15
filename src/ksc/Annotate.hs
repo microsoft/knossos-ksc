@@ -262,10 +262,17 @@ callResultTy_maybe env fun arg_ty
   | otherwise
   = primCallResultTy_maybe fun arg_ty
   where
-    is_user_fun (Fun     (UserFun{}))    = True
-    is_user_fun (GradFun (UserFun {}) _) = True
-    is_user_fun (DrvFun  (UserFun {}) _) = True
-    is_user_fun _                        = False
+    funId = \case
+      Fun     f   -> f
+      GradFun f _ -> f
+      DrvFun  f _ -> f
+
+    isUserFunConstructor = \case
+      UserFun{} -> True
+      PrimFun{} -> False
+      SelFun{}  -> False
+
+    is_user_fun = isUserFunConstructor . funId
 
 userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
                        -> Type -> Either SDoc Type
