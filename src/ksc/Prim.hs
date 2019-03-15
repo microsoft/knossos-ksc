@@ -367,7 +367,3 @@ isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "sumbuild"
                        , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT"
                        , "abs", "max" ]
-
-mkFun :: String -> Fun
-mkFun f | isPrimFun f = Fun (PrimFun f)
-        | otherwise   = Fun (UserFun f)
