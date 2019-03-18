@@ -15,6 +15,8 @@ import CSE
 import ANF
 import qualified Cgen
 import KMonad
+import qualified Control.Exception
+import qualified Data.Maybe
 import Data.List( partition )
 import qualified System.Directory
 import qualified System.Environment
@@ -226,9 +228,16 @@ compileKscTestPrograms compiler = do
 
   putStrLn ("Testing " ++ show ksTests)
 
-  flip mapM_ ksTests $ \ksTest -> do
+  errors <- flip mapM ksTests $ \ksTest -> do
     putStrLn ksTest
-    (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing) ksTest
+    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing ksTest)
+      `Control.Exception.catch` \e -> do
+        print (e :: Control.Exception.ErrorCall)
+        return (Just ksTest)
+
+  case Data.Maybe.catMaybes errors of
+    []     -> return ()
+    errors -> error ("Had errors in:\n" ++ unlines errors)
 
 testC :: String -> IO ()
 testC compiler = do
