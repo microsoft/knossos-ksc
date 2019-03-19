@@ -1,2 +1,2 @@
-:set -isrc/ksc -Wunused-local-binds -Wunused-matches -Wunused-imports -Wunused-top-binds -Wmissing-signatures
+:set -isrc/ksc -Wunused-local-binds -Wunused-matches -Wunused-imports -Wunused-top-binds -Wmissing-signatures -Wincomplete-patterns
 

@@ -14,8 +14,6 @@
 )
 
 
-(def test_tuple Integer ((x : Tuple (Vec Float) (Vec (Vec Float)) Integer))
-    (+ 1 (if (< 2 3) 4 5)))
 
 (def main Integer ()
     (let (v1 (build 3 (lam (i : Integer) (* 3.0 (to_float i)))))

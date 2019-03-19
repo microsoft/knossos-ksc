@@ -30,14 +30,17 @@ mkPrimCall3 f a b c = mkPrimCall f (Tuple [a, b, c])
 --  Building simple calls
 --------------------------------------------
 
-lmZero :: Type -> Type -> TExpr
-lmZero s t = mkPrimCall2 "lmZero" (mkDummy s) (mkDummy t)
+-- lmZero might look as if it should take a Type and cons up a dummy of that type,
+-- but types such as Vec need constructor arguments such as size, 
+-- so are consed from a template 
+lmZero :: TExpr -> TExpr -> TExpr
+lmZero s t = mkPrimCall2 "lmZero" s t
 
 lmOne :: Type -> TExpr
 lmOne t = mkPrimCall "lmOne" (mkDummy t)
 
-lmScale :: HasCallStack => TExpr -> TExpr
-lmScale e = mkPrimCall "lmScale" e
+lmScale :: HasCallStack => Type -> TExpr -> TExpr
+lmScale t e = mkPrimCall2 "lmScale" (mkDummy t) e
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd f g = mkPrimCall2 "lmAdd" f g
@@ -79,15 +82,21 @@ isLMOne _ = False
 isLMZero (Call f e) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
 
+fstArg, sndArg :: TExpr -> TExpr
+fstArg (Call _ (Tuple [e,_])) = e
+fstArg e = error $ "fstArg on non-duple" ++ pps e
+sndArg (Call _ (Tuple [_,e])) = e
+sndArg e = error $ "sndArg on non-duple" ++ pps e
 
-lmDelta :: Type -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmOne t) (lmZero t t)
+
+lmDelta :: TExpr -> TExpr -> TExpr -> TExpr
+lmDelta t i j = If (pEqual i j) (lmOne $ typeof t) (lmZero t t)
 
 primDindex :: TExpr -> TExpr -> TExpr
-primDindex i v = lmHCat [ lmZero TypeInteger t
-                        , lmBuildT (pSize v) (Lam ii (lmDelta t (Var ii) i)) ]
+primDindex i v = lmHCat [ lmZero i vi
+                        , lmBuildT (pSize v) (Lam ii (lmDelta vi (Var ii) i)) ]
              where ii = TVar TypeInteger $ Simple "primDindex$i"
-                   TypeVec t = typeof v
+                   vi = pIndex i v
 
 isEqualityCall :: TExpr -> Maybe (TExpr, TExpr)
 isEqualityCall (Call f (Tuple [e1,e2]))
@@ -118,10 +127,12 @@ pMul a b   = mkPrimCall2 "*" a b
 pDiv a b   = mkPrimCall2 "/" a b
 pEqual a b = mkPrimCall2 "==" a b
 
-pNeg, pExp, pLog :: HasCallStack => TExpr -> TExpr
+pNeg, pExp, pLog, pZero, pTangentZero :: HasCallStack => TExpr -> TExpr
 pNeg x = mkPrimCall "neg" x
 pExp x = mkPrimCall "exp" x
 pLog x = mkPrimCall "log" x
+pZero x = mkPrimCall "zero" x
+pTangentZero x = mkPrimCall "tangent_zero" x
 
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild n f = mkPrimCall2 "build" n f
@@ -195,7 +206,7 @@ primCallResultTy_maybe fun arg_ty
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
       DrvFun f Rev    -- f :: S -> T, then rev$f :: (S,T) -> T
-        -> pprPanic "primFunCallResultTy" (ppr fun <+> ppr arg_ty)
+        -> pprPanic "Can't get DrvFun Rev from" (ppr fun <+> ppr arg_ty)
            -- How do we split up that tuple?
 
       Fun (UserFun _) -> Left (text "Not in scope:" <+> ppr fun)
@@ -205,8 +216,8 @@ primFunCallResultTy :: HasCallStack => PrimFun -> Type -> Type
 primFunCallResultTy fun arg_ty
   = case primFunCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
-      Nothing -> -- pprTrace "primCallResultTy: Could not determine result type for"
-                 --         (text fun <+> text " @ " <+> ppr arg_ty) $
+      Nothing -> pprTrace "primCallResultTy: Could not determine result type for"
+                          (text fun <+> text " @ " <+> ppr arg_ty) $
                  TypeUnknown
 
 primFunCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
@@ -281,8 +292,8 @@ lmAddResultTy ty
   | otherwise = Nothing
 
 lmScaleResultTy ty
-  | TypeFloat <- ty
-  = Just (TypeLM TypeFloat TypeFloat)
+  | TypeTuple ([t, TypeFloat]) <- ty
+  = Just (TypeLM t t)
   | otherwise
   = Nothing
 
@@ -313,8 +324,6 @@ simplePrimResultTy "+" (TypeTuple [t1, t2])
     add t  (TypeTuple [])   = Just t
     add (TypeVec t1) (TypeVec t2) = do { tr <- add t1 t2
                                        ; return (TypeVec tr) }
-    add t1 (TypeZero t2) = Just t1
-    add (TypeZero t1) t2 = Just t2
     add (TypeTuple t1s) (TypeTuple t2s) = do { ts <- zipWithM add t1s t2s
                                              ; return (TypeTuple ts) }
     add t1 t2 = Nothing
@@ -330,7 +339,6 @@ simplePrimResultTy fun arg_ty
       ("index"    , TypeTuple [TypeInteger, TypeVec t]     ) -> Just t
       ("size"     , TypeVec _                              ) -> Just TypeInteger
       ("sum"      , TypeVec t                              ) -> Just t
-      ("sum"      , TypeZero (TypeVec t)                   ) -> Just (TypeZero t)
       ("to_float" , TypeInteger                            ) -> Just TypeFloat
 
       -- arithmetic ops.   See special case for "+" above
@@ -341,6 +349,8 @@ simplePrimResultTy fun arg_ty
       ("-"        , TypeTuple [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
       ("-"        , TypeTuple [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
+      ("zero"     , t                                      ) -> Just t
+      ("tangent_zero", t                                   ) -> Just (tangentType t)
       ("neg"      , t                                      ) -> Just t
       ("exp"      , TypeFloat                              ) -> Just TypeFloat
       ("log"      , TypeFloat                              ) -> Just TypeFloat

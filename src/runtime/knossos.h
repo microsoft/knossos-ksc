@@ -13,12 +13,10 @@
 #include <string>
 #include <chrono>
 
-using std::get;
-using std::make_tuple;
 using std::tuple;
 
 // Enable bump allocator.  See mark/reset below.
-#define xBUMPY
+#define BUMPY
 
 #define COMMENT(x)
 
@@ -55,62 +53,6 @@ namespace ks
 #define ENTER { objects.insert(this); LOG("ctor", log_indent++); }
 #define NOTE { LOG("note " << (FIND ? (void*)this : (void*)0), log_indent); }
 #define LEAVE { LOG("dtor " << FIND, --log_indent);  objects.erase(this); }
-
-	// Inplace add requires a couple of forward declarations.
-	// This seemed to be the minimal we could get away with.
-	template <class T>
-	class vec;
-	template <class T>
-	void inplace_add(vec<T> *t1, const vec<T> &t2);
-	void inplace_add(double *t1, const double &t2);
-
-	// ===============================  Allocator  ==================================
-#ifdef BUMPY
-	struct allocator {
-		size_t max_size;
-		unsigned char* buf;
-		size_t top;
-
-		allocator(size_t max_size) :
-			max_size(max_size),
-			buf(new unsigned char[max_size]),
-			top(0)
-		{}
-		~allocator() {
-			delete[] buf;
-		}
-		void* alloc(size_t size)
-		{
-			KS_ASSERT(size < 1000000);
-			void* ret = buf + top;
-			top += ((size + 15) / 16) * 16;
-			KS_ASSERT(top < max_size);
-			return ret;
-		}
-
-		size_t mark() { return top; }
-
-		void* top_ptr() { return buf + top; }
-
-		void reset(size_t top_ = 0)
-		{
-			top = top_;
-		}
-	};
-
-	extern allocator g_alloc;
-	typedef size_t alloc_mark_t;
-	inline alloc_mark_t mark_bump_allocator_if_present() { return g_alloc.mark(); }
-	inline void reset_bump_allocator_if_present(alloc_mark_t top) { g_alloc.reset(top); }
-#define $MRK(var) alloc_mark_t var = mark_bump_allocator_if_present()
-#define $REL(var) reset_bump_allocator_if_present(var)
-#else
-	typedef size_t alloc_mark_t;
-	inline alloc_mark_t mark_bump_allocator_if_present() { return 0; }
-	inline void reset_bump_allocator_if_present(alloc_mark_t top) { }
-#define $MRK(var)
-#define $REL(var)
-#endif
 
 	// ===============================  String utils  ==================================
 
@@ -228,79 +170,22 @@ namespace ks
 		KS_ASSERT(s == "tuple<int,float>");
 	}
 
-
-
-	// ===============================  Zero  ==================================
-	template <typename T>
-	struct zero_t
-	{
-		zero_t(T) { }
-
-		zero_t() { }
-
-		// operator T() { return T {}; }
-	};
-
-	template <>
-	struct zero_t<double>
-	{
-		zero_t(double) { }
-
-		zero_t() { }
-
-		operator double() { return 0.0; }
-	};
-
-
-	template <>
-	struct zero_t<int>
-	{
-		zero_t(int) { }
-
-		zero_t() { }
-
-		operator int() { return 0; }
-	};
-	template <class T>
-	std::ostream &operator<<(std::ostream &s, ks::zero_t<T> const &v)
-	{
-		return s << "zero_t<" << type_to_string<T>::name() << ">{}";
-	}
-
-	template <class T>
-	bool is_zero(T)
-	{
-		return false;   // It might be tempting to put a runtime check in here, but beware of lost static optimization opportunities
-	}
-
-	template <typename T>
-	bool is_zero(zero_t<T>)
-	{
-		return true;
-	}
-
 	// ===============================  Tuple utils  ==================================
 
-	template < size_t N, typename... Ts >
-	auto ks_get(std::tuple<Ts...> t)
-	{
-		return  std::get<N>(t);
-	}
-
 	template < typename T, typename... Ts >
-	auto head(std::tuple<T, Ts...> t)
+	auto head(tuple<T, Ts...> const& t)
 	{
 		return  std::get<0>(t);
 	}
 
 	template < std::size_t... Ns, typename... Ts >
-	auto tail_impl(std::index_sequence<Ns...>, std::tuple<Ts...> t)
+	auto tail_impl(std::index_sequence<Ns...>, tuple<Ts...> t)
 	{
 		return  std::make_tuple(std::get<Ns + 1u>(t)...);
 	}
 
 	template < typename... Ts >
-	auto tail(std::tuple<Ts...> t)
+	auto tail(tuple<Ts...> t)
 	{
 		return  tail_impl(std::make_index_sequence<sizeof...(Ts) - 1u>(), t);
 	}
@@ -308,7 +193,7 @@ namespace ks
 	template <typename T, typename... Ts >
 	auto prepend(T t, tuple<Ts...> tup)
 	{
-		return std::tuple_cat(std::make_tuple(t), tup);
+		return tuple_cat(std::make_tuple(t), tup);
 	}
 
 	// Prepend at the type level, e.g. 
@@ -325,7 +210,7 @@ namespace ks
 	template <size_t i, class... Ts>
 	std::ostream& tuple_print(std::ostream& s, tuple<Ts...> const& t)
 	{
-		if constexpr (i < sizeof...(Ts))
+		if constexpr(i < sizeof...(Ts))
 		{
 			if (i > 0) s << ",";
 			s << std::get<i>(t);
@@ -340,93 +225,161 @@ namespace ks
 		return tuple_print<0>(s, t);
 	}
 
-	// =============================== Type conversion ============================
-	template <class T>
-	struct convert
+	template < size_t N, class T >
+	auto ks_get(T const& t)
 	{
-		template <class U>
-		static T go(U const& u) {
-			return static_cast<T>(u);
+		return std::get<N>(t);
+	}
+
+	// ===============================  Allocator  ==================================
+#ifdef BUMPY
+	struct allocator {
+		size_t max_size;
+		unsigned char* buf;
+		size_t top;
+
+		allocator(size_t max_size) :
+			max_size(max_size),
+			buf(new unsigned char[max_size]),
+			top(0)
+		{}
+		~allocator() {
+			delete[] buf;
 		}
+		void* alloc(size_t size)
+		{
+			KS_ASSERT(size < 1000000);
+			void* ret = buf + top;
+			top += ((size + 15) / 16) * 16;
+			KS_ASSERT(top < max_size);
+			return ret;
+		}
+
+		size_t mark() { return top;  }
+
+		void* top_ptr() { return buf + top; }
+
+		void reset(size_t top_ = 0)
+		{
+			top = top_;
+		}
+	};
+
+	extern allocator g_alloc;
+	typedef size_t alloc_mark_t;
+	inline alloc_mark_t mark_bump_allocator_if_present() { return g_alloc.mark(); }
+	inline void reset_bump_allocator_if_present(alloc_mark_t top) { g_alloc.reset(top); }
+#define $MRK(var) alloc_mark_t var = mark_bump_allocator_if_present()
+#define $REL(var) reset_bump_allocator_if_present(var)
+#else
+	typedef size_t alloc_mark_t;
+	inline alloc_mark_t mark_bump_allocator_if_present() { return 0; }
+	inline void reset_bump_allocator_if_present(alloc_mark_t top) { }
+#define $MRK(var)
+#define $REL(var)
+#endif
+
+	
+	// ===============================  Zero  ==================================
+	// This template to be overloaded when e.g. a vector of T needs to use val to discover a size
+	template <class T>
+	T zero(T const& val)
+	{
+		KS_ASSERT(false && "Need to overload zero for this type");
+		return T{};
+	}
+
+	template <>
+	double zero(double const& val)
+	{
+		return 0.0;
+	}
+
+	template <>
+	int zero(int const& val)
+	{
+		return 0;
+	}
+
+	tuple<> zero(tuple<> const& val)
+	{
+		return tuple<> ();
+	}
+
+	template <class... Ts>
+	tuple<Ts...> zero(tuple<Ts...> const& val)
+	{
+		return prepend(zero(head(val)), zero(tail(val)));
+	}
+
+	// Zero of multiple args is a tuple
+	template <class T1, class T2, class... Ts>
+	tuple<T1, T2, Ts...> zero(T1 const& t1, T2 const& t2, Ts const&... ts) 
+	{
+		return zero(std::make_tuple(t1, t2, ts...));
+	}
+
+	// ===============================  Inflate zero  ==================================
+	template <class T>
+	T inflate(T z)
+	{
+		return z;
+	}
+
+	template <class T, class... Ts>
+	tuple<T, Ts...> inflate(tuple<T, Ts...> val)
+	{
+		return prepend(inflate(head(val)), inflate(tail(val)));
+	}
+
+	// ============================== Tangent types ==================================
+	template <class T>
+	struct tangent {
+		typedef T type;
 	};
 
 	template <>
-	struct convert<double>
-	{
-		static double go(zero_t<double> const&) {
-			return 0.0;
-		}
+	struct tangent<int> {
+		typedef tuple<> type;
 	};
 
-	template <>
-	struct convert<int>
-	{
-		static int go(zero_t<int> const&) {
-			return 0;
-		}
-	};
-
-	template<>
-	struct convert<tuple<>>
-	{
-		static tuple<> go(zero_t<tuple<>> const&) {
-			return tuple<>{};
-		}
+	template <class T, class... Ts>
+	struct tangent<tuple<T, Ts...>> {
+		typedef tuple_prepend<typename tangent<T>::type, typename tangent<tuple<Ts...>>::type> type;
 	};
 
 	template <class T>
-	struct convert<zero_t<T>>
+	typename tangent<T>::type tangent_zero(const T& t)
 	{
-		static zero_t<T> go(zero_t<zero_t<T>> const& u) {
-			return zero_t<T>{};
-		}
-	};
+		return zero(t);
+	}
 
-	template <class T0, class... Ts>
-	struct convert<tuple<T0, Ts...>>
+	template <>
+	tuple<> tangent_zero(const int& t)
 	{
-		template <class U0, class... Us>
-		static tuple<T0, Ts...> go(zero_t<tuple<U0, Us...>> const& u)
-		{
-			return prepend(convert<T0>::go(zero_t<U0>{}), convert<tuple<Ts...>>::go(zero_t<tuple<Us...>>{}));
-		}
+		return tuple<>{};
+	}
 
-		template <class U0, class... Us>
-		static tuple<T0, Ts...> go(tuple<U0, Us...> const& u)
-		{
-			return prepend(convert<T0>::go(head(u)), convert<tuple<Ts...>>::go(tail(u)));
-		}
-	};
-
-	template < size_t N, typename... Ts >
-	auto ks_get(zero_t<tuple<Ts...>> t)
+	template <>
+	typename tangent<tuple<>>::type tangent_zero(const tuple<>& t)
 	{
-		return std::get<N>(convert<tuple<Ts...>>::go(t));
+		return tuple<>{};
+	}
+
+	template <class T, class... Ts>
+	auto tangent_zero(const tuple<T, Ts...>& t)
+	{
+		return prepend(tangent_zero(head(t)), tangent_zero(tail(t)));
+	}
+
+	// Tangent zero of multiple args is a tuple
+	template <class T1, class T2, class... Ts>
+	auto tangent_zero(T1 const& t1, T2 const& t2, Ts const&... ts) 
+	{
+		return tangent_zero(std::make_tuple(t1, t2, ts...));
 	}
 
 
-	template <>
-	struct zero_t<tuple<>>
-	{
-		zero_t(tuple<>) { }
-
-		zero_t() { }
-
-		operator tuple<>() { return tuple<>{}; }
-	};
-
-	template <class T0, class... Ts>
-	struct zero_t<tuple<T0, Ts...>>
-	{
-		zero_t(tuple<T0, Ts...>) { }
-
-		zero_t() { }
-
-		operator tuple<T0, Ts...>()
-		{
-			return convert<tuple<T0, Ts...>>::go(*this);
-		}
-	};
 
 	// ===============================  Addition ==================================
 	// Adding is special because it needs to be defined before linear maps,
@@ -436,17 +389,8 @@ namespace ks
 	template <class T1, class T2>
 	T1 add(T1 t1, T2 t2) { return t1 + t2; }
 
-	template <class T2>
-	T2 add(zero_t<T2> t1, T2 t2) { return t2; }
-
-	template <class T1>
-	T1 add(T1 t1, zero_t<T1> t2) { return t1; }
-
 	template <class T1>
 	T1 add(T1 t1, tuple<> t2) { return t1; }
-
-	template <class T1>
-	zero_t<T1> add(zero_t<T1> t1, zero_t<T1> t2) { return t1; }
 
 	template <>
 	inline tuple<> add(tuple<> t1, tuple<> t2)
@@ -461,128 +405,8 @@ namespace ks
 			add(tail(t1), tail(t2)));
 	}
 
-	// ===============================  Vector class ==================================
-
-	template <class T>
-	class vec
-	{
-#ifdef BUMPY
-		//TODO Full set of 5 ctors/assigners
-		size_t size_;
-		T* data_;
-#else
-		std::vector<T> data_;
-#endif
-		// Runtime flag indicating this is an all-zero vector.  
-		// TODO: Ideally this would propagate nicely through the type system, 
-		// without a runtime flag but, need to pass initializer lists through
-		// zero_t {}
-		// As is, many instances are collapsed statically and the remainder 
-		// come through here.
-		bool is_zero_ = false;
-
-	public:
-
-		typedef T value_type;
-
-#ifdef BUMPY
-		vec() :
-			size_{ 0 },
-			data_{ nullptr },
-			is_zero_{ true }
-		{
-		}
-
-		vec(size_t  size) {
-			void *storage = g_alloc.alloc(sizeof(T) * size);
-			this->size_ = size;
-			this->data_ = (T*)storage;
-			this->is_zero_ = false;
-		}
-
-		vec(vec<T> const& that) = default; // Just copy the pointer.
-
-		vec& operator=(const vec<T>& that)
-		{
-			KS_ASSERT(that.size() != 0 || that.is_zero_);
-			this->size_ = that.size_;
-			this->data_ = that.data_; // Yes, this will alias, but there is no mutation, and no deletion.
-			this->is_zero_ = that.is_zero_;
-			return *this;
-		}
-
-		template <class U>
-		vec(vec<U> const& that) : vec{ that.size() }
-		{
-			// Copying from another type - allocate.
-			if (that.is_zero())
-				this->is_zero = true;
-			else {
-				KS_ASSERT(!this->is_zero_);
-				for (int i = 0; i < that.size(); ++i)
-					this->data_[i] = that[i];
-			}
-		}
-
-		vec(std::vector<T> const& that) : vec{ that.size() }
-		{
-			// Copying from std vector - allocate.
-			for (int i = 0; i < that.size(); ++i)
-				data_[i] = that[i];
-		}
-
-		int size() const { return int(size_); }
-
-		vec(zero_t<vec<T>>) :
-			size_{ 0 },
-			data_{ 0 },
-			is_zero_{ true }
-		{
-		}
-
-#else
-		vec() {}
-
-		vec(size_t  size) : data_(size), is_zero_(false) {}
-
-		vec(std::vector<T> const& that) :data_{ that } {}
-
-		vec(zero_t<vec<T>>) :
-			data_(0),
-			is_zero_{ true }
-		{
-		}
-
-		int size() const { return static_cast<int>(data_.size()); }
-
-		vec& operator=(const vec<T>& that)
-		{
-			KS_ASSERT(that.size() != 0 || that.is_zero_);
-			data_ = that.data_;
-			is_zero_ = that.is_zero_;
-			return *this;
-		}
-
-#endif
-
-		T& operator[](int i) { return data_[i]; }
-		T const& operator[](int i) const { return data_[i]; }
-
-		static vec<T> create(size_t size);
-
-		bool is_zero() const { return is_zero_; }
-
-		friend void inplace_add <>(vec<T> *t1, const vec<T> &t2);
-	};
-
-	template <class T>
-	bool is_zero(vec<T> const& v)
-	{
-		return v.is_zero();
-	}
-
-	// ===============================  Inplace add ==================================
-	void inplace_add(int *t1, const int &t2) { *t1 += t2; }
+		// ===============================  Inplace add ==================================
+void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 
 	void inplace_add(double *t1, const double &t2) { *t1 += t2; }
 
@@ -610,31 +434,134 @@ namespace ks
 			inplace_add_aux<i + 1>(t1, t2);
 	}
 
-	template <class T2>
-	void inplace_add(zero_t<T2> *t1, const zero_t<T2> &t2) { return; }
-
+	// ===============================  Vector class ==================================
+	struct zero_tag_t {};
+	const struct zero_tag_t zero_tag;
 
 	template <class T>
-	void inplace_add(vec<T> *t1, const vec<T> &t2)
+	class vec
 	{
-		KS_ASSERT(t2.size() != 0 || t2.is_zero_);
-		KS_ASSERT(t1->size() == t2.size()
-				|| t1->is_zero()
-				|| t2.is_zero());
-
-		if (t2.is_zero()) return;
-
-		if (t1->is_zero()) {
 #ifdef BUMPY
-			std::cerr << "aliasing: " << t2.data_ << ", mark at " << (char*)g_alloc.top_ptr() - (char*)t2.data_ << std::endl;
+		//TODO Full set of 5 ctors/assigners
+		size_t size_;
+		T* data_;
+#else
+		std::vector<T> data_;
 #endif
-			*t1 = t2; // TODO: memory aliasing here?   When we free, this will get lost.  We need another heap....
-			return;
+		// Runtime flag indicating this is an all-zero vector.  
+		// TODO: Ideally this would propagate nicely through the type system, 
+		// without a runtime flag but, need to pass initializer lists through
+		// zero_t {}
+		// As is, many instances are collapsed statically and the remainder 
+		// come through here.
+		bool is_zero_ = false;
+		T z_; // ToDo save this cost.
+
+	public:
+
+		typedef T value_type;
+
+#ifdef BUMPY
+		vec() :
+			size_{ 0 },
+			data_{ nullptr },
+			is_zero_{ false },
+			z_{T{}}
+		{
 		}
 
-		for (int i = 0; i < t2.size(); ++i)
-			ks::inplace_add(&t1->data_[i], t2[i]);
-	}
+		vec(zero_tag_t, T const& z, size_t size) :
+			size_{ size },
+			data_{ nullptr },
+			is_zero_{ true },
+			z_(z)
+		{
+		}
+
+		vec(size_t  size) {
+			alloc(size);
+			z_ = T{};
+		}
+
+		void alloc(size_t size)
+		{
+			void *storage = g_alloc.alloc(sizeof(T) * size);
+			this->size_ = size;
+			this->data_ = (T*)storage;
+			this->is_zero_ = false;
+		}
+
+		vec(vec<T> const& that) 
+		{
+			this->operator=(that);
+		}
+
+		vec& operator=(const vec<T>& that)
+		{
+			this->size_ = that.size_;
+			this->data_ = that.data_; // Yes, this will alias, but there is no mutation, and no deletion.
+			this->is_zero_ = that.is_zero_;
+			this->z_ = that.z_;
+			return *this;
+		}
+
+		template <class U>
+		vec(vec<U> const& that) : vec{ that.size() }
+		{
+			KS_ASSERT(size_ != 0);
+
+			// Copying from another type - allocate.
+			if (this->is_zero_)
+				alloc(size_);
+
+			for (int i = 0; i < that.size(); ++i)
+				this->data_[i] = that[i];
+		}
+
+		vec(std::vector<T> const& that) : vec{ that.size() }
+		{
+			// Copying from std vector - allocate.
+			for (int i = 0; i < that.size(); ++i)
+				data_[i] = that[i];
+		}
+
+		int size() const { return int(size_); }
+
+#else
+		vec() {}
+
+		vec(size_t  size) : data_(size), is_zero_(false) {}
+
+		vec(std::vector<T> const& that) :data_{ that } {}
+
+		int size() const { return static_cast<int>(data_.size()); }
+
+		vec& operator=(const vec<T>& that)
+		{
+			KS_ASSERT(that.size() != 0 || that.is_zero_);
+			data_ = that.data_;
+			is_zero_ = that.is_zero_;
+			return *this;
+		}
+
+#endif
+
+		T& operator[](int i) { if (is_zero_) return z_; else return data_[i]; }
+		T const& operator[](int i) const {  if (is_zero_) return z_; else return data_[i]; }
+
+		static vec<T> create(size_t size);
+
+		bool is_zero() const { return is_zero_; }
+
+		T zero_element() const {
+			if (is_zero())
+				return z_;
+			else {
+				KS_ASSERT(size() > 0);
+				return zero(data_[0]);
+			}
+		}
+	};
 
 	template <class T>
 	int size(vec<T> const & v)
@@ -645,10 +572,6 @@ namespace ks
 	template <class T>
 	T const &index(int i, vec<T> const & v)
 	{
-		static T z{ zero_t<T> {} };
-		if (v.is_zero())
-			return z;
-
 #ifndef xxx_NDEBUG
 		if (i >= v.size()) {
 			std::cerr << "ERROR: Accessing element " << i << " of vec of length " << v.size() << std::endl;
@@ -675,29 +598,90 @@ namespace ks
 		return ret;
 	}
 
+	// specialize zero(vec<T>)
+	template <class T>
+	vec<T> zero(vec<T> const& val)
+	{
+		return vec<T> {zero_tag, val.zero_element(), (size_t)val.size()};
+	}
+
+	// specialize tangent<vec<T>>
+	template <class T>
+	struct tangent<vec<T>> {
+		typedef vec<typename tangent<T>::type> type;
+	};
+
+	// specialize tangent_zero(vec<T>)
+	template <class T>
+	auto tangent_zero(const vec<T>& t)
+	{
+		return vec<typename tangent<T>::type>(zero_tag, tangent_zero(t.zero_element()), t.size());
+	}
+
+	template <class T>
+	vec<T> inflate_aux(vec<T> t)
+	{
+		vec<T> ret = vec<T>::create(t.size());
+
+		for (int i = 0; i < t.size(); ++i)
+			ret[i] = inflate(t[i]);
+		return ret;
+	}
+
+	// specialize inflate(vec<T>*,vec<T>)
+	template <class T>
+	vec<T> inflate(vec<T> t)
+	{
+		return inflate_aux(t);
+	}
+
+	// And for PODs, don't inflate if nonzero
+	template <>
+	vec<double> inflate<double>(vec<double> t)
+	{
+		if (t.is_zero())
+			return inflate_aux(t); 
+		else
+			return t;
+	}
+
+	// specialize inplace_add(vec<T>*,vec<T>)
+	template <class T>
+	void inplace_add(vec<T> *t1, const vec<T> &t2)
+	{
+		KS_ASSERT(t1->size() == t2.size());
+
+		if (t2.is_zero()) return;
+
+		if (t1->is_zero()) {
+#ifdef BUMPY
+			std::cerr << "aliasing: " << &t2[0] << ", mark at " << (char*)g_alloc.top_ptr() - (char*)&t2[0] << std::endl;
+#endif
+			*t1 = t2; // TODO: memory aliasing here?   When we free, this will get lost.  We need another heap....
+			return;
+		}
+
+		for (int i = 0; i < t2.size(); ++i)
+			ks::inplace_add(&(*t1)[i], t2[i]);
+	}
+
 	template <class T, class F>
 	T sumbuild(int size, F f)
 	{
-		if (size == 0) { return convert<T>::go(zero_t<T>{}); }
+		if (size == 0)
+		{
+			std::cerr << "hope this is ok";
+			return zero(T{});
+		}
 
-		if (size == 1) return T{ f(0) };
+		if (size == 1)
+			return T{f(0)};
 
-		// Wait until we get a non-zero to start accumulating
-		T ret = f(0);
-		int i = 1;
-		if (is_zero(ret))
-			for (; i < size; ++i) {
-				auto mark = mark_bump_allocator_if_present();
-				ret = f(i);
-				if (is_zero(ret))
-					break;
-				reset_bump_allocator_if_present(mark);
-			}
-
-		for (; i < size; ++i) {
+		T ret = inflate(f(0));
+		for (int i = 1; i < size; ++i)
+		{
 			auto mark = mark_bump_allocator_if_present();
-			T fi = f(i);
-			inplace_add(&ret, fi);
+			inplace_add(&ret, T{f(i)});
 			reset_bump_allocator_if_present(mark);
 		}
 		return ret;
@@ -706,14 +690,14 @@ namespace ks
 	template <class T>
 	T delta(int i, int j, T val)
 	{
-		return (i == j) ? val : convert<T>::go(zero_t<T>{});
+		return (i == j) ? val : zero(val);
 	}
 
 	template <class T>
 	vec<T> deltaVec(int n, int i, T val)
 	{
 		return build<T>(n, [i, val](int ii) {
-			return (i == ii) ? val : convert<T>::go(zero_t<T>{});
+			return (i == ii) ? val : zero(val);
 		});
 	}
 
@@ -722,8 +706,9 @@ namespace ks
 	{
 		KS_ASSERT(rows == cols);
 		typedef decltype(f(int{})) T;
-		return build<vec<T>>(rows, [cols, f](int i) {
-			return deltaVec(cols, i, f(i)); });
+		return build<vec<T>>(rows, [cols,f](int i) { 
+					return deltaVec(cols, i, f(i)); 
+		});
 	}
 
 
@@ -741,13 +726,12 @@ namespace ks
 	template <class T>
 	vec<T> operator+(vec<T> const& a, vec<T> const& b)
 	{
-		if (is_zero(a))
+		if (a.is_zero())
 			return b;
 
-		if (is_zero(b))
+		if (b.is_zero())
 			return a;
 
-		KS_ASSERT(a.size() != 0);
 		KS_ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(a.size());
 
@@ -760,9 +744,8 @@ namespace ks
 	template <class T>
 	vec<T> operator+(vec<T> const& a, T const& b)
 	{
-		KS_ASSERT(false); // Can't handle zero_t + const
-		if (is_zero(a))
-			return a;
+		if (a.is_zero())
+			return inflate(a) + b;
 
 		KS_ASSERT(a.size() != 0);
 		vec<T> ret{ a.size() };
@@ -776,10 +759,10 @@ namespace ks
 	template <class T>
 	vec<T> operator-(vec<T> const& a, vec<T> const& b)
 	{
-		KS_ASSERT(!is_zero(a));
+		KS_ASSERT(!a.is_zero());
 		// return -b;
 
-		if (is_zero(b))
+		if (b.is_zero())
 			return a;
 
 		KS_ASSERT(a.size() != 0);
@@ -833,10 +816,12 @@ namespace ks
 	template <class T>
 	T sum(vec<T> const& v)
 	{
-		if (is_zero(v))
-			return convert<T>::go(zero_t<T>{});
+		if (v.is_zero()) {
+			std::cerr <<"okkk?";
+			return zero(T{});
+		}
 
-		if (v.size() == 0) { return convert<T>::go(zero_t<T>{}); }
+		if (v.size() == 0) { return zero(T{}); }
 
 		if (v.size() == 1) return v[0];
 		T ret = add(v[0], v[1]);
@@ -845,22 +830,16 @@ namespace ks
 		return ret;
 	}
 
-	// sum of elements
-	template <class T>
-	zero_t<T> sum(zero_t<vec<T>> const& v)
-	{
-		return zero_t<T>{};
-	}
-
 	template <class T>
 	std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
 	{
 		s << "[";
-		if (v.is_zero()) return s << "ZERO]";
+		if (v.is_zero()) return s << "ZERO(" << v.size() << ")]";
 		for (int i = 0; i < v.size(); ++i)
 			s << (i > 0 ? ", " : "") << v[i];
 		return s << "]";
 	}
+
 	// ===============================  Linear maps ==================================
 	namespace LM
 	{
@@ -893,8 +872,8 @@ namespace ks
 
 			static Zero mk(From, To) { return Zero{}; }
 
-			zero_t<To> Apply(From f) const {
-				return { };
+			To Apply(From f) const {
+				return zero(To{});
 			}
 		};
 
@@ -1049,19 +1028,6 @@ namespace ks
 				else
 					return add(accum, ai);
 			}
-
-			template <size_t i>
-			To Apply_aux(zero_t<To> accum, From const& f) const {
-				if constexpr (i < n) {
-					// Accumulator could be zero if first terms are zero,
-					// just move on to case 1
-					auto ai = std::get<i>(lms).Apply(std::get<i>(f));
-					return Apply_aux<i + 1>(ai, f);
-				}
-				else
-					return accum;
-			}
-
 		};
 
 		template <class T, class... Ts>
@@ -1313,13 +1279,11 @@ namespace ks
 
 			To Apply(From x) const
 			{
-				if (is_zero(x)) return To{ zero_t<To> {} };
-
 				if (n != x.size())
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
-				KS_ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
-				std::function<L(int)> f_local = f;
-				return sum(build<LFrom>(n, [f_local, x](int i) { return lmApply(f_local(i), x[i]); }));
+				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
+				std::function<L(int)> f_local = f;  // TODO: use sumbuild
+				return sum(build<LFrom>(n, [f_local,x](int i) { return lmApply(f_local(i), x[i]); }));
 			}
 		};
 
@@ -1423,12 +1387,6 @@ namespace ks
 	T mul(double s, T const& t)
 	{
 		return s * t;
-	}
-
-	template <class T>
-	zero_t<T> mul(double s, zero_t<T> const& t)
-	{
-		return t;
 	}
 
 	template <>

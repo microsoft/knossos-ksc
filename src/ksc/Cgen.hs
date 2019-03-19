@@ -16,9 +16,9 @@ import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
-import Debug.Trace
-
 import           Lang
+
+import Debug.Trace
 
 data CType =  CType Type
             | CTuple [CType]
@@ -27,7 +27,7 @@ data CType =  CType Type
             | UseTypeDef String
             | LMZero Type Type
             | LMOne Type
-            | LMScale
+            | LMScale Type
             | LMHCat [CType]
             | LMVCat [CType]
             | LMBuild CType
@@ -46,7 +46,7 @@ isScalar = \case
   UseTypeDef _  -> False
   LMZero _ _    -> False
   LMOne _       -> False
-  LMScale       -> False
+  LMScale  _    -> False
   LMHCat   _    -> False
   LMVCat   _    -> False
   LMBuild  _    -> False
@@ -70,13 +70,7 @@ stripCType = \case
   TypeDef _ cty -> stripCType cty
   _             -> error "LM/Function type in stripCType"
 
-cgenIsZero :: CType -> Bool
-cgenIsZero = \case
-  CType  (TypeZero _) -> True
-  CTuple ts           -> all cgenIsZero ts
-  _                   -> False
-
-cgenIsLM :: CType -> Bool
+cgenIsLM :: HasCallStack => CType -> Bool
 cgenIsLM = \case
   CType  (TypeLM _ _) -> True
   CType  _            -> False
@@ -86,30 +80,34 @@ cgenIsLM = \case
   UseTypeDef s        -> error ("Don't know; it's a UseTypeDef: " ++ s)
   _                   -> True
 
-makeUnionType :: HasCallStack => CType -> CType -> (CType, String)
-makeUnionType (CTuple ts) (CTuple us) = if ts == us
-  then (CTuple ts, "")
-  else
-    let ty = CTuple $ map fst $ zipWith makeUnionType ts us
-    in  (ty, "convert<" ++ cgenType ty ++ ">::go")  -- TODO: remove unnecessary convert<>s, now that zero_t auto-casts
+isUseTypeDef :: CType -> Bool
+isUseTypeDef (UseTypeDef _) = True
+isUseTypeDef _ = False 
 
-makeUnionType ty1 ty2 = if ty1 == ty2
-  then (ty1, "")
-  else if cgenIsZero ty1
-    then (ty2, "convert<" ++ cgenType ty2 ++ ">::go")
-    else if cgenIsZero ty2
-      then (ty1, "convert<" ++ cgenType ty1 ++ ">::go")
-      else if cgenIsLM ty1
-        then
--- trace ("***Making variant from \n" ++ show ty1 ++ "\n" ++ show ty2)
-             (LMVariant [ty1, ty2], "")
-        else
-          let sty1 = stripCType ty1
-              sty2 = stripCType ty2
-          in  if sty1 == sty2
-                then (mkCType sty1, "")
-                else error
-                  ("GENVAR[\n" ++ show ty1 ++ "\n" ++ show ty2 ++ "\n]")
+makeUnionType :: HasCallStack => CType -> CType -> CType
+makeUnionType (CTuple ts) (CTuple us) = 
+  if ts == us
+  then CTuple ts
+  else
+    CTuple $ zipWith makeUnionType ts us
+  
+makeUnionType ty1 ty2 = 
+  if ty1 == ty2
+  then ty1
+  else if isUseTypeDef ty1  -- Punt and hope it's fine for now...
+  then ty2
+  else if isUseTypeDef ty2
+  then ty1
+  else if cgenIsLM (trace ("***Making variant from \n" ++ show ty1 ++ "\n" ++ show ty2) ty1)
+  then  -- trace ("***Making variant from \n" ++ show ty1 ++ "\n" ++ show ty2)
+        LMVariant [ty1, ty2]
+  else
+    let sty1 = stripCType ty1
+        sty2 = stripCType ty2
+    in  if sty1 == sty2
+          then mkCType sty1
+          else error
+            ("GENVAR[\n" ++ show ty1 ++ "\n" ++ show ty2 ++ "\n]")
 
 -------------- String utils
 
@@ -354,7 +352,7 @@ cgenExprR env = \case
     (CG declc vc _  ) <- cgenExprR env c
     (CG declt vt tyt) <- cgenExprR env texpr
     (CG declf vf tyf) <- cgenExprR env fexpr
-    let (crettype, cretcast) = makeUnionType tyt tyf
+    let crettype = makeUnionType tyt tyf
     let dotv = case crettype of
           LMVariant _ -> ".v"  -- TODO: Ugh. Fix c++ to not require this.
           _           -> "" -- Ugh.
@@ -374,7 +372,6 @@ cgenExprR env = \case
       ++    cret
       ++    dotv
       ++    "= "
-      ++    cretcast
       ++    "("
       ++    vt
       ++    ");\n" -- assign to "return"
@@ -386,7 +383,6 @@ cgenExprR env = \case
       ++    cret
       ++    dotv
       ++    "= "
-      ++    cretcast
       ++    "("
       ++    vf
       ++    ");\n" -- assign to "return"
@@ -452,7 +448,7 @@ cgenType = \case
   UseTypeDef s    -> s
   LMZero s t      -> lmt "Zero" [s, t]
   LMOne t         -> lmt "One" [t]
-  LMScale         -> "LM::Scale"
+  LMScale t       -> lmt "Scale" [t]
   LMHCat   ts     -> lm "HCat" ts
   LMVCat   ts     -> lm "VCat" ts
   LMBuild  t      -> lm "Build" [t]
@@ -466,7 +462,6 @@ cgenType = \case
 
 cgenTypeLang :: HasCallStack => Type -> String
 cgenTypeLang = \case
-  TypeZero t    -> "zero_t<" ++ cgenTypeLang t ++ ">"
   TypeFloat     -> "double"
   TypeInteger   -> "int"
   TypeString    -> "std::string"
@@ -502,7 +497,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
   ("lmBuildT" , [_, lam]  ) -> LMBuildT lam
   ("lmOne"    , [ct]      ) -> LMOne (stripCType ct)
   ("lmZero"   , [cs, ct]  ) -> LMZero (stripCType cs) (stripCType ct)
-  ("lmScale"  , _         ) -> LMScale
+  ("lmScale"  , [ct, CType TypeFloat]) -> LMScale (stripCType ct)
   ("lmHCat"   , _         ) -> LMHCat arg_types
   ("lmVCat"   , _         ) -> LMVCat arg_types
   ("lmCompose", [lm1, lm2]) -> LMCompose lm1 lm2
@@ -525,22 +520,21 @@ pattern VecR = TypeVec TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "-"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
-  (PrimFun "+"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
-  (PrimFun "/"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
-  (PrimFun "*"       , [CType RR, CType RR]) -> LMHCat [LMScale, LMScale]
+  (PrimFun "-"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "+"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "/"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "*"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "to_float", [CType TypeInteger] ) -> LMZero TypeInteger TypeFloat
   (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
   (PrimFun "$rand"   , [CType ty]          ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
   (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"   , [CType (TypeVec t)] ) -> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale)]
+  (PrimFun "index"   , [CType (TypeVec t)] ) -> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
 
 cgenKonst :: Konst -> String
 cgenKonst = \case
-  KZero    t -> "zero_t<" ++ cgenTypeLang t ++ "> {}"
   KInteger i -> show i
   KFloat   f -> show f
   KString  s -> show s

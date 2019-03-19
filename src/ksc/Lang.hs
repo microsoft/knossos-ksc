@@ -63,8 +63,7 @@ data ExprX f b
 type Expr  = ExprX Fun Var
 type TExpr = ExprX TFun TVar
 
-data Type = TypeZero Type          -- See Note [Zeros]
-          | TypeBool
+data Type = TypeBool
           | TypeInteger
           | TypeFloat
           | TypeString
@@ -77,7 +76,6 @@ data Type = TypeZero Type          -- See Note [Zeros]
 
 isScalar :: Type -> Bool
 isScalar = \case
-  TypeZero _     -> False
   TypeBool       -> True
   TypeInteger    -> True
   TypeFloat      -> True
@@ -94,7 +92,6 @@ isScalar = \case
 tangentType :: Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
-tangentType (TypeZero  t ) = tangentType t
 tangentType (TypeVec   t ) = TypeVec (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
 tangentType TypeInteger    = TypeTuple []
@@ -104,29 +101,8 @@ tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLambda
 
-promoteZero :: Type -> Type
-promoteZero (TypeZero  t      ) = t
-promoteZero (TypeTuple ts     ) = TypeTuple $ map promoteZero ts
-promoteZero (TypeVec   t      ) = TypeVec $ promoteZero t
-promoteZero (TypeLambda from t) = TypeLambda from $ promoteZero t
-promoteZero t                   = t
-
 eqType :: Type -> Type -> Bool
-eqType t1 t2 = promoteZero t1 == promoteZero t2
-
-{- Note [Zeros]
-~~~~~~~~~~~~~~~
-  Zeros occur frequently in AD, so we keep track of them using TypeZero, to make it easier
-  for rules of the form (* v 0) -> 0 for non-scalar types v.
-  Without, we would need to represent such rules something like this:
-    (* (build N (lam i 0)) x) -> (build N (lam i 0))
-
-  On the other hand, it is a slightly odd Type -- TypeZero@T is an element of T.
-  When we have decent benchmarks, we can try to delete it and see if it has a big effect
-  on speed.  Today, numerous zero_t's appear in the generated C++, meaning they would incur
-  cost if not handled.
--}
-
+eqType t1 t2 = t1 == t2
 
 type PrimFun = String
 
@@ -162,8 +138,7 @@ data Var
 data TVar = TVar Type Var
   deriving( Show, Eq, Ord )
 
-data Konst = KZero Type
-           | KInteger Integer
+data Konst = KInteger Integer
            | KFloat   Double
            | KBool    Bool
            | KString  String
@@ -187,16 +162,12 @@ flipMode :: ADMode -> ADMode
 flipMode Fwd = Rev
 flipMode Rev = Fwd
 
-isZero :: Type -> Bool
-isZero (TypeZero _) = True
-isZero _            = False
-
 isKZero :: TExpr -> Bool
 isKZero = \case
-  Konst (KZero    _  ) -> True
   Konst (KInteger 0  ) -> True
   Konst (KFloat   0.0) -> True
-  e                    -> isZero (typeof e)
+  Call (TFun _ (Fun (UserFun "zero"))) _ -> True
+  _                    -> False
 
 partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
 -- Separate the Rules from the Defs
@@ -235,9 +206,6 @@ isDummy _     = False
 mkDummy :: Type -> TExpr
 mkDummy ty = Var (TVar ty Dummy)
 
-mkZero :: Type -> TExpr
-mkZero = mkDummy . TypeZero
-
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body =
   assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs) ty (typeof rhs)
@@ -258,6 +226,12 @@ kFloat f = Konst (KFloat f)
 kTFloat :: Double -> TExpr
 kTFloat f = Konst (KFloat f)
 
+zeroInt :: TExpr
+zeroInt = Konst (KInteger 0)
+
+zeroFloat :: TExpr
+zeroFloat = Konst (KFloat 0.0)
+
 mkTuple :: [ExprX f b] -> ExprX f b
 mkTuple [e] = e
 mkTuple es  = Tuple es
@@ -276,7 +250,7 @@ mkTypeTuple tys  = TypeTuple tys
 -----------------------------------------------
 
 class HasType b where
-  typeof :: b -> Type
+  typeof :: HasCallStack => b -> Type
 
 instance HasType TVar where
   typeof (TVar ty _) = ty
@@ -299,14 +273,8 @@ instance (HasType b, HasType f,
   typeof (Assert _ e)  = typeof e
   typeof (If _ t f)    = makeIfType (typeof t) (typeof f)
 
--- ToDo:
--- The type of an If statement is a sort of union of the types on the branches
--- This occurs because of types like TypeZero which intersect both Float and Integer
+-- ToDo: delete this if no longer needed
 makeIfType :: HasCallStack => Type -> Type -> Type
-makeIfType (TypeZero ty1) ty2            = makeIfType ty1 ty2
-makeIfType ty1            (TypeZero ty2) = makeIfType ty1 ty2
-makeIfType (TypeTuple t1s) (TypeTuple t2s) =
-  TypeTuple $ zipWith makeIfType t1s t2s
 makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $ ty2
 
 getLM :: HasCallStack => Type -> Type
@@ -321,7 +289,6 @@ unzipLMTypes (TypeLM s t : lmts) = case unzipLMTypes lmts of
 unzipLMTypes _ = Nothing
 
 typeofKonst :: Konst -> Type
-typeofKonst (KZero    t) = TypeZero t
 typeofKonst (KInteger _) = TypeInteger
 typeofKonst (KFloat   _) = TypeFloat
 typeofKonst (KBool    _) = TypeBool
@@ -338,23 +305,6 @@ assert doc False _ = error (show doc)
 assertBool :: Bool -> Bool
 assertBool x = x    -- To remove check, return True always
 
-assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
-assertTypesEqualThen msg t1 (TypeZero t2) e = assertTypesEqualThen msg t1 t2 e
-assertTypesEqualThen msg (TypeZero t1) t2 e = assertTypesEqualThen msg t1 t2 e
-assertTypesEqualThen msg t1 t2 e = if t1 == t2
-  then e
-  else
-    error
-        (  "Asserts unequal ["
-        ++ msg
-        ++ "] \n T1 = "
-        ++ show t1
-        ++ "\n T2 = "
-        ++ show t2
-        ++ "\n"
-        )
-      $ e
-
 assertEqualThen :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e = if t1 == t2
   then e
@@ -369,6 +319,9 @@ assertEqualThen msg t1 t2 e = if t1 == t2
         ++ "\n"
         )
       $ e
+
+assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
+assertTypesEqualThen = assertEqualThen
 
 assertAllEqualThen :: (HasCallStack, Eq a, Show a) => String -> [a] -> b -> b
 assertAllEqualThen msg es e = if allEq es
@@ -595,8 +548,6 @@ instance Pretty Konst where
   pprPrec _ (KFloat f)   = double f
   pprPrec _ (KString s)  = text (show s)
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
-  pprPrec p (KZero t)    = parensIf p precZero $
-                           text "KZero " <> pprParendType t
 
 instance Pretty Type where
   pprPrec p (TypeVec ty)         = parensIf p precZero $
@@ -606,7 +557,6 @@ instance Pretty Type where
   pprPrec p (TypeLambda from to) = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
   pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> pprParendType s <+> ppr t
-  pprPrec _ (TypeZero t)         = text "zero_t@" <> pprParendType t
   pprPrec _ TypeFloat            = text "Float"
   pprPrec _ TypeInteger          = text "Integer"
   pprPrec _ TypeString           = text "String"

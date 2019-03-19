@@ -21,12 +21,10 @@ gradV v          = error ("gradV: bad variable: " ++ render (ppr v))
 gradSelFun :: [TVar] -> TVar -> Int -> TExpr
 -- (gradSelFun i n) selects the i'th component of a n-tuple
 -- Result expr has type (t1, ..., tn) -o ti
-gradSelFun params typaram i
-  = lmHCat [ if i == j then lmOne             t
-                       else lmZero (typeof p) t
-           | (p,j) <- params `zip` [1..] ]
-  where
-    t = typeof typaram
+gradSelFun params pi i
+  = lmHCat [ if i == j then lmOne $ typeof pi
+                       else lmZero (Var pj) (Var pi)
+           | (pj,j) <- params `zip` [1..] ]
 
 -------------------------------------------------
 
@@ -35,23 +33,31 @@ gradDefs defs = map gradDef defs
 
 gradDef :: TDef -> TDef
 gradDef (DefX f params rhs)
-  = DefX (gradTFun s f)
+  = DefX (gradTFun sty f)
          params
          (mkLets lets (gradE s rhs))
   where
-    s = case params of
-          [TVar ty _] -> ty
-          _           -> TypeTuple (map typeof params)
+    param1 :: TExpr
+    param1 = case params of
+          [p] -> Var p
+          ps  -> Tuple $ map Var ps
 
-    lets = case params of
+    sty = typeof param1
+    svar = TVar sty $ Simple "$arg"
+
+    s = Var svar
+
+    lets =  (svar, param1)
+            :
+            case params of
              [p] -> [ (gradTVar s p, lmOne (typeof p)) ]
              _   -> [ (gradTVar s p, gradSelFun params p i)
                     | (p,i) <- params `zip` [1..] ]
 
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
-gradE :: Type -> TExpr -> TExpr
-gradE s (Konst k)      = lmZero s (typeofKonst k)
+gradE :: TExpr -> TExpr -> TExpr
+gradE s e@(Konst _)    = lmZero s e
 gradE s (Var tv)       = Var (gradTVar s tv)
 gradE s (Assert e1 e2) = Assert e1 (gradE s e2)
 gradE s (Tuple es)     = lmVCat (map (gradE s) es)
@@ -65,10 +71,10 @@ gradE s (Let v e1 e2)  = mkLet v e1                       $
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE s (Call f (Tuple [n, Lam ti@(TVar TypeInteger _i) body]))
+gradE s (Call f (Tuple [n, Lam ti body]))
   | f `isThePrimFun` "build"
   = lmBuild n $ Lam ti $
-    mkLet (gradTVar s ti) (lmZero s TypeInteger) $
+    mkLet (gradTVar s ti) (lmZero s $ Var ti) $
     gradE s body
 
 gradE s (Call f arg) = Call (gradTFun (typeof arg) f) arg
@@ -77,8 +83,8 @@ gradE s (Call f arg) = Call (gradTFun (typeof arg) f) arg
 gradTFun :: Type -> TFun -> TFun
 gradTFun arg_ty (TFun res_ty f) = TFun (TypeLM arg_ty res_ty) (gradF f)
 
-gradTVar :: Type -> TVar -> TVar
-gradTVar s (TVar ty v) = TVar (TypeLM s ty) (gradV v)
+gradTVar :: TExpr -> TVar -> TVar
+gradTVar s (TVar ty v) = TVar (TypeLM (typeof s) ty) (gradV v)
 
 ---------------------------------
 
@@ -123,7 +129,7 @@ test_AD =
   hspec $ do
     let e1 = runParserOrPanic pDef "(def f ((x : Float)) (* x 2.0))"
     let (env,ae1) = annotDef e1
-    let de1_expected = runParserOrPanic pDef "(def D$f ((x : Float)) (lmScale 2.0))"
+    let de1_expected = runParserOrPanic pDef "(def D$f ((x : Float)) (lmScale Float 2.0))"
     let (env1,ade1_expected) = annotDef de1_expected
     let ade1 = gradDef emptyST ae1
     describe "AD" $ do

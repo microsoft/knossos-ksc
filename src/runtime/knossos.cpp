@@ -3,7 +3,7 @@
 
 namespace ks {
 #ifdef BUMPY
-	allocator g_alloc{ 100'000'000 };
+	allocator g_alloc{ 1'000'000'000 };
 #endif
 
 	int log_indent = 8;
