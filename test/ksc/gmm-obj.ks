@@ -105,7 +105,7 @@
 
 (def main Integer ()
     (let ((D 64)
-          (N 10000)
+          (N 100)
           (K 64)
 
           (x       (build N  (lam (i : Integer) (mkvec D 1.0))))
