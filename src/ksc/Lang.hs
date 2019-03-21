@@ -528,7 +528,7 @@ instance Pretty Fun where
 pprFunId :: FunId -> SDoc
 pprFunId (UserFun s ) = text s
 pprFunId (PrimFun p ) = text p
-pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
+pprFunId (SelFun i n) = text "get_" <> int i <> char '_' <> int n
 
 pprFun :: Fun -> SDoc
 pprFun (Fun s         ) = ppr s
