@@ -115,8 +115,9 @@ tcExpr (Konst k)
 
 tcExpr (Call f es)
   = do { (fun, mb_ty) <- getFunTc f
-       ; (tyes, aes) <- addCtxt (text "In the call of:" <+> ppr fun) $
-                        tcExpr es
+       ; pairs <- addCtxt (text "In the call of:" <+> ppr fun) $
+                  mapM tcExpr es
+       ; let (tyes, aes) = unzip pairs
        ; ty <- lookupGblTc fun tyes
        ; checkTypes_maybe mb_ty ty $
          text "Function call type mismatch for" <+> ppr fun
@@ -240,7 +241,7 @@ modifygblST g = \env -> env { gblST = g (gblST env) }
 -- It has special cases for a bunch of built-in functions with polymorphic
 -- types; that is, where the result type is a function of the argument types
 -- Otherwise it just looks in the global symbol table.
-callResultTy :: HasCallStack => SymTab -> Fun -> Type -> Type
+callResultTy :: HasCallStack => SymTab -> Fun -> [Type] -> Type
 callResultTy env fun arg_ty
   = case callResultTy_maybe env fun arg_ty of
       Right res_ty -> res_ty
@@ -254,7 +255,7 @@ callResultTy env fun arg_ty
   where
     gbl_env_keys = map fst $ Map.toList $ gblST env
 
-callResultTy_maybe :: SymTab -> Fun -> Type
+callResultTy_maybe :: SymTab -> Fun -> [Type]
                    -> Either SDoc Type
 callResultTy_maybe env fun arg_ty
   | is_user_fun fun
@@ -275,17 +276,11 @@ callResultTy_maybe env fun arg_ty
     is_user_fun = isUserFunConstructor . funId
 
 userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
-                       -> Type -> Either SDoc Type
+                       -> [Type] -> Either SDoc Type
 userCallResultTy_maybe f env arg_ty
   | Just def <- lookupGblST f env
   , DefX { def_fun = TFun ret_ty _, def_args = params } <- def
-  = case params of
-      [_] -> check_args ret_ty 1 params [arg_ty]
-      _ | TypeTuple arg_tys <- arg_ty
-        -> check_args ret_ty 1 params arg_tys
-        | otherwise
-        -> Left (text "Argument should be a tuple but has type" <+> ppr arg_ty)
-
+  = check_args ret_ty 1 params arg_ty
   | otherwise
   = Left (text "Not in scope:" <+> ppr f)
 
@@ -404,7 +399,7 @@ lookupLclTc v
                          ; return TypeUnknown }
            Just ty -> return ty }
 
-lookupGblTc :: Fun -> Type -> TcM f b Type
+lookupGblTc :: Fun -> [Type] -> TcM f b Type
 lookupGblTc fun arg_ty
   = do { st <- getSymTabTc
        ; case callResultTy_maybe st fun arg_ty of

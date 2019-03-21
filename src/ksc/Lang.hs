@@ -51,7 +51,7 @@ type TDef = DefX TFun TVar
 data ExprX f b
   = Konst Konst
   | Var b
-  | Call f (ExprX f b)      -- f e
+  | Call f [ExprX f b]      -- f e
   | Tuple [ExprX f b]       -- (e1, ..., en)
   | Lam TVar (ExprX f b)    -- Lambda-bound variable is typed from birth
   | App (ExprX f b) (ExprX f b)
@@ -236,6 +236,15 @@ mkTuple :: [ExprX f b] -> ExprX f b
 mkTuple [e] = e
 mkTuple es  = Tuple es
 
+mkTupleTy :: [Type] -> Type
+mkTupleTy [t] = t
+mkTupleTy ts  = TypeTuple ts
+
+dropLast :: [a] -> [a]
+-- Drop the last element of a list.
+-- No-op for empty list
+dropLast xs = take (length xs - 1) xs
+
 -----------------------------------------------
 --     Building types
 -----------------------------------------------
@@ -251,6 +260,9 @@ mkTypeTuple tys  = TypeTuple tys
 
 class HasType b where
   typeof :: HasCallStack => b -> Type
+
+typeofArgs :: HasType b => [b] -> Type
+typeofArgs args = mkTupleTy (map typeof args)
 
 instance HasType TVar where
   typeof (TVar ty _) = ty
@@ -556,7 +568,7 @@ instance Pretty Type where
                                    text "Tuple" <+> parens (pprList ppr tys)
   pprPrec p (TypeLambda from to) = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
-  pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> pprParendType s <+> ppr t
+  pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> pprParendType s <+> pprParendType t
   pprPrec _ TypeFloat            = text "Float"
   pprPrec _ TypeInteger          = text "Integer"
   pprPrec _ TypeString           = text "String"
@@ -621,18 +633,16 @@ pprExpr _ (App e1 e2) =
     -- We aren't expecting Apps, so I'm making them very visible
 
 pprCall
-  :: (PrettyVar f, PrettyVar b, HasInfix f) => Prec -> f -> ExprX f b -> SDoc
+  :: (PrettyVar f, PrettyVar b, HasInfix f) => Prec -> f -> [ExprX f b] -> SDoc
 pprCall prec f e = mode
   (parens $ (pprVar f) <+> pp_args)
   (case (e, isInfix f) of
-    (Tuple [e1, e2], Just prec') -> parensIf prec prec'
+    ([e1, e2], Just prec') -> parensIf prec prec'
       $ sep [pprExpr prec' e1, pprVar f <+> pprExpr prec' e2]
     _ -> cat [pprVar f, nest 2 (parensSp pp_args)]
   )
  where
-  pp_args = case e of
-    (Tuple es) -> pprList ppr es
-    _          -> ppr e
+  pp_args = pprList ppr e
 
 pprLetSexp :: (PrettyVar f, PrettyVar b, HasInfix f) =>
            b -> ExprX f b -> ExprX f b -> SDoc
@@ -721,8 +731,8 @@ hspec = do
   let test e s = it s $ pps e `shouldBe` s
 
   let var s = Var (Simple s)
-  let e  = Call (Fun (UserFun "g")) (var "i")
-  let e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
+  let e  = Call (Fun (UserFun "g")) [var "i"]
+  let e2 = Call (Fun (UserFun "f")) [e, var "_t1", kInt 5]
 
   describe "Pretty" $ do
     test e  "g( i )"

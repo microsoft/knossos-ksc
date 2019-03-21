@@ -71,17 +71,20 @@ gradE s (Let v e1 e2)  = mkLet v e1                       $
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE s (Call f (Tuple [n, Lam ti body]))
+gradE s (Call f [n, Lam ti body])
   | f `isThePrimFun` "build"
   = lmBuild n $ Lam ti $
     mkLet (gradTVar s ti) (lmZero s $ Var ti) $
     gradE s body
 
-gradE s (Call f arg) = Call (gradTFun (typeof arg) f) arg
-                       `lmCompose` gradE s arg
+gradE s (Call f args)
+  = Call gf args `lmCompose` lmVCat (map (gradE s) args)
+  where
+    gf = gradTFun (mkTupleTy (map typeof args)) f
 
 gradTFun :: Type -> TFun -> TFun
-gradTFun arg_ty (TFun res_ty f) = TFun (TypeLM arg_ty res_ty) (gradF f)
+gradTFun arg_ty (TFun res_ty f)
+  = TFun (TypeLM arg_ty res_ty) (gradF f)
 
 gradTVar :: TExpr -> TVar -> TVar
 gradTVar s (TVar ty v) = TVar (TypeLM (typeof s) ty) (gradV v)
@@ -105,7 +108,6 @@ applyD (DefX (TFun (TypeLM _ t) (GradFun f Fwd)) vars rhs)
     lmApply rhs (mkTuple $ map Var dvars)
   where
     dvars = map to_delta vars
-
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
 
 applyDefs :: [TDef] -> [TDef]

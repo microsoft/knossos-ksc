@@ -39,9 +39,9 @@ occAnalE (Lam v e)
   where
     (e', vs) = occAnalE e
 
-occAnalE (Call f e) = (Call f e', vs)
-                      where
-                        (e',vs) = occAnalE e
+occAnalE (Call f e) = (Call f e', unions vs)
+                     where
+                       (e',vs) = unzip (map occAnalE e)
 occAnalE (Tuple es) = (Tuple es', unions vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
@@ -183,7 +183,7 @@ optLetsE args e = go (mkEmptySubst args) e
           Nothing -> Var tv
 
     go _ubst (Konst k)      = Konst k
-    go subst (Call f e)     = Call f (go subst e)
+    go subst (Call f es)    = Call f (map (go subst) es)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
@@ -201,9 +201,9 @@ inline_me n bndr rhs
   | otherwise       = False
 
 isTrivial :: TExpr -> Bool
-isTrivial (Tuple [])          = True
-isTrivial (Var {})            = True
-isTrivial (Konst {})          = True
-isTrivial (Call _ (Tuple [])) = True
-isTrivial (Assert _ e2)       = isTrivial e2
+isTrivial (Tuple [])    = True
+isTrivial (Var {})      = True
+isTrivial (Konst {})    = True
+isTrivial (Call _ [])   = True
+isTrivial (Assert _ e2) = isTrivial e2
 isTrivial _ = False

@@ -57,9 +57,9 @@ match_e _ tsubst (Konst k1) (Konst k2)
   = do { guard (k1 == k2)
        ; return tsubst }
 
-match_e vsubst tsubst (Call f1 e1) (Call f2 e2)
+match_e vsubst tsubst (Call f1 es1) (Call f2 es2)
   = do { guard (f1 == f2)
-       ; match_e vsubst tsubst e1 e2 }
+       ; match_es vsubst tsubst es1 es2 }
 
 match_e vsubst tsubst (App e1a e1b) (App e2a e2b)
   = do { tsubst1 <- match_e vsubst tsubst e1a e2a

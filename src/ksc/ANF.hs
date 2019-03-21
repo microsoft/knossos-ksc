@@ -22,18 +22,9 @@ anfExpr e = wrapLets (anfE e)
 
 anfE :: (GenBndr f b) => ExprX f b -> AnfM f b (ExprX f b)
 anfE (Tuple es)            = Tuple <$> mapM anfE1 es
-anfE (Call fun (Tuple es)) {- FIXME anf build
-  | Fun (SFun "build") <- fun
-  , [n,e] <- es
-  = -- Don't bother to ANF the first arr
-    -- and leave the second arg in place
-    do { e' <- anfE e
-       ; return (Call fun (Tuple [n, e'])) }
-  | otherwise -}
-  = (Call fun . Tuple) <$> mapM anfE1 es
 anfE (Konst k)      = return (Konst k)
 anfE (Var v)        = return (Var v)
-anfE (Call fun e)   = Call fun <$> anfE1 e
+anfE (Call fun es)  = Call fun <$> mapM anfE1 es
 anfE (Let v r e)    = do { r' <- anfE r
                          ; emit v r'
                          ; anfE e }

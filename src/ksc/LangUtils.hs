@@ -34,7 +34,7 @@ substEMayCapture subst (Konst k)      = Konst k
 substEMayCapture subst (Var v)        = case M.lookup v subst of
                                Just e  -> e
                                Nothing -> Var v
-substEMayCapture subst (Call f e)     = Call f (substEMayCapture subst e)
+substEMayCapture subst (Call f es)    = Call f (map (substEMayCapture subst) es)
 substEMayCapture subst (If b t e)     = If (substEMayCapture subst b) (substEMayCapture subst t) (substEMayCapture subst e)
 substEMayCapture subst (Tuple es)     = Tuple (map (substEMayCapture subst) es)
 substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEMayCapture subst e2)
@@ -79,7 +79,7 @@ cmpExpr e1 e2
      = case e2 of
          Konst {} -> GT
          Var {} -> GT
-         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (go e1 subst e2)
+         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (gos e1 subst e2)
          _ -> LT
 
    go (Tuple es1) subst e2
@@ -145,12 +145,12 @@ notFreeIn :: TVar -> TExpr -> Bool
 notFreeIn v e = go v e
  where
    go:: TVar -> TExpr -> Bool
-   go v (Var v2) = v /= v2
-   go v (Konst _) = True
-   go v (Tuple es) = all (go v) es
-   go v (If b t e) = go v b && go v t && go v e
-   go v (Call _ e) = go v e
-   go v (App f a)  = go v f && go v a
+   go v (Var v2)     = v /= v2
+   go v (Konst _)    = True
+   go v (Tuple es)   = all (go v) es
+   go v (If b t e)   = go v b && go v t && go v e
+   go v (Call _ e)   = all (go v) e
+   go v (App f a)    = go v f && go v a
    go v (Let v2 r b) = go v r && (v == v2 || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Assert e1 e2) = go v e1 && go v e2
@@ -173,8 +173,8 @@ hspec = do
         var s = TVar TypeFloat (Simple s)
         fun :: String -> TFun
         fun s = TFun TypeFloat (Fun (UserFun s))
-        e  = Call (fun "f") (Var (var "i"))
-        e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
+        e  = Call (fun "f") [Var (var "i")]
+        e2 = Call (fun "f") [Var (var "_t1"), kInt 5]
     describe "notFreeIn" $ do
       it ("i notFreeIn " ++ show (ppr (e::TExpr))) $
         (var "i" `notFreeIn` e) `shouldBe` False

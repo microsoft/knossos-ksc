@@ -246,7 +246,7 @@ cgenExprR env = \case
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
   Var (TVar _ v)                -> return $ CG "" (show v) (cstLookupVar v env)
 
-  Call tf@(TFun _ _) (Tuple vs) -> do
+  Call tf@(TFun _ _) vs -> do
       -- Untuple argument for C++ call
     cgvs <- mapM (cgenExprR env) vs
     let cdecls = map getDecl cgvs
@@ -278,8 +278,6 @@ cgenExprR env = \case
       )
       v
       cftype
-
-  Call tf@(TFun _ _) v   -> cgenExprR env $ Call tf (Tuple [v])
 
   Let (TVar _ v) e1 body -> do
     (CG decle1   ve1   type1 ) <- cgenExprR env e1

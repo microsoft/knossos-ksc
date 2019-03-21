@@ -234,15 +234,12 @@ pCall = do { f <- pIdentifier
            ; es <- many pExpr
            ; case es of
                []  -> return (Var (Simple f))
-               [e] -> return (Call (mk_fun f) e)
                _   | f == "$trace"   -- See Note [$trace]
                    , Var (Simple g) : es1 <- es
-                   , let g_arg = case es1 of [e1] -> e1
-                                             _    -> Tuple es1
-                   -> return (Call (mk_fun f) (Call (mk_fun g) g_arg))
+                   -> return (Call (mk_fun f) [Call (mk_fun g) es1])
 
                    | otherwise
-                   -> return (Call (mk_fun f) (Tuple es))
+                   -> return (Call (mk_fun f) es)
         }
 
 {- Note [$trace]
