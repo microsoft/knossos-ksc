@@ -32,10 +32,10 @@ gradDefs :: [TDef] -> [TDef]
 gradDefs defs = map gradDef defs
 
 gradDef :: TDef -> TDef
-gradDef (DefX f params rhs)
-  = DefX (gradTFun sty f)
-         params
-         (mkLets lets (gradE s rhs))
+gradDef (DefX { def_fun = f, def_args = params, def_rhs = rhs })
+  = DefX { def_fun = gradTFun sty f
+         , def_args = params
+         , def_rhs = mkLets lets (gradE s rhs) }
   where
     param1 :: TExpr
     param1 = case params of
