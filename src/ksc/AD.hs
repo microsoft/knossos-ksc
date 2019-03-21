@@ -38,10 +38,7 @@ gradDef (DefX { def_fun = f, def_args = params, def_rhs = rhs })
          , def_rhs = mkLets lets (gradE s rhs) }
   where
     param1 :: TExpr
-    param1 = case params of
-          [p] -> Var p
-          ps  -> Tuple $ map Var ps
-
+    param1 = mkTuple (map Var params)
     sty = typeof param1
     svar = TVar sty $ Simple "$arg"
 
