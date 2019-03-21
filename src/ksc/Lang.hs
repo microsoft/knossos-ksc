@@ -417,7 +417,9 @@ sep ss = SDoc
     ss
   )
 
-mode :: SDoc -> SDoc -> SDoc
+mode :: SDoc  -- How to print in s-expression style
+     -> SDoc  -- How to print in "user" style
+     -> SDoc
 mode (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
 
 nest :: Int -> SDoc -> SDoc
