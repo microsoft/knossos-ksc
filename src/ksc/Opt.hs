@@ -399,8 +399,14 @@ optGradFun ty (PrimFun f)  arg = optGradPrim ty f arg
 optGradFun _ (SelFun i n) arg = optGradSel i n arg
 
 optGradSel :: Int -> Int -> TExpr -> Maybe TExpr
--- sel 2 3 :: (a,b,c) -> b
--- Dsel 2 3 :: (a,b,c) -> (a,b,c) -o a
+--   sel 2 3 :: (a,b,c) -> b
+-- D$sel 2 3 :: (a,b,c) -> (a,b,c) -o b
+--
+-- D$sel 2 3 (a,b,c)  --->   lmHCat [ 0 :: S1 -o S2
+--                                  , 1 :: S2 -o S2
+--                                  , 0 :: S3 -o S2 ]
+-- NB: this works regardless of the value argument;
+--     the gradient is the same everywhere
 optGradSel i n arg
   | TypeTuple tys <- typeof arg
   , length tys == n
