@@ -97,12 +97,16 @@ gradTVar s (TVar ty v) = TVar (TypeLM (typeof s) ty) (gradV v)
 -- are transformed to ones of type T
 
 applyD :: TDef -> TDef
+--   R$f :: S1 S2   -> (T -o (S1,S2))
+-- rev$f :: S1 S2 T -> (S1,S2)
 applyD (DefX (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
   = DefX (TFun (tangentType t) (DrvFun f Rev)) (vars ++ [dr]) $
     lmApply rhs $ Var dr
   where
     dr = TVar (tangentType s) $ Delta "r"
 
+--   D$f :: S1 S2       -> ((S1,S2) -o T)
+-- rev$f :: S1 S2 S1 S2 -> T
 applyD (DefX (TFun (TypeLM _ t) (GradFun f Fwd)) vars rhs)
   = DefX (TFun (tangentType t) (DrvFun f Fwd)) (vars ++ dvars) $
     lmApply rhs (mkTuple $ map Var dvars)
