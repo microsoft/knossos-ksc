@@ -1,3 +1,5 @@
+set -e
+
 GHC=$1
 
 ERRORS="-Wincomplete-patterns -Wunused-local-binds -Wunused-matches -Wunused-imports -Wunused-top-binds -Wmissing-signatures"
