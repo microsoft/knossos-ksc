@@ -333,7 +333,6 @@ assertEqualThen msg t1 t2 e = if t1 == t2
         ++ show t2
         ++ "\n"
         )
-      $ e
 
 assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
 assertTypesEqualThen = assertEqualThen
