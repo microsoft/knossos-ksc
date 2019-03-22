@@ -9,8 +9,6 @@ import           Text.PrettyPrint               ( Doc )
 import           Data.List                      ( intersperse )
 import           KMonad
 
-import           Data.Either                    ( partitionEithers )
-
 import           Debug.Trace                    ( trace )
 import           Test.Hspec
 
@@ -20,6 +18,7 @@ import           Test.Hspec
 
 data DeclX f b = RuleDecl (RuleX f b)
                | DefDecl  (DefX f b)
+               | EdefDecl Edef
 
 type Decl  = DeclX Fun  Var
 type TDecl = DeclX TFun TVar
@@ -157,6 +156,8 @@ data RuleX f b = Rule { ru_name  :: String   -- Just for logging
 type Rule  = RuleX Fun Var
 type TRule = RuleX TFun TVar
 
+data Edef = Edef Fun Type [Type]
+
 -----------------------------------------------
 --  Simple functions over these types
 -----------------------------------------------
@@ -165,16 +166,19 @@ flipMode :: ADMode -> ADMode
 flipMode Fwd = Rev
 flipMode Rev = Fwd
 
-partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
--- Separate the Rules from the Defs
-partitionDecls decls =
-  partitionEithers
-    $ map
-        (\case
-          RuleDecl r -> Left r
-          DefDecl  d -> Right d
-        )
-      decls
+partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b], [Edef])
+-- Separate the Rules, Defs and Edefs
+--
+-- See https://www.stackage.org/haddock/lts-12.1/base-4.11.1.0/src/Data-Either.html#partitionEithers
+partitionDecls = foldr (declX rule def edef) ([], [], [])
+  where
+    declX rule' def' edef' = \case
+      RuleDecl r -> rule' r
+      DefDecl  d -> def' d
+      EdefDecl e -> edef' e
+    rule a ~(r, d, e) = (a:r, d, e)
+    def  a ~(r, d, e) = (r, a:d, e)
+    edef a ~(r, d, e) = (r, d, a:e)
 
 tVarVar :: TVar -> Var
 tVarVar (TVar _ v) = v
@@ -199,8 +203,11 @@ isDummy :: Var -> Bool
 isDummy Dummy = True
 isDummy _     = False
 
+mkDummyTVar :: Type -> TVar
+mkDummyTVar ty = TVar ty Dummy
+
 mkDummy :: Type -> TExpr
-mkDummy ty = Var (TVar ty Dummy)
+mkDummy ty = Var (mkDummyTVar ty)
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body =
@@ -658,6 +665,7 @@ instance (Show f, PrettyVar f, PrettyVar b, HasInfix f)
       => Pretty (DeclX f b) where
   ppr (DefDecl d)  = ppr d
   ppr (RuleDecl r) = ppr r
+  ppr (EdefDecl e) = ppr e
 
 instance (Show f, PrettyVar f, PrettyVar b, HasInfix f) => Pretty (DefX f b) where
   ppr (DefX f vs rhs) = mode
@@ -672,6 +680,14 @@ instance (PrettyVar f, PrettyVar b, HasInfix f) => Pretty (RuleX f b) where
     = sep [ text "rule" <+> doubleQuotes (text name)
                  <+> parens (pprList pprTVar qvars)
              , nest 2 (sep [ ppr lhs, nest 2 (text "=" <+> ppr rhs)]) ]
+
+instance Pretty Edef where
+  ppr (Edef fun returnType argTypes) =
+    parens (sep [ text "edef"
+                , ppr fun
+                , ppr returnType
+                , parens (sep (map ppr argTypes))
+                ])
 
 printK :: SDoc -> KM ()
 printK d = liftIO (putStrLn (render d))

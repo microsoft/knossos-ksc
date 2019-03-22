@@ -4,12 +4,14 @@ module Parse  where
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Here's the BNF for our language:
 
-<decl> ::= <def> | <rule>
+<decl> ::= <def> | <rule> | <edef>
 
 <rule> ::= ( rule <string> <params> <expr> <expr> )
 
 <def> ::= ( def <var> <type> <params> <expr> )
 -- (def f Float ( (x : Float) (y : Vec Float) ) (...) )
+
+<edef> ::= ( edef <var> <type> <types> )
 
 <params> ::= <param> | ( <param_1> ... <param_n> )
 <param>  ::= ( <var> ":" <type> )
@@ -19,6 +21,7 @@ Here's the BNF for our language:
 <ktype>  ::= "Vec" <type>
            | "Tuple" <type_1> .. <type_n>
            | <type>
+<types>  ::= ( <type_1> ... <type_n> )
 
 {-
 x : Vec Float
@@ -125,7 +128,8 @@ langDef = Tok.LanguageDef
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "rule", "let", "if", "assert", "call", "tuple", ":"
-                          , "Integer", "Float", "Vec", "String", "true", "false" ]
+                          , "Integer", "Float", "Vec", "String", "true", "false"
+                          , "edef" ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -222,10 +226,13 @@ pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "String"  >> return TypeString)
     <|> parens pKType
 
+pTypes :: Parser [Type]
+pTypes = parens (many pType)
 
 pKType :: Parser Type
 pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
        <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
+       <|> (do { pReserved "LM"; s <- pType; t <- pType ; return (TypeLM s t) })
        <|> pType
 
 pCall :: Parser (ExprX Fun Var)
@@ -313,9 +320,17 @@ pRule = do { pReserved "rule"
            ; return (Rule { ru_name = name, ru_qvars = qvars
                           , ru_lhs = lhs, ru_rhs = rhs }) }
 
+pEdef :: Parser Edef
+pEdef = do { pReserved "edef"
+           ; name       <- pIdentifier
+           ; returnType <- pType
+           ; argTypes   <- pTypes
+           ; return (Edef (mk_fun name) returnType argTypes) }
+
 pDecl :: Parser Decl
 pDecl = parens ( (DefDecl  <$> pDef)
-                 <|>  (RuleDecl <$> pRule ))
+                 <|>  (RuleDecl <$> pRule )
+                 <|>  (EdefDecl <$> pEdef ))
 
 pDecls :: Parser [Decl]
 pDecls = spaces >> many pDecl

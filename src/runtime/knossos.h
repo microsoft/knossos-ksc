@@ -1547,7 +1547,7 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 	*/
 
 	// ===============================  Dot ===========================================
-        inline double dot(double t1, double t2) { return t1 * t2; }
+  inline double dot(double t1, double t2) { return t1 * t2; }
 
 	inline double dot(tuple<> t1, tuple<> t2)
 	{
@@ -1631,3 +1631,13 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
         template <>
         tuple<> to_tangent<tuple<>, std::string>(std::string s) { return tuple<>{}; }
 } // namespace ks
+
+
+// These only exist so that we can test edef functionality.
+// We should probably come up with a better story for the
+// tests but at the time of writing I didn't want to hold back
+// edef support any longer.
+double edef_example(double x) { return x; }
+double fwd$edef_example(double x, double dx) { return dx; }
+double rev$edef_example(double x, double ddr) { return ddr; }
+

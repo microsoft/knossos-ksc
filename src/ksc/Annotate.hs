@@ -73,6 +73,7 @@ tcDeclX (DefDecl def)   = do { def' <- tcDef def
                              ; return (DefDecl def') }
 tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
                              ; return (RuleDecl rule') }
+tcDeclX (EdefDecl edef) = return (EdefDecl edef)
 
 tcDef :: (PrettyVar f, PrettyVar b, HasInfix f)
       => DefX f b -> TcM f b TDef
@@ -384,6 +385,17 @@ extendGblEnv :: TDecl -> TcM f b a -> TcM f b a
 extendGblEnv (RuleDecl {}) = id
 extendGblEnv (DefDecl tdef@(DefX { def_fun = TFun _ f }))
   = modifyEnvTc (modifygblST (stInsertFun f tdef))
+extendGblEnv (EdefDecl (Edef f retType argTypes))
+  = modifyEnvTc (modifygblST (flip extendGblST [tdef]))
+  where
+    tf = TFun retType f
+
+    targs = map mkDummyTVar argTypes
+    
+    tdef  = DefX { def_fun  = tf
+                 , def_args = targs
+                 , def_rhs  = mkDummy retType
+                 }
 
 modifyEnvTc :: (SymTab -> SymTab) -> TcM f b a -> TcM f b a
 modifyEnvTc extend (TCM f)
@@ -412,6 +424,6 @@ lookupGblTc fun arg_ty
       = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
              , text " Arg type:" <+> ppr arg_ty
              , text "ST lookup:" <+> ppr (Map.lookup fun (gblST st))
-             -- , text "ST keys:" <+> vcat (map (text . show) (Map.keys (gblST st))) 
+             , text "ST keys:" <+> vcat (map (text . show) (Map.keys (gblST st))) 
              ]
 

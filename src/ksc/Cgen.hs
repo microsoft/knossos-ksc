@@ -559,7 +559,11 @@ createDirectoryWriteFile filepath contents = do
 
 cppGen :: String -> [TDef] -> IO (String, String)
 cppGen outfile defs = do
-  let lines = ["#include \"knossos.h\"", "namespace ks {\n"]
+  let lines =
+        [
+        "#include \"knossos.h\"", 
+        "namespace ks {\n"
+        ]
       lls   = cgenDefs defs
       tail =
         [ "}"
