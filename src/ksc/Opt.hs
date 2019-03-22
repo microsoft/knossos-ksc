@@ -545,12 +545,12 @@ optApplyLMCall "lmVCat" es dx
 optApplyLMCall "lmHCat" es dx
   | (e1:_) <- es
   , TypeLM _ _ <- typeof e1
-  = Just $ foldr1 pAdd $ map apply (es `zip` [1..])
+  = Just $ foldr1 pAdd $ zipWith apply es [1..]
   where
     n = length es
 
-    apply :: (TExpr, Int) -> TExpr
-    apply (e,i) = lmApply e (pSel i n dx)
+    apply :: TExpr -> Int -> TExpr
+    apply e i = lmApply e (pSel i n dx)
 
 optApplyLMCall "lmScale" [_ty, x] dx
   = Just (pMul x dx)
