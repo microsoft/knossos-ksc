@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-unused-matches #-}
-
 module Prim where
 
 import Lang
@@ -81,10 +79,10 @@ isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
 isLMOne, isLMZero :: TExpr -> Bool
-isLMOne (Call f e) = f `isThePrimFun` "lmOne"
+isLMOne (Call f _) = f `isThePrimFun` "lmOne"
 isLMOne _ = False
 
-isLMZero (Call f e) = f `isThePrimFun` "lmZero"
+isLMZero (Call f _) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
 
 fstArg, sndArg :: TExpr -> TExpr
@@ -221,11 +219,11 @@ primCallResultTy_maybe fun arg_ty
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
-      DrvFun f Rev    -- f :: S1 S2 -> T, then rev$f :: S1 S2 T_t -> (S1_t, S2_t)
+      DrvFun _ Rev    -- f :: S1 S2 -> T, then rev$f :: S1 S2 T_t -> (S1_t, S2_t)
         | let s_tys = dropLast arg_ty
         -> Right (tangentType (mkTupleTy s_tys))
 
-      CheckFun f -> return TypeFloat
+      CheckFun _ -> return TypeFloat
 
       Fun (UserFun _) -> Left (text "Not in scope:" <+> ppr fun)
 
@@ -312,7 +310,7 @@ lmVCatResultTy tys
 
 lmHCatResultTy tys
   | Just (ss, ts) <- unzipLMTypes tys
-  , (t1:ts1) <- ts
+  , (t1:_) <- ts
   -- TODO: cope with mixtures of T and Zero T, assertBool $ all (== t1) ts1
   = Just (TypeLM (TypeTuple ss) t1)
   | otherwise = Nothing
@@ -330,7 +328,7 @@ simplePrimResultTy "+" [t1, t2]
                                        ; return (TypeVec tr) }
     add (TypeTuple t1s) (TypeTuple t2s) = do { ts <- zipWithM add t1s t2s
                                              ; return (TypeTuple ts) }
-    add t1 t2 = Nothing
+    add _ _ = Nothing
 
 simplePrimResultTy fun arg_tys
   = case (fun, arg_tys) of
@@ -345,7 +343,7 @@ simplePrimResultTy fun arg_tys
       ("sum"      , [TypeVec t]                            ) -> Just t
       ("to_float" , [TypeInteger]                          ) -> Just TypeFloat
       ("dot"      , [t, t']                                ) | t == t' -> Just TypeFloat
-      ("norm"     , [t]                                    ) -> Just TypeFloat
+      ("norm"     , [_]                                    ) -> Just TypeFloat
       ("tangent_add", [t, t']                              ) | tangentType t == t' -> Just t
       ("to_tangent",  [t]                                  ) -> Just (tangentType t)
 
