@@ -696,9 +696,14 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 	template <class T>
 	vec<T> deltaVec(int n, int i, T val)
 	{
-		return build<T>(n, [i, val](int ii) {
-			return (i == ii) ? val : zero(val);
-		});
+		vec<T> ret(n);
+		T z = zero(val);
+		for(int j = 0; j < n; ++j)
+			if (j != i)
+			  ret[j] = z;
+			else
+			  ret[j] = val;
+		return ret;
 	}
 
 	template <class F>
@@ -778,9 +783,9 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 	template <class T>
 	vec<T> operator-(vec<T> const& a, T const& b)
 	{
-		KS_ASSERT(false); // Can't handle zero_t - const
-		if (is_zero(a))
-			return a;
+		KS_ASSERT(false); // Can't handle zero_t - const?
+		if (a.is_zero())
+			return inflate(a) + b;
 
 		KS_ASSERT(a.size() != 0);
 		vec<T> ret = vec<T>::create(a.size());

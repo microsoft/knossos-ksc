@@ -609,6 +609,7 @@ compileWithOpts opts compiler cppfile exefile = do
   let compcmd =
         ( compiler
         , [ "-fmax-errors=5"
+          , "-fdiagnostics-color=always"
           , "-Wall"
           , "-Wno-unused"
           , "-Isrc/runtime"

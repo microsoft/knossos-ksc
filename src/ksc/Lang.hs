@@ -165,13 +165,6 @@ flipMode :: ADMode -> ADMode
 flipMode Fwd = Rev
 flipMode Rev = Fwd
 
-isKZero :: TExpr -> Bool
-isKZero = \case
-  Konst (KInteger 0  ) -> True
-  Konst (KFloat   0.0) -> True
-  Call (TFun _ (Fun (UserFun "zero"))) _ -> True
-  _                    -> False
-
 partitionDecls :: [DeclX f b] -> ([RuleX f b], [DefX f b])
 -- Separate the Rules from the Defs
 partitionDecls decls =

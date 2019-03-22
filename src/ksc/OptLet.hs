@@ -4,6 +4,7 @@ module OptLet( optLets
              where
 
 import Lang
+import Prim
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char( isDigit )
@@ -197,6 +198,7 @@ inline_me n bndr rhs
   | n==0            = True   -- Dead code
   | n==1            = True   -- Used exactly once
   | isTrivial rhs   = True   -- RHS is just a variable or literal
+  | isKZero rhs     = True   -- Inline zeros, as they will very likely disappear
   | Grad {} <- bndr = True   -- Always inline Grads (might not do this in future)
   | otherwise       = False
 

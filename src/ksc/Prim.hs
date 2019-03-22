@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Prim where
 
 import Lang
@@ -85,10 +87,20 @@ isLMOne _ = False
 isLMZero (Call f _) = f `isThePrimFun` "lmZero"
 isLMZero _ = False
 
-fstArg, sndArg :: TExpr -> TExpr
+
+isKZero :: TExpr -> Bool
+isKZero = \case
+  Konst (KInteger 0  ) -> True
+  Konst (KFloat   0.0) -> True
+  Call f _ | f `isThePrimFun` "zero" -> True
+           | f `isThePrimFun` "tangent_zero" -> True
+  _                    -> False
+
+fstArg :: TExpr -> TExpr
 fstArg (Call _ [e,_]) = e
 fstArg e = error $ "fstArg on non-duple" ++ pps e
 
+sndArg :: TExpr -> TExpr
 sndArg (Call _ [_,e]) = e
 sndArg e = error $ "sndArg on non-duple" ++ pps e
 

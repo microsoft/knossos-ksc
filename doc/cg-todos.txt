@@ -1,0 +1,4 @@
+inline build
+inline sumbuild
+elim more deltavec
+(f (\ a1 . B(e))) where a1 notFreeIn e -> let v = e in (f (\ a1 . B(v)))

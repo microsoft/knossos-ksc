@@ -90,14 +90,19 @@
         (D (size (index 0 x)))
         (K (size alphas))
         (CONSTANT (* (to_float (* N D)) (neg 0.9189385332046727)) ) -- n * d*-0.5*log(2 * PI)
+        (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
         (slse     (sum (build N (lam (i : Integer)
-                      (logsumexp (build K (lam (k : Integer)
-                        (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
-                              (mahal_vec (mul$Mat$Vec Q
-                                                  (sub$VecR$VecR (index i x) (index k means)))))
-                          (- (+ (index k alphas) (sum (index k qs)))
-                            (* 0.500000  (sqnorm mahal_vec))
-                          )))))))))
+                        (logsumexp (build K (lam (k : Integer)
+                          (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
+                                (mahal_vec (mul$Mat$Vec Q
+                                                    (sub$VecR$VecR (index i x) (index k means)))))
+                            (- (+ (index k alphas) 
+                                  -- (index k sum_qs)
+                                  (sum (index k qs))
+                            )
+                              (* 0.500000  (sqnorm mahal_vec)))
+                          ))))
+                        ))))
         )
           (+ (+ CONSTANT
               (- slse

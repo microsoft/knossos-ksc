@@ -186,6 +186,11 @@ optPrimFun "zero" [Call zero [e]]
   | zero `isThePrimFun` "zero"
   = Just $ pZero e
 
+-- RULE: deltaVec n i (\ j . 0) = zero (build n (\i . 0))
+optPrimFun "deltaVec" [n, _i, val]
+  | isKZero val
+  = Just $ pZero $ pBuild n (Lam (TVar TypeInteger Dummy) val)
+
 -- RULE: zero (Int) = 0
 optPrimFun "zero" [Konst (KInteger _)]
   = Just (Konst (KInteger 0))
