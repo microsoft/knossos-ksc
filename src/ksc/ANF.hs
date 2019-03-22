@@ -40,12 +40,12 @@ anfE (Assert e1 e2) = do { e1' <- anfE e1
                          ; e2' <- anfExpr e2
                          ; return (Assert e1' e2') }
 
-anfE1 :: (GenBndr f b) => (ExprX f b) -> AnfM f b (ExprX f b)
+anfE1 :: GenBndr f b => ExprX f b -> AnfM f b (ExprX f b)
 -- Returns an atomic expression
 anfE1 e = do { e' <- anfE e
              ; atomise e' }
 
-atomise :: (GenBndr f b) => (ExprX f b) -> AnfM f b (ExprX f b)
+atomise :: GenBndr f b => ExprX f b -> AnfM f b (ExprX f b)
 atomise (Var v)   = return (Var v)
 atomise (Konst k) = return (Konst k)
 atomise (Lam x e) = return (Lam x e) -- Don't separate build from lambda

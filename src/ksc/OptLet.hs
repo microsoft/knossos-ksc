@@ -53,7 +53,7 @@ occAnalE (Let var rhs body)
           Nothing -> 0
     (rhs',  vsr) = occAnalE rhs
     (body', vsb) = occAnalE body
-    vs | n == 0    = (var `M.delete` vsb)
+    vs | n == 0    = var `M.delete` vsb
        | otherwise = (var `M.delete` vsb) `union` vsr
 
 occAnalE (If b t e)
@@ -167,7 +167,7 @@ optLetsE :: [TVar] -> ExprX TFun (Int,TVar) -> TExpr
 -- This function inline let-bindings that are only used once
 -- or whose RHS is trivial (see inline_me for exactly what.
 -- Take care: see Note [Capture-avoiding substitution]
-optLetsE args e = go (mkEmptySubst args) e
+optLetsE = go . mkEmptySubst
   where
     go :: Subst -> ExprX TFun (Int,TVar) -> TExpr
     go subst (Let (n, tv@(TVar _ty v)) r b)

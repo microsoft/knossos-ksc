@@ -60,8 +60,8 @@ EQ `thenCmp` o = o
 o  `thenCmp` _ = o
 
 cmpExpr :: TExpr -> TExpr -> Ordering
-cmpExpr e1 e2
- = go e1 M.empty e2
+cmpExpr e1
+ = go e1 M.empty
  where
    go :: TExpr -> M.Map TVar TVar -> TExpr -> Ordering
    go (Konst k1) subst e2
@@ -142,7 +142,7 @@ cmpExpr e1 e2
 -----------------------------------------------
 
 notFreeIn :: TVar -> TExpr -> Bool
-notFreeIn v e = go v e
+notFreeIn = go
  where
    go:: TVar -> TExpr -> Bool
    go v (Var v2)     = v /= v2

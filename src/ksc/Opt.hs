@@ -25,7 +25,7 @@ emptyOptEnv = OptEnv { optRuleBase = mkRuleBase []
 optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
                         -> (GblSymTab, [TDef])
 -- Returned GblSymTab contains the optimised definitions
-optDefs rb gst defs = mapAccumL (optDef rb) gst defs
+optDefs = mapAccumL . optDef
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> (GblSymTab, TDef)
@@ -45,8 +45,8 @@ simplify env args rhs
 
 ---------------
 optE :: HasCallStack => OptEnv -> TExpr -> TExpr
-optE env e
-  = go e
+optE env
+  = go
   where
     go :: HasCallStack => TExpr -> TExpr
     go e | Just e' <- tryRules (optRuleBase env) e = go e'
@@ -108,8 +108,7 @@ rewriteCall _ (TFun ty (GradFun f _)) arg
   = optGradFun ty f arg
 
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
-  = trace ("NOTE: Unmatched LM call {" ++ show f ++ "}") $
-    Nothing
+  = trace ("NOTE: Unmatched LM call {" ++ show f ++ "}") Nothing
 
 rewriteCall _ _ _
   = Nothing
@@ -189,11 +188,11 @@ optPrimFun "zero" [Call zero [e]]
 
 -- RULE: zero (Int) = 0
 optPrimFun "zero" [Konst (KInteger _)]
-  = Just $ (Konst (KInteger 0))
+  = Just (Konst (KInteger 0))
 
 -- RULE: zero (Float) = 0.0
 optPrimFun "zero" [Konst (KFloat _)]
-  = Just $ (Konst (KFloat 0))
+  = Just (Konst (KFloat 0))
 
 optPrimFun "sum"         [arg]          = optSum arg
 optPrimFun "build"       [sz, Lam i e2] = optBuild sz i e2
@@ -283,7 +282,7 @@ optSum :: TExpr -> Maybe TExpr
 --       = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
 optSum (Call build [n, Lam i (Tuple es)])
   | build `isThePrimFun` "build"
-  = Just $ Tuple (map (\e -> pSum (pBuild n (Lam i e))) es)
+  = Just $ Tuple (map (pSum . pBuild n . Lam i) es)
 
 -- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
 optSum (Call build [n, Lam i e])
@@ -461,7 +460,7 @@ optGradPrim _ "lgamma" x = Just (lmScale TypeFloat $ mkPrimCall "digamma" x)
 optGradPrim _ "neg" [e] = Just (lmScale (typeof e) (kTFloat $ -1.0))
 optGradPrim _ "exp" [e] = Just (lmScale TypeFloat (pExp e))
 optGradPrim _ "log" [e] = Just (lmScale TypeFloat (pDiv (kTFloat 1.0) e))
-optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) $ Nothing
+optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 
 ---------------
 -- Called for (lmApply lm dx)
@@ -522,7 +521,7 @@ optApplyLM e _
 optApplyLMCall :: HasCallStack
                => String -> [TExpr] -- f args :: s -o t
                -> TExpr             -- :: S
-               -> Maybe (TExpr)     -- :: T
+               -> Maybe TExpr     -- :: T
 
 -- (lmZero :: s -o t) `apply` (x :: T(s))  = 0 :: T(t)
 optApplyLMCall "lmZero" [s, t] dx
@@ -593,8 +592,7 @@ optLMTrans (Let var rhs body)
 optLMTrans (If b t e)
   = Just $ If b (lmTranspose t) (lmTranspose e)
 
-optLMTrans e = error ("Missed lmTranspose " ++ show e) $
-               Nothing
+optLMTrans e = error ("Missed lmTranspose " ++ show e) Nothing
 
 optTransPrim :: String -> [TExpr] -> Maybe TExpr
 optTransPrim "lmZero"      [s,t]        = Just $ lmZero t s

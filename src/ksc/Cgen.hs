@@ -170,7 +170,7 @@ cstLookup0 v env = case cstMaybeLookup0 v env of
       $  "Failed lookup ["
       ++ v
       ++ "] in\n"
-      ++ (unlines (map show (Map.toList env)))
+      ++ unlines (map show (Map.toList env))
 
 cstInsertVar :: Var -> CType -> CST -> CST
 cstInsertVar v ty env = -- trace ("cstInsertVar [" ++ show v ++ "] = [" ++ show ty ++ "]\n" ++ show env) $
@@ -446,7 +446,7 @@ cgenType = \case
   CType  ty -> cgenTypeLang ty
   CTuple ts -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
   CFunction s t ->
-    "std::function<" ++ (cgenType t) ++ "(" ++ (cgenType s) ++ ")>"
+    "std::function<" ++ cgenType t ++ "(" ++ cgenType s ++ ")>"
   TypeDef s _     -> s
   UseTypeDef s    -> s
   LMZero s t      -> lmt "Zero" [s, t]
@@ -474,7 +474,7 @@ cgenTypeLang = \case
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
   TypeLambda from to ->
-    "std::function<" ++ (cgenTypeLang to) ++ "(" ++ (cgenTypeLang from) ++ ")>"
+    "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
 ctypeofFun :: HasCallStack => CST -> TFun -> [CType] -> CType

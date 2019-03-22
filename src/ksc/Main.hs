@@ -120,7 +120,7 @@ moveMain = partition isMain
 
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
 displayCppGenAndCompile compile verbosity file =
-  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . (flip take defs)) verbosity
+  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
   in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))

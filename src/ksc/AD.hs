@@ -30,7 +30,7 @@ gradSelFun params pi i
 -------------------------------------------------
 
 gradDefs :: [TDef] -> [TDef]
-gradDefs defs = map gradDef defs
+gradDefs = map gradDef
 
 gradDef :: TDef -> TDef
 gradDef (DefX { def_fun = f, def_args = params, def_rhs = rhs })
@@ -113,7 +113,7 @@ applyD (DefX (TFun (TypeLM _ t) (GradFun f Fwd)) vars rhs)
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
 
 applyDefs :: [TDef] -> [TDef]
-applyDefs defs = map applyD defs
+applyDefs = map applyD
 
 ---------------------------------
 -- Transpose

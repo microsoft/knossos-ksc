@@ -38,7 +38,7 @@ annotDecls gbl_env decls
     -- TODO: this comment still current?
     -- We don't have a type-checked body yet, but that 
     -- doesn't matter because we aren't doing inlining
-    rec_gbl_env = extendGblST gbl_env $
+    rec_gbl_env = extendGblST gbl_env
                   [ DefX { def_fun = fun, def_args = args
                          , def_rhs = pprPanic "Rec body of" (ppr fun) }
                   | DefDecl (DefX { def_fun = fun, def_args = args }) <- decls ]
@@ -221,13 +221,13 @@ newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = Map.empty }
 
 stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
-stInsertFun f ty env = Map.insert f ty env
+stInsertFun = Map.insert
 
 lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
-lookupGblST f env = Map.lookup f env
+lookupGblST = Map.lookup
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
-extendGblST env defs = foldl add env defs
+extendGblST = foldl add
   where
     add env def@(DefX (TFun _ f) _ _) = stInsertFun f def env
 
@@ -246,7 +246,7 @@ callResultTy env fun arg_ty
   = case callResultTy_maybe env fun arg_ty of
       Right res_ty -> res_ty
       Left msg     -> pprPanic "callResultTy" $
-                      vcat [ (ppr fun <+> ppr arg_ty)
+                      vcat [ ppr fun <+> ppr arg_ty
                            , msg
                            , text "Env =" <+> ppr env
                            , ppr (map (== fun) gbl_env_keys)

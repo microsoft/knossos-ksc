@@ -181,7 +181,7 @@ partitionDecls decls =
           RuleDecl r -> Left r
           DefDecl  d -> Right d
         )
-    $ decls
+      decls
 
 tVarVar :: TVar -> Var
 tVarVar (TVar _ v) = v
@@ -197,10 +197,10 @@ mkPrimTFun :: Type -> String -> TFun
 mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
 
 mkVar :: String -> Var  -- Just a Simple var
-mkVar s = Simple s
+mkVar = Simple
 
 mkTVar :: Type -> String -> TVar
-mkTVar ty s = TVar ty (mkVar s)
+mkTVar ty = TVar ty . mkVar
 
 isDummy :: Var -> Bool
 isDummy Dummy = True
@@ -290,7 +290,7 @@ instance (HasType b, HasType f,
 
 -- ToDo: delete this if no longer needed
 makeIfType :: HasCallStack => Type -> Type -> Type
-makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 $ ty2
+makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 ty2
 
 getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
@@ -338,11 +338,11 @@ assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
 assertTypesEqualThen = assertEqualThen
 
 assertAllEqualThen :: (HasCallStack, Eq a, Show a) => String -> [a] -> b -> b
-assertAllEqualThen msg es e = if allEq es
-  then e
+assertAllEqualThen msg es = if allEq es
+  then id
   else
-    flip trace e
-      $ ("Assert failed: [" ++ msg ++ "] not all equal  \n " ++ show es ++ "\n")
+    trace
+      ("Assert failed: [" ++ msg ++ "] not all equal  \n " ++ show es ++ "\n")
  where
   allEq []       = True
   allEq (a : as) = allEqa a as
@@ -378,10 +378,10 @@ instance Show Var where
 newtype SDoc = SDoc(Bool -> Doc) -- True = S-expressions, False = infix style
 
 (<>) :: SDoc -> SDoc -> SDoc
-(SDoc d1) <> (SDoc d2) = SDoc (\s -> (d1 s) PP.<> (d2 s))
+SDoc d1 <> SDoc d2 = SDoc (\s -> d1 s PP.<> d2 s)
 
 (<+>) :: SDoc -> SDoc -> SDoc
-(SDoc d1) <+> (SDoc d2) = SDoc (\s -> (d1 s) PP.<+> (d2 s))
+SDoc d1 <+> SDoc d2 = SDoc (\s -> d1 s PP.<+> d2 s)
 
 text :: String -> SDoc
 text s = SDoc (\_ -> PP.text s)
@@ -399,7 +399,7 @@ double :: Double -> SDoc
 double d = SDoc (\_ -> PP.double d)
 
 parens :: SDoc -> SDoc
-parens (SDoc d) = SDoc (\m -> PP.parens $ d m)
+parens (SDoc d) = SDoc (PP.parens . d)
 
 cat :: [SDoc] -> SDoc
 cat ss = SDoc
@@ -425,7 +425,7 @@ mode :: SDoc  -- How to print in s-expression style
 mode (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
 
 nest :: Int -> SDoc -> SDoc
-nest i (SDoc d) = SDoc (\m -> PP.nest i (d m))
+nest i (SDoc d) = SDoc (PP.nest i . d)
 
 vcat :: [SDoc] -> SDoc
 vcat ss = SDoc
@@ -440,13 +440,13 @@ hang :: SDoc -> Int -> SDoc -> SDoc
 hang (SDoc d1) i (SDoc d2) = SDoc (\m -> PP.hang (d1 m) i (d2 m))
 
 braces :: SDoc -> SDoc
-braces (SDoc d) = SDoc (\m -> PP.braces $ d m)
+braces (SDoc d) = SDoc (PP.braces . d)
 
 brackets :: SDoc -> SDoc
-brackets (SDoc d) = SDoc (\m -> PP.brackets $ d m)
+brackets (SDoc d) = SDoc (PP.brackets . d)
 
 doubleQuotes :: SDoc -> SDoc
-doubleQuotes (SDoc d) = SDoc (\m -> PP.doubleQuotes $ d m)
+doubleQuotes (SDoc d) = SDoc (PP.doubleQuotes . d)
 
 fsep :: [SDoc] -> SDoc
 fsep ss = SDoc
@@ -505,7 +505,7 @@ class Pretty p where
   pprPrec _ = ppr
 
 instance Pretty Char where
-  ppr s = char s
+  ppr = char
 
 instance Pretty Bool where
   ppr True  = text "True"
@@ -516,13 +516,13 @@ instance Pretty a => Pretty (Maybe a) where
   ppr (Just x) = text "Just" <+> ppr x
 
 instance Pretty Var where
-  ppr v  = text $ show v
+  ppr = text . show
 
 instance Pretty FunId where
-  ppr f = pprFunId f
+  ppr = pprFunId
 
 instance Pretty Fun where
-  ppr f = pprFun f
+  ppr = pprFun
 
 pprFunId :: FunId -> SDoc
 pprFunId (UserFun s ) = text s
@@ -542,22 +542,22 @@ instance Pretty TVar where
   pprPrec _ (TVar _ v)     = ppr v
 
 instance PrettyVar TVar where
-  pprVar  v = ppr v
-  pprBndr v = pprTVar v
+  pprVar  = ppr
+  pprBndr = pprTVar
 
 instance PrettyVar Var where
-  pprVar v  = ppr v
-  pprBndr v = ppr v
+  pprVar  = ppr
+  pprBndr = ppr
 
 instance Pretty TFun where
   ppr (TFun _ f) = ppr f
 
 instance PrettyVar Fun where
-  pprVar  f = ppr f
-  pprBndr f = ppr f
+  pprVar  = ppr
+  pprBndr = ppr
 
 instance PrettyVar TFun where
-  pprVar  f = ppr f
+  pprVar  = ppr
   pprBndr (TFun ty f) = ppr f <+> text ":" <+> ppr ty
 
 instance Pretty Konst where
@@ -610,7 +610,7 @@ pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
   where rest = pprList ppr es
 pprExpr p (Lam v e) =  mode (parensIf p precZero $ text "lam" <+> parens (pprTVar v) <+> ppr e)
-                            (parens $ text "lam" <+> (vcat [parens (pprTVar v), ppr e]))
+                            (parens $ text "lam" <+> vcat [parens (pprTVar v), ppr e])
 pprExpr p (Let v e1 e2) = mode
   (pprLetSexp v e1 e2)
   (parensIf
@@ -640,7 +640,7 @@ pprExpr _ (App e1 e2) =
 pprCall
   :: (PrettyVar f, PrettyVar b, HasInfix f) => Prec -> f -> [ExprX f b] -> SDoc
 pprCall prec f e = mode
-  (parens $ (pprVar f) <+> pp_args)
+  (parens $ pprVar f <+> pp_args)
   (case (e, isInfix f) of
     ([e1, e2], Just prec') -> parensIf prec prec'
       $ sep [pprExpr prec' e1, pprVar f <+> pprExpr prec' e2]
@@ -651,12 +651,12 @@ pprCall prec f e = mode
 
 pprLetSexp :: (PrettyVar f, PrettyVar b, HasInfix f) =>
            b -> ExprX f b -> ExprX f b -> SDoc
-pprLetSexp v e body =
-      go [(v,e)] body
+pprLetSexp v e =
+      go [(v,e)]
     where
       go binds (Let v1 e1 body) = go ((v1,e1):binds) body
       go binds body =
-            parens $ sep [text "let", (parens $ vcat (map parenBind $ reverse binds)),
+            parens $ sep [text "let", parens $ vcat (map parenBind $ reverse binds),
                         ppr body]
       parenBind (v,e) = parens $ pprVar v <+> ppr e
 
@@ -723,13 +723,13 @@ instance Pretty a => Pretty [a] where
   ppr xs = char '[' <> pprList ppr xs <> char ']'
 
 pprTrace :: String -> SDoc -> a -> a
-pprTrace str doc v = trace (render (sep [text str, nest 2 doc])) v
+pprTrace str doc = trace (render (sep [text str, nest 2 doc]))
 
 pprPanic :: HasCallStack => String -> SDoc -> a
 pprPanic str doc = error (take 1000 $ render (sep [text str, nest 2 doc]))
 
 pps :: Pretty a => a -> String
-pps a = show $ ppr a
+pps = show . ppr
 
 hspec :: Spec
 hspec = do

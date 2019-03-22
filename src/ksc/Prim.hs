@@ -9,8 +9,8 @@ import Control.Monad( zipWithM )
 --------------------------------------------
 
 primCall :: PrimFun -> Type -> [TExpr] -> TExpr
-primCall fun res_ty arg
-  = Call (TFun res_ty (Fun (PrimFun fun))) arg
+primCall fun res_ty
+  = Call (TFun res_ty (Fun (PrimFun fun)))
 
 mkPrimCall :: HasCallStack => PrimFun -> [TExpr] -> TExpr
 mkPrimCall fun arg
@@ -35,16 +35,16 @@ mkPrimCall3 f a b c = mkPrimCall f [a, b, c]
 -- but types such as Vec need constructor arguments such as size, 
 -- so are consed from a template 
 lmZero :: TExpr -> TExpr -> TExpr
-lmZero s t = mkPrimCall2 "lmZero" s t
+lmZero = mkPrimCall2 "lmZero"
 
 lmOne :: Type -> TExpr
-lmOne t = mkPrimCall1 "lmOne" (mkDummy t)
+lmOne = mkPrimCall1 "lmOne" . mkDummy
 
 lmScale :: HasCallStack => Type -> TExpr -> TExpr
-lmScale t e = mkPrimCall2 "lmScale" (mkDummy t) e
+lmScale = mkPrimCall2 "lmScale" . mkDummy
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
-lmAdd f g = mkPrimCall2 "lmAdd" f g
+lmAdd = mkPrimCall2 "lmAdd"
 
 lmAdds :: HasCallStack => [TExpr]-> TExpr
 lmAdds [] = error "lmAdds of empty list (perhaps this should return lmZero?)"
@@ -60,19 +60,19 @@ lmVCat [e] = e
 lmVCat es  = mkPrimCall "lmVCat" es
 
 lmTranspose :: TExpr -> TExpr
-lmTranspose m = mkPrimCall1 "lmTranspose" m
+lmTranspose = mkPrimCall1 "lmTranspose"
 
 lmCompose :: TExpr -> TExpr -> TExpr
-lmCompose f g = mkPrimCall2 "lmCompose" f g
+lmCompose = mkPrimCall2 "lmCompose"
 
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
-lmApply f x = mkPrimCall2 "lmApply" f x
+lmApply = mkPrimCall2 "lmApply"
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuild n f = mkPrimCall2 "lmBuild" n f
+lmBuild = mkPrimCall2 "lmBuild"
 
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuildT n f = mkPrimCall2 "lmBuildT" n f
+lmBuildT = mkPrimCall2 "lmBuildT"
 
 isThePrimFun :: TFun -> String -> Bool
 isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
@@ -112,44 +112,44 @@ isEqualityCall _          = Nothing
 
 pDelta :: TExpr -> TExpr -> TExpr -> TExpr
 -- delta i j e  =  if i==j then e else zero
-pDelta ei ej e = mkPrimCall3 "delta" ei ej e
+pDelta = mkPrimCall3 "delta"
 
 pDeltaVec :: TExpr -> TExpr -> TExpr -> TExpr
 -- deltaVec size i e = build size (\j. delta i j e)
-pDeltaVec sz ei e = mkPrimCall3 "deltaVec" sz ei e
+pDeltaVec = mkPrimCall3 "deltaVec"
 
 pDiag :: TExpr -> TExpr -> TExpr -> TExpr
 -- diag rows cols (\i. e) = build row (\i. deltaVec cols i e)
-pDiag rows cols d = mkPrimCall3 "diag" rows cols d
+pDiag = mkPrimCall3 "diag"
 
 ---------------------------
 -- "User-defined" functions
 ---------------------------
 pAdd, pMul, pDiv, pSub, pEqual :: HasCallStack => TExpr -> TExpr -> TExpr
-pAdd a b   = mkPrimCall2 "+" a b
-pMul a b   = mkPrimCall2 "*" a b
-pDiv a b   = mkPrimCall2 "/" a b
-pSub a b   = mkPrimCall2 "-" a b
-pEqual a b = mkPrimCall2 "==" a b
+pAdd   = mkPrimCall2 "+"
+pMul   = mkPrimCall2 "*"
+pDiv   = mkPrimCall2 "/"
+pSub   = mkPrimCall2 "-"
+pEqual = mkPrimCall2 "=="
 
 pNeg, pExp, pLog, pZero, pTangentZero :: HasCallStack => TExpr -> TExpr
-pNeg x = mkPrimCall1 "neg" x
-pExp x = mkPrimCall1 "exp" x
-pLog x = mkPrimCall1 "log" x
-pZero x = mkPrimCall1 "zero" x
-pTangentZero x = mkPrimCall1 "tangent_zero" x
+pNeg = mkPrimCall1 "neg"
+pExp = mkPrimCall1 "exp"
+pLog = mkPrimCall1 "log"
+pZero = mkPrimCall1 "zero"
+pTangentZero = mkPrimCall1 "tangent_zero"
 
 pBuild :: TExpr -> TExpr -> TExpr
-pBuild n f = mkPrimCall2 "build" n f
+pBuild = mkPrimCall2 "build"
 
 pIndex :: TExpr -> TExpr -> TExpr
-pIndex i e = mkPrimCall2 "index" i e
+pIndex = mkPrimCall2 "index"
 
 pSum :: TExpr -> TExpr
-pSum e = mkPrimCall1 "sum" e
+pSum = mkPrimCall1 "sum"
 
 pSumBuild :: TExpr -> TExpr -> TExpr
-pSumBuild n f = mkPrimCall2 "sumbuild" n f
+pSumBuild = mkPrimCall2 "sumbuild"
 
 pSize :: TExpr -> TExpr
 pSize e = case typeof e of
@@ -233,8 +233,7 @@ primFunCallResultTy fun arg_ty
   = case primFunCallResultTy_maybe fun arg_ty of
       Just res_ty -> res_ty
       Nothing -> pprTrace "primCallResultTy: Could not determine result type for"
-                          (text fun <+> text " @ " <+> ppr arg_ty) $
-                 TypeUnknown
+                          (text fun <+> text " @ " <+> ppr arg_ty) TypeUnknown
 
 primFunCallResultTy_maybe :: PrimFun -> [Type] -> Maybe Type
 primFunCallResultTy_maybe fun

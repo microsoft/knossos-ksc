@@ -13,7 +13,7 @@ type TSubst = M.Map TVar TExpr -- Substitution for fv(lhs)
 type VSubst = M.Map TVar TVar  -- Substitution for bv(lhs)
 
 mkRuleBase :: [TRule] -> RuleBase
-mkRuleBase rs = Rules rs
+mkRuleBase = Rules
 
 tryRules :: RuleBase -> TExpr -> Maybe TExpr
 tryRules rules e
@@ -38,7 +38,7 @@ matchRules (Rules rules) e
      , Just subst <- [match (ru_lhs rule) e] ]
 
 match :: TExpr -> TExpr -> Maybe TSubst
-match e1 e2 = match_e M.empty M.empty e1 e2
+match = match_e M.empty M.empty
 
 match_e :: VSubst -> TSubst -> TExpr -> TExpr -> Maybe TSubst
 match_e vsubst tsubst (Var v) e

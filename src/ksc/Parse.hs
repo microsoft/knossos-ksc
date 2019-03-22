@@ -96,7 +96,7 @@ testParse  p s = case runParser p s of
                    Right r  -> putStrLn (render (ppr r))
 
 runParser :: Parser a -> String -> Either ParseError a
-runParser p s = parse p "" s
+runParser p = parse p ""
 
 runParserOrPanic :: Parser a -> String -> a
 runParserOrPanic p s = case runParser p s of
