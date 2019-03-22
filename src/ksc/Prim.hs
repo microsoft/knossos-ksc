@@ -269,9 +269,7 @@ lmZeroResultTy _     = Nothing
 lmOneResultTy [ty] = Just (TypeLM ty ty)
 lmOneResultTy _    = Nothing
 
-lmApplyResultTy [TypeLM s t, s1]
-  | assertBool (tangentType s `eqType` s1)
-  = Just (tangentType t)
+lmApplyResultTy [TypeLM _ t, _] = Just (tangentType t)
 lmApplyResultTy _ = Nothing
 
 lmTransposeResultTy [TypeLM s t] = Just (TypeLM t s)
@@ -285,15 +283,10 @@ lmBuildTResultTy [TypeInteger, TypeLambda TypeInteger (TypeLM s t)]
   = Just (TypeLM (TypeVec s) t)
 lmBuildTResultTy _ = Nothing
 
-lmComposeResultTy [TypeLM b1 c, TypeLM a b2]
-  | assertBool (b1 == b2)
-  = Just (TypeLM a c)
+lmComposeResultTy [TypeLM _ c, TypeLM a _] = Just (TypeLM a c)
 lmComposeResultTy _ = Nothing
 
-lmAddResultTy [TypeLM s1 t1, TypeLM s2 t2]
-  | assertBool (s1 == s2)
-  , assertBool (t1 == t2)
-  = Just (TypeLM s1 t1)
+lmAddResultTy [TypeLM s1 t1, TypeLM _ _] = Just (TypeLM s1 t1)
 lmAddResultTy _ = Nothing
 
 lmScaleResultTy [t, TypeFloat]
@@ -302,8 +295,7 @@ lmScaleResultTy _ = Nothing
 
 lmVCatResultTy tys
   | Just (ss, ts) <- unzipLMTypes tys
-  , (s1:ss1) <- ss
-  , assertBool $ all (== s1) ss1
+  , (s1:_) <- ss
   = Just (TypeLM s1 (TypeTuple ts))
   | otherwise = Nothing
 

@@ -317,9 +317,6 @@ assert :: HasCallStack => SDoc -> Bool -> b -> b
 assert _   True  x = x
 assert doc False _ = error (show doc)
 
-assertBool :: Bool -> Bool
-assertBool x = x    -- To remove check, return True always
-
 assertEqualThen :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
 assertEqualThen msg t1 t2 e = if t1 == t2
   then e
