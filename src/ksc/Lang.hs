@@ -349,10 +349,6 @@ assertAllEqualThen msg es = if allEq es
 
   allEqa a0 = all (a0 ==)
 
-assertAllEqualRet :: (HasCallStack, Eq a, Show a) => String -> [a] -> a
-assertAllEqualRet msg [] = error ("assertAllEqualRet: Empty list: " ++ msg)
-assertAllEqualRet msg (e : es) = assertAllEqualThen msg (e : es) e
-
 
 
 -----------------------------------------------
