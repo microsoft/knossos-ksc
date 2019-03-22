@@ -337,19 +337,6 @@ assertEqualThen msg t1 t2 e = if t1 == t2
 assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
 assertTypesEqualThen = assertEqualThen
 
-assertAllEqualThen :: (HasCallStack, Eq a, Show a) => String -> [a] -> b -> b
-assertAllEqualThen msg es = if allEq es
-  then id
-  else
-    trace
-      ("Assert failed: [" ++ msg ++ "] not all equal  \n " ++ show es ++ "\n")
- where
-  allEq []       = True
-  allEq (a : as) = allEqa a as
-
-  allEqa a0 = all (a0 ==)
-
-
 
 -----------------------------------------------
 --       Show instances
