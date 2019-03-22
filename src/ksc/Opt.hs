@@ -237,7 +237,7 @@ optPrimFun "lmCompose" [f,g]
   , Call vcat qs <- g
   , hcat `isThePrimFun` "lmHCat"
   , vcat `isThePrimFun` "lmVCat"
-  = assertEqualThen "H o V" (length ps) (length qs) $
+  = traceWhenUnequal "H o V" (length ps) (length qs) $
     Just (lmAdds (zipWith lmCompose ps qs))
 
 optPrimFun "lmVCat" es
@@ -525,11 +525,11 @@ optApplyLMCall :: HasCallStack
 
 -- (lmZero :: s -o t) `apply` (x :: T(s))  = 0 :: T(t)
 optApplyLMCall "lmZero" [s, t] dx
-  = assertTypesEqualThen "Apply lmZero" (tangentType (typeof s)) (typeof dx) $
+  = traceWhenTypesUnequal "Apply lmZero" (tangentType (typeof s)) (typeof dx) $
     Just (pTangentZero t)
 
 optApplyLMCall "lmOne" t dx
-  = assertTypesEqualThen "Apply lmOne" (tangentType (typeofArgs t)) (typeof dx) $
+  = traceWhenTypesUnequal "Apply lmOne" (tangentType (typeofArgs t)) (typeof dx) $
     Just dx
 
 optApplyLMCall "lmAdd"  [f,g] dx

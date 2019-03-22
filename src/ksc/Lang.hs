@@ -211,7 +211,7 @@ mkDummy ty = Var (TVar ty Dummy)
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body =
-  assertEqualThen ("mkLet " ++ show v ++ " = " ++ pps rhs) ty (typeof rhs)
+  traceWhenUnequal ("mkLet " ++ show v ++ " = " ++ pps rhs) ty (typeof rhs)
     $ Let (TVar ty v) rhs body
 
 mkLets :: HasCallStack => [(TVar, TExpr)] -> TExpr -> TExpr
@@ -290,7 +290,7 @@ instance (HasType b, HasType f,
 
 -- ToDo: delete this if no longer needed
 makeIfType :: HasCallStack => Type -> Type -> Type
-makeIfType ty1 ty2 = assertEqualThen "makeIfType" ty1 ty2 ty2
+makeIfType ty1 ty2 = traceWhenUnequal "makeIfType" ty1 ty2 ty2
 
 getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
@@ -317,11 +317,11 @@ assert :: HasCallStack => SDoc -> Bool -> b -> b
 assert _   True  x = x
 assert doc False _ = error (show doc)
 
-assertEqualThen :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
-assertEqualThen msg t1 t2 e = if t1 == t2
-  then e
+traceWhenUnequal :: (HasCallStack, Eq a, Show a) => String -> a -> a -> b -> b
+traceWhenUnequal msg t1 t2 = if t1 == t2
+  then id
   else
-    error
+    trace
         (  "Asserts unequal ["
         ++ msg
         ++ "] \n T1 = "
@@ -331,8 +331,8 @@ assertEqualThen msg t1 t2 e = if t1 == t2
         ++ "\n"
         )
 
-assertTypesEqualThen :: HasCallStack => String -> Type -> Type -> b -> b
-assertTypesEqualThen = assertEqualThen
+traceWhenTypesUnequal :: HasCallStack => String -> Type -> Type -> b -> b
+traceWhenTypesUnequal = traceWhenUnequal
 
 
 -----------------------------------------------
