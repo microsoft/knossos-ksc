@@ -20,7 +20,9 @@ optLets args rhs
 occAnal :: TExpr -> ExprX TFun (Int,TVar)
 occAnal e = fst (occAnalE e)
 
-occAnalE :: TExpr -> (ExprX TFun (Int,TVar), M.Map TVar Int)
+type OccMap = M.Map TVar Int  -- How often each free variable occurs
+
+occAnalE :: TExpr -> (ExprX TFun (Int,TVar), OccMap)
 occAnalE (Var v)   = (Var (1,v), M.singleton v 1)
 occAnalE (Konst k) = (Konst k, M.empty)
 occAnalE (App e1 e2)
@@ -36,7 +38,12 @@ occAnalE (Assert e1 e2)
     (e2', vs2) = occAnalE e2
 
 occAnalE (Lam v e)
-  = (Lam v e', v `M.delete` vs)
+  = (Lam v e', markMany (v `M.delete` vs))
+    -- If a variable is used under a lambda
+    -- we must not inline it uncritically, lest
+    -- we duplcate work.   E.g.
+    --   let x = <expensive> in
+    --   build N (\i.  ...x...)
   where
     (e', vs) = occAnalE e
 
@@ -64,10 +71,18 @@ occAnalE (If b t e)
     (t', vst) = occAnalE t
     (e', vse) = occAnalE e
 
-union :: Ord b => M.Map b Int -> M.Map b Int -> M.Map b Int
+markMany :: OccMap -> OccMap
+-- markMany takes each variable in the OccMap
+-- and makes occur many times
+markMany m = M.map (const manyOcc) m
+
+manyOcc :: Int
+manyOcc = 100   -- Obviously ad-hoc; anything >= 2 should be fine
+
+union :: OccMap -> OccMap -> OccMap
 union = M.unionWith (+)
 
-unions :: Ord b => [M.Map b Int] -> M.Map b Int
+unions :: [OccMap] -> OccMap
 unions = foldr union M.empty
 
 -------------------------
