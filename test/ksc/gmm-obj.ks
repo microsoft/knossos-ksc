@@ -18,8 +18,16 @@
   (assert (== (size a) (size b))
     (build (size a) (lam (i : Integer) (- (index i a) (index i b))))))
 
-(def dotv Float ((a : Vec Float) (b : Vec Float))
-  (sum (mul$VecR$VecR a b)))
+-- dotv
+(edef dotv Float ((Vec Float) (Vec Float)))
+(edef D$dotv (LM (Tuple (Vec Float) (Vec Float)) Float) 
+            ((Vec Float) (Vec Float)))
+(edef R$dotv (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
+(def fwd$dotv Float ((a : Vec Float) (b : Vec Float) (da : Vec Float) (db : Vec Float))
+    (+ (dotv a db) (dotv da b)))
+(def rev$dotv (Tuple (Vec Float) (Vec Float))
+               ((a : Vec Float) (b : Vec Float) (dr : Float))
+    (tuple (mul$R$VecR dr b) (mul$R$VecR dr a)))
 
 (def dotvv Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dotv (index i a) (index i b)))))
@@ -28,9 +36,21 @@
 (def sqnorm Float ((v : Vec Float))
   (dotv v v))
 
--- M is vector of rows
-(def mul$Mat$Vec (Vec Float) ((M : Vec (Vec Float)) (v : Vec Float))
-  (build (size M) (lam (i : Integer) (dotv (index i M) v))))
+-- mul Mat Vec
+(edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
+
+(edef D$mul$Mat$Vec (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)) 
+          ((Vec (Vec Float)) (Vec Float)))
+
+(edef R$mul$Mat$Vec (LM (Vec Float) (Tuple (Vec (Vec Float)) (Vec Float))) 
+          ((Vec (Vec Float)) (Vec Float)))
+
+(def fwd$mul$Mat$Vec (Vec Float) 
+          ((M : Vec (Vec Float)) (v : Vec Float) (dM : Vec (Vec Float)) (dv : Vec Float))
+    (+ (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))) 
+
+(edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
+          ((Vec (Vec Float)) (Vec Float) (Vec Float)))
 
 (def gmm_knossos_makeQ (Vec (Vec Float)) ((q : Vec Float) (l : Vec Float))
     (let (D

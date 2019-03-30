@@ -1,4 +1,6 @@
-inline build
-inline sumbuild
 elim more deltavec
 (f (\ a1 . B(e))) where a1 notFreeIn e -> let v = e in (f (\ a1 . B(v)))
+Make vec<vec<>> non-jagged.
+Don't mark/release so much
+Ah.  Don't compute grad wrt gmm xs when it will soon be thrown away...
+And note that GMM as of this commit adds zero 91% of adds

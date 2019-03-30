@@ -353,6 +353,7 @@ simplePrimResultTy fun arg_tys
       -- arithmetic ops.   See special case for "+" above
       ("*"        , [TypeFloat,   t]             ) -> Just t
       ("*"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+      ("*"        , [TypeInteger, TypeTuple []]  ) -> Just $ TypeTuple []
       ("/"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
       ("/"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
       ("-"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat

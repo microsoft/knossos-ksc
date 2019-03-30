@@ -246,6 +246,72 @@ cgenExprR env = \case
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
   Var (TVar _ v)                -> return $ CG "" (show v) (cstLookupVar v env)
 
+  -- Special case for build -- inline the loop
+  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
+    CG szdecl szex _szty <- cgenExprR env sz
+    let varty = mkCType vty
+    let varcty = cgenType varty
+    CG bodydecl bodyex _bodyty <- cgenExprR (cstInsertVar var varty env) body
+
+    ret  <- freshCVar
+    cvar <- freshCVar
+
+    return $ CG
+        (  "/*build*/\n"
+        ++ szdecl
+        ++ "vec<" ++ (cgenType $ mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
+        ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;" 
+                  ++ cvar ++ " < " ++ szex ++ ";" 
+                  ++ " ++" ++ cvar ++ ") {\n"
+        ++ (case var of
+              Dummy -> ""
+              _ -> "   " ++ varcty ++ " " ++ show var ++ " = " ++ cvar ++ ";\n" )
+        ++ "   " ++ bodydecl ++ "\n"
+        ++ "   " ++ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";\n"       
+        ++ "}\n"
+        )
+        ret
+        (mkCType (TypeVec ty))
+
+  -- Special case for sumbuild -- inline the loop
+  Call (TFun ty (Fun (PrimFun "sumbuild"))) [sz, Lam (TVar vty var@(Simple _)) body] -> do
+    CG szdecl szex _szty <- cgenExprR env sz
+    let varty = mkCType vty
+    let varcty = cgenType varty
+    CG bodydecl bodyex _bodyty <- cgenExprR (cstInsertVar var varty env) body
+
+    let cretty = cgenType $ mkCType ty
+    ret  <- freshCVar
+    bumpmark <- freshCVar
+
+    return $ CG
+        (  "/*sumbuild*/\n"
+        ++ szdecl
+        ++ "KS_ASSERT(" ++ szex ++ " > 0);\n"
+        ++ cretty ++ " " ++ ret ++ ";\n"
+        ++ "{\n"
+        ++ "   " ++ varcty ++ " " ++ show var ++ " = 0;\n"
+        ++ "   do {\n"
+        ++ "     $MRK(" ++ bumpmark ++ ");\n" -- TODO: this is just to declare it
+        ++       bodydecl
+        --       First time round, inflate it, put it in the ret, then mark the allocator
+        ++ "     if (" ++ show var ++ " == 0) {\n"
+        ++ "       " ++ ret ++ " = inflate(" ++ bodyex ++ ");\n"
+        ++ "       $MRK(" ++ bumpmark ++ ");\n"
+        ++ "     } else {\n"
+        ++ "       inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");\n"
+        --         Release the allocator back to where it was on iter 0    
+        ++ "       $REL(" ++ bumpmark ++ ");\n"
+        ++ "     }\n"
+        ++ "   } while (++" ++ show var ++ " < " ++ szex ++ ");\n"
+        ++ "}\n"
+        )
+        ret
+        (mkCType ty)
+
+
+        
+
   Call tf@(TFun _ _) vs -> do
       -- Untuple argument for C++ call
     cgvs <- mapM (cgenExprR env) vs
@@ -258,22 +324,18 @@ cgenExprR env = \case
     v        <- freshCVar
     bumpmark <- freshCVar
 
-    let gc tag =  if Cgen.isScalar cftype
+    let dogc = Cgen.isScalar cftype
+    let gc tag =  if dogc
                     then tag ++ "(" ++ bumpmark ++ ");\n"
                     else ""
 
+    let cf = cgenAnyFun tf cftype ctypes
+
     return $ CG
       (  unlines cdecls
-      ++ cgenType cftype
-      ++ " "
-      ++ v
-      ++ ";\n"
       ++ gc "$MRK"
-      ++ v ++ " = "
-      ++ cgenAnyFun tf cftype ctypes
-      ++ "("
-      ++ intercalate "," cexprs
-      ++ ");\n"
+      ++ cgenType cftype ++ " " ++ v ++ " = "
+      ++ cf ++ "(" ++ intercalate "," cexprs ++ ");\n"
       ++ gc "$REL"
       )
       v
@@ -616,6 +678,7 @@ compileWithOpts opts compiler cppfile exefile = do
           , "-fdiagnostics-color=always"
           , "-Wall"
           , "-Wno-unused"
+          , "-Wno-maybe-uninitialized"
           , "-Isrc/runtime"
           , "-O3"
           , "-g"

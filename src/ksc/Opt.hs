@@ -201,6 +201,7 @@ optPrimFun "zero" [Konst (KFloat _)]
 
 optPrimFun "sum"         [arg]          = optSum arg
 optPrimFun "build"       [sz, Lam i e2] = optBuild sz i e2
+optPrimFun "sumbuild"    [sz, Lam i e2] = optSumBuild sz i e2
 optPrimFun "lmBuild"     [sz, Lam i e2] = optLMBuild sz i e2
 optPrimFun "lmApply"     [e1,e2]        = optApplyLM e1 e2
 optPrimFun "lmTranspose" [arg]          = optLMTrans arg
@@ -374,6 +375,25 @@ optBuild sz i e
 --}
 
 optBuild _ _ _ = Nothing
+
+-----------------------
+optSumBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
+
+-- RULE: sumbuild n (\i. e)  =  n * e, when i not free in e
+optSumBuild sz i e
+  | TVar TypeInteger _ <- i
+  , i `notFreeIn` e
+  = Just $ pMul sz e
+
+-- RULE: sumbuild n (\i. deltaVec n i \j . e) 
+--       = build n (\j . e) 
+optSumBuild n i (Call deltaVec [_n1, Var i1, e])
+  | deltaVec `isThePrimFun` "deltaVec"
+  , i == i1
+  -- TODO n == sz
+  = Just $ pBuild n (Lam i e)
+
+optSumBuild _ _ _ = Nothing
 
 -----------------------
 optLMBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr

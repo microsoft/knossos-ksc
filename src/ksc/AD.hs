@@ -5,13 +5,14 @@ module AD where
 import Lang
 import qualified LangUtils
 import Prim
+import GHC.Stack
 
 -- for unit test
 --import Test.Hspec
 
 --------------- Generate names for gradded indentifiers
 
-gradF :: Fun -> Fun
+gradF :: HasCallStack => Fun -> Fun
 gradF (Fun f) = GradFun f Fwd
 gradF f       = error ("gradF: bad function: " ++ show f)
 
@@ -29,8 +30,15 @@ gradSelFun params pi i
 
 -------------------------------------------------
 
+isUserFunDef :: TDef -> Bool
+isUserFunDef (DefX { def_fun = (TFun _ (Fun _))}) = True
+isUserFunDef _ = False
+
+filterGradFuns :: [TDef] -> [TDef]
+filterGradFuns = filter isUserFunDef
+
 gradDefs :: [TDef] -> [TDef]
-gradDefs = map gradDef
+gradDefs = map gradDef . filterGradFuns
 
 gradDef :: TDef -> TDef
 gradDef (DefX { def_fun = f, def_args = params, def_rhs = rhs })

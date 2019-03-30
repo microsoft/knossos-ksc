@@ -2,6 +2,9 @@
 .vs/
 .vscode/
 
+# autodiff, could also be a submodule
+/autodiff/
+
 # Prerequisites
 *.d
 
@@ -82,3 +85,4 @@ users/simonpj/AD.pdf
 *.synctex.gz
 *.xcp
 users/simonpj/obj/
+autodiff

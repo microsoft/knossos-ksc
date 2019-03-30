@@ -90,7 +90,7 @@ demoN decls
        ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
        ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
 
-       ; let checks = map checkD opt_defs
+       ; let checks = map checkD $ filterGradFuns opt_defs
              env9   = env8 `extendGblST` checks
        ; disp "Checks" env9 checks
        }
@@ -151,7 +151,7 @@ displayCppGenAndCompile compile verbosity file =
   ; let (env3, optfwd) = optDefs rulebase env2 fwd
   ; displayPassM verbosity "OptFwd" env3 optfwd
 
-  ; let checks = map checkD defs
+  ; let checks = map checkD $ filterGradFuns defs
         env3_1 = env3 `extendGblST` checks
   ; displayPassM verbosity "Checks" env3_1 checks
 

@@ -35,10 +35,10 @@ namespace ks {
 	}
 };
 
-// ======================== Exrta math =====================
+// ======================== Extra math =====================
 double digamma(double x)
 {
-	std::cerr << "digamma";
+	std::cerr << "digamma unimp!\n";
 	return 1.0;
 }
 
@@ -279,7 +279,7 @@ namespace ks
 #define $REL(var)
 #endif
 
-	
+
 	// ===============================  Zero  ==================================
 	// This template to be overloaded when e.g. a vector of T needs to use val to discover a size
 	template <class T>
@@ -405,34 +405,40 @@ namespace ks
 			add(tail(t1), tail(t2)));
 	}
 
-		// ===============================  Inplace add ==================================
-void inplace_add(int *t1, const int &t2) { *t1 += t2; }
+	// ===============================  Inplace add ==================================
+	template <class T>
+	struct inplace_add_t {
+		static void go(T *t1, const T &t2) { *t1 += t2; }
+	};
 
-	void inplace_add(double *t1, const double &t2) { *t1 += t2; }
-
-	inline void inplace_add(tuple<> *t1, const tuple<> &t2)
+	template <class T>
+	void inplace_add(T* t1, T const& t2)
 	{
-		return;
+		inplace_add_t<T>::go(t1, t2);
 	}
 
-	template <size_t i, class... Ts, class... Us>
-	void inplace_add_aux(tuple<Ts...> *t1, const tuple<Us...> &t2);
+	template <>
+	struct inplace_add_t<tuple<>> {
+		static void go(tuple<> *t1, const tuple<> &t2) { }
+	};
 
-	template <class... Ts, class... Us>
-	void inplace_add(tuple<Ts...> *t1, const tuple<Us...> &t2)
-	{
-		inplace_add_aux<0>(t1, t2);
-	}
-
-	template <size_t i, class... Ts, class... Us>
-	void inplace_add_aux(tuple<Ts...> *t1, const tuple<Us...> &t2)
+	template <size_t i, class T, class... Ts>
+	void inplace_add_aux(tuple<T, Ts...> *t1, const tuple<T, Ts...> &t2)
 	{
 		static constexpr size_t n = sizeof...(Ts);
 
 		inplace_add(&std::get<i>(*t1), std::get<i>(t2));
-		if constexpr (i + 1 < n)
+		if constexpr (i < n)
 			inplace_add_aux<i + 1>(t1, t2);
 	}
+
+	template <class T, class... Ts>
+	struct inplace_add_t<tuple<T, Ts...>> {
+		static void go(tuple<T, Ts...> *t1, const tuple<T, Ts...> &t2)
+		{
+			inplace_add_aux<0>(t1, t2);
+		}
+	};
 
 	// ===============================  Vector class ==================================
 	struct zero_tag_t {};
@@ -647,23 +653,26 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 
 	// specialize inplace_add(vec<T>*,vec<T>)
 	template <class T>
-	void inplace_add(vec<T> *t1, const vec<T> &t2)
-	{
-		KS_ASSERT(t1->size() == t2.size());
+	struct inplace_add_t<vec<T>> {
+		static void go(vec<T> *t1, const vec<T> &t2)
+		{
+			int n = t2.size();
+			KS_ASSERT(t1->size() == n);
 
-		if (t2.is_zero()) return;
+			if (t2.is_zero()) return;
 
-		if (t1->is_zero()) {
+			if (t1->is_zero()) {
 #ifdef BUMPY
-			std::cerr << "aliasing: " << &t2[0] << ", mark at " << (char*)g_alloc.top_ptr() - (char*)&t2[0] << std::endl;
+				std::cerr << "aliasing: " << &t2[0] << ", mark at " << (char*)g_alloc.top_ptr() - (char*)&t2[0] << std::endl;
 #endif
-			*t1 = t2; // TODO: memory aliasing here?   When we free, this will get lost.  We need another heap....
-			return;
-		}
+				*t1 = t2; // TODO: memory aliasing here?   When we free, this will get lost.  We need another heap....
+				return;
+			}
 
-		for (int i = 0; i < t2.size(); ++i)
-			ks::inplace_add(&(*t1)[i], t2[i]);
-	}
+			for (int i = 0; i < n; ++i)
+				ks::inplace_add_t<T>::go(&(*t1)[i], t2[i]);
+		}
+	};
 
 	template <class T, class F>
 	T sumbuild(int size, F f)
@@ -677,11 +686,13 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 		if (size == 1)
 			return T{f(0)};
 
-		T ret = inflate(f(0));
+		T f0 = f(0);
+		T ret = inflate(f0);
 		for (int i = 1; i < size; ++i)
 		{
 			auto mark = mark_bump_allocator_if_present();
-			inplace_add(&ret, T{f(i)});
+			T fi = f(i);
+			inplace_add_t<T>::go(&ret, fi);
 			reset_bump_allocator_if_present(mark);
 		}
 		return ret;
@@ -799,7 +810,7 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 	template <class T>
 	vec<T> operator*(vec<T> const& v, double val)
 	{
-		if (is_zero(v))
+		if (v.is_zero())
 			return v;
 
 		KS_ASSERT(v.size() != 0);
@@ -1416,9 +1427,7 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 	template <class T1, class T2>
 	auto D$mul(T1 t1, T2 t2)
 	{
-		typedef LM::Scale M1;
-		typedef LM::Scale M2;
-		return LM::HCat<M1, M2>::mk(M1::mk(t2), M2::mk(t1));
+		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(t2), LM::Scale::mk(t1));
 	}
 
 	template <class T1, class T2>
@@ -1560,22 +1569,23 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 		return dot(head(t1), head(t2)) + dot(tail(t1), tail(t2));
 	}
 
-        template <class T>
-        inline double dot(vec<T> t1, vec<T> t2)
-        {
-          double ret = 0;
+	template <class T>
+	inline double dot(vec<T> t1, vec<T> t2)
+	{
+		double ret = 0;
 
-          // FIXME Assert sizes equal
+		// FIXME Assert sizes equal
 
-          for (int i = 0; i < t1.size(); i++)
-          {
-            ret += dot(t1[i], t2[i]);
-          }
+		for (int i = 0; i < t1.size(); i++)
+		{
+			ret += dot(t1[i], t2[i]);
+		}
 
-          return ret;
-        }
+		return ret;
+	}
 
-        template <class T> inline double norm(T t1) { return sqrt(dot(t1, t1)); }
+	// ===============================  Norm ===========================================
+  template <class T> inline double norm(T t1) { return sqrt(dot(t1, t1)); }
 
 	// ===============================  Tangent add ====================================
 
@@ -1630,8 +1640,6 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 
         template <>
         tuple<> to_tangent<tuple<>, std::string>(std::string s) { return tuple<>{}; }
-} // namespace ks
-
 
 // These only exist so that we can test edef functionality.
 // We should probably come up with a better story for the
@@ -1640,4 +1648,41 @@ void inplace_add(int *t1, const int &t2) { *t1 += t2; }
 double edef_example(double x) { return x; }
 double fwd$edef_example(double x, double dx) { return dx; }
 double rev$edef_example(double x, double ddr) { return ddr; }
+
+double dotv(vec<double> const& a, vec<double> const& b)
+{
+	return dot(a,b);
+}
+
+vec<double> 
+mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v)
+{
+	int r = size(M);
+	vec<double> ret(r);
+	for(int i = 0; i < r; ++i)
+		ret[i] = dot(M[i], v);
+	return ret;
+}
+
+tuple<vec<vec<double>>,vec<double>> 
+rev$mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v, vec<double> const& dr)
+{
+	int r = size(M);
+	int c = size(v);
+	vec<vec<double>> retM(r);
+	for(int i = 0; i < r; ++i)
+		retM[i] = v*dr[i];
+
+	vec<double> retv(c);
+	for(int i = 0; i < c; ++i) {
+		double retvi = 0;
+		for(int j = 0; j < r; ++j)
+			retvi += M[j][i] * dr[j];
+		retv[i] = retvi;
+	}
+
+	return std::make_tuple(retM,retv);
+}
+
+} // namespace ks
 
