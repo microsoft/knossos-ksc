@@ -39,7 +39,7 @@ simplify :: OptEnv -> [TVar] -> TExpr -> TExpr
 simplify env args rhs
   =  -- id
      -- optE env . optLets . optE env
-     optE env (optLets args rhs)
+     optLets args (optE env (optLets args rhs))
   -- Note the extra optLets, which gets simple things,
   -- notably lmOne, to their use sites
 
