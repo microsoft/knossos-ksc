@@ -128,7 +128,7 @@ optFun _ (SelFun i _) arg
 optFun env (PrimFun "$inline") arg
   | [Call (TFun _ fun) inner_arg] <- arg
   , Just fun_def <- lookupGblST fun (optGblST env)
-  = inlineCall fun_def inner_arg
+  = Just (inlineCall fun_def inner_arg)
 
 optFun _ (PrimFun f) e
   = optPrimFun f e
@@ -276,10 +276,10 @@ optPrimFun "lmAdd" [ Call hcat1 ps
 optPrimFun _ _ = Nothing
 
 -----------------------
-inlineCall :: TDef -> [TExpr] -> Maybe TExpr
+inlineCall :: TDef -> [TExpr] -> TExpr
 inlineCall def@(DefX _ bndrs body) arg
   = assert (vcat [ppr def, ppr arg]) (length arg == length bndrs) $
-    Just (mkLets (bndrs `zip` arg) body)
+    (mkLets (bndrs `zip` arg) body)
 
 -----------------------
 optSum :: TExpr -> Maybe TExpr
