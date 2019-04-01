@@ -10,3 +10,4 @@ cp prof-obj.out Artifact
 cp prof-rev-functions.txt Artifact
 cp prof-rev-lines.txt Artifact
 cp prof-rev.out Artifact
+git rev-parse HEAD > Artifact/git-rev-parse-HEAD.txt
