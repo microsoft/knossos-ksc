@@ -83,6 +83,12 @@ gradE s (Call f [n, Lam ti body])
     mkLet (gradTVar s ti) (lmZero s $ Var ti) $
     gradE s body
 
+-- Currently ignoring $inline when gradding.  Perhaps we should
+-- perform the inlining before gradding.
+gradE s (Call f [arg])
+  | f `isThePrimFun` "$inline"
+  = gradE s arg
+
 gradE s (Call f args)
   = Call gf args `lmCompose` lmVCat (map (gradE s) args)
   where

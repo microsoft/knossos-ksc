@@ -380,7 +380,7 @@ simplePrimResultTy fun arg_tys
       _ -> Nothing
 
 isPrimFun :: String -> Bool
-isPrimFun f = f `elem` [ "inline", "$trace", "$rand", "pr", "build", "sumbuild"
+isPrimFun f = f `elem` [ "$inline", "$trace", "$rand", "pr", "build", "sumbuild"
                        , "index", "size", "sum", "to_float"
                        , "neg", "exp", "log", "lgamma", "digamma", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag"
