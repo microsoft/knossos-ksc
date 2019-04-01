@@ -37,11 +37,11 @@ optDef rb gst (DefX (TFun ty f) args rhs)
 
 simplify :: OptEnv -> [TVar] -> TExpr -> TExpr
 simplify env args rhs
-  =  -- id
-     -- optE env . optLets . optE env
+  =  -- We run optLets again at the end of the simplify pass to ensure
+     -- that variables have unique names.  See
+     --
+     --     https://github.com/awf/knossos/pull/386#issuecomment-476586918
      optLets args (optE env (optLets args rhs))
-  -- Note the extra optLets, which gets simple things,
-  -- notably lmOne, to their use sites
 
 ---------------
 optE :: HasCallStack => OptEnv -> TExpr -> TExpr
