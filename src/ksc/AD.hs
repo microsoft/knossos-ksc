@@ -37,10 +37,10 @@ isUserFunDef _ = False
 filterGradFuns :: [TDef] -> [TDef]
 filterGradFuns = filter isUserFunDef
 
-gradDefs :: [TDef] -> [TDef]
+gradDefs :: HasCallStack => [TDef] -> [TDef]
 gradDefs = map gradDef . filterGradFuns
 
-gradDef :: TDef -> TDef
+gradDef :: HasCallStack => TDef -> TDef
 gradDef (DefX { def_fun = f, def_args = params, def_rhs = rhs })
   = DefX { def_fun = gradTFun sty f
          , def_args = params
@@ -62,7 +62,7 @@ gradDef (DefX { def_fun = f, def_args = params, def_rhs = rhs })
 
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
-gradE :: TExpr -> TExpr -> TExpr
+gradE :: HasCallStack => TExpr -> TExpr -> TExpr
 gradE s e@(Konst _)    = lmZero s e
 gradE s (Var tv)       = Var (gradTVar s tv)
 gradE s (Assert e1 e2) = Assert e1 (gradE s e2)
@@ -94,7 +94,7 @@ gradE s (Call f args)
   where
     gf = gradTFun (mkTupleTy (map typeof args)) f
 
-gradTFun :: Type -> TFun -> TFun
+gradTFun :: HasCallStack => Type -> TFun -> TFun
 gradTFun arg_ty (TFun res_ty f)
   = TFun (TypeLM arg_ty res_ty) (gradF f)
 
