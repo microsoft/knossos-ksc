@@ -31,7 +31,7 @@ gradSelFun params pi i
 -------------------------------------------------
 
 isUserFunDef :: TDef -> Bool
-isUserFunDef (DefX { def_fun = (TFun _ (Fun _))}) = True
+isUserFunDef (DefX { def_fun = TFun _ (Fun _) }) = True
 isUserFunDef _ = False
 
 filterGradFuns :: [TDef] -> [TDef]
