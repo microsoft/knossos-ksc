@@ -9,6 +9,7 @@ import           Prelude                 hiding ( lines
 
 import qualified Data.Map                      as Map
 import           Data.List                      ( intercalate )
+import qualified Data.Set                      as Set
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import qualified System.Directory
@@ -82,16 +83,16 @@ cgenIsLM = \case
 
 isUseTypeDef :: CType -> Bool
 isUseTypeDef (UseTypeDef _) = True
-isUseTypeDef _ = False 
+isUseTypeDef _ = False
 
 makeUnionType :: HasCallStack => CType -> CType -> CType
-makeUnionType (CTuple ts) (CTuple us) = 
+makeUnionType (CTuple ts) (CTuple us) =
   if ts == us
   then CTuple ts
   else
     CTuple $ zipWith makeUnionType ts us
-  
-makeUnionType ty1 ty2 = 
+
+makeUnionType ty1 ty2 =
   if ty1 == ty2
   then ty1
   else if isUseTypeDef ty1  -- Punt and hope it's fine for now...
@@ -196,7 +197,7 @@ cgenDefs :: [TDef] -> [String]
 cgenDefs defs = snd $ foldl go (cstEmpty, []) defs
  where
   go :: (CST, [String]) -> TDef -> (CST, [String])
-  go (env, strs) def@(DefX (TFun _ f) _ _) =
+  go (env, strs) def@(Def { def_fun = f }) =
     let env' = cstInsertFun f (UseTypeDef ("ty$" ++ cgenUserFun f)) env
         (CG cdecl _cfun _ctype) = cgenDefE env' def
     in  (env', strs ++ [cdecl])
@@ -205,10 +206,51 @@ cgenDefs defs = snd $ foldl go (cstEmpty, []) defs
 cgenDef :: TDef -> String
 cgenDef def = getDecl $ cgenDefE cstEmpty def
 
+-- A decl of the form v : Vec n (Tuple (String, Vec m (Vec n Float)))
+-- should cg to a prelude in the C function like the following
+--   int n = size(v);
+--   assert(n>0);
+--   int m = size(get<2>(get_an_element(v)));
+--   assert(n == get_an_element(get<2>(get_an_element(v))))
+
+vecSizeDecls :: [TVar] -> String
+vecSizeDecls vs = goVars (Set.fromList $ map tVarVar vs) vs
+  where
+    goVars :: Set.Set Var -> [TVar] -> String
+    goVars _ [] = ""
+    goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (show v) ty 
+                                 in str ++ goVars seen' vs 
+
+    goVec :: Set.Set Var -> String -> Var -> (Set.Set Var, String)
+    goVec seen value sz = 
+        if sz `Set.member` seen then
+          (seen, "KS_ASSERT(" ++ show sz ++ " == size(" ++ value ++ "));\n")
+        else
+          (Set.insert sz seen, "/*" ++ show seen ++ "*/\n" ++ "int " ++ show sz ++ " = size(" ++ value ++ ");\n")
+
+    goType :: Set.Set Var -> String -> Type -> (Set.Set Var, String)
+    goType seen value (TypeVec (Var (TVar TypeSize sz)) ty) = 
+        let (seen',str) = goVec seen value sz
+        in accum str $ goType seen' (get_element value) ty
+
+    goType seen value (TypeTuple tys) = 
+        foldl (\ (seen,str) (ty,n) -> accum (str ++ "/*tup*/") $ goType seen (get value n) ty) 
+              (seen, "") 
+              (zip tys [0..])
+
+    goType seen value _ = (seen, "/*" ++ value ++ "*/\n")
+
+    get_element v = "(" ++ v ++ ")[0]"
+    get v n = "std::get<" ++ show n ++ ">(" ++ v ++ ")"
+
+    accum str (seen,str') = (seen, str ++ str')
+
 cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (DefX (TFun _ f) params body) =
+cgenDefE env (Def { def_fun = f, def_args = params, def_rhs = body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      env'                             = foldl addParam env params
+      env' = foldl addParam env params
+
+      vecsizes = vecSizeDecls params
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
       cf                               = cgenUserFun f
@@ -227,6 +269,7 @@ cgenDefE env (DefX (TFun _ f) params body) =
         ++    "("
         ++    intercalate ", " cvars
         ++    ") {\n"
+        ++    vecsizes ++ "\n"
         ++    cbodydecl
         ++    "return ("
         ++    cbodyexpr
@@ -247,7 +290,7 @@ cgenExprR env = \case
   Var (TVar _ v)                -> return $ CG "" (show v) (cstLookupVar v env)
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
+  Call (TFun (TypeVec sty ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -260,18 +303,18 @@ cgenExprR env = \case
         (  "/*build*/\n"
         ++ szdecl
         ++ "vec<" ++ (cgenType $ mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
-        ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;" 
-                  ++ cvar ++ " < " ++ szex ++ ";" 
+        ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
+                  ++ cvar ++ " < " ++ szex ++ ";"
                   ++ " ++" ++ cvar ++ ") {\n"
         ++ (case var of
               Dummy -> ""
               _ -> "   " ++ varcty ++ " " ++ show var ++ " = " ++ cvar ++ ";\n" )
         ++ "   " ++ bodydecl ++ "\n"
-        ++ "   " ++ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";\n"       
+        ++ "   " ++ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";\n"
         ++ "}\n"
         )
         ret
-        (mkCType (TypeVec ty))
+        (mkCType (TypeVec sty ty))
 
   -- Special case for sumbuild -- inline the loop
   Call (TFun ty (Fun (PrimFun "sumbuild"))) [sz, Lam (TVar vty var@(Simple _)) body] -> do
@@ -300,7 +343,7 @@ cgenExprR env = \case
         ++ "       $MRK(" ++ bumpmark ++ ");\n"
         ++ "     } else {\n"
         ++ "       inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");\n"
-        --         Release the allocator back to where it was on iter 0    
+        --         Release the allocator back to where it was on iter 0
         ++ "       $REL(" ++ bumpmark ++ ");\n"
         ++ "     }\n"
         ++ "   } while (++" ++ show var ++ " < " ++ szex ++ ");\n"
@@ -310,7 +353,7 @@ cgenExprR env = \case
         (mkCType ty)
 
 
-        
+
 
   Call tf@(TFun _ _) vs -> do
       -- Untuple argument for C++ call
@@ -372,7 +415,7 @@ cgenExprR env = \case
       lvar
       tybody
 
-  Tuple [t] -> cgenExpr env t
+  -- Tuple [t] -> cgenExpr env t -- Don't detuple willy-nilly
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs
     let cdecls = map getDecl cgvs
@@ -483,13 +526,12 @@ cgenUserFun f = case f of
   GradFun  s Rev -> "R$" ++ cgenFunId s
   DrvFun   s Fwd -> "fwd$" ++ cgenFunId s
   DrvFun   s Rev -> "rev$" ++ cgenFunId s
-  CheckFun s     -> "check$" ++ cgenFunId s
 
 cgenAnyFun :: HasCallStack => TFun -> CType -> [CType] -> String
 cgenAnyFun tf cftype ctypes = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
-    let TypeVec t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
+    let TypeVec _ t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
   TFun ty (Fun (PrimFun "sumbuild")) ->
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
@@ -532,10 +574,10 @@ cgenTypeLang = \case
   TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
-  TypeVec   t   -> "vec<" ++ cgenTypeLang t ++ ">"
+  TypeVec _ t   -> "vec<" ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
-  TypeLambda from to ->
+  TypeLam from to ->
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
@@ -581,7 +623,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
     _ -> mkCType ty
 
 pattern RR = TypeFloat
-pattern VecR = TypeVec TypeFloat
+pattern VecR <- TypeVec _ TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
@@ -593,7 +635,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
   (PrimFun "$rand"   , [CType ty]          ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
   (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"   , [CType (TypeVec t)] ) -> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun "index"   , [CType (TypeVec _ t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
@@ -601,6 +643,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
 cgenKonst :: Konst -> String
 cgenKonst = \case
   KInteger i -> show i
+  KSize i    -> show i
   KFloat   f -> show f
   KString  s -> show s
   KBool    b -> if b then "1 /* TRUE */" else "0 /* FALSE */"
@@ -623,7 +666,7 @@ cppGen :: String -> [TDef] -> IO (String, String)
 cppGen outfile defs = do
   let lines =
         [
-        "#include \"knossos.h\"", 
+        "#include \"knossos.h\"",
         "namespace ks {\n"
         ]
       lls   = cgenDefs defs

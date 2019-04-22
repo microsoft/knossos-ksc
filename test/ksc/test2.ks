@@ -3,11 +3,11 @@
         (* (if (< i 3) (+ x 1.0) (* 7.0 (to_float i))) y)
 )
 
-(def f2 Float ((x : Vec Float) (y : Vec Float) (i : Integer) )
+(def f2 Float ((x : Vec n Float) (y : Vec m Float) (i : Integer) )
         (* (if (< i 3) (index i x) 7.0) (index i y))
 )
 
-(def f7 Float ((x : Vec Float) (y : Vec Float) )
+(def f7 Float ((x : Vec n Float) (y : Vec m Float) )
     (assert (== (size(x)) (size(y)))
         (sum (build (size x)
                     (lam (i : Integer) (* (if (< i 3) (index i x) 7.0) (index i y))))))

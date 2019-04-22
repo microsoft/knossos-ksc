@@ -4,7 +4,7 @@ import GHC.Stack
 import qualified System.Exit
 
 import Lang
-import LangUtils (hspec)
+import LangUtils
 import Parse (parseF)
 import Rules
 import Annotate
@@ -89,10 +89,6 @@ demoN decls
 
        ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
        ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
-
-       ; let checks = map checkD $ filterGradFuns opt_defs
-             env9   = env8 `extendGblST` checks
-       ; disp "Checks" env9 checks
        }
 
 displayPassM :: Maybe Int -> String -> GblSymTab -> [TDef] -> KM ()
@@ -115,7 +111,7 @@ moveMain :: [Decl]
             , [Decl])   -- All the rest
 moveMain = partition isMain
   where
-    isMain (DefDecl (DefX (TFun _ (Fun (UserFun "main"))) _ _)) = True
+    isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
@@ -133,7 +129,6 @@ displayCppGenAndCompile compile verbosity file =
   ; let rulebase      = mkRuleBase rules
   ; displayPassM verbosity "Typechecked defs" env defs
 
-  ; banner "main"
   ; dd main
 
   ; let grad_defs = gradDefs defs
@@ -151,18 +146,14 @@ displayCppGenAndCompile compile verbosity file =
   ; let (env3, optfwd) = optDefs rulebase env2 fwd
   ; displayPassM verbosity "OptFwd" env3 optfwd
 
-  ; let checks = map checkD $ filterGradFuns defs
-        env3_1 = env3 `extendGblST` checks
-  ; displayPassM verbosity "Checks" env3_1 checks
-
-  ; (env4, ann_main) <- annotDecls env3_1 main
+  ; (env4, ann_main) <- annotDecls env3 main
 
   ; let (_rules, main_tdef, _edefs) = partitionDecls ann_main
 
   -- Note optgrad removed from below as we can not currently 
   -- codegen the optgrad for recursive functions 
   -- [see https://github.com/awf/knossos/issues/281]
-  ; let alldefs = defs ++ optfwd ++ checks ++ main_tdef
+  ; let alldefs = defs ++ optfwd ++ main_tdef
 
   ; (env5, cse) <- cseDefs rulebase env4 alldefs
   ; displayPassM verbosity "CSE" env5 cse

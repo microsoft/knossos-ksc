@@ -3,7 +3,7 @@
 module AD where
 
 import Lang
-import qualified LangUtils
+import LangUtils
 import Prim
 import GHC.Stack
 
@@ -25,13 +25,13 @@ gradSelFun :: [TVar] -> TVar -> Int -> TExpr
 -- Result expr has type (t1, ..., tn) -o ti
 gradSelFun params pi i
   = lmHCat [ if i == j then lmOne $ typeof pi
-                       else lmZero (Var pj) (Var pi)
+                       else lmZero (typeof pj) (typeof pi)
            | (pj,j) <- params `zip` [1..] ]
 
 -------------------------------------------------
 
 isUserFunDef :: TDef -> Bool
-isUserFunDef (DefX { def_fun = TFun _ (Fun _) }) = True
+isUserFunDef (Def { def_fun = Fun _ }) = True
 isUserFunDef _ = False
 
 filterGradFuns :: [TDef] -> [TDef]
@@ -41,29 +41,31 @@ gradDefs :: HasCallStack => [TDef] -> [TDef]
 gradDefs = map gradDef . filterGradFuns
 
 gradDef :: HasCallStack => TDef -> TDef
-gradDef (DefX { def_fun = f, def_args = params, def_rhs = rhs })
-  = DefX { def_fun = gradTFun sty f
-         , def_args = params
-         , def_rhs = mkLets lets (gradE s rhs) }
+gradDef (Def { def_fun = f, def_args = params
+             , def_rhs = rhs, def_res_ty = res_ty })
+  = Def { def_fun    = gradF f
+        , def_args   = params
+        , def_res_ty = TypeLM s res_ty
+        , def_rhs    = mkLets lets (gradE s rhs) }
   where
     param1 :: TExpr
     param1 = mkTuple (map Var params)
-    sty = typeof param1
-    svar = TVar sty $ Simple "$arg"
+    s = typeof param1
 
-    s = Var svar
-
-    lets =  (svar, param1)
-            :
-            case params of
+    plets = case params of
              [p] -> [ (gradTVar s p, lmOne (typeof p)) ]
              _   -> [ (gradTVar s p, gradSelFun params p i)
                     | (p,i) <- params `zip` [1..] ]
 
+    szlets = [ (gradTVar s p, lmZero s TypeSize) | p <- paramsSizeBinders params]
+
+    lets = plets ++ szlets
+
+
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
-gradE :: HasCallStack => TExpr -> TExpr -> TExpr
-gradE s e@(Konst _)    = lmZero s e
+gradE :: HasCallStack => Type -> TExpr -> TExpr
+gradE s e@(Konst _)    = lmZero s (typeof e)
 gradE s (Var tv)       = Var (gradTVar s tv)
 gradE s (Assert e1 e2) = Assert e1 (gradE s e2)
 gradE s (Tuple es)     = lmVCat (map (gradE s) es)
@@ -80,7 +82,7 @@ gradE s (Let v e1 e2)  = mkLet v e1                       $
 gradE s (Call f [n, Lam ti body])
   | f `isThePrimFun` "build"
   = lmBuild n $ Lam ti $
-    mkLet (gradTVar s ti) (lmZero s $ Var ti) $
+    mkLet (gradTVar s ti) (lmZero s (typeof  ti)) $
     gradE s body
 
 -- Currently ignoring $inline when gradding.  Perhaps we should
@@ -98,8 +100,8 @@ gradTFun :: HasCallStack => Type -> TFun -> TFun
 gradTFun arg_ty (TFun res_ty f)
   = TFun (TypeLM arg_ty res_ty) (gradF f)
 
-gradTVar :: TExpr -> TVar -> TVar
-gradTVar s (TVar ty v) = TVar (TypeLM (typeof s) ty) (gradV v)
+gradTVar :: Type -> TVar -> TVar
+gradTVar s (TVar ty v) = TVar (TypeLM s ty) (gradV v)
 
 ---------------------------------
 
@@ -111,17 +113,21 @@ gradTVar s (TVar ty v) = TVar (TypeLM (typeof s) ty) (gradV v)
 applyD :: TDef -> TDef
 --   R$f :: S1 S2   -> (T -o (S1,S2))
 -- rev$f :: S1 S2 T -> (S1,S2)
-applyD (DefX (TFun (TypeLM s t) (GradFun f Rev)) vars rhs)
-  = DefX (TFun (tangentType t) (DrvFun f Rev)) (vars ++ [dr]) $
-    lmApply rhs $ Var dr
+applyD (Def { def_fun = GradFun f Rev, def_res_ty =  TypeLM s t
+            , def_args = vars, def_rhs = rhs })
+  = Def { def_fun = DrvFun f Rev, def_res_ty = tangentType t
+        , def_args = vars ++ [dr]
+        , def_rhs  = lmApply rhs $ Var dr }
   where
     dr = TVar (tangentType s) $ Delta "r"
 
 --   D$f :: S1 S2       -> ((S1,S2) -o T)
 -- rev$f :: S1 S2 S1 S2 -> T
-applyD (DefX (TFun (TypeLM _ t) (GradFun f Fwd)) vars rhs)
-  = DefX (TFun (tangentType t) (DrvFun f Fwd)) (vars ++ dvars) $
-    lmApply rhs (mkTuple $ map Var dvars)
+applyD (Def { def_fun = GradFun f Fwd, def_res_ty = TypeLM _ t
+            , def_args = vars, def_rhs = rhs })
+  = Def { def_fun = DrvFun f Fwd, def_res_ty = tangentType t
+        , def_args = vars ++ dvars
+        , def_rhs = lmApply rhs (mkTuple $ map Var dvars) }
   where
     dvars = map to_delta vars
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
@@ -133,56 +139,10 @@ applyDefs = map applyD
 -- Transpose
 
 transposeD :: TDef -> TDef
-transposeD (DefX (TFun (TypeLM s t) (GradFun f d)) args rhs)
-  = DefX (TFun (TypeLM t s) (GradFun f (flipMode d))) args $
-    lmTranspose rhs
-
----------------------------------
--- Check
---
--- Generates code for
---
--- f$check(x_1, .., x_n, d$x_1, .., d$x_n, d$r)
---   = (<(d$x_1, ..., d$x_n), rev$f(x_1, ..., x_n, d$r)>
---      - <f(x_1 + d$x_1, ..., x_n + d$x_n) - f(x_1, ..., x_n), d$r>)
---     / norm(d$x_1, .., d$x_n)
---
--- i.e. what should be small (when (d$x_1, .., d$x_n) is) if our
--- reverse mode generated code is correct.
-
-checkD :: TDef -> TDef
-checkD (DefX tf@(TFun retType (Fun f_id)) vars _)
-  = DefX (TFun TypeFloat (CheckFun f_id)) checkVars checkRhs
-  where
-    checkRhs  = pDiv (pSub (pDot dxs (Call frev xs_dr))
-                           (pDot (myPSub (pToTangent (Call tf xs_plus_dxs))
-                                         (pToTangent (Call tf xs)))
-                                 (Var dr)))
-                     (pNorm dxs)
-    checkVars = vars ++ dvars ++ [dr]
-
-    myPSub x y = pAdd x (pNeg y)
-
-    frev = TFun frevRetType (DrvFun f_id Rev)
-
-    frevRetType = let typeOfTVar (TVar t _) = t
-                  in tangentType $ case map typeOfTVar vars of
-                    [tvar] -> tvar
-                    tvars  -> TypeTuple tvars
-
-    dxs_l    = map Var dvars
-    xs_l     = map Var vars
-
-    dxs         = mkTuple dxs_l
-    xs_plus_dxs = zipWith pTangentAdd xs_l dxs_l
-    xs          = xs_l
-    xs_dr       = xs_l ++ [Var dr]
-
-
-    -- NB These have duplication with applyD
-    dvars = map to_delta vars
-    dr = LangUtils.newVarNotIn (tangentType retType) (Tuple dxs_l)
-    to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
+transposeD (Def { def_fun = GradFun f d, def_res_ty = TypeLM s t
+                , def_args = args, def_rhs = rhs })
+  = Def { def_fun = GradFun f (flipMode d), def_res_ty = TypeLM t s
+         , def_args = args, def_rhs = lmTranspose rhs }
 
 ----------------------------------
 --- Unit test

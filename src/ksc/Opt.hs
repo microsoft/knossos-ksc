@@ -1,3 +1,7 @@
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
+             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+	     ScopedTypeVariables, TypeApplications #-}
+
 module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
 
 import Lang
@@ -5,7 +9,6 @@ import LangUtils
 import Prim
 import Rules
 import OptLet
-import Annotate( GblSymTab, lookupGblST, extendGblST, emptyGblST )
 
 import Debug.Trace
 import Test.Hspec
@@ -29,10 +32,10 @@ optDefs = mapAccumL . optDef
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> (GblSymTab, TDef)
-optDef rb gst (DefX (TFun ty f) args rhs)
+optDef rb gst def@(Def { def_args = args, def_rhs = rhs })
   = (extendGblST gst [def'], def')
   where
-    def' = DefX (TFun ty f) args (simplify env args rhs)
+    def' = def { def_rhs = simplify env args rhs }
     env = OptEnv { optRuleBase = rb, optGblST = gst }
 
 simplify :: OptEnv -> [TVar] -> TExpr -> TExpr
@@ -108,7 +111,7 @@ rewriteCall _ (TFun ty (GradFun f _)) arg
   = optGradFun ty f arg
 
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
-  = trace ("NOTE: Unmatched LM call {" ++ show f ++ "}") Nothing
+  = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
 
 rewriteCall _ _ _
   = Nothing
@@ -125,11 +128,13 @@ optFun _ (SelFun i _) arg
   | otherwise
   = Nothing
 
+-- $inline needs to look up the global symtab
 optFun env (PrimFun "$inline") arg
   | [Call (TFun _ fun) inner_arg] <- arg
   , Just fun_def <- lookupGblST fun (optGblST env)
   = Just (inlineCall fun_def inner_arg)
 
+-- Other prims are determined by their args
 optFun _ (PrimFun f) e
   = optPrimFun f e
 
@@ -139,10 +144,18 @@ optFun _ (UserFun {}) _
 -----------------------
 optPrimFun :: PrimFun -> [TExpr] -> Maybe TExpr
 
-
+-- RULE: (e1 : ()) + (e2 : ()) = ()
+-- The type () contains only one value (), which is a zero of the type
+-- We use () as the tangent type for non-differentiatable types
+optPrimFun "+" [e1, e2]
+  | TypeTuple [] <- typeof e1
+  , TypeTuple [] <- typeof e2
+  = Just (Tuple [])
+  
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optPrimFun "+" [Tuple es1, Tuple es2]
-  | length es1 == length es2 = Just (Tuple (zipWith pAdd es1 es2))
+  | length es1 == length es2
+  = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
 optPrimFun "+" [x, y] = 
@@ -156,7 +169,7 @@ optPrimFun "+" [x, y] =
 -- RULE: x*0 = 0*x = 0
 optPrimFun "*" [x, y]
   | isKZero x || isKZero y
-  = Just $ pZero y
+  = Just $ mkZero (typeof y)
   | otherwise
   = Nothing
 
@@ -180,16 +193,10 @@ optPrimFun "index" [ ei, arr ]
 -- RULE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
 
-
--- RULE: zero (zero v) = zero v
-optPrimFun "zero" [Call zero [e]]
-  | zero `isThePrimFun` "zero"
-  = Just $ pZero e
-
--- RULE: deltaVec n i (\ j . 0) = zero (build n (\i . 0))
+-- RULE: deltaVec n i 0 = zero (build n (\i . 0))
 optPrimFun "deltaVec" [n, _i, val]
   | isKZero val
-  = Just $ pZero $ pBuild n (Lam (TVar TypeInteger Dummy) val)
+  = Just $ pConstVec n val
 
 -- RULE: zero (Int) = 0
 optPrimFun "zero" [Konst (KInteger _)]
@@ -248,10 +255,9 @@ optPrimFun "lmCompose" [f,g]
 
 optPrimFun "lmVCat" es
   | all isLMZero es
-  , (s:ss) <- map fstArg es
+  , Just (s:ss, ts) <- unzipLMTypes (map typeof es)
   , assert (text "lmVCat" <+> pprList ppr es) (all (s ==) ss) True
-  , ts <- map sndArg es
-  = Just $ lmZero s (Tuple ts)
+  = Just $ lmZero s (mkTupleTy ts)
 
 -- Add(0, x) = x = Add(x, 0)
 optPrimFun "lmAdd" [p,q]
@@ -277,9 +283,9 @@ optPrimFun _ _ = Nothing
 
 -----------------------
 inlineCall :: TDef -> [TExpr] -> TExpr
-inlineCall def@(DefX _ bndrs body) arg
+inlineCall def@(Def { def_args = bndrs, def_rhs = body }) arg
   = assert (vcat [ppr def, ppr arg]) (length arg == length bndrs) $
-    (mkLets (bndrs `zip` arg) body)
+    mkLets (bndrs `zip` arg) body
 
 -----------------------
 optSum :: TExpr -> Maybe TExpr
@@ -383,7 +389,7 @@ optSumBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
 optSumBuild sz i e
   | TVar TypeInteger _ <- i
   , i `notFreeIn` e
-  = Just $ pMul sz e
+  = Just $ pMul (mkPrimCall1 "to_float" sz) e
 
 -- RULE: sumbuild n (\i. deltaVec n i \j . e) 
 --       = build n (\j . e) 
@@ -430,10 +436,11 @@ optGradSel i n [arg]
   , length tys == n
   = let
       tyi = tys !! (i-1)
-      ti       = pSel i n arg
     in
-      Just (lmHCat [ if i == j then lmOne tyi else lmZero (pSel j n arg) ti
-                   | j <- [1..n] ])
+      Just (lmHCat [ if i == j then lmOne tyi
+                               else lmZero tyj tyi
+                   | j <- [1..n]
+                   , let tyj = tys !! (j-1) ])
 
 optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
 
@@ -455,7 +462,7 @@ optGradPrim _ "*" [x,y]
 
 optGradPrim _ "*" arg
   | [TypeInteger, TypeInteger] <- map typeof arg
-  = Just (lmZero (Tuple [zeroInt, zeroInt]) zeroInt)
+  = Just $ lmZero (mkTupleTy [TypeInteger, TypeInteger]) TypeInteger
 
 optGradPrim _ "/"  [x,y]
   | TypeFloat <- typeof x
@@ -465,22 +472,28 @@ optGradPrim _ "/"  [x,y]
 
 optGradPrim _  "/" arg
   | [TypeInteger, TypeInteger] <- map typeof arg
-  = Just $ lmZero (Tuple [zeroInt, zeroInt]) zeroInt
+  = Just $ lmZero (mkTupleTy [TypeInteger, TypeInteger]) TypeInteger
 
 optGradPrim _ "sum" [e]
-  | TypeVec t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "sum$i")
-                                  (lmOne t)))
+  | TypeVec n t <- typeof e
+  = Just (lmBuildT n (Lam (TVar TypeInteger $ Simple "sum$i")
+                          (lmOne t)))
 
 optGradPrim _ "size" [e]
-  = Just $ lmZero e zeroInt
+  = Just $ lmZero (typeof e) TypeInteger
 
 optGradPrim _ "index" [i,v]
-  = Just (primDindex i v)
+  = Just (lmHCat [ lmZero (typeof i) elt_ty
+                 , lmBuildT sz (Lam ii (lmDelta vi (Var ii) i)) ])
+  where
+    ii = TVar TypeInteger $ Simple "primDindex$i"
+    vi = pIndex i v
+    TypeVec sz elt_ty = typeof v
+
 
 optGradPrim _ "$trace" [e] = Just (lmOne $ typeof e)
-optGradPrim _ "$rand" _ = Just (lmZero zeroFloat zeroFloat )
-optGradPrim _ "to_float" _ = Just (lmZero zeroInt zeroFloat )
+optGradPrim _ "$rand" _ = Just (lmZero TypeFloat TypeFloat )
+optGradPrim _ "to_float" _ = Just (lmZero TypeInteger TypeFloat)
 optGradPrim _ "lgamma" x = Just (lmScale TypeFloat $ mkPrimCall "digamma" x)
 optGradPrim _ "neg" [e] = Just (lmScale (typeof e) (kTFloat $ -1.0))
 optGradPrim _ "exp" [e] = Just (lmScale TypeFloat (pExp e))
@@ -545,13 +558,13 @@ optApplyLM e _
 -- Optimise (lmApply (fun arg) dx)
 optApplyLMCall :: HasCallStack
                => String -> [TExpr] -- f args :: s -o t
-               -> TExpr             -- :: S
-               -> Maybe TExpr     -- :: T
+               -> TExpr             -- :: T(s)
+               -> Maybe TExpr       -- :: T(t)
 
 -- (lmZero :: s -o t) `apply` (x :: T(s))  = 0 :: T(t)
 optApplyLMCall "lmZero" [s, t] dx
   = traceWhenTypesUnequal "Apply lmZero" (tangentType (typeof s)) (typeof dx) $
-    Just (pTangentZero t)
+    Just (mkZero (tangentType (typeof t)))
 
 optApplyLMCall "lmOne" t dx
   = traceWhenTypesUnequal "Apply lmOne" (tangentType (typeofArgs t)) (typeof dx) $
@@ -620,9 +633,9 @@ optLMTrans (If b t e)
 optLMTrans e = error ("Missed lmTranspose " ++ show e) Nothing
 
 optTransPrim :: String -> [TExpr] -> Maybe TExpr
-optTransPrim "lmZero"      [s,t]        = Just $ lmZero t s
-optTransPrim "lmOne"       [e]          = Just $ lmOne (typeof e)
-optTransPrim "lmScale"     [t, e]       = Just $ lmScale (typeof t) e
+optTransPrim "lmZero"  [s,t]    = Just $ lmZero (typeof t) (typeof s)
+optTransPrim "lmOne"   [t]      = Just $ lmOne (typeof t)
+optTransPrim "lmScale" [t,e]    = Just $ lmScale (typeof t) e
 optTransPrim "lmTranspose" [e]          = Just e
 optTransPrim "lmCompose"   [f,g]        = Just (lmCompose (lmTranspose g) (lmTranspose f))
 optTransPrim "lmAdd"       [f,g]        = Just (lmAdd (lmTranspose f) (lmTranspose g))

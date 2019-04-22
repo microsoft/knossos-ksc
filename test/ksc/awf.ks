@@ -1,3 +1,5 @@
-(def h (Vec Float) (x : Vec Float)
-  (let (n (size x))
-    (build (* 2 n) (lam (i : Integer) 1.0))))
+(def h (Vec n Float) (x : Vec n Float)
+    (build n (lam (i : Integer) 1.0)))
+
+(def g Float (x : Vec p Float)
+    (sum (h x)))

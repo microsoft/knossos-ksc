@@ -717,6 +717,15 @@ namespace ks
 		return ret;
 	}
 
+	template <class T>
+	vec<T> constVec(int n, T val)
+	{
+		vec<T> ret(n);
+		for(int j = 0; j < n; ++j)
+			ret[j] = val;
+		return ret;
+	}
+
 	template <class F>
 	auto diag(int rows, int cols, F f)
 	{
@@ -806,9 +815,12 @@ namespace ks
 		return ret;
 	}
 
+	template <class T>
+	T mul(double s, T const& t);
+
 	// Scale a vec
 	template <class T>
-	vec<T> operator*(vec<T> const& v, double val)
+	vec<T> mul(double val, vec<T> const& v)
 	{
 		if (v.is_zero())
 			return v;
@@ -817,7 +829,7 @@ namespace ks
 		int size = v.size();
 		vec<T> ret = vec<T>::create(size);
 		for (int i = 0; i < size; ++i)
-			ret[i] = v[i] * val;
+			ret[i] = mul(val, v[i]);
 		return ret;
 	}
 
@@ -825,7 +837,14 @@ namespace ks
 	template <class T>
 	vec<T> operator*(double val, vec<T> const& v)
 	{
-		return v * val;
+		return mul(val, v);
+	}
+
+	// Scale a vec
+	template <class T>
+	vec<T> operator*(vec<T> const& v, double val)
+	{
+		return mul(val, v);
 	}
 
 	// sum of elements
@@ -1388,16 +1407,15 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
-	inline
-		double sub(double t1, double t2) { return t1 - t2; }
-	inline
-		auto D$sub(double, double) {
+	inline double sub(double t1, double t2) { return t1 - t2; }
+	inline auto D$sub(double, double) 
+	{
 		typedef LM::Scale M1;
 		typedef LM::Scale M2;
 		return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
 	}
-	inline
-		int sub(int t1, int t2) { return t1 - t2; }
+	
+	inline int sub(int t1, int t2) { return t1 - t2; }
 
 	template <class T>
 	T mul(double s, T const& t)
@@ -1463,6 +1481,8 @@ namespace ks
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(s), LM::Scale::mk(1.0 - s));
 	}
 
+	inline int neg(int d) { return -d; }
+
 	inline double neg(double d) { return -d; }
 	inline auto D$neg(double d) { return LM::Scale::mk(-1.0); }
 
@@ -1473,6 +1493,12 @@ namespace ks
 
 	inline double to_float(int d) { return d; }
 	inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
+
+	inline int to_size(int d) { return d; }
+	inline auto D$to_size(int d) { return LM::Zero<int, int>(); }
+
+	inline int to_integer(int d) { return d; }
+	inline auto D$to_integer(int d) { return LM::Zero<int, int>(); }
 
 	/*
 		template <class I, class Vec>
@@ -1558,9 +1584,16 @@ namespace ks
 	// ===============================  Dot ===========================================
   inline double dot(double t1, double t2) { return t1 * t2; }
 
-	inline double dot(tuple<> t1, tuple<> t2)
+	template <class T>
+	inline double dot(T t1, tuple<> t2)
 	{
 		return 0.0;
+	}
+
+	template <class T>
+	inline double dot(T t1, tuple<T> t2)
+	{
+		return dot(t1,std::get<0>(t2));
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
@@ -1569,8 +1602,8 @@ namespace ks
 		return dot(head(t1), head(t2)) + dot(tail(t1), tail(t2));
 	}
 
-	template <class T>
-	inline double dot(vec<T> t1, vec<T> t2)
+	template <class T1, class T2>
+	inline double dot(vec<T1> t1, vec<T2> t2)
 	{
 		double ret = 0;
 
@@ -1640,6 +1673,41 @@ namespace ks
 
         template <>
         tuple<> to_tangent<tuple<>, std::string>(std::string s) { return tuple<>{}; }
+
+	// ===============================  Derivative check  ================================
+  //  Check derivatives:
+  // 
+	//    delta_f = f(x+dx) - f(x) ~= D$f * dx
+	//
+	//  And
+	//    rev_f(x, df) = df' * D$f
+	//  So
+	//    dot(df, delta_f) =~ df*d$f*dx 
+	//                     =~ dot(rev_f, dx)
+  // 
+  //  i.e. what should be small (when dx is) if our
+  //  reverse mode generated code is correct.
+	template <class Functor, class RevFunctor, class X, class Dx, class Df>
+	double $check(Functor f, RevFunctor rev_f, X x, Dx dx, Df df)
+	{
+		auto f_x = std::apply(f, x);
+		auto f_x_plus_dx = std::apply(f, add(x, dx));
+		auto delta_f = f_x_plus_dx - f_x;
+		double d1 = dot(delta_f, df);
+		auto dfJ = std::apply(rev_f, tuple_cat(x, std::make_tuple(df)));
+		double d2 = dot(dfJ, dx);
+
+		/*
+		std::cout << "dfJ=" << dfJ << std::endl;
+		std::cout << "DOT=" << dot(dfJ, dx) << std::endl;
+		std::cout << " D1=" << d1 << std::endl;
+		std::cout << " D2=" << d2 << std::endl;
+		*/
+
+		return abs(d1 - d2)/(abs(d1) + abs(d2));
+	}
+
+	// ===============================  Test edef (TODO: Move)  ========================
 
 // These only exist so that we can test edef functionality.
 // We should probably come up with a better story for the

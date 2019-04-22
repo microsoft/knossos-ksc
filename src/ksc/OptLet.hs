@@ -1,6 +1,11 @@
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
+             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+	     ScopedTypeVariables, TypeApplications #-}
+
 module OptLet( optLets
              , Subst, mkEmptySubst, lookupSubst
-             , extendSubstInScope, extendSubstMap )
+             , extendSubstInScope, extendSubstMap
+             , substType, substExpr )
              where
 
 import Lang
@@ -17,13 +22,48 @@ optLets args rhs
 -- Dead code elimination - occurrence analysis
 ----------------------
 
-occAnal :: TExpr -> ExprX TFun (Int,TVar)
+occAnal :: TExpr -> ExprX OccAnald
 occAnal e = fst (occAnalE e)
 
 type OccMap = M.Map TVar Int  -- How often each free variable occurs
 
-occAnalE :: TExpr -> (ExprX TFun (Int,TVar), OccMap)
-occAnalE (Var v)   = (Var (1,v), M.singleton v 1)
+occAnalTv :: TVar -> (TVarX OccAnald, OccMap)
+occAnalTv (TVar ty v) = (TVar ty' v, vs)
+  where
+    (ty', vs) = occAnalT ty
+
+occAnalT :: Type -> (TypeX OccAnald, OccMap)
+occAnalT (TypeVec e ty)
+  = (TypeVec e' ty', M.union vs1 vs2)
+  where
+    (e',  vs1) = occAnalE e
+    (ty', vs2) = occAnalT ty
+
+occAnalT (TypeTuple tys)
+  = (TypeTuple tys', unions vs_s)
+  where
+    (tys', vs_s) = unzip (map occAnalT tys)
+
+occAnalT (TypeLM ty1 ty2)
+  = (TypeLM ty1' ty2', M.union vs1 vs2)
+  where
+    (ty1', vs1) = occAnalT ty1
+    (ty2', vs2) = occAnalT ty2
+
+occAnalT (TypeLam ty1 ty2)
+  = (TypeLam ty1' ty2', M.union vs1 vs2)
+  where
+    (ty1', vs1) = occAnalT ty1
+    (ty2', vs2) = occAnalT ty2
+
+occAnalT TypeBool    = (TypeBool,    M.empty)
+occAnalT TypeInteger = (TypeInteger, M.empty)
+occAnalT TypeFloat   = (TypeFloat,   M.empty)
+occAnalT TypeString  = (TypeString,  M.empty)
+occAnalT TypeUnknown = (TypeUnknown, M.empty)
+
+occAnalE :: TExpr -> (ExprX OccAnald, OccMap)
+occAnalE (Var v)   = (Var v, M.singleton v 1)
 occAnalE (Konst k) = (Konst k, M.empty)
 occAnalE (App e1 e2)
   = (App e1' e2', M.union vs1 vs2)
@@ -37,15 +77,17 @@ occAnalE (Assert e1 e2)
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
-occAnalE (Lam v e)
-  = (Lam v e', markMany (v `M.delete` vs))
+occAnalE (Lam tv e)
+  = (Lam tv' e', vs2 `M.union` markMany (tv `M.delete` vs))
     -- If a variable is used under a lambda
     -- we must not inline it uncritically, lest
     -- we duplcate work.   E.g.
     --   let x = <expensive> in
     --   build N (\i.  ...x...)
   where
-    (e', vs) = occAnalE e
+    e' :: ExprX OccAnald
+    (e', vs)   = occAnalE e
+    (tv', vs2) = occAnalTv tv
 
 occAnalE (Call f e) = (Call f e', unions vs)
                      where
@@ -53,16 +95,18 @@ occAnalE (Call f e) = (Call f e', unions vs)
 occAnalE (Tuple es) = (Tuple es', unions vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
-occAnalE (Let var rhs body)
-  = (Let (n, var) rhs' body', vs)
+occAnalE (Let tv rhs body)
+  = (Let (n, tv') rhs' body', vs)
   where
-    n = case var `M.lookup` vsb of
+    n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (rhs',  vsr) = occAnalE rhs
-    (body', vsb) = occAnalE body
-    vs | n == 0    = var `M.delete` vsb
-       | otherwise = (var `M.delete` vsb) `union` vsr
+    (tv',   vstv) = occAnalTv tv
+    (rhs',  vsr)  = occAnalE rhs
+    (body', vsb)  = occAnalE body
+    vs | n == 0    = tv `M.delete` vsb
+       | otherwise = (tv `M.delete` vsb)
+                     `union` vstv `union` vsr
 
 occAnalE (If b t e)
   = (If b' t' e', vsb `M.union` vst `M.union` vse)
@@ -138,6 +182,38 @@ extendSubstInScope (TVar ty v)
     env' | v == v'   = v `M.delete` env
          | otherwise = M.insert v (Var tv') env
 
+substType :: Subst -> Type -> Type
+substType subst ty
+  = go ty
+  where
+    go (TypeVec size ty) = TypeVec (substExpr subst size) (go ty)
+    go (TypeTuple tys)   = TypeTuple (map go tys)
+    go (TypeLM ty1 ty2)  = TypeLM (go ty1) (go ty2)
+    go (TypeLam ty1 ty2) = TypeLam (go ty1) (go ty2)
+    go ty                = ty
+
+substExpr :: Subst -> TExpr -> TExpr
+substExpr subst e
+  = go e
+  where
+    go (Var tv@(TVar _ v))
+      = case lookupSubst v subst of
+          Just e  -> e
+          Nothing -> Var tv
+
+    go (Konst k)      = Konst k
+    go (Call f es)    = Call f (map go es)
+    go (If b t e)     = If (go b) (go t) (go e)
+    go (Tuple es)     = Tuple (map go es)
+    go (App e1 e2)    = App (go e1) (go e2)
+    go (Assert e1 e2) = Assert (go e1) (go e2)
+    go (Let v r b)    = Let v' (go r) (substExpr subst' b)
+                      where
+                        (v', subst') = extendSubstInScope v subst
+    go (Lam v e)      = Lam v' (substExpr subst' e)
+                      where
+                        (v', subst') = extendSubstInScope v subst
+
 notInScope :: Var -> S.Set Var -> Var
 -- Find a variant of the input Var that is not in the in-scope set
 --
@@ -177,23 +253,22 @@ notInScope v in_scope
     parse_suffix ds cs
       = (reverse cs ++ ds, 0)
 
-
-
-optLetsE :: [TVar] -> ExprX TFun (Int,TVar) -> TExpr
+optLetsE :: [TVar] -> ExprX OccAnald -> TExpr
 -- This function inline let-bindings that are only used once
 -- or whose RHS is trivial (see inline_me for exactly what.
 -- Take care: see Note [Capture-avoiding substitution]
-optLetsE = go . mkEmptySubst
+optLetsE params rhs = go (mkEmptySubst params) rhs
   where
-    go :: Subst -> ExprX TFun (Int,TVar) -> TExpr
-    go subst (Let (n, tv@(TVar _ty v)) r b)
+    go :: Subst -> ExprX OccAnald -> TExpr
+    go subst (Let (n, (TVar ty v)) r b)
       | inline_me n v r' = go (extendSubstMap v r' subst) b
-      | otherwise        = Let tv' r' (go subst' b)
+      | otherwise        = Let tv'' r' (go subst' b)
       where
         r' = go subst r
-        (tv', subst') = extendSubstInScope tv subst
+        tv' = TVar (go_ty subst ty) v
+        (tv'', subst') = extendSubstInScope tv' subst
 
-    go subst (Var (_, tv@(TVar _ v)))
+    go subst (Var tv@(TVar _ v))
       = case lookupSubst v subst of
           Just e  -> e
           Nothing -> Var tv
@@ -204,15 +279,28 @@ optLetsE = go . mkEmptySubst
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
     go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
-    go subst (Lam v e)      = Lam v' (go subst' e)
-                            where
-                              (v', subst') = extendSubstInScope v subst
+    go subst (Lam (TVar ty v) e) = Lam tv'' (go subst' e)
+                                 where
+                                   (tv'', subst') = extendSubstInScope tv' subst
+                                   ty' = go_ty subst ty
+                                   tv' = TVar ty' v
+
+    go_ty :: Subst -> TypeX OccAnald -> Type
+    go_ty subst (TypeTuple tys)   = TypeTuple (map (go_ty subst) tys)
+    go_ty subst (TypeVec e ty)    = TypeVec (go subst e) (go_ty subst ty)
+    go_ty subst (TypeLM  ty1 ty2) = TypeLM (go_ty subst ty1) (go_ty subst ty2)
+    go_ty subst (TypeLam ty1 ty2) = TypeLam (go_ty subst ty1) (go_ty subst ty2)
+    go_ty _ TypeBool    = TypeBool
+    go_ty _ TypeInteger = TypeInteger
+    go_ty _ TypeFloat   = TypeFloat
+    go_ty _ TypeString  = TypeString
+    go_ty _ TypeUnknown = TypeUnknown
 
 inline_me :: Int -> Var -> TExpr -> Bool
 inline_me n bndr rhs
   | n==0            = True   -- Dead code
   | n==1            = True   -- Used exactly once
-  | isTrivial rhs   = True   -- RHS is just a variable or literal
+  | isTrivial rhs   = True   -- RHS is trivial, see isTrivial for what that means
   | isKZero rhs     = True   -- Inline zeros, as they will very likely disappear
   | Grad {} <- bndr = True   -- Always inline Grads (might not do this in future)
   | otherwise       = False

@@ -3,9 +3,8 @@ module CSE where
 import Lang
 import Prim
 import OptLet( Subst, extendSubstInScope, lookupSubst, mkEmptySubst, extendSubstMap )
-import LangUtils( substEMayCapture )
+import LangUtils( GblSymTab, substEMayCapture )
 import Rules
-import Annotate( GblSymTab )
 import ANF
 import Opt
 import KMonad
@@ -95,8 +94,8 @@ cseDefs rb gst defs
       }
 
 cseD :: TDef -> TDef
-cseD (DefX f1 args rhs)
-  = DefX f1 args (cseE init_env rhs)
+cseD def@(Def { def_args = args, def_rhs = rhs })
+  = def { def_rhs = cseE init_env rhs }
   where
     init_env = CS { cs_subst = mkEmptySubst args
                   , cs_map   = M.empty }

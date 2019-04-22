@@ -1,23 +1,33 @@
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
+             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+	     ScopedTypeVariables, TypeApplications #-}
 
 module LangUtils (
-  -- Substitution 
+  -- Substitution
   substEMayCapture,
 
   -- Equality
   cmpExpr,
 
   -- Free vars
-  notFreeIn, newVarNotIn,
+  notFreeIn, notFreeInType, newVarNotIn, freeVarsOf,
+  paramsSizeBinders, typesSizeBinders,
 
   -- Tests
-  LangUtils.hspec,
-  test_FreeIn
+  LangUtils.hspec, test_FreeIn,
+
+  -- Symbol table
+  GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
+  stInsertFun,
+  LclSymTab, extendLclST,
+  SymTab(..), newSymTab, emptySymTab
+
   ) where
-  
+
 import Lang
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Test.Hspec
 import Debug.Trace( trace )
 
@@ -44,102 +54,52 @@ substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
                                           substEMayCapture (v `M.delete` subst) b
 
 -----------------------------------------------
---     Equality modulo alpha
------------------------------------------------
-
-instance Eq TExpr where
-  e1 == e2 = case e1 `cmpExpr` e2 of
-               EQ -> True
-               _  -> False
-
-instance Ord TExpr where
-  compare = cmpExpr
-
-thenCmp :: Ordering -> Ordering -> Ordering
-EQ `thenCmp` o = o
-o  `thenCmp` _ = o
-
-cmpExpr :: TExpr -> TExpr -> Ordering
-cmpExpr e1
- = go e1 M.empty
- where
-   go :: TExpr -> M.Map TVar TVar -> TExpr -> Ordering
-   go (Konst k1) subst e2
-     = case e2 of
-         Konst k2 -> k1 `compare` k2
-         _        -> LT
-
-   go (Var v1) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var v2   -> v1 `compare` M.findWithDefault v2 v2 subst
-         _        -> LT
-
-   go (Call f1 e1) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var {} -> GT
-         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (gos e1 subst e2)
-         _ -> LT
-
-   go (Tuple es1) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var {}  -> GT
-         Call {} -> GT
-         Tuple es2 -> gos es1 subst es2
-         _        -> LT
-
-   go (Lam b1 e1) subst e2
-      = case e2 of
-         Konst {}  -> GT
-         Var {}    -> GT
-         Call {}   -> GT
-         Tuple es  -> GT
-         Lam b2 e2 -> go e1 (M.insert b2 b1 subst) e2
-         _         -> LT
-
-   go (App e1a e1b) subst e2
-     = case e2 of
-         Konst {} -> GT
-         Var {}   -> GT
-         Call {}  -> GT
-         Tuple {} -> GT
-         Lam {}   -> GT
-         App e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
-         _           -> LT
-
-   go (Let b1 r1 e1) subst e2
-     = case e2 of
-         If {}     -> LT
-         Assert {} -> LT
-         Let b2 r2 e2 ->
-                go r1 subst r2 `thenCmp` go e1 (M.insert b2 b1 subst) e2
-         _ -> GT
-
-   go (If e1c e1t e1f) subst e2
-      = case e2 of
-          Assert {} -> LT
-          If e2c e2t e2f -> go e1c subst e2c `thenCmp`
-                            go e1t subst e2t `thenCmp`
-                            go e1f subst e2f
-          _ -> GT
-
-   go (Assert e1a e1b) subst e2
-      = case e2 of
-          Assert e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
-          _              -> GT
-
-   gos :: [TExpr] -> M.Map TVar TVar -> [TExpr] -> Ordering
-   gos [] subst [] = EQ
-   gos [] subst (_:_) = LT
-   gos (_:_) subst [] = GT
-   gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
-
-
------------------------------------------------
 --     Free variables
 -----------------------------------------------
+
+paramsSizeBinders :: forall p. InPhase p =>  [TVarX p] -> [TVar]
+-- Get the vector size binders bound by the type of the parameters
+-- E.g.   (x :: Vec n Float, y :: (Vec m (Vec n Float), Float))
+--        binds m and n
+-- Notes:
+--   1. we do not consider (Vec (n+m) Float) as binding anything
+--   2. a duplicate (e.g. n above) enters twice with the same definition
+--      at codegen the second defn is an assert of equality
+paramsSizeBinders vs = concatMap paramSizeBinders vs
+
+paramSizeBinders :: forall p. InPhase p => TVarX p -> [TVar]
+paramSizeBinders (TVar TypeInteger v)
+  = [TVar TypeInteger v]     -- An argument of type Integer
+paramSizeBinders (TVar ty _)
+  = typeSizeBinders ty       -- For other args, look in their types
+
+typesSizeBinders :: forall p. InPhase p => [TypeX p] -> [TVar]
+typesSizeBinders tys = concatMap typeSizeBinders tys
+
+typeSizeBinders :: forall p. InPhase p => TypeX p -> [TVar]
+-- Find any (Vec n ty) types, and return the 'n' part
+typeSizeBinders ty = go ty
+  where
+    go (TypeVec (Var vx) ty) = TVar TypeInteger v : go ty
+                             where
+                               (v, _) = getVar @p vx
+    go (TypeTuple ts)        = concatMap go ts
+    go (TypeLM t1 t2)        = go t1 ++ go t2
+    go _                     = []
+
+freeVarsOf :: TExpr -> S.Set TVar
+freeVarsOf = go
+  where
+   go :: TExpr -> S.Set TVar
+   go (Var v)        = S.singleton v
+   go (Konst _)      = S.empty
+   go (Tuple es)     = S.unions (map go es)
+   go (If b t e)     = go b `S.union` go t `S.union` go e
+   go (Call _ es)    = S.unions (map go es)
+   go (App f a)      = go f `S.union` go a
+   go (Let v r b)    = go r `S.union` (S.delete v $ go b)
+   go (Lam v e)      = S.delete v $ go e
+   go (Assert e1 e2) = go e1 `S.union` go e2
 
 notFreeIn :: TVar -> TExpr -> Bool
 notFreeIn = go
@@ -155,6 +115,13 @@ notFreeIn = go
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Assert e1 e2) = go v e1 && go v e2
 
+notFreeInType :: TVar -> Type -> Bool
+notFreeInType v (TypeTuple tys) = all (notFreeInType v) tys
+notFreeInType v (TypeVec sz ty) = v `notFreeIn` sz && v `notFreeInType` ty
+notFreeInType v (TypeLam t1 t2) = v `notFreeInType` t1 && v `notFreeInType` t2
+notFreeInType v (TypeLM t1 t2)  = v `notFreeInType` t1 && v `notFreeInType` t2
+notFreeInType _ _ = True
+
 -----------------
 
 newVarNotIn :: Type -> TExpr -> TVar
@@ -162,7 +129,7 @@ newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
   where
     go ty e n
       | v `notFreeIn` e = v
-      | otherwise       = trace ("newVarNotIn: Var " ++ show v ++ " was bound in E, retry")
+      | otherwise       = trace ("newVarNotIn: Var " ++ pps v ++ " was bound in E, retry")
                           (go ty e (n + 1))
       where
          v = mkTVar ty ("_t" ++ show n)
@@ -188,3 +155,66 @@ hspec = do
 
 test_FreeIn :: IO ()
 test_FreeIn = Test.Hspec.hspec LangUtils.hspec
+
+
+-----------------------------------------------
+--     Symbol table, ST, maps variables to types
+-----------------------------------------------
+
+-- Global symbol table
+type GblSymTab = M.Map Fun TDef
+   -- Maps a function to its definition, which lets us
+   --   * Find its return type
+   --   * Inline it
+   -- Domain is UserFun, and perhaps the Grad of PrimFuns
+
+-- Local symbol table
+type LclSymTab = M.Map Var Type
+   -- The Type is the type of the variable
+
+-- Entire symbol table
+data SymTab
+  = ST { gblST :: GblSymTab
+       , lclST :: LclSymTab
+    }
+
+instance (Pretty k, Pretty v) => Pretty (M.Map k v) where
+   ppr m = braces $ fsep  $ punctuate comma $
+           [ ppr k <+> text ":->" <+> ppr v | (k,v) <- M.toList m ]
+
+instance Pretty SymTab where
+  ppr (ST { lclST = lcl_env, gblST = gbl_env })
+    = vcat [ hang (text "Global symbol table:")
+                2 (ppr gbl_env)
+           , hang (text "Local symbol table:")
+                2 (ppr lcl_env) ]
+
+emptyGblST :: GblSymTab
+emptyGblST = M.empty
+
+emptySymTab :: SymTab
+emptySymTab = ST { gblST = M.empty, lclST = M.empty }
+
+newSymTab :: GblSymTab -> SymTab
+newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
+
+stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
+stInsertFun = M.insert
+
+lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
+lookupGblST = M.lookup
+
+extendGblST :: GblSymTab -> [TDef] -> GblSymTab
+extendGblST = foldl add
+  where
+    add env def@(Def { def_fun = f }) = stInsertFun f def env
+
+modifyGblST :: (GblSymTab -> GblSymTab) -> SymTab -> SymTab
+modifyGblST g = \env -> env { gblST = g (gblST env) }
+
+extendLclST :: LclSymTab -> [TVar] -> LclSymTab
+extendLclST lst vars = foldl add lst vars
+  where
+    add :: LclSymTab -> TVar -> LclSymTab
+    add env (TVar ty v) = M.insert v ty env
+

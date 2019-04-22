@@ -1,3 +1,7 @@
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
+             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+	     ScopedTypeVariables, TypeApplications #-}
+
 module Parse  where
 
 {- The language we parse
@@ -159,58 +163,32 @@ pBool :: Parser Bool
 pBool = (True <$ pReserved "true")
         <|> (False <$ pReserved "false")
 
-mk_fun :: String -> Fun
--- Parses the print-name of a top-level function into a Fun
--- In particular,
---
---   * Recognises D$f as (Grad f Fwd) etc
---     Keep this in sync with 'instance Show Fun' in Lang.hs
---
---   * Distinguishes PrimFun from UserFun
-mk_fun f = case find_dollar f of
-             Just ("D",   s) -> GradFun (mk_fun_id s) Fwd
-             Just ("R",   s) -> GradFun (mk_fun_id s) Rev
-             Just ("fwd", s) -> DrvFun  (mk_fun_id s) Fwd
-             Just ("rev", s) -> DrvFun  (mk_fun_id s) Rev
-             Just ("get", s) -> Fun     (mk_sel_fun s)
-             Just ("check", s) -> CheckFun (mk_fun_id s)
-             _               -> Fun     (mk_fun_id f)
-  where
-    mk_fun_id f | isPrimFun f = PrimFun f
-                | otherwise   = UserFun f
-    find_dollar f = case break (== '$') f of
-                       (_, [])  -> Nothing  -- No $
-                       (_, [_]) -> Nothing  -- Trailing $
-                       (prefix, _ : suffix) -> Just (prefix, suffix)
-    mk_sel_fun s = let (i,_:n) = break (== '$') s
-                   in SelFun (read i :: Int) (read n :: Int)
-
 pVar :: Parser Var
 pVar = Simple <$> pIdentifier
 
-pParam :: Parser TVar
+pParam :: Parser (TVarX Parsed)
 pParam = do { v <- pVar
             ; pReserved ":"
             ; ty <- pKType
             ; return (TVar ty v) }
 
-pParams :: Parser [TVar]
+pParams :: Parser [TVarX Parsed]
 pParams = parens $ do { b <- pParam
                       ; return [b] }
                <|> many (parens pParam)
 
-pKonst :: Parser (ExprX Fun Var)
+pKonst :: Parser (ExprX Parsed)
 pKonst =   try (( Konst . KFloat) <$> pDouble)
        <|> ((Konst . KInteger) <$> pInteger)
        <|> ((Konst . KString) <$> pString)
        <|> ((Konst . KBool) <$> pBool)
 
-pExpr :: Parser (ExprX Fun Var)
+pExpr :: Parser (ExprX Parsed)
 pExpr = pKonst
    <|> (Var . Simple) <$> pIdentifier
    <|> parens pKExpr
 
-pKExpr :: Parser (ExprX Fun Var)
+pKExpr :: Parser (ExprX Parsed)
 -- All these start with a keyword
 pKExpr =   pIfThenElse
        <|> pLet
@@ -220,22 +198,25 @@ pKExpr =   pIfThenElse
        <|> pTuple
        <|> pKonst
 
-pType :: Parser Type
+pType :: Parser (TypeX Parsed)
 pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
     <|> (pReserved "String"  >> return TypeString)
     <|> parens pKType
 
-pTypes :: Parser [Type]
+pTypes :: Parser [TypeX Parsed]
 pTypes = parens (many pType)
 
-pKType :: Parser Type
-pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
+pKType :: Parser (TypeX Parsed)
+pKType =   (do { pReserved "Vec"; sz <- pVecSize; ty <- pType; return (TypeVec sz ty) })
        <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
        <|> (do { pReserved "LM"; s <- pType; t <- pType ; return (TypeLM s t) })
        <|> pType
 
-pCall :: Parser (ExprX Fun Var)
+pVecSize :: Parser (ExprX Parsed)
+pVecSize = pExpr
+
+pCall :: Parser (ExprX Parsed)
 -- Calls (f e), (f e1 e2), etc
 -- Deals with plain variables (Var v), which look like nullary calls
 pCall = do { f <- pIdentifier
@@ -258,7 +239,7 @@ add strings, and this hackery will allow us to also add useful context
 annotations.
 -}
 
-pIfThenElse :: Parser (ExprX Fun Var)
+pIfThenElse :: Parser (ExprX Parsed)
 -- (if e1 e2 e3)
 pIfThenElse = do { pReserved "if"
                  ; cond <- pExpr
@@ -266,33 +247,33 @@ pIfThenElse = do { pReserved "if"
                  ; fl   <- pExpr
                  ; return $ If cond tr fl }
 
-pAssert :: Parser (ExprX Fun Var)
+pAssert :: Parser (ExprX Parsed)
 -- (assert e1 e2)
 pAssert = do { pReserved "assert"
              ; e1 <- pExpr
              ; e2 <- pExpr
              ; return $ Assert e1 e2 }
 
-pTuple :: Parser (ExprX Fun Var)
+pTuple :: Parser (ExprX Parsed)
 -- (assert e1 e2)
 pTuple = do { pReserved "tuple"
             ; es <- many pExpr
             ; return $ Tuple es }
 
-pLam :: Parser (ExprX Fun Var)
+pLam :: Parser (ExprX Parsed)
 -- (lam i e)
 pLam = do { pReserved "lam"
-          ; TVar ty v <- parens pParam
+          ; bndr <- parens pParam
           ; e <- pExpr
-          ; return $ Lam (TVar ty v) e }
+          ; return $ Lam bndr e }
 
-pBind :: Parser (Var, ExprX Fun Var)
+pBind :: Parser (Var, ExprX Parsed)
 -- var rhs
 pBind = do { v <- pIdentifier
            ; e <- pExpr
           ; return (Simple v, e) }
 
-pLet :: Parser (ExprX Fun Var)
+pLet :: Parser (ExprX Parsed)
 -- (let (x r) b)
 pLet = do { pReserved "let"
           ; pairs <- parens $ do { b <- pBind
@@ -308,8 +289,8 @@ pDef = do { pReserved "def"
           ; ty <- pType
           ; xs <- pParams
           ; rhs <- pExpr
-          ; let fun = TFun ty (mk_fun f)
-          ; return (DefX fun xs rhs) }
+          ; return (Def { def_fun = mk_fun f, def_args = xs
+                        , def_rhs = rhs, def_res_ty = ty }) }
 
 pRule :: Parser Rule
 pRule = do { pReserved "rule"
@@ -320,12 +301,13 @@ pRule = do { pReserved "rule"
            ; return (Rule { ru_name = name, ru_qvars = qvars
                           , ru_lhs = lhs, ru_rhs = rhs }) }
 
-pEdef :: Parser Edef
+pEdef :: Parser (EdefX Parsed)
 pEdef = do { pReserved "edef"
            ; name       <- pIdentifier
            ; returnType <- pType
            ; argTypes   <- pTypes
-           ; return (Edef (mk_fun name) returnType argTypes) }
+           ; return (Edef { ed_fun = mk_fun name, ed_res_ty = returnType
+                          , ed_arg_tys = argTypes }) }
 
 pDecl :: Parser Decl
 pDecl = parens ( (DefDecl  <$> pDef)

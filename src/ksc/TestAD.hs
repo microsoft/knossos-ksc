@@ -5,7 +5,7 @@ import Annotate
 import Parse
 
 -- For when TODO Lam is done
---toLam (DefX f vs body) = Lam vs body
+--toLam (Def f vs body) = Lam vs body
 -- cmpDef a b = cmpExpr (toLam a) (toLam b)
 
 main:: IO ()

@@ -1,4 +1,4 @@
-(def test_tuple Integer ((x : Tuple (Vec Float) (Vec (Vec Float)) Integer))
+(def test_tuple Integer ((x : Tuple (Vec n Float) (Vec m (Vec p Float)) Integer))
     (+ 1 (if (< 2 3) 4 5)))
 
 
