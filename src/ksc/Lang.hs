@@ -568,7 +568,7 @@ instance InPhase Parsed where
 
 instance InPhase Typed where
   pprVar  = ppr
-  pprLetBndr = pprTVar
+  pprLetBndr = pprTVarVar
   pprFunOcc (TFun _ f) = ppr f
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun, Just ty)
@@ -622,7 +622,7 @@ instance Pretty Fun where
 pprFunId :: FunId -> SDoc
 pprFunId (UserFun s ) = text s
 pprFunId (PrimFun p ) = text p
-pprFunId (SelFun i n) = text "get_" <> int i <> char '_' <> int n
+pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> SDoc
 pprFun (Fun s         ) = ppr s
@@ -648,8 +648,7 @@ instance Pretty Konst where
 instance InPhase p => Pretty (TypeX p) where
   pprPrec p (TypeVec sz ty)      = parensIf p precZero $
                                    text "Vec" <+> pprParendExpr sz <+> pprParendType ty
-  pprPrec p (TypeTuple tys)      = parensIf p precZero $
-                                   text "Tuple" <+> parens (pprList ppr tys)
+  pprPrec _ (TypeTuple tys)      = parens (text "Tuple" <+> pprList pprParendType tys)
   pprPrec p (TypeLam from to)    = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
   pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> pprParendType s <+> pprParendType t
@@ -683,14 +682,17 @@ pprParendExpr = pprExpr precTop
 pprTVar :: InPhase p => TVarX p -> SDoc
 pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
-pprExpr :: forall p. InPhase p => Prec -> ExprX p -> SDoc
-pprExpr _ (Var   v ) = pprVar @p v
+pprTVarVar :: InPhase p => TVarX p -> SDoc
+pprTVarVar (TVar _ v) = ppr v
+
+pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
+pprExpr _ (Var   v ) = pprVar @phase v
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
   where rest = pprList ppr es
-pprExpr p (Lam v e) =  mode (parensIf p precZero $ text "lam" <+> parens (pprTVar @p v) <+> ppr e)
-                            (parens $ text "lam" <+> vcat [parens (pprTVar @p v), ppr e])
+pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar @phase v) <+> ppr e)
+                            (parens $ text "lam" <+> vcat [parens (pprTVar @phase v), ppr e])
 pprExpr p (Let v e1 e2) = mode
   (pprLetSexp v e1 e2)
   (parensIf
@@ -698,7 +700,7 @@ pprExpr p (Let v e1 e2) = mode
     precZero
     (vcat
       [ text "let"
-        <+> (bracesSp $ sep [pprLetBndr @p v, nest 2 (text "=" <+> ppr e1)])
+        <+> (bracesSp $ sep [pprLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
       , ppr e2
       ]
     )
@@ -765,7 +767,8 @@ instance InPhase p => Pretty (DeclX p) where
 
 instance InPhase p => Pretty (DefX p) where
   ppr (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs }) = mode
-      (parens $ sep [ text "def", pprFun f, parens (sep (map (parens . pprTVar) vs)), ppr rhs])
+      (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty, 
+                      parens (sep (map (parens . pprTVar) vs)), ppr rhs])
       (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
              2 (parens (pprList pprTVar vs))
            , nest 2 (text "=" <+> ppr rhs) ])

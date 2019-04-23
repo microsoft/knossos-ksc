@@ -55,7 +55,7 @@ An example
 
 
 We have comments, thus
-   -- Comment to end of line
+   ; Comment to end of line
    {- block comment -}
 
 Notes:
@@ -85,7 +85,7 @@ Notes:
 import Lang hiding (parens)
 import Prim
 
-import Text.Parsec( (<|>), try, many, parse, ParseError )
+import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError )
 import Text.Parsec.Char
 import Text.Parsec.String (Parser)
 
@@ -120,20 +120,21 @@ parseF file = do
 ------- Parser -------
 langDef :: Tok.LanguageDef ()
 langDef = Tok.LanguageDef
-  { Tok.commentStart    = "{-"
-  , Tok.commentEnd      = "-}"
-  , Tok.commentLine     = "--"
+  { Tok.commentStart    = "#|"
+  , Tok.commentEnd      = "|#"
+  , Tok.commentLine     = ";"
   , Tok.nestedComments  = True
 --  , Tok.identLetter     = alphaNum <|> oneOf "_'"
 --  , Tok.opStart         = oneOf ":!#$%&*+./<=>?@\\^|-~"
 --  , Tok.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Tok.identStart      = letter <|> oneOf "_':!#$%&*+./<=>?@\\^|-~"
-  , Tok.identLetter     = alphaNum <|> oneOf "_':!#$%&*+./<=>?@\\^|-~"
+  , Tok.identStart      = letter <|> oneOf "_':!$%&*+./<=>?@\\^|-~"
+  , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+./<=>?@\\^|-~"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
-  , Tok.reservedNames   = [ "def", "rule", "let", "if", "assert", "call", "tuple", ":"
+  , Tok.reservedNames   = [ "def", "edef", "rule"
+                          , "let", "if", "assert", "call", "tuple", ":"
                           , "Integer", "Float", "Vec", "String", "true", "false"
-                          , "edef" ]
+                          ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
   }
@@ -315,7 +316,7 @@ pDecl = parens ( (DefDecl  <$> pDef)
                  <|>  (EdefDecl <$> pEdef ))
 
 pDecls :: Parser [Decl]
-pDecls = spaces >> many pDecl
+pDecls = spaces >> manyTill pDecl eof
 
 
 ---------------------- Tests ------------------

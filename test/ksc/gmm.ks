@@ -16,7 +16,7 @@
 (def sub$VecR$VecR (Vec n Float) ((a : Vec n Float) (b : Vec n Float))
   (build n (lam (i : Integer) (- (index i a) (index i b)))))
 
--- dotv
+; dotv
 (edef dotv Float ((Vec n Float) (Vec n Float)))
 (edef D$dotv (LM (Tuple (Vec n Float) (Vec n Float)) Float)
              ((Vec n Float) (Vec n Float)))
@@ -34,7 +34,7 @@
 (def sqnorm Float ((v : Vec n Float))
   (dotv v v))
 
--- mul Mat Vec
+; mul Mat Vec
 (edef mul$Mat$Vec (Vec m Float) ((Vec m (Vec n Float)) (Vec n Float)))
 
 (edef D$mul$Mat$Vec (LM (Tuple (Vec m (Vec n Float)) (Vec n Float)) (Vec m Float))
@@ -67,10 +67,10 @@
 (def logsumexp Float ((v : Vec n Float))
     (log (sum (exp$VecR v))))
 
--- TODO deriv lgamma - but no deriv wishart_m anyway.
--- wishart_m -> int
+; TODO deriv lgamma - but no deriv wishart_m anyway.
+; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
-    (let ((out (* 0.28618247146235004 (to_float (* p (- p 1)))))) -- 0.25 log pi
+    (let ((out (* 0.28618247146235004 (to_float (* p (- p 1)))))) ; 0.25 log pi
       (+ out
          (sum (build p (lam (j : Integer)
                  (lgamma (- a (* 0.5 (to_float j))))))))))
@@ -106,7 +106,7 @@
        (ls : Vec K (Vec triD Float))
        (wishart : (Tuple Float Integer)))
   (assert (== triD (gmm_knossos_tri D))
-    (let ((CONSTANT (* (to_float (* N D)) (neg 0.9189385332046727)) ) -- n * d*-0.5*log(2 * PI)
+    (let ((CONSTANT (* (to_float (* N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
           (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
@@ -114,7 +114,7 @@
                                   (mahal_vec (mul$Mat$Vec Q
                                                       (sub$VecR$VecR (index i x) (index k means)))))
                               (- (+ (index k alphas)
-                                    -- (index k sum_qs)
+                                    ; (index k sum_qs)
                                     (sum (index k qs))
                               )
                                 (* 0.500000  (sqnorm mahal_vec)))
@@ -192,10 +192,10 @@
                     (zerovv x) (zerov alphas)  (zerovv mus)  dq12     (zerovv ls)   (tuple 0.0 (tuple))  ))
 
           (everything_works_as_expected
-           -- I would like to pull out a function called something
-           -- like `floating_point_numbers_are_close` but I would have
-           -- to implement the derivtives of abs and max for that, and
-           -- I can't be bothered right now.
+           ; I would like to pull out a function called something
+           ; like `floating_point_numbers_are_close` but I would have
+           ; to implement the derivtives of abs and max for that, and
+           ; I can't be bothered right now.
            (let ((tolerance 0.001)
                  (actual gmm_fd)
                  (expected gmm_fwd))
@@ -204,8 +204,8 @@
                      tolerance))))
           (impossibly_good (== gmm_fd gmm_fwd))
 
-          -- Check <grad_f, dx> = f(x+dx) - f(x)
-          -- with grad_f = f`(x, 1.0)
+          ; Check <grad_f, dx> = f(x+dx) - f(x)
+          ; with grad_f = f`(x, 1.0)
           (grad_gmm (rev$gmm_knossos_gmm_objective x alphas mus qs ls wishart 1.0))
           (grad_gmm_x          (get$1$6 grad_gmm))
           (grad_gmm_alphas     (get$2$6 grad_gmm))
@@ -245,7 +245,7 @@
       (pr x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
-          -- see https://github.com/awf/knossos/issues/281 (D$gmm_knossos_gmm_objective x alphas mus qs ls wishart)
+          ; see https://github.com/awf/knossos/issues/281 (D$gmm_knossos_gmm_objective x alphas mus qs ls wishart)
 
           (gmm_knossos_gmm_objective x alphas mus qs ls wishart)
           gmm_at_theta

@@ -51,5 +51,6 @@
         "xutility": "cpp",
         "array": "cpp",
         "iterator": "cpp"
-    }
+    },
+    "search.usePCRE2": true
 }

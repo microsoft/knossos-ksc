@@ -24,7 +24,7 @@
     (let (x 4) x)))
 
 (def main Integer ()
-    (pr -- No grad.  See https://github.com/awf/knossos/issues/281 (D$f 9.0)
+    (pr ; No grad.  See https://github.com/awf/knossos/issues/281 (D$f 9.0)
         (f 9.0)
         (fwd$f 9.0 1.0)
         (build 4 (lam (i : Integer) i))

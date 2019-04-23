@@ -6,5 +6,5 @@
     (sum (build 3 (lam (y : Integer) (+ z (/ y y)))))
     ))))
 
-{- Tests capture-avoiding substitution -}
+#| Tests capture-avoiding substitution |#
 
