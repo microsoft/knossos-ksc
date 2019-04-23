@@ -13,8 +13,8 @@ import KMonad
 import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
-import Control.Monad( ap, unless )
-import Data.List( intersperse )
+import Control.Monad( ap, unless, when )
+import Data.List( intersperse, nub, (\\) )
 
 -----------------------------------------------
 --     The type inference pass
@@ -98,7 +98,8 @@ tcDef (Def { def_fun    = fun
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
     extendLclSTM (paramsSizeBinders vars) $
-    do { vars' <- mapM tcTVar vars
+    do { tcArgs vars
+       ; vars' <- mapM tcTVar vars
        ; extendLclSTM vars' $
     do { TE rhs' rhs_ty <- tcExpr rhs
        ; fun_ty' <- tcType fun_ty
@@ -122,6 +123,14 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
        ; return (Rule { ru_name = name, ru_qvars = qvars'
                       , ru_lhs = lhs', ru_rhs = rhs' })
     }}
+
+tcArgs :: [TVarX p] -> TcM ()
+tcArgs args = when (not distinct) $
+                  addErr (text "Duplicated arguments:" <+> commaPpr duplicated)
+    where argNames   = map tVarVar args
+          duplicated = nub (argNames \\ nub argNames)
+          distinct   = null duplicated
+          commaPpr   = sep . punctuate comma . map ppr
 
 tcTVar :: InPhase p => TVarX p -> TcM TVar
 tcTVar (TVar ty v)
