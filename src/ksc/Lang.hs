@@ -167,7 +167,8 @@ tangentType t              = pprPanic "tangentType" (ppr t)
 
 eqType :: Type -> Type -> Bool
 eqType (TypeVec sz1 ty1) (TypeVec sz2 ty2) = eqType ty1 ty2 && eqSize sz1 sz2
-eqType (TypeTuple tys1) (TypeTuple tys2) = and $ zipWith eqType tys1 tys2
+eqType (TypeTuple tys1) (TypeTuple tys2) =
+  (length tys1 == length tys2) && (and (zipWith eqType tys1 tys2))
 eqType (TypeLM s1 t1) (TypeLM s2 t2) = eqType s1 s2 && eqType t1 t2
 eqType t1 t2 = t1 == t2
 
@@ -831,6 +832,9 @@ hspec = do
   describe "Pretty" $ do
     test e  "g( i )"
     test e2 "f( g( i ), _t1, 5 )"
+
+  describe "eqType" $
+    it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
 
 test_Pretty :: IO ()
 test_Pretty = Test.Hspec.hspec Lang.hspec
