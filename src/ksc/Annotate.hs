@@ -35,9 +35,11 @@ annotDecls gbl_env decls
                ; return (gblST st, []) }
 
     go (decl:decls)
-      = do { tdecl <- tcDeclX decl
-           ; (env', tdecls) <- extendGblEnv tdecl (go decls)
-           ; return (env', tdecl:tdecls) }
+      = do { mb_tdecl <- tryTc (tcDeclX decl)
+           ; case mb_tdecl of
+                Nothing    -> go decls
+                Just tdecl -> do { (env', tdecls) <- extendGblEnv tdecl (go decls)
+                                 ; return (env', tdecl:tdecls) } }
 
     defs = [ def | DefDecl def <- decls ]
 
@@ -53,7 +55,7 @@ annotDecls gbl_env decls
             ; res_ty' <- tcType res_ty
             ; return (Def { def_fun = fun, def_args = args'
                           , def_res_ty = res_ty'
-                          , def_rhs = pprPanic "Rec body of" (ppr fun) }) }
+                          , def_rhs = StubRhs }) }
 
 -----------------------------------------------
 --     A Lint function to do type checking
@@ -64,7 +66,7 @@ lintDefs :: String -> GblSymTab -> [TDef] -> KM ()
 -- The incoming environment already has a type for
 -- each top level function
 lintDefs what gbl_env defs
-  = do { runTc what init_env (mapM_ tcDef defs)
+  = do { runTc what init_env (mapM_ (tryTc . tcDef) defs)
        ; printK (text "Linted" <+> text what) }
   where
     init_env = TCE { tce_ctxt = []
@@ -80,34 +82,32 @@ tcDeclX (DefDecl def)   = do { def' <- tcDef def
                              ; return (DefDecl def') }
 tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
                              ; return (RuleDecl rule') }
-tcDeclX (EdefDecl edef) = do { edef' <- tcEdef edef
-                             ; return (EdefDecl edef') }
-
-tcEdef :: InPhase p => EdefX p -> TcM (EdefX Typed)
-tcEdef (Edef { ed_fun = fun, ed_res_ty = res_ty, ed_arg_tys = arg_tys })
-  = addCtxt (text "In the definition of" <+> ppr fun) $
-    extendLclSTM (typesSizeBinders arg_tys) $
-    do { res_ty' <- tcType res_ty
-       ; arg_tys' <- mapM tcType arg_tys
-       ; return (Edef { ed_fun = fun, ed_res_ty = res_ty', ed_arg_tys = arg_tys' }) }
 
 tcDef :: InPhase p => DefX p -> TcM TDef
 tcDef (Def { def_fun    = fun
            , def_args   = vars
-           , def_res_ty = fun_ty
+           , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
     extendLclSTM (paramsSizeBinders vars) $
     do { tcArgs vars
        ; vars' <- mapM tcTVar vars
        ; extendLclSTM vars' $
-    do { TE rhs' rhs_ty <- tcExpr rhs
-       ; fun_ty' <- tcType fun_ty
-       ; checkTypes fun_ty' rhs_ty $
-         text "Function result type mis-match for" <+> ppr fun
+    do { res_ty' <- tcType res_ty
+       ; rhs' <- tcRhs fun rhs res_ty'
        ; return (Def { def_fun = fun, def_args = vars'
-                     , def_rhs = rhs', def_res_ty = fun_ty' })
+                     , def_rhs = rhs', def_res_ty = res_ty' })
     }}
+
+tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
+tcRhs _ StubRhs _ = return StubRhs
+tcRhs _ EDefRhs _ = return EDefRhs
+tcRhs fun (UserRhs rhs) res_ty
+  = do { TE rhs' rhs_ty <- tcExpr rhs
+       ; TE rhs' rhs_ty <- tcExpr rhs
+       ; checkTypes res_ty rhs_ty $
+         text "Function result type mis-match for" <+> ppr fun
+       ; return (UserRhs rhs') }
 
 tcRule :: InPhase p => RuleX p -> TcM TRule
 tcRule (Rule { ru_name = name, ru_qvars = qvars
@@ -376,27 +376,38 @@ data TcEnv
   = TCE { tce_ctxt :: [SDoc]   -- Context, innermost first
         , tce_st   :: SymTab }
 
-newtype TcM a = TCM { unTc :: TcEnv -> [SDoc] -> (a, [SDoc]) }
+newtype TcM a = TCM { unTc :: TcEnv -> [SDoc] -> (Maybe a, [SDoc]) }
 -- Just a writer monad on [SDoc]
+-- Return Nothing if typechecking failure; it's an exception
+-- In that case there should always be a message in the
+-- returned [SDoc]
 
 instance Functor TcM where
   fmap f (TCM m) = TCM (\ctxt ds -> case m ctxt ds of
-                                     (r, ds') -> (f r, ds'))
+                                     (r, ds') -> (fmap f r, ds'))
 
 instance Applicative TcM where
   pure  = return
   (<*>) = ap
 
 instance Monad TcM where
-  return v = TCM (\_ ds -> (v, ds))
+  return v = TCM (\_ ds -> (Just v, ds))
   TCM m >>= k = TCM $ \ctxt ds ->
                 case m ctxt ds of
-                  (r1, ds') -> unTc (k r1) ctxt ds'
+                  (Just r1, ds') -> unTc (k r1) ctxt ds'
+                  (Nothing, ds') -> (Nothing, ds')
+
+tryTc :: TcM a -> TcM (Maybe a)
+tryTc (TCM m)
+  = TCM $ \env ds ->
+    case m env ds of
+      (mb_r, ds) -> (Just mb_r,  ds)
 
 runTc :: String -> TcEnv -> TcM a -> KM a
 runTc what init_env (TCM m)
-  | null rev_errs
-  = return result
+  | Just res <- mb_res
+  , null rev_errs
+  = return res
   | otherwise
   = do { liftIO $ putStrLn $ render $
          vcat [ text ""
@@ -409,10 +420,10 @@ runTc what init_env (TCM m)
               , text "" ]
        ; error "Exiting" }
   where
-    (result, rev_errs) = m init_env []
+    (mb_res, rev_errs) = m init_env []
 
-addErr :: SDoc -> TcM ()
-addErr d = TCM (\env ds -> ((), mk_err env d : ds))
+addErr :: SDoc -> TcM a
+addErr d = TCM (\env ds -> (Nothing, mk_err env d : ds))
   where
     mk_err env d =  vcat (d : tce_ctxt env)
 
@@ -464,23 +475,13 @@ extendGblEnv :: TDecl -> TcM a -> TcM a
 extendGblEnv (RuleDecl {}) = id
 extendGblEnv (DefDecl tdef@(Def { def_fun = f }))
   = modifyEnvTc (modifyGblST (stInsertFun f tdef))
-extendGblEnv (EdefDecl (Edef f retType argTypes))
-  = modifyEnvTc (modifyGblST (flip extendGblST [tdef]))
-  where
-    targs = map mkDummyTVar argTypes
-
-    tdef  = Def { def_fun    = f
-                , def_res_ty = retType
-                , def_args   = targs
-                , def_rhs    = mkDummy retType
-                }
 
 modifyEnvTc :: (SymTab -> SymTab) -> TcM a -> TcM a
 modifyEnvTc extend (TCM f)
   = TCM (\env -> f (env { tce_st = extend (tce_st env) }))
 
 getSymTabTc :: TcM SymTab
-getSymTabTc = TCM (\env ds -> (tce_st env, ds))
+getSymTabTc = TCM (\env ds -> (Just (tce_st env), ds))
 
 lookupLclTc :: Var -> TcM Type
 lookupLclTc v
@@ -490,7 +491,7 @@ lookupLclTc v
               case Map.lookup (varFun v) (gblST st) of
                   Nothing -> do {
                              addErr (text "Not in scope: local var/tld:" <+> ppr v <+> gblDoc st)
-                             ; return TypeUnknown 
+                             ; return TypeUnknown
                              }
                   Just (Def { def_fun  = _fn
                            , def_res_ty = ret_ty
@@ -521,4 +522,3 @@ lookupGblTc fun args
 
 gblDoc :: SymTab -> SDoc
 gblDoc st = vcat (map (text . show) (Map.keys (gblST st)))
-

@@ -48,8 +48,8 @@ demoN decls
        ; displayN decls
 
        ; (env, tc_decls) <- annotDecls emptyGblST decls
-       ; let (rules, defs, _edefs) = partitionDecls tc_decls
-             rulebase              = mkRuleBase rules
+       ; let (rules, defs) = partitionDecls tc_decls
+             rulebase     = mkRuleBase rules
 
        ; disp "Typechecked declarations" env defs
 
@@ -125,7 +125,7 @@ displayCppGenAndCompile compile verbosity file =
   ; let (main, decls)    = moveMain decls0
 
   ; (env, ann_decls) <- annotDecls emptyGblST decls
-  ; let (rules, defs, _edefs) = partitionDecls ann_decls
+  ; let (rules, defs) = partitionDecls ann_decls
   ; let rulebase      = mkRuleBase rules
   ; displayPassM verbosity "Typechecked defs" env defs
 
@@ -148,10 +148,10 @@ displayCppGenAndCompile compile verbosity file =
 
   ; (env4, ann_main) <- annotDecls env3 main
 
-  ; let (_rules, main_tdef, _edefs) = partitionDecls ann_main
+  ; let (_rules, main_tdef) = partitionDecls ann_main
 
-  -- Note optgrad removed from below as we can not currently 
-  -- codegen the optgrad for recursive functions 
+  -- Note optgrad removed from below as we can not currently
+  -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
   ; let alldefs = defs ++ optfwd ++ main_tdef
 

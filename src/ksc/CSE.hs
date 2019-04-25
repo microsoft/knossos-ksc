@@ -94,11 +94,13 @@ cseDefs rb gst defs
       }
 
 cseD :: TDef -> TDef
-cseD def@(Def { def_args = args, def_rhs = rhs })
-  = def { def_rhs = cseE init_env rhs }
+cseD def@(Def { def_args = args, def_rhs = UserRhs rhs })
+  = def { def_rhs = UserRhs $ cseE init_env rhs }
   where
     init_env = CS { cs_subst = mkEmptySubst args
                   , cs_map   = M.empty }
+
+cseD def = def  -- EDefRhs, StubRhs
 
 ---------------------------------
 cseE :: CSEnv -> TExpr -> TExpr

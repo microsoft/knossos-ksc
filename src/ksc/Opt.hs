@@ -32,11 +32,12 @@ optDefs = mapAccumL . optDef
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> (GblSymTab, TDef)
-optDef rb gst def@(Def { def_args = args, def_rhs = rhs })
+optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
   = (extendGblST gst [def'], def')
   where
-    def' = def { def_rhs = simplify env args rhs }
+    def' = def { def_rhs = UserRhs $ simplify env args rhs }
     env = OptEnv { optRuleBase = rb, optGblST = gst }
+optDef rb gst def = (gst,def)
 
 simplify :: OptEnv -> [TVar] -> TExpr -> TExpr
 simplify env args rhs
@@ -132,7 +133,8 @@ optFun _ (SelFun i _) arg
 optFun env (PrimFun "$inline") arg
   | [Call (TFun _ fun) inner_arg] <- arg
   , Just fun_def <- lookupGblST fun (optGblST env)
-  = Just (inlineCall fun_def inner_arg)
+  , Def { def_args = bndrs, def_rhs = UserRhs body } <- fun_def
+  = Just (inlineCall bndrs body inner_arg)
 
 -- Other prims are determined by their args
 optFun _ (PrimFun f) e
@@ -151,14 +153,14 @@ optPrimFun "+" [e1, e2]
   | TypeTuple [] <- typeof e1
   , TypeTuple [] <- typeof e2
   = Just (Tuple [])
-  
+
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optPrimFun "+" [Tuple es1, Tuple es2]
   | length es1 == length es2
   = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
-optPrimFun "+" [x, y] = 
+optPrimFun "+" [x, y] =
     if isKZero y then
       Just x
     else if isKZero x then
@@ -282,10 +284,12 @@ optPrimFun "lmAdd" [ Call hcat1 ps
 optPrimFun _ _ = Nothing
 
 -----------------------
-inlineCall :: TDef -> [TExpr] -> TExpr
-inlineCall def@(Def { def_args = bndrs, def_rhs = body }) arg
-  = assert (vcat [ppr def, ppr arg]) (length arg == length bndrs) $
-    mkLets (bndrs `zip` arg) body
+inlineCall :: [TVar] -> TExpr  -- Function parameters and body
+           -> [TExpr]          -- Arguments
+           -> TExpr
+inlineCall bndrs body args
+  = assert (vcat [ppr bndrs, ppr args]) (length args == length bndrs) $
+    mkLets (bndrs `zip` args) body
 
 -----------------------
 optSum :: TExpr -> Maybe TExpr
@@ -391,8 +395,8 @@ optSumBuild sz i e
   , i `notFreeIn` e
   = Just $ pMul (mkPrimCall1 "to_float" sz) e
 
--- RULE: sumbuild n (\i. deltaVec n i \j . e) 
---       = build n (\j . e) 
+-- RULE: sumbuild n (\i. deltaVec n i \j . e)
+--       = build n (\j . e)
 optSumBuild n i (Call deltaVec [_n1, Var i1, e])
   | deltaVec `isThePrimFun` "deltaVec"
   , i == i1

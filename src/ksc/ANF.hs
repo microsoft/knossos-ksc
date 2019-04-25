@@ -21,8 +21,12 @@ anfDefs defs
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
 anfD :: TDef -> AnfM Typed TDef
 anfD def@(Def { def_rhs = rhs })
-  = do { rhs' <- anfExpr rhs
-       ; return (def { def_rhs = rhs' }) }
+  | UserRhs expr <- rhs
+  = do { expr' <- anfExpr expr
+       ; return (def { def_rhs = UserRhs expr' }) }
+
+  | otherwise   -- EDefRhs, StubRhs
+  = return def
 
 -- anfExpr :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
 anfExpr :: TExpr -> AnfM Typed TExpr

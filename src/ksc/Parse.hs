@@ -291,7 +291,8 @@ pDef = do { pReserved "def"
           ; xs <- pParams
           ; rhs <- pExpr
           ; return (Def { def_fun = mk_fun f, def_args = xs
-                        , def_rhs = rhs, def_res_ty = ty }) }
+                        , def_rhs = UserRhs rhs
+                        , def_res_ty = ty }) }
 
 pRule :: Parser Rule
 pRule = do { pReserved "rule"
@@ -302,18 +303,29 @@ pRule = do { pReserved "rule"
            ; return (Rule { ru_name = name, ru_qvars = qvars
                           , ru_lhs = lhs, ru_rhs = rhs }) }
 
-pEdef :: Parser (EdefX Parsed)
+pEdef :: Parser (DefX Parsed)
 pEdef = do { pReserved "edef"
            ; name       <- pIdentifier
            ; returnType <- pType
            ; argTypes   <- pTypes
-           ; return (Edef { ed_fun = mk_fun name, ed_res_ty = returnType
-                          , ed_arg_tys = argTypes }) }
+           ; let params =  [ mkTVar ty name
+                           | (ty,name) <- argTypes `zip` allNames ]
+           ; return (Def { def_fun = mk_fun name
+                         , def_res_ty = returnType
+                         , def_args = params
+                         , def_rhs = EDefRhs }) }
+
+allNames :: [String]
+-- An infinite list [a,b,c... aa, ba, ca, ..]
+allNames = [ c : cs
+           | cs <- "" : allNames
+           , c <- ['a'..'z'] ]
 
 pDecl :: Parser Decl
-pDecl = parens ( (DefDecl  <$> pDef)
-                 <|>  (RuleDecl <$> pRule )
-                 <|>  (EdefDecl <$> pEdef ))
+pDecl = parens $
+             (DefDecl  <$> pDef)
+        <|>  (DefDecl  <$> pEdef)
+        <|>  (RuleDecl <$> pRule)
 
 pDecls :: Parser [Decl]
 pDecls = spaces >> manyTill pDecl eof

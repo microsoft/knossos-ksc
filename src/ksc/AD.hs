@@ -31,7 +31,9 @@ gradSelFun params pi i
 -------------------------------------------------
 
 isUserFunDef :: TDef -> Bool
-isUserFunDef (Def { def_fun = Fun _ }) = True
+isUserFunDef (Def { def_fun = Fun _
+                  , def_rhs = UserRhs {} })
+               = True
 isUserFunDef _ = False
 
 filterGradFuns :: [TDef] -> [TDef]
@@ -42,11 +44,11 @@ gradDefs = map gradDef . filterGradFuns
 
 gradDef :: HasCallStack => TDef -> TDef
 gradDef (Def { def_fun = f, def_args = params
-             , def_rhs = rhs, def_res_ty = res_ty })
+             , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Def { def_fun    = gradF f
         , def_args   = params
         , def_res_ty = TypeLM s res_ty
-        , def_rhs    = mkLets lets (gradE s rhs) }
+        , def_rhs    = UserRhs (mkLets lets (gradE s rhs)) }
   where
     param1 :: TExpr
     param1 = mkTuple (map Var params)
@@ -61,6 +63,8 @@ gradDef (Def { def_fun = f, def_args = params
 
     lets = plets ++ szlets
 
+gradDef def = pprPanic "gradDef" (ppr def)
+   -- The fitlterGradFuns should make this impossible
 
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
@@ -114,23 +118,25 @@ applyD :: TDef -> TDef
 --   R$f :: S1 S2   -> (T -o (S1,S2))
 -- rev$f :: S1 S2 T -> (S1,S2)
 applyD (Def { def_fun = GradFun f Rev, def_res_ty =  TypeLM s t
-            , def_args = vars, def_rhs = rhs })
+            , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun = DrvFun f Rev, def_res_ty = tangentType t
         , def_args = vars ++ [dr]
-        , def_rhs  = lmApply rhs $ Var dr }
+        , def_rhs  = UserRhs $ lmApply rhs $ Var dr }
   where
     dr = TVar (tangentType s) $ Delta "r"
 
 --   D$f :: S1 S2       -> ((S1,S2) -o T)
 -- rev$f :: S1 S2 S1 S2 -> T
 applyD (Def { def_fun = GradFun f Fwd, def_res_ty = TypeLM _ t
-            , def_args = vars, def_rhs = rhs })
+            , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun = DrvFun f Fwd, def_res_ty = tangentType t
         , def_args = vars ++ dvars
-        , def_rhs = lmApply rhs (mkTuple $ map Var dvars) }
+        , def_rhs = UserRhs $ lmApply rhs $ mkTuple $ map Var dvars }
   where
     dvars = map to_delta vars
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
+
+applyD def = def
 
 applyDefs :: [TDef] -> [TDef]
 applyDefs = map applyD
@@ -140,9 +146,12 @@ applyDefs = map applyD
 
 transposeD :: TDef -> TDef
 transposeD (Def { def_fun = GradFun f d, def_res_ty = TypeLM s t
-                , def_args = args, def_rhs = rhs })
+                , def_args = args, def_rhs = UserRhs rhs })
   = Def { def_fun = GradFun f (flipMode d), def_res_ty = TypeLM t s
-         , def_args = args, def_rhs = lmTranspose rhs }
+         , def_args = args
+         , def_rhs = UserRhs $ lmTranspose rhs }
+
+transposeD def = def
 
 ----------------------------------
 --- Unit test

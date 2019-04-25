@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
-	     ScopedTypeVariables, TypeApplications #-}
+             ScopedTypeVariables, TypeApplications #-}
 
 module Lang where
 
@@ -19,9 +19,10 @@ import           Test.Hspec
 --  The main data types
 -----------------------------------------------
 
+data Phase = Parsed | Typed | OccAnald
+
 data DeclX p = RuleDecl (RuleX p)
              | DefDecl  (DefX p)
-             | EdefDecl (EdefX p)
 
 type Decl  = DeclX Parsed
 type TDecl = DeclX Typed
@@ -30,9 +31,27 @@ data DefX p  -- f x = e
   = Def { def_fun    :: Fun
         , def_args   :: [TVarX p]  -- See Note [Function arity]
         , def_res_ty :: TypeX p     -- Result type
-        , def_rhs    :: ExprX p }
+        , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
   -- (via TVar) and result types (via TFun)
+
+type Def  = DefX Parsed
+type TDef = DefX Typed
+
+data RhsX p
+  = UserRhs (ExprX p)   -- An ordinary definition with a right hand side
+
+  | StubRhs             -- Used during recursion, or after a type error
+                        --   to allow a Def to be added to the environment
+                        --   without having a RHS
+
+  | EDefRhs             -- An external definition: no RHS
+
+type TRhs  = RhsX Typed
+
+isUserDef :: DefX p -> Bool
+isUserDef (Def { def_rhs = UserRhs {} }) = True
+isUserDef _ = False
 
 data TVarX p = TVar (TypeX p) Var
 type TVar = TVarX Typed
@@ -61,11 +80,6 @@ and bind the arugments to e1.. en respectively.
 
 That is, arity-1 is treated specially. We do not have 1-tuples.
 -}
-
-type Def  = DefX Parsed
-type TDef = DefX Typed
-
-data Phase = Parsed | Typed | OccAnald
 
 type family VarX p where
   VarX Parsed   = Var
@@ -228,10 +242,6 @@ data RuleX p = Rule { ru_name  :: String   -- Just for logging
 type Rule  = RuleX Parsed
 type TRule = RuleX Typed
 
-data EdefX p = Edef { ed_fun     :: Fun
-                    , ed_res_ty  :: TypeX p
-                    , ed_arg_tys :: [TypeX p] }
-
 -----------------------------------------------
 --  Simple functions over these types
 -----------------------------------------------
@@ -240,19 +250,16 @@ flipMode :: ADMode -> ADMode
 flipMode Fwd = Rev
 flipMode Rev = Fwd
 
-partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p], [EdefX p])
--- Separate the Rules, Defs and Edefs
+partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p])
+-- Separate the Rules, Defs
 --
 -- See https://www.stackage.org/haddock/lts-12.1/base-4.11.1.0/src/Data-Either.html#partitionEithers
-partitionDecls = foldr (declX rule def edef) ([], [], [])
+partitionDecls = foldr declX ([], [])
   where
-    declX rule' def' edef' = \case
-      RuleDecl r -> rule' r
-      DefDecl  d -> def' d
-      EdefDecl e -> edef' e
-    rule a ~(r, d, e) = (a:r, d, e)
-    def  a ~(r, d, e) = (r, a:d, e)
-    edef a ~(r, d, e) = (r, d, a:e)
+    declX (RuleDecl r) = rule r
+    declX (DefDecl  d) = def  d
+    rule a ~(r, d) = (a:r, d)
+    def  a ~(r, d) = (r, a:d)
 
 -----------------------------------------------
 --       Building values
@@ -267,7 +274,7 @@ mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
 mkVar :: String -> Var  -- Just a Simple var
 mkVar = Simple
 
-mkTVar :: Type -> String -> TVar
+mkTVar :: TypeX p -> String -> TVarX p
 mkTVar ty = TVar ty . mkVar
 
 isDummy :: Var -> Bool
@@ -764,15 +771,27 @@ parensIf ctxt inner doc | ctxt == precZero = doc
 instance InPhase p => Pretty (DeclX p) where
   ppr (DefDecl d)  = ppr d
   ppr (RuleDecl r) = ppr r
-  ppr (EdefDecl e) = ppr e
 
 instance InPhase p => Pretty (DefX p) where
-  ppr (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs }) = mode
-      (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty, 
-                      parens (sep (map (parens . pprTVar) vs)), ppr rhs])
-      (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
-             2 (parens (pprList pprTVar vs))
-           , nest 2 (text "=" <+> ppr rhs) ])
+  ppr def = pprDef def
+
+pprDef :: InPhase p => DefX p -> SDoc
+pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
+  = case rhs of
+      EDefRhs -> parens $
+                 sep [ text "edef", ppr f
+                     , pprParendType res_ty
+                     , parens (pprList pprTVar vs) ]
+
+      UserRhs rhs -> mode
+          (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
+                        , parens (sep (map (parens . pprTVar) vs))
+                        , ppr rhs])
+          (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
+                    2 (parens (pprList pprTVar vs))
+               , nest 2 (text "=" <+> ppr rhs) ])
+
+      StubRhs -> text "<<StubRhs>>"
 
 instance InPhase p => Pretty (RuleX p) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
@@ -780,14 +799,6 @@ instance InPhase p => Pretty (RuleX p) where
     = sep [ text "rule" <+> doubleQuotes (text name)
                  <+> parens (pprList pprTVar qvars)
              , nest 2 (sep [ ppr lhs, nest 2 (text "=" <+> ppr rhs)]) ]
-
-instance InPhase p => Pretty (EdefX p) where
-  ppr (Edef fun returnType argTypes) =
-    parens (sep [ text "edef"
-                , ppr fun
-                , pprParendType returnType
-                , parens (sep (map pprParendType argTypes))
-                ])
 
 printK :: SDoc -> KM ()
 printK d = liftIO (putStrLn (render d))

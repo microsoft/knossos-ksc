@@ -194,7 +194,8 @@ cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
 cgenDefs :: [TDef] -> [String]
-cgenDefs defs = snd $ foldl go (cstEmpty, []) defs
+cgenDefs defs = snd $ foldl go (cstEmpty, []) $
+                filter isUserDef defs
  where
   go :: (CST, [String]) -> TDef -> (CST, [String])
   go (env, strs) def@(Def { def_fun = f }) =
@@ -218,24 +219,24 @@ vecSizeDecls vs = goVars (Set.fromList $ map tVarVar vs) vs
   where
     goVars :: Set.Set Var -> [TVar] -> String
     goVars _ [] = ""
-    goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (show v) ty 
-                                 in str ++ goVars seen' vs 
+    goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (show v) ty
+                                 in str ++ goVars seen' vs
 
     goVec :: Set.Set Var -> String -> Var -> (Set.Set Var, String)
-    goVec seen value sz = 
+    goVec seen value sz =
         if sz `Set.member` seen then
           (seen, "KS_ASSERT(" ++ show sz ++ " == size(" ++ value ++ "));\n")
         else
           (Set.insert sz seen, "/*" ++ show seen ++ "*/\n" ++ "int " ++ show sz ++ " = size(" ++ value ++ ");\n")
 
     goType :: Set.Set Var -> String -> Type -> (Set.Set Var, String)
-    goType seen value (TypeVec (Var (TVar TypeSize sz)) ty) = 
+    goType seen value (TypeVec (Var (TVar TypeSize sz)) ty) =
         let (seen',str) = goVec seen value sz
         in accum str $ goType seen' (get_element value) ty
 
-    goType seen value (TypeTuple tys) = 
-        foldl (\ (seen,str) (ty,n) -> accum (str ++ "/*tup*/") $ goType seen (get value n) ty) 
-              (seen, "") 
+    goType seen value (TypeTuple tys) =
+        foldl (\ (seen,str) (ty,n) -> accum (str ++ "/*tup*/") $ goType seen (get value n) ty)
+              (seen, "")
               (zip tys [0..])
 
     goType seen value _ = (seen, "/*" ++ value ++ "*/\n")
@@ -246,7 +247,8 @@ vecSizeDecls vs = goVars (Set.fromList $ map tVarVar vs) vs
     accum str (seen,str') = (seen, str ++ str')
 
 cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (Def { def_fun = f, def_args = params, def_rhs = body }) =
+cgenDefE env (Def { def_fun = f, def_args = params
+                  , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
       env' = foldl addParam env params
 
