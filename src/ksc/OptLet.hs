@@ -95,6 +95,28 @@ occAnalE (Call f e) = (Call f e', unions vs)
 occAnalE (Tuple es) = (Tuple es', unions vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
+
+occAnalE (Let tv (Tuple es) body)
+  = (Let (n, tv') (Tuple es') body', vs)
+  -- When a tuple is on the RHS of a let we want to prevent its
+  -- contents from being inlined back into it because we generally
+  -- want to fuse tuple construction with a function call that
+  -- dismantles it.  In order to stop the contents being inlined we
+  -- pretend that it occurs many times.
+  --
+  -- See Note [Inline tuples]
+  where
+    n = case tv `M.lookup` vsb of
+          Just n  -> n
+          Nothing -> 0
+    (tv',   vstv) = occAnalTv tv
+    (es',   vsr)  = unzip (map occAnalE es)
+    (body', vsb)  = occAnalE body
+    vs | n == 0    = tv `M.delete` vsb
+       | otherwise = (tv `M.delete` vsb)
+                     `union` vstv
+                     `union` markMany (unions vsr)
+
 occAnalE (Let tv rhs body)
   = (Let (n, tv') rhs' body', vs)
   where
@@ -296,6 +318,57 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
     go_ty _ TypeString  = TypeString
     go_ty _ TypeUnknown = TypeUnknown
 
+{- Note [Inline tuples]
+~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+ let t = (expensive1(x), expensive2(x))
+ in ...get$1$2(t)...get$2$2(t)....get$1$2(t)...
+
+We want to optimise away the calls to the gets but we don't want to
+duplicate the expensive calls.  Our strategy is as follows:
+
+ 1. The ANF pass rewrites f to
+
+  f(x) = let t1 = expensive1(x)
+             t2 = expensive2(x)
+             t  = (t1, t2)
+         in ...get$1$2(t)...get$2$2(t)....get$1$2(t)...
+
+ 2. We prevent t1 and t2 from being reinlined into the tuple by
+ marking them as "occurring many times" in occAnalE.
+
+ 3. t is inlined into the body, either by a sufficiently smart
+ compiler pass, or, as is the case at the time of writing, an explicit
+ $inline call.
+
+ 4. The calls to get can be eliminated.
+
+This has the beneficial consequence that redundant work can be
+eliminated, for example if we wrote
+
+ let t = (expensive1(x), expensive2(x), expensive3(x))
+ in ...get$1$3(t)...get$2$3(t)....get$1$3(t)...
+
+then this transformation avoids ever calculating expensive3(x).
+Furthermore we can obtain cross-function slicing by inlining an entire
+function.  For example
+
+ f(x) = (expensive1(x), expensive2(x))
+ g(x) = get$1$2(f(x))
+
+can be rewritten to
+
+ g(x) = expensive1(x)
+
+(Again, at the time of writing, the call to f must be marked with
+$inline.)
+
+Some of this is discussed at
+
+ https://github.com/awf/knossos/pull/426
+
+-}
+
 inline_me :: Int -> Var -> TExpr -> Bool
 inline_me n bndr rhs
   | n==0            = True   -- Dead code
@@ -303,6 +376,8 @@ inline_me n bndr rhs
   | isTrivial rhs   = True   -- RHS is trivial, see isTrivial for what that means
   | isKZero rhs     = True   -- Inline zeros, as they will very likely disappear
   | Grad {} <- bndr = True   -- Always inline Grads (might not do this in future)
+  | Tuple ts <- rhs          -- Always inline tuples whose fields are all trivial
+  , all isTrivial ts = True  -- See Note [Inline tuples]
   | otherwise       = False
 
 isTrivial :: TExpr -> Bool
