@@ -104,7 +104,6 @@ tcRhs _ StubRhs _ = return StubRhs
 tcRhs _ EDefRhs _ = return EDefRhs
 tcRhs fun (UserRhs rhs) res_ty
   = do { TE rhs' rhs_ty <- tcExpr rhs
-       ; TE rhs' rhs_ty <- tcExpr rhs
        ; checkTypes res_ty rhs_ty $
          text "Function result type mis-match for" <+> ppr fun
        ; return (UserRhs rhs') }

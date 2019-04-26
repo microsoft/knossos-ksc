@@ -37,7 +37,7 @@ optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
   where
     def' = def { def_rhs = UserRhs $ simplify env args rhs }
     env = OptEnv { optRuleBase = rb, optGblST = gst }
-optDef rb gst def = (gst,def)
+optDef _ gst def = (gst,def)
 
 simplify :: OptEnv -> [TVar] -> TExpr -> TExpr
 simplify env args rhs
