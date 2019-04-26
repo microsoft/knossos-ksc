@@ -64,7 +64,7 @@ gradDef (Def { def_fun = f, def_args = params
     lets = plets ++ szlets
 
 gradDef def = pprPanic "gradDef" (ppr def)
-   -- The fitlterGradFuns should make this impossible
+   -- The filterGradFuns should make this impossible
 
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)

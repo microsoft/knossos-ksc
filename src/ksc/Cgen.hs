@@ -203,9 +203,44 @@ cgenDefs defs = snd $ foldl go (cstEmpty, []) $
         (CG cdecl _cfun _ctype) = cgenDefE env' def
     in  (env', strs ++ [cdecl])
 
+cgenDefE :: CST -> TDef -> CGenResult
+cgenDefE env (Def { def_fun = f, def_args = params
+                  , def_rhs = UserRhs body }) =
+  let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
+      env' = foldl addParam env params
 
-cgenDef :: TDef -> String
-cgenDef def = getDecl $ cgenDefE cstEmpty def
+      vecsizes = vecSizeDecls params
+
+      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
+      cf                               = cgenUserFun f
+
+      mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
+      cvars       = map mkVar params
+
+      cftypealias = "ty$" ++ cf
+  in  CG
+        (     "typedef "
+        ++    cgenType cbodytype
+        `spc` cftypealias
+        ++    ";\n"
+        ++    cftypealias
+        `spc` cf
+        ++    "("
+        ++    intercalate ", " cvars
+        ++    ") {\n"
+        ++    vecsizes ++ "\n"
+        ++    cbodydecl
+        ++    "return ("
+        ++    cbodyexpr
+        ++    ");\n"
+        ++    "}\n"
+        )
+        cf
+        (TypeDef cftypealias cbodytype)
+
+cgenDefE _ def = pprPanic "cgenDefE" (ppr def)
+  -- Should not happen because of the 'filter isUserDef' in cgenDefs
+
 
 -- A decl of the form v : Vec n (Tuple (String, Vec m (Vec n Float)))
 -- should cg to a prelude in the C function like the following
@@ -245,41 +280,6 @@ vecSizeDecls vs = goVars (Set.fromList $ map tVarVar vs) vs
     get v n = "std::get<" ++ show n ++ ">(" ++ v ++ ")"
 
     accum str (seen,str') = (seen, str ++ str')
-
-cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (Def { def_fun = f, def_args = params
-                  , def_rhs = UserRhs body }) =
-  let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      env' = foldl addParam env params
-
-      vecsizes = vecSizeDecls params
-
-      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
-      cf                               = cgenUserFun f
-
-      mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      cvars       = map mkVar params
-
-      cftypealias = "ty$" ++ cf
-  in  CG
-        (     "typedef "
-        ++    cgenType cbodytype
-        `spc` cftypealias
-        ++    ";\n"
-        ++    cftypealias
-        `spc` cf
-        ++    "("
-        ++    intercalate ", " cvars
-        ++    ") {\n"
-        ++    vecsizes ++ "\n"
-        ++    cbodydecl
-        ++    "return ("
-        ++    cbodyexpr
-        ++    ");\n"
-        ++    "}\n"
-        )
-        cf
-        (TypeDef cftypealias cbodytype)
 
 cgenExpr :: CST -> TExpr -> M CGenResult
 cgenExpr = cgenExprR

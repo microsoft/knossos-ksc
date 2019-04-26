@@ -377,9 +377,18 @@ data TcEnv
 
 newtype TcM a = TCM { unTc :: TcEnv -> [SDoc] -> (Maybe a, [SDoc]) }
 -- Just a writer monad on [SDoc]
--- Return Nothing if typechecking failure; it's an exception
--- In that case there should always be a message in the
--- returned [SDoc]
+--
+-- Returns (Nothing, errs) if typechecking failure; it's an exception
+--   In that case there should always be a message in the
+--   returned 'errs'
+-- Returns (Just r, errs) if this piece of typechecking succeeded;
+--   We can recover from errors (via tryTc), so the 'errs' may
+--   be non-empty even in the (Just r) case, meaning that errors
+--   have been encountered, but we have recovered from them.
+--
+-- Needless to say, the incoming [SDoc] messages are always included
+--  in the returned [SDoc]; it's a writer monad that extends the
+--  error-message accumulator
 
 instance Functor TcM where
   fmap f (TCM m) = TCM (\ctxt ds -> case m ctxt ds of
