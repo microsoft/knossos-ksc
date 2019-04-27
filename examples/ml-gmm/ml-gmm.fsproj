@@ -1,15 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="Util.fs" />
     <Compile Include="Vector.fs" />
+    <Compile Include="Knossos.fs" />
     <Compile Include="gmm.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
-
 </Project>

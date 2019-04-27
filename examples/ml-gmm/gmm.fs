@@ -1,30 +1,16 @@
 module gmm
 
-open DV
-
-type Vec = Vector<float>
-type Mat = Vector<Vector<float>>
-
-let inline size (v: Vector<'T>) = v.Length
-
-let inline build n (f : int -> 'T) = Vector.init n f
-let inline build2 m n (f : int -> int -> float) = Vector.init m (fun i -> Vector.init n (f i))
-let inline sum v = Vector.sum v
-let inline mul (a: Vector<Vector<float>>) (b: Vector<float>) : Vector<float> = 
-    sum(build (size a) (fun i -> a.[i] * b.[i]))
-
-let inline max (a: Vector<float>) = a.GetMaxBy( fun x->x )
-let inline exp (a: Vector<float>) = Vector.map exp a
-let inline sqnorm (a: Vector<'a>) = a.GetL2NormSq()
+open Knossos
+open System
 
 let logsumexp (a:Vec) =
     let mx = max a
-    let semx = sum (exp (a - mx))
+    let semx = sum (expv (a - mx))
     (log semx) + mx
 
 let log_gamma_distrib a p =
-    log (Math.Pow(Math.PI,(0.25*(float (p*(p-1)))))) + 
-        sum (build p (fun j -> SpecialFunctions.GammaLn (a + 0.5*(1. - (float j)))))
+    log (Math.PI ** (0.25*(float (p*(p-1))))) + 
+        sum (build p (fun j -> gammaLn (a + 0.5*(1. - (float j)))))
 
 // ---------- Gaussian Mixture Model (GMM) ----------
 
@@ -55,7 +41,7 @@ let gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
             alphas.[k] + sum (qs.[k]) - 0.5 * mahal)
     ))) - 
     (float n) * (logsumexp alphas) +
-        0.5 * sum (build K (fun k -> sqnorm (exp qs.[k]) + sqnorm ls.[k]))
+        0.5 * sum (build K (fun k -> sqnorm (expv qs.[k]) + sqnorm ls.[k]))
 
 // Log of Wishart prior
 let log_wishart_prior p wishart_gamma wishart_m (qs:Vec[]) (ls:Vec[]) =
@@ -75,10 +61,11 @@ let gmm_with_prior x alphas means qs ls wishart_gamma wishart_m =
     gmm_objective x alphas means qs ls + 
     log_wishart_prior (size x.[0]) wishart_gamma wishart_m qs ls
 
+(* -- When we start probabilistic programming
 // Sample from GMM
 let gmm_sample (rng: RNG) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
     let K = size alphas
     let k = categorical_sample rng alphas
     let InvSqrtSigma = makeQ qs.[k] ls.[k]
     invSqrtGaussian_sample rng Q means.[k]   
-
+*)

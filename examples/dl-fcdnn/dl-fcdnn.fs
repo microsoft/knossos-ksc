@@ -1,10 +1,9 @@
-
 // "Artist's rendition" of simple FC DNN in DF#. 
 open FP      // Functional programming primitives: polymorphic zip, fold, etc
 open Tensor  // Vector/Matrix/Tensor, as plain-ol-data types
 
-type Mat = double
-type Vec = double
+type Mat = Matrix<double>
+type Vec = Vector<double>
 
 // Pretend that Tensor didn't define relu
 let relu x = max x 0.0
@@ -27,7 +26,8 @@ let dnn2 (weights : Mat list) (x : Vec) =
 let autoencoder_loss weights x = sqnorm (x - dnn weights x)
  
 // Autoencoder loss for a batch of examples
-let autoencoder_loss weights examples =     sum [for input in examples do (loss weights input)]
+let autoencoder_loss weights examples = 
+   sum [for input in examples do (loss weights input)]
  
 // Initialize weights
 let weights_init = [Mat.rand 784 400, Mat.rand 400 200, Mat.rand 200 784]
