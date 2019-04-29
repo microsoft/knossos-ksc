@@ -2,8 +2,8 @@
     (if (< 2 3) (index 1 x) 7.0)
 )
 
-(def mul_R_VecR (Vec n Float) ((r : Float) (a : Vec n Float))
-    (build n (lam (i : Integer) (* r (index i a)))))
+(def q (Vec (* 2 n) Float) ((r : Float) (m : Integer) (a : Vec n Float))
+    (build (* 2 n) (lam (i : Integer) (* r (index (/ i m) a)))))
 
 (def mkvec (Vec n Float) (n : Integer)
     (build n (lam (j : Integer) (to_float j))))
@@ -19,12 +19,16 @@
 |#
 
 (def g Float (gamma : Float)
-    (let (v     (mul_R_VecR gamma (mkvec 3)))
+    (let (v     (q gamma 3 (mkvec 3)))
          (sqnorm v)))
 
 #|
+
 (def main Integer ()
-    (let (v1 (build 4 (lam (i : Integer) 3.0)))
+    (let ((v1 (build 4 (lam (i : Integer) (to_float i))))
+          (delta 0.00001)
+          (dv (build 4 (lam (i : Integer) (* (to_float i) delta))))
+          (dq (build 8 (lam (i : Integer) (/ delta (to_float (+ 3 i)))))))
         (pr 1
             ; (D$f v1 v1)
             ; (D$g 1.1)

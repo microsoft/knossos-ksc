@@ -383,11 +383,27 @@ primFunCallResultTy_maybe fun args
                          , (t1:ts1) <- ts
                          , all (== t1) ts1                   -> Just (TypeLM (TypeTuple ss) t1)
                          
-
+      -- ($inline f args) forces f to be inlined here
       ("$inline"  , [t])                                     -> Just t
-      ("$check"   , [_f,_revf, _x,_dx,_df])                  -> Just TypeFloat
+
+      -- ($check f rev$f s ds dt) verifies the derivatives rev$f at s in directions ds,dt.
+      -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
+      -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s)) 
+      ("$check"   , [TypeLam s t, TypeLam s_dt _ds', s', ds, dt])
+                      | s' `eqType` s
+                      -- , ds' `eqType` ds -- fails in test0 for Tuple (Float) != Float 
+                      , tangentType s `eqType` ds
+                      , tangentType t `eqType` dt
+                      , s_dt `eqType` (typeTupleAppend s dt)
+                       -> Just TypeFloat
+      
+      -- ($trace e) emits its argument's value to stdout and returns it 
       ("$trace"   , [t])                                     -> Just t
+
+      -- ($rand s) returns a uniform random float between 0 and s 
       ("$rand"    , [TypeFloat])                             -> Just TypeFloat
+
+      -- (pr a b c) prints its arguments to stdout
       ("pr"       , _)                                       -> Just TypeInteger
       ("sumbuild" , [TypeSize, TypeLam TypeInteger t])       -> Just t
       ("sumbuild" , [TypeInteger, TypeLam TypeInteger t])    -> Just t
@@ -423,6 +439,10 @@ primFunCallResultTy_maybe fun args
       ("max"      , _                                      ) -> Just TypeFloat
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
       _ -> Nothing
+
+      where
+        typeTupleAppend (TypeTuple t1s) t2 = TypeTuple (t1s ++ [t2])
+        typeTupleAppend t1 t2 = TypeTuple [t1, t2]
 
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args

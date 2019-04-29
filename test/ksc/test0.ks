@@ -2,7 +2,7 @@
     (sum (build 3 (lam (y3 : Integer) (+ y 2))))
     )
 
-(def f Float ((x : Float))
+(def f Float (x : Float)
     ($trace * x x)
 )
 
