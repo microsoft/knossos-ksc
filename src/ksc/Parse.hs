@@ -151,8 +151,18 @@ pReserved = Tok.reserved lexer
 pInteger :: Parser Integer
 pInteger = Tok.integer lexer
 
+-- Along the same lines as the definition of integer from
+-- http://hackage.haskell.org/package/parsec-3.0.0/docs/src/Text-Parsec-Token.html#makeTokenParser
 pDouble :: Parser Double
-pDouble = Tok.float lexer
+pDouble = do
+  s <- Tok.lexeme lexer pSign
+  f <- Tok.float lexer
+  return (s f)
+
+pSign :: Num a => Parser (a -> a)
+pSign = (Text.Parsec.Char.char '-' >> return negate)
+        <|> (Text.Parsec.Char.char '+' >> return id)
+        <|> return id
 
 pString :: Parser String
 pString = Tok.stringLiteral lexer
