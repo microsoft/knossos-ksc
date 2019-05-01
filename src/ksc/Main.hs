@@ -155,7 +155,13 @@ displayCppGenAndCompile compile verbosity file =
   -- [see https://github.com/awf/knossos/issues/281]
   ; let alldefs = defs ++ optfwd ++ main_tdef
 
-  ; (env5, cse) <- cseDefs rulebase env4 alldefs
+  -- We use ANF to expose optimisation opportunities and use optDefs
+  -- to take them.  See Note [Inline tuples] for the motiviation for
+  -- doing ANF-then-optDefs.
+  ; anf_alldefs <- anfDefs alldefs
+  ; let (env45, opt_alldefs) = optDefs rulebase env4 anf_alldefs
+
+  ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
   ; displayPassM verbosity "CSE" env5 cse
 
   ; let ann2 =  cse
