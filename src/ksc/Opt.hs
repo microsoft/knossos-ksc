@@ -248,6 +248,7 @@ optPrimFun "lmCompose" [f,g]
   , hcat `isThePrimFun` "lmHCat"
   = Just (lmHCat (map (lmCompose f) qs))
 
+  -- (m1 `hcat` m2) . (m3 `vcat` m4)  =>  (m1 . m3) + (m2 . m4)
   | Call hcat ps <- f
   , Call vcat qs <- g
   , hcat `isThePrimFun` "lmHCat"
