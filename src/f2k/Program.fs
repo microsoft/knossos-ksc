@@ -71,7 +71,7 @@ let main argv =
     printfn "f2k: Parsing %d files to %s" (Seq.length prefixedFiles) outFile
 
     (* e.g. run as:
-       dotnet run .\f2k.fsproj (echo Util Vector Knossos gmm | % { "..\..\..\examples\ml-gmm\$_.fs" })  
+       dotnet run .\f2k.fsproj (echo Util Vector Knossos gmm | % { "..\..\examples\ml-gmm\$_.fs" })  
     *)
 
     for f in prefixedFiles do
