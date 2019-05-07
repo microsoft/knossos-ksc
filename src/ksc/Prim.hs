@@ -132,6 +132,7 @@ isKZero :: TExpr -> Bool
 isKZero = \case
   Konst (KInteger 0  ) -> True
   Konst (KFloat   0.0) -> True
+  Tuple ts -> all isKZero ts
   Call f [_,v] | f `isThePrimFun` "constVec" -> isKZero v
   _ -> False
 
