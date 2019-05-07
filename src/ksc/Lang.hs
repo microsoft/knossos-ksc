@@ -654,7 +654,7 @@ instance Pretty Konst where
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
 instance InPhase p => Pretty (TypeX p) where
-  pprPrec p (TypeVec sz ty)      = parensIf p precZero $
+  pprPrec p (TypeVec sz ty)      = parensIf p precTyApp $
                                    text "Vec" <+> pprParendExpr sz <+> pprParendType ty
   pprPrec _ (TypeTuple tys)      = parens (text "Tuple" <+> pprList pprParendType tys)
   pprPrec p (TypeLam from to)    = parensIf p precZero $
@@ -674,12 +674,14 @@ type Prec = Int
  -- 0 => no need for parens
  -- high => parenthesise everything
 
-precZero, precOne, precTwo, precThree, precTop :: Int
+precZero, precOne, precTwo, precThree, precTyApp, precCall, precTop :: Int
 precZero  = 0  -- Base
 precOne   = 1  -- ==
 precTwo   = 2  -- +
 precThree = 3  -- *
-precTop   = 3
+precTyApp = 4
+precCall  = 4
+precTop   = 4
 
 instance InPhase p => Pretty (ExprX p) where
   pprPrec = pprExpr
@@ -734,7 +736,7 @@ pprCall prec f e = mode
     ([e1, e2], Just prec')
       -> parensIf prec prec' $
          sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
-    _ -> parensIf prec precZero $
+    _ -> parensIf prec precCall $
          cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
   )
  where
@@ -764,8 +766,7 @@ isInfixFun (Fun (PrimFun s))
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
-parensIf ctxt inner doc | ctxt == precZero = doc
-                        | ctxt >= inner    = parens doc
+parensIf ctxt inner doc | ctxt >= inner    = parens doc
                         | otherwise        = doc
 
 instance InPhase p => Pretty (DeclX p) where
