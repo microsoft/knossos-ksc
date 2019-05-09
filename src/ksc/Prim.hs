@@ -362,7 +362,8 @@ primFunCallResultTy_maybe "+" args
     add (TypeVec n1 t1) (TypeVec n2 t2)
       | eqSize n1 n2                    = do { tr <- add t1 t2
                                              ; return (TypeVec n1 tr) }
-    add (TypeTuple t1s) (TypeTuple t2s) = do { ts <- zipWithM add t1s t2s
+    add (TypeTuple t1s) (TypeTuple t2s)
+      | length t1s == length t2s        = do { ts <- zipWithM add t1s t2s
                                              ; return (TypeTuple ts) }
     add _ _ = Nothing
 
