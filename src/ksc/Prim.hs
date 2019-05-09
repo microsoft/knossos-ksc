@@ -251,7 +251,7 @@ primCallResultTy_maybe fun args
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
 
-      Fun (SelFun i _) -> selCallResultTy_maybe i arg_tys
+      Fun (SelFun i n) -> selCallResultTy_maybe i n arg_tys
 
       GradFun f dir
         -> case primCallResultTy_maybe (Fun f) args of
@@ -277,11 +277,12 @@ primCallResultTy_maybe fun args
   where
     arg_tys = map typeof args
 
-selCallResultTy_maybe :: Int -> [Type] -> Either SDoc Type
-selCallResultTy_maybe i [TypeTuple arg_tys]
+selCallResultTy_maybe :: Int -> Int -> [Type] -> Either SDoc Type
+selCallResultTy_maybe i n [TypeTuple arg_tys]
   | i <= length arg_tys
+  , n == length arg_tys
   = Right (arg_tys !! (i - 1))
-selCallResultTy_maybe _ _ = Left (text "Bad argument to selector")
+selCallResultTy_maybe _ _ _ = Left (text "Bad argument to selector")
 
 primFunCallResultTy :: HasCallStack => PrimFun -> [TExpr] -> Type
 primFunCallResultTy fun args
