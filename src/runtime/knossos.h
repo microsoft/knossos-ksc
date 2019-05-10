@@ -1501,6 +1501,9 @@ namespace ks
 
         inline tuple<> neg(tuple<> d) { return d; }
 
+        template <class U0, class... Us>
+        inline tuple<U0, Us...> neg(tuple<U0, Us...> t) { return prepend(neg(head(t)), neg(tail(t))); }
+
         template <class T>
         inline vec<T> neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return neg(v[i]); }); }
 
