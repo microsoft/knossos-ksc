@@ -497,11 +497,15 @@ namespace ks
 			this->is_zero_ = false;
 		}
 
+                // We can efficiently copy construct (i.e. from a vec
+                // of the same type).  We just use operator=.
 		vec(vec<T> const& that) 
 		{
 			this->operator=(that);
 		}
 
+                // operator= is fast because it merely involves
+                // assigning small things
 		vec& operator=(const vec<T>& that)
 		{
 			this->size_ = that.size_;
@@ -511,6 +515,10 @@ namespace ks
 			return *this;
 		}
 
+                // We cannot efficiently construct from a vec of a
+                // different type.  Instead we have to allocate and
+                // copy all the data item by item to give a C++ a
+                // chance to auto-convert it.
 		template <class U>
 		vec(vec<U> const& that) : vec{ that.size() }
 		{
@@ -524,6 +532,11 @@ namespace ks
 				this->data_[i] = that[i];
 		}
 
+                // We cannot efficiently construct from a std::vector.
+                // When constructing from a std::vector we need to
+                // allocated and copy because we have no guarantee
+                // that the std::vector will not mutate or vanish
+                // beneath our feet.
 		vec(std::vector<T> const& that) : vec{ that.size() }
 		{
 			// Copying from std vector - allocate.
