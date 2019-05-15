@@ -6,6 +6,9 @@
 	     ScopedTypeVariables, TypeApplications #-}
 
 module LangUtils (
+  -- Functions over expressions
+  isTrivial,
+
   -- Substitution
   substEMayCapture,
 
@@ -32,6 +35,23 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Test.Hspec
 import Debug.Trace( trace )
+import Data.List( nub )
+
+-----------------------------------------------
+--     Functions over expressions
+-----------------------------------------------
+
+isTrivial :: TExpr -> Bool
+isTrivial (Tuple [])    = True
+isTrivial (Var {})      = True
+isTrivial (Konst {})    = True
+isTrivial (Call f args) = all isDummy args
+isTrivial (Assert _ e2) = isTrivial e2
+isTrivial _ = False
+
+isDummy :: TExpr -> Bool
+isDummy (Var v) = isDummyVar (tVarVar v)
+isDummy _       = False
 
 -----------------------------------------------
 --     Substitution
@@ -67,7 +87,7 @@ paramsSizeBinders :: forall p. InPhase p =>  [TVarX p] -> [TVar]
 --   1. we do not consider (Vec (n+m) Float) as binding anything
 --   2. a duplicate (e.g. n above) enters twice with the same definition
 --      at codegen the second defn is an assert of equality
-paramsSizeBinders vs = concatMap paramSizeBinders vs
+paramsSizeBinders vs = nub (concatMap paramSizeBinders vs)
 
 paramSizeBinders :: forall p. InPhase p => TVarX p -> [TVar]
 paramSizeBinders (TVar TypeInteger v)

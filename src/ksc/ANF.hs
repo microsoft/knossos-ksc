@@ -13,11 +13,8 @@ import Control.Monad( ap )
 
 -- anfDefs :: (GenBndr p) => [DefX p] -> KM [DefX p]
 anfDefs :: [TDef] -> KM [TDef]
-anfDefs defs
-  = do { u <- getUniq
-       ; let (u', defs') = runAnf u (mapM anfD defs)
-       ; setUniq u'
-       ; return defs' }
+anfDefs defs = runAnf $
+               mapM anfD defs
 
 -----------------------------------------------
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
@@ -90,12 +87,20 @@ be nicer, but I have not tried it.
 -}
 
 
-type FloatDef p = (LetBndrX p, ExprX p)
+data FloatDef p = FD (LetBndrX p) (ExprX p)
 
-runAnf :: Uniq -> AnfM p a -> (Uniq, a)
-runAnf u (AnfM f1) = case f1 u of (u', _, r) -> (u', r)
+instance InPhase p => Pretty (FloatDef p) where
+  pprPrec _ (FD b e) = pprLetBndr @p b <+> char '=' <+> ppr e
 
-newtype AnfM p a = AnfM (Uniq -> (Uniq, [FloatDef p], a))
+newtype AnfM p a = AnfM (KM ([FloatDef p], a))
+
+runAnf :: InPhase p => AnfM p a -> KM a
+runAnf m = do { (fs, r) <- run m
+              ; assert (text "runANF" <+> ppr fs) (null fs) $
+                return r }
+
+run :: AnfM p a -> KM ([FloatDef p], a)
+run (AnfM m) = m
 
 instance Applicative (AnfM p) where
   pure  = return
@@ -105,23 +110,20 @@ instance Functor (AnfM p) where
   fmap f m = do { x <- m; return (f x) }
 
 instance Monad (AnfM p) where
-  return x = AnfM (\u -> (u, [], x))
-  AnfM m1 >>= k  = AnfM $ \u ->
-                   case m1 u  of { (u1, fs1, x) ->
-                   case k x   of { AnfM m2 ->
-                   case m2 u1 of { (u2, fs2, r) ->
-                   (u2, fs1 ++ fs2, r) } } }
+  return x = AnfM (return ([], x))
+  m >>= k  = AnfM $ do { (fs1, x) <- run m
+                       ; (fs2, r) <- run (k x)
+                       ; return (fs1 ++ fs2, r) }
 
 wrapLets :: AnfM p (ExprX p) -> AnfM p (ExprX p)
-wrapLets (AnfM f1) = AnfM $ \u ->
-                    case f1 u of
-                       (u', fs, e) -> (u', [], wrap fs e)
+wrapLets (AnfM m) = AnfM $ do { (fs, e) <- m
+                              ; return ([], wrap fs e) }
 
 wrap :: [FloatDef p] -> ExprX p -> ExprX p
-wrap fs e = foldr (\(v,r) b -> Let v r b) e fs
+wrap fs e = foldr (\(FD v r) b -> Let v r b) e fs
 
 emit :: LetBndrX p -> ExprX p -> AnfM p ()
-emit v r = AnfM (\u -> (u, [(v,r)], ()))
+emit v r = AnfM (return ([FD v r], ()))
 
 ---------------------------------
 class GenBndr p where
@@ -138,6 +140,6 @@ instance GenBndr Typed where
        tv = mkTVar (typeof e) ("t" ++ show u)
 
 newVar :: GenBndr p => ExprX p -> AnfM p (LetBndrX p, VarX p)
-newVar e = AnfM (\u -> (u+1, [], mkNewVar u e))
+newVar e = AnfM $ do { u <- getUniq; return ([], mkNewVar u e) }
 
 

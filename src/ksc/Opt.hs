@@ -8,46 +8,97 @@ module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) wher
 
 import Lang
 import LangUtils
+import ANF
 import Prim
 import Rules
 import OptLet
+import KMonad
 
 import Debug.Trace
 import Test.Hspec
-import Data.List( mapAccumL )
+import Data.List( mapAccumR )
 
 optTrace :: msg -> a -> a
 optTrace _msg t = t -- trace msg t
 
 data OptEnv = OptEnv { optRuleBase :: RuleBase
-                     , optGblST    :: GblSymTab }
+                     , optGblST    :: GblSymTab
+                     , optSubst    :: Subst }
+
+optEnvInScope :: OptEnv -> InScopeSet
+optEnvInScope env = substInScope (optSubst env)
 
 emptyOptEnv :: OptEnv
 emptyOptEnv = OptEnv { optRuleBase = mkRuleBase []
-                     , optGblST    = emptyGblST }
+                     , optGblST    = emptyGblST
+                     , optSubst    = mkEmptySubst [] }
+
+optZapSubst :: OptEnv -> OptEnv
+optZapSubst env@(OptEnv { optSubst = subst })
+  = env { optSubst = zapSubst subst }
+
+optSubstBndr :: TVar -> OptEnv -> (TVar, OptEnv)
+optSubstBndr tv env@(OptEnv { optSubst = subst })
+  = (tv', env { optSubst = subst' })
+  where
+    (tv', subst') = substBndr tv subst
 
 ---------------
 optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
-                        -> (GblSymTab, [TDef])
+                        -> KM (GblSymTab, [TDef])
 -- Returned GblSymTab contains the optimised definitions
-optDefs = mapAccumL . optDef
+optDefs _  gst [] = return (gst, [])
+optDefs rb gst (def:defs) = do { (gst1, def')  <- optDef  rb gst def
+                               ; (gst2, defs') <- optDefs rb gst1 defs
+                               ; return (gst2, def' : defs') }
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
-                       -> (GblSymTab, TDef)
+                       -> KM (GblSymTab, TDef)
 optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
-  = (extendGblST gst [def'], def')
-  where
-    def' = def { def_rhs = UserRhs $ simplify env args rhs }
-    env = OptEnv { optRuleBase = rb, optGblST = gst }
-optDef _ gst def = (gst,def)
+  = do { let env = OptEnv { optRuleBase = rb
+                          , optGblST = gst
+                          , optSubst = mkEmptySubst args }
+       ; rhs' <- simplify env args rhs
+       ; let def' = def { def_rhs = UserRhs rhs' }
+       ; return (extendGblST gst [def'], def') }
 
-simplify :: OptEnv -> [TVar] -> TExpr -> TExpr
+optDef _ gst def = return (gst,def)
+
+simplify :: OptEnv -> [TVar] -> TExpr -> KM TExpr
 simplify env args rhs
-  =  -- We run optLets again at the end of the simplify pass to ensure
-     -- that variables have unique names.  See
-     --
-     --     https://github.com/awf/knossos/pull/386#issuecomment-476586918
-     optLets args (optE env (optLets args rhs))
+  = do { rhs1 <- runAnf (anfExpr rhs)
+--       ; banner "ANF'd (1)"
+--       ; display rhs1
+
+       ; let rhs2 = optLets args rhs1
+--       ; banner "OptLets (1)"
+--       ; display rhs2
+
+       ; let rhs3 = optE env rhs2
+--       ; banner "OptE (1)"
+--       ; display rhs3
+
+       ; rhs4 <- runAnf (anfExpr rhs3)
+--       ; banner "ANF'd (2)"
+--       ; display rhs4
+
+       ; let rhs5 = optLets args rhs4
+--       ; banner "OptLets (2)"
+--       ; display rhs5
+
+       ; let rhs6 = optE env rhs5
+--       ; banner "OptE (2)"
+--       ; display rhs6
+
+          -- We run optLets again at the end of the simplify pass to ensure
+          -- that variables have unique names.  See
+          --
+          --     https://github.com/awf/knossos/pull/386#issuecomment-476586918
+       ; let rhs7 = optLets args rhs6
+--       ; banner "OptLets (3)"
+--       ; display rhs7
+
+       ; return rhs7 }
 
 ---------------
 optE :: HasCallStack => OptEnv -> TExpr -> TExpr
@@ -58,22 +109,30 @@ optE env
     go e | Just e' <- tryRules (optRuleBase env) e = go e'
 
     go (Tuple es)         = Tuple (map go es)
-    go (Var v)            = Var v
+    go (Var v) | Just e <- lookupSubst (tVarVar v) (optSubst env)
+               = e
+               | otherwise = Var v
     go (Konst k)          = Konst k
-    go (Lam v e)          = Lam v (go e)
     go (App e1 e2)        = optApp env (go e1) (go e2)
     go (Assert e1 e2)     = Assert (go e1) (go e2)
-    go (Let var rhs body) = mkLet var (go rhs) (go body)
+    go (Lam tv e)         = Lam tv' (optE env' e)
+       where
+         (tv', env') = optSubstBndr tv env
+    go (Let tv rhs body)  = mkLet tv' (go rhs) (optE env' body)
+       where
+         (tv', env') = optSubstBndr tv env
     go (If b t e)         = optIf (go b) (go t) (go e)
-    go (Call f arg)       = optCall env f (map go arg)
+    go (Call f arg)       = optCall (optZapSubst env) f (map go arg)
 
 --------------
 optCall :: OptEnv -> TFun -> [TExpr] -> TExpr
-optCall env fun opt_arg
-  | Just new_e <- rewriteCall env fun opt_arg
-  = optE env new_e
+optCall env fun opt_args
+  | Just new_e <- rewriteCall env fun opt_args
+--  = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
+--                                 , text "After: " <+> ppr new_e ])
+    = optE env new_e
   | otherwise
-  = Call fun opt_arg
+  = Call fun opt_args
 
 --------------
 optApp :: OptEnv -> TExpr -> TExpr -> TExpr
@@ -101,17 +160,22 @@ optIf b                     t e = If b t e
 rewriteCall :: HasCallStack => OptEnv -> TFun -> [TExpr] -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
--- But be careful with lmTranspose because it needs to transform the
--- RHS of the let (sigh; this seems terribly ad-hoc)
+-- Just for unary functions so far
+-- Could do this for n-ary functions but beware shadowing
 rewriteCall _ fun [Let v r arg]
-  | not (fun `isThePrimFun` "lmTranspose")
   = Just (Let v r (Call fun [arg]))
+
+-- RULE: f( if e1 then e2 else e3 )  =  if e1 then f(e2) else f(e3)
+-- Again unary functions only (notably fst, snd)
+-- For nary functions worry about code duplication.
+rewriteCall _ fun [If e1 e2 e3]
+  = Just (If e1 (Call fun [e2]) (Call fun [e3]))
 
 rewriteCall env (TFun _ (Fun fun)) arg
   = optFun env fun arg
 
-rewriteCall _ (TFun ty (GradFun f _)) arg
-  = optGradFun ty f arg
+rewriteCall env (TFun ty (GradFun f adm)) arg
+  = optGradFun (optEnvInScope env) adm ty f arg
 
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
   = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
@@ -139,30 +203,30 @@ optFun env (PrimFun "$inline") arg
   = Just (inlineCall bndrs body inner_arg)
 
 -- Other prims are determined by their args
-optFun _ (PrimFun f) e
-  = optPrimFun f e
+optFun env (PrimFun f) e
+  = optPrimFun (optEnvInScope env) f e
 
 optFun _ (UserFun {}) _
   = Nothing
 
 -----------------------
-optPrimFun :: PrimFun -> [TExpr] -> Maybe TExpr
+optPrimFun :: InScopeSet -> PrimFun -> [TExpr] -> Maybe TExpr
 
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type
 -- We use () as the tangent type for non-differentiatable types
-optPrimFun "+" [e1, e2]
+optPrimFun _ "+" [e1, e2]
   | TypeTuple [] <- typeof e1
   , TypeTuple [] <- typeof e2
   = Just (Tuple [])
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
-optPrimFun "+" [Tuple es1, Tuple es2]
+optPrimFun _ "+" [Tuple es1, Tuple es2]
   | length es1 == length es2
   = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
-optPrimFun "+" [x, y] =
+optPrimFun _ "+" [x, y] =
     if isKZero y then
       Just x
     else if isKZero x then
@@ -171,66 +235,97 @@ optPrimFun "+" [x, y] =
       Nothing
 
 -- RULE: x*0 = 0*x = 0
-optPrimFun "*" [x, y]
+optPrimFun _ "*" [x, y]
   | isKZero x || isKZero y
   = Just $ mkZero (typeof y)
   | otherwise
   = Nothing
 
 -- RULE: size (build (n, _)) = n
-optPrimFun "size" [Call build [n,_]]
+optPrimFun _ "size" [Call build [n,_]]
   | build `isThePrimFun` "build"
   = Just n
 
 -- RULE: size (x * y) = size(x)
-optPrimFun "size" [Call mul [x,_]]
+optPrimFun _ "size" [Call mul [x,_]]
   | mul `isThePrimFun` "*"
   = Just (pSize x)
 
 -- RULE: index j (build n f) = f j
-optPrimFun "index" [ ei, arr ]
-  | Call build [_, f] <- arr
-  , build `isThePrimFun` "build"
-  , Lam i e <- f
+optPrimFun _ "index" [ ei, arr ]
+  | Just (_, i, e) <- isBuild_maybe arr
   = Just (Let i ei e)
 
 -- RULE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v
 
 -- RULE: deltaVec n i 0 = zero (build n (\i . 0))
-optPrimFun "deltaVec" [n, _i, val]
+optPrimFun _ "deltaVec" [n, _i, val]
   | isKZero val
   = Just $ pConstVec n val
 
 -- RULE: zero (Int) = 0
-optPrimFun "zero" [Konst (KInteger _)]
+optPrimFun _ "zero" [Konst (KInteger _)]
   = Just (Konst (KInteger 0))
 
 -- RULE: zero (Float) = 0.0
-optPrimFun "zero" [Konst (KFloat _)]
+optPrimFun _ "zero" [Konst (KFloat _)]
   = Just (Konst (KFloat 0))
 
-optPrimFun "sum"         [arg]          = optSum arg
-optPrimFun "build"       [sz, Lam i e2] = optBuild sz i e2
-optPrimFun "sumbuild"    [sz, Lam i e2] = optSumBuild sz i e2
-optPrimFun "lmBuild"     [sz, Lam i e2] = optLMBuild sz i e2
-optPrimFun "lmApply"     [e1,e2]        = optApplyLM e1 e2
-optPrimFun "lmTranspose" [arg]          = optLMTrans arg
+optPrimFun _ "sum"         [arg]          = optSum arg
+optPrimFun _ "build"       [sz, Lam i e2] = optBuild sz i e2
+optPrimFun _ "sumbuild"    [sz, Lam i e2] = optSumBuild sz i e2
+optPrimFun _ "lmBuild"     [sz, Lam i e2] = optLMBuild sz i e2
+optPrimFun env "lmApply"   [e1,e2]        = optLMApply env (AD BasicAD Fwd) e1 e2
+optPrimFun env "lmApplyR"  [e1,e2]        = optLMApply env (AD BasicAD Rev) e2 e1
+optPrimFun env "lmApplyT"  [e1,e2]        = optLMApply env (AD TupleAD Fwd) e1 e2
+optPrimFun env "lmApplyTR" [e1,e2]        = optLMApply env (AD TupleAD Rev) e2 e1
+optPrimFun _ "lmCompose"   [f,g]          = optLMCompose f g
 
-optPrimFun "lmCompose" [f,g]
+optPrimFun _ "lmVCat" es
+  | all isLMZero es
+  , Just (s:ss, ts) <- unzipLMTypes (map typeof es)
+  , assert (text "lmVCat" <+> pprList ppr es) (all (s ==) ss) True
+  = Just $ lmZero s (mkTupleTy ts)
+
+-- Add(0, x) = x = Add(x, 0)
+optPrimFun _ "lmAdd" [p,q]
+  | isLMZero p = Just q
+  | isLMZero q = Just p
+
+-- Add(Scale(x), Scale(y)) = Scale(Add(x,y))
+  | Call scale1 [t1, x] <- p
+  , Call scale2 [t2, y] <- q
+  , scale1 `isThePrimFun` "lmScale"
+  , scale2 `isThePrimFun` "lmScale"
+  , typeof t1 == typeof t2
+  = Just $ lmScale (typeof t1) (pAdd x y)
+
+-- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
+optPrimFun _ "lmAdd" [ Call hcat1 ps
+                   , Call hcat2 qs]
+  | hcat1 `isThePrimFun` "lmHCat"
+  , hcat2 `isThePrimFun` "lmHCat"
+  = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
+
+optPrimFun _ _ _ = Nothing
+
+----------------------
+optLMCompose :: TExpr -> TExpr -> Maybe TExpr
+optLMCompose f g
   | isLMOne f  = Just g
 
   -- 1 o g = g
   | isLMOne g  = Just f
 
   -- f o 0 = 0
-  {-  but where to get a zero of F's output type?
-      We can't just check if the types are the same, as the sizes may be different.
-  | Call gz [s,t] <- g
-  , gz `isThePrimFun` "lmZero"
-  = Just ?
-  -}
+  | isLMZero f = Just (lmZero s t)
+  | isLMZero g = Just (lmZero s t)
+  where
+    TypeLM _ t = typeof f
+    TypeLM s _ = typeof g
 
+optLMCompose f g
   -- Scale(T, x) . Scale(T, y) = Scale(T, xy )
   | Call scale1 [t1, x] <- f
   , Call scale2 [t2, y] <- g
@@ -242,7 +337,7 @@ optPrimFun "lmCompose" [f,g]
   -- (f . g) . h   =>   f . (g . h)
   | Call lmcomp [p1,p2] <- f
   , lmcomp `isThePrimFun` "lmCompose"
-  = optPrimFun "lmCompose" [p1, lmCompose p2 g]
+  = optLMCompose p1 (lmCompose p2 g)
 
   -- f . (g x h)   =>  (f . g) x (f . h)
   -- This duplicates f; we might want to take care
@@ -258,33 +353,8 @@ optPrimFun "lmCompose" [f,g]
   = traceWhenUnequal "H o V" (length ps) (length qs) $
     Just (lmAdds (zipWith lmCompose ps qs))
 
-optPrimFun "lmVCat" es
-  | all isLMZero es
-  , Just (s:ss, ts) <- unzipLMTypes (map typeof es)
-  , assert (text "lmVCat" <+> pprList ppr es) (all (s ==) ss) True
-  = Just $ lmZero s (mkTupleTy ts)
-
--- Add(0, x) = x = Add(x, 0)
-optPrimFun "lmAdd" [p,q]
-  | isLMZero p = Just q
-  | isLMZero q = Just p
-
--- Add(Scale(x), Scale(y)) = Scale(Add(x,y))
-  | Call scale1 [t1, x] <- p
-  , Call scale2 [t2, y] <- q
-  , scale1 `isThePrimFun` "lmScale"
-  , scale2 `isThePrimFun` "lmScale"
-  , typeof t1 == typeof t2
-  = Just $ lmScale (typeof t1) (pAdd x y)
-
--- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
-optPrimFun "lmAdd" [ Call hcat1 ps
-                   , Call hcat2 qs]
-  | hcat1 `isThePrimFun` "lmHCat"
-  , hcat2 `isThePrimFun` "lmHCat"
-  = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
-
-optPrimFun _ _ = Nothing
+  | otherwise
+  = Nothing
 
 -----------------------
 inlineCall :: [TVar] -> TExpr  -- Function parameters and body
@@ -299,14 +369,11 @@ optSum :: TExpr -> Maybe TExpr
 
 -- RULE: sum (build n (\i. (e1,e2,...)))
 --       = (sum (build n (\i.e1)), sum (build n (\i.e2)), ...)
-optSum (Call build [n, Lam i (Tuple es)])
-  | build `isThePrimFun` "build"
-  = Just $ Tuple (map (pSum . pBuild n . Lam i) es)
+optSum e
+  | Just (n, i, body) <- isBuild_maybe e
+  = Just $ pSumBuild n (Lam i body)
 
 -- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
-optSum (Call build [n, Lam i e])
-  | build `isThePrimFun` "build"
-  = Just $ pSumBuild n (Lam i e)
 
 -- RULE: sum (diag sz f)  =  build sz f
 optSum (Call diag [sz, f])
@@ -392,11 +459,23 @@ optBuild _ _ _ = Nothing
 -----------------------
 optSumBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
 
+-- RULE: sumbuild n (\i. (e1,e2))  =  (sumbuild n (\i.e1), sumbuild n (\i.e2))
+optSumBuild n i (Tuple es)
+  = Just $ Tuple (map (pSumBuild n . Lam i) es)
+
 -- RULE: sumbuild n (\i. e)  =  n * e, when i not free in e
 optSumBuild sz i e
   | TVar TypeInteger _ <- i
   , i `notFreeIn` e
   = Just $ pMul (mkPrimCall1 "to_float" sz) e
+
+-- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
+--       = let i = ej in e
+optSumBuild _ i (Call delta [Var i1, ej, e])
+  | delta `isThePrimFun` "delta"
+  , i == i1
+  , i `notFreeIn` ej
+  = Just (Let i ej e)
 
 -- RULE: sumbuild n (\i. deltaVec n i e)
 --       = build n (\i. e)
@@ -431,11 +510,47 @@ optLMBuild _ _ _ = Nothing
 
 
 -----------------------
-optGradFun :: HasCallStack => Type -> FunId -> [TExpr] -> Maybe TExpr
+optGradFun :: HasCallStack => InScopeSet -> ADPlan
+                           -> Type -> FunId -> [TExpr] -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun _ (UserFun {}) _   = Nothing
-optGradFun ty (PrimFun f) arg = optGradPrim ty f arg
-optGradFun _ (SelFun i n) arg = optGradSel i n arg
+optGradFun _ _ _ (UserFun {}) _
+  = Nothing
+
+-- From here on we have primitives or selection
+
+optGradFun env TupleAD ty f args
+  | TypeTuple [res_ty, lm_ty] <- ty
+  , Just opt_grad <- optGradFun env BasicAD lm_ty f new_args
+  = Just $
+    mkLets binds $
+    Tuple [ Call (TFun res_ty (Fun f)) new_args, opt_grad ]
+  | otherwise
+  = Nothing
+  where
+    (binds, new_args) = makeAtomic False env args
+
+optGradFun _ BasicAD  _ (SelFun i n) args = optGradSel  i n args
+optGradFun _ BasicAD ty (PrimFun f)  args = optGradPrim ty f args
+
+type TBinds = [(TVar, TExpr)]
+
+makeAtomic :: Bool           -- True => add a fresh binding regardless
+           -> InScopeSet     -- Do not chose these as binders
+           -> [TExpr]        -- Arguments
+           -> (TBinds, [TExpr])
+makeAtomic always_bind in_scope args
+  = (binds, new_args)
+  where
+    ((_,binds), new_args) = mapAccumR do_arg (in_scope, []) args
+    do_arg :: (InScopeSet, TBinds) -> TExpr -> ((InScopeSet, TBinds), TExpr)
+    do_arg (in_scope, binds) arg
+       | not always_bind
+       , isTrivial arg = ((in_scope, binds), arg)
+       | otherwise     = ((in_scope', bind:binds), Var tv)
+       where
+         tv = TVar (typeof arg) (notInScope argVar in_scope)
+         bind = (tv, arg)
+         in_scope' = extendInScopeSet tv in_scope
 
 optGradSel :: Int -> Int -> [TExpr] -> Maybe TExpr
 --   sel 2 3 :: (a,b,c) -> b
@@ -449,13 +564,12 @@ optGradSel :: Int -> Int -> [TExpr] -> Maybe TExpr
 optGradSel i n [arg]
   | TypeTuple tys <- typeof arg
   , length tys == n
-  = let
-      tyi = tys !! (i-1)
-    in
-      Just (lmHCat [ if i == j then lmOne tyi
-                               else lmZero tyj tyi
-                   | j <- [1..n]
-                   , let tyj = tys !! (j-1) ])
+  , let tyi = tys !! (i-1)
+  = Just $
+    lmHCat [ if i == j then lmOne tyi
+                       else lmZero tyj tyi
+           | j <- [1..n]
+           , let tyj = tys !! (j-1) ]
 
 optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
 
@@ -491,7 +605,7 @@ optGradPrim _  "/" arg
 
 optGradPrim _ "sum" [e]
   | TypeVec n t <- typeof e
-  = Just (lmBuildT n (Lam (TVar TypeInteger $ Simple "sum$i")
+  = Just (lmBuildT n (Lam (TVar TypeSize $ Simple "sum$i")
                           (lmOne t)))
 
 optGradPrim _ "size" [e]
@@ -518,30 +632,36 @@ optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 
 ---------------
 -- Called for (lmApply lm dx)
-optApplyLM :: TExpr -> TExpr -> Maybe TExpr
-optApplyLM (Assert e1 e2) dx
-  = Just (Assert e1 (lmApply e2 dx))
+optLMApply :: InScopeSet -> ADMode -> TExpr -> TExpr -> Maybe TExpr
+
+optLMApply _ adm (Assert e1 e2) dx
+  = Just (Assert e1 (lmApply_AD adm e2 dx))
+
+optLMApply _ adm (Let v rhs body) dx
+  = Just $ Let v rhs $ lmApply_AD adm body dx
+
+optLMApply _ adm (If b et ef) dx
+  = Just $ If b (lmApply_AD adm et dx) (lmApply_AD adm ef dx)
+
+-- lmApplyT  (r, lm) dx ===> lmApply  lm dx
+-- lmApplyTR dr (r, lm) ===> lmApplyR dr lm
+optLMApply _ (AD TupleAD dir) (Tuple [_, lm]) dx
+  = Just (lmApply_Dir dir lm dx)
 
 -- Called for (lmApply (lm* es) dx)
-optApplyLM (Call (TFun _ (Fun (PrimFun f))) es) dx
-  = optApplyLMCall f es dx
-
-optApplyLM (Let v rhs body) dx
-  = Just $
-    Let v rhs $
-    lmApply body dx
-
-optApplyLM (If b et ef) dx
-  = Just $ If b (lmApply et dx) (lmApply ef dx)
+-- In BasicAD only
+optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun (PrimFun f))) es) dx
+  = optLMApplyCall env dir f es dx
 
 -- Looking at:   D$f(e1, e2) `lmApply` dx
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
-optApplyLM (Call (TFun (TypeLM _ t) (GradFun f Fwd)) es) dx
+optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
+  | adp1 == adp2
   = Just (Call grad_fun (es ++ dxs))
   where
-    grad_fun = TFun (tangentType t) (DrvFun f Fwd)
+    grad_fun = TFun (tangentType t) (DrvFun f (AD adp1 Fwd))
 
     -- Unpack dx to match the arity of the function
     -- Remember: fwd$f :: S1 S2 S1_t S2_t -> T_t
@@ -549,124 +669,152 @@ optApplyLM (Call (TFun (TypeLM _ t) (GradFun f Fwd)) es) dx
             []                  -> []
             [_]                 -> [dx]
             _ | Tuple dxs <- dx -> dxs
-              | otherwise       -> pprPanic "optApplyLM" (vcat [ppr es, ppr dx])
+              | otherwise       -> pprPanic "optLMApply" (vcat [ppr es, ppr dx])
 
--- Looking at:   R$f(e1, e2) `lmApply` dx
+-- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
---   R$f :: S1 S2 -> (T -o (S1,S2))
+--   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
-optApplyLM (Call (TFun (TypeLM _ t) (GradFun f Rev)) es) dx
+optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (GradFun f adp2)) es) dx
+  | adp1 == adp2
   = Just (Call grad_fun (es ++ [dx]))
   where
-    grad_fun = TFun (tangentType t) (DrvFun f Rev)
+    grad_fun = TFun (tangentType s) (DrvFun f (AD adp1 Rev))
 
 {-
-optApplyLM (Call (TFun (TypeLM _ t) (GradFun (PrimFun f) mode)) e) dx
+optLMApply (Call (TFun (TypeLM _ t) (GradFun (PrimFun f) mode)) e) dx
   = -- trace ("Prim Grad->Der [" ++ f ++ "]")
     Just $ Call (TFun (tangentType t) (DrvFun (PrimFun f) mode)) (Tuple [e, dx])
 -}
 
-optApplyLM e _
+optLMApply _ _ e _
   = pprTrace "Apply not optimized:" (ppr e)
     Nothing
 
 ------------------
 -- Optimise (lmApply (fun arg) dx)
-optApplyLMCall :: HasCallStack
-               => String -> [TExpr] -- f args :: s -o t
+-- Only for the BasicAD form
+optLMApplyCall :: HasCallStack
+               => InScopeSet -> ADDir
+               -> String -> [TExpr] -- f args :: s -o t
                -> TExpr             -- :: T(s)
                -> Maybe TExpr       -- :: T(t)
 
 -- (lmZero :: s -o t) `apply` (x :: T(s))  = 0 :: T(t)
-optApplyLMCall "lmZero" [s, t] dx
-  = traceWhenTypesUnequal "Apply lmZero" (tangentType (typeof s)) (typeof dx) $
-    Just (mkZero (tangentType (typeof t)))
+optLMApplyCall _ dir "lmZero" [s, t] dx
+  = traceWhenTypesUnequal "Apply lmZero" in_ty (typeof dx) $
+    Just (mkZero out_ty)
+  where
+    tangent_s = tangentType (typeof s)
+    tangent_t = tangentType (typeof t)
+    (in_ty, out_ty) = case dir of
+                        Fwd -> (tangent_s, tangent_t)
+                        Rev -> (tangent_t, tangent_s)
 
-optApplyLMCall "lmOne" t dx
-  = traceWhenTypesUnequal "Apply lmOne" (tangentType (typeofArgs t)) (typeof dx) $
+optLMApplyCall _ _ "lmOne" t dx
+  = traceWhenTypesUnequal "Apply lmOne"
+             (tangentType (typeofArgs t)) (typeof dx) $
     Just dx
 
-optApplyLMCall "lmAdd"  [f,g] dx
-  = Just (pAdd (lmApply f dx) (lmApply g dx))
+optLMApplyCall _ dir "lmAdd"  [f,g] dx
+  = Just (pAdd (lmApply_Dir dir f dx) (lmApply_Dir dir g dx))
 
-optApplyLMCall "lmCompose" [f,g] dx
-  = Just (lmApply f (lmApply g dx))
+optLMApplyCall _ Fwd "lmCompose" [f,g] dx = Just (lmApply f (lmApply g dx))
+optLMApplyCall _ Rev "lmCompose" [f,g] dx = Just (lmApplyR (lmApplyR dx f) g)
 
-optApplyLMCall "lmVCat" es dx
-  = Just (Tuple [lmApply e dx | e <- es])
-
-optApplyLMCall "lmHCat" es dx
-  | (e1:_) <- es
-  , TypeLM _ _ <- typeof e1
-  = Just $ foldr1 pAdd $ zipWith apply es [1..]
-  where
-    n = length es
-
-    apply :: TExpr -> Int -> TExpr
-    apply e i = lmApply e (pSel i n dx)
-
-optApplyLMCall "lmScale" [_ty, x] dx
+optLMApplyCall _ _ "lmScale" [_ty, x] dx
   = Just (pMul x dx)
 
-optApplyLMCall "lmBuild" [n, Lam i m] dx
-  = Just (pBuild n (Lam i (lmApply m dx)))
+optLMApplyCall _ Fwd "lmVCat" es dx = do_prod Fwd es dx
+optLMApplyCall _ Rev "lmVCat" es dx = do_sum  Rev es dx
+optLMApplyCall _ Fwd "lmHCat" es dx = do_sum  Fwd es dx
+optLMApplyCall _ Rev "lmHCat" es dx = do_prod Rev es dx
 
-optApplyLMCall "lmBuildT" [n, Lam i m] dx
-  = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
+optLMApplyCall env Fwd "lmVCatV" [e] dx = do_prod_v env Fwd e dx
+optLMApplyCall env Rev "lmVCatV" [e] dx = do_sum_v  env Rev e dx
+optLMApplyCall env Fwd "lmHCatV" [e] dx = do_sum_v  env Fwd e dx
+optLMApplyCall env Rev "lmHCatV" [e] dx = do_prod_v env Rev e dx
 
-optApplyLMCall _ _ _
+optLMApplyCall _ Fwd "lmBuild"  [n, Lam i m] dx = do_build   Fwd n i m dx
+optLMApplyCall _ Rev "lmBuild"  [n, Lam i m] dx = do_build_t Rev n i m dx
+optLMApplyCall _ Fwd "lmBuildT" [n, Lam i m] dx = do_build_t Fwd n i m dx
+optLMApplyCall _ Rev "lmBuild%" [n, Lam i m] dx = do_build   Rev n i m dx
+
+optLMApplyCall _ _ _ _ _
   = -- pprTrace ("No opt for LM apply of " ++ show fun)
     --         (ppr arg)
     Nothing
 
-
 ----------------------
-optLMTrans :: TExpr -> Maybe TExpr
--- Transpose an expression
-optLMTrans (Var (TVar (TypeLM s t) (Grad n d)))
-   = Just (Var (TVar (TypeLM t s) (Grad n (flipMode d))))
+do_prod :: ADDir -> [TExpr] -> TExpr -> Maybe TExpr
+do_prod dir es dx = Just (Tuple [lmApply_Dir dir e dx | e <- es])
 
-optLMTrans (Call (TFun (TypeLM s t) (GradFun f mode)) arg)
-   = Just (Call (TFun (TypeLM t s) (GradFun f (flipMode mode))) arg)
+do_sum :: ADDir -> [TExpr] -> TExpr -> Maybe TExpr
+do_sum dir es dx
+  = Just $ foldr1 pAdd $ zipWith (lmApply_Dir dir) es dxs
+  where
+    n = length es
 
-optLMTrans (Call (TFun _ (Fun (PrimFun fun))) arg)
-  = optTransPrim fun arg
+    dxs = case dx of
+            Tuple dxs -> dxs
+            _ -> [ pSel i n dx | i <- [1..n] ]
 
-optLMTrans (Assert e1 e2)
-  = fmap (Assert e1) (optLMTrans e2)
+do_prod_v :: InScopeSet -> ADDir -> TExpr -> TExpr -> Maybe TExpr
 
-optLMTrans (Let (TVar (TypeLM s t) (Grad n d)) rhs body)
-  = Just $ Let (TVar (TypeLM t s) (Grad n (flipMode d))) (lmTranspose rhs) $
-    lmTranspose body
+-- (V( build n (\i.m) ) `lmApply` dx) = build n (\i. m `lmApply` dx)
+--   This special case to avoids the hard-to-optimise
+--       let m = build (\j. blah)
+--       in ...(build n (\i. ...m[i]...))...
+do_prod_v env dir e dx
+  | Just (n, i, body) <- isBuild_maybe e
+  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet i env) [dx]
+  = Just $ mkLets binds $
+    pBuild n $ Lam i $
+    lmApply_Dir dir body vdx
 
-optLMTrans (Let var rhs body)
-  = Just $ Let var rhs $
-    lmTranspose body
+  -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
+  | TypeVec n _ <- typeof e
+  = Just $ mkLets binds $
+    pBuild n $ Lam indexTVar $
+    lmApply_Dir dir (pIndex (Var indexTVar) ve) vdx
 
-optLMTrans (If b t e)
-  = Just $ If b (lmTranspose t) (lmTranspose e)
+  | otherwise = Nothing
+  where
+    (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
 
-optLMTrans e = error ("Missed lmTranspose " ++ show e) Nothing
+do_sum_v :: InScopeSet -> ADDir -> TExpr -> TExpr -> Maybe TExpr
+do_sum_v env dir e dx
+  | Just (n, i, body) <- isBuild_maybe e
+  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet i env) [dx]
+  = Just $ mkLets binds $
+    pSumBuild n $ Lam i $
+    lmApply_Dir dir body (pIndex (Var i) vdx)
 
-optTransPrim :: String -> [TExpr] -> Maybe TExpr
-optTransPrim "lmZero"  [s,t]    = Just $ lmZero (typeof t) (typeof s)
-optTransPrim "lmOne"   [t]      = Just $ lmOne (typeof t)
-optTransPrim "lmScale" [t,e]    = Just $ lmScale (typeof t) e
-optTransPrim "lmTranspose" [e]          = Just e
-optTransPrim "lmCompose"   [f,g]        = Just (lmCompose (lmTranspose g) (lmTranspose f))
-optTransPrim "lmAdd"       [f,g]        = Just (lmAdd (lmTranspose f) (lmTranspose g))
-optTransPrim "lmVCat"      es           = Just (lmHCat (map lmTranspose es))
-optTransPrim "lmHCat"      es           = Just (lmVCat (map lmTranspose es))
-optTransPrim "lmBuild"     [n, Lam i b] = Just (lmBuildT n (Lam i (lmTranspose b)))
-optTransPrim "lmBuildT"    [n, Lam i b] = Just (lmBuild n (Lam i (lmTranspose b)))
-optTransPrim _ _ = Nothing
+  -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
+  | TypeVec n _ <- typeof e
+  = Just $
+    mkLets binds $
+    pSumBuild n $ Lam indexTVar $
+    lmApply_Dir dir (pIndex (Var indexTVar) vm)
+                    (pIndex (Var indexTVar) vdx)
+
+  | otherwise = Nothing
+  where
+    (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
+
+do_build, do_build_t :: ADDir
+                     -> TExpr -> TVar -> TExpr -> TExpr
+                     -> Maybe TExpr
+do_build   dir n i m dx = Just (pBuild n (Lam i (lmApply_Dir dir m dx)))
+do_build_t dir n i m dx = Just (pSum (pBuild n (Lam i (lmApply_Dir dir m (pIndex (Var i) dx)))))
 
 --------------------------------------
 hspec :: Spec
 hspec = do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
-        optPrimFun "lmAdd" [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)]
+        optPrimFun emptyInScopeSet "lmAdd"
+            [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)]
         `shouldBe`
         Just (lmScale TypeFloat (mkPrimCall2 "+" (kTFloat 1.3) (kTFloat 0.4)))
 

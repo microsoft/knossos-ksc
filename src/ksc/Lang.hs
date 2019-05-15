@@ -21,6 +21,19 @@ import           Test.Hspec
 --  The main data types
 -----------------------------------------------
 
+mkGradType :: ADPlan -> Type -> Type -> Type
+mkGradType BasicAD s ty = TypeLM s ty
+mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
+  -- For TupleAD, mkGradType s t = (t, s -o t)
+
+mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
+mkGradTuple BasicAD _ lm = lm
+mkGradTuple TupleAD p lm = Tuple [p, lm]
+
+mkLMType_Dir :: ADDir -> Type -> Type -> Type
+mkLMType_Dir Fwd s t = TypeLM s t
+mkLMType_Dir Rev s t = TypeLM t s
+
 data Phase = Parsed | Typed | OccAnald
 
 data DeclX p = RuleDecl (RuleX p)
@@ -169,7 +182,7 @@ isScalar = \case
 ----------------------------------
 --- Tangent space
 
-tangentType :: Type -> Type
+tangentType :: HasCallStack => Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
 tangentType (TypeVec s t ) = TypeVec s (tangentType t)
@@ -205,27 +218,32 @@ data FunId = UserFun String   -- UserFuns have a Def
            deriving( Eq, Ord, Show )
 
 data Fun = Fun      FunId         -- The function              f(x)
-         | GradFun  FunId ADMode  -- Full Jacobian Df(x)
-                                  --   Rev <=> transposed  Rf(x)
+         | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
          deriving( Eq, Ord, Show )
 
-data ADMode = Fwd | Rev
-            deriving( Eq, Ord, Show )
+
+data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
+  deriving( Eq, Ord, Show )
+
+data ADPlan = BasicAD | TupleAD
+  deriving( Eq, Ord, Show )
+
+data ADDir = Fwd | Rev
+  deriving( Eq, Ord, Show )
 
 data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
   deriving (Eq, Ord)  -- type of the function.
 
 
 data Var
-  = Dummy                   -- Used for type arguments
-  | Simple   String         -- x
-  | Delta    String         -- The 'dx' or 'dr' argument to fwd
-                            -- or backward versions of f
-  | Grad     String ADMode  -- \nabla x
-                            --   True <=> transposed \bowtie x
-  deriving( Eq, Ord )
+  = Dummy                 -- Used for type arguments
+  | Simple String         -- x
+  | Delta  String         -- The 'dx' or 'dr' argument to
+                          -- forward or backward versions of f
+  | Grad   String ADPlan  -- Derivative of x
+  deriving( Eq, Ord, Show )
 
 data Konst = KInteger Integer   -- :: TypeInteger
            | KSize    Integer   -- :: TypeSize
@@ -247,10 +265,6 @@ type TRule = RuleX Typed
 -----------------------------------------------
 --  Simple functions over these types
 -----------------------------------------------
-
-flipMode :: ADMode -> ADMode
-flipMode Fwd = Rev
-flipMode Rev = Fwd
 
 partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p])
 -- Separate the Rules, Defs
@@ -279,9 +293,21 @@ mkVar = Simple
 mkTVar :: TypeX p -> String -> TVarX p
 mkTVar ty = TVar ty . mkVar
 
-isDummy :: Var -> Bool
-isDummy Dummy = True
-isDummy _     = False
+resVar :: Var
+resVar = Simple "r"
+
+argVar :: Var
+argVar = Simple "a"
+
+indexTVar :: TVar
+indexTVar = TVar TypeSize (Simple "i")
+
+mkArgVar :: Int -> Var
+mkArgVar n = Simple ("a" ++ show n)
+
+isDummyVar :: Var -> Bool
+isDummyVar Dummy = True
+isDummyVar _     = False
 
 mkDummyTVar :: Type -> TVar
 mkDummyTVar ty = TVar ty Dummy
@@ -290,9 +316,10 @@ mkDummy :: Type -> TExpr
 mkDummy ty = Var (mkDummyTVar ty)
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
-mkLet (TVar ty v) rhs body =
-  traceWhenUnequal ("mkLet " ++ pps v ++ " = " ++ pps rhs) ty (typeof rhs)
-    $ Let (TVar ty v) rhs body
+mkLet (TVar ty v) rhs body
+  = -- traceWhenUnequal ("mkLet " ++ pps v ++ " = " ++ pps rhs) ty (typeof rhs) $
+    -- Lint discovers this better
+    Let (TVar ty v) rhs body
 
 mkLets :: HasCallStack => [(TVar, TExpr)] -> TExpr -> TExpr
 mkLets xs e = foldr (uncurry mkLet) e xs
@@ -562,7 +589,7 @@ instance InPhase Parsed where
 
 instance InPhase Typed where
   pprVar  = ppr
-  pprLetBndr = pprTVarVar
+  pprLetBndr = pprTVar
   pprFunOcc (TFun _ f) = ppr f
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun, Just ty)
@@ -604,6 +631,20 @@ instance Pretty a => Pretty (Maybe a) where
   ppr Nothing  = text "Nothing"
   ppr (Just x) = text "Just" <+> ppr x
 
+instance (Pretty a, Pretty b) => Pretty (a,b) where
+  ppr (x,y) = parens (sep [ ppr x <> comma, ppr y])
+
+instance Pretty ADMode where
+  ppr (AD p d) = ppr p <> ppr d
+
+instance Pretty ADDir where
+  ppr Fwd = char 'f'
+  ppr Rev = char 'r'
+
+instance Pretty ADPlan where
+  ppr BasicAD = empty
+  ppr TupleAD = char 't'
+
 instance Pretty Var where
   ppr Dummy      = text "/*dummy*/"
   ppr (Simple s) = text s
@@ -619,14 +660,15 @@ instance Pretty Fun where
 pprFunId :: FunId -> SDoc
 pprFunId (UserFun s ) = text s
 pprFunId (PrimFun p ) = text p
+pprFunId (SelFun 1 2) = text "fst"  -- We use selectors on pairs a lot
+pprFunId (SelFun 2 2) = text "snd"  -- so I'm printing them specially
 pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> SDoc
-pprFun (Fun s         ) = ppr s
-pprFun (GradFun  s Fwd) = text "D$" <> ppr s
-pprFun (GradFun  s Rev) = text "R$" <> ppr s
-pprFun (DrvFun   s Fwd) = text "fwd$" <> ppr s
-pprFun (DrvFun   s Rev) = text "rev$" <> ppr s
+pprFun (Fun s)                   = ppr s
+pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
+pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
+pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
 
 instance Pretty TVar where
   pprPrec _ (TVar ty Dummy) = parens $ text "_ : " <> ppr ty
@@ -645,10 +687,10 @@ instance Pretty Konst where
 instance InPhase p => Pretty (TypeX p) where
   pprPrec p (TypeVec sz ty)      = parensIf p precTyApp $
                                    text "Vec" <+> pprParendExpr sz <+> pprParendType ty
-  pprPrec _ (TypeTuple tys)      = parens (text "Tuple" <+> pprList pprParendType tys)
+  pprPrec _ (TypeTuple tys)      = parens (pprList (pprPrec precZero) tys)
   pprPrec p (TypeLam from to)    = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
-  pprPrec p (TypeLM s t)         = parensIf p precZero $ text "LM" <+> pprParendType s <+> pprParendType t
+  pprPrec p (TypeLM s t)         = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
   pprPrec _ TypeFloat            = text "Float"
   pprPrec _ TypeInteger          = text "Integer"
   pprPrec _ TypeSize             = text "Size"
@@ -680,9 +722,6 @@ pprParendExpr = pprExpr precTop
 
 pprTVar :: InPhase p => TVarX p -> SDoc
 pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
-
-pprTVarVar :: InPhase p => TVarX p -> SDoc
-pprTVarVar (TVar _ v) = ppr v
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
@@ -806,8 +845,9 @@ parensSp :: SDoc -> SDoc
 parensSp d = char '(' <+> d <+> char ')'
 
 pprList :: (p -> SDoc) -> [p] -> SDoc
-pprList ppr ps =
-  let pps = map ppr ps in mode (sep pps) (sep $ punctuate comma pps)
+pprList ppr ps = mode (sep pps) (sep $ punctuate comma pps)
+  where
+   pps = map ppr ps
 
 instance Pretty a => Pretty [a] where
   ppr xs = char '[' <> pprList ppr xs <> char ']'
