@@ -236,7 +236,7 @@ tcExpr (App fun arg)
 
 tcVar :: Var -> Maybe Type -> TcM Type
 tcVar var mb_ty
-  | isDummy var
+  | isDummyVar var
   = case mb_ty of
       Just ty -> return ty
       Nothing -> do { addErr (text "Dummy var in untyped code")
@@ -284,7 +284,7 @@ userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
 userCallResultTy_maybe fn env args
   = case lookupGblST fn env of
       Just def -> userCallResultTy_help def args
-      Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn)
+      Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> [TypedExpr] -> Either SDoc Type
@@ -510,7 +510,7 @@ lookupLclTc v
            Just ty -> return ty }
   where
      varFun (Simple name) = mk_fun name
-     varFun _ = error "varFun"
+     varFun n = pprPanic "varFun" (ppr n $$ text (show n))
 
 lookupGblTc :: Fun -> [TypedExpr] -> TcM Type
 lookupGblTc fun args

@@ -15,39 +15,56 @@
 
 \renewcommand{\arraystretch}{1.2}
 
+\newcommand{\deriv}{\partial}  % The symbol we use for ``derivative''
+   % Was \nabla\!, but mathematicans hate that
+
 \renewcommand{\to}{\rightarrow}    % ->
 \newcommand{\linto}{\multimap}     % -o
 \newcommand{\grad}[1]{\nabla_S\lb #1 \rb}  % grad[#1]
-\newcommand{\gradf}[1]{\nabla\! #1}  % Full Jacobian
-\newcommand{\gradft}[1]{\nabla^{\top}\!#1}  % Full Jacobian
+\newcommand{\gradf}[1]{\deriv #1}  % Full Jacobian
+\newcommand{\gradft}[1]{\deriv_R#1}  % Full reverse (transposed) Jacobian
+\newcommand{\tangent}[1]{\delta #1}
 
-% Overline versions
+\newcommand{\swap}{\Phi}    % Vector of pairs to pair of vectors etc
+
+% Tuple versions
+\newcommand{\targ}[1]{\overline{#1}}
+\newcommand{\tgrad}[1]{\overline{\nabla}_S\lb #1 \rb}  % grad[#1]
+\newcommand{\tgradf}[1]{\overline{\gradf{#1}}}  % Full Jacobian
+\newcommand{\tgradft}[1]{\overline{\gradft{#1}}}  % Full Jacobian
+\newcommand{\tlmtrans}[1]{#1^{\overline{\top}}}   % Transpose (takes an argument)
+\newcommand{\tlmapply}{\;\overline{\odot}\;}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
+\newcommand{\tlmvcat}{\;\overline{\lmvcat}\;}         % Infix pairing
+\newcommand{\tlmhcat}{\;\overline{\lmhcat}\;}         % Infix pairing
+
+% Polymorphic tuple versions
 \newcommand{\oarg}[1]{\overline{#1}}
 \newcommand{\ograd}[1]{\overline{\nabla}_a\lb #1 \rb}  % grad[#1]
 \newcommand{\ogradf}[1]{\overline{\gradf{#1}}}  % Full Jacobian
 \newcommand{\ogradft}[1]{\overline{\gradft{#1}}}  % Full Jacobian
 \newcommand{\olmtrans}[1]{#1^{\overline{\top}}}   % Transpose (takes an argument)
 \newcommand{\olmapply}{\;\overline{\odot}\;}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
-\newcommand{\olmpair}{\;\overline{\lmpair}\;}         % Infix pairing
-\newcommand{\olmjoin}{\;\overline{\lmjoin}\;}         % Infix pairing
+\newcommand{\olmapplyR}{\;\overline{\odot}_R\;}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
+\newcommand{\olmvcat}{\;\overline{\lmvcat}\;}         % Infix pairing
+\newcommand{\olmhcat}{\;\overline{\lmhcat}\;}         % Infix pairing
 
-\newcommand{\fwdDf}[1]{f'}  % Forward derivative, f'
-\newcommand{\revDf}[1]{f'_R}  % Reverse derivative, f`
+\newcommand{\fwdDf}[1]{#1'}  % Forward derivative, f'
+\newcommand{\revDf}[1]{#1'_R}  % Reverse derivative, f`
 \newcommand{\lb}{\llbracket}
 \newcommand{\rb}{\rrbracket}
 \newcommand{\sel}[2]{\pi_{#1,#2}}
-\newcommand{\fst}{\pi_{1,2}}
-\newcommand{\snd}{\pi_{2,2}}
+\newcommand{\fst}[1]{\pi_1(#1)}
+\newcommand{\snd}[1]{\pi_2(#1)}
 \newcommand{\iffun}{\mathit{if}}
 \newcommand{\buildfun}{\mathit{build}}
 \newcommand{\sumfunname}{\mathit{sum}}   % Wanted to allow either \Sigma e or sum(e)
 \newcommand{\sumfun}[1]{\sumfunname(#1)}   % Wanted to allow either \Sigma e or sum(e)
-\newcommand{\sizefun}{size}
+\newcommand{\sizefun}{sz}
 \newcommand{\deltafun}[2]{\delta(#1,#2)}
-\newcommand{\indexfunname}{\mathit{ixR}} %% Reversed from current code  
+\newcommand{\indexfunname}{\mathit{ixR}} %% Reversed from current code
 \newcommand{\indexfun}[2]{\indexfunname(#2,#1)} % Vector indexing  \indexfun{v}{i}
 \renewcommand{\d}[1]{\delta_{\mathit{#1}}}   % delta_x etc
-\renewcommand{\vector}[1]{\mathit{Vec}\;#1}
+\renewcommand{\vector}[2]{\mathit{Vec}\;#1\;#2}   % the type (Vec n t)
 
 \newcommand{\tcolon}{\!:\!}
 \newcommand{\typ}[2]{#1 \tcolon #2}  % x:S, with less horizontal whitespace
@@ -60,9 +77,12 @@
 % Linear maps
 \newcommand{\dotprod}{\bullet}    % Dot-product of vectors
 \newcommand{\lmcomp}{\,\circ\,}   % Infix composition
-\newcommand{\lmpair}{\times}         % Infix pairing
-\newcommand{\lmjoin}{\bowtie}        % Infix join
+\newcommand{\lmvcat}{\times}         % Infix pairing
+\newcommand{\lmvcatv}[1]{{\mathcal V}(#1)}         % Vector version
+\newcommand{\lmhcat}{\bowtie}        % Infix join
+\newcommand{\lmhcatv}[1]{{\mathcal H}(#1)}         % Vector version
 \newcommand{\lmapply}{\,\odot\,}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
+\newcommand{\lmapplyR}{\,\odot_R\,}      % Infix application\newcommand{\lmcomp}{\,\circ\,}   % Infix composition
 \newcommand{\lmadd}{\oplus}        % Infix join
 \newcommand{\lmtrans}[1]{#1^{\top}}   % Transpose (takes an argument)
 \newcommand{\lmzero}{\mathbf{0}}     % 0
@@ -117,7 +137,7 @@ $$
         \tau & ::= & \nat & \mbox{Natural numbers} \\
         & | & \real & \mbox{Real numbers} \\
         & | & (\tau_1, \tau_2) & \mbox{Pairs} \\
-        & | & \vector{\tau} & \mbox{Vectors} \\
+        & | & \vector{n}{\tau} & \mbox{Vectors} \\
         & | & \tau_1 \to \tau_2 & \mbox{Functions} \\
         & | & \tau_1 \linto \tau_2 & \mbox{Linear maps} \\
       \end{array}
@@ -133,7 +153,7 @@ Note that
 \begin{itemize}
 \item  Variables are divided into \emph{functions}, $f,g,h$; and \emph{local variables}, $x,y,z$,
   which are either function arguments or let-bound.
-\item 
+\item
   The language has a first order sub-language.  Functions are defined at top level;
   functions always appear in a call, never (say) as an argument to a
   function; in a call $f(e)$, the function $f$ is always a
@@ -172,10 +192,10 @@ $$
   \sel{1}{2} & :: & (t_1,t_2) \to t_1 & \mbox{Selection} \\
   \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
 %  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
-  \buildfun & :: & (\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
-  \indexfunname & :: & (\nat, \; \vector{t}) \to t & \mbox {Indexing (NB arg order)} \\
-  \sumfunname & :: & \vector{t} \to t & \mbox{Sum a vector} \\
-  \sizefun & :: & \vector{t} \to \nat & \mbox{Size of a vector} \\
+  \buildfun & :: & (n::\nat,\; \nat \to t) \to \vector{n}{t} & \mbox{Vector build} \\
+  \indexfunname & :: & (\nat, \; \vector{n}{t}) \to t & \mbox {Indexing (NB arg order)} \\
+  \sumfunname & :: & \vector{n}{t} \to t & \mbox{Sum a vector} \\
+  \sizefun & :: & \vector{n}{t} \to \nat & \mbox{Size of a vector} \\
 \end{array}
 $$
 \\[3mm]
@@ -183,15 +203,15 @@ $$
       $$
       \begin{array}{rcl}
         \gradf{+}      & :: & (\real,\real) \to ((\real,\real) \linto \real) \\
-        \gradf{+}(x,y) & = & \lmone \lmjoin \lmone \\[2mm]
+        \gradf{+}(x,y) & = & \lmone \lmhcat \lmone \\[2mm]
         \gradf{*}      & :: & (\real,\real) \to ((\real,\real) \linto \real) \\
-        \gradf{*}(x,y) & = & \lmscalar{y} \lmjoin \lmscalar{x} \\[2mm]
+        \gradf{*}(x,y) & = & \lmscalar{y} \lmhcat \lmscalar{x} \\[2mm]
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
-        \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
-        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
-        \gradf{\indexfunname}(i,v) & = & \lmzero \lmjoin \lmbuildt( \sizefun(v),
+        \gradf{\sel{1}{2}}(x) & = & \lmone \lmhcat \lmzero \\[2mm]
+        \gradf{\indexfunname} & :: & (\nat, \;\vector{n}{t}) \to ((\nat, \; \vector{n}{t}) \linto t) \\
+        \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat \lmbuildt( \sizefun(v),
                \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
-         \gradf{\sumfunname} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
+         \gradf{\sumfunname} & :: & \vector{n}{\real} \to (\vector{n}{\real} \linto \real) \\
          \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
         \ldots
         \end{array}
@@ -205,7 +225,7 @@ The language has built-in functions shown in Figure~\ref{fig:built-in}.
 We allow ourselves to write functions infix where it is convenient.
 Thus $e_1 + e_2$ means the call $+(e1,e2)$, which applies the function $+$ to
 the pair $(e_1,e_2)$.  (So, like all other functions, $(+)$ has one argument.)
-Similarly the linear map $m_1 \lmpair m_2$ is short for $\lmpair(e_1,e_2)$.
+Similarly the linear map $m_1 \lmvcat m_2$ is short for $\lmvcat(e_1,e_2)$.
 
 We allow ourselves to write vector indexing $\indexfun{a}{i}$ using square brackets, thus $a[i]$.
 
@@ -223,16 +243,16 @@ On vectors they work element-wise; if you want dot-product you have to program i
 
 \subsection{Vectors}
 
-The language supports one-dimensional vectors, of type $\vector{T}$,
+The language supports one-dimensional vectors, of type $\vector{n}{T}$,
 whose elements have type $T$ (Figure~\ref{fig:syntax}).
 A matrix can be represented as a vector of vectors.
 
 Vectors are supported by the following built-in functions (Figure~\ref{fig:built-in}):
 \begin{itemize}
-\item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
-\item $\indexfunname :: (\nat,\; \vector{t}) \to t$ for indexing.  Informally we allow ourselves to write
+\item $\buildfun :: (\nat,\; \nat \to t) \to \vector{n}{t}$ for vector construction.
+\item $\indexfunname :: (\nat,\; \vector{n}{t}) \to t$ for indexing.  Informally we allow ourselves to write
   $v[i]$ instead of $\indexfun{v}{i}$.
-\item $\sumfunname :: \vector{\real} \to \real$ to add up the elements of a vector.
+\item $\sumfunname :: \vector{n}{\real} \to \real$ to add up the elements of a vector.
 We specifically do not have a general, higher order, fold operator;
 we say why in Section~\ref{sec:gen-fold}.
   \tom{I believe that for a vector $v$ of size $n$, $\sumfun{v}$ is the
@@ -241,7 +261,7 @@ we say why in Section~\ref{sec:gen-fold}.
   \simon{I don't think so!  $\lmbuildt$ is a linear map, so you can't apply it to $v$.
     Maybe you mean $\lmbuildt(n, const~ id) \lmapply v$?  But that (Figure~\ref{fig:lm-laws}) is
     defined using $\sumfunname$!}
-\item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
+\item $\sizefun :: \vector{n}{t} \to \nat$ takes the size of a vector.
 \item Arithmetic functions $(*), (+)$ etc are overloaded to work over vectors, always elementwise.
 \end{itemize}
 
@@ -283,8 +303,10 @@ passing through $z = g(p_x, p_y)$
       & \multicolumn{3}{l}{\mbox{Operator \hspace{2em} Type}} & \mbox{Matrix interpretation} \\
       & &&& \mbox{where $s = \real^m$, and $t = \real^n$} \\
 \hline
-    \mbox{Apply} & (\lmapply) & : & (s \linto t) \to (s \to t)
+    \mbox{Apply} & (\lmapply) & : & (s \linto t) \to \tangent{s} \to \tangent{t}
            & \mbox{Matrix/vector multiplication} \\
+    \mbox{Reverse apply} & (\lmapplyR) & : & \tangent{t} \to (s \linto t) \to \tangent{s}
+           & \mbox{Vector/matrix multiplication} \\[2mm]
     \mbox{Compose} & (\lmcomp) & : & (s \linto t,\; r \linto s) \to (r \linto t)
            & \mbox{Matrix/matrix multiplication} \\
     \mbox{Sum}   & (\lmadd) & : & (s \linto t,\; s \linto t) \to (s \linto t)
@@ -292,17 +314,22 @@ passing through $z = g(p_x, p_y)$
     \mbox{Zero}  & \lmzero & : & s \linto t & \mbox{Zero matrix}\\
     \mbox{Unit}  & \lmone  & : & s \linto s & \mbox{Identity matrix (square)}\\
     \mbox{Scale} & \lmscalar{\cdot} & : & \real \to (s \linto s) \\
-    \mbox{Pair}      & (\lmpair) & : & (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
+    \mbox{VCat}      & (\lmvcat) & : & (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
-    \mbox{Join}  & (\lmjoin) & : & (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
+    \mbox{VCatV}      & \lmvcatv{\cdot} & : & \vector{n}{(s \linto t)} \to (s \linto \vector{n}{t})
+           & \mbox{...vector version} \\
+    \mbox{HCat}  & (\lmhcat) & : & (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
            & \mbox{Horizontal juxtaposition} \\
+    \mbox{HCatV}  & \lmhcatv{\cdot} & : & \vector{n}{(t \linto s)} \to (\vector{n}{t} \linto s)
+           & \mbox{...vector version} \\
+
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\[2mm]
 %    \\
     \multicolumn{5}{l}{\mbox{\bf NB: We expect to have only $\lmlam / \lmlamt$ or $\lmbuild / \lmbuildt$, but not both}} \\
     \mbox{Lambda} & \lmlam & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
     \mbox{TLambda} & \lmlamt & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) & \mbox{Transpose of $\lmlam$} \\
-    \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{t}) \\
-    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{t} \linto s) & \mbox{Transpose of $\lmbuild$} \\
+    \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{n}{t}) \\
+    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{n}{t} \linto s) & \mbox{Transpose of $\lmbuild$} \\
   \end{array}
   $$
 \end{minipage}}
@@ -313,10 +340,12 @@ passing through $z = g(p_x, p_y)$
   \fbox{\begin{minipage}{\columnwidth}
 {\bf Semantics of linear maps}
   $$
-  \begin{array}{rcl}
+  \begin{array}{r@{\;}c@{\;}l}
     (m_1 \lmcomp m_2) \lmapply x  & = & m_1 \lmapply (m_2 \lmapply x) \\
-    (m_1 \lmpair m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
-    (m_1 \lmjoin m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
+    (m_1 \lmvcat m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
+    \lmvcatv{m} \lmapply x  & = & build( \sizefun(m), \lambda i. m[i] \lmapply x) \\
+    (m_1 \lmhcat m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
+    \lmhcatv{m} \lmapply x  & = & \Sigma_i\, (m[i] \lmapply x[i]) \\
     (m_1 \lmadd m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
     \lmzero \lmapply x  & = & 0 \\
     \lmone \lmapply x & = & x \\
@@ -337,8 +366,8 @@ passing through $z = g(p_x, p_y)$
     m \lmcomp \lmone & = & m \\
     m \lmadd \lmzero & = & m \\
     \lmzero \lmadd m & = & m \\
-    m \lmcomp (n_1 \lmjoin n_2) & = & (m \lmcomp n_1) \lmjoin (m \lmcomp n_2) \\
-    (m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) & = & (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
+    m \lmcomp (n_1 \lmhcat n_2) & = & (m \lmcomp n_1) \lmhcat (m \lmcomp n_2) \\
+    (m_1 \lmhcat m_2) \lmcomp (n_1 \lmvcat n_2) & = & (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
     \lmscalar{k_1} \lmcomp \lmscalar{k_2} & = & \lmscalar{ k_1 * k_2 } \\
     \lmscalar{k_1} \lmadd \lmscalar{k_2} & = & \lmscalar{ k_1 + k_2 } \\
   \end{array}
@@ -393,7 +422,7 @@ $$
 
 Note that the property
 $$
-(m_1 \lmjoin m_2) \lmcomp (n_1 \lmpair n_2) \; = \;  (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
+(m_1 \lmhcat m_2) \lmcomp (n_1 \lmvcat n_2) \; = \;  (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
 $$
 is the only reason we need the linear map $(\lmadd)$.
 
@@ -434,20 +463,20 @@ $$
 What types are vector spaces?  Look the syntax of types in Figure~\ref{fig:syntax}.
 \begin{itemize}
   \item The real numbers $\real$ is a vector space, using the standard $+$ and $*$ for reals; and $\dotprod_{\real} = *$.
-  \item If $V$ is a vector space then $\vector{V}$ is a vector space, with
+  \item If $V$ is a vector space then $\vector{n}{V}$ is a vector space, with
     \begin{itemize}
       \item $v_1 + v_2$ is vector addittion
       \item $r * v$ multiplies each element of the vector $v$ by the real $r$.
       \item $v_1 \dotprod v_2$ is a the usual vector dot-product.
     \end{itemize}
-    We often write $\vector{\real}$ as $\real^N$.
+    We often write $\vector{n}{\real}$ as $\real^N$.
   \item If $V_1$ and $V_2$ are vector spaces, then the product space $(V_1, V_2)$ is a vector space
     \begin{itemize}
       \item $(v_1,v_2) +(w_1,w_2) = (v_1 + w_1, v_2 + w_2)$.
       \item $r * (v_1,v_2) = (r*v_1, r*v_2)$
       \item $(v_1,v_2) \dotprod (w_1,w_2) = (v_1 \dotprod w_1) + (v_2 \dotprod w_2)$.
     \end{itemize}
-\end{itemize}    
+\end{itemize}
 In all cases the necessary properties of the operations (associativity, distribution etc) are easy to prove.
 
 \subsection{Transposition}
@@ -458,8 +487,10 @@ In all cases the necessary properties of the operations (associativity, distribu
   $$
   \begin{array}{rcll}
     \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
-    \lmtrans{(m_1 \lmpair m_2)} & = & \lmtrans{m_1} \lmjoin \lmtrans{m_2} \\
-    \lmtrans{(m_1 \lmjoin m_2)} & = & \lmtrans{m_1} \lmpair \lmtrans{m_2} \\
+    \lmtrans{(m_1 \lmvcat m_2)} & = & \lmtrans{m_1} \lmhcat \lmtrans{m_2} \\
+    \lmtrans{\lmvcatv{v}} & = & \lmhcatv{map\;\lmtrans{(\cdot)}\,v} \\
+    \lmtrans{(m_1 \lmhcat m_2)} & = & \lmtrans{m_1} \lmvcat \lmtrans{m_2} \\
+    \lmtrans{\lmhcatv{v}} & = & \lmvcatv{map\;\lmtrans{(\cdot)}\,v} \\
     \lmtrans{(m_1 \lmadd m_2)} & = & \lmtrans{m_1} \lmadd \lmtrans{m_2} \\
     \lmtrans{\lmzero} & = & \lmzero \\
     \lmtrans{\lmone} & = & \lmone \\
@@ -469,6 +500,25 @@ In all cases the necessary properties of the operations (associativity, distribu
     \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
    \lmtrans{\lmlam(\lambda i. m)} & = & \lmlamt(\lambda i. \lmtrans{m}) \\
    \lmtrans{\lmlamt(\lambda i. m)} & = & \lmlam(\lambda i. \lmtrans{m}) \\
+  \end{array}
+  $$
+  {\bf Laws for reverse-application}
+  $$
+  \begin{array}{r@{\;}c@{\;}l}
+    r \lmapplyR m & = & \lmtrans{m} \lmapply r \qquad \mbox{By definition} \\[1mm]
+    r \lmapplyR (m_1 \lmcomp m_2) & = & (r \lmapplyR m_1) \lmapplyR m_2 \\
+    (r_1,r_2) \lmapplyR (m_1 \lmvcat m_2) & = & (r_1 \lmapplyR m_1) + (r_2 \lmapplyR m_2) \\
+    r \lmapplyR (m_1 \lmhcat m_2) & = & (r \lmapplyR m_1,\; r \lmapplyR m_2) \\
+    r \lmapplyR \lmvcatv{v} & = & \Sigma_i\, (r[i] \lmapplyR v[i]) \\
+    r \lmapplyR \lmhcatv{v} & = & \buildfun( \sizefun(v), \lambda i. r \lmapplyR m[i]) \\
+    r \lmapplyR (m_1 \lmadd m_2) & = & (r \lmapplyR m_1) + (r \lmapplyR m_2) \\
+    r \lmapplyR \lmzero & = & 0 \\
+    r \lmapplyR \lmone & = & r \\
+    r \lmapplyR \lmscalar{k} & = & k*r \\
+    r \lmapplyR \lmtrans{m} & = & m \lmapply r \\
+    r \lmapplyR \lmbuild( n,\; \lambda i. m ) & = & \sumfun{\buildfun(n, \lambda i. r[i] \lmapplyR m)} ) \\
+%   \lmtrans{\lmlam(\lambda i. m)} & = & \lmlamt(\lambda i. \lmtrans{m}) \\
+%   \lmtrans{\lmlamt(\lambda i. m)} & = & \lmlam(\lambda i. \lmtrans{m}) \\
   \end{array}
   $$
     \end{minipage}
@@ -528,7 +578,7 @@ And now the property follows by Theorem~\ref{thm:trans-eq}.
 A linear map $m \tcolon \real^M \linto \real^N$ is isomorphic to a matrix $\real^{N \times M}$ with $N$ rows and $M$ columns.
 
 Many of the operators over linear maps then have simple matrix interpetations; for example, composition of
-linear maps $(\lmcomp)$ is matrix multiplication, pairing $(\lmpair)$ is vetical juxtaposition, and so on.
+linear maps $(\lmcomp)$ is matrix multiplication, pairing $(\lmvcat)$ is vetical juxtaposition, and so on.
 These matrix interpretations are all given in the final column of Figure~\ref{fig:linear-maps}.
 
 You might like to check that matrix transposition satisfies property (TP).
@@ -578,11 +628,11 @@ is important.
 
 \subsection{Lambdas and linear maps}
 
-Notice the similarity between the type of $(\lmpair)$ and the type of $\lmlam$; the latter is really
+Notice the similarity between the type of $(\lmvcat)$ and the type of $\lmlam$; the latter is really
 just an infinite version of the latter.
 Their semantics in Figure~\ref{fig:lm-laws} are equally closely  related.
 
-The tranpsositions of these two linear maps, $(\lmjoin)$ and $\lmlamt$, are
+The tranpsositions of these two linear maps, $(\lmhcat)$ and $\lmlamt$, are
 similarly related. \emph{But}, there is a problem with the semantics of
 $\lmlamt$:
 $$
@@ -602,7 +652,7 @@ This is an \emph{infinite sum}, so there is something fishy about this as a sema
 \end{itemize}
 Notes
 \begin{itemize}
-\item In practice we allow n-ary versions of $m \lmjoin n$ and $m \lmpair n$.
+\item In practice we allow n-ary versions of $m \lmhcat n$ and $m \lmvcat n$.
 \end{itemize}
 
 % --------------------------------------
@@ -617,12 +667,10 @@ $$
   & f(x) = e \\[2mm]
   \mbox{\bf Full Jacobian}       & \gradf{f}  :  S \to (S \linto T) \\
   & \mbox{\lstinline|$\gradf{f}(x)$ = let $\;\gradf{x}$ = $\lmone\;$ in $\;\grad{e}$|} \\[2mm]
-  \mbox{\bf Transposed Jacobian}   & \gradft{f}  :  S \to (T \linto S) \\
-  & \mbox{\lstinline|$\gradft{f}(x)$ =  $\lmtrans{(\gradf{f}(x))}$|}  \\[2mm]
   \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,S) \to T \\
   & \fwdDf{f}(x,dx) = \gradf{f}(x) \lmapply  dx \\[2mm]
   \mbox{\bf Reverse derivative}  & \revDf{f} : (S,T) \to S \\
-  & \revDf{f}(x,dr) = \gradft{f}(x) \lmapply dr
+  & \revDf{f}(x,dr) = dr \lmapplyR \gradf{f}(x)
 \end{array}
 $$
       {\bf Differentiation of an expression} \\
@@ -634,14 +682,15 @@ $$
         \grad{k} & = & \lmzero \\
         \grad{x} & = & \gradf{x} \\
         \grad{f(e)} & = & \gradf{f}(e) \lmcomp \grad{e} \\
-        \grad{(e_1,e_2)} & = & \grad{e_1} \lmpair \grad{e_2} \\
+        \grad{(e_1,e_2)} & = & \grad{e_1} \lmvcat \grad{e_2} \\
         \grad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
         & = & \begin{array}[t]{l}
            \mbox{\lstinline|let $\;x\;$ = $\;e_1\;$ in|} \\
            \mbox{\lstinline|let $\;\gradf{x}\;$ = $\;\grad{e_1}\;$ in|} \\
            \mbox{\lstinline|$\grad{e_2}$|}
            \end{array} \\
-        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e})  \\
+%        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e})  \\
+        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmvcatv{\buildfun(e_n, \lambda i. \grad{e})}  \\
         \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e})
       \end{array}
       $$
@@ -732,7 +781,7 @@ understand this better.
 Like other built-in functions, each built-in function for vectors
 has has its full Jacobian versions, defined in Figure~\ref{fig:built-in}.
 You may enjoy checking that $\gradf{\sumfunname}$ and
-$\gradf{\indexfunname}$ are correct! 
+$\gradf{\indexfunname}$ are correct!
 
 For $\buildfun$ there are two possible paths, and it's not yet clear
 which is best
@@ -764,11 +813,11 @@ I hate this!
 
 \subsection{General folds} \label{sec:gen-fold}
 
-We have $\sumfunname :: \vector{\real} \to \real$.  What is $\gradf{\sumfunname}$?
+We have $\sumfunname :: \vector{n}{\real} \to \real$.  What is $\gradf{\sumfunname}$?
 One way to define its semantics is by applying it:
 $$
 \begin{array}{rcl}
-  \gradf{\sumfunname} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
+  \gradf{\sumfunname} & :: & \vector{n}{\real} \to (\vector{n}{\real} \linto \real) \\
   \gradf{\sumfunname}(v) \lmapply dv & = & \sumfun{dv}
 \end{array}
 $$
@@ -791,80 +840,6 @@ no attempt to do general folds.
 
 \section{Avoiding duplication}
 
-\begin{figure}
-  \fbox{\begin{minipage}{\columnwidth}
-$$
-\begin{array}{ll}
-  \mbox{\bf Original function}   & f : S \to T \\
-  & f(x) = e \\[2mm]
-  \mbox{\bf Full Jacobian}       & \ogradf{f}  :  \forall a. (a \linto S, S) \to (a \linto T, T) \\
-  & \mbox{\lstinline|$\ogradf{f}(\oarg{x})\;$ = $\;\ograd{e}$|} \\[2mm]
-  \mbox{\bf Transposed Jacobian}   & \ogradft{f}  :  (S \linto a, S) \to (T \linto a, T) \\
-  & \mbox{\lstinline|$\ogradft{f}(\oarg{x})\;$ =  $\;\olmtrans{(\ogradf{f}(\oarg{x}))}$|}  \\[2mm]
-  \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,S) \to (T,T) \\
-   & \fwdDf{f}(x,dx) = \ogradf{f}(x,\lmone) \olmapply  dx \\[2mm]
-  \mbox{\bf Reverse derivative}  & \revDf{f} : (S,T) \to (T,S) \\
-  & \revDf{f}(x,dr) = \ogradft{f}(x,\lmone) \olmapply dr
-\end{array}
-$$
-      {\bf Differentiation of an expression}
-      \begin{center}
-        If $e : T$ then $\ograd{e} : (a \linto T, T)$
-      \end{center}
-$$
-      \begin{array}{rcll}
-        \ograd{k} & = & (\lmzero, k) \\
-        \ograd{x} & = & \oarg{x} \\
-        \ograd{f(e)} & = & \ogradf{f}(\ograd{e}) \\
-        \ograd{(e_1,e_2)} & = & \ograd{e_1} \olmpair \ograd{e_2} \\
-        \ograd{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
-        & = & \mbox{\lstinline|let $\;\oarg{x}$ = $\ograd{e_1}\;$ in $\; \ograd{e_2}$|} \\
-%
-%        build( n, \i.e )
-%        (x) :: ((t1, s -o t1), (t2, s -o t2)) -> ((t1,t2), s -o (t1,t2))
-
-%        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e}) \\
-%         \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e}) \\
-      \end{array}
-      $$
-\\
-      {\bf Modified linear-map operations} \\
-$$
- \begin{array}{rcl}
-   (\olmapply) & : & (s \linto t, t) \to (s \to t) \\
-   (m,v) \olmapply ds & = & m \lmapply ds \\[2mm]
-   (\olmpair) & : & ((s \linto t_1,t_1),\; (s \linto t_2,t_2)) \\
-                 && \to (s \linto (t_1,t_2),\; (t_1,t_2)) \\
-    (m_1,t_1) \olmpair (m_2,t_2) & = & (m_1 \lmpair m_2, (t_1,t_2)) \\[2mm]
-   (\olmjoin) & : & ((t_1 \linto s),t_1),\; (t_2 \linto s,t_2)) \\
-                 && \to ((t_1,t_2) \linto s, \; (t_1,t_2)) \\
-    (m_1,t_1) \olmjoin (m_2,t_2) & = & (m_1 \lmjoin m_2, t_1 + t_2) \\[2mm]
-    \olmtrans{\cdot} & : & (s \linto t, t) \to (t \linto s, t)
-%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{t}, \vector{t})
- \end{array}
-$$
- \\
-   {\bf Derivatives of built-in functions}
-$$
-      \begin{array}{rcl}
-        \ogradf{+}      & :: & \forall a. ((\real,\real), a \linto (\real,\real)) \to (\real, a \linto \real) \\
-        \ogradf{+}(m, (x,y)) & = & ((\lmone \lmjoin \lmone) \lmcomp m, \,x+y  ) \\[2mm]
-        \ogradf{*}      & :: & \forall a. ((\real,\real), a \linto (\real,\real)) \to (\real, a \linto \real) \\
-        \ogradf{*}(m, (x,y)) & = & ((\lmscalar{y} \lmjoin \lmscalar{x}) \lmcomp m, \, x*y)  \\[2mm]
-%        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
-%        \gradf{\sel{1}{2}}(x) & = & \lmone \lmjoin \lmzero \\[2mm]
-%        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
-%        \gradf{\indexfunname}(i,v) & = & \lmzero \lmjoin \lmbuildt( \sizefun(v),
-%               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
-%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
-%         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
-%        \ldots
-        \end{array}
-$$
-\end{minipage}}
-\caption{Automatic differentiation: version 2} \label{fig:ad2}
-\end{figure}
-
 \subsection{ANF and CSE}
 
 We may want to ANF-ise before AD to avoid gratuitous duplication.
@@ -874,9 +849,9 @@ $$
     \multicolumn{3}{l}{\grad{sqrt(x+(y*z))}} \\
       & = & \gradf{sqrt}(x+(y*z)) \lmcomp \grad{x+(y*z)} \\
     & = & \gradf{sqrt}(x+(y*z)) \lmcomp  \gradf{+}(x, y*z) \\
-     && \lmcomp (\grad{x} \lmpair \grad{y*z}) \\
+     && \lmcomp (\grad{x} \lmvcat \grad{y*z}) \\
     & = & \gradf{sqrt}(x+(y*z)) \lmcomp \gradf{+}(x, y*z) \\
-    & & \lmcomp (\gradf{x} \lmpair (\gradf{*}(y,z) \lmcomp (\gradf{y} \lmpair \gradf{z}))) \\
+    & & \lmcomp (\gradf{x} \lmvcat (\gradf{*}(y,z) \lmcomp (\gradf{y} \lmvcat \gradf{z}))) \\
   \end{array}
   $$
 Note the duplication of $y*z$ in the result.
@@ -897,7 +872,95 @@ Of course, CSE may recover it.
   Does that make it any clearer what I mean?}
   \awf{For me, ``AD'' very specifically implies a second argument to the function.   That's how you detect it's AD.  I.e.  $f'(x,dx) = ....$ is forward mode, and $f`(x,df) = ...$ is reverse mode.  There's a lot of chat about what AD really is, and those who want to avoid such chat often now say ``algorithmic differentiation'', to mean ``all this stuff''.  The real claim we want to explore is this: ``Forward mode is good for functions with small inputs and large outputs, e.g. $\real \mapsto \real^n$, and reverse mode is for $\real^n \mapsto \real$.}
 
-\subsection{Pairing}
+% ----------------------------------------------
+
+\subsection{Tupling: basic version}
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+$$
+\begin{array}{ll}
+  \mbox{\bf Original function}   & f : S \to T \\
+   & f(x) = e \\[2mm]
+  \mbox{\bf Full Jacobian}       & \tgradf{f}  :  S \to (T, S \linto T) \\
+  & \mbox{\lstinline|$\tgradf{f}(x)$ = let $\;\tgradf{x}$ = $(x, \lmone)\;$ in $\;\tgrad{e}$|} \\[2mm]
+  \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,\tangent{S}) \to (T,\tangent{T}) \\
+   & \fwdDf{f}(x,dx) = \tgradf{f}(x) \olmapply  dx \\[2mm]
+  \mbox{\bf Reverse derivative}  & \revDf{f} : (S,\tangent{T}) \to (T,\tangent{S}) \\
+   & \revDf{f}(x,dfr) = dr \olmapplyR \tgradf{f}(x)
+\end{array}
+$$
+      {\bf Differentiation of an expression}
+      \begin{center}
+        If $e : T$ then $\tgrad{e} : (S \linto T, T)$
+      \end{center}
+$$
+      \begin{array}{rcll}
+        \tgrad{k} & = & (k, \lmzero) \\
+        \tgrad{x} & = & \tgradf{x} \\
+        \tgrad{(e_1,e_2)} & = & \tgrad{e_1} \olmvcat \tgrad{e_2} \\
+        \tgrad{f(e)}
+        & = & \begin{array}[t]{l}
+           \mbox{\lstinline|let $\;a\;$ = $\;\tgrad{e}\;$ in|} \\
+           \mbox{\lstinline|let $\;r\;$ = $\;\tgradf{f}( \fst{a} )\;$ in|} \\
+           (\fst{r},\; \snd{r} \lmcomp \snd{a})
+           \end{array} \\
+        \tgrad{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
+        & = & \mbox{\lstinline|let $\;\tgradf{x}\;$ = $\;\grad{e_1}\;$ in $\;\tgrad{e_2}$|} \\
+%
+%        build( n, \i.e )
+%        (x) :: ((t1, s -o t1), (t2, s -o t2)) -> ((t1,t2), s -o (t1,t2))
+
+        \tgrad{\buildfun(e_n, \lambda i.e)}
+        & = & \begin{array}[t]{l}
+          \mbox{\lstinline|let $\;p\;$ = $\;\swap(\buildfun(e_n, \lambda i. \tgrad{e}))\;$ in|} \\
+          (\fst{p}, \; \lmvcatv{\snd{p}})
+          \end{array} \\
+%         \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e}) \\
+      \end{array}
+      $$
+\\
+      {\bf Modified linear-map operations} \\
+$$
+ \begin{array}{rcl}
+   (\olmapply) & : & (r, s \linto t) \to \tangent{s} \to \tangent{t} \\
+   (v,m) \olmapply ds & = & m \lmapply ds \\[2mm]
+
+   (\olmapplyR) & : & \tangent{t} \to (r, s \linto t) \to \tangent{s} \\
+   dr \olmapplyR vm & = & dr \olmapply vm \\[2mm]
+
+   (\olmvcat) & : & ((t_1, s \linto t_1),\; (t_2, s \linto t_2))
+                    \to ((t_1,t_2), \; s \linto (t_1,t_2)) \\
+    (t_1,m_1) \olmvcat (t_2,m_2) & = & ((t_1,t_2), m_1 \lmvcat m_2) \\[2mm]
+   (\olmhcat) & : & ((t_1, t_1 \linto s),\; (t_2, t_2 \linto s))
+                     \to ((t_1,t_2),\; (t_1,t_2) \linto s) \\
+    (t_1,m_1) \olmhcat (t_2,m_2) & = & ((t_1,t_2), m_1 \lmhcat m_2) \\[2mm]
+    \swap & : & \vector{n}{(a,b)} \to (\vector{n}{a}, \vector{n}{b}) \\[2mm]
+    \olmtrans{\cdot} & : & (r, s \linto t) \to (r, t \linto s)
+%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{n}{t}, \vector{n}{t})
+ \end{array}
+$$
+ \\
+   {\bf Derivatives of built-in functions}
+$$
+      \begin{array}{rcl}
+        \tgradf{+}      & :: & (\real,\real) \to ((\real,\real) \linto \real, \real) \\
+        \tgradf{+}(x,y) & = & (\lmone \lmhcat \lmone, \,x+y  ) \\[2mm]
+        \tgradf{*}      & :: & (\real,\real) \to ((\real,\real) \linto \real, \real) \\
+        \tgradf{*}(x,y) & = & (\lmscalar{y} \lmhcat \lmscalar{x}, \, x*y)  \\[2mm]
+%        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
+%        \gradf{\sel{1}{2}}(x) & = & \lmone \lmhcat \lmzero \\[2mm]
+%        \gradf{\indexfunname} & :: & (\nat, \;\vector{n}{t}) \to ((\nat, \; \vector{n}{t}) \linto t) \\
+%        \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat \lmbuildt( \sizefun(v),
+%               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
+%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{n}{t} \to (\vector{n}{t} \linto t) \\
+%         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
+%        \ldots
+        \end{array}
+$$
+\end{minipage}}
+\caption{Automatic differentiation: tupling} \label{fig:ad2}
+\end{figure*}
 
 A better (and well-established) path is to modify $\gradf{f} : S \to (S \linto T)$ so that
 it returns a pair:
@@ -905,18 +968,225 @@ $$
    \ogradf{f}  :  \forall a. (a \linto S, S) \to (a \linto T, T)
 $$
 That is $\ogradf{f}$ returns the ``normal result'' $T$ as well as a linear map.
-Somewhat mysteriously, everything works much more compositionally if $\ogradf{f}$ also \emph{takes} a linear map as its input.
 
-The new transform is shown in Figure~\ref{fig:ad2}. Note that there is no longer any code duplications, even without ANF or CSE.
+\subsection{Polymorphic tupling: forward mode}
 
-In exchange, though, all the types are a bit more complicated.  So we regard Figure~\ref{fig:ad} as canonical, to be used when working thiungs out, and Figure~\ref{fig:ad2} as a (crucial) implementation strategy.
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+$$
+\begin{array}{ll}
+  \mbox{\bf Original function}   & f : S \to T \\
+  & f(x) = e \\[2mm]
+  \mbox{\bf Full Jacobian}       & \ogradf{f}  :  \forall a.\, (S, a \linto S) \to (T, a \linto T) \\
+  & \mbox{\lstinline|$\ogradf{f}(\oarg{x})\;$ = $\;\ograd{e}$|} \\[2mm]
+  \mbox{\bf Transposed Jacobian}   & \ogradft{f}  :  \forall a.\,(S, S \linto a) \to (T, T \linto a) \\
+  & \mbox{\lstinline|$\ogradft{f}(\oarg{x})\;$ =  $\;\olmtrans{(\ogradf{f}(\oarg{x}))}$|}  \\[2mm]
+  \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,\tangent{S}) \to (T,\tangent{T}) \\
+   & \fwdDf{f}(x,dx) = \ogradf{f}(x,\lmone) \olmapply  dx \\[2mm]
+  \mbox{\bf Reverse derivative}  & \revDf{f} : (S,\tangent{T}) \to (T,\tangent{S}) \\
+  & \revDf{f}(x,dr) = \ogradft{f}(x,\lmone) \olmapply dr
+\end{array}
+$$
+      {\bf Differentiation of an expression}
+      \begin{center}
+        If $e : T$ then $\ograd{e} : (T, a \linto T)$
+      \end{center}
+$$
+      \begin{array}{rcll}
+        \ograd{k} & = & (k, \lmzero) \\
+        \ograd{x} & = & \oarg{x} \\
+        \ograd{f(e)} & = & \ogradf{f}(\;\ograd{e}\;) \\
+        \ograd{(e_1,e_2)} & = & \ograd{e_1} \olmvcat \ograd{e_2} \\
+        \ograd{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
+        & = & \mbox{\lstinline|let $\;\oarg{x}$ = $\ograd{e_1}\;$ in $\; \ograd{e_2}$|} \\
+%
+%        build( n, \i.e )
+%        (x) :: ((t1, s -o t1), (t2, s -o t2)) -> ((t1,t2), s -o (t1,t2))
+
+%        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e}) \\
+%         \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e}) \\
+      \end{array}
+      $$
+\\
+      {\bf Modified linear-map operations} \\
+$$
+ \begin{array}{rcl}
+   (\olmapply) & : & (r, s \linto t) \to \tangent{s} \to (r, \tangent{t}) \\
+   (v,m) \olmapply ds & = & (v, m \lmapply ds) \\[2mm]
+   (\olmvcat) & : & ((t_1, s \linto t_1),\; (t_2, s \linto t_2)) \to ((t_1,t_2),\; s \linto (t_1,t_2)) \\
+    (t_1,m_1) \olmvcat (t_2,m_2) & = & ((t_1,t_2), m_1 \lmvcat m_2) \\[2mm]
+   (\olmhcat) & : & ((t_1, t_1 \linto s),\; (t_2, t_2 \linto s)) \to ((t_1,t_2),\; (t_1,t_2) \linto s) \\
+    (t_1,m_1) \olmhcat (t_2,m_2) & = & (t_1 + t_2, m_1 \lmhcat m_2) \\[2mm]
+    \olmtrans{\cdot} & : & (t, s \linto t) \to (t, t \linto s)
+%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{n}{t}, \vector{n}{t})
+ \end{array}
+$$
+ \\
+   {\bf Derivatives of built-in functions}
+$$
+      \begin{array}{rcl}
+        \ogradf{+}      & :: & \forall a. ((\real,\real), a \linto (\real,\real)) \to (\real, a \linto \real) \\
+        \ogradf{+}((x,y),m) & = & (x+y,\,(\lmone \lmhcat \lmone) \lmcomp m ) \\[2mm]
+        \ogradf{*}      & :: & \forall a. ((\real,\real), a \linto (\real,\real)) \to (\real, a \linto \real) \\
+        \ogradf{*}((x,y), m) & = & (x*y,\, (\lmscalar{y} \lmhcat \lmscalar{x}) \lmcomp m)  \\[2mm]
+%        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
+%        \gradf{\sel{1}{2}}(x) & = & \lmone \lmhcat \lmzero \\[2mm]
+%        \gradf{\indexfunname} & :: & (\nat, \;\vector{n}{t}) \to ((\nat, \; \vector{n}{t}) \linto t) \\
+%        \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat \lmbuildt( \sizefun(v),
+%               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
+%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{n}{t} \to (\vector{n}{t} \linto t) \\
+%         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
+%        \ldots
+        \end{array}
+$$
+\end{minipage}}
+\caption{Automatic differentiation: polymorphic tuples} \label{fig:ad2}
+\end{figure*}
+
+Everything works much more compositionally if $\ogradf{f}$ also
+\emph{takes} a linear map as its input.  The new transform is shown in
+Figure~\ref{fig:ad2}. Note that there is no longer any code
+duplications, even without ANF or CSE.
+
+In exchange, though, all the types are a bit more complicated.  So we
+regard Figure~\ref{fig:ad} as canonical, to be used when working
+thiungs out, and Figure~\ref{fig:ad2} as a (crucial) implementation
+strategy.
+
+The crucial property are these:
+$$
+\begin{array}{rrcl}
+(CP) & \ogradf{f}(e) \olmapply dx & = & \fwdDf{f}(e \olmapply dx) \\
+\end{array}
+$$
+Crucial because suppose we have
+$$
+\lstinline|f(x) = g(h(x))|
+$$
+Then, we can transform as follows, using (CP)  twice, on lines marked $(\dagger)$:
+$$
+\begin{array}{rcll}
+  \ogradf{f}(\oarg{x}) & = & \ogradf{g}(\;\ogradf{h}(\;\oarg{x}\;)\;) \\
+  \fwdDf{f}(x, dx) & = & \ogradf{g}(\;\ogradf{h}(\;x,\lmone\;)\;) \olmapply dx \\
+                   & = & \fwdDf{g}( \;\ogradf{h}(\;x,\lmone\;) \olmapply dx \;) & (\dagger)\\
+                   & = & \fwdDf{g}(\; \fwdDf{h}(\;(x,\lmone) \olmapply dx\; ))  & (\dagger) \\
+                   & = & \fwdDf{g}(\; \fwdDf{h}(\;x,\lmone \lmapply dx\; ))   \\
+                   & = & \fwdDf{g}(\; \fwdDf{h}(\;x, dx\; )) \\
+\end{array}
+$$
+Why is (CP) true?   It follows from a more general property of $\ogradf{f}$:
+$$
+\begin{array}{l}
+  \forall f \tcolon S \to T,\, x \tcolon S,\, m_1 \tcolon A \linto S,\, m_2 \tcolon B \linto A,\, db\tcolon \tangent{B}. \\
+ \quad    \ogradf{f}(x,m_1) \olmapply (m_2 \lmapply db) = \ogradf{f}(x, m_1 \lmcomp m_2) \olmapply db \\[2mm]
+
+  \forall f \tcolon S \to T,\, x \tcolon S,\, m_1 \tcolon S \linto A,\, m_2 \tcolon A \linto B,\, dr\tcolon \tangent{T}. \\
+ \quad    m_2 \lmapply (\ogradft{f}(x,m_1) \olmapply dr) = \ogradft{f}(x, m_2 \lmcomp m_1) \olmapply dr
+\end{array}
+$$
+Now we can prove our claim as follows
+$$
+\begin{array}{lll}
+\multicolumn{3}{l}{\fwdDf{f}(e \olmapply dx)} \\
+& = & \mbox{ \{by defn of $(\olmapply)$\} } \\
+& & \fwdDf{f}( \fst{e},\; \snd{e} \lmapply dx ) \\[1mm]
+& = & \mbox{ \{by defn of $\fwdDf{f}$\}} \\
+& & \ogradf{f}(\fst{e} ,\; \lmone) \olmapply (\snd{e} \lmapply dx) \\[1mm]
+& = & \mbox{ \{by crucial property\}} \\
+& & \ogradf{f}(\fst{e} ,\; \snd{e} ) \olmapply dx \\[1mm]
+& = & \ogradf{f}(e) \olmapply dx
+\end{array}
+$$
+
+\subsection{Polymorphic tupling: reverse mode}
+
+It turns out that things work quite differently for reverse mode.
+For a start the equivalent of (CP) for reverse-mode would look like this:
+$$
+  \ogradft{f}(e) \olmapply dr  =  \revDf{f}(e \olmapply dr)
+$$
+But this is not even well-typed!
+
+How did we use (CP)?  Supppose $f$ is defined in terms of $g$ and $h$:
+$$
+\lstinline|f(x) = g(h(x))|
+$$
+Then we want $\fwdDf{f}$ to be defined in terms of $\fwdDf{g}$ and $\fwdDf{h}$.
+That is, we want a \emph{compositional} method, where we can create the code for
+$\fwdDf{f}$ without looking at the code for $g$ or $h$, simpply by calling
+$g$ and $h$'s derived functions. And that's just what we achieved:
+$$
+\fwdDf{f}(x,dx) = \fwdDf{g}(\fwdDf{h}(x,dx))
+$$
+
+But for reverse mode, this plan is much less straightforward.   Look at the types:
+$$
+\begin{array}{rcl}
+f & : & R \to T \\
+g & : & S \to T \\
+h & : & R \to S \\
+\revDf{f} & : & (R, \tangent{T}) \to (T, \tangent{R}) \\
+\revDf{g} & : & (S, \tangent{T}) \to (T, \tangent{S}) \\
+\revDf{h} & : & (R, \tangent{S}) \to (S, \tangent{R}) \\
+\end{array}
+$$
+How can we define $\revDf{f}$ by calling $\revDf{g}$ and $\revDf{h}$?  It would
+have to look something like this
+$$
+\begin{array}{rcl}
+\revDf{f}(r,dt) & = & \lstinline|letrec| \begin{array}[t]{l}
+                          (t, ds) = \revDf{g}( s, dt ) \\
+                          (s, dr) = \revDf{h}( r, ds ) \\
+                        \end{array} \\
+ && \lstinline|in| \; (t, dr)
+\end{array}
+$$
+We can't call $\revDf{g}$ before $\revDf{h}$, nor the other way around.
+That's why there is a letrec!  Even leaving aside how we generate this code,
+We'd need lazy evaluation to execute it.
+
+The obvious alternative is to change $\fwdDf{f}$'s interface.  Currently we have
+$$
+\revDf{f} : (R, \tangent{T}) \to (T, \tangent{R}) \\
+$$
+Instead, we can take that $R$ value, but return a function
+$\tangent{T} \to \tangent{R}$, thus:
+$$
+\revDf{f} : R \to (T, \tangent{T} \to \tangent{R})
+$$
+But that commits to returning a \emph{function}, with its fixed, built-in representation.
+Instead, let's return linear map:
+$$
+\revDf{f} : R \to (T, \tangent{T} \linto \tangent{R})
+$$
+Now we can re-interpret the retuned linear map as some kind of record (trace) of
+all the things that $f$ did.  And if we insist on our compositional account
+we really must \emph{manifest} that data structure, and later apply it to a value of
+type $\tangent{T}$ to get a value of type $\tangent{R}$.  We could represent those linear maps as:
+\begin{itemize}
+\item A matrix
+\item A function closure that, when called, applies the linear map to an argument
+\item A syntax tree whose nodes are the constructors of the linear map type.
+  When applying the linear map, we interpret taht syntax tree.
+\end{itemize}
+Finally, notice that this final version of $\fwdDf{f}$ is exactly $\ogradft{f}$,
+just specialised with an input linear map of $\lmone$.  So we may as well
+just use $\ogradft{f}$, which \emph{already} compositionally calls $\ogradft{g}$
+and $\ogradft{h}$.
+
+TL;DR: for reverse mode, we must simply compile $\ogradft{f}$.
+
+Notice that we can get quite a bit of optimisation by inlining $\ogradft{g}$ into $\ogradft{f}$,
+and so on. The more inlining the better.  If we inline everything we'll elminate
+all intermediate linear maps.
+
 
 \section{Implementation}
 
 The implementation differs from this document as follows:
 \begin{itemize}
 \item Rather than pairs, the implementation supports $n$-ary tuples.
-  Similary the linear maps $(\lmpair)$ and $\lmjoin$ are $n$-ary.
+  Similary the linear maps $(\lmvcat)$ and $\lmhcat$ are $n$-ary.
 \item Functions definitions can take $n$ arguments, thus
   \begin{lstlisting}
    f(x,y,z) = e
@@ -1069,7 +1339,7 @@ I'm not happy with the story for build and lambda. It started well:
 
 \item But then things get trickier.  What is the transose of $\lmlam$?
   I invented $\lmlamt$ (Figure~\ref{fig:linear-maps}) as its transpose.
-  There is a nice pattern here: $\lmpair$ and $\lmjoin$ are related
+  There is a nice pattern here: $\lmvcat$ and $\lmhcat$ are related
   in just the same way as $\lmlam$ and $\lmlamt$.
 
 \item But I got stuck: what is the semantics of $\lmlamt$?

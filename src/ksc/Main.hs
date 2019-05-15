@@ -33,18 +33,18 @@ import Test.Hspec (hspec, Spec)
 --  The demo driver
 -------------------------------------
 
-demoF :: String -> IO ()
+demoF :: ADPlan -> String -> IO ()
 -- Read source code from specified input file, optimise,
 -- differentiate, optimise, and display results of each step
-demoF file = do
+demoF adp file = do
   defs <- parseF file
-  runKM (demoN defs)
+  runKM (demoN adp defs)
 
 demo :: Decl -> IO ()
-demo d = runKM (demoN [d])
+demo d = runKM (demoN BasicAD [d])
 
-demoN :: [Decl] -> KM ()
-demoN decls
+demoN :: ADPlan -> [Decl] -> KM ()
+demoN adp decls
   = let disp = displayPass 999 in
     do { banner "Original declarations"
        ; displayN decls
@@ -55,38 +55,41 @@ demoN decls
 
        ; disp "Typechecked declarations" env defs
 
-       ; let (env1, opt_defs) = optDefs rulebase env defs
+       ; (env1, opt_defs) <- optDefs rulebase env defs
        ; disp "Optimized original definition" env1 opt_defs
 
        ; anf_defs <- anfDefs opt_defs
        ; disp "Anf-ised original definition" env1 anf_defs
 
-       ; let grad_defs = gradDefs anf_defs
+       ; let grad_defs = gradDefs adp anf_defs
              env2      = env1 `extendGblST` grad_defs
        ; disp "The full Jacobian (unoptimised)" env2 grad_defs
 
-       ; let (env3, opt_grad_defs) = optDefs rulebase env2 grad_defs
+       ; (env3, opt_grad_defs) <- optDefs rulebase env2 grad_defs
        ; disp "The full Jacobian (optimised)" env3 opt_grad_defs
 
-       ; let der_fwd = applyDefs opt_grad_defs
+       ; let der_fwd = applyDefs Fwd opt_grad_defs
        ; disp "Forward derivative (unoptimised)" env3 der_fwd
 
-       ; let (env4, opt_der_fwd) = optDefs rulebase env3 der_fwd
+       ; (env4, opt_der_fwd) <- optDefs rulebase env3 der_fwd
        ; disp "Forward-mode derivative (optimised)" env4 opt_der_fwd
 
        ; (env5, cse_fwd) <- cseDefs rulebase env4 opt_der_fwd
        ; disp "Forward-mode derivative (CSE'd)" env5 cse_fwd
 
-       ; let trans_grad_defs = map transposeD opt_grad_defs
+{-
+       ; let trans_grad_defs = gradDefs (AD adp Rev) anf_defs
+             env5      = env1 `extendGblST` trans_grad_defs
        ; disp "Transposed Jacobian" env5 trans_grad_defs
 
-       ; let (env6, opt_trans_grad_defs) = optDefs rulebase env5 trans_grad_defs
+       ; (env6, opt_trans_grad_defs) <- optDefs rulebase env5 trans_grad_defs
        ; disp "Optimised transposed Jacobian" env6 opt_trans_grad_defs
+-}
 
-       ; let der_rev = applyDefs opt_trans_grad_defs
-       ; disp "Reverse-mode derivative (unoptimised)" env6 der_rev
+       ; let der_rev = applyDefs Rev opt_grad_defs
+       ; disp "Reverse-mode derivative (unoptimised)" env3 der_rev
 
-       ; let (env7, opt_der_rev) = optDefs rulebase env6 der_rev
+       ; (env7, opt_der_rev) <- optDefs rulebase env3 der_rev
        ; disp "Reverse-mode derivative (optimised)" env7 opt_der_rev
 
        ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
@@ -133,20 +136,35 @@ displayCppGenAndCompile compile verbosity file =
 
   ; dd main
 
-  ; let grad_defs = gradDefs defs
+  ; let grad_defs = gradDefs BasicAD defs
         env1 = env `extendGblST` grad_defs
   ; displayPassM verbosity "Grad" env1 grad_defs
 
-  ; let trans_grad_defs = map transposeD grad_defs
+  -- We generate grad_defs_tupled even though we do not use it yet.
+  -- We do not use it because
+  --
+  -- 1. lmApplys are not completely removed in forward mode, and
+  --
+  -- 2. lmApplys are deliberately not removed in reverse mode but we
+  -- don't yet implement the necessary LM constructors in C++.
+  --
+  -- Nonetheless, it's good to generated optgrad_tupled here so that
+  -- the tests will run on it and we can be sure it typechecks.
+  ; let grad_defs_tupled = gradDefs TupleAD defs
+        env15 = env1 `extendGblST` grad_defs_tupled
+  ; displayPassM verbosity "Grad tupled" env15 grad_defs_tupled
 
-  ; let (env2, optgrad) = optDefs rulebase env1 (grad_defs ++ trans_grad_defs)
+  ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
   ; displayPassM verbosity "Optgrad" env2 optgrad
 
-  ; let fwd = applyDefs optgrad
-  ; displayPassM verbosity "Fwd" env2 fwd
+  ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
+  ; displayPassM verbosity "Optgrad tupled" env25 optgrad_tupled
 
-  ; let (env3, optfwd) = optDefs rulebase env2 fwd
-  ; displayPassM verbosity "OptFwd" env3 optfwd
+  ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
+  ; displayPassM verbosity "Diffs" env25 diffs
+
+  ; (env3, optdiffs) <- optDefs rulebase env25 diffs
+  ; displayPassM verbosity "OptDiffs" env3 optdiffs
 
   ; (env4, ann_main) <- annotDecls env3 main
 
@@ -155,13 +173,13 @@ displayCppGenAndCompile compile verbosity file =
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; let alldefs = defs ++ optfwd ++ main_tdef
+  ; let alldefs = defs ++ optdiffs ++ main_tdef
 
   -- We use ANF to expose optimisation opportunities and use optDefs
   -- to take them.  See Note [Inline tuples] for the motiviation for
   -- doing ANF-then-optDefs.
   ; anf_alldefs <- anfDefs alldefs
-  ; let (env45, opt_alldefs) = optDefs rulebase env4 anf_alldefs
+  ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
 
   ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
   ; displayPassM verbosity "CSE" env5 cse
