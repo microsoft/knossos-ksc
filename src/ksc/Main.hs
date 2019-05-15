@@ -273,10 +273,10 @@ profileArgs source proffile proffunctions proflines = do
 
   exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) Nothing source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
-  withOutputFileStream proffunctions $ \std_out -> createProcess
+  withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
                                                                }
-  withOutputFileStream proflines $ \std_out ->
+  withOutputFileStream proffunctions $ \std_out ->
     createProcess (proc "google-pprof" ["--text", "--functions", exe, proffile])
       { std_out = std_out
       }
