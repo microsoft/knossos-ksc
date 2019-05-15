@@ -1331,7 +1331,7 @@ namespace ks
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
 				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
 				std::function<L(int)> f_local = f;  // TODO: use sumbuild
-				return sum(build<LFrom>(n, [f_local,x](int i) { return lmApply(f_local(i), x[i]); }));
+				return sumbuild<LFrom>(n, [f_local,x](int i) { return lmApply(f_local(i), x[i]); });
 			}
 		};
 
