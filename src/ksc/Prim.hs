@@ -52,10 +52,12 @@ mk_fun :: String -> Fun
 --
 --   * Distinguishes PrimFun from UserFun
 mk_fun f = case find_dollar f of
-             Just ("D",   s) -> GradFun (mk_fun_id s) Fwd
-             Just ("R",   s) -> GradFun (mk_fun_id s) Rev
-             Just ("fwd", s) -> DrvFun  (mk_fun_id s) Fwd
-             Just ("rev", s) -> DrvFun  (mk_fun_id s) Rev
+             Just ("D",   s)  -> GradFun (mk_fun_id s) BasicAD
+             Just ("Dt",   s) -> GradFun (mk_fun_id s) TupleAD
+             Just ("fwd", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Fwd)
+             Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
+             Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
+             Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
@@ -67,7 +69,7 @@ mk_fun f = case find_dollar f of
                        (prefix, _ : suffix) -> Just (prefix, suffix)
     mk_sel_fun s = case break (== '$') s of
                      (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
-                     _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]" 
+                     _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
 
 
 --------------------------------------------
@@ -75,10 +77,14 @@ mk_fun f = case find_dollar f of
 --------------------------------------------
 
 -- lmZero might look as if it should take a Type and cons up a dummy of that type,
--- but types such as Vec need constructor arguments such as size, 
--- so are consed from a template 
+-- but types such as Vec need constructor arguments such as size,
+-- so are consed from a template
 lmZero :: Type -> Type -> TExpr
 lmZero s t = mkPrimCall2 "lmZero" (mkDummy s) (mkDummy t)
+
+lmZero_Dir :: ADDir -> Type -> Type -> TExpr
+lmZero_Dir Fwd s t = lmZero s t
+lmZero_Dir Rev s t = lmZero t s
 
 lmOne :: Type -> TExpr
 lmOne s = mkPrimCall1 "lmOne" (mkDummy s)
@@ -99,9 +105,15 @@ lmHCat :: HasCallStack => [TExpr] -> TExpr
 lmHCat [e] = e
 lmHCat es  = mkPrimCall "lmHCat" es
 
+lmHCatV :: HasCallStack => TExpr -> TExpr
+lmHCatV e  = mkPrimCall1 "lmHCatV" e
+
 lmVCat :: HasCallStack => [TExpr] -> TExpr
 lmVCat [e] = e
 lmVCat es  = mkPrimCall "lmVCat" es
+
+lmVCatV :: HasCallStack => TExpr -> TExpr
+lmVCatV e  = mkPrimCall1 "lmVCatV" e
 
 lmTranspose :: TExpr -> TExpr
 lmTranspose = mkPrimCall1 "lmTranspose"
@@ -112,11 +124,50 @@ lmCompose = mkPrimCall2 "lmCompose"
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApply = mkPrimCall2 "lmApply"
 
+lmApplyR :: HasCallStack => TExpr -> TExpr -> TExpr
+lmApplyR = mkPrimCall2 "lmApplyR"
+
+lmApply_AD :: HasCallStack => ADMode -> TExpr -> TExpr -> TExpr
+lmApply_AD (AD BasicAD dir) = lmApply_Dir  dir
+lmApply_AD (AD TupleAD dir) = lmApplyT_Dir dir
+
+lmApply_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
+lmApply_Dir Fwd e ds = lmApply  e ds
+lmApply_Dir Rev e dt = lmApplyR dt e
+
+lmApplyT_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
+lmApplyT_Dir Fwd e ds = mkPrimCall2 "lmApplyT"  e ds
+lmApplyT_Dir Rev e dt = mkPrimCall2 "lmApplyTR" dt e
+
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuild = mkPrimCall2 "lmBuild"
+lmBuild n b = lmVCatV (pBuild n b)
 
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuildT = mkPrimCall2 "lmBuildT"
+lmBuildT n b = lmHCatV (pBuild n b)
+
+lmBuild_Dir :: ADDir -> TExpr -> TExpr -> TExpr
+lmBuild_Dir Fwd = lmBuild
+lmBuild_Dir Rev = lmBuildT
+
+lmBuildT_Dir :: ADDir -> TExpr -> TExpr -> TExpr
+lmBuildT_Dir Fwd = lmBuildT
+lmBuildT_Dir Rev = lmBuild
+
+lmVCat_Dir :: ADDir -> [TExpr] -> TExpr
+lmVCat_Dir Fwd = lmVCat
+lmVCat_Dir Rev = lmHCat
+
+lmVCatV_Dir :: ADDir -> TExpr -> TExpr
+lmVCatV_Dir Fwd = lmVCatV
+lmVCatV_Dir Rev = lmHCatV
+
+lmHCat_Dir :: ADDir -> [TExpr] -> TExpr
+lmHCat_Dir Fwd = lmHCat
+lmHCat_Dir Rev = lmVCat
+
+lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
+lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
+lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
 isThePrimFun :: TFun -> String -> Bool
 isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
@@ -126,9 +177,8 @@ isLMOne, isLMZero :: TExpr -> Bool
 isLMOne (Call f _) = f `isThePrimFun` "lmOne"
 isLMOne _ = False
 
-isLMZero (Call f _) = f `isThePrimFun` "lmZero"
+isLMZero (Call f _) =  f `isThePrimFun` "lmZero"
 isLMZero _ = False
-
 
 isKZero :: TExpr -> Bool
 isKZero = \case
@@ -137,6 +187,12 @@ isKZero = \case
   Tuple ts -> all isKZero ts
   Call f [_,v] | f `isThePrimFun` "constVec" -> isKZero v
   _ -> False
+
+isBuild_maybe :: TExpr -> Maybe (TExpr, TVar, TExpr)
+isBuild_maybe (Call f [n,Lam i e])
+  | f `isThePrimFun` "build"
+  = Just (n, i, e)
+isBuild_maybe _ = Nothing
 
 fstArg :: TExpr -> TExpr
 fstArg (Call _ [e,_]) = e
@@ -204,14 +260,19 @@ pSum = mkPrimCall1 "sum"
 pSumBuild :: TExpr -> TExpr -> TExpr
 pSumBuild = mkPrimCall2 "sumbuild"
 
+pUnzip :: TExpr -> TExpr
+pUnzip = mkPrimCall1 "unzip"
+
 pSize :: TExpr -> TExpr
 pSize e = mkPrimCall1 "size" e
 
 pSel :: Int -> Int -> TExpr -> TExpr
-pSel i n e = Call (TFun (ts !! (i-1))
+pSel i n e = Call (TFun el_ty
                         (Fun (SelFun i n))) [e]
            where
-             TypeTuple ts = typeof e
+             el_ty = case typeof e of
+                        TypeTuple ts -> ts !! (i-1)
+                        _ -> TypeUnknown  -- Better error from Lint
 
 pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
@@ -224,7 +285,7 @@ pNorm :: TExpr -> TExpr
 pNorm = mkPrimCall1 "norm"
 
 pTangentAdd :: TExpr -> TExpr -> TExpr
-pTangentAdd x dx = case typeof dx of 
+pTangentAdd x dx = case typeof dx of
                    TypeTuple [] -> x -- It's helpful for size typechecking to ensure n + dn passes through
                    _ -> mkPrimCall2 "tangent_add" x dx
 
@@ -256,14 +317,12 @@ primCallResultTy_maybe fun args
 
       Fun (SelFun i n) -> selCallResultTy_maybe i n arg_tys
 
-      GradFun f dir
+      GradFun f adp
         -> case primCallResultTy_maybe (Fun f) args of
-            Right res_ty -> case dir of
-                              Fwd -> Right (TypeLM (mkTupleTy arg_tys) res_ty)
-                              Rev -> Right (TypeLM res_ty (mkTupleTy arg_tys))
             Left err -> Left err
+            Right res_ty -> Right (mkGradType adp (mkTupleTy arg_tys) res_ty)
 
-      DrvFun f Fwd    -- f :: S1 S2 -> T, then fwd$f :: S1 S2 S1_t S2_t -> T_t
+      DrvFun f (AD _ Fwd)    -- f :: S1 S2 -> T, then fwd$f :: S1 S2 S1_t S2_t -> T_t
         | let n_s = length args
         , even n_s
         , let s_args = take (n_s `div` 2) args
@@ -272,7 +331,7 @@ primCallResultTy_maybe fun args
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
-      DrvFun _ Rev    -- f :: S1 S2 -> T, then rev$f :: S1 S2 T_t -> (S1_t, S2_t)
+      DrvFun _ (AD _ Rev)    -- f :: S1 S2 -> T, then rev$f :: S1 S2 T_t -> (S1_t, S2_t)
         | let s_tys = dropLast arg_tys
         -> Right (tangentType (mkTupleTy s_tys))
 
@@ -352,7 +411,7 @@ primFunCallResultTy_maybe "diag" args
   | otherwise = Nothing
 
 -- Addition is special: it can add any two things of the same type,
--- or it can add t to tangentType t, which is implemented somewhat loosely 
+-- or it can add t to tangentType t, which is implemented somewhat loosely
 -- here by allowing t + () -> t
 primFunCallResultTy_maybe "+" args
   | [t1,t2] <- map typeof args
@@ -380,32 +439,43 @@ primFunCallResultTy_maybe fun args
       ("lmCompose", [TypeLM _ c, TypeLM a _])                -> Just (TypeLM a c)
       ("lmAdd"    , [TypeLM s1 t1, TypeLM _ _])              -> Just (TypeLM s1 t1)
       ("lmTranspose", [TypeLM s t])                          -> Just (TypeLM t s)
+
       ("lmApply"  , [TypeLM s1 t, s2]) | tangentType s1 `eqType` s2 -> Just (tangentType t)
+           -- Linar map apply:  lmApply :: (s -o t) -> ds -> dt
+      ("lmApplyR" , [t1, TypeLM s t2]) | t1 `eqType` tangentType t2 -> Just (tangentType s)
+           -- Reverse apply:  lmApplyR :: dt -> (s -o t) -> ds
+
+      ("lmApplyT" , [TypeTuple [_, TypeLM s1 t], s2])
+                                | tangentType s1 `eqType` s2 -> Just (tangentType t)
+           -- Tupled version:  lmApplyT :: (r, s -o t) -> ds -> dt
+
       ("lmVCat"   , tys) | Just (ss,ts) <- unzipLMTypes tys
                          , (s1:ss1) <- ss
                          , all (== s1) ss1                   -> Just (TypeLM s1 (TypeTuple ts))
+      ("lmVCatV"  , [TypeVec n (TypeLM s t)])                -> Just (TypeLM s (TypeVec n t))
       ("lmHCat"   , tys) | Just (ss,ts) <- unzipLMTypes tys
                          , (t1:ts1) <- ts
                          , all (== t1) ts1                   -> Just (TypeLM (TypeTuple ss) t1)
-                         
+      ("lmHCatV"  , [TypeVec n (TypeLM t s)])                -> Just (TypeLM (TypeVec n t) s)
+
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , [t])                                     -> Just t
 
       -- ($check f rev$f s ds dt) verifies the derivatives rev$f at s in directions ds,dt.
       -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
-      -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s)) 
+      -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s))
       ("$check"   , [TypeLam s t, TypeLam s_dt _ds', s', ds, dt])
                       | s' `eqType` s
-                      -- , ds' `eqType` ds -- fails in test0 for Tuple (Float) != Float 
+                      -- , ds' `eqType` ds -- fails in test0 for Tuple (Float) != Float
                       , tangentType s `eqType` ds
                       , tangentType t `eqType` dt
                       , s_dt `eqType` (typeTupleAppend s dt)
                        -> Just TypeFloat
-      
-      -- ($trace e) emits its argument's value to stdout and returns it 
+
+      -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , [t])                                     -> Just t
 
-      -- ($rand s) returns a uniform random float between 0 and s 
+      -- ($rand s) returns a uniform random float between 0 and s
       ("$rand"    , [TypeFloat])                             -> Just TypeFloat
       ("$ranhashdoub" , [TypeInteger])                           -> Just TypeFloat
 
@@ -413,7 +483,6 @@ primFunCallResultTy_maybe fun args
       ("pr"       , _)                                       -> Just TypeInteger
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                       -> Just TypeInteger
-      ("sumbuild" , [TypeSize, TypeLam TypeInteger t])       -> Just t
       ("sumbuild" , [TypeInteger, TypeLam TypeInteger t])    -> Just t
       ("index"    , [TypeInteger, TypeVec _ t])              -> Just t
       ("size"     , [TypeVec _ _])                           -> Just TypeSize
@@ -424,6 +493,8 @@ primFunCallResultTy_maybe fun args
       ("norm"     , [_])                                     -> Just TypeFloat
       ("tangent_add", [t, t'])| tangentType t == t'          -> Just t
       ("to_tangent",  [t])                                   -> Just (tangentType t)
+
+      ("unzip"    , [TypeVec n (TypeTuple ts)])              -> Just (TypeTuple (map (TypeVec n) ts))
 
       -- arithmetic ops.   See special case for "+" above
       ("*"        , [TypeFloat,   t]             ) -> Just t
@@ -455,7 +526,7 @@ primFunCallResultTy_maybe fun args
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
-                       , "$trace"   -- ($trace f args)            Print and return (f args)  
+                       , "$trace"   -- ($trace f args)            Print and return (f args)
                        , "$rand"    -- ($rand val)                Generate a random float between 0 and val
                        , "$ranhashdoub" -- ($ranhashdoub val)     Generate a random float between 0 and 1 purely
                        , "pr"       -- (pr "msg" 3)               Print "msg\n---3\n"
@@ -465,10 +536,12 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "index"
                        , "size"
                        , "sum"
+                       , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "to_float"
                        , "neg", "exp", "log", "lgamma", "digamma", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag", "constVec"
-                       , "lmApply", "lmVCat", "lmHCat", "lmTranspose"
+                       , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
+                       , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT"
                        , "abs", "max"
 

@@ -4,7 +4,7 @@ module CSE where
 
 import Lang
 import Prim
-import OptLet( Subst, extendSubstInScope, lookupSubst, mkEmptySubst, extendSubstMap )
+import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
 import LangUtils( GblSymTab, substEMayCapture )
 import Rules
 import ANF
@@ -92,7 +92,7 @@ cseDefs rb gst defs
              --      into    let x = e in ..let y = x in ...
             -- Then optDefs substitutes x for y
 
-       ; return $ optDefs rb gst cse_defs
+       ; optDefs rb gst cse_defs
       }
 
 cseD :: TDef -> TDef
@@ -119,7 +119,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 
   -- Second case: CSE does not fire
   -- Clone, extend the reverse-map, retain the let
-  | let (tv', subst') = extendSubstInScope tv subst
+  | let (tv', subst') = substBndr tv subst
         rev_map'      = M.insert rhs' (Var tv') rev_map
         body_env      = CS { cs_subst = subst', cs_map = rev_map' }
   = Let tv' rhs' (cseE_check body_env body)
@@ -154,7 +154,7 @@ cseE cse_env (App e1 e2) = App (cseE_check cse_env e1)
 cseE cse_env@(CS { cs_subst = subst }) (Lam v e)
   = Lam v' (cseE body_env e)
   where
-    (v', subst') = extendSubstInScope v subst
+    (v', subst') = substBndr v subst
     body_env     = cse_env { cs_subst = subst' }
 
 cseE cs_env (Var tv)

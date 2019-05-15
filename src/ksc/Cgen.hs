@@ -528,10 +528,11 @@ cgenFunId = \case
 cgenUserFun :: HasCallStack => Fun -> String
 cgenUserFun f = case f of
   Fun funId     -> cgenFunId funId
-  GradFun  s Fwd -> "D$" ++ cgenFunId s
-  GradFun  s Rev -> "R$" ++ cgenFunId s
-  DrvFun   s Fwd -> "fwd$" ++ cgenFunId s
-  DrvFun   s Rev -> "rev$" ++ cgenFunId s
+  GradFun  s _  -> "D$" ++ cgenFunId s
+  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenFunId s
+  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenFunId s
+  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId s
+  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId s
 
 cgenAnyFun :: HasCallStack => TFun -> CType -> [CType] -> String
 cgenAnyFun tf cftype ctypes = case tf of
@@ -596,7 +597,7 @@ ctypeofFun env (TFun ty f) ctys = case cstMaybeLookupFun f env of
 
 ctypeofFun1 :: HasCallStack => Type -> Fun -> [CType] -> CType
 ctypeofFun1 ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
-ctypeofFun1 (TypeLM _ _) (GradFun f Fwd) ctys = ctypeofGradBuiltin f ctys
+ctypeofFun1 (TypeLM _ _) (GradFun f _) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 (TypeLM _ _) f ctys =
   error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
