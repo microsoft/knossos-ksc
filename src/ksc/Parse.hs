@@ -338,7 +338,14 @@ pDecl = parens $
         <|>  (RuleDecl <$> pRule)
 
 pDecls :: Parser [Decl]
-pDecls = spaces >> manyTill pDecl eof
+-- NB: `Tok.whiteSpace lexer` matches whitespace *or* comments
+--
+--         https://hackage.haskell.org/package/parsec-3.1.11/docs/src/Text.Parsec.Token.html#local-1627451418
+--
+-- `spaces` is not good enough because that will fail to parse a
+-- comment and therefore cause a file that starts with a comment to
+-- fail to parse.
+pDecls = Tok.whiteSpace lexer >> manyTill pDecl eof
 
 
 ---------------------- Tests ------------------
