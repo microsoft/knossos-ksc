@@ -403,7 +403,7 @@ optSumBuild sz i e
 --
 --   index j (sumbuild n (\i. deltaVec n i e))
 -- = sumbuild n (\i. index j (deltaVec n i e))
--- = sumbuild (\i. if j == i then e else 0)
+-- = sumbuild n (\i. if j == i then e else 0)
 -- = e[i->j]
 -- = index j (build n (\i. e))
 optSumBuild n i (Call deltaVec [_n1, Var i1, e])
