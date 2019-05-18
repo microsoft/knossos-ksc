@@ -13,7 +13,7 @@ open System.IO
 let checker = FSharpChecker.Create(keepAssemblyContents=true)
 
 let parseAndCheckFiles files = 
-    let fsproj = @"c:\dev\github\knossos\test\f2k\test0.fsproj" // unused?
+    let fsproj = "nul.fsproj" // unused?
 
     (* see https://fsharp.github.io/FSharp.Compiler.Service/project.html *)
     let sysLib nm = 
@@ -67,13 +67,20 @@ let parseAndCheckFiles files =
 
 [<EntryPoint>]
 let main argv =
+    if argv.Length < 3 then
+        printfn "usage: f2k outfile infiles"
+        exit 1
+    
     let outFile = argv.[1]
     let prefixedFiles = argv.[2..]
+
+    if File.Exists(outFile) then
+        failwithf "Error: Will not overwrite existing file %s\n" outFile
 
     printfn "f2k: Parsing %d files to %s" (Seq.length prefixedFiles) outFile
 
     (* e.g. run as:
-       dotnet run .\f2k.fsproj (echo Util Vector Knossos gmm | % { "..\..\examples\ml-gmm\$_.fs" })  
+       dotnet run .\f2k.fsproj (echo Util Vector Knossos gmm | % { "..\..\..\examples\ml-gmm\$_.fs" })  
     *)
 
     for f in prefixedFiles do
