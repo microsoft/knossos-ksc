@@ -180,6 +180,14 @@
                      x  alphas  mus  qs  ls  wishart
                     dx dalphas dmus dqs dls dwishart))
 
+          (golden_test_gmm_objective
+           (let ((tolerance 0.000001)
+                 (actual gmm_at_theta)
+                 (expected 76.0882))
+             (< (abs (- actual expected))
+                (max (* (abs expected) tolerance)
+                     tolerance))))
+
           (everything_works_as_expected
            ; I would like to pull out a function called something
            ; like `floating_point_numbers_are_close` but I would have
@@ -245,6 +253,7 @@
 
           (tuple "Checked, should be small:" checked)
 
+          golden_test_gmm_objective
           everything_works_as_expected_reverse
           everything_works_as_expected
           (not_ impossibly_good)

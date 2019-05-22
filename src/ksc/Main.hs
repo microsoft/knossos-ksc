@@ -253,13 +253,14 @@ testC compiler = do
   output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
 
   let success = case reverse (lines output) of
-        notImpossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->
+        notImpossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_:goldenGMMS:_ ->
           let boolOfIntString s = case s of
                 "0" -> False
                 "1" -> True
                 _   -> error ("boolOfIntString: Unexpected " ++ s)
 
-          in all boolOfIntString [ everythingWorksAsExpectedReverseS
+          in all boolOfIntString [ goldenGMMS
+                                 , everythingWorksAsExpectedReverseS
                                  , everythingWorksAsExpectedS
                                  , notImpossiblyGoodS ]
         _ -> False
