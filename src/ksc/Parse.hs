@@ -21,7 +21,7 @@ Here's the BNF for our language:
 <param>  ::= ( <var> ":" <type> )
 
 -- <type> is atomic; <ktype> is compound
-<type>   ::= "Integer" | "Float" | "String" | ( <ktype> )
+<type>   ::= "Integer" | "Float" | "String" | "Bool" | ( <ktype> )
 <ktype>  ::= "Vec" <type>
            | "Tuple" <type_1> .. <type_n>
            | <type>
@@ -213,6 +213,7 @@ pType :: Parser (TypeX Parsed)
 pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
     <|> (pReserved "String"  >> return TypeString)
+    <|> (pReserved "Bool"    >> return TypeBool)
     <|> parens pKType
 
 pTypes :: Parser [TypeX Parsed]
