@@ -60,7 +60,7 @@
             0.0
             (if (== i j)
               (exp (index i q))
-              (index (+ (gmm_knossos_tri (- i 1)) j) l))
+              (index (+ (- (gmm_knossos_tri D) (gmm_knossos_tri (- D j))) (- (- i j) 1)) l))
            )
            ))))))
 
