@@ -44,6 +44,12 @@ let parseAndCheckFiles files =
                                    yield "--fullpaths" 
                                    yield "--flaterrors" 
                                    yield "--target:library"
+                               
+                                   //This is effective a stub library. We should also check the files exist
+                                   yield "Util.fs"
+                                   yield "Vector.fs"
+                                   yield "Knossos.fs"
+
                                    yield! files
                                    let references =
                                      [ sysLib "mscorlib" 
@@ -80,7 +86,7 @@ let main argv =
     printfn "f2k: Parsing %d files to %s" (Seq.length prefixedFiles) outFile
 
     (* e.g. run as:
-       dotnet run .\f2k.fsproj (echo Util Vector Knossos gmm | % { "..\..\..\examples\ml-gmm\$_.fs" })  
+       dotnet run .\f2k.fsproj (echo gmm | % { "..\..\..\examples\ml-gmm\$_.fs" })  
     *)
 
     for f in prefixedFiles do
