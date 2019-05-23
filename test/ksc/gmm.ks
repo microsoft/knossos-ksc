@@ -250,7 +250,7 @@
           (gmm_knossos_gmm_objective x alphas mus qs ls wishart)
           gmm_at_theta
           gmm_at_theta_plus_dq12
-          (tuple "GMM_FD:" gmm_fwd)
+          (tuple "GMM_FWD:" gmm_fwd)
           (tuple "GMM_FD:" gmm_fd)
           (tuple "everything_works_as_expected: is 0, non-pure $rand is inlined" everything_works_as_expected) 
 
