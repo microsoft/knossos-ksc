@@ -63,7 +63,7 @@ let parseAndCheckFiles files =
         if checkProjectResults.Errors|> Array.exists (fun error -> error.Severity = FSharpErrorSeverity.Error) then
             failwith "There were errors"
 
-    checkProjectResults.AssemblyContents.ImplementationFiles |> List.last
+    checkProjectResults.AssemblyContents.ImplementationFiles
 
 [<EntryPoint>]
 let main argv =
@@ -87,8 +87,10 @@ let main argv =
         if not (File.Exists(f)) then
             failwithf "Cannot open file %A" f
 
-    let checkedFile = parseAndCheckFiles prefixedFiles
-    let decls = lispgen.toLispDecls checkedFile
+    let checkedFiles = parseAndCheckFiles prefixedFiles
+    let decls =
+        checkedFiles
+        |> Seq.collect (fun implementationFileContent -> seq {yield ";" + implementationFileContent.FileName; yield! lispgen.toLispDecls implementationFileContent} )
     printfn "f2k: Writing %d lines to file %s" (Seq.length decls) outFile
     File.WriteAllLines (outFile, decls)
     0

@@ -32,7 +32,9 @@ let rec strType (t:FSharpType) =
       | a,n -> "**UK[" + a + "." + n + "]"
   else
     match t.ToString() with
-    | _ -> "**UNKNOWN TYPE " + t.TypeDefinition.ToString()
+    | _ ->
+        if t.HasTypeDefinition then "**UNKNOWN TYPE " + t.TypeDefinition.ToString()
+        else "**UNKNOWN TYPE UNKNOWN"
 
 and strRangeType (t:FSharpType) = 
   if t.IsFunctionType then
