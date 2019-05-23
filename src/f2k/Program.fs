@@ -90,7 +90,10 @@ let main argv =
     let checkedFiles = parseAndCheckFiles prefixedFiles
     let decls =
         checkedFiles
-        |> Seq.collect (fun implementationFileContent -> seq {yield ";" + implementationFileContent.FileName; yield! lispgen.toLispDecls implementationFileContent} )
+        |> Seq.collect (fun implementationFileContent -> seq {
+            yield ";" + implementationFileContent.FileName
+            yield! lispgen.toLispDecls implementationFileContent
+        })
     printfn "f2k: Writing %d lines to file %s" (Seq.length decls) outFile
     File.WriteAllLines (outFile, decls)
     0
