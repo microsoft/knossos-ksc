@@ -198,14 +198,13 @@
 
           (dtheta   (tuple dx dalphas dmus dqs dls dwishart))
 
-          (dq12 (mkdeltavv qs 2 1 delta))
-
           (gmm_at_theta (gmm_knossos_gmm_objective x alphas mus qs ls wishart))
-          (gmm_at_theta_plus_dq12 (gmm_knossos_gmm_objective x alphas mus (+ qs dq12) ls wishart))
-          (gmm_fd (- gmm_at_theta_plus_dq12 gmm_at_theta))
+          (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (+ x dx) (+ alphas dalphas) (+ mus dmus) (+ qs dqs) (+ ls dls) (+ wishart dwishart)))
+
+          (gmm_fd (- gmm_at_theta_plus_dtheta gmm_at_theta))
           (gmm_fwd (fwd$gmm_knossos_gmm_objective
-                    x          alphas          mus           qs       ls            wishart
-                    (zerovv x) (zerov alphas)  (zerovv mus)  dq12     (zerovv ls)   (tuple 0.0 (tuple))  ))
+                     x  alphas  mus  qs  ls  wishart
+                    dx dalphas dmus dqs dls dwishart))
 
           (everything_works_as_expected
            ; I would like to pull out a function called something
@@ -229,8 +228,6 @@
           (grad_gmm_qs         (get$4$6 grad_gmm))
           (grad_gmm_ls         (get$5$6 grad_gmm))
           (grad_gmm_wishart    (get$6$6 grad_gmm))
-
-          (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (+ x dx) (+ alphas dalphas) (+ mus dmus) (+ qs dqs) (+ ls dls) (+ wishart dwishart)))
 
           (dot_at_x          (dotvv grad_gmm_x dx))
           (dot_at_alphas     (dotv  grad_gmm_alphas dalphas))
@@ -265,7 +262,7 @@
 
           (gmm_knossos_gmm_objective x alphas mus qs ls wishart)
           gmm_at_theta
-          gmm_at_theta_plus_dq12
+          gmm_at_theta_plus_dtheta
           (tuple "GMM_FWD:" gmm_fwd)
           (tuple "GMM_FD:" gmm_fd)
 
