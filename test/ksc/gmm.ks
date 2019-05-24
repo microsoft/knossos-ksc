@@ -128,8 +128,20 @@
                     (log_wishart_prior wishart (index k qs) (index k ls))))))
     )))
 
-(def mkvec (Vec n Float) ((n : Integer) (scale : Float))
-    (build n (lam (j : Integer) ($rand scale))))
+(def mkfloat Float ((seed  : Integer)
+                    (scale : Float))
+       (* ($ranhashdoub seed) scale))
+
+(def mkvec (Vec n Float) ((seed  : Integer)
+                          (n     : Integer)
+                          (scale : Float))
+    (build n (lam (j : Integer) (mkfloat (+ j seed) scale))))
+
+(def mkvecvec (Vec n (Vec m Float)) ((seed  : Integer)
+                                     (n     : Integer)
+                                     (m     : Integer)
+                                     (scale : Float))
+     (build n (lam (j : Integer) (mkvec (+ (* j m) seed) m scale))))
 
 (def zerov (Vec n Float) ((x : Vec n Float))
   (mul$R$VecR 0.0 x))
@@ -163,22 +175,26 @@
     (let ((D 4)
           (N 5)
           (K 10)
+          (seed 0)
+          (scale_unity 1.0)
+          (scale_small 0.1)
 
-          (x       (build N (lam (i : Integer) (mkvec D 1.0))))
-          (alphas  (build K (lam (i : Integer) ($rand 1.0))))
-          (mus     (build K (lam (i : Integer) (mkvec D 1.0))))
-          (qs      (build K (lam (i : Integer) (mkvec D 0.1))))
-          (ls      (build K (lam (i : Integer) (mkvec (gmm_knossos_tri D) 1.0))))
+
+          (x       (mkvecvec (+ seed 0)    N D scale_unity))
+          (alphas  (mkvec    (+ seed 1000) K   scale_unity))
+          (mus     (mkvecvec (+ seed 2000) K D scale_unity))
+          (qs      (mkvecvec (+ seed 3000) K D scale_small))
+          (ls      (mkvecvec (+ seed 4000) K (gmm_knossos_tri D) scale_unity))
           (wishart (tuple 3.1 7))
 
           (delta 0.0001)
 
-          (dx       (build N (lam (i : Integer) (mkvec D ($rand delta)))))
-          (dalphas  (build K (lam (i : Integer) ($rand delta))))
-          (dmus     (build K (lam (i : Integer) (mkvec D delta))))
-          (dqs      (build K (lam (i : Integer) (mkvec D delta))))
-          (dls      (build K (lam (i : Integer) (mkvec (gmm_knossos_tri D) delta))))
-          (dwishart (tuple ($rand delta) (tuple)))
+          (dx       (mkvecvec (+ seed 5000)  N D delta))
+          (dalphas  (mkvec    (+ seed 6000)  K   delta))
+          (dmus     (mkvecvec (+ seed 7000)  K D delta))
+          (dqs      (mkvecvec (+ seed 8000)  K D delta))
+          (dls      (mkvecvec (+ seed 9000)  K (gmm_knossos_tri D) delta))
+          (dwishart (tuple (mkfloat (+ seed 10000) delta) (tuple)))
 
           (dtheta   (tuple dx dalphas dmus dqs dls dwishart))
 
@@ -252,7 +268,6 @@
           gmm_at_theta_plus_dq12
           (tuple "GMM_FWD:" gmm_fwd)
           (tuple "GMM_FD:" gmm_fd)
-          (tuple "everything_works_as_expected: is 0, non-pure $rand is inlined" everything_works_as_expected) 
 
           grad_gmm
           dtheta
@@ -261,6 +276,6 @@
           (tuple "Checked, should be small:" checked)
 
           everything_works_as_expected_reverse
-          everything_works_as_expected_reverse
+          everything_works_as_expected
           impossibly_good
           )))
