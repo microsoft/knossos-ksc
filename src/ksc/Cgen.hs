@@ -653,7 +653,7 @@ cgenKonst = \case
   KBool    b -> if b then "1 /* TRUE */" else "0 /* FALSE */"
 
 cgenVar :: Var -> String
-cgenVar v = show v
+cgenVar = render . ppr
 
 makeDirectoryForFile :: FilePath -> IO ()
 makeDirectoryForFile =
