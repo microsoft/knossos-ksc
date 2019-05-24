@@ -260,15 +260,14 @@
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           ; see https://github.com/awf/knossos/issues/281 (D$gmm_knossos_gmm_objective x alphas mus qs ls wishart)
 
-          (gmm_knossos_gmm_objective x alphas mus qs ls wishart)
-          gmm_at_theta
-          gmm_at_theta_plus_dtheta
-          (tuple "GMM_FWD:" gmm_fwd)
-          (tuple "GMM_FD:" gmm_fd)
+          (tuple "gmm_at_theta:" gmm_at_theta)
+          (tuple "gmm_at_theta_plus_dtheta:" gmm_at_theta_plus_dtheta)
+          (tuple "gmm_fwd:" gmm_fwd)
+          (tuple "gmm_fd:" gmm_fd)
 
-          grad_gmm
-          dtheta
-          rev_ok
+          (tuple "grad_gmm:" grad_gmm)
+          (tuple "dtheta:" dtheta)
+          (tuple "rev_ok:" rev_ok)
 
           (tuple "Checked, should be small:" checked)
 
