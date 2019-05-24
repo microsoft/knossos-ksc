@@ -259,10 +259,9 @@ testC compiler = do
                 "1" -> True
                 _   -> error ("boolOfIntString: Unexpected " ++ s)
 
-              everythingWorksAsExpectedReverse = boolOfIntString everythingWorksAsExpectedReverseS
-              everythingWorksAsExpected = boolOfIntString everythingWorksAsExpectedS
-              notImpossiblyGood = boolOfIntString notImpossiblyGoodS
-          in everythingWorksAsExpectedReverse && everythingWorksAsExpected && notImpossiblyGood
+          in all boolOfIntString [ everythingWorksAsExpectedReverseS
+                                 , everythingWorksAsExpectedS
+                                 , notImpossiblyGoodS ]
         _ -> False
 
   if success
