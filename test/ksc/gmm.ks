@@ -171,6 +171,8 @@
                     0.0)
                 0.0))))))
 
+(def not_ Bool (p : Bool) (if p false true))
+
 (def main Integer ()
     (let ((D 4)
           (N 5)
@@ -273,5 +275,5 @@
 
           everything_works_as_expected_reverse
           everything_works_as_expected
-          impossibly_good
+          (not_ impossibly_good)
           )))

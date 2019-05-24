@@ -253,7 +253,7 @@ testC compiler = do
   output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
 
   let success = case reverse (lines output) of
-        impossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->
+        notImpossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_ ->
           let boolOfIntString s = case s of
                 "0" -> False
                 "1" -> True
@@ -261,8 +261,8 @@ testC compiler = do
 
               everythingWorksAsExpectedReverse = boolOfIntString everythingWorksAsExpectedReverseS
               everythingWorksAsExpected = boolOfIntString everythingWorksAsExpectedS
-              impossiblyGood = boolOfIntString impossiblyGoodS
-          in everythingWorksAsExpectedReverse && everythingWorksAsExpected && not impossiblyGood
+              notImpossiblyGood = boolOfIntString notImpossiblyGoodS
+          in everythingWorksAsExpectedReverse && everythingWorksAsExpected && notImpossiblyGood
         _ -> False
 
   if success
