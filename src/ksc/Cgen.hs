@@ -254,15 +254,15 @@ vecSizeDecls vs = goVars (Set.fromList $ map tVarVar vs) vs
   where
     goVars :: Set.Set Var -> [TVar] -> String
     goVars _ [] = ""
-    goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (show v) ty
+    goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (cgenVar v) ty
                                  in str ++ goVars seen' vs
 
     goVec :: Set.Set Var -> String -> Var -> (Set.Set Var, String)
     goVec seen value sz =
         if sz `Set.member` seen then
-          (seen, "KS_ASSERT(" ++ show sz ++ " == size(" ++ value ++ "));\n")
+          (seen, "KS_ASSERT(" ++ cgenVar sz ++ " == size(" ++ value ++ "));\n")
         else
-          (Set.insert sz seen, "/*" ++ show seen ++ "*/\n" ++ "int " ++ show sz ++ " = size(" ++ value ++ ");\n")
+          (Set.insert sz seen, "/*" ++ show seen ++ "*/\n" ++ "int " ++ cgenVar sz ++ " = size(" ++ value ++ ");\n")
 
     goType :: Set.Set Var -> String -> Type -> (Set.Set Var, String)
     goType seen value (TypeVec (Var (TVar TypeSize sz)) ty) =
@@ -289,7 +289,7 @@ cgenExprR env = \case
   Konst k -> return $ CG "" (cgenKonst k) (mkCType $ typeofKonst k)
   Var (TVar ty Dummy) ->
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
-  Var (TVar _ v)                -> return $ CG "" (show v) (cstLookupVar v env)
+  Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec sty ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
@@ -310,7 +310,7 @@ cgenExprR env = \case
                   ++ " ++" ++ cvar ++ ") {\n"
         ++ (case var of
               Dummy -> ""
-              _ -> "   " ++ varcty ++ " " ++ show var ++ " = " ++ cvar ++ ";\n" )
+              _ -> "   " ++ varcty ++ " " ++ cgenVar var ++ " = " ++ cvar ++ ";\n" )
         ++ "   " ++ bodydecl ++ "\n"
         ++ "   " ++ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";\n"
         ++ "}\n"
@@ -335,12 +335,12 @@ cgenExprR env = \case
         ++ "KS_ASSERT(" ++ szex ++ " > 0);\n"
         ++ cretty ++ " " ++ ret ++ ";\n"
         ++ "{\n"
-        ++ "   " ++ varcty ++ " " ++ show var ++ " = 0;\n"
+        ++ "   " ++ varcty ++ " " ++ cgenVar var ++ " = 0;\n"
         ++ "   do {\n"
         ++ "     $MRK(" ++ bumpmark ++ ");\n" -- TODO: this is just to declare it
         ++       bodydecl
         --       First time round, inflate it, put it in the ret, then mark the allocator
-        ++ "     if (" ++ show var ++ " == 0) {\n"
+        ++ "     if (" ++ cgenVar var ++ " == 0) {\n"
         ++ "       " ++ ret ++ " = inflate(" ++ bodyex ++ ");\n"
         ++ "       $MRK(" ++ bumpmark ++ ");\n"
         ++ "     } else {\n"
@@ -348,7 +348,7 @@ cgenExprR env = \case
         --         Release the allocator back to where it was on iter 0
         ++ "       $REL(" ++ bumpmark ++ ");\n"
         ++ "     }\n"
-        ++ "   } while (++" ++ show var ++ " < " ++ szex ++ ");\n"
+        ++ "   } while (++" ++ cgenVar var ++ " < " ++ szex ++ ");\n"
         ++ "}\n"
         )
         ret
