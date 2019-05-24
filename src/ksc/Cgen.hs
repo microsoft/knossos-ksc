@@ -497,7 +497,9 @@ cgenExprR env = \case
       crettype
 
   Assert cond body -> do
-    (CG declcond vcond (CType TypeBool)) <- cgenExprR env cond
+    (CG declcond vcond tycond) <- cgenExprR env cond
+    case tycond of CType TypeBool -> return ()
+                   _              -> error "tycond was not TypeBool"
     (CG declbody vbody tybody          ) <- cgenExprR env body
     return $ CG (declcond `spc` "KS_ASSERT(" ++ vcond ++ ");\n" ++ declbody)
                 vbody
