@@ -1534,7 +1534,7 @@ namespace ks
 
 	*/
 
-	// ========================= Rand primitive ===============
+	// ========================= Random primitives ============
 	inline double $rand(double max)
 	{
 		static std::mt19937 rng(42);
@@ -1542,6 +1542,22 @@ namespace ks
 
 		return dist(rng);
 	}
+
+        // ranhash functions from
+        //
+        //     https://mathoverflow.net/questions/104915/pseudo-random-algorithm-allowing-o1-computation-of-nth-element
+        inline uint64_t $ranhash(uint64_t v) {
+          v *= 3935559000370003845LL;
+          v += 2691343689449507681LL;
+          v ^= v >> 21; v ^= v << 37; v ^= v >> 4;
+          v *= 4768777513237032717LL;
+          v ^= v << 20; v ^= v >> 41; v ^= v << 5;
+          return v;
+        }
+
+        inline double $ranhashdoub(uint64_t v) {
+          return 5.42101086242752217E-20 * $ranhash(v);
+        }
 
 	// ========================= Trace primitive ===============
 	template <class T>

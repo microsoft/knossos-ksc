@@ -405,6 +405,7 @@ primFunCallResultTy_maybe fun args
 
       -- ($rand s) returns a uniform random float between 0 and s 
       ("$rand"    , [TypeFloat])                             -> Just TypeFloat
+      ("$ranhashdoub" , [TypeInteger])                           -> Just TypeFloat
 
       -- (pr a b c) prints its arguments to stdout
       ("pr"       , _)                                       -> Just TypeInteger
@@ -452,6 +453,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
                        , "$trace"   -- ($trace f args)            Print and return (f args)  
                        , "$rand"    -- ($rand val)                Generate a random float between 0 and val
+                       , "$ranhashdoub" -- ($ranhashdoub val)    Generate a random float between 0 and 1 purely
                        , "pr"       -- (pr "msg")                 Print "msg"
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))

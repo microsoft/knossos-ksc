@@ -506,6 +506,7 @@ optGradPrim _ "index" [i,v]
 
 optGradPrim _ "$trace" [e] = Just (lmOne $ typeof e)
 optGradPrim _ "$rand" _ = Just (lmZero TypeFloat TypeFloat )
+optGradPrim _ "$ranhashdoub" _ = Just (lmZero TypeFloat TypeFloat )
 optGradPrim _ "to_float" _ = Just (lmZero TypeInteger TypeFloat)
 optGradPrim _ "lgamma" x = Just (lmScale TypeFloat $ mkPrimCall "digamma" x)
 optGradPrim _ "neg" [e] = Just (lmScale (typeof e) (kTFloat $ -1.0))
