@@ -17,4 +17,4 @@ executable ksc
                  containers >= 0.5,
                  process >= 1.4,
                  directory >= 1.3
-  ghc-options: -Werror -Wunused-local-binds -Wunused-matches -Wunused-imports -Wunused-top-binds -Wmissing-signatures
+  ghc-options: -Werror -Wmissing-monadfail-instances -Wincomplete-patterns -Wunused-local-binds -Wunused-matches -Wunused-imports -Wunused-top-binds -Wmissing-signatures
