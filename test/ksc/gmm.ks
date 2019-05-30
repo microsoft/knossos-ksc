@@ -143,34 +143,6 @@
                                      (scale : Float))
      (build n (lam (j : Integer) (mkvec (+ (* j m) seed) m scale))))
 
-(def zerov (Vec n Float) ((x : Vec n Float))
-  (mul$R$VecR 0.0 x))
-
-(def zerovv (Vec m (Vec n Float)) ((x : Vec m (Vec n Float)))
-  (mul$R$VecVecR 0.0 x))
-
-(def mkdeltav (Vec n Float)
-              ((n : Integer)
-               (i : Integer)
-               (val : Float))
-    (build n (lam (ii : Integer)
-                (if (== i ii)
-                    val
-                    0.0))))
-
-(def mkdeltavv (Vec m (Vec n Float))
-               ((x : Vec m (Vec n Float))
-                (i : Integer)
-                (j : Integer)
-                (val : Float))
-    (build m (lam (ii : Integer)
-        (build n (lam (jj : Integer)
-            (if (== i ii)
-                (if (== j jj)
-                    val
-                    0.0)
-                0.0))))))
-
 (def not_ Bool (p : Bool) (if p false true))
 
 (def main Integer ()
