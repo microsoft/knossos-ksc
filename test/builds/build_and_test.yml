@@ -1,0 +1,56 @@
+trigger: none
+
+jobs:
+
+- job: 'Ubuntu'
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-16.04'
+
+  steps:
+  - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
+    displayName: 'Install dependencies'
+
+  - script: cabal install --with-ghc /opt/ghc/bin/ghc --dependencies-only && cabal configure --with-ghc /opt/ghc/bin/ghc && cabal build --with-ghc /opt/ghc/bin/ghc
+    displayName: 'Can build with cabal'
+
+  - script: sh ./test/builds/build_linux.sh /opt/ghc/bin/ghc
+    displayName: 'GHC compile src/ksc/Main.hs'
+
+  - script: src/ksc/Main
+    displayName: 'ksc test'
+
+  - script: ./profile test/ksc/gmm-obj prof-obj.out prof-obj-functions.txt prof-obj-lines.txt && ./profile test/ksc/gmm-rev prof-rev.out prof-rev-functions.txt prof-rev-lines.txt
+    displayName: gperftools
+
+  - script: sh test/builds/publish_artifact.sh
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathToPublish: Artifact
+      artifactName: Artifact
+      targetPath: Artifact
+
+  - script: rm -rf *
+    displayName: 'Clean'
+
+
+- job: 'Windows'
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'vs2017-win2016'
+
+  steps:
+  - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
+    displayName: 'Install dependencies'
+
+  - script: refreshenv && ghc -main-is testWindows -isrc/ksc -Werror -Wunused-imports -Wunused-top-binds -Wmissing-signatures src/ksc/Main.hs
+    displayName: 'GHC compile src/ksc/Main.hs'
+
+  - script: src\ksc\Main.exe
+    displayName: 'ksc test'
+
+  - script: rm -rf *
+    displayName: 'Clean'

@@ -1,0 +1,12 @@
+workspace:
+  clean: all
+
+steps:
+- script: 'sh ./test/builds/build_linux.sh /opt/ghc/bin/ghc'
+  displayName: 'Build Main.hs'
+
+- script: src/ksc/Main
+  displayName: 'Run Main'
+
+- script: rm -rf *
+  displayName: 'Clean'
