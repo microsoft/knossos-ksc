@@ -118,6 +118,12 @@ lmBuild = mkPrimCall2 "lmBuild"
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuildT = mkPrimCall2 "lmBuildT"
 
+lmIndexPrim :: Type -> TExpr -> TExpr
+lmIndexPrim typevec i = lmBuildT n (Lam ii (lmDelta vi (Var ii) i))
+  where ii = TVar TypeInteger $ Simple "primDindex$i"
+        vi = mkDummy t
+        TypeVec n t = typevec
+
 isThePrimFun :: TFun -> String -> Bool
 isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
 isThePrimFun _ _ = False

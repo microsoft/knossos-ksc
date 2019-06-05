@@ -497,12 +497,9 @@ optGradPrim _ "size" [e]
   = Just $ lmZero (typeof e) TypeInteger
 
 optGradPrim _ "index" [i,v]
+  | typeof_v@(TypeVec _ elt_ty) <- typeof v
   = Just (lmHCat [ lmZero (typeof i) elt_ty
-                 , lmBuildT sz (Lam ii (lmDelta vi (Var ii) i)) ])
-  where
-    ii = TVar TypeInteger $ Simple "primDindex$i"
-    vi = pIndex i v
-    TypeVec sz elt_ty = typeof v
+                 , lmIndexPrim typeof_v i ])
 
 
 optGradPrim _ "$trace" [e] = Just (lmOne $ typeof e)
