@@ -499,7 +499,7 @@ optGradPrim _ "size" [e]
 optGradPrim _ "index" [i,v]
   | typeof_v@(TypeVec _ elt_ty) <- typeof v
   = Just (lmHCat [ lmZero (typeof i) elt_ty
-                 , lmIndexPrim typeof_v i ])
+                 , lmIndex typeof_v i ])
 
 
 optGradPrim _ "$trace" [e] = Just (lmOne $ typeof e)
