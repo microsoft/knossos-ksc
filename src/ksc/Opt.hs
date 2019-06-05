@@ -224,12 +224,11 @@ optPrimFun "lmCompose" [f,g]
   | isLMOne g  = Just f
 
   -- f o 0 = 0
-  {-  but where to get a zero of F's output type?
-      We can't just check if the types are the same, as the sizes may be different.
-  | Call gz [s,t] <- g
+  | Call gz _   <- g
+  , TypeLM s _tg <- typeof g
+  , TypeLM _tf u <- typeof f
   , gz `isThePrimFun` "lmZero"
-  = Just ?
-  -}
+  = Just (lmZero s u)
 
   -- Scale(T, x) . Scale(T, y) = Scale(T, xy )
   | Call scale1 [t1, x] <- f
