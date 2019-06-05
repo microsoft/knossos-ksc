@@ -35,6 +35,7 @@ data CType =  CType Type
             | LMVCat [CType]
             | LMBuild CType
             | LMBuildT CType
+            | LMIndex Type
             | LMCompose CType CType
             | LMAdd [CType]
             | LMVariant [CType]
@@ -54,6 +55,8 @@ isScalar = \case
   LMVCat   _    -> False
   LMBuild  _    -> False
   LMBuildT _    -> False
+  LMIndex (TypeVec _ t) -> Lang.isScalar t
+  LMIndex t             -> error ("Invalid type in LMIndex: " ++ show t)
   LMCompose _ _ -> False
   LMAdd     _   -> False
   LMVariant _   -> False
@@ -566,6 +569,7 @@ cgenType = \case
   LMVCat   ts     -> lm "VCat" ts
   LMBuild  t      -> lm "Build" [t]
   LMBuildT t      -> lm "BuildT" [t]
+  LMIndex t       -> lmt "Index" [t]
   LMCompose m1 m2 -> lm "Compose" [m1, m2]
   LMAdd     ms    -> lm "Add" ms
   LMVariant ts    -> lm "Variant" ts
@@ -608,6 +612,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
   ("lmApply"  , _         ) -> mkCType ty
   ("lmBuild"  , [_, lam]  ) -> LMBuild lam
   ("lmBuildT" , [_, lam]  ) -> LMBuildT lam
+  ("lmIndex"  , [ct, CType TypeInteger]) -> LMIndex (stripCType ct)
   ("lmOne"    , [ct]      ) -> LMOne (stripCType ct)
   ("lmZero"   , [cs, ct]  ) -> LMZero (stripCType cs) (stripCType ct)
   ("lmScale"  , [ct, CType TypeFloat]) -> LMScale (stripCType ct)

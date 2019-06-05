@@ -610,6 +610,9 @@ optApplyLMCall "lmBuild" [n, Lam i m] dx
 optApplyLMCall "lmBuildT" [n, Lam i m] dx
   = Just (pSum (pBuild n (Lam i (lmApply m (pIndex (Var i) dx)))))
 
+optApplyLMCall "lmIndex" [_, i] dx
+  = Just (pIndex i dx)
+
 optApplyLMCall _ _ _
   = -- pprTrace ("No opt for LM apply of " ++ show fun)
     --         (ppr arg)
@@ -655,6 +658,10 @@ optTransPrim "lmVCat"      es           = Just (lmHCat (map lmTranspose es))
 optTransPrim "lmHCat"      es           = Just (lmVCat (map lmTranspose es))
 optTransPrim "lmBuild"     [n, Lam i b] = Just (lmBuildT n (Lam i (lmTranspose b)))
 optTransPrim "lmBuildT"    [n, Lam i b] = Just (lmBuild n (Lam i (lmTranspose b)))
+-- This is an easy to implement way of transposing lmIndex.  We don't
+-- have to explicitly provide a primitive for its transpose.  Perhaps
+-- we should at a later date.
+optTransPrim "lmIndex"     [typevec, i] = Just (lmTranspose (lmIndexPrim (typeof typevec) i))
 optTransPrim _ _ = Nothing
 
 --------------------------------------

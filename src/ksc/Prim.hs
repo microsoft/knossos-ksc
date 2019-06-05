@@ -118,6 +118,11 @@ lmBuild = mkPrimCall2 "lmBuild"
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuildT = mkPrimCall2 "lmBuildT"
 
+lmIndex :: Type -> TExpr -> TExpr
+lmIndex t = mkPrimCall2 "lmIndex" (mkDummy t)
+
+-- The same semantics as lmIndex but built out of other primitive
+-- functions
 lmIndexPrim :: Type -> TExpr -> TExpr
 lmIndexPrim typevec i = lmBuildT n (Lam ii (lmDelta vi (Var ii) i))
   where ii = TVar TypeInteger $ Simple "primDindex$i"
@@ -394,6 +399,7 @@ primFunCallResultTy_maybe fun args
                          , (t1:ts1) <- ts
                          , all (== t1) ts1                   -> Just (TypeLM (TypeTuple ss) t1)
                          
+      ("lmIndex"  , [vt@(TypeVec _ t), TypeInteger])         -> Just (TypeLM vt t)
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , [t])                                     -> Just t
 
