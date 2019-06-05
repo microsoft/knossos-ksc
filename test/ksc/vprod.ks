@@ -1,4 +1,5 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
-(def vprod Float ( (i : Integer) (v : Vec n Float) )
-       (if (== i 0) 0.0 (* (index i v) (vprod (+ i 1) v))))
+(def vprod Float ( (i : Integer) (acc : Float) (v : Vec n Float) )
+     (if (== i n) 1.0 (vprod (+ i 1) (* acc (index i v)) v)))
+
