@@ -225,6 +225,7 @@ pKType :: Parser (TypeX Parsed)
 pKType =   (do { pReserved "Vec"; sz <- pVecSize; ty <- pType; return (TypeVec sz ty) })
        <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
        <|> (do { pReserved "LM"; s <- pType; t <- pType ; return (TypeLM s t) })
+       <|> (do { pReserved "Lam"; s <- pType; t <- pType ; return (TypeLam s t) })
        <|> pType
 
 pVecSize :: Parser (ExprX Parsed)
