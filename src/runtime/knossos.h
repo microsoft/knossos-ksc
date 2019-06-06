@@ -1603,7 +1603,7 @@ namespace ks
 	// BENCHMARK
 	// Call with e.g. 
 	// benchmark(repeat([&]() { ... my code ... ; }));
-	void benchmark(std::function<void(int)> f);
+	double benchmark(std::function<void(int)> f);
 #define BENCHMARK(CODE) ks::benchmark(ks::repeat([&]() { CODE; }))
 	/* e.g:
 		alloc_mark_t mark = mark_bump_allocator_if_present();
@@ -1612,6 +1612,12 @@ namespace ks
 			c$68 = gmm_knossos_gmm_objective(c$62, c$63, c$64, c$65, c$66, c$67)
 		);
 	*/
+
+#define $BENCH(FUN) ks::benchmark(ks::repeat([&]() { \
+																								$MRK(t); \
+																								FUN(tuple<>{}); \
+																								$REL(t); \
+																						}))
 
 	// ===============================  Dot ===========================================
   inline double dot(double t1, double t2) { return t1 * t2; }
