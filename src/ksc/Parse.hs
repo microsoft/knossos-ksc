@@ -58,7 +58,7 @@ An example
 
 We have comments, thus
    ; Comment to end of line
-   {- block comment -}
+   #| block comment |#
 
 Notes:
 
