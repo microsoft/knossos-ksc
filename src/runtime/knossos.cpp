@@ -29,7 +29,7 @@ namespace ks {
 		}
 	};
 
-	void benchmark(std::function<void(int)> f)
+	double benchmark(std::function<void(int)> f)
 	{
 		std::cerr << "Start timing -- calibration ... ";
 		timer_t timer;
@@ -47,8 +47,8 @@ namespace ks {
 			n_repeats *= 2;
 		}
 		// if n_repeats > 1, we took at most 1 sec to do that number.
-		// Now spend 10 more seconds at most in sampling.
-		double time_to_sample = 10.0;
+		// Now spend 4 more seconds at most in sampling.
+		double time_to_sample = 4.0;
 		int n_samples = int(time_to_sample / t);
 
 		// Report minimum cost.  
@@ -57,7 +57,7 @@ namespace ks {
 		// Worst possible case is old Windows machines at 15ms, ie. 1.5% at 1 second.
 		double per_call_min = t / n_repeats;
 
-		// Do a few more runs up to 10 sec
+		// Do a few more runs up to time_to_sample sec
 		timer_t total;
 		for (int i = 0; i < n_samples; ++i) {
 			std::cerr << "Start timing sample " << i << "/" << n_samples << " or " << total() << "/" << time_to_sample << " sec... ";
@@ -72,7 +72,8 @@ namespace ks {
 			}
 		}
 		
-		std::cerr << "Per-call min: " << per_call_min << " sec.\n";
+		std::cerr << "Per-call min: " << per_call_min*1e6 << " usec.\n";
+		return per_call_min * 1e6;
 	};
 
 };
