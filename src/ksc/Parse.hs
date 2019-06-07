@@ -135,7 +135,7 @@ langDef = Tok.LanguageDef
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
                           , "let", "if", "assert", "call", "tuple", ":"
-                          , "Integer", "Float", "Vec", "String", "true", "false"
+                          , "Integer", "Float", "Vec", "Lam", "String", "true", "false"
                           ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
