@@ -20,25 +20,35 @@
 ;;   *Main> :! obj\\test\\ksc\\vprod.exe
 ;; to see progress bars
 (def main Integer ()
-  (pr "VPROD"
-      (build 4 (lam (n : Integer) 
-                  (let (v (build (* (+ n 1) 100) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
+  (let ((N 6)
+        (ns (build N (lam (i : Integer) (* (+ i 1) 100)))))
+  (print "# Julia code:\n"
+      "n=" ns "\n"
+      "vp="
+      (build N (lam (n : Integer) 
+                  (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (vprod 0 v))))))
+      "\n"
 
-      "APROD"
-      (build 4 (lam (n : Integer) 
-                  (let (v (build (* (+ n 1) 100) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
+      "ap="
+      (build N (lam (n : Integer) 
+                  (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (aprod 0 v 1.0))))))
+      "\n"
 
-      "rev$vprod"
-      (build 4 (lam (n : Integer) 
-                  (let (v (build (* (+ n 1) 100) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
-                      ($BENCH (lam (_ : (Tuple)) (vchomp (rev$vprod 0 v 1.0)))))))
-          
-      "rev$aprod"
-      (build 4 (lam (n : Integer) 
-                  (let (v (build (* (+ n 1) 100) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
+      "rvp="
+      (build N (lam (n : Integer) 
+                  (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
+                      ($BENCH (lam (_ : (Tuple)) (vchomp (rev$vprod 0 v 1.0)))))))          
+      "\n"
+
+      "rap="
+      (build N (lam (n : Integer) 
+                  (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (achomp (rev$aprod 0 v 1.0 1.0)))))))
 
+      "\n"
+      "plot(n,rap,n,rvp)\n"
+  )
   )
 )

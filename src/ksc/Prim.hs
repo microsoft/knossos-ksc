@@ -409,8 +409,10 @@ primFunCallResultTy_maybe fun args
       ("$rand"    , [TypeFloat])                             -> Just TypeFloat
       ("$ranhashdoub" , [TypeInteger])                           -> Just TypeFloat
 
-      -- (pr a b c) prints its arguments to stdout
+      -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
       ("pr"       , _)                                       -> Just TypeInteger
+      -- (print a b c) prints its arguments to stdout with no separators
+      ("print"    , _)                                       -> Just TypeInteger
       ("sumbuild" , [TypeSize, TypeLam TypeInteger t])       -> Just t
       ("sumbuild" , [TypeInteger, TypeLam TypeInteger t])    -> Just t
       ("index"    , [TypeInteger, TypeVec _ t])              -> Just t
@@ -455,8 +457,9 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
                        , "$trace"   -- ($trace f args)            Print and return (f args)  
                        , "$rand"    -- ($rand val)                Generate a random float between 0 and val
-                       , "$ranhashdoub" -- ($ranhashdoub val)    Generate a random float between 0 and 1 purely
-                       , "pr"       -- (pr "msg")                 Print "msg"
+                       , "$ranhashdoub" -- ($ranhashdoub val)     Generate a random float between 0 and 1 purely
+                       , "pr"       -- (pr "msg" 3)               Print "msg\n---3\n"
+                       , "print"    -- (print "msg" 3)            Print "msg3"
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "index"
