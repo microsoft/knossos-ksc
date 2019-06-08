@@ -1590,6 +1590,20 @@ namespace ks
 		return 1 + pr(t...);
 	}
 
+	template <class T>
+	int print(T a)
+	{
+		std::cout << a;
+		return 0;
+	}
+
+	template <class T, class... Ts>
+	int print(T a, Ts... t)
+	{
+		print(a);
+		return 1 + print(t...);
+	}
+
 	// =========================== Timing ===============================
 	template <class Functor>
 	std::function<void(int)> repeat(Functor const& f) {
