@@ -1,13 +1,11 @@
-# knossos
+# Compiler with automatic differentiation
 
-Knossos: AI Compiler
-
-Knossos is a functional compiler and code-gen tool that will
+This project is a functional compiler and code-gen tool that will
 accelerate writing AI algorithms as well as making them easier.  The
-output of code-gen is C++ code. We envisage that Knossos will have
+output of code-gen is C++ code. We envisage that it will have
 interfaces for popular languages such as Python, Julia and F# which
 will make it easier for a wide variety of programmers to leverage the
-benefits of Knossos.
+benefits.
 
 ### Installing
 
@@ -95,3 +93,8 @@ HCat(Scale(0.454545),Scale(-0.227273))
 *Main> <b>"Hooray!"</b>
 "Hooray!"
 </pre>
+
+### Code of Conduct
+
+Collaboration on this project is subject to the [Microsoft Open Source
+Code of Conduct](https://opensource.microsoft.com/codeofconduct).

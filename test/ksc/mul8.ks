@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def xtimes Float ( (x1 : Float) (x2 : Float) ) (* x1 x2))
 
 (def times Float ( (x1 : Float) (x2 : Float) ) (* x1 (* x2 2.0)))

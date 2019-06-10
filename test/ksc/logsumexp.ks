@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def exp. (Vec Float) (v : Vec Float)
     (build (size v) (lam (i : Integer) (exp (index i v)))))
 

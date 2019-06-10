@@ -1,3 +1,5 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 module Rules( RuleBase, tryRules, mkRuleBase ) where
 

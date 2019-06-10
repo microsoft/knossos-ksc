@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def h Integer ((y : Integer))
     (sum (build 3 (lam (y3 : Integer) (+ y 2))))
     )

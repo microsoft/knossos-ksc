@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def test_tuple Integer ((x : Tuple (Vec n Float) (Vec m (Vec p Float)) Integer))
     (+ 1 (if (< 2 3) 4 5)))
 

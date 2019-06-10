@@ -1,4 +1,6 @@
-﻿/// These are stubs that we expect Knossos to substitute later, they may want to be given implementations
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+/// These are stubs that we expect Knossos to substitute later, they may want to be given implementations
 /// so that debugging on the F# side is possible.
 module Knossos
 

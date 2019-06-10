@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 
 (def f1 Float ((x :  Float) (y :  Float) (i : Integer))
         (* (if (< i 3) (+ x 1.0) (* 7.0 (to_float i))) y)

@@ -1,4 +1,6 @@
-﻿// Learn more about F# at http://fsharp.org
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+// Learn more about F# at http://fsharp.org
 
 open System
 

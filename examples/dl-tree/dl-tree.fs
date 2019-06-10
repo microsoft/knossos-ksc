@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 type Mat = float
 let rand () = System.Random().NextDouble()
 let Mat_rand n m = 3.2

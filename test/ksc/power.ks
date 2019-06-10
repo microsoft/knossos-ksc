@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def f Float ( (n : Integer) (x : Float) )
     (if (== n 1) 
         x 

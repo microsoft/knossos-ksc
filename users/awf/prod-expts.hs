@@ -1,3 +1,5 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
 {---------------------------------------------------}
 {- Can we get to linear time with simple rewrites? -}
 

@@ -1,4 +1,6 @@
-﻿// Learn more about F# at http://fsharp.org
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+// Learn more about F# at http://fsharp.org
 #if INTERACTIVE
 #r @"C:\Users\Andrew Fitzgibbon\.nuget\packages\fsharp.compiler.service\25.0.1\lib\netstandard2.0\FSharp.Compiler.Service.dll"
 #endif

@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 open FP      // Functional programming primitives: polymorphic zip, fold, etc
 open Tensor  // Vector/Matrix/Tensor, 
 open MLFuncs // relu, crossentropy etc
