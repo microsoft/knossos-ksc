@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 module MF_CurveFitting
 
 // B-Spline basis function of degree p, segment i

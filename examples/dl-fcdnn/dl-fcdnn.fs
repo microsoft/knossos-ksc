@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 // "Artist's rendition" of simple FC DNN in DF#. 
 open FP      // Functional programming primitives: polymorphic zip, fold, etc
 open Tensor  // Vector/Matrix/Tensor, as plain-ol-data types

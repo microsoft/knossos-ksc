@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def a Float ((x : Float))
     (* 3.0 x))
 

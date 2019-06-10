@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def f Float ((x : Float) (y : Float))
      (let (z (* x y))
        (+ (* z x) (* z y))))

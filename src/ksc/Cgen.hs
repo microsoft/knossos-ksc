@@ -1,3 +1,5 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
 {-# LANGUAGE LambdaCase, FlexibleInstances, TypeApplications, PatternSynonyms  #-}
 
 module Cgen where

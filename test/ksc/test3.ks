@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def f Float ((x : Vec 2 Float) (y : Vec n Float))
     (if (< 2 3) (index 1 x) 7.0)
 )

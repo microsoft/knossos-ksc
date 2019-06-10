@@ -1,3 +1,5 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module AD where

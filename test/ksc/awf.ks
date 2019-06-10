@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def h (Vec n Float) (x : Vec n Float)
     (build n (lam (i : Integer) 1.0)))
 

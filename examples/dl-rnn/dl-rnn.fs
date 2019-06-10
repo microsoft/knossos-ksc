@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 ///// Mocking
 type Vec = float
 type Mat = Vec

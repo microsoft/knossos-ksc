@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 type Vec = float[]
 type Mat = Vec[]
 

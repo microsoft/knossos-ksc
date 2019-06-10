@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 (def tri Integer (n : Integer)
   (/ (* n (- n 1)) 2))
 

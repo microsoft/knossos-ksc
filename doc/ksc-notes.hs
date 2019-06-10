@@ -1,3 +1,5 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
 -- Clean documentation of the Knossos IR
 
 -- Top-level function definition

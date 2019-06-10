@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 
 
 (def h Float ( (x1 : Float) (x2 : Float) (x3 : Float) (x4 : Float) )

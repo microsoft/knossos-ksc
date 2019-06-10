@@ -1,3 +1,5 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveFunctor #-}
 

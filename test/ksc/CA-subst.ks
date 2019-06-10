@@ -1,3 +1,5 @@
+; Copyright (c) Microsoft Corporation.
+; Licensed under the MIT license.
 
 (def f Integer ( (y : Integer) (p : Integer))
     (let (y (+ y y))

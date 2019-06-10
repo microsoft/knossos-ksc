@@ -1,3 +1,5 @@
+-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT license.
 module Main where
 
 import GHC.Stack

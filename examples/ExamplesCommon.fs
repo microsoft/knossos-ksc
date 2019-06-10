@@ -1,3 +1,5 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
 module ExamplesCommon
 
 open NUnit.Framework
