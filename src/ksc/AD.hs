@@ -128,7 +128,7 @@ applyD (Def { def_fun = GradFun f Rev, def_res_ty =  TypeLM s t
     dr = TVar (tangentType s) $ Delta "r"
 
 --   D$f :: S1 S2       -> ((S1,S2) -o T)
--- rev$f :: S1 S2 S1 S2 -> T
+-- fwd$f :: S1 S2 S1 S2 -> T
 applyD (Def { def_fun = GradFun f Fwd, def_res_ty = TypeLM _ t
             , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun = DrvFun f Fwd, def_res_ty = tangentType t
