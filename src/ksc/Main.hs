@@ -175,7 +175,7 @@ displayCppGenAndCompileS compiler = displayCppGenAndCompile (Cgen.compile compil
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
 displayCppGenCompileAndRun compiler verbosity file = do
-  { exefile <- displayCppGenAndCompile (Cgen.compile compiler) verbosity file
+  { exefile <- displayCppGenAndCompileS compiler verbosity file
   ; Cgen.runExe exefile
   }
 
