@@ -225,7 +225,7 @@ data Var
                             -- or backward versions of f
   | Grad     String ADMode  -- \nabla x
                             --   True <=> transposed \bowtie x
-  deriving( Eq, Ord )
+  deriving( Eq, Ord, Show )
 
 data Konst = KInteger Integer   -- :: TypeInteger
            | KSize    Integer   -- :: TypeSize
@@ -419,22 +419,6 @@ traceWhenTypesUnequal = traceWhenUnequal
 
 
 -----------------------------------------------
---       Show instances
------------------------------------------------
-
-instance Show Var where
-  show v = case v of
-    Dummy -> "/*dummy*/"
-    Simple s -> s
-    Delta  d -> "d$" ++ d
-    Grad g m -> "g" ++ (case m of
-                          Fwd -> "f"
-                          Rev -> "r")
-                    ++ "$"
-                    ++ g
-
-
------------------------------------------------
 --     SDoc abstraction over expression display style
 -----------------------------------------------
 
@@ -621,7 +605,15 @@ instance Pretty a => Pretty (Maybe a) where
   ppr (Just x) = text "Just" <+> ppr x
 
 instance Pretty Var where
-  ppr = text . show
+  ppr Dummy      = text "/*dummy*/"
+  ppr (Simple s) = text s
+  ppr (Delta  d) = text "d$" <> text d
+  ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
+
+instance Pretty ADMode where
+  ppr m = text $ case m of
+            Fwd -> "f"
+            Rev -> "r"
 
 instance Pretty FunId where
   ppr = pprFunId
