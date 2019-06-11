@@ -81,12 +81,12 @@ cseDefs :: RuleBase -> GblSymTab -> [TDef]
 -- The returned GblSymTab contains the CSE'd definitions
 cseDefs rb gst defs
   = do { anf_defs <- anfDefs defs
---       ; banner "ANF'd"
---       ; displayN anf_defs
+       ; banner "ANF'd"
+       ; displayN anf_defs
 
        ; let cse_defs = map cseD anf_defs
---       ; banner "CSE'd"
---       ; displayN cse_defs
+       ; banner "CSE'd"
+       ; displayN cse_defs
 
              -- cseE turns   let x = e in ..let y = e in ...
              --      into    let x = e in ..let y = x in ...
