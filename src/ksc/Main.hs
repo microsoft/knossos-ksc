@@ -233,8 +233,7 @@ ksTestFiles testDir = do
 
 compileKscTestPrograms :: String -> IO ()
 compileKscTestPrograms compiler = do
-  let testDir = "test/ksc/"
-  ksFiles <- ksTestFiles testDir
+  ksFiles <- ksTestFiles "test/ksc/"
 
   let ksTests = map System.FilePath.dropExtension ksFiles
 
