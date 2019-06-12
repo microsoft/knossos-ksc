@@ -219,17 +219,21 @@ test = testC "g++-7"
 testWindows :: IO ()
 testWindows = testC "g++"
 
-compileKscTestPrograms :: String -> IO ()
-compileKscTestPrograms compiler = do
+ksTestFiles :: String -> IO [String]
+ksTestFiles testDir = do
   let last n xs = drop (length xs - n) xs
-      testDir = "test/ksc/"
 
       naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList
         = ["logsumexp.ks"]
 
-  ksFiles <- fmap (filter (not . (`elem` naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList))
-                    . filter ((== ".ks") . last 3))
-             (System.Directory.listDirectory testDir)
+    in fmap (filter (not . (`elem` naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList))
+             . filter ((== ".ks") . last 3))
+            (System.Directory.listDirectory testDir)
+
+compileKscTestPrograms :: String -> IO ()
+compileKscTestPrograms compiler = do
+  let testDir = "test/ksc/"
+  ksFiles <- ksTestFiles testDir
 
   let ksTests = map ((testDir ++) . System.FilePath.dropExtension) ksFiles
 
