@@ -226,7 +226,8 @@ ksTestFiles testDir = do
       naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList
         = ["logsumexp.ks"]
 
-    in fmap (filter (not . (`elem` naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList))
+    in fmap (map (testDir ++)
+             . filter (not . (`elem` naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList))
              . filter ((== ".ks") . last 3))
             (System.Directory.listDirectory testDir)
 
@@ -235,7 +236,7 @@ compileKscTestPrograms compiler = do
   let testDir = "test/ksc/"
   ksFiles <- ksTestFiles testDir
 
-  let ksTests = map ((testDir ++) . System.FilePath.dropExtension) ksFiles
+  let ksTests = map System.FilePath.dropExtension ksFiles
 
   putStrLn ("Testing " ++ show ksTests)
 
