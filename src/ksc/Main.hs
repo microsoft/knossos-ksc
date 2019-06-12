@@ -36,9 +36,12 @@ import Test.Hspec (hspec, Spec)
 demoF :: ADPlan -> String -> IO ()
 -- Read source code from specified input file, optimise,
 -- differentiate, optimise, and display results of each step
-demoF adp file = do
+demoF = demoFFilter id
+
+demoFFilter :: ([Decl] -> [Decl]) -> ADPlan -> String -> IO ()
+demoFFilter theFilter adp file = do
   defs <- parseF file
-  runKM (demoN adp defs)
+  runKM (demoN adp (theFilter defs))
 
 demo :: Decl -> IO ()
 demo d = runKM (demoN BasicAD [d])
@@ -269,6 +272,25 @@ compileKscTestPrograms compiler = do
     []     -> return ()
     errors -> error ("Had errors in:\n" ++ unlines errors)
 
+demoFOnTestPrograms :: IO ()
+demoFOnTestPrograms = do
+  ksTests <- ksTestFiles "test/ksc/"
+
+  putStrLn ("Testing " ++ show ksTests)
+
+  errors <- flip mapM ksTests $ \ksTest -> do
+    flip mapM [BasicAD, TupleAD] $ \adp -> do
+      putStrLn ""
+      putStrLn $ ">>>>> TEST: " ++ ksTest
+      fmap (const Nothing) (demoFFilter (snd . moveMain) adp ksTest)
+        `Control.Exception.catch` \e -> do
+          print (e :: Control.Exception.ErrorCall)
+          return (Just (ksTest, adp))
+
+  case Data.Maybe.catMaybes (concat errors) of
+    []     -> return ()
+    errors -> error ("Had errors in:\n" ++ unlines (map show errors))
+
 testGMM :: String -> IO ()
 testGMM compiler = do
   output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
@@ -297,6 +319,7 @@ testGMM compiler = do
 testC :: String -> IO ()
 testC compiler = do
   Test.Hspec.hspec Main.hspec
+  demoFOnTestPrograms
   compileKscTestPrograms compiler
   testGMM compiler
 
