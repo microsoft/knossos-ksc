@@ -251,11 +251,8 @@ compileKscTestPrograms compiler = do
     []     -> return ()
     errors -> error ("Had errors in:\n" ++ unlines errors)
 
-testC :: String -> IO ()
-testC compiler = do
-  Test.Hspec.hspec Main.hspec
-  compileKscTestPrograms compiler
-
+testGMM :: String -> IO ()
+testGMM compiler = do
   output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
 
   let success = case reverse (lines output) of
@@ -278,6 +275,12 @@ testC compiler = do
     else do
     putStrLn ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output)))))
     System.Exit.exitWith (System.Exit.ExitFailure 1)
+
+testC :: String -> IO ()
+testC compiler = do
+  Test.Hspec.hspec Main.hspec
+  compileKscTestPrograms compiler
+  testGMM compiler
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
