@@ -91,6 +91,13 @@ gradE s (Call f [n, Lam ti body])
     mkLet (gradTVar s ti) (lmZero s (typeof  ti)) $
     gradE s body
 
+-- AD does not currently have rules for handling primitive sumbuild.
+-- Instead we deoptimize by just treating it as though it were a sum
+-- and a build.  It can be optimized again by a later stage of the
+-- pipeline.
+  | f `isThePrimFun` "sumbuild"
+  = gradE s (pSum (pBuild n (Lam ti body)))
+
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.
 gradE s (Call f [arg])
