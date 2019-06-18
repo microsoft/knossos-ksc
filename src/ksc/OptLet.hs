@@ -195,6 +195,9 @@ extendSubstMap :: Var -> TExpr -> Subst -> Subst
 extendSubstMap v e subst@(S { s_env = env })
   = subst { s_env = M.insert v e env }
 
+-- * It applies the substitution to the type of the binder
+-- * It clones the binder if it is already in scope
+-- * Extends the substitution and the in-scope set as appropriate
 extendSubstInScope :: TVar -> Subst -> (TVar, Subst)
 extendSubstInScope (TVar ty v)
                    (S { s_in_scope = in_scope, s_env = env })
