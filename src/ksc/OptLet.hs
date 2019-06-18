@@ -200,14 +200,14 @@ extendSubstMap v e subst@(S { s_env = env })
 -- * Extends the substitution and the in-scope set as appropriate
 extendSubstInScope :: TVar -> Subst -> (TVar, Subst)
 extendSubstInScope (TVar ty v)
-                   (S { s_in_scope = in_scope, s_env = env })
+                   subst@(S { s_in_scope = in_scope, s_env = env })
   = (tv', S { s_env      = env'
             , s_in_scope = v' `S.insert` in_scope })
   where
-    v'  = notInScope v in_scope
-    tv' = TVar ty v'
-    env' | v == v'   = v `M.delete` env
-         | otherwise = M.insert v (Var tv') env
+    v'   = notInScope v in_scope
+    ty'  = substType subst ty
+    tv'  = TVar ty' v'
+    env' = M.insert v (Var tv') env
 
 substType :: Subst -> Type -> Type
 substType subst ty
