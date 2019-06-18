@@ -7,6 +7,7 @@
 module ANF where
 
 import Lang
+import OptLet( Subst, extendSubstInScope, lookupSubst, mkEmptySubst )
 import Prim( isThePrimFun )
 import KMonad
 import Control.Monad( ap )
@@ -22,50 +23,57 @@ anfDefs defs
 -----------------------------------------------
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
 anfD :: TDef -> AnfM Typed TDef
-anfD def@(Def { def_rhs = rhs })
+anfD def@(Def { def_rhs  = rhs
+              , def_args = args })
   | UserRhs expr <- rhs
-  = do { expr' <- anfExpr expr
+  = do { expr' <- anfExpr (mkEmptySubst args) expr
        ; return (def { def_rhs = UserRhs expr' }) }
 
   | otherwise   -- EDefRhs, StubRhs
   = return def
 
 -- anfExpr :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
-anfExpr :: TExpr -> AnfM Typed TExpr
-anfExpr e = wrapLets (anfE e)
+anfExpr :: Subst -> TExpr -> AnfM Typed TExpr
+anfExpr subst e = wrapLets (anfE subst e)
 
+-- See Note [Cloning during ANF]
+--
 -- anfE :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
-anfE :: TExpr -> AnfM Typed TExpr
-anfE (Tuple es)     = Tuple <$> mapM anfE1 es
-anfE (Konst k)      = return (Konst k)
-anfE (Var v)        = return (Var v)
-anfE (Call fun es)
+anfE :: Subst -> TExpr -> AnfM Typed TExpr
+anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
+anfE _ (Konst k)         = return (Konst k)
+anfE subst (Var tv)      = return (case lookupSubst v subst of
+                                      Just e  -> e
+                                      Nothing -> Var tv)
+  where TVar _ v = tv
+anfE subst (Call fun es)
  | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]
  , [e1,e2] <- es
- = do { e2' <- anfE1 e2
+ = do { e2' <- anfE1 subst e2
       ; return (Call fun [e1, e2']) }
  | otherwise
- = Call fun <$> mapM anfE1 es
-anfE (Let v r e)    = do { r' <- anfE r
-                         ; emit v r'
-                         ; anfE e }
-anfE (If b t e)     = do { t' <- anfExpr t
-                         ; e' <- anfExpr e
-                         ; return (If b t' e') }
-anfE (App e1 e2)    = do { f <- anfE e1
-                         ; a <- anfE1 e2
-                         ; return (App f a) }
-anfE (Lam v e)      = do { e' <- anfExpr e
-                         ; return (Lam v e') }
-anfE (Assert e1 e2) = do { e1' <- anfE e1
-                         ; e2' <- anfExpr e2
-                         ; return (Assert e1' e2') }
+ = Call fun <$> mapM (anfE1 subst) es
+anfE subst (Let v r e)    = do { r' <- anfE subst r
+                               ; let (v', subst') = extendSubstInScope v subst
+                               ; emit v' r'
+                               ; anfE subst' e }
+anfE subst (If b t e)     = do { t' <- anfExpr subst t
+                               ; e' <- anfExpr subst e
+                               ; return (If b t' e') }
+anfE subst (App e1 e2)    = do { f <- anfE subst e1
+                               ; a <- anfE1 subst e2
+                               ; return (App f a) }
+anfE subst (Lam v e)      = do { e' <- anfExpr subst e
+                               ; return (Lam v e') }
+anfE subst (Assert e1 e2) = do { e1' <- anfE subst e1
+                               ; e2' <- anfExpr subst e2
+                               ; return (Assert e1' e2') }
 
 -- anfE1 :: GenBndr p => ExprX p -> AnfM p (ExprX p)
-anfE1 :: TExpr -> AnfM Typed TExpr
+anfE1 :: Subst -> TExpr -> AnfM Typed TExpr
 -- Returns an atomic expression
-anfE1 e = do { e' <- anfE e
-             ; atomise e' }
+anfE1 subst e = do { e' <- anfE subst e
+                   ; atomise e' }
 
 -- atomise :: GenBndr p => ExprX p -> AnfM p (ExprX p)
 atomise :: TExpr -> AnfM Typed TExpr
@@ -89,6 +97,23 @@ and similarly in the type checker.  In some ways that would
 be nicer, but I have not tried it.
 -}
 
+{- Note [Cloning during ANF]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    let v = let r = <rhs1> in <body1>
+    in <body2>
+
+The ANF pass will float out that r-binding to
+   let r = <rhs1> in
+   let v = <body1> in
+   <body2>
+
+But that risks shadowing free occurrences of 'f' in <body2>.
+
+Solution: clone any binder that is already in scope, so that the
+result has no shadowing.  That is the (sole) reason that ANF carries a
+substitution.
+-}
 
 type FloatDef p = (LetBndrX p, ExprX p)
 
