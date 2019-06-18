@@ -7,7 +7,7 @@
 module ANF where
 
 import Lang
-import OptLet( Subst, extendSubstInScope, lookupSubst, mkEmptySubst )
+import OptLet( Subst, extendSubstInScope, mkEmptySubst, substVar )
 import Prim( isThePrimFun )
 import KMonad
 import Control.Monad( ap )
@@ -42,10 +42,7 @@ anfExpr subst e = wrapLets (anfE subst e)
 anfE :: Subst -> TExpr -> AnfM Typed TExpr
 anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
-anfE subst (Var tv)      = return (case lookupSubst v subst of
-                                      Just e  -> e
-                                      Nothing -> Var tv)
-  where TVar _ v = tv
+anfE subst (Var tv)      = return (substVar subst tv)
 anfE subst (Call fun es)
  | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]
  , [e1,e2] <- es
