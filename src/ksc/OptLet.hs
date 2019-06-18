@@ -7,7 +7,7 @@
 module OptLet( optLets
              , Subst, mkEmptySubst, lookupSubst
              , extendSubstInScope, extendSubstMap
-             , substType, substExpr )
+             , substType, substExpr, substVar )
              where
 
 import Lang
@@ -219,15 +219,17 @@ substType subst ty
     go (TypeLam ty1 ty2) = TypeLam (go ty1) (go ty2)
     go ty                = ty
 
+substVar :: Subst -> TVar -> TExpr
+substVar subst tv = case lookupSubst v subst of
+                      Just e  -> e
+                      Nothing -> Var tv
+  where TVar _ v = tv
+
 substExpr :: Subst -> TExpr -> TExpr
 substExpr subst e
   = go e
   where
-    go (Var tv@(TVar _ v))
-      = case lookupSubst v subst of
-          Just e  -> e
-          Nothing -> Var tv
-
+    go (Var tv)       = substVar subst tv
     go (Konst k)      = Konst k
     go (Call f es)    = Call f (map go es)
     go (If b t e)     = If (go b) (go t) (go e)
@@ -295,11 +297,7 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
         tv' = TVar (go_ty subst ty) v
         (tv'', subst') = extendSubstInScope tv' subst
 
-    go subst (Var tv@(TVar _ v))
-      = case lookupSubst v subst of
-          Just e  -> e
-          Nothing -> Var tv
-
+    go subst (Var tv)       = substVar subst tv
     go _ubst (Konst k)      = Konst k
     go subst (Call f es)    = Call f (map (go subst) es)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)
