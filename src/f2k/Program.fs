@@ -20,7 +20,7 @@ let parseAndCheckFiles files =
         if System.Environment.OSVersion.Platform = System.PlatformID.Win32NT then
             // file references only valid on Windows
             System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) +
-            @"\dotnet\sdk\NuGetFallbackFolder\microsoft.netcore.app\2.1.0\ref\netcoreapp2.1\" + nm + ".dll"
+            @"\dotnet\sdk\NuGetFallbackFolder\microsoft.netcore.app\2.2.0\ref\netcoreapp2.2\" + nm + ".dll"
         else
             let sysDir = System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory()
             let (++) a b = System.IO.Path.Combine(a,b)
