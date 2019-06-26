@@ -119,10 +119,6 @@ gradE adp s (Call f [n, body])
   | f `isThePrimFun` "sumbuild"
   = gradE adp s (pSum (pBuild n body))
 
-gradE adp s (Call f [n, Lam ti body])
-  | f `isThePrimFun` "build"
-  = gradBuild adp s n ti body
-
 gradE adp s (Call f args) = gradCall adp s f args
 
 ---------------
