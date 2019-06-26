@@ -37,21 +37,22 @@ import Test.Hspec.Runner (runSpec, defaultConfig)
 demoF :: ADPlan -> String -> IO ()
 -- Read source code from specified input file, optimise,
 -- differentiate, optimise, and display results of each step
-demoF = demoFFilter id
+demoF = demoFFilter (Just 999) id
 
-demoFFilter :: ([Decl] -> [Decl]) -> ADPlan -> String -> IO ()
-demoFFilter theFilter adp file = do
+demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> String -> IO ()
+demoFFilter verbosity theFilter adp file = do
   defs <- parseF file
-  runKM (demoN adp (theFilter defs))
+  runKM (demoN verbosity adp (theFilter defs))
 
 demo :: Decl -> IO ()
-demo d = runKM (demoN BasicAD [d])
+demo d = runKM (demoN (Just 999) BasicAD [d])
 
-demoN :: ADPlan -> [Decl] -> KM ()
-demoN adp decls
-  = let disp = displayPass 999 in
-    do { banner "Original declarations"
-       ; displayN decls
+demoN :: Maybe Int -> ADPlan -> [Decl] -> KM ()
+demoN verbosity adp decls
+  = let disp = displayPassM verbosity in
+    do { flip mapM_ verbosity $ \v -> do
+           banner "Original declarations"
+           displayN (take v decls)
 
        ; (env, tc_decls) <- annotDecls emptyGblST decls
        ; let (rules, defs) = partitionDecls tc_decls
@@ -283,7 +284,7 @@ demoFOnTestPrograms = do
     flip mapM [BasicAD, TupleAD] $ \adp -> do
       putStrLn ""
       putStrLn $ ">>>>> TEST: " ++ ksTest
-      fmap (const Nothing) (demoFFilter (snd . moveMain) adp ksTest)
+      fmap (const Nothing) (demoFFilter Nothing (snd . moveMain) adp ksTest)
         `Control.Exception.catch` \e -> do
           print (e :: Control.Exception.ErrorCall)
           return (Just (ksTest, adp))
