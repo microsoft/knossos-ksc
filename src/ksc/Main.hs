@@ -258,11 +258,10 @@ compileKscTestPrograms :: String -> IO ()
 compileKscTestPrograms compiler = do
   ksFiles <- ksTestFiles "test/ksc/"
 
-  let ksTests = map System.FilePath.dropExtension ksFiles
+  putStrLn ("Testing " ++ show ksFiles)
 
-  putStrLn ("Testing " ++ show ksTests)
-
-  errors <- flip mapM ksTests $ \ksTest -> do
+  errors <- flip mapM ksFiles $ \ksFile -> do
+    let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
     putStrLn $ ">>>>> TEST: " ++ ksTest ++ ".ks"
     fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing ksTest)
