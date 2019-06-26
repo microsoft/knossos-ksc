@@ -523,6 +523,7 @@ cgenFunId = \case
     "-"  -> "sub"
     "==" -> "eq"
     "<"  -> "lt"
+    ">"  -> "gt"
     s    -> s
 
 cgenUserFun :: HasCallStack => Fun -> String
