@@ -46,6 +46,46 @@ and strList sep mapper ts = String.concat sep <| Seq.map mapper ts
 
 and strParendType = strType >> paren
 
+let rec mangleType (t:FSharpType) = 
+  if t.IsAbbreviation then
+    mangleType t.AbbreviatedType
+  else if t.IsFunctionType then
+    "L[" + mangleList "_" mangleType t.GenericArguments + "]"
+  else if t.IsTupleType then
+    "T[" + (mangleList "_" mangleParendType t.GenericArguments) + "]"
+  else if t.HasTypeDefinition then
+    let tdef = t.TypeDefinition
+    let name = t.TypeDefinition.DisplayName
+    if tdef.IsArrayType then
+      "V[" + mangleList "_" mangleParendType t.GenericArguments + "]"
+    else
+      // Nasty string match -- is there a better way?
+      let core = "Microsoft.FSharp.Core"
+      match (tdef.AccessPath, name) with
+      | core,"float" -> "Float"
+      | core,"int" -> "Integer"
+      | "System","Double" -> "Float"
+      | "System","Int32" -> "Integer"
+      | "DV", "Vector" -> "V[" + mangleList "_" mangleParendType t.GenericArguments + "]"
+      | a,n -> "**UK[" + a + "." + n + "]"
+  else
+    match t.ToString() with
+    | _ ->
+        if t.HasTypeDefinition then "**UNKNOWN TYPE " + t.TypeDefinition.ToString()
+        else "**UNKNOWN TYPE UNKNOWN"
+
+and mangleRangeType (t:FSharpType) = 
+  if t.IsFunctionType then
+     mangleRangeType <| Seq.last t.GenericArguments
+  else
+     mangleType t
+
+and mangleList sep mapper ts = String.concat sep <| Seq.map mapper ts
+
+and mangleParendType x = "[" + mangleType x + "]"
+
+
+
 let strVal (v:FSharpMemberOrFunctionOrValue) =
   match v.CompiledName with
   | "Cos"                   -> "cos"
@@ -57,12 +97,12 @@ let strVal (v:FSharpMemberOrFunctionOrValue) =
   | "ToInt"                 -> "to_int"
   | "op_DotMinus"           -> "sub"
   | "op_DotPlus"            -> "add"
-  | "op_Addition"           -> "+"
+  | "op_Addition"           -> "add"
   | "op_Multiply"           -> "*"
-  | "op_Subtraction"        -> "-"
+  | "op_Subtraction"        -> "sub"
   | "op_Division"           -> "/"
   | "op_Modulus"            -> "%"
-  | "op_UnaryNegation"      -> "-"
+  | "op_UnaryNegation"      -> "neg"
   | "op_Inequality"         -> "ne"
   | "op_Equality"           -> "eq"
   | "op_LessThan"           -> "lt"
@@ -87,9 +127,9 @@ let rec toLispR indent (e:FSharpExpr) :string =
     | BasicPatterns.Application(funcExpr, typeArgs, argExprs) -> 
         paren <| (toLispR indent funcExpr + db "App" + toLispRs indent argExprs)
     | BasicPatterns.Call(objExprOpt, memberOrFunc, typeArgs1, typeArgs2, argExprs) -> 
-          let typeannot1 = if List.isEmpty typeArgs1 then "" else db (String.concat "," <| List.map strType typeArgs2)
-          let typeannot2 = if List.isEmpty typeArgs2 then "" else "@" + (String.concat "," <| List.map strType typeArgs2)
-          let typeannot = "" // typeannot1 + typeannot2
+          let typeannot1 = if List.isEmpty typeArgs1 then "" else "@1" + (String.concat "," <| List.map mangleType typeArgs1)
+          let typeannot2 = if List.isEmpty typeArgs2 then "" else "@1" + (String.concat "," <| List.map mangleType typeArgs2)
+          let typeannot = typeannot1 + typeannot2
           match objExprOpt with
           | Some e -> paren (strVal memberOrFunc + typeannot + ndb "CS" + " " + paren (toLispR indent e) + " " + toLispRs indent argExprs)
           | None -> paren ((strVal memberOrFunc) + typeannot + ndb "CN" + " " + (toLispRs indent argExprs))
@@ -171,8 +211,8 @@ let rec toLispR indent (e:FSharpExpr) :string =
     // | BasicPatterns.DefaultValue defaultType -> ()
     // | BasicPatterns.ThisValue thisType -> ()
     | BasicPatterns.Const(null, float) -> sprintf "%A" null //How should be handling nulls??
-    | BasicPatterns.Const(v, float) -> sprintfloat v
-    | BasicPatterns.Const(v, _) -> ndb "C" + sprintf "%A" v
+    | BasicPatterns.Const(v, float) -> db "F" + sprintfloat v
+    | BasicPatterns.Const(v, _) -> db "C" + sprintf "%A" v
     | BasicPatterns.Value(v) -> ndb "V" + sprintf "%s" v.DisplayName
     | _ -> sprintf "(**UNRECOGNIZED** %+A)" e
 

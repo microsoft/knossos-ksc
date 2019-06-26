@@ -29,3 +29,6 @@ let inline expv (a: Vector<float>) = Vector.map exp a
 let inline sqnorm (a: Vector<float>) = a.GetL2NormSq()
 let gammaLn (a: float) = a
 
+let rng = new System.Random()
+let rand m = build m (fun _ -> rng.NextDouble())
+let rand2 m n = build2 m n (fun i j -> rng.NextDouble())
