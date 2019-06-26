@@ -1,6 +1,7 @@
 # Visual Studio[ Code] state
 .vs/
 .vscode/
+.ionide/
 
 # autodiff, could also be a submodule
 /autodiff/
