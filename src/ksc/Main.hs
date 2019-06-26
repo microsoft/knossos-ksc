@@ -264,11 +264,11 @@ compileKscPrograms compiler ksFiles = do
   errors <- flip mapM ksFiles $ \ksFile -> do
     let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
-    putStrLn $ ">>>>> TEST: " ++ ksTest ++ ".ks"
+    putStrLn $ ">>>>> TEST: " ++ ksFile
     fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing ksTest)
       `Control.Exception.catch` \e -> do
         print (e :: Control.Exception.ErrorCall)
-        return (Just ksTest)
+        return (Just ksFile)
 
   case Data.Maybe.catMaybes errors of
     []     -> return ()
