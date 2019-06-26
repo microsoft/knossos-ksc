@@ -43,6 +43,16 @@ jobs:
     vmImage: 'vs2017-win2016'
 
   steps:
+  - task: DotNetCoreInstaller@0
+    inputs:
+      version: 2.2.300
+
+  - script: dotnet build .\src\f2k\f2k.fsproj && dotnet .\src\f2k\bin\Debug\netcoreapp2.2\f2k.dll SKIPPED out.k .\test\f2k\test0.fs
+    env:
+      # v Otherwise it wastes a bunch of time caching
+      # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
     displayName: 'Install dependencies'
 
