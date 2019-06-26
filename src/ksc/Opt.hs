@@ -627,6 +627,8 @@ optGradPrim _ "to_float" _ = Just (lmZero TypeInteger TypeFloat)
 optGradPrim _ "lgamma" x = Just (lmScale TypeFloat $ mkPrimCall "digamma" x)
 optGradPrim _ "neg" [e] = Just (lmScale (typeof e) (kTFloat $ -1.0))
 optGradPrim _ "exp" [e] = Just (lmScale TypeFloat (pExp e))
+optGradPrim _ "sin" [e] = Just (lmScale TypeFloat (pCos e))
+optGradPrim _ "cos" [e] = Just (lmScale TypeFloat (pNeg (pSin e)))
 optGradPrim _ "log" [e] = Just (lmScale TypeFloat (pDiv (kTFloat 1.0) e))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 
