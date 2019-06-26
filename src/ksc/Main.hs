@@ -240,7 +240,11 @@ test :: IO ()
 test = testC "g++-7"
 
 testWindows :: IO ()
-testWindows = testC "g++"
+testWindows = do
+  let compiler = "g++"
+  testC compiler
+  [fsTestKs] <- System.Environment.getArgs
+  compileKscPrograms compiler [fsTestKs]
 
 ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do

@@ -47,7 +47,7 @@ jobs:
     inputs:
       version: 2.2.300
 
-  - script: dotnet build .\src\f2k\f2k.fsproj && dotnet .\src\f2k\bin\Debug\netcoreapp2.2\f2k.dll SKIPPED out.k .\test\f2k\test0.fs
+  - script: dotnet build .\src\f2k\f2k.fsproj && dotnet .\src\f2k\bin\Debug\netcoreapp2.2\f2k.dll SKIPPED out.ks .\test\f2k\test0.fs
     env:
       # v Otherwise it wastes a bunch of time caching
       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
@@ -59,7 +59,7 @@ jobs:
   - script: refreshenv && ghc -main-is testWindows -isrc/ksc -Werror -Wunused-imports -Wunused-top-binds -Wmissing-signatures src/ksc/Main.hs
     displayName: 'GHC compile src/ksc/Main.hs'
 
-  - script: src\ksc\Main.exe
+  - script: src\ksc\Main.exe out.ks
     displayName: 'ksc test'
 
   - script: rm -rf *
