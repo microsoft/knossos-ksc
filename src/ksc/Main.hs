@@ -3,7 +3,6 @@
 module Main where
 
 import GHC.Stack
-import qualified System.Exit
 
 import Lang
 import LangUtils
@@ -18,6 +17,7 @@ import ANF
 import qualified Cgen
 import KMonad
 import qualified Control.Exception
+import Control.Monad (unless)
 import qualified Data.Maybe
 import Data.List( partition )
 import qualified System.Directory
@@ -310,13 +310,7 @@ testGMM compiler = do
                                  , notImpossiblyGoodS ]
         _ -> False
 
-  if success
-    then do
-    putStrLn "Success"
-    System.Exit.exitWith System.Exit.ExitSuccess
-    else do
-    putStrLn ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output)))))
-    System.Exit.exitWith (System.Exit.ExitFailure 1)
+  unless success (error ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output))))))
 
 testC :: String -> IO ()
 testC compiler = do
