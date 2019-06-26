@@ -243,10 +243,12 @@ pDiv   = mkPrimCall2 "/"
 pSub   = mkPrimCall2 "-"
 pEqual = mkPrimCall2 "=="
 
-pNeg, pExp, pLog :: HasCallStack => TExpr -> TExpr
+pNeg, pExp, pLog, pSin, pCos :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "neg"
 pExp = mkPrimCall1 "exp"
 pLog = mkPrimCall1 "log"
+pSin = mkPrimCall1 "sin"
+pCos = mkPrimCall1 "cos"
 
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild = mkPrimCall2 "build"
@@ -507,6 +509,8 @@ primFunCallResultTy_maybe fun args
       ("neg"      , [t]                                    ) -> Just t
       ("exp"      , [TypeFloat]                            ) -> Just TypeFloat
       ("log"      , [TypeFloat]                            ) -> Just TypeFloat
+      ("sin"      , [TypeFloat]                            ) -> Just TypeFloat
+      ("cos"      , [TypeFloat]                            ) -> Just TypeFloat
       ("lgamma"   , [TypeFloat]                            ) -> Just TypeFloat
       ("digamma"  , [TypeFloat]                            ) -> Just TypeFloat
 
@@ -538,7 +542,8 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "to_float"
-                       , "neg", "exp", "log", "lgamma", "digamma", "+", "-", "*", "/"
+                       , "neg", "exp", "log", "sin", "cos"
+                       , "lgamma", "digamma", "+", "-", "*", "/"
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
