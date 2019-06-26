@@ -255,9 +255,10 @@ ksTestFiles testDir = do
             (System.Directory.listDirectory testDir)
 
 compileKscTestPrograms :: String -> IO ()
-compileKscTestPrograms compiler = do
-  ksFiles <- ksTestFiles "test/ksc/"
+compileKscTestPrograms compiler = compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
 
+compileKscPrograms :: String -> [String] -> IO ()
+compileKscPrograms compiler ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
 
   errors <- flip mapM ksFiles $ \ksFile -> do
