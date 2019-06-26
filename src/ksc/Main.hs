@@ -26,7 +26,8 @@ import qualified System.FilePath
 import qualified System.Process
 import System.Process (createProcess, proc, std_out)
 import qualified System.IO
-import Test.Hspec (hspec, Spec)
+import Test.Hspec (Spec)
+import Test.Hspec.Runner (runSpec, defaultConfig)
 
 
 -------------------------------------
@@ -318,7 +319,7 @@ testGMM compiler = do
 
 testC :: String -> IO ()
 testC compiler = do
-  Test.Hspec.hspec Main.hspec
+  runSpec Main.hspec defaultConfig
   demoFOnTestPrograms
   compileKscTestPrograms compiler
   testGMM compiler
