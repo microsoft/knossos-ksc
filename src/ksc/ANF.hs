@@ -7,65 +7,67 @@
 module ANF where
 
 import Lang
+import OptLet( Subst, mkEmptySubst, substBndr, substVar )
 import Prim( isThePrimFun )
 import KMonad
 import Control.Monad( ap )
 
 -- anfDefs :: (GenBndr p) => [DefX p] -> KM [DefX p]
 anfDefs :: [TDef] -> KM [TDef]
-anfDefs defs
-  = do { u <- getUniq
-       ; let (u', defs') = runAnf u (mapM anfD defs)
-       ; setUniq u'
-       ; return defs' }
+anfDefs defs = runAnf $
+               mapM anfD defs
 
 -----------------------------------------------
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
 anfD :: TDef -> AnfM Typed TDef
-anfD def@(Def { def_rhs = rhs })
+anfD def@(Def { def_rhs  = rhs
+              , def_args = args })
   | UserRhs expr <- rhs
-  = do { expr' <- anfExpr expr
+  = do { expr' <- anfExpr (mkEmptySubst args) expr
        ; return (def { def_rhs = UserRhs expr' }) }
 
   | otherwise   -- EDefRhs, StubRhs
   = return def
 
 -- anfExpr :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
-anfExpr :: TExpr -> AnfM Typed TExpr
-anfExpr e = wrapLets (anfE e)
+anfExpr :: Subst -> TExpr -> AnfM Typed TExpr
+anfExpr subst e = wrapLets (anfE subst e)
 
+-- See Note [Cloning during ANF]
+--
 -- anfE :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
-anfE :: TExpr -> AnfM Typed TExpr
-anfE (Tuple es)     = Tuple <$> mapM anfE1 es
-anfE (Konst k)      = return (Konst k)
-anfE (Var v)        = return (Var v)
-anfE (Call fun es)
+anfE :: Subst -> TExpr -> AnfM Typed TExpr
+anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
+anfE _ (Konst k)         = return (Konst k)
+anfE subst (Var tv)      = return (substVar subst tv)
+anfE subst (Call fun es)
  | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]
  , [e1,e2] <- es
- = do { e2' <- anfE1 e2
+ = do { e2' <- anfE1 subst e2
       ; return (Call fun [e1, e2']) }
  | otherwise
- = Call fun <$> mapM anfE1 es
-anfE (Let v r e)    = do { r' <- anfE r
-                         ; emit v r'
-                         ; anfE e }
-anfE (If b t e)     = do { t' <- anfExpr t
-                         ; e' <- anfExpr e
-                         ; return (If b t' e') }
-anfE (App e1 e2)    = do { f <- anfE e1
-                         ; a <- anfE1 e2
-                         ; return (App f a) }
-anfE (Lam v e)      = do { e' <- anfExpr e
-                         ; return (Lam v e') }
-anfE (Assert e1 e2) = do { e1' <- anfE e1
-                         ; e2' <- anfExpr e2
-                         ; return (Assert e1' e2') }
+ = Call fun <$> mapM (anfE1 subst) es
+anfE subst (Let v r e)    = do { r' <- anfE subst r
+                               ; let (v', subst') = substBndr v subst
+                               ; emit v' r'
+                               ; anfE subst' e }
+anfE subst (If b t e)     = do { t' <- anfExpr subst t
+                               ; e' <- anfExpr subst e
+                               ; return (If b t' e') }
+anfE subst (App e1 e2)    = do { f <- anfE subst e1
+                               ; a <- anfE1 subst e2
+                               ; return (App f a) }
+anfE subst (Lam v e)      = do { e' <- anfExpr subst e
+                               ; return (Lam v e') }
+anfE subst (Assert e1 e2) = do { e1' <- anfE subst e1
+                               ; e2' <- anfExpr subst e2
+                               ; return (Assert e1' e2') }
 
 -- anfE1 :: GenBndr p => ExprX p -> AnfM p (ExprX p)
-anfE1 :: TExpr -> AnfM Typed TExpr
+anfE1 :: Subst -> TExpr -> AnfM Typed TExpr
 -- Returns an atomic expression
-anfE1 e = do { e' <- anfE e
-             ; atomise e' }
+anfE1 subst e = do { e' <- anfE subst e
+                   ; atomise e' }
 
 -- atomise :: GenBndr p => ExprX p -> AnfM p (ExprX p)
 atomise :: TExpr -> AnfM Typed TExpr
@@ -89,13 +91,38 @@ and similarly in the type checker.  In some ways that would
 be nicer, but I have not tried it.
 -}
 
+{- Note [Cloning during ANF]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    let v = let r = <rhs1> in <body1>
+    in <body2>
 
-type FloatDef p = (LetBndrX p, ExprX p)
+The ANF pass will float out that r-binding to
+   let r = <rhs1> in
+   let v = <body1> in
+   <body2>
 
-runAnf :: Uniq -> AnfM p a -> (Uniq, a)
-runAnf u (AnfM f1) = case f1 u of (u', _, r) -> (u', r)
+But that risks shadowing free occurrences of 'f' in <body2>.
 
-newtype AnfM p a = AnfM (Uniq -> (Uniq, [FloatDef p], a))
+Solution: clone any binder that is already in scope, so that the
+result has no shadowing.  That is the (sole) reason that ANF carries a
+substitution.
+-}
+
+data FloatDef p = FD (LetBndrX p) (ExprX p)
+
+instance InPhase p => Pretty (FloatDef p) where
+  pprPrec _ (FD b e) = pprLetBndr @p b <+> char '=' <+> ppr e
+
+newtype AnfM p a = AnfM (KM ([FloatDef p], a))
+
+runAnf :: InPhase p => AnfM p a -> KM a
+runAnf m = do { (fs, r) <- run m
+              ; assert (text "runANF" <+> ppr fs) (null fs) $
+                return r }
+
+run :: AnfM p a -> KM ([FloatDef p], a)
+run (AnfM m) = m
 
 instance Applicative (AnfM p) where
   pure  = return
@@ -105,23 +132,20 @@ instance Functor (AnfM p) where
   fmap f m = do { x <- m; return (f x) }
 
 instance Monad (AnfM p) where
-  return x = AnfM (\u -> (u, [], x))
-  AnfM m1 >>= k  = AnfM $ \u ->
-                   case m1 u  of { (u1, fs1, x) ->
-                   case k x   of { AnfM m2 ->
-                   case m2 u1 of { (u2, fs2, r) ->
-                   (u2, fs1 ++ fs2, r) } } }
+  return x = AnfM (return ([], x))
+  m >>= k  = AnfM $ do { (fs1, x) <- run m
+                       ; (fs2, r) <- run (k x)
+                       ; return (fs1 ++ fs2, r) }
 
 wrapLets :: AnfM p (ExprX p) -> AnfM p (ExprX p)
-wrapLets (AnfM f1) = AnfM $ \u ->
-                    case f1 u of
-                       (u', fs, e) -> (u', [], wrap fs e)
+wrapLets (AnfM m) = AnfM $ do { (fs, e) <- m
+                              ; return ([], wrap fs e) }
 
 wrap :: [FloatDef p] -> ExprX p -> ExprX p
-wrap fs e = foldr (\(v,r) b -> Let v r b) e fs
+wrap fs e = foldr (\(FD v r) b -> Let v r b) e fs
 
 emit :: LetBndrX p -> ExprX p -> AnfM p ()
-emit v r = AnfM (\u -> (u, [(v,r)], ()))
+emit v r = AnfM (return ([FD v r], ()))
 
 ---------------------------------
 class GenBndr p where
@@ -138,6 +162,6 @@ instance GenBndr Typed where
        tv = mkTVar (typeof e) ("t" ++ show u)
 
 newVar :: GenBndr p => ExprX p -> AnfM p (LetBndrX p, VarX p)
-newVar e = AnfM (\u -> (u+1, [], mkNewVar u e))
+newVar e = AnfM $ do { u <- getUniq; return ([], mkNewVar u e) }
 
 

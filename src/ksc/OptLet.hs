@@ -5,12 +5,15 @@
 	     ScopedTypeVariables, TypeApplications #-}
 
 module OptLet( optLets
-             , Subst, mkEmptySubst, lookupSubst
-             , extendSubstInScope, extendSubstMap
-             , substType, substExpr )
+             , Subst, InScopeSet, emptyInScopeSet
+             , mkEmptySubst, lookupSubst
+             , substInScope, extendInScopeSet
+             , substBndr, extendSubstMap, zapSubst
+             , substType, substExpr, substVar, notInScope )
              where
 
 import Lang
+import LangUtils( isTrivial )
 import Prim
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -178,10 +181,22 @@ We must instead rename the inner 'x' so we get
         (x+1) * x_1 * x_1
 -}
 
+type InScopeSet = S.Set Var
+
+emptyInScopeSet :: InScopeSet
+emptyInScopeSet = S.empty
+
 data Subst
   = S { s_env      :: M.Map Var TExpr   -- Keys are Vars not TVars
-      , s_in_scope :: S.Set Var         -- Don't bother to compare the types
+      , s_in_scope :: InScopeSet        -- Don't bother to compare the types
     }
+
+substInScope :: Subst -> InScopeSet
+substInScope = s_in_scope
+
+extendInScopeSet :: TVar -> InScopeSet -> InScopeSet
+extendInScopeSet tv in_scope
+  = tVarVar tv `S.insert` in_scope
 
 mkEmptySubst :: [TVar] -> Subst
 mkEmptySubst tvs
@@ -195,16 +210,23 @@ extendSubstMap :: Var -> TExpr -> Subst -> Subst
 extendSubstMap v e subst@(S { s_env = env })
   = subst { s_env = M.insert v e env }
 
-extendSubstInScope :: TVar -> Subst -> (TVar, Subst)
-extendSubstInScope (TVar ty v)
-                   (S { s_in_scope = in_scope, s_env = env })
+zapSubst :: Subst -> Subst
+-- Zap the substitution, but preserve the in-scope set
+zapSubst (S { s_in_scope = in_scope })
+  = S { s_env = M.empty, s_in_scope = in_scope }
+
+-- * It applies the substitution to the type of the binder
+-- * It clones the binder if it is already in scope
+-- * Extends the substitution and the in-scope set as appropriate
+substBndr :: TVar -> Subst -> (TVar, Subst)
+substBndr (TVar ty v) subst@(S { s_in_scope = in_scope, s_env = env })
   = (tv', S { s_env      = env'
             , s_in_scope = v' `S.insert` in_scope })
   where
-    v'  = notInScope v in_scope
-    tv' = TVar ty v'
-    env' | v == v'   = v `M.delete` env
-         | otherwise = M.insert v (Var tv') env
+    v'   = notInScope v in_scope
+    ty'  = substType subst ty
+    tv'  = TVar ty' v'
+    env' = M.insert v (Var tv') env
 
 substType :: Subst -> Type -> Type
 substType subst ty
@@ -216,15 +238,17 @@ substType subst ty
     go (TypeLam ty1 ty2) = TypeLam (go ty1) (go ty2)
     go ty                = ty
 
+substVar :: Subst -> TVar -> TExpr
+substVar subst tv = case lookupSubst v subst of
+                      Just e  -> e
+                      Nothing -> Var tv
+  where TVar _ v = tv
+
 substExpr :: Subst -> TExpr -> TExpr
 substExpr subst e
   = go e
   where
-    go (Var tv@(TVar _ v))
-      = case lookupSubst v subst of
-          Just e  -> e
-          Nothing -> Var tv
-
+    go (Var tv)       = substVar subst tv
     go (Konst k)      = Konst k
     go (Call f es)    = Call f (map go es)
     go (If b t e)     = If (go b) (go t) (go e)
@@ -233,12 +257,12 @@ substExpr subst e
     go (Assert e1 e2) = Assert (go e1) (go e2)
     go (Let v r b)    = Let v' (go r) (substExpr subst' b)
                       where
-                        (v', subst') = extendSubstInScope v subst
+                        (v', subst') = substBndr v subst
     go (Lam v e)      = Lam v' (substExpr subst' e)
                       where
-                        (v', subst') = extendSubstInScope v subst
+                        (v', subst') = substBndr v subst
 
-notInScope :: Var -> S.Set Var -> Var
+notInScope :: Var -> InScopeSet -> Var
 -- Find a variant of the input Var that is not in the in-scope set
 --
 -- Do this by adding "_1", "_2" etc
@@ -246,13 +270,13 @@ notInScope v in_scope
   | not (v `S.member` in_scope)
   = v
   | otherwise
-  = try (n+1)
+  = try (S.size in_scope)
   where
     (str, rebuild) = case v of
-            Dummy -> error "Can't bind Dummy"
-            Simple s   -> (s, Simple)
-            Delta  s   -> (s, Delta)
-            Grad s dir -> (s, \s' -> Grad s' dir)
+            Dummy    -> error "Can't bind Dummy"
+            Simple s -> (s, Simple)
+            Delta  s -> (s, Delta)
+            Grad s m -> (s, \s' -> Grad s' m)
 
     try :: Int -> Var
     try n | var' `S.member` in_scope = try (n+1)
@@ -261,12 +285,12 @@ notInScope v in_scope
             var' = rebuild str'
             str' = prefix ++ '_' : show n
 
-    (prefix, n) = parse_suffix [] (reverse str)
+    (prefix, _n) = parse_suffix [] (reverse str)
 
     parse_suffix :: [Char]          -- Digits parsed from RH end (in order)
                  -> String          -- String being parsed (reversed)
                  -> (String, Int)   -- Srring before ":", plus number found after
-    -- E.g. parse_suffix "foo:23"  = ("foo",    23)
+    -- E.g. parse_suffix "foo_23"  = ("foo",    23)
     --      parse_suffix "womabat" = ("wombat", 0)
     parse_suffix ds (c:cs)
       | c == '_'
@@ -284,19 +308,20 @@ optLetsE :: [TVar] -> ExprX OccAnald -> TExpr
 optLetsE params rhs = go (mkEmptySubst params) rhs
   where
     go :: Subst -> ExprX OccAnald -> TExpr
+
     go subst (Let (n, (TVar ty v)) r b)
-      | inline_me n v r' = go (extendSubstMap v r' subst) b
-      | otherwise        = Let tv'' r' (go subst' b)
+      = go_let (go subst r)
       where
-        r' = go subst r
-        tv' = TVar (go_ty subst ty) v
-        (tv'', subst') = extendSubstInScope tv' subst
+        ty' = go_ty subst ty
+        tv' = TVar ty' v
+        (tv'', subst') = substBndr tv' subst
 
-    go subst (Var tv@(TVar _ v))
-      = case lookupSubst v subst of
-          Just e  -> e
-          Nothing -> Var tv
+        go_let (Let b1 r1 r2)  = Let b1 r1 (go_let r2)
+        go_let r'
+          | inline_me n ty' r' = go (extendSubstMap v r' subst) b
+          | otherwise          = Let tv'' r' (go subst' b)
 
+    go subst (Var tv)       = substVar subst tv
     go _ubst (Konst k)      = Konst k
     go subst (Call f es)    = Call f (map (go subst) es)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)
@@ -305,7 +330,7 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
     go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
     go subst (Lam (TVar ty v) e) = Lam tv'' (go subst' e)
                                  where
-                                   (tv'', subst') = extendSubstInScope tv' subst
+                                   (tv'', subst') = substBndr tv' subst
                                    ty' = go_ty subst ty
                                    tv' = TVar ty' v
 
@@ -371,21 +396,18 @@ Some of this is discussed at
 
 -}
 
-inline_me :: Int -> Var -> TExpr -> Bool
-inline_me n bndr rhs
+inline_me :: Int -> TypeX p -> TExpr -> Bool
+inline_me n _ty rhs
   | n==0            = True   -- Dead code
   | n==1            = True   -- Used exactly once
+  | otherwise       = inline_me_help rhs
+
+inline_me_help :: TExpr -> Bool
+inline_me_help rhs
   | isTrivial rhs   = True   -- RHS is trivial, see isTrivial for what that means
   | isKZero rhs     = True   -- Inline zeros, as they will very likely disappear
-  | Grad {} <- bndr = True   -- Always inline Grads (might not do this in future)
-  | Tuple ts <- rhs          -- Always inline tuples whose fields are all trivial
-  , all isTrivial ts = True  -- See Note [Inline tuples]
-  | otherwise       = False
+  | TypeLM {} <- typeof rhs = True   -- Always inline linear maprs (might not do this in future)
+  | Tuple ts <- rhs              -- Always inline tuples whose fields are all trivial
+  , all inline_me_help ts = True  -- See Note [Inline tuples]
+  | otherwise             = False
 
-isTrivial :: TExpr -> Bool
-isTrivial (Tuple [])    = True
-isTrivial (Var {})      = True
-isTrivial (Konst {})    = True
-isTrivial (Call _ [])   = True
-isTrivial (Assert _ e2) = isTrivial e2
-isTrivial _ = False
