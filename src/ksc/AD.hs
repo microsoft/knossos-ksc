@@ -225,8 +225,7 @@ applyD :: ADDir -> TDef -> TDef
 -- fwdt$f :: S1 S2 dS1 dS2 -> (T, dT)
 applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                 , def_args = vars, def_rhs = UserRhs rhs })
-  = pprTrace "applyD" (ppr f $$ ppr res_ty $$ ppr t) $
-    Def { def_fun    = DrvFun f (AD adp Fwd)
+  = Def { def_fun    = DrvFun f (AD adp Fwd)
         , def_args   = vars ++ dvars
         , def_rhs    = UserRhs $ perhapsFstToo $ lmApply lm $ mkTuple $ map Var dvars
         , def_res_ty = t }
