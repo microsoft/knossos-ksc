@@ -689,8 +689,8 @@ optLMApply (Call (TFun (TypeLM _ t) (GradFun (PrimFun f) mode)) e) dx
     Just $ Call (TFun (tangentType t) (DrvFun (PrimFun f) mode)) (Tuple [e, dx])
 -}
 
-optLMApply _ _ e _
-  = pprTrace "Apply not optimized:" (ppr e)
+optLMApply _ _ _e _
+  = --pprTrace "Apply not optimized:" (ppr e)
     Nothing
 
 ------------------
