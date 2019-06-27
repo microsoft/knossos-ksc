@@ -18,10 +18,18 @@ let parseAndCheckFiles files =
     (* see https://fsharp.github.io/FSharp.Compiler.Service/project.html *)
     let sysLib nm = 
         if System.Environment.OSVersion.Platform = System.PlatformID.Win32NT then
-            // file references only valid on Windows
-            System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) +
-            @"\dotnet\sdk\NuGetFallbackFolder\microsoft.netcore.app\2.2.0\ref\netcoreapp2.2\" + nm + ".dll"
+
+            let windowsReferencePath =
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) +
+                @"\dotnet\sdk\NuGetFallbackFolder\microsoft.netcore.app\2.2.0\ref\netcoreapp2.2\"
+
+            if not (Directory.Exists windowsReferencePath) then
+                failwithf "Can't find .NET Core references, ensure they're installed. Looking in%s%s" System.Environment.NewLine windowsReferencePath 
+
+            // file references only implemented on Windows
+            windowsReferencePath + nm + ".dll"
         else
+            eprintf ".NET Reference paths not configured for your operating system. Defaulting to local."
             let sysDir = System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory()
             let (++) a b = System.IO.Path.Combine(a,b)
             sysDir ++ nm + ".dll" 
