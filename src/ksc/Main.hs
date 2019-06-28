@@ -12,6 +12,7 @@ import Annotate
 import AD
 import Opt
 import CSE
+import qualified Ksc.Futhark
 
 import ANF
 import qualified Cgen
@@ -19,7 +20,7 @@ import KMonad
 import qualified Control.Exception
 import Control.Monad (unless)
 import qualified Data.Maybe
-import Data.List( partition )
+import Data.List( partition, intercalate )
 import qualified System.Directory
 import qualified System.Environment
 import qualified System.FilePath
@@ -350,3 +351,84 @@ profile :: IO ()
 profile = do
   [source, proffile, proffunctions, proflines] <- System.Environment.getArgs
   profileArgs source proffile proffunctions proflines
+
+-------------------------------------
+-- The Futhark driver
+-------------------------------------
+
+-- This pipeline is derived from displayCppGenAndCompile, but omits
+-- debugging information, returns the optimised Knossos declarations
+-- instead of generating C++, and strips the main function (the latter
+-- does not make sense when compiling to futhark).  Ideally, the
+-- common parts should be factored out.
+futharkPipeline :: FilePath -> KM [TDef]
+futharkPipeline file
+  = do
+  { decls0 <- liftIO (parseF (file ++ ".ks"))
+
+  ; let (_main, decls)    = moveMain decls0
+
+  ; (env, ann_decls) <- annotDecls emptyGblST decls
+  ; let (rules, defs) = partitionDecls ann_decls
+  ; let rulebase      = mkRuleBase rules
+
+  ; let grad_defs = gradDefs BasicAD defs
+        env1 = env `extendGblST` grad_defs
+
+  -- We generate grad_defs_tupled even though we do not use it yet.
+  -- We do not use it because
+  --
+  -- 1. lmApplys are not completely removed in forward mode, and
+  --
+  -- 2. lmApplys are deliberately not removed in reverse mode but we
+  -- don't yet implement the necessary LM constructors in C++.
+  --
+  -- Nonetheless, it's good to generated optgrad_tupled here so that
+  -- the tests will run on it and we can be sure it typechecks.
+  ; let grad_defs_tupled = gradDefs TupleAD defs
+        env15 = env1 `extendGblST` grad_defs_tupled
+
+  ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
+
+  ; (env25, _optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
+
+  ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
+
+  ; (env3, optdiffs) <- optDefs rulebase env25 diffs
+
+  -- Note optgrad removed from below as we can not currently
+  -- codegen the optgrad for recursive functions
+  -- [see https://github.com/awf/knossos/issues/281]
+  ; let alldefs = defs ++ optdiffs
+
+  -- We use ANF to expose optimisation opportunities and use optDefs
+  -- to take them.  See Note [Inline tuples] for the motiviation for
+  -- doing ANF-then-optDefs.
+  ; anf_alldefs <- anfDefs alldefs
+  ; (env45, opt_alldefs) <- optDefs rulebase env3 anf_alldefs
+
+  ; (_env5, cse) <- cseDefs rulebase env45 opt_alldefs
+
+  ; return cse
+  }
+
+-- | Read source code from specified input file, optimise,
+-- differentiate, optimise, and write result to corresponding @.fut@
+-- file.  You will have to run the Futhark compiler yourself
+-- afterwards (and probably write a small wrapper program, because
+-- currently the generated file will not have any entry points).
+--
+-- Usage:
+--
+-- @
+-- $ ghci -isrc/ksc -e 'genFuthark "test/ksc/gmm"' src/ksc/Main.hs
+-- @
+genFuthark :: FilePath -> IO ()
+genFuthark file = do
+  prelude <- readFile "src/runtime/knossos.fut"
+  defs <- runKM $ futharkPipeline file
+  putStrLn $ "Writing to " ++ futfile
+  Cgen.createDirectoryWriteFile futfile $
+    intercalate "\n\n" $
+    prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
+  where futfile = "obj/" ++ file ++ ".fut"
