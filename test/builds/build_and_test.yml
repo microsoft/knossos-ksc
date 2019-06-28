@@ -29,7 +29,7 @@ jobs:
   - script: sh ./test/builds/build_linux.sh /opt/ghc/bin/ghc
     displayName: 'GHC compile src/ksc/Main.hs'
 
-  - script: src/ksc/Main
+  - script: src/ksc/Main out.ks
     displayName: 'ksc test'
 
   - script: ./profile test/ksc/gmm-obj prof-obj.out prof-obj-functions.txt prof-obj-lines.txt && ./profile test/ksc/gmm-rev prof-rev.out prof-rev-functions.txt prof-rev-lines.txt

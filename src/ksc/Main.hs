@@ -237,7 +237,11 @@ hspec = do
     LangUtils.hspec
 
 test :: IO ()
-test = testC "g++-7"
+test = do
+  let compiler = "g++-7"
+  testC compiler
+  [fsTestKs] <- System.Environment.getArgs
+  compileKscPrograms compiler [fsTestKs]
 
 testWindows :: IO ()
 testWindows = do
