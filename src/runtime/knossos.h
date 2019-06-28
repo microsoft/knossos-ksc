@@ -1561,7 +1561,7 @@ namespace ks
           return v;
         }
 
-        inline double $ranhashdoub(uint64_t v) {
+        inline double $ranhashdoub(int32_t v) {
           return 5.42101086242752217E-20 * $ranhash(v);
         }
 
