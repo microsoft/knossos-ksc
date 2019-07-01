@@ -1,5 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
+{-# LANGUAGE LambdaCase #-}
+
 module Main where
 
 import GHC.Stack
@@ -17,9 +19,8 @@ import ANF
 import qualified Cgen
 import KMonad
 import qualified Control.Exception
-import Control.Monad (unless)
 import qualified Data.Maybe
-import Data.List( partition )
+import Data.List( partition, intercalate )
 import qualified System.Directory
 import qualified System.Environment
 import qualified System.FilePath
@@ -301,20 +302,32 @@ testGMM :: String -> IO ()
 testGMM compiler = do
   output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
 
-  let success = case reverse (lines output) of
-        notImpossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_:goldenGMMS:_ ->
-          let boolOfIntString s = case s of
+  let "TESTS FOLLOW":"----":testResults = dropWhile (/= "TESTS FOLLOW") (lines output)
+
+      groupedTestResults = group testResults
+        where group = \case
+                testName:"----":testResult:[] ->
+                  [(testName, boolOfIntString testResult)]
+                testName:"----":testResult:"----":rest ->
+                  (testName, boolOfIntString testResult):group rest
+                _ -> error "Unexpected test result structure"
+
+              boolOfIntString = \case
                 "0" -> False
                 "1" -> True
-                _   -> error ("boolOfIntString: Unexpected " ++ s)
+                s   -> error ("boolOfIntString: Unexpected " ++ s)
 
-          in all boolOfIntString [ goldenGMMS
-                                 , everythingWorksAsExpectedReverseS
-                                 , everythingWorksAsExpectedS
-                                 , notImpossiblyGoodS ]
-        _ -> False
+      failed   = not . snd
+      failures = map fst (filter failed groupedTestResults)
 
-  unless success (error ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output))))))
+  case failures of
+    []  -> putStrLn ("All "
+                     ++ show (length groupedTestResults)
+                     ++ " tests passed: "
+                     ++ intercalate ", " (map fst groupedTestResults))
+    _:_ -> do
+      putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
+      error ("These tests failed:\n" ++ unlines failures)
 
 testC :: String -> IO ()
 testC compiler = do

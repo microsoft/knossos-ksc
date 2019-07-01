@@ -259,8 +259,13 @@
 
           (tuple "Checked, should be small:" checked)
 
+          "TESTS FOLLOW"
+          "Golden test GMM objective"
           golden_test_gmm_objective
+          "Reverse mode as expected"
           everything_works_as_expected_reverse
+          "Forward mode as expected"
           everything_works_as_expected
+          "Not impossibly good"
           (not_ impossibly_good)
           )))
