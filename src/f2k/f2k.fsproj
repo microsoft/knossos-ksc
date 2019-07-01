@@ -26,12 +26,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="FSharp.Compiler.Service">
-      <HintPath>..\..\..\..\..\..\Users\Andrew Fitzgibbon\.nuget\packages\fsharp.compiler.service\26.0.1\lib\netstandard2.0\FSharp.Compiler.Service.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="4.6.2" />
   </ItemGroup>
 

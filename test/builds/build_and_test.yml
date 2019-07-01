@@ -9,6 +9,17 @@ jobs:
     vmImage: 'ubuntu-16.04'
 
   steps:
+
+  - task: DotNetCoreInstaller@0
+    inputs:
+      version: 2.2.300
+
+  - script: dotnet run --project src/f2k/f2k.fsproj SKIPPED out.ks test/f2k/test0.fs
+    env:
+      # v Otherwise it wastes a bunch of time caching
+      # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
   - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
     displayName: 'Install dependencies'
 
@@ -18,7 +29,7 @@ jobs:
   - script: sh ./test/builds/build_linux.sh /opt/ghc/bin/ghc
     displayName: 'GHC compile src/ksc/Main.hs'
 
-  - script: src/ksc/Main
+  - script: src/ksc/Main out.ks
     displayName: 'ksc test'
 
   - script: ./profile test/ksc/gmm-obj prof-obj.out prof-obj-functions.txt prof-obj-lines.txt && ./profile test/ksc/gmm-rev prof-rev.out prof-rev-functions.txt prof-rev-lines.txt
@@ -47,7 +58,7 @@ jobs:
     inputs:
       version: 2.2.300
 
-  - script: dotnet build .\src\f2k\f2k.fsproj && dotnet .\src\f2k\bin\Debug\netcoreapp2.2\f2k.dll SKIPPED out.k .\test\f2k\test0.fs
+  - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED out.ks .\test\f2k\test0.fs
     env:
       # v Otherwise it wastes a bunch of time caching
       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
@@ -59,7 +70,7 @@ jobs:
   - script: refreshenv && ghc -main-is testWindows -isrc/ksc -Werror -Wunused-imports -Wunused-top-binds -Wmissing-signatures src/ksc/Main.hs
     displayName: 'GHC compile src/ksc/Main.hs'
 
-  - script: src\ksc\Main.exe
+  - script: src\ksc\Main.exe out.ks
     displayName: 'ksc test'
 
   - script: rm -rf *
