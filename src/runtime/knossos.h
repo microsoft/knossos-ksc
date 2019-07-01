@@ -418,7 +418,7 @@ namespace ks
 		vec() :
 			size_{ 0 },
 			data_{ nullptr },
-			is_zero_{ false },
+			is_zero_{ true },
 			z_{T{}}
 		{
 		}
