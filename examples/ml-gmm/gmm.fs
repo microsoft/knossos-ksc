@@ -2,8 +2,28 @@
 // Licensed under the MIT license.
 module gmm
 
-open Knossos
+
 open System
+
+//Knossos Interface
+//open Knossos
+
+//DiffSharp interface
+open DiffSharp.AD.Float64
+type Vec = DV
+let sum = DV.sum
+let expv = DV.Exp
+let max = DV.max
+let build p f = DV.init p f 
+let gammaLn a = a //Why?
+let size (x:DV) = x.Length
+let mul (A:DM) (V:DV) = A*V
+let sqnorm = DV.L2NormSq
+let build2 m n f = DM.init m n f
+let exp = D.Exp
+let rng = new System.Random()
+let rand m = build m (fun _ -> rng.NextDouble())
+let rand2 m n = build2 m n (fun i j -> rng.NextDouble())
 
 let logsumexp (a:Vec) =
     let mx = max a
@@ -24,7 +44,7 @@ let makeQ (q : Vec) (l : Vec) =
     let d = size q
     build2 d d (fun i j ->
         if i < j then
-            0.0
+            D 0.0
         else if i = j then
             exp q.[i]
         else
