@@ -5,6 +5,7 @@
 open System
 open gmm
 //open Knossos
+open F2K_DiffSharp
 
 //  gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
 
@@ -19,5 +20,9 @@ let main argv =
     let qs = Array.init K (fun _ -> rand D)
     //let ls = Array.init K (fun _ -> rand (gmm.tri (D - 1)))
     let ls = Array.init K (fun _ -> rand (gmm.tri D))
-    printfn "Hello %A" (gmm.gmm_objective x alphas means qs ls)
+    printfn "Initial %A" (gmm.gmm_objective x alphas means qs ls)
+    
+    let alphas' = F2K_DiffSharp.Minimize 100 (toD 0.01) (fun a -> gmm.gmm_objective x a means qs ls) alphas
+    printfn "Optimized %A" (gmm.gmm_objective x alphas' means qs ls)
+    
     0 

@@ -4,6 +4,7 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DiffSharp.fs" />
     <Compile Include="../../src/f2k/Util.fs" />
     <Compile Include="../../src/f2k/Vector.fs" />
     <Compile Include="../../src/f2k/Knossos.fs" />
