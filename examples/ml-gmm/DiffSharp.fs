@@ -19,10 +19,10 @@ let rng = new System.Random()
 let rand m = build m (fun _ -> rng.NextDouble())
 let rand2 m n = build2 m n (fun i j -> rng.NextDouble())
 
-let Minimize steps (eta:D) (loss:DV->D) (V:DV) =                    
-    let mutable V = V
-    for i in [0..steps] do 
+let Minimize steps (eta:D) (loss:DV->D) (V0:DV) =                    
+    [0..steps]
+    |> Seq.fold (fun V _ ->
         let _, g = grad' loss V    
-        V <-  V - eta*g    
-    V
+        V - eta*g) V0  
+ 
         
