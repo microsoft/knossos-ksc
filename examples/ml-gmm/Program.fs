@@ -17,6 +17,7 @@ let main argv =
     let alphas = rand K 
     let means = Array.init K <| fun _ -> rand D
     let qs = Array.init K (fun _ -> rand D)
-    let ls = Array.init K (fun _ -> rand (gmm.tri (D - 1)))
+    //let ls = Array.init K (fun _ -> rand (gmm.tri (D - 1)))
+    let ls = Array.init K (fun _ -> rand (gmm.tri D))
     printfn "Hello %A" (gmm.gmm_objective x alphas means qs ls)
     0 
