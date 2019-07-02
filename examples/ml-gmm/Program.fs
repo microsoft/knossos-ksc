@@ -4,7 +4,7 @@
 
 open System
 open gmm
-open Knossos
+//open Knossos
 
 //  gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
 
