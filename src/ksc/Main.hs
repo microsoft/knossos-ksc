@@ -352,15 +352,12 @@ testRunKS compiler ksFile = do
       putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
       error ("These tests failed:\n" ++ unlines failures)
 
-testGMM :: String -> IO ()
-testGMM compiler = testRunKS compiler "test/ksc/gmm.ks"
-
 testC :: String -> IO ()
 testC compiler = do
   runSpec Main.hspec defaultConfig
   demoFOnTestPrograms
   compileKscTestPrograms compiler
-  testGMM compiler
+  testRunKS compiler "test/ksc/gmm.ks"
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
