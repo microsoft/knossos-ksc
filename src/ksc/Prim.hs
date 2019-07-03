@@ -31,6 +31,18 @@ mkPrimCall2 f a b = mkPrimCall f [a, b]
 mkPrimCall3 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall3 f a b c = mkPrimCall f [a, b, c]
 
+mkPrimCall4 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall4 f a b c d = mkPrimCall f [a, b, c, d]
+
+mkPrimCall5 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall5 f a b c d e = mkPrimCall f [a, b, c, d, e]
+
+mkPrimCall6 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall6 f a b c d e g = mkPrimCall f [a, b, c, d, e, g]
+
+mkPrimCall7 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall7 f a b c d e g h = mkPrimCall f [a, b, c, d, e, g, h]
+
 mkZero :: HasCallStack => Type -> TExpr
 -- (mkZero t) returns the zero of t
 -- It should never be applied to types that don't have a zero
@@ -144,6 +156,18 @@ lmBuild n b = lmVCatV (pBuild n b)
 
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuildT n b = lmHCatV (pBuild n b)
+
+lmFold :: HasCallStack => TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+lmFold = mkPrimCall5 "lmFold"
+
+pFFold :: HasCallStack => TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+pFFold = mkPrimCall6 "FFold"
+
+pRFold :: HasCallStack => Type -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+pRFold = mkPrimCall7 "RFold" . mkDummy
+
+lmDummyFold :: HasCallStack => Type -> TExpr
+lmDummyFold = mkPrimCall1 "lmDummyFold" . mkDummy
 
 lmBuild_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmBuild_Dir Fwd = lmBuild
@@ -367,12 +391,59 @@ primFunCallResultTy_maybe "build" args
   = Just (TypeVec (toSize n) elt_ty)
   | otherwise = Nothing
 
+primFunCallResultTy_maybe "fold" args
+  | [f,acc,v] <- args
+  , TypeLam (TypeTuple [a1, b1]) a2 <- typeof f
+  , TypeVec _n b2 <- typeof v
+  , b1 `eqType` b2
+  , Just a <- eqTypes a1 [a2, typeof acc]
+  = Just a
+  | otherwise = Nothing
+
 -- lmbuild n (m :: Integer -> (s -o t)) :: s -o Vec n t
 primFunCallResultTy_maybe "lmBuild" args
   | [n,f] <- args
   , sizeArgOK n
   , TypeLam TypeInteger (TypeLM s t) <- typeof f
   = Just (TypeLM s (TypeVec (toSize n) t))
+  | otherwise = Nothing
+
+primFunCallResultTy_maybe "lmFold" args
+  | [ds_zero,f,f',acc,v] <- args
+  , TypeLam t1 a1 <- typeof f
+  , TypeLam t2 (TypeLM (TypeTuple [s1, t3]) a2) <- typeof f'
+  , Just t <- eqTypes t1 [t2, t3]
+  , TypeTuple [a3, b1] <- t
+  , Just a <- eqTypes a1 [a2, a3, typeof acc]
+  , Just _ <- eqTypes (typeof ds_zero) [tangentType s1]
+  , v_ty@(TypeVec _n b2) <- typeof v
+  , b2 `eqType` b1
+  = Just (TypeLM (TypeTuple [s1, TypeTuple [a, v_ty]]) a)
+  | otherwise = Nothing
+
+--- Type checking is not comprehensive because we only ever generate
+--- RFold through reverse applying to an lmFold, and we assume that is
+--- done correctly.  We could add more comprehensive type checking
+--- later if we want.
+primFunCallResultTy_maybe "RFold" args
+  | [_ty_dv,ty_in,_f,_f',acc,v,_dr] <- args
+  = Just (TypeTuple [ typeof ty_in
+                    , TypeTuple [ tangentType (typeof acc)
+                                , tangentType (typeof v)]])
+  | otherwise = Nothing
+
+--- Type checking is not comprehensive because we only ever generate
+--- FFold through forward applying to an lmFold, and we assume that is
+--- done correctly.  We could add more comprehensive type checking
+--- later if we want.
+primFunCallResultTy_maybe "FFold" args
+  | [_f,_acc,_v,_df,dacc,_dv] <- args
+  = Just (typeof dacc)
+  | otherwise = Nothing
+
+primFunCallResultTy_maybe "lmDummyFold" args
+  | [t] <- args
+  = Just (typeof t)
   | otherwise = Nothing
 
 -- constVec (n :: Integer) (e :: t) :: Vec n t
@@ -525,6 +596,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "print"    -- (print "msg" 3)            Print "msg3"
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
+                       , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
                        , "size"
                        , "sum"
