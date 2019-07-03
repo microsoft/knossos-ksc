@@ -358,6 +358,7 @@ testC compiler = do
   demoFOnTestPrograms
   compileKscTestPrograms compiler
   testRunKS compiler "test/ksc/gmm.ks"
+  testRunKS compiler "test/ksc/fold.ks"
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do

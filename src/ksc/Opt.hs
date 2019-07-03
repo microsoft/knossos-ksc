@@ -740,6 +740,9 @@ optLMApplyCall env Rev "lmHCatV" [e] dx = do_prod_v env Rev e dx
 optLMApplyCall _ Fwd "lmBuild"  [n, Lam i m] dx = do_build   Fwd n i m dx
 optLMApplyCall _ Rev "lmBuild"  [n, Lam i m] dx = do_build_t Rev n i m dx
 
+optLMApplyCall _ dir "lmFold" [sZero, Lam i m, Lam i' m', acc, v] dx =
+  do_fold dir sZero i m i' m' acc v dx
+
 optLMApplyCall _ _ _ _ _
   = -- pprTrace ("No opt for LM apply of " ++ show fun)
     --         (ppr arg)
@@ -807,6 +810,43 @@ do_build, do_build_t :: ADDir
                      -> Maybe TExpr
 do_build   dir n i m dx = Just (pBuild n (Lam i (lmApply_Dir dir m dx)))
 do_build_t dir n i m dx = Just (pSum (pBuild n (Lam i (lmApply_Dir dir m (pIndex (Var i) dx)))))
+
+do_fold :: ADDir
+        -> TExpr
+        -> TVar -> TExpr
+        -> TVar -> TExpr
+        -> TExpr -> TExpr -> TExpr
+        -> Maybe TExpr
+do_fold Rev sZero i m i' m' acc v dx = Just (pRFold (tangentType elt_ty) sZero f f' acc v dx)
+  where acc_elt_ty = typeof i'
+        TypeTuple [acc_ty, elt_ty] = acc_elt_ty
+        dacc_ty = tangentType acc_ty
+        f = Lam i m
+        f' = Lam i'_dr
+             $ mkLet i' (pFst (Var i'_dr))
+             $ mkLet dr (pSnd (Var i'_dr))
+             $ lmApplied
+          where
+            lmApplied = lmApply_Dir Rev m' (Var dr)
+            dr        = newVarNotIn dacc_ty m'
+            i'_dr     = newVarNotIn (TypeTuple [acc_elt_ty, dacc_ty]) lmApplied
+
+do_fold Fwd _ i m i' m' acc v ds_acc_v = Just (pFFold f acc v df dacc dv)
+  where f = Lam i m
+        df = Lam i'_di'
+             $ mkLet i' (pFst (Var i'_di'))
+             $ mkLet di' (pSnd (Var i'_di'))
+             $ lmApplied
+          where
+            lmApplied = lmApply_Dir Fwd m' (Tuple [ds, Var di'])
+            di'       = newVarNotIn (tangentType (typeof i')) m'
+            i'_di'    =
+              newVarNotIn (TypeTuple [ typeof i' , tangentType (typeof i')])
+                          lmApplied
+
+        ds   = pFst ds_acc_v
+        dacc = pFst (pSnd ds_acc_v)
+        dv   = pSnd (pSnd ds_acc_v)
 
 --------------------------------------
 hspec :: Spec
