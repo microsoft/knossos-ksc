@@ -154,7 +154,7 @@ displayCppGenAndCompile compile verbosity file =
   -- 2. lmApplys are deliberately not removed in reverse mode but we
   -- don't yet implement the necessary LM constructors in C++.
   --
-  -- Nonetheless, it's good to generated optgrad_tupled here so that
+  -- Nonetheless, it's good to generate optgrad_tupled here so that
   -- the tests will run on it and we can be sure it typechecks.
   ; let grad_defs_tupled = gradDefs TupleAD defs
         env15 = env1 `extendGblST` grad_defs_tupled
