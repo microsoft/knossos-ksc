@@ -320,9 +320,10 @@ demoFOnTestPrograms = do
     []     -> return ()
     errors -> error ("Had errors in:\n" ++ unlines (map show errors))
 
-testGMM :: String -> IO ()
-testGMM compiler = do
-  output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
+testRunKS :: String -> String -> IO ()
+testRunKS compiler ksFile = do
+  let ksTest = System.FilePath.dropExtension ksFile
+  output <- displayCppGenCompileAndRun compiler Nothing ksTest
 
   let "TESTS FOLLOW":"----":testResults = dropWhile (/= "TESTS FOLLOW") (lines output)
 
@@ -350,6 +351,9 @@ testGMM compiler = do
     _:_ -> do
       putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
       error ("These tests failed:\n" ++ unlines failures)
+
+testGMM :: String -> IO ()
+testGMM compiler = testRunKS compiler "test/ksc/gmm.ks"
 
 testC :: String -> IO ()
 testC compiler = do
