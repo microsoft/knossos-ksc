@@ -739,8 +739,6 @@ optLMApplyCall env Rev "lmHCatV" [e] dx = do_prod_v env Rev e dx
 
 optLMApplyCall _ Fwd "lmBuild"  [n, Lam i m] dx = do_build   Fwd n i m dx
 optLMApplyCall _ Rev "lmBuild"  [n, Lam i m] dx = do_build_t Rev n i m dx
-optLMApplyCall _ Fwd "lmBuildT" [n, Lam i m] dx = do_build_t Fwd n i m dx
-optLMApplyCall _ Rev "lmBuild%" [n, Lam i m] dx = do_build   Rev n i m dx
 
 optLMApplyCall _ _ _ _ _
   = -- pprTrace ("No opt for LM apply of " ++ show fun)

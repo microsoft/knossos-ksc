@@ -149,10 +149,6 @@ lmBuild_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmBuild_Dir Fwd = lmBuild
 lmBuild_Dir Rev = lmBuildT
 
-lmBuildT_Dir :: ADDir -> TExpr -> TExpr -> TExpr
-lmBuildT_Dir Fwd = lmBuildT
-lmBuildT_Dir Rev = lmBuild
-
 lmVCat_Dir :: ADDir -> [TExpr] -> TExpr
 lmVCat_Dir Fwd = lmVCat
 lmVCat_Dir Rev = lmHCat
@@ -379,14 +375,6 @@ primFunCallResultTy_maybe "lmBuild" args
   = Just (TypeLM s (TypeVec (toSize n) t))
   | otherwise = Nothing
 
--- lmbuildT n (m :: Integer -> (t -o s)) :: Vec n t -o s
-primFunCallResultTy_maybe "lmBuildT" args
-  | [n,f] <- args
-  , sizeArgOK n
-  , TypeLam TypeInteger (TypeLM t s) <- typeof f
-  = Just (TypeLM (TypeVec (toSize n) t) s)
-  | otherwise = Nothing
-
 -- constVec (n :: Integer) (e :: t) :: Vec n t
 primFunCallResultTy_maybe "constVec" args
   | [n,e] <- args
@@ -547,7 +535,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "==", "!=", "<", ">", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
-                       , "lmCompose", "lmAdd", "lmScale", "lmBuild", "lmBuildT"
+                       , "lmCompose", "lmAdd", "lmScale", "lmBuild"
                        , "abs", "max"
 
                        -- The dot-product, also known as inner-product
