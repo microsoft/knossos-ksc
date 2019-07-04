@@ -12,6 +12,6 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="DiffSharp" Version="0.8.2-beta" />
+    <PackageReference Include="DiffSharp" Version="0.8.3-beta" />
   </ItemGroup>
 </Project>
