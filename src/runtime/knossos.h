@@ -790,6 +790,18 @@ namespace ks
 		return ret;
 	}
 
+	vec<double> constVec(int n, double val)
+	{
+          if (val == 0.0) {
+            return vec(zero_tag, 0.0, n);
+          } else {
+		vec<double> ret(n);
+		for(int j = 0; j < n; ++j)
+			ret[j] = val;
+		return ret;
+          }
+	}
+
 	template <class T>
 	vec<T> constVec(int n, T val)
 	{
