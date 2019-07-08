@@ -4,7 +4,11 @@
 
 open System
 open gmm
+
+//Knossos Interface
 //open Knossos
+
+//DiffSharp interface
 open F2K_DiffSharp
 
 //  gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =

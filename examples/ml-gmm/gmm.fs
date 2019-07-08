@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 module gmm
 
-
 open System
 
 //Knossos Interface
@@ -10,8 +9,6 @@ open System
 
 //DiffSharp interface
 open F2K_DiffSharp
-
-
 
 // ---------------------------------------------------
 
