@@ -125,23 +125,14 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
-displayCppGenAndCompile compile verbosity file =
-  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
-      display = displayPassM verbosity
-  in
-  runKM $
-  do { decls0 <- liftIO (parseF (file ++ ".ks"))
-  ; liftIO $ putStrLn "read decls"
-
-  ; let (main, decls)    = moveMain decls0
-
+defsAndDiffs :: (String -> GblSymTab -> [TDef] -> KM a)
+             -> [Decl]
+             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
+defsAndDiffs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
   ; let rulebase      = mkRuleBase rules
   ; display "Typechecked defs" env defs
-
-  ; dd main
 
   ; let grad_defs = gradDefs BasicAD defs
         env1 = env `extendGblST` grad_defs
@@ -172,6 +163,23 @@ displayCppGenAndCompile compile verbosity file =
 
   ; (env3, optdiffs) <- optDefs rulebase env25 diffs
   ; display "OptDiffs" env3 optdiffs
+
+  ; return (env3, defs, optdiffs, rulebase)
+  }
+
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
+displayCppGenAndCompile compile verbosity file =
+  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
+      display = displayPassM verbosity
+  in
+  runKM $
+  do { decls0 <- liftIO (parseF (file ++ ".ks"))
+  ; liftIO $ putStrLn "read decls"
+
+  ; let (main, decls)    = moveMain decls0
+  ; dd main
+
+  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
 
   ; (env4, ann_main) <- annotDecls env3 main
 
