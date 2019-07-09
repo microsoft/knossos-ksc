@@ -128,6 +128,7 @@ moveMain = partition isMain
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
 displayCppGenAndCompile compile verbosity file =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
+      display = displayPassM verbosity
   in
   runKM $
   do { decls0 <- liftIO (parseF (file ++ ".ks"))
@@ -138,13 +139,13 @@ displayCppGenAndCompile compile verbosity file =
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
   ; let rulebase      = mkRuleBase rules
-  ; displayPassM verbosity "Typechecked defs" env defs
+  ; display "Typechecked defs" env defs
 
   ; dd main
 
   ; let grad_defs = gradDefs BasicAD defs
         env1 = env `extendGblST` grad_defs
-  ; displayPassM verbosity "Grad" env1 grad_defs
+  ; display "Grad" env1 grad_defs
 
   -- We generate grad_defs_tupled even though we do not use it yet.
   -- We do not use it because
@@ -158,19 +159,19 @@ displayCppGenAndCompile compile verbosity file =
   -- the tests will run on it and we can be sure it typechecks.
   ; let grad_defs_tupled = gradDefs TupleAD defs
         env15 = env1 `extendGblST` grad_defs_tupled
-  ; displayPassM verbosity "Grad tupled" env15 grad_defs_tupled
+  ; display "Grad tupled" env15 grad_defs_tupled
 
   ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
-  ; displayPassM verbosity "Optgrad" env2 optgrad
+  ; display "Optgrad" env2 optgrad
 
   ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
-  ; displayPassM verbosity "Optgrad tupled" env25 optgrad_tupled
+  ; display "Optgrad tupled" env25 optgrad_tupled
 
   ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
-  ; displayPassM verbosity "Diffs" env25 diffs
+  ; display "Diffs" env25 diffs
 
   ; (env3, optdiffs) <- optDefs rulebase env25 diffs
-  ; displayPassM verbosity "OptDiffs" env3 optdiffs
+  ; display "OptDiffs" env3 optdiffs
 
   ; (env4, ann_main) <- annotDecls env3 main
 
@@ -188,7 +189,7 @@ displayCppGenAndCompile compile verbosity file =
   ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
 
   ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
-  ; displayPassM verbosity "CSE" env5 cse
+  ; display "CSE" env5 cse
 
   ; let ann2 =  cse
   ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
