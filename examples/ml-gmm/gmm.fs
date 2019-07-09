@@ -4,11 +4,17 @@ module gmm
 
 open System
 
-//Knossos Interface
-//open Knossos
+#if DiffSharp 
 
 //DiffSharp interface
 open F2K_DiffSharp
+
+#else
+
+//Knossos Interface
+open Knossos
+
+#endif
 
 // ---------------------------------------------------
 
@@ -31,7 +37,12 @@ let makeQ (q : Vec) (l : Vec) =
     let d = size q
     build2 d d (fun i j ->
         if i < j then
+// Discuss adding "let toD = id" to Knossos.fs 
+#if DiffSharp 
             toD 0.0
+#else
+            0.0
+#endif
         else if i = j then
             exp q.[i]
         else
