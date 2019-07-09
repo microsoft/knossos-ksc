@@ -10,17 +10,17 @@ benefits.
 ### Installing
 
 #### Ubuntu
-<pre>
+```sh
 sudo apt install ghc cabal-install
 cabal update
 cabal install hspec parsec mtl hashable filepath
 git clone <knossos repo>
 cd ksc
-</pre>
+```
 
 #### Windows
 Install [Chocolatey](https://chocolatey.org/), then:
-<pre>
+```cmd
 choco install ghc --version 8.4.4 -y
 cabal update
 cabal install hspec parsec mtl hashable filepath
@@ -28,7 +28,7 @@ choco install mingw --version 7.3.0 -y
 refreshenv
 git clone <knossos repo>
 cd ksc
-</pre>
+```
 
 ### Running
 
