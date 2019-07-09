@@ -165,6 +165,9 @@ defsAndDiffs display decls = do {
   ; (env3, optdiffs) <- optDefs rulebase env25 diffs
   ; display "OptDiffs" env3 optdiffs
 
+  -- Note optgrad removed from below as we can not currently
+  -- codegen the optgrad for recursive functions
+  -- [see https://github.com/awf/knossos/issues/281]
   ; return (env3, defs, optdiffs, rulebase)
   }
 
@@ -202,9 +205,6 @@ displayCppGenAndCompile compile verbosity file =
 
   ; let (_rules, main_tdef) = partitionDecls ann_main
 
-  -- Note optgrad removed from below as we can not currently
-  -- codegen the optgrad for recursive functions
-  -- [see https://github.com/awf/knossos/issues/281]
   ; let alldefs = defs ++ optdiffs ++ main_tdef
 
   ; cse <- anfOptAndCse display rulebase env4 alldefs
@@ -403,9 +403,6 @@ futharkPipeline file
 
   ; let env4 = env3
 
-  -- Note optgrad removed from below as we can not currently
-  -- codegen the optgrad for recursive functions
-  -- [see https://github.com/awf/knossos/issues/281]
   ; let alldefs = defs ++ optdiffs
 
   ; anfOptAndCse display rulebase env4 alldefs
