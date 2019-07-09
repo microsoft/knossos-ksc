@@ -167,6 +167,22 @@ defsAndDiffs display decls = do {
   ; return (env3, defs, optdiffs, rulebase)
   }
 
+anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)
+             -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
+anfOptAndCse display rulebase env4 alldefs =
+  do {
+  -- We use ANF to expose optimisation opportunities and use optDefs
+  -- to take them.  See Note [Inline tuples] for the motiviation for
+  -- doing ANF-then-optDefs.
+  ; anf_alldefs <- anfDefs alldefs
+  ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
+
+  ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
+  ; display "CSE" env5 cse
+
+  ; return cse
+  }
+
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
 displayCppGenAndCompile compile verbosity file =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
@@ -190,14 +206,7 @@ displayCppGenAndCompile compile verbosity file =
   -- [see https://github.com/awf/knossos/issues/281]
   ; let alldefs = defs ++ optdiffs ++ main_tdef
 
-  -- We use ANF to expose optimisation opportunities and use optDefs
-  -- to take them.  See Note [Inline tuples] for the motiviation for
-  -- doing ANF-then-optDefs.
-  ; anf_alldefs <- anfDefs alldefs
-  ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
-
-  ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
-  ; display "CSE" env5 cse
+  ; cse <- anfOptAndCse display rulebase env4 alldefs
 
   ; let ann2 =  cse
   ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
