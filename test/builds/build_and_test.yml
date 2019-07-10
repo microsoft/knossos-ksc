@@ -23,10 +23,10 @@ jobs:
   - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
     displayName: 'Install dependencies'
 
-  - script: cabal install --with-ghc /opt/ghc/8.4.4/bin/ghc-8.4.4 --dependencies-only && cabal configure --with-ghc /opt/ghc/8.4.4/bin/ghc-8.4.4 && cabal build --with-ghc /opt/ghc/8.4.4/bin/ghc-8.4.4
+  - script: cabal install --with-ghc /opt/ghc/8.6.3/bin/ghc-8.6.3 --dependencies-only && cabal configure --with-ghc /opt/ghc/8.6.3/bin/ghc-8.6.3 && cabal build --with-ghc /opt/ghc/8.6.3/bin/ghc-8.6.3
     displayName: 'Can build with cabal'
 
-  - script: sh ./test/builds/build_linux.sh /opt/ghc/8.4.4/bin/ghc-8.4.4
+  - script: sh ./test/builds/build_linux.sh /opt/ghc/8.6.3/bin/ghc-8.6.3
     displayName: 'GHC compile src/ksc/Main.hs'
 
   - script: src/ksc/Main out.ks
