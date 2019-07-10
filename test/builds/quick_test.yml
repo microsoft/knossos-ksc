@@ -2,7 +2,7 @@ workspace:
   clean: all
 
 steps:
-- script: 'sh ./test/builds/build_linux.sh /opt/ghc/bin/ghc'
+- script: 'sh ./test/builds/build_linux.sh /opt/ghc/8.4.4/bin/ghc-8.4.4'
   displayName: 'Build Main.hs'
 
 - script: src/ksc/Main
