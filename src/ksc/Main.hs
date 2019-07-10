@@ -214,7 +214,7 @@ displayCppGenAndCompile compile verbosity file =
   }
 
 displayCppGenAndCompileS :: HasCallStack => String -> Maybe Int -> String -> IO String
-displayCppGenAndCompileS compiler = displayCppGenAndCompile (Cgen.compile compiler)
+displayCppGenAndCompileS = displayCppGenAndCompile . Cgen.compile
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
 displayCppGenCompileAndRun compiler verbosity file = do
