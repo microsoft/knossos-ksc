@@ -325,14 +325,13 @@ testRunKS compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
   output <- displayCppGenCompileAndRun compiler Nothing ksTest
 
-  let "TESTS FOLLOW":"----":testResults = dropWhile (/= "TESTS FOLLOW") (lines output)
+  let "TESTS FOLLOW":testResults = dropWhile (/= "TESTS FOLLOW") (lines output)
 
       groupedTestResults = group testResults
         where group = \case
-                testName:"----":testResult:[] ->
-                  [(testName, boolOfIntString testResult)]
-                testName:"----":testResult:"----":rest ->
+                "----":testName:"----":testResult:rest ->
                   (testName, boolOfIntString testResult):group rest
+                [] -> []
                 _ -> error "Unexpected test result structure"
 
               boolOfIntString = \case
