@@ -15,4 +15,4 @@ sudo apt-get install libgoogle-perftools-dev google-perftools
 echo ----- cabal update -----
 cabal update
 echo ----- cabal install -----
-cabal install --with-compiler /opt/ghc/bin/ghc hspec parsec mtl hashable
+cabal install --with-compiler /opt/ghc/8.4.4/bin/ghc-8.4.4 hspec parsec mtl hashable
