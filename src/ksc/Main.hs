@@ -102,9 +102,6 @@ displayPassM mverbosity what env decls
        ; lintDefs what env decls
     }
 
-displayPass :: Int -> String -> GblSymTab -> [TDef] -> KM ()
-displayPass = displayPassM . Just
-
 -------------------------------------
 -- GMM derivatives
 -------------------------------------
