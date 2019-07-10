@@ -276,9 +276,6 @@ ksTestFiles testDir = do
              . filter ((== ".ks") . last 3))
             (System.Directory.listDirectory testDir)
 
-compileKscTestPrograms :: String -> IO ()
-compileKscTestPrograms compiler = compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
-
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compiler ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
@@ -350,7 +347,7 @@ testC :: String -> IO ()
 testC compiler = do
   runSpec Main.hspec defaultConfig
   demoFOnTestPrograms
-  compileKscTestPrograms compiler
+  compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
   testRunKS compiler "test/ksc/gmm.ks"
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
