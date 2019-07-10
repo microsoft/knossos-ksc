@@ -234,14 +234,8 @@ displayCppGenCompileAndRunWithOutputGpp7 = displayCppGenCompileAndRunWithOutput 
 doall :: HasCallStack => Int -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
 
-doallE :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
-doallE compile = displayCppGenAndCompile compile . Just
-
 doallC :: HasCallStack => String -> Int -> String -> IO ()
 doallC compiler = displayCppGenCompileAndRunWithOutput compiler . Just
-
-doallG :: HasCallStack => String -> Int -> String -> IO String
-doallG compiler = displayCppGenCompileAndRun compiler . Just
 
 gmm :: IO ()
 gmm = displayCppGenCompileAndRunWithOutputGpp7 (Just 400) "test/ksc/gmm"
