@@ -238,17 +238,14 @@ doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
 doallC :: HasCallStack => String -> Int -> String -> IO ()
 doallC compiler = displayCppGenCompileAndRunWithOutput compiler . Just
 
-gmm :: IO ()
-gmm = displayCppGenCompileAndRunWithOutputGpp7 (Just 400) "test/ksc/gmm"
-
-main :: IO ()
-main = gmm
-
 hspec :: Spec
 hspec = do
     Opt.hspec
     Lang.hspec
     LangUtils.hspec
+
+main :: IO ()
+main = test
 
 test :: IO ()
 test = do
