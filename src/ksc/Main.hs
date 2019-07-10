@@ -293,10 +293,8 @@ compileKscPrograms compiler ksFiles = do
     []     -> return ()
     errors -> error ("Had errors in:\n" ++ unlines errors)
 
-demoFOnTestPrograms :: IO ()
-demoFOnTestPrograms = do
-  ksTests <- ksTestFiles "test/ksc/"
-
+demoFOnTestPrograms :: [String] -> IO ()
+demoFOnTestPrograms ksTests = do
   putStrLn ("Testing " ++ show ksTests)
 
   errors <- flip mapM ksTests $ \ksTest -> do
@@ -346,7 +344,7 @@ testRunKS compiler ksFile = do
 testC :: String -> IO ()
 testC compiler = do
   runSpec Main.hspec defaultConfig
-  demoFOnTestPrograms
+  demoFOnTestPrograms =<< ksTestFiles "test/ksc/"
   compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
   testRunKS compiler "test/ksc/gmm.ks"
 
