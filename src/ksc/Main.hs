@@ -84,15 +84,6 @@ demoN verbosity adp decls
        ; (env5, cse_fwd) <- cseDefs rulebase env4 opt_der_fwd
        ; disp "Forward-mode derivative (CSE'd)" env5 cse_fwd
 
-{-
-       ; let trans_grad_defs = gradDefs (AD adp Rev) anf_defs
-             env5      = env1 `extendGblST` trans_grad_defs
-       ; disp "Transposed Jacobian" env5 trans_grad_defs
-
-       ; (env6, opt_trans_grad_defs) <- optDefs rulebase env5 trans_grad_defs
-       ; disp "Optimised transposed Jacobian" env6 opt_trans_grad_defs
--}
-
        ; let der_rev = applyDefs Rev opt_grad_defs
        ; disp "Reverse-mode derivative (unoptimised)" env3 der_rev
 
