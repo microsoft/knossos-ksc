@@ -1575,6 +1575,16 @@ namespace ks
 		return t1 >= t2;
 	}
 
+	inline int or_(int b1, int b2)
+	{
+	  return b1 || b2;
+	}
+
+	inline int and_(int b1, int b2)
+	{
+	  return b1 && b2;
+	}
+
 	inline double abs(double d) { return d > 0 ? d : -d; }
 	inline auto D$abs(double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
 

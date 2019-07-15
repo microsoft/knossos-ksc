@@ -524,6 +524,8 @@ cgenFunId = \case
     ">"  -> "gt"
     "<=" -> "lte"
     ">=" -> "gte"
+    "or" -> "or_"
+    "and"-> "and_"
     s    -> s
 
 cgenUserFun :: HasCallStack => Fun -> String
