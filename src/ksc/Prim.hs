@@ -579,6 +579,9 @@ primFunCallResultTy_maybe fun args
       ("abs"      , _                                      ) -> Just TypeFloat
       ("max"      , _                                      ) -> Just TypeFloat
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
+
+      ("or"       , [TypeBool, TypeBool]                   ) -> Just TypeBool
+      ("and"      , [TypeBool, TypeBool]                   ) -> Just TypeBool
       _ -> Nothing
 
       where
@@ -608,6 +611,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild"
                        , "abs", "max"
+                       , "or", "and"
 
                        -- The dot-product, also known as inner-product
                        -- of vectors (not just TypeVecs)
