@@ -1,12 +1,12 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def vprod Float ( (i : Integer) (v : Vec n Float) )
-       (if (== i n) 
-           1.0 
+       (if (== i n)
+           1.0
            (* (index i v) (vprod (+ i 1) v))))
 
 (def aprod Float ( (i : Integer) (v : Vec n Float) (acc : Float) )
-       (if (== i n) 
+       (if (== i n)
            acc
          (let (acc (* acc (index i v)))
             (aprod (+ i 1) v acc))))
@@ -34,13 +34,13 @@
   (print "# Julia code:\n"
       "n=" ns "\n"
       "vp="
-      (build N (lam (n : Integer) 
+      (build N (lam (n : Integer)
                   (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (vprod 0 v))))))
       "\n"
 
       "ap="
-      (build N (lam (n : Integer) 
+      (build N (lam (n : Integer)
                   (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (aprod 0 v 1.0))))))
       "\n"
@@ -54,13 +54,13 @@
       "\n"
 
       "rvp="
-      (build N (lam (n : Integer) 
+      (build N (lam (n : Integer)
                   (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (vchomp (rev$vprod 0 v 1.0)))))))          
       "\n"
 
       "rap="
-      (build N (lam (n : Integer) 
+      (build N (lam (n : Integer)
                   (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (achomp (rev$aprod 0 v 1.0 1.0)))))))
 
