@@ -19,4 +19,5 @@
 (def sub@1Integer,Integer,Integer Integer ((a : Integer) (b : Integer))
    (- a b))
 
-
+(def >@1Float Bool ((a : Float) (b : Float))
+   (> a b))
