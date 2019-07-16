@@ -1,14 +1,14 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def f Float ( (n : Integer) (x : Float) )
-    (if (== n 1) 
-        x 
+    (if (== n 1)
+        x
         (* x (f (- n 1) x))))
 
 (def main Integer ()
     (let ((n 7)
           (x 1.31))
-        (pr 
+        (pr
             ; Compute x^3
             (f n x)
             ; Compute the gradient
