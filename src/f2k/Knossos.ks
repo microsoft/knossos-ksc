@@ -10,10 +10,10 @@
 (def log@1Float Float (v : Float)
    (log v))
 
-(def add@1Float,Float,Float ((a : Float) (b : Float))
+(def add@1Float,Float,Float Float ((a : Float) (b : Float))
    (+ a b))
 
-(def *@1Integer,Integer,Integer ((a : Float) (b : Float))
+(def *@1Integer,Integer,Integer Integer ((a : Float) (b : Float))
    (* a b))
 
 (def sub@1Integer,Integer,Integer Integer ((a : Integer) (b : Integer))
