@@ -13,7 +13,7 @@
 (def add@1Float,Float,Float Float ((a : Float) (b : Float))
    (+ a b))
 
-(def *@1Integer,Integer,Integer Integer ((a : Float) (b : Float))
+(def *@1Float,Float,Float Float ((a : Float) (b : Float))
    (* a b))
 
 (def sub@1Integer,Integer,Integer Integer ((a : Integer) (b : Integer))
