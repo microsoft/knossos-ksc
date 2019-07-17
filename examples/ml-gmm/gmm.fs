@@ -37,12 +37,7 @@ let makeQ (q : Vec) (l : Vec) =
     let d = size q
     build2 d d (fun i j ->
         if i < j then
-// Discuss adding "let toD = id" to Knossos.fs 
-#if DiffSharp 
-            toD 0.0
-#else
-            0.0
-#endif
+            Float 0.0
         else if i = j then
             exp q.[i]
         else

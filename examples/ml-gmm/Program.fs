@@ -34,7 +34,7 @@ let main argv =
     
 #if DiffSharp 
 
-    //let alphas' = F2K_DiffSharp.Minimize 100 (toD 0.01) (fun a -> gmm.gmm_objective x a means qs ls) alphas
+    //let alphas' = F2K_DiffSharp.Minimize 100 (Float 0.01) (fun a -> gmm.gmm_objective x a means qs ls) alphas
     //printfn "Optimized %A" (gmm.gmm_objective x alphas' means qs ls)
 
 #endif

@@ -32,3 +32,44 @@ let gammaLn (a: float) = a
 let rng = new System.Random()
 let rand m = build m (fun _ -> rng.NextDouble())
 let rand2 m n = build2 m n (fun i j -> rng.NextDouble())
+
+
+let Float (x:float) = x
+
+let Rows (A:Mat) = A.Length
+
+let Cols (A:Mat) = A.[0].Length
+
+let MatToArray (M:Mat) = 
+    match M with  
+    | Vector V -> V |> Array.map(fun v -> match v with | Vector x -> x | ZeroVector _ -> failwith "unsupported") |> Array.concat
+    | ZeroVector _ -> failwith "unsupported"
+
+let VecToArray (V:Vec) = Vector.toArray V    
+
+let MatOfArray n (X:float[]) : Mat= 
+    X 
+    |> Array.chunkBySize (X.Length/n)
+    |> Array.map (fun x -> Vector x)
+    |> Vector    
+
+let VecOfArray (X:float[]) : Vec = Vector X
+    
+let MatToVec (A:Mat) = Vector (MatToArray A)    
+
+let VecToMat n (V:Vec) :Mat = 
+    let V' = V |> VecToArray 
+    V' |> Array.chunkBySize (V'.Length/n) |> Array.map Vector |> Vector
+
+let VecConcat (X:seq<Vec>) = X |> Seq.map VecToArray |> Seq.concat |> Array.ofSeq |> Vector
+
+let CreateRows n (x:Vec) : Mat = Array.replicate n x |> Vector
+
+let reLU (A:Mat) = Vector.map (Vector.map (fun x -> System.Math.Max(x, 0.0))) A
+
+let GetRows (A:Mat) = 
+    match A with  
+    | Vector V -> V 
+    | ZeroVector _ -> failwith "unsupported"
+
+let MatMul (A:Mat) (B:Mat) = build2 (Rows A) (Cols B) (fun i j -> sum(build (Cols A) (fun k -> A.[i].[k] * B.[k].[j])))
