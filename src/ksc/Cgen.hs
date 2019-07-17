@@ -509,9 +509,21 @@ cgenExprR env = \case
 
   App{} -> error "App"
 
+substitute :: (a -> Maybe [a]) -> [a] -> [a]
+substitute f = concatMap (\x -> case f x of Nothing -> [x]; Just s -> s)
+
+mangleFun :: String -> String
+mangleFun = substitute $ \case
+    '@' -> Just "$a"
+    ',' -> Just "$_"
+    '[' -> Just "$6"
+    ']' -> Just "$9"
+    '*' -> Just "$x"
+    _   -> Nothing
+
 cgenFunId :: FunId -> String
 cgenFunId = \case
-  UserFun fun -> fun
+  UserFun fun -> mangleFun fun
   PrimFun fun -> translateFun fun
   SelFun i _  -> "ks_get<" ++ show (i - 1) ++ ">"  -- TODO: rename to ks::get
  where
