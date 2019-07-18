@@ -31,7 +31,7 @@ type FFLayer =
     static member evalDrop rnd (x:Mat) (l:FFLayer) = 
         let activation = l.a >> Dropout rnd l.dropout
         let B = (CreateRows (Rows x) l.b)
-        x*l.W + B |> activation 
+        (MatMul x l.W) + B |> activation 
 
     member this.EvalDrop rnd (x:Mat) = FFLayer.evalDrop rnd x this                
 

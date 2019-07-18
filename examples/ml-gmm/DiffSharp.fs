@@ -49,6 +49,28 @@ let CreateRows n (x:Vec) : Mat = DM.createRows n x
 
 let reLU (A:Mat) = DiffSharp.Util.reLU A
 
+let tanh (A:Mat) = tanh A
+
+let sigmoid (A:Mat) = DiffSharp.Util.sigmoid A
+
 let GetRows (A:Mat) = DM.toRows A
 
+let GetCols (A:Mat) = A.GetCols()    
+
+let MatOfRows (V:Vec[]) = DM.ofRows V
+
+let Transpose (A:Mat) = DM.Transpose A
+
+let MatOfCols (V:Vec[]) = DM.ofCols V
+
 let MatMul (A:Mat) (A':Mat) = A*A'
+
+let MatAppendCols (A:Mat) (A':Mat) = Seq.append (A.GetCols()) (A'.GetCols())  |> DM.ofCols
+
+let VecGetSlice (i:int option, j:int option) (V:Vec) = V.GetSlice (i, j)
+   
+let MatGetSlice (row_i:int option, row_j:int option, col_i:int option, col_j:int option) (A:Mat) = A.GetSlice (row_i, row_j, col_i, col_j)
+
+let ElemProd (A:Mat) (A':Mat) = A .* A'
+
+let Minus (x:float) (A:Mat) = x - A
