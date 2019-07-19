@@ -14,11 +14,11 @@ open System.IO
 
 // Create an interactive checker instance 
 let checker = FSharpChecker.Create(keepAssemblyContents=true)
+let exeDirectory = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+let (++) a b = System.IO.Path.Combine(a,b)
 
 let parseAndCheckFiles files = 
     let fsproj = "nul.fsproj" // unused?
-
-    let (++) a b = System.IO.Path.Combine(a,b)
 
     (* adapted for .NET Core from https://fsharp.github.io/FSharp.Compiler.Service/project.html *)
     let sysLib nm =
@@ -46,10 +46,10 @@ let parseAndCheckFiles files =
                     System.Environment.NewLine
                     otherPathLocal
             
-    let directory = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    
 
     let localLib name =
-        directory ++ name + ".dll"
+        exeDirectory ++ name + ".dll"
 
     // Get context representing a stand-alone (script) file
     let projOptions = checker.GetProjectOptionsFromCommandLineArgs
@@ -118,7 +118,7 @@ let main argv =
      
     let prelude = seq {
         yield ";; Prelude: Knossos.ks"
-        yield! File.ReadAllLines "Knossos.ks"
+        yield! File.ReadAllLines (exeDirectory ++ "Knossos.ks")
     }
     let decls =
         checkedFiles

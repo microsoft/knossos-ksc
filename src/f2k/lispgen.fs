@@ -117,7 +117,7 @@ let sprintfloat v = let s = v.ToString() in if s.Contains(".") then s else s + "
 let rec toLispR indent (e:FSharpExpr) :string = 
     let iindent = indent + tab
     let ndb x = ""
-    let db x = "{- " + x + "-}"
+    let db x = "#| " + x + "|#"
     let nl = "\n" + iindent
     match e with 
     | BasicPatterns.AddressOf(lvalueExpr) -> 

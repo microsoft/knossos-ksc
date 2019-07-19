@@ -1,7 +1,8 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
-/// These are stubs that we expect Knossos to substitute later, they may want to be given implementations
-/// so that debugging on the F# side is possible.
+/// These are stubs that we expect Knossos to substitute later, 
+/// they should given implementations so that debugging on the F# side 
+/// produces the same results as compilation 
 module Knossos
 
 open DV
@@ -22,6 +23,9 @@ let inline build2 m n (f : int -> int -> float) = Vector.init m (fun i -> Vector
 let inline sum v = Vector.sum v
 let inline mul (a: Vector<Vector<float>>) (b: Vector<float>) : Vector<float> = 
     sum(build (size a) (fun i -> a.[i] * b.[i]))
+
+let inline map (f: 'a -> 'b) (x: Vector<'a>) : Vector<'b> = 
+    build (size x) (fun i -> f x.[i])
 
 let inline max (a: Vector<float>) = a.GetMaxBy( fun x->x )
 let inline expv (a: Vector<float>) = Vector.map exp a
