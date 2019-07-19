@@ -19,4 +19,5 @@
 (def sub@1Integer,Integer,Integer Integer ((a : Integer) (b : Integer))
    (- a b))
 
-
+;;(def map (Vec n 'b) ((f : Lambda 'a 'b) (v : Vec n 'a))
+;;   (build n (lam (i : Integer) (f (index i v)))))
