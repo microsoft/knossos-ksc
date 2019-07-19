@@ -10,10 +10,10 @@
 (def log@1Float Float (v : Float)
    (log v))
 
-(def add@1Float,Float,Float ((a : Float) (b : Float))
+(def add@1Float,Float,Float Float ((a : Float) (b : Float))
    (+ a b))
 
-(def *@1Integer,Integer,Integer ((a : Float) (b : Float))
+(def *@1Float,Float,Float Float ((a : Float) (b : Float))
    (* a b))
 
 (def sub@1Integer,Integer,Integer Integer ((a : Integer) (b : Integer))
@@ -21,3 +21,6 @@
 
 ;;(def map (Vec n 'b) ((f : Lambda 'a 'b) (v : Vec n 'a))
 ;;   (build n (lam (i : Integer) (f (index i v)))))
+
+(def >@1Float Bool ((a : Float) (b : Float))
+   (> a b))

@@ -102,13 +102,13 @@ let strVal (v:FSharpMemberOrFunctionOrValue) =
   | "op_Subtraction"        -> "sub"
   | "op_Division"           -> "/"
   | "op_Modulus"            -> "%"
-  | "op_UnaryNegation"      -> "neg"
-  | "op_Inequality"         -> "ne"
-  | "op_Equality"           -> "eq"
-  | "op_LessThan"           -> "lt"
-  | "op_GreaterThan"        -> "gt"
-  | "op_LessThanOrEqual"    -> "le"
-  | "op_GreaterThanOrEqual" -> "ge"
+  | "op_UnaryNegation"      -> "-"
+  | "op_Inequality"         -> "!="
+  | "op_Equality"           -> "=="
+  | "op_LessThan"           -> "<"
+  | "op_GreaterThan"        -> ">"
+  | "op_LessThanOrEqual"    -> "<="
+  | "op_GreaterThanOrEqual" -> ">="
   | "op_Exponentiation"     -> "pow"
   | "get_Item"              -> "index" 
   | _ -> v.CompiledName
@@ -117,7 +117,7 @@ let sprintfloat v = let s = v.ToString() in if s.Contains(".") then s else s + "
 let rec toLispR indent (e:FSharpExpr) :string = 
     let iindent = indent + tab
     let ndb x = ""
-    let db x = "{- " + x + "-}"
+    let db x = "#| " + x + "|#"
     let nl = "\n" + iindent
     match e with 
     | BasicPatterns.AddressOf(lvalueExpr) -> 

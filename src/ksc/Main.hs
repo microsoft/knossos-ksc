@@ -3,7 +3,6 @@
 module Main where
 
 import GHC.Stack
-import qualified System.Exit
 
 import Lang
 import LangUtils
@@ -18,6 +17,7 @@ import ANF
 import qualified Cgen
 import KMonad
 import qualified Control.Exception
+import Control.Monad (unless)
 import qualified Data.Maybe
 import Data.List( partition )
 import qualified System.Directory
@@ -26,7 +26,8 @@ import qualified System.FilePath
 import qualified System.Process
 import System.Process (createProcess, proc, std_out)
 import qualified System.IO
-import Test.Hspec (hspec, Spec)
+import Test.Hspec (Spec)
+import Test.Hspec.Runner (runSpec, defaultConfig)
 
 
 -------------------------------------
@@ -36,21 +37,22 @@ import Test.Hspec (hspec, Spec)
 demoF :: ADPlan -> String -> IO ()
 -- Read source code from specified input file, optimise,
 -- differentiate, optimise, and display results of each step
-demoF = demoFFilter id
+demoF = demoFFilter (Just 999) id
 
-demoFFilter :: ([Decl] -> [Decl]) -> ADPlan -> String -> IO ()
-demoFFilter theFilter adp file = do
+demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> String -> IO ()
+demoFFilter verbosity theFilter adp file = do
   defs <- parseF file
-  runKM (demoN adp (theFilter defs))
+  runKM (demoN verbosity adp (theFilter defs))
 
 demo :: Decl -> IO ()
-demo d = runKM (demoN BasicAD [d])
+demo d = runKM (demoN (Just 999) BasicAD [d])
 
-demoN :: ADPlan -> [Decl] -> KM ()
-demoN adp decls
-  = let disp = displayPass 999 in
-    do { banner "Original declarations"
-       ; displayN decls
+demoN :: Maybe Int -> ADPlan -> [Decl] -> KM ()
+demoN verbosity adp decls
+  = let disp = displayPassM verbosity in
+    do { flip mapM_ verbosity $ \v -> do
+           banner "Original declarations"
+           displayN (take v decls)
 
        ; (env, tc_decls) <- annotDecls emptyGblST decls
        ; let (rules, defs) = partitionDecls tc_decls
@@ -235,10 +237,18 @@ hspec = do
     LangUtils.hspec
 
 test :: IO ()
-test = testC "g++-7"
+test = do
+  let compiler = "g++-7"
+  testC compiler
+  [fsTestKs] <- System.Environment.getArgs
+  compileKscPrograms compiler [fsTestKs]
 
 testWindows :: IO ()
-testWindows = testC "g++"
+testWindows = do
+  let compiler = "g++"
+  testC compiler
+  [fsTestKs] <- System.Environment.getArgs
+  compileKscPrograms compiler [fsTestKs]
 
 ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do
@@ -253,20 +263,20 @@ ksTestFiles testDir = do
             (System.Directory.listDirectory testDir)
 
 compileKscTestPrograms :: String -> IO ()
-compileKscTestPrograms compiler = do
-  ksFiles <- ksTestFiles "test/ksc/"
+compileKscTestPrograms compiler = compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
 
-  let ksTests = map System.FilePath.dropExtension ksFiles
+compileKscPrograms :: String -> [String] -> IO ()
+compileKscPrograms compiler ksFiles = do
+  putStrLn ("Testing " ++ show ksFiles)
 
-  putStrLn ("Testing " ++ show ksTests)
-
-  errors <- flip mapM ksTests $ \ksTest -> do
+  errors <- flip mapM ksFiles $ \ksFile -> do
+    let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
-    putStrLn $ ">>>>> TEST: " ++ ksTest ++ ".ks"
+    putStrLn $ ">>>>> TEST: " ++ ksFile
     fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing ksTest)
       `Control.Exception.catch` \e -> do
         print (e :: Control.Exception.ErrorCall)
-        return (Just ksTest)
+        return (Just ksFile)
 
   case Data.Maybe.catMaybes errors of
     []     -> return ()
@@ -282,7 +292,7 @@ demoFOnTestPrograms = do
     flip mapM [BasicAD, TupleAD] $ \adp -> do
       putStrLn ""
       putStrLn $ ">>>>> TEST: " ++ ksTest
-      fmap (const Nothing) (demoFFilter (snd . moveMain) adp ksTest)
+      fmap (const Nothing) (demoFFilter Nothing (snd . moveMain) adp ksTest)
         `Control.Exception.catch` \e -> do
           print (e :: Control.Exception.ErrorCall)
           return (Just (ksTest, adp))
@@ -308,17 +318,11 @@ testGMM compiler = do
                                  , notImpossiblyGoodS ]
         _ -> False
 
-  if success
-    then do
-    putStrLn "Success"
-    System.Exit.exitWith System.Exit.ExitSuccess
-    else do
-    putStrLn ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output)))))
-    System.Exit.exitWith (System.Exit.ExitFailure 1)
+  unless success (error ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output))))))
 
 testC :: String -> IO ()
 testC compiler = do
-  Test.Hspec.hspec Main.hspec
+  runSpec Main.hspec defaultConfig
   demoFOnTestPrograms
   compileKscTestPrograms compiler
   testGMM compiler

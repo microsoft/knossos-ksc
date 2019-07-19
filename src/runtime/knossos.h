@@ -1485,6 +1485,12 @@ namespace ks
 		return t1 < t2;
 	}
 
+	template <class T1, class T2>
+	T1 gt(T1 t1, T2 t2)
+	{
+		return t1 > t2;
+	}
+
 	inline double abs(double d) { return d > 0 ? d : -d; }
 	inline auto D$abs(double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
 
@@ -1555,7 +1561,7 @@ namespace ks
           return v;
         }
 
-        inline double $ranhashdoub(uint64_t v) {
+        inline double $ranhashdoub(int32_t v) {
           return 5.42101086242752217E-20 * $ranhash(v);
         }
 

@@ -5,31 +5,51 @@
 #r @"C:\Users\Andrew Fitzgibbon\.nuget\packages\fsharp.compiler.service\25.0.1\lib\netstandard2.0\FSharp.Compiler.Service.dll"
 #endif
 
+//We're avoiding requiring projects files so we specify the exact location, is there a better way of doing this?
+let extendedPath = @"dotnet/sdk/NuGetFallbackFolder/microsoft.netcore.app/2.2.0/ref/netcoreapp2.2/"
+
 open FSharp.Compiler.SourceCodeServices
 open lispgen
 open System.IO
 
 // Create an interactive checker instance 
 let checker = FSharpChecker.Create(keepAssemblyContents=true)
+let exeDirectory = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+let (++) a b = System.IO.Path.Combine(a,b)
 
 let parseAndCheckFiles files = 
     let fsproj = "nul.fsproj" // unused?
 
-    (* see https://fsharp.github.io/FSharp.Compiler.Service/project.html *)
-    let sysLib nm = 
+    (* adapted for .NET Core from https://fsharp.github.io/FSharp.Compiler.Service/project.html *)
+    let sysLib nm =
         if System.Environment.OSVersion.Platform = System.PlatformID.Win32NT then
-            // file references only valid on Windows
-            System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) +
-            @"\dotnet\sdk\NuGetFallbackFolder\microsoft.netcore.app\2.2.0\ref\netcoreapp2.2\" + nm + ".dll"
-        else
-            let sysDir = System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory()
-            let (++) a b = System.IO.Path.Combine(a,b)
-            sysDir ++ nm + ".dll" 
 
-    let directory = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+            let windowsReferencePath =
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) ++ extendedPath
+            if not (Directory.Exists windowsReferencePath) then
+                failwithf "Can't find .NET Core references, ensure they're installed. Looking in%s%s" System.Environment.NewLine windowsReferencePath 
+            windowsReferencePath ++ nm + ".dll"
+        else
+
+            let otherPath = "/usr/share/" ++ extendedPath //WSL/Ubuntu install
+            let otherPathLocal = "/usr/share/local/" ++ extendedPath //macOS install
+
+            if Directory.Exists otherPath then
+                otherPath ++ nm + ".dll"
+            elif Directory.Exists otherPathLocal then
+                otherPathLocal ++ nm + ".dll"
+            else
+                failwithf
+                    "Can't find .NET Core references, ensure they're installed. Looking in%s%s%s%s"
+                    System.Environment.NewLine
+                    otherPath
+                    System.Environment.NewLine
+                    otherPathLocal
+            
+    
 
     let localLib name =
-        System.IO.Path.Combine(directory, name) + ".dll"
+        exeDirectory ++ name + ".dll"
 
     // Get context representing a stand-alone (script) file
     let projOptions = checker.GetProjectOptionsFromCommandLineArgs
@@ -98,7 +118,7 @@ let main argv =
      
     let prelude = seq {
         yield ";; Prelude: Knossos.ks"
-        yield! File.ReadAllLines "Knossos.ks"
+        yield! File.ReadAllLines (exeDirectory ++ "Knossos.ks")
     }
     let decls =
         checkedFiles
