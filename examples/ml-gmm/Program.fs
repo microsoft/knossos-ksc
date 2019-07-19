@@ -30,7 +30,7 @@ let main argv =
     let qs = Array.init K (fun _ -> rand D)
     //let ls = Array.init K (fun _ -> rand (gmm.tri (D - 1)))
     let ls = Array.init K (fun _ -> rand (gmm.tri D))
-    printfn "Initial %A" (gmm.gmm_objective x alphas means qs ls)
+    //printfn "Hello %A" (gmm.gmm_objective x alphas means qs ls)
     
 #if DiffSharp 
 

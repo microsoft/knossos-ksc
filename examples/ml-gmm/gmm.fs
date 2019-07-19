@@ -76,23 +76,23 @@ type SqrtPosDefMat = {
 // Row i=3 : [    l3,     l4,     l5, exp q3,      0]
 // Row i=4 : [    l6,     l7,     l8,     l9, exp q4]
 type SqrtPosDefMat with member this.asMat () = 
-        let d = size this.log_diags
-        build2 d d (fun i j ->
-            if i < j then
-                0.0
-            else if i = j then
-                exp this.log_diags.[i]
-            else
-                this.off_diags.[tri (i-1) + j]
-        )
+    let d = size this.log_diags
+    build2 d d (fun i j ->
+        if i < j then
+            0.0
+        else if i = j then
+            exp this.log_diags.[i]
+        else
+            this.off_diags.[tri (i-1) + j]
+    )
 
-let test_sqrtpd = 
+(*let test_sqrtpd = 
     let d = 3 in 
     {
         log_diags = rand d
         off_diags = rand (tri d)
     }
-    in test_sqrtpd.asMat()
+    in test_sqrtpd.asMat()*)
 
 // Type of a Gaussian, parametrized by
 // mean and inverse-square-root of covariance, 
@@ -118,7 +118,8 @@ let log_wishart_prior (wishart:Wishart) (g:InvSqrtGaussian) =
     let n = p + wishart.m + 1
     let C = (float (n*p))*((log wishart.gamma) - 0.5*(log 2.)) - (log_gamma_distrib (0.5*(float n)) p)
 
-    0.5*(sqr wishart.gamma)*g.invSqrtCov.froNorm() - (float wishart.m)*g.invSqrtCov.logDet() - C
+    //0.5*(sqr wishart.gamma)*g.invSqrtCov.froNorm() - (float wishart.m)*g.invSqrtCov.logDet() - C
+    0.5*(sqrt wishart.gamma)*g.invSqrtCov.froNorm() - (float wishart.m)*g.invSqrtCov.logDet() - C
 
 // ---------- Gaussian Mixture Model (GMM) ----------
 type GMM = 
