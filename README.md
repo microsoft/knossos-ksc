@@ -24,6 +24,7 @@ Install [Chocolatey](https://chocolatey.org/), then:
 choco install ghc --version 8.4.4 -y
 cabal v2-update
 choco install mingw --version 7.3.0 -y
+choco install msys2
 refreshenv
 git clone <knossos repo>
 cd ksc
