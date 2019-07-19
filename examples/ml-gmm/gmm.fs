@@ -75,16 +75,17 @@ type SqrtPosDefMat = {
 // Row i=2 : [    l1,     l2, exp q2,      0,      0]
 // Row i=3 : [    l3,     l4,     l5, exp q3,      0]
 // Row i=4 : [    l6,     l7,     l8,     l9, exp q4]
-type SqrtPosDefMat with member this.asMat () = 
-    let d = size this.log_diags
-    build2 d d (fun i j ->
-        if i < j then
-            0.0
-        else if i = j then
-            exp this.log_diags.[i]
-        else
-            this.off_diags.[tri (i-1) + j]
-    )
+type SqrtPosDefMat with
+    member this.asMat () = 
+        let d = size this.log_diags
+        build2 d d (fun i j ->
+            if i < j then
+                Float 0.0
+            else if i = j then
+                exp this.log_diags.[i]
+            else
+                this.off_diags.[tri (i-1) + j]
+        )
 
 (*let test_sqrtpd = 
     let d = 3 in 
