@@ -22,6 +22,10 @@ cmake-build/
 # nuget packages
 /packages/
 
+# cabal
+/dist-newstyle/
+.ghc.environment.*
+
 # Precompiled Headers
 *.gch
 *.pch
