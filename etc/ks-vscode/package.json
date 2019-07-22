@@ -1,0 +1,25 @@
+{
+    "name": "ks-lisp",
+    "displayName": "Knossos KS",
+    "description": "Lisp-like IR for Knossos",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.36.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "ks-lisp",
+            "aliases": ["Knossos IR", "ks-lisp"],
+            "extensions": [".ks",".kso"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "ks-lisp",
+            "scopeName": "source.ks-lisp",
+            "path": "./syntaxes/Knossos.tmLanguage"
+        }]
+    }
+}
