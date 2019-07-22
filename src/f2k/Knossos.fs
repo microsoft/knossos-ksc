@@ -21,7 +21,7 @@ let inline size (v: Vector<'T>) = v.Length
 let inline build n (f : int -> 'T) = Vector.init n f
 let inline build2 m n (f : int -> int -> float) = Vector.init m (fun i -> Vector.init n (f i))
 let inline sum v = Vector.sum v
-let inline mul (a: Vector<Vector<float>>) (b: Vector<float>) : Vector<float> = 
+let inline mvmul (a: Vector<Vector<float>>) (b: Vector<float>) : Vector<float> = 
     sum(build (size a) (fun i -> a.[i] * b.[i]))
 
 let inline map (f: 'a -> 'b) (x: Vector<'a>) : Vector<'b> = 
@@ -36,3 +36,6 @@ let gammaLn (a: float) = a
 let rng = new System.Random()
 let rand m = build m (fun _ -> rng.NextDouble())
 let rand2 m n = build2 m n (fun i j -> rng.NextDouble())
+// Square a number
+let inline sqr x = x * x
+

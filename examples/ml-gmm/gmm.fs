@@ -22,14 +22,14 @@ let tri n = n * (n - 1) /2
 // Create lower triangular matrix from log-diagonal and lower triangle
 let makeQ (q : Vec) (l : Vec) =
     let d = size q
-    build2 d d (fun i j ->
+    build d (fun i -> (build d (fun j ->  // TODO: revert to Mat.init once we can parse it in KSC
         if i < j then
             0.0
         else if i = j then
             exp q.[i]
         else
             l.[tri (i - 1) + j]
-    )
+    )))
 
 // Negative log likelihood of GMM
 let gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
@@ -39,7 +39,7 @@ let gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
           logsumexp( build K (fun k -> 
             let Q = makeQ qs.[k] ls.[k]
             let dik = x.[i] - means.[k]
-            let mahal = mul Q dik |> sqnorm
+            let mahal = sqnorm (mvmul Q dik) // TODO: replace with |> and handle op_PipeRight 
             alphas.[k] + sum (qs.[k]) - 0.5 * mahal)
     ))) - 
     (float n) * (logsumexp alphas) +
