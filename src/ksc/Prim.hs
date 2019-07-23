@@ -88,9 +88,6 @@ mk_fun f = case find_dollar f of
 --  Building simple calls
 --------------------------------------------
 
--- lmZero might look as if it should take a Type and cons up a dummy of that type,
--- but types such as Vec need constructor arguments such as size,
--- so are consed from a template
 lmZero :: Type -> Type -> TExpr
 lmZero s t = mkPrimCall2 "lmZero" (mkDummy s) (mkDummy t)
 
