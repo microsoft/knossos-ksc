@@ -325,6 +325,12 @@ callPrimFun "index" _ [i, arr] =
     arr' ->
       Index arr' [toFutharkExp i]
 
+callPrimFun "or" _ [x, y] =
+  BinOp "||" (toFutharkExp x) (toFutharkExp y)
+
+callPrimFun "and" _ [x, y] =
+  BinOp "&&" (toFutharkExp x) (toFutharkExp y)
+
 callPrimFun "pr" _ es =
   ExpTuple $ map toFutharkExp es
 
