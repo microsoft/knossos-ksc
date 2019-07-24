@@ -31,6 +31,18 @@
        (max_ (index (* 2 ni) image)
              (index (+ 1 (* 2 ni)) image)))))
 
+; This function stands in for one that could actually be expensivex
+(def expensive Float ((x1 : Float) (x2 : Float)) 0.0)
+
+; An example to show that if we pool with an expensive function it's
+; harder to eliminate the deltaVecs
+(def expensivepool
+     (Vec (/ n 2) Float)
+     (image : Vec n Float)
+     (build (/ n 2) (lam (ni : Integer)
+       (expensive (index (* 2 ni) image)
+                  (index (+ 1 (* 2 ni)) image)))))
+
 (def conv1d
      (Vec k (Vec n Float))
      ((kernels : Vec k (Vec l (Vec kn Float)))
