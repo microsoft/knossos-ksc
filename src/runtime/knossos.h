@@ -540,7 +540,7 @@ namespace ks
 		vec(std::vector<T> const& that) : vec{ that.size() }
 		{
 			// Copying from std vector - allocate.
-			for (int i = 0; i < that.size(); ++i)
+			for (size_t i = 0; i < that.size(); ++i)
 				data_[i] = that[i];
 		}
 
