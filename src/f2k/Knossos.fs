@@ -27,7 +27,7 @@ let inline mvmul (a: Vector<Vector<float>>) (b: Vector<float>) : Vector<float> =
 let inline map (f: 'a -> 'b) (x: Vector<'a>) : Vector<'b> = 
     build (size x) (fun i -> f x.[i])
 
-let inline max (a: Vector<float>) = a.GetMaxBy( fun x->x )
+let inline maximum (a: Vector<float>) = a.GetMaxBy( fun x->x )
 let inline expv (a: Vector<float>) = Vector.map exp a
 //let inline sqnorm (a: Vector<'a>) = a.GetL2NormSq()
 let inline sqnorm (a: Vector<float>) = a.GetL2NormSq()

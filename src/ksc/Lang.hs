@@ -784,13 +784,14 @@ pprLetSexp v e =
 isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
 isInfix f = isInfixFun (fst (getFun @p f))
 
+-- TODO: this is rather out of date, and it's not clear we need to keep it...
 isInfixFun :: Fun -> Maybe Prec
 isInfixFun (Fun (PrimFun s))
-    | s == "==" = Just precOne
-    | s == "+"  = Just precTwo
-    | s == "-"  = Just precTwo
-    | s == "*"  = Just precThree
-    | s == "/"  = Just precThree
+    | s == "eq"   = Just precOne
+    | s == "add"  = Just precTwo
+    | s == "sub"  = Just precTwo
+    | s == "mul"  = Just precThree
+    | s == "div"  = Just precThree
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc

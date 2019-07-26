@@ -12,7 +12,7 @@ import Parse
 
 main:: IO ()
 main = do
-    let d = runParserOrPanic pDef "(def f ((x : Float)) (* x 2.0))"
+    let d = runParserOrPanic pDef "(def f ((x : Float)) (mul x 2.0))"
     putStrLn $ pps d
     let (env,ad) = annotDef d
     putStrLn $ pps ad
@@ -20,6 +20,6 @@ main = do
     putStrLn $ pps dd
     let oo = optDef env dd
     putStrLn $ pps $ stripAnnot oo
-    let expected = runParserOrPanic pDef "(def f' ((x : Float) (dx : Float)) (* 2.0 dx))"
+    let expected = runParserOrPanic pDef "(def f' ((x : Float) (dx : Float)) (mul 2.0 dx))"
     putStrLn $ pps expected
     -- putStrLn $ show $ cmpDef (stripAnnot oo) expected

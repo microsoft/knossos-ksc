@@ -6,7 +6,7 @@ open Knossos
 open System
 
 let logsumexp (a:Vec) =
-    let mx = max a
+    let mx = maximum a
     let semx = sum (expv (a - mx))
     (log semx) + mx
 

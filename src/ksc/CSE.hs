@@ -132,7 +132,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 -- where we want to CSE e2 into e1
 cseE cse_env@(CS { cs_map = rev_map }) (Assert e1 e2)
  | Call eq [e1a, e1b] <- e1'
- , eq `isThePrimFun` "=="
+ , eq `isThePrimFun` "eq"
  , let cse_env' = cse_env { cs_map = M.map (substAssert e1a e1b) rev_map }
  = Assert e1' (cseE cse_env' e2)
 

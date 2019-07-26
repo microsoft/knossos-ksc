@@ -1,7 +1,7 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def h Integer ((y : Integer))
-    (sum (build 3 (lam (y3 : Integer) (+ y 2))))
+    (sum (build 3 (lam (y3 : Integer) (add y 2))))
     )
 
 (def f Float (x : Float)
@@ -9,17 +9,17 @@
 )
 
 (def g Float ((n : Integer) (m : Integer))
-  (to_float (* n m)))
+  (to_float (mul n m)))
 
 (def e Float ((vn : Vec n Integer) 
               (t : Tuple (Vec m (Vec n Float)) 
                          (Tuple Integer 
                                 (Vec m Float))))
-  (+ (sum (build n (lam (i : Integer) (to_float i))))
+  (add (sum (build n (lam (i : Integer) (to_float i))))
      (sum (build m (lam (j : Integer) (sum (get$2$2 (get$2$2 t))))))))
 
 (def test_inline (Vec n Integer) (x : Vec n Float)
-    (build n (lam (i : Integer) (* i 2))))
+    (build n (lam (i : Integer) (mul i 2))))
 
 (def test_inline2 Integer (x : Vec n Float)
   (let (n1 (size x))
