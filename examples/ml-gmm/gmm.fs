@@ -2,8 +2,27 @@
 // Licensed under the MIT license.
 module gmm
 
-open Knossos
 open System
+
+#if DiffSharp 
+
+//DiffSharp interface
+open F2K_DiffSharp
+
+#else
+
+#if INTERACTIVE
+#load "../../src/f2k/Util.fs";;
+#load "../../src/f2k/Vector.fs";;
+#load "../../src/f2k/Knossos.fs";;
+#endif
+
+//Knossos Interface
+open Knossos
+
+#endif
+
+// ---------------------------------------------------
 
 let logsumexp (a:Vec) =
     let mx = maximum a

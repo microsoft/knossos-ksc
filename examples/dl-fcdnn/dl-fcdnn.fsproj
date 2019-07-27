@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <RootNamespace>dl_fcdnn</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>TRACE;DiffSharp</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ml-gmm\DiffSharp.fs" Link="DiffSharp.fs" />
+    <Compile Include="..\..\src\f2k\Util.fs" Link="Util.fs" />
+    <Compile Include="..\..\src\f2k\Vector.fs" Link="Vector.fs" />
+    <Compile Include="..\..\src\f2k\Knossos.fs" Link="Knossos.fs" />
+    <Compile Include="dnn.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DiffSharp" Version="0.8.3-beta" />
+  </ItemGroup>
+
+</Project>
