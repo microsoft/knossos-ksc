@@ -90,6 +90,7 @@ let parseAndCheckFiles files =
             failwith "There were errors"
 
     checkProjectResults.AssemblyContents.ImplementationFiles
+    // TODO: checkProjectResults.GetOptimizedAssemblyContents().ImplementationFiles
 
 [<EntryPoint>]
 let main argv =

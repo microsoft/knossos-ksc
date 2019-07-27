@@ -29,7 +29,7 @@ let rec strType (t:FSharpType) =
       | "System","Double" -> "Float"
       | "System","Int32" -> "Integer"
       | "DV", "Vector" -> "Vec n " + strList ", " strParendType t.GenericArguments
-      | a,n -> "**UK[" + a + "." + n + "]"
+      | a,n -> "UnkType{" + a + "." + n + "}"
   else
     match t.ToString() with
     | _ ->
@@ -95,29 +95,31 @@ let strVal (v:FSharpMemberOrFunctionOrValue) =
   | "Exp"                   -> "exp"
   | "ToDouble"              -> "to_float"
   | "ToInt"                 -> "to_int"
-  | "op_DotMinus"           -> "sub"
-  | "op_DotPlus"            -> "add"
+  | "op_DotMinus"           -> ".sub"
+  | "op_DotPlus"            -> ".add"
   | "op_Addition"           -> "add"
-  | "op_Multiply"           -> "*"
+  | "op_Multiply"           -> "mul"
   | "op_Subtraction"        -> "sub"
-  | "op_Division"           -> "/"
-  | "op_Modulus"            -> "%"
-  | "op_UnaryNegation"      -> "-"
-  | "op_Inequality"         -> "!="
-  | "op_Equality"           -> "=="
-  | "op_LessThan"           -> "<"
-  | "op_GreaterThan"        -> ">"
-  | "op_LessThanOrEqual"    -> "<="
-  | "op_GreaterThanOrEqual" -> ">="
+  | "op_Division"           -> "div"
+  | "op_Modulus"            -> "mod"
+  | "op_UnaryNegation"      -> "neg"
+  | "op_Inequality"         -> "ne"
+  | "op_Equality"           -> "eq"
+  | "op_LessThan"           -> "lt"
+  | "op_GreaterThan"        -> "gt"
+  | "op_LessThanOrEqual"    -> "lt"
+  | "op_GreaterThanOrEqual" -> "gt"
   | "op_Exponentiation"     -> "pow"
-  | "get_Item"              -> "index" 
+  | "get_Length"            -> "size" 
   | _ -> v.CompiledName
 
-let sprintfloat v = let s = v.ToString() in if s.Contains(".") then s else s + ".0"
+let ndb x = ""
+let db x = "#|" + x.ToString() + "|#"
+let sprintfloat v = db "F" + let s = v.ToString() in if s.Contains(".") then s else s + ".0"
+let sprint v = v.ToString()
+
 let rec toLispR indent (e:FSharpExpr) :string = 
     let iindent = indent + tab
-    let ndb x = ""
-    let db x = "#| " + x + "|#"
     let nl = "\n" + iindent
     match e with 
     | BasicPatterns.AddressOf(lvalueExpr) -> 
@@ -127,12 +129,21 @@ let rec toLispR indent (e:FSharpExpr) :string =
     | BasicPatterns.Application(funcExpr, typeArgs, argExprs) -> 
         paren <| (toLispR indent funcExpr + db "App" + toLispRs indent argExprs)
     | BasicPatterns.Call(objExprOpt, memberOrFunc, typeArgs1, typeArgs2, argExprs) -> 
-          let typeannot1 = if List.isEmpty typeArgs1 then "" else "@1" + (String.concat "," <| List.map mangleType typeArgs1)
-          let typeannot2 = if List.isEmpty typeArgs2 then "" else "@1" + (String.concat "," <| List.map mangleType typeArgs2)
-          let typeannot = typeannot1 + typeannot2
-          match objExprOpt with
-          | Some e -> paren (strVal memberOrFunc + typeannot + ndb "CS" + " " + paren (toLispR indent e) + " " + toLispRs indent argExprs)
-          | None -> paren ((strVal memberOrFunc) + typeannot + ndb "CN" + " " + (toLispRs indent argExprs))
+        let objName = match objExprOpt with
+                      | Some e ->  paren (toLispR indent e)
+                      | None -> ""
+        match (memberOrFunc.CompiledName) with
+        | "get_Item" -> paren ("index " + toLispR indent argExprs.[0] + " " + objName)
+        | "GetArray" -> paren ("index#|GA|# " + toLispR indent argExprs.[1] + " " + toLispR indent argExprs.[0])
+        // TODO? | "build2" -> paren ("build " + toLispR indent argExprs.[0] + " " + objName)
+        | _ ->  let typeannot' tag (targs : 'a list) = 
+                    let n = targs.Length
+                    if n < 2 then 
+                      ""
+                    else 
+                      "@" + (String.concat "," (targs.[.. n-2] |> List.map mangleType))
+                let typeannot = typeannot' "" typeArgs1 + typeannot' "" typeArgs2
+                paren (strVal memberOrFunc + typeannot + db memberOrFunc + " " + objName + " " + toLispRs indent argExprs)
 
 (*    | BasicPatterns.Coerce(targetType, inpExpr) -> 
         toLispR indent inpExpr
@@ -211,7 +222,7 @@ let rec toLispR indent (e:FSharpExpr) :string =
     // | BasicPatterns.DefaultValue defaultType -> ()
     // | BasicPatterns.ThisValue thisType -> ()
     | BasicPatterns.Const(null, float) -> sprintf "%A" null //How should be handling nulls??
-    | BasicPatterns.Const(v, float) -> db "F" + sprintfloat v
+    | BasicPatterns.Const(v, t) -> if v :? float then sprintfloat v else sprint v
     | BasicPatterns.Const(v, _) -> db "C" + sprintf "%A" v
     | BasicPatterns.Value(v) -> ndb "V" + sprintf "%s" v.DisplayName
     | _ -> sprintf "(**UNRECOGNIZED** %+A)" e

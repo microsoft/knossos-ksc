@@ -51,7 +51,7 @@ An example
   (def f7 ((x : Vec Float) (y : Vec Float))
        (assert (== (size(x)) (size(y)))
          (sum (build (size x)
-                     (lam i (* (index i x)
+                     (lam i (mul (index i x)
                                (index i y)
    ))))))
 
@@ -364,9 +364,9 @@ test_Parser =
   hspec $ do
     describe "Parser" $ do
       test pExpr "(f 1)" "f( 1 )" ;
-      test pExpr "(if (f 1 2 3) (let (v (+ 2 3)) (* v 7)) 0.7)" $
+      test pExpr "(if (f 1 2 3) (let (v (+ 2 3)) (mul v 7)) 0.7)" $
                     "if f( 1, 2, 3 )\nthen let { v = 2 + 3 }\n     v * 7\nelse 0.7"
-      test pDef "(def f ((x : Integer)) (lam (y : Float) (+ x y)))" $
+      test pDef "(def f ((x : Integer)) (lam (y : Float) (add x y)))" $
                 "def f((x : Integer)) = (lam (y : Float)  x + y)" ;
   where test p src expected = it src $ (toStr p src) `shouldBe` (show expected)
 -}

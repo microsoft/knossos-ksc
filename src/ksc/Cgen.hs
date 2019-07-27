@@ -524,19 +524,8 @@ mangleFun = substitute $ \case
 cgenFunId :: FunId -> String
 cgenFunId = \case
   UserFun fun -> mangleFun fun
-  PrimFun fun -> translateFun fun
+  PrimFun fun -> fun
   SelFun i _  -> "ks_get<" ++ show (i - 1) ++ ">"  -- TODO: rename to ks::get
- where
-  translateFun :: String -> String
-  translateFun = \case
-    "*"  -> "mul"
-    "+"  -> "add"
-    "/"  -> "div"
-    "-"  -> "sub"
-    "==" -> "eq"
-    "<"  -> "lt"
-    ">"  -> "gt"
-    s    -> s
 
 cgenUserFun :: HasCallStack => Fun -> String
 cgenUserFun f = case f of
@@ -647,10 +636,10 @@ pattern VecR <- TypeVec _ TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "-"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun "+"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun "/"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun "*"       , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "sub"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "add"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "div"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "mul"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "to_float", [CType TypeInteger] ) -> LMZero TypeInteger TypeFloat
   (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
   (PrimFun "$rand"   , [CType ty]          ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
