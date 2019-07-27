@@ -41,14 +41,14 @@ let tri n = n * (n - 1) /2
 // Create lower triangular matrix from log-diagonal and lower triangle
 let makeQ (q : Vec) (l : Vec) =
     let d = size q
-    build d (fun i -> (build d (fun j ->  // TODO: revert to Mat.init once we can parse it in KSC
+    build2 d d (fun i j ->
         if i < j then
-            0.0
+            Float 0.0
         else if i = j then
             exp q.[i]
         else
             l.[tri (i - 1) + j]
-    )))
+    )
 
 // Negative log likelihood of GMM
 let gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =

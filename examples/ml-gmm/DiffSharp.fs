@@ -8,11 +8,11 @@ let Float (x:float) = D x
 
 let sum = DV.sum
 let expv = DV.Exp
-let max = DV.max
+let maximum = DV.max
 let build p f = DV.init p f 
 let gammaLn a = a //Why?
 let size (x:DV) = x.Length
-let mul (A:DM) (V:DV) = A*V
+let mvmul (A:DM) (V:DV) = A*V
 let sqnorm = DV.L2NormSq
 let build2 m n f = DM.init m n f
 let exp = D.Exp

@@ -28,15 +28,18 @@ let main argv =
     let alphas = rand K 
     let means = Array.init K <| fun _ -> rand D
     let qs = Array.init K (fun _ -> rand D)
-    //let ls = Array.init K (fun _ -> rand (gmm.tri (D - 1)))
     let ls = Array.init K (fun _ -> rand (gmm.tri D))
-    //printfn "Hello %A" (gmm.gmm_objective x alphas means qs ls)
+    printfn "Hello %A" (gmm.gmm_objective x alphas means qs ls)
     
 #if DiffSharp 
 
-    //let alphas' = F2K_DiffSharp.Minimize 100 (Float 0.01) (fun a -> gmm.gmm_objective x a means qs ls) alphas
-    //printfn "Optimized %A" (gmm.gmm_objective x alphas' means qs ls)
+    let alphas' = F2K_DiffSharp.Minimize 100 (Float 0.01) (fun a -> gmm.gmm_objective x a means qs ls) alphas
+    printfn "Optimized %A" (gmm.gmm_objective x alphas' means qs ls)
+
+#else
+
+    printfn "Without diffsharp, no optim."
 
 #endif
 
-    0 
+    0

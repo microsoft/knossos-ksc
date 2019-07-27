@@ -15,6 +15,7 @@ type RNG =
 let Q = id
 let categorical_sample _ _ : int = 0
 
+// TODO: build2 -> Mat.init
 
 let inline size (v: Vector<'T>) = v.Length
 
