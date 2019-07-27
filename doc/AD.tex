@@ -15,6 +15,17 @@
 
 \renewcommand{\arraystretch}{1.2}
 
+% The cateorical language
+\newcommand{\CatLang}{$\mathcal CL$}
+\newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
+\newcommand{\cl}[1]{#1_{cl}}
+\newcommand{\clcomp}{\,\circ\,}   % CL composition
+\newcommand{\ck}[1]{{\mathcal K}(#1)}   % CL constant
+\newcommand{\clet}[3]{{\mathcal L}(#1,#2,#3)}   % CL composition
+\newcommand{\cif}[3]{{\mathcal IF}(#1,#2,#3)}   % CL conditional
+\newcommand{\ctupx}{\rhd}   % CL tuple extension
+\newcommand{\capply}{\diamond}   % CL application
+
 \newcommand{\deriv}{\partial}  % The symbol we use for ``derivative''
    % Was \nabla\!, but mathematicans hate that
 
@@ -1191,6 +1202,83 @@ and so on. The more inlining the better.  If we inline everything we'll elminate
 all intermediate linear maps.
 
 
+\section{Compiling through categories}
+
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+$$
+      \begin{array}{rcll}
+        \multicolumn{4}{l}{\mbox{\bf Atoms}} \\
+        f,g,h & ::= & \multicolumn{2}{l}{\mbox{Function}} \\
+        k & ::= & \multicolumn{2}{l}{\mbox{Literal constants}} \\
+        \multicolumn{4}{l}{\mbox{\bf Terms}} \\
+        \mathit{pgm} & ::= & \mathit{def}_1 \ldots \mathit{def}_n \\
+        \mathit{def} & ::= & f : S \to T = e \\
+        c & ::= & \ck{k} & \mbox{Constant} \\
+          & |   & \sel{i}{n} & \mbox{Selector} \\
+          & |   & c_1 \clcomp c_2  & \mbox{Composition} \\
+          & |   & (c_1,\ldots, c_n) & \mbox{Tuple} \\
+          & |   & \clet{x}{c_r}{c_b} & \mbox{Let} \\
+          & |   & \cif{c_1}{c_2}{c_3} & \mbox{Conditional}
+        \\
+      \end{array}
+$$
+\mbox{\bf Semantics}
+$$
+\begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
+   \ck{k} \capply t & = & k \\
+   \sel{i}{n}\capply (x_1, \ldots, x_n) & = & x_i \\
+   (c_1 \clcomp c_2) \capply t & = & c_1 \; (c_2 \; t) \\
+   (c_1,\ldots, c_n) \capply t & = & (c_1 \capply t,\ldots, c_n \capply t) \\
+   \cif{c_1}{c_2}{c_3}\capply t & = & \lstinline|if|\; (c_1 \capply t) \; (c_2 \capply t)\; (c_3 \capply t) \\
+   \clet{x}{c_r}{c_b} \capply t & = & \lstinline|let|\;\begin{array}[t]{l}
+   x\, = \, c_r\capply t \\
+   \lstinline{in}\; c_b \capply (t \ctupx x)
+   \end{array}
+\end{array}
+$$
+\mbox{\bf Conversion to \CatLang}
+$$
+\begin{array}{l}
+\begin{array}{rcl}
+\Gamma & ::= & (x_1\colon\tau_1, \ldots, x_n\tcolon\tau_n) \\[1mm]
+\end{array} \\
+\begin{array}{rcl}
+\pi((x_1\tcolon\tau_1,\ldots, x_n\tcolon\tau_n),\,x_i) & = & \sel{i}{n} \\
+T(x_1\tcolon\tau_1, \ldots, x_n\tcolon\tau_n) & = & (\tau_1, \ldots, \tau_n) \\
+\end{array}
+\\ \\
+\begin{array}{l}
+  \KC{f(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n) = e}{} \\
+  \quad = \quad \cl{f} = \KC{e}(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n)
+  \end{array} \\ \\
+\begin{array}{rcl}
+\multicolumn{3}{l}{\mbox{If $\Gamma \vdash e:\tau$ then $\KC{e}\Gamma : T(\Gamma) \to \tau$}} \\
+  \KC{k}{\Gamma} & = & \ck{k} \\
+  \KC{x}{\Gamma} & = & \pi(\Gamma,x) \\
+  \KC{f(e)}{\Gamma} & = & \cl{f} \clcomp \KC{e}{\Gamma} \\
+  \KC{\lstinline|if|\;e_1\;e_2\;e_3}{\Gamma} & = & \lstinline|if|\;\begin{array}[t]{l}
+      (\KC{e_1}{\Gamma}) \\ (\KC{e_2}{\Gamma}) \\ (\KC{e_3}{\Gamma}) \end{array} \\
+  \KC{\lambda x.e}{\Gamma} & = & blah
+\end{array}
+\\[1mm]
+\mbox{\bf Pruning} \\
+\begin{array}{rcl}
+  \KC{e}\Gamma & = & \KC{e}{\Gamma'} \clcomp \KC{(v_1,\ldots,v_n)}{\Gamma} \\
+  \multicolumn{3}{l}{\quad \mbox{where}
+    $\begin{array}[t]{rcl}
+        \{v_1, \ldots, v_n\} & = & fv(e) \\
+        \Gamma' & = & (v_1\tcolon\Gamma(v_1), \ldots, v_n\tcolon\Gamma(v_n))
+      \end{array}$} \\
+\end{array}
+\end{array}
+$$
+\end{minipage}}
+\caption{Syntax of \CatLang} \label{fig:cl-syntax}
+\end{figure}
+Hello
+
 \section{Implementation}
 
 The implementation differs from this document as follows:
@@ -1505,6 +1593,9 @@ This looks simpler and more direct to me.
   the solution I adopted was not to have a new language construct, but
   rather to differentiate only $\buildfun(n, \lambda i.e)$.  Any other
   use of $\buildfun$ will fail.}
+
+
+
 \end{document}
 
 do  C( s -o t) -> s -o C(t)
