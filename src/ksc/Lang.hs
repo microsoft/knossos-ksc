@@ -267,10 +267,11 @@ data FunId = UserFun String   -- UserFuns have a Def
                 Int      -- Arity
            deriving( Eq, Ord, Show )
 
-data Fun = Fun      FunId         -- The function              f(x)
+data Fun = Fun      FunId         -- The function f(x)
          | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
+         | CLFun FunId            -- Categorial language version of f
          deriving( Eq, Ord, Show )
 
 isUserFun :: FunId -> Bool
@@ -729,6 +730,7 @@ pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> SDoc
 pprFun (Fun s)                   = ppr s
+pprFun (CLFun s)                 = text "C$" <> ppr s
 pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s

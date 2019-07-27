@@ -1229,7 +1229,7 @@ $$
 \begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
    \ck{k} \capply t & = & k \\
    \sel{i}{n}\capply (x_1, \ldots, x_n) & = & x_i \\
-   (c_1 \clcomp c_2) \capply t & = & c_1 \; (c_2 \; t) \\
+   (c_1 \clcomp c_2) \capply t & = & c_1 \capply (c_2 \capply t) \\
    (c_1,\ldots, c_n) \capply t & = & (c_1 \capply t,\ldots, c_n \capply t) \\
    \cif{c_1}{c_2}{c_3}\capply t & = & \lstinline|if|\; (c_1 \capply t) \; (c_2 \capply t)\; (c_3 \capply t) \\
    \clet{x}{c_r}{c_b} \capply t & = & \lstinline|let|\;\begin{array}[t]{l}
