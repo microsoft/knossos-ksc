@@ -23,7 +23,8 @@ let main argv =
     let TrainingSamples = 100
     let TestingSamples = 20
     let TotalSamples = TrainingSamples + TestingSamples
-    
+    let rng = new System.Random(42)
+
     let RndDna n = Array.init n (fun _ -> rng.Next(4))
 
     let data = Array.init TotalSamples (fun _ -> RndDna DnaSeqLength)
@@ -34,9 +35,8 @@ let main argv =
     let training_labels, testing_labels = Split TrainingSamples labels
 
     let encodeData (D:int[][]) = 
-        Array.init D.[0].Length (fun i -> D |> Array.map (fun x -> x.[i] |> float |> Float) |> MatOfArray D.Length)
-    let encodeLabels (L:int[]) = L |> Array.map (float >> Float) |> MatOfArray L.Length
-    
+        Array.init D.[0].Length (fun i -> D |> Array.map (fun x -> x.[i] |> float |> toFloat) |> Mat_ofArray D.Length)
+    let encodeLabels (L:int[]) = L |> Array.map (float >> toFloat) |> Mat_ofArray L.Length
 
     let net = GRU.init rng 1 1 // size of hidden = 1; size of input = 1
     
@@ -45,11 +45,7 @@ let main argv =
         let Y' = GRU.eval X net'
         Y - Y'
         |> GetRows
-        |> Seq.map sqnorm
-        |> Array.ofSeq
-        |> VecOfArray
-        |> sum
-
+        |> Seq.sumBy sqnorm
 
     let V0 = GRU.Encode net
     let X = encodeData training_data
@@ -59,7 +55,7 @@ let main argv =
 
     let print_predictions (V:Vec) = 
         let net' = GRU.Decode net V
-        let pred = GRU.eval X' net' |> MatToVec
+        let pred = GRU.eval X' net' |> Vec_ofMat
         let ToDna (S:seq<int>) = 
             S 
             |> Seq.map (fun s -> 
@@ -81,7 +77,7 @@ let main argv =
     print_predictions V0
             
     #if DiffSharp 
-    let V' = F2K_DiffSharp.Minimize 100 (Float 0.01) (fun V -> rnn_objective X Y V) V0
+    let V' = F2K_DiffSharp.Minimize 100 (toFloat 0.01) (fun V -> rnn_objective X Y V) V0
     printfn "Before training" 
     printfn "\tTraining loss: %A" (rnn_objective X Y V')
     printfn "\tValidation loss: %A" (rnn_objective X' Y' V')

@@ -23,18 +23,19 @@ let main argv =
                 1.; 0.;
                 1.; 1.;
               |]
-              |> Array.map Float 
-              |> MatOfArray 4
+              |> Array.map toFloat 
+              |> Mat_ofArray 4
 
     let ORy = [|0.
                 1.
                 1.
                 1.
               |]
-              |> Array.map Float 
-              |> MatOfArray 4
+              |> Array.map toFloat 
+              |> Mat_ofArray 4
 
-    
+    let rng = new System.Random()
+
     // 2 inputs, one layer with one neuron
     let net = FFLayer.initNet rng [|2; 1|]
     
@@ -45,8 +46,8 @@ let main argv =
         |> GetRows
         |> Seq.map sqnorm
         |> Array.ofSeq
-        |> VecOfArray
-        |> sum
+        |> Vec_ofArray
+        |> Vec_sum
         
     let V0 = FFLayer.Encode net
         
@@ -54,7 +55,7 @@ let main argv =
             
     #if DiffSharp 
 
-    let V' = F2K_DiffSharp.Minimize 100 (Float 0.01) (fun V -> dnn_objective V) V0
+    let V' = F2K_DiffSharp.Minimize 100 (toFloat 0.01) (fun V -> dnn_objective V) V0
     printfn "After training: loss = %A" (dnn_objective V')
 
     #endif
