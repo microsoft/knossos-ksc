@@ -708,10 +708,9 @@ cppGen outfile defs = do
   return (ksofile, cppfile)
 
 cppGenAndCompile
-  :: (String -> String -> IO String) -> String -> [TDef] -> IO String
-cppGenAndCompile compiler outfile defs = do
+  :: (String -> String -> IO String) -> String -> String -> [TDef] -> IO String
+cppGenAndCompile compiler outfile exefile defs = do
   (_, cppfile) <- cppGen outfile defs
-  let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
   compiler cppfile exefile
@@ -724,9 +723,9 @@ compileWithProfiling =
   compileWithOpts ["-Wl,--no-as-needed,-lprofiler,--as-needed"]
 
 compileWithOpts :: [String] -> String -> String -> String -> IO String
-compileWithOpts opts compiler cppfile exefile = do
+compileWithOpts opts compilername cppfile exefile = do
   let compcmd =
-        ( compiler
+        ( compilername
         , [ "-fmax-errors=5"
           , "-fdiagnostics-color=always"
           , "-Wall"
@@ -747,11 +746,6 @@ compileWithOpts opts compiler cppfile exefile = do
   uncurry readProcessPrintStderr compcmd
   return exefile
 
-cppFG :: String -> String -> [TDef] -> IO String
-cppFG compiler outfile defs = do
-  exefile <- cppGenAndCompile (compile compiler) outfile defs
-  runExe exefile
-
 runExe :: String -> IO String
 runExe exefile = do
   putStrLn "Running"
@@ -771,10 +765,3 @@ readProcessEnvPrintStderr executable args env = do
 readProcessPrintStderr :: FilePath -> [String] -> IO String
 readProcessPrintStderr executable args =
   readProcessEnvPrintStderr executable args Nothing
-
-cppF :: String -> [TDef] -> IO ()
--- String is the file name
-cppF outfile defs = do
-  output <- cppFG "g++-7" outfile defs
-  putStrLn "Done"
-  putStr output

@@ -124,8 +124,8 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
-displayCppGenAndCompile compile verbosity file =
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
+displayCppGenAndCompile compile ext verbosity file =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
   in
   runKM $
@@ -190,21 +190,18 @@ displayCppGenAndCompile compile verbosity file =
   ; displayPassM verbosity "CSE" env5 cse
 
   ; let ann2 =  cse
-  ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
+  ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ("obj/" ++ file ++ ext) ann2)
   }
 
-displayCppGenAndCompileS :: HasCallStack => String -> Maybe Int -> String -> IO String
-displayCppGenAndCompileS compiler = displayCppGenAndCompile (Cgen.compile compiler)
-
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
-displayCppGenCompileAndRun compiler verbosity file = do
-  { exefile <- displayCppGenAndCompileS compiler verbosity file
+displayCppGenCompileAndRun compilername verbosity file = do
+  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file
   ; Cgen.runExe exefile
   }
 
 displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> String -> IO ()
-displayCppGenCompileAndRunWithOutput compiler verbosity file = do
-  { output <- displayCppGenCompileAndRun compiler verbosity file
+displayCppGenCompileAndRunWithOutput compilername verbosity file = do
+  { output <- displayCppGenCompileAndRun compilername verbosity file
   ; putStrLn "Done"
   ; putStr output
   }
@@ -216,19 +213,19 @@ doall :: HasCallStack => Int -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
 
 doallE :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
-doallE compile = displayCppGenAndCompile compile . Just
+doallE compile = displayCppGenAndCompile compile ".obj" . Just
 
 doallC :: HasCallStack => String -> Int -> String -> IO ()
-doallC compiler = displayCppGenCompileAndRunWithOutput compiler . Just
+doallC compilername = displayCppGenCompileAndRunWithOutput compilername . Just
 
 doallG :: HasCallStack => String -> Int -> String -> IO String
-doallG compiler = displayCppGenCompileAndRun compiler . Just
+doallG compilername = displayCppGenCompileAndRun compilername . Just
 
 gmm :: IO ()
 gmm = displayCppGenCompileAndRunWithOutputGpp7 (Just 400) "test/ksc/gmm"
 
 main :: IO ()
-main = gmm
+main = testWindows
 
 hspec :: Spec
 hspec = do
@@ -250,6 +247,13 @@ testWindows = do
   [fsTestKs] <- System.Environment.getArgs
   compileKscPrograms compiler [fsTestKs]
 
+runWindows :: IO ()
+runWindows = do
+  let compiler = "g++"
+  testC compiler
+  [fsTestKs] <- System.Environment.getArgs
+  compileKscPrograms compiler [fsTestKs]
+
 ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do
   let last n xs = drop (length xs - n) xs
@@ -266,14 +270,14 @@ compileKscTestPrograms :: String -> IO ()
 compileKscTestPrograms compiler = compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
 
 compileKscPrograms :: String -> [String] -> IO ()
-compileKscPrograms compiler ksFiles = do
+compileKscPrograms compilername ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
 
   errors <- flip mapM ksFiles $ \ksFile -> do
     let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
     putStrLn $ ">>>>> TEST: " ++ ksFile
-    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing ksTest)
+    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest)
       `Control.Exception.catch` \e -> do
         print (e :: Control.Exception.ErrorCall)
         return (Just ksFile)
@@ -331,7 +335,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) Nothing source
+  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
