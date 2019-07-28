@@ -73,6 +73,12 @@
 (def logsumexp Float ((v : Vec n Float))
     (log (sum (exp$VecR v))))
 
+(edef lgamma Float (Float))
+(edef D$lgamma (LM Float Float) (Float))
+(edef fwd$lgamma Float (Float Float))
+(edef rev$lgamma Float (Float Float))
+(edef Dt$lgamma (Tuple Float (LM Float Float)) (Float))
+
 ; TODO deriv lgamma - but no deriv wishart_m anyway.
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
