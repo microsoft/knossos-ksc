@@ -1,5 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
+{-# LANGUAGE LambdaCase #-}
+
 module Main where
 
 import GHC.Stack
@@ -12,14 +14,14 @@ import Annotate
 import AD
 import Opt
 import CSE
+import qualified Ksc.Futhark
 
 import ANF
 import qualified Cgen
 import KMonad
 import qualified Control.Exception
-import Control.Monad (unless)
 import qualified Data.Maybe
-import Data.List( partition )
+import Data.List( partition, intercalate )
 import qualified System.Directory
 import qualified System.Environment
 import qualified System.FilePath
@@ -82,15 +84,6 @@ demoN verbosity adp decls
        ; (env5, cse_fwd) <- cseDefs rulebase env4 opt_der_fwd
        ; disp "Forward-mode derivative (CSE'd)" env5 cse_fwd
 
-{-
-       ; let trans_grad_defs = gradDefs (AD adp Rev) anf_defs
-             env5      = env1 `extendGblST` trans_grad_defs
-       ; disp "Transposed Jacobian" env5 trans_grad_defs
-
-       ; (env6, opt_trans_grad_defs) <- optDefs rulebase env5 trans_grad_defs
-       ; disp "Optimised transposed Jacobian" env6 opt_trans_grad_defs
--}
-
        ; let der_rev = applyDefs Rev opt_grad_defs
        ; disp "Reverse-mode derivative (unoptimised)" env3 der_rev
 
@@ -109,9 +102,6 @@ displayPassM mverbosity what env decls
        ; lintDefs what env decls
     }
 
-displayPass :: Int -> String -> GblSymTab -> [TDef] -> KM ()
-displayPass = displayPassM . Just
-
 -------------------------------------
 -- GMM derivatives
 -------------------------------------
@@ -124,26 +114,18 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
-displayCppGenAndCompile compile ext verbosity file =
-  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
-  in
-  runKM $
-  do { decls0 <- liftIO (parseF (file ++ ".ks"))
-  ; liftIO $ putStrLn "read decls"
-
-  ; let (main, decls)    = moveMain decls0
-
+defsAndDiffs :: (String -> GblSymTab -> [TDef] -> KM a)
+             -> [Decl]
+             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
+defsAndDiffs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
   ; let rulebase      = mkRuleBase rules
-  ; displayPassM verbosity "Typechecked defs" env defs
-
-  ; dd main
+  ; display "Typechecked defs" env defs
 
   ; let grad_defs = gradDefs BasicAD defs
         env1 = env `extendGblST` grad_defs
-  ; displayPassM verbosity "Grad" env1 grad_defs
+  ; display "Grad" env1 grad_defs
 
   -- We generate grad_defs_tupled even though we do not use it yet.
   -- We do not use it because
@@ -153,33 +135,34 @@ displayCppGenAndCompile compile ext verbosity file =
   -- 2. lmApplys are deliberately not removed in reverse mode but we
   -- don't yet implement the necessary LM constructors in C++.
   --
-  -- Nonetheless, it's good to generated optgrad_tupled here so that
+  -- Nonetheless, it's good to generate optgrad_tupled here so that
   -- the tests will run on it and we can be sure it typechecks.
   ; let grad_defs_tupled = gradDefs TupleAD defs
         env15 = env1 `extendGblST` grad_defs_tupled
-  ; displayPassM verbosity "Grad tupled" env15 grad_defs_tupled
+  ; display "Grad tupled" env15 grad_defs_tupled
 
   ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
-  ; displayPassM verbosity "Optgrad" env2 optgrad
+  ; display "Optgrad" env2 optgrad
 
   ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
-  ; displayPassM verbosity "Optgrad tupled" env25 optgrad_tupled
+  ; display "Optgrad tupled" env25 optgrad_tupled
 
   ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
-  ; displayPassM verbosity "Diffs" env25 diffs
+  ; display "Diffs" env25 diffs
 
   ; (env3, optdiffs) <- optDefs rulebase env25 diffs
-  ; displayPassM verbosity "OptDiffs" env3 optdiffs
-
-  ; (env4, ann_main) <- annotDecls env3 main
-
-  ; let (_rules, main_tdef) = partitionDecls ann_main
+  ; display "OptDiffs" env3 optdiffs
 
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; let alldefs = defs ++ optdiffs ++ main_tdef
+  ; return (env3, defs, optdiffs, rulebase)
+  }
 
+anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)
+             -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
+anfOptAndCse display rulebase env4 alldefs =
+  do {
   -- We use ANF to expose optimisation opportunities and use optDefs
   -- to take them.  See Note [Inline tuples] for the motiviation for
   -- doing ANF-then-optDefs.
@@ -187,7 +170,33 @@ displayCppGenAndCompile compile ext verbosity file =
   ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
 
   ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
-  ; displayPassM verbosity "CSE" env5 cse
+  ; display "CSE" env5 cse
+
+  ; return cse
+  }
+
+
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
+displayCppGenAndCompile compile ext verbosity file =
+  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
+      display = displayPassM verbosity
+  in
+  runKM $
+  do { decls0 <- liftIO (parseF (file ++ ".ks"))
+  ; liftIO $ putStrLn "read decls"
+
+  ; let (main, decls)    = moveMain decls0
+  ; dd main
+
+  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
+
+  ; (env4, ann_main) <- annotDecls env3 main
+
+  ; let (_rules, main_tdef) = partitionDecls ann_main
+
+  ; let alldefs = defs ++ optdiffs ++ main_tdef
+
+  ; cse <- anfOptAndCse display rulebase env4 alldefs
 
   ; let ann2 =  cse
   ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ("obj/" ++ file ++ ext) ann2)
@@ -212,26 +221,17 @@ displayCppGenCompileAndRunWithOutputGpp7 = displayCppGenCompileAndRunWithOutput 
 doall :: HasCallStack => Int -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
 
-doallE :: HasCallStack => (String -> String -> IO String) -> Int -> String -> IO String
-doallE compile = displayCppGenAndCompile compile ".obj" . Just
-
 doallC :: HasCallStack => String -> Int -> String -> IO ()
 doallC compilername = displayCppGenCompileAndRunWithOutput compilername . Just
-
-doallG :: HasCallStack => String -> Int -> String -> IO String
-doallG compilername = displayCppGenCompileAndRun compilername . Just
-
-gmm :: IO ()
-gmm = displayCppGenCompileAndRunWithOutputGpp7 (Just 400) "test/ksc/gmm"
-
-main :: IO ()
-main = testWindows
 
 hspec :: Spec
 hspec = do
     Opt.hspec
     Lang.hspec
     LangUtils.hspec
+
+main :: IO ()
+main = test
 
 test :: IO ()
 test = do
@@ -266,9 +266,6 @@ ksTestFiles testDir = do
              . filter ((== ".ks") . last 3))
             (System.Directory.listDirectory testDir)
 
-compileKscTestPrograms :: String -> IO ()
-compileKscTestPrograms compiler = compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
-
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
@@ -286,10 +283,8 @@ compileKscPrograms compilername ksFiles = do
     []     -> return ()
     errors -> error ("Had errors in:\n" ++ unlines errors)
 
-demoFOnTestPrograms :: IO ()
-demoFOnTestPrograms = do
-  ksTests <- ksTestFiles "test/ksc/"
-
+demoFOnTestPrograms :: [String] -> IO ()
+demoFOnTestPrograms ksTests = do
   putStrLn ("Testing " ++ show ksTests)
 
   errors <- flip mapM ksTests $ \ksTest -> do
@@ -305,31 +300,44 @@ demoFOnTestPrograms = do
     []     -> return ()
     errors -> error ("Had errors in:\n" ++ unlines (map show errors))
 
-testGMM :: String -> IO ()
-testGMM compiler = do
-  output <- displayCppGenCompileAndRun compiler Nothing "test/ksc/gmm"
+testRunKS :: String -> String -> IO ()
+testRunKS compiler ksFile = do
+  let ksTest = System.FilePath.dropExtension ksFile
+  output <- displayCppGenCompileAndRun compiler Nothing ksTest
 
-  let success = case reverse (lines output) of
-        notImpossiblyGoodS:_:everythingWorksAsExpectedS:_:everythingWorksAsExpectedReverseS:_:goldenGMMS:_ ->
-          let boolOfIntString s = case s of
+  let "TESTS FOLLOW":testResults = dropWhile (/= "TESTS FOLLOW") (lines output)
+
+      groupedTestResults = group testResults
+        where group = \case
+                "----":testName:"----":testResult:rest ->
+                  (testName, boolOfIntString testResult):group rest
+                [] -> []
+                _ -> error "Unexpected test result structure"
+
+              boolOfIntString = \case
                 "0" -> False
                 "1" -> True
-                _   -> error ("boolOfIntString: Unexpected " ++ s)
+                s   -> error ("boolOfIntString: Unexpected " ++ s)
 
-          in all boolOfIntString [ goldenGMMS
-                                 , everythingWorksAsExpectedReverseS
-                                 , everythingWorksAsExpectedS
-                                 , notImpossiblyGoodS ]
-        _ -> False
+      failed   = not . snd
+      failures = map fst (filter failed groupedTestResults)
 
-  unless success (error ("FAILURE!" ++ unlines (reverse (take 5 (reverse (lines output))))))
+  case failures of
+    []  -> putStrLn ("All "
+                     ++ show (length groupedTestResults)
+                     ++ " tests passed: "
+                     ++ intercalate ", " (map fst groupedTestResults))
+    _:_ -> do
+      putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
+      error ("These tests failed:\n" ++ unlines failures)
 
 testC :: String -> IO ()
 testC compiler = do
   runSpec Main.hspec defaultConfig
-  demoFOnTestPrograms
-  compileKscTestPrograms compiler
-  testGMM compiler
+  demoFOnTestPrograms =<< ksTestFiles "test/ksc/"
+  compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
+  testRunKS compiler "test/ksc/gmm.ks"
+  testRunKS compiler "test/ksc/fold.ks"
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
@@ -358,3 +366,45 @@ profile :: IO ()
 profile = do
   [source, proffile, proffunctions, proflines] <- System.Environment.getArgs
   profileArgs source proffile proffunctions proflines
+
+-------------------------------------
+-- The Futhark driver
+-------------------------------------
+futharkPipeline :: FilePath -> KM [TDef]
+futharkPipeline file
+  = do
+  { let display _ _ _ = return ()
+
+  ; decls0 <- liftIO (parseF (file ++ ".ks"))
+
+  ; let (_main, decls)    = moveMain decls0
+
+  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
+
+  ; let env4 = env3
+
+  ; let alldefs = defs ++ optdiffs
+
+  ; anfOptAndCse display rulebase env4 alldefs
+  }
+
+-- | Read source code from specified input file, optimise,
+-- differentiate, optimise, and write result to corresponding @.fut@
+-- file.  You will have to run the Futhark compiler yourself
+-- afterwards (and probably write a small wrapper program, because
+-- currently the generated file will not have any entry points).
+--
+-- Usage:
+--
+-- @
+-- $ ghci -isrc/ksc -e 'genFuthark "test/ksc/gmm"' src/ksc/Main.hs
+-- @
+genFuthark :: FilePath -> IO ()
+genFuthark file = do
+  prelude <- readFile "src/runtime/knossos.fut"
+  defs <- runKM $ futharkPipeline file
+  putStrLn $ "Writing to " ++ futfile
+  Cgen.createDirectoryWriteFile futfile $
+    intercalate "\n\n" $
+    prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
+  where futfile = "obj/" ++ file ++ ".fut"

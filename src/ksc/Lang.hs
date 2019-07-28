@@ -201,6 +201,11 @@ eqType (TypeTuple tys1) (TypeTuple tys2) =
 eqType (TypeLM s1 t1) (TypeLM s2 t2) = eqType s1 s2 && eqType t1 t2
 eqType t1 t2 = t1 == t2
 
+eqTypes :: Type -> [Type] -> Maybe Type
+eqTypes x xs = if all (eqType x) xs
+               then Just x
+               else Nothing
+
 eqSize :: TExpr -> TExpr -> Bool
 eqSize (Konst k1) (Konst k2) = traceWhenUnequal "eqSize" k1 k2 $ k1 == k2
 -- eqSize (Var v1) (Var v2) = traceWhenUnequal "eqSize" v1 v2 $ v1 == v2

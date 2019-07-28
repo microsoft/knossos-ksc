@@ -6,6 +6,20 @@ cabal-version:   >= 1.18
 executable ksc
   default-language: Haskell2010
   main-is: Main.hs
+  other-modules: AD
+                 ANF
+                 Annotate
+                 CSE
+                 Cgen
+                 KMonad
+                 Ksc.Futhark
+                 Lang
+                 LangUtils
+                 Opt
+                 OptLet
+                 Parse
+                 Prim
+                 Rules
   hs-source-dirs: src/ksc
   build-depends: base >= 4.9,
                  pretty >= 1.1,

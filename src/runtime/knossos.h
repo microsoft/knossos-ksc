@@ -612,6 +612,66 @@ namespace ks
 		return ret;
 	}
 
+	template <class T, class F, class A>
+        A fold(F f, A z, vec<T> v)
+	{
+          A acc = z;
+
+          for (int i = 0; i < v.size(); i++) {
+            acc = f(tuple(acc, v[i]));
+          }
+
+          return acc;
+	}
+
+        template <class F, class F_, class A, class T, class S, class dA, class dT>
+        tuple<S, vec<dT>, dA> RFold_recursive(const dT &dummy, S s_zero, F f, F_ f_, int i, vec<T> v, A acc, dA dr) {
+          if (i == v.size()) {
+            return tuple(s_zero, vec<dT>(v.size()), dr);
+          } else {
+            tuple<S, vec<dT>, dA> RFold_call =
+              RFold_recursive(dummy, s_zero, f, f_, i + 1, v, f(tuple(acc, v[i])), dr);
+
+            S       RFold_call_dS    = std::get<0>(RFold_call);
+            vec<dT> RFold_call_v     = std::get<1>(RFold_call);
+            dA      RFold_call_dacc  = std::get<2>(RFold_call);
+
+            tuple<S, tuple<dA, dT>> f_call = f_(tuple(tuple(acc, v[i]), RFold_call_dacc));
+
+            S  f_call_dS   = std::get<0>(f_call);
+            dA f_call_dacc = std::get<0>(std::get<1>(f_call));
+            dT f_call_dT   = std::get<1>(std::get<1>(f_call));
+
+            RFold_call_v[i] = f_call_dT;
+
+            return tuple(add(RFold_call_dS, f_call_dS),
+                         RFold_call_v,
+                         f_call_dacc);
+          }
+        }
+
+        template <class T, class F, class F_, class A, class S, class dA, class dT>
+          tuple<S, tuple<dA, vec<dT>>> RFold(const dT &dummy, S s_zero, F f, F_ f_, A acc, vec<T> v, dA dr) {
+          tuple<S, vec<dT>, dA> ret = RFold_recursive(dummy, s_zero, f, f_, 0, v, acc, dr);
+          return tuple(std::get<0>(ret), tuple(std::get<2>(ret), std::get<1>(ret)));
+        }
+
+        // Probably should implement this as a loop
+        template <class T, class F, class F_, class A, class dA, class dT>
+        dA FFold_recursive(int i, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
+          if (i == v.size()) {
+            return dacc;
+          } else {
+            dA fwd_f = f_(tuple(tuple(acc, v[i]), tuple(dacc, dv[i])));
+            return FFold_recursive(i + 1, f, f(tuple(acc, v[i])), v, f_, fwd_f, dv);
+          }
+        }
+
+        template <class T, class F, class F_, class A, class dA, class dT>
+        dA FFold(F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
+          return FFold_recursive(0, f, acc, v, f_, dacc, dv);
+        }
+
 	// specialize zero(vec<T>)
 	template <class T>
 	vec<T> zero(vec<T> const& val)
@@ -723,6 +783,18 @@ namespace ks
 			else
 			  ret[j] = val;
 		return ret;
+	}
+
+	vec<double> constVec(int n, double val)
+	{
+          if (val == 0.0) {
+            return vec(zero_tag, 0.0, n);
+          } else {
+		vec<double> ret(n);
+		for(int j = 0; j < n; ++j)
+			ret[j] = val;
+		return ret;
+          }
 	}
 
 	template <class T>

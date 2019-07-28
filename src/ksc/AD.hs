@@ -1,6 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 module AD where
 
@@ -119,6 +120,10 @@ gradE adp s (Call f [n, body])
   | f `isThePrimFun` "sumbuild"
   = gradE adp s (pSum (pBuild n body))
 
+gradE adp s (Call f [Lam ti body, acc, v])
+  | f `isThePrimFun` "fold"
+  = gradFold adp s ti body acc v
+
 gradE adp s (Call f args) = gradCall adp s f args
 
 ---------------
@@ -140,6 +145,43 @@ gradBuild TupleAD s n ti body
      grad_body = mkLet (gradTVar TupleAD s ti)
                        (Tuple [Var ti, lmZero s (typeof ti)]) $
                  gradE TupleAD s body
+---------------
+gradFold :: ADPlan -> Type -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
+gradFold BasicAD s ti body acc v =
+  lmFold (mkZero (tangentType s)) (Lam ti body) (Lam ti bodyAdjusted) acc v
+  `lmCompose`
+  args
+  where body' = mkLet (gradTVar BasicAD ty' ti)
+                      (lmHCat [lmZero s (typeof ti), lmOne (typeof ti)])
+                $ gradE BasicAD ty' body
+        ty' = TypeTuple [s, typeof ti]
+
+        -- The gradded free variables occurring in `body'` are linear
+        -- maps whose domain is `ty'` (because they were created with
+        -- a call of `gradE Basic AD ty'`). However, they were bound
+        -- outside body in such a way that their domain is `s`.  Thus
+        -- we reassign them here.  All we need to do is project from
+        -- `ty` = `(s, typeof ti)` to `s`, which is a simple `HCat` of
+        -- an `lmOne` (on `s`) and an `lmZero` (on `ti`).
+        --
+        -- NB the gradded free variables occurring in `body'` are the
+        -- gradded versions of all free variables occurring in
+        -- `\ti.body`.
+        bodyAdjusted = foldr adjustGrad body' (freeVarsOf (Lam ti body))
+          where
+            adjustGrad v = mkLet (grad ty' v) (adjust (grad s v))
+            grad = gradTVar BasicAD
+            adjust v = Var v `lmCompose` lmHCat [lmOne s, lmZero (typeof ti) s]
+
+        args = lmVCat
+               [ lmOne s
+               , lmVCat (map (gradE BasicAD s) [acc, v]) ]
+
+-- Just a dummy for tuple mode.  We don't calculate it properly yet.
+gradFold TupleAD s _ti _body acc _v =
+  lmDummyFold (TypeTuple [t_acc, TypeLM s t_acc])
+  where t_acc = typeof acc
+
 ---------------
 gradCall :: ADPlan -> Type -> TFun -> [TExpr] -> TExpr
 gradCall BasicAD s f args

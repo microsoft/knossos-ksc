@@ -10,32 +10,31 @@ benefits.
 ### Installing
 
 #### Ubuntu
-<pre>
+```sh
+# You must ensure you have ghc version >= 8.4 and cabal version >= 2.0
 sudo apt install ghc cabal-install
-cabal update
-cabal install hspec parsec mtl hashable filepath
+cabal v2-update
 git clone <knossos repo>
 cd ksc
-</pre>
+```
 
 #### Windows
 Install [Chocolatey](https://chocolatey.org/), then:
-<pre>
+```cmd
 choco install ghc --version 8.4.4 -y
-cabal update
-cabal install hspec parsec mtl hashable filepath
+cabal v2-update
 choco install mingw --version 7.3.0 -y
 refreshenv
 git clone <knossos repo>
 cd ksc
-</pre>
+```
 
 ### Running
 
 Start ghci in this folder:
 
 <pre>
-$ <b>ghci -isrc/ksc</b>
+$ <b>cabal v2-repl --ghc-option=-Wwarn</b>
 GHCi, version 8.0.2: http://www.haskell.org/ghc/  :? for help
 Prelude> :l src/ksc/Main
 [ 1 of 14] Compiling KMonad           ( src/ksc/KMonad.hs, interpreted )

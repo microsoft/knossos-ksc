@@ -776,6 +776,15 @@ understand this better.
   but firstly it's very cool and secondly it's Conal, so I want it to
   be true and I still hope it is.}
 
+\tom{Now some time has passed I think I can justify why the difference
+  between forward and reverse modes cannot simply be the order of
+  association.  In the case of only two functions, say $f$ and $g$,
+  there is no difference between the ``left'' and ``right''
+  associations their composition: they are both just \(f \circ g\).
+  Yet we do expect there to be a difference between the forward and
+  reverse mode \emph{derivatives} of the composition.  Therefore there
+  must be more to it than the order of composition.}
+
 \section{AD for vectors} \label{sec:ad-vectors}
 
 Like other built-in functions, each built-in function for vectors
@@ -1200,6 +1209,140 @@ The implementation differs from this document as follows:
   \end{lstlisting}
 \end{itemize}
 
+\section{Fold}
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+      {\bf Typing rules for fold} \\
+\[
+ \begin{array}{rcl}
+   t & : & (a, b) \\
+   e & : & a \\
+   acc & : & a \\
+   v & : & \mathrm{Vec} \,\, b \\
+   \mathrm{fold} \,\, (\lambda t . e) \,\, acc \,\, v & : & a
+ \end{array}
+\]
+      {\bf Typing rules for lmFold} \\
+\[
+ \begin{array}{rcl}
+   t & : & (a, b) \\
+   e & : & a \\
+   e' & : & (s, (a, b)) \linto a \\
+   acc & : & a \\
+   v & : & \mathrm{Vec} \,\, b \\
+   \mathrm{lmFold} \,\, (\lambda t . e) \,\, (\lambda t . e') \,\, acc \,\, v & : &
+       (s, (a, \mathrm{Vec} \,\, b)) \linto a
+ \end{array}
+ \]
+      {\bf Typing rules for FFold and RFold} \\
+\[
+ \begin{array}{rcl}
+   t & : & (a, b) \\
+   t_{dr} & : & ((a, b), \tangent a) \\
+   t_{dt} & : & ((a, b), (\tangent a, \tangent b)) \\
+   e & : & a \\
+   e_{dr} & : & (\tangent s, (\tangent a, \tangent b)) \\
+   e_{dt} & : & \tangent a \\
+   acc & : & a \\
+   v & : & \mathrm{Vec} \,\, b \\
+   dr & : & \tangent a \\
+   d_{acc} & : & \tangent a \\
+   d_v & : & \mathrm{Vec} \,\, \tangent b \\
+   \mathrm{FFold} \,\, (\lambda t . e) \,\, acc \,\, v \,\,
+                       (\lambda t_{dt} . e_{dt}) \,\, d_{acc} \,\, d_v & : &
+       \tangent a \\
+   \mathrm{RFold} \,\, (\lambda t . e) \,\, (\lambda t_{dr} . e_{dr}) \,\, acc \,\, v \,\, dr & : &
+       (\tangent s, (\tangent a, \mathrm{Vec} \,\, \tangent b)) \\
+ \end{array}
+\]
+  \end{minipage}}
+  \caption{Rules for fold}
+\end{figure*}
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+      {\bf Differentiation of fold}
+
+      \newcommand{\gradS}[2]{\nabla_{#1}\lb #2 \rb}
+      \newcommand{\gradV}[1]{\nabla#1}
+
+      \begin{center}
+        If $e : T$ then $\gradS{s}{e} : s \linto T$
+      \end{center}
+\[
+      \begin{array}{rcll}
+        \gradS{s}{\mathrm{fold} \,\, (\lambda t . e) \,\, acc \,\, v} & = &
+        \mathrm{lmFold} \,\, (\lambda t . e) \,\, (\lambda t . e') \,\, acc \,\, v \lmcomp p\\
+        \textrm{where} \,\, p & : & s \linto (s, (a, \mathrm{Vec} \,\, b)) \\
+        p & = & \lmone_s \lmvcat (\gradS{s}{acc} \lmvcat \gradS{s}{v}) \\
+        e' & = & \textrm{let} \,\, \gradV{x} = \gradV{x} \lmcomp (\lmone_s \lmhcat \lmzero_s^{(a,b)}) \\
+        & & \ldots \,\, \textrm{for each \(x\) ocurring free in \(\lambda t.e\)} \\
+        & & \textrm{let} \,\, \gradV{t} = \lmzero_{(a,b)}^s \lmhcat \lmone_{(a,b)} \\
+        & & \textrm{in} \,\, \gradS{(s, (a, b))}{e} \\
+      \end{array}
+      \]
+\\
+      {\bf Applying an lmFold}
+\[
+      \begin{array}{rcll}
+        \mathrm{lmFold} \,\, (\lambda t . e) \,\, (\lambda t . e') \,\, acc \,\, v \lmapply dx
+        & =
+        & \mathrm{FFold} \,\, (\lambda t . e) \,\, acc \,\, v \,\,
+              (\lambda t_{dt} . e_{dt}) \,\, d_{acc} \,\, d_v
+        \\
+        \textrm{where} \,\, e_{dt} & = & \textrm{let} \,\, t = \fst{t_{dt}} \\
+        & & \textrm{let} \,\, dt = \snd{t_{dt}} \\
+        & & \textrm{in} \,\, e' \lmapply (ds, dt) \\
+        ds & = & \fst{dx} \\
+        d_{acc} & = & \fst{\snd{dx}} \\
+        d_{v} & = & \snd{\snd{dx}} \\
+        \\
+        dx \lmapplyR \mathrm{lmFold} \,\, (\lambda t . e) \,\, (\lambda t . e') \,\, acc \,\, v
+        & =
+        & \mathrm{RFold} \,\, (\lambda t . e) \,\, (\lambda t_{dr} . e_{dr}) \,\, acc \,\, v \,\, dx
+        \\
+        \textrm{where} \,\, e_{dr} & = & \textrm{let} \,\, t = \fst{t_{dr}} \\
+        & & \textrm{let} \,\, dr = \snd{t_{dr}} \\
+        & & \textrm{in} \,\, dr \lmapplyR e' \\
+      \end{array}
+      \]
+\end{minipage}}
+\caption{Rules for fold}
+\end{figure*}
+
+\begin{figure*}
+\begin{verbatim}
+def FFold dA ((f  : F)  (acc  : A)  (v  : Vec n B)
+              (f_ : F_) (dacc : dA) (dv : Vec n dB))
+  = FFold_recursive(0, f, acc, v f_, dacc, dv)
+
+def FFold_recursive dA ((i : Integer) (f  : F)  (acc  : A)  (v  : Vec n B)
+                                      (f_ : F_) (dacc : dA) (dv : Vec n dB))
+  = if i == n
+    then dacc
+    else let fwd_f = f_((acc, v[i]), (dacc, dv[i]))
+         in FFold_recursive(i + 1, f, f(acc, v[i]), v, f_, fwd_f, dv)
+\end{verbatim}
+\caption{Forward mode derivative for fold}
+\end{figure*}
+
+\begin{figure*}
+\begin{verbatim}
+def RFold (S, (dA, Vec n dB)) ((f : F) (f_ : F_) (acc : A) (v : Vec n B) (dr : dA))
+  = let (ds, dv, da) = RFold_recursive(f, f_, 0, v, acc, dr)
+    in (s, (da, dv))
+
+def RFold_recursive (S, Vec n dB, dA) ((f : F) (f_ : F_) (i : Integer) (v : Vec n B)
+                                       (acc : A) (dr : dA))
+  = if i == n
+    then (0, 0, dr)
+    else let (r_ds, r_dv, r_dacc) = RFold_recursive(f, f_, i + 1, v, f(acc, v[i]), dr)
+             (f_ds, (f_dacc, f_db)) = f_((acc, v[i]), r_dacc)
+         in (r_ds + f_ds, r_dv + deltaVec(i, f_db), f_dacc)
+\end{verbatim}
+\caption{Reverse mode derivative for fold}
+\end{figure*}
 \section{Demo}
 
 You can run the prototype by saying {\tt ghci Main}.
