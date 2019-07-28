@@ -3,9 +3,6 @@
 .vscode/
 .ionide/
 
-# autodiff, could also be a submodule
-/autodiff/
-
 # Prerequisites
 *.d
 
@@ -17,12 +14,12 @@
 obj/
 Debug/
 Release/
-cmake-build/
 
 # nuget packages
 /packages/
 
 # cabal
+/dist/
 /dist-newstyle/
 .ghc.environment.*
 
@@ -89,5 +86,3 @@ users/simonpj/AD.pdf
 *.synctex(busy)
 *.synctex.gz
 *.xcp
-users/simonpj/obj/
-autodiff
