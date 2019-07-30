@@ -10,6 +10,6 @@ if (test-path $out) {
 		throw "Output file $out exists, not deleting.  Call with '-del' to force delete."
 	}
 }
-Set-Location src\f2k
-dotnet run f2k "..\..\$out" ($args | % { "../../$_" })
-Set-Location ../..
+$dir = split-path $PSCommandPath
+$proj = "$dir/src/f2k/f2k.fsproj"
+dotnet run --project $proj $proj $out $args

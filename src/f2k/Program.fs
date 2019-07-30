@@ -64,11 +64,10 @@ let parseAndCheckFiles files =
                                    yield "--fullpaths" 
                                    yield "--flaterrors" 
                                    yield "--target:library"
-                               
-                                   //This is effective a stub library. We should also check the files exist
-                                   yield "Util.fs"
-                                   yield "Vector.fs"
-                                   yield "Knossos.fs"
+
+                                   yield exeDirectory ++ "Util.fs"
+                                   yield exeDirectory ++ "Vector.fs"
+                                   yield exeDirectory ++ "Knossos.fs"
 
                                    yield! files
                                    let references =
@@ -98,6 +97,7 @@ let main argv =
         printfn "usage: f2k outfile infiles"
         exit 1
     
+    let exe = argv.[0]
     let outFile = argv.[1]
     let files = argv.[2..]
 
