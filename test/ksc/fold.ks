@@ -3,22 +3,22 @@
 
 (def fold_f Float ((env : Float) (i : Integer) (v : Vec n Float) (acc : Float))
      (if
-         (== i n)
+         (eq i n)
          acc
-       (fold_f env (+ i 1) v (f (tuple env (tuple acc (index i v)))))))
+       (fold_f env (add i 1) v (f (tuple env (tuple acc (index i v)))))))
 
 (def prod Float ((i : Integer) (v : Vec n Float) (acc : Float))
      (if
-         (== i n)
+         (eq i n)
          acc
-       (prod (+ i 1) v (* acc (index i v)))))
+       (prod (add i 1) v (mul acc (index i v)))))
 
 ; This ends up calculating prod(v) * pow(closure, size(v))
 (def prod_fold Float ((v : Vec n Float) (closure : Float))
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (* (* acc x) closure)))
+                  (mul (mul acc x) closure)))
            1.0
            v))
 
@@ -28,7 +28,7 @@
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (* acc x)))
+                  (mul acc x)))
            1.0
            v))
 
@@ -54,35 +54,35 @@
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
-       (* ($ranhashdoub seed) scale))
+       (mul ($ranhashdoub seed) scale))
 
 (def mkvec (Vec n Float) ((seed  : Integer)
                           (n     : Integer)
                           (scale : Float))
-    (build n (lam (j : Integer) (mkfloat (+ j seed) scale))))
+    (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
 
 (def main Integer ()
      (let ((seed 20000)
            (delta 0.0001)
-           (v  (mkvec   (+ seed 0)    10 1.0))
-           (c  (mkfloat (+ seed 1000)    1.0))
-           (dv (mkvec   (+ seed 2000) 10 delta))
-           (dc (mkfloat (+ seed 3000)    delta))
+           (v  (mkvec   (add seed 0)    10 1.0))
+           (c  (mkfloat (add seed 1000)    1.0))
+           (dv (mkvec   (add seed 2000) 10 delta))
+           (dc (mkfloat (add seed 3000)    delta))
            (checked ($check prod_fold rev$prod_fold
                             (tuple v  c)
                             (tuple dv dc)
                             1.0))
            (rev_ok (< (abs checked) 0.001))
            (fold_x   (prod_fold v c))
-           (fold_xpd (prod_fold (+ v dv) (+ c dc)))
+           (fold_xpd (prod_fold (add v dv) (add c dc)))
            (fold_fwd (fwd$prod_fold v c dv dc))
-           (fold_fd  (- fold_xpd fold_x))
+           (fold_fd  (sub fold_xpd fold_x))
            (everything_works_as_expected
             (let ((tolerance 0.001)
                   (actual fold_fd)
                   (expected fold_fwd))
-              (< (abs (- actual expected))
-                      (* (+ (abs expected) (abs actual))
+              (< (abs (sub actual expected))
+                      (mul (add (abs expected) (abs actual))
                          tolerance)))))
        (pr
         "v"
@@ -102,7 +102,7 @@
         "fd fold"
         fold_fd
         "fwd - fd"
-        (- fold_fwd fold_fd)
+        (sub fold_fwd fold_fd)
         "rev fold"
         (rev$prod_fold v c 1.0)
         "checked (should be small)"
