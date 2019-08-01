@@ -212,6 +212,17 @@ optFun _ (UserFun {}) _
 -----------------------
 optPrimFun :: InScopeSet -> PrimFun -> [TExpr] -> Maybe TExpr
 
+-- Constant folding.  
+-- TODO: match precision to target machine
+optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
+  = Just . Konst . KFloat $ 
+    case op of
+      "mul" -> k1 * k2
+      "sub" -> k1 - k2
+      "add" -> k1 + k2
+      "div" -> k1 / k2
+      s -> error ("Failed constant folding [" ++ s ++ "]")
+ 
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type
 -- We use () as the tangent type for non-differentiatable types
