@@ -15,7 +15,7 @@
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (* acc x)))
+                  (mul acc x)))
            1.0
            v))
 
@@ -47,7 +47,7 @@
 
       "fp="
        (build N (lam (n : Integer) 0.0
-;                  (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
+;                  (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
 ;                      ($BENCH (lam (_ : (Tuple)) (fprod v))))))
                      ))
       "\n# C++ currently seems to optimize this to a constant at -O3"
@@ -68,7 +68,7 @@
 
       "rfp="
       (build N (lam (n : Integer)
-                  (let (v (build (index n ns) (lam (i : Integer) (+ ($ranhashdoub i) 0.5))))
+                  (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
                       ($BENCH (lam (_ : (Tuple)) (fchomp (rev$fprod v 1.0)))))))
 
       "\n"

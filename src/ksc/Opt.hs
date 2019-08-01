@@ -872,12 +872,13 @@ hspec = do
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat
             f2 = kTFloat 2.0
+            f4 = kTFloat 4.0
             l2 = lmScale TypeFloat f2
         in
             optE emptyOptEnv
                  (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
-            lmHCat [lmAdd l1 l2, lmScale TypeFloat (pAdd f2 f2)]
+            lmHCat [lmAdd l1 l2, lmScale TypeFloat f4]
 
 test_opt:: IO ()
 test_opt = Test.Hspec.hspec Opt.hspec
