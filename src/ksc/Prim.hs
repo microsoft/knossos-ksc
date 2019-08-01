@@ -88,9 +88,6 @@ mk_fun f = case find_dollar f of
 --  Building simple calls
 --------------------------------------------
 
--- lmZero might look as if it should take a Type and cons up a dummy of that type,
--- but types such as Vec need constructor arguments such as size,
--- so are consed from a template
 lmZero :: Type -> Type -> TExpr
 lmZero s t = mkPrimCall2 "lmZero" (mkDummy s) (mkDummy t)
 
@@ -575,11 +572,16 @@ primFunCallResultTy_maybe fun args
       ("ne"       , _                                      ) -> Just TypeBool
       ("lt"        , _                                     ) -> Just TypeBool
       ("gt"        , _                                     ) -> Just TypeBool
+      ("lte"        , _                                    ) -> Just TypeBool
+      ("gte"        , _                                    ) -> Just TypeBool
 
       ("abs"      , _                                      ) -> Just TypeFloat
       ("max"      , [TypeFloat, TypeFloat]                 ) -> Just TypeFloat
 
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
+
+      ("or"       , [TypeBool, TypeBool]                   ) -> Just TypeBool
+      ("and"      , [TypeBool, TypeBool]                   ) -> Just TypeBool
       _ -> Nothing
 
       where
@@ -604,11 +606,12 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "to_float"
                        , "neg", "exp", "log", "sin", "cos"
                        , "add", "sub", "mul", "div"
-                       , "eq", "ne", "lt", "gt", "delta", "deltaVec", "diag", "constVec"
+                       , "eq", "ne", "lt", "gt", "lte", "gte", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild"
                        , "abs", "max"
+                       , "or", "and"
 
                        -- The dot-product, also known as inner-product
                        -- of vectors (not just TypeVecs)

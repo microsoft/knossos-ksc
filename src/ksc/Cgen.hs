@@ -522,8 +522,14 @@ mangleFun = substitute $ \case
 cgenFunId :: FunId -> String
 cgenFunId = \case
   UserFun fun -> mangleFun fun
-  PrimFun fun -> fun
+  PrimFun fun -> translateFun fun
   SelFun i _  -> "ks_get<" ++ show (i - 1) ++ ">"  -- TODO: rename to ks::get
+ where
+  translateFun :: String -> String
+  translateFun = \case
+    "or" -> "or_"
+    "and"-> "and_"
+    s    -> s
 
 cgenUserFun :: HasCallStack => Fun -> String
 cgenUserFun f = case f of

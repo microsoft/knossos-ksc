@@ -8,7 +8,7 @@
 (def main Integer ()
     (let ((n 7)
           (x 1.31))
-        (pr 
+        (pr
             ; Compute x^3
             (f n x)
             ; Compute the gradient

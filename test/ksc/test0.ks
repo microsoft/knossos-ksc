@@ -11,9 +11,9 @@
 (def g Float ((n : Integer) (m : Integer))
   (to_float (mul n m)))
 
-(def e Float ((vn : Vec n Integer) 
-              (t : Tuple (Vec m (Vec n Float)) 
-                         (Tuple Integer 
+(def e Float ((vn : Vec n Integer)
+              (t : Tuple (Vec m (Vec n Float))
+                         (Tuple Integer
                                 (Vec m Float))))
   (add (sum (build n (lam (i : Integer) (to_float i))))
      (sum (build m (lam (j : Integer) (sum (get$2$2 (get$2$2 t))))))))

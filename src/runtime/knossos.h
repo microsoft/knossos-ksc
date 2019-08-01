@@ -535,7 +535,7 @@ namespace ks
 		vec(std::vector<T> const& that) : vec{ that.size() }
 		{
 			// Copying from std vector - allocate.
-			for (int i = 0; i < that.size(); ++i)
+			for (size_t i = 0; i < that.size(); ++i)
 				data_[i] = that[i];
 		}
 
@@ -1541,21 +1541,43 @@ namespace ks
 	}
 
 	template <class T1, class T2>
-	T1 eq(T1 t1, T2 t2)
+	inline T1 eq(T1 t1, T2 t2)
 	{
 		return t1 == t2;
 	}
 
 	template <class T1, class T2>
-	T1 lt(T1 t1, T2 t2)
+	inline T1 lt(T1 t1, T2 t2)
 	{
 		return t1 < t2;
 	}
 
 	template <class T1, class T2>
-	T1 gt(T1 t1, T2 t2)
+	inline T1 gt(T1 t1, T2 t2)
 	{
 		return t1 > t2;
+	}
+
+	template <class T1, class T2>
+	inline T1 lte(T1 t1, T2 t2)
+	{
+		return t1 <= t2;
+	}
+
+	template <class T1, class T2>
+	inline T1 gte(T1 t1, T2 t2)
+	{
+		return t1 >= t2;
+	}
+
+	inline int or_(int b1, int b2)
+	{
+	  return b1 || b2;
+	}
+
+	inline int and_(int b1, int b2)
+	{
+	  return b1 && b2;
 	}
 
 	inline double abs(double d) { return d > 0 ? d : -d; }
