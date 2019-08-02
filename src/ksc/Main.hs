@@ -246,13 +246,6 @@ testWindows = do
   [fsTestKs] <- System.Environment.getArgs
   compileKscPrograms compiler [fsTestKs]
 
-runWindows :: IO ()
-runWindows = do
-  let compiler = "g++"
-  testC compiler
-  [fsTestKs] <- System.Environment.getArgs
-  compileKscPrograms compiler [fsTestKs]
-
 ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do
   let last n xs = drop (length xs - n) xs
