@@ -16,3 +16,6 @@ echo ----- cabal update -----
 /opt/cabal/2.4/bin/cabal update
 echo ----- cabal install -----
 /opt/cabal/2.4/bin/cabal v1-install --with-compiler /opt/ghc/8.6.3/bin/ghc-8.6.3 hspec parsec mtl hashable
+echo ------ futhark -----
+wget https://futhark-lang.org/releases/futhark-0.11.2-linux-x86_64.tar.xz
+tar -xvaf futhark-0.11.2-linux-x86_64.tar.xz

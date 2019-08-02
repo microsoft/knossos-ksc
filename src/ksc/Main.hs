@@ -237,6 +237,7 @@ main = test
 
 test :: IO ()
 test = do
+  futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
   let compiler = "g++-7"
   [fsTestKs] <- System.Environment.getArgs
   testC compiler [fsTestKs]
@@ -268,6 +269,52 @@ compileKscPrograms compiler ksFiles = do
     putStrLn ""
     putStrLn $ ">>>>> TEST: " ++ ksFile
     fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing ksTest)
+      `Control.Exception.catch` \e -> do
+        print (e :: Control.Exception.ErrorCall)
+        return (Just ksFile)
+
+  case Data.Maybe.catMaybes errors of
+    []     -> return ()
+    errors -> error ("Had errors in:\n" ++ unlines errors)
+
+futharkCompileKscPrograms :: [String] -> IO ()
+futharkCompileKscPrograms ksFiles = do
+  putStrLn ("Testing " ++ show ksFiles)
+
+  let testsThatDon'tWorkWithFuthark =
+        [ -- Incompatible mangling
+          "test/ksc/derivative-selection.ks"
+          -- Doesn't handle edefs
+        , "test/ksc/edef.ks"
+          -- Doesn't handle strings
+        , "test/ksc/string.ks"
+          -- Doesn't handle dummy variables
+        , "test/ksc/fold.ks"
+        , "test/ksc/vprod.ks"
+          -- Doesn't handle recursion
+        , "test/ksc/power.ks"
+        , "test/ksc/sum.ks"
+          -- Unexpected appearance of to_float
+        , "test/ksc/test0.ks"
+        , "test/ksc/CA-subst.ks"
+        -- Doesn't handle size
+        , "test/ksc/test2.ks"
+        ]
+
+  errors <- flip mapM ksFiles $ \ksFile -> do
+    let ksTest = System.FilePath.dropExtension ksFile
+    putStrLn ""
+    putStrLn $ ">>>>> TEST: " ++ ksFile
+    fmap (const Nothing)
+         (if ksFile `elem` testsThatDon'tWorkWithFuthark
+          then putStrLn ("Skipping " ++ ksFile
+                         ++ " because it is known not to work with Futhark")
+          else do
+             genFuthark ksTest
+             Cgen.readProcessPrintStderr
+               "futhark-0.11.2-linux-x86_64/bin/futhark"
+               ["check", "obj/" ++ ksTest ++ ".fut"]
+             return ())
       `Control.Exception.catch` \e -> do
         print (e :: Control.Exception.ErrorCall)
         return (Just ksFile)
