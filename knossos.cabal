@@ -32,16 +32,3 @@ executable ksc
                  process >= 1.4,
                  directory >= 1.3
   ghc-options: -Werror -Wmissing-monadfail-instances -Wincomplete-patterns -Wunused-local-binds -Wunused-matches -Wunused-imports -Wunused-top-binds -Wmissing-signatures
-  other-modules:  AD
-                  ANF
-                  Annotate
-                  CSE
-                  Cgen
-                  KMonad
-                  Lang
-                  LangUtils
-                  Opt
-                  OptLet
-                  Parse
-                  Prim
-                  Rules
