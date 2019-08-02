@@ -1,4 +1,4 @@
-(def doubleFloat Float (x : Float) (+ x x))
+(def doubleFloat Float (x : Float) (add x x))
 
 (def muld Float ( (x : Float) (y : Float) )
-  (* (doubleFloat x) (doubleFloat y)))
+  (mul (doubleFloat x) (doubleFloat y)))

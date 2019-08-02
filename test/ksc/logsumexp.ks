@@ -10,7 +10,7 @@
     (log (sum (build n (lam (i : Integer) (exp (index i v)))))))
 
 (def sub$VecR$R (Vec n Float) ((v : Vec n Float) (x : Float))
-     (build n (lam (ni : Integer) (- (index ni v) x))))
+     (build n (lam (ni : Integer) (sub (index ni v) x))))
 
 (def max_ Float ((x : Float) (y : Float)) (if (> x y) x y))
 
@@ -28,4 +28,4 @@
 (def logsumexp_safe Float (a : Vec n Float)
   (let (mx (max$VecR a))
     (let (sum_exp_minus_x (sum (exp$Vec (sub$VecR$R a mx))))
-        (+ (log sum_exp_minus_x) mx))))
+        (add (log sum_exp_minus_x) mx))))

@@ -1,6 +1,6 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
-(rule "mul2" (v : Float) (* v 2.0) (+ v v))
+(rule "mul2" (v : Float) (mul v 2.0) (add v v))
 
 (def f Float ( x : Float )
-     (let (y (* x 2.0)) (+ x y)))
+     (let (y (mul x 2.0)) (add x y)))
