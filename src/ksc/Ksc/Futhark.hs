@@ -332,11 +332,31 @@ callPrimFun "index" _ [i, arr] =
     arr' ->
       Index arr' [toFutharkExp i]
 
-callPrimFun "or" _ [x, y] =
-  BinOp "||" (toFutharkExp x) (toFutharkExp y)
-
-callPrimFun "and" _ [x, y] =
-  BinOp "&&" (toFutharkExp x) (toFutharkExp y)
+-- A number of Knossos functions corresponding to arithmetic and
+-- relational operators are overloaded.  Since the only overloaded
+-- Futhark functions are the magical built-in infix operators, we map
+-- these functions to those.
+callPrimFun op ret [x, y]
+  | Just op' <- lookup op binOpPrimFuns =
+      -- This might be a vectorised operator - if so, we have to put
+      -- enough 'map2's on top to make the types work out.
+      if primType ret'
+      then BinOp op' (toFutharkExp x) (toFutharkExp y)
+      else Call (plusFunction ret') [toFutharkExp x, toFutharkExp y]
+  where binOpPrimFuns = [ ("or", "||")
+                        , ("and", "&&")
+                        , ("add", "+")
+                        , ("sub", "-")
+                        , ("mul", "*")
+                        , ("div", "/")
+                        , ("eq" , "==")
+                        , ("ne" , "!=")
+                        , ("lt" , "<")
+                        , ("gt" , ">")
+                        , ("lte", "<=")
+                        , ("gte", ">=")
+                        ]
+        ret' = toFutharkType ret
 
 callPrimFun "pr" _ es =
   ExpTuple $ map toFutharkExp es
@@ -349,14 +369,6 @@ callPrimFun f _ args =
 -- In particular, no ad-hoc polymorphism.  We handle this on a
 -- case-by-case basis.
 toCall :: L.TFun -> [L.TExpr] -> Exp
-toCall (L.TFun ret f) [e1, e2]
-  | isInfix (toName f) =
-    -- This might be a vectorised operator - if so, we have to put
-    -- enough 'map2's on top to make the types work out.
-      if primType ret'
-      then BinOp (toName f) (toFutharkExp e1) (toFutharkExp e2)
-      else Call (plusFunction ret') [toFutharkExp e1, toFutharkExp e2]
-  where ret' = toFutharkType ret
 
 toCall (L.TFun _ (L.Fun (L.SelFun f _))) [e] =
   Project (toFutharkExp e) $ show f

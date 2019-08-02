@@ -7,6 +7,7 @@ module Prim where
 import Lang
 import GHC.Stack
 import Control.Monad( zipWithM )
+import Data.Tuple( swap )
 
 --------------------------------------------
 --  Simple call construction
@@ -83,7 +84,8 @@ mk_fun f = case find_dollar f of
                      (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
                      _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
     isPrimFun_ f = (f `elem` (map fst translation)) || isPrimFun f
-    translation = [ ("mul", "*")
+    translation = map swap $
+                  [ ("mul", "*")
                   , ("div", "/")
                   , ("sub", "-")
                   , ("add", "+")
@@ -241,7 +243,7 @@ lmDelta t i j = If (pEqual i j) (lmOne ty) (lmZero ty ty)
 
 isEqualityCall :: TExpr -> Maybe (TExpr, TExpr)
 isEqualityCall (Call f [e1,e2])
-  | f `isThePrimFun` "==" = Just (e1,e2)
+  | f `isThePrimFun` "eq" = Just (e1,e2)
 isEqualityCall _          = Nothing
 
 -----------------------
@@ -268,11 +270,11 @@ pDiag = mkPrimCall3 "diag"
 -- "User-defined" functions
 ---------------------------
 pAdd, pMul, pDiv, pSub, pEqual :: HasCallStack => TExpr -> TExpr -> TExpr
-pAdd   = mkPrimCall2 "+"
-pMul   = mkPrimCall2 "*"
-pDiv   = mkPrimCall2 "/"
-pSub   = mkPrimCall2 "-"
-pEqual = mkPrimCall2 "=="
+pAdd   = mkPrimCall2 "add"
+pMul   = mkPrimCall2 "mul"
+pDiv   = mkPrimCall2 "div"
+pSub   = mkPrimCall2 "sub"
+pEqual = mkPrimCall2 "eq"
 
 pNeg, pExp, pLog, pSin, pCos :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "neg"
@@ -485,7 +487,7 @@ primFunCallResultTy_maybe "diag" args
 -- Addition is special: it can add any two things of the same type,
 -- or it can add t to tangentType t, which is implemented somewhat loosely
 -- here by allowing t + () -> t
-primFunCallResultTy_maybe "+" args
+primFunCallResultTy_maybe "add" args
   | [t1,t2] <- map typeof args
   = add t1 t2
   | otherwise = Nothing
@@ -568,13 +570,13 @@ primFunCallResultTy_maybe fun args
 
       ("unzip"    , [TypeVec n (TypeTuple ts)])              -> Just (TypeTuple (map (TypeVec n) ts))
 
-      -- arithmetic ops.   See special case for "+" above
-      ("*"        , [TypeFloat,   t]             ) -> Just t
-      ("*"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
-      ("/"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
-      ("/"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
-      ("-"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
-      ("-"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+      -- arithmetic ops.   See special case for "add" above
+      ("mul"        , [TypeFloat,   t]             ) -> Just t
+      ("mul"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+      ("div"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
+      ("div"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
+      ("sub"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
+      ("sub"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
       ("neg"      , [t]                                    ) -> Just t
       ("exp"      , [TypeFloat]                            ) -> Just TypeFloat
@@ -583,15 +585,16 @@ primFunCallResultTy_maybe fun args
       ("cos"      , [TypeFloat]                            ) -> Just TypeFloat
       ("lgamma"   , [TypeFloat]                            ) -> Just TypeFloat
       ("digamma"  , [TypeFloat]                            ) -> Just TypeFloat
+      ("eq"       , _                                      ) -> Just TypeBool
+      ("ne"       , _                                      ) -> Just TypeBool
+      ("lt"        , _                                     ) -> Just TypeBool
+      ("gt"        , _                                     ) -> Just TypeBool
+      ("lte"        , _                                    ) -> Just TypeBool
+      ("gte"        , _                                    ) -> Just TypeBool
 
-      ("=="       , _                                      ) -> Just TypeBool
-      ("!="       , _                                      ) -> Just TypeBool
-      ("<"        , _                                      ) -> Just TypeBool
-      (">"        , _                                      ) -> Just TypeBool
-      ("<="       , _                                      ) -> Just TypeBool
-      (">="       , _                                      ) -> Just TypeBool
       ("abs"      , _                                      ) -> Just TypeFloat
       ("max"      , [TypeFloat, TypeFloat]                 ) -> Just TypeFloat
+
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
 
       ("or"       , [TypeBool, TypeBool]                   ) -> Just TypeBool
@@ -619,8 +622,8 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "to_float"
                        , "neg", "exp", "log", "sin", "cos"
-                       , "lgamma", "digamma", "+", "-", "*", "/"
-                       , "==", "!=", "<", ">", ">=", "<=", "delta", "deltaVec", "diag", "constVec"
+                       , "lgamma", "digamma", "add", "sub", "mul", "div"
+                       , "eq", "ne", "lt", "gt", "lte", "gte", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale", "lmBuild"
