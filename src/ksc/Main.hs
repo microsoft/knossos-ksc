@@ -175,8 +175,8 @@ anfOptAndCse display rulebase env4 alldefs =
   ; return cse
   }
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> Maybe Int -> String -> IO String
-displayCppGenAndCompile compile verbosity file =
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
+displayCppGenAndCompile compile ext verbosity file =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
       display = displayPassM verbosity
   in
@@ -198,12 +198,12 @@ displayCppGenAndCompile compile verbosity file =
   ; cse <- anfOptAndCse display rulebase env4 alldefs
 
   ; let ann2 =  cse
-  ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ann2)
+  ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ("obj/" ++ file ++ ext) ann2)
   }
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
 displayCppGenCompileAndRun compilername verbosity file = do
-  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) verbosity file
+  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file
   ; Cgen.runExe exefile
   }
 
@@ -266,7 +266,7 @@ compileKscPrograms compilername ksFiles = do
     let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
     putStrLn $ ">>>>> TEST: " ++ ksFile
-    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) Nothing ksTest)
+    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest)
       `Control.Exception.catch` \e -> do
         print (e :: Control.Exception.ErrorCall)
         return (Just ksFile)
@@ -335,7 +335,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) Nothing source
+  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out

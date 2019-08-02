@@ -719,10 +719,9 @@ cppGen outfile defs = do
   return (ksofile, cppfile)
 
 cppGenAndCompile
-  :: (String -> String -> IO String) -> String -> [TDef] -> IO String
-cppGenAndCompile compiler outfile defs = do
+  :: (String -> String -> IO String) -> String -> String -> [TDef] -> IO String
+cppGenAndCompile compiler outfile exefile defs = do
   (_, cppfile) <- cppGen outfile defs
-  let exefile = outfile ++ ".exe"
   --putStrLn $ "Formatting " ++ cppfile
   --callCommand $ "clang-format -i " ++ cppfile
   compiler cppfile exefile
