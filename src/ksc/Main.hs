@@ -238,16 +238,14 @@ main = test
 test :: IO ()
 test = do
   let compiler = "g++-7"
-  testC compiler
   [fsTestKs] <- System.Environment.getArgs
-  compileKscPrograms compiler [fsTestKs]
+  testC compiler [fsTestKs]
 
 testWindows :: IO ()
 testWindows = do
   let compiler = "g++"
-  testC compiler
   [fsTestKs] <- System.Environment.getArgs
-  compileKscPrograms compiler [fsTestKs]
+  testC compiler [fsTestKs]
 
 ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do
@@ -326,13 +324,14 @@ testRunKS compiler ksFile = do
       putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
       error ("These tests failed:\n" ++ unlines failures)
 
-testC :: String -> IO ()
-testC compiler = do
+testC :: String -> [String] -> IO ()
+testC compiler fsTestKs = do
   runSpec Main.hspec defaultConfig
   demoFOnTestPrograms =<< ksTestFiles "test/ksc/"
   compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
   testRunKS compiler "test/ksc/gmm.ks"
   testRunKS compiler "test/ksc/fold.ks"
+  compileKscPrograms compiler fsTestKs
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
