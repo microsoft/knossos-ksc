@@ -758,11 +758,6 @@ compileWithOpts opts compiler cppfile exefile = do
   uncurry readProcessPrintStderr compcmd
   return exefile
 
-cppFG :: String -> String -> [TDef] -> IO String
-cppFG compiler outfile defs = do
-  exefile <- cppGenAndCompile (compile compiler) outfile defs
-  runExe exefile
-
 runExe :: String -> IO String
 runExe exefile = do
   putStrLn "Running"
@@ -782,10 +777,3 @@ readProcessEnvPrintStderr executable args env = do
 readProcessPrintStderr :: FilePath -> [String] -> IO String
 readProcessPrintStderr executable args =
   readProcessEnvPrintStderr executable args Nothing
-
-cppF :: String -> [TDef] -> IO ()
--- String is the file name
-cppF outfile defs = do
-  output <- cppFG "g++-7" outfile defs
-  putStrLn "Done"
-  putStr output
