@@ -221,8 +221,16 @@ optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
       "sub" -> k1 - k2
       "add" -> k1 + k2
       "div" -> k1 / k2
-      s -> error ("Failed constant folding [" ++ s ++ "]")
- 
+      s -> errorFor s
+  where errorFor s = error $ unlines $
+          [ "Failed constant folding [" ++ s ++ "]."
+          , "This error exists to prompt you, the ksc user,"
+          , "to go ahead and add a constant folding rule for"
+          , "this operation to ksc.  See also"
+          , ""
+          , "    https://github.com/microsoft/knossos-ksc/pull/61/commits/29c2ab04568e17b953d3fe942aba5881ab15e1f8#r309892713"
+          ]
+
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type
 -- We use () as the tangent type for non-differentiatable types
