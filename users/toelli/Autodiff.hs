@@ -70,10 +70,10 @@ toTree = \case
   Lit l -> Node (show l) []
   Op o -> Node (symbol o) (map toTree (F.toList o))
     where symbol = \case
-            (:+) _ _ -> "add"
-            (:-) _ _ -> "sub"
-            (:*) _ _ -> "mul"
-            (:/) _ _ -> "div"
+            (:+) _ _ -> "+"
+            (:-) _ _ -> "-"
+            (:*) _ _ -> "*"
+            (:/) _ _ -> "/"
 
   LetIn v e0 e1 -> Node ("Let " ++ v ++ " =") (map toTree [e0, e1])
 
