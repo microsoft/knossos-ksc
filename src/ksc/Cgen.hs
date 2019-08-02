@@ -735,9 +735,9 @@ compileWithProfiling =
   compileWithOpts ["-Wl,--no-as-needed,-lprofiler,--as-needed"]
 
 compileWithOpts :: [String] -> String -> String -> String -> IO String
-compileWithOpts opts compiler cppfile exefile = do
+compileWithOpts opts compilername cppfile exefile = do
   let compcmd =
-        ( compiler
+        ( compilername
         , [ "-fmax-errors=5"
           , "-fdiagnostics-color=always"
           , "-Wall"

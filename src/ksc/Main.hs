@@ -202,14 +202,14 @@ displayCppGenAndCompile compile verbosity file =
   }
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
-displayCppGenCompileAndRun compiler verbosity file = do
-  { exefile <- displayCppGenAndCompile (Cgen.compile compiler) verbosity file
+displayCppGenCompileAndRun compilername verbosity file = do
+  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) verbosity file
   ; Cgen.runExe exefile
   }
 
 displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> String -> IO ()
-displayCppGenCompileAndRunWithOutput compiler verbosity file = do
-  { output <- displayCppGenCompileAndRun compiler verbosity file
+displayCppGenCompileAndRunWithOutput compilername verbosity file = do
+  { output <- displayCppGenCompileAndRun compilername verbosity file
   ; putStrLn "Done"
   ; putStr output
   }
@@ -221,7 +221,7 @@ doall :: HasCallStack => Int -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
 
 doallC :: HasCallStack => String -> Int -> String -> IO ()
-doallC compiler = displayCppGenCompileAndRunWithOutput compiler . Just
+doallC compilername = displayCppGenCompileAndRunWithOutput compilername . Just
 
 hspec :: Spec
 hspec = do
@@ -254,14 +254,14 @@ ksTestFiles testDir = do
             (System.Directory.listDirectory testDir)
 
 compileKscPrograms :: String -> [String] -> IO ()
-compileKscPrograms compiler ksFiles = do
+compileKscPrograms compilername ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
 
   errors <- flip mapM ksFiles $ \ksFile -> do
     let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
     putStrLn $ ">>>>> TEST: " ++ ksFile
-    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compiler) Nothing ksTest)
+    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) Nothing ksTest)
       `Control.Exception.catch` \e -> do
         print (e :: Control.Exception.ErrorCall)
         return (Just ksFile)
