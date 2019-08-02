@@ -1,29 +1,29 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def f Float ((x : Float) (y : Float))
-     (let (z (* x y))
-       (+ (* z x) (* z y))))
+     (let (z (mul x y))
+       (add (mul z x) (mul z y))))
 
 (def rev_f (Tuple Float Float)
      ((x : Float) (y : Float) (d_r : Float))
-     (let (z (* x y))
-          (tuple (+ (+ (* y (* x d_r))
-                       (* z d_r))
-                    (* y (* y d_r)))
-                 (+ (* x (* x d_r))
-                    (+ (* x (* y d_r))
-                       (* z d_r))))))
+     (let (z (mul x y))
+          (tuple (add (add (mul y (mul x d_r))
+                       (mul z d_r))
+                    (mul y (mul y d_r)))
+                 (add (mul x (mul x d_r))
+                    (add (mul x (mul y d_r))
+                       (mul z d_r))))))
 
 (def fst_rev_f Float
      ((x : Float) (y : Float) (d_r : Float))
-     (let (z (* x y))
+     (let (z (mul x y))
        (get$1$2
-          (tuple (+ (+ (* y (* x d_r))
-                       (* z d_r))
-                    (* y (* y d_r)))
-                 (+ (* x (* x d_r))
-                    (+ (* x (* y d_r))
-                       (* z d_r)))))))
+          (tuple (add (add (mul y (mul x d_r))
+                       (mul z d_r))
+                    (mul y (mul y d_r)))
+                 (add (mul x (mul x d_r))
+                    (add (mul x (mul y d_r))
+                       (mul z d_r)))))))
 
 (def fst_rev_f_inline Float
      ((x : Float) (y : Float) (d_r : Float))
