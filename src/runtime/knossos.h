@@ -36,11 +36,6 @@ namespace ks {
 };
 
 // ======================== Extra math =====================
-double digamma(double x)
-{
-	std::cerr << "digamma unimp!\n";
-	return 1.0;
-}
 
 namespace ks
 {
@@ -1861,48 +1856,7 @@ namespace ks
 
 	// ===============================  Test edef (TODO: Move)  ========================
 
-// These only exist so that we can test edef functionality.
-// We should probably come up with a better story for the
-// tests but at the time of writing I didn't want to hold back
-// edef support any longer.
-double edef_example(double x) { return x; }
-double fwd$edef_example(double x, double dx) { return dx; }
-double rev$edef_example(double x, double ddr) { return ddr; }
-
-double dotv(vec<double> const& a, vec<double> const& b)
-{
-	return dot(a,b);
-}
-
-vec<double> 
-mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v)
-{
-	int r = size(M);
-	vec<double> ret(r);
-	for(int i = 0; i < r; ++i)
-		ret[i] = dot(M[i], v);
-	return ret;
-}
-
-tuple<vec<vec<double>>,vec<double>> 
-rev$mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v, vec<double> const& dr)
-{
-	int r = size(M);
-	int c = size(v);
-	vec<vec<double>> retM(r);
-	for(int i = 0; i < r; ++i)
-		retM[i] = v*dr[i];
-
-	vec<double> retv(c);
-	for(int i = 0; i < c; ++i) {
-		double retvi = 0;
-		for(int j = 0; j < r; ++j)
-			retvi += M[j][i] * dr[j];
-		retv[i] = retvi;
-	}
-
-	return std::make_tuple(retM,retv);
-}
 
 } // namespace ks
 
+#include "knossos-prelude.h"
