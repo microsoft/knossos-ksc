@@ -73,7 +73,7 @@ mk_fun f = case find_dollar f of
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
-    mk_fun_id f | isPrimFun f = PrimFun f
+    mk_fun_id f | isPrimFun_ f = PrimFun (translate_fun f)
                 | otherwise   = UserFun f
     find_dollar f = case break (== '$') f of
                        (_, [])  -> Nothing  -- No $
@@ -82,6 +82,20 @@ mk_fun f = case find_dollar f of
     mk_sel_fun s = case break (== '$') s of
                      (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
                      _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
+    isPrimFun_ f = (f `elem` (map fst translation)) || isPrimFun f
+    translation = [ ("mul", "*")
+                  , ("div", "/")
+                  , ("sub", "-")
+                  , ("add", "+")
+                  , ("eq" , "==")
+                  , ("ne" , "!=")
+                  , ("lt" , "<")
+                  , ("gt" , ">")
+                  , ("lte", "<=")
+                  , ("gte", ">=") ]
+    translate_fun f = case lookup f translation of
+      Just s  -> s
+      Nothing -> f
 
 
 --------------------------------------------
