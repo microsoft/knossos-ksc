@@ -583,8 +583,6 @@ primFunCallResultTy_maybe fun args
       ("log"      , [TypeFloat]                            ) -> Just TypeFloat
       ("sin"      , [TypeFloat]                            ) -> Just TypeFloat
       ("cos"      , [TypeFloat]                            ) -> Just TypeFloat
-      ("lgamma"   , [TypeFloat]                            ) -> Just TypeFloat
-      ("digamma"  , [TypeFloat]                            ) -> Just TypeFloat
       ("eq"       , _                                      ) -> Just TypeBool
       ("ne"       , _                                      ) -> Just TypeBool
       ("lt"        , _                                     ) -> Just TypeBool
@@ -622,7 +620,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "to_float"
                        , "neg", "exp", "log", "sin", "cos"
-                       , "lgamma", "digamma", "add", "sub", "mul", "div"
+                       , "add", "sub", "mul", "div"
                        , "eq", "ne", "lt", "gt", "lte", "gte", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
