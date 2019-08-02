@@ -567,7 +567,6 @@ primFunCallResultTy_maybe fun args
       ("log"      , [TypeFloat]                            ) -> Just TypeFloat
       ("sin"      , [TypeFloat]                            ) -> Just TypeFloat
       ("cos"      , [TypeFloat]                            ) -> Just TypeFloat
-
       ("eq"       , _                                      ) -> Just TypeBool
       ("ne"       , _                                      ) -> Just TypeBool
       ("lt"        , _                                     ) -> Just TypeBool

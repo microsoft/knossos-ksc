@@ -175,7 +175,6 @@ anfOptAndCse display rulebase env4 alldefs =
   ; return cse
   }
 
-
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
 displayCppGenAndCompile compile ext verbosity file =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity

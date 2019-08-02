@@ -212,10 +212,10 @@ optFun _ (UserFun {}) _
 -----------------------
 optPrimFun :: InScopeSet -> PrimFun -> [TExpr] -> Maybe TExpr
 
--- Constant folding.  
+-- Constant folding.
 -- TODO: match precision to target machine
 optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
-  = Just . Konst . KFloat $ 
+  = Just . Konst . KFloat $
     case op of
       "mul" -> k1 * k2
       "sub" -> k1 - k2
