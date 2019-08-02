@@ -186,10 +186,10 @@ tcExpr (Let vx rhs body)
          text "Let binding mis-match for" <+> ppr var
        ; let tvar = TVar rhs_ty var
        ; TE abody tybody <- extendLclSTM [tvar] (tcExpr body)
-{-
+
        ; checkFreeness tvar tybody $
          text "in the let binding for" <+> ppr tvar
--}
+
        ; return (TE (Let tvar arhs abody) tybody) }
 
 tcExpr (Tuple es)
