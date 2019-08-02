@@ -20,7 +20,7 @@ jobs:
       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
-  - script: sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh || sleep 30 && sh ./test/builds/install_linux.sh
+  - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
     displayName: 'Install dependencies'
 
   - script: /opt/cabal/2.4/bin/cabal v1-install --with-ghc /opt/ghc/8.6.3/bin/ghc-8.6.3 --dependencies-only && /opt/cabal/2.4/bin/cabal v1-configure --with-ghc /opt/ghc/8.6.3/bin/ghc-8.6.3 && /opt/cabal/2.4/bin/cabal v1-build --with-ghc /opt/ghc/8.6.3/bin/ghc-8.6.3
