@@ -591,7 +591,7 @@ primFunCallResultTy_maybe fun args
       ("<="       , _                                      ) -> Just TypeBool
       (">="       , _                                      ) -> Just TypeBool
       ("abs"      , _                                      ) -> Just TypeFloat
-      ("max"      , _                                      ) -> Just TypeFloat
+      ("max"      , [TypeFloat, TypeFloat]                 ) -> Just TypeFloat
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
 
       ("or"       , [TypeBool, TypeBool]                   ) -> Just TypeBool
