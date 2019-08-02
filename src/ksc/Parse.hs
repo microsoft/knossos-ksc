@@ -129,8 +129,8 @@ langDef = Tok.LanguageDef
 --  , Tok.identLetter     = alphaNum <|> oneOf "_'"
 --  , Tok.opStart         = oneOf ":!#$%&*+./<=>?@\\^|-~"
 --  , Tok.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Tok.identStart      = letter <|> oneOf "_':!$%&*+./<=>?@\\^|-~"
-  , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+./<=>?@\\^|-~"
+  , Tok.identStart      = letter <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~[]"
+  , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~[]"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
