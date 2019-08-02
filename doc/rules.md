@@ -19,4 +19,13 @@ index ki (sumbuild o (lam oi e))
 
 index ki (sum e)
   = sum (build (size e) (lam i (index ki (index i e))))
+
+sum (build k (lam ki e))
+  = sumbuild k (lam ki e)
+
+sumbuild k (lam ki (deltaVec o i e))
+  = deltaVec o i (sumbuild k (lam ki e))
+
+sumbuild k (lam ki (deltaVec k ki e))
+  = build k (lam ki e)
 ```
