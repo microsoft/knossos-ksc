@@ -215,18 +215,18 @@ optPrimFun :: InScopeSet -> PrimFun -> [TExpr] -> Maybe TExpr
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type
 -- We use () as the tangent type for non-differentiatable types
-optPrimFun _ "+" [e1, e2]
+optPrimFun _ "add" [e1, e2]
   | TypeTuple [] <- typeof e1
   , TypeTuple [] <- typeof e2
   = Just (Tuple [])
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
-optPrimFun _ "+" [Tuple es1, Tuple es2]
+optPrimFun _ "add" [Tuple es1, Tuple es2]
   | length es1 == length es2
   = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
-optPrimFun _ "+" [x, y] =
+optPrimFun _ "add" [x, y] =
     if isKZero y then
       Just x
     else if isKZero x then
@@ -235,7 +235,7 @@ optPrimFun _ "+" [x, y] =
       Nothing
 
 -- RULE: x*0 = 0*x = 0
-optPrimFun _ "*" [x, y]
+optPrimFun _ "mul" [x, y]
   | isKZero x || isKZero y
   = Just $ mkZero (typeof y)
   | otherwise
@@ -248,7 +248,7 @@ optPrimFun _ "size" [Call build [n,_]]
 
 -- RULE: size (x * y) = size(x)
 optPrimFun _ "size" [Call mul [x,_]]
-  | mul `isThePrimFun` "*"
+  | mul `isThePrimFun` "mul"
   = Just (pSize x)
 
 -- RULE: index j (build n f) = f j
@@ -445,7 +445,7 @@ optBuild sz i e
 {-  TODO: once decided on amount of polymorphism in *
 optBuild sz i e
   | Call f (Tuple [e1,e2]) <- e
-  , f `isThePrimFun` "*"
+  , f `isThePrimFun` "mul"
   , i `notFreeIn` e2
   , is_expensive e2
   = Just $ pMul (pBuild sz (Lam i e1)) e2
@@ -576,30 +576,30 @@ optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
 optGradPrim :: HasCallStack => Type -> PrimFun -> [TExpr] -> Maybe TExpr
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
-optGradPrim _ "+" arg
+optGradPrim _ "add" arg
   | [t1, t2] <- map typeof arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
-optGradPrim _ "-" arg
+optGradPrim _ "sub" arg
   | [t1, t2] <- map typeof arg
   = Just (lmHCat [lmOne t1, lmScale t2 $ kTFloat (-1.0)])
 
-optGradPrim _ "*" [x,y]
+optGradPrim _ "mul" [x,y]
   | TypeFloat <- typeof x
   , TypeFloat <- typeof y
   = Just (lmHCat [lmScale TypeFloat y, lmScale TypeFloat x])
 
-optGradPrim _ "*" arg
+optGradPrim _ "mul" arg
   | [TypeInteger, TypeInteger] <- map typeof arg
   = Just $ lmZero (mkTupleTy [TypeInteger, TypeInteger]) TypeInteger
 
-optGradPrim _ "/"  [x,y]
+optGradPrim _ "div"  [x,y]
   | TypeFloat <- typeof x
   , TypeFloat <- typeof y
   = Just (lmHCat [ lmScale TypeFloat (pDiv (kTFloat 1.0) y)
                  , lmScale TypeFloat (pNeg (pDiv x (pMul y y)))])
 
-optGradPrim _  "/" arg
+optGradPrim _  "div" arg
   | [TypeInteger, TypeInteger] <- map typeof arg
   = Just $ lmZero (mkTupleTy [TypeInteger, TypeInteger]) TypeInteger
 
@@ -856,17 +856,18 @@ hspec = do
         optPrimFun emptyInScopeSet "lmAdd"
             [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)]
         `shouldBe`
-        Just (lmScale TypeFloat (mkPrimCall2 "+" (kTFloat 1.3) (kTFloat 0.4)))
+        Just (lmScale TypeFloat (mkPrimCall2 "add" (kTFloat 1.3) (kTFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat
             f2 = kTFloat 2.0
+            f4 = kTFloat 4.0
             l2 = lmScale TypeFloat f2
         in
             optE emptyOptEnv
                  (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
-            lmHCat [lmAdd l1 l2, lmScale TypeFloat (pAdd f2 f2)]
+            lmHCat [lmAdd l1 l2, lmScale TypeFloat f4]
 
 test_opt:: IO ()
 test_opt = Test.Hspec.hspec Opt.hspec

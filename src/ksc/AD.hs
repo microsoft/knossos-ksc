@@ -308,7 +308,7 @@ applyDefs dir = map (applyD dir)
 -- TODO make this work
 test_AD =
   hspec $ do
-    let e1 = runParserOrPanic pDef "(def f ((x : Float)) (* x 2.0))"
+    let e1 = runParserOrPanic pDef "(def f ((x : Float)) (mul x 2.0))"
     let (env,ae1) = annotDef e1
     let de1_expected = runParserOrPanic pDef "(def D$f ((x : Float)) (lmScale Float 2.0))"
     let (env1,ade1_expected) = annotDef de1_expected
