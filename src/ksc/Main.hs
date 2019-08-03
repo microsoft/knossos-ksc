@@ -282,12 +282,8 @@ futharkCompileKscPrograms ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
 
   let testsThatDon'tWorkWithFuthark =
-        [ -- Incompatible mangling
-          "test/ksc/derivative-selection.ks"
-          -- Doesn't handle edefs
-        , "test/ksc/edef.ks"
-          -- Doesn't handle strings
-        , "test/ksc/string.ks"
+        [ -- Doesn't handle edefs
+          "test/ksc/edef.ks"
           -- Doesn't handle dummy variables
         , "test/ksc/fold.ks"
         , "test/ksc/vprod.ks"
@@ -296,8 +292,6 @@ futharkCompileKscPrograms ksFiles = do
         , "test/ksc/sum.ks"
           -- $trace not supported
         , "test/ksc/test0.ks"
-        -- Doesn't handle size
-        , "test/ksc/test2.ks"
         ]
 
   errors <- flip mapM ksFiles $ \ksFile -> do
