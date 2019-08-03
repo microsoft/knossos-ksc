@@ -467,7 +467,10 @@ optSumBuild n i (Tuple es)
 optSumBuild sz i e
   | TVar TypeInteger _ <- i
   , i `notFreeIn` e
-  = Just $ pMul (mkPrimCall1 "to_float" sz) e
+  = Just $ pMul sz' e
+    where sz' = case typeof e of
+                  TypeInteger -> sz
+                  _ -> mkPrimCall1 "to_float" sz
 
 -- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
 --       = let i = ej in e
