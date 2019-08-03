@@ -190,13 +190,13 @@ primType Tuple{} = False
 primType _ = True
 
 -- | Futhark does not support dollar signs in names, so replace them
--- with underscores (but not leading, because that's also not
+-- with double underscores (but not leading, because that's also not
 -- permitted).  Also, as a hack, rewrite some known reserved names by
 -- tailing an underscore.
 escape :: String -> Name
-escape = noLeadingUnderscore . escapeReserved . map escape'
-  where escape' '$' = '_'
-        escape' c = c
+escape = noLeadingUnderscore . escapeReserved . concatMap escape'
+  where escape' '$' = "__"
+        escape' c = [c]
 
         escapeReserved s
           | s `elem` reserved = s ++ "_"
