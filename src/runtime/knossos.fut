@@ -10,6 +10,7 @@ let dotv xs ys = map2 (*) xs ys |> f64.sum
 let mul_Mat_Vec xss ys = map (dotv ys) xss
 let u_rand scale = scale
 let constVec = replicate
+let size = length
 
 let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =
   tabulate n (\j -> if j == i then v else zero)
