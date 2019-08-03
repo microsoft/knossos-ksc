@@ -35,7 +35,8 @@ data Def = DefFun Entry Name [TypeParam] [Param] (Maybe Type) Exp
          | DefComment String
          deriving (Eq, Ord, Show)
 
-data Const = ConstI32 Int32
+data Const = ConstI8 Int8
+           | ConstI32 Int32
            | ConstF32 Float
            | ConstF64 Double
            | ConstBool Bool
@@ -64,7 +65,7 @@ data Exp = Var Name
 data Dim = DimAny | DimConst Int32 | DimNamed Name
           deriving (Eq, Ord, Show)
 
-data Type = I32 | F32 | F64 | Bool | Tuple [Type] | Array Dim Type
+data Type = I8 | I32 | F32 | F64 | Bool | Tuple [Type] | Array Dim Type
           deriving (Eq, Ord, Show)
 
 ------------------------------
@@ -80,6 +81,7 @@ instance Pretty Dim where
   ppr (DimNamed v) = text v
 
 instance Pretty Type where
+  ppr I8 = text "i8"
   ppr I32 = text "i32"
   ppr F32 = text "f32"
   ppr F64 = text "f64"
@@ -109,6 +111,7 @@ instance Pretty Def where
     text $ intercalate "\n" $ map ("-- "++) $ lines s
 
 instance Pretty Const where
+  ppr (ConstI8 x) = integer $ toInteger x
   ppr (ConstI32 x) = integer $ toInteger x
   ppr (ConstF32 x) = double $ fromRational $ toRational x
   ppr (ConstF64 x) = double x
@@ -221,6 +224,8 @@ toFutharkType (L.TypeVec (L.Konst (L.KSize x)) t) =
   Array (DimConst $ fromInteger x) $ toFutharkType t
 toFutharkType (L.TypeVec _ t) =
   Array DimAny $ toFutharkType t
+toFutharkType L.TypeString =
+  Array DimAny I8
 toFutharkType t =
   error $ "toFutharkType: unhandled " ++ error (show t)
 
@@ -242,6 +247,7 @@ toFutharkConst (L.KBool x) = ConstBool x
 toFutharkConst (L.KString x) = ConstString x
 
 plusFunction :: Type -> Exp
+plusFunction I8 = Var "+"
 plusFunction I32 = Var "+"
 plusFunction F32 = Var "+"
 plusFunction F64 = Var "+"
@@ -256,6 +262,7 @@ plusFunction (Tuple ts)  =
                                  Project (Var "y") (show i)]
 
 zeroValue :: Type -> Exp
+zeroValue I8 = Const $ ConstI8 0
 zeroValue I32 = Const $ ConstI32 0
 zeroValue F32 = Const $ ConstF32 0
 zeroValue F64 = Const $ ConstF64 0
