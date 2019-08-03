@@ -252,11 +252,7 @@ ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do
   let last n xs = drop (length xs - n) xs
 
-      naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList
-        = ["logsumexp.ks"]
-
     in fmap (map (testDir ++)
-             . filter (not . (`elem` naughtyTestsThatDon'tWorkButShouldBeFixedAndRemovedFromThisList))
              . filter ((== ".ks") . last 3))
             (System.Directory.listDirectory testDir)
 
@@ -286,6 +282,7 @@ futharkCompileKscPrograms ksFiles = do
           "test/ksc/edef.ks"
           -- Doesn't handle dummy variables
         , "test/ksc/fold.ks"
+        , "test/ksc/logsumexp.ks"
         , "test/ksc/vprod.ks"
           -- Doesn't handle recursion
         , "test/ksc/power.ks"
