@@ -294,9 +294,8 @@ futharkCompileKscPrograms ksFiles = do
           -- Doesn't handle recursion
         , "test/ksc/power.ks"
         , "test/ksc/sum.ks"
-          -- Unexpected appearance of to_float
+          -- $trace not supported
         , "test/ksc/test0.ks"
-        , "test/ksc/CA-subst.ks"
         -- Doesn't handle size
         , "test/ksc/test2.ks"
         ]
