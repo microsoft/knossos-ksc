@@ -490,11 +490,17 @@ optSumBuild _ i (Call delta [Var i1, ej, e])
 -- = sumbuild n (\i. if j == i then e else 0)
 -- = e[i->j]
 -- = index j (build n (\i. e))
-optSumBuild n i (Call deltaVec [_n1, Var i1, e])
+optSumBuild n i (Call deltaVec [m, j, e])
   | deltaVec `isThePrimFun` "deltaVec"
+  , Var i1 <- j
   , i == i1
-  -- TODO n == sz
+  , n == m
   = Just $ pBuild n (Lam i e)
+
+  | deltaVec `isThePrimFun` "deltaVec"
+  , i `notFreeIn` m
+  , i `notFreeIn` j
+  = Just $ pDeltaVec m j (pSumBuild n (Lam i e))
 
 optSumBuild _ _ _ = Nothing
 
