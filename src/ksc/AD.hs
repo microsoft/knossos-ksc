@@ -151,13 +151,8 @@ gradSumBuild BasicAD s n ti body
     gradE BasicAD s body
 
 gradSumBuild TupleAD s n ti body
-  = mkLet p (pSumBuild n (Lam ti grad_body)) $
-    Tuple [ pFst (Var p)
-          , pSnd (Var p) ]
+  = pSumBuild n (Lam ti grad_body)
   where
-     t_ty = typeof body
-     p = TVar res_ty resVar
-     res_ty = TypeTuple [ t_ty, TypeLM s t_ty ]
      grad_body = mkLet (gradTVar TupleAD s ti)
                        (Tuple [Var ti, lmZero s (typeof ti)]) $
                  gradE TupleAD s body
