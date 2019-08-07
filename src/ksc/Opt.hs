@@ -746,6 +746,9 @@ optLMApplyCall _ Rev "lmBuild"  [n, Lam i m] dx = do_build_t Rev n i m dx
 optLMApplyCall _ dir "lmFold" [sZero, Lam i m, Lam i' m', acc, v] dx =
   do_fold dir sZero i m i' m' acc v dx
 
+optLMApplyCall _ dir "sumbuild" [n, Lam i m] dx =
+  Just (pSumBuild n (Lam i (lmApply_Dir dir m dx)))
+
 optLMApplyCall _ _ _ _ _
   = -- pprTrace ("No opt for LM apply of " ++ show fun)
     --         (ppr arg)

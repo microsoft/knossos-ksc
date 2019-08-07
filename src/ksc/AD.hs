@@ -114,11 +114,9 @@ gradE adp s (Call f [n, Lam ti body])
   | f `isThePrimFun` "build"
   = gradBuild adp s n ti body
 
--- I'm not very happy about this rule, which effectively
--- undoes sum (build e) --> sumbuild e
-gradE adp s (Call f [n, body])
+gradE adp s (Call f [n, Lam ti body])
   | f `isThePrimFun` "sumbuild"
-  = gradE adp s (pSum (pBuild n body))
+  = gradSumBuild adp s n ti body
 
 gradE adp s (Call f [Lam ti body, acc, v])
   | f `isThePrimFun` "fold"
@@ -142,6 +140,24 @@ gradBuild TupleAD s n ti body
      t_ty = typeof body
      p = TVar res_ty resVar
      res_ty = TypeTuple [ TypeVec n t_ty, TypeVec n (TypeLM s t_ty) ]
+     grad_body = mkLet (gradTVar TupleAD s ti)
+                       (Tuple [Var ti, lmZero s (typeof ti)]) $
+                 gradE TupleAD s body
+---------------
+gradSumBuild :: ADPlan -> Type -> TExpr -> TVar -> TExpr -> TExpr
+gradSumBuild BasicAD s n ti body
+  = pSumBuild n $ Lam ti $
+    mkLet (gradTVar BasicAD s ti) (lmZero s (typeof ti)) $
+    gradE BasicAD s body
+
+gradSumBuild TupleAD s n ti body
+  = mkLet p (pSumBuild n (Lam ti grad_body)) $
+    Tuple [ pFst (Var p)
+          , pSnd (Var p) ]
+  where
+     t_ty = typeof body
+     p = TVar res_ty resVar
+     res_ty = TypeTuple [ t_ty, TypeLM s t_ty ]
      grad_body = mkLet (gradTVar TupleAD s ti)
                        (Tuple [Var ti, lmZero s (typeof ti)]) $
                  gradE TupleAD s body
