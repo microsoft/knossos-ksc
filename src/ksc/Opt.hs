@@ -502,6 +502,12 @@ optSumBuild n i (Call deltaVec [m, j, e])
   , i `notFreeIn` j
   = Just $ pDeltaVec m j (pSumBuild n (Lam i e))
 
+optSumBuild n i (Call build [m, Lam j e])
+  | build `isThePrimFun` "build"
+  , i `notFreeIn` m
+  , i /= j
+  = Just (pBuild m (Lam j (pSumBuild n (Lam i e))))
+
 optSumBuild _ _ _ = Nothing
 
 -----------------------
