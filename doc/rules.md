@@ -25,7 +25,19 @@ sum (build k (lam ki e))
 
 sumbuild k (lam ki (deltaVec o i e))
   = deltaVec o i (sumbuild k (lam ki e))
+# ki should not appear free in o or i
 
 sumbuild k (lam ki (deltaVec k ki e))
   = build k (lam ki e)
+
+sumbuild k (lam ki (if c t f))
+  = if c (sumbuild k (lam ki t)) (sumbuild k (lam ki f))
+# ki should not appear free in c
+
+build k (lam ki (if c t f))
+  = if c (build k (lam ki t)) (build k (lam ki f))
+# ki should not appear free in c
+
+op (if c t f)
+  = if c (op t) (op f)
 ```
