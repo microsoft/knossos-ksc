@@ -374,7 +374,7 @@ cgenExprR env = \case
                     then tag ++ "(" ++ bumpmark ++ ");\n"
                     else ""
 
-    let cf = cgenAnyFun tf cftype ctypes
+    let cf = cgenAnyFun tf cftype
 
     return $ CG
       (  unlines cdecls
@@ -540,8 +540,8 @@ cgenUserFun f = case f of
   DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId s
   DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId s
 
-cgenAnyFun :: HasCallStack => TFun -> CType -> ctypes -> String
-cgenAnyFun tf cftype _ctypes = case tf of
+cgenAnyFun :: HasCallStack => TFun -> CType -> String
+cgenAnyFun tf cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
     let TypeVec _ t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
