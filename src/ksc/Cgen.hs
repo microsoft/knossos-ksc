@@ -540,8 +540,8 @@ cgenUserFun f = case f of
   DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId s
   DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId s
 
-cgenAnyFun :: HasCallStack => TFun -> CType -> [CType] -> String
-cgenAnyFun tf cftype ctypes = case tf of
+cgenAnyFun :: HasCallStack => TFun -> CType -> ctypes -> String
+cgenAnyFun tf cftype _ctypes = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
     let TypeVec _ t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
@@ -549,10 +549,6 @@ cgenAnyFun tf cftype ctypes = case tf of
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
-  TFun _ (Fun (PrimFun "to_tangent")) ->
-    case ctypes of
-      [ctype] -> "to_tangent<" ++ cgenType cftype ++ "," ++ cgenType ctype ++ ">"
-      _       -> error "Expected one argument to to_tangent"
   TFun _            f                 -> cgenUserFun f
 
 cgenTypeOf :: TExpr -> String

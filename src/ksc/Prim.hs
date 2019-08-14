@@ -313,20 +313,6 @@ pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
 pSnd   = pSel 2 2
 
-pDot :: TExpr -> TExpr -> TExpr
-pDot = mkPrimCall2 "dot"
-
-pNorm :: TExpr -> TExpr
-pNorm = mkPrimCall1 "norm"
-
-pTangentAdd :: TExpr -> TExpr -> TExpr
-pTangentAdd x dx = case typeof dx of
-                   TypeTuple [] -> x -- It's helpful for size typechecking to ensure n + dn passes through
-                   _ -> mkPrimCall2 "tangent_add" x dx
-
-pToTangent :: TExpr -> TExpr
-pToTangent = mkPrimCall1 "to_tangent"
-
 ensureTuple :: TExpr -> TExpr
 ensureTuple x = case typeof x of
     TypeTuple _ -> x
@@ -557,8 +543,6 @@ primFunCallResultTy_maybe fun args
       ("dot"      , [t, t']) | t == t'                       -> Just TypeFloat
       ("dot"      , [t, t']) | tangentType t == t'           -> Just TypeFloat
       ("norm"     , [_])                                     -> Just TypeFloat
-      ("tangent_add", [t, t'])| tangentType t == t'          -> Just t
-      ("to_tangent",  [t])                                   -> Just (tangentType t)
 
       ("unzip"    , [TypeVec n (TypeTuple ts)])              -> Just (TypeTuple (map (TypeVec n) ts))
 
@@ -619,22 +603,6 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "lmCompose", "lmAdd", "lmScale"
                        , "abs", "max"
                        , "or", "and"
-
-                       -- The dot-product, also known as inner-product
-                       -- of vectors (not just TypeVecs)
-                       , "dot"
-
-                       -- The Euclidean (L2) norm of a vector (not
-                       -- just a TypeVec), i.e. norm(x) = sqrt(dot(x, x))
-                       , "norm"
-
-                       -- If x :: s then dx :: tangentType t.
-                       -- tangent_add allows us to add them to get
-                       -- something of type s.
-                       , "tangent_add"
-
-                       -- Maps x :: s its tangent space (tangentType s)
-                       , "to_tangent"
                        ]
 
 sizeArgOK :: TypedExpr -> Bool

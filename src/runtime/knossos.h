@@ -1764,63 +1764,6 @@ namespace ks
 		return ret;
 	}
 
-	// ===============================  Norm ===========================================
-  template <class T> inline double norm(T t1) { return sqrt(dot(t1, t1)); }
-
-	// ===============================  Tangent add ====================================
-
-	double tangent_add(double t1, double t2) { return t1 + t2; }
-	int tangent_add(int t1, tuple<> t2) { return t1; }
-
-	inline tuple<> tangent_add(tuple<> t1, tuple<> t2)
-	{
-		return tuple<>{};
-	}
-
-	template <class T0, class... Ts, class U0, class... Us>
-	inline auto tangent_add(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
-	{
-		return prepend(tangent_add(head(t1), head(t2)),
-			tangent_add(tail(t1), tail(t2)));
-	}
-
-        template <class T, class U>
-        inline vec<T> tangent_add(vec<T> t1, vec<U> t2)
-        {
-          // FIXME: Assert the sizes are equal
-          return build<T>(t1.size(), [t1, t2](int i) { return tangent_add(t1[i], t2[i]); });
-        }
-
-        inline std::string tangent_add(std::string s, tuple<> t) { return s; }
-
-	// ===============================  To tangent  ====================================
-
-        template <class R, class T>
-        inline R to_tangent(T t1)
-        {
-          // Dummy value to avoid compiler warning.  This template
-          // should never be instantiated.  It needs to exist so its
-          // specialisations below can exist.  I don't know if there's
-          // a more official way to mark it as "abstract".
-          return 0;
-        }
-
-        template <class R, class T>
-        inline vec<R> to_tangent(vec<T> t1)
-        {
-          // FIXME: Assert the sizes are equal
-          return build<R>(t1.size(), [t1](int i) { return to_tangent<R,T>(t1[i]); });
-        }
-
-        template <>
-        double to_tangent<double, double>(double t1) { return t1; }
-
-        template <>
-        tuple<> to_tangent<tuple<>, int>(int t1) { return tuple<>{}; }
-
-        template <>
-        tuple<> to_tangent<tuple<>, std::string>(std::string s) { return tuple<>{}; }
-
 	// ===============================  Derivative check  ================================
   //  Check derivatives:
   // 
