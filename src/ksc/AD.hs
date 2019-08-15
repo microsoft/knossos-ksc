@@ -1,6 +1,5 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# LANGUAGE LambdaCase #-}
 
 module AD where
@@ -99,6 +98,7 @@ gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
 gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 gradE adp s (Let v e1 e2)  = gradLet adp s v e1 e2
+gradE _   _ (App{})        = error "gradE of App not yet supported"
 
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.
@@ -270,12 +270,17 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
   where
     dvars = map to_delta vars
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
+    to_delta (TVar _  v         )
+      = error ("Unexpected non-Simple variable: " ++ show v)
     (perhapsFstToo, lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (id, rhs, tangentType t)
             (TupleAD, TypeTuple [t, _]) -> ((\lmrhs -> Tuple [pFst rhs, lmrhs]),
                                             pSnd rhs,
                                             TypeTuple [t, tangentType t])
+            (adp    , t               )
+              -> error ("Unexpected combination of AD plan and result type:"
+                       ++ show adp ++ " " ++ show t)
 
 --   D$f :: S1 S2    -> ((S1,S2) -o T)
 -- rev$f :: S1 S2 dT -> (dS1,dS2)
@@ -291,6 +296,9 @@ applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (rhs,      t)
             (TupleAD, TypeTuple [t, _]) -> (pSnd rhs, t)
+            (adp    , t               )
+              -> error ("Unexpected combination of AD plan and result type:"
+                       ++ show adp ++ " " ++ show t)
 
 -------------------------------
 
