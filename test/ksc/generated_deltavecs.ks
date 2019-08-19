@@ -31,7 +31,7 @@
        (max_ (index (* 2 ni) image)
              (index (+ 1 (* 2 ni)) image)))))
 
-; This function stands in for one that could actually be expensivex
+; This function stands in for one that could actually be expensive
 (def expensive Float ((x1 : Float) (x2 : Float)) 0.0)
 
 ; An example to show that if we pool with an expensive function it's
