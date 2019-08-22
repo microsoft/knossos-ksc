@@ -64,12 +64,12 @@ lineariseE = \case
           let argv' = LU.newVarNotIn (L.typeof call) body
           in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
       k@(L.Konst{}) -> (id, k)
-      arg -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
+      arg           -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
     dups' :: L.TExpr -> L.TExpr
     new_args :: [L.TExpr]
     (dups', new_args) =
       foldr (\(g, arg) (gs, args) -> (g . gs, arg : args)) (id, []) dups
 
-  var@(L.Var{}) -> var
+  var@( L.Var{} ) -> var
   call@(L.Call{}) -> call
-  v -> error ("unexpected " ++ L.render (L.ppr v))
+  v               -> error ("unexpected " ++ L.render (L.ppr v))
