@@ -143,3 +143,56 @@ fromCLExpr args (CLComp e1 e2)
       Tuple es -> fromCLExpr es e1
       e        -> fromCLExpr [e] e1
 
+-----------------------------------------------
+-- AD with tupling
+ -----------------------------------------------
+
+{-
+
+  S => T  =   S -> (T, S -o T)
+
+  (.) :: (b => c) -> (a => b) -> (a => c)
+  (f . g) <> s = let (b, lmab) = g <> s
+                     (c, lmbc) = f <> b
+                 in (c, lmbc `lmComp` lmab)
+
+  (,) :: (s => t1) -> (s => t2) -> (s =-> (t1,t2))
+  (a,b) <> s = let (a, lmsa) = a <> s
+                   (b, lmsb) = b <> s
+               in )(a,b), lmsa x lmsb)
+
+-}
+
+adCLExpr :: CLExpr -> TExpr
+adCLExpr _ (CLKonst k) = Konst k
+
+fromCLExpr args (CLCall fun)
+  | TFun ty (CLFun f) <- fun
+  = Call (TFun ty (Fun f)) args
+  | otherwise
+  = pprPanic "fromCLExpr:CLCall" (ppr fun)
+
+adCLExpr args (CLComp e1 e2)
+  = mkTempLet "b" (adCLExpr args         e2) $ \ bpair ->
+    mkTempLet "c" (adCLExpr (pFst bpair) e1) $ \ cpair ->
+    Tuple [ pFst cpair
+          , pSnd cpair `lmCompose` pSnd bpair ]
+
+adCLExpr args (CTuple es)
+  = mkTempLets "t" es $ \ tvs ->
+    Tuple [ Tuple (map pFst tvs)
+          , lmVCat (map pSnd tvs) ]
+
+mkTempLets :: String -> [TExpr] -> ([TExpr] -> TExpr) -> TExpr
+mkTemplLets s es body_fn
+  = body_fn (go 1 es)
+  where
+    go n []     tvs = body_fn (revverse tvs)
+    go n (e:es) tvs = mkTempLet (s ++ show n) e $ \tv ->
+                      go (n+1) es (tv:tvs)
+
+mkTempLet :: String -> TExpr -> (TExpr -> TExpr) -> TExpr
+mkTempLet s rhs body_fn
+  = mkLet tv rhs (body_fn (Var tv))
+  where
+    tv = TVar (typeof rhs) (Simple s)
