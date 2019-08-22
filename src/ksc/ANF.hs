@@ -52,6 +52,7 @@ anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = substBndr v subst
                                ; emit v' r'
                                ; anfE subst' e }
+anfE _ubst (Dup{})        = error "anfE Dup unimplemented"
 anfE subst (If b t e)     = do { t' <- anfExpr subst t
                                ; e' <- anfExpr subst e
                                ; return (If b t' e') }

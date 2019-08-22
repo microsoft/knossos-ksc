@@ -417,6 +417,8 @@ cgenExprR env = \case
       lvar
       tybody
 
+  Dup{} -> error "Cgen Dup unimplemented"
+
   -- Tuple [t] -> cgenExpr env t -- Don't detuple willy-nilly
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs

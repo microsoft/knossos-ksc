@@ -128,6 +128,10 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
     rhs' = cseE cse_env rhs
     v    = tVarVar tv
 
+cseE _cse_env@(CS { cs_subst = _subst, cs_map = _rev_map })
+     (Dup{})
+  = error "cseE Dup unimplemented"
+
 -- Special case for (assert (e1 == e2) body)
 -- where we want to CSE e2 into e1
 cseE cse_env@(CS { cs_map = rev_map }) (Assert e1 e2)

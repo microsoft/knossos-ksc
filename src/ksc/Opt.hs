@@ -121,6 +121,7 @@ optE env
     go (Let tv rhs body)  = mkLet tv' (go rhs) (optE env' body)
        where
          (tv', env') = optSubstBndr tv env
+    go (Dup{})            = error "optE Dup unimplemented"
     go (If b t e)         = optIf (go b) (go t) (go e)
     go (Call f arg)       = optCall (optZapSubst env) f (map go arg)
 

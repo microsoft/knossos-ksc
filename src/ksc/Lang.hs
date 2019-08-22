@@ -121,6 +121,7 @@ data ExprX p
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)  -- FIXME make cond ExprX?
   | Assert (ExprX p) (ExprX p)
+  | Dup (LetBndrX p, LetBndrX p) (ExprX p) (ExprX p)
 
 instance InPhase p => Show (ExprX p) where
   show e = pps e
@@ -401,6 +402,7 @@ instance HasType TExpr where
   typeof (Tuple es)    = TypeTuple $ map typeof es
   typeof (Lam b e)     = TypeLam (typeof b) (typeof e)
   typeof (Let _ _ e2)  = typeof e2
+  typeof (Dup _ _ e)   = typeof e
   typeof (Assert _ e)  = typeof e
   typeof (If _ t f)    = makeIfType (typeof t) (typeof f)
 
@@ -740,6 +742,13 @@ pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
   where rest = pprList ppr es
 pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar @phase v) <+> ppr e)
                             (parens $ text "lam" <+> vcat [parens (pprTVar @phase v), ppr e])
+pprExpr _ (Dup (v1, v2) v body) =
+  text "dup"
+  <+> vcat [ sep (punctuate comma [pprLetBndr @phase v1, pprLetBndr @phase v2])
+             <+> text " = "
+             <+> ppr v
+           , ppr body
+           ]
 pprExpr p (Let v e1 e2) = mode
   (pprLetSexp v e1 e2)
   (parensIf
@@ -979,6 +988,8 @@ cmpExpr e1
       = case e2 of
           Assert e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
           _              -> GT
+
+   go (Dup _ _ _) _ _ = error "cmp Dup unimlpmented"
 
    gos :: [TExpr] -> M.Map Var TVar -> [TExpr] -> Ordering
    gos []    _ []    = EQ
