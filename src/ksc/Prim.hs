@@ -343,6 +343,9 @@ primCallResultTy_maybe fun args
             Left err -> Left err
             Right res_ty -> Right (mkGradType adp (mkTupleTy arg_tys) res_ty)
 
+      LinearGradFun _s
+        -> error "Prim.hs LinearGradFun"
+
       DrvFun f (AD _ Fwd)    -- f :: S1 S2 -> T, then fwd$f :: S1 S2 S1_t S2_t -> T_t
         | let n_s = length args
         , even n_s

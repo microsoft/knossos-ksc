@@ -227,6 +227,7 @@ data Fun = Fun      FunId         -- The function              f(x)
          | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
+         | LinearGradFun FunId
          deriving( Eq, Ord, Show )
 
 
@@ -679,6 +680,7 @@ pprFun (Fun s)                   = ppr s
 pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
+pprFun (LinearGradFun s)         = text "revl$" <> ppr s
 
 instance Pretty TVar where
   pprPrec _ (TVar ty Dummy) = parens $ text "_ : " <> ppr ty

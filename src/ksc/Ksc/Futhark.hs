@@ -388,6 +388,9 @@ toCall f@(L.TFun _ L.GradFun{}) args =
 toCall f@(L.TFun _ L.DrvFun{}) args =
   Call (Var (toName f)) $ map toFutharkExp args
 
+toCall f@(L.TFun _ L.LinearGradFun{}) args =
+  Call (Var (toName f)) $ map toFutharkExp args
+
 toFuthark :: L.TDef -> Def
 toFuthark (L.Def f args res_ty (L.UserRhs e)) =
   DefFun entry fname (filter notParam $ nub $ concat size_params)

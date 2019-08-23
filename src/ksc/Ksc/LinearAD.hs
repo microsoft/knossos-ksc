@@ -48,12 +48,13 @@ disp what env decls = do
   A.lintDefs what env decls
 
 lineariseD :: L.TDef -> L.TDef
-lineariseD tdef@(L.Def { L.def_rhs = L.UserRhs rhs }) = L.Def
-  { L.def_fun    = L.def_fun tdef
-  , L.def_args   = L.def_args tdef
-  , L.def_res_ty = L.def_res_ty tdef
-  , L.def_rhs    = L.UserRhs (lineariseE rhs)
-  }
+lineariseD tdef@(L.Def { L.def_rhs = L.UserRhs rhs })
+  = L.Def
+    { L.def_fun    = L.def_fun tdef
+    , L.def_args   = L.def_args tdef
+    , L.def_res_ty = L.def_res_ty tdef
+    , L.def_rhs    = L.UserRhs (lineariseE rhs)
+    }
 lineariseD _ = error "I can't cope with that rhs"
 
 lineariseE :: L.TExpr -> L.TExpr
@@ -75,13 +76,14 @@ lineariseE = \case
       foldr (\(g, arg) (gs, args) -> (g . gs, arg : args)) (id, []) dups
 
   L.Let v k@(L.Konst{}) body -> L.Let v k (lineariseE body)
-  var@( L.Var{} ) -> var
-  call@(L.Call{}) -> call
-  v               -> error ("lineariseE unexpected " ++ show v)
+  var@( L.Var{} )            -> var
+  call@(L.Call{})            -> call
+  v                          -> error ("lineariseE unexpected " ++ show v)
 
 differentiateD :: L.TDef -> L.TDef
-differentiateD tdef@(L.Def { L.def_rhs = L.UserRhs rhs }) = L.Def
-  { L.def_fun    = L.def_fun tdef
+differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f)
+                           , L.def_rhs = L.UserRhs rhs }) = L.Def
+  { L.def_fun    = L.LinearGradFun (L.UserFun f)
   , L.def_args   = args ++ [rev r]
   , L.def_res_ty = res_ty
   , L.def_rhs    = L.UserRhs d_rhs
@@ -165,13 +167,12 @@ differentiateE = \case
   L.Let v k@(L.Konst{}) body ->
     -- Not strictly linear because we don't eliminate `rev v`, but we
     -- probably don't care at the moment
-    (L.Let v k . body', r, xs, \xs' -> f xs')
-   where
-    (body', r, xs, f) = differentiateE body
+                                (L.Let v k . body', r, xs, \xs' -> f xs')
+    where (body', r, xs, f) = differentiateE body
 
   L.Var v -> (id, v, [], \[] -> id)
 
-  s -> error ("Couldn't differentiate: " ++ show s)
+  s       -> error ("Couldn't differentiate: " ++ show s)
 
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
