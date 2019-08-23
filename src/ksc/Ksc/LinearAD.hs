@@ -105,7 +105,9 @@ differentiateE = \case
     , \xs' -> f xs' . L.Let (rev v) (revVar v1 .+ revVar v2)
     )
     where (body', r, xs, f) = differentiateE body
-  L.Let r (L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) body
+  L.Let r rhs body
+   -> case rhs of
+   (L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2])
     -> case op of
       "add" ->
         ( L.Let r (v a1 .+ v a2) . body'
@@ -132,16 +134,16 @@ differentiateE = \case
             (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_)))
         )
       s -> error ("differentiateE unexpected " ++ s)
-    where (body', final, xs, f) = differentiateE body
-
-  L.Let v k@(L.Konst{}) body ->
-    -- Not strictly linear because we don't eliminate `rev v`, but we
+   k@(L.Konst{}) ->
+         -- Not strictly linear because we don't eliminate `rev v`, but we
     -- probably don't care at the moment
-                                (L.Let v k . body', r, xs, \xs' -> f xs')
-    where (body', r, xs, f) = differentiateE body
+
+     (L.Let r k . body', final, xs, \xs' -> f xs')
+
+   rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
+   where (body', final, xs, f) = differentiateE body
 
   L.Var v -> (id, v, [], \[] -> id)
-
   s       -> error ("Couldn't differentiate: " ++ show s)
  where
   (.*) :: L.TExpr -> L.TExpr -> L.TExpr
