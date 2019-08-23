@@ -22,12 +22,13 @@ anfDefs defs = runAnf $
 anfD :: TDef -> AnfM Typed TDef
 anfD def@(Def { def_rhs  = rhs
               , def_args = args })
-  | UserRhs expr <- rhs
-  = do { expr' <- anfExpr (mkEmptySubst args) expr
-       ; return (def { def_rhs = UserRhs expr' }) }
+  = case rhs of
+      UserRhs expr ->
+        do { expr' <- anfExpr (mkEmptySubst args) expr
+           ; return (def { def_rhs = UserRhs expr' }) }
 
-  | otherwise   -- EDefRhs, StubRhs
-  = return def
+      EDefRhs{} -> return def
+      StubRhs{} -> return def
 
 -- anfExpr :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
 anfExpr :: Subst -> TExpr -> AnfM Typed TExpr
