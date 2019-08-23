@@ -102,15 +102,15 @@ differentiateE = \case
     ( L.Dup (v1, v2) (L.Var v) . body'
     , r
     , xs
-    , \xs' -> f xs' . L.Let (rev v) (Prim.pAdd (revVar v1) (revVar v2))
+    , \xs' -> f xs' . L.Let (rev v) (revVar v1 .+ revVar v2)
     )
     where (body', r, xs, f) = differentiateE body
-  L.Let r (L.Call (L.TFun t (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) body
+  L.Let r (L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) body
     -> case op of
       "add" ->
         ( L.Let
             r
-            (L.Call (L.TFun t (L.Fun (L.PrimFun "add"))) [L.Var a1, L.Var a2])
+            (v a1 .+ v a2)
           . body'
         , final
         , xs
@@ -119,34 +119,30 @@ differentiateE = \case
       "mul" ->
         ( L.Let
               r
-              (L.Call (L.TFun t (L.Fun (L.PrimFun "mul")))
-                      [L.Var a1, L.Var a2]
-              )
+              (v a1 .* v a2)
           . body'
         , final
         , a1 : a2 : xs
         , \(a1_ : a2_ : xs') ->
           f xs'
-            . L.Let (rev a1) (Prim.pMul (revVar r) (L.Var a2_))
-            . L.Let (rev a2) (Prim.pMul (revVar r) (L.Var a1_))
+            . L.Let (rev a1) (revVar r .* v a2_)
+            . L.Let (rev a2) (revVar r .* v a1_)
         )
       "div"
         -> ( L.Let
                  r
-                 (L.Call (L.TFun t (L.Fun (L.PrimFun "div")))
-                         [L.Var a1, L.Var a2]
-                 )
+                 (v a1 ./ v a2)
              . body'
            , final
            , a1 : a2 : xs
            , \(a1_ : a2_ : xs') ->
              f xs'
-               . L.Let (rev a1) (Prim.pDiv (revVar r) (L.Var a2_))
+               . L.Let (rev a1) (revVar r ./ v a2_)
                . L.Let
                    (rev a2)
                    (Prim.pNeg
-                     (Prim.pDiv (Prim.pMul (L.Var a1_) (revVar r))
-                                (Prim.pMul (L.Var a2_) (L.Var a2_))
+                     ((v a1_ .* revVar r) ./
+                                (v a2_ .* v a2_)
                      )
                    )
            )
@@ -163,6 +159,13 @@ differentiateE = \case
   L.Var v -> (id, v, [], \[] -> id)
 
   s       -> error ("Couldn't differentiate: " ++ show s)
+
+  where
+    (.*) :: L.TExpr -> L.TExpr -> L.TExpr
+    (.*) = Prim.pMul
+    (./) = Prim.pDiv
+    (.+) = Prim.pAdd
+    v = L.Var
 
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
