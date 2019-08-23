@@ -113,23 +113,21 @@ differentiateE = \case
           , []
           , \xs' -> (xs', L.Dup (rev a1, rev a2) (revVar r))
           )
-        "mul" ->
-          ( L.Let r (v a1 .* v a2) . body'
-          , final
-          , a1 : a2 : xs
+        "mul" -> g
+          ( L.Let r (v a1 .* v a2)
+          , [a1, a2]
           , \(a1_ : a2_ : xs') ->
-            f xs' . L.Let (rev a1) (revVar r .* v a2_) . L.Let
+            (xs', L.Let (rev a1) (revVar r .* v a2_) . L.Let
               (rev a2)
-              (revVar r .* v a1_)
+              (revVar r .* v a1_))
           )
-        "div" ->
-          ( L.Let r (v a1 ./ v a2) . body'
-          , final
-          , a1 : a2 : xs
+        "div" -> g
+          ( L.Let r (v a1 ./ v a2)
+          , [a1, a2]
           , \(a1_ : a2_ : xs') ->
-            f xs' . L.Let (rev a1) (revVar r ./ v a2_) . L.Let
+            (xs', L.Let (rev a1) (revVar r ./ v a2_) . L.Let
               (rev a2)
-              (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_)))
+              (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_))))
           )
         s -> error ("differentiateE unexpected " ++ s)
     k@(L.Konst{}) ->
