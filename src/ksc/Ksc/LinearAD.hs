@@ -130,10 +130,10 @@ differentiateE = \case
               (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_))))
           )
         s -> error ("differentiateE unexpected " ++ s)
-    k@(L.Konst{}) ->
+    k@(L.Konst{}) -> g
       -- Not strictly linear because we don't eliminate `rev v`, but we
       -- probably don't care at the moment
-      (L.Let r k . body', final, xs, \xs' -> f xs')
+      (L.Let r k, [], \xs' -> (xs', id))
 
     rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
     where (body', final, xs, f) = differentiateE body
