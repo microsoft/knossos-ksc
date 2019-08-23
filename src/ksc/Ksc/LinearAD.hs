@@ -105,43 +105,42 @@ differentiateE = \case
     , \xs' -> f xs' . L.Let (rev v) (revVar v1 .+ revVar v2)
     )
     where (body', r, xs, f) = differentiateE body
-  L.Let r rhs body
-   -> case rhs of
-   (L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2])
-    -> case op of
-      "add" ->
-        ( L.Let r (v a1 .+ v a2) . body'
-        , final
-        , xs
-        , \xs' -> f xs' . L.Dup (rev a1, rev a2) (revVar r)
-        )
-      "mul" ->
-        ( L.Let r (v a1 .* v a2) . body'
-        , final
-        , a1 : a2 : xs
-        , \(a1_ : a2_ : xs') ->
-          f xs' . L.Let (rev a1) (revVar r .* v a2_) . L.Let
-            (rev a2)
-            (revVar r .* v a1_)
-        )
-      "div" ->
-        ( L.Let r (v a1 ./ v a2) . body'
-        , final
-        , a1 : a2 : xs
-        , \(a1_ : a2_ : xs') ->
-          f xs' . L.Let (rev a1) (revVar r ./ v a2_) . L.Let
-            (rev a2)
-            (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_)))
-        )
-      s -> error ("differentiateE unexpected " ++ s)
-   k@(L.Konst{}) ->
-         -- Not strictly linear because we don't eliminate `rev v`, but we
-    -- probably don't care at the moment
+  L.Let r rhs body -> case rhs of
+    (L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) ->
+      case op of
+        "add" ->
+          ( L.Let r (v a1 .+ v a2) . body'
+          , final
+          , xs
+          , \xs' -> f xs' . L.Dup (rev a1, rev a2) (revVar r)
+          )
+        "mul" ->
+          ( L.Let r (v a1 .* v a2) . body'
+          , final
+          , a1 : a2 : xs
+          , \(a1_ : a2_ : xs') ->
+            f xs' . L.Let (rev a1) (revVar r .* v a2_) . L.Let
+              (rev a2)
+              (revVar r .* v a1_)
+          )
+        "div" ->
+          ( L.Let r (v a1 ./ v a2) . body'
+          , final
+          , a1 : a2 : xs
+          , \(a1_ : a2_ : xs') ->
+            f xs' . L.Let (rev a1) (revVar r ./ v a2_) . L.Let
+              (rev a2)
+              (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_)))
+          )
+        s -> error ("differentiateE unexpected " ++ s)
+    k@(L.Konst{}) ->
+          -- Not strictly linear because we don't eliminate `rev v`, but we
+     -- probably don't care at the moment
 
-     (L.Let r k . body', final, xs, \xs' -> f xs')
+      (L.Let r k . body', final, xs, \xs' -> f xs')
 
-   rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
-   where (body', final, xs, f) = differentiateE body
+    rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
+    where (body', final, xs, f) = differentiateE body
 
   L.Var v -> (id, v, [], \[] -> id)
   s       -> error ("Couldn't differentiate: " ++ show s)
