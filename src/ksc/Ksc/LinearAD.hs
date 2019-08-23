@@ -74,9 +74,10 @@ lineariseE = \case
     (dups', new_args) =
       foldr (\(g, arg) (gs, args) -> (g . gs, arg : args)) (id, []) dups
 
+  L.Let v k@(L.Konst{}) body -> L.Let v k (lineariseE body)
   var@( L.Var{} ) -> var
   call@(L.Call{}) -> call
-  v               -> error ("unexpected " ++ L.render (L.ppr v))
+  v               -> error ("lineariseE unexpected " ++ show v)
 
 differentiateD :: L.TDef -> L.TDef
 differentiateD tdef@(L.Def { L.def_rhs = L.UserRhs rhs }) = L.Def
@@ -103,12 +104,12 @@ differentiateE = \case
     , \xs' -> f xs' . L.Let v (Prim.pAdd (L.Var v1) (L.Var v2))
     )
     where (body', r, xs, f) = differentiateE body
-  L.Let v (L.Call (L.TFun t (L.Fun (L.UserFun op))) [L.Var a1, L.Var a2]) body
+  L.Let v (L.Call (L.TFun t (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) body
     -> case op of
       "add" ->
         ( L.Let
             v
-            (L.Call (L.TFun t (L.Fun (L.UserFun "add"))) [L.Var a1, L.Var a2])
+            (L.Call (L.TFun t (L.Fun (L.PrimFun "add"))) [L.Var a1, L.Var a2])
           . body'
         , r
         , xs
@@ -119,7 +120,7 @@ differentiateE = \case
           . L.Dup (renameTVar a2 (++ "$1"), a2) (L.Var a2)
           . L.Let
               v
-              (L.Call (L.TFun t (L.Fun (L.UserFun "mul"))) [L.Var a1, L.Var a2])
+              (L.Call (L.TFun t (L.Fun (L.PrimFun "mul"))) [L.Var a1, L.Var a2])
           . body'
         , r
         , a1 : a2 : xs
@@ -134,7 +135,7 @@ differentiateE = \case
              . L.Dup (renameTVar a2 (++ "$1"), a2) (L.Var a2)
              . L.Let
                  v
-                 (L.Call (L.TFun t (L.Fun (L.UserFun "div")))
+                 (L.Call (L.TFun t (L.Fun (L.PrimFun "div")))
                          [L.Var a1, L.Var a2]
                  )
              . body'
@@ -152,15 +153,25 @@ differentiateE = \case
                      )
                    )
            )
-      s -> error ("Unexpected " ++ s)
+      s -> error ("differentiateE unexpected " ++ s)
    where
     (body', r, xs, f) = differentiateE body
+    -- These renamings are really quite naughty
     a1'               = renameTVar a1 (++ "$1")
-    a2'               = renameTVar a2 (++ "$1")
-    v1                = undefined
-    v2                = undefined
+    a2'               = renameTVar a2 (++ "$2")
+    v1                = renameTVar v (++ "$1")
+    v2                = renameTVar v (++ "$2")
 
-  _ -> error "differentiate"
+  L.Let v k@(L.Konst{}) body ->
+    -- Not strictly linear because we don't eliminate `rev v`, but we
+    -- probably don't care at the moment
+    (L.Let v k . body', r, xs, \xs' -> f xs')
+   where
+    (body', r, xs, f) = differentiateE body
+
+  L.Var v -> (id, v, [], \[] -> id)
+
+  s -> error ("Couldn't differentiate: " ++ show s)
 
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
