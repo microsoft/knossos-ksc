@@ -411,9 +411,7 @@ futharkPipeline file
 
   ; let env4 = env3
 
-  ; let alldefs = defs_optdiffs
-
-  ; anfOptAndCse display rulebase env4 alldefs
+  ; anfOptAndCse display rulebase env4 defs_optdiffs
   }
 
 -- | Read source code from specified input file, optimise,
