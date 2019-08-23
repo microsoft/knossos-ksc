@@ -134,9 +134,8 @@ differentiateE = \case
           )
         s -> error ("differentiateE unexpected " ++ s)
     k@(L.Konst{}) ->
-          -- Not strictly linear because we don't eliminate `rev v`, but we
-     -- probably don't care at the moment
-
+      -- Not strictly linear because we don't eliminate `rev v`, but we
+      -- probably don't care at the moment
       (L.Let r k . body', final, xs, \xs' -> f xs')
 
     rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
