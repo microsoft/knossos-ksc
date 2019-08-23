@@ -142,15 +142,15 @@ differentiateE = \case
 
     rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
-    g (myBody, myTrace, fromTrace) =
-      ( myBody . theirBody
+    g (myFwd, myTrace, fromTrace) =
+      ( myFwd . theirFwd
       , final
       , myTrace ++ theirTrace
       , \fullTrace ->
-        let (theirTrace_, myRBody) = fromTrace fullTrace
-        in  theirRBody theirTrace_ . myRBody
+        let (theirTrace_, myRev) = fromTrace fullTrace
+        in  theirRev theirTrace_ . myRev
       )
-      where (theirBody, final, theirTrace, theirRBody) = differentiateE body
+      where (theirFwd, final, theirTrace, theirRev) = differentiateE body
 
   L.Var v -> (id, v, [], \[] -> id)
   s       -> error ("Couldn't differentiate: " ++ show s)
