@@ -28,6 +28,12 @@
            (v (add (mul (mul 2.0 p) q) (mul 3.0 r))))
        v))
 
+(def tminka Float ((x : Float) (y : Float))
+     (let ((a (+ (* 2.0 x) (* 3.0 y)))
+           (b (+ (* 4.0 a) (* 5.0 a)))
+           (r (+ (* 6.0 b) (* 7.0 b))))
+       r))
+
 (def main Integer ()
      (print "13238.25 = " 13238.25 "\n"
             "f 3.0 4.0 = " (f 3.0 4.0) "\n"
