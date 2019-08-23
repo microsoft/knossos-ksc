@@ -116,7 +116,7 @@ moveMain = partition isMain
 
 defsAndDiffs :: (String -> GblSymTab -> [TDef] -> KM a)
              -> [Decl]
-             -> KM (GblSymTab, [TDef], RuleBase)
+             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
 defsAndDiffs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
@@ -156,7 +156,7 @@ defsAndDiffs display decls = do {
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; return (env3, defs ++ optdiffs, rulebase)
+  ; return (env3, defs, optdiffs, rulebase)
   }
 
 anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)
@@ -187,13 +187,13 @@ displayCppGenAndCompile compile ext verbosity file =
   ; let (main, decls)    = moveMain decls0
   ; dd main
 
-  ; (env3, defs_optdiffs, rulebase) <- defsAndDiffs display decls
+  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
 
   ; (env4, ann_main) <- annotDecls env3 main
 
   ; let (_rules, main_tdef) = partitionDecls ann_main
 
-  ; let alldefs = defs_optdiffs ++ main_tdef
+  ; let alldefs = defs ++ optdiffs ++ main_tdef
 
   ; cse <- anfOptAndCse display rulebase env4 alldefs
 
@@ -407,11 +407,11 @@ futharkPipeline file
 
   ; let (_main, decls)    = moveMain decls0
 
-  ; (env3, defs_optdiffs, rulebase) <- defsAndDiffs display decls
+  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
 
   ; let env4 = env3
 
-  ; let alldefs = defs_optdiffs
+  ; let alldefs = defs ++ optdiffs
 
   ; anfOptAndCse display rulebase env4 alldefs
   }
