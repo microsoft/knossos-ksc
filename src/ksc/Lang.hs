@@ -123,8 +123,7 @@ data ExprX p
   | Assert (ExprX p) (ExprX p)
   | Dup (LetBndrX p, LetBndrX p) (ExprX p) (ExprX p)
 
-instance InPhase p => Show (ExprX p) where
-  show e = pps e
+deriving instance Show (ExprX Typed)
 
 type Expr  = ExprX Parsed
 
@@ -241,7 +240,7 @@ data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
 
 data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
-  deriving (Eq, Ord)  -- type of the function.
+  deriving (Eq, Ord, Show)  -- type of the function.
 
 
 data Var
