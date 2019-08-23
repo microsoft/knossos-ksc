@@ -117,28 +117,40 @@ differentiateE = \case
           ( L.Let r (v a1 .* v a2)
           , [a1, a2]
           , \(a1_ : a2_ : xs') ->
-            (xs', L.Let (rev a1) (revVar r .* v a2_) . L.Let
-              (rev a2)
-              (revVar r .* v a1_))
+            ( xs'
+            , L.Let (rev a1) (revVar r .* v a2_)
+              . L.Let (rev a2) (revVar r .* v a1_)
+            )
           )
         "div" -> g
           ( L.Let r (v a1 ./ v a2)
           , [a1, a2]
           , \(a1_ : a2_ : xs') ->
-            (xs', L.Let (rev a1) (revVar r ./ v a2_) . L.Let
-              (rev a2)
-              (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_))))
+            ( xs'
+            , L.Let (rev a1) (revVar r ./ v a2_)
+              . L.Let
+                  (rev a2)
+                  (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_)))
+            )
           )
         s -> error ("differentiateE unexpected " ++ s)
-    k@(L.Konst{}) -> g
+    k@(L.Konst{}) ->
+      g
       -- Not strictly linear because we don't eliminate `rev v`, but we
       -- probably don't care at the moment
-      (L.Let r k, [], \xs' -> (xs', id))
+        (L.Let r k, [], \xs' -> (xs', id))
 
     rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
-    where g (body'', trace, gg) = (body'' . body', final, trace ++ xs, \xs' -> let (rest, rbody'') = gg xs'
-                                                                               in f rest . rbody'')
-            where (body', final, xs, f) = differentiateE body
+   where
+    g (myBody, myTrace, fromTrace) =
+      ( myBody . theirBody
+      , final
+      , myTrace ++ theirTrace
+      , \fullTrace ->
+        let (theirTrace_, myRBody) = fromTrace fullTrace
+        in  theirRBody theirTrace_ . myRBody
+      )
+      where (theirBody, final, theirTrace, theirRBody) = differentiateE body
 
   L.Var v -> (id, v, [], \[] -> id)
   s       -> error ("Couldn't differentiate: " ++ show s)
