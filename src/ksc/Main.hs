@@ -15,6 +15,7 @@ import AD
 import Opt
 import CSE
 import qualified Ksc.Futhark
+import qualified Ksc.LinearAD as L
 
 import ANF
 import qualified Cgen
@@ -153,10 +154,15 @@ defsAndDiffs display decls = do {
   ; (env3, optdiffs) <- optDefs rulebase env25 diffs
   ; display "OptDiffs" env3 optdiffs
 
+  ; anf_defs <- anfDefs defs
+  ; let lineardiffs = map (L.removeDupsD . L.differentiateD) anf_defs
+        env4 = env3 `extendGblST` lineardiffs
+  ; display "Linear diffs" env4 lineardiffs
+
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; return (env3, defs, optdiffs, rulebase)
+  ; return (env4, defs, optdiffs ++ lineardiffs, rulebase)
   }
 
 anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)

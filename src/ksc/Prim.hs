@@ -71,6 +71,7 @@ mk_fun f = case find_dollar f of
              Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
              Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
              Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
+             Just ("revl", s) -> LinearGradFun (mk_fun_id s)
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where

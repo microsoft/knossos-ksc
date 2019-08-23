@@ -48,13 +48,12 @@ disp what env decls = do
   A.lintDefs what env decls
 
 lineariseD :: L.TDef -> L.TDef
-lineariseD tdef@(L.Def { L.def_rhs = L.UserRhs rhs })
-  = L.Def
-    { L.def_fun    = L.def_fun tdef
-    , L.def_args   = L.def_args tdef
-    , L.def_res_ty = L.def_res_ty tdef
-    , L.def_rhs    = L.UserRhs (lineariseE rhs)
-    }
+lineariseD tdef@(L.Def { L.def_rhs = L.UserRhs rhs }) = L.Def
+  { L.def_fun    = L.def_fun tdef
+  , L.def_args   = L.def_args tdef
+  , L.def_res_ty = L.def_res_ty tdef
+  , L.def_rhs    = L.UserRhs (lineariseE rhs)
+  }
 lineariseD _ = error "I can't cope with that rhs"
 
 lineariseE :: L.TExpr -> L.TExpr
@@ -81,13 +80,13 @@ lineariseE = \case
   v                          -> error ("lineariseE unexpected " ++ show v)
 
 differentiateD :: L.TDef -> L.TDef
-differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f)
-                           , L.def_rhs = L.UserRhs rhs }) = L.Def
-  { L.def_fun    = L.LinearGradFun (L.UserFun f)
-  , L.def_args   = args ++ [rev r]
-  , L.def_res_ty = res_ty
-  , L.def_rhs    = L.UserRhs d_rhs
-  }
+differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f), L.def_rhs = L.UserRhs rhs })
+  = L.Def
+    { L.def_fun    = L.LinearGradFun (L.UserFun f)
+    , L.def_args   = args ++ [rev r]
+    , L.def_res_ty = res_ty
+    , L.def_rhs    = L.UserRhs d_rhs
+    }
  where
   (fwd, r, trace, rev') = differentiateE rhs
   d_rhs = (fwd . rev' trace . L.Tuple) (L.Var r : map (L.Var . rev) args)
@@ -177,6 +176,18 @@ differentiateE = \case
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
 renameTVar _                       _ = error "renameTVar"
+
+removeDupsE :: L.TExpr -> L.TExpr
+removeDupsE = \case
+  L.Dup (v1, v2) v@(L.Var{}) body -> L.Let v1 v (L.Let v2 v (removeDupsE body))
+  L.Let v        e           body -> L.Let v e (removeDupsE body)
+  -- Since we're supposed be in ANF we only recurse on Dups and Lets
+  notDup                          -> notDup
+
+removeDupsD :: L.TDef -> L.TDef
+removeDupsD def@(L.Def { L.def_rhs = L.UserRhs rhs }) =
+  def { L.def_rhs = L.UserRhs (removeDupsE rhs) }
+removeDupsD _ = error "removeDupsF"
 
 rev :: L.TVar -> L.TVar
 rev = flip renameTVar (++ "$r")
