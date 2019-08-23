@@ -105,65 +105,54 @@ differentiateE = \case
     , \xs' -> f xs' . L.Let (rev v) (Prim.pAdd (revVar v1) (revVar v2))
     )
     where (body', r, xs, f) = differentiateE body
-  L.Let v (L.Call (L.TFun t (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) body
+  L.Let r (L.Call (L.TFun t (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) body
     -> case op of
       "add" ->
         ( L.Let
-            v
+            r
             (L.Call (L.TFun t (L.Fun (L.PrimFun "add"))) [L.Var a1, L.Var a2])
           . body'
-        , r
+        , final
         , xs
-        , \xs' -> f xs' . L.Dup (rev a1, rev a2) (revVar v)
+        , \xs' -> f xs' . L.Dup (rev a1, rev a2) (revVar r)
         )
       "mul" ->
-        ( L.Dup (a1, a1') (L.Var a1)
-          . L.Dup (a2, a2') (L.Var a2)
-          . L.Let
-              v
+        ( L.Let
+              r
               (L.Call (L.TFun t (L.Fun (L.PrimFun "mul")))
-                      [L.Var a1', L.Var a2']
+                      [L.Var a1, L.Var a2]
               )
           . body'
-        , r
+        , final
         , a1 : a2 : xs
         , \(a1_ : a2_ : xs') ->
           f xs'
-            . L.Dup (rev v1, rev v2) (revVar v)
-            . L.Let (rev a1) (Prim.pMul (revVar v1) (L.Var a2_))
-            . L.Let (rev a2) (Prim.pMul (revVar v2) (L.Var a1_))
+            . L.Let (rev a1) (Prim.pMul (revVar r) (L.Var a2_))
+            . L.Let (rev a2) (Prim.pMul (revVar r) (L.Var a1_))
         )
       "div"
-        -> ( L.Dup (a1, a1') (L.Var a1)
-             . L.Dup (a2, a2') (L.Var a2)
-             . L.Let
-                 v
+        -> ( L.Let
+                 r
                  (L.Call (L.TFun t (L.Fun (L.PrimFun "div")))
-                         [L.Var a1', L.Var a2']
+                         [L.Var a1, L.Var a2]
                  )
              . body'
-           , r
+           , final
            , a1 : a2 : xs
            , \(a1_ : a2_ : xs') ->
              f xs'
-               . L.Dup (rev v1, rev v2) (revVar v)
-               . L.Let (rev a1) (Prim.pDiv (revVar v1) (L.Var a2_))
+               . L.Let (rev a1) (Prim.pDiv (revVar r) (L.Var a2_))
                . L.Let
                    (rev a2)
                    (Prim.pNeg
-                     (Prim.pDiv (Prim.pMul (L.Var a1_) (revVar v2))
+                     (Prim.pDiv (Prim.pMul (L.Var a1_) (revVar r))
                                 (Prim.pMul (L.Var a2_) (L.Var a2_))
                      )
                    )
            )
       s -> error ("differentiateE unexpected " ++ s)
    where
-    (body', r, xs, f) = differentiateE body
-    -- These renamings are really quite naughty
-    a1'               = renameTVar a1 (++ "$1")
-    a2'               = renameTVar a2 (++ "$1")
-    v1                = renameTVar v (++ "$1")
-    v2                = renameTVar v (++ "$2")
+    (body', final, xs, f) = differentiateE body
 
   L.Let v k@(L.Konst{}) body ->
     -- Not strictly linear because we don't eliminate `rev v`, but we
