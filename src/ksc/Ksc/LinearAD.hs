@@ -108,11 +108,10 @@ differentiateE = \case
   L.Let r rhs body -> case rhs of
     (L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) ->
       case op of
-        "add" ->
-          ( L.Let r (v a1 .+ v a2) . body'
-          , final
-          , xs
-          , \xs' -> f xs' . L.Dup (rev a1, rev a2) (revVar r)
+        "add" -> g
+          ( L.Let r (v a1 .+ v a2)
+          , []
+          , \xs' -> (xs', L.Dup (rev a1, rev a2) (revVar r))
           )
         "mul" ->
           ( L.Let r (v a1 .* v a2) . body'
@@ -140,6 +139,8 @@ differentiateE = \case
 
     rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
     where (body', final, xs, f) = differentiateE body
+          g (body'', trace, gg) = (body'' . body', final, trace ++ xs, \xs' -> let (rest, rbody'') = gg xs'
+                                                                               in f rest . rbody'')
 
   L.Var v -> (id, v, [], \[] -> id)
   s       -> error ("Couldn't differentiate: " ++ show s)
