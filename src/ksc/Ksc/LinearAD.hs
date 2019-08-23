@@ -136,9 +136,9 @@ differentiateE = \case
       (L.Let r k, [], \xs' -> (xs', id))
 
     rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
-    where (body', final, xs, f) = differentiateE body
-          g (body'', trace, gg) = (body'' . body', final, trace ++ xs, \xs' -> let (rest, rbody'') = gg xs'
+    where g (body'', trace, gg) = (body'' . body', final, trace ++ xs, \xs' -> let (rest, rbody'') = gg xs'
                                                                                in f rest . rbody'')
+            where (body', final, xs, f) = differentiateE body
 
   L.Var v -> (id, v, [], \[] -> id)
   s       -> error ("Couldn't differentiate: " ++ show s)
