@@ -74,7 +74,6 @@ anfE1 subst e = do { e' <- anfE subst e
 -- atomise :: GenBndr p => ExprX p -> AnfM p (ExprX p)
 atomise :: TExpr -> AnfM Typed TExpr
 atomise (Var v)   = return (Var v)
-atomise (Konst k) = return (Konst k)
 atomise (Lam x e) = return (Lam x e) -- Don't separate build from lambda
 atomise e         = do { (b,v) <- newVar e
                        ; emit b e
