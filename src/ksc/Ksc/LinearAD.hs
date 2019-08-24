@@ -175,6 +175,7 @@ differentiateE = \case
                   (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_)))
             )
           )
+        "eq" -> temporaryDummy
         s -> error ("differentiateE unexpected PrimFun: " ++ s)
     k@(L.Konst{}) ->
       g
@@ -184,12 +185,18 @@ differentiateE = \case
 
     L.Var vv ->
       g (L.Let r (v vv), [], \xs' -> (xs', L.Let (rev vv) (revVar r)))
-    call@(L.Call build [L.Var _n, _lambda])
-      | build `Prim.isThePrimFun` "build"
-        -- I'm not going to do build properly yet
-        -> g (L.Let r call,
-              [],
-              \xs' -> (xs', id))
+    L.Call f args
+      | f `Prim.isThePrimFun` "build"
+      , [L.Var _n, _lambda] <- args
+        -> temporaryDummy
+      | f `Prim.isThePrimFun` "sum"
+      , [L.Var{}] <- args
+        -> temporaryDummy
+      | f `Prim.isThePrimFun` "eq"
+      , [L.Var{}, L.Var{}] <- args
+        -> temporaryDummy
+      | (L.TFun _ (L.Fun (L.UserFun{}))) <- f
+        -> temporaryDummy
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g (myFwd, myTrace, fromTrace) =
@@ -201,6 +208,10 @@ differentiateE = \case
         in  theirRev theirTrace_ . myRev
       )
       where (theirFwd, final, theirTrace, theirRev) = differentiateE body
+    temporaryDummy = g (id,
+              [],
+              \xs' -> (xs', id))
+
 
   L.Var vv -> (id, vv, [], \[] -> id)
   s        -> error ("Couldn't differentiate: " ++ show s)
