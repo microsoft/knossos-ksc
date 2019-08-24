@@ -62,7 +62,8 @@ anfE subst (App e1 e2)    = do { f <- anfE subst e1
                                ; return (App f a) }
 anfE subst (Lam v e)      = do { e' <- anfExpr subst e
                                ; return (Lam v e') }
-anfE subst (Assert e1 e2) = do { e1' <- anfE subst e1
+anfE subst (Assert e1 e2) = atomise =<<
+                            do { e1' <- anfE subst e1
                                ; e2' <- anfExpr subst e2
                                ; return (Assert e1' e2') }
 
