@@ -28,6 +28,12 @@
            (v (add (mul (mul 2.0 p) q) (mul 3.0 r))))
        v))
 
+(def f2 Float ((x : Float) (y : Float))
+     (let ((p (mul 7.0 x))
+           (r (div 11.0 y))
+           (q (mul (mul p x) 5.0)))
+       (add (mul (mul 2.0 p) q) (mul 3.0 r))))
+
 (def tminka Float ((x : Float) (y : Float))
      (let ((a (+ (* 2.0 x) (* 3.0 y)))
            (b (+ (* 4.0 a) (* 5.0 a)))

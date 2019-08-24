@@ -47,7 +47,7 @@ anfE subst (Call fun es)
  = do { e2' <- anfE1 subst e2
       ; return (Call fun [e1, e2']) }
  | otherwise
- = Call fun <$> mapM (anfE1 subst) es
+ = atomise =<< Call fun <$> mapM (anfE1 subst) es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = substBndr v subst
                                ; emit v' r'

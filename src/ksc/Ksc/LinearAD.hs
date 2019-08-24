@@ -75,6 +75,7 @@ lineariseE = \case
       foldr (\(g, arg) (gs, args) -> (g . gs, arg : args)) (id, []) dups
 
   L.Let v k@(L.Konst{}) body -> L.Let v k (lineariseE body)
+  L.Let v v'@(L.Var{}) body  -> L.Let v v' (lineariseE body)
   var@( L.Var{} )            -> var
   call@(L.Call{})            -> call
   v                          -> error ("lineariseE unexpected " ++ show v)
@@ -140,6 +141,8 @@ differentiateE = \case
       -- probably don't care at the moment
         (L.Let r k, [], \xs' -> (xs', id))
 
+    L.Var v -> g
+      (L.Let r (L.Var v), [], \xs' -> (xs', L.Let (rev v) (revVar r)))
     rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g (myFwd, myTrace, fromTrace) =
