@@ -44,7 +44,7 @@
        r))
 
 (def alog Float ((x : Float) (y : Float))
-     (mul x (log (add x y))))
+     (exp (mul x (log (add x y)))))
 
 (def main Integer ()
      (print "13238.25 = " 13238.25 "\n"

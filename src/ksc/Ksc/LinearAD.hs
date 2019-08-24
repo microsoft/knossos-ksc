@@ -202,6 +202,14 @@ differentiateE = \case
         , [a]
         , \(a_:xs') -> (xs', L.Let (rev a) (revVar r ./ v a_))
         )
+      | f `Prim.isThePrimFun` "exp"
+      , [L.Var a] <- args
+        -> g
+        ( L.Let r call
+        , [a]
+        -- Could share this exp
+        , \(a_:xs') -> (xs', L.Let (rev a) (revVar r .* Prim.pExp (v a_)))
+        )
       | f `Prim.isThePrimFun` "to_float"
       , [L.Var{}] <- args
         -> temporaryDummy
