@@ -64,8 +64,7 @@ lineariseD (L.Def { L.def_rhs = L.StubRhs{} }) =
 lineariseE :: L.TExpr -> L.TExpr
 lineariseE = \case
   L.Let v rhs body -> case rhs of
-    L.Call f args -> dups'
-      (L.Let v (L.Call f new_args) (lineariseE body))
+    L.Call f args -> dups' (L.Let v (L.Call f new_args) (lineariseE body))
      where
       dups = flip map args $ \case
         argvv@(L.Var argv) -> if argv `LU.notFreeIn` body
