@@ -72,7 +72,6 @@ lineariseE = \case
         else
           let argv' = LU.newVarNotIn (L.typeof call) body
           in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
-      k@(L.Konst{}) -> (id, k)
       arg           -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
     dups' :: L.TExpr -> L.TExpr
     new_args :: [L.TExpr]
