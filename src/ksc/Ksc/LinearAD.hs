@@ -185,7 +185,7 @@ differentiateE = \case
 
     L.Var vv ->
       g (L.Let r (v vv), [], \xs' -> (xs', L.Let (rev vv) (revVar r)))
-    L.Call f args
+    call@(L.Call f args)
       | f `Prim.isThePrimFun` "build"
       , [L.Var _n, _lambda] <- args
         -> temporaryDummy
@@ -196,8 +196,12 @@ differentiateE = \case
       , [L.Var{}, L.Var{}] <- args
         -> temporaryDummy
       | f `Prim.isThePrimFun` "log"
-      , [L.Var{}] <- args
-        -> temporaryDummy
+      , [L.Var a] <- args
+        -> g
+        ( L.Let r call
+        , [a]
+        , \(a_:xs') -> (xs', L.Let (rev a) (revVar r ./ v a_))
+        )
       | f `Prim.isThePrimFun` "to_float"
       , [L.Var{}] <- args
         -> temporaryDummy

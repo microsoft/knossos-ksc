@@ -43,6 +43,9 @@
            (r (add (mul 6.0 b) (mul 7.0 b))))
        r))
 
+(def alog Float ((x : Float) (y : Float))
+     (mul x (log (add x y))))
+
 (def main Integer ()
      (print "13238.25 = " 13238.25 "\n"
             "f 3.0 4.0 = " (f 3.0 4.0) "\n"
@@ -59,4 +62,8 @@
             "rev$e2 3.0 1.0 = " (rev$e2 3.0 1.0) "\n"
             "d 3.0 = " (d 3.0) "\n"
             "revl$d 3.0 1.0 = " (revl$d 3.0 1.0) "\n"
-            "rev$d 3.0 1.0 = " (rev$d 3.0 1.0) "\n"))
+            "rev$d 3.0 1.0 = " (rev$d 3.0 1.0) "\n"
+            "alog 3.0 4.0 = " (alog 3.0 4.0) "\n"
+            "revl$alog 3.0 4.0 1.0 = " (revl$alog 3.0 4.0 1.0) "\n"
+            "rev$alog 3.0 4.0 1.0 = " (rev$alog 3.0 4.0 1.0) "\n"
+            ))
