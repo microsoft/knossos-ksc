@@ -86,7 +86,10 @@ lineariseE = \case
     a@(L.Tuple{}) -> L.Let v a (lineariseE body)
     -- I can't be bothered to deal with assert so I'm just going to
     -- remove it
-    L.Assert{}           -> lineariseE body
+    L.Assert cond assertbody -> case cond of
+      vv@(L.Var{}) ->
+        L.Let v (L.Assert vv (lineariseE assertbody)) (lineariseE body)
+      o -> error ("lineariseE Let Assert unexpected " ++ show o)
     -- This is probably quite broken.  We need to be sure that both
     -- branches consume the same variables, otherwise we'll have
     -- problems.
