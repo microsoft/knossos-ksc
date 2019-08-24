@@ -103,6 +103,8 @@ differentiateD (L.Def { L.def_fun = L.Fun (L.SelFun{}) })
   = error "Wasn't expecting to be asked to differentiate a SelFun"
 differentiateD (L.Def { L.def_rhs = L.StubRhs })
   = error "Did not expect to see StubRhs"
+differentiateD edef@(L.Def { L.def_rhs = L.EDefRhs })
+  = edef
 differentiateD _ = error "differentiateD"
 
 differentiateE
@@ -188,7 +190,10 @@ removeDupsE = \case
 removeDupsD :: L.TDef -> L.TDef
 removeDupsD def@(L.Def { L.def_rhs = L.UserRhs rhs }) =
   def { L.def_rhs = L.UserRhs (removeDupsE rhs) }
-removeDupsD _ = error "removeDupsF"
+removeDupsD (L.Def { L.def_rhs = L.StubRhs })
+  = error "Did not expect to see StubRhs"
+removeDupsD edef@(L.Def { L.def_rhs = L.EDefRhs })
+  = edef
 
 rev :: L.TVar -> L.TVar
 rev = flip renameTVar (++ "$r")
