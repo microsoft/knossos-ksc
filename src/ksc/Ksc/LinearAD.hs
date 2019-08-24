@@ -84,7 +84,6 @@ lineariseE = \case
   L.Let v k@(L.Konst{}) body -> L.Let v k (lineariseE body)
   L.Let v v'@(L.Var{}) body  -> L.Let v v' (lineariseE body)
   var@( L.Var{} )            -> var
-  call@(L.Call{})            -> call
   v                          -> error ("lineariseE unexpected " ++ show v)
 
 differentiateD :: L.TDef -> Maybe L.TDef
