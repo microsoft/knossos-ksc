@@ -175,7 +175,7 @@ differentiateE = \case
                   (Prim.pNeg ((v a1_ .* revVar r) ./ (v a2_ .* v a2_)))
             )
           )
-        s -> error ("differentiateE unexpected " ++ s)
+        s -> error ("differentiateE unexpected PrimFun: " ++ s)
     k@(L.Konst{}) ->
       g
       -- Not strictly linear because we don't eliminate `rev v`, but we
