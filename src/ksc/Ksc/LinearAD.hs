@@ -64,15 +64,15 @@ lineariseD (L.Def { L.def_rhs = L.StubRhs{} }) =
 lineariseE :: L.TExpr -> L.TExpr
 lineariseE = \case
   L.Let v rhs body -> case rhs of
-    call@(L.Call f args) -> dups'
+    L.Call f args -> dups'
       (L.Let v (L.Call f new_args) (lineariseE body))
      where
       dups = flip map args $ \case
-        L.Var argv -> if argv `LU.notFreeIn` body
+        argvv@(L.Var argv) -> if argv `LU.notFreeIn` body
           then (id, L.Var argv)
           else
-            let argv' = LU.newVarNotIn (L.typeof call) body
-            in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
+            let argv' = LU.newVarNotIn (L.typeof argvv) body
+            in  (L.Dup (argv, argv') argvv, L.Var argv')
         lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
           then (id, lam)
           else error "Didn't expect to see lam in Anf form"
