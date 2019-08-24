@@ -19,6 +19,8 @@ import qualified LangUtils                     as LU
 import qualified Rules
 import qualified ANF                           as A
 
+import           Data.Maybe                    (mapMaybe)
+
 demoF :: String -> IO ()
 demoF file = do
   defs <- parseF file
@@ -39,7 +41,7 @@ demoN decls = do
   let linear_defs = map lineariseD anf_defs
   disp "Linear original definition" env linear_defs
 
-  let diff_defs = map differentiateD linear_defs
+  let diff_defs = mapMaybe differentiateD linear_defs
   disp "Derivative" env diff_defs
 
 disp :: String -> LU.GblSymTab -> [L.TDef] -> KM ()
@@ -83,14 +85,14 @@ lineariseE = \case
   call@(L.Call{})            -> call
   v                          -> error ("lineariseE unexpected " ++ show v)
 
-differentiateD :: L.TDef -> L.TDef
+differentiateD :: L.TDef -> Maybe L.TDef
 differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f), L.def_rhs = L.UserRhs rhs })
-  = L.Def
+  = Just (L.Def
     { L.def_fun    = L.LinearGradFun (L.UserFun f)
     , L.def_args   = args ++ [rev r]
     , L.def_res_ty = res_ty
     , L.def_rhs    = L.UserRhs d_rhs
-    }
+    })
  where
   (fwd, r, trace, rev') = differentiateE rhs
   d_rhs = (fwd . rev' trace . L.Tuple) (L.Var r : map (L.Var . rev) args)
@@ -103,9 +105,11 @@ differentiateD (L.Def { L.def_fun = L.Fun (L.SelFun{}) })
   = error "Wasn't expecting to be asked to differentiate a SelFun"
 differentiateD (L.Def { L.def_rhs = L.StubRhs })
   = error "Did not expect to see StubRhs"
-differentiateD edef@(L.Def { L.def_rhs = L.EDefRhs })
-  = edef
-differentiateD _ = error "differentiateD"
+-- Some things we don't expect to have to differentiate
+differentiateD L.Def { L.def_rhs = L.EDefRhs } = Nothing
+differentiateD L.Def { L.def_fun = L.GradFun{} } = Nothing
+differentiateD L.Def { L.def_fun = L.DrvFun{} } = Nothing
+differentiateD L.Def { L.def_fun = L.LinearGradFun{} } = Nothing
 
 differentiateE
   :: L.TExpr

@@ -23,6 +23,7 @@ import KMonad
 import qualified Control.Exception
 import qualified Data.Maybe
 import Data.List( partition, intercalate )
+import Data.Maybe( mapMaybe )
 import qualified System.Directory
 import qualified System.Environment
 import qualified System.FilePath
@@ -157,7 +158,7 @@ defsAndDiffs display decls = do {
   ; anf_defs <- anfDefs defs
   ; display "ANF'd" env3 anf_defs
   ; let linear_defs = map L.lineariseD anf_defs
-        linear_diffs_withDups = map L.differentiateD linear_defs
+        linear_diffs_withDups = mapMaybe L.differentiateD linear_defs
         linear_diffs = map L.removeDupsD linear_diffs_withDups
         env4 = env3 `extendGblST` linear_diffs
   ; display "Linearised" env4 linear_defs
