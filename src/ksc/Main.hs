@@ -155,6 +155,7 @@ defsAndDiffs display decls = do {
   ; display "OptDiffs" env3 optdiffs
 
   ; anf_defs <- anfDefs defs
+  ; display "ANF'd" env3 anf_defs
   ; let linear_defs = map L.lineariseD anf_defs
         linear_diffs_withDups = map L.differentiateD linear_defs
         linear_diffs = map L.removeDupsD linear_diffs_withDups
