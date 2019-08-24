@@ -81,9 +81,9 @@ lineariseE = \case
       (dups', new_args) =
         foldr (\(g, a) (gs, as) -> (g . gs, a : as)) (id, []) dups
 
-    a@(L.Konst{})        -> L.Let v a (lineariseE body)
-    a@(L.Var{}  )        -> L.Let v a (lineariseE body)
-    a@(L.Tuple{})        -> L.Let v a (lineariseE body)
+    a@(L.Konst{}) -> L.Let v a (lineariseE body)
+    a@(L.Var{}  ) -> L.Let v a (lineariseE body)
+    a@(L.Tuple{}) -> L.Let v a (lineariseE body)
     -- I can't be bothered to deal with assert so I'm just going to
     -- remove it
     L.Assert{}           -> lineariseE body
