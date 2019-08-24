@@ -146,6 +146,8 @@ differentiateE = \case
         "add" -> g
           ( L.Let r (v a1 .+ v a2)
           , []
+          -- We don't need Dup here.  We could just use Let.  We don't
+          -- guarantee that the result of differentiating is linear
           , \xs' -> (xs', L.Dup (rev a1, rev a2) (revVar r))
           )
         "mul" -> g
