@@ -19,7 +19,7 @@ import qualified LangUtils                     as LU
 import qualified Rules
 import qualified ANF                           as A
 
-import           Data.Maybe                    (mapMaybe)
+import           Data.Maybe                     ( mapMaybe )
 
 demoF :: String -> IO ()
 demoF file = do
@@ -57,72 +57,74 @@ lineariseD tdef@(L.Def { L.def_rhs = L.UserRhs rhs }) = L.Def
   , L.def_res_ty = L.def_res_ty tdef
   , L.def_rhs    = L.UserRhs (lineariseE rhs)
   }
-lineariseD d@(L.Def{ L.def_rhs = L.EDefRhs{} }) = d
-lineariseD (L.Def{ L.def_rhs = L.StubRhs{} }) =
+lineariseD d@(L.Def { L.def_rhs = L.EDefRhs{} }) = d
+lineariseD (L.Def { L.def_rhs = L.StubRhs{} }) =
   error "Didn't expect to see a StubRhs at this stage"
 
 lineariseE :: L.TExpr -> L.TExpr
 lineariseE = \case
   L.Let v rhs body -> case rhs of
-    call@(L.Call f args) ->
-      dups'
+    call@(L.Call f args) -> dups'
       (L.Let v (L.Call f new_args) (lineariseE body))
-      where
-        dups = flip map args $ \case
-          L.Var argv -> if argv `LU.notFreeIn` body
-            then (id, L.Var argv)
-            else
-                        let argv' = LU.newVarNotIn (L.typeof call) body
-                        in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
-          lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
-                           then (id, lam)
-                           else error "Didn't expect to see lam in Anf form"
-          arg           -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
-        dups' :: L.TExpr -> L.TExpr
-        new_args :: [L.TExpr]
-        (dups', new_args) =
-          foldr (\(g, a) (gs, as) -> (g . gs, a : as)) (id, []) dups
+     where
+      dups = flip map args $ \case
+        L.Var argv -> if argv `LU.notFreeIn` body
+          then (id, L.Var argv)
+          else
+            let argv' = LU.newVarNotIn (L.typeof call) body
+            in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
+        lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
+          then (id, lam)
+          else error "Didn't expect to see lam in Anf form"
+        arg -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
+      dups' :: L.TExpr -> L.TExpr
+      new_args :: [L.TExpr]
+      (dups', new_args) =
+        foldr (\(g, a) (gs, as) -> (g . gs, a : as)) (id, []) dups
 
-    k@(L.Konst{}) -> L.Let v k (lineariseE body)
-    v'@(L.Var{})  -> L.Let v v' (lineariseE body)
-    t@(L.Tuple{}) -> L.Let v t (lineariseE body)
+    k@( L.Konst{})       -> L.Let v k (lineariseE body)
+    v'@(L.Var{}  )       -> L.Let v v' (lineariseE body)
+    t@( L.Tuple{})       -> L.Let v t (lineariseE body)
     -- I can't be bothered to deal with assert so I'm just going to
     -- remove it
-    L.Assert{}    -> lineariseE body
+    L.Assert{}           -> lineariseE body
     -- This is probably quite broken.  We need to be sure that both
     -- branches consume the same variables, otherwise we'll have
     -- problems.
     L.If cond true false -> case cond of
-      vv@(L.Var{}) -> L.Let v (L.If vv (lineariseE true) (lineariseE false)) body
+      vv@(L.Var{}) ->
+        L.Let v (L.If vv (lineariseE true) (lineariseE false)) body
       o -> error ("lineariseE Let If unexpected " ++ show o)
-    o                          -> error ("lineariseE Let unexpected " ++ show o)
-  var@( L.Var{} )            -> var
-  v                          -> error ("lineariseE unexpected " ++ show v)
+    o -> error ("lineariseE Let unexpected " ++ show o)
+  var@(L.Var{}) -> var
+  v             -> error ("lineariseE unexpected " ++ show v)
 
 differentiateD :: L.TDef -> Maybe L.TDef
 differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f), L.def_rhs = L.UserRhs rhs })
-  = Just (L.Def
-    { L.def_fun    = L.LinearGradFun (L.UserFun f)
-    , L.def_args   = args ++ [rev r]
-    , L.def_res_ty = res_ty
-    , L.def_rhs    = L.UserRhs d_rhs
-    })
+  = Just
+    (L.Def { L.def_fun    = L.LinearGradFun (L.UserFun f)
+           , L.def_args   = args ++ [rev r]
+           , L.def_res_ty = res_ty
+           , L.def_rhs    = L.UserRhs d_rhs
+           }
+    )
  where
   (fwd, r, trace, rev') = differentiateE rhs
   d_rhs = (fwd . rev' trace . L.Tuple) (L.Var r : map (L.Var . rev) args)
   args                  = L.def_args tdef
   res_ty                = L.TypeTuple (L.def_res_ty tdef : map L.typeof args)
-differentiateD (L.Def { L.def_fun = L.Fun (L.PrimFun f) })
-  = error ("Wasn't expecting to be asked to differentiate a PrimFun: "
-           ++ L.render (L.ppr f))
-differentiateD (L.Def { L.def_fun = L.Fun (L.SelFun{}) })
-  = error "Wasn't expecting to be asked to differentiate a SelFun"
-differentiateD (L.Def { L.def_rhs = L.StubRhs })
-  = error "Did not expect to see StubRhs"
+differentiateD (L.Def { L.def_fun = L.Fun (L.PrimFun f) }) = error
+  (  "Wasn't expecting to be asked to differentiate a PrimFun: "
+  ++ L.render (L.ppr f)
+  )
+differentiateD (L.Def { L.def_fun = L.Fun (L.SelFun{}) }) =
+  error "Wasn't expecting to be asked to differentiate a SelFun"
+differentiateD (L.Def { L.def_rhs = L.StubRhs }) =
+  error "Did not expect to see StubRhs"
 -- Some things we don't expect to have to differentiate
-differentiateD L.Def { L.def_rhs = L.EDefRhs } = Nothing
-differentiateD L.Def { L.def_fun = L.GradFun{} } = Nothing
-differentiateD L.Def { L.def_fun = L.DrvFun{} } = Nothing
+differentiateD L.Def { L.def_rhs = L.EDefRhs }         = Nothing
+differentiateD L.Def { L.def_fun = L.GradFun{} }       = Nothing
+differentiateD L.Def { L.def_fun = L.DrvFun{} }        = Nothing
 differentiateD L.Def { L.def_fun = L.LinearGradFun{} } = Nothing
 
 differentiateE
@@ -171,8 +173,8 @@ differentiateE = \case
       -- probably don't care at the moment
         (L.Let r k, [], \xs' -> (xs', id))
 
-    L.Var vv -> g
-      (L.Let r (v vv), [], \xs' -> (xs', L.Let (rev vv) (revVar r)))
+    L.Var vv ->
+      g (L.Let r (v vv), [], \xs' -> (xs', L.Let (rev vv) (revVar r)))
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g (myFwd, myTrace, fromTrace) =
@@ -186,7 +188,7 @@ differentiateE = \case
       where (theirFwd, final, theirTrace, theirRev) = differentiateE body
 
   L.Var vv -> (id, vv, [], \[] -> id)
-  s       -> error ("Couldn't differentiate: " ++ show s)
+  s        -> error ("Couldn't differentiate: " ++ show s)
  where
   (.*) :: L.TExpr -> L.TExpr -> L.TExpr
   (.*) = Prim.pMul
@@ -208,10 +210,9 @@ removeDupsE = \case
 removeDupsD :: L.TDef -> L.TDef
 removeDupsD def@(L.Def { L.def_rhs = L.UserRhs rhs }) =
   def { L.def_rhs = L.UserRhs (removeDupsE rhs) }
-removeDupsD (L.Def { L.def_rhs = L.StubRhs })
-  = error "Did not expect to see StubRhs"
-removeDupsD edef@(L.Def { L.def_rhs = L.EDefRhs })
-  = edef
+removeDupsD (L.Def { L.def_rhs = L.StubRhs }) =
+  error "Did not expect to see StubRhs"
+removeDupsD edef@(L.Def { L.def_rhs = L.EDefRhs }) = edef
 
 rev :: L.TVar -> L.TVar
 rev = flip renameTVar (++ "$r")
