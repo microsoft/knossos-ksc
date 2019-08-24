@@ -55,7 +55,9 @@ lineariseD tdef@(L.Def { L.def_rhs = L.UserRhs rhs }) = L.Def
   , L.def_res_ty = L.def_res_ty tdef
   , L.def_rhs    = L.UserRhs (lineariseE rhs)
   }
-lineariseD _ = error "I can't cope with that rhs"
+lineariseD d@(L.Def{ L.def_rhs = L.EDefRhs{} }) = d
+lineariseD (L.Def{ L.def_rhs = L.StubRhs{} }) =
+  error "Didn't expect to see a StubRhs at this stage"
 
 lineariseE :: L.TExpr -> L.TExpr
 lineariseE = \case
@@ -94,6 +96,13 @@ differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f), L.def_rhs = L.User
   d_rhs = (fwd . rev' trace . L.Tuple) (L.Var r : map (L.Var . rev) args)
   args                  = L.def_args tdef
   res_ty                = L.TypeTuple (L.def_res_ty tdef : map L.typeof args)
+differentiateD (L.Def { L.def_fun = L.Fun (L.PrimFun f) })
+  = error ("Wasn't expecting to be asked to differentiate a PrimFun: "
+           ++ L.render (L.ppr f))
+differentiateD (L.Def { L.def_fun = L.Fun (L.SelFun{}) })
+  = error "Wasn't expecting to be asked to differentiate a SelFun"
+differentiateD (L.Def { L.def_rhs = L.StubRhs })
+  = error "Did not expect to see StubRhs"
 differentiateD _ = error "differentiateD"
 
 differentiateE
