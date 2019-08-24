@@ -150,6 +150,11 @@ differentiateE = \case
           -- guarantee that the result of differentiating is linear
           , \xs' -> (xs', L.Dup (rev a1, rev a2) (revVar r))
           )
+        "sub" -> g
+          ( L.Let r (v a1 .- v a2)
+          , []
+          , \xs' -> (xs', L.Let (rev a1) (revVar r) . L.Let (rev a2) (revVar r))
+          )
         "mul" -> g
           ( L.Let r (v a1 .* v a2)
           , [a1, a2]
@@ -194,10 +199,10 @@ differentiateE = \case
   L.Var vv -> (id, vv, [], \[] -> id)
   s        -> error ("Couldn't differentiate: " ++ show s)
  where
-  (.*) :: L.TExpr -> L.TExpr -> L.TExpr
   (.*) = Prim.pMul
   (./) = Prim.pDiv
   (.+) = Prim.pAdd
+  (.-) = Prim.pSub
   v    = L.Var
 
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
