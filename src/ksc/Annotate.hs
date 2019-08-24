@@ -486,7 +486,8 @@ compatibleType exp_ty act_ty
 
 checkFreeness :: TVar -> Type -> SDoc -> TcM ()
 checkFreeness tv ty extra
-  = unless (tv `notFreeInType` ty) $
+  -- Temporarily disabling this because it doesn't cope with dups
+  = unless True $ --(tv `notFreeInType` ty) $
     addErr $ vcat [ hang (text "Locally bound variable" <+> ppr tv)
                        2 (text "appears free in result type" <+> ppr ty)
                   , extra ]
