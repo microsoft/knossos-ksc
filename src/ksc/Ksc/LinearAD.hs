@@ -72,6 +72,9 @@ lineariseE = \case
         else
           let argv' = LU.newVarNotIn (L.typeof call) body
           in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
+      lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
+                       then (id, lam)
+                       else error "Didn't expect to see lam in Anf form"
       arg           -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
     dups' :: L.TExpr -> L.TExpr
     new_args :: [L.TExpr]
