@@ -184,6 +184,12 @@ differentiateE = \case
 
     L.Var vv ->
       g (L.Let r (v vv), [], \xs' -> (xs', L.Let (rev vv) (revVar r)))
+    call@(L.Call build [L.Var _n, _lambda])
+      | build `Prim.isThePrimFun` "build"
+        -- I'm not going to do build properly yet
+        -> g (L.Let r call,
+              [],
+              \xs' -> (xs', id))
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g (myFwd, myTrace, fromTrace) =
