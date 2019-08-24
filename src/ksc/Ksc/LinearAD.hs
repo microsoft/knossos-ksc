@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fwarn-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Ksc.LinearAD where
@@ -72,7 +73,7 @@ lineariseE = \case
     dups' :: L.TExpr -> L.TExpr
     new_args :: [L.TExpr]
     (dups', new_args) =
-      foldr (\(g, arg) (gs, args) -> (g . gs, arg : args)) (id, []) dups
+      foldr (\(g, a) (gs, as) -> (g . gs, a : as)) (id, []) dups
 
   L.Let v k@(L.Konst{}) body -> L.Let v k (lineariseE body)
   L.Let v v'@(L.Var{}) body  -> L.Let v v' (lineariseE body)
@@ -99,11 +100,11 @@ differentiateE
   :: L.TExpr
   -> (L.TExpr -> L.TExpr, L.TVar, [L.TVar], [L.TVar] -> L.TExpr -> L.TExpr)
 differentiateE = \case
-  L.Dup (v1, v2) (L.Var v) body ->
-    ( L.Dup (v1, v2) (L.Var v) . body'
+  L.Dup (v1, v2) (L.Var vv) body ->
+    ( L.Dup (v1, v2) (L.Var vv) . body'
     , r
     , xs
-    , \xs' -> f xs' . L.Let (rev v) (revVar v1 .+ revVar v2)
+    , \xs' -> f xs' . L.Let (rev vv) (revVar v1 .+ revVar v2)
     )
     where (body', r, xs, f) = differentiateE body
   L.Let r rhs body -> case rhs of
@@ -141,9 +142,9 @@ differentiateE = \case
       -- probably don't care at the moment
         (L.Let r k, [], \xs' -> (xs', id))
 
-    L.Var v -> g
-      (L.Let r (L.Var v), [], \xs' -> (xs', L.Let (rev v) (revVar r)))
-    rhs -> error ("Couldn't differentiate rhs: " ++ show rhs)
+    L.Var vv -> g
+      (L.Let r (v vv), [], \xs' -> (xs', L.Let (rev vv) (revVar r)))
+    _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g (myFwd, myTrace, fromTrace) =
       ( myFwd . theirFwd
@@ -155,7 +156,7 @@ differentiateE = \case
       )
       where (theirFwd, final, theirTrace, theirRev) = differentiateE body
 
-  L.Var v -> (id, v, [], \[] -> id)
+  L.Var vv -> (id, vv, [], \[] -> id)
   s       -> error ("Couldn't differentiate: " ++ show s)
  where
   (.*) :: L.TExpr -> L.TExpr -> L.TExpr
