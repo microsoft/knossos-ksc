@@ -38,7 +38,7 @@ anfExpr subst e = wrapLets (anfE subst e)
 --
 -- anfE :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
 anfE :: Subst -> TExpr -> AnfM Typed TExpr
-anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
+anfE subst (Tuple es)    = atomise =<< (Tuple <$> mapM (anfE1 subst) es)
 anfE _ (Konst k)         = return (Konst k)
 anfE subst (Var tv)      = return (substVar subst tv)
 anfE subst (Call fun es)
@@ -54,7 +54,8 @@ anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; emit v' r'
                                ; anfE subst' e }
 anfE _ubst (Dup{})        = error "anfE Dup unimplemented"
-anfE subst (If b t e)     = do { t' <- anfExpr subst t
+anfE subst (If b t e)     = atomise =<<
+                            do { t' <- anfExpr subst t
                                ; e' <- anfExpr subst e
                                ; return (If b t' e') }
 anfE subst (App e1 e2)    = do { f <- anfE subst e1

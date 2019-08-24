@@ -63,26 +63,39 @@ lineariseD (L.Def{ L.def_rhs = L.StubRhs{} }) =
 
 lineariseE :: L.TExpr -> L.TExpr
 lineariseE = \case
-  L.Let v call@(L.Call f args) body -> dups'
-    (L.Let v (L.Call f new_args) (lineariseE body))
-   where
-    dups = flip map args $ \case
-      L.Var argv -> if argv `LU.notFreeIn` body
-        then (id, L.Var argv)
-        else
-          let argv' = LU.newVarNotIn (L.typeof call) body
-          in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
-      lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
-                       then (id, lam)
-                       else error "Didn't expect to see lam in Anf form"
-      arg           -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
-    dups' :: L.TExpr -> L.TExpr
-    new_args :: [L.TExpr]
-    (dups', new_args) =
-      foldr (\(g, a) (gs, as) -> (g . gs, a : as)) (id, []) dups
+  L.Let v rhs body -> case rhs of
+    call@(L.Call f args) ->
+      dups'
+      (L.Let v (L.Call f new_args) (lineariseE body))
+      where
+        dups = flip map args $ \case
+          L.Var argv -> if argv `LU.notFreeIn` body
+            then (id, L.Var argv)
+            else
+                        let argv' = LU.newVarNotIn (L.typeof call) body
+                        in  (L.Dup (argv, argv') (L.Var argv), L.Var argv')
+          lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
+                           then (id, lam)
+                           else error "Didn't expect to see lam in Anf form"
+          arg           -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
+        dups' :: L.TExpr -> L.TExpr
+        new_args :: [L.TExpr]
+        (dups', new_args) =
+          foldr (\(g, a) (gs, as) -> (g . gs, a : as)) (id, []) dups
 
-  L.Let v k@(L.Konst{}) body -> L.Let v k (lineariseE body)
-  L.Let v v'@(L.Var{}) body  -> L.Let v v' (lineariseE body)
+    k@(L.Konst{}) -> L.Let v k (lineariseE body)
+    v'@(L.Var{})  -> L.Let v v' (lineariseE body)
+    t@(L.Tuple{}) -> L.Let v t (lineariseE body)
+    -- I can't be bothered to deal with assert so I'm just going to
+    -- remove it
+    L.Assert{}    -> lineariseE body
+    -- This is probably quite broken.  We need to be sure that both
+    -- branches consume the same variables, otherwise we'll have
+    -- problems.
+    L.If cond true false -> case cond of
+      vv@(L.Var{}) -> L.Let v (L.If vv (lineariseE true) (lineariseE false)) body
+      o -> error ("lineariseE Let If unexpected " ++ show o)
+    o                          -> error ("lineariseE Let unexpected " ++ show o)
   var@( L.Var{} )            -> var
   v                          -> error ("lineariseE unexpected " ++ show v)
 
