@@ -38,9 +38,9 @@
        (add (mul (mul 2.0 p) q) (mul 3.0 r))))
 
 (def tminka Float ((x : Float) (y : Float))
-     (let ((a (+ (* 2.0 x) (* 3.0 y)))
-           (b (+ (* 4.0 a) (* 5.0 a)))
-           (r (+ (* 6.0 b) (* 7.0 b))))
+     (let ((a (add (mul 2.0 x) (mul 3.0 y)))
+           (b (add (mul 4.0 a) (mul 5.0 a)))
+           (r (add (mul 6.0 b) (mul 7.0 b))))
        r))
 
 (def main Integer ()
