@@ -195,8 +195,21 @@ differentiateE = \case
       | f `Prim.isThePrimFun` "eq"
       , [L.Var{}, L.Var{}] <- args
         -> temporaryDummy
+      | f `Prim.isThePrimFun` "log"
+      , [L.Var{}] <- args
+        -> temporaryDummy
+      | f `Prim.isThePrimFun` "to_float"
+      , [L.Var{}] <- args
+        -> temporaryDummy
+      | f `Prim.isThePrimFun` "$ranhashdoub"
+      , [L.Var{}] <- args
+        -> temporaryDummy
       | (L.TFun _ (L.Fun (L.UserFun{}))) <- f
         -> temporaryDummy
+      | (L.TFun _ (L.Fun (L.SelFun{}))) <- f
+        -> temporaryDummy
+    L.Assert _cond _assertBody -> temporaryDummy
+    L.If _cond _true _false -> temporaryDummy
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g (myFwd, myTrace, fromTrace) =
