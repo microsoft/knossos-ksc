@@ -44,7 +44,8 @@ anfE subst (Var tv)      = return (substVar subst tv)
 anfE subst (Call fun es)
  | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]
  , [e1,e2] <- es
- = do { e2' <- anfE1 subst e2
+ = atomise =<<
+   do { e2' <- anfE1 subst e2
       ; return (Call fun [e1, e2']) }
  | otherwise
  = atomise =<< Call fun <$> mapM (anfE1 subst) es

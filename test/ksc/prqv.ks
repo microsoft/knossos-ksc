@@ -6,6 +6,9 @@
      (let ((p (mul 7.0 x)))
        p))
 
+(def d1 Float ((x : Float) (y : Float))
+     (mul x y))
+
 (def e Float ((x : Float))
      (let ((p (mul 7.0 x))
            (q (mul (mul p x) 5.0)))
