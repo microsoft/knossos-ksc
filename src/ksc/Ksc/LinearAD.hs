@@ -132,7 +132,7 @@ differentiateD L.Def { L.def_fun = L.LinearGradFun{} } = Nothing
 
 differentiateE
   :: L.TExpr
-  -> (L.TExpr -> L.TExpr, L.TVar, [L.TVar], [L.TVar] -> L.TExpr -> L.TExpr)
+  -> (L.TExpr -> L.TExpr, L.TVar, [[L.TVar]], [[L.TVar]] -> L.TExpr -> L.TExpr)
 differentiateE = \case
   L.Dup (v1, v2) (L.Var vv) body ->
     ( L.Dup (v1, v2) (L.Var vv) . body'
@@ -149,17 +149,17 @@ differentiateE = \case
           , []
           -- We don't need Dup here.  We could just use Let.  We don't
           -- guarantee that the result of differentiating is linear
-          , \xs' -> (xs', L.Dup (rev a1, rev a2) (revVar r))
+          , \([]:xs') -> (xs', L.Dup (rev a1, rev a2) (revVar r))
           )
         "sub" -> g
           ( L.Let r (v a1 .- v a2)
           , []
-          , \xs' -> (xs', L.Let (rev a1) (revVar r) . L.Let (rev a2) (Prim.pNeg (revVar r)))
+          , \([]:xs') -> (xs', L.Let (rev a1) (revVar r) . L.Let (rev a2) (Prim.pNeg (revVar r)))
           )
         "mul" -> g
           ( L.Let r (v a1 .* v a2)
           , [a1, a2]
-          , \(a1_ : a2_ : xs') ->
+          , \([a1_, a2_] : xs') ->
             ( xs'
             , L.Let (rev a1) (revVar r .* v a2_)
               . L.Let (rev a2) (revVar r .* v a1_)
@@ -168,7 +168,7 @@ differentiateE = \case
         "div" -> g
           ( L.Let r (v a1 ./ v a2)
           , [a1, a2]
-          , \(a1_ : a2_ : xs') ->
+          , \([a1_, a2_] : xs') ->
             ( xs'
             , L.Let (rev a1) (revVar r ./ v a2_)
               . L.Let
@@ -180,22 +180,22 @@ differentiateE = \case
         "gt" -> g
           ( L.Let r call
           , []
-          , (\xs' -> (xs', let ra1 = rev a1
-                               ra2 = rev a2
-                               t1  = L.typeof ra1
-                               t2  = L.typeof ra2
-                           in L.Let ra1 (Prim.mkZero t1)
-                              . L.Let ra2 (Prim.mkZero t2)))
+          , (\([]:xs') -> (xs', let ra1 = rev a1
+                                    ra2 = rev a2
+                                    t1  = L.typeof ra1
+                                    t2  = L.typeof ra2
+                                in L.Let ra1 (Prim.mkZero t1)
+                                   . L.Let ra2 (Prim.mkZero t2)))
           )
         s -> error ("differentiateE unexpected PrimFun: " ++ s)
     k@(L.Konst{}) ->
       g
       -- Not strictly linear because we don't eliminate `rev v`, but we
       -- probably don't care at the moment
-        (L.Let r k, [], \xs' -> (xs', id))
+        (L.Let r k, [], \([]:xs') -> (xs', id))
 
     L.Var vv ->
-      g (L.Let r (v vv), [], \xs' -> (xs', L.Let (rev vv) (revVar r)))
+      g (L.Let r (v vv), [], \([]:xs') -> (xs', L.Let (rev vv) (revVar r)))
     call@(L.Call f args)
       | f `Prim.isThePrimFun` "build"
       , [L.Var _n, _lambda] <- args
@@ -211,7 +211,7 @@ differentiateE = \case
         -> g
         ( L.Let r call
         , [a]
-        , \(a_:xs') -> (xs', L.Let (rev a) (revVar r ./ v a_))
+        , \([a_]:xs') -> (xs', L.Let (rev a) (revVar r ./ v a_))
         )
       | f `Prim.isThePrimFun` "exp"
       , [L.Var a] <- args
@@ -219,7 +219,7 @@ differentiateE = \case
         ( L.Let r call
         , [a]
         -- Could share this exp
-        , \(a_:xs') -> (xs', L.Let (rev a) (revVar r .* Prim.pExp (v a_)))
+        , \([a_]:xs') -> (xs', L.Let (rev a) (revVar r .* Prim.pExp (v a_)))
         )
       | f `Prim.isThePrimFun` "to_float"
       , [L.Var{}] <- args
@@ -237,7 +237,7 @@ differentiateE = \case
         . L.Let r (Prim.pSel 1 2 (v rtf))
         . L.Let tf (Prim.pSel 2 2 (v rtf))
       , [cond, tf]
-      , \(cond_:tf_:xs') ->
+      , \([cond_,tf_]:xs') ->
           (xs', untupleEverythingInScope
             (L.If (v cond_)
               (L.Let (rev trueR) (revVar r)
@@ -258,25 +258,33 @@ differentiateE = \case
       where (trueFwd, trueR, trueTrace, trueRev) = differentiateE true
             (falsFwd, falsR, falsTrace, falsRev) = differentiateE fals
 
-            trueTraceRevVars :: [L.TVar]
-            trueTraceRevVars = map (flip renameTVar (++ "$rt")) trueTrace
+            trueTraceFlat :: [L.TVar]
+            trueTraceFlat = concat trueTrace
 
-            falsTraceRevVars :: [L.TVar]
-            falsTraceRevVars = map (flip renameTVar (++ "$rt")) falsTrace
+            falsTraceFlat :: [L.TVar]
+            falsTraceFlat = concat falsTrace
+
+            trueTraceRevVars :: [[L.TVar]]
+            trueTraceRevVars = (map . map) (flip renameTVar (++ "$rt")) trueTrace
+
+            falsTraceRevVars :: [[L.TVar]]
+            falsTraceRevVars = (map . map) (flip renameTVar (++ "$rt")) falsTrace
 
             untupleTrueTrace :: L.TExpr -> L.TExpr
             untupleTrueTrace =
               foldr (\(i, vv) rest ->
                        L.Let vv (Prim.pSel i n (L.Var tTrace)) . rest)
-                    id (zip [1..] trueTraceRevVars)
-              where n = length trueTraceRevVars
+                    id (zip [1..] revVarsFlat)
+              where n = length revVarsFlat
+                    revVarsFlat = concat trueTraceRevVars
 
             untupleFalsTrace :: L.TExpr -> L.TExpr
             untupleFalsTrace =
               foldr (\(i, vv) rest ->
                        L.Let vv (Prim.pSel i n (L.Var tTrace)) . rest)
-                    id (zip [1..] falsTraceRevVars)
-              where n = length falsTraceRevVars
+                    id (zip [1..] revVarsFlat)
+              where n = length revVarsFlat
+                    revVarsFlat = concat trueTraceRevVars
 
             rtf :: L.TVar
             rtf = if trueT == falsT
@@ -299,19 +307,19 @@ differentiateE = \case
                     falsTraceT = L.typeof onlyFalsTrace
 
             tTrace :: L.TVar
-            tTrace = temporaryMakeVar (L.TypeTuple (map L.typeof trueTrace)) "tTrace"
+            tTrace = temporaryMakeVar (L.TypeTuple (map L.typeof trueTraceFlat)) "tTrace"
 
             fTrace :: L.TVar
-            fTrace = temporaryMakeVar (L.TypeTuple (map L.typeof falsTrace)) "fTrace"
+            fTrace = temporaryMakeVar (L.TypeTuple (map L.typeof falsTraceFlat)) "fTrace"
 
             -- Really these should be put in a sum type but we don't
             -- have those at the moment
             onlyTrueTrace =
-              L.Tuple [ L.Tuple (map L.Var trueTrace)
-                      , L.Tuple (map (Prim.mkZero . L.typeof) falsTrace) ]
+              L.Tuple [ L.Tuple (map L.Var trueTraceFlat)
+                      , L.Tuple (map (Prim.mkZero . L.typeof) falsTraceFlat) ]
             onlyFalsTrace =
-              L.Tuple [ L.Tuple (map (Prim.mkZero . L.typeof) trueTrace)
-                      , L.Tuple (map L.Var falsTrace) ]
+              L.Tuple [ L.Tuple (map (Prim.mkZero . L.typeof) trueTraceFlat)
+                      , L.Tuple (map L.Var falsTraceFlat) ]
 
             untupleEverythingInScope :: L.TExpr -> L.TExpr -> L.TExpr
             untupleEverythingInScope theIf =
@@ -359,7 +367,7 @@ differentiateE = \case
     g (myFwd, myTrace, fromTrace) =
       ( myFwd . theirFwd
       , final
-      , myTrace ++ theirTrace
+      , myTrace:theirTrace
       , \fullTrace ->
         let (theirTrace_, myRev) = fromTrace fullTrace
         in  theirRev theirTrace_ . myRev
@@ -367,7 +375,7 @@ differentiateE = \case
       where (theirFwd, final, theirTrace, theirRev) = differentiateE body
     temporaryDummy = g (id,
               [],
-              \xs' -> (xs', id))
+              \([]:xs') -> (xs', id))
 
 
   L.Var vv -> (id, vv, [], \[] -> id)
