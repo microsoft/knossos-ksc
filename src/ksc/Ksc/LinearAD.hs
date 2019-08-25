@@ -20,7 +20,7 @@ import qualified Rules
 import qualified ANF                           as A
 
 import           Data.Maybe                     ( mapMaybe )
-import           Data.Set                       ( Set, (\\), union )
+import           Data.Set                       ( Set, (\\), union, toList )
 
 demoF :: String -> IO ()
 demoF file = do
@@ -241,13 +241,13 @@ differentiateE = \case
           (xs', untupleEverythingInScope
             (L.If (v cond_)
               (L.Let (rev trueR) (revVar r)
-               $ L.Let tTrace (Prim.pSel 1 2 (v tf))
+               $ L.Let tTrace (Prim.pSel 1 2 (v tf_))
                $ untupleTrueTrace
                $ trueRev trueTraceRevVars
                $ mkZeroNotInTrue
                $ tupleEverythingInScope)
               (L.Let (rev falsR) (revVar r)
-               $ L.Let fTrace (Prim.pSel 2 2 (v tf))
+               $ L.Let fTrace (Prim.pSel 2 2 (v tf_))
                $ untupleFalsTrace
                $ falsRev falsTraceRevVars
                $ mkZeroNotInFals
@@ -265,10 +265,18 @@ differentiateE = \case
             falsTraceRevVars = map (flip renameTVar (++ "$rt")) falsTrace
 
             untupleTrueTrace :: L.TExpr -> L.TExpr
-            untupleTrueTrace = _
+            untupleTrueTrace =
+              foldr (\(i, vv) rest ->
+                       L.Let vv (Prim.pSel i n (L.Var tTrace)) . rest)
+                    id (zip [1..] trueTraceRevVars)
+              where n = length trueTraceRevVars
 
             untupleFalsTrace :: L.TExpr -> L.TExpr
-            untupleFalsTrace = _
+            untupleFalsTrace =
+              foldr (\(i, vv) rest ->
+                       L.Let vv (Prim.pSel i n (L.Var tTrace)) . rest)
+                    id (zip [1..] falsTraceRevVars)
+              where n = length falsTraceRevVars
 
             rtf :: L.TVar
             rtf = if trueT == falsT
@@ -306,10 +314,20 @@ differentiateE = \case
                       , L.Tuple (map L.Var falsTrace) ]
 
             untupleEverythingInScope :: L.TExpr -> L.TExpr -> L.TExpr
-            untupleEverythingInScope = _
+            untupleEverythingInScope theIf =
+              L.Let rScope theIf
+              . foldr (\(i, vv) rest -> L.Let vv (Prim.pSel i n (v rScope)) . rest)
+                      id
+                      (zip [1..] (map rev (toList inEither)))
+              where n = length (toList inEither)
+
+            rScope :: L.TVar
+            rScope =
+              temporaryMakeVar (L.TypeTuple (map L.typeof (toList inEither)))
+                               "rScope"
 
             tupleEverythingInScope :: L.TExpr
-            tupleEverythingInScope = _
+            tupleEverythingInScope = L.Tuple (map revVar (toList inEither))
 
             inTrue :: Set L.TVar
             inTrue = LU.freeVarsOf true
@@ -328,12 +346,12 @@ differentiateE = \case
 
             mkZeroNotInTrue :: L.TExpr -> L.TExpr
             mkZeroNotInTrue =
-              foldr (\v rest -> L.Let (rev v) (Prim.mkZero (L.typeof v)) . rest)
+              foldr (\vv rest -> L.Let (rev vv) (Prim.mkZero (L.typeof vv)) . rest)
                     id notInTrue
 
             mkZeroNotInFals :: L.TExpr -> L.TExpr
             mkZeroNotInFals =
-              foldr (\v rest -> L.Let (rev v) (Prim.mkZero (L.typeof v)) . rest)
+              foldr (\vv rest -> L.Let (rev vv) (Prim.mkZero (L.typeof vv)) . rest)
                     id notInFals
 
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
