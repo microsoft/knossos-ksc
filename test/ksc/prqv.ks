@@ -46,6 +46,16 @@
 (def alog Float ((x : Float) (y : Float))
      (exp (mul x (log (add x y)))))
 
+
+(def anif Float ((x : Float) (y : Float))
+     (if (gt x y) (sub x y) (sub y x)))
+
+
+#|
+(def abuild (Vec n Float) ((n : Integer) (x : Float))
+     (build n (lam (i : Integer) x)))
+|#
+
 (def main Integer ()
      (print "13238.25 = " 13238.25 "\n"
             "f 3.0 4.0 = " (f 3.0 4.0) "\n"
@@ -66,4 +76,12 @@
             "alog 3.0 4.0 = " (alog 3.0 4.0) "\n"
             "revl$alog 3.0 4.0 1.0 = " (revl$alog 3.0 4.0 1.0) "\n"
             "rev$alog 3.0 4.0 1.0 = " (rev$alog 3.0 4.0 1.0) "\n"
+            "anif 3.0 4.0 = " (anif 3.0 4.0) "\n"
+            "revl$anif 3.0 4.0 1.0 = " (revl$anif 3.0 4.0 1.0) "\n"
+            "rev$anif 3.0 4.0 1.0 = " (rev$anif 3.0 4.0 1.0) "\n"
+#|
+            "abuild 3.0 = " (abuild 3.0) "\n"
+            "revl$d 3.0 1.0 = " (abuildl$d 3.0 1.0) "\n"
+            "rev$d 3.0 1.0 = " (abuild$d 3.0 1.0) "\n"
+|#
             ))

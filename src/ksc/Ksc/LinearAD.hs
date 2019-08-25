@@ -20,6 +20,7 @@ import qualified Rules
 import qualified ANF                           as A
 
 import           Data.Maybe                     ( mapMaybe )
+import           Data.Set                       ( Set, (\\), union )
 
 demoF :: String -> IO ()
 demoF file = do
@@ -231,7 +232,104 @@ differentiateE = \case
       | (L.TFun _ (L.Fun (L.SelFun{}))) <- f
         -> temporaryDummy
     L.Assert _cond _assertBody -> temporaryDummy
-    L.If _cond _true _false -> temporaryDummy
+    (L.If (L.Var cond) true fals) -> g
+      ( L.Let rtf (L.If (L.Var cond) trueFwd' falsFwd')
+        . L.Let r (Prim.pSel 1 2 (v rtf))
+        . L.Let tf (Prim.pSel 2 2 (v rtf))
+      , [cond, tf]
+      , \(cond_:tf_:xs') ->
+          (xs', untupleEverythingInScope
+            (L.If (v cond_)
+              (L.Let (rev trueR) (revVar r)
+               $ L.Let tTrace (Prim.pSel 1 2 (v tf))
+               $ untupleTrueTrace
+               $ trueRev trueTraceRevVars
+               $ mkZeroNotInTrue
+               $ tupleEverythingInScope)
+              (L.Let (rev falsR) (revVar r)
+               $ L.Let fTrace (Prim.pSel 2 2 (v tf))
+               $ untupleFalsTrace
+               $ falsRev falsTraceRevVars
+               $ mkZeroNotInFals
+               $ tupleEverythingInScope)
+            )
+          )
+      )
+      where (trueFwd, trueR, trueTrace, trueRev) = differentiateE true
+            (falsFwd, falsR, falsTrace, falsRev) = differentiateE fals
+
+            trueTraceRevVars :: [L.TVar]
+            trueTraceRevVars = _
+
+            falsTraceRevVars :: [L.TVar]
+            falsTraceRevVars = _
+
+            untupleTrueTrace :: L.TExpr -> L.TExpr
+            untupleTrueTrace = _
+
+            untupleFalsTrace :: L.TExpr -> L.TExpr
+            untupleFalsTrace = _
+
+            rtf :: L.TVar
+            rtf = _
+              where trueT = L.typeof trueFwd
+                    falsT = L.typeof falsFwd
+
+            trueFwd' :: L.TExpr
+            trueFwd' = trueFwd (L.Tuple [L.Var trueR, onlyTrueTrace])
+
+            falsFwd' :: L.TExpr
+            falsFwd' = falsFwd (L.Tuple [L.Var falsR, onlyFalsTrace])
+
+            tf :: L.TVar
+            tf = _
+
+            tTrace :: L.TVar
+            tTrace = _
+
+            fTrace :: L.TVar
+            fTrace = _
+
+            -- Really these should be put in a sum type but we don't
+            -- have those at the moment
+            onlyTrueTrace =
+              L.Tuple [ L.Tuple (map L.Var trueTrace)
+                      , L.Tuple (map (Prim.mkZero . L.typeof) falsTrace) ]
+            onlyFalsTrace =
+              L.Tuple [ L.Tuple (map (Prim.mkZero . L.typeof) trueTrace)
+                      , L.Tuple (map L.Var falsTrace) ]
+
+            untupleEverythingInScope :: L.TExpr -> L.TExpr -> L.TExpr
+            untupleEverythingInScope = _
+
+            tupleEverythingInScope :: L.TExpr
+            tupleEverythingInScope = _
+
+            inTrue :: Set L.TVar
+            inTrue = LU.freeVarsOf true
+
+            inFals :: Set L.TVar
+            inFals = LU.freeVarsOf fals
+
+            inEither :: Set L.TVar
+            inEither =  inTrue `union` inFals
+
+            notInTrue :: Set L.TVar
+            notInTrue = inEither \\ inTrue
+
+            notInFals :: Set L.TVar
+            notInFals = inEither \\ inFals
+
+            mkZeroNotInTrue :: L.TExpr -> L.TExpr
+            mkZeroNotInTrue =
+              foldr (\v rest -> L.Let (rev v) (Prim.mkZero (L.typeof v)) . rest)
+                    id notInTrue
+
+            mkZeroNotInFals :: L.TExpr -> L.TExpr
+            mkZeroNotInFals =
+              foldr (\v rest -> L.Let (rev v) (Prim.mkZero (L.typeof v)) . rest)
+                    id notInFals
+
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g (myFwd, myTrace, fromTrace) =
