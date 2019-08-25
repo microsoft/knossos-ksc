@@ -259,10 +259,10 @@ differentiateE = \case
             (falsFwd, falsR, falsTrace, falsRev) = differentiateE fals
 
             trueTraceRevVars :: [L.TVar]
-            trueTraceRevVars = _
+            trueTraceRevVars = map (flip renameTVar (++ "$rt")) trueTrace
 
             falsTraceRevVars :: [L.TVar]
-            falsTraceRevVars = _
+            falsTraceRevVars = map (flip renameTVar (++ "$rt")) falsTrace
 
             untupleTrueTrace :: L.TExpr -> L.TExpr
             untupleTrueTrace = _
@@ -271,9 +271,11 @@ differentiateE = \case
             untupleFalsTrace = _
 
             rtf :: L.TVar
-            rtf = _
-              where trueT = L.typeof trueFwd
-                    falsT = L.typeof falsFwd
+            rtf = if trueT == falsT
+                  then temporaryMakeVar trueT "rtf"
+                  else error "trueT /= falsT"
+              where trueT = L.typeof trueFwd'
+                    falsT = L.typeof falsFwd'
 
             trueFwd' :: L.TExpr
             trueFwd' = trueFwd (L.Tuple [L.Var trueR, onlyTrueTrace])
@@ -282,13 +284,17 @@ differentiateE = \case
             falsFwd' = falsFwd (L.Tuple [L.Var falsR, onlyFalsTrace])
 
             tf :: L.TVar
-            tf = _
+            tf = if trueTraceT == falsTraceT
+                 then temporaryMakeVar trueTraceT "tf"
+                 else error "trueTraceT /= falsTraceT"
+              where trueTraceT = L.typeof onlyTrueTrace
+                    falsTraceT = L.typeof onlyFalsTrace
 
             tTrace :: L.TVar
-            tTrace = _
+            tTrace = temporaryMakeVar (L.TypeTuple (map L.typeof trueTrace)) "tTrace"
 
             fTrace :: L.TVar
-            fTrace = _
+            fTrace = temporaryMakeVar (L.TypeTuple (map L.typeof falsTrace)) "fTrace"
 
             -- Really these should be put in a sum type but we don't
             -- have those at the moment
@@ -378,3 +384,6 @@ rev = flip renameTVar (++ "$r")
 
 revVar :: L.TVar -> L.TExpr
 revVar = L.Var . rev
+
+temporaryMakeVar :: L.Type -> String -> L.TVar
+temporaryMakeVar t s = L.TVar t (L.Simple s)
