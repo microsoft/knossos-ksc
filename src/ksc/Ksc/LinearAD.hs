@@ -154,7 +154,7 @@ differentiateE = \case
         "sub" -> g
           ( L.Let r (v a1 .- v a2)
           , []
-          , \xs' -> (xs', L.Let (rev a1) (revVar r) . L.Let (rev a2) (revVar r))
+          , \xs' -> (xs', L.Let (rev a1) (revVar r) . L.Let (rev a2) (Prim.pNeg (revVar r)))
           )
         "mul" -> g
           ( L.Let r (v a1 .* v a2)
