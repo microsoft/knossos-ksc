@@ -70,7 +70,7 @@ lineariseE = \case
         argvv@(L.Var argv) -> if argv `LU.notFreeIn` body
           then (id, L.Var argv)
           else
-            let argv' = LU.newVarNotIn (L.typeof argvv) body
+            let argv' = renameTVar argv (++ "$1")
             in  (L.Dup (argv, argv') argvv, L.Var argv')
         lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
           then (id, lam)
@@ -141,7 +141,7 @@ differentiateE = \case
     )
     where (body', r, xs, f) = differentiateE body
   L.Let r rhs body -> case rhs of
-    (L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) ->
+    call@(L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) ->
       case op of
         "add" -> g
           ( L.Let r (v a1 .+ v a2)
@@ -176,6 +176,16 @@ differentiateE = \case
             )
           )
         "eq" -> temporaryDummy
+        "gt" -> g
+          ( L.Let r call
+          , []
+          , (\xs' -> (xs', let ra1 = rev a1
+                               ra2 = rev a2
+                               t1  = L.typeof ra1
+                               t2  = L.typeof ra2
+                           in L.Let ra1 (Prim.mkZero t1)
+                              . L.Let ra2 (Prim.mkZero t2)))
+          )
         s -> error ("differentiateE unexpected PrimFun: " ++ s)
     k@(L.Konst{}) ->
       g
