@@ -243,15 +243,15 @@ differentiateE = \case
             (L.If (v cond_)
               (L.Let (rev trueR) (revVar r)
                $ L.Let tTrace (Prim.pSel 1 2 (v tf_))
-               $ untupleTrueTrace
+               $ untupleTrace tTrace trueTraceRevVars
                $ trueRev trueTraceRevVars
-               $ mkZeroNotInTrue
+               $ mkZero (notIn inTrue)
                $ tupleEverythingInScope)
               (L.Let (rev falsR) (revVar r)
                $ L.Let fTrace (Prim.pSel 2 2 (v tf_))
-               $ untupleFalsTrace
+               $ untupleTrace fTrace falsTraceRevVars
                $ falsRev falsTraceRevVars
-               $ mkZeroNotInFals
+               $ mkZero (notIn inFals)
                $ tupleEverythingInScope)
             )
           )
@@ -265,27 +265,22 @@ differentiateE = \case
             falsTraceFlat :: [L.TVar]
             falsTraceFlat = concat falsTrace
 
+            traceRevVars :: [[L.TVar]] -> [[L.TVar]]
+            traceRevVars = (map . map) (flip renameTVar (++ "$rt"))
+
             trueTraceRevVars :: [[L.TVar]]
-            trueTraceRevVars = (map . map) (flip renameTVar (++ "$rt")) trueTrace
+            trueTraceRevVars = traceRevVars trueTrace
 
             falsTraceRevVars :: [[L.TVar]]
-            falsTraceRevVars = (map . map) (flip renameTVar (++ "$rt")) falsTrace
+            falsTraceRevVars = traceRevVars falsTrace
 
-            untupleTrueTrace :: L.TExpr -> L.TExpr
-            untupleTrueTrace =
+            untupleTrace :: L.TVar -> [[L.TVar]] -> L.TExpr -> L.TExpr
+            untupleTrace traceVar traceRevVars' =
               foldr (\(i, vv) rest ->
-                       L.Let vv (Prim.pSel i n (L.Var tTrace)) . rest)
+                       L.Let vv (Prim.pSel i n (L.Var traceVar)) . rest)
                     id (zip [1..] revVarsFlat)
               where n = length revVarsFlat
-                    revVarsFlat = concat trueTraceRevVars
-
-            untupleFalsTrace :: L.TExpr -> L.TExpr
-            untupleFalsTrace =
-              foldr (\(i, vv) rest ->
-                       L.Let vv (Prim.pSel i n (L.Var fTrace)) . rest)
-                    id (zip [1..] revVarsFlat)
-              where n = length revVarsFlat
-                    revVarsFlat = concat falsTraceRevVars
+                    revVarsFlat = concat traceRevVars'
 
             rtf :: L.TVar
             rtf = if trueT == falsT
@@ -307,11 +302,14 @@ differentiateE = \case
               where trueTraceT = L.typeof onlyTrueTrace
                     falsTraceT = L.typeof onlyFalsTrace
 
+            trace :: [L.TVar] -> String -> L.TVar
+            trace = temporaryMakeVar . L.TypeTuple . map L.typeof
+
             tTrace :: L.TVar
-            tTrace = temporaryMakeVar (L.TypeTuple (map L.typeof trueTraceFlat)) "tTrace"
+            tTrace = trace trueTraceFlat "tTrace"
 
             fTrace :: L.TVar
-            fTrace = temporaryMakeVar (L.TypeTuple (map L.typeof falsTraceFlat)) "fTrace"
+            fTrace = trace falsTraceFlat "fTrace"
 
             -- Really these should be put in a sum type but we don't
             -- have those at the moment
@@ -347,21 +345,13 @@ differentiateE = \case
             inEither :: Set L.TVar
             inEither =  inTrue `union` inFals
 
-            notInTrue :: Set L.TVar
-            notInTrue = inEither \\ inTrue
+            notIn :: Set L.TVar -> Set L.TVar
+            notIn = (inEither \\)
 
-            notInFals :: Set L.TVar
-            notInFals = inEither \\ inFals
-
-            mkZeroNotInTrue :: L.TExpr -> L.TExpr
-            mkZeroNotInTrue =
+            mkZero :: Set L.TVar -> L.TExpr -> L.TExpr
+            mkZero =
               foldr (\vv rest -> L.Let (rev vv) (Prim.mkZero (L.typeof vv)) . rest)
-                    id notInTrue
-
-            mkZeroNotInFals :: L.TExpr -> L.TExpr
-            mkZeroNotInFals =
-              foldr (\vv rest -> L.Let (rev vv) (Prim.mkZero (L.typeof vv)) . rest)
-                    id notInFals
+                    id
 
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
