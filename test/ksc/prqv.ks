@@ -48,8 +48,13 @@
 
 
 (def anif Float ((x : Float) (y : Float))
-     (if (gt x y) (sub x y) (sub y x)))
-
+     (if (gt x y)
+         (sub x y)
+       (let ((p (mul 7.0 x))
+             (r (div 11.0 y))
+             (q (mul (mul p x) 5.0))
+             (v (add (mul (mul 2.0 p) q) (mul 3.0 r))))
+         v)))
 
 #|
 (def abuild (Vec n Float) ((n : Integer) (x : Float))

@@ -395,9 +395,20 @@ renameTVar _                       _ = error "renameTVar"
 removeDupsE :: L.TExpr -> L.TExpr
 removeDupsE = \case
   L.Dup (v1, v2) v@(L.Var{}) body -> L.Let v1 v (L.Let v2 v (removeDupsE body))
-  L.Let v        e           body -> L.Let v e (removeDupsE body)
-  -- Since we're supposed be in ANF we only recurse on Dups and Lets
-  notDup                          -> notDup
+  L.Dup _        v           _ ->
+    error ("Didn't expect to see being Dup'd: " ++ show v)
+  L.Let v        e           body -> L.Let v (removeDupsE e) (removeDupsE body)
+  L.If  cond     true        fals ->
+    L.If cond (removeDupsE true) (removeDupsE fals)
+  noDups@(L.Tuple{}) -> noDups
+  noDups@(L.Call{})  -> noDups
+  noDups@(L.Konst{}) -> noDups
+  noDups@(L.Var{})   -> noDups
+  (L.Lam{})    -> notImplemented "Lam"
+  (L.App{})    -> notImplemented "App"
+  (L.Assert{}) -> notImplemented "Assert"
+  where notImplemented c =
+          error ("removeDupsE for " ++ c ++ " not implemented yet")
 
 removeDupsD :: L.TDef -> L.TDef
 removeDupsD def@(L.Def { L.def_rhs = L.UserRhs rhs }) =
