@@ -343,7 +343,7 @@ differentiateE = \case
             inFals = LU.freeVarsOf fals
 
             inEither :: Set L.TVar
-            inEither =  inTrue `union` inFals
+            inEither = inTrue `union` inFals
 
             notIn :: Set L.TVar -> Set L.TVar
             notIn = (inEither \\)
