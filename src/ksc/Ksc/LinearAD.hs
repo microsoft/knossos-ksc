@@ -282,10 +282,10 @@ differentiateE = \case
             untupleFalsTrace :: L.TExpr -> L.TExpr
             untupleFalsTrace =
               foldr (\(i, vv) rest ->
-                       L.Let vv (Prim.pSel i n (L.Var tTrace)) . rest)
+                       L.Let vv (Prim.pSel i n (L.Var fTrace)) . rest)
                     id (zip [1..] revVarsFlat)
               where n = length revVarsFlat
-                    revVarsFlat = concat trueTraceRevVars
+                    revVarsFlat = concat falsTraceRevVars
 
             rtf :: L.TVar
             rtf = if trueT == falsT
