@@ -408,9 +408,9 @@ removeDupsE = \case
   noDups@(L.Call{})  -> noDups
   noDups@(L.Konst{}) -> noDups
   noDups@(L.Var{})   -> noDups
-  (L.Lam{})    -> notImplemented "Lam"
-  (L.App{})    -> notImplemented "App"
-  (L.Assert{}) -> notImplemented "Assert"
+  L.Lam{}    -> notImplemented "Lam"
+  L.App{}    -> notImplemented "App"
+  L.Assert{} -> notImplemented "Assert"
   where notImplemented c =
           error ("removeDupsE for " ++ c ++ " not implemented yet")
 
