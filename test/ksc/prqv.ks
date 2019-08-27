@@ -24,6 +24,11 @@
            (q (add p x)))
        q))
 
+(def e3 Integer ((x : Integer))
+     (let ((p (add 7 x))
+           (q (add p x)))
+       q))
+
 (def f Float ((x : Float) (y : Float))
      (let ((p (mul 7.0 x))
            (r (div 11.0 y))
@@ -75,6 +80,9 @@
             "e2 3.0 = " (e2 3.0) "\n"
             "revl$e2 3.0 1.0 = " (revl$e2 3.0 1.0) "\n"
             "rev$e2 3.0 1.0 = " (rev$e2 3.0 1.0) "\n"
+            "e3 3 = " (e3 3) "\n"
+            "revl$e3 3 1 = " (revl$e3 3 (tuple)) "\n"
+            "rev$e3 3 1 = " (rev$e3 3 (tuple)) "\n"
             "d 3.0 = " (d 3.0) "\n"
             "revl$d 3.0 1.0 = " (revl$d 3.0 1.0) "\n"
             "rev$d 3.0 1.0 = " (rev$d 3.0 1.0) "\n"

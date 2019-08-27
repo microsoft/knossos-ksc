@@ -115,7 +115,8 @@ differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f), L.def_rhs = L.User
   (fwd, r, trace, rev') = differentiateE rhs
   d_rhs = (fwd . rev' trace . L.Tuple) (L.Var r : map (L.Var . rev) args)
   args                  = L.def_args tdef
-  res_ty                = L.TypeTuple (L.def_res_ty tdef : map L.typeof args)
+  res_ty                =
+    L.TypeTuple (L.def_res_ty tdef : map (L.tangentType . L.typeof) args)
 differentiateD (L.Def { L.def_fun = L.Fun (L.PrimFun f) }) = error
   (  "Wasn't expecting to be asked to differentiate a PrimFun: "
   ++ L.render (L.ppr f)
@@ -392,6 +393,9 @@ renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
 renameTVar _                       _ = error "renameTVar"
 
+retypeTVar :: L.TVar -> (L.Type -> L.Type) -> L.TVar
+retypeTVar (L.TVar t v) f = L.TVar (f t) v
+
 removeDupsE :: L.TExpr -> L.TExpr
 removeDupsE = \case
   L.Dup (v1, v2) v@(L.Var{}) body -> L.Let v1 v (L.Let v2 v (removeDupsE body))
@@ -418,7 +422,7 @@ removeDupsD (L.Def { L.def_rhs = L.StubRhs }) =
 removeDupsD edef@(L.Def { L.def_rhs = L.EDefRhs }) = edef
 
 rev :: L.TVar -> L.TVar
-rev = flip renameTVar (++ "$r")
+rev = flip retypeTVar L.tangentType . flip renameTVar (++ "$r")
 
 revVar :: L.TVar -> L.TExpr
 revVar = L.Var . rev
