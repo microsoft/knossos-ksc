@@ -233,7 +233,46 @@ differentiateE = \case
       | (L.TFun _ (L.Fun (L.SelFun{}))) <- f
         -> temporaryDummy
     L.Assert _cond _assertBody -> temporaryDummy
-    (L.If (L.Var cond) true fals) -> g
+    (L.If (L.Var cond) true fals) -> g (differentiateIf r cond true fals)
+    _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
+   where
+    g = differentiateComponent body
+    temporaryDummy = g (id,
+              [],
+              \([]:xs') -> (xs', id))
+
+
+  L.Var vv -> (id, vv, [], \[] -> id)
+  s        -> error ("Couldn't differentiate: " ++ show s)
+ where
+  (.*) = Prim.pMul
+  (./) = Prim.pDiv
+  (.+) = Prim.pAdd
+  (.-) = Prim.pSub
+  v    = L.Var
+
+differentiateComponent
+   :: L.TExpr
+   -> (L.TExpr -> c, [L.TVar], p -> ([[L.TVar]], a -> L.TExpr))
+   -> (L.TExpr -> c, L.TVar, [[L.TVar]], p -> a -> L.TExpr)
+differentiateComponent body (myFwd, myTrace, fromTrace) =
+      ( myFwd . theirFwd
+      , final
+      , myTrace:theirTrace
+      , \fullTrace ->
+        let (theirTrace_, myRev) = fromTrace fullTrace
+        in  theirRev theirTrace_ . myRev
+      )
+      where (theirFwd, final, theirTrace, theirRev) = differentiateE body
+
+differentiateIf
+  :: L.TVar
+  -> L.TVar
+  -> L.TExpr
+  -> L.TExpr
+  -> (L.TExpr -> L.TExpr, [L.TVar],
+       [[L.TVar]] -> ([[L.TVar]], L.TExpr -> L.TExpr))
+differentiateIf r cond true fals =
       ( L.Let rtf (L.If (L.Var cond) trueFwd' falsFwd')
         . L.Let r (Prim.pSel 1 2 (v rtf))
         . L.Let tf (Prim.pSel 2 2 (v rtf))
@@ -353,36 +392,7 @@ differentiateE = \case
               foldr (\vv rest -> L.Let (rev vv) (Prim.mkZero (L.typeof vv)) . rest)
                     id
 
-    _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
-   where
-    g = differentiateComponent body
-    temporaryDummy = g (id,
-              [],
-              \([]:xs') -> (xs', id))
-
-
-  L.Var vv -> (id, vv, [], \[] -> id)
-  s        -> error ("Couldn't differentiate: " ++ show s)
- where
-  (.*) = Prim.pMul
-  (./) = Prim.pDiv
-  (.+) = Prim.pAdd
-  (.-) = Prim.pSub
-  v    = L.Var
-
-differentiateComponent
-   :: L.TExpr
-   -> (L.TExpr -> c, [L.TVar], p -> ([[L.TVar]], a -> L.TExpr))
-   -> (L.TExpr -> c, L.TVar, [[L.TVar]], p -> a -> L.TExpr)
-differentiateComponent body (myFwd, myTrace, fromTrace) =
-      ( myFwd . theirFwd
-      , final
-      , myTrace:theirTrace
-      , \fullTrace ->
-        let (theirTrace_, myRev) = fromTrace fullTrace
-        in  theirRev theirTrace_ . myRev
-      )
-      where (theirFwd, final, theirTrace, theirRev) = differentiateE body
+            v = L.Var
 
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
