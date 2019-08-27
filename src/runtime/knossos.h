@@ -597,6 +597,20 @@ namespace ks
 	}
 
 	template <class T>
+	std::tuple<T, vec<T>> indexL(int i, vec<T> const & v)
+	{
+	  T vi = v[i];
+	  return std::make_tuple(vi, v);
+	}
+
+	template <class T>
+	vec<T> const &incAt(int i, T a, vec<T> & v)
+	{
+	  v[i] += a;
+	  return v;
+	}
+
+	template <class T>
 	vec<T> vec<T>::create(size_t size)
 	{
 		return vec{ size };

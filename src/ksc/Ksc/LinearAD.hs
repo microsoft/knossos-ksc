@@ -188,6 +188,17 @@ differentiateE = \case
                                 in L.Let ra1 (Prim.mkZero t1)
                                    . L.Let ra2 (Prim.mkZero t2)))
           )
+        "indexL" -> g
+          ( L.Let r call
+          , [a1]
+          , (\([i]:xs') ->
+               (xs', L.Let (rev a1) (L.Tuple [])
+                     . L.Let (rev a2) (Prim.pIncAt
+                                        (v i)
+                                        (Prim.pSel 1 2 (revVar r))
+                                        (Prim.pSel 2 2 (revVar r)))
+               ))
+          )
         s -> error ("differentiateE unexpected PrimFun: " ++ s)
     k@(L.Konst{}) -> g (L.Let r k, [], \([]:xs') -> (xs', id))
     L.Var vv ->
@@ -225,8 +236,22 @@ differentiateE = \case
         -> temporaryDummy
       | L.TFun _ (L.Fun (L.UserFun{})) <- f
         -> temporaryDummy
-      | L.TFun _ (L.Fun (L.SelFun{})) <- f
-        -> temporaryDummy
+      | L.TFun _ (L.Fun (L.SelFun i _)) <- f
+      , [L.Var t] <- args
+      , L.TypeTuple types <- L.typeof t
+        -> g
+        ( L.Let r call
+        , []
+        , \([]:xs) -> (xs, L.Let (rev t)
+                           $ L.Tuple
+                           $ flip map (zip [1..] types)
+                           $ \(j, type_) ->
+                               if i == j
+                               then revVar r
+                               else Prim.mkZero type_
+                      )
+        )
+
     L.Assert _cond _assertBody -> temporaryDummy
     L.If (L.Var cond) true fals -> g (differentiateIf r cond true fals)
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)

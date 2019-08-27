@@ -290,6 +290,9 @@ pBuild = mkPrimCall2 "build"
 pIndex :: TExpr -> TExpr -> TExpr
 pIndex = mkPrimCall2 "index"
 
+pIncAt :: TExpr -> TExpr -> TExpr -> TExpr
+pIncAt = mkPrimCall3 "incAt"
+
 pSum :: TExpr -> TExpr
 pSum = mkPrimCall1 "sum"
 
@@ -541,6 +544,9 @@ primFunCallResultTy_maybe fun args
       ("print"    , _)                                       -> Just TypeInteger
       ("sumbuild" , [TypeInteger, TypeLam TypeInteger t])    -> Just t
       ("index"    , [TypeInteger, TypeVec _ t])              -> Just t
+      ("indexL"   , [TypeInteger, vt@(TypeVec _ t)])         -> Just (TypeTuple [t, vt])
+      ("incAt"    , [TypeInteger, t, vt@(TypeVec _ t')])
+        | t == t'                                            -> Just vt
       ("size"     , [TypeVec _ _])                           -> Just TypeSize
       ("sum"      , [TypeVec _ t])                           -> Just t
       ("to_float" , [TypeInteger])                           -> Just TypeFloat
@@ -595,6 +601,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
+                       , "indexL"
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors

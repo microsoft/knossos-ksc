@@ -113,6 +113,10 @@ gradE adp s (Call f [n, body])
   | f `isThePrimFun` "sumbuild"
   = gradE adp s (pSum (pBuild n body))
 
+gradE adp s (Call f [i, v])
+  | f `isThePrimFun` "indexL"
+  = gradE adp s (Tuple [pIndex i v, v])
+
 gradE adp s (Call f [Lam ti body, acc, v])
   | f `isThePrimFun` "fold"
   = gradFold adp s ti body acc v

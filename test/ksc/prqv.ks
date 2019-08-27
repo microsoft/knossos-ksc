@@ -66,12 +66,22 @@
            (b (if (gt y 0.0) x (mul x y))))
        (add a b)))
 
+(def indexExample (Tuple Float (Vec n Float)) ((i : Integer) (v : Vec n Float))
+     (indexL i v))
+
 #|
 (def abuild (Vec n Float) ((n : Integer) (x : Float))
      (build n (lam (i : Integer) x)))
 |#
 
 (def main Integer ()
+     ; CSE and other optimisations are going to going to assume all
+     ; our functions are pure.  How unfortunate.  Something goes wrong
+     ; even if we try to define multiple different zeroVecs so only
+     ; some of them are mutated!
+     (let ((zero 1e-38)
+           (zeroVec  (build 2 (lam (i : Integer) 0.0)))
+           (zeroVec_ (build 2 (lam (i : Integer) zero))))
      (print "13238.25 = " 13238.25 "\n"
             "f 3.0 4.0 = " (f 3.0 4.0) "\n"
             "revl$f 3.0 4.0 1.0 = " (revl$f 3.0 4.0 1.0) "\n"
@@ -97,9 +107,14 @@
             "anif 3.0 4.0 = " (anif 3.0 4.0) "\n"
             "revl$anif 3.0 4.0 1.0 = " (revl$anif 3.0 4.0 1.0) "\n"
             "rev$anif 3.0 4.0 1.0 = " (rev$anif 3.0 4.0 1.0) "\n"
+            "indexExample 0 zeroVec = " (indexExample 0 zeroVec) "\n"
+            "revl$indexExample 0 zeroVec 1.0 zeroVec = "
+              (revl$indexExample 0 zeroVec (tuple 1.0 zeroVec_)) "\n"
+            "rev$indexExample 0 zeroVec 1.0 zeroVec = zeroVecC "
+              (rev$indexExample 0 zeroVec (tuple 1.0 zeroVec)) "\n"
 #|
             "abuild 3.0 = " (abuild 3.0) "\n"
             "revl$d 3.0 1.0 = " (abuildl$d 3.0 1.0) "\n"
             "rev$d 3.0 1.0 = " (abuild$d 3.0 1.0) "\n"
 |#
-            ))
+            )))
