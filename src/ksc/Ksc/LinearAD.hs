@@ -233,7 +233,7 @@ differentiateE = \case
       | (L.TFun _ (L.Fun (L.SelFun{}))) <- f
         -> temporaryDummy
     L.Assert _cond _assertBody -> temporaryDummy
-    (L.If (L.Var cond) true fals) -> g (differentiateIf r cond true fals)
+    L.If (L.Var cond) true fals -> g (differentiateIf r cond true fals)
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g = differentiateComponent body
