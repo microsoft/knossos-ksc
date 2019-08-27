@@ -355,15 +355,7 @@ differentiateE = \case
 
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
-    g (myFwd, myTrace, fromTrace) =
-      ( myFwd . theirFwd
-      , final
-      , myTrace:theirTrace
-      , \fullTrace ->
-        let (theirTrace_, myRev) = fromTrace fullTrace
-        in  theirRev theirTrace_ . myRev
-      )
-      where (theirFwd, final, theirTrace, theirRev) = differentiateE body
+    g = differentiateComponent body
     temporaryDummy = g (id,
               [],
               \([]:xs') -> (xs', id))
@@ -377,6 +369,20 @@ differentiateE = \case
   (.+) = Prim.pAdd
   (.-) = Prim.pSub
   v    = L.Var
+
+differentiateComponent
+   :: L.TExpr
+   -> (L.TExpr -> c, [L.TVar], p -> ([[L.TVar]], a -> L.TExpr))
+   -> (L.TExpr -> c, L.TVar, [[L.TVar]], p -> a -> L.TExpr)
+differentiateComponent body (myFwd, myTrace, fromTrace) =
+      ( myFwd . theirFwd
+      , final
+      , myTrace:theirTrace
+      , \fullTrace ->
+        let (theirTrace_, myRev) = fromTrace fullTrace
+        in  theirRev theirTrace_ . myRev
+      )
+      where (theirFwd, final, theirTrace, theirRev) = differentiateE body
 
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
