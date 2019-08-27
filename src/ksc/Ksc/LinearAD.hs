@@ -228,9 +228,9 @@ differentiateE = \case
       | f `Prim.isThePrimFun` "$ranhashdoub"
       , [L.Var{}] <- args
         -> temporaryDummy
-      | (L.TFun _ (L.Fun (L.UserFun{}))) <- f
+      | L.TFun _ (L.Fun (L.UserFun{})) <- f
         -> temporaryDummy
-      | (L.TFun _ (L.Fun (L.SelFun{}))) <- f
+      | L.TFun _ (L.Fun (L.SelFun{})) <- f
         -> temporaryDummy
     L.Assert _cond _assertBody -> temporaryDummy
     L.If (L.Var cond) true fals -> g (differentiateIf r cond true fals)
