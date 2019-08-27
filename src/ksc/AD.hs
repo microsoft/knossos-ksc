@@ -9,6 +9,8 @@ import LangUtils
 import Prim
 import GHC.Stack
 
+import Data.Maybe (mapMaybe)
+
 -- for unit test
 --import Test.Hspec
 
@@ -47,23 +49,15 @@ lmSelFun params pi i
 
 -------------------------------------------------
 
-isUserFunDef :: TDef -> Bool
-isUserFunDef (Def { def_fun = Fun _
-                  , def_rhs = UserRhs {} })
-               = True
-isUserFunDef _ = False
-
-filterGradFuns :: [TDef] -> [TDef]
-filterGradFuns = filter isUserFunDef
-
 gradDefs :: HasCallStack => ADPlan -> [TDef] -> [TDef]
-gradDefs adp = map (gradDef adp) . filterGradFuns
+gradDefs adp = mapMaybe (gradDef adp)
 
-gradDef :: HasCallStack => ADPlan -> TDef -> TDef
+gradDef :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDef adp
-        (Def { def_fun = f, def_args = params
+        (Def { def_fun = f@(Fun{}), def_args = params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
-  = Def { def_fun    = gradF adp f
+  = Just $
+    Def { def_fun    = gradF adp f
         , def_args   = params
         , def_res_ty = mkGradType adp s res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs)) }
@@ -82,8 +76,7 @@ gradDef adp
                                      (lmZero s TypeSize))
              | p <- paramsSizeBinders params]
 
-gradDef _ def = pprPanic "gradDef" (ppr def)
-   -- The filterGradFuns should make this impossible
+gradDef _ _ = Nothing
 
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
