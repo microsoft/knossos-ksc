@@ -61,6 +61,11 @@
              (v (add (mul (mul 2.0 p) q) (mul 3.0 r))))
          v)))
 
+(def twoif Float ((x : Float) (y : Float))
+     (let ((a (if (gt x 0.0) 0.0 1.0))
+           (b (if (gt y 0.0) x (mul x y))))
+       (add a b)))
+
 #|
 (def abuild (Vec n Float) ((n : Integer) (x : Float))
      (build n (lam (i : Integer) x)))

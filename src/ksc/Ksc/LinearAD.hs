@@ -318,7 +318,7 @@ differentiateIf r cond true fals =
 
             rtf :: L.TVar
             rtf = if trueT == falsT
-                  then temporaryMakeVar trueT "rtf"
+                  then makeVarNameFrom r trueT "rtf"
                   else error "trueT /= falsT"
               where trueT = L.typeof trueFwd'
                     falsT = L.typeof falsFwd'
@@ -331,13 +331,13 @@ differentiateIf r cond true fals =
 
             tf :: L.TVar
             tf = if trueTraceT == falsTraceT
-                 then temporaryMakeVar trueTraceT "tf"
+                 then makeVarNameFrom r trueTraceT "tf"
                  else error "trueTraceT /= falsTraceT"
               where trueTraceT = L.typeof onlyTrueTrace
                     falsTraceT = L.typeof onlyFalsTrace
 
             trace :: [L.TVar] -> String -> L.TVar
-            trace = temporaryMakeVar . L.TypeTuple . map L.typeof
+            trace = makeVarNameFrom r . L.TypeTuple . map L.typeof
 
             tTrace :: L.TVar
             tTrace = trace trueTraceFlat "tTrace"
@@ -364,7 +364,7 @@ differentiateIf r cond true fals =
 
             rScope :: L.TVar
             rScope =
-              temporaryMakeVar (L.TypeTuple (map L.typeof (toList inEither)))
+              makeVarNameFrom r (L.TypeTuple (map L.typeof (toList inEither)))
                                "rScope"
 
             tupleEverythingInScope :: L.TExpr
@@ -427,5 +427,6 @@ rev = flip retypeTVar L.tangentType . flip renameTVar (++ "$r")
 revVar :: L.TVar -> L.TExpr
 revVar = L.Var . rev
 
-temporaryMakeVar :: L.Type -> String -> L.TVar
-temporaryMakeVar t s = L.TVar t (L.Simple s)
+makeVarNameFrom :: L.TVar -> L.Type -> String -> L.TVar
+makeVarNameFrom orig t s = L.TVar t (L.Simple (origS ++ "$" ++ s))
+  where L.TVar _ (L.Simple origS) = orig
