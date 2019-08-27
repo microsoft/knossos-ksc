@@ -188,12 +188,7 @@ differentiateE = \case
                                    . L.Let ra2 (Prim.mkZero t2)))
           )
         s -> error ("differentiateE unexpected PrimFun: " ++ s)
-    k@(L.Konst{}) ->
-      g
-      -- Not strictly linear because we don't eliminate `rev v`, but we
-      -- probably don't care at the moment
-        (L.Let r k, [], \([]:xs') -> (xs', id))
-
+    k@(L.Konst{}) -> g (L.Let r k, [], \([]:xs') -> (xs', id))
     L.Var vv ->
       g (L.Let r (v vv), [], \([]:xs') -> (xs', L.Let (rev vv) (revVar r)))
     call@(L.Call f args)
