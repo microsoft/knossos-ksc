@@ -417,7 +417,8 @@ cgenExprR env = \case
       lvar
       tybody
 
-  Dup{} -> error "Cgen Dup unimplemented"
+  Dup{}  -> error "Cgen Dup unimplemented"
+  Elim{} -> error "Cgen Elim unimplemented"
 
   -- Tuple [t] -> cgenExpr env t -- Don't detuple willy-nilly
   Tuple vs  -> do

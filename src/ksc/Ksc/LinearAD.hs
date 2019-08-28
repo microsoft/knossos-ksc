@@ -56,8 +56,20 @@ lineariseD tdef@(L.Def { L.def_rhs = L.UserRhs rhs }) = L.Def
   { L.def_fun    = L.def_fun tdef
   , L.def_args   = L.def_args tdef
   , L.def_res_ty = L.def_res_ty tdef
-  , L.def_rhs    = L.UserRhs (lineariseE rhs)
+  , L.def_rhs    = L.UserRhs (lineariseAndRemoveUnused rhs)
   }
+  where elimUnusedArgs body =
+          flip applyAll body
+          $ flip map (L.def_args tdef)
+          $ \arg ->
+              if arg `LU.notFreeIn` body
+              then L.Elim arg
+              else id
+        applyAll = foldr (.) id
+
+        lineariseAndRemoveUnused =
+          verySlowlyRemoveUnusedLets . elimUnusedArgs . lineariseE
+
 lineariseD d@(L.Def { L.def_rhs = L.EDefRhs{} }) = d
 lineariseD (L.Def { L.def_rhs = L.StubRhs{} }) =
   error "Didn't expect to see a StubRhs at this stage"
@@ -142,6 +154,13 @@ differentiateE = \case
     , \xs' -> f xs' . L.Let (rev vv) (revVar v1 .+ revVar v2)
     )
     where (body', r, xs, f) = differentiateE body
+  L.Elim a body -> differentiateComponent body
+    ( id
+    , []
+    , \([]:xs) -> (xs, let ra = rev a
+                           t  = L.typeof ra
+                       in L.Let ra (Prim.mkZero t))
+    )
   L.Let r rhs body -> case rhs of
     call@(L.Call (L.TFun _ (L.Fun (L.PrimFun op))) [L.Var a1, L.Var a2]) ->
       case op of
@@ -421,6 +440,24 @@ renameTVar _                       _ = error "renameTVar"
 retypeTVar :: L.TVar -> (L.Type -> L.Type) -> L.TVar
 retypeTVar (L.TVar t v) f = L.TVar (f t) v
 
+verySlowlyRemoveUnusedLets :: L.TExpr -> L.TExpr
+verySlowlyRemoveUnusedLets = \case
+  e@L.Var{}       -> e
+  e@L.Konst{}     -> e
+  e@L.Call{}      -> e
+  e@L.Tuple{}     -> e
+  e@(L.App{})     -> e
+  L.Lam v e       -> L.Lam v (recurse e)
+  L.Let v r b     ->
+    (L.Let v r
+    . if v `LU.notFreeIn` b then L.Elim v else id
+    . recurse) b
+  L.If cond t f   -> L.If cond (recurse t) (recurse f)
+  L.Assert cond e -> L.Assert cond (recurse e)
+  L.Dup vs e body -> L.Dup vs e (recurse body)
+  L.Elim v body   -> L.Elim v (recurse body)
+  where recurse = verySlowlyRemoveUnusedLets
+
 unlineariseE :: L.TExpr -> L.TExpr
 unlineariseE = \case
   L.Dup (v1, v2) v@(L.Var{}) body -> L.Let v1 v (L.Let v2 v (unlineariseE body))
@@ -429,6 +466,7 @@ unlineariseE = \case
   L.Let v        e           body -> L.Let v (unlineariseE e) (unlineariseE body)
   L.If  cond     true        fals ->
     L.If cond (unlineariseE true) (unlineariseE fals)
+  L.Elim _ body -> unlineariseE body
   noDups@(L.Tuple{}) -> noDups
   noDups@(L.Call{})  -> noDups
   noDups@(L.Konst{}) -> noDups

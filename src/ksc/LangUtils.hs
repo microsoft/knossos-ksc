@@ -25,7 +25,7 @@ module LangUtils (
   -- Symbol table
   GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
   stInsertFun,
-  LclSymTab, extendLclST,
+  LclSymTab, extendLclST, reduceLclST,
   SymTab(..), newSymTab, emptySymTab
 
   ) where
@@ -73,6 +73,7 @@ substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEM
 substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (substEMayCapture subst e2)
 substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
 substEMayCapture subst (Dup{})        = error "substEMayCapture Dup unimplemented"
+substEMayCapture subst (Elim{})       = error "substEMayCapture Elim unimplemented"
 substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
                                           substEMayCapture (v `M.delete` subst) b
 
@@ -123,6 +124,7 @@ freeVarsOf = go
    go (Let v r b)    = go r `S.union` (S.delete v $ go b)
    go (Dup (v1, v2) r b) =
      go r `S.union` (S.delete v1 $ S.delete v2 $ go b)
+   go (Elim v b)     = S.insert v (go b)
    go (Lam v e)      = S.delete v $ go e
    go (Assert e1 e2) = go e1 `S.union` go e2
 
@@ -140,6 +142,7 @@ notFreeIn = go
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Dup (v1, v2) r b) =
      go v r && (go v b || v == v1 || v == v2)
+   go v (Elim v2 b)  = go v b && (v /= v2)
    go v (Assert e1 e2) = go v e1 && go v e2
 
 notFreeInType :: TVar -> Type -> Bool
@@ -245,3 +248,7 @@ extendLclST lst vars = foldl add lst vars
     add :: LclSymTab -> TVar -> LclSymTab
     add env (TVar ty v) = M.insert v ty env
 
+reduceLclST :: LclSymTab -> [TVar] -> LclSymTab
+reduceLclST lst vars = foldl remove lst vars
+  where remove :: LclSymTab -> TVar -> LclSymTab
+        remove env (TVar _ v) = M.delete v env

@@ -135,7 +135,8 @@ occAnalE (Let tv rhs body)
        | otherwise = (tv `M.delete` vsb)
                      `union` vstv `union` vsr
 
-occAnalE (Dup{}) = error "occAnalE Dup unimplemented"
+occAnalE (Dup{})  = error "occAnalE Dup unimplemented"
+occAnalE (Elim{}) = error "occAnalE Elim unimplemented"
 
 occAnalE (If b t e)
   = (If b' t' e', vsb `M.union` vst `M.union` vse)
@@ -261,6 +262,7 @@ substExpr subst e
                       where
                         (v', subst') = substBndr v subst
     go (Dup{})        = error "substExpr Dup unimplemented"
+    go (Elim{})       = error "substExpr Elim unimplemented"
     go (Lam v e)      = Lam v' (substExpr subst' e)
                       where
                         (v', subst') = substBndr v subst
@@ -325,6 +327,7 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
           | otherwise          = Let tv'' r' (go subst' b)
 
     go _ubst (Dup{})        = error "optLetsE Dup unimplemented"
+    go _ubst (Elim{})       = error "optLetsE Elim unimplemented"
     go subst (Var tv)       = substVar subst tv
     go _ubst (Konst k)      = Konst k
     go subst (Call f es)    = Call f (map (go subst) es)

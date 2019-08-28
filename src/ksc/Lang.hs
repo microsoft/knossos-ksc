@@ -122,6 +122,7 @@ data ExprX p
   | If (ExprX p) (ExprX p) (ExprX p)  -- FIXME make cond ExprX?
   | Assert (ExprX p) (ExprX p)
   | Dup (LetBndrX p, LetBndrX p) (ExprX p) (ExprX p)
+  | Elim (LetBndrX p) (ExprX p)
 
 deriving instance Show (ExprX Typed)
 
@@ -403,6 +404,7 @@ instance HasType TExpr where
   typeof (Lam b e)     = TypeLam (typeof b) (typeof e)
   typeof (Let _ _ e2)  = typeof e2
   typeof (Dup _ _ e)   = typeof e
+  typeof (Elim _ e)    = typeof e
   typeof (Assert _ e)  = typeof e
   typeof (If _ t f)    = makeIfType (typeof t) (typeof f)
 
@@ -750,6 +752,7 @@ pprExpr _ (Dup (v1, v2) v body) =
              <+> ppr v
            , ppr body
            ]
+pprExpr _ (Elim v body) = text "elim" <+> vcat [ pprLetBndr @phase v, ppr body ]
 pprExpr p (Let v e1 e2) = mode
   (pprLetSexp v e1 e2)
   (parensIf
@@ -991,6 +994,7 @@ cmpExpr e1
           _              -> GT
 
    go (Dup _ _ _) _ _ = error "cmp Dup unimlpmented"
+   go Elim{} _ _      = error "cmp Elim unimlpmented"
 
    gos :: [TExpr] -> M.Map Var TVar -> [TExpr] -> Ordering
    gos []    _ []    = EQ

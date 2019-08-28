@@ -69,6 +69,11 @@
 (def indexExample (Tuple Float (Vec n Float)) ((i : Integer) (v : Vec n Float))
      (indexL i v))
 
+(def unusedArgument Float (x : Float) 0.0)
+
+(def unusedLet Float (x : Float)
+     (let (y (mul x 10.0)) x))
+
 #|
 (def abuild (Vec n Float) ((n : Integer) (x : Float))
      (build n (lam (i : Integer) x)))

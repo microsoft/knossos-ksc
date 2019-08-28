@@ -211,6 +211,13 @@ tcExpr (Dup (v1, v2) rhs body)
 
        ; return (TE (Dup (tvar1, tvar2) arhs abody) tybody) }
 
+tcExpr (Elim vx body)
+  = do { let (var, _) = getLetBndr @p vx
+       ; t <- lookupLclTc var
+       ; let tv = TVar t var
+       ; TE abody tybody <- reduceLclSTM [tv] (tcExpr body)
+       ; return (TE (Elim tv abody) tybody) }
+
 tcExpr (Tuple es)
   = do { pairs <- mapM tcExpr es
        ; let (aes, tys) = unzipTEs pairs
@@ -501,6 +508,11 @@ extendLclSTM :: [TVar] -> TcM a -> TcM a
 extendLclSTM vars = modifyEnvTc add_vars
   where
     add_vars st = st { lclST = extendLclST (lclST st) vars }
+
+reduceLclSTM :: [TVar] -> TcM a -> TcM a
+reduceLclSTM vars = modifyEnvTc remove_vars
+  where
+    remove_vars st = st { lclST = reduceLclST (lclST st) vars }
 
 extendGblEnv :: TDecl -> TcM a -> TcM a
 extendGblEnv (RuleDecl {}) = id
