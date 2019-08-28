@@ -111,7 +111,7 @@ lineariseE = \case
         L.Let v (L.If vv
                       (elim (notIn inTrue) (lineariseE true))
                       (elim (notIn inFals) (lineariseE false))
-                ) body
+                ) (lineariseE body)
 
         where
           elim :: Set L.TVar -> L.TExpr -> L.TExpr
