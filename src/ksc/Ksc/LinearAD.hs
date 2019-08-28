@@ -108,7 +108,27 @@ lineariseE = \case
     -- problems.
     L.If cond true false -> case cond of
       vv@(L.Var{}) ->
-        L.Let v (L.If vv (lineariseE true) (lineariseE false)) body
+        L.Let v (L.If vv
+                      (elim (notIn inTrue) (lineariseE true))
+                      (elim (notIn inFals) (lineariseE false))
+                ) body
+
+        where
+          elim :: Set L.TVar -> L.TExpr -> L.TExpr
+          elim = foldr (\vvv rest -> L.Elim vvv . rest) id . toList
+
+          inTrue :: Set L.TVar
+          inTrue = LU.freeVarsOf true
+
+          inFals :: Set L.TVar
+          inFals = LU.freeVarsOf false
+
+          inEither :: Set L.TVar
+          inEither = inTrue `union` inFals
+
+          notIn :: Set L.TVar -> Set L.TVar
+          notIn = (inEither \\)
+
       o -> error ("lineariseE Let If unexpected " ++ show o)
     o -> error ("lineariseE Let unexpected " ++ show o)
   var@(L.Var{}) -> var
@@ -323,13 +343,11 @@ differentiateIf r cond true fals =
                $ L.Let tTrace (Prim.pSel 1 2 (v tf_))
                $ untupleTrace tTrace trueTraceRevVars
                $ trueRev trueTraceRevVars
-               $ mkZero (notIn inTrue)
                $ tupleEverythingInScope)
               (L.Let (rev falsR) (revVar r)
                $ L.Let fTrace (Prim.pSel 2 2 (v tf_))
                $ untupleTrace fTrace falsTraceRevVars
                $ falsRev falsTraceRevVars
-               $ mkZero (notIn inFals)
                $ tupleEverythingInScope)
             )
           )
@@ -422,14 +440,6 @@ differentiateIf r cond true fals =
 
             inEither :: Set L.TVar
             inEither = inTrue `union` inFals
-
-            notIn :: Set L.TVar -> Set L.TVar
-            notIn = (inEither \\)
-
-            mkZero :: Set L.TVar -> L.TExpr -> L.TExpr
-            mkZero =
-              foldr (\vv rest -> L.Let (rev vv) (Prim.mkZero (L.typeof vv)) . rest)
-                    id
 
             v = L.Var
 
