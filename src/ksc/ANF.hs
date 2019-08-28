@@ -54,7 +54,6 @@ anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; emit v' r'
                                ; anfE subst' e }
 anfE _ubst (Dup{})        = error "anfE Dup unimplemented"
--- Why isn't b anf'd?
 anfE subst (If b t e)     = atomise =<<
                             do { b' <- anfE subst b
                                ; t' <- anfExpr subst t
