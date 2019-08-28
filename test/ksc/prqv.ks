@@ -110,7 +110,7 @@
             "indexExample 0 zeroVec = " (indexExample 0 zeroVec) "\n"
             "revl$indexExample 0 zeroVec 1.0 zeroVec = "
               (revl$indexExample 0 zeroVec (tuple 1.0 zeroVec_)) "\n"
-            "rev$indexExample 0 zeroVec 1.0 zeroVec = zeroVecC "
+            "rev$indexExample 0 zeroVec 1.0 zeroVec = "
               (rev$indexExample 0 zeroVec (tuple 1.0 zeroVec)) "\n"
 #|
             "abuild 3.0 = " (abuild 3.0) "\n"
