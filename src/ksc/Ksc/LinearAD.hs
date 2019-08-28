@@ -432,14 +432,8 @@ differentiateIf r cond true fals =
             tupleEverythingInScope :: L.TExpr
             tupleEverythingInScope = L.Tuple (map revVar (toList inEither))
 
-            inTrue :: Set L.TVar
-            inTrue = LU.freeVarsOf true
-
-            inFals :: Set L.TVar
-            inFals = LU.freeVarsOf fals
-
             inEither :: Set L.TVar
-            inEither = inTrue `union` inFals
+            inEither = LU.freeVarsOf true `union` LU.freeVarsOf fals
 
             v = L.Var
 
