@@ -159,7 +159,7 @@ defsAndDiffs display decls = do {
   ; display "ANF'd" env3 anf_defs
   ; let linear_defs = map L.lineariseD anf_defs
         linear_diffs_withDups = mapMaybe L.differentiateD linear_defs
-        linear_diffs = map L.removeDupsD linear_diffs_withDups
+        linear_diffs = map L.unlineariseD linear_diffs_withDups
         env4 = env3 `extendGblST` linear_diffs
   ; display "Linearised" env4 linear_defs
   ; display "Linear diffs" env4 linear_diffs_withDups

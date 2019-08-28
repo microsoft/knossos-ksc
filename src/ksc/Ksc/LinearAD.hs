@@ -421,14 +421,14 @@ renameTVar _                       _ = error "renameTVar"
 retypeTVar :: L.TVar -> (L.Type -> L.Type) -> L.TVar
 retypeTVar (L.TVar t v) f = L.TVar (f t) v
 
-removeDupsE :: L.TExpr -> L.TExpr
-removeDupsE = \case
-  L.Dup (v1, v2) v@(L.Var{}) body -> L.Let v1 v (L.Let v2 v (removeDupsE body))
+unlineariseE :: L.TExpr -> L.TExpr
+unlineariseE = \case
+  L.Dup (v1, v2) v@(L.Var{}) body -> L.Let v1 v (L.Let v2 v (unlineariseE body))
   L.Dup _        v           _ ->
     error ("Didn't expect to see being Dup'd: " ++ show v)
-  L.Let v        e           body -> L.Let v (removeDupsE e) (removeDupsE body)
+  L.Let v        e           body -> L.Let v (unlineariseE e) (unlineariseE body)
   L.If  cond     true        fals ->
-    L.If cond (removeDupsE true) (removeDupsE fals)
+    L.If cond (unlineariseE true) (unlineariseE fals)
   noDups@(L.Tuple{}) -> noDups
   noDups@(L.Call{})  -> noDups
   noDups@(L.Konst{}) -> noDups
@@ -437,14 +437,14 @@ removeDupsE = \case
   L.App{}    -> notImplemented "App"
   L.Assert{} -> notImplemented "Assert"
   where notImplemented c =
-          error ("removeDupsE for " ++ c ++ " not implemented yet")
+          error ("unlineariseE for " ++ c ++ " not implemented yet")
 
-removeDupsD :: L.TDef -> L.TDef
-removeDupsD def@(L.Def { L.def_rhs = L.UserRhs rhs }) =
-  def { L.def_rhs = L.UserRhs (removeDupsE rhs) }
-removeDupsD (L.Def { L.def_rhs = L.StubRhs }) =
+unlineariseD :: L.TDef -> L.TDef
+unlineariseD def@(L.Def { L.def_rhs = L.UserRhs rhs }) =
+  def { L.def_rhs = L.UserRhs (unlineariseE rhs) }
+unlineariseD (L.Def { L.def_rhs = L.StubRhs }) =
   error "Did not expect to see StubRhs"
-removeDupsD edef@(L.Def { L.def_rhs = L.EDefRhs }) = edef
+unlineariseD edef@(L.Def { L.def_rhs = L.EDefRhs }) = edef
 
 rev :: L.TVar -> L.TVar
 rev = flip retypeTVar L.tangentType . flip renameTVar (++ "$r")
