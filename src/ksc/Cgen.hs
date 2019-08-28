@@ -292,7 +292,8 @@ cgenExprR env = \case
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec sty ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
+  Call (TFun (TypeVec sty ty) (Fun (PrimFun "build")))
+       (Tuple [sz, Lam (TVar vty var) body]) -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -319,7 +320,8 @@ cgenExprR env = \case
         (mkCType (TypeVec sty ty))
 
   -- Special case for sumbuild -- inline the loop
-  Call (TFun ty (Fun (PrimFun "sumbuild"))) [sz, Lam (TVar vty var@(Simple _)) body] -> do
+  Call (TFun ty (Fun (PrimFun "sumbuild")))
+       (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -357,8 +359,11 @@ cgenExprR env = \case
 
 
 
-  Call tf@(TFun _ _) vs -> do
+  Call tf@(TFun _ _) v -> do
       -- Untuple argument for C++ call
+    let vs = case v of
+              Tuple vs -> vs
+              _        -> [v]
     cgvs <- mapM (cgenExprR env) vs
     let cdecls = map getDecl cgvs
     let cexprs = map getExpr cgvs

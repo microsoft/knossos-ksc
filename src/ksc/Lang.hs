@@ -21,19 +21,6 @@ import           Test.Hspec
 --  The main data types
 -----------------------------------------------
 
-mkGradType :: ADPlan -> Type -> Type -> Type
-mkGradType BasicAD s ty = TypeLM s ty
-mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
-  -- For TupleAD, mkGradType s t = (t, s -o t)
-
-mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
-mkGradTuple BasicAD _ lm = lm
-mkGradTuple TupleAD p lm = Tuple [p, lm]
-
-mkLMType_Dir :: ADDir -> Type -> Type -> Type
-mkLMType_Dir Fwd s t = TypeLM s t
-mkLMType_Dir Rev s t = TypeLM t s
-
 data Phase = Parsed | Typed | OccAnald
 
 data DeclX p = RuleDecl (RuleX p)
@@ -44,7 +31,7 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: Fun
-        , def_args   :: [TVarX p]  -- See Note [Function arity]
+        , def_args   :: [TVarX p]  -- See Note [Function arity and tuples]
         , def_res_ty :: TypeX p     -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
@@ -64,38 +51,6 @@ data RhsX p
 
 type TRhs  = RhsX Typed
 
-isUserDef :: DefX p -> Bool
-isUserDef (Def { def_rhs = UserRhs {} }) = True
-isUserDef _ = False
-
-data TVarX p = TVar (TypeX p) Var
-type TVar = TVarX Typed
-
-deriving instance Eq TVar
-deriving instance Ord TVar
-instance Show TVar where
-  show e = pps e
-
-tVarVar :: TVarX p -> Var
-tVarVar (TVar _ v) = v
-
-tVarType :: TVarX p -> TypeX p
-tVarType (TVar ty _) = ty
-
-
-{- Note [Function arity]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Top level functions with exactly one argument expect a call
-    Call f e
-and bind the argument to e
-
-Top level functions with zero, or two or more arguments expect a call
-   Call f (Tuple [e1, .. en])
-and bind the arugments to e1.. en respectively.
-
-That is, arity-1 is treated specially. We do not have 1-tuples.
--}
-
 type family VarX p where
   VarX Parsed   = Var
   VarX Typed    = TVar
@@ -114,7 +69,7 @@ type family FunX p where
 data ExprX p
   = Konst Konst
   | Var  (VarX p)
-  | Call (FunX p) [ExprX p]  -- f e
+  | Call (FunX p) (ExprX p)    -- f e
   | Tuple [ExprX p]            -- (e1, ..., en)
   | Lam (TVarX p) (ExprX p)    -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
@@ -129,17 +84,6 @@ type Expr  = ExprX Parsed
 
 type TExpr = ExprX Typed
 type Type  = TypeX Typed
-
-data TypedExpr = TE TExpr Type   -- A pair of an expression and its type
-
-exprOf :: TypedExpr -> TExpr
-exprOf (TE e _) = e
-
-unzipTEs :: [TypedExpr] -> ([TExpr], [Type])
-unzipTEs []             = ([],[])
-unzipTEs (TE e t : tes) = (e:es, t:ts)
-  where
-    (es, ts) = unzipTEs tes
 
 data TypeX p
   = TypeBool
@@ -161,6 +105,146 @@ deriving instance Ord Type
 
 instance InPhase p => Show (TypeX p) where
   show e = pps e
+
+type PrimFun = String
+
+data FunId = UserFun String   -- UserFuns have a Def
+           | PrimFun PrimFun  -- PrimFuns do not have a Def
+           | SelFun
+                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
+                Int      -- Arity
+           deriving( Eq, Ord, Show )
+
+data Fun = Fun      FunId         -- The function              f(x)
+         | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
+         | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
+                                  --   Rev <=> reverse mode f`(x,dr)
+         deriving( Eq, Ord, Show )
+
+
+data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
+  deriving( Eq, Ord, Show )
+
+data ADPlan = BasicAD | TupleAD
+  deriving( Eq, Ord, Show )
+
+data ADDir = Fwd | Rev
+  deriving( Eq, Ord, Show )
+
+data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
+  deriving (Eq, Ord)  -- type of the function.
+
+data Var
+  = Dummy                 -- Used for type arguments
+  | Simple String         -- x
+  | Delta  String         -- The 'dx' or 'dr' argument to
+                          -- forward or backward versions of f
+  | Grad   String ADPlan  -- Derivative of x
+  deriving( Eq, Ord, Show )
+
+data TVarX p = TVar (TypeX p) Var
+type TVar = TVarX Typed
+
+deriving instance Eq TVar
+deriving instance Ord TVar
+instance Show TVar where
+  show e = pps e
+
+tVarVar :: TVarX p -> Var
+tVarVar (TVar _ v) = v
+
+tVarType :: TVarX p -> TypeX p
+tVarType (TVar ty _) = ty
+
+
+data Konst = KInteger Integer   -- :: TypeInteger
+           | KSize    Integer   -- :: TypeSize
+           | KFloat   Double    -- :: TypeFloat
+           | KBool    Bool      -- :: TypeBool
+           | KString  String    -- :: TypeString
+           deriving( Eq, Ord, Show )
+
+data RuleX p = Rule { ru_name  :: String   -- Just for logging
+                    , ru_qvars :: [TVarX p]
+                    , ru_lhs   :: ExprX p
+                    , ru_rhs   :: ExprX p }
+  -- When matching may bind any of the ru_qvars, which are typed,
+  -- just like any other lambda-bound variable
+
+type Rule  = RuleX Parsed
+type TRule = RuleX Typed
+
+{- Note [Function arity and tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Every top-level function has type (S -> T), for some tpye S;
+that it, it takes exactly one argument.  However, in the concrete
+syntax a function is defined as if it had several arguments:
+
+  def f2 Float ( x : Float, y :: Float) ...
+  -- f2 :: (Float, Float) -> Float
+
+  def f1 Float ( x : Float ) ...
+  -- f1 :: Float -> Float
+
+  def f0 Float () ...
+  -- f2 :: () -> Float
+
+We do not have 1-tuples; a function defined with one argument takes
+that argument --  see f1 above.
+
+In a call, you must supply one argument of the correct type; in the
+ExprX data types, a Call has a single argument.
+
+In the concrete syntax you can supply several arguments, but that's
+just concrete syntax for the tupled version; e.g.
+
+   Concrete syntax        Abstract syntax
+   --------------------------------------
+   (f1 x)                  Call f1 x
+   (f2 x y)                Call f2 (Tuple x y)
+
+Note that it is perfect legal to call f2 with a argument that is
+not a tuple, such as
+
+   Call f2 (Call g 3)
+   Call f2 x
+
+provided the argument has the right type.  However, optimisation rules
+mostly expect the argument to be a visible tuple, and will fail to
+fire if not.
+-}
+
+-----------------------------------------------
+--  TypedExpr
+-----------------------------------------------
+
+data TypedExpr = TE TExpr Type   -- A pair of an expression and its type
+
+exprOf :: TypedExpr -> TExpr
+exprOf (TE e _) = e
+
+unzipTEs :: [TypedExpr] -> ([TExpr], [Type])
+unzipTEs []             = ([],[])
+unzipTEs (TE e t : tes) = (e:es, t:ts)
+  where
+    (es, ts) = unzipTEs tes
+
+-----------------------------------------------
+--  Functions over Types
+-----------------------------------------------
+
+mkGradType :: ADPlan -> Type -> Type -> Type
+mkGradType BasicAD s ty = TypeLM s ty
+mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
+  -- For TupleAD, mkGradType s t = (t, s -o t)
+
+mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
+mkGradTuple BasicAD _ lm = lm
+mkGradTuple TupleAD p lm = Tuple [p, lm]
+
+mkLMType_Dir :: ADDir -> Type -> Type -> Type
+mkLMType_Dir Fwd s t = TypeLM s t
+mkLMType_Dir Rev s t = TypeLM t s
 
 -- TypeSize is used to document when an integer represents a Size.
 -- It's too viral to use a separate Integer type because most integer operations
@@ -213,63 +297,13 @@ eqSize (Konst k1) (Konst k2) = traceWhenUnequal "eqSize" k1 k2 $ k1 == k2
 eqSize _e1 _e2 = -- trace ("[Punting eqSize " ++ pps _e1 ++ " == " ++ pps _e2 ++ "]")
                  True
 
-type PrimFun = String
-
-data FunId = UserFun String   -- UserFuns have a Def
-           | PrimFun PrimFun  -- PrimFuns do not have a Def
-           | SelFun
-                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
-                Int      -- Arity
-           deriving( Eq, Ord, Show )
-
-data Fun = Fun      FunId         -- The function              f(x)
-         | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
-         | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
-                                  --   Rev <=> reverse mode f`(x,dr)
-         deriving( Eq, Ord, Show )
-
-
-data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
-  deriving( Eq, Ord, Show )
-
-data ADPlan = BasicAD | TupleAD
-  deriving( Eq, Ord, Show )
-
-data ADDir = Fwd | Rev
-  deriving( Eq, Ord, Show )
-
-data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
-  deriving (Eq, Ord)  -- type of the function.
-
-
-data Var
-  = Dummy                 -- Used for type arguments
-  | Simple String         -- x
-  | Delta  String         -- The 'dx' or 'dr' argument to
-                          -- forward or backward versions of f
-  | Grad   String ADPlan  -- Derivative of x
-  deriving( Eq, Ord, Show )
-
-data Konst = KInteger Integer   -- :: TypeInteger
-           | KSize    Integer   -- :: TypeSize
-           | KFloat   Double    -- :: TypeFloat
-           | KBool    Bool      -- :: TypeBool
-           | KString  String    -- :: TypeString
-           deriving( Eq, Ord, Show )
-
-data RuleX p = Rule { ru_name  :: String   -- Just for logging
-                    , ru_qvars :: [TVarX p]
-                    , ru_lhs   :: ExprX p
-                    , ru_rhs   :: ExprX p }
-  -- When matching may bind any of the ru_qvars, which are typed,
-  -- just like any other lambda-bound variable
-
-type Rule  = RuleX Parsed
-type TRule = RuleX Typed
-
 -----------------------------------------------
---  Simple functions over these types
+--  Functions over Decls and Defs
 -----------------------------------------------
+
+isUserDef :: DefX p -> Bool
+isUserDef (Def { def_rhs = UserRhs {} }) = True
+isUserDef _ = False
 
 partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p])
 -- Separate the Rules, Defs
@@ -319,6 +353,10 @@ mkDummyTVar ty = TVar ty Dummy
 
 mkDummy :: Type -> TExpr
 mkDummy ty = Var (mkDummyTVar ty)
+
+mkLet_maybe :: HasCallStack => Maybe (TVar, TExpr) -> TExpr -> TExpr
+mkLet_maybe (Just (v,rhs)) body = mkLet v rhs body
+mkLet_maybe Nothing        body = body
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
@@ -762,18 +800,21 @@ pprExpr _ (App e1 e2) =
   parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
 
-pprCall :: forall p. InPhase p => Prec -> FunX p -> [ExprX p] -> SDoc
-pprCall prec f e = mode
+pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
+pprCall prec f arg = mode
   (parens $ pprFunOcc @p f <+> pp_args)
-  (case (e, isInfix @p f) of
-    ([e1, e2], Just prec')
+  (case (arg, isInfix @p f) of
+    (Tuple [arg1, arg2], Just prec')
       -> parensIf prec prec' $
-         sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
+         sep [pprExpr prec' arg1, pprFunOcc @p f <+> pprExpr prec' arg2]
     _ -> parensIf prec precCall $
-         cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
+         cat [pprFunOcc @p f, nest 2 pp_args]
   )
  where
-  pp_args = pprList ppr e
+  args = case arg of
+           Tuple args -> args
+           _          -> [arg]
+  pp_args = parensSp (pprList ppr args)
 
 pprLetSexp :: forall p. InPhase p => LetBndrX p -> ExprX p -> ExprX p -> SDoc
 pprLetSexp v e =
@@ -873,8 +914,8 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (Fun (UserFun "g")) [var "i"]
-      e2 = Call (Fun (UserFun "f")) [e, var "_t1", kInt 5]
+      e  = Call (Fun (UserFun "g")) (var "i")
+      e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"
@@ -922,7 +963,7 @@ cmpExpr e1
      = case e2 of
          Konst {} -> GT
          Var {} -> GT
-         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (gos e1 subst e2)
+         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (go e1 subst e2)
          _ -> LT
 
    go (Tuple es1) subst e2

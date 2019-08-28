@@ -240,10 +240,10 @@ pCall = do { f <- pIdentifier
                []  -> return (Var (Simple f))
                _   | f == "$trace"   -- See Note [$trace]
                    , Var (Simple g) : es1 <- es
-                   -> return (Call (mk_fun f) [Call (mk_fun g) es1])
+                   -> return (Call (mk_fun f) (Call (mk_fun g) (mkTuple es1)))
 
                    | otherwise
-                   -> return (Call (mk_fun f) es)
+                   -> return (Call (mk_fun f) (mkTuple es))
         }
 
 {- Note [$trace]

@@ -19,6 +19,9 @@ module LangUtils (
   notFreeIn, notFreeInType, newVarNotIn, freeVarsOf,
   paramsSizeBinders, typesSizeBinders,
 
+  -- Misc useful functions
+  isSingleton,
+
   -- Tests
   LangUtils.hspec, test_FreeIn,
 
@@ -45,13 +48,17 @@ isTrivial :: TExpr -> Bool
 isTrivial (Tuple [])    = True
 isTrivial (Var {})      = True
 isTrivial (Konst {})    = True
-isTrivial (Call f args) = all isDummy args
+isTrivial (Call f arg)  = isDummy arg
 isTrivial (Assert _ e2) = isTrivial e2
 isTrivial _ = False
 
 isDummy :: TExpr -> Bool
 isDummy (Var v) = isDummyVar (tVarVar v)
 isDummy _       = False
+
+isSingleton :: [a] -> Bool
+isSingleton [_] = True
+isSingleton _   = False
 
 -----------------------------------------------
 --     Substitution
@@ -66,7 +73,7 @@ substEMayCapture subst (Konst k)      = Konst k
 substEMayCapture subst (Var v)        = case M.lookup v subst of
                                Just e  -> e
                                Nothing -> Var v
-substEMayCapture subst (Call f es)    = Call f (map (substEMayCapture subst) es)
+substEMayCapture subst (Call f e)     = Call f (substEMayCapture subst e)
 substEMayCapture subst (If b t e)     = If (substEMayCapture subst b) (substEMayCapture subst t) (substEMayCapture subst e)
 substEMayCapture subst (Tuple es)     = Tuple (map (substEMayCapture subst) es)
 substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEMayCapture subst e2)
@@ -117,7 +124,7 @@ freeVarsOf = go
    go (Konst _)      = S.empty
    go (Tuple es)     = S.unions (map go es)
    go (If b t e)     = go b `S.union` go t `S.union` go e
-   go (Call _ es)    = S.unions (map go es)
+   go (Call _ e)     = go e
    go (App f a)      = go f `S.union` go a
    go (Let v r b)    = go r `S.union` (S.delete v $ go b)
    go (Lam v e)      = S.delete v $ go e
@@ -131,7 +138,7 @@ notFreeIn = go
    go v (Konst _)    = True
    go v (Tuple es)   = all (go v) es
    go v (If b t e)   = go v b && go v t && go v e
-   go v (Call _ e)   = all (go v) e
+   go v (Call _ e)   = go v e
    go v (App f a)    = go v f && go v a
    go v (Let v2 r b) = go v r && (v == v2 || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
@@ -162,8 +169,8 @@ hspec = do
         var s = TVar TypeFloat (Simple s)
         fun :: String -> TFun
         fun s = TFun TypeFloat (Fun (UserFun s))
-        e  = Call (fun "f") [Var (var "i")]
-        e2 = Call (fun "f") [Var (var "_t1"), kInt 5]
+        e  = Call (fun "f") (Var (var "i"))
+        e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
     describe "notFreeIn" $ do
       it ("i notFreeIn " ++ show (ppr (e::TExpr))) $
         (var "i" `notFreeIn` e) `shouldBe` False

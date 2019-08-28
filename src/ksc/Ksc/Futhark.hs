@@ -285,8 +285,10 @@ toFutharkExp (L.Lam (L.TVar _ v) body) =
   Lambda [PatId $ toName v] $ toFutharkExp body
 toFutharkExp (L.Assert _ e) =
   toFutharkExp e
-toFutharkExp (L.Call f args) =
-  toCall f args
+
+toFutharkExp (L.Call f (L.Tuple args)) = toCall f args
+toFutharkExp (L.Call f arg)            = toCall f [arg]
+
 toFutharkExp e =
   error $ "toFutharkExp: unhandled " ++ show e
 

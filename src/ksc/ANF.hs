@@ -42,11 +42,11 @@ anfE _ (Konst k)         = return (Konst k)
 anfE subst (Var tv)      = return (substVar subst tv)
 anfE subst (Call fun es)
  | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]
- , [e1,e2] <- es
+ , Tuple [e1,e2] <- es
  = do { e2' <- anfE1 subst e2
-      ; return (Call fun [e1, e2']) }
+      ; return (Call fun (Tuple [e1, e2'])) }
  | otherwise
- = Call fun <$> mapM (anfE1 subst) es
+ = Call fun <$> anfE1 subst es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = substBndr v subst
                                ; emit v' r'

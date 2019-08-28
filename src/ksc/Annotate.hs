@@ -167,16 +167,16 @@ tcExpr (Var vx)
 tcExpr (Konst k)
   = return (TE (Konst k) (typeofKonst k))
 
-tcExpr (Call fx es)
+tcExpr (Call fx arg)
   = do { let (fun, mb_ty) = getFun @p fx
-       ; pairs <- addCtxt (text "In the call of:" <+> ppr fun) $
-                  mapM tcExpr es
+       ; t_arg <- addCtxt (text "In the call of:" <+> ppr fun) $
+                  tcExpr arg
 
-       ; res_ty <- lookupGblTc fun pairs
+       ; res_ty <- lookupGblTc fun t_arg
 
        ; checkTypes_maybe mb_ty res_ty $
          text "Function call type mismatch for" <+> ppr fun
-       ; let call' = Call (TFun res_ty fun) (map exprOf pairs)
+       ; let call' = Call (TFun res_ty fun) (exprOf t_arg)
        ; return (TE call' res_ty) }
 
 tcExpr (Let vx rhs body)
@@ -255,13 +255,13 @@ tcVar var mb_ty
 -- It has special cases for a bunch opuilt-in functions with polymorphic
 -- types; that is, where the result type is a function of the argument types
 -- Otherwise it just looks in the global symbol table.
-callResultTy_maybe :: SymTab -> Fun -> [TypedExpr]
+callResultTy_maybe :: SymTab -> Fun -> TypedExpr
                    -> Either SDoc Type
-callResultTy_maybe env fun args
+callResultTy_maybe env fun targ
   | is_user_fun fun
-  = userCallResultTy_maybe fun (gblST env) args
+  = userCallResultTy_maybe fun (gblST env) targ
   | otherwise
-  = primCallResultTy_maybe fun args
+  = primCallResultTy_maybe fun targ
   where
     funId = \case
       Fun     f   -> f
@@ -280,25 +280,42 @@ callResultTy_maybe env fun args
 -----------------------------------------------
 
 userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
-                       -> [TypedExpr] -> Either SDoc Type
-userCallResultTy_maybe fn env args
+                       -> TypedExpr -> Either SDoc Type
+userCallResultTy_maybe fn env targ
   = case lookupGblST fn env of
-      Just def -> userCallResultTy_help def args
+      Just def -> userCallResultTy_help def targ
       Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
 
 userCallResultTy_help :: HasCallStack
-                      => TDef -> [TypedExpr] -> Either SDoc Type
-userCallResultTy_help (Def { def_fun  = fn
+                      => TDef -> TypedExpr -> Either SDoc Type
+userCallResultTy_help (Def { def_fun    = fn
                            , def_res_ty = ret_ty
-                           , def_args = params })
-                      args
+                           , def_args   = params })
+                      (TE arg arg_ty)
+  | Just arg_tys <- get_arg_tys
+  , let size_subst = bindTypeArgs params args arg_tys
   = case check_args 1 (map (substType size_subst) bndr_tys) arg_tys of
       Just err -> Left err
       Nothing  -> Right (substType size_subst ret_ty)
+
+  | otherwise  -- E.g.   f (x,y) = e, and a call (f 44)
+               -- This is simply ill-typed
+  = Left (hang (text "Argument tuple expected in a call of" <+> ppr fn)
+             2 (text "but the arg has type" <+> ppr arg_ty))
   where
-    bndr_tys   = map tVarType params
-    arg_tys    = map typeof args
-    size_subst = bindTypeArgs params args
+    bndr_tys = map tVarType params
+
+    get_arg_tys
+      | isSingleton params          = Just [arg_ty]
+      | TypeTuple arg_tys <- arg_ty = Just arg_tys
+      | otherwise                   = Nothing
+
+    n = length params
+    args | isSingleton params = [arg]
+         | Tuple args <- arg  = args
+         | otherwise          = [ pSel i n arg | i <- [1..n] ]
+      -- The third case is when we have f :: (Integer, Integer) -> blah
+      -- and a call (f x), i.e. not applied to a literal tuple.
 
     check_args :: Int -> [Type] -> [Type] -> Maybe SDoc
     -- Return (Just err) if there's a wrong-ness
@@ -314,25 +331,27 @@ userCallResultTy_help (Def { def_fun  = fn
     check_args _ [] _  = Just (text "Too many arguments")
     check_args _ _  [] = Just (text "Too few arguments")
 
-bindTypeArgs :: [TVar]      -- Parameters
-             -> [TypedExpr] -- Arguments of this call, each with its type
+bindTypeArgs :: [TVar]             -- Parameters
+             -> [TExpr] -> [Type]  -- Value arg and list of arg types
              -> Subst
 -- Given function binders [ x :: Vec (2*n) Float
+--                        , m :: Integer
 --                        , y :: (Float, Vec n Float) ]
 --
 --   and args of type 	  [ Vec e1 Float
+--                        , em
 --                    	  , (Float, Vec (3*j) Float ]
 --
--- extract the substitution [n :-> 3*j]
+-- extract the substitution [n :-> 3*j, m :-> em]
 -- Note that we get the substitution from the y-binding,
 -- which binds a simple 'n', ignoring the earlier, but more
 -- complex x-binding.
 --
 -- If matching fails, just return a smaller substitution
 -- The caller is going to re-match anyway
-bindTypeArgs bndrs args
-  = match_args bndrs              args              $
-    match_tys  (map typeof bndrs) (map typeof args) $
+bindTypeArgs bndrs args arg_tys
+  = match_args bndrs args                   $
+    match_tys  (map tVarType bndrs) arg_tys $
     empty_subst
   where
     empty_subst = mkEmptySubst []
@@ -340,8 +359,8 @@ bindTypeArgs bndrs args
         -- are substituting into, so no need for
         -- a full in-scope set
 
-    match_args :: [TVar] -> [TypedExpr] -> Subst -> Subst
-    match_args (TVar bndr_ty v : bndrs) (TE arg _ : args) subst
+    match_args :: [TVar] -> [TExpr] -> Subst -> Subst
+    match_args (TVar bndr_ty v : bndrs) (arg : args) subst
       | TypeInteger <- bndr_ty
       = extendSubstMap v arg $
         match_args bndrs args subst
@@ -350,9 +369,9 @@ bindTypeArgs bndrs args
     match_args _ _ subst = subst
 
     match_tys :: [Type] -> [Type] -> Subst -> Subst
-    match_tys (bndr_ty : bndr_tys) (arg_ty : arg_tys) subst
-      = match_ty  bndr_ty  arg_ty $
-        match_tys bndr_tys arg_tys subst
+    match_tys (bndr_ty : bndrs_tys) (arg_ty : arg_tys) subst
+      = match_ty  bndr_ty   arg_ty $
+        match_tys bndrs_tys arg_tys subst
     match_tys _ _ subst = subst
 
     match_ty :: Type -> Type -> Subst ->  Subst
@@ -512,18 +531,18 @@ lookupLclTc v
      varFun (Simple name) = mk_fun name
      varFun n = pprPanic "varFun" (ppr n $$ text (show n))
 
-lookupGblTc :: Fun -> [TypedExpr] -> TcM Type
-lookupGblTc fun args
+lookupGblTc :: Fun -> TypedExpr -> TcM Type
+lookupGblTc fun arg
   = do { st <- getSymTabTc
-       ; case callResultTy_maybe st fun args of
+       ; case callResultTy_maybe st fun arg of
            Left err -> do { addErr $ hang err 2 (mk_extra st)
                           ; return TypeUnknown }
            Right res_ty -> return res_ty }
   where
     mk_extra st
       = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
-             , text " Arg types:" <+> ppr (map typeof args)
-             , text " Args:"      <+> ppr (map exprOf args)
+             , text " Arg type:" <+> ppr (typeof arg)
+             , text " Arg:"      <+> ppr (exprOf arg)
              , text "ST lookup:" <+> ppr (Map.lookup fun (gblST st))
              -- This is very verbose, and obscures error messages, but can be useful for typos.
              -- Perhaps think about printing it only for failed lookup of userfun

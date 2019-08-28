@@ -94,9 +94,9 @@ occAnalE (Lam tv e)
     (e', vs)   = occAnalE e
     (tv', vs2) = occAnalTv tv
 
-occAnalE (Call f e) = (Call f e', unions vs)
+occAnalE (Call f e) = (Call f e', vs)
                      where
-                       (e',vs) = unzip (map occAnalE e)
+                       (e',vs) = occAnalE e
 occAnalE (Tuple es) = (Tuple es', unions vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
@@ -250,7 +250,7 @@ substExpr subst e
   where
     go (Var tv)       = substVar subst tv
     go (Konst k)      = Konst k
-    go (Call f es)    = Call f (map go es)
+    go (Call f es)    = Call f (go es)
     go (If b t e)     = If (go b) (go t) (go e)
     go (Tuple es)     = Tuple (map go es)
     go (App e1 e2)    = App (go e1) (go e2)
@@ -323,7 +323,7 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
 
     go subst (Var tv)       = substVar subst tv
     go _ubst (Konst k)      = Konst k
-    go subst (Call f es)    = Call f (map (go subst) es)
+    go subst (Call f e)     = Call f (go subst e)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
