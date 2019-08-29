@@ -134,7 +134,7 @@ langDef = Tok.LanguageDef
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
-                          , "let", "if", "assert", "call", "tuple", ":"
+                          , "let", "if", "assert", "call", "tuple", "untuple", ":"
                           , "Integer", "Float", "Vec", "Lam", "String", "true", "false"
                           ]
   , Tok.reservedOpNames = []
@@ -205,6 +205,7 @@ pKExpr :: Parser (ExprX Parsed)
 -- All these start with a keyword
 pKExpr =   pIfThenElse
        <|> pLet
+       <|> pUntuple
        <|> pLam
        <|> pAssert
        <|> pCall
@@ -296,6 +297,15 @@ pLet = do { pReserved "let"
                           <|> many (parens pBind)
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
+
+pUntuple :: Parser (ExprX Parsed)
+-- (untuple (t1 ... tn) t b)
+pUntuple =
+  do { pReserved "untuple"
+     ; ts <- parens (many pIdentifier)
+     ; t <- pExpr
+     ; b <- pExpr
+     ; return (Untuple (fmap Simple ts) t b) }
 
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)

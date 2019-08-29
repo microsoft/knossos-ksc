@@ -419,6 +419,7 @@ cgenExprR env = \case
 
   Dup{}  -> error "Cgen Dup unimplemented"
   Elim{} -> error "Cgen Elim unimplemented"
+  Untuple{} -> error "Cgen Untuple unimplemented"
 
   -- Tuple [t] -> cgenExpr env t -- Don't detuple willy-nilly
   Tuple vs  -> do

@@ -134,6 +134,8 @@ cseE _cse_env@(CS { cs_subst = _subst, cs_map = _rev_map })
 cseE _cse_env@(CS { cs_subst = _subst, cs_map = _rev_map })
      (Elim{})
   = error "cseE Elim unimplemented"
+cseE cse_env (Untuple vs r body)
+  = badCseEUntuple cse_env vs r body
 
 -- Special case for (assert (e1 == e2) body)
 -- where we want to CSE e2 into e1
@@ -170,6 +172,9 @@ cseE cs_env (Var tv)
       Nothing -> Var tv
 
 cseE _ e@(Konst {}) = e
+
+badCseEUntuple :: CSEnv -> [TVar] -> TExpr -> TExpr -> TExpr
+badCseEUntuple cse_env vs r body = Untuple vs r (cseE_check cse_env body)
 
 cseE_check :: CSEnv -> TExpr -> TExpr
 -- Look up the entire expression in the envt

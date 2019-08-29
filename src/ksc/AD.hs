@@ -94,6 +94,9 @@ gradE adp s (Let v e1 e2)  = gradLet adp s v e1 e2
 gradE _   _ (App{})        = error "gradE of App not yet supported"
 gradE _   _ (Dup{})        = error "gradE of Dup not yet supported"
 gradE _   _ (Elim{})       = error "gradE of Elim not yet supported"
+gradE adp s (Untuple vs t body) =
+  gradE adp s (foldr (\(i, v) -> Let v (Prim.pSel i n t)) body (zip [1..] vs))
+  where n = length vs
 
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.

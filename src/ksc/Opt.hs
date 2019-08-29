@@ -123,8 +123,12 @@ optE env
          (tv', env') = optSubstBndr tv env
     go (Dup{})            = error "optE Dup unimplemented"
     go (Elim{})           = error "optE Elim unimplemented"
+    go (Untuple vs r b)   = badOptEUntuple env vs r b
     go (If b t e)         = optIf (go b) (go t) (go e)
     go (Call f arg)       = optCall (optZapSubst env) f (map go arg)
+
+badOptEUntuple :: OptEnv -> [TVar] -> TExpr -> TExpr -> TExpr
+badOptEUntuple env vs r b = Untuple vs r (optE env b)
 
 --------------
 optCall :: OptEnv -> TFun -> [TExpr] -> TExpr

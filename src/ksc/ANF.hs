@@ -11,6 +11,8 @@ import OptLet( Subst, mkEmptySubst, substBndr, substVar )
 import Prim( isThePrimFun )
 import KMonad
 import Control.Monad( ap )
+import Data.List( mapAccumL )
+import Data.Tuple( swap )
 
 -- anfDefs :: (GenBndr p) => [DefX p] -> KM [DefX p]
 anfDefs :: [TDef] -> KM [TDef]
@@ -55,6 +57,12 @@ anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; anfE subst' e }
 anfE _ubst (Dup{})        = error "anfE Dup unimplemented"
 anfE _ubst (Elim{})       = error "anfE Elim unimplemented"
+anfE subst (Untuple vs r e) =
+  do { r' <- anfE1 subst r
+     ; let (subst', vs') =
+             mapAccumL (\s v -> swap (substBndr v s)) subst vs
+     ; emitTuple vs' r'
+     ; anfE subst' e }
 anfE subst (If b t e)     = atomise =<<
                             do { b' <- anfE subst b
                                ; t' <- anfExpr subst t
@@ -116,9 +124,11 @@ substitution.
 -}
 
 data FloatDef p = FD (LetBndrX p) (ExprX p)
+                | FDTuple [LetBndrX p] (ExprX p)
 
 instance InPhase p => Pretty (FloatDef p) where
   pprPrec _ (FD b e) = pprLetBndr @p b <+> char '=' <+> ppr e
+  pprPrec _ (FDTuple bs e) = sep (map (pprLetBndr @p) bs) <+> char '=' <+> ppr e
 
 newtype AnfM p a = AnfM (KM ([FloatDef p], a))
 
@@ -148,10 +158,16 @@ wrapLets (AnfM m) = AnfM $ do { (fs, e) <- m
                               ; return ([], wrap fs e) }
 
 wrap :: [FloatDef p] -> ExprX p -> ExprX p
-wrap fs e = foldr (\(FD v r) b -> Let v r b) e fs
+wrap fs e = foldr f e fs
+  where f = \case
+          FD v r -> Let v r
+          FDTuple vs r -> Untuple vs r
 
 emit :: LetBndrX p -> ExprX p -> AnfM p ()
 emit v r = AnfM (return ([FD v r], ()))
+
+emitTuple :: [LetBndrX p] -> ExprX p -> AnfM p ()
+emitTuple vs r = AnfM (return ([FDTuple vs r], ()))
 
 ---------------------------------
 class GenBndr p where

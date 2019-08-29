@@ -74,6 +74,7 @@ substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (subs
 substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
 substEMayCapture subst (Dup{})        = error "substEMayCapture Dup unimplemented"
 substEMayCapture subst (Elim{})       = error "substEMayCapture Elim unimplemented"
+substEMayCapture subst (Untuple{})    = error "substEMayCapture Untuple unimplemented"
 substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
                                           substEMayCapture (v `M.delete` subst) b
 
@@ -122,6 +123,7 @@ freeVarsOf = go
    go (Call _ es)    = S.unions (map go es)
    go (App f a)      = go f `S.union` go a
    go (Let v r b)    = go r `S.union` (S.delete v $ go b)
+   go (Untuple vs r b) = go r `S.union` (foldr S.delete (go b) vs)
    go (Dup (v1, v2) r b) =
      r `S.insert` (S.delete v1 $ S.delete v2 $ go b)
    go (Elim v b)     = S.insert v (go b)
@@ -139,6 +141,7 @@ notFreeIn = go
    go v (Call _ e)   = all (go v) e
    go v (App f a)    = go v f && go v a
    go v (Let v2 r b) = go v r && (v == v2 || go v b)
+   go v (Untuple vs r b) = go v r && (any (v ==) vs || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Dup (v1, v2) r b) =
      (v /= r) && (go v b || v == v1 || v == v2)

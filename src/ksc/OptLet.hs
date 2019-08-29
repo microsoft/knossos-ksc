@@ -18,6 +18,7 @@ import Prim
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char( isDigit )
+import Unsafe.Coerce( unsafeCoerce )
 
 optLets :: [TVar] -> TExpr -> TExpr
 optLets args rhs
@@ -135,6 +136,8 @@ occAnalE (Let tv rhs body)
        | otherwise = (tv `M.delete` vsb)
                      `union` vstv `union` vsr
 
+occAnalE (Untuple vs rhs body) = badlyOccAnalEUntuple vs rhs body
+
 occAnalE (Dup{})  = error "occAnalE Dup unimplemented"
 occAnalE (Elim{}) = error "occAnalE Elim unimplemented"
 
@@ -144,6 +147,22 @@ occAnalE (If b t e)
     (b', vsb) = occAnalE b
     (t', vst) = occAnalE t
     (e', vse) = occAnalE e
+
+-- A rather conservative implementation of occAnalE for Untuple
+-- because I couldn't work out how to do a better one
+badlyOccAnalEUntuple :: [TVar] -> TExpr -> TExpr -> (ExprX 'OccAnald, OccMap)
+badlyOccAnalEUntuple tvs rhs body
+  = (Untuple (map (\tv -> (n, tv)) tv's) rhs' body', vs)
+  where
+    n = manyOcc
+    tv's_vstvs    = map occAnalTv tvs
+    tv's          = map fst tv's_vstvs
+    vstvs         = map snd tv's_vstvs
+    (rhs',  vsr)  = occAnalE rhs
+    (body', vsb)  = occAnalE body
+    vs            = (foldr M.delete vsb tvs)
+                    `union`
+                    (foldr union vsr vstvs)
 
 markMany :: OccMap -> OccMap
 -- markMany takes each variable in the OccMap
@@ -263,6 +282,7 @@ substExpr subst e
                         (v', subst') = substBndr v subst
     go (Dup{})        = error "substExpr Dup unimplemented"
     go (Elim{})       = error "substExpr Elim unimplemented"
+    go (Untuple{})    = error "substExpr Elim unimplemented"
     go (Lam v e)      = Lam v' (substExpr subst' e)
                       where
                         (v', subst') = substBndr v subst
@@ -328,6 +348,8 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
 
     go _ubst (Dup{})        = error "optLetsE Dup unimplemented"
     go _ubst (Elim{})       = error "optLetsE Elim unimplemented"
+    go subst (Untuple ns_vs rhs body)
+      = veryBadOptLetsEUntuple subst ns_vs rhs body
     go subst (Var tv)       = substVar subst tv
     go _ubst (Konst k)      = Konst k
     go subst (Call f es)    = Call f (map (go subst) es)
@@ -351,6 +373,15 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
     go_ty _ TypeFloat   = TypeFloat
     go_ty _ TypeString  = TypeString
     go_ty _ TypeUnknown = TypeUnknown
+
+    -- I just wanted this to compile.  I don't really care if it does
+    -- anything useful.  I don't really understand what's going on
+    -- here.
+    veryBadOptLetsEUntuple subst ns_vs rhs body
+      = Untuple vs' (go subst rhs) (go subst body)
+      where vs' = flip map ns_vs $ \(_, TVar ty v) -> TVar (unsafeCoerce ty) v
+
+
 
 {- Note [Inline tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~

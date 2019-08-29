@@ -123,6 +123,8 @@ data ExprX p
   | Assert (ExprX p) (ExprX p)
   | Dup (LetBndrX p, LetBndrX p) (VarX p) (ExprX p)
   | Elim (VarX p) (ExprX p)
+  -- let (x1, ..., xn) = t in body
+  | Untuple [LetBndrX p] (ExprX p) (ExprX p)
 
 deriving instance Show (ExprX Typed)
 
@@ -403,6 +405,7 @@ instance HasType TExpr where
   typeof (Tuple es)    = TypeTuple $ map typeof es
   typeof (Lam b e)     = TypeLam (typeof b) (typeof e)
   typeof (Let _ _ e2)  = typeof e2
+  typeof (Untuple _ _ e2) = typeof e2
   typeof (Dup _ _ e)   = typeof e
   typeof (Elim _ e)    = typeof e
   typeof (Assert _ e)  = typeof e
@@ -765,6 +768,17 @@ pprExpr p (Let v e1 e2) = mode
       ]
     )
   )
+pprExpr p (Untuple vs e1 e2) =
+  (parensIf
+    p
+    precZero
+    (vcat
+      [ text "untuple"
+        <+> (bracesSp $ sep (map (pprLetBndr @phase) vs ++ [nest 2 (text "=" <+> ppr e1)]))
+      , ppr e2
+      ]
+    )
+  )
 pprExpr p (If e1 e2 e3) = mode
   (parens (sep [text "if", ppr e1, ppr e2, ppr e3]))
   (parensIf
@@ -995,6 +1009,7 @@ cmpExpr e1
 
    go (Dup _ _ _) _ _ = error "cmp Dup unimlpmented"
    go Elim{} _ _      = error "cmp Elim unimlpmented"
+   go Untuple{} _ _      = error "cmp Untuple unimlpmented"
 
    gos :: [TExpr] -> M.Map Var TVar -> [TExpr] -> Ordering
    gos []    _ []    = EQ

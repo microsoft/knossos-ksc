@@ -192,6 +192,28 @@ tcExpr (Let vx rhs body)
 
        ; return (TE (Let tvar arhs abody) tybody) }
 
+-- TODO: Should check that the bound variables are distinct
+tcExpr (Untuple vxs rhs body)
+  = do { TE arhs rhs_ty <- tcExpr rhs
+       ; let vars_mb_tys = map (getLetBndr @p) vxs
+             vars        = map fst vars_mb_tys
+             mb_tys      = map snd vars_mb_tys
+             mb_tuple_ty = fmap TypeTuple (sequence mb_tys)
+
+       ; checkTypes_maybe mb_tuple_ty rhs_ty $
+         text "Let binding mis-match for" <+> sep (map ppr vars)
+       ; let rhs_tys = case rhs_ty of
+               TypeTuple rhs_tys -> rhs_tys
+               _                 -> error "tcExpr: expected TypeTuple"
+             tvars = (map (uncurry TVar) (zip rhs_tys vars))
+       ; TE abody tybody <- extendLclSTM tvars (tcExpr body)
+
+       ; flip mapM_ tvars $ \tvar ->
+           checkFreeness tvar tybody $
+           text "in the let binding for" <+> ppr tvar
+
+       ; return (TE (Untuple tvars arhs abody) tybody) }
+
 tcExpr (Dup (v1, v2) r body)
   = do { let (rx, mb_tyr) = getVar @p r
        ; tyr <- tcVar rx mb_tyr

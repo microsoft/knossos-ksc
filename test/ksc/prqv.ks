@@ -74,6 +74,9 @@
 (def unusedLet Float (x : Float)
      (let (y (mul x 10.0)) x))
 
+(def untupleExample Float (t : Tuple Float Float)
+     (untuple (x1 x2) t (mul x1 x2)))
+
 #|
 (def abuild (Vec n Float) ((n : Integer) (x : Float))
      (build n (lam (i : Integer) x)))
@@ -117,6 +120,9 @@
               (revl$indexExample 0 zeroVec (tuple 1.0 zeroVec_)) "\n"
             "rev$indexExample 0 zeroVec 1.0 zeroVec = "
               (rev$indexExample 0 zeroVec (tuple 1.0 zeroVec)) "\n"
+            "untupleExample (3.0, 4.0) = " (untupleExample (tuple 3.0 4.0)) "\n"
+            "revl$untupleExample (3.0, 4.0) 1.0 = " (revl$untupleExample (tuple 3.0 4.0) 1.0) "\n"
+            "rev$untupleExample (3.0, 4.0) 1.0 = " (rev$untupleExample (tuple 3.0 4.0) 1.0) "\n"
 #|
             "abuild 3.0 = " (abuild 3.0) "\n"
             "revl$d 3.0 1.0 = " (abuildl$d 3.0 1.0) "\n"

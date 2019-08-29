@@ -131,8 +131,9 @@ lineariseE = \case
 
       o -> error ("lineariseE Let If unexpected " ++ show o)
     o -> error ("lineariseE Let unexpected " ++ show o)
-  var@(L.Var{}) -> var
-  v             -> error ("lineariseE unexpected " ++ show v)
+  var@(L.Var{})       -> var
+  L.Untuple vs r body -> L.Untuple vs r (lineariseE body)
+  v                   -> error ("lineariseE unexpected " ++ show v)
 
 differentiateD :: L.TDef -> Maybe L.TDef
 differentiateD tdef@(L.Def { L.def_fun = L.Fun (L.UserFun f), L.def_rhs = L.UserRhs rhs })
@@ -302,7 +303,14 @@ differentiateE = \case
 
 
   L.Var vv -> (id, vv, [], \[] -> id)
-  s        -> error ("Couldn't differentiate: " ++ show s)
+  L.Untuple rs uv body -> case uv of
+    L.Var vv -> differentiateComponent body
+      ( L.Untuple rs uv
+      , []
+      , \([]:xs) -> (xs, L.Let (rev vv) (L.Tuple (map revVar rs)))
+      )
+    _        -> error ("Couldn't differentiate untuple rhs: " ++ show uv)
+  s -> error ("Couldn't differentiate: " ++ show s)
  where
   (.*) = Prim.pMul
   (./) = Prim.pDiv
@@ -460,6 +468,7 @@ verySlowlyRemoveUnusedLets = \case
   L.Assert cond e -> L.Assert cond (recurse e)
   L.Dup vs e body -> L.Dup vs e (recurse body)
   L.Elim v body   -> L.Elim v (recurse body)
+  L.Untuple vs t body -> L.Untuple vs t (recurse body)
   where recurse = verySlowlyRemoveUnusedLets
 
 unlineariseE :: L.TExpr -> L.TExpr
@@ -470,6 +479,9 @@ unlineariseE = \case
   L.If  cond     true        fals ->
     L.If cond (unlineariseE true) (unlineariseE fals)
   L.Elim _ body -> unlineariseE body
+  L.Untuple vs t body ->
+    foldr (\(i, v) -> L.Let v (Prim.pSel i n t)) (unlineariseE body) (zip [1..] vs)
+    where n = length vs
   noDups@(L.Tuple{}) -> noDups
   noDups@(L.Call{})  -> noDups
   noDups@(L.Konst{}) -> noDups

@@ -160,6 +160,7 @@ defsAndDiffs display decls = do {
   ; let linear_defs = map L.lineariseD anf_defs
         linear_diffs_withDups = mapMaybe L.differentiateD linear_defs
         linear_diffs = map L.unlineariseD linear_diffs_withDups
+        defs_without_untuples = map L.unlineariseD defs
         env4 = env3 `extendGblST` linear_diffs
   ; display "Linearised" env4 linear_defs
   ; display "Linear diffs" env4 linear_diffs_withDups
@@ -168,7 +169,7 @@ defsAndDiffs display decls = do {
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; return (env4, defs, optdiffs ++ linear_diffs, rulebase)
+  ; return (env4, defs_without_untuples, optdiffs ++ linear_diffs, rulebase)
   }
 
 anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)
