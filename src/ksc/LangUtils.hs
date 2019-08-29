@@ -123,7 +123,7 @@ freeVarsOf = go
    go (App f a)      = go f `S.union` go a
    go (Let v r b)    = go r `S.union` (S.delete v $ go b)
    go (Dup (v1, v2) r b) =
-     go r `S.union` (S.delete v1 $ S.delete v2 $ go b)
+     r `S.insert` (S.delete v1 $ S.delete v2 $ go b)
    go (Elim v b)     = S.insert v (go b)
    go (Lam v e)      = S.delete v $ go e
    go (Assert e1 e2) = go e1 `S.union` go e2
@@ -141,7 +141,7 @@ notFreeIn = go
    go v (Let v2 r b) = go v r && (v == v2 || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Dup (v1, v2) r b) =
-     go v r && (go v b || v == v1 || v == v2)
+     (v /= r) && (go v b || v == v1 || v == v2)
    go v (Elim v2 b)  = go v b && (v /= v2)
    go v (Assert e1 e2) = go v e1 && go v e2
 

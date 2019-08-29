@@ -121,7 +121,7 @@ data ExprX p
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)  -- FIXME make cond ExprX?
   | Assert (ExprX p) (ExprX p)
-  | Dup (LetBndrX p, LetBndrX p) (ExprX p) (ExprX p)
+  | Dup (LetBndrX p, LetBndrX p) (VarX p) (ExprX p)
   | Elim (LetBndrX p) (ExprX p)
 
 deriving instance Show (ExprX Typed)
@@ -749,7 +749,7 @@ pprExpr _ (Dup (v1, v2) v body) =
   text "dup"
   <+> vcat [ sep (punctuate comma [pprLetBndr @phase v1, pprLetBndr @phase v2])
              <+> text " = "
-             <+> ppr v
+             <+> pprVar @phase v
            , ppr body
            ]
 pprExpr _ (Elim v body) = text "elim" <+> vcat [ pprLetBndr @phase v, ppr body ]

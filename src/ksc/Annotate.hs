@@ -192,16 +192,18 @@ tcExpr (Let vx rhs body)
 
        ; return (TE (Let tvar arhs abody) tybody) }
 
-tcExpr (Dup (v1, v2) rhs body)
-  = do { TE arhs rhs_ty <- tcExpr rhs
+tcExpr (Dup (v1, v2) r body)
+  = do { let (rx, mb_tyr) = getVar @p r
+       ; tyr <- tcVar rx mb_tyr
        ; let (var1, mb_ty1) = getLetBndr @p v1
        ; let (var2, mb_ty2) = getLetBndr @p v2
-       ; checkTypes_maybe mb_ty1 rhs_ty $
+       ; checkTypes_maybe mb_ty1 tyr $
          text "Let binding mis-match for" <+> ppr var1
-       ; checkTypes_maybe mb_ty2 rhs_ty $
+       ; checkTypes_maybe mb_ty2 tyr $
          text "Let binding mis-match for" <+> ppr var2
-       ; let tvar1 = TVar rhs_ty var1
-       ; let tvar2 = TVar rhs_ty var2
+       ; let tvar1 = TVar tyr var1
+       ; let tvar2 = TVar tyr var2
+       ; let tr    = TVar tyr rx
        ; TE abody tybody <- extendLclSTM [tvar1, tvar2] (tcExpr body)
 
        ; checkFreeness tvar1 tybody $
@@ -209,7 +211,7 @@ tcExpr (Dup (v1, v2) rhs body)
        ; checkFreeness tvar2 tybody $
          text "in the let binding for" <+> ppr tvar2
 
-       ; return (TE (Dup (tvar1, tvar2) arhs abody) tybody) }
+       ; return (TE (Dup (tvar1, tvar2) tr abody) tybody) }
 
 tcExpr (Elim vx body)
   = do { let (var, _) = getLetBndr @p vx

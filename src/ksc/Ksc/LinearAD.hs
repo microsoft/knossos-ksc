@@ -80,11 +80,11 @@ lineariseE = \case
     L.Call f args -> dups' (L.Let v (L.Call f new_args) (lineariseE body))
      where
       dups = flip map args $ \case
-        argvv@(L.Var argv) -> if argv `LU.notFreeIn` body
+        L.Var argv -> if argv `LU.notFreeIn` body
           then (id, L.Var argv)
           else
             let argv' = renameTVar argv (++ "$1")
-            in  (L.Dup (argv, argv') argvv, L.Var argv')
+            in  (L.Dup (argv, argv') argv, L.Var argv')
         lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
           then (id, lam)
           else error "Didn't expect to see lam in Anf form"
@@ -167,8 +167,8 @@ differentiateE
   :: L.TExpr
   -> (L.TExpr -> L.TExpr, L.TVar, [[L.TVar]], [[L.TVar]] -> L.TExpr -> L.TExpr)
 differentiateE = \case
-  L.Dup (v1, v2) (L.Var vv) body ->
-    ( L.Dup (v1, v2) (L.Var vv) . body'
+  L.Dup (v1, v2) vv body ->
+    ( L.Dup (v1, v2) vv . body'
     , r
     , xs
     , \xs' -> f xs' . L.Let (rev vv) (revVar v1 .+ revVar v2)
@@ -464,9 +464,8 @@ verySlowlyRemoveUnusedLets = \case
 
 unlineariseE :: L.TExpr -> L.TExpr
 unlineariseE = \case
-  L.Dup (v1, v2) v@(L.Var{}) body -> L.Let v1 v (L.Let v2 v (unlineariseE body))
-  L.Dup _        v           _ ->
-    error ("Didn't expect to see being Dup'd: " ++ show v)
+  L.Dup (v1, v2) v body ->
+    L.Let v1 (L.Var v) (L.Let v2 (L.Var v) (unlineariseE body))
   L.Let v        e           body -> L.Let v (unlineariseE e) (unlineariseE body)
   L.If  cond     true        fals ->
     L.If cond (unlineariseE true) (unlineariseE fals)
