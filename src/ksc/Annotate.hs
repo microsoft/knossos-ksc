@@ -214,7 +214,7 @@ tcExpr (Dup (v1, v2) r body)
        ; return (TE (Dup (tvar1, tvar2) tr abody) tybody) }
 
 tcExpr (Elim vx body)
-  = do { let (var, _) = getLetBndr @p vx
+  = do { let (var, _) = getVar @p vx
        ; t <- lookupLclTc var
        ; let tv = TVar t var
        ; TE abody tybody <- reduceLclSTM [tv] (tcExpr body)

@@ -122,7 +122,7 @@ data ExprX p
   | If (ExprX p) (ExprX p) (ExprX p)  -- FIXME make cond ExprX?
   | Assert (ExprX p) (ExprX p)
   | Dup (LetBndrX p, LetBndrX p) (VarX p) (ExprX p)
-  | Elim (LetBndrX p) (ExprX p)
+  | Elim (VarX p) (ExprX p)
 
 deriving instance Show (ExprX Typed)
 
@@ -752,7 +752,7 @@ pprExpr _ (Dup (v1, v2) v body) =
              <+> pprVar @phase v
            , ppr body
            ]
-pprExpr _ (Elim v body) = text "elim" <+> vcat [ pprLetBndr @phase v, ppr body ]
+pprExpr _ (Elim v body) = text "elim" <+> vcat [ pprVar @phase v, ppr body ]
 pprExpr p (Let v e1 e2) = mode
   (pprLetSexp v e1 e2)
   (parensIf
