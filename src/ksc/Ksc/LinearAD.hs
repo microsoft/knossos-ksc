@@ -115,7 +115,7 @@ lineariseE = \case
 
         where
           elim :: Set L.TVar -> L.TExpr -> L.TExpr
-          elim = foldr (\vvv rest -> L.Elim vvv . rest) id . toList
+          elim s t = foldr L.Elim t (toList s)
 
           inTrue :: Set L.TVar
           inTrue = LU.freeVarsOf true
@@ -371,10 +371,10 @@ differentiateIf r cond true fals =
             falsTraceRevVars = traceRevVars falsTrace
 
             untupleTrace :: L.TVar -> [[L.TVar]] -> L.TExpr -> L.TExpr
-            untupleTrace traceVar traceRevVars' =
-              foldr (\(i, vv) rest ->
-                       L.Let vv (Prim.pSel i n (L.Var traceVar)) . rest)
-                    id (zip [1..] revVarsFlat)
+            untupleTrace traceVar traceRevVars' rest =
+              foldr (\(i, vv) ->
+                       L.Let vv (Prim.pSel i n (L.Var traceVar)))
+                    rest (zip [1..] revVarsFlat)
               where n = length revVarsFlat
                     revVarsFlat = concat traceRevVars'
 
@@ -417,11 +417,11 @@ differentiateIf r cond true fals =
                       , L.Tuple (map L.Var falsTraceFlat) ]
 
             untupleEverythingInScope :: L.TExpr -> L.TExpr -> L.TExpr
-            untupleEverythingInScope theIf =
+            untupleEverythingInScope theIf rest =
               L.Let rScope theIf
-              . foldr (\(i, vv) rest -> L.Let vv (Prim.pSel i n (v rScope)) . rest)
-                      id
-                      (zip [1..] (map rev (toList inEither)))
+               (foldr (\(i, vv) -> L.Let vv (Prim.pSel i n (v rScope)) )
+                      rest
+                      (zip [1..] (map rev (toList inEither))))
               where n = length (toList inEither)
 
             rScope :: L.TVar
