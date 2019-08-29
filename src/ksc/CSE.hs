@@ -131,6 +131,9 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 cseE _cse_env@(CS { cs_subst = _subst, cs_map = _rev_map })
      (Dup{})
   = error "cseE Dup unimplemented"
+cseE _cse_env@(CS { cs_subst = _subst, cs_map = _rev_map })
+     (Elim{})
+  = error "cseE Elim unimplemented"
 
 -- Special case for (assert (e1 == e2) body)
 -- where we want to CSE e2 into e1

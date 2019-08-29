@@ -92,6 +92,8 @@ gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
 gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 gradE adp s (Let v e1 e2)  = gradLet adp s v e1 e2
 gradE _   _ (App{})        = error "gradE of App not yet supported"
+gradE _   _ (Dup{})        = error "gradE of Dup not yet supported"
+gradE _   _ (Elim{})       = error "gradE of Elim not yet supported"
 
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.
