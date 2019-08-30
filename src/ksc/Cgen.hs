@@ -305,73 +305,10 @@ cgenExprR env = \case
           ++ "vec<" ++ (cgenType $ mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n")
           ret
           (mkCType vecty)
-    | TFun statety _ <- f
-    , f `isThePrimFun` "forRange"
-    , [n, initialState, Lam (TVar i_s_ty i_s) loopbody] <- args
-    -> do
-        CG ndecl nex _nty <- cgenExprR env n
-        CG sdecl sex _sty <- cgenExprR env initialState
-        CG bdecl bex _bty <- cgenExprR env loopbody
-
-        i <- freshCVar
-        s <- freshCVar
-
-        let sType = mkCType statety
-
-        return $ CG
-           ("/*forRange*/\n"
-           ++ ndecl
-           ++ sdecl
-           ++ cgenType sType ++ " " ++ s ++ " = " ++ sex ++ ";\n"
-           ++ "for(int " ++ i ++ " = 0; "
-           ++ i ++ " < " ++ nex ++ "; "
-           ++ " ++" ++ i ++ ") {\n"
-           ++ cgenType (mkCType i_s_ty) ++ " " ++ cgenVar i_s
-           ++ " = std::make_tuple("
-           ++ i
-           ++ ","
-           ++ s
-           ++ ");\n"
-           ++ bdecl
-           ++ s ++ " = " ++ bex ++ ";\n"
-           ++ "}\n"
-           )
-           s
-           sType
-
-    | TFun statety _ <- f
-    , f `isThePrimFun` "forRangeRev"
-    , [n, initialState, Lam (TVar i_s_ty i_s) loopbody] <- args
-    -> do
-        CG ndecl nex _nty <- cgenExprR env n
-        CG sdecl sex _sty <- cgenExprR env initialState
-        CG bdecl bex _bty <- cgenExprR env loopbody
-
-        i <- freshCVar
-        s <- freshCVar
-
-        let sType = mkCType statety
-
-        return $ CG
-           ("/*forRange*/\n"
-           ++ ndecl
-           ++ sdecl
-           ++ cgenType sType ++ " " ++ s ++ " = " ++ sex ++ ";\n"
-           ++ "for(int " ++ i ++ " = " ++ nex ++ "-1; "
-           ++ i ++ " >= 0; "
-           ++ " --" ++ i ++ ") {\n"
-           ++ cgenType (mkCType i_s_ty) ++ " " ++ cgenVar i_s
-           ++ " = std::make_tuple("
-           ++ i
-           ++ ","
-           ++ s
-           ++ ");\n"
-           ++ bdecl
-           ++ s ++ " = " ++ bex ++ ";\n"
-           ++ "}\n"
-           )
-           s
-           sType
+    | f `isThePrimFun` "forRange"
+    -> cgenForRange env True f args
+    | f `isThePrimFun` "forRangeRev"
+    -> cgenForRange env False f args
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec sty ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
@@ -592,6 +529,46 @@ cgenExprR env = \case
                 tybody
 
   App{} -> error "App"
+
+cgenForRange :: CST -> Bool -> TFun -> [TExpr] -> M CGenResult
+cgenForRange env isFwd f args =
+  let [n, initialState, Lam (TVar i_s_ty i_s) loopbody] = args
+      TFun statety _ = f
+  in do
+        CG ndecl nex _nty <- cgenExprR env n
+        CG sdecl sex _sty <- cgenExprR env initialState
+        CG bdecl bex _bty <- cgenExprR env loopbody
+
+        i <- freshCVar
+        s <- freshCVar
+
+        let sType = mkCType statety
+
+            (op, start, cond) =
+              case isFwd of
+                True  -> ("++", "0", " < " ++ nex)
+                False -> ("--", nex ++ "-1", " >= 0")
+
+        return $ CG
+           ("/*forRange*/\n"
+           ++ ndecl
+           ++ sdecl
+           ++ cgenType sType ++ " " ++ s ++ " = " ++ sex ++ ";\n"
+           ++ "for(int " ++ i ++ " = " ++ start ++ "; "
+           ++ i ++ cond ++ "; "
+           ++ " " ++ op ++ i ++ ") {\n"
+           ++ cgenType (mkCType i_s_ty) ++ " " ++ cgenVar i_s
+           ++ " = std::make_tuple("
+           ++ i
+           ++ ","
+           ++ s
+           ++ ");\n"
+           ++ bdecl
+           ++ s ++ " = " ++ bex ++ ";\n"
+           ++ "}\n"
+           )
+           s
+           sType
 
 substitute :: (a -> Maybe [a]) -> [a] -> [a]
 substitute f = concatMap (\x -> case f x of Nothing -> [x]; Just s -> s)
