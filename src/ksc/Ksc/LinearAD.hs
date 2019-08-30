@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fwarn-name-shadowing #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Ksc.LinearAD where
 
@@ -19,6 +20,7 @@ import qualified LangUtils                     as LU
 import qualified Rules
 import qualified ANF                           as A
 
+import           Control.Category               ( (>>>) )
 import           Data.Maybe                     ( mapMaybe )
 import           Data.Set                       ( Set, (\\), union, toList )
 
@@ -85,7 +87,7 @@ lineariseE = \case
           else
             let argv' = renameTVar argv (++ "$1")
             in  (L.Dup (argv, argv') argv, L.Var argv')
-        lam@(L.Lam{}) -> if f `Prim.isThePrimFun` "build"
+        lam@(L.Lam{}) -> if any (f `Prim.isThePrimFun`) ["build", "forRange"]
           then (id, lam)
           else error "Didn't expect to see lam in Anf form"
         arg -> error ("Unexpected in Anf form " ++ L.render (L.ppr arg))
@@ -250,6 +252,69 @@ differentiateE = \case
       | f `Prim.isThePrimFun` "sum"
       , [L.Var{}] <- args
         -> temporaryDummy
+      | f `Prim.isThePrimFun` "forRange"
+      , [L.Var n, L.Var s, L.Lam i_s f] <- args
+        ->
+        let traceVec :: L.TExpr
+            traceVec = Prim.pNewVec traceT (v n)
+
+            v_i_s :: L.TVar
+            v_i_s = _
+
+            vv :: L.TVar
+            vv = _
+
+            vv' :: L.TVar
+            vv' = _
+
+            traceT :: L.Type
+            traceT = L.typeof tracef
+
+            tracefVar :: L.TVar
+            tracefVar = _
+
+            tracef :: L.TExpr
+            tracef = (map (map L.Var >>> L.Tuple) >>> L.Tuple) tracefvarss
+
+            makeTraceFVars :: L.TExpr -> L.TExpr -> L.TExpr
+            makeTraceFVars tr =
+              let (intermediates, untuples) =
+                    foldr (\(a, f) (as, fs) -> (a:as, f . fs)) ([], id)
+                    $ flip map (zip [1..] tracefvarss) $ \(i, tracefvars) ->
+                        let tracefvar = _
+                        in (tracefvar, L.Untuple tracefvars tracefvar)
+
+              in untuples . L.Untuple intermediates tr
+
+            (fwdf,
+             rf,
+             tracefvarss,
+             revf)
+              = differentiateE f
+
+            newf = L.Lam v_i_s (L.Untuple [vv, i_s] (v v_i_s) (fwdf
+                     (L.Tuple [ Prim.pSetAt (Prim.pFst (v i_s)) tracef (v vv)
+                              , v rf
+                              ])))
+
+            newr = L.Lam v_i_s (L.Untuple [vv, rev rf] (v v_i_s)
+                                 (L.Untuple [vv', tracefVar] (Prim.pIndexL (Prim.pFst (v i_s)) (v vv))
+                                  (makeTraceFVars (v tracefVar)
+                                   (revf tracefvarss
+                                    (L.Tuple [v vv', revVar i_s])))))
+
+
+        in g
+        ( L.Untuple [vv, r]
+            (Prim.pForRange (v n) (L.Tuple [traceVec, L.Var s]) newf)
+        , [n, vv]
+        , \([n_, vv_]:xs) ->
+            (xs
+            , L.Let (rev n) (L.Tuple [])
+              . L.Untuple [rev vv_, rev s]
+                  (Prim.pForRangeRev (v n_) (L.Tuple [v vv_, revVar r]) newr)
+            )
+        )
       | f `Prim.isThePrimFun` "eq"
       , [L.Var{}, L.Var{}] <- args
         -> temporaryDummy
@@ -294,6 +359,15 @@ differentiateE = \case
 
     L.Assert _cond _assertBody -> temporaryDummy
     L.If (L.Var cond) true fals -> g (differentiateIf r cond true fals)
+    L.Tuple es -> g
+      ( L.Let r (L.Tuple es)
+      , []
+      , \([]:xs) -> (xs, L.Untuple (map rev (unVar es)) (revVar r))
+      )
+      where unVar = \case
+              [] -> []
+              L.Var x:xs -> x:unVar xs
+              _:_ -> error "differentiateE: Expected variable in Tuple"
     _ -> error ("Couldn't differentiate rhs: " ++ show rhs)
    where
     g = differentiateComponent body

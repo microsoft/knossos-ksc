@@ -287,11 +287,26 @@ pCos = mkPrimCall1 "cos"
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild = mkPrimCall2 "build"
 
+pNewVec :: HasCallStack => Type -> TExpr -> TExpr
+pNewVec = mkPrimCall2 "newVec" . mkDummy
+
 pIndex :: TExpr -> TExpr -> TExpr
 pIndex = mkPrimCall2 "index"
 
+pIndexL :: TExpr -> TExpr -> TExpr
+pIndexL = mkPrimCall2 "indexL"
+
 pIncAt :: TExpr -> TExpr -> TExpr -> TExpr
 pIncAt = mkPrimCall3 "incAt"
+
+pSetAt :: TExpr -> TExpr -> TExpr -> TExpr
+pSetAt = mkPrimCall3 "setAt"
+
+pForRange :: TExpr -> TExpr -> TExpr -> TExpr
+pForRange = mkPrimCall3 "forRange"
+
+pForRangeRev :: TExpr -> TExpr -> TExpr -> TExpr
+pForRangeRev = mkPrimCall3 "forRangeRev"
 
 pSum :: TExpr -> TExpr
 pSum = mkPrimCall1 "sum"
@@ -405,6 +420,13 @@ primFunCallResultTy_maybe "fold" args
   , Just a <- eqTypes a1 [a2, typeof acc]
   = Just a
   | otherwise = Nothing
+
+primFunCallResultTy_maybe "forRange" args
+  | [n,initialState,body] <- args
+  , sizeArgOK n
+  , s1 <- typeof initialState
+  , TypeLam (TypeTuple [TypeInteger, s2]) s3 <- typeof body
+  = eqTypes s1 [s2, s3]
 
 primFunCallResultTy_maybe "lmFold" args
   | [ds_zero,f,f',acc,v] <- args
@@ -600,6 +622,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "fold"     -- (fold f z v)               (Left) fold over v
+                       , "forRange"
                        , "index"
                        , "indexL"
                        , "size"

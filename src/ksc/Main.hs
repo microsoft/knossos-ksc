@@ -125,6 +125,7 @@ defsAndDiffs display decls = do {
   ; let rulebase      = mkRuleBase rules
   ; display "Typechecked defs" env defs
 
+  {-
   ; let grad_defs = gradDefs BasicAD defs
         env1 = env `extendGblST` grad_defs
   ; display "Grad" env1 grad_defs
@@ -154,6 +155,9 @@ defsAndDiffs display decls = do {
 
   ; (env3, optdiffs) <- optDefs rulebase env25 diffs
   ; display "OptDiffs" env3 optdiffs
+  -}
+
+  ; let env3 = env
 
   ; anf_defs <- anfDefs defs
   ; display "ANF'd" env3 anf_defs
@@ -169,7 +173,7 @@ defsAndDiffs display decls = do {
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; return (env4, defs_without_untuples, optdiffs ++ linear_diffs, rulebase)
+  ; return (env4, defs_without_untuples, {-optdiffs ++ -} linear_diffs, rulebase)
   }
 
 anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)

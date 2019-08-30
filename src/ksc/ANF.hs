@@ -49,6 +49,12 @@ anfE subst (Call fun es)
  = atomise =<<
    do { e2' <- anfE1 subst e2
       ; return (Call fun [e1, e2']) }
+ | fun `isThePrimFun` "forRange"   -- See Note [Do not ANF first arg of build]
+ , [n,s,f] <- es
+ = atomise =<<
+   do { f' <- anfE1 subst f
+      ; s' <- anfE  subst s
+      ; return (Call fun [n,s',f']) }
  | otherwise
  = atomise =<< Call fun <$> mapM (anfE1 subst) es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
