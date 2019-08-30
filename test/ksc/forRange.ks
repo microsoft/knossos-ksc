@@ -4,3 +4,12 @@
          (untuple (v acc) v_acc
          (untuple (vi v_) (indexL i v)
          (tuple v_ (add acc vi))))))))
+
+(def main Integer ()
+     (let ((v (build 10 (lam (i : Integer) (to_float i))))
+           (zero (build 10 (lam (i : Integer) 0.0))))
+       (print "sumExample v" (sumExample v) "\n"
+              "revl$sumExample v (tuple zero 1.0) "
+              (revl$sumExample v (tuple zero 1.0))
+              "\n"
+              )))

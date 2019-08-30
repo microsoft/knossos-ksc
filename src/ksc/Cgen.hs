@@ -292,8 +292,9 @@ cgenExprR env = \case
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
 
-  Call f [_, sz]
-    | (TFun vecty@(TypeVec _ ty) _) <- f
+  Call f args
+    | TFun vecty@(TypeVec _ ty) _ <- f
+    , [_, sz] <- args
     , f `isThePrimFun` "newVec"
     -> do
         CG szdecl szex _szty <- cgenExprR env sz
@@ -304,6 +305,73 @@ cgenExprR env = \case
           ++ "vec<" ++ (cgenType $ mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n")
           ret
           (mkCType vecty)
+    | TFun statety _ <- f
+    , f `isThePrimFun` "forRange"
+    , [n, initialState, Lam (TVar i_s_ty i_s) loopbody] <- args
+    -> do
+        CG ndecl nex _nty <- cgenExprR env n
+        CG sdecl sex _sty <- cgenExprR env initialState
+        CG bdecl bex _bty <- cgenExprR env loopbody
+
+        i <- freshCVar
+        s <- freshCVar
+
+        let sType = mkCType statety
+
+        return $ CG
+           ("/*forRange*/\n"
+           ++ ndecl
+           ++ sdecl
+           ++ cgenType sType ++ " " ++ s ++ " = " ++ sex ++ ";\n"
+           ++ "for(int " ++ i ++ " = 0; "
+           ++ i ++ " < " ++ nex ++ "; "
+           ++ " ++" ++ i ++ ") {\n"
+           ++ cgenType (mkCType i_s_ty) ++ " " ++ cgenVar i_s
+           ++ " = std::make_tuple("
+           ++ i
+           ++ ","
+           ++ s
+           ++ ");\n"
+           ++ bdecl
+           ++ s ++ " = " ++ bex ++ ";\n"
+           ++ "}\n"
+           )
+           s
+           sType
+
+    | TFun statety _ <- f
+    , f `isThePrimFun` "forRangeRev"
+    , [n, initialState, Lam (TVar i_s_ty i_s) loopbody] <- args
+    -> do
+        CG ndecl nex _nty <- cgenExprR env n
+        CG sdecl sex _sty <- cgenExprR env initialState
+        CG bdecl bex _bty <- cgenExprR env loopbody
+
+        i <- freshCVar
+        s <- freshCVar
+
+        let sType = mkCType statety
+
+        return $ CG
+           ("/*forRange*/\n"
+           ++ ndecl
+           ++ sdecl
+           ++ cgenType sType ++ " " ++ s ++ " = " ++ sex ++ ";\n"
+           ++ "for(int " ++ i ++ " = " ++ nex ++ "-1; "
+           ++ i ++ " >= 0; "
+           ++ " --" ++ i ++ ") {\n"
+           ++ cgenType (mkCType i_s_ty) ++ " " ++ cgenVar i_s
+           ++ " = std::make_tuple("
+           ++ i
+           ++ ","
+           ++ s
+           ++ ");\n"
+           ++ bdecl
+           ++ s ++ " = " ++ bex ++ ";\n"
+           ++ "}\n"
+           )
+           s
+           sType
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec sty ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
