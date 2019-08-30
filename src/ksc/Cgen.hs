@@ -20,6 +20,7 @@ import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
 import           Lang
+import           Prim                           ( isThePrimFun )
 
 import Debug.Trace
 
@@ -290,6 +291,19 @@ cgenExprR env = \case
   Var (TVar ty Dummy) ->
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
+
+  Call f [_, sz]
+    | (TFun vecty@(TypeVec _ ty) _) <- f
+    , f `isThePrimFun` "newVec"
+    -> do
+        CG szdecl szex _szty <- cgenExprR env sz
+        ret <- freshCVar
+
+        return $ CG
+          ( szdecl
+          ++ "vec<" ++ (cgenType $ mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n")
+          ret
+          (mkCType vecty)
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec sty ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do

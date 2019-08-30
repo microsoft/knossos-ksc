@@ -611,6 +611,13 @@ namespace ks
 	}
 
 	template <class T>
+	vec<T> const &setAt(int i, T a, vec<T> & v)
+	{
+	  v[i] = a;
+	  return v;
+	}
+
+	template <class T>
 	vec<T> vec<T>::create(size_t size)
 	{
 		return vec{ size };
