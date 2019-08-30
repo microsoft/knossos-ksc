@@ -289,7 +289,7 @@ differentiateE = \case
             tracefVar = L.TVar (L.typeof tracef) (L.Simple "tracefVar")
 
             tracef :: L.TExpr
-            tracef = (map (map L.Var >>> L.Tuple) >>> L.Tuple) tracefvarss
+            tracef = (map (map L.Var >>> tuple) >>> tuple) tracefvarss
 
             makeTraceFVars :: L.TExpr -> L.TExpr -> L.TExpr
             makeTraceFVars tr =
@@ -297,11 +297,28 @@ differentiateE = \case
                     foldr (\(a, ff) (as, fs) -> (a:as, ff . fs)) ([], id)
                     $ flip map (zip [1..] tracefvarss) $ \(ii, tracefvars) ->
                         let tracefvar :: L.TVar
-                            tracefvar = L.TVar (L.TypeTuple (map L.typeof tracefvars))
+                            tracefvar = L.TVar (typeTuple (map L.typeof tracefvars))
                                                (L.Simple ("tracefvar" ++ show ii))
-                        in (tracefvar, L.Untuple tracefvars (v tracefvar))
+                        in (tracefvar, untuple tracefvars (v tracefvar))
 
-              in L.Untuple intermediates tr . untuples
+              in untuple intermediates tr . untuples
+
+
+            -- This is really quite annoying.  We should just have a
+            -- 1-tuple.
+            tuple :: [L.TExpr] -> L.TExpr
+            tuple [vvv] = vvv
+            tuple vs  = L.Tuple vs
+
+            typeTuple :: [L.Type] -> L.Type
+            typeTuple [t] = t
+            typeTuple ts  = L.TypeTuple ts
+
+            untuple :: [L.TVar] -> L.TExpr -> L.TExpr -> L.TExpr
+            untuple [var] = L.Let var
+            untuple vars  = L.Untuple vars
+
+
 
             (fwdf,
              rf,
