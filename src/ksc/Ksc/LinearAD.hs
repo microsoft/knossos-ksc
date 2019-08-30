@@ -362,13 +362,11 @@ differentiateIf r cond true fals =
           (xs', untupleEverythingInScope
             (L.If (v cond_)
               (L.Let (rev trueR) (revVar r)
-               $ L.Let tTrace (Prim.pSel 1 2 (v tf_))
-               $ untupleTrace tTrace trueTraceRevVars
+               $ untupleTrace (Prim.pSel 1 2 (v tf_)) trueTraceRevVars
                $ trueRev trueTraceRevVars
                $ tupleEverythingInScope)
               (L.Let (rev falsR) (revVar r)
-               $ L.Let fTrace (Prim.pSel 2 2 (v tf_))
-               $ untupleTrace fTrace falsTraceRevVars
+               $ untupleTrace (Prim.pSel 2 2 (v tf_)) falsTraceRevVars
                $ falsRev falsTraceRevVars
                $ tupleEverythingInScope)
             )
@@ -392,9 +390,9 @@ differentiateIf r cond true fals =
             falsTraceRevVars :: [[L.TVar]]
             falsTraceRevVars = traceRevVars falsTrace
 
-            untupleTrace :: L.TVar -> [[L.TVar]] -> L.TExpr -> L.TExpr
+            untupleTrace :: L.TExpr -> [[L.TVar]] -> L.TExpr -> L.TExpr
             untupleTrace traceVar traceRevVars' =
-              L.Untuple (concat traceRevVars') (L.Var traceVar)
+              L.Untuple (concat traceRevVars') traceVar
 
             rtf :: L.TVar
             rtf = if trueT == falsT
@@ -415,15 +413,6 @@ differentiateIf r cond true fals =
                  else error "trueTraceT /= falsTraceT"
               where trueTraceT = L.typeof onlyTrueTrace
                     falsTraceT = L.typeof onlyFalsTrace
-
-            trace :: [L.TVar] -> String -> L.TVar
-            trace = makeVarNameFrom r . L.TypeTuple . map L.typeof
-
-            tTrace :: L.TVar
-            tTrace = trace trueTraceFlat "tTrace"
-
-            fTrace :: L.TVar
-            fTrace = trace falsTraceFlat "fTrace"
 
             -- Really these should be put in a sum type but we don't
             -- have those at the moment
