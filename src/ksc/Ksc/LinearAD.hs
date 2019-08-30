@@ -439,17 +439,7 @@ differentiateIf r cond true fals =
                       , L.Tuple (map L.Var falsTraceFlat) ]
 
             untupleEverythingInScope :: L.TExpr -> L.TExpr -> L.TExpr
-            untupleEverythingInScope theIf rest =
-              L.Let rScope theIf
-               (foldr (\(i, vv) -> L.Let vv (Prim.pSel i n (v rScope)) )
-                      rest
-                      (zip [1..] (map rev (toList inEither))))
-              where n = length (toList inEither)
-
-            rScope :: L.TVar
-            rScope =
-              makeVarNameFrom r (L.TypeTuple (map L.typeof (toList inEither)))
-                               "rScope"
+            untupleEverythingInScope = L.Untuple (map rev (toList inEither))
 
             tupleEverythingInScope :: L.TExpr
             tupleEverythingInScope = L.Tuple (map revVar (toList inEither))
