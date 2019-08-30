@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fwarn-name-shadowing #-}
+{-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -253,25 +254,39 @@ differentiateE = \case
       , [L.Var{}] <- args
         -> temporaryDummy
       | f `Prim.isThePrimFun` "forRange"
-      , [L.Var n, L.Var s, L.Lam i_s f] <- args
+      , [L.Var n, L.Var s, L.Lam i_s loopbody] <- args
+      , L.TypeTuple [_, typestate] <- L.typeof i_s
         ->
         let traceVec :: L.TExpr
             traceVec = Prim.pNewVec traceT (v n)
 
-            v_i_s :: L.TVar
-            v_i_s = _
+            i_v_s :: L.TVar
+            i_v_s =
+              L.TVar (L.TypeTuple [ L.TypeInteger
+                                  , L.TypeTuple [L.typeof vv, typestate]])
+                     (L.Simple "v_i_s")
+
+
+            v_s :: L.TVar
+            v_s =
+              L.TVar (L.TypeTuple [L.typeof vv, typestate])
+                     (L.Simple "i_s")
+
+            i :: L.TVar
+            i =
+              L.TVar typestate (L.Simple "i")
 
             vv :: L.TVar
-            vv = _
+            vv = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv")
 
             vv' :: L.TVar
-            vv' = _
+            vv' = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv")
 
             traceT :: L.Type
             traceT = L.typeof tracef
 
             tracefVar :: L.TVar
-            tracefVar = _
+            tracefVar = L.TVar (L.typeof tracef) (L.Simple "tracefVar")
 
             tracef :: L.TExpr
             tracef = (map (map L.Var >>> L.Tuple) >>> L.Tuple) tracefvarss
@@ -279,10 +294,12 @@ differentiateE = \case
             makeTraceFVars :: L.TExpr -> L.TExpr -> L.TExpr
             makeTraceFVars tr =
               let (intermediates, untuples) =
-                    foldr (\(a, f) (as, fs) -> (a:as, f . fs)) ([], id)
+                    foldr (\(a, ff) (as, fs) -> (a:as, ff . fs)) ([], id)
                     $ flip map (zip [1..] tracefvarss) $ \(i, tracefvars) ->
-                        let tracefvar = _
-                        in (tracefvar, L.Untuple tracefvars tracefvar)
+                        let tracefvar :: L.TVar
+                            tracefvar = L.TVar (L.TypeTuple (map L.typeof tracefvars))
+                                               (L.Simple ("tracefvar" ++ show i))
+                        in (tracefvar, L.Untuple tracefvars (v tracefvar))
 
               in untuples . L.Untuple intermediates tr
 
@@ -290,18 +307,22 @@ differentiateE = \case
              rf,
              tracefvarss,
              revf)
-              = differentiateE f
+              = differentiateE loopbody
 
-            newf = L.Lam v_i_s (L.Untuple [vv, i_s] (v v_i_s) (fwdf
-                     (L.Tuple [ Prim.pSetAt (Prim.pFst (v i_s)) tracef (v vv)
-                              , v rf
-                              ])))
+            newf = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
+                               (L.Untuple [vv, s] (v v_s)
+                               (L.Let i_s (L.Tuple [L.Tuple [], v s])
+                               (fwdf
+                               (L.Tuple [ Prim.pSetAt (Prim.pFst (v i_s)) tracef (v vv)
+                                        , v rf
+                                        ])))))
 
-            newr = L.Lam v_i_s (L.Untuple [vv, rev rf] (v v_i_s)
+            newr = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
+                                 (L.Untuple [vv, rev rf] (v v_s)
                                  (L.Untuple [vv', tracefVar] (Prim.pIndexL (Prim.pFst (v i_s)) (v vv))
                                   (makeTraceFVars (v tracefVar)
                                    (revf tracefvarss
-                                    (L.Tuple [v vv', revVar i_s])))))
+                                    (L.Tuple [v vv', revVar i_s]))))))
 
 
         in g

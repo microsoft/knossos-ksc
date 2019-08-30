@@ -412,6 +412,11 @@ primFunCallResultTy_maybe "build" args
   = Just (TypeVec (toSize n) elt_ty)
   | otherwise = Nothing
 
+primFunCallResultTy_maybe "newVec" args
+  | [t,n] <- args
+  , sizeArgOK n
+  = Just (TypeVec (toSize n) (typeof t))
+
 primFunCallResultTy_maybe "fold" args
   | [f,acc,v] <- args
   , TypeLam (TypeTuple [a1, b1]) a2 <- typeof f
@@ -569,6 +574,8 @@ primFunCallResultTy_maybe fun args
       ("indexL"   , [TypeInteger, vt@(TypeVec _ t)])         -> Just (TypeTuple [t, vt])
       ("incAt"    , [TypeInteger, t, vt@(TypeVec _ t')])
         | t == t'                                            -> Just vt
+      ("setAt"    , [TypeInteger, t, vt@(TypeVec _ t')])
+        | t == t'                                            -> Just vt
       ("size"     , [TypeVec _ _])                           -> Just TypeSize
       ("sum"      , [TypeVec _ t])                           -> Just t
       ("to_float" , [TypeInteger])                           -> Just TypeFloat
@@ -625,6 +632,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "forRange"
                        , "index"
                        , "indexL"
+                       , "newVec"
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
