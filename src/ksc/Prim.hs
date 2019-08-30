@@ -433,6 +433,14 @@ primFunCallResultTy_maybe "forRange" args
   , TypeLam (TypeTuple [TypeInteger, s2]) s3 <- typeof body
   = eqTypes s1 [s2, s3]
 
+-- The same as forRange
+primFunCallResultTy_maybe "forRangeRev" args
+  | [n,initialState,body] <- args
+  , sizeArgOK n
+  , s1 <- typeof initialState
+  , TypeLam (TypeTuple [TypeInteger, s2]) s3 <- typeof body
+  = eqTypes s1 [s2, s3]
+
 primFunCallResultTy_maybe "lmFold" args
   | [ds_zero,f,f',acc,v] <- args
   , TypeLam t1 a1 <- typeof f

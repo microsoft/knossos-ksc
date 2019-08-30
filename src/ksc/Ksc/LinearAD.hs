@@ -264,23 +264,23 @@ differentiateE = \case
             i_v_s =
               L.TVar (L.TypeTuple [ L.TypeInteger
                                   , L.TypeTuple [L.typeof vv, typestate]])
-                     (L.Simple "v_i_s")
+                     (L.Simple "i_v_s")
 
 
             v_s :: L.TVar
             v_s =
               L.TVar (L.TypeTuple [L.typeof vv, typestate])
-                     (L.Simple "i_s")
+                     (L.Simple "v_s")
 
             i :: L.TVar
             i =
-              L.TVar typestate (L.Simple "i")
+              L.TVar L.TypeInteger (L.Simple "i")
 
             vv :: L.TVar
             vv = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv")
 
             vv' :: L.TVar
-            vv' = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv")
+            vv' = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv_")
 
             traceT :: L.Type
             traceT = L.typeof tracef
@@ -295,13 +295,13 @@ differentiateE = \case
             makeTraceFVars tr =
               let (intermediates, untuples) =
                     foldr (\(a, ff) (as, fs) -> (a:as, ff . fs)) ([], id)
-                    $ flip map (zip [1..] tracefvarss) $ \(i, tracefvars) ->
+                    $ flip map (zip [1..] tracefvarss) $ \(ii, tracefvars) ->
                         let tracefvar :: L.TVar
                             tracefvar = L.TVar (L.TypeTuple (map L.typeof tracefvars))
-                                               (L.Simple ("tracefvar" ++ show i))
+                                               (L.Simple ("tracefvar" ++ show ii))
                         in (tracefvar, L.Untuple tracefvars (v tracefvar))
 
-              in untuples . L.Untuple intermediates tr
+              in L.Untuple intermediates tr . untuples
 
             (fwdf,
              rf,
@@ -311,7 +311,7 @@ differentiateE = \case
 
             newf = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
                                (L.Untuple [vv, s] (v v_s)
-                               (L.Let i_s (L.Tuple [L.Tuple [], v s])
+                               (L.Let i_s (L.Tuple [v i, v s])
                                (fwdf
                                (L.Tuple [ Prim.pSetAt (Prim.pFst (v i_s)) tracef (v vv)
                                         , v rf
@@ -319,12 +319,11 @@ differentiateE = \case
 
             newr = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
                                  (L.Untuple [vv, rev rf] (v v_s)
-                                 (L.Untuple [vv', tracefVar] (Prim.pIndexL (Prim.pFst (v i_s)) (v vv))
-                                  (makeTraceFVars (v tracefVar)
-                                   (revf tracefvarss
-                                    (L.Tuple [v vv', revVar i_s]))))))
-
-
+                                 (L.Untuple [tracefVar, vv'] (Prim.pIndexL (v i) (v vv))
+                                 (makeTraceFVars (v tracefVar)
+                                 (revf tracefvarss
+                                 (L.Untuple [rev i, rev s] (revVar i_s)
+                                 (L.Tuple [v vv', revVar s])))))))
         in g
         ( L.Untuple [vv, r]
             (Prim.pForRange (v n) (L.Tuple [traceVec, L.Var s]) newf)
@@ -332,7 +331,7 @@ differentiateE = \case
         , \([n_, vv_]:xs) ->
             (xs
             , L.Let (rev n) (L.Tuple [])
-              . L.Untuple [rev vv_, rev s]
+              . L.Untuple [vv_, rev s]
                   (Prim.pForRangeRev (v n_) (L.Tuple [v vv_, revVar r]) newr)
             )
         )

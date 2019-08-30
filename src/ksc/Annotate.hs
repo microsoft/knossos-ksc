@@ -201,7 +201,7 @@ tcExpr (Untuple vxs rhs body)
              mb_tuple_ty = fmap TypeTuple (sequence mb_tys)
 
        ; checkTypes_maybe mb_tuple_ty rhs_ty $
-         text "Let binding mis-match for" <+> sep (map ppr vars)
+         text "Untuple binding mis-match for" <+> sep (map ppr vars)
        ; let rhs_tys = case rhs_ty of
                TypeTuple rhs_tys -> rhs_tys
                _                 -> error "tcExpr: expected TypeTuple"
