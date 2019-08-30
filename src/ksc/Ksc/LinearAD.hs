@@ -475,32 +475,31 @@ differentiateForRange r args =
             traceVec = Prim.pNewVec traceT (v n)
 
             i_v_s :: L.TVar
-            i_v_s =
-              L.TVar (L.TypeTuple [ L.TypeInteger
-                                  , L.TypeTuple [L.typeof vv, typestate]])
-                     (L.Simple "i_v_s")
+            i_v_s = unhygenicVarFIXME
+                        (L.TypeTuple [ L.TypeInteger
+                                     , L.TypeTuple [L.typeof vv, typestate]])
+                        "i_v_s"
 
+            unhygenicVarFIXME :: L.Type -> String -> L.TVar
+            unhygenicVarFIXME t = L.TVar t . L.Simple
 
             v_s :: L.TVar
-            v_s =
-              L.TVar (L.TypeTuple [L.typeof vv, typestate])
-                     (L.Simple "v_s")
+            v_s = unhygenicVarFIXME (L.TypeTuple [L.typeof vv, typestate]) "v_s"
 
             i :: L.TVar
-            i =
-              L.TVar L.TypeInteger (L.Simple "i")
+            i = unhygenicVarFIXME L.TypeInteger "i"
 
             vv :: L.TVar
-            vv = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv")
+            vv = unhygenicVarFIXME (L.TypeVec (v n) (L.typeof tracef)) "vv"
 
             vv' :: L.TVar
-            vv' = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv_")
+            vv' = unhygenicVarFIXME (L.TypeVec (v n) (L.typeof tracef)) "vv_"
 
             traceT :: L.Type
             traceT = L.typeof tracef
 
             tracefVar :: L.TVar
-            tracefVar = L.TVar (L.typeof tracef) (L.Simple "tracefVar")
+            tracefVar = unhygenicVarFIXME (L.typeof tracef) "tracefVar"
 
             tracef :: L.TExpr
             tracef = (map (map L.Var >>> tuple) >>> tuple) tracefvarss
@@ -511,8 +510,9 @@ differentiateForRange r args =
                     foldr (\(a, ff) (as, fs) -> (a:as, ff . fs)) ([], id)
                     $ flip map (zip [1..] tracefvarss) $ \(ii, tracefvars) ->
                         let tracefvar :: L.TVar
-                            tracefvar = L.TVar (typeTuple (map L.typeof tracefvars))
-                                               (L.Simple ("tracefvar" ++ show ii))
+                            tracefvar = unhygenicVarFIXME
+                                           (typeTuple (map L.typeof tracefvars))
+                                           ("tracefvar" ++ show ii)
                         in (tracefvar, untuple tracefvars (v tracefvar))
 
               in untuple intermediates tr . untuples
@@ -608,7 +608,7 @@ unlineariseE = \case
                  (unlineariseE body)
                  (zip [1..] vs))
     where n = length vs
-          tv = (L.TVar (L.typeof t) (L.Simple "temporaryUntupleV"))
+          tv = (L.TVar (L.typeof t) (L.Simple "thisVariableIsUnhygenic"))
   L.Call f args
     | [n, s, L.Lam i_s loopbody] <- args
     , any (f `Prim.isThePrimFun`) ["forRange", "forRangeRev"]
