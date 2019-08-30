@@ -574,8 +574,17 @@ unlineariseE = \case
     L.If cond (unlineariseE true) (unlineariseE fals)
   L.Elim _ body -> unlineariseE body
   L.Untuple vs t body ->
-    foldr (\(i, v) -> L.Let v (Prim.pSel i n t)) (unlineariseE body) (zip [1..] vs)
+    L.Let tv
+          (unlineariseE t)
+          (foldr (\(i, v) -> L.Let v (Prim.pSel i n (L.Var tv)))
+                 (unlineariseE body)
+                 (zip [1..] vs))
     where n = length vs
+          tv = (L.TVar (L.typeof t) (L.Simple "temporaryUntupleV"))
+  L.Call f args
+    | [n, s, L.Lam i_s loopbody] <- args
+    , any (f `Prim.isThePrimFun`) ["forRange", "forRangeRev"]
+    -> L.Call f [n, s, L.Lam i_s (unlineariseE loopbody)]
   noDups@(L.Tuple{}) -> noDups
   noDups@(L.Call{})  -> noDups
   noDups@(L.Konst{}) -> noDups
