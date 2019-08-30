@@ -354,19 +354,17 @@ differentiateIf
   -> (L.TExpr -> L.TExpr, [L.TVar],
        [[L.TVar]] -> ([[L.TVar]], L.TExpr -> L.TExpr))
 differentiateIf r cond true fals =
-      ( L.Let rtf (L.If (L.Var cond) trueFwd' falsFwd')
-        . L.Let r (Prim.pSel 1 2 (v rtf))
-        . L.Let tf (Prim.pSel 2 2 (v rtf))
+      ( L.Untuple [r, tf] (L.If (L.Var cond) trueFwd' falsFwd')
       , [cond, tf]
       , \([cond_,tf_]:xs') ->
           (xs', untupleEverythingInScope
             (L.If (v cond_)
               (L.Let (rev trueR) (revVar r)
-               $ untupleTrace (Prim.pSel 1 2 (v tf_)) trueTraceRevVars
+               $ untupleTrace trueTraceRevVars (Prim.pSel 1 2 (v tf_))
                $ trueRev trueTraceRevVars
                $ tupleEverythingInScope)
               (L.Let (rev falsR) (revVar r)
-               $ untupleTrace (Prim.pSel 2 2 (v tf_)) falsTraceRevVars
+               $ untupleTrace falsTraceRevVars (Prim.pSel 2 2 (v tf_))
                $ falsRev falsTraceRevVars
                $ tupleEverythingInScope)
             )
@@ -390,16 +388,8 @@ differentiateIf r cond true fals =
             falsTraceRevVars :: [[L.TVar]]
             falsTraceRevVars = traceRevVars falsTrace
 
-            untupleTrace :: L.TExpr -> [[L.TVar]] -> L.TExpr -> L.TExpr
-            untupleTrace traceVar traceRevVars' =
-              L.Untuple (concat traceRevVars') traceVar
-
-            rtf :: L.TVar
-            rtf = if trueT == falsT
-                  then makeVarNameFrom r trueT "rtf"
-                  else error "trueT /= falsT"
-              where trueT = L.typeof trueFwd'
-                    falsT = L.typeof falsFwd'
+            untupleTrace :: [[L.TVar]] -> L.TExpr -> L.TExpr -> L.TExpr
+            untupleTrace = L.Untuple . concat
 
             trueFwd' :: L.TExpr
             trueFwd' = trueFwd (L.Tuple [L.Var trueR, onlyTrueTrace])
