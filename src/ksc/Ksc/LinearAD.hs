@@ -393,12 +393,8 @@ differentiateIf r cond true fals =
             falsTraceRevVars = traceRevVars falsTrace
 
             untupleTrace :: L.TVar -> [[L.TVar]] -> L.TExpr -> L.TExpr
-            untupleTrace traceVar traceRevVars' rest =
-              foldr (\(i, vv) ->
-                       L.Let vv (Prim.pSel i n (L.Var traceVar)))
-                    rest (zip [1..] revVarsFlat)
-              where n = length revVarsFlat
-                    revVarsFlat = concat traceRevVars'
+            untupleTrace traceVar traceRevVars' =
+              L.Untuple (concat traceRevVars') (L.Var traceVar)
 
             rtf :: L.TVar
             rtf = if trueT == falsT
