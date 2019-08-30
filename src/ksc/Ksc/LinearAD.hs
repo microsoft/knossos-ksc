@@ -254,104 +254,7 @@ differentiateE = \case
       , [L.Var{}] <- args
         -> temporaryDummy
       | f `Prim.isThePrimFun` "forRange"
-      , [L.Var n, L.Var s, L.Lam i_s loopbody] <- args
-      , L.TypeTuple [_, typestate] <- L.typeof i_s
-        ->
-        let traceVec :: L.TExpr
-            traceVec = Prim.pNewVec traceT (v n)
-
-            i_v_s :: L.TVar
-            i_v_s =
-              L.TVar (L.TypeTuple [ L.TypeInteger
-                                  , L.TypeTuple [L.typeof vv, typestate]])
-                     (L.Simple "i_v_s")
-
-
-            v_s :: L.TVar
-            v_s =
-              L.TVar (L.TypeTuple [L.typeof vv, typestate])
-                     (L.Simple "v_s")
-
-            i :: L.TVar
-            i =
-              L.TVar L.TypeInteger (L.Simple "i")
-
-            vv :: L.TVar
-            vv = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv")
-
-            vv' :: L.TVar
-            vv' = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv_")
-
-            traceT :: L.Type
-            traceT = L.typeof tracef
-
-            tracefVar :: L.TVar
-            tracefVar = L.TVar (L.typeof tracef) (L.Simple "tracefVar")
-
-            tracef :: L.TExpr
-            tracef = (map (map L.Var >>> tuple) >>> tuple) tracefvarss
-
-            makeTraceFVars :: L.TExpr -> L.TExpr -> L.TExpr
-            makeTraceFVars tr =
-              let (intermediates, untuples) =
-                    foldr (\(a, ff) (as, fs) -> (a:as, ff . fs)) ([], id)
-                    $ flip map (zip [1..] tracefvarss) $ \(ii, tracefvars) ->
-                        let tracefvar :: L.TVar
-                            tracefvar = L.TVar (typeTuple (map L.typeof tracefvars))
-                                               (L.Simple ("tracefvar" ++ show ii))
-                        in (tracefvar, untuple tracefvars (v tracefvar))
-
-              in untuple intermediates tr . untuples
-
-
-            -- This is really quite annoying.  We should just have a
-            -- 1-tuple.
-            tuple :: [L.TExpr] -> L.TExpr
-            tuple [vvv] = vvv
-            tuple vs  = L.Tuple vs
-
-            typeTuple :: [L.Type] -> L.Type
-            typeTuple [t] = t
-            typeTuple ts  = L.TypeTuple ts
-
-            untuple :: [L.TVar] -> L.TExpr -> L.TExpr -> L.TExpr
-            untuple [var] = L.Let var
-            untuple vars  = L.Untuple vars
-
-
-
-            (fwdf,
-             rf,
-             tracefvarss,
-             revf)
-              = differentiateE loopbody
-
-            newf = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
-                               (L.Untuple [vv, s] (v v_s)
-                               (L.Let i_s (L.Tuple [v i, v s])
-                               (fwdf
-                               (L.Tuple [ Prim.pSetAt (Prim.pFst (v i_s)) tracef (v vv)
-                                        , v rf
-                                        ])))))
-
-            newr = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
-                                 (L.Untuple [vv, rev rf] (v v_s)
-                                 (L.Untuple [tracefVar, vv'] (Prim.pIndexL (v i) (v vv))
-                                 (makeTraceFVars (v tracefVar)
-                                 (revf tracefvarss
-                                 (L.Untuple [rev i, rev s] (revVar i_s)
-                                 (L.Tuple [v vv', revVar s])))))))
-        in g
-        ( L.Untuple [vv, r]
-            (Prim.pForRange (v n) (L.Tuple [traceVec, L.Var s]) newf)
-        , [n, vv]
-        , \([n_, vv_]:xs) ->
-            (xs
-            , L.Let (rev n) (L.Tuple [])
-              . L.Untuple [vv_, rev s]
-                  (Prim.pForRangeRev (v n_) (L.Tuple [v vv_, revVar r]) newr)
-            )
-        )
+      -> g (differentiateForRange r args)
       | f `Prim.isThePrimFun` "eq"
       , [L.Var{}, L.Var{}] <- args
         -> temporaryDummy
@@ -555,6 +458,114 @@ differentiateIf r cond true fals =
             inEither = LU.freeVarsOf true `union` LU.freeVarsOf fals
 
             v = L.Var
+
+differentiateForRange
+  :: L.TVar
+  -> [L.TExpr]
+  -> (L.TExpr -> L.TExpr,
+      [L.TVar],
+      [[L.TVar]] -> ([[L.TVar]], L.TExpr -> L.TExpr))
+differentiateForRange r args =
+        let [L.Var n, L.Var s, L.Lam i_s loopbody] = args
+            L.TypeTuple [_, typestate] = L.typeof i_s
+
+            v = L.Var
+
+            traceVec :: L.TExpr
+            traceVec = Prim.pNewVec traceT (v n)
+
+            i_v_s :: L.TVar
+            i_v_s =
+              L.TVar (L.TypeTuple [ L.TypeInteger
+                                  , L.TypeTuple [L.typeof vv, typestate]])
+                     (L.Simple "i_v_s")
+
+
+            v_s :: L.TVar
+            v_s =
+              L.TVar (L.TypeTuple [L.typeof vv, typestate])
+                     (L.Simple "v_s")
+
+            i :: L.TVar
+            i =
+              L.TVar L.TypeInteger (L.Simple "i")
+
+            vv :: L.TVar
+            vv = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv")
+
+            vv' :: L.TVar
+            vv' = L.TVar (L.TypeVec (v n) (L.typeof tracef)) (L.Simple "vv_")
+
+            traceT :: L.Type
+            traceT = L.typeof tracef
+
+            tracefVar :: L.TVar
+            tracefVar = L.TVar (L.typeof tracef) (L.Simple "tracefVar")
+
+            tracef :: L.TExpr
+            tracef = (map (map L.Var >>> tuple) >>> tuple) tracefvarss
+
+            makeTraceFVars :: L.TExpr -> L.TExpr -> L.TExpr
+            makeTraceFVars tr =
+              let (intermediates, untuples) =
+                    foldr (\(a, ff) (as, fs) -> (a:as, ff . fs)) ([], id)
+                    $ flip map (zip [1..] tracefvarss) $ \(ii, tracefvars) ->
+                        let tracefvar :: L.TVar
+                            tracefvar = L.TVar (typeTuple (map L.typeof tracefvars))
+                                               (L.Simple ("tracefvar" ++ show ii))
+                        in (tracefvar, untuple tracefvars (v tracefvar))
+
+              in untuple intermediates tr . untuples
+
+
+            -- This is really quite annoying.  We should just have a
+            -- 1-tuple.
+            tuple :: [L.TExpr] -> L.TExpr
+            tuple [vvv] = vvv
+            tuple vs  = L.Tuple vs
+
+            typeTuple :: [L.Type] -> L.Type
+            typeTuple [t] = t
+            typeTuple ts  = L.TypeTuple ts
+
+            untuple :: [L.TVar] -> L.TExpr -> L.TExpr -> L.TExpr
+            untuple [var] = L.Let var
+            untuple vars  = L.Untuple vars
+
+
+
+            (fwdf,
+             rf,
+             tracefvarss,
+             revf)
+              = differentiateE loopbody
+
+            newf = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
+                               (L.Untuple [vv, s] (v v_s)
+                               (L.Let i_s (L.Tuple [v i, v s])
+                               (fwdf
+                               (L.Tuple [ Prim.pSetAt (Prim.pFst (v i_s)) tracef (v vv)
+                                        , v rf
+                                        ])))))
+
+            newr = L.Lam i_v_s (L.Untuple [i, v_s] (v i_v_s)
+                                 (L.Untuple [vv, rev rf] (v v_s)
+                                 (L.Untuple [tracefVar, vv'] (Prim.pIndexL (v i) (v vv))
+                                 (makeTraceFVars (v tracefVar)
+                                 (revf tracefvarss
+                                 (L.Untuple [rev i, rev s] (revVar i_s)
+                                 (L.Tuple [v vv', revVar s])))))))
+        in
+        ( L.Untuple [vv, r]
+            (Prim.pForRange (v n) (L.Tuple [traceVec, L.Var s]) newf)
+        , [n, vv]
+        , \([n_, vv_]:xs) ->
+            (xs
+            , L.Let (rev n) (L.Tuple [])
+              . L.Untuple [vv_, rev s]
+                  (Prim.pForRangeRev (v n_) (L.Tuple [v vv_, revVar r]) newr)
+            )
+        )
 
 renameTVar :: L.TVar -> (String -> String) -> L.TVar
 renameTVar (L.TVar t (L.Simple s)) f = L.TVar t (L.Simple (f s))
