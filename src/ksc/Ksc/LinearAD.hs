@@ -486,12 +486,10 @@ differentiateForRange r args =
             -- This is really quite annoying.  We should just have a
             -- 1-tuple.
             tuple :: [L.TExpr] -> L.TExpr
-            tuple [vvv] = vvv
-            tuple vs  = L.Tuple vs
+            tuple = L.mkTuple
 
             typeTuple :: [L.Type] -> L.Type
-            typeTuple [t] = t
-            typeTuple ts  = L.TypeTuple ts
+            typeTuple = L.mkTupleTy
 
             untuple :: [L.TVar] -> L.TExpr -> L.TExpr -> L.TExpr
             untuple [var] = L.Let var
