@@ -404,6 +404,9 @@ instance HasType TExpr where
   typeof (Assert _ e)  = typeof e
   typeof (If _ t f)    = makeIfType (typeof t) (typeof f)
 
+instance HasType Type where
+  typeof t = t
+
 -- ToDo: delete this if no longer needed
 makeIfType :: HasCallStack => Type -> Type -> Type
 makeIfType ty1 ty2 = traceWhenUnequal "makeIfType" ty1 ty2 ty2
