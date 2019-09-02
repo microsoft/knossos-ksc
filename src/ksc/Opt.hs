@@ -294,7 +294,6 @@ optPrimFun _ "zero" [Konst (KFloat _)]
 optPrimFun _ "sum"         [arg]          = optSum arg
 optPrimFun _ "build"       [sz, Lam i e2] = optBuild sz i e2
 optPrimFun _ "sumbuild"    [sz, Lam i e2] = optSumBuild sz i e2
-optPrimFun _ "lmBuild"     [sz, Lam i e2] = optLMBuild sz i e2
 optPrimFun env "lmApply"   [e1,e2]        = optLMApply env (AD BasicAD Fwd) e1 e2
 optPrimFun env "lmApplyR"  [e1,e2]        = optLMApply env (AD BasicAD Rev) e2 e1
 optPrimFun env "lmApplyT"  [e1,e2]        = optLMApply env (AD TupleAD Fwd) e1 e2
@@ -516,19 +515,6 @@ optSumBuild n i (Call deltaVec [_n1, Var i1, e])
   = Just $ pBuild n (Lam i e)
 
 optSumBuild _ _ _ = Nothing
-
------------------------
-optLMBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
-
-{-
--- RULE: build sz (\i. lmZero ty T)  =  lmZero ty (Vec T)
-optLMBuild _ _ e
-  | isLMZero e
-  , TypeLM s t <- typeof e
-  = Just $ lmZero s (TypeVec t)
--}
-
-optLMBuild _ _ _ = Nothing
 
 
 -----------------------
@@ -758,9 +744,6 @@ optLMApplyCall env Rev "lmVCatV" [e] dx = do_sum_v  env Rev e dx
 optLMApplyCall env Fwd "lmHCatV" [e] dx = do_sum_v  env Fwd e dx
 optLMApplyCall env Rev "lmHCatV" [e] dx = do_prod_v env Rev e dx
 
-optLMApplyCall _ Fwd "lmBuild"  [n, Lam i m] dx = do_build   Fwd n i m dx
-optLMApplyCall _ Rev "lmBuild"  [n, Lam i m] dx = do_build_t Rev n i m dx
-
 optLMApplyCall _ dir "lmFold" [sZero, Lam i m, Lam i' m', acc, v] dx =
   do_fold dir sZero i m i' m' acc v dx
 
@@ -825,12 +808,6 @@ do_sum_v env dir e dx
   | otherwise = Nothing
   where
     (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
-
-do_build, do_build_t :: ADDir
-                     -> TExpr -> TVar -> TExpr -> TExpr
-                     -> Maybe TExpr
-do_build   dir n i m dx = Just (pBuild n (Lam i (lmApply_Dir dir m dx)))
-do_build_t dir n i m dx = Just (pSum (pBuild n (Lam i (lmApply_Dir dir m (pIndex (Var i) dx)))))
 
 do_fold :: ADDir
         -> TExpr

@@ -612,7 +612,6 @@ ctypeofFun1 ty _ _ = mkCType ty
 ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
 ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
   ("lmApply"  , _         ) -> mkCType ty
-  ("lmBuild"  , [_, lam]  ) -> LMBuild lam
   ("lmOne"    , [ct]      ) -> LMOne (stripCType ct)
   ("lmZero"   , [cs, ct]  ) -> LMZero (stripCType cs) (stripCType ct)
   ("lmScale"  , [ct, CType TypeFloat]) -> LMScale (stripCType ct)
