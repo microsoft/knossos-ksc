@@ -413,14 +413,6 @@ primFunCallResultTy_maybe "fold" args
   = Just a
   | otherwise = Nothing
 
--- lmbuild n (m :: Integer -> (s -o t)) :: s -o Vec n t
-primFunCallResultTy_maybe "lmBuild" args
-  | [n,f] <- args
-  , sizeArgOK n
-  , TypeLam TypeInteger (TypeLM s t) <- typeof f
-  = Just (TypeLM s (TypeVec (toSize n) t))
-  | otherwise = Nothing
-
 primFunCallResultTy_maybe "lmFold" args
   | [ds_zero,f,f',acc,v] <- args
   , TypeLam t1 a1 <- typeof f
@@ -624,7 +616,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "eq", "ne", "lt", "gt", "lte", "gte", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
-                       , "lmCompose", "lmAdd", "lmScale", "lmBuild"
+                       , "lmCompose", "lmAdd", "lmScale"
                        , "abs", "max"
                        , "or", "and"
 
