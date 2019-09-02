@@ -41,10 +41,20 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
 anfE subst (Var tv)      = return (substVar subst tv)
 anfE subst (Call fun es)
- | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]
+ -- See Note [Do not ANF first arg of build]
+ | fun `isThePrimFun` "build"
  , Tuple [e1,e2] <- es
  = do { e2' <- anfE1 subst e2
       ; return (Call fun (Tuple [e1, e2'])) }
+ | fun `isThePrimFun` "sumbuild"
+ , Tuple [e1,e2] <- es
+ = do { e2' <- anfE1 subst e2
+      ; return (Call fun (Tuple [e1, e2'])) }
+ | fun `isThePrimFun` "fold"
+ , Tuple [e1,e2,e3] <- es
+ = do { e2' <- anfE1 subst e2
+      ; e3' <- anfE1 subst e3
+      ; return (Call fun (Tuple [e1, e2', e3'])) }
  | otherwise
  = Call fun <$> anfE1 subst es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
@@ -88,7 +98,8 @@ because the type makes no sense.
 
 An alternative would be to substitute for t1, in typeofExpr;
 and similarly in the type checker.  In some ways that would
-be nicer, but I have not tried it.
+be nicer, but I have not tried it.  Similarly for fold and
+sumbuild.
 -}
 
 {- Note [Cloning during ANF]
