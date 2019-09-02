@@ -388,6 +388,24 @@ bindTypeArgs bndrs args arg_tys
         match_ty bndr_ty2 arg_ty2 subst
     match_ty _ _ subst = subst
 
+{- Note [Typing depenendent calls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   build :: n -> (Integer -> a) -> Vec n a
+and a call
+   build (e1, e2)
+and suppose e2 :: Integer -> T
+
+What is the result type?  It's (Vec e1 T). Note that can duplicate
+e1 in types, but so be it.
+
+What if the agument isn't an explicit tuple?
+   build e
+where e :: (Integer, Integer -> T)
+
+Then the result type is   Vec (fst e) T
+which again may duplicate (fst e) into the type.
+-}
+
 -----------------------------------------------
 --     The typecheck monad
 -----------------------------------------------

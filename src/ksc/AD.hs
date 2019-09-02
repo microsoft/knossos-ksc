@@ -183,34 +183,18 @@ gradCall BasicAD s f arg
     gf = gradTFun BasicAD f (typeof arg)
 
 gradCall TupleAD s f arg
-  = mkLet_maybe mb_grad_arg_bind $
-    mkLet res_tv (Call gf arg')  $
+  = mkLet arg_tv (gradE TupleAD s arg)    $
+    mkLet res_tv (Call gf (pFst (Var arg_tv)))  $
     Tuple [ pFst (Var res_tv)
           , lmCompose (pSnd (Var res_tv))
-                      (pSnd grad_arg_expr)
+                      (pSnd (Var arg_tv))
           ]
   where
     gf     = gradTFun TupleAD f (typeof arg)
     res_ty = typeof f
     res_tv = mkGradTVar TupleAD arg_ty resVar res_ty
     arg_ty = typeof arg
-
-    arg_var  = mkGradTVar TupleAD s argVar arg_ty
-    grad_arg = gradE TupleAD s arg
-
-    mb_grad_arg_bind :: Maybe (TVar,TExpr)
-     -- Nothing <=> the arg is atomic, so no need to let-bind
-
-    (grad_arg_expr, arg', mb_grad_arg_bind)
-      -- If arg is trivial then we want to apply it directly to gf.
-      -- This is particularly important in cases where the type of the
-      -- body depends on arg.  Having arg appear in the form 'fst
-      -- (arg, <darg>)' displeases the type checker when it's the
-      -- first argument of build, for example.
-      | isTrivial arg
-      = (grad_arg,    arg,                Nothing)
-      | otherwise
-      = (Var arg_var, pFst (Var arg_var), Just (arg_var, grad_arg))
+    arg_tv = mkGradTVar TupleAD s argVar arg_ty
 
 ----------------------
 gradLet :: HasCallStack => ADPlan -> Type -> TVar -> TExpr -> TExpr -> TExpr
