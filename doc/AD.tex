@@ -21,7 +21,7 @@
 \renewcommand{\to}{\rightarrow}    % ->
 \newcommand{\linto}{\multimap}     % -o
 \newcommand{\grad}[1]{\nabla_S\lb #1 \rb}  % grad[#1]
-\newcommand{\gradf}[1]{\deriv #1}  % Full Jacobian
+\newcommand{\gradf}[1]{\deriv\hspace{-0.15mm} #1}  % Full Jacobian
 \newcommand{\gradft}[1]{\deriv_R#1}  % Full reverse (transposed) Jacobian
 \newcommand{\tangent}[1]{\delta #1}
 
@@ -90,8 +90,6 @@
 \newcommand{\lmscalar}[1]{{\mathcal S}(#1)}      % S(k)
 \newcommand{\lmlam}{{\mathcal L}}      % L(k)
 \newcommand{\lmlamt}{{\mathcal L'}}     % Transposed lambda
-\newcommand{\lmbuild}{\mathcal B}             % Build linear map
-\newcommand{\lmbuildt}{\mathcal B'}             % Transposed Build linear map
 
 % \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 % \newcommand{\tom}[1]{{\color{red}TE: #1}}
@@ -209,10 +207,11 @@ $$
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmhcat \lmzero \\[2mm]
         \gradf{\indexfunname} & :: & (\nat, \;\vector{n}{t}) \to ((\nat, \; \vector{n}{t}) \linto t) \\
-        \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat \lmbuildt( \sizefun(v),
-               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
+        \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat
+        \lmhcatv{\buildfun( \sizefun(v),
+              \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero )} \\[2mm]
          \gradf{\sumfunname} & :: & \vector{n}{\real} \to (\vector{n}{\real} \linto \real) \\
-         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
+         \gradf{\sumfun{v}} & = & lmhcatv{\buildfun( \sizefun(v),\; \lambda i. \lmone )} \\[2mm]
         \ldots
         \end{array}
 $$
@@ -255,12 +254,6 @@ Vectors are supported by the following built-in functions (Figure~\ref{fig:built
 \item $\sumfunname :: \vector{n}{\real} \to \real$ to add up the elements of a vector.
 We specifically do not have a general, higher order, fold operator;
 we say why in Section~\ref{sec:gen-fold}.
-  \tom{I believe that for a vector $v$ of size $n$, $\sumfun{v}$ is the
-    same as $\lmbuildt(n, const~ id)~ v$.  This may or may not be useful
-    in reducing the size of the base language, should we want to do that.}
-  \simon{I don't think so!  $\lmbuildt$ is a linear map, so you can't apply it to $v$.
-    Maybe you mean $\lmbuildt(n, const~ id) \lmapply v$?  But that (Figure~\ref{fig:lm-laws}) is
-    defined using $\sumfunname$!}
 \item $\sizefun :: \vector{n}{t} \to \nat$ takes the size of a vector.
 \item Arithmetic functions $(*), (+)$ etc are overloaded to work over vectors, always elementwise.
 \end{itemize}
@@ -325,11 +318,9 @@ passing through $z = g(p_x, p_y)$
 
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\[2mm]
 %    \\
-    \multicolumn{5}{l}{\mbox{\bf NB: We expect to have only $\lmlam / \lmlamt$ or $\lmbuild / \lmbuildt$, but not both}} \\
+    \multicolumn{5}{l}{\mbox{\bf NB: We expect to have only $\lmlam / \lmlamt$ but not both}} \\
     \mbox{Lambda} & \lmlam & : & (\nat \to (s \linto t)) \to (s \linto (\nat \to t)) \\
     \mbox{TLambda} & \lmlamt & : & (\nat \to (t \linto s)) \to ((\nat \to t) \linto s) & \mbox{Transpose of $\lmlam$} \\
-    \mbox{Build}   & \lmbuild  & : & (\nat,\; \nat \to (s \linto t)) \to (s \linto \vector{n}{t}) \\
-    \mbox{BuildT}   & \lmbuildt  & : & (\nat,\; \nat \to (t \linto s)) \to (\vector{n}{t} \linto s) & \mbox{Transpose of $\lmbuild$} \\
   \end{array}
   $$
 \end{minipage}}
@@ -343,17 +334,15 @@ passing through $z = g(p_x, p_y)$
   \begin{array}{r@{\;}c@{\;}l}
     (m_1 \lmcomp m_2) \lmapply x  & = & m_1 \lmapply (m_2 \lmapply x) \\
     (m_1 \lmvcat m_2) \lmapply x  & = & (m_1 \lmapply x, m_2 \lmapply x) \\
-    \lmvcatv{m} \lmapply x  & = & build( \sizefun(m), \lambda i. m[i] \lmapply x) \\
     (m_1 \lmhcat m_2)  \lmapply (x_1,x_2) & = & (m_1 \lmapply x_1) + (m_2 \lmapply x_2) \\
-    \lmhcatv{m} \lmapply x  & = & \Sigma_i\, (m[i] \lmapply x[i]) \\
     (m_1 \lmadd m_2)  \lmapply x & = & (m_1 \lmapply x) + (m_2 \lmapply x) \\
     \lmzero \lmapply x  & = & 0 \\
     \lmone \lmapply x & = & x \\
     \lmscalar{k} \lmapply x & = & k * x \\
+    \lmvcatv{m} \lmapply x  & = & build( \sizefun(m), \lambda i. m[i] \lmapply x) \\
+    \lmhcatv{m} \lmapply x  & = & \Sigma_i\, (m[i] \lmapply x[i]) \\
    \lmlam(f) \lmapply x & = & \lambda i\dot (f\; i) \lmapply x \\
    \lmlamt(f) \lmapply g & = & \Sigma_i (f \;i) \lmapply g(i) \\
-    \lmbuild(n,\lambda i.\, m) \lmapply x & = & build(n, \lambda i.\, m \lmapply x) \\
-    \lmbuildt(n,\lambda i.\, m) \lmapply x & = & \sumfun{\buildfun(n,\; \lambda i.\, m \lmapply x[i] )} \\
    \end{array}
   $$
 \\[3mm]
@@ -367,6 +356,7 @@ passing through $z = g(p_x, p_y)$
     m \lmadd \lmzero & = & m \\
     \lmzero \lmadd m & = & m \\
     m \lmcomp (n_1 \lmhcat n_2) & = & (m \lmcomp n_1) \lmhcat (m \lmcomp n_2) \\
+    (m_1 \lmvcat m_2) \lmcomp n & = & (m_1 \lmcomp n) \lmvcat (m_2 \lmcomp n) \\
     (m_1 \lmhcat m_2) \lmcomp (n_1 \lmvcat n_2) & = & (m_1 \lmcomp n_1) \lmadd (m_2 \lmcomp n_2) \\
     \lmscalar{k_1} \lmcomp \lmscalar{k_2} & = & \lmscalar{ k_1 * k_2 } \\
     \lmscalar{k_1} \lmadd \lmscalar{k_2} & = & \lmscalar{ k_1 + k_2 } \\
@@ -488,16 +478,14 @@ In all cases the necessary properties of the operations (associativity, distribu
   \begin{array}{rcll}
     \lmtrans{(m_1 \lmcomp m_2)} & = & \lmtrans{m_2} \lmcomp \lmtrans{m_1} & \mbox{Note reversed order!}\\
     \lmtrans{(m_1 \lmvcat m_2)} & = & \lmtrans{m_1} \lmhcat \lmtrans{m_2} \\
-    \lmtrans{\lmvcatv{v}} & = & \lmhcatv{map\;\lmtrans{(\cdot)}\,v} \\
     \lmtrans{(m_1 \lmhcat m_2)} & = & \lmtrans{m_1} \lmvcat \lmtrans{m_2} \\
-    \lmtrans{\lmhcatv{v}} & = & \lmvcatv{map\;\lmtrans{(\cdot)}\,v} \\
     \lmtrans{(m_1 \lmadd m_2)} & = & \lmtrans{m_1} \lmadd \lmtrans{m_2} \\
     \lmtrans{\lmzero} & = & \lmzero \\
     \lmtrans{\lmone} & = & \lmone \\
     \lmtrans{\lmscalar{k}} & = & \lmscalar{k} \\
     \lmtrans{(\lmtrans{m})} & = & m \\
-    \lmtrans{\lmbuild( n,\; \lambda i. m )} & = & \lmbuildt( n,\; \lambda i. \lmtrans{m} ) \\
-    \lmtrans{\lmbuildt( n,\; \lambda i. m )} & = & \lmbuild( n,\; \lambda i. \lmtrans{m} ) \\
+    \lmtrans{\lmvcatv{v}} & = & \lmhcatv{map\;\lmtrans{(\cdot)}\,v} \\
+    \lmtrans{\lmhcatv{v}} & = & \lmvcatv{map\;\lmtrans{(\cdot)}\,v} \\
    \lmtrans{\lmlam(\lambda i. m)} & = & \lmlamt(\lambda i. \lmtrans{m}) \\
    \lmtrans{\lmlamt(\lambda i. m)} & = & \lmlam(\lambda i. \lmtrans{m}) \\
   \end{array}
@@ -509,14 +497,13 @@ In all cases the necessary properties of the operations (associativity, distribu
     r \lmapplyR (m_1 \lmcomp m_2) & = & (r \lmapplyR m_1) \lmapplyR m_2 \\
     (r_1,r_2) \lmapplyR (m_1 \lmvcat m_2) & = & (r_1 \lmapplyR m_1) + (r_2 \lmapplyR m_2) \\
     r \lmapplyR (m_1 \lmhcat m_2) & = & (r \lmapplyR m_1,\; r \lmapplyR m_2) \\
-    r \lmapplyR \lmvcatv{v} & = & \Sigma_i\, (r[i] \lmapplyR v[i]) \\
-    r \lmapplyR \lmhcatv{v} & = & \buildfun( \sizefun(v), \lambda i. r \lmapplyR m[i]) \\
     r \lmapplyR (m_1 \lmadd m_2) & = & (r \lmapplyR m_1) + (r \lmapplyR m_2) \\
     r \lmapplyR \lmzero & = & 0 \\
     r \lmapplyR \lmone & = & r \\
     r \lmapplyR \lmscalar{k} & = & k*r \\
     r \lmapplyR \lmtrans{m} & = & m \lmapply r \\
-    r \lmapplyR \lmbuild( n,\; \lambda i. m ) & = & \sumfun{\buildfun(n, \lambda i. r[i] \lmapplyR m)} ) \\
+    r \lmapplyR \lmvcatv{v} & = & \Sigma_i\, (r[i] \lmapplyR v[i]) \\
+    r \lmapplyR \lmhcatv{v} & = & \buildfun( \sizefun(v), \lambda i. r \lmapplyR m[i]) \\
 %   \lmtrans{\lmlam(\lambda i. m)} & = & \lmlamt(\lambda i. \lmtrans{m}) \\
 %   \lmtrans{\lmlamt(\lambda i. m)} & = & \lmlam(\lambda i. \lmtrans{m}) \\
   \end{array}
@@ -572,6 +559,20 @@ $$
 \end{array}
 $$
 And now the property follows by Theorem~\ref{thm:trans-eq}.
+
+\subsection{Reverse linear-map application}
+
+Rather than transpose the linear map (which is a rather boring operation), just replacing
+one operator with another, it's easier to define a reverse-application operator for
+linear maps:
+$$
+(\lmapplyR)  :  \tangent{t} \to (s \linto t) \to \tangent{s}
+$$
+It is defined by the following property:
+$$
+(RP) \quad \forall s\tcolon \tangent{S},\, t \tcolon \tangent{T}.\;\;
+     (t \lmapplyR m) \dotprod s =  t \dotprod (m \lmapply s)
+$$
 
 \subsection{Matrix interpretation of linear maps} \label{sec:matrix-rep}
 
@@ -805,8 +806,8 @@ a lambda, thus $\buildfun(e_n, \lambda i.e)$.  I tried dealing with build and
 lambdas separately, but failed (see Section~\ref{sec:build-lam-fail}).
 
 I did think about having a specialised linear map for indexing, rather
-than using $\lmbuildt$, but then I needed its transposition, so just
-using $\lmbuildt$ seemed more economical.  On the other hand, with the
+than using $\lmhcatv$, but then I needed its transposition, so just
+using $\lmhcatv$ seemed more economical.  On the other hand, with the
 fucntions as I have them, I need the grotesquely delicate optimisation
 rule
 $$
