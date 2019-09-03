@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -fwarn-name-shadowing #-}
-{-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 
