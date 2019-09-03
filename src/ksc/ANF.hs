@@ -40,8 +40,10 @@ anfE :: Subst -> TExpr -> AnfM Typed TExpr
 anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
 anfE subst (Var tv)      = return (substVar subst tv)
+
+-- Special case for calls of 'build', 'sumbuild', and 'fold'
+-- See Note [Do not ANF first arg of build]
 anfE subst (Call fun es)
- -- See Note [Do not ANF first arg of build]
  | fun `isThePrimFun` "build"
  , Tuple [e1,e2] <- es
  = do { e2' <- anfE1 subst e2
@@ -55,8 +57,10 @@ anfE subst (Call fun es)
  = do { e2' <- anfE1 subst e2
       ; e3' <- anfE1 subst e3
       ; return (Call fun (Tuple [e1, e2', e3'])) }
- | otherwise
- = Call fun <$> anfE1 subst es
+
+-- The generic case for Call
+anfE subst (Call fun es)  = Call fun <$> anfE1 subst es
+
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = substBndr v subst
                                ; emit v' r'
