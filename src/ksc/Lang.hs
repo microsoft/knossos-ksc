@@ -695,7 +695,8 @@ instance Pretty Konst where
 instance InPhase p => Pretty (TypeX p) where
   pprPrec p (TypeVec sz ty)      = parensIf p precTyApp $
                                    text "Vec" <+> pprParendExpr sz <+> pprParendType ty
-  pprPrec _ (TypeTuple tys)      = parens (text "Tuple" <+> pprList pprParendType tys)
+  pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
+                                        (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to)    = parensIf p precZero $
                                    text "Lambda" <+> ppr from <+> text "->" <+> ppr to
   pprPrec p (TypeLM s t)         = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
