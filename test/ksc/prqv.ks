@@ -29,6 +29,12 @@
            (q (add p x)))
        q))
 
+(def i Float ((x : Float) (y : Float))
+     (let ((p (mul 7.0 x))
+           (q (let (r (div x y))
+                (add (mul r p) (mul 3.0 r)))))
+       q))
+
 (def f Float ((x : Float) (y : Float))
      (let ((p (mul 7.0 x))
            (r (div 11.0 y))
