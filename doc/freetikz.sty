@@ -1,0 +1,398 @@
+\NeedsTeXFormat{LaTeX2e}[1999/01/01]
+\ProvidesPackage{freetikz}
+\RequirePackage{tikz}
+
+\pgfdeclarelayer{edgelayer}
+\pgfdeclarelayer{nodelayer}
+\pgfdeclarelayer{foreground}
+\pgfdeclarelayer{background}
+\pgfsetlayers{background,edgelayer,nodelayer,main,foreground,background}
+
+\def\thickness{0.7pt}
+
+\tikzstyle{dot}=[circle, draw=black, fill=black!25, inner sep=.4ex, line width=\thickness, node on layer=foreground]
+\tikzstyle{blackdot}=[dot, fill=black!50]
+\tikzstyle{blackdot}=[dot, fill=gray!40!white]
+\tikzstyle{whitedot}=[dot, fill=white]
+\tikzstyle{reddot}=[dot, fill=red]
+\tikzstyle{greendot}=[dot, fill=green]
+
+\makeatletter
+\pgfkeys{%
+  /tikz/on layer/.code={
+    \pgfonlayer{#1}\begingroup
+    \aftergroup\endpgfonlayer
+    \aftergroup\endgroup
+  },
+  /tikz/node on layer/.code={
+    \gdef\node@@on@layer{%
+      \setbox\tikz@tempbox=\hbox\bgroup\pgfonlayer{#1}\unhbox\tikz@tempbox\endpgfonlayer\egroup}
+    \aftergroup\node@on@layer
+  },
+  /tikz/end node on layer/.code={
+    \endpgfonlayer\endgroup\endgroup
+  }
+}
+\def\node@on@layer{\aftergroup\node@@on@layer}
+\makeatother
+
+% Lengths
+\newlength\morphismheight
+\setlength\morphismheight{0.6cm}
+\newlength\minimummorphismwidth
+\setlength\minimummorphismwidth{0.6cm}
+\newlength\stateheight
+\setlength\stateheight{0.6cm}
+\newlength\minimumstatewidth
+\setlength\minimumstatewidth{0.89cm}
+\newlength\connectheight
+\setlength\connectheight{0.5cm}
+\tikzset{width/.initial=\minimummorphismwidth}
+
+% Keys
+\newif\ifwedge\pgfkeys{/tikz/wedge/.is if=wedge}
+\tikzset{wedge}
+\newif\ifvflip\pgfkeys{/tikz/vflip/.is if=vflip}
+\newif\ifhflip\pgfkeys{/tikz/hflip/.is if=hflip}
+\newif\ifhvflip\pgfkeys{/tikz/hvflip/.is if=hvflip}
+\newif\ifconnectnw\pgfkeys{/tikz/connect nw/.is if=connectnw}
+\newif\ifconnectne\pgfkeys{/tikz/connect ne/.is if=connectne}
+\newif\ifconnectsw\pgfkeys{/tikz/connect sw/.is if=connectsw}
+\newif\ifconnectse\pgfkeys{/tikz/connect se/.is if=connectse}
+\newif\ifconnectn\pgfkeys{/tikz/connect n/.is if=connectn}
+\newif\ifconnects\pgfkeys{/tikz/connect s/.is if=connects}
+\newif\ifconnectnwf\pgfkeys{/tikz/connect nw >/.is if=connectnwf}
+\newif\ifconnectnef\pgfkeys{/tikz/connect ne >/.is if=connectnef}
+\newif\ifconnectswf\pgfkeys{/tikz/connect sw >/.is if=connectswf}
+\newif\ifconnectsef\pgfkeys{/tikz/connect se >/.is if=connectsef}
+\newif\ifconnectnf\pgfkeys{/tikz/connect n >/.is if=connectnf}
+\newif\ifconnectsf\pgfkeys{/tikz/connect s >/.is if=connectsf}
+\newif\ifconnectnwr\pgfkeys{/tikz/connect nw </.is if=connectnwr}
+\newif\ifconnectner\pgfkeys{/tikz/connect ne </.is if=connectner}
+\newif\ifconnectswr\pgfkeys{/tikz/connect sw </.is if=connectswr}
+\newif\ifconnectser\pgfkeys{/tikz/connect se </.is if=connectser}
+\newif\ifconnectnr\pgfkeys{/tikz/connect n </.is if=connectnr}
+\newif\ifconnectsr\pgfkeys{/tikz/connect s </.is if=connectsr}
+\tikzset{keylengthnw/.initial=\connectheight}
+\tikzset{keylengthn/.initial =\connectheight}
+\tikzset{keylengthne/.initial=\connectheight}
+\tikzset{keylengthsw/.initial=\connectheight}
+\tikzset{keylengths/.initial =\connectheight}
+\tikzset{keylengthse/.initial=\connectheight}
+\tikzset{connect nw length/.style={connect nw=true, keylengthnw={#1}}}
+\tikzset{connect n length/.style ={connect n =true, keylengthn ={#1}}}
+\tikzset{connect ne length/.style={connect ne=true, keylengthne={#1}}}
+\tikzset{connect sw length/.style={connect sw=true, keylengthsw={#1}}}
+\tikzset{connect s length/.style ={connect s =true, keylengths ={#1}}}
+\tikzset{connect se length/.style={connect se=true, keylengthse={#1}}}
+\tikzset{connect nw < length/.style={connect nw <=true, keylengthnw={#1}}}
+\tikzset{connect n < length/.style ={connect n <=true,  keylengthn ={#1}}}
+\tikzset{connect ne < length/.style={connect ne <=true, keylengthne={#1}}}
+\tikzset{connect sw < length/.style={connect sw <=true, keylengthnw={#1}}}
+\tikzset{connect s < length/.style ={connect s <=true,  keylengths ={#1}}}
+\tikzset{connect se < length/.style={connect se <=true, keylengthse={#1}}}
+\tikzset{connect nw > length/.style={connect nw >=true, keylengthnw={#1}}}
+\tikzset{connect n > length/.style ={connect n >=true,  keylengthn ={#1}}}
+\tikzset{connect ne > length/.style={connect ne >=true, keylengthne={#1}}}
+\tikzset{connect sw > length/.style={connect sw >=true, keylengthsw={#1}}}
+\tikzset{connect s > length/.style ={connect s >=true,  keylengths ={#1}}}
+\tikzset{connect se > length/.style={connect se >=true, keylengthse={#1}}}
+
+% Shapes
+\makeatletter
+\pgfdeclareshape{morphism}
+{
+    \savedanchor\centerpoint
+    {
+        \pgf@x=0pt
+        \pgf@y=0pt
+    }
+    \anchor{center}{\centerpoint}
+    \anchorborder{\centerpoint}
+    \saveddimen\savedlengthnw
+    {
+        \pgfkeysgetvalue{/tikz/keylengthnw}{\len}
+        \pgf@x=\len
+    }
+    \saveddimen\savedlengthn
+    {
+        \pgfkeysgetvalue{/tikz/keylengthn}{\len}
+        \pgf@x=\len
+    }
+    \saveddimen\savedlengthne
+    {
+        \pgfkeysgetvalue{/tikz/keylengthne}{\len}
+        \pgf@x=\len
+    }
+    \saveddimen\savedlengthsw
+    {
+        \pgfkeysgetvalue{/tikz/keylengthsw}{\len}
+        \pgf@x=\len
+    }
+    \saveddimen\savedlengths
+    {
+        \pgfkeysgetvalue{/tikz/keylengths}{\len}
+        \pgf@x=\len
+    }
+    \saveddimen\savedlengthse
+    {
+        \pgfkeysgetvalue{/tikz/keylengthse}{\len}
+        \pgf@x=\len
+    }
+    \saveddimen\overallwidth
+    {
+        \pgfkeysgetvalue{/tikz/width}{\minwidth}
+        \pgf@x=\wd\pgfnodeparttextbox
+        \ifdim\pgf@x<\minwidth
+            \pgf@x=\minwidth
+        \fi
+    }
+    \savedanchor{\upperrightcorner}
+    {
+        \pgf@y=.5\ht\pgfnodeparttextbox
+        \advance\pgf@y by -.5\dp\pgfnodeparttextbox
+        \pgf@x=.5\wd\pgfnodeparttextbox
+    }
+    \anchor{north}
+    {
+        \pgf@x=0pt
+        \pgf@y=0.5\morphismheight
+    }
+    \anchor{north east}
+    {
+        \pgf@x=\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=0.5\morphismheight
+    }
+    \anchor{east}
+    {
+        \pgf@x=\overallwidth
+        \divide \pgf@x by 2
+        \advance \pgf@x by 5pt
+        \pgf@y=0pt
+    }
+    \anchor{west}
+    {
+        \pgf@x=-\overallwidth
+        \divide \pgf@x by 2
+        \advance \pgf@x by -5pt
+        \pgf@y=0pt
+    }
+    \anchor{north west}
+    {
+        \pgf@x=-\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=0.5\morphismheight
+    }
+    \anchor{connect nw}
+    {
+        \pgf@x=-\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=0.5\morphismheight
+        \advance\pgf@y by \savedlengthnw
+    }
+    \anchor{connect ne}
+    {
+        \pgf@x=\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=0.5\morphismheight
+        \advance\pgf@y by \savedlengthne
+    }
+    \anchor{connect sw}
+    {
+        \pgf@x=-\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=-0.5\morphismheight
+        \advance\pgf@y by -\savedlengthsw
+    }
+    \anchor{connect se}
+    {
+        \pgf@x=\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=-0.5\morphismheight
+        \advance\pgf@y by -\savedlengthse
+    }
+    \anchor{connect n}
+    {
+        \pgf@x=0pt
+        \pgf@y=0.5\morphismheight
+        \advance\pgf@y by \savedlengthn
+    }
+    \anchor{connect s}
+    {
+        \pgf@x=0pt
+        \pgf@y=-0.5\morphismheight
+        \advance\pgf@y by -\savedlengths
+    }
+    \anchor{south east}
+    {
+        \pgf@x=\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=-0.5\morphismheight
+    }
+    \anchor{south west}
+    {
+        \pgf@x=-\overallwidth
+        \multiply \pgf@x by 2
+        \divide \pgf@x by 5
+        \pgf@y=-0.5\morphismheight
+    }
+    \anchor{south}
+    {
+        \pgf@x=0pt
+        \pgf@y=-0.5\morphismheight
+    }
+    \anchor{text}
+    {
+        \upperrightcorner
+        \pgf@x=-\pgf@x
+        \pgf@y=-\pgf@y
+    }
+    \backgroundpath
+    {
+        \pgfsetstrokecolor{black}
+        \pgfsetlinewidth{\thickness}
+        \begin{scope}
+                \ifhflip
+                    \pgftransformyscale{-1}
+                \fi
+                \ifvflip
+                    \pgftransformxscale{-1}
+                \fi
+                \ifhvflip
+                    \pgftransformxscale{-1}
+                    \pgftransformyscale{-1}
+                \fi
+                \pgfpathmoveto{\pgfpoint
+                    {-0.5*\overallwidth-5pt}
+                    {0.5*\morphismheight}}
+                \pgfpathlineto{\pgfpoint
+                    {0.5*\overallwidth+5pt}
+                    {0.5*\morphismheight}}
+                \ifwedge
+                    \pgfpathlineto{\pgfpoint
+                        {0.5*\overallwidth + 15pt}
+                        {-0.5*\morphismheight}}
+                \else
+                    \pgfpathlineto{\pgfpoint
+                        {0.5*\overallwidth + 5pt}
+                        {-0.5*\morphismheight}}
+                \fi
+                \pgfpathlineto{\pgfpoint
+                    {-0.5*\overallwidth-5pt}
+                    {-0.5*\morphismheight}}
+                \pgfpathclose
+                \pgfusepath{stroke}
+        \end{scope}
+        \ifconnectnw
+            \pgfpathmoveto{\pgfpoint
+                {-0.4*\overallwidth}
+                {0.5*\morphismheight}}
+            \pgfpathlineto{\pgfpoint
+                {-0.4*\overallwidth}
+                {0.5*\morphismheight+\savedlengthnw}}
+            \pgfusepath{stroke}
+        \fi
+        \ifconnectne
+            \pgfpathmoveto{\pgfpoint
+                {0.4*\overallwidth}
+                {0.5*\morphismheight}}
+            \pgfpathlineto{\pgfpoint
+                {0.4*\overallwidth}
+                {0.5*\morphismheight+\savedlengthne}}
+            \pgfusepath{stroke}
+        \fi
+        \ifconnectsw
+            \pgfpathmoveto{\pgfpoint
+                {-0.4*\overallwidth}
+                {-0.5*\morphismheight}}
+            \pgfpathlineto{\pgfpoint
+                {-0.4*\overallwidth}
+                {-0.5*\morphismheight-\savedlengthsw}}
+            \pgfusepath{stroke}
+        \fi
+        \ifconnectse
+            \pgfpathmoveto{\pgfpoint
+                {0.4*\overallwidth}
+                {-0.5*\morphismheight}}
+            \pgfpathlineto{\pgfpoint
+                {0.4*\overallwidth}
+                {-0.5*\morphismheight-\savedlengthse}}
+            \pgfusepath{stroke}
+        \fi
+        \ifconnectn
+            \pgfpathmoveto{\pgfpoint
+                {0pt}
+                {0.5*\morphismheight}}
+            \pgfpathlineto{\pgfpoint
+                {0pt}
+                {0.5*\morphismheight+\savedlengthn}}
+            \pgfusepath{stroke}
+        \fi
+        \ifconnects
+            \pgfpathmoveto{\pgfpoint
+                {0pt}
+                {-0.5*\morphismheight}}
+            \pgfpathlineto{\pgfpoint
+                {0pt}
+                {-0.5*\morphismheight-\savedlengths}}
+            \pgfusepath{stroke}
+        \fi
+        \ifconnectnwf
+            \draw [forward arrow style] (-0.4*\overallwidth,0.5*\morphismheight)
+                to (-0.4*\overallwidth,0.5*\morphismheight+\savedlengthnw);
+        \fi
+        \ifconnectnef
+            \draw [forward arrow style] (0.4*\overallwidth,0.5*\morphismheight)
+                to (0.4*\overallwidth,0.5*\morphismheight+\savedlengthne);
+        \fi
+        \ifconnectswf
+            \draw [forward arrow style] (-0.4*\overallwidth,-0.5*\morphismheight-\savedlengthsw)
+                to (-0.4*\overallwidth,-0.5*\morphismheight);
+        \fi
+        \ifconnectsef
+            \draw [forward arrow style] (0.4*\overallwidth,-0.5*\morphismheight-\savedlengthse)
+                to (0.4*\overallwidth,-0.5*\morphismheight);
+        \fi
+        \ifconnectnf
+            \draw [forward arrow style] (0,0.5*\morphismheight)
+                to (0,0.5*\morphismheight+\savedlengthn);
+        \fi
+        \ifconnectsf
+            \draw [forward arrow style] (0,-0.5*\morphismheight-\savedlengths)
+                to (0,-0.5*\morphismheight);
+        \fi
+        \ifconnectnwr
+            \draw [reverse arrow style] (-0.4*\overallwidth,0.5*\morphismheight)
+                to (-0.4*\overallwidth,0.5*\morphismheight+\savedlengthnw);
+        \fi
+        \ifconnectner
+            \draw [reverse arrow style] (0.4*\overallwidth,0.5*\morphismheight)
+                to (0.4*\overallwidth,0.5*\morphismheight+\savedlengthne);
+        \fi
+        \ifconnectswr
+            \draw [reverse arrow style] (-0.4*\overallwidth,-0.5*\morphismheight-\savedlengthsw)
+                to (-0.4*\overallwidth,-0.5*\morphismheight);
+        \fi
+        \ifconnectser
+            \draw [reverse arrow style] (0.4*\overallwidth,-0.5*\morphismheight-\savedlengthse)
+                to (0.4*\overallwidth,-0.5*\morphismheight);
+        \fi
+        \ifconnectnr
+            \draw [reverse arrow style] (0,0.5*\morphismheight)
+                to (0,0.5*\morphismheight+\savedlengthn);
+        \fi
+        \ifconnectsr
+            \draw [reverse arrow style] (0,-0.5*\morphismheight-\savedlengths)
+                to (0,-0.5*\morphismheight);
+        \fi
+    }
+}
+\makeatother
