@@ -1,10 +1,12 @@
 \documentclass{standalone}
 \usepackage{freetikz}
 \usetikzlibrary{calc}
+\newcommand{\F}{\mathcal{F}}
+\newcommand{\dd}{\partial_r}
 \begin{document}
 \begin{tikzpicture}
-  \node[dot,minimum size=25] (plus) at (0, 0) {$+$};
-  \node[dot,minimum size=25] (dup) at ($ (plus) + (0, -2) $) {dup};
+  \node[dot,minimum size=25] (plus) at (0, 0) {$\F +$};
+  \node[dot] (dup) at ($ (plus) + (0, -2) $) {};
   \draw[->] ($ (plus) + (-1.5, -0.5) $) to[out=0, in=-135] (plus);
   \draw[->] ($ (plus) + (-1.5, +0.5) $) to[out=0, in=+135] (plus);
   \draw[->] (plus) to ($ (plus) + (1.5, 0) $);
@@ -15,11 +17,11 @@
 
   \draw[->] [dashed] (plus) to[] node[right] {()} (dup);
 
-  \node[dot,minimum size=25] (fcomp) at ($ (plus) + (5, 0) $) {$f$};
-  \node[dot,minimum size=25] (gcomp) at ($ (fcomp) + (2, 0) $) {$g$};
+  \node[dot,minimum size=25] (fcomp) at ($ (plus) + (5, 0) $) {$\F f$};
+  \node[dot,minimum size=25] (gcomp) at ($ (fcomp) + (2, 0) $) {$\F g$};
 
-  \node[dot,minimum size=25] (dfcomp) at ($ (fcomp) + (0, -2) $) {$df$};
-  \node[dot,minimum size=25] (dgcomp) at ($ (gcomp) + (0, -2) $) {$dg$};
+  \node[dot,minimum size=25] (dfcomp) at ($ (fcomp) + (0, -2) $) {$\dd f$};
+  \node[dot,minimum size=25] (dgcomp) at ($ (gcomp) + (0, -2) $) {$\dd g$};
 
   \draw[->] ($ (fcomp) + (-1.5, 0) $) to (fcomp);
   \draw[->] (fcomp) to (gcomp);
@@ -32,11 +34,11 @@
   \draw[->] (dgcomp) to (dfcomp);
   \draw[->] ($ (dgcomp) + (1.5, 0) $) to (dfcomp);
 
-  \node[dot,minimum size=25] (fpar) at ($ (plus) + (0, -5) $) {$f$};
-  \node[dot,minimum size=25] (gpar) at ($ (fpar) + (1, -1) $) {$g$};
+  \node[dot,minimum size=25] (fpar) at ($ (plus) + (0, -5) $) {$\F f$};
+  \node[dot,minimum size=25] (gpar) at ($ (fpar) + (0.75, -0.75) $) {$\F g$};
 
-  \node[dot,minimum size=25] (dfpar) at ($ (fpar) + (0, -3) $) {$df$};
-  \node[dot,minimum size=25] (dgpar) at ($ (gpar) + (0, -3) $) {$dg$};
+  \node[dot,minimum size=25] (dfpar) at ($ (fpar) + (0, -3) $) {$\dd f$};
+  \node[dot,minimum size=25] (dgpar) at ($ (gpar) + (0, -3) $) {$\dd g$};
 
   \draw[->] ($ (fpar) + (-1.5, 0) $) to (fpar);
   \draw[->] (fpar) to ($ (fpar) + (2.5, 0) $);
@@ -50,6 +52,50 @@
   \draw[->] ($ (dfpar) + (2.5, 0) $) to (dfpar);
   \draw[->] (dgpar) to ($ (dgpar) + (-2.5, 0) $);
   \draw[->] ($ (dgpar) + (1.5, 0) $) to (dgpar);
+
+  \node[dot,minimum size=25] (elim) at ($ (fpar) + (6, 0) $) {$\F$elim};
+  \node[dot,minimum size=25] (zero) at ($ (elim) + (0, -2) $) {zero};
+
+  \draw[->] ($ (elim) + (-1.5, 0) $) to (elim);
+  \draw[->] (zero) to ($ (zero) + (-1.5, 0) $);
+  \draw[->] [dashed] (elim) tonode[right] {$()$}  (zero);
+
+
+  \node[dot,minimum size=25] (const) at ($ (elim) + (3, 0) $) {$\F$const};
+  \node[dot,minimum size=25] (elimconst) at ($ (const) + (0, -2) $) {elim};
+
+  \draw[->] (const) to ($ (const) + (+1.5, 0) $);
+  \draw[->] ($ (elimconst) + (+1.5, 0) $) to (elimconst);
+  \draw[->] [dashed] (const) tonode[right] {$()$} (elimconst);
+
+
+  \node[dot,minimum size=25] (nocheckf) at ($ (fpar) + (0, -7) $) {$f$};
+  \node[dot,minimum size=25] (nocheckdf) at ($ (nocheckf) + (0, -2) $) {$\dd f$};
+
+  \draw[->] ($ (nocheckf) + (-1.5, 0) $) to (nocheckf);
+  \draw[->] (nocheckf) to ($ (nocheckf) + (+1.5, 0) $);
+  \draw[->] ($ (nocheckdf) + (+1.5, 0) $) to (nocheckdf);
+  \draw[->] (nocheckdf) to ($ (nocheckdf) + (-1.5, 0) $);
+
+  \draw[->] [dashed] (nocheckf) tonode[right] {$T_f$} (nocheckdf);
+
+  \node[dot,minimum size=25] (checkf) at ($ (nocheckf) + (5, 0) $) {$f$};
+  \node[dot,minimum size=25] (checkfagain) at ($ (checkf) + (0, -1.5) $) {$f$};
+  \node[dot,minimum size=25] (checkdf) at ($ (checkfagain) + (0, -1.5) $) {$\dd f$};
+  \node[dot] (dupcheck) at ($ (checkf) + (-1, 0) $) {};
+  \node[dot,minimum size=25] (checkelim) at ($ (checkfagain) + (1.5, 0) $) {elim};
+
+  \draw[->] ($ (checkf) + (-1.5, 0) $) to (dupcheck);
+
+  \draw[->] (dupcheck) to (checkf);
+  \draw[->] [dashed] (dupcheck) to[out=-90,in=180] (checkfagain);
+  \draw[->] (checkfagain) to (checkelim);
+
+  \draw[->] (checkf) to ($ (checkf) + (+1.5, 0) $);
+  \draw[->] ($ (checkdf) + (1.5, 0) $) to (checkdf);
+  \draw[->] (checkdf) to ($ (checkdf) + (-1.5, 0) $);
+
+  \draw[->] (checkfagain) to node[right] {$T_f$} (checkdf);
 
 \end{tikzpicture}
 \end{document}
