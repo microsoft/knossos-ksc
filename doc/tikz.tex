@@ -35,9 +35,6 @@
   \draw[->] ($ (plus) + (-1.5, +0.5) $) to[out=0, in=+135] (plus);
   \draw[->] (plus) to ($ (plus) + (1.5, 0) $);
 
-
-
-
   \node[dot,minimum size=25] (fplus) at (5, 0) {$+$};
   \node[dot] (dup) at ($ (fplus) + (0, -2) $) {};
   \draw[->] ($ (fplus) + (-1.5, -0.5) $) to[out=0, in=-135] (fplus);
@@ -140,6 +137,7 @@
   \draw[->] (dgpar) to ($ (dgpar) + (-2.5, 0) $);
   \draw[->] ($ (dgpar) + (1.5, 0) $) to (dgpar);
 
+
   % elim
 
   \node[dot,minimum size=25] (elim1) at ($ (fpar1) + (0, -6) $) {elim};
@@ -151,6 +149,7 @@
   \draw[->] (zero) to ($ (zero) + (-1.5, 0) $);
   \draw[->] [dashed] (elim) tonode[right] {$()$}  (zero);
 
+
   % const
 
   \node[dot,minimum size=25] (const1) at ($ (elim1) + (0, -5) $) {const};
@@ -161,6 +160,7 @@
   \draw[->] (const) to ($ (const) + (+1.5, 0) $);
   \draw[->] ($ (elimconst) + (+1.5, 0) $) to (elimconst);
   \draw[->] [dashed] (const) tonode[right] {$()$} (elimconst);
+
 
   % checkpoint
 
