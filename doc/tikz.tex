@@ -162,9 +162,19 @@
   \draw[->] [dashed] (const) tonode[right] {$()$} (elimconst);
 
 
+  % index
+
+  \node[dot] (index) at ($ (const1) + (0, -5) $) {index};
+
+  \draw[->] ($ (index) + (-1.5, +0.5) $) node[left] {Integer} to[out=0,in=+135] (index);
+  \draw[->] ($ (index) + (-1.5, -0.5) $) node[left] {Vec $n$ $a$} to[out=0,in=-135] (index);
+  \draw[->] (index) to[out=+45,in=180] ($ (index) + (+1.5, +0.5) $) node[right] {$a$};
+  \draw[->] (index) to[out=-45,in=180] ($ (index) + (+1.5, -0.5) $) node[right] {Vec $n$ $a$};
+
+
   % checkpoint
 
-  \node[dot,minimum size=25] (nocheckf) at ($ (const1) + (0, -5) $) {$f$};
+  \node[dot,minimum size=25] (nocheckf) at ($ (index) + (0, -5) $) {$f$};
   \node[dot,minimum size=25] (nocheckdf) at ($ (nocheckf) + (0, -2) $) {$\dd f$};
 
   \draw[->] ($ (nocheckf) + (-1.5, 0) $) node[left] {$a$} to (nocheckf);
