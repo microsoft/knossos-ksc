@@ -51,28 +51,48 @@
   \draw[->] [dashed] (fplus) to[] node[right] {()} (dup);
 
 
-  \node[dot,minimum size=25] (fcomp) at ($ (fplus) + (5, 0) $) {$\F f$};
+  % comp
+
+  \node[dot,minimum size=25] (fcomp1) at ($ (plus) + (-1, -5) $) {$f$};
+  \node[dot,minimum size=25] (gcomp1) at ($ (fcomp1) + (2, 0) $) {$g$};
+
+  \node[dot,minimum size=25] (fcomp) at ($ (fcomp1) + (5, 0) $) {$\F f$};
   \node[dot,minimum size=25] (gcomp) at ($ (fcomp) + (2, 0) $) {$\F g$};
 
   \node[dot,minimum size=25] (dfcomp) at ($ (fcomp) + (0, -2) $) {$\dd f$};
   \node[dot,minimum size=25] (dgcomp) at ($ (gcomp) + (0, -2) $) {$\dd g$};
 
-  \draw[->] ($ (fcomp) + (-1.5, 0) $) to (fcomp);
+  \draw[->] ($ (fcomp1) + (-1, 0) $) to (fcomp1);
+  \draw[->] (fcomp1) to (gcomp1);
+  \draw[->] (fcomp1) to ($ (gcomp1) + (1, 0) $);
+
+  \draw[->] ($ (fcomp) + (-1, 0) $) to (fcomp);
   \draw[->] (fcomp) to (gcomp);
-  \draw[->] (fcomp) to ($ (gcomp) + (1.5, 0) $);
+  \draw[->] (fcomp) to ($ (gcomp) + (1, 0) $);
 
   \draw[->] [dashed] (fcomp) to (dfcomp);
   \draw[->] [dashed] (gcomp) to node[right] {$(T_f, T_g)$} (dgcomp);
 
-  \draw[->] (dfcomp) to ($ (dfcomp) + (-1.5, 0) $);
+  \draw[->] (dfcomp) to ($ (dfcomp) + (-1, 0) $);
   \draw[->] (dgcomp) to (dfcomp);
-  \draw[->] ($ (dgcomp) + (1.5, 0) $) to (dfcomp);
+  \draw[->] ($ (dgcomp) + (1, 0) $) to (dfcomp);
 
-  \node[dot,minimum size=25] (fpar) at ($ (fplus) + (0, -5) $) {$\F f$};
+
+  % par
+
+  \node[dot,minimum size=25] (fpar1) at ($ (fcomp1) + (0, -5) $) {$f$};
+  \node[dot,minimum size=25] (gpar1) at ($ (fpar1) + (0.75, -0.75) $) {$g$};
+
+  \node[dot,minimum size=25] (fpar) at ($ (fcomp) + (0, -5) $) {$\F f$};
   \node[dot,minimum size=25] (gpar) at ($ (fpar) + (0.75, -0.75) $) {$\F g$};
 
   \node[dot,minimum size=25] (dfpar) at ($ (fpar) + (0, -3) $) {$\dd f$};
   \node[dot,minimum size=25] (dgpar) at ($ (gpar) + (0, -3) $) {$\dd g$};
+
+  \draw[->] ($ (fpar1) + (-1.5, 0) $) to (fpar1);
+  \draw[->] (fpar1) to ($ (fpar1) + (2.5, 0) $);
+  \draw[->] ($ (gpar1) + (-2.5, 0) $) to (gpar1);
+  \draw[->] (gpar1) to ($ (gpar1) + (1.5, 0) $);
 
   \draw[->] ($ (fpar) + (-1.5, 0) $) to (fpar);
   \draw[->] (fpar) to ($ (fpar) + (2.5, 0) $);
@@ -87,26 +107,34 @@
   \draw[->] (dgpar) to ($ (dgpar) + (-2.5, 0) $);
   \draw[->] ($ (dgpar) + (1.5, 0) $) to (dgpar);
 
-  \node[dot,minimum size=25] (elim) at ($ (fpar) + (6, 0) $) {$\F$elim};
+  % elim
+
+  \node[dot,minimum size=25] (elim1) at ($ (fpar1) + (0, -6) $) {elim};
+  \node[dot,minimum size=25] (elim) at ($ (elim1) + (5, 0) $) {elim};
   \node[dot,minimum size=25] (zero) at ($ (elim) + (0, -2) $) {zero};
 
+  \draw[->] ($ (elim1) + (-1.5, 0) $) to (elim1);
   \draw[->] ($ (elim) + (-1.5, 0) $) to (elim);
   \draw[->] (zero) to ($ (zero) + (-1.5, 0) $);
   \draw[->] [dashed] (elim) tonode[right] {$()$}  (zero);
 
+  % const
 
-  \node[dot,minimum size=25] (const) at ($ (elim) + (3, 0) $) {$\F$const};
+  \node[dot,minimum size=25] (const1) at ($ (elim1) + (0, -5) $) {const};
+  \node[dot,minimum size=25] (const) at ($ (const1) + (5, 0) $) {const};
   \node[dot,minimum size=25] (elimconst) at ($ (const) + (0, -2) $) {elim};
 
+  \draw[->] (const1) to ($ (const1) + (+1.5, 0) $);
   \draw[->] (const) to ($ (const) + (+1.5, 0) $);
   \draw[->] ($ (elimconst) + (+1.5, 0) $) to (elimconst);
   \draw[->] [dashed] (const) tonode[right] {$()$} (elimconst);
 
+  % checkpoint
 
-  \node[dot,minimum size=25] (nocheckf) at ($ (fpar) + (0, -7) $) {$f$};
+  \node[dot,minimum size=25] (nocheckf) at ($ (const1) + (0, -5) $) {$f$};
   \node[dot,minimum size=25] (nocheckdf) at ($ (nocheckf) + (0, -2) $) {$\dd f$};
 
-  \draw[->] ($ (nocheckf) + (-1.5, 0) $) to (nocheckf);
+  \draw[->] ($ (nocheckf) + (-1.5, 0) $) node[left] {$a$} to (nocheckf);
   \draw[->] (nocheckf) to ($ (nocheckf) + (+1.5, 0) $);
   \draw[->] ($ (nocheckdf) + (+1.5, 0) $) to (nocheckdf);
   \draw[->] (nocheckdf) to ($ (nocheckdf) + (-1.5, 0) $);
@@ -119,10 +147,10 @@
   \node[dot] (dupcheck) at ($ (checkf) + (-1, 0) $) {};
   \node[dot,minimum size=25] (checkelim) at ($ (checkfagain) + (1.5, 0) $) {elim};
 
-  \draw[->] ($ (checkf) + (-1.5, 0) $) to (dupcheck);
+  \draw[->] ($ (checkf) + (-1.5, 0) $) node[left] {$a$} to (dupcheck);
 
   \draw[->] (dupcheck) to (checkf);
-  \draw[->] [dashed] (dupcheck) to[out=-90,in=180] (checkfagain);
+  \draw[->] [dashed] (dupcheck) to[out=-90,in=180] node[left] {$a$} (checkfagain);
   \draw[->] (checkfagain) to (checkelim);
 
   \draw[->] (checkf) to ($ (checkf) + (+1.5, 0) $);
