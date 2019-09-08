@@ -165,11 +165,25 @@
   % index
 
   \node[dot] (index) at ($ (const1) + (0, -5) $) {index};
+  \node[dot] (findex) at ($ (index) + (6, 0) $) {index};
+  \node[dot] (incAt) at ($ (findex) + (0, -2) $) {incAt};
+  \node[dot] (indexdup) at ($ (findex) + (-1, +0.5) $) {};
 
   \draw[->] ($ (index) + (-1.5, +0.5) $) node[left] {Integer} to[out=0,in=+135] (index);
   \draw[->] ($ (index) + (-1.5, -0.5) $) node[left] {Vec $n$ $a$} to[out=0,in=-135] (index);
   \draw[->] (index) to[out=+45,in=180] ($ (index) + (+1.5, +0.5) $) node[right] {$a$};
   \draw[->] (index) to[out=-45,in=180] ($ (index) + (+1.5, -0.5) $) node[right] {Vec $n$ $a$};
+
+  \draw[->] ($ (findex) + (-1.5, +0.5) $) node[left] {Integer} to[out=0,in=180] (indexdup);
+  \draw[->] (indexdup) to[out=0,in=+135] (findex);
+  \draw[->] ($ (findex) + (-1.5, -0.5) $) node[left] {Vec $n$ $a$} to[out=0,in=-135] (findex);
+  \draw[->] (findex) to[out=+45,in=180] ($ (findex) + (+1.5, +0.5) $) node[right] {$a$};
+  \draw[->] (findex) to[out=-45,in=180] ($ (findex) + (+1.5, -0.5) $) node[right] {Vec $n$ $a$};
+
+  \draw[->] (incAt) to ($ (incAt) + (-1.5, 0.0) $) node[left] {Vec $n$ $a$};
+  \draw[->] [dashed] (indexdup) to[out=-90,in=45] (incAt);
+  \draw[->] ($ (incAt) + (+1.5,  0.0) $) node[right] {$a$} to[out=180,  in=0] (incAt);
+  \draw[->] ($ (incAt) + (+1.5, -0.5) $) node[right] {Vec $n$ $a$} to[out=180,in=-45] (incAt);
 
 
   % checkpoint
