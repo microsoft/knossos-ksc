@@ -51,9 +51,42 @@
   \draw[->] [dashed] (fplus) to[] node[right] {()} (dup);
 
 
+  % *
+
+  \node[dot,minimum size=25] (mul) at ($ (plus) + (0, -5) $) {$*$};
+  \draw[->] ($ (mul) + (-1.5, -0.5) $) to[out=0, in=-135] (mul);
+  \draw[->] ($ (mul) + (-1.5, +0.5) $) to[out=0, in=+135] (mul);
+  \draw[->] (mul) to ($ (mul) + (1.5, 0) $);
+
+  \node[dot,minimum size=25] (fmul) at ($ (mul) + (5, 0) $) {$*$};
+  \node[dot] (dupm1) at ($ (fmul) + (-1, +0.5) $) {};
+  \node[dot] (dupm2) at ($ (fmul) + (-1, -0.5) $) {};
+
+  \node[dot] (dupm) at ($ (fmul) + (0, -2) $) {};
+  \node[dot,minimum size=25] (muld1) at ($ (dupm) + (-1, +0.5) $) {$*$};
+  \node[dot,minimum size=25] (muld2) at ($ (dupm) + (-1, -0.5) $) {$*$};
+
+  \draw[->] ($ (fmul) + (-1.5, +0.5) $) to (dupm1);
+  \draw[->] ($ (fmul) + (-1.5, -0.5) $) to (dupm2);
+  \draw[->] (dupm1) to[out=0, in=+135] (fmul);
+  \draw[->] (dupm2) to[out=0, in=-135] (fmul);
+  \draw[->] (fmul) to ($ (fmul) + (1.5, 0) $);
+
+
+  \draw[->] (dupm) to[out=+135, in=-45] (muld1);
+  \draw[->] (dupm) to[out=-135, in=-45]  (muld2);
+  \draw[->] ($ (dupm) + (1.5, 0) $) to (dupm);
+
+  \draw[->] (muld1) to ($ (muld1) + (-1, 0) $);
+  \draw[->] (muld2) to ($ (muld2) + (-1, 0) $);
+
+  \draw[->] [dashed] (dupm1) to[out=-90, in=+45] ($ (muld2) + (1, 1) $) to (muld2);
+  \draw[->] [dashed] (dupm2) to[out=-90, in=+45] (muld1);
+
+
   % comp
 
-  \node[dot,minimum size=25] (fcomp1) at ($ (plus) + (-1, -5) $) {$f$};
+  \node[dot,minimum size=25] (fcomp1) at ($ (mul) + (-1, -5) $) {$f$};
   \node[dot,minimum size=25] (gcomp1) at ($ (fcomp1) + (2, 0) $) {$g$};
 
   \node[dot,minimum size=25] (fcomp) at ($ (fcomp1) + (5, 0) $) {$\F f$};
