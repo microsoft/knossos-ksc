@@ -190,7 +190,7 @@
 
   \node[dot,minimum size=25] (fif) at ($ (index) + (0, -5) $) {$f$};
   \node[dot,minimum size=25] (gif) at ($ (fif) + (0, -1.5) $) {$g$};
-  \node[rectangle,draw,fill=black!25] (if) at ($ (fif) + (5, 0) $) {if -- then $f$ else $g$};
+  \node[rectangle,draw,fill=black!25] (if) at ($ (fif) + (6, 0) $) {if -- then $f$ else $g$};
 
   \draw[->] ($ (fif) + (-1.5, 0) $) node[left] {$a$} to (fif);
   \draw[->] (fif) to ($ (fif) + (1.5, 0) $) node[right] {$b$};
@@ -201,9 +201,43 @@
   \draw[->] ($ (if) + (-2,-0.25) $) node[left] {$a$} to (if);
   \draw[->] (if) to ($ (if) + (2, 0) $) node[right] {$b$};
 
+
+  % if differentiation
+
+  \node[rectangle,draw,fill=black!25] (ifprimal) at ($ (fif) + (0, -5) $) {if -- then $f$ else $g$};
+  \node[rectangle,draw,fill=black!25] (ifforward) at ($ (ifprimal) + (6, 0) $) {if -- then $\FF{f}$ else $\FF{g}$};
+  \node[rectangle,draw,fill=black!25] (ifrev) at ($ (ifforward) + (0, -2) $) {if -- then $\ddd{f}$ else $\ddd{g}$};
+
+  \draw[->] ($ (ifprimal) + (-2,+0.25) $) node[left] {Bool} to (ifprimal);
+  \draw[->] ($ (ifprimal) + (-2,-0.25) $) node[left] {$a$} to (ifprimal);
+  \draw[->] (ifprimal) to ($ (ifprimal) + (2, 0) $) node[right] {$b$};
+
+  \draw[->] ($ (ifforward) + (-2.5,+0.25) $) node[left] {Bool} to (ifforward);
+  \draw[->] ($ (ifforward) + (-2.5,-0.25) $) node[left] {$a$} to (ifforward);
+  \draw[->] (ifforward) to ($ (ifforward) + (2.5, 0) $) node[right] {$b$};
+
+  \draw[->] (ifrev) to ($ (ifrev) + (-2.5,0) $) node[left] {$\tangenttype{a}$};
+  \draw[->] ($ (ifrev) + (2.5, 0) $) node[right] {$\tangenttype{b}$} to (ifrev);
+
+  \draw[->] [dashed] (ifforward) to[out=-90,in=10] node[right] {Either $\tape{f}$ $\tape{g}$} (ifrev);
+  \draw[->] [dashed] ($ (ifforward) + (-2.5,+0.25) $) to[out=-90,in=20] node[left] {Bool} (ifrev);
+
+  % loop introduction
+
+  \node[dot,minimum size=25] (floop) at ($ (ifprimal) + (0, -5) $) {$f$};
+  \node[rectangle,draw,fill=black!25] (loop) at ($ (floop) + (6, 0) $) {loop $f$};
+
+  \draw[->] ($ (floop) + (-1.5, 0) $) node[left] {$a$} to (floop);
+  \draw[->] (floop) to ($ (floop) + (1.5, 0) $) node[right] {$a$};
+
+  \draw[->] ($ (loop) + (-1,+0.25) $) node[left] {Integer} to (loop);
+  \draw[->] ($ (loop) + (-1,-0.25) $) node[left] {$a$} to (loop);
+  \draw[->] (loop) to ($ (loop) + (1, 0) $) node[right] {$a$};
+
+
   % checkpoint
 
-  \node[dot,minimum size=25] (nocheckf) at ($ (fif) + (0, -5) $) {$f$};
+  \node[dot,minimum size=25] (nocheckf) at ($ (floop) + (0, -5) $) {$f$};
   \node[dot,minimum size=25] (nocheckdf) at ($ (nocheckf) + (0, -2) $) {$\dd f$};
 
   \draw[->] ($ (nocheckf) + (-1.5, 0) $) node[left] {$a$} to (nocheckf);
