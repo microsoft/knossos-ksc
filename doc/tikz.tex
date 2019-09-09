@@ -48,6 +48,9 @@
   \draw[->] [dashed] (fplus) to[] node[right] {()} (dup);
 
 
+  % dup
+
+
   % *
 
   \node[dot,minimum size=25] (mul) at ($ (plus) + (0, -5) $) {$*$};
@@ -182,10 +185,10 @@
   \draw[->] (findex) to[out=+45,in=180] ($ (findex) + (+1.5, +0.5) $) node[right] {$a$};
   \draw[->] (findex) to[out=-45,in=180] ($ (findex) + (+1.5, -0.5) $) node[right] {Vec $n$ $a$};
 
-  \draw[->] (incAt) to ($ (incAt) + (-1.5, 0.0) $) node[left] {Vec $n$ $a$};
+  \draw[->] (incAt) to ($ (incAt) + (-1.5, 0.0) $) node[left] {$\tangenttype{}$(Vec $n$ $a$)};
   \draw[->] [dashed] (indexdup) to[out=-90,in=45] (incAt);
-  \draw[->] ($ (incAt) + (+1.5,  0.0) $) node[right] {$a$} to[out=180,  in=0] (incAt);
-  \draw[->] ($ (incAt) + (+1.5, -0.5) $) node[right] {Vec $n$ $a$} to[out=180,in=-45] (incAt);
+  \draw[->] ($ (incAt) + (+1.5,  0.0) $) node[right] {$\tangenttype{a}$} to[out=180,  in=0] (incAt);
+  \draw[->] ($ (incAt) + (+1.5, -0.5) $) node[right] {$\tangenttype{}$(Vec $n$ $a$)} to[out=180,in=-45] (incAt);
 
 
   % if introduction
@@ -250,7 +253,7 @@
   \draw[->] [dashed] (nocheckf) tonode[right] {$T_f$} (nocheckdf);
 
   \node[dot,minimum size=25] (checkf) at ($ (nocheckf) + (5, 0) $) {$f$};
-  \node[dot,minimum size=25] (checkfagain) at ($ (checkf) + (0, -1.5) $) {$f$};
+  \node[dot,minimum size=25] (checkfagain) at ($ (checkf) + (0, -1.5) $) {$\FF{f}$};
   \node[dot,minimum size=25] (checkdf) at ($ (checkfagain) + (0, -1.5) $) {$\dd f$};
   \node[dot] (dupcheck) at ($ (checkf) + (-1, 0) $) {};
   \node[dot,minimum size=25] (checkelim) at ($ (checkfagain) + (1.5, 0) $) {elim};
