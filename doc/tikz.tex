@@ -186,9 +186,24 @@
   \draw[->] ($ (incAt) + (+1.5, -0.5) $) node[right] {Vec $n$ $a$} to[out=180,in=-45] (incAt);
 
 
+  % if introduction
+
+  \node[dot,minimum size=25] (fif) at ($ (index) + (0, -5) $) {$f$};
+  \node[dot,minimum size=25] (gif) at ($ (fif) + (0, -1.5) $) {$g$};
+  \node[rectangle,draw,fill=black!25] (if) at ($ (fif) + (5, 0) $) {if -- then $f$ else $g$};
+
+  \draw[->] ($ (fif) + (-1.5, 0) $) node[left] {$a$} to (fif);
+  \draw[->] (fif) to ($ (fif) + (1.5, 0) $) node[right] {$b$};
+  \draw[->] ($ (gif) + (-1.5, 0) $) node[left] {$a$} to (gif);
+  \draw[->] (gif) to ($ (gif) + (1.5, 0) $) node[right] {$b$};
+
+  \draw[->] ($ (if) + (-2,+0.25) $) node[left] {Bool} to (if);
+  \draw[->] ($ (if) + (-2,-0.25) $) node[left] {$a$} to (if);
+  \draw[->] (if) to ($ (if) + (2, 0) $) node[right] {$b$};
+
   % checkpoint
 
-  \node[dot,minimum size=25] (nocheckf) at ($ (index) + (0, -5) $) {$f$};
+  \node[dot,minimum size=25] (nocheckf) at ($ (fif) + (0, -5) $) {$f$};
   \node[dot,minimum size=25] (nocheckdf) at ($ (nocheckf) + (0, -2) $) {$\dd f$};
 
   \draw[->] ($ (nocheckf) + (-1.5, 0) $) node[left] {$a$} to (nocheckf);
