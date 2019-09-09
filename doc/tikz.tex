@@ -77,7 +77,9 @@
   \draw[->] (muld1) to ($ (muld1) + (-1, 0) $);
   \draw[->] (muld2) to ($ (muld2) + (-1, 0) $);
 
-  \draw[->] [dashed] (dupm1) to[out=-90, in=+45] ($ (muld2) + (1, 1) $) to (muld2);
+  \draw[->] [dashed] (dupm1) to[out=-90, in=+45]
+                     ($ (muld2) + (1, 1) $) node[right] {(Float, Float)} to
+                     (muld2);
   \draw[->] [dashed] (dupm2) to[out=-90, in=+45] (muld1);
 
 
@@ -206,7 +208,7 @@
 
   \node[rectangle,draw,fill=black!25] (ifprimal) at ($ (fif) + (0, -5) $) {if -- then $f$ else $g$};
   \node[rectangle,draw,fill=black!25] (ifforward) at ($ (ifprimal) + (6, 0) $) {if -- then $\FF{f}$ else $\FF{g}$};
-  \node[rectangle,draw,fill=black!25] (ifrev) at ($ (ifforward) + (0, -2) $) {if -- then $\ddd{f}$ else $\ddd{g}$};
+  \node[rectangle,draw,fill=black!25] (ifrev) at ($ (ifforward) + (0, -2.5) $) {if -- then $\ddd{f}$ else $\ddd{g}$};
 
   \draw[->] ($ (ifprimal) + (-2,+0.25) $) node[left] {Bool} to (ifprimal);
   \draw[->] ($ (ifprimal) + (-2,-0.25) $) node[left] {$a$} to (ifprimal);
