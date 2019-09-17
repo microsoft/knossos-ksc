@@ -11,7 +11,12 @@ benefits.
 
 #### Ubuntu
 ```sh
-# You must ensure you have ghc version >= 8.4 and cabal version >= 2.0
+# You must ensure you have ghc version >= 8.4 and cabal version >= 2.0.
+# You may want to use the packages from
+#
+#    https://launchpad.net/~hvr/+archive/ubuntu/ghc
+#
+# See section "Adding this PPA to your system"
 sudo apt install ghc cabal-install
 cabal v2-update
 git clone <knossos repo>
