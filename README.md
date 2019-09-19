@@ -53,6 +53,8 @@ Prelude> :l src/ksc/Main
 [14 of 14] Compiling Main             ( src/ksc/Main.hs, interpreted )
 Ok, modules loaded: AD, ANF, Annotate, CSE, Cgen, KMonad, Lang, LangUtils, Main, Opt, OptLet, Parse, Prim, Rules.
 *Main> 
+*Main> <b>-- Optional: Convert F# to KS</b>
+*Main> :! f2k -del obj/gmm.ks examples\\ml-gmm\\gmm.fs
 *Main> <b>-- Compile test1.ks to test1.cpp and run</b>
 *Main> <b>doallC "g++" 0 "test/ksc/test1"</b>
 read decls
