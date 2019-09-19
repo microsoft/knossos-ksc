@@ -17,6 +17,7 @@ import KMonad
 import Debug.Trace
 import Test.Hspec
 import Data.List( mapAccumR )
+import qualified Data.Set as Set
 
 optTrace :: msg -> a -> a
 optTrace _msg t = t -- trace msg t
@@ -379,8 +380,19 @@ inlineCall :: [TVar] -> TExpr  -- Function parameters and body
            -> [TExpr]          -- Arguments
            -> TExpr
 inlineCall bndrs body args
-  = assert (vcat [ppr bndrs, ppr args]) (length args == length bndrs) $
+  = possiblyTrace $
+    assert (vcat [ppr bndrs, ppr args]) (length args == length bndrs) $
     mkLets (bndrs `zip` args) body
+  where traceMessage =
+          ("inlineCall is known to be flaky.\n"
+           ++ "See https://github.com/microsoft/knossos-ksc/issues/93")
+        possiblyTrace = if bindersIntersectArgs
+                        then trace traceMessage
+                        else id
+        bindersIntersectArgs =
+          not (Set.null (bindersSet `Set.intersection` argsSet))
+          where bindersSet = Set.fromList bndrs
+                argsSet    = foldMap freeVarsOf args
 
 -----------------------
 optSum :: TExpr -> Maybe TExpr
