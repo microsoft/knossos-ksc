@@ -2,11 +2,30 @@
 // Licensed under the MIT license.
 module gmm
 
-open Knossos
 open System
 
+#if DiffSharp 
+
+//DiffSharp interface
+open F2K_DiffSharp
+
+#else
+
+#if INTERACTIVE
+#load "../../src/f2k/Util.fs";;
+#load "../../src/f2k/Vector.fs";;
+#load "../../src/f2k/Knossos.fs";;
+#endif
+
+//Knossos Interface
+open Knossos
+
+#endif
+
+// ---------------------------------------------------
+
 let logsumexp (a:Vec) =
-    let mx = max a
+    let mx = maximum a
     let semx = sum (expv (a - mx))
     (log semx) + mx
 
@@ -24,7 +43,7 @@ let makeQ (q : Vec) (l : Vec) =
     let d = size q
     build2 d d (fun i j ->
         if i < j then
-            0.0
+            Float 0.0
         else if i = j then
             exp q.[i]
         else
@@ -39,7 +58,7 @@ let gmm_objective (x:Vec[]) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
           logsumexp( build K (fun k -> 
             let Q = makeQ qs.[k] ls.[k]
             let dik = x.[i] - means.[k]
-            let mahal = mul Q dik |> sqnorm
+            let mahal = sqnorm (mvmul Q dik) // TODO: replace with |> and handle op_PipeRight 
             alphas.[k] + sum (qs.[k]) - 0.5 * mahal)
     ))) - 
     (float n) * (logsumexp alphas) +

@@ -14,11 +14,11 @@ open System.IO
 
 // Create an interactive checker instance 
 let checker = FSharpChecker.Create(keepAssemblyContents=true)
+let exeDirectory = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+let (++) a b = System.IO.Path.Combine(a,b)
 
 let parseAndCheckFiles files = 
     let fsproj = "nul.fsproj" // unused?
-
-    let (++) a b = System.IO.Path.Combine(a,b)
 
     (* adapted for .NET Core from https://fsharp.github.io/FSharp.Compiler.Service/project.html *)
     let sysLib nm =
@@ -46,10 +46,10 @@ let parseAndCheckFiles files =
                     System.Environment.NewLine
                     otherPathLocal
             
-    let directory = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
+    
 
     let localLib name =
-        directory ++ name + ".dll"
+        exeDirectory ++ name + ".dll"
 
     // Get context representing a stand-alone (script) file
     let projOptions = checker.GetProjectOptionsFromCommandLineArgs
@@ -64,11 +64,10 @@ let parseAndCheckFiles files =
                                    yield "--fullpaths" 
                                    yield "--flaterrors" 
                                    yield "--target:library"
-                               
-                                   //This is effective a stub library. We should also check the files exist
-                                   yield "Util.fs"
-                                   yield "Vector.fs"
-                                   yield "Knossos.fs"
+
+                                   yield exeDirectory ++ "Util.fs"
+                                   yield exeDirectory ++ "Vector.fs"
+                                   yield exeDirectory ++ "Knossos.fs"
 
                                    yield! files
                                    let references =
@@ -90,6 +89,7 @@ let parseAndCheckFiles files =
             failwith "There were errors"
 
     checkProjectResults.AssemblyContents.ImplementationFiles
+    // TODO: checkProjectResults.GetOptimizedAssemblyContents().ImplementationFiles
 
 [<EntryPoint>]
 let main argv =
@@ -97,29 +97,37 @@ let main argv =
         printfn "usage: f2k outfile infiles"
         exit 1
     
+    let exe = argv.[0]
     let outFile = argv.[1]
-    let prefixedFiles = argv.[2..]
+    let files = argv.[2..]
 
     if File.Exists(outFile) then
         failwithf "Error: Will not overwrite existing file %s\n" outFile
 
-    printfn "f2k: Parsing %d files to %s" (Seq.length prefixedFiles) outFile
+    printfn "f2k: Parsing %d files to %s" (Seq.length files) outFile
 
     (* e.g. run as:
-       dotnet run .\f2k.fsproj (echo gmm | % { "..\..\..\examples\ml-gmm\$_.fs" })  
+       dotnet run .\f2k.fsproj ..\..\..\examples\ml-gmm\gmm.fs  
     *)
 
-    for f in prefixedFiles do
+    for f in files do
         if not (File.Exists(f)) then
             failwithf "Cannot open file %A" f
 
-    let checkedFiles = parseAndCheckFiles prefixedFiles
+    let checkedFiles = parseAndCheckFiles files
+    // checkedFiles now also contains the stub libraries, so take only the last N 
+     
+    let prelude = seq {
+        yield ";; Prelude: Knossos.ks"
+        yield! File.ReadAllLines (exeDirectory ++ "Knossos.ks")
+    }
     let decls =
         checkedFiles
-        |> Seq.collect (fun implementationFileContent -> seq {
-            yield ";" + implementationFileContent.FileName
+        |> Seq.skip (Seq.length checkedFiles - Seq.length files)
+        |> Seq.collect (fun implementationFileContent -> seq {            
+            yield ";; SRC: " + implementationFileContent.FileName
             yield! lispgen.toLispDecls implementationFileContent
         })
-    printfn "f2k: Writing %d lines to file %s" (Seq.length decls) outFile
-    File.WriteAllLines (outFile, decls)
+    printfn "f2k: Writing %d + %d lines to file %s" (Seq.length prelude) (Seq.length decls) outFile
+    File.WriteAllLines (outFile, (Seq.append prelude decls))
     0

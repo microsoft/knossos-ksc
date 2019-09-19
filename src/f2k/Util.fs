@@ -71,3 +71,4 @@ let inline matrixSolveHelper (lu:'a[,]) (b:'a[]) =
 
 /// Checks whether a float contains an integer value
 let isInteger a = a = float (int a)
+

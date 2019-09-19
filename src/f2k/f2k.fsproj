@@ -18,6 +18,9 @@
     </Compile>
     <Compile Include="lispgen.fs" />
     <Compile Include="Program.fs" />
+    <Content Include="Knossos.ks">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
