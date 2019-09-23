@@ -204,9 +204,9 @@ cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = params
                   , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      env' = foldl addParam env params
-
       (vecsizes, _) = vecSizeDecls params
+
+      env' = foldl addParam env params
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
       cf                               = cgenUserFun f
