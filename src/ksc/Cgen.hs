@@ -206,7 +206,7 @@ cgenDefE env (Def { def_fun = f, def_args = params
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
       env' = foldl addParam env params
 
-      vecsizes = vecSizeDecls params
+      (vecsizes, _) = vecSizeDecls params
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
       cf                               = cgenUserFun f
@@ -246,8 +246,9 @@ cgenDefE _ def = pprPanic "cgenDefE" (ppr def)
 --   int m = size(get<2>(get_an_element(v)));
 --   assert(n == get_an_element(get<2>(get_an_element(v))))
 
-vecSizeDecls :: [TVar] -> String
-vecSizeDecls = concat . fst . vecSizeDecls'
+vecSizeDecls :: [TVar] -> (String, Set.Set Var)
+vecSizeDecls vs = (concat str, new)
+  where (str, new) = vecSizeDecls' vs
 
 vecSizeDecls' :: [TVar] -> ([String], Set.Set Var)
 vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
