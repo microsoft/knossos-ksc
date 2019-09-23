@@ -184,9 +184,6 @@ cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show 
 cstLookupVar :: HasCallStack => Var -> CST -> CType
 cstLookupVar v env = cstLookup0 (show v) env
 
-cstLookupFun :: HasCallStack => Fun -> CST -> CType
-cstLookupFun f env = cstLookup0 (show f) env
-
 cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe CType
 cstMaybeLookupFun f env = cstMaybeLookup0 (show f) env
 
