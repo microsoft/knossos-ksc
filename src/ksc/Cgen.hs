@@ -10,6 +10,7 @@ import           Prelude                 hiding ( lines
                                                 )
 
 import qualified Data.Map                      as Map
+import           Data.Monoid                    ( (<>), mempty )
 import           Data.List                      ( intercalate )
 import qualified Data.Set                      as Set
 import           Control.Monad                  ( when )
@@ -19,7 +20,7 @@ import qualified System.FilePath
 import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
-import           Lang
+import           Lang                    hiding ( (<>) )
 
 import Debug.Trace
 
@@ -255,9 +256,9 @@ vecSizeDecls' :: [TVar] -> ([String], Set.Set Var)
 vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
   where
     goVars :: Set.Set Var -> [TVar] -> ([String], Set.Set Var)
-    goVars _ [] = ([], Set.empty)
+    goVars _ [] = mempty
     goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (cgenVar v) ty
-                                 in accum2 str (goVars seen' vs)
+                                 in str <> goVars seen' vs
 
     goVec :: Set.Set Var -> String -> Var -> (Set.Set Var, String)
     goVec seen value sz =
@@ -273,7 +274,7 @@ vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
 
     goType seen value (TypeTuple tys) =
         foldl (\ (seen,(str, new)) (ty,n) -> accum (str ++ ["/*tup*/"], new) $ goType seen (get value n) ty)
-              (seen, ([], Set.empty))
+              (seen, mempty)
               (zip tys [0..])
 
     goType seen value _ = (seen, (["/*" ++ value ++ "*/\n"], Set.empty))
@@ -281,9 +282,7 @@ vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
     get_element v = "(" ++ v ++ ")[0]"
     get v n = "std::get<" ++ show n ++ ">(" ++ v ++ ")"
 
-    accum str (seen,str') = (seen, accum2 str str')
-
-    accum2 (str, new) (str', new') = (str ++ str', new `Set.union` new')
+    accum str (seen,str') = (seen, str <> str')
 
 cgenExpr :: CST -> TExpr -> M CGenResult
 cgenExpr = cgenExprR
