@@ -260,17 +260,21 @@ vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
     goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (cgenVar v) ty
                                  in str <> goVars seen' vs
 
-    goVec :: Set.Set Var -> String -> Var -> (Set.Set Var, String)
-    goVec seen value sz =
+    goVec1 :: Set.Set Var -> String -> Var -> (Set.Set Var, String)
+    goVec1 seen value sz =
         if sz `Set.member` seen then
           (seen, "KS_ASSERT(" ++ cgenVar sz ++ " == size(" ++ value ++ "));\n")
         else
           (Set.insert sz seen, "/*" ++ show seen ++ "*/\n" ++ "int " ++ cgenVar sz ++ " = size(" ++ value ++ ");\n")
 
+    goVec :: Set.Set Var -> String -> Var -> (Set.Set Var, [String])
+    goVec seen value sz = (seen', [str])
+      where (seen', str) = goVec1 seen value sz
+
     goType :: Set.Set Var -> String -> Type -> (Set.Set Var, ([String], Set.Set Var))
     goType seen value (TypeVec (Var (TVar TypeSize sz)) ty) =
         let (seen',str) = goVec seen value sz
-        in accum ([str], Set.singleton sz) $ goType seen' (get_element value) ty
+        in accum (str, Set.singleton sz) $ goType seen' (get_element value) ty
 
     goType seen value (TypeTuple tys) =
         foldl (\ (seen,(str, new)) (ty,n) -> accum (str ++ ["/*tup*/"], new) $ goType seen (get value n) ty)
