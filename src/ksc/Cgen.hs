@@ -250,10 +250,13 @@ cgenDefE _ def = pprPanic "cgenDefE" (ppr def)
 --   assert(n == get_an_element(get<2>(get_an_element(v))))
 
 vecSizeDecls :: [TVar] -> String
-vecSizeDecls vs = goVars (Set.fromList $ map tVarVar vs) vs
+vecSizeDecls = concat . vecSizeDecls'
+
+vecSizeDecls' :: [TVar] -> [String]
+vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
   where
-    goVars :: Set.Set Var -> [TVar] -> String
-    goVars _ [] = ""
+    goVars :: Set.Set Var -> [TVar] -> [String]
+    goVars _ [] = []
     goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (cgenVar v) ty
                                  in str ++ goVars seen' vs
 
@@ -264,17 +267,17 @@ vecSizeDecls vs = goVars (Set.fromList $ map tVarVar vs) vs
         else
           (Set.insert sz seen, "/*" ++ show seen ++ "*/\n" ++ "int " ++ cgenVar sz ++ " = size(" ++ value ++ ");\n")
 
-    goType :: Set.Set Var -> String -> Type -> (Set.Set Var, String)
+    goType :: Set.Set Var -> String -> Type -> (Set.Set Var, [String])
     goType seen value (TypeVec (Var (TVar TypeSize sz)) ty) =
         let (seen',str) = goVec seen value sz
-        in accum str $ goType seen' (get_element value) ty
+        in accum [str] $ goType seen' (get_element value) ty
 
     goType seen value (TypeTuple tys) =
-        foldl (\ (seen,str) (ty,n) -> accum (str ++ "/*tup*/") $ goType seen (get value n) ty)
-              (seen, "")
+        foldl (\ (seen,str) (ty,n) -> accum (str ++ ["/*tup*/"]) $ goType seen (get value n) ty)
+              (seen, [])
               (zip tys [0..])
 
-    goType seen value _ = (seen, "/*" ++ value ++ "*/\n")
+    goType seen value _ = (seen, ["/*" ++ value ++ "*/\n"])
 
     get_element v = "(" ++ v ++ ")[0]"
     get v n = "std::get<" ++ show n ++ ">(" ++ v ++ ")"
