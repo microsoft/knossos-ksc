@@ -586,7 +586,7 @@ namespace ks
 	template <class T>
 	T const &index(int i, vec<T> const & v)
 	{
-#ifndef xxx_NDEBUG
+#ifndef NDEBUG
 		if (i >= v.size()) {
 			std::cerr << "ERROR: Accessing element " << i << " of vec of length " << v.size() << std::endl;
 			throw "oiks";
