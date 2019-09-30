@@ -30,10 +30,6 @@ mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
 mkGradTuple TupleAD p lm = Tuple [p, lm]
 
-mkLMType_Dir :: ADDir -> Type -> Type -> Type
-mkLMType_Dir Fwd s t = TypeLM s t
-mkLMType_Dir Rev s t = TypeLM t s
-
 data Phase = Parsed | Typed | OccAnald
 
 data DeclX p = RuleDecl (RuleX p)
