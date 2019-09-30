@@ -264,14 +264,18 @@ gatherErrors errors =
     []     -> return ()
     errors -> Left ("Had errors in:\n" ++ unlines (map show errors))
 
+printTestHeader :: String -> IO ()
+printTestHeader s = do
+    putStrLn ""
+    putStrLn $ ">>>>> TEST: " ++ s
+
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
 
   errors <- flip mapM ksFiles $ \ksFile -> do
     let ksTest = System.FilePath.dropExtension ksFile
-    putStrLn ""
-    putStrLn $ ">>>>> TEST: " ++ ksFile
+    printTestHeader ksFile
     displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest
       `orThrowJust` ksFile
 
@@ -299,8 +303,7 @@ futharkCompileKscPrograms ksFiles = do
 
   errors <- flip mapM ksFiles $ \ksFile -> do
     let ksTest = System.FilePath.dropExtension ksFile
-    putStrLn ""
-    putStrLn $ ">>>>> TEST: " ++ ksFile
+    printTestHeader ksFile
     (if ksFile `elem` testsThatDon'tWorkWithFuthark
       then putStrLn ("Skipping " ++ ksFile
                       ++ " because it is known not to work with Futhark")
@@ -324,8 +327,7 @@ demoFOnTestPrograms ksTests = do
       ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
   errors <- flip mapM ksTestsInModes $ \(ksTest, adp) -> do
-    putStrLn ""
-    putStrLn $ ">>>>> TEST: " ++ ksTest
+    printTestHeader ksTest
     demoFFilter Nothing (snd . moveMain) adp ksTest
       `orThrowJust` (ksTest, adp)
 
