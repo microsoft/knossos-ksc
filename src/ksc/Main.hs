@@ -253,6 +253,11 @@ ksTestFiles testDir = do
              . filter ((== ".ks") . last 3))
             (System.Directory.listDirectory testDir)
 
+orThrowJust :: IO z -> a -> IO (Maybe a)
+orThrowJust body message = fmap (const Nothing) body `Control.Exception.catch` \e -> do
+  print (e :: Control.Exception.ErrorCall)
+  return (Just message)
+
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
@@ -261,10 +266,8 @@ compileKscPrograms compilername ksFiles = do
     let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
     putStrLn $ ">>>>> TEST: " ++ ksFile
-    fmap (const Nothing) (displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest)
-      `Control.Exception.catch` \e -> do
-        print (e :: Control.Exception.ErrorCall)
-        return (Just ksFile)
+    displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest
+      `orThrowJust` ksFile
 
   case Data.Maybe.catMaybes errors of
     []     -> return ()
@@ -292,19 +295,16 @@ futharkCompileKscPrograms ksFiles = do
     let ksTest = System.FilePath.dropExtension ksFile
     putStrLn ""
     putStrLn $ ">>>>> TEST: " ++ ksFile
-    fmap (const Nothing)
-         (if ksFile `elem` testsThatDon'tWorkWithFuthark
-          then putStrLn ("Skipping " ++ ksFile
-                         ++ " because it is known not to work with Futhark")
-          else do
-             genFuthark ksTest
-             Cgen.readProcessPrintStderr
-               "futhark-0.11.2-linux-x86_64/bin/futhark"
-               ["check", "obj/" ++ ksTest ++ ".fut"]
-             return ())
-      `Control.Exception.catch` \e -> do
-        print (e :: Control.Exception.ErrorCall)
-        return (Just ksFile)
+    (if ksFile `elem` testsThatDon'tWorkWithFuthark
+      then putStrLn ("Skipping " ++ ksFile
+                      ++ " because it is known not to work with Futhark")
+      else do
+        genFuthark ksTest
+        Cgen.readProcessPrintStderr
+          "futhark-0.11.2-linux-x86_64/bin/futhark"
+          ["check", "obj/" ++ ksTest ++ ".fut"]
+        return ())
+      `orThrowJust` ksFile
 
   case Data.Maybe.catMaybes errors of
     []     -> return ()
@@ -318,10 +318,8 @@ demoFOnTestPrograms ksTests = do
     flip mapM [BasicAD, TupleAD] $ \adp -> do
       putStrLn ""
       putStrLn $ ">>>>> TEST: " ++ ksTest
-      fmap (const Nothing) (demoFFilter Nothing (snd . moveMain) adp ksTest)
-        `Control.Exception.catch` \e -> do
-          print (e :: Control.Exception.ErrorCall)
-          return (Just (ksTest, adp))
+      demoFFilter Nothing (snd . moveMain) adp ksTest
+        `orThrowJust` (ksTest, adp)
 
   case Data.Maybe.catMaybes (concat errors) of
     []     -> return ()
