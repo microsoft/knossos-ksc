@@ -388,9 +388,10 @@ testRunKS compiler ksFile = do
 testC :: String -> [String] -> IO ()
 testC compiler fsTestKs = do
   runSpec Main.hspec defaultConfig
-  testRoundTrip =<< ksTestFiles "test/ksc/"
-  demoFOnTestPrograms =<< ksTestFiles "test/ksc/"
-  compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
+  ksTestFiles_ <- ksTestFiles "test/ksc/"
+  testRoundTrip ksTestFiles_
+  demoFOnTestPrograms ksTestFiles_
+  compileKscPrograms compiler ksTestFiles_
   testRunKS compiler "test/ksc/gmm.ks"
   testRunKS compiler "test/ksc/fold.ks"
   compileKscPrograms compiler fsTestKs
