@@ -115,6 +115,10 @@ runParserOrPanic p s = case runParser p s of
 parseF :: String -> IO [Decl]
 parseF file = do
         cts <- readFile file
+        parseS cts
+
+parseS :: String -> IO [Decl]
+parseS cts =
         case runParser pDecls cts of
                     Left err    -> error ("Failed parse: " ++ show err)
                     Right decls -> return decls
