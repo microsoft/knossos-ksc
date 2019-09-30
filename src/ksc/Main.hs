@@ -258,7 +258,8 @@ testOn cases f = do
   putStrLn ("Testing " ++ show cases)
 
   errors <- flip mapM cases $ \case_ -> do
-    printTestHeader (show case_)
+    putStrLn ""
+    putStrLn $ ">>>>> TEST: " ++ show case_
     f case_ `orThrowJust` case_
 
   case gatherErrors errors of
@@ -275,11 +276,6 @@ gatherErrors errors =
   case Data.Maybe.catMaybes errors of
     []     -> return ()
     errors -> Left ("Had errors in:\n" ++ unlines (map show errors))
-
-printTestHeader :: String -> IO ()
-printTestHeader s = do
-    putStrLn ""
-    putStrLn $ ">>>>> TEST: " ++ s
 
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
