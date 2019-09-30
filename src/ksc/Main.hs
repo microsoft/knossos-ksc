@@ -258,6 +258,12 @@ orThrowJust body message = fmap (const Nothing) body `Control.Exception.catch` \
   print (e :: Control.Exception.ErrorCall)
   return (Just message)
 
+gatherErrors :: Show a => [Maybe a] -> Either String ()
+gatherErrors errors =
+  case Data.Maybe.catMaybes errors of
+    []     -> return ()
+    errors -> Left ("Had errors in:\n" ++ unlines (map show errors))
+
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   putStrLn ("Testing " ++ show ksFiles)
@@ -269,9 +275,9 @@ compileKscPrograms compilername ksFiles = do
     displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest
       `orThrowJust` ksFile
 
-  case Data.Maybe.catMaybes errors of
-    []     -> return ()
-    errors -> error ("Had errors in:\n" ++ unlines (map show errors))
+  case gatherErrors errors of
+    Right r -> return r
+    Left e  -> error e
 
 futharkCompileKscPrograms :: [String] -> IO ()
 futharkCompileKscPrograms ksFiles = do
@@ -306,9 +312,9 @@ futharkCompileKscPrograms ksFiles = do
         return ())
       `orThrowJust` ksFile
 
-  case Data.Maybe.catMaybes errors of
-    []     -> return ()
-    errors -> error ("Had errors in:\n" ++ unlines (map show errors))
+  case gatherErrors errors of
+    Right r -> return r
+    Left e  -> error e
 
 demoFOnTestPrograms :: [String] -> IO ()
 demoFOnTestPrograms ksTests = do
@@ -321,9 +327,9 @@ demoFOnTestPrograms ksTests = do
       demoFFilter Nothing (snd . moveMain) adp ksTest
         `orThrowJust` (ksTest, adp)
 
-  case Data.Maybe.catMaybes (concat errors) of
-    []     -> return ()
-    errors -> error ("Had errors in:\n" ++ unlines (map show errors))
+  case gatherErrors (concat errors) of
+    Right r -> return r
+    Left e  -> error e
 
 testRunKS :: String -> String -> IO ()
 testRunKS compiler ksFile = do
