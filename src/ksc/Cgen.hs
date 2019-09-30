@@ -704,7 +704,7 @@ cppGen outfile defs = do
       cppfile = outfile ++ ".cpp"
 
   putStrLn $ "Writing to " ++ ksofile
-  createDirectoryWriteFile ksofile (intercalate "\n" (map (renderSexp . ppr) defs))
+  createDirectoryWriteFile ksofile (unlines (map (renderSexp . ppr) defs))
 
   putStrLn $ "Writing to " ++ cppfile
   createDirectoryWriteFile cppfile (unlines (lines ++ lls ++ tail))
