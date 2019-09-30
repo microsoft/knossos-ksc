@@ -320,14 +320,16 @@ demoFOnTestPrograms :: [String] -> IO ()
 demoFOnTestPrograms ksTests = do
   putStrLn ("Testing " ++ show ksTests)
 
-  errors <- flip mapM ksTests $ \ksTest -> do
-    flip mapM [BasicAD, TupleAD] $ \adp -> do
-      putStrLn ""
-      putStrLn $ ">>>>> TEST: " ++ ksTest
-      demoFFilter Nothing (snd . moveMain) adp ksTest
-        `orThrowJust` (ksTest, adp)
+  let ksTestsInModes :: [(String, ADPlan)]
+      ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
-  case gatherErrors (concat errors) of
+  errors <- flip mapM ksTestsInModes $ \(ksTest, adp) -> do
+    putStrLn ""
+    putStrLn $ ">>>>> TEST: " ++ ksTest
+    demoFFilter Nothing (snd . moveMain) adp ksTest
+      `orThrowJust` (ksTest, adp)
+
+  case gatherErrors errors of
     Right r -> return r
     Left e  -> error e
 
