@@ -158,6 +158,20 @@ deriving instance Ord Type
 instance InPhase p => Show (TypeX p) where
   show e = pps e
 
+-- Round trip testing requires that two different DeclXs be checked
+-- for equality.  If the equality check fails we'd like to print them
+-- to see the differences.  Thus we add Eq and Show instances for
+-- DeclX and other types that transitively need them.
+deriving instance Eq (RhsX Typed)
+deriving instance Eq (DefX Typed)
+deriving instance Eq (DeclX Typed)
+deriving instance Eq (RuleX Typed)
+
+deriving instance Show (RhsX Typed)
+deriving instance Show (DefX Typed)
+deriving instance Show (DeclX Typed)
+deriving instance Show (RuleX Typed)
+
 -- TypeSize is used to document when an integer represents a Size.
 -- It's too viral to use a separate Integer type because most integer operations
 -- need to be supported, e.g. the size of a lower-triangular matrix is d*(d+1)/2
