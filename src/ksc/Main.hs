@@ -8,7 +8,7 @@ import GHC.Stack
 
 import Lang
 import LangUtils
-import Parse (parseF)
+import Parse (parseF, parseS)
 import Rules
 import Annotate
 import AD
@@ -283,6 +283,41 @@ compileKscPrograms compilername ksFiles = do
         let ksTest = System.FilePath.dropExtension ksFile
         displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest
 
+testRoundTrip :: [String] -> IO ()
+testRoundTrip ksFiles = do
+  testOn ksFiles $ \ksFile -> do
+    original <- readFile ksFile
+
+    let render :: [TDecl] -> String
+        render = unlines . map (renderSexp . ppr)
+
+        ignoreMain :: [Decl] -> [Decl]
+        ignoreMain = snd . moveMain
+
+        typecheck = annotDecls emptyGblST
+
+        parseIgnoringMain :: String -> IO [TDecl]
+        parseIgnoringMain =
+          runKM . fmap snd . typecheck . ignoreMain . parseS
+
+    parsed <- parseIgnoringMain original
+    parsed_rendered_parsed <- parseIgnoringMain (render parsed)
+
+    -- It's unlikely that
+    --
+    --     original == render parsed
+    --
+    -- because the rendered version will have different whitespace to
+    -- the original so instead we test
+    --
+    --     parsed = parsed_rendered_parsed
+    if (parsed /= parsed_rendered_parsed)
+      then do
+        print parsed
+        print parsed_rendered_parsed
+        error "Round trip failure"
+      else return ()
+
 futharkCompileKscPrograms :: [String] -> IO ()
 futharkCompileKscPrograms ksFiles = do
   let testsThatDon'tWorkWithFuthark =
@@ -353,6 +388,7 @@ testRunKS compiler ksFile = do
 testC :: String -> [String] -> IO ()
 testC compiler fsTestKs = do
   runSpec Main.hspec defaultConfig
+  testRoundTrip =<< ksTestFiles "test/ksc/"
   demoFOnTestPrograms =<< ksTestFiles "test/ksc/"
   compileKscPrograms compiler =<< ksTestFiles "test/ksc/"
   testRunKS compiler "test/ksc/gmm.ks"

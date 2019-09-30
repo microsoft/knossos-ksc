@@ -678,8 +678,6 @@ instance Pretty Fun where
 pprFunId :: FunId -> SDoc
 pprFunId (UserFun s ) = text s
 pprFunId (PrimFun p ) = text p
-pprFunId (SelFun 1 2) = text "fst"  -- We use selectors on pairs a lot
-pprFunId (SelFun 2 2) = text "snd"  -- so I'm printing them specially
 pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> SDoc
@@ -708,7 +706,7 @@ instance InPhase p => Pretty (TypeX p) where
   pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
                                         (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to)    = parensIf p precZero $
-                                   text "Lambda" <+> ppr from <+> text "->" <+> ppr to
+                                   text "Lam" <+> ppr from <+> ppr to
   pprPrec p (TypeLM s t)         = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
   pprPrec _ TypeFloat            = text "Float"
   pprPrec _ TypeInteger          = text "Integer"
@@ -797,7 +795,7 @@ pprLetSexp v e =
       go binds body =
             parens $ sep [text "let", parens $ vcat (map parenBind $ reverse binds),
                         ppr body]
-      parenBind (v,e) = parens $ pprLetBndr @p v <+> ppr e
+      parenBind (v,e) = parens $ (ppr . fst . getLetBndr @p) v <+> ppr e
 
 
 isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
@@ -830,7 +828,7 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
       EDefRhs -> parens $
                  sep [ text "edef", ppr f
                      , pprParendType res_ty
-                     , parens (pprList pprTVar vs) ]
+                     , parens (pprList (pprParendType . tVarType) vs) ]
 
       UserRhs rhs -> mode
           (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
@@ -845,9 +843,9 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
 instance InPhase p => Pretty (RuleX p) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
             , ru_lhs = lhs, ru_rhs = rhs })
-    = sep [ text "rule" <+> doubleQuotes (text name)
+    = parens $ sep [ text "rule" <+> doubleQuotes (text name)
                  <+> parens (pprList pprTVar qvars)
-             , nest 2 (sep [ ppr lhs, nest 2 (text "=" <+> ppr rhs)]) ]
+             , nest 2 (sep [ ppr lhs, nest 2 (ppr rhs)]) ]
 
 printK :: SDoc -> KM ()
 printK d = liftIO (putStrLn (render d))
