@@ -271,7 +271,7 @@ compileKscPrograms compilername ksFiles = do
 
   case Data.Maybe.catMaybes errors of
     []     -> return ()
-    errors -> error ("Had errors in:\n" ++ unlines errors)
+    errors -> error ("Had errors in:\n" ++ unlines (map show errors))
 
 futharkCompileKscPrograms :: [String] -> IO ()
 futharkCompileKscPrograms ksFiles = do
@@ -308,7 +308,7 @@ futharkCompileKscPrograms ksFiles = do
 
   case Data.Maybe.catMaybes errors of
     []     -> return ()
-    errors -> error ("Had errors in:\n" ++ unlines errors)
+    errors -> error ("Had errors in:\n" ++ unlines (map show errors))
 
 demoFOnTestPrograms :: [String] -> IO ()
 demoFOnTestPrograms ksTests = do
