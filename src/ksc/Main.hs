@@ -253,6 +253,18 @@ ksTestFiles testDir = do
              . filter ((== ".ks") . last 3))
             (System.Directory.listDirectory testDir)
 
+testOn :: Show t => [t] -> (t -> IO z) -> IO ()
+testOn cases f = do
+  putStrLn ("Testing " ++ show cases)
+
+  errors <- flip mapM cases $ \case_ -> do
+    printTestHeader (show case_)
+    f case_ `orThrowJust` case_
+
+  case gatherErrors errors of
+    Right r -> return r
+    Left e  -> error e
+
 orThrowJust :: IO z -> a -> IO (Maybe a)
 orThrowJust body message = fmap (const Nothing) body `Control.Exception.catch` \e -> do
   print (e :: Control.Exception.ErrorCall)
@@ -271,22 +283,12 @@ printTestHeader s = do
 
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
-  putStrLn ("Testing " ++ show ksFiles)
-
-  errors <- flip mapM ksFiles $ \ksFile -> do
-    let ksTest = System.FilePath.dropExtension ksFile
-    printTestHeader ksFile
-    displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest
-      `orThrowJust` ksFile
-
-  case gatherErrors errors of
-    Right r -> return r
-    Left e  -> error e
+  testOn ksFiles $ \ksFile -> do
+        let ksTest = System.FilePath.dropExtension ksFile
+        displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ksTest
 
 futharkCompileKscPrograms :: [String] -> IO ()
 futharkCompileKscPrograms ksFiles = do
-  putStrLn ("Testing " ++ show ksFiles)
-
   let testsThatDon'tWorkWithFuthark =
         [ -- Doesn't handle edefs
           "test/ksc/edef.ks"
@@ -301,39 +303,25 @@ futharkCompileKscPrograms ksFiles = do
         , "test/ksc/test0.ks"
         ]
 
-  errors <- flip mapM ksFiles $ \ksFile -> do
-    let ksTest = System.FilePath.dropExtension ksFile
-    printTestHeader ksFile
-    (if ksFile `elem` testsThatDon'tWorkWithFuthark
-      then putStrLn ("Skipping " ++ ksFile
-                      ++ " because it is known not to work with Futhark")
-      else do
-        genFuthark ksTest
-        Cgen.readProcessPrintStderr
-          "futhark-0.11.2-linux-x86_64/bin/futhark"
-          ["check", "obj/" ++ ksTest ++ ".fut"]
-        return ())
-      `orThrowJust` ksFile
-
-  case gatherErrors errors of
-    Right r -> return r
-    Left e  -> error e
+  testOn ksFiles $ \ksFile -> do
+        let ksTest = System.FilePath.dropExtension ksFile
+        (if ksFile `elem` testsThatDon'tWorkWithFuthark
+         then putStrLn ("Skipping " ++ ksFile
+                        ++ " because it is known not to work with Futhark")
+         else do
+            genFuthark ksTest
+            Cgen.readProcessPrintStderr
+              "futhark-0.11.2-linux-x86_64/bin/futhark"
+              ["check", "obj/" ++ ksTest ++ ".fut"]
+            return ())
 
 demoFOnTestPrograms :: [String] -> IO ()
 demoFOnTestPrograms ksTests = do
-  putStrLn ("Testing " ++ show ksTests)
-
   let ksTestsInModes :: [(String, ADPlan)]
       ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
-  errors <- flip mapM ksTestsInModes $ \(ksTest, adp) -> do
-    printTestHeader ksTest
-    demoFFilter Nothing (snd . moveMain) adp ksTest
-      `orThrowJust` (ksTest, adp)
-
-  case gatherErrors errors of
-    Right r -> return r
-    Left e  -> error e
+  testOn ksTestsInModes $ \(ksTest, adp) -> do
+        demoFFilter Nothing (snd . moveMain) adp ksTest
 
 testRunKS :: String -> String -> IO ()
 testRunKS compiler ksFile = do
