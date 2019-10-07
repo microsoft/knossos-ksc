@@ -174,7 +174,7 @@ tcExpr (Call fx es)
 
        ; res_ty <- lookupGblTc fun pairs
 
-       ; checkTypes_maybe mb_ty res_ty $
+       ; res_ty <- checkTypes_maybe mb_ty res_ty $
          text "Function call type mismatch for" <+> ppr fun
        ; let call' = Call (TFun res_ty fun) (map exprOf pairs)
        ; return (TE call' res_ty) }
@@ -182,7 +182,7 @@ tcExpr (Call fx es)
 tcExpr (Let vx rhs body)
   = do { TE arhs rhs_ty <- tcExpr rhs
        ; let (var, mb_ty) = getLetBndr @p vx
-       ; checkTypes_maybe mb_ty rhs_ty $
+       ; rhs_ty <- checkTypes_maybe mb_ty rhs_ty $
          text "Let binding mis-match for" <+> ppr var
        ; let tvar = TVar rhs_ty var
        ; TE abody tybody <- extendLclSTM [tvar] (tcExpr body)
@@ -245,8 +245,7 @@ tcVar var mb_ty
   | otherwise
   = do { ty <- lookupLclTc var
        ; checkTypes_maybe mb_ty ty $
-         text "Variable occurrence mis-match for" <+> ppr var
-       ; return ty }
+         text "Variable occurrence mis-match for" <+> ppr var }
 
 ------------------------------------------------------------------------------
 -- callResultTy_maybe is given a (global) function and the type of its
@@ -441,11 +440,22 @@ addCtxt :: SDoc -> TcM a -> TcM a
 addCtxt cd (TCM m) = TCM $ \env@(TCE { tce_ctxt = cds }) ds ->
                      m (env { tce_ctxt = cd : cds }) ds
 
-checkTypes_maybe :: Maybe Type -> Type -> SDoc -> TcM ()
-checkTypes_maybe mb_ty1 ty2 herald
-  = case mb_ty1 of
-      Nothing  -> return ()
-      Just ty1 -> checkTypes ty1 ty2 herald
+checkTypes_maybe :: Maybe Type -> Type -> SDoc -> TcM Type
+checkTypes_maybe mb_expected actual herald
+  -- Check the type match, returning the expected
+  -- type if supplied, otherwise the actual one.
+  --
+  -- This is important because `checkTypes` is ultimately implemented in
+  -- terms of `eqType`.  `eqType` sometimes claims that types are equal
+  -- when they aren't, so that we can allow programs that otherwise we
+  -- would need to implement a more sophisticated type checker for.  For
+  -- Calls and Lets the expected type is the type on the Fun or binder
+  -- respectively (if it exists) and (when it exists) we want type
+  -- checking to keep it unchanged.
+  = case mb_expected of
+      Just expected -> do { checkTypes expected actual herald
+                          ; return expected }
+      Nothing       -> return actual
 
 checkTypes :: Type -> Type -> SDoc -> TcM ()
 checkTypes exp_ty act_ty herald
