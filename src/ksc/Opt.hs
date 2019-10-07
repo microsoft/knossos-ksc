@@ -56,9 +56,11 @@ optDefs rb gst (def:defs) = do { (gst1, def')  <- optDef  rb gst def
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> KM (GblSymTab, TDef)
 optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
-  = do { let env = OptEnv { optRuleBase = rb
+  = do { let varsBroughtIntoScopeByArgs =
+               mkEmptySubst (args ++ paramsSizeBinders args)
+             env = OptEnv { optRuleBase = rb
                           , optGblST = gst
-                          , optSubst = mkEmptySubst (args ++ paramsSizeBinders args) }
+                          , optSubst = varsBroughtIntoScopeByArgs }
        ; rhs' <- simplify env args rhs
        ; let def' = def { def_rhs = UserRhs rhs' }
        ; return (extendGblST gst [def'], def') }
