@@ -56,7 +56,19 @@ optDefs rb gst (def:defs) = do { (gst1, def')  <- optDef  rb gst def
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> KM (GblSymTab, TDef)
 optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
-  = do { let varsBroughtIntoScopeByArgs =
+  = do { -- The variables brought into scope by the argument list are
+         -- the names of the arguments themselves (args), plus those
+         -- vector size variables that are brought into scope by the
+         -- types of the arguments (paramsSizeBinders args).
+         --
+         -- For example
+         --
+         --    def f Float ((x : Vec n Float) (y : Vec (mul a b) Float) <rhs>
+         --
+         -- brings into scope `x` and `y` (of course), plus `n` (which
+         -- is `size x`) but not `a` or `b` since they cannot be
+         -- obtained directly from `y`.
+         let varsBroughtIntoScopeByArgs =
                mkEmptySubst (args ++ paramsSizeBinders args)
              env = OptEnv { optRuleBase = rb
                           , optGblST = gst
