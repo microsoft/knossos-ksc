@@ -11,3 +11,6 @@
 (def randfloatmat (Vec m (Vec n Float)) ((seed : Integer) (m : Integer) (n : Integer))
   (let ((flat (randfloatvec seed (mul m n))))
     (vec2mat flat m n)))
+
+(def size_binders Float (x : Vec a Float)
+     (sumbuild a (lam (j : Integer) 3.0)))
