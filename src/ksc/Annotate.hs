@@ -92,7 +92,7 @@ tcDef (Def { def_fun    = fun
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
     extendLclSTM (paramsSizeBinders vars) $
-    do { tcArgs vars
+    do { checkNoDuplicatedArgs vars
        ; vars' <- mapM tcTVar vars
        ; extendLclSTM vars' $
     do { res_ty' <- tcType res_ty
@@ -125,8 +125,8 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
                       , ru_lhs = lhs', ru_rhs = rhs' })
     }}
 
-tcArgs :: [TVarX p] -> TcM ()
-tcArgs args = when (not distinct) $
+checkNoDuplicatedArgs :: [TVarX p] -> TcM ()
+checkNoDuplicatedArgs args = when (not distinct) $
                   addErr (text "Duplicated arguments:" <+> commaPpr duplicated)
     where argNames   = map tVarVar args
           duplicated = nub (argNames \\ nub argNames)
