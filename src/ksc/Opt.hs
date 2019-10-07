@@ -67,7 +67,7 @@ optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
          --
          -- brings into scope `x` and `y` (of course), plus `n` (which
          -- is `size x`) but not `a` or `b` since they cannot be
-         -- obtained directly from `y`.
+         -- obtained directly from `y`.  See `Note [paramsSizeBinders]`.
          let varsBroughtIntoScopeByArgs =
                mkEmptySubst (args ++ paramsSizeBinders args)
              env = OptEnv { optRuleBase = rb
