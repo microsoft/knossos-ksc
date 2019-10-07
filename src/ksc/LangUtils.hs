@@ -88,11 +88,7 @@ substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
 --   1. we do not consider (Vec (n+m) Float) as binding anything
 --   2. a duplicate (e.g. n above) enters twice with the same definition
 --      at codegen the second defn is an assert of equality
---   3. paramsSizeBinders also returns all arguments of type Integer.
---      This seems strange and we would like to remove this behaviour.
---      We haven't yet worked out why we can't.  See
---          https://github.com/microsoft/knossos-ksc/issues/115
---   4. perhaps it should, in fact, only return those type size
+--   3. perhaps it should, in fact, only return those type size
 --      binders that are *not* bound by an arg, that is
 --          (n :: Integer, x :: Vec n Float, y :: (Vec m (Vec n Float), Float))
 --      should not return n.  This behaviour is still in discussion
@@ -101,10 +97,7 @@ paramsSizeBinders :: forall p. InPhase p =>  [TVarX p] -> [TVar]
 paramsSizeBinders vs = nub (concatMap paramSizeBinders vs)
 
 paramSizeBinders :: forall p. InPhase p => TVarX p -> [TVar]
-paramSizeBinders (TVar TypeInteger v)
-  = [TVar TypeInteger v]     -- An argument of type Integer
-paramSizeBinders (TVar ty _)
-  = typeSizeBinders ty       -- For other args, look in their types
+paramSizeBinders (TVar ty _) = typeSizeBinders ty
 
 typesSizeBinders :: forall p. InPhase p => [TypeX p] -> [TVar]
 typesSizeBinders tys = concatMap typeSizeBinders tys

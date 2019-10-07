@@ -14,3 +14,5 @@
 
 (def size_binders Float (x : Vec a Float)
      (sumbuild a (lam (j : Integer) 3.0)))
+
+(def explicitly_bound Float ((a : Integer) (b : Integer) (x : Vec (mul a b) Float)) 0.0)
