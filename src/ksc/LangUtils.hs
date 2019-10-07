@@ -79,7 +79,8 @@ substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
 --     Free variables
 -----------------------------------------------
 
-paramsSizeBinders :: forall p. InPhase p =>  [TVarX p] -> [TVar]
+-- Note [paramsSizeBinders]
+--
 -- Get the vector size binders bound by the type of the parameters
 -- E.g.   (x :: Vec n Float, y :: (Vec m (Vec n Float), Float))
 --        binds m and n
@@ -87,6 +88,7 @@ paramsSizeBinders :: forall p. InPhase p =>  [TVarX p] -> [TVar]
 --   1. we do not consider (Vec (n+m) Float) as binding anything
 --   2. a duplicate (e.g. n above) enters twice with the same definition
 --      at codegen the second defn is an assert of equality
+paramsSizeBinders :: forall p. InPhase p =>  [TVarX p] -> [TVar]
 paramsSizeBinders vs = nub (concatMap paramSizeBinders vs)
 
 paramSizeBinders :: forall p. InPhase p => TVarX p -> [TVar]
