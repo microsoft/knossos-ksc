@@ -125,6 +125,11 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
                       , ru_lhs = lhs', ru_rhs = rhs' })
     }}
 
+-- Checks that there are no duplicated args, i.e. nothing of the form
+--
+--     f (..., x : T1, ..., x : T2, ...) = ...
+--
+-- (regardless of whether T1 and T2 are the same or not)
 checkNoDuplicatedArgs :: [TVarX p] -> TcM ()
 checkNoDuplicatedArgs args = when (not distinct) $
                   addErr (text "Duplicated arguments:" <+> commaPpr duplicated)
