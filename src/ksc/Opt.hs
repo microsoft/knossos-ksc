@@ -654,15 +654,15 @@ optGradPrim _ "index" [i,v]
     TypeVec sz elt_ty = typeof v
 
 
-optGradPrim _ "$rand" _ = Just (lmZero TypeFloat TypeFloat )
-optGradPrim _ "$ranhashdoub" _ = Just (lmZero TypeInteger TypeFloat )
-optGradPrim _ "to_float" _ = Just (lmZero TypeInteger TypeFloat)
-optGradPrim _ "$trace" [e] = Just (lmOne $ typeof e)
-optGradPrim _ "neg" [e] = Just (lmScale (typeof e) (kTFloat $ -1.0))
-optGradPrim _ "exp" [e] = Just (lmScale TypeFloat (pExp e))
-optGradPrim _ "sin" [e] = Just (lmScale TypeFloat (pCos e))
-optGradPrim _ "cos" [e] = Just (lmScale TypeFloat (pNeg (pSin e)))
-optGradPrim _ "log" [e] = Just (lmScale TypeFloat (pDiv (kTFloat 1.0) e))
+optGradPrim (TypeLM a r) "$rand" _ = Just (lmZero a r)
+optGradPrim (TypeLM a r) "$ranhashdoub" _ = Just (lmZero a r)
+optGradPrim (TypeLM a r) "to_float" _ = Just (lmZero a r)
+optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
+optGradPrim (TypeLM a _) "neg" _ = Just (lmScale a (kTFloat $ -1.0))
+optGradPrim (TypeLM a _) "exp" [e] = Just (lmScale a (pExp e))
+optGradPrim (TypeLM a _) "sin" [e] = Just (lmScale a (pCos e))
+optGradPrim (TypeLM a _) "cos" [e] = Just (lmScale a (pNeg (pSin e)))
+optGradPrim (TypeLM a _) "log" [e] = Just (lmScale a (pDiv (kTFloat 1.0) e))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 
 ---------------
