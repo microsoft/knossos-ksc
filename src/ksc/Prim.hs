@@ -85,16 +85,7 @@ mk_fun f = case find_dollar f of
                      _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
     isPrimFun_ f = (f `elem` (map fst translation)) || isPrimFun f
     translation = map swap $
-                  [ ("mul", "*")
-                  , ("div", "/")
-                  , ("sub", "-")
-                  , ("add", "+")
-                  , ("eq" , "==")
-                  , ("ne" , "!=")
-                  , ("lt" , "<")
-                  , ("gt" , ">")
-                  , ("lte", "<=")
-                  , ("gte", ">=") ]
+                  []
     translate_fun f = case lookup f translation of
       Just s  -> s
       Nothing -> f
