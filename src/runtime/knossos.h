@@ -1547,6 +1547,12 @@ namespace ks
 	}
 
 	template <class T1, class T2>
+	inline T1 ne(T1 t1, T2 t2)
+	{
+		return t1 != t2;
+	}
+
+	template <class T1, class T2>
 	inline T1 lt(T1 t1, T2 t2)
 	{
 		return t1 < t2;
