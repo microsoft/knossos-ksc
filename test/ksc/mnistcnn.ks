@@ -14,10 +14,10 @@
                (kmc (div km 2))
                (noi (add (sub ni knc) kni))
                (moi (add (sub mi kmc) kmi))
-               (outside_image (or (< noi 0)
-                              (or (>= noi n)
-                              (or (< moi 0)
-                                  (>= moi m)))))
+               (outside_image (or (lt noi 0)
+                              (or (gte noi n)
+                              (or (lt moi 0)
+                                  (gte moi m)))))
                (image_noi_moi
                 (if outside_image
                     0.0
@@ -30,7 +30,7 @@
        (index ki bias))
        )))))))
 
-(def max_ Float ((x : Float) (y : Float)) (if (> x y) x y))
+(def max_ Float ((x : Float) (y : Float)) (if (gt x y) x y))
 
 (def relu Float (x : Float) (max_ x 0.0))
 
