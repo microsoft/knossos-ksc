@@ -53,8 +53,8 @@ annotDecls gbl_env decls
     mk_rec_def (Def { def_fun = fun, def_args = args, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
          extendLclSTM (paramsSizeBinders args) $
-         do { args' <- tcArgs args
-            ; res_ty' <- extendLclSTM args' (tcType res_ty)
+         tcArgs args $ \args' ->
+         do { res_ty' <- tcType res_ty
             ; return (Def { def_fun = fun, def_args = args'
                           , def_res_ty = res_ty'
                           , def_rhs = StubRhs }) }
@@ -93,19 +93,20 @@ tcDef (Def { def_fun    = fun
   = addCtxt (text "In the definition of" <+> ppr fun) $
     extendLclSTM (paramsSizeBinders vars) $
     do { checkNoDuplicatedArgs vars
-       ; vars' <- tcArgs vars
-       ; extendLclSTM vars' $
+       ; tcArgs vars $ \vars' ->
     do { res_ty' <- tcType res_ty
        ; rhs' <- tcRhs fun rhs res_ty'
        ; return (Def { def_fun = fun, def_args = vars'
                      , def_rhs = rhs', def_res_ty = res_ty' })
     }}
 
-tcArgs :: InPhase p => [TVarX p] -> TcM [TVar]
-tcArgs = foldr (\var rest -> do
-                   { tVar  <- tcTVar var
-                   ; rest' <- extendLclSTM [tVar] rest
-                   ; return (tVar:rest') }) (pure [])
+tcArgs :: InPhase p => [TVarX p] -> ([TVar] -> TcM a) -> TcM a
+tcArgs []       continueWithArgs = continueWithArgs []
+tcArgs (tv:tvs) continueWithArgs
+  = do { tv' <- tcTVar tv
+       ; extendLclSTM [tv'] $
+         tcArgs tvs $ \tvs' ->
+         continueWithArgs (tv' : tvs') }
 
 tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
