@@ -654,11 +654,11 @@ optGradPrim _ "index" [i,v]
     TypeVec sz elt_ty = typeof v
 
 
-optGradPrim (TypeLM a r) "$rand" _ = Just (lmZero a r)
+optGradPrim (TypeLM a r) "$rand" _        = Just (lmZero a r)
 optGradPrim (TypeLM a r) "$ranhashdoub" _ = Just (lmZero a r)
-optGradPrim (TypeLM a r) "to_float" _ = Just (lmZero a r)
+optGradPrim (TypeLM a r) "to_float" _     = Just (lmZero a r)
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
-optGradPrim (TypeLM a _) "neg" _ = Just (lmScale a (kTFloat $ -1.0))
+optGradPrim (TypeLM a _) "neg" _   = Just (lmScale a (kTFloat $ -1.0))
 optGradPrim (TypeLM a _) "exp" [e] = Just (lmScale a (pExp e))
 optGradPrim (TypeLM a _) "sin" [e] = Just (lmScale a (pCos e))
 optGradPrim (TypeLM a _) "cos" [e] = Just (lmScale a (pNeg (pSin e)))
