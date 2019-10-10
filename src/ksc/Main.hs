@@ -8,7 +8,7 @@ import GHC.Stack
 
 import Lang
 import LangUtils
-import Parse (parseF, parseS)
+import Parse (parseF, parseE)
 import Rules
 import Annotate
 import AD
@@ -296,12 +296,27 @@ testRoundTrip ksFiles = do
 
         typecheck = annotDecls emptyGblST
 
-        parseIgnoringMain :: String -> IO [TDecl]
+        parseIgnoringMain :: String -> IO (Either String [TDecl])
         parseIgnoringMain =
-          runKM . fmap snd . typecheck . ignoreMain . parseS
+          runKM . mapM (fmap snd . typecheck . ignoreMain) . parseE
 
-    parsed <- parseIgnoringMain original
-    parsed_rendered_parsed <- parseIgnoringMain (render parsed)
+    parsedE <- parseIgnoringMain original
+
+    let parsed = case parsedE of
+          Left e  -> error ("Original failed to parse:\n"
+                            ++ original ++ "\n"
+                            ++ e)
+          Right p -> p
+
+        rendered_parsed = render parsed
+
+    parsed_rendered_parsedE <- parseIgnoringMain rendered_parsed
+
+    let parsed_rendered_parsed = case parsed_rendered_parsedE of
+          Left e  -> error ("Round-tripped failed to parse:\n"
+                            ++ rendered_parsed ++ "\n"
+                            ++ e)
+          Right p -> p
 
     -- It's unlikely that
     --
