@@ -294,11 +294,12 @@ testRoundTrip ksFiles = do
         ignoreMain :: [Decl] -> [Decl]
         ignoreMain = snd . moveMain
 
-        typecheck = annotDecls emptyGblST
+        typecheck :: [Decl] -> KM [TDecl]
+        typecheck = fmap snd . annotDecls emptyGblST
 
         parseIgnoringMain :: String -> IO (Either String [TDecl])
         parseIgnoringMain =
-          runKM . mapM (fmap snd . typecheck . ignoreMain) . parseE
+          runKM . mapM (typecheck . ignoreMain) . parseE
 
     parsedE <- parseIgnoringMain original
 
