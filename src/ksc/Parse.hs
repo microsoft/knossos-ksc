@@ -119,9 +119,14 @@ parseF file = do
 
 parseS :: String -> [Decl]
 parseS cts =
-        case runParser pDecls cts of
-                    Left err    -> error ("Failed parse: " ++ show err)
+        case parseE cts of
+                    Left err    -> error err
                     Right decls -> decls
+
+parseE :: String -> Either String [Decl]
+parseE cts = case runParser pDecls cts of
+                    Left err    -> Left ("Failed parse: " ++ show err)
+                    Right decls -> Right decls
 
 ------- Parser -------
 langDef :: Tok.LanguageDef ()
