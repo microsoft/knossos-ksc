@@ -86,6 +86,7 @@ gradE adp s e@(Konst _)    = mkGradTuple adp e lm_zero
     lm_zero = lmZero s (typeof e)
 
 gradE adp s (Var tv)       = Var (gradTVar adp s tv)
+gradE adp s (Dummy ty)     = Dummy (mkGradType adp s ty)
 gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
 gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)

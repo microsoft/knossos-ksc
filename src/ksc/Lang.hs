@@ -78,6 +78,12 @@ tVarVar (TVar _ v) = v
 tVarType :: TVarX p -> TypeX p
 tVarType (TVar ty _) = ty
 
+-- MTypeX pm
+--   pm controls whether the type is there at all
+type family MTypeX p where
+  MTypeX Parsed   = ()
+  MTypeX Typed    = Type
+  MTypeX OccAnald = Type
 
 {- Note [Function arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -117,6 +123,7 @@ data ExprX p
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)  -- FIXME make cond ExprX?
   | Assert (ExprX p) (ExprX p)
+  | Dummy (MTypeX p)
 
 instance InPhase p => Show (ExprX p) where
   show e = pps e
@@ -267,8 +274,7 @@ data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
 
 
 data Var
-  = Dummy                 -- Used for type arguments
-  | Simple String         -- x
+  = Simple String         -- x
   | Delta  String         -- The 'dx' or 'dr' argument to
                           -- forward or backward versions of f
   | Grad   String ADPlan  -- Derivative of x
@@ -334,15 +340,8 @@ indexTVar = TVar TypeSize (Simple "i")
 mkArgVar :: Int -> Var
 mkArgVar n = Simple ("a" ++ show n)
 
-isDummyVar :: Var -> Bool
-isDummyVar Dummy = True
-isDummyVar _     = False
-
-mkDummyTVar :: Type -> TVar
-mkDummyTVar ty = TVar ty Dummy
-
 mkDummy :: Type -> TExpr
-mkDummy ty = Var (mkDummyTVar ty)
+mkDummy ty = Dummy ty
 
 mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
 mkLet (TVar ty v) rhs body
@@ -416,6 +415,7 @@ instance HasType TFun where
   typeof (TFun ty _) = ty
 
 instance HasType TExpr where
+  typeof (Dummy ty)    = ty
   typeof (Konst k)     = typeofKonst k
   typeof (Var b)       = typeof b
   typeof (Call f _)    = typeof f
@@ -607,6 +607,7 @@ class InPhase p where
   pprLetBndr :: LetBndrX p -> SDoc  -- Print with its type
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
 
+  getMType   :: MTypeX p   -> Maybe Type
   getVar     :: VarX p     -> (Var, Maybe Type)
   getFun     :: FunX p     -> (Fun, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
@@ -615,6 +616,8 @@ instance InPhase Parsed where
   pprVar  = ppr
   pprLetBndr = ppr
   pprFunOcc  = ppr
+
+  getMType _      = Nothing
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
@@ -623,6 +626,8 @@ instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
   pprFunOcc (TFun _ f) = ppr f
+
+  getMType ty              = Just ty
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun, Just ty)
   getLetBndr (TVar ty var) = (var, Just ty)
@@ -631,12 +636,19 @@ instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc (TFun _ f) = ppr f
+
+  getMType   ty            = Just ty
   getVar     (TVar ty var)       = (var, Just ty)
   getFun     (TFun ty fun)       = (fun, Just ty)
   getLetBndr (_, tv)             = (tVarVar tv, Nothing)
     -- This last case is awkward. _ty :: TypeX OccAnald
     -- and we could convert it to a Type, but it does not
     -- see worth the bother.  Nothing is fine, actually
+
+pprMTypeX :: forall p. InPhase p => MTypeX p -> SDoc
+pprMTypeX mty = case getMType @p mty of
+                 Just ty -> ppr ty
+                 Nothing -> empty
 
 pprTFun :: TFun -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
@@ -678,7 +690,6 @@ instance Pretty ADPlan where
   ppr TupleAD = char 't'
 
 instance Pretty Var where
-  ppr Dummy      = text "/*dummy*/"
   ppr (Simple s) = text s
   ppr (Delta  d) = text "d$" <> text d
   ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
@@ -701,7 +712,6 @@ pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
 
 instance Pretty TVar where
-  pprPrec _ (TVar ty Dummy) = parens $ text "_ : " <> ppr ty
   pprPrec _ (TVar _ v)     = ppr v
 
 instance Pretty TFun where
@@ -756,6 +766,7 @@ pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
+pprExpr _ (Dummy ty) = char '<' <> pprMTypeX @phase ty <> char '>'
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
@@ -933,19 +944,27 @@ cmpExpr e1
  = go e1 M.empty
  where
    go :: TExpr -> M.Map Var TVar -> TExpr -> Ordering
+   go (Dummy t1) _ e2
+     = case e2 of
+         Dummy t2 -> t1 `compare` t2
+         _        -> LT
+
    go (Konst k1) _ e2
      = case e2 of
+         Dummy {} -> GT
          Konst k2 -> k1 `compare` k2
          _        -> LT
 
    go (Var v1) subst e2
      = case e2 of
+         Dummy {} -> GT
          Konst {} -> GT
          Var v2   -> v1 `compare` M.findWithDefault v2 (tVarVar v2) subst
          _        -> LT
 
    go (Call f1 e1) subst e2
      = case e2 of
+         Dummy {} -> GT
          Konst {} -> GT
          Var {} -> GT
          Call f2 e2 -> (f1 `compare` f2) `thenCmp` (gos e1 subst e2)
@@ -953,6 +972,7 @@ cmpExpr e1
 
    go (Tuple es1) subst e2
      = case e2 of
+         Dummy {} -> GT
          Konst {} -> GT
          Var {}  -> GT
          Call {} -> GT
@@ -961,6 +981,7 @@ cmpExpr e1
 
    go (Lam b1 e1) subst e2
       = case e2 of
+         Dummy {} -> GT
          Konst {}  -> GT
          Var {}    -> GT
          Call {}   -> GT
@@ -971,6 +992,7 @@ cmpExpr e1
 
    go (App e1a e1b) subst e2
      = case e2 of
+         Dummy {} -> GT
          Konst {} -> GT
          Var {}   -> GT
          Call {}  -> GT

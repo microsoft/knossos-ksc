@@ -163,6 +163,7 @@ cseE cs_env (Var tv)
       Nothing -> Var tv
 
 cseE _ e@(Konst {}) = e
+cseE _ e@(Dummy {}) = e
 
 cseE_check :: CSEnv -> TExpr -> TExpr
 -- Look up the entire expression in the envt
