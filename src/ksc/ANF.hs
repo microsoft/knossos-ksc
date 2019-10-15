@@ -164,5 +164,3 @@ instance GenBndr Typed where
 
 newVar :: GenBndr p => ExprX p -> AnfM p (LetBndrX p, VarX p)
 newVar e = AnfM $ do { u <- getUniq; return ([], mkNewVar u e) }
-
-
