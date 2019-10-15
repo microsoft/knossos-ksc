@@ -288,22 +288,18 @@ testRoundTrip ksFiles = do
   testOn ksFiles $ \ksFile -> do
     original <- readFile ksFile
 
-    let render :: [TDecl] -> String
+    let render :: InPhase p => [DeclX p] -> String
         render = unlines . map (renderSexp . ppr)
 
         ignoreMain :: [Decl] -> [Decl]
         ignoreMain = snd . moveMain
 
-        typecheck :: [Decl] -> KM [TDecl]
-        typecheck = fmap snd . annotDecls emptyGblST
+        parseIgnoringMain :: String -> Either String [Decl]
+        parseIgnoringMain = fmap ignoreMain . parseE
 
-        parseIgnoringMain :: String -> IO (Either String [TDecl])
-        parseIgnoringMain =
-          runKM . mapM (typecheck . ignoreMain) . parseE
+        parsedE = parseIgnoringMain original
 
-    parsedE <- parseIgnoringMain original
-
-    let parsed = case parsedE of
+        parsed = case parsedE of
           Left e  -> error ("Original failed to parse:\n"
                             ++ original ++ "\n"
                             ++ e)
@@ -311,9 +307,9 @@ testRoundTrip ksFiles = do
 
         rendered_parsed = render parsed
 
-    parsed_rendered_parsedE <- parseIgnoringMain rendered_parsed
+        parsed_rendered_parsedE = parseIgnoringMain rendered_parsed
 
-    let parsed_rendered_parsed = case parsed_rendered_parsedE of
+        parsed_rendered_parsed = case parsed_rendered_parsedE of
           Left e  -> error ("Round-tripped failed to parse:\n"
                             ++ rendered_parsed ++ "\n"
                             ++ e)
