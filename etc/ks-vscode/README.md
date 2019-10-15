@@ -21,6 +21,35 @@ This extension contributes the following settings:
 
 --->
 
+## How to build the formatter extension
+
+1. Install npm from https://nodejs.org/en/download/
+2. In `./etc/ks-vscode` run
+
+```
+npm install
+```
+
+3. Then run
+
+```
+npm run compile
+```
+
+4. Copy the files in `./etc/ks-vscode/` to `C:\Users\<user>\.vscode\extensions\knossos-vscode-0.01` 
+
+```
+.
+├── package.json
+├── language-configuration.json
+├── out
+|   ├── extension.js
+|   └── knossos_ir_formatter.js
+└── syntaxes
+    └── Knossos.tmLanguage
+```
+
+5. Start a new instance of VS Code. Open a `.ks` file. Make sure that VS Code auto detects Knossos IR. Then try "Format Document" (`shift` + `alt` + `F`).
 ## Known Issues
 
 None yet.

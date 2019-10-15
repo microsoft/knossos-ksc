@@ -10,7 +10,9 @@ $manifest = echo `
     language-configuration.json `
     package.json `
     README.md `
-    syntaxes\Knossos.tmLanguage
+    syntaxes\Knossos.tmLanguage `
+    out\knossos_ir_formatter.js `
+    out\extension.js
 
 write-host "ks-vscode: Deleting $extensions_dst"
 Remove-Item -force -rec $extensions_dst
