@@ -9,7 +9,6 @@ module Annotate (
   ) where
 
 import Lang
-import OptLet
 import LangUtils
 import KMonad
 import Prim
@@ -52,7 +51,6 @@ annotDecls gbl_env decls
     mk_rec_def :: DefX Parsed -> TcM TDef
     mk_rec_def (Def { def_fun = fun, def_args = args, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
-         extendLclSTM (paramsSizeBinders args) $
          tcArgs args $ \args' ->
          do { res_ty' <- tcType res_ty
             ; return (Def { def_fun = fun, def_args = args'
@@ -91,7 +89,6 @@ tcDef (Def { def_fun    = fun
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
-    extendLclSTM (paramsSizeBinders vars) $
     do { checkNoDuplicatedArgs vars
        ; tcArgs vars $ \vars' ->
     do { res_ty' <- tcType res_ty
@@ -121,7 +118,6 @@ tcRule :: InPhase p => RuleX p -> TcM TRule
 tcRule (Rule { ru_name = name, ru_qvars = qvars
              , ru_lhs = lhs, ru_rhs = rhs })
   = addCtxt (text "In the rule with lhs:" <+> ppr lhs) $
-    extendLclSTM (paramsSizeBinders qvars) $
     do { qvars' <- mapM tcTVar qvars
         ; extendLclSTM qvars' $
     do { TE lhs' lhs_ty <- tcExpr lhs
@@ -151,11 +147,8 @@ tcTVar (TVar ty v)
        ; return (TVar ty' v) }
 
 tcType :: InPhase p => TypeX p -> TcM Type
-tcType (TypeVec size ty) = do { TE size' size_ty <- tcExpr size
-                              ; checkTypes TypeInteger size_ty $
-                                text "The size field of a Vec must have type Integer, but is" <+> ppr size_ty
-                              ; ty' <- tcType ty
-                              ; return (TypeVec size' ty') }
+tcType (TypeVec ty)      = do { ty' <- tcType ty
+                              ; return (TypeVec ty') }
 tcType (TypeTuple tys)   = TypeTuple <$> mapM tcType tys
 tcType (TypeLM ty1 ty2)  = TypeLM <$> tcType ty1 <*> tcType ty2
 tcType (TypeLam ty1 ty2) = TypeLam <$> tcType ty1 <*> tcType ty2
@@ -302,13 +295,12 @@ userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
                            , def_args = params })
                       args
-  = case check_args 1 (map (substType size_subst) bndr_tys) arg_tys of
+  = case check_args 1 bndr_tys arg_tys of
       Just err -> Left err
-      Nothing  -> Right (substType size_subst ret_ty)
+      Nothing  -> Right ret_ty
   where
     bndr_tys   = map tVarType params
     arg_tys    = map typeof args
-    size_subst = bindTypeArgs params args
 
     check_args :: Int -> [Type] -> [Type] -> Maybe SDoc
     -- Return (Just err) if there's a wrong-ness
@@ -323,61 +315,6 @@ userCallResultTy_help (Def { def_fun  = fn
     check_args _ [] [] = Nothing
     check_args _ [] _  = Just (text "Too many arguments")
     check_args _ _  [] = Just (text "Too few arguments")
-
-bindTypeArgs :: [TVar]      -- Parameters
-             -> [TypedExpr] -- Arguments of this call, each with its type
-             -> Subst
--- Given function binders [ x :: Vec (2*n) Float
---                        , y :: (Float, Vec n Float) ]
---
---   and args of type 	  [ Vec e1 Float
---                    	  , (Float, Vec (3*j) Float ]
---
--- extract the substitution [n :-> 3*j]
--- Note that we get the substitution from the y-binding,
--- which binds a simple 'n', ignoring the earlier, but more
--- complex x-binding.
---
--- If matching fails, just return a smaller substitution
--- The caller is going to re-match anyway
-bindTypeArgs bndrs args
-  = match_args bndrs              args              $
-    match_tys  (map typeof bndrs) (map typeof args) $
-    empty_subst
-  where
-    empty_subst = mkEmptySubst []
-        -- There are no binders in the types we
-        -- are substituting into, so no need for
-        -- a full in-scope set
-
-    match_args :: [TVar] -> [TypedExpr] -> Subst -> Subst
-    match_args (TVar bndr_ty v : bndrs) (TE arg _ : args) subst
-      | TypeInteger <- bndr_ty
-      = extendSubstMap v arg $
-        match_args bndrs args subst
-      | otherwise
-      = match_args bndrs args subst
-    match_args _ _ subst = subst
-
-    match_tys :: [Type] -> [Type] -> Subst -> Subst
-    match_tys (bndr_ty : bndr_tys) (arg_ty : arg_tys) subst
-      = match_ty  bndr_ty  arg_ty $
-        match_tys bndr_tys arg_tys subst
-    match_tys _ _ subst = subst
-
-    match_ty :: Type -> Type -> Subst ->  Subst
-    match_ty (TypeVec (Var tv) bndr_ty) (TypeVec size arg_ty) subst
-      = extendSubstMap (tVarVar tv) size $
-        match_ty bndr_ty arg_ty subst
-    match_ty (TypeTuple bndr_tys) (TypeTuple arg_tys) subst
-      = match_tys bndr_tys arg_tys subst
-    match_ty (TypeLM bndr_ty1 bndr_ty2) (TypeLM arg_ty1 arg_ty2) subst
-      = match_ty bndr_ty1 arg_ty1 $
-        match_ty bndr_ty2 arg_ty2 subst
-    match_ty (TypeLam bndr_ty1 bndr_ty2) (TypeLam arg_ty1 arg_ty2) subst
-      = match_ty bndr_ty1 arg_ty1 $
-        match_ty bndr_ty2 arg_ty2 subst
-    match_ty _ _ subst = subst
 
 -----------------------------------------------
 --     The typecheck monad

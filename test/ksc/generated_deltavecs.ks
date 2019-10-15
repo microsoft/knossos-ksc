@@ -3,31 +3,35 @@
 ; rid of.
 
 (def matrix_multiply
-     (Vec o Float)
-     ((w : Vec o (Vec k Float))
-      (image : Vec k Float))
+     (Vec Float)
+     ((w : Vec (Vec Float))
+      (image : Vec Float))
+   (let ((o (size w))
+         (k (size (index 0 w))))
      (build o (lam (oi : Integer)
      (sumbuild k (lam (ki : Integer)
        (mul (index ki (index oi w))
           (index ki image))
-       )))))
+       ))))))
 
 (def matrix_multiply_transpose
-     (Vec o Float)
-     ((w : Vec k (Vec o Float))
-      (image : Vec k Float))
+     (Vec Float)
+     ((w : Vec (Vec Float))
+      (image : Vec Float))
+     (let ((o (size (index 0 w)))   ; Ugh!
+           (k (size w)))
      (build o (lam (oi : Integer)
      (sumbuild k (lam (ki : Integer)
        (mul (index oi (index ki w))
           (index ki image))
-       )))))
+       ))))))
 
 (def max_ Float ((x1 : Float) (x2 : Float)) (if (gt x1 x2) x1 x2))
 
 (def maxpool
-     (Vec (div n 2) Float)
-     (image : Vec n Float)
-     (build (div n 2) (lam (ni : Integer)
+     (Vec Float)
+     (image : Vec Float)
+     (build (div (size image) 2) (lam (ni : Integer)
        (max_ (index (mul 2 ni) image)
              (index (add 1 (mul 2 ni)) image)))))
 
@@ -37,16 +41,22 @@
 ; An example to show that if we pool with an expensive function it's
 ; harder to eliminate the deltaVecs
 (def expensivepool
-     (Vec (div n 2) Float)
-     (image : Vec n Float)
-     (build (div n 2) (lam (ni : Integer)
+     (Vec Float)
+     (image : Vec Float)
+     (build (div (size image) 2) (lam (ni : Integer)
        (expensive (index (mul 2 ni) image)
                   (index (add 1 (mul 2 ni)) image)))))
 
 (def conv1d
-     (Vec k (Vec n Float))
-     ((kernels : Vec k (Vec l (Vec kn Float)))
-      (image : Vec l (Vec n Float)))
+     (Vec (Vec Float))
+     ((kernels : Vec (Vec (Vec Float)))
+      (image : Vec (Vec Float)))
+   (let ((k (size kernels))
+         (kernels_elt (index 0 kernels))
+         (l (size kernels_elt))
+         (kn (size (index 0 kernels_elt)))
+         (l  (size image))
+         (n  (size (index 0 image))))
      (build k (lam (ki : Integer)
      (build n (lam (ni : Integer)
      (sumbuild kn (lam (kni : Integer)
@@ -57,4 +67,4 @@
              (image_noi
               (if outside_image 0.0 (index noi (index li image)))))
          (mul image_noi (index kni (index li (index ki kernels))))
-         ))))))))))
+         )))))))))))

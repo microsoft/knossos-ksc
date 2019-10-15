@@ -19,7 +19,7 @@ let rec strType (t:FSharpType) =
     let tdef = t.TypeDefinition
     let name = t.TypeDefinition.DisplayName
     if tdef.IsArrayType then
-      "Vec m " + strList "!!" strParendType t.GenericArguments
+      "Vec " + strList "!!" strParendType t.GenericArguments
     else
       // Nasty string match -- is there a better way?
       let core = "Microsoft.FSharp.Core"
@@ -28,7 +28,7 @@ let rec strType (t:FSharpType) =
       | core,"int" -> "Integer"
       | "System","Double" -> "Float"
       | "System","Int32" -> "Integer"
-      | "DV", "Vector" -> "Vec n " + strList ", " strParendType t.GenericArguments
+      | "DV", "Vector" -> "Vec " + strList ", " strParendType t.GenericArguments
       | a,n -> "UnkType{" + a + "." + n + "}"
   else
     match t.ToString() with

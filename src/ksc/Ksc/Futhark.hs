@@ -214,30 +214,18 @@ toName :: Pretty x => x -> Name
 toName = escape . render . ppr
 
 toFutharkType :: L.Type -> Type
-toFutharkType L.TypeInteger = I32
-toFutharkType L.TypeFloat = F64
-toFutharkType L.TypeBool = Bool
+toFutharkType L.TypeInteger    = I32
+toFutharkType L.TypeFloat      = F64
+toFutharkType L.TypeBool       = Bool
 toFutharkType (L.TypeTuple ts) = Tuple $ map toFutharkType ts
-toFutharkType (L.TypeVec (L.Var (L.TVar _ (L.Simple v))) t) =
-  Array (DimNamed v) $ toFutharkType t
-toFutharkType (L.TypeVec (L.Konst (L.KSize x)) t) =
-  Array (DimConst $ fromInteger x) $ toFutharkType t
-toFutharkType (L.TypeVec _ t) =
-  Array DimAny $ toFutharkType t
-toFutharkType L.TypeString =
-  Array DimAny I8
+toFutharkType (L.TypeVec t)    = Array DimAny $ toFutharkType t
+toFutharkType L.TypeString     = Array DimAny I8
 toFutharkType t =
   error $ "toFutharkType: unhandled " ++ error (show t)
 
-sizesInType :: L.Type -> [Name]
-sizesInType (L.TypeVec (L.Var (L.TVar _ (L.Simple v))) t) = v : sizesInType t
-sizesInType (L.TypeTuple ts) = concatMap sizesInType ts
-sizesInType _ = []
-
 toFutharkParam :: L.TVar -> (Param, [TypeParam])
 toFutharkParam (L.TVar t v) =
-  (Param (toName v) $ toFutharkType t,
-   map SizeParam $ sizesInType t)
+  (Param (toName v) $ toFutharkType t, [])
 
 toFutharkConst :: L.Konst -> Const
 toFutharkConst (L.KInteger x) = ConstI32 $ fromInteger x

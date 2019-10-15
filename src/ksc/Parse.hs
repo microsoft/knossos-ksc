@@ -231,14 +231,11 @@ pTypes :: Parser [TypeX Parsed]
 pTypes = parens (many pType)
 
 pKType :: Parser (TypeX Parsed)
-pKType =   (do { pReserved "Vec"; sz <- pVecSize; ty <- pType; return (TypeVec sz ty) })
+pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
        <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
        <|> (do { pReserved "LM"; s <- pType; t <- pType ; return (TypeLM s t) })
        <|> (do { pReserved "Lam"; s <- pType; t <- pType ; return (TypeLam s t) })
        <|> pType
-
-pVecSize :: Parser (ExprX Parsed)
-pVecSize = pExpr
 
 pCall :: Parser (ExprX Parsed)
 -- Calls (f e), (f e1 e2), etc

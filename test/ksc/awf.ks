@@ -1,7 +1,7 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
-(def h (Vec n Float) (x : Vec n Float)
-    (build n (lam (i : Integer) 1.0)))
+(def h (Vec Float) (x : Vec Float)
+    (build (size x) (lam (i : Integer) 1.0)))
 
-(def g Float (x : Vec p Float)
+(def g Float (x : Vec Float)
     (sum (h x)))

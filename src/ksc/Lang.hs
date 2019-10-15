@@ -144,15 +144,14 @@ unzipTEs (TE e t : tes) = (e:es, t:ts)
   where
     (es, ts) = unzipTEs tes
 
-data TypeX p
+data TypeX (p :: Phase)
   = TypeBool
   | TypeInteger
   | TypeFloat
   | TypeString
   | TypeTuple [TypeX p]
 
-  | TypeVec (ExprX p)  -- Size and element type
-            (TypeX p)  -- The TExpr must have TypeInteger
+  | TypeVec (TypeX p)
 
   | TypeLam (TypeX p) (TypeX p)  -- Domain -> Range
   | TypeLM  (TypeX p) (TypeX p)  -- Linear map  Src -o Target
@@ -216,7 +215,7 @@ isScalar = \case
 tangentType :: HasCallStack => Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
-tangentType (TypeVec s t ) = TypeVec s (tangentType t)
+tangentType (TypeVec t)    = TypeVec (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
 tangentType TypeInteger    = TypeTuple []
 tangentType TypeBool       = TypeTuple []
@@ -226,7 +225,7 @@ tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
 
 eqType :: Type -> Type -> Bool
-eqType (TypeVec sz1 ty1) (TypeVec sz2 ty2) = eqType ty1 ty2 && eqSize sz1 sz2
+eqType (TypeVec ty1)    (TypeVec ty2)   = eqType ty1 ty2
 eqType (TypeTuple tys1) (TypeTuple tys2) =
   (length tys1 == length tys2) && (and (zipWith eqType tys1 tys2))
 eqType (TypeLM s1 t1) (TypeLM s2 t2) = eqType s1 s2 && eqType t1 t2
@@ -613,7 +612,7 @@ class InPhase p where
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
 instance InPhase Parsed where
-  pprVar  = ppr
+  pprVar     = ppr
   pprLetBndr = ppr
   pprFunOcc  = ppr
 
@@ -637,13 +636,13 @@ instance InPhase OccAnald where
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc (TFun _ f) = ppr f
 
-  getMType   ty            = Just ty
-  getVar     (TVar ty var)       = (var, Just ty)
-  getFun     (TFun ty fun)       = (fun, Just ty)
-  getLetBndr (_, tv)             = (tVarVar tv, Nothing)
-    -- This last case is awkward. _ty :: TypeX OccAnald
-    -- and we could convert it to a Type, but it does not
-    -- see worth the bother.  Nothing is fine, actually
+  getMType   ty                 = Just ty
+  getVar     (TVar ty var)      = (var, Just ty)
+  getFun     (TFun ty fun)      = (fun, Just ty)
+  getLetBndr (_, tv)            = (tVarVar tv,   Nothing)
+  -- This last case is awkward. _ty :: TypeX OccAnald
+  -- and we could convert it to a Type, but it does not
+  -- see worth the bother.  Nothing is fine, actually
 
 pprMTypeX :: forall p. InPhase p => MTypeX p -> SDoc
 pprMTypeX mty = case getMType @p mty of
@@ -712,7 +711,7 @@ pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
 
 instance Pretty TVar where
-  pprPrec _ (TVar _ v)     = ppr v
+  pprPrec _ (TVar _ v) = ppr v
 
 instance Pretty TFun where
   ppr (TFun _ f) = ppr f
@@ -725,8 +724,8 @@ instance Pretty Konst where
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
 instance InPhase p => Pretty (TypeX p) where
-  pprPrec p (TypeVec sz ty)      = parensIf p precTyApp $
-                                   text "Vec" <+> pprParendExpr sz <+> pprParendType ty
+  pprPrec p (TypeVec ty)         = parensIf p precTyApp $
+                                   text "Vec" <+> pprParendType ty
   pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
                                         (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to)    = parensIf p precZero $
@@ -966,7 +965,7 @@ cmpExpr e1
      = case e2 of
          Dummy {} -> GT
          Konst {} -> GT
-         Var {} -> GT
+         Var {}   -> GT
          Call f2 e2 -> (f1 `compare` f2) `thenCmp` (gos e1 subst e2)
          _ -> LT
 

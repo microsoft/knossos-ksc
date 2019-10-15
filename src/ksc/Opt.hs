@@ -57,19 +57,8 @@ optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> KM (GblSymTab, TDef)
 optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
   = do { -- The variables brought into scope by the argument list are
-         -- the names of the arguments themselves (args), plus those
-         -- vector size variables that are brought into scope by the
-         -- types of the arguments (paramsSizeBinders args).
-         --
-         -- For example
-         --
-         --    def f Float ((x : Vec n Float) (y : Vec (mul a b) Float) <rhs>
-         --
-         -- brings into scope `x` and `y` (of course), plus `n` (which
-         -- is `size x`) but not `a` or `b` since they cannot be
-         -- obtained directly from `y`.  See `Note [paramsSizeBinders]`.
-         let varsBroughtIntoScopeByArgs =
-               mkEmptySubst (args ++ paramsSizeBinders args)
+         -- the names of the arguments themselves (args)
+         let varsBroughtIntoScopeByArgs = mkEmptySubst args
              env = OptEnv { optRuleBase = rb
                           , optGblST = gst
                           , optSubst = varsBroughtIntoScopeByArgs }
@@ -277,7 +266,7 @@ optPrimFun _ "mul" [x, y]
   --
   -- 1. mul: (Float, t) -> t
   -- 2. mul: (Integer, Integer) -> Integer
-  = Just $ mkZero (typeof y)
+  = Just $ mkZero y
   | otherwise
   = Nothing
 
@@ -322,10 +311,9 @@ optPrimFun env "lmApplyTR" [e1,e2]        = optLMApply env (AD TupleAD Rev) e2 e
 optPrimFun _ "lmCompose"   [f,g]          = optLMCompose f g
 
 optPrimFun _ "lmVCat" es
-  | all isLMZero es
-  , Just (s:ss, ts) <- unzipLMTypes (map typeof es)
-  , assert (text "lmVCat" <+> pprList ppr es) (all (s ==) ss) True
-  = Just $ lmZero s (mkTupleTy ts)
+  | Just prs <- mapM isLMZero_maybe es
+  , (s:_, ts) <- unzip prs
+  = Just $ lmZero s (mkTuple ts)
 
 -- Add(0, x) = x = Add(x, 0)
 optPrimFun _ "lmAdd" [p,q]
@@ -358,11 +346,10 @@ optLMCompose f g
   | isLMOne g  = Just f
 
   -- f o 0 = 0
-  | isLMZero f = Just (lmZero s t)
-  | isLMZero g = Just (lmZero s t)
-  where
-    TypeLM _ t = typeof f
-    TypeLM s _ = typeof g
+-- Can't do this without vector sizes :-(
+-- optLMCompose f g
+--  | isLMZero f = Just (lmZero s t)
+--  | isLMZero g = Just (lmZero s t)
 
 optLMCompose f g
   -- Scale(T, x) . Scale(T, y) = Scale(T, xy )
@@ -605,11 +592,11 @@ optGradSel i n [arg]
   | TypeTuple tys <- typeof arg
   , length tys == n
   , let tyi = tys !! (i-1)
+        ti  = pSel i n arg
   = Just $
     lmHCat [ if i == j then lmOne tyi
-                       else lmZero tyj tyi
-           | j <- [1..n]
-           , let tyj = tys !! (j-1) ]
+                       else lmZero (pSel j n arg) ti
+           | j <- [1..n] ]
 
 optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
 
@@ -631,7 +618,7 @@ optGradPrim _ "mul" [x,y]
 
 optGradPrim _ "mul" arg
   | [TypeInteger, TypeInteger] <- map typeof arg
-  = Just $ lmZero (mkTupleTy [TypeInteger, TypeInteger]) TypeInteger
+  = Just $ lmZero (mkTuple (map (const zeroInt) arg)) zeroInt
 
 optGradPrim _ "div"  [x,y]
   | TypeFloat <- typeof x
@@ -641,28 +628,27 @@ optGradPrim _ "div"  [x,y]
 
 optGradPrim _  "div" arg
   | [TypeInteger, TypeInteger] <- map typeof arg
-  = Just $ lmZero (mkTupleTy [TypeInteger, TypeInteger]) TypeInteger
+  = Just $ lmZero (mkTuple (map (const zeroInt) arg)) zeroInt
 
 optGradPrim _ "sum" [e]
-  | TypeVec n t <- typeof e
-  = Just (lmBuildT n (Lam (TVar TypeSize $ Simple "sum$i")
-                          (lmOne t)))
+  | TypeVec t <- typeof e
+  = Just (lmBuildT (pSize e) (Lam (TVar TypeSize $ Simple "sum$i")
+                             (lmOne t)))
 
 optGradPrim _ "size" [e]
-  = Just $ lmZero (typeof e) TypeInteger
+  = Just $ lmZero e zeroInt
 
 optGradPrim _ "index" [i,v]
-  = Just (lmHCat [ lmZero (typeof i) elt_ty
-                 , lmBuildT sz (Lam ii (lmDelta vi (Var ii) i)) ])
+  = Just (lmHCat [ lmZero i vi
+                 , lmBuildT (pSize v) (Lam ii (lmDelta vi (Var ii) i)) ])
   where
     ii = TVar TypeInteger $ Simple "primDindex$i"
     vi = pIndex i v
-    TypeVec sz elt_ty = typeof v
 
 
-optGradPrim (TypeLM a r) "$rand" _        = Just (lmZero a r)
-optGradPrim (TypeLM a r) "$ranhashdoub" _ = Just (lmZero a r)
-optGradPrim (TypeLM a r) "to_float" _     = Just (lmZero a r)
+optGradPrim _ "$rand"        _ = Just (lmZero zeroFloat zeroFloat)
+optGradPrim _ "$ranhashdoub" _ = Just (lmZero zeroInt   zeroFloat)
+optGradPrim _ "to_float"     _ = Just (lmZero zeroInt   zeroFloat)
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "neg" _   = Just (lmScale a (kTFloat $ -1.0))
 optGradPrim (TypeLM a _) "exp" [e] = Just (lmScale a (pExp e))
@@ -744,13 +730,15 @@ optLMApplyCall :: HasCallStack
 -- (lmZero :: s -o t) `apply` (x :: T(s))  = 0 :: T(t)
 optLMApplyCall _ dir "lmZero" [s, t] dx
   = traceWhenTypesUnequal "Apply lmZero" in_ty (typeof dx) $
-    Just (mkZero out_ty)
+    Just (case dir of
+            Fwd -> mkTangentZero t
+            Rev -> mkTangentZero s)
   where
     tangent_s = tangentType (typeof s)
     tangent_t = tangentType (typeof t)
-    (in_ty, out_ty) = case dir of
-                        Fwd -> (tangent_s, tangent_t)
-                        Rev -> (tangent_t, tangent_s)
+    in_ty = case dir of
+               Fwd -> tangent_s
+               Rev -> tangent_t
 
 optLMApplyCall _ _ "lmOne" t dx
   = traceWhenTypesUnequal "Apply lmOne"
@@ -812,9 +800,9 @@ do_prod_v env dir e dx
     lmApply_Dir dir body vdx
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
-  | TypeVec n _ <- typeof e
+  | TypeVec {} <- typeof e
   = Just $ mkLets binds $
-    pBuild n $ Lam indexTVar $
+    pBuild (pSize ve) $ Lam indexTVar $
     lmApply_Dir dir (pIndex (Var indexTVar) ve) vdx
 
   | otherwise = Nothing
@@ -830,10 +818,10 @@ do_sum_v env dir e dx
     lmApply_Dir dir body (pIndex (Var i) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
-  | TypeVec n _ <- typeof e
+  | TypeVec {} <- typeof e
   = Just $
     mkLets binds $
-    pSumBuild n $ Lam indexTVar $
+    pSumBuild (pSize vm) $ Lam indexTVar $
     lmApply_Dir dir (pIndex (Var indexTVar) vm)
                     (pIndex (Var indexTVar) vdx)
 

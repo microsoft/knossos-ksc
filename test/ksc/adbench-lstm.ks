@@ -9,14 +9,15 @@
 (def sigmoid Float (x : Float)
      (div 1.0 (add 1.0 (exp (neg x)))))
 
-(def exp$VecR (Vec n Float) ((v : Vec n Float))
-  (build n (lam (i : Integer) (exp (index i v)))))
+(def exp$VecR (Vec Float) ((v : Vec Float))
+ (let (n (size v))
+  (build n (lam (i : Integer) (exp (index i v))))))
 
 ; The other ADBench implementations add 2 to the logsumexp. It's not
 ; clear why they do that but we have to do the same to match.  See
 ;
 ;     https://github.com/awf/ADBench/issues/143
-(def logsumexp Float ((v : Vec n Float))
+(def logsumexp Float ((v : Vec Float))
     (log (add 2.0 (sum (exp$VecR v)))))
 
 (def fwd$tanh Float ((x : Float) (dx : Float))
@@ -33,16 +34,18 @@
 (edef Dt$tanh (Tuple Float (LM Float Float)) (Float))
 (edef tanh Float (Float))
 
-(def lstm_model (Tuple (Vec h Float) (Vec h Float))
-     ((wf : Vec h Float) (bf : Vec h Float)
-      (wi : Vec h Float) (bi : Vec h Float)
-      (wo : Vec h Float) (bo : Vec h Float)
-      (wc : Vec h Float) (bc : Vec h Float)
-      (hidden : Vec h Float)
-      (cell   : Vec h Float)
-      (input  : Vec h Float))
+; all Vecs size h
+(def lstm_model (Tuple (Vec Float) (Vec Float))
+     ((wf : Vec Float) (bf : Vec Float)
+      (wi : Vec Float) (bi : Vec Float)
+      (wo : Vec Float) (bo : Vec Float)
+      (wc : Vec Float) (bc : Vec Float)
+      (hidden : Vec Float)
+      (cell   : Vec Float)
+      (input  : Vec Float))
 
-     (let ((cell_out (build h (lam (hi : Integer)
+     (let ((h (size wf))
+           (cell_out (build h (lam (hi : Integer)
               (let ((forget  (sigmoid (add (mul (index hi input)  (index hi wf)) (index hi bf))))
                     (ingate  (sigmoid (add (mul (index hi hidden) (index hi wi)) (index hi bi))))
                     (change  (tanh    (add (mul (index hi hidden) (index hi wc)) (index hi bc)))))
@@ -52,29 +55,34 @@
                 (mul outgate (tanh (index hi cell_out))))))))
        (tuple hidden_out cell_out)))
 
-(def lstm_predict (Tuple (Vec h Float) (Vec l (Tuple (Vec h Float) (Vec h Float))))
+; Return (Tuple (Vec h Float) (Vec l (Tuple (Vec h Float) (Vec h Float)))
+; wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell : Vec l <tuple of (Vec h)s>
+; All others size h
+(def lstm_predict (Tuple (Vec Float) (Vec (Tuple (Vec Float) (Vec Float))))
      ((wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell :
-           Vec l (Tuple (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)))
+           Vec (Tuple (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)))
 
-      (in_weight  : Vec h Float)
-      (out_weight : Vec h Float)
-      (out_bias   : Vec h Float)
+      (in_weight  : Vec Float)
+      (out_weight : Vec Float)
+      (out_bias   : Vec Float)
 
-      (input : Vec h Float))
+      (input : Vec Float))
 
-     (let ((output1 (build h (lam (bi : Integer) (mul (index bi input) (index bi in_weight)))))
+     (let ((h (size in_weight))
+           (l (size wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell))
+           (output1 (build h (lam (bi : Integer) (mul (index bi input) (index bi in_weight)))))
            (final_output_i_o_v (fold (lam
                (layer_output_params
-                : (Tuple (Tuple Integer (Vec h Float) (Vec l (Tuple (Vec h Float) (Vec h Float))))
-                         (Tuple (Vec h Float) (Vec h Float)
-                                (Vec h Float) (Vec h Float)
-                                (Vec h Float) (Vec h Float)
-                                (Vec h Float) (Vec h Float)
-                                (Vec h Float) (Vec h Float))))
+                : (Tuple (Tuple Integer (Vec Float) (Vec (Tuple (Vec Float) (Vec Float))))
+                         (Tuple (Vec Float) (Vec Float)
+                                (Vec Float) (Vec Float)
+                                (Vec Float) (Vec Float)
+                                (Vec Float) (Vec Float)
+                                (Vec Float) (Vec Float))))
                (let ((i_layer_output_vec (get$1$2 layer_output_params))
                      (iteration (get$1$3 i_layer_output_vec))
                      (layer_output (get$2$3 i_layer_output_vec))
@@ -111,22 +119,26 @@
                             (index bi out_bias))))))
        (tuple output final_output_vec)))
 
+; sequence: Vec cm1 <tuple of (Vec h)s>
 (def lstm_objective Float
      ((wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell :
-           Vec l (Tuple (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)
-                        (Vec h Float) (Vec h Float)))
+           Vec (Tuple (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)
+                      (Vec Float) (Vec Float)))
 
-      (in_weight  : Vec h Float)
-      (out_weight : Vec h Float)
-      (out_bias   : Vec h Float)
-      (sequence : Vec cm1 (Tuple (Vec h Float) (Vec h Float))))
+      (in_weight  : Vec Float)
+      (out_weight : Vec Float)
+      (out_bias   : Vec Float)
+      (sequence : Vec (Tuple (Vec Float) (Vec Float))))
 
-     (let ((total_hidden (fold (lam (total_data_gold
-               : (Tuple (Tuple Float (Vec l (Tuple (Vec h Float) (Vec h Float))))
-                         (Tuple (Vec h Float) (Vec h Float))))
+     (let ((l (size wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell))
+           (h (size in_weight))
+           (cm1 (size sequence))
+           (total_hidden (fold (lam (total_data_gold
+               : (Tuple (Tuple Float (Vec (Tuple (Vec Float) (Vec Float))))
+                         (Tuple (Vec Float) (Vec Float))))
                    (let ((total_hidden (get$1$2 total_data_gold))
                          (total (get$1$2 total_hidden))
                          (hidden_cell (get$2$2 total_hidden))
