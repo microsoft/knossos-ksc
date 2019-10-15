@@ -294,7 +294,7 @@ cgenExpr = cgenExprR
 cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
 cgenExprR env = \case
   Konst k -> return $ CG "" (cgenKonst k) (mkCType $ typeofKonst k)
-  Var (TVar ty Dummy) ->
+  Dummy ty ->
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
 
@@ -315,9 +315,7 @@ cgenExprR env = \case
         ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
                   ++ cvar ++ " < " ++ szex ++ ";"
                   ++ " ++" ++ cvar ++ ") {\n"
-        ++ (case var of
-              Dummy -> ""
-              _ -> "   " ++ varcty ++ " " ++ cgenVar var ++ " = " ++ cvar ++ ";\n" )
+        ++ ("   " ++ varcty ++ " " ++ cgenVar var ++ " = " ++ cvar ++ ";\n" )
         ++ "   " ++ bodydecl ++ "\n"
         ++ "   " ++ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";\n"
         ++ "}\n"

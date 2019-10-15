@@ -50,8 +50,8 @@ isTrivial (Assert _ e2) = isTrivial e2
 isTrivial _ = False
 
 isDummy :: TExpr -> Bool
-isDummy (Var v) = isDummyVar (tVarVar v)
-isDummy _       = False
+isDummy (Dummy {}) = True
+isDummy _          = False
 
 -----------------------------------------------
 --     Substitution
@@ -62,6 +62,7 @@ substEMayCapture :: M.Map TVar TExpr -> TExpr -> TExpr
 -- But substEMayCapture is not really used
 -- The heavy lifting is done by OptLets.optLetsE, which /does/
 -- do capture-avoiding substitution.
+substEMayCapture subst (Dummy ty)     = Dummy ty
 substEMayCapture subst (Konst k)      = Konst k
 substEMayCapture subst (Var v)        = case M.lookup v subst of
                                Just e  -> e
@@ -119,6 +120,7 @@ freeVarsOf = go
    go :: TExpr -> S.Set TVar
    go (Var v)        = S.singleton v
    go (Konst _)      = S.empty
+   go (Dummy _)      = S.empty
    go (Tuple es)     = S.unions (map go es)
    go (If b t e)     = go b `S.union` go t `S.union` go e
    go (Call _ es)    = S.unions (map go es)
@@ -132,6 +134,7 @@ notFreeIn = go
  where
    go:: TVar -> TExpr -> Bool
    go v (Var v2)     = v /= v2
+   go v (Dummy {})   = True
    go v (Konst _)    = True
    go v (Tuple es)   = all (go v) es
    go v (If b t e)   = go v b && go v t && go v e
