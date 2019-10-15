@@ -4,10 +4,10 @@
 
 module KMonad where
 
-import Data.IORef
-import Control.Monad
+import Control.Monad.State hiding (liftIO)
+import qualified Control.Monad.State
 
-newtype KM a = KM { unKM :: IORef Uniq -> IO a }
+newtype KM a = KM { unKM :: StateT Uniq IO a }
 
 instance Functor KM where
   fmap f km = do { r <- km; return (f r) }
@@ -17,24 +17,22 @@ instance Applicative KM where
   (<*>) = ap
 
 instance Monad KM where
-  return x = KM (\_ -> return x)
-  KM km >>= k  = KM (\ur -> do { a <- km ur
-                              ; unKM (k a) ur })
+  return = KM . return
+  KM km >>= k  = KM $ do (km >>= (unKM . k))
 
 getUniq :: KM Uniq
-getUniq = KM (\ur -> do { uniq <- readIORef ur
-                        ; writeIORef ur (uniq+1)
-                        ; return uniq })
+getUniq = KM (do { uniq <- get
+                 ; put (uniq+1)
+                 ; return uniq })
 
 setUniq :: Uniq -> KM ()
-setUniq uniq = KM (\ur -> writeIORef ur uniq)
+setUniq uniq = KM (put uniq)
 
 runKM :: KM a -> IO a
-runKM (KM km) = do { ur <- newIORef initialUniq
-                   ; km ur }
+runKM (KM km) = evalStateT km initialUniq
 
 liftIO :: IO a -> KM a
-liftIO io = KM (\ur -> io)
+liftIO io = KM (Control.Monad.State.liftIO io)
 
 -----------------------------
 banner :: String -> KM ()
