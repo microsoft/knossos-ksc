@@ -7,19 +7,21 @@ module KMonad where
 import Control.Monad.State hiding (liftIO)
 import qualified Control.Monad.State
 
+newtype KMT m a = KM { unKM :: StateT Uniq m a }
+
 -- We use
 --  * Uniq state so we can allocate fresh names
 --  * IO so we can print debug output and type checker errors
-newtype KM a = KM { unKM :: StateT Uniq IO a }
+type KM = KMT IO
 
-instance Functor KM where
+instance Monad m => Functor (KMT m) where
   fmap f km = do { r <- km; return (f r) }
 
-instance Applicative KM where
+instance Monad m => Applicative (KMT m) where
   pure  = return
   (<*>) = ap
 
-instance Monad KM where
+instance Monad m => Monad (KMT m) where
   return = KM . return
   KM km >>= k  = KM $ do (km >>= (unKM . k))
 
