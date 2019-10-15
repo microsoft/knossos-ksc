@@ -9,17 +9,47 @@
     "categories": [
         "Programming Languages"
     ],
+    "activationEvents": [
+        "onLanguage:ks-lisp"
+    ],
+    "main": "./out/extension",
     "contributes": {
-        "languages": [{
-            "id": "ks-lisp",
-            "aliases": ["Knossos IR", "ks-lisp"],
-            "extensions": [".ks",".kso"],
-            "configuration": "./language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "ks-lisp",
-            "scopeName": "source.ks-lisp",
-            "path": "./syntaxes/Knossos.tmLanguage"
-        }]
+        "languages": [
+            {
+                "id": "ks-lisp",
+                "aliases": [
+                    "Knossos IR",
+                    "ks-lisp"
+                ],
+                "extensions": [
+                    ".ks",
+                    ".kso"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "ks-lisp",
+                "scopeName": "source.ks-lisp",
+                "path": "./syntaxes/Knossos.tmLanguage"
+            }
+        ]
+    },
+    "scripts": {
+        "compile": "tsc -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "watch": "tsc -watch -p ./",
+        "test": "mocha -u tdd out/test"
+    },
+    "devDependencies": {
+        "@types/assert": "^1.4.3",
+        "@types/mocha": "",
+        "@types/node": "",
+        "vscode": "^1.1.22"
+    },
+    "dependencies": {
+        "mocha": "^6.2.1",
+        "typescript": "^3.3.3"
     }
 }
