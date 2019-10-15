@@ -430,7 +430,7 @@ runTc what init_env (TCM m)
   , null rev_errs
   = return res
   | otherwise
-  = do { liftIO $ putStrLn $ render $
+  = do { printK $
          vcat [ text ""
               , text "--------------------------"
               , text "Type errors in" <+> text what
