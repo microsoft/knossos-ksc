@@ -115,24 +115,26 @@ data FloatDef p = FD (LetBndrX p) (ExprX p)
 instance InPhase p => Pretty (FloatDef p) where
   pprPrec _ (FD b e) = pprLetBndr @p b <+> char '=' <+> ppr e
 
-newtype AnfM p a = AnfM (KM ([FloatDef p], a))
+newtype AnfMT p m a = AnfM (KMT m ([FloatDef p], a))
+
+type AnfM p = AnfMT p IO
 
 runAnf :: InPhase p => AnfM p a -> KM a
 runAnf m = do { (fs, r) <- run m
               ; assert (text "runANF" <+> ppr fs) (null fs) $
                 return r }
 
-run :: AnfM p a -> KM ([FloatDef p], a)
+run :: AnfMT p m a -> KMT m ([FloatDef p], a)
 run (AnfM m) = m
 
-instance Applicative (AnfM p) where
+instance Monad m => Applicative (AnfMT p m) where
   pure  = return
   (<*>) = ap
 
-instance Functor (AnfM p) where
+instance Monad m => Functor (AnfMT p m) where
   fmap f m = do { x <- m; return (f x) }
 
-instance Monad (AnfM p) where
+instance Monad m => Monad (AnfMT p m) where
   return x = AnfM (return ([], x))
   m >>= k  = AnfM $ do { (fs1, x) <- run m
                        ; (fs2, r) <- run (k x)
