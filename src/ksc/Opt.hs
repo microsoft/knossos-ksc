@@ -128,6 +128,7 @@ optE env
                = e
                | otherwise = Var v
     go (Konst k)          = Konst k
+    go (Dummy ty)         = Dummy ty
     go (App e1 e2)        = optApp env (go e1) (go e2)
     go (Assert e1 e2)     = Assert (go e1) (go e2)
     go (Lam tv e)         = Lam tv' (optE env' e)

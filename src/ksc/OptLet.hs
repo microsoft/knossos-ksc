@@ -68,8 +68,10 @@ occAnalT TypeString  = (TypeString,  M.empty)
 occAnalT TypeUnknown = (TypeUnknown, M.empty)
 
 occAnalE :: TExpr -> (ExprX OccAnald, OccMap)
-occAnalE (Var v)   = (Var v, M.singleton v 1)
-occAnalE (Konst k) = (Konst k, M.empty)
+occAnalE (Var v)    = (Var v, M.singleton v 1)
+occAnalE (Konst k)  = (Konst k, M.empty)
+occAnalE (Dummy ty) = (Dummy ty, M.empty)
+
 occAnalE (App e1 e2)
   = (App e1' e2', M.union vs1 vs2)
   where
@@ -249,6 +251,7 @@ substExpr subst e
   = go e
   where
     go (Var tv)       = substVar subst tv
+    go (Dummy ty)     = Dummy (substType subst ty)
     go (Konst k)      = Konst k
     go (Call f es)    = Call f (map go es)
     go (If b t e)     = If (go b) (go t) (go e)
@@ -273,7 +276,6 @@ notInScope v in_scope
   = try (S.size in_scope)
   where
     (str, rebuild) = case v of
-            Dummy    -> error "Can't bind Dummy"
             Simple s -> (s, Simple)
             Delta  s -> (s, Delta)
             Grad s m -> (s, \s' -> Grad s' m)
@@ -322,6 +324,7 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
           | otherwise          = Let tv'' r' (go subst' b)
 
     go subst (Var tv)       = substVar subst tv
+    go _ubst (Dummy ty)     = Dummy ty
     go _ubst (Konst k)      = Konst k
     go subst (Call f es)    = Call f (map (go subst) es)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)

@@ -40,6 +40,7 @@ anfExpr subst e = wrapLets (anfE subst e)
 anfE :: Subst -> TExpr -> AnfM Typed TExpr
 anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
+anfE _ (Dummy ty)        = return (Dummy ty)
 anfE subst (Var tv)      = return (substVar subst tv)
 anfE subst (Call fun es)
  | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]

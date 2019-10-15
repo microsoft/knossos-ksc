@@ -39,7 +39,8 @@ import Test.Hspec.Runner (runSpec, defaultConfig)
 demoF :: ADPlan -> String -> IO ()
 -- Read source code from specified input file, optimise,
 -- differentiate, optimise, and display results of each step
-demoF = demoFFilter (Just 999) id
+-- demoF = demoFFilter (Just 999) id
+demoF = demoFFilter (Just 999) ignoreMain
 
 demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> String -> IO ()
 demoFFilter verbosity theFilter adp file = do
@@ -105,6 +106,9 @@ displayPassM mverbosity what env decls
 -------------------------------------
 -- GMM derivatives
 -------------------------------------
+
+ignoreMain :: [Decl] -> [Decl]
+ignoreMain = snd . moveMain
 
 moveMain :: [Decl]
          -> ( [Decl]    -- Singleton 'main' decl, or empty
@@ -364,7 +368,7 @@ demoFOnTestPrograms ksTests = do
       ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
   testOn ksTestsInModes $ \(ksTest, adp) -> do
-        demoFFilter Nothing (snd . moveMain) adp ksTest
+        demoFFilter Nothing ignoreMain adp ksTest
 
 testRunKS :: String -> String -> IO ()
 testRunKS compiler ksFile = do
@@ -401,7 +405,7 @@ testC :: String -> [String] -> IO ()
 testC compiler fsTestKs = do
   runSpec Main.hspec defaultConfig
   ksTestFiles_ <- ksTestFiles "test/ksc/"
-  testRoundTrip ksTestFiles_
+--  testRoundTrip ksTestFiles_
   demoFOnTestPrograms ksTestFiles_
   compileKscPrograms compiler ksTestFiles_
   testRunKS compiler "test/ksc/gmm.ks"
@@ -446,7 +450,7 @@ futharkPipeline file
 
   ; decls0 <- liftIO (parseF (file ++ ".ks"))
 
-  ; let (_main, decls)    = moveMain decls0
+  ; let decls = ignoreMain decls0
 
   ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
 

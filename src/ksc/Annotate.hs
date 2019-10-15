@@ -246,15 +246,14 @@ tcExpr (App fun arg)
                    ; return TypeUnknown }
        ; return (TE (App afun aarg) res_ty) }
 
+tcExpr (Dummy m_ty)
+  = case getMType @p m_ty of
+      Just ty -> return (TE (Dummy ty) ty)
+      Nothing -> do { addErr (text "Dummy var in untyped code")
+                    ; return (TE (Dummy TypeUnknown) TypeUnknown) }
+
 tcVar :: Var -> Maybe Type -> TcM Type
 tcVar var mb_ty
-  | isDummyVar var
-  = case mb_ty of
-      Just ty -> return ty
-      Nothing -> do { addErr (text "Dummy var in untyped code")
-                    ; return TypeUnknown }
-
-  | otherwise
   = do { ty <- lookupLclTc var
        ; checkTypes_maybe mb_ty ty $
          text "Variable occurrence mis-match for" <+> ppr var }
@@ -522,7 +521,8 @@ lookupLclTc v
            Nothing -> do {
               case Map.lookup (varFun v) (gblST st) of
                   Nothing -> do {
-                             addErr (text "Not in scope: local var/tld:" <+> ppr v <+> gblDoc st)
+                             addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
+                                          , text "Envt:" <+> gblDoc st ])
                              ; return TypeUnknown
                              }
                   Just (Def { def_fun  = _fn
