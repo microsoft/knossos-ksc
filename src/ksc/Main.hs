@@ -323,7 +323,7 @@ testRoundTrip ksFiles = do
     -- the original so instead we test
     --
     --     parsed = parsed_rendered_parsed
-    if (parsed /= parsed_rendered_parsed)
+    if parsed /= parsed_rendered_parsed
       then do
         print parsed
         print parsed_rendered_parsed
