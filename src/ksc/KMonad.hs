@@ -7,6 +7,9 @@ module KMonad where
 import Control.Monad.State hiding (liftIO)
 import qualified Control.Monad.State
 
+-- We use
+--  * Uniq state so we can allocate fresh names
+--  * IO so we can print debug output and type checker errors
 newtype KM a = KM { unKM :: StateT Uniq IO a }
 
 instance Functor KM where
