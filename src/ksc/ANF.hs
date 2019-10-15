@@ -8,7 +8,6 @@ module ANF where
 
 import Lang
 import OptLet( Subst, mkEmptySubst, substBndr, substVar )
-import Prim( isThePrimFun )
 import KMonad
 import Control.Monad( ap )
 
@@ -42,13 +41,7 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
 anfE _ (Dummy ty)        = return (Dummy ty)
 anfE subst (Var tv)      = return (substVar subst tv)
-anfE subst (Call fun es)
- | fun `isThePrimFun` "build"   -- See Note [Do not ANF first arg of build]
- , [e1,e2] <- es
- = do { e2' <- anfE1 subst e2
-      ; return (Call fun [e1, e2']) }
- | otherwise
- = Call fun <$> mapM (anfE1 subst) es
+anfE subst (Call fun es) = Call fun <$> mapM (anfE1 subst) es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = substBndr v subst
                                ; emit v' r'
@@ -79,19 +72,6 @@ atomise (Lam x e) = return (Lam x e) -- Don't separate build from lambda
 atomise e         = do { (b,v) <- newVar e
                        ; emit b e
                        ; return (Var v) }
-
-{- Note [Do not ANF first arg of build]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not want to transform
-   build (2*n) blah  ::: Vec (2*n) Float
-into
-   (let t1 = 2*n in build t1 blah) :: Vec t1 Float
-because the type makes no sense.
-
-An alternative would be to substitute for t1, in typeofExpr;
-and similarly in the type checker.  In some ways that would
-be nicer, but I have not tried it.
--}
 
 {- Note [Cloning during ANF]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

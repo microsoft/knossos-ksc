@@ -1,17 +1,18 @@
-(def expv (Vec n Float) (v : Vec n Float)
-   (build n (lam (i : Integer) (exp (index i v)))))
+(def expv (Vec Float) (v : Vec Float)
+ (let (n (size v))
+   (build n (lam (i : Integer) (exp (index i v))))))
 
-(def sum@V[[Float]] Float (v : Vec n Float)
+(def sum@V[[Float]] Float (v : Vec Float)
    (sum v))
 
 (def log@Float Float (v : Float)
    (log v))
 
-(edef maximum Float ((Vec n Float)))
-(edef D$maximum (LM (Vec n Float) Float) ((Vec n Float)))
-(edef Dt$maximum (Tuple Float (LM (Vec n Float) Float)) ((Vec n Float)))
-(edef fwd$maximum Float ((Vec n Float) (Vec n Float)))
-(edef rev$maximum (Vec n Float) ((Vec n Float) Float))
+(edef maximum Float ((Vec Float)))
+(edef D$maximum (LM (Vec Float) Float) ((Vec Float)))
+(edef Dt$maximum (Tuple Float (LM (Vec Float) Float)) ((Vec Float)))
+(edef fwd$maximum Float ((Vec Float) (Vec Float)))
+(edef rev$maximum (Vec Float) ((Vec Float) Float))
 
 (edef lgamma Float (Float))
 (edef D$lgamma (LM Float Float) (Float))
@@ -49,40 +50,43 @@
 (def sub@Float,Float Float ((a : Float) (b : Float))
    (sub a b))
 
-(def sub@V[[Float]],Float (Vec n Float) ((a : Vec n Float) (b : Float))
-    (build n (lam (i : Integer) (sub (index i a) b))))
+(def sub@V[[Float]],Float (Vec Float) ((a : Vec Float) (b : Float))
+  (let (n (size a))
+    (build n (lam (i : Integer) (sub (index i a) b)))))
 
-(def sub@V[[Float]],V[[Float]] (Vec n Float) ((a : Vec n Float) (b : Vec n Float))
-    (build n (lam (i : Integer) (sub (index i a) (index i b)))))
+(def sub@V[[Float]],V[[Float]] (Vec Float) ((a : Vec Float) (b : Vec Float))
+  (let (n (size a))
+    (build n (lam (i : Integer) (sub (index i a) (index i b))))))
 
 (def sqr Float (a : Float)
    (mul a a))
 
 ; mul Mat Vec
-(edef mul$Mat$Vec (Vec m Float) ((Vec m (Vec n Float)) (Vec n Float)))
+(edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
 
-(edef D$mul$Mat$Vec (LM (Tuple (Vec m (Vec n Float)) (Vec n Float)) (Vec m Float))
-          ((Vec m (Vec n Float)) (Vec n Float)))
-(edef Dt$mul$Mat$Vec (Tuple (Vec m Float) (LM (Tuple (Vec m (Vec n Float)) (Vec n Float)) (Vec m Float)))
-          ((Vec m (Vec n Float)) (Vec n Float)))
+(edef D$mul$Mat$Vec (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
+          ((Vec (Vec Float)) (Vec Float)))
+(edef Dt$mul$Mat$Vec (Tuple (Vec Float) (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
+          ((Vec (Vec Float)) (Vec Float)))
 
-(edef R$mul$Mat$Vec (LM (Vec m Float) (Tuple (Vec m (Vec n Float)) (Vec n Float)))
-          ((Vec m (Vec n Float)) (Vec n Float)))
+(edef R$mul$Mat$Vec (LM (Vec Float) (Tuple (Vec (Vec Float)) (Vec Float)))
+          ((Vec (Vec Float)) (Vec Float)))
 
-(def fwd$mul$Mat$Vec (Vec m Float)
-          ((M : Vec m (Vec n Float)) (v : Vec n Float) (dM : Vec m (Vec n Float)) (dv : Vec n Float))
+(def fwd$mul$Mat$Vec (Vec Float)
+          ((M : Vec (Vec Float)) (v : Vec Float) (dM : Vec (Vec Float)) (dv : Vec Float))
     (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv)))
 
-(edef rev$mul$Mat$Vec (Tuple (Vec m (Vec n Float)) (Vec n Float))
-          ((Vec m (Vec n Float)) (Vec n Float) (Vec m Float)))
+(edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
+          ((Vec (Vec Float)) (Vec Float) (Vec Float)))
 
-(def mvmul (Vec m Float) ((a : Vec m (Vec n Float)) (b : Vec n Float))
+(def mvmul (Vec Float) ((a : Vec (Vec Float)) (b : Vec Float))
    (mul$Mat$Vec a b))
 
-(def sqnorm Float (v : Vec n Float)
-   (sum (build n (lam (i : Integer) (sqr (index i v))))))
+(def sqnorm Float (v : Vec Float)
+  (let (n (size v))
+   (sum (build n (lam (i : Integer) (sqr (index i v)))))))
 
-;;(def map (Vec n 'b) ((f : Lambda 'a 'b) (v : Vec n 'a))
+;;(def map (Vec 'b) ((f : Lambda 'a 'b) (v : Vec 'a))
 ;;   (build n (lam (i : Integer) (f (index i v)))))
 
 (def gt@Float Bool ((a : Float) (b : Float))
