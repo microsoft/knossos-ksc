@@ -25,15 +25,15 @@ instance Monad m => Monad (KMT m) where
   return = KM . return
   KM km >>= k  = KM $ do (km >>= (unKM . k))
 
-getUniq :: KM Uniq
+getUniq :: Monad m => KMT m Uniq
 getUniq = KM (do { uniq <- get
                  ; put (uniq+1)
                  ; return uniq })
 
-setUniq :: Uniq -> KM ()
+setUniq :: Monad m => Uniq -> KMT m ()
 setUniq uniq = KM (put uniq)
 
-runKM :: KM a -> IO a
+runKM :: Monad m => KMT m a -> m a
 runKM (KM km) = evalStateT km initialUniq
 
 liftIO :: IO a -> KM a
