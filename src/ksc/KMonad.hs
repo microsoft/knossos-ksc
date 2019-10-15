@@ -51,4 +51,3 @@ type Uniq = Int
 
 initialUniq :: Uniq
 initialUniq = 1
-
