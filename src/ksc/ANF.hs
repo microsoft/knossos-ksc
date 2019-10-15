@@ -13,13 +13,13 @@ import KMonad
 import Control.Monad( ap )
 
 -- anfDefs :: (GenBndr p) => [DefX p] -> KM [DefX p]
-anfDefs :: [TDef] -> KM [TDef]
+anfDefs :: Monad m => [TDef] -> KMT m [TDef]
 anfDefs defs = runAnf $
                mapM anfD defs
 
 -----------------------------------------------
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
-anfD :: TDef -> AnfM Typed TDef
+anfD :: Monad m => TDef -> AnfMT Typed m TDef
 anfD def@(Def { def_rhs  = rhs
               , def_args = args })
   = case rhs of
@@ -31,13 +31,13 @@ anfD def@(Def { def_rhs  = rhs
       StubRhs{} -> return def
 
 -- anfExpr :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
-anfExpr :: Subst -> TExpr -> AnfM Typed TExpr
+anfExpr :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
 anfExpr subst e = wrapLets (anfE subst e)
 
 -- See Note [Cloning during ANF]
 --
 -- anfE :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
-anfE :: Subst -> TExpr -> AnfM Typed TExpr
+anfE :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
 anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
 anfE subst (Var tv)      = return (substVar subst tv)
@@ -65,13 +65,13 @@ anfE subst (Assert e1 e2) = do { e1' <- anfE subst e1
                                ; return (Assert e1' e2') }
 
 -- anfE1 :: GenBndr p => ExprX p -> AnfM p (ExprX p)
-anfE1 :: Subst -> TExpr -> AnfM Typed TExpr
+anfE1 :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
 -- Returns an atomic expression
 anfE1 subst e = do { e' <- anfE subst e
                    ; atomise e' }
 
 -- atomise :: GenBndr p => ExprX p -> AnfM p (ExprX p)
-atomise :: TExpr -> AnfM Typed TExpr
+atomise :: Monad m => TExpr -> AnfMT Typed m TExpr
 atomise (Var v)   = return (Var v)
 atomise (Konst k) = return (Konst k)
 atomise (Lam x e) = return (Lam x e) -- Don't separate build from lambda
@@ -119,7 +119,7 @@ newtype AnfMT p m a = AnfM (KMT m ([FloatDef p], a))
 
 type AnfM p = AnfMT p IO
 
-runAnf :: InPhase p => AnfM p a -> KM a
+runAnf :: (Monad m, InPhase p) => AnfMT p m a -> KMT m a
 runAnf m = do { (fs, r) <- run m
               ; assert (text "runANF" <+> ppr fs) (null fs) $
                 return r }
@@ -140,14 +140,14 @@ instance Monad m => Monad (AnfMT p m) where
                        ; (fs2, r) <- run (k x)
                        ; return (fs1 ++ fs2, r) }
 
-wrapLets :: AnfM p (ExprX p) -> AnfM p (ExprX p)
+wrapLets :: Monad m => AnfMT p m (ExprX p) -> AnfMT p m (ExprX p)
 wrapLets (AnfM m) = AnfM $ do { (fs, e) <- m
                               ; return ([], wrap fs e) }
 
 wrap :: [FloatDef p] -> ExprX p -> ExprX p
 wrap fs e = foldr (\(FD v r) b -> Let v r b) e fs
 
-emit :: LetBndrX p -> ExprX p -> AnfM p ()
+emit :: Monad m => LetBndrX p -> ExprX p -> AnfMT p m ()
 emit v r = AnfM (return ([FD v r], ()))
 
 ---------------------------------
@@ -164,5 +164,5 @@ instance GenBndr Typed where
     where
        tv = mkTVar (typeof e) ("t" ++ show u)
 
-newVar :: GenBndr p => ExprX p -> AnfM p (LetBndrX p, VarX p)
+newVar :: (Monad m, GenBndr p) => ExprX p -> AnfMT p m (LetBndrX p, VarX p)
 newVar e = AnfM $ do { u <- getUniq; return ([], mkNewVar u e) }
