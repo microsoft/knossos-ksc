@@ -172,6 +172,20 @@ deriving instance Show (DefX Typed)
 deriving instance Show (DeclX Typed)
 deriving instance Show (RuleX Typed)
 
+deriving instance Eq (TypeX Parsed)
+deriving instance Eq (TVarX Parsed)
+deriving instance Eq (ExprX Parsed)
+deriving instance Eq (RhsX Parsed)
+deriving instance Eq (DefX Parsed)
+deriving instance Eq (DeclX Parsed)
+deriving instance Eq (RuleX Parsed)
+
+deriving instance Show (TVarX Parsed)
+deriving instance Show (RhsX Parsed)
+deriving instance Show (DefX Parsed)
+deriving instance Show (DeclX Parsed)
+deriving instance Show (RuleX Parsed)
+
 -- TypeSize is used to document when an integer represents a Size.
 -- It's too viral to use a separate Integer type because most integer operations
 -- need to be supported, e.g. the size of a lower-triangular matrix is d*(d+1)/2
