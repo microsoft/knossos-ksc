@@ -1,20 +1,20 @@
 (def f Float (t : Tuple Float (Tuple Float Float))
      0.0)
 
-(def fold_f Float ((env : Float) (i : Integer) (v : Vec n Float) (acc : Float))
+(def fold_f Float ((env : Float) (i : Integer) (v : Vec Float) (acc : Float))
      (if
-         (eq i n)
+         (eq i (size v))
          acc
        (fold_f env (add i 1) v (f (tuple env (tuple acc (index i v)))))))
 
-(def prod Float ((i : Integer) (v : Vec n Float) (acc : Float))
+(def prod Float ((i : Integer) (v : Vec Float) (acc : Float))
      (if
-         (eq i n)
+         (eq i (size v))
          acc
        (prod (add i 1) v (mul acc (index i v)))))
 
 ; This ends up calculating prod(v) * pow(closure, size(v))
-(def prod_fold Float ((v : Vec n Float) (closure : Float))
+(def prod_fold Float ((v : Vec Float) (closure : Float))
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
@@ -24,7 +24,7 @@
 
 ;; Check that it works with an environment type that isn't its own
 ;; tangent type
-(def prod_fold_integer_env Float ((v : Vec n Float) (ignored : Integer))
+(def prod_fold_integer_env Float ((v : Vec Float) (ignored : Integer))
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
@@ -34,7 +34,7 @@
 
 ;; Check that it works with an accumulator type that isn't its own
 ;; tangent type
-(def prod_fold_integer_acc Integer (v : Vec n Float)
+(def prod_fold_integer_acc Integer (v : Vec Float)
      (fold (lam (acc_x : Tuple Integer Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
@@ -44,7 +44,7 @@
 
 ;; Check that it works with a vector element type that isn't its own
 ;; tangent type
-(def prod_fold_integer_v Float (v : Vec n Integer)
+(def prod_fold_integer_v Float (v : Vec Integer)
      (fold (lam (acc_x : Tuple Float Integer)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
@@ -56,9 +56,9 @@
                     (scale : Float))
        (mul ($ranhashdoub seed) scale))
 
-(def mkvec (Vec n Float) ((seed  : Integer)
-                          (n     : Integer)
-                          (scale : Float))
+(def mkvec (Vec Float) ((seed  : Integer)
+                        (n     : Integer)
+                        (scale : Float))
     (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
 
 (def main Integer ()

@@ -40,8 +40,8 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: Fun
-        , def_args   :: [TVarX p]  -- See Note [Function arity]
-        , def_res_ty :: TypeX p    -- Result type
+        , def_args   :: [TVar]  -- See Note [Function arity]
+        , def_res_ty :: Type    -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
   -- (via TVar) and result types (via TFun)
@@ -64,18 +64,17 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
-data TVarX p = TVar (TypeX p) Var
-type TVar = TVarX Typed
+data TVar = TVar Type Var
 
 deriving instance Eq TVar
 deriving instance Ord TVar
 instance Show TVar where
   show e = pps e
 
-tVarVar :: TVarX p -> Var
+tVarVar :: TVar -> Var
 tVarVar (TVar _ v) = v
 
-tVarType :: TVarX p -> TypeX p
+tVarType :: TVar -> Type
 tVarType (TVar ty _) = ty
 
 -- MTypeX pm
@@ -105,8 +104,8 @@ type family VarX p where
 
 type family LetBndrX p where
   LetBndrX Parsed   = Var
-  LetBndrX Typed    = TVarX Typed
-  LetBndrX OccAnald = (Int, TVarX OccAnald)
+  LetBndrX Typed    = TVar
+  LetBndrX OccAnald = (Int, TVar)
 
 type family FunX p where
   FunX Parsed   = Fun
@@ -118,7 +117,7 @@ data ExprX p
   | Var  (VarX p)
   | Call (FunX p) [ExprX p]   -- f e
   | Tuple [ExprX p]           -- (e1, ..., en)
-  | Lam (TVarX p) (ExprX p)   -- Lambda-bound variable is typed from birth
+  | Lam TVar (ExprX p)   -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)  -- FIXME make cond ExprX?
@@ -129,9 +128,7 @@ instance InPhase p => Show (ExprX p) where
   show e = pps e
 
 type Expr  = ExprX Parsed
-
 type TExpr = ExprX Typed
-type Type  = TypeX Typed
 
 data TypedExpr = TE TExpr Type   -- A pair of an expression and its type
 
@@ -144,25 +141,24 @@ unzipTEs (TE e t : tes) = (e:es, t:ts)
   where
     (es, ts) = unzipTEs tes
 
-data TypeX p
+data Type
   = TypeBool
   | TypeInteger
   | TypeFloat
   | TypeString
-  | TypeTuple [TypeX p]
+  | TypeTuple [Type]
 
-  | TypeVec (ExprX p)  -- Size and element type
-            (TypeX p)  -- The TExpr must have TypeInteger
+  | TypeVec Type
 
-  | TypeLam (TypeX p) (TypeX p)  -- Domain -> Range
-  | TypeLM  (TypeX p) (TypeX p)  -- Linear map  Src -o Target
+  | TypeLam Type Type   -- Domain -> Range
+  | TypeLM  Type Type   -- Linear map  Src -o Target
 
   | TypeUnknown
 
 deriving instance Eq  Type
 deriving instance Ord Type
 
-instance InPhase p => Show (TypeX p) where
+instance Show Type where
   show e = pps e
 
 -- Round trip testing requires that two different DeclXs be checked
@@ -179,15 +175,12 @@ deriving instance Show (DefX Typed)
 deriving instance Show (DeclX Typed)
 deriving instance Show (RuleX Typed)
 
-deriving instance Eq (TVarX Parsed)
-deriving instance Eq (TypeX Parsed)
 deriving instance Eq (ExprX Parsed)
 deriving instance Eq (RhsX Parsed)
 deriving instance Eq (DefX Parsed)
 deriving instance Eq (DeclX Parsed)
 deriving instance Eq (RuleX Parsed)
 
-deriving instance Show (TVarX Parsed)
 deriving instance Show (RhsX Parsed)
 deriving instance Show (DefX Parsed)
 deriving instance Show (DeclX Parsed)
@@ -216,7 +209,7 @@ isScalar = \case
 tangentType :: HasCallStack => Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
-tangentType (TypeVec s t ) = TypeVec s (tangentType t)
+tangentType (TypeVec t)    = TypeVec (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
 tangentType TypeInteger    = TypeTuple []
 tangentType TypeBool       = TypeTuple []
@@ -226,7 +219,7 @@ tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
 
 eqType :: Type -> Type -> Bool
-eqType (TypeVec sz1 ty1) (TypeVec sz2 ty2) = eqType ty1 ty2 && eqSize sz1 sz2
+eqType (TypeVec ty1)    (TypeVec ty2)   = eqType ty1 ty2
 eqType (TypeTuple tys1) (TypeTuple tys2) =
   (length tys1 == length tys2) && (and (zipWith eqType tys1 tys2))
 eqType (TypeLM s1 t1) (TypeLM s2 t2) = eqType s1 s2 && eqType t1 t2
@@ -288,7 +281,7 @@ data Konst = KInteger Integer   -- :: TypeInteger
            deriving( Eq, Ord, Show )
 
 data RuleX p = Rule { ru_name  :: String   -- Just for logging
-                    , ru_qvars :: [TVarX p]
+                    , ru_qvars :: [TVar]
                     , ru_lhs   :: ExprX p
                     , ru_rhs   :: ExprX p }
   -- When matching may bind any of the ru_qvars, which are typed,
@@ -325,7 +318,7 @@ mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
 mkVar :: String -> Var  -- Just a Simple var
 mkVar = Simple
 
-mkTVar :: TypeX p -> String -> TVarX p
+mkTVar :: Type -> String -> TVar
 mkTVar ty s = TVar ty (mkVar s)
 
 resVar :: Var
@@ -624,7 +617,7 @@ instance InPhase Parsed where
 
 instance InPhase Typed where
   pprVar     = ppr
-  pprLetBndr = ppr
+  pprLetBndr = pprTVar
   pprFunOcc (TFun _ f) = ppr f
 
   getMType ty              = Just ty
@@ -637,20 +630,17 @@ instance InPhase OccAnald where
   pprLetBndr (n,tv)    = pprTVar tv <> braces (int n)
   pprFunOcc (TFun _ f) = ppr f
 
-  getMType   ty            = Just ty
-  getVar     (TVar ty var) = (var,        Just ty)
-  getFun     (TFun ty fun) = (fun,        Just ty)
-  getLetBndr (_, tv)       = (tVarVar tv, Nothing)
-    -- This last case is awkward. _ty :: TypeX OccAnald
-    -- and we could convert it to a Type, but it does not
-    -- see worth the bother.  Nothing is fine, actually
+  getMType   ty                 = Just ty
+  getVar     (TVar ty var)      = (var, Just ty)
+  getFun     (TFun ty fun)      = (fun, Just ty)
+  getLetBndr (_, (TVar ty var)) = (var, Just ty)
 
 pprMTypeX :: forall p. InPhase p => MTypeX p -> SDoc
 pprMTypeX mty = case getMType @p mty of
                  Just ty -> ppr ty
                  Nothing -> empty
 
-pprTVar :: forall p. InPhase p => TVarX p -> SDoc
+pprTVar :: TVar -> SDoc
 pprTVar (TVar ty v)
   = ppr v <+> text ":" <+> ppr ty
 
@@ -728,9 +718,9 @@ instance Pretty Konst where
   pprPrec _ (KString s)  = text (show s)
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
-instance InPhase p => Pretty (TypeX p) where
-  pprPrec p (TypeVec sz ty)      = parensIf p precTyApp $
-                                   text "Vec" <+> pprParendExpr sz <+> pprParendType ty
+instance Pretty Type where
+  pprPrec p (TypeVec ty)         = parensIf p precTyApp $
+                                   text "Vec" <+> pprParendType ty
   pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
                                         (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to)    = parensIf p precZero $
@@ -743,7 +733,7 @@ instance InPhase p => Pretty (TypeX p) where
   pprPrec _ TypeBool             = text "Bool"
   pprPrec _ TypeUnknown          = text "UNKNOWN"
 
-pprParendType :: InPhase p => TypeX p -> SDoc
+pprParendType :: Type -> SDoc
 pprParendType = pprPrec precTop
 
 type Prec = Int
@@ -772,8 +762,8 @@ pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
   where rest = pprList ppr es
-pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar @phase v) <+> ppr e)
-                            (parens $ text "lam" <+> vcat [parens (pprTVar @phase v), ppr e])
+pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar v) <+> ppr e)
+                            (parens $ text "lam" <+> vcat [parens (pprTVar v), ppr e])
 pprExpr p (Let v e1 e2) = mode
   (pprLetSexp v e1 e2)
   (parensIf

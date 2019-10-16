@@ -14,6 +14,7 @@ import Data.Maybe (mapMaybe)
 -- for unit test
 --import Test.Hspec
 
+
 --------------- Generate names for gradded indentifiers
 
 gradF :: HasCallStack => ADPlan -> Fun -> Fun
@@ -33,19 +34,18 @@ mkGradTVar :: HasCallStack => ADPlan -> Type -> Var -> Type -> TVar
 mkGradTVar adp s var ty
   = TVar (mkGradType adp s ty) var
 
-gradTVar :: ADPlan -> Type -> TVar -> TVar
-gradTVar adp s (TVar ty v) = mkGradTVar adp s (gradV adp v) ty
+gradTVar :: ADPlan -> Shape -> TVar -> TVar
+gradTVar adp s (TVar ty v) = mkGradTVar adp (typeof s) (gradV adp v) ty
 
-lmSelFun :: [TVar] -> TVar -> Int -> TExpr
--- (gradSelFun i n) selects the i'th component of a n-tuple
+lmSelFun :: [TVar] -> TVar -> TExpr
+-- (lmSelFun ps p) selects the i'th component of a n-tuple
 -- Result expr has type (t1, ..., tn) -o ti
 --  or its transpose depending on direction
-lmSelFun params pi i
-  = lmHCat [ lm pj j | (pj,j) <- params `zip` [1..] ]
+lmSelFun params pi
+  = lmHCat (map lm params)
   where
-    pi_ty = typeof pi
-    lm pj j | i == j    = lmOne pi_ty
-            | otherwise = lmZero (typeof pj) pi_ty
+    lm pj | pi == pj  = lmOne (typeof pi)
+          | otherwise = lmZero (Var pj) (Var pi)
 
 -------------------------------------------------
 
@@ -59,34 +59,28 @@ gradDef adp
   = Just $
     Def { def_fun    = gradF adp f
         , def_args   = params
-        , def_res_ty = mkGradType adp s res_ty
+        , def_res_ty = mkGradType adp s_ty res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs)) }
   where
-    param1 :: TExpr
-    param1 = mkTuple (map Var params)
-    s = typeof param1
+    s :: TExpr
+    s = mkTuple (map Var params)
+    s_ty = typeof s
 
-    lets = plets ++ szlets
-
-    plets = [ (gradTVar adp s p, mkGradTuple adp (Var p) lm)
-            | (p,i) <- params `zip` [1..]
-            , let lm = lmSelFun params p i ]
-
-    szlets = [ (gradTVar adp s p, mkGradTuple adp (Var p)
-                                     (lmZero s TypeSize))
-             | p <- paramsSizeBinders params]
+    lets = [ (gradTVar adp s p, mkGradTuple adp (Var p) lm)
+           | p <- params
+           , let lm = lmSelFun params p ]
 
 gradDef _ _ = Nothing
 
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
-gradE :: HasCallStack => ADPlan -> Type -> TExpr -> TExpr
+gradE :: HasCallStack => ADPlan -> Shape -> TExpr -> TExpr
 gradE adp s e@(Konst _)    = mkGradTuple adp e lm_zero
   where
-    lm_zero = lmZero s (typeof e)
+    lm_zero = lmZero s e
 
 gradE adp s (Var tv)       = Var (gradTVar adp s tv)
-gradE adp s (Dummy ty)     = Dummy (mkGradType adp s ty)
+gradE adp s (Dummy ty)     = Dummy (mkGradType adp (typeof s) ty)
 gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
 gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
@@ -121,11 +115,11 @@ gradE adp s (Call f [Lam ti body, acc, v])
 gradE adp s (Call f args) = gradCall adp s f args
 
 ---------------
-gradBuild :: ADPlan -> Type -> TExpr -> TVar -> TExpr -> TExpr
+gradBuild :: ADPlan -> Shape -> TExpr -> TVar -> TExpr -> TExpr
 gradBuild BasicAD s n ti body
   = lmVCatV $
     pBuild n $ Lam ti $
-    mkLet (gradTVar BasicAD s ti) (lmZero s (typeof ti)) $
+    mkLet (gradTVar BasicAD s ti) (lmZero s (Var ti)) $
     gradE BasicAD s body
 
 gradBuild TupleAD s n ti body
@@ -135,20 +129,21 @@ gradBuild TupleAD s n ti body
   where
      t_ty = typeof body
      p = TVar res_ty resVar
-     res_ty = TypeTuple [ TypeVec n t_ty, TypeVec n (TypeLM s t_ty) ]
+     res_ty = TypeTuple [ TypeVec t_ty
+                        , TypeVec (TypeLM (typeof s) t_ty) ]
      grad_body = mkLet (gradTVar TupleAD s ti)
-                       (Tuple [Var ti, lmZero s (typeof ti)]) $
+                       (Tuple [Var ti, lmZero s (Var ti)]) $
                  gradE TupleAD s body
 ---------------
-gradFold :: ADPlan -> Type -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
+gradFold :: ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
 gradFold BasicAD s ti body acc v =
-  lmFold (mkZero (tangentType s)) (Lam ti body) (Lam ti bodyAdjusted) acc v
+  lmFold (mkTangentZero s) (Lam ti body) (Lam ti bodyAdjusted) acc v
   `lmCompose`
   args
-  where body' = mkLet (gradTVar BasicAD ty' ti)
-                      (lmHCat [lmZero s (typeof ti), lmOne (typeof ti)])
-                $ gradE BasicAD ty' body
-        ty' = TypeTuple [s, typeof ti]
+  where body' = mkLet (gradTVar BasicAD s' ti)
+                      (lmHCat [lmZero s (Var ti), lmOne (typeof ti)])
+                $ gradE BasicAD s' body
+        s' = Tuple [s, Var ti]
 
         -- The gradded free variables occurring in `body'` are linear
         -- maps whose domain is `ty'` (because they were created with
@@ -163,21 +158,21 @@ gradFold BasicAD s ti body acc v =
         -- `\ti.body`.
         bodyAdjusted = foldr adjustGrad body' (freeVarsOf (Lam ti body))
           where
-            adjustGrad v = mkLet (grad ty' v) (adjust (grad s v))
+            adjustGrad v = mkLet (grad s' v) (adjust (grad s v))
             grad = gradTVar BasicAD
-            adjust v = Var v `lmCompose` lmHCat [lmOne s, lmZero (typeof ti) s]
+            adjust v = Var v `lmCompose` lmHCat [lmOne (typeof s), lmZero (Var ti) s]
 
         args = lmVCat
-               [ lmOne s
+               [ lmOne (typeof s)
                , lmVCat (map (gradE BasicAD s) [acc, v]) ]
 
 -- Just a dummy for tuple mode.  We don't calculate it properly yet.
 gradFold TupleAD s _ti _body acc _v =
-  lmDummyFold (TypeTuple [t_acc, TypeLM s t_acc])
+  lmDummyFold (TypeTuple [t_acc, TypeLM (typeof s) t_acc])
   where t_acc = typeof acc
 
 ---------------
-gradCall :: ADPlan -> Type -> TFun -> [TExpr] -> TExpr
+gradCall :: ADPlan -> Shape -> TFun -> [TExpr] -> TExpr
 gradCall BasicAD s f args
   = lmCompose (Call gf args) (lmVCat (map (gradE BasicAD s) args))
   where
@@ -214,11 +209,11 @@ gradCall TupleAD s f args
       | otherwise
       = (Var arg_var, pFst (Var arg_var), Just (arg_var, grad_arg))
       where
-        arg_var  = mkGradTVar TupleAD s (mkArgVar i) (typeof arg)
+        arg_var  = mkGradTVar TupleAD (typeof s) (mkArgVar i) (typeof arg)
         grad_arg = gradE TupleAD s arg
 
 ----------------------
-gradLet :: HasCallStack => ADPlan -> Type -> TVar -> TExpr -> TExpr -> TExpr
+gradLet :: HasCallStack => ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr
 gradLet BasicAD s v e1 e2
   = mkLet v e1                                        $
     mkLet (gradTVar BasicAD s v) (gradE BasicAD s e1) $

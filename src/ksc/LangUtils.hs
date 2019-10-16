@@ -17,7 +17,6 @@ module LangUtils (
 
   -- Free vars
   notFreeIn, notFreeInType, newVarNotIn, freeVarsOf,
-  paramsSizeBinders, typesSizeBinders,
 
   -- Tests
   LangUtils.hspec, test_FreeIn,
@@ -35,7 +34,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Test.Hspec
 import Debug.Trace( trace )
-import Data.List( nub )
 
 -----------------------------------------------
 --     Functions over expressions
@@ -80,40 +78,6 @@ substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
 --     Free variables
 -----------------------------------------------
 
--- Note [paramsSizeBinders]
---
--- Get the vector size binders bound by the type of the parameters
--- E.g.   (x :: Vec n Float, y :: (Vec m (Vec n Float), Float))
---        binds m and n
--- Notes:
---   1. we do not consider (Vec (n+m) Float) as binding anything
---   2. a duplicate (e.g. n above) enters twice with the same definition
---      at codegen the second defn is an assert of equality
---   3. perhaps it should, in fact, only return those type size
---      binders that are *not* bound by an arg, that is
---          (n :: Integer, x :: Vec n Float, y :: (Vec m (Vec n Float), Float))
---      should not return n.  This behaviour is still in discussion
---      and yet to be implemented
-paramsSizeBinders :: forall p. InPhase p =>  [TVarX p] -> [TVar]
-paramsSizeBinders vs = nub (concatMap paramSizeBinders vs)
-
-paramSizeBinders :: forall p. InPhase p => TVarX p -> [TVar]
-paramSizeBinders (TVar ty _) = typeSizeBinders ty
-
-typesSizeBinders :: forall p. InPhase p => [TypeX p] -> [TVar]
-typesSizeBinders tys = concatMap typeSizeBinders tys
-
-typeSizeBinders :: forall p. InPhase p => TypeX p -> [TVar]
--- Find any (Vec n ty) types, and return the 'n' part
-typeSizeBinders ty = go ty
-  where
-    go (TypeVec (Var vx) ty) = TVar TypeInteger v : go ty
-                             where
-                               (v, _) = getVar @p vx
-    go (TypeTuple ts)        = concatMap go ts
-    go (TypeLM t1 t2)        = go t1 ++ go t2
-    go _                     = []
-
 freeVarsOf :: TExpr -> S.Set TVar
 freeVarsOf = go
   where
@@ -146,7 +110,7 @@ notFreeIn = go
 
 notFreeInType :: TVar -> Type -> Bool
 notFreeInType v (TypeTuple tys) = all (notFreeInType v) tys
-notFreeInType v (TypeVec sz ty) = v `notFreeIn` sz && v `notFreeInType` ty
+notFreeInType v (TypeVec ty)    = v `notFreeInType` ty
 notFreeInType v (TypeLam t1 t2) = v `notFreeInType` t1 && v `notFreeInType` t2
 notFreeInType v (TypeLM t1 t2)  = v `notFreeInType` t1 && v `notFreeInType` t2
 notFreeInType _ _ = True
@@ -246,4 +210,3 @@ extendLclST lst vars = foldl add lst vars
   where
     add :: LclSymTab -> TVar -> LclSymTab
     add env (TVar ty v) = M.insert v ty env
-

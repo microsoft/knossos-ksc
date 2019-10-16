@@ -6,6 +6,7 @@ module Prim where
 
 import Lang
 import GHC.Stack
+import Data.Maybe
 import Control.Monad( zipWithM )
 
 --------------------------------------------
@@ -43,14 +44,6 @@ mkPrimCall6 f a b c d e g = mkPrimCall f [a, b, c, d, e, g]
 mkPrimCall7 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall7 f a b c d e g h = mkPrimCall f [a, b, c, d, e, g, h]
 
-mkZero :: HasCallStack => Type -> TExpr
--- (mkZero t) returns the zero of t
--- It should never be applied to types that don't have a zero
-mkZero TypeFloat      = Konst (KFloat 0.0)
-mkZero (TypeVec n t)  = pConstVec n (mkZero t)
-mkZero (TypeTuple ts) = Tuple (map mkZero ts)
-mkZero t              = pprPanic "mkZero" (ppr t)
-
 --------------------------------------------
 --  Parsing function names
 --------------------------------------------
@@ -84,14 +77,77 @@ mk_fun f = case find_dollar f of
                      _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
 
 
+---------------------------
+-- Zeros
+---------------------------
+mkZero, mkTangentZero :: HasCallStack => TExpr -> TExpr
+mkZero        = getZero id
+mkTangentZero = getZero tangentType
+
+getZero :: HasCallStack => (Type -> Type) -> TExpr -> TExpr
+getZero tangent_type e
+  = go e
+  where
+    go e = case tangent_type e_ty of
+            TypeInteger  -> Konst (KInteger 0)
+            TypeFloat    -> Konst (KFloat 0.0)
+            TypeString   -> Konst (KString "")
+            TypeBool     -> Konst (KBool False)
+            TypeVec _    -> Let t_evar e $
+                            pBuild (pSize (Var t_evar)) $
+                            Lam indexTVar $
+                            go (pIndex (Var indexTVar) (Var t_evar))
+            TypeTuple ts
+               | Tuple es <- e
+               -> assert (text "splitTuple") (length ts == length es) $
+                  Tuple (map go  es)
+               | let n = length ts
+               -> Let t_evar e $
+                  Tuple $ map go $
+                  [ pSel i n (Var t_evar) | i <- [1..n] ]
+            _ -> pprPanic "mkZero" (ppr e_ty $$ ppr e)
+
+         where
+           e_ty = typeof e
+           t_evar = TVar e_ty argVar
+
 --------------------------------------------
 --  Building simple calls
 --------------------------------------------
 
-lmZero :: Type -> Type -> TExpr
-lmZero s t = mkPrimCall2 "lmZero" (mkDummy s) (mkDummy t)
+{-  Note [Shapes]
+~~~~~~~~~~~~~~~~~
+When doing AD we have the 'S' parameter, which we need to build a zero
+linear map.  We make it a named type, Shape, because it could be
+implemented in various ways.
 
-lmZero_Dir :: ADDir -> Type -> Type -> TExpr
+- Shape = Type     This worked when we had vector sizes in types
+
+- Shape = Expr     The value tuple of function argumetnts
+
+- Shape = Expr     A new value abstracting the shape of the function
+                   arguments (e.g. an Int for a vector, describing its
+                   size)
+
+Note [lmZero]
+~~~~~~~~~~~~~
+lmZero should have type  lmZero :: forall s t. s -o t
+When applied, via `lmApply` or `lmApplyR`, it should produce
+a zero value of type T(t) or T(s) respectively.  Alas, taht
+is tricky to do, given only the types.  How can we produce a
+zero of type (Vec Float) for example?  How big should it be?
+
+Our solution is to pass a /value/ of type s, and one of type t,
+to lmZero, and provide mkTangentZero to turn that value into a
+zero value.  Painful, but possible.
+-}
+
+type Shape = TExpr
+
+lmZero :: Shape -> Shape -> TExpr
+lmZero s t = mkPrimCall2 "lmZero" s t
+
+lmZero_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmZero_Dir Fwd s t = lmZero s t
 lmZero_Dir Rev s t = lmZero t s
 
@@ -190,12 +246,20 @@ isThePrimFun :: TFun -> String -> Bool
 isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
-isLMOne, isLMZero :: TExpr -> Bool
+isLMOne :: TExpr -> Bool
 isLMOne (Call f _) = f `isThePrimFun` "lmOne"
 isLMOne _ = False
 
-isLMZero (Call f _) =  f `isThePrimFun` "lmZero"
-isLMZero _ = False
+isLMZero :: TExpr -> Bool
+isLMZero = isJust . isLMZero_maybe
+
+isLMZero_maybe :: TExpr -> Maybe (TExpr, TExpr)
+-- Just (a,b) means that the input was indeed (lmZero (a,b))
+isLMZero_maybe (Call f args)
+  | f `isThePrimFun` "lmZero"
+  , [a,b] <- args
+  = Just (a,b)
+isLMZero_maybe _ = Nothing
 
 isKZero :: TExpr -> Bool
 isKZero = \case
@@ -221,7 +285,7 @@ sndArg e = error $ "sndArg on non-duple" ++ pps e
 
 
 lmDelta :: TExpr -> TExpr -> TExpr -> TExpr
-lmDelta t i j = If (pEqual i j) (lmOne ty) (lmZero ty ty)
+lmDelta t i j = If (pEqual i j) (lmOne ty) (lmZero t t)
   where
     ty = typeof t
 
@@ -367,17 +431,15 @@ primFunCallResultTy_maybe :: PrimFun -> [TypedExpr] -> Maybe Type
 
 -- build n (e :: Integer -> elt) :: Vec n elt
 primFunCallResultTy_maybe "build" args
-  | [n,f] <- args
-  , sizeArgOK n
+  | [_n,f] <- args
   , TypeLam TypeInteger elt_ty <- typeof f
-    -- ToDo: add free-var check for 'n'
-  = Just (TypeVec (toSize n) elt_ty)
+  = Just (TypeVec elt_ty)
   | otherwise = Nothing
 
 primFunCallResultTy_maybe "fold" args
   | [f,acc,v] <- args
   , TypeLam (TypeTuple [a1, b1]) a2 <- typeof f
-  , TypeVec _n b2 <- typeof v
+  , TypeVec b2 <- typeof v
   , b1 `eqType` b2
   , Just a <- eqTypes a1 [a2, typeof acc]
   = Just a
@@ -391,7 +453,7 @@ primFunCallResultTy_maybe "lmFold" args
   , TypeTuple [a3, b1] <- t
   , Just a <- eqTypes a1 [a2, a3, typeof acc]
   , Just _ <- eqTypes (typeof ds_zero) [tangentType s1]
-  , v_ty@(TypeVec _n b2) <- typeof v
+  , v_ty@(TypeVec b2) <- typeof v
   , b2 `eqType` b1
   = Just (TypeLM (TypeTuple [s1, TypeTuple [a, v_ty]]) a)
   | otherwise = Nothing
@@ -423,27 +485,23 @@ primFunCallResultTy_maybe "lmDummyFold" args
 
 -- constVec (n :: Integer) (e :: t) :: Vec n t
 primFunCallResultTy_maybe "constVec" args
-  | [n,e] <- args
-  , sizeArgOK n
-  = Just (TypeVec (toSize n) (typeof e))
+  | [_n,e] <- args
+  = Just (TypeVec (typeof e))
   | otherwise = Nothing
 
 -- deltaVec (n :: Integer) (i :: Integer) (e :: t) :: Vec n t
 primFunCallResultTy_maybe "deltaVec" args
-  | [n,i,e] <- args
-  , sizeArgOK n
+  | [_n,i,e] <- args
   , TypeInteger <- typeof i
-  = Just (TypeVec (toSize n) (typeof e))
+  = Just (TypeVec (typeof e))
   | otherwise = Nothing
 
 -- diag (rows :: Integer) (cols :: Integer) (f :: Integer -> t)
 --      :: Vec rows (Vec cols t)
 primFunCallResultTy_maybe "diag" args
-  | [r,c,f] <- args
-  , sizeArgOK r
-  , sizeArgOK c
+  | [_r,_c,f] <- args
   , TypeLam TypeInteger t <- typeof f
-  = Just (TypeVec (toSize r) (TypeVec (toSize c) t))
+  = Just (TypeVec (TypeVec t))
   | otherwise = Nothing
 
 -- Addition is special: it can add any two things of the same type,
@@ -458,9 +516,8 @@ primFunCallResultTy_maybe "add" args
     add TypeInteger TypeInteger   = Just TypeInteger
     add TypeFloat   TypeFloat     = Just TypeFloat
     add t (TypeTuple [])          = Just t
-    add (TypeVec n1 t1) (TypeVec n2 t2)
-      | eqSize n1 n2                    = do { tr <- add t1 t2
-                                             ; return (TypeVec n1 tr) }
+    add (TypeVec t1) (TypeVec t2) = do { tr <- add t1 t2
+                                       ; return (TypeVec tr) }
     add (TypeTuple t1s) (TypeTuple t2s)
       | length t1s == length t2s        = do { ts <- zipWithM add t1s t2s
                                              ; return (TypeTuple ts) }
@@ -488,11 +545,11 @@ primFunCallResultTy_maybe fun args
       ("lmVCat"   , tys) | Just (ss,ts) <- unzipLMTypes tys
                          , (s1:ss1) <- ss
                          , all (== s1) ss1                   -> Just (TypeLM s1 (TypeTuple ts))
-      ("lmVCatV"  , [TypeVec n (TypeLM s t)])                -> Just (TypeLM s (TypeVec n t))
+      ("lmVCatV"  , [TypeVec (TypeLM s t)])                  -> Just (TypeLM s (TypeVec t))
       ("lmHCat"   , tys) | Just (ss,ts) <- unzipLMTypes tys
                          , (t1:ts1) <- ts
                          , all (== t1) ts1                   -> Just (TypeLM (TypeTuple ss) t1)
-      ("lmHCatV"  , [TypeVec n (TypeLM t s)])                -> Just (TypeLM (TypeVec n t) s)
+      ("lmHCatV"  , [TypeVec (TypeLM t s)])                  -> Just (TypeLM (TypeVec t) s)
 
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , [t])                                     -> Just t
@@ -512,23 +569,23 @@ primFunCallResultTy_maybe fun args
       ("$trace"   , [t])                                     -> Just t
 
       -- ($rand s) returns a uniform random float between 0 and s
-      ("$rand"    , [TypeFloat])                             -> Just TypeFloat
-      ("$ranhashdoub" , [TypeInteger])                           -> Just TypeFloat
+      ("$rand"        , [TypeFloat])                         -> Just TypeFloat
+      ("$ranhashdoub" , [TypeInteger])                       -> Just TypeFloat
 
       -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
       ("pr"       , _)                                       -> Just TypeInteger
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                       -> Just TypeInteger
       ("sumbuild" , [TypeInteger, TypeLam TypeInteger t])    -> Just t
-      ("index"    , [TypeInteger, TypeVec _ t])              -> Just t
-      ("size"     , [TypeVec _ _])                           -> Just TypeSize
-      ("sum"      , [TypeVec _ t])                           -> Just t
+      ("index"    , [TypeInteger, TypeVec t])                -> Just t
+      ("size"     , [TypeVec _])                             -> Just TypeSize
+      ("sum"      , [TypeVec t])                             -> Just t
       ("to_float" , [TypeInteger])                           -> Just TypeFloat
       ("dot"      , [t, t']) | t == t'                       -> Just TypeFloat
       ("dot"      , [t, t']) | tangentType t == t'           -> Just TypeFloat
       ("norm"     , [_])                                     -> Just TypeFloat
 
-      ("unzip"    , [TypeVec n (TypeTuple ts)])              -> Just (TypeTuple (map (TypeVec n) ts))
+      ("unzip"    , [TypeVec (TypeTuple ts)])                -> Just (TypeTuple (map TypeVec ts))
 
       -- arithmetic ops.   See special case for "add" above
       ("mul"        , [TypeFloat,   t]             ) -> Just t
@@ -588,16 +645,6 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "abs", "max"
                        , "or", "and"
                        ]
-
-sizeArgOK :: TypedExpr -> Bool
--- In (build n f), is the expresion 'n' ok?
-sizeArgOK (TE n_expr n_ty)
-  | TypeSize <- n_ty
-  = True
-  | Konst (KInteger _) <- n_expr
-  = True
-  | otherwise
-  = False
 
 toSize :: TypedExpr -> TExpr
 toSize (TE n_expr n_ty)

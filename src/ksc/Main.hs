@@ -238,7 +238,7 @@ main = test
 
 test :: IO ()
 test = do
-  futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
+--  futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
   let compiler = "g++-7"
   [fsTestKs] <- System.Environment.getArgs
   testC compiler [fsTestKs]

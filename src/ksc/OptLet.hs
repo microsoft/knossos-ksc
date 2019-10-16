@@ -9,7 +9,7 @@ module OptLet( optLets
              , mkEmptySubst, lookupSubst
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
-             , substType, substExpr, substVar, notInScope )
+             , substExpr, substVar, notInScope )
              where
 
 import Lang
@@ -32,17 +32,16 @@ occAnal e = fst (occAnalE e)
 
 type OccMap = M.Map TVar Int  -- How often each free variable occurs
 
-occAnalTv :: TVar -> (TVarX OccAnald, OccMap)
+occAnalTv :: TVar -> (TVar, OccMap)
 occAnalTv (TVar ty v) = (TVar ty' v, vs)
   where
     (ty', vs) = occAnalT ty
 
-occAnalT :: Type -> (TypeX OccAnald, OccMap)
-occAnalT (TypeVec e ty)
-  = (TypeVec e' ty', M.union vs1 vs2)
+occAnalT :: Type -> (Type, OccMap)
+occAnalT (TypeVec ty)
+  = (TypeVec ty', vs)
   where
-    (e',  vs1) = occAnalE e
-    (ty', vs2) = occAnalT ty
+    (ty', vs) = occAnalT ty
 
 occAnalT (TypeTuple tys)
   = (TypeTuple tys', unions vs_s)
@@ -221,37 +220,25 @@ zapSubst (S { s_in_scope = in_scope })
 -- * It clones the binder if it is already in scope
 -- * Extends the substitution and the in-scope set as appropriate
 substBndr :: TVar -> Subst -> (TVar, Subst)
-substBndr (TVar ty v) subst@(S { s_in_scope = in_scope, s_env = env })
+substBndr (TVar ty v) (S { s_in_scope = in_scope, s_env = env })
   = (tv', S { s_env      = env'
             , s_in_scope = v' `S.insert` in_scope })
   where
     v'   = notInScope v in_scope
-    ty'  = substType subst ty
-    tv'  = TVar ty' v'
+    tv'  = TVar ty v'
     env' = M.insert v (Var tv') env
 
-substType :: Subst -> Type -> Type
-substType subst ty
-  = go ty
-  where
-    go (TypeVec size ty) = TypeVec (substExpr subst size) (go ty)
-    go (TypeTuple tys)   = TypeTuple (map go tys)
-    go (TypeLM ty1 ty2)  = TypeLM (go ty1) (go ty2)
-    go (TypeLam ty1 ty2) = TypeLam (go ty1) (go ty2)
-    go ty                = ty
-
 substVar :: Subst -> TVar -> TExpr
-substVar subst tv = case lookupSubst v subst of
+substVar subst tv = case lookupSubst (tVarVar tv) subst of
                       Just e  -> e
                       Nothing -> Var tv
-  where TVar _ v = tv
 
 substExpr :: Subst -> TExpr -> TExpr
 substExpr subst e
   = go e
   where
     go (Var tv)       = substVar subst tv
-    go (Dummy ty)     = Dummy (substType subst ty)
+    go (Dummy ty)     = Dummy ty
     go (Konst k)      = Konst k
     go (Call f es)    = Call f (map go es)
     go (If b t e)     = If (go b) (go t) (go e)
@@ -337,9 +324,9 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
                                    ty' = go_ty subst ty
                                    tv' = TVar ty' v
 
-    go_ty :: Subst -> TypeX OccAnald -> Type
+    go_ty :: Subst -> Type -> Type
     go_ty subst (TypeTuple tys)   = TypeTuple (map (go_ty subst) tys)
-    go_ty subst (TypeVec e ty)    = TypeVec (go subst e) (go_ty subst ty)
+    go_ty subst (TypeVec ty)      = TypeVec (go_ty subst ty)
     go_ty subst (TypeLM  ty1 ty2) = TypeLM (go_ty subst ty1) (go_ty subst ty2)
     go_ty subst (TypeLam ty1 ty2) = TypeLam (go_ty subst ty1) (go_ty subst ty2)
     go_ty _ TypeBool    = TypeBool
@@ -399,7 +386,7 @@ Some of this is discussed at
 
 -}
 
-inline_me :: Int -> TypeX p -> TExpr -> Bool
+inline_me :: Int -> Type -> TExpr -> Bool
 inline_me n _ty rhs
   | n==0            = True   -- Dead code
   | n==1            = True   -- Used exactly once

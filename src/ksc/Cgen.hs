@@ -260,22 +260,7 @@ vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
     goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (cgenVar v) ty
                                  in str <> goVars seen' vs
 
-    goVec1 :: Set.Set Var -> String -> Var -> (Set.Set Var, (String, Var))
-    goVec1 seen value sz =
-        if sz `Set.member` seen then
-          (seen, ("KS_ASSERT(" ++ cgenVar sz ++ " == size(" ++ value ++ "));\n", sz))
-        else
-          (Set.insert sz seen, ("/*" ++ show seen ++ "*/\n" ++ "int " ++ cgenVar sz ++ " = size(" ++ value ++ ");\n", sz))
-
-    goVec :: Set.Set Var -> String -> Var -> (Set.Set Var, ([String], Set.Set Var))
-    goVec seen value sz = (seen', ([str], Set.singleton var))
-      where (seen', (str, var)) = goVec1 seen value sz
-
     goType :: Set.Set Var -> String -> Type -> (Set.Set Var, ([String], Set.Set Var))
-    goType seen value (TypeVec (Var (TVar TypeSize sz)) ty) =
-        let (seen',str) = goVec seen value sz
-        in accum str $ goType seen' (get_element value) ty
-
     goType seen value (TypeTuple tys) =
         foldl (\ (seen,(str, new)) (ty,n) -> accum (str ++ ["/*tup*/"], new) $ goType seen (get value n) ty)
               (seen, mempty)
@@ -283,7 +268,6 @@ vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
 
     goType seen value _ = (seen, (["/*" ++ value ++ "*/\n"], Set.empty))
 
-    get_element v = "(" ++ v ++ ")[0]"
     get v n = "std::get<" ++ show n ++ ">(" ++ v ++ ")"
 
     accum str (seen,str') = (seen, str <> str')
@@ -299,7 +283,7 @@ cgenExprR env = \case
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec sty ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
+  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -321,7 +305,7 @@ cgenExprR env = \case
         ++ "}\n"
         )
         ret
-        (mkCType (TypeVec sty ty))
+        (mkCType (TypeVec ty))
 
   -- Special case for sumbuild -- inline the loop
   Call (TFun ty (Fun (PrimFun "sumbuild"))) [sz, Lam (TVar vty var@(Simple _)) body] -> do
@@ -549,7 +533,7 @@ cgenAnyFun :: HasCallStack => TFun -> CType -> String
 cgenAnyFun tf cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
-    let TypeVec _ t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
+    let TypeVec t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
   TFun ty (Fun (PrimFun "sumbuild")) ->
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
@@ -587,7 +571,7 @@ cgenTypeLang = \case
   TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
-  TypeVec _ t   -> "vec<" ++ cgenTypeLang t ++ ">"
+  TypeVec t     -> "vec<" ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
   TypeLam from to ->
@@ -634,7 +618,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
     _ -> mkCType ty
 
 pattern RR = TypeFloat
-pattern VecR <- TypeVec _ TypeFloat
+pattern VecR <- TypeVec TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
@@ -647,7 +631,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "$rand"   , [CType ty]          ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
   (PrimFun "$ranhashdoub", [CType ty]      ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
   (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"   , [CType (TypeVec _ t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun "index"   , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)

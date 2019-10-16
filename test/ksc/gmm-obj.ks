@@ -3,63 +3,64 @@
 (def gmm_knossos_tri Integer ((n : Integer))
   (div (mul n (sub n 1)) 2))
 
-(def exp$VecR (Vec n Float) ((v : Vec n Float))
-  (build n (lam (i : Integer) (exp (index i v)))))
+(def exp$VecR (Vec Float) ((v : Vec Float))
+  (build (size v) (lam (i : Integer) (exp (index i v)))))
 
-(def mul$R$VecR (Vec n Float) ((r : Float) (a : Vec n Float))
-    (build n (lam (i : Integer) (mul r (index i a)))))
+(def mul$R$VecR (Vec Float) ((r : Float) (a : Vec Float))
+    (build (size a) (lam (i : Integer) (mul r (index i a)))))
 
-(def mul$R$VecVecR (Vec m (Vec n Float)) ((r : Float) (a : Vec m (Vec n Float)))
-    (build m (lam (i : Integer) (mul$R$VecR r (index i a)))))
+(def mul$R$VecVecR (Vec (Vec Float)) ((r : Float) (a : Vec (Vec Float)))
+    (build (size a) (lam (i : Integer) (mul$R$VecR r (index i a)))))
 
-(def mul$VecR$VecR (Vec n Float) ((a : Vec n Float) (b : Vec n Float))
-  (build n (lam (i : Integer) (mul (index i a) (index i b)))))
+(def mul$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
+  (build (size a) (lam (i : Integer) (mul (index i a) (index i b)))))
 
-(def sub$VecR$VecR (Vec n Float) ((a : Vec n Float) (b : Vec n Float))
-  (build n (lam (i : Integer) (sub (index i a) (index i b)))))
+(def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
+  (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
 
 ; dotv
-(edef dotv Float ((Vec n Float) (Vec n Float)))
-(edef D$dotv (LM (Tuple (Vec n Float) (Vec n Float)) Float) 
-             ((Vec n Float) (Vec n Float)))
-(edef Dt$dotv (Tuple Float (LM (Tuple (Vec n Float) (Vec n Float)) Float))
-              ((Vec n Float) (Vec n Float)))
-(edef R$dotv (LM Float (Tuple (Vec n Float) (Vec n Float))) ((Vec n Float) (Vec n Float)))
-(def fwd$dotv Float ((a : Vec n Float) (b : Vec n Float) (da : Vec n Float) (db : Vec n Float))
+(edef dotv Float ((Vec Float) (Vec Float)))
+(edef D$dotv (LM (Tuple (Vec Float) (Vec Float)) Float)
+             ((Vec Float) (Vec Float)))
+(edef Dt$dotv (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
+              ((Vec Float) (Vec Float)))
+(edef R$dotv (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
+(def fwd$dotv Float ((a : Vec Float) (b : Vec Float) (da : Vec Float) (db : Vec Float))
     (add (dotv a db) (dotv da b)))
-(def rev$dotv (Tuple (Vec n Float) (Vec n Float))
-               ((a : Vec n Float) (b : Vec n Float) (dr : Float))
+(def rev$dotv (Tuple (Vec Float) (Vec Float))
+               ((a : Vec Float) (b : Vec Float) (dr : Float))
     (tuple (mul$R$VecR dr b) (mul$R$VecR dr a)))
 
-(def dotvv Float ((a : Vec m (Vec n Float)) (b : Vec m (Vec n Float)))
-  (sum (build m (lam (i : Integer) (dotv (index i a) (index i b)))))
+(def dotvv Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
+  (sum (build (size a) (lam (i : Integer) (dotv (index i a) (index i b)))))
   )
 
-(def sqnorm Float ((v : Vec n Float))
+(def sqnorm Float ((v : Vec Float))
   (dotv v v))
 
 ; mul Mat Vec
-(edef mul$Mat$Vec (Vec m Float) ((Vec m (Vec n Float)) (Vec n Float)))
+(edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
 
-(edef D$mul$Mat$Vec (LM (Tuple (Vec m (Vec n Float)) (Vec n Float)) (Vec m Float)) 
-          ((Vec m (Vec n Float)) (Vec n Float)))
-(edef Dt$mul$Mat$Vec (Tuple (Vec m Float) (LM (Tuple (Vec m (Vec n Float)) (Vec n Float)) (Vec m Float)))
-          ((Vec m (Vec n Float)) (Vec n Float)))
+(edef D$mul$Mat$Vec (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
+          ((Vec (Vec Float)) (Vec Float)))
+(edef Dt$mul$Mat$Vec (Tuple (Vec Float) (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
+          ((Vec (Vec Float)) (Vec Float)))
 
-(edef R$mul$Mat$Vec (LM (Vec m Float) (Tuple (Vec m (Vec n Float)) (Vec n Float))) 
-          ((Vec m (Vec n Float)) (Vec n Float)))
+(edef R$mul$Mat$Vec (LM (Vec Float) (Tuple (Vec (Vec Float)) (Vec Float)))
+          ((Vec (Vec Float)) (Vec Float)))
 
-(def fwd$mul$Mat$Vec (Vec m Float) 
-          ((M : Vec m (Vec n Float)) (v : Vec n Float) (dM : Vec m (Vec n Float)) (dv : Vec n Float))
-    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))) 
+(def fwd$mul$Mat$Vec (Vec Float)
+          ((M : Vec (Vec Float)) (v : Vec Float) (dM : Vec (Vec Float)) (dv : Vec Float))
+    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv)))
 
-(edef rev$mul$Mat$Vec (Tuple (Vec m (Vec n Float)) (Vec n Float))
-          ((Vec m (Vec n Float)) (Vec n Float) (Vec m Float)))
+(edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
+          ((Vec (Vec Float)) (Vec Float) (Vec Float)))
 
 
 
-(def gmm_knossos_makeQ (Vec D (Vec D Float)) ((q : Vec D Float) (l : Vec triD Float))
-  (assert (eq triD (gmm_knossos_tri D))
+(def gmm_knossos_makeQ (Vec (Vec Float)) ((q : Vec Float) (l : Vec Float))
+ (let (D (size q))
+   (assert (eq (size l) (gmm_knossos_tri D))
     (build D (lam (i : Integer)
         (build D (lam (j : Integer)
            (if (lt i j)
@@ -68,9 +69,9 @@
               (exp (index i q))
               (index (add (gmm_knossos_tri (sub i 1)) j) l))
            )
-           ))))))
+           )))))))
 
-(def logsumexp Float ((v : Vec n Float))
+(def logsumexp Float ((v : Vec Float))
     (log (sum (exp$VecR v))))
 
 (edef lgamma Float (Float))
@@ -88,9 +89,10 @@
                  (lgamma (sub a (mul 0.5 (to_float j))))))))))
 
 (def log_wishart_prior Float ((wishart : Tuple Float Integer)
-                              (log_Qdiag : Vec p Float)
-                              (ltri_Q : Vec tri_p Float))
+                              (log_Qdiag : Vec Float)
+                              (ltri_Q : Vec Float))
     (let (
+          (p (size log_Qdiag))
           (wishart_gamma (get$1$2 wishart))
           (wishart_m     (get$2$2 wishart))
           (sum_qs        (sum log_Qdiag))
@@ -98,25 +100,30 @@
 
           (n  (add p (add wishart_m 1)))
           (C  (sub (mul (to_float (mul n p))
-                    (sub (log wishart_gamma) 
+                    (sub (log wishart_gamma)
                        (mul 0.5 (log 2.0))))
                  (log_gamma_distrib (mul 0.5 (to_float n)) p)))
           (frobenius (add  (sqnorm Qdiag) (sqnorm ltri_Q)))
           (w2f   (mul 0.5 (mul (mul wishart_gamma wishart_gamma) frobenius)))
           )
         (sub (sub w2f
-              (mul (to_float wishart_m) 
+              (mul (to_float wishart_m)
                   sum_qs))
             C)
     ))
 
 (def gmm_knossos_gmm_objective Float
-      ((x : Vec N (Vec D Float))
-       (alphas : Vec K Float)
-       (means : Vec K (Vec D Float))
-       (qs : Vec K (Vec D Float))
-       (ls : Vec K (Vec triD Float))
+      ((x : Vec (Vec Float))        ; N x D
+       (alphas : Vec Float)         ; K
+       (means : Vec (Vec Float))    ; K x D
+       (qs : Vec (Vec Float))       ; K x D
+       (ls : Vec (Vec Float))       ; K x triD
        (wishart : (Tuple Float Integer)))
+ (let ((N (size x))
+       (K (size alphas))
+       (D (size (index 1 x)))       ; Ugh
+       (triD (size (index 1 ls)))   ; Ugh
+      )
   (assert (eq triD (gmm_knossos_tri D))
     (let ((CONSTANT (mul (to_float (mul N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
           (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
@@ -125,7 +132,7 @@
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
                                   (mahal_vec (mul$Mat$Vec Q
                                                       (sub$VecR$VecR (index i x) (index k means)))))
-                              (sub (add (index k alphas) 
+                              (sub (add (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))
                               )
@@ -138,21 +145,21 @@
                   (mul (to_float N) (logsumexp alphas))))
             (sum (build K (lam (k : Integer)
                     (log_wishart_prior wishart (index k qs) (index k ls))))))
-    )))
-  
+    ))))
+
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
        (mul ($ranhashdoub seed) scale))
 
-(def mkvec (Vec n Float) ((seed  : Integer)
-                          (n     : Integer)
-                          (scale : Float))
+(def mkvec (Vec Float) ((seed  : Integer)
+                        (n     : Integer)
+                        (scale : Float))
     (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
 
-(def mkvecvec (Vec n (Vec m Float)) ((seed  : Integer)
-                                     (n     : Integer)
-                                     (m     : Integer)
-                                     (scale : Float))
+(def mkvecvec (Vec (Vec Float)) ((seed  : Integer)
+                                 (n     : Integer)
+                                 (m     : Integer)
+                                 (scale : Float))
      (build n (lam (j : Integer) (mkvec (add (mul j m) seed) m scale))))
 
 (def main Integer ()

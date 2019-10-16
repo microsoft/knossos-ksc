@@ -1,17 +1,18 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
-(def f Float ((x : Vec 2 Float) (y : Vec n Float))
+(def f Float ((x : Vec Float) (y : Vec Float))
     (if (lt 2 3) (index 1 x) 7.0)
 )
 
-(def q (Vec (mul 2 n) Float) ((r : Float) (m : Integer) (a : Vec n Float))
-    (build (mul 2 n) (lam (i : Integer) (mul r (index (div i m) a)))))
+(def q (Vec Float) ((r : Float) (m : Integer) (a : Vec Float))
+  (let (n (size a))
+    (build (mul 2 n) (lam (i : Integer) (mul r (index (div i m) a))))))
 
-(def mkvec (Vec n Float) (n : Integer)
+(def mkvec (Vec Float) (n : Integer)
     (build n (lam (j : Integer) (to_float j))))
 
-(def sqnorm Float (v : Vec n Float)
-  (sum (build n (lam (i : Integer) (let (vi (index i v)) (mul vi vi))))))
+(def sqnorm Float (v : Vec Float)
+  (sum (build (size v) (lam (i : Integer) (let (vi (index i v)) (mul vi vi))))))
 
 #|
 
