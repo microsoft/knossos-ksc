@@ -268,9 +268,14 @@ optPrimFun _ "add" [x, y] =
     else
       Nothing
 
--- RULE: x*0 = 0*x = 0
+-- RULE: x*0 = 0*y = 0
 optPrimFun _ "mul" [x, y]
   | isKZero x || isKZero y
+  -- We use the type of y because the two typing rules for mul in
+  -- Prim.hs are
+  --
+  -- 1. mul: (Float, t) -> t
+  -- 2. mul: (Integer, Integer) -> Integer
   = Just $ mkZero (typeof y)
   | otherwise
   = Nothing
