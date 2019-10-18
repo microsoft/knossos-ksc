@@ -209,6 +209,7 @@ export function formatKnossosIR(document: string) {
 		"\r": formatNewLine,
 		"\n": formatNewLine,
 		" ": formatWhitespace,
+		" ": formatWhitespace, // no-break space
 		"\t": formatWhitespace,
 		";": formatComment,
 		"\\": escapeFormatter,

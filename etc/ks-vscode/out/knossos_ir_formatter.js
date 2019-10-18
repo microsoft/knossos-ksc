@@ -180,6 +180,7 @@ function formatKnossosIR(document) {
         "\r": formatNewLine,
         "\n": formatNewLine,
         " ": formatWhitespace,
+        " ": formatWhitespace,
         "\t": formatWhitespace,
         ";": formatComment,
         "\\": escapeFormatter,
