@@ -340,6 +340,7 @@ futharkCompileKscPrograms ksFiles = do
         [ -- Doesn't handle edefs
           "test/ksc/edef.ks"
           -- Doesn't handle dummy variables
+        , "test/ksc/adbench-lstm.ks"
         , "test/ksc/fold.ks"
         , "test/ksc/logsumexp.ks"
         , "test/ksc/vprod.ks"
