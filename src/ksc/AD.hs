@@ -215,8 +215,9 @@ gradCall TupleAD s f args
 ----------------------
 gradLet :: HasCallStack => ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr
 gradLet BasicAD s v e1 e2
-  = mkLet v e1                                        $
-    mkLet (gradTVar BasicAD s v) (gradE BasicAD s e1) $
+  = mkLet (gradTVar BasicAD s v) (gradE BasicAD s e1) $
+      -- See Note [Shadowing after grad]
+    mkLet v e1                                        $
     gradE BasicAD s e2
 
 gradLet TupleAD s v e1 e2
@@ -228,6 +229,24 @@ gradLet TupleAD s v e1 e2
     mkLet v (pFst (Var dv)) $
     gradE TupleAD s e2
   where dv = gradTVar TupleAD s v
+
+{- Note [Shadowing after grad]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We transform   let x = <rhs>
+               in <body>
+to
+               let g$x = <gradded rhs>
+               let x   = <rhs>
+               in body
+
+Note that the g$x defn comes first.  Why?  Because <greadded rhs>
+might mention x, either directly (remember this is a non-rec let)
+or via a cal to lmZero if 'x' is a parameter of the function in
+whose RHS this is.
+
+If <gradded rhs> mentions x, it should be the x from the outer
+scope, the locally bound x!  See test/ksc/test0, test_inline2
+-}
 
 lmVCat_AD :: ADPlan -> [TExpr] -> TExpr
 lmVCat_AD BasicAD ms = lmVCat ms
