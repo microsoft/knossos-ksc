@@ -1,5 +1,5 @@
 # There's a lot of duplication between this and
-# build_and_test_adbench_lstm.sh, but we will follow the Rule of Three
+# build_and_test_mnistcnn.sh, but we will follow the Rule of Three
 #
 #     https://en.wikipedia.org/wiki/Rule_of_three_(computer_programming)
 
@@ -14,12 +14,8 @@ PYBIND11_INCLUDE=$PYBIND11/include
 
 PYTHON3_CONFIG_EXTENSION_SUFFIX=$(python3-config --extension-suffix)
 
-MODULE_NAME=mnistcnncpp
+MODULE_NAME=adbench_lstm
 MODULE_FILE="$OBJ/$MODULE_NAME$PYTHON3_CONFIG_EXTENSION_SUFFIX"
-
-echo Installing JAX...
-
-python3 -m pip install jax==0.1.39 jaxlib==0.1.22
 
 echo Compiling...
 
@@ -38,7 +34,7 @@ g++-7 -fmax-errors=5 \
       -fPIC \
       -o $MODULE_FILE \
       -DMNISTCNNCPP_MODULE_NAME=$MODULE_NAME \
-      $KNOSSOS/test/ksc/mnistcnnpy.cpp
+      $KNOSSOS/test/ksc/adbench-lstmpy.cpp
 
 KSCPY=$KNOSSOS/src/python
-PYTHONPATH=$OBJ:$KSCPY python3 -m ksc.mnist.test
+PYTHONPATH=$OBJ:$KSCPY python3 -m ksc.adbench_lstm.test
