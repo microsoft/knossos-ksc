@@ -16,7 +16,7 @@ void declare_vec(py::module &m, std::string typestr) {
     .def(py::init<>())
     .def(py::init<std::vector<T> const&>())
     .def("is_zero",     &Class::is_zero)
-    .def("__getitem__", [](const ks::vec<T> &a, int &b) {
+    .def("__getitem__", [](const ks::vec<T> &a, const int &b) {
 	return a[b];
       })
     .def("__len__", [](const ks::vec<T> &a) { return a.size(); });
