@@ -522,7 +522,8 @@ lookupLclTc v
            Nothing -> do {
               case Map.lookup (varFun v) (gblST st) of
                   Nothing -> do {
-                             addErr (text "Not in scope: local var/tld:" <+> ppr v <+> gblDoc st)
+                             addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
+                                          , text "Envt:" <+> gblDoc st ])
                              ; return TypeUnknown
                              }
                   Just (Def { def_fun  = _fn
