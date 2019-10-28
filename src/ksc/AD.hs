@@ -144,14 +144,14 @@ gradFold BasicAD s ti body acc v =
   lmFold (mkZero (tangentType s)) (Lam ti body) (Lam ti bodyAdjusted) acc v
   `lmCompose`
   args
-  where body' = mkLet (gradTVar BasicAD ty' ti)
+  where body' = mkLet (gradTVar BasicAD s' ti)
                       (lmHCat [lmZero s (typeof ti), lmOne (typeof ti)])
-                $ gradE BasicAD ty' body
-        ty' = TypeTuple [s, typeof ti]
+                $ gradE BasicAD s' body
+        s' = TypeTuple [s, typeof ti]
 
         -- The gradded free variables occurring in `body'` are linear
-        -- maps whose domain is `ty'` (because they were created with
-        -- a call of `gradE Basic AD ty'`). However, they were bound
+        -- maps whose domain is `s'` (because they were created with
+        -- a call of `gradE Basic AD s'`). However, they were bound
         -- outside body in such a way that their domain is `s`.  Thus
         -- we reassign them here.  All we need to do is project from
         -- `ty` = `(s, typeof ti)` to `s`, which is a simple `HCat` of
@@ -162,7 +162,7 @@ gradFold BasicAD s ti body acc v =
         -- `\ti.body`.
         bodyAdjusted = foldr adjustGrad body' (freeVarsOf (Lam ti body))
           where
-            adjustGrad v = mkLet (grad ty' v) (adjust (grad s v))
+            adjustGrad v = mkLet (grad s' v) (adjust (grad s v))
             grad = gradTVar BasicAD
             adjust v = Var v `lmCompose` lmHCat [lmOne s, lmZero (typeof ti) s]
 
