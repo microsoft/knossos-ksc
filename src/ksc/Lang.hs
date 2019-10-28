@@ -633,7 +633,7 @@ instance InPhase OccAnald where
   pprFunOcc (TFun _ f) = ppr f
   getVar     (TVar ty var)       = (var, Just ty)
   getFun     (TFun ty fun)       = (fun, Just ty)
-  getLetBndr (_, (TVar _ty var)) = (var,   Nothing)
+  getLetBndr (_, tv)             = (tVarVar tv, Nothing)
     -- This last case is awkward. _ty :: TypeX OccAnald
     -- and we could convert it to a Type, but it does not
     -- see worth the bother.  Nothing is fine, actually
