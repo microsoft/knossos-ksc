@@ -239,10 +239,9 @@ substType subst ty
     go ty                = ty
 
 substVar :: Subst -> TVar -> TExpr
-substVar subst tv = case lookupSubst v subst of
+substVar subst tv = case lookupSubst (tVarVar tv) subst of
                       Just e  -> e
                       Nothing -> Var tv
-  where TVar _ v = tv
 
 substExpr :: Subst -> TExpr -> TExpr
 substExpr subst e
