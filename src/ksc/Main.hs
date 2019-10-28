@@ -106,6 +106,9 @@ displayPassM mverbosity what env decls
 -- GMM derivatives
 -------------------------------------
 
+ignoreMain :: [Decl] -> [Decl]
+ignoreMain = snd . moveMain
+
 moveMain :: [Decl]
          -> ( [Decl]    -- Singleton 'main' decl, or empty
             , [Decl])   -- All the rest
@@ -291,9 +294,6 @@ testRoundTrip ksFiles = do
     let render :: InPhase p => [DeclX p] -> String
         render = unlines . map (renderSexp . ppr)
 
-        ignoreMain :: [Decl] -> [Decl]
-        ignoreMain = snd . moveMain
-
         parseIgnoringMain :: String -> Either String [Decl]
         parseIgnoringMain = fmap ignoreMain . parseE
 
@@ -365,7 +365,7 @@ demoFOnTestPrograms ksTests = do
       ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
   testOn ksTestsInModes $ \(ksTest, adp) -> do
-        demoFFilter Nothing (snd . moveMain) adp ksTest
+        demoFFilter Nothing ignoreMain adp ksTest
 
 testRunKS :: String -> String -> IO ()
 testRunKS compiler ksFile = do
@@ -447,7 +447,7 @@ futharkPipeline file
 
   ; decls0 <- liftIO (parseF (file ++ ".ks"))
 
-  ; let (_main, decls)    = moveMain decls0
+  ; let decls = ignoreMain decls0
 
   ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
 
