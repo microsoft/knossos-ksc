@@ -529,7 +529,7 @@ namespace ks
 
                 // We cannot efficiently construct from a std::vector.
                 // When constructing from a std::vector we need to
-                // allocated and copy because we have no guarantee
+                // allocate and copy because we have no guarantee
                 // that the std::vector will not mutate or vanish
                 // beneath our feet.
 		vec(std::vector<T> const& that) : vec{ that.size() }
