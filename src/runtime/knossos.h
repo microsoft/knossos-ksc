@@ -860,25 +860,6 @@ namespace ks
 		return ret;
 	}
 
-	// Elemetwise subtraction
-	template <class T>
-	vec<T> operator-(vec<T> const& a, vec<T> const& b)
-	{
-		KS_ASSERT(!a.is_zero());
-		// return -b;
-
-		if (b.is_zero())
-			return a;
-
-		KS_ASSERT(a.size() != 0);
-		KS_ASSERT(a.size() == b.size());
-		vec<T> ret = vec<T>::create(a.size());
-
-		for (int i = 0; i < a.size(); ++i)
-			ret[i] = a[i] - b[i];
-		return ret;
-	}
-
 	// Subtraction of a scalar
 	template <class T>
 	vec<T> operator-(vec<T> const& a, T const& b)
