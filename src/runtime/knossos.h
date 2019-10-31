@@ -504,7 +504,12 @@ namespace ks
 		vec& operator=(const vec<T>& that)
 		{
 			this->size_ = that.size_;
-			this->data_ = that.data_; // Yes, this will alias, but there is no mutation, and no deletion.
+			// Yes, this will alias, but there is no
+			// deletion, and mutation only happens under
+			// controlled circumstances (inplace_add used
+			// in mutating sumbuild) where we promise to
+			// be careful.
+			this->data_ = that.data_;
 			this->is_zero_ = that.is_zero_;
 			this->z_ = that.z_;
 			return *this;
