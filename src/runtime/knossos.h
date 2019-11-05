@@ -328,55 +328,6 @@ namespace ks
 		return prepend(inflated_deep_copy(head(val)), inflated_deep_copy(tail(val)));
 	}
 
-	// ============================== Tangent types ==================================
-	template <class T>
-	struct tangent {
-		typedef T type;
-	};
-
-	template <>
-	struct tangent<int> {
-		typedef tuple<> type;
-	};
-
-	template <class T, class... Ts>
-	struct tangent<tuple<T, Ts...>> {
-		typedef tuple_prepend<typename tangent<T>::type, typename tangent<tuple<Ts...>>::type> type;
-	};
-
-	template <class T>
-	typename tangent<T>::type tangent_zero(const T& t)
-	{
-		return zero(t);
-	}
-
-	template <>
-	tuple<> tangent_zero(const int& t)
-	{
-		return tuple<>{};
-	}
-
-	template <>
-	typename tangent<tuple<>>::type tangent_zero(const tuple<>& t)
-	{
-		return tuple<>{};
-	}
-
-	template <class T, class... Ts>
-	auto tangent_zero(const tuple<T, Ts...>& t)
-	{
-		return prepend(tangent_zero(head(t)), tangent_zero(tail(t)));
-	}
-
-	// Tangent zero of multiple args is a tuple
-	template <class T1, class T2, class... Ts>
-	auto tangent_zero(T1 const& t1, T2 const& t2, Ts const&... ts) 
-	{
-		return tangent_zero(std::make_tuple(t1, t2, ts...));
-	}
-
-
-
 	// ===============================  Addition ==================================
 	// Adding is special because it needs to be defined before linear maps,
 	// And needs to be defined before any primitives are used in linear maps.
@@ -678,19 +629,6 @@ namespace ks
 	vec<T> zero(vec<T> const& val)
 	{
 		return vec<T> {zero_tag, val.zero_element(), (size_t)val.size()};
-	}
-
-	// specialize tangent<vec<T>>
-	template <class T>
-	struct tangent<vec<T>> {
-		typedef vec<typename tangent<T>::type> type;
-	};
-
-	// specialize tangent_zero(vec<T>)
-	template <class T>
-	auto tangent_zero(const vec<T>& t)
-	{
-		return vec<typename tangent<T>::type>(zero_tag, tangent_zero(t.zero_element()), t.size());
 	}
 
 	template <class T>
