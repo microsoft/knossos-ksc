@@ -234,20 +234,24 @@ toFutharkConst (L.KSize x) = ConstI32 $ fromInteger x
 toFutharkConst (L.KBool x) = ConstBool x
 toFutharkConst (L.KString x) = ConstString x
 
-plusFunction :: Type -> Exp
-plusFunction I8 = Var "+"
-plusFunction I32 = Var "+"
-plusFunction F32 = Var "+"
-plusFunction F64 = Var "+"
-plusFunction Bool = Var "||"
-plusFunction (Array _ t)  = Call (Var "map2") [plusFunction t]
-plusFunction (Tuple ts)  =
-  Lambda [PatId "x" `PatAscript` Tuple ts,
-          PatId "y" `PatAscript` Tuple ts] $
-  ExpTuple $ zipWith mkPlus [(1::Int)..] ts
-  where mkPlus i t =
-          Call (plusFunction t) [Project (Var "x") (show i),
-                                 Project (Var "y") (show i)]
+binopFunction :: String -> Type -> Type -> Exp
+binopFunction op (Array _ t1) (Array _ t2) =
+  Call (Var "map2") [binopFunction op t1 t2]
+binopFunction op (Array d t1) t2 =
+  Lambda [PatId "x" `PatAscript` Array d t2,
+          PatId "y" `PatAscript` t2] $
+  Call (Var "map") [Call (binopFunction op t1 t2) [Var "y"], Var "x"]
+binopFunction op t1 (Array _ t2) =
+  Lambda [PatId "x" `PatAscript` t1] $
+  Call (Var "map") [Call (binopFunction op t1 t2) [Var "x"]]
+binopFunction op (Tuple ts1) (Tuple ts2)  =
+  Lambda [PatId "x" `PatAscript` Tuple ts1,
+          PatId "y" `PatAscript` Tuple ts2] $
+  ExpTuple $ zipWith3 f [(1::Int)..] ts1 ts2
+  where f i t1 t2 =
+          Call (binopFunction op t1 t2) [Project (Var "x") (show i),
+                                         Project (Var "y") (show i)]
+binopFunction op _ _ = Var op
 
 zeroValue :: Type -> Exp
 zeroValue I8 = Const $ ConstI8 0
@@ -255,10 +259,8 @@ zeroValue I32 = Const $ ConstI32 0
 zeroValue F32 = Const $ ConstF32 0
 zeroValue F64 = Const $ ConstF64 0
 zeroValue Bool = Const $ ConstBool False
-zeroValue (Array d t) = Call (Var "replicate") [d', zeroValue t]
-  where d' = case d of DimNamed v -> Var v
-                       DimConst k -> Const $ ConstI32 k
-                       DimAny -> error "zeroValue: DimAny"
+zeroValue (Array _ t) = Call (Var "replicate") [d, zeroValue t]
+  where d = Const $ ConstI32 0
 zeroValue (Tuple ts) = ExpTuple $ map zeroValue ts
 
 toFutharkExp :: L.TExpr -> Exp
@@ -292,7 +294,7 @@ sumbuild (L.TypeTuple ts) xs =
   ExpTuple $ zipWith sumbuild ts
   [Call (Var "map") [SectionProject (show i), xs'] | i <- [1..length ts] ]
 sumbuild ret xs =
-  Call (Var "sumbuild") [plusFunction ret', zeroValue ret', xs]
+  Call (Var "sumbuild") [binopFunction "+" ret' ret', zeroValue ret', xs]
   where ret' = toFutharkType ret
 
 callPrimFun :: String -> L.Type -> [L.TExpr] -> Exp
@@ -324,13 +326,15 @@ callPrimFun "index" _ [i, arr] =
 -- relational operators are overloaded.  Since the only overloaded
 -- Futhark functions are the magical built-in infix operators, we map
 -- these functions to those.
-callPrimFun op ret [x, y]
+callPrimFun op _ [x, y]
   | Just op' <- lookup op binOpPrimFuns =
       -- This might be a vectorised operator - if so, we have to put
       -- enough 'map2's on top to make the types work out.
-      if primType ret'
-      then BinOp op' (toFutharkExp x) (toFutharkExp y)
-      else Call (plusFunction ret') [toFutharkExp x, toFutharkExp y]
+      let xt = toFutharkType $ L.typeof x
+          yt = toFutharkType $ L.typeof y
+      in if primType xt && primType yt
+         then BinOp op' (toFutharkExp x) (toFutharkExp y)
+         else Call (binopFunction op' xt yt) [toFutharkExp x, toFutharkExp y]
   where binOpPrimFuns = [ ("or", "||")
                         , ("and", "&&")
                         , ("add", "+")
@@ -344,7 +348,6 @@ callPrimFun op ret [x, y]
                         , ("lte", "<=")
                         , ("gte", ">=")
                         ]
-        ret' = toFutharkType ret
 
 callPrimFun "pr" _ es =
   ExpTuple $ map toFutharkExp es
