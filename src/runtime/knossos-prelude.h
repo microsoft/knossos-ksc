@@ -88,7 +88,11 @@ double rev$lgamma(double x, double dr)
 }
 double fwd$lgamma(double x, double dx)
 {
-	throw "fwd$gamma unimp!\n";
+  if (dx == 0.0) {
+    return 0.0;
+  } else {
+    throw "fwd$gamma unimp except at dx == 0!\n";
+  }
 }
 
 double pow$aFloat(double x, double e)
