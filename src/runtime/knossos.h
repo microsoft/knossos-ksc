@@ -314,17 +314,18 @@ namespace ks
 		return zero(std::make_tuple(t1, t2, ts...));
 	}
 
-	// ===============================  Inflate zero  ==================================
+	// ===============================  Inflated deep copy  ==================================
+
 	template <class T>
-	T inflate(T z)
+	T inflated_deep_copy(T z)
 	{
 		return z;
 	}
 
 	template <class T, class... Ts>
-	tuple<T, Ts...> inflate(tuple<T, Ts...> val)
+	tuple<T, Ts...> inflated_deep_copy(tuple<T, Ts...> val)
 	{
-		return prepend(inflate(head(val)), inflate(tail(val)));
+		return prepend(inflated_deep_copy(head(val)), inflated_deep_copy(tail(val)));
 	}
 
 	// ============================== Tangent types ==================================
@@ -693,30 +694,20 @@ namespace ks
 	}
 
 	template <class T>
-	vec<T> inflate_aux(vec<T> t)
+	vec<T> inflated_deep_copy_aux(vec<T> t)
 	{
 		vec<T> ret = vec<T>::create(t.size());
 
 		for (int i = 0; i < t.size(); ++i)
-			ret[i] = inflate(t[i]);
+			ret[i] = inflated_deep_copy(t[i]);
 		return ret;
 	}
 
-	// specialize inflate(vec<T>*,vec<T>)
+	// specialize inflated_deep_copy(vec<T>*,vec<T>)
 	template <class T>
-	vec<T> inflate(vec<T> t)
+	vec<T> inflated_deep_copy(vec<T> t)
 	{
-		return inflate_aux(t);
-	}
-
-	// And for PODs, don't inflate if nonzero
-	template <>
-	vec<double> inflate<double>(vec<double> t)
-	{
-		if (t.is_zero())
-			return inflate_aux(t); 
-		else
-			return t;
+		return inflated_deep_copy_aux(t);
 	}
 
 	// specialize inplace_add(vec<T>*,vec<T>)
@@ -755,7 +746,7 @@ namespace ks
 			return T{f(0)};
 
 		T f0 = f(0);
-		T ret = inflate(f0);
+		T ret = inflated_deep_copy(f0);
 		for (int i = 1; i < size; ++i)
 		{
 			auto mark = mark_bump_allocator_if_present();
@@ -850,7 +841,7 @@ namespace ks
 	vec<T> operator+(vec<T> const& a, T const& b)
 	{
 		if (a.is_zero())
-			return inflate(a) + b;
+			return inflated_deep_copy(a) + b;
 
 		KS_ASSERT(a.size() != 0);
 		vec<T> ret{ a.size() };
@@ -866,7 +857,7 @@ namespace ks
 	{
 		KS_ASSERT(false); // Can't handle zero_t - const?
 		if (a.is_zero())
-			return inflate(a) + b;
+			return inflated_deep_copy(a) + b;
 
 		KS_ASSERT(a.size() != 0);
 		vec<T> ret = vec<T>::create(a.size());
