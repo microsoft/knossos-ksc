@@ -344,9 +344,9 @@ cgenExprR env = \case
         ++ "   do {\n"
         ++ "     $MRK(" ++ bumpmark ++ ");\n" -- TODO: this is just to declare it
         ++       bodydecl
-        --       First time round, inflate it, put it in the ret, then mark the allocator
+        --       First time round, deep copy it, put it in the ret, then mark the allocator
         ++ "     if (" ++ cgenVar var ++ " == 0) {\n"
-        ++ "       " ++ ret ++ " = inflate(" ++ bodyex ++ ");\n"
+        ++ "       " ++ ret ++ " = inflated_deep_copy(" ++ bodyex ++ ");\n"
         ++ "       $MRK(" ++ bumpmark ++ ");\n"
         ++ "     } else {\n"
         ++ "       inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");\n"
