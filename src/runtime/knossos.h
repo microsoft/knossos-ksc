@@ -694,20 +694,13 @@ namespace ks
 	}
 
 	template <class T>
-	vec<T> inflated_deep_copy_aux(vec<T> t)
+	vec<T> inflated_deep_copy(vec<T> t)
 	{
 		vec<T> ret = vec<T>::create(t.size());
 
 		for (int i = 0; i < t.size(); ++i)
 			ret[i] = inflated_deep_copy(t[i]);
 		return ret;
-	}
-
-	// specialize inflated_deep_copy(vec<T>*,vec<T>)
-	template <class T>
-	vec<T> inflated_deep_copy(vec<T> t)
-	{
-		return inflated_deep_copy_aux(t);
 	}
 
 	// specialize inplace_add(vec<T>*,vec<T>)
