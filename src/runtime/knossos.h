@@ -790,6 +790,12 @@ namespace ks
 		return ret;
 	}
 
+	template <class T, class dT>
+	vec<dT> fwd$constVec(int n, T val, std::tuple<> unit, dT dval)
+	{
+		return constVec(n, dval);
+	}
+
 	template <class F>
 	auto diag(int rows, int cols, F f)
 	{
