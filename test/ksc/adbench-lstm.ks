@@ -101,8 +101,7 @@
 
                          (tuple 0
                                 output1
-                                (build l (lam (li : Integer)
-                                    (tuple (constVec h 0.0) (constVec h 0.0)))))
+                                (constVec l (tuple (constVec h 0.0) (constVec h 0.0))))
                          wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell))
 
            (final_output (get$2$3 final_output_i_o_v))
