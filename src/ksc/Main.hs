@@ -367,12 +367,17 @@ demoFOnTestPrograms ksTests = do
   testOn ksTestsInModes $ \(ksTest, adp) -> do
         demoFFilter Nothing ignoreMain adp ksTest
 
+-- Drop items from the list while the condition is satisfied, and also
+-- drop the first element satisfying the condition, if any.
+dropWhile1 :: (a -> Bool) -> [a] -> [a]
+dropWhile1 f = tail . dropWhile f
+
 testRunKS :: String -> String -> IO ()
 testRunKS compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
   output <- displayCppGenCompileAndRun compiler Nothing ksTest
 
-  let "TESTS FOLLOW":testResults = dropWhile (/= "TESTS FOLLOW") (lines output)
+  let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
       groupedTestResults = group testResults
         where group = \case

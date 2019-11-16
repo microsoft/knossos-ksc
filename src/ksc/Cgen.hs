@@ -533,7 +533,9 @@ cgenAnyFun :: HasCallStack => TFun -> CType -> String
 cgenAnyFun tf cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
-    let TypeVec t = ty in "build<" ++ cgenType (mkCType t) ++ ">"
+    case ty of
+      TypeVec t -> "build<" ++ cgenType (mkCType t) ++ ">"
+      _         -> error ("Unexpected type for build: " ++ show ty)
   TFun ty (Fun (PrimFun "sumbuild")) ->
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
@@ -617,7 +619,9 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
       )
     _ -> mkCType ty
 
+pattern RR :: TypeX p
 pattern RR = TypeFloat
+pattern VecR :: TypeX p
 pattern VecR <- TypeVec TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType

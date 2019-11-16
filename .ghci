@@ -1,2 +1,2 @@
-:set -isrc/ksc -Wmissing-monadfail-instances -Wincomplete-patterns -Wunused-local-binds -Wunused-matches -Wunused-imports -Wunused-top-binds -Wmissing-signatures -Wincomplete-patterns
+:set -isrc/ksc -Wall -Wno-name-shadowing -Wno-unticked-promoted-constructors -Wno-type-defaults -Wno-unused-do-bind -Wincomplete-uni-patterns -Wincomplete-record-updates
 
