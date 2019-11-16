@@ -195,6 +195,7 @@ deriving instance Show (RuleX Parsed)
 -- TypeSize is used to document when an integer represents a Size.
 -- It's too viral to use a separate Integer type because most integer operations
 -- need to be supported, e.g. the size of a lower-triangular matrix is d*(d+1)/2
+pattern TypeSize :: TypeX p
 pattern TypeSize = TypeInteger
 
 isScalar :: Type -> Bool
