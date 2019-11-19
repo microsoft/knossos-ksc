@@ -31,6 +31,6 @@ build_pybind11_module() {
 	  -shared \
 	  -fPIC \
 	  -o $MODULE_FILE \
-	  -DMNISTCNNCPP_MODULE_NAME=$MODULE_NAME \
+	  -DPYTHON_MODULE_NAME=$MODULE_NAME \
 	  $CPP_FILE
 }

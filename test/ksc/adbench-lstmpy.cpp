@@ -36,7 +36,7 @@ void declare_vec(py::module &m, std::string typestr) {
 // possible because Python tuples map to std::tuples regardless of
 // their contents.  I'll look into it later.  For now I'll just have a
 // bunch of verbose replication.
-PYBIND11_MODULE(MNISTCNNCPP_MODULE_NAME, m) {
+PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<double>(m, std::string("double"));
   declare_vec<std::tuple<ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec10"));
   declare_vec<std::tuple<ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec2"));
