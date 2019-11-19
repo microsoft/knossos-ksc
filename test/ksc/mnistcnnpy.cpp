@@ -24,7 +24,7 @@ void declare_vec(py::module &m, std::string typestr) {
 
 // In the future it might make more sense to move the vec type
 // definitions to a general Knossos CPP types Python module.
-PYBIND11_MODULE(MNISTCNNCPP_MODULE_NAME, m) {
+PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<double>(m, std::string("double"));
   declare_vec<ks::vec<double> >(m, std::string("vec_double"));
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
