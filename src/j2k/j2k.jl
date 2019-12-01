@@ -3,23 +3,15 @@ using Zygote
 using IRTools
 import Base.show
 
-f(x) = cos(x) * x
+nl = "\n"
 
-
-function foo1(a,b)
-    if a > 0
-        y = sin(a) * f(b)
-    else
-        y = -a*f(b)
-    end
-    f(y) + 5
-end
-
-ir = @code_ir foo1(1.1,2.2)             
+blockid(id::Int) = string("b",id)
 
 struct Ex 
     args :: Array{Any}
 end
+
+head(e) = e.args[1]
 
 function show(io::IO, ex::Ex)
     print(io, "(")
@@ -49,7 +41,7 @@ function make_sexp(x :: IRTools.Variable)
 end
 
 function make_sexp(x :: GlobalRef)
-    string(x.mod, "\$", x.name)
+    string(x.mod, ".", x.name)
 end
 
 function make_sexp(x :: Expr)
@@ -60,17 +52,28 @@ function make_sexp(x :: Expr)
     end
 end
 
-function make_sexp(x :: IRTools.Variable, st :: IRTools.Statement) 
+function make_let(x :: IRTools.Variable, st :: IRTools.Statement, body) 
     if isnothing(st.expr)
-        ex = sexp("!")
+        ex = sexp("!!!") # When does this happen?
     else
         ex = make_sexp(st.expr)
     end
     if isnothing(x)
         sexp("nil", ex)
     else
-        sexp("let",string("v%", x.id),ex)
+        sexp("let", sexp(string("v%", x.id),ex), nl, body)
     end
+end
+
+function make_lets(let_args, body)
+    n = length(let_args)
+    if n == 0
+        return body
+    end
+
+    x,st = let_args[1]
+    body = make_lets(let_args[2:end], body)
+    make_let(x, st, body)
 end
 
 # struct IRTools.Branch
@@ -78,31 +81,37 @@ end
 #     block     :: Int64
 #     args      :: Array{Any,1}
 
-function make_sexp_br(id :: Int, br :: IRTools.Branch)
+function make_sexp_br(env_args, id :: Int, br :: IRTools.Branch)
     if br.block == 0
         sexp(br.args...)
     else
-        sexp(string("%b", br.block), br.args...)
+        sexp(blockid(br.block), map(head, env_args)..., br.args...)
     end
 end
 
-function make_sexp_brs(id :: Int, br :: IRTools.Branch)
+function make_sexp_brs(env_args, id :: Int, br :: IRTools.Branch)
     if isnothing(br.condition)
-        make_sexp_br(id, br)
+        make_sexp_br(env_args, id, br)
     else
-        sexp("if", br.condition, sexp(string("b",id+1)), make_sexp_br(br))
+        sexp("if", br.condition, nl,
+             sexp(blockid(id+1), map(head, env_args)...), nl,
+             make_sexp_br(env_args, id, br))
     end
 end
 
-function make_sexp_brs(id :: Int, br :: IRTools.Branch, tail...)
+function make_sexp_brs(env_args, id :: Int, br :: IRTools.Branch, tail...)
     # Must be conditional if tail nonempty
     @assert !isnothing(br.condition)
-    sexp("if", br.condition, make_sexp_br(id, br), make_sexp_brs(id, tail...))
+    sexp("if", br.condition, nl, make_sexp_br(env_args, id, br), nl, make_sexp_brs(env_args, id, tail...))
 end
 
-function make_sexp(b :: IRTools.Block)
+function block_args(b :: IRTools.Block)
     ats = zip(IRTools.arguments(b),IRTools.argtypes(b))
-    args = sexp([sexp(a,":",t) for (a,t) in ats]...)
+    [sexp(a,":",t) for (a,t) in ats]
+end
+
+function make_sexp(env_args, env_args2, b :: IRTools.Block)
+    args = sexp(env_args..., block_args(b)...)
 
     if false
         for (x,t) in b
@@ -114,20 +123,46 @@ function make_sexp(b :: IRTools.Block)
         end
     end
 
-    exs = [make_sexp(x,t) for (x,t) in b if x != undef]
-    body = sexp(exs...)
-    last = make_sexp_brs(b.id,IRTools.branches(b)...)
+    branches = make_sexp_brs(env_args2, b.id, IRTools.branches(b)...)
+
+    let_args = [(x,t) for (x,t) in b if x != undef]
+    body = make_lets(let_args, branches)
             
-    sexp("def",string("b",b.id), 
-         "Any",
-         args,
-         body,
-         last
-         )
+    se = sexp("def",blockid(b.id), 
+              "Any",
+              args, nl,
+              body)
+    se
 end
 
-print("---\n")
-ir
-for b in reverse(IRTools.blocks(ir))
-    println(make_sexp(b))
+function make_sexps(ir :: IRTools.IR)
+    blocks = IRTools.blocks(ir)
+    env_args = block_args(blocks[1])
+
+    for b in reverse(blocks[2:end])
+        se = make_sexp(env_args, env_args, b)
+        println(se,"\n")
+    end
+    se = make_sexp([], env_args, blocks[1])
+    println(se)
 end
+
+###################
+### Test
+
+print("---\n")
+f(x) = cos(x) * x
+
+function foo1(a,b)
+    if a > 0
+        y = sin(a) * f(b)
+    else
+        y = -a*f(b)
+    end
+    f(y) + 5
+end
+
+ir = @code_ir foo1(1.1,2.2)
+println(ir)
+
+make_sexps(ir)
