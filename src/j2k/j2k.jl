@@ -3,6 +3,10 @@ using Zygote
 using IRTools
 import Base.show
 
+### TODOS
+# 1. Nice printing :)
+# 2. Instead of env_args, collect free vars of expressions, and pass those down explicitly
+
 nl = "\n"
 
 blockid(id::Int) = string("b",id)
@@ -37,7 +41,7 @@ function make_sexp(x :: Number)
 end
 
 function make_sexp(x :: IRTools.Variable)
-    x
+    string("v",x)
 end
 
 function make_sexp(x :: GlobalRef)
@@ -89,20 +93,31 @@ function make_sexp_br(env_args, id :: Int, br :: IRTools.Branch)
     end
 end
 
+function make_if(cond, t, f)
+    sexp("if", cond, nl,
+         t, nl,
+         f)
+end
+
 function make_sexp_brs(env_args, id :: Int, br :: IRTools.Branch)
+    # The last branch in a list
     if isnothing(br.condition)
+        # unconditional... 
         make_sexp_br(env_args, id, br)
     else
-        sexp("if", br.condition, nl,
-             sexp(blockid(id+1), map(head, env_args)...), nl,
-             make_sexp_br(env_args, id, br))
+        # if conditional, is either the br or a fallthrough
+        make_if(br.condition,
+                sexp(blockid(id+1), map(head, env_args)...), 
+                make_sexp_br(env_args, id, br))
     end
 end
 
 function make_sexp_brs(env_args, id :: Int, br :: IRTools.Branch, tail...)
     # Must be conditional if tail nonempty
     @assert !isnothing(br.condition)
-    sexp("if", br.condition, nl, make_sexp_br(env_args, id, br), nl, make_sexp_brs(env_args, id, tail...))
+    make_if(br.condition, 
+            make_sexp_br(env_args, id, br), 
+            make_sexp_brs(env_args, id, tail...))
 end
 
 function block_args(b :: IRTools.Block)
@@ -153,16 +168,18 @@ end
 print("---\n")
 f(x) = cos(x) * x
 
-function foo1(a,b)
-    if a > 0
-        y = sin(a) * f(b)
+sumsq(xs) = sum(xs.^2)
+
+function foo1(as,b)
+    if length(as) > 1
+        y = [sin(a) for a in as] .* f(b)
     else
-        y = -a*f(b)
+        y = -as.*f(b)
     end
-    f(y) + 5
+    f(sumsq(y)) + 5
 end
 
-ir = @code_ir foo1(1.1,2.2)
+ir = @code_ir foo1(rand(4),2.2)
 println(ir)
 
 make_sexps(ir)
