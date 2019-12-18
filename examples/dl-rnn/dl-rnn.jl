@@ -11,7 +11,7 @@ struct RNN
 end
 
 # RNN model: Given input sequence xs, compute output sequence
-function rnn(weights :: RNN, xs :: Array{Vec})
+function rnn(weights :: RNN, xs :: Array{Vec}) :: Array{Vec}
     h = rand(rng, length(weights.b))
     [
       h = tanh.(weights.Wh * h) + tanh.(weights.Wx * x) + weights.b
