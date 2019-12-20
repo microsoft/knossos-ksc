@@ -394,10 +394,10 @@ checkTypes_maybe mb_expected actual herald
   -- type if supplied, otherwise the actual one.
   --
   -- This is important because `checkTypes` is ultimately implemented in
-  -- terms of `eqType`.  `eqType` sometimes claims that types are equal
-  -- when they aren't, so that we can allow programs that otherwise we
-  -- would need to implement a more sophisticated type checker for.  For
-  -- Calls and Lets the expected type is the type on the Fun or binder
+  -- terms of `eqType` and so the two types may not actually be
+  -- structurally equal.
+  --
+  -- For Calls and Lets the expected type is the type on the Fun or binder
   -- respectively (if it exists) and (when it exists) we want type
   -- checking to keep it unchanged.
   = case mb_expected of
