@@ -225,12 +225,10 @@ tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
 
+-- eqType is currently == but coud be more complicated if we do size
+-- types
 eqType :: Type -> Type -> Bool
-eqType (TypeVec ty1)    (TypeVec ty2)   = eqType ty1 ty2
-eqType (TypeTuple tys1) (TypeTuple tys2) =
-  (length tys1 == length tys2) && (and (zipWith eqType tys1 tys2))
-eqType (TypeLM s1 t1) (TypeLM s2 t2) = eqType s1 s2 && eqType t1 t2
-eqType t1 t2 = t1 == t2
+eqType = (==)
 
 eqTypes :: Type -> [Type] -> Maybe Type
 eqTypes x xs = if all (eqType x) xs
