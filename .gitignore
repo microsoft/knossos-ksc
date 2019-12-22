@@ -86,3 +86,6 @@ users/simonpj/AD.pdf
 *.synctex(busy)
 *.synctex.gz
 *.xcp
+
+etc/ks-vscode/node_modules/
+etc/ks-vscode/out/
