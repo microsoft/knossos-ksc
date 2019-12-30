@@ -76,8 +76,8 @@ a specific package archive, as detailed below.
 #     https://launchpad.net/~hvr/+archive/ubuntu/ghc/
 sudo add-apt-repository ppa:hvr/ghc
 sudo apt-get update
-sudo apt install ghc-8.6.5 cabal-install-2.4 g++
-/opt/cabal/bin/cabal-2.4 v2-update
+sudo apt install ghc-8.6.5 cabal-install-3.0 g++
+/opt/cabal/bin/cabal-3.0 v2-update
 ```
 
 ### Cloning knossos
@@ -102,7 +102,7 @@ their `PATH` so that command will run fine.  Ubuntu users might need
 to use the following, more explicit, command line.
 
 ```
-/opt/cabal/2.4/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc=/opt/ghc/bin/ghc-8.6.5
+/opt/cabal/3.0/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc=/opt/ghc/bin/ghc-8.6.5
 ```
 
 It will build a lot of packages, which will look a bit like
