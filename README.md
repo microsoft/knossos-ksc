@@ -63,8 +63,8 @@ refreshenv
 
 ### Ubuntu
 
-You ought to use Ubuntu version >= 18.06 because older Ubuntus don't
-have g++ >= 7.  Ubuntu 18.06 under WSL works perfectly fine.  The
+You ought to use Ubuntu version >= 18.04 because older Ubuntus don't
+have g++ >= 7.  Ubuntu 18.04 under WSL works perfectly fine.  The
 simplest way to get ghc and cabal is to install specific versions from
 a specific package archive, as detailed below.
 
