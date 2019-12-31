@@ -171,6 +171,50 @@ Hello world!
 If you are seeing this output then knossos-ksc has successfully compiled and run the hello-world.ks program!
 </pre>
 
+## ksc basics
+
+* Syntax of .ks files
+
+  * The syntax is defined by the parser in Parse.hs and the
+    pretty-printer in Lang.hs.  That they agree is checked in
+    `testRoundTrip` in Main.hs.
+
+  * Give examples of different constructions
+
+* Pipeline
+
+  * defs and diffs
+
+  * ANF-opt-CSE
+
+* Derivatives
+
+  * Forward/Reverse
+
+  * Tupled/Untupled
+
+  * Tupled doesn't work all the way through code gen!  We're working
+    on "Conalisation" to handle that.
+
+  * Either give example or point to an example file with a command
+    line to run to generate it.
+  
+* Backends
+
+  * C++ is generated from the transformed and optimised ksc code in
+    Cgen.hs.
+
+    * The C++ code depends on a small runtime which provides a
+      bump-allocated vector implementation, implementations of
+      primitives, and a very small standard library called the
+      "prelude" (available in `src/runtime`)
+
+  * We also have a Futhark backend, but most of our efforts are
+    concentrated on C++ at the moment.
+  
+
+
+
 ## Code of Conduct
 
 Collaboration on this project is subject to the [Microsoft Open Source
