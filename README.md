@@ -173,47 +173,29 @@ If you are seeing this output then knossos-ksc has successfully compiled and run
 
 ## ksc basics
 
-* Syntax of .ks files
+### Syntax of .ks files
 
-  * The syntax is defined by the parser in Parse.hs and the
-    pretty-printer in Lang.hs.  That they agree is checked in
-    `testRoundTrip` in Main.hs.
+See [the ksc syntax primer](test/ksc/syntax-primer.ks) for an
+introduction to the syntax of `.ks` files.
 
-  * Give examples of different constructions
+In the compiler the syntax is defined by the parser in
+[`Parse.hs`](src/ksc/Parse.hs) and the pretty-printer in
+[`Lang.hs`](src/ksc/Lang.hs).  `testRoundTrip` in
+[`Main.hs`](src/ksc/Main.hs) checks that they agree.
 
-* Pipeline
+### Compiler pipeline
 
-  * defs and diffs
+The compiler works by parsing the source code, generating forward and
+reverse mode automatic derivatives, and then applying some
+optimisations before emitting the code to backend.
 
-  * ANF-opt-CSE
+The main backend is C++ (defined in [`src/runtime`](src/runtime)).  It
+depends on a small runtime which provides a bump-allocated vector
+implementation, implementations of primitives, and a very small
+standard library called the "prelude".
 
-* Derivatives
-
-  * Forward/Reverse
-
-  * Tupled/Untupled
-
-  * Tupled doesn't work all the way through code gen!  We're working
-    on "Conalisation" to handle that.
-
-  * Either give example or point to an example file with a command
-    line to run to generate it.
-  
-* Backends
-
-  * C++ is generated from the transformed and optimised ksc code in
-    Cgen.hs.
-
-    * The C++ code depends on a small runtime which provides a
-      bump-allocated vector implementation, implementations of
-      primitives, and a very small standard library called the
-      "prelude" (available in `src/runtime`)
-
-  * We also have a Futhark backend, but most of our efforts are
-    concentrated on C++ at the moment.
-  
-
-
+We also have a [Futhark](https://futhark-lang.org/) backend, but most
+of our efforts are concentrated on C++ at the moment.
 
 ## Code of Conduct
 
