@@ -340,6 +340,7 @@ futharkCompileKscPrograms ksFiles = do
         , "test/ksc/fold.ks"
         , "test/ksc/logsumexp.ks"
         , "test/ksc/vprod.ks"
+        , "test/ksc/syntax-primer.ks"
           -- Doesn't handle recursion
         , "test/ksc/power.ks"
         , "test/ksc/sum.ks"
