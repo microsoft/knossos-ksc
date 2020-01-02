@@ -121,7 +121,7 @@ data ExprX p
   | Lam (TVarX p) (ExprX p)    -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
-  | If (ExprX p) (ExprX p) (ExprX p)  -- FIXME make cond ExprX?
+  | If (ExprX p) (ExprX p) (ExprX p)
   | Assert (ExprX p) (ExprX p)
   | Dummy (MTypeX p)
 
