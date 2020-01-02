@@ -542,9 +542,6 @@ cgenAnyFun tf cftype = case tf of
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun f
 
-cgenTypeOf :: TExpr -> String
-cgenTypeOf = cgenType . mkCType . typeof
-
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
   CType  ty -> cgenTypeLang ty
