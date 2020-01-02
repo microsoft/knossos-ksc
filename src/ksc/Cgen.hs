@@ -512,7 +512,7 @@ cgenFunId :: FunId -> String
 cgenFunId = \case
   UserFun fun -> mangleFun fun
   PrimFun fun -> translateFun fun
-  SelFun i _  -> "ks_get<" ++ show (i - 1) ++ ">"  -- TODO: rename to ks::get
+  SelFun i _  -> "ks::get<" ++ show (i - 1) ++ ">"
  where
   translateFun :: String -> String
   translateFun = \case
