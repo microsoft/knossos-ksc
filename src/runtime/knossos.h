@@ -1711,10 +1711,6 @@ namespace ks
 
 		return abs(d1 - d2)/(abs(d1) + abs(d2));
 	}
-
-	// ===============================  Test edef (TODO: Move)  ========================
-
-
 } // namespace ks
 
 #include "knossos-prelude.h"

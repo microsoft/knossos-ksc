@@ -1,7 +1,8 @@
 // Defines everything in Knossos.ks
 
 namespace ks {
-    // These only exist so that we can test edef functionality.
+// ===============================  Test edef  ========================
+// These only exist so that we can test edef functionality.
 // We should probably come up with a better story for the
 // tests but at the time of writing I didn't want to hold back
 // edef support any longer.
