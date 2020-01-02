@@ -221,7 +221,7 @@ namespace ks
 	}
 
 	template < size_t N, class T >
-	auto ks_get(T const& t)
+	auto get(T const& t)
 	{
 		return std::get<N>(t);
 	}
