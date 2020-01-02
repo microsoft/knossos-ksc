@@ -17,7 +17,7 @@ module LangUtils (
   cmpExpr,
 
   -- Free vars
-  notFreeIn, notFreeInType, newVarNotIn, freeVarsOf,
+  notFreeIn, newVarNotIn, freeVarsOf,
 
   -- Tests
   LangUtils.hspec, test_FreeIn,
@@ -108,13 +108,6 @@ notFreeIn = go
    go v (Let v2 r b) = go v r && (v == v2 || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Assert e1 e2) = go v e1 && go v e2
-
-notFreeInType :: TVar -> Type -> Bool
-notFreeInType v (TypeTuple tys) = all (notFreeInType v) tys
-notFreeInType v (TypeVec ty)    = v `notFreeInType` ty
-notFreeInType v (TypeLam t1 t2) = v `notFreeInType` t1 && v `notFreeInType` t2
-notFreeInType v (TypeLM t1 t2)  = v `notFreeInType` t1 && v `notFreeInType` t2
-notFreeInType _ _ = True
 
 -----------------
 
