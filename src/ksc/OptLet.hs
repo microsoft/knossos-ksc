@@ -278,9 +278,9 @@ notInScope v in_scope
 
     parse_suffix :: [Char]          -- Digits parsed from RH end (in order)
                  -> String          -- String being parsed (reversed)
-                 -> (String, Int)   -- Srring before ":", plus number found after
-    -- E.g. parse_suffix "foo_23"  = ("foo",    23)
-    --      parse_suffix "womabat" = ("wombat", 0)
+                 -> (String, Int)   -- String before "_", plus number found after
+    -- E.g. parse_suffix "foo_23" = ("foo",    23)
+    --      parse_suffix "wombat" = ("wombat", 0)
     parse_suffix ds (c:cs)
       | c == '_'
       , not (null ds)
