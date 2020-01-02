@@ -1669,7 +1669,7 @@ namespace ks
 	{
 		double ret = 0;
 
-		// FIXME Assert sizes equal
+		KS_ASSERT(t1.size() == t2.size());
 
 		for (int i = 0; i < t1.size(); i++)
 		{
