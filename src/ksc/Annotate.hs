@@ -14,7 +14,7 @@ import KMonad
 import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
-import Control.Monad( ap, unless, when )
+import Control.Monad( ap, when )
 import Data.List( intersperse, nub, (\\) )
 
 -----------------------------------------------
@@ -192,9 +192,6 @@ tcExpr (Let vx rhs body)
        ; let tvar = TVar rhs_ty var
        ; TE abody tybody <- extendLclSTM [tvar] (tcExpr body)
 
-       ; checkFreeness tvar tybody $
-         text "in the let binding for" <+> ppr tvar
-
        ; return (TE (Let tvar arhs abody) tybody) }
 
 tcExpr (Tuple es)
@@ -202,11 +199,9 @@ tcExpr (Tuple es)
        ; let (aes, tys) = unzipTEs pairs
        ; return (TE (Tuple aes) (TypeTuple tys)) }
 
-tcExpr (Lam tv@(TVar tyv _v) body)
+tcExpr (Lam tv body)
   = do { tv' <- tcTVar tv
        ; TE abody tybody <- extendLclSTM [tv'] (tcExpr body)
-       ; checkFreeness tv' tybody $
-         text "in the lambda binding for" <+> ppr tyv
        ; return (TE (Lam tv' abody)
                     (TypeLam (typeof tv') tybody)) }
 
@@ -421,13 +416,6 @@ compatibleType exp_ty act_ty
   = True
   | otherwise
   = exp_ty `eqType` act_ty   -- Simple syntactic equality for now
-
-checkFreeness :: TVar -> Type -> SDoc -> TcM ()
-checkFreeness tv ty extra
-  = unless (tv `notFreeInType` ty) $
-    addErr $ vcat [ hang (text "Locally bound variable" <+> ppr tv)
-                       2 (text "appears free in result type" <+> ppr ty)
-                  , extra ]
 
 extendGblSTM :: [TDef] -> TcM a -> TcM a
 extendGblSTM defs = modifyEnvTc add_defs
