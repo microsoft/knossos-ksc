@@ -462,9 +462,7 @@ lookupLclTc v
                                           , text "Envt:" <+> gblDoc st ])
                              ; return TypeUnknown
                              }
-                  Just (Def { def_fun  = _fn
-                           , def_res_ty = ret_ty
-                           , def_args = params }) -> return (TypeLam (TypeTuple $ map tVarType params) ret_ty)
+                  Just d -> return (TypeLam (TypeTuple $ map tVarType (def_args d)) (def_res_ty d))
            }
            Just ty -> return ty }
   where
