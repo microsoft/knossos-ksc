@@ -455,15 +455,13 @@ lookupLclTc :: Var -> TcM Type
 lookupLclTc v
   = do { st <- getSymTabTc
        ; case Map.lookup v (lclST st) of
-           Nothing -> do {
-              case Map.lookup (varFun v) (gblST st) of
+           Nothing -> case Map.lookup (varFun v) (gblST st) of
                   Nothing -> do {
                              addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
                                           , text "Envt:" <+> gblDoc st ])
                              ; return TypeUnknown
                              }
                   Just d -> return (TypeLam (TypeTuple $ map tVarType (def_args d)) (def_res_ty d))
-           }
            Just ty -> return ty }
   where
      varFun (Simple name) = mk_fun name
