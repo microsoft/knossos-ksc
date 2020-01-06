@@ -130,12 +130,12 @@ theDefs display decls = do {
   ; return (defs, env, rulebase)
   }
 
-defsAndDiffs :: DisplayLint a
-             -> [Decl]
-             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
-defsAndDiffs display decls = do {
-  ; (defs, env, rulebase) <- theDefs display decls
-
+theDiffs :: DisplayLint a
+         -> [TDef]
+         -> GblSymTab
+         -> RuleBase
+         -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase)
+theDiffs display defs env rulebase = do {
   ; let grad_defs = gradDefs BasicAD defs
         env1 = env `extendGblST` grad_defs
   ; display "Grad" env1 grad_defs
@@ -172,6 +172,13 @@ defsAndDiffs display decls = do {
   ; return (env3, defs, optdiffs, rulebase)
   }
 
+defsAndDiffs :: DisplayLint a
+             -> [Decl]
+             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
+defsAndDiffs display decls = do {
+  ; (defs, env, rulebase) <- theDefs display decls
+  ; theDiffs display defs env rulebase
+  }
 anfOptAndCse :: DisplayLint a
              -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
 anfOptAndCse display rulebase env4 alldefs =
