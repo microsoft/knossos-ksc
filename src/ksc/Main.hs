@@ -94,7 +94,10 @@ demoN verbosity adp decls
        ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
        }
 
-displayPassM :: Maybe Int -> String -> GblSymTab -> [TDef] -> KM ()
+type DisplayLintT m a = String -> GblSymTab -> [TDef] -> KMT m a
+type DisplayLint a = DisplayLintT IO a
+
+displayPassM :: Maybe Int -> DisplayLint ()
 displayPassM mverbosity what env decls
   = do { flip mapM_ mverbosity $ \verbosity -> do
            banner what
@@ -117,7 +120,7 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
-theDefs :: ([Char] -> GblSymTab -> [TDef] -> KMT IO a)
+theDefs :: DisplayLint a
         -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
 theDefs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
@@ -127,7 +130,7 @@ theDefs display decls = do {
   ; return (defs, env, rulebase)
   }
 
-defsAndDiffs :: (String -> GblSymTab -> [TDef] -> KM a)
+defsAndDiffs :: DisplayLint a
              -> [Decl]
              -> KM (GblSymTab, [TDef], [TDef], RuleBase)
 defsAndDiffs display decls = do {
@@ -169,7 +172,7 @@ defsAndDiffs display decls = do {
   ; return (env3, defs, optdiffs, rulebase)
   }
 
-anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)
+anfOptAndCse :: DisplayLint a
              -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
 anfOptAndCse display rulebase env4 alldefs =
   do {
