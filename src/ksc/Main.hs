@@ -117,14 +117,21 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
-defsAndDiffs :: (String -> GblSymTab -> [TDef] -> KM a)
-             -> [Decl]
-             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
-defsAndDiffs display decls = do {
+theDefs :: ([Char] -> GblSymTab -> [TDef] -> KMT IO a)
+        -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
+theDefs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
   ; let rulebase      = mkRuleBase rules
   ; display "Typechecked defs" env defs
+  ; return (defs, env, rulebase)
+  }
+
+defsAndDiffs :: (String -> GblSymTab -> [TDef] -> KM a)
+             -> [Decl]
+             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
+defsAndDiffs display decls = do {
+  ; (defs, env, rulebase) <- theDefs display decls
 
   ; let grad_defs = gradDefs BasicAD defs
         env1 = env `extendGblST` grad_defs
