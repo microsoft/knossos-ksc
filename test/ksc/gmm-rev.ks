@@ -164,7 +164,7 @@
 
 (def main Integer ()
     (let ((D 64)
-          (N 5)
+          (N 50)
           (K 64)
           (seed 0)
           (scale_unity 1.0)
