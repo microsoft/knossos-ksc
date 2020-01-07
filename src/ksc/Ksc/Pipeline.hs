@@ -198,7 +198,8 @@ displayCppGen verbosity ksFile ksofile cppfile =
   ; let (main, decls)    = moveMain decls0
   ; dd main
 
-  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
+  ; (defs, env, rulebase) <- theDefs display decls
+  ; (env3, defs, optdiffs, rulebase) <- theDiffs display defs env rulebase
 
   ; (env4, ann_main) <- annotDecls env3 main
 
