@@ -10,7 +10,7 @@ import Parse (parseE)
 import Opt
 import Ksc.Pipeline (demoFFilter,
                      displayCppGenAndCompile, displayCppGenCompileAndRun,
-                     genFuthark, ignoreMain)
+                     displayCppGenNoDiffs, genFuthark, ignoreMain)
 import qualified Cgen
 import qualified Control.Exception
 import qualified Data.Maybe
@@ -42,6 +42,16 @@ main = do
       "--proffunctions", proffunctions,
       "--proflines", proflines ]
       -> profileArgs source proffile proffunctions proflines
+    [ "--generate-cpp-without-diffs",
+      "--ks-source-file",
+      sourceFile,
+      "--ks-output-file",
+      outputFile,
+      "--cpp-output-file",
+      cppOutputFile
+      ] -> Ksc.Pipeline.displayCppGenNoDiffs
+             Nothing sourceFile outputFile cppOutputFile
+
     _ -> fail "Unknown arguments"
 
 testWithfsTest :: String -> IO ()
