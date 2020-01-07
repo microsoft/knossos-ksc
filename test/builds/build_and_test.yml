@@ -28,7 +28,7 @@ jobs:
   - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
     displayName: 'Install dependencies'
 
-  - script: /opt/cabal/3.0/bin/cabal v1-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --dependencies-only && /opt/cabal/3.0/bin/cabal v1-configure --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 && /opt/cabal/3.0/bin/cabal v1-build --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5
+  - script: /opt/cabal/3.0/bin/cabal v2-build --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5
     displayName: 'Can build with cabal'
 
   - script: sh ./test/builds/build_linux.sh /opt/ghc/8.6.5/bin/ghc-8.6.5
