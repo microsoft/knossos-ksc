@@ -690,16 +690,12 @@ cppGenWithFiles ksofile cppfile defs = do
 
   return (ksofile, cppfile)
 
-cppGen :: String -> [TDef] -> IO (String, String)
-cppGen outfile =
-  let ksofile = outfile ++ ".kso"
-      cppfile = outfile ++ ".cpp"
-  in cppGenWithFiles ksofile cppfile
-
 cppGenAndCompile
   :: (String -> String -> IO String) -> String -> String -> [TDef] -> IO String
 cppGenAndCompile compiler outfile exefile defs = do
-  (_, cppfile) <- cppGen outfile defs
+  let ksofile = outfile ++ ".kso"
+      cppfile = outfile ++ ".cpp"
+  (_, cppfile) <- cppGenWithFiles ksofile cppfile defs
   compiler cppfile exefile
 
 compile :: String -> String -> String -> IO String
