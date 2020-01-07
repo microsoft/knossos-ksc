@@ -208,10 +208,7 @@ displayCppGen verbosity ksFile ksofile cppfile =
 
   ; cse <- anfOptAndCse display rulebase env4 alldefs
 
-  ; let ann2 =  cse
-  ; let defs = ann2
-  ; liftIO $ do
-      Cgen.cppGenWithFiles ksofile cppfile defs
+  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
 
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
