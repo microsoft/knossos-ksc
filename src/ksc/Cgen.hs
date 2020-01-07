@@ -696,8 +696,6 @@ cppGenAndCompile
   :: (String -> String -> IO String) -> String -> String -> [TDef] -> IO String
 cppGenAndCompile compiler outfile exefile defs = do
   (_, cppfile) <- cppGen outfile defs
-  --putStrLn $ "Formatting " ++ cppfile
-  --callCommand $ "clang-format -i " ++ cppfile
   compiler cppfile exefile
 
 compile :: String -> String -> String -> IO String
