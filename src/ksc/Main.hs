@@ -11,6 +11,7 @@ import Opt
 import Ksc.Pipeline (demoFFilter,
                      displayCppGenCompileAndRun,
                      displayCppGenAndCompile,
+                     displayCppGenNoDiffs,
                      genFuthark, ignoreMain)
 import qualified Ksc.Pipeline
 import qualified Cgen
@@ -51,6 +52,16 @@ main = do
       "--proffunctions", proffunctions,
       "--proflines", proflines ]
       -> profileArgs source proffile proffunctions proflines
+    [ "--generate-cpp-without-diffs",
+      "--ks-source-file",
+      sourceFile,
+      "--ks-output-file",
+      outputFile,
+      "--cpp-output-file",
+      cppOutputFile
+      ] -> Ksc.Pipeline.displayCppGenNoDiffs
+             Nothing sourceFile outputFile cppOutputFile
+
     _ -> fail "Unknown arguments"
 
 testWithfsTest :: String -> IO ()
