@@ -102,7 +102,7 @@ their `PATH` so that command will run fine.  Ubuntu users might need
 to use the following, more explicit, command line.
 
 ```
-/opt/cabal/3.0/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc=/opt/ghc/bin/ghc-8.6.5
+/opt/cabal/3.0/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc=/opt/ghc/bin/ghc-8.6.5 ksc
 ```
 
 It will build a lot of packages, which will look a bit like
@@ -125,7 +125,7 @@ Then it will present you with a prompt at which you should issue the
 following two commands
 
 ```
-:l src/ksc/Main
+:l src/ksc/Ksc/Pipeline
 displayCppGenCompileAndRunWithOutput "g++" Nothing "test/ksc/hello-world"
 ```
 
@@ -133,7 +133,7 @@ The output will look a little bit like this.
 
 <pre>
 GHCi, version 8.6.5: http://www.haskell.org/ghc/  :? for help
-Prelude> :l src/ksc/Main
+Prelude> :l src/ksc/Ksc/Pipeline
 [ 1 of 14] Compiling KMonad           ( src/ksc/KMonad.hs, interpreted )
 [ 2 of 14] Compiling Lang             ( src/ksc/Lang.hs, interpreted )
 [ 3 of 14] Compiling LangUtils        ( src/ksc/LangUtils.hs, interpreted )
@@ -147,11 +147,11 @@ Prelude> :l src/ksc/Main
 [11 of 14] Compiling ANF              ( src/ksc/ANF.hs, interpreted )
 [12 of 14] Compiling CSE              ( src/ksc/CSE.hs, interpreted )
 [13 of 14] Compiling AD               ( src/ksc/AD.hs, interpreted )
-[14 of 14] Compiling Main             ( src/ksc/Main.hs, interpreted )
-Ok, modules loaded: AD, ANF, Annotate, CSE, Cgen, KMonad, Lang, LangUtils, Main, Opt, OptLet, Parse, Prim, Rules.
-*Main> 
-*Main> <b>-- Compile hello-world.ks to hello-world.cpp and run</b>
-*Main> <b>displayCppGenCompileAndRunWithOutput "g++" Nothing "test/ksc/hello-world"</b>
+[14 of 14] Compiling Ksc.Pipeline     ( src/ksc/Ksc.Pipeline.hs, interpreted )
+Ok, modules loaded: AD, ANF, Annotate, CSE, Cgen, KMonad, Lang, LangUtils, Ksc.Pipeline, Opt, OptLet, Parse, Prim, Rules.
+*Ksc.Pipeline> 
+*Ksc.Pipeline> <b>-- Compile hello-world.ks to hello-world.cpp and run</b>
+*Ksc.Pipeline> <b>displayCppGenCompileAndRunWithOutput "g++" Nothing "test/ksc/hello-world"</b>
 read decls
 Linted Typechecked defs
 Linted Grad
