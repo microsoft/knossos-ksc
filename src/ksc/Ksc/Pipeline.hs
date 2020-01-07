@@ -208,7 +208,11 @@ displayCppGenAndCompile compile ext verbosity file =
   ; cse <- anfOptAndCse display rulebase env4 alldefs
 
   ; let ann2 =  cse
-  ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ("obj/" ++ file ++ ext) ann2)
+  ; let compiler = compile
+  ; let outfile = ("obj/" ++ file)
+  ; let exefile = ("obj/" ++ file ++ ext)
+  ; let defs = ann2
+  ; liftIO (Cgen.cppGenAndCompile compiler outfile exefile defs)
   }
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
