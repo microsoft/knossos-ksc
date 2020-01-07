@@ -3,13 +3,20 @@
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 module Rules( RuleBase, tryRules, mkRuleBase ) where
 
-import Lang
+import Lang hiding ((<>))
 import LangUtils ()
 import Control.Monad( guard )
 import Data.Map as M
+import Data.Monoid (Monoid, (<>))
 
 newtype RuleBase = Rules [TRule]
         -- Rule is defined in Lang
+
+instance Semigroup RuleBase where
+  Rules x1 <> Rules x2 = Rules (x1 <> x2)
+
+instance Monoid RuleBase where
+  mempty = Rules mempty
 
 type TSubst = M.Map TVar TExpr -- Substitution for fv(lhs)
 type VSubst = M.Map TVar TVar  -- Substitution for bv(lhs)
