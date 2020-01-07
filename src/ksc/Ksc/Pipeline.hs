@@ -185,14 +185,13 @@ anfOptAndCse display rulebase env4 alldefs =
   ; return cse
   }
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
-displayCppGenAndCompile compile ext verbosity file =
+displayCppGen :: Maybe Int -> String -> String -> String -> IO ()
+displayCppGen verbosity ksFile ksofile cppfile =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
       display = displayPassM verbosity
   in
   runKM $
   do {
-  ; let ksFile = file ++ ".ks"
   ; decls0 <- liftIO (parseF ksFile)
   ; liftIO $ putStrLn "read decls"
 
@@ -210,15 +209,21 @@ displayCppGenAndCompile compile ext verbosity file =
   ; cse <- anfOptAndCse display rulebase env4 alldefs
 
   ; let ann2 =  cse
+  ; let defs = ann2
+  ; liftIO $ do
+      Cgen.cppGenWithFiles ksofile cppfile defs
+  }
+
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
+displayCppGenAndCompile compile ext verbosity file = do {
+  ; let ksFile = file ++ ".ks"
   ; let compiler = compile
   ; let outfile = ("obj/" ++ file)
   ; let exefile = ("obj/" ++ file ++ ext)
-  ; let defs = ann2
-  ; liftIO $ do
-      let ksofile = outfile ++ ".kso"
-          cppfile = outfile ++ ".cpp"
-      Cgen.cppGenWithFiles ksofile cppfile defs
-      compiler cppfile exefile
+  ; let ksofile = outfile ++ ".kso"
+  ; let cppfile = outfile ++ ".cpp"
+  ; displayCppGen verbosity ksFile ksofile cppfile
+  ; compiler cppfile exefile
   }
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
