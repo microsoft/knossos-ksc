@@ -191,7 +191,9 @@ displayCppGenAndCompile compile ext verbosity file =
       display = displayPassM verbosity
   in
   runKM $
-  do { decls0 <- liftIO (parseF (file ++ ".ks"))
+  do {
+  ; let ksFile = file ++ ".ks"
+  ; decls0 <- liftIO (parseF ksFile)
   ; liftIO $ putStrLn "read decls"
 
   ; let (main, decls)    = moveMain decls0
