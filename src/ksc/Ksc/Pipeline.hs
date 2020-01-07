@@ -96,7 +96,7 @@ displayPassM mverbosity what env decls
     }
 
 -------------------------------------
--- GMM derivatives
+-- Main compiler driver
 -------------------------------------
 
 ignoreMain :: [Decl] -> [Decl]
