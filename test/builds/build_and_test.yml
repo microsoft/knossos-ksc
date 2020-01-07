@@ -28,13 +28,13 @@ jobs:
   - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
     displayName: 'Install dependencies'
 
-  - script: /opt/cabal/3.0/bin/cabal v2-build --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5
+  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=.
     displayName: 'Can build with cabal'
 
   - script: sh ./test/builds/build_linux.sh /opt/ghc/8.6.5/bin/ghc-8.6.5
     displayName: 'GHC compile src/ksc/Main.hs'
 
-  - script: src/ksc/Main out.ks
+  - script: ksc-test out.ks
     displayName: 'ksc test'
 
   - script: git clone https://github.com/pybind/pybind11.git && cd pybind11 && git checkout c9d32a81f40ad540015814edf13b29980c63e39c
