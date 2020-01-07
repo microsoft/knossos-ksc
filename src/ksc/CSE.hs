@@ -11,6 +11,7 @@ import ANF
 import Opt
 import KMonad
 import qualified Data.Map as M
+import Data.Monoid( Sum )
 
 {- Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -78,8 +79,12 @@ data CSEnv
 
 cseDefs :: RuleBase -> GblSymTab -> [TDef]
         -> KM (GblSymTab, [TDef])
+cseDefs = (fmap . fmap . fmap . fmap) (\(_, x, y) -> (x, y)) cseDefsMany
+
+cseDefsMany :: RuleBase -> GblSymTab -> [TDef]
+            -> KM (Sum Int, GblSymTab, [TDef])
 -- The returned GblSymTab contains the CSE'd definitions
-cseDefs rb gst defs
+cseDefsMany rb gst defs
   = do { anf_defs <- anfDefs defs
 --       ; banner "ANF'd"
 --       ; displayN anf_defs
@@ -92,7 +97,7 @@ cseDefs rb gst defs
              --      into    let x = e in ..let y = x in ...
             -- Then optDefs substitutes x for y
 
-       ; optDefs rb gst cse_defs
+       ; optDefsMany rb gst cse_defs
       }
 
 cseD :: TDef -> TDef

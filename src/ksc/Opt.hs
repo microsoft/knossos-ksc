@@ -6,9 +6,9 @@
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
 	     ScopedTypeVariables, TypeApplications #-}
 
-module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
+module Opt( optLets, optDef, optDefs, optDefsMany, optE, Opt.hspec, simplify, test_opt ) where
 
-import Lang
+import Lang hiding ( (<>) )
 import LangUtils
 import ANF
 import Prim
@@ -18,7 +18,9 @@ import KMonad
 
 import Debug.Trace
 import Test.Hspec
+import Control.Monad( join )
 import Data.List( mapAccumR )
+import Data.Monoid( Sum )
 import qualified Data.Set as Set
 
 optTrace :: msg -> a -> a
@@ -48,15 +50,19 @@ optSubstBndr tv env@(OptEnv { optSubst = subst })
 
 ---------------
 optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
-                        -> KM (GblSymTab, [TDef])
+        -> KM (GblSymTab, [TDef])
+optDefs = (fmap . fmap . fmap . fmap) (\(_, x, y) -> (x, y)) optDefsMany
+
+optDefsMany :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
+            -> KM (Sum Int, GblSymTab, [TDef])
 -- Returned GblSymTab contains the optimised definitions
-optDefs _  gst [] = return (gst, [])
-optDefs rb gst (def:defs) = do { (gst1, def')  <- optDef  rb gst def
-                               ; (gst2, defs') <- optDefs rb gst1 defs
-                               ; return (gst2, def' : defs') }
+optDefsMany _  gst [] = return (0, gst, [])
+optDefsMany rb gst (def:defs) = do { (i1, gst1, def')  <- optDef  rb gst def
+                               ; (i2, gst2, defs') <- optDefsMany rb gst1 defs
+                               ; return (i1 <> i2, gst2, def' : defs') }
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
-                       -> KM (GblSymTab, TDef)
+                       -> KM (Sum Int, GblSymTab, TDef)
 optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
   = do { -- The variables brought into scope by the argument list are
          -- the names of the arguments themselves (args)
@@ -64,13 +70,13 @@ optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
              env = OptEnv { optRuleBase = rb
                           , optGblST = gst
                           , optSubst = varsBroughtIntoScopeByArgs }
-       ; rhs' <- simplify env args rhs
+       ; (i, rhs') <- simplify env args rhs
        ; let def' = def { def_rhs = UserRhs rhs' }
-       ; return (extendGblST gst [def'], def') }
+       ; return (i, extendGblST gst [def'], def') }
 
-optDef _ gst def = return (gst,def)
+optDef _ gst def = return (0, gst,def)
 
-simplify :: OptEnv -> [TVar] -> TExpr -> KM TExpr
+simplify :: OptEnv -> [TVar] -> TExpr -> KM (Sum Int, TExpr)
 simplify env args rhs
   = do { rhs1 <- runAnf (anfExpr (mkEmptySubst args) rhs)
 --       ; banner "ANF'd (1)"
@@ -80,7 +86,7 @@ simplify env args rhs
 --       ; banner "OptLets (1)"
 --       ; display rhs2
 
-       ; let rhs3 = optE env rhs2
+       ; let (i1, rhs3) = optEMany env rhs2
 --       ; banner "OptE (1)"
 --       ; display rhs3
 
@@ -92,7 +98,7 @@ simplify env args rhs
 --       ; banner "OptLets (2)"
 --       ; display rhs5
 
-       ; let rhs6 = optE env rhs5
+       ; let (i2, rhs6) = optEMany env rhs5
 --       ; banner "OptE (2)"
 --       ; display rhs6
 
@@ -104,47 +110,52 @@ simplify env args rhs
 --       ; banner "OptLets (3)"
 --       ; display rhs7
 
-       ; return rhs7 }
+       ; return (i1 <> i2, rhs7) }
 
 ---------------
 optE :: HasCallStack => OptEnv -> TExpr -> TExpr
-optE env
+optE env expr = snd (optEMany env expr)
+
+optEMany :: HasCallStack => OptEnv -> TExpr -> (Sum Int, TExpr)
+optEMany env
   = go
   where
-    go :: HasCallStack => TExpr -> TExpr
+    go :: HasCallStack => TExpr -> (Sum Int, TExpr)
     go e | Just e' <- tryRules (optRuleBase env) e = go e'
 
-    go (Tuple es)         = Tuple (map go es)
+    go (Tuple es)         = Tuple <$> mapM go es
     go (Var v) | Just e <- lookupSubst (tVarVar v) (optSubst env)
-               = e
-               | otherwise = Var v
-    go (Konst k)          = Konst k
-    go (Dummy ty)         = Dummy ty
-    go (App e1 e2)        = optApp env (go e1) (go e2)
-    go (Assert e1 e2)     = Assert (go e1) (go e2)
-    go (Lam tv e)         = Lam tv' (optE env' e)
+               = pure e
+               | otherwise = pure (Var v)
+    go (Konst k)          = pure (Konst k)
+    go (Dummy ty)         = pure (Dummy ty)
+    go (App e1 e2)        = join (optApp env <$> go e1 <*> go e2)
+    go (Assert e1 e2)     = Assert <$> go e1 <*> go e2
+    go (Lam tv e)         = Lam tv' <$> optEMany env' e
        where
          (tv', env') = optSubstBndr tv env
-    go (Let tv rhs body)  = mkLet tv' (go rhs) (optE env' body)
+    go (Let tv rhs body)  = mkLet tv' <$> go rhs <*> optEMany env' body
        where
          (tv', env') = optSubstBndr tv env
-    go (If b t e)         = optIf (go b) (go t) (go e)
-    go (Call f arg)       = optCall (optZapSubst env) f (map go arg)
+    go (If b t e)         = optIf <$> go b <*> go t <*> go e
+    go (Call f arg)       = join (optCall (optZapSubst env) f <$> mapM go arg)
 
 --------------
-optCall :: OptEnv -> TFun -> [TExpr] -> TExpr
+optCall :: OptEnv -> TFun -> [TExpr] -> (Sum Int, TExpr)
 optCall env fun opt_args
   | Just new_e <- rewriteCall env fun opt_args
 --  = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
 --                                 , text "After: " <+> ppr new_e ])
-    = optE env new_e
+    = do { (1, ())
+         ; optEMany env new_e
+         }
   | otherwise
-  = Call fun opt_args
+  = pure (Call fun opt_args)
 
 --------------
-optApp :: OptEnv -> TExpr -> TExpr -> TExpr
-optApp env (Lam v e) a = Let v (optE env a) (optE env e)
-optApp _ f a         = App f a
+optApp :: OptEnv -> TExpr -> TExpr -> (Sum Int, TExpr)
+optApp env (Lam v e) a = Let v <$> optEMany env a <*> optEMany env e
+optApp _ f a         = pure (App f a)
 
 --------------
 optIf :: TExpr -> TExpr -> TExpr -> TExpr

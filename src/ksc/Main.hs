@@ -6,7 +6,7 @@ module Main where
 
 import GHC.Stack
 
-import Lang
+import Lang hiding ( (<>) )
 import LangUtils
 import Parse (parseF, parseE)
 import Rules
@@ -22,6 +22,7 @@ import KMonad
 import qualified Control.Exception
 import qualified Data.Maybe
 import Data.List( partition, intercalate )
+import Data.Monoid( Sum )
 import qualified System.Directory
 import qualified System.Environment
 import qualified System.FilePath
@@ -119,7 +120,7 @@ moveMain = partition isMain
 
 defsAndDiffs :: (String -> GblSymTab -> [TDef] -> KM a)
              -> [Decl]
-             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
+             -> KM (Sum Int, GblSymTab, [TDef], [TDef], RuleBase)
 defsAndDiffs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
@@ -144,38 +145,38 @@ defsAndDiffs display decls = do {
         env15 = env1 `extendGblST` grad_defs_tupled
   ; display "Grad tupled" env15 grad_defs_tupled
 
-  ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
+  ; (i0, env2, optgrad) <- optDefsMany rulebase env15 grad_defs
   ; display "Optgrad" env2 optgrad
 
-  ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
+  ; (i1, env25, optgrad_tupled) <- optDefsMany rulebase env2 grad_defs_tupled
   ; display "Optgrad tupled" env25 optgrad_tupled
 
   ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
   ; display "Diffs" env25 diffs
 
-  ; (env3, optdiffs) <- optDefs rulebase env25 diffs
+  ; (i2, env3, optdiffs) <- optDefsMany rulebase env25 diffs
   ; display "OptDiffs" env3 optdiffs
 
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; return (env3, defs, optdiffs, rulebase)
+  ; return (i0 <> i1 <> i2, env3, defs, optdiffs, rulebase)
   }
 
 anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)
-             -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
+             -> RuleBase -> GblSymTab -> [TDef] -> KM (Sum Int, [TDef])
 anfOptAndCse display rulebase env4 alldefs =
   do {
   -- We use ANF to expose optimisation opportunities and use optDefs
   -- to take them.  See Note [Inline tuples] for the motiviation for
   -- doing ANF-then-optDefs.
   ; anf_alldefs <- anfDefs alldefs
-  ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
+  ; (i0, env45, opt_alldefs) <- optDefsMany rulebase env4 anf_alldefs
 
-  ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
+  ; (i1, env5, cse) <- cseDefsMany rulebase env45 opt_alldefs
   ; display "CSE" env5 cse
 
-  ; return cse
+  ; return (i0 <> i1, cse)
   }
 
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
@@ -190,7 +191,7 @@ displayCppGenAndCompile compile ext verbosity file =
   ; let (main, decls)    = moveMain decls0
   ; dd main
 
-  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
+  ; (i0, env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
 
   ; (env4, ann_main) <- annotDecls env3 main
 
@@ -198,7 +199,10 @@ displayCppGenAndCompile compile ext verbosity file =
 
   ; let alldefs = defs ++ optdiffs ++ main_tdef
 
-  ; cse <- anfOptAndCse display rulebase env4 alldefs
+  ; (i1, cse) <- anfOptAndCse display rulebase env4 alldefs
+
+  ; let totalRulesApplied = i0 + i1
+  ; liftIO (putStrLn ("Total rules applied: " ++ show totalRulesApplied))
 
   ; let ann2 =  cse
   ; liftIO (Cgen.cppGenAndCompile compile ("obj/" ++ file) ("obj/" ++ file ++ ext) ann2)
@@ -455,13 +459,13 @@ futharkPipeline file
 
   ; let decls = ignoreMain decls0
 
-  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
+  ; (_, env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
 
   ; let env4 = env3
 
   ; let alldefs = defs ++ optdiffs
 
-  ; anfOptAndCse display rulebase env4 alldefs
+  ; snd <$> anfOptAndCse display rulebase env4 alldefs
   }
 
 -- | Read source code from specified input file, optimise,
