@@ -688,14 +688,6 @@ cppGenWithFiles ksofile cppfile defs = do
   putStrLn $ "Writing to " ++ cppfile
   createDirectoryWriteFile cppfile (unlines (lines ++ lls ++ tail))
 
-cppGenAndCompile
-  :: (String -> String -> IO String) -> String -> String -> [TDef] -> IO String
-cppGenAndCompile compiler outfile exefile defs = do
-  let ksofile = outfile ++ ".kso"
-      cppfile = outfile ++ ".cpp"
-  cppGenWithFiles ksofile cppfile defs
-  compiler cppfile exefile
-
 compile :: String -> String -> String -> IO String
 compile = compileWithOpts []
 

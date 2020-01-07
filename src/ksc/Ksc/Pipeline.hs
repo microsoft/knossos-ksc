@@ -212,7 +212,11 @@ displayCppGenAndCompile compile ext verbosity file =
   ; let outfile = ("obj/" ++ file)
   ; let exefile = ("obj/" ++ file ++ ext)
   ; let defs = ann2
-  ; liftIO (Cgen.cppGenAndCompile compiler outfile exefile defs)
+  ; liftIO $ do
+      let ksofile = outfile ++ ".kso"
+          cppfile = outfile ++ ".cpp"
+      Cgen.cppGenWithFiles ksofile cppfile defs
+      compiler cppfile exefile
   }
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
