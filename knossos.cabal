@@ -13,6 +13,7 @@ executable ksc
                  Cgen
                  KMonad
                  Ksc.Futhark
+                 Ksc.Pipeline
                  Lang
                  LangUtils
                  Opt
