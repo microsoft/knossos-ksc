@@ -657,7 +657,7 @@ createDirectoryWriteFile filepath contents = do
   makeDirectoryForFile filepath
   writeFile filepath contents
 
-cppGenWithFiles :: String -> String -> [TDef] -> IO (String, String)
+cppGenWithFiles :: String -> String -> [TDef] -> IO ()
 cppGenWithFiles ksofile cppfile defs = do
   let lines =
         [
@@ -688,14 +688,12 @@ cppGenWithFiles ksofile cppfile defs = do
   putStrLn $ "Writing to " ++ cppfile
   createDirectoryWriteFile cppfile (unlines (lines ++ lls ++ tail))
 
-  return (ksofile, cppfile)
-
 cppGenAndCompile
   :: (String -> String -> IO String) -> String -> String -> [TDef] -> IO String
 cppGenAndCompile compiler outfile exefile defs = do
   let ksofile = outfile ++ ".kso"
       cppfile = outfile ++ ".cpp"
-  (_, cppfile) <- cppGenWithFiles ksofile cppfile defs
+  cppGenWithFiles ksofile cppfile defs
   compiler cppfile exefile
 
 compile :: String -> String -> String -> IO String
