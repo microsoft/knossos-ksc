@@ -148,7 +148,7 @@ defsAndDiffs display decls = do {
   ; (i0, env2, optgrad) <- optDefsMany rulebase env15 grad_defs
   ; display "Optgrad" env2 optgrad
 
-  ; (i1, env25, optgrad_tupled) <- optDefsMany rulebase env2 grad_defs_tupled
+  ; (_, env25, optgrad_tupled) <- optDefsMany rulebase env2 grad_defs_tupled
   ; display "Optgrad tupled" env25 optgrad_tupled
 
   ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
@@ -160,7 +160,7 @@ defsAndDiffs display decls = do {
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; return (i0 <> i1 <> i2, env3, defs, optdiffs, rulebase)
+  ; return (i0 <> i2, env3, defs, optdiffs, rulebase)
   }
 
 anfOptAndCse :: (String -> GblSymTab -> [TDef] -> KM a)
