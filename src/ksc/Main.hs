@@ -254,9 +254,15 @@ main = test
 
 test :: IO ()
 test = do
+  System.Environment.getArgs >>= \case
+    ["--test", "--fs-test", fsTest]
+      -> testWithfsTest fsTest
+    _ -> fail "Unknown arguments"
+
+testWithfsTest :: String -> IO ()
+testWithfsTest fsTestKs = do
   futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
   let compiler = "g++-7"
-  [fsTestKs] <- System.Environment.getArgs
   testC compiler [fsTestKs]
 
 testWindows :: IO ()
