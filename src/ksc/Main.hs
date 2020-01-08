@@ -457,7 +457,11 @@ withOutputFileStream filename handle =
 
 profile :: IO ()
 profile = do
-  [source, proffile, proffunctions, proflines] <- System.Environment.getArgs
+  [ "--profile",
+    "--ks-file-without-extension", source,
+    "--proffile", proffile,
+    "--proffunctions", proffunctions,
+    "--proflines", proflines ] <- System.Environment.getArgs
   profileArgs source proffile proffunctions proflines
 
 -------------------------------------
