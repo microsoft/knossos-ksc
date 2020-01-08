@@ -250,13 +250,16 @@ hspec = do
     LangUtils.hspec
 
 main :: IO ()
-main = test
-
-test :: IO ()
-test = do
+main = do
   System.Environment.getArgs >>= \case
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
+    [ "--profile",
+      "--ks-file-without-extension", source,
+      "--proffile", proffile,
+      "--proffunctions", proffunctions,
+      "--proflines", proflines ]
+      -> profileArgs source proffile proffunctions proflines
     _ -> fail "Unknown arguments"
 
 testWithfsTest :: String -> IO ()
@@ -460,15 +463,6 @@ withOutputFileStream filename handle =
     filename
     System.IO.WriteMode
     (handle . System.Process.UseHandle)
-
-profile :: IO ()
-profile = do
-  [ "--profile",
-    "--ks-file-without-extension", source,
-    "--proffile", proffile,
-    "--proffunctions", proffunctions,
-    "--proflines", proflines ] <- System.Environment.getArgs
-  profileArgs source proffile proffunctions proflines
 
 -------------------------------------
 -- The Futhark driver
