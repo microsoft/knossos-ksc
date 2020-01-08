@@ -28,11 +28,8 @@ jobs:
   - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
     displayName: 'Install dependencies'
 
-  - script: /opt/cabal/3.0/bin/cabal v2-build --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5
+  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=.
     displayName: 'Can build with cabal'
-
-  - script: sh ./test/builds/build_linux.sh /opt/ghc/8.6.5/bin/ghc-8.6.5
-    displayName: 'GHC compile src/ksc/Main.hs'
 
   - script: ./ksc --test --fs-test out.ks
     displayName: 'ksc test'
