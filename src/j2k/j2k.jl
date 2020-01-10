@@ -6,6 +6,11 @@ import Base.show
 ### TODOS
 # 1. Nice printing :)
 # 2. Instead of env_args, collect free vars of expressions, and pass those down explicitly
+#    (e.g. now all basic blocks get passed all incoming args, which is messy, and will 
+#    cause a few redunant derivative calculations.  Of course Knossos can just rewrite 
+#    them away, but it's nice to remove obvious cruft.
+# 3. Emit fully monomorphized (essentially name-mangled) function names, e.g. "mul@Float64,Array{Float64}"
+# 4. Handle unhandled constructs
 
 nl = "\n"
 
@@ -172,14 +177,14 @@ sumsq(xs) = sum(xs.^2)
 
 function foo1(as,b)
     if length(as) > 1
-        y = [sin(a) for a in as] .* f(b)
+        y = [a*sin(a) for a in as] .* f(b)
     else
         y = -as.*f(b)
     end
     f(sumsq(y)) + 5
 end
 
-ir = @code_ir foo1(rand(4),2.2)
+ir = IR(IRTools.typed_meta(Tuple{typeof(foo1),Array{Float64,1},Float64}))
 println(ir)
-
+println("--------------------")
 make_sexps(ir)
