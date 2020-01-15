@@ -1,49 +1,70 @@
-\documentclass[12pt]{article}
-\usepackage{makecell}
+\documentclass[10pt]{article}
+\usepackage{makecell,amsmath}
+\usepackage[a4paper, total={6.5in, 8in}]{geometry}
 
 %\renewcommand{\cellalign}{l}
 
+\newcommand{\fn}[1]{\mathrm{#1}}
+\newcommand{\vars}[1]{\mathcal{#1}}
 \newcommand{\B}[1]{\mathcal{B}[#1]}
-\newcommand{\typed}[3]{#1 : #2 \vdash #3}
+\newcommand{\typed}[3]{#1 : \vars #2 \vdash #3}
+\newcommand{\typeddef}[4]{
+\begin{aligned}
+#1 &: \vars #2 \vdash #3 \\ 
+ &= #4
+\end{aligned}
+}
 \newcommand{\dd}[1]{\delta #1}
+\def\V{\vars V}
 
 \begin{document}
 
-\begin{tabular}[t]{c|l}
+Notation: 
+
+An expression $e : \V \vdash T$ has free variables $\V$ and its return value is of type $T$.
+
+The freevar list $\V$ has type $V$, which is the type of a tuple containing the vars, and type $\dd V$ which is the tangent type of $V$.
+
+And $A \sqcup B$ is ``exclusive union": the list $A \sqcup \{x\}$ contains $x$ exactly once.
+
+\def\concat{\#}
+And $A \concat B$ is tuple concatenation.
+
+\bigskip
+
+\begin{tabular}[t]{l|c|p{3in}}
+  Expression e &
   $\typed{e}{V}{T}$
   &
   $\typed{\B{e}}{V}{(T, \dd{V} \to \dd{T})}$ \\
 
   \hline
 
-  $\typed{k}{()}{T}$
-  &
-  \makecell{
-    $\typed{\B{k}}{()}{(T, \dd{T} \to ())}$ \\
-    $= (k, const \, ())$
-  } \\
+  Constant k &
+       $\typed{k}{()}{T}$ &
+       $\typeddef{\B{k}}{()}{(T, \dd{T} \to ())}{(k,\fn{const} \, ())}$     \\
+
+  \hline
+  Variable v &
+      $\typed{v}{T}{T}$ &
+      $\typeddef{\B{v}}{T}{(T, \dd{T} \to \dd{T})}{(v,\fn{id})}$  \\
 
   \hline
 
-  $\typed{v}{T}{T}$
-  &
-  \makecell{ $\typed{\B{v}}{T}{(T, \dd{T} \to \dd{T})}$ \\
-    $= (v, id)$
-    } \\
-
-  \hline
-
+  Let&
   \makecell{
+    $\typed{\textrm{let } x = e_1 \textrm{ in } e_2}{V_1 \cup V_2}{T}$\\
+where\\[2pt]
     $\typed{e_1}{V_1}{X}$ \\
-    $\typed{e_2}{V_2 \sqcup \{x\}}{T}$ \\
-    $\typed{\textrm{let } x_1 = e_1 \textrm{ in } e_2}{V_1 \cup V_2}{T}$
+    $\typed{e_2}{V_2 \sqcup \{x\}}{T}$\\
+so\\
+    $\typed{\B{e_1}}{V_1}{(X, \dd{X} \to \dd{V_1})}$ \\
+    $\typed{\B{e_2}}{V_2 \sqcup \{x\}}{(T, \dd{T} \to \dd{V_2} \concat \dd{X})}$
   }
   &
   \makecell[l] {
-    $\typed{\B{e_1}}{V_1}{(X, \dd{X} \to \dd{V_1})}$ \\
-    $\typed{\B{e_2}}{V_2 \sqcup \{x\}}{(T, \dd{T} \to (\dd{V_2}, \dd{X}))}$ \\
     $\B{\textrm{let } x_1 = e_1 \textrm{ in } e_2}$ \\
-    $ : V_1 \cup V_2 \vdash (T, \dd{T} \to \dd(V_1) \cup \dd(V_2))$ \\
+    ~~$ : V_1 \cup V_2 \vdash (T, \dd{T} \to \dd(V_1) \cup \dd(V_2))$ \\
     % zero horizontal padding
     \setlength{\tabcolsep}{0.0em}
     \begin{tabular}[t]{ll}
@@ -60,10 +81,13 @@
   }
   \\
   \hline
+
+  Apply &
   \makecell {
+    $\typed{f(e)}{V}{T}$ \\
+where\\
     $\typed{e}{V}{S}$ \\
     $\typed{f}{()}{S \to T}$ \\
-    $\typed{f(e)}{V}{T}$ \\
   }
   &
   \makecell {
@@ -77,6 +101,8 @@
     \end{tabular}
   } \\
   \hline
+
+  Def&
   \makecell {
     $\typed{e}{V}{T}$ \\
     $\textrm{def } f(v) = e$ \\
@@ -85,8 +111,8 @@
   &
   \makecell {
     $\typed{\B{e}}{V}{(T, \dd{V} \to \dd{T})}$ \\
-    $\typed{f`}{()}{V \to (T, \dd{T} \to \dd{V})}$ \\
-    $\textrm{def } f`(v) = \B{e}$
+    $\textrm{def } f`(v) = \B{e}$\\
+    $\typed{f`}{()}{V \to (T, \dd{T} \to \dd{V})}$ 
   }
 \end{tabular}
 
