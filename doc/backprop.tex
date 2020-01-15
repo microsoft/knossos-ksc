@@ -1,0 +1,90 @@
+\documentclass[12pt]{article}
+\usepackage{makecell}
+
+%\renewcommand{\cellalign}{l}
+
+\newcommand{\B}[1]{\mathcal{B}[#1]}
+\newcommand{\typed}[3]{#1 : #2 \vdash #3}
+\newcommand{\dd}[1]{\delta #1}
+
+\begin{document}
+
+\begin{tabular}[t]{c|l}
+  $\typed{e}{V}{T}$
+  &
+  $\typed{\B{e}}{V}{(T, \dd{V} \to \dd{T})}$ \\
+
+  \hline
+
+  $\typed{k}{()}{T}$
+  &
+  $\typed{\B{k}}{()}{(T, \dd{T} \to ())}$ \\
+
+  \hline
+
+  $\typed{v}{T}{T}$
+  &
+  \makecell{ $\typed{\B{v}}{T}{(T, \dd{T} \to \dd{T})}$ \\
+    $= (v, id)$
+    } \\
+
+  \hline
+
+  \makecell{
+    $\typed{e_1}{V_1}{X}$ \\
+    $\typed{e_2}{V_2 \sqcup \{x\}}{T}$ \\
+    $\typed{\textrm{let } x_1 = e_1 \textrm{ in } e_2}{V_1 \cup V_2}{T}$
+  }
+  &
+  \makecell[l] {
+    $\typed{\B{e_1}}{V_1}{(X, \dd{X} \to \dd{V_1})}$ \\
+    $\typed{\B{e_2}}{V_2 \sqcup \{x\}}{(T, \dd{T} \to (\dd{V_2}, \dd{X}))}$ \\
+    $\B{\textrm{let } x_1 = e_1 \textrm{ in } e_2}$ \\
+    $ : V_1 \cup V_2 \vdash (T, \dd{T} \to \dd(V_1) \cup \dd(V_2))$ \\
+    % zero horizontal padding
+    \setlength{\tabcolsep}{0.0em}
+    \begin{tabular}[t]{ll}
+    $ = \,\, $ & $\textrm{let } (x, b_1) = \B{e_1}$ \\
+      & $ \textrm{let } (t, b_2) = \B{e_2}$ \\
+      & \begin{tabular}[t]{ll}
+        $ \textrm{let } b = \lambda \, dt. \,$ & $\textrm{let } (dv_2, dx) = b_2(dt) $ \\
+          & $\textrm{let } dv_1 = b_1(dx)$ \\
+          & $\textrm{in } dv_1 \oplus dv_2$
+      \end{tabular}
+      \\
+      & $ \textrm{in } (t, b)$
+    \end{tabular}
+  }
+  \\
+  \hline
+  \makecell {
+    $\typed{e}{V}{S}$ \\
+    $\typed{f}{()}{S \to T}$ \\
+    $\typed{f(e)}{V}{T}$ \\
+  }
+  &
+  \makecell {
+    $\typed{\B{e}}{V}{(S, \dd{S} \to \dd{V})}$ \\
+    $\typed{f`}{()}{S \to (T, \dd{T} \to \dd{S})}$ \\
+    $\typed{\B{f(e)}}{V}{(T, \dd{T} \to \dd{V})}$ \\
+    \begin{tabular}[t]{ll}
+    $=$ & $\textrm{let } (s, b_1) = \B{e}$ \\
+    & $\textrm{let } (t, b_2) = f`(s)$ \\
+    & $\textrm{in } (t, b_1 \circ b_2)$
+    \end{tabular}
+  } \\
+  \hline
+  \makecell {
+    $\typed{e}{V}{T}$ \\
+    $\textrm{def } f(v) = e$ \\
+    $\typed{f}{()}{V \to T}$
+  }
+  &
+  \makecell {
+    $\typed{\B{e}}{V}{(T, \dd{V} \to \dd{T})}$ \\
+    $\typed{f`}{()}{V \to (T, \dd{T} \to \dd{V})}$ \\
+    $\textrm{def } f`(v) = \B{e}$
+  }
+\end{tabular}
+
+\end{document}
