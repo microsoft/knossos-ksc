@@ -1,0 +1,153 @@
+\documentclass[10pt]{article}
+\usepackage{makecell,amsmath}
+\usepackage[a4paper, total={6.5in, 8in}]{geometry}
+
+%\renewcommand{\cellalign}{l}
+
+\newcommand{\fn}[1]{\mathrm{#1}}
+\newcommand{\vars}[1]{\mathcal{#1}}
+\newcommand{\B}[1]{\mathcal{B}[#1]}
+\newcommand{\typed}[3]{#1 : #2 \vdash #3}
+\newcommand{\typeddef}[4]{
+\begin{aligned}
+#1 &: #2 \vdash #3 \\
+ &= #4
+\end{aligned}
+}
+\newcommand{\dd}[1]{\delta #1}
+\newcommand{\V}{\vars V}
+\newcommand{\T}{\vars T}
+\newcommand{\union}{\cup}
+\newcommand{\disjointunion}{\sqcup}
+\newcommand{\emptyfvs}{\{\}}
+\newcommand{\concat}{\#}
+
+\begin{document}
+
+Notation:
+
+\begin{itemize}
+\item
+  An expression $\typed{e}{\V}{T}$ has free variables $\V$ and its return value is of type $T$.
+
+\item
+  The freevar list $\V$ has type $V$, which is the type of a tuple containing the vars
+
+\item
+  type $\dd V$ which is the tangent type of $V$.
+
+\item
+  $A \disjointunion B$ is ``exclusive union": the list $A \disjointunion \{x\}$ contains $x$ exactly once.
+
+\item
+  $A \concat B$ is tuple concatenation.
+
+\item
+  $\oplus$ adds two ``free variable tuples'' (i.e.\ the things of type
+  $V$ above)
+\end{itemize}
+
+\bigskip
+
+\begin{tabular}[t]{l|c|p{3in}}
+  Expression e &
+  $\typed{e}{\V}{T}$
+  &
+  $\typed{\B{e}}{\V}{(T, \dd{V} \to \dd{T})}$ \\
+
+  \hline
+
+  Constant k &
+       $\typed{k}{\emptyfvs}{T}$ &
+       $\typeddef{\B{k}}{\emptyfvs}{(T, \dd{T} \to ())}{(k,\fn{const} \, ())}$     \\
+
+  \hline
+  Variable v &
+      $\typed{v}{\{v\}}{T}$ &
+      $\typeddef{\B{v}}{\{v\}}{(T, \dd{T} \to \dd{T})}{(v,\fn{id})}$  \\
+
+  \hline
+
+  Let&
+  \makecell{
+    $\typed{\textrm{let } x = e_1 \textrm{ in } e_2}{\V_1 \union \V_2}{T}$\\
+where\\[2pt]
+    $\typed{e_1}{\V_1}{X}$ \\
+    $\typed{e_2}{\V_2 \disjointunion \{x\}}{T}$\\
+so\\
+    $\typed{\B{e_1}}{\V_1}{(X, \dd{X} \to \dd{V_1})}$ \\
+    $\typed{\B{e_2}}{\V_2 \disjointunion \{x\}}{(T, \dd{T} \to \dd{V_2} \concat \dd{X})}$
+  }
+  &
+  \makecell[l] {
+    $\B{\textrm{let } x = e_1 \textrm{ in } e_2}$ \\
+    ~~$ : \V_1 \union \V_2 \vdash (T, \dd{T} \to \dd{V_1} \union \dd{V_2})$ \\
+    % zero horizontal padding
+    \setlength{\tabcolsep}{0.0em}
+    \begin{tabular}[t]{ll}
+    $ = \,\, $ & $\textrm{let } (x, b_1) = \B{e_1}$ \\
+      & $ \textrm{let } (t, b_2) = \B{e_2}$ \\
+      & \begin{tabular}[t]{ll}
+        $ \textrm{let } b = \lambda \, dt. \,$ & $\textrm{let } (dv_2, dx) = b_2(dt) $ \\
+          & $\textrm{let } dv_1 = b_1(dx)$ \\
+          & $\textrm{in } dv_1 \oplus dv_2$
+      \end{tabular}
+      \\
+      & $ \textrm{in } (t, b)$
+    \end{tabular}
+  }
+  \\
+  \hline
+
+  Apply &
+  \makecell {
+    $\typed{f(e)}{\V}{T}$ \\
+where\\
+    $\typed{e}{\V}{S}$ \\
+    $\typed{f}{\emptyfvs}{S \to T}$ \\
+so\\
+    $\typed{\B{e}}{\V}{(S, \dd{S} \to \dd{V})}$ \\
+    $\typed{f`}{\emptyfvs}{S \to (T, \dd{T} \to \dd{S})}$ \\
+  }
+  &
+  \makecell {
+    $\typed{\B{f(e)}}{\V}{(T, \dd{T} \to \dd{V})}$ \\
+    \begin{tabular}[t]{ll}
+    $=$ & $\textrm{let } (s, b_1) = \B{e}$ \\
+    & $\textrm{let } (t, b_2) = f`(s)$ \\
+    & $\textrm{in } (t, b_1 \circ b_2)$
+    \end{tabular}
+  } \\
+  \hline
+
+  Apply to a variable &
+  \makecell {
+    $\typed{f(v)}{\{v\}}{T}$ \\
+where\\
+    $\typed{v}{\{v\}}{S}$ \\
+    $\typed{f}{\emptyfvs}{S \to T}$ \\
+so\\
+    $\typed{f`}{\emptyfvs}{S \to (T, \dd{T} \to \dd{S})}$ \\
+  }
+  &
+  \makecell {
+    $\typed{\B{f(v)}}{\{v\}}{(T, \dd{T} \to \dd{V})}$ \\
+    $= f`(v)$
+  } \\
+  \hline
+
+  Def&
+  \makecell {
+    $\typed{e}{\V}{T}$ \\
+    $\textrm{def } f(v) = e$ \\
+    $\typed{f}{\emptyfvs}{V \to T}$
+  }
+  &
+  \makecell {
+    $\typed{\B{e}}{\V}{(T, \dd{V} \to \dd{T})}$ \\
+    $\textrm{def } f`(v) = \B{e}$\\
+    $\typed{f`}{\emptyfvs}{V \to (T, \dd{T} \to \dd{V})}$
+  }
+\end{tabular}
+
+\end{document}
