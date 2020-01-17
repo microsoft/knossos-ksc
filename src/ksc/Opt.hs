@@ -228,6 +228,7 @@ optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
       "sub" -> k1 - k2
       "add" -> k1 + k2
       "div" -> k1 / k2
+      "scale" -> k1 * k2
       s -> errorFor s
   where errorFor s = error $ unlines $
           [ "Failed constant folding [" ++ s ++ "]."
@@ -268,6 +269,17 @@ optPrimFun _ "mul" [x, y]
   --
   -- 1. mul: (Float, t) -> t
   -- 2. mul: (Integer, Integer) -> Integer
+  = Just $ mkZero y
+  | otherwise
+  = Nothing
+
+-- RULE: scale 0 y = 0
+optPrimFun _ "scale" [x, y]
+  | isKZero x || isKZero y
+  -- We use the type of y because the two typing rule for scale in
+  -- Prim.hs is
+  --
+  -- scale: (Float, t) -> t
   = Just $ mkZero y
   | otherwise
   = Nothing
@@ -506,10 +518,10 @@ optSumBuild n i (Tuple es)
 optSumBuild sz i e
   | TVar TypeInteger _ <- i
   , i `notFreeIn` e
-  = Just $ pMul sz' e
+  = Just $ sz' sz e
     where sz' = case typeof e of
-                  TypeInteger -> sz
-                  _ -> pToFloat sz
+                  TypeInteger -> pMul
+                  _ -> pScale . pToFloat
 
 -- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
 --       = let i = ej in e
@@ -747,7 +759,7 @@ optLMApplyCall _ Fwd "lmCompose" [f,g] dx = Just (lmApply f (lmApply g dx))
 optLMApplyCall _ Rev "lmCompose" [f,g] dx = Just (lmApplyR (lmApplyR dx f) g)
 
 optLMApplyCall _ _ "lmScale" [_ty, x] dx
-  = Just (pMul x dx)
+  = Just (pScale x dx)
 
 optLMApplyCall _ Fwd "lmVCat" es dx = do_prod Fwd es dx
 optLMApplyCall _ Rev "lmVCat" es dx = do_sum  Rev es dx

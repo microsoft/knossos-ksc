@@ -518,6 +518,11 @@ cgenFunId = \case
   translateFun = \case
     "or" -> "or_"
     "and"-> "and_"
+    -- Translating "scale" to "mul" is a shortcut that allows us to
+    -- avoid updating the runtime to remove polymorphic "mul" and
+    -- replace it with "scale".  At some point we should actually fix
+    -- that properly.
+    "scale" -> "mul"
     s    -> s
 
 cgenUserFun :: HasCallStack => Fun -> String
