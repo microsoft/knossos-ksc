@@ -7,7 +7,6 @@ module Prim where
 import Lang
 import GHC.Stack
 import Data.Maybe
-import Control.Monad( zipWithM )
 
 --------------------------------------------
 --  Simple call construction
@@ -504,25 +503,6 @@ primFunCallResultTy_maybe "diag" args
   = Just (TypeVec (TypeVec t))
   | otherwise = Nothing
 
--- Addition is special: it can add any two things of the same type,
--- or it can add t to tangentType t, which is implemented somewhat loosely
--- here by allowing t + () -> t
-primFunCallResultTy_maybe "add" args
-  | [t1,t2] <- map typeof args
-  = add t1 t2
-  | otherwise = Nothing
-  where
-    add :: Type -> Type -> Maybe Type
-    add TypeInteger TypeInteger   = Just TypeInteger
-    add TypeFloat   TypeFloat     = Just TypeFloat
-    add t (TypeTuple [])          = Just t
-    add (TypeVec t1) (TypeVec t2) = do { tr <- add t1 t2
-                                       ; return (TypeVec tr) }
-    add (TypeTuple t1s) (TypeTuple t2s)
-      | length t1s == length t2s        = do { ts <- zipWithM add t1s t2s
-                                             ; return (TypeTuple ts) }
-    add _ _ = Nothing
-
 primFunCallResultTy_maybe fun args
   = case (fun, map typeof args) of
       ("lmZero"   , [s, t])                                  -> Just (TypeLM s t)
@@ -585,7 +565,7 @@ primFunCallResultTy_maybe fun args
 
       ("unzip"    , [TypeVec (TypeTuple ts)])                -> Just (TypeTuple (map TypeVec ts))
 
-      -- arithmetic ops.   See special case for "add" above
+      ("add"        , [t, t']                      ) -> eqTypes t [t']
       ("mul"        , [TypeFloat,   t]             ) -> Just t
       ("mul"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
       ("div"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat

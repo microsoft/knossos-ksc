@@ -187,12 +187,14 @@
           (dmus     (mkvecvec (add seed 7000)  K D delta))
           (dqs      (mkvecvec (add seed 8000)  K D delta))
           (dls      (mkvecvec (add seed 9000)  K (gmm_knossos_tri D) delta))
+          ; See Note [dwishart]
           (dwishart (tuple (mkfloat (add seed 10000) delta) (tuple)))
+          (dwishart_int (tuple (mkfloat (add seed 10000) delta) 0))
 
           (dtheta   (tuple dx dalphas dmus dqs dls dwishart))
 
           (gmm_at_theta (gmm_knossos_gmm_objective x alphas mus qs ls wishart))
-          (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (add x dx) (add alphas dalphas) (add mus dmus) (add qs dqs) (add ls dls) (add wishart dwishart)))
+          (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (add x dx) (add alphas dalphas) (add mus dmus) (add qs dqs) (add ls dls) (add wishart dwishart_int)))
 
           (gmm_fd (sub gmm_at_theta_plus_dtheta gmm_at_theta))
           (gmm_fwd (fwd$gmm_knossos_gmm_objective
@@ -282,3 +284,14 @@
           "Not impossibly good"
           (not_ impossibly_good)
           )))
+
+; Note [dwishart]
+;
+; We want to have a tangent space value for `wishart` that we can pass
+; to forward deriatives and also a value for a "small perturbation to
+; `wishart`" that we can add to wishart itself.  Since the second
+; component of `wishart` is an Integer we can't use the same value for
+; both of these.  We can't add an empty tuple (our representation of a
+; "unit" type) to an Integer.  We used to have a tangent_add function
+; that could do this, but until we bring it back we just use two
+; slightly different versions.
