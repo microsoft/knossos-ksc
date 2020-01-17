@@ -321,12 +321,13 @@ pDiag = mkPrimCall3 "diag"
 ---------------------------
 -- "User-defined" functions
 ---------------------------
-pAdd, pMul, pDiv, pSub, pEqual :: HasCallStack => TExpr -> TExpr -> TExpr
+pAdd, pMul, pDiv, pSub, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
 pAdd   = mkPrimCall2 "add"
 pMul   = mkPrimCall2 "mul"
 pDiv   = mkPrimCall2 "div"
 pSub   = mkPrimCall2 "sub"
 pEqual = mkPrimCall2 "eq"
+pScale = mkPrimCall2 "scale"
 
 pNeg :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "neg"
@@ -583,7 +584,8 @@ primFunCallResultTy_maybe fun args
       ("unzip"    , [TypeVec (TypeTuple ts)])                -> Just (TypeTuple (map TypeVec ts))
 
       -- arithmetic ops.   See special case for "add" above
-      ("mul"        , [TypeFloat,   t]             ) -> Just t
+      ("scale"      , [TypeFloat,   t]             ) -> Just t
+      ("mul"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
       ("mul"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
       ("div"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
       ("div"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
