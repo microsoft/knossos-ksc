@@ -168,6 +168,52 @@ Hello world!
 If you are seeing this output then knossos-ksc has successfully compiled and run the hello-world.ks program!
 </pre>
 
+## The ksc executable
+
+### Compiling the ksc executable
+
+To create the `ksc` executable run the following.  If the versions of
+ghc and cabal you installed above are on your `PATH` then it will be
+sufficient to do
+
+```
+# Delete the old ksc binary, if it exists
+rm ksc
+cabal v2-install --installdir=.
+```
+
+Those who installed cabal and ghc via ghcup might need to use the
+following, more explicit, command line.
+
+```
+# Delete the old ksc binary, if it exists
+rm ksc
+~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=.
+```
+
+### Running the ksc executable
+
+#### Tests
+
+To run the ksc self-tests use the command line
+
+```
+./ksc --test --fs-test out.fs
+```
+
+(Don't worry if the final test, of `out.fs`, fails.  It is a test for
+F#-to-ks, which most users will not have set up.)
+
+#### Generating a `.kso` file from a `.ks` file
+
+To generate a `.kso` file from a `.ks` file without differentiating,
+i.e. to type check and apply ksc's heuristic optimisations, use the
+command line
+
+```
+./ksc --generate-cpp-without-diffs --ks-source-file input.ks --ks-output-file output.ks --cpp-output-file output.cpp
+```
+
 ## ksc basics
 
 ### Syntax of .ks files
