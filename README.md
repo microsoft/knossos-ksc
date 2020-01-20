@@ -65,19 +65,16 @@ refreshenv
 
 You ought to use Ubuntu version >= 18.04 because older Ubuntus don't
 have g++ >= 7.  Ubuntu 18.04 under WSL works perfectly fine.  The
-simplest way to get ghc and cabal is to install specific versions from
-a specific package archive, as detailed below.
+simplest way to get ghc and cabal is to install specific versions
+using [ghcup](https://gitlab.haskell.org/haskell/ghcup) as detailed
+below.
 
 ```sh
-# ppa:hvr/ghc is an Ubuntu personal package archive that allows you
-# to install specific versions of ghc and cabal.  More information is
-# available at
-#
-#     https://launchpad.net/~hvr/+archive/ubuntu/ghc/
-sudo add-apt-repository ppa:hvr/ghc
-sudo apt-get update
-sudo apt install ghc-8.6.5 cabal-install-3.0 g++
-/opt/cabal/bin/cabal-3.0 v2-update
+# NB Installing 8.6.5 has copious ouput
+curl https://gitlab.haskell.org/haskell/ghcup/raw/master/ghcup > ghcup
+sh ./ghcup install 8.6.5
+sh ./ghcup install-cabal 3.0.0.0
+~/.ghcup/bin/cabal v2-update
 ```
 
 ### Cloning knossos
@@ -102,7 +99,7 @@ their `PATH` so that command will run fine.  Ubuntu users might need
 to use the following, more explicit, command line.
 
 ```
-/opt/cabal/3.0/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc=/opt/ghc/bin/ghc-8.6.5
+~/.ghcup/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc
 ```
 
 It will build a lot of packages, which will look a bit like
