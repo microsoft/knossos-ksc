@@ -648,7 +648,6 @@ optGradPrim _ "index" [i,v]
     vi = pIndex i v
 
 
-optGradPrim _ "$rand"        _ = Just (lmZero zeroFloat zeroFloat)
 optGradPrim _ "$ranhashdoub" _ = Just (lmZero zeroInt   zeroFloat)
 optGradPrim _ "to_float"     _ = Just (lmZero zeroInt   zeroFloat)
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)

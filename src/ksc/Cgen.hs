@@ -627,7 +627,6 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "mul"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "to_float", [CType TypeInteger] ) -> LMZero TypeInteger TypeFloat
   (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
-  (PrimFun "$rand"   , [CType ty]          ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
   (PrimFun "$ranhashdoub", [CType ty]      ) -> trace "GRADRAND?" $ LMZero ty ty -- make this noisy -- the type does't look right
   (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
   (PrimFun "index"   , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]

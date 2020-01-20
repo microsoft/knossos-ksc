@@ -1545,14 +1545,6 @@ namespace ks
 	*/
 
 	// ========================= Random primitives ============
-	inline double $rand(double max)
-	{
-		static std::mt19937 rng(42);
-		std::uniform_real_distribution<double> dist(0, max);
-
-		return dist(rng);
-	}
-
         // ranhash functions from
         //
         //     https://mathoverflow.net/questions/104915/pseudo-random-algorithm-allowing-o1-computation-of-nth-element
