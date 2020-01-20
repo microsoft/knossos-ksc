@@ -46,6 +46,12 @@ jobs:
   - script: sh ./test/builds/build_and_test_gmm.sh . pybind11
     displayName: Testing ADBench GMM
 
+  - script: sh ./test/builds/test_pytest.sh
+    displayName: Testing kspy
+
+  - script: sh ./test/builds/test_resnet50.sh
+    displayName: Testing Resnet50 through kspy
+
   - script: ./ksc --profile --ks-file-without-extension test/ksc/gmm-obj --proffile prof-obj.out --proffunctions prof-obj-functions.txt --proflines prof-obj-lines.txt && ./ksc --profile --ks-file-without-extension test/ksc/gmm-rev --proffile prof-rev.out  --proffunctions prof-rev-functions.txt --proflines prof-rev-lines.txt
     displayName: gperftools
 
