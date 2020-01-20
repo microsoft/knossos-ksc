@@ -47,7 +47,7 @@ Knossos `ksc` requires reasonably up-to-date versions of ghc, cabal
 and g++.   The following are sufficient
 
 * ghc version >= 8.4
-* cabal version >= 2.0
+* cabal version >= 3.0
 * g++ version >= 7
 
 This section describes how to get them.
