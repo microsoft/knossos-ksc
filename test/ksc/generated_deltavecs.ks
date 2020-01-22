@@ -55,8 +55,9 @@
          (kernels_elt (index 0 kernels))
          (l (size kernels_elt))
          (kn (size (index 0 kernels_elt)))
-         (l  (size image))
+         (l2 (size image))
          (n  (size (index 0 image))))
+     (assert (eq l l2)
      (build k (lam (ki : Integer)
      (build n (lam (ni : Integer)
      (sumbuild kn (lam (kni : Integer)
@@ -67,4 +68,4 @@
              (image_noi
               (if outside_image 0.0 (index noi (index li image)))))
          (mul image_noi (index kni (index li (index ki kernels))))
-         )))))))))))
+         ))))))))))))
