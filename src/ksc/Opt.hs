@@ -656,7 +656,6 @@ optGradPrim (TypeLM a _) "neg" _   = Just (lmScale a (kTFloat $ -1.0))
 optGradPrim (TypeLM a _) "exp" [e] = Just (lmScale a (pExp e))
 optGradPrim (TypeLM a _) "sin" [e] = Just (lmScale a (pCos e))
 optGradPrim (TypeLM a _) "cos" [e] = Just (lmScale a (pNeg (pSin e)))
-optGradPrim (TypeLM a _) "log" [e] = Just (lmScale a (pDiv (kTFloat 1.0) e))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 
 ---------------
