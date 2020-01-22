@@ -593,10 +593,14 @@ primFunCallResultTy_maybe fun args
       ("neg"      , [t]                                    ) -> Just t
       ("eq"       , _                                      ) -> Just TypeBool
       ("ne"       , _                                      ) -> Just TypeBool
-      ("lt"        , _                                     ) -> Just TypeBool
-      ("gt"        , _                                     ) -> Just TypeBool
-      ("lte"        , _                                    ) -> Just TypeBool
-      ("gte"        , _                                    ) -> Just TypeBool
+      ("lt"        , [TypeFloat, TypeFloat]                ) -> Just TypeBool
+      ("lt"        , [TypeInteger, TypeInteger]            ) -> Just TypeBool
+      ("gt"        , [TypeFloat, TypeFloat]                ) -> Just TypeBool
+      ("gt"        , [TypeInteger, TypeInteger]            ) -> Just TypeBool
+      ("lte"       , [TypeFloat, TypeFloat]                ) -> Just TypeBool
+      ("lte"       , [TypeInteger, TypeInteger]            ) -> Just TypeBool
+      ("gte"       , [TypeFloat, TypeFloat]                ) -> Just TypeBool
+      ("gte"       , [TypeInteger, TypeInteger]            ) -> Just TypeBool
 
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
 
