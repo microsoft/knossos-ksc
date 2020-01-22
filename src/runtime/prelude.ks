@@ -39,3 +39,9 @@
 (def rev$abs Float ((x : Float) (d_dabs : Float))
      (if (gt x 0.0) d_dabs (neg d_dabs)))
 (edef Dt$abs (Tuple Float (LM Float Float)) (Float))
+
+(edef to_float Float (Integer))
+(edef D$to_float (LM Integer Float) (Integer))
+(def fwd$to_float Float ((x : Integer) (dx : (Tuple))) 0.0)
+(def rev$to_float (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
+(edef Dt$to_float (Tuple Float (LM Integer Float)) (Integer))
