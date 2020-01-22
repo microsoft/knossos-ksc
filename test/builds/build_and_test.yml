@@ -68,7 +68,7 @@ jobs:
     vmImage: 'vs2017-win2016'
 
   steps:
-  - task: DotNetCoreInstaller@0
+  - task: UseDotNet@2
     inputs:
       version: 3.1.100
 
