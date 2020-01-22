@@ -13,3 +13,9 @@
 (edef max Float (Float Float))
 (edef D$max (LM Float Float) (Float Float))
 (edef Dt$max (Tuple Float (LM Float Float)) (Float Float))
+
+(edef $ranhashdoub Float (Integer))
+(edef D$$ranhashdoub (LM Integer Float) (Integer))
+(def fwd$$ranhashdoub Float ((x : Integer) (dx : (Tuple))) (0.0))
+(def rev$$ranhashdoub (Tuple) ((x : Integer) (d_dranhashdoub : Float)) (tuple))
+(edef Dt$$ranhashdoub (Tuple Float (LM Integer Float)) (Integer))
