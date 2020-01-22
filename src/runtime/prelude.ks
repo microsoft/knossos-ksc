@@ -9,3 +9,7 @@
 (def fwd$exp Float ((x : Float) (dx : Float)) (mul (exp x) dx))
 (def rev$exp Float ((x : Float) (d_dexp : Float)) (mul (exp x) d_dexp))
 (edef Dt$exp (Tuple Float (LM Float Float)) (Float))
+
+(edef max Float (Float Float))
+(edef D$max (LM Float Float) (Float Float))
+(edef Dt$max (Tuple Float (LM Float Float)) (Float Float))
