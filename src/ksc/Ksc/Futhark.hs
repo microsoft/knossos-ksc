@@ -221,7 +221,7 @@ toFutharkType (L.TypeTuple ts) = Tuple $ map toFutharkType ts
 toFutharkType (L.TypeVec t)    = Array DimAny $ toFutharkType t
 toFutharkType L.TypeString     = Array DimAny I8
 toFutharkType t =
-  error $ "toFutharkType: unhandled " ++ error (show t)
+  error $ "toFutharkType: unhandled " ++ show t
 
 toFutharkParam :: L.TVar -> (Param, [TypeParam])
 toFutharkParam (L.TVar t v) =
