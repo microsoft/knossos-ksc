@@ -203,7 +203,7 @@ def translate(ks_str, backend):
     edefs = _built_in_edefs + edefs
 
     return '''import numpy as np
-from kspy.backends.{backend} import ({edefs}
+from ksc.backends.{backend} import ({edefs}
 )
 {defs}
 
@@ -221,7 +221,7 @@ if __name__ == "__main__":
            main_args=", ".join([k for k, _ in main_samples]))
 
 def main():
-    parser = argparse.ArgumentParser(prog="python -m kspy.translate", description=__doc__)
+    parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
     parser.add_argument("input_ks_file", type=str)
     parser.add_argument("--backend", choices=["common", "jax"], default="common")
     args = parser.parse_args()

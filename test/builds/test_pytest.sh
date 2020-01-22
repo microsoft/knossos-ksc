@@ -4,10 +4,10 @@ echo Installing dependencies...
 
 python3 -m pip install pytest numpy
 
-echo Installing kspy...
-cd ./src/python/kspy
+echo Installing ksc...
+cd ./src/python
 python3 -m pip install .
-cd ../../..
+cd ../..
 
 echo Running pytest
-python3 -m pytest test/kspy
+python3 -m pytest test/python

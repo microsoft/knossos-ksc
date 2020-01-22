@@ -47,10 +47,10 @@ jobs:
     displayName: Testing ADBench GMM
 
   - script: sh ./test/builds/test_pytest.sh
-    displayName: Testing kspy
+    displayName: Testing ksc
 
   - script: sh ./test/builds/test_resnet50.sh
-    displayName: Testing Resnet50 through kspy
+    displayName: Testing Resnet50 through ksc
 
   - script: ./ksc --profile --ks-file-without-extension test/ksc/gmm-obj --proffile prof-obj.out --proffunctions prof-obj-functions.txt --proflines prof-obj-lines.txt && ./ksc --profile --ks-file-without-extension test/ksc/gmm-rev --proffile prof-rev.out  --proffunctions prof-rev-functions.txt --proflines prof-rev-lines.txt
     displayName: gperftools
