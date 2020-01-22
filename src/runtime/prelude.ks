@@ -1,0 +1,5 @@
+(edef log Float (Float))
+(edef D$log (LM Float Float) (Float))
+(def fwd$log Float ((x : Float) (dx : Float)) (div dx x))
+(def rev$log Float ((x : Float) (d_dlog : Float)) (div d_dlog x))
+(edef Dt$log (Tuple Float (LM Float Float)) (Float))
