@@ -5,7 +5,7 @@ try:
 except ModuleNotFoundError:
   import numpy as np
 
-from kspy.backends.common import *
+from ksc.backends.common import *
 
 def BroadcastAdd(x, b):
   return x + b[None, :]

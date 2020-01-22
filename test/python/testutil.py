@@ -1,7 +1,7 @@
 import importlib.util
 from tempfile import NamedTemporaryFile
 
-from kspy.translate import translate
+from ksc.translate import translate
 
 def translate_and_import(*args):
     py_out = translate(*args)
