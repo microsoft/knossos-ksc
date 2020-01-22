@@ -143,7 +143,7 @@ compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   testOn ksFiles $ \ksFile -> do
         let ksTest = System.FilePath.dropExtension ksFile
-        displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing [] ksTest
+        displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ["src/runtime/prelude"] ksTest
 
 testRoundTrip :: [String] -> IO ()
 testRoundTrip ksFiles = do
@@ -213,7 +213,7 @@ futharkCompileKscPrograms ksFiles = do
          then putStrLn ("Skipping " ++ ksFile
                         ++ " because it is known not to work with Futhark")
          else do
-            genFuthark [] ksTest
+            genFuthark ["src/runtime/prelude"] ksTest
             Cgen.readProcessPrintStderr
               "futhark-0.11.2-linux-x86_64/bin/futhark"
               ["check", "obj/" ++ ksTest ++ ".fut"]
@@ -225,7 +225,7 @@ demoFOnTestPrograms ksTests = do
       ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
   testOn ksTestsInModes $ \(ksTest, adp) -> do
-        demoFFilter Nothing ignoreMain adp [ksTest]
+        demoFFilter Nothing ignoreMain adp ["src/runtime/prelude.ks", ksTest]
 
 -- Drop items from the list while the condition is satisfied, and also
 -- drop the first element satisfying the condition, if any.
@@ -235,7 +235,7 @@ dropWhile1 f = tail . dropWhile f
 testRunKS :: String -> String -> IO ()
 testRunKS compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
-  output <- displayCppGenCompileAndRun compiler Nothing [] ksTest
+  output <- displayCppGenCompileAndRun compiler Nothing ["src/runtime/prelude"] ksTest
 
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
@@ -278,7 +278,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing [] source
+  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["src/runtime/prelude"] source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out
