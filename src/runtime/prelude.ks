@@ -32,3 +32,10 @@
 (def fwd$$ranhashdoub Float ((x : Integer) (dx : (Tuple))) (0.0))
 (def rev$$ranhashdoub (Tuple) ((x : Integer) (d_dranhashdoub : Float)) (tuple))
 (edef Dt$$ranhashdoub (Tuple Float (LM Integer Float)) (Integer))
+
+(edef abs Float (Float))
+(edef D$abs (LM Float Float) (Float))
+(def fwd$abs Float ((x : Float) (dx : Float)) (if (gt x 0.0) dx (neg dx)))
+(def rev$abs Float ((x : Float) (d_dabs : Float))
+     (if (gt x 0.0) d_dabs (neg d_dabs)))
+(edef Dt$abs (Tuple Float (LM Float Float)) (Float))

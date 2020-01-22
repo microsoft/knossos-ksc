@@ -592,8 +592,6 @@ primFunCallResultTy_maybe fun args
       ("lte"        , _                                    ) -> Just TypeBool
       ("gte"        , _                                    ) -> Just TypeBool
 
-      ("abs"      , _                                      ) -> Just TypeFloat
-
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
 
       ("or"       , [TypeBool, TypeBool]                   ) -> Just TypeBool
@@ -624,7 +622,6 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale"
-                       , "abs"
                        , "or", "and"
                        ]
 
