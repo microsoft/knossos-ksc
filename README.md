@@ -152,6 +152,7 @@ a `.ks` program.  This example runs `hello-world.ks`.
 
 ```
 ./ksc --compile-and-run \
+  --ks-source-file src/runtime/prelude.ks \
   --ks-source-file test/ksc/hello-world.ks \
   --ks-output-file obj/test/ksc/hello-world.kso \
   --cpp-output-file obj/test/ksc/hello-world.cpp \
@@ -177,7 +178,11 @@ i.e. to type check and apply ksc's heuristic optimisations, use the
 command line
 
 ```
-./ksc --generate-cpp-without-diffs --ks-source-file input.ks --ks-output-file output.ks --cpp-output-file output.cpp
+./ksc --generate-cpp-without-diffs \
+  --ks-source-file src/runtime/prelude.ks \
+  --ks-source-file input.ks \
+  --ks-output-file output.ks \
+  --cpp-output-file output.cpp
 ```
 
 ## ksc basics
