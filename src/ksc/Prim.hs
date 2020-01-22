@@ -575,7 +575,6 @@ primFunCallResultTy_maybe fun args
       ("size"     , [TypeVec _])                             -> Just TypeSize
       ("sum"      , [TypeVec t])                             -> Just t
       ("to_float" , [TypeInteger])                           -> Just TypeFloat
-      ("norm"     , [_])                                     -> Just TypeFloat
 
       ("unzip"    , [TypeVec (TypeTuple ts)])                -> Just (TypeTuple (map TypeVec ts))
 
