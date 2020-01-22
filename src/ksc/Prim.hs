@@ -17,6 +17,10 @@ primCall :: PrimFun -> Type -> [TExpr] -> TExpr
 primCall fun res_ty
   = Call (TFun res_ty (Fun (PrimFun fun)))
 
+userCall :: String -> Type -> [TExpr] -> TExpr
+userCall fun res_ty
+  = Call (TFun res_ty (Fun (UserFun fun)))
+
 mkPrimCall :: HasCallStack => PrimFun -> [TExpr] -> TExpr
 mkPrimCall fun args
   = primCall fun res_ty args
@@ -357,6 +361,9 @@ pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
 pSnd   = pSel 2 2
 
+pToFloat :: TExpr -> TExpr
+pToFloat from = userCall "to_float" TypeFloat [from]
+
 ensureTuple :: TExpr -> TExpr
 ensureTuple x = case typeof x of
     TypeTuple _ -> x
@@ -572,7 +579,6 @@ primFunCallResultTy_maybe fun args
       ("index"    , [TypeInteger, TypeVec t])                -> Just t
       ("size"     , [TypeVec _])                             -> Just TypeSize
       ("sum"      , [TypeVec t])                             -> Just t
-      ("to_float" , [TypeInteger])                           -> Just TypeFloat
 
       ("unzip"    , [TypeVec (TypeTuple ts)])                -> Just (TypeTuple (map TypeVec ts))
 
@@ -615,7 +621,6 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
-                       , "to_float"
                        , "neg"
                        , "add", "sub", "mul", "div"
                        , "eq", "ne", "lt", "gt", "lte", "gte", "delta", "deltaVec", "diag", "constVec"

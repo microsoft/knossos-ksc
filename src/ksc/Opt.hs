@@ -509,7 +509,7 @@ optSumBuild sz i e
   = Just $ pMul sz' e
     where sz' = case typeof e of
                   TypeInteger -> sz
-                  _ -> mkPrimCall1 "to_float" sz
+                  _ -> pToFloat sz
 
 -- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
 --       = let i = ej in e
@@ -648,7 +648,6 @@ optGradPrim _ "index" [i,v]
     vi = pIndex i v
 
 
-optGradPrim _ "to_float"     _ = Just (lmZero zeroInt   zeroFloat)
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "neg" _   = Just (lmScale a (kTFloat $ -1.0))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
