@@ -249,11 +249,8 @@ displayCppGenCompileAndRunWithOutput compilername verbosity file = do
   ; putStr output
   }
 
-displayCppGenCompileAndRunWithOutputGpp7 :: HasCallStack => Maybe Int -> String -> IO ()
-displayCppGenCompileAndRunWithOutputGpp7 = displayCppGenCompileAndRunWithOutput "g++-7"
-
 doall :: HasCallStack => Int -> String -> IO ()
-doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
+doall = displayCppGenCompileAndRunWithOutput "g++-7" . Just
 
 -------------------------------------
 -- The Futhark driver
