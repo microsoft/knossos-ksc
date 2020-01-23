@@ -217,15 +217,6 @@ displayCppGenDiffs generateDiffs verbosity ksFiles ksofile cppfile =
   ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
 
-displayCppGenDiff :: (DisplayLint ()
-                       -> [TDef]
-                       -> GblSymTab
-                       -> RuleBase
-                       -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
-                   -> Maybe Int -> String -> String -> String -> IO ()
-displayCppGenDiff generateDiffs verbosity file =
-  displayCppGenDiffs generateDiffs verbosity [file]
-
 displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO ()
 displayCppGenNoDiffs =
   displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
@@ -238,7 +229,7 @@ displayCppGenAndCompile compile ext verbosity file = do {
   ; let exefile = ("obj/" ++ file ++ ext)
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGenDiff theDiffs verbosity ksFile ksofile cppfile
+  ; displayCppGenDiffs theDiffs verbosity [ksFile] ksofile cppfile
   ; compiler cppfile exefile
   }
 
