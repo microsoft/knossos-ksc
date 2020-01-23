@@ -255,9 +255,6 @@ displayCppGenCompileAndRunWithOutputGpp7 = displayCppGenCompileAndRunWithOutput 
 doall :: HasCallStack => Int -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutputGpp7 . Just
 
-doallC :: HasCallStack => String -> Int -> String -> IO ()
-doallC compilername = displayCppGenCompileAndRunWithOutput compilername . Just
-
 -------------------------------------
 -- The Futhark driver
 -------------------------------------
