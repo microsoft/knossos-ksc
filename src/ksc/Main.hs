@@ -27,6 +27,7 @@ import qualified System.IO
 import Test.Hspec (Spec)
 import Test.Hspec.Runner (runSpec, defaultConfig)
 
+import Text.Parsec hiding (option)
 
 -- We need to keep this in Main.hs because it is referred to in the
 -- documentation as the entry point for users using GHCi.  We
@@ -61,8 +62,42 @@ main = do
       cppOutputFile
       ] -> Ksc.Pipeline.displayCppGenNoDiffs
              Nothing sourceFile outputFile cppOutputFile
+    "--compile-and-run":rest
+      -> compileAndRun rest
 
     _ -> fail "Unknown arguments"
+
+parseErr :: Parsec [String] () a -> [String] -> a
+parseErr p s = either (error . show) id (parse p "" s)
+
+compileAndRun :: [String] -> IO ()
+compileAndRun = parseErr p
+  where p = do
+          inputs   <- many (option "ks-source-file")
+          ksout    <- option "ks-output-file"
+          cppout   <- option "cpp-output-file"
+          compiler <- option "c++"
+          exeout   <- option "exe-output-file"
+
+          return $ do
+            Ksc.Pipeline.displayCppGenDiffs
+               Ksc.Pipeline.theDiffs Nothing inputs ksout cppout
+            Cgen.compile compiler cppout exeout
+            output <- Cgen.runExe exeout
+            putStrLn output
+
+satisfyS :: Monad m => (String -> Bool) -> ParsecT [String] u m String
+satisfyS f = tokenPrim id
+                       (\pos _ _ -> pos)
+                       (\s -> if f s then Just s else Nothing)
+
+switch :: String -> Parsec [String] u ()
+switch s = satisfyS (== ("--" ++ s)) >> return ()
+
+option :: String -> Parsec [String] u String
+option s = do
+  switch s
+  anyToken
 
 testWithfsTest :: String -> IO ()
 testWithfsTest fsTestKs = do
