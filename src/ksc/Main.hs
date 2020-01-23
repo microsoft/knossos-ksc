@@ -53,15 +53,8 @@ main = do
       "--proffunctions", proffunctions,
       "--proflines", proflines ]
       -> profileArgs source proffile proffunctions proflines
-    [ "--generate-cpp-without-diffs",
-      "--ks-source-file",
-      sourceFile,
-      "--ks-output-file",
-      outputFile,
-      "--cpp-output-file",
-      cppOutputFile
-      ] -> Ksc.Pipeline.displayCppGenNoDiffs
-             Nothing sourceFile outputFile cppOutputFile
+    "--generate-cpp-without-diffs":rest
+      -> generateCppWithoutDiffs rest
     "--compile-and-run":rest
       -> compileAndRun rest
 
@@ -69,6 +62,16 @@ main = do
 
 parseErr :: Parsec [String] () a -> [String] -> a
 parseErr p s = either (error . show) id (parse p "" s)
+
+generateCppWithoutDiffs :: [String] -> IO ()
+generateCppWithoutDiffs = parseErr p
+  where p = do
+          input  <- option "--ks-source-file"
+          ksout  <- option "--ks-output-file"
+          cppout <- option "--cpp-output-file"
+
+          return (Ksc.Pipeline.displayCppGenNoDiffs
+                   Nothing input ksout cppout)
 
 compileAndRun :: [String] -> IO ()
 compileAndRun = parseErr p
