@@ -226,9 +226,9 @@ displayCppGenDiff :: (DisplayLint ()
 displayCppGenDiff generateDiffs verbosity file =
   displayCppGenDiffs generateDiffs verbosity [file]
 
-displayCppGenNoDiffs :: Maybe Int -> String -> String -> String -> IO ()
+displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO ()
 displayCppGenNoDiffs =
-  displayCppGenDiff (\_ defs env rulebase -> pure (env, defs, [], rulebase))
+  displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
 
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
 displayCppGenAndCompile compile ext verbosity file = do {
