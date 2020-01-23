@@ -66,9 +66,9 @@ parseErr p s = either (error . show) id (parse p "" s)
 generateCppWithoutDiffs :: [String] -> IO ()
 generateCppWithoutDiffs = parseErr p
   where p = do
-          input  <- option "--ks-source-file"
-          ksout  <- option "--ks-output-file"
-          cppout <- option "--cpp-output-file"
+          input  <- option "ks-source-file"
+          ksout  <- option "ks-output-file"
+          cppout <- option "cpp-output-file"
 
           return (Ksc.Pipeline.displayCppGenNoDiffs
                    Nothing input ksout cppout)
