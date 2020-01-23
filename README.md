@@ -84,14 +84,14 @@ git clone https://github.com/microsoft/knossos-ksc
 cd knossos-ksc
 ```
 
-## Running
+## Building
 
-Start the ghc REPL in the `knossos-ksc` folder as follows.  If the
+Build knossos in the `knossos-ksc` folder as follows.  If the
 versions of ghc and cabal you installed above are on your `PATH` then
 it will be sufficient to do
 
 ```sh
-cabal v2-repl --ghc-option=-Wwarn
+cabal v2-build --ghc-option=-Wwarn
 ```
 
 `choco` users on Windows should find that cabal and ghc are already on
@@ -99,7 +99,7 @@ their `PATH` so that command will run fine.  Ubuntu users might need
 to use the following, more explicit, command line.
 
 ```
-~/.ghcup/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc
+~/.ghcup/bin/cabal v2-build --ghc-option=-Wwarn --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc
 ```
 
 It will build a lot of packages, which will look a bit like
@@ -118,55 +118,7 @@ Completed    setenv-0.1.1.3 (lib)
 ...
 ```
 
-Then it will present you with a prompt at which you should issue the
-following two commands
-
-```
-:l src/ksc/Main
-displayCppGenCompileAndRunWithOutput "g++" Nothing "test/ksc/hello-world"
-```
-
-The output will look a little bit like this.
-
-<pre>
-GHCi, version 8.6.5: http://www.haskell.org/ghc/  :? for help
-Prelude> :l src/ksc/Main
-[ 1 of 14] Compiling KMonad           ( src/ksc/KMonad.hs, interpreted )
-[ 2 of 14] Compiling Lang             ( src/ksc/Lang.hs, interpreted )
-[ 3 of 14] Compiling LangUtils        ( src/ksc/LangUtils.hs, interpreted )
-[ 4 of 14] Compiling Prim             ( src/ksc/Prim.hs, interpreted )
-[ 5 of 14] Compiling OptLet           ( src/ksc/OptLet.hs, interpreted )
-[ 6 of 14] Compiling Parse            ( src/ksc/Parse.hs, interpreted )
-[ 7 of 14] Compiling Rules            ( src/ksc/Rules.hs, interpreted )
-[ 8 of 14] Compiling Cgen             ( src/ksc/Cgen.hs, interpreted )
-[ 9 of 14] Compiling Annotate         ( src/ksc/Annotate.hs, interpreted )
-[10 of 14] Compiling Opt              ( src/ksc/Opt.hs, interpreted )
-[11 of 14] Compiling ANF              ( src/ksc/ANF.hs, interpreted )
-[12 of 14] Compiling CSE              ( src/ksc/CSE.hs, interpreted )
-[13 of 14] Compiling AD               ( src/ksc/AD.hs, interpreted )
-[14 of 14] Compiling Main             ( src/ksc/Main.hs, interpreted )
-Ok, modules loaded: AD, ANF, Annotate, CSE, Cgen, KMonad, Lang, LangUtils, Main, Opt, OptLet, Parse, Prim, Rules.
-*Main> 
-*Main> <b>-- Compile hello-world.ks to hello-world.cpp and run</b>
-*Main> <b>displayCppGenCompileAndRunWithOutput "g++" Nothing "test/ksc/hello-world"</b>
-read decls
-Linted Typechecked defs
-Linted Grad
-Linted Grad tupled
-Linted Optgrad
-Linted Optgrad tupled
-Linted Diffs
-Linted OptDiffs
-Linted CSE
-Writing to obj/test/ksc/hello-world.kso
-Writing to obj/test/ksc/hello-world.cpp
-Compiling: g++ -fmax-errors=5 -fdiagnostics-color=always -Wall -Wno-unused -Wno-maybe-uninitialized -Isrc/runtime -O3 -g -std=c++17 -o obj/test/ksc/hello-world.exe obj/test/ksc/hello-world.cpp
-Running
-Done
-
-Hello world!
-If you are seeing this output then knossos-ksc has successfully compiled and run the hello-world.ks program!
-</pre>
+Then it will build knossos.
 
 ## The ksc executable
 
@@ -193,6 +145,20 @@ rm ksc
 
 ### Running the ksc executable
 
+#### Running
+
+Run the `ksc` executable as follows to differentiate, compile and run
+a `.ks` program.  This example runs `hello-world.ks`.
+
+```
+./ksc --compile-and-run \
+  --ks-source-file test/ksc/hello-world.ks \
+  --ks-output-file obj/test/ksc/hello-world.kso \
+  --cpp-output-file obj/test/ksc/hello-world.cpp \
+  --c++ g++ \
+  --exe-output-file obj/test/ksc/hello-world.exe
+```
+
 #### Tests
 
 To run the ksc self-tests use the command line
@@ -204,7 +170,7 @@ To run the ksc self-tests use the command line
 (Don't worry if the final test, of `out.fs`, fails.  It is a test for
 F#-to-ks, which most users will not have set up.)
 
-#### Generating a `.kso` file from a `.ks` file
+#### Generating a `.kso` file from a `.ks` file without differentiating
 
 To generate a `.kso` file from a `.ks` file without differentiating,
 i.e. to type check and apply ksc's heuristic optimisations, use the
