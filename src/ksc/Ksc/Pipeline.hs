@@ -217,9 +217,6 @@ displayCppGenDiff generateDiffs verbosity ksFile ksofile cppfile =
   ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
 
-displayCppGen :: Maybe Int -> String -> String -> String -> IO ()
-displayCppGen = displayCppGenDiff theDiffs
-
 displayCppGenNoDiffs :: Maybe Int -> String -> String -> String -> IO ()
 displayCppGenNoDiffs =
   displayCppGenDiff (\_ defs env rulebase -> pure (env, defs, [], rulebase))
@@ -232,7 +229,7 @@ displayCppGenAndCompile compile ext verbosity file = do {
   ; let exefile = ("obj/" ++ file ++ ext)
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGen verbosity ksFile ksofile cppfile
+  ; displayCppGenDiff theDiffs verbosity ksFile ksofile cppfile
   ; compiler cppfile exefile
   }
 
