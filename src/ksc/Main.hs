@@ -29,13 +29,6 @@ import Test.Hspec.Runner (runSpec, defaultConfig)
 
 import Text.Parsec hiding (option)
 
--- We need to keep this in Main.hs because it is referred to in the
--- documentation as the entry point for users using GHCi.  We
--- shouldn't break anyone's workflow without good reason.
-displayCppGenCompileAndRunWithOutput :: String -> Maybe Int -> String -> IO ()
-displayCppGenCompileAndRunWithOutput =
-  Ksc.Pipeline.displayCppGenCompileAndRunWithOutput
-
 hspec :: Spec
 hspec = do
     Opt.hspec
