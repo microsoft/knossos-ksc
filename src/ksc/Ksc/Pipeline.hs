@@ -26,14 +26,14 @@ import GHC.Stack (HasCallStack)
 --  The demo driver
 -------------------------------------
 
-demoF :: ADPlan -> String -> IO ()
--- Read source code from specified input file, optimise,
+demoF :: ADPlan -> [String] -> IO ()
+-- Read source code from specified input files, optimise,
 -- differentiate, optimise, and display results of each step
 demoF = demoFFilter (Just 999) id
 
-demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> String -> IO ()
-demoFFilter verbosity theFilter adp file = do
-  defs <- parseF file
+demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> [String] -> IO ()
+demoFFilter verbosity theFilter adp files = do
+  defs <- fmap concat (mapM parseF files)
   runKM (demoN verbosity adp (theFilter defs))
 
 demo :: Decl -> IO ()
@@ -221,43 +221,44 @@ displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO ()
 displayCppGenNoDiffs =
   displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> String -> IO String
-displayCppGenAndCompile compile ext verbosity file = do {
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> [String] -> String -> IO String
+displayCppGenAndCompile compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
+  ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
   ; let outfile = ("obj/" ++ file)
   ; let exefile = ("obj/" ++ file ++ ext)
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGenDiffs theDiffs verbosity [ksFile] ksofile cppfile
+  ; displayCppGenDiffs theDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
   ; compiler cppfile exefile
   }
 
-displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> String -> IO String
-displayCppGenCompileAndRun compilername verbosity file = do
-  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file
+displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
+displayCppGenCompileAndRun compilername verbosity file files = do
+  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }
 
-displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> String -> IO ()
-displayCppGenCompileAndRunWithOutput compilername verbosity file = do
-  { output <- displayCppGenCompileAndRun compilername verbosity file
+displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
+displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
+  { output <- displayCppGenCompileAndRun compilername verbosity files file
   ; putStrLn "Done"
   ; putStr output
   }
 
-doall :: HasCallStack => Int -> String -> IO ()
+doall :: HasCallStack => Int -> [String] -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutput "g++-7" . Just
 
 -------------------------------------
 -- The Futhark driver
 -------------------------------------
-futharkPipeline :: FilePath -> KM [TDef]
-futharkPipeline file
+futharkPipeline :: [FilePath] -> KM [TDef]
+futharkPipeline files
   = do
   { let display _ _ _ = return ()
 
-  ; decls0 <- liftIO (parseF (file ++ ".ks"))
+  ; decls0 <- liftIO (fmap concat (mapM (parseF . (++ ".ks")) files))
 
   ; let decls = ignoreMain decls0
 
@@ -281,10 +282,10 @@ futharkPipeline file
 -- @
 -- $ ghci -isrc/ksc -e 'genFuthark "test/ksc/gmm"' src/ksc/Main.hs
 -- @
-genFuthark :: FilePath -> IO ()
-genFuthark file = do
+genFuthark :: [FilePath] -> FilePath -> IO ()
+genFuthark files file = do
   prelude <- readFile "src/runtime/knossos.fut"
-  defs <- runKM $ futharkPipeline file
+  defs <- runKM $ futharkPipeline (files ++ [file])
   putStrLn $ "Writing to " ++ futfile
   Cgen.createDirectoryWriteFile futfile $
     intercalate "\n\n" $
