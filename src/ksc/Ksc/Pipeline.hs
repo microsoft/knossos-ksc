@@ -185,19 +185,19 @@ anfOptAndCse display rulebase env4 alldefs =
   ; return cse
   }
 
-displayCppGenDiff :: (DisplayLint ()
-                      -> [TDef]
-                      -> GblSymTab
-                      -> RuleBase
-                      -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
-                  -> Maybe Int -> [Char] -> String -> String -> IO ()
-displayCppGenDiff generateDiffs verbosity ksFile ksofile cppfile =
+displayCppGenDiffs :: (DisplayLint ()
+                       -> [TDef]
+                       -> GblSymTab
+                       -> RuleBase
+                       -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+                   -> Maybe Int -> [String] -> String -> String -> IO ()
+displayCppGenDiffs generateDiffs verbosity ksFiles ksofile cppfile =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
       display = displayPassM verbosity
   in
   runKM $
   do {
-  ; decls0 <- liftIO (parseF ksFile)
+  ; decls0 <- liftIO (fmap concat (mapM parseF ksFiles))
   ; liftIO $ putStrLn "read decls"
 
   ; let (main, decls)    = moveMain decls0
@@ -216,6 +216,15 @@ displayCppGenDiff generateDiffs verbosity ksFile ksofile cppfile =
 
   ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
+
+displayCppGenDiff :: (DisplayLint ()
+                       -> [TDef]
+                       -> GblSymTab
+                       -> RuleBase
+                       -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+                   -> Maybe Int -> String -> String -> String -> IO ()
+displayCppGenDiff generateDiffs verbosity file =
+  displayCppGenDiffs generateDiffs verbosity [file]
 
 displayCppGenNoDiffs :: Maybe Int -> String -> String -> String -> IO ()
 displayCppGenNoDiffs =
