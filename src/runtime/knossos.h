@@ -1491,8 +1491,12 @@ namespace ks
 		return t1 <= t2;
 	}
 
-	template <class T1, class T2>
-	inline T1 gte(T1 t1, T2 t2)
+	int gte$aff(double t1, double t2)
+	{
+		return t1 >= t2;
+	}
+
+	int gte$aii(int t1, int t2)
 	{
 		return t1 >= t2;
 	}

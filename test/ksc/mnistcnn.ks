@@ -24,9 +24,9 @@
                (noi (add (sub ni knc) kni))
                (moi (add (sub mi kmc) kmi))
                (outside_image (or (lt@ii noi 0)
-                              (or (gte noi n)
+                              (or (gte@ii noi n)
                               (or (lt@ii moi 0)
-                                  (gte moi m)))))
+                                  (gte@ii moi m)))))
                (image_noi_moi
                 (if outside_image
                     0.0
