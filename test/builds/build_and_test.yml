@@ -47,7 +47,7 @@ jobs:
     displayName: Testing ADBench GMM
 
   - script: sh ./test/builds/test_pytest.sh
-    displayName: Testing ksc
+    displayName: Testing Python ksc
 
   - script: sh ./test/builds/test_resnet50.sh
     displayName: Testing Resnet50 through ksc
