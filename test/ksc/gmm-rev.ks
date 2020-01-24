@@ -63,7 +63,7 @@
    (assert (eq (size l) (gmm_knossos_tri D))
     (build D (lam (i : Integer)
         (build D (lam (j : Integer)
-           (if (lt i j)
+           (if (lt@ii i j)
             0.0
             (if (eq i j)
               (exp (index i q))

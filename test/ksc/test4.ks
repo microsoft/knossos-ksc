@@ -1,7 +1,7 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def test_tuple Integer ((x : Tuple (Vec Float) (Vec (Vec Float)) Integer))
-    (add 1 (if (lt 2 3) 4 5)))
+    (add 1 (if (lt@ii 2 3) 4 5)))
 
 
 (def g Float ((w : Tuple Float Integer))

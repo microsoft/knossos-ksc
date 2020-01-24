@@ -83,7 +83,7 @@ If you prefer block comments then use pairs of #| and |#
            (i2 (add i 10))
            (f2 (add f 10.0))
            (s2 "Hello"))
-       (if (and (gte i 0) (lt i (size v)))
+       (if (and (gte i 0) (lt@ii i (size v)))
            (index i v)
            f2)))
 
