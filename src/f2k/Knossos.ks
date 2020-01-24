@@ -90,4 +90,4 @@
 ;;   (build n (lam (i : Integer) (f (index i v)))))
 
 (def gt@Float Bool ((a : Float) (b : Float))
-   (gt a b))
+   (gt@ff a b))
