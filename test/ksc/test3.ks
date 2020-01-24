@@ -1,7 +1,7 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def f Float ((x : Vec Float) (y : Vec Float))
-    (if (lt 2 3) (index 0 x) 7.0)
+    (if (lt@ii 2 3) (index 0 x) 7.0)
 )
 
 (def q (Vec Float) ((r : Float) (m : Integer) (a : Vec Float))

@@ -70,7 +70,7 @@
   (assert (eq triD (gmm_knossos_tri D))
     (build D (lam (i : Integer)
         (build D (lam (j : Integer)
-           (if (lt i j)
+           (if (lt@ii i j)
             0.0
             (if (eq i j)
               (exp (index i q))
@@ -203,7 +203,7 @@
            (let ((tolerance 0.000001)
                  (actual gmm_at_theta)
                  (expected 76.0882))
-             (lt (abs (sub actual expected))
+             (lt@ff (abs (sub actual expected))
                 (max (mul (abs expected) tolerance)
                      tolerance))))
 
@@ -215,7 +215,7 @@
            (let ((tolerance 0.001)
                  (actual gmm_fd)
                  (expected gmm_fwd))
-             (lt (abs (sub actual expected))
+             (lt@ff (abs (sub actual expected))
                 (max (mul (abs expected) tolerance)
                      tolerance))))
           (impossibly_good (eq gmm_fd gmm_fwd))
@@ -254,7 +254,7 @@
                     1.0))
 
           (tolerance 0.0001)
-          (everything_works_as_expected_reverse (lt checked tolerance))
+          (everything_works_as_expected_reverse (lt@ff checked tolerance))
         )
       (pr x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))

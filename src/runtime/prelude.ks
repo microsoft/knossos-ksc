@@ -14,6 +14,22 @@
 (def rev$gt@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dgt : (Tuple)))
      (tuple (tuple) (tuple)))
 
+(edef lt@ff Bool (Float Float))
+(edef D$lt@ff (LM (Tuple Float Float) Bool) (Float Float))
+(edef Dt$lt@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
+(def fwd$lt@ff (Tuple) ((x1 : Float) (x2 : Float) (dx1 : Float) (dx2 : Float))
+     (tuple))
+(def rev$lt@ff (Tuple Float Float) ((x1 : Float) (x2 : Float) (d_dlt : (Tuple)))
+     (tuple 0.0 0.0))
+
+(edef lt@ii Bool (Integer Integer))
+(edef D$lt@ii (LM (Tuple Integer Integer) Bool) (Integer Integer))
+(edef Dt$lt@ii (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+(def fwd$lt@ii (Tuple) ((x1 : Integer) (x2 : Integer) (dx1 : (Tuple)) (dx2 : (Tuple)))
+     (tuple))
+(def rev$lt@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dlt : (Tuple)))
+     (tuple (tuple) (tuple)))
+
 (edef log Float (Float))
 (edef D$log (LM Float Float) (Float))
 (def fwd$log Float ((x : Float) (dx : Float)) (div dx x))

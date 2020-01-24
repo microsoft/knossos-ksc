@@ -16,6 +16,8 @@ let constVec = replicate
 let size = length
 let gt__aii (x: i32) (y: i32) = x > y
 let gt__aff (x: f64) (y: f64) = x > y
+let lt__aii (x: i32) (y: i32) = x < y
+let lt__aff (x: f64) (y: f64) = x < y
 
 let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =
   tabulate n (\j -> if j == i then v else zero)
