@@ -12,7 +12,7 @@
 (def sub$VecR$R (Vec Float) ((v : Vec Float) (x : Float))
      (build (size v) (lam (ni : Integer) (sub (index ni v) x))))
 
-(def max_ Float ((x : Float) (y : Float)) (if (gt x y) x y))
+(def max_ Float ((x : Float) (y : Float)) (if (gt@ff x y) x y))
 
 (def max$VecR Float (v : Vec Float)
      (let ; We can't write -inf in a .ks file so use something very

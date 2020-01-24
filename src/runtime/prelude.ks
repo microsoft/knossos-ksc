@@ -1,3 +1,19 @@
+(edef gt@ff Bool (Float Float))
+(edef D$gt@ff (LM (Tuple Float Float) Bool) (Float Float))
+(edef Dt$gt@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
+(def fwd$gt@ff (Tuple) ((x1 : Float) (x2 : Float) (dx1 : Float) (dx2 : Float))
+     (tuple))
+(def rev$gt@ff (Tuple Float Float) ((x1 : Float) (x2 : Float) (d_dgt : (Tuple)))
+     (tuple 0.0 0.0))
+
+(edef gt@ii Bool (Integer Integer))
+(edef D$gt@ii (LM (Tuple Integer Integer) Bool) (Integer Integer))
+(edef Dt$gt@ii (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+(def fwd$gt@ii (Tuple) ((x1 : Integer) (x2 : Integer) (dx1 : (Tuple)) (dx2 : (Tuple)))
+     (tuple))
+(def rev$gt@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dgt : (Tuple)))
+     (tuple (tuple) (tuple)))
+
 (edef log Float (Float))
 (edef D$log (LM Float Float) (Float))
 (def fwd$log Float ((x : Float) (dx : Float)) (div dx x))
@@ -35,9 +51,9 @@
 
 (edef abs Float (Float))
 (edef D$abs (LM Float Float) (Float))
-(def fwd$abs Float ((x : Float) (dx : Float)) (if (gt x 0.0) dx (neg dx)))
+(def fwd$abs Float ((x : Float) (dx : Float)) (if (gt@ff x 0.0) dx (neg dx)))
 (def rev$abs Float ((x : Float) (d_dabs : Float))
-     (if (gt x 0.0) d_dabs (neg d_dabs)))
+     (if (gt@ff x 0.0) d_dabs (neg d_dabs)))
 (edef Dt$abs (Tuple Float (LM Float Float)) (Float))
 
 (edef to_float Float (Integer))

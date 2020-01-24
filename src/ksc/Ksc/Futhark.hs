@@ -199,6 +199,7 @@ primType _ = True
 escape :: String -> Name
 escape = noLeadingUnderscore . escapeReserved . concatMap escape'
   where escape' '$' = "__"
+        escape' '@' = "__a"
         escape' c = [c]
 
         escapeReserved s
@@ -345,7 +346,6 @@ callPrimFun op _ [x, y]
                         , ("eq" , "==")
                         , ("ne" , "!=")
                         , ("lt" , "<")
-                        , ("gt" , ">")
                         , ("lte", "<=")
                         , ("gte", ">=")
                         ]

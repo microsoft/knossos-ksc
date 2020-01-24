@@ -39,7 +39,7 @@
        (index ki bias))
        ))))))))
 
-(def max_ Float ((x : Float) (y : Float)) (if (gt x y) x y))
+(def max_ Float ((x : Float) (y : Float)) (if (gt@ff x y) x y))
 
 (def relu Float (x : Float) (max_ x 0.0))
 

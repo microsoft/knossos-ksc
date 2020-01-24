@@ -26,7 +26,7 @@
           (index ki image))
        ))))))
 
-(def max_ Float ((x1 : Float) (x2 : Float)) (if (gt x1 x2) x1 x2))
+(def max_ Float ((x1 : Float) (x2 : Float)) (if (gt@ff x1 x2) x1 x2))
 
 (def maxpool
      (Vec Float)
