@@ -345,7 +345,6 @@ callPrimFun op _ [x, y]
                         , ("div", "/")
                         , ("eq" , "==")
                         , ("ne" , "!=")
-                        , ("gte", ">=")
                         ]
 
 callPrimFun "pr" _ es =
