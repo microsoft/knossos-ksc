@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from testutil import translate_and_import
+from ksc.utils import translate_and_import
 
 def test_conv1d():
     # we need parentheses around Vec after ':' to parse correctly
@@ -16,8 +16,8 @@ def test_conv1d():
       (build n (lam (ni : Integer)
         (sumbuild kn (lam (kni : Integer)
           (sumbuild l  (lam (li  : Integer)
-            (let ((knc (div kn 2))
-                  (noi (sub (add ni knc) kni))
+            (let ((knc (div@ii kn 2))
+                  (noi (sub@ii (add@ii ni knc) kni))
                   (outside_image (or (lt noi 0) (gte noi n)))
                   (image_noi
                   (if outside_image 0.0 (index noi (index li image)))))

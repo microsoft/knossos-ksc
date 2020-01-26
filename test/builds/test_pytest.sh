@@ -11,3 +11,6 @@ cd ../..
 
 echo Running pytest
 python3 -m pytest test/python
+
+echo Running pytest using cpp backend
+python3 -m pytest test/python/test_tracing_core.py --backend cpp

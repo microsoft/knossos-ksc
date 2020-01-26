@@ -7,12 +7,10 @@ def sub(a, b):
 def mul(a, b):
     return a * b
 
-def divi(a, b):
+def div_ii(a, b):
     return a // b
 
-div = divi
-
-def divf(a, b):
+def div_ff(a, b):
     return a / b
 
 def eq(a, b):
@@ -45,7 +43,7 @@ def max_(a, b):
 def neg(a):
     return -a
 
-def to_float(a):
+def to_float_i(a):
     return float(a)
 
 def build(n, f):
