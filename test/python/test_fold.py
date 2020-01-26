@@ -1,9 +1,9 @@
-from testutil import translate_and_import
+from ksc.utils import translate_and_import
 
 def test_fold():
     ks_str = """
 (def mod (Integer) ((x : Integer) (y : Integer))
-  (sub x (mul (div x y) y)))
+  (sub x (mul (div@ii x y) y)))
 
 (def test Integer ((n : Integer))
     (fold (lam (s_x : (Tuple Integer Integer))

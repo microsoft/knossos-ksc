@@ -7,13 +7,14 @@ import sys
 
 import sexpdata
 
+from ksc.backends import specs
+
 _built_in_edefs = [
     "add",
     "sub",
     "mul",
-    "div",
-    "divi",
-    "divf",
+    "div_ii",
+    "div_ff",
     "eq",
     "lt",
     "gt",
@@ -24,7 +25,7 @@ _built_in_edefs = [
     "abs_",
     "max_",
     "neg",
-    "to_float",
+    "to_float_i",
     "build",
     "sumbuild",
     "size",
@@ -58,6 +59,12 @@ def _let_to_lambda(let_var_names, let_exprs, body, indent=4):
     else:
         return lambda_expr
 
+def get_specialized_func_name(name):
+    specialized = specs.specialized_functions()
+    if name in specialized:
+        return specialized[name]
+    return name.split("@")[0]
+
 def handle_body(s_exp, indent=2):
     if isinstance(s_exp, sexpdata.Symbol):
         return s_exp.value()
@@ -67,7 +74,7 @@ def handle_body(s_exp, indent=2):
         assert all(isinstance(se, type(s_exp[0])) for se in s_exp)
         return [v for v in s_exp]
     joiner = ("\n" + (" " * indent))
-    func_name = s_exp[0].value()
+    func_name = get_specialized_func_name(_value_to_str(s_exp[0]))
     if func_name == "let":
         let_list = s_exp[1]
         let_var_names = [se[0].value() for se in let_list]
@@ -164,25 +171,31 @@ def type_to_sample(arg_type):
 def args_to_sample_values(args):
     arg_types = []
     for name, _, arg_type in args:
-        arg_types.append((name.value(), type_to_sample(arg_type)))
+        name = _value_to_str(name)
+        arg_types.append((name, type_to_sample(arg_type)))
     return arg_types
 
 Def = namedtuple("Def", ["name", "str", "sample_args"])
 
+def _value_to_str(name):
+    return name if isinstance(name, str) else name.value()
+
 def handle_def(s_exp):
     name, _, args, body = s_exp[1:]
+    name = _value_to_str(name)
     arg_names = [se[0].value() for se in args]
-    return Def(name.value(),
+    return Def(name,
                """def {name}({args}):
   return {body}
-""".format(name=name.value(),
+""".format(name=name.split("@")[0], # ignore the type info in the name
            args=", ".join(arg_names),
            body=handle_body(body)),
                args_to_sample_values(args))
 
 def to_def_or_edef(s_exp):
     if s_exp[0].value() == "edef":
-        return s_exp[1].value(), None
+        name = _value_to_str(s_exp[1])
+        return get_specialized_func_name(name), None
     elif s_exp[0].value() == "def":
         return None, handle_def(s_exp)
     else:
@@ -193,19 +206,31 @@ def parse_defs(string_or_stream):
     edefs, defs = zip(*[to_def_or_edef(se) for se in se_list])
     return list(filter(None, edefs)), list(filter(None, defs))
 
-def translate(ks_str, backend):
+def translate(ks_str, backend, with_main=True):
     edefs, defs = parse_defs(ks_str)
     def_names, def_strs, samples = zip(*defs)
     main_samples = samples[-1]
     main_name = def_names[-1]
 
     # include built-in functions
-    edefs = _built_in_edefs + edefs
+    edefs = sorted(set(_built_in_edefs + edefs))
 
-    return '''import numpy as np
+    ks_str = '''import numpy as np
 from ksc.backends.{backend} import ({edefs}
 )
 {defs}
+
+defs={{
+  {defs_map}
+}}
+'''.format(backend=backend,
+           edefs=",\n  ".join(edefs),
+           defs="\n".join(def_strs),
+           defs_map=",\n  ".join([f'"{d.name}": {d.name.split("@")[0]}' for d in defs])
+    )
+
+    if with_main:
+        ks_str += """
 
 def main():
   {sample_args}
@@ -213,17 +238,18 @@ def main():
 
 if __name__ == "__main__":
   main()
-'''.format(backend=backend,
-           edefs=",\n  ".join(edefs),
-           defs="\n".join(def_strs),
-           sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main_samples),
-           main=main_name,
-           main_args=", ".join([k for k, _ in main_samples]))
+""".format(
+        sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main_samples),
+        main=main_name,
+        main_args=", ".join([k for k, _ in main_samples])
+)
+
+    return ks_str
 
 def main():
     parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
     parser.add_argument("input_ks_file", type=str)
-    parser.add_argument("--backend", choices=["common", "jax"], default="common")
+    parser.add_argument("--backend", choices=["common", "jax", "jax_input_last"], default="common")
     args = parser.parse_args()
 
     with open(args.input_ks_file) as f:

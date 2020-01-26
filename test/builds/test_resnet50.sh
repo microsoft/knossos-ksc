@@ -12,7 +12,11 @@ python3 -m pip install .
 cd ../..
 
 echo Translating Knossos to Python
-python3 -m ksc.translate examples/dl-resnet/resnet_v2.ks --backend jax > resnet_v2.py
+python3 -m ksc.translate examples/dl-resnet/resnet_v2.ks --backend jax_input_last > resnet_v2.py
 
-echo Running test...
-PYTHONPATH=. python ./test/builds/test_resnet50.py
+echo Running test of Resnet50 written in Knossos
+PYTHONPATH=. python ./test/builds/test_resnet50.py --model resnet_v2
+
+echo Running test of Resnet50 written in Python
+PYTHONPATH=. python ./test/builds/test_resnet50.py --model resnet_py
+
