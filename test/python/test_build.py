@@ -1,4 +1,4 @@
-from testutil import translate_and_import
+from ksc.utils import translate_and_import
 
 def test_vec_vec_add():
     ks_str = """(def test (Vec Integer) ((x : (Vec Integer)) (y : (Vec Integer)))

@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import json
 import numpy as np
@@ -5,7 +6,6 @@ import os
 from PIL import Image
 from urllib.request import urlretrieve
 
-from resnet_v2 import Resnet50
 
 INPUT_FILE_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/msrc.jpg"
 PYTORCH_RESNET50_ORIGINAL_URL = "https://download.pytorch.org/models/resnet50-19c8e357.pth"
@@ -28,7 +28,7 @@ def download_file(file_url, md5_hash):
     assert _hash_file(local_filename) == md5_hash
     return local_filename
 
-def resnet50_weights_from_pytorch(p):
+def resnet50_v2_weights_from_pytorch(p):
     num_blocks = [3, 4, 6, 3]
 
     return (
@@ -110,6 +110,89 @@ def resnet50_weights_from_pytorch(p):
         )
     )
 
+def resnet50_py_weights_from_pytorch(p):
+    num_blocks = [3, 4, 6, 3]
+
+    return (
+        (
+            np.array([0.485, 0.456, 0.406], dtype=np.float32), # mean
+            np.array([0.229, 0.224, 0.225], dtype=np.float32)  # std
+        ),
+        p["conv1.weight"],
+        (
+            p["bn1.running_mean"],
+            p["bn1.running_var"],
+            p["bn1.weight"],
+            p["bn1.bias"]
+        ),
+        tuple(
+            (
+                (
+                    (
+                        p[f"layer{i+1}.0.conv1.weight"],
+                        (
+                            p[f"layer{i+1}.0.bn1.running_mean"],
+                            p[f"layer{i+1}.0.bn1.running_var"],
+                            p[f"layer{i+1}.0.bn1.weight"],
+                            p[f"layer{i+1}.0.bn1.bias"]
+                        ),
+                        p[f"layer{i+1}.0.conv2.weight"],
+                        (
+                            p[f"layer{i+1}.0.bn2.running_mean"],
+                            p[f"layer{i+1}.0.bn2.running_var"],
+                            p[f"layer{i+1}.0.bn2.weight"],
+                            p[f"layer{i+1}.0.bn2.bias"]
+                        ),
+                        p[f"layer{i+1}.0.conv3.weight"],
+                        (
+                            p[f"layer{i+1}.0.bn3.running_mean"],
+                            p[f"layer{i+1}.0.bn3.running_var"],
+                            p[f"layer{i+1}.0.bn3.weight"],
+                            p[f"layer{i+1}.0.bn3.bias"]
+                        ),
+                    ),
+                    p[f"layer{i+1}.0.downsample.0.weight"],
+                    (
+                        p[f"layer{i+1}.0.downsample.1.running_mean"],
+                        p[f"layer{i+1}.0.downsample.1.running_var"],
+                        p[f"layer{i+1}.0.downsample.1.weight"],
+                        p[f"layer{i+1}.0.downsample.1.bias"]
+                    )
+                ),
+            )
+            + tuple(
+                (
+                    p[f"layer{i+1}.{j}.conv1.weight"],
+                    (
+                        p[f"layer{i+1}.{j}.bn1.running_mean"],
+                        p[f"layer{i+1}.{j}.bn1.running_var"],
+                        p[f"layer{i+1}.{j}.bn1.weight"],
+                        p[f"layer{i+1}.{j}.bn1.bias"]
+                    ),
+                    p[f"layer{i+1}.{j}.conv2.weight"],
+                    (
+                        p[f"layer{i+1}.{j}.bn2.running_mean"],
+                        p[f"layer{i+1}.{j}.bn2.running_var"],
+                        p[f"layer{i+1}.{j}.bn2.weight"],
+                        p[f"layer{i+1}.{j}.bn2.bias"]
+                    ),
+                    p[f"layer{i+1}.{j}.conv3.weight"],
+                    (
+                        p[f"layer{i+1}.{j}.bn3.running_mean"],
+                        p[f"layer{i+1}.{j}.bn3.running_var"],
+                        p[f"layer{i+1}.{j}.bn3.weight"],
+                        p[f"layer{i+1}.{j}.bn3.bias"]
+                    )
+                ) for j in range(1, num_blocks[i])
+            ) for i in range(len(num_blocks))
+        ),
+        (
+            p["fc.weight"],
+            p["fc.bias"]
+        )
+    )
+
+
 def get_shape(weights):
     if isinstance(weights, tuple):
         return tuple(get_shape(el) for el in weights)
@@ -125,6 +208,9 @@ def get_class_name_dict(class_names_file):
         return json.load(f)
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py"])
+    args = parser.parse_args()
     npz_file = download_file(
         PYTORCH_RESNET50_URL,
         "8947031f2fc1799404c49924d72a97c4"
@@ -135,9 +221,6 @@ def main():
     )
     weights = np.load(npz_file)
     assert weights["_original_url"] == PYTORCH_RESNET50_ORIGINAL_URL
-    weights = resnet50_weights_from_pytorch(weights)
-    # just check that it is ok
-    get_shape(weights)
 
     input_file = download_file(
         INPUT_FILE_URL,
@@ -145,12 +228,26 @@ def main():
     )
     print(f"Loading image {input_file}")
     input = np.asarray(Image.open(input_file)).transpose((2, 0, 1))[None, :, :, :] / 255.0 # NCHW
-    out = Resnet50(weights, input)
+
+    if args.model == "resnet_v2":
+        from resnet_v2 import Resnet50 as resnet
+        weights = resnet50_v2_weights_from_pytorch(weights)
+    elif args.model == "resnet_py":
+        import sys
+        sys.path.append("examples/dl-resnet")
+        from resnet import resnet
+        weights = resnet50_py_weights_from_pytorch(weights)
+    
+    if args.model == "resnet_py":
+        out = resnet(input, weights)
+        out = out.data
+    else:
+        out = resnet(weights, input)
     class_names = get_class_name_dict(imagenet_class_names_file)
     top5 = out.ravel().argsort()[-5:][::-1]
     print("\n".join([f"score={out[0, i]}, {class_names[str(i)]}" for i in top5]))
     assert class_names[str(top5[0])] == ["n03661043", "library"]
-    assert class_names[str(top5[1])] == ["n04335435", "streetcar"]
+    assert class_names[str(top5[1])] == ["n02871525", "bookshop"]
 
 if __name__ == "__main__":
     main()
