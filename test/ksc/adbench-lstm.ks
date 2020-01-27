@@ -163,7 +163,7 @@
                          (ypred (get$1$2 ypred_v))
                          (hidden_cell_next (get$2$2 ypred_v))
                          (lse (logsumexp ypred))
-                         (ynorm (build h (lam (hi : Integer) (sub (index hi ypred) lse))))
+                         (ynorm (build h (lam (hi : Integer) (sub@ff (index hi ypred) lse))))
 
                          (total_increment (sumbuild h (lam (hi : Integer)
                                               (mul (index hi ygold) (index hi ynorm)))))

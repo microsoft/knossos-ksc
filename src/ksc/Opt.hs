@@ -225,7 +225,6 @@ optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
   = Just . Konst . KFloat $
     case op of
       "mul" -> k1 * k2
-      "sub" -> k1 - k2
       "add" -> k1 + k2
       "div" -> k1 / k2
       "scale" -> k1 * k2
@@ -620,10 +619,6 @@ optGradPrim :: HasCallStack => Type -> PrimFun -> [TExpr] -> Maybe TExpr
 optGradPrim _ "add" arg
   | [t1, t2] <- map typeof arg
   = Just (lmHCat [lmOne t1, lmOne t2])
-
-optGradPrim _ "sub" arg
-  | [t1, t2] <- map typeof arg
-  = Just (lmHCat [lmOne t1, lmScale t2 $ kTFloat (-1.0)])
 
 optGradPrim _ "mul" [x,y]
   | TypeFloat <- typeof x

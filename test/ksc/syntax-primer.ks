@@ -29,9 +29,10 @@ If you prefer block comments then use pairs of #| and |#
 
 ; The syntax of nested function calls looks different in .ksc to most
 ; other languages. It does not use infix operators for arithmetic.
-; Instead there are functions called "add", "sub", "mul", "div", etc..
-; The best place to find a full list of supported functions is
-; probably the Prim module.
+; Instead there are functions called "add", "sub", "mul", "div", etc.,
+; suffixed with the type of argument that they take (i for Integer, f
+; for Float). The best places to find a full list of supported
+; functions are prelude.ks and the Prim module.
 ;
 ; The following defines a function that takes five arguments (a to e)
 ; each of type Integer and returns an Integer.  It performs the
@@ -42,7 +43,7 @@ If you prefer block comments then use pairs of #| and |#
       (c : Integer)
       (d : Integer)
       (e : Integer))
-     (sub (add (mul a b) (neg c)) (div d e)))
+     (sub@ii (add (mul a b) (neg c)) (div d e)))
 
 ; Conditionals
 
@@ -55,7 +56,7 @@ If you prefer block comments then use pairs of #| and |#
 (def if_example Integer ((b1 : Bool) (b2 : Bool) (a : Integer))
      (if (or b1 b2)
          (add a 10)
-         (sub a 10)))
+         (sub@ii a 10)))
 
 ; Knossos types, constants, let bindings
 
@@ -103,7 +104,7 @@ If you prefer block comments then use pairs of #| and |#
 (def triangle Integer (n : Integer)
      (if (eq n 0)
          0
-         (add n (triangle (sub n 1)))))
+         (add n (triangle (sub@ii n 1)))))
 
 ; fold is a primitive that implements a particular recursion pattern
 ; so that you don't have to write it out by hand.  It is written as

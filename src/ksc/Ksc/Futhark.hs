@@ -339,7 +339,6 @@ callPrimFun op _ [x, y]
   where binOpPrimFuns = [ ("or", "||")
                         , ("and", "&&")
                         , ("add", "+")
-                        , ("sub", "-")
                         , ("mul", "*")
                         , ("scale", "*")
                         , ("div", "/")

@@ -321,11 +321,10 @@ pDiag = mkPrimCall3 "diag"
 ---------------------------
 -- "User-defined" functions
 ---------------------------
-pAdd, pMul, pDiv, pSub, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
+pAdd, pMul, pDiv, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
 pAdd   = mkPrimCall2 "add"
 pMul   = mkPrimCall2 "mul"
 pDiv   = mkPrimCall2 "div"
-pSub   = mkPrimCall2 "sub"
 pEqual = mkPrimCall2 "eq"
 pScale = mkPrimCall2 "scale"
 
@@ -589,8 +588,6 @@ primFunCallResultTy_maybe fun args
       ("mul"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
       ("div"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
       ("div"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
-      ("sub"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
-      ("sub"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
       ("neg"      , [t]                                    ) -> Just t
       ("eq"       , _                                      ) -> Just TypeBool
@@ -620,7 +617,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "neg"
-                       , "add", "sub", "mul", "div"
+                       , "add", "mul", "div"
                        , "eq", "ne", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"

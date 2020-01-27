@@ -76,12 +76,12 @@
            (fold_x   (prod_fold v c))
            (fold_xpd (prod_fold (add v dv) (add c dc)))
            (fold_fwd (fwd$prod_fold v c dv dc))
-           (fold_fd  (sub fold_xpd fold_x))
+           (fold_fd  (sub@ff fold_xpd fold_x))
            (everything_works_as_expected
             (let ((tolerance 0.001)
                   (actual fold_fd)
                   (expected fold_fwd))
-              (lt@ff (abs (sub actual expected))
+              (lt@ff (abs (sub@ff actual expected))
                       (mul (add (abs expected) (abs actual))
                          tolerance)))))
        (pr
@@ -102,7 +102,7 @@
         "fd fold"
         fold_fd
         "fwd - fd"
-        (sub fold_fwd fold_fd)
+        (sub@ff fold_fwd fold_fd)
         "rev fold"
         (rev$prod_fold v c 1.0)
         "checked (should be small)"

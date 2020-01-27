@@ -626,7 +626,6 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "sub"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "add"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "div"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "mul"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
