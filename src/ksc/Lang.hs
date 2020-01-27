@@ -829,7 +829,6 @@ isInfixFun :: Fun -> Maybe Prec
 isInfixFun (Fun (PrimFun s))
     | s == "eq"   = Just precOne
     | s == "add"  = Just precTwo
-    | s == "sub"  = Just precTwo
     | s == "mul"  = Just precThree
     | s == "div"  = Just precThree
 isInfixFun _ = Nothing

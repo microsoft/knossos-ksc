@@ -1,7 +1,7 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def gmm_knossos_tri Integer ((n : Integer))
-  (div (mul n (sub n 1)) 2))
+  (div (mul n (sub@ii n 1)) 2))
 
 (def exp$VecR (Vec Float) ((v : Vec Float))
   (build (size v) (lam (i : Integer) (exp (index i v)))))
@@ -16,7 +16,7 @@
   (build (size a) (lam (i : Integer) (mul (index i a) (index i b)))))
 
 (def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
+  (build (size a) (lam (i : Integer) (sub@ff (index i a) (index i b)))))
 
 ; dotv
 (edef dotv Float ((Vec Float) (Vec Float)))
@@ -67,7 +67,7 @@
             0.0
             (if (eq i j)
               (exp (index i q))
-              (index (add (gmm_knossos_tri (sub i 1)) j) l))
+              (index (add (gmm_knossos_tri (sub@ii i 1)) j) l))
            )
            )))))))
 
@@ -83,10 +83,10 @@
 ; TODO deriv lgamma - but no deriv wishart_m anyway.
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
-    (let ((out (mul 0.28618247146235004 (to_float (mul p (sub p 1)))))) ; 0.25 log pi
+    (let ((out (mul 0.28618247146235004 (to_float (mul p (sub@ii p 1)))))) ; 0.25 log pi
       (add out
          (sum (build p (lam (j : Integer)
-                 (lgamma (sub a (mul 0.5 (to_float j))))))))))
+                 (lgamma (sub@ff a (mul 0.5 (to_float j))))))))))
 
 (def log_wishart_prior Float ((wishart : Tuple Float Integer)
                               (log_Qdiag : Vec Float)
@@ -99,14 +99,14 @@
           (Qdiag         (exp$VecR log_Qdiag))
 
           (n  (add p (add wishart_m 1)))
-          (C  (sub (mul (to_float (mul n p))
-                    (sub (log wishart_gamma)
+          (C  (sub@ff (mul (to_float (mul n p))
+                    (sub@ff (log wishart_gamma)
                        (mul 0.5 (log 2.0))))
                  (log_gamma_distrib (mul 0.5 (to_float n)) p)))
           (frobenius (add  (sqnorm Qdiag) (sqnorm ltri_Q)))
           (w2f   (mul 0.5 (mul (mul wishart_gamma wishart_gamma) frobenius)))
           )
-        (sub (sub w2f
+        (sub@ff (sub@ff w2f
               (mul (to_float wishart_m)
                   sum_qs))
             C)
@@ -132,7 +132,7 @@
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
                                   (mahal_vec (mul$Mat$Vec Q
                                                       (sub$VecR$VecR (index i x) (index k means)))))
-                              (sub (add (index k alphas)
+                              (sub@ff (add (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))
                               )
@@ -141,7 +141,7 @@
                           ))))
           )
             (add (add CONSTANT
-                (sub slse
+                (sub@ff slse
                   (mul (to_float N) (logsumexp alphas))))
             (sum (build K (lam (k : Integer)
                     (log_wishart_prior wishart (index k qs) (index k ls))))))

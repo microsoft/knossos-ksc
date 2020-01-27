@@ -45,18 +45,18 @@
    (div a b))
 
 (def sub@Integer,Integer  Integer ((a : Integer) (b : Integer))
-   (sub a b))
+   (sub@ii a b))
 
 (def sub@Float,Float Float ((a : Float) (b : Float))
-   (sub a b))
+   (sub@ff a b))
 
 (def sub@V[[Float]],Float (Vec Float) ((a : Vec Float) (b : Float))
   (let (n (size a))
-    (build n (lam (i : Integer) (sub (index i a) b)))))
+    (build n (lam (i : Integer) (sub@ff (index i a) b)))))
 
 (def sub@V[[Float]],V[[Float]] (Vec Float) ((a : Vec Float) (b : Vec Float))
   (let (n (size a))
-    (build n (lam (i : Integer) (sub (index i a) (index i b))))))
+    (build n (lam (i : Integer) (sub@ff (index i a) (index i b))))))
 
 (def sqr Float (a : Float)
    (mul a a))
