@@ -1,7 +1,7 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def gmm_knossos_tri Integer ((n : Integer))
-  (div (mul n (sub@ii n 1)) 2))
+  (div@ii (mul n (sub@ii n 1)) 2))
 
 (def exp$VecR (Vec Float) ((v : Vec Float))
   (build (size v) (lam (i : Integer) (exp (index i v)))))

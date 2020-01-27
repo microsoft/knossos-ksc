@@ -42,7 +42,7 @@
    (mul a b))
 
 (def div@Integer,Integer  Integer ((a : Integer) (b : Integer))
-   (div a b))
+   (div@ii a b))
 
 (def sub@Integer,Integer  Integer ((a : Integer) (b : Integer))
    (sub@ii a b))
