@@ -256,7 +256,7 @@ doall = displayCppGenCompileAndRunWithOutput "g++-7" . Just
 futharkPipeline :: [FilePath] -> KM [TDef]
 futharkPipeline files
   = do
-  { let display _ _ _ = return ()
+  { let display = displayPassM Nothing
 
   ; decls0 <- liftIO (fmap concat (mapM (parseF . (++ ".ks")) files))
 
