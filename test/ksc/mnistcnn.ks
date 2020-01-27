@@ -32,7 +32,7 @@
                     0.0
                   (index moi (index noi (index li image))))))
 
-           (mul image_noi_moi
+           (mul@ff image_noi_moi
               (index kmi (index kni (index li (index ki kernels)))))
 
            )))))))
@@ -69,8 +69,8 @@
      (build l (lam (li : Integer)
      (build (div@ii n 2) (lam (ni : Integer)
      (build (div@ii m 2) (lam (mi : Integer)
-       (let ((nid (mul 2 ni))
-             (mid (mul 2 mi))
+       (let ((nid (mul@ii 2 ni))
+             (mid (mul@ii 2 mi))
              (a00 (index mid (index nid (index li image))))
              (a01 (index (add 1 mid) (index nid (index li image))))
              (a10 (index mid (index (add 1 nid) (index li image))))
@@ -93,7 +93,7 @@
      (sumbuild k (lam (ki : Integer)
      (sumbuild n (lam (ni : Integer)
      (sumbuild m (lam (mi : Integer)
-       (mul (index mi (index ni (index ki (index oi w))))
+       (mul@ff (index mi (index ni (index ki (index oi w))))
              (index mi (index ni (index ki image))))
        ))))))
      (index oi bias))
@@ -110,7 +110,7 @@
      (build o (lam (oi : Integer)
      (add
      (sumbuild k (lam (ki : Integer)
-       (mul (index ki (index oi w))
+       (mul@ff (index ki (index oi w))
              (index ki image))
        ))
      (index oi bias))

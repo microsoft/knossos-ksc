@@ -9,7 +9,7 @@
 
 (def g2 Float ((wishart : Tuple Float Integer))
     (let ((wishart_gamma (get$1$2 wishart))
-         (f (mul 2.2 wishart_gamma))
+         (f (mul@ff 2.2 wishart_gamma))
          )
       f))
 

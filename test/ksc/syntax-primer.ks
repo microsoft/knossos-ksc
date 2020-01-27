@@ -43,7 +43,7 @@ If you prefer block comments then use pairs of #| and |#
       (c : Integer)
       (d : Integer)
       (e : Integer))
-     (sub@ii (add (mul a b) (neg c)) (div@ii d e)))
+     (sub@ii (add (mul@ii a b) (neg c)) (div@ii d e)))
 
 ; Conditionals
 
@@ -97,7 +97,7 @@ If you prefer block comments then use pairs of #| and |#
 ; a vector of length n where the element at position i is given by the
 ; lambda expression applied to i".
 (def build_example (Vec Float) (n : Integer)
-     (build n (lam (ni : Integer) (to_float (mul ni ni)))))
+     (build n (lam (ni : Integer) (to_float (mul@ii ni ni)))))
 
 ; Knossos does not have for loops or while loops.  Instead we use
 ; recursion.

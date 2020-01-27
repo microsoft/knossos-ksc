@@ -1,17 +1,17 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def a Float ((x : Float))
-    (mul 3.0 x))
+    (mul@ff 3.0 x))
 
 (def b Float ((y : Float))
-    (mul 2.0 y))
+    (mul@ff 2.0 y))
 
 (def g Float ((x : Float) (y : Float))
-    (mul x y))
+    (mul@ff x y))
 
 ; f = 3z/2y for z=5x so f = 15x/2y so linear in x
 (def f1 Float ((x : Float) (y : Float))
-    (let (z (mul 5.0 x))
+    (let (z (mul@ff 5.0 x))
         (div@ff (a z) (b y))))
 
 (def f Float ((x : Float) (y : Float))

@@ -321,9 +321,8 @@ pDiag = mkPrimCall3 "diag"
 ---------------------------
 -- "User-defined" functions
 ---------------------------
-pAdd, pMul, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
+pAdd, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
 pAdd   = mkPrimCall2 "add"
-pMul   = mkPrimCall2 "mul"
 pEqual = mkPrimCall2 "eq"
 pScale = mkPrimCall2 "scale"
 
@@ -362,6 +361,12 @@ pSnd   = pSel 2 2
 
 pToFloat :: TExpr -> TExpr
 pToFloat from = userCall "to_float" TypeFloat [from]
+
+pMulii :: TExpr -> TExpr -> TExpr
+pMulii x1 x2 = userCall "mul@ii" TypeInteger [x1, x2]
+
+pMulff :: TExpr -> TExpr -> TExpr
+pMulff x1 x2 = userCall "mul@ff" TypeFloat [x1, x2]
 
 ensureTuple :: TExpr -> TExpr
 ensureTuple x = case typeof x of
@@ -583,8 +588,6 @@ primFunCallResultTy_maybe fun args
 
       -- arithmetic ops.   See special case for "add" above
       ("scale"      , [TypeFloat,   t]             ) -> Just t
-      ("mul"        , [TypeFloat,   TypeFloat]     ) -> Just TypeFloat
-      ("mul"        , [TypeInteger, TypeInteger]   ) -> Just TypeInteger
 
       ("neg"      , [t]                                    ) -> Just t
       ("eq"       , _                                      ) -> Just TypeBool
@@ -614,7 +617,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "neg"
-                       , "add", "mul"
+                       , "add"
                        , "eq", "ne", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"

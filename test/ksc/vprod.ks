@@ -3,19 +3,19 @@
 (def vprod Float ( (i : Integer) (v : Vec Float) )
        (if (eq i (size v))
            1.0
-           (mul (index i v) (vprod (add i 1) v))))
+           (mul@ff (index i v) (vprod (add i 1) v))))
 
 (def aprod Float ( (i : Integer) (v : Vec Float) (acc : Float) )
        (if (eq i (size v))
            acc
-         (let (acc (mul acc (index i v)))
+         (let (acc (mul@ff acc (index i v)))
             (aprod (add i 1) v acc))))
 
 (def fprod Float (v : Vec Float)
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (mul acc x)))
+                  (mul@ff acc x)))
            1.0
            v))
 
@@ -30,7 +30,7 @@
 ;; to see progress bars
 (def main Integer ()
   (let ((N 6)
-        (ns (build N (lam (i : Integer) (mul (add i 1) 100)))))
+        (ns (build N (lam (i : Integer) (mul@ii (add i 1) 100)))))
   (print "# Julia code:\n"
       "n=" ns "\n"
       "vp="

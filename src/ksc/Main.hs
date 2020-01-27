@@ -213,6 +213,8 @@ futharkCompileKscPrograms ksFiles = do
         , "test/ksc/sum.ks"
           -- $trace not supported
         , "test/ksc/test0.ks"
+          -- Seems not to handle negative float literals
+        , "test/ksc/negative-float-literals.ks"
         ]
 
   testOn ksFiles $ \ksFile -> do

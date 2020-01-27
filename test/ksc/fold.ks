@@ -11,14 +11,14 @@
      (if
          (eq i (size v))
          acc
-       (prod (add i 1) v (mul acc (index i v)))))
+       (prod (add i 1) v (mul@ff acc (index i v)))))
 
 ; This ends up calculating prod(v) * pow(closure, size(v))
 (def prod_fold Float ((v : Vec Float) (closure : Float))
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (mul (mul acc x) closure)))
+                  (mul@ff (mul@ff acc x) closure)))
            1.0
            v))
 
@@ -28,7 +28,7 @@
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (mul acc x)))
+                  (mul@ff acc x)))
            1.0
            v))
 
@@ -54,7 +54,7 @@
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
-       (mul ($ranhashdoub seed) scale))
+       (mul@ff ($ranhashdoub seed) scale))
 
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
@@ -82,7 +82,7 @@
                   (actual fold_fd)
                   (expected fold_fwd))
               (lt@ff (abs (sub@ff actual expected))
-                      (mul (add (abs expected) (abs actual))
+                      (mul@ff (add (abs expected) (abs actual))
                          tolerance)))))
        (pr
         "v"

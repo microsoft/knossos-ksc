@@ -22,13 +22,13 @@
 
 (def fwd$tanh Float ((x : Float) (dx : Float))
      (let ((tanh_x (tanh x))
-           (tanh_x_2 (mul tanh_x tanh_x)))
-       (mul tanh_x_2 dx)))
+           (tanh_x_2 (mul@ff tanh_x tanh_x)))
+       (mul@ff tanh_x_2 dx)))
 
 (def rev$tanh Float ((x : Float) (d_dr : Float))
      (let ((tanh_x (tanh x))
-           (tanh_x_2 (mul tanh_x tanh_x)))
-       (mul tanh_x_2 d_dr)))
+           (tanh_x_2 (mul@ff tanh_x tanh_x)))
+       (mul@ff tanh_x_2 d_dr)))
 
 (edef D$tanh (LM Float Float) (Float))
 (edef Dt$tanh (Tuple Float (LM Float Float)) (Float))
@@ -46,13 +46,13 @@
 
      (let ((h (size wf))
            (cell_out (build h (lam (hi : Integer)
-              (let ((forget  (sigmoid (add (mul (index hi input)  (index hi wf)) (index hi bf))))
-                    (ingate  (sigmoid (add (mul (index hi hidden) (index hi wi)) (index hi bi))))
-                    (change  (tanh    (add (mul (index hi hidden) (index hi wc)) (index hi bc)))))
-                (add (mul (index hi cell) forget) (mul ingate change))))))
+              (let ((forget  (sigmoid (add (mul@ff (index hi input)  (index hi wf)) (index hi bf))))
+                    (ingate  (sigmoid (add (mul@ff (index hi hidden) (index hi wi)) (index hi bi))))
+                    (change  (tanh    (add (mul@ff (index hi hidden) (index hi wc)) (index hi bc)))))
+                (add (mul@ff (index hi cell) forget) (mul@ff ingate change))))))
            (hidden_out (build h (lam (hi : Integer)
-              (let ((outgate (sigmoid (add (mul (index hi input)  (index hi wo)) (index hi bo)))))
-                (mul outgate (tanh (index hi cell_out))))))))
+              (let ((outgate (sigmoid (add (mul@ff (index hi input)  (index hi wo)) (index hi bo)))))
+                (mul@ff outgate (tanh (index hi cell_out))))))))
        (tuple hidden_out cell_out)))
 
 ; Return (Tuple (Vec h Float) (Vec l (Tuple (Vec h Float) (Vec h Float)))
@@ -74,7 +74,7 @@
 
      (let ((h (size in_weight))
            (l (size wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell))
-           (output1 (build h (lam (bi : Integer) (mul (index bi input) (index bi in_weight)))))
+           (output1 (build h (lam (bi : Integer) (mul@ff (index bi input) (index bi in_weight)))))
            (final_output_i_o_v (fold (lam
                (layer_output_params
                 : (Tuple (Tuple Integer (Vec Float) (Vec (Tuple (Vec Float) (Vec Float))))
@@ -115,7 +115,7 @@
            (final_output (get$2$3 final_output_i_o_v))
            (final_output_vec (get$3$3 final_output_i_o_v))
            (output (build h (lam (bi : Integer)
-                       (add (mul (index bi final_output) (index bi out_weight))
+                       (add (mul@ff (index bi final_output) (index bi out_weight))
                             (index bi out_bias))))))
        (tuple output final_output_vec)))
 
@@ -166,7 +166,7 @@
                          (ynorm (build h (lam (hi : Integer) (sub@ff (index hi ypred) lse))))
 
                          (total_increment (sumbuild h (lam (hi : Integer)
-                                              (mul (index hi ygold) (index hi ynorm)))))
+                                              (mul@ff (index hi ygold) (index hi ynorm)))))
 
                          (total_next (add total total_increment)))
                      (tuple total_next hidden_cell_next))
@@ -175,6 +175,6 @@
                                                                               (get$10$10 (index li wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell))))))
                         sequence))
            (total (get$1$2 total_hidden))
-           (count (to_float (mul cm1 h)))
+           (count (to_float (mul@ii cm1 h)))
            (loss (neg (div@ff total count))))
        loss))
