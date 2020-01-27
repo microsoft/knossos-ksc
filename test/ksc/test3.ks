@@ -6,13 +6,13 @@
 
 (def q (Vec Float) ((r : Float) (m : Integer) (a : Vec Float))
   (let (n (size a))
-    (build (mul 2 n) (lam (i : Integer) (mul r (index (div@ii i m) a))))))
+    (build (mul@ii 2 n) (lam (i : Integer) (mul@ff r (index (div@ii i m) a))))))
 
 (def mkvec (Vec Float) (n : Integer)
     (build n (lam (j : Integer) (to_float j))))
 
 (def sqnorm Float (v : Vec Float)
-  (sum (build (size v) (lam (i : Integer) (let (vi (index i v)) (mul vi vi))))))
+  (sum (build (size v) (lam (i : Integer) (let (vi (index i v)) (mul@ff vi vi))))))
 
 #|
 
@@ -30,7 +30,7 @@
 (def main Integer ()
     (let ((v1 (build 4 (lam (i : Integer) (to_float i))))
           (delta 0.00001)
-          (dv (build 4 (lam (i : Integer) (mul (to_float i) delta))))
+          (dv (build 4 (lam (i : Integer) (mul@ff (to_float i) delta))))
           (dq (build 8 (lam (i : Integer) (div delta (to_float (add 3 i)))))))
         (pr 1
             ; (D$f v1 v1)

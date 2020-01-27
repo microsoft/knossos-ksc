@@ -5,11 +5,11 @@
     )
 
 (def f Float (x : Float)
-    ($trace mul x x)
+    ($trace mul@ff x x)
 )
 
 (def g Float ((n : Integer) (m : Integer))
-  (to_float (mul n m)))
+  (to_float (mul@ii n m)))
 
 (def e Float ((vn : Vec Integer)
               (t : Tuple (Vec (Vec Float))
@@ -21,7 +21,7 @@
      (sum (build m (lam (j : Integer) (sum (get$2$2 (get$2$2 t)))))))))
 
 (def test_inline (Vec Integer) (x : Vec Float)
-    (build (size x) (lam (i : Integer) (mul i 2))))
+    (build (size x) (lam (i : Integer) (mul@ii i 2))))
 
 (def test_inline2 Integer (x : Vec Float)
   (let (n1 (size x))

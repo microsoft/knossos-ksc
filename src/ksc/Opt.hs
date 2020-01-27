@@ -224,7 +224,6 @@ optPrimFun :: InScopeSet -> PrimFun -> [TExpr] -> Maybe TExpr
 optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
   = Just . Konst . KFloat $
     case op of
-      "mul" -> k1 * k2
       "add" -> k1 + k2
       "scale" -> k1 * k2
       s -> errorFor s
@@ -259,18 +258,6 @@ optPrimFun _ "add" [x, y] =
     else
       Nothing
 
--- RULE: x*0 = 0*y = 0
-optPrimFun _ "mul" [x, y]
-  | isKZero x || isKZero y
-  -- We use the type of y because the two typing rules for mul in
-  -- Prim.hs are
-  --
-  -- 1. mul: (Float, t) -> t
-  -- 2. mul: (Integer, Integer) -> Integer
-  = Just $ mkZero y
-  | otherwise
-  = Nothing
-
 -- RULE: scale 0 y = 0
 optPrimFun _ "scale" [x, y]
   | isKZero x || isKZero y
@@ -286,11 +273,6 @@ optPrimFun _ "scale" [x, y]
 optPrimFun _ "size" [Call build [n,_]]
   | build `isThePrimFun` "build"
   = Just n
-
--- RULE: size (x * y) = size(x)
-optPrimFun _ "size" [Call mul [x,_]]
-  | mul `isThePrimFun` "mul"
-  = Just (pSize x)
 
 -- RULE: index j (build n f) = f j
 optPrimFun _ "index" [ ei, arr ]
@@ -370,7 +352,7 @@ optLMCompose f g
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
   , typeof t1 == typeof t2
-  = Just $ lmScale (typeof t1) (pMul x y)
+  = Just $ lmScale (typeof t1) (pMulff x y)
 
   -- (f . g) . h   =>   f . (g . h)
   | Call lmcomp [p1,p2] <- f
@@ -518,7 +500,7 @@ optSumBuild sz i e
   , i `notFreeIn` e
   = Just $ sz' sz e
     where sz' = case typeof e of
-                  TypeInteger -> pMul
+                  TypeInteger -> pMulii
                   _ -> pScale . pToFloat
 
 -- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
@@ -618,15 +600,6 @@ optGradPrim :: HasCallStack => Type -> PrimFun -> [TExpr] -> Maybe TExpr
 optGradPrim _ "add" arg
   | [t1, t2] <- map typeof arg
   = Just (lmHCat [lmOne t1, lmOne t2])
-
-optGradPrim _ "mul" [x,y]
-  | TypeFloat <- typeof x
-  , TypeFloat <- typeof y
-  = Just (lmHCat [lmScale TypeFloat y, lmScale TypeFloat x])
-
-optGradPrim _ "mul" arg
-  | [TypeInteger, TypeInteger] <- map typeof arg
-  = Just $ lmZero (mkTuple (map (const zeroInt) arg)) zeroInt
 
 optGradPrim _ "sum" [e]
   | TypeVec t <- typeof e

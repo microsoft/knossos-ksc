@@ -1,19 +1,19 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def gmm_knossos_tri Integer ((n : Integer))
-  (div@ii (mul n (sub@ii n 1)) 2))
+  (div@ii (mul@ii n (sub@ii n 1)) 2))
 
 (def exp$VecR (Vec Float) ((v : Vec Float))
   (build (size v) (lam (i : Integer) (exp (index i v)))))
 
 (def mul$R$VecR (Vec Float) ((r : Float) (a : Vec Float))
-    (build (size a) (lam (i : Integer) (mul r (index i a)))))
+    (build (size a) (lam (i : Integer) (mul@ff r (index i a)))))
 
 (def mul$R$VecVecR (Vec (Vec Float)) ((r : Float) (a : Vec (Vec Float)))
     (build (size a) (lam (i : Integer) (mul$R$VecR r (index i a)))))
 
 (def mul$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (mul (index i a) (index i b)))))
+  (build (size a) (lam (i : Integer) (mul@ff (index i a) (index i b)))))
 
 (def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
   (build (size a) (lam (i : Integer) (sub@ff (index i a) (index i b)))))
@@ -83,10 +83,10 @@
 
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
-    (let ((out (mul 0.28618247146235004 (to_float (mul p (sub@ii p 1)))))) ; 0.25 log pi
+    (let ((out (mul@ff 0.28618247146235004 (to_float (mul@ii p (sub@ii p 1)))))) ; 0.25 log pi
       (add out
          (sum (build p (lam (j : Integer)
-                 (lgamma (sub@ff a (mul 0.5 (to_float j))))))))))
+                 (lgamma (sub@ff a (mul@ff 0.5 (to_float j))))))))))
 
 (def log_wishart_prior Float ((wishart : Tuple Float Integer)
                               (log_Qdiag : Vec Float)
@@ -99,15 +99,15 @@
           (Qdiag         (exp$VecR log_Qdiag))
 
           (n  (add p (add wishart_m 1)))
-          (C  (sub@ff (mul (to_float (mul n p))
+          (C  (sub@ff (mul@ff (to_float (mul@ii n p))
                     (sub@ff (log wishart_gamma)
-                       (mul 0.5 (log 2.0))))
-                 (log_gamma_distrib (mul 0.5 (to_float n)) p)))
+                       (mul@ff 0.5 (log 2.0))))
+                 (log_gamma_distrib (mul@ff 0.5 (to_float n)) p)))
           (frobenius (add  (sqnorm Qdiag) (sqnorm ltri_Q)))
-          (w2f   (mul 0.5 (mul (mul wishart_gamma wishart_gamma) frobenius)))
+          (w2f   (mul@ff 0.5 (mul@ff (mul@ff wishart_gamma wishart_gamma) frobenius)))
           )
         (sub@ff (sub@ff w2f
-              (mul (to_float wishart_m)
+              (mul@ff (to_float wishart_m)
                   sum_qs))
             C)
     ))
@@ -125,7 +125,7 @@
        (triD (size (index 0 ls)))   ; Ugh
       )
   (assert (eq triD (gmm_knossos_tri D))
-    (let ((CONSTANT (mul (to_float (mul N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
+    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
           (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
@@ -136,20 +136,20 @@
                                     ; (index k sum_qs)
                                     (sum (index k qs))
                               )
-                                (mul 0.500000  (sqnorm mahal_vec)))
+                                (mul@ff 0.500000  (sqnorm mahal_vec)))
                             ))))
                           ))))
           )
             (add (add CONSTANT
                 (sub@ff slse
-                  (mul (to_float N) (logsumexp alphas))))
+                  (mul@ff (to_float N) (logsumexp alphas))))
             (sum (build K (lam (k : Integer)
                     (log_wishart_prior wishart (index k qs) (index k ls))))))
     ))))
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
-       (mul ($ranhashdoub seed) scale))
+       (mul@ff ($ranhashdoub seed) scale))
 
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
@@ -160,7 +160,7 @@
                                 (n     : Integer)
                                 (m     : Integer)
                                 (scale : Float))
-     (build n (lam (j : Integer) (mkvec (add (mul j m) seed) m scale))))
+     (build n (lam (j : Integer) (mkvec (add (mul@ii j m) seed) m scale))))
 
 (def not_ Bool (p : Bool) (if p false true))
 
@@ -204,7 +204,7 @@
                  (actual gmm_at_theta)
                  (expected 76.0882))
              (lt@ff (abs (sub@ff actual expected))
-                (max (mul (abs expected) tolerance)
+                (max (mul@ff (abs expected) tolerance)
                      tolerance))))
 
           (everything_works_as_expected
@@ -216,7 +216,7 @@
                  (actual gmm_fd)
                  (expected gmm_fwd))
              (lt@ff (abs (sub@ff actual expected))
-                (max (mul (abs expected) tolerance)
+                (max (mul@ff (abs expected) tolerance)
                      tolerance))))
           (impossibly_good (eq gmm_fd gmm_fwd))
 
@@ -235,7 +235,7 @@
           (dot_at_mus        (dotvv grad_gmm_mus dmus))
           (dot_at_qs         (dotvv grad_gmm_qs dqs))
           (dot_at_ls         (dotvv grad_gmm_ls dls))
-          (dot_at_wishart    (mul (get$1$2 grad_gmm_wishart) (get$1$2 dwishart)))
+          (dot_at_wishart    (mul@ff (get$1$2 grad_gmm_wishart) (get$1$2 dwishart)))
 
           (grad_gmm_dot_dtheta (add      dot_at_x
                                 (add     dot_at_alphas

@@ -36,10 +36,10 @@
    (add a b))
 
 (def mul@Float,Float Float ((a : Float) (b : Float))
-   (mul a b))
+   (mul@ff a b))
 
 (def mul@Integer,Integer Integer ((a : Integer) (b : Integer))
-   (mul a b))
+   (mul@ii a b))
 
 (def div@Integer,Integer  Integer ((a : Integer) (b : Integer))
    (div@ii a b))
@@ -59,7 +59,7 @@
     (build n (lam (i : Integer) (sub@ff (index i a) (index i b))))))
 
 (def sqr Float (a : Float)
-   (mul a a))
+   (mul@ff a a))
 
 ; mul Mat Vec
 (edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
