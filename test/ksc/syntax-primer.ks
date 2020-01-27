@@ -137,3 +137,14 @@ If you prefer block comments then use pairs of #| and |#
 ; You can use the pr function for printing values.
 (def main Integer ()
      (pr "Hello world"))
+
+; If you want to call a function defined in an external C module you
+; can provide its name and type with an "edef" declaration, and then
+; use it as though it were a function you had defined yourself.  An
+; "edef" is somewhat like a C function declaration.  You can even define
+; manual derivatives for your function.
+(edef my_log Float (Float))
+(edef D$my_log (LM Float Float) (Float))
+(def fwd$my_log Float ((x : Float) (dx : Float)) (div@ff dx x))
+(def rev$my_log Float ((x : Float) (d_dmy_log : Float)) (div@ff d_dmy_log x))
+(edef Dt$my_log (Tuple Float (LM Float Float)) (Float))
