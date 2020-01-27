@@ -25,8 +25,9 @@ import qualified System.Process
 import System.Process (createProcess, proc, std_out)
 import qualified System.IO
 import Test.Hspec (Spec)
-import Test.Hspec.Runner (runSpec, defaultConfig)
+import Test.Hspec.Runner (isSuccess, runSpec, defaultConfig)
 
+import Control.Monad (when)
 import Text.Parsec hiding (option)
 
 hspec :: Spec
@@ -270,9 +271,14 @@ testRunKS compiler ksFile = do
       putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
       error ("These tests failed:\n" ++ unlines failures)
 
+testHspec :: IO ()
+testHspec = do
+  summary <- runSpec Main.hspec defaultConfig
+  when (not (isSuccess summary)) (fail "Hspec tests failed.  See message above")
+
 testC :: String -> [String] -> IO ()
 testC compiler fsTestKs = do
-  runSpec Main.hspec defaultConfig
+  testHspec
   ksTestFiles_ <- ksTestFiles "test/ksc/"
   testRoundTrip ksTestFiles_
   demoFOnTestPrograms ksTestFiles_
