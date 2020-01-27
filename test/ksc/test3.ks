@@ -6,7 +6,7 @@
 
 (def q (Vec Float) ((r : Float) (m : Integer) (a : Vec Float))
   (let (n (size a))
-    (build (mul 2 n) (lam (i : Integer) (mul r (index (div i m) a))))))
+    (build (mul 2 n) (lam (i : Integer) (mul r (index (div@ii i m) a))))))
 
 (def mkvec (Vec Float) (n : Integer)
     (build n (lam (j : Integer) (to_float j))))

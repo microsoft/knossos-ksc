@@ -43,7 +43,7 @@ If you prefer block comments then use pairs of #| and |#
       (c : Integer)
       (d : Integer)
       (e : Integer))
-     (sub@ii (add (mul a b) (neg c)) (div d e)))
+     (sub@ii (add (mul a b) (neg c)) (div@ii d e)))
 
 ; Conditionals
 

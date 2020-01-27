@@ -31,7 +31,7 @@
 (def maxpool
      (Vec Float)
      (image : Vec Float)
-     (build (div (size image) 2) (lam (ni : Integer)
+     (build (div@ii (size image) 2) (lam (ni : Integer)
        (max_ (index (mul 2 ni) image)
              (index (add 1 (mul 2 ni)) image)))))
 
@@ -43,7 +43,7 @@
 (def expensivepool
      (Vec Float)
      (image : Vec Float)
-     (build (div (size image) 2) (lam (ni : Integer)
+     (build (div@ii (size image) 2) (lam (ni : Integer)
        (expensive (index (mul 2 ni) image)
                   (index (add 1 (mul 2 ni)) image)))))
 
@@ -62,7 +62,7 @@
      (build n (lam (ni : Integer)
      (sumbuild kn (lam (kni : Integer)
      (sumbuild l  (lam (li  : Integer)
-       (let ((knc (div kn 2))
+       (let ((knc (div@ii kn 2))
              (noi (sub@ii (add ni knc) kni))
              (outside_image (or (lt@ii noi 0) (gte@ii noi n)))
              (image_noi

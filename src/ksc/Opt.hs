@@ -226,7 +226,6 @@ optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
     case op of
       "mul" -> k1 * k2
       "add" -> k1 + k2
-      "div" -> k1 / k2
       "scale" -> k1 * k2
       s -> errorFor s
   where errorFor s = error $ unlines $
@@ -626,16 +625,6 @@ optGradPrim _ "mul" [x,y]
   = Just (lmHCat [lmScale TypeFloat y, lmScale TypeFloat x])
 
 optGradPrim _ "mul" arg
-  | [TypeInteger, TypeInteger] <- map typeof arg
-  = Just $ lmZero (mkTuple (map (const zeroInt) arg)) zeroInt
-
-optGradPrim _ "div"  [x,y]
-  | TypeFloat <- typeof x
-  , TypeFloat <- typeof y
-  = Just (lmHCat [ lmScale TypeFloat (pDiv (kTFloat 1.0) y)
-                 , lmScale TypeFloat (pNeg (pDiv x (pMul y y)))])
-
-optGradPrim _  "div" arg
   | [TypeInteger, TypeInteger] <- map typeof arg
   = Just $ lmZero (mkTuple (map (const zeroInt) arg)) zeroInt
 
