@@ -367,11 +367,6 @@ pMulii x1 x2 = userCall "mul@ii" TypeInteger [x1, x2]
 pMulff :: TExpr -> TExpr -> TExpr
 pMulff x1 x2 = userCall "mul@ff" TypeFloat [x1, x2]
 
-ensureTuple :: TExpr -> TExpr
-ensureTuple x = case typeof x of
-    TypeTuple _ -> x
-    _ -> Tuple [x]
-
 
 ---------------------------------------------
 --       Types of primitive functions
