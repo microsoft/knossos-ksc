@@ -67,7 +67,7 @@
             0.0
             (if (eq i j)
               (exp (index i q))
-              (index (add (gmm_knossos_tri (sub@ii i 1)) j) l))
+              (index (add@ii (gmm_knossos_tri (sub@ii i 1)) j) l))
            )
            )))))))
 
@@ -98,7 +98,7 @@
           (sum_qs        (sum log_Qdiag))
           (Qdiag         (exp$VecR log_Qdiag))
 
-          (n  (add p (add wishart_m 1)))
+          (n  (add@ii p (add@ii wishart_m 1)))
           (C  (sub@ff (mul@ff (to_float (mul@ii n p))
                     (sub@ff (log wishart_gamma)
                        (mul@ff 0.5 (log 2.0))))
@@ -154,13 +154,13 @@
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
                         (scale : Float))
-    (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
+    (build n (lam (j : Integer) (mkfloat (add@ii j seed) scale))))
 
 (def mkvecvec (Vec (Vec Float)) ((seed  : Integer)
                                  (n     : Integer)
                                  (m     : Integer)
                                  (scale : Float))
-     (build n (lam (j : Integer) (mkvec (add (mul@ii j m) seed) m scale))))
+     (build n (lam (j : Integer) (mkvec (add@ii (mul@ii j m) seed) m scale))))
 
 (def main Integer ()
     (let ((D 64)
@@ -170,11 +170,11 @@
           (scale_unity 1.0)
           (scale_small 0.1)
 
-          (x       (mkvecvec (add seed 0)    N D scale_unity))
-          (alphas  (mkvec    (add seed 1000) K   scale_unity))
-          (mus     (mkvecvec (add seed 2000) K D scale_unity))
-          (qs      (mkvecvec (add seed 3000) K D scale_small))
-          (ls      (mkvecvec (add seed 4000) K (gmm_knossos_tri D) scale_unity))
+          (x       (mkvecvec (add@ii seed 0)    N D scale_unity))
+          (alphas  (mkvec    (add@ii seed 1000) K   scale_unity))
+          (mus     (mkvecvec (add@ii seed 2000) K D scale_unity))
+          (qs      (mkvecvec (add@ii seed 3000) K D scale_small))
+          (ls      (mkvecvec (add@ii seed 4000) K (gmm_knossos_tri D) scale_unity))
           (wishart (tuple 3.1 7))
         )
 

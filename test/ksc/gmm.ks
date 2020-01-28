@@ -74,7 +74,7 @@
             0.0
             (if (eq i j)
               (exp (index i q))
-              (index (add (sub@ii (gmm_knossos_tri D) (gmm_knossos_tri (sub@ii D j))) (sub@ii (sub@ii i j) 1)) l))
+              (index (add@ii (sub@ii (gmm_knossos_tri D) (gmm_knossos_tri (sub@ii D j))) (sub@ii (sub@ii i j) 1)) l))
            )
            )))))))
 
@@ -98,7 +98,7 @@
           (sum_qs        (sum log_Qdiag))
           (Qdiag         (exp$VecR log_Qdiag))
 
-          (n  (add p (add wishart_m 1)))
+          (n  (add@ii p (add@ii wishart_m 1)))
           (C  (sub@ff (mul@ff (to_float (mul@ii n p))
                     (sub@ff (log wishart_gamma)
                        (mul@ff 0.5 (log 2.0))))
@@ -154,13 +154,13 @@
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
                         (scale : Float))
-    (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
+    (build n (lam (j : Integer) (mkfloat (add@ii j seed) scale))))
 
 (def mkvecvec (Vec (Vec Float)) ((seed  : Integer)
                                 (n     : Integer)
                                 (m     : Integer)
                                 (scale : Float))
-     (build n (lam (j : Integer) (mkvec (add (mul@ii j m) seed) m scale))))
+     (build n (lam (j : Integer) (mkvec (add@ii (mul@ii j m) seed) m scale))))
 
 (def not_ Bool (p : Bool) (if p false true))
 
@@ -173,21 +173,21 @@
           (scale_small 0.1)
 
 
-          (x       (mkvecvec (add seed 0)    N D scale_unity))
-          (alphas  (mkvec    (add seed 1000) K   scale_unity))
-          (mus     (mkvecvec (add seed 2000) K D scale_unity))
-          (qs      (mkvecvec (add seed 3000) K D scale_small))
-          (ls      (mkvecvec (add seed 4000) K (gmm_knossos_tri D) scale_unity))
+          (x       (mkvecvec (add@ii seed 0)    N D scale_unity))
+          (alphas  (mkvec    (add@ii seed 1000) K   scale_unity))
+          (mus     (mkvecvec (add@ii seed 2000) K D scale_unity))
+          (qs      (mkvecvec (add@ii seed 3000) K D scale_small))
+          (ls      (mkvecvec (add@ii seed 4000) K (gmm_knossos_tri D) scale_unity))
           (wishart (tuple 3.1 7))
 
           (delta 0.0001)
 
-          (dx       (mkvecvec (add seed 5000)  N D delta))
-          (dalphas  (mkvec    (add seed 6000)  K   delta))
-          (dmus     (mkvecvec (add seed 7000)  K D delta))
-          (dqs      (mkvecvec (add seed 8000)  K D delta))
-          (dls      (mkvecvec (add seed 9000)  K (gmm_knossos_tri D) delta))
-          (dwishart (tuple (mkfloat (add seed 10000) delta) (tuple)))
+          (dx       (mkvecvec (add@ii seed 5000)  N D delta))
+          (dalphas  (mkvec    (add@ii seed 6000)  K   delta))
+          (dmus     (mkvecvec (add@ii seed 7000)  K D delta))
+          (dqs      (mkvecvec (add@ii seed 8000)  K D delta))
+          (dls      (mkvecvec (add@ii seed 9000)  K (gmm_knossos_tri D) delta))
+          (dwishart (tuple (mkfloat (add@ii seed 10000) delta) (tuple)))
 
           (dtheta   (tuple dx dalphas dmus dqs dls dwishart))
 

@@ -1,3 +1,11 @@
+(edef add@ii Integer (Integer Integer))
+(edef D$add@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
+(edef Dt$add@ii (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
+(def fwd$add@ii (Tuple) ((x1 : Integer) (x2 : Integer) (dx1 : (Tuple)) (dx2 : (Tuple)))
+     (tuple))
+(def rev$add@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dadd : (Tuple)))
+     (tuple (tuple) (tuple)))
+
 (edef sub@ff Float (Float Float))
 (edef D$sub@ff (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$sub@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))

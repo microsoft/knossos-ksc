@@ -22,6 +22,7 @@ let gte__aii (x: i32) (y: i32) = x >= y
 let gte__aff (x: f64) (y: f64) = x >= y
 let lte__aii (x: i32) (y: i32) = x <= y
 let lte__aff (x: f64) (y: f64) = x <= y
+let add__aii (x: i32) (y: i32) = x + y
 let sub__aii (x: i32) (y: i32) = x - y
 let sub__aff (x: f64) (y: f64) = x - y
 let div__aii (x: i32) (y: i32) = x / y
