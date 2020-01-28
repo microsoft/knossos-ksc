@@ -1461,12 +1461,12 @@ namespace ks
 		return t1 != t2;
 	}
 
-        int lt$aff(double t1, double t2)
+        inline int lt$aff(double t1, double t2)
 	{
 		return t1 < t2;
 	}
 
-        int lt$aii(int t1, int t2)
+        inline int lt$aii(int t1, int t2)
 	{
 		return t1 < t2;
 	}
@@ -1491,47 +1491,47 @@ namespace ks
 		return t1 <= t2;
 	}
 
-	int gte$aff(double t1, double t2)
+	inline int gte$aff(double t1, double t2)
 	{
 		return t1 >= t2;
 	}
 
-	int gte$aii(int t1, int t2)
+	inline int gte$aii(int t1, int t2)
 	{
 		return t1 >= t2;
 	}
 
-	int add$aii(int t1, int t2)
+	inline int add$aii(int t1, int t2)
 	{
 		return t1 + t2;
 	}
 
-	double sub$aff(double t1, double t2)
+	inline double sub$aff(double t1, double t2)
 	{
 		return t1 - t2;
 	}
 
-	int sub$aii(int t1, int t2)
+	inline int sub$aii(int t1, int t2)
 	{
 		return t1 - t2;
 	}
 
-	double div$aff(double t1, double t2)
+	inline double div$aff(double t1, double t2)
 	{
 		return t1 / t2;
 	}
 
-	int div$aii(int t1, int t2)
+	inline int div$aii(int t1, int t2)
 	{
 		return t1 / t2;
 	}
 
-	double mul$aff(double t1, double t2)
+	inline double mul$aff(double t1, double t2)
 	{
 		return t1 * t2;
 	}
 
-	int mul$aii(int t1, int t2)
+	inline int mul$aii(int t1, int t2)
 	{
 		return t1 * t2;
 	}
