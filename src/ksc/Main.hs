@@ -139,10 +139,17 @@ gatherErrors errors =
     []     -> return ()
     errors -> Left ("Had errors in:\n" ++ unlines (map show errors))
 
+dropExtensionOrFail :: String -> FilePath -> IO String
+dropExtensionOrFail ext path =
+  if pathWithoutExt ++ "." ++ ext == path
+  then return pathWithoutExt
+  else fail (path ++ " did not end with ." ++ ext)
+  where pathWithoutExt = System.FilePath.dropExtension path
+
 compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   testOn ksFiles $ \ksFile -> do
-        let ksTest = System.FilePath.dropExtension ksFile
+        ksTest <- dropExtensionOrFail "ks" ksFile
         displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ["src/runtime/prelude"] ksTest
 
 testRoundTrip :: [String] -> IO ()
@@ -208,7 +215,7 @@ futharkCompileKscPrograms ksFiles = do
         ]
 
   testOn ksFiles $ \ksFile -> do
-        let ksTest = System.FilePath.dropExtension ksFile
+        ksTest <- dropExtensionOrFail "ks" ksFile
         (if ksFile `elem` testsThatDon'tWorkWithFuthark
          then putStrLn ("Skipping " ++ ksFile
                         ++ " because it is known not to work with Futhark")
