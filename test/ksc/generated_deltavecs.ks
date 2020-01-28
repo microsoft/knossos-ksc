@@ -33,7 +33,7 @@
      (image : Vec Float)
      (build (div@ii (size image) 2) (lam (ni : Integer)
        (max_ (index (mul@ii 2 ni) image)
-             (index (add 1 (mul@ii 2 ni)) image)))))
+             (index (add@ii 1 (mul@ii 2 ni)) image)))))
 
 ; This function stands in for one that could actually be expensive
 (def expensive Float ((x1 : Float) (x2 : Float)) 0.0)
@@ -45,7 +45,7 @@
      (image : Vec Float)
      (build (div@ii (size image) 2) (lam (ni : Integer)
        (expensive (index (mul@ii 2 ni) image)
-                  (index (add 1 (mul@ii 2 ni)) image)))))
+                  (index (add@ii 1 (mul@ii 2 ni)) image)))))
 
 (def conv1d
      (Vec (Vec Float))
@@ -63,7 +63,7 @@
      (sumbuild kn (lam (kni : Integer)
      (sumbuild l  (lam (li  : Integer)
        (let ((knc (div@ii kn 2))
-             (noi (sub@ii (add ni knc) kni))
+             (noi (sub@ii (add@ii ni knc) kni))
              (outside_image (or (lt@ii noi 0) (gte@ii noi n)))
              (image_noi
               (if outside_image 0.0 (index noi (index li image)))))

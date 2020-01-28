@@ -567,7 +567,6 @@ primFunCallResultTy_maybe fun args
       ("unzip"    , [TypeVec (TypeTuple ts)])                -> Just (TypeTuple (map TypeVec ts))
 
       ("scale"      , [TypeFloat,   t]             ) -> Just t
-      ("add"      , [TypeInteger, TypeInteger]             ) -> Just TypeInteger
       ("add"      , [t, dt]                                ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing

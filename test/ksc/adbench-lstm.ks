@@ -105,7 +105,7 @@
                               (if (eq li iteration)
                                   hidden_cell
                                 (index li vec_output))))))
-                 (tuple (add iteration 1) layer_output_next vec_output_next)))
+                 (tuple (add@ii iteration 1) layer_output_next vec_output_next)))
 
                          (tuple 0
                                 output1

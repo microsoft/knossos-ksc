@@ -33,7 +33,7 @@
    (add a b))
 
 (def add@Integer,Integer Integer ((a : Integer) (b : Integer))
-   (add a b))
+   (add@ii a b))
 
 (def mul@Float,Float Float ((a : Float) (b : Float))
    (mul@ff a b))

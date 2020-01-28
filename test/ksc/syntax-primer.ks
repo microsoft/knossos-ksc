@@ -12,7 +12,7 @@
 ; Integers) which returns an Integer.
 
 (def f1 Integer ((x : Integer) (y : Integer))
-     (add x y))
+     (add@ii x y))
 
 ; Comments
 
@@ -43,7 +43,7 @@ If you prefer block comments then use pairs of #| and |#
       (c : Integer)
       (d : Integer)
       (e : Integer))
-     (sub@ii (add (mul@ii a b) (neg c)) (div@ii d e)))
+     (sub@ii (add@ii (mul@ii a b) (neg c)) (div@ii d e)))
 
 ; Conditionals
 
@@ -55,7 +55,7 @@ If you prefer block comments then use pairs of #| and |#
 ; The Knossos boolean type is called "Bool"
 (def if_example Integer ((b1 : Bool) (b2 : Bool) (a : Integer))
      (if (or b1 b2)
-         (add a 10)
+         (add@ii a 10)
          (sub@ii a 10)))
 
 ; Knossos types, constants, let bindings
@@ -81,7 +81,7 @@ If you prefer block comments then use pairs of #| and |#
 ; To create new variables use "let"
 (def let_and_types Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
      (let ((b2 (or b false))
-           (i2 (add i 10))
+           (i2 (add@ii i 10))
            (f2 (add f 10.0))
            (s2 "Hello"))
        (if (and (gte@ii i 0) (lt@ii i (size v)))
@@ -104,7 +104,7 @@ If you prefer block comments then use pairs of #| and |#
 (def triangle Integer (n : Integer)
      (if (eq n 0)
          0
-         (add n (triangle (sub@ii n 1)))))
+         (add@ii n (triangle (sub@ii n 1)))))
 
 ; fold is a primitive that implements a particular recursion pattern
 ; so that you don't have to write it out by hand.  It is written as

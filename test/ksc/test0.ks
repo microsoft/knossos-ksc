@@ -1,7 +1,7 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def h Integer ((y : Integer))
-    (sum (build 3 (lam (y3 : Integer) (add y 2))))
+    (sum (build 3 (lam (y3 : Integer) (add@ii y 2))))
     )
 
 (def f Float (x : Float)

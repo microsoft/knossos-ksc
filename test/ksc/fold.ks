@@ -5,13 +5,13 @@
      (if
          (eq i (size v))
          acc
-       (fold_f env (add i 1) v (f (tuple env (tuple acc (index i v)))))))
+       (fold_f env (add@ii i 1) v (f (tuple env (tuple acc (index i v)))))))
 
 (def prod Float ((i : Integer) (v : Vec Float) (acc : Float))
      (if
          (eq i (size v))
          acc
-       (prod (add i 1) v (mul@ff acc (index i v)))))
+       (prod (add@ii i 1) v (mul@ff acc (index i v)))))
 
 ; This ends up calculating prod(v) * pow(closure, size(v))
 (def prod_fold Float ((v : Vec Float) (closure : Float))
@@ -59,15 +59,15 @@
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
                         (scale : Float))
-    (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
+    (build n (lam (j : Integer) (mkfloat (add@ii j seed) scale))))
 
 (def main Integer ()
      (let ((seed 20000)
            (delta 0.0001)
-           (v  (mkvec   (add seed 0)    10 1.0))
-           (c  (mkfloat (add seed 1000)    1.0))
-           (dv (mkvec   (add seed 2000) 10 delta))
-           (dc (mkfloat (add seed 3000)    delta))
+           (v  (mkvec   (add@ii seed 0)    10 1.0))
+           (c  (mkfloat (add@ii seed 1000)    1.0))
+           (dv (mkvec   (add@ii seed 2000) 10 delta))
+           (dc (mkfloat (add@ii seed 3000)    delta))
            (checked ($check prod_fold rev$prod_fold
                             (tuple v  c)
                             (tuple dv dc)
