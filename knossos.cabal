@@ -32,4 +32,4 @@ executable ksc
                  containers >= 0.5,
                  process >= 1.4,
                  directory >= 1.3
-  ghc-options: -Werror -Wall -Wno-name-shadowing -Wno-unticked-promoted-constructors -Wno-type-defaults -Wno-unused-do-bind -Wincomplete-uni-patterns
+  ghc-options: -Werror -Wall -Wno-name-shadowing -Wno-unticked-promoted-constructors -Wno-type-defaults -Wno-unused-do-bind
