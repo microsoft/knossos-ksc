@@ -1,3 +1,5 @@
+;; add :: Number x Number -> Number
+;; add (x, y) = x + y
 (edef add@ii Integer (Integer Integer))
 (edef D$add@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef Dt$add@ii (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -6,6 +8,8 @@
 (def rev$add@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dadd : (Tuple)))
      (tuple (tuple) (tuple)))
 
+;; sub :: Number x Number -> Number
+;; sub (x, y) = x - y
 (edef sub@ff Float (Float Float))
 (edef D$sub@ff (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$sub@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
@@ -22,6 +26,8 @@
 (def rev$sub@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dsub : (Tuple)))
      (tuple (tuple) (tuple)))
 
+;; div :: Number x Number -> Number
+;; div (x, y) = x / y
 (edef div@ff Float (Float Float))
 (edef D$div@ff (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$div@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
@@ -38,6 +44,8 @@
 (def rev$div@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_ddiv : (Tuple)))
      (tuple (tuple) (tuple)))
 
+;; mul :: Number x Number -> Number
+;; mul (x, y) = x * y
 (edef mul@ff Float (Float Float))
 (edef D$mul@ff (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$mul@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
@@ -54,6 +62,8 @@
 (def rev$mul@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dmul : (Tuple)))
      (tuple (tuple) (tuple)))
 
+;; gt :: Number x Number -> Bool
+;; gt (x, y) = x > y
 (edef gt@ff Bool (Float Float))
 (edef D$gt@ff (LM (Tuple Float Float) Bool) (Float Float))
 (edef Dt$gt@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
@@ -70,6 +80,8 @@
 (def rev$gt@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dgt : (Tuple)))
      (tuple (tuple) (tuple)))
 
+;; lt :: Number x Number -> Bool
+;; lt (x, y) = x < y
 (edef lt@ff Bool (Float Float))
 (edef D$lt@ff (LM (Tuple Float Float) Bool) (Float Float))
 (edef Dt$lt@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
@@ -86,6 +98,8 @@
 (def rev$lt@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dlt : (Tuple)))
      (tuple (tuple) (tuple)))
 
+;; lte :: Number x Number -> Bool
+;; lte (x, y) = x <= y
 (edef lte@ff Bool (Float Float))
 (edef D$lte@ff (LM (Tuple Float Float) Bool) (Float Float))
 (edef Dt$lte@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
@@ -102,6 +116,8 @@
 (def rev$lte@ii (Tuple (Tuple) (Tuple)) ((x1 : Integer) (x2 : Integer) (d_dlte : (Tuple)))
      (tuple (tuple) (tuple)))
 
+;; gte :: Number x Number -> Bool
+;; gte (x, y) = x >= y
 (edef gte@ff Bool (Float Float))
 (edef D$gte@ff (LM (Tuple Float Float) Bool) (Float Float))
 (edef Dt$gte@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
