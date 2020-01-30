@@ -59,3 +59,9 @@ def Flatten(x):
 
 def Add(x, y):
   return x + y
+
+def ones(len):
+  return np.ones(len)
+
+def ones_2d(len1, len2):
+  return np.ones((len1, len2))
