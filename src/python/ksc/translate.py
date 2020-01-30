@@ -201,15 +201,27 @@ def translate(ks_str, backend):
 
     # include built-in functions
     edefs = _built_in_edefs + edefs
+    # For popart, also import _run_model
+    if backend == 'popart':
+        edefs.append('_run_model')
+
+    # For popart, wrap the main call in _run_model (popart boilerplate)
+    main_call = '{main}({main_args})'.format(
+        main=main_name,
+        main_args=", ".join([k for k, _ in main_samples])
+    )
+    if backend == 'popart':
+        main_call = f'_run_model({main_name})'
 
     return '''import numpy as np
 from ksc.backends.{backend} import ({edefs}
 )
+
 {defs}
 
 def main():
   {sample_args}
-  print({main}({main_args}))
+  print({main_call})
 
 if __name__ == "__main__":
   main()
@@ -217,13 +229,12 @@ if __name__ == "__main__":
            edefs=",\n  ".join(edefs),
            defs="\n".join(def_strs),
            sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main_samples),
-           main=main_name,
-           main_args=", ".join([k for k, _ in main_samples]))
+           main_call=main_call)
 
 def main():
     parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
     parser.add_argument("input_ks_file", type=str)
-    parser.add_argument("--backend", choices=["common", "jax"], default="common")
+    parser.add_argument("--backend", choices=["common", "jax", "popart"], default="common")
     args = parser.parse_args()
 
     with open(args.input_ks_file) as f:
