@@ -27,6 +27,12 @@ Zygote.@code_adjoint make_f(3.0)
 
 
 #------------------------------------------
+const Float = Float64
+
+function make_f(a :: Float)
+    b = 2a
+    t -> sin(b*t)
+end
 
 function h(as, xs)
     fs = map(make_f, as)
