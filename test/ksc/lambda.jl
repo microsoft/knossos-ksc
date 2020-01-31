@@ -41,4 +41,3 @@ map(make_f, as)
 
 println(h(as, xs))
 println(Zygote.gradient(h, as, xs))
-
