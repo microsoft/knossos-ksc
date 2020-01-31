@@ -2,11 +2,17 @@
 \usepackage{makecell,amsmath}
 \usepackage[a4paper, total={6.5in, 8in}]{geometry}
 
+\parindent=0pt
+\parskip=2pt
 %\renewcommand{\cellalign}{l}
 
 \newcommand{\fn}[1]{\mathrm{#1}}
 \newcommand{\vars}[1]{\mathcal{#1}}
 \newcommand{\B}[1]{\mathcal{B}[#1]}
+\newcommand{\dd}[1]{\delta #1}
+
+\def\V{\vars V}
+
 \newcommand{\typed}[3]{#1 : \vars #2 \vdash #3}
 \newcommand{\typeddef}[4]{
 \begin{aligned}
@@ -14,16 +20,23 @@
  &= #4
 \end{aligned}
 }
-\newcommand{\dd}[1]{\delta #1}
-\def\V{\vars V}
+
+\def\type#1:#2|-#3{\typed{#1}{#2}{#3}}
+
+\def\Let#1=#2#3{\textrm{let}~ #1 = #2 ~\textrm{in}~ #3}
+\def\LET#1=#2#3{\begin{aligned}[t] &\textrm{let}~ #1 = #2\\ &#3 \end{aligned}}
+\def\LETin#1=#2#3{\LET{#1}={#2}{\textrm{in}~ #3}}
+
+\def\LAM#1.#2{\lambda \, #1 \,.\, #2}
 
 \begin{document}
-
 Notation: 
 
 An expression $e : \V \vdash T$ has free variables $\V$ and its return value is of type $T$.
 
-The freevar list $\V$ has type $V$, which is the type of a tuple containing the vars, and type $\dd V$ which is the tangent type of $V$.
+The freevar list $\V$ has type $V$, which is the type of a tuple containing the vars.
+
+A type $V$ has associated type $\dd V$ which is the tangent type of $V$.
 
 And $A \sqcup B$ is ``exclusive union": the list $A \sqcup \{x\}$ contains $x$ exactly once.
 
@@ -32,16 +45,16 @@ And $A \concat B$ is tuple concatenation.
 
 \bigskip
 
-\begin{tabular}[t]{l|c|p{3in}}
+\begin{tabular}[t]{l|c|p{70mm}}
   Expression e &
-  $\typed{e}{V}{T}$
+  $\type e : V |- T$
   &
-  $\typed{\B{e}}{V}{(T, \dd{V} \to \dd{T})}$ \\
+  $\type \B{e} : V |- {(T, \dd{V} \to \dd{T})}$ \\
 
   \hline
 
   Constant k &
-       $\typed{k}{()}{T}$ &
+       $\type k : () |- T$ &
        $\typeddef{\B{k}}{()}{(T, \dd{T} \to ())}{(k,\fn{const} \, ())}$     \\
 
   \hline
@@ -53,7 +66,7 @@ And $A \concat B$ is tuple concatenation.
 
   Let&
   \makecell{
-    $\typed{\textrm{let } x = e_1 \textrm{ in } e_2}{V_1 \cup V_2}{T}$\\
+    $\typed{\Let x = {e_1}{e_2}}{V_1 \cup V_2}{T}$\\
 where\\[2pt]
     $\typed{e_1}{V_1}{X}$ \\
     $\typed{e_2}{V_2 \sqcup \{x\}}{T}$\\
@@ -63,21 +76,15 @@ so\\
   }
   &
   \makecell[l] {
-    $\B{\textrm{let } x_1 = e_1 \textrm{ in } e_2}$ \\
+    $\B{\Let  x_1 = {e_1}{e_2}}$ \\
     ~~$ : V_1 \cup V_2 \vdash (T, \dd{T} \to \dd(V_1) \cup \dd(V_2))$ \\
-    % zero horizontal padding
-    \setlength{\tabcolsep}{0.0em}
-    \begin{tabular}[t]{ll}
-    $ = \,\, $ & $\textrm{let } (x, b_1) = \B{e_1}$ \\
-      & $ \textrm{let } (t, b_2) = \B{e_2}$ \\
-      & \begin{tabular}[t]{ll}
-        $ \textrm{let } b = \lambda \, dt. \,$ & $\textrm{let } (dv_2, dx) = b_2(dt) $ \\
-          & $\textrm{let } dv_1 = b_1(dx)$ \\
-          & $\textrm{in } dv_1 \oplus dv_2$
-      \end{tabular}
-      \\
-      & $ \textrm{in } (t, b)$
-    \end{tabular}
+    $~~=\LET (x, b_1) = {\B{e_1}}
+    {\LET (t, b_2) = {\B{e_2}}
+     {\LETin b = {\LAM dt . \LET (dv_2, dx) = {b_2(dt)}
+					{\LETin dv_1 = {b_1(dx)} 
+					 {dv_1 \oplus dv_2}}}
+	   {(t, b)}}}
+    $
   }
   \\
   \hline
