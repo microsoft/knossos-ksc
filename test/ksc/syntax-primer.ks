@@ -10,7 +10,6 @@
 ;
 ; The following defines a function of two variables x and y (both
 ; Integers) which returns an Integer.
-
 (def f1 Integer ((x : Integer) (y : Integer))
      (add@ii x y))
 
