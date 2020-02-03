@@ -158,7 +158,7 @@ f3 = if x >= 0
 
 #### Python statement-based
 
-Python can imperatively create an array by appending values.
+Python can imperatively create an list by appending values.
 
 ```python
 def h1(n):
