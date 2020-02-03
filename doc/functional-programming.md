@@ -28,8 +28,14 @@ Knossos.
 
 ## Expression-based style versus statement-based style
 
-Here are some functions in statement-based style in Python, and the
-equivalents in expression-based style, in Python and Haskell.
+As observed in [Expressions versus
+Statements](https://fsharpforfunandprofit.com/posts/expressions-vs-statements/),
+one of the advantages of functional programming languages is that they
+have excellent support for expression-based programming style.  Let's
+have a look at some statement-based Python code and see what the
+equivalent is in expression-based style, in Python (which has limited
+support for expression-based style) and Haskell (which has excellent
+support for it).
 
 ### Single conditional
 
