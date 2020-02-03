@@ -58,6 +58,12 @@ def f1(x):
     return x if x > 0 else 0
 ```
 
+#### Haskell (expression-based)
+
+```haskell
+f1 x = if x > 0 then x else 0
+```
+
 ### Multiple conditionals
 
 Early return was convenient when the function consisted of a single
@@ -96,6 +102,14 @@ def f2(x, y):
     yr = y * y if y > 5 else 0
 
     return xr + yr
+```
+
+#### Haskell (expression-based)
+
+```haskell
+f2 x y = let xr = if x > 0 then x else 0
+	         yr = if y > 5 then y * y else 0
+	     in xr + yr
 ```
 
 ### Conditionals that contain more than a single expression
@@ -178,6 +192,14 @@ def h1(n):
     return list(i * i for i in range(n))
 ```
 
+#### Haskell (expression-based)
+
+In Haskell, `[1..n]` is like Python's `range(n)`.
+
+```haskell
+def h1 n = [i * i | i <- [0..n-1]
+```
+
 ### Creating lists/arrays, more complicated
 
 The iterative approach has no difficulty creating a list from a
@@ -223,12 +245,9 @@ def h1(n):
 #### Haskell (expression-based)
 
 Functional languages don't have any difficulty with this because they
-support binding variables within expressions.  For example, in
-Haskell, `[1..n]` is like Python's `range(n)`, and we can create a new
-list by mapping over it, similar to how Python uses a generator
-expression.
+support binding variables within expressions.
 
 ```haskell
-h1 n = map (\i -> let j = i * i + 6 in j * j) [1..n]
+h1 n = [let j = i * i + 6 in j * j | i <- [0..n-1]]
 ```
 
