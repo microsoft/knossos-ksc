@@ -148,10 +148,39 @@ If you prefer block comments then use pairs of #| and |#
 ;     return list(float(ni * ni) for ni in range(n))
 
 
+; Looping constructs
+
 ; Knossos does not have for loops or while loops.  Instead we use
-; recursion.  The "acc" argument is the loop accumulator.  To
-; calculate the nth triangle number one starts the accumulator at zero
-; by calling
+; recursion.  A recursive function to calculate the nth triangle
+; number might be implemented as follows.
+(def triangle0 Integer (n : Integer)
+    (if (eq n 0)
+        0
+        (add@ii n (triangle0 (sub@ii n 1)))))
+
+; Python equivalent
+;
+; The direct Python equivalent would be triangle0 below.
+;
+; def triangle0(n : int) -> int:
+;     if n == 0:
+;         return 0
+;     else:
+;         return n + triangle0(n - 1)
+
+
+; There is a problem with both the Knossos and the Python
+; implementations of triangle0.  They are recursive but not tail
+; recursive.  Therefore they consume stack space.  One tends to right
+; such functions in tail-recursive form if possible.  For more
+; information on tail recursion see the Wikipedia article.
+;
+; https://en.wikipedia.org/wiki/Tail_call
+;
+; A triangle number calculation function in tail recursive form is
+; given in triangle below.  The "acc" argument is the loop
+; accumulator.  To calculate the nth triangle number one starts the
+; accumulator at zero by calling
 ;
 ;     (triangle 0 n)
 (def triangle Integer ((acc : Integer) (n : Integer))
@@ -167,8 +196,6 @@ If you prefer block comments then use pairs of #| and |#
 ; Python programmer would write an imperative-style program like
 ; triangle_imperative or a functional-style program like
 ; triangle_functional.
-;
-; https://en.wikipedia.org/wiki/Tail_call
 ;
 ; def triangle(acc : int, n : int) -> int:
 ;     if n == 0:
