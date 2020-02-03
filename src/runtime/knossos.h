@@ -1501,6 +1501,11 @@ namespace ks
 		return t1 >= t2;
 	}
 
+	inline double add$aff(double t1, double t2)
+	{
+		return t1 + t2;
+	}
+
 	inline int add$aii(int t1, int t2)
 	{
 		return t1 + t2;
@@ -1534,6 +1539,16 @@ namespace ks
 	inline int mul$aii(int t1, int t2)
 	{
 		return t1 * t2;
+	}
+
+	inline double neg$aff(double t)
+	{
+		return -t;
+	}
+
+	inline int neg$aii(int t)
+	{
+		return -t;
 	}
 
 	inline int or_(int b1, int b2)
