@@ -73,7 +73,7 @@ to hold the "result" of the `if`.
 
 #### Python statement-based
 
-```
+```python
 def f2(x, y):
     if x > 0:
         xr = x
@@ -96,7 +96,7 @@ If we use expression-based `if` then the `if` expression itself
 returns its value.  It is generally more compact than the
 statement-based form.
 
-```
+```python
 def f2(x, y):
     xr = x if x > 0 else 0
     yr = y * y if y > 5 else 0
