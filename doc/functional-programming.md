@@ -250,4 +250,3 @@ support binding variables within expressions.
 ```haskell
 h1 n = [let j = i * i + 6 in j * j | i <- [0..n-1]]
 ```
-
