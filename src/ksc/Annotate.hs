@@ -146,7 +146,7 @@ tcTVar (TVar ty v)
   = do { ty' <- tcType ty
        ; return (TVar ty' v) }
 
-tcType :: InPhase p => TypeX p -> TcM Type
+tcType :: Monad m => InPhase p => TypeX p -> m Type
 tcType (TypeVec ty)      = do { ty' <- tcType ty
                               ; return (TypeVec ty') }
 tcType (TypeTuple tys)   = TypeTuple <$> mapM tcType tys
