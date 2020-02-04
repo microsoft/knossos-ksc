@@ -40,8 +40,8 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: Fun
-        , def_args   :: [TVarX p]  -- See Note [Function arity]
-        , def_res_ty :: TypeX p     -- Result type
+        , def_args   :: [TVarX]  -- See Note [Function arity]
+        , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
   -- (via TVar) and result types (via TFun)
@@ -64,18 +64,17 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
-data TVarX p = TVar (TypeX p) Var
-type TVar = TVarX Typed
+data TVarX = TVar TypeX Var
+type TVar = TVarX
 
-deriving instance Eq TVar
 deriving instance Ord TVar
 instance Show TVar where
   show e = pps e
 
-tVarVar :: TVarX p -> Var
+tVarVar :: TVarX -> Var
 tVarVar (TVar _ v) = v
 
-tVarType :: TVarX p -> TypeX p
+tVarType :: TVarX -> TypeX
 tVarType (TVar ty _) = ty
 
 -- MTypeX pm
@@ -105,8 +104,8 @@ type family VarX p where
 
 type family LetBndrX p where
   LetBndrX Parsed   = Var
-  LetBndrX Typed    = TVarX Typed
-  LetBndrX OccAnald = (Int,TVarX OccAnald)
+  LetBndrX Typed    = TVarX
+  LetBndrX OccAnald = (Int,TVarX)
 
 type family FunX p where
   FunX Parsed   = Fun
@@ -118,7 +117,7 @@ data ExprX p
   | Var  (VarX p)
   | Call (FunX p) [ExprX p]  -- f e
   | Tuple [ExprX p]            -- (e1, ..., en)
-  | Lam (TVarX p) (ExprX p)    -- Lambda-bound variable is typed from birth
+  | Lam TVarX (ExprX p)    -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)
@@ -131,7 +130,7 @@ instance InPhase p => Show (ExprX p) where
 type Expr  = ExprX Parsed
 
 type TExpr = ExprX Typed
-type Type  = TypeX Typed
+type Type  = TypeX
 
 data TypedExpr = TE TExpr Type   -- A pair of an expression and its type
 
@@ -144,24 +143,24 @@ unzipTEs (TE e t : tes) = (e:es, t:ts)
   where
     (es, ts) = unzipTEs tes
 
-data TypeX (p :: Phase)
+data TypeX
   = TypeBool
   | TypeInteger
   | TypeFloat
   | TypeString
-  | TypeTuple [TypeX p]
+  | TypeTuple [TypeX]
 
-  | TypeVec (TypeX p)
+  | TypeVec (TypeX)
 
-  | TypeLam (TypeX p) (TypeX p)  -- Domain -> Range
-  | TypeLM  (TypeX p) (TypeX p)  -- Linear map  Src -o Target
+  | TypeLam TypeX TypeX  -- Domain -> Range
+  | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
 
   | TypeUnknown
 
 deriving instance Eq  Type
 deriving instance Ord Type
 
-instance InPhase p => Show (TypeX p) where
+instance Show TypeX where
   show e = pps e
 
 -- Round trip testing requires that two different DeclXs be checked
@@ -178,15 +177,13 @@ deriving instance Show (DefX Typed)
 deriving instance Show (DeclX Typed)
 deriving instance Show (RuleX Typed)
 
-deriving instance Eq (TypeX Parsed)
-deriving instance Eq (TVarX Parsed)
+deriving instance Eq TVarX
 deriving instance Eq (ExprX Parsed)
 deriving instance Eq (RhsX Parsed)
 deriving instance Eq (DefX Parsed)
 deriving instance Eq (DeclX Parsed)
 deriving instance Eq (RuleX Parsed)
 
-deriving instance Show (TVarX Parsed)
 deriving instance Show (RhsX Parsed)
 deriving instance Show (DefX Parsed)
 deriving instance Show (DeclX Parsed)
@@ -195,7 +192,7 @@ deriving instance Show (RuleX Parsed)
 -- TypeSize is used to document when an integer represents a Size.
 -- It's too viral to use a separate Integer type because most integer operations
 -- need to be supported, e.g. the size of a lower-triangular matrix is d*(d+1)/2
-pattern TypeSize :: TypeX p
+pattern TypeSize :: TypeX
 pattern TypeSize = TypeInteger
 
 isScalar :: Type -> Bool
@@ -286,7 +283,7 @@ data Konst = KInteger Integer   -- :: TypeInteger
            deriving( Eq, Ord, Show )
 
 data RuleX p = Rule { ru_name  :: String   -- Just for logging
-                    , ru_qvars :: [TVarX p]
+                    , ru_qvars :: [TVarX]
                     , ru_lhs   :: ExprX p
                     , ru_rhs   :: ExprX p }
   -- When matching may bind any of the ru_qvars, which are typed,
@@ -323,7 +320,7 @@ mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
 mkVar :: String -> Var  -- Just a Simple var
 mkVar = Simple
 
-mkTVar :: TypeX p -> String -> TVarX p
+mkTVar :: TypeX -> String -> TVarX
 mkTVar ty = TVar ty . mkVar
 
 resVar :: Var
@@ -722,7 +719,7 @@ instance Pretty Konst where
   pprPrec _ (KString s)  = text (show s)
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
-instance InPhase p => Pretty (TypeX p) where
+instance Pretty TypeX where
   pprPrec p (TypeVec ty)         = parensIf p precTyApp $
                                    text "Vec" <+> pprParendType ty
   pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
@@ -737,7 +734,7 @@ instance InPhase p => Pretty (TypeX p) where
   pprPrec _ TypeBool             = text "Bool"
   pprPrec _ TypeUnknown          = text "UNKNOWN"
 
-pprParendType :: InPhase p => TypeX p -> SDoc
+pprParendType :: TypeX -> SDoc
 pprParendType = pprPrec precTop
 
 type Prec = Int
@@ -759,7 +756,7 @@ instance InPhase p => Pretty (ExprX p) where
 pprParendExpr :: InPhase p => ExprX p -> SDoc
 pprParendExpr = pprExpr precTop
 
-pprTVar :: InPhase p => TVarX p -> SDoc
+pprTVar :: TVarX -> SDoc
 pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
@@ -769,8 +766,8 @@ pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
   where rest = pprList ppr es
-pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar @phase v) <+> ppr e)
-                            (parens $ text "lam" <+> vcat [parens (pprTVar @phase v), ppr e])
+pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar v) <+> ppr e)
+                            (parens $ text "lam" <+> vcat [parens (pprTVar v), ppr e])
 pprExpr p (Let v e1 e2) = mode
   (pprLetSexp v e1 e2)
   (parensIf

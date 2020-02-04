@@ -3,7 +3,7 @@
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_GHC -Wno-orphans        #-}
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+             PatternSynonyms, StandaloneDeriving,
 	     ScopedTypeVariables, TypeApplications #-}
 
 module LangUtils (

@@ -1,7 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+             PatternSynonyms, StandaloneDeriving,
 	     ScopedTypeVariables, TypeApplications #-}
 
 module Parse  where
@@ -188,13 +188,13 @@ pBool = (True <$ pReserved "true")
 pVar :: Parser Var
 pVar = Simple <$> pIdentifier
 
-pParam :: Parser (TVarX Parsed)
+pParam :: Parser TVarX
 pParam = do { v <- pVar
             ; pReserved ":"
             ; ty <- pKType
             ; return (TVar ty v) }
 
-pParams :: Parser [TVarX Parsed]
+pParams :: Parser [TVarX]
 pParams = parens $ do { b <- pParam
                       ; return [b] }
                <|> many (parens pParam)
@@ -220,17 +220,17 @@ pKExpr =   pIfThenElse
        <|> pTuple
        <|> pKonst
 
-pType :: Parser (TypeX Parsed)
+pType :: Parser (TypeX)
 pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
     <|> (pReserved "String"  >> return TypeString)
     <|> (pReserved "Bool"    >> return TypeBool)
     <|> parens pKType
 
-pTypes :: Parser [TypeX Parsed]
+pTypes :: Parser [TypeX]
 pTypes = parens (many pType)
 
-pKType :: Parser (TypeX Parsed)
+pKType :: Parser TypeX
 pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
        <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
        <|> (do { pReserved "LM"; s <- pType; t <- pType ; return (TypeLM s t) })

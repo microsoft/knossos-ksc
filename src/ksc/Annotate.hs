@@ -1,7 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+             PatternSynonyms, StandaloneDeriving,
 	     ScopedTypeVariables, TypeApplications #-}
 
 module Annotate (
@@ -97,7 +97,7 @@ tcDef (Def { def_fun    = fun
                      , def_rhs = rhs', def_res_ty = res_ty' })
     }}
 
-tcArgs :: InPhase p => [TVarX p] -> ([TVar] -> TcM a) -> TcM a
+tcArgs :: [TVarX] -> ([TVar] -> TcM a) -> TcM a
 tcArgs []       continueWithArgs = continueWithArgs []
 tcArgs (tv:tvs) continueWithArgs
   = do { tv' <- tcTVar tv
@@ -133,7 +133,7 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
 --     f (..., x : T1, ..., x : T2, ...) = ...
 --
 -- (regardless of whether T1 and T2 are the same or not)
-checkNoDuplicatedArgs :: [TVarX p] -> TcM ()
+checkNoDuplicatedArgs :: [TVarX] -> TcM ()
 checkNoDuplicatedArgs args = when (not distinct) $
                   addErr (text "Duplicated arguments:" <+> commaPpr duplicated)
     where argNames   = map tVarVar args
@@ -141,12 +141,12 @@ checkNoDuplicatedArgs args = when (not distinct) $
           distinct   = null duplicated
           commaPpr   = sep . punctuate comma . map ppr
 
-tcTVar :: (Monad m, InPhase p) => TVarX p -> m TVar
+tcTVar :: Monad m => TVarX -> m TVar
 tcTVar (TVar ty v)
   = do { ty' <- tcType ty
        ; return (TVar ty' v) }
 
-tcType :: Monad m => InPhase p => TypeX p -> m Type
+tcType :: Monad m => TypeX -> m Type
 tcType (TypeVec ty)      = do { ty' <- tcType ty
                               ; return (TypeVec ty') }
 tcType (TypeTuple tys)   = TypeTuple <$> mapM tcType tys

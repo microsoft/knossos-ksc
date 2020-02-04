@@ -621,7 +621,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
       )
     _ -> mkCType ty
 
-pattern RR :: TypeX p
+pattern RR :: TypeX
 pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
