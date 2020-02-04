@@ -1,7 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
+             PatternSynonyms, StandaloneDeriving,
 	     ScopedTypeVariables, TypeApplications #-}
 
 module OptLet( optLets
@@ -32,12 +32,12 @@ occAnal e = fst (occAnalE e)
 
 type OccMap = M.Map TVar Int  -- How often each free variable occurs
 
-occAnalTv :: TVar -> (TVarX OccAnald, OccMap)
+occAnalTv :: TVar -> (TVarX, OccMap)
 occAnalTv (TVar ty v) = (TVar ty' v, vs)
   where
     (ty', vs) = occAnalT ty
 
-occAnalT :: Type -> (TypeX OccAnald, OccMap)
+occAnalT :: Type -> (TypeX, OccMap)
 occAnalT (TypeVec ty)
   = (TypeVec ty', vs)
   where
@@ -324,7 +324,7 @@ optLetsE params rhs = go (mkEmptySubst params) rhs
                                    ty' = go_ty subst ty
                                    tv' = TVar ty' v
 
-    go_ty :: Subst -> TypeX OccAnald -> Type
+    go_ty :: Subst -> TypeX -> Type
     go_ty subst (TypeTuple tys)   = TypeTuple (map (go_ty subst) tys)
     go_ty subst (TypeVec ty)      = TypeVec (go_ty subst ty)
     go_ty subst (TypeLM  ty1 ty2) = TypeLM (go_ty subst ty1) (go_ty subst ty2)
@@ -386,7 +386,7 @@ Some of this is discussed at
 
 -}
 
-inline_me :: Int -> TypeX p -> TExpr -> Bool
+inline_me :: Int -> TypeX -> TExpr -> Bool
 inline_me n _ty rhs
   | n==0            = True   -- Dead code
   | n==1            = True   -- Used exactly once
