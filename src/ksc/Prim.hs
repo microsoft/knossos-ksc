@@ -484,14 +484,6 @@ primFunCallResultTy_maybe "lmDummyFold" args
   = Just (typeof t)
   | otherwise = Nothing
 
--- diag (rows :: Integer) (cols :: Integer) (f :: Integer -> t)
---      :: Vec rows (Vec cols t)
-primFunCallResultTy_maybe "diag" args
-  | [_r,_c,f] <- args
-  , TypeLam TypeInteger t <- typeof f
-  = Just (TypeVec (TypeVec t))
-  | otherwise = Nothing
-
 primFunCallResultTy_maybe fun args
   = case (fun, map typeof args) of
       ("lmZero"   , [s, t])                                  -> Just (TypeLM s t)
@@ -539,6 +531,9 @@ primFunCallResultTy_maybe fun args
 
       ("constVec" , [TypeInteger, t])                        -> Just (TypeVec t)
       ("deltaVec" , [TypeInteger, TypeInteger, t])           -> Just (TypeVec t)
+      ("diag"     , [TypeInteger,
+                     TypeInteger,
+                     TypeLam TypeInteger t])                 -> Just (TypeVec (TypeVec t))
 
       -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
       ("pr"       , _)                                       -> Just TypeInteger
