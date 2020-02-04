@@ -165,7 +165,8 @@ tcExpr (Call fx es)
 
 tcExpr (Let vx rhs body)
   = do { let (var, mb_ty) = getLetBndr @p vx
-       ; TE arhs rhs_ty <- tcExpr rhs
+       ; TE arhs rhs_ty <- addCtxt (text "In the rhs of the binding for:" <+> ppr var) $
+                           tcExpr rhs
        ; rhs_ty <- checkTypes_maybe mb_ty rhs_ty $
          text "Let binding mis-match for" <+> ppr var
        ; let tvar = TVar rhs_ty var
