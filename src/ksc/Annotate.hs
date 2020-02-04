@@ -141,7 +141,7 @@ checkNoDuplicatedArgs args = when (not distinct) $
           distinct   = null duplicated
           commaPpr   = sep . punctuate comma . map ppr
 
-tcTVar :: InPhase p => TVarX p -> TcM TVar
+tcTVar :: (Monad m, InPhase p) => TVarX p -> m TVar
 tcTVar (TVar ty v)
   = do { ty' <- tcType ty
        ; return (TVar ty' v) }
