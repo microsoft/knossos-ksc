@@ -432,22 +432,22 @@ primFunCallResultTy_maybe :: PrimFun -> [Type] -> Maybe Type
 
 primFunCallResultTy_maybe "fold" args
   | [f,acc,v] <- args
-  , TypeLam (TypeTuple [a1, b1]) a2 <- typeof f
-  , TypeVec b2 <- typeof v
+  , TypeLam (TypeTuple [a1, b1]) a2 <- f
+  , TypeVec b2 <- v
   , b1 `eqType` b2
-  , Just a <- eqTypes a1 [a2, typeof acc]
+  , Just a <- eqTypes a1 [a2, acc]
   = Just a
   | otherwise = Nothing
 
 primFunCallResultTy_maybe "lmFold" args
   | [ds_zero,f,f',acc,v] <- args
-  , TypeLam t1 a1 <- typeof f
-  , TypeLam t2 (TypeLM (TypeTuple [s1, t3]) a2) <- typeof f'
+  , TypeLam t1 a1 <- f
+  , TypeLam t2 (TypeLM (TypeTuple [s1, t3]) a2) <- f'
   , Just t <- eqTypes t1 [t2, t3]
   , TypeTuple [a3, b1] <- t
-  , Just a <- eqTypes a1 [a2, a3, typeof acc]
-  , Just _ <- eqTypes (typeof ds_zero) [tangentType s1]
-  , v_ty@(TypeVec b2) <- typeof v
+  , Just a <- eqTypes a1 [a2, a3, acc]
+  , Just _ <- eqTypes ds_zero [tangentType s1]
+  , v_ty@(TypeVec b2) <- v
   , b2 `eqType` b1
   = Just (TypeLM (TypeTuple [s1, TypeTuple [a, v_ty]]) a)
   | otherwise = Nothing
@@ -458,9 +458,9 @@ primFunCallResultTy_maybe "lmFold" args
 --- later if we want.
 primFunCallResultTy_maybe "RFold" args
   | [_ty_dv,ty_in,_f,_f',acc,v,_dr] <- args
-  = Just (TypeTuple [ typeof ty_in
-                    , TypeTuple [ tangentType (typeof acc)
-                                , tangentType (typeof v)]])
+  = Just (TypeTuple [ ty_in
+                    , TypeTuple [ tangentType acc
+                                , tangentType v]])
   | otherwise = Nothing
 
 --- Type checking is not comprehensive because we only ever generate
@@ -469,16 +469,16 @@ primFunCallResultTy_maybe "RFold" args
 --- later if we want.
 primFunCallResultTy_maybe "FFold" args
   | [_f,_acc,_v,_df,dacc,_dv] <- args
-  = Just (typeof dacc)
+  = Just dacc
   | otherwise = Nothing
 
 primFunCallResultTy_maybe "lmDummyFold" args
   | [t] <- args
-  = Just (typeof t)
+  = Just t
   | otherwise = Nothing
 
 primFunCallResultTy_maybe fun args
-  = case (fun, map typeof args) of
+  = case (fun, args) of
       ("lmZero"   , [s, t])                                  -> Just (TypeLM s t)
       ("lmOne"    , [t])                                     -> Just (TypeLM t t)
       ("lmScale"  , [t, TypeFloat])                          -> Just (TypeLM t t)
