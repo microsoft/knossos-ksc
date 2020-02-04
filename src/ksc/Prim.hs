@@ -430,13 +430,6 @@ primFunCallResultTy fun args
 
 primFunCallResultTy_maybe :: PrimFun -> [TypedExpr] -> Maybe Type
 
--- build n (e :: Integer -> elt) :: Vec n elt
-primFunCallResultTy_maybe "build" args
-  | [_n,f] <- args
-  , TypeLam TypeInteger elt_ty <- typeof f
-  = Just (TypeVec elt_ty)
-  | otherwise = Nothing
-
 primFunCallResultTy_maybe "fold" args
   | [f,acc,v] <- args
   , TypeLam (TypeTuple [a1, b1]) a2 <- typeof f
@@ -534,6 +527,8 @@ primFunCallResultTy_maybe fun args
       ("diag"     , [TypeInteger,
                      TypeInteger,
                      TypeLam TypeInteger t])                 -> Just (TypeVec (TypeVec t))
+      ("build"    , [TypeInteger,
+                     TypeLam TypeInteger t])                 -> Just (TypeVec t)
 
       -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
       ("pr"       , _)                                       -> Just TypeInteger
