@@ -52,9 +52,8 @@ annotDecls gbl_env decls
     mk_rec_def (Def { def_fun = fun, def_args = args, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
          tcArgs args $ \args' ->
-         do { res_ty' <- tcType res_ty
-            ; return (Def { def_fun = fun, def_args = args'
-                          , def_res_ty = res_ty'
+         do { return (Def { def_fun = fun, def_args = args'
+                          , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
 
 -----------------------------------------------
@@ -91,19 +90,17 @@ tcDef (Def { def_fun    = fun
   = addCtxt (text "In the definition of" <+> ppr fun) $
     do { checkNoDuplicatedArgs vars
        ; tcArgs vars $ \vars' ->
-    do { res_ty' <- tcType res_ty
-       ; rhs' <- tcRhs fun rhs res_ty'
+    do { rhs' <- tcRhs fun rhs res_ty
        ; return (Def { def_fun = fun, def_args = vars'
-                     , def_rhs = rhs', def_res_ty = res_ty' })
+                     , def_rhs = rhs', def_res_ty = res_ty })
     }}
 
 tcArgs :: [TVarX] -> ([TVar] -> TcM a) -> TcM a
 tcArgs []       continueWithArgs = continueWithArgs []
 tcArgs (tv:tvs) continueWithArgs
-  = do { tv' <- tcTVar tv
-       ; extendLclSTM [tv'] $
+  = do { extendLclSTM [tv] $
          tcArgs tvs $ \tvs' ->
-         continueWithArgs (tv' : tvs') }
+         continueWithArgs (tv : tvs') }
 
 tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
@@ -118,13 +115,12 @@ tcRule :: InPhase p => RuleX p -> TcM TRule
 tcRule (Rule { ru_name = name, ru_qvars = qvars
              , ru_lhs = lhs, ru_rhs = rhs })
   = addCtxt (text "In the rule with lhs:" <+> ppr lhs) $
-    do { qvars' <- mapM tcTVar qvars
-        ; extendLclSTM qvars' $
+    do { extendLclSTM qvars $
     do { TE lhs' lhs_ty <- tcExpr lhs
        ; TE rhs' rhs_ty <- tcExpr rhs
        ; checkTypes lhs_ty rhs_ty $
          text "LHS and RHS of a rule have different types"
-       ; return (Rule { ru_name = name, ru_qvars = qvars'
+       ; return (Rule { ru_name = name, ru_qvars = qvars
                       , ru_lhs = lhs', ru_rhs = rhs' })
     }}
 
@@ -140,23 +136,6 @@ checkNoDuplicatedArgs args = when (not distinct) $
           duplicated = nub (argNames \\ nub argNames)
           distinct   = null duplicated
           commaPpr   = sep . punctuate comma . map ppr
-
-tcTVar :: Monad m => TVarX -> m TVar
-tcTVar (TVar ty v)
-  = do { ty' <- tcType ty
-       ; return (TVar ty' v) }
-
-tcType :: Monad m => TypeX -> m Type
-tcType (TypeVec ty)      = do { ty' <- tcType ty
-                              ; return (TypeVec ty') }
-tcType (TypeTuple tys)   = TypeTuple <$> mapM tcType tys
-tcType (TypeLM ty1 ty2)  = TypeLM <$> tcType ty1 <*> tcType ty2
-tcType (TypeLam ty1 ty2) = TypeLam <$> tcType ty1 <*> tcType ty2
-tcType TypeBool          = return TypeBool
-tcType TypeInteger       = return TypeInteger
-tcType TypeFloat         = return TypeFloat
-tcType TypeString        = return TypeString
-tcType TypeUnknown       = return TypeUnknown
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
@@ -200,10 +179,9 @@ tcExpr (Tuple es)
        ; return (TE (Tuple aes) (TypeTuple tys)) }
 
 tcExpr (Lam tv body)
-  = do { tv' <- tcTVar tv
-       ; TE abody tybody <- extendLclSTM [tv'] (tcExpr body)
-       ; return (TE (Lam tv' abody)
-                    (TypeLam (typeof tv') tybody)) }
+  = do { TE abody tybody <- extendLclSTM [tv] (tcExpr body)
+       ; return (TE (Lam tv abody)
+                    (TypeLam (typeof tv) tybody)) }
 
 tcExpr (If cond texpr fexpr)
   = do { TE acond tycond   <- tcExpr cond
