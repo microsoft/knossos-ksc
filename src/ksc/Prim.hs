@@ -380,7 +380,7 @@ primCallResultTy_maybe :: HasCallStack => Fun -> [TypedExpr]
 primCallResultTy_maybe fun args
   = case fun of
       Fun (PrimFun f)
-         | Just ty <- primFunCallResultTy_maybe f args
+         | Just ty <- primFunCallResultTy_maybe f (map typeof args)
          -> Right ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
@@ -418,7 +418,7 @@ selCallResultTy_maybe _ _ _ = Left (text "Bad argument to selector")
 
 primFunCallResultTy :: HasCallStack => PrimFun -> [TExpr] -> Type
 primFunCallResultTy fun args
-  = case primFunCallResultTy_maybe fun [TE arg (typeof arg) | arg <- args] of
+  = case primFunCallResultTy_maybe fun [typeof arg | arg <- args] of
       Just res_ty -> res_ty
       Nothing -> pprTrace "primCallResultTy: Could not determine result type for"
                           (vcat [ text fun <+> ppr args
@@ -428,7 +428,7 @@ primFunCallResultTy fun args
 ---------------------------------------
 -- This is the function that does the heavy lifting for primitives
 
-primFunCallResultTy_maybe :: PrimFun -> [TypedExpr] -> Maybe Type
+primFunCallResultTy_maybe :: PrimFun -> [Type] -> Maybe Type
 
 primFunCallResultTy_maybe "fold" args
   | [f,acc,v] <- args
