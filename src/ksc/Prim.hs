@@ -484,12 +484,6 @@ primFunCallResultTy_maybe "lmDummyFold" args
   = Just (typeof t)
   | otherwise = Nothing
 
--- constVec (n :: Integer) (e :: t) :: Vec n t
-primFunCallResultTy_maybe "constVec" args
-  | [_n,e] <- args
-  = Just (TypeVec (typeof e))
-  | otherwise = Nothing
-
 -- deltaVec (n :: Integer) (i :: Integer) (e :: t) :: Vec n t
 primFunCallResultTy_maybe "deltaVec" args
   | [_n,i,e] <- args
@@ -549,6 +543,8 @@ primFunCallResultTy_maybe fun args
 
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , [t])                                     -> Just t
+
+      ("constVec" , [TypeInteger, t])                        -> Just (TypeVec t)
 
       -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
       ("pr"       , _)                                       -> Just TypeInteger
