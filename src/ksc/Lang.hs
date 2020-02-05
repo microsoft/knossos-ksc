@@ -254,6 +254,11 @@ data Fun = Fun      FunId         -- The function              f(x)
                                   --   Rev <=> reverse mode f`(x,dr)
          deriving( Eq, Ord, Show )
 
+funIdOfFun :: Fun -> FunId
+funIdOfFun = \case
+  Fun f       -> f
+  GradFun f _ -> f
+  DrvFun f _  -> f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )

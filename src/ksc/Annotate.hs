@@ -240,17 +240,12 @@ callResultTy_maybe env fun args
   | otherwise
   = primCallResultTy_maybe fun (map typeof args)
   where
-    funId = \case
-      Fun     f   -> f
-      GradFun f _ -> f
-      DrvFun  f _ -> f
-
     isUserFunConstructor = \case
       UserFun{} -> True
       PrimFun{} -> False
       SelFun{}  -> False
 
-    is_user_fun = isUserFunConstructor . funId
+    is_user_fun = isUserFunConstructor . funIdOfFun
 
 -----------------------------------------------
 --     The typecheck monad
