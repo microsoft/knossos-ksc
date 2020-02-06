@@ -12,7 +12,7 @@
             ; Compute x^3
             (f n x)
             ; Compute the gradient
-            (get$2$2 (rev$f n x 1.0))
+            (get$2$2 (rev$f (tuple n x) 1.0))
             ; And forward
             (fwd$f (tuple n x) (tuple (tuple) 1.0))
             ; Is the derivative n*x^(n-1)?

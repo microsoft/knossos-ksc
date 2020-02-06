@@ -90,12 +90,12 @@ def assert_equal_objective():
     print(reference_objective)
 
     # Check no NaNs in reverse mode derivative
-    rev = knossos.rev_gmm_knossos_gmm_objective(vvd(x),
-                                                vd(alphas),
-                                                vvd(means),
-                                                vvd(qs),
-                                                vvd(ls),
-                                                (wishart_gamma, wishart_m),
+    rev = knossos.rev_gmm_knossos_gmm_objective((vvd(x),
+                                                 vd(alphas),
+                                                 vvd(means),
+                                                 vvd(qs),
+                                                 vvd(ls),
+                                                 (wishart_gamma, wishart_m)),
                                                 1.0)
 
     (d_dx, d_dalphas, d_dmeans, d_dqs, d_dls, (d_dwishart_gamma, d_dwishartm)) = rev

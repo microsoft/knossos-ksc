@@ -660,7 +660,7 @@ optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
 optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (GradFun f adp2)) es) dx
   | adp1 == adp2
-  = Just (Call grad_fun (es ++ [dx]))
+  = Just (Call grad_fun [mkTuple es, dx])
   where
     grad_fun = TFun (tangentType s) (DrvFun f (AD adp1 Rev))
 

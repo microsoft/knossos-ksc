@@ -1752,14 +1752,14 @@ namespace ks
   // 
   //  i.e. what should be small (when dx is) if our
   //  reverse mode generated code is correct.
-	template <class Functor, class RevFunctor, class X, class Dx, class Df>
-	double $check(Functor f, RevFunctor rev_f, X x, Dx dx, Df df)
+	template <class Functor, class RevFunctor, class X, class X_, class Dx, class Df>
+        double $check(Functor f, RevFunctor rev_f, X x, X_ x_, Dx dx, Df df)
 	{
 		auto f_x = std::apply(f, x);
 		auto f_x_plus_dx = std::apply(f, add(x, dx));
 		auto delta_f = f_x_plus_dx - f_x;
 		double d1 = dot(delta_f, df);
-		auto dfJ = std::apply(rev_f, tuple_cat(x, std::make_tuple(df)));
+		auto dfJ = std::apply(rev_f, std::make_tuple(x_, df));
 		double d2 = dot(dfJ, dx);
 
 		/*

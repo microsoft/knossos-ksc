@@ -56,13 +56,13 @@
       "rvp="
       (build N (lam (n : Integer)
                   (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
-                      ($BENCH (lam (_ : (Tuple)) (vchomp (rev$vprod 0 v 1.0)))))))
+                      ($BENCH (lam (_ : (Tuple)) (vchomp (rev$vprod (tuple 0 v) 1.0)))))))
       "\n"
 
       "rap="
       (build N (lam (n : Integer)
                   (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
-                      ($BENCH (lam (_ : (Tuple)) (achomp (rev$aprod 0 v 1.0 1.0)))))))
+                      ($BENCH (lam (_ : (Tuple)) (achomp (rev$aprod (tuple 0 v 1.0) 1.0)))))))
 
       "\n"
 

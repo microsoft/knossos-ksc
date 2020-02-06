@@ -302,14 +302,25 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                        ++ show adp ++ " " ++ show t)
 
 --   D$f :: S1 S2    -> ((S1,S2) -o T)
--- rev$f :: S1 S2 dT -> (dS1,dS2)
+-- rev$f :: (S1, S2) dT -> (dS1,dS2)
 applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                 , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Rev)
-        , def_args   = vars ++ [dr]
-        , def_rhs    = UserRhs $ lmApplyR (Var dr) lm
+        , def_args   = [varst, dr]
+        , def_rhs    = UserRhs $ lmApplyR (Var dr) (lets lm)
         , def_res_ty = tangentType (mkTupleTy (map typeof vars)) }
   where
+    varst = case vars of
+      [var] -> var
+      _     -> newVarNotIn (TypeTuple (map typeof vars)) (Tuple (map Var vars))
+
+    nVars = length vars
+
+    lets = case vars of
+      [_] -> id
+      _   -> mkLets $ flip map (zip [1..] vars) $ \(i, v) ->
+        (v, pSel i nVars (Var varst))
+
     dr = TVar (tangentType t) $ Delta "r"
     (lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of

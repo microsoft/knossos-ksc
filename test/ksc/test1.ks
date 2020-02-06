@@ -28,7 +28,7 @@
         (g x y)
         "FD=" (div@ff (sub@ff (f x (add y delta)) (f x y)) delta)
         (fwd$f (tuple x y) (tuple delta delta))
-        "CHECK=" ($check f1 rev$f1 (tuple x y) (tuple delta delta) 0.1)
+        "CHECK=" ($check f1 rev$f1 (tuple x y) (tuple x y) (tuple delta delta) 0.1)
       )
     )
 )

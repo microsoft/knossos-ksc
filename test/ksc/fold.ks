@@ -70,6 +70,7 @@
            (dc (mkfloat (add@ii seed 3000)    delta))
            (checked ($check prod_fold rev$prod_fold
                             (tuple v  c)
+                            (tuple v  c)
                             (tuple dv dc)
                             1.0))
            (rev_ok (lt@ff (abs checked) 0.001))
@@ -104,7 +105,7 @@
         "fwd - fd"
         (sub@ff fold_fwd fold_fd)
         "rev fold"
-        (rev$prod_fold v c 1.0)
+        (rev$prod_fold (tuple v c) 1.0)
         "checked (should be small)"
         checked
         "TESTS FOLLOW"
