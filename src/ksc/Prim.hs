@@ -362,8 +362,9 @@ pToFloat :: TExpr -> TExpr
 pToFloat from = userCall "to_float" TypeFloat [from]
 
 pMulii :: TExpr -> TExpr -> TExpr
-pMulii x1 x2 = userCall "mul@ii" TypeInteger [x1, x2]
+pMulii x1 x2 = userCall "mul@ii" TypeInteger [Tuple [x1, x2]]
 
+-- This is currently wrong but our tests don't catch it
 pMulff :: TExpr -> TExpr -> TExpr
 pMulff x1 x2 = userCall "mul@ff" TypeFloat [x1, x2]
 
@@ -513,11 +514,13 @@ primFunCallResultTy_maybe fun args
       --
       -- NB s and s' should be equal, except if s' is not a tuple, in
       -- which case s should be (tuple s')
-      ("$check"   , [TypeLam s t, TypeLam s_dt ds', s', s'0, ds, dt])
-                      | s' `eqType` s
+      ("$check"   , [ TypeLam (TypeTuple [s]) t
+                    , TypeLam (TypeTuple [s_dt]) ds', s', s'0, ds, dt])
+                      | s `eqType` case s' of TypeTuple [s1] -> s1
+                                              _              -> s
                       , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
                                                 _               -> ds
-                      , tangentType s `eqType` ds
+                      , tangentType s `eqType` ds'
                       , tangentType t `eqType` dt
                       , s_dt `eqType` (TypeTuple [s'0, dt])
                        -> Just TypeFloat

@@ -203,13 +203,34 @@ cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = params
                   , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      env' = foldl addParam env params
+      -- This check will vanish once Defs become one-arg
+      param = case params of
+        [params] -> params
+        _        -> error $ "Expected exactly one argument in UserFun.\n"
+                          ++ "Instead " ++ show f ++ " had " ++ show params
+      env' = addParam env param
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
       cf                               = cgenUserFun f
 
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      cvars       = map mkVar params
+      (params', tupling) = case typeof param of
+        -- Defs of a tuple argument have their argument list unpacked,
+        -- that is, if f is a Def of type Tuple [S1, ..., SN] -> T
+        -- then the C++ function we generate for it will have N
+        -- arguments, not one tuple.
+        TypeTuple tys ->
+          let argVar i ty = (ty, "argVarFixme" ++ show i)
+              argVars     = zipWith argVar [1..] tys
+              argTypes    = map (cgenType . mkCType . fst) argVars
+              argVarNames = map snd argVars
+          in (flip map argVars $ \(ty, newParam) -> TVar ty (Simple newParam),
+              mkVar param
+              ++ " = std::tuple<" ++ intercalate "," argTypes ++ ">"
+              ++ "(" ++ intercalate "," argVarNames ++ ");\n")
+        _             -> ([param], "")
+
+      cvars = map mkVar params'
 
       cftypealias = "ty$" ++ cf
   in  CG
@@ -222,6 +243,7 @@ cgenDefE env (Def { def_fun = f, def_args = params
         ++    "("
         ++    intercalate ", " cvars
         ++    ") {\n"
+        ++    tupling
         ++    cbodydecl
         ++    "return ("
         ++    cbodyexpr
@@ -308,11 +330,11 @@ cgenExprR env = \case
 
 
 
-  Call tf@(TFun _ _) vs -> do
-      -- Untuple argument for C++ call
-    cgvs <- mapM (cgenExprR env) vs
+  Call tf@(TFun _ fun) vs -> do
+    cgvs_tys <- mapM (\v -> do cgv <- cgenExprR env v; return (cgv, typeof v)) vs
+    let cgvs = map fst cgvs_tys
     let cdecls = map getDecl cgvs
-    let cexprs = map getExpr cgvs
+    let cexprs_tys = map (\(v, ty) -> (getExpr v, ty)) cgvs_tys
     let ctypes = map getType cgvs
 
     let cftype = ctypeofFun env tf ctypes
@@ -331,7 +353,22 @@ cgenExprR env = \case
       (  unlines cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ cf ++ "(" ++ intercalate "," cexprs ++ ");\n"
+      ++ case (isUserFun (funIdOfFun fun), cexprs_tys) of
+          -- Untuple argument for C++ call
+          --
+          -- Calls of a tuple argument have their argument list
+          -- unpacked.  See the explanation in cgenDefE above.
+          (True, [(cexpr, TypeTuple _)])
+            -> "std::apply(" ++ cf ++ ", " ++ cexpr ++ ");\n"
+          -- Currently only UserFuns are expected to have exactly one
+          -- argument but soon we will ensure that all funs have
+          -- exactly one argument (and indeed change the Call
+          -- constructor to enforce this), so these special cases will
+          -- go away.
+          (True, [_]) -> cf ++ "(" ++ intercalate "," (map fst cexprs_tys) ++ ");\n"
+          (False, _)  -> cf ++ "(" ++ intercalate "," (map fst cexprs_tys) ++ ");\n"
+          (True,  _) -> error $ "Expected UserFun to have exactly one argument.\n"
+                              ++ "Instead " ++ show fun ++ " had " ++ show vs
       ++ gc "$REL"
       )
       v

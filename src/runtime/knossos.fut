@@ -8,28 +8,28 @@ let to_float = r64
 let neg (x: f64) = -x
 let lgamma = f64.lgamma
 let digamma = const 1f64 -- FIXME
-let fwd__lgamma = const (const 1f64) -- FIXME
-let rev__lgamma = const (const 1f64) -- FIXME
-let dotv xs ys = map2 (*) xs ys |> f64.sum
-let mul__Mat__Vec xss ys = map (dotv ys) xss
+let fwd__lgamma = const 1f64 -- FIXME
+let rev__lgamma = const 1f64 -- FIXME
+let dotv (xs, ys) = map2 (*) xs ys |> f64.sum
+let mul__Mat__Vec (xss, ys) = map (\xs -> dotv (ys, xs)) xss
 let constVec = replicate
 let size = length
-let gt__aii (x: i32) (y: i32) = x > y
-let gt__aff (x: f64) (y: f64) = x > y
-let lt__aii (x: i32) (y: i32) = x < y
-let lt__aff (x: f64) (y: f64) = x < y
-let gte__aii (x: i32) (y: i32) = x >= y
-let gte__aff (x: f64) (y: f64) = x >= y
-let lte__aii (x: i32) (y: i32) = x <= y
-let lte__aff (x: f64) (y: f64) = x <= y
-let add__aii (x: i32) (y: i32) = x + y
-let add__aff (x: f64) (y: f64) = x + y
-let sub__aii (x: i32) (y: i32) = x - y
-let sub__aff (x: f64) (y: f64) = x - y
-let div__aii (x: i32) (y: i32) = x / y
-let div__aff (x: f64) (y: f64) = x / y
-let mul__aii (x: i32) (y: i32) = x * y
-let mul__aff (x: f64) (y: f64) = x * y
+let gt__aii (x: i32, y: i32) = x > y
+let gt__aff (x: f64, y: f64) = x > y
+let lt__aii (x: i32, y: i32) = x < y
+let lt__aff (x: f64, y: f64) = x < y
+let gte__aii (x: i32, y: i32) = x >= y
+let gte__aff (x: f64, y: f64) = x >= y
+let lte__aii (x: i32, y: i32) = x <= y
+let lte__aff (x: f64, y: f64) = x <= y
+let add__aii (x: i32, y: i32) = x + y
+let add__aff (x: f64, y: f64) = x + y
+let sub__aii (x: i32, y: i32) = x - y
+let sub__aff (x: f64, y: f64) = x - y
+let div__aii (x: i32, y: i32) = x / y
+let div__aff (x: f64, y: f64) = x / y
+let mul__aii (x: i32, y: i32) = x * y
+let mul__aff (x: f64, y: f64) = x * y
 let neg__aii (x: i32) = -x
 let neg__aff (x: f64) = -x
 
@@ -40,7 +40,7 @@ let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =
 let delta 't (zero: t) (i: i32) (j: i32) (v: t) =
   if i == j then v else zero
 
-let rev__mul__Mat__Vec [r][c] (M_v: ([r][c]f64, [c]f64)) (dr: [r]f64): ([r][c]f64, [c]f64) =
+let rev__mul__Mat__Vec [r][c] (M_v: ([r][c]f64, [c]f64), dr: [r]f64): ([r][c]f64, [c]f64) =
   let (M, v) = M_v
   in (map (\x -> map (*x) v) dr,
       map (\col -> f64.sum (map2 (*) col dr)) (transpose M))
