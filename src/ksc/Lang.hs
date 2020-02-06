@@ -382,15 +382,6 @@ dropLast :: [a] -> [a]
 dropLast xs = take (length xs - 1) xs
 
 -----------------------------------------------
---     Building types
------------------------------------------------
-
-mkTypeTuple :: [Type] -> Type
-mkTypeTuple [ty] = ty
-mkTypeTuple tys  = TypeTuple tys
-
-
------------------------------------------------
 --  Finding the type of an expression
 -----------------------------------------------
 
