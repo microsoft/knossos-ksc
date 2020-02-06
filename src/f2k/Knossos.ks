@@ -81,7 +81,7 @@
     (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
-          ((Vec (Vec Float)) (Vec Float) (Vec Float)))
+          ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
 
 (def mvmul (Vec Float) ((a : Vec (Vec Float)) (b : Vec Float))
    (mul$Mat$Vec a b))

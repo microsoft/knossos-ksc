@@ -26,8 +26,9 @@ mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v)
 }
 
 tuple<vec<vec<double>>,vec<double>> 
-rev$mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v, vec<double> const& dr)
+rev$mul$Mat$Vec(std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
 {
+        auto [M, v] = M_v;
 	int r = size(M);
 	int c = size(v);
 	vec<vec<double>> retM(r);

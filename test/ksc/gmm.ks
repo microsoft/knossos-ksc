@@ -32,8 +32,10 @@
            (db (get$2$2 da_db)))
     (add (dotv a db) (dotv da b))))
 (def rev$dotv (Tuple (Vec Float) (Vec Float))
-               ((a : Vec Float) (b : Vec Float) (dr : Float))
-    (tuple (mul$R$VecR dr b) (mul$R$VecR dr a)))
+               ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
+     (let ((a  (get$1$2 a_b))
+           (b  (get$2$2 a_b)))
+    (tuple (mul$R$VecR dr b) (mul$R$VecR dr a))))
 
 (edef lgamma Float (Float))
 (edef D$lgamma (LM Float Float) (Float))
@@ -69,7 +71,7 @@
     (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
-          ((Vec (Vec Float)) (Vec Float) (Vec Float)))
+          ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
 
 
 (def gmm_knossos_makeQ (Vec (Vec Float)) ((q : Vec Float) (l : Vec Float))
@@ -230,7 +232,7 @@
 
           ; Check <grad_f, dx> = f(x+dx) - f(x)
           ; with grad_f = f`(x, 1.0)
-          (grad_gmm (rev$gmm_knossos_gmm_objective x alphas mus qs ls wishart 1.0))
+          (grad_gmm (rev$gmm_knossos_gmm_objective (tuple x alphas mus qs ls wishart) 1.0))
           (grad_gmm_x          (get$1$6 grad_gmm))
           (grad_gmm_alphas     (get$2$6 grad_gmm))
           (grad_gmm_mus        (get$3$6 grad_gmm))
@@ -257,6 +259,7 @@
 
 
           (checked ($check gmm_knossos_gmm_objective rev$gmm_knossos_gmm_objective
+                    (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)
                     1.0))

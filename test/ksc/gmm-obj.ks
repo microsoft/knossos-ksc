@@ -32,8 +32,10 @@
            (db (get$2$2 da_db)))
     (add (dotv a db) (dotv da b))))
 (def rev$dotv (Tuple (Vec Float) (Vec Float))
-               ((a : Vec Float) (b : Vec Float) (dr : Float))
-    (tuple (mul$R$VecR dr b) (mul$R$VecR dr a)))
+               ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
+     (let ((a  (get$1$2 a_b))
+           (b  (get$2$2 a_b)))
+    (tuple (mul$R$VecR dr b) (mul$R$VecR dr a))))
 
 (def dotvv Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dotv (index i a) (index i b)))))
@@ -62,7 +64,7 @@
     (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
-          ((Vec (Vec Float)) (Vec Float) (Vec Float)))
+          ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
 
 
 

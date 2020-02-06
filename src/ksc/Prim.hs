@@ -402,7 +402,7 @@ primCallResultTy_maybe fun args
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
-      DrvFun _ (AD _ Rev)    -- f :: S1 S2 -> T, then rev$f :: S1 S2 T_t -> (S1_t, S2_t)
+      DrvFun _ (AD _ Rev)    -- f :: S1 S2 -> T, then rev$f :: (S1, S2) T_t -> (S1_t, S2_t)
         | let s_tys = dropLast args
         -> Right (tangentType (mkTupleTy s_tys))
 
@@ -507,16 +507,19 @@ primFunCallResultTy_maybe fun args
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , [t])                                     -> Just t
 
-      -- ($check f rev$f s ds dt) verifies the derivatives rev$f at s in directions ds,dt.
+      -- ($check f rev$f s s' ds dt) verifies the derivatives rev$f at s in directions ds,dt.
       -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
       -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s))
-      ("$check"   , [TypeLam s t, TypeLam s_dt ds', s', ds, dt])
+      --
+      -- NB s and s' should be equal, except if s' is not a tuple, in
+      -- which case s should be (tuple s')
+      ("$check"   , [TypeLam s t, TypeLam s_dt ds', s', s'0, ds, dt])
                       | s' `eqType` s
                       , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
                                                 _               -> ds
                       , tangentType s `eqType` ds
                       , tangentType t `eqType` dt
-                      , s_dt `eqType` (typeTupleAppend s dt)
+                      , s_dt `eqType` (TypeTuple [s'0, dt])
                        -> Just TypeFloat
 
       -- ($trace e) emits its argument's value to stdout and returns it
@@ -554,10 +557,6 @@ primFunCallResultTy_maybe fun args
       ("or"       , [TypeBool, TypeBool]                   ) -> Just TypeBool
       ("and"      , [TypeBool, TypeBool]                   ) -> Just TypeBool
       _ -> Nothing
-
-      where
-        typeTupleAppend (TypeTuple t1s) t2 = TypeTuple (t1s ++ [t2])
-        typeTupleAppend t1 t2 = TypeTuple [t1, t2]
 
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args

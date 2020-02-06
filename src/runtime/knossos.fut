@@ -40,9 +40,10 @@ let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =
 let delta 't (zero: t) (i: i32) (j: i32) (v: t) =
   if i == j then v else zero
 
-let rev__mul__Mat__Vec [r][c] (M: [r][c]f64) (v: [c]f64) (dr: [r]f64): ([r][c]f64, [c]f64) =
-  (map (\x -> map (*x) v) dr,
-   map (\col -> f64.sum (map2 (*) col dr)) (transpose M))
+let rev__mul__Mat__Vec [r][c] (M_v: ([r][c]f64, [c]f64)) (dr: [r]f64): ([r][c]f64, [c]f64) =
+  let (M, v) = M_v
+  in (map (\x -> map (*x) v) dr,
+      map (\col -> f64.sum (map2 (*) col dr)) (transpose M))
 
 let upper_tri_to_linear (D: i32) (v: [D][D]f64) =
   tabulate_2d D D (\i j -> j >= i)
