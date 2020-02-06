@@ -511,9 +511,10 @@ primFunCallResultTy_maybe fun args
       -- ($check f rev$f s ds dt) verifies the derivatives rev$f at s in directions ds,dt.
       -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
       -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s))
-      ("$check"   , [TypeLam s t, TypeLam s_dt _ds', s', ds, dt])
+      ("$check"   , [TypeLam s t, TypeLam s_dt ds', s', ds, dt])
                       | s' `eqType` s
-                      -- , ds' `eqType` ds -- fails in test0 for Tuple (Float) != Float
+                      , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
+                                                _               -> ds
                       , tangentType s `eqType` ds
                       , tangentType t `eqType` dt
                       , s_dt `eqType` (typeTupleAppend s dt)
