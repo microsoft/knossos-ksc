@@ -392,11 +392,12 @@ primCallResultTy_maybe fun args
             Left err -> Left err
             Right res_ty -> Right (mkGradType adp (mkTupleTy arg_tys) res_ty)
 
-      DrvFun f (AD _ Fwd)    -- f :: S1 S2 -> T, then fwd$f :: S1 S2 S1_t S2_t -> T_t
-        | let n_s = length args
-        , even n_s
-        , let s_args = take (n_s `div` 2) args
-        , Right t_ty <- primCallResultTy_maybe (Fun f) s_args
+      DrvFun f (AD _ Fwd)    -- f :: S1 S2 -> T, then fwd$f :: (S1, S2) (S1_t, S2_t) -> T_t
+        | [x, _dx] <- args
+        , let x' = case typeof x of
+                TypeTuple ts -> ts
+                _            -> [typeof x]
+        , Right t_ty <- primCallResultTy_maybe (Fun f) x'
         -> Right (tangentType t_ty)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)

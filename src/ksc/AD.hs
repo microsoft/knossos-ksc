@@ -266,23 +266,35 @@ applyD :: ADDir -> TDef -> TDef
 -- Forward
 --   D$f  :: S1 S2       -> ((S1,S2) -o T)
 --  Dt$f  :: S1 S2       -> (T, (S1,S2) -o T)
--- fwd$f  :: S1 S2 dS1 dS2 -> dT
--- fwdt$f :: S1 S2 dS1 dS2 -> (T, dT)
+-- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
+-- fwdt$f :: (S1, S2) (dS1, dS2) -> (T, dT)
 applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                 , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Fwd)
-        , def_args   = vars ++ dvars
-        , def_rhs    = UserRhs $ perhapsFstToo $ lmApply lm $ mkTuple $ map Var dvars
+        , def_args   = [varst, dvarst]
+        , def_rhs    = UserRhs $ perhapsFstToo $ lmApply (lets lm) $ Var dvarst
         , def_res_ty = t }
   where
-    dvars = map to_delta vars
+    varst = case vars of
+      [var] -> var
+      _     -> newVarNotIn (TypeTuple (map typeof vars)) (Tuple (map Var vars))
+
+    dvarst = to_delta varst
+
+    nVars = length vars
+
+    lets = case vars of
+      [_] -> id
+      _   -> mkLets $ flip map (zip [1..] vars) $ \(i, v) ->
+        (v, pSel i nVars (Var varst))
+
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
     to_delta (TVar _  v         )
       = error ("Unexpected non-Simple variable: " ++ show v)
     (perhapsFstToo, lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (id, rhs, tangentType t)
-            (TupleAD, TypeTuple [t, _]) -> ((\lmrhs -> Tuple [pFst rhs, lmrhs]),
+            (TupleAD, TypeTuple [t, _]) -> ((\lmrhs -> Tuple [lets (pFst rhs), lmrhs]),
                                             pSnd rhs,
                                             TypeTuple [t, tangentType t])
             (adp    , t               )

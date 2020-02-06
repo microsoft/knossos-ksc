@@ -650,17 +650,9 @@ optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun (PrimFun f))) es) dx
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
 optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
   | adp1 == adp2
-  = Just (Call grad_fun (es ++ dxs))
+  = Just (Call grad_fun [mkTuple es, dx])
   where
     grad_fun = TFun (tangentType t) (DrvFun f (AD adp1 Fwd))
-
-    -- Unpack dx to match the arity of the function
-    -- Remember: fwd$f :: S1 S2 S1_t S2_t -> T_t
-    dxs = case es of
-            []                  -> []
-            [_]                 -> [dx]
-            _ | Tuple dxs <- dx -> dxs
-              | otherwise       -> pprPanic "optLMApply" (vcat [ppr es, ppr dx])
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
