@@ -650,9 +650,14 @@ optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun (PrimFun f))) es) dx
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
 optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
   | adp1 == adp2
-  = Just (Call grad_fun [mkTuple es, dx])
+  = Just (Call grad_fun es_dx)
   where
     grad_fun = TFun (tangentType t) (DrvFun f (AD adp1 Fwd))
+    -- This treats UserFuns as though they have exactly one arg and
+    -- PrimFuns as though they have many args.  This is an
+    -- intermediate step to making everything one arg, so this check
+    -- will be removed in due course.
+    es_dx = if isUserFun f then [Tuple [mkTuple es, dx]] else [mkTuple es, dx]
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
@@ -660,9 +665,14 @@ optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
 optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (GradFun f adp2)) es) dx
   | adp1 == adp2
-  = Just (Call grad_fun [mkTuple es, dx])
+  = Just (Call grad_fun es_dx)
   where
     grad_fun = TFun (tangentType s) (DrvFun f (AD adp1 Rev))
+    -- This treats UserFuns as though they have exactly one arg and
+    -- PrimFuns as though they have many args.  This is an
+    -- intermediate step to making everything one arg, so this check
+    -- will be removed in due course.
+    es_dx = if isUserFun f then [Tuple [mkTuple es, dx]] else [mkTuple es, dx]
 
 {-
 optLMApply (Call (TFun (TypeLM _ t) (GradFun (PrimFun f) mode)) e) dx

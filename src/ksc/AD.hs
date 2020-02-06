@@ -271,10 +271,13 @@ applyD :: ADDir -> TDef -> TDef
 applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                 , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Fwd)
-        , def_args   = [varst, dvarst]
-        , def_rhs    = UserRhs $ perhapsFstToo $ lmApply (lets lm) $ Var dvarst
+        , def_args   = [varst1]
+        , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply (lets lm) $ Var dvarst
         , def_res_ty = t }
   where
+    varst1 = newVarNotIn (TypeTuple [typeof varst, typeof dvarst])
+                         (Tuple (map Var (varst:dvarst:vars)))
+
     varst = case vars of
       [var] -> var
       _     -> newVarNotIn (TypeTuple (map typeof vars)) (Tuple (map Var vars))
@@ -282,6 +285,9 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
     dvarst = to_delta varst
 
     nVars = length vars
+
+    extract2args = mkLets [ (varst,  pSel 1 2 (Var varst1))
+                          , (dvarst, pSel 2 2 (Var varst1)) ]
 
     lets = case vars of
       [_] -> id
@@ -306,15 +312,21 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                 , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Rev)
-        , def_args   = [varst, dr]
-        , def_rhs    = UserRhs $ lmApplyR (Var dr) (lets lm)
+        , def_args   = [varst1]
+        , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) (lets lm)
         , def_res_ty = tangentType (mkTupleTy (map typeof vars)) }
   where
+    varst1 = newVarNotIn (TypeTuple [typeof varst, typeof dr])
+                         (Tuple (map Var (varst:dr:vars)))
+
     varst = case vars of
       [var] -> var
       _     -> newVarNotIn (TypeTuple (map typeof vars)) (Tuple (map Var vars))
 
     nVars = length vars
+
+    extract2args = mkLets [ (varst, pSel 1 2 (Var varst1))
+                          , (dr,    pSel 2 2 (Var varst1)) ]
 
     lets = case vars of
       [_] -> id
