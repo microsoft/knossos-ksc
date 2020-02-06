@@ -14,7 +14,7 @@
             ; Compute the gradient
             (get$2$2 (rev$f n x 1.0))
             ; And forward
-            (fwd$f n x (tuple) 1.0)
+            (fwd$f (tuple n x) (tuple (tuple) 1.0))
             ; Is the derivative n*x^(n-1)?
             (mul@ff (to_float n) (f (sub@ii n 1) x))
         )))

@@ -729,8 +729,10 @@ namespace ks
 	}
 
 	template <class T, class dT>
-	vec<dT> fwd$constVec(int n, T val, std::tuple<> unit, dT dval)
+        vec<dT> fwd$constVec(std::tuple<int, T> n_val, std::tuple<std::tuple<>, dT> unit_dval)
 	{
+                auto n = std::get<0>(n_val);
+                auto dval = std::get<1>(unit_dval);
 		return constVec(n, dval);
 	}
 

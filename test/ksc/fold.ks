@@ -75,7 +75,7 @@
            (rev_ok (lt@ff (abs checked) 0.001))
            (fold_x   (prod_fold v c))
            (fold_xpd (prod_fold (add v dv) (add c dc)))
-           (fold_fwd (fwd$prod_fold v c dv dc))
+           (fold_fwd (fwd$prod_fold (tuple v c) (tuple dv dc)))
            (fold_fd  (sub@ff fold_xpd fold_x))
            (everything_works_as_expected
             (let ((tolerance 0.001)

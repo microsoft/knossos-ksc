@@ -25,8 +25,12 @@
 (edef Dt$dotv (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
               ((Vec Float) (Vec Float)))
 (edef R$dotv (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
-(def fwd$dotv Float ((a : Vec Float) (b : Vec Float) (da : Vec Float) (db : Vec Float))
-    (add (dotv a db) (dotv da b)))
+(def fwd$dotv Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
+     (let ((a  (get$1$2 a_b))
+           (b  (get$2$2 a_b))
+           (da (get$1$2 da_db))
+           (db (get$2$2 da_db)))
+    (add (dotv a db) (dotv da b))))
 (def rev$dotv (Tuple (Vec Float) (Vec Float))
                ((a : Vec Float) (b : Vec Float) (dr : Float))
     (tuple (mul$R$VecR dr b) (mul$R$VecR dr a)))
@@ -57,8 +61,12 @@
           ((Vec (Vec Float)) (Vec Float)))
 
 (def fwd$mul$Mat$Vec (Vec Float)
-          ((M : Vec (Vec Float)) (v : Vec Float) (dM : Vec (Vec Float)) (dv : Vec Float))
-    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv)))
+          ((M_v : (Tuple (Vec (Vec Float)) (Vec Float))) (dM_dv : (Tuple (Vec (Vec Float)) (Vec Float))))
+     (let ((M  (get$1$2 M_v))
+           (v  (get$2$2 M_v))
+           (dM (get$1$2 dM_dv))
+           (dv (get$2$2 dM_dv)))
+    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
           ((Vec (Vec Float)) (Vec Float) (Vec Float)))
@@ -196,8 +204,8 @@
 
           (gmm_fd (sub@ff gmm_at_theta_plus_dtheta gmm_at_theta))
           (gmm_fwd (fwd$gmm_knossos_gmm_objective
-                     x  alphas  mus  qs  ls  wishart
-                    dx dalphas dmus dqs dls dwishart))
+                    (tuple x  alphas  mus  qs  ls  wishart)
+                    (tuple dx dalphas dmus dqs dls dwishart)))
 
           (golden_test_gmm_objective
            (let ((tolerance 0.000001)

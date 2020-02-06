@@ -73,8 +73,12 @@
           ((Vec (Vec Float)) (Vec Float)))
 
 (def fwd$mul$Mat$Vec (Vec Float)
-          ((M : Vec (Vec Float)) (v : Vec Float) (dM : Vec (Vec Float)) (dv : Vec Float))
-    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv)))
+          ((M_v : (Tuple (Vec (Vec Float)) (Vec Float))) (dM_dv : (Tuple (Vec (Vec Float)) (Vec Float))))
+     (let ((M  (get$1$2 M_v))
+           (v  (get$2$2 M_v))
+           (dM (get$1$2 dM_dv))
+           (dv (get$2$2 dM_dv)))
+    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
           ((Vec (Vec Float)) (Vec Float) (Vec Float)))
