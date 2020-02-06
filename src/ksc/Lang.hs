@@ -338,13 +338,10 @@ mkArgVar n = Simple ("a" ++ show n)
 mkDummy :: Type -> TExpr
 mkDummy ty = Dummy ty
 
-mkLet :: HasCallStack => TVar -> TExpr -> TExpr -> TExpr
-mkLet (TVar ty v) rhs body
-  = -- traceWhenUnequal ("mkLet " ++ pps v ++ " = " ++ pps rhs) ty (typeof rhs) $
-    -- Lint discovers this better
-    Let (TVar ty v) rhs body
+mkLet :: HasCallStack => LetBndrX p -> ExprX p -> ExprX p -> ExprX p
+mkLet = Let
 
-mkLets :: HasCallStack => [(TVar, TExpr)] -> TExpr -> TExpr
+mkLets :: HasCallStack => [(LetBndrX p, ExprX p)] -> ExprX p -> ExprX p
 mkLets xs e = foldr (uncurry mkLet) e xs
 
 kInt :: Integer -> ExprX p
