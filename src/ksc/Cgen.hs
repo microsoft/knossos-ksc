@@ -10,7 +10,7 @@ import           Prelude                 hiding ( lines
                                                 )
 
 import qualified Data.Map                      as Map
-import           Data.List                      ( intercalate )
+import           Data.List                      ( intercalate , foldl' )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import qualified System.Directory
@@ -19,6 +19,7 @@ import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
 import           Lang                    hiding ( (<>) )
+import qualified OptLet
 
 import Debug.Trace
 
@@ -199,17 +200,48 @@ cgenDefs defs = snd $ foldl go (cstEmpty, []) $
         (CG cdecl _cfun _ctype) = cgenDefE env' def
     in  (env', strs ++ [cdecl])
 
+{- Note [Unpack tuple arguments]
+
+Defs of a tuple argument have their argument list unpacked,
+that is, if f is a Def of type Tuple [S1, ..., SN] -> T
+then the C++ function we generate for it will have N
+arguments, not one tuple.
+
+We choose N names for the argument variables and pack them into a
+tuple before emitting the function body.  We ensure that the names
+that we chose are not used in the function body by using substExpr.
+-}
+
+ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
+ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
+
 cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = params
                   , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      env' = foldl addParam env params
+      -- This check will vanish once Defs become one-arg
+      param = case params of
+        [param] -> param
+        _       -> error $ "Expected exactly one argument in UserFun.\n"
+                         ++ "Instead " ++ show f ++ " had " ++ show params
 
-      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
       cf                               = cgenUserFun f
 
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      cvars       = map mkVar params
+      (params', bodyWithUnpacking) = case typeof param of
+        -- See Note [Unpack tuple arguments]
+        TypeTuple tys ->
+          let params  = zipWith mkParam [1..] tys
+              mkParam i ty = TVar ty (Simple name)
+                where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
+              packParams = Let param (Tuple (map Var params))
+          in (params, ensureDon'tReuseParams params (packParams body))
+        _             -> ([param], body)
+
+      env' = foldl' addParam env (param:params')
+
+      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' bodyWithUnpacking
+      cvars = map mkVar params'
 
       cftypealias = "ty$" ++ cf
   in  CG
@@ -308,11 +340,11 @@ cgenExprR env = \case
 
 
 
-  Call tf@(TFun _ _) vs -> do
-      -- Untuple argument for C++ call
-    cgvs <- mapM (cgenExprR env) vs
+  Call tf@(TFun _ fun) vs -> do
+    cgvs_tys <- mapM (\v -> do cgv <- cgenExprR env v; return (cgv, typeof v)) vs
+    let cgvs = map fst cgvs_tys
     let cdecls = map getDecl cgvs
-    let cexprs = map getExpr cgvs
+    let cexprs_tys = map (\(v, ty) -> (getExpr v, ty)) cgvs_tys
     let ctypes = map getType cgvs
 
     let cftype = ctypeofFun env tf ctypes
@@ -331,7 +363,22 @@ cgenExprR env = \case
       (  unlines cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ cf ++ "(" ++ intercalate "," cexprs ++ ");\n"
+      ++ case (isUserFun (funIdOfFun fun), cexprs_tys) of
+          -- Untuple argument for C++ call
+          --
+          -- Calls of a tuple argument have their argument list
+          -- unpacked.  See the explanation in cgenDefE above.
+          (True, [(cexpr, TypeTuple _)])
+            -> "std::apply(" ++ cf ++ ", " ++ cexpr ++ ");\n"
+          -- Currently only UserFuns are expected to have exactly one
+          -- argument but soon we will ensure that all funs have
+          -- exactly one argument (and indeed change the Call
+          -- constructor to enforce this), so these special cases will
+          -- go away.
+          (True, [_]) -> cf ++ "(" ++ intercalate "," (map fst cexprs_tys) ++ ");\n"
+          (False, _)  -> cf ++ "(" ++ intercalate "," (map fst cexprs_tys) ++ ");\n"
+          (True,  _) -> error $ "Expected UserFun to have exactly one argument.\n"
+                              ++ "Instead " ++ show fun ++ " had " ++ show vs
       ++ gc "$REL"
       )
       v

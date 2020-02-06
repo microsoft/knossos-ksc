@@ -85,6 +85,7 @@ Notes:
 
 
 import Lang hiding (parens)
+import LangUtils (newVarNotIn)
 import Prim
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError )
@@ -242,14 +243,21 @@ pCall :: Parser (ExprX Parsed)
 -- Deals with plain variables (Var v), which look like nullary calls
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
+           -- See Note [Function arity]
+           ; let mkCall g args = let mk_fun_g = mk_fun g
+                                     args' = case funIdOfFun mk_fun_g of
+                                       UserFun{} -> [mkTuple args]
+                                       PrimFun{} -> args
+                                       SelFun{}  -> args
+                                 in Call mk_fun_g args'
            ; case es of
                []  -> return (Var (Simple f))
                _   | f == "$trace"   -- See Note [$trace]
                    , Var (Simple g) : es1 <- es
-                   -> return (Call (mk_fun f) [Call (mk_fun g) es1])
+                   -> return (Call (mk_fun f) [mkCall g es1])
 
                    | otherwise
-                   -> return (Call (mk_fun f) es)
+                   -> return (mkCall f es)
         }
 
 {- Note [$trace]
@@ -310,8 +318,19 @@ pDef = do { pReserved "def"
           ; ty <- pType
           ; xs <- pParams
           ; rhs <- pExpr
-          ; return (Def { def_fun = mk_fun f, def_args = xs
-                        , def_rhs = UserRhs rhs
+          -- See Note [Function arity]
+          ; let (param, argUnpackingLets) = case xs of
+                  [x] -> (x, id)
+                  xs  -> let argVar = newVarNotIn (TypeTuple (map typeof xs))
+                                                  (Tuple (map Var xs))
+                         in (argVar,
+                             let n = length xs
+                                 pSel i n e = Call (Fun (SelFun i n)) [e]
+                             in mkLets (flip map (zip [1..] xs) $ \(i, tv) ->
+                                 (tVarVar tv, pSel i n (Var (tVarVar argVar)))))
+
+          ; return (Def { def_fun = mk_fun f, def_args = [param]
+                        , def_rhs = UserRhs (argUnpackingLets rhs)
                         , def_res_ty = ty }) }
 
 pRule :: Parser Rule
@@ -328,11 +347,10 @@ pEdef = do { pReserved "edef"
            ; name       <- pIdentifier
            ; returnType <- pType
            ; argTypes   <- pTypes
-           ; let params =  [ mkTVar ty name
-                           | (ty,name) <- argTypes `zip` allNames ]
            ; return (Def { def_fun = mk_fun name
                          , def_res_ty = returnType
-                         , def_args = params
+                         -- See note [Function arity]
+                         , def_args = [mkTVar (mkTupleTy argTypes) "edefArgVar"]
                          , def_rhs = EDefRhs }) }
 
 allNames :: [String]
