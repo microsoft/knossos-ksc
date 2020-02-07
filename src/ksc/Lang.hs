@@ -422,11 +422,15 @@ getLM :: HasCallStack => Type -> Type
 getLM (TypeLM s t) = TypeLM s t
 getLM t            = error $ "Wanted TypeLM, got " ++ pps t
 
+unzipLMType :: Type -> Maybe (Type, Type)
+unzipLMType = \case
+  TypeLM s t -> Just (s, t)
+  _          -> Nothing
+
 unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
 unzipLMTypes []                  = Just ([], [])
-unzipLMTypes (lmt : lmts) = (case lmt of
-  TypeLM s t -> Just (s, t)
-  _ -> Nothing) >>= \(s, t) -> flip fmap (unzipLMTypes lmts) $
+unzipLMTypes (lmt : lmts) = unzipLMType lmt
+  >>= \(s, t) -> flip fmap (unzipLMTypes lmts) $
     \(ss, ts) -> (s : ss, t : ts)
 
 typeofKonst :: Konst -> Type
