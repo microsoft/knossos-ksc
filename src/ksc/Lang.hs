@@ -429,9 +429,9 @@ unzipLMType = \case
 
 unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
 unzipLMTypes []                  = Just ([], [])
-unzipLMTypes (lmt : lmts) = unzipLMType lmt
-  >>= \(s, t) -> flip fmap (unzipLMTypes lmts) $
-    \(ss, ts) -> (s : ss, t : ts)
+unzipLMTypes (lmt : lmts) = do
+  (s, t) <- unzipLMType lmt
+  flip fmap (unzipLMTypes lmts) $ \(ss, ts) -> (s : ss, t : ts)
 
 typeofKonst :: Konst -> Type
 typeofKonst (KInteger _) = TypeInteger
