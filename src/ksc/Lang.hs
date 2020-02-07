@@ -425,7 +425,7 @@ getLM t            = error $ "Wanted TypeLM, got " ++ pps t
 unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
 unzipLMTypes []                  = Just ([], [])
 unzipLMTypes (lmt : lmts) = case lmt of
-  TypeLM s t -> flip fmap (unzipLMTypes lmts) $
+  TypeLM s t -> Just (s, t) >>= \(s, t) -> flip fmap (unzipLMTypes lmts) $
     \(ss, ts) -> (s : ss, t : ts)
   _ -> Nothing
 
