@@ -11,26 +11,26 @@ type LSTMWeights = {
   wx : Mat  // learnable parameters for input-to-hidden projection with the shape [hidden_dim x 4, in_dim]
   wh : Mat  // learnable parameters for hidden-to-hidden projection with the shape [hidden_dim x 4, in_dim]
   b : Vec   // learnable bias with shape [1, hidden_dim x 4]
-end
+}
 
 // learnable parameters for the attention module.
-struct AttentionWeights
+type AttentionWeights = {
   enc_proj : Mat
   dec_hidden_proj : Mat
   attn_proj : Mat  // this projection projects hidden vectors into unnormalized attention scores.
-end
+}
 
 // all learnable parameters for the seq2seq model.
-struct Seq2SeqWeights
+type Seq2SeqWeights = {
   src_embedding : Mat
   trg_embedding : Mat
   encoder::Array{LSTMWeights}  // parameters for bi-directional LSTM
   decoder::LSTMWeights
   attn::AttentionWeights
   pre_softmax_proj : Mat
-end
-sigmoid, tanh and softmax activations.
+}
 
+// sigmoid, tanh and softmax activations.
 σ(x) = 1 / (1 + exp(-x))
 
 tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))
@@ -40,12 +40,12 @@ function softmax(m : Mat)
   out .= exp.(m .- maxval)
   out ./= sum(out, 2)
 end
-Embedding layer
+// Embedding layer
 
 // This overloading function defines the embedding layer
 // which is a lookup table in essence.
 A : Mat * B::Array{Int} = A[:, B]
-LSTM and bi-directional LSTM
+//LSTM and bi-directional LSTM
 
 offset(x:Mat, h : int, n : int) = x[(n - 1) * h : h * n, :]
 
