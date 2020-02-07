@@ -315,7 +315,7 @@ pConstVec = mkPrimCall2 "constVec"
 
 pDiag :: TExpr -> TExpr -> TExpr -> TExpr
 -- diag rows cols (\i. e) = build row (\i. deltaVec cols i e)
-pDiag = mkPrimCall3 "diag"
+pDiag r c l = mkPrimCall1 "diag" (Tuple [r, c, l])
 
 ---------------------------
 -- "User-defined" functions
@@ -527,9 +527,9 @@ primFunCallResultTy_maybe fun args
 
       ("constVec" , [TypeInteger, t])                        -> Just (TypeVec t)
       ("deltaVec" , [TypeInteger, TypeInteger, t])           -> Just (TypeVec t)
-      ("diag"     , [TypeInteger,
-                     TypeInteger,
-                     TypeLam TypeInteger t])                 -> Just (TypeVec (TypeVec t))
+      ("diag"     , [TypeTuple [TypeInteger,
+                                TypeInteger,
+                                TypeLam TypeInteger t]])     -> Just (TypeVec (TypeVec t))
       ("build"    , [TypeInteger,
                      TypeLam TypeInteger t])                 -> Just (TypeVec t)
 

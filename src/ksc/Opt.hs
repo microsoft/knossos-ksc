@@ -407,7 +407,7 @@ optSum e
 -- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
 
 -- RULE: sum (diag sz f)  =  build sz f
-optSum (Call diag [sz, f])
+optSum (Call diag [Tuple [sz, f]])
   | diag `isThePrimFun` "diag"
   = Just $ pBuild sz f
 
