@@ -304,7 +304,7 @@ optPrimFun env "lmApplyT"  [Tuple [e1,e2]]        = optLMApply env (AD TupleAD F
 optPrimFun env "lmApplyTR" [Tuple [e1,e2]]        = optLMApply env (AD TupleAD Rev) e2 e1
 optPrimFun _ "lmCompose"   [Tuple [f,g]]  = optLMCompose f g
 
-optPrimFun _ "lmVCat" es
+optPrimFun _ "lmVCat" [Tuple es]
   | Just prs <- mapM isLMZero_maybe es
   , (s:_, ts) <- unzip prs
   = Just $ lmZero s (mkTuple ts)
@@ -367,7 +367,7 @@ optLMCompose f g
 
   -- (m1 `hcat` m2) . (m3 `vcat` m4)  =>  (m1 . m3) + (m2 . m4)
   | Call hcat ps <- f
-  , Call vcat qs <- g
+  , Call vcat [Tuple qs] <- g
   , hcat `isThePrimFun` "lmHCat"
   , vcat `isThePrimFun` "lmVCat"
   = traceWhenUnequal "H o V" (length ps) (length qs) $
@@ -718,8 +718,8 @@ optLMApplyCall _ Rev "lmCompose" [Tuple [f,g]] dx = Just (lmApplyR (lmApplyR dx 
 optLMApplyCall _ _ "lmScale" [Tuple [_ty, x]] dx
   = Just (pScale x dx)
 
-optLMApplyCall _ Fwd "lmVCat" es dx = do_prod Fwd es dx
-optLMApplyCall _ Rev "lmVCat" es dx = do_sum  Rev es dx
+optLMApplyCall _ Fwd "lmVCat" [Tuple es] dx = do_prod Fwd es dx
+optLMApplyCall _ Rev "lmVCat" [Tuple es] dx = do_sum  Rev es dx
 optLMApplyCall _ Fwd "lmHCat" es dx = do_sum  Fwd es dx
 optLMApplyCall _ Rev "lmHCat" es dx = do_prod Rev es dx
 

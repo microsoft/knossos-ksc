@@ -178,7 +178,7 @@ lmHCatV e  = mkPrimCall1 "lmHCatV" e
 
 lmVCat :: HasCallStack => [TExpr] -> TExpr
 lmVCat [e] = e
-lmVCat es  = mkPrimCall "lmVCat" es
+lmVCat es  = mkPrimCall1 "lmVCat" (Tuple es)
 
 lmVCatV :: HasCallStack => TExpr -> TExpr
 lmVCatV e  = mkPrimCall1 "lmVCatV" e
@@ -496,9 +496,9 @@ primFunCallResultTy_maybe fun args
                                 | tangentType s1 `eqType` s2 -> Just (tangentType t)
            -- Tupled version:  lmApplyT :: (r, s -o t) -> ds -> dt
 
-      ("lmVCat"   , tys) | Just (ss,ts) <- unzipLMTypes tys
-                         , (s1:ss1) <- ss
-                         , all (== s1) ss1                   -> Just (TypeLM s1 (TypeTuple ts))
+      ("lmVCat"   , [TypeTuple tys]) | Just (ss,ts) <- unzipLMTypes tys
+                                     , (s1:ss1) <- ss
+                                     , all (== s1) ss1       -> Just (TypeLM s1 (TypeTuple ts))
       ("lmVCatV"  , [TypeVec (TypeLM s t)])                  -> Just (TypeLM s (TypeVec t))
       ("lmHCat"   , tys) | Just (ss,ts) <- unzipLMTypes tys
                          , (t1:ts1) <- ts
