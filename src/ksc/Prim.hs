@@ -273,7 +273,7 @@ isKZero = \case
   _ -> False
 
 isBuild_maybe :: TExpr -> Maybe (TExpr, TVar, TExpr)
-isBuild_maybe (Call f [n,Lam i e])
+isBuild_maybe (Call f [Tuple [n,Lam i e]])
   | f `isThePrimFun` "build"
   = Just (n, i, e)
 isBuild_maybe _ = Nothing
@@ -329,7 +329,7 @@ pNeg :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "neg"
 
 pBuild :: TExpr -> TExpr -> TExpr
-pBuild = mkPrimCall2 "build"
+pBuild n l = mkPrimCall1 "build" (Tuple [n, l])
 
 pIndex :: TExpr -> TExpr -> TExpr
 pIndex = mkPrimCall2 "index"
@@ -528,8 +528,8 @@ primFunCallResultTy_maybe fun args
       ("diag"     , [TypeTuple [TypeInteger,
                                 TypeInteger,
                                 TypeLam TypeInteger t]])     -> Just (TypeVec (TypeVec t))
-      ("build"    , [TypeInteger,
-                     TypeLam TypeInteger t])                 -> Just (TypeVec t)
+      ("build"    , [TypeTuple [TypeInteger,
+                                TypeLam TypeInteger t]])     -> Just (TypeVec t)
 
       -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
       ("pr"       , _)                                       -> Just TypeInteger

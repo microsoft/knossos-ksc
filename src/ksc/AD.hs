@@ -97,7 +97,7 @@ gradE adp s (Call f [arg])
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE adp s (Call f [n, Lam ti body])
+gradE adp s (Call f [Tuple [n, Lam ti body]])
   | f `isThePrimFun` "build"
   = gradBuild adp s n ti body
 

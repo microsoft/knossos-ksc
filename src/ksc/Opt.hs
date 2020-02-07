@@ -270,7 +270,7 @@ optPrimFun _ "scale" [x, y]
   = Nothing
 
 -- RULE: size (build (n, _)) = n
-optPrimFun _ "size" [Call build [n,_]]
+optPrimFun _ "size" [Call build [Tuple [n,_]]]
   | build `isThePrimFun` "build"
   = Just n
 
@@ -296,7 +296,7 @@ optPrimFun _ "zero" [Konst (KFloat _)]
   = Just (Konst (KFloat 0))
 
 optPrimFun _ "sum"         [arg]          = optSum arg
-optPrimFun _ "build"       [sz, Lam i e2] = optBuild sz i e2
+optPrimFun _ "build"       [Tuple [sz, Lam i e2]] = optBuild sz i e2
 optPrimFun _ "sumbuild"    [sz, Lam i e2] = optSumBuild sz i e2
 optPrimFun env "lmApply"   [Tuple [e1,e2]]        = optLMApply env (AD BasicAD Fwd) e1 e2
 optPrimFun env "lmApplyR"  [Tuple [e1,e2]]        = optLMApply env (AD BasicAD Rev) e2 e1
