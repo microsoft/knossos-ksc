@@ -684,7 +684,7 @@ optLMApplyCall :: HasCallStack
                -> Maybe TExpr       -- :: T(t)
 
 -- (lmZero :: s -o t) `apply` (x :: T(s))  = 0 :: T(t)
-optLMApplyCall _ dir "lmZero" [s, t] dx
+optLMApplyCall _ dir "lmZero" [Tuple [s, t]] dx
   = traceWhenTypesUnequal "Apply lmZero" in_ty (typeof dx) $
     Just (case dir of
             Fwd -> mkTangentZero t
