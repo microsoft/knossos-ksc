@@ -431,7 +431,8 @@ unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
 unzipLMTypes []                  = Just ([], [])
 unzipLMTypes (lmt : lmts) = do
   (s, t) <- unzipLMType lmt
-  flip fmap (unzipLMTypes lmts) $ \(ss, ts) -> (s : ss, t : ts)
+  (ss, ts) <- unzipLMTypes lmts
+  return (s : ss, t : ts)
 
 typeofKonst :: Konst -> Type
 typeofKonst (KInteger _) = TypeInteger
