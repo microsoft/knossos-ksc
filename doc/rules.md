@@ -1,6 +1,6 @@
 # Some useful rewrite rules
 
-A collection of useful rewrite ruless.  This document will probably be
+A collection of useful rewrite rules.  This document will probably be
 written up into a better LaTeX document at some point in the future.
 
 In the following, identifiers stand for expressions that may have free

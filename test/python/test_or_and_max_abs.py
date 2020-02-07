@@ -1,4 +1,4 @@
-from testutil import translate_and_import
+from ksc.utils import translate_and_import
 
 def test_abs():
     ks_str = """

@@ -6,5 +6,5 @@ setup(name='ksc',
       author='Ryota Tomioka',
       author_email='ryoto@microsoft.com',
       install_requires=['sexpdata'],
-      packages=["ksc", "ksc.backends"]
+      packages=["ksc", "ksc.backends", "ksc.tracing", "ksc.tracing.functions"]
      )

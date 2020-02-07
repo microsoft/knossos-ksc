@@ -23,12 +23,15 @@ let gte__aff (x: f64) (y: f64) = x >= y
 let lte__aii (x: i32) (y: i32) = x <= y
 let lte__aff (x: f64) (y: f64) = x <= y
 let add__aii (x: i32) (y: i32) = x + y
+let add__aff (x: f64) (y: f64) = x + y
 let sub__aii (x: i32) (y: i32) = x - y
 let sub__aff (x: f64) (y: f64) = x - y
 let div__aii (x: i32) (y: i32) = x / y
 let div__aff (x: f64) (y: f64) = x / y
 let mul__aii (x: i32) (y: i32) = x * y
 let mul__aff (x: f64) (y: f64) = x * y
+let neg__aii (x: i32) = -x
+let neg__aff (x: f64) = -x
 
 
 let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =
