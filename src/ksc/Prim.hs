@@ -148,7 +148,7 @@ zero value.  Painful, but possible.
 type Shape = TExpr
 
 lmZero :: Shape -> Shape -> TExpr
-lmZero s t = mkPrimCall2 "lmZero" s t
+lmZero s t = mkPrimCall1 "lmZero" (Tuple [s, t])
 
 lmZero_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmZero_Dir Fwd s t = lmZero s t
@@ -260,7 +260,7 @@ isLMZero_maybe :: TExpr -> Maybe (TExpr, TExpr)
 -- Just (a,b) means that the input was indeed (lmZero (a,b))
 isLMZero_maybe (Call f args)
   | f `isThePrimFun` "lmZero"
-  , [a,b] <- args
+  , [Tuple [a,b]] <- args
   = Just (a,b)
 isLMZero_maybe _ = Nothing
 
@@ -479,7 +479,7 @@ primFunCallResultTy_maybe "lmDummyFold" args
 
 primFunCallResultTy_maybe fun args
   = case (fun, args) of
-      ("lmZero"   , [s, t])                                  -> Just (TypeLM s t)
+      ("lmZero"   , [TypeTuple [s, t]])                      -> Just (TypeLM s t)
       ("lmOne"    , [t])                                     -> Just (TypeLM t t)
       ("lmScale"  , [t, TypeFloat])                          -> Just (TypeLM t t)
 
