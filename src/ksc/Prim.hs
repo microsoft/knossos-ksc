@@ -187,7 +187,7 @@ lmTranspose :: TExpr -> TExpr
 lmTranspose = mkPrimCall1 "lmTranspose"
 
 lmCompose :: TExpr -> TExpr -> TExpr
-lmCompose = mkPrimCall2 "lmCompose"
+lmCompose x1 x2 = mkPrimCall1 "lmCompose" (Tuple [x1, x2])
 
 lmApply :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApply = mkPrimCall2 "lmApply"
@@ -483,7 +483,7 @@ primFunCallResultTy_maybe fun args
       ("lmOne"    , [t])                                     -> Just (TypeLM t t)
       ("lmScale"  , [TypeTuple [t, TypeFloat]])              -> Just (TypeLM t t)
 
-      ("lmCompose", [TypeLM _ c, TypeLM a _])                -> Just (TypeLM a c)
+      ("lmCompose", [TypeTuple [TypeLM _ c, TypeLM a _]])    -> Just (TypeLM a c)
       ("lmAdd"    , [TypeLM s1 t1, TypeLM _ _])              -> Just (TypeLM s1 t1)
       ("lmTranspose", [TypeLM s t])                          -> Just (TypeLM t s)
 
