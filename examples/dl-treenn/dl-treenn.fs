@@ -5,7 +5,7 @@ type Vec = float
 type Mat = Vec
 type Tensor3 = Mat
 
-let sum = Array.sum
+let sum (v : float[]) : float = Array.sum v
 let softmax (v : Vec) = 1.1
 let argmax (v : Vec) = 1
 let crossentropy a b = 1.1
@@ -23,13 +23,16 @@ type WordTree =
     | Node of WordTree * WordTree
 
 type SentimentAnalyzerWeights = {
-    embedding : Vec []  // 300x60K  Each word in the alphabet has an embedding ...
-    Wl : Mat; Wr : Mat  // 300x300  ... and left and right child embeddings combine to give parent embedding
-    dense : Mat         // 5x300    ... and the embeddings are mapped to sentiments with a final fully connected layer
+    embedding : Vec []  // 300x60K  Each leaf (word in the alphabet) has an embedding ...
+    Wl : Mat            // 300x300  ... and internal node embedding combines left    
+    Wr : Mat            // 300x300  ... and right children with matrices Wl, Wr
+                        // And the root note embeddings are mapped to sentiments with ... 
+    dense : Mat         // 5x300    ... a final fully connected layer
 }
 
 // TreeNN model: Given input `phrase`, compute a one-hot encoding of sentiment
 let treenn (weights : SentimentAnalyzerWeights) (phrase : WordTree) =                  
+    
     // Local function to walk the tree, accumulating embedding vecs
     let rec embedding phrase =
         match phrase with
@@ -43,7 +46,7 @@ let treenn (weights : SentimentAnalyzerWeights) (phrase : WordTree) =
     // Compute the "embedding" (a 300-dim vector) for the given tree
     let tree_embedding = embedding phrase
 
-    // Map tree embedding to sentiment
+    // Map tree embedding to sentiment: 5x300 matrix and softmax
     softmax (weights.dense * tree_embedding)
 
 // Loss for one example, given hand-labelled sentiment (integer from 1..5)
@@ -65,6 +68,7 @@ let weights_init = {
         Wr = rand (H,H)
         dense = rand (5, H)
     }
+
 
 let weights_optimized = adam (fun w -> loss w examples) weights_init
 
