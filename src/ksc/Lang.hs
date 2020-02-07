@@ -428,7 +428,7 @@ unzipLMType = \case
   _          -> Nothing
 
 unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
-unzipLMTypes []                  = Just ([], [])
+unzipLMTypes [] = Just ([], [])
 unzipLMTypes (lmt : lmts) = do
   (s, t) <- unzipLMType lmt
   (ss, ts) <- unzipLMTypes lmts
