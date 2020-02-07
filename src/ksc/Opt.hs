@@ -283,7 +283,7 @@ optPrimFun _ "index" [ ei, arr ]
 --  = let i = ej in v
 
 -- RULE: deltaVec n i 0 = zero (build n (\i . 0))
-optPrimFun _ "deltaVec" [n, _i, val]
+optPrimFun _ "deltaVec" [Tuple [n, _i, val]]
   | isKZero val
   = Just $ pConstVec n val
 
@@ -412,7 +412,7 @@ optSum (Call diag [Tuple [sz, f]])
   = Just $ pBuild sz f
 
 -- RULE: sum (deltaVec sz i e) = e
-optSum (Call deltaVec [_, _, e])
+optSum (Call deltaVec [Tuple [_, _, e]])
   | deltaVec `isThePrimFun` "deltaVec"
   = Just e
 
@@ -447,7 +447,7 @@ optBuild sz i e
 
 -- RULE: build sz (\i. deltaVec sz i e)   = diag sz (\i. e)
 optBuild sz i build_e
-  | Call deltaVec [sz2, Var i2, e] <- build_e
+  | Call deltaVec [Tuple [sz2, Var i2, e]] <- build_e
   , deltaVec `isThePrimFun` "deltaVec"
   , i  == i2
   = Just $ pDiag sz sz2 (Lam i e)
@@ -521,7 +521,7 @@ optSumBuild _ i (Call delta [Var i1, ej, e])
 -- = sumbuild n (\i. if j == i then e else 0)
 -- = e[i->j]
 -- = index j (build n (\i. e))
-optSumBuild n i (Call deltaVec [_n1, Var i1, e])
+optSumBuild n i (Call deltaVec [Tuple [_n1, Var i1, e]])
   | deltaVec `isThePrimFun` "deltaVec"
   , i == i1
   -- TODO n == sz

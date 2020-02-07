@@ -307,7 +307,7 @@ pDelta = mkPrimCall3 "delta"
 pDeltaVec :: TExpr -> TExpr -> TExpr -> TExpr
 -- deltaVec size i e = build size (\j. delta i j e)
 -- Returns a size-vector with e at index i, and zeros elsewhere
-pDeltaVec = mkPrimCall3 "deltaVec"
+pDeltaVec n i e = mkPrimCall1 "deltaVec" (Tuple [n, i, e])
 
 pConstVec :: TExpr -> TExpr -> TExpr
 -- constVec size e = build size (\_. e)
@@ -524,7 +524,7 @@ primFunCallResultTy_maybe fun args
       ("$trace"   , [t])                                     -> Just t
 
       ("constVec" , [TypeInteger, t])                        -> Just (TypeVec t)
-      ("deltaVec" , [TypeInteger, TypeInteger, t])           -> Just (TypeVec t)
+      ("deltaVec" , [TypeTuple [TypeInteger, TypeInteger, t]]) -> Just (TypeVec t)
       ("diag"     , [TypeTuple [TypeInteger,
                                 TypeInteger,
                                 TypeLam TypeInteger t]])     -> Just (TypeVec (TypeVec t))

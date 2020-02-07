@@ -695,8 +695,9 @@ namespace ks
 	}
 
 	template <class T>
-	vec<T> deltaVec(int n, int i, T val)
+	vec<T> deltaVec(std::tuple<int, int, T>  n_i_val)
 	{
+		auto [n, i, val] = n_i_val;
 		vec<T> ret(n);
 		T z = zero(val);
 		for(int j = 0; j < n; ++j)
@@ -740,7 +741,7 @@ namespace ks
 		KS_ASSERT(rows == cols);
 		typedef decltype(f(int{})) T;
 		return build<vec<T>>(rows, [cols,f](int i) { 
-					return deltaVec(cols, i, f(i)); 
+					return deltaVec(make_tuple(cols, i, f(i)));
 		});
 	}
 

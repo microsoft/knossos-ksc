@@ -299,7 +299,7 @@ sumbuild ret xs =
   where ret' = toFutharkType ret
 
 callPrimFun :: String -> L.Type -> [L.TExpr] -> Exp
-callPrimFun "deltaVec" (L.TypeVec ret) [n, i, v] =
+callPrimFun "deltaVec" (L.TypeVec ret) [L.Tuple [n, i, v]] =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
                          toFutharkExp i,

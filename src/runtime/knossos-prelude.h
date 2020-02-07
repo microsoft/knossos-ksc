@@ -75,7 +75,7 @@ vec<double> rev$maximum(vec<double> const& v, double dr)
 {
     std::cerr << "[rev$maximum untested]";
     size_t i = imaximum(v);
-    return deltaVec(size(v), i, dr);
+    return deltaVec(std::make_tuple(size(v), (int)i, dr));
 }
 
 double digamma(double x)
