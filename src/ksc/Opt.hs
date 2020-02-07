@@ -323,8 +323,8 @@ optPrimFun _ "lmAdd" [Tuple [p,q]]
   = Just $ lmScale (typeof t1) (pAdd x y)
 
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
-optPrimFun _ "lmAdd" [Tuple [ Call hcat1 ps
-                            , Call hcat2 qs] ]
+optPrimFun _ "lmAdd" [Tuple [ Call hcat1 [Tuple ps]
+                            , Call hcat2 [Tuple qs] ] ]
   | hcat1 `isThePrimFun` "lmHCat"
   , hcat2 `isThePrimFun` "lmHCat"
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
@@ -361,12 +361,12 @@ optLMCompose f g
 
   -- f . (g x h)   =>  (f . g) x (f . h)
   -- This duplicates f; we might want to take care
-  | Call hcat qs <- g
+  | Call hcat [Tuple qs] <- g
   , hcat `isThePrimFun` "lmHCat"
   = Just (lmHCat (map (lmCompose f) qs))
 
   -- (m1 `hcat` m2) . (m3 `vcat` m4)  =>  (m1 . m3) + (m2 . m4)
-  | Call hcat ps <- f
+  | Call hcat [Tuple ps] <- f
   , Call vcat [Tuple qs] <- g
   , hcat `isThePrimFun` "lmHCat"
   , vcat `isThePrimFun` "lmVCat"
@@ -720,8 +720,8 @@ optLMApplyCall _ _ "lmScale" [Tuple [_ty, x]] dx
 
 optLMApplyCall _ Fwd "lmVCat" [Tuple es] dx = do_prod Fwd es dx
 optLMApplyCall _ Rev "lmVCat" [Tuple es] dx = do_sum  Rev es dx
-optLMApplyCall _ Fwd "lmHCat" es dx = do_sum  Fwd es dx
-optLMApplyCall _ Rev "lmHCat" es dx = do_prod Rev es dx
+optLMApplyCall _ Fwd "lmHCat" [Tuple es] dx = do_sum  Fwd es dx
+optLMApplyCall _ Rev "lmHCat" [Tuple es] dx = do_prod Rev es dx
 
 optLMApplyCall env Fwd "lmVCatV" [e] dx = do_prod_v env Fwd e dx
 optLMApplyCall env Rev "lmVCatV" [e] dx = do_sum_v  env Rev e dx

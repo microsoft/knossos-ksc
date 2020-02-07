@@ -171,7 +171,7 @@ lmAdds (x:xs) = lmAdd x (lmAdds xs)
 
 lmHCat :: HasCallStack => [TExpr] -> TExpr
 lmHCat [e] = e
-lmHCat es  = mkPrimCall "lmHCat" es
+lmHCat es  = mkPrimCall "lmHCat" [Tuple es]
 
 lmHCatV :: HasCallStack => TExpr -> TExpr
 lmHCatV e  = mkPrimCall1 "lmHCatV" e
@@ -500,9 +500,9 @@ primFunCallResultTy_maybe fun args
                                      , (s1:ss1) <- ss
                                      , all (== s1) ss1       -> Just (TypeLM s1 (TypeTuple ts))
       ("lmVCatV"  , [TypeVec (TypeLM s t)])                  -> Just (TypeLM s (TypeVec t))
-      ("lmHCat"   , tys) | Just (ss,ts) <- unzipLMTypes tys
-                         , (t1:ts1) <- ts
-                         , all (== t1) ts1                   -> Just (TypeLM (TypeTuple ss) t1)
+      ("lmHCat"   , [TypeTuple tys]) | Just (ss,ts) <- unzipLMTypes tys
+                                     , (t1:ts1) <- ts
+                                     , all (== t1) ts1       -> Just (TypeLM (TypeTuple ss) t1)
       ("lmHCatV"  , [TypeVec (TypeLM t s)])                  -> Just (TypeLM (TypeVec t) s)
 
       -- ($inline f args) forces f to be inlined here
