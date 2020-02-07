@@ -315,8 +315,8 @@ optPrimFun _ "lmAdd" [p,q]
   | isLMZero q = Just p
 
 -- Add(Scale(x), Scale(y)) = Scale(Add(x,y))
-  | Call scale1 [t1, x] <- p
-  , Call scale2 [t2, y] <- q
+  | Call scale1 [Tuple [t1, x]] <- p
+  , Call scale2 [Tuple [t2, y]] <- q
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
   , typeof t1 == typeof t2
@@ -347,8 +347,8 @@ optLMCompose f g
 
 optLMCompose f g
   -- Scale(T, x) . Scale(T, y) = Scale(T, xy )
-  | Call scale1 [t1, x] <- f
-  , Call scale2 [t2, y] <- g
+  | Call scale1 [Tuple [t1, x]] <- f
+  , Call scale2 [Tuple [t2, y]] <- g
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
   , typeof t1 == typeof t2
@@ -707,7 +707,7 @@ optLMApplyCall _ dir "lmAdd"  [f,g] dx
 optLMApplyCall _ Fwd "lmCompose" [f,g] dx = Just (lmApply f (lmApply g dx))
 optLMApplyCall _ Rev "lmCompose" [f,g] dx = Just (lmApplyR (lmApplyR dx f) g)
 
-optLMApplyCall _ _ "lmScale" [_ty, x] dx
+optLMApplyCall _ _ "lmScale" [Tuple [_ty, x]] dx
   = Just (pScale x dx)
 
 optLMApplyCall _ Fwd "lmVCat" es dx = do_prod Fwd es dx
