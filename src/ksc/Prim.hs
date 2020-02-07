@@ -380,35 +380,33 @@ primCallResultTy_maybe :: HasCallStack => Fun -> [Type]
 primCallResultTy_maybe fun args
   = case fun of
       Fun (PrimFun f)
-         | Just ty <- primFunCallResultTy_maybe f (map typeof args)
+         | Just ty <- primFunCallResultTy_maybe f args
          -> Right ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
 
-      Fun (SelFun i n) -> selCallResultTy_maybe i n arg_tys
+      Fun (SelFun i n) -> selCallResultTy_maybe i n args
 
       GradFun f adp
         -> case primCallResultTy_maybe (Fun f) args of
             Left err -> Left err
-            Right res_ty -> Right (mkGradType adp (mkTupleTy arg_tys) res_ty)
+            Right res_ty -> Right (mkGradType adp (mkTupleTy args) res_ty)
 
       DrvFun f (AD _ Fwd)    -- f :: S1 S2 -> T, then fwd$f :: (S1, S2) (S1_t, S2_t) -> T_t
         | [x, _dx] <- args
-        , let x' = case typeof x of
+        , let x' = case x of
                 TypeTuple ts -> ts
-                _            -> [typeof x]
+                _            -> [x]
         , Right t_ty <- primCallResultTy_maybe (Fun f) x'
         -> Right (tangentType t_ty)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
       DrvFun _ (AD _ Rev)    -- f :: S1 S2 -> T, then rev$f :: S1 S2 T_t -> (S1_t, S2_t)
-        | let s_tys = dropLast arg_tys
+        | let s_tys = dropLast args
         -> Right (tangentType (mkTupleTy s_tys))
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
-  where
-    arg_tys = map typeof args
 
 selCallResultTy_maybe :: Int -> Int -> [Type] -> Either SDoc Type
 selCallResultTy_maybe i n [TypeTuple arg_tys]
