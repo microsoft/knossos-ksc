@@ -205,7 +205,7 @@ lmApply_Dir Rev e dt = lmApplyR dt e
 
 lmApplyT_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApplyT_Dir Fwd e ds = mkPrimCall1 "lmApplyT"  (Tuple [e, ds])
-lmApplyT_Dir Rev e dt = mkPrimCall2 "lmApplyTR" dt e
+lmApplyT_Dir Rev e dt = mkPrimCall1 "lmApplyTR" (Tuple [dt, e])
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuild n b = lmVCatV (pBuild n b)
