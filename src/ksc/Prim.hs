@@ -204,7 +204,7 @@ lmApply_Dir Fwd e ds = lmApply  e ds
 lmApply_Dir Rev e dt = lmApplyR dt e
 
 lmApplyT_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
-lmApplyT_Dir Fwd e ds = mkPrimCall2 "lmApplyT"  e ds
+lmApplyT_Dir Fwd e ds = mkPrimCall1 "lmApplyT"  (Tuple [e, ds])
 lmApplyT_Dir Rev e dt = mkPrimCall2 "lmApplyTR" dt e
 
 lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
@@ -491,7 +491,7 @@ primFunCallResultTy_maybe fun args
       ("lmApplyR" , [TypeTuple [t1, TypeLM s t2]]) | t1 `eqType` tangentType t2 -> Just (tangentType s)
            -- Reverse apply:  lmApplyR :: dt -> (s -o t) -> ds
 
-      ("lmApplyT" , [TypeTuple [_, TypeLM s1 t], s2])
+      ("lmApplyT" , [TypeTuple [TypeTuple [_, TypeLM s1 t], s2]])
                                 | tangentType s1 `eqType` s2 -> Just (tangentType t)
            -- Tupled version:  lmApplyT :: (r, s -o t) -> ds -> dt
 

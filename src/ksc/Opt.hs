@@ -300,7 +300,7 @@ optPrimFun _ "build"       [sz, Lam i e2] = optBuild sz i e2
 optPrimFun _ "sumbuild"    [sz, Lam i e2] = optSumBuild sz i e2
 optPrimFun env "lmApply"   [Tuple [e1,e2]]        = optLMApply env (AD BasicAD Fwd) e1 e2
 optPrimFun env "lmApplyR"  [Tuple [e1,e2]]        = optLMApply env (AD BasicAD Rev) e2 e1
-optPrimFun env "lmApplyT"  [e1,e2]        = optLMApply env (AD TupleAD Fwd) e1 e2
+optPrimFun env "lmApplyT"  [Tuple [e1,e2]]        = optLMApply env (AD TupleAD Fwd) e1 e2
 optPrimFun env "lmApplyTR" [e1,e2]        = optLMApply env (AD TupleAD Rev) e2 e1
 optPrimFun _ "lmCompose"   [Tuple [f,g]]  = optLMCompose f g
 
