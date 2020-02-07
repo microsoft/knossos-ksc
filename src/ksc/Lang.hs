@@ -338,7 +338,7 @@ mkArgVar n = Simple ("a" ++ show n)
 mkDummy :: Type -> TExpr
 mkDummy ty = Dummy ty
 
-mkLet :: HasCallStack => LetBndrX p -> ExprX p -> ExprX p -> ExprX p
+mkLet :: LetBndrX p -> ExprX p -> ExprX p -> ExprX p
 mkLet = Let
 
 mkLets :: HasCallStack => [(LetBndrX p, ExprX p)] -> ExprX p -> ExprX p
