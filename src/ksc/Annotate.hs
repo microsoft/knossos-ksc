@@ -238,7 +238,7 @@ callResultTy_maybe env fun args
   | is_user_fun fun
   = userCallResultTy_maybe fun (gblST env) args
   | otherwise
-  = primCallResultTy_maybe fun args
+  = primCallResultTy_maybe fun (map typeof args)
   where
     funId = \case
       Fun     f   -> f

@@ -375,7 +375,7 @@ pMulff x1 x2 = userCall "mul@ff" TypeFloat [x1, x2]
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: HasType t => HasCallStack => Fun -> [t]
+primCallResultTy_maybe :: HasCallStack => Fun -> [Type]
                        -> Either SDoc Type
 primCallResultTy_maybe fun args
   = case fun of
