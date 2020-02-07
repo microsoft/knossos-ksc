@@ -185,6 +185,41 @@ function foo1(as,b)
 end
 
 ir = IR(IRTools.typed_meta(Tuple{typeof(foo1),Array{Float64,1},Float64}))
+IRTools.expand!(ir)
 println(ir)
 println("--------------------")
+make_sexps(ir)
+
+#------------------------------------------
+const Float = Float64
+
+function make_f(a :: Float)
+    b = 2a
+    t -> sin(b*t)
+end
+
+function h(as, xs)
+    fs = map(make_f, as)
+    vals = map(map, fs, map(cos, xs))
+    sum(vals)
+end
+
+function h1(as, xs)
+    sum([g2(as[i],xs[i]) for i = 1:length(as)])
+end
+
+as = [x + 0.1 for x in 1:4]
+xs = [sqrt(x) for x in 1:4]
+
+map(make_f, as)
+
+println("h = ",h(as, xs))
+println(Zygote.pullback(h, as, xs))
+
+println("h1 = ", h1(as, xs))
+println(Zygote.gradient(h1, as, xs))
+
+ir = IR(IRTools.typed_meta(Tuple{typeof(h),Array{Float64,1},Array{Float64,1}}, 
+            optimize=true))
+#IRTools.expand!(ir)
 make_sexps(ir)
