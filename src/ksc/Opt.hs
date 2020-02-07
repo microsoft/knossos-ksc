@@ -302,7 +302,7 @@ optPrimFun env "lmApply"   [e1,e2]        = optLMApply env (AD BasicAD Fwd) e1 e
 optPrimFun env "lmApplyR"  [e1,e2]        = optLMApply env (AD BasicAD Rev) e2 e1
 optPrimFun env "lmApplyT"  [e1,e2]        = optLMApply env (AD TupleAD Fwd) e1 e2
 optPrimFun env "lmApplyTR" [e1,e2]        = optLMApply env (AD TupleAD Rev) e2 e1
-optPrimFun _ "lmCompose"   [f,g]          = optLMCompose f g
+optPrimFun _ "lmCompose"   [Tuple [f,g]]  = optLMCompose f g
 
 optPrimFun _ "lmVCat" es
   | Just prs <- mapM isLMZero_maybe es
@@ -355,7 +355,7 @@ optLMCompose f g
   = Just $ lmScale (typeof t1) (pMulff x y)
 
   -- (f . g) . h   =>   f . (g . h)
-  | Call lmcomp [p1,p2] <- f
+  | Call lmcomp [Tuple [p1,p2]] <- f
   , lmcomp `isThePrimFun` "lmCompose"
   = optLMCompose p1 (lmCompose p2 g)
 
@@ -704,8 +704,8 @@ optLMApplyCall _ _ "lmOne" t dx
 optLMApplyCall _ dir "lmAdd"  [f,g] dx
   = Just (pAdd (lmApply_Dir dir f dx) (lmApply_Dir dir g dx))
 
-optLMApplyCall _ Fwd "lmCompose" [f,g] dx = Just (lmApply f (lmApply g dx))
-optLMApplyCall _ Rev "lmCompose" [f,g] dx = Just (lmApplyR (lmApplyR dx f) g)
+optLMApplyCall _ Fwd "lmCompose" [Tuple [f,g]] dx = Just (lmApply f (lmApply g dx))
+optLMApplyCall _ Rev "lmCompose" [Tuple [f,g]] dx = Just (lmApplyR (lmApplyR dx f) g)
 
 optLMApplyCall _ _ "lmScale" [Tuple [_ty, x]] dx
   = Just (pScale x dx)
