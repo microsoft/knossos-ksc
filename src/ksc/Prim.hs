@@ -159,7 +159,7 @@ lmOne s = mkPrimCall1 "lmOne" (mkDummy s)
 
 lmScale :: HasCallStack => Type -> TExpr -> TExpr
 -- lmScale :: Float -> (s -o s)
-lmScale s r = mkPrimCall2 "lmScale" (mkDummy s) r
+lmScale s r = mkPrimCall1 "lmScale" (Tuple [mkDummy s, r])
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd = mkPrimCall2 "lmAdd"
@@ -481,7 +481,7 @@ primFunCallResultTy_maybe fun args
   = case (fun, args) of
       ("lmZero"   , [TypeTuple [s, t]])                      -> Just (TypeLM s t)
       ("lmOne"    , [t])                                     -> Just (TypeLM t t)
-      ("lmScale"  , [t, TypeFloat])                          -> Just (TypeLM t t)
+      ("lmScale"  , [TypeTuple [t, TypeFloat]])              -> Just (TypeLM t t)
 
       ("lmCompose", [TypeLM _ c, TypeLM a _])                -> Just (TypeLM a c)
       ("lmAdd"    , [TypeLM s1 t1, TypeLM _ _])              -> Just (TypeLM s1 t1)
