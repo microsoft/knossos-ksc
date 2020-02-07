@@ -311,7 +311,7 @@ pDeltaVec n i e = mkPrimCall1 "deltaVec" (Tuple [n, i, e])
 
 pConstVec :: TExpr -> TExpr -> TExpr
 -- constVec size e = build size (\_. e)
-pConstVec = mkPrimCall2 "constVec"
+pConstVec n e = mkPrimCall1 "constVec" (Tuple [n, e])
 
 pDiag :: TExpr -> TExpr -> TExpr -> TExpr
 -- diag rows cols (\i. e) = build row (\i. deltaVec cols i e)
@@ -523,7 +523,7 @@ primFunCallResultTy_maybe fun args
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , [t])                                     -> Just t
 
-      ("constVec" , [TypeInteger, t])                        -> Just (TypeVec t)
+      ("constVec" , [TypeTuple [TypeInteger, t]])            -> Just (TypeVec t)
       ("deltaVec" , [TypeTuple [TypeInteger, TypeInteger, t]]) -> Just (TypeVec t)
       ("diag"     , [TypeTuple [TypeInteger,
                                 TypeInteger,
