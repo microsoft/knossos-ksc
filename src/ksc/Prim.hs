@@ -162,7 +162,7 @@ lmScale :: HasCallStack => Type -> TExpr -> TExpr
 lmScale s r = mkPrimCall1 "lmScale" (Tuple [mkDummy s, r])
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
-lmAdd = mkPrimCall2 "lmAdd"
+lmAdd x1 x2 = mkPrimCall1 "lmAdd" (Tuple [x1, x2])
 
 lmAdds :: HasCallStack => [TExpr]-> TExpr
 lmAdds [] = error "lmAdds of empty list (perhaps this should return lmZero?)"
@@ -483,7 +483,7 @@ primFunCallResultTy_maybe fun args
       ("lmScale"  , [TypeTuple [t, TypeFloat]])              -> Just (TypeLM t t)
 
       ("lmCompose", [TypeTuple [TypeLM _ c, TypeLM a _]])    -> Just (TypeLM a c)
-      ("lmAdd"    , [TypeLM s1 t1, TypeLM _ _])              -> Just (TypeLM s1 t1)
+      ("lmAdd"    , [TypeTuple [TypeLM s1 t1, TypeLM _ _]])  -> Just (TypeLM s1 t1)
       ("lmTranspose", [TypeLM s t])                          -> Just (TypeLM t s)
 
       ("lmApply"  , [TypeLM s1 t, s2]) | tangentType s1 `eqType` s2 -> Just (tangentType t)

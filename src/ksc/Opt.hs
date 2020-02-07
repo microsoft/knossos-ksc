@@ -310,7 +310,7 @@ optPrimFun _ "lmVCat" es
   = Just $ lmZero s (mkTuple ts)
 
 -- Add(0, x) = x = Add(x, 0)
-optPrimFun _ "lmAdd" [p,q]
+optPrimFun _ "lmAdd" [Tuple [p,q]]
   | isLMZero p = Just q
   | isLMZero q = Just p
 
@@ -323,8 +323,8 @@ optPrimFun _ "lmAdd" [p,q]
   = Just $ lmScale (typeof t1) (pAdd x y)
 
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
-optPrimFun _ "lmAdd" [ Call hcat1 ps
-                   , Call hcat2 qs]
+optPrimFun _ "lmAdd" [Tuple [ Call hcat1 ps
+                            , Call hcat2 qs] ]
   | hcat1 `isThePrimFun` "lmHCat"
   , hcat2 `isThePrimFun` "lmHCat"
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
@@ -701,7 +701,7 @@ optLMApplyCall _ _ "lmOne" t dx
              (tangentType (typeofArgs t)) (typeof dx) $
     Just dx
 
-optLMApplyCall _ dir "lmAdd"  [f,g] dx
+optLMApplyCall _ dir "lmAdd" [Tuple [f,g]] dx
   = Just (pAdd (lmApply_Dir dir f dx) (lmApply_Dir dir g dx))
 
 optLMApplyCall _ Fwd "lmCompose" [Tuple [f,g]] dx = Just (lmApply f (lmApply g dx))
@@ -828,7 +828,7 @@ hspec = do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
         optPrimFun emptyInScopeSet "lmAdd"
-            [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)]
+            [Tuple [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)]]
         `shouldBe`
         Just (lmScale TypeFloat (mkPrimCall2 "add" (kTFloat 1.3) (kTFloat 0.4)))
 
