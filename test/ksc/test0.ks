@@ -17,7 +17,7 @@
                                 (Vec Float))))
   (let ((n (size vn))
         (m (size (get$1$2 t))))
-  (add (sum (build n (lam (i : Integer) (to_float i))))
+  (add@ff (sum (build n (lam (i : Integer) (to_float i))))
      (sum (build m (lam (j : Integer) (sum (get$2$2 (get$2$2 t)))))))))
 
 (def test_inline (Vec Integer) (x : Vec Float)
