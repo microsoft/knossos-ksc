@@ -547,8 +547,13 @@ primFunCallResultTy_maybe fun args
                                                                 then Just t
                                                                 else Nothing
       ("neg"      , [t]                                    ) -> Just t
-      ("eq"       , _                                      ) -> Just TypeBool
-      ("ne"       , _                                      ) -> Just TypeBool
+      -- For eq and ne we check that the two arguments have the same type
+      ("eq"       , [t1, t2]                               )
+        | t1 `eqType` t2 -> Just TypeBool
+        | otherwise      -> Nothing
+      ("ne"       , [t1, t2]                               )
+        | t1 `eqType` t2 -> Just TypeBool
+        | otherwise      -> Nothing
 
       ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
 
