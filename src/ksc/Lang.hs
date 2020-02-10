@@ -254,6 +254,12 @@ data Fun = Fun      FunId         -- The function              f(x)
                                   --   Rev <=> reverse mode f`(x,dr)
          deriving( Eq, Ord, Show )
 
+isUserFun :: FunId -> Bool
+isUserFun = \case
+  UserFun{} -> True
+  PrimFun{} -> False
+  SelFun{}  -> False
+
 funIdOfFun :: Fun -> FunId
 funIdOfFun = \case
   Fun f       -> f
