@@ -98,7 +98,7 @@ notFreeIn :: TVar -> TExpr -> Bool
 notFreeIn = go
  where
    go:: TVar -> TExpr -> Bool
-   go v (Var v2)     = v /= v2
+   go v (Var v2)     = tVarVar v /= tVarVar v2
    go v (Dummy {})   = True
    go v (Konst _)    = True
    go v (Tuple es)   = all (go v) es
