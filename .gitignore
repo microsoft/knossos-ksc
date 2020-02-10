@@ -89,3 +89,8 @@ users/simonpj/AD.pdf
 
 etc/ks-vscode/node_modules/
 etc/ks-vscode/out/
+
+# Python byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
