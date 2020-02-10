@@ -813,7 +813,7 @@ do_fold Fwd _ i m i' m' acc v ds_acc_v = Just (pFFold f acc v df dacc dv)
              $ lmApplied
           where
             lmApplied = lmApply_Dir Fwd m' (Tuple [ds, Var di'])
-            di'       = newVarNotIn (tangentType (typeof i')) m'
+            di'       = newVarNotIn (tangentType (typeof i')) (Tuple [m', ds])
             i'_di'    =
               newVarNotIn (TypeTuple [ typeof i' , tangentType (typeof i')])
                           lmApplied
