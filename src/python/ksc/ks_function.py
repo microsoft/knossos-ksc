@@ -1,4 +1,6 @@
 from ksc import utils
+from ksc.backends import popart
+from functools import partial
 
 class KsFunction:
     def __init__(self, name, return_type, arg_name_types, ks_str, is_edef=False, is_builtin=False):
@@ -55,6 +57,12 @@ class KsFunction:
             if self._py_mod is None:
                 self._py_mod = utils.translate_and_import(ks_str, backend)
         if hasattr(self._py_mod, "defs"):
-            return self._py_mod.defs[name_to_call](*args)
+            fn = self._py_mod.defs[name_to_call]
         else:
-            return self._py_mod.main(*args)
+            fn = self._py_mod.main
+        if backend == 'popart':
+            res = popart._run_model(partial(fn, *args))
+        else:
+            res = fn(*args)
+
+        return res
