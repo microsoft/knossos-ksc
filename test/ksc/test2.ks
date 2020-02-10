@@ -2,7 +2,7 @@
 ; Licensed under the MIT license.
 
 (def f1 Float ((x :  Float) (y :  Float) (i : Integer))
-        (mul@ff (if (lt@ii i 3) (add x 1.0) (mul@ff 7.0 (to_float i))) y)
+        (mul@ff (if (lt@ii i 3) (add@ff x 1.0) (mul@ff 7.0 (to_float i))) y)
 )
 
 (def f2 Float ((x : Vec Float) (y : Vec Float) (i : Integer) )

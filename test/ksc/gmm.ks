@@ -26,7 +26,7 @@
               ((Vec Float) (Vec Float)))
 (edef R$dotv (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
 (def fwd$dotv Float ((a : Vec Float) (b : Vec Float) (da : Vec Float) (db : Vec Float))
-    (add (dotv a db) (dotv da b)))
+    (add@ff (dotv a db) (dotv da b)))
 (def rev$dotv (Tuple (Vec Float) (Vec Float))
                ((a : Vec Float) (b : Vec Float) (dr : Float))
     (tuple (mul$R$VecR dr b) (mul$R$VecR dr a)))
@@ -84,7 +84,7 @@
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
     (let ((out (mul@ff 0.28618247146235004 (to_float (mul@ii p (sub@ii p 1)))))) ; 0.25 log pi
-      (add out
+      (add@ff out
          (sum (build p (lam (j : Integer)
                  (lgamma (sub@ff a (mul@ff 0.5 (to_float j))))))))))
 
@@ -103,7 +103,7 @@
                     (sub@ff (log wishart_gamma)
                        (mul@ff 0.5 (log 2.0))))
                  (log_gamma_distrib (mul@ff 0.5 (to_float n)) p)))
-          (frobenius (add  (sqnorm Qdiag) (sqnorm ltri_Q)))
+          (frobenius (add@ff  (sqnorm Qdiag) (sqnorm ltri_Q)))
           (w2f   (mul@ff 0.5 (mul@ff (mul@ff wishart_gamma wishart_gamma) frobenius)))
           )
         (sub@ff (sub@ff w2f
@@ -132,7 +132,7 @@
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
                                   (mahal_vec (mul$Mat$Vec Q
                                                       (sub$VecR$VecR (index i x) (index k means)))))
-                              (sub@ff (add (index k alphas)
+                              (sub@ff (add@ff (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))
                               )
@@ -140,7 +140,7 @@
                             ))))
                           ))))
           )
-            (add (add CONSTANT
+            (add@ff (add@ff CONSTANT
                 (sub@ff slse
                   (mul@ff (to_float N) (logsumexp alphas))))
             (sum (build K (lam (k : Integer)
@@ -237,11 +237,11 @@
           (dot_at_ls         (dotvv grad_gmm_ls dls))
           (dot_at_wishart    (mul@ff (get$1$2 grad_gmm_wishart) (get$1$2 dwishart)))
 
-          (grad_gmm_dot_dtheta (add      dot_at_x
-                                (add     dot_at_alphas
-                                 (add    dot_at_mus
-                                  (add   dot_at_qs
-                                   (add  dot_at_ls
+          (grad_gmm_dot_dtheta (add@ff      dot_at_x
+                                (add@ff     dot_at_alphas
+                                 (add@ff    dot_at_mus
+                                  (add@ff   dot_at_qs
+                                   (add@ff  dot_at_ls
                                        dot_at_wishart))))))
 
           (df (sub@ff gmm_at_theta_plus_dtheta gmm_at_theta))
