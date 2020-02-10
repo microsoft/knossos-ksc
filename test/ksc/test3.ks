@@ -31,7 +31,7 @@
     (let ((v1 (build 4 (lam (i : Integer) (to_float i))))
           (delta 0.00001)
           (dv (build 4 (lam (i : Integer) (mul@ff (to_float i) delta))))
-          (dq (build 8 (lam (i : Integer) (div delta (to_float (add 3 i)))))))
+          (dq (build 8 (lam (i : Integer) (div delta (to_float (add@ff 3 i)))))))
         (pr 1
             ; (D$f v1 v1)
             ; (D$g 1.1)

@@ -30,7 +30,7 @@
            (b  (get$2$2 a_b))
            (da (get$1$2 da_db))
            (db (get$2$2 da_db)))
-    (add (dotv a db) (dotv da b))))
+    (add@ff (dotv a db) (dotv da b))))
 (def rev$dotv (Tuple (Vec Float) (Vec Float))
                ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
      (let ((a  (get$1$2 a_b))
@@ -94,7 +94,7 @@
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
     (let ((out (mul@ff 0.28618247146235004 (to_float (mul@ii p (sub@ii p 1)))))) ; 0.25 log pi
-      (add out
+      (add@ff out
          (sum (build p (lam (j : Integer)
                  (lgamma (sub@ff a (mul@ff 0.5 (to_float j))))))))))
 
@@ -113,7 +113,7 @@
                     (sub@ff (log wishart_gamma)
                        (mul@ff 0.5 (log 2.0))))
                  (log_gamma_distrib (mul@ff 0.5 (to_float n)) p)))
-          (frobenius (add  (sqnorm Qdiag) (sqnorm ltri_Q)))
+          (frobenius (add@ff  (sqnorm Qdiag) (sqnorm ltri_Q)))
           (w2f   (mul@ff 0.5 (mul@ff (mul@ff wishart_gamma wishart_gamma) frobenius)))
           )
         (sub@ff (sub@ff w2f
@@ -142,7 +142,7 @@
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
                                   (mahal_vec (mul$Mat$Vec Q
                                                       (sub$VecR$VecR (index i x) (index k means)))))
-                              (sub@ff (add (index k alphas)
+                              (sub@ff (add@ff (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))
                               )
@@ -150,7 +150,7 @@
                             ))))
                           ))))
           )
-            (add (add CONSTANT
+            (add@ff (add@ff CONSTANT
                 (sub@ff slse
                   (mul@ff (to_float N) (logsumexp alphas))))
             (sum (build K (lam (k : Integer)

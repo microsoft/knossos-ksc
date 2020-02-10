@@ -26,7 +26,7 @@
         (f 0.0 1.0)
         ; See https://github.com/awf/knossos/issues/281 (D$f 1.1 2.2 )
         (g x y)
-        "FD=" (div@ff (sub@ff (f x (add y delta)) (f x y)) delta)
+        "FD=" (div@ff (sub@ff (f x (add@ff y delta)) (f x y)) delta)
         (fwd$f (tuple x y) (tuple delta delta))
         "CHECK=" ($check f1 rev$f1 (tuple x y) (tuple x y) (tuple delta delta) 0.1)
       )
