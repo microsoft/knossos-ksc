@@ -60,11 +60,11 @@ optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
 optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
   = do { -- The variables brought into scope by the argument list are
          -- the names of the arguments themselves (args)
-         let varsBroughtIntoScopeByArgs = mkEmptySubst args
+         let varsBroughtIntoScopeByArgs = mkEmptySubst [args]
              env = OptEnv { optRuleBase = rb
                           , optGblST = gst
                           , optSubst = varsBroughtIntoScopeByArgs }
-       ; rhs' <- simplify env args rhs
+       ; rhs' <- simplify env [args] rhs
        ; let def' = def { def_rhs = UserRhs rhs' }
        ; return (extendGblST gst [def'], def') }
 
@@ -207,7 +207,7 @@ optFun env (PrimFun "$inline") arg
   | [Call (TFun _ fun) inner_arg] <- arg
   , Just fun_def <- lookupGblST fun (optGblST env)
   , Def { def_args = bndrs, def_rhs = UserRhs body } <- fun_def
-  = Just (inlineCall bndrs body inner_arg)
+  = Just (inlineCall [bndrs] body inner_arg)
 
 -- Other prims are determined by their args
 optFun env (PrimFun f) e

@@ -376,7 +376,7 @@ toCall f@(L.TFun _ L.DrvFun{}) args =
 toFuthark :: L.TDef -> Def
 toFuthark (L.Def f args res_ty (L.UserRhs e)) =
   DefFun entry fname []
-  params res_ty' (toFutharkExp e)
+  [param] res_ty' (toFutharkExp e)
   where fname = toName f
         entry = if fname == "main" then Entry else NotEntry
         -- We do not insert a return type annotation on entry points
@@ -384,6 +384,6 @@ toFuthark (L.Def f args res_ty (L.UserRhs e)) =
         -- translate in a non-type-preserving way.
         res_ty' = case entry of Entry -> Nothing
                                 NotEntry -> Just $ toFutharkType res_ty
-        params = map toFutharkParam args
+        param = toFutharkParam args
 toFuthark d =
   DefComment $ render $ ppr d

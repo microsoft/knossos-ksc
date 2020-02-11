@@ -62,12 +62,12 @@ gradDef adp
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs)) }
   where
     s :: TExpr
-    s = mkTuple (map Var params)
+    s = mkTuple [Var params]
     s_ty = typeof s
 
     lets = [ (gradTVar adp s p, mkGradTuple adp (Var p) lm)
-           | p <- params
-           , let lm = lmSelFun params p ]
+           | p <- [params]
+           , let lm = lmSelFun [params] p ]
 
 gradDef _ _ = Nothing
 
@@ -271,28 +271,17 @@ applyD :: ADDir -> TDef -> TDef
 applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                 , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Fwd)
-        , def_args   = [varst1]
-        , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply (lets lm) $ Var dvarst
+        , def_args   = varst1
+        , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dvarst
         , def_res_ty = t }
   where
-    varst1 = newVarNotIn (TypeTuple [typeof varst, typeof dvarst])
-                         (Tuple (map Var (varst:dvarst:vars)))
+    varst1 = newVarNotIn (TypeTuple [typeof vars, typeof dvarst])
+                         (Tuple (map Var [vars,dvarst,vars]))
 
-    varst = case vars of
-      [var] -> var
-      _     -> newVarNotIn (TypeTuple (map typeof vars)) (Tuple (map Var vars))
+    dvarst = to_delta vars
 
-    dvarst = to_delta varst
-
-    nVars = length vars
-
-    extract2args = mkLets [ (varst,  pSel 1 2 (Var varst1))
+    extract2args = mkLets [ (vars,   pSel 1 2 (Var varst1))
                           , (dvarst, pSel 2 2 (Var varst1)) ]
-
-    lets = case vars of
-      [_] -> id
-      _   -> mkLets $ flip map (zip [1..] vars) $ \(i, v) ->
-        (v, pSel i nVars (Var varst))
 
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
     to_delta (TVar _  v         )
@@ -300,7 +289,7 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
     (perhapsFstToo, lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (id, rhs, tangentType t)
-            (TupleAD, TypeTuple [t, _]) -> ((\lmrhs -> Tuple [lets (pFst rhs), lmrhs]),
+            (TupleAD, TypeTuple [t, _]) -> ((\lmrhs -> Tuple [pFst rhs, lmrhs]),
                                             pSnd rhs,
                                             TypeTuple [t, tangentType t])
             (adp    , t               )
@@ -312,26 +301,15 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
                 , def_args = vars, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Rev)
-        , def_args   = [varst1]
-        , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) (lets lm)
-        , def_res_ty = tangentType (mkTupleTy (map typeof vars)) }
+        , def_args   = varst1
+        , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
+        , def_res_ty = tangentType (mkTupleTy [typeof vars]) }
   where
-    varst1 = newVarNotIn (TypeTuple [typeof varst, typeof dr])
-                         (Tuple (map Var (varst:dr:vars)))
+    varst1 = newVarNotIn (TypeTuple [typeof vars, typeof dr])
+                         (Tuple (map Var [vars,dr,vars]))
 
-    varst = case vars of
-      [var] -> var
-      _     -> newVarNotIn (TypeTuple (map typeof vars)) (Tuple (map Var vars))
-
-    nVars = length vars
-
-    extract2args = mkLets [ (varst, pSel 1 2 (Var varst1))
+    extract2args = mkLets [ (vars,  pSel 1 2 (Var varst1))
                           , (dr,    pSel 2 2 (Var varst1)) ]
-
-    lets = case vars of
-      [_] -> id
-      _   -> mkLets $ flip map (zip [1..] vars) $ \(i, v) ->
-        (v, pSel i nVars (Var varst))
 
     dr = TVar (tangentType t) $ Delta "r"
     (lm, t)  -- lm :: s -o t

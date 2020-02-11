@@ -200,14 +200,9 @@ cgenDefs defs = snd $ foldl go (cstEmpty, []) $
     in  (env', strs ++ [cdecl])
 
 cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (Def { def_fun = f, def_args = params
+cgenDefE env (Def { def_fun = f, def_args = param
                   , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      -- This check will vanish once Defs become one-arg
-      param = case params of
-        [params] -> params
-        _        -> error $ "Expected exactly one argument in UserFun.\n"
-                          ++ "Instead " ++ show f ++ " had " ++ show params
       env' = addParam env param
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
@@ -230,7 +225,7 @@ cgenDefE env (Def { def_fun = f, def_args = params
               ++ "(" ++ intercalate "," argVarNames ++ ");\n")
         _             -> ([param], "")
 
-      cvars = map mkVar params'
+      cvars      = map mkVar params'
 
       cftypealias = "ty$" ++ cf
   in  CG
@@ -241,7 +236,7 @@ cgenDefE env (Def { def_fun = f, def_args = params
         ++    cftypealias
         `spc` cf
         ++    "("
-        ++    intercalate ", " cvars
+        ++    intercalate "," cvars
         ++    ") {\n"
         ++    tupling
         ++    cbodydecl
