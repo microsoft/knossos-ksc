@@ -172,3 +172,21 @@ def shape_type_from_object(o):
         return ShapeType((), Type.Float)
     else:
         raise ValueError(f"Cannot handle object {o}")
+
+def compare_backend_results(fn):
+    import os
+    backends_path = os.path.join(os.path.dirname(__file__), "backends")
+    _b = import_module_from_path('_b', os.path.join(backends_path, 'jax.py'))
+    res_jax = fn(_b)
+    _b = import_module_from_path('_b', os.path.join(backends_path, 'popart.py'))
+    from functools import partial
+    res_pop = _b._run_model(partial(fn, _b))
+    # print(f'{type(res_jax)} {type(res_pop)} {np.allclose(res_jax, res_pop, rtol=1e-4)}')
+    # if type(res_jax) == np.ndarray and type (res_pop) == np.ndarray and \
+    if not np.allclose(res_jax, res_pop, rtol=1e-4):
+        print('Results DIFFER')
+        print(f'Results:\n'
+            f'jax:\n  {res_jax}\npopart:\n  {res_pop}')
+    else:
+        print('All good.')
+    return res_jax
