@@ -1,8 +1,8 @@
-(edef MatMul (Vec (Vec Float)) ((Vec (Vec Float)) (Vec (Vec Float))))
-(edef BroadcastAdd (Vec (Vec Float)) ((Vec (Vec Float)) (Vec Float)))
-(edef Transpose (Vec (Vec Float)) ((Vec (Vec Float))))
-(edef Relu (Vec (Vec Float)) (Vec (Vec Float)))
-(edef LogSoftmax (Vec (Vec Float)) (Vec (Vec Float)))
+(edef dot (Vec (Vec Float)) ((Vec (Vec Float)) (Vec (Vec Float))))
+(edef broadcast_add (Vec (Vec Float)) ((Vec (Vec Float)) (Vec Float)))
+(edef transpose (Vec (Vec Float)) ((Vec (Vec Float))))
+(edef relu (Vec (Vec Float)) (Vec (Vec Float)))
+(edef log_softmax (Vec (Vec Float)) (Vec (Vec Float)))
 (edef ones (Vec Float) ((len : Integer)))
 (edef ones_2d (Vec (Vec Float)) ((len1 : Integer) (len2 : Integer)))
 
@@ -11,13 +11,13 @@
       (input : (Vec (Vec Float))))
   (let ((W (get$1$2 weights))
         (b (get$2$2 weights)))
-    (BroadcastAdd (MatMul input (Transpose W)) b))
+    (broadcast_add (dot input (transpose W)) b))
 )
 
 (def DenseAndRelu (Vec (Vec Float))
     ((weights : (Tuple (Vec (Vec Float)) (Vec Float)))
       (input : (Vec (Vec Float))))
-  (Relu (Dense weights input))
+  (relu (Dense weights input))
 )
 
 (def MLP (Vec (Vec Float))
@@ -26,7 +26,7 @@
      (input : (Vec (Vec Float))))
   (let ((weights_1 (get$1$2 weights))
         (weights_2 (get$2$2 weights)))
-    (LogSoftmax (DenseAndRelu weights_2 (DenseAndRelu weights_1 input)))
+    (log_softmax (DenseAndRelu weights_2 (DenseAndRelu weights_1 input)))
   )
 )
 
