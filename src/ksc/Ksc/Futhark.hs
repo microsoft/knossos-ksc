@@ -267,8 +267,8 @@ toFutharkExp :: L.TExpr -> Exp
 toFutharkExp (L.Konst k) = Const $ toFutharkConst k
 toFutharkExp (L.Var v) = Var $ toName v
 toFutharkExp (L.If cond te fe) = If (toFutharkExp cond) (toFutharkExp te) (toFutharkExp fe)
-toFutharkExp (L.Let (L.TVar _ (L.Simple v)) e1 body) =
-  Let (PatId v) (toFutharkExp e1) (toFutharkExp body)
+toFutharkExp (L.Let (L.TVar _ v) e1 body) =
+  Let (PatId (toName v)) (toFutharkExp e1) (toFutharkExp body)
 toFutharkExp (L.Tuple es) =
   ExpTuple $ map toFutharkExp es
 toFutharkExp (L.Lam (L.TVar _ v) body) =
