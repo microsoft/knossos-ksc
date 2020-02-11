@@ -40,7 +40,7 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: Fun
-        , def_args   :: [TVarX]  -- See Note [Function arity]
+        , def_args   :: TVarX  -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
@@ -116,9 +116,6 @@ if n /= 2.  Nested unpacking is not supported, yet.
 
 (For the moment this transformation only happens for UserFuns but once
 we make PrimFuns one-arg the special case will vanish.)
-
-Soon the Def constructor will be changed to enforce the condition that
-there must be exactly one argument.
 
 -}
 
@@ -880,14 +877,14 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
       EDefRhs -> parens $
                  sep [ text "edef", ppr f
                      , pprParendType res_ty
-                     , parens (pprList (pprParendType . tVarType) vs) ]
+                     , parens ((pprParendType . tVarType) vs) ]
 
       UserRhs rhs -> mode
           (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
-                        , parens (sep (map (parens . pprTVar) vs))
+                        , parens ((parens . pprTVar) vs)
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
-                    2 (parens (pprList pprTVar vs))
+                    2 (parens (pprTVar vs))
                , nest 2 (text "=" <+> ppr rhs) ])
 
       StubRhs -> text "<<StubRhs>>"

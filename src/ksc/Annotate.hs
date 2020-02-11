@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
              PatternSynonyms, StandaloneDeriving,
 	     ScopedTypeVariables, TypeApplications #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Annotate (
   annotDecls, lintDefs
@@ -14,8 +15,8 @@ import KMonad
 import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
-import Control.Monad( ap, when )
-import Data.List( intersperse, nub, (\\) )
+import Control.Monad( ap )
+import Data.List( intersperse )
 
 -----------------------------------------------
 --     The type inference pass
@@ -51,7 +52,7 @@ annotDecls gbl_env decls
     mk_rec_def :: DefX Parsed -> TcM TDef
     mk_rec_def (Def { def_fun = fun, def_args = args, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
-         tcArgs args $ \args' ->
+         tcArgs [args] $ \[args'] ->
          do { return (Def { def_fun = fun, def_args = args'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
@@ -88,8 +89,7 @@ tcDef (Def { def_fun    = fun
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
-    do { checkNoDuplicatedArgs vars
-       ; tcArgs vars $ \vars' ->
+    do { tcArgs [vars] $ \[vars'] ->
     do { rhs' <- tcRhs fun rhs res_ty
        ; return (Def { def_fun = fun, def_args = vars'
                      , def_rhs = rhs', def_res_ty = res_ty })
@@ -123,19 +123,6 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
        ; return (Rule { ru_name = name, ru_qvars = qvars
                       , ru_lhs = lhs', ru_rhs = rhs' })
     }}
-
--- Checks that there are no duplicated args, i.e. nothing of the form
---
---     f (..., x : T1, ..., x : T2, ...) = ...
---
--- (regardless of whether T1 and T2 are the same or not)
-checkNoDuplicatedArgs :: [TVarX] -> TcM ()
-checkNoDuplicatedArgs args = when (not distinct) $
-                  addErr (text "Duplicated arguments:" <+> commaPpr duplicated)
-    where argNames   = map tVarVar args
-          duplicated = nub (argNames \\ nub argNames)
-          distinct   = null duplicated
-          commaPpr   = sep . punctuate comma . map ppr
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
@@ -259,11 +246,11 @@ userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
                            , def_args = params })
                       args
-  = case check_args 1 bndr_tys arg_tys of
+  = case check_args 1 [bndr_tys] arg_tys of
       Just err -> Left err
       Nothing  -> Right ret_ty
   where
-    bndr_tys   = map tVarType params
+    bndr_tys   = tVarType params
     arg_tys    = map typeof args
 
     check_args :: Int -> [Type] -> [Type] -> Maybe SDoc
@@ -418,7 +405,7 @@ lookupLclTc v
                                           , text "Envt:" <+> gblDoc st ])
                              ; return TypeUnknown
                              }
-                  Just d -> return (TypeLam (TypeTuple $ map tVarType (def_args d)) (def_res_ty d))
+                  Just d -> return (TypeLam (TypeTuple $ map tVarType [def_args d]) (def_res_ty d))
            Just ty -> return ty }
   where
      varFun (Simple name) = mk_fun name

@@ -329,7 +329,7 @@ pDef = do { pReserved "def"
                              in mkLets (flip map (zip [1..] xs) $ \(i, tv) ->
                                  (tVarVar tv, pSel i n (Var (tVarVar argVar)))))
 
-          ; return (Def { def_fun = mk_fun f, def_args = [param]
+          ; return (Def { def_fun = mk_fun f, def_args = param
                         , def_rhs = UserRhs (argUnpackingLets rhs)
                         , def_res_ty = ty }) }
 
@@ -350,7 +350,7 @@ pEdef = do { pReserved "edef"
            ; return (Def { def_fun = mk_fun name
                          , def_res_ty = returnType
                          -- See note [Function arity]
-                         , def_args = [mkTVar (mkTupleTy argTypes) "edefArgVar"]
+                         , def_args = mkTVar (mkTupleTy argTypes) "edefArgVar"
                          , def_rhs = EDefRhs }) }
 
 allNames :: [String]
