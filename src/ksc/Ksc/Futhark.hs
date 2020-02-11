@@ -224,9 +224,8 @@ toFutharkType L.TypeString     = Array DimAny I8
 toFutharkType t =
   error $ "toFutharkType: unhandled " ++ show t
 
-toFutharkParam :: L.TVar -> (Param, [TypeParam])
-toFutharkParam (L.TVar t v) =
-  (Param (toName v) $ toFutharkType t, [])
+toFutharkParam :: L.TVar -> Param
+toFutharkParam (L.TVar t v) = Param (toName v) $ toFutharkType t
 
 toFutharkConst :: L.Konst -> Const
 toFutharkConst (L.KInteger x) = ConstI32 $ fromInteger x
@@ -376,7 +375,7 @@ toCall f@(L.TFun _ L.DrvFun{}) args =
 
 toFuthark :: L.TDef -> Def
 toFuthark (L.Def f args res_ty (L.UserRhs e)) =
-  DefFun entry fname (filter notParam $ nub $ concat size_params)
+  DefFun entry fname []
   params res_ty' (toFutharkExp e)
   where fname = toName f
         entry = if fname == "main" then Entry else NotEntry
@@ -385,7 +384,6 @@ toFuthark (L.Def f args res_ty (L.UserRhs e)) =
         -- translate in a non-type-preserving way.
         res_ty' = case entry of Entry -> Nothing
                                 NotEntry -> Just $ toFutharkType res_ty
-        (params, size_params) = unzip $ map toFutharkParam args
-        notParam tp = typeParamName tp `notElem` map paramName params
+        params = map toFutharkParam args
 toFuthark d =
   DefComment $ render $ ppr d
