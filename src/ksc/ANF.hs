@@ -23,7 +23,7 @@ anfD def@(Def { def_rhs  = rhs
               , def_args = args })
   = case rhs of
       UserRhs expr ->
-        do { expr' <- anfExpr (mkEmptySubst args) expr
+        do { expr' <- anfExpr (mkEmptySubst [args]) expr
            ; return (def { def_rhs = UserRhs expr' }) }
 
       EDefRhs{} -> return def

@@ -216,19 +216,14 @@ ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
 ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
 
 cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (Def { def_fun = f, def_args = params
+cgenDefE env (Def { def_fun = f, def_args = param
                   , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      -- This check will vanish once Defs become one-arg
-      param = case params of
-        [param] -> param
-        _       -> error $ "Expected exactly one argument in UserFun.\n"
-                         ++ "Instead " ++ show f ++ " had " ++ show params
 
       cf                               = cgenUserFun f
 
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      (params', bodyWithUnpacking) = case typeof param of
+      (params, bodyWithUnpacking) = case typeof param of
         -- See Note [Unpack tuple arguments]
         TypeTuple tys ->
           let params  = zipWith mkParam [1..] tys
@@ -238,10 +233,10 @@ cgenDefE env (Def { def_fun = f, def_args = params
           in (params, ensureDon'tReuseParams params (packParams body))
         _             -> ([param], body)
 
-      env' = foldl' addParam env (param:params')
+      env' = foldl' addParam env (param:params)
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' bodyWithUnpacking
-      cvars = map mkVar params'
+      cvars = map mkVar params
 
       cftypealias = "ty$" ++ cf
   in  CG
