@@ -10,9 +10,7 @@ import           Prelude                 hiding ( lines
                                                 )
 
 import qualified Data.Map                      as Map
-import           Data.Monoid                    ( (<>), mempty )
 import           Data.List                      ( intercalate )
-import qualified Data.Set                      as Set
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import qualified System.Directory
@@ -205,10 +203,7 @@ cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = params
                   , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-      addSizeVar env v = cstInsertVar v (CType TypeInteger) env
-      (vecsizes, sizeVars) = vecSizeDecls params
-
-      env' = foldl addSizeVar (foldl addParam env params) sizeVars
+      env' = foldl addParam env params
 
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' body
       cf                               = cgenUserFun f
@@ -227,7 +222,6 @@ cgenDefE env (Def { def_fun = f, def_args = params
         ++    "("
         ++    intercalate ", " cvars
         ++    ") {\n"
-        ++    vecsizes ++ "\n"
         ++    cbodydecl
         ++    "return ("
         ++    cbodyexpr
@@ -239,38 +233,6 @@ cgenDefE env (Def { def_fun = f, def_args = params
 
 cgenDefE _ def = pprPanic "cgenDefE" (ppr def)
   -- Should not happen because of the 'filter isUserDef' in cgenDefs
-
-
--- A decl of the form v : Vec n (Tuple (String, Vec m (Vec n Float)))
--- should cg to a prelude in the C function like the following
---   int n = size(v);
---   assert(n>0);
---   int m = size(get<2>(get_an_element(v)));
---   assert(n == get_an_element(get<2>(get_an_element(v))))
-
-vecSizeDecls :: [TVar] -> (String, Set.Set Var)
-vecSizeDecls vs = (concat str, new)
-  where (str, new) = vecSizeDecls' vs
-
-vecSizeDecls' :: [TVar] -> ([String], Set.Set Var)
-vecSizeDecls' vs = goVars (Set.fromList $ map tVarVar vs) vs
-  where
-    goVars :: Set.Set Var -> [TVar] -> ([String], Set.Set Var)
-    goVars _ [] = mempty
-    goVars seen (TVar ty v:vs) = let (seen',str) = goType seen (cgenVar v) ty
-                                 in str <> goVars seen' vs
-
-    goType :: Set.Set Var -> String -> Type -> (Set.Set Var, ([String], Set.Set Var))
-    goType seen value (TypeTuple tys) =
-        foldl (\ (seen,(str, new)) (ty,n) -> accum (str ++ ["/*tup*/"], new) $ goType seen (get value n) ty)
-              (seen, mempty)
-              (zip tys [0..])
-
-    goType seen value _ = (seen, (["/*" ++ value ++ "*/\n"], Set.empty))
-
-    get v n = "std::get<" ++ show n ++ ">(" ++ v ++ ")"
-
-    accum str (seen,str') = (seen, str <> str')
 
 cgenExpr :: CST -> TExpr -> M CGenResult
 cgenExpr = cgenExprR
