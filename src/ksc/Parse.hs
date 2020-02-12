@@ -244,17 +244,12 @@ pCall :: Parser (ExprX Parsed)
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            -- See Note [Function arity]
-           ; let mkCall g args = let mk_fun_g = mk_fun g
-                                     args' = case funIdOfFun mk_fun_g of
-                                       UserFun{} -> [mkTuple args]
-                                       PrimFun{} -> [mkTuple args]
-                                       SelFun{}  -> args
-                                 in Call mk_fun_g args'
+           ; let mkCall g args = Call (mk_fun g) (mkTuple args)
            ; case es of
                []  -> return (Var (Simple f))
                _   | f == "$trace"   -- See Note [$trace]
                    , Var (Simple g) : es1 <- es
-                   -> return (Call (mk_fun f) [mkCall g es1])
+                   -> return (Call (mk_fun f) (mkCall g es1))
 
                    | otherwise
                    -> return (mkCall f es)
@@ -325,7 +320,7 @@ pDef = do { pReserved "def"
                                                   (Tuple (map Var xs))
                          in (argVar,
                              let n = length xs
-                                 pSel i n e = Call (Fun (SelFun i n)) [e]
+                                 pSel i n e = Call (Fun (SelFun i n)) e
                              in mkLets (flip map (zip [1..] xs) $ \(i, tv) ->
                                  (tVarVar tv, pSel i n (Var (tVarVar argVar)))))
 

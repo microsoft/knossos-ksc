@@ -272,7 +272,7 @@ cgenExprR env = \case
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) [Tuple [sz, Lam (TVar vty var) body]] -> do
+  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -297,7 +297,7 @@ cgenExprR env = \case
         (mkCType (TypeVec ty))
 
   -- Special case for sumbuild -- inline the loop
-  Call (TFun ty (Fun (PrimFun "sumbuild"))) [Tuple [sz, Lam (TVar vty var@(Simple _)) body]] -> do
+  Call (TFun ty (Fun (PrimFun "sumbuild"))) (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -336,13 +336,13 @@ cgenExprR env = \case
 
 
   Call tf@(TFun _ fun) vs -> do
-    cgvs_tys <- mapM (\v -> do cgv <- cgenExprR env v; return (cgv, typeof v)) vs
-    let cgvs = map fst cgvs_tys
-    let cdecls = map getDecl cgvs
-    let cexprs_tys = map (\(v, ty) -> (getExpr v, ty)) cgvs_tys
-    let ctypes = map getType cgvs
+    cgvs_tys <- do cgv <- cgenExprR env vs; return (cgv, typeof vs)
+    let cgvs = fst cgvs_tys
+    let cdecls = getDecl cgvs
+    let cexprs_tys = (\(v, ty) -> (getExpr v, ty)) cgvs_tys
+    let ctypes = getType cgvs
 
-    let cftype = ctypeofFun env tf ctypes
+    let cftype = ctypeofFun env tf [ctypes]
 
     v        <- freshCVar
     bumpmark <- freshCVar
@@ -355,7 +355,7 @@ cgenExprR env = \case
     let cf = cgenAnyFun tf cftype
 
     return $ CG
-      (  unlines cdecls
+      (  cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
       ++ case (not (isSelFun (funIdOfFun fun)), cexprs_tys) of
@@ -363,21 +363,15 @@ cgenExprR env = \case
           --
           -- Calls of a tuple argument have their argument list
           -- unpacked.  See the explanation in cgenDefE above.
-          (True, [(cexpr, TypeTuple ts)])
+          -- SelFuns translate to C++ get, so they don't have their
+          -- argument lists unpacked!
+          (True, (cexpr, TypeTuple ts))
             -> cf ++ "("
                ++ intercalate ","
                       (flip map [0..length ts - 1] $ \i ->
                           "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
                ++ ");\n"
-          -- Currently non-SelFuns are expected to have exactly one
-          -- argument but soon we will ensure that all funs have
-          -- exactly one argument (and indeed change the Call
-          -- constructor to enforce this), so these special cases will
-          -- go away.
-          (True, [_]) -> cf ++ "(" ++ intercalate "," (map fst cexprs_tys) ++ ");\n"
-          (False, _)  -> cf ++ "(" ++ intercalate "," (map fst cexprs_tys) ++ ");\n"
-          (True,  _) -> error $ "Expected UserFun to have exactly one argument.\n"
-                              ++ "Instead " ++ show fun ++ " had " ++ show vs
+          (_, (cexpr, _)) -> cf ++ "(" ++ cexpr ++ ");\n"
       ++ gc "$REL"
       )
       v

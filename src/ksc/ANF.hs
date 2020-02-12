@@ -41,9 +41,9 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
 anfE _ (Dummy ty)        = return (Dummy ty)
 anfE subst (Var tv)      = return (substVar subst tv)
-anfE subst (Call fun es@[Tuple _])
-                         = Call fun <$> mapM (anfE  subst) es
-anfE subst (Call fun es) = Call fun <$> mapM (anfE1 subst) es
+anfE subst (Call fun es@(Tuple _))
+                         = Call fun <$> anfE  subst es
+anfE subst (Call fun es) = Call fun <$> anfE1 subst es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = substBndr v subst
                                ; emit v' r'
