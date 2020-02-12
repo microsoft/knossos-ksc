@@ -21,17 +21,36 @@ def _np_to_popart_tensor(x):
       np.dtype('float32'): 'FLOAT',
       np.dtype('float64'): 'FLOAT',
       np.dtype('int32'): 'INT32',
+      np.dtype('int64'): 'INT32',
     }
     t = builder.addInputTensor(popart.TensorInfo(typs[x.dtype], x.shape))
     if x.dtype == np.dtype('float64'):
       x = x.astype(np.float32)  # TODO maybe not do this
+    if x.dtype == np.dtype('int64'):
+      x = x.astype(np.int32)  # TODO maybe not do this
     inputs[t] = x
   elif x_typ == str:
-    # TODO need a better way to identify the output of popart operations!
+    if x in builder.getInputTensorIds() or x in builder.getValueTensorIds():
     t = x
+  else:
+      raise Exception(f'Tensor {x} not recognized by popART!\n'
+        f'Available tensors are:\n'
+        f'{builder.getInputTensorIds()}\n{builder.getValueTensorIds()}')
   else:
     raise Exception('Got unrecognized type: ' + str(x_typ))
   return t
+
+def _np_to_popart_tensors(*args):
+  '''Convert a list or tuple of numpy arrays to a popart tensors.'''
+  if len(args) != 1:
+    return tuple(_np_to_popart_tensors(t) for t in args)
+  else:
+    arg = args[0]
+    if isinstance(arg, list):
+      return list(_np_to_popart_tensors(t) for t in arg)
+    if isinstance(arg, tuple):
+      return tuple(_np_to_popart_tensors(t) for t in arg)
+    return _np_to_popart_tensor(arg)
 
 def _run_test(model, inputs):
   '''Run `model` on the IPU model for debugging the output.'''
@@ -88,42 +107,35 @@ def _run_model(model):
     results = results[0]
   return results
 
-def add(x, b):
-  x = _np_to_popart_tensor(x)
-  b = _np_to_popart_tensor(b)
-  return builder.aiOnnx.add([x, b])
+def add(a, b):
+  a, b = _np_to_popart_tensors(a, b)
+  return builder.aiOnnx.add([a, b])
 
 def sub(a, b):
-  a = _np_to_popart_tensor(a)
-  b = _np_to_popart_tensor(b)
+  a, b = _np_to_popart_tensors(a, b)
   return builder.aiOnnx.sub([a, b])
 
 def mul(a, b):
-  a = _np_to_popart_tensor(a)
-  b = _np_to_popart_tensor(b)
+  a, b = _np_to_popart_tensors(a, b)
   return builder.aiOnnx.mul([a, b])
 
 def div_ii(a, b):
   raise NotImplementedError
 
 def div_ff(a, b):
-  a = _np_to_popart_tensor(a)
-  b = _np_to_popart_tensor(b)
+  a, b = _np_to_popart_tensors(a, b)
   return builder.aiOnnx.div([a, b])
 
 def eq(a, b):
-  a = _np_to_popart_tensor(a)
-  b = _np_to_popart_tensor(b)
+  a, b = _np_to_popart_tensors(a, b)
   return builder.aiOnnx.equal([a, b])
 
 def lt(a, b):
-  a = _np_to_popart_tensor(a)
-  b = _np_to_popart_tensor(b)
+  a, b = _np_to_popart_tensors(a, b)
   return builder.aiOnnx.less([a, b])
 
 def gt(a, b):
-  a = _np_to_popart_tensor(a)
-  b = _np_to_popart_tensor(b)
+  a, b = _np_to_popart_tensors(a, b)
   return builder.aiOnnx.greater([a, b])
 
 def lte(a, b):
@@ -143,8 +155,7 @@ def abs_(a):
   return builder.aiOnnx.abs([a])
 
 def max_(a, b):
-  a = _np_to_popart_tensor(a)
-  b = _np_to_popart_tensor(b)
+  a, b = _np_to_popart_tensors(a, b)
   return builder.aiOnnx.max([a, b])
 
 def neg(a):
@@ -172,14 +183,12 @@ def fold(f, s0, xs):
       s = f((s, x))
   return s
 
-def broadcast_add(x, b):
-  x = _np_to_popart_tensor(x)
-  b = _np_to_popart_tensor(b)
-  return builder.aiOnnx.add([x, b])
+def broadcast_add(a, b):
+  a, b = _np_to_popart_tensors(a, b)
+  return builder.aiOnnx.add([a, b])
 
 def dot(x, y):
-  x = _np_to_popart_tensor(x)
-  y = _np_to_popart_tensor(y)
+  x, y = _np_to_popart_tensors(x, y)
   return builder.aiOnnx.matmul([x, y])
 
 def transpose(x):
@@ -216,16 +225,16 @@ conv_2d_no_bias_valid = _conv_2d_no_bias_factory("VALID")
 
 def normalize_2d(x, weights):
   mean, sigma = weights
-  x = _np_to_popart_tensor(x)
-  mean = _np_to_popart_tensor(mean[:, None, None])
-  sigma = _np_to_popart_tensor(sigma[:, None, None])
+  x, mean, sigma = _np_to_popart_tensors(
+      x, mean[:, None, None], sigma[:, None, None])
   return builder.aiOnnx.div([builder.aiOnnx.sub([x, mean]), sigma])
 
 def batch_norm_2d(x, weights):
+  # TODO implement using builder.aiOnnx.batchnormalization
   mean, var, gamma, beta = weights
   sigma = np.sqrt(var + 1e-5)
   z = normalize_2d(x, (mean, sigma))
-  return gamma[:, None, None] * z + beta[:, None, None]
+  return add(mul(gamma[:, None, None], z), beta[:, None, None])
 
 def to_float(x):
   if hasattr(x, "astype"):
