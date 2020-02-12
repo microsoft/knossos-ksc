@@ -298,24 +298,24 @@ sumbuild ret xs =
   where ret' = toFutharkType ret
 
 callPrimFun :: String -> L.Type -> [L.TExpr] -> Exp
-callPrimFun "deltaVec" (L.TypeVec ret) [n, i, v] =
+callPrimFun "deltaVec" (L.TypeVec ret) [L.Tuple [n, i, v]] =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
                          toFutharkExp i,
                          toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "delta" ret [i, j, v] =
+callPrimFun "delta" ret [L.Tuple [i, j, v]] =
   Call (Var "delta") [zeroValue ret',
                       toFutharkExp i,
                       toFutharkExp j,
                       toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "sumbuild" ret [n, f] =
+callPrimFun "sumbuild" ret [L.Tuple [n, f]] =
   sumbuild ret $ Call (Var "tabulate") [toFutharkExp n, toFutharkExp f]
 
-callPrimFun "index" _ [i, arr] =
+callPrimFun "index" _ [L.Tuple [i, arr]] =
   case toFutharkExp arr of
     Index arr' is ->
       Index arr' $ is ++ [toFutharkExp i]
@@ -326,7 +326,7 @@ callPrimFun "index" _ [i, arr] =
 -- relational operators are overloaded.  Since the only overloaded
 -- Futhark functions are the magical built-in infix operators, we map
 -- these functions to those.
-callPrimFun op _ [x, y]
+callPrimFun op _ [L.Tuple [x, y]]
   | Just op' <- lookup op binOpPrimFuns =
       -- This might be a vectorised operator - if so, we have to put
       -- enough 'map2's on top to make the types work out.

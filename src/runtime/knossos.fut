@@ -1,4 +1,4 @@
-let build = tabulate
+let build (n, l) = tabulate n l
 let exp = f64.exp
 let log = f64.log
 let sin = f64.sin

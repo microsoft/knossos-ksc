@@ -33,7 +33,7 @@ anfD def@(Def { def_rhs  = rhs
 anfExpr :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
 anfExpr subst e = wrapLets (anfE subst e)
 
--- See Note [Cloning during ANF]
+-- See Notes [Cloning during ANF] [ANF on tuples]
 --
 -- anfE :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
 anfE :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
@@ -41,6 +41,8 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ (Konst k)         = return (Konst k)
 anfE _ (Dummy ty)        = return (Dummy ty)
 anfE subst (Var tv)      = return (substVar subst tv)
+anfE subst (Call fun es@[Tuple _])
+                         = Call fun <$> mapM (anfE  subst) es
 anfE subst (Call fun es) = Call fun <$> mapM (anfE1 subst) es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = substBndr v subst
@@ -89,6 +91,18 @@ But that risks shadowing free occurrences of 'f' in <body2>.
 Solution: clone any binder that is already in scope, so that the
 result has no shadowing.  That is the (sole) reason that ANF carries a
 substitution.
+-}
+
+{- Note [ANF on tuples]
+~~~~~~~~~~~~~~~~~~~~~~~
+
+We do not want turn to `f (x, y)` into `let a = (x, y) in f a`.  This
+is particularly important when f is build, or some other function
+which takes a lambda (inside a tuple).  We simply are not able (yet)
+to differentiate the lambda away from its build.  But in general it
+makes life harder for the optimiser if we move the tuple away from its
+function.  Many of our optimisation rules match on the call of a
+function on a literal tuple.
 -}
 
 data FloatDef p = FD (LetBndrX p) (ExprX p)

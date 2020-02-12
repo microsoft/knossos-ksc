@@ -87,11 +87,11 @@ type family MTypeX p where
 {- Note [Function arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-All UserFuns are functions of a single argument, regardless of whether
+All functions are functions of a single argument, regardless of whether
 they were given multiple arguments in the surface syntax.  If the
 surface syntax def takes multiple arguments then we generate code to
 unpack the arguments from a single argument tuple.  For consistency we
-therefore also treat calls of UserFuns specially in the surface syntax.
+therefore also treat calls specially in the surface syntax.
 Multiple arguments are implicitly wrapped in a tuple.  That is, the syntax
 
     (def f T ((x1 : S1) ... (xn : Sn)) ...)
@@ -113,9 +113,6 @@ means the same thing as
     (f (tuple e1 ... en))
 
 if n /= 2.  Nested unpacking is not supported, yet.
-
-(For the moment this transformation only happens for UserFuns but once
-we make PrimFuns one-arg the special case will vanish.)
 
 -}
 
@@ -281,6 +278,12 @@ isUserFun = \case
   UserFun{} -> True
   PrimFun{} -> False
   SelFun{}  -> False
+
+isSelFun :: FunId -> Bool
+isSelFun = \case
+  UserFun{} -> False
+  PrimFun{} -> False
+  SelFun{}  -> True
 
 funIdOfFun :: Fun -> FunId
 funIdOfFun = \case

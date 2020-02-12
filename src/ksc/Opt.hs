@@ -221,7 +221,7 @@ optPrimFun :: InScopeSet -> PrimFun -> [TExpr] -> Maybe TExpr
 
 -- Constant folding.
 -- TODO: match precision to target machine
-optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
+optPrimFun _ op [Tuple [Konst (KFloat k1), Konst (KFloat k2)]]
   = Just . Konst . KFloat $
     case op of
       "add" -> k1 + k2
@@ -239,18 +239,18 @@ optPrimFun _ op [Konst (KFloat k1), Konst (KFloat k2)]
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type
 -- We use () as the tangent type for non-differentiatable types
-optPrimFun _ "add" [e1, e2]
+optPrimFun _ "add" [Tuple [e1, e2]]
   | TypeTuple [] <- typeof e1
   , TypeTuple [] <- typeof e2
   = Just (Tuple [])
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
-optPrimFun _ "add" [Tuple es1, Tuple es2]
+optPrimFun _ "add" [Tuple [Tuple es1, Tuple es2]]
   | length es1 == length es2
   = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
-optPrimFun _ "add" [x, y] =
+optPrimFun _ "add" [Tuple [x, y]] =
     if isKZero y then
       Just x
     else if isKZero x then
@@ -259,7 +259,7 @@ optPrimFun _ "add" [x, y] =
       Nothing
 
 -- RULE: scale 0 y = 0
-optPrimFun _ "scale" [x, y]
+optPrimFun _ "scale" [Tuple [x, y]]
   | isKZero x || isKZero y
   -- We use the type of y because the two typing rule for scale in
   -- Prim.hs is
@@ -270,12 +270,12 @@ optPrimFun _ "scale" [x, y]
   = Nothing
 
 -- RULE: size (build (n, _)) = n
-optPrimFun _ "size" [Call build [n,_]]
+optPrimFun _ "size" [Call build [Tuple [n,_]]]
   | build `isThePrimFun` "build"
   = Just n
 
 -- RULE: index j (build n f) = f j
-optPrimFun _ "index" [ ei, arr ]
+optPrimFun _ "index" [Tuple [ ei, arr ]]
   | Just (_, i, e) <- isBuild_maybe arr
   = Just (Let i ei e)
 
@@ -283,7 +283,7 @@ optPrimFun _ "index" [ ei, arr ]
 --  = let i = ej in v
 
 -- RULE: deltaVec n i 0 = zero (build n (\i . 0))
-optPrimFun _ "deltaVec" [n, _i, val]
+optPrimFun _ "deltaVec" [Tuple [n, _i, val]]
   | isKZero val
   = Just $ pConstVec n val
 
@@ -296,8 +296,8 @@ optPrimFun _ "zero" [Konst (KFloat _)]
   = Just (Konst (KFloat 0))
 
 optPrimFun _ "sum"         [arg]          = optSum arg
-optPrimFun _ "build"       [sz, Lam i e2] = optBuild sz i e2
-optPrimFun _ "sumbuild"    [sz, Lam i e2] = optSumBuild sz i e2
+optPrimFun _ "build"       [Tuple [sz, Lam i e2]] = optBuild sz i e2
+optPrimFun _ "sumbuild"    [Tuple [sz, Lam i e2]] = optSumBuild sz i e2
 optPrimFun env "lmApply"   [Tuple [e1,e2]]        = optLMApply env (AD BasicAD Fwd) e1 e2
 optPrimFun env "lmApplyR"  [Tuple [e1,e2]]        = optLMApply env (AD BasicAD Rev) e2 e1
 optPrimFun env "lmApplyT"  [Tuple [e1,e2]]        = optLMApply env (AD TupleAD Fwd) e1 e2
@@ -412,7 +412,7 @@ optSum (Call diag [Tuple [sz, f]])
   = Just $ pBuild sz f
 
 -- RULE: sum (deltaVec sz i e) = e
-optSum (Call deltaVec [_, _, e])
+optSum (Call deltaVec [Tuple [_, _, e]])
   | deltaVec `isThePrimFun` "deltaVec"
   = Just e
 
@@ -433,7 +433,7 @@ optBuild _ _ e
 --       (if i is not free in ex)
 -- NB: however, i might be free in eb
 optBuild sz i e
-  | Call delta [e1,e2,eb] <- e
+  | Call delta [Tuple [e1,e2,eb]] <- e
   , delta `isThePrimFun` "delta"
   , Just ex <- ok_eq e1 e2
   , i `notFreeIn` ex
@@ -447,7 +447,7 @@ optBuild sz i e
 
 -- RULE: build sz (\i. deltaVec sz i e)   = diag sz (\i. e)
 optBuild sz i build_e
-  | Call deltaVec [sz2, Var i2, e] <- build_e
+  | Call deltaVec [Tuple [sz2, Var i2, e]] <- build_e
   , deltaVec `isThePrimFun` "deltaVec"
   , i  == i2
   = Just $ pDiag sz sz2 (Lam i e)
@@ -521,7 +521,7 @@ optSumBuild _ i (Call delta [Var i1, ej, e])
 -- = sumbuild n (\i. if j == i then e else 0)
 -- = e[i->j]
 -- = index j (build n (\i. e))
-optSumBuild n i (Call deltaVec [_n1, Var i1, e])
+optSumBuild n i (Call deltaVec [Tuple [_n1, Var i1, e]])
   | deltaVec `isThePrimFun` "deltaVec"
   , i == i1
   -- TODO n == sz
@@ -598,7 +598,8 @@ optGradPrim :: HasCallStack => Type -> PrimFun -> [TExpr] -> Maybe TExpr
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
 optGradPrim _ "add" arg
-  | [t1, t2] <- map typeof arg
+  | [Tuple arg'] <- arg
+  , [t1, t2] <- map typeof arg'
   = Just (lmHCat [lmOne t1, lmOne t2])
 
 optGradPrim _ "sum" [e]
@@ -609,7 +610,7 @@ optGradPrim _ "sum" [e]
 optGradPrim _ "size" [e]
   = Just $ lmZero e zeroInt
 
-optGradPrim _ "index" [i,v]
+optGradPrim _ "index" [Tuple [i,v]]
   = Just (lmHCat [ lmZero i vi
                  , lmBuildT (pSize v) (Lam ii (lmDelta vi (Var ii) i)) ])
   where
@@ -653,11 +654,11 @@ optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
   = Just (Call grad_fun es_dx)
   where
     grad_fun = TFun (tangentType t) (DrvFun f (AD adp1 Fwd))
-    -- This treats UserFuns as though they have exactly one arg and
-    -- PrimFuns as though they have many args.  This is an
+    -- This treats non-SelFuns as though they have exactly one arg and
+    -- SelFuns as though they have many args.  This is an
     -- intermediate step to making everything one arg, so this check
     -- will be removed in due course.
-    es_dx = if isUserFun f then [Tuple [mkTuple es, dx]] else [mkTuple es, dx]
+    es_dx = if not (isSelFun f) then [Tuple [mkTuple es, dx]] else [mkTuple es, dx]
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
@@ -668,11 +669,11 @@ optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (GradFun f adp2)) es) dx
   = Just (Call grad_fun es_dx)
   where
     grad_fun = TFun (tangentType s) (DrvFun f (AD adp1 Rev))
-    -- This treats UserFuns as though they have exactly one arg and
-    -- PrimFuns as though they have many args.  This is an
+    -- This treats non-SelFuns as though they have exactly one arg and
+    -- SelFuns as though they have many args.  This is an
     -- intermediate step to making everything one arg, so this check
     -- will be removed in due course.
-    es_dx = if isUserFun f then [Tuple [mkTuple es, dx]] else [mkTuple es, dx]
+    es_dx = if not (isSelFun f) then [Tuple [mkTuple es, dx]] else [mkTuple es, dx]
 
 {-
 optLMApply (Call (TFun (TypeLM _ t) (GradFun (PrimFun f) mode)) e) dx
@@ -730,7 +731,7 @@ optLMApplyCall env Rev "lmVCatV" [e] dx = do_sum_v  env Rev e dx
 optLMApplyCall env Fwd "lmHCatV" [e] dx = do_sum_v  env Fwd e dx
 optLMApplyCall env Rev "lmHCatV" [e] dx = do_prod_v env Rev e dx
 
-optLMApplyCall _ dir "lmFold" [sZero, Lam i m, Lam i' m', acc, v] dx =
+optLMApplyCall _ dir "lmFold" [Tuple [sZero, Lam i m, Lam i' m', acc, v]] dx =
   do_fold dir sZero i m i' m' acc v dx
 
 optLMApplyCall _ _ _ _ _
@@ -840,7 +841,7 @@ hspec = do
         optPrimFun emptyInScopeSet "lmAdd"
             [Tuple [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)]]
         `shouldBe`
-        Just (lmScale TypeFloat (mkPrimCall2 "add" (kTFloat 1.3) (kTFloat 0.4)))
+        Just (lmScale TypeFloat (pAdd (kTFloat 1.3) (kTFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat

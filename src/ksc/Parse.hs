@@ -247,7 +247,7 @@ pCall = do { f <- pIdentifier
            ; let mkCall g args = let mk_fun_g = mk_fun g
                                      args' = case funIdOfFun mk_fun_g of
                                        UserFun{} -> [mkTuple args]
-                                       PrimFun{} -> args
+                                       PrimFun{} -> [mkTuple args]
                                        SelFun{}  -> args
                                  in Call mk_fun_g args'
            ; case es of
