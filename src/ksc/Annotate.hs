@@ -141,13 +141,13 @@ tcExpr (Konst k)
 tcExpr (Call fx es)
   = do { let (fun, mb_ty) = getFun @p fx
        ; pairs <- addCtxt (text "In the call of:" <+> ppr fun) $
-                  mapM tcExpr es
+                  tcExpr es
 
        ; res_ty <- lookupGblTc fun pairs
 
        ; res_ty <- checkTypes_maybe mb_ty res_ty $
          text "Function call type mismatch for" <+> ppr fun
-       ; let call' = Call (TFun res_ty fun) (map exprOf pairs)
+       ; let call' = Call (TFun res_ty fun) (exprOf pairs)
        ; return (TE call' res_ty) }
 
 tcExpr (Let vx rhs body)
@@ -219,13 +219,13 @@ tcVar var mb_ty
 -- It has special cases for a bunch opuilt-in functions with polymorphic
 -- types; that is, where the result type is a function of the argument types
 -- Otherwise it just looks in the global symbol table.
-callResultTy_maybe :: SymTab -> Fun -> [TypedExpr]
+callResultTy_maybe :: SymTab -> Fun -> TypedExpr
                    -> Either SDoc Type
 callResultTy_maybe env fun args
   | is_user_fun fun
   = userCallResultTy_maybe fun (gblST env) args
   | otherwise
-  = primCallResultTy_maybe fun (map typeof args)
+  = primCallResultTy_maybe fun (typeof args)
   where
     is_user_fun = isUserFun . funIdOfFun
 
@@ -234,24 +234,24 @@ callResultTy_maybe env fun args
 -----------------------------------------------
 
 userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
-                       -> [TypedExpr] -> Either SDoc Type
+                       -> TypedExpr -> Either SDoc Type
 userCallResultTy_maybe fn env args
   = case lookupGblST fn env of
       Just def -> userCallResultTy_help def args
       Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
 
 userCallResultTy_help :: HasCallStack
-                      => TDef -> [TypedExpr] -> Either SDoc Type
+                      => TDef -> TypedExpr -> Either SDoc Type
 userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
                            , def_args = params })
                       args
-  = case check_args 1 [bndr_tys] arg_tys of
+  = case check_args 1 [bndr_tys] [arg_tys] of
       Just err -> Left err
       Nothing  -> Right ret_ty
   where
     bndr_tys   = tVarType params
-    arg_tys    = map typeof args
+    arg_tys    = typeof args
 
     check_args :: Int -> [Type] -> [Type] -> Maybe SDoc
     -- Return (Just err) if there's a wrong-ness
@@ -411,7 +411,7 @@ lookupLclTc v
      varFun (Simple name) = mk_fun name
      varFun n = pprPanic "varFun" (ppr n $$ text (show n))
 
-lookupGblTc :: Fun -> [TypedExpr] -> TcM Type
+lookupGblTc :: Fun -> TypedExpr -> TcM Type
 lookupGblTc fun args
   = do { st <- getSymTabTc
        ; case callResultTy_maybe st fun args of
@@ -421,8 +421,8 @@ lookupGblTc fun args
   where
     mk_extra st
       = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
-             , text " Arg types:" <+> ppr (map typeof args)
-             , text " Args:"      <+> ppr (map exprOf args)
+             , text " Arg types:" <+> ppr (typeof args)
+             , text " Args:"      <+> ppr (exprOf args)
              , text "ST lookup:" <+> ppr (Map.lookup fun (gblST st))
              -- This is very verbose, and obscures error messages, but can be useful for typos.
              -- Perhaps think about printing it only for failed lookup of userfun

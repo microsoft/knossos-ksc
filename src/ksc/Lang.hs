@@ -134,7 +134,7 @@ type family FunX p where
 data ExprX p
   = Konst Konst
   | Var  (VarX p)
-  | Call (FunX p) [ExprX p]  -- f e
+  | Call (FunX p) (ExprX p)  -- f e
   | Tuple [ExprX p]            -- (e1, ..., en)
   | Lam TVarX (ExprX p)    -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
@@ -426,9 +426,6 @@ dropLast xs = take (length xs - 1) xs
 
 class HasType b where
   typeof :: HasCallStack => b -> Type
-
-typeofArgs :: HasType b => [b] -> Type
-typeofArgs args = mkTupleTy (map typeof args)
 
 instance HasType TVar where
   typeof (TVar ty _) = ty
@@ -829,18 +826,18 @@ pprExpr _ (App e1 e2) =
   parens (text "App" <+> sep [pprParendExpr e1, pprParendExpr e2])
     -- We aren't expecting Apps, so I'm making them very visible
 
-pprCall :: forall p. InPhase p => Prec -> FunX p -> [ExprX p] -> SDoc
+pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
   (parens $ pprFunOcc @p f <+> pp_args)
   (case (e, isInfix @p f) of
-    ([e1, e2], Just prec')
+    (Tuple [e1, e2], Just prec')
       -> parensIf prec prec' $
          sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
     _ -> parensIf prec precCall $
          cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
   )
  where
-  pp_args = pprList ppr e
+  pp_args = ppr e
 
 pprLetSexp :: forall p. InPhase p => LetBndrX p -> ExprX p -> ExprX p -> SDoc
 pprLetSexp v e =
@@ -937,12 +934,12 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (Fun (UserFun "g")) [var "i"]
-      e2 = Call (Fun (UserFun "f")) [e, var "_t1", kInt 5]
+      e  = Call (Fun (UserFun "g")) (var "i")
+      e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"
-    test e2 "f( g( i ), _t1, 5 )"
+    test e2 "f( (g( i ), _t1, 5) )"
 
   describe "eqType" $
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
@@ -994,7 +991,7 @@ cmpExpr e1
          Dummy {} -> GT
          Konst {} -> GT
          Var {}   -> GT
-         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (gos e1 subst e2)
+         Call f2 e2 -> (f1 `compare` f2) `thenCmp` (go e1 subst e2)
          _ -> LT
 
    go (Tuple es1) subst e2

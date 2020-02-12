@@ -297,25 +297,25 @@ sumbuild ret xs =
   Call (Var "sumbuild") [binopFunction "+" ret' ret', zeroValue ret', xs]
   where ret' = toFutharkType ret
 
-callPrimFun :: String -> L.Type -> [L.TExpr] -> Exp
-callPrimFun "deltaVec" (L.TypeVec ret) [L.Tuple [n, i, v]] =
+callPrimFun :: String -> L.Type -> L.TExpr -> Exp
+callPrimFun "deltaVec" (L.TypeVec ret) (L.Tuple [n, i, v]) =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
                          toFutharkExp i,
                          toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "delta" ret [L.Tuple [i, j, v]] =
+callPrimFun "delta" ret (L.Tuple [i, j, v]) =
   Call (Var "delta") [zeroValue ret',
                       toFutharkExp i,
                       toFutharkExp j,
                       toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "sumbuild" ret [L.Tuple [n, f]] =
+callPrimFun "sumbuild" ret (L.Tuple [n, f]) =
   sumbuild ret $ Call (Var "tabulate") [toFutharkExp n, toFutharkExp f]
 
-callPrimFun "index" _ [L.Tuple [i, arr]] =
+callPrimFun "index" _ (L.Tuple [i, arr]) =
   case toFutharkExp arr of
     Index arr' is ->
       Index arr' $ is ++ [toFutharkExp i]
@@ -326,7 +326,7 @@ callPrimFun "index" _ [L.Tuple [i, arr]] =
 -- relational operators are overloaded.  Since the only overloaded
 -- Futhark functions are the magical built-in infix operators, we map
 -- these functions to those.
-callPrimFun op _ [L.Tuple [x, y]]
+callPrimFun op _ (L.Tuple [x, y])
   | Just op' <- lookup op binOpPrimFuns =
       -- This might be a vectorised operator - if so, we have to put
       -- enough 'map2's on top to make the types work out.
@@ -343,35 +343,31 @@ callPrimFun op _ [L.Tuple [x, y]]
                         , ("ne" , "!=")
                         ]
 
-callPrimFun "pr" _ es =
-  ExpTuple $ map toFutharkExp es
+callPrimFun "pr" _ es = toFutharkExp es
 
 callPrimFun f _ args =
-  Call (Var (escape f)) $ map toFutharkExp args
+  Call (Var (escape f)) [toFutharkExp args]
 
 -- | Handling function calls is the most complicated bit, because
 -- Futhark has different semantics than the source language (and C++).
 -- In particular, no ad-hoc polymorphism.  We handle this on a
 -- case-by-case basis.
-toCall :: L.TFun -> [L.TExpr] -> Exp
+toCall :: L.TFun -> L.TExpr -> Exp
 
-toCall (L.TFun _ (L.Fun (L.SelFun f _))) [e] =
+toCall (L.TFun _ (L.Fun (L.SelFun f _))) e =
   Project (toFutharkExp e) $ show f
-
-toCall (L.TFun _ (L.Fun L.SelFun{})) args =
-  error $ "toCall: cannot project arguments: " ++ show args
 
 toCall (L.TFun ret (L.Fun (L.PrimFun f))) args =
   callPrimFun f ret args
 
 toCall f@(L.TFun _ (L.Fun L.UserFun{})) args =
-  Call (Var (toName f)) $ map toFutharkExp args
+  Call (Var (toName f)) [toFutharkExp args]
 
 toCall f@(L.TFun _ L.GradFun{}) args =
-  Call (Var (toName f)) $ map toFutharkExp args
+  Call (Var (toName f)) [toFutharkExp args]
 
 toCall f@(L.TFun _ L.DrvFun{}) args =
-  Call (Var (toName f)) $ map toFutharkExp args
+  Call (Var (toName f)) [toFutharkExp args]
 
 toFuthark :: L.TDef -> Def
 toFuthark (L.Def f args res_ty (L.UserRhs e)) =

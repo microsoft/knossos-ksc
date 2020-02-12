@@ -24,9 +24,9 @@ gradV :: ADPlan -> Var -> Var
 gradV adp (Simple x) = Grad x adp
 gradV _ v            = error ("gradV: bad variable: " ++ render (ppr v))
 
-gradTFun :: HasCallStack => ADPlan -> TFun -> [Type] -> TFun
+gradTFun :: HasCallStack => ADPlan -> TFun -> Type -> TFun
 gradTFun adp (TFun res_ty f) arg_tys
-  = TFun (mkGradType adp (mkTupleTy arg_tys) res_ty)
+  = TFun (mkGradType adp arg_tys res_ty)
          (gradF adp f)
 
 mkGradTVar :: HasCallStack => ADPlan -> Type -> Var -> Type -> TVar
@@ -89,7 +89,7 @@ gradE _   _ (App{})        = error "gradE of App not yet supported"
 
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.
-gradE adp s (Call f [arg])
+gradE adp s (Call f arg)
   | f `isThePrimFun` "$inline"
   = gradE adp s arg
 
@@ -97,17 +97,17 @@ gradE adp s (Call f [arg])
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE adp s (Call f [Tuple [n, Lam ti body]])
+gradE adp s (Call f (Tuple [n, Lam ti body]))
   | f `isThePrimFun` "build"
   = gradBuild adp s n ti body
 
 -- I'm not very happy about this rule, which effectively
 -- undoes sum (build e) --> sumbuild e
-gradE adp s (Call f [Tuple [n, body]])
+gradE adp s (Call f (Tuple [n, body]))
   | f `isThePrimFun` "sumbuild"
   = gradE adp s (pSum (pBuild n body))
 
-gradE adp s (Call f [Tuple [Lam ti body, acc, v]])
+gradE adp s (Call f (Tuple [Lam ti body, acc, v]))
   | f `isThePrimFun` "fold"
   = gradFold adp s ti body acc v
 
@@ -171,29 +171,29 @@ gradFold TupleAD s _ti _body acc _v =
   where t_acc = typeof acc
 
 ---------------
-gradCall :: ADPlan -> Shape -> TFun -> [TExpr] -> TExpr
+gradCall :: ADPlan -> Shape -> TFun -> TExpr -> TExpr
 gradCall BasicAD s f args
-  = lmCompose (Call gf args) (lmVCat (map (gradE BasicAD s) args))
+  = lmCompose (Call gf args) (gradE BasicAD s args)
   where
-    gf = gradTFun BasicAD f (map typeof args)
+    gf = gradTFun BasicAD f (typeof args)
 
 gradCall TupleAD s f args
-  = mkLets [p | (_, _, Just p) <- grad_arg_binds] $
+  = mkLets [p | (_, _, Just p) <- [grad_arg_binds]] $
     mkLet res_tv
-          (Call gf [ pFstga | (_,pFstga,_) <- grad_arg_binds ]) $
+          (Call gf (let (_,pFstga,_) = grad_arg_binds in pFstga)) $
     Tuple [ pFst (Var res_tv)
           , lmCompose (pSnd (Var res_tv))
-                      (lmVCat [ pSnd ga | (ga, _, _) <- grad_arg_binds ])
+                      (lmVCat [ pSnd ga | (ga, _, _) <- [grad_arg_binds] ])
           ]
   where
-    gf     = gradTFun TupleAD f (map typeof args)
+    gf     = gradTFun TupleAD f (typeof args)
     res_ty = typeof f
-    res_tv = mkGradTVar TupleAD (mkTupleTy arg_tys) resVar res_ty
-    arg_tys = map typeof args
+    res_tv = mkGradTVar TupleAD arg_tys resVar res_ty
+    arg_tys = typeof args
 
-    grad_arg_binds :: [(TExpr, TExpr, Maybe (TVar,TExpr))]
+    grad_arg_binds :: (TExpr, TExpr, Maybe (TVar,TExpr))
      -- Nothing <=> the arg is atomic, so no need to let-bind
-    grad_arg_binds = zipWith mk_grad_arg_bind args [1..]
+    grad_arg_binds = mk_grad_arg_bind args 1
 
     mk_grad_arg_bind arg i
       -- If arg is trivial then we want to apply it directly to gf.
