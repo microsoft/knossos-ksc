@@ -204,23 +204,41 @@ def log_softmax(x):
   x = _np_to_popart_tensor(x)
   return builder.aiOnnx.logsoftmax([x])
 
+def _padtype_to_pads(in_shape, window_shape, window_strides, padding):
+  """Convert padding string to list of pad values."""
+  if padding == 'SAME':
+    out_shape = np.ceil(np.true_divide(in_shape, window_strides)).astype(int)
+      # _ceil_divide(in_shape, window_strides)
+    pad_sizes = np.maximum(0, (out_shape - 1) * window_strides +
+                                window_shape - in_shape)
+    return [f(pad_size)
+        for f in (lambda x: x // 2, lambda x: x - x // 2)
+        for pad_size in pad_sizes]
+  elif padding == 'VALID':
+    return [0, 0] * len(in_shape)
+  else:
+    msg = "Unknown padding type: {}."
+    raise TypeError(msg.format(padding))
+
 def _conv_2d_no_bias_factory(padding):
   def conv_2d(x, weights, strides):
-    x = _np_to_popart_tensor(x)
-    weights = _np_to_popart_tensor(weights)
-    ksize = 7
-    pad = int(ksize / 2)
-    y = builder.aiOnnx.conv(  # TODO need to fix these options
+    x, weights = _np_to_popart_tensors(x, weights)
+
+    in_shape = builder.getTensorShape(x)[2:]
+    window_shape = builder.getTensorShape(weights)[2:]
+    ksize = builder.getTensorShape(weights)[1]
+    pads = _padtype_to_pads(in_shape, window_shape, strides, padding)
+
+    return builder.aiOnnx.conv(
         [x, weights],
         dilations=[1, 1],
-        # kernel_shape=[ksize, ksize],
+        kernel_shape=[ksize, ksize],
         strides=strides,
-        pads=[pad, pad, pad, pad],
+        pads=pads,
       )
-    return y
   return conv_2d
 
-conv_2d_no_bias_same = _conv_2d_no_bias_factory("SAME_UPPER")  # TODO confirm
+conv_2d_no_bias_same = _conv_2d_no_bias_factory("SAME")
 conv_2d_no_bias_valid = _conv_2d_no_bias_factory("VALID")
 
 def normalize_2d(x, weights):
@@ -242,16 +260,20 @@ def to_float(x):
   else:
     return float(x)
 
-def _pooling_factory(pool_type, padding):
-  def pooling(x, pool_size, strides):
-    f = getattr(stax, pool_type)
-    _, apply_fn = f(pool_size, strides, padding=padding, spec='NCHW')
-    y = apply_fn((), x)
-    return y
-  return pooling
+def max_pool_same(x, pool_size, strides):
+  x = _np_to_popart_tensor(x)
+  in_shape = builder.getTensorShape(x)[2:]
+  pads = _padtype_to_pads(in_shape, pool_size, strides, 'SAME')
+  return builder.aiOnnx.maxpool(
+    [x],
+    num_outputs=1,
+    kernel_shape=pool_size,
+    pads=pads,
+    strides=strides,
+  )[0]  # Because for some reason maxpool returns a list of one output..
 
-max_pool_same = _pooling_factory("MaxPool", "SAME")
-avg_pool_valid = _pooling_factory("AvgPool", "VALID")
+def avg_pool_valid(x, pool_size, strides):
+  raise NotImplementedError
 
 def flatten(x):
   b = x.shape[0]
