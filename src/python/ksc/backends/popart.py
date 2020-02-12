@@ -66,7 +66,7 @@ def _run_model(model):
 
   # Construct model
   out_ops = model()
-  if not isinstance(out_ops, list) or not isinstance(out_ops, tuple):
+  if not isinstance(out_ops, list) and not isinstance(out_ops, tuple):
     out_ops = [out_ops]
 
   # Run the model
