@@ -363,8 +363,12 @@ cgenExprR env = \case
           --
           -- Calls of a tuple argument have their argument list
           -- unpacked.  See the explanation in cgenDefE above.
-          (True, [(cexpr, TypeTuple _)])
-            -> "std::apply(" ++ cf ++ ", " ++ cexpr ++ ");\n"
+          (True, [(cexpr, TypeTuple ts)])
+            -> cf ++ "("
+               ++ intercalate ","
+                      (flip map [0..length ts - 1] $ \i ->
+                          "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
+               ++ ");\n"
           -- Currently only UserFuns are expected to have exactly one
           -- argument but soon we will ensure that all funs have
           -- exactly one argument (and indeed change the Call
