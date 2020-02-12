@@ -1451,14 +1451,14 @@ namespace ks
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(1.0 / t2), LM::Scale::mk(-1.0 / (t1*t1)));
 	}
 
-	template <class T1, class T2>
-	inline T1 eq(T1 t1, T2 t2)
+	template <class T>
+	inline T eq(T t1, T t2)
 	{
 		return t1 == t2;
 	}
 
-	template <class T1, class T2>
-	inline T1 ne(T1 t1, T2 t2)
+	template <class T>
+          inline T ne(T t1, T t2)
 	{
 		return t1 != t2;
 	}
