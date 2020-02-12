@@ -214,13 +214,14 @@ lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuildT n b = lmHCatV (pBuild n b)
 
 lmFold :: HasCallStack => TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
-lmFold = mkPrimCall5 "lmFold"
+lmFold x1 x2 x3 x4 x5 = mkPrimCall1 "lmFold" (Tuple [x1, x2, x3, x4, x5])
 
 pFFold :: HasCallStack => TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
-pFFold = mkPrimCall6 "FFold"
+pFFold x1 x2 x3 x4 x5 x6 = mkPrimCall1 "FFold" (Tuple [x1, x2, x3, x4, x5, x6])
 
 pRFold :: HasCallStack => Type -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
-pRFold = mkPrimCall7 "RFold" . mkDummy
+pRFold x1 x2 x3 x4 x5 x6 x7 =
+  mkPrimCall1 "RFold" (Tuple [mkDummy x1, x2, x3, x4, x5, x6, x7])
 
 lmDummyFold :: HasCallStack => Type -> TExpr
 lmDummyFold = mkPrimCall1 "lmDummyFold" . mkDummy
@@ -269,11 +270,11 @@ isKZero = \case
   Konst (KInteger 0  ) -> True
   Konst (KFloat   0.0) -> True
   Tuple ts -> all isKZero ts
-  Call f [_,v] | f `isThePrimFun` "constVec" -> isKZero v
+  Call f [Tuple [_,v]] | f `isThePrimFun` "constVec" -> isKZero v
   _ -> False
 
 isBuild_maybe :: TExpr -> Maybe (TExpr, TVar, TExpr)
-isBuild_maybe (Call f [n,Lam i e])
+isBuild_maybe (Call f [Tuple [n,Lam i e]])
   | f `isThePrimFun` "build"
   = Just (n, i, e)
 isBuild_maybe _ = Nothing
@@ -302,16 +303,16 @@ isEqualityCall _          = Nothing
 
 pDelta :: TExpr -> TExpr -> TExpr -> TExpr
 -- delta i j e  =  if i==j then e else zero
-pDelta = mkPrimCall3 "delta"
+pDelta i j e = mkPrimCall1 "delta" (Tuple [i, j, e])
 
 pDeltaVec :: TExpr -> TExpr -> TExpr -> TExpr
 -- deltaVec size i e = build size (\j. delta i j e)
 -- Returns a size-vector with e at index i, and zeros elsewhere
-pDeltaVec = mkPrimCall3 "deltaVec"
+pDeltaVec sz i e = mkPrimCall1 "deltaVec" (Tuple [sz, i, e])
 
 pConstVec :: TExpr -> TExpr -> TExpr
 -- constVec size e = build size (\_. e)
-pConstVec = mkPrimCall2 "constVec"
+pConstVec sz e = mkPrimCall1 "constVec" (Tuple [sz, e])
 
 pDiag :: TExpr -> TExpr -> TExpr -> TExpr
 -- diag rows cols (\i. e) = build row (\i. deltaVec cols i e)
@@ -321,24 +322,24 @@ pDiag r c l = mkPrimCall1 "diag" (Tuple [r, c, l])
 -- "User-defined" functions
 ---------------------------
 pAdd, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
-pAdd   = mkPrimCall2 "add"
-pEqual = mkPrimCall2 "eq"
-pScale = mkPrimCall2 "scale"
+pAdd x1 x2   = mkPrimCall1 "add" (Tuple [x1, x2])
+pEqual x1 x2 = mkPrimCall1 "eq" (Tuple [x1, x2])
+pScale x1 x2 = mkPrimCall1 "scale" (Tuple [x1, x2])
 
 pNeg :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "neg"
 
 pBuild :: TExpr -> TExpr -> TExpr
-pBuild = mkPrimCall2 "build"
+pBuild n l = mkPrimCall1 "build" (Tuple [n, l])
 
 pIndex :: TExpr -> TExpr -> TExpr
-pIndex = mkPrimCall2 "index"
+pIndex i v = mkPrimCall1 "index" (Tuple [i, v])
 
 pSum :: TExpr -> TExpr
 pSum = mkPrimCall1 "sum"
 
 pSumBuild :: TExpr -> TExpr -> TExpr
-pSumBuild = mkPrimCall2 "sumbuild"
+pSumBuild i l = mkPrimCall1 "sumbuild" (Tuple [i, l])
 
 pUnzip :: TExpr -> TExpr
 pUnzip = mkPrimCall1 "unzip"
@@ -392,19 +393,18 @@ primCallResultTy_maybe fun args
             Left err -> Left err
             Right res_ty -> Right (mkGradType adp (mkTupleTy args) res_ty)
 
-      DrvFun f (AD _ Fwd)    -- f :: S1 S2 -> T, then fwd$f :: (S1, S2) (S1_t, S2_t) -> T_t
-        | [x, _dx] <- args
-        , let x' = case x of
-                TypeTuple ts -> ts
-                _            -> [x]
-        , Right t_ty <- primCallResultTy_maybe (Fun f) x'
+      DrvFun f (AD _ Fwd)    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
+        | [TypeTuple [x, _dx]] <- args
+        , Right t_ty <- primCallResultTy_maybe (Fun f) [x]
         -> Right (tangentType t_ty)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
-      DrvFun _ (AD _ Rev)    -- f :: S1 S2 -> T, then rev$f :: (S1, S2) T_t -> (S1_t, S2_t)
-        | let s_tys = dropLast args
-        -> Right (tangentType (mkTupleTy s_tys))
+      DrvFun _ (AD _ Rev)    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
+        | [TypeTuple [s, _dt]] <- args
+        -> Right (tangentType s)
+        | otherwise
+        -> Left (text "Ill-typed call to:" <+> ppr fun)
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
@@ -430,7 +430,7 @@ primFunCallResultTy fun args
 primFunCallResultTy_maybe :: PrimFun -> [Type] -> Maybe Type
 
 primFunCallResultTy_maybe "fold" args
-  | [f,acc,v] <- args
+  | [TypeTuple [f,acc,v]] <- args
   , TypeLam (TypeTuple [a1, b1]) a2 <- f
   , TypeVec b2 <- v
   , b1 `eqType` b2
@@ -439,7 +439,7 @@ primFunCallResultTy_maybe "fold" args
   | otherwise = Nothing
 
 primFunCallResultTy_maybe "lmFold" args
-  | [ds_zero,f,f',acc,v] <- args
+  | [TypeTuple [ds_zero,f,f',acc,v]] <- args
   , TypeLam t1 a1 <- f
   , TypeLam t2 (TypeLM (TypeTuple [s1, t3]) a2) <- f'
   , Just t <- eqTypes t1 [t2, t3]
@@ -456,7 +456,7 @@ primFunCallResultTy_maybe "lmFold" args
 --- done correctly.  We could add more comprehensive type checking
 --- later if we want.
 primFunCallResultTy_maybe "RFold" args
-  | [_ty_dv,ty_in,_f,_f',acc,v,_dr] <- args
+  | [TypeTuple [_ty_dv,ty_in,_f,_f',acc,v,_dr]] <- args
   = Just (TypeTuple [ ty_in
                     , TypeTuple [ tangentType acc
                                 , tangentType v]])
@@ -467,7 +467,7 @@ primFunCallResultTy_maybe "RFold" args
 --- done correctly.  We could add more comprehensive type checking
 --- later if we want.
 primFunCallResultTy_maybe "FFold" args
-  | [_f,_acc,_v,_df,dacc,_dv] <- args
+  | [TypeTuple [_f,_acc,_v,_df,dacc,_dv]] <- args
   = Just dacc
   | otherwise = Nothing
 
@@ -513,8 +513,9 @@ primFunCallResultTy_maybe fun args
       --
       -- NB s and s' should be equal, except if s' is not a tuple, in
       -- which case s should be (tuple s')
-      ("$check"   , [ TypeLam (TypeTuple [s]) t
-                    , TypeLam (TypeTuple [s_dt]) ds', s', s'0, ds, dt])
+      ("$check"   , [TypeTuple
+                      [ TypeLam (TypeTuple [s]) t
+                      , TypeLam (TypeTuple [s_dt]) ds', s', s'0, ds, dt]])
                       | s `eqType` case s' of TypeTuple [s1] -> s1
                                               _              -> s
                       , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
@@ -527,42 +528,44 @@ primFunCallResultTy_maybe fun args
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , [t])                                     -> Just t
 
-      ("constVec" , [TypeInteger, t])                        -> Just (TypeVec t)
-      ("deltaVec" , [TypeInteger, TypeInteger, t])           -> Just (TypeVec t)
+      ("constVec" , [TypeTuple [TypeInteger, t]])            -> Just (TypeVec t)
+      ("deltaVec" , [TypeTuple [TypeInteger, TypeInteger, t]]) -> Just (TypeVec t)
       ("diag"     , [TypeTuple [TypeInteger,
                                 TypeInteger,
                                 TypeLam TypeInteger t]])     -> Just (TypeVec (TypeVec t))
-      ("build"    , [TypeInteger,
-                     TypeLam TypeInteger t])                 -> Just (TypeVec t)
+      ("build"    , [TypeTuple
+                     [TypeInteger, TypeLam TypeInteger t]])  -> Just (TypeVec t)
 
       -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
       ("pr"       , _)                                       -> Just TypeInteger
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                       -> Just TypeInteger
-      ("sumbuild" , [TypeInteger, TypeLam TypeInteger t])    -> Just t
-      ("index"    , [TypeInteger, TypeVec t])                -> Just t
+      ("sumbuild" , [TypeTuple
+                     [TypeInteger, TypeLam TypeInteger t]])  -> Just t
+      ("index"    , [TypeTuple [TypeInteger, TypeVec t]])    -> Just t
       ("size"     , [TypeVec _])                             -> Just TypeSize
       ("sum"      , [TypeVec t])                             -> Just t
 
       ("unzip"    , [TypeVec (TypeTuple ts)])                -> Just (TypeTuple (map TypeVec ts))
 
-      ("scale"      , [TypeFloat,   t]             ) -> Just t
-      ("add"      , [t, dt]                                ) -> if dt == tangentType t
+      ("scale"    , [TypeTuple [TypeFloat,   t]]           ) -> Just t
+      ("add"      , [TypeTuple [t, dt]]                    ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing
       ("neg"      , [t]                                    ) -> Just t
       -- For eq and ne we check that the two arguments have the same type
-      ("eq"       , [t1, t2]                               )
+      ("eq"       , [TypeTuple [t1, t2]]                   )
         | t1 `eqType` t2 -> Just TypeBool
         | otherwise      -> Nothing
-      ("ne"       , [t1, t2]                               )
+      ("ne"       , [TypeTuple [t1, t2]]                   )
         | t1 `eqType` t2 -> Just TypeBool
         | otherwise      -> Nothing
 
-      ("delta"    , [TypeInteger, TypeInteger, t]          ) -> Just t
+      ("delta"    , [TypeTuple
+                     [TypeInteger, TypeInteger, t]])         -> Just t
 
-      ("or"       , [TypeBool, TypeBool]                   ) -> Just TypeBool
-      ("and"      , [TypeBool, TypeBool]                   ) -> Just TypeBool
+      ("or"       , [TypeTuple [TypeBool, TypeBool]]       ) -> Just TypeBool
+      ("and"      , [TypeTuple [TypeBool, TypeBool]]       ) -> Just TypeBool
       _ -> Nothing
 
 isPrimFun :: String -> Bool

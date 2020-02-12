@@ -97,17 +97,17 @@ gradE adp s (Call f [arg])
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE adp s (Call f [n, Lam ti body])
+gradE adp s (Call f [Tuple [n, Lam ti body]])
   | f `isThePrimFun` "build"
   = gradBuild adp s n ti body
 
 -- I'm not very happy about this rule, which effectively
 -- undoes sum (build e) --> sumbuild e
-gradE adp s (Call f [n, body])
+gradE adp s (Call f [Tuple [n, body]])
   | f `isThePrimFun` "sumbuild"
   = gradE adp s (pSum (pBuild n body))
 
-gradE adp s (Call f [Lam ti body, acc, v])
+gradE adp s (Call f [Tuple [Lam ti body, acc, v]])
   | f `isThePrimFun` "fold"
   = gradFold adp s ti body acc v
 

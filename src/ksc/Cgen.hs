@@ -272,7 +272,7 @@ cgenExprR env = \case
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) [sz, Lam (TVar vty var) body] -> do
+  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) [Tuple [sz, Lam (TVar vty var) body]] -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -297,7 +297,7 @@ cgenExprR env = \case
         (mkCType (TypeVec ty))
 
   -- Special case for sumbuild -- inline the loop
-  Call (TFun ty (Fun (PrimFun "sumbuild"))) [sz, Lam (TVar vty var@(Simple _)) body] -> do
+  Call (TFun ty (Fun (PrimFun "sumbuild"))) [Tuple [sz, Lam (TVar vty var@(Simple _)) body]] -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -358,7 +358,7 @@ cgenExprR env = \case
       (  unlines cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ case (isUserFun (funIdOfFun fun), cexprs_tys) of
+      ++ case (not (isSelFun (funIdOfFun fun)), cexprs_tys) of
           -- Untuple argument for C++ call
           --
           -- Calls of a tuple argument have their argument list
@@ -369,7 +369,7 @@ cgenExprR env = \case
                       (flip map [0..length ts - 1] $ \i ->
                           "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
                ++ ");\n"
-          -- Currently only UserFuns are expected to have exactly one
+          -- Currently non-SelFuns are expected to have exactly one
           -- argument but soon we will ensure that all funs have
           -- exactly one argument (and indeed change the Call
           -- constructor to enforce this), so these special cases will
