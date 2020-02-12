@@ -81,11 +81,13 @@ vec<double> rev$maximum(vec<double> const& v, double dr)
 
 double digamma(double x)
 {
+	std::cerr << "digamma unimp!\n" << std::endl;
 	throw "digamma unimp!\n";
 }
 
 double rev$lgamma(double x, double dr)
 {
+	std::cerr << "rev$lgamma unimp!\n" << std::endl;
 	throw "rev$gamma unimp!\n";
 }
 double fwd$lgamma(double x, double dx)
@@ -93,6 +95,7 @@ double fwd$lgamma(double x, double dx)
   if (dx == 0.0) {
     return 0.0;
   } else {
+    std::cerr << "fwd$lgamma unimp!\n" << std::endl;
     throw "fwd$gamma unimp except at dx == 0!\n";
   }
 }
@@ -104,11 +107,13 @@ double pow$aFloat(double x, double e)
 
 double fwd$pow$aFloat(double x, double e, double dx, double de)
 {
+	std::cerr << "fwd$pow unimp!\n" << std::endl;
 	throw "fwd$pow unimp!\n";
 }
 
 tuple<double,double> rev$pow$aFloat(double x, double e, double dr)
 {
+	std::cerr << "rev$pow unimp!\n" << std::endl;
 	throw "rev$pow unimp!\n";
 }
 
@@ -119,6 +124,7 @@ tuple<> fwd$gt(double a,double b,double d$a,double d$b)
 
 tuple<double,double> rev$gt(double a,double b, tuple<> d$r)
 {
+	std::cerr << "rev$gt unimp!\n" << std::endl;
 	throw "rev$gt unimp!\n";
 }
 
