@@ -173,7 +173,7 @@ def shape_type_from_object(o):
     else:
         raise ValueError(f"Cannot handle object {o}")
 
-def compare_backend_results(fn, debug=False, atol=1e-5):
+def compare_backend_results(fn, debug=False):
     import os
     backends_path = os.path.join(os.path.dirname(__file__), "backends")
     _b = import_module_from_path('_b', os.path.join(backends_path, 'jax.py'))
@@ -182,12 +182,15 @@ def compare_backend_results(fn, debug=False, atol=1e-5):
     from functools import partial
     res_pop = _b._run_model(partial(fn, _b))
     # if type(res_jax) == np.ndarray and type (res_pop) == np.ndarray and \
-    if not np.allclose(res_jax, res_pop, atol=atol):
-        print('Results DIFFER')
-        if debug:
-            print(f'Results:\n'
-                f'jax:\n  {res_jax}\npopart:\n  {res_pop}')
-    else:
+    print(f'Results have shape {res_jax.shape} and {res_pop.shape}')
+    eqs = [np.allclose(res_jax, res_pop, atol=10**(-i)) for i in range(10)]
+    try:
+        i = eqs.index(False)
+        print(f'Results DIFFER at absolute tolerance 1e-{i}')
+        # if debug:
+        #     print(f'Results:\n'
+        #         f'jax:\n  {res_jax}\npopart:\n  {res_pop}')
+    except ValueError:
         print('All good.')
     if debug:
         return res_jax, res_pop
