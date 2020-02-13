@@ -76,7 +76,7 @@ simplify env args rhs
 --       ; banner "ANF'd (1)"
 --       ; display rhs1
 
-       ; let rhs2 = optLets args rhs1
+       ; let rhs2 = optLets (optSubst env) rhs1
 --       ; banner "OptLets (1)"
 --       ; display rhs2
 
@@ -88,7 +88,7 @@ simplify env args rhs
 --       ; banner "ANF'd (2)"
 --       ; display rhs4
 
-       ; let rhs5 = optLets args rhs4
+       ; let rhs5 = optLets (optSubst env) rhs4
 --       ; banner "OptLets (2)"
 --       ; display rhs5
 
@@ -100,7 +100,7 @@ simplify env args rhs
           -- that variables have unique names.  See
           --
           --     https://github.com/awf/knossos/pull/386#issuecomment-476586918
-       ; let rhs7 = optLets args rhs6
+       ; let rhs7 = optLets (optSubst env) rhs6
 --       ; banner "OptLets (3)"
 --       ; display rhs7
 
