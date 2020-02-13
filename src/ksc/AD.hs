@@ -173,7 +173,7 @@ gradCall TupleAD s f args
           (Call gf pFst_grad_arg) $
     Tuple [ pFst (Var res_tv)
           , lmCompose (pSnd (Var res_tv))
-                      (lmVCat [ pSnd grad_arg ])
+                      (pSnd grad_arg)
           ]
   where
     gf     = gradTFun TupleAD f (typeof args)
