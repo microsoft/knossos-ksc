@@ -21,7 +21,7 @@ import Data.Char( isDigit )
 
 optLets :: [TVar] -> TExpr -> TExpr
 optLets args rhs
-  = optLetsE args (occAnal rhs)
+  = optLetsE (mkEmptySubst args) (occAnal rhs)
 
 ----------------------
 -- Dead code elimination - occurrence analysis
@@ -290,11 +290,11 @@ notInScope v in_scope
     parse_suffix ds cs
       = (reverse cs ++ ds, 0)
 
-optLetsE :: [TVar] -> ExprX OccAnald -> TExpr
+optLetsE :: Subst -> ExprX OccAnald -> TExpr
 -- This function inline let-bindings that are only used once
 -- or whose RHS is trivial (see inline_me for exactly what.
 -- Take care: see Note [Capture-avoiding substitution]
-optLetsE params rhs = go (mkEmptySubst params) rhs
+optLetsE = go
   where
     go :: Subst -> ExprX OccAnald -> TExpr
 
