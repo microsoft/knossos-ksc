@@ -169,12 +169,8 @@ gradCall BasicAD s f args
 
 gradCall TupleAD s f args
   = mkLets (case grad_arg_let of { Just p -> [p]; Nothing -> [] }) $
-    mkLet res_tv
-          (Call gf pFst_grad_arg) $
-    Tuple [ pFst (Var res_tv)
-          , lmCompose (pSnd (Var res_tv))
-                      (pSnd grad_arg)
-          ]
+    mkLet res_tv (Call gf pFst_grad_arg) $
+    Tuple [ pFst (Var res_tv), lmCompose (pSnd (Var res_tv)) (pSnd grad_arg) ]
   where
     gf     = gradTFun TupleAD f (typeof args)
     res_ty = typeof f
