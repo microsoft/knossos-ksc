@@ -240,13 +240,11 @@ pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
 
 pCall :: Parser (ExprX Parsed)
 -- Calls (f e), (f e1 e2), etc
--- Deals with plain variables (Var v), which look like nullary calls
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            -- See Note [Function arity]
            ; let mkCall g args = Call (mk_fun g) (mkTuple args)
-           ; case es of
-               []  -> return (Var (Simple f))
+           ; case () of
                _   | f == "$trace"   -- See Note [$trace]
                    , Var (Simple g) : es1 <- es
                    -> return (Call (mk_fun f) (mkCall g es1))

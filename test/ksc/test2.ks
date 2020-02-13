@@ -10,7 +10,7 @@
 )
 
 (def f7 Float ((x : Vec Float) (y : Vec Float) )
-    (assert (eq (size(x)) (size(y)))
+    (assert (eq (size x) (size y))
         (sum (build (size x)
                     (lam (i : Integer) (mul@ff (if (lt@ii i 3) (index i x) 7.0) (index i y))))))
 )
