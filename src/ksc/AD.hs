@@ -267,8 +267,8 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 
     dx = to_delta x
 
-    extract2args = mkLets [ (x,  pSel 1 2 (Var x_dx))
-                          , (dx, pSel 2 2 (Var x_dx)) ]
+    extract2args = mkLets [ (x,  pFst (Var x_dx))
+                          , (dx, pSnd (Var x_dx)) ]
 
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
     to_delta (TVar _  v         )
@@ -295,8 +295,8 @@ applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
     x_dr = newVarNotIn (TypeTuple [typeof x, typeof dr])
                        (Tuple (map Var [x,dr]))
 
-    extract2args = mkLets [ (x,  pSel 1 2 (Var x_dr))
-                          , (dr, pSel 2 2 (Var x_dr)) ]
+    extract2args = mkLets [ (x,  pFst (Var x_dr))
+                          , (dr, pSnd (Var x_dr)) ]
 
     dr = TVar (tangentType t) $ Delta "r"
     (lm, t)  -- lm :: s -o t
