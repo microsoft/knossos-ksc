@@ -181,11 +181,9 @@ gradCall TupleAD s f args
     res_tv = mkGradTVar TupleAD arg_tys resVar res_ty
     arg_tys = typeof args
 
-    grad_arg_binds :: (TExpr, TExpr, Maybe (TVar,TExpr))
      -- Nothing <=> the arg is atomic, so no need to let-bind
-    grad_arg_binds = mk_grad_arg_bind args 1
-
-    mk_grad_arg_bind arg i
+    grad_arg_binds :: (TExpr, TExpr, Maybe (TVar,TExpr))
+    grad_arg_binds
       -- If arg is trivial then we want to apply it directly to gf.
       -- This is particularly important in cases where the type of the
       -- body depends on arg.  Having arg appear in the form 'fst
@@ -198,8 +196,9 @@ gradCall TupleAD s f args
       | otherwise
       = (Var arg_var, pFst (Var arg_var), Just (arg_var, grad_arg))
       where
-        arg_var  = mkGradTVar TupleAD (typeof s) (mkArgVar i) (typeof arg)
+        arg_var  = mkGradTVar TupleAD (typeof s) (mkArgVar 1) (typeof arg)
         grad_arg = gradE TupleAD s arg
+        arg      = args
 
 ----------------------
 gradLet :: HasCallStack => ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr
