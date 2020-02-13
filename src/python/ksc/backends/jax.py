@@ -32,7 +32,7 @@ def _conv_2d_no_bias_factory(padding):
       padding,
       dimension_numbers=('NCHW', 'OIHW', 'NCHW') # the same as pytorch / onnx
     )
-    print(f"conv_2d shape: {y.shape}")
+    # print(f"conv_2d shape: {y.shape}")
     return y
   return conv_2d
 
