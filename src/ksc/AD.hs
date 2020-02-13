@@ -168,18 +168,20 @@ gradCall BasicAD s f args
     gf = gradTFun BasicAD f (typeof args)
 
 gradCall TupleAD s f args
-  = mkLets [p | (_, _, Just p) <- [grad_arg_binds]] $
+  = mkLets (case grad_arg_let of { Just p -> [p]; Nothing -> [] }) $
     mkLet res_tv
-          (Call gf (let (_,pFstga,_) = grad_arg_binds in pFstga)) $
+          (Call gf pFst_grad_arg) $
     Tuple [ pFst (Var res_tv)
           , lmCompose (pSnd (Var res_tv))
-                      (lmVCat [ pSnd ga | (ga, _, _) <- [grad_arg_binds] ])
+                      (lmVCat [ pSnd grad_arg ])
           ]
   where
     gf     = gradTFun TupleAD f (typeof args)
     res_ty = typeof f
     res_tv = mkGradTVar TupleAD arg_tys resVar res_ty
     arg_tys = typeof args
+
+    (grad_arg, pFst_grad_arg, grad_arg_let) = grad_arg_binds
 
      -- Nothing <=> the arg is atomic, so no need to let-bind
     grad_arg_binds :: (TExpr, TExpr, Maybe (TVar,TExpr))
