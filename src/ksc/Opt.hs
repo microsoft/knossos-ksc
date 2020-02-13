@@ -382,7 +382,7 @@ inlineCall :: TVar -> TExpr  -- Function parameters and body
            -> TExpr
 inlineCall bndrs body args
   = possiblyTrace $
-    mkLets [(bndrs, args)] body
+    mkLet bndrs args body
   where traceMessage =
           ("inlineCall is known to be flaky.\n"
            ++ "See https://github.com/microsoft/knossos-ksc/issues/93")
