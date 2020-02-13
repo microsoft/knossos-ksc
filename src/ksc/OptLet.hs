@@ -19,9 +19,9 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char( isDigit )
 
-optLets :: [TVar] -> TExpr -> TExpr
-optLets args rhs
-  = optLetsE (mkEmptySubst args) (occAnal rhs)
+optLets :: Subst -> TExpr -> TExpr
+optLets subst rhs
+  = optLetsE subst (occAnal rhs)
 
 ----------------------
 -- Dead code elimination - occurrence analysis
