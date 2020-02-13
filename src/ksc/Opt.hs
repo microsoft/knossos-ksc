@@ -70,9 +70,9 @@ optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
 
 optDef _ gst def = return (gst,def)
 
-simplify :: OptEnv -> [TVar] -> TExpr -> KM TExpr
-simplify env args rhs
-  = do { rhs1 <- runAnf (anfExpr (mkEmptySubst args) rhs)
+simplify :: OptEnv -> a -> TExpr -> KM TExpr
+simplify env _ rhs
+  = do { rhs1 <- runAnf (anfExpr (optSubst env) rhs)
 --       ; banner "ANF'd (1)"
 --       ; display rhs1
 
@@ -84,7 +84,7 @@ simplify env args rhs
 --       ; banner "OptE (1)"
 --       ; display rhs3
 
-       ; rhs4 <- runAnf (anfExpr (mkEmptySubst args) rhs3)
+       ; rhs4 <- runAnf (anfExpr (optSubst env) rhs3)
 --       ; banner "ANF'd (2)"
 --       ; display rhs4
 
