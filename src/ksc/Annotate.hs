@@ -246,26 +246,23 @@ userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
                            , def_args = params })
                       args
-  = case check_args 1 [bndr_tys] [arg_tys] of
+  = case check_args bndr_tys arg_tys of
       Just err -> Left err
       Nothing  -> Right ret_ty
   where
     bndr_tys   = tVarType params
     arg_tys    = typeof args
 
-    check_args :: Int -> [Type] -> [Type] -> Maybe SDoc
+    check_args :: Type -> Type -> Maybe SDoc
     -- Return (Just err) if there's a wrong-ness
-    check_args n (bndr_ty : bndr_tys) (arg_ty : arg_tys)
+    check_args bndr_ty arg_ty
       | bndr_ty `compatibleType` arg_ty
-      = check_args (n+1) bndr_tys arg_tys
+      = Nothing
       | otherwise
-      = Just (hang (text "Type mis-match in argument" <+> int n
+      = Just (hang (text "Type mis-match in argument"
                      <+> text "of call to" <+> ppr fn)
                  2 (vcat [ text "Expected:" <+> ppr bndr_ty
                          , text "Actual:  " <+> ppr arg_ty ]))
-    check_args _ [] [] = Nothing
-    check_args _ [] _  = Just (text "Too many arguments")
-    check_args _ _  [] = Just (text "Too few arguments")
 
 -----------------------------------------------
 --     The typecheck monad
