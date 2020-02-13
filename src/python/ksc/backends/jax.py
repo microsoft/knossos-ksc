@@ -24,7 +24,7 @@ def log_softmax(x):
   return (x - x_max) - np.log(np.exp(x - x_max).sum(axis=-1, keepdims=True))
 
 def _conv_2d_no_bias_factory(padding):
-  def conv_2d(x, weights, strides):
+  def conv_2d(x, weights, ksizes, strides):
     y = jax.lax.conv_general_dilated(
       x,
       weights,
