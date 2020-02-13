@@ -16,7 +16,7 @@ from ksc.tracing.functions import math, nn
 def test_conv_2d_no_bias(kernel_size, strides, padding, expected_shape):
     x = np.random.uniform(0, 1, (1, 64, 56, 56))
     weights = np.random.normal(0, 1, (64, 64) + kernel_size)
-    y = nn.conv_2d_no_bias(x, weights, strides, padding=padding)
+    y = nn.conv_2d_no_bias(x, weights, kernel_size, strides, padding=padding)
     assert y.data.shape == expected_shape
 
 @pytest.mark.parametrize(

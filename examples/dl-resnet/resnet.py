@@ -14,13 +14,13 @@ def conv_block(x, weights, strides):
      norm_2_weights,
      conv_3_weights,
      norm_3_weights) = weights
-    h = nn.conv_2d_no_bias(x, conv_1_weights, strides)
+    h = nn.conv_2d_no_bias(x, conv_1_weights, (1, 1), strides)
     h = nn.batch_norm_2d(h, norm_1_weights)
     h = nn.relu(h)
-    h = nn.conv_2d_no_bias(h, conv_2_weights, (1, 1))
+    h = nn.conv_2d_no_bias(h, conv_2_weights, (3, 3),  (1, 1))
     h = nn.batch_norm_2d(h, norm_2_weights)
     h = nn.relu(h)
-    h = nn.conv_2d_no_bias(h, conv_3_weights, (1, 1))
+    h = nn.conv_2d_no_bias(h, conv_3_weights, (1, 1),  (1, 1))
     return nn.batch_norm_2d(h, norm_3_weights)
 
 @ksc.trace
@@ -29,7 +29,7 @@ def conv_residual_block(x, weights, strides):
      shortcut_conv_weights,
      shortcut_norm_weights) = weights
     main = conv_block(x, conv_block_weights, strides)
-    h = nn.conv_2d_no_bias(x, shortcut_conv_weights, strides)
+    h = nn.conv_2d_no_bias(x, shortcut_conv_weights, (1, 1), strides)
     shortcut = nn.batch_norm_2d(h, shortcut_norm_weights)
     return nn.relu(main + shortcut)
 
@@ -46,7 +46,7 @@ def resnet(x, weights):
      residual_blocks_weights,
      final_dense_weights) = weights
     h = nn.normalize_2d(x, normalization_weights)
-    h = nn.conv_2d_no_bias(h, conv_weights, (2, 2))
+    h = nn.conv_2d_no_bias(h, conv_weights, (7, 7), (2, 2))
     h = nn.batch_norm_2d(h, batch_norm_weights)
     h = nn.relu(h)
     h = nn.max_pool(h, (3, 3), (2, 2), padding="SAME")
