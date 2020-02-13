@@ -36,16 +36,6 @@ mkGradTVar adp s var ty
 gradTVar :: ADPlan -> Shape -> TVar -> TVar
 gradTVar adp s (TVar ty v) = mkGradTVar adp (typeof s) (gradV adp v) ty
 
-lmSelFun :: [TVar] -> TVar -> TExpr
--- (lmSelFun ps p) selects the i'th component of a n-tuple
--- Result expr has type (t1, ..., tn) -o ti
---  or its transpose depending on direction
-lmSelFun params pi
-  = lmHCat (map lm params)
-  where
-    lm pj | pi == pj  = lmOne (typeof pi)
-          | otherwise = lmZero (Var pj) (Var pi)
-
 -------------------------------------------------
 
 gradDefs :: HasCallStack => ADPlan -> [TDef] -> [TDef]
@@ -65,9 +55,9 @@ gradDef adp
     s = Var params
     s_ty = typeof s
 
-    lets = [ (gradTVar adp s p, mkGradTuple adp (Var p) lm)
-           | p <- [params]
-           , let lm = lmSelFun [params] p ]
+    lets = [ (gradTVar adp s params,
+              mkGradTuple adp (Var params) (lmOne (typeof params)))
+           ]
 
 gradDef _ _ = Nothing
 
