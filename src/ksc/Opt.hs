@@ -64,14 +64,14 @@ optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
              env = OptEnv { optRuleBase = rb
                           , optGblST = gst
                           , optSubst = varsBroughtIntoScopeByArgs }
-       ; rhs' <- simplify env [args] rhs
+       ; rhs' <- simplify env rhs
        ; let def' = def { def_rhs = UserRhs rhs' }
        ; return (extendGblST gst [def'], def') }
 
 optDef _ gst def = return (gst,def)
 
-simplify :: OptEnv -> a -> TExpr -> KM TExpr
-simplify env _ rhs
+simplify :: OptEnv -> TExpr -> KM TExpr
+simplify env rhs
   = do { let subst = optSubst env
 
        ; rhs1 <- runAnf (anfExpr subst rhs)
