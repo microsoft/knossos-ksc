@@ -256,19 +256,19 @@ applyD :: ADDir -> TDef -> TDef
 -- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
 -- fwdt$f :: (S1, S2) (dS1, dS2) -> (T, dT)
 applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
-                , def_args = vars, def_rhs = UserRhs rhs })
+                , def_args = x, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Fwd)
-        , def_args   = varst1
-        , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dvarst
+        , def_args   = x_dx
+        , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dx
         , def_res_ty = t }
   where
-    varst1 = newVarNotIn (TypeTuple [typeof vars, typeof dvarst])
-                         (Tuple (map Var [vars,dvarst]))
+    x_dx = newVarNotIn (TypeTuple [typeof x, typeof dx])
+                       (Tuple (map Var [x,dx]))
 
-    dvarst = to_delta vars
+    dx = to_delta x
 
-    extract2args = mkLets [ (vars,   pSel 1 2 (Var varst1))
-                          , (dvarst, pSel 2 2 (Var varst1)) ]
+    extract2args = mkLets [ (x,  pSel 1 2 (Var x_dx))
+                          , (dx, pSel 2 2 (Var x_dx)) ]
 
     to_delta (TVar ty (Simple x)) = TVar (tangentType ty) (Delta x)
     to_delta (TVar _  v         )
@@ -286,17 +286,17 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 --   D$f :: S1 S2    -> ((S1,S2) -o T)
 -- rev$f :: (S1, S2) dT -> (dS1,dS2)
 applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
-                , def_args = vars, def_rhs = UserRhs rhs })
+                , def_args = x, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Rev)
-        , def_args   = varst1
+        , def_args   = x_dr
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
-        , def_res_ty = tangentType (mkTupleTy [typeof vars]) }
+        , def_res_ty = tangentType (mkTupleTy [typeof x]) }
   where
-    varst1 = newVarNotIn (TypeTuple [typeof vars, typeof dr])
-                         (Tuple (map Var [vars,dr]))
+    x_dr = newVarNotIn (TypeTuple [typeof x, typeof dr])
+                       (Tuple (map Var [x,dr]))
 
-    extract2args = mkLets [ (vars,  pSel 1 2 (Var varst1))
-                          , (dr,    pSel 2 2 (Var varst1)) ]
+    extract2args = mkLets [ (x,  pSel 1 2 (Var x_dr))
+                          , (dr, pSel 2 2 (Var x_dr)) ]
 
     dr = TVar (tangentType t) $ Delta "r"
     (lm, t)  -- lm :: s -o t
