@@ -31,12 +31,12 @@ def conv_residual_block(x, weights, strides):
     main = conv_block(x, conv_block_weights, strides)
     h = nn.conv_2d_no_bias(x, shortcut_conv_weights, strides)
     shortcut = nn.batch_norm_2d(h, shortcut_norm_weights)
-    return nn.relu(main + shortcut)
+    return nn.relu(core.add(main + shortcut))
 
 @ksc.trace
 def identity_residual_block(x, weights):
     main = conv_block(x, weights, (1, 1))
-    return nn.relu(main + x)
+    return nn.relu(core.add(main + x))
 
 @ksc.trace
 def resnet(x, weights):
