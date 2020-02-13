@@ -3,7 +3,6 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
              PatternSynonyms, StandaloneDeriving,
 	     ScopedTypeVariables, TypeApplications #-}
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Annotate (
   annotDecls, lintDefs
@@ -52,7 +51,7 @@ annotDecls gbl_env decls
     mk_rec_def :: DefX Parsed -> TcM TDef
     mk_rec_def (Def { def_fun = fun, def_args = args, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
-         tcArgs [args] $ \[args'] ->
+         tcArg args $ \args' ->
          do { return (Def { def_fun = fun, def_args = args'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
@@ -89,18 +88,18 @@ tcDef (Def { def_fun    = fun
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
-    do { tcArgs [vars] $ \[vars'] ->
+    do { tcArg vars $ \vars' ->
     do { rhs' <- tcRhs fun rhs res_ty
        ; return (Def { def_fun = fun, def_args = vars'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
 
-tcArgs :: [TVarX] -> ([TVar] -> TcM a) -> TcM a
-tcArgs []       continueWithArgs = continueWithArgs []
-tcArgs (tv:tvs) continueWithArgs
-  = do { extendLclSTM [tv] $
-         tcArgs tvs $ \tvs' ->
-         continueWithArgs (tv : tvs') }
+-- CPS form of extendLclSTM.  Formerly types could contain expressions
+-- so they were typechecked.  The name of this function is a vestige
+-- of those times.
+tcArg :: TVarX -> (TVar -> TcM a) -> TcM a
+tcArg tv continueWithArg
+  = do { extendLclSTM [tv] $ continueWithArg tv }
 
 tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
