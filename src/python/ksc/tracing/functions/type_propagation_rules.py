@@ -40,7 +40,7 @@ def keep_shape_prop_rule(new_type):
     return type_prop_rule
 
 def conv_2d_type_prop_rule(padding):
-    def type_prop_rule(x, weights, strides):
+    def type_prop_rule(x, weights, ksizes, strides):
         stride_w, stride_h = strides.data
         if weights.shape_type.type.kind == "Tuple":
             # has bias
@@ -48,9 +48,12 @@ def conv_2d_type_prop_rule(padding):
         else:
             w_shape = weights.shape_type.shape
 
+        k_w, k_h = ksizes.data
+
         x_shape, x_type = x.shape_type
         b, c1, w, h = x_shape
-        m, c2, k_w, k_h = w_shape
+        m, c2, k_w_, k_h_ = w_shape
+        assert (k_w, k_h) == (k_w_, k_h_), f"Expected kernel size {(k_w, k_h)}, but got {(k_w_, k_h_)}"
         assert c1 == c2, f"Expected {c2} input channels, but got {c1}"
         y_w = _get_output_length(w, k_w, stride_w, padding)
         y_h = _get_output_length(h, k_h, stride_h, padding)
