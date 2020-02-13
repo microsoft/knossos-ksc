@@ -72,11 +72,13 @@ optDef _ gst def = return (gst,def)
 
 simplify :: OptEnv -> a -> TExpr -> KM TExpr
 simplify env _ rhs
-  = do { rhs1 <- runAnf (anfExpr (optSubst env) rhs)
+  = do { let subst = optSubst env
+
+       ; rhs1 <- runAnf (anfExpr subst rhs)
 --       ; banner "ANF'd (1)"
 --       ; display rhs1
 
-       ; let rhs2 = optLets (optSubst env) rhs1
+       ; let rhs2 = optLets subst rhs1
 --       ; banner "OptLets (1)"
 --       ; display rhs2
 
@@ -84,11 +86,11 @@ simplify env _ rhs
 --       ; banner "OptE (1)"
 --       ; display rhs3
 
-       ; rhs4 <- runAnf (anfExpr (optSubst env) rhs3)
+       ; rhs4 <- runAnf (anfExpr subst rhs3)
 --       ; banner "ANF'd (2)"
 --       ; display rhs4
 
-       ; let rhs5 = optLets (optSubst env) rhs4
+       ; let rhs5 = optLets subst rhs4
 --       ; banner "OptLets (2)"
 --       ; display rhs5
 
@@ -100,7 +102,7 @@ simplify env _ rhs
           -- that variables have unique names.  See
           --
           --     https://github.com/awf/knossos/pull/386#issuecomment-476586918
-       ; let rhs7 = optLets (optSubst env) rhs6
+       ; let rhs7 = optLets subst rhs6
 --       ; banner "OptLets (3)"
 --       ; display rhs7
 
