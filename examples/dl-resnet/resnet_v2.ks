@@ -4,7 +4,7 @@
 (edef dot (Vec (Vec Float)) ((Vec (Vec Float)) (Vec (Vec Float))))
 (edef transpose (Vec (Vec Float)) ((Vec (Vec Float))))
 (edef broadcast_add (Vec (Vec Float)) ((Vec (Vec Float)) (Vec Float)))
-(edef conv_2d_no_bias (Vec (Vec (Vec (Vec Float)))) (Integer (Tuple Integer Integer) (Tuple Integer Integer) (Vec (Vec (Vec (Vec Float)))) (Vec (Vec (Vec (Vec Float))))))
+(edef conv_2d_no_bias (Vec (Vec (Vec (Vec Float)))) ((Tuple Integer Integer) (Tuple Integer Integer) (Tuple (Tuple Integer Integer) (Tuple Integer Integer)) (Vec (Vec (Vec (Vec Float)))) (Vec (Vec (Vec (Vec Float))))))
 (edef batch_norm_2d (Vec (Vec (Vec (Vec Float)))) ((Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float)) (Vec (Vec (Vec (Vec Float))))))
 (edef relu (Vec (Vec (Vec (Vec Float)))) ((Vec (Vec (Vec (Vec Float))))))
 (edef to_float (Vec (Vec (Vec (Vec Float)))) ((Vec (Vec (Vec (Vec Integer))))))
@@ -96,13 +96,13 @@
         (conv_3_weights (get$5$6 weights))
         (norm_3_weights (get$6$6 weights)))
     (batch_norm_2d norm_3_weights
-      (conv_2d_no_bias (tuple 1 1) conv_3_weights
+      (conv_2d_no_bias (tuple 1 1) (tuple 1 1) (tuple (tuple 0 0) (tuple 0 0)) conv_3_weights
         (relu
           (batch_norm_2d norm_2_weights
-            (conv_2d_no_bias (tuple 1 1) conv_2_weights
+            (conv_2d_no_bias (tuple 3 3)  (tuple 1 1) (tuple (tuple 1 1) (tuple 1 1)) conv_2_weights
               (relu
                 (batch_norm_2d norm_1_weights
-                  (conv_2d_no_bias strides conv_1_weights
+                  (conv_2d_no_bias (tuple 1 1) strides (tuple (tuple 0 0) (tuple 0 0)) conv_1_weights
                     input
                   )
                 )
@@ -138,7 +138,7 @@
         (shortcut_norm_weights (get$3$3 weights)))
     (let ((main (ConvBlock strides conv_block_weights input))
           (shortcut (batch_norm_2d shortcut_norm_weights
-                      (conv_2d_no_bias strides shortcut_conv_weights
+                      (conv_2d_no_bias (tuple 1 1) strides (tuple (tuple 0 0) (tuple 0 0)) shortcut_conv_weights
                         input
                       )
                     )))
@@ -279,7 +279,7 @@
               (max_pool_same (tuple 3 3) (tuple 2 2)  ; pool_size=(3, 3), strides=(2, 2), padding='same'
                 (relu
                   (batch_norm_2d batch_norm_weights
-                    (conv_2d_no_bias (tuple 2 2) conv_weights            ; d_hidden=64, kernel_size=(7, 7), strides=(2, 2), padding="SAME"
+                    (conv_2d_no_bias (tuple 7 7) (tuple 2 2) (tuple (tuple 2 3) (tuple 2 3)) conv_weights            ; d_hidden=64, kernel_size=(7, 7), strides=(2, 2), padding="SAME"
                       (normalize_2d normalization_weights input)
                     )
                   )

@@ -23,21 +23,16 @@ def log_softmax(x):
   x_max = np.amax(x, axis=-1, keepdims=True)
   return (x - x_max) - np.log(np.exp(x - x_max).sum(axis=-1, keepdims=True))
 
-def _conv_2d_no_bias_factory(padding):
-  def conv_2d(x, weights, ksizes, strides):
-    y = jax.lax.conv_general_dilated(
-      x,
-      weights,
-      strides,
-      padding,
-      dimension_numbers=('NCHW', 'OIHW', 'NCHW') # the same as pytorch / onnx
-    )
-    print(f"conv_2d shape: {y.shape}")
-    return y
-  return conv_2d
-
-conv_2d_no_bias_same = _conv_2d_no_bias_factory("SAME")
-conv_2d_no_bias_valid = _conv_2d_no_bias_factory("VALID")
+def conv_2d_no_bias(x, weights, ksizes, strides, padding):
+  y = jax.lax.conv_general_dilated(
+    x,
+    weights,
+    strides,
+    padding,
+    dimension_numbers=('NCHW', 'OIHW', 'NCHW') # the same as pytorch / onnx
+  )
+  print(f"conv_2d shape: {y.shape}")
+  return y
 
 def normalize_2d(x, weights):
   mean, sigma = weights
@@ -65,6 +60,20 @@ def _pooling_factory(pool_type, padding):
 
 max_pool_same = _pooling_factory("MaxPool", "SAME")
 avg_pool_valid = _pooling_factory("AvgPool", "VALID")
+
+# This is a bit silly but jax does not have an API
+# to provide the precise padding sizes for pooling layers
+def max_pool(x, pool_size, strides, padding):
+  if padding == ((0, 0), (0, 0)):
+    return max_pool_valid(x, pool_size, strides)
+  else:
+    return max_pool_same(x, pool_size, strides)
+
+def avg_pool(x, pool_size, strides, padding):
+  if padding == ((0, 0), (0, 0)):
+    return avg_pool_valid(x, pool_size, strides)
+  else:
+    return avg_pool_same(x, pool_size, strides)
 
 def flatten(x):
   b = x.shape[0]
