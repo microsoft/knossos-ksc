@@ -11,8 +11,6 @@ from ksc.type import Type
 ShapeType = namedtuple("ShapeType", ["shape", "type"])
 
 
-PYTHON_MODULE_NAME = "ks_mod"
-
 def import_module_from_path(module_name, path):
     # These three lines are for loading a module from a file in Python 3.5+
     # https://bugs.python.org/issue21436
@@ -27,7 +25,8 @@ def translate_and_import(*args):
     with NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(py_out)
     print(f.name)
-    return import_module_from_path(PYTHON_MODULE_NAME, f.name)
+    module_name = os.path.basename(f.name).split(".")[0]
+    return import_module_from_path(module_name, f.name)
 
 def subprocess_run(cmd, env=None):
     return subprocess.run(cmd, stdout=subprocess.PIPE, env=env).stdout.decode().strip("\n")
