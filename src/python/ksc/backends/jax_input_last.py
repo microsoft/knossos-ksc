@@ -14,8 +14,8 @@ from ksc.backends.jax import (
 )
 import ksc.backends.jax as jax_backend
 
-def conv_2d_no_bias(ksizes, strides, padding, weights, x):
-    return jax_backend.conv_2d_no_bias(x, weights, ksizes, strides, padding) # padding='same'
+def conv_2d_no_bias(ksizes, strides, paddings, weights, x):
+    return jax_backend.conv_2d_no_bias(x, weights, ksizes, strides, paddings)
 
 def normalize_2d(weights, x):
     return jax_backend.normalize_2d(x, weights)

@@ -16,7 +16,7 @@ relu = make_edef("relu", ["x"], elementwise)
 normalize_2d = make_edef("normalize_2d", ["x", "weights"], first_arg)
 batch_norm_2d = make_edef("batch_norm_2d", ["x", "weights"], first_arg)
 
-def _get_padding(shape_in, shape_out, window_sizes, strides):
+def _get_paddings(shape_in, shape_out, window_sizes, strides):
     def get_padding_1d(size_in, size_out, window_size, stride):
         pad_len = max(0, (size_out - 1) * stride + window_size - size_in)
         return (pad_len // 2, pad_len - pad_len // 2)
@@ -34,7 +34,7 @@ class RequirePadding2d(TraceableFunction):
         super().__init__(f"{name}_{{0}}{{1}}{{2}}{{3}}", arg_names)
         self._internal_function = make_edef(
             name,
-            arg_names + ["padding"],
+            arg_names + ["paddings"],
             self._internal_shape_prop_function
         )
         self.padding = padding
@@ -43,9 +43,9 @@ class RequirePadding2d(TraceableFunction):
 
     def _internal_shape_prop_function(self, *args):
         x = args[0]
-        padding = args[-1]
+        paddings = args[-1]
         x_shape, x_type = x.shape_type
-        pad_w, pad_h = padding.data
+        pad_w, pad_h = paddings.data
         b, c, w, h = x_shape
         new_x_shape = (b, c, w + pad_w[0] + pad_w[1], h + pad_h[0] + pad_h[1])
         new_x = Node(x.name, new_x_shape, x_type)
@@ -59,13 +59,13 @@ class RequirePadding2d(TraceableFunction):
         strides = args[-1]
         w, h = x.shape_type.shape[2:]
         w_o, h_o = shape[2:]
-        padding = _get_padding((w, h), (w_o, h_o), ksizes, strides)
-        print(f"In RequirePadding2d.trace(): padding_type={self.padding}, padding={padding}")
-        body = self._internal_function(*args, padding)
+        paddings = _get_paddings((w, h), (w_o, h_o), ksizes, strides)
+        print(f"In RequirePadding2d.trace(): padding_type={self.padding}, paddings={paddings}")
+        body = self._internal_function(*args, paddings)
         shape_types = tuple([arg.shape_type for arg in args])
 
         # specialize the name to avoid cache clash
-        self._name = self._name.format(*padding[0], *padding[1])
+        self._name = self._name.format(*paddings[0], *paddings[1])
         return Trace(body, ShapeType(shape, type), shape_types)
 
 def conv_2d_no_bias(x, weights, ksizes, strides, padding="SAME"):
