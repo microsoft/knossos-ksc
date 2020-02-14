@@ -36,14 +36,19 @@ ProtoFunction = namedtuple("ProtoFunction", ["name", "return_type", "arg_names",
 def get_or_trace_function(f, original_args):
     global _jitted
     arg_types = tuple(arg.shape_type.type for arg in original_args)
-    key = (f.name, arg_types) # only key on arg types (not on shape)
-    if key in _jitted:
-        return _jitted[key]
+
+    # allow the name to be specialized during f.trace()
+    if "{0}" not in f.name:
+        key = (f.name, arg_types) # only key on arg types (not on shape)
+        if key in _jitted:
+            return _jitted[key]
 
     inputs = [node.Node(n, *arg.shape_type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
 
     # trace the function
     trace = f.trace(*inputs)
+    # the name is specialized
+    key = (f.name, arg_types)
 
     print(f"Traced {f.name}: root {trace.body}")
     f = ProtoFunction(

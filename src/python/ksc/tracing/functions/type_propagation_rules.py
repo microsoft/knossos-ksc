@@ -2,6 +2,7 @@ import numpy as np
 from ksc.type import Type
 from ksc.utils import ShapeType
 
+
 def unique_element(s):
     assert len(s) == 1
     return next(iter(s))
@@ -39,7 +40,7 @@ def keep_shape_prop_rule(new_type):
         return ShapeType(x_shape, to_new_type(x_type))
     return type_prop_rule
 
-def conv_2d_type_prop_rule(padding):
+def conv_2d_type_prop_rule_from_padding_type(padding):
     def type_prop_rule(x, weights, ksizes, strides):
         stride_w, stride_h = strides.data
         if weights.shape_type.type.kind == "Tuple":
