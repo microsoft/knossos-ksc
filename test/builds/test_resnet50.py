@@ -207,10 +207,7 @@ def get_class_name_dict(class_names_file):
     with open(class_names_file) as f:
         return json.load(f)
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py"])
-    args = parser.parse_args()
+def get_weights_labels_input(model='resnet_py'):
     npz_file = download_file(
         PYTORCH_RESNET50_URL,
         "8947031f2fc1799404c49924d72a97c4"
