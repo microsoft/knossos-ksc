@@ -6,7 +6,6 @@ import os
 from PIL import Image
 from urllib.request import urlretrieve
 
-
 INPUT_FILE_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/msrc.jpg"
 PYTORCH_RESNET50_ORIGINAL_URL = "https://download.pytorch.org/models/resnet50-19c8e357.pth"
 PYTORCH_RESNET50_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/resnet50.npz"
@@ -229,6 +228,9 @@ def main():
     print(f"Loading image {input_file}")
     input = np.asarray(Image.open(input_file)).transpose((2, 0, 1))[None, :, :, :] / 255.0 # NCHW
 
+    # disable name mangling so that the output looks more readable
+    from ksc.tracing import jitting
+    jitting.disable_name_mangling()
     if args.model == "resnet_v2":
         from resnet_v2 import Resnet50 as resnet
         weights = resnet50_v2_weights_from_pytorch(weights)

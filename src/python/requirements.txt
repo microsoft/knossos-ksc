@@ -1,1 +1,3 @@
 sexpdata
+numpy
+jax

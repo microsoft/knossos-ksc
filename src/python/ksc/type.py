@@ -31,7 +31,7 @@ class Type:
 
     def __init__(self, kind, children=[]):
         assert kind in Type.node_kinds
-        assert (kind == "Tuple" and len(children) != 1) or (Type.node_kinds[kind] == len(children))
+        assert kind == "Tuple" or (Type.node_kinds[kind] == len(children)) # dont' check for 1-tuple
         assert all((ch is None or isinstance(ch, Type)) for ch in children)
         self.kind = kind
         self.children = children

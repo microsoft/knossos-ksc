@@ -63,7 +63,9 @@ def get_specialized_func_name(name):
     specialized = specs.specialized_functions()
     if name in specialized:
         return specialized[name]
-    return name.split("@")[0]
+    if name.startswith("get$"):
+        return name.split("@")[0]
+    return normalize_def_name(name)
 
 def handle_body(s_exp, indent=2):
     if isinstance(s_exp, sexpdata.Symbol):
@@ -87,10 +89,15 @@ def handle_body(s_exp, indent=2):
         )
     elif func_name == "tuple":
         tuple_args = [handle_body(se) for se in s_exp[1:]]
+        if len(tuple_args) == 1:
+            return f"({tuple_args[0]},)"
         return "({tuple_args})".format(tuple_args=", ".join(tuple_args))
-    elif func_name.startswith("get"):
+    elif func_name.startswith("get$"):
         index = int(func_name.split("$")[1]) - 1
-        tuple_name = s_exp[1].value()
+        if isinstance(s_exp[1], sexpdata.Symbol):
+            tuple_name = s_exp[1].value()
+        else:
+            tuple_name = handle_body(s_exp[1], index+2)
         return "{tuple_name}[{index}]".format(tuple_name=tuple_name, index=index)
     elif func_name == "lam":
         var_name = get_var_name(s_exp[1])
@@ -177,6 +184,9 @@ def args_to_sample_values(args):
 
 Def = namedtuple("Def", ["name", "str", "sample_args"])
 
+def normalize_def_name(name):
+    return name.replace("$", "_").split("@")[0] # ignore the type info in the name
+
 def _value_to_str(name):
     return name if isinstance(name, str) else name.value()
 
@@ -187,7 +197,7 @@ def handle_def(s_exp):
     return Def(name,
                """def {name}({args}):
   return {body}
-""".format(name=name.split("@")[0], # ignore the type info in the name
+""".format(name=normalize_def_name(name),
            args=", ".join(arg_names),
            body=handle_body(body)),
                args_to_sample_values(args))
@@ -226,7 +236,7 @@ defs={{
 '''.format(backend=backend,
            edefs=",\n  ".join(edefs),
            defs="\n".join(def_strs),
-           defs_map=",\n  ".join([f'"{d.name}": {d.name.split("@")[0]}' for d in defs])
+           defs_map=",\n  ".join([f'"{d.name}": {normalize_def_name(d.name)}' for d in defs])
     )
 
     if with_main:
