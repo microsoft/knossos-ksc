@@ -106,6 +106,23 @@ class Node:
         from ksc.tracing.functions import core
         return core.div(self, Node.from_data(other))
 
+    def __getitem__(self, index):
+        assert self._type.kind == "Vec", f"Tried to call index on a non-vec {self}"
+        from ksc.tracing.functions import core
+        return core.get_vector_element(index, self)
+
+    @property
+    def shape(self):
+        from ksc.tracing.functions import core
+        def helper(v_exp, v_type):
+            assert v_type.kind == "Vec", f"Tried to call shape on a non-vec {v}"
+            self_shape = (core.get_vector_size(v_exp),)
+            if v_type.children[0].kind != "Vec":
+                return self_shape
+            else:
+                return self_shape + helper(core.get_vector_element(0, v_exp), v_type.children[0])
+        return core.make_tuple(*helper(self, self.shape_type.type))
+
     def __repr__(self):
         if self._data is not None:
             if len(self.children) == 0:

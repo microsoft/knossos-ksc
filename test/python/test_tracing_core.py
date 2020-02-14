@@ -4,7 +4,9 @@ import ksc
 import numpy as np
 
 from ksc.tracing.node import Node
+from ksc.tracing.functions import core
 import ksc.tracing.functions as F
+from ksc.type import Type
 
 @pytest.fixture()
 def backend(pytestconfig):
@@ -152,3 +154,31 @@ def test_reuse_result(backend):
 
     z = y - x
     assert z.get_data_with_backend(backend) == 48
+
+def test_get_vector_element(backend):
+    xn = np.arange(24).reshape((2, 3, 4))
+    x = Node.from_data(xn)
+    o = x[0]
+    assert o.shape_type.shape == (3, 4)
+    o = o[2]
+    assert o.shape_type.shape == (4,)
+    o = o[3]
+    assert o.shape_type.type == Type.Integer
+    assert o.shape_type.shape == ()
+    o.get_data_with_backend(backend) == xn[0, 2, 3]
+
+def test_vector_size(backend):
+    xn = np.arange(24).reshape((2, 3, 4))
+    x = Node.from_data(xn)
+    assert core.get_vector_size(x).get_data_with_backend(backend) == 2
+    o = x[0]
+    assert core.get_vector_size(o).get_data_with_backend(backend) == 3
+    o = o[2]
+    assert core.get_vector_size(o).get_data_with_backend(backend) == 4
+
+def test_tensor_shape(backend):
+    x = Node.from_data(np.arange(24).reshape((2, 3, 4)))
+    assert x.shape.get_data_with_backend(backend) == (2, 3, 4)
+
+    x = Node.from_data(np.random.normal(0, 1, (5, 3, 9)))
+    assert x.shape.get_data_with_backend(backend) == (5, 3, 9)

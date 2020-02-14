@@ -23,19 +23,15 @@ flatten = make_edef("flatten", ["x"], flatten_type_prop_rule)
 
 to_float = make_edef("to_float", ["x"], keep_shape_prop_rule(Type.Float))
 
-def get_tuple_element(index, x):
-    size = len(x)
-    def shape_prop_function(arg):
-        x_shape, x_type = arg.shape_type
-        return ShapeType(x_shape[index], x_type.children[index])
-    class GetTupleElement(TraceableFunction):
+def make_builtin(name, arg_names, shape_prop_function):
+    class Builtin(TraceableFunction):
         is_edef = False
         is_builtin = True
         def __init__(self):
-            super().__init__(f"get${index+1}${size}", arg_names=["x"])
+            super().__init__(name, arg_names)
         def trace(self, *args):
-            assert len(args) == 1
-            o_shape, o_type = shape_prop_function(args[0])
+            assert len(args) == len(arg_names)
+            o_shape, o_type = shape_prop_function(*args)
             body = node.Node(
                 name=self.name,
                 shape=o_shape,
@@ -44,4 +40,36 @@ def get_tuple_element(index, x):
                 shape_prop_function=shape_prop_function)
             shape_types = tuple(arg.shape_type for arg in args)
             return Trace(body, ShapeType(o_shape, o_type), shape_types)
-    return GetTupleElement()(x)
+    return Builtin()
+
+def get_vector_element(index, x):
+    def shape_prop_function(index, x):
+        x_shape, x_type = x.shape_type
+        assert x_type.kind == "Vec"
+        return ShapeType(x_shape[1:], x_type.children[0])
+    f = make_builtin("index", ["index", "x"], shape_prop_function)
+    return f(index, x)
+
+def get_vector_size(x):
+    def shape_prop_function(x):
+        _, x_type = x.shape_type
+        assert x_type.kind == "Vec"
+        return ShapeType((), Type.Integer)
+    f = make_builtin("size", ["x"], shape_prop_function)
+    return f(x)
+
+def make_tuple(*args):
+    def shape_prop_function(*args):
+        shapes, types = zip(*[arg.shape_type for arg in args])
+        return ShapeType(tuple(shapes), Type.Tuple(*types))
+    arg_names = [f"arg{i}" for i in range(len(args))]
+    f = make_builtin("tuple", arg_names, shape_prop_function)
+    return f(*args)
+
+def get_tuple_element(index, x):
+    size = len(x)
+    def shape_prop_function(arg):
+        x_shape, x_type = arg.shape_type
+        return ShapeType(x_shape[index], x_type.children[index])
+    f = make_builtin(f"get${index+1}${size}", ["x"], shape_prop_function)
+    return f(x)
