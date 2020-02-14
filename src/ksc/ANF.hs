@@ -6,6 +6,8 @@
 
 module ANF where
 
+import Data.Void (Void, absurd)
+
 import Ksc.Traversal( traverseState )
 import Lang
 import OptLet( Subst, mkEmptySubst, substBndr, substVar )
@@ -19,7 +21,7 @@ anfDefs defs = runAnf $
 
 -----------------------------------------------
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
-anfD :: Monad m => TDef -> AnfMT Typed m TDef
+anfD :: Monad m => TDef -> AnfMTL l m TDef
 anfD def@(Def { def_rhs = rhs
               , def_pat = pat })
   = case rhs of
@@ -31,7 +33,7 @@ anfD def@(Def { def_rhs = rhs
       StubRhs{} -> return def
 
 -- anfExpr :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
-anfExpr :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
+anfExpr :: Monad m => Subst -> TExpr -> AnfMTL l m TExpr
 anfExpr subst e = wrapLets (anfE subst e)
 
 -- See Notes [Cloning during ANF] [ANF on tuples]
@@ -111,32 +113,35 @@ data FloatDef p = FD (PatG (LetBndrX p)) (ExprX p)
 instance InPhase p => Pretty (FloatDef p) where
   pprPrec _ (FD b e) = pprPatLetBndr @p b <+> char '=' <+> ppr e
 
-newtype AnfMT p m a = AnfM (KMT m ([FloatDef p], a))
+newtype AnfMTL l m a = AnfM (KMT m ([l], a))
 
+type AnfMT p = AnfMTL (FloatDef p)
 type AnfM p = AnfMT p IO
 
-runAnf :: (Monad m, InPhase p) => AnfMT p m a -> KMT m a
+runAnf :: Monad m  => AnfMTL Void m a -> KMT m a
 runAnf m = do { (fs, r) <- run m
-              ; assert (text "runANF" <+> ppr fs) (null fs) $
-                return r }
+              ; case fs of
+                  []  -> return r
+                  x:_ -> absurd x
+                 }
 
-run :: AnfMT p m a -> KMT m ([FloatDef p], a)
+run :: AnfMTL l m a -> KMT m ([l], a)
 run (AnfM m) = m
 
-instance Monad m => Applicative (AnfMT p m) where
+instance Monad m => Applicative (AnfMTL l m) where
   pure  = return
   (<*>) = ap
 
-instance Monad m => Functor (AnfMT p m) where
+instance Monad m => Functor (AnfMTL l m) where
   fmap f m = do { x <- m; return (f x) }
 
-instance Monad m => Monad (AnfMT p m) where
+instance Monad m => Monad (AnfMTL l m) where
   return x = AnfM (return ([], x))
   m >>= k  = AnfM $ do { (fs1, x) <- run m
                        ; (fs2, r) <- run (k x)
                        ; return (fs1 ++ fs2, r) }
 
-wrapLets :: Monad m => AnfMT p m (ExprX p) -> AnfMT p m (ExprX p)
+wrapLets :: Monad m => AnfMT p m (ExprX p) -> AnfMTL l m (ExprX p)
 wrapLets (AnfM m) = AnfM $ do { (fs, e) <- m
                               ; return ([], wrap fs e) }
 
