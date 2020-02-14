@@ -23,6 +23,8 @@ flatten = make_edef("flatten", ["x"], flatten_type_prop_rule)
 
 to_float = make_edef("to_float", ["x"], keep_shape_prop_rule(Type.Float))
 
+max = make_edef("max", ["x", "y"], elementwise)
+
 def make_builtin(name, arg_names, shape_prop_function):
     class Builtin(TraceableFunction):
         is_edef = False

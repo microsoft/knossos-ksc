@@ -7,5 +7,6 @@ def specialized_functions():
         "div@vfvf": "div_ff",
         "div@vvfvvf": "div_ff",
         "div@vvvfvvvf": "div_ff",
-        "div@vvvvfvvvvf": "div_ff"
+        "div@vvvvfvvvvf": "div_ff",
+        "max@ff": "max_"
     }
