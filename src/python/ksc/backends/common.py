@@ -43,6 +43,9 @@ def max_(a, b):
 def neg(a):
     return -a
 
+def pow(a, b):
+    return a ** b
+
 def to_float_i(a):
     return float(a)
 

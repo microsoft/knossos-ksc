@@ -1,7 +1,9 @@
 from functools import wraps
 
+import ksc
 from ksc.tracing.function import Trace, TraceableFunction
 from ksc.tracing.jitting import make_edef
+from ksc.tracing.functions import core
 from ksc.tracing.functions.type_propagation_rules import (
     elementwise,
     first_arg,
@@ -30,12 +32,14 @@ def _get_paddings(shape_in, shape_out, window_sizes, strides):
 class RequirePadding2d(TraceableFunction):
     is_edef = False
     is_builtin = False
-    def __init__(self, name, arg_names, padding, shape_prop_function):
+    def __init__(self, name, arg_names, padding, shape_prop_function, shape_def=None, cost_def=None):
         super().__init__(f"{name}_{{0}}{{1}}{{2}}{{3}}", arg_names)
         self._internal_function = make_edef(
             name,
             arg_names + ["paddings"],
-            self._internal_shape_prop_function
+            self._internal_shape_prop_function,
+            shape_def,
+            cost_def
         )
         self.padding = padding
         self._proto_shape_prop_function = shape_prop_function
@@ -68,12 +72,46 @@ class RequirePadding2d(TraceableFunction):
         self._name = self._name.format(*paddings[0], *paddings[1])
         return Trace(body, ShapeType(shape, type), shape_types)
 
+def cost_conv_2d_no_bias(c0, c1, c2):
+    def f(x, weights, ksizes, strides, paddings):
+        b, c, w, h = x.shape
+        k_w, k_h = ksizes
+        stride_w, stride_h = strides
+        m = core.get_vector_size(weights)
+        w_o = core.to_float(w // stride_w)
+        h_o = core.to_float(h // stride_h)
+        flops = (core.to_float(b)
+                * w_o * h_o
+                * core.to_float(k_w *k_h)
+                * core.to_float(c)
+                * core.to_float(m))
+
+        return c0 + c1 * (flops ** 0.5) + c2 * flops
+    return f
+
+@ksc.trace
+def _ceil_div(x, y):
+    return (x + y - 1) // y
+
+def shape_conv_2d_no_bias(x, weights, ksizes, strides, paddings):
+    b, _, w, h = x.shape
+    m, _, _, _ = weights.shape
+    pad_w, pad_h = paddings
+    k_w, k_h = ksizes
+    stride_w, stride_h = strides
+    pad_w, pad_h = paddings
+    w_new = _ceil_div(w + pad_w[0] + pad_w[1] - k_w + 1, stride_w)
+    h_new = _ceil_div(h + pad_h[0] + pad_h[1] - k_h + 1, stride_h)
+    return core.make_tuple(b, m, w_new, h_new)
+
 def conv_2d_no_bias(x, weights, ksizes, strides, padding="SAME"):
     conv =RequirePadding2d(
         "conv_2d_no_bias",
         ["x", "weights", "ksizes", "strides"],
         padding,
-        conv_2d_type_prop_rule_from_padding_type
+        conv_2d_type_prop_rule_from_padding_type,
+        shape_conv_2d_no_bias,
+        cost_conv_2d_no_bias(0.0, 0.0, 1.0)
     )
     return conv(x, weights, ksizes, strides)
 
