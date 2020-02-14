@@ -182,3 +182,6 @@ def test_tensor_shape(backend):
 
     x = Node.from_data(np.random.normal(0, 1, (5, 3, 9)))
     assert x.shape.get_data_with_backend(backend) == (5, 3, 9)
+
+    x = Node.from_data((np.arange(6).reshape((2, 3)), np.arange(12).reshape((3, 4))))
+    assert x.shape.data == ((2, 3), (3, 4))

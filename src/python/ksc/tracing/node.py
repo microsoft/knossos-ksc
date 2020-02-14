@@ -114,14 +114,24 @@ class Node:
     @property
     def shape(self):
         from ksc.tracing.functions import core
-        def helper(v_exp, v_type):
-            assert v_type.kind == "Vec", f"Tried to call shape on a non-vec {v}"
-            self_shape = (core.get_vector_size(v_exp),)
-            if v_type.children[0].kind != "Vec":
-                return self_shape
+        def helper(current, type):
+            if type.kind == "Vec":
+                self_shape = (core.get_vector_size(current),)
+                return self_shape + helper(core.get_vector_element(0, current), type.children[0])
+            elif type.kind == "Tuple":
+                child_shapes = [helper(core.get_tuple_element(i, current), ct) for i, ct in enumerate(type.children)]
+                # make sure that child_shapes is a list of nodes
+                # rather than list of tuple of nodes
+                child_shapes = [core.make_tuple(*cs) if isinstance(cs, tuple) else cs for cs in child_shapes]
+                print(f"In shape: child_shapes={child_shapes}")
+                return core.make_tuple(*child_shapes)
             else:
-                return self_shape + helper(core.get_vector_element(0, v_exp), v_type.children[0])
-        return core.make_tuple(*helper(self, self.shape_type.type))
+                return ()
+        shape = helper(self, self.shape_type.type)
+        print(f"In shape: shape={shape}")
+        if isinstance(shape, tuple):
+            shape = core.make_tuple(*shape)
+        return shape
 
     def __repr__(self):
         if self._data is not None:
