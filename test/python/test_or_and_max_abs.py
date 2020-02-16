@@ -2,6 +2,7 @@ from ksc.utils import translate_and_import
 
 def test_abs():
     ks_str = """
+(edef abs Integer (Integer))
 (def test Integer ((x : Integer))
     (abs x)
 )
@@ -13,6 +14,7 @@ def test_abs():
 
 def test_max():
     ks_str = """
+(edef max Integer (Integer Integer))
 (def test Integer ((x : Integer) (y : Integer) (z : Integer))
     (max (max x y) z)
 )
@@ -23,6 +25,9 @@ def test_max():
 
 def test_or():
     ks_str = """
+(edef or Bool (Bool Bool))
+(edef lt Bool (Integer Integer))
+(edef gt Bool (Integer Integer))
 (def test Bool ((x : Integer))
     (or (lt x 0) (gt x 0))
 )
@@ -34,6 +39,9 @@ def test_or():
 
 def test_and():
     ks_str = """
+(edef and Bool (Bool Bool))
+(edef lt Bool (Integer Integer))
+(edef gt Bool (Integer Integer))
 (def test Bool ((x : Integer))
     (and (gt x 0) (lt x 2))
 )

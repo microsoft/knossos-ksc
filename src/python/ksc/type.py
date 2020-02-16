@@ -90,16 +90,19 @@ class Type:
         assert self.kind == "Tuple"
         return (c for c in self.children)
 
-    def shortstr(self):
+    def shortstr(self, tb="<", te=">"):
         el_types = {"Integer": "i", "Bool": "b", "Float": "f", "Lam": "l"}
         if self.kind in el_types:
             return el_types[self.kind]
         if self.kind == "Tuple":
-            return "<" + "".join([c.shortstr() for c in self.children]) + ">"
+            return tb + "".join([c.shortstr() for c in self.children]) + te
         elif self.kind == "Vec":
             return "v" + self.children[0].shortstr()
         else:
             raise ValueError(f"Unknown Type.{self.kind}")
+
+    def shortstr_py_friendly(self):
+        return self.shortstr("_t", "t_")
 
     def __str__(self):
         if len(self.children) == 0 and (self.kind != "Tuple"):

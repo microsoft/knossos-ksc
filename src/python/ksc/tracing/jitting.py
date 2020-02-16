@@ -328,6 +328,7 @@ def trace(f, name=None):
         is_edef = False
         is_builtin = False
         def __init__(self):
+            # This does not work for variable length arguments
             arg_names = inspect.getfullargspec(f).args
             super().__init__(name, arg_names=arg_names)
         def forward(self, *args):

@@ -7,6 +7,9 @@ except ModuleNotFoundError:
 
 from ksc.backends.common import *
 
+from ksc.backends import common
+_built_ins = common._built_ins
+
 def broadcast_add(x, b):
   return x + b[None, :]
 
