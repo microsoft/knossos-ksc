@@ -1,5 +1,7 @@
 ; Use --backend jax_input_last because in the jax backend we switched to
 ; ordering arguments as (x, weights, ...)
+(edef eq Bool (Integer Integer))
+(edef add (Vec (Vec (Vec (Vec Float)))) ((Vec (Vec (Vec (Vec Float)))) (Vec (Vec (Vec (Vec Float))))))
 (edef normalize_2d (Vec (Vec (Vec (Vec Float)))) ((Tuple (Vec Float) (Vec Float)) (Vec (Vec (Vec (Vec Float))))))
 (edef dot (Vec (Vec Float)) ((Vec (Vec Float)) (Vec (Vec Float))))
 (edef transpose (Vec (Vec Float)) ((Vec (Vec Float))))

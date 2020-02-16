@@ -13,6 +13,7 @@ from ksc.backends.jax import (
     flatten
 )
 import ksc.backends.jax as jax_backend
+_built_ins = jax_backend._built_ins
 
 def conv_2d_no_bias(ksizes, strides, paddings, weights, x):
     return jax_backend.conv_2d_no_bias(x, weights, ksizes, strides, paddings)

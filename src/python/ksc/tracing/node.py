@@ -2,19 +2,15 @@ import hashlib
 
 import ksc
 from ksc.type import Type
+from ksc.abstract_value import AbstractValue
 from ksc.tracing import function
 from ksc.tracing import jitting
 from ksc import utils
-from ksc.utils import ShapeType
 
-class Node:
+class Node(AbstractValue):
     def __init__(self, name, shape=None, type=None, data=None, children=[], jitted=None, shape_prop_function=None):
+        super().__init__(shape, type, data)
         self._name = name
-        # only for Value
-        self._data = data
-        # shape and type of the value (filled in through tracing)
-        self._shape = shape
-        self._type = type
         self._children = children
         self._jitted = jitted
         self._shape_prop_function = shape_prop_function
@@ -60,10 +56,6 @@ class Node:
     @property
     def users(self):
         return self._users
-
-    @property
-    def shape_type(self):
-        return ShapeType(self._shape, self._type)
 
     @property
     def children(self):

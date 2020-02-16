@@ -66,3 +66,23 @@ def fold(f, s0, xs):
     for x in xs:
         s = f((s, x))
     return s
+
+def make_tuple(*args):
+    return tuple(args)
+
+def get_tuple_element(i, tup):
+    return tup[i]
+
+def let(var, body):
+    return body(var)
+
+_built_ins = [
+    "build",
+    "sumbuild",
+    "size",
+    "index",
+    "fold",
+    "make_tuple",
+    "get_tuple_element",
+    "let"
+]

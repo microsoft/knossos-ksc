@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='ksc',
-      version='0.3',
+      version='0.4',
       description='Python interface for Knossos',
       author='The Knossos Team',
       author_email='Knossos@service.microsoft.com',
