@@ -45,16 +45,9 @@ main = do
             _ -> Nothing
           _ -> Nothing
 
-  putStrLn "Rules"
-  print rules
+  showDebugging rules prog
 
-  putStrLn "Prog"
-  print prog
-
-  putStrLn "Match rules"
-  print (Rules.tryRules rules prog)
-
-  let link = "</p><a href=\"/\">Start again</a></p>"
+  let link = "<p><a href=\"/\">Start again</a></p>"
 
   scotty 3000 $ do
     get "/" $ do
@@ -74,6 +67,16 @@ main = do
               let (m'', s) = render 0 (rewrites rules id e')
               liftAndCatchIO (writeIORef m m'')
               html $ mconcat [link, Data.Text.Lazy.pack s]
+
+  where showDebugging rules prog = do
+          putStrLn "Rules"
+          print rules
+
+          putStrLn "Prog"
+          print prog
+
+          putStrLn "Match rules"
+          print (Rules.tryRules rules prog)
 
 data Link = Link String
 
