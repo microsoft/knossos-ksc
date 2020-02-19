@@ -1,3 +1,13 @@
+-- To run it:
+--
+-- ~/.ghcup/bin/cabal v2-repl --ghc-option=-Wwarn --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc
+--
+-- :l src/ksc/Ksc/RewriteApp.hs
+--
+-- main
+--
+-- The go to http://localhost:3000/ in your browser
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE LambdaCase #-}
