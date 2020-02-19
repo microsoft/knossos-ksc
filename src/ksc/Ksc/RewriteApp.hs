@@ -21,7 +21,7 @@ import           Data.List (intercalate)
 import           Data.IORef (newIORef, readIORef, writeIORef)
 import qualified Data.Text.Lazy
 
-import Web.Scotty hiding (body)
+import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 
 main :: IO ()
 main = do
