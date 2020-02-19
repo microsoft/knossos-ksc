@@ -154,7 +154,7 @@ render i = \case
   Left s:rest -> fmap (s ++) (render i rest)
   Right (s, e):rest ->
     let ((m, j), rests) = render (i + 1) rest
-    in ((Data.Map.insert i e m, j + 1),
+    in ((Data.Map.insert i e m, j),
         "<a href=\"" ++ show i ++ "\">"
         ++ s
         ++ "</a>"
