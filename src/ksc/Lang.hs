@@ -318,7 +318,6 @@ nameOfVar = \case
   Grad s _ -> s
 
 data Konst = KInteger Integer   -- :: TypeInteger
-           | KSize    Integer   -- :: TypeSize
            | KFloat   Double    -- :: TypeFloat
            | KBool    Bool      -- :: TypeBool
            | KString  String    -- :: TypeString
@@ -388,9 +387,6 @@ mkLets xs e = foldr (uncurry mkLet) e xs
 
 kInt :: Integer -> ExprX p
 kInt i = Konst (KInteger i)
-
-kTSize :: Integer -> TExpr
-kTSize i = Konst (KSize i)
 
 kTInt :: Integer -> TExpr
 kTInt i = Konst (KInteger i)
@@ -475,7 +471,6 @@ unzipLMTypes (lmt : lmts) = do
 
 typeofKonst :: Konst -> Type
 typeofKonst (KInteger _) = TypeInteger
-typeofKonst (KSize    _) = TypeSize
 typeofKonst (KFloat   _) = TypeFloat
 typeofKonst (KBool    _) = TypeBool
 typeofKonst (KString  _) = TypeString
@@ -746,7 +741,6 @@ instance Pretty TFun where
 
 instance Pretty Konst where
   pprPrec _ (KInteger i) = integer i
-  pprPrec _ (KSize s)    = integer s
   pprPrec _ (KFloat f)   = double f
   pprPrec _ (KString s)  = text (show s)
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })

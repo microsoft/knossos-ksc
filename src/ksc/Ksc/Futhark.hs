@@ -230,7 +230,6 @@ toFutharkParam (L.TVar t v) = Param (toName v) $ toFutharkType t
 toFutharkConst :: L.Konst -> Const
 toFutharkConst (L.KInteger x) = ConstI32 $ fromInteger x
 toFutharkConst (L.KFloat x) = ConstF64 $ fromRational $ toRational x
-toFutharkConst (L.KSize x) = ConstI32 $ fromInteger x
 toFutharkConst (L.KBool x) = ConstBool x
 toFutharkConst (L.KString x) = ConstString x
 

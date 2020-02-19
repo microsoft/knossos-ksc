@@ -639,7 +639,6 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
 cgenKonst :: Konst -> String
 cgenKonst = \case
   KInteger i -> show i
-  KSize i    -> show i
   KFloat   f -> show f
   KString  s -> show s
   KBool    b -> if b then "1 /* TRUE */" else "0 /* FALSE */"
