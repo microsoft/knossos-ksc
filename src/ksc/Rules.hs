@@ -1,14 +1,14 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-module Rules( RuleBase, tryRules, mkRuleBase ) where
+module Rules( RuleBase, tryRules, mkRuleBase, matchRules ) where
 
 import Lang
 import LangUtils ()
 import Control.Monad( guard )
 import Data.Map as M
 
-newtype RuleBase = Rules [TRule]
+newtype RuleBase = Rules [TRule] deriving Show
         -- Rule is defined in Lang
 
 type TSubst = M.Map TVar TExpr -- Substitution for fv(lhs)
