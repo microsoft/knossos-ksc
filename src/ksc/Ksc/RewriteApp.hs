@@ -13,6 +13,7 @@ import qualified LangUtils
 import qualified Parse
 import qualified Annotate
 import qualified KMonad
+import qualified OptLet
 
 import qualified Data.Map
 import           Data.Maybe (mapMaybe)
@@ -53,11 +54,13 @@ main = do
   putStrLn "Match rules"
   print (Rules.tryRules rules prog)
 
+  let link = "</p><a href=\"/\">Start again</a></p>"
+
   scotty 3000 $ do
-    get "/start" $ do
+    get "/" $ do
       let (m'', s) = render 0 (rewrites rules id prog)
       liftAndCatchIO (writeIORef m m'')
-      html $ Data.Text.Lazy.pack s
+      html $ mconcat [link, Data.Text.Lazy.pack s]
     get "/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
@@ -65,11 +68,12 @@ main = do
       m' <- liftAndCatchIO (readIORef m)
 
       case Data.Map.lookup i m' of
-            Nothing -> html $ mconcat ["<h1>Couldn't find ", beam, "</h1>"]
+            Nothing -> html $ mconcat [link, "<h1>Couldn't find ", beam, "</h1>"]
             Just e -> do
-              let (m'', s) = render 0 (rewrites rules id e)
+              let e' = OptLet.optLets (OptLet.mkEmptySubst []) e
+              let (m'', s) = render 0 (rewrites rules id e')
               liftAndCatchIO (writeIORef m m'')
-              html $ Data.Text.Lazy.pack s
+              html $ mconcat [link, Data.Text.Lazy.pack s]
 
 data Link = Link String
 

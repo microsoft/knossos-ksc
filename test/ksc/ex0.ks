@@ -2,7 +2,10 @@
 ; Licensed under the MIT license.
 
 (rule "mul2" (v : Float) (mul@ff v 2.0) (add v v))
-(def f Float (x : Float) (mul@ff 5.0 2.0))
+(rule "add0" (v : Float) (add v 0.0) 0.0)
+
+
+(def f Float (x : Float) (mul@ff 0.0 2.0))
 
 
 ; (rule "mult" (v : Float) (mul@ff (tuple v 2.0)) (add v v))
