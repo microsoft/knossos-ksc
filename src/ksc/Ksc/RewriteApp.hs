@@ -36,7 +36,7 @@ import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 main :: IO ()
 main = do
 
-  m <- newIORef Data.Map.empty
+  m <- newIORef (Data.Map.empty, 0)
 
   decls <- fmap concat (mapM Parse.parseF [ "src/runtime/prelude.ks"
                                           , "test/ksc/ex0.ks"])
@@ -61,21 +61,23 @@ main = do
 
   scotty 3000 $ do
     get "/" $ do
-      let (m'', s) = render 0 (rewrites rules id prog)
-      liftAndCatchIO (writeIORef m m'')
+      (m', j) <- liftAndCatchIO (readIORef m)
+
+      let ((m'', j'), s) = render j (rewrites rules id prog)
+      liftAndCatchIO (writeIORef m (m' <> m'', j'))
       html $ mconcat [link, Data.Text.Lazy.pack s]
     get "/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
 
-      m' <- liftAndCatchIO (readIORef m)
+      (m', j) <- liftAndCatchIO (readIORef m)
 
       case Data.Map.lookup i m' of
             Nothing -> html $ mconcat [link, "<h1>Couldn't find ", beam, "</h1>"]
             Just e -> do
               let e' = OptLet.optLets (OptLet.mkEmptySubst []) e
-              let (m'', s) = render 0 (rewrites rules id e')
-              liftAndCatchIO (writeIORef m m'')
+              let ((m'', j'), s) = render j (rewrites rules id e')
+              liftAndCatchIO (writeIORef m (m' <> m'', j'))
               html $ mconcat [link, Data.Text.Lazy.pack s]
 
   where showDebugging rules prog = do
@@ -146,13 +148,13 @@ tupleRewrites rulebase k es =
         k (Lang.Tuple (setList j e' es)) ) e)
     (zip [1..] es))
 
-render :: Int -> Document -> (Data.Map.Map Int Lang.TExpr, String)
+render :: Int -> Document -> ((Data.Map.Map Int Lang.TExpr, Int), String)
 render i = \case
-  [] -> (Data.Map.empty, "")
+  [] -> ((Data.Map.empty, i), "")
   Left s:rest -> fmap (s ++) (render i rest)
   Right (s, e):rest ->
-    let (m, rests) = render (i + 1) rest
-    in (Data.Map.insert i e m,
+    let ((m, j), rests) = render (i + 1) rest
+    in ((Data.Map.insert i e m, j + 1),
         "<a href=\"" ++ show i ++ "\">"
         ++ s
         ++ "</a>"
