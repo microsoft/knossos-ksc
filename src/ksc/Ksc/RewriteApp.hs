@@ -96,7 +96,8 @@ rewrites rulebase k = \case
               k' = k . Lang.Call ff
           in (case Rules.tryRules rulebase c of
                Just rewritten -> [Right (fstr, k rewritten)]
-                                  <> rewrites rulebase k' e
+                                 <> [Left " "]
+                                 <> rewrites rulebase k' e
                Nothing -> [Left (fstr ++ " ")] <> rewrites rulebase k' e)
        <> [Left ")"]
      Lang.Tuple es -> [Left "(tuple "]
