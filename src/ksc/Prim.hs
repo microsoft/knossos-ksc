@@ -578,12 +578,3 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "lmZero", "lmOne"
                        , "or", "and"
                        ]
-
-toSize :: TypedExpr -> TExpr
-toSize (TE n_expr n_ty)
-  | TypeSize <- n_ty
-  = n_expr
-  | Konst (KInteger n) <- n_expr
-  = Konst (KSize n)
-  | otherwise
-  = error "toSize"
