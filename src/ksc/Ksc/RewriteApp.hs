@@ -138,9 +138,9 @@ rewrites rulebase k = \case
               rewrites_ = case e of
                 Lang.Tuple es -> tupleRewrites rulebase k' es
                 _ -> rewrites rulebase k' e
-          in case tryRules rulebase c of
-               (rule,rewritten):_ -> [Right (fstr, [(rule, k rewritten)])]
-               [] -> [Left fstr]
+          in [Right (fstr,
+                     map (\(rule, rewritten)
+                           -> (rule, k rewritten)) (tryRules rulebase c))]
           <> [Left " "] <> rewrites_
        <> [Left ")"]
      Lang.Tuple es -> [Left "(tuple "]
