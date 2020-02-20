@@ -140,9 +140,8 @@ rewrites rulebase k = \case
                 _ -> rewrites rulebase k' e
           in case tryRules rulebase c of
                (rule,rewritten):_ -> [Right (fstr, rule, k rewritten)]
-                                 <> [Left " "]
-                                 <> rewrites_
-               [] -> [Left (fstr ++ " ")] <> rewrites_
+               [] -> [Left fstr]
+          <> [Left " "] <> rewrites_
        <> [Left ")"]
      Lang.Tuple es -> [Left "(tuple "]
                       <> tupleRewrites rulebase k es
