@@ -18,14 +18,15 @@ type VSubst = M.Map TVar TVar  -- Substitution for bv(lhs)
 mkRuleBase :: [TRule] -> RuleBase
 mkRuleBase = Rules
 
-tryRulesMany :: RuleBase -> TExpr -> [TExpr]
+tryRulesMany :: RuleBase -> TExpr -> [(TRule, TExpr)]
 tryRulesMany rules = fmap f . matchRules rules
-  where f (rule, subst) = mkLets (M.toList subst) (ru_rhs rule)
+  where f (rule, subst) = (rule,
+                           mkLets (M.toList subst) (ru_rhs rule))
          -- Use lets, not substE, so that optLetsE will guarantee
          -- capture-avoiding substitution
 
 tryRules :: RuleBase -> TExpr -> Maybe TExpr
-tryRules rules = listToMaybe . tryRulesMany rules
+tryRules rules = fmap snd . listToMaybe . tryRulesMany rules
          -- For now, arbitrarily pick the first rule that matches
          -- One could imagine priority schemes (e.g. best-match)
 
