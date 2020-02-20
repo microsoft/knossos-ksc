@@ -92,18 +92,18 @@ main = do
 
 data Link = Link String
 
-type Chunk = Either String (String, Lang.TExpr)
+type Chunk a = Either String (String, a)
 
-type Document = [Chunk]
+type Document a = [Chunk a]
 
 setList :: Int -> a -> [a] -> [a]
 setList i a as = zipWith f [1..] as
   where f j a' = if i == j then a else a'
 
 rewrites :: Rules.RuleBase
-         -> (Lang.TExpr -> Lang.TExpr)
+         -> (Lang.TExpr -> e)
          -> Lang.TExpr
-         -> Document
+         -> Document e
 rewrites rulebase k = \case
      c@(Lang.Call ff@(Lang.TFun _ f) e) ->
        [Left "("]
@@ -139,16 +139,16 @@ rewrites rulebase k = \case
      Lang.Dummy _ -> error "We don't do Dummy"
 
 tupleRewrites :: Rules.RuleBase
-              -> (Lang.TExpr -> Lang.TExpr)
+              -> (Lang.TExpr -> e)
               -> [Lang.TExpr]
-              -> Document
+              -> Document e
 tupleRewrites rulebase k es =
   intercalate [Left " "] (map (\(j, e) ->
     rewrites rulebase (\e' ->
         k (Lang.Tuple (setList j e' es)) ) e)
     (zip [1..] es))
 
-render :: Int -> Document -> ((Data.Map.Map Int Lang.TExpr, Int), String)
+render :: Int -> Document Lang.TExpr -> ((Data.Map.Map Int Lang.TExpr, Int), String)
 render i = \case
   [] -> ((Data.Map.empty, i), "")
   Left s:rest -> fmap (s ++) (render i rest)
