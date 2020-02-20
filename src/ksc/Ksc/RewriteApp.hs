@@ -29,6 +29,7 @@ import qualified Data.Map
 import           Data.Maybe (mapMaybe)
 import           Data.List (intercalate)
 import           Data.IORef (newIORef, readIORef, writeIORef)
+import           Data.String (fromString)
 import qualified Data.Text.Lazy
 
 import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
@@ -38,8 +39,11 @@ main = do
 
   m <- newIORef (Data.Map.empty, 0)
 
+  let sourceFile = "test/ksc/ex0.ks"
+      functionName = "f"
+
   decls <- fmap concat (mapM Parse.parseF [ "src/runtime/prelude.ks"
-                                          , "test/ksc/ex0.ks"])
+                                          , sourceFile ])
 
   (_, tc_decls) <- KMonad.runKM (Annotate.annotDecls LangUtils.emptyGblST decls)
 
@@ -50,14 +54,29 @@ main = do
   let prog = head $ flip mapMaybe tc_decls $ \case
        Lang.RuleDecl{} -> Nothing
        Lang.DefDecl d -> case Lang.funIdOfFun (Lang.def_fun d) of
-          Lang.UserFun "f" -> case Lang.def_rhs d of
-            Lang.UserRhs e -> Just e
-            _ -> Nothing
+          Lang.UserFun f -> if f == functionName
+                            then case Lang.def_rhs d of
+                                   Lang.UserRhs e -> Just e
+                                   _ -> Nothing
+                            else Nothing
           _ -> Nothing
 
   showDebugging rules prog
 
   let link = "<p><a href=\"/\">Start again</a></p>"
+
+      comments = [ link
+                 , "<p>Comments</p>"
+                 , "<ul>"
+                 , "<li>Displays the body of the function "
+                 , fromString functionName
+                 , " from the source file "
+                 , fromString sourceFile
+                 , "</li>"
+                 , "<li>Only allows one rewrite per subexpression "
+                 , " (what should the UI be for multiple rewrites?</li>"
+                 , "</ul>"
+                 ]
 
   scotty 3000 $ do
     get "/" $ do
@@ -65,7 +84,7 @@ main = do
 
       let ((m'', j'), s) = render j (rewrites rules id prog)
       liftAndCatchIO (writeIORef m (m' <> m'', j'))
-      html $ mconcat [link, Data.Text.Lazy.pack s]
+      html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
@@ -73,12 +92,12 @@ main = do
       (m', j) <- liftAndCatchIO (readIORef m)
 
       case Data.Map.lookup i m' of
-            Nothing -> html $ mconcat [link, "<h1>Couldn't find ", beam, "</h1>"]
+            Nothing -> html $ mconcat (comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
             Just e -> do
               let e' = OptLet.optLets (OptLet.mkEmptySubst []) e
               let ((m'', j'), s) = render j (rewrites rules id e')
               liftAndCatchIO (writeIORef m (m' <> m'', j'))
-              html $ mconcat [link, Data.Text.Lazy.pack s]
+              html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
 
   where showDebugging rules prog = do
           putStrLn "Rules"
