@@ -122,6 +122,10 @@ setList :: Int -> a -> [a] -> [a]
 setList i a as = zipWith f [1..] as
   where f j a' = if i == j then a else a'
 
+tryRules :: Rules.RuleBase -> Lang.TExpr -> Maybe Lang.TExpr
+tryRules rulebase = fmap (OptLet.optLets (OptLet.mkEmptySubst []))
+                    . Rules.tryRules rulebase
+
 rewrites :: Rules.RuleBase
          -> (Lang.TExpr -> e)
          -> Lang.TExpr
@@ -134,8 +138,8 @@ rewrites rulebase k = \case
               rewrites_ = case e of
                 Lang.Tuple es -> tupleRewrites rulebase k' es
                 _ -> rewrites rulebase k' e
-          in case Rules.tryRules rulebase c of
-               Just rewritten -> [Right (fstr, k $ OptLet.optLets (OptLet.mkEmptySubst []) rewritten)]
+          in case tryRules rulebase c of
+               Just rewritten -> [Right (fstr, k rewritten)]
                                  <> [Left " "]
                                  <> rewrites_
                Nothing -> [Left (fstr ++ " ")] <> rewrites_
