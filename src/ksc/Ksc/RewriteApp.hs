@@ -191,33 +191,31 @@ rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
 rewritesPages r e = Free (fmap (rewritesPages r) (rewritesPage r e))
 
 renderDocument :: Data.Map.Map Int a
-               -> (b -> a)
-               -> Document b
+               -> Document a
                -> (Data.Map.Map Int a, String)
-renderDocument m f = \case
+renderDocument m = \case
      [] -> (m, "")
-     Left s:rest -> fmap (s ++) (renderDocument m f rest)
-     Right (s, []):rest -> fmap (s ++) (renderDocument m f rest)
+     Left s:rest -> fmap (s ++) (renderDocument m rest)
+     Right (s, []):rest -> fmap (s ++) (renderDocument m rest)
      Right (s, (b:_)):rest ->
        let i = case Data.Map.lookupMax m of
              Just (theMax, _) -> theMax + 1
              Nothing -> 0
-           m' = Data.Map.insert i (f b) m
+           m' = Data.Map.insert i b m
            s' = "<a href=\"" ++ show i ++ "\">"
                 ++ s
                 ++ "</a>"
-           (mrest, srest) = renderDocument m' f rest
+           (mrest, srest) = renderDocument m' rest
        in (mrest, s' ++ srest)
 
 renderPage :: Data.Map.Map Int a
-           -> (b -> a)
-           -> Page b
+           -> Page a
            -> (Data.Map.Map Int a, String)
-renderPage m f (Document d) = renderDocument m f d
+renderPage m (Document d) = renderDocument m d
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
             -> (Data.Map.Map Int (Free Page Void), String)
 renderPages m = \case
   Pure void -> absurd void
-  Free page -> renderPage m id page
+  Free page -> renderPage m page
