@@ -8,6 +8,7 @@
 --
 -- The go to http://localhost:3000/ in your browser
 
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE LambdaCase #-}
@@ -34,10 +35,13 @@ import qualified Data.Text.Lazy
 
 import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 
+import           Control.Monad.Free
+import           Data.Void
+
 main :: IO ()
 main = do
 
-  m <- newIORef (Data.Map.empty, 0)
+  m <- newIORef Data.Map.empty
 
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
@@ -83,23 +87,22 @@ main = do
 
   scotty 3000 $ do
     get "/" $ do
-      (m', j) <- liftAndCatchIO (readIORef m)
+      m' <- liftAndCatchIO (readIORef m)
 
-      let ((m'', j'), s) = render j (rewrites rules id prog)
-      liftAndCatchIO (writeIORef m (m' <> m'', j'))
+      let (m'', s) = renderPages m' (rewritesPages rules prog)
+      liftAndCatchIO (writeIORef m m'')
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
 
-      (m', j) <- liftAndCatchIO (readIORef m)
+      m' <- liftAndCatchIO (readIORef m)
 
       case Data.Map.lookup i m' of
             Nothing -> html $ mconcat (comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
             Just e -> do
-              let e' = e
-              let ((m'', j'), s) = render j (rewrites rules id e')
-              liftAndCatchIO (writeIORef m (m' <> m'', j'))
+              let (m'', s) = renderPages m' e
+              liftAndCatchIO (writeIORef m m'')
               html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
 
   where showDebugging rules prog = do
@@ -114,9 +117,14 @@ main = do
 
 data Link = Link String
 
-type Chunk a = Either String (String, [(Lang.TRule, a)])
+type Chunk1 a = Either String (String, [a])
 
-type Document a = [Chunk a]
+type Chunk a = Chunk1 (Lang.TRule, a)
+
+type Document a = [Chunk1 a]
+
+data Page a = Document (Document a)
+  deriving Functor
 
 setList :: Int -> a -> [a] -> [a]
 setList i a as = zipWith f [1..] as
@@ -129,7 +137,7 @@ tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
 rewrites :: Rules.RuleBase
          -> (Lang.TExpr -> e)
          -> Lang.TExpr
-         -> Document e
+         -> Document (Lang.TRule, e)
 rewrites rulebase k = \case
      c@(Lang.Call ff@(Lang.TFun _ f) e) ->
        [Left "("]
@@ -167,22 +175,49 @@ rewrites rulebase k = \case
 tupleRewrites :: Rules.RuleBase
               -> (Lang.TExpr -> e)
               -> [Lang.TExpr]
-              -> Document e
+              -> Document (Lang.TRule, e)
 tupleRewrites rulebase k es =
   intercalate [Left " "] (map (\(j, e) ->
     rewrites rulebase (\e' ->
         k (Lang.Tuple (setList j e' es)) ) e)
     (zip [1..] es))
 
-render :: Int -> Document Lang.TExpr -> ((Data.Map.Map Int Lang.TExpr, Int), String)
-render i = \case
-  [] -> ((Data.Map.empty, i), "")
-  Left s:rest -> fmap (s ++) (render i rest)
-  Right (s, []):rest -> fmap (s ++) (render i rest)
-  Right (s, (_, e):_):rest ->
-    let ((m, j), rests) = render (i + 1) rest
-    in ((Data.Map.insert i e m, j),
-        "<a href=\"" ++ show i ++ "\">"
-        ++ s
-        ++ "</a>"
-        ++ rests)
+rewritesPage :: Rules.RuleBase
+             -> Lang.TExpr
+             -> Page Lang.TExpr
+rewritesPage r e = fmap snd (Document (rewrites r id e))
+
+rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
+rewritesPages r e = Free (fmap (rewritesPages r) (rewritesPage r e))
+
+renderDocument :: Data.Map.Map Int a
+               -> (b -> a)
+               -> Document b
+               -> (Data.Map.Map Int a, String)
+renderDocument m f = \case
+     [] -> (m, "")
+     Left s:rest -> fmap (s ++) (renderDocument m f rest)
+     Right (s, []):rest -> fmap (s ++) (renderDocument m f rest)
+     Right (s, (b:_)):rest ->
+       let i = case Data.Map.lookupMax m of
+             Just (theMax, _) -> theMax + 1
+             Nothing -> 0
+           m' = Data.Map.insert i (f b) m
+           s' = "<a href=\"" ++ show i ++ "\">"
+                ++ s
+                ++ "</a>"
+           (mrest, srest) = renderDocument m' f rest
+       in (mrest, s' ++ srest)
+
+renderPage :: Data.Map.Map Int a
+           -> (b -> a)
+           -> Page b
+           -> (Data.Map.Map Int a, String)
+renderPage m f (Document d) = renderDocument m f d
+
+renderPages :: Data.Map.Map Int (Free Page Void)
+            -> Free Page Void
+            -> (Data.Map.Map Int (Free Page Void), String)
+renderPages m = \case
+  Pure void -> absurd void
+  Free page -> renderPage m id page
