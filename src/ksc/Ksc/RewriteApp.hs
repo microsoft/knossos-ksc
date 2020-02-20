@@ -124,6 +124,7 @@ type Chunk a = Chunk1 (Lang.TRule, a)
 type Document a = [Chunk1 a]
 
 data Page a = Document (Document a)
+            | Rewrites (Document a) [(String, a)]
   deriving Functor
 
 setList :: Int -> a -> [a] -> [a]
@@ -184,11 +185,13 @@ tupleRewrites rulebase k es =
 
 rewritesPage :: Rules.RuleBase
              -> Lang.TExpr
-             -> Page Lang.TExpr
-rewritesPage r e = fmap snd (Document (rewrites r id e))
+             -> Page (Lang.TRule, Lang.TExpr)
+rewritesPage r e = Document (rewrites r id e)
 
 rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
-rewritesPages r e = Free (fmap (rewritesPages r) (rewritesPage r e))
+rewritesPages r e = do
+  x <- liftF (rewritesPage r e)
+  rewritesPages r (snd x)
 
 renderDocument :: Data.Map.Map Int a
                -> Document a
@@ -202,16 +205,33 @@ renderDocument m = \case
              Just (theMax, _) -> theMax + 1
              Nothing -> 0
            m' = Data.Map.insert i b m
-           s' = "<a href=\"" ++ show i ++ "\">"
-                ++ s
-                ++ "</a>"
+           s' = renderLink i s
            (mrest, srest) = renderDocument m' rest
        in (mrest, s' ++ srest)
+
+renderLink :: Show a => a -> String -> String
+renderLink i s = "<a href=\"" ++ show i ++ "\">"
+                 ++ s
+                 ++ "</a>"
 
 renderPage :: Data.Map.Map Int a
            -> Page a
            -> (Data.Map.Map Int a, String)
-renderPage m (Document d) = renderDocument m d
+renderPage m = \case
+  Document d   -> renderDocument m d
+  Rewrites d r -> let (m', s')   = renderDocument m d
+                      (m'', s'') = renderRewrites m' r
+                  in (m'', s' ++ s'')
+    where renderRewrites mm = \case
+            []        -> (mm, "")
+            (s,b):rrs ->
+              let i = case Data.Map.lookupMax m of
+                    Just (theMax, _) -> theMax + 1
+                    Nothing -> 0
+                  m' = Data.Map.insert i b m
+                  s' = "<p>" ++ renderLink i s ++ "</p>"
+                  (m'', s'') = renderRewrites m' rrs
+              in (m'', s' ++ s'')
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
