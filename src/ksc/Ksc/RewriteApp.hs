@@ -117,9 +117,7 @@ main = do
 
 data Link = Link String
 
-type Chunk1 a = Either String (String, [a])
-
-type Chunk a = Chunk1 (Lang.TRule, a)
+type Chunk1 a = Either String (String, a)
 
 type Document a = [Chunk1 a]
 
@@ -138,7 +136,7 @@ tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
 rewrites :: Rules.RuleBase
          -> (Lang.TExpr -> e)
          -> Lang.TExpr
-         -> Document (Lang.TRule, e)
+         -> Document [(Lang.TRule, e)]
 rewrites rulebase k = \case
      c@(Lang.Call ff@(Lang.TFun _ f) e) ->
        [Left "("]
@@ -176,7 +174,7 @@ rewrites rulebase k = \case
 tupleRewrites :: Rules.RuleBase
               -> (Lang.TExpr -> e)
               -> [Lang.TExpr]
-              -> Document (Lang.TRule, e)
+              -> Document [(Lang.TRule, e)]
 tupleRewrites rulebase k es =
   intercalate [Left " "] (map (\(j, e) ->
     rewrites rulebase (\e' ->
@@ -185,13 +183,31 @@ tupleRewrites rulebase k es =
 
 rewritesPage :: Rules.RuleBase
              -> Lang.TExpr
-             -> Page (Lang.TRule, Lang.TExpr)
+             -> Page [(Lang.TRule, Lang.TExpr)]
 rewritesPage r e = Document (rewrites r id e)
+
+choosePage :: Rules.RuleBase
+           -> Lang.TExpr
+           -> [(Lang.TRule, Lang.TExpr)]
+           -> Page (Either Lang.TExpr [(Lang.TRule, Lang.TExpr)])
+choosePage r e rs =
+  Rewrites ((fmap . fmap . fmap) Right (rewrites r id e))
+           (fmap (\(r', e') -> (Lang.ru_name r', Left e')) rs)
 
 rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
 rewritesPages r e = do
-  x <- liftF (rewritesPage r e)
-  rewritesPages r (snd x)
+    x <- liftF (rewritesPage r e)
+    choosePages r e x
+
+choosePages :: Rules.RuleBase
+            -> Lang.TExpr
+            -> [(Lang.TRule, Lang.TExpr)]
+            -> Free Page a
+choosePages r e rs = do
+    x <- liftF (choosePage r e rs)
+    case x of
+      Left e' -> rewritesPages r e'
+      Right rs' -> choosePages r e rs'
 
 renderDocument :: Data.Map.Map Int a
                -> Document a
@@ -199,8 +215,7 @@ renderDocument :: Data.Map.Map Int a
 renderDocument m = \case
      [] -> (m, "")
      Left s:rest -> fmap (s ++) (renderDocument m rest)
-     Right (s, []):rest -> fmap (s ++) (renderDocument m rest)
-     Right (s, (b:_)):rest ->
+     Right (s, b):rest ->
        let i = case Data.Map.lookupMax m of
              Just (theMax, _) -> theMax + 1
              Nothing -> 0
