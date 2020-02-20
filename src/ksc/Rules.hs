@@ -1,7 +1,8 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-module Rules( RuleBase, tryRules, mkRuleBase, matchRules ) where
+module Rules( RuleBase, tryRules, tryRulesMany,
+              mkRuleBase, matchRules ) where
 
 import Lang
 import LangUtils ()
