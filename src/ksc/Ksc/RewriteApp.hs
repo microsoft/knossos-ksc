@@ -160,6 +160,7 @@ rewrites rulebase k = \case
      Lang.Assert _ _ -> error "We don't do Assert"
      Lang.Dummy _ -> error "We don't do Dummy"
 
+-- For avoiding "(tuple ...)" around multiple arguments
 tupleRewrites :: Rules.RuleBase
               -> (Lang.TExpr -> e)
               -> [Lang.TExpr]
