@@ -7,6 +7,7 @@ import Lang
 import LangUtils ()
 import Control.Monad( guard )
 import Data.Map as M
+import Data.Maybe ( listToMaybe )
 
 newtype RuleBase = Rules [TRule] deriving Show
         -- Rule is defined in Lang
@@ -17,21 +18,16 @@ type VSubst = M.Map TVar TVar  -- Substitution for bv(lhs)
 mkRuleBase :: [TRule] -> RuleBase
 mkRuleBase = Rules
 
-tryRules :: RuleBase -> TExpr -> Maybe TExpr
-tryRules rules e
-  = case matchRules rules e of
-      []               -> Nothing
-      ((rule,subst):_) -> -- pprTrace ("Rule fired: " ++ ru_name rule)
-                          --   (vcat [ text "Before:" <+> ppr e
-                          --         , text "After: " <+> ppr e' ]) $
-                          Just e'
-        where
-         e' = mkLets (M.toList subst) (ru_rhs rule)
-         -- For now, arbitrarily pick the first rule that matches
-         -- One could imagine priority schemes (e.g. best-match)
-         --
+tryRulesMany :: RuleBase -> TExpr -> [TExpr]
+tryRulesMany rules = fmap f . matchRules rules
+  where f (rule, subst) = mkLets (M.toList subst) (ru_rhs rule)
          -- Use lets, not substE, so that optLetsE will guarantee
          -- capture-avoiding substitution
+
+tryRules :: RuleBase -> TExpr -> Maybe TExpr
+tryRules rules = listToMaybe . tryRulesMany rules
+         -- For now, arbitrarily pick the first rule that matches
+         -- One could imagine priority schemes (e.g. best-match)
 
 matchRules :: RuleBase -> TExpr -> [(TRule, TSubst)]
 matchRules (Rules rules) e
