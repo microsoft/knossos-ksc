@@ -114,7 +114,7 @@ main = do
 
 data Link = Link String
 
-type Chunk a = Either String (String, Lang.TRule, a)
+type Chunk a = Either String (String, (Lang.TRule, a))
 
 type Document a = [Chunk a]
 
@@ -139,7 +139,7 @@ rewrites rulebase k = \case
                 Lang.Tuple es -> tupleRewrites rulebase k' es
                 _ -> rewrites rulebase k' e
           in case tryRules rulebase c of
-               (rule,rewritten):_ -> [Right (fstr, rule, k rewritten)]
+               (rule,rewritten):_ -> [Right (fstr, (rule, k rewritten))]
                [] -> [Left fstr]
           <> [Left " "] <> rewrites_
        <> [Left ")"]
@@ -178,7 +178,7 @@ render :: Int -> Document Lang.TExpr -> ((Data.Map.Map Int Lang.TExpr, Int), Str
 render i = \case
   [] -> ((Data.Map.empty, i), "")
   Left s:rest -> fmap (s ++) (render i rest)
-  Right (s, _, e):rest ->
+  Right (s, (_, e)):rest ->
     let ((m, j), rests) = render (i + 1) rest
     in ((Data.Map.insert i e m, j),
         "<a href=\"" ++ show i ++ "\">"
