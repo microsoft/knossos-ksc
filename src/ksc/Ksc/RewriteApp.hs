@@ -97,7 +97,7 @@ main = do
       case Data.Map.lookup i m' of
             Nothing -> html $ mconcat (comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
             Just e -> do
-              let e' = OptLet.optLets (OptLet.mkEmptySubst []) e
+              let e' = e
               let ((m'', j'), s) = render j (rewrites rules id e')
               liftAndCatchIO (writeIORef m (m' <> m'', j'))
               html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
@@ -135,7 +135,7 @@ rewrites rulebase k = \case
                 Lang.Tuple es -> tupleRewrites rulebase k' es
                 _ -> rewrites rulebase k' e
           in case Rules.tryRules rulebase c of
-               Just rewritten -> [Right (fstr, k rewritten)]
+               Just rewritten -> [Right (fstr, k $ OptLet.optLets (OptLet.mkEmptySubst []) rewritten)]
                                  <> [Left " "]
                                  <> rewrites_
                Nothing -> [Left (fstr ++ " ")] <> rewrites_
