@@ -79,9 +79,7 @@ main = do
                  , " from the source file "
                  , fromString sourceFile
                  , "</li>"
-                 , "<li>Only allows one rewrite per subexpression "
-                 , " (what should the UI be for multiple rewrites? "
-                 , " Maybe a drop-down list)</li>"
+                 , "<li>Allows clicking a function even if there are zero rewrites</li>"
                  , "<li>The expression is not formatted at all</li>"
                  , "<li>The expression under rewrite should be highlighted</li>"
                  , "</ul>"
