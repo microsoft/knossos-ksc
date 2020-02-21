@@ -111,7 +111,7 @@ data Document a = Left' String
                 deriving Functor
 
 data Page a = Document [Document a]
-            | Rewrites [Document a] [(String, a)]
+            | Rewrites [Document a] [(String, String, a)]
   deriving Functor
 
 setList :: Int -> a -> [a] -> [a]
@@ -182,7 +182,11 @@ choosePage :: Rules.RuleBase
            -> Page (Either Lang.TExpr [(Lang.TRule, Lang.TExpr)])
 choosePage r e rs =
   Rewrites ((fmap . fmap) Right (rewrites r id e))
-           (fmap (\(r', e') -> (Lang.ru_name r', Left e')) rs)
+           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs)
+  where pretty rule = ": "
+                      ++ Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
+                      ++ " &rarr; "
+                      ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
 
 rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
 rewritesPages r e = do
@@ -257,7 +261,10 @@ traversePage :: Applicative f
 traversePage f = \case
   Document d   -> Document <$> (traverse . traverseDocument) f d
   Rewrites d r -> Rewrites <$> (traverse . traverseDocument) f d
-                           <*> (traverse . traverse) f r
+                           <*> (traverse . traverse3of3) f r
+
+traverse3of3 :: Functor f => (c -> f c') -> (a, b, c) -> f (a, b, c')
+traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderPageString :: Page Int -> String
 renderPageString = \case
@@ -269,7 +276,7 @@ renderPageString = \case
     where renderRewrites = \case
             Nothing -> "<p>No rewrites available for selected expression</p>"
             Just l -> foldr f "" l
-              where f (s, b) rrs = "<li>" ++ renderLink b s ++ "</li>" ++ rrs
+              where f (s, s1, b) rrs = "<li>" ++ renderLink b s ++ s1 ++ "</li>" ++ rrs
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
