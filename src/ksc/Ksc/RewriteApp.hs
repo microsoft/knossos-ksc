@@ -52,6 +52,8 @@ main = do
 
   m <- newIORef Data.Map.empty
 
+  let withMap = liftAndCatchIO . atomicModifyIORef m
+
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
 
@@ -91,14 +93,13 @@ main = do
 
   scotty 3000 $ do
     get "/" $ do
-      s <- liftAndCatchIO (atomicModifyIORef m
-               (\m' -> renderPages m' (rewritesPages rules prog)))
+      s <- withMap (\m' -> renderPages m' (rewritesPages rules prog))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
 
-      ss <- liftAndCatchIO $ atomicModifyIORef m $ \m' ->
+      ss <- withMap $ \m' ->
         case Data.Map.lookup i m' of
           Nothing -> (m', comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
           Just e -> let (m'', s) = renderPages m' e
