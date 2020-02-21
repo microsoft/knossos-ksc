@@ -262,9 +262,12 @@ traversePage f = \case
 renderPageString :: Page Int -> String
 renderPageString = \case
   Document d -> renderDocumentString d
-  Rewrites d r -> renderDocumentString d ++ renderRewrites r
+  Rewrites d r -> renderDocumentString d
+                  ++ "<ul>"
+                  ++ renderRewrites r
+                  ++ "</ul>"
     where renderRewrites = foldr f ""
-          f (s, b) rrs = "<p>" ++ renderLink b s ++ "</p>" ++ rrs
+          f (s, b) rrs = "<li>" ++ renderLink b s ++ "</li>" ++ rrs
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
