@@ -99,7 +99,11 @@ main = do
 
       ss <- withMap $ \m ->
         case Data.Map.lookup i m of
-          Nothing -> (m, comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
+          Nothing -> (m, comments
+                       ++ ["<p>Couldn't find ", beam, ". ",
+                           "You may want to ",
+                           "<a href=\"/\">start again</a>.</p>"
+                          ])
           Just e -> let (m', s) = renderPages m e
                     in  (m', comments ++ [Data.Text.Lazy.pack s])
 
