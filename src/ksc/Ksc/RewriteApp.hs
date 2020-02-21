@@ -94,7 +94,7 @@ main = do
     get "/" $ do
       s <- withMap (\m' -> renderPages m' (rewritesPages rules prog))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
-    get "/:word" $ do
+    get "/rewrite/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
 
@@ -236,7 +236,7 @@ renderDocumentString = foldr f ""
           Right (s, b) -> (renderLink b s ++)
 
 renderLink :: Show a => a -> String -> String
-renderLink i s = "<a href=\"" ++ show i ++ "\">" ++ s ++ "</a>"
+renderLink i s = "<a href=\"/rewrite/" ++ show i ++ "\">" ++ s ++ "</a>"
 
 renderPage :: Data.Map.Map Int a
            -> Page a
