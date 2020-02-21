@@ -38,7 +38,8 @@ import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 import           Control.Monad.Free
 import qualified Control.Monad.Trans.State
 import           Control.Monad.Trans.State hiding (get)
-import           Data.Void
+import           Data.Void (Void, absurd)
+import qualified Data.List.NonEmpty as NEL
 
 main :: IO ()
 main = do
@@ -264,10 +265,12 @@ renderPageString = \case
   Document d -> renderDocumentString d
   Rewrites d r -> renderDocumentString d
                   ++ "<ul>"
-                  ++ renderRewrites r
+                  ++ renderRewrites (NEL.nonEmpty r)
                   ++ "</ul>"
-    where renderRewrites = foldr f ""
-          f (s, b) rrs = "<li>" ++ renderLink b s ++ "</li>" ++ rrs
+    where renderRewrites = \case
+            Nothing -> "<p>No rewrites available for selected expression</p>"
+            Just l -> foldr f "" l
+              where f (s, b) rrs = "<li>" ++ renderLink b s ++ "</li>" ++ rrs
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
