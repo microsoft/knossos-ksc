@@ -29,13 +29,13 @@ import qualified OptLet
 import qualified Data.Map
 import           Data.Maybe (mapMaybe)
 import           Data.List (intercalate)
-import           Data.IORef (newIORef, readIORef, writeIORef)
+import           Data.IORef (newIORef, atomicModifyIORef)
 import           Data.String (fromString)
 import qualified Data.Text.Lazy
 
 import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 
-import           Control.Monad.Free
+import           Control.Monad.Free (Free(Pure, Free), liftF)
 import qualified Control.Monad.Trans.State
 import           Control.Monad.Trans.State hiding (get)
 import           Data.Void (Void, absurd)
@@ -88,23 +88,20 @@ main = do
 
   scotty 3000 $ do
     get "/" $ do
-      m' <- liftAndCatchIO (readIORef m)
-
-      let (m'', s) = renderPages m' (rewritesPages rules prog)
-      liftAndCatchIO (writeIORef m m'')
+      s <- liftAndCatchIO (atomicModifyIORef m
+               (\m' -> renderPages m' (rewritesPages rules prog)))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
 
-      m' <- liftAndCatchIO (readIORef m)
+      ss <- liftAndCatchIO $ atomicModifyIORef m $ \m' ->
+        case Data.Map.lookup i m' of
+          Nothing -> (m', comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
+          Just e -> let (m'', s) = renderPages m' e
+                    in  (m'', comments ++ [Data.Text.Lazy.pack s])
 
-      case Data.Map.lookup i m' of
-            Nothing -> html $ mconcat (comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
-            Just e -> do
-              let (m'', s) = renderPages m' e
-              liftAndCatchIO (writeIORef m m'')
-              html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+      html (mconcat ss)
 
   where showDebugging rules prog = do
           putStrLn "Rules"
