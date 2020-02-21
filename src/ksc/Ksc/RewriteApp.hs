@@ -86,7 +86,6 @@ main = do
                  , fromString sourceFile
                  , "</li>"
                  , "<li>The expression is not formatted at all</li>"
-                 , "<li>The expression under rewrite should be highlighted</li>"
                  , "</ul>"
                  ]
 
