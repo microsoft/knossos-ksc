@@ -41,6 +41,12 @@ import           Control.Monad.Trans.State hiding (get)
 import           Data.Void (Void, absurd)
 import qualified Data.List.NonEmpty as NEL
 
+typeCheck :: [Lang.Decl] -> IO [Lang.TDecl]
+typeCheck = fmap snd . KMonad.runKM . Annotate.annotDecls LangUtils.emptyGblST
+
+parse :: [String] -> IO [Lang.Decl]
+parse = fmap concat . mapM Parse.parseF
+
 main :: IO ()
 main = do
 
@@ -49,10 +55,7 @@ main = do
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
 
-  decls <- fmap concat (mapM Parse.parseF [ "src/runtime/prelude.ks"
-                                          , sourceFile ])
-
-  (_, tc_decls) <- KMonad.runKM (Annotate.annotDecls LangUtils.emptyGblST decls)
+  tc_decls <- typeCheck =<< parse [ "src/runtime/prelude.ks", sourceFile ]
 
   let rules = Rules.mkRuleBase $ flip mapMaybe tc_decls (\case
        Lang.RuleDecl r -> Just r
