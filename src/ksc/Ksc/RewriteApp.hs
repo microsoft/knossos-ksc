@@ -232,11 +232,17 @@ traverseDocument f = \case
   Right' (s, a) -> (\a' -> Right' (s, a')) <$> f a
   Branch ds     -> Branch <$> (traverse . traverseDocument) f ds
 
+spanColor :: String -> String
+spanColor s = "<span onMouseOver=\"window.event.stopPropagation(); this.style.backgroundColor='#ffdddd'\" "
+              ++ "onMouseOut=\"window.event.stopPropagation(); this.style.backgroundColor='transparent'\">"
+              ++ s
+              ++ "</span>"
+
 renderDocumentString :: Document Int -> String
 renderDocumentString = \case
   Left' s       -> s
   Right' (s, b) -> renderLink b s
-  Branch ds     -> foldr f "" ds
+  Branch ds     -> spanColor (foldr f "" ds)
     where f d rest = renderDocumentString d ++ rest
 
 renderLink :: Show a => a -> String -> String
