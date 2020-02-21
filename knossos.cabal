@@ -34,5 +34,6 @@ executable ksc
                  directory >= 1.3,
                  scotty >= 0.11.5,
                  text,
-                 free
+                 free,
+                 transformers
   ghc-options: -Werror -Wall -Wno-name-shadowing -Wno-unticked-promoted-constructors -Wno-type-defaults -Wno-unused-do-bind -Wincomplete-uni-patterns -Wincomplete-record-updates

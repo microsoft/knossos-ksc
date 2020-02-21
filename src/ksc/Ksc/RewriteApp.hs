@@ -36,6 +36,8 @@ import qualified Data.Text.Lazy
 import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 
 import           Control.Monad.Free
+import qualified Control.Monad.Trans.State
+import           Control.Monad.Trans.State hiding (get)
 import           Data.Void
 
 main :: IO ()
@@ -212,17 +214,30 @@ choosePages r e rs = do
 renderDocument :: Data.Map.Map Int a
                -> Document a
                -> (Data.Map.Map Int a, String)
-renderDocument m = \case
-     [] -> (m, "")
-     Left s:rest -> fmap (s ++) (renderDocument m rest)
-     Right (s, b):rest ->
-       let i = case Data.Map.lookupMax m of
-             Just (theMax, _) -> theMax + 1
-             Nothing -> 0
-           m' = Data.Map.insert i b m
-           s' = renderLink i s
-           (mrest, srest) = renderDocument m' rest
-       in (mrest, s' ++ srest)
+renderDocument m d = (m', renderDocumentString d')
+  where d' :: Document Int
+        (d', m') = flip runState m $ flip traverseDocument d $ \a -> do
+          mm <- Control.Monad.Trans.State.get
+          let i = case Data.Map.lookupMax mm of
+                Just (theMax, _) -> theMax + 1
+                Nothing -> 0
+          put (Data.Map.insert i a mm)
+          pure i
+
+traverseDocument :: Applicative f
+                 => (a -> f b)
+                 -> Document a
+                 -> f (Document b)
+traverseDocument = traverse . traverse . traverse
+
+renderDocumentString :: Document Int
+                     -> String
+renderDocumentString = \case
+  [] -> ""
+  Left s:rest -> s ++ renderDocumentString rest
+  Right (s, b):rest -> let s' = renderLink b s
+                           srest = renderDocumentString rest
+                       in s' ++ srest
 
 renderLink :: Show a => a -> String -> String
 renderLink i s = "<a href=\"" ++ show i ++ "\">"
