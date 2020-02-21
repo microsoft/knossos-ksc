@@ -85,7 +85,6 @@ main = do
                  , " from the source file "
                  , fromString sourceFile
                  , "</li>"
-                 , "<li>Allows clicking a function even if there are zero rewrites</li>"
                  , "<li>The expression is not formatted at all</li>"
                  , "<li>The expression under rewrite should be highlighted</li>"
                  , "</ul>"
