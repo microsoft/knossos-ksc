@@ -62,8 +62,8 @@ mkRuleBase = Rules.mkRuleBase . mapMaybe (\case
 
 main :: IO ()
 main = do
-  m <- newIORef Data.Map.empty
-  let withMap = liftAndCatchIO . atomicModifyIORef m
+  mapOfPages <- newIORef Data.Map.empty
+  let withMap = liftAndCatchIO . atomicModifyIORef mapOfPages
 
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
@@ -92,25 +92,21 @@ main = do
 
   scotty 3000 $ do
     get "/" $ do
-      s <- withMap (\m' -> renderPages m' (rewritesPages rules prog))
+      s <- withMap (\m -> renderPages m (rewritesPages rules prog))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/rewrite/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
 
-      ss <- withMap $ \m' ->
-        case Data.Map.lookup i m' of
-          Nothing -> (m', comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
-          Just e -> let (m'', s) = renderPages m' e
-                    in  (m'', comments ++ [Data.Text.Lazy.pack s])
+      ss <- withMap $ \m ->
+        case Data.Map.lookup i m of
+          Nothing -> (m, comments ++ ["<h1>Couldn't find ", beam, "</h1>"])
+          Just e -> let (m', s) = renderPages m e
+                    in  (m', comments ++ [Data.Text.Lazy.pack s])
 
       html (mconcat ss)
 
-data Link = Link String
-
-type Chunk1 a = Either String (String, a)
-
-type Document a = [Chunk1 a]
+type Document a = [Either String (String, a)]
 
 data Page a = Document (Document a)
             | Rewrites (Document a) [(String, a)]
