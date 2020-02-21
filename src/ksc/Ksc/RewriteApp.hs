@@ -230,14 +230,11 @@ traverseDocument :: Applicative f
                  -> f (Document b)
 traverseDocument = traverse . traverse . traverse
 
-renderDocumentString :: Document Int
-                     -> String
-renderDocumentString = \case
-  [] -> ""
-  Left s:rest -> s ++ renderDocumentString rest
-  Right (s, b):rest -> let s' = renderLink b s
-                           srest = renderDocumentString rest
-                       in s' ++ srest
+renderDocumentString :: Document Int -> String
+renderDocumentString = foldr f ""
+  where f = \case
+          Left s -> (s ++)
+          Right (s, b) -> (renderLink b s ++)
 
 renderLink :: Show a => a -> String -> String
 renderLink i s = "<a href=\"" ++ show i ++ "\">"
@@ -247,21 +244,35 @@ renderLink i s = "<a href=\"" ++ show i ++ "\">"
 renderPage :: Data.Map.Map Int a
            -> Page a
            -> (Data.Map.Map Int a, String)
-renderPage m = \case
-  Document d   -> renderDocument m d
-  Rewrites d r -> let (m', s')   = renderDocument m d
-                      (m'', s'') = renderRewrites m' r
-                  in (m'', s' ++ s'')
-    where renderRewrites mm = \case
-            []        -> (mm, "")
+renderPage m p = (m', renderPageString p')
+  where p' :: Page Int
+        (p', m') = flip runState m $ flip traversePage p $ \a -> do
+          mm <- Control.Monad.Trans.State.get
+          let i = case Data.Map.lookupMax mm of
+                Just (theMax, _) -> theMax + 1
+                Nothing -> 0
+          put (Data.Map.insert i a mm)
+          pure i
+
+traversePage :: Applicative f
+             => (a -> f b) -> Page a -> f (Page b)
+traversePage f = \case
+  Document d   -> Document <$> traverseDocument f d
+  Rewrites d r -> Rewrites <$> traverseDocument f d
+                           <*> (traverse . traverse) f r
+
+renderPageString :: Page Int -> String
+renderPageString = \case
+  Document d -> renderDocumentString d
+  Rewrites d r -> let s' = renderDocumentString d
+                      s'' = renderRewrites r
+                  in s' ++ s''
+    where renderRewrites = \case
+            [] -> ""
             (s,b):rrs ->
-              let i = case Data.Map.lookupMax m of
-                    Just (theMax, _) -> theMax + 1
-                    Nothing -> 0
-                  m' = Data.Map.insert i b m
-                  s' = "<p>" ++ renderLink i s ++ "</p>"
-                  (m'', s'') = renderRewrites m' rrs
-              in (m'', s' ++ s'')
+              let s' = "<p>" ++ renderLink b s ++ "</p>"
+                  s'' = renderRewrites rrs
+              in s' ++ s''
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
