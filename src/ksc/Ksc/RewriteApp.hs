@@ -49,9 +49,7 @@ parse = fmap concat . mapM Parse.parseF
 
 main :: IO ()
 main = do
-
   m <- newIORef Data.Map.empty
-
   let withMap = liftAndCatchIO . atomicModifyIORef m
 
   let sourceFile = "test/ksc/ex0.ks"
