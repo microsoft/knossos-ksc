@@ -47,6 +47,19 @@ typeCheck = fmap snd . KMonad.runKM . Annotate.annotDecls LangUtils.emptyGblST
 parse :: [String] -> IO [Lang.Decl]
 parse = fmap concat . mapM Parse.parseF
 
+userFuns :: [Lang.DeclX p] -> [(String, Lang.ExprX p)]
+userFuns = mapMaybe $ \case
+       Lang.RuleDecl{} -> Nothing
+       Lang.DefDecl d ->
+         case (Lang.funIdOfFun (Lang.def_fun d), Lang.def_rhs d) of
+           (Lang.UserFun f, Lang.UserRhs e) -> Just (f, e)
+           _ -> Nothing
+
+mkRuleBase :: [Lang.TDecl] -> Rules.RuleBase
+mkRuleBase = Rules.mkRuleBase . mapMaybe (\case
+       Lang.RuleDecl r -> Just r
+       Lang.DefDecl{} -> Nothing)
+
 main :: IO ()
 main = do
   m <- newIORef Data.Map.empty
@@ -57,21 +70,10 @@ main = do
 
   tc_decls <- typeCheck =<< parse [ "src/runtime/prelude.ks", sourceFile ]
 
-  let rules = Rules.mkRuleBase $ flip mapMaybe tc_decls (\case
-       Lang.RuleDecl r -> Just r
-       Lang.DefDecl{} -> Nothing)
+  let rules = mkRuleBase tc_decls
 
-  let prog = head $ flip mapMaybe tc_decls $ \case
-       Lang.RuleDecl{} -> Nothing
-       Lang.DefDecl d -> case Lang.funIdOfFun (Lang.def_fun d) of
-          Lang.UserFun f -> if f == functionName
-                            then case Lang.def_rhs d of
-                                   Lang.UserRhs e -> Just e
-                                   _ -> Nothing
-                            else Nothing
-          _ -> Nothing
-
-  showDebugging rules prog
+  let prog = head $ flip mapMaybe (userFuns tc_decls) $ \(f, e) ->
+        if f == functionName then Just e else Nothing
 
   let link = "<p><a href=\"/\">Start again</a></p>"
 
@@ -104,16 +106,6 @@ main = do
                     in  (m'', comments ++ [Data.Text.Lazy.pack s])
 
       html (mconcat ss)
-
-  where showDebugging rules prog = do
-          putStrLn "Rules"
-          print rules
-
-          putStrLn "Prog"
-          print prog
-
-          putStrLn "Match rules"
-          print (Rules.tryRules rules prog)
 
 data Link = Link String
 
