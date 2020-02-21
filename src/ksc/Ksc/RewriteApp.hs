@@ -106,10 +106,13 @@ main = do
 
       html (mconcat ss)
 
-type Document a = [Either String (String, a)]
+data Document a = Left' String
+                | Right' (String, a)
+                | Branch [Document a]
+                deriving Functor
 
-data Page a = Document (Document a)
-            | Rewrites (Document a) [(String, a)]
+data Page a = Document [Document a]
+            | Rewrites [Document a] [(String, a)]
   deriving Functor
 
 setList :: Int -> a -> [a] -> [a]
@@ -123,33 +126,34 @@ tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
 rewrites :: Rules.RuleBase
          -> (Lang.TExpr -> e)
          -> Lang.TExpr
-         -> Document [(Lang.TRule, e)]
+         -> [Document [(Lang.TRule, e)]]
 rewrites rulebase k = \case
      c@(Lang.Call ff@(Lang.TFun _ f) e) ->
-       [Left "("]
-       <> let fstr = Lang.renderSexp (Lang.pprFunId (Lang.funIdOfFun f))
+       [Left' "("]
+       <> [Branch $
+          let fstr = Lang.renderSexp (Lang.pprFunId (Lang.funIdOfFun f))
               k' = k . Lang.Call ff
               rewrites_ = case e of
                 Lang.Tuple es -> tupleRewrites rulebase k' es
                 _ -> rewrites rulebase k' e
-          in [Right (fstr,
+          in [Right' (fstr,
                      map (\(rule, rewritten)
                            -> (rule, k rewritten)) (tryRules rulebase c))]
-          <> [Left " "] <> rewrites_
-       <> [Left ")"]
-     Lang.Tuple es -> [Left "(tuple "]
+          <> [Left' " "] <> rewrites_]
+       <> [Left' ")"]
+     Lang.Tuple es -> [Left' "(tuple "]
                       <> tupleRewrites rulebase k es
-                      <> [Left ")"]
-     Lang.Var v -> [Left (Lang.nameOfVar (Lang.tVarVar v))]
+                      <> [Left' ")"]
+     Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
-       Lang.KFloat f -> [Left (show f)]
-       Lang.KBool b -> [Left (show b)]
-       Lang.KString s -> [Left (show s)]
-       Lang.KInteger i -> [Left (show i)]
+       Lang.KFloat f -> [Left' (show f)]
+       Lang.KBool b -> [Left' (show b)]
+       Lang.KString s -> [Left' (show s)]
+       Lang.KInteger i -> [Left' (show i)]
      Lang.Let v rhs body ->
        let rhs'  = rewrites rulebase (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
            body' = rewrites rulebase (\body'' -> k (Lang.Let v rhs body'')) body
-       in [Left ("(let (" ++ show v ++ " ")] <> rhs' <> [Left ") "] <> body'
+       in [Left' ("(let (" ++ show v ++ " ")] <> rhs' <> [Left' ") "] <> body'
 
      Lang.App _ _ -> error "We don't do App"
      Lang.Lam _ _ -> error "We don't do Lam"
@@ -161,9 +165,9 @@ rewrites rulebase k = \case
 tupleRewrites :: Rules.RuleBase
               -> (Lang.TExpr -> e)
               -> [Lang.TExpr]
-              -> Document [(Lang.TRule, e)]
+              -> [Document [(Lang.TRule, e)]]
 tupleRewrites rulebase k es =
-  intercalate [Left " "] (map (\(j, e) ->
+  intercalate [Left' " "] (map (\(j, e) ->
     rewrites rulebase (\e' ->
         k (Lang.Tuple (setList j e' es)) ) e)
     (zip [1..] es))
@@ -178,7 +182,7 @@ choosePage :: Rules.RuleBase
            -> [(Lang.TRule, Lang.TExpr)]
            -> Page (Either Lang.TExpr [(Lang.TRule, Lang.TExpr)])
 choosePage r e rs =
-  Rewrites ((fmap . fmap . fmap) Right (rewrites r id e))
+  Rewrites ((fmap . fmap) Right (rewrites r id e))
            (fmap (\(r', e') -> (Lang.ru_name r', Left e')) rs)
 
 rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
@@ -223,13 +227,17 @@ traverseDocument :: Applicative f
                  => (a -> f b)
                  -> Document a
                  -> f (Document b)
-traverseDocument = traverse . traverse . traverse
+traverseDocument f = \case
+  Left' s       -> pure (Left' s)
+  Right' (s, a) -> (\a' -> Right' (s, a')) <$> f a
+  Branch ds     -> Branch <$> (traverse . traverseDocument) f ds
 
 renderDocumentString :: Document Int -> String
-renderDocumentString = foldr f ""
-  where f = \case
-          Left s -> (s ++)
-          Right (s, b) -> (renderLink b s ++)
+renderDocumentString = \case
+  Left' s       -> s
+  Right' (s, b) -> renderLink b s
+  Branch ds     -> foldr f "" ds
+    where f d rest = renderDocumentString d ++ rest
 
 renderLink :: Show a => a -> String -> String
 renderLink i s = "<a href=\"/rewrite/" ++ show i ++ "\">" ++ s ++ "</a>"
@@ -242,14 +250,14 @@ renderPage = render renderPageString traversePage
 traversePage :: Applicative f
              => (a -> f b) -> Page a -> f (Page b)
 traversePage f = \case
-  Document d   -> Document <$> traverseDocument f d
-  Rewrites d r -> Rewrites <$> traverseDocument f d
+  Document d   -> Document <$> (traverse . traverseDocument) f d
+  Rewrites d r -> Rewrites <$> (traverse . traverseDocument) f d
                            <*> (traverse . traverse) f r
 
 renderPageString :: Page Int -> String
 renderPageString = \case
-  Document d -> renderDocumentString d
-  Rewrites d r -> renderDocumentString d
+  Document d -> concatMap renderDocumentString d
+  Rewrites d r -> concatMap renderDocumentString d
                   ++ "<ul>"
                   ++ renderRewrites (NEL.nonEmpty r)
                   ++ "</ul>"
