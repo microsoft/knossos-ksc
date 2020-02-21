@@ -25,7 +25,7 @@ from .common import (
     to_float_i
 )
 
-_built_ins = common._built_ins
+_built_ins = common._built_ins + ["to_device"]
 
 def check_args_and_get_context(name, args, concrete="concrete"):
     context = None
@@ -183,3 +183,8 @@ def if_then_else(cond, then_branch, else_branch):
         return then_branch()
     else:
         return else_branch()
+
+def to_device(x, device_id):
+    print(f"In to_device. Old context={x.context}. New context={device_id}")
+    shape, type = x.shape_type
+    return AbstractValue(shape, type, x._data, context=device_id)

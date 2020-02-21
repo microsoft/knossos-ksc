@@ -50,6 +50,7 @@ def resnet(x, weights):
     h = nn.batch_norm_2d(h, batch_norm_weights)
     h = nn.relu(h)
     h = nn.max_pool(h, (3, 3), (2, 2), padding="SAME")
+    h = nn.to_device(h, 1)
     for i, blocks_weights in enumerate(residual_blocks_weights):
         for j, weights in enumerate(blocks_weights):
             if j == 0:

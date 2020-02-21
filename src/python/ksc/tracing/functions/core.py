@@ -38,7 +38,9 @@ div = make_edef(
 )
 
 pow = make_edef(
-    "pow", ["a", "b"], elementwise
+    "pow", ["a", "b"], elementwise,
+    lambda x, y: x.shape,
+    lambda x, y: x.size * 10
 )
 
 flatten = make_edef(
@@ -47,7 +49,12 @@ flatten = make_edef(
     lambda x: node.Node.from_data(0)
 )
 
-to_float = make_edef("to_float", ["x"], keep_shape_prop_rule(Type.Float))
+to_float = make_edef(
+    "to_float", ["x"],
+    keep_shape_prop_rule(Type.Float),
+    lambda x: x.shape,
+    lambda x: x.size
+)
 
 def make_builtin(name, arg_names, shape_prop_function):
     class Builtin(TraceableFunction):

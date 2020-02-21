@@ -6,6 +6,9 @@ import os
 from PIL import Image
 from urllib.request import urlretrieve
 
+from ksc.abstract_value import AbstractValue, ExecutionContext
+from ksc.utils import translate_and_import
+
 INPUT_FILE_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/msrc.jpg"
 PYTORCH_RESNET50_ORIGINAL_URL = "https://download.pytorch.org/models/resnet50-19c8e357.pth"
 PYTORCH_RESNET50_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/resnet50.npz"
@@ -206,9 +209,22 @@ def get_class_name_dict(class_names_file):
     with open(class_names_file) as f:
         return json.load(f)
 
+def check_abstract(ks_str, x, weights):
+    m = translate_and_import(ks_str, "abstract")
+    ctx = ExecutionContext(state=0)
+    x = AbstractValue.from_data(x, ctx)
+    weights = AbstractValue.from_data(weights, ExecutionContext())
+    o = m.resnet(x, weights)
+    print(o)
+    keys = o.context._costs.keys()
+    total_cost = sum(o.context._costs.values())
+    print(o.context._costs)
+    print({k: v * 100 / total_cost for k, v in o.context._costs.items()})
+    exit(0)
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py"])
+    parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py", "resnet_abstract"])
     args = parser.parse_args()
     npz_file = download_file(
         PYTORCH_RESNET50_URL,
@@ -239,9 +255,17 @@ def main():
         sys.path.append("examples/dl-resnet")
         from resnet import resnet
         weights = resnet50_py_weights_from_pytorch(weights)
-    
+    elif args.model == "resnet_abstract":
+        weights = resnet50_py_weights_from_pytorch(weights)
+        with open("resnet50.ks") as f:
+            ks_str = f.read()
+        check_abstract(ks_str, input, weights)
     if args.model == "resnet_py":
         out = resnet(input, weights)
+        ks_str = out.creator._jitted.combined_ks_str()
+        with open("resnet50.ks", "w") as f:
+            f.write(ks_str)
+        check_abstract(ks_str, input, weights)
         out = out.data
     else:
         out = resnet(weights, input)
@@ -250,6 +274,7 @@ def main():
     print("\n".join([f"score={out[0, i]}, {class_names[str(i)]}" for i in top5]))
     assert class_names[str(top5[0])] == ["n03661043", "library"]
     assert class_names[str(top5[1])] == ["n02871525", "bookshop"]
+
 
 if __name__ == "__main__":
     main()

@@ -13,10 +13,23 @@ from ksc.tracing.functions.type_propagation_rules import (
 from ksc.tracing.node import Node
 from ksc.utils import ShapeType
 
-relu = make_edef("relu", ["x"], elementwise)
+relu = make_edef(
+    "relu", ["x"], elementwise,
+    lambda x: x.shape,
+    lambda x: x.size
+)
 
-normalize_2d = make_edef("normalize_2d", ["x", "weights"], first_arg)
-batch_norm_2d = make_edef("batch_norm_2d", ["x", "weights"], first_arg)
+normalize_2d = make_edef(
+    "normalize_2d", ["x", "weights"], first_arg,
+    lambda x, w: x.shape,
+    lambda x, w: x.size * 3
+)
+
+batch_norm_2d = make_edef(
+    "batch_norm_2d", ["x", "weights"], first_arg,
+    lambda x, w: x.shape,
+    lambda x, w: x.size * 10
+)
 
 def _get_paddings(shape_in, shape_out, window_sizes, strides):
     def get_padding_1d(size_in, size_out, window_size, stride):
@@ -118,12 +131,35 @@ def conv_2d_no_bias(x, weights, ksizes, strides, padding="SAME"):
 def _pooling_name(pooling_type, padding):
     return f"{pooling_type}_{padding.lower()}"
 
+def shape_pool_2d(x, ksizes, strides, paddings):
+    b, c, w, h = x.shape
+    pad_w, pad_h = paddings
+    k_w, k_h = ksizes
+    stride_w, stride_h = strides
+    pad_w, pad_h = paddings
+    w_new = _ceil_div(w + pad_w[0] + pad_w[1] - k_w + 1, stride_w)
+    h_new = _ceil_div(h + pad_h[0] + pad_h[1] - k_h + 1, stride_h)
+    return core.make_tuple(b, c, w_new, h_new)
+
+def cost_pool_2d(x, ksizes, strides, paddings):
+    b, c, w, h = x.shape
+    k_w, k_h = ksizes
+    stride_w, stride_h = strides
+    w_o = core.to_float(w // stride_w)
+    h_o = core.to_float(h // stride_h)
+    return (core.to_float(b)
+            * w_o * h_o
+            * core.to_float(k_w *k_h)
+            * core.to_float(c))
+
 def max_pool(x, pool_size, strides, padding="VALID"):
     pool = RequirePadding2d(
         "max_pool",
         ["x", "pool_size", "strides"],
         padding,
-        pooling_type_prop_rule
+        pooling_type_prop_rule,
+        shape_pool_2d,
+        cost_pool_2d
     )
     return pool(x, pool_size, strides)
 
@@ -132,8 +168,20 @@ def avg_pool(x, pool_size, strides, padding="VALID"):
         "avg_pool",
         ["x", "pool_size", "strides"],
         padding,
-        pooling_type_prop_rule
+        pooling_type_prop_rule,
+        shape_pool_2d,
+        cost_pool_2d
     )
     return pool(x, pool_size, strides)
 
-log_softmax = make_edef("log_softmax", ["x"], first_arg)
+log_softmax = make_edef(
+    "log_softmax", ["x"], first_arg,
+    lambda x: x.shape,
+    lambda x: x.size * 10
+)
+
+to_device = make_edef(
+    "to_device", ["x", "device_id"], first_arg,
+    lambda x, d: x.shape,
+    lambda x, d: Node.from_data(0)
+)
