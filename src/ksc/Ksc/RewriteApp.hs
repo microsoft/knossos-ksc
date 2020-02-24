@@ -98,7 +98,7 @@ main = do
   scotty 3000 $ do
     get "/" $ do
       (prog, rules) <- liftAndCatchIO $ readProgram sourceFile functionName
-      s <- withMap (\m -> renderPages m (rewritesPages rules prog))
+      s <- withMap (\m -> renderPages m (chooseLocationPages rules prog))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/rewrite/:word" $ do
       beam <- param "word"
