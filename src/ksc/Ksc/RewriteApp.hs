@@ -121,18 +121,18 @@ data Document a = Left' String
                 | Branch [Document a]
                 deriving Functor
 
-newtype DocumentPage a = DocumentPage [Document a]
+newtype ChooseLocationPage a = ChooseLocationPage [Document a]
   deriving Functor
 
-data RewritesPage a = RewritesPage [Document a] [(String, String, a)]
+data ChooseRewritePage a = ChooseRewritePage [Document a] [(String, String, a)]
   deriving Functor
 
-type DocumentModel = Lang.TExpr
+type ChooseLocationModel = Lang.TExpr
 
-type RewritesModel = (Lang.TExpr, [(Lang.TRule, Lang.TExpr)])
+type ChooseRewriteModel = (Lang.TExpr, [(Lang.TRule, Lang.TExpr)])
 
-data Page a = Document (DocumentPage a)
-            | Rewrites (RewritesPage a)
+data Page a = ChooseLocation (ChooseLocationPage a)
+            | ChooseRewrite (ChooseRewritePage a)
   deriving Functor
 
 setList :: Int -> a -> [a] -> [a]
@@ -193,16 +193,16 @@ tupleRewrites rulebase k es =
         k (Lang.Tuple (setList j e' es)) ) e)
     (zip [1..] es))
 
-rewritesPage :: Rules.RuleBase
-             -> DocumentModel
-             -> DocumentPage RewritesModel
-rewritesPage r e = DocumentPage ((fmap . fmap) ((,) e) (rewrites r id e))
+chooseLocationPage :: Rules.RuleBase
+                   -> ChooseLocationModel
+                   -> ChooseLocationPage ChooseRewriteModel
+chooseLocationPage r e = ChooseLocationPage ((fmap . fmap) ((,) e) (rewrites r id e))
 
-choosePage :: Rules.RuleBase
-           -> RewritesModel
-           -> RewritesPage (Either DocumentModel RewritesModel)
-choosePage r (e, rs) =
-           RewritesPage
+chooseRewritePage :: Rules.RuleBase
+                  -> ChooseRewriteModel
+                  -> ChooseRewritePage (Either ChooseLocationModel ChooseRewriteModel)
+chooseRewritePage r (e, rs) =
+           ChooseRewritePage
            ((fmap . fmap) (\x -> Right (e, x)) (rewrites r id e))
            (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs)
   where pretty rule = ": "
@@ -210,19 +210,21 @@ choosePage r (e, rs) =
                       ++ " &rarr; "
                       ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
 
-rewritesPages :: Rules.RuleBase -> DocumentModel -> Free Page a
-rewritesPages r e = do
-    x <- liftF (Document (rewritesPage r e))
-    choosePages r x
+chooseLocationPages :: Rules.RuleBase
+                    -> ChooseLocationModel
+                    -> Free Page a
+chooseLocationPages r e = do
+    x <- liftF (ChooseLocation (chooseLocationPage r e))
+    chooseRewritePages r x
 
-choosePages :: Rules.RuleBase
-            -> RewritesModel
-            -> Free Page a
-choosePages r m = do
-    x <- liftF (Rewrites (choosePage r m))
+chooseRewritePages :: Rules.RuleBase
+                   -> ChooseRewriteModel
+                   -> Free Page a
+chooseRewritePages r m = do
+    x <- liftF (ChooseRewrite (chooseRewritePage r m))
     case x of
-      Left e' -> rewritesPages r e'
-      Right rs' -> choosePages r rs'
+      Left rw -> chooseLocationPages r rw
+      Right c -> chooseRewritePages r c
 
 newLink :: a -> State (Data.Map.Map Int a) Int
 newLink a = do
@@ -277,30 +279,32 @@ renderPage :: Data.Map.Map Int a
            -> (Data.Map.Map Int a, String)
 renderPage = render renderPageString traversePage
 
-traverseDocumentPage :: Applicative f
-                     => (a -> f b) -> DocumentPage a -> f (DocumentPage b)
-traverseDocumentPage f = \case
-  DocumentPage d -> DocumentPage <$> (traverse . traverseDocument) f d
+traverseChooseLocationPage :: Applicative f
+                           => (a -> f b)
+                           -> ChooseLocationPage a
+                           -> f (ChooseLocationPage b)
+traverseChooseLocationPage f = \case
+  ChooseLocationPage d -> ChooseLocationPage <$> (traverse . traverseDocument) f d
 
-traverseRewritesPage :: Applicative f
-                     => (a -> f b) -> RewritesPage a -> f (RewritesPage b)
-traverseRewritesPage f = \case
-  RewritesPage d r -> RewritesPage <$> (traverse . traverseDocument) f d
+traverseChooseRewritePage :: Applicative f
+                     => (a -> f b) -> ChooseRewritePage a -> f (ChooseRewritePage b)
+traverseChooseRewritePage f = \case
+  ChooseRewritePage d r -> ChooseRewritePage <$> (traverse . traverseDocument) f d
                                    <*> (traverse . traverse3of3) f r
 
 traversePage :: Applicative f
              => (a -> f b) -> Page a -> f (Page b)
 traversePage f = \case
-  Document d -> Document <$> traverseDocumentPage f d
-  Rewrites r -> Rewrites <$> traverseRewritesPage f r
+  ChooseLocation d -> ChooseLocation <$> traverseChooseLocationPage f d
+  ChooseRewrite r -> ChooseRewrite <$> traverseChooseRewritePage f r
 
 traverse3of3 :: Functor f => (c -> f c') -> (a, b, c) -> f (a, b, c')
 traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderPageString :: Page Int -> String
 renderPageString = \case
-  Document (DocumentPage d) -> concatMap renderDocumentString d
-  Rewrites (RewritesPage d r) ->
+  ChooseLocation (ChooseLocationPage d) -> concatMap renderDocumentString d
+  ChooseRewrite (ChooseRewritePage d r) ->
                   concatMap renderDocumentString d
                   ++ "<ul>"
                   ++ renderRewrites (NEL.nonEmpty r)
