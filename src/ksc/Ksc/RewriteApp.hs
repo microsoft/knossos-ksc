@@ -91,14 +91,13 @@ main = do
                  , "<li>Click \"start again\" to reload the "
                  , "function and rules</li>"
                  , "<li>TODO: format the expression</li>"
-                 , "<li>TODO: breadcrumbs</li>"
                  , "</ul>"
                  ]
 
   scotty 3000 $ do
     get "/" $ do
       (prog, rules) <- liftAndCatchIO $ readProgram sourceFile functionName
-      s <- withMap (\m -> renderPages m (chooseLocationPages rules prog))
+      s <- withMap (\m -> renderPages m (chooseLocationPages rules ([], prog)))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/rewrite/:word" $ do
       beam <- param "word"
@@ -121,15 +120,22 @@ data Document a = Left' String
                 | Branch [Document a]
                 deriving Functor
 
-newtype ChooseLocationPage a = ChooseLocationPage [Document a]
+removeLinks :: Document a -> Document void
+removeLinks = \case
+  Left' s       -> Left' s
+  Right' (s, _) -> Left' s
+  Branch ds     -> Branch (map removeLinks ds)
+
+data ChooseLocationPage a = ChooseLocationPage [[Document Void]] [Document a]
   deriving Functor
 
-data ChooseRewritePage a = ChooseRewritePage [Document a] [(String, String, a)]
+data ChooseRewritePage a =
+  ChooseRewritePage [[Document Void]] [Document a] [(String, String, a)]
   deriving Functor
 
-type ChooseLocationModel = Lang.TExpr
+type ChooseLocationModel = ([Lang.TExpr], Lang.TExpr)
 
-type ChooseRewriteModel = (Lang.TExpr, [(Lang.TRule, Lang.TExpr)])
+type ChooseRewriteModel = ([Lang.TExpr], Lang.TExpr, [(Lang.TRule, Lang.TExpr)])
 
 data Page a = ChooseLocation (ChooseLocationPage a)
             | ChooseRewrite (ChooseRewritePage a)
@@ -196,19 +202,24 @@ tupleRewrites rulebase k es =
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
                    -> ChooseLocationPage ChooseRewriteModel
-chooseLocationPage r e = ChooseLocationPage ((fmap . fmap) ((,) e) (rewrites r id e))
+chooseLocationPage r (es, e) =
+  ChooseLocationPage ((map . map) removeLinks (map f es)) (f e)
+  where f = (fmap . fmap) ((,,) es e) . rewrites r id
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
-                  -> ChooseRewritePage (Either ChooseLocationModel ChooseRewriteModel)
-chooseRewritePage r (e, rs) =
+                  -> ChooseRewritePage
+                       (Either ChooseLocationModel ChooseRewriteModel)
+chooseRewritePage r (es, e, rs) =
            ChooseRewritePage
-           ((fmap . fmap) (\x -> Right (e, x)) (rewrites r id e))
-           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs)
+           ((map . map) removeLinks (map f es))
+           ((fmap . fmap) (\x -> Right (es, e, x)) (f e))
+           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left (es ++ [e], e'))) rs)
   where pretty rule = ": "
                       ++ Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
                       ++ " &rarr; "
                       ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
+        f = rewrites r id
 
 chooseLocationPages :: Rules.RuleBase
                     -> ChooseLocationModel
@@ -271,6 +282,9 @@ renderDocumentString = \case
   Branch ds     -> spanColor (foldr f "" ds)
     where f d rest = renderDocumentString d ++ rest
 
+renderDocumentsString :: [Document Int] -> String
+renderDocumentsString ds = "<p>" ++ concatMap renderDocumentString ds ++ "</p>"
+
 renderLink :: Show a => a -> String -> String
 renderLink i s = "<a href=\"/rewrite/" ++ show i ++ "\">" ++ s ++ "</a>"
 
@@ -284,13 +298,15 @@ traverseChooseLocationPage :: Applicative f
                            -> ChooseLocationPage a
                            -> f (ChooseLocationPage b)
 traverseChooseLocationPage f = \case
-  ChooseLocationPage d -> ChooseLocationPage <$> (traverse . traverseDocument) f d
+  ChooseLocationPage ds d ->
+    ChooseLocationPage ds <$> (traverse . traverseDocument) f d
 
 traverseChooseRewritePage :: Applicative f
                      => (a -> f b) -> ChooseRewritePage a -> f (ChooseRewritePage b)
 traverseChooseRewritePage f = \case
-  ChooseRewritePage d r -> ChooseRewritePage <$> (traverse . traverseDocument) f d
-                                   <*> (traverse . traverse3of3) f r
+  ChooseRewritePage ds d r ->
+    ChooseRewritePage ds <$> (traverse . traverseDocument) f d
+                         <*> (traverse . traverse3of3) f r
 
 traversePage :: Applicative f
              => (a -> f b) -> Page a -> f (Page b)
@@ -303,12 +319,15 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderPageString :: Page Int -> String
 renderPageString = \case
-  ChooseLocation (ChooseLocationPage d) -> concatMap renderDocumentString d
-  ChooseRewrite (ChooseRewritePage d r) ->
-                  concatMap renderDocumentString d
-                  ++ "<ul>"
-                  ++ renderRewrites (NEL.nonEmpty r)
-                  ++ "</ul>"
+  ChooseLocation (ChooseLocationPage ds d) ->
+    (concatMap renderDocumentsString . (map . map . fmap) absurd) ds
+    ++ renderDocumentsString d
+  ChooseRewrite (ChooseRewritePage ds d r) ->
+    (concatMap renderDocumentsString . (map . map . fmap) absurd) ds
+    ++ renderDocumentsString d
+    ++ "<ul>"
+    ++ renderRewrites (NEL.nonEmpty r)
+    ++ "</ul>"
     where renderRewrites = \case
             Nothing -> "<p>No rewrites available for selected expression</p>"
             Just l -> foldr f "" l
