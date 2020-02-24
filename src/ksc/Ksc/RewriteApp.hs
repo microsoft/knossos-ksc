@@ -191,17 +191,17 @@ tupleRewrites rulebase k es =
 
 rewritesPage :: Rules.RuleBase
              -> Lang.TExpr
-             -> Page [(Lang.TRule, Lang.TExpr)]
-rewritesPage r e = Document (DocumentPage (rewrites r id e))
+             -> DocumentPage [(Lang.TRule, Lang.TExpr)]
+rewritesPage r e = DocumentPage (rewrites r id e)
 
 choosePage :: Rules.RuleBase
            -> Lang.TExpr
            -> [(Lang.TRule, Lang.TExpr)]
-           -> Page (Either Lang.TExpr [(Lang.TRule, Lang.TExpr)])
+           -> RewritesPage (Either Lang.TExpr [(Lang.TRule, Lang.TExpr)])
 choosePage r e rs =
-  Rewrites (RewritesPage
+           RewritesPage
            ((fmap . fmap) Right (rewrites r id e))
-           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs))
+           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs)
   where pretty rule = ": "
                       ++ Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
                       ++ " &rarr; "
@@ -209,7 +209,7 @@ choosePage r e rs =
 
 rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
 rewritesPages r e = do
-    x <- liftF (rewritesPage r e)
+    x <- liftF (Document (rewritesPage r e))
     choosePages r e x
 
 choosePages :: Rules.RuleBase
@@ -217,7 +217,7 @@ choosePages :: Rules.RuleBase
             -> [(Lang.TRule, Lang.TExpr)]
             -> Free Page a
 choosePages r e rs = do
-    x <- liftF (choosePage r e rs)
+    x <- liftF (Rewrites (choosePage r e rs))
     case x of
       Left e' -> rewritesPages r e'
       Right rs' -> choosePages r e rs'
