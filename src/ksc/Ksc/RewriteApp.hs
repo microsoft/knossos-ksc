@@ -121,8 +121,14 @@ data Document a = Left' String
                 | Branch [Document a]
                 deriving Functor
 
-data Page a = Document [Document a]
-            | Rewrites [Document a] [(String, String, a)]
+newtype DocumentPage a = DocumentPage [Document a]
+  deriving Functor
+
+data RewritesPage a = RewritesPage [Document a] [(String, String, a)]
+  deriving Functor
+
+data Page a = Document (DocumentPage a)
+            | Rewrites (RewritesPage a)
   deriving Functor
 
 setList :: Int -> a -> [a] -> [a]
@@ -186,15 +192,16 @@ tupleRewrites rulebase k es =
 rewritesPage :: Rules.RuleBase
              -> Lang.TExpr
              -> Page [(Lang.TRule, Lang.TExpr)]
-rewritesPage r e = Document (rewrites r id e)
+rewritesPage r e = Document (DocumentPage (rewrites r id e))
 
 choosePage :: Rules.RuleBase
            -> Lang.TExpr
            -> [(Lang.TRule, Lang.TExpr)]
            -> Page (Either Lang.TExpr [(Lang.TRule, Lang.TExpr)])
 choosePage r e rs =
-  Rewrites ((fmap . fmap) Right (rewrites r id e))
-           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs)
+  Rewrites (RewritesPage
+           ((fmap . fmap) Right (rewrites r id e))
+           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs))
   where pretty rule = ": "
                       ++ Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
                       ++ " &rarr; "
@@ -268,20 +275,31 @@ renderPage :: Data.Map.Map Int a
            -> (Data.Map.Map Int a, String)
 renderPage = render renderPageString traversePage
 
+traverseDocumentPage :: Applicative f
+                     => (a -> f b) -> DocumentPage a -> f (DocumentPage b)
+traverseDocumentPage f = \case
+  DocumentPage d -> DocumentPage <$> (traverse . traverseDocument) f d
+
+traverseRewritesPage :: Applicative f
+                     => (a -> f b) -> RewritesPage a -> f (RewritesPage b)
+traverseRewritesPage f = \case
+  RewritesPage d r -> RewritesPage <$> (traverse . traverseDocument) f d
+                                   <*> (traverse . traverse3of3) f r
+
 traversePage :: Applicative f
              => (a -> f b) -> Page a -> f (Page b)
 traversePage f = \case
-  Document d   -> Document <$> (traverse . traverseDocument) f d
-  Rewrites d r -> Rewrites <$> (traverse . traverseDocument) f d
-                           <*> (traverse . traverse3of3) f r
+  Document d -> Document <$> traverseDocumentPage f d
+  Rewrites r -> Rewrites <$> traverseRewritesPage f r
 
 traverse3of3 :: Functor f => (c -> f c') -> (a, b, c) -> f (a, b, c')
 traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderPageString :: Page Int -> String
 renderPageString = \case
-  Document d -> concatMap renderDocumentString d
-  Rewrites d r -> concatMap renderDocumentString d
+  Document (DocumentPage d) -> concatMap renderDocumentString d
+  Rewrites (RewritesPage d r) ->
+                  concatMap renderDocumentString d
                   ++ "<ul>"
                   ++ renderRewrites (NEL.nonEmpty r)
                   ++ "</ul>"
