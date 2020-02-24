@@ -60,6 +60,17 @@ mkRuleBase = Rules.mkRuleBase . mapMaybe (\case
        Lang.RuleDecl r -> Just r
        Lang.DefDecl{} -> Nothing)
 
+readProgram :: String -> String -> IO (Lang.TExpr, Rules.RuleBase)
+readProgram sourceFile functionName = do
+  tc_decls <- typeCheck =<< parse [ "src/runtime/prelude.ks", sourceFile ]
+
+  let rules = mkRuleBase tc_decls
+
+  let prog = head $ flip mapMaybe (userFuns tc_decls) $ \(f, e) ->
+        if f == functionName then Just e else Nothing
+
+  return (prog, rules)
+
 main :: IO ()
 main = do
   mapOfPages <- newIORef Data.Map.empty
@@ -68,12 +79,7 @@ main = do
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
 
-  tc_decls <- typeCheck =<< parse [ "src/runtime/prelude.ks", sourceFile ]
-
-  let rules = mkRuleBase tc_decls
-
-  let prog = head $ flip mapMaybe (userFuns tc_decls) $ \(f, e) ->
-        if f == functionName then Just e else Nothing
+  (prog, rules) <- readProgram sourceFile functionName
 
   let link = "<p><a href=\"/\">Start again</a></p>"
 
