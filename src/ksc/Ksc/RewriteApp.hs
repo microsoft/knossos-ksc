@@ -133,12 +133,13 @@ rewrites :: Rules.RuleBase
 rewrites rulebase k = \case
      c@(Lang.Call ff@(Lang.TFun _ f) e) ->
        [Left' "("]
-       <> [Branch $ [Right' call] <> [Left' " "] <> rewrites_]
+       <> [Branch $ [Right' f_and_rewrites, Left' " "] <> rewrites_]
        <> [Left' ")"]
-       where call = (fstr,
-                     map (\(rule, rewritten)
-                           -> (rule, k rewritten)) (tryRules rulebase c))
-             fstr = Lang.renderSexp (Lang.pprFunId (Lang.funIdOfFun f))
+       where f_and_rewrites = (f_name, call_rewrites)
+             f_name = Lang.renderSexp (Lang.pprFunId (Lang.funIdOfFun f))
+             call_rewrites =
+                   map (\(rule, rewritten) -> (rule, k rewritten))
+                       (tryRules rulebase c)
              k' = k . Lang.Call ff
              rewrites_ = case e of
                 Lang.Tuple es -> tupleRewrites rulebase k' es
