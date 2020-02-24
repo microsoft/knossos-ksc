@@ -127,6 +127,10 @@ newtype DocumentPage a = DocumentPage [Document a]
 data RewritesPage a = RewritesPage [Document a] [(String, String, a)]
   deriving Functor
 
+type DocumentModel = Lang.TExpr
+
+type RewritesModel = (Lang.TExpr, [(Lang.TRule, Lang.TExpr)])
+
 data Page a = Document (DocumentPage a)
             | Rewrites (RewritesPage a)
   deriving Functor
@@ -190,37 +194,35 @@ tupleRewrites rulebase k es =
     (zip [1..] es))
 
 rewritesPage :: Rules.RuleBase
-             -> Lang.TExpr
-             -> DocumentPage [(Lang.TRule, Lang.TExpr)]
-rewritesPage r e = DocumentPage (rewrites r id e)
+             -> DocumentModel
+             -> DocumentPage RewritesModel
+rewritesPage r e = DocumentPage ((fmap . fmap) ((,) e) (rewrites r id e))
 
 choosePage :: Rules.RuleBase
-           -> Lang.TExpr
-           -> [(Lang.TRule, Lang.TExpr)]
-           -> RewritesPage (Either Lang.TExpr [(Lang.TRule, Lang.TExpr)])
-choosePage r e rs =
+           -> RewritesModel
+           -> RewritesPage (Either DocumentModel RewritesModel)
+choosePage r (e, rs) =
            RewritesPage
-           ((fmap . fmap) Right (rewrites r id e))
+           ((fmap . fmap) (\x -> Right (e, x)) (rewrites r id e))
            (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left e')) rs)
   where pretty rule = ": "
                       ++ Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
                       ++ " &rarr; "
                       ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
 
-rewritesPages :: Rules.RuleBase -> Lang.TExpr -> Free Page a
+rewritesPages :: Rules.RuleBase -> DocumentModel -> Free Page a
 rewritesPages r e = do
     x <- liftF (Document (rewritesPage r e))
-    choosePages r e x
+    choosePages r x
 
 choosePages :: Rules.RuleBase
-            -> Lang.TExpr
-            -> [(Lang.TRule, Lang.TExpr)]
+            -> RewritesModel
             -> Free Page a
-choosePages r e rs = do
-    x <- liftF (Rewrites (choosePage r e rs))
+choosePages r m = do
+    x <- liftF (Rewrites (choosePage r m))
     case x of
       Left e' -> rewritesPages r e'
-      Right rs' -> choosePages r e rs'
+      Right rs' -> choosePages r rs'
 
 newLink :: a -> State (Data.Map.Map Int a) Int
 newLink a = do
