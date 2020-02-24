@@ -78,14 +78,14 @@ main = do
   let link = "<p><a href=\"/\">Start again</a></p>"
 
       comments = [ link
-                 , "<p>Comments</p>"
                  , "<ul>"
                  , "<li>Displays the body of the function "
                  , fromString functionName
                  , " from the source file "
                  , fromString sourceFile
                  , "</li>"
-                 , "<li>The expression is not formatted at all</li>"
+                 , "<li>TODO: format the expression</li>"
+                 , "<li>TODO: breadcrumbs</li>"
                  , "</ul>"
                  ]
 
