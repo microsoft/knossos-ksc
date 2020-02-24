@@ -35,6 +35,7 @@ import qualified Data.Text.Lazy
 
 import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 
+import           Control.Arrow (first)
 import           Control.Monad.Free (Free(Pure, Free), liftF)
 import qualified Control.Monad.Trans.State
 import           Control.Monad.Trans.State hiding (get)
@@ -128,16 +129,20 @@ removeLinks = \case
   Right' (s, _) -> Left' s
   Branch ds     -> Branch (map removeLinks ds)
 
-data ChooseLocationPage a = ChooseLocationPage [[Document Void]] [Document a]
+data ChooseLocationPage a =
+  ChooseLocationPage [([Document Void], Lang.TRule)] [Document a]
   deriving Functor
 
 data ChooseRewritePage a =
-  ChooseRewritePage [[Document Void]] [Document a] [(String, String, a)]
+  ChooseRewritePage [([Document Void], Lang.TRule)]
+                    [Document a] [(String, String, a)]
   deriving Functor
 
-type ChooseLocationModel = ([Lang.TExpr], Lang.TExpr)
+type ChooseLocationModel = ([(Lang.TExpr, Lang.TRule)], Lang.TExpr)
 
-type ChooseRewriteModel = ([Lang.TExpr], Lang.TExpr, [(Lang.TRule, Lang.TExpr)])
+type ChooseRewriteModel = ([(Lang.TExpr, Lang.TRule)],
+                           Lang.TExpr,
+                           [(Lang.TRule, Lang.TExpr)])
 
 data Page a = ChooseLocation (ChooseLocationPage a)
             | ChooseRewrite (ChooseRewritePage a)
@@ -205,7 +210,7 @@ chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
                    -> ChooseLocationPage ChooseRewriteModel
 chooseLocationPage r (es, e) =
-  ChooseLocationPage ((map . map) removeLinks (map f es)) (f e)
+  ChooseLocationPage ((map . first . map) removeLinks ((map . first) f es)) (f e)
   where f = (fmap . fmap) ((,,) es e) . rewrites r id
 
 chooseRewritePage :: Rules.RuleBase
@@ -214,14 +219,18 @@ chooseRewritePage :: Rules.RuleBase
                        (Either ChooseLocationModel ChooseRewriteModel)
 chooseRewritePage r (es, e, rs) =
            ChooseRewritePage
-           ((map . map) removeLinks (map f es))
+           ((map . first . map) removeLinks ((map . first) f es))
            ((fmap . fmap) (\x -> Right (es, e, x)) (f e))
-           (fmap (\(r', e') -> (Lang.ru_name r', pretty r', Left (es ++ [e], e'))) rs)
-  where pretty rule = ": "
-                      ++ Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
-                      ++ " &rarr; "
-                      ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
+           (fmap (\(r', e') -> (Lang.ru_name r',
+                                pretty r',
+                                Left (es ++ [(e, r')], e'))) rs)
+  where pretty rule = ": " ++ renderRule rule
         f = rewrites r id
+
+renderRule :: Lang.TRule -> String
+renderRule rule = Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
+                  ++ " &rarr; "
+                  ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
 
 chooseLocationPages :: Rules.RuleBase
                     -> ChooseLocationModel
@@ -322,15 +331,19 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 renderPageString :: Page Int -> String
 renderPageString = \case
   ChooseLocation (ChooseLocationPage ds d) ->
-    (concatMap renderDocumentsString . (map . map . fmap) absurd) ds
+    concatMap (\(d', r) -> renderDocumentsString d'
+                           ++ "<p>then applied: " ++ renderRule r ++ "</p>") asInt
     ++ renderDocumentsString d
+    where asInt = (map . first . map . fmap) absurd ds
   ChooseRewrite (ChooseRewritePage ds d r) ->
-    (concatMap renderDocumentsString . (map . map . fmap) absurd) ds
+    concatMap (\(d', r') -> renderDocumentsString d'
+                            ++ "<p>then applied:" ++ renderRule r' ++ "</p>") asInt
     ++ renderDocumentsString d
     ++ "<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
     ++ "</ul>"
-    where renderRewrites = \case
+    where asInt = (map . first . map . fmap) absurd ds
+          renderRewrites = \case
             Nothing -> "<p>No rewrites available for selected expression</p>"
             Just l -> foldr f "" l
               where f (s, s1, b) rrs = "<li>" ++ renderLink b s ++ s1 ++ "</li>" ++ rrs
