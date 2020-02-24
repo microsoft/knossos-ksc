@@ -79,8 +79,6 @@ main = do
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
 
-  (prog, rules) <- readProgram sourceFile functionName
-
   let link = "<p><a href=\"/\">Start again</a></p>"
 
       comments = [ link
@@ -97,6 +95,7 @@ main = do
 
   scotty 3000 $ do
     get "/" $ do
+      (prog, rules) <- liftAndCatchIO $ readProgram sourceFile functionName
       s <- withMap (\m -> renderPages m (rewritesPages rules prog))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/rewrite/:word" $ do
