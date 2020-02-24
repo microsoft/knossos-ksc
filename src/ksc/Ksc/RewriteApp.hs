@@ -91,6 +91,8 @@ main = do
                  , "<li>Click \"start again\" to reload the "
                  , "function and rules</li>"
                  , "<li>TODO: format the expression</li>"
+                 , "<li>TODO: expressions have multiple arguments "
+                 , "but rules have literal tuples</li>"
                  , "</ul>"
                  ]
 
