@@ -135,8 +135,8 @@ rewrites rulebase k = \case
        [Left' "("]
        <> [Branch $ [Right' f_and_rewrites, Left' " "] <> rewrites_]
        <> [Left' ")"]
-       where f_and_rewrites = (f_name, call_rewrites)
-             f_name = Lang.renderSexp (Lang.pprFunId (Lang.funIdOfFun f))
+       where f_and_rewrites = (nameOfFun f, call_rewrites)
+             nameOfFun = Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
              call_rewrites =
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase c)
