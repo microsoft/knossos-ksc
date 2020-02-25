@@ -99,3 +99,11 @@ def avg_pool(x, pool_size, strides, padding="VALID"):
     return pool(x, pool_size, strides)
 
 log_softmax = make_edef("log_softmax", ["x"], first_arg)
+
+to_device = make_edef(
+    "to_device", ["x", "device_id"], first_arg
+)
+
+make_input = make_edef(
+    "make_input", ["x"], first_arg
+)
