@@ -228,7 +228,8 @@ chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationPage ChooseRewriteModel
 chooseLocationPage r (es, e) =
   ChooseLocationPage ((map . first . map) removeLinks ((map . first) f es)) (f e)
-  where f = (fmap . fmap) ((,,) es e) . rewrites r
+  where f :: Lang.TExpr -> [Document ChooseRewriteModel]
+        f = (fmap . fmap) ((,,) es e) . rewrites r
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
@@ -333,7 +334,9 @@ traverseChooseLocationPage f = \case
     ChooseLocationPage ds <$> (traverse . traverseDocument) f d
 
 traverseChooseRewritePage :: Applicative f
-                     => (a -> f b) -> ChooseRewritePage a -> f (ChooseRewritePage b)
+                          => (a -> f b)
+                          -> ChooseRewritePage a
+                          -> f (ChooseRewritePage b)
 traverseChooseRewritePage f = \case
   ChooseRewritePage ds d r ->
     ChooseRewritePage ds <$> (traverse . traverseDocument) f d
