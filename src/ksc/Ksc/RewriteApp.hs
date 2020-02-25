@@ -169,9 +169,9 @@ separate :: (Lang.TExpr -> e)
 separate k = \case
      c@(Lang.Call ff@(Lang.TFun _ f) e) ->
        [Left' "("]
-       <> [Branch $ [Right' f_and_rewrites, Left' " "] <> rewrites_]
+       <> [Branch $ [Right' fAndSeparated, Left' " "] <> rewrites_]
        <> [Left' ")"]
-       where f_and_rewrites = (nameOfFun f, (c, k))
+       where fAndSeparated = (nameOfFun f, (c, k))
              nameOfFun = Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
              k' = k . Lang.Call ff
              rewrites_ = case e of
