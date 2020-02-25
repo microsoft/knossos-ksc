@@ -3,8 +3,21 @@
 
 (rule "mul2" (v : Float) (mul@ff v 2.0) (add v v))
 (rule "add2" (v : Float) (add v v) (mul@ff v 2.0))
-(rule "add0" (v : Float) (add v 0.0) v)
-(rule "mul0" (v : Float) (mul@ff 0.0 v ) 0.0)
+
+(rule "add0.elim" (v : Float) (add v 0.0) v)
+(rule "mul0.elim" (v : Float) (mul@ff 0.0 v) 0.0)
+(rule "mul1.elim" (v : Float) (mul@ff 1.0 v) v)
+
+(rule "add0.intro" (v : Float) v (add v 0.0))
+(rule "mul0.intro" (v : Float) 0.0 (mul@ff 0.0 v))
+(rule "mul1.intro" (v : Float) v (mul@ff 1.0 v))
+
+(rule "mul.assocr" ((x1 : Float) (x2 : Float) (x3 : Float))
+      (mul@ff (mul@ff x1 x2) x3)
+      (mul@ff x1 (mul@ff x2 x3)))
+(rule "mul.assocl" ((x1 : Float) (x2 : Float) (x3 : Float))
+      (mul@ff x1 (mul@ff x2 x3))
+      (mul@ff (mul@ff x1 x2) x3))
 
 (rule "let.elim" ((e : Float) (a : Float))
       (let (a e) a) e)
