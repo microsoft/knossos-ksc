@@ -163,27 +163,23 @@ tryRules :: Rules.RuleBase -> Lang.TExpr -> [(Lang.TRule, Lang.TExpr)]
 tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
                     . Rules.tryRulesMany rulebase
 
-rewrites :: Rules.RuleBase
-         -> (Lang.TExpr -> e)
+separate :: (Lang.TExpr -> e)
          -> Lang.TExpr
-         -> [Document [(Lang.TRule, e)]]
-rewrites rulebase k = \case
+         -> [Document (Lang.TExpr, Lang.TExpr -> e)]
+separate k = \case
      c@(Lang.Call ff@(Lang.TFun _ f) e) ->
        [Left' "("]
        <> [Branch $ [Right' f_and_rewrites, Left' " "] <> rewrites_]
        <> [Left' ")"]
-       where f_and_rewrites = (nameOfFun f, call_rewrites)
+       where f_and_rewrites = (nameOfFun f, (c, k))
              nameOfFun = Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
-             call_rewrites =
-                   map (\(rule, rewritten) -> (rule, k rewritten))
-                       (tryRules rulebase c)
              k' = k . Lang.Call ff
              rewrites_ = case e of
-                Lang.Tuple es -> tupleRewrites rulebase k' es
-                _ -> rewrites rulebase k' e
+                Lang.Tuple es -> separateTuple k' es
+                _ -> separate k' e
 
      Lang.Tuple es -> [Left' "(tuple "]
-                      <> tupleRewrites rulebase k es
+                      <> separateTuple k es
                       <> [Left' ")"]
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
@@ -192,8 +188,8 @@ rewrites rulebase k = \case
        Lang.KString s -> [Left' (show s)]
        Lang.KInteger i -> [Left' (show i)]
      Lang.Let v rhs body ->
-       let rhs'  = rewrites rulebase (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
-           body' = rewrites rulebase (\body'' -> k (Lang.Let v rhs body'')) body
+       let rhs'  = separate  (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
+           body' = separate  (\body'' -> k (Lang.Let v rhs body'')) body
        in [Left' ("(let (" ++ show v ++ " ")] <> rhs' <> [Left' ") "] <> body'
 
      Lang.App _ _ -> error "We don't do App"
@@ -203,15 +199,25 @@ rewrites rulebase k = \case
      Lang.Dummy _ -> error "We don't do Dummy"
 
 -- For avoiding "(tuple ...)" around multiple arguments
-tupleRewrites :: Rules.RuleBase
-              -> (Lang.TExpr -> e)
+separateTuple :: (Lang.TExpr -> e)
               -> [Lang.TExpr]
-              -> [Document [(Lang.TRule, e)]]
-tupleRewrites rulebase k es =
+              -> [Document (Lang.TExpr, Lang.TExpr -> e)]
+separateTuple k es =
   intercalate [Left' " "] (map (\(j, e) ->
-    rewrites rulebase (\e' ->
+    separate (\e' ->
         k (Lang.Tuple (setList j e' es)) ) e)
     (zip [1..] es))
+
+rewrites :: Rules.RuleBase
+         -> a
+         -> Lang.TExpr
+         -> [Document [(Lang.TRule, Lang.TExpr)]]
+rewrites rulebase _ e = (map . fmap) f (separate id e)
+  where f :: (Lang.TExpr, Lang.TExpr -> b) -> [(Lang.TRule, b)]
+        f (ee, k) = call_rewrites
+          where call_rewrites =
+                   map (\(rule, rewritten) -> (rule, k rewritten))
+                       (tryRules rulebase ee)
 
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
