@@ -5,7 +5,7 @@
     )
 
 (def f Float (x : Float)
-    ($trace mul@ff x x)
+    ($trace (mul@ff x x))
 )
 
 (def g Float ((n : Integer) (m : Integer))
