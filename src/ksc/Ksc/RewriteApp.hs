@@ -187,10 +187,12 @@ separate k = \case
        Lang.KBool b -> [Left' (show b)]
        Lang.KString s -> [Left' (show s)]
        Lang.KInteger i -> [Left' (show i)]
-     Lang.Let v rhs body ->
+     e@(Lang.Let v rhs body) ->
        let rhs'  = separate  (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
            body' = separate  (\body'' -> k (Lang.Let v rhs body'')) body
-       in [Left' ("(let (" ++ show v ++ " ")] <> rhs' <> [Left' ") "] <> body'
+       in [Left' "("] <> [Right' ("let", (e, k))] <> [Left' (" (" ++ show v ++ " ")]
+          <> rhs' <> [Left' ") "]
+          <> body' <> [Left' ")"]
 
      Lang.App _ _ -> error "We don't do App"
      Lang.Lam _ _ -> error "We don't do Lam"
