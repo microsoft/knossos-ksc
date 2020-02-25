@@ -57,8 +57,11 @@ def resnet(x, weights):
                 h = conv_residual_block(h, weights, strides)
             else:
                 h = identity_residual_block(h, weights)
+        if i == 1:
+            h = nn.to_device(h, 1)
     h = nn.avg_pool(h, (7, 7), (1, 1))
     h = core.flatten(h)
+    final_dense_weights = nn.to_device(final_dense_weights, 1)
     h = dense(h, final_dense_weights)
     return nn.log_softmax(h)
 

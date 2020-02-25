@@ -236,6 +236,8 @@ def get_weights_labels_input(model='resnet_py'):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py"])
+    parser.add_argument("--backend", type=str, choices=["jax"], default="jax")
+    parser.add_argument("--pipeline", action="store_true")
     args = parser.parse_args()
 
     weights, class_names, input = get_weights_labels_input(args.model)
@@ -243,8 +245,13 @@ def main():
         import sys
         sys.path.append("examples/dl-resnet")
         from resnet import resnet
+        if args.pipeline:
+            from ksc.tracing.functions import nn
+            input = nn.make_input(input)
         out = resnet(input, weights)
-        out = out.data
+        out = out.get_data_with_backend(args.backend)
+        if args.pipeline:
+            out = out[0]
     else:
         from resnet_v2 import Resnet50 as resnet
         out = resnet(weights, input)
