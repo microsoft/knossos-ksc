@@ -190,9 +190,12 @@ separate k = \case
      e@(Lang.Let v rhs body) ->
        let rhs'  = separate  (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
            body' = separate  (\body'' -> k (Lang.Let v rhs body'')) body
-       in [Left' "("] <> [Right' ("let", (e, k))] <> [Left' (" (" ++ show v ++ " ")]
-          <> rhs' <> [Left' ") "]
-          <> body' <> [Left' ")"]
+       in [Left' "("]
+          <> [Branch $
+              [Right' ("let", (e, k))] <> [Left' (" (" ++ show v ++ " ")]
+              <> rhs' <> [Left' ") "]
+              <> body']
+          <> [Left' ")"]
 
      Lang.App _ _ -> error "We don't do App"
      Lang.Lam _ _ -> error "We don't do Lam"
