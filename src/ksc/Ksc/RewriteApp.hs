@@ -91,6 +91,7 @@ main = do
                  , "</li>"
                  , "<li>Click \"start again\" to reload the "
                  , "function and rules</li>"
+                 , "<li>TODO</li>"
                  , "<ul>"
                  , "<li>format the expression</li>"
                  , "<li>consistent tuple rendering</li>"
