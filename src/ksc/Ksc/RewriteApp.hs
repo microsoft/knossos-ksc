@@ -317,7 +317,7 @@ renderDocumentsString :: [Document Int] -> String
 renderDocumentsString ds = "<tt>" ++ concatMap renderDocumentString ds ++ "</tt>"
 
 renderLink :: Show a => a -> String -> String
-renderLink i s = "<a href=\"/rewrite/" ++ show i ++ "\">" ++ s ++ "</a>"
+renderLink i s = "<a href=\"/rewrite/" ++ show i ++ "#target\">" ++ s ++ "</a>"
 
 renderPage :: Data.Map.Map Int a
            -> Page a
@@ -353,11 +353,13 @@ renderPageString = \case
   ChooseLocation (ChooseLocationPage ds d) ->
     concatMap (\(d', r) -> renderDocumentsString d'
                            ++ "<p>then applied: " ++ renderRule r ++ "</p>") asInt
+    ++ "<a name=\"target\"></a>"
     ++ renderDocumentsString d
     where asInt = (map . first . map . fmap) absurd ds
   ChooseRewrite (ChooseRewritePage ds d r) ->
     concatMap (\(d', r') -> renderDocumentsString d'
                             ++ "<p>then applied:" ++ renderRule r' ++ "</p>") asInt
+    ++ "<a name=\"target\"></a>"
     ++ renderDocumentsString d
     ++ "<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
