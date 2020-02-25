@@ -243,8 +243,7 @@ pCall :: Parser (ExprX Parsed)
 pCall = do { f <- pIdentifier
            ; es <- many pExpr
            -- See Note [Function arity]
-           ; let mkCall g args = Call (mk_fun g) (mkTuple args)
-           ; return (mkCall f es)
+           ; return (Call (mk_fun f) (mkTuple es))
         }
 
 pIfThenElse :: Parser (ExprX Parsed)
