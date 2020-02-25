@@ -209,10 +209,9 @@ separateTuple k es =
     (zip [1..] es))
 
 rewrites :: Rules.RuleBase
-         -> a
          -> Lang.TExpr
          -> [Document [(Lang.TRule, Lang.TExpr)]]
-rewrites rulebase _ e = (map . fmap) f (separate id e)
+rewrites rulebase e = (map . fmap) f (separate id e)
   where f :: (Lang.TExpr, Lang.TExpr -> b) -> [(Lang.TRule, b)]
         f (ee, k) = call_rewrites
           where call_rewrites =
@@ -224,7 +223,7 @@ chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationPage ChooseRewriteModel
 chooseLocationPage r (es, e) =
   ChooseLocationPage ((map . first . map) removeLinks ((map . first) f es)) (f e)
-  where f = (fmap . fmap) ((,,) es e) . rewrites r id
+  where f = (fmap . fmap) ((,,) es e) . rewrites r
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
@@ -238,7 +237,7 @@ chooseRewritePage r (es, e, rs) =
                                 pretty r',
                                 Left (es ++ [(e, r')], e'))) rs)
   where pretty rule = ": " ++ renderRule rule
-        f = rewrites r id
+        f = rewrites r
 
 renderRule :: Lang.TRule -> String
 renderRule rule =
