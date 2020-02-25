@@ -244,22 +244,8 @@ pCall = do { f <- pIdentifier
            ; es <- many pExpr
            -- See Note [Function arity]
            ; let mkCall g args = Call (mk_fun g) (mkTuple args)
-           ; case () of
-               _   | f == "$trace"   -- See Note [$trace]
-                   , Var (Simple g) : es1 <- es
-                   -> return (Call (mk_fun f) (mkCall g es1))
-
-                   | otherwise
-                   -> return (mkCall f es)
+           ; return (mkCall f es)
         }
-
-{- Note [$trace]
-~~~~~~~~~~~~~~~~
-$trace has "fake" higher-order call pattern ($trace f arg1 .. argn),
-transform, as we parse it, to ($trace (f arg1 .. argn)).  Later we'll
-add strings, and this hackery will allow us to also add useful context
-annotations.
--}
 
 pIfThenElse :: Parser (ExprX Parsed)
 -- (if e1 e2 e3)
