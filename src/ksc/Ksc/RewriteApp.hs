@@ -94,7 +94,6 @@ main = do
                  , "<li>TODO</li>"
                  , "<ul>"
                  , "<li>format the expression</li>"
-                 , "<li>consistent tuple rendering</li>"
                  , "<li>show all rules on LHS and highlight "
                  , "when hovered subexpression has applicable rule</li>"
                  , "<li>show infix rendering and "
