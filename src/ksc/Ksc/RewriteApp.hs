@@ -228,9 +228,12 @@ chooseRewritePage r (es, e, rs) =
         f = rewrites r id
 
 renderRule :: Lang.TRule -> String
-renderRule rule = Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
-                  ++ " &rarr; "
-                  ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
+renderRule rule =
+  "<tt>"
+  ++ Lang.renderSexp (Lang.ppr (Lang.ru_lhs rule))
+  ++ " &rarr; "
+  ++ Lang.renderSexp (Lang.ppr (Lang.ru_rhs rule))
+  ++ "</tt>"
 
 chooseLocationPages :: Rules.RuleBase
                     -> ChooseLocationModel
@@ -294,7 +297,7 @@ renderDocumentString = \case
     where f d rest = renderDocumentString d ++ rest
 
 renderDocumentsString :: [Document Int] -> String
-renderDocumentsString ds = "<p>" ++ concatMap renderDocumentString ds ++ "</p>"
+renderDocumentsString ds = "<tt>" ++ concatMap renderDocumentString ds ++ "</tt>"
 
 renderLink :: Show a => a -> String -> String
 renderLink i s = "<a href=\"/rewrite/" ++ show i ++ "\">" ++ s ++ "</a>"
