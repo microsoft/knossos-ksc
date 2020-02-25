@@ -2,6 +2,7 @@
 ; Licensed under the MIT license.
 
 (rule "mul2" (v : Float) (mul@ff v 2.0) (add v v))
+(rule "add2" (v : Float) (add v v) (mul@ff v 2.0))
 (rule "add0" (v : Float) (add v 0.0) v)
 (rule "mul0" (v : Float) (mul@ff 0.0 v ) 0.0)
 
