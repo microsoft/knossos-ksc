@@ -822,7 +822,7 @@ pprExpr _ (App e1 e2) =
 
 pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
-  (parens $ pprFunOcc @p f <+> pp_args)
+  (parens $ pprFunOcc @p f <+> pp_args_tuple)
   (case (e, isInfix @p f) of
     (Tuple [e1, e2], Just prec')
       -> parensIf prec prec' $
@@ -832,6 +832,11 @@ pprCall prec f e = mode
   )
  where
   pp_args = ppr e
+
+  pp_args_tuple = case e of
+    Tuple [_] -> pp_args
+    Tuple es  -> sep (map ppr es)
+    _         -> pp_args
 
 pprLetSexp :: forall p. InPhase p => LetBndrX p -> ExprX p -> ExprX p -> SDoc
 pprLetSexp v e =
