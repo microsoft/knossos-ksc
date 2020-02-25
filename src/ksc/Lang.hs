@@ -801,8 +801,8 @@ pprExpr p (Let v e1 e2) = mode
     precZero
     (vcat
       [ text "let"
-        <+> (bracesSp $ sep [pprLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
-      , ppr e2
+        <+> (bracesSp $ pprLetBndr @phase v <+> nest 2 (text "=" <+> ppr e1))
+        <+> ppr e2
       ]
     )
   )
@@ -824,9 +824,9 @@ pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
   (parens $ pprFunOcc @p f <+> pp_args_tuple)
   (case (e, isInfix @p f) of
-    (Tuple [e1, e2], Just prec')
+    (Tuple [e1, e2], Just (prec', symbol))
       -> parensIf prec prec' $
-         sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
+         pprExpr prec' e1 <+> text symbol <+> pprExpr prec' e2
     _ -> parensIf prec precCall $
          cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
   )
@@ -849,14 +849,16 @@ pprLetSexp v e =
       parenBind (v,e) = parens $ (ppr . fst . getLetBndr @p) v <+> ppr e
 
 
-isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
+isInfix :: forall p. InPhase p => FunX p -> Maybe (Prec, String)
 isInfix f = isInfixFun (fst (getFun @p f))
 
 -- TODO: this is rather out of date, and it's not clear we need to keep it...
-isInfixFun :: Fun -> Maybe Prec
+isInfixFun :: Fun -> Maybe (Prec, String)
 isInfixFun (Fun (PrimFun s))
-    | s == "eq"   = Just precOne
-    | s == "add"  = Just precTwo
+    | s == "eq"     = Just (precOne, "==")
+    | s == "add"    = Just (precTwo, "+")
+isInfixFun (Fun (UserFun s))
+    | s == "mul@ff" = Just (precThree, "*")
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
