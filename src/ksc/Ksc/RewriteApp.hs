@@ -182,8 +182,8 @@ separate k = \case
                       <> separateTuple k es
                       <> [Left' ")"]
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
-     Lang.Konst c -> case c of
-       Lang.KFloat f -> [Left' (show f)]
+     e@(Lang.Konst c) -> case c of
+       Lang.KFloat f -> [Branch [Right' (show f, (e, k))]]
        Lang.KBool b -> [Left' (show b)]
        Lang.KString s -> [Left' (show s)]
        Lang.KInteger i -> [Left' (show i)]
