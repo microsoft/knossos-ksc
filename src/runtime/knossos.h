@@ -1452,53 +1452,53 @@ namespace ks
 	}
 
 	template <class T>
-	inline T eq(T t1, T t2)
+	inline bool eq(T t1, T t2)
 	{
 		return t1 == t2;
 	}
 
 	template <class T>
-          inline T ne(T t1, T t2)
+          inline bool ne(T t1, T t2)
 	{
 		return t1 != t2;
 	}
 
-        inline int lt$aff(double t1, double t2)
+        inline bool lt$aff(double t1, double t2)
 	{
 		return t1 < t2;
 	}
 
-        inline int lt$aii(int t1, int t2)
+        inline bool lt$aii(int t1, int t2)
 	{
 		return t1 < t2;
 	}
 
-	inline int gt$aff(double t1, double t2)
+	inline bool gt$aff(double t1, double t2)
 	{
 		return t1 > t2;
 	}
 
-	inline int gt$aii(int t1, int t2)
+	inline bool gt$aii(int t1, int t2)
 	{
 		return t1 > t2;
 	}
 
-	inline int lte$aff(double t1, double t2)
+	inline bool lte$aff(double t1, double t2)
 	{
 		return t1 <= t2;
 	}
 
-	inline int lte$aii(int t1, int t2)
+	inline bool lte$aii(int t1, int t2)
 	{
 		return t1 <= t2;
 	}
 
-	inline int gte$aff(double t1, double t2)
+	inline bool gte$aff(double t1, double t2)
 	{
 		return t1 >= t2;
 	}
 
-	inline int gte$aii(int t1, int t2)
+	inline bool gte$aii(int t1, int t2)
 	{
 		return t1 >= t2;
 	}
@@ -1553,12 +1553,12 @@ namespace ks
 		return -t;
 	}
 
-	inline int or_(int b1, int b2)
+	inline bool or_(int b1, int b2)
 	{
 	  return b1 || b2;
 	}
 
-	inline int and_(int b1, int b2)
+	inline bool and_(int b1, int b2)
 	{
 	  return b1 && b2;
 	}
