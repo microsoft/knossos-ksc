@@ -402,8 +402,8 @@ renderPageString = \case
     ++ "</ul>"
     where renderRewrites = \case
             Nothing -> "<p>No rewrites available for selected expression</p>"
-            Just l -> foldr f "" l
-              where f (s, s1, b) rrs = "<li>" ++ renderLink b s ++ s1 ++ "</li>" ++ rrs
+            Just l -> concatMap f l
+              where f (s, s1, b) = "<li>" ++ renderLink b s ++ s1 ++ "</li>"
 
 renderCost :: Either String Float -> String
 renderCost s = "<p>" ++ costString s ++ "</p>"
