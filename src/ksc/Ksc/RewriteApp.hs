@@ -226,6 +226,9 @@ separateTuple k es =
         k (Lang.Tuple (setList j e' es)) ) e)
     (zip [1..] es))
 
+documentOfExpr :: Lang.TExpr -> [Document a]
+documentOfExpr = map removeLinks . (map . fmap) (const ()) . separate id
+
 rewrites :: Rules.RuleBase
          -> Lang.TExpr
          -> [Document [(Lang.TRule, Lang.TExpr)]]
