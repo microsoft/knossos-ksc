@@ -95,7 +95,7 @@ main = do
                  , "<li>TODO</li>"
                  , "<ul>"
                  , "<li>format the expression</li>"
-                 , "<li>show all rules on LHS and highlight "
+                 , "<li>show all rules on RHS and highlight "
                  , "when hovered subexpression has applicable rule</li>"
                  , "<li>leaderboard</li>"
                  , "<li>support non-rules optimisations, e.g. "
