@@ -148,10 +148,7 @@ data ChooseLocationPage a =
   deriving Functor
 
 data ChooseRewritePage a =
-  ChooseRewritePage [([Document Void], Lang.TRule)]
-                    String
-                    (Either String Float)
-                    [Document a]
+  ChooseRewritePage (ChooseLocationPage a)
                     [(String, String, a)]
   deriving Functor
 
@@ -250,10 +247,11 @@ chooseRewritePage :: Rules.RuleBase
                        (Either ChooseLocationModel ChooseRewriteModel)
 chooseRewritePage r (es, e, rs) =
            ChooseRewritePage
+           (ChooseLocationPage
            ((map . first . map) removeLinks ((map . first) f es))
            (Lang.pps e)
            (Ksc.Cost.cost e)
-           ((fmap . fmap) (\x -> Right (es, e, x)) (f e))
+           ((fmap . fmap) (\x -> Right (es, e, x)) (f e)))
            (fmap (\(r', e') -> (Lang.ru_name r',
                                 pretty r',
                                 Left (es ++ [(e, r')], e'))) rs)
@@ -353,9 +351,9 @@ traverseChooseRewritePage :: Applicative f
                           -> ChooseRewritePage a
                           -> f (ChooseRewritePage b)
 traverseChooseRewritePage f = \case
-  ChooseRewritePage ds s cost d r ->
-    ChooseRewritePage ds s cost <$> (traverse . traverseDocument) f d
-                                <*> (traverse . traverse3of3) f r
+  ChooseRewritePage clp r ->
+    ChooseRewritePage <$> traverseChooseLocationPage f clp
+                      <*> (traverse . traverse3of3) f r
 
 traversePage :: Applicative f
              => (a -> f b) -> Page a -> f (Page b)
@@ -376,7 +374,7 @@ renderPageString = \case
     ++ "<pre>" ++ s ++ "</pre>"
     ++ renderCost cost
     where asInt = (map . first . map . fmap) absurd ds
-  ChooseRewrite (ChooseRewritePage ds ss cost d r) ->
+  ChooseRewrite (ChooseRewritePage (ChooseLocationPage ds ss cost d) r) ->
     concatMap (\(d', r') -> renderDocumentsString d'
                             ++ "<p>then applied:" ++ renderRule r' ++ "</p>") asInt
     ++ "<a name=\"target\"></a>"
