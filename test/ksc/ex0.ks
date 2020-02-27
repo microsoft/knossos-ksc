@@ -22,15 +22,17 @@
 (rule "let.elim" ((e : Float) (a : Float))
       (let (a e) a) e)
 
-(def f (Tuple Float Float) (x : Float)
-     (tuple (mul@ff 0.0 (let (a 2.0) a)) (add (mul@ff 5.0 2.0) 0.0)))
+(def f (Tuple Float Float Float) (x : Float)
+     (tuple (mul@ff 0.0 (let (a 2.0) a)) (add (mul@ff 5.0 2.0) 0.0)
+            (h 0.0)
+            ))
 
 ; (rule "mult" (v : Float) (mul@ff (tuple v 2.0)) (add v v))
 (def f_working2 Float (x : Float) (mul@ff (tuple 5.0 2.0)))
 
 ; (rule "tuple" (v : Float) (tuple v 2.0) (tuple v 3.0))
 ; (rule "wrong" () 2.0 3.0)
-(def f_working Float (x : Float) 2.0)
+(def h Float (x : Float) 2.0)
 
 (def g (Tuple Float Float) ( x : Float )
      (tuple (mul@ff 3.0 2.0) (add 5.0 5.0)))

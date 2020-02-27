@@ -97,8 +97,6 @@ main = do
                  , "<li>format the expression</li>"
                  , "<li>show all rules on LHS and highlight "
                  , "when hovered subexpression has applicable rule</li>"
-                 , "<li>show infix rendering and "
-                 , "\"normal\" function call syntax</li>"
                  , "<li>leaderboard</li>"
                  , "<li>support non-rules optimisations, e.g. "
                  , "constant folding, let lifting/dropping"
