@@ -12,6 +12,7 @@ executable ksc
                  CSE
                  Cgen
                  KMonad
+                 Ksc.Cost
                  Ksc.Futhark
                  Ksc.Pipeline
                  Lang
