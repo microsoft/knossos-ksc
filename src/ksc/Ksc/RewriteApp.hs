@@ -138,6 +138,7 @@ removeLinks = \case
 
 data ChooseLocationPage a =
   ChooseLocationPage { clpHistory :: [([Document Void],
+                                       String,
                                        Either String Float,
                                        Lang.TRule)]
                      , clpCStyle  :: String
@@ -242,13 +243,17 @@ chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationPage [(Lang.TRule, Lang.TExpr)]
 chooseLocationPageOfModel r (es, e) =
   ChooseLocationPage (map (\(e', r') ->
-                             (documentOfExpr e', Ksc.Cost.cost e', r')) es)
+                             (documentOfExpr e',
+                              Lang.pps e',
+                              Ksc.Cost.cost e',
+                              r'))
+                          es)
                      (Lang.pps e)
                      (Ksc.Cost.cost e)
                      (rewrites r e)
 
-firstOf3 :: (a -> a') -> (a, b, c) -> (a', b, c)
-firstOf3 f (a, b, c) = (f a, b, c)
+firstOf4 :: (a -> a') -> (a, b, c, d) -> (a', b, c, d)
+firstOf4 f (a, b, c, d) = (f a, b, c, d)
 
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
@@ -382,15 +387,17 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderChooseLocationPageString :: ChooseLocationPage Int -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
-    concatMap (\(d', c, r) -> renderDocumentsString d'
-                              ++ renderCost c
-                              ++ "<p>then applied: " ++ renderRule r ++ "</p>")
+    concatMap (\(d', cstyle, c, r) ->
+                 renderDocumentsString d'
+                 ++ "<pre>" ++ cstyle ++ "</pre>"
+                 ++ renderCost c
+                 ++ "<p>then applied: " ++ renderRule r ++ "</p>")
               asInt
     ++ "<a name=\"target\"></a>"
     ++ renderDocumentsString d
     ++ "<pre>" ++ s ++ "</pre>"
     ++ renderCost cost
-    where asInt = (map . firstOf3 . map . fmap) absurd ds
+    where asInt = (map . firstOf4 . map . fmap) absurd ds
 
 renderPageString :: Page Int -> String
 renderPageString = \case
