@@ -48,7 +48,7 @@ If you prefer block comments then use pairs of #| and |#
       (c : Integer)
       (d : Integer)
       (e : Integer))
-     (sub@ii (add@ii (mul@ii a b) (neg@ii c)) (div@ii d e)))
+     (sub@ii (add@ii (mul@ii a b) (neg@i c)) (div@ii d e)))
 
 ; Python equivalent
 ;

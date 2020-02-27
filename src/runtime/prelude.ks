@@ -46,7 +46,7 @@
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
   ((d_dsub drt))
-  (tuple d_dsub (neg@ff d_dsub))))
+  (tuple d_dsub (neg@f d_dsub))))
 
 (edef sub@ii Integer (Integer Integer))
 (edef D$sub@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
@@ -84,7 +84,7 @@
    (x2 (get$2$2 xt))
    (d_ddiv drt))
   (tuple (div@ff d_ddiv x2)
-         (neg@ff (div@ff (mul@ff x1 d_ddiv)
+         (neg@f (div@ff (mul@ff x1 d_ddiv)
                          (mul@ff x2 x2))))))
 (edef div@ii Integer (Integer Integer))
 (edef D$div@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
@@ -133,22 +133,22 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
-;; neg :: Number x Number -> Number
+;; neg :: Number -> Number
 ;; neg x = -x
-(edef neg@ff Float (Float))
-(edef D$neg@ff (LM Float Float) (Float))
-(edef Dt$neg@ff (Tuple Float (LM Float Float)) (Float))
-(def fwd$neg@ff Float ((x : Float) (dx : Float))
-     (neg@ff dx))
-(def rev$neg@ff Float ((x : Float) (d_dneg : Float))
-     (neg@ff d_dneg))
+(edef neg@f Float (Float))
+(edef D$neg@f (LM Float Float) (Float))
+(edef Dt$neg@f (Tuple Float (LM Float Float)) (Float))
+(def fwd$neg@f Float ((x : Float) (dx : Float))
+     (neg@f dx))
+(def rev$neg@f Float ((x : Float) (d_dneg : Float))
+     (neg@f d_dneg))
 
-(edef neg@ii Integer (Integer))
-(edef D$neg@ii (LM Integer Integer) (Integer))
-(edef Dt$neg@ii (Tuple Integer (LM Integer Integer)) (Integer))
-(def fwd$neg@ii (Tuple) ((x : Integer) (dx : (Tuple)))
+(edef neg@i Integer (Integer))
+(edef D$neg@i (LM Integer Integer) (Integer))
+(edef Dt$neg@i (Tuple Integer (LM Integer Integer)) (Integer))
+(def fwd$neg@i (Tuple) ((x : Integer) (dx : (Tuple)))
      (tuple))
-(def rev$neg@ii (Tuple) ((x : Integer) (d_dneg : (Tuple)))
+(def rev$neg@i (Tuple) ((x : Integer) (d_dneg : (Tuple)))
      (tuple))
 
 ;; gt :: Number x Number -> Bool
@@ -276,8 +276,8 @@
 (edef Dt$sin (Tuple Float (LM Float Float)) (Float))
 
 (edef D$cos (LM Float Float) (Float))
-(def fwd$cos Float ((x : Float) (dx : Float)) (neg@ff (mul@ff (sin x) dx)))
-(def rev$cos Float ((x : Float) (d_dcos : Float)) (neg@ff (mul@ff (sin x) d_dcos)))
+(def fwd$cos Float ((x : Float) (dx : Float)) (neg@f (mul@ff (sin x) dx)))
+(def rev$cos Float ((x : Float) (d_dcos : Float)) (neg@f (mul@ff (sin x) d_dcos)))
 (edef Dt$cos (Tuple Float (LM Float Float)) (Float))
 
 (edef max Float (Float Float))
@@ -292,9 +292,9 @@
 
 (edef abs Float (Float))
 (edef D$abs (LM Float Float) (Float))
-(def fwd$abs Float ((x : Float) (dx : Float)) (if (gt@ff x 0.0) dx (neg@ff dx)))
+(def fwd$abs Float ((x : Float) (dx : Float)) (if (gt@ff x 0.0) dx (neg@f dx)))
 (def rev$abs Float ((x : Float) (d_dabs : Float))
-     (if (gt@ff x 0.0) d_dabs (neg@ff d_dabs)))
+     (if (gt@ff x 0.0) d_dabs (neg@f d_dabs)))
 (edef Dt$abs (Tuple Float (LM Float Float)) (Float))
 
 (edef to_float Float (Integer))
