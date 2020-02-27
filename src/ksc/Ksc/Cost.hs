@@ -49,6 +49,7 @@ costFun :: Lang.TFun -> Lang.Type -> Either String Float
 costFun f t
   | f `isThePrimFun` "add"    = fmap fromIntegral (size t)
   | f `isTheUserFun` "mul@ff" = fmap fromIntegral (size t)
+  | f `isTheUserFun` "h"      = pure 10
   | otherwise = Left ("Unknown function: " ++ show f)
 
 isTheUserFun :: Lang.TFun -> String -> Bool
