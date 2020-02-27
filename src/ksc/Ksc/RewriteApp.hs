@@ -364,9 +364,8 @@ traversePage f = \case
 traverse3of3 :: Functor f => (c -> f c') -> (a, b, c) -> f (a, b, c')
 traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
-renderPageString :: Page Int -> String
-renderPageString = \case
-  ChooseLocation (ChooseLocationPage ds s cost d) ->
+renderChooseLocationPageString :: ChooseLocationPage Int -> String
+renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
     concatMap (\(d', r) -> renderDocumentsString d'
                            ++ "<p>then applied: " ++ renderRule r ++ "</p>") asInt
     ++ "<a name=\"target\"></a>"
@@ -374,18 +373,16 @@ renderPageString = \case
     ++ "<pre>" ++ s ++ "</pre>"
     ++ renderCost cost
     where asInt = (map . first . map . fmap) absurd ds
-  ChooseRewrite (ChooseRewritePage (ChooseLocationPage ds ss cost d) r) ->
-    concatMap (\(d', r') -> renderDocumentsString d'
-                            ++ "<p>then applied:" ++ renderRule r' ++ "</p>") asInt
-    ++ "<a name=\"target\"></a>"
-    ++ renderDocumentsString d
-    ++ "<pre>" ++ ss ++ "</pre>"
+
+renderPageString :: Page Int -> String
+renderPageString = \case
+  ChooseLocation clp -> renderChooseLocationPageString clp
+  ChooseRewrite (ChooseRewritePage clp r) ->
+    renderChooseLocationPageString clp
     ++ "<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
     ++ "</ul>"
-    ++ renderCost cost
-    where asInt = (map . first . map . fmap) absurd ds
-          renderRewrites = \case
+    where renderRewrites = \case
             Nothing -> "<p>No rewrites available for selected expression</p>"
             Just l -> foldr f "" l
               where f (s, s1, b) rrs = "<li>" ++ renderLink b s ++ s1 ++ "</li>" ++ rrs
