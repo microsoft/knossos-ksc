@@ -100,7 +100,6 @@ main = do
                  , "<li>show infix rendering and "
                  , "\"normal\" function call syntax</li>"
                  , "<li>leaderboard</li>"
-                 , "<li>show costs</li>"
                  , "<li>support non-rules optimisations, e.g. "
                  , "constant folding, let lifting/dropping"
                  , "</ul>"
