@@ -1543,12 +1543,12 @@ namespace ks
 		return t1 * t2;
 	}
 
-	inline double neg$aff(double t)
+	inline double neg$af(double t)
 	{
 		return -t;
 	}
 
-	inline int neg$aii(int t)
+	inline int neg$ai(int t)
 	{
 		return -t;
 	}
