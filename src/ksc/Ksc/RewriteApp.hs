@@ -141,10 +141,11 @@ removeLinks = \case
   Branch ds     -> Branch (map removeLinks ds)
 
 data ChooseLocationPage a =
-  ChooseLocationPage [([Document Void], Lang.TRule)]
-                     String
-                     (Either String Float)
-                     [Document a]
+  ChooseLocationPage { clpHistory :: [([Document Void], Lang.TRule)]
+                     , clpCStyle  :: String
+                     , clpCost    :: Either String Float
+                     , clpThisExp :: [Document a]
+                     }
   deriving Functor
 
 data ChooseRewritePage a =
