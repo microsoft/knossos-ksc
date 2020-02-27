@@ -301,7 +301,7 @@ data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
 
 data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
-  deriving (Eq, Ord)  -- type of the function.
+  deriving (Eq, Ord, Show)  -- type of the function.
 
 
 data Var
