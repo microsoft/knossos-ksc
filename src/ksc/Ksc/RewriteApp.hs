@@ -35,7 +35,6 @@ import qualified Data.Text.Lazy
 
 import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
 
-import           Control.Arrow (first)
 import           Control.Monad.Free (Free(Pure, Free), liftF)
 import qualified Control.Monad.Trans.State
 import           Control.Monad.Trans.State hiding (get)
@@ -141,7 +140,9 @@ removeLinks = \case
   Branch ds     -> Branch (map removeLinks ds)
 
 data ChooseLocationPage a =
-  ChooseLocationPage { clpHistory :: [([Document Void], Lang.TRule)]
+  ChooseLocationPage { clpHistory :: [([Document Void],
+                                       Either String Float,
+                                       Lang.TRule)]
                      , clpCStyle  :: String
                      , clpCost    :: Either String Float
                      , clpThisExp :: [Document a]
@@ -243,10 +244,14 @@ chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationModel
                           -> ChooseLocationPage [(Lang.TRule, Lang.TExpr)]
 chooseLocationPageOfModel r (es, e) =
-  ChooseLocationPage ((map . first) documentOfExpr es)
+  ChooseLocationPage (map (\(e', r') ->
+                             (documentOfExpr e', Ksc.Cost.cost e', r')) es)
                      (Lang.pps e)
                      (Ksc.Cost.cost e)
                      (rewrites r e)
+
+firstOf3 :: (a -> a') -> (a, b, c) -> (a', b, c)
+firstOf3 f (a, b, c) = (f a, b, c)
 
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
@@ -380,13 +385,15 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderChooseLocationPageString :: ChooseLocationPage Int -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
-    concatMap (\(d', r) -> renderDocumentsString d'
-                           ++ "<p>then applied: " ++ renderRule r ++ "</p>") asInt
+    concatMap (\(d', c, r) -> renderDocumentsString d'
+                              ++ renderCost c
+                              ++ "<p>then applied: " ++ renderRule r ++ "</p>")
+              asInt
     ++ "<a name=\"target\"></a>"
     ++ renderDocumentsString d
     ++ "<pre>" ++ s ++ "</pre>"
     ++ renderCost cost
-    where asInt = (map . first . map . fmap) absurd ds
+    where asInt = (map . firstOf3 . map . fmap) absurd ds
 
 renderPageString :: Page Int -> String
 renderPageString = \case
