@@ -239,22 +239,21 @@ rewrites rulebase e = (map . fmap) f (separate id e)
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
 
-chooseLocationPageOfModel :: (Lang.TExpr -> [Document a])
+chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationModel
-                          -> ChooseLocationPage a
-chooseLocationPageOfModel h (es, e) =
-  ChooseLocationPage ((map . first . map) removeLinks ((map . first) h es))
+                          -> ChooseLocationPage [(Lang.TRule, Lang.TExpr)]
+chooseLocationPageOfModel r (es, e) =
+  ChooseLocationPage ((map . first) documentOfExpr es)
                      (Lang.pps e)
                      (Ksc.Cost.cost e)
-                     (h e)
+                     (rewrites r e)
 
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
                    -> ChooseLocationPage ChooseRewriteModel
-chooseLocationPage r (es, e) = chooseLocationPageOfModel h (es, e)
-  where h :: Lang.TExpr -> [Document ChooseRewriteModel]
-        h = (fmap . fmap) ((,,) es e) . f
-        f = rewrites r
+chooseLocationPage r (es, e) =
+  mapLocationDocument g (chooseLocationPageOfModel r (es, e))
+  where g = (fmap . fmap) ((,,) es e)
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
@@ -262,13 +261,11 @@ chooseRewritePage :: Rules.RuleBase
                        (Either ChooseLocationModel ChooseRewriteModel)
 chooseRewritePage r (es, e, rs) =
            ChooseRewritePage
-           (mapLocationDocument g
-           (chooseLocationPageOfModel f (es, e)))
+           (mapLocationDocument g (chooseLocationPageOfModel r (es, e)))
            (fmap (\(r', e') -> (Lang.ru_name r',
                                 pretty r',
                                 Left (es ++ [(e, r')], e'))) rs)
   where pretty rule = ": " ++ renderRule rule
-        f = rewrites r
         g = (fmap . fmap) (\x -> Right (es, e, x))
 
 renderRule :: Lang.TRule -> String
