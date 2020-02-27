@@ -162,6 +162,11 @@ data Page a = ChooseLocation (ChooseLocationPage a)
             | ChooseRewrite (ChooseRewritePage a)
   deriving Functor
 
+mapLocationDocument :: ([Document a] -> [Document b])
+                    -> ChooseLocationPage a -> ChooseLocationPage b
+mapLocationDocument f (ChooseLocationPage ds s e d) =
+  ChooseLocationPage ds s e (f d)
+
 setList :: Int -> a -> [a] -> [a]
 setList i a as = zipWith f [1..] as
   where f j a' = if i == j then a else a'
@@ -230,16 +235,22 @@ rewrites rulebase e = (map . fmap) f (separate id e)
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
 
+chooseLocationPageOfModel :: (Lang.TExpr -> [Document a])
+                          -> ChooseLocationModel
+                          -> ChooseLocationPage a
+chooseLocationPageOfModel h (es, e) =
+  ChooseLocationPage ((map . first . map) removeLinks ((map . first) h es))
+                     (Lang.pps e)
+                     (Ksc.Cost.cost e)
+                     (h e)
+
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
                    -> ChooseLocationPage ChooseRewriteModel
-chooseLocationPage r (es, e) =
-  ChooseLocationPage ((map . first . map) removeLinks ((map . first) f es))
-                     (Lang.pps e)
-                     (Ksc.Cost.cost e)
-                     (f e)
-  where f :: Lang.TExpr -> [Document ChooseRewriteModel]
-        f = (fmap . fmap) ((,,) es e) . rewrites r
+chooseLocationPage r (es, e) = chooseLocationPageOfModel h (es, e)
+  where h :: Lang.TExpr -> [Document ChooseRewriteModel]
+        h = (fmap . fmap) ((,,) es e) . f
+        f = rewrites r
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
@@ -247,16 +258,14 @@ chooseRewritePage :: Rules.RuleBase
                        (Either ChooseLocationModel ChooseRewriteModel)
 chooseRewritePage r (es, e, rs) =
            ChooseRewritePage
-           (ChooseLocationPage
-           ((map . first . map) removeLinks ((map . first) f es))
-           (Lang.pps e)
-           (Ksc.Cost.cost e)
-           ((fmap . fmap) (\x -> Right (es, e, x)) (f e)))
+           (mapLocationDocument g
+           (chooseLocationPageOfModel f (es, e)))
            (fmap (\(r', e') -> (Lang.ru_name r',
                                 pretty r',
                                 Left (es ++ [(e, r')], e'))) rs)
   where pretty rule = ": " ++ renderRule rule
         f = rewrites r
+        g = (fmap . fmap) (\x -> Right (es, e, x))
 
 renderRule :: Lang.TRule -> String
 renderRule rule =
