@@ -42,6 +42,8 @@ import           Control.Monad.Trans.State hiding (get)
 import           Data.Void (Void, absurd)
 import qualified Data.List.NonEmpty as NEL
 
+import qualified Ksc.Cost (cost)
+
 typeCheck :: [Lang.Decl] -> IO [Lang.TDecl]
 typeCheck = fmap snd . KMonad.runKM . Annotate.annotDecls LangUtils.emptyGblST
 
@@ -100,6 +102,8 @@ main = do
                  , "\"normal\" function call syntax</li>"
                  , "<li>leaderboard</li>"
                  , "<li>show costs</li>"
+                 , "<li>support non-rules optimisations, e.g. "
+                 , "constant folding, let lifting/dropping"
                  , "</ul>"
                  , "</ul>"
                  ]
@@ -139,12 +143,14 @@ removeLinks = \case
 data ChooseLocationPage a =
   ChooseLocationPage [([Document Void], Lang.TRule)]
                      String
+                     (Either String Float)
                      [Document a]
   deriving Functor
 
 data ChooseRewritePage a =
   ChooseRewritePage [([Document Void], Lang.TRule)]
                     String
+                    (Either String Float)
                     [Document a]
                     [(String, String, a)]
   deriving Functor
@@ -233,6 +239,7 @@ chooseLocationPage :: Rules.RuleBase
 chooseLocationPage r (es, e) =
   ChooseLocationPage ((map . first . map) removeLinks ((map . first) f es))
                      (Lang.pps e)
+                     (Ksc.Cost.cost e)
                      (f e)
   where f :: Lang.TExpr -> [Document ChooseRewriteModel]
         f = (fmap . fmap) ((,,) es e) . rewrites r
@@ -245,6 +252,7 @@ chooseRewritePage r (es, e, rs) =
            ChooseRewritePage
            ((map . first . map) removeLinks ((map . first) f es))
            (Lang.pps e)
+           (Ksc.Cost.cost e)
            ((fmap . fmap) (\x -> Right (es, e, x)) (f e))
            (fmap (\(r', e') -> (Lang.ru_name r',
                                 pretty r',
@@ -337,17 +345,17 @@ traverseChooseLocationPage :: Applicative f
                            -> ChooseLocationPage a
                            -> f (ChooseLocationPage b)
 traverseChooseLocationPage f = \case
-  ChooseLocationPage ds s d ->
-    ChooseLocationPage ds s <$> (traverse . traverseDocument) f d
+  ChooseLocationPage ds s cost d ->
+    ChooseLocationPage ds s cost <$> (traverse . traverseDocument) f d
 
 traverseChooseRewritePage :: Applicative f
                           => (a -> f b)
                           -> ChooseRewritePage a
                           -> f (ChooseRewritePage b)
 traverseChooseRewritePage f = \case
-  ChooseRewritePage ds s d r ->
-    ChooseRewritePage ds s <$> (traverse . traverseDocument) f d
-                           <*> (traverse . traverse3of3) f r
+  ChooseRewritePage ds s cost d r ->
+    ChooseRewritePage ds s cost <$> (traverse . traverseDocument) f d
+                                <*> (traverse . traverse3of3) f r
 
 traversePage :: Applicative f
              => (a -> f b) -> Page a -> f (Page b)
@@ -360,14 +368,15 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderPageString :: Page Int -> String
 renderPageString = \case
-  ChooseLocation (ChooseLocationPage ds s d) ->
+  ChooseLocation (ChooseLocationPage ds s cost d) ->
     concatMap (\(d', r) -> renderDocumentsString d'
                            ++ "<p>then applied: " ++ renderRule r ++ "</p>") asInt
     ++ "<a name=\"target\"></a>"
     ++ renderDocumentsString d
     ++ "<pre>" ++ s ++ "</pre>"
+    ++ renderCost cost
     where asInt = (map . first . map . fmap) absurd ds
-  ChooseRewrite (ChooseRewritePage ds ss d r) ->
+  ChooseRewrite (ChooseRewritePage ds ss cost d r) ->
     concatMap (\(d', r') -> renderDocumentsString d'
                             ++ "<p>then applied:" ++ renderRule r' ++ "</p>") asInt
     ++ "<a name=\"target\"></a>"
@@ -376,11 +385,18 @@ renderPageString = \case
     ++ "<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
     ++ "</ul>"
+    ++ renderCost cost
     where asInt = (map . first . map . fmap) absurd ds
           renderRewrites = \case
             Nothing -> "<p>No rewrites available for selected expression</p>"
             Just l -> foldr f "" l
               where f (s, s1, b) rrs = "<li>" ++ renderLink b s ++ s1 ++ "</li>" ++ rrs
+
+renderCost :: Either String Float -> String
+renderCost s = "<p>" ++ costString s ++ "</p>"
+  where costString = \case
+          Left err -> "Error calculating cost: " ++ err
+          Right c  -> "Cost: " ++ show c
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
