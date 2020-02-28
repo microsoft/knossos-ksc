@@ -135,7 +135,10 @@ main = do
 
       html (mconcat ss)
     get "/upload.html" $ do
-      html $ mconcat [ "<form action=\"/do-upload\" "
+      html $ mconcat [ "<p>The body of the function called \""
+                     , fromString functionName
+                     , "\" in your file will be used as the test expression</p>"
+                     , "<form action=\"/do-upload\" "
                      , "enctype=\"multipart/form-data\" method=\"POST\">"
                      , "<input type=\"file\" name=\"file\">"
                      , "<input type=\"submit\">"
