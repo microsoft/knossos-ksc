@@ -52,8 +52,11 @@ match_e vsubst tsubst (Var v) e
   = do { guard (e == e2)
        ; return tsubst }
 
-  | otherwise
+  | typeof v == typeof e
   = return (M.insert v e tsubst)
+
+  | otherwise
+  = Nothing
 
 match_e _ tsubst (Konst k1) (Konst k2)
   = do { guard (k1 == k2)
