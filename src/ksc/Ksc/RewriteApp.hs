@@ -186,18 +186,15 @@ separate :: (Lang.TExpr -> e)
          -> [Document (Lang.TExpr, Lang.TExpr -> e)]
 separate k ee = case ee of
      Lang.Call ff@(Lang.TFun _ f) e ->
-       [Left' "("]
-       <> [Branch $ [link (nameOfFun f), Left' " "] <> rewrites_]
-       <> [Left' ")"]
+       parens [Branch $ [link (nameOfFun f), Left' " "] <> rewrites_]
        where k' = k . Lang.Call ff
              rewrites_ = case e of
                 Lang.Tuple es -> separateTuple k' es
                 _ -> separate k' e
 
-     Lang.Tuple es -> [Left' "("] <> [link "tuple"]
+     Lang.Tuple es -> parens $ [link "tuple"]
                       <> [Left' " "]
                       <> separateTuple k es
-                      <> [Left' ")"]
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
        Lang.KFloat f -> [Branch [link (show f)]]
@@ -207,21 +204,18 @@ separate k ee = case ee of
      Lang.Let v rhs body ->
        let rhs'  = separate  (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
            body' = separate  (\body'' -> k (Lang.Let v rhs body'')) body
-       in [Left' "("]
-          <> [Branch $
-              [link "let"] <> [Left' (" (" ++ show v ++ " ")]
-              <> rhs' <> [Left' ") "]
-              <> body']
-          <> [Left' ")"]
+       in parens [Branch $
+                 intercalate [Left' " "]
+                   [ [link "let"]
+                   , parens ([Left' (show v ++ " ")] <> rhs')
+                   , body' ]]
      Lang.If c t f ->
        let c' = separate (\c'' -> k (Lang.If c'' t f)) c
            t' = separate (\t'' -> k (Lang.If c t'' f)) t
            f' = separate (\f'' -> k (Lang.If c f'' f)) f
-       in [Left' "("]
-          <> [Branch $
-               [link "if"] <> [Left' " "]
-               <> intercalate [Left' " "] [c', t', f']]
-          <> [Left' ")"]
+       in parens [Branch $
+                  [link "if"] <> [Left' " "]
+                  <> intercalate [Left' " "] [c', t', f']]
 
      Lang.App{}    -> unsupported "App"
      Lang.Lam{}    -> unsupported "Lam"
@@ -229,6 +223,7 @@ separate k ee = case ee of
      Lang.Dummy{}  -> unsupported "Dummy"
      where unsupported s = error ("We don't do " ++ s)
            link s = Right' (s, (ee, k))
+           parens s = [Left' "("] <> s <> [Left' ")"]
 
 -- For avoiding "(tuple ...)" around multiple arguments
 separateTuple :: (Lang.TExpr -> e)
