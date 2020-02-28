@@ -395,17 +395,26 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderChooseLocationPageString :: ChooseLocationPage Int -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
+    "<table style=\"border-collapse: collapse\">" ++
     concatMap (\(HistoryEntry d' cstyle c r) ->
-                 renderDocumentsString d'
-                 ++ "<pre>" ++ cstyle ++ "</pre>"
-                 ++ renderCost c
-                 ++ "<p>then applied: " ++ renderRule r ++ "</p>")
+                 tr (td (renderCost c)
+                     <> td (renderDocumentsString d')
+                     <> td ("<pre>" ++ cstyle ++ "</pre>"))
+                 <>
+                 tr (td ""
+                     <> td ("<p>then applied: " ++ renderRule r ++ "</p>")
+                     <> td "")
+              )
               asInt
+    ++ "</table>"
     ++ "<a name=\"target\"></a>"
     ++ renderDocumentsString d
     ++ "<pre>" ++ s ++ "</pre>"
     ++ renderCost cost
     where asInt = (map . overheSExp . map . fmap) absurd ds
+
+          td s' = "<td style=\"border: 1px solid black;\">" ++ s' ++ "</td>"
+          tr s' = "<tr>" ++ s' ++ "</tr>"
 
 renderPageString :: Page Int -> String
 renderPageString = \case
