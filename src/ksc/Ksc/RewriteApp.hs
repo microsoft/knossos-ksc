@@ -192,9 +192,9 @@ separate k ee = case ee of
                 Lang.Tuple es -> separateTuple k' es
                 _ -> separate k' e
 
-     Lang.Tuple es -> parens $ [link "tuple"]
+     Lang.Tuple es -> parens [Branch $ [link "tuple"]
                       <> [Left' " "]
-                      <> separateTuple k es
+                      <> separateTuple k es]
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
        Lang.KFloat f -> [Branch [link (show f)]]
@@ -214,8 +214,7 @@ separate k ee = case ee of
            t' = separate (\t'' -> k (Lang.If c t'' f)) t
            f' = separate (\f'' -> k (Lang.If c f'' f)) f
        in parens [Branch $
-                  [link "if"] <> [Left' " "]
-                  <> intercalate [Left' " "] [c', t', f']]
+                  intercalate [Left' " "] [ [link "if"], c', t', f'] ]
 
      Lang.App{}    -> unsupported "App"
      Lang.Lam{}    -> unsupported "Lam"
