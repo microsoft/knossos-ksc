@@ -33,7 +33,10 @@ import           Data.IORef (newIORef, atomicModifyIORef)
 import           Data.String (fromString)
 import qualified Data.Text.Lazy
 
-import           Web.Scotty (scotty, get, liftAndCatchIO, html, param)
+import qualified Web.Scotty
+import           Web.Scotty (scotty, get, liftAndCatchIO, html, param, post)
+import qualified Network.Wai.Parse
+import qualified Data.ByteString.Lazy.Char8
 
 import           Control.Monad.Free (Free(Pure, Free), liftF)
 import qualified Control.Monad.Trans.State
@@ -46,8 +49,8 @@ import qualified Ksc.Cost (cost)
 typeCheck :: [Lang.Decl] -> IO [Lang.TDecl]
 typeCheck = fmap snd . KMonad.runKM . Annotate.annotDecls LangUtils.emptyGblST
 
-parse :: [String] -> IO [Lang.Decl]
-parse = fmap concat . mapM Parse.parseF
+parseS :: [String] -> [Lang.Decl]
+parseS = concat . map Parse.parseS
 
 userFuns :: [Lang.DeclX p] -> [(String, Lang.ExprX p)]
 userFuns = mapMaybe $ \case
@@ -64,7 +67,13 @@ mkRuleBase = Rules.mkRuleBase . mapMaybe (\case
 
 readProgram :: String -> String -> IO (Lang.TExpr, Rules.RuleBase)
 readProgram sourceFile functionName = do
-  tc_decls <- typeCheck =<< parse [ "src/runtime/prelude.ks", sourceFile ]
+  sourceFileContent <- readFile sourceFile
+  readProgramS sourceFileContent functionName
+
+readProgramS :: String -> String -> IO (Lang.TExpr, Rules.RuleBase)
+readProgramS sourceFileContent functionName = do
+  prelude <- readFile "src/runtime/prelude.ks"
+  tc_decls <- typeCheck (parseS [prelude, sourceFileContent])
 
   let rules = mkRuleBase tc_decls
 
@@ -81,7 +90,8 @@ main = do
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
 
-  let link = "<p><a href=\"/\">Start again</a></p>"
+  let link = "<p><a href=\"/\">Start again</a> "
+             <> " or <a href=\"/upload.html\">upload a file</a></p>"
 
       comments = [ link
                  , "<ul>"
@@ -124,6 +134,30 @@ main = do
                     in  (m', comments ++ [Data.Text.Lazy.pack s])
 
       html (mconcat ss)
+    get "/upload.html" $ do
+      html $ mconcat [ "<form action=\"/do-upload\" "
+                     , "enctype=\"multipart/form-data\" method=\"POST\">"
+                     , "<input type=\"file\" name=\"file\">"
+                     , "<input type=\"submit\">"
+                     , "</form>" ]
+    post "/do-upload" $ do
+      uploadedFileContentM <- readUploadedFile "file"
+      let uploadedFileContent = case uploadedFileContentM of
+            Just s  -> s
+            Nothing -> error "Couldn't find uploaded file"
+
+      (prog, rules) <- liftAndCatchIO $ readProgramS uploadedFileContent functionName
+      s <- withMap (\m -> renderPages m (chooseLocationPages rules ([], prog)))
+
+      html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+
+readUploadedFile :: Data.Text.Lazy.Text
+                 -> Web.Scotty.ActionM (Maybe String)
+readUploadedFile fieldname = do
+  uploadedFiles <- Web.Scotty.files
+  return $ fmap (Data.ByteString.Lazy.Char8.unpack
+                 . Network.Wai.Parse.fileContent)
+                $ lookup fieldname uploadedFiles
 
 data Document a = Left' String
                 | Right' (String, a)
