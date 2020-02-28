@@ -154,8 +154,7 @@ data ChooseRewritePage a =
 
 type ChooseLocationModel = ([(Lang.TExpr, Lang.TRule)], Lang.TExpr)
 
-type ChooseRewriteModel = ([(Lang.TExpr, Lang.TRule)],
-                           Lang.TExpr,
+type ChooseRewriteModel = (ChooseLocationModel,
                            [(Lang.TRule, Lang.TExpr)])
 
 data Page a = ChooseLocation (ChooseLocationPage a)
@@ -261,18 +260,18 @@ chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationPage ChooseRewriteModel
 chooseLocationPage r (es, e) =
   mapLocationDocument g (chooseLocationPageOfModel r (es, e))
-  where g = (fmap . fmap) ((,,) es e)
+  where g = (fmap . fmap) ((,) (es, e))
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
                   -> ChooseRewritePage
                        (Either ChooseLocationModel ChooseRewriteModel)
-chooseRewritePage r (es, e, rs) =
+chooseRewritePage r ((es, e), rs) =
            ChooseRewritePage
            (mapLocationDocument g (chooseLocationPageOfModel r (es, e)))
            (fmap f rs)
   where pretty rule = ": " ++ renderRule rule
-        g = (fmap . fmap) (\x -> Right (es, e, x))
+        g = (fmap . fmap) (\x -> Right ((es, e), x))
 
         f :: (Lang.TRule, texpr)
           -> (String, String, Either ([(Lang.TExpr, Lang.TRule)], texpr) void)
