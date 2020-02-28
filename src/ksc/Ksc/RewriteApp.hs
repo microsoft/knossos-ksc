@@ -414,7 +414,8 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
     ++ "</table>"
     where asInt = (map . overheSExp . map . fmap) absurd ds
 
-          td s' = "<td style=\"border: 1px solid black;\">" ++ s' ++ "</td>"
+          td s' = "<td style=\"border: 1px solid black; "
+                  ++ "padding: 0.5em\">" ++ s' ++ "</td>"
           tr s' = "<tr>" ++ s' ++ "</tr>"
 
 renderPageString :: Page Int -> String
