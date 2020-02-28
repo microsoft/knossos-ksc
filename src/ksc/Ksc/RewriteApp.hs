@@ -396,6 +396,7 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 renderChooseLocationPageString :: ChooseLocationPage Int -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
     "<table style=\"border-collapse: collapse\">" ++
+    tr "<th>Cost</th><th>IR</th><th>Infix</th>" ++
     concatMap (\(HistoryEntry d' cstyle c r) ->
                  tr (td (renderCost c)
                      <> td (renderDocumentsString d')
@@ -433,7 +434,7 @@ renderCost :: Either String Float -> String
 renderCost s = "<p>" ++ costString s ++ "</p>"
   where costString = \case
           Left err -> "Error calculating cost: " ++ err
-          Right c  -> "Cost: " ++ show c
+          Right c  -> show c
 
 renderPages :: Data.Map.Map Int (Free Page Void)
             -> Free Page Void
