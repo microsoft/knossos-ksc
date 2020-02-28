@@ -48,6 +48,8 @@ size = \case
 costFun :: Lang.TFun -> Lang.Type -> Either String Float
 costFun f t
   | f `isThePrimFun` "add"    = fmap fromIntegral (size t)
+  | f `isThePrimFun` "and"    = fmap fromIntegral (size t)
+  | f `isThePrimFun` "or"     = fmap fromIntegral (size t)
   | f `isTheUserFun` "mul@ff" = fmap fromIntegral (size t)
   | f `isTheUserFun` "h"      = pure 10
   | otherwise = Left ("Unknown function: " ++ show f)
