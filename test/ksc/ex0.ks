@@ -30,6 +30,18 @@
       (if c (tuple a1 a2) (tuple b1 b2))
       (tuple (if c a1 b1) (if c a2 b2)))
 
+(rule "or.intro" (p : Bool) p (or p false))
+(rule "or.elim" (p : Bool) (or p false) p)
+
+(rule "and.intro" (p : Bool) p (and p false))
+(rule "and.elim" (p : Bool) (and p false) p)
+
+(rule "if.true.elim" ((t : Float) (f : Float))
+      (if true t f) t)
+
+(rule "if.false.elim" ((t : Float) (f : Float))
+      (if false t f) f)
+
 (def f (Tuple Float Float (Tuple Float Float)) (x : Float)
      (tuple (mul@ff 0.0 (let (a 2.0) a)) (add (mul@ff 5.0 2.0) 0.0)
             (tuple (if true 2.0 5.0) (if true 7.0 11.0))
