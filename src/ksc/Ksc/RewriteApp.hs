@@ -212,10 +212,18 @@ separate k ee = case ee of
               <> rhs' <> [Left' ") "]
               <> body']
           <> [Left' ")"]
+     Lang.If c t f ->
+       let c' = separate (\c'' -> k (Lang.If c'' t f)) c
+           t' = separate (\t'' -> k (Lang.If c t'' f)) t
+           f' = separate (\f'' -> k (Lang.If c f'' f)) f
+       in [Left' "("]
+          <> [Branch $
+               [link "if"] <> [Left' " "]
+               <> intercalate [Left' " "] [c', t', f']]
+          <> [Left' ")"]
 
      Lang.App{}    -> unsupported "App"
      Lang.Lam{}    -> unsupported "Lam"
-     Lang.If{}     -> unsupported "If"
      Lang.Assert{} -> unsupported "Assert"
      Lang.Dummy{}  -> unsupported "Dummy"
      where unsupported s = error ("We don't do " ++ s)

@@ -24,7 +24,7 @@
 
 (def f (Tuple Float Float Float) (x : Float)
      (tuple (mul@ff 0.0 (let (a 2.0) a)) (add (mul@ff 5.0 2.0) 0.0)
-            (h 0.0)
+            (if true (h 0.0) 0.0)
             ))
 
 ; (rule "mult" (v : Float) (mul@ff (tuple v 2.0)) (add v v))
