@@ -181,13 +181,12 @@ tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
 separate :: (Lang.TExpr -> e)
          -> Lang.TExpr
          -> [Document (Lang.TExpr, Lang.TExpr -> e)]
-separate k = \case
-     c@(Lang.Call ff@(Lang.TFun _ f) e) ->
+separate k ee = case ee of
+     Lang.Call ff@(Lang.TFun _ f) e ->
        [Left' "("]
-       <> [Branch $ [Right' fAndSeparated, Left' " "] <> rewrites_]
+       <> [Branch $ [link (nameOfFun f), Left' " "] <> rewrites_]
        <> [Left' ")"]
-       where fAndSeparated = (nameOfFun f, (c, k))
-             nameOfFun = Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
+       where nameOfFun = Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
              k' = k . Lang.Call ff
              rewrites_ = case e of
                 Lang.Tuple es -> separateTuple k' es
@@ -197,17 +196,17 @@ separate k = \case
                       <> separateTuple k es
                       <> [Left' ")"]
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
-     e@(Lang.Konst c) -> case c of
-       Lang.KFloat f -> [Branch [Right' (show f, (e, k))]]
+     Lang.Konst c -> case c of
+       Lang.KFloat f -> [Branch [link (show f)]]
        Lang.KBool b -> [Left' (show b)]
        Lang.KString s -> [Left' (show s)]
        Lang.KInteger i -> [Left' (show i)]
-     e@(Lang.Let v rhs body) ->
+     Lang.Let v rhs body ->
        let rhs'  = separate  (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
            body' = separate  (\body'' -> k (Lang.Let v rhs body'')) body
        in [Left' "("]
           <> [Branch $
-              [Right' ("let", (e, k))] <> [Left' (" (" ++ show v ++ " ")]
+              [link "let"] <> [Left' (" (" ++ show v ++ " ")]
               <> rhs' <> [Left' ") "]
               <> body']
           <> [Left' ")"]
@@ -218,6 +217,7 @@ separate k = \case
      Lang.Assert{} -> unsupported "Assert"
      Lang.Dummy{}  -> unsupported "Dummy"
      where unsupported s = error ("We don't do " ++ s)
+           link s = Right' (s, (ee, k))
 
 -- For avoiding "(tuple ...)" around multiple arguments
 separateTuple :: (Lang.TExpr -> e)
