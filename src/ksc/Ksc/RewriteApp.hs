@@ -397,24 +397,19 @@ renderChooseLocationPageString :: ChooseLocationPage Int -> String -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
     "<table style=\"border-collapse: collapse\">" ++
     tr "<th>Cost</th><th>IR</th><th>Infix</th>" ++
-    concatMap (\(HistoryEntry d' cstyle c r) ->
-                 tr (td (renderCost c)
-                     <> td (renderDocumentsString d')
-                     <> td ("<pre>" ++ cstyle ++ "</pre>"))
-                 <>
-                 tr (td ""
-                     <> td ("<p>then applied: " ++ renderRule r ++ "</p>")
-                     <> td "")
-              )
-              asInt
+    flip concatMap ds (\(HistoryEntry d' cstyle c r) ->
+      let ir = renderDocumentsString ((map . fmap) absurd d')
+          infix_ = "<pre>" ++ cstyle ++ "</pre>"
+          appliedRule = "<p>then applied: " ++ renderRule r ++ "</p>"
+      in concatMap (tr . concatMap td)
+      [[renderCost c, ir,          infix_ ],
+       ["",           appliedRule, ""     ]])
     ++ tr (td (renderCost cost)
           <> td ("<a name=\"target\"></a>" <> renderDocumentsString d
                 <> rewriteChoices)
           <> td ("<pre>" ++ s ++ "</pre>"))
     ++ "</table>"
-    where asInt = (map . overheSExp . map . fmap) absurd ds
-
-          td s' = "<td style=\"border: 1px solid black; "
+    where td s' = "<td style=\"border: 1px solid black; "
                   ++ "padding: 0.5em\">" ++ s' ++ "</td>"
           tr s' = "<tr>" ++ s' ++ "</tr>"
 
