@@ -242,15 +242,17 @@ chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationModel
                           -> ChooseLocationPage [(Lang.TRule, Lang.TExpr)]
 chooseLocationPageOfModel r (es, e) =
-  ChooseLocationPage (map (\(e', r') ->
-                             (documentOfExpr e',
-                              Lang.pps e',
-                              Ksc.Cost.cost e',
-                              r'))
-                          es)
-                     (Lang.pps e)
-                     (Ksc.Cost.cost e)
-                     (rewrites r e)
+  ChooseLocationPage {
+    clpHistory = map (\(e', r') ->
+                         (documentOfExpr e',
+                          Lang.pps e',
+                          Ksc.Cost.cost e',
+                          r'))
+                     es
+  , clpCStyle  = Lang.pps e
+  , clpCost    = Ksc.Cost.cost e
+  , clpThisExp = rewrites r e
+  }
 
 firstOf4 :: (a -> a') -> (a, b, c, d) -> (a', b, c, d)
 firstOf4 f (a, b, c, d) = (f a, b, c, d)
