@@ -136,11 +136,15 @@ removeLinks = \case
   Right' (s, _) -> Left' s
   Branch ds     -> Branch (map removeLinks ds)
 
+data HistoryEntry = HistoryEntry {
+    heSExp   :: [Document Void]
+  , heCstyle :: String
+  , heCost   :: Either String Float
+  , heRule   :: Lang.TRule
+  }
+
 data ChooseLocationPage a =
-  ChooseLocationPage { clpHistory :: [([Document Void],
-                                       String,
-                                       Either String Float,
-                                       Lang.TRule)]
+  ChooseLocationPage { clpHistory :: [HistoryEntry]
                      , clpCStyle  :: String
                      , clpCost    :: Either String Float
                      , clpThisExp :: [Document a]
@@ -241,14 +245,15 @@ rewrites rulebase e = (map . fmap) f (separate id e)
 chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationModel
                           -> ChooseLocationPage [(Lang.TRule, Lang.TExpr)]
-chooseLocationPageOfModel r (es, e) =
+chooseLocationPageOfModel r (es_rs, e) =
   ChooseLocationPage {
     clpHistory = map (\(e', r') ->
-                         (documentOfExpr e',
-                          Lang.pps e',
-                          Ksc.Cost.cost e',
-                          r'))
-                     es
+      HistoryEntry {
+          heSExp   = documentOfExpr e'
+        , heCstyle = Lang.pps e'
+        , heCost   = Ksc.Cost.cost e'
+        , heRule   = r'
+      }) es_rs
   , clpCStyle  = Lang.pps e
   , clpCost    = Ksc.Cost.cost e
   , clpThisExp = rewrites r e
