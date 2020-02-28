@@ -277,14 +277,13 @@ chooseRewritePage r ((es, e), rs) =
            ChooseRewritePage
            (mapLocationDocument g (chooseLocationPageOfModel r (es, e)))
            (fmap f rs)
-  where pretty rule = ": " ++ renderRule rule
-        g = (fmap . fmap) (\x -> Right ((es, e), x))
+  where g = (fmap . fmap) (\x -> Right ((es, e), x))
 
         f :: (Lang.TRule, texpr)
           -> (String, String, Either ([(Lang.TExpr, Lang.TRule)], texpr) void)
-        f = (\(r', e') -> (Lang.ru_name r',
-                           pretty r',
-                           Left (es ++ [(e, r')], e')))
+        f (r', e') = (Lang.ru_name r',
+                      ": " ++ renderRule r',
+                      Left (es ++ [(e, r')], e'))
 
 renderRule :: Lang.TRule -> String
 renderRule rule =
