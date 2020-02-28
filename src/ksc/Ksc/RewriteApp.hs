@@ -178,6 +178,9 @@ tryRules :: Rules.RuleBase -> Lang.TExpr -> [(Lang.TRule, Lang.TExpr)]
 tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
                     . Rules.tryRulesMany rulebase
 
+nameOfFun :: Lang.Fun -> String
+nameOfFun = takeWhile (/= '@') . Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
+
 separate :: (Lang.TExpr -> e)
          -> Lang.TExpr
          -> [Document (Lang.TExpr, Lang.TExpr -> e)]
@@ -186,8 +189,7 @@ separate k ee = case ee of
        [Left' "("]
        <> [Branch $ [link (nameOfFun f), Left' " "] <> rewrites_]
        <> [Left' ")"]
-       where nameOfFun = Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
-             k' = k . Lang.Call ff
+       where k' = k . Lang.Call ff
              rewrites_ = case e of
                 Lang.Tuple es -> separateTuple k' es
                 _ -> separate k' e
