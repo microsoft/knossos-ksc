@@ -209,11 +209,12 @@ separate k = \case
               <> body']
           <> [Left' ")"]
 
-     Lang.App _ _ -> error "We don't do App"
-     Lang.Lam _ _ -> error "We don't do Lam"
-     Lang.If _ _ _ -> error "We don't do If"
-     Lang.Assert _ _ -> error "We don't do Assert"
-     Lang.Dummy _ -> error "We don't do Dummy"
+     Lang.App{}    -> unsupported "App"
+     Lang.Lam{}    -> unsupported "Lam"
+     Lang.If{}     -> unsupported "If"
+     Lang.Assert{} -> unsupported "Assert"
+     Lang.Dummy{}  -> unsupported "Dummy"
+     where unsupported s = error ("We don't do " ++ s)
 
 -- For avoiding "(tuple ...)" around multiple arguments
 separateTuple :: (Lang.TExpr -> e)
