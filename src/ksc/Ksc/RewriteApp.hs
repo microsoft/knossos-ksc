@@ -195,8 +195,8 @@ separate k ee = case ee of
      Lang.Tuple es -> sexpr "tuple" [separateTuple k es]
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
-       Lang.KFloat f -> [Branch [link (show f)]]
-       Lang.KBool b -> [Left' (show b)]
+       Lang.KFloat f -> sexprnp (show f) []
+       Lang.KBool b -> sexprnp (show b) []
        Lang.KString s -> [Left' (show s)]
        Lang.KInteger i -> [Left' (show i)]
      Lang.Let v rhs body ->
@@ -216,8 +216,8 @@ separate k ee = case ee of
      where unsupported s = error ("We don't do " ++ s)
            link s = Right' (s, (ee, k))
            parens s = [Left' "("] <> s <> [Left' ")"]
-           sexpr car cdr =
-             parens [Branch $ intercalate [Left' " "] ([link car]:cdr)]
+           sexpr car cdr = parens (sexprnp car cdr)
+           sexprnp car cdr = [Branch $ intercalate [Left' " "] ([link car]:cdr)]
 
 
 -- For avoiding "(tuple ...)" around multiple arguments
