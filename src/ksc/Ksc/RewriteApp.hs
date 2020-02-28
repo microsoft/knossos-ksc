@@ -393,8 +393,8 @@ traversePage f = \case
 traverse3of3 :: Functor f => (c -> f c') -> (a, b, c) -> f (a, b, c')
 traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
-renderChooseLocationPageString :: ChooseLocationPage Int -> String
-renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
+renderChooseLocationPageString :: ChooseLocationPage Int -> String -> String
+renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
     "<table style=\"border-collapse: collapse\">" ++
     tr "<th>Cost</th><th>IR</th><th>Infix</th>" ++
     concatMap (\(HistoryEntry d' cstyle c r) ->
@@ -407,11 +407,11 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
                      <> td "")
               )
               asInt
+    ++ tr (td (renderCost cost)
+          <> td ("<a name=\"target\"></a>" <> renderDocumentsString d
+                <> rewriteChoices)
+          <> td ("<pre>" ++ s ++ "</pre>"))
     ++ "</table>"
-    ++ "<a name=\"target\"></a>"
-    ++ renderDocumentsString d
-    ++ "<pre>" ++ s ++ "</pre>"
-    ++ renderCost cost
     where asInt = (map . overheSExp . map . fmap) absurd ds
 
           td s' = "<td style=\"border: 1px solid black;\">" ++ s' ++ "</td>"
@@ -419,12 +419,12 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
 
 renderPageString :: Page Int -> String
 renderPageString = \case
-  ChooseLocation clp -> renderChooseLocationPageString clp
+  ChooseLocation clp -> renderChooseLocationPageString clp ""
   ChooseRewrite (ChooseRewritePage clp r) ->
     renderChooseLocationPageString clp
-    ++ "<ul>"
+      ("<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
-    ++ "</ul>"
+    ++ "</ul>")
     where renderRewrites = \case
             Nothing -> "<p>No rewrites available for selected expression</p>"
             Just l -> concatMap f l
