@@ -194,7 +194,8 @@ separate k ee = case ee of
                 Lang.Tuple es -> separateTuple k' es
                 _ -> separate k' e
 
-     Lang.Tuple es -> [Left' "(tuple "]
+     Lang.Tuple es -> [Left' "("] <> [link "tuple"]
+                      <> [Left' " "]
                       <> separateTuple k es
                       <> [Left' ")"]
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]

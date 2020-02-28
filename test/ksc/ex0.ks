@@ -22,9 +22,17 @@
 (rule "let.elim" ((e : Float) (a : Float))
       (let (a e) a) e)
 
-(def f (Tuple Float Float Float) (x : Float)
+(rule "tuple.if" ((c : Bool) (a1 : Float) (a2 : Float) (b1 : Float) (b2 : Float))
+      (tuple (if c a1 b1) (if c a2 b2))
+      (if c (tuple a1 a2) (tuple b1 b2)))
+
+(rule "if.tuple" ((c : Bool) (a1 : Float) (a2 : Float) (b1 : Float) (b2 : Float))
+      (if c (tuple a1 a2) (tuple b1 b2))
+      (tuple (if c a1 b1) (if c a2 b2)))
+
+(def f (Tuple Float Float (Tuple Float Float)) (x : Float)
      (tuple (mul@ff 0.0 (let (a 2.0) a)) (add (mul@ff 5.0 2.0) 0.0)
-            (if true (h 0.0) 0.0)
+            (tuple (if true 2.0 5.0) (if true 7.0 11.0))
             ))
 
 ; (rule "mult" (v : Float) (mul@ff (tuple v 2.0)) (add v v))
