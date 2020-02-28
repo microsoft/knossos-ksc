@@ -783,7 +783,7 @@ pprParendExpr :: InPhase p => ExprX p -> SDoc
 pprParendExpr = pprExpr precTop
 
 pprTVar :: TVarX -> SDoc
-pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
+pprTVar (TVar _ v) = ppr v
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
@@ -801,7 +801,8 @@ pprExpr p (Let v e1 e2) = mode
     precZero
     (vcat
       [ text "let"
-        <+> (bracesSp $ pprLetBndr @phase v <+> nest 2 (text "=" <+> ppr e1))
+        <+> (pprLetBndr @phase v <+> nest 2 (text "=" <+> ppr e1))
+        <+> text "in"
         <+> ppr e2
       ]
     )
