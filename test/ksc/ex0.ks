@@ -46,8 +46,8 @@
 (rule "or.intro" (p : Bool) p (or p false))
 (rule "or.elim" (p : Bool) (or p false) p)
 
-(rule "and.intro" (p : Bool) p (and p false))
-(rule "and.elim" (p : Bool) (and p false) p)
+(rule "and.intro" (p : Bool) p (and p true))
+(rule "and.elim" (p : Bool) (and p true) p)
 
 (rule "if.true.elim" ((t : Float) (f : Float))
       (if true t f) t)
