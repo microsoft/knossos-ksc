@@ -136,15 +136,15 @@ removeLinks = \case
   Right' (s, _) -> Left' s
   Branch ds     -> Branch (map removeLinks ds)
 
-data HistoryEntry = HistoryEntry {
-    heSExp   :: [Document Void]
+data HistoryEntry a = HistoryEntry {
+    heSExp   :: [Document a]
   , heCstyle :: String
   , heCost   :: Either String Float
   , heRule   :: Lang.TRule
   }
 
 data ChooseLocationPage a =
-  ChooseLocationPage { clpHistory :: [HistoryEntry]
+  ChooseLocationPage { clpHistory :: [HistoryEntry Void]
                      , clpCStyle  :: String
                      , clpCost    :: Either String Float
                      , clpThisExp :: [Document a]
@@ -259,8 +259,10 @@ chooseLocationPageOfModel r (es_rs, e) =
   , clpThisExp = rewrites r e
   }
 
-firstOf4 :: (a -> a') -> (a, b, c, d) -> (a', b, c, d)
-firstOf4 f (a, b, c, d) = (f a, b, c, d)
+overheSExp :: ([Document a] -> [Document b])
+           -> HistoryEntry a
+           -> HistoryEntry b
+overheSExp f (HistoryEntry a b c d) = HistoryEntry (f a) b c d
 
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
@@ -393,7 +395,7 @@ traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderChooseLocationPageString :: ChooseLocationPage Int -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
-    concatMap (\(d', cstyle, c, r) ->
+    concatMap (\(HistoryEntry d' cstyle c r) ->
                  renderDocumentsString d'
                  ++ "<pre>" ++ cstyle ++ "</pre>"
                  ++ renderCost c
@@ -403,7 +405,7 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost d) =
     ++ renderDocumentsString d
     ++ "<pre>" ++ s ++ "</pre>"
     ++ renderCost cost
-    where asInt = (map . firstOf4 . map . fmap) absurd ds
+    where asInt = (map . overheSExp . map . fmap) absurd ds
 
 renderPageString :: Page Int -> String
 renderPageString = \case
