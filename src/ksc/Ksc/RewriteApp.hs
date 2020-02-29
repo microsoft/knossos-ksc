@@ -243,7 +243,7 @@ separate k ee = case ee of
      Lang.If c t f ->
        let c' = separate (\c'' -> k (Lang.If c'' t f)) c
            t' = separate (\t'' -> k (Lang.If c t'' f)) t
-           f' = separate (\f'' -> k (Lang.If c f'' f)) f
+           f' = separate (\f'' -> k (Lang.If c t f'')) f
        in sexpr "if" [c', t', f']
 
      Lang.App{}    -> unsupported "App"
