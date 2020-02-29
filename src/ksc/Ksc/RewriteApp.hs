@@ -355,8 +355,7 @@ rewrites rulebase e = (map . fmap) f (separateWrapped id id e)
 
 chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationModel
-                          -> ChooseLocationPage ([Document (Wrapped Lang.TExpr e)],
-                                                  [(Lang.TRule, Lang.TExpr)])
+                          -> ChooseLocationPage ChooseRewriteModel
 chooseLocationPageOfModel r clm =
   ChooseLocationPage {
     clpHistory = map (\(e', r') ->
@@ -368,7 +367,11 @@ chooseLocationPageOfModel r clm =
       }) es_rs
   , clpCStyle  = Lang.pps e
   , clpCost    = Ksc.Cost.cost e
-  , clpThisExp = rewrites r e
+  , clpThisExp = flip (fmap . fmap) (rewrites r e) $ \(d, rs) ->
+      ChooseRewriteModel { crmClm = clm
+                         , crmHighlighted = d
+                         , crmRewrites = rs
+                         }
   }
   where ChooseLocationModel { clmHistory = es_rs
                             , clmCurrent = e
@@ -384,11 +387,7 @@ chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationPage ChooseRewriteModel
 chooseLocationPage r clm =
   mapLocationDocument g (chooseLocationPageOfModel r clm)
-  where g = (fmap . fmap) (\(d, rs) ->
-                             ChooseRewriteModel { crmClm = clm
-                                                , crmHighlighted = d
-                                                , crmRewrites = rs
-                                                })
+  where g = (fmap . fmap) (id)
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
@@ -400,11 +399,7 @@ chooseRewritePage r crm =
     , crpHigLighted = dd
     , crpRewrites = fmap f rs
     }
-  where g = (fmap . fmap) (\(d, rs) ->
-          Right ChooseRewriteModel { crmClm = clm
-                                   , crmHighlighted = d
-                                   , crmRewrites = rs
-                                   })
+  where g = (fmap . fmap) Right
 
         f :: (Lang.TRule, Lang.TExpr)
           -> (String, String, Either ChooseLocationModel void)
