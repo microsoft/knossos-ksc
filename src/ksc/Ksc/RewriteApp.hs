@@ -121,7 +121,10 @@ main = do
   scotty 3000 $ do
     get "/" $ do
       (prog, rules) <- liftAndCatchIO $ readProgram sourceFile functionName
-      s <- withMap (\m -> renderPages m (chooseLocationPages rules ([], prog)))
+      s <- withMap (\m -> renderPages m (chooseLocationPages rules ChooseLocationModel {
+                            clmHistory = []
+                          , clmCurrent = prog
+                          }))
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
     get "/rewrite/:word" $ do
       beam <- param "word"
@@ -154,7 +157,11 @@ main = do
             Nothing -> error "Couldn't find uploaded file"
 
       (prog, rules) <- liftAndCatchIO $ readProgramS uploadedFileContent functionName
-      s <- withMap (\m -> renderPages m (chooseLocationPages rules ([], prog)))
+      s <- withMap (\m ->
+        renderPages m (chooseLocationPages rules ChooseLocationModel {
+                            clmHistory = []
+                          , clmCurrent = prog
+                          }))
 
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
 
@@ -195,16 +202,22 @@ data ChooseLocationPage a =
   deriving Functor
 
 data ChooseRewritePage a =
-  ChooseRewritePage (ChooseLocationPage a)
-                    [Document (Wrapped Lang.TExpr Void)]
-                    [(String, String, a)]
+  ChooseRewritePage { crpClp        :: ChooseLocationPage a
+                    , crpHigLighted :: [Document (Wrapped Lang.TExpr Void)]
+                    , crpRewrites   :: [(String, String, a)]
+                    }
   deriving Functor
 
-type ChooseLocationModel = ([(Lang.TExpr, Lang.TRule)], Lang.TExpr)
+data ChooseLocationModel =
+  ChooseLocationModel { clmHistory :: [(Lang.TExpr, Lang.TRule)]
+                      , clmCurrent :: Lang.TExpr
+                      }
 
-type ChooseRewriteModel = (ChooseLocationModel,
-                           ([Document (Wrapped Lang.TExpr Void)],
-                            [(Lang.TRule, Lang.TExpr)]))
+data ChooseRewriteModel =
+  ChooseRewriteModel { crmClm         :: ChooseLocationModel
+                     , crmHighlighted :: [Document (Wrapped Lang.TExpr Void)]
+                     , crmRewrites    :: [(Lang.TRule, Lang.TExpr)]
+                     }
 
 data Page a = ChooseLocation (ChooseLocationPage a)
             | ChooseRewrite (ChooseRewritePage a)
@@ -344,7 +357,7 @@ chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationModel
                           -> ChooseLocationPage ([Document (Wrapped Lang.TExpr e)],
                                                   [(Lang.TRule, Lang.TExpr)])
-chooseLocationPageOfModel r (es_rs, e) =
+chooseLocationPageOfModel r clm =
   ChooseLocationPage {
     clpHistory = map (\(e', r') ->
       HistoryEntry {
@@ -357,6 +370,9 @@ chooseLocationPageOfModel r (es_rs, e) =
   , clpCost    = Ksc.Cost.cost e
   , clpThisExp = rewrites r e
   }
+  where ChooseLocationModel { clmHistory = es_rs
+                            , clmCurrent = e
+                            } = clm
 
 overheSExp :: ([Document a] -> [Document b])
            -> HistoryEntry a
@@ -366,26 +382,46 @@ overheSExp f (HistoryEntry a b c d) = HistoryEntry (f a) b c d
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
                    -> ChooseLocationPage ChooseRewriteModel
-chooseLocationPage r (es, e) =
-  mapLocationDocument g (chooseLocationPageOfModel r (es, e))
-  where g = (fmap . fmap) ((,) (es, e))
+chooseLocationPage r clm =
+  mapLocationDocument g (chooseLocationPageOfModel r clm)
+  where g = (fmap . fmap) (\(d, rs) ->
+                             ChooseRewriteModel { crmClm = clm
+                                                , crmHighlighted = d
+                                                , crmRewrites = rs
+                                                })
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
                   -> ChooseRewritePage
                        (Either ChooseLocationModel ChooseRewriteModel)
-chooseRewritePage r ((es, e), (dd, rs)) =
-           ChooseRewritePage
-           (mapLocationDocument g (chooseLocationPageOfModel r (es, e)))
-           dd
-           (fmap f rs)
-  where g = (fmap . fmap) (\x -> Right ((es, e), x))
+chooseRewritePage r crm =
+  ChooseRewritePage {
+      crpClp = mapLocationDocument g (chooseLocationPageOfModel r clm)
+    , crpHigLighted = dd
+    , crpRewrites = fmap f rs
+    }
+  where g = (fmap . fmap) (\(d, rs) ->
+          Right ChooseRewriteModel { crmClm = clm
+                                   , crmHighlighted = d
+                                   , crmRewrites = rs
+                                   })
 
-        f :: (Lang.TRule, texpr)
-          -> (String, String, Either ([(Lang.TExpr, Lang.TRule)], texpr) void)
+        f :: (Lang.TRule, Lang.TExpr)
+          -> (String, String, Either ChooseLocationModel void)
         f (r', e') = (Lang.ru_name r',
                       ": " ++ renderRule r',
-                      Left (es ++ [(e, r')], e'))
+                      Left ChooseLocationModel {
+                           clmHistory = es ++ [(e, r')]
+                         , clmCurrent = e'
+                         })
+        ChooseRewriteModel {
+            crmClm = clm@ChooseLocationModel
+              { clmHistory = es
+              , clmCurrent = e
+              }
+          , crmHighlighted = dd
+          , crmRewrites    = rs
+          } = crm
 
 renderRule :: Lang.TRule -> String
 renderRule rule =
