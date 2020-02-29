@@ -523,11 +523,11 @@ traversePage f = \case
 renderChooseLocationPageString :: ChooseLocationPage Int -> String -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
     "<table style=\"border-collapse: collapse\">" ++
-    tr "<th>Cost</th><th>IR</th><th>Infix</th>" ++
+    tr (th "Cost" <> th "IR" <> th "Infix") ++
     flip concatMap ds (\(HistoryEntry d' cstyle c r) ->
       let ir = renderDocumentsString ((map . fmap) absurd d')
           infix_ = "<pre>" ++ cstyle ++ "</pre>"
-          appliedRule = "<p>then applied: " ++ renderRule r ++ "</p>"
+          appliedRule = p ("then applied: " ++ renderRule r)
       in concatMap (tr . concatMap td)
       [[renderCost c, ir,          infix_ ],
        ["",           appliedRule, ""     ]])
@@ -538,24 +538,33 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
     ++ "</table>"
     where td s' = "<td style=\"border: 1px solid black; "
                   ++ "padding: 0.5em\">" ++ s' ++ "</td>"
-          tr s' = "<tr>" ++ s' ++ "</tr>"
+
+tr :: Html -> Html
+tr = tag "tr"
+
+th :: Html -> Html
+th = tag "th"
+
+tag :: String -> Html -> Html
+tag t s = "<" ++ t ++ ">" ++ s ++ "</" ++ t ++ ">"
+
 
 renderPageString :: Page Int -> String
 renderPageString = \case
   ChooseLocation clp -> renderChooseLocationPageString clp ""
   ChooseRewrite (ChooseRewritePage clp dd r) ->
     renderChooseLocationPageString clp
-      ("<p>" ++ renderDocumentsString (map removeLinks dd) ++ "</p>" ++
+      (p (renderDocumentsString (map removeLinks dd)) ++
         "<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
     ++ "</ul>")
     where renderRewrites = \case
-            Nothing -> "<p>No rewrites available for selected expression</p>"
+            Nothing -> p ("No rewrites available for selected expression")
             Just l -> concatMap f l
               where f (s, s1, b) = "<li>" ++ renderLink b s ++ s1 ++ "</li>"
 
 renderCost :: Either String Float -> String
-renderCost s = "<p>" ++ costString s ++ "</p>"
+renderCost s = p (costString s)
   where costString = \case
           Left err -> "Error calculating cost: " ++ err
           Right c  -> show c
@@ -566,3 +575,8 @@ renderPages :: Data.Map.Map Int (Free Page Void)
 renderPages m = \case
   Pure void -> absurd void
   Free page -> renderPage m page
+
+type Html = String
+
+p :: Html -> Html
+p s = "<p>" ++ s ++ "</p>"
