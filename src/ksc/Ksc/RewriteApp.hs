@@ -386,27 +386,26 @@ chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
                   -> ChooseRewritePage
                        (Either ChooseLocationModel ChooseRewriteModel)
-chooseRewritePage r crm =
+chooseRewritePage rules crm =
   ChooseRewritePage {
-      crpClp = (mapLocationDocument . fmap . fmap) Right (chooseLocationPage r clm)
-    , crpHigLighted = dd
-    , crpRewrites = fmap f rs
+      crpClp =
+        (mapLocationDocument . fmap . fmap) Right (chooseLocationPage rules clm)
+    , crpHigLighted = crmHighlighted crm
+    , crpRewrites = fmap f (crmRewrites crm)
     }
   where f :: (Lang.TRule, Lang.TExpr)
           -> (String, String, Either ChooseLocationModel void)
-        f (r', e') = (Lang.ru_name r',
-                      ": " ++ renderRule r',
+        f (rule, nextExp) = (Lang.ru_name rule,
+                             ": " ++ renderRule rule,
                       Left ChooseLocationModel {
-                           clmHistory = es ++ [(e, r')]
-                         , clmCurrent = e'
+                           clmHistory = history ++ [(currentExp, rule)]
+                         , clmCurrent = nextExp
                          })
         ChooseRewriteModel {
             crmClm = clm@ChooseLocationModel
-              { clmHistory = es
-              , clmCurrent = e
+              { clmHistory = history
+              , clmCurrent = currentExp
               }
-          , crmHighlighted = dd
-          , crmRewrites    = rs
           } = crm
 
 renderRule :: Lang.TRule -> String
