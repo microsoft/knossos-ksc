@@ -335,57 +335,8 @@ separateWrappedTuple k ke es = foo es'
 nameOfFun :: Lang.Fun -> String
 nameOfFun = takeWhile (/= '@') . Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
 
-separate :: (Lang.TExpr -> e)
-         -> Lang.TExpr
-         -> [Document (Lang.TExpr, Lang.TExpr -> e)]
-separate k ee = case ee of
-     Lang.Call ff@(Lang.TFun _ f) e ->
-       sexpr (nameOfFun f) [rewrites_]
-       where k' = k . Lang.Call ff
-             rewrites_ = case e of
-                Lang.Tuple es -> separateTuple k' es
-                _ -> separate k' e
-
-     Lang.Tuple es -> sexpr "tuple" [separateTuple k es]
-     Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
-     Lang.Konst c -> case c of
-       Lang.KFloat f -> sexprnp (show f) []
-       Lang.KBool b -> sexprnp (show b) []
-       Lang.KString s -> [Left' (show s)]
-       Lang.KInteger i -> [Left' (show i)]
-     Lang.Let v rhs body ->
-       let rhs'  = separate  (\rhs'' -> k (Lang.Let v rhs'' body)) rhs
-           body' = separate  (\body'' -> k (Lang.Let v rhs body'')) body
-       in sexpr "let" [parens ([Left' (show v ++ " ")] <> rhs'), body' ]
-     Lang.If c t f ->
-       let c' = separate (\c'' -> k (Lang.If c'' t f)) c
-           t' = separate (\t'' -> k (Lang.If c t'' f)) t
-           f' = separate (\f'' -> k (Lang.If c t f'')) f
-       in sexpr "if" [c', t', f']
-
-     Lang.App{}    -> unsupported "App"
-     Lang.Lam{}    -> unsupported "Lam"
-     Lang.Assert{} -> unsupported "Assert"
-     Lang.Dummy{}  -> unsupported "Dummy"
-     where unsupported s = error ("We don't do " ++ s)
-           link s = Right' (s, (ee, k))
-           parens s = [Left' "("] <> s <> [Left' ")"]
-           sexpr car cdr = parens (sexprnp car cdr)
-           sexprnp car cdr = [Branch $ intercalate [Left' " "] ([link car]:cdr)]
-
-
--- For avoiding "(tuple ...)" around multiple arguments
-separateTuple :: (Lang.TExpr -> e)
-              -> [Lang.TExpr]
-              -> [Document (Lang.TExpr, Lang.TExpr -> e)]
-separateTuple k es =
-  intercalate [Left' " "] (map (\(j, e) ->
-    separate (\e' ->
-        k (Lang.Tuple (setList j e' es)) ) e)
-    (zip [1..] es))
-
 documentOfExpr :: Lang.TExpr -> [Document a]
-documentOfExpr = map removeLinks . separate id
+documentOfExpr = map removeLinks . separateWrapped id id
 
 rewrites :: Rules.RuleBase
          -> Lang.TExpr
