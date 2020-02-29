@@ -13,6 +13,7 @@
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wwarn #-}
 {-# OPTIONS_GHC -Werror=incomplete-patterns #-}
@@ -226,20 +227,23 @@ data Wrapped tExpr e =
            [Document (Wrapped tExpr e)],
            [Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
 
-separateWrapped :: ([Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
+separateWrapped :: forall tExpr e.
+                   ([Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
                 -> (Lang.TExpr -> tExpr)
                 -> Lang.TExpr
                 -> [Document (Wrapped tExpr e)]
 separateWrapped k ke ee = case ee of
      Lang.Call ff@(Lang.TFun _ f) e -> bar
-       where k' :: [Document (Wrapped _ _)] -> _
+       where k' :: [Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)]
              k' = k . foo
              ke' = ke . Lang.Call ff
 
+             bar :: [Document (Wrapped tExpr e)]
              bar = foo (case e of
                           Lang.Tuple es -> separateWrappedTuple (k . foo) ke es
                           _ -> separateWrapped k' ke' e)
 
+             foo :: [Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)]
              foo rewrites_' = sexpr bar ke (nameOfFun f) [rewrites_']
      Lang.Tuple es -> bar
        where foo rewrites_' = sexpr bar ke "tuple" [rewrites_']
