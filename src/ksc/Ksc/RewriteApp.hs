@@ -12,8 +12,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
-{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wwarn #-}
 {-# OPTIONS_GHC -fdefer-typed-holes #-}
 
 module Ksc.RewriteApp where
@@ -214,6 +215,82 @@ setList i a as = zipWith f [1..] as
 tryRules :: Rules.RuleBase -> Lang.TExpr -> [(Lang.TRule, Lang.TExpr)]
 tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
                     . Rules.tryRulesMany rulebase
+
+data Wrapped e =
+  Wrapped (Lang.TExpr, [Document (Wrapped e)], [Document (Wrapped e)] -> e)
+
+separateWrapped :: ([Document (Wrapped e)] -> e)
+                -> Lang.TExpr
+                -> [Document (Wrapped e)]
+separateWrapped k ee = case ee of
+     Lang.Call (Lang.TFun _ f) e -> bar
+       where k' :: [Document (Wrapped _)] -> _
+             k' = k . foo
+
+             bar = foo (separateWrapped k' e)
+
+             foo rewrites_' = [Left' "("]
+               <> [Branch $ [link bar (nameOfFun f), Left' " "] <> rewrites_']
+               <> [Left' ")"]
+     Lang.Tuple es -> bar
+       where foo rewrites_' = sexpr bar "tuple" [rewrites_']
+             bar = foo (separateWrappedTuple k es)
+     Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
+     Lang.Konst c -> case c of
+       Lang.KFloat f -> let bar = foo
+                            foo = sexprnp bar (show f) []
+                        in bar
+       Lang.KBool b -> let bar = foo
+                           foo = sexprnp bar (show b) []
+                       in bar
+       Lang.KString s -> [Left' (show s)]
+       Lang.KInteger i -> [Left' (show i)]
+     Lang.Let v rhs body ->
+       let rhs'  = separateWrapped k'rhs rhs
+           body' = separateWrapped k'body body
+           k'rhs = (\rhs'' -> k (foo rhs'' body'))
+           k'body = (\body'' -> k (foo rhs' body''))
+
+           bar = foo rhs' body'
+
+           foo rhs'' body'' =
+             sexpr bar "let" [parens ([Left' (show v ++ " ")] <> rhs''), body'' ]
+       in bar
+     Lang.If c t f ->
+       let c' = separateWrapped (\c'' -> k (foo c'' t' f')) c
+           t' = separateWrapped (\t'' -> k (foo c' t'' f')) t
+           f' = separateWrapped (\f'' -> k (foo c' t' f'')) f
+
+           bar = foo c' t' f'
+
+           foo c'' t'' f'' = sexpr bar "if" [c'', t'', f'']
+
+       in bar
+
+     Lang.App{}    -> unsupported "App"
+     Lang.Lam{}    -> unsupported "Lam"
+     Lang.Assert{} -> unsupported "Assert"
+     Lang.Dummy{}  -> unsupported "Dummy"
+     where unsupported s = error ("We don't do " ++ s)
+           link dd s = Right' (s, Wrapped (ee, dd, k))
+           parens s = [Left' "("] <> s <> [Left' ")"]
+           sexpr dd car cdr = parens (sexprnp dd car cdr)
+           sexprnp dd car cdr = [Branch $ intercalate [Left' " "] ([link dd car]:cdr)]
+
+
+-- For avoiding "(tuple ...)" around multiple arguments
+separateWrappedTuple :: ([Document (Wrapped e)] -> e)
+                     -> [Lang.TExpr]
+                     -> [Document (Wrapped e)]
+separateWrappedTuple k es = foo es'
+  where es' =
+          map (\(j, e) ->
+                  separateWrapped (\e' ->
+                                     k (foo (setList j e' es')) ) e)
+               (zip [1..] es)
+
+        foo = intercalate [Left' " "]
+
 
 nameOfFun :: Lang.Fun -> String
 nameOfFun = takeWhile (/= '@') . Lang.renderSexp . Lang.pprFunId . Lang.funIdOfFun
