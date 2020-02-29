@@ -353,10 +353,10 @@ rewrites rulebase e = (map . fmap) f (separateWrapped id id e)
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
 
-chooseLocationPageOfModel :: Rules.RuleBase
-                          -> ChooseLocationModel
-                          -> ChooseLocationPage ChooseRewriteModel
-chooseLocationPageOfModel r clm =
+chooseLocationPage :: Rules.RuleBase
+                   -> ChooseLocationModel
+                   -> ChooseLocationPage ChooseRewriteModel
+chooseLocationPage r clm =
   ChooseLocationPage {
     clpHistory = map (\(e', r') ->
       HistoryEntry {
@@ -382,26 +382,17 @@ overheSExp :: ([Document a] -> [Document b])
            -> HistoryEntry b
 overheSExp f (HistoryEntry a b c d) = HistoryEntry (f a) b c d
 
-chooseLocationPage :: Rules.RuleBase
-                   -> ChooseLocationModel
-                   -> ChooseLocationPage ChooseRewriteModel
-chooseLocationPage r clm =
-  mapLocationDocument g (chooseLocationPageOfModel r clm)
-  where g = (fmap . fmap) (id)
-
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
                   -> ChooseRewritePage
                        (Either ChooseLocationModel ChooseRewriteModel)
 chooseRewritePage r crm =
   ChooseRewritePage {
-      crpClp = mapLocationDocument g (chooseLocationPageOfModel r clm)
+      crpClp = (mapLocationDocument . fmap . fmap) Right (chooseLocationPage r clm)
     , crpHigLighted = dd
     , crpRewrites = fmap f rs
     }
-  where g = (fmap . fmap) Right
-
-        f :: (Lang.TRule, Lang.TExpr)
+  where f :: (Lang.TRule, Lang.TExpr)
           -> (String, String, Either ChooseLocationModel void)
         f (r', e') = (Lang.ru_name r',
                       ": " ++ renderRule r',
