@@ -39,6 +39,7 @@ executable ksc-rewrite-app
                  free,
                  transformers,
                  wai-extra,
-                 bytestring
+                 bytestring,
+                 microlens
   ghc-options: -Werror -Wall -Wno-name-shadowing -Wno-unticked-promoted-constructors -Wno-type-defaults -Wno-unused-do-bind -Wincomplete-uni-patterns -Wincomplete-record-updates
   ld-options: -static

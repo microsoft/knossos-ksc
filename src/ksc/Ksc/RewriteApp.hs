@@ -48,6 +48,8 @@ import           Data.Void (Void, absurd)
 import qualified Data.List.NonEmpty as NEL
 
 import qualified Ksc.Cost (cost)
+import           Lens.Micro (set, traverseOf, _1, _2, _3)
+import           Lens.Micro.Extras (view)
 
 typeCheck :: [Lang.Decl] -> IO [Lang.TDecl]
 typeCheck = fmap snd . KMonad.runKM . Annotate.annotDecls LangUtils.emptyGblST
@@ -268,13 +270,13 @@ separateWrapped k ke ee = case ee of
            t = (rhs, body)
            t' = (rhs', body')
 
-           rhs'  = s set1of2 set1of2 rhs
-           body' = s set2of2 set2of2 body
+           rhs'  = s _1 _1 _1
+           body' = s _2 _2 _2
 
-           s set set' setc =
-             separateWrapped k' ke' setc
-             where k' = k . recurse . set t'
-                   ke' = ke . let_ . set' t
+           s l l' l'' =
+             separateWrapped k' ke' (view l'' t)
+             where k' = k . recurse . flip (set l) t'
+                   ke' = ke . let_ . flip (set l') t
 
            bar = recurse t'
 
@@ -283,15 +285,18 @@ separateWrapped k ke ee = case ee of
        in bar
      Lang.If c t f ->
        let tt = (c', t', f')
+           ttt  = (c, t, f)
 
            if_ (cx, tx, fx) = Lang.If cx tx fx
 
-           c' = s set1of3 set1of3 c
-           t' = s set2of3 set2of3 t
-           f' = s set3of3 set3of3 f
+           c' = s _1 _1 _1
+           t' = s _2 _2 _2
+           f' = s _3 _3 _3
 
-           s set set' setc =
-             separateWrapped (k . recurse . set tt) (ke . if_ . set' (c, t, f)) setc
+           s l l' l'' =
+             separateWrapped (k . recurse . flip (set l) tt)
+                             (ke . if_ . flip (set l') ttt)
+                             (view l'' ttt)
 
            bar = recurse tt
 
@@ -308,22 +313,6 @@ separateWrapped k ke ee = case ee of
            sexpr dd ke' car cdr = parens (sexprnp dd ke' car cdr)
            sexprnp dd ke' car cdr =
              [Branch $ intercalate [Left' " "] ([link dd ke' car]:cdr)]
-
-
-set1of2 :: (a1, b) -> a2 -> (a2, b)
-set1of2 (_, b) a' = (a', b)
-
-set2of2 :: (a, b1) -> b2 -> (a, b2)
-set2of2 (a, _) b' = (a, b')
-
-set1of3 :: (a, b, c) -> a' -> (a', b, c)
-set1of3 (_, b, c) a' = (a', b, c)
-
-set2of3 :: (a, b1, c) -> b2 -> (a, b2, c)
-set2of3 (a, _, c) b' = (a, b', c)
-
-set3of3 :: (a, b, c1) -> c2 -> (a, b, c2)
-set3of3 (a, b, _) c' = (a, b, c')
 
 -- For avoiding "(tuple ...)" around multiple arguments
 separateWrappedTuple :: ([Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
@@ -559,16 +548,13 @@ traverseChooseRewritePage f = \case
   ChooseRewritePage clp dd r ->
     ChooseRewritePage <$> traverseChooseLocationPage f clp
                       <*> pure dd
-                      <*> (traverse . traverse3of3) f r
+                      <*> (traverse . traverseOf _3) f r
 
 traversePage :: Applicative f
              => (a -> f b) -> Page a -> f (Page b)
 traversePage f = \case
   ChooseLocation d -> ChooseLocation <$> traverseChooseLocationPage f d
   ChooseRewrite r -> ChooseRewrite <$> traverseChooseRewritePage f r
-
-traverse3of3 :: Functor f => (c -> f c') -> (a, b, c) -> f (a, b, c')
-traverse3of3 f (a, b, c) = (\c' -> (a, b, c')) <$> f c
 
 renderChooseLocationPageString :: ChooseLocationPage Int -> String -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
