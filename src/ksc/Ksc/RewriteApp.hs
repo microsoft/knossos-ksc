@@ -239,7 +239,7 @@ separateWrapped k ke ee = case ee of
              ke' = ke . Lang.Call ff
 
              e' = case e of
-               Lang.Tuple es -> separateWrappedTuple k' ke es
+               Lang.Tuple es -> separateWrappedTuple k' ke' es
                _ -> separateWrapped k' ke' e
 
              bar :: [Document (Wrapped tExpr e)]
