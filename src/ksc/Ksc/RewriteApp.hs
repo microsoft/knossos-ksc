@@ -47,7 +47,7 @@ import           Data.Void (Void, absurd)
 import qualified Data.List.NonEmpty as NEL
 
 import qualified Ksc.Cost (cost)
-import           Lens.Micro (set, traverseOf, _1, _2, _3)
+import           Lens.Micro (set, traverseOf, _1, _2, _3,each,toListOf)
 import           Lens.Micro.Extras (view)
 
 typeCheck :: [Lang.Decl] -> IO [Lang.TDecl]
@@ -524,15 +524,15 @@ renderChooseLocationPageString :: ChooseLocationPage Int -> String -> String
 renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
     "<table style=\"border-collapse: collapse\">" ++
     tr (th "Cost" <> th "IR" <> th "Infix") ++
-      (concatMap (tr . concatMap td)
+      (concatMap (tr . concatMap td . toListOf each)
       $ flip concatMap ds (\(HistoryEntry d' cstyle c r) ->
       let ir = renderDocumentsString ((map . fmap) absurd d')
           infix_ = pre cstyle
           appliedRule = p ("then applied: " ++ renderRule r)
       in
-      [[renderCost c, ir,          infix_ ],
-       ["",           appliedRule, ""     ]])
-    ++ [[ renderCost cost, expAndRWCs, pre s]])
+      [(renderCost c, ir,          infix_ ),
+       ("",           appliedRule, ""     )])
+    ++ [( renderCost cost, expAndRWCs, pre s)])
     ++ "</table>"
     where td s' = "<td style=\"border: 1px solid black; "
                   ++ "padding: 0.5em\">" ++ s' ++ "</td>"
