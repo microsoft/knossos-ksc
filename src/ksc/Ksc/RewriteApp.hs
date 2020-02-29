@@ -238,9 +238,7 @@ separateWrapped k ke ee = case ee of
 
              bar = foo (separateWrapped k' ke' e)
 
-             foo rewrites_' = [Left' "("]
-               <> [Branch $ [link bar ke (nameOfFun f), Left' " "] <> rewrites_']
-               <> [Left' ")"]
+             foo rewrites_' = sexpr bar ke (nameOfFun f) [rewrites_']
      Lang.Tuple es -> bar
        where foo rewrites_' = sexpr bar ke "tuple" [rewrites_']
              bar = foo (separateWrappedTuple (k . foo) ke es)
