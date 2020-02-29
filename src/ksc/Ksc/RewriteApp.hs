@@ -15,6 +15,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 
 {-# OPTIONS_GHC -Wwarn #-}
+{-# OPTIONS_GHC -Werror=incomplete-patterns #-}
 {-# OPTIONS_GHC -fdefer-typed-holes #-}
 
 module Ksc.RewriteApp where
@@ -166,6 +167,7 @@ readUploadedFile fieldname = do
 data Document a = Left' String
                 | Right' (String, a)
                 | Branch [Document a]
+                | Highlight [Document a]
                 deriving Functor
 
 removeLinks :: Document a -> Document void
@@ -173,6 +175,7 @@ removeLinks = \case
   Left' s       -> Left' s
   Right' (s, _) -> Left' s
   Branch ds     -> Branch (map removeLinks ds)
+  Highlight ds  -> Highlight (map removeLinks ds)
 
 data HistoryEntry a = HistoryEntry {
     heSExp   :: [Document a]
@@ -191,13 +194,15 @@ data ChooseLocationPage a =
 
 data ChooseRewritePage a =
   ChooseRewritePage (ChooseLocationPage a)
+                    [Document (Wrapped Lang.TExpr Void)]
                     [(String, String, a)]
   deriving Functor
 
 type ChooseLocationModel = ([(Lang.TExpr, Lang.TRule)], Lang.TExpr)
 
 type ChooseRewriteModel = (ChooseLocationModel,
-                           [(Lang.TRule, Lang.TExpr)])
+                           ([Document (Wrapped Lang.TExpr Void)],
+                            [(Lang.TRule, Lang.TExpr)]))
 
 data Page a = ChooseLocation (ChooseLocationPage a)
             | ChooseRewrite (ChooseRewritePage a)
@@ -238,7 +243,7 @@ separateWrapped k ke ee = case ee of
                <> [Left' ")"]
      Lang.Tuple es -> bar
        where foo rewrites_' = sexpr bar ke "tuple" [rewrites_']
-             bar = foo (separateWrappedTuple k ke es)
+             bar = foo (separateWrappedTuple (k . foo) ke es)
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
        Lang.KFloat f -> let bar = foo
@@ -361,14 +366,15 @@ rewrites :: Rules.RuleBase
          -> [Document ([Document (Wrapped Lang.TExpr e)], [(Lang.TRule, Lang.TExpr)])]
 rewrites rulebase e = (map . fmap) f (separateWrapped id id e)
   where f :: Wrapped tExpr e -> ([Document (Wrapped tExpr e)], [(Lang.TRule, tExpr)])
-        f (Wrapped (ee, k, dd, ddk)) = (ddk dd, call_rewrites)
+        f (Wrapped (ee, k, dd, ddk)) = (ddk [Highlight dd], call_rewrites)
           where call_rewrites =
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
 
 chooseLocationPageOfModel :: Rules.RuleBase
                           -> ChooseLocationModel
-                          -> ChooseLocationPage [(Lang.TRule, Lang.TExpr)]
+                          -> ChooseLocationPage ([Document (Wrapped Lang.TExpr e)],
+                                                  [(Lang.TRule, Lang.TExpr)])
 chooseLocationPageOfModel r (es_rs, e) =
   ChooseLocationPage {
     clpHistory = map (\(e', r') ->
@@ -380,7 +386,7 @@ chooseLocationPageOfModel r (es_rs, e) =
       }) es_rs
   , clpCStyle  = Lang.pps e
   , clpCost    = Ksc.Cost.cost e
-  , clpThisExp = (map . fmap) snd (rewrites r e)
+  , clpThisExp = rewrites r e
   }
 
 overheSExp :: ([Document a] -> [Document b])
@@ -399,9 +405,10 @@ chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
                   -> ChooseRewritePage
                        (Either ChooseLocationModel ChooseRewriteModel)
-chooseRewritePage r ((es, e), rs) =
+chooseRewritePage r ((es, e), (dd, rs)) =
            ChooseRewritePage
            (mapLocationDocument g (chooseLocationPageOfModel r (es, e)))
+           dd
            (fmap f rs)
   where g = (fmap . fmap) (\x -> Right ((es, e), x))
 
@@ -466,6 +473,7 @@ traverseDocument f = \case
   Left' s       -> pure (Left' s)
   Right' (s, a) -> (\a' -> Right' (s, a')) <$> f a
   Branch ds     -> Branch <$> (traverse . traverseDocument) f ds
+  Highlight ds  -> Highlight <$> (traverse . traverseDocument) f ds
 
 spanColor :: String -> String
 spanColor s = "<span onMouseOver=\"window.event.stopPropagation(); this.style.backgroundColor='#ffdddd'\" "
@@ -473,11 +481,18 @@ spanColor s = "<span onMouseOver=\"window.event.stopPropagation(); this.style.ba
               ++ s
               ++ "</span>"
 
+spanColorFixed :: String -> String
+spanColorFixed s = "<span style=\"color: red\">"
+                   ++ s
+                   ++ "</span>"
+
 renderDocumentString :: Document Int -> String
 renderDocumentString = \case
   Left' s       -> s
   Right' (s, b) -> renderLink b s
   Branch ds     -> spanColor (foldr f "" ds)
+    where f d rest = renderDocumentString d ++ rest
+  Highlight ds  -> spanColorFixed (foldr f "" ds)
     where f d rest = renderDocumentString d ++ rest
 
 renderDocumentsString :: [Document Int] -> String
@@ -504,8 +519,9 @@ traverseChooseRewritePage :: Applicative f
                           -> ChooseRewritePage a
                           -> f (ChooseRewritePage b)
 traverseChooseRewritePage f = \case
-  ChooseRewritePage clp r ->
+  ChooseRewritePage clp dd r ->
     ChooseRewritePage <$> traverseChooseLocationPage f clp
+                      <*> pure dd
                       <*> (traverse . traverse3of3) f r
 
 traversePage :: Applicative f
@@ -540,9 +556,10 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
 renderPageString :: Page Int -> String
 renderPageString = \case
   ChooseLocation clp -> renderChooseLocationPageString clp ""
-  ChooseRewrite (ChooseRewritePage clp r) ->
+  ChooseRewrite (ChooseRewritePage clp dd r) ->
     renderChooseLocationPageString clp
-      ("<ul>"
+      ("<p>" ++ renderDocumentsString (map removeLinks dd) ++ "</p>" ++
+        "<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
     ++ "</ul>")
     where renderRewrites = \case
