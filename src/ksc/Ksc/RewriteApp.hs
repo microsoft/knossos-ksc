@@ -358,10 +358,10 @@ documentOfExpr = map removeLinks . separate id
 
 rewrites :: Rules.RuleBase
          -> Lang.TExpr
-         -> [Document [(Lang.TRule, Lang.TExpr)]]
+         -> [Document ([Document (Wrapped Lang.TExpr e)], [(Lang.TRule, Lang.TExpr)])]
 rewrites rulebase e = (map . fmap) f (separateWrapped id id e)
-  where f :: Wrapped tExpr e -> [(Lang.TRule, tExpr)]
-        f (Wrapped (ee, k, _, _)) = call_rewrites
+  where f :: Wrapped tExpr e -> ([Document (Wrapped tExpr e)], [(Lang.TRule, tExpr)])
+        f (Wrapped (ee, k, dd, ddk)) = (ddk dd, call_rewrites)
           where call_rewrites =
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
@@ -380,7 +380,7 @@ chooseLocationPageOfModel r (es_rs, e) =
       }) es_rs
   , clpCStyle  = Lang.pps e
   , clpCost    = Ksc.Cost.cost e
-  , clpThisExp = rewrites r e
+  , clpThisExp = (map . fmap) snd (rewrites r e)
   }
 
 overheSExp :: ([Document a] -> [Document b])
