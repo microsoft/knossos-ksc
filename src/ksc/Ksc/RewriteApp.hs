@@ -236,7 +236,9 @@ separateWrapped k ke ee = case ee of
              k' = k . foo
              ke' = ke . Lang.Call ff
 
-             bar = foo (separateWrapped k' ke' e)
+             bar = foo (case e of
+                          Lang.Tuple es -> separateWrappedTuple (k . foo) ke es
+                          _ -> separateWrapped k' ke' e)
 
              foo rewrites_' = sexpr bar ke (nameOfFun f) [rewrites_']
      Lang.Tuple es -> bar
