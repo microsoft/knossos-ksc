@@ -235,49 +235,67 @@ separateWrapped :: forall tExpr e.
 separateWrapped k ke ee = case ee of
      Lang.Call ff@(Lang.TFun _ f) e -> bar
        where k' :: [Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)]
-             k' = k . foo
+             k' = k . recurse
              ke' = ke . Lang.Call ff
 
-             bar :: [Document (Wrapped tExpr e)]
-             bar = foo (case e of
-                          Lang.Tuple es -> separateWrappedTuple (k . foo) ke es
-                          _ -> separateWrapped k' ke' e)
+             e' = case e of
+               Lang.Tuple es -> separateWrappedTuple k' ke es
+               _ -> separateWrapped k' ke' e
 
-             foo :: [Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)]
-             foo rewrites_' = sexpr bar ke (nameOfFun f) [rewrites_']
+             bar :: [Document (Wrapped tExpr e)]
+             bar = recurse e'
+
+             recurse :: [Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)]
+             recurse e'' = sexpr bar ke (nameOfFun f) [e'']
      Lang.Tuple es -> bar
-       where foo rewrites_' = sexpr bar ke "tuple" [rewrites_']
-             bar = foo (separateWrappedTuple (k . foo) ke es)
+       where recurse rewrites_' = sexpr bar ke "tuple" [rewrites_']
+             k' = k . recurse
+             bar = recurse (separateWrappedTuple k' ke es)
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
-       Lang.KFloat f -> let bar = foo
-                            foo = sexprnp bar ke (show f) []
+       Lang.KFloat f -> let bar = recurse
+                            recurse = sexprnp bar ke (show f) []
                         in bar
-       Lang.KBool b -> let bar = foo
-                           foo = sexprnp bar ke (show b) []
+       Lang.KBool b -> let bar = recurse
+                           recurse = sexprnp bar ke (show b) []
                        in bar
        Lang.KString s -> [Left' (show s)]
        Lang.KInteger i -> [Left' (show i)]
      Lang.Let v rhs body ->
-       let rhs'  = separateWrapped k'rhs (\rhs'' -> ke (Lang.Let v rhs'' body)) rhs
-           body' = separateWrapped k'body (\body'' -> ke (Lang.Let v rhs body'')) body
-           k'rhs = (\rhs'' -> k (foo rhs'' body'))
-           k'body = (\body'' -> k (foo rhs' body''))
+       let let_ :: (Lang.TExpr, Lang.TExpr) -> Lang.TExpr
+           let_ = uncurry (Lang.Let v)
 
-           bar = foo rhs' body'
+           t = (rhs, body)
+           t' = (rhs', body')
 
-           foo rhs'' body'' =
+           rhs'  = s set1of2 set1of2 rhs
+           body' = s set2of2 set2of2 body
+
+           s set set' setc =
+             separateWrapped k' ke' setc
+             where k' = k . recurse . set t'
+                   ke' = ke . let_ . set' t
+
+           bar = recurse t'
+
+           recurse (rhs'', body'') =
              sexpr bar ke "let" [parens ([Left' (show v ++ " ")] <> rhs''), body'' ]
        in bar
      Lang.If c t f ->
-       let c' = separateWrapped (\c'' -> k (foo c'' t' f')) (\c'' -> ke (Lang.If c'' t f)) c
-           t' = separateWrapped (\t'' -> k (foo c' t'' f')) (\t'' -> ke (Lang.If c t'' f)) t
-           f' = separateWrapped (\f'' -> k (foo c' t' f'')) (\f'' -> ke (Lang.If c t f'')) f
+       let tt = (c', t', f')
 
-           bar = foo c' t' f'
+           if_ (cx, tx, fx) = Lang.If cx tx fx
 
-           foo c'' t'' f'' = sexpr bar ke "if" [c'', t'', f'']
+           c' = s set1of3 set1of3 c
+           t' = s set2of3 set2of3 t
+           f' = s set3of3 set3of3 f
 
+           s set set' setc =
+             separateWrapped (k . recurse . set tt) (ke . if_ . set' (c, t, f)) setc
+
+           bar = recurse tt
+
+           recurse (c'', t'', f'') = sexpr bar ke "if" [c'', t'', f'']
        in bar
 
      Lang.App{}    -> unsupported "App"
@@ -291,6 +309,21 @@ separateWrapped k ke ee = case ee of
            sexprnp dd ke' car cdr =
              [Branch $ intercalate [Left' " "] ([link dd ke' car]:cdr)]
 
+
+set1of2 :: (a1, b) -> a2 -> (a2, b)
+set1of2 (_, b) a' = (a', b)
+
+set2of2 :: (a, b1) -> b2 -> (a, b2)
+set2of2 (a, _) b' = (a, b')
+
+set1of3 :: (a, b, c) -> a' -> (a', b, c)
+set1of3 (_, b, c) a' = (a', b, c)
+
+set2of3 :: (a, b1, c) -> b2 -> (a, b2, c)
+set2of3 (a, _, c) b' = (a, b', c)
+
+set3of3 :: (a, b, c1) -> c2 -> (a, b, c2)
+set3of3 (a, b, _) c' = (a, b, c')
 
 -- For avoiding "(tuple ...)" around multiple arguments
 separateWrappedTuple :: ([Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
