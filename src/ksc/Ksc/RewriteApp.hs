@@ -193,6 +193,11 @@ data HistoryEntry a = HistoryEntry {
   , heRule   :: Lang.TRule
   }
 
+data ChooseLocationModel =
+  ChooseLocationModel { clmHistory :: [(Lang.TExpr, Lang.TRule)]
+                      , clmCurrent :: Lang.TExpr
+                      }
+
 data ChooseLocationPage a =
   ChooseLocationPage { clpHistory :: [HistoryEntry Void]
                      , clpCStyle  :: String
@@ -201,23 +206,18 @@ data ChooseLocationPage a =
                      }
   deriving Functor
 
+data ChooseRewriteModel =
+  ChooseRewriteModel { crmClm         :: ChooseLocationModel
+                     , crmHighlighted :: [Document (Wrapped Lang.TExpr Void)]
+                     , crmRewrites    :: [(Lang.TRule, Lang.TExpr)]
+                     }
+
 data ChooseRewritePage a =
   ChooseRewritePage { crpClp        :: ChooseLocationPage a
                     , crpHigLighted :: [Document (Wrapped Lang.TExpr Void)]
                     , crpRewrites   :: [(String, String, a)]
                     }
   deriving Functor
-
-data ChooseLocationModel =
-  ChooseLocationModel { clmHistory :: [(Lang.TExpr, Lang.TRule)]
-                      , clmCurrent :: Lang.TExpr
-                      }
-
-data ChooseRewriteModel =
-  ChooseRewriteModel { crmClm         :: ChooseLocationModel
-                     , crmHighlighted :: [Document (Wrapped Lang.TExpr Void)]
-                     , crmRewrites    :: [(Lang.TRule, Lang.TExpr)]
-                     }
 
 data Page a = ChooseLocation (ChooseLocationPage a)
             | ChooseRewrite (ChooseRewritePage a)
