@@ -216,54 +216,58 @@ tryRules :: Rules.RuleBase -> Lang.TExpr -> [(Lang.TRule, Lang.TExpr)]
 tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
                     . Rules.tryRulesMany rulebase
 
-data Wrapped e =
-  Wrapped (Lang.TExpr, [Document (Wrapped e)], [Document (Wrapped e)] -> e)
+data Wrapped tExpr e =
+  Wrapped (Lang.TExpr, Lang.TExpr -> tExpr,
+           [Document (Wrapped tExpr e)],
+           [Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
 
-separateWrapped :: ([Document (Wrapped e)] -> e)
+separateWrapped :: ([Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
+                -> (Lang.TExpr -> tExpr)
                 -> Lang.TExpr
-                -> [Document (Wrapped e)]
-separateWrapped k ee = case ee of
-     Lang.Call (Lang.TFun _ f) e -> bar
-       where k' :: [Document (Wrapped _)] -> _
+                -> [Document (Wrapped tExpr e)]
+separateWrapped k ke ee = case ee of
+     Lang.Call ff@(Lang.TFun _ f) e -> bar
+       where k' :: [Document (Wrapped _ _)] -> _
              k' = k . foo
+             ke' = ke . Lang.Call ff
 
-             bar = foo (separateWrapped k' e)
+             bar = foo (separateWrapped k' ke' e)
 
              foo rewrites_' = [Left' "("]
-               <> [Branch $ [link bar (nameOfFun f), Left' " "] <> rewrites_']
+               <> [Branch $ [link bar ke (nameOfFun f), Left' " "] <> rewrites_']
                <> [Left' ")"]
      Lang.Tuple es -> bar
-       where foo rewrites_' = sexpr bar "tuple" [rewrites_']
-             bar = foo (separateWrappedTuple k es)
+       where foo rewrites_' = sexpr bar ke "tuple" [rewrites_']
+             bar = foo (separateWrappedTuple k ke es)
      Lang.Var v -> [Left' (Lang.nameOfVar (Lang.tVarVar v))]
      Lang.Konst c -> case c of
        Lang.KFloat f -> let bar = foo
-                            foo = sexprnp bar (show f) []
+                            foo = sexprnp bar ke (show f) []
                         in bar
        Lang.KBool b -> let bar = foo
-                           foo = sexprnp bar (show b) []
+                           foo = sexprnp bar ke (show b) []
                        in bar
        Lang.KString s -> [Left' (show s)]
        Lang.KInteger i -> [Left' (show i)]
      Lang.Let v rhs body ->
-       let rhs'  = separateWrapped k'rhs rhs
-           body' = separateWrapped k'body body
+       let rhs'  = separateWrapped k'rhs (\rhs'' -> ke (Lang.Let v rhs'' body)) rhs
+           body' = separateWrapped k'body (\body'' -> ke (Lang.Let v rhs body'')) body
            k'rhs = (\rhs'' -> k (foo rhs'' body'))
            k'body = (\body'' -> k (foo rhs' body''))
 
            bar = foo rhs' body'
 
            foo rhs'' body'' =
-             sexpr bar "let" [parens ([Left' (show v ++ " ")] <> rhs''), body'' ]
+             sexpr bar ke "let" [parens ([Left' (show v ++ " ")] <> rhs''), body'' ]
        in bar
      Lang.If c t f ->
-       let c' = separateWrapped (\c'' -> k (foo c'' t' f')) c
-           t' = separateWrapped (\t'' -> k (foo c' t'' f')) t
-           f' = separateWrapped (\f'' -> k (foo c' t' f'')) f
+       let c' = separateWrapped (\c'' -> k (foo c'' t' f')) (\c'' -> ke (Lang.If c'' t f)) c
+           t' = separateWrapped (\t'' -> k (foo c' t'' f')) (\t'' -> ke (Lang.If c t'' f)) t
+           f' = separateWrapped (\f'' -> k (foo c' t' f'')) (\f'' -> ke (Lang.If c t f'')) f
 
            bar = foo c' t' f'
 
-           foo c'' t'' f'' = sexpr bar "if" [c'', t'', f'']
+           foo c'' t'' f'' = sexpr bar ke "if" [c'', t'', f'']
 
        in bar
 
@@ -272,21 +276,26 @@ separateWrapped k ee = case ee of
      Lang.Assert{} -> unsupported "Assert"
      Lang.Dummy{}  -> unsupported "Dummy"
      where unsupported s = error ("We don't do " ++ s)
-           link dd s = Right' (s, Wrapped (ee, dd, k))
+           link dd ke' s = Right' (s, Wrapped (ee, ke', dd, k))
            parens s = [Left' "("] <> s <> [Left' ")"]
-           sexpr dd car cdr = parens (sexprnp dd car cdr)
-           sexprnp dd car cdr = [Branch $ intercalate [Left' " "] ([link dd car]:cdr)]
+           sexpr dd ke' car cdr = parens (sexprnp dd ke' car cdr)
+           sexprnp dd ke' car cdr =
+             [Branch $ intercalate [Left' " "] ([link dd ke' car]:cdr)]
 
 
 -- For avoiding "(tuple ...)" around multiple arguments
-separateWrappedTuple :: ([Document (Wrapped e)] -> e)
+separateWrappedTuple :: ([Document (Wrapped tExpr e)] -> [Document (Wrapped tExpr e)])
+                     -> (Lang.TExpr -> tExpr)
                      -> [Lang.TExpr]
-                     -> [Document (Wrapped e)]
-separateWrappedTuple k es = foo es'
+                     -> [Document (Wrapped tExpr e)]
+separateWrappedTuple k ke es = foo es'
   where es' =
           map (\(j, e) ->
                   separateWrapped (\e' ->
-                                     k (foo (setList j e' es')) ) e)
+                                     k (foo (setList j e' es')) )
+                                  (\e' ->
+                                     ke (Lang.Tuple (setList j e' es)) )
+                  e)
                (zip [1..] es)
 
         foo = intercalate [Left' " "]
@@ -350,9 +359,9 @@ documentOfExpr = map removeLinks . separate id
 rewrites :: Rules.RuleBase
          -> Lang.TExpr
          -> [Document [(Lang.TRule, Lang.TExpr)]]
-rewrites rulebase e = (map . fmap) f (separate id e)
-  where f :: (Lang.TExpr, Lang.TExpr -> b) -> [(Lang.TRule, b)]
-        f (ee, k) = call_rewrites
+rewrites rulebase e = (map . fmap) f (separateWrapped id id e)
+  where f :: Wrapped tExpr e -> [(Lang.TRule, tExpr)]
+        f (Wrapped (ee, k, _, _)) = call_rewrites
           where call_rewrites =
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
