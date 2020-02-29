@@ -12,7 +12,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wwarn #-}
@@ -268,10 +267,7 @@ separateWrapped k ke ee = case ee of
            let_ = uncurry (Lang.Let v)
 
            t = (rhs, body)
-           t' = (rhs', body')
-
-           rhs'  = s _1 _1 _1
-           body' = s _2 _2 _2
+           t' = (s _1 _1 _1, s _2 _2 _2)
 
            s l l' l'' =
              separateWrapped k' ke' (view l'' t)
@@ -284,14 +280,10 @@ separateWrapped k ke ee = case ee of
              sexpr bar ke "let" [parens ([Left' (show v ++ " ")] <> rhs''), body'' ]
        in bar
      Lang.If c t f ->
-       let tt = (c', t', f')
+       let tt = (s _1 _1 _1, s _2 _2 _2, s _3 _3 _3)
            ttt  = (c, t, f)
 
            if_ (cx, tx, fx) = Lang.If cx tx fx
-
-           c' = s _1 _1 _1
-           t' = s _2 _2 _2
-           f' = s _3 _3 _3
 
            s l l' l'' =
              separateWrapped (k . recurse . flip (set l) tt)
