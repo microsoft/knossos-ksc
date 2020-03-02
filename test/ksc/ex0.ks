@@ -38,6 +38,27 @@
 (rule "let.intro" ((e : Float) (a : Float))
       e (let (a e) a))
 
+(rule "let.intro.tfftff"
+      ((e : Tuple Float Float (Tuple Float Float))
+       (a : Tuple Float Float (Tuple Float Float)))
+      e (let (a e) a))
+
+(rule "let.intro.tff"
+      ((e : Tuple Float Float)
+       (a : Tuple Float Float))
+      e (let (a e) a))
+
+(rule "let.intro.b"
+      ((e : Bool)
+       (a : Bool))
+      e (let (a e) a))
+
+
+(rule "let.intro" ((e : Float) (a : Float))
+      e (let (a e) a))
+
+
+
 (rule "tuple.if" ((c : Bool) (a1 : Float) (a2 : Float) (b1 : Float) (b2 : Float))
       (tuple (if c a1 b1) (if c a2 b2))
       (if c (tuple a1 a2) (tuple b1 b2)))
