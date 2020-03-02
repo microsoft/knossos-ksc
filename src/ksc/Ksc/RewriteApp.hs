@@ -68,11 +68,6 @@ mkRuleBase = Rules.mkRuleBase . mapMaybe (\case
        Lang.RuleDecl r -> Just r
        Lang.DefDecl{} -> Nothing)
 
-readProgram :: String -> String -> IO (Lang.TExpr, Rules.RuleBase)
-readProgram sourceFile functionName = do
-  sourceFileContent <- readFile sourceFile
-  readProgramS sourceFileContent functionName
-
 readProgramS :: String -> String -> IO (Lang.TExpr, Rules.RuleBase)
 readProgramS sourceFileContent functionName = do
   prelude <- readFile "src/runtime/prelude.ks"
@@ -119,7 +114,8 @@ main = do
 
   scotty 3000 $ do
     get "/" $ do
-      (prog, rules) <- liftAndCatchIO $ readProgram sourceFile functionName
+      sourceFileContent <- liftAndCatchIO $ readFile sourceFile
+      (prog, rules) <- liftAndCatchIO $ readProgramS sourceFileContent functionName
       s <- withMap (\m -> renderPages m (chooseLocationPages rules ChooseLocationModel {
                             clmHistory = []
                           , clmCurrent = prog
