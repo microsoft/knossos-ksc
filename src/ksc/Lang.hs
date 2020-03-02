@@ -859,7 +859,9 @@ isInfixFun (Fun (PrimFun s))
     | s == "eq"     = Just (precOne, "==")
     | s == "add"    = Just (precTwo, "+")
 isInfixFun (Fun (UserFun s))
+    | s == "add@ff" = Just (precTwo, "+")
     | s == "mul@ff" = Just (precThree, "*")
+    | s == "div@ff" = Just (precThree, "/")
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
