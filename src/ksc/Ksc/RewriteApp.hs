@@ -147,8 +147,15 @@ main = do
                      , "<form action=\"/do-upload\" "
                      , "enctype=\"multipart/form-data\" method=\"POST\">"
                      , "<input type=\"file\" name=\"file\">"
-                     , "<input type=\"submit\">"
-                     , "</form>" ]
+                     , "<p><input type=\"submit\" value=\"Upload chosen file\"></p>"
+                     , "</form>"
+                     , "<form action=\"/do-upload-text\" "
+                     , "enctype=\"multipart/form-data\" method=\"POST\">"
+                     , "<textarea name=\"file\" rows=\"20\" cols=\"80\">"
+                     , "</textarea>"
+                     , "<p><input type=\"submit\" value=\"Upload contents of text box\"></p>"
+                     , "</form>"
+                     ]
     post "/do-upload" $ do
       uploadedFileContentM <- readUploadedFile "file"
       let uploadedFileContent = case uploadedFileContentM of
@@ -163,6 +170,17 @@ main = do
                           }))
 
       html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+    post "/do-upload-text" $ do
+      uploadedFileContent <- param "file"
+      (prog, rules) <- liftAndCatchIO $ readProgramS uploadedFileContent functionName
+      s <- withMap (\m ->
+        renderPages m (chooseLocationPages rules ChooseLocationModel {
+                            clmHistory = []
+                          , clmCurrent = prog
+                          }))
+
+      html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+
 
 readUploadedFile :: Data.Text.Lazy.Text
                  -> Web.Scotty.ActionM (Maybe String)
