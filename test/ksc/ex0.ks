@@ -35,6 +35,9 @@
 (rule "let.elim" ((e : Float) (a : Float))
       (let (a e) a) e)
 
+(rule "let.intro" ((e : Float) (a : Float))
+      e (let (a e) a))
+
 (rule "tuple.if" ((c : Bool) (a1 : Float) (a2 : Float) (b1 : Float) (b2 : Float))
       (tuple (if c a1 b1) (if c a2 b2))
       (if c (tuple a1 a2) (tuple b1 b2)))

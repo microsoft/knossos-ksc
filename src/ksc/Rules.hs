@@ -1,7 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-module Rules( RuleBase, tryRules, tryRulesMany,
+module Rules( RuleBase, tryRules, tryRulesMany, tryRulesManyNoLet,
               mkRuleBase, matchRules ) where
 
 import Lang
@@ -9,6 +9,7 @@ import LangUtils ()
 import Control.Monad( guard )
 import Data.Map as M
 import Data.Maybe ( listToMaybe )
+import OptLet ( Subst, extendSubstMap, mkEmptySubst, substExpr )
 
 newtype RuleBase = Rules [TRule] deriving Show
         -- Rule is defined in Lang
@@ -18,6 +19,15 @@ type VSubst = M.Map TVar TVar  -- Substitution for bv(lhs)
 
 mkRuleBase :: [TRule] -> RuleBase
 mkRuleBase = Rules
+
+tryRulesManyNoLet :: [TVar] -> RuleBase -> TExpr -> [(TRule, TExpr)]
+tryRulesManyNoLet inScope rules = fmap f . matchRules rules
+  where f (rule, tSubst) = (rule, substExpr subst (ru_rhs rule))
+          where subst = Prelude.foldl addVarToSubst
+                                      (mkEmptySubst inScope)
+                                      (M.toList tSubst)
+                addVarToSubst :: Subst -> (TVar, TExpr) -> Subst
+                addVarToSubst s (tv, e) = extendSubstMap (tVarVar tv) e s
 
 tryRulesMany :: RuleBase -> TExpr -> [(TRule, TExpr)]
 tryRulesMany rules = fmap f . matchRules rules

@@ -26,7 +26,6 @@ import qualified LangUtils
 import qualified Parse
 import qualified Annotate
 import qualified KMonad
-import qualified OptLet
 
 import qualified Data.Map
 import           Data.Maybe (mapMaybe)
@@ -233,8 +232,12 @@ setList i a as = zipWith f [1..] as
   where f j a' = if i == j then a else a'
 
 tryRules :: Rules.RuleBase -> Lang.TExpr -> [(Lang.TRule, Lang.TExpr)]
-tryRules rulebase = (fmap . fmap) (OptLet.optLets (OptLet.mkEmptySubst []))
-                    . Rules.tryRulesMany rulebase
+tryRules = Rules.tryRulesManyNoLet inScopeSet
+  where -- FIXME: It is false that the in-scope set is empty.  This
+        -- may mean that we substitute incorrectly.  I'm tolerating
+        -- this now for the sake of getting a prototype working but we
+        -- need to think this through properly.
+        inScopeSet = []
 
 data Wrapped tExpr e =
   Wrapped (Lang.TExpr, Lang.TExpr -> tExpr,
