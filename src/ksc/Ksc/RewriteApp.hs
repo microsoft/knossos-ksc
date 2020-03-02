@@ -112,15 +112,18 @@ main = do
                  , "</ul>"
                  ]
 
+      webFile sourceFileContent = do
+        (prog, rules) <- liftAndCatchIO $ readProgramS sourceFileContent functionName
+        s <- withMap (\m -> renderPages m (chooseLocationPages rules ChooseLocationModel {
+                              clmHistory = []
+                            , clmCurrent = prog
+                            }))
+        html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+
   scotty 3000 $ do
     get "/" $ do
       sourceFileContent <- liftAndCatchIO $ readFile sourceFile
-      (prog, rules) <- liftAndCatchIO $ readProgramS sourceFileContent functionName
-      s <- withMap (\m -> renderPages m (chooseLocationPages rules ChooseLocationModel {
-                            clmHistory = []
-                          , clmCurrent = prog
-                          }))
-      html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+      webFile sourceFileContent
     get "/rewrite/:word" $ do
       beam <- param "word"
       let i = read (Data.Text.Lazy.unpack beam) :: Int
@@ -157,26 +160,10 @@ main = do
       let uploadedFileContent = case uploadedFileContentM of
             Just s  -> s
             Nothing -> error "Couldn't find uploaded file"
-
-      (prog, rules) <- liftAndCatchIO $ readProgramS uploadedFileContent functionName
-      s <- withMap (\m ->
-        renderPages m (chooseLocationPages rules ChooseLocationModel {
-                            clmHistory = []
-                          , clmCurrent = prog
-                          }))
-
-      html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+      webFile uploadedFileContent
     post "/do-upload-text" $ do
       uploadedFileContent <- param "file"
-      (prog, rules) <- liftAndCatchIO $ readProgramS uploadedFileContent functionName
-      s <- withMap (\m ->
-        renderPages m (chooseLocationPages rules ChooseLocationModel {
-                            clmHistory = []
-                          , clmCurrent = prog
-                          }))
-
-      html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
-
+      webFile uploadedFileContent
 
 readUploadedFile :: Data.Text.Lazy.Text
                  -> Web.Scotty.ActionM (Maybe String)
