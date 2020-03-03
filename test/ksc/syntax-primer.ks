@@ -155,27 +155,28 @@ If you prefer block comments then use pairs of #| and |#
 ;     return a + 10 if b1 or b2 else a - 10
 
 
-; Knossos types, constants, let bindings
+; Knossos constants, variables and let bindings
+;
+; Constants are literals in code:
+;  * Integer literals are numeric literals (without the decimal point)
+;  * Float literals are numeric literals (and must contain a decimal point)
+;  * Bool literals are "true" and "false"
+;  * String literals are "quoted strings"
+;
+; Variables are:
+;  * Declared in function definitions, ex: "(x : Float)" to use in the function
+;  * Defined in Let bindings, see below, with an initialiser
+;  * Used inside functions, by using its name directly
+;
+; To create new variables use let bindings. The scope of the variable remains
+; active after the let binding and is destroyed when the scope encompassing let
+; is left. There can be any number of let bindings in that way.
+;
+; Knossos allows name shadowing, so you can reuse the name of an earlier
+; variable in a subsequent let binding.
 
-; Knossos has the following types: String, Bool, Integer, Float, Tuple
-; and Vec.
-;
-; "Float" compiles to C++ double and "Vec" compiles to ks::vec from
-; the Knossos C++ runtime.
-;
-; * Integer literals are numeric literals
-;
-; * Float literals are numeric literals (and must contain a decimal point)
-;
-; * Bool literals are "true" and "false"
-;
-; * Vec is indexed with "index" (and created with "build" (see
-;   below)).  Please note that the order of arguments is "index i v"
-;   where v is the vector being indexed and i is the index.  This is
-;   the opposite way round from what you might expect if you are used
-;   to "v[i]" notation.
-;
-; To create new variables use "let"
+; The following code defines four variables, b2, i2, f2 and s2, in one let
+; statement, and those variables are used on the following if statement:
 (def let_and_types Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
      (let ((b2 (or b false))
            (i2 (add@ii i 10))
