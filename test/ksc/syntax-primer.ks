@@ -199,15 +199,14 @@ If you prefer block comments then use pairs of #| and |#
 ;     else:
 ;         return f2
 
-
 ; Vectors are created with the "build" function.
 ;
-; This example creates a vector of length n whose ith index is i
-; squared.
+; The syntax is: (build N (Lambda))
 ;
-; If you are already familiar with lambdas you can read this as "build
-; a vector of length n where the element at position i is given by the
-; lambda expression applied to i".
+; The lambda can only accept one argument, an Integer, the induction variable,
+; which "build" iterates from 0 to N, calling the lambda with that value.
+
+; This example creates a vector of length n whose ith index is i squared as float:
 (def build_example (Vec Float) (n : Integer)
      (build n (lam (ni : Integer) (to_float (mul@ii ni ni)))))
 
