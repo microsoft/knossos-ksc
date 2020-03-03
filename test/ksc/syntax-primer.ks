@@ -1,6 +1,6 @@
 ; ksc syntax primer
 
-; Basic syntax, definining and calling functions
+; Introduction
 
 ; The basic building block of ksc syntax is the S-expression (also are
 ; used in Lisp and Scheme).  That means that every language construct
@@ -8,16 +8,15 @@
 ; wherever we like and and we don't need to end lines with semi-colons
 ; or any other form of punctuation.
 ;
-; The following defines a function of two variables x and y (both
-; Integers) which returns an Integer.
-(def f1 Integer ((x : Integer) (y : Integer))
-     (add@ii x y))
-
-; Python equivalent
+; There are two top-level constructs: function declaration and definitions.
+; Those are not required for transformations, and all constructs can appear
+; in the global context, but execution needs a "main" function, which will
+; then become the entry point of the compiled binary.
 ;
-; def f1(x : int, y : int) -> int:
-;     return x + y
-
+; Knossos compilers automatically include its "standard library" called
+; prelude.ks (in src/runtime). The functions declared there are implemented
+; in Haskell/C++ (knossos.fut/knossos.h) and will be linked with the final
+; executable.
 
 ; Comments
 
@@ -29,6 +28,42 @@
 If you prefer block comments then use pairs of #| and |#
 
 |#
+
+; Types
+
+; Knossos has four basic types:
+;  * String: used mostly for debug purposes on (pr) statements
+;  * Bool: used as conditions in (if) statements
+;  * Integer: default to 64-bit signed integer (int64_t)
+;  * Float: default to 64-bit IEEE 754 floating point numbers (double)
+;
+; As well as two composite types:
+;  * Tuple: a collection of different types (like a C structure)
+;           (Tuple Float (Tuple Integer Bool) String) -> nesting tuples
+;    * Access: (get$2$3 t) -> gets second (of three) element (starts at 1)
+;  * Vec: a list of single-typed elements (like Python lists)
+;           (Vec (Vec Float)) -> a 2D matrix
+;    * Access: (index N vec) -> return Nth element (0 < N < size(vec)-1)
+;
+; A Lambda type, for callable objects:
+;           (Lambda (Tuple Float Float) Float) -> f({float, float}) -> float
+;
+; Linear Maps (LM) represent a transformation that converts one type into
+; another and are used in auto-derivative functions. These are not used
+; directly by user code and can be ignored (for now).
+
+; Declarations, definining and calling functions
+
+; The following defines a function of two variables x and y (both
+; Integers) which returns an Integer.
+(def f1 Integer ((x : Integer) (y : Integer))
+     (add@ii x y))
+
+; Python equivalent
+;
+; def f1(x : int, y : int) -> int:
+;     return x + y
+
 
 ; A bigger example
 
@@ -239,10 +274,6 @@ If you prefer block comments then use pairs of #| and |#
 ;         return s
 
 
-; If there's a main function then it will become the main function of
-; the resulting C++ file and thus the entry point of the compiled
-; binary.
-;
 ; You can use the pr function for printing values.
 (def main Integer ()
      (pr "Hello world"))
