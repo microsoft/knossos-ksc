@@ -122,7 +122,6 @@ If you prefer block comments then use pairs of #| and |#
 ; def f2(a : int, b : int, c : int, d : int, e : int) -> int:
 ;     return ((a * b) + -c) - (d / e)
 
-
 ; Conditionals
 
 ; A conditional ("if") looks like a function call with three
@@ -130,7 +129,9 @@ If you prefer block comments then use pairs of #| and |#
 ; to be evaluated if the condition is true, and the third is the
 ; expression to be evaluated if the condition is false.
 ;
-; The Knossos boolean type is called "Bool"
+; The return type is the type returned by the basic blocks, which must be
+; identical for consistency.
+;
 (def if_example Integer ((b1 : Bool) (b2 : Bool) (a : Integer))
      (if (or b1 b2)
          (add@ii a 10)
@@ -139,17 +140,17 @@ If you prefer block comments then use pairs of #| and |#
 ; Python equivalent
 ;
 ; The equivalent in Python would most commonly be written like
-; if_example1 below.  On the other hand, Knossos has if expressions
-; rather than if statements so a more direct translation would use
-; Python's ternary "... if ... else ..." expression form, as shown in
-; if_example2.
-;
+; if_example1 below:
 ; def if_example1(b1 : bool, b2 : bool, a : Integer) -> int:
 ;     if b1 or b2:
 ;         return a + 10
 ;     else:
 ;         return a - 10
 ;
+; On the other hand, Knossos has if expressions
+; rather than if statements so a more direct translation would use
+; Python's ternary "... if ... else ..." expression form, as shown in
+; if_example2:
 ; def if_example2(b1 : bool, b2 : bool, a : Integer) -> int:
 ;     return a + 10 if b1 or b2 else a - 10
 
