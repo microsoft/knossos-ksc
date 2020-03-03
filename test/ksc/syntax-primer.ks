@@ -52,10 +52,49 @@ If you prefer block comments then use pairs of #| and |#
 ; another and are used in auto-derivative functions. These are not used
 ; directly by user code and can be ignored (for now).
 
-; Declarations, definining and calling functions
+; Functions
 
-; The following defines a function of two variables x and y (both
+; Functions can be forward-declared, defined (with implementation) or called
+; from within another function.
+;
+; Declarations only expose the signature to the rest of the compilation unit
+; without actually implementing the logic. This is used for the standard
+; library functions (the ones implemented in Haskell/C++) as well as to help
+; test arbitrary code without needing complex implementation.
+;
+; The syntax is: (edef name ReturnType (ArgTy1 ArgTy2 ...))
+;
+; Definitions implement the function directly in Knossos. If a function was
+; already declared, the definition signature must match the declaration. If
+; not, the declaration is implied from the definition.
+;
+; The syntax is: (def name ReturnType ((arg1 : ArgTy1) (arg2 : ArgTy2) ... )
+;                                     (expression))
+;
+; Only declared or defined functions can be called. A call, like any operation,
+; passes the arguments to the function definition.
+;
+; The syntax is: (name op1 op2 ...)
+;
+; Note that, even primitive operations like add or sub are function calls in
+; the Knossos IR. The best places to find a full list of supported functions
+; are prelude.ks and the Prim module.
+;
+; The standard library names are split into three parts: prefix$name@types
+;
+; The prefix is reserved for auto-generated functions (like derivatives) and
+; you shouldn't need to call those functions directly.
+;
+; The name represents the operation itself, like add, mul, dot, gt, lt, etc.
+;
+; The suffix represents the types involved, for example 'f' for float and 'i'
+; for integers. So, 'add@ii' "adds" two integers, returning the sum.
+
+; The following declares a function of two variables x and y (both
 ; Integers) which returns an Integer.
+(edef f1 Integer (Integer Integer))
+
+; Then it defines that function, with its implementation
 (def f1 Integer ((x : Integer) (y : Integer))
      (add@ii x y))
 
@@ -64,16 +103,9 @@ If you prefer block comments then use pairs of #| and |#
 ; def f1(x : int, y : int) -> int:
 ;     return x + y
 
+; A call to that function would simply be:
+(fun 10 20)
 
-; A bigger example
-
-; The syntax of nested function calls looks different in .ksc to most
-; other languages. It does not use infix operators for arithmetic.
-; Instead there are functions called "add", "sub", "mul", "div", etc.,
-; suffixed with the type of argument that they take (i for Integer, f
-; for Float). The best places to find a full list of supported
-; functions are prelude.ks and the Prim module.
-;
 ; The following defines a function that takes five arguments (a to e)
 ; each of type Integer and returns an Integer.  It performs the
 ; arithmetic operation ((a*b) + (-c)) - (d/e).
