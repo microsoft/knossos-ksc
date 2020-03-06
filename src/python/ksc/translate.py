@@ -195,8 +195,11 @@ class Translator:
         elif func_name == "if":
             # need to special case if because "if" is a python keyword
             cond, then_branch, else_branch = [self.handle_body(se, indent+2) for se in s_exp[1:]]
-            return joiner.join([f"({then_branch} if {cond} else",
-                                f" {else_branch})"])
+            return joiner.join([
+                f"if_then_else({cond},",
+                f"             lambda: {then_branch},",
+                f"             lambda: {else_branch})"
+            ])
 
         args = s_exp[1:]
         args_handled = []
