@@ -211,15 +211,15 @@ def get_class_name_dict(class_names_file):
 
 def check_abstract(ks_str, x, weights):
     m = translate_and_import(ks_str, "abstract")
-    ctx = ExecutionContext(state=0)
-    x = AbstractValue.from_data(x, ctx)
-    weights = AbstractValue.from_data(weights, ExecutionContext())
-    o = m.resnet(x, weights)
+    x = AbstractValue.from_data(x, context=0)
+    weights = AbstractValue.from_data(weights, context=0)
+    with ExecutionContext() as ctx:
+        o = m.resnet(x, weights)
     print(o)
-    keys = o.context._costs.keys()
-    total_cost = sum(o.context._costs.values())
-    print(o.context._costs)
-    print({k: v * 100 / total_cost for k, v in o.context._costs.items()})
+    keys = ctx.costs.keys()
+    total_cost = sum(ctx.costs.values())
+    print(ctx.costs)
+    print({k: v * 100 / total_cost for k, v in ctx.costs.items()})
     exit(0)
 
 def main():
@@ -246,7 +246,7 @@ def main():
 
     # disable name mangling so that the output looks more readable
     from ksc.tracing import jitting
-    jitting.disable_name_mangling()
+    # jitting.disable_name_mangling()
     if args.model == "resnet_v2":
         from resnet_v2 import Resnet50 as resnet
         weights = resnet50_v2_weights_from_pytorch(weights)

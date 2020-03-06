@@ -138,6 +138,9 @@ def fold(f, s0, xs):
 
 def make_tuple(*args):
     context = check_args_and_get_context("tuple", args)
+    if context == "concrete":
+        # deal with literal tuple
+        return AbstractValue.from_data(tuple(_get_data(arg) for arg in args), context=context)
     child_shapes = tuple(arg.shape_type.shape for arg in args)
     child_types = tuple(arg.shape_type.type for arg in args)
     child_data = tuple(_get_data(arg) for arg in args)
