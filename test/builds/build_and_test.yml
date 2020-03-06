@@ -49,21 +49,6 @@ jobs:
   - script: sh ./test/builds/test_pytest.sh
     displayName: Testing ksc python package
 
-  - script: |
-      python3 -m pip install wheel twine
-      pushd ./src/python && python3 setup.py bdist_wheel
-      popd
-    displayName: Prepare for ksc python package publishing
-
-  - task: TwineAuthenticate@1
-    displayName: 'Twine Authenticate'
-    inputs:
-      artifactFeed: Knossos/Knossos
-
-  - script: |
-      python3 -m twine upload -r "Knossos" --skip-existing --config-file $(PYPIRC_PATH) ./src/python/dist/*.whl --verbose
-    displayName: Publishing ksc python package
-
   - script: sh ./test/builds/test_resnet50.sh
     displayName: Testing Resnet50 through ksc
 
