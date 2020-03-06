@@ -539,7 +539,7 @@ traversePage f = \case
   ChooseRewrite r -> ChooseRewrite <$> traverseChooseRewritePage f r
 
 renderChooseLocationPageString :: ChooseLocationPage Int -> String -> String
-renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
+renderChooseLocationPageString (ChooseLocationPage ds s cost _) rewriteChoices =
     "<table style=\"border-collapse: collapse\">" ++
     tr (th "Cost" <> th "IR" <> th "Infix") ++
       (concatMap (tr . concatMap td . toListOf each)
@@ -554,9 +554,7 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost d) rewriteChoices =
     ++ "</table>"
     where td s' = "<td style=\"border: 1px solid black; "
                   ++ "padding: 0.5em\">" ++ s' ++ "</td>"
-          expAndRWCs = "<a name=\"target\"></a>"
-            <> renderDocumentsString d
-            <> rewriteChoices
+          expAndRWCs = rewriteChoices
 
 tr :: Html -> Html
 tr = tag "tr"
@@ -573,7 +571,10 @@ tag t s = "<" ++ t ++ ">" ++ s ++ "</" ++ t ++ ">"
 
 renderPageString :: Page Int -> String
 renderPageString = \case
-  ChooseLocation clp -> renderChooseLocationPageString clp ""
+  ChooseLocation clp -> renderChooseLocationPageString clp
+    ("<a name=\"target\"></a>"
+      <> renderDocumentsString d)
+    where d = clpThisExp clp
   ChooseRewrite (ChooseRewritePage clp dd r) ->
     renderChooseLocationPageString clp
       (p (renderDocumentsString dd) ++
