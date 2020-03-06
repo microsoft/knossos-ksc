@@ -214,7 +214,7 @@ data ChooseRewriteModel =
 
 data ChooseRewritePage a =
   ChooseRewritePage { crpClp        :: ChooseLocationPage a
-                    , crpHigLighted :: [Document (Wrapped Lang.TExpr Void)]
+                    , crpHigLighted :: [Document a]
                     , crpRewrites   :: [(String, String, a)]
                     }
   deriving Functor
@@ -351,11 +351,26 @@ rewrites :: Rules.RuleBase
          -> Lang.TExpr
          -> [Document ([Document (Wrapped Lang.TExpr e)], [(Lang.TRule, Lang.TExpr)])]
 rewrites rulebase e = (map . fmap) f (separateWrapped id id e)
-  where f :: Wrapped tExpr e -> ([Document (Wrapped tExpr e)], [(Lang.TRule, tExpr)])
-        f (Wrapped (ee, k, dd, ddk)) = (ddk [Highlight dd], call_rewrites)
+  where f = rewritesHere rulebase
+
+rewritesHere :: Rules.RuleBase
+             -> Wrapped tExpr e
+             -> ([Document (Wrapped tExpr e)], [(Lang.TRule, tExpr)])
+rewritesHere rulebase (Wrapped (ee, k, dd, ddk)) =
+  (ddk [Highlight dd], call_rewrites)
           where call_rewrites =
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
+
+chooseRewriteModelHere :: ([Document (Wrapped Lang.TExpr Void)],
+                            [(Lang.TRule, Lang.TExpr)])
+                       -> ChooseLocationModel
+                       -> ChooseRewriteModel
+chooseRewriteModelHere (d, rs) clm =
+  ChooseRewriteModel { crmClm = clm
+                     , crmHighlighted = d
+                     , crmRewrites = rs
+                     }
 
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
@@ -371,11 +386,8 @@ chooseLocationPage r clm =
       }) es_rs
   , clpCStyle  = Lang.pps e
   , clpCost    = Ksc.Cost.cost e
-  , clpThisExp = flip (fmap . fmap) (rewrites r e) $ \(d, rs) ->
-      ChooseRewriteModel { crmClm = clm
-                         , crmHighlighted = d
-                         , crmRewrites = rs
-                         }
+  , clpThisExp = flip (fmap . fmap) (rewrites r e) $ \t ->
+      chooseRewriteModelHere t clm
   }
   where ChooseLocationModel { clmHistory = es_rs
                             , clmCurrent = e
@@ -394,7 +406,8 @@ chooseRewritePage rules crm =
   ChooseRewritePage {
       crpClp =
         (mapLocationDocument . fmap . fmap) Right (chooseLocationPage rules clm)
-    , crpHigLighted = crmHighlighted crm
+    , crpHigLighted = flip (fmap . fmap) (crmHighlighted crm) $ \w ->
+        Right (chooseRewriteModelHere (rewritesHere rules w) clm)
     , crpRewrites = fmap f (crmRewrites crm)
     }
   where f :: (Lang.TRule, Lang.TExpr)
@@ -476,7 +489,7 @@ spanColor s = "<span onMouseOver=\"window.event.stopPropagation(); this.style.ba
               ++ "</span>"
 
 spanColorFixed :: String -> String
-spanColorFixed s = "<span style=\"color: red\">"
+spanColorFixed s = "<span style=\"background-color: #eeeeff\">"
                    ++ s
                    ++ "</span>"
 
@@ -515,7 +528,7 @@ traverseChooseRewritePage :: Applicative f
 traverseChooseRewritePage f = \case
   ChooseRewritePage clp dd r ->
     ChooseRewritePage <$> traverseChooseLocationPage f clp
-                      <*> pure dd
+                      <*> (traverse . traverseDocument) f dd
                       <*> (traverse . traverseOf _3) f r
 
 traversePage :: Applicative f
@@ -562,7 +575,7 @@ renderPageString = \case
   ChooseLocation clp -> renderChooseLocationPageString clp ""
   ChooseRewrite (ChooseRewritePage clp dd r) ->
     renderChooseLocationPageString clp
-      (p (renderDocumentsString (map removeLinks dd)) ++
+      (p (renderDocumentsString dd) ++
         "<ul>"
     ++ renderRewrites (NEL.nonEmpty r)
     ++ "</ul>")
