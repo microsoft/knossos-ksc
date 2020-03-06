@@ -2,8 +2,8 @@
  A version of jax backend that expects arguments as (..., weights, input)
  used by resnet_v2.ks
 """
-from ksc.backends.common import *
-from ksc.backends.jax import (
+from .common import *
+from .jax import (
     broadcast_add,
     dot,
     transpose,
@@ -12,7 +12,7 @@ from ksc.backends.jax import (
     to_float,
     flatten
 )
-import ksc.backends.jax as jax_backend
+from . import jax as jax_backend
 _built_ins = jax_backend._built_ins
 
 def conv_2d_no_bias(ksizes, strides, paddings, weights, x):

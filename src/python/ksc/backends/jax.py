@@ -5,9 +5,11 @@ try:
 except ModuleNotFoundError:
   import numpy as np
 
-from ksc.backends.common import *
+# Use relative import to work around a python 3.6 issue
+# https://stackoverflow.com/questions/57615877/importing-difference-in-python3-6-and-python3-7
+from . import common
+from .common import *
 
-from ksc.backends import common
 _built_ins = common._built_ins
 
 def broadcast_add(x, b):
