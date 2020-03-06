@@ -4,8 +4,8 @@ import ksc
 from ksc.abstract_value import AbstractValue, ExecutionContext, current_execution_context
 from ksc.type import Type
 
-from ksc.backends import common
-from ksc.backends.common import (
+from . import common
+from .common import (
     add,
     sub,
     mul,
