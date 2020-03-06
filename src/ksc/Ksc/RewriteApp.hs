@@ -362,15 +362,16 @@ rewritesHere rulebase (Wrapped (ee, k, dd, ddk)) =
                    map (\(rule, rewritten) -> (rule, k rewritten))
                        (tryRules rulebase ee)
 
-chooseRewriteModelHere :: ([Document (Wrapped Lang.TExpr Void)],
-                            [(Lang.TRule, Lang.TExpr)])
+chooseRewriteModelHere :: Rules.RuleBase
+                       -> Wrapped Lang.TExpr Void
                        -> ChooseLocationModel
                        -> ChooseRewriteModel
-chooseRewriteModelHere (d, rs) clm =
+chooseRewriteModelHere r t clm =
   ChooseRewriteModel { crmClm = clm
                      , crmHighlighted = d
                      , crmRewrites = rs
                      }
+  where (d, rs) = rewritesHere r t
 
 chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationModel
@@ -386,8 +387,8 @@ chooseLocationPage r clm =
       }) es_rs
   , clpCStyle  = Lang.pps e
   , clpCost    = Ksc.Cost.cost e
-  , clpThisExp = flip (fmap . fmap) (rewrites r e) $ \t ->
-      chooseRewriteModelHere t clm
+  , clpThisExp = flip (fmap . fmap) (separateWrapped id id e) $ \t ->
+      chooseRewriteModelHere r t clm
   }
   where ChooseLocationModel { clmHistory = es_rs
                             , clmCurrent = e
@@ -407,7 +408,7 @@ chooseRewritePage rules crm =
       crpClp =
         (mapLocationDocument . fmap . fmap) Right (chooseLocationPage rules clm)
     , crpHigLighted = flip (fmap . fmap) (crmHighlighted crm) $ \w ->
-        Right (chooseRewriteModelHere (rewritesHere rules w) clm)
+        Right (chooseRewriteModelHere rules w clm)
     , crpRewrites = fmap f (crmRewrites crm)
     }
   where f :: (Lang.TRule, Lang.TExpr)
