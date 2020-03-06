@@ -76,6 +76,9 @@ def get_tuple_element(i, tup):
 def let(var, body):
     return body(var)
 
+def if_then_else(cond, then_branch, else_branch):
+    return then_branch() if cond else else_branch()
+
 _built_ins = [
     "build",
     "sumbuild",
@@ -84,5 +87,6 @@ _built_ins = [
     "fold",
     "make_tuple",
     "get_tuple_element",
-    "let"
+    "let",
+    "if_then_else"
 ]

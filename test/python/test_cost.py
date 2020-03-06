@@ -170,3 +170,55 @@ def test_states():
         compile_and_compute_cost(f, (x2, y2), arg_context=2, exec_context=ctx)
     assert ctx.costs[1] == 3 * 2
     assert ctx.costs[2] == 3 * 2 * 5
+
+def test_if_then_else():
+    ks_str = """
+(edef mul@ii Integer (Integer Integer))
+(def cost$mul@ii Float ((a : Integer) (b : Integer)) 2.0)
+(def shape$mul@ii Integer ((a : Integer) (b : Integer)) 0)
+(edef eq@ii Bool (Float Float))
+(def cost$eq@ii Float ((a : Float) (b : Float)) 1.0)
+(def shape$eq@ii Integer ((a : Float) (b : Float)) 0)
+
+(def select1 (Vec Integer) ((p : Bool) (x : (Vec Integer)))
+  (if p
+      (build (size x) (lam (i : Integer) (mul@ii i 2)))  ; expensive branch cost 301
+      (build (size x) (lam (i : Integer) (index i x)))   ; cheap branch cost 201
+  )
+)
+(def select2 (Vec Integer) ((p : Bool) (x : (Vec Integer)))
+  (if p
+      (build (size x) (lam (i : Integer) (index i x)))
+      (build (size x) (lam (i : Integer) (mul@ii i 2)))
+  )
+)
+(def select3 (Vec Integer) ((x : (Vec Integer)))
+  (if (eq@ii 0 0)
+      (build (size x) (lam (i : Integer) (mul@ii i 2)))
+      (build (size x) (lam (i : Integer) (index i x)))
+  )
+)
+"""
+    cost1 = compute_cost(ks_str,
+                         "select1",
+                         [
+                             AbstractValue((), Type.Bool),
+                             AbstractValue((100,), Type.Vec(Type.Integer))
+                         ]
+    )
+    cost2 = compute_cost(ks_str,
+                         "select2",
+                         [
+                             AbstractValue((), Type.Bool),
+                             AbstractValue((100,), Type.Vec(Type.Integer))
+                         ]
+    )
+    cost3 = compute_cost(ks_str,
+                         "select3",
+                         [
+                             AbstractValue((100,), Type.Vec(Type.Integer))
+                         ]
+    )
+    assert cost1 == 302.0201
+    assert cost1 == cost2
+    assert cost3 < cost1

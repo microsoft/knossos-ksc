@@ -11,7 +11,8 @@ def _cleanup_value(data):
 
 class AbstractValue:
     def __init__(self, shape=None, type=None, data=None, context=None):
-        self._shape = shape
+        # handle scalar shape output by shape$ function
+        self._shape = () if shape == 0 else shape
         self._type = type
         self._data = data
         self._context = context
@@ -28,6 +29,14 @@ class AbstractValue:
             return AbstractValue.from_data(value, context)
         shape, type = value.shape_type
         return AbstractValue(shape, type, value.data, context)
+
+    @staticmethod
+    def abstract_like(value):
+        if not isinstance(value, AbstractValue):
+            shape, type = shape_type_from_object(value)
+            return AbstractValue(shape, type)
+        shape, type = value.shape_type
+        return AbstractValue(shape, type, context=value.context)
 
     @property
     def shape_type(self):
@@ -51,7 +60,9 @@ def get_default_cost_config():
         "build_malloc_cost": 100,
         "index_cost": 1,
         "size_cost": 1,
-        "select_cost": 0
+        "select_cost": 0,
+        "if_selection_cost": 1,
+        "if_epsilon": 0.0001
     }
 
 class ExecutionContext:

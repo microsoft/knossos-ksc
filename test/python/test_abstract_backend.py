@@ -54,3 +54,22 @@ def test_tuple_of_tensors():
     with ExecutionContext():
         assert m.fst(x).shape_type == ((3, 4), Type.Vec(Type.Vec(Type.Float)))
         assert m.snd(x).shape_type == ((4,), Type.Vec(Type.Float))
+
+def test_if_then_else():
+    ks_str = """
+(edef lt@ii Bool (Float Float))
+(def cost$lt@ii Float ((a : Float) (b : Float)) 1.0)
+(def shape$lt@ii Integer ((a : Float) (b : Float)) 0)
+(edef eq@ii Bool (Float Float))
+(def cost$eq@ii Float ((a : Float) (b : Float)) 1.0)
+(def shape$eq@ii Integer ((a : Float) (b : Float)) 0)
+(def sign Float ((x : Float))
+    (if (lt@ii x 0) -1.0 (if (eq@ii x 0) 0.0 1.0))
+)
+"""
+    m = translate_and_import(ks_str, "abstract")
+    with ExecutionContext():
+        assert m.sign(2.0) == 1.0
+        assert m.sign(-5.0) == -1.0
+        assert m.sign(0) == 0.0
+        assert m.sign(AbstractValue((), Type.Float)).shape_type == ((), Type.Float)
