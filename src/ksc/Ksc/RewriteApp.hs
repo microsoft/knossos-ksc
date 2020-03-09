@@ -205,8 +205,8 @@ removeLinks = \case
   Branch ds     -> Branch (map removeLinks ds)
   Highlight ds  -> Highlight (map removeLinks ds)
 
-data HistoryEntry a = HistoryEntry {
-    heSExp   :: [Document a]
+data HistoryEntry = HistoryEntry {
+    heSExp   :: [Document Void]
   , heHExp   :: [Document (Wrapped Lang.TExpr Void)]
   , heCstyle :: String
   , heCost   :: Either String Double
@@ -222,7 +222,7 @@ data ChooseLocationModel =
                       }
 
 data ChooseLocationPage a =
-  ChooseLocationPage { clpHistory :: [HistoryEntry Void]
+  ChooseLocationPage { clpHistory :: [HistoryEntry]
                      , clpCStyle  :: String
                      , clpCost    :: Either String Double
                      , clpThisExp :: [Document a]
@@ -417,11 +417,6 @@ chooseLocationPage r clm =
   where ChooseLocationModel { clmHistory = es_rs
                             , clmCurrent = e
                             } = clm
-
-overheSExp :: ([Document a] -> [Document b])
-           -> HistoryEntry a
-           -> HistoryEntry b
-overheSExp f (HistoryEntry a e b c d) = HistoryEntry (f a) e b c d
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
