@@ -140,6 +140,8 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
     return import_module_from_path(module_name, module_path)
 
 def shape_type_from_object(o):
+    # import here to avoid circular dependencies
+    from ksc.abstract_value import AbstractValue
     if hasattr(o, "shape") and hasattr(o, "dtype"):
         # numpy array-like object
         if np.issubdtype(o.dtype, np.floating):
@@ -154,6 +156,8 @@ def shape_type_from_object(o):
         for _ in range(o.ndim):
             vec_type = Type.Vec(vec_type)
         return ShapeType(o.shape, vec_type)
+    elif isinstance(o, AbstractValue):
+        return o.shape_type
     elif hasattr(o, "data") and o.data is not None:
         # value node
         return shape_type_from_object(o.data)

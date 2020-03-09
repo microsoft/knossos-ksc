@@ -4,6 +4,7 @@ import inspect
 
 import numpy as np
 
+from ksc.abstract_value import AbstractValue
 from ksc.ks_function import KsFunction
 from ksc.type import Type
 from ksc.tracing import node
@@ -90,6 +91,9 @@ def jit_and_execute_annonymous_function(body, backend):
     # the jitted function through the origin attribute)
     arg_nodes = [node.Node(n, s, t, data=v) for n, (s, t), v in zip(arg_names, shape_types, values)]
     _ = node.Node(jitted.name, shape_type.shape, shape_type.type, children=arg_nodes, jitted=jitted)
+    if backend == "abstract":
+        # wrap the concrete values in AbstractValue
+        values = [AbstractValue.from_data(value) for value in values]
     v = jitted(*values, backend=backend)
     s, t = utils.shape_type_from_object(v)
     value = node.Node("_identity", s, t, data=v)
