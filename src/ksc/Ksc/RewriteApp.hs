@@ -4,7 +4,7 @@
 --
 -- :l src/ksc/Ksc/RewriteApp.hs
 --
--- main
+-- main3000
 --
 -- The go to http://localhost:3000/ in your browser
 
@@ -45,6 +45,8 @@ import           Control.Monad.Trans.State hiding (get)
 import           Data.Void (Void, absurd)
 import qualified Data.List.NonEmpty as NEL
 
+import qualified System.Environment
+
 import qualified Ksc.Cost (cost)
 import           Lens.Micro (set, traverseOf, _1, _2, _3,each,toListOf)
 import           Lens.Micro.Extras (view)
@@ -81,7 +83,17 @@ readProgramS sourceFileContent functionName = do
   return (prog, rules)
 
 main :: IO ()
-main = do
+main = mainWithArgs =<< System.Environment.getArgs
+
+main3000 :: IO ()
+main3000 = mainWithArgs ["3000"]
+
+mainWithArgs :: [String] -> IO ()
+mainWithArgs args = do
+  let portNumber = case args of
+        portNumberString:_ -> read portNumberString
+        _ -> error "Expected port number as first argument"
+
   mapOfPages <- newIORef Data.Map.empty
   let withMap = liftAndCatchIO . atomicModifyIORef mapOfPages
 
@@ -120,7 +132,7 @@ main = do
                             }))
         html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
 
-  scotty 3000 $ do
+  scotty portNumber $ do
     get "/" $ do
       sourceFileContent <- liftAndCatchIO $ readFile sourceFile
       webFile sourceFileContent
