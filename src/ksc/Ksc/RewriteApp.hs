@@ -102,6 +102,22 @@ mainWithArgs args = do
   let sourceFile = "test/ksc/ex0.ks"
       functionName = "f"
 
+      uploadForms =  [ "<p>The body of the function called \""
+                     , fromString functionName
+                     , "\" in your file will be used as the test expression</p>"
+                     , "<form action=\"/do-upload\" "
+                     , "enctype=\"multipart/form-data\" method=\"POST\">"
+                     , "<input type=\"file\" name=\"file\">"
+                     , "<p><input type=\"submit\" value=\"Upload chosen file\"></p>"
+                     , "</form>"
+                     , "<form action=\"/do-upload-text\" "
+                     , "enctype=\"multipart/form-data\" method=\"POST\">"
+                     , "<textarea name=\"file\" rows=\"20\" cols=\"80\">"
+                     , "</textarea>"
+                     , "<p><input type=\"submit\" value=\"Upload contents of text box\"></p>"
+                     , "</form>"
+                     ]
+
   let link = "<p><a href=\"/\">Start again</a> "
              <> " or <a href=\"/upload.html\">upload a file</a></p>"
 
@@ -135,7 +151,7 @@ mainWithArgs args = do
                               clmHistory = []
                             , clmCurrent = prog
                             }))
-        html $ mconcat (comments ++ [Data.Text.Lazy.pack s])
+        html $ mconcat (comments ++ uploadForms ++ [Data.Text.Lazy.pack s])
 
   scotty portNumber $ do
     get "/" $ do
@@ -157,21 +173,7 @@ mainWithArgs args = do
 
       html (mconcat ss)
     get "/upload.html" $ do
-      html $ mconcat [ "<p>The body of the function called \""
-                     , fromString functionName
-                     , "\" in your file will be used as the test expression</p>"
-                     , "<form action=\"/do-upload\" "
-                     , "enctype=\"multipart/form-data\" method=\"POST\">"
-                     , "<input type=\"file\" name=\"file\">"
-                     , "<p><input type=\"submit\" value=\"Upload chosen file\"></p>"
-                     , "</form>"
-                     , "<form action=\"/do-upload-text\" "
-                     , "enctype=\"multipart/form-data\" method=\"POST\">"
-                     , "<textarea name=\"file\" rows=\"20\" cols=\"80\">"
-                     , "</textarea>"
-                     , "<p><input type=\"submit\" value=\"Upload contents of text box\"></p>"
-                     , "</form>"
-                     ]
+      html $ mconcat uploadForms
     post "/do-upload" $ do
       uploadedFileContentM <- readUploadedFile "file"
       let uploadedFileContent = case uploadedFileContentM of
