@@ -207,13 +207,17 @@ removeLinks = \case
 
 data HistoryEntry a = HistoryEntry {
     heSExp   :: [Document a]
+  , heHExp   :: [Document (Wrapped Lang.TExpr Void)]
   , heCstyle :: String
   , heCost   :: Either String Double
   , heRule   :: Lang.TRule
   }
 
 data ChooseLocationModel =
-  ChooseLocationModel { clmHistory :: [(Lang.TExpr, Lang.TRule)]
+  ChooseLocationModel { clmHistory :: [(Lang.TExpr,
+                                        Lang.TRule,
+                                        [Document (Wrapped Lang.TExpr Void)]
+                                        )]
                       , clmCurrent :: Lang.TExpr
                       }
 
@@ -397,9 +401,10 @@ chooseLocationPage :: Rules.RuleBase
                    -> ChooseLocationPage ChooseRewriteModel
 chooseLocationPage r clm =
   ChooseLocationPage {
-    clpHistory = map (\(e', r') ->
+    clpHistory = map (\(e', r', d') ->
       HistoryEntry {
           heSExp   = documentOfExpr e'
+        , heHExp   = d'
         , heCstyle = Lang.pps e'
         , heCost   = Ksc.Cost.cost e'
         , heRule   = r'
@@ -416,7 +421,7 @@ chooseLocationPage r clm =
 overheSExp :: ([Document a] -> [Document b])
            -> HistoryEntry a
            -> HistoryEntry b
-overheSExp f (HistoryEntry a b c d) = HistoryEntry (f a) b c d
+overheSExp f (HistoryEntry a e b c d) = HistoryEntry (f a) e b c d
 
 chooseRewritePage :: Rules.RuleBase
                   -> ChooseRewriteModel
@@ -435,7 +440,8 @@ chooseRewritePage rules crm =
         f (rule, nextExp) = (Lang.ru_name rule,
                              ": " ++ renderRule rule,
                       Left ChooseLocationModel {
-                           clmHistory = history ++ [(currentExp, rule)]
+                           clmHistory = history
+                             ++ [(currentExp, rule, crmHighlighted crm)]
                          , clmCurrent = nextExp
                          })
         ChooseRewriteModel {
@@ -562,8 +568,8 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost _) rewriteChoices =
     "<table style=\"border-collapse: collapse\">" ++
     tr (th "Cost" <> th "IR" <> th "Infix") ++
       (concatMap (tr . concatMap td . toListOf each)
-      $ flip concatMap ds (\(HistoryEntry d' cstyle c r) ->
-      let ir = renderDocumentsString ((map . fmap) absurd d')
+      $ flip concatMap ds (\(HistoryEntry _ d' cstyle c r) ->
+      let ir = renderDocumentsString (map removeLinks d')
           infix_ = pre cstyle
           appliedRule = p ("then applied: " ++ renderRule r)
       in
