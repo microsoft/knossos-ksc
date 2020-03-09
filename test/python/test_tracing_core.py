@@ -119,7 +119,10 @@ def test_flatten():
     out = F.flatten(x)
     assert out.shape_type.shape == (3, 4 * 5 * 6)
     assert np.allclose(out.data, x.reshape((3, 4 * 5 * 6)))
-    shape_def = next(f for key, f in out.creator._jitted.all_called_functions().items()
+    # creator of out is an anonymous function. So the shape$
+    # function of flatten must be in before.
+    before, _ = out.creator._jitted.all_called_functions()
+    shape_def = next(f for key, f in before.items()
                      if key == "shape$flatten@vvvvf")
     assert shape_def(x) == (3, 4 * 5 * 6)
 
