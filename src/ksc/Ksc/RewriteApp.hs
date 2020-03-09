@@ -15,6 +15,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wwarn #-}
+{-# OPTIONS_GHC -Wall  #-}
 {-# OPTIONS_GHC -Werror=incomplete-patterns #-}
 {-# OPTIONS_GHC -fdefer-typed-holes #-}
 
@@ -46,6 +47,7 @@ import           Data.Void (Void, absurd)
 import qualified Data.List.NonEmpty as NEL
 
 import qualified System.Environment
+import qualified Text.Read
 
 import qualified Ksc.Cost (cost)
 import           Lens.Micro (set, traverseOf, _1, _2, _3,each,toListOf)
@@ -138,7 +140,9 @@ mainWithArgs args = do
       webFile sourceFileContent
     get "/rewrite/:word" $ do
       beam <- param "word"
-      let i = read (Data.Text.Lazy.unpack beam) :: Int
+      let i = case Text.Read.readMaybe (Data.Text.Lazy.unpack beam) of
+            Just i' -> i'
+            Nothing -> error ("Couldn't read " ++ show beam)
 
       ss <- withMap $ \m ->
         case Data.Map.lookup i m of
