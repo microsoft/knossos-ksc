@@ -254,11 +254,14 @@ def check_resnet_expr(input, weights):
     # expr = rewrites.delete_unused_defs(expr)
     with open("resnet50.kso", "w") as f:
         f.write(expr.ksc_str())
-    print([n for n in expr.nodes if n.op == "let" and n.first.name == "var396"])
     from ksc.cost import compute_cost
     from ksc.abstract_value import AbstractValue
+    import time
+    t0 = time.time()
     args = [AbstractValue.from_data(input, 0), AbstractValue.from_data(weights, 0)]
-    print(compute_cost(expr.ksc_str(), def_name, args, aggregation_option="all"))
+    costs = compute_cost(expr.ksc_str(), def_name, args, aggregation_option="all")
+    t1 = time.time()
+    print(f"costs={costs}, time={t1-t0}")
     exit(0)
 
 def main():
