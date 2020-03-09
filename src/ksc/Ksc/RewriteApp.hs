@@ -164,12 +164,13 @@ mainWithArgs args = do
       ss <- withMap $ \m ->
         case flip Data.Map.lookup m =<< i of
           Nothing -> (m, comments
+                       ++ uploadForms
                        ++ ["<p>Couldn't find ", beam, ". ",
                            "You may want to ",
                            "<a href=\"/\">start again</a>.</p>"
                           ])
           Just e -> let (m', s) = renderPages m e
-                    in  (m', comments ++ [Data.Text.Lazy.pack s])
+                    in  (m', comments ++ uploadForms ++ [Data.Text.Lazy.pack s])
 
       html (mconcat ss)
     get "/upload.html" $ do
