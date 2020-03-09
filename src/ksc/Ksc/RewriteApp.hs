@@ -140,12 +140,10 @@ mainWithArgs args = do
       webFile sourceFileContent
     get "/rewrite/:word" $ do
       beam <- param "word"
-      let i = case Text.Read.readMaybe (Data.Text.Lazy.unpack beam) of
-            Just i' -> i'
-            Nothing -> error ("Couldn't read " ++ show beam)
+      let i = Text.Read.readMaybe (Data.Text.Lazy.unpack beam)
 
       ss <- withMap $ \m ->
-        case Data.Map.lookup i m of
+        case flip Data.Map.lookup m =<< i of
           Nothing -> (m, comments
                        ++ ["<p>Couldn't find ", beam, ". ",
                            "You may want to ",
