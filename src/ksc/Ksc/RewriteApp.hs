@@ -208,7 +208,7 @@ removeLinks = \case
 data HistoryEntry a = HistoryEntry {
     heSExp   :: [Document a]
   , heCstyle :: String
-  , heCost   :: Either String Float
+  , heCost   :: Either String Double
   , heRule   :: Lang.TRule
   }
 
@@ -220,7 +220,7 @@ data ChooseLocationModel =
 data ChooseLocationPage a =
   ChooseLocationPage { clpHistory :: [HistoryEntry Void]
                      , clpCStyle  :: String
-                     , clpCost    :: Either String Float
+                     , clpCost    :: Either String Double
                      , clpThisExp :: [Document a]
                      }
   deriving Functor
@@ -604,7 +604,7 @@ renderPageString = \case
             Just l -> concatMap f l
               where f (s, s1, b) = "<li>" ++ renderLink b s ++ s1 ++ "</li>"
 
-renderCost :: Either String Float -> String
+renderCost :: Either String Double -> String
 renderCost s = p (costString s)
   where costString = \case
           Left err -> "Error calculating cost: " ++ err
