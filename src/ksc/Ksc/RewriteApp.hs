@@ -568,7 +568,7 @@ renderChooseLocationPageString (ChooseLocationPage ds s cost _) rewriteChoices =
     ++ "</table>"
     where td s' = "<td style=\"border: 1px solid black; "
                   ++ "padding: 0.5em\">" ++ s' ++ "</td>"
-          expAndRWCs = rewriteChoices
+          expAndRWCs = "<a name=\"target\"></a>" <> rewriteChoices
 
 tr :: Html -> Html
 tr = tag "tr"
@@ -586,8 +586,7 @@ tag t s = "<" ++ t ++ ">" ++ s ++ "</" ++ t ++ ">"
 renderPageString :: Page Int -> String
 renderPageString = \case
   ChooseLocation clp -> renderChooseLocationPageString clp
-    ("<a name=\"target\"></a>"
-      <> renderDocumentsString d)
+    (renderDocumentsString d)
     where d = clpThisExp clp
   ChooseRewrite (ChooseRewritePage clp dd r) ->
     renderChooseLocationPageString clp
