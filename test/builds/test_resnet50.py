@@ -222,17 +222,10 @@ def check_abstract(ks_str, x, weights):
     print({k: v * 100 / total_cost for k, v in ctx.costs.items()})
     exit(0)
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py", "resnet_abstract"])
-    args = parser.parse_args()
+def get_input_weights(model):
     npz_file = download_file(
         PYTORCH_RESNET50_URL,
         "8947031f2fc1799404c49924d72a97c4"
-    )
-    imagenet_class_names_file = download_file(
-        CLASS_INDEX_URL,
-        "c2c37ea517e94d9795004a39431a14cb"
     )
     weights = np.load(npz_file)
     assert weights["_original_url"] == PYTORCH_RESNET50_ORIGINAL_URL
@@ -243,32 +236,66 @@ def main():
     )
     print(f"Loading image {input_file}")
     input = np.asarray(Image.open(input_file)).transpose((2, 0, 1))[None, :, :, :] / 255.0 # NCHW
+    if model == "resnet_v2":
+        weights = resnet50_v2_weights_from_pytorch(weights)
+    elif model in ["resnet_py", "resnet_expr"]:
+        weights = resnet50_py_weights_from_pytorch(weights)
+    return input, weights
 
+def check_resnet_expr(input, weights):
+    import sys
+    sys.path.append("../knossos/src/rlo")
+    import sparser
+    # import rewrites
+    with open("resnet50.ks") as f:
+        ks_str = f.read()
+    defs = sparser.parse_defs(ks_str, nested=True, include_edefs=True)
+    def_name, expr = defs[-1]
+    # expr = rewrites.delete_unused_defs(expr)
+    with open("resnet50.kso", "w") as f:
+        f.write(expr.ksc_str())
+    print([n for n in expr.nodes if n.op == "let" and n.first.name == "var396"])
+    from ksc.cost import compute_cost
+    from ksc.abstract_value import AbstractValue
+    args = [AbstractValue.from_data(input, 0), AbstractValue.from_data(weights, 0)]
+    print(compute_cost(expr.ksc_str(), def_name, args, aggregation_option="all"))
+    exit(0)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py", "resnet_abstract", "resnet_expr"])
+    args = parser.parse_args()
+    input, weights = get_input_weights(args.model)
+    
     # disable name mangling so that the output looks more readable
     from ksc.tracing import jitting
     # jitting.disable_name_mangling()
-    if args.model == "resnet_v2":
-        from resnet_v2 import Resnet50 as resnet
-        weights = resnet50_v2_weights_from_pytorch(weights)
-    elif args.model == "resnet_py":
+    if args.model == "resnet_py":
         import sys
         sys.path.append("examples/dl-resnet")
         from resnet import resnet
-        weights = resnet50_py_weights_from_pytorch(weights)
-    elif args.model == "resnet_abstract":
-        weights = resnet50_py_weights_from_pytorch(weights)
-        with open("resnet50.ks") as f:
-            ks_str = f.read()
-        check_abstract(ks_str, input, weights)
-    if args.model == "resnet_py":
         out = resnet(input, weights)
         ks_str = out.creator._jitted.combined_ks_str()
         with open("resnet50.ks", "w") as f:
             f.write(ks_str)
         check_abstract(ks_str, input, weights)
         out = out.data
+    elif args.model == "resnet_abstract":
+        weights = resnet50_py_weights_from_pytorch(weights)
+        with open("resnet50.ks") as f:
+            ks_str = f.read()
+        check_abstract(ks_str, input, weights)
+    elif args.model == "resnet_expr":
+        check_resnet_expr(input, weights)
     else:
+        from resnet_v2 import Resnet50 as resnet
         out = resnet(weights, input)
+
+    imagenet_class_names_file = download_file(
+        CLASS_INDEX_URL,
+        "c2c37ea517e94d9795004a39431a14cb"
+    )
+
     class_names = get_class_name_dict(imagenet_class_names_file)
     top5 = out.ravel().argsort()[-5:][::-1]
     print("\n".join([f"score={out[0, i]}, {class_names[str(i)]}" for i in top5]))
