@@ -160,6 +160,9 @@ class Translator:
             return s_exp.value()
         if isinstance(s_exp, (int, float)):
             return str(s_exp)
+        assert isinstance(s_exp, list)
+        if len(s_exp) == 1:
+            return self.handle_body(s_exp[0])
         if isinstance(s_exp[0], (int, float)):
             assert all(isinstance(se, type(s_exp[0])) for se in s_exp)
             return [v for v in s_exp]
@@ -167,6 +170,8 @@ class Translator:
         func_name = self.normalize_def_name(_value_to_str(s_exp[0]))
         if func_name == "let":
             let_list = s_exp[1]
+            if isinstance(let_list[0], sexpdata.Symbol):
+                let_list = [let_list]
             let_var_names = [se[0].value() for se in let_list]
             let_exprs = [se[1] for se in let_list]
             return handle_let(

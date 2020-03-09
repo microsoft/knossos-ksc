@@ -93,8 +93,11 @@ class ExecutionContext:
         _execution_contexts.pop()
 
     def accumulate_cost(self, name, state, cost):
-        self.costs[state] += cost
-        print(f"{self.__repr__()}: Added cost {cost:.2e} for {name} in state {state} (accumulated: {self.costs})")
+        try:
+            self.costs[state] += cost
+        except:
+            raise ValueError(f"Cannot add cost {cost} for {name} in state {state}!")
+        # print(f"{self.__repr__()}: Added cost {cost:.2e} for {name} in state {state} (accumulated: {self.costs})")
 
 _execution_contexts = []
 

@@ -287,27 +287,48 @@ class JittedFunction(KsFunction):
         )
 
     def all_called_functions(self, seen=None):
-        ret = {}
+        """ Returns two ordered dictionaries before and after that contains
+            functions (instances of JittedFunction) called by this function.
+            `before` contains all the functions that need to be defined before
+            this function. `after` contains cost$ and shape$ functions associated
+            with this function.
+        """
+        before = {}
+        after = {}
         if seen is None:
             seen = set()
         for key, called in self._called_functions.items():
             if len(key) > 0 and key not in seen:
-                called = called() if isinstance(called, JittedFunctionFromCall) else called
+                called_function = called() if isinstance(called, JittedFunctionFromCall) else called
                 seen.add(key)
-                ret.update(called.all_called_functions(seen))
-                ret[key] = called # make sure topological sort
-        return ret
+                inner_before, inner_after = called_function.all_called_functions(seen)
+                before.update(inner_before) # add functions called by called first
+                if not isinstance(called, JittedFunctionFromCall):
+                    # if called is not cost$ or shape$, add the called function itself
+                    before[key] = called
+                else:
+                    after[key] = called_function
+                before.update(inner_after)  # cost$ and shape$
+        return before, after
 
     def combined_ks_str(self):
         if len(self._ks_str) == 0:
             # built-in
             return ""
-        all_called_functions = self.all_called_functions()
-        print(f"All called functions for {self.name}: {all_called_functions.keys()}")
-        called_functions = [called.ks_str for called in all_called_functions.values()]
-        called_functions = filter(lambda x: len(x) > 0, called_functions)
+        before, after = self.all_called_functions()
+        print(f"All called functions for {self.name}: {list(before.keys()) + list(after.keys())}")
+        before_functions = [
+            called.ks_str
+            for called in before.values()
+            if len(called.ks_str) > 0
+        ]
+        after_functions = [
+            called.ks_str
+            for called in after.values()
+            if len(called.ks_str) > 0
+        ]
         return "\n\n".join(
-            list(called_functions) + [self._ks_str]
+            before_functions + [self._ks_str] + after_functions
         )
 
     def shape_type(self, *args):
