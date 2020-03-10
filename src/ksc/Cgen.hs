@@ -177,15 +177,15 @@ cstInsertVar :: Var -> CType -> CST -> CST
 cstInsertVar v ty env = -- trace ("cstInsertVar [" ++ show v ++ "] = [" ++ show ty ++ "]\n" ++ show env) $
   Map.insert (show v) ty env
 
-cstInsertFun :: Fun -> CType -> CST -> CST
-cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
-  Map.insert (show f) ctype env
+cstInsertFun :: (Fun, Type) -> CType -> CST -> CST
+cstInsertFun (f,ty) ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
+  Map.insert (cgenUserFun (f,ty)) ctype env
 
 cstLookupVar :: HasCallStack => Var -> CST -> CType
 cstLookupVar v env = cstLookup0 (show v) env
 
-cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe CType
-cstMaybeLookupFun f env = cstMaybeLookup0 (show f) env
+cstMaybeLookupFun :: HasCallStack => (Fun, Type) -> CST -> Maybe CType
+cstMaybeLookupFun (f,ty) env = cstMaybeLookup0 (cgenUserFun (f,ty)) env
 
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
@@ -195,8 +195,9 @@ cgenDefs defs = snd $ foldl go (cstEmpty, []) $
                 filter isUserDef defs
  where
   go :: (CST, [String]) -> TDef -> (CST, [String])
-  go (env, strs) def@(Def { def_fun = f }) =
-    let env' = cstInsertFun f (UseTypeDef ("ty$" ++ cgenUserFun f)) env
+  go (env, strs) def@(Def { def_fun = f, def_args = arg }) =
+    let typedef = "ty$" ++ cgenUserFun (f, typeof arg)
+        env' = cstInsertFun (f, typeof arg) (UseTypeDef typedef) env
         (CG cdecl _cfun _ctype) = cgenDefE env' def
     in  (env', strs ++ [cdecl])
 
@@ -220,8 +221,6 @@ cgenDefE env (Def { def_fun = f, def_args = param
                   , def_rhs = UserRhs body }) =
   let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
 
-      cf                               = cgenUserFun f
-
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
       (params, bodyWithUnpacking) = case typeof param of
         -- See Note [Unpack tuple arguments]
@@ -238,6 +237,7 @@ cgenDefE env (Def { def_fun = f, def_args = param
       CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' bodyWithUnpacking
       cvars = map mkVar params
 
+      cf = cgenUserFun (f, typeof param)
       cftypealias = "ty$" ++ cf
   in  CG
         (     "typedef "
@@ -337,12 +337,12 @@ cgenExprR env = \case
 
   Call tf@(TFun _ fun) vs -> do
     cgvs_tys <- do cgv <- cgenExprR env vs; return (cgv, typeof vs)
-    let cgvs = fst cgvs_tys
+    let (cgvs, cgargtype) = cgvs_tys
     let cdecls = getDecl cgvs
     let cexprs_tys = (\(v, ty) -> (getExpr v, ty)) cgvs_tys
     let ctypes = getType cgvs
 
-    let cftype = ctypeofFun env tf [ctypes]
+    let cftype = ctypeofFun env (tf, cgargtype) [ctypes]
 
     v        <- freshCVar
     bumpmark <- freshCVar
@@ -352,7 +352,7 @@ cgenExprR env = \case
                     then tag ++ "(" ++ bumpmark ++ ");\n"
                     else ""
 
-    let cf = cgenAnyFun tf cftype
+    let cf = cgenAnyFun (tf, cgargtype) cftype
 
     return $ CG
       (  cdecls
@@ -507,18 +507,32 @@ mangleFun = substitute $ \case
     ',' -> Just "$_"
     '[' -> Just "$6"
     ']' -> Just "$9"
+    '<' -> Just "$d"
+    '>' -> Just "$b"
     '*' -> Just "$x"
     _   -> Nothing
 
-cgenFunId :: FunId -> String
+mangleType :: TypeX -> String
+mangleType = \case
+    TypeBool -> "b"
+    TypeInteger -> "i"
+    TypeFloat -> "f"
+    TypeString -> "s"
+    TypeTuple tys -> "<" ++ (concatMap mangleType tys) ++ ">"
+    TypeVec ty -> "v" ++ mangleType ty
+    ty  -> error $ show ty
+
+cgenFunId :: (FunId, Type) -> String
 cgenFunId = \case
-  UserFun fun -> mangleFun fun
-  PrimFun fun -> translateFun fun
-  SelFun i _  -> "ks::get<" ++ show (i - 1) ++ ">"
+  (UserFun fun, TypeTuple []) -> mangleFun fun
+  (UserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
+  (UserFun fun, ty) -> mangleFun (fun ++ "@" ++ mangleType ty)
+  (PrimFun fun, _ty) -> translateFun fun
+  (SelFun i _, _ty)  -> "ks::get<" ++ show (i - 1) ++ ">"
  where
   translateFun :: String -> String
   translateFun = \case
-    "or" -> "or_"
+    "or" -> "or_"  -- TODO: ks_or and ks_and
     "and"-> "and_"
     -- Translating "scale" to "mul" is a shortcut that allows us to
     -- avoid updating the runtime to remove polymorphic "mul" and
@@ -527,27 +541,27 @@ cgenFunId = \case
     "scale" -> "mul"
     s    -> s
 
-cgenUserFun :: HasCallStack => Fun -> String
-cgenUserFun f = case f of
-  Fun funId     -> cgenFunId funId
-  GradFun  s _  -> "D$" ++ cgenFunId s
-  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenFunId s
-  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenFunId s
-  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId s
-  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId s
+cgenUserFun :: HasCallStack => (Fun, Type) -> String
+cgenUserFun (f, ty) = case f of
+  Fun funId     -> cgenFunId (funId, ty)
+  GradFun  s _  -> "D$" ++ cgenFunId (s, ty)
+  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenFunId (s, ty)
+  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenFunId (s, ty)
+  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId (s, ty)
+  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId (s, ty)
 
-cgenAnyFun :: HasCallStack => TFun -> CType -> String
-cgenAnyFun tf cftype = case tf of
+cgenAnyFun :: HasCallStack => (TFun, Type) -> CType -> String
+cgenAnyFun (tf, ty) cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
-  TFun ty (Fun (PrimFun "build")) ->
+  TFun ty (Fun (PrimFun "build")) ->  
     case ty of
       TypeVec t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _         -> error ("Unexpected type for build: " ++ show ty)
-  TFun ty (Fun (PrimFun "sumbuild")) ->
+  TFun ty (Fun (PrimFun "sumbuild")) -> -- TODO: remove special case
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
-  TFun _            f                 -> cgenUserFun f
+  TFun _            f                -> cgenUserFun (f, ty)
 
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
@@ -572,11 +586,11 @@ cgenType = \case
 
 cgenTypeLang :: HasCallStack => Type -> String
 cgenTypeLang = \case
-  TypeFloat     -> "double"
+  TypeFloat     -> "double" -- TODO: make these all ks_Float etc, and add typedefs in knossos.h
   TypeInteger   -> "int"
   TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t
-  TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
+  TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">" 
   TypeVec t     -> "vec<" ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
@@ -584,8 +598,8 @@ cgenTypeLang = \case
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
-ctypeofFun :: HasCallStack => CST -> TFun -> [CType] -> CType
-ctypeofFun env (TFun ty f) ctys = case cstMaybeLookupFun f env of
+ctypeofFun :: HasCallStack => CST -> (TFun, Type) -> [CType] -> CType
+ctypeofFun env (TFun ty f, argty) ctys = case cstMaybeLookupFun (f, argty) env of
   Just ctype -> -- trace ("Found fun " ++ show f) $
     ctype
   Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
@@ -661,8 +675,9 @@ cppGenWithFiles :: String -> String -> [TDef] -> IO ()
 cppGenWithFiles ksofile cppfile defs = do
   let lines =
         [
-        "#include \"knossos.h\"",
-        "namespace ks {\n"
+          "#include \"knossos.h\"",
+          "#include \"prelude.h\"",
+          "namespace ks {\n"
         ]
       lls   = cgenDefs defs
       tail =
