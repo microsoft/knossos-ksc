@@ -1,284 +1,249 @@
-;; add :: Number x Number -> Number
-;; add (x, y) = x + y
-(edef add@ff Float (Float Float))
-(edef D$add@ff (LM (Tuple Float Float) Float) (Float Float))
-(edef Dt$add@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
-(def
- fwd$add@ff Float
- ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
- (let
-  ((dx1 (get$1$2 dxt))
-   (dx2 (get$2$2 dxt)))
-  (add@ff dx1 dx2)))
-(def
- rev$add@ff (Tuple Float Float)
- ((xt : (Tuple Float Float)) (drt : Float))
- (let
-  ((d_dadd drt))
-  (tuple d_dadd d_dadd)))
-
-(edef add@ii Integer (Integer Integer))
-(edef D$add@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
-(edef Dt$add@ii (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
-(def
- fwd$add@ii (Tuple)
- ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
-  (tuple))
-(def
- rev$add@ii (Tuple (Tuple) (Tuple))
- ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
-  (tuple (tuple) (tuple)))
 
 ;; sub :: Number x Number -> Number
 ;; sub (x, y) = x - y
-(edef sub@ff Float (Float Float))
-(edef D$sub@ff (LM (Tuple Float Float) Float) (Float Float))
-(edef Dt$sub@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
+(edef sub Float (Float Float))
+(edef D$sub (LM (Tuple Float Float) Float) (Float Float))
+(edef Dt$sub (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
 (def
- fwd$sub@ff Float
+ fwd$sub Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
  (let
   ((dx1 (get$1$2 dxt))
    (dx2 (get$2$2 dxt)))
-  (sub@ff dx1 dx2)))
+  (sub dx1 dx2)))
 (def
- rev$sub@ff (Tuple Float Float)
+ rev$sub (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
   ((d_dsub drt))
-  (tuple d_dsub (neg@f d_dsub))))
+  (tuple d_dsub (neg d_dsub))))
 
-(edef sub@ii Integer (Integer Integer))
-(edef D$sub@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
-(edef Dt$sub@ii (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
+(edef sub Integer (Integer Integer))
+(edef D$sub (LM (Tuple Integer Integer) Integer) (Integer Integer))
+(edef Dt$sub (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
 (def
- fwd$sub@ii (Tuple)
+ fwd$sub (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$sub@ii (Tuple (Tuple) (Tuple))
+ rev$sub (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
 ;; div :: Number x Number -> Number
 ;; div (x, y) = x / y
-(edef div@ff Float (Float Float))
-(edef D$div@ff (LM (Tuple Float Float) Float) (Float Float))
-(edef Dt$div@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
+(edef div Float (Float Float))
+(edef D$div (LM (Tuple Float Float) Float) (Float Float))
+(edef Dt$div (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
 (def
- fwd$div@ff Float
+ fwd$div Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
  (let
   ((x1 (get$1$2 xt))
    (x2 (get$2$2 xt))
    (dx1 (get$1$2 dxt))
    (dx2 (get$2$2 dxt)))
-  (div@ff (sub@ff (mul@ff x2 dx1)
-                  (mul@ff x1 dx2))
-          (mul@ff x2 x2))))
+  (div (sub (mul x2 dx1)
+                  (mul x1 dx2))
+          (mul x2 x2))))
 (def
- rev$div@ff (Tuple Float Float)
+ rev$div (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
   ((x1 (get$1$2 xt))
    (x2 (get$2$2 xt))
    (d_ddiv drt))
-  (tuple (div@ff d_ddiv x2)
-         (neg@f (div@ff (mul@ff x1 d_ddiv)
-                         (mul@ff x2 x2))))))
-(edef div@ii Integer (Integer Integer))
-(edef D$div@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
-(edef Dt$div@ii (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
+  (tuple (div d_ddiv x2)
+         (neg (div (mul x1 d_ddiv)
+                         (mul x2 x2))))))
+(edef div Integer (Integer Integer))
+(edef D$div (LM (Tuple Integer Integer) Integer) (Integer Integer))
+(edef Dt$div (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
 (def
- fwd$div@ii (Tuple)
+ fwd$div (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$div@ii (Tuple (Tuple) (Tuple))
+ rev$div (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
 ;; mul :: Number x Number -> Number
 ;; mul (x, y) = x * y
-(edef mul@ff Float (Float Float))
-(edef D$mul@ff (LM (Tuple Float Float) Float) (Float Float))
-(edef Dt$mul@ff (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
+(edef mul Float (Float Float))
+(edef D$mul (LM (Tuple Float Float) Float) (Float Float))
+(edef Dt$mul (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
 (def
- fwd$mul@ff Float
+ fwd$mul Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
  (let
   ((x1 (get$1$2 xt))
    (x2 (get$2$2 xt))
    (dx1 (get$1$2 dxt))
    (dx2 (get$2$2 dxt)))
-  (add@ff (mul@ff x2 dx1) (mul@ff x1 dx2))))
+  (add (mul x2 dx1) (mul x1 dx2))))
 (def
- rev$mul@ff (Tuple Float Float)
+ rev$mul (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
   ((x1 (get$1$2 xt))
    (x2 (get$2$2 xt))
    (d_dmul drt))
-  (tuple (mul@ff d_dmul x2) (mul@ff d_dmul x1))))
+  (tuple (mul d_dmul x2) (mul d_dmul x1))))
 
-(edef mul@ii Integer (Integer Integer))
-(edef D$mul@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
-(edef Dt$mul@ii (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
+(edef mul Integer (Integer Integer))
+(edef D$mul (LM (Tuple Integer Integer) Integer) (Integer Integer))
+(edef Dt$mul (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
 (def
- fwd$mul@ii (Tuple)
+ fwd$mul (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$mul@ii (Tuple (Tuple) (Tuple))
+ rev$mul (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
-;; neg :: Number -> Number
-;; neg x = -x
-(edef neg@f Float (Float))
-(edef D$neg@f (LM Float Float) (Float))
-(edef Dt$neg@f (Tuple Float (LM Float Float)) (Float))
-(def fwd$neg@f Float ((x : Float) (dx : Float))
-     (neg@f dx))
-(def rev$neg@f Float ((x : Float) (d_dneg : Float))
-     (neg@f d_dneg))
-
-(edef neg@i Integer (Integer))
-(edef D$neg@i (LM Integer Integer) (Integer))
-(edef Dt$neg@i (Tuple Integer (LM Integer Integer)) (Integer))
-(def fwd$neg@i (Tuple) ((x : Integer) (dx : (Tuple)))
-     (tuple))
-(def rev$neg@i (Tuple) ((x : Integer) (d_dneg : (Tuple)))
-     (tuple))
-
 ;; gt :: Number x Number -> Bool
 ;; gt (x, y) = x > y
-(edef gt@ff Bool (Float Float))
-(edef D$gt@ff (LM (Tuple Float Float) Bool) (Float Float))
-(edef Dt$gt@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
+(edef gt Bool (Float Float))
+(edef D$gt (LM (Tuple Float Float) Bool) (Float Float))
+(edef Dt$gt (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
 (def
- fwd$gt@ff (Tuple)
+ fwd$gt (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
   (tuple))
 (def
- rev$gt@ff (Tuple Float Float)
+ rev$gt (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
 
-(edef gt@ii Bool (Integer Integer))
-(edef D$gt@ii (LM (Tuple Integer Integer) Bool) (Integer Integer))
-(edef Dt$gt@ii (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+(edef gt Bool (Integer Integer))
+(edef D$gt (LM (Tuple Integer Integer) Bool) (Integer Integer))
+(edef Dt$gt (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
 (def
- fwd$gt@ii (Tuple)
+ fwd$gt (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$gt@ii (Tuple (Tuple) (Tuple))
+ rev$gt (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
 ;; lt :: Number x Number -> Bool
 ;; lt (x, y) = x < y
-(edef lt@ff Bool (Float Float))
-(edef D$lt@ff (LM (Tuple Float Float) Bool) (Float Float))
-(edef Dt$lt@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
+(edef lt Bool (Float Float))
+(edef D$lt (LM (Tuple Float Float) Bool) (Float Float))
+(edef Dt$lt (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
 (def
- fwd$lt@ff (Tuple)
+ fwd$lt (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
   (tuple))
 (def
- rev$lt@ff (Tuple Float Float)
+ rev$lt (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
 
-(edef lt@ii Bool (Integer Integer))
-(edef D$lt@ii (LM (Tuple Integer Integer) Bool) (Integer Integer))
-(edef Dt$lt@ii (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+(edef lt Bool (Integer Integer))
+(edef D$lt (LM (Tuple Integer Integer) Bool) (Integer Integer))
+(edef Dt$lt (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
 (def
- fwd$lt@ii (Tuple)
+ fwd$lt (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$lt@ii (Tuple (Tuple) (Tuple))
+ rev$lt (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
 ;; lte :: Number x Number -> Bool
 ;; lte (x, y) = x <= y
-(edef lte@ff Bool (Float Float))
-(edef D$lte@ff (LM (Tuple Float Float) Bool) (Float Float))
-(edef Dt$lte@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
+(edef lte Bool (Float Float))
+(edef D$lte (LM (Tuple Float Float) Bool) (Float Float))
+(edef Dt$lte (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
 (def
- fwd$lte@ff (Tuple)
+ fwd$lte (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
   (tuple))
 (def
- rev$lte@ff (Tuple Float Float)
+ rev$lte (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
 
-(edef lte@ii Bool (Integer Integer))
-(edef D$lte@ii (LM (Tuple Integer Integer) Bool) (Integer Integer))
-(edef Dt$lte@ii (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+(edef lte Bool (Integer Integer))
+(edef D$lte (LM (Tuple Integer Integer) Bool) (Integer Integer))
+(edef Dt$lte (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
 (def
- fwd$lte@ii (Tuple)
+ fwd$lte (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$lte@ii (Tuple (Tuple) (Tuple))
+ rev$lte (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
 ;; gte :: Number x Number -> Bool
 ;; gte (x, y) = x >= y
-(edef gte@ff Bool (Float Float))
-(edef D$gte@ff (LM (Tuple Float Float) Bool) (Float Float))
-(edef Dt$gte@ff (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
+(edef gte Bool (Float Float))
+(edef D$gte (LM (Tuple Float Float) Bool) (Float Float))
+(edef Dt$gte (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
 (def
- fwd$gte@ff (Tuple)
+ fwd$gte (Tuple)
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
   (tuple))
 (def
- rev$gte@ff (Tuple Float Float)
+ rev$gte (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
 
-(edef gte@ii Bool (Integer Integer))
-(edef D$gte@ii (LM (Tuple Integer Integer) Bool) (Integer Integer))
-(edef Dt$gte@ii (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+(edef gte Bool (Integer Integer))
+(edef D$gte (LM (Tuple Integer Integer) Bool) (Integer Integer))
+(edef Dt$gte (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
 (def
- fwd$gte@ii (Tuple)
+ fwd$gte (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$gte@ii (Tuple (Tuple) (Tuple))
+ rev$gte (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
 (edef log Float (Float))
 (edef D$log (LM Float Float) (Float))
-(def fwd$log Float ((x : Float) (dx : Float)) (div@ff dx x))
-(def rev$log Float ((x : Float) (d_dlog : Float)) (div@ff d_dlog x))
+(def fwd$log Float ((x : Float) (dx : Float)) (div dx x))
+(def rev$log Float ((x : Float) (d_dlog : Float)) (div d_dlog x))
 (edef Dt$log (Tuple Float (LM Float Float)) (Float))
 
 (edef exp Float (Float))
 (edef D$exp (LM Float Float) (Float))
-(def fwd$exp Float ((x : Float) (dx : Float)) (mul@ff (exp x) dx))
-(def rev$exp Float ((x : Float) (d_dexp : Float)) (mul@ff (exp x) d_dexp))
+(def fwd$exp Float ((x : Float) (dx : Float)) (mul (exp x) dx))
+(def rev$exp Float ((x : Float) (d_dexp : Float)) (mul (exp x) d_dexp))
 (edef Dt$exp (Tuple Float (LM Float Float)) (Float))
 
 (edef sin Float (Float))
 (edef cos Float (Float))
 
 (edef D$sin (LM Float Float) (Float))
-(def fwd$sin Float ((x : Float) (dx : Float)) (mul@ff (cos x) dx))
-(def rev$sin Float ((x : Float) (d_dsin : Float)) (mul@ff (cos x) d_dsin))
+(def fwd$sin Float ((x : Float) (dx : Float)) (mul (cos x) dx))
+(def rev$sin Float ((x : Float) (d_dsin : Float)) (mul (cos x) d_dsin))
 (edef Dt$sin (Tuple Float (LM Float Float)) (Float))
 
 (edef D$cos (LM Float Float) (Float))
-(def fwd$cos Float ((x : Float) (dx : Float)) (neg@f (mul@ff (sin x) dx)))
-(def rev$cos Float ((x : Float) (d_dcos : Float)) (neg@f (mul@ff (sin x) d_dcos)))
+(def fwd$cos Float ((x : Float) (dx : Float)) (neg (mul (sin x) dx)))
+(def rev$cos Float ((x : Float) (d_dcos : Float)) (neg (mul (sin x) d_dcos)))
 (edef Dt$cos (Tuple Float (LM Float Float)) (Float))
+
+(edef tanh Float (Float))
+(def fwd$tanh Float ((x : Float) (dx : Float))
+     (let ((tanh_x (tanh x))
+           (tanh_x_2 (mul tanh_x tanh_x)))
+       (mul tanh_x_2 dx)))
+(def rev$tanh Float ((x : Float) (d_dr : Float))
+     (let ((tanh_x (tanh x))
+           (tanh_x_2 (mul tanh_x tanh_x)))
+       (mul tanh_x_2 d_dr)))
+(edef D$tanh (LM Float Float) (Float))
+(edef Dt$tanh (Tuple Float (LM Float Float)) (Float))
+
 
 (edef max Float (Float Float))
 (edef D$max (LM Float Float) (Float Float))
@@ -292,9 +257,9 @@
 
 (edef abs Float (Float))
 (edef D$abs (LM Float Float) (Float))
-(def fwd$abs Float ((x : Float) (dx : Float)) (if (gt@ff x 0.0) dx (neg@f dx)))
+(def fwd$abs Float ((x : Float) (dx : Float)) (if (gt x 0.0) dx (neg dx)))
 (def rev$abs Float ((x : Float) (d_dabs : Float))
-     (if (gt@ff x 0.0) d_dabs (neg@f d_dabs)))
+     (if (gt x 0.0) d_dabs (neg d_dabs)))
 (edef Dt$abs (Tuple Float (LM Float Float)) (Float))
 
 (edef to_float Float (Integer))
