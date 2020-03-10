@@ -172,14 +172,24 @@ class Translator:
             let_list = s_exp[1]
             if isinstance(let_list[0], sexpdata.Symbol):
                 let_list = [let_list]
-            let_var_names = [se[0].value() for se in let_list]
-            let_exprs = [se[1] for se in let_list]
-            return handle_let(
-                let_var_names,
-                [self.handle_body(se, indent+2) for se in let_exprs],
-                self.handle_body(s_exp[2], indent + 2 * len(let_var_names)),
-                indent=indent + 2 * len(let_var_names) # inner most indent
-            )
+            let_var_names = []
+            let_exprs = []
+            for se in let_list:
+                var_name = se[0].value()
+                if var_name.split("@")[0] in self._built_ins:
+                    # redundant definition of built-ins
+                    continue
+                let_var_names.append(var_name)
+                let_exprs.append(se[1])
+            if len(let_var_names) > 0:
+                return handle_let(
+                    let_var_names,
+                    [self.handle_body(se, indent+2) for se in let_exprs],
+                    self.handle_body(s_exp[2], indent + 2 * len(let_var_names)),
+                    indent=indent + 2 * len(let_var_names) # inner most indent
+                )
+            else:
+                return self.handle_body(s_exp[2], indent)
         elif func_name == "tuple":
             tuple_args = [self.handle_body(se, indent+2) for se in s_exp[1:]]
             return "make_tuple({tuple_args})".format(tuple_args=", ".join(tuple_args))
