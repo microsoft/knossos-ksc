@@ -1,22 +1,22 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
 (def gmm_knossos_tri Integer ((n : Integer))
-  (div@ii (mul@ii n (sub@ii n 1)) 2))
+  (div (mul n (sub n 1)) 2))
 
 (def exp$VecR (Vec Float) ((v : Vec Float))
   (build (size v) (lam (i : Integer) (exp (index i v)))))
 
 (def mul$R$VecR (Vec Float) ((r : Float) (a : Vec Float))
-    (build (size a) (lam (i : Integer) (mul@ff r (index i a)))))
+    (build (size a) (lam (i : Integer) (mul r (index i a)))))
 
 (def mul$R$VecVecR (Vec (Vec Float)) ((r : Float) (a : Vec (Vec Float)))
     (build (size a) (lam (i : Integer) (mul$R$VecR r (index i a)))))
 
 (def mul$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (mul@ff (index i a) (index i b)))))
+  (build (size a) (lam (i : Integer) (mul (index i a) (index i b)))))
 
 (def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (sub@ff (index i a) (index i b)))))
+  (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
 
 ; dotv
 (edef dotv Float ((Vec Float) (Vec Float)))
@@ -73,11 +73,11 @@
    (assert (eq (size l) (gmm_knossos_tri D))
     (build D (lam (i : Integer)
         (build D (lam (j : Integer)
-           (if (lt@ii i j)
+           (if (lt i j)
             0.0
             (if (eq i j)
               (exp (index i q))
-              (index (add@ii (gmm_knossos_tri (sub@ii i 1)) j) l))
+              (index (add (gmm_knossos_tri (sub i 1)) j) l))
            )
            )))))))
 
@@ -93,10 +93,10 @@
 ; TODO deriv lgamma - but no deriv wishart_m anyway.
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
-    (let ((out (mul@ff 0.28618247146235004 (to_float (mul@ii p (sub@ii p 1)))))) ; 0.25 log pi
+    (let ((out (mul 0.28618247146235004 (to_float (mul p (sub p 1)))))) ; 0.25 log pi
       (add out
          (sum (build p (lam (j : Integer)
-                 (lgamma (sub@ff a (mul@ff 0.5 (to_float j))))))))))
+                 (lgamma (sub a (mul 0.5 (to_float j))))))))))
 
 (def log_wishart_prior Float ((wishart : Tuple Float Integer)
                               (log_Qdiag : Vec Float)
@@ -108,16 +108,16 @@
           (sum_qs        (sum log_Qdiag))
           (Qdiag         (exp$VecR log_Qdiag))
 
-          (n  (add@ii p (add@ii wishart_m 1)))
-          (C  (sub@ff (mul@ff (to_float (mul@ii n p))
-                    (sub@ff (log wishart_gamma)
-                       (mul@ff 0.5 (log 2.0))))
-                 (log_gamma_distrib (mul@ff 0.5 (to_float n)) p)))
+          (n  (add p (add wishart_m 1)))
+          (C  (sub (mul (to_float (mul n p))
+                    (sub (log wishart_gamma)
+                       (mul 0.5 (log 2.0))))
+                 (log_gamma_distrib (mul 0.5 (to_float n)) p)))
           (frobenius (add  (sqnorm Qdiag) (sqnorm ltri_Q)))
-          (w2f   (mul@ff 0.5 (mul@ff (mul@ff wishart_gamma wishart_gamma) frobenius)))
+          (w2f   (mul 0.5 (mul (mul wishart_gamma wishart_gamma) frobenius)))
           )
-        (sub@ff (sub@ff w2f
-              (mul@ff (to_float wishart_m)
+        (sub (sub w2f
+              (mul (to_float wishart_m)
                   sum_qs))
             C)
     ))
@@ -135,42 +135,42 @@
        (triD (size (index 0 ls)))   ; Ugh
       )
   (assert (eq triD (gmm_knossos_tri D))
-    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
+    (let ((CONSTANT (mul (to_float (mul N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
           (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
                                   (mahal_vec (mul$Mat$Vec Q
                                                       (sub$VecR$VecR (index i x) (index k means)))))
-                              (sub@ff (add (index k alphas)
+                              (sub (add (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))
                               )
-                                (mul@ff 0.500000  (sqnorm mahal_vec)))
+                                (mul 0.500000  (sqnorm mahal_vec)))
                             ))))
                           ))))
           )
             (add (add CONSTANT
-                (sub@ff slse
-                  (mul@ff (to_float N) (logsumexp alphas))))
+                (sub slse
+                  (mul (to_float N) (logsumexp alphas))))
             (sum (build K (lam (k : Integer)
                     (log_wishart_prior wishart (index k qs) (index k ls))))))
     ))))
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
-       (mul@ff ($ranhashdoub seed) scale))
+       (mul ($ranhashdoub seed) scale))
 
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
                         (scale : Float))
-    (build n (lam (j : Integer) (mkfloat (add@ii j seed) scale))))
+    (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
 
 (def mkvecvec (Vec (Vec Float)) ((seed  : Integer)
                                  (n     : Integer)
                                  (m     : Integer)
                                  (scale : Float))
-     (build n (lam (j : Integer) (mkvec (add@ii (mul@ii j m) seed) m scale))))
+     (build n (lam (j : Integer) (mkvec (add (mul j m) seed) m scale))))
 
 (def main Integer ()
     (let ((D 64)
@@ -180,11 +180,11 @@
           (scale_unity 1.0)
           (scale_small 0.1)
 
-          (x       (mkvecvec (add@ii seed 0)    N D scale_unity))
-          (alphas  (mkvec    (add@ii seed 1000) K   scale_unity))
-          (mus     (mkvecvec (add@ii seed 2000) K D scale_unity))
-          (qs      (mkvecvec (add@ii seed 3000) K D scale_small))
-          (ls      (mkvecvec (add@ii seed 4000) K (gmm_knossos_tri D) scale_unity))
+          (x       (mkvecvec (add seed 0)    N D scale_unity))
+          (alphas  (mkvec    (add seed 1000) K   scale_unity))
+          (mus     (mkvecvec (add seed 2000) K D scale_unity))
+          (qs      (mkvecvec (add seed 3000) K D scale_small))
+          (ls      (mkvecvec (add seed 4000) K (gmm_knossos_tri D) scale_unity))
           (wishart (tuple 3.1 7))
         )
 

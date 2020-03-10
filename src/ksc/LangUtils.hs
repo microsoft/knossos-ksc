@@ -149,7 +149,7 @@ test_FreeIn = Test.Hspec.hspec LangUtils.hspec
 -----------------------------------------------
 
 -- Global symbol table
-type GblSymTab = M.Map Fun TDef
+type GblSymTab = M.Map (Fun, Type) TDef
    -- Maps a function to its definition, which lets us
    --   * Find its return type
    --   * Inline it
@@ -185,16 +185,16 @@ emptySymTab = ST { gblST = M.empty, lclST = M.empty }
 newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
-stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
-stInsertFun = M.insert
+stInsertFun :: TDef -> GblSymTab -> GblSymTab
+stInsertFun def@(Def { def_fun = f, def_args = arg }) = M.insert (f, tVarType arg) def
 
-lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
+lookupGblST :: HasCallStack => (Fun, Type) -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
 extendGblST = foldl add
   where
-    add env def@(Def { def_fun = f }) = stInsertFun f def env
+    add env def = stInsertFun def env
 
 modifyGblST :: (GblSymTab -> GblSymTab) -> SymTab -> SymTab
 modifyGblST g = \env -> env { gblST = g (gblST env) }

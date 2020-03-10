@@ -1398,16 +1398,6 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
-	inline double sub(double t1, double t2) { return t1 - t2; }
-	inline auto D$sub(double, double) 
-	{
-		typedef LM::Scale M1;
-		typedef LM::Scale M2;
-		return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
-	}
-	
-	inline int sub(int t1, int t2) { return t1 - t2; }
-
 	template <class T>
 	T mul(double s, T const& t)
 	{
@@ -1437,18 +1427,6 @@ namespace ks
 	auto D$mul(T1 t1, T2 t2)
 	{
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(t2), LM::Scale::mk(t1));
-	}
-
-	template <class T1, class T2>
-	T1 div(T1 t1, T2 t2)
-	{
-		return t1 / t2;
-	}
-
-	inline
-		auto D$div(double t1, double t2)
-	{
-		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(1.0 / t2), LM::Scale::mk(-1.0 / (t1*t1)));
 	}
 
 	template <class T>
@@ -1513,26 +1491,6 @@ namespace ks
 		return t1 + t2;
 	}
 
-	inline double sub$aff(double t1, double t2)
-	{
-		return t1 - t2;
-	}
-
-	inline int sub$aii(int t1, int t2)
-	{
-		return t1 - t2;
-	}
-
-	inline double div$aff(double t1, double t2)
-	{
-		return t1 / t2;
-	}
-
-	inline int div$aii(int t1, int t2)
-	{
-		return t1 / t2;
-	}
-
 	inline double mul$aff(double t1, double t2)
 	{
 		return t1 * t2;
@@ -1541,16 +1499,6 @@ namespace ks
 	inline int mul$aii(int t1, int t2)
 	{
 		return t1 * t2;
-	}
-
-	inline double neg$af(double t)
-	{
-		return -t;
-	}
-
-	inline int neg$ai(int t)
-	{
-		return -t;
 	}
 
 	inline bool or_(int b1, int b2)
@@ -1572,6 +1520,16 @@ namespace ks
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(s), LM::Scale::mk(1.0 - s));
 	}
 
+	inline double neg$af(double t)
+	{
+		return -t;
+	}
+
+	inline int neg$ai(int t)
+	{
+		return -t;
+	}
+
 	inline int neg(int d) { return -d; }
 
 	inline double neg(double d) { return -d; }
@@ -1584,9 +1542,6 @@ namespace ks
 
         template <class T>
         inline vec<T> neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return neg(v[i]); }); }
-
-	inline double to_float(int d) { return d; }
-	inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
 	inline int to_size(int d) { return d; }
 	inline auto D$to_size(int d) { return LM::Zero<int, int>(); }

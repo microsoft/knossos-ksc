@@ -537,6 +537,7 @@ primFunCallResultTy_maybe fun args
       ("unzip"    , TypeVec (TypeTuple ts))                -> Just (TypeTuple (map TypeVec ts))
 
       ("scale"    , TypeTuple [TypeFloat,   t]           ) -> Just t
+      ("add"      , TypeTuple [TypeInteger, TypeInteger] ) -> Just TypeInteger -- TODO: Remove when ts_add
       ("add"      , TypeTuple [t, dt]                    ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing

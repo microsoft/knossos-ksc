@@ -5,20 +5,20 @@
      (if
          (eq i (size v))
          acc
-       (fold_f env (add@ii i 1) v (f (tuple env (tuple acc (index i v)))))))
+       (fold_f env (add i 1) v (f (tuple env (tuple acc (index i v)))))))
 
 (def prod Float ((i : Integer) (v : Vec Float) (acc : Float))
      (if
          (eq i (size v))
          acc
-       (prod (add@ii i 1) v (mul@ff acc (index i v)))))
+       (prod (add i 1) v (mul acc (index i v)))))
 
 ; This ends up calculating prod(v) * pow(closure, size(v))
 (def prod_fold Float ((v : Vec Float) (closure : Float))
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (mul@ff (mul@ff acc x) closure)))
+                  (mul (mul acc x) closure)))
            1.0
            v))
 
@@ -28,7 +28,7 @@
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (mul@ff acc x)))
+                  (mul acc x)))
            1.0
            v))
 
@@ -54,36 +54,36 @@
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
-       (mul@ff ($ranhashdoub seed) scale))
+       (mul ($ranhashdoub seed) scale))
 
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
                         (scale : Float))
-    (build n (lam (j : Integer) (mkfloat (add@ii j seed) scale))))
+    (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
 
 (def main Integer ()
      (let ((seed 20000)
            (delta 0.0001)
-           (v  (mkvec   (add@ii seed 0)    10 1.0))
-           (c  (mkfloat (add@ii seed 1000)    1.0))
-           (dv (mkvec   (add@ii seed 2000) 10 delta))
-           (dc (mkfloat (add@ii seed 3000)    delta))
+           (v  (mkvec   (add seed 0)    10 1.0))
+           (c  (mkfloat (add seed 1000)    1.0))
+           (dv (mkvec   (add seed 2000) 10 delta))
+           (dc (mkfloat (add seed 3000)    delta))
            (checked ($check prod_fold rev$prod_fold
                             (tuple v  c)
                             (tuple v  c)
                             (tuple dv dc)
                             1.0))
-           (rev_ok (lt@ff (abs checked) 0.001))
+           (rev_ok (lt (abs checked) 0.001))
            (fold_x   (prod_fold v c))
            (fold_xpd (prod_fold (add v dv) (add c dc)))
            (fold_fwd (fwd$prod_fold (tuple v c) (tuple dv dc)))
-           (fold_fd  (sub@ff fold_xpd fold_x))
+           (fold_fd  (sub fold_xpd fold_x))
            (everything_works_as_expected
             (let ((tolerance 0.001)
                   (actual fold_fd)
                   (expected fold_fwd))
-              (lt@ff (abs (sub@ff actual expected))
-                      (mul@ff (add (abs expected) (abs actual))
+              (lt (abs (sub actual expected))
+                      (mul (add (abs expected) (abs actual))
                          tolerance)))))
        (pr
         "v"
@@ -103,7 +103,7 @@
         "fd fold"
         fold_fd
         "fwd - fd"
-        (sub@ff fold_fwd fold_fd)
+        (sub fold_fwd fold_fd)
         "rev fold"
         (rev$prod_fold (tuple v c) 1.0)
         "checked (should be small)"
