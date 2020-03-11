@@ -368,6 +368,9 @@ toCall f@(L.TFun _ L.GradFun{}) args =
 toCall f@(L.TFun _ L.DrvFun{}) args =
   Call (Var (toName f)) [toFutharkExp args]
 
+toCall f@(L.TFun _ L.CLFun{}) args =
+  L.pprPanic "Conalised function in Futhark" (ppr f <+> ppr args)
+
 toFuthark :: L.TDef -> Def
 toFuthark (L.Def f args res_ty (L.UserRhs e)) =
   DefFun entry fname []

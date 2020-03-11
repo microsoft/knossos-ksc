@@ -166,7 +166,7 @@ fromCLExpr args (CLComp e1 e2)
 adCLExpr :: CLExpr -> TExpr
 adCLExpr _ (CLKonst k) = Konst k
 
-fromCLExpr args (CLCall fun)
+adCLExpr args (CLCall fun)
   | TFun ty (CLFun f) <- fun
   = Call (TFun ty (Fun f)) args
   | otherwise
@@ -178,13 +178,13 @@ adCLExpr args (CLComp e1 e2)
     Tuple [ pFst cpair
           , pSnd cpair `lmCompose` pSnd bpair ]
 
-adCLExpr args (CTuple es)
+adCLExpr args (CLTuple es)
   = mkTempLets "t" es $ \ tvs ->
     Tuple [ Tuple (map pFst tvs)
           , lmVCat (map pSnd tvs) ]
 
 mkTempLets :: String -> [TExpr] -> ([TExpr] -> TExpr) -> TExpr
-mkTemplLets s es body_fn
+mkTempLets s es body_fn
   = body_fn (go 1 es)
   where
     go n []     tvs = body_fn (revverse tvs)

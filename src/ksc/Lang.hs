@@ -291,6 +291,7 @@ funIdOfFun = \case
   Fun f       -> f
   GradFun f _ -> f
   DrvFun f _  -> f
+  CLFun f     -> f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
