@@ -215,6 +215,8 @@ class Translator:
                 f"             lambda: {then_branch},",
                 f"             lambda: {else_branch})"
             ])
+        elif func_name == "stop":
+            return self.handle_body(s_exp[1])
 
         args = s_exp[1:]
         args_handled = []
