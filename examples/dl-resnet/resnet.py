@@ -52,16 +52,13 @@ def resnet(x, weights):
     h = nn.max_pool(h, (3, 3), (2, 2), padding="SAME")
     for i, blocks_weights in enumerate(residual_blocks_weights):
         for j, weights in enumerate(blocks_weights):
-            weights = nn.to_device(weights, 1) if i >= 2 else weights
             if j == 0:
                 strides = (1, 1) if i == 0 else (2, 2)
                 h = conv_residual_block(h, weights, strides)
             else:
                 h = identity_residual_block(h, weights)
-        if i == 1:
-            h = nn.to_device(h, 1)
     h = nn.avg_pool(h, (7, 7), (1, 1))
     h = core.flatten(h)
-    h = dense(h, nn.to_device(final_dense_weights, 1))
-    return nn.log_softmax(h)
+    h = dense(h, final_dense_weights)
+    return nn.to_device(nn.log_softmax(h), 1)
 
