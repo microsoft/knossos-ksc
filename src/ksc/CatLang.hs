@@ -16,7 +16,7 @@ data CLExpr
   | CLLet TVar CLExpr CLExpr   -- Rhs and body
 
 data CLDef = CLDef { cldef_fun    :: Fun
-                   , cldef_args   :: [TVar]
+                   , cldef_args   :: TVar
                    , cldef_res_ty :: Type
                    , cldef_rhs    :: CLExpr }
 
@@ -26,11 +26,11 @@ data CLDef = CLDef { cldef_fun    :: Fun
 
 instance Pretty CLDef where
   ppr (CLDef { cldef_fun = f
-             , cldef_args = args
+             , cldef_args = arg
              , cldef_res_ty = res_ty
              , cldef_rhs = rhs })
      = sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
-                2 (parens (pprList pprTVar args))
+                2 (parens (pprTVar arg))
            , nest 2 (text "=" <+> ppr rhs) ]
 
 instance Pretty CLExpr where
@@ -66,15 +66,15 @@ toCLDefs defs = mapMaybe toCLDef_maybe defs
 
 toCLDef_maybe :: TDef -> Maybe CLDef
 toCLDef_maybe  (Def { def_fun  = fun
-                    , def_args = args
+                    , def_args = arg
                     , def_res_ty = res_ty
                     , def_rhs  = rhs })
   | Fun f     <- fun
   , UserRhs e <- rhs
   = Just CLDef { cldef_fun = CLFun f
-               , cldef_args = args
+               , cldef_args = arg
                , cldef_res_ty = res_ty
-               , cldef_rhs = toCLExpr args e }
+               , cldef_rhs = toCLExpr [arg] e }
   | otherwise
   = Nothing
 
@@ -84,9 +84,8 @@ toCLExpr env (If e1 e2 e3) = CLIf (toCLExpr env e1)
                                   (toCLExpr env e2)
                                   (toCLExpr env e3)
 toCLExpr env (Tuple es)  = CLTuple (map (toCLExpr env) es)
-toCLExpr env (Call (TFun ty (Fun f)) es)
-  = CLCall (TFun ty (CLFun f)) `CLComp`
-    CLTuple (map (toCLExpr env) es)
+toCLExpr env (Call (TFun ty (Fun f)) e)
+  = CLCall (TFun ty (CLFun f)) `CLComp` toCLExpr env e
 toCLExpr env (Var tv)
   = CLSel (find 1 env) (length env)
   where
@@ -110,13 +109,13 @@ fromCLDefs cldefs = map fromCLDef cldefs
 
 fromCLDef :: CLDef -> TDef
 fromCLDef (CLDef { cldef_fun = CLFun f
-                 , cldef_args = args
+                 , cldef_args = arg
                  , cldef_res_ty = res_ty
                  , cldef_rhs = rhs })
   = Def { def_fun  = Fun f
-        , def_args = args
+        , def_args = arg
         , def_res_ty = res_ty
-        , def_rhs  = UserRhs (fromCLExpr (map Var args) rhs) }
+        , def_rhs  = UserRhs (fromCLExpr [Var arg] rhs) }
 
 fromCLDef def = pprPanic "fromCLDef" (ppr def)  -- Not a CLFun
 
@@ -163,6 +162,7 @@ fromCLExpr args (CLComp e1 e2)
 
 -}
 
+{-
 adCLExpr :: CLExpr -> TExpr
 adCLExpr _ (CLKonst k) = Konst k
 
@@ -196,3 +196,4 @@ mkTempLet s rhs body_fn
   = mkLet tv rhs (body_fn (Var tv))
   where
     tv = TVar (typeof rhs) (Simple s)
+-}
