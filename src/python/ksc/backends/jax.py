@@ -87,3 +87,10 @@ def ones(len):
 
 def ones_2d(len1, len2):
   return np.ones((len1, len2))
+
+def to_device(x, d):
+  '''For now, jax's to_device does nothing.'''
+  return x
+
+def make_input(x):
+  return x
