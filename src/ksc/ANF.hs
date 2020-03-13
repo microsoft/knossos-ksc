@@ -38,8 +38,8 @@ anfExpr subst e = wrapLets (anfE subst e)
 -- anfE :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
 anfE :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
 anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
-anfE _ (Konst k)         = return (Konst k)
-anfE _ (Dummy ty)        = return (Dummy ty)
+anfE _ e@(Konst _)       = return e
+anfE _ e@(Dummy _)       = return e
 anfE subst (Var tv)      = return (substVar subst tv)
 anfE subst (Call fun es@(Tuple _))
                          = Call fun <$> anfE  subst es
