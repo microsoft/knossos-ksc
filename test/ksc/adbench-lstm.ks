@@ -20,20 +20,6 @@
 (def logsumexp Float ((v : Vec Float))
     (log (add@ff 2.0 (sum (exp$VecR v)))))
 
-(def fwd$tanh Float ((x : Float) (dx : Float))
-     (let ((tanh_x (tanh x))
-           (tanh_x_2 (mul@ff tanh_x tanh_x)))
-       (mul@ff tanh_x_2 dx)))
-
-(def rev$tanh Float ((x : Float) (d_dr : Float))
-     (let ((tanh_x (tanh x))
-           (tanh_x_2 (mul@ff tanh_x tanh_x)))
-       (mul@ff tanh_x_2 d_dr)))
-
-(edef D$tanh (LM Float Float) (Float))
-(edef Dt$tanh (Tuple Float (LM Float Float)) (Float))
-(edef tanh Float (Float))
-
 ; all Vecs size h
 (def lstm_model (Tuple (Vec Float) (Vec Float))
      ((wf : Vec Float) (bf : Vec Float)

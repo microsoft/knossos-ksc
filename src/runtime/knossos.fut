@@ -3,6 +3,7 @@ let exp = f64.exp
 let log = f64.log
 let sin = f64.sin
 let cos = f64.cos
+let tanh = const 1f64 -- FIXME
 let sum = f64.sum
 let to_float = r64
 let neg (x: f64) = -x

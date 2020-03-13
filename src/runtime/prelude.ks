@@ -280,6 +280,19 @@
 (def rev$cos Float ((x : Float) (d_dcos : Float)) (neg@f (mul@ff (sin x) d_dcos)))
 (edef Dt$cos (Tuple Float (LM Float Float)) (Float))
 
+(edef tanh Float (Float))
+(def fwd$tanh Float ((x : Float) (dx : Float))
+     (let ((tanh_x (tanh x))
+           (tanh_x_2 (mul@ff tanh_x tanh_x)))
+       (mul@ff tanh_x_2 dx)))
+(def rev$tanh Float ((x : Float) (d_dr : Float))
+     (let ((tanh_x (tanh x))
+           (tanh_x_2 (mul@ff tanh_x tanh_x)))
+       (mul@ff tanh_x_2 d_dr)))
+(edef D$tanh (LM Float Float) (Float))
+(edef Dt$tanh (Tuple Float (LM Float Float)) (Float))
+
+
 (edef max Float (Float Float))
 (edef D$max (LM Float Float) (Float Float))
 (edef Dt$max (Tuple Float (LM Float Float)) (Float Float))
