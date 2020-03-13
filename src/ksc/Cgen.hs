@@ -507,6 +507,8 @@ mangleFun = substitute $ \case
     ',' -> Just "$_"
     '[' -> Just "$6"
     ']' -> Just "$9"
+    '<' -> Just "$d"
+    '>' -> Just "$b"
     '*' -> Just "$x"
     _   -> Nothing
 
