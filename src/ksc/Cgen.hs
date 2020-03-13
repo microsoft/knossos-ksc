@@ -518,7 +518,7 @@ cgenFunId = \case
  where
   translateFun :: String -> String
   translateFun = \case
-    "or" -> "or_"
+    "or" -> "or_"  -- TODO: ks_or and ks_and
     "and"-> "and_"
     -- Translating "scale" to "mul" is a shortcut that allows us to
     -- avoid updating the runtime to remove polymorphic "mul" and
@@ -543,7 +543,7 @@ cgenAnyFun tf cftype = case tf of
     case ty of
       TypeVec t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _         -> error ("Unexpected type for build: " ++ show ty)
-  TFun ty (Fun (PrimFun "sumbuild")) ->
+  TFun ty (Fun (PrimFun "sumbuild")) -> -- TODO: remove special case
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
@@ -572,7 +572,7 @@ cgenType = \case
 
 cgenTypeLang :: HasCallStack => Type -> String
 cgenTypeLang = \case
-  TypeFloat     -> "double"
+  TypeFloat     -> "double" -- TODO: make these all ks_Float etc, and add typedefs in knossos.h
   TypeInteger   -> "int"
   TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t

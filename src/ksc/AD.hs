@@ -88,7 +88,7 @@ gradE adp s (Call f (Tuple [n, Lam ti body]))
   | f `isThePrimFun` "build"
   = gradBuild adp s n ti body
 
--- I'm not very happy about this rule, which effectively
+-- TODO: I'm not very happy about this rule, which effectively
 -- undoes sum (build e) --> sumbuild e
 gradE adp s (Call f (Tuple [n, body]))
   | f `isThePrimFun` "sumbuild"
