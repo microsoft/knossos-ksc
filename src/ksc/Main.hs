@@ -4,7 +4,6 @@
 
 module Main where
 
-import CatLang
 import Lang
 import LangUtils
 import Parse (parseE)

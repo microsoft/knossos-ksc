@@ -6,7 +6,7 @@ import Annotate (annotDecls, lintDefs)
 import AD (gradDefs, applyDefs)
 import ANF (anfDefs)
 import qualified Cgen
-import CatLang (toCLDefs)
+import CatLang (toCLDefs, fromCLDefs )
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
@@ -27,10 +27,38 @@ import GHC.Stack (HasCallStack)
 --  The demo driver
 -------------------------------------
 
+demoCL :: ADPlan -> String -> IO ()
+demoCL _adp file
+  = do { pr_decls <- parseF "src/runtime/prelude.ks"
+       ; my_decls <- parseF file
+       ; runKM $
+
+    do { banner "Original decls"
+       ; displayN my_decls
+
+       ; (env1, pr_tc) <- annotDecls emptyGblST pr_decls
+       ; (env2, my_tc) <- annotDecls env1       my_decls
+       ; let (_pr_rules, _pr_defs) = partitionDecls pr_tc
+             (_my_rules, my_defs)  = partitionDecls my_tc
+             _rulebase             = mkRuleBase (_pr_rules ++ _my_rules)
+
+       ; displayPassM veryVerbose "Typechecked declarations" env2 my_defs
+
+       ; banner "toCLDefs"
+       ; let cl_defs = toCLDefs my_defs
+       ; displayN cl_defs
+
+       ; banner "fromCLDefs"
+       ; displayN (fromCLDefs cl_defs) } }
+
+
+veryVerbose :: Maybe Int
+veryVerbose = Just 999
+
 demoF :: ADPlan -> [String] -> IO ()
 -- Read source code from specified input files, optimise,
 -- differentiate, optimise, and display results of each step
-demoF = demoFFilter (Just 999) id
+demoF = demoFFilter veryVerbose id
 
 demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> [String] -> IO ()
 demoFFilter verbosity theFilter adp files = do
@@ -53,7 +81,12 @@ demoN verbosity adp decls
 
        ; disp "Typechecked declarations" env defs
 
-       ; displayN (toCLDefs defs)
+       ; let cl_defs = toCLDefs defs
+       ; banner "toCLDefs"
+       ; displayN cl_defs
+
+       ; banner "fromCLDefs"
+       ; displayN (fromCLDefs cl_defs)
 
        ; (env1, opt_defs) <- optDefs rulebase env defs
        ; disp "Optimized original definition" env1 opt_defs

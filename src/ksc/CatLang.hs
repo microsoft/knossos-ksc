@@ -134,9 +134,12 @@ fromCLExpr (_,arg) (CLCall fun)
   = pprPanic "fromCLExpr:CLCall" (ppr fun)
 
 fromCLExpr (n, arg) (CLSel i n')
+  | assert (text "fromCLExpr1" <+> ppr (n,n')) (n == n') $
+    n == 1
+  = arg
+
   | Tuple es <- arg
   = assert (text "fromCLExpr1" <+> ppr (n,arg)) (n == length es) $
-    assert (text "fromCLExpr1" <+> ppr (n,n')) (n == n') $
     es !! (i-1)
 
   | otherwise
