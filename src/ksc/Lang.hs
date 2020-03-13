@@ -135,8 +135,8 @@ data ExprX p
   = Konst Konst
   | Var  (VarX p)
   | Call (FunX p) (ExprX p)  -- f e
-  | Tuple [ExprX p]            -- (e1, ..., en)
-  | Lam TVarX (ExprX p)    -- Lambda-bound variable is typed from birth
+  | Tuple [ExprX p]          -- (e1, ..., en)
+  | Lam TVarX (ExprX p)      -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)

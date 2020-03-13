@@ -64,10 +64,7 @@ gradDef _ _ = Nothing
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
 gradE :: HasCallStack => ADPlan -> Shape -> TExpr -> TExpr
-gradE adp s e@(Konst _)    = mkGradTuple adp e lm_zero
-  where
-    lm_zero = lmZero s e
-
+gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
 gradE adp s (Var tv)       = Var (gradTVar adp s tv)
 gradE adp s (Dummy ty)     = Dummy (mkGradType adp (typeof s) ty)
 gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
