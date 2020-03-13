@@ -6,6 +6,7 @@ import Annotate (annotDecls, lintDefs)
 import AD (gradDefs, applyDefs)
 import ANF (anfDefs)
 import qualified Cgen
+import CatLang (toCLDefs)
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
@@ -51,6 +52,8 @@ demoN verbosity adp decls
              rulebase     = mkRuleBase rules
 
        ; disp "Typechecked declarations" env defs
+
+       ; displayN (toCLDefs defs)
 
        ; (env1, opt_defs) <- optDefs rulebase env defs
        ; disp "Optimized original definition" env1 opt_defs
