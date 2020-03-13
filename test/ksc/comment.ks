@@ -5,4 +5,4 @@
 ; a compile failure (subsequently).  That no longer happens and this
 ; file tests it (or at least the latter).
 
-(def f Float () (0.0))
+(def f Float () 0.0)
