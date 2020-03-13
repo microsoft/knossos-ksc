@@ -1398,16 +1398,6 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
-	inline double sub(double t1, double t2) { return t1 - t2; }
-	inline auto D$sub(double, double) 
-	{
-		typedef LM::Scale M1;
-		typedef LM::Scale M2;
-		return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
-	}
-	
-	inline int sub(int t1, int t2) { return t1 - t2; }
-
 	template <class T>
 	T mul(double s, T const& t)
 	{
@@ -1437,18 +1427,6 @@ namespace ks
 	auto D$mul(T1 t1, T2 t2)
 	{
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(t2), LM::Scale::mk(t1));
-	}
-
-	template <class T1, class T2>
-	T1 div(T1 t1, T2 t2)
-	{
-		return t1 / t2;
-	}
-
-	inline
-		auto D$div(double t1, double t2)
-	{
-		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(1.0 / t2), LM::Scale::mk(-1.0 / (t1*t1)));
 	}
 
 	template <class T>
