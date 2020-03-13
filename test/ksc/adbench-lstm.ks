@@ -18,7 +18,7 @@
 ;
 ;     https://github.com/awf/ADBench/issues/143
 (def logsumexp Float ((v : Vec Float))
-    (log (add 2.0 (sum (exp$VecR v)))))
+    (log (add@ff 2.0 (sum (exp$VecR v)))))
 
 ; all Vecs size h
 (def lstm_model (Tuple (Vec Float) (Vec Float))
@@ -154,7 +154,7 @@
                          (total_increment (sumbuild h (lam (hi : Integer)
                                               (mul (index hi ygold) (index hi ynorm)))))
 
-                         (total_next (add total total_increment)))
+                         (total_next (add@ff total total_increment)))
                      (tuple total_next hidden_cell_next))
                    )
                                (tuple 0.0 (build l (lam (li : Integer) (tuple (get$9$10 (index li wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell))

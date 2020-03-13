@@ -5,6 +5,14 @@ from ksc.utils import translate_and_import
 def test_conv1d():
     # we need parentheses around Vec after ':' to parse correctly
     ks_str = """
+(edef add@ii Integer (Integer Integer))
+(edef sub@ii Integer (Integer Integer))
+(edef mul@ii Integer (Integer Integer))
+(edef div@ii Integer (Integer Integer))
+(edef lt Bool (Integer Integer))
+(edef gte Bool (Integer Integer))
+(edef or Bool (Bool Bool))
+
 (def conv1d (Vec (Vec Float)) ((kernels : (Vec (Vec (Vec Float))))
                                (image : (Vec (Vec Float))))
   (let ((k (size kernels))
@@ -21,7 +29,7 @@ def test_conv1d():
                   (outside_image (or (lt noi 0) (gte noi n)))
                   (image_noi
                   (if outside_image 0.0 (index noi (index li image)))))
-              (mul image_noi (index kni (index li (index ki kernels))))
+              (mul@ii image_noi (index kni (index li (index ki kernels))))
         )))))))))))"""
     py_out = translate_and_import(ks_str, "common")
     image = np.random.normal(0, 1, (1, 100))

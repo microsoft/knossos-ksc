@@ -1,5 +1,6 @@
 import ksc
 from ksc.type import Type
+from ksc.tracing.functions import core
 from ksc.tracing.functions.type_propagation_rules import unique_element_type
 from ksc.utils import ShapeType
 
@@ -28,8 +29,19 @@ def mat_vec_broadcast_prop_rule(m, v):
     assert d == d2
     return ShapeType((n, d), Type.Vec(Type.Vec(el_type)))
 
-dot = ksc.tracing.make_edef("dot", ["x", "y"], mat_mat_mul_prop_rule)
-broadcast_add = ksc.tracing.make_edef("broadcast_add", ["m", "v"], mat_vec_broadcast_prop_rule)
+dot = ksc.tracing.make_edef(
+    "dot", ["x", "y"], mat_mat_mul_prop_rule,
+    # the shape is (m, n) if x = (m, k) and y = (k, n)
+    lambda x, y: core.make_tuple(x.shape[0], y.shape[1]),
+    # just count the number of flops
+    lambda x, y: (lambda s_x, s_y: s_x[0] * s_x[1] * s_y[1] * 2)(x.shape, y.shape)
+)
+
+broadcast_add = ksc.tracing.make_edef(
+    "broadcast_add", ["m", "v"], mat_vec_broadcast_prop_rule,
+    lambda m, v: m.shape,
+    lambda m, v: m.size
+)
 
 def transpose_prop_rule(x):
     x_shape, x_type = x.shape_type

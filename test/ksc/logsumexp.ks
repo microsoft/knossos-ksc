@@ -28,4 +28,4 @@
 (def logsumexp_safe Float (a : Vec Float)
   (let (mx (max$VecR a))
     (let (sum_exp_minus_x (sum (exp$Vec (sub$VecR$R a mx))))
-        (add (log sum_exp_minus_x) mx))))
+        (add@ff (log sum_exp_minus_x) mx))))

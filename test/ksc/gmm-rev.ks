@@ -30,7 +30,7 @@
            (b  (get$2$2 a_b))
            (da (get$1$2 da_db))
            (db (get$2$2 da_db)))
-    (add (dotv a db) (dotv da b))))
+    (add@ff (dotv a db) (dotv da b))))
 (def rev$dotv (Tuple (Vec Float) (Vec Float))
                ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
      (let ((a  (get$1$2 a_b))

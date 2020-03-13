@@ -4,8 +4,8 @@ extern bool ctrl_c();
 using std::vector;
 struct Vec : vector<double> {};
 struct Mat : vector<Vec>{ 
-  static Mat rand(int,int); 
 };
+Mat rand(int,int); 
 Vec conv(Mat,Vec);
 Vec operator*(Mat,Vec);
 vector<Mat> operator*(double, vector<Mat> const&){}
@@ -28,6 +28,16 @@ Vec relu(Vec x) {
     return transform(x, relu);
 }
 
+typedef vector<Vec> T1;
+typedef vector<Mat> T1;
+
+template<double F(typename T1, typename T2)>
+std::tuple<T1,T2> grad(T1, T2)
+{}
+
+template <class A, class B>
+B snd(std::tuple<A,B>) {}
+
 // conv(M,x) is convolution
 
 // Vec and Mat are vector and matrix from some numerical library
@@ -36,7 +46,7 @@ Vec relu(Vec x) {
 Vec dnn(vector<Mat> weights, Vec x) {
     Vec out = x;
     for(auto W: weights)
-        out = relu(W * out);                   // relu(x) = max(x,0)
+        out = relu(W * out);          // relu(x) = max(x,0)
     return out;
 }
 
@@ -49,20 +59,14 @@ double loss(vector<Vec> examples, vector<Mat> weights)
     return tot;
 }
 
-// Gradient of loss function wrt "weights"
-vector<Mat> grad_loss(vector<Vec> examples, vector<Mat> weights)
-{
-  // code for d_loss/d_weights
-
-}
-
 // Training code: return weights given examples
 vector<Mat> train(vector<Vec> examples)
 {
+    // Initialize weights to random values
     vector<Mat> weights = 
         { rand(784,400), rand(400,30), rand(30,400), rand(400,784) };
     while (!ctrl_c()) {
-        weights -= 0.001 * grad2<loss>(examples, weights);
+        weights -= 0.001 * snd(grad<loss>(examples, weights));
         std::cout << "Loss = " << loss(examples, weights) << std::endl;
     }
 }

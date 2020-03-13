@@ -8,4 +8,4 @@
 (edef fwdt$edef_example Float (Float Float))
 (edef rev$edef_example Float (Float Float))
 
-(def g Float ((x : Float) (y : Float)) (add (edef_example x) y))
+(def g Float ((x : Float) (y : Float)) (add@ff (edef_example x) y))

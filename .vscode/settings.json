@@ -52,5 +52,6 @@
         "array": "cpp",
         "iterator": "cpp"
     },
-    "search.usePCRE2": true
+    "search.usePCRE2": true,
+    "python.pythonPath": "C:\\Users\\awf\\AppData\\Local\\Continuum\\anaconda3\\python.exe"
 }

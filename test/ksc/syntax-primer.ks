@@ -226,7 +226,7 @@ If you prefer block comments then use pairs of #| and |#
      (fold (lam (s_vi : Tuple Float Float)
                 (let ((s (get$1$2 s_vi))
                       (vi (get$2$2 s_vi)))
-                  (add s vi)))
+                  (add@ff s vi)))
            0.0
            v))
 

@@ -4,7 +4,9 @@ import ksc
 import numpy as np
 
 from ksc.tracing.node import Node
+from ksc.tracing.functions import core
 import ksc.tracing.functions as F
+from ksc.type import Type
 
 @pytest.fixture()
 def backend(pytestconfig):
@@ -117,6 +119,12 @@ def test_flatten():
     out = F.flatten(x)
     assert out.shape_type.shape == (3, 4 * 5 * 6)
     assert np.allclose(out.data, x.reshape((3, 4 * 5 * 6)))
+    # creator of out is an anonymous function. So the shape$
+    # function of flatten must be in before.
+    before, _ = out.creator._jitted.all_called_functions()
+    shape_def = next(f for key, f in before.items()
+                     if key == "shape$flatten@vvvvf")
+    assert shape_def(x) == (3, 4 * 5 * 6)
 
 def test_to_float():
     x = np.arange(9)
@@ -152,3 +160,43 @@ def test_reuse_result(backend):
 
     z = y - x
     assert z.get_data_with_backend(backend) == 48
+
+def test_get_vector_element():
+    xn = np.arange(24).reshape((2, 3, 4))
+    x = Node.from_data(xn)
+    o = x[0]
+    assert o.shape_type.shape == (3, 4)
+    o = o[2]
+    assert o.shape_type.shape == (4,)
+    o = o[3]
+    assert o.shape_type.type == Type.Integer
+    assert o.shape_type.shape == ()
+    o.data == xn[0, 2, 3]
+
+def test_vector_size():
+    xn = np.arange(24).reshape((2, 3, 4))
+    x = Node.from_data(xn)
+    assert core.get_vector_size(x).data == 2
+    o = x[0]
+    assert core.get_vector_size(o).data == 3
+    o = o[2]
+    assert core.get_vector_size(o).data == 4
+
+def test_tensor_shape():
+    x = Node.from_data(np.arange(24).reshape((2, 3, 4)))
+    assert x.shape.data == (2, 3, 4)
+
+    x = Node.from_data(np.random.normal(0, 1, (5, 3, 9)))
+    assert x.shape.data == (5, 3, 9)
+
+    x = Node.from_data((np.arange(6).reshape((2, 3)), np.arange(12).reshape((3, 4))))
+    assert x.shape.data == ((2, 3), (3, 4))
+
+def test_tensor_num_elements():
+    x = Node.from_data(np.arange(24).reshape((2, 3, 4)))
+    assert x.size.data == 24
+
+def test_floor_div(backend):
+    x = Node.from_data(10)
+    o = x // 3
+    assert o.get_data_with_backend(backend) == 3

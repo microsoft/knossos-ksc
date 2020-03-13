@@ -43,6 +43,9 @@ def max_(a, b):
 def neg(a):
     return -a
 
+def pow(a, b):
+    return a ** b
+
 def to_float_i(a):
     return float(a)
 
@@ -63,3 +66,27 @@ def fold(f, s0, xs):
     for x in xs:
         s = f((s, x))
     return s
+
+def make_tuple(*args):
+    return tuple(args)
+
+def get_tuple_element(i, tup):
+    return tup[i]
+
+def let(var, body):
+    return body(var)
+
+def if_then_else(cond, then_branch, else_branch):
+    return then_branch() if cond else else_branch()
+
+_built_ins = [
+    "build",
+    "sumbuild",
+    "size",
+    "index",
+    "fold",
+    "make_tuple",
+    "get_tuple_element",
+    "let",
+    "if_then_else"
+]

@@ -1,7 +1,8 @@
 from ksc.utils import translate_and_import
 
 def test_vec_vec_add():
-    ks_str = """(def test (Vec Integer) ((x : (Vec Integer)) (y : (Vec Integer)))
+    ks_str = """(edef add Integer (Integer Integer))
+(def test (Vec Integer) ((x : (Vec Integer)) (y : (Vec Integer)))
   (build (size x) (lam (i : Integer) (add (index i x) (index i y))))
 )"""
     py_out = translate_and_import(ks_str, "common")

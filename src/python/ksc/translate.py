@@ -7,31 +7,34 @@ import sys
 
 import sexpdata
 
+import ksc.backends
+from ksc.type import Type
 from ksc.backends import specs
 
-_built_in_edefs = [
-    "add",
-    "sub",
-    "mul",
-    "div_ii",
-    "div_ff",
-    "eq",
-    "lt",
-    "gt",
-    "lte",
-    "gte",
-    "or_",
-    "and_",
-    "abs_",
-    "max_",
-    "neg",
-    "to_float_i",
-    "build",
-    "sumbuild",
-    "size",
-    "index",
-    "fold",
-]
+def _convert_to_type(se, allow_implicit_tuple=False):
+    """ Converts an S-Expression representing a type, like (Vec Float) or (Tuple Float (Vec Float)),
+        into a Type object, e.g. Type.Vec(Type.Float) or Type.Tuple(Type.Float, Type.Vec(Type.Float)).
+
+        If allow_implicit_tuple is true, also converts a list of types into a Tuple, e.g.
+        (Float (Vec Float)) becomes Type.Tuple(Type.Float, Type.Vec(Type.Float)), i.e. as if
+        the S-Expression began with an extra "Tuple".
+    """
+    while isinstance(se, list) and len(se)==1:
+        se=se[0] # Discard ((pointless)) brackets
+    if isinstance(se, sexpdata.Symbol):
+        return Type(se.value())
+    if isinstance(se, list) and len(se)>0:
+        if isinstance(se[0], sexpdata.Symbol):
+            sym = se[0].value()
+            children = [_convert_to_type(s) for s in se[1:]]
+            if sym == "Vec" and len(se)==2:
+                return Type.Vec(*children)
+            if sym == "Tuple":
+                return Type.Tuple(*children)
+            # Fall through in case it's a list of types with allow_implicit_tuple.
+        if allow_implicit_tuple:
+            return Type.Tuple(*[_convert_to_type(s) for s in se])
+    raise ValueError("Did not know how to parse type {}".format(se))
 
 def _parse_to_s_exp(string_or_stream):
     return sexpdata.Parser(string_or_stream, nil=None, true="True", false="False").parse()
@@ -42,84 +45,23 @@ def get_var_name(s_exp):
     else:
         return s_exp[0].value()
 
-def _let_to_lambda(let_var_names, let_exprs, body, indent=4):
+def handle_let(let_var_names, let_exprs, body, indent=4):
     joiner = ("\n" + (" " * indent))
     let_var = let_var_names[-1]
     let_expr = let_exprs[-1]
     lambda_expr = joiner.join([
-        f"(lambda {let_var}:",
-        f"  {body}",
-        f")({let_expr})"
+        f"let(var={let_expr},",
+        f"    body=lambda {let_var}:",
+        f"      {body}",
+        ")"
     ])
     if len(let_var_names) > 1:
-        return _let_to_lambda(let_var_names[:-1],
+        return handle_let(let_var_names[:-1],
                               let_exprs[:-1],
                               lambda_expr,
                               indent=indent-2)
     else:
         return lambda_expr
-
-def get_specialized_func_name(name):
-    specialized = specs.specialized_functions()
-    if name in specialized:
-        return specialized[name]
-    return name.split("@")[0]
-
-def handle_body(s_exp, indent=2):
-    if isinstance(s_exp, sexpdata.Symbol):
-        return s_exp.value()
-    if isinstance(s_exp, (int, float)):
-        return str(s_exp)
-    if isinstance(s_exp[0], (int, float)):
-        assert all(isinstance(se, type(s_exp[0])) for se in s_exp)
-        return [v for v in s_exp]
-    joiner = ("\n" + (" " * indent))
-    func_name = get_specialized_func_name(_value_to_str(s_exp[0]))
-    if func_name == "let":
-        let_list = s_exp[1]
-        let_var_names = [se[0].value() for se in let_list]
-        let_exprs = [se[1] for se in let_list]
-        return _let_to_lambda(
-            let_var_names,
-            [handle_body(se, indent+2) for se in let_exprs],
-            handle_body(s_exp[2], indent + 2 * len(let_var_names)),
-            indent=indent + 2 * len(let_var_names) # inner most indent
-        )
-    elif func_name == "tuple":
-        tuple_args = [handle_body(se) for se in s_exp[1:]]
-        return "({tuple_args})".format(tuple_args=", ".join(tuple_args))
-    elif func_name.startswith("get"):
-        index = int(func_name.split("$")[1]) - 1
-        tuple_name = s_exp[1].value()
-        return "{tuple_name}[{index}]".format(tuple_name=tuple_name, index=index)
-    elif func_name == "lam":
-        var_name = get_var_name(s_exp[1])
-        body = handle_body(s_exp[2], indent=indent+2)
-        return joiner.join([
-            f"(lambda {var_name}:",
-            f"  {body}",
-            ")"])
-    elif func_name == "if":
-        # need to special case if because "if" is a python keyword
-        cond, then_branch, else_branch = [handle_body(se) for se in s_exp[1:]]
-        return joiner.join([f"({then_branch} if {cond} else",
-                            f" {else_branch})"])
-    elif func_name in ["or", "and", "max", "abs"]:
-        # need to special case them because they conflict with python functions
-        func_name = func_name + "_"
-
-    args = s_exp[1:]
-    args_handled = []
-    for i, se in enumerate(args):
-        try:
-            args_handled.append(handle_body(se))
-        except:
-            raise ValueError("In {}, failed to handle"
-                                " argument #{}, {}".format(func_name,
-                                                            i + 1,
-                                                            se))
-    return "{func_name}({args})".format(func_name=func_name,
-                                        args=", ".join([arg for arg in args_handled]))
 
 _global_prime_list = [2, 3, 5, 7, 11, 13]
 _global_prime_index = 0
@@ -175,62 +117,147 @@ def args_to_sample_values(args):
         arg_types.append((name, type_to_sample(arg_type)))
     return arg_types
 
-Def = namedtuple("Def", ["name", "str", "sample_args"])
-
 def _value_to_str(name):
     return name if isinstance(name, str) else name.value()
 
-def handle_def(s_exp):
-    name, _, args, body = s_exp[1:]
-    name = _value_to_str(name)
-    arg_names = [se[0].value() for se in args]
-    return Def(name,
-               """def {name}({args}):
+Def = namedtuple("Def", ["name", "str", "sample_args"])
+EDef = namedtuple("EDef", ["name", "py_name", "return_type"])
+
+
+class Translator:
+    def __init__(self, backend):
+        self._backend = backend
+        self._edefs = {}
+        self._defs = []
+        self._built_ins = ksc.backends.__dict__[backend]._built_ins
+
+    @property
+    def backend(self):
+        return self._backend
+
+    def normalize_def_name(self, name, new_edef=False, keep_type_annotation=None):
+        specialized = specs.specialized_functions()
+        if name in specialized:
+            return specialized[name]
+        if (name.split("@")[0] in self._built_ins
+            or name.startswith("get$")):
+            return name.split("@")[0]
+        if keep_type_annotation is None:
+            is_edef = new_edef or name in self._edefs
+            keep_type_annotation = (self.backend == "abstract" and is_edef
+                                    or name.startswith("cost$")
+                                    or name.startswith("shape$"))
+        if keep_type_annotation:
+            return name.replace("$", "_").replace("@", "_").replace("<", "_t").replace(">", "t_") # keep the type info
+        name = name.replace("$", "_").split("@")[0]
+        if name in ["or", "and", "max", "abs"]:
+            # need to special case them because they conflict with python functions
+           return name + "_"
+        return name
+
+    def handle_body(self, s_exp, indent=2):
+        if isinstance(s_exp, sexpdata.Symbol):
+            return s_exp.value()
+        if isinstance(s_exp, (int, float)):
+            return str(s_exp)
+        assert isinstance(s_exp, list)
+        if len(s_exp) == 1:
+            return self.handle_body(s_exp[0])
+        if isinstance(s_exp[0], (int, float)):
+            assert all(isinstance(se, type(s_exp[0])) for se in s_exp)
+            return [v for v in s_exp]
+        joiner = ("\n" + (" " * indent))
+        func_name = self.normalize_def_name(_value_to_str(s_exp[0]))
+        if func_name == "let":
+            let_list = s_exp[1]
+            if isinstance(let_list[0], sexpdata.Symbol):
+                let_list = [let_list]
+            let_var_names = [se[0].value() for se in let_list]
+            let_exprs = [se[1] for se in let_list]
+            return handle_let(
+                let_var_names,
+                [self.handle_body(se, indent+2) for se in let_exprs],
+                self.handle_body(s_exp[2], indent + 2 * len(let_var_names)),
+                indent=indent + 2 * len(let_var_names) # inner most indent
+            )
+        elif func_name == "tuple":
+            tuple_args = [self.handle_body(se, indent+2) for se in s_exp[1:]]
+            return "make_tuple({tuple_args})".format(tuple_args=", ".join(tuple_args))
+        elif func_name.startswith("get$"):
+            index = int(func_name.split("$")[1]) - 1
+            if isinstance(s_exp[1], sexpdata.Symbol):
+                tuple_name = s_exp[1].value()
+            else:
+                tuple_name = self.handle_body(s_exp[1], indent+2)
+            return "get_tuple_element({index}, {tuple_name})".format(tuple_name=tuple_name, index=index)
+        elif func_name == "lam":
+            var_name = get_var_name(s_exp[1])
+            body = self.handle_body(s_exp[2], indent+2)
+            return joiner.join([
+                f"(lambda {var_name}:",
+                f"  {body}",
+                ")"])
+        elif func_name == "if":
+            # need to special case if because "if" is a python keyword
+            cond, then_branch, else_branch = [self.handle_body(se, indent+2) for se in s_exp[1:]]
+            return joiner.join([
+                f"if_then_else({cond},",
+                f"             lambda: {then_branch},",
+                f"             lambda: {else_branch})"
+            ])
+
+        args = s_exp[1:]
+        args_handled = []
+        for i, se in enumerate(args):
+            try:
+                args_handled.append(self.handle_body(se, indent+2))
+            except:
+                raise ValueError("In {}, failed to handle"
+                                 " argument #{}, {}".format(func_name,
+                                                            i + 1,
+                                                            se))
+        return "{func_name}({args})".format(func_name=func_name,
+                                            args=", ".join([arg for arg in args_handled]))
+
+    def handle_def(self, s_exp):
+        name, _, args, body = s_exp[1:]
+        name = _value_to_str(name)
+        arg_names = [se[0].value() for se in args]
+        return Def(name,
+                   """def {name}({args}):
   return {body}
-""".format(name=name.split("@")[0], # ignore the type info in the name
+""".format(name=self.normalize_def_name(name),
            args=", ".join(arg_names),
-           body=handle_body(body)),
-               args_to_sample_values(args))
+           body=self.handle_body(body)),
+                   args_to_sample_values(args))
 
-def to_def_or_edef(s_exp):
-    if s_exp[0].value() == "edef":
-        name = _value_to_str(s_exp[1])
-        return get_specialized_func_name(name), None
-    elif s_exp[0].value() == "def":
-        return None, handle_def(s_exp)
-    else:
-        return None, None
+    def parse_defs(self, string_or_stream):
+        defs_to_process = []
+        for s_exp in _parse_to_s_exp(string_or_stream):
+            def_or_edef = s_exp[0].value()
+            if def_or_edef == "edef":
+                name = _value_to_str(s_exp[1])
+                py_name = self.normalize_def_name(name, new_edef=True)
+                if py_name in self._built_ins:
+                    # if it is built-in no need to edef
+                    continue
+                edef = EDef(name,
+                            py_name,
+                            _convert_to_type(s_exp[2]))
+                self._edefs[name] = edef
+            elif def_or_edef == "def":
+                name = _value_to_str(s_exp[1])
+                if name.startswith("cost$") or name.startswith("shape$"):
+                    # delay so that we read edefs first
+                    defs_to_process.append(s_exp)
+                else:
+                    self._defs.append(self.handle_def(s_exp))
+        for s_exp in defs_to_process:
+            self._defs.append(self.handle_def(s_exp))
 
-def parse_defs(string_or_stream):
-    se_list = _parse_to_s_exp(string_or_stream)
-    edefs, defs = zip(*[to_def_or_edef(se) for se in se_list])
-    return list(filter(None, edefs)), list(filter(None, defs))
-
-def translate(ks_str, backend, with_main=True):
-    edefs, defs = parse_defs(ks_str)
-    def_names, def_strs, samples = zip(*defs)
-    main_samples = samples[-1]
-    main_name = def_names[-1]
-
-    # include built-in functions
-    edefs = sorted(set(_built_in_edefs + edefs))
-
-    ks_str = '''import numpy as np
-from ksc.backends.{backend} import ({edefs}
-)
-{defs}
-
-defs={{
-  {defs_map}
-}}
-'''.format(backend=backend,
-           edefs=",\n  ".join(edefs),
-           defs="\n".join(def_strs),
-           defs_map=",\n  ".join([f'"{d.name}": {d.name.split("@")[0]}' for d in defs])
-    )
-
-    if with_main:
-        ks_str += """
+    def make_main(self):
+        main = self._defs[-1]
+        return """
 
 def main():
   {sample_args}
@@ -239,10 +266,60 @@ def main():
 if __name__ == "__main__":
   main()
 """.format(
-        sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main_samples),
-        main=main_name,
-        main_args=", ".join([k for k, _ in main_samples])
+        sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main.sample_args),
+        main=main.name,
+        main_args=", ".join([k for k, _ in main.sample_args])
 )
+
+    def translate(self, ks_str):
+        self.parse_defs(ks_str)
+        if self.backend == "abstract":
+            # in abstract backend, edefs are generated by _get_edef function.
+            # py_name in this case maintains the type in a python-friendly
+            # mangled format. The generated function will dynamically switch
+            # between "concrete" execution and "abstract" execution depending
+            # on the arguments. The concrete execution uses the edefs defined
+            # in the common backend. The abstract execution uses the cost$ and
+            # shape$ functions defined by the user. Keeping the name mangled
+            # is necessary for calling the right version of the generated edef.
+            imports = sorted(self._built_ins)
+            edefs = [f'{edef.py_name} = ksc.backends.abstract._get_edef('
+                     f'defs, "{edef.name}", '
+                     f'{edef.return_type.__repr__()}, '
+                     f'py_name_for_concrete="{self.normalize_def_name(edef.name, keep_type_annotation=False)}")'
+                     for edef in self._edefs.values()]
+        else:
+            # in most backends, edefs are imported from backend
+            imports = sorted(set(self._built_ins
+                                 + [edef.py_name for edef in self._edefs.values()]))
+            edefs = []
+
+        return '''import numpy as np
+import ksc
+from ksc.type import Type
+from ksc.backends.{backend} import (
+  {imports}
+)
+{defs}
+
+defs={{
+  {defs_map}
+}}
+
+{edefs}
+'''.format(backend=self.backend,
+           imports=",\n  ".join(imports),
+           defs="\n".join([d.str for d in self._defs]),
+           defs_map=",\n  ".join([f'"{d.name}": {self.normalize_def_name(d.name)}' for d in self._defs]),
+           edefs="\n".join(edefs)
+    )
+
+def translate(ks_str, backend, with_main=True):
+    translator = Translator(backend)
+    ks_str = translator.translate(ks_str)
+
+    if with_main:
+        ks_str += translator.make_main()
 
     return ks_str
 

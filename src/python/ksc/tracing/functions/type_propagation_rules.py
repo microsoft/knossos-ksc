@@ -14,7 +14,9 @@ def unique_element_type(types):
     return el_type
 
 def elementwise(*args):
-    assert all(a.shape_type == args[0].shape_type for a in args)
+    a = args[0]
+    for arg in args:
+        assert a.shape_type == arg.shape_type, f"Expected {a.shape_type}, but got {arg.shape_type}"
     return args[0].shape_type
 
 def first_arg(*args):
