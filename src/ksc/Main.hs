@@ -4,8 +4,6 @@
 
 module Main where
 
-import GHC.Stack
-
 import CatLang
 import Lang
 import LangUtils

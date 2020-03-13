@@ -2,6 +2,7 @@ module CatLang where
 
 import Prelude hiding( (<>) )
 import Lang
+import Prim
 import Data.Maybe( mapMaybe )
 
 data CLExpr
@@ -115,32 +116,44 @@ fromCLDef (CLDef { cldef_fun = CLFun f
   = Def { def_fun  = Fun f
         , def_args = arg
         , def_res_ty = res_ty
-        , def_rhs  = UserRhs (fromCLExpr [Var arg] rhs) }
+        , def_rhs  = UserRhs (fromCLExpr (1, Var arg) rhs) }
 
 fromCLDef def = pprPanic "fromCLDef" (ppr def)  -- Not a CLFun
 
-fromCLExpr :: [TExpr] -> CLExpr -> TExpr
+fromCLExpr :: (Int, TExpr) -> CLExpr -> TExpr
+-- In (fromClExpr arg cl)
+--   If 'arg' is (1, arg)  then the arg is not a tuple
+--   If 'arg' is (n, args) then args is a n-tuple
 fromCLExpr _   (CLKonst k)  = Konst k
-fromCLExpr args (CLTuple es) = Tuple (map (fromCLExpr args) es)
-fromCLExpr args (CLIf b t e) = If (fromCLExpr args b) (fromCLExpr args t) (fromCLExpr args e)
-fromCLExpr args (CLCall fun)
+fromCLExpr arg (CLTuple es) = Tuple (map (fromCLExpr arg) es)
+fromCLExpr arg (CLIf b t e) = If (fromCLExpr arg b) (fromCLExpr arg t) (fromCLExpr arg e)
+fromCLExpr (_,arg) (CLCall fun)
   | TFun ty (CLFun f) <- fun
-  = Call (TFun ty (Fun f)) args
+  = Call (TFun ty (Fun f)) arg
   | otherwise
   = pprPanic "fromCLExpr:CLCall" (ppr fun)
 
-fromCLExpr args sel@(CLSel i n)
-  | n == length args = args !! (i-1)
-  | otherwise        = pprPanic "fromCLExpr" (ppr args $$ ppr sel)
+fromCLExpr (n, arg) (CLSel i n')
+  | Tuple es <- arg
+  = assert (text "fromCLExpr1" <+> ppr (n,arg)) (n == length es) $
+    assert (text "fromCLExpr1" <+> ppr (n,n')) (n == n') $
+    es !! (i-1)
 
-fromCLExpr args (CLLet tv rhs body)
-  = Let tv (fromCLExpr args rhs)
-           (fromCLExpr (Var tv : args) body)
+  | otherwise
+  = pSel i n arg
 
-fromCLExpr args (CLComp e1 e2)
-  = case fromCLExpr args e2 of       -- Ugh!!
-      Tuple es -> fromCLExpr es e1
-      e        -> fromCLExpr [e] e1
+fromCLExpr arg (CLLet tv rhs body)
+  = Let tv (fromCLExpr arg rhs)
+           (fromCLExpr (extendArg (Var tv) arg) body)
+
+fromCLExpr arg (CLComp e1 e2)
+  = fromCLExpr (1, fromCLExpr arg e2) e1
+
+extendArg :: TExpr -> (Int,TExpr) -> (Int,TExpr)
+extendArg arg2 (1,arg1)       = (2, Tuple [arg2,arg1])
+extendArg arg  (n,Tuple args) = (n+1, Tuple (arg:args))
+extendArg arg  (n,args)       = (n+1, pConsTup arg args)
+
 
 -----------------------------------------------
 -- AD with tupling
