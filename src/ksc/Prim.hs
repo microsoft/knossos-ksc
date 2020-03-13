@@ -504,8 +504,8 @@ primFunCallResultTy_maybe fun args
       ("$check"   , TypeTuple
                       [ TypeLam (TypeTuple [s]) t
                       , TypeLam (TypeTuple [s_dt]) ds', s', s'0, ds, dt])
-                      | s `eqType` case s' of TypeTuple [s1] -> s1
-                                              _              -> s
+                      | s `eqType` case s' of TypeTuple [s'1] -> s'1
+                                              _               -> s
                       , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
                                                 _               -> ds
                       , tangentType s `eqType` ds'
