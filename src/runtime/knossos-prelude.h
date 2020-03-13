@@ -128,4 +128,37 @@ tuple<double,double> rev$gt(double a,double b, tuple<> d$r)
 	throw "rev$gt unimp!\n";
 }
 
+inline double sub$aff(double t1, double t2)
+{
+	return t1 - t2;
+}
+
+inline int sub$aii(int t1, int t2)
+{
+	return t1 - t2;
+}
+
+inline double div$aff(double t1, double t2)
+{
+	return t1 / t2;
+}
+
+inline int div$aii(int t1, int t2)
+{
+	return t1 / t2;
+}
+
+inline double neg$af(double t)
+{
+	return -t;
+}
+
+inline int neg$ai(int t)
+{
+	return -t;
+}
+
+inline double to_float(int d) { return d; }
+inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
+
 }
