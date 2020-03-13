@@ -66,6 +66,7 @@ substEMayCapture subst (Konst k)      = Konst k
 substEMayCapture subst (Var v)        = case M.lookup v subst of
                                Just e  -> e
                                Nothing -> Var v
+substEMayCapture subst (Funref f ty)  = Funref f ty
 substEMayCapture subst (Call f es)    = Call f (substEMayCapture subst es)
 substEMayCapture subst (If b t e)     = If (substEMayCapture subst b) (substEMayCapture subst t) (substEMayCapture subst e)
 substEMayCapture subst (Tuple es)     = Tuple (map (substEMayCapture subst) es)
@@ -83,9 +84,10 @@ freeVarsOf :: TExpr -> S.Set TVar
 freeVarsOf = go
   where
    go :: TExpr -> S.Set TVar
-   go (Var v)        = S.singleton v
-   go (Konst _)      = S.empty
    go (Dummy _)      = S.empty
+   go (Konst _)      = S.empty
+   go (Funref _ _)   = S.empty
+   go (Var v)        = S.singleton v
    go (Tuple es)     = S.unions (map go es)
    go (If b t e)     = go b `S.union` go t `S.union` go e
    go (Call _ es)    = go es
@@ -101,6 +103,7 @@ notFreeIn = go
    go v (Var v2)     = tVarVar v /= tVarVar v2
    go v (Dummy {})   = True
    go v (Konst _)    = True
+   go v (Funref _ _) = True
    go v (Tuple es)   = all (go v) es
    go v (If b t e)   = go v b && go v t && go v e
    go v (Call _ e)   = go v e

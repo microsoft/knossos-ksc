@@ -120,8 +120,9 @@ optE env
     go (Var v) | Just e <- lookupSubst (tVarVar v) (optSubst env)
                = e
                | otherwise = Var v
-    go (Konst k)          = Konst k
-    go (Dummy ty)         = Dummy ty
+    go e@(Konst _)        = e
+    go e@(Dummy _)        = e
+    go e@(Funref _ _)     = e
     go (App e1 e2)        = optApp env (go e1) (go e2)
     go (Assert e1 e2)     = Assert (go e1) (go e2)
     go (Lam tv e)         = Lam tv' (optE env' e)
@@ -205,9 +206,9 @@ optFun _ (SelFun i _) arg
   = Nothing
 
 -- $inline needs to look up the global symtab
-optFun env (PrimFun "$inline") arg
+optFun env (PrimFun "$inline") arg 
   | Call (TFun _ fun) inner_arg <- arg
-  , Just fun_def <- lookupGblST fun (optGblST env)
+  , Just fun_def <- lookupGblST (fun, typeof inner_arg) (optGblST env)
   , Def { def_args = bndrs, def_rhs = UserRhs body } <- fun_def
   = Just (inlineCall bndrs body inner_arg)
 
