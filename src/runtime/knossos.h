@@ -1491,26 +1491,6 @@ namespace ks
 		return t1 + t2;
 	}
 
-	inline double sub$aff(double t1, double t2)
-	{
-		return t1 - t2;
-	}
-
-	inline int sub$aii(int t1, int t2)
-	{
-		return t1 - t2;
-	}
-
-	inline double div$aff(double t1, double t2)
-	{
-		return t1 / t2;
-	}
-
-	inline int div$aii(int t1, int t2)
-	{
-		return t1 / t2;
-	}
-
 	inline double mul$aff(double t1, double t2)
 	{
 		return t1 * t2;
@@ -1519,16 +1499,6 @@ namespace ks
 	inline int mul$aii(int t1, int t2)
 	{
 		return t1 * t2;
-	}
-
-	inline double neg$af(double t)
-	{
-		return -t;
-	}
-
-	inline int neg$ai(int t)
-	{
-		return -t;
 	}
 
 	inline bool or_(int b1, int b2)
@@ -1562,9 +1532,6 @@ namespace ks
 
         template <class T>
         inline vec<T> neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return neg(v[i]); }); }
-
-	inline double to_float(int d) { return d; }
-	inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
 	inline int to_size(int d) { return d; }
 	inline auto D$to_size(int d) { return LM::Zero<int, int>(); }
