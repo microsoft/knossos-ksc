@@ -831,7 +831,7 @@ pprCall prec f e = mode
       -> parensIf prec prec' $
          sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
     _ -> parensIf prec precCall $
-         cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
+         cat [pprFunOcc @p f, nest 2 (case e of { Tuple {} -> ppr e; _ -> parens (ppr e) })]
   )
  where
   pp_args = ppr e
@@ -865,8 +865,8 @@ isInfixFun (Fun (PrimFun s))
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
-parensIf ctxt inner doc | ctxt >= inner    = parens doc
-                        | otherwise        = doc
+parensIf ctxt inner doc | ctxt > inner = parens doc
+                        | otherwise    = doc
 
 instance InPhase p => Pretty (DeclX p) where
   ppr (DefDecl d)  = ppr d
@@ -889,7 +889,7 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
                     2 (parens (pprTVar vs))
-               , nest 2 (text "=" <+> ppr rhs) ])
+               , nest 2 (text "=" <+> pprExpr precZero rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
 

@@ -27,10 +27,10 @@ import GHC.Stack (HasCallStack)
 --  The demo driver
 -------------------------------------
 
-demoCL :: ADPlan -> String -> IO ()
-demoCL _adp file
+demoCL :: String -> IO ()
+demoCL file
   = do { pr_decls <- parseF "src/runtime/prelude.ks"
-       ; my_decls <- parseF file
+       ; my_decls <- parseF ("test/ksc/" ++ file ++ ".ks")
        ; runKM $
 
     do { banner "Original decls"
@@ -48,8 +48,9 @@ demoCL _adp file
        ; let cl_defs = toCLDefs my_defs
        ; displayN cl_defs
 
-       ; banner "fromCLDefs"
-       ; displayN (fromCLDefs cl_defs) } }
+       ; displayPassM veryVerbose "fromCLDefs" env2
+                       (fromCLDefs cl_defs)
+     } }
 
 
 veryVerbose :: Maybe Int

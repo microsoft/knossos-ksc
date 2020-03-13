@@ -53,9 +53,10 @@ pprCLExpr p (CLIf b t e) = parensIf p precZero $
                            sep [ text "if" <+> ppr b
                                , text "then" <+> ppr t
                                , text "else" <+> ppr e]
-pprCLExpr p (CLLet x r b) = parensIf p precOne $
-                            sep [ text "let" <+> ppr x <+> char '=' <+> pprCLExpr precZero r
-                                , text "in" <+> pprCLExpr precZero b ]
+pprCLExpr p (CLLet x r b)
+  = parensIf p precZero $
+    vcat [ text "let" <+> (bracesSp $ sep [ ppr x <+> char '=', nest 2 (pprCLExpr precZero r) ])
+         , pprCLExpr precZero b ]
 
 
 -----------------------------------------------
@@ -127,6 +128,7 @@ fromCLExpr :: (Int, TExpr) -> CLExpr -> TExpr
 fromCLExpr _   (CLKonst k)  = Konst k
 fromCLExpr arg (CLTuple es) = Tuple (map (fromCLExpr arg) es)
 fromCLExpr arg (CLIf b t e) = If (fromCLExpr arg b) (fromCLExpr arg t) (fromCLExpr arg e)
+
 fromCLExpr (_,arg) (CLCall fun)
   | TFun ty (CLFun f) <- fun
   = Call (TFun ty (Fun f)) arg
@@ -134,16 +136,8 @@ fromCLExpr (_,arg) (CLCall fun)
   = pprPanic "fromCLExpr:CLCall" (ppr fun)
 
 fromCLExpr (n, arg) (CLSel i n')
-  | assert (text "fromCLExpr1" <+> ppr (n,n')) (n == n') $
-    n == 1
-  = arg
-
-  | Tuple es <- arg
-  = assert (text "fromCLExpr1" <+> ppr (n,arg)) (n == length es) $
-    es !! (i-1)
-
-  | otherwise
-  = pSel i n arg
+  = assert (text "fromCLExpr1" <+> ppr (n,n')) (n == n') $
+    pSel i n arg
 
 fromCLExpr arg (CLLet tv rhs body)
   = Let tv (fromCLExpr arg rhs)
