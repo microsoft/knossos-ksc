@@ -210,7 +210,7 @@ data HistoryEntry = HistoryEntry {
     heSExp   :: [Document Void]
   , heHExp   :: [Document (Wrapped Lang.TExpr Void)]
   , heCstyle :: String
-  , heCost   :: Either String Double
+  , heCost   :: Either String Rational
   , heRule   :: Lang.TRule
   }
 
@@ -225,7 +225,7 @@ data ChooseLocationModel =
 data ChooseLocationPage a =
   ChooseLocationPage { clpHistory :: [HistoryEntry]
                      , clpCStyle  :: String
-                     , clpCost    :: Either String Double
+                     , clpCost    :: Either String Rational
                      , clpThisExp :: [Document a]
                      }
   deriving Functor
@@ -606,7 +606,7 @@ renderPageString = \case
             Just l -> concatMap f l
               where f (s, s1, b) = "<li>" ++ renderLink b s ++ s1 ++ "</li>"
 
-renderCost :: Either String Double -> String
+renderCost :: Either String Rational -> String
 renderCost s = p (costString s)
   where costString = \case
           Left err -> "Error calculating cost: " ++ err

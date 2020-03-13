@@ -5,7 +5,7 @@ module Ksc.Cost where
 import qualified Lang
 import           Prim (isThePrimFun)
 
-cost :: Lang.TExpr -> Either String Double
+cost :: Lang.TExpr -> Either String Rational
 cost = \case
   Lang.Konst{}  -> pure 0
   Lang.Var{}    -> pure 0
@@ -45,7 +45,7 @@ size = \case
   Lang.TypeUnknown -> notImpl "Unknown"
   where notImpl s = Left ("size not implemented for " ++ s)
 
-costFun :: Lang.TFun -> Lang.Type -> Either String Double
+costFun :: Lang.TFun -> Lang.Type -> Either String Rational
 costFun f t
   | f `isThePrimFun` "add"    = fmap fromIntegral (size t)
   | f `isThePrimFun` "and"    = fmap fromIntegral (size t)
