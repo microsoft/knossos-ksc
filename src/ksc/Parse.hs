@@ -219,7 +219,6 @@ pKExpr =   pIfThenElse
        <|> pAssert
        <|> pCall
        <|> pTuple
-       <|> pKonst
 
 pType :: Parser (TypeX)
 pType = (pReserved "Integer" >> return TypeInteger)
