@@ -505,7 +505,7 @@ primFunCallResultTy_maybe fun args
                       [ TypeLam (TypeTuple [s]) t
                       , TypeLam (TypeTuple [s_dt]) ds', s', s'0, ds, dt])
                       | s `eqType` case s' of TypeTuple [s'1] -> s'1
-                                              _               -> s
+                                              _               -> s'
                       , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
                                                 _               -> ds
                       , tangentType s `eqType` ds'
