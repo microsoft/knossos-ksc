@@ -397,8 +397,7 @@ modifyEnvTc extend (TCM f)
 getSymTabTc :: TcM SymTab
 getSymTabTc = TCM (\env ds -> (Just (tce_st env), ds))
 
--- This used to look up function names, now disabled.
--- We will need new and better syntax for naming functions under AHP
+-- This used to look up function names, now done by Funref
 lookupLclTc :: Var -> TcM Type
 lookupLclTc v
   = do { st <- getSymTabTc
