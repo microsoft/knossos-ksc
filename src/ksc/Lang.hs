@@ -134,9 +134,10 @@ type family FunX p where
 data ExprX p
   = Konst Konst
   | Var  (VarX p)
+  | Funref (FunX p) (TypeX)
   | Call (FunX p) (ExprX p)  -- f e
-  | Tuple [ExprX p]            -- (e1, ..., en)
-  | Lam TVarX (ExprX p)    -- Lambda-bound variable is typed from birth
+  | Tuple [ExprX p]          -- (e1, ..., en)
+  | Lam TVarX (ExprX p)      -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)
@@ -436,6 +437,7 @@ instance HasType TExpr where
   typeof (Dummy ty)    = ty
   typeof (Konst k)     = typeofKonst k
   typeof (Var b)       = typeof b
+  typeof (Funref f ty) = TypeLam ty (typeof f)
   typeof (Call f _)    = typeof f
   typeof (App f _)     = case typeof f of
                             TypeLam _ res -> res
@@ -787,6 +789,7 @@ pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
+pprExpr _ (Funref f ty) = parens $ text "Funref" <+> pprFunOcc @phase f <+> ppr ty
 pprExpr _ (Dummy ty) = char '<' <> pprMTypeX @phase ty <> char '>'
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
@@ -1021,25 +1024,33 @@ cmpExpr e1
 
    go (Let b1 r1 e1) subst e2
      = case e2 of
-         If {}     -> LT
-         Assert {} -> LT
          Let b2 r2 e2
            -> go r1 subst r2 `thenCmp`
               (typeof b1 `compare` typeof b2) `thenCmp`
               go e1 (M.insert (tVarVar b2) b1 subst) e2
+         If {}     -> LT
+         Assert {} -> LT
+         Funref {} -> LT
          _ -> GT
 
    go (If e1c e1t e1f) subst e2
       = case e2 of
-          Assert {} -> LT
           If e2c e2t e2f -> go e1c subst e2c `thenCmp`
                             go e1t subst e2t `thenCmp`
                             go e1f subst e2f
+          Assert {} -> LT
+          Funref {} -> LT
           _ -> GT
 
    go (Assert e1a e1b) subst e2
       = case e2 of
           Assert e2a e2b -> go e1a subst e2a `thenCmp` go e1b subst e2b
+          Funref {} -> LT
+          _              -> GT
+
+   go (Funref f1 ty1) _ e2
+      = case e2 of
+          Funref f2 ty2  -> (f1 `compare` f2) `thenCmp` (ty1 `compare` ty2)
           _              -> GT
 
    gos :: [TExpr] -> M.Map Var TVar -> [TExpr] -> Ordering
