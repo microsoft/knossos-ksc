@@ -64,12 +64,10 @@ gradDef _ _ = Nothing
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
 gradE :: HasCallStack => ADPlan -> Shape -> TExpr -> TExpr
-gradE adp s e@(Konst _)    = mkGradTuple adp e lm_zero
-  where
-    lm_zero = lmZero s e
-
+gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
 gradE adp s (Var tv)       = Var (gradTVar adp s tv)
 gradE adp s (Dummy ty)     = Dummy (mkGradType adp (typeof s) ty)
+gradE _dp _ e@(Funref _ _) = pprPanic "gradE: can't deal with Funref yet" (ppr e)
 gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
 gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
@@ -91,7 +89,7 @@ gradE adp s (Call f (Tuple [n, Lam ti body]))
   | f `isThePrimFun` "build"
   = gradBuild adp s n ti body
 
--- I'm not very happy about this rule, which effectively
+-- TODO: I'm not very happy about this rule, which effectively
 -- undoes sum (build e) --> sumbuild e
 gradE adp s (Call f (Tuple [n, body]))
   | f `isThePrimFun` "sumbuild"

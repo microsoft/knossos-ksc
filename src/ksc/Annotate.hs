@@ -137,6 +137,12 @@ tcExpr (Var vx)
 tcExpr (Konst k)
   = return (TE (Konst k) (typeofKonst k))
 
+tcExpr (Funref fx argtype)
+  = do { let (fun, _mb_ty) = getFun @p fx
+       ; res_ty <- lookupGblTc fun (TE (Dummy argtype) argtype)
+       ; let fr = (Funref (TFun res_ty fun) argtype)
+       ; return (TE fr (typeof fr)) }
+
 tcExpr (Call fx es)
   = do { let (fun, mb_ty) = getFun @p fx
        ; pairs <- addCtxt (text "In the call of:" <+> ppr fun) $

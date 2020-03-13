@@ -130,21 +130,18 @@ freshCVar = do
 
 -------------------- Cgen
 
--- CGenResult is (C declaration, C expression, C type, CType)
+-- CGenResult is (C declaration, C expression, CType)
 -- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
 --       "r",
---       TypeDouble,
---       "double")
+--       TypeDouble)
 -- e.g. ("",         -- simple constant needs no pre-declaration
 --       "1.0",      -- this is what we use at the occurrence
---       TypeDouble,
---       "double")
+--       TypeDouble)
 -- e.g. ("typedef LM::HCat<LM::VCat<LM::One, LM::Zero>,LM::Zero> v12_t;
 --        v12_t v12 = v12_t::mk(a,b);",
 --       "v12",      -- this is what we use at the occurrence
---       LMHCat [LMVCat [LMOne, LMZero], LMZero]
---       "v12_t")
-data CGenResult = CG String String CType
+--       LMHCat [LMVCat [LMOne, LMZero], LMZero])
+data CGenResult = CG String String CType -- TODO: rename CG CGenResult
 
 getDecl :: CGenResult -> String
 getDecl (CG dc _ _) = dc
@@ -183,6 +180,9 @@ cstInsertFun (f,ty) ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ 
 
 cstLookupVar :: HasCallStack => Var -> CST -> CType
 cstLookupVar v env = cstLookup0 (show v) env
+
+cstLookupFun :: HasCallStack => (Fun, Type) -> CST -> CType
+cstLookupFun (f,ty) env = cstLookup0 (cgenUserFun (f,ty)) env
 
 cstMaybeLookupFun :: HasCallStack => (Fun, Type) -> CST -> Maybe CType
 cstMaybeLookupFun (f,ty) env = cstMaybeLookup0 (cgenUserFun (f,ty)) env
@@ -270,6 +270,7 @@ cgenExprR env = \case
   Dummy ty ->
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
   Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
+  Funref (TFun _ f) ty -> return $ CG "" (cgenUserFun (f,ty)) (cstLookupFun (f,ty) env)
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
