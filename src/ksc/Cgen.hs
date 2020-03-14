@@ -174,9 +174,11 @@ cgenDefs defs = foldl go [] $
                                     _         -> Nothing) defs)
 
   go :: [String] -> TDef -> [String]
-  go strs def =
-    let (CG cdecl _cfun _ctype) = cgenDefE env def
-    in  strs ++ [cdecl]
+  go strs def = strs ++ cdecl def
+
+  cdecl def =
+    let (CG cdecl_ _cfun _ctype) = cgenDefE env def
+    in [cdecl_]
 
 {- Note [Unpack tuple arguments]
 
