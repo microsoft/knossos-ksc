@@ -163,7 +163,7 @@ cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
 cgenDefs :: [TDef] -> [String]
-cgenDefs defs = foldl go [] $
+cgenDefs defs = concatMap cdecl $
                 filter isUserDef defs
  where
   env = Map.fromList (mapMaybe (\(Def { def_fun = f
@@ -172,9 +172,6 @@ cgenDefs defs = foldl go [] $
                                   case rhs of
                                     UserRhs _ -> Just (f, ())
                                     _         -> Nothing) defs)
-
-  go :: [String] -> TDef -> [String]
-  go strs def = strs ++ cdecl def
 
   cdecl def =
     let (CG cdecl_ _cfun _ctype) = cgenDefE env def
