@@ -312,7 +312,7 @@ pDiag = mkPrimCall3 "diag"
 -- "User-defined" functions
 ---------------------------
 pAdd, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
-pAdd   = mkPrimCall2 "add"
+pAdd   = mkPrimCall2 "ts_add"
 pEqual = mkPrimCall2 "eq"
 pScale = mkPrimCall2 "scale"
 
@@ -537,10 +537,10 @@ primFunCallResultTy_maybe fun args
       ("unzip"    , TypeVec (TypeTuple ts))                -> Just (TypeTuple (map TypeVec ts))
 
       ("scale"    , TypeTuple [TypeFloat,   t]           ) -> Just t
-      ("add"      , TypeTuple [t, dt]                    ) -> if dt == tangentType t
+      ("ts_add"   , TypeTuple [t, dt]                    ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing
-      ("neg"      , t                                    ) -> Just t
+      ("ts_neg"   , t                                    ) -> Just t
       -- For eq and ne we check that the two arguments have the same type
       ("eq"       , TypeTuple [t1, t2]                   )
         | t1 `eqType` t2 -> Just TypeBool
@@ -569,8 +569,8 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
-                       , "neg"
-                       , "add"
+                       , "ts_neg"
+                       , "ts_add"
                        , "eq", "ne", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyR", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"

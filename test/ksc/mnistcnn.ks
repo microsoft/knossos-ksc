@@ -15,7 +15,7 @@
      (build k (lam (ki : Integer)
      (build n (lam (ni : Integer)
      (build m (lam (mi : Integer)
-       (add
+       (ts_add
        (sumbuild kn (lam (kni : Integer)
        (sumbuild km (lam (kmi : Integer)
        (sumbuild l  (lam (li  : Integer)
@@ -89,7 +89,7 @@
         (n (size image_elt))
         (m (size (index 0 image_elt))))
      (build o (lam (oi : Integer)
-     (add
+     (ts_add
      (sumbuild k (lam (ki : Integer)
      (sumbuild n (lam (ni : Integer)
      (sumbuild m (lam (mi : Integer)
@@ -108,7 +108,7 @@
    (let ((o (size w))
          (k (size image)))
      (build o (lam (oi : Integer)
-     (add
+     (ts_add
      (sumbuild k (lam (ki : Integer)
        (mul@ff (index ki (index oi w))
              (index ki image))

@@ -336,7 +336,7 @@ callPrimFun op _ (L.Tuple [x, y])
          else Call (binopFunction op' xt yt) [toFutharkExp x, toFutharkExp y]
   where binOpPrimFuns = [ ("or", "||")
                         , ("and", "&&")
-                        , ("add", "+")
+                        , ("ts_add", "+")
                         , ("scale", "*")
                         , ("eq" , "==")
                         , ("ne" , "!=")

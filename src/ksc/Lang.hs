@@ -858,7 +858,7 @@ isInfix f = isInfixFun (fst (getFun @p f))
 isInfixFun :: Fun -> Maybe Prec
 isInfixFun (Fun (PrimFun s))
     | s == "eq"   = Just precOne
-    | s == "add"  = Just precTwo
+    | s == "ts_add" = Just precTwo
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc

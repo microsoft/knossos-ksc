@@ -30,7 +30,7 @@
 (edef rev$pow@Float (Tuple Float Float) (Float Float Float))
 
 (def add@Float,Float Float ((a : Float) (b : Float))
-   (add a b))
+   (add@ff a b))
 
 (def add@Integer,Integer Integer ((a : Integer) (b : Integer))
    (add@ii a b))
@@ -78,7 +78,7 @@
            (v  (get$2$2 M_v))
            (dM (get$1$2 dM_dv))
            (dv (get$2$2 dM_dv)))
-    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
+    (ts_add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
           ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
