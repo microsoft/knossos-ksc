@@ -11,6 +11,7 @@ import           Prelude                 hiding ( lines
 
 import qualified Data.Map                      as Map
 import           Data.List                      ( intercalate )
+import           Data.Maybe                     ( mapMaybe )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import qualified System.Directory
@@ -172,14 +173,20 @@ cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
 cgenDefs :: [TDef] -> [String]
-cgenDefs defs = snd $ foldl go (cstEmpty, []) $
+cgenDefs defs = foldl go [] $
                 filter isUserDef defs
  where
-  go :: (CST, [String]) -> TDef -> (CST, [String])
-  go (env, strs) def@(Def { def_fun = f }) =
-    let env' = cstInsertFun f () env
-        (CG cdecl _cfun _ctype) = cgenDefE env' def
-    in  (env', strs ++ [cdecl])
+  env = Map.fromList (mapMaybe (\(Def { def_fun = f
+                                      , def_rhs = rhs
+                                      }) ->
+                                  case rhs of
+                                    UserRhs _ -> Just (f, ())
+                                    _         -> Nothing) defs)
+
+  go :: [String] -> TDef -> [String]
+  go strs def =
+    let (CG cdecl _cfun _ctype) = cgenDefE env def
+    in  strs ++ [cdecl]
 
 {- Note [Unpack tuple arguments]
 
