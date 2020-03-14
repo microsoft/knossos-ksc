@@ -353,10 +353,10 @@ pToFloat :: TExpr -> TExpr
 pToFloat from = userCall "to_float" TypeFloat from
 
 pMulii :: TExpr -> TExpr -> TExpr
-pMulii x1 x2 = userCall "mul@ii" TypeInteger (Tuple [x1, x2])
+pMulii x1 x2 = userCall "mul" TypeInteger (Tuple [x1, x2])
 
 pMulff :: TExpr -> TExpr -> TExpr
-pMulff x1 x2 = userCall "mul@ff" TypeFloat (Tuple [x1, x2])
+pMulff x1 x2 = userCall "mul" TypeFloat (Tuple [x1, x2])
 
 
 ---------------------------------------------

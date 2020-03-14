@@ -3,7 +3,7 @@
 (def f Float ( (n : Integer) (x : Float) )
     (if (eq n 1) 
         x 
-        (mul@ff x (f (sub@ii n 1) x))))
+        (mul x (f (sub n 1) x))))
 
 (def main Integer ()
     (let ((n 7)
@@ -16,5 +16,5 @@
             ; And forward
             (fwd$f (tuple n x) (tuple (tuple) 1.0))
             ; Is the derivative n*x^(n-1)?
-            (mul@ff (to_float n) (f (sub@ii n 1) x))
+            (mul (to_float n) (f (sub n 1) x))
         )))

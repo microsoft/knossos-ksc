@@ -19,27 +19,27 @@
        (sumbuild kn (lam (kni : Integer)
        (sumbuild km (lam (kmi : Integer)
        (sumbuild l  (lam (li  : Integer)
-         (let ((knc (div@ii kn 2))
-               (kmc (div@ii km 2))
-               (noi (add@ii (sub@ii ni knc) kni))
-               (moi (add@ii (sub@ii mi kmc) kmi))
-               (outside_image (ks_or (lt@ii noi 0)
-                              (ks_or (gte@ii noi n)
-                              (ks_or (lt@ii moi 0)
-                                     (gte@ii moi m)))))
+         (let ((knc (div kn 2))
+               (kmc (div km 2))
+               (noi (add (sub ni knc) kni))
+               (moi (add (sub mi kmc) kmi))
+               (outside_image (ks_or (lt noi 0)
+                              (ks_or (gte noi n)
+                              (ks_or (lt moi 0)
+                                     (gte moi m)))))
                (image_noi_moi
                 (if outside_image
                     0.0
                   (index moi (index noi (index li image))))))
 
-           (mul@ff image_noi_moi
+           (mul image_noi_moi
               (index kmi (index kni (index li (index ki kernels)))))
 
            )))))))
        (index ki bias))
        ))))))))
 
-(def max_ Float ((x : Float) (y : Float)) (if (gt@ff x y) x y))
+(def max_ Float ((x : Float) (y : Float)) (if (gt x y) x y))
 
 (def relu Float (x : Float) (max_ x 0.0))
 
@@ -67,14 +67,14 @@
          (n (size image_elt))
          (m (size (index 0 image_elt))))
      (build l (lam (li : Integer)
-     (build (div@ii n 2) (lam (ni : Integer)
-     (build (div@ii m 2) (lam (mi : Integer)
-       (let ((nid (mul@ii 2 ni))
-             (mid (mul@ii 2 mi))
+     (build (div n 2) (lam (ni : Integer)
+     (build (div m 2) (lam (mi : Integer)
+       (let ((nid (mul 2 ni))
+             (mid (mul 2 mi))
              (a00 (index mid (index nid (index li image))))
-             (a01 (index (add@ii 1 mid) (index nid (index li image))))
-             (a10 (index mid (index (add@ii 1 nid) (index li image))))
-             (a11 (index (add@ii 1 mid) (index (add@ii 1 nid) (index li image)))))
+             (a01 (index (add 1 mid) (index nid (index li image))))
+             (a10 (index mid (index (add 1 nid) (index li image))))
+             (a11 (index (add 1 mid) (index (add 1 nid) (index li image)))))
          (max_ (max_ a00 a01) (max_ a10 a11))
          )))))))))
 
@@ -93,7 +93,7 @@
      (sumbuild k (lam (ki : Integer)
      (sumbuild n (lam (ni : Integer)
      (sumbuild m (lam (mi : Integer)
-       (mul@ff (index mi (index ni (index ki (index oi w))))
+       (mul (index mi (index ni (index ki (index oi w))))
              (index mi (index ni (index ki image))))
        ))))))
      (index oi bias))
@@ -110,7 +110,7 @@
      (build o (lam (oi : Integer)
      (ts_add
      (sumbuild k (lam (ki : Integer)
-       (mul@ff (index ki (index oi w))
+       (mul (index ki (index oi w))
              (index ki image))
        ))
      (index oi bias))

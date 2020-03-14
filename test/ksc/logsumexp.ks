@@ -10,9 +10,9 @@
     (log (sum (build (size v) (lam (i : Integer) (exp (index i v)))))))
 
 (def sub$VecR$R (Vec Float) ((v : Vec Float) (x : Float))
-     (build (size v) (lam (ni : Integer) (sub@ff (index ni v) x))))
+     (build (size v) (lam (ni : Integer) (sub (index ni v) x))))
 
-(def max_ Float ((x : Float) (y : Float)) (if (gt@ff x y) x y))
+(def max_ Float ((x : Float) (y : Float)) (if (gt x y) x y))
 
 (def max$VecR Float (v : Vec Float)
      (let ; We can't write -inf in a .ks file so use something very
@@ -28,4 +28,4 @@
 (def logsumexp_safe Float (a : Vec Float)
   (let (mx (max$VecR a))
     (let (sum_exp_minus_x (sum (exp$Vec (sub$VecR$R a mx))))
-        (add@ff (log sum_exp_minus_x) mx))))
+        (add (log sum_exp_minus_x) mx))))
