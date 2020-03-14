@@ -502,8 +502,8 @@ primFunCallResultTy_maybe fun args
       -- NB s and s' should be equal, except if s' is not a tuple, in
       -- which case s should be (tuple s')
       ("$check"   , TypeTuple
-                      [ TypeLam (TypeTuple [s]) t
-                      , TypeLam (TypeTuple [s_dt]) ds', s', s'0, ds, dt])
+                      [ TypeLam s t
+                      , TypeLam s_dt ds', s', s'0, ds, dt])
                       | s `eqType` case s' of TypeTuple [s'1] -> s'1
                                               _               -> s'
                       , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
