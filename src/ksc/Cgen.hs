@@ -152,37 +152,38 @@ getExpr (CG _ ex _) = ex
 getType :: CGenResult -> CType
 getType (CG _ _ ty) = ty
 
-type CST = Map.Map String CType
+type CSTKey = Either Var Fun
+type CST    = Map.Map CSTKey CType
 
 cstEmpty :: CST
 cstEmpty = Map.empty
 
-cstMaybeLookup0 :: HasCallStack => String -> CST -> Maybe CType
+cstMaybeLookup0 :: HasCallStack => CSTKey -> CST -> Maybe CType
 cstMaybeLookup0 s env = Map.lookup s env
 
-cstLookup0 :: HasCallStack => String -> CST -> CType
+cstLookup0 :: HasCallStack => CSTKey -> CST -> CType
 cstLookup0 v env = case cstMaybeLookup0 v env of
   Just e -> e
   Nothing ->
     error
       $  "Failed lookup ["
-      ++ v
+      ++ show v
       ++ "] in\n"
       ++ unlines (map show (Map.toList env))
 
 cstInsertVar :: Var -> CType -> CST -> CST
 cstInsertVar v ty env = -- trace ("cstInsertVar [" ++ show v ++ "] = [" ++ show ty ++ "]\n" ++ show env) $
-  Map.insert (show v) ty env
+  Map.insert (Left v) ty env
 
 cstInsertFun :: Fun -> CType -> CST -> CST
 cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
-  Map.insert (show f) ctype env
+  Map.insert (Right f) ctype env
 
 cstLookupVar :: HasCallStack => Var -> CST -> CType
-cstLookupVar v env = cstLookup0 (show v) env
+cstLookupVar v env = cstLookup0 (Left v) env
 
 cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe CType
-cstMaybeLookupFun f env = cstMaybeLookup0 (show f) env
+cstMaybeLookupFun f env = cstMaybeLookup0 (Right f) env
 
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
