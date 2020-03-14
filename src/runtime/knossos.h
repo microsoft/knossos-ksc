@@ -334,22 +334,22 @@ namespace ks
 	// ... At least for gcc, which seems to require more info at template decl time.
 
 	template <class T1, class T2>
-	T1 add(T1 t1, T2 t2) { return t1 + t2; }
+	T1 ts_add(T1 t1, T2 t2) { return t1 + t2; }
 
 	template <class T1>
-	T1 add(T1 t1, tuple<> t2) { return t1; }
+	T1 ts_add(T1 t1, tuple<> t2) { return t1; }
 
 	template <>
-	inline tuple<> add(tuple<> t1, tuple<> t2)
+	inline tuple<> ts_add(tuple<> t1, tuple<> t2)
 	{
 		return tuple<>{};
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
-	auto add(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
+	auto ts_add(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
 	{
-		return prepend(add(head(t1), head(t2)),
-			add(tail(t1), tail(t2)));
+		return prepend(ts_add(head(t1), head(t2)),
+			ts_add(tail(t1), tail(t2)));
 	}
 
 	// ===============================  Inplace add ==================================
@@ -601,7 +601,7 @@ namespace ks
 	    dT f_call_dT     = std::get<1>(std::get<1>(f_call));
 
 	    dr = f_call_dacc;
-	    dScope = add(dScope, f_call_dScope);
+	    dScope = ts_add(dScope, f_call_dScope);
 	    dv[i] = f_call_dT;
 	  }
 
@@ -771,7 +771,7 @@ namespace ks
 		vec<T> ret = vec<T>::create(a.size());
 
 		for (int i = 0; i < a.size(); ++i)
-			ret[i] = add(a[i], b[i]);
+			ret[i] = ts_add(a[i], b[i]);
 		return ret;
 	}
 
@@ -786,7 +786,7 @@ namespace ks
 		vec<T> ret{ a.size() };
 
 		for (int i = 0; i < a.size(); ++i)
-			ret[i] = add(a[i], b);
+			ret[i] = ts_add(a[i], b);
 		return ret;
 	}
 
@@ -850,9 +850,9 @@ namespace ks
 		if (v.size() == 0) { return zero(T{}); }
 
 		if (v.size() == 1) return v[0];
-		T ret = add(v[0], v[1]);
+		T ret = ts_add(v[0], v[1]);
 		for (int i = 2; i < v.size(); ++i)
-			ret = add(ret, v[i]);
+			ret = ts_add(ret, v[i]);
 		return ret;
 	}
 
@@ -977,7 +977,7 @@ namespace ks
 
 			static Add mk(LM1 lm1, LM2 lm2) { return Add{ lm1, lm2 }; }
 
-			To Apply(From f) const { return add(lm1.Apply(f), lm2.Apply(f)); }
+			To Apply(From f) const { return ts_add(lm1.Apply(f), lm2.Apply(f)); }
 		};
 
 		template <class T1, class T2>
@@ -1050,9 +1050,9 @@ namespace ks
 				typedef typename std::tuple_element<i, Tup>::type T0;
 				To ai = std::get<i>(lms).Apply(typename T0::From{ std::get<i>(f) });
 				if constexpr (i + 1 < n)
-					return Apply_aux<i + 1>(add(accum, ai), f);
+					return Apply_aux<i + 1>(ts_add(accum, ai), f);
 				else
-					return add(accum, ai);
+					return ts_add(accum, ai);
 			}
 		};
 
@@ -1701,7 +1701,7 @@ namespace ks
         double $check(Functor f, RevFunctor rev_f, X x, X_ x_, Dx dx, Df df)
 	{
 		auto f_x = std::apply(f, x);
-		auto f_x_plus_dx = std::apply(f, add(x, dx));
+		auto f_x_plus_dx = std::apply(f, ts_add(x, dx));
 		auto delta_f = f_x_plus_dx - f_x;
 		double d1 = dot(delta_f, df);
 		auto dfJ = std::apply(rev_f, std::make_tuple(x_, df));

@@ -226,7 +226,7 @@ optPrimFun :: InScopeSet -> PrimFun -> TExpr -> Maybe TExpr
 optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
   = Just . Konst . KFloat $
     case op of
-      "add" -> k1 + k2
+      "ts_add" -> k1 + k2
       "scale" -> k1 * k2
       s -> errorFor s
   where errorFor s = error $ unlines $
@@ -241,18 +241,18 @@ optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type
 -- We use () as the tangent type for non-differentiatable types
-optPrimFun _ "add" (Tuple [e1, e2])
+optPrimFun _ "ts_add" (Tuple [e1, e2])
   | TypeTuple [] <- typeof e1
   , TypeTuple [] <- typeof e2
   = Just (Tuple [])
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
-optPrimFun _ "add" (Tuple [Tuple es1, Tuple es2])
+optPrimFun _ "ts_add" (Tuple [Tuple es1, Tuple es2])
   | length es1 == length es2
   = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
-optPrimFun _ "add" (Tuple [x, y]) =
+optPrimFun _ "ts_add" (Tuple [x, y]) =
     if isKZero y then
       Just x
     else if isKZero x then
@@ -598,7 +598,7 @@ optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 -- (+) :: (F,F) -> f
 -- (D+)(x,y) :: (F,F) -o F
-optGradPrim _ "add" arg
+optGradPrim _ "ts_add" arg
   | Tuple arg' <- arg
   , [t1, t2] <- map typeof arg'
   = Just (lmHCat [lmOne t1, lmOne t2])
