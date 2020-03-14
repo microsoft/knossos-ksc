@@ -10,7 +10,7 @@ import           Prelude                 hiding ( lines
                                                 )
 
 import qualified Data.Map                      as Map
-import           Data.List                      ( intercalate , foldl' )
+import           Data.List                      ( intercalate )
 import           Control.Monad                  ( when )
 import qualified Control.Monad.State           as S
 import qualified System.Directory
@@ -161,26 +161,9 @@ cstEmpty = Map.empty
 cstMaybeLookup0 :: HasCallStack => CSTKey -> CST -> Maybe CType
 cstMaybeLookup0 s env = Map.lookup s env
 
-cstLookup0 :: HasCallStack => CSTKey -> CST -> CType
-cstLookup0 v env = case cstMaybeLookup0 v env of
-  Just e -> e
-  Nothing ->
-    error
-      $  "Failed lookup ["
-      ++ show v
-      ++ "] in\n"
-      ++ unlines (map show (Map.toList env))
-
-cstInsertVar :: Var -> CType -> CST -> CST
-cstInsertVar v ty env = -- trace ("cstInsertVar [" ++ show v ++ "] = [" ++ show ty ++ "]\n" ++ show env) $
-  Map.insert (Left v) ty env
-
 cstInsertFun :: Fun -> CType -> CST -> CST
 cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
   Map.insert (Right f) ctype env
-
-cstLookupVar :: HasCallStack => Var -> CST -> CType
-cstLookupVar v env = cstLookup0 (Left v) env
 
 cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe CType
 cstMaybeLookupFun f env = cstMaybeLookup0 (Right f) env
@@ -216,9 +199,7 @@ ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
 cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = param
                   , def_rhs = UserRhs body }) =
-  let addParam env (TVar ty v) = cstInsertVar v (mkCType ty) env
-
-      cf                               = cgenUserFun f
+  let cf                               = cgenUserFun f
 
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
       (params, bodyWithUnpacking) = case typeof param of
@@ -231,9 +212,7 @@ cgenDefE env (Def { def_fun = f, def_args = param
           in (params, ensureDon'tReuseParams params (packParams body))
         _             -> ([param], body)
 
-      env' = foldl' addParam env (param:params)
-
-      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env' bodyWithUnpacking
+      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env bodyWithUnpacking
       cvars = map mkVar params
 
       cftypealias = "ty$" ++ cf
@@ -274,7 +253,7 @@ cgenExprR env = \case
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
-    CG bodydecl bodyex _bodyty <- cgenExprR (cstInsertVar var varty env) body
+    CG bodydecl bodyex _bodyty <- cgenExprR env body
 
     ret  <- freshCVar
     cvar <- freshCVar
@@ -299,7 +278,7 @@ cgenExprR env = \case
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
-    CG bodydecl bodyex _bodyty <- cgenExprR (cstInsertVar var varty env) body
+    CG bodydecl bodyex _bodyty <- cgenExprR env body
 
     let cretty = cgenType $ mkCType ty
     ret  <- freshCVar
@@ -377,7 +356,7 @@ cgenExprR env = \case
 
   Let (TVar _ v) e1 body -> do
     (CG decle1   ve1   type1 ) <- cgenExprR env e1
-    (CG declbody vbody tybody) <- cgenExprR (cstInsertVar v type1 env) body
+    (CG declbody vbody tybody) <- cgenExprR env body
     lvar                       <- freshCVar
 
     return $ CG
@@ -421,7 +400,7 @@ cgenExprR env = \case
   Lam (TVar tyv v) body -> do
     lvar <- freshCVar
     let vtype = mkCType tyv
-    (CG cdecl cexpr ctype) <- cgenExprR (cstInsertVar v vtype env) body
+    (CG cdecl cexpr ctype) <- cgenExprR env body
     return $ CG
       (     "/**Lam**/"
       ++    "auto"
