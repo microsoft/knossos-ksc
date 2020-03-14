@@ -156,18 +156,8 @@ getType (CG _ _ ty) = ty
 type CSTKey = Fun
 type CST    = Map.Map CSTKey ()
 
-cstEmpty :: CST
-cstEmpty = Map.empty
-
-cstMaybeLookup0 :: HasCallStack => CSTKey -> CST -> Maybe ()
-cstMaybeLookup0 s env = Map.lookup s env
-
-cstInsertFun :: Fun -> () -> CST -> CST
-cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
-  Map.insert f ctype env
-
 cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe ()
-cstMaybeLookupFun f env = cstMaybeLookup0 f env
+cstMaybeLookupFun = Map.lookup
 
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
