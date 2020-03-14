@@ -586,8 +586,8 @@ cgenTypeLang = \case
 
 ctypeofFun :: HasCallStack => CST -> TFun -> [CType] -> CType
 ctypeofFun env (TFun ty f) ctys = case cstMaybeLookupFun f env of
-  Just ctype -> -- trace ("Found fun " ++ show f) $
-    ctype
+  Just _ -> -- trace ("Found fun " ++ show f) $
+    UseTypeDef ("ty$" ++ cgenUserFun f)
   Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
 
