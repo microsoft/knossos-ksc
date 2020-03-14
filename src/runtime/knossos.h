@@ -1520,18 +1520,18 @@ namespace ks
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(s), LM::Scale::mk(1.0 - s));
 	}
 
-	inline int neg(int d) { return -d; }
+	inline int ts_neg(int d) { return -d; }
 
-	inline double neg(double d) { return -d; }
-	inline auto D$neg(double d) { return LM::Scale::mk(-1.0); }
+	inline double ts_neg(double d) { return -d; }
+	inline auto D$ts_neg(double d) { return LM::Scale::mk(-1.0); }
 
-        inline tuple<> neg(tuple<> d) { return d; }
+        inline tuple<> ts_neg(tuple<> d) { return d; }
 
         template <class U0, class... Us>
-        inline tuple<U0, Us...> neg(tuple<U0, Us...> t) { return prepend(neg(head(t)), neg(tail(t))); }
+        inline tuple<U0, Us...> ts_neg(tuple<U0, Us...> t) { return prepend(neg(head(t)), neg(tail(t))); }
 
         template <class T>
-        inline vec<T> neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return neg(v[i]); }); }
+        inline vec<T> ts_neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return neg(v[i]); }); }
 
 	inline int to_size(int d) { return d; }
 	inline auto D$to_size(int d) { return LM::Zero<int, int>(); }
