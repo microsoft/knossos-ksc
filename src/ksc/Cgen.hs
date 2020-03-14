@@ -267,7 +267,7 @@ cgenExprR env = \case
   Konst k -> return $ CG "" (cgenKonst k) (mkCType $ typeofKonst k)
   Dummy ty ->
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
-  Var (TVar _ v)                -> return $ CG "" (cgenVar v) (cstLookupVar v env)
+  Var (TVar ty v)               -> return $ CG "" (cgenVar v) (mkCType ty)
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
