@@ -152,21 +152,21 @@ getExpr (CG _ ex _) = ex
 getType :: CGenResult -> CType
 getType (CG _ _ ty) = ty
 
-type CSTKey = Either Var Fun
-type CST    = Map.Map CSTKey CType
+type CSTKey = Fun
+type CST    = Map.Map CSTKey ()
 
 cstEmpty :: CST
 cstEmpty = Map.empty
 
-cstMaybeLookup0 :: HasCallStack => CSTKey -> CST -> Maybe CType
+cstMaybeLookup0 :: HasCallStack => CSTKey -> CST -> Maybe ()
 cstMaybeLookup0 s env = Map.lookup s env
 
-cstInsertFun :: Fun -> CType -> CST -> CST
+cstInsertFun :: Fun -> () -> CST -> CST
 cstInsertFun f ctype env = -- trace ("cstInsertFun " ++ show f ++ " = " ++ show ctype ++ "\n" ++ show env) $
-  Map.insert (Right f) ctype env
+  Map.insert f ctype env
 
-cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe CType
-cstMaybeLookupFun f env = cstMaybeLookup0 (Right f) env
+cstMaybeLookupFun :: HasCallStack => Fun -> CST -> Maybe ()
+cstMaybeLookupFun f env = cstMaybeLookup0 f env
 
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
@@ -177,7 +177,7 @@ cgenDefs defs = snd $ foldl go (cstEmpty, []) $
  where
   go :: (CST, [String]) -> TDef -> (CST, [String])
   go (env, strs) def@(Def { def_fun = f }) =
-    let env' = cstInsertFun f (UseTypeDef ("ty$" ++ cgenUserFun f)) env
+    let env' = cstInsertFun f () env
         (CG cdecl _cfun _ctype) = cgenDefE env' def
     in  (env', strs ++ [cdecl])
 
