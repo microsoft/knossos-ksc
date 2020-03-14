@@ -122,6 +122,7 @@ optE env
                | otherwise = Var v
     go e@(Konst _)        = e
     go e@(Dummy _)        = e
+    go e@(Funref _ _)     = e
     go (App e1 e2)        = optApp env (go e1) (go e2)
     go (Assert e1 e2)     = Assert (go e1) (go e2)
     go (Lam tv e)         = Lam tv' (optE env' e)

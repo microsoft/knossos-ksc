@@ -146,6 +146,7 @@ langDef = Tok.LanguageDef
   , Tok.reservedNames   = [ "def", "edef", "rule"
                           , "let", "if", "assert", "call", "tuple", ":"
                           , "Integer", "Float", "Vec", "Lam", "String", "true", "false"
+                          , "Funref"
                           ]
   , Tok.reservedOpNames = []
   , Tok.caseSensitive   = True
@@ -206,6 +207,14 @@ pKonst =   try (( Konst . KFloat) <$> pDouble)
        <|> ((Konst . KString) <$> pString)
        <|> ((Konst . KBool) <$> pBool)
 
+pFunref :: Parser (ExprX Parsed)
+pFunref =  do {
+             pReserved "Funref";
+             f <- pIdentifier;
+             t <- pType ;
+             return (Funref (mk_fun f) t)
+           }
+
 pExpr :: Parser (ExprX Parsed)
 pExpr = pKonst
    <|> (Var . Simple) <$> pIdentifier
@@ -219,6 +228,7 @@ pKExpr =   pIfThenElse
        <|> pAssert
        <|> pCall
        <|> pTuple
+       <|> pFunref
 
 pType :: Parser (TypeX)
 pType = (pReserved "Integer" >> return TypeInteger)

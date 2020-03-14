@@ -243,6 +243,7 @@ cgenExprR env = \case
   Dummy ty ->
     let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
   Var (TVar ty v)               -> return $ CG "" (cgenVar v) (mkCType ty)
+  Funref (TFun _ f) ty -> return $ CG "" (cgenUserFun f) (mkCType ty)
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
