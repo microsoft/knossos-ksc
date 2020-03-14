@@ -130,20 +130,17 @@ freshCVar = do
 
 -------------------- Cgen
 
--- CGenResult is (C declaration, C expression, C type, CType)
+-- CGenResult is (C declaration, C expression, CType)
 -- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
 --       "r",
---       TypeDouble,
---       "double")
+--       TypeDouble)
 -- e.g. ("",         -- simple constant needs no pre-declaration
 --       "1.0",      -- this is what we use at the occurrence
---       TypeDouble,
---       "double")
+--       TypeDouble)
 -- e.g. ("typedef LM::HCat<LM::VCat<LM::One, LM::Zero>,LM::Zero> v12_t;
 --        v12_t v12 = v12_t::mk(a,b);",
 --       "v12",      -- this is what we use at the occurrence
---       LMHCat [LMVCat [LMOne, LMZero], LMZero]
---       "v12_t")
+--       LMHCat [LMVCat [LMOne, LMZero], LMZero])
 data CGenResult = CG String String CType
 
 getDecl :: CGenResult -> String
