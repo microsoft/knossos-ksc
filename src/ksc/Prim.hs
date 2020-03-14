@@ -314,7 +314,7 @@ pDiag = mkPrimCall3 "diag"
 pAdd, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
 pAdd   = mkPrimCall2 "ts_add"
 pEqual = mkPrimCall2 "eq"
-pScale = mkPrimCall2 "scale"
+pScale = mkPrimCall2 "ts_scale"
 
 pNeg :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "ts_neg"
@@ -535,7 +535,7 @@ primFunCallResultTy_maybe fun args
 
       ("unzip"    , TypeVec (TypeTuple ts))                -> Just (TypeTuple (map TypeVec ts))
 
-      ("scale"    , TypeTuple [TypeFloat,   t]           ) -> Just t
+      ("ts_scale" , TypeTuple [TypeFloat,   t]           ) -> Just t
       ("ts_add"   , TypeTuple [t, dt]                    ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing

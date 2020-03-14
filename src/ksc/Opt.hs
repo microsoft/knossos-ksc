@@ -227,7 +227,7 @@ optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
   = Just . Konst . KFloat $
     case op of
       "ts_add" -> k1 + k2
-      "scale" -> k1 * k2
+      "ts_scale" -> k1 * k2
       s -> errorFor s
   where errorFor s = error $ unlines $
           [ "Failed constant folding [" ++ s ++ "]."
@@ -261,7 +261,7 @@ optPrimFun _ "ts_add" (Tuple [x, y]) =
       Nothing
 
 -- RULE: scale 0 y = 0
-optPrimFun _ "scale" (Tuple [x, y])
+optPrimFun _ "ts_scale" (Tuple [x, y])
   | isKZero x || isKZero y
   -- We use the type of y because the two typing rule for scale in
   -- Prim.hs is
