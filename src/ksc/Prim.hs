@@ -317,7 +317,7 @@ pEqual = mkPrimCall2 "eq"
 pScale = mkPrimCall2 "scale"
 
 pNeg :: HasCallStack => TExpr -> TExpr
-pNeg = mkPrimCall1 "neg"
+pNeg = mkPrimCall1 "ts_neg"
 
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild = mkPrimCall2 "build"
