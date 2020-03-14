@@ -14,8 +14,6 @@ from ksc.utils import ShapeType
 
 _jitted = {}
 
-_name_mangling_enabled = True
-
 # from
 # https://stackoverflow.com/questions/47192626/deceptively-simple-implementation-of-topological-sorting-in-python
 def topological_sort(final_node):
@@ -258,25 +256,26 @@ class JittedFunction(KsFunction):
         nodes = topological_sort(trace.body)
         called_functions = {}
         for node in nodes:
-            if node.name not in called_functions and node.jitted is not None:
-                called_functions[node.name] = node.jitted
+            if node.jitted is not None:
+                key = (node.name, tuple(node.jitted.arg_types))
+                if key not in called_functions:
+                    called_functions[key] = node.jitted
         # If _anonymous function is called in _anonymous, add appendix '_{index}'
         # to avoid name clash
         name = f.name
-        called_func_gen_names = [n.split("@")[0] for n in called_functions.keys()]
-        if name in called_func_gen_names and name.startswith("_anonymous"):
+        called_func_names = [n for n, _arg_types in called_functions.keys()]
+        if name in called_func_names and name.startswith("_anonymous"):
             index = max(int(n.split("_")[2]) if n.count("_") == 2 else 0
-                for n in called_func_gen_names
+                for n in called_func_names
                 if n.startswith("_anonymous")) + 1
             name = f"_anonymous_{index}"
         # append arg types
-        arg_types = [t for _, t in trace.arg_shape_types]
-        name = apply_name_mangling(name, arg_types, f.is_builtin)
+        arg_types = tuple(t for _, t in trace.arg_shape_types)
         if f.is_edef:
             if f.shape_def is not None:
-                called_functions[apply_name_mangling(f.shape_def.name, arg_types)] = f.shape_def
+                called_functions[(f.shape_def.name, arg_types)] = f.shape_def
             if f.cost_def is not None:
-                called_functions[apply_name_mangling(f.cost_def.name, arg_types)] = f.cost_def
+                called_functions[(f.cost_def.name, arg_types)] = f.cost_def
 
         f = ProtoFunction(name, *f[1:]) # for compute_ks_str
         return JittedFunction(
@@ -302,7 +301,7 @@ class JittedFunction(KsFunction):
         if seen is None:
             seen = set()
         for key, called in self._called_functions.items():
-            if len(key) > 0 and key not in seen:
+            if len(key[0]) > 0 and key not in seen:
                 called_function = called() if isinstance(called, JittedFunctionFromCall) else called
                 seen.add(key)
                 inner_before, inner_after = called_function.all_called_functions(seen)
@@ -365,40 +364,6 @@ def trace(f, name=None):
     wrapper.__qualname__ = f"{name} [traceable]"
     return wrapper
 
-def memoize(f):
-    memo = {}
-    def wrapper(name, arg_names, type_prop_function):
-        key = (name, tuple(arg_names))
-        if key not in memo:
-            memo[key] = f(name, arg_names, type_prop_function)
-        return memo[key]
-    return wrapper
-
-@memoize
-def make_edef(name, arg_names, shape_prop_function):
-    class F(TraceableFunction):
-        is_edef = True
-        is_builtin = False
-        def __init__(self):
-            super().__init__(name, arg_names=arg_names)
-        def trace(self, *args):
-            shape, type = shape_prop_function(*args)
-            body = node.Node(
-                name=name,
-                shape=shape,
-                type=type,
-                children=args,
-                shape_prop_function=shape_prop_function)
-            shape_types = tuple(arg.shape_type for arg in args)
-            return Trace(body, ShapeType(shape, type), shape_types)
-    d = {"F": F}
-    arg_names_str = ", ".join(arg_names)
-    exec(f"def wrapped({arg_names_str}): return F()({arg_names_str})", d)
-    wrapped = d["wrapped"]
-    wrapped.__name__ = name
-    wrapped.__qualname__ = f"{name} [edef]"
-    return wrapped
-
 class JittedFunctionFromCall:
     """
     This class stores a traceable function and arguments so that
@@ -447,14 +412,3 @@ def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=Non
     wrapped.__name__ = name
     wrapped.__qualname__ = f"{name} [edef]"
     return wrapped
-
-def disable_name_mangling():
-    global _name_mangling_enabled
-    _name_mangling_enabled = False
-
-def apply_name_mangling(name, arg_types, is_builtin=False):
-    # div is an exception because we need to distinguish truediv from floordiv in python
-    if (is_builtin or not _name_mangling_enabled) and not name == "div":
-        return name
-    arg_type_strings = "".join([t.shortstr() for t in arg_types])
-    return f"{name}@{arg_type_strings}"

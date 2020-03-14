@@ -13,6 +13,12 @@ def div_ii(a, b):
 def div_ff(a, b):
     return a / b
 
+def div(a, b):
+    if isinstance(a, int):
+        return a // b
+    else:
+        return a / b
+
 def eq(a, b):
     return a == b
 

@@ -10,7 +10,7 @@
          (k (size (index 0 w))))
      (build o (lam (oi : Integer)
      (sumbuild k (lam (ki : Integer)
-       (mul@ff (index ki (index oi w))
+       (mul (index ki (index oi w))
           (index ki image))
        ))))))
 
@@ -22,18 +22,18 @@
            (k (size w)))
      (build o (lam (oi : Integer)
      (sumbuild k (lam (ki : Integer)
-       (mul@ff (index oi (index ki w))
+       (mul (index oi (index ki w))
           (index ki image))
        ))))))
 
-(def max_ Float ((x1 : Float) (x2 : Float)) (if (gt@ff x1 x2) x1 x2))
+(def max_ Float ((x1 : Float) (x2 : Float)) (if (gt x1 x2) x1 x2))
 
 (def maxpool
      (Vec Float)
      (image : Vec Float)
-     (build (div@ii (size image) 2) (lam (ni : Integer)
-       (max_ (index (mul@ii 2 ni) image)
-             (index (add@ii 1 (mul@ii 2 ni)) image)))))
+     (build (div (size image) 2) (lam (ni : Integer)
+       (max_ (index (mul 2 ni) image)
+             (index (add 1 (mul 2 ni)) image)))))
 
 ; This function stands in for one that could actually be expensive
 (def expensive Float ((x1 : Float) (x2 : Float)) 0.0)
@@ -43,9 +43,9 @@
 (def expensivepool
      (Vec Float)
      (image : Vec Float)
-     (build (div@ii (size image) 2) (lam (ni : Integer)
-       (expensive (index (mul@ii 2 ni) image)
-                  (index (add@ii 1 (mul@ii 2 ni)) image)))))
+     (build (div (size image) 2) (lam (ni : Integer)
+       (expensive (index (mul 2 ni) image)
+                  (index (add 1 (mul 2 ni)) image)))))
 
 (def conv1d
      (Vec (Vec Float))
@@ -62,10 +62,10 @@
      (build n (lam (ni : Integer)
      (sumbuild kn (lam (kni : Integer)
      (sumbuild l  (lam (li  : Integer)
-       (let ((knc (div@ii kn 2))
-             (noi (sub@ii (add@ii ni knc) kni))
-             (outside_image (ks_or (lt@ii noi 0) (gte@ii noi n)))
+       (let ((knc (div kn 2))
+             (noi (sub (add ni knc) kni))
+             (outside_image (ks_or (lt noi 0) (gte noi n)))
              (image_noi
               (if outside_image 0.0 (index noi (index li image)))))
-         (mul@ff image_noi (index kni (index li (index ki kernels))))
+         (mul image_noi (index kni (index li (index ki kernels))))
          ))))))))))))

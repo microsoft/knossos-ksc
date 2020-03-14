@@ -10,16 +10,16 @@ from ksc.utils import translate_and_import
 
 def test_afe():
     ks_str = """
-(edef div@ff Float (Float Float))
-(def cost$div@ff Float ((a : Float) (b : Float)) 2.0)
-(def shape$div@ff Integer ((a : Float) (b : Float)) 0)
-(edef add@ff Float (Float Float))
-(def cost$add@ff Float ((a : Float) (b : Float)) 1.0)
-(def shape$add@ff Integer ((a : Float) (b : Float)) 0)
+(edef div Float (Float Float))
+(def cost$div Float ((a : Float) (b : Float)) 2.0)
+(def shape$div Integer ((a : Float) (b : Float)) 0)
+(edef add Float (Float Float))
+(def cost$add Float ((a : Float) (b : Float)) 1.0)
+(def shape$add Integer ((a : Float) (b : Float)) 0)
 
 (def afe Float ((x : Float))
-  (let ((a (div@ff 1.0 x)))
-    (div@ff a (add@ff 1.0 a))
+  (let ((a (div 1.0 x)))
+    (div a (add 1.0 a))
   )
 )
 """
@@ -30,12 +30,12 @@ def test_afe():
 
 def test_build():
     ks_str = """
-(edef add@ff Float (Float Float))
-(def cost$add@ff Float ((a : Float) (b : Float)) 1.0)
-(def shape$add@ff Integer ((a : Float) (b : Float)) 0)
+(edef add Float (Float Float))
+(def cost$add Float ((a : Float) (b : Float)) 1.0)
+(def shape$add Integer ((a : Float) (b : Float)) 0)
 
 (def vec_vec_add (Vec Float) ((a : (Vec Float)) (b : (Vec Float)))
-  (build (size a) (lam (i : Integer) (add@ff (index i a) (index i b))))
+  (build (size a) (lam (i : Integer) (add (index i a) (index i b))))
 )
 """
     args = [AbstractValue((100,), Type.Vec(Type.Float)), AbstractValue((100,), Type.Vec(Type.Float))]
@@ -44,9 +44,9 @@ def test_build():
 
 def test_outer_product():
     ks_str = """
-(edef mul@ff Float (Float Float))
-(def cost$mul@ff Float ((a : Float) (b : Float)) 2.0)
-(def shape$mul@ff Integer ((a : Float) (b : Float)) 0)
+(edef mul Float (Float Float))
+(def cost$mul Float ((a : Float) (b : Float)) 2.0)
+(def shape$mul Integer ((a : Float) (b : Float)) 0)
 (def outer_product (Vec (Vec Float))
  ((var0 : (Tuple (Vec Float) (Vec Float))))
     (let ((x (get$1$2 var0))
@@ -55,7 +55,7 @@ def test_outer_product():
           (n (size y)))
             (build m (lam (i : Integer)
               (build n (lam (j : Integer)
-                (mul@ff
+                (mul
                   (index i x)
                   (index j y))))))))
 """
@@ -65,9 +65,9 @@ def test_outer_product():
 
 def test_sumbuild():
     ks_str = """
-(edef add@ff Float (Float Float))
-(def cost$add@ff Float ((a : Float) (b : Float)) 1.0)
-(def shape$add@ff Integer ((a : Float) (b : Float)) 0)
+(edef add Float (Float Float))
+(def cost$add Float ((a : Float) (b : Float)) 1.0)
+(def shape$add Integer ((a : Float) (b : Float)) 0)
 
 (def sum_of_vec Float ((a : (Vec Float)))
   (sumbuild (size a) (lam (i : Integer) (index i a)))
@@ -78,15 +78,15 @@ def test_sumbuild():
 
 def test_rot():
     ks_str = """
-(edef mul@ff Float (Float Float))
-(def cost$mul@ff Float ((a : Float) (b : Float)) 2.0)
-(def shape$mul@ff Integer ((a : Float) (b : Float)) 0)
-(edef add@ff Float (Float Float))
-(def cost$add@ff Float ((a : Float) (b : Float)) 1.0)
-(def shape$add@ff Integer ((a : Float) (b : Float)) 0)
-(edef neg@f Float (Float))
-(def cost$neg@f Float ((a : Float)) 1.0)
-(def shape$neg@f Integer ((a : Float)) 0)
+(edef mul Float (Float Float))
+(def cost$mul Float ((a : Float) (b : Float)) 2.0)
+(def shape$mul Integer ((a : Float) (b : Float)) 0)
+(edef add Float (Float Float))
+(def cost$add Float ((a : Float) (b : Float)) 1.0)
+(def shape$add Integer ((a : Float) (b : Float)) 0)
+(edef neg Float (Float))
+(def cost$neg Float ((a : Float)) 1.0)
+(def shape$neg Integer ((a : Float)) 0)
 
 (def rot (Tuple (Vec Float) (Vec Float))
          ((var0 : (Tuple (Vec Float) (Vec Float) Float Float)))
@@ -97,13 +97,13 @@ def test_rot():
           (n (size x)))
       (tuple
         (build n (lam (var1 : Integer)
-          (add@ff
-              (mul@ff c (index var1 x))
-              (mul@ff s (index var1 y)))))
+          (add
+              (mul c (index var1 x))
+              (mul s (index var1 y)))))
         (build n (lam (i : Integer)
-          (add@ff
-              (mul@ff (neg@f s) (index i x))
-              (mul@ff c (index i y))))))))
+          (add
+              (mul (neg s) (index i x))
+              (mul c (index i y))))))))
 """
     args = [
         AbstractValue(
@@ -173,28 +173,28 @@ def test_states():
 
 def test_if_then_else():
     ks_str = """
-(edef mul@ii Integer (Integer Integer))
-(def cost$mul@ii Float ((a : Integer) (b : Integer)) 2.0)
-(def shape$mul@ii Integer ((a : Integer) (b : Integer)) 0)
-(edef eq@ii Bool (Float Float))
-(def cost$eq@ii Float ((a : Float) (b : Float)) 1.0)
-(def shape$eq@ii Integer ((a : Float) (b : Float)) 0)
+(edef mul Integer (Integer Integer))
+(def cost$mul Float ((a : Integer) (b : Integer)) 2.0)
+(def shape$mul Integer ((a : Integer) (b : Integer)) 0)
+(edef eq Bool (Float Float))
+(def cost$eq Float ((a : Float) (b : Float)) 1.0)
+(def shape$eq Integer ((a : Float) (b : Float)) 0)
 
 (def select1 (Vec Integer) ((p : Bool) (x : (Vec Integer)))
   (if p
-      (build (size x) (lam (i : Integer) (mul@ii i 2)))  ; expensive branch cost 301
+      (build (size x) (lam (i : Integer) (mul i 2)))  ; expensive branch cost 301
       (build (size x) (lam (i : Integer) (index i x)))   ; cheap branch cost 201
   )
 )
 (def select2 (Vec Integer) ((p : Bool) (x : (Vec Integer)))
   (if p
       (build (size x) (lam (i : Integer) (index i x)))
-      (build (size x) (lam (i : Integer) (mul@ii i 2)))
+      (build (size x) (lam (i : Integer) (mul i 2)))
   )
 )
 (def select3 (Vec Integer) ((x : (Vec Integer)))
-  (if (eq@ii 0 0)
-      (build (size x) (lam (i : Integer) (mul@ii i 2)))
+  (if (eq 0 0)
+      (build (size x) (lam (i : Integer) (mul i 2)))
       (build (size x) (lam (i : Integer) (index i x)))
   )
 )

@@ -63,7 +63,7 @@ def test_jit_anonymous(backend):
     out = F.add(F.add(1, 2,), 3)
     assert out.get_data_with_backend(backend) == 6
     jitted = out.creator._jitted
-    assert jitted.name == "_anonymous@iii"
+    assert jitted.name == "_anonymous"
     assert len(jitted.arg_names) == 3
     assert jitted(2, 3, 4) == 9
 
@@ -82,7 +82,7 @@ def need_let(a, b):
 
 def test_need_let(backend):
     out = need_let(3, 1)
-    assert "(let ((v0 (square@i a)))" in out.creator._jitted.ks_str
+    assert "(let ((v0 (square a)))" in out.creator._jitted.ks_str
     assert out.get_data_with_backend(backend) == 17 # 9 + 8
 
 @ksc.trace
@@ -123,7 +123,7 @@ def test_flatten():
     # function of flatten must be in before.
     before, _ = out.creator._jitted.all_called_functions()
     shape_def = next(f for key, f in before.items()
-                     if key == "shape$flatten@vvvvf")
+                     if key[0] == "shape$flatten")
     assert shape_def(x) == (3, 4 * 5 * 6)
 
 def test_to_float():

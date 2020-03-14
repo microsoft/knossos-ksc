@@ -50,7 +50,7 @@ class KsFunction:
         print(ks_str)
         if backend == "cpp":
             if self._py_mod is None:
-                self._py_mod = utils.generate_and_compile_cpp_from_ks(ks_str, self.name)
+                self._py_mod = utils.generate_and_compile_cpp_from_ks(ks_str, self.name, self._arg_types)
         else:
             if self._py_mod is None:
                 self._py_mod = utils.translate_and_import(ks_str, backend)

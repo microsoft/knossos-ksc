@@ -1501,11 +1501,11 @@ namespace ks
 		return t1 * t2;
 	}
 
-	inline double abs(double d) { return d > 0 ? d : -d; }
-	inline auto D$abs(double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
+	inline double abs$af(double d) { return d > 0 ? d : -d; }
+	inline auto D$abs$af(double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
 
-	inline double max(double a, double b) { return a > b ? a : b; }
-	inline auto D$max(double a, double b) {
+	inline double max$aff(double a, double b) { return a > b ? a : b; }
+	inline auto D$max$aff(double a, double b) {
 		double s = a > b ? 1.0 : 0.0;
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(s), LM::Scale::mk(1.0 - s));
 	}
@@ -1560,7 +1560,7 @@ namespace ks
           return v;
         }
 
-        inline double $ranhashdoub(int32_t v) {
+        inline double $ranhashdoub$ai(int32_t v) {
           return 5.42101086242752217E-20 * $ranhash(v);
         }
 
@@ -1632,7 +1632,7 @@ namespace ks
 		);
 	*/
 
-#define $BENCH(FUN) ks::benchmark(ks::repeat([&]() { \
+#define $BENCH$al$d$d$bf$b(FUN) ks::benchmark(ks::repeat([&]() { \
 																								$MRK(t); \
 																								FUN(); \
 																								$REL(t); \
@@ -1704,7 +1704,7 @@ namespace ks
 		std::cout << " D2=" << d2 << std::endl;
 		*/
 
-		return abs(d1 - d2)/(abs(d1) + abs(d2));
+		return std::abs(d1 - d2)/(std::abs(d1) + std::abs(d2));
 	}
 } // namespace ks
 

@@ -30,36 +30,36 @@
 (edef rev$pow@Float (Tuple Float Float) (Float Float Float))
 
 (def add@Float,Float Float ((a : Float) (b : Float))
-   (add@ff a b))
+   (add a b))
 
 (def add@Integer,Integer Integer ((a : Integer) (b : Integer))
-   (add@ii a b))
+   (add a b))
 
 (def mul@Float,Float Float ((a : Float) (b : Float))
-   (mul@ff a b))
+   (mul a b))
 
 (def mul@Integer,Integer Integer ((a : Integer) (b : Integer))
-   (mul@ii a b))
+   (mul a b))
 
 (def div@Integer,Integer  Integer ((a : Integer) (b : Integer))
-   (div@ii a b))
+   (div a b))
 
 (def sub@Integer,Integer  Integer ((a : Integer) (b : Integer))
-   (sub@ii a b))
+   (sub a b))
 
 (def sub@Float,Float Float ((a : Float) (b : Float))
-   (sub@ff a b))
+   (sub a b))
 
 (def sub@V[[Float]],Float (Vec Float) ((a : Vec Float) (b : Float))
   (let (n (size a))
-    (build n (lam (i : Integer) (sub@ff (index i a) b)))))
+    (build n (lam (i : Integer) (sub (index i a) b)))))
 
 (def sub@V[[Float]],V[[Float]] (Vec Float) ((a : Vec Float) (b : Vec Float))
   (let (n (size a))
-    (build n (lam (i : Integer) (sub@ff (index i a) (index i b))))))
+    (build n (lam (i : Integer) (sub (index i a) (index i b))))))
 
 (def sqr Float (a : Float)
-   (mul@ff a a))
+   (mul a a))
 
 ; mul Mat Vec
 (edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
@@ -94,4 +94,4 @@
 ;;   (build n (lam (i : Integer) (f (index i v)))))
 
 (def gt@Float Bool ((a : Float) (b : Float))
-   (gt@ff a b))
+   (gt a b))

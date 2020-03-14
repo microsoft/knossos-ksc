@@ -148,8 +148,33 @@ test_FreeIn = Test.Hspec.hspec LangUtils.hspec
 --     Symbol table, ST, maps variables to types
 -----------------------------------------------
 
+{-
+Note [Global function ad-hoc overloading]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  A global function is uniquely identified by the combination of
+
+* its name (e.g. 'mul') and
+* its argument type (e.g. (Float, Float))
+
+Many global functions can be called 'mul', provided they have
+different argument types.  Indeed you can see this in
+src/runtime/prelude.ks.  Functions with the same name, same argument
+type but differing return types are *not* allowed.
+
+The global symbol table is keyed by (name, arg-type) pairs.
+
+All of this would go out of the window if we had polymorphism, because
+then the argument type could be a type variable.  But we don't!
+
+Moreover, for type inference, we can work out the type of the aguments
+before looking up the function to find its result type.  That would
+fail if were were inferring the type of a recursive function -- but
+fortunately all functions have explicitly-declared types.
+-}
+
 -- Global symbol table
-type GblSymTab = M.Map Fun TDef
+type GblSymTab = M.Map (Fun, Type) TDef
    -- Maps a function to its definition, which lets us
    --   * Find its return type
    --   * Inline it
@@ -185,16 +210,14 @@ emptySymTab = ST { gblST = M.empty, lclST = M.empty }
 newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
-stInsertFun :: Fun -> TDef -> GblSymTab -> GblSymTab
-stInsertFun = M.insert
+stInsertFun :: TDef -> GblSymTab -> GblSymTab
+stInsertFun def@(Def { def_fun = f, def_args = arg }) = M.insert (f, tVarType arg) def
 
-lookupGblST :: HasCallStack => Fun -> GblSymTab -> Maybe TDef
+lookupGblST :: HasCallStack => (Fun, Type) -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
-extendGblST = foldl add
-  where
-    add env def@(Def { def_fun = f }) = stInsertFun f def env
+extendGblST = foldl (flip stInsertFun)
 
 modifyGblST :: (GblSymTab -> GblSymTab) -> SymTab -> SymTab
 modifyGblST g = \env -> env { gblST = g (gblST env) }

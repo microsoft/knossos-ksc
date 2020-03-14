@@ -30,6 +30,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("conv2d", &ks::conv2d);
-  m.def("mnist", &ks::mnist);
+  m.def("conv2d", &ks::conv2d$avvvvfvfvvvf);
+  m.def("mnist", &ks::mnist$avvvfvvvvfvfvvvvfvfvvvvfvfvvfvf);
 }
