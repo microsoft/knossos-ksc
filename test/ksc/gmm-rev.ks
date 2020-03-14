@@ -135,7 +135,7 @@
        (triD (size (index 0 ls)))   ; Ugh
       )
   (assert (eq triD (gmm_knossos_tri D))
-    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
+    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg@f 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
           (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
