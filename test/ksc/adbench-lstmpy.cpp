@@ -44,9 +44,9 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("sigmoid", &ks::sigmoid);
-  m.def("logsumexp", &ks::logsumexp);
-  m.def("lstm_model", &ks::lstm_model);
-  m.def("lstm_predict", &ks::lstm_predict);
-  m.def("lstm_objective", &ks::lstm_objective);
+  m.def("sigmoid", &ks::sigmoid$af);
+  m.def("logsumexp", &ks::logsumexp$avf);
+  m.def("lstm_model", &ks::lstm_model$avfvfvfvfvfvfvfvfvfvfvf);
+  m.def("lstm_predict", &ks::lstm_predict$av$dvfvfvfvfvfvfvfvfvfvf$bvfvfvfvf);
+  m.def("lstm_objective", &ks::lstm_objective$av$dvfvfvfvfvfvfvfvfvfvf$bvfvfvfv$dvfvf$b);
 }

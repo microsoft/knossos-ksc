@@ -135,25 +135,16 @@ class Translator:
     def backend(self):
         return self._backend
 
-    def normalize_def_name(self, name, new_edef=False, keep_type_annotation=None):
+    def normalize_def_name(self, name):
         specialized = specs.specialized_functions()
         if name in specialized:
             return specialized[name]
-        if (name.split("@")[0] in self._built_ins
-            or name.startswith("get$")):
-            return name.split("@")[0]
-        if keep_type_annotation is None:
-            is_edef = new_edef or name in self._edefs
-            keep_type_annotation = (self.backend == "abstract" and is_edef
-                                    or name.startswith("cost$")
-                                    or name.startswith("shape$"))
-        if keep_type_annotation:
-            return name.replace("$", "_").replace("@", "_").replace("<", "_t").replace(">", "t_") # keep the type info
-        name = name.replace("$", "_").split("@")[0]
+        if name in self._built_ins or name.startswith("get$"):
+            return name
         if name in ["or", "and", "max", "abs"]:
             # need to special case them because they conflict with python functions
            return name + "_"
-        return name
+        return name.replace("$", "_")
 
     def handle_body(self, s_exp, indent=2):
         if isinstance(s_exp, sexpdata.Symbol):
@@ -237,7 +228,7 @@ class Translator:
             def_or_edef = s_exp[0].value()
             if def_or_edef == "edef":
                 name = _value_to_str(s_exp[1])
-                py_name = self.normalize_def_name(name, new_edef=True)
+                py_name = self.normalize_def_name(name)
                 if py_name in self._built_ins:
                     # if it is built-in no need to edef
                     continue
@@ -286,7 +277,7 @@ if __name__ == "__main__":
             edefs = [f'{edef.py_name} = ksc.backends.abstract._get_edef('
                      f'defs, "{edef.name}", '
                      f'{edef.return_type.__repr__()}, '
-                     f'py_name_for_concrete="{self.normalize_def_name(edef.name, keep_type_annotation=False)}")'
+                     f'py_name_for_concrete="{self.normalize_def_name(edef.name)}")'
                      for edef in self._edefs.values()]
         else:
             # in most backends, edefs are imported from backend

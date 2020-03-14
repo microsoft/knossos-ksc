@@ -235,7 +235,7 @@ callResultTy_maybe env fun args
 userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
                        -> Type -> Either SDoc Type
 userCallResultTy_maybe fn env args
-  = case lookupGblST fn env of
+  = case lookupGblST (fn, typeof args) env of
       Just def -> userCallResultTy_help def args
       Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
 
@@ -381,8 +381,8 @@ extendLclSTM vars = modifyEnvTc add_vars
 
 extendGblEnv :: TDecl -> TcM a -> TcM a
 extendGblEnv (RuleDecl {}) = id
-extendGblEnv (DefDecl tdef@(Def { def_fun = f }))
-  = modifyEnvTc (modifyGblST (stInsertFun f tdef))
+extendGblEnv (DefDecl tdef)
+  = modifyEnvTc (modifyGblST (stInsertFun tdef))
 
 modifyEnvTc :: (SymTab -> SymTab) -> TcM a -> TcM a
 modifyEnvTc extend (TCM f)
@@ -414,10 +414,10 @@ lookupGblTc fun args
       = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
              , text " Arg types:" <+> ppr (typeof args)
              , text " Args:"      <+> ppr (exprOf args)
-             , text "ST lookup:" <+> ppr (Map.lookup fun (gblST st))
+             , text "ST lookup:"  <+> ppr (Map.lookup (fun, typeof args) (gblST st))
              -- This is very verbose, and obscures error messages, but can be useful for typos.
              -- Perhaps think about printing it only for failed lookup of userfun
-             -- , text "ST keys:" <+> gblDoc
+             -- , text "ST keys:" <+> gblDoc st
              ]
 
 gblDoc :: SymTab -> SDoc

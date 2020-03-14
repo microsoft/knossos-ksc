@@ -11,7 +11,7 @@
 ; The following defines a function of two variables x and y (both
 ; Integers) which returns an Integer.
 (def f1 Integer ((x : Integer) (y : Integer))
-     (add@ii x y))
+     (add x y))
 
 ; Python equivalent
 ;
@@ -48,7 +48,7 @@ If you prefer block comments then use pairs of #| and |#
       (c : Integer)
       (d : Integer)
       (e : Integer))
-     (sub@ii (add@ii (mul@ii a b) (neg@i c)) (div@ii d e)))
+     (sub (add (mul a b) (neg c)) (div d e)))
 
 ; Python equivalent
 ;
@@ -66,8 +66,8 @@ If you prefer block comments then use pairs of #| and |#
 ; The Knossos boolean type is called "Bool"
 (def if_example Integer ((b1 : Bool) (b2 : Bool) (a : Integer))
      (if (ks_or b1 b2)
-         (add@ii a 10)
-         (sub@ii a 10)))
+         (add a 10)
+         (sub a 10)))
 
 ; Python equivalent
 ;
@@ -110,10 +110,10 @@ If you prefer block comments then use pairs of #| and |#
 ; To create new variables use "let"
 (def let_and_types Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
      (let ((b2 (ks_or b false))
-           (i2 (add@ii i 10))
-           (f2 (add@ff f 10.0))
+           (i2 (add i 10))
+           (f2 (add f 10.0))
            (s2 "Hello"))
-       (if (ks_and (gte@ii i 0) (lt@ii i (size v)))
+       (if (ks_and (gte i 0) (lt i (size v)))
            (index i v)
            f2)))
 
@@ -140,7 +140,7 @@ If you prefer block comments then use pairs of #| and |#
 ; a vector of length n where the element at position i is given by the
 ; lambda expression applied to i".
 (def build_example (Vec Float) (n : Integer)
-     (build n (lam (ni : Integer) (to_float (mul@ii ni ni)))))
+     (build n (lam (ni : Integer) (to_float (mul ni ni)))))
 
 ; Python equivalent
 ;
@@ -156,7 +156,7 @@ If you prefer block comments then use pairs of #| and |#
 (def triangle0 Integer (n : Integer)
     (if (eq n 0)
         0
-        (add@ii n (triangle0 (sub@ii n 1)))))
+        (add n (triangle0 (sub n 1)))))
 
 ; Python equivalent
 ;
@@ -186,7 +186,7 @@ If you prefer block comments then use pairs of #| and |#
 (def triangle Integer ((acc : Integer) (n : Integer))
      (if (eq n 0)
          0
-         (triangle (add@ii acc n) (sub@ii n 1))))
+         (triangle (add acc n) (sub n 1))))
 
 ; Python equivalent
 ;
@@ -226,7 +226,7 @@ If you prefer block comments then use pairs of #| and |#
      (fold (lam (s_vi : Tuple Float Float)
                 (let ((s (get$1$2 s_vi))
                       (vi (get$2$2 s_vi)))
-                  (add@ff s vi)))
+                  (add s vi)))
            0.0
            v))
 
@@ -262,6 +262,6 @@ If you prefer block comments then use pairs of #| and |#
 ; manual derivatives for your function.
 (edef my_log Float (Float))
 (edef D$my_log (LM Float Float) (Float))
-(def fwd$my_log Float ((x : Float) (dx : Float)) (div@ff dx x))
-(def rev$my_log Float ((x : Float) (d_dmy_log : Float)) (div@ff d_dmy_log x))
+(def fwd$my_log Float ((x : Float) (dx : Float)) (div dx x))
+(def rev$my_log Float ((x : Float) (d_dmy_log : Float)) (div d_dmy_log x))
 (edef Dt$my_log (Tuple Float (LM Float Float)) (Float))

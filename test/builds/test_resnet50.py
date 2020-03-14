@@ -228,9 +228,6 @@ def main():
     print(f"Loading image {input_file}")
     input = np.asarray(Image.open(input_file)).transpose((2, 0, 1))[None, :, :, :] / 255.0 # NCHW
 
-    # disable name mangling so that the output looks more readable
-    from ksc.tracing import jitting
-    jitting.disable_name_mangling()
     if args.model == "resnet_v2":
         from resnet_v2 import Resnet50 as resnet
         weights = resnet50_v2_weights_from_pytorch(weights)

@@ -10,11 +10,11 @@ from ksc.tracing.functions import core
 
 def test_get_shape():
     ks_str = """
-(def get_shape@vvvvf (Tuple Integer Integer Integer Integer) ((x : (Vec (Vec (Vec (Vec Float))))))
-  (let ((v0 (index@ivvvvf 0 x)))
-  (let ((v1 (index@ivvvf 0 v0)))
-    (let ((v2 (index@ivvf 0 v1)))
-      (tuple@iiii (size@vvvvf x) (size@vvvf v0) (size@vvf v1) (size@vf v2))
+(def get_shape (Tuple Integer Integer Integer Integer) ((x : (Vec (Vec (Vec (Vec Float))))))
+  (let ((v0 (index 0 x)))
+  (let ((v1 (index 0 v0)))
+    (let ((v2 (index 0 v1)))
+      (tuple (size x) (size v0) (size v1) (size v2))
       )
     )
   )
@@ -28,7 +28,7 @@ def test_get_shape():
 def test_get_tuple_element():
     ks_str = """
 (def flatten (Tuple Integer Integer Integer) ((x : (Tuple (Tuple Integer Integer) Integer)))
-  (tuple@iii (get$1$2 (get$1$2 x)) (get$2$2 (get$1$2 x)) (get$2$2 x))
+  (tuple (get$1$2 (get$1$2 x)) (get$2$2 (get$1$2 x)) (get$2$2 x))
 )
 """
     d = AbstractValue.from_data(((1, 2,), 3))
@@ -57,14 +57,14 @@ def test_tuple_of_tensors():
 
 def test_if_then_else():
     ks_str = """
-(edef lt@ii Bool (Float Float))
-(def cost$lt@ii Float ((a : Float) (b : Float)) 1.0)
-(def shape$lt@ii Integer ((a : Float) (b : Float)) 0)
-(edef eq@ii Bool (Float Float))
-(def cost$eq@ii Float ((a : Float) (b : Float)) 1.0)
-(def shape$eq@ii Integer ((a : Float) (b : Float)) 0)
+(edef lt Bool (Float Float))
+(def cost$lt Float ((a : Float) (b : Float)) 1.0)
+(def shape$lt Integer ((a : Float) (b : Float)) 0)
+(edef eq Bool (Float Float))
+(def cost$eq Float ((a : Float) (b : Float)) 1.0)
+(def shape$eq Integer ((a : Float) (b : Float)) 0)
 (def sign Float ((x : Float))
-    (if (lt@ii x 0) -1.0 (if (eq@ii x 0) 0.0 1.0))
+    (if (lt x 0) -1.0 (if (eq x 0) 0.0 1.0))
 )
 """
     m = translate_and_import(ks_str, "abstract")

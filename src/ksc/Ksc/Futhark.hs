@@ -8,6 +8,7 @@ import           Data.Int
 import           Data.List
 import           Prelude                 hiding ( (<>) )
 
+import qualified Cgen
 import qualified Lang                    as L
 import Lang (Pretty(..), text, render, empty, parensIf,
              (<>), (<+>), ($$), parens, brackets, punctuate, sep,
@@ -214,6 +215,17 @@ escape = noLeadingUnderscore . escapeReserved . concatMap escape'
 toName :: Pretty x => x -> Name
 toName = escape . render . ppr
 
+toTypedName :: Pretty a => a -> L.TypeX -> Name
+toTypedName = toTypedNameString . render . ppr
+
+-- This leads to rather verbose mangled names for tuple types.
+-- Alternatively we could take the Cgen.cgenFunId approach of
+-- concatting the mangled tupled types, so TypeTuple [TypeInteger,
+-- TypeInteger] would give "ii" instead of "<ii>".
+toTypedNameString :: String -> L.TypeX -> Name
+toTypedNameString x ty =
+  escape (Cgen.mangleFun (x ++ "@" ++ Cgen.mangleType ty))
+
 toFutharkType :: L.Type -> Type
 toFutharkType L.TypeInteger    = I32
 toFutharkType L.TypeFloat      = F64
@@ -358,19 +370,19 @@ toCall (L.TFun ret (L.Fun (L.PrimFun f))) args =
   callPrimFun f ret args
 
 toCall f@(L.TFun _ (L.Fun L.UserFun{})) args =
-  Call (Var (toName f)) [toFutharkExp args]
+  Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall f@(L.TFun _ L.GradFun{}) args =
-  Call (Var (toName f)) [toFutharkExp args]
+  Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall f@(L.TFun _ L.DrvFun{}) args =
-  Call (Var (toName f)) [toFutharkExp args]
+  Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toFuthark :: L.TDef -> Def
 toFuthark (L.Def f args res_ty (L.UserRhs e)) =
   DefFun entry fname []
   [param] res_ty' (toFutharkExp e)
-  where fname = toName f
+  where fname = toTypedName f (L.typeof args)
         entry = if fname == "main" then Entry else NotEntry
         -- We do not insert a return type annotation on entry points
         -- because they use the 'pr' pseudo-function, which we

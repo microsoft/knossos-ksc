@@ -6,17 +6,17 @@ namespace ks {
 // We should probably come up with a better story for the
 // tests but at the time of writing I didn't want to hold back
 // edef support any longer.
-double edef_example(double x) { return x; }
-double fwd$edef_example(double x, double dx) { return dx; }
-double rev$edef_example(double x, double ddr) { return ddr; }
+double edef_example$af(double x) { return x; }
+double fwd$edef_example$aff(double x, double dx) { return dx; }
+double rev$edef_example$aff(double x, double ddr) { return ddr; }
 
-double dotv(vec<double> const& a, vec<double> const& b)
+double dot$avfvf(vec<double> const& a, vec<double> const& b)
 {
 	return dot(a,b);
 }
 
 vec<double> 
-mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v)
+mul$Mat$Vec$avvfvf(vec<vec<double>> const& M, vec<double> const& v)
 {
 	int r = size(M);
 	vec<double> ret(r);
@@ -26,7 +26,7 @@ mul$Mat$Vec(vec<vec<double>> const& M, vec<double> const& v)
 }
 
 tuple<vec<vec<double>>,vec<double>> 
-rev$mul$Mat$Vec(std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
+rev$mul$Mat$Vec$a$dvvfvf$bvf(std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
 {
         auto [M, v] = M_v;
 	int r = size(M);
@@ -85,12 +85,12 @@ double digamma(double x)
 	throw "digamma unimp!\n";
 }
 
-double rev$lgamma(double x, double dr)
+double rev$lgamma$aff(double x, double dr)
 {
 	std::cerr << "rev$lgamma unimp!\n" << std::endl;
 	throw "rev$gamma unimp!\n";
 }
-double fwd$lgamma(double x, double dx)
+double fwd$lgamma$aff(double x, double dx)
 {
   if (dx == 0.0) {
     return 0.0;
@@ -171,9 +171,19 @@ inline int neg$ai(int t)
 	return -t;
 }
 
+inline double exp$af(double d) { return exp(d); }
+inline double log$af(double d) { return log(d); }
+inline double sin$af(double d) { return sin(d); }
+inline double cos$af(double d) { return cos(d); }
+inline double tanh$af(double d) { return tanh(d); }
+inline double lgamma$af(double d) { return lgamma(d); }
+
+inline double to_float$ai(int d) { return d; }
+inline auto D$to_float$ai(int d) { return LM::Zero<int, double>(); }
+
 inline double to_float(int d) { return d; }
 inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
-inline bool ks_or(int b1, int b2)  { return b1 || b2; }
-inline bool ks_and(int b1, int b2) { return b1 && b2; }
+inline bool ks_or$abb(int b1, int b2)  { return b1 || b2; }
+inline bool ks_and$abb(int b1, int b2) { return b1 && b2; }
 }
