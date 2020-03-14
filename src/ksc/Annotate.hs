@@ -401,7 +401,7 @@ lookupLclTc v
                                           , text "Envt:" <+> gblDoc st ])
                              ; return TypeUnknown
                              }
-                  Just d -> return (TypeLam (TypeTuple $ map tVarType [def_args d]) (def_res_ty d))
+                  Just d -> return (TypeLam (tVarType (def_args d)) (def_res_ty d))
            Just ty -> return ty }
   where
      varFun (Simple name) = mk_fun name
