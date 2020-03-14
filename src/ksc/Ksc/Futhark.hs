@@ -337,7 +337,7 @@ callPrimFun op _ (L.Tuple [x, y])
   where binOpPrimFuns = [ ("or", "||")
                         , ("and", "&&")
                         , ("ts_add", "+")
-                        , ("scale", "*")
+                        , ("ts_scale", "*")
                         , ("eq" , "==")
                         , ("ne" , "!=")
                         ]
