@@ -141,7 +141,7 @@ freshCVar = do
 --        v12_t v12 = v12_t::mk(a,b);",
 --       "v12",      -- this is what we use at the occurrence
 --       LMHCat [LMVCat [LMOne, LMZero], LMZero])
-data CGenResult = CG String String CType
+data CGenResult = CG String String CType -- TODO: rename CG CGenResult
 
 getDecl :: CGenResult -> String
 getDecl (CG dc _ _) = dc
