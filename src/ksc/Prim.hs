@@ -506,9 +506,8 @@ primFunCallResultTy_maybe fun args
                       , TypeLam s_dt ds, s', s'0, ds', dt])
                       | s `eqType` case s' of TypeTuple [s'1] -> s'1
                                               _               -> s'
-                      , ds `eqType` case ds' of TypeTuple [ds'1] -> ds'1
-                                                _                -> ds'
                       , tangentType s `eqType` ds
+                      , tangentType s' `eqType` ds'
                       , tangentType t `eqType` dt
                       , s_dt `eqType` (TypeTuple [s'0, dt])
                        -> Just TypeFloat
