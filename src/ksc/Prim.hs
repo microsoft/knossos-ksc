@@ -312,12 +312,12 @@ pDiag = mkPrimCall3 "diag"
 -- "User-defined" functions
 ---------------------------
 pAdd, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
-pAdd   = mkPrimCall2 "add"
+pAdd   = mkPrimCall2 "ts_add"
 pEqual = mkPrimCall2 "eq"
-pScale = mkPrimCall2 "scale"
+pScale = mkPrimCall2 "ts_scale"
 
 pNeg :: HasCallStack => TExpr -> TExpr
-pNeg = mkPrimCall1 "neg"
+pNeg = mkPrimCall1 "ts_neg"
 
 pBuild :: TExpr -> TExpr -> TExpr
 pBuild = mkPrimCall2 "build"
@@ -502,8 +502,8 @@ primFunCallResultTy_maybe fun args
       -- NB s and s' should be equal, except if s' is not a tuple, in
       -- which case s should be (tuple s')
       ("$check"   , TypeTuple
-                      [ TypeLam (TypeTuple [s]) t
-                      , TypeLam (TypeTuple [s_dt]) ds', s', s'0, ds, dt])
+                      [ TypeLam s t
+                      , TypeLam s_dt ds', s', s'0, ds, dt])
                       | s `eqType` case s' of TypeTuple [s'1] -> s'1
                                               _               -> s'
                       , ds' `eqType` case ds of TypeTuple [ds1] -> ds1
@@ -536,11 +536,11 @@ primFunCallResultTy_maybe fun args
 
       ("unzip"    , TypeVec (TypeTuple ts))                -> Just (TypeTuple (map TypeVec ts))
 
-      ("scale"    , TypeTuple [TypeFloat,   t]           ) -> Just t
-      ("add"      , TypeTuple [t, dt]                    ) -> if dt == tangentType t
+      ("ts_scale" , TypeTuple [TypeFloat,   t]           ) -> Just t
+      ("ts_add"   , TypeTuple [t, dt]                    ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing
-      ("neg"      , t                                    ) -> Just t
+      ("ts_neg"   , t                                    ) -> Just t
       -- For eq and ne we check that the two arguments have the same type
       ("eq"       , TypeTuple [t1, t2]                   )
         | t1 `eqType` t2 -> Just TypeBool
@@ -569,8 +569,8 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
-                       , "neg"
-                       , "add"
+                       , "ts_neg"
+                       , "ts_add"
                        , "eq", "ne", "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyR", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"

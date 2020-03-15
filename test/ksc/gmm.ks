@@ -68,7 +68,7 @@
            (v  (get$2$2 M_v))
            (dM (get$1$2 dM_dv))
            (dv (get$2$2 dM_dv)))
-    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
+    (ts_add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
           ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
@@ -135,7 +135,7 @@
        (triD (size (index 0 ls)))   ; Ugh
       )
   (assert (eq triD (gmm_knossos_tri D))
-    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
+    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg@f 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
           (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
@@ -202,7 +202,7 @@
           (dtheta   (tuple dx dalphas dmus dqs dls dwishart))
 
           (gmm_at_theta (gmm_knossos_gmm_objective x alphas mus qs ls wishart))
-          (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (add x dx) (add alphas dalphas) (add mus dmus) (add qs dqs) (add ls dls) (add wishart dwishart)))
+          (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (ts_add x dx) (ts_add alphas dalphas) (ts_add mus dmus) (ts_add qs dqs) (ts_add ls dls) (ts_add wishart dwishart)))
 
           (gmm_fd (sub@ff gmm_at_theta_plus_dtheta gmm_at_theta))
           (gmm_fwd (fwd$gmm_knossos_gmm_objective

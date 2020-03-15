@@ -7,7 +7,7 @@
 ;     https://github.com/awf/ADBench/blob/master/src/cpp/shared/lstm.h
 
 (def sigmoid Float (x : Float)
-     (div@ff 1.0 (add@ff 1.0 (exp (neg x)))))
+     (div@ff 1.0 (add@ff 1.0 (exp (neg@f x)))))
 
 (def exp$VecR (Vec Float) ((v : Vec Float))
  (let (n (size v))
@@ -162,5 +162,5 @@
                         sequence))
            (total (get$1$2 total_hidden))
            (count (to_float (mul@ii cm1 h)))
-           (loss (neg (div@ff total count))))
+           (loss (neg@f (div@ff total count))))
        loss))

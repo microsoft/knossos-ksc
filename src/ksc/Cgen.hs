@@ -495,11 +495,11 @@ cgenFunId = \case
   translateFun = \case
     "or" -> "or_"  -- TODO: ks_or and ks_and
     "and"-> "and_"
-    -- Translating "scale" to "mul" is a shortcut that allows us to
+    -- Translating "ts_scale" to "mul" is a shortcut that allows us to
     -- avoid updating the runtime to remove polymorphic "mul" and
-    -- replace it with "scale".  At some point we should actually fix
+    -- replace it with "ts_scale".  At some point we should actually fix
     -- that properly.
-    "scale" -> "mul"
+    "ts_scale" -> "mul"
     s    -> s
 
 cgenUserFun :: HasCallStack => Fun -> String
@@ -603,7 +603,7 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "add"     , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "ts_add"  , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
   (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
   (PrimFun "index"   , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]

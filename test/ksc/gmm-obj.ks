@@ -61,7 +61,7 @@
            (v  (get$2$2 M_v))
            (dM (get$1$2 dM_dv))
            (dv (get$2$2 dM_dv)))
-    (add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
+    (ts_add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
           ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
@@ -135,7 +135,7 @@
        (triD (size (index 0 ls)))   ; Ugh
       )
   (assert (eq triD (gmm_knossos_tri D))
-    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
+    (let ((CONSTANT (mul@ff (to_float (mul@ii N D)) (neg@f 0.9189385332046727)) ) ; n * d*-0.5*log(2 * PI)
           (sum_qs   (build K (lam (k12 : Integer) (sum (index k12 qs)))))
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
