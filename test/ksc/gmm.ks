@@ -37,13 +37,6 @@
            (b  (get$2$2 a_b)))
     (tuple (mul$R$VecR dr b) (mul$R$VecR dr a))))
 
-(edef lgamma Float (Float))
-(edef D$lgamma (LM Float Float) (Float))
-(edef fwd$lgamma Float (Float Float))
-(edef rev$lgamma Float (Float Float))
-(edef Dt$lgamma (Tuple Float (LM Float Float)) (Float))
-
-
 (def dotvv Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dotv (index i a) (index i b)))))
   )

@@ -315,3 +315,9 @@
 (def fwd$to_float Float ((x : Integer) (dx : (Tuple))) 0.0)
 (def rev$to_float (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
 (edef Dt$to_float (Tuple Float (LM Integer Float)) (Integer))
+
+(edef lgamma Float (Float))
+(edef D$lgamma (LM Float Float) (Float))
+(edef fwd$lgamma Float (Float Float))
+(edef rev$lgamma Float (Float Float))
+(edef Dt$lgamma (Tuple Float (LM Float Float)) (Float))
