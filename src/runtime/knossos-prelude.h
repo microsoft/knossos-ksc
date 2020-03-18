@@ -174,4 +174,6 @@ inline int neg$ai(int t)
 inline double to_float(int d) { return d; }
 inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
+inline bool ks_or(int b1, int b2)  { return b1 || b2; }
+inline bool ks_and(int b1, int b2) { return b1 && b2; }
 }
