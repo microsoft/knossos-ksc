@@ -33,6 +33,8 @@ let mul__aii (x: i32, y: i32) = x * y
 let mul__aff (x: f64, y: f64) = x * y
 let neg__ai (x: i32) = -x
 let neg__af (x: f64) = -x
+let ks_or (x, y)  = x || y
+let ks_and (x, y) = x && y
 
 
 let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =

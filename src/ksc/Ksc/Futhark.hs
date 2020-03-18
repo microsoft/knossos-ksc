@@ -334,9 +334,7 @@ callPrimFun op _ (L.Tuple [x, y])
       in if primType xt && primType yt
          then BinOp op' (toFutharkExp x) (toFutharkExp y)
          else Call (binopFunction op' xt yt) [toFutharkExp x, toFutharkExp y]
-  where binOpPrimFuns = [ ("ks_or", "||")
-                        , ("ks_and", "&&")
-                        , ("ts_add", "+")
+  where binOpPrimFuns = [ ("ts_add", "+")
                         , ("ts_scale", "*")
                         , ("eq" , "==")
                         , ("ne" , "!=")
