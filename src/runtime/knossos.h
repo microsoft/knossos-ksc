@@ -1501,12 +1501,12 @@ namespace ks
 		return t1 * t2;
 	}
 
-	inline bool or_(int b1, int b2)
+	inline bool ks_or(int b1, int b2)
 	{
 	  return b1 || b2;
 	}
 
-	inline bool and_(int b1, int b2)
+	inline bool ks_and(int b1, int b2)
 	{
 	  return b1 && b2;
 	}

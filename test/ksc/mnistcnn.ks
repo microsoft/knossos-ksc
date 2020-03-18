@@ -23,10 +23,10 @@
                (kmc (div@ii km 2))
                (noi (add@ii (sub@ii ni knc) kni))
                (moi (add@ii (sub@ii mi kmc) kmi))
-               (outside_image (or (lt@ii noi 0)
-                              (or (gte@ii noi n)
-                              (or (lt@ii moi 0)
-                                  (gte@ii moi m)))))
+               (outside_image (ks_or (lt@ii noi 0)
+                              (ks_or (gte@ii noi n)
+                              (ks_or (lt@ii moi 0)
+                                     (gte@ii moi m)))))
                (image_noi_moi
                 (if outside_image
                     0.0
