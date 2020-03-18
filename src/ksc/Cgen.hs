@@ -493,8 +493,6 @@ cgenFunId = \case
  where
   translateFun :: String -> String
   translateFun = \case
-    "or" -> "or_"  -- TODO: ks_or and ks_and
-    "and"-> "and_"
     -- Translating "ts_scale" to "mul" is a shortcut that allows us to
     -- avoid updating the runtime to remove polymorphic "mul" and
     -- replace it with "ts_scale".  At some point we should actually fix

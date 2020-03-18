@@ -551,8 +551,8 @@ primFunCallResultTy_maybe fun args
       ("delta"    , TypeTuple
                      [TypeInteger, TypeInteger, t])        -> Just t
 
-      ("or"       , TypeTuple [TypeBool, TypeBool]       ) -> Just TypeBool
-      ("and"      , TypeTuple [TypeBool, TypeBool]       ) -> Just TypeBool
+      ("ks_or"    , TypeTuple [TypeBool, TypeBool]       ) -> Just TypeBool
+      ("ks_and"   , TypeTuple [TypeBool, TypeBool]       ) -> Just TypeBool
       _ -> Nothing
 
 isPrimFun :: String -> Bool
@@ -575,5 +575,5 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale"
                        , "lmZero", "lmOne"
-                       , "or", "and"
+                       , "ks_or", "ks_and"
                        ]

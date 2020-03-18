@@ -65,7 +65,7 @@ If you prefer block comments then use pairs of #| and |#
 ;
 ; The Knossos boolean type is called "Bool"
 (def if_example Integer ((b1 : Bool) (b2 : Bool) (a : Integer))
-     (if (or b1 b2)
+     (if (ks_or b1 b2)
          (add@ii a 10)
          (sub@ii a 10)))
 
@@ -109,11 +109,11 @@ If you prefer block comments then use pairs of #| and |#
 ;
 ; To create new variables use "let"
 (def let_and_types Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
-     (let ((b2 (or b false))
+     (let ((b2 (ks_or b false))
            (i2 (add@ii i 10))
            (f2 (add@ff f 10.0))
            (s2 "Hello"))
-       (if (and (gte@ii i 0) (lt@ii i (size v)))
+       (if (ks_and (gte@ii i 0) (lt@ii i (size v)))
            (index i v)
            f2)))
 
