@@ -383,8 +383,6 @@ primCallResultTy_maybe :: HasCallStack => Fun -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun args
   = case fun of
-      CLFun {} -> pprPanic "primCalResultTy_maybe" (ppr fun)
-
       Fun (PrimFun f)
          | Just ty <- primFunCallResultTy_maybe f args
          -> Right ty

@@ -7,16 +7,16 @@ import Data.Maybe( mapMaybe )
 
 data CLExpr
   = CLKonst Konst
-  | CLCall TFun
+  | CLCall Type FunId      -- The Type is the result type
   | CLComp CLExpr CLExpr
   | CLSel Int Int    -- (CLSel i n) selects the
                      -- i'th component of a n-tuple
                      -- One indexed, so 1 is first component
   | CLTuple [CLExpr]
   | CLIf CLExpr CLExpr CLExpr
-  | CLLet TVar CLExpr CLExpr   -- Rhs and body
+  | CLLet Type String CLExpr CLExpr   -- Rhs and body
 
-data CLDef = CLDef { cldef_fun    :: Fun
+data CLDef = CLDef { cldef_fun    :: FunId
                    , cldef_args   :: TVar
                    , cldef_res_ty :: Type
                    , cldef_rhs    :: CLExpr }
@@ -30,7 +30,7 @@ instance Pretty CLDef where
              , cldef_args = arg
              , cldef_res_ty = res_ty
              , cldef_rhs = rhs })
-     = sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
+     = sep [ hang (text "def" <+> ppr f <+> pprParendType res_ty)
                 2 (parens (pprTVar arg))
            , nest 2 (text "=" <+> ppr rhs) ]
 
@@ -46,14 +46,14 @@ pprCLExpr _ (CLComp e1 e2) = sep [ pprCLExpr precOne e1
                              collect e            = [e]
 
 pprCLExpr _ (CLKonst k)  = ppr k
-pprCLExpr _ (CLCall f)   = ppr f
+pprCLExpr _ (CLCall _ f) = ppr f
 pprCLExpr _ (CLSel i n)  = text "pi" <> ppr i <> char '_' <> ppr n
 pprCLExpr _ (CLTuple es) = parens (pprList ppr es)
 pprCLExpr p (CLIf b t e) = parensIf p precZero $
                            sep [ text "if" <+> ppr b
                                , text "then" <+> ppr t
                                , text "else" <+> ppr e]
-pprCLExpr p (CLLet x r b)
+pprCLExpr p (CLLet _ty x r b)
   = parensIf p precZero $
     vcat [ text "let" <+> (bracesSp $ sep [ ppr x <+> char '=', nest 2 (pprCLExpr precZero r) ])
          , pprCLExpr precZero b ]
@@ -73,7 +73,7 @@ toCLDef_maybe  (Def { def_fun  = fun
                     , def_rhs  = rhs })
   | Fun f     <- fun
   , UserRhs e <- rhs
-  = Just CLDef { cldef_fun = CLFun f
+  = Just CLDef { cldef_fun = f
                , cldef_args = arg
                , cldef_res_ty = res_ty
                , cldef_rhs = toCLExpr [arg] e }
@@ -87,7 +87,7 @@ toCLExpr env (If e1 e2 e3) = CLIf (toCLExpr env e1)
                                   (toCLExpr env e3)
 toCLExpr env (Tuple es)  = CLTuple (map (toCLExpr env) es)
 toCLExpr env (Call (TFun ty (Fun f)) e)
-  = CLCall (TFun ty (CLFun f)) `CLComp` toCLExpr env e
+  = CLCall ty f `CLComp` toCLExpr env e
 toCLExpr env (Var tv)
   = CLSel (find 1 env) (length env)
   where
@@ -96,9 +96,9 @@ toCLExpr env (Var tv)
       | otherwise   = find (n+1) env_vs
     find _ [] = pprPanic "tcCLExpr:var" (ppr tv $$ ppr env)
 
-toCLExpr env (Let tv rhs body)
-  = CLLet tv (toCLExpr env rhs)
-              (toCLExpr (tv:env) body)
+toCLExpr env (Let (TVar ty (Simple v)) rhs body)
+  = CLLet ty v (toCLExpr env rhs)
+               (toCLExpr (tv:env) body)
 
 toCLExpr _ e = pprPanic "toCLExpr" (ppr e)
 
@@ -110,7 +110,7 @@ fromCLDefs :: [CLDef] -> [TDef]
 fromCLDefs cldefs = map fromCLDef cldefs
 
 fromCLDef :: CLDef -> TDef
-fromCLDef (CLDef { cldef_fun = CLFun f
+fromCLDef (CLDef { cldef_fun  = f
                  , cldef_args = arg
                  , cldef_res_ty = res_ty
                  , cldef_rhs = rhs })
@@ -118,8 +118,6 @@ fromCLDef (CLDef { cldef_fun = CLFun f
         , def_args = arg
         , def_res_ty = res_ty
         , def_rhs  = UserRhs (fromCLExpr (1, Var arg) rhs) }
-
-fromCLDef def = pprPanic "fromCLDef" (ppr def)  -- Not a CLFun
 
 fromCLExpr :: (Int, TExpr) -> CLExpr -> TExpr
 -- In (fromClExpr arg cl)
@@ -129,19 +127,17 @@ fromCLExpr _   (CLKonst k)  = Konst k
 fromCLExpr arg (CLTuple es) = Tuple (map (fromCLExpr arg) es)
 fromCLExpr arg (CLIf b t e) = If (fromCLExpr arg b) (fromCLExpr arg t) (fromCLExpr arg e)
 
-fromCLExpr (_,arg) (CLCall fun)
-  | TFun ty (CLFun f) <- fun
+fromCLExpr (_,arg) (CLCall ty f)
   = Call (TFun ty (Fun f)) arg
-  | otherwise
-  = pprPanic "fromCLExpr:CLCall" (ppr fun)
 
 fromCLExpr (n, arg) (CLSel i n')
   = assert (text "fromCLExpr1" <+> ppr (n,n')) (n == n') $
     pSel i n arg
 
-fromCLExpr arg (CLLet tv rhs body)
-  = Let tv (fromCLExpr arg rhs)
-           (fromCLExpr (extendArg (Var tv) arg) body)
+fromCLExpr arg (CLLet ty v rhs body)
+  = Let (TVar ty (Simple v))
+        (fromCLExpr arg rhs)
+        (fromCLExpr (extendArg (Var tv) arg) body)
 
 fromCLExpr arg (CLComp e1 e2)
   = fromCLExpr (1, fromCLExpr arg e2) e1
@@ -151,6 +147,44 @@ extendArg arg2 (1,arg1)       = (2, Tuple [arg2,arg1])
 extendArg arg  (n,Tuple args) = (n+1, Tuple (arg:args))
 extendArg arg  (n,args)       = (n+1, pConsTup arg args)
 
+
+{- --------------------------------------------
+-- Forward AD
+-----------------------------------------------
+   S => T  =   (S, dS) -> (T, dT)
+
+  Call f :: 
+
+  (.) :: (b => c) -> (a => b) -> (a => c)
+  (f . g) <> s = f (g s)
+
+  (,) :: (s => t1) -> (s => t2) -> (s =-> (t1,t2))
+  (a,b) <> s = let (ar,dar) = a <> s
+                   (br,dbr) = b <> s
+               in ((ar,br),(dar,dbr))
+
+fwdAD :: CLExpr -> TExpr -> TExpr
+fwdAD (CLKonst k) _      = Konst k
+fwdAD (CLIf a b c) arg   = If (fwdAd a arg) (fwdAD b arg) fwdAD c arg)
+fwdAD (CLSel i n) arg    = pSel i n arg
+fwdAD (CLComp f g) arg   = fwdAD f (fwdAD g arg)
+
+fwdAD (CLCall ty f)  arg
+  = Call (TFun (tangentPair ty) fwd_fun) arg
+  where
+    fwd_fun = DrvFun f ad_mode
+    ad_mode = AD { adPlan = BasicAD, adDir = Fwd }
+
+
+
+fwdAD (CLet ty v rhs body) arg
+  = Let (TVar (tangentPair ty) (Delta v))
+        (fwdAD rhs arg)
+        (fwdAD rhs (extendArg 
+
+tangentPair :: Type -> Type
+tangentPair ty = TupleTy [ty, tangentType ty]
+-}
 
 -----------------------------------------------
 -- AD with tupling
