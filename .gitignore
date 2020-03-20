@@ -17,6 +17,9 @@ Release/
 
 # nuget packages
 /packages/
+/dist/
+/dist-newstyle/
+/etc/ks-vscode/tmp/
 
 # cabal
 /dist/
