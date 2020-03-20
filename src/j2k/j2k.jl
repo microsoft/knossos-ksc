@@ -41,7 +41,6 @@ sexp(terms...) = SExpr([terms...])
 ## IR utilities
 blockid(id::Int) = string("b",id)
 
-    
 ## make_sexp converts IR to s-expressions
 function make_sexp(x :: Any)
     sexp("[UNK", typeof(x), ":", x, "]")
@@ -204,6 +203,11 @@ function jl2ks(f, argtypes)
     meta = IRTools.typed_meta(Tuple{typeof(f),argtypes...})
     ir = IRTools.IR(meta)
     IRTools.expand!(ir)
+
+    println("-------- IR ----------")
+    println(ir)
+    println("--------")
+
     make_sexps(ir)
 end
 
