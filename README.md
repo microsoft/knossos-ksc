@@ -190,9 +190,12 @@ command line
 ### Syntax of .ks files
 
 See [the ksc syntax primer](test/ksc/syntax-primer.ks) for an
-introduction to the syntax of `.ks` files.
+introduction to the syntax of `.ks` files.  [The ksc test
+directory](test/ksc) provides more examples of the constructs
+available when writing `.ks` files.
 
-In the compiler the syntax is defined by the parser in
+In the compiler, the IR is defined in [`Lang.hs`](src/ksc/Lang.hs).
+The syntax is defined by the parser in
 [`Parse.hs`](src/ksc/Parse.hs) and the pretty-printer in
 [`Lang.hs`](src/ksc/Lang.hs).  `testRoundTrip` in
 [`Main.hs`](src/ksc/Main.hs) checks that they agree.
@@ -203,8 +206,10 @@ The compiler works by parsing the source code, generating forward and
 reverse mode automatic derivatives, and then applying some
 optimisations before emitting the code to backend.
 
-The main backend is C++ (defined in [`src/runtime`](src/runtime)).  It
-depends on a small runtime which provides a bump-allocated vector
+The main backend is C++ (defined in [`Cgen.hs`](src/ksc/Cgen.hs)).
+It depends on a small runtime (defined in
+[`src/runtime/knossos.h`](src/runtime/knossos.h)) which provides a
+bump-allocated vector
 implementation, implementations of primitives, and a very small
 standard library called the "prelude".
 
