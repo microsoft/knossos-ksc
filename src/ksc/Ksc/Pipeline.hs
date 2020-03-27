@@ -6,7 +6,7 @@ import Annotate (annotDecls, lintDefs)
 import AD (gradDefs, applyDefs)
 import ANF (anfDefs)
 import qualified Cgen
-import CatLang (toCLDefs, fromCLDefs )
+import CatLang
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
@@ -40,7 +40,7 @@ demoCL file
        ; (env2, my_tc) <- annotDecls env1       my_decls
        ; let (_pr_rules, _pr_defs) = partitionDecls pr_tc
              (_my_rules, my_defs)  = partitionDecls my_tc
-             _rulebase             = mkRuleBase (_pr_rules ++ _my_rules)
+             rulebase              = mkRuleBase (_pr_rules ++ _my_rules)
 
        ; displayPassM veryVerbose "Typechecked declarations" env2 my_defs
 
@@ -50,6 +50,21 @@ demoCL file
 
        ; displayPassM veryVerbose "fromCLDefs" env2
                        (fromCLDefs cl_defs)
+
+       ; let ad_defs = fwdAdDefs cl_defs
+       ; displayPassM veryVerbose "Forward tupled AD" env2 ad_defs
+
+       ; (env3, opt_ad_defs) <- optDefs rulebase env2 ad_defs
+       ; displayPassM veryVerbose "Optimized forward tupled AD " env3 opt_ad_defs
+
+       ; let rev_defs = revAdDefs cl_defs
+       ; displayPassM veryVerbose "Reverse AD" env2 rev_defs
+
+       ; (env3, opt_rev_defs) <- optDefs rulebase env2 rev_defs
+       ; displayPassM veryVerbose "Optimized reverse AD " env3 opt_rev_defs
+
+       ; (env4, cse_rev_defs) <- cseDefs rulebase env3 opt_rev_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env4 cse_rev_defs
      } }
 
 
@@ -127,6 +142,8 @@ type DisplayLint a = DisplayLintT IO a
 displayPassM :: Maybe Int -> DisplayLint ()
 displayPassM mverbosity what env decls
   = do { flip mapM_ mverbosity $ \verbosity -> do
+           banner what
+           displayN (take verbosity decls)
            banner what
            displayN (take verbosity decls)
        ; lintDefs what env decls

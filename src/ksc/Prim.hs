@@ -328,8 +328,27 @@ pIndex = mkPrimCall2 "index"
 pSum :: TExpr -> TExpr
 pSum = mkPrimCall1 "sum"
 
-pConsTup :: TExpr -> TExpr -> TExpr
-pConsTup = mkPrimCall2 "consTup"
+pTupCons :: TExpr -> TExpr -> TExpr
+-- Put arg1 on the front of the tuple arg2
+pTupCons arg1 arg2
+  | Tuple args <- arg2          = Tuple (arg1:args)
+  | TypeTuple {} <- typeof arg2 = mkPrimCall2 "tupCons" arg1 arg2
+  | otherwise                   = Tuple [arg1,arg2]
+
+pTupHead :: TExpr -> TExpr
+pTupHead e | Tuple (e1:_) <- e        = e1
+           | TypeTuple es <- typeof e = pSel 1 (length es) e
+           | otherwise = pprTrace "pTupHead" (ppr e <+> dcolon <+> ppr (typeof e)) $
+                         Konst (KInteger 99)
+
+pTupTail :: TExpr -> TExpr
+pTupTail e | Tuple (_:es) <- e       = mkTuple es
+           | TypeTuple [_,_] <- e_ty = pSel 2 2 e
+           | TypeTuple {}    <- e_ty = mkPrimCall1 "tupTail" e
+           | otherwise = pprTrace "pTupTail" (ppr e <+> dcolon <+> ppr e_ty) $
+                         Konst (KInteger 88)
+           where
+             e_ty = typeof e
 
 pSumBuild :: TExpr -> TExpr -> TExpr
 pSumBuild = mkPrimCall2 "sumbuild"
@@ -348,7 +367,7 @@ pSel i n e
 
   | Tuple es <- e  -- Reduce clutter by optimising right here
                    --    sel_1_2 (e1,e2) --> e1
-  = assert (text "pSel") (n == length es)
+  = assert (text "pSel" <+> int i <+> int n <+> int (length es) $$ ppr es) (n == length es)
     es !! (i-1)
 
   | otherwise
@@ -396,16 +415,21 @@ primCallResultTy_maybe fun args
             Left err -> Left err
             Right res_ty -> Right (mkGradType adp args res_ty)
 
-      DrvFun f (AD _ Fwd)    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
-        | TypeTuple [x, _dx] <- args
+      DrvFun f adm
+        | AD BasicAD Fwd <- adm    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
+        , TypeTuple [x, _dx] <- args
         , Right t_ty <- primCallResultTy_maybe (Fun f) x
         -> Right (tangentType t_ty)
-        | otherwise
-        -> Left (text "Ill-typed call to:" <+> ppr fun)
 
-      DrvFun _ (AD _ Rev)    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
-        | TypeTuple [s, _dt] <- args
+        | AD TupleAD Fwd <- adm    -- f :: S1 -> T, then fwdt$f :: (S1, S2_t) -> (T,T_t)
+        , TypeTuple [x, _dx] <- args
+        , Right t_ty <- primCallResultTy_maybe (Fun f) x
+        -> Right (TypeTuple [t_ty, tangentType t_ty])
+
+        | AD BasicAD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
+        , TypeTuple [s, _dt] <- args
         -> Right (tangentType s)
+
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
@@ -567,6 +591,12 @@ primFunCallResultTy_maybe fun args
 
       ("or"       , TypeTuple [TypeBool, TypeBool]       ) -> Just TypeBool
       ("and"      , TypeTuple [TypeBool, TypeBool]       ) -> Just TypeBool
+
+      ("tupCons" , TypeTuple [t, TypeTuple ts] ) -> Just (TypeTuple (t:ts))
+      ("tupHead" , TypeTuple (t:_)             ) -> Just t
+      ("tupTail" , TypeTuple (_:ts)            ) | length ts >= 2
+                                                  -> Just (TypeTuple ts)
+
       _ -> Nothing
 
 isPrimFun :: String -> Bool
@@ -579,6 +609,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
+                       , "pTupCons", "pTupTail"
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors

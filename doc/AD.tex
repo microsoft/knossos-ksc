@@ -3,6 +3,7 @@
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \usepackage{color}
+\usepackage{proof}
 \usepackage{url}
 \usepackage{stmaryrd}  % double brackets
 \usepackage{listings}
@@ -18,12 +19,13 @@
 % The cateorical language
 \newcommand{\CatLang}{$\mathcal CL$}
 \newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
-\newcommand{\cl}[1]{#1_{cl}}
 \newcommand{\clcomp}{\,\circ\,}   % CL composition
 \newcommand{\ck}[1]{{\mathcal K}(#1)}   % CL constant
-\newcommand{\clet}[3]{{\mathcal L}(#1,#2,#3)}   % CL composition
-\newcommand{\cif}[3]{{\mathcal IF}(#1,#2,#3)}   % CL conditional
-\newcommand{\ctupx}{\rhd}   % CL tuple extension
+\newcommand{\cfun}[1]{{\mathcal F}(#1)}   % CL function
+\newcommand{\clet}[3]{{\mathcal L}(#1,#2,#3)}   % CL let
+\newcommand{\cif}[3]{\mathcal{IF}(#1,#2,#3)}   % CL conditional
+\newcommand{\ctupx}{\gtrdot}   % CL tuple extension (terms)
+\newcommand{\ctupxt}{\gtrdot}   % CL tuple extension (types)
 \newcommand{\capply}{\diamond}   % CL application
 
 \newcommand{\deriv}{\partial}  % The symbol we use for ``derivative''
@@ -83,6 +85,7 @@
 \renewcommand{\dot}{.\,}               % dot with some space after
 \newcommand{\real}{\mathbb{R}}       % R, the reals11
 \newcommand{\nat}{\mathbb{N}}        % N, the natural numbers
+\newcommand{\bool}{\mathbb{B}}        % B, the booleans
 \newcommand{\darrow}{\Rightarrow}    % =>
 
 % Linear maps
@@ -1216,18 +1219,20 @@ $$
         \mathit{pgm} & ::= & \mathit{def}_1 \ldots \mathit{def}_n \\
         \mathit{def} & ::= & f : S \to T = e \\
         c & ::= & \ck{k} & \mbox{Constant} \\
+          & |   & \cfun{f} & \mbox{Function constant} \\
           & |   & \sel{i}{n} & \mbox{Selector} \\
           & |   & c_1 \clcomp c_2  & \mbox{Composition} \\
           & |   & (c_1,\ldots, c_n) & \mbox{Tuple} \\
-          & |   & \clet{x}{c_r}{c_b} & \mbox{Let} \\
-          & |   & \cif{c_1}{c_2}{c_3} & \mbox{Conditional}
+          & |   & \cif{c_1}{c_2}{c_3} & \mbox{Conditional} \\
+          & |   & \clet{x}{c_r}{c_b} & \mbox{Let}
         \\
       \end{array}
 $$
-\mbox{\bf Semantics}
+\mbox{{\bf Semantics:}\; \fbox{$c \capply e = e$}}
 $$
 \begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
    \ck{k} \capply t & = & k \\
+   \cfun{f} \capply t & = & f(t) \\
    \sel{i}{n}\capply (x_1, \ldots, x_n) & = & x_i \\
    (c_1 \clcomp c_2) \capply t & = & c_1 \capply (c_2 \capply t) \\
    (c_1,\ldots, c_n) \capply t & = & (c_1 \capply t,\ldots, c_n \capply t) \\
@@ -1251,15 +1256,18 @@ T(x_1\tcolon\tau_1, \ldots, x_n\tcolon\tau_n) & = & (\tau_1, \ldots, \tau_n) \\
 \\ \\
 \begin{array}{l}
   \KC{f(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n) = e}{} \\
-  \quad = \quad \cl{f} = \KC{e}(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n)
+  \quad = \quad \cfun{f} = \KC{e}(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n)
   \end{array} \\ \\
-\begin{array}{rcl}
-\multicolumn{3}{l}{\mbox{If $\Gamma \vdash e:\tau$ then $\KC{e}\Gamma : T(\Gamma) \to \tau$}} \\
+\begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
+\multicolumn{3}{l}{\mbox{If $\Gamma \vdash e:\tau$ then $\KC{e}\Gamma : T(\Gamma) \darrow \tau$}} \\
   \KC{k}{\Gamma} & = & \ck{k} \\
   \KC{x}{\Gamma} & = & \pi(\Gamma,x) \\
-  \KC{f(e)}{\Gamma} & = & \cl{f} \clcomp \KC{e}{\Gamma} \\
-  \KC{\lstinline|if|\;e_1\;e_2\;e_3}{\Gamma} & = & \lstinline|if|\;\begin{array}[t]{l}
-      (\KC{e_1}{\Gamma}) \\ (\KC{e_2}{\Gamma}) \\ (\KC{e_3}{\Gamma}) \end{array} \\
+  \KC{f(e)}{\Gamma} & = & \cfun{f} \clcomp \KC{e}{\Gamma} \\
+  \KC{\lstinline|if|\;e_1\;e_2\;e_3}{\Gamma} \\
+     \multicolumn{3}{l}{\hspace{2cm} = \lstinline|if|\,
+      (\KC{e_1}{\Gamma})\, (\KC{e_2}{\Gamma})\, (\KC{e_3}{\Gamma})} \\
+  \KC{(e_1, \ldots, e_n)}{\Gamma} & = & (\KC{e_1}{\Gamma}, \ldots, \KC{e_n}{\Gamma}) \\
+  \KC{\lstinline|let|\;x{:}\tau = e_r \;\lstinline|in|\; e_b}{\Gamma} & = & \clet{x}{\KC{e_r}{\Gamma}}{\KC{e_b}{(\Gamma,x{:}\tau)}} \\
   \KC{\lambda x.e}{\Gamma} & = & blah
 \end{array}
 \\[1mm]
@@ -1277,7 +1285,36 @@ $$
 \end{minipage}}
 \caption{Syntax of \CatLang} \label{fig:cl-syntax}
 \end{figure}
-Hello
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+  \begin{center}{\large \fbox{$\Gamma \vdash c : S \darrow T$}}\end{center}
+
+  \begin{gather*}
+    \infer{\Gamma \vdash \cfun{f} : S \darrow T}
+          {f : S \to T \in \Gamma} \qquad
+    \infer{\Gamma \vdash \ck{k} : S \darrow \real}
+          {}
+   \\[1mm]
+   \infer{\Gamma \vdash \sel{i}{n} : (T_1,\ldots,T_i,\ldots, T_n) \darrow T_i}{}
+   \\[1mm]
+   \infer{\Gamma \vdash c_1 \clcomp c_2 : S \darrow T}
+   {\Gamma \vdash c_1 : R \darrow T \quad \Gamma \vdash c_2 : S \darrow R}
+   \\[1mm]
+   \infer{\Gamma \vdash (c_1, \ldots, c_n) : S \darrow (T_1, \ldots, T_n)}
+    {\Gamma \vdash c_1:S \darrow T_1 \quad \ldots \quad \Gamma \vdash c_n:S \darrow T_n}
+   \\[1mm]
+   \infer{\Gamma \vdash \cif{c_1}{c_2}{c_3} : S \darrow T}
+    {\Gamma \vdash c_1 : S \darrow \bool \quad \Gamma \vdash c_2:S \darrow T \quad  \Gamma \vdash c_3:S \darrow T}
+   \\[1mm]
+   \infer{\Gamma \vdash \clet{x}{c_r}{c_b} : S \darrow T}
+    {\Gamma \vdash c_r : S \darrow R \quad \Gamma \vdash c_b: (S \ctupxt R) \darrow T}
+  \end{gather*}
+\end{minipage}}
+  \caption{Type system for \CatLang} \label{fig:cl-types}
+\end{figure}
+
+
 
 \section{Implementation}
 

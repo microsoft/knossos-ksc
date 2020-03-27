@@ -10,6 +10,18 @@
   ((dx1 (get$1$2 dxt))
    (dx2 (get$2$2 dxt)))
   (add@ff dx1 dx2)))
+
+; Tupled forward add
+(def
+ fwdt$add@ff (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+ (let
+  ((dx1 (get$1$2 dxt))
+   (dx2 (get$2$2 dxt)))
+  (tuple (add@ff (get$1$2 xt) (get$2$2 xt))
+         (add@ff dx1 dx2))))
+
+; Reverse add
 (def
  rev$add@ff (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
@@ -112,6 +124,19 @@
    (dx1 (get$1$2 dxt))
    (dx2 (get$2$2 dxt)))
   (add@ff (mul@ff x2 dx1) (mul@ff x1 dx2))))
+
+; Tupled forward multiply
+(def
+ fwdt$mul@ff (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt))
+   (dx1 (get$1$2 dxt))
+   (dx2 (get$2$2 dxt)))
+  (tuple (mul@ff x1 x2) (add@ff (mul@ff x2 dx1) (mul@ff x1 dx2)))))
+
+; Reverse multiply
 (def
  rev$mul@ff (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))

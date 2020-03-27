@@ -1,8 +1,10 @@
-module CatLang where
+module CatLang( CLDef, toCLDefs, fromCLDefs, fwdAdDefs, revAdDefs ) where
 
 import Prelude hiding( (<>) )
 import Lang
+import LangUtils
 import Prim
+import OptLet
 import Data.Maybe( mapMaybe )
 
 data CLExpr
@@ -96,7 +98,7 @@ toCLExpr env (Var tv)
       | otherwise   = find (n+1) env_vs
     find _ [] = pprPanic "tcCLExpr:var" (ppr tv $$ ppr env)
 
-toCLExpr env (Let (TVar ty (Simple v)) rhs body)
+toCLExpr env (Let tv@(TVar ty (Simple v)) rhs body)
   = CLLet ty v (toCLExpr env rhs)
                (toCLExpr (tv:env) body)
 
@@ -114,130 +116,230 @@ fromCLDef (CLDef { cldef_fun  = f
                  , cldef_args = arg
                  , cldef_res_ty = res_ty
                  , cldef_rhs = rhs })
-  = Def { def_fun  = Fun f
-        , def_args = arg
+  = Def { def_fun    = Fun f
+        , def_args   = arg
         , def_res_ty = res_ty
-        , def_rhs  = UserRhs (fromCLExpr (1, Var arg) rhs) }
+        , def_rhs    = UserRhs rhs' }
+  where
+    rhs' = fromCLExpr (mkInScopeSet [arg]) [Var arg] rhs
 
-fromCLExpr :: (Int, TExpr) -> CLExpr -> TExpr
--- In (fromClExpr arg cl)
---   If 'arg' is (1, arg)  then the arg is not a tuple
---   If 'arg' is (n, args) then args is a n-tuple
-fromCLExpr _   (CLKonst k)  = Konst k
-fromCLExpr arg (CLTuple es) = Tuple (map (fromCLExpr arg) es)
-fromCLExpr arg (CLIf b t e) = If (fromCLExpr arg b) (fromCLExpr arg t) (fromCLExpr arg e)
+fromCLExpr :: InScopeSet -> [TExpr] -> CLExpr -> TExpr
+fromCLExpr _  _   (CLKonst k)    = Konst k
+fromCLExpr is arg (CLTuple es)   = Tuple (map (fromCLExpr is arg) es)
+fromCLExpr is arg (CLIf b t e)   = If (fromCLExpr is arg b)
+                                      (fromCLExpr is arg t)
+                                      (fromCLExpr is arg e)
+fromCLExpr is arg (CLComp e1 e2)
+  | CLCall ty f <- e1   -- Shortcut to avoid an unnecessary let
+  = Call (TFun ty (Fun f)) (fromCLExpr is arg e2)
+  | otherwise
+  = mkTempLet is "a" (fromCLExpr is arg e2) $ \ is v2 ->
+    fromCLExpr is [v2] e1
 
-fromCLExpr (_,arg) (CLCall ty f)
-  = Call (TFun ty (Fun f)) arg
+fromCLExpr _  arg (CLSel i _)
+  | i <= length arg = arg !! (i-1)
+  | otherwise = pprTrace "fromCLExp:sel" (ppr i $$ ppr arg) $
+                Konst (KInteger 77)
+fromCLExpr _  arg (CLCall ty f)  = Call (TFun ty (Fun f)) (mkTuple arg)
 
-fromCLExpr (n, arg) (CLSel i n')
-  = assert (text "fromCLExpr1" <+> ppr (n,n')) (n == n') $
-    pSel i n arg
-
-fromCLExpr arg (CLLet ty v rhs body)
-  = Let (TVar ty (Simple v))
-        (fromCLExpr arg rhs)
-        (fromCLExpr (extendArg (Var tv) arg) body)
-
-fromCLExpr arg (CLComp e1 e2)
-  = fromCLExpr (1, fromCLExpr arg e2) e1
-
-extendArg :: TExpr -> (Int,TExpr) -> (Int,TExpr)
-extendArg arg2 (1,arg1)       = (2, Tuple [arg2,arg1])
-extendArg arg  (n,Tuple args) = (n+1, Tuple (arg:args))
-extendArg arg  (n,args)       = (n+1, pConsTup arg args)
+fromCLExpr is arg (CLLet ty v rhs body)
+  = Let tv (fromCLExpr is arg rhs)
+           (fromCLExpr is (Var tv: arg) body)
+  where
+    tv = TVar ty (Simple v)
 
 
 {- --------------------------------------------
--- Forward AD
+-- Forward AD, tupled
 -----------------------------------------------
    S => T  =   (S, dS) -> (T, dT)
 
-  Call f :: 
-
   (.) :: (b => c) -> (a => b) -> (a => c)
-  (f . g) <> s = f (g s)
+  (f . g) <f> s = f (g s)
 
-  (,) :: (s => t1) -> (s => t2) -> (s =-> (t1,t2))
-  (a,b) <> s = let (ar,dar) = a <> s
-                   (br,dbr) = b <> s
-               in ((ar,br),(dar,dbr))
+  (,) :: (s => t1) -> (s => t2) -> (s => (t1,t2))
+  (c1,c2) <f> sds = let (ar,dar) = c1 <f> sds
+                        (br,dbr) = c2 <f> sds
+                    in ((ar,br),(dar,dbr))
 
-fwdAD :: CLExpr -> TExpr -> TExpr
-fwdAD (CLKonst k) _      = Konst k
-fwdAD (CLIf a b c) arg   = If (fwdAd a arg) (fwdAD b arg) fwdAD c arg)
-fwdAD (CLSel i n) arg    = pSel i n arg
-fwdAD (CLComp f g) arg   = fwdAD f (fwdAD g arg)
+  sel_i_n <f> (s,ds) = (sel_i_n s, sel_i_n ds)
 
-fwdAD (CLCall ty f)  arg
+  (let x = c in b) <> (s,ds) = let (x,dx) = c <> (s,ds)
+                               in b <> (x:s, dx:ds)
+
+-}
+
+fwdAdDefs :: [CLDef] -> [TDef]
+fwdAdDefs = error "fwdAdDefs"
+
+revAdDefs :: [CLDef] -> [TDef]
+revAdDefs = error "revAdDefs"
+
+{-
+fwdAdDefs :: [CLDef] -> [TDef]
+fwdAdDefs cldefs = map fwdAdDef cldefs
+
+fwdAdDef :: CLDef -> TDef
+fwdAdDef (CLDef { cldef_fun  = f
+                , cldef_args = TVar ty v
+                , cldef_res_ty = res_ty
+                , cldef_rhs = rhs })
+  = Def { def_fun    = DrvFun f (AD { adPlan = TupleAD, adDir = Fwd })
+        , def_args   = arg'
+        , def_res_ty = tangentPair res_ty
+        , def_rhs    = UserRhs rhs' }
+  where
+    arg' = TVar (tangentPair ty) v
+    rhs' = fwdAdExpr (mkInScopeSet [arg'])
+                     (Var arg')
+                     rhs
+
+fwdAdExpr :: InScopeSet -> [TExpr] -> CLExpr -> TExpr
+fwdAdExpr _  _   (CLKonst k)  = Konst k
+fwdAdExpr is arg (CLIf a b c) = If (fromCLExpr is arg a) (fwdAdExpr is arg b) (fwdAdExpr is arg c)
+fwdAdExpr is arg (CLComp f g) = fwdAdExpr is (fwdAdExpr is arg g) f
+fwdAdExpr _  arg (CLSel i n)  = Tuple [ pSel i n (pFst arg), pSel i n (pSnd arg) ]
+
+fwdAdExpr _ arg (CLCall ty f)
   = Call (TFun (tangentPair ty) fwd_fun) arg
   where
     fwd_fun = DrvFun f ad_mode
-    ad_mode = AD { adPlan = BasicAD, adDir = Fwd }
+    ad_mode = AD { adPlan = TupleAD, adDir = Fwd }
 
+fwdAdExpr is arg (CLTuple cs)
+  = mkTempLets is (repeat "t") es $ \vs ->
+    Tuple [ mkTuple (map pFst vs), mkTuple (map pSnd vs) ]
+  where
+    es = map (fwdAdExpr is arg) cs
 
-
-fwdAD (CLet ty v rhs body) arg
-  = Let (TVar (tangentPair ty) (Delta v))
-        (fwdAD rhs arg)
-        (fwdAD rhs (extendArg 
+fwdAdExpr is arg (CLLet ty v rhs body)
+  = Let tv (fwdAdExpr is arg rhs)
+        (fwdAdExpr is' arg' body)
+  where
+    tv   = TVar (tangentPair ty) (Simple v)
+    is'  = extendInScopeSet tv is
+    arg' = Tuple [ pTupCons (pFst (Var tv)) (pFst arg)
+                 , pTupCons (pSnd (Var tv)) (pSnd arg) ]
 
 tangentPair :: Type -> Type
-tangentPair ty = TupleTy [ty, tangentType ty]
+tangentPair ty = TypeTuple [ty, tangentType ty]
+
+{- --------------------------------------------
+-- Reverse AD, not tupled
+-----------------------------------------------
+   S => T  =   (S, dT) -> dS
+
+  (.) :: (b => c) -> (a => b) -> (a => c)
+  (f . g) <r> (a,dc) = let (a,dc) = s
+                         b = g <> a
+                         db = f <r> (b,dc)
+                       in
+                       g <r> (a,db)
+
+  (,) :: (s => t1) -> (s => t2) -> (s => (t1,t2))
+  (c1,c2) <r> (s,dt) = let (dt1,dt2) = dt
+                           ds1 = c1 <r> (s,dt1)
+                           ds2 = c2 <r> (s,dt2)
+                     in (ds1 + ds2)
+
+  sel_i_n <r> (s,dr) = delta i n dr
+
+
+  (let x = c in b) <r> (s,dt) = let x         = c <> s
+                                    (dxb:dsb) = b <r> (x:s, dt)
+                                    dsx       = c <r> (s,dxb)
+                                in
+                                dsx + dsb
+-}
+
+revAdDefs :: [CLDef] -> [TDef]
+revAdDefs cldefs = map revAdDef cldefs
+
+revAdDef :: CLDef -> TDef
+revAdDef (CLDef { cldef_fun  = f
+                , cldef_args = TVar arg_ty v
+                , cldef_res_ty = res_ty
+                , cldef_rhs = rhs })
+  = Def { def_fun    = DrvFun f (AD { adPlan = BasicAD, adDir = Rev })
+        , def_args   = arg'
+        , def_res_ty = tangentType arg_ty
+        , def_rhs    = UserRhs rhs' }
+  where
+    arg' = TVar (TypeTuple [arg_ty, tangentType res_ty]) v
+    rhs' = revAdExpr (mkInScopeSet [arg'])
+                     (Var arg')
+                     rhs
+
+revAdExpr :: InScopeSet -> TExpr -> CLExpr -> TExpr
+revAdExpr _  arg (CLKonst _)  = mkTangentZero (pFst arg)
+revAdExpr is arg (CLIf a b c) = If (fromCLExpr is arg a) (revAdExpr is arg b) (revAdExpr is arg c)
+
+revAdExpr _  arg (CLSel i n)
+  = mkTuple (map ds [1..n])    -- Returns (0,0,dr,0)
+  where
+    s  = pFst arg
+    dr = pSnd arg
+    ds j | i==j      = dr
+         | otherwise = mkTangentZero (pSel i n s)
+
+revAdExpr is arg (CLComp f g)
+  = mkTempLet is "cx" (revAdExpr is (Tuple [b,dc]) f) $ \ is db ->
+    revAdExpr is (Tuple [a,db]) g
+  where
+    a  = pFst arg
+    dc = pSnd arg
+    b  = fromCLExpr is a g
+
+revAdExpr _ arg (CLCall _ f)
+  = Call (TFun res_ty rev_fun) arg
+  where
+    res_ty  = tangentType (typeof (pFst arg))
+    rev_fun = DrvFun f ad_mode
+    ad_mode = AD { adPlan = BasicAD, adDir = Rev }
+
+revAdExpr is arg (CLTuple cs)
+  = foldr1 pAdd $
+    [ revAdExpr is (Tuple [s,pSel i n dt]) c
+    | (c,i) <- cs `zip` [1..] ]
+  where
+    n = length cs
+    s = pFst arg
+    dt = pSnd arg
+
+revAdExpr is arg (CLLet ty v rhs body)
+  = mkTempLet is "s" (pFst arg) $ \ is s ->
+    Let x (fromCLExpr is s rhs)    $
+    mkTempLet is "db"
+      (revAdExpr is (Tuple [pTupCons (Var x) s, pSnd arg]) body) $ \ is db ->
+    pAdd (pTupTail db) (revAdExpr is (Tuple [s,pTupHead db]) rhs)
+  where
+    x = TVar ty (Simple v)
 -}
 
 -----------------------------------------------
--- AD with tupling
+-- Utilities
  -----------------------------------------------
 
-{-
+mkTempLets :: InScopeSet -> [String] -> [TExpr]
+           -> ([TExpr] -> TExpr) -> TExpr
+mkTempLets _ _ [] thing_inside
+  = thing_inside []
+mkTempLets is (s:ss) (e:es) thing_inside
+  = mkTempLet is s e      $ \ is' ve ->
+    mkTempLets is' ss es  $ \ ves ->
+    thing_inside (ve : ves)
+mkTempLets _ [] es _
+  = pprPanic "mkTempLets" (ppr es)
 
-  S => T  =   S -> (T, S -o T)
-
-  (.) :: (b => c) -> (a => b) -> (a => c)
-  (f . g) <> s = let (b, lmab) = g <> s
-                     (c, lmbc) = f <> b
-                 in (c, lmbc `lmComp` lmab)
-
-  (,) :: (s => t1) -> (s => t2) -> (s =-> (t1,t2))
-  (a,b) <> s = let (a, lmsa) = a <> s
-                   (b, lmsb) = b <> s
-               in )(a,b), lmsa x lmsb)
-
--}
-
-{-
-adCLExpr :: CLExpr -> TExpr
-adCLExpr _ (CLKonst k) = Konst k
-
-adCLExpr args (CLCall fun)
-  | TFun ty (CLFun f) <- fun
-  = Call (TFun ty (Fun f)) args
-  | otherwise
-  = pprPanic "fromCLExpr:CLCall" (ppr fun)
-
-adCLExpr args (CLComp e1 e2)
-  = mkTempLet "b" (adCLExpr args         e2) $ \ bpair ->
-    mkTempLet "c" (adCLExpr (pFst bpair) e1) $ \ cpair ->
-    Tuple [ pFst cpair
-          , pSnd cpair `lmCompose` pSnd bpair ]
-
-adCLExpr args (CLTuple es)
-  = mkTempLets "t" es $ \ tvs ->
-    Tuple [ Tuple (map pFst tvs)
-          , lmVCat (map pSnd tvs) ]
-
-mkTempLets :: String -> [TExpr] -> ([TExpr] -> TExpr) -> TExpr
-mkTempLets s es body_fn
-  = body_fn (go 1 es)
+mkTempLet :: InScopeSet -> String -> TExpr
+          -> (InScopeSet -> TExpr -> TExpr) -> TExpr
+mkTempLet is s e thing_inside
+  | isTrivial e = thing_inside is e
+  | otherwise   = Let tv e $
+                  thing_inside is' (Var tv)
   where
-    go n []     tvs = body_fn (revverse tvs)
-    go n (e:es) tvs = mkTempLet (s ++ show n) e $ \tv ->
-                      go (n+1) es (tv:tvs)
+    v = notInScope (Simple s) is
+    tv = TVar (typeof e) v
+    is' = extendInScopeSet tv is
 
-mkTempLet :: String -> TExpr -> (TExpr -> TExpr) -> TExpr
-mkTempLet s rhs body_fn
-  = mkLet tv rhs (body_fn (Var tv))
-  where
-    tv = TVar (typeof rhs) (Simple s)
--}
+

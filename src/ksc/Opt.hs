@@ -196,10 +196,16 @@ rewriteCall _ _ _
 optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
 
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
-optFun _ (SelFun i _) arg
+optFun _ (SelFun i n) arg
   | Tuple es <- arg
   , i <= length es
   = Just (es !! (i-1))
+
+  | Call tupCons (Tuple [e,es]) <- arg
+  , tupCons `isThePrimFun` "tupCons"
+  = case i of
+      1 -> Just e
+      _ -> Just (pSel (i-1) (n-1) es)
 
   | otherwise
   = Nothing
@@ -237,6 +243,10 @@ optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
           , ""
           , "    https://github.com/microsoft/knossos-ksc/pull/61/commits/29c2ab04568e17b953d3fe942aba5881ab15e1f8#r309892713"
           ]
+
+optPrimFun _ "tupTail" (Tuple es)
+  | [_,e2] <- es = Just e2
+  | _:es2  <- es = Just (Tuple es2)
 
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type

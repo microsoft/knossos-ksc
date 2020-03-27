@@ -5,7 +5,7 @@
 	     ScopedTypeVariables, TypeApplications #-}
 
 module OptLet( optLets
-             , Subst, InScopeSet, emptyInScopeSet
+             , Subst, InScopeSet, emptyInScopeSet, mkInScopeSet
              , mkEmptySubst, lookupSubst
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
@@ -195,6 +195,9 @@ data Subst
 substInScope :: Subst -> InScopeSet
 substInScope = s_in_scope
 
+mkInScopeSet :: [TVar] -> InScopeSet
+mkInScopeSet tvs = S.fromList (map tVarVar tvs)
+
 extendInScopeSet :: TVar -> InScopeSet -> InScopeSet
 extendInScopeSet tv in_scope
   = tVarVar tv `S.insert` in_scope
@@ -202,7 +205,7 @@ extendInScopeSet tv in_scope
 mkEmptySubst :: [TVar] -> Subst
 mkEmptySubst tvs
   = S { s_env = M.empty
-      , s_in_scope = S.fromList (map tVarVar tvs) }
+      , s_in_scope = mkInScopeSet tvs }
 
 lookupSubst :: Var -> Subst -> Maybe TExpr
 lookupSubst v (S { s_env = env }) = v `M.lookup` env
@@ -272,7 +275,7 @@ notInScope v in_scope
           | otherwise                = var'
           where
             var' = rebuild str'
-            str' = prefix ++ '_' : show n
+            str' = prefix ++ show n
 
     (prefix, _n) = parse_suffix [] (reverse str)
 
@@ -282,11 +285,10 @@ notInScope v in_scope
     -- E.g. parse_suffix "foo_23" = ("foo",    23)
     --      parse_suffix "wombat" = ("wombat", 0)
     parse_suffix ds (c:cs)
-      | c == '_'
-      , not (null ds)
-      = (reverse cs, read ds)
       | isDigit c
       = parse_suffix (c:ds) cs
+      | not (null ds)
+      = (reverse cs, read ds)
     parse_suffix ds cs
       = (reverse cs ++ ds, 0)
 
