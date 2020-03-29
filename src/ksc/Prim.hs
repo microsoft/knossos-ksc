@@ -436,8 +436,11 @@ primCallResultTy_maybe fun args
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
 selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
-selCallResultTy_maybe i n (TypeTuple arg_tys)
-  | i <= length arg_tys
+selCallResultTy_maybe i n arg_ty
+  | i == 1, n == 1
+  = Right arg_ty
+  | TypeTuple arg_tys <- arg_ty
+  , i <= length arg_tys
   , n == length arg_tys
   = Right (arg_tys !! (i - 1))
 selCallResultTy_maybe _ _ _ = Left (text "Bad argument to selector")

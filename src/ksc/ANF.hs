@@ -152,12 +152,12 @@ class GenBndr p where
 instance GenBndr Parsed where
   mkNewVar u _ = (v,v)
      where
-        v = mkVar ("t" ++ show u)
+        v = mkVar ("t$" ++ show u)
 
 instance GenBndr Typed where
   mkNewVar u e = (tv, tv)
     where
-       tv = mkTVar (typeof e) ("t" ++ show u)
+       tv = mkTVar (typeof e) ("t$" ++ show u)
 
 newVar :: (Monad m, GenBndr p) => ExprX p -> AnfMT p m (LetBndrX p, VarX p)
 newVar e = AnfM $ do { u <- getUniq; return ([], mkNewVar u e) }

@@ -51,20 +51,20 @@ demoCL file
        ; displayPassM veryVerbose "fromCLDefs" env2
                        (fromCLDefs cl_defs)
 
-       ; let ad_defs = fwdAdDefs cl_defs
-       ; displayPassM veryVerbose "Forward tupled AD" env2 ad_defs
+       ; let (env3, ad_defs) = fwdAdDefs env2 cl_defs
+       ; displayPassM veryVerbose "Forward tupled AD" env3 ad_defs
 
-       ; (env3, opt_ad_defs) <- optDefs rulebase env2 ad_defs
-       ; displayPassM veryVerbose "Optimized forward tupled AD " env3 opt_ad_defs
+       ; (env4, opt_ad_defs) <- optDefs rulebase env3 ad_defs
+       ; displayPassM veryVerbose "Optimized forward tupled AD " env4 opt_ad_defs
 
        ; let rev_defs = revAdDefs cl_defs
-       ; displayPassM veryVerbose "Reverse AD" env2 rev_defs
+       ; displayPassM veryVerbose "Reverse AD" env4 rev_defs
 
-       ; (env3, opt_rev_defs) <- optDefs rulebase env2 rev_defs
-       ; displayPassM veryVerbose "Optimized reverse AD " env3 opt_rev_defs
+       ; (env5, opt_rev_defs) <- optDefs rulebase env4 rev_defs
+       ; displayPassM veryVerbose "Optimized reverse AD " env5 opt_rev_defs
 
-       ; (env4, cse_rev_defs) <- cseDefs rulebase env3 opt_rev_defs
-       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env4 cse_rev_defs
+       ; (env6, cse_rev_defs) <- cseDefs rulebase env5 opt_rev_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env6 cse_rev_defs
      } }
 
 

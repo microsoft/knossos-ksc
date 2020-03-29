@@ -183,20 +183,20 @@ rewriteCall _ fun (If e1 e2 e3)
 rewriteCall env (TFun _ (Fun fun)) arg
   = optFun env fun arg
 
-rewriteCall env (TFun ty (GradFun f adm)) arg
-  = optGradFun (optEnvInScope env) adm ty f arg
+rewriteCall env (TFun ty (GradFun f adp)) arg
+  = optGradFun (optEnvInScope env) adp ty f arg
 
-rewriteCall _ f@(TFun (TypeLM _ _) _) _
-  = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
-
-rewriteCall _ _ _
-  = Nothing
+rewriteCall env (TFun ty (DrvFun f adm)) arg
+  = optDrvFun (optEnvInScope env) adm ty f arg
 
 -----------------------
 optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
 
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
 optFun _ (SelFun i n) arg
+  | n == 1, i == 1
+  = Just arg
+
   | Tuple es <- arg
   , i <= length es
   = Just (es !! (i-1))
@@ -258,7 +258,8 @@ optPrimFun _ "add" (Tuple [e1, e2])
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optPrimFun _ "add" (Tuple [Tuple es1, Tuple es2])
-  | length es1 == length es2
+  | pprTrace "optprimadd" (ppr es1 $$ ppr es2) $
+    length es1 == length es2
   = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
@@ -342,6 +343,20 @@ optPrimFun _ "lmAdd" (Tuple [ Call hcat1 (Tuple ps)
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
 
 optPrimFun _ _ _ = Nothing
+
+----------------------
+optDrvFun :: HasCallStack => InScopeSet -> ADMode
+                          -> Type -> FunId -> TExpr -> Maybe TExpr
+optDrvFun _ (AD BasicAD Fwd) _ (SelFun i n) (Tuple [_,ds])
+  = Just (pSel i n ds)
+optDrvFun _ (AD TupleAD Fwd) _ (SelFun i n) (Tuple [s,ds])
+  = Just (Tuple [pSel i n s, pSel i n ds])
+optDrvFun _ (AD BasicAD Rev) _ (SelFun i n) (Tuple [s,dt])
+  = Just (mkTuple (map mk_dr [1..n]))    -- Returns (0,0,dt,0)
+  where
+    mk_dr j | i==j      = dt
+            | otherwise = mkTangentZero (pSel j n s)
+optDrvFun _ _ _ _ _ = Nothing
 
 ----------------------
 optLMCompose :: TExpr -> TExpr -> Maybe TExpr

@@ -9,7 +9,7 @@ module OptLet( optLets
              , mkEmptySubst, lookupSubst
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
-             , substExpr, substVar, notInScope )
+             , substExpr, substVar, notInScope, notInScopeTV )
              where
 
 import Lang
@@ -225,10 +225,9 @@ zapSubst (S { s_in_scope = in_scope })
 substBndr :: TVar -> Subst -> (TVar, Subst)
 substBndr (TVar ty v) (S { s_in_scope = in_scope, s_env = env })
   = (tv', S { s_env      = env'
-            , s_in_scope = v' `S.insert` in_scope })
+            , s_in_scope = is' })
   where
-    v'   = notInScope v in_scope
-    tv'  = TVar ty v'
+    (is', tv') = notInScopeTV in_scope v ty
     env' = M.insert v (Var tv') env
 
 substVar :: Subst -> TVar -> TExpr
@@ -254,6 +253,12 @@ substExpr subst e
     go (Lam v e)      = Lam v' (substExpr subst' e)
                       where
                         (v', subst') = substBndr v subst
+
+notInScopeTV :: InScopeSet -> Var -> Type -> (InScopeSet, TVar)
+notInScopeTV is v ty
+  = (v' `S.insert` is, TVar ty v')
+  where
+    v' = notInScope v is
 
 notInScope :: Var -> InScopeSet -> Var
 -- Find a variant of the input Var that is not in the in-scope set
