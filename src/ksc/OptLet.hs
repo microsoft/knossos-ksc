@@ -407,3 +407,5 @@ inline_me_help rhs
   | Tuple ts <- rhs                  -- Always inline tuples whose fields are all trivial
   , all inline_me_help ts = True     -- See Note [Inline tuples]
   | otherwise             = False
+
+

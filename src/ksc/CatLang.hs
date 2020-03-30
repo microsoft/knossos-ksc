@@ -5,16 +5,18 @@ import Lang
 import LangUtils
 import Prim
 import OptLet
+import qualified Data.Set as S
 import Data.Maybe( mapMaybe )
 
 data CLExpr
   = CLKonst Konst
   | CLCall Type FunId      -- The Type is the result type
   | CLComp CLExpr CLExpr
+  | CLPrune [Int] CLExpr
   | CLTuple [CLExpr]
   | CLIf CLExpr CLExpr CLExpr
-  | CLLet Type String CLExpr CLExpr   -- Rhs and body
-  | CLBuild CLExpr String CLExpr      -- Size and element expr
+  | CLLet String CLExpr CLExpr   -- Rhs and body
+  | CLBuild CLExpr String CLExpr -- Size and element expr
 
 data CLDef = CLDef { cldef_fun    :: FunId
                    , cldef_args   :: TVar
@@ -38,23 +40,34 @@ instance Pretty CLExpr where
   pprPrec = pprCLExpr
 
 pprCLExpr :: Prec -> CLExpr -> SDoc
-pprCLExpr p (CLComp e1 e2)
+pprCLExpr p c@(CLComp {})
   = parensIf p precZero $
-    sep [ pprCLExpr precOne e1
-        , vcat [ text "." <+> pprCLExpr precOne e
-               | e <- collect e2 ] ]
+    sep [ pprCLExpr precOne c1
+        , vcat [ text "." <+> pprCLExpr precOne c
+               | c <- cs ] ]
   where
+    (c1,cs) = case collect c of
+                (c1:cs) -> (c1,cs)
+                [] -> pprPanic "pprCLExpr" (text "")
+
     collect (CLComp a b) = collect a ++ collect b
     collect e            = [e]
 
-pprCLExpr _ (CLKonst k)  = ppr k
-pprCLExpr _ (CLCall _ f) = ppr f
-pprCLExpr _ (CLTuple es) = parens (pprList ppr es)
+pprCLExpr _ (CLKonst k)    = ppr k
+pprCLExpr _ (CLCall _ f)   = ppr f
+pprCLExpr _ (CLPrune ts c) = sep [ text "Prune" <> ppr ts
+                                 , nest 2 (pprCLExpr precOne c) ]
+pprCLExpr _ (CLTuple cs)
+  | [] <- cs  = text "[]"
+  | [c] <- cs = char '[' <+> pprCLExpr precZero c <+> char ']'
+  | (c1:rest) <- cs = cat ( [ char '[' <+> pprCLExpr precZero c1 ] ++
+                            [ char ',' <+> pprCLExpr precZero c | c <- rest ] ) <+> char ']'
+
 pprCLExpr p (CLIf b t e) = parensIf p precZero $
                            sep [ text "if" <+> ppr b
                                , text "then" <+> ppr t
                                , text "else" <+> ppr e]
-pprCLExpr p (CLLet _ty x r b)
+pprCLExpr p (CLLet x r b)
   = parensIf p precZero $
     vcat [ text "let" <+> (bracesSp $ sep [ ppr x <+> char '=', nest 2 (pprCLExpr precZero r) ])
          , pprCLExpr precZero b ]
@@ -85,35 +98,71 @@ toCLDef_maybe  (Def { def_fun  = fun
   | otherwise
   = Nothing
 
-toCLExpr :: [TVar] -> TExpr -> CLExpr
-toCLExpr _   (Konst k) = CLKonst k
-toCLExpr env (If e1 e2 e3) = CLIf (toCLExpr env e1)
-                                  (toCLExpr env e2)
-                                  (toCLExpr env e3)
-toCLExpr env (Tuple es)  = CLTuple (map (toCLExpr env) es)
+data EnvPruned = Pruned | NotPruned
 
-toCLExpr env (Call f e)
+toCLExpr :: [TVar] -> TExpr -> CLExpr
+toCLExpr = to_cl_expr NotPruned
+
+to_cl_expr :: EnvPruned -> [TVar] -> TExpr -> CLExpr
+
+to_cl_expr _ env (Var tv)
+  = toCLVar env tv
+
+to_cl_expr _ _ (Konst k)
+  = CLKonst k
+
+to_cl_expr Pruned env (If e1 e2 e3)
+  = CLIf (toCLExpr env e1) (toCLExpr env e2) (toCLExpr env e3)
+
+to_cl_expr Pruned env (Tuple es)
+  = CLTuple (map (toCLExpr env) es)
+
+to_cl_expr pruned env c@(Call f e)
   | f `isThePrimFun` "build"
   , Tuple [n, Lam ti@(TVar _ (Simple i)) body] <- e
-  = CLBuild (toCLExpr env n) i (toCLExpr (ti:env) body)
+  = case pruned of
+      NotPruned -> prune env c
+      Pruned    -> CLBuild (toCLExpr env n) i (toCLExpr (ti:env) body)
 
-toCLExpr env (Call (TFun ty (Fun f)) e)
-  = CLCall ty f `CLComp` toCLExpr env e
+to_cl_expr pruned env (Call (TFun ty (Fun f)) e)
+  = CLCall ty f `CLComp` to_cl_expr pruned env e
 
-toCLExpr env (Var tv)
-  = CLCall (typeof tv) (SelFun (find 1 env) (length env))
+to_cl_expr NotPruned env (Let tv rhs body)
+  = CLLet (tVarName tv)
+          (toCLExpr env rhs)
+          (toCLExpr (tv:env) body)
+
+to_cl_expr NotPruned env e = prune env e
+to_cl_expr Pruned    _   e = pprPanic "toCLExpr" (ppr e)
+
+prune :: [TVar] -> TExpr -> CLExpr
+prune env e
+  | no_prune_reqd = to_cl_expr Pruned env e
+  | otherwise     = CLPrune (map snd trimmed_prs)
+                            (to_cl_expr Pruned trimmed_env e)
   where
-    find n (env_v : env_vs)
-      | tv == env_v = n
-      | otherwise   = find (n+1) env_vs
-    find _ [] = pprPanic "tcCLExpr:var" (ppr tv $$ ppr env)
+    fvs = freeVarsOf e
+    no_prune_reqd = all (\tv -> tv `S.member` fvs) env
+    trimmed_prs :: [(TVar,Int)]
+    trimmed_prs = [ pr | pr@(tv,_) <- env `zip` [1..]
+                       , tv `S.member` fvs ]
+    trimmed_env = map fst trimmed_prs
 
-toCLExpr env (Let tv@(TVar ty (Simple v)) rhs body)
-  = CLLet ty v (toCLExpr env rhs)
-               (toCLExpr (tv:env) body)
+toCLVar :: [TVar] -> TVar -> CLExpr
+toCLVar env tv
+  | Just i <- find tv env
+  = CLCall (typeof tv) (SelFun i (length env))
+  | otherwise
+  = pprPanic "tcCLVar" (ppr tv $$ ppr env)
 
-
-toCLExpr _ e = pprPanic "toCLExpr" (ppr e)
+find :: Eq a => a -> [a] -> Maybe Int
+-- Return 1-indexed position of the item in the list
+find x xs
+  = go 1 xs
+  where
+    go j (x1:xs) | x == x1   = Just j
+                 | otherwise = go (j+1) xs
+    go _ [] = Nothing
 
 -----------------------------------------------
 --  Convert from CLDedf
@@ -135,11 +184,12 @@ fromCLDef (CLDef { cldef_fun  = f
     rhs' = fromCLExpr (mkInScopeSet [arg]) [Var arg] rhs
 
 fromCLExpr :: InScopeSet -> [TExpr] -> CLExpr -> TExpr
-fromCLExpr _  _   (CLKonst k)   = Konst k
-fromCLExpr is arg (CLTuple es)  = Tuple (map (fromCLExpr is arg) es)
-fromCLExpr is arg (CLIf b t e)  = If (fromCLExpr is arg b)
-                                     (fromCLExpr is arg t)
-                                     (fromCLExpr is arg e)
+fromCLExpr _  _   (CLKonst k)    = Konst k
+fromCLExpr is arg (CLPrune ts c) = fromCLExpr is (pick ts arg) c
+fromCLExpr is arg (CLTuple es)   = Tuple (map (fromCLExpr is arg) es)
+fromCLExpr is arg (CLIf b t e)   = If (fromCLExpr is arg b)
+                                      (fromCLExpr is arg t)
+                                      (fromCLExpr is arg e)
 fromCLExpr _  arg (CLCall ty f)
   | SelFun i n <- f
   , Just res <- shortCutSelector i n arg
@@ -154,11 +204,12 @@ fromCLExpr is arg (CLComp e1 e2)
   = mkTempLet is "ax" (fromCLExpr is arg e2) $ \ is v2 ->
     fromCLExpr is [v2] e1
 
-fromCLExpr is arg (CLLet ty v rhs body)
-  = Let tv (fromCLExpr is' arg rhs)
-           (fromCLExpr is' (Var tv: arg) body)
+fromCLExpr is arg (CLLet v rhs body)
+  = Let tv rhs' (fromCLExpr is' (Var tv : arg) body)
   where
-    (is', tv) = notInScopeTV is (Simple v) ty
+    rhs'      = fromCLExpr is arg rhs
+    rhs_ty    = typeof rhs'
+    (is', tv) = notInScopeTV is (Simple v) rhs_ty
 
 fromCLExpr is arg (CLBuild size i elt)
   = pBuild (fromCLExpr is arg size)
@@ -166,6 +217,9 @@ fromCLExpr is arg (CLBuild size i elt)
   where
     (is', tv) = notInScopeTV is (Simple i) TypeInteger
 
+pick :: [Int] -> [TExpr] -> [TExpr]
+-- Pick the specifed items from the list
+pick ts es = [ es !! (t-1) | t <- ts ]
 
 {- --------------------------------------------
 -- Forward AD, tupled
@@ -205,6 +259,9 @@ fwdAdExpr is s ds (CLComp f g)
   = mkPairLet is "ay" "da" (fwdAdExpr is s ds g) $ \is a da ->
     fwdAdExpr is [a] [da] f
 
+fwdAdExpr is s ds (CLPrune ts c)
+  = fwdAdExpr is (pick ts s) (pick ts ds) c
+
 fwdAdExpr _ s ds (CLCall ty f)
   | SelFun i n <- f
   , Just si  <- shortCutSelector i n s
@@ -229,7 +286,7 @@ fwdAdExpr is s ds (CLTuple cs)
 
 --  (let x = c in b) <f> (s,ds) = let (x,dx) = c <f> (s,ds)
 --                                in b <f> (x:s, dx:ds)
-fwdAdExpr is s ds (CLLet _ nm rhs body)
+fwdAdExpr is s ds (CLLet nm rhs body)
   = mkPairLet is nm ("d" ++ nm) (fwdAdExpr is s ds rhs) $ \ is x dx ->
     fwdAdExpr is (x:s) (dx:ds) body
 
@@ -269,7 +326,7 @@ revAdDef (CLDef { cldef_fun  = f
         , def_rhs    = UserRhs rhs' }
   where
     arg' = TVar (TypeTuple [arg_ty, tangentType res_ty]) (Simple "arg")
-    nm   = nameOfVar v
+    nm   = varName v
     rhs' = mkPairLet (mkInScopeSet [arg']) nm "dr" (Var arg') $ \ is x dr ->
            revAdExpr is [x] dr rhs
 
@@ -288,6 +345,15 @@ revAdExpr is s dt (CLComp f g)
   = mkTempLet is "b"  (fromCLExpr is s g)     $ \ is b ->
     mkTempLet is "db" (revAdExpr is [b] dt f) $ \ is db ->
     revAdExpr is s db g
+
+revAdExpr is s dt (CLPrune ts c)
+  = mkTempLet is "dps" (revAdExpr is (pick ts s) dt c) $ \ _ dps ->
+    let do_one (s,i)
+          | Just j <- find i ts = pSel j n dps
+          | otherwise           = mkTangentZero s
+    in mkTuple (map do_one (s `zip` [1..]))
+  where
+    n = length ts
 
 revAdExpr _ s dt (CLCall _ f)
   | SelFun i n <- f
@@ -326,7 +392,7 @@ revAdExpr is s dt (CLBuild sz i elt)
 --                                    dsx       = c <r> (s,dxb)
 --                                in
 --                                dsb + dsx
-revAdExpr is s dt (CLLet _ v rhs body)
+revAdExpr is s dt (CLLet v rhs body)
   = mkTempLet is v (fromCLExpr is s rhs)             $ \is x ->
     mkTempLet is "dx" (revAdExpr is (x : s) dt body) $ \ is dx ->
     pAdd (pTupTail dx) (revAdExpr is s (pTupHead dx) rhs)
@@ -339,7 +405,8 @@ shortCutSelector :: Int -> Int -> [TExpr] -> Maybe TExpr
 shortCutSelector i n es
   | n == 1, [e] <- es = Just e
   | n == length es    = Just (es !! (i-1))
-  | otherwise         = assert (text "shortCutSelector") (isSingleton es) Nothing
+  | otherwise         = -- assert (text "shortCutSelector") (isSingleton es) Nothing
+                        pprTrace "shortCutSelector" (ppr i <+> ppr n <+> ppr es) Nothing
   -- The selector might have come from the original program
   -- in which case the [TExpr] should be a singleton
 

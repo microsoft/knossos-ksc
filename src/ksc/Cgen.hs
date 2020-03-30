@@ -228,7 +228,7 @@ cgenDefE env (Def { def_fun = f, def_args = param
         TypeTuple tys ->
           let params  = zipWith mkParam [1..] tys
               mkParam i ty = TVar ty (Simple name)
-                where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
+                where name = tVarName param ++ "arg" ++ show i
               packParams = Let param (Tuple (map Var params))
           in (params, ensureDon'tReuseParams params (packParams body))
         _             -> ([param], body)
