@@ -206,11 +206,11 @@ fwdAdExpr is s ds (CLComp f g)
     fwdAdExpr is [a] [da] f
 
 fwdAdExpr _ s ds (CLCall ty f)
---  | SelFun i n <- f
---  , Just si  <- shortCutSelector i n s
---  , Just dsi <- shortCutSelector i n ds
---  = Tuple [ si, dsi ]
---  | otherwise
+  | SelFun i n <- f
+  , Just si  <- shortCutSelector i n s
+  , Just dsi <- shortCutSelector i n ds
+  = Tuple [ si, dsi ]
+  | otherwise
   = Call (TFun (tangentPair ty) fwd_fun)
          (Tuple [mkTuple s, mkTuple ds])
   where
