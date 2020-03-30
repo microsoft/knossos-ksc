@@ -404,6 +404,6 @@ inline_me_help rhs
   | isTrivial rhs   = True   -- RHS is trivial, see isTrivial for what that means
   | isKZero rhs     = True   -- Inline zeros, as they will very likely disappear
   | TypeLM {} <- typeof rhs = True   -- Always inline linear maprs (might not do this in future)
-  | Tuple ts <- rhs              -- Always inline tuples whose fields are all trivial
-  , all inline_me_help ts = True  -- See Note [Inline tuples]
+  | Tuple ts <- rhs                  -- Always inline tuples whose fields are all trivial
+  , all inline_me_help ts = True     -- See Note [Inline tuples]
   | otherwise             = False

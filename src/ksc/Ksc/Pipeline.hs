@@ -57,14 +57,14 @@ demoCL file
        ; (env4, opt_ad_defs) <- optDefs rulebase env3 ad_defs
        ; displayPassM veryVerbose "Optimized forward tupled AD " env4 opt_ad_defs
 
-       ; let rev_defs = revAdDefs cl_defs
-       ; displayPassM veryVerbose "Reverse AD" env4 rev_defs
+       ; let (env5, rev_defs) = revAdDefs env4 cl_defs
+       ; displayPassM veryVerbose "Reverse AD" env5 rev_defs
 
-       ; (env5, opt_rev_defs) <- optDefs rulebase env4 rev_defs
+       ; (env6, opt_rev_defs) <- optDefs rulebase env5 rev_defs
        ; displayPassM veryVerbose "Optimized reverse AD " env5 opt_rev_defs
 
-       ; (env6, cse_rev_defs) <- cseDefs rulebase env5 opt_rev_defs
-       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env6 cse_rev_defs
+       ; (env7, cse_rev_defs) <- cseDefs rulebase env6 opt_rev_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env7 cse_rev_defs
      } }
 
 
@@ -144,8 +144,8 @@ displayPassM mverbosity what env decls
   = do { flip mapM_ mverbosity $ \verbosity -> do
            banner what
            displayN (take verbosity decls)
-           banner what
-           displayN (take verbosity decls)
+--           banner what
+--           displayN (take verbosity decls)
        ; lintDefs what env decls
     }
 

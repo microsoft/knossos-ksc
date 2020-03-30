@@ -141,8 +141,11 @@ fromCLExpr is arg (CLIf b t e)  = If (fromCLExpr is arg b)
                                      (fromCLExpr is arg t)
                                      (fromCLExpr is arg e)
 fromCLExpr _  arg (CLCall ty f)
-  | SelFun i _ <- f = arg !! (i-1)
-  | otherwise       = Call (TFun ty (Fun f)) (mkTuple arg)
+  | SelFun i n <- f
+  , Just res <- shortCutSelector i n arg
+  = res
+  | otherwise
+  = Call (TFun ty (Fun f)) (mkTuple arg)
 
 fromCLExpr is arg (CLComp e1 e2)
   | CLCall ty f <- e1   -- Shortcut to avoid an unnecessary let
@@ -191,7 +194,7 @@ fwdAdDef (CLDef { cldef_fun  = f
            fwdAdExpr is [x] [dx] rhs
 
 fwdAdExpr :: InScopeSet -> [TExpr] -> [TExpr] -> CLExpr -> TExpr
-fwdAdExpr _  _ _  (CLKonst k)  = Konst k
+fwdAdExpr _  _ _  (CLKonst k)  = Tuple [ Konst k, mkTangentZero (Konst k) ]
 fwdAdExpr is s ds (CLIf a b c) = If (fromCLExpr is s a)
                                     (fwdAdExpr is s ds b)
                                     (fwdAdExpr is s ds c)
@@ -203,6 +206,11 @@ fwdAdExpr is s ds (CLComp f g)
     fwdAdExpr is [a] [da] f
 
 fwdAdExpr _ s ds (CLCall ty f)
+--  | SelFun i n <- f
+--  , Just si  <- shortCutSelector i n s
+--  , Just dsi <- shortCutSelector i n ds
+--  = Tuple [ si, dsi ]
+--  | otherwise
   = Call (TFun (tangentPair ty) fwd_fun)
          (Tuple [mkTuple s, mkTuple ds])
   where
@@ -245,8 +253,10 @@ tangentPair ty = TypeTuple [ty, tangentType ty]
    S => T  =   (S, dT) -> dS
 -}
 
-revAdDefs :: [CLDef] -> [TDef]
-revAdDefs cldefs = map revAdDef cldefs
+revAdDefs :: GblSymTab -> [CLDef] -> (GblSymTab, [TDef])
+revAdDefs gst cldefs
+  = let defs = map revAdDef cldefs
+    in (extendGblST gst defs, defs)
 
 revAdDef :: CLDef -> TDef
 revAdDef (CLDef { cldef_fun  = f
@@ -280,6 +290,12 @@ revAdExpr is s dt (CLComp f g)
     revAdExpr is s db g
 
 revAdExpr _ s dt (CLCall _ f)
+  | SelFun i n <- f
+  , Just _ <- shortCutSelector i n s  -- Short cut
+  = let mk_dr j | i==j      = dt
+                | otherwise = mkTangentZero (s !! (j-1))
+    in mkTuple (map mk_dr [1..n])
+  | otherwise
   = Call (TFun res_ty rev_fun) (Tuple [mkTuple s, dt])
   where
     res_ty  = tangentType (typeof (mkTuple s))
@@ -298,6 +314,13 @@ revAdExpr is s dt (CLTuple cs)
   where
     n = length cs
 
+--  (build sz (\i.e) <r> (s,dt)
+--    = sumbuild (sz <> s) (\i. (e <r> (i:s, dt[i])))
+revAdExpr is s dt (CLBuild sz i elt)
+  = let (is', iv) = notInScopeTV is (Simple i) TypeInteger
+    in pSumBuild (fromCLExpr is' s sz)
+                 (Lam iv (pTupTail (revAdExpr is' (Var iv : s) (pIndex (Var iv) dt) elt)))
+
 --  (let x = c in b) <r> (s,dt) = let x         = c <> s
 --                                    (dxb:dsb) = b <r> (x:s, dt)
 --                                    dsx       = c <r> (s,dxb)
@@ -308,10 +331,17 @@ revAdExpr is s dt (CLLet _ v rhs body)
     mkTempLet is "dx" (revAdExpr is (x : s) dt body) $ \ is dx ->
     pAdd (pTupTail dx) (revAdExpr is s (pTupHead dx) rhs)
 
-
 -----------------------------------------------
 -- Utilities
  -----------------------------------------------
+
+shortCutSelector :: Int -> Int -> [TExpr] -> Maybe TExpr
+shortCutSelector i n es
+  | n == 1, [e] <- es = Just e
+  | n == length es    = Just (es !! (i-1))
+  | otherwise         = assert (text "shortCutSelector") (isSingleton es) Nothing
+  -- The selector might have come from the original program
+  -- in which case the [TExpr] should be a singleton
 
 mkTempLets :: InScopeSet -> [String] -> [TExpr]
            -> ([TExpr] -> TExpr) -> TExpr

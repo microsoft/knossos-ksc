@@ -88,6 +88,21 @@
   (div@ff (sub@ff (mul@ff x2 dx1)
                   (mul@ff x1 dx2))
           (mul@ff x2 x2))))
+
+; Tupled forward divide
+(def
+ fwdt$div@ff (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt))
+   (dx1 (get$1$2 dxt))
+   (dx2 (get$2$2 dxt)))
+  (tuple (div@ff x1 x2)
+         (div@ff (sub@ff (mul@ff x2 dx1)
+                         (mul@ff x1 dx2))
+                 (mul@ff x2 x2)))))
+
 (def
  rev$div@ff (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
@@ -98,6 +113,7 @@
   (tuple (div@ff d_ddiv x2)
          (neg@f (div@ff (mul@ff x1 d_ddiv)
                          (mul@ff x2 x2))))))
+
 (edef div@ii Integer (Integer Integer))
 (edef D$div@ii (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef Dt$div@ii (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))

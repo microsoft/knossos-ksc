@@ -5,6 +5,7 @@
 module Prim where
 
 import Lang
+import LangUtils
 import GHC.Stack
 import Data.Maybe
 
@@ -91,28 +92,29 @@ getZero :: HasCallStack => (Type -> Type) -> TExpr -> TExpr
 getZero tangent_type e
   = go e
   where
-    go e = case tangent_type e_ty of
+    go e = case tangent_type (typeof e) of
             TypeInteger  -> Konst (KInteger 0)
             TypeFloat    -> Konst (KFloat 0.0)
             TypeString   -> Konst (KString "")
             TypeBool     -> Konst (KBool False)
-            TypeVec _    -> Let t_evar e $
-                            pBuild (pSize (Var t_evar)) $
-                            Lam indexTVar $
-                            go (pIndex (Var indexTVar) (Var t_evar))
+            TypeVec _    -> mkAtomic e $ \ e ->
+                            pConstVec (pSize e) (go (pIndex (kInt 1) e))
             TypeTuple ts
                | Tuple es <- e
                -> assert (text "splitTuple") (length ts == length es) $
                   Tuple (map go  es)
                | let n = length ts
-               -> Let t_evar e $
+               -> mkAtomic e $ \e ->
                   Tuple $ map go $
-                  [ pSel i n (Var t_evar) | i <- [1..n] ]
-            _ -> pprPanic "mkZero" (ppr e_ty $$ ppr e)
+                  [ pSel i n e | i <- [1..n] ]
+            _ -> pprPanic "mkZero" (ppr (typeof e) $$ ppr e)
 
-         where
-           e_ty = typeof e
-           t_evar = TVar e_ty argVar
+mkAtomic :: TExpr -> (TExpr -> TExpr) -> TExpr
+mkAtomic e thing_inside
+  | isTrivial e = thing_inside e
+  | otherwise   = Let ev e (thing_inside (Var ev))
+  where
+    ev = TVar (typeof e) argVar
 
 --------------------------------------------
 --  Building simple calls

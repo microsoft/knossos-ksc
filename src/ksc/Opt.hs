@@ -258,8 +258,7 @@ optPrimFun _ "add" (Tuple [e1, e2])
 
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optPrimFun _ "add" (Tuple [Tuple es1, Tuple es2])
-  | pprTrace "optprimadd" (ppr es1 $$ ppr es2) $
-    length es1 == length es2
+  | length es1 == length es2
   = Just (Tuple (zipWith pAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
