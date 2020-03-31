@@ -20,33 +20,30 @@ let (++) a b = System.IO.Path.Combine(a,b)
 let parseAndCheckFiles files = 
     let fsproj = "nul.fsproj" // unused?
 
-    (* adapted for .NET Core from https://fsharp.github.io/FSharp.Compiler.Service/project.html *)
+    (* adapted for .NET Core from https://fsharp.github.io/FSharp.Compiler.Service/project.html
+    *)
     let sysLib nm =
         if System.Environment.OSVersion.Platform = System.PlatformID.Win32NT then
-
             let windowsReferencePath =
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) ++ extendedPath
             if not (Directory.Exists windowsReferencePath) then
                 failwithf "Can't find .NET Core references, ensure they're installed. Looking in%s%s" System.Environment.NewLine windowsReferencePath 
             windowsReferencePath ++ nm + ".dll"
         else
-
-            let otherPath = "/usr/share/" ++ extendedPath //WSL/Ubuntu install
-            let otherPathLocal = "/usr/share/local/" ++ extendedPath //macOS install
-
-            if Directory.Exists otherPath then
-                otherPath ++ nm + ".dll"
-            elif Directory.Exists otherPathLocal then
-                otherPathLocal ++ nm + ".dll"
-            else
-                failwithf
-                    "Can't find .NET Core references, ensure they're installed. Looking in%s%s%s%s"
-                    System.Environment.NewLine
-                    otherPath
-                    System.Environment.NewLine
-                    otherPathLocal
-            
-    
+            let otherPaths = [
+                "/usr/share/" ++ extendedPath //WSL/Ubuntu install
+                "/usr/share/local/" ++ extendedPath //macOS install
+                "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/"  // Newer .NET version in WSL/Ubuntu
+            ]
+            otherPaths
+            |> List.tryFind (Directory.Exists)
+            |> (function
+                | Some path -> path ++ nm + ".dll"
+                | None ->
+                    failwithf
+                        "Can't find .NET Core references, ensure they're installed. Looked in:\n%s"
+                        (otherPaths |> String.concat "\n")
+            )
 
     let localLib name =
         exeDirectory ++ name + ".dll"
@@ -102,7 +99,7 @@ let main argv =
     let files = argv.[2..]
 
     if File.Exists(outFile) then
-        failwithf "Error: Will not overwrite existing file %s\n" outFile
+        printf "Warning: Overwriting existing file %s\n" outFile
 
     printfn "f2k: Parsing %d files to %s" (Seq.length files) outFile
 
