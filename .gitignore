@@ -89,3 +89,7 @@ users/simonpj/AD.pdf
 
 etc/ks-vscode/node_modules/
 etc/ks-vscode/out/
+
+# Ionide F# VS Code extension
+.fake
+.ionide
