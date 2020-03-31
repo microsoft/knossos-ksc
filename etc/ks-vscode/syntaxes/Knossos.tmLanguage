@@ -73,7 +73,7 @@
 				</dict>
 			</dict>
 			<key>match</key>
-			<string>(\b(?i:(def|edef))\b)(\s+)((\w|\-|\!|\?)*)</string>
+			<string>(\b(?i:(def|edef))\b)(\s+)((\w|\-|\!|\?|\@|\$)*)</string>
 			<key>name</key>
 			<string>meta.function.lisp</string>
 		</dict>
