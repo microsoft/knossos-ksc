@@ -203,15 +203,17 @@ params_withPackedParams param = case typeof param of
     in (params, ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 
+mkCTypedVar :: TVar -> String
+mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
+
 cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = param
                   , def_rhs = UserRhs body }) =
   let cf                         = cgenUserFun f
-      mkVar (TVar ty var)        = cgenType (mkCType ty) `spc` cgenVar var
       (params, withPackedParams) = params_withPackedParams param
       CG cbodydecl cbodyexpr cbodytype =
         runM $ cgenExpr env (withPackedParams body)
-      cvars       = map mkVar params
+      cvars       = map mkCTypedVar params
       cftypealias = "ty$" ++ cf
   in  CG
         (     "typedef "
@@ -397,14 +399,13 @@ cgenExprR env = \case
   Lam param@(TVar tyv _) body -> do
     lvar <- freshCVar
     let vtype = mkCType tyv
-        mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
     (CG cdecl cexpr ctype) <- cgenExprR env body
     return $ CG
       (     "/**Lam**/"
       ++    "auto"
       `spc` lvar
       ++    " = [=]("
-      ++    mkVar param
+      ++    mkCTypedVar param
       ++    ") { "  -- TODO: capture only freeVars here
       ++    cdecl
       ++    "   return ("
