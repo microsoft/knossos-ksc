@@ -397,14 +397,14 @@ cgenExprR env = \case
   Lam (TVar tyv v) body -> do
     lvar <- freshCVar
     let vtype = mkCType tyv
+        mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
     (CG cdecl cexpr ctype) <- cgenExprR env body
     return $ CG
       (     "/**Lam**/"
       ++    "auto"
       `spc` lvar
       ++    " = [=]("
-      ++    cgenType (mkCType tyv)
-      `spc` cgenVar v
+      ++    mkVar (TVar tyv v)
       ++    ") { "  -- TODO: capture only freeVars here
       ++    cdecl
       ++    "   return ("
