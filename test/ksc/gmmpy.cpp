@@ -42,6 +42,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("gmm_knossos_gmm_objective", &ks::gmm_knossos_gmm_objective);
-  m.def("rev_gmm_knossos_gmm_objective", &ks::rev$gmm_knossos_gmm_objective);
+  m.def("gmm_knossos_gmm_objective", &ks::gmm_knossos_gmm_objective$avvfvfvvfvvfvvf$dfi$b);
+  m.def("rev_gmm_knossos_gmm_objective", &ks::rev$gmm_knossos_gmm_objective$a$dvvfvfvvfvvfvvf$dfi$b$bf);
 }
