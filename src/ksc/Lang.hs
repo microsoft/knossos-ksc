@@ -508,11 +508,15 @@ traceWhenTypesUnequal = traceWhenUnequal
 
 -- Uses Wadler-Leijen pretty printing, for which the following docs may be helpful
 -- http://gallium.inria.fr/blog/first-release-of-pprint
---    - OCaml, but the concepts are the same and it's a helpful intro)
+--    - OCaml, but the concepts are the same and it's a helpful intro
 -- https://hackage.haskell.org/package/wl-pprint-1.2.1/docs/Text-PrettyPrint-Leijen.html
 --    - Closer to what we're using, but less introductory.
+-- http://hackage.haskell.org/package/prettyprinter-1.6.1/docs/Data-Text-Prettyprint-Doc.html
+--    - Not trivial to find this on Hackage.
 -- And of course, https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
 --    - The original paper, which I (awf) don't find the best intro.
+
+-- TODO: Implement Python linebreaking with flatAlt
 
 newtype SDoc = SDoc(Bool -> Doc) -- True = S-expressions, False = infix style
 
@@ -903,7 +907,7 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f)
                     2 (sep [ parens (pprTVar vs)
-                           ,  (text "->" <+> pprParendType res_ty)])
+                           , text "->" <+> pprParendType res_ty])
                , nest 2 (text "=" <+> pprExpr precZero rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
