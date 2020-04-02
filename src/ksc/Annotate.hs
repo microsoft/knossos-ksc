@@ -395,17 +395,12 @@ lookupLclTc :: Var -> TcM Type
 lookupLclTc v
   = do { st <- getSymTabTc
        ; case Map.lookup v (lclST st) of
-           Nothing -> case Map.lookup (varFun v) (gblST st) of
-                  Nothing -> do {
+           Nothing -> do {
                              addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
                                           , text "Envt:" <+> gblDoc st ])
                              ; return TypeUnknown
                              }
-                  Just d -> return (TypeLam (tVarType (def_args d)) (def_res_ty d))
            Just ty -> return ty }
-  where
-     varFun (Simple name) = mk_fun name
-     varFun n = pprPanic "varFun" (ppr n $$ text (show n))
 
 lookupGblTc :: Fun -> TypedExpr -> TcM Type
 lookupGblTc fun args
