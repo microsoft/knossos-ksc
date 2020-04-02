@@ -251,7 +251,8 @@
           (rev_ok (tuple grad_gmm_dot_dtheta " ==?== " df))
 
 
-          (checked ($check gmm_knossos_gmm_objective rev$gmm_knossos_gmm_objective
+          (checked ($check gmm_knossos_gmm_objective
+                           rev$gmm_knossos_gmm_objective
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)
