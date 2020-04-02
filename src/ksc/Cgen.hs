@@ -198,7 +198,7 @@ cgenDefE env (Def { def_fun = f, def_args = param
   let cf                               = cgenUserFun f
 
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      (params, bodyWithUnpacking) = case typeof param of
+      (params, bodyWithPacking) = case typeof param of
         -- See Note [Unpack tuple arguments]
         TypeTuple tys ->
           let params  = zipWith mkParam [1..] tys
@@ -208,7 +208,7 @@ cgenDefE env (Def { def_fun = f, def_args = param
           in (params, ensureDon'tReuseParams params (packParams body))
         _             -> ([param], body)
 
-      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env bodyWithUnpacking
+      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env bodyWithPacking
       cvars = map mkVar params
 
       cftypealias = "ty$" ++ cf
