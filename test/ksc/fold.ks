@@ -68,8 +68,8 @@
            (c  (mkfloat (add@ii seed 1000)    1.0))
            (dv (mkvec   (add@ii seed 2000) 10 delta))
            (dc (mkfloat (add@ii seed 3000)    delta))
-           (checked ($check prod_fold
-                            rev$prod_fold
+           (checked ($check (lam (t : Tuple (Vec Float) Float) (prod_fold t))
+                            (lam (t : Tuple (Tuple (Vec Float) Float) Float) (rev$prod_fold t))
                             (tuple v  c)
                             (tuple v  c)
                             (tuple dv dc)
