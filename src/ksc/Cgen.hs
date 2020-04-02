@@ -206,14 +206,12 @@ params_withPackedParams param = case typeof param of
 cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = param
                   , def_rhs = UserRhs body }) =
-  let cf                               = cgenUserFun f
-      mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
+  let cf                         = cgenUserFun f
+      mkVar (TVar ty var)        = cgenType (mkCType ty) `spc` cgenVar var
       (params, withPackedParams) = params_withPackedParams param
-
       CG cbodydecl cbodyexpr cbodytype =
         runM $ cgenExpr env (withPackedParams body)
-      cvars = map mkVar params
-
+      cvars       = map mkVar params
       cftypealias = "ty$" ++ cf
   in  CG
         (     "typedef "
