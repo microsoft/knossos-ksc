@@ -901,8 +901,9 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
           (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
                         , parens ((parens . pprTVar) vs)
                         , ppr rhs])
-          (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
-                    2 (parens (pprTVar vs))
+          (sep [ hang (text "def" <+> pprFun f)
+                    2 (sep [ parens (pprTVar vs)
+                           ,  (text "->" <+> pprParendType res_ty)])
                , nest 2 (text "=" <+> pprExpr precZero rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
