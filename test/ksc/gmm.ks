@@ -251,8 +251,21 @@
           (rev_ok (tuple grad_gmm_dot_dtheta " ==?== " df))
 
 
-          (checked ($check gmm_knossos_gmm_objective
-                           rev$gmm_knossos_gmm_objective
+          (checked ($check (lam (t : Tuple (Vec (Vec Float))
+                                           (Vec Float)
+                                           (Vec (Vec Float))
+                                           (Vec (Vec Float))
+                                           (Vec (Vec Float))
+                                           (Tuple Float Integer))
+                                (gmm_knossos_gmm_objective t))
+                           (lam (t : Tuple (Tuple (Vec (Vec Float))
+                                                  (Vec Float)
+                                                  (Vec (Vec Float))
+                                                  (Vec (Vec Float))
+                                                  (Vec (Vec Float))
+                                                  (Tuple Float Integer))
+                                           Float)
+                                (rev$gmm_knossos_gmm_objective t))
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)
