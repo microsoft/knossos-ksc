@@ -506,6 +506,14 @@ traceWhenTypesUnequal = traceWhenUnequal
 --     SDoc abstraction over expression display style
 -----------------------------------------------
 
+-- Uses Wadler-Leijen pretty printing, for which the following docs may be helpful
+-- http://gallium.inria.fr/blog/first-release-of-pprint
+--    - OCaml, but the concepts are the same and it's a helpful intro)
+-- https://hackage.haskell.org/package/wl-pprint-1.2.1/docs/Text-PrettyPrint-Leijen.html
+--    - Closer to what we're using, but less introductory.
+-- And of course, https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
+--    - The original paper, which I (awf) don't find the best intro.
+
 newtype SDoc = SDoc(Bool -> Doc) -- True = S-expressions, False = infix style
 
 (<>) :: SDoc -> SDoc -> SDoc
@@ -553,10 +561,10 @@ sep ss = SDoc
     ss
   )
 
-mode :: SDoc  -- How to print in s-expression style
-     -> SDoc  -- How to print in "user" style
-     -> SDoc
-mode (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
+ifSexp :: SDoc  -- How to print in s-expression style
+       -> SDoc  -- How to print in "user" style
+       -> SDoc
+ifSexp (SDoc se) (SDoc inf) = SDoc (\m -> if m then se m else inf m)
 
 nest :: Int -> SDoc -> SDoc
 nest i (SDoc d) = SDoc (PP.nest i . d)
@@ -754,8 +762,8 @@ instance Pretty Konst where
 instance Pretty TypeX where
   pprPrec p (TypeVec ty)         = parensIf p precTyApp $
                                    text "Vec" <+> pprParendType ty
-  pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
-                                        (parens (pprList pprParendType tys))
+  pprPrec _ (TypeTuple tys)      = ifSexp (parens (text "Tuple" <+> pprList pprParendType tys))
+                                          (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to)    = parensIf p precZero $
                                    text "Lam" <+> ppr from <+> ppr to
   pprPrec p (TypeLM s t)         = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
@@ -796,23 +804,24 @@ pprExpr _ (Var   v ) = pprVar @phase v
 pprExpr _ (Dummy ty) = char '<' <> pprMTypeX @phase ty <> char '>'
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
-pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
+pprExpr _ (Tuple es) = ifSexp (parens $ text "tuple" <+> rest) (parens rest)
   where rest = pprList ppr es
-pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar v) <+> ppr e)
-                            (parens $ text "lam" <+> vcat [parens (pprTVar v), ppr e])
-pprExpr p (Let v e1 e2) = mode
+pprExpr _ (Lam v e) =  ifSexp (parens $ text "lam" <+> parens (pprTVar v) <+> ppr e)
+                              (parens $ text "lam" <+> vcat [parens (pprTVar v), ppr e])
+pprExpr p (Let v e1 e2) = ifSexp
   (pprLetSexp v e1 e2)
   (parensIf
     p
     precZero
     (vcat
       [ text "let"
-        <+> (bracesSp $ sep [pprLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
+        <+> (bracesSp $ sep [pprLetBndr @phase v, 
+                             nest 2 (text "=" <+> ppr e1)])
       , ppr e2
       ]
     )
   )
-pprExpr p (If e1 e2 e3) = mode
+pprExpr p (If e1 e2 e3) = ifSexp
   (parens (sep [text "if", ppr e1, ppr e2, ppr e3]))
   (parensIf
     p
@@ -827,7 +836,7 @@ pprExpr _ (App e1 e2) =
     -- We aren't expecting Apps, so I'm making them very visible
 
 pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
-pprCall prec f e = mode
+pprCall prec f e = ifSexp
   (parens $ pprFunOcc @p f <+> pp_args_tuple)
   (case (e, isInfix @p f) of
     (Tuple [e1, e2], Just prec')
@@ -888,7 +897,7 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
                      , pprParendType res_ty
                      , parens ((pprParendType . tVarType) vs) ]
 
-      UserRhs rhs -> mode
+      UserRhs rhs -> ifSexp
           (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
                         , parens ((parens . pprTVar) vs)
                         , ppr rhs])
@@ -921,7 +930,7 @@ parensSp :: SDoc -> SDoc
 parensSp d = char '(' <+> d <+> char ')'
 
 pprList :: (p -> SDoc) -> [p] -> SDoc
-pprList ppr ps = mode (sep pps) (sep $ punctuate comma pps)
+pprList ppr ps = ifSexp (sep pps) (sep $ punctuate comma pps)
   where
    pps = map ppr ps
 
