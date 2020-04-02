@@ -98,7 +98,7 @@ option s = do
 
 testWithfsTest :: String -> IO ()
 testWithfsTest fsTestKs = do
-  --futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
+  futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
   let compiler = "g++-7"
   testC compiler [fsTestKs]
 
