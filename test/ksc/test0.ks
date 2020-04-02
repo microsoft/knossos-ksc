@@ -35,6 +35,11 @@
         (e (build 7 (lam (i : Integer) i))
            (tuple (build 13 (lam (i : Integer) (build 7 (lam (i : Integer) 3.3))))
                   (tuple 23 (build 13 (lam (i : Integer) (to_float i))))))
-        (tuple "CHECK=" ($check (lam (x : Float) (f x)) (lam (t : Tuple Float Float) (rev$f t)) (tuple 1.1) 1.1 (tuple 0.00001) 0.3))
+        (tuple "CHECK=" ($check (lam (x : Float) (f x))
+                                (lam (t : Tuple Float Float) (rev$f t))
+                                (tuple 1.1)
+                                1.1
+                                (tuple 0.00001)
+                                0.3))
     )
 )
