@@ -198,17 +198,17 @@ cgenDefE env (Def { def_fun = f, def_args = param
   let cf                               = cgenUserFun f
 
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      (params, bodyWithPacking) = case typeof param of
+      (params, withPackedParams) = case typeof param of
         -- See Note [Unpack tuple arguments]
         TypeTuple tys ->
           let params  = zipWith mkParam [1..] tys
               mkParam i ty = TVar ty (Simple name)
                 where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
               packParams = Let param (Tuple (map Var params))
-          in (params, ensureDon'tReuseParams params (packParams body))
-        _             -> ([param], body)
+          in (params, ensureDon'tReuseParams params . packParams)
+        _             -> ([param], id)
 
-      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env bodyWithPacking
+      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env (withPackedParams body)
       cvars = map mkVar params
 
       cftypealias = "ty$" ++ cf
