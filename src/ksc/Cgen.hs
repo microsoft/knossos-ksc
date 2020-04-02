@@ -394,7 +394,7 @@ cgenExprR env = \case
                 ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
                 ctype
 
-  Lam (TVar tyv v) body -> do
+  Lam param@(TVar tyv _) body -> do
     lvar <- freshCVar
     let vtype = mkCType tyv
         mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
@@ -404,7 +404,7 @@ cgenExprR env = \case
       ++    "auto"
       `spc` lvar
       ++    " = [=]("
-      ++    mkVar (TVar tyv v)
+      ++    mkVar param
       ++    ") { "  -- TODO: capture only freeVars here
       ++    cdecl
       ++    "   return ("
