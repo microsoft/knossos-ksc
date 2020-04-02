@@ -192,21 +192,23 @@ that we chose are not used in the function body by using substExpr.
 ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
 ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
 
+params_withPackedParams :: TVarX -> ([TVarX], TExpr -> TExpr)
+params_withPackedParams param = case typeof param of
+  -- See Note [Unpack tuple arguments]
+  TypeTuple tys ->
+    let params  = zipWith mkParam [1..] tys
+        mkParam i ty = TVar ty (Simple name)
+          where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
+        packParams = Let param (Tuple (map Var params))
+    in (params, ensureDon'tReuseParams params . packParams)
+  _             -> ([param], id)
+
 cgenDefE :: CST -> TDef -> CGenResult
 cgenDefE env (Def { def_fun = f, def_args = param
                   , def_rhs = UserRhs body }) =
   let cf                               = cgenUserFun f
-
       mkVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
-      (params, withPackedParams) = case typeof param of
-        -- See Note [Unpack tuple arguments]
-        TypeTuple tys ->
-          let params  = zipWith mkParam [1..] tys
-              mkParam i ty = TVar ty (Simple name)
-                where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
-              packParams = Let param (Tuple (map Var params))
-          in (params, ensureDon'tReuseParams params . packParams)
-        _             -> ([param], id)
+      (params, withPackedParams) = params_withPackedParams param
 
       CG cbodydecl cbodyexpr cbodytype =
         runM $ cgenExpr env (withPackedParams body)
