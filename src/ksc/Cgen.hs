@@ -208,7 +208,8 @@ cgenDefE env (Def { def_fun = f, def_args = param
           in (params, ensureDon'tReuseParams params . packParams)
         _             -> ([param], id)
 
-      CG cbodydecl cbodyexpr cbodytype = runM $ cgenExpr env (withPackedParams body)
+      CG cbodydecl cbodyexpr cbodytype =
+        runM $ cgenExpr env (withPackedParams body)
       cvars = map mkVar params
 
       cftypealias = "ty$" ++ cf
