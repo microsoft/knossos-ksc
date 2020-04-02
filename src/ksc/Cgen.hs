@@ -403,7 +403,7 @@ cgenExprR env = \case
       ++    "auto"
       `spc` lvar
       ++    " = [=]("
-      ++    cgenType vtype
+      ++    cgenType (mkCType tyv)
       `spc` cgenVar v
       ++    ") { "  -- TODO: capture only freeVars here
       ++    cdecl
