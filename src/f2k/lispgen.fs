@@ -108,7 +108,7 @@ let strVal (v:FSharpMemberOrFunctionOrValue) =
   | "op_LessThan"           -> "lt"
   // These monomorphised versions are not correct in general.
   // F2K needs to take into account that there may be Integers.
-  | "op_GreaterThan"        -> "gt@ff"
+  | "op_GreaterThan"        -> "gt"
   | "op_LessThanOrEqual"    -> "lt"
   | "op_GreaterThanOrEqual" -> "gt"
   | "op_Exponentiation"     -> "pow"
