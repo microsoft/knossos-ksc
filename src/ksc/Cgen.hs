@@ -399,13 +399,14 @@ cgenExprR env = \case
   Lam param@(TVar tyv _) body -> do
     lvar <- freshCVar
     let vtype = mkCType tyv
-    (CG cdecl cexpr ctype) <- cgenExprR env body
+        (params, withPackedParams) = params_withPackedParams param
+    (CG cdecl cexpr ctype) <- cgenExprR env (withPackedParams body)
     return $ CG
       (     "/**Lam**/"
       ++    "auto"
       `spc` lvar
       ++    " = [=]("
-      ++    mkCTypedVar param
+      ++    intercalate ", " (map mkCTypedVar params)
       ++    ") { "  -- TODO: capture only freeVars here
       ++    cdecl
       ++    "   return ("

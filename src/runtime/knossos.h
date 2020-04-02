@@ -575,7 +575,7 @@ namespace ks
           A acc = z;
 
           for (int i = 0; i < v.size(); i++) {
-            acc = f(tuple(acc, v[i]));
+            acc = f(acc, v[i]);
           }
 
           return acc;
@@ -587,14 +587,14 @@ namespace ks
 
 	  for (int i = 0; i < v.size(); i++) {
 	    forward_pass[i] = acc;
-	    acc = f(tuple(acc, v[i]));
+	    acc = f(acc, v[i]);
 	  }
 
 	  S dScope = s_zero;
 	  auto dv = vec<dT>(v.size());
 
 	  for (int i = v.size() - 1; i >= 0; i--) {
-            tuple<S, tuple<dA, dT>> f_call = f_(tuple(tuple(forward_pass[i], v[i]), dr));
+            tuple<S, tuple<dA, dT>> f_call = f_(tuple(forward_pass[i], v[i]), dr);
 
 	    S  f_call_dScope = std::get<0>(f_call);
 	    dA f_call_dacc   = std::get<0>(std::get<1>(f_call));
@@ -614,8 +614,8 @@ namespace ks
           if (i == v.size()) {
             return dacc;
           } else {
-            dA fwd_f = f_(tuple(tuple(acc, v[i]), tuple(dacc, dv[i])));
-            return FFold_recursive(i + 1, f, f(tuple(acc, v[i])), v, f_, fwd_f, dv);
+            dA fwd_f = f_(tuple(acc, v[i]), tuple(dacc, dv[i]));
+            return FFold_recursive(i + 1, f, f(acc, v[i]), v, f_, fwd_f, dv);
           }
         }
 
@@ -1634,7 +1634,7 @@ namespace ks
 
 #define $BENCH(FUN) ks::benchmark(ks::repeat([&]() { \
 																								$MRK(t); \
-																								FUN(tuple<>{}); \
+																								FUN(); \
 																								$REL(t); \
 																						}))
 
