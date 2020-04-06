@@ -57,14 +57,14 @@ def test_tuple_of_tensors():
 
 def test_if_then_else():
     ks_str = """
-(edef lt@ii Bool (Float Float))
+(edef lt Bool (Float Float))
 (def cost$lt@ii Float ((a : Float) (b : Float)) 1.0)
 (def shape$lt@ii Integer ((a : Float) (b : Float)) 0)
-(edef eq@ii Bool (Float Float))
+(edef eq Bool (Float Float))
 (def cost$eq@ii Float ((a : Float) (b : Float)) 1.0)
 (def shape$eq@ii Integer ((a : Float) (b : Float)) 0)
 (def sign Float ((x : Float))
-    (if (lt@ii x 0) -1.0 (if (eq@ii x 0) 0.0 1.0))
+    (if (lt x 0) -1.0 (if (eq x 0) 0.0 1.0))
 )
 """
     m = translate_and_import(ks_str, "abstract")

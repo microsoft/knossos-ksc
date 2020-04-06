@@ -102,7 +102,10 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
         os.unlink(fcpp.name)
     return module_name, module_path
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, pybind11_path="pybind11"):
+def arg_type_strings(types):
+    return "".join(t.shortstr() for t in types)
+
+def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, pybind11_path="pybind11"):
 
     cpp_str = """
 #include <pybind11/pybind11.h>
@@ -134,7 +137,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
 }}
 """.format(
         generated_cpp_source=generate_cpp_from_ks(ks_str),
-        name_to_call=name_to_call.replace("@", "$a")
+        name_to_call=(name_to_call + "@" + arg_type_strings(arg_types)).replace("@", "$a")
     )
     module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path)
     return import_module_from_path(module_name, module_path)

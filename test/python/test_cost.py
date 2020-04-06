@@ -173,28 +173,28 @@ def test_states():
 
 def test_if_then_else():
     ks_str = """
-(edef mul@ii Integer (Integer Integer))
+(edef mul Integer (Integer Integer))
 (def cost$mul@ii Float ((a : Integer) (b : Integer)) 2.0)
 (def shape$mul@ii Integer ((a : Integer) (b : Integer)) 0)
-(edef eq@ii Bool (Float Float))
+(edef eq Bool (Float Float))
 (def cost$eq@ii Float ((a : Float) (b : Float)) 1.0)
 (def shape$eq@ii Integer ((a : Float) (b : Float)) 0)
 
 (def select1 (Vec Integer) ((p : Bool) (x : (Vec Integer)))
   (if p
-      (build (size x) (lam (i : Integer) (mul@ii i 2)))  ; expensive branch cost 301
+      (build (size x) (lam (i : Integer) (mul i 2)))  ; expensive branch cost 301
       (build (size x) (lam (i : Integer) (index i x)))   ; cheap branch cost 201
   )
 )
 (def select2 (Vec Integer) ((p : Bool) (x : (Vec Integer)))
   (if p
       (build (size x) (lam (i : Integer) (index i x)))
-      (build (size x) (lam (i : Integer) (mul@ii i 2)))
+      (build (size x) (lam (i : Integer) (mul i 2)))
   )
 )
 (def select3 (Vec Integer) ((x : (Vec Integer)))
-  (if (eq@ii 0 0)
-      (build (size x) (lam (i : Integer) (mul@ii i 2)))
+  (if (eq 0 0)
+      (build (size x) (lam (i : Integer) (mul i 2)))
       (build (size x) (lam (i : Integer) (index i x)))
   )
 )

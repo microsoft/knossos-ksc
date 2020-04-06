@@ -456,5 +456,4 @@ def apply_name_mangling(name, arg_types, is_builtin=False):
     # div is an exception because we need to distinguish truediv from floordiv in python
     if (is_builtin or not _name_mangling_enabled) and not name == "div":
         return name
-    arg_type_strings = "".join([t.shortstr() for t in arg_types])
-    return f"{name}@{arg_type_strings}"
+    return f"{name}"
