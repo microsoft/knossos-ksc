@@ -1,0 +1,17 @@
+trigger: none
+
+jobs:
+
+- job: 'Ubuntu'
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-16.04'
+
+  steps:
+
+  - script: sh ./test/builds/build_and_test_mlir.sh
+    displayName: Building LLVM/MLIR
+
+  - script: sh ./test/builds/build_and_test_kscmlir.sh
+    displayName: Testing Ksc MLIR
