@@ -5,6 +5,7 @@
 module Prim where
 
 import Lang
+import LangUtils (isTrivial)
 import GHC.Stack
 import Data.Maybe
 
@@ -96,23 +97,40 @@ getZero tangent_type e
             TypeFloat    -> Konst (KFloat 0.0)
             TypeString   -> Konst (KString "")
             TypeBool     -> Konst (KBool False)
-            TypeVec _    -> Let t_evar e $
-                            pBuild (pSize (Var t_evar)) $
+            TypeVec _    -> mkAtomicNoFVs e $ \ e ->
+                            pBuild (pSize e) $
                             Lam indexTVar $
-                            go (pIndex (Var indexTVar) (Var t_evar))
+                            go (pIndex (Var indexTVar) e)
             TypeTuple ts
                | Tuple es <- e
                -> assert (text "splitTuple") (length ts == length es) $
                   Tuple (map go  es)
                | let n = length ts
-               -> Let t_evar e $
+               -> mkAtomicNoFVs e $ \e ->
                   Tuple $ map go $
-                  [ pSel i n (Var t_evar) | i <- [1..n] ]
+                  [ pSel i n e | i <- [1..n] ]
             _ -> pprPanic "mkZero" (ppr e_ty $$ ppr e)
-
          where
            e_ty = typeof e
-           t_evar = TVar e_ty argVar
+
+-- (mkAtomicNoFVs e body) returns the expression (let a = e in body a)
+-- where body :: TExpr -> TExpr is a function expecting an expression
+-- The idea is that body might use its argument many types, and we
+-- don't want to duplicate e, so we let-bind it instead
+--
+-- NB1: there's a short-cut when e is trivial (e.g. another variable)
+--
+-- NB2: we use the same variable name every time.  That's not safe in
+--      general, but the k's we use never mention any other variables,
+--      so it's fine c.f. the more general Opt.makeAtomic, which does
+--      not have this side condition but which requires an in-scope
+--      set
+mkAtomicNoFVs :: TExpr -> (TExpr -> TExpr) -> TExpr
+mkAtomicNoFVs e body
+  | isTrivial e = body e
+  | otherwise   = Let ev e (body (Var ev))
+  where
+    ev = TVar (typeof e) argVar
 
 --------------------------------------------
 --  Building simple calls
