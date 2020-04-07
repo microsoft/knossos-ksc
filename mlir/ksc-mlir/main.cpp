@@ -59,7 +59,6 @@ int main(int argc, char **argv) {
   // FIXME: registering dialects must happen before building the context
   // Create a more logical API that doesn't require it to be done by the caller
   mlir::registerAllDialects();
-
   mlir::registerDialect<mlir::knossos::KnossosDialect>();
 
   // Unit tests
