@@ -146,18 +146,34 @@ emit :: Monad m => LetBndrX p -> ExprX p -> AnfMT p m ()
 emit v r = AnfM (return ([FD v r], ()))
 
 ---------------------------------
+{-
+Note [Fresh names in ANF]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ANF pass invents fresh names via a monad and a unique supply,
+rather than by using OptLet.notInScope.  No particular reason for that
+choice, but it comes with a danger: that the ANF pass might invent a
+"fresh" name that is already in scope.
+
+To avoid this nasty possiblity, we make the ANF names have the form
+"t$23", "t$24" etc, and avoid using "t$" in any other names.  Simple,
+if not very beautiful.
+-}
+
 class GenBndr p where
   mkNewVar :: Uniq -> ExprX p -> (LetBndrX p, VarX p)
 
 instance GenBndr Parsed where
   mkNewVar u _ = (v,v)
      where
-        v = mkVar ("t" ++ show u)
+        -- See Note [Fresh names in ANF]
+        v = mkVar ("t$" ++ show u)
 
 instance GenBndr Typed where
   mkNewVar u e = (tv, tv)
     where
-       tv = mkTVar (typeof e) ("t" ++ show u)
+       -- See Note [Fresh names in ANF]
+       tv = mkTVar (typeof e) ("t$" ++ show u)
 
 newVar :: (Monad m, GenBndr p) => ExprX p -> AnfMT p m (LetBndrX p, VarX p)
 newVar e = AnfM $ do { u <- getUniq; return ([], mkNewVar u e) }
