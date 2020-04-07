@@ -5,7 +5,7 @@
 module Prim where
 
 import Lang
-import LangUtils (isTrivial)
+import LangUtils
 import GHC.Stack
 import Data.Maybe
 
@@ -92,7 +92,7 @@ getZero :: HasCallStack => (Type -> Type) -> TExpr -> TExpr
 getZero tangent_type e
   = go e
   where
-    go e = case tangent_type e_ty of
+    go e = case tangent_type (typeof e) of
             TypeInteger  -> Konst (KInteger 0)
             TypeFloat    -> Konst (KFloat 0.0)
             TypeString   -> Konst (KString "")
@@ -107,9 +107,7 @@ getZero tangent_type e
                -> mkAtomicNoFVs e $ \e ->
                   Tuple $ map go $
                   [ pSel i n e | i <- [1..n] ]
-            _ -> pprPanic "mkZero" (ppr e_ty $$ ppr e)
-         where
-           e_ty = typeof e
+            _ -> pprPanic "mkZero" (ppr (typeof e) $$ ppr e)
 
 -- (mkAtomicNoFVs e body) returns the expression (let a = e in body a)
 -- where body :: TExpr -> TExpr is a function expecting an expression
