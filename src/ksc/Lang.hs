@@ -267,7 +267,7 @@ data FunId = UserFun String   -- UserFuns have a Def
                 Int      -- Arity
            deriving( Eq, Ord, Show )
 
-data Fun = Fun      FunId         -- The function              f(x)
+data Fun = Fun      FunId         -- The function f(x)
          | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
