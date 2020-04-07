@@ -368,30 +368,30 @@ pMulff x1 x2 = userCall "mul@ff" TypeFloat (Tuple [x1, x2])
 
 primCallResultTy_maybe :: HasCallStack => Fun -> Type
                        -> Either SDoc Type
-primCallResultTy_maybe fun args
+primCallResultTy_maybe fun arg_ty
   = case fun of
       Fun (PrimFun f)
-         | Just ty <- primFunCallResultTy_maybe f args
+         | Just ty <- primFunCallResultTy_maybe f arg_ty
          -> Right ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
 
-      Fun (SelFun i n) -> selCallResultTy_maybe i n args
+      Fun (SelFun i n) -> selCallResultTy_maybe i n arg_ty
 
       GradFun f adp
-        -> case primCallResultTy_maybe (Fun f) args of
+        -> case primCallResultTy_maybe (Fun f) arg_ty of
             Left err -> Left err
-            Right res_ty -> Right (mkGradType adp args res_ty)
+            Right res_ty -> Right (mkGradType adp arg_ty res_ty)
 
       DrvFun f (AD _ Fwd)    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
-        | TypeTuple [x, _dx] <- args
+        | TypeTuple [x, _dx] <- arg_ty
         , Right t_ty <- primCallResultTy_maybe (Fun f) x
         -> Right (tangentType t_ty)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
       DrvFun _ (AD _ Rev)    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
-        | TypeTuple [s, _dt] <- args
+        | TypeTuple [s, _dt] <- arg_ty
         -> Right (tangentType s)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
