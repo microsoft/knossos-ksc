@@ -98,9 +98,7 @@ getZero tangent_type e
             TypeString   -> Konst (KString "")
             TypeBool     -> Konst (KBool False)
             TypeVec _    -> mkAtomicNoFVs e $ \ e ->
-                            pBuild (pSize e) $
-                            Lam indexTVar $
-                            go (pIndex (Var indexTVar) e)
+                            pConstVec (pSize e) (go (pIndex (kInt 1) e))
             TypeTuple ts
                | Tuple es <- e
                -> assert (text "splitTuple") (length ts == length es) $
