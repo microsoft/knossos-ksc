@@ -218,7 +218,7 @@ tcVar var mb_ty
 -- It has special cases for a bunch opuilt-in functions with polymorphic
 -- types; that is, where the result type is a function of the argument types
 -- Otherwise it just looks in the global symbol table.
-callResultTy_maybe :: SymTab -> Fun -> TypedExpr
+callResultTy_maybe :: SymTab -> Fun -> Type
                    -> Either SDoc Type
 callResultTy_maybe env fun args
   | is_user_fun fun
@@ -233,14 +233,14 @@ callResultTy_maybe env fun args
 -----------------------------------------------
 
 userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
-                       -> TypedExpr -> Either SDoc Type
+                       -> Type -> Either SDoc Type
 userCallResultTy_maybe fn env args
   = case lookupGblST fn env of
       Just def -> userCallResultTy_help def args
       Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
 
 userCallResultTy_help :: HasCallStack
-                      => TDef -> TypedExpr -> Either SDoc Type
+                      => TDef -> Type -> Either SDoc Type
 userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
                            , def_args = params })
@@ -410,7 +410,7 @@ lookupLclTc v
 lookupGblTc :: Fun -> TypedExpr -> TcM Type
 lookupGblTc fun args
   = do { st <- getSymTabTc
-       ; case callResultTy_maybe st fun args of
+       ; case callResultTy_maybe st fun (typeof args) of
            Left err -> do { addErr $ hang err 2 (mk_extra st)
                           ; return TypeUnknown }
            Right res_ty -> return res_ty }
