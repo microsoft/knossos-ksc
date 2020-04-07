@@ -1,0 +1,55 @@
+RUN: ksc-mlir TEST | FileCheck %s
+
+CHECK: test_lexer
+CHECK-NEXT: OK
+
+CHECK: test_parser_block
+CHECK-NEXT: OK
+
+CHECK: test_parser_let
+CHECK-NEXT: OK
+
+CHECK: test_parser_decl
+CHECK-NEXT: OK
+
+CHECK: test_parser_def
+CHECK-NEXT: OK
+
+CHECK: test_parser_decl_def_use
+CHECK-NEXT: OK
+
+CHECK: test_parser_cond
+CHECK-NEXT: OK
+
+CHECK: test_parser_rule
+CHECK-NEXT: OK
+
+CHECK: test_parser_vector_type
+CHECK-NEXT: OK
+
+CHECK: test_parser_build
+CHECK-NEXT: OK
+
+CHECK: test_parser_index
+CHECK-NEXT: OK
+
+CHECK: test_parser_size
+CHECK-NEXT: OK
+
+CHECK: test_parser_vector
+CHECK-NEXT: OK
+
+CHECK: test_parser_tuple_type
+CHECK-NEXT: OK
+
+CHECK: test_parser_tuple
+CHECK-NEXT: OK
+
+CHECK: test_parser_get
+CHECK-NEXT: OK
+
+CHECK: test_parser_fold
+CHECK-NEXT: OK
+
+CHECK: All tests OK
+
