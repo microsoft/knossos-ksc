@@ -195,6 +195,9 @@ data Subst
 substInScope :: Subst -> InScopeSet
 substInScope = s_in_scope
 
+mkInScopeSet :: [TVar] -> InScopeSet
+mkInScopeSet tvs = S.fromList (map tVarVar tvs)
+
 extendInScopeSet :: TVar -> InScopeSet -> InScopeSet
 extendInScopeSet tv in_scope
   = tVarVar tv `S.insert` in_scope
@@ -202,7 +205,7 @@ extendInScopeSet tv in_scope
 mkEmptySubst :: [TVar] -> Subst
 mkEmptySubst tvs
   = S { s_env = M.empty
-      , s_in_scope = S.fromList (map tVarVar tvs) }
+      , s_in_scope = mkInScopeSet tvs }
 
 lookupSubst :: Var -> Subst -> Maybe TExpr
 lookupSubst v (S { s_env = env }) = v `M.lookup` env
