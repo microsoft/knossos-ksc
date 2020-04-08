@@ -365,16 +365,16 @@ mkTVar :: TypeX -> String -> TVarX
 mkTVar ty = TVar ty . mkVar
 
 resVar :: Var
-resVar = Simple "r"
+resVar = Simple "ksc$resVar"
 
 argVar :: Var
-argVar = Simple "a"
+argVar = Simple "ksc$argVar"
 
 indexTVar :: TVar
-indexTVar = TVar TypeSize (Simple "i")
+indexTVar = TVar TypeSize (Simple "ksc$indexTVar")
 
 mkArgVar :: Int -> Var
-mkArgVar n = Simple ("a" ++ show n)
+mkArgVar n = Simple ("ksc$argVar" ++ show n)
 
 mkDummy :: Type -> TExpr
 mkDummy ty = Dummy ty
