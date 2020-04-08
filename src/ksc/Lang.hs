@@ -919,7 +919,7 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
                     2 (parens (pprPat False vs))
-               , nest 2 (text "=" <+> ppr rhs) ])
+               , nest 2 (text "=" <+> pprExpr precZero rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
 
