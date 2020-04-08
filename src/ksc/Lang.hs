@@ -331,6 +331,9 @@ nameOfVar = \case
   Delta s  -> s
   Grad s _ -> s
 
+tVarName :: TVarX -> String
+tVarName tv = nameOfVar (tVarVar tv)
+
 data Konst = KInteger Integer   -- :: TypeInteger
            | KFloat   Double    -- :: TypeFloat
            | KBool    Bool      -- :: TypeBool
