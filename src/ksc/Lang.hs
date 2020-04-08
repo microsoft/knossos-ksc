@@ -827,7 +827,7 @@ pprCall prec f e = mode
       -> parensIf prec prec' $
          sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
     _ -> parensIf prec precCall $
-         cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
+         cat [pprFunOcc @p f, nest 2 (case e of { Tuple {} -> ppr e; _ -> parens (ppr e) })]
   )
  where
   pp_args = ppr e
@@ -938,8 +938,8 @@ hspec = do
       e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
-    test e  "g( i )"
-    test e2 "f( (g( i ), _t1, 5) )"
+    test e  "g(i)"
+    test e2 "f(g(i), _t1, 5)"
 
   describe "eqType" $
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
