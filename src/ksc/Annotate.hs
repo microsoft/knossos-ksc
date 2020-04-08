@@ -219,11 +219,11 @@ tcVar var mb_ty
 -- Otherwise it just looks in the global symbol table.
 callResultTy_maybe :: GblSymTab -> Fun -> Type
                    -> Either SDoc Type
-callResultTy_maybe env fun args
+callResultTy_maybe env fun arg_ty
   | is_user_fun fun
-  = userCallResultTy_maybe fun env args
+  = userCallResultTy_maybe fun env arg_ty
   | otherwise
-  = primCallResultTy_maybe fun (typeof args)
+  = primCallResultTy_maybe fun arg_ty
   where
     is_user_fun = isUserFun . funIdOfFun
 
@@ -233,9 +233,9 @@ callResultTy_maybe env fun args
 
 userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
                        -> Type -> Either SDoc Type
-userCallResultTy_maybe fn env args
-  = case lookupGblST (fn, typeof args) env of
-      Just def -> userCallResultTy_help def args
+userCallResultTy_maybe fn env arg_ty
+  = case lookupGblST (fn, arg_ty) env of
+      Just def -> userCallResultTy_help def arg_ty
       Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
 
 userCallResultTy_help :: HasCallStack
@@ -243,13 +243,12 @@ userCallResultTy_help :: HasCallStack
 userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
                            , def_args = params })
-                      args
-  = case check_args bndr_tys arg_tys of
+                      arg_ty
+  = case check_args bndr_ty arg_ty of
       Just err -> Left err
       Nothing  -> Right ret_ty
   where
-    bndr_tys   = tVarType params
-    arg_tys    = typeof args
+    bndr_ty   = tVarType params
 
     check_args :: Type -> Type -> Maybe SDoc
     -- Return (Just err) if there's a wrong-ness
@@ -402,18 +401,18 @@ lookupLclTc v
            Just ty -> return ty }
 
 lookupGblTc :: Fun -> TypedExpr -> TcM Type
-lookupGblTc fun args
+lookupGblTc fun arg
   = do { st <- getSymTabTc
-       ; case callResultTy_maybe (gblST st) fun (typeof args) of
+       ; case callResultTy_maybe (gblST st) fun (typeof arg) of
            Left err -> do { addErr $ hang err 2 (mk_extra st)
                           ; return TypeUnknown }
            Right res_ty -> return res_ty }
   where
     mk_extra st
       = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
-             , text " Arg types:" <+> ppr (typeof args)
-             , text " Args:"      <+> ppr (exprOf args)
-             , text "ST lookup:"  <+> ppr (Map.lookup (fun, typeof args) (gblST st))
+             , text " Arg types:" <+> ppr (typeof arg)
+             , text " Args:"      <+> ppr (exprOf arg)
+             , text "ST lookup:"  <+> ppr (Map.lookup (fun, typeof arg) (gblST st))
              -- This is very verbose, and obscures error messages, but can be useful for typos.
              -- Perhaps think about printing it only for failed lookup of userfun
              -- , text "ST keys:" <+> gblDoc st
