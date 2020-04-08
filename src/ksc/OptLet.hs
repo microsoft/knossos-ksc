@@ -290,12 +290,9 @@ notInScope v in_scope
     -- E.g. parse_suffix "foo23"  = ("foo",    23)
     --      parse_suffix "wombat" = ("wombat", 0)
     parse_suffix ds (c:cs)
-      | isDigit c
-      = parse_suffix (c:ds) cs
-      | not (null ds)
-      = (reverse (c:cs), read ds)
-    parse_suffix ds cs
-      = (reverse cs ++ ds, 0)
+      | isDigit c      = parse_suffix (c:ds) cs
+      | not (null ds)  = (reverse (c:cs), read ds)
+    parse_suffix ds cs = (reverse cs ++ ds, 0)
 
 optLetsE :: Subst -> ExprX OccAnald -> TExpr
 -- This function inline let-bindings that are only used once
