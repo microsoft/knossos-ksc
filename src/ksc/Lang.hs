@@ -325,14 +325,14 @@ data Var
   | Grad   String ADPlan  -- Derivative of x
   deriving( Eq, Ord, Show )
 
-nameOfVar :: Var -> String
-nameOfVar = \case
+varName :: Var -> String
+varName = \case
   Simple s -> s
   Delta s  -> s
   Grad s _ -> s
 
 tVarName :: TVarX -> String
-tVarName tv = nameOfVar (tVarVar tv)
+tVarName tv = varName (tVarVar tv)
 
 data Konst = KInteger Integer   -- :: TypeInteger
            | KFloat   Double    -- :: TypeFloat
