@@ -825,7 +825,9 @@ pprCall prec f e = mode
   (case (e, isInfix @p f) of
     (Tuple [e1, e2], Just prec')
       -> parensIf prec prec' $
-         sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
+         sep [pprExpr prec' e1
+             , char '`'<> pprFunOcc @p f <> char '`'
+               <+> pprExpr prec' e2]
     _ -> parensIf prec precCall $
          cat [pprFunOcc @p f, nest 2 (case e of { Tuple {} -> ppr e; _ -> parens (ppr e) })]
   )
