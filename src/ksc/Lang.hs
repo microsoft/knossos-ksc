@@ -453,10 +453,6 @@ instance HasType Type where
 makeIfType :: HasCallStack => Type -> Type -> Type
 makeIfType ty1 ty2 = traceWhenUnequal "makeIfType" ty1 ty2 ty2
 
-getLM :: HasCallStack => Type -> Type
-getLM (TypeLM s t) = TypeLM s t
-getLM t            = error $ "Wanted TypeLM, got " ++ pps t
-
 unzipLMType :: Type -> Maybe (Type, Type)
 unzipLMType = \case
   TypeLM s t -> Just (s, t)
