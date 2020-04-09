@@ -643,7 +643,7 @@ instance InPhase Parsed where
 instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
-  pprFunOcc (TFun _ f) = ppr f
+  pprFunOcc  = ppr
 
   getMType ty              = Just ty
   getVar     (TVar ty var) = (var, Just ty)
@@ -653,7 +653,7 @@ instance InPhase Typed where
 instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
-  pprFunOcc (TFun _ f) = ppr f
+  pprFunOcc = ppr
 
   getMType   ty                 = Just ty
   getVar     (TVar ty var)      = (var, Just ty)
