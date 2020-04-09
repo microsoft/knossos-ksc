@@ -853,7 +853,7 @@ isInfix f = isInfixFun (fst (getFun @p f))
 -- TODO: this is rather out of date, and it's not clear we need to keep it...
 isInfixFun :: Fun -> Maybe Prec
 isInfixFun (Fun (PrimFun s))
-    | s == "eq"   = Just precOne
+    | s == "eq"     = Just precOne
     | s == "ts_add" = Just precTwo
 isInfixFun _ = Nothing
 
