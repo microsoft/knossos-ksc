@@ -438,8 +438,8 @@ instance HasType TExpr where
   typeof (Var b)       = typeof b
   typeof (Call f _)    = typeof f
   typeof (App f _)     = case typeof f of
-                            TypeLam _ res -> res
-                            _ -> pprPanic "typeof:app " (vcat [ppr f, ppr (typeof f)])
+    TypeLam _ res -> res
+    _ -> pprPanic "typeof:app " (vcat [ppr f, ppr (typeof f)])
   typeof (Tuple es)    = TypeTuple $ map typeof es
   typeof (Lam b e)     = TypeLam (typeof b) (typeof e)
   typeof (Let _ _ e2)  = typeof e2
