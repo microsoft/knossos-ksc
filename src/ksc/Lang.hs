@@ -742,19 +742,19 @@ instance Pretty Konst where
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
 instance Pretty TypeX where
-  pprPrec p (TypeVec ty)         = parensIf p precTyApp $
-                                   text "Vec" <+> pprParendType ty
-  pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
-                                        (parens (pprList pprParendType tys))
-  pprPrec p (TypeLam from to)    = parensIf p precZero $
-                                   text "Lam" <+> ppr from <+> ppr to
-  pprPrec p (TypeLM s t)         = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
-  pprPrec _ TypeFloat            = text "Float"
-  pprPrec _ TypeInteger          = text "Integer"
-  pprPrec _ TypeSize             = text "Size"
-  pprPrec _ TypeString           = text "String"
-  pprPrec _ TypeBool             = text "Bool"
-  pprPrec _ TypeUnknown          = text "UNKNOWN"
+  pprPrec p (TypeVec ty)      = parensIf p precTyApp $
+                                text "Vec" <+> pprParendType ty
+  pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
+                                     (parens (pprList pprParendType tys))
+  pprPrec p (TypeLam from to) = parensIf p precZero $
+                                text "Lam" <+> ppr from <+> ppr to
+  pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
+  pprPrec _ TypeFloat         = text "Float"
+  pprPrec _ TypeInteger       = text "Integer"
+  pprPrec _ TypeSize          = text "Size"
+  pprPrec _ TypeString        = text "String"
+  pprPrec _ TypeBool          = text "Bool"
+  pprPrec _ TypeUnknown       = text "UNKNOWN"
 
 pprParendType :: TypeX -> SDoc
 pprParendType = pprPrec precTop
