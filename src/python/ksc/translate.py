@@ -39,6 +39,17 @@ def _convert_to_type(se, allow_implicit_tuple=False):
 def _parse_to_s_exp(string_or_stream):
     return sexpdata.Parser(string_or_stream, nil=None, true="True", false="False").parse()
 
+# return input, wrapped in a singleton list if its first element is not a list
+def ensure_list_of_lists(l):
+    if not isinstance(l, list):
+        raise ValueError("Expect a list")
+    if len(l) < 1:  # Empty list is empty list
+        return l
+    if not isinstance(l[0], list):
+        return [l]
+    else:
+        return l
+
 def get_var_name(s_exp):
     if isinstance(s_exp, sexpdata.Symbol):
         return s_exp.value()
@@ -122,7 +133,6 @@ def _value_to_str(name):
 
 Def = namedtuple("Def", ["name", "str", "sample_args"])
 EDef = namedtuple("EDef", ["name", "py_name", "return_type"])
-
 
 class Translator:
     def __init__(self, backend):
@@ -213,6 +223,7 @@ class Translator:
     def handle_def(self, s_exp):
         name, _, args, body = s_exp[1:]
         name = _value_to_str(name)
+        args = ensure_list_of_lists(args)
         arg_names = [se[0].value() for se in args]
         return Def(name,
                    """def {name}({args}):
