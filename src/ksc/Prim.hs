@@ -352,12 +352,18 @@ pSize :: TExpr -> TExpr
 pSize e = mkPrimCall1 "size" e
 
 pSel :: Int -> Int -> TExpr -> TExpr
-pSel i n e = Call (TFun el_ty
-                        (Fun (SelFun i n))) e
-           where
-             el_ty = case typeof e of
-                        TypeTuple ts -> ts !! (i-1)
-                        _ -> TypeUnknown  -- Better error from Lint
+pSel i n e
+  | Tuple es <- e  -- Reduce clutter by optimising right here
+                   --    sel_1_2 (e1,e2) --> e1
+  = assert (text "pSel" <+> int i <+> int n <+> int (length es) $$ ppr es) (n == length es)
+    es !! (i-1)
+
+  | otherwise
+  = Call (TFun el_ty (Fun (SelFun i n))) e
+  where
+    el_ty = case typeof e of
+               TypeTuple ts -> ts !! (i-1)
+               _ -> TypeUnknown  -- Better error from Lint
 
 pFst,pSnd :: TExpr -> TExpr
 pFst   = pSel 1 2
