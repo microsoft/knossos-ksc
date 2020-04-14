@@ -254,6 +254,8 @@ class Translator:
                     defs_to_process.append(s_exp)
                 else:
                     self._defs.append(self.handle_def(s_exp))
+            else:
+                print("translate: ignoring unrecognized definition type ", s_exp[0], file=sys.stderr)
         for s_exp in defs_to_process:
             self._defs.append(self.handle_def(s_exp))
 
