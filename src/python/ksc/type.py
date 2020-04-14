@@ -7,7 +7,8 @@ class Type:
         "Integer": 0,
         "Float": 0,
         "Bool": 0,
-        "Lam": 2
+        "Lam": 2, # TODO: Lambda args are in reverse order, prefer src -> dst
+        "LM": 2 # Linear map, used in AD
     }
 
     @staticmethod
@@ -23,6 +24,10 @@ class Type:
         return Type("Lam", [return_type, arg_type])
 
     @staticmethod
+    def LM(return_type, arg_type):
+        return Type("LM", [return_type, arg_type]) 
+
+    @staticmethod
     def Index(vec):
         if vec is None:
             return None
@@ -30,20 +35,21 @@ class Type:
         return vec.children[0]
 
     def __init__(self, kind, children=[]):
-        assert kind in Type.node_kinds
-        assert kind == "Tuple" or (Type.node_kinds[kind] == len(children)) # dont' check for 1-tuple
+        if kind not in Type.node_kinds:
+            raise ValueError("bad kind:", kind)
+        assert kind == "Tuple" or (Type.node_kinds[kind] == len(children)), (kind, len(children)) # dont' check for 1-tuple
         assert all((ch is None or isinstance(ch, Type)) for ch in children)
         self.kind = kind
         self.children = children
 
     @property
     def return_type(self):
-        assert self.kind == "Lam"
+        assert self.kind == "Lam" or self.kind == "LM"
         return self.children[0]
 
     @property
     def arg_type(self):
-        assert self.kind == "Lam"
+        assert self.kind == "Lam" or self.kind == "LM"
         return self.children[1]
 
     def accept_value_of_type(self, other):
@@ -62,7 +68,7 @@ class Type:
             return sum([c.num_elements(assumed_vector_size) for c in self.children])
         elif self.kind == "Vec":
             return assumed_vector_size * self.children[0].num_elements(assumed_vector_size)
-        elif self.kind in ["Integer", "Float", "Bool", "Lam"]:
+        elif self.kind in ["Integer", "Float", "Bool", "Lam", "LM"]:
             return 1
 
     def all_element_types(self):
@@ -91,7 +97,7 @@ class Type:
         return (c for c in self.children)
 
     def shortstr(self, tb="<", te=">"):
-        el_types = {"Integer": "i", "Bool": "b", "Float": "f", "Lam": "l"}
+        el_types = {"Integer": "i", "Bool": "b", "Float": "f", "Lam": "l", "LM": "l"}
         if self.kind in el_types:
             return el_types[self.kind]
         if self.kind == "Tuple":
@@ -108,7 +114,7 @@ class Type:
         if len(self.children) == 0 and (self.kind != "Tuple"):
             return self.kind
         elems = [str(c) for c in self.children]
-        if self.kind == "Lam":
+        if self.kind == "Lam" or self.kind == "LM":
             elems = ["{}({})".format(*elems)]
         return "({})".format(" ".join([self.kind] + elems))
 
