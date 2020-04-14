@@ -31,6 +31,10 @@ def _convert_to_type(se, allow_implicit_tuple=False):
                 return Type.Vec(*children)
             if sym == "Tuple":
                 return Type.Tuple(*children)
+            if sym == "Lam":
+                return Type.Lam(*children)
+            if sym == "LM":
+                return Type.LM(*children)
             # Fall through in case it's a list of types with allow_implicit_tuple.
         if allow_implicit_tuple:
             return Type.Tuple(*[_convert_to_type(s) for s in se])
