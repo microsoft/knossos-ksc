@@ -148,6 +148,10 @@
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
+ fwdt$div (Tuple Integer (Tuple))
+ ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
+ (tuple (div xt) (tuple)))
+(def
  rev$div (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
@@ -220,6 +224,10 @@
  fwd$mul (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
+(def
+ fwdt$mul (Tuple Integer (Tuple))
+ ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
+ (tuple (mul xt) (tuple)))
 (def
  rev$mul (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
@@ -408,6 +416,8 @@
 (edef to_float Float (Integer))
 (edef D$to_float (LM Integer Float) (Integer))
 (def fwd$to_float Float ((x : Integer) (dx : (Tuple))) 0.0)
+(def fwdt$to_float (Tuple Float Float) ((x : Integer) (dx : (Tuple)))
+     (tuple (to_float x) 0.0))
 (def rev$to_float (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
 (edef Dt$to_float (Tuple Float (LM Integer Float)) (Integer))
 
