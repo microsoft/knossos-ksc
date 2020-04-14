@@ -145,6 +145,12 @@ class Translator:
     def backend(self):
         return self._backend
 
+    # Reserved word constants
+    sym_if = sexpdata.Symbol("if")
+    sym_let = sexpdata.Symbol("let")
+    sym_lam = sexpdata.Symbol("lam")
+    sym_tuple = sexpdata.Symbol("tuple")
+
     def normalize_def_name(self, name):
         specialized = specs.specialized_functions()
         if name in specialized:
@@ -156,23 +162,40 @@ class Translator:
            return name + "_"
         return name.replace("$", "_")
 
+    # Convert s-exp for a KS expression to python code string
     def handle_body(self, s_exp, indent=2):
+        
+        # symbols e.g. sin -> sin
         if isinstance(s_exp, sexpdata.Symbol):
             return s_exp.value()
+        
+        # numeric literal e.g. 5.4 -> 5.4
         if isinstance(s_exp, (int, float)):
             return str(s_exp)
-        assert isinstance(s_exp, list)
+        
+        # remaining forms are lists
+        assert isinstance(s_exp, list) 
+        assert len(s_exp) > 0    # One might imagine allowing empty tuples, but not allowed in ksc
+        head = s_exp[0]
+
+        # Nested exp e.g. ((sin 5)) -> (sin 5)
         if len(s_exp) == 1:
-            return self.handle_body(s_exp[0])
-        if isinstance(s_exp[0], (int, float)):
-            assert all(isinstance(se, type(s_exp[0])) for se in s_exp)
+            return self.handle_body(head)
+
+        # List-of-const literals (1 2 3 4)
+        # TODO: ksc does not allow this, so either add in ksc, or rm here
+        #  Ideally it is best not to add such sugar unless it significantly 
+        #  improves efficiency/readability. This feels the wrong side, as it 
+        #  just replaces (tuple 1 2 3) with (1 2 3)  
+        if isinstance(head, (int, float)):
+            assert all(isinstance(se, type(head)) for se in s_exp)
             return [v for v in s_exp]
+
         joiner = ("\n" + (" " * indent))
-        func_name = self.normalize_def_name(_value_to_str(s_exp[0]))
-        if func_name == "let":
-            let_list = s_exp[1]
-            if isinstance(let_list[0], sexpdata.Symbol):
-                let_list = [let_list]
+        
+        # (let ((var expr) ...) body)
+        if head == Translator.sym_let:
+            let_list = ensure_list_of_lists(s_exp[1])
             let_var_names = [se[0].value() for se in let_list]
             let_exprs = [se[1] for se in let_list]
             return handle_let(
@@ -181,24 +204,29 @@ class Translator:
                 self.handle_body(s_exp[2], indent + 2 * len(let_var_names)),
                 indent=indent + 2 * len(let_var_names) # inner most indent
             )
-        elif func_name == "tuple":
+
+        # (tuple e1 .. eN)
+        elif head == Translator.sym_tuple:
             tuple_args = [self.handle_body(se, indent+2) for se in s_exp[1:]]
             return "make_tuple({tuple_args})".format(tuple_args=", ".join(tuple_args))
-        elif func_name.startswith("get$"):
-            index = int(func_name.split("$")[1]) - 1
-            if isinstance(s_exp[1], sexpdata.Symbol):
-                tuple_name = s_exp[1].value()
-            else:
-                tuple_name = self.handle_body(s_exp[1], indent+2)
+
+        # (get$m$n t)
+        elif head.value().startswith("get$"):
+            index = int(head.value().split("$")[1]) - 1
+            tuple_name = self.handle_body(s_exp[1], indent+2)
             return "get_tuple_element({index}, {tuple_name})".format(tuple_name=tuple_name, index=index)
-        elif func_name == "lam":
+        
+        # Lambda e.g. (lam (var : type) body)
+        elif head == Translator.sym_lam:
             var_name = get_var_name(s_exp[1])
             body = self.handle_body(s_exp[2], indent+2)
             return joiner.join([
                 f"(lambda {var_name}:",
                 f"  {body}",
                 ")"])
-        elif func_name == "if":
+
+        # If-then-else e.g. (if c e1 e2)
+        elif head == Translator.sym_if:
             # need to special case if because "if" is a python keyword
             cond, then_branch, else_branch = [self.handle_body(se, indent+2) for se in s_exp[1:]]
             return joiner.join([
@@ -207,6 +235,8 @@ class Translator:
                 f"             lambda: {else_branch})"
             ])
 
+        # All others are function call e.g. (f e1 .. eN)
+        func_name = self.normalize_def_name(_value_to_str(head))
         args = s_exp[1:]
         args_handled = []
         for i, se in enumerate(args):
@@ -221,12 +251,12 @@ class Translator:
                                             args=", ".join([arg for arg in args_handled]))
 
     def handle_def(self, s_exp):
-        name, _, args, body = s_exp[1:]
+        name, _return_type, args, body = s_exp[1:]
         name = _value_to_str(name)
         args = ensure_list_of_lists(args)
         arg_names = [se[0].value() for se in args]
-        return Def(name,
-                   """def {name}({args}):
+        return Def(name, """
+def {name}({args}):
   return {body}
 """.format(name=self.normalize_def_name(name),
            args=", ".join(arg_names),
