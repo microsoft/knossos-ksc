@@ -39,8 +39,16 @@ def _convert_to_type(se, allow_implicit_tuple=False):
 def _parse_to_s_exp(string_or_stream):
     return sexpdata.Parser(string_or_stream, nil=None, true="True", false="False").parse()
 
-# return input, wrapped in a singleton list if its first element is not a list
 def ensure_list_of_lists(l):
+    """return input, wrapped in a singleton list if its first element is not a list
+
+       ensure_list_of_lists([])    = []
+       ensure_list_of_lists([1])   = [[1]]
+       ensure_list_of_lists([[1]]) = [[1]]
+       ensure_list_of_lists([[1,2]])        = [[1, 2]]
+       ensure_list_of_lists([[1,2], [3,4]]) = [[1, 2], [3, 4]]
+    """
+
     if not isinstance(l, list):
         raise ValueError("Expect a list")
     if len(l) < 1:  # Empty list is empty list
