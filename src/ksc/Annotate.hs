@@ -214,7 +214,7 @@ tcVar var mb_ty
 -- callResultTy_maybe is given a (global) function and the type of its
 -- argument, and returns the type of its result.
 --
--- It has special cases for a bunch opuilt-in functions with polymorphic
+-- It has special cases for a bunch built-in functions with polymorphic
 -- types; that is, where the result type is a function of the argument types
 -- Otherwise it just looks in the global symbol table.
 callResultTy_maybe :: GblSymTab -> Fun -> Type
