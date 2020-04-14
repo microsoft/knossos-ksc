@@ -87,5 +87,7 @@ users/simonpj/AD.pdf
 *.synctex.gz
 *.xcp
 
+# Misc
 etc/ks-vscode/node_modules/
 etc/ks-vscode/out/
+__pycache__/
