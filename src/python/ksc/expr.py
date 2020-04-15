@@ -1,7 +1,7 @@
 """
 Expr: lightweight classes implementing the Knossos IR
 """
-from collections import namedtuple
+
 from typing import NamedTuple, Union, List
 
 from ksc.type import Type
@@ -13,43 +13,43 @@ class Expr:
     type: Type
 
 class Def(NamedTuple):
-    name : str
-    return_type : Type
-    args : list
-    body : Expr
+    name: str
+    return_type: Type
+    args: list
+    body: Expr
 
 class EDef(NamedTuple):
-    name : str
-    return_type : Type
-    args : list
+    name: str
+    return_type: Type
+    args: list
 
 class Rule(NamedTuple):
-    name : str
-    args : list
-    e1 : Expr
-    e2 : Expr
+    name: str
+    args: list
+    e1: Expr
+    e2: Expr
 
 class Const(NamedTuple, Expr):
-    value : Union[int, str, float, bool]
+    value: Union[int, str, float, bool]
 
 class Var(NamedTuple, Expr):
-    name : str
-    type : Type
-    decl : bool
+    name: str
+    type: Type
+    decl: bool
 
 class Call(NamedTuple, Expr):
-    f : str
-    args : list
+    f: str
+    args: list
 
 class Lam(NamedTuple, Expr):
-    arg : Var
-    body : Expr
+    arg: Var
+    body: Expr
 
 class Let(NamedTuple, Expr):
-    var : Var
-    rhs : Expr
-    body : Expr
-    
+    var: Var
+    rhs: Expr
+    body: Expr
+
 class If(NamedTuple, Expr):
     cond: Expr    # Condition
     t_body: Expr  # Value if true
@@ -66,7 +66,7 @@ def nl(indent):
 
 def pystr_intercomma(indent, exprs):
     return ", ".join([pystr(ex, indent) for ex in exprs])
- 
+
 @singledispatch
 def pystr(expr, indent=0):
     """
@@ -93,7 +93,7 @@ def _(ex, indent):
 @pystr.register(Rule)
 def _(ex, indent):
     indent += 1
-    return "@rule\ndef " + ex.name + " " + "(" + pystr(ex.args,indent) + ")" + ":" + nl(indent) \
+    return "@rule\ndef " + ex.name + " " + "(" + pystr(ex.args, indent) + ")" + ":" + nl(indent) \
            + pystr(ex.e1, indent+1) + nl(indent) \
            + "<===> " + nl(indent) \
            + pystr(ex.e2, indent+1)
@@ -105,7 +105,7 @@ def _(ex, indent):
 @pystr.register(Var)
 def _(ex, indent):
     if ex.decl:
-        return ex.name + " : " + str(ex.type)
+        return ex.name + ": " + str(ex.type)
     else:
         return ex.name
 
@@ -125,7 +125,8 @@ def _(ex, indent):
 @pystr.register(Lam)
 def _(ex, indent):
     indent += 1
-    return "{lambda (" + pystr(ex.arg, indent) + ") : " + nl(indent+1) + pystr(ex.body, indent+1) + "}"
+    return "{lambda (" + pystr(ex.arg, indent) + "): " + nl(indent+1)\
+            + pystr(ex.body, indent+1) + "}"
 
 @pystr.register(Let)
 def _(ex, indent):
@@ -147,13 +148,13 @@ from translate import _convert_to_type, ensure_list_of_lists
 ## S-expression Utils
 
 # Parse a fixed-length s-exp into a list given a set of parsers, e.g.
-# parse_seq(se, parse_name, parse_int, parse_int) 
+# parse_seq(se, parse_name, parse_int, parse_int)
 # would accept (fred 3 4)
 def parse_seq(se, *parsers):
     if len(se) != len(parsers):
         raise ParseError("Cannot parse ", se, " with ", parsers)
 
-    return [parser(term) for parser,term in zip(parsers, se)]
+    return [parser(term) for (parser, term) in zip(parsers, se)]
 
 #####################################################################
 # parse_{expr,tld}: Convert s-expressions to Exprs
@@ -175,6 +176,9 @@ _colon = sexpdata.Symbol(":")
 def parse_type(se):
     return _convert_to_type(se)
 
+def parse_types(ses):
+    return map(parse_type, ses)
+
 # "x" -> string
 def parse_name(se):
     if isinstance(se, sexpdata.Symbol):
@@ -191,8 +195,8 @@ def parse_arg(arg):
     if len(arg) < 3:
         raise ParseError("expect (arg : type), not: ", arg)
     if arg[1] != _colon:
-        raise ParseError("no colon: ", arg) 
-        
+        raise ParseError("no colon: ", arg)
+
     return Var(parse_name(arg[0]), parse_type(arg[2:]), True)
 
 # "((x : Float) (y : Integer))" -> [Var("x", Type.Float), Var("y", Type.Integer)]
@@ -208,8 +212,8 @@ def parse_expr(se):
     if not isinstance(se, list):
         return Const(se)
 
-    # Lists of length one should not occur.  
-    # TODO: It is tempting to always strip ((redundant)) parens, but in general a 
+    # Lists of length one should not occur.
+    # TODO: It is tempting to always strip ((redundant)) parens, but in general a
     # profusion of such defenses can hide carbuncles elsewhere
     if len(se) < 2 and se[0] != _tuple:
         raise ParseError("Cannot parse ", se, " in TODO context")
@@ -248,8 +252,7 @@ def parse_tld(se):
             return Def(*parse_seq(se[1:], parse_name, parse_type, parse_args, parse_expr))
 
         if head == _edef:
-            return EDef(*parse_seq(se[1:], parse_name, parse_type, 
-                        lambda ts : map(parse_type, ts)))
+            return EDef(*parse_seq(se[1:], parse_name, parse_type, parse_types))
 
         if head == _rule:
             return Rule(*parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr))
