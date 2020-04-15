@@ -41,6 +41,8 @@ def elementwise_or_scalar(*args):
         '''Gets type if scalar, and element type if vector.'''
         if x.kind == 'Vec':
             return _get_type(x.children[0])
+        elif x.kind in ['Tuple', 'Bool', 'Lam']:
+            raise ValueError(f'Argument has unsupported type {x.kind}')
         return x
     assert len(args) > 0
     # All types must be equal:
