@@ -2,22 +2,58 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 from collections import namedtuple
+from typing import NamedTuple, Union, List
 
 from ksc.type import Type
 
 #####################################################################
 ## Expr classes
 
-Def = namedtuple("Def", ["name", "return_type", "args", "body"])
-EDef = namedtuple("EDef", ["name", "return_type", "args"])
-Rule = namedtuple("Rule", ["name", "args", "e1", "e2"])
-Const = namedtuple("Const", ["value"])
-Var = namedtuple("Var", ["name", "type", "decl"])
-Call = namedtuple("Call", ["f", "args"])
-Lam = namedtuple("Lam", ["arg", "body"])
-Let = namedtuple("Let", ["var", "rhs", "body"])
-If = namedtuple("If", ["cond", "t_body", "f_body"])
+class Expr:
+    type: Type
 
+class Def(NamedTuple):
+    name : str
+    return_type : Type
+    args : list
+    body : Expr
+
+class EDef(NamedTuple):
+    name : str
+    return_type : Type
+    args : list
+
+class Rule(NamedTuple):
+    name : str
+    args : list
+    e1 : Expr
+    e2 : Expr
+
+class Const(NamedTuple, Expr):
+    value : Union[int, str, float, bool]
+
+class Var(NamedTuple, Expr):
+    name : str
+    type : Type
+    decl : bool
+
+class Call(NamedTuple, Expr):
+    f : str
+    args : list
+
+class Lam(NamedTuple, Expr):
+    arg : Var
+    body : Expr
+
+class Let(NamedTuple, Expr):
+    var : Var
+    rhs : Expr
+    body : Expr
+    
+class If(NamedTuple, Expr):
+    cond: Expr    # Condition
+    t_body: Expr  # Value if true
+    f_body: Expr  # Value if false
 
 #####################################################################
 # pystr:
