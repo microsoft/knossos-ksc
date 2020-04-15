@@ -20,11 +20,27 @@ def test_add(backend):
     out = F.add(1, 2)
     assert out.get_data_with_backend(backend) == 3
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         out = F.add(1.0, 2)
 
-    out = F.add(np.array([1.0, 0.0]), np.array([2.0, 3.0]))
-    assert np.allclose(out.data, [3.0, 3.0])
+    a = np.ones((2, 3))
+    b = np.ones((3, 2))
+
+    out = F.add(a, a)
+    assert np.allclose(out.get_data_with_backend(backend), np.tile(2.0, (2, 3)))
+
+    # We're allowed to add scalars to vectors:
+    out = F.add(2.0, a)
+    assert np.allclose(out.get_data_with_backend(backend), np.tile(3.0, (2, 3)))
+    out = F.add(b, 1.0)
+    assert np.allclose(out.get_data_with_backend(backend), np.tile(2.0, (3, 2)))
+    # But not if the types don't match:
+    with pytest.raises(ValueError):
+        out = F.add(2, a)
+
+    # But if we add vectors, their shapes must match:
+    with pytest.raises(ValueError):
+        out = F.add(b, a)
 
 def test_my_add(backend):
     out = my_add(1.0, 2.0)
@@ -50,8 +66,8 @@ def test_user_function(backend):
     assert out.get_data_with_backend(backend) == 4.0
 
 def test_wrong_type():
-    with pytest.raises(AssertionError):
-        out = add3(1.0, 3.0, 4)
+    with pytest.raises(ValueError):
+        _ = add3(1.0, 3.0, 4)
 
 def test_jit_wrong_type():
     out = add3(1.0, 3.0, 4.0)

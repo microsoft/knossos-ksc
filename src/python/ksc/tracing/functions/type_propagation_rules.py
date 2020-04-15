@@ -21,19 +21,40 @@ def elementwise(*args):
 
 def elementwise_or_scalar(*args):
     '''Type propagation rule for operations like elementwise add/multiply,
-        that allows arguments to be scalar.'''
-    scalar_typ = unique_element(args[0]._type.all_element_types())
-    exp_shape_type = None
-    for arg in args:
-        typ = arg.shape_type
-        if not (typ.shape == () and typ.type == scalar_typ):
-            if exp_shape_type is None:
-                exp_shape_type = typ
-            elif typ != exp_shape_type:
-                raise ValueError(f'Expected {exp_shape_type} but got {typ}')
-    if exp_shape_type is None:
-        return ShapeType((), scalar_typ)
-    return exp_shape_type
+    that allows arguments to be scalar. Rules:
+    - All vectors in `args` must have the same shape and element type.
+    - Any scalars in `args` must have the same type, and this type must
+        match the element type of the vectors, if any.
+    Example ShapeTypes and return ShapeType:
+        ((), Float) ((2, 3), Vec(Vec(Float))) ((), Float)
+            -> ((2, 3), Vec(Vec(Float)))
+        ((2, 3), Vec(Vec(Float))) ((), Float) ((2, 3), Vec(Vec(Float)))
+            -> ((2, 3), Vec(Vec(Float)))
+        ((), Float) ((2, 3), Vec(Vec(Float))) ((), Int)
+            -> ValueError
+        ((2, 3), Vec(Vec(Float))) ((), Float) ((2, 3), Vec(Vec(Int)))
+            -> ValueError
+        ((3, 2), Vec(Vec(Float))) ((), Float) ((2, 3), Vec(Vec(Float)))
+            -> ValueError
+    '''
+    def _get_type(x):
+        '''Gets type if scalar, and element type if vector.'''
+        if x.kind == 'Vec':
+            return _get_type(x.children[0])
+        return x
+    assert len(args) > 0
+    # All types must be equal:
+    types = set(_get_type(a.shape_type.type) for a in args)
+    if len(types) > 1:
+        raise ValueError(f'Arguments have unsupported types: {types}')
+    # If there are any non-scalars, then their shapes must be equal:
+    shapes = set(a.shape_type.shape for a in args if a.shape_type.shape != ())
+    if len(shapes) > 1:
+        raise ValueError(f'Arguments have incompatible shapes: {shapes}')
+    # Return shape is the shape of the vector, if there is one:
+    if len(shapes) > 0:
+        return ShapeType(shapes.pop(), types.pop())
+    return ShapeType((), types.pop())
 
 def first_arg(*args):
     return args[0].shape_type
