@@ -13,10 +13,29 @@ from ksc.tracing.functions.type_propagation_rules import (
 from ksc.tracing.node import Node
 from ksc.utils import ShapeType
 
-relu = make_edef("relu", ["x"], elementwise)
+relu = make_edef(
+    "relu", ["x"], elementwise,
+    lambda x: x.shape,
+    lambda x: x.size
+)
 
-normalize_2d = make_edef("normalize_2d", ["x", "weights"], first_arg)
-batch_norm_2d = make_edef("batch_norm_2d", ["x", "weights"], first_arg)
+sigmoid = make_edef(
+    "sigmoid", ["x"], elementwise,
+    lambda x: x.shape,
+    lambda x: x.size
+)
+
+normalize_2d = make_edef(
+    "normalize_2d", ["x", "weights"], first_arg,
+    lambda x, w: x.shape,
+    lambda x, w: x.size * 3
+)
+
+batch_norm_2d = make_edef(
+    "batch_norm_2d", ["x", "weights"], first_arg,
+    lambda x, w: x.shape,
+    lambda x, w: x.size * 10
+)
 
 def _get_paddings(shape_in, shape_out, window_sizes, strides):
     def get_padding_1d(size_in, size_out, window_size, stride):
@@ -136,4 +155,8 @@ def avg_pool(x, pool_size, strides, padding="VALID"):
     )
     return pool(x, pool_size, strides)
 
-log_softmax = make_edef("log_softmax", ["x"], first_arg)
+log_softmax = make_edef(
+    "log_softmax", ["x"], first_arg,
+    lambda x: x.shape,
+    lambda x: x.size * 10
+)

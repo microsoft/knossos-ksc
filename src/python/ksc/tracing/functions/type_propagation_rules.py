@@ -19,6 +19,22 @@ def elementwise(*args):
         assert a.shape_type == arg.shape_type, f"Expected {a.shape_type}, but got {arg.shape_type}"
     return args[0].shape_type
 
+def elementwise_or_scalar(*args):
+    '''Type propagation rule for operations like elementwise add/multiply,
+        that allows arguments to be scalar.'''
+    scalar_typ = unique_element(args[0]._type.all_element_types())
+    exp_shape_type = None
+    for arg in args:
+        typ = arg.shape_type
+        if not (typ.shape == () and typ.type == scalar_typ):
+            if exp_shape_type is None:
+                exp_shape_type = typ
+            elif typ != exp_shape_type:
+                raise ValueError(f'Expected {exp_shape_type} but got {typ}')
+    if exp_shape_type is None:
+        return ShapeType((), scalar_typ)
+    return exp_shape_type
+
 def first_arg(*args):
     return args[0].shape_type
 
