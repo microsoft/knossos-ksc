@@ -90,4 +90,12 @@ users/simonpj/AD.pdf
 # Misc
 etc/ks-vscode/node_modules/
 etc/ks-vscode/out/
+
+# Python byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Ionide F# VS Code extension
+.fake
+.ionide
