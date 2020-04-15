@@ -51,10 +51,11 @@ def elementwise_or_scalar(*args):
     shapes = set(a.shape_type.shape for a in args if a.shape_type.shape != ())
     if len(shapes) > 1:
         raise ValueError(f'Arguments have incompatible shapes: {shapes}')
-    # Return shape is the shape of the vector, if there is one:
-    if len(shapes) > 0:
-        return ShapeType(shapes.pop(), types.pop())
-    return ShapeType((), types.pop())
+    # Return ShapeType is that of the vector, if there is one:
+    try:
+        return next(a.shape_type for a in args if a.shape_type.shape != ())
+    except StopIteration:
+        return args[0].shape_type
 
 def first_arg(*args):
     return args[0].shape_type

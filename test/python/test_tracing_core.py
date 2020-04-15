@@ -216,3 +216,22 @@ def test_floor_div(backend):
     x = Node.from_data(10)
     o = x // 3
     assert o.get_data_with_backend(backend) == 3
+
+def test_elementwise_or_scalar():
+    from ksc.tracing.functions.type_propagation_rules import elementwise_or_scalar
+    from ksc.utils import ShapeType
+
+    f = Node.from_data(1.0)
+    i = Node.from_data(1)
+    a = Node.from_data(np.ones((2, 3)))
+    b = Node.from_data(np.ones((3, 2)))
+    c = Node.from_data(np.ones((2, 3), dtype=np.int32))
+
+    assert elementwise_or_scalar(f, a, f) == a.shape_type
+    assert elementwise_or_scalar(a, f, a) == a.shape_type
+    with pytest.raises(ValueError):
+        _ = elementwise_or_scalar(f, a, i)
+    with pytest.raises(ValueError):
+        _ = elementwise_or_scalar(a, f, c)
+    with pytest.raises(ValueError):
+        _ = elementwise_or_scalar(b, f, a)
