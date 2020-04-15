@@ -76,6 +76,14 @@ def _(ex, indent):
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
+
+    # Some calls deserve fancy treatment or printing; but should not be AST nodes.
+    # Assert is very much on the borderline
+    if ex.f == "assert":
+        assert len(ex.args) == 2
+        return "assert(" + pystr(ex.args[0], indent) + ")" + nl(indent) \
+               + pystr(ex.args[1], indent)
+
     return pystr(ex.f, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
