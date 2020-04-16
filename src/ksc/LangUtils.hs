@@ -34,7 +34,6 @@ import Lang
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Test.Hspec
-import Debug.Trace( trace )
 
 -----------------------------------------------
 --     Functions over expressions
@@ -116,8 +115,7 @@ newVarNotIn ty e = go ty e 1 -- FIXME start with hash of e to reduce retries
   where
     go ty e n
       | v `notFreeIn` e = v
-      | otherwise       = trace ("newVarNotIn: Var " ++ pps v ++ " was bound in E, retry")
-                          (go ty e (n + 1))
+      | otherwise       = go ty e (n + 1)
       where
          v = mkTVar ty ("_t" ++ show n)
 
