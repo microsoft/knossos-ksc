@@ -12,44 +12,83 @@ from ksc.type import Type
 class Expr:
     type: Type
 
+## Def
+# (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
+#      ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+#      name  return_type  args                            body
 class Def(NamedTuple):
     name: str
     return_type: Type
     args: list
     body: Expr
 
+## Edef
+# (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
+#       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#       name  return_type  args
 class EDef(NamedTuple):
     name: str
     return_type: Type
     args: list
 
+## Rule
+# (rule "add0"  (a : Float) (add a 0) a)
+#       ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
+#       name    args        e1        e2
 class Rule(NamedTuple):
     name: str
     args: list
     e1: Expr
     e2: Expr
 
+## Const
+# (combine 1.234      "a string")
+#          ^^^^^      ^^^^^^^^^^
+#          value      value'
 class Const(NamedTuple, Expr):
     value: Union[int, str, float, bool]
 
+## Var
+# (add x 1.234)  ; use of var, decl=false, type is None or propagated
+#      ^
+#      name
+# (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+#       ^      ^^^^^
+#       name   type
 class Var(NamedTuple, Expr):
     name: str
     type: Type
     decl: bool
 
+## Call
+# (add   1.234 4.56)
+#  ^     ^^^^^^^^^^
+#  name  args
 class Call(NamedTuple, Expr):
-    f: str
+    name: str
     args: list
 
+## Lam
+# (lam (i : Integer)  (add i 4))
+#      ^^^^^^^^^^^^^  ^^^^^^^^^
+#      arg            body
 class Lam(NamedTuple, Expr):
     arg: Var
     body: Expr
 
+## Let
+# (let (a    1)   (add a a))
+#       ^    ^    ^^^^^^^^^
+#       var  rhs  body
 class Let(NamedTuple, Expr):
     var: Var
     rhs: Expr
     body: Expr
 
+## If
+# (if (eq a a) "good"  "bad")
+#     ^^^^^^^^ ^^^^^^  ^^^^^
+#     cond     t_body  f_body
 class If(NamedTuple, Expr):
     cond: Expr    # Condition
     t_body: Expr  # Value if true
@@ -120,12 +159,12 @@ def _(ex, indent):
 
     # Some calls deserve fancy treatment or printing; but should not be AST nodes.
     # Assert is very much on the borderline
-    if ex.f == "assert":
+    if ex.name == "assert":
         assert len(ex.args) == 2
         return "assert(" + pystr(ex.args[0], indent) + ")" + nl(indent) \
                + pystr(ex.args[1], indent)
 
-    return pystr(ex.f, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
+    return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
 def _(ex, indent):
