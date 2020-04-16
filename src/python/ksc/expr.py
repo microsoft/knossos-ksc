@@ -60,6 +60,11 @@ class If(NamedTuple, Expr):
 #  Expression to string, formatted in a loose python-like syntax
 #  This isn't a backend, just a way to view the expr structure in a format
 #  slightly more palatable than s-expressions
+#
+# This also serves as an example of a user-defined AST visitor.
+# Defining functions on each node type using singledispatch is a clean
+# way to write recursive tree transformations.
+
 from functools import singledispatch
 def nl(indent):
     return "\n" + "  " * indent
