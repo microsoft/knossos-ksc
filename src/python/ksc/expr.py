@@ -231,7 +231,7 @@ def parse_name(se):
 
 # "\"x\"" -> string
 def parse_string(se):
-    assert isinstance(se, str)
+    assert isinstance(se, str), se
     return se
 
 # "x : Float" -> Var(x, Type.Float)
@@ -289,7 +289,7 @@ def parse_expr(se):
 # Parse a top-level definition (def, edef, rule)
 def parse_tld(se):
     try:
-        assert isinstance(se, list)
+        assert isinstance(se, list), se
         assert len(se) > 0
         head = se[0]
         if head == _def:
@@ -313,7 +313,7 @@ import argparse
 import sys
 
 def parse_ks_file(string_or_stream):
-    s_exps = sexpdata.Parser(string_or_stream, nil=None, true="True", false="False").parse()
+    s_exps = sexpdata.Parser(string_or_stream, nil=None, true="true", false="false", line_comment=";").parse()
     return [parse_tld(s_exp) for s_exp in s_exps]
 
 def main():
@@ -325,7 +325,7 @@ def main():
         ks_str = f.read()
         print(ks_str)
         print("--------------->")
-        [print(pystr(x, 0)) for x in parse_ks_file(ks_str)]
+        [print(pystr(x, 0), "\n") for x in parse_ks_file(ks_str)]
 
 if __name__ == "__main__":
     sys.exit(main())
