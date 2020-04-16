@@ -8,8 +8,26 @@ from tempfile import NamedTemporaryFile
 
 from ksc.type import Type
 
-ShapeType = namedtuple("ShapeType", ["shape", "type"])
+def ensure_list_of_lists(l):
+    """return input, wrapped in a singleton list if its first element is not a list
 
+       ensure_list_of_lists([])    = []
+       ensure_list_of_lists([1])   = [[1]]
+       ensure_list_of_lists([[1]]) = [[1]]
+       ensure_list_of_lists([[1,2]])        = [[1, 2]]
+       ensure_list_of_lists([[1,2], [3,4]]) = [[1, 2], [3, 4]]
+    """
+
+    if not isinstance(l, list):
+        raise ValueError("Expect a list")
+    if len(l) < 1:  # Empty list is empty list
+        return l
+    if not isinstance(l[0], list):
+        return [l]
+    else:
+        return l
+
+ShapeType = namedtuple("ShapeType", ["shape", "type"])
 
 PYTHON_MODULE_NAME = "ks_mod"
 
