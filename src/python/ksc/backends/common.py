@@ -85,6 +85,10 @@ def let(var, body):
 def if_then_else(cond, then_branch, else_branch):
     return then_branch() if cond else else_branch()
 
+def assert_(cond, body):
+    assert cond
+    return body
+
 _built_ins = [
     "build",
     "sumbuild",
@@ -94,5 +98,24 @@ _built_ins = [
     "make_tuple",
     "get_tuple_element",
     "let",
-    "if_then_else"
+    "if_then_else",
+    "assert_",
+
+    "add",
+    "sub",
+    "mul",
+    "div_ii",
+    "div_ff",
+    "div",
+    "eq",
+    "lt",
+    "gt",
+    "lte",
+    "gte",
+    "or_",
+    "and_",
+    "abs_",
+    "max_",
+    "neg",
+    "pow",
 ]

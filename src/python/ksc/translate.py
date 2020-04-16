@@ -112,7 +112,7 @@ class Translator:
             return specialized[name]
         if name in self._built_ins or name.startswith("get$"):
             return name
-        if name in ["or", "and", "max", "abs"]:
+        if name in ["or", "and", "max", "abs", "assert"]:
             # need to special case them because they conflict with python functions
            return name + "_"
         return name.replace("$", "_")
@@ -126,7 +126,7 @@ class Translator:
         
         # numeric literal e.g. 5.4 -> 5.4
         if isinstance(ex, Const):
-            return str(ex)
+            return repr(ex.value)
         
         joiner = ("\n" + (" " * indent))
         
@@ -211,6 +211,7 @@ def {name}({args}):
                 py_name = self.normalize_def_name(name)
                 if py_name in self._built_ins:
                     # if it is built-in no need to edef
+                    print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)                    
                     continue
                 edef = myEDef(name, py_name, tld.return_type)
                 self._edefs[name] = edef
