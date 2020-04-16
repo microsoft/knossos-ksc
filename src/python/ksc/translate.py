@@ -13,10 +13,8 @@ from ksc.type import Type
 from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If
 from ksc.parse_ks import parse_ks_file
 
-def handle_let(var, ex, body, indent=4):
+def handle_let(let_var, let_expr, body, indent=4):
     joiner = ("\n" + (" " * indent))
-    let_var = var
-    let_expr = ex
     lambda_expr = joiner.join([
         f"let(var={let_expr},",
         f"    body=lambda {let_var}:",
@@ -86,8 +84,8 @@ def args_to_sample_values(args):
 def _value_to_str(name):
     return name if isinstance(name, str) else name.value()
 
-myDef = namedtuple("myDef", ["name", "str", "sample_args"])
-myEDef = namedtuple("myEDef", ["name", "py_name", "return_type"])
+_Def = namedtuple("_Def", ["name", "str", "sample_args"])
+_EDef = namedtuple("_EDef", ["name", "py_name", "return_type"])
 
 class Translator:
     def __init__(self, backend):
@@ -135,8 +133,8 @@ class Translator:
             return handle_let(
                 ex.var,
                 self.handle_body(ex.rhs, indent+2),
-                self.handle_body(ex.body, indent + 2),
-                indent=indent + 2 # inner most indent
+                self.handle_body(ex.body, indent+2),
+                indent=indent+2 # inner most indent
             )
 
         # Lambda e.g. (lam (var : type) body)
@@ -191,11 +189,10 @@ class Translator:
 
 
     def handle_def(self, ex):
-        #name, _return_type, args, body = s_exp[1:]
         name = ex.name
         args = ex.args
         arg_names = [arg.name for arg in args]
-        return myDef(name, """
+        return _Def(name, """
 def {name}({args}):
   return {body}
 """.format(name=self.normalize_def_name(name),
@@ -213,7 +210,7 @@ def {name}({args}):
                     # if it is built-in no need to edef
                     print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)                    
                     continue
-                edef = myEDef(name, py_name, tld.return_type)
+                edef = _EDef(name, py_name, tld.return_type)
                 self._edefs[name] = edef
             elif isinstance(tld, Def):
                 name = tld.name
