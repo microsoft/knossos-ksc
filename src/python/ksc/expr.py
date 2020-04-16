@@ -3,11 +3,69 @@ Expr: lightweight classes implementing the Knossos IR
 """
 
 from typing import NamedTuple, Union, List
-
 from ksc.type import Type
 
 #####################################################################
-## Expr classes
+# 
+# The Knossos IR is a lightweight, clean, functional IR with strong
+# similarities to Lisp.  The AST has just a few basic concepts, 
+# each with a backing class defined below.  The concepts are, in
+# lisp-like (KS) syntax, with the NamedTuple fields below:
+#
+### Top-level definitions (TLDs):
+#
+# Def: Function definition
+# (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
+#      ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+#      name  return_type  args                            body
+#
+# Edef: Declaration for externally-supplied function
+# (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
+#       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#       name  return_type  args
+#
+# Rule: Rewrite rule for the Knossos optimizer 
+# (rule "add0"  (a : Float) (add a 0) a)
+#       ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
+#       name    args        e1        e2
+#
+### AST nodes (Expr):
+# 
+# Const: Constant float, int, string, bool
+# (combine 1.234      "a string")
+#          ^^^^^      ^^^^^^^^^^
+#          value      value'
+#
+# Var: Variable use or declaration (with type)
+# (add x 1.234)  ; use of var, decl=false, type is None or propagated
+#      ^
+#      name
+# (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+#       ^      ^^^^^
+#       name   type
+#
+# Call: Function call, including assert, tuple, and other "builtins" 
+# (add   1.234 4.56)
+#  ^     ^^^^^^^^^^
+#  name  args
+#
+# Lam: Anonymous function/lambda, single argument -- use tuples to pass more 
+# (lam (i : Integer)  (add i 4))
+#      ^^^^^^^^^^^^^  ^^^^^^^^^
+#      arg            body
+#
+# Let: Variable binding with scope limited to "body".
+# (let (a    1)   (add a a))
+#       ^    ^    ^^^^^^^^^
+#       var  rhs  body
+#
+# If: We could just consider "if" to be another function call, as the IR makes
+#     no statement about lazy vs eager evaluation, but on balance it felt better
+#     to special-case it.
+# (if (eq a a) "good"  "bad")
+#     ^^^^^^^^ ^^^^^^  ^^^^^
+#     cond     t_body  f_body
+
 
 class Expr:
     type: Type
