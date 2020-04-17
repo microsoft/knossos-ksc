@@ -514,17 +514,8 @@ cgenFunId = \case
   (UserFun fun, TypeTuple [])  -> mangleFun fun
   (UserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
   (UserFun fun, ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
-  (PrimFun fun, _ty) -> translateFun fun
+  (PrimFun fun, _ty) -> fun
   (SelFun i _, _ty)  -> "ks::get<" ++ show (i - 1) ++ ">"
- where
-  translateFun :: String -> String
-  translateFun = \case
-    -- Translating "ts_scale" to "mul" is a shortcut that allows us to
-    -- avoid updating the runtime to remove polymorphic "mul" and
-    -- replace it with "ts_scale".  At some point we should actually fix
-    -- that properly.
-    "ts_scale" -> "mul"
-    s    -> s
 
 cgenUserFun :: HasCallStack => (Fun, Type) -> String
 cgenUserFun (f, ty) = case f of
