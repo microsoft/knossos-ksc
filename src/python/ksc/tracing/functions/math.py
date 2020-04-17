@@ -1,5 +1,6 @@
 import ksc
 from ksc.type import Type
+from ksc.tracing.node import Node
 from ksc.tracing.functions import core
 from ksc.tracing.functions.type_propagation_rules import unique_element_type
 from ksc.utils import ShapeType
