@@ -9,6 +9,7 @@ from .common import (
     add,
     sub,
     mul,
+    div,
     div_ii,
     div_ff,
     eq,
@@ -25,7 +26,7 @@ from .common import (
     to_float_i
 )
 
-_built_ins = common._built_ins
+_built_ins = common._core_built_ins
 
 def check_args_and_get_context(name, args, concrete="concrete"):
     context = None
@@ -183,3 +184,7 @@ def if_then_else(cond, then_branch, else_branch):
         return then_branch()
     else:
         return else_branch()
+
+def assert_(cond, body):
+    assert cond
+    return body

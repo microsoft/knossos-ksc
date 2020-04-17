@@ -89,7 +89,7 @@ def assert_(cond, body):
     assert cond
     return body
 
-_built_ins = [
+_core_built_ins = [
     "build",
     "sumbuild",
     "size",
@@ -100,7 +100,9 @@ _built_ins = [
     "let",
     "if_then_else",
     "assert_",
+]
 
+_built_ins = _core_built_ins + [
     "add",
     "sub",
     "mul",
