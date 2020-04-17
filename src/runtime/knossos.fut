@@ -33,8 +33,8 @@ let mul__a__dii__b (x: i32, y: i32) = x * y
 let mul__a__dff__b (x: f64, y: f64) = x * y
 let neg__ai (x: i32) = -x
 let neg__af (x: f64) = -x
-let ks_or__a__dbb__b (x, y)  = x || y
-let ks_and__a__dbb__b (x, y) = x && y
+let or__a__dbb__b (x, y)  = x || y
+let and__a__dbb__b (x, y) = x && y
 
 
 let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =
