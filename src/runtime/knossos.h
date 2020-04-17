@@ -807,11 +807,11 @@ namespace ks
 	}
 
 	template <class T>
-	T mul(double s, T const& t);
+	T ts_scale(double s, T const& t);
 
 	// Scale a vec
 	template <class T>
-	vec<T> mul(double val, vec<T> const& v)
+	vec<T> ts_scale(double val, vec<T> const& v)
 	{
 		if (v.is_zero())
 			return v;
@@ -820,7 +820,7 @@ namespace ks
 		int size = v.size();
 		vec<T> ret = vec<T>::create(size);
 		for (int i = 0; i < size; ++i)
-			ret[i] = mul(val, v[i]);
+			ret[i] = ts_scale(val, v[i]);
 		return ret;
 	}
 
@@ -828,14 +828,14 @@ namespace ks
 	template <class T>
 	vec<T> operator*(double val, vec<T> const& v)
 	{
-		return mul(val, v);
+		return ts_scale(val, v);
 	}
 
 	// Scale a vec
 	template <class T>
 	vec<T> operator*(vec<T> const& v, double val)
 	{
-		return mul(val, v);
+		return ts_scale(val, v);
 	}
 
 	// sum of elements
@@ -1399,32 +1399,32 @@ namespace ks
 	// ===============================  Primitives  ==================================
 
 	template <class T>
-	T mul(double s, T const& t)
+	T ts_scale(double s, T const& t)
 	{
 		return s * t;
 	}
 
 	template <>
-	inline tuple<> mul(double s, tuple<> const& t)
+	inline tuple<> ts_scale(double s, tuple<> const& t)
 	{
 		return t;
 	}
 
 	template <class U0, class... Us>
-	auto mul(double s, tuple<U0, Us...> const& t)
+	auto ts_scale(double s, tuple<U0, Us...> const& t)
 	{
-		return prepend(mul(s, head(t)),
-			mul(s, tail(t)));
+		return prepend(ts_scale(s, head(t)),
+			ts_scale(s, tail(t)));
 	}
 
 	inline
-		int mul(int const& t1, int const& t2)
+		int ts_scale(int const& t1, int const& t2)
 	{
 		return t1 * t2;
 	}
 
 	template <class T1, class T2>
-	auto D$mul(T1 t1, T2 t2)
+	auto D$ts_scale(T1 t1, T2 t2)
 	{
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(t2), LM::Scale::mk(t1));
 	}
