@@ -173,8 +173,6 @@ def pystr_intercomma(indent, exprs):
 def pystr(expr, indent=0):
     """
     Expression to string, formatted in a loose python-like syntax
-    This isn't a backend, just a way to view the expr structure in a format
-    slightly more palatable than s-expressions
     """
     # Default implementation, for types not specialized below
     return str(expr)
