@@ -64,7 +64,7 @@
      (sumbuild l  (lam (li  : Integer)
        (let ((knc (div kn 2))
              (noi (sub (add ni knc) kni))
-             (outside_image (or (lt noi 0) (gte noi n)))
+             (outside_image (ks_or (lt noi 0) (gte noi n)))
              (image_noi
               (if outside_image 0.0 (index noi (index li image)))))
          (mul image_noi (index kni (index li (index ki kernels))))
