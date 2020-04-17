@@ -26,15 +26,15 @@ def elementwise_or_scalar(*args):
     - Any scalars in `args` must have the same type, and this type must
         match the element type of the vectors, if any.
     Example ShapeTypes and return ShapeType:
-        ((), Float) ((2, 3), Vec(Vec(Float))) ((), Float)
+        ((), Float), ((2, 3), Vec(Vec(Float)))
             -> ((2, 3), Vec(Vec(Float)))
-        ((2, 3), Vec(Vec(Float))) ((), Float) ((2, 3), Vec(Vec(Float)))
+        ((2, 3), Vec(Vec(Float))), ((2, 3), Vec(Vec(Float)))
             -> ((2, 3), Vec(Vec(Float)))
-        ((), Float) ((2, 3), Vec(Vec(Float))) ((), Int)
+        ((2, 3), Vec(Vec(Float))), ((), Int)
             -> ValueError
-        ((2, 3), Vec(Vec(Float))) ((), Float) ((2, 3), Vec(Vec(Int)))
+        ((2, 3), Vec(Vec(Float))), ((2, 3), Vec(Vec(Int)))
             -> ValueError
-        ((3, 2), Vec(Vec(Float))) ((), Float) ((2, 3), Vec(Vec(Float)))
+        ((3, 2), Vec(Vec(Float))), ((2, 3), Vec(Vec(Float)))
             -> ValueError
     '''
     def _get_type(x):
