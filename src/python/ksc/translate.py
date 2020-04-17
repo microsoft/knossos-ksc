@@ -158,23 +158,13 @@ class Translator:
                 f"             lambda: {else_branch})"
             ])
 
+        # All others are function call e.g. (f e1 .. eN)
         assert isinstance(ex, Call), ex
 
         name = ex.name
         args = ex.args
-        # (tuple e1 .. eN)
-        if name == "tuple":
-            tuple_args = [self.handle_body(arg, indent+2) for arg in args]
-            return "make_tuple({tuple_args})".format(tuple_args=", ".join(tuple_args))
 
-        # (get$m$n t)
-        if name.startswith("get$"):
-            index = int(name.split("$")[1]) - 1
-            tuple_name = self.handle_body(args[0], indent+2)
-            return "get_tuple_element({index}, {tuple_name})".format(tuple_name=tuple_name, index=index)
-        
-        # All others are function call e.g. (f e1 .. eN)
-        func_name = self.normalize_def_name(name)
+        # Recursively handle args
         args_handled = []
         for i, arg in enumerate(args):
             try:
@@ -184,6 +174,18 @@ class Translator:
                                 " argument #{}, {}".format(func_name,
                                                             i + 1,
                                                             arg))
+        
+        # (get$m$n t)
+        if name.startswith("get$"):
+            index = int(name.split("$")[1]) - 1
+            return "get_tuple_element({index}, {tuple_name})".format(tuple_name=args_handled[0], index=index)
+
+        # (tuple e1 .. eN)
+        if name == "tuple":
+            return "make_tuple({tuple_args})".format(tuple_args=", ".join(args_handled))
+
+        # other function calls     
+        func_name = self.normalize_def_name(name)
         return "{func_name}({args})".format(func_name=func_name,
                                             args=", ".join(args_handled))
 
