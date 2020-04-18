@@ -68,86 +68,114 @@ from ksc.type import Type
 
 
 class Expr:
+    '''Base class for AST nodes.'''
     type: Type
 
-## Def
-# (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
-#      ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
-#      name  return_type  args                            body
 class Def(NamedTuple):
+    '''Def(name, return_type, args, body). Example:
+    ```
+    (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
+         ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+         name  return_type  args                            body
+    ```
+    '''
     name: str
     return_type: Type
     args: list
     body: Expr
 
-## Edef
-# (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
-#       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#       name  return_type  args
 class EDef(NamedTuple):
+    '''Edef(name, return_type, args). Example:
+    ```
+    (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
+          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          name  return_type  args
+    ```
+    '''
     name: str
     return_type: Type
     args: list
 
-## Rule
-# (rule "add0"  (a : Float) (add a 0) a)
-#       ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
-#       name    args        e1        e2
 class Rule(NamedTuple):
+    '''Rule(name, args, e1, e2). Example:
+    ```
+    (rule "add0"  (a : Float) (add a 0) a)
+          ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
+          name    args        e1        e2
+    ```
+    '''
     name: str
     args: list
     e1: Expr
     e2: Expr
 
-## Const
-# (combine 1.234      "a string")
-#          ^^^^^      ^^^^^^^^^^
-#          value      value'
 class Const(NamedTuple, Expr):
+    '''Const(value). Example:
+    ```
+    (combine 1.234      "a string")
+             ^^^^^      ^^^^^^^^^^
+             value      value'
+    ```
+    '''
     value: Union[int, str, float, bool]
 
-## Var
-# (add x 1.234)  ; use of var, decl=false, type is None or propagated
-#      ^
-#      name
-# (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
-#       ^      ^^^^^
-#       name   type
 class Var(NamedTuple, Expr):
+    '''Var(name, type, decl). Examples:
+    ```
+    (add x 1.234)  ; use of var, decl=false, type is None or propagated
+         ^
+         name
+    (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+          ^      ^^^^^
+          name   type
+    ```
+    '''
     name: str
     type: Type
     decl: bool
 
-## Call
-# (add   1.234 4.56)
-#  ^     ^^^^^^^^^^
-#  name  args
 class Call(NamedTuple, Expr):
+    '''Call(name, args). Example:
+    ```
+    (add   1.234 4.56)
+     ^^^   ^^^^^^^^^^
+     name  args
+    ```
+    '''
     name: str
     args: list
 
-## Lam
-# (lam (i : Integer)  (add i 4))
-#      ^^^^^^^^^^^^^  ^^^^^^^^^
-#      arg            body
 class Lam(NamedTuple, Expr):
+    '''Lam(arg, body). Example:
+    ```
+    (lam (i : Integer)  (add i 4))
+         ^^^^^^^^^^^^^  ^^^^^^^^^
+         arg            body
+    ```
+    '''
     arg: Var
     body: Expr
 
-## Let
-# (let (a    1)   (add a a))
-#       ^    ^    ^^^^^^^^^
-#       var  rhs  body
 class Let(NamedTuple, Expr):
+    '''Let(var, rhs, body). Example:
+    ```
+    (let (a    1)   (add a a))
+          ^    ^    ^^^^^^^^^
+          var  rhs  body
+    ```
+    '''
     var: Var
     rhs: Expr
     body: Expr
 
-## If
-# (if (eq a a) "good"  "bad")
-#     ^^^^^^^^ ^^^^^^  ^^^^^
-#     cond     t_body  f_body
 class If(NamedTuple, Expr):
+    '''If(cond, t_body, f_body). Example:
+    ```
+    (if (eq a a) "good"  "bad")
+        ^^^^^^^^ ^^^^^^  ^^^^^
+        cond     t_body  f_body
+    ```
+    '''
     cond: Expr    # Condition
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
