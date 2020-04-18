@@ -59,13 +59,15 @@ from ksc.type import Type
 #       ^    ^    ^^^^^^^^^
 #       var  rhs  body
 #
-# If: We could just consider "if" to be another function call, as the IR makes
-#     no statement about lazy vs eager evaluation, but on balance it felt better
-#     to special-case it.
+# If: We could just consider "if" to be another function call, but it defines sequencing.
 # (if (eq a a) "good"  "bad")
 #     ^^^^^^^^ ^^^^^^  ^^^^^
 #     cond     t_body  f_body
-
+#
+# Assert: As with If, it defines a sequence, so is included.
+# (assert (gt i 0) (do_stuff))
+#         ^^^^^^^^ ^^^^^^^^^^
+#         cond     body
 
 class Expr:
     '''Base class for AST nodes.'''
@@ -189,6 +191,19 @@ class If(NamedTuple, Expr):
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
 
+class Assert(NamedTuple, Expr):
+    '''Assert(cond, body).
+    Example:
+    ```
+    (assert (gt i 0) (do_stuff))
+            ^^^^^^^^ ^^^^^^^^^^
+            cond     body
+    ```
+    '''
+    cond: Expr    # Condition
+    body: Expr    # Value if true
+
+
 #####################################################################
 # pystr:
 #  Expression to string, formatted in a loose python-like syntax
@@ -249,14 +264,6 @@ def _(ex, indent):
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
-
-    # Some calls deserve fancy treatment or printing; but should not be AST nodes.
-    # "If" is on the borderline, so assert is definitely fine.
-    if ex.name == "assert":
-        assert len(ex.args) == 2
-        return "assert(" + pystr(ex.args[0], indent) + ")" + nl(indent) \
-               + pystr(ex.args[1], indent)
-
     return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
@@ -274,3 +281,9 @@ def _(ex, indent):
 def _(ex, indent):
     return "(" + pystr(ex.t_body, indent+2) + " if " +  pystr(ex.cond, indent+1) + nl(indent+1) \
                + " else " + pystr(ex.f_body, indent+1) + ")\n"
+
+@pystr.register(Assert)
+def _(ex, indent):
+    indent += 1
+    return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) \
+            + pystr(ex.body, indent)

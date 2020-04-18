@@ -4,7 +4,7 @@ import sexpdata
 
 from ksc.type import Type
 from ksc.utils import ensure_list_of_lists
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If
+from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 
 #####################################################################
 ## S-expression Utils
@@ -23,13 +23,14 @@ class ParseError(Exception):
     pass
 
 # Raise ParseError if cond not true
-def _assert(cond, *message):
+def check(cond, *message):
     if not cond:
         raise ParseError(*message)
 
 # Reserved word constants
 _def = sexpdata.Symbol("def")
 _edef = sexpdata.Symbol("edef")
+_assert = sexpdata.Symbol("assert")
 _if = sexpdata.Symbol("if")
 _let = sexpdata.Symbol("let")
 _lam = sexpdata.Symbol("lam")
@@ -67,22 +68,22 @@ def parse_type(se, allow_implicit_tuple=False):
     raise ValueError("Did not know how to parse type {}".format(se))
 
 def parse_types(ses):
-    return map(parse_type, ses)
+    return list(map(parse_type, ses))
 
 # "x" -> string
 def parse_name(se):
-    _assert(isinstance(se, sexpdata.Symbol), "Wanted identifier, got: ", se)
+    check(isinstance(se, sexpdata.Symbol), "Wanted identifier, got: ", se)
     return se.value()
 
 # "\"x\"" -> string
 def parse_string(se):
-    _assert(isinstance(se, str), "Expected string, got: ", se) 
+    check(isinstance(se, str), "Expected string, got: ", se) 
     return se
 
 # "x : Float" -> Var(x, Type.Float)
 def parse_arg(arg):
-    _assert(len(arg) >= 3, "Expect (arg : type), not: ", arg)
-    _assert(arg[1] == _colon, "No colon: ", arg)
+    check(len(arg) >= 3, "Expect (arg : type), not: ", arg)
+    check(arg[1] == _colon, "No colon: ", arg)
 
     return Var(parse_name(arg[0]), parse_type(arg[2:]), True)
 
@@ -102,8 +103,8 @@ def parse_expr(se):
     # Remaining forms are lists
 
     # Empty lists one should not occur.
-    _assert(len(se) > 0, "Empty list")
-    _assert(len(se) > 1 or se[0] == _tuple, "Singleton list other than (tuple): ", se)
+    check(len(se) > 0, "Empty list")
+    check(len(se) > 1 or se[0] == _tuple, "Singleton list other than (tuple): ", se)
 
     head = se[0]
 
@@ -120,19 +121,23 @@ def parse_expr(se):
     #  just replaces (tuple 1 2 3) with (1 2 3)  
     if True:
         if isinstance(head, (int, float)):
-            _assert(all(isinstance(se, type(head)) for se in se), "Constant tuple should be all the same type: ", se)
+            check(all(isinstance(se, type(head)) for se in se), "Constant tuple should be all the same type: ", se)
             return [v for v in se]
 
     # If(cond, t, f)
     if head == _if:
         return If(*parse_seq(se[1:], parse_expr, parse_expr, parse_expr))
 
+    # Assert(cond, body)
+    if head == _assert:
+        return Assert(*parse_seq(se[1:], parse_expr, parse_expr))
+
     # Let(var, rhs, body)
     if head == _let:
         bindings = ensure_list_of_lists(se[1])
         ans = parse_expr(se[2])
         for b in bindings[::-1]:
-            _assert(len(b) == 2, "Let bindings should be pairs", b, "in", se)
+            check(len(b) == 2, "Let bindings should be pairs", b, "in", se)
             var = parse_name(b[0])
             rhs = parse_expr(b[1])
             ans = Let(var, rhs, ans)
@@ -149,8 +154,8 @@ def parse_expr(se):
 
 # Parse a top-level definition (def, edef, rule)
 def parse_tld(se):
-    _assert(isinstance(se, list), "Non-list at top level", se)
-    _assert(len(se) > 0, "Empty list at top level")
+    check(isinstance(se, list), "Non-list at top level", se)
+    check(len(se) > 0, "Empty list at top level")
     head = se[0]
     if head == _def:
         return Def(*parse_seq(se[1:], parse_name, parse_type, parse_args, parse_expr))
