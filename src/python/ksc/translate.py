@@ -3,9 +3,6 @@
 import sys
 import argparse
 from collections import namedtuple
-from functools import wraps
-
-import sexpdata
 
 import ksc.backends
 from ksc.backends import specs
@@ -98,12 +95,6 @@ class Translator:
     def backend(self):
         return self._backend
 
-    # Reserved word constants
-    sym_if = sexpdata.Symbol("if")
-    sym_let = sexpdata.Symbol("let")
-    sym_lam = sexpdata.Symbol("lam")
-    sym_tuple = sexpdata.Symbol("tuple")
-
     def normalize_def_name(self, name):
         specialized = specs.specialized_functions()
         if name in specialized:
@@ -112,7 +103,7 @@ class Translator:
             return name
         if name in ["or", "and", "max", "abs", "assert"]:
             # need to special case them because they conflict with python functions
-           return name + "_"
+            return name + "_"
         return name.replace("$", "_")
 
     # Convert KS expression to python code string
@@ -171,7 +162,7 @@ class Translator:
                 args_handled.append(self.handle_body(arg, indent+2))
             except:
                 raise ValueError("In {}, failed to handle"
-                                " argument #{}, {}".format(func_name,
+                                " argument #{}, {}".format(name,
                                                             i + 1,
                                                             arg))
         
