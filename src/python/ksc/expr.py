@@ -72,7 +72,8 @@ class Expr:
     type: Type
 
 class Def(NamedTuple):
-    '''Def(name, return_type, args, body). Example:
+    '''Def(name, return_type, args, body). 
+    Example:
     ```
     (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
@@ -85,7 +86,8 @@ class Def(NamedTuple):
     body: Expr
 
 class EDef(NamedTuple):
-    '''Edef(name, return_type, args). Example:
+    '''Edef(name, return_type, args). 
+    Example:
     ```
     (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
           ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -97,7 +99,8 @@ class EDef(NamedTuple):
     args: list
 
 class Rule(NamedTuple):
-    '''Rule(name, args, e1, e2). Example:
+    '''Rule(name, args, e1, e2). 
+    Example:
     ```
     (rule "add0"  (a : Float) (add a 0) a)
           ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
@@ -110,7 +113,8 @@ class Rule(NamedTuple):
     e2: Expr
 
 class Const(NamedTuple, Expr):
-    '''Const(value). Example:
+    '''Const(value). 
+    Examples:
     ```
     (combine 1.234      "a string")
              ^^^^^      ^^^^^^^^^^
@@ -120,7 +124,8 @@ class Const(NamedTuple, Expr):
     value: Union[int, str, float, bool]
 
 class Var(NamedTuple, Expr):
-    '''Var(name, type, decl). Examples:
+    '''Var(name, type, decl). 
+    Examples:
     ```
     (add x 1.234)  ; use of var, decl=false, type is None or propagated
          ^
@@ -135,7 +140,8 @@ class Var(NamedTuple, Expr):
     decl: bool
 
 class Call(NamedTuple, Expr):
-    '''Call(name, args). Example:
+    '''Call(name, args). 
+    Example:
     ```
     (add   1.234 4.56)
      ^^^   ^^^^^^^^^^
@@ -146,7 +152,8 @@ class Call(NamedTuple, Expr):
     args: list
 
 class Lam(NamedTuple, Expr):
-    '''Lam(arg, body). Example:
+    '''Lam(arg, body).
+     Example:
     ```
     (lam (i : Integer)  (add i 4))
          ^^^^^^^^^^^^^  ^^^^^^^^^
@@ -157,7 +164,8 @@ class Lam(NamedTuple, Expr):
     body: Expr
 
 class Let(NamedTuple, Expr):
-    '''Let(var, rhs, body). Example:
+    '''Let(var, rhs, body). 
+    Example:
     ```
     (let (a    1)   (add a a))
           ^    ^    ^^^^^^^^^
@@ -169,7 +177,8 @@ class Let(NamedTuple, Expr):
     body: Expr
 
 class If(NamedTuple, Expr):
-    '''If(cond, t_body, f_body). Example:
+    '''If(cond, t_body, f_body). 
+    Example:
     ```
     (if (eq a a) "good"  "bad")
         ^^^^^^^^ ^^^^^^  ^^^^^
