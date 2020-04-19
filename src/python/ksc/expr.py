@@ -2,15 +2,16 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import NamedTuple, Union, List
+from typing import Union
 from ksc.type import Type
+from ksc.utils import paren
 
 #####################################################################
 # 
 # The Knossos IR is a lightweight, clean, functional IR with strong
 # similarities to Lisp.  The AST has just a few basic concepts, 
 # each with a backing class defined below.  The concepts are, in
-# lisp-like (KS) syntax, with the NamedTuple fields below:
+# lisp-like (KS) syntax, with named fields below:
 #
 ### Top-level definitions (TLDs):
 #
@@ -29,7 +30,7 @@ from ksc.type import Type
 #       ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
 #       name    args        e1        e2
 #
-### AST nodes (Expr):
+### Expression nodes (Expr):
 # 
 # Const: Constant float, int, string, bool
 # (combine 1.234      "a string")
@@ -71,9 +72,30 @@ from ksc.type import Type
 
 class Expr:
     '''Base class for AST nodes.'''
-    type: Type
+    def __init__(self, *args):
+        for (nt,v) in zip(self.__annotations__, args):
+            setattr(self, nt, v)
 
-class Def(NamedTuple):
+    def __eq__(self, that):
+        if type(self) != type(that):
+            return False
+
+        for nt in self.__annotations__:
+            if getattr(self, nt) != getattr(that,nt):
+                return False
+        return True
+
+    def nodes(self):
+        """
+        Return child nodes of this expr
+        """
+        for nt in self.__annotations__:
+            yield getattr(self, nt)
+
+    def __str__(self):
+        return paren(type(self).__name__ + ' ' + ' '.join(str(node) for node in self.nodes()))
+
+class Def(Expr):
     '''Def(name, return_type, args, body). 
     Example:
     ```
@@ -87,7 +109,7 @@ class Def(NamedTuple):
     args: list
     body: Expr
 
-class EDef(NamedTuple):
+class EDef(Expr):
     '''Edef(name, return_type, args). 
     Example:
     ```
@@ -100,7 +122,7 @@ class EDef(NamedTuple):
     return_type: Type
     args: list
 
-class Rule(NamedTuple):
+class Rule(Expr):
     '''Rule(name, args, e1, e2). 
     Example:
     ```
@@ -114,7 +136,7 @@ class Rule(NamedTuple):
     e1: Expr
     e2: Expr
 
-class Const(NamedTuple, Expr):
+class Const(Expr):
     '''Const(value). 
     Examples:
     ```
@@ -125,7 +147,10 @@ class Const(NamedTuple, Expr):
     '''
     value: Union[int, str, float, bool]
 
-class Var(NamedTuple, Expr):
+    def __str__(self):
+        return repr(self.value)
+
+class Var(Expr):
     '''Var(name, type, decl). 
     Examples:
     ```
@@ -141,7 +166,7 @@ class Var(NamedTuple, Expr):
     type: Type
     decl: bool
 
-class Call(NamedTuple, Expr):
+class Call(Expr):
     '''Call(name, args). 
     Example:
     ```
@@ -153,7 +178,7 @@ class Call(NamedTuple, Expr):
     name: str
     args: list
 
-class Lam(NamedTuple, Expr):
+class Lam(Expr):
     '''Lam(arg, body).
      Example:
     ```
@@ -165,7 +190,7 @@ class Lam(NamedTuple, Expr):
     arg: Var
     body: Expr
 
-class Let(NamedTuple, Expr):
+class Let(Expr):
     '''Let(var, rhs, body). 
     Example:
     ```
@@ -178,7 +203,7 @@ class Let(NamedTuple, Expr):
     rhs: Expr
     body: Expr
 
-class If(NamedTuple, Expr):
+class If(Expr):
     '''If(cond, t_body, f_body). 
     Example:
     ```
@@ -191,7 +216,7 @@ class If(NamedTuple, Expr):
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
 
-class Assert(NamedTuple, Expr):
+class Assert(Expr):
     '''Assert(cond, body).
     Example:
     ```

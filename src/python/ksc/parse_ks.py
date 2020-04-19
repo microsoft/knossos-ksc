@@ -138,7 +138,7 @@ def parse_expr(se):
         ans = parse_expr(se[2])
         for b in bindings[::-1]:
             check(len(b) == 2, "Let bindings should be pairs", b, "in", se)
-            var = parse_name(b[0])
+            var = Var(parse_name(b[0]), None, False)
             rhs = parse_expr(b[1])
             ans = Let(var, rhs, ans)
         return ans

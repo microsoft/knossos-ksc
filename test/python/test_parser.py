@@ -1,4 +1,3 @@
-
 import pytest
 
 from ksc.type import Type
@@ -34,8 +33,24 @@ def test_parses():
                Def("f", Type.Float, [Var_a_Float, Var_b_Float], 
                         Call("add", [Var_a, Var_b]))
 
-    assert expr("(assert a b)") ==\
-               Assert(Var_a, Var_b)
+    assert expr("(assert a b)") == Assert(Var_a, Var_b)
+    assert expr("(if a a b)") == If(Var_a, Var_a, Var_b)
+    assert expr("(let (a b) a)") == Let(Var_a, Var_b, Var_a)
+    assert expr("(lam (a : Float) a)") == Lam(Var_a_Float, Var_a)
+    assert expr("(let ((a b) (b 3)) a)") == \
+                Let(Var_a, Var_b, Let(Var_b, Const(3), Var_a))
+
+def test_expr():
+    Var_a_Float = Var("a", Type.Float, True)
+    Var_a = Var("a", None, False)
+    Var_b = Var("b", None, False)
+    Var_a1 = Var("a", None, False)
+
+    l = Lam(Var_a_Float, Var_a)
+    l1 = Lam(Var_a_Float, Var_a1)
+    assert l == l1
+    assert l != Lam(Var_a_Float, Var_b)
+    assert Lam(Var_a_Float, Var_b) != Assert(Var_a_Float, Var_b)
 
 def test_errors():
     with pytest.raises(ParseError, match='Empty list at top level'):
@@ -48,4 +63,4 @@ def test_errors():
         expr("(2 2 3.2)")
 
 if __name__ == "__main__":
-    test_errors()
+    test_parses()

@@ -11,10 +11,10 @@ from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If
 from ksc.parse_ks import parse_ks_file
 
 def handle_let(let_var, let_expr, body, indent=4):
-    joiner = ("\n" + (" " * indent))
+    joiner = "\n" + (" " * indent)
     lambda_expr = joiner.join([
         f"let(var={let_expr},",
-        f"    body=lambda {let_var}:",
+        f"    body=lambda {let_var.name}:",
         f"      {body}",
         ")"
     ])

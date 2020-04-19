@@ -27,6 +27,9 @@ def ensure_list_of_lists(l):
     else:
         return l
 
+def paren(s):
+    return "(" + s + ")"
+
 ShapeType = namedtuple("ShapeType", ["shape", "type"])
 
 PYTHON_MODULE_NAME = "ks_mod"
