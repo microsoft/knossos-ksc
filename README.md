@@ -70,6 +70,9 @@ using [ghcup](https://gitlab.haskell.org/haskell/ghcup) as detailed
 below.
 
 ```sh
+sudo apt-get update
+sudo apt-get install build-essential libgmp-dev
+
 # NB Installing 8.6.5 has copious ouput
 curl https://raw.githubusercontent.com/haskell/ghcup/c2bc5941f076f1fa9c62169f6217acac8dd62fc8/ghcup > ghcup
 sh ./ghcup install 8.6.5
