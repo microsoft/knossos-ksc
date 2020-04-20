@@ -160,6 +160,18 @@ a `.ks` program.  This example runs `hello-world.ks`.
   --exe-output-file obj/test/ksc/hello-world.exe
 ```
 
+or with PowerShell syntax:
+
+```
+./ksc --compile-and-run `
+  --ks-source-file src/runtime/prelude.ks `
+  --ks-source-file test/ksc/hello-world.ks `
+  --ks-output-file obj/test/ksc/hello-world.kso `
+  --cpp-output-file obj/test/ksc/hello-world.cpp `
+  --c++ g++ `
+  --exe-output-file obj/test/ksc/hello-world.exe
+```
+
 #### Tests
 
 To run the ksc self-tests use the command line
