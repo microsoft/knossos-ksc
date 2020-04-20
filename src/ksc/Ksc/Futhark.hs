@@ -192,6 +192,14 @@ primType Array{} = False
 primType Tuple{} = False
 primType _ = True
 
+rank :: Type -> Int
+rank (Array _ t) = 1 + rank t
+rank _ = 0
+
+elemType :: Type -> Type
+elemType (Array _ t) = elemType t
+elemType t = t
+
 -- | Futhark does not support dollar signs in names, so replace them
 -- with double underscores (but not leading, because that's also not
 -- permitted).  Also, as a hack, rewrite some known reserved names by
@@ -248,7 +256,7 @@ binopFunction op t1 (Array _ t2) =
 binopFunction op (Tuple ts1) (Tuple ts2)  =
   Lambda [PatId "x" `PatAscript` Tuple ts1,
           PatId "y" `PatAscript` Tuple ts2] $
-  ExpTuple $ zipWith3 f [(1::Int)..] ts1 ts2
+  ExpTuple $ zipWith3 f [(0::Int)..] ts1 ts2
   where f i t1 t2 =
           Call (binopFunction op t1 t2) [Project (Var "x") (show i),
                                          Project (Var "y") (show i)]
@@ -293,10 +301,15 @@ sumbuild (L.TypeTuple []) _ =
 sumbuild (L.TypeTuple ts) xs =
   letPat "xs" xs $ \xs' ->
   ExpTuple $ zipWith sumbuild ts
-  [Call (Var "map") [SectionProject (show i), xs'] | i <- [1..length ts] ]
+  [Call (Var "map") [SectionProject (show i), xs'] | i <- [0..length ts] ]
 sumbuild ret xs =
-  Call (Var "sumbuild") [binopFunction "+" ret' ret', zeroValue ret', xs]
+  letPat "xs" xs $ \xs' ->
+  Call (Var "sumbuild") [binopFunction "+" ret' ret',
+                         Call (Var zero_fun) [zeroValue (elemType ret'),
+                                              xs'],
+                         xs']
   where ret' = toFutharkType ret
+        zero_fun = "zero_" ++ show (1+rank ret') ++ "d"
 
 callPrimFun :: String -> L.Type -> [L.TExpr] -> Exp
 callPrimFun "deltaVec" (L.TypeVec ret) [n, i, v] =
@@ -314,7 +327,7 @@ callPrimFun "delta" ret [i, j, v] =
   where ret' = toFutharkType ret
 
 callPrimFun "sumbuild" ret [n, f] =
-  sumbuild ret $ Call (Var "tabulate") [toFutharkExp n, toFutharkExp f]
+  sumbuild ret $ Call (Var "build") [toFutharkExp n, toFutharkExp f]
 
 callPrimFun "index" _ [i, arr] =
   case toFutharkExp arr of
@@ -357,7 +370,7 @@ callPrimFun f _ args =
 toCall :: L.TFun -> [L.TExpr] -> Exp
 
 toCall (L.TFun _ (L.Fun (L.SelFun f _))) [e] =
-  Project (toFutharkExp e) $ show f
+  Project (toFutharkExp e) $ show $ f - 1
 
 toCall (L.TFun _ (L.Fun L.SelFun{})) args =
   error $ "toCall: cannot project arguments: " ++ show args

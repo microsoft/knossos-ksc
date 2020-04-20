@@ -225,7 +225,7 @@ futharkCompileKscPrograms ksFiles = do
          else do
             genFuthark ["src/runtime/prelude"] ksTest
             Cgen.readProcessPrintStderr
-              "futhark-0.11.2-linux-x86_64/bin/futhark"
+              "futhark"
               ["check", "obj/" ++ ksTest ++ ".fut"]
             return ())
 

@@ -730,8 +730,9 @@ readProcessEnvPrintStderr executable args env = do
   (exitCode, stdout, stderr) <- System.Process.readCreateProcessWithExitCode
     (System.Process.proc executable args) { System.Process.env = env }
     stdin
-  putStr stderr
-  when (exitCode /= ExitSuccess) $ error "Compilation failed"
+  when (exitCode /= ExitSuccess) $ do
+    putStr stderr
+    error "Compilation failed"
   return stdout
 
 readProcessPrintStderr :: FilePath -> [String] -> IO String

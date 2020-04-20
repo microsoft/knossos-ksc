@@ -33,6 +33,14 @@ let mul__aff (x: f64) (y: f64) = x * y
 let neg__aii (x: i32) = -x
 let neg__aff (x: f64) = -x
 
+-- zero values for up to three dimensions.  TODO: emit these on a
+-- per-needed basis in the code generator.
+let zero_1d [a] 't (zero: t) (_: [a]t) : t =
+  zero
+let zero_2d [a][b] 't (zero: t) (_: [a][b]t) : [b]t =
+  replicate b zero
+let zero_3d [a][b][c] 't (zero: t) (_: [a][b][c]t) : [b][c]t =
+  replicate b (replicate c zero)
 
 let deltaVec 't (zero: t) (n: i32) i (v: t) : [n]t =
   tabulate n (\j -> if j == i then v else zero)
@@ -46,10 +54,10 @@ let rev__mul__Mat__Vec [r][c] (M: [r][c]f64) (v: [c]f64) (dr: [r]f64): ([r][c]f6
 
 let upper_tri_to_linear (D: i32) (v: [D][D]f64) =
   tabulate_2d D D (\i j -> j >= i)
-  |> flatten
-  |> zip (flatten v)
-  |> filter (.2)
-  |> map (.1)
+  |> flatten_to (D*D)
+  |> zip (flatten_to (D*D) v)
+  |> filter (.1)
+  |> map (.0)
 
 let sumbuild plus zero xs = reduce plus zero xs
 
