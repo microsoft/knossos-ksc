@@ -2,7 +2,7 @@
 
 Julia already offers a rich set of tools (particularly Mike Innes's IRTools) for reflection over methods, so this is a short demo of how that allows translation of Julia code to Knossos IR.
 
-To demo, just `julia j2k.jl`.  This takes these three method definitions
+To demo, just `julia --project j2k.jl`.  This takes these three method definitions
 
 ```julia
 f(x) = cos(x) * x
