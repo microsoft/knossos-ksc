@@ -1,119 +1,54 @@
 """Tool for translating Knossos .ks file into Python .py file.
 """
+import sys
 import argparse
 from collections import namedtuple
-from functools import wraps
-import sys
-
-import sexpdata
 
 import ksc.backends
-from ksc.type import Type
 from ksc.backends import specs
+from ksc.type import Type
+from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If
+from ksc.parse_ks import parse_ks_file
 
-def _convert_to_type(se, allow_implicit_tuple=False):
-    """ Converts an S-Expression representing a type, like (Vec Float) or (Tuple Float (Vec Float)),
-        into a Type object, e.g. Type.Vec(Type.Float) or Type.Tuple(Type.Float, Type.Vec(Type.Float)).
-
-        If allow_implicit_tuple is true, also converts a list of types into a Tuple, e.g.
-        (Float (Vec Float)) becomes Type.Tuple(Type.Float, Type.Vec(Type.Float)), i.e. as if
-        the S-Expression began with an extra "Tuple".
-    """
-    while isinstance(se, list) and len(se)==1:
-        se=se[0] # Discard ((pointless)) brackets
-    if isinstance(se, sexpdata.Symbol):
-        return Type(se.value())
-    if isinstance(se, list) and len(se)>0:
-        if isinstance(se[0], sexpdata.Symbol):
-            sym = se[0].value()
-            children = [_convert_to_type(s) for s in se[1:]]
-            if sym == "Vec" and len(se)==2:
-                return Type.Vec(*children)
-            if sym == "Tuple":
-                return Type.Tuple(*children)
-            if sym == "Lam":
-                return Type.Lam(*children)
-            if sym == "LM":
-                return Type.LM(*children)
-            # Fall through in case it's a list of types with allow_implicit_tuple.
-        if allow_implicit_tuple:
-            return Type.Tuple(*[_convert_to_type(s) for s in se])
-    raise ValueError("Did not know how to parse type {}".format(se))
-
-def _parse_to_s_exp(string_or_stream):
-    return sexpdata.Parser(string_or_stream, nil=None, true="True", false="False").parse()
-
-def ensure_list_of_lists(l):
-    """return input, wrapped in a singleton list if its first element is not a list
-
-       ensure_list_of_lists([])    = []
-       ensure_list_of_lists([1])   = [[1]]
-       ensure_list_of_lists([[1]]) = [[1]]
-       ensure_list_of_lists([[1,2]])        = [[1, 2]]
-       ensure_list_of_lists([[1,2], [3,4]]) = [[1, 2], [3, 4]]
-    """
-
-    if not isinstance(l, list):
-        raise ValueError("Expect a list")
-    if len(l) < 1:  # Empty list is empty list
-        return l
-    if not isinstance(l[0], list):
-        return [l]
-    else:
-        return l
-
-def get_var_name(s_exp):
-    if isinstance(s_exp, sexpdata.Symbol):
-        return s_exp.value()
-    else:
-        return s_exp[0].value()
-
-def handle_let(let_var_names, let_exprs, body, indent=4):
-    joiner = ("\n" + (" " * indent))
-    let_var = let_var_names[-1]
-    let_expr = let_exprs[-1]
+def handle_let(let_var, let_expr, body, indent=4):
+    joiner = "\n" + (" " * indent)
     lambda_expr = joiner.join([
         f"let(var={let_expr},",
-        f"    body=lambda {let_var}:",
+        f"    body=lambda {let_var.name}:",
         f"      {body}",
         ")"
     ])
-    if len(let_var_names) > 1:
-        return handle_let(let_var_names[:-1],
-                              let_exprs[:-1],
-                              lambda_expr,
-                              indent=indent-2)
-    else:
-        return lambda_expr
+    return lambda_expr
 
 _global_prime_list = [2, 3, 5, 7, 11, 13]
 _global_prime_index = 0
 
 def get_type(arg_type):
-    return arg_type[0].value() if isinstance(arg_type, list) else arg_type.value()
+    return arg_type.kind
+    
 def get_shape_dtype(arg_type):
     global _global_prime_index
-    type = get_type(arg_type)
-    if type == "Integer":
+    kind = get_type(arg_type)
+    if kind == "Integer":
         return (), "np.int32"
-    elif type == "Float":
+    elif kind == "Float":
         return (), "np.float32"
-    elif type == "Vec":
-        child_shape, child_type = get_shape_dtype(arg_type[1])
+    elif kind == "Vec":
+        child_shape, child_type = get_shape_dtype(Type.Index(arg_type))
         dim = _global_prime_list[_global_prime_index % len(_global_prime_list)]
         _global_prime_index += 1
         return (dim,) + child_shape, child_type
     else:
-        raise ValueError("Found {} in a Vec!".format(type))
+        raise ValueError("Found {} in a Vec!".format(kind))
 
 def is_tensor(arg_type):
     type = get_type(arg_type)
     if type != "Vec":
         return False
-    child_type = get_type(arg_type[1])
-    if child_type == "Vec":
-        return is_tensor(arg_type[1])
-    elif child_type in ["Integer", "Float"]:
+    child_type = Type.Index(arg_type)
+    if child_type.kind == "Vec":
+        return is_tensor(child_type)
+    elif child_type.kind in ["Integer", "Float"]:
         return True
     else:
         return False
@@ -122,29 +57,32 @@ def type_to_sample(arg_type):
     type = get_type(arg_type)
     if type == "Integer":
         return "3"
-    elif type == "Float":
+    if type == "Bool":
+        return "True"
+    if type == "Float":
         return "np.random.uniform()"
-    elif type == "Vec":
+    if type == "Vec":
         if is_tensor(arg_type):
             shape, dtype = get_shape_dtype(arg_type)
             return "np.random.uniform(0, 1, {}).astype({})".format(shape, dtype)
         else:
-            return "[{} for _ in range(2)]".format(type_to_sample(arg_type[1]))
+            return "[{} for _ in range(2)]".format(type_to_sample(Type.Index(arg_type)))
     elif type == "Tuple":
-        return "({})".format(",\n  ".join([type_to_sample(t) for t in arg_type[1:]]))
+        return "({})".format(",\n  ".join([type_to_sample(t) for t in arg_type]))
+    assert False, arg_type
 
 def args_to_sample_values(args):
     arg_types = []
-    for name, _, arg_type in args:
-        name = _value_to_str(name)
-        arg_types.append((name, type_to_sample(arg_type)))
+    for arg in args:
+        sample = type_to_sample(arg.type)
+        arg_types.append((arg.name, sample))
     return arg_types
 
 def _value_to_str(name):
     return name if isinstance(name, str) else name.value()
 
-Def = namedtuple("Def", ["name", "str", "sample_args"])
-EDef = namedtuple("EDef", ["name", "py_name", "return_type"])
+_Def = namedtuple("_Def", ["name", "str", "sample_args"])
+_EDef = namedtuple("_EDef", ["name", "py_name", "return_type"])
 
 class Translator:
     def __init__(self, backend):
@@ -157,90 +95,54 @@ class Translator:
     def backend(self):
         return self._backend
 
-    # Reserved word constants
-    sym_if = sexpdata.Symbol("if")
-    sym_let = sexpdata.Symbol("let")
-    sym_lam = sexpdata.Symbol("lam")
-    sym_tuple = sexpdata.Symbol("tuple")
-
     def normalize_def_name(self, name):
         specialized = specs.specialized_functions()
         if name in specialized:
             return specialized[name]
         if name in self._built_ins or name.startswith("get$"):
             return name
-        if name in ["or", "and", "max", "abs"]:
+        if name in ["or", "and", "max", "abs", "assert"]:
             # need to special case them because they conflict with python functions
-           return name + "_"
+            return name + "_"
         return name.replace("$", "_")
 
-    # Convert s-exp for a KS expression to python code string
-    def handle_body(self, s_exp, indent=2):
+    # Convert KS expression to python code string
+    def handle_body(self, ex, indent=2):
         
         # symbols e.g. sin -> sin
-        if isinstance(s_exp, sexpdata.Symbol):
-            return s_exp.value()
+        if isinstance(ex, Var):
+            return ex.name
         
         # numeric literal e.g. 5.4 -> 5.4
-        if isinstance(s_exp, (int, float)):
-            return str(s_exp)
+        if isinstance(ex, Const):
+            return repr(ex.value)
         
-        # remaining forms are lists
-        assert isinstance(s_exp, list) 
-        assert len(s_exp) > 0    # One might imagine allowing empty tuples, but not allowed in ksc
-        head = s_exp[0]
-
-        # Nested exp e.g. ((sin 5)) -> (sin 5)
-        if len(s_exp) == 1:
-            return self.handle_body(head)
-
-        # List-of-const literals (1 2 3 4)
-        # TODO: ksc does not allow this, so either add in ksc, or rm here
-        #  Ideally it is best not to add such sugar unless it significantly 
-        #  improves efficiency/readability. This feels the wrong side, as it 
-        #  just replaces (tuple 1 2 3) with (1 2 3)  
-        if isinstance(head, (int, float)):
-            assert all(isinstance(se, type(head)) for se in s_exp)
-            return [v for v in s_exp]
-
         joiner = ("\n" + (" " * indent))
         
         # (let ((var expr) ...) body)
-        if head == Translator.sym_let:
-            let_list = ensure_list_of_lists(s_exp[1])
-            let_var_names = [se[0].value() for se in let_list]
-            let_exprs = [se[1] for se in let_list]
+        if isinstance(ex, Let):
             return handle_let(
-                let_var_names,
-                [self.handle_body(se, indent+2) for se in let_exprs],
-                self.handle_body(s_exp[2], indent + 2 * len(let_var_names)),
-                indent=indent + 2 * len(let_var_names) # inner most indent
+                ex.var,
+                self.handle_body(ex.rhs, indent+2),
+                self.handle_body(ex.body, indent+2),
+                indent=indent+2 # inner most indent
             )
 
-        # (tuple e1 .. eN)
-        elif head == Translator.sym_tuple:
-            tuple_args = [self.handle_body(se, indent+2) for se in s_exp[1:]]
-            return "make_tuple({tuple_args})".format(tuple_args=", ".join(tuple_args))
-
-        # (get$m$n t)
-        elif head.value().startswith("get$"):
-            index = int(head.value().split("$")[1]) - 1
-            tuple_name = self.handle_body(s_exp[1], indent+2)
-            return "get_tuple_element({index}, {tuple_name})".format(tuple_name=tuple_name, index=index)
-        
         # Lambda e.g. (lam (var : type) body)
-        elif head == Translator.sym_lam:
-            var_name = get_var_name(s_exp[1])
-            body = self.handle_body(s_exp[2], indent+2)
+        if isinstance(ex, Lam):
+            var_name = ex.arg.name
+            body = self.handle_body(ex.body, indent+2)
             return joiner.join([
                 f"(lambda {var_name}:",
                 f"  {body}",
                 ")"])
 
         # If-then-else e.g. (if c e1 e2)
-        elif head == Translator.sym_if:
+        if isinstance(ex, If):
             # need to special case if because "if" is a python keyword
-            cond, then_branch, else_branch = [self.handle_body(se, indent+2) for se in s_exp[1:]]
+            cond = self.handle_body(ex.cond, indent+2)
+            then_branch = self.handle_body(ex.t_body, indent+2)
+            else_branch = self.handle_body(ex.f_body, indent+2)
             return joiner.join([
                 f"if_then_else({cond},",
                 f"             lambda: {then_branch},",
@@ -248,58 +150,72 @@ class Translator:
             ])
 
         # All others are function call e.g. (f e1 .. eN)
-        func_name = self.normalize_def_name(_value_to_str(head))
-        args = s_exp[1:]
+        assert isinstance(ex, Call), ex
+
+        name = ex.name
+        args = ex.args
+
+        # Recursively handle args
         args_handled = []
-        for i, se in enumerate(args):
+        for i, arg in enumerate(args):
             try:
-                args_handled.append(self.handle_body(se, indent+2))
+                args_handled.append(self.handle_body(arg, indent+2))
             except:
                 raise ValueError("In {}, failed to handle"
-                                 " argument #{}, {}".format(func_name,
+                                " argument #{}, {}".format(name,
                                                             i + 1,
-                                                            se))
-        return "{func_name}({args})".format(func_name=func_name,
-                                            args=", ".join([arg for arg in args_handled]))
+                                                            arg))
+        
+        # (get$m$n t)
+        if name.startswith("get$"):
+            index = int(name.split("$")[1]) - 1
+            return "get_tuple_element({index}, {tuple_name})".format(tuple_name=args_handled[0], index=index)
 
-    def handle_def(self, s_exp):
-        name, _return_type, args, body = s_exp[1:]
-        name = _value_to_str(name)
-        args = ensure_list_of_lists(args)
-        arg_names = [se[0].value() for se in args]
-        return Def(name, """
+        # (tuple e1 .. eN)
+        if name == "tuple":
+            return "make_tuple({tuple_args})".format(tuple_args=", ".join(args_handled))
+
+        # other function calls     
+        func_name = self.normalize_def_name(name)
+        return "{func_name}({args})".format(func_name=func_name,
+                                            args=", ".join(args_handled))
+
+
+    def handle_def(self, ex):
+        name = ex.name
+        args = ex.args
+        arg_names = [arg.name for arg in args]
+        return _Def(name, """
 def {name}({args}):
   return {body}
 """.format(name=self.normalize_def_name(name),
            args=", ".join(arg_names),
-           body=self.handle_body(body)),
+           body=self.handle_body(ex.body)),
                    args_to_sample_values(args))
 
     def parse_defs(self, string_or_stream):
         defs_to_process = []
-        for s_exp in _parse_to_s_exp(string_or_stream):
-            def_or_edef = s_exp[0].value()
-            if def_or_edef == "edef":
-                name = _value_to_str(s_exp[1])
+        for tld in parse_ks_file(string_or_stream):
+            if isinstance(tld, EDef):
+                name = tld.name
                 py_name = self.normalize_def_name(name)
                 if py_name in self._built_ins:
                     # if it is built-in no need to edef
+                    print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)                    
                     continue
-                edef = EDef(name,
-                            py_name,
-                            _convert_to_type(s_exp[2]))
+                edef = _EDef(name, py_name, tld.return_type)
                 self._edefs[name] = edef
-            elif def_or_edef == "def":
-                name = _value_to_str(s_exp[1])
+            elif isinstance(tld, Def):
+                name = tld.name
                 if name.startswith("cost$") or name.startswith("shape$"):
                     # delay so that we read edefs first
-                    defs_to_process.append(s_exp)
+                    defs_to_process.append(tld)
                 else:
-                    self._defs.append(self.handle_def(s_exp))
+                    self._defs.append(self.handle_def(tld))
             else:
-                print("translate: ignoring unrecognized definition type ", s_exp[0], file=sys.stderr)
-        for s_exp in defs_to_process:
-            self._defs.append(self.handle_def(s_exp))
+                print("translate: ignoring unrecognized definition type ", tld, file=sys.stderr)
+        for tld in defs_to_process:
+            self._defs.append(self.handle_def(tld))
 
     def make_main(self):
         main = self._defs[-1]
