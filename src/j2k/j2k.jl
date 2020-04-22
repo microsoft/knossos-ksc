@@ -1,6 +1,7 @@
 # Julia to Knossos
 using Zygote
 using IRTools
+using ArgParse
 import Base.show
 import IRTools: isconditional
 
@@ -8,6 +9,30 @@ import IRTools: isconditional
 # 1. Need to propagate types 
 #    (still some Anys in basic block defs)
 # 2. Nice printing :)
+
+
+function parse_commandline()
+    s = ArgParseSettings()
+
+    @add_arg_table! s begin
+        "--input"
+            help = "input .jl file, last expression used, absolute path"
+            required = true
+        "--output", "-o"
+            help = "output Knossos .ks extension recommended"
+            required = true
+    end
+
+    return parse_args(s)
+end
+
+parsed_args = parse_commandline()
+inputfilename = parsed_args["input"]
+outputfilename = parsed_args["output"]
+
+mkpath(dirname(outputfilename))
+
+io = open(outputfilename, "w")
 
 # Newline constant for s-expr printing
 nl = "\n"
@@ -167,22 +192,25 @@ function make_sexps(ir :: IRTools.IR)
     # Emit blocks n:2 in reverse
     for b in reverse(blocks[2:end])
         se = make_def(false, blockid(b.id), b)
-        println(se,"\n")
+        println(io, se,"\n")
     end
     # Emit block 1
     f = IRTools.argtypes(blocks[1])[1].val
     se = make_def(true, string(f), blocks[1])
-    println(se)
+    println(io, se)
 end
 
 ###################
 ### Test make_sexp
 
 
-print("---\n")
+print(io, "---\n")
+
+#=
 f(x) = cos(x) * x
 
 sumsq(xs) = sum(xs.^2)
+
 
 function foo1(as :: Vector{Float64}, b :: Float64)
     p = length(as)
@@ -198,18 +226,21 @@ function foo1(as :: Vector{Float64}, b :: Float64)
     end
     f(sumsq(y)) + 5.5555
 end
+=#
 
 function jl2ks(f, argtypes)
     meta = IRTools.typed_meta(Tuple{typeof(f),argtypes...})
     ir = IRTools.IR(meta)
     IRTools.expand!(ir)
 
-    println("-------- IR ----------")
-    println(ir)
-    println("--------")
+    println(io, "-------- IR ----------")
+    println(io, ir)
+    println(io, "--------")
 
     make_sexps(ir)
 end
 
-jl2ks(foo1, (Vector{Float64},Float64))
+sample = evalfile(joinpath(pwd(), inputfilename))
+
+jl2ks(sample, (Vector{Float64},Float64))
 
