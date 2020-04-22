@@ -203,39 +203,14 @@ end
 ###################
 ### Test make_sexp
 
-
-print(io, "---\n")
-
-#=
-f(x) = cos(x) * x
-
-sumsq(xs) = sum(xs.^2)
-
-
-function foo1(as :: Vector{Float64}, b :: Float64)
-    p = length(as)
-    p = p - 1
-    if p > 0
-        if as[1] > 0
-            y = [sin(a) for a in as] .* f(b)
-        else
-            y = [1.1*p, foo1(as[2:end], 1.1)]
-        end
-    else
-        y = -as.*f(b)
-    end
-    f(sumsq(y)) + 5.5555
-end
-=#
-
 function jl2ks(f, argtypes)
     meta = IRTools.typed_meta(Tuple{typeof(f),argtypes...})
     ir = IRTools.IR(meta)
     IRTools.expand!(ir)
 
-    println(io, "-------- IR ----------")
+    println(io, "#| -------- IR ----------")
     println(io, ir)
-    println(io, "--------")
+    println(io, "-------- |#")
 
     make_sexps(ir)
 end
