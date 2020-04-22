@@ -2,7 +2,7 @@
 
 Julia already offers a rich set of tools (particularly Mike Innes's IRTools) for reflection over methods, so this is a short demo of how that allows translation of Julia code to Knossos IR.
 
-To demo, just `julia --project j2k.jl`.  This takes these three method definitions
+To demo, just `julia --project j2k.jl --input foo1.jl --output test.jl`.  This takes these three method definitions
 
 ```julia
 f(x) = cos(x) * x
@@ -119,4 +119,33 @@ Which converts to this IRTools IR:
 	   (if _6
 	       (b6 %2 %3)
 	     (b2 %2 %5 %3))))))
+```
+
+This can also be connected to the overall tools, from the project root
+
+```
+julia --project=./src/j2k/ ./src/j2k/j2k.jl --input ./test/j2k/test0.jl --output obj/test/j2k/j2k_test0.ks
+```
+
+then (in PowerShell style)
+
+```powershell
+./ksc --compile-and-run `
+  --ks-source-file src/runtime/prelude.ks `
+  --ks-source-file obj/test/j2k/j2k_test0.ks `
+  --ks-output-file obj/test/j2k/j2k_test0.kso `
+  --cpp-output-file obj/test/j2k/j2k_test0.cpp `
+  --c++ g++ `
+  --exe-output-file obj/test/j2k/j2k_test0.exe
+```
+
+which currently fails, but we can work on next
+
+```
+read decls
+ksc.exe: Failed parse: (line 1, column 1):
+unexpected '-'
+expecting end of input or "("
+CallStack (from HasCallStack):
+  error, called at src/ksc\Parse.hs:124:36 in main:Parse
 ```

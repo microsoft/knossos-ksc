@@ -1,7 +1,7 @@
 f(x) = cos(x) * x
 sumsq(xs) = sum(xs.^2)
 
-function foo2(as :: Vector{Float64}, b :: Float64)
+function foo1(as :: Vector{Float64}, b :: Float64)
     p = length(as)
     p = p - 1
     if p > 0

@@ -16,7 +16,7 @@ function parse_commandline()
 
     @add_arg_table! s begin
         "--input"
-            help = "input .jl file, last expression used"
+            help = "input .jl file, last expression used, absolute path"
             required = true
         "--output", "-o"
             help = "output Knossos .ks extension recommended"
@@ -29,6 +29,8 @@ end
 parsed_args = parse_commandline()
 inputfilename = parsed_args["input"]
 outputfilename = parsed_args["output"]
+
+mkpath(dirname(outputfilename))
 
 io = open(outputfilename, "w")
 
@@ -238,7 +240,7 @@ function jl2ks(f, argtypes)
     make_sexps(ir)
 end
 
-sample = evalfile(inputfilename)
+sample = evalfile(joinpath(pwd(), inputfilename))
 
 jl2ks(sample, (Vector{Float64},Float64))
 
