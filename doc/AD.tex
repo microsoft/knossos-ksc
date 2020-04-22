@@ -21,6 +21,8 @@
 \newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
 \newcommand{\clcomp}{\,\circ\,}   % CL composition
 \newcommand{\ck}[1]{{\mathcal K}(#1)}   % CL constant
+\newcommand{\cid}{\mathcal{I}}   % CL function
+\newcommand{\cprune}[3]{\mathcal{P}[#1/#2]#3}   % CL function
 \newcommand{\cfun}[1]{{\mathcal F}(#1)}   % CL function
 \newcommand{\clet}[3]{{\mathcal L}(#1,#2,#3)}   % CL let
 \newcommand{\cbuild}[3]{{\mathcal B}(#1,#2,#3)}   % CL build
@@ -1225,7 +1227,9 @@ $$
         \multicolumn{4}{l}{\mbox{\bf Terms}} \\
         \mathit{pgm} & ::= & \mathit{def}_1 \ldots \mathit{def}_n \\
         \mathit{def} & ::= & f {:} S \darrow T = c \\
-        c & ::= & \ck{k} & \mbox{Constant} \\
+        c & ::= & \cid & \mbox{Identity} \\
+          & |   & \ck{k} & \mbox{Constant} \\
+          & |   & \cprune{i_1,\ldots,i_m}{n}{c} & \mbox{Pruning} (0 \leq m \leq n) \\
           & |   & \cfun{f} & \mbox{Function constant} \\
           & |   & c_1 \clcomp c_2  & \mbox{Composition} \\
           & |   & (c_1,\ldots, c_n) & \mbox{Tuple} \\
@@ -1234,9 +1238,18 @@ $$
           & |   & \cbuild{c_s}{i}{c_e} & \mbox{Build}
       \end{array}
 $$
-\mbox{{\bf Semantics:}\; \fbox{$c \capply e = e$}}
+\end{minipage}}
+\caption{Syntax of \CatLang} \label{fig:cl-syntax}
+\end{figure}
+
+% --------------------- Semantics
+\begin{figure}
+\fbox{\begin{minipage}{\columnwidth}
+\mbox{{\bf Semantics (aka conversion from \CatLang):}\; \fbox{$c \capply e = e$}}
 $$
 \begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
+   \cid \capply t & = & t \\
+   \cprune{i_1,\ldots,i_m}{n}{c} \capply t & = & c \capply (\sel{i_1}{n}(t), \ldots, \sel{i_m}{n}(t)) \\
    \ck{k} \capply t & = & k \\
    \cfun{f} \capply t & = & f(t) \\
    (c_1 \clcomp c_2) \capply t & = & c_1 \capply (c_2 \capply t) \\
@@ -1250,13 +1263,13 @@ $$
 $$
 \begin{array}{l}
 \begin{array}{rcl}
-\Gamma & ::= & (x_1\colon\tau_1, \ldots, x_n\tcolon\tau_n) \\[1mm]
+\Gamma & ::= & (x_1\tcolon\tau_1, \ldots, x_n\tcolon\tau_n) \\[1mm]
 \end{array} \\
 \begin{array}{rcl}
-\pi((x_1\tcolon\tau_1,\ldots, x_n\tcolon\tau_n),\,x_i) & = & \sel{i}{n} \\
+\phi((x_1\tcolon\tau_1,\ldots, x_n\tcolon\tau_n),\,x_i) & = & i \\
 T(x_1\tcolon\tau_1, \ldots, x_n\tcolon\tau_n) & = & (\tau_1, \ldots, \tau_n) \\
 \end{array}
-\\ \\
+\\[5mm]
 \begin{array}{l}
   \KC{f(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n) = e}{} \\
   \quad = \quad \cfun{f} = \KC{e}(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n)
@@ -1267,26 +1280,25 @@ T(x_1\tcolon\tau_1, \ldots, x_n\tcolon\tau_n) & = & (\tau_1, \ldots, \tau_n) \\
   \KC{x}{\Gamma} & = & \cfun{\pi(\Gamma,x)} \\
   \KC{f(e)}{\Gamma} & = & \cfun{f} \clcomp \KC{e}{\Gamma} \\
   \KC{\lstinline|if|\;e_1\;e_2\;e_3}{\Gamma} \\
-     \multicolumn{3}{l}{\hspace{2cm} = \lstinline|if|\,
-      (\KC{e_1}{\Gamma})\, (\KC{e_2}{\Gamma})\, (\KC{e_3}{\Gamma})} \\
+     \multicolumn{3}{l}{\hspace{2cm} = \cif{\KC{e_1}{\Gamma}}{\KC{e_2}{\Gamma}}{\KC{e_3}{\Gamma}}} \\
   \KC{(e_1, \ldots, e_n)}{\Gamma} & = & (\KC{e_1}{\Gamma}, \ldots, \KC{e_n}{\Gamma}) \\
   \KC{\lstinline|let|\;x{:}\tau = e_r \;\lstinline|in|\; e_b}{\Gamma} & = & \clet{x}{\KC{e_r}{\Gamma}}{\KC{e_b}{(\Gamma,x{:}\tau)}} \\
   \KC{\lstinline|build|\;e_s\;(\lambda i.e_e)}{\Gamma} & = & \cbuild{\KC{e_s}{\Gamma}}{i}{\KC{e_e}{(\Gamma,i)}}
 \end{array}
 \\[1mm]
 \mbox{\bf Pruning} \\
-\begin{array}{rcl}
-  \KC{e}\Gamma & = & \KC{e}{\Gamma'} \clcomp \KC{(v_1,\ldots,v_n)}{\Gamma} \\
+\begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
+  \KC{e}\Gamma & = & \cprune{\phi(\Gamma,v_1), \ldots, \phi(\Gamma, v_m)}{\sizefun(\Gamma)}(\KC{e}{\Gamma'}) \\
   \multicolumn{3}{l}{\quad \mbox{where}
-    $\begin{array}[t]{rcl}
-        \{v_1, \ldots, v_n\} & = & \mathi{fv}(e) \\
+    $\begin{array}[t]{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
+        \{v_1, \ldots, v_m\} & = & \mathit{fv}(e) \\
         \Gamma' & = & (v_1\tcolon\Gamma(v_1), \ldots, v_n\tcolon\Gamma(v_n))
       \end{array}$} \\
 \end{array}
 \end{array}
 $$
 \end{minipage}}
-\caption{Syntax of \CatLang} \label{fig:cl-syntax}
+\caption{Semantics of \CatLang} \label{fig:cl-semantics}
 \end{figure}
 
 \begin{figure}
@@ -1294,12 +1306,15 @@ $$
   \begin{center}{\large \fbox{$\Gamma \vdash c : S \darrow T$}}\end{center}
 
   \begin{gather*}
+    \infer{\Gamma \vdash \cid : S \darrow S}
+          {} \qquad
+    \infer{\Gamma \vdash \cprune{i_1, \ldots, i_m}{n}{c} : (s_1, \ldots, s_n) \darrow T}
+          {\Gamma \vdash c : (s_{i_1},\ldots,s_{i_m}) \darrow T}
+   \\[1mm]
     \infer{\Gamma \vdash \cfun{f} : S \darrow T}
           {f : S \to T \in \Gamma} \qquad
-    \infer{\Gamma \vdash \ck{k} : S \darrow \real}
+    \infer{\Gamma \vdash \ck{k} : () \darrow \real}
           {}
-   \\[1mm]
-   \infer{\Gamma \vdash \sel{i}{n} : (T_1,\ldots,T_i,\ldots, T_n) \darrow T_i}{}
    \\[1mm]
    \infer{\Gamma \vdash c_1 \clcomp c_2 : S \darrow T}
    {\Gamma \vdash c_1 : R \darrow T \quad \Gamma \vdash c_2 : S \darrow R}
