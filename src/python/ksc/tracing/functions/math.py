@@ -1,5 +1,6 @@
 import ksc
 from ksc.type import Type
+from ksc.tracing.node import Node
 from ksc.tracing.functions import core
 from ksc.tracing.functions.type_propagation_rules import unique_element_type
 from ksc.utils import ShapeType
@@ -49,4 +50,15 @@ def transpose_prop_rule(x):
     m, n = x_shape
     return ShapeType((n, m), x_type)
 
-transpose = ksc.tracing.make_edef("transpose", ["x"], transpose_prop_rule)
+transpose = ksc.tracing.make_edef(
+    "transpose", ["x"], transpose_prop_rule,
+    lambda x: (lambda s: core.make_tuple(s[1], s[0]))(x.shape),
+    lambda x: Node.from_data(0)
+)
+
+reducemean = ksc.tracing.make_edef(
+    "reducemean", ["x"],
+    lambda x: ShapeType((), Type.Float),
+    lambda x: (),
+    lambda x: Node.from_data(0)
+)

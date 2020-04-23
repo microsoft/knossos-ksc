@@ -19,6 +19,46 @@ def elementwise(*args):
         assert a.shape_type == arg.shape_type, f"Expected {a.shape_type}, but got {arg.shape_type}"
     return args[0].shape_type
 
+def elementwise_or_scalar(*args):
+    '''Type propagation rule for operations like elementwise add/multiply,
+    that allows arguments to be scalar. Rules:
+    - All vectors in `args` must have the same shape and element type.
+    - Any scalars in `args` must have the same type, and this type must
+        match the element type of the vectors, if any.
+    Example ShapeTypes and return ShapeType:
+        ((), Float), ((2, 3), Vec(Vec(Float)))
+            -> ((2, 3), Vec(Vec(Float)))
+        ((2, 3), Vec(Vec(Float))), ((2, 3), Vec(Vec(Float)))
+            -> ((2, 3), Vec(Vec(Float)))
+        ((2, 3), Vec(Vec(Float))), ((), Int)
+            -> ValueError
+        ((2, 3), Vec(Vec(Float))), ((2, 3), Vec(Vec(Int)))
+            -> ValueError
+        ((3, 2), Vec(Vec(Float))), ((2, 3), Vec(Vec(Float)))
+            -> ValueError
+    '''
+    def _get_type(x):
+        '''Gets type if scalar, and element type if vector.'''
+        if x.kind == 'Vec':
+            return _get_type(x.children[0])
+        elif x.kind in ['Tuple', 'Bool', 'Lam']:
+            raise ValueError(f'Argument has unsupported type {x.kind}')
+        return x
+    assert len(args) > 0
+    # All types must be equal:
+    types = set(_get_type(a.shape_type.type) for a in args)
+    if len(types) > 1:
+        raise ValueError(f'Arguments have unsupported types: {types}')
+    # If there are any non-scalars, then their shapes must be equal:
+    shapes = set(a.shape_type.shape for a in args if a.shape_type.shape != ())
+    if len(shapes) > 1:
+        raise ValueError(f'Arguments have incompatible shapes: {shapes}')
+    # Return ShapeType is that of the vector, if there is one:
+    try:
+        return next(a.shape_type for a in args if a.shape_type.shape != ())
+    except StopIteration:
+        return args[0].shape_type
+
 def first_arg(*args):
     return args[0].shape_type
 

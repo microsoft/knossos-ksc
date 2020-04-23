@@ -8,37 +8,50 @@ from ksc.utils import ShapeType
 from ksc.tracing.function import Trace, TraceableFunction
 from ksc.tracing.functions.type_propagation_rules import (
     elementwise,
+    elementwise_or_scalar,
     first_arg,
     flatten_type_prop_rule,
     keep_shape_prop_rule
 )
 
 add = make_edef(
-    "add", ["a", "b"], elementwise,
+    "add", ["a", "b"], elementwise_or_scalar,
     lambda a, b: a.shape,
     lambda a, b: a.size
 )
 
 sub = make_edef(
-    "sub", ["a", "b"], elementwise,
+    "sub", ["a", "b"], elementwise_or_scalar,
     lambda a, b: a.shape,
     lambda a, b: a.size
 )
 
+neg = make_edef(
+    "neg", ["x"], first_arg,
+    lambda x: x.shape,
+    lambda x: x.size
+)
+
 mul = make_edef(
-    "mul", ["a", "b"], elementwise,
+    "mul", ["a", "b"], elementwise_or_scalar,
     lambda a, b: a.shape,
     lambda a, b: a.size * 2
 )
 
 div = make_edef(
-    "div", ["a", "b"], elementwise,
+    "div", ["a", "b"], elementwise_or_scalar,
     lambda a, b: a.shape,
     lambda a, b: a.size * 2
 )
 
 pow = make_edef(
     "pow", ["a", "b"], elementwise
+)
+
+log = make_edef(
+    "log", ["a"], first_arg,
+    lambda x, y: x.shape,
+    lambda x, y: x.size * 10
 )
 
 flatten = make_edef(

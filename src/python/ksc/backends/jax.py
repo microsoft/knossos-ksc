@@ -24,6 +24,9 @@ def transpose(x):
 def relu(x):
   return np.maximum(x, 0.0)
 
+def sigmoid(x):
+  return jax.nn.sigmoid(x)
+
 def log_softmax(x):
   x_max = np.amax(x, axis=-1, keepdims=True)
   return (x - x_max) - np.log(np.exp(x - x_max).sum(axis=-1, keepdims=True))
@@ -83,3 +86,6 @@ def avg_pool(x, pool_size, strides, paddings):
 def flatten(x):
   b = x.shape[0]
   return x.reshape((b, -1))
+
+def reducemean(x):
+  return np.mean(x)

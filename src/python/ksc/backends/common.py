@@ -52,6 +52,9 @@ def neg(a):
 def pow(a, b):
     return a ** b
 
+def log(a):
+    return np.log(a)
+
 def to_float_i(a):
     return float(a)
 
