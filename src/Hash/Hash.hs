@@ -367,7 +367,7 @@ addLocn = Map.insert
 
 -- | The most basic hash one could think of.  Is not intended to
 -- respect any kind of equivalences.
-naiveHash :: Hashable a => Expr a -> Int
+naiveHash :: Hashable a => Expr a -> Hash
 naiveHash = \case
   Var x   -> hash x
   Lam x e -> hash (x, naiveHash e)
@@ -385,6 +385,77 @@ naiveHashNestedExplicit path expr = (naiveHash expr, path, expr) : case expr of
   Lam _ e -> naiveHashNestedExplicit (L:path) e
   App f e -> naiveHashNestedExplicit (Apl:path) f
              ++ naiveHashNestedExplicit (Apr:path) e
+
+naiveHashWithBinders :: (Ord a, Hashable a)
+                     => Expr a -> [(Hash, Path, Expr a)]
+naiveHashWithBinders e = exprs
+  where (_h, _depth, exprs) = naiveHashWithBindersExplicit [] Map.empty e
+
+naiveHashWithBindersExplicit :: (Ord a, Hashable a)
+                             => Path
+                             -> Map a Path
+                             -> Expr a
+                             -> (Hash, Int, [(Hash, Path, Expr a)])
+naiveHashWithBindersExplicit location env expr = case expr of
+  Var x -> (hash', depth', l_ret)
+    where hash' = hash $ case Map.lookup x env of
+            Nothing -> hash ("free", x, depth')
+            Just p  -> hash ("bound", p, depth')
+          depth' = 0
+          subExpressionHashes = []
+          l_ret = (hash', location, expr) : subExpressionHashes
+  Lam x e -> (hash', depth', l_ret)
+    where (hashE, depthE, subExpressionHashesE) =
+            naiveHashWithBindersExplicit (L:location) (Map.insert x location env) e
+          hash' = hash ("lam", hashE, depth')
+          depth' = depthE + 1
+          subExpressionHashes = subExpressionHashesE
+          l_ret = (hash', location, expr) : subExpressionHashes
+  App f e -> (hash', depth', l_ret)
+    where (hashF, depthF, subExpressionHashesF) =
+            naiveHashWithBindersExplicit (Apl:location) env f
+          (hashE, depthE, subExpressionHashesE) =
+            naiveHashWithBindersExplicit (Apr:location) env e
+          hash' = hash ("app", hashF, hashE, depth')
+          subExpressionHashes = subExpressionHashesE ++ subExpressionHashesF
+          depth' = max depthF depthE + 1
+          l_ret = (hash', location, expr) : subExpressionHashes
+
+naiveHashWithBinders2 :: (Ord a, Hashable a)
+                     => Expr a -> [(Hash, Path, Expr a)]
+naiveHashWithBinders2 e = exprs
+  where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty e
+
+naiveHashWithBinders2Explicit :: (Ord a, Hashable a)
+                              => Path
+                              -> Map a Path
+                              -> Expr a
+                              -> (Hash, Int, [(Hash, Path, Expr a)])
+naiveHashWithBinders2Explicit location env expr = case expr of
+  Var x -> (hash', depth', l_ret)
+    where hash' = hash $ case Map.lookup x env of
+            Nothing -> hash ("free", x, depth')
+            Just p  -> hash ("bound", p, depth')
+          depth' = 0
+          subExpressionHashes = []
+          l_ret = (hash', location, expr) : subExpressionHashes
+  Lam x e -> (hash', depth', l_ret)
+    where (hashE, depthE, subExpressionHashesE) =
+            naiveHashWithBindersExplicit (L:location)
+                                         (Map.insert x [] (Map.map (L:) env)) e
+          hash' = hash ("lam", hashE, depth')
+          depth' = depthE + 1
+          subExpressionHashes = subExpressionHashesE
+          l_ret = (hash', location, expr) : subExpressionHashes
+  App f e -> (hash', depth', l_ret)
+    where (hashF, depthF, subExpressionHashesF) =
+            naiveHashWithBindersExplicit (Apl:location) (Map.map (Apl:) env) f
+          (hashE, depthE, subExpressionHashesE) =
+            naiveHashWithBindersExplicit (Apr:location) (Map.map (Apr:) env) e
+          hash' = hash ("app", hashF, hashE, depth')
+          subExpressionHashes = subExpressionHashesE ++ subExpressionHashesF
+          depth' = max depthF depthE + 1
+          l_ret = (hash', location, expr) : subExpressionHashes
 
 normalizedGroupedEquivalentSubexpressions
   :: Ord hash => [(hash, Path, expr)] -> [[(Path, expr)]]

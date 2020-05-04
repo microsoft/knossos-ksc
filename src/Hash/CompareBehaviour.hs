@@ -1,6 +1,7 @@
 module CompareBehaviour where
 
 import Hash (hashSubExprs,combinedHash,deBruijnHash,
+             naiveHashWithBinders, naiveHashWithBinders2,
              normalizedGroupedEquivalentSubexpressions)
 import Expr (Expr, Path, showExpr,
              example1,example2,example3,example4,example5,example6,example7,
@@ -49,22 +50,24 @@ awfFormatExpressionHTML e =
 
   where algorithms = ( ("Tom's", hashSubExprs)
                      , ("Combined", combinedHash)
-                     , ("DeBruijn", deBruijnHash) )
+                     , ("DeBruijn", deBruijnHash)
+                     , ("Naive with binders 1", naiveHashWithBinders)
+                     , ("Naive with binders 2", naiveHashWithBinders2) )
 
         groupsOfAlgorithm algorithm =
           ((map . map) fst
            . normalizedGroupedEquivalentSubexpressions
            . algorithm) e
 
-        (tom'sGroups, _, _) = groupsPerAlgorithm
+        (tom'sGroups, _, _, _, _) = groupsPerAlgorithm
 
         groupsPerAlgorithm = mapRow (groupsOfAlgorithm . snd) algorithms
 
         allGroups = setFromIterator $ forEach (inRow groupsPerAlgorithm) inList
 
-        inRow (a1, a2, a3) = inList [a1, a2, a3]
+        inRow (a1, a2, a3, a4, a5) = inList [a1, a2, a3, a4, a5]
 
-        mapRow f (a1, a2, a3) = (f a1, f a2, f a3)
+        mapRow f (a1, a2, a3, a4, a5) = (f a1, f a2, f a3, f a4, f a5)
 
 printGroups :: Ord hash => [(hash, Path, Expr String)] -> IO ()
 printGroups = mapM_ (\x -> putStrLn "" >> mapM_ putStrLn x)
