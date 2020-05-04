@@ -417,7 +417,7 @@ naiveHashWithBindersExplicit location env expr = case expr of
           (hashE, depthE, subExpressionHashesE) =
             naiveHashWithBindersExplicit (Apr:location) env e
           hash' = hash ("app", hashF, hashE, depth')
-          subExpressionHashes = subExpressionHashesE ++ subExpressionHashesF
+          subExpressionHashes = subExpressionHashesF ++ subExpressionHashesE
           depth' = max depthF depthE + 1
           l_ret = (hash', location, expr) : subExpressionHashes
 
@@ -453,7 +453,7 @@ naiveHashWithBinders2Explicit location env expr = case expr of
           (hashE, depthE, subExpressionHashesE) =
             naiveHashWithBindersExplicit (Apr:location) (Map.map (Apr:) env) e
           hash' = hash ("app", hashF, hashE, depth')
-          subExpressionHashes = subExpressionHashesE ++ subExpressionHashesF
+          subExpressionHashes = subExpressionHashesF ++ subExpressionHashesE
           depth' = max depthF depthE + 1
           l_ret = (hash', location, expr) : subExpressionHashes
 
@@ -514,6 +514,28 @@ prop_compareSubExpressionHashes = withTests 1 $ property $ do
   n (hashSubExprs example3) === n (combinedHash example3)
 
   n (hashSubExprs example4) /== n (combinedHash example4)
+
+-- | Checks that the paths come out of the algorithms in the same
+-- order (which just so happens to be depth first preorder).  This is
+-- not an essential property of the algorithms, but it's nice that
+-- they are thus normalised so that we can compare behaviour more
+-- easily.
+prop_stablePaths :: Property
+prop_stablePaths = withTests numRandomTests $ property $ do
+  let paths = map (\(_, path, _) -> path)
+
+  expr <- forAll genExpr
+
+  let h = hashSubExprs expr
+      d = deBruijnHash expr
+      c = combinedHash expr
+      n1 = naiveHashWithBinders expr
+      n2 = naiveHashWithBinders2 expr
+
+  paths h === paths d
+  paths h === paths c
+  paths h === paths n1
+  paths h === paths n2
 
 numRandomTests :: TestLimit
 numRandomTests = 100 * 1000
