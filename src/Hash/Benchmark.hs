@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wall #-}
+-- Doesn't actually seem to be required
+--{-# OPTIONS_GHC -fno-full-laziness #-}
 
 module Benchmark where
 
@@ -15,10 +17,11 @@ import System.IO.Temp (createTempDirectory)
 import Expr (Expr, Path, exprSize)
 import Hash (Hash, hashSubExprs, deBruijnHash, combinedHash, genExprNumVars)
 
-evalHashResult :: [(Hash, Path, Expr a)] -> IO ()
-evalHashResult l = evaluate (fix (\next -> \case
+{-# NOINLINE evalHashResult #-}
+evalHashResult :: (e -> [(Hash, Path, Expr a)]) -> e -> IO ()
+evalHashResult a e = evaluate (fix (\next -> \case
   (!_hash, _, _) : rest -> next rest
-  [] -> ()) l)
+  [] -> ()) (a e))
 
 times :: Monad m => Int -> s -> (s -> m s) -> m s
 times n s f = times_f 0 s
@@ -60,7 +63,7 @@ benchmark = do
       (n, tsum, tsquaredsum, tmin) <- times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
         start <- Clock.getTime Clock.Monotonic
         times iterationsPerSample () $ \() ->
-          evalHashResult (algorithm expression)
+          evalHashResult algorithm expression
         stop <- Clock.getTime Clock.Monotonic
 
         let elapsed_micro = iterationsElapsed_micro / fromIntegral iterationsPerSample
@@ -111,7 +114,7 @@ benchmark = do
 gnuplotFile :: [((String, b, String), (Int, String), String)] -> String
 gnuplotFile results =
   unlines [ "set xlabel \"Number of nodes in expression\""
-          , "set ylabel \"Time taken to hash / us"
+          , "set ylabel \"Time taken to hash all subexpressions / us"
           , "plot " ++ intercalate ", " (fmap plotComponent results)
           ]
 
