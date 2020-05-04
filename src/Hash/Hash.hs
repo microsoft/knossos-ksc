@@ -50,7 +50,7 @@
 --
 -- The sub-expression hashing algorithms are
 --
--- * hashSubExprs (Tom's structural and free-vars hash)
+-- * castHash (Tom's structural and free-vars hash)
 -- * deBruijnHash (known to be broken)
 -- * combinedHash (deBruijnHash plus a free variable hash -- known to be broken)
 --
@@ -111,16 +111,16 @@ type Hash = Int
 -- (modulo hash collision, which we expect to be very rare).
 --
 -- Combines the variables hash and structure hash into a single hash
--- value.  NB it is the triple returned by 'hashExprExplicit' that is
+-- value.  NB it is the triple returned by 'castHashExplicit' that is
 -- compositional, not this single hash value.
-hashExpr :: (Ord a, Hashable a) => Expr a -> Hash
-hashExpr e = hash (Map.toList m, h)
-  where (m, h, _depth, _exprs) = hashExprExplicit [] Map.empty e
+castHashTop :: (Ord a, Hashable a) => Expr a -> Hash
+castHashTop e = hash (Map.toList m, h)
+  where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e
 
-hashSubExprs :: (Ord a, Hashable a)
-             => Expr a -> [(Hash, Path, Expr a)]
-hashSubExprs e = exprs
-  where (_m, _h, _depth, exprs) = hashExprExplicit [] Map.empty e
+castHash :: (Ord a, Hashable a)
+         => Expr a -> [(Hash, Path, Expr a)]
+castHash e = exprs
+  where (_m, _h, _depth, exprs) = castHashExplicit [] Map.empty e
 
 -- | The implementation of the alpha-equivalence-respecting hashing
 -- function.
@@ -134,6 +134,7 @@ hashSubExprs e = exprs
 -- data structures (in general, not just lambda-expression-like data
 -- structures).  The other components will be explained below.
 --
+-- "castHash" means "compositional AST hash".
 -- The important property that it satisfies is compositionality: the
 -- value assigned to each subtree can be calculated from the values
 -- assigned to its direct children and nothing else.  Compositionality
@@ -151,7 +152,7 @@ hashSubExprs e = exprs
 -- to determine the placement of free variables in the expression, and
 -- the "structure hash" determines everything else about the
 -- expression (the "structure").  Treating the two values separately
--- is what allows @hashExpr@ to respect alpha-equivalence.
+-- is what allows @castHash@ to respect alpha-equivalence.
 --
 -- The "structure hash" is a hash that uniquely determines the
 -- "structure" of the lambda expression up to the names of the
@@ -192,12 +193,12 @@ hashSubExprs e = exprs
 --
 -- (*) the map operations are actually logarithmic, not constant, but
 -- we probably don't care about that.
-hashExprExplicit :: (Ord a, Hashable a)
+castHashExplicit :: (Ord a, Hashable a)
                  => Path
                  -> Map a Path
                  -> Expr a
                  -> (Map a Hash, Hash, Int, [(Hash, Path, Expr a)])
-hashExprExplicit =
+castHashExplicit =
   let subExprHash_ variablesHash structureHash bvEnv =
         hash (Map.toList variablesHash,
               structureHash,
@@ -215,7 +216,7 @@ hashExprExplicit =
     where variablesHash = Map.delete x variablesHashE
           structureHash = hashExprOWithSalt depth (LamO hashX structureHashE)
           (variablesHashE, structureHashE, depth, subExprHashes) =
-            hashExprExplicit (L:path) (addLocn x path bvEnv) e
+            castHashExplicit (L:path) (addLocn x path bvEnv) e
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
           hashes        = (subExprHash, path, expr) : subExprHashes
 
@@ -237,15 +238,15 @@ hashExprExplicit =
           hashes        = (subExprHash, path, expr) : subExprHashes
 
           (variablesHashF, structureHashF, depthF, subExprHashesF) =
-            hashExprExplicit (Apl:path) bvEnv f
+            castHashExplicit (Apl:path) bvEnv f
           (variablesHashE, structureHashE, depthE, subExprHashesE) =
-            hashExprExplicit (Apr:path) bvEnv e
+            castHashExplicit (Apr:path) bvEnv e
 
 -- | Whether two expressions are alpha-equivalent, implemented using
--- 'hashExpr'
+-- 'castHash'
 alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
                                    => Expr a -> Expr a -> Bool
-alphaEquivalentAccordingToHashExpr = (==) `on` hashExpr
+alphaEquivalentAccordingToHashExpr = (==) `on` castHash
 
 -- | Makes binders unique whilst preserving alpha-equivalence.  The
 -- binders are replaced with integers starting from zero and
@@ -509,11 +510,11 @@ prop_compareSubExpressionHashes :: Property
 prop_compareSubExpressionHashes = withTests 1 $ property $ do
   let n = normalizedGroupedEquivalentSubexpressions
 
-  n (hashSubExprs example1) === n (combinedHash example1)
-  n (hashSubExprs example2) === n (combinedHash example2)
-  n (hashSubExprs example3) === n (combinedHash example3)
+  n (castHash example1) === n (combinedHash example1)
+  n (castHash example2) === n (combinedHash example2)
+  n (castHash example3) === n (combinedHash example3)
 
-  n (hashSubExprs example4) /== n (combinedHash example4)
+  n (castHash example4) /== n (combinedHash example4)
 
 -- | Checks that the paths come out of the algorithms in the same
 -- order (which just so happens to be depth first preorder).  This is
@@ -526,7 +527,7 @@ prop_stablePaths = withTests numRandomTests $ property $ do
 
   expr <- forAll genExpr
 
-  let h = hashSubExprs expr
+  let h = castHash expr
       d = deBruijnHash expr
       c = combinedHash expr
       n1 = naiveHashWithBinders expr
@@ -555,9 +556,9 @@ prop_uniquifyBindersIdempotent = withTests numRandomTests $ property $ do
 
   massageVariables uniquifyBinders_expr === uniquifyBinders uniquifyBinders_expr
 
--- | A sanity check for both uniquifyBinders and hashExpr: uniquifying
+-- | A sanity check for both uniquifyBinders and castHash: uniquifying
 -- binders should preserve alpha-equivalence and this equivalence
--- should be picked up by hashExpr.
+-- should be picked up by castHash.
 prop_hashUniquifyBinders :: Property
 prop_hashUniquifyBinders = withTests numRandomTests $ property $ do
   expr <- forAll genExpr
@@ -565,7 +566,7 @@ prop_hashUniquifyBinders = withTests numRandomTests $ property $ do
   assert (alphaEquivalentAccordingToHashExpr (uniquifyBinders expr)
                                              (massageVariables expr))
 
--- | A check for whether hashExpr respects alpha-equivalence (as
+-- | A check for whether castHash respects alpha-equivalence (as
 -- defined above) by checking it against alpha-equivalence in terms of
 -- uniquifyBinders, which is presumably easier to get right.
 prop_hashAlphaEquivalence :: Property

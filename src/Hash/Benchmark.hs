@@ -9,7 +9,7 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, Path, exprSize)
-import Hash (Hash, hashSubExprs, deBruijnHash, combinedHash, naiveHashNested,
+import Hash (Hash, castHash, deBruijnHash, combinedHash, naiveHashNested,
              genExprNumVars)
 
 -- We apply the argument to the function here.  If we do it at the
@@ -42,7 +42,7 @@ benchmark = do
 
       genExpr = Gen.scale (* (100 * 1000)) . genExprNumVars
 
-      algorithms = [ ("Tom",      hashSubExprs,    "green")
+      algorithms = [ ("Compositional", castHash,   "green")
                    , ("DeBruijn", deBruijnHash,    "red")
                    , ("Combined", combinedHash,    "blue")
                    , ("Naive",    naiveHashNested, "orange") ]
