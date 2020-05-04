@@ -9,7 +9,8 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, Path, exprSize)
-import Hash (Hash, hashSubExprs, deBruijnHash, combinedHash, genExprNumVars)
+import Hash (Hash, hashSubExprs, deBruijnHash, combinedHash, naiveHashNested,
+             genExprNumVars)
 
 -- We apply the argument to the function here.  If we do it at the
 -- call site then GHC may float it outside of the timing loop!
@@ -41,9 +42,10 @@ benchmark = do
 
       genExpr = Gen.scale (* (100 * 1000)) . genExprNumVars
 
-      algorithms = [ ("Tom",      hashSubExprs, "green")
-                   , ("DeBruijn", deBruijnHash, "red")
-                   , ("Combined", combinedHash, "blue") ]
+      algorithms = [ ("Tom",      hashSubExprs,    "green")
+                   , ("DeBruijn", deBruijnHash,    "red")
+                   , ("Combined", combinedHash,    "blue")
+                   , ("Naive",    naiveHashNested, "orange") ]
 
       varCounts = [ (10, "1"), (100, "4") ]
 

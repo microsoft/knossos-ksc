@@ -365,6 +365,27 @@ combinedHashExplicit = \env fvEnv location expr ->
 addLocn :: Ord k => k -> a -> Map k a -> Map k a
 addLocn = Map.insert
 
+-- | The most basic hash one could think of.  Is not intended to
+-- respect any kind of equivalences.
+naiveHash :: Hashable a => Expr a -> Int
+naiveHash = \case
+  Var x   -> hash x
+  Lam x e -> hash (x, naiveHash e)
+  App f e -> hash (naiveHash f, naiveHash e)
+
+naiveHashNested :: Hashable a => Expr a -> [(Hash, Path, Expr a)]
+naiveHashNested = naiveHashNestedExplicit []
+
+naiveHashNestedExplicit :: Hashable a
+                        => Path
+                        -> Expr a
+                        -> [(Hash, Path, Expr a)]
+naiveHashNestedExplicit path expr = (naiveHash expr, path, expr) : case expr of
+  Var{}   -> []
+  Lam _ e -> naiveHashNestedExplicit (L:path) e
+  App f e -> naiveHashNestedExplicit (Apl:path) f
+             ++ naiveHashNestedExplicit (Apr:path) e
+
 normalizedGroupedEquivalentSubexpressions
   :: Ord hash => [(hash, Path, expr)] -> [[(Path, expr)]]
 normalizedGroupedEquivalentSubexpressions =
