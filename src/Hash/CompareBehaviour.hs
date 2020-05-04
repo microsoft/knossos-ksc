@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wall #-}
-
 module CompareBehaviour where
 
 import Hash (hashSubExprs,combinedHash,deBruijnHash,

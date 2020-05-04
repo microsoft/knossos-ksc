@@ -20,9 +20,13 @@ library
                        temporary,
                        blaze-html
   default-language:    Haskell2010
+  ghc-options: -Werror -Wall
 
 executable hash
   main-is:             Main.hs
+  other-modules:       Benchmark,
+                       Expr,
+                       Hash
   hs-source-dirs:      .
   build-depends:       base,
                        containers >= 0.5.9,
@@ -33,3 +37,4 @@ executable hash
                        temporary,
                        blaze-html
   default-language:    Haskell2010
+  ghc-options: -Werror -Wall

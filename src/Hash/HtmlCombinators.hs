@@ -1,7 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
 
-{-# OPTIONS_GHC -Wall #-}
-
 module HtmlCombinators (module HtmlCombinators) where
 
 import qualified Control.Monad.Trans.Writer as W
@@ -34,7 +32,7 @@ type Iterator' a r = W.Writer [a] r
 type Iterator a = Iterator' a ()
 
 forEach :: Monad m => Iterator' a r -> (a -> m b) -> m ()
-forEach s f = flip mapM_ (W.execWriter s) f
+forEach s = flip mapM_ (W.execWriter s)
 
 inList :: [a] -> Iterator a
 inList = mapM_ yield

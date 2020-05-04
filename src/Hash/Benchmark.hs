@@ -1,7 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -Wall #-}
--- Doesn't actually seem to be required
---{-# OPTIONS_GHC -fno-full-laziness #-}
 
 module Benchmark where
 
@@ -14,9 +11,10 @@ import System.IO.Temp (createTempDirectory)
 import Expr (Expr, Path, exprSize)
 import Hash (Hash, hashSubExprs, deBruijnHash, combinedHash, genExprNumVars)
 
-{-# NOINLINE evalHashResult #-}
 -- We apply the argument to the function here.  If we do it at the
 -- call site then GHC may float it outside of the timing loop!
+-- Therefore it's important that this function not be inlined.
+{-# NOINLINE evalHashResult #-}
 evalHashResult :: (e -> [(Hash, Path, Expr a)]) -> e -> IO ()
 evalHashResult a e = let !_ = seqHashResult (a e)
                      in return ()
