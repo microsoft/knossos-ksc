@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wall #-}
 -- Doesn't actually seem to be required
 --{-# OPTIONS_GHC -fno-full-laziness #-}
@@ -7,9 +6,7 @@
 module Benchmark where
 
 import qualified Hedgehog.Gen as Gen
-import Control.Exception (evaluate)
-import Data.Function (fix)
-import Data.List (intercalate)
+import Data.List (intercalate, foldl')
 import qualified System.Clock as Clock
 import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
@@ -18,10 +15,16 @@ import Expr (Expr, Path, exprSize)
 import Hash (Hash, hashSubExprs, deBruijnHash, combinedHash, genExprNumVars)
 
 {-# NOINLINE evalHashResult #-}
+-- We apply the argument to the function here.  If we do it at the
+-- call site then GHC may float it outside of the timing loop!
 evalHashResult :: (e -> [(Hash, Path, Expr a)]) -> e -> IO ()
-evalHashResult a e = evaluate (fix (\next -> \case
-  (!_hash, _, _) : rest -> next rest
-  [] -> ()) (a e))
+evalHashResult a e = let !_ = seqHashResult (a e)
+                     in return ()
+
+seqHashResult :: [(Hash, Path, Expr a)] -> ()
+seqHashResult = let f a (hash, _path, _expr) =
+                      let !_ = hash in a
+                in foldl' f ()
 
 times :: Monad m => Int -> s -> (s -> m s) -> m s
 times n s f = times_f 0 s

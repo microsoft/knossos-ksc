@@ -33,6 +33,3 @@ executable hash
                        temporary,
                        blaze-html
   default-language:    Haskell2010
-  -- -O0 is really important otherwise GHC seems to optimise our loops
-  -- away!
-  ghc-options:         -fno-full-laziness -O0
