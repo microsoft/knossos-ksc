@@ -39,6 +39,8 @@ benchmark = do
       samplesPerExpression = 10
       iterationsPerSample  = 100
 
+      genExpr = Gen.scale (* (100 * 1000)) . genExprNumVars
+
       algorithms = [ ("Tom",      hashSubExprs, "green")
                    , ("DeBruijn", deBruijnHash, "red")
                    , ("Combined", combinedHash, "blue") ]
@@ -58,8 +60,7 @@ benchmark = do
     let (varCount, _) = var_
         (algorithmName, algorithm, _) = algorithm_
     results <- times totalExpressions [] $ \rest -> do
-      expression <- Gen.sample (Gen.scale (* (100 * 1000))
-                                 (genExprNumVars varCount))
+      expression <- Gen.sample (genExpr varCount)
 
       (n, tsum, tsquaredsum, tmin) <- times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
         start <- Clock.getTime Clock.Monotonic
