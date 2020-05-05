@@ -591,12 +591,55 @@ genExprWithVars vars = genExprWithVars_vars
           , Gen.subterm2 genExprWithVars_vars genExprWithVars_vars App
           ]
 
+genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr a)
+genExprWithVarsLinear vars =
+  Gen.choice [ Var <$> Gen.element vars
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             , recurse
+             ]
+  where e = genExprWithVarsLinear vars
+        recurse = App <$> (Lam <$> Gen.element vars <*> e)
+                   <*> (Var <$> Gen.element vars)
+
 -- | Generates random expressions for testing
 genExpr :: MonadGen m => m (Expr Char)
 genExpr = genExprWithVars ['u'..'z']
 
 genExprNumVars :: MonadGen m => Int -> m (Expr String)
 genExprNumVars n = genExprWithVars (map show [1..n])
+
+genExprLinearNumVars :: MonadGen m => Int -> m (Expr String)
+genExprLinearNumVars n = genExprWithVarsLinear (map show [1..n])
 
 -- A slightly nicer API for merging maps
 data MergeMaps l r = LeftOnly l

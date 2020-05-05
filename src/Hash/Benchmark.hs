@@ -10,7 +10,7 @@ import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, Path, exprSize)
 import Hash (Hash, castHash, deBruijnHash, combinedHash, naiveHashNested,
-             genExprNumVars)
+             {-genExprNumVars,-} genExprLinearNumVars)
 
 -- We apply the argument to the function here.  If we do it at the
 -- call site then GHC may float it outside of the timing loop!
@@ -40,7 +40,7 @@ benchmark = do
       samplesPerExpression = 10
       iterationsPerSample  = 100
 
-      genExpr = Gen.scale (* (100 * 1000)) . genExprNumVars
+      genExpr = Gen.resize 1000 . genExprLinearNumVars
 
       algorithms = [ ("Compositional", castHash,   "green")
                    , ("DeBruijn", deBruijnHash,    "red")
