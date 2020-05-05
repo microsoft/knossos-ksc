@@ -526,6 +526,8 @@ Syntax: `(assert (cond) (expr))`
 
 #### pr
 
-Prints a value of numeric or string types. Returns nothing.
+Prints a list of values of numeric or string types, from literals, expressions, etc.
 
-Syntax: `(pr value)`
+Returns the number of elements printed as Integer.
+
+Syntax: `(pr value expr literal ... )`
