@@ -591,45 +591,16 @@ genExprWithVars vars = genExprWithVars_vars
           , Gen.subterm2 genExprWithVars_vars genExprWithVars_vars App
           ]
 
+-- | Generate expressions that are completely unbalanced, for testing
+-- the worst cases of some of our hashing algorithms.
 genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr a)
 genExprWithVarsLinear vars =
-  Gen.choice [ Var <$> Gen.element vars
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             , recurse
-             ]
+  Gen.choice ([ Var <$> Gen.element vars ]
+             ++ replicate 22 recurse)
+
   where e = genExprWithVarsLinear vars
         recurse = App <$> (Lam <$> Gen.element vars <*> e)
-                   <*> (Var <$> Gen.element vars)
+                      <*> (Var <$> Gen.element vars)
 
 -- | Generates random expressions for testing
 genExpr :: MonadGen m => m (Expr Char)
