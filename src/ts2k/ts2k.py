@@ -26,7 +26,6 @@ tab = "\t"
 def f(x):
     return x + 4.0
 
-
 @torch.jit.script
 def main():
     t = torch.tensor([[1.2, 3.4, 5.6], [2.3, 4.5, 6.7]])
@@ -38,8 +37,13 @@ def main():
 # https://pytorch.org/docs/master/jit.html#interpreting-graphs
 # https://github.com/pytorch/pytorch/blob/8fe2a5e91b79e3f9b6f6c632fdf7f39ec3bf4fca/torch/csrc/jit/ir/ir.h
 
+
+# CallMethod resolution:
+# https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
+
 output.write("#| -------- Graph ----------")
 output.write(str(f.graph))
+output.write("\n")
 output.write(str(main.graph))
 output.write("-------- |#")
 output.write("\n")
