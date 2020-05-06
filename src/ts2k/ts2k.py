@@ -1,7 +1,10 @@
 import torch
 import sexpdata
-
 import os
+import importlib.util
+import sys
+import inspect
+
 
 # TODO: Take output as argument
 dirname = os.path.dirname(__file__)
@@ -14,6 +17,15 @@ nl = "\n"
 tab = "\t"
 
 
+# TODO: Take input path as argument
+input_file_path = """C:/dev/knossos-ksc/test/ts2k/test0.py"""
+module_name = "DynamicLoadedModule"
+
+spec = importlib.util.spec_from_file_location(module_name, input_file_path)
+dynamicModule = importlib.util.module_from_spec(spec)
+# We deliberately don't make visible via sys.modules[module_name] = module
+spec.loader.exec_module(dynamicModule)
+
 # @torch.jit.script
 # def sqr(x):
 #      torch.mul(x,x)
@@ -22,16 +34,19 @@ tab = "\t"
 # def g(x,y):
 #     return sqr(torch.sin(x*y) if x > 0 else -y*torch.sin(-x))
 
-@torch.jit.script
-def f(x):
-    return x + 4.0
+# @torch.jit.script
+# def f(x):
+#     return x + 4.0
 
-@torch.jit.script
-def main():
-    t = torch.tensor([[1.2, 3.4, 5.6], [2.3, 4.5, 6.7]])
-    t2 = f(t)
-    print("Hello world from TorchScript -> Knossos!")
+# @torch.jit.script
+# def main():
+#     t = torch.tensor([[1.2, 3.4, 5.6], [2.3, 4.5, 6.7]])
+#     t2 = f(t)
+#     print("Hello world from TorchScript -> Knossos!")
 
+# load all TorchScript methods in target modules
+# (various limitations, local sibling modules)
+dynamicMembers = inspect.getmembers(dynamicModule, predicate=lambda v : type(v) == torch.jit.ScriptFunction)
 
 # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
 # https://pytorch.org/docs/master/jit.html#interpreting-graphs
@@ -42,16 +57,16 @@ def main():
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
 
 output.write("#| -------- Graph ----------")
-output.write(str(f.graph))
-output.write("\n")
-output.write(str(main.graph))
+
+for (name, member) in dynamicMembers:
+    output.write(str(member.graph))
+    output.write("\n")
 output.write("-------- |#")
 output.write("\n")
 
 symbolLook = {
     "Tensor": [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")]  # float vs integer?
 }
-
 
 def make_arg(input):
     # [input.debugName(), " :", input.type()]
@@ -126,4 +141,5 @@ def ts2ks(function):
 
     output.write(sexpdata.dumps(whole_exp))
 
-ts2ks(main)
+# do all members instead
+ts2ks(dynamicModule.main)
