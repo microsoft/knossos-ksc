@@ -89,8 +89,8 @@ example3 = (Lam "x" (Var "x" .+ (Var "y" .+ Var "3")))
            `App` (Lam "y" (Var "y" .+ Var "3"))
 
 example4 :: Expr String
-example4 = Lam "x" ((Var "x" .+ Var "x")
-                    .+ (Lam "y" ((Var "x" .+ Var "x") .+ Var "y")
+example4 = Lam "x" (sin_ (Var "x")
+                    .+ (Lam "y" (sin_ (Var "x") .+ Var "y")
                          `App` Var "3"))
 
 example5 :: Expr String
@@ -121,3 +121,6 @@ binOp opName e1 e2 = Var opName `App` e1 `App` e2
 
 atan2 :: Expr String -> Expr String -> Expr String
 atan2 = binOp "atan2"
+
+sin_ :: Expr String -> Expr String
+sin_ = (Var "sin" `App`)
