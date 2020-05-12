@@ -142,4 +142,6 @@ def ts2ks(function):
     output.write(sexpdata.dumps(whole_exp))
 
 # do all members instead
+# ts2ks(dynamicModule.f)
+# output.write("\n\n")
 ts2ks(dynamicModule.main)
