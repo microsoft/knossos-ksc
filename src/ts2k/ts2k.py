@@ -4,11 +4,14 @@ import os
 import importlib.util
 import sys
 import inspect
+import argparse
 
+parser = argparse.ArgumentParser(description='Convert TorchScript to Knossos IR')
+parser.add_argument('--input_file', required=True, help='TorchScript [file_path].py')
+parser.add_argument('--output_file', required=True, help='Knossos IR [file_path].ks')
+args = parser.parse_args()
 
-# TODO: Take output as argument
-dirname = os.path.dirname(__file__)
-filename = os.path.join(dirname, '../../obj/test/ts2k/ts2k_test.ks')
+filename = args.output_file
 
 output = open(filename, "w")
 
@@ -16,9 +19,7 @@ output = open(filename, "w")
 nl = "\n"
 tab = "\t"
 
-
-# TODO: Take input path as argument
-input_file_path = """C:/dev/knossos-ksc/test/ts2k/test0.py"""
+input_file_path = args.input_file
 module_name = "DynamicLoadedModule"
 
 spec = importlib.util.spec_from_file_location(module_name, input_file_path)
@@ -26,23 +27,6 @@ dynamicModule = importlib.util.module_from_spec(spec)
 # We deliberately don't make visible via sys.modules[module_name] = module
 spec.loader.exec_module(dynamicModule)
 
-# @torch.jit.script
-# def sqr(x):
-#      torch.mul(x,x)
-
-# @torch.jit.script
-# def g(x,y):
-#     return sqr(torch.sin(x*y) if x > 0 else -y*torch.sin(-x))
-
-# @torch.jit.script
-# def f(x):
-#     return x + 4.0
-
-# @torch.jit.script
-# def main():
-#     t = torch.tensor([[1.2, 3.4, 5.6], [2.3, 4.5, 6.7]])
-#     t2 = f(t)
-#     print("Hello world from TorchScript -> Knossos!")
 
 # load all TorchScript methods in target modules
 # (various limitations, local sibling modules)

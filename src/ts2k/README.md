@@ -3,7 +3,7 @@
 TorchScript https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html provides a way to get the full code graph which we can convert to Knossos IR.
 
 
-To demo, just `python ts2k.py`. (TODO: allow it to take arguments)
+To demo, just `python src\ts2k\ts2k.py --input_file=test.py --output_file=test.ks`.
 
 ```python
 @torch.jit.script
@@ -68,7 +68,7 @@ graph():
 This can also be connected to the overall tools, from the project root
 
 ```
-python src\ts2k\ts2k.py
+python src\ts2k\ts2k.py --input_file=test/ts2k/test0.py --output_file=obj/test/ts2k/ts2k_test.ks
 ```
 
 then (in PowerShell style)
@@ -83,7 +83,7 @@ then (in PowerShell style)
   --exe-output-file obj/test/ts2k/ts2k_test.exe
 ```
 
-which compiles OK
+which compiles and runs
 
 ```
 read decls
