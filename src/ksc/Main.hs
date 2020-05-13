@@ -234,7 +234,7 @@ demoFOnTestPrograms ksTests = do
   let ksTestsInModes :: [(String, ADPlan)]
       ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
-  testOn ksTestsInModes $ \(ksTest, adp) -> do
+  testOn ksTestsInModes $ \(ksTest, adp) ->
         demoFFilter Nothing ignoreMain adp ["src/runtime/prelude.ks", ksTest]
 
 -- Drop items from the list while the condition is satisfied, and also
