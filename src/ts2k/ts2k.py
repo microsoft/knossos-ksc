@@ -62,13 +62,7 @@ def make_arg(input):
     ]
 
 
-# prim::Constant
-# prim::ListConstruct
-# prim::ListConstruct
-# prim::ListConstruct
-# aten::tensor
-# prim::CallFunction
-# prim::Print
+
 
 def managleDebugName(name):
     return "_" + name
@@ -95,14 +89,49 @@ def make_print(node):
     return [sexpdata.Symbol("print"), sexpdata.Symbol(mangled_id)]
 
 
+def make_list(node):
+    print("WARNING: Lists aren't correctly translated yet, " + node.kind() )
+    # build n (lam (ni : Integer) (to_float (mul ni ni))))
+    value = node.outputsAt(0)
+    return [
+        sexpdata.Symbol("\n"),
+        sexpdata.Symbol("_" + value.debugName()),
+        [
+            sexpdata.Symbol("build"),
+            sexpdata.Symbol("1"),
+            [
+                sexpdata.Symbol("lam"),
+                [
+                    sexpdata.Symbol("ni"),
+                    sexpdata.Symbol(":"),
+                    sexpdata.Symbol("Integer")
+                ],
+                # this bit is just exploring, need to replace with actual values
+                [
+                    sexpdata.Symbol("to_float"),
+                    sexpdata.Symbol("ni")
+                ]
+            ]
+        ]
+    ]    
+
 def make_default(node):
     print("TODO:" + node.kind() )
     return sexpdata.Symbol("")
 
 
+# prim::Constant
+# prim::ListConstruct
+# prim::ListConstruct
+# prim::ListConstruct
+# aten::tensor
+# prim::CallFunction
+# prim::Print
+
 lookups = {
     'prim::Constant': make_constant,
-    'prim::Print': make_print
+    'prim::Print': make_print,
+    'prim::ListConstruct': make_list
 }
 
 

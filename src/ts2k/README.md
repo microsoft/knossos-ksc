@@ -47,7 +47,7 @@ graph():
 -------- |#
 ```
 
-  And thence to this Knossos IR (TODO)
+  And thence to this Knossos IR
 
   ```lisp
 (def main Integer () (
