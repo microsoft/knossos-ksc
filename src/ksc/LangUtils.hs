@@ -2,9 +2,9 @@
 -- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_GHC -Wno-orphans        #-}
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
-	     ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
+             PatternSynonyms,
+	     ScopedTypeVariables #-}
 
 module LangUtils (
   -- Functions over expressions

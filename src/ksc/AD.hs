@@ -1,6 +1,5 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE LambdaCase #-}
 
 module AD where
 
