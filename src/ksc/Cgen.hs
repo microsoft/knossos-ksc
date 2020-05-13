@@ -261,7 +261,7 @@ cgenExprR env = \case
     return $ CG
         (  "/*build*/\n"
         ++ szdecl
-        ++ "vec<" ++ (cgenType $ mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
+        ++ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
         ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
                   ++ cvar ++ " < " ++ szex ++ ";"
                   ++ " ++" ++ cvar ++ ") {\n"
@@ -503,7 +503,7 @@ mangleType = \case
     TypeInteger   -> "i"
     TypeFloat     -> "f"
     TypeString    -> "s"
-    TypeTuple tys -> "<" ++ (concatMap mangleType tys) ++ ">"
+    TypeTuple tys -> "<" ++ concatMap mangleType tys ++ ">"
     TypeVec ty    -> "v" ++ mangleType ty
     TypeLam a b   -> "l<" ++ mangleType a ++ mangleType b ++ ">"
     TypeLM _ _    -> error "Can't mangle TypeLM"

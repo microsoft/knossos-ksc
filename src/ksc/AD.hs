@@ -272,7 +272,7 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
     (perhapsFstToo, lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (id, rhs, tangentType t)
-            (TupleAD, TypeTuple [t, _]) -> ((\lmrhs -> Tuple [pFst rhs, lmrhs]),
+            (TupleAD, TypeTuple [t, _]) -> (\lmrhs -> Tuple [pFst rhs, lmrhs],
                                             pSnd rhs,
                                             TypeTuple [t, tangentType t])
             (adp    , t               )

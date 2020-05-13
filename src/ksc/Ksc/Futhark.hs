@@ -104,7 +104,7 @@ instance Pretty Def where
     L.hang (let' entry <+> text fname <+>
             L.fsep (map ppr tparams) <+>
             L.fsep (map ppr params) <+>
-            (maybe empty ((text ":" <+>) . ppr) ret) <+> text "=")
+            maybe empty ((text ":" <+>) . ppr) ret <+> text "=")
     2 (ppr rhs)
     where let' Entry = text "entry"
           let' NotEntry = text "let"
