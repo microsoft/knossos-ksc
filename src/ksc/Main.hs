@@ -219,7 +219,7 @@ futharkCompileKscPrograms ksFiles = do
 
   testOn ksFiles $ \ksFile -> do
         ksTest <- dropExtensionOrFail "ks" ksFile
-        (if ksFile `elem` testsThatDon'tWorkWithFuthark
+        if ksFile `elem` testsThatDon'tWorkWithFuthark
          then putStrLn ("Skipping " ++ ksFile
                         ++ " because it is known not to work with Futhark")
          else do
@@ -227,7 +227,7 @@ futharkCompileKscPrograms ksFiles = do
             Cgen.readProcessPrintStderr
               "futhark-0.11.2-linux-x86_64/bin/futhark"
               ["check", "obj/" ++ ksTest ++ ".fut"]
-            return ())
+            return ()
 
 demoFOnTestPrograms :: [String] -> IO ()
 demoFOnTestPrograms ksTests = do
