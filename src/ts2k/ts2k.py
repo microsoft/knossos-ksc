@@ -13,6 +13,7 @@ args = parser.parse_args()
 
 filename = args.output_file
 
+os.makedirs(os.path.dirname(filename), exist_ok=True)
 output = open(filename, "w")
 
 # Newline constant for s-expr printing
