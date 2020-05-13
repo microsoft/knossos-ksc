@@ -284,7 +284,7 @@ notInScope v in_scope
 
     (prefix, _n) = parse_suffix [] (reverse str)
 
-    parse_suffix :: [Char]          -- Digits parsed from RH end (in order)
+    parse_suffix :: String          -- Digits parsed from RH end (in order)
                  -> String          -- String being parsed (reversed)
                  -> (String, Int)   -- String before "_", plus number found after
     -- E.g. parse_suffix "foo_23" = ("foo",    23)
