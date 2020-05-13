@@ -42,11 +42,14 @@ dynamicMembers = inspect.getmembers(dynamicModule, predicate=lambda v : type(v) 
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
 
 output.write("#| -------- Graph ----------")
+output.write("\n")
+output.write("\n")
 
 for (name, member) in dynamicMembers:
     output.write(str(member.graph))
     output.write("\n")
 output.write("-------- |#")
+output.write("\n")
 output.write("\n")
 
 symbolLook = {
