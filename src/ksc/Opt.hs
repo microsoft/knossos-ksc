@@ -2,9 +2,9 @@
 
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
-	     ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
+             PatternSynonyms,
+	     ScopedTypeVariables #-}
 
 module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
 

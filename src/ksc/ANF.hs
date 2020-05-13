@@ -1,7 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
+             PatternSynonyms,
 	     ScopedTypeVariables, TypeApplications #-}
 
 module ANF where
