@@ -169,7 +169,7 @@ data TypeX
   | TypeString
   | TypeTuple [TypeX]
 
-  | TypeVec (TypeX)
+  | TypeVec TypeX
 
   | TypeLam TypeX TypeX  -- Domain -> Range
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target

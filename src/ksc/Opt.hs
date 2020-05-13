@@ -386,8 +386,8 @@ inlineCall bndrs body args
   = possiblyTrace $
     mkLet bndrs args body
   where traceMessage =
-          ("inlineCall is known to be flaky.\n"
-           ++ "See https://github.com/microsoft/knossos-ksc/issues/93")
+          "inlineCall is known to be flaky.\n"
+           ++ "See https://github.com/microsoft/knossos-ksc/issues/93"
         possiblyTrace = if bindersIntersectArgs
                         then trace traceMessage
                         else id

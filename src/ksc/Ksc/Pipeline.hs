@@ -226,8 +226,8 @@ displayCppGenAndCompile compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
-  ; let outfile = ("obj/" ++ file)
-  ; let exefile = ("obj/" ++ file ++ ext)
+  ; let outfile = "obj/" ++ file
+  ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
   ; displayCppGenDiffs theDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile

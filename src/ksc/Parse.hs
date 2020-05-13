@@ -220,7 +220,7 @@ pKExpr =   pIfThenElse
        <|> pCall
        <|> pTuple
 
-pType :: Parser (TypeX)
+pType :: Parser TypeX
 pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
     <|> (pReserved "String"  >> return TypeString)
