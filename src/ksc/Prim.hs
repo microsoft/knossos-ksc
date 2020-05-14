@@ -67,6 +67,8 @@ mk_fun f = case find_dollar f of
              Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
              Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
              Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
+             Just ("fwds", s) -> DrvFun  (mk_fun_id s) (AD SplitAD Fwd)
+             Just ("revs", s) -> DrvFun  (mk_fun_id s) (AD SplitAD Rev)
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
@@ -87,6 +89,27 @@ mk_fun f = case find_dollar f of
 mkZero, mkTangentZero :: HasCallStack => TExpr -> TExpr
 mkZero        = getZero id
 mkTangentZero = getZero tangentType
+
+mkTangentZeroFromType :: Type -> TExpr
+-- Only works for types with no vectors,
+-- for which needValueForTangentZero says True
+mkTangentZeroFromType TypeInteger    = unitExpr
+mkTangentZeroFromType TypeFloat      = Konst (KFloat 0.0)
+mkTangentZeroFromType TypeString     = unitExpr
+mkTangentZeroFromType TypeBool       = unitExpr
+mkTangentZeroFromType (TypeTuple ts) = Tuple (map mkTangentZeroFromType ts)
+mkTangentZeroFromType ty             = pprTrace "mkTangentZeroFromType" (ppr ty)
+                                       Konst (KInteger 99)  -- A distinctive value
+
+needValueForTangentZero :: Type -> Bool
+needValueForTangentZero TypeInteger    = False
+needValueForTangentZero TypeFloat      = False
+needValueForTangentZero TypeString     = False
+needValueForTangentZero TypeBool       = False
+needValueForTangentZero (TypeTuple ts) = any needValueForTangentZero ts
+needValueForTangentZero TypeUnknown    = False
+needValueForTangentZero (TypeVec {})   = True
+needValueForTangentZero ty             = pprPanic "needValueForTangentZero" (ppr ty)
 
 getZero :: HasCallStack => (Type -> Type) -> TExpr -> TExpr
 getZero tangent_type e
@@ -212,6 +235,7 @@ lmApplyR = mkPrimCall2 "lmApplyR"
 lmApply_AD :: HasCallStack => ADMode -> TExpr -> TExpr -> TExpr
 lmApply_AD (AD BasicAD dir) = lmApply_Dir  dir
 lmApply_AD (AD TupleAD dir) = lmApplyT_Dir dir
+lmApply_AD (AD SplitAD _)   = error "lmApply_AD:SplitAD"  -- Doesn't make sense
 
 lmApply_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApply_Dir Fwd e ds = lmApply  e ds
@@ -342,6 +366,28 @@ pIndex = mkPrimCall2 "index"
 pSum :: TExpr -> TExpr
 pSum = mkPrimCall1 "sum"
 
+pTupCons :: TExpr -> TExpr -> TExpr
+-- Put arg1 on the front of the tuple arg2
+pTupCons arg1 arg2
+  | Tuple args <- arg2          = Tuple (arg1:args)
+  | TypeTuple {} <- typeof arg2 = mkPrimCall2 "tupCons" arg1 arg2
+  | otherwise                   = Tuple [arg1,arg2]
+
+pTupHead :: TExpr -> TExpr
+pTupHead e | Tuple (e1:_) <- e        = e1
+           | TypeTuple es <- typeof e = pSel 1 (length es) e
+           | otherwise = pprTrace "pTupHead" (ppr e <+> dcolon <+> ppr (typeof e)) $
+                         Konst (KInteger 99)
+
+pTupTail :: TExpr -> TExpr
+pTupTail e | Tuple (_:es) <- e       = mkTuple es
+           | TypeTuple [_,_] <- e_ty = pSel 2 2 e
+           | TypeTuple {}    <- e_ty = mkPrimCall1 "tupTail" e
+           | otherwise = pprTrace "pTupTail" (ppr e <+> dcolon <+> ppr e_ty) $
+                         Konst (KInteger 88)
+           where
+             e_ty = typeof e
+
 pSumBuild :: TExpr -> TExpr -> TExpr
 pSumBuild = mkPrimCall2 "sumbuild"
 
@@ -353,6 +399,10 @@ pSize e = mkPrimCall1 "size" e
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e
+  | n == 1  -- A 1-tuple is the same as the thing itself
+            -- So sel_1_1 e = e
+  = assert (text "pSel1") (i==1) e
+
   | Tuple es <- e  -- Reduce clutter by optimising right here
                    --    sel_1_2 (e1,e2) --> e1
   = assert (text "pSel" <+> int i <+> int n <+> int (length es) $$ ppr es) (n == length es)
@@ -382,7 +432,7 @@ pMulff x1 x2 = userCall "mul" TypeFloat (Tuple [x1, x2])
 ---------------------------------------------
 --       Types of primitive functions
 --
---  For each primitve, we give its type
+--  For each primitive, we give its type
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
@@ -417,14 +467,26 @@ primCallResultTy_maybe fun arg_ty
         | AD BasicAD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
         , TypeTuple [s, _dt] <- arg_ty
         -> Right (tangentType s)
+
+        | AD SplitAD Fwd <- adm
+        , Right t_ty <- primCallResultTy_maybe (Fun f) arg_ty
+        -> Right (TypeTuple [t_ty, unitType])  -- Not clear this is always right
+                                               -- What is the X type for a primitive?
+
+        | AD SplitAD Rev <- adm
+        -> Right arg_ty
+
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
 selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
-selCallResultTy_maybe i n (TypeTuple arg_tys)
-  | i <= length arg_tys
+selCallResultTy_maybe i n arg_ty
+  | i == 1, n == 1
+  = Right arg_ty
+  | TypeTuple arg_tys <- arg_ty
+  , i <= length arg_tys
   , n == length arg_tys
   = Right (arg_tys !! (i - 1))
 selCallResultTy_maybe _ _ _ = Left (text "Bad argument to selector")
@@ -574,6 +636,11 @@ primFunCallResultTy_maybe fun args
 
       ("delta"    , TypeTuple
                      [TypeInteger, TypeInteger, t])        -> Just t
+      ("tupCons" , TypeTuple [t, TypeTuple ts] ) -> Just (TypeTuple (t:ts))
+      ("tupHead" , TypeTuple (t:_)             ) -> Just t
+      ("tupTail" , TypeTuple (_:ts)            ) | length ts >= 2
+                                                  -> Just (TypeTuple ts)
+
       _ -> Nothing
 
 isPrimFun :: String -> Bool
@@ -586,6 +653,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
+                       , "tupCons", "tupTail"
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors

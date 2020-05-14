@@ -4,7 +4,7 @@
 	     ScopedTypeVariables, TypeApplications #-}
 
 module Annotate (
-  annotDecls, lintDefs
+  annotDecls, lintDefs, callResultTy_maybe, callResultTy
   ) where
 
 import Lang
@@ -226,6 +226,12 @@ callResultTy_maybe env fun arg_ty
   = primCallResultTy_maybe fun arg_ty
   where
     is_user_fun = isUserFun . funIdOfFun
+
+callResultTy :: GblSymTab -> Fun -> Type -> Type
+callResultTy gst fun arg_ty
+ = case callResultTy_maybe gst fun arg_ty of
+     Left err     -> pprTrace "callResultType:" err TypeUnknown
+     Right res_ty -> res_ty
 
 -----------------------------------------------
 --     The typecheck monad
