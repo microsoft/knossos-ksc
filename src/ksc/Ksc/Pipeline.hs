@@ -267,7 +267,7 @@ displayCppGenAndCompile compile ext verbosity files file = do {
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGenDiffs theDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; displayCppGenDefsDiffs theDefs theDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
   ; compiler cppfile exefile
   }
 
