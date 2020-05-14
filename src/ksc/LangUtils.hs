@@ -30,6 +30,9 @@ module LangUtils (
   LclSymTab, extendLclST,
   SymTab(..), newSymTab, emptySymTab,
 
+  -- Other utility functions
+  isSingleton, count,
+
   -- OneArg
   oneArgifyDef
 
@@ -41,6 +44,20 @@ import qualified Data.Set as S
 import Data.Char( isDigit )
 import Data.List( mapAccumL )
 import Test.Hspec
+
+
+-----------------------------------------------
+--     Utility functions
+-----------------------------------------------
+
+isSingleton :: [a] -> Bool
+isSingleton [x] = True
+isSingleton _   = False
+
+count :: (a->Bool) -> [a] -> Int
+count f [] = 0
+count f (x:xs) | f x       = 1 + count f xs
+               | otherwise = count f xs
 
 -----------------------------------------------
 --     Functions over expressions

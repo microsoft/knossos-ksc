@@ -24,11 +24,13 @@ import           Test.Hspec
 mkGradType :: ADPlan -> Type -> Type -> Type
 mkGradType BasicAD s ty = TypeLM s ty
 mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
+mkGradType SplitAD _ _ = error "mkGradType:SplitAD"  -- Doesn't make sense
   -- For TupleAD, mkGradType s t = (t, s -o t)
 
 mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
 mkGradTuple TupleAD p lm = Tuple [p, lm]
+mkGradTuple SplitAD _ _ = error "mkGradTuple:SplitAD"  -- Doesn't make sense
 
 data Phase = Parsed | Typed | OccAnald
 
@@ -157,6 +159,9 @@ data ExprX p
   | Assert (ExprX p) (ExprX p)
   | Dummy (MTypeX p)
 
+unitExpr :: ExprX p
+unitExpr = Tuple []
+
 instance InPhase p => Show (ExprX p) where
   show e = pps e
 
@@ -189,6 +194,9 @@ data TypeX
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
 
   | TypeUnknown
+
+unitType :: TypeX
+unitType = TypeTuple []
 
 deriving instance Eq  Type
 deriving instance Ord Type
@@ -248,9 +256,9 @@ tangentType :: HasCallStack => Type -> Type
 tangentType TypeFloat      = TypeFloat
 tangentType (TypeVec t)    = TypeVec (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
-tangentType TypeInteger    = TypeTuple []
-tangentType TypeBool       = TypeTuple []
-tangentType TypeString     = TypeTuple []
+tangentType TypeInteger    = unitType
+tangentType TypeBool       = unitType
+tangentType TypeString     = unitType
 tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
@@ -308,7 +316,7 @@ funIdOfFun = \case
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
 
-data ADPlan = BasicAD | TupleAD
+data ADPlan = BasicAD | TupleAD | SplitAD
   deriving( Eq, Ord, Show )
 
 data ADDir = Fwd | Rev
@@ -435,6 +443,10 @@ dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e
+  | n == 1  -- A 1-tuple is the same as the thing itself
+            -- So sel_1_1 e = e
+  = assert (text "pSel1") (i==1) e
+
   | Tuple es <- e  -- Reduce clutter by optimising right here
                    --    sel_1_2 (e1,e2) --> e1
   = assert (text "pSel" <+> int i <+> int n <+> int (length es) $$ ppr es) (n == length es)
@@ -639,6 +651,9 @@ punctuate (SDoc p) ss =
 comma :: SDoc
 comma = text ","
 
+dcolon :: SDoc
+dcolon = text "::"
+
 empty :: SDoc
 empty = SDoc (\_ -> PP.empty)
 
@@ -744,6 +759,7 @@ instance Pretty ADDir where
 instance Pretty ADPlan where
   ppr BasicAD = empty
   ppr TupleAD = char 't'
+  ppr SplitAD = char 's'
 
 instance Pretty Var where
   ppr (Simple s) = text s
@@ -901,8 +917,8 @@ isInfixFun (Fun (PrimFun s))
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
-parensIf ctxt inner doc | ctxt >= inner    = parens doc
-                        | otherwise        = doc
+parensIf ctxt inner doc | ctxt >= inner = parens doc
+                        | otherwise     = doc
 
 instance InPhase p => Pretty (DeclX p) where
   ppr (DefDecl d)  = ppr d

@@ -122,6 +122,8 @@ gradBuild TupleAD s n ti body
      grad_body = mkLet (gradTVar TupleAD s ti)
                        (Tuple [Var ti, lmZero s (Var ti)]) $
                  gradE TupleAD s body
+gradBuild SplitAD _ _ _ _ = error "gradBuild:SplitAD"  -- Doesn't make sense
+
 ---------------
 gradFold :: ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
 gradFold BasicAD s ti body acc v =
@@ -158,6 +160,8 @@ gradFold BasicAD s ti body acc v =
 gradFold TupleAD s _ti _body acc _v =
   lmDummyFold (TypeTuple [t_acc, TypeLM (typeof s) t_acc])
   where t_acc = typeof acc
+
+gradFold SplitAD _ _ _ _ _ = error "gradFold:SplitAD"  -- Doesn't make sense
 
 ---------------
 gradCall :: ADPlan -> Shape -> TFun -> TExpr -> TExpr
@@ -197,6 +201,8 @@ gradCall TupleAD s f args
         grad_arg = gradE TupleAD s arg
         arg      = args
 
+gradCall SplitAD _ _ _ = error "gradCall:SplitAD"  -- Doesn't make sense
+
 ----------------------
 gradLet :: HasCallStack => ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr
 gradLet BasicAD s v e1 e2
@@ -214,6 +220,8 @@ gradLet TupleAD s v e1 e2
     mkLet v (pFst (Var dv)) $
     gradE TupleAD s e2
   where dv = gradTVar TupleAD s v
+
+gradLet SplitAD _ _ _ _ = error "gradLet:SplitAD"  -- Doesn't make sense
 
 {- Note [Shadowing after grad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -237,7 +245,7 @@ lmVCat_AD :: ADPlan -> [TExpr] -> TExpr
 lmVCat_AD BasicAD ms = lmVCat ms
 lmVCat_AD TupleAD ms = Tuple [ Tuple  (map pFst ms)
                              , lmVCat (map pSnd ms) ]
-
+lmVCat_AD SplitAD _ = error "lmVCat_AD:SplitAD"  -- Doesn't make sense
 
 
 ---------------------------------

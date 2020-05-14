@@ -3,6 +3,7 @@
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \usepackage{color}
+\usepackage{proof}
 \usepackage{url}
 \usepackage{stmaryrd}  % double brackets
 \usepackage{listings}
@@ -14,6 +15,19 @@
 \setlist[itemize,1]{itemsep=4pt}
 
 \renewcommand{\arraystretch}{1.2}
+
+% The cateorical language
+\newcommand{\CatLang}{$\mathcal CL$}
+\newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
+\newcommand{\clcomp}{\,\circ\,}   % CL composition
+\newcommand{\ck}[1]{{\mathcal K}(#1)}   % CL constant
+\newcommand{\cfun}[1]{{\mathcal F}(#1)}   % CL function
+\newcommand{\clet}[3]{{\mathcal L}(#1,#2,#3)}   % CL let
+\newcommand{\cbuild}[3]{{\mathcal B}(#1,#2,#3)}   % CL build
+\newcommand{\cif}[3]{\mathcal{IF}(#1,#2,#3)}   % CL conditional
+\newcommand{\ctupx}{\gtrdot}   % CL tuple extension (terms)
+\newcommand{\ctupxt}{\gtrdot}   % CL tuple extension (types)
+\newcommand{\capply}{\diamond}   % CL application
 
 \newcommand{\deriv}{\partial}  % The symbol we use for ``derivative''
    % Was \nabla\!, but mathematicans hate that
@@ -48,8 +62,14 @@
 \newcommand{\olmvcat}{\;\overline{\lmvcat}\;}         % Infix pairing
 \newcommand{\olmhcat}{\;\overline{\lmhcat}\;}         % Infix pairing
 
-\newcommand{\fwdDf}[1]{#1'}  % Forward derivative, f'
-\newcommand{\revDf}[1]{#1'_R}  % Reverse derivative, f`
+\newcommand{\fwdDf}[1]{\mathit{fwd\$}#1}  % Forward derivative, f'
+\newcommand{\revDf}[1]{\mathit{rev\$}#1}  % Reverse derivative, f`
+
+% With splitting
+\newcommand{\revfDf}[1]{\mathit{revf\$}#1}  % Reverse derivative, f`
+\newcommand{\revrDf}[1]{\mathit{revr\$}#1}  % Reverse derivative, f`
+
+
 \newcommand{\lb}{\llbracket}
 \newcommand{\rb}{\rrbracket}
 \newcommand{\sel}[2]{\pi_{#1,#2}}
@@ -64,7 +84,7 @@
 \newcommand{\indexfunname}{\mathit{ixR}} %% Reversed from current code
 \newcommand{\indexfun}[2]{\indexfunname(#2,#1)} % Vector indexing  \indexfun{v}{i}
 \renewcommand{\d}[1]{\delta_{\mathit{#1}}}   % delta_x etc
-\renewcommand{\vector}[2]{\mathit{Vec}\;#1\;#2}   % the type (Vec n t)
+\renewcommand{\vector}[1]{\mathit{Vec}\;#1}   % the type (Vec t)
 
 \newcommand{\tcolon}{\!:\!}
 \newcommand{\typ}[2]{#1 \tcolon #2}  % x:S, with less horizontal whitespace
@@ -72,6 +92,7 @@
 \renewcommand{\dot}{.\,}               % dot with some space after
 \newcommand{\real}{\mathbb{R}}       % R, the reals11
 \newcommand{\nat}{\mathbb{N}}        % N, the natural numbers
+\newcommand{\bool}{\mathbb{B}}        % B, the booleans
 \newcommand{\darrow}{\Rightarrow}    % =>
 
 % Linear maps
@@ -135,7 +156,7 @@ $$
         \tau & ::= & \nat & \mbox{Natural numbers} \\
         & | & \real & \mbox{Real numbers} \\
         & | & (\tau_1, \tau_2) & \mbox{Pairs} \\
-        & | & \vector{n}{\tau} & \mbox{Vectors} \\
+        & | & \vector{\tau} & \mbox{Vectors} \\
         & | & \tau_1 \to \tau_2 & \mbox{Functions} \\
         & | & \tau_1 \linto \tau_2 & \mbox{Linear maps} \\
       \end{array}
@@ -190,10 +211,10 @@ $$
   \sel{1}{2} & :: & (t_1,t_2) \to t_1 & \mbox{Selection} \\
   \sel{2}{2} & :: & (t_1,t_2) \to t_2 & \mbox{..ditto..} \\
 %  \deltafun & :: & Field \; t \darrow (\nat,\; \nat) \to t & \mbox{Delta-function} \\
-  \buildfun & :: & (n::\nat,\; \nat \to t) \to \vector{n}{t} & \mbox{Vector build} \\
-  \indexfunname & :: & (\nat, \; \vector{n}{t}) \to t & \mbox {Indexing (NB arg order)} \\
-  \sumfunname & :: & \vector{n}{t} \to t & \mbox{Sum a vector} \\
-  \sizefun & :: & \vector{n}{t} \to \nat & \mbox{Size of a vector} \\
+  \buildfun & :: & (n::\nat,\; \nat \to t) \to \vector{t} & \mbox{Vector build} \\
+  \indexfunname & :: & (\nat, \; \vector{t}) \to t & \mbox {Indexing (NB arg order)} \\
+  \sumfunname & :: & \vector{t} \to t & \mbox{Sum a vector} \\
+  \sizefun & :: & \vector{t} \to \nat & \mbox{Size of a vector} \\
 \end{array}
 $$
 \\[3mm]
@@ -206,11 +227,11 @@ $$
         \gradf{*}(x,y) & = & \lmscalar{y} \lmhcat \lmscalar{x} \\[2mm]
         \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
         \gradf{\sel{1}{2}}(x) & = & \lmone \lmhcat \lmzero \\[2mm]
-        \gradf{\indexfunname} & :: & (\nat, \;\vector{n}{t}) \to ((\nat, \; \vector{n}{t}) \linto t) \\
+        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
         \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat
         \lmhcatv{\buildfun( \sizefun(v),
               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero )} \\[2mm]
-         \gradf{\sumfunname} & :: & \vector{n}{\real} \to (\vector{n}{\real} \linto \real) \\
+         \gradf{\sumfunname} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
          \gradf{\sumfun{v}} & = & lmhcatv{\buildfun( \sizefun(v),\; \lambda i. \lmone )} \\[2mm]
         \ldots
         \end{array}
@@ -242,19 +263,19 @@ On vectors they work element-wise; if you want dot-product you have to program i
 
 \subsection{Vectors}
 
-The language supports one-dimensional vectors, of type $\vector{n}{T}$,
+The language supports one-dimensional vectors, of type $\vector{T}$,
 whose elements have type $T$ (Figure~\ref{fig:syntax}).
 A matrix can be represented as a vector of vectors.
 
 Vectors are supported by the following built-in functions (Figure~\ref{fig:built-in}):
 \begin{itemize}
-\item $\buildfun :: (\nat,\; \nat \to t) \to \vector{n}{t}$ for vector construction.
-\item $\indexfunname :: (\nat,\; \vector{n}{t}) \to t$ for indexing.  Informally we allow ourselves to write
+\item $\buildfun :: (\nat,\; \nat \to t) \to \vector{t}$ for vector construction.
+\item $\indexfunname :: (\nat,\; \vector{t}) \to t$ for indexing.  Informally we allow ourselves to write
   $v[i]$ instead of $\indexfun{v}{i}$.
-\item $\sumfunname :: \vector{n}{\real} \to \real$ to add up the elements of a vector.
+\item $\sumfunname :: \vector{\real} \to \real$ to add up the elements of a vector.
 We specifically do not have a general, higher order, fold operator;
 we say why in Section~\ref{sec:gen-fold}.
-\item $\sizefun :: \vector{n}{t} \to \nat$ takes the size of a vector.
+\item $\sizefun :: \vector{t} \to \nat$ takes the size of a vector.
 \item Arithmetic functions $(*), (+)$ etc are overloaded to work over vectors, always elementwise.
 \end{itemize}
 
@@ -309,11 +330,11 @@ passing through $z = g(p_x, p_y)$
     \mbox{Scale} & \lmscalar{\cdot} & : & \real \to (s \linto s) \\
     \mbox{VCat}      & (\lmvcat) & : & (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
-    \mbox{VCatV}      & \lmvcatv{\cdot} & : & \vector{n}{(s \linto t)} \to (s \linto \vector{n}{t})
+    \mbox{VCatV}      & \lmvcatv{\cdot} & : & \vector{(s \linto t)} \to (s \linto \vector{t})
            & \mbox{...vector version} \\
     \mbox{HCat}  & (\lmhcat) & : & (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
            & \mbox{Horizontal juxtaposition} \\
-    \mbox{HCatV}  & \lmhcatv{\cdot} & : & \vector{n}{(t \linto s)} \to (\vector{n}{t} \linto s)
+    \mbox{HCatV}  & \lmhcatv{\cdot} & : & \vector{(t \linto s)} \to (\vector{t} \linto s)
            & \mbox{...vector version} \\
 
     \mbox{Transpose} & \lmtrans{\cdot} & : & (s \linto t) \to (t \linto s) & \mbox{Matrix transpose} \\[2mm]
@@ -453,13 +474,13 @@ $$
 What types are vector spaces?  Look the syntax of types in Figure~\ref{fig:syntax}.
 \begin{itemize}
   \item The real numbers $\real$ is a vector space, using the standard $+$ and $*$ for reals; and $\dotprod_{\real} = *$.
-  \item If $V$ is a vector space then $\vector{n}{V}$ is a vector space, with
+  \item If $V$ is a vector space then $\vector{V}$ is a vector space, with
     \begin{itemize}
       \item $v_1 + v_2$ is vector addittion
       \item $r * v$ multiplies each element of the vector $v$ by the real $r$.
       \item $v_1 \dotprod v_2$ is a the usual vector dot-product.
     \end{itemize}
-    We often write $\vector{n}{\real}$ as $\real^N$.
+    We often write $\vector{\real}$ as $\real^N$.
   \item If $V_1$ and $V_2$ are vector spaces, then the product space $(V_1, V_2)$ is a vector space
     \begin{itemize}
       \item $(v_1,v_2) +(w_1,w_2) = (v_1 + w_1, v_2 + w_2)$.
@@ -823,11 +844,11 @@ I hate this!
 
 \subsection{General folds} \label{sec:gen-fold}
 
-We have $\sumfunname :: \vector{n}{\real} \to \real$.  What is $\gradf{\sumfunname}$?
+We have $\sumfunname :: \vector{\real} \to \real$.  What is $\gradf{\sumfunname}$?
 One way to define its semantics is by applying it:
 $$
 \begin{array}{rcl}
-  \gradf{\sumfunname} & :: & \vector{n}{\real} \to (\vector{n}{\real} \linto \real) \\
+  \gradf{\sumfunname} & :: & \vector{\real} \to (\vector{\real} \linto \real) \\
   \gradf{\sumfunname}(v) \lmapply dv & = & \sumfun{dv}
 \end{array}
 $$
@@ -945,9 +966,9 @@ $$
    (\olmhcat) & : & ((t_1, t_1 \linto s),\; (t_2, t_2 \linto s))
                      \to ((t_1,t_2),\; (t_1,t_2) \linto s) \\
     (t_1,m_1) \olmhcat (t_2,m_2) & = & ((t_1,t_2), m_1 \lmhcat m_2) \\[2mm]
-    \swap & : & \vector{n}{(a,b)} \to (\vector{n}{a}, \vector{n}{b}) \\[2mm]
+    \swap & : & \vector{(a,b)} \to (\vector{a}, \vector{b}) \\[2mm]
     \olmtrans{\cdot} & : & (r, s \linto t) \to (r, t \linto s)
-%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{n}{t}, \vector{n}{t})
+%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{t}, \vector{t})
  \end{array}
 $$
  \\
@@ -960,10 +981,10 @@ $$
         \tgradf{*}(x,y) & = & (\lmscalar{y} \lmhcat \lmscalar{x}, \, x*y)  \\[2mm]
 %        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
 %        \gradf{\sel{1}{2}}(x) & = & \lmone \lmhcat \lmzero \\[2mm]
-%        \gradf{\indexfunname} & :: & (\nat, \;\vector{n}{t}) \to ((\nat, \; \vector{n}{t}) \linto t) \\
+%        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
 %        \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat \lmbuildt( \sizefun(v),
 %               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
-%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{n}{t} \to (\vector{n}{t} \linto t) \\
+%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
 %         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
 %        \ldots
         \end{array}
@@ -1028,7 +1049,7 @@ $$
    (\olmhcat) & : & ((t_1, t_1 \linto s),\; (t_2, t_2 \linto s)) \to ((t_1,t_2),\; (t_1,t_2) \linto s) \\
     (t_1,m_1) \olmhcat (t_2,m_2) & = & (t_1 + t_2, m_1 \lmhcat m_2) \\[2mm]
     \olmtrans{\cdot} & : & (t, s \linto t) \to (t, t \linto s)
-%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{n}{t}, \vector{n}{t})
+%   B  & : & (N, N \to (s \linto t, t)) \to (s \linto \vector{t}, \vector{t})
  \end{array}
 $$
  \\
@@ -1041,10 +1062,10 @@ $$
         \ogradf{*}((x,y), m) & = & (x*y,\, (\lmscalar{y} \lmhcat \lmscalar{x}) \lmcomp m)  \\[2mm]
 %        \gradf{\sel{1}{2}}      & :: & (t,t) \to ((t,t) \linto t) \\
 %        \gradf{\sel{1}{2}}(x) & = & \lmone \lmhcat \lmzero \\[2mm]
-%        \gradf{\indexfunname} & :: & (\nat, \;\vector{n}{t}) \to ((\nat, \; \vector{n}{t}) \linto t) \\
+%        \gradf{\indexfunname} & :: & (\nat, \;\vector{t}) \to ((\nat, \; \vector{t}) \linto t) \\
 %        \gradf{\indexfunname}(i,v) & = & \lmzero \lmhcat \lmbuildt( \sizefun(v),
 %               \lambda j. \mbox{\lstinline|if|}\, i=j \,\mbox{\lstinline|then|}\, \lmone  \, \mbox{\lstinline|else|}\, \lmzero ) \\[2mm]
-%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{n}{t} \to (\vector{n}{t} \linto t) \\
+%         \gradf{\sumfunname} & :: & Field \; t \darrow \vector{t} \to (\vector{t} \linto t) \\
 %         \gradf{\sumfun{v}} & = & \lmbuildt( \sizefun(v),\; \lambda i. \lmone ) \\[2mm]
 %        \ldots
         \end{array}
@@ -1190,6 +1211,175 @@ Notice that we can get quite a bit of optimisation by inlining $\ogradft{g}$ int
 and so on. The more inlining the better.  If we inline everything we'll elminate
 all intermediate linear maps.
 
+
+\section{Compiling through categories}
+
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+$$
+      \begin{array}{rcll}
+        \multicolumn{4}{l}{\mbox{\bf Atoms}} \\
+        f,g,h & ::= & \multicolumn{2}{l}{\mbox{Function}} \\
+        k & ::= & \multicolumn{2}{l}{\mbox{Literal constants}} \\
+        \multicolumn{4}{l}{\mbox{\bf Terms}} \\
+        \mathit{pgm} & ::= & \mathit{def}_1 \ldots \mathit{def}_n \\
+        \mathit{def} & ::= & f {:} S \darrow T = c \\
+        c & ::= & \ck{k} & \mbox{Constant} \\
+          & |   & \cfun{f} & \mbox{Function constant} \\
+          & |   & c_1 \clcomp c_2  & \mbox{Composition} \\
+          & |   & (c_1,\ldots, c_n) & \mbox{Tuple} \\
+          & |   & \cif{c_1}{c_2}{c_3} & \mbox{Conditional} \\
+          & |   & \clet{x}{c_r}{c_b} & \mbox{Let} \\
+          & |   & \cbuild{c_s}{i}{c_e} & \mbox{Build}
+      \end{array}
+$$
+\mbox{{\bf Semantics:}\; \fbox{$c \capply e = e$}}
+$$
+\begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
+   \ck{k} \capply t & = & k \\
+   \cfun{f} \capply t & = & f(t) \\
+   (c_1 \clcomp c_2) \capply t & = & c_1 \capply (c_2 \capply t) \\
+   (c_1,\ldots, c_n) \capply t & = & (c_1 \capply t,\ldots, c_n \capply t) \\
+   \cif{c_1}{c_2}{c_3}\capply t & = & \lstinline|if|\; (c_1 \capply t) \; (c_2 \capply t)\; (c_3 \capply t) \\
+   \clet{x}{c_r}{c_b} \capply t & = & \lstinline|let|\;x\, = \, c_r\capply t \; \lstinline{in}\; c_b \capply (t \ctupx x) \\
+   \cbuild{c_s}{i}{c_e} \capply t & = & \lstinline|build|\;(c_x \capply t)\;(\lambda i. c_e \capply (t \ctupx i))
+\end{array}
+$$
+\mbox{\bf Conversion to \CatLang}
+$$
+\begin{array}{l}
+\begin{array}{rcl}
+\Gamma & ::= & (x_1\colon\tau_1, \ldots, x_n\tcolon\tau_n) \\[1mm]
+\end{array} \\
+\begin{array}{rcl}
+\pi((x_1\tcolon\tau_1,\ldots, x_n\tcolon\tau_n),\,x_i) & = & \sel{i}{n} \\
+T(x_1\tcolon\tau_1, \ldots, x_n\tcolon\tau_n) & = & (\tau_1, \ldots, \tau_n) \\
+\end{array}
+\\ \\
+\begin{array}{l}
+  \KC{f(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n) = e}{} \\
+  \quad = \quad \cfun{f} = \KC{e}(x_1\tcolon\tau_1,\ldots,x_n\tcolon\tau_n)
+  \end{array} \\ \\
+\begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
+\multicolumn{3}{c}{\fbox{If $\Gamma \vdash e:\tau$ then $\KC{e}\Gamma : T(\Gamma) \darrow \tau$}} \\
+  \KC{k}{\Gamma} & = & \ck{k} \\
+  \KC{x}{\Gamma} & = & \cfun{\pi(\Gamma,x)} \\
+  \KC{f(e)}{\Gamma} & = & \cfun{f} \clcomp \KC{e}{\Gamma} \\
+  \KC{\lstinline|if|\;e_1\;e_2\;e_3}{\Gamma} \\
+     \multicolumn{3}{l}{\hspace{2cm} = \lstinline|if|\,
+      (\KC{e_1}{\Gamma})\, (\KC{e_2}{\Gamma})\, (\KC{e_3}{\Gamma})} \\
+  \KC{(e_1, \ldots, e_n)}{\Gamma} & = & (\KC{e_1}{\Gamma}, \ldots, \KC{e_n}{\Gamma}) \\
+  \KC{\lstinline|let|\;x{:}\tau = e_r \;\lstinline|in|\; e_b}{\Gamma} & = & \clet{x}{\KC{e_r}{\Gamma}}{\KC{e_b}{(\Gamma,x{:}\tau)}} \\
+  \KC{\lstinline|build|\;e_s\;(\lambda i.e_e)}{\Gamma} & = & \cbuild{\KC{e_s}{\Gamma}}{i}{\KC{e_e}{(\Gamma,i)}}
+\end{array}
+\\[1mm]
+\mbox{\bf Pruning} \\
+\begin{array}{rcl}
+  \KC{e}\Gamma & = & \KC{e}{\Gamma'} \clcomp \KC{(v_1,\ldots,v_n)}{\Gamma} \\
+  \multicolumn{3}{l}{\quad \mbox{where}
+    $\begin{array}[t]{rcl}
+        \{v_1, \ldots, v_n\} & = & \mathi{fv}(e) \\
+        \Gamma' & = & (v_1\tcolon\Gamma(v_1), \ldots, v_n\tcolon\Gamma(v_n))
+      \end{array}$} \\
+\end{array}
+\end{array}
+$$
+\end{minipage}}
+\caption{Syntax of \CatLang} \label{fig:cl-syntax}
+\end{figure}
+
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+  \begin{center}{\large \fbox{$\Gamma \vdash c : S \darrow T$}}\end{center}
+
+  \begin{gather*}
+    \infer{\Gamma \vdash \cfun{f} : S \darrow T}
+          {f : S \to T \in \Gamma} \qquad
+    \infer{\Gamma \vdash \ck{k} : S \darrow \real}
+          {}
+   \\[1mm]
+   \infer{\Gamma \vdash \sel{i}{n} : (T_1,\ldots,T_i,\ldots, T_n) \darrow T_i}{}
+   \\[1mm]
+   \infer{\Gamma \vdash c_1 \clcomp c_2 : S \darrow T}
+   {\Gamma \vdash c_1 : R \darrow T \quad \Gamma \vdash c_2 : S \darrow R}
+   \\[1mm]
+   \infer{\Gamma \vdash (c_1, \ldots, c_n) : S \darrow (T_1, \ldots, T_n)}
+    {\Gamma \vdash c_1:S \darrow T_1 \quad \ldots \quad \Gamma \vdash c_n:S \darrow T_n}
+   \\[1mm]
+   \infer{\Gamma \vdash \cif{c_1}{c_2}{c_3} : S \darrow T}
+    {\Gamma \vdash c_1 : S \darrow \bool \quad \Gamma \vdash c_2:S \darrow T \quad  \Gamma \vdash c_3:S \darrow T}
+   \\[1mm]
+   \infer{\Gamma \vdash \clet{x}{c_r}{c_b} : S \darrow T}
+    {\Gamma \vdash c_r : S \darrow R \quad \Gamma \vdash c_b: (S \ctupxt R) \darrow T}
+   \\[1mm]
+   \infer{\Gamma \vdash \cbuild{c_s}{i}{c_e} : S \darrow \vector{T}}
+    {\Gamma \vdash c_s : S \darrow \nat \quad \Gamma \vdash c_e: (S \ctupxt \nat) \darrow T}
+  \end{gather*}
+\end{minipage}}
+  \caption{Type system for \CatLang} \label{fig:cl-types}
+\end{figure}
+
+\subsection{Splitting for reverse mode}
+
+Supppose $f$ is defined in terms of $g$ and $h$:
+$$
+\lstinline|f(x) = g(h(x))|
+$$
+Here are the types:
+$$
+\begin{array}{rcl}
+f & : & R \to T \\
+g & : & S \to T \\
+h & : & R \to S \\
+\revDf{f} & : & (R, \tangent{T}) \to (T, \tangent{R}) \\
+\revDf{g} & : & (S, \tangent{T}) \to (T, \tangent{S}) \\
+\revDf{h} & : & (R, \tangent{S}) \to (S, \tangent{R}) \\
+\end{array}
+$$
+How can we define $\revDf{f}$ by calling $\revDf{g}$ and $\revDf{h}$?  It would
+have to look something like this
+$$
+\begin{array}{rcl}
+\revDf{f}(r,dt) & = & \lstinline|letrec| \begin{array}[t]{l}
+                          (t, ds) = \revDf{g}( s, dt ) \\
+                          (s, dr) = \revDf{h}( r, ds ) \\
+                        \end{array} \\
+ && \lstinline|in| \; (t, dr)
+\end{array}
+$$
+We can't call $\revDf{g}$ before $\revDf{h}$, nor the other way around.
+That's why there is a letrec!  Even leaving aside how we generate this code,
+We'd need lazy evaluation to execute it.
+
+The key idea for splitting is this.  Given $f : S \to T$, produce two functions
+$$
+\begin{array}{rcl}
+  \revfDf{f} & : & S \to (T,X) \\
+  \revrDf{f} & : & (X,\tangent{T}) \to \tangent{S}
+\end{array}
+$$
+where the type $X$ depends on the details of f's definition.  The idea is that
+$X$ records all the stuff that $f$ computed when running forward that is necessary
+for it to run backward.  Now we can write
+$$
+\begin{array}{rcl}
+\revDf{f}(s,dt) & = & \lstinline|letrec| \begin{array}[t]{l}
+                          (t, \mathit{xf}) = \revfDf{f}( s ) \\
+                          ds = \revfDf{f}( \mathit{xf}, dt ) \\
+                        \end{array} \\
+&& \lstinline|in| \; (t, ds)
+\\[1mm]
+
+\revfDf{f}(r) & = & \lstinline|letrec| \begin{array}[t]{l}
+                          (s, xh) = \revfDf{h}( r ) \\
+                          (t, xg) = \revfDf{g}( r ) \\
+                        \end{array} \\
+ && \lstinline|in| \; (t, (xh,xg))
+\\[1mm]
+\revrDf{f}((xh,xg),dt) & = & \revrDf{h}(dh, \revrDf{g}(dg, gt))
+\end{array}
+$$
 
 \section{Implementation}
 
@@ -1505,6 +1695,9 @@ This looks simpler and more direct to me.
   the solution I adopted was not to have a new language construct, but
   rather to differentiate only $\buildfun(n, \lambda i.e)$.  Any other
   use of $\buildfun$ will fail.}
+
+
+
 \end{document}
 
 do  C( s -o t) -> s -o C(t)
