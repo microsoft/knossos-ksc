@@ -133,6 +133,17 @@ theDefs display decls = do {
   ; return (defs, env, rulebase)
   }
 
+theDefsViaCatLang :: DisplayLint a
+                  -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
+theDefsViaCatLang display decls = do {
+  (defs, env, rulebase) <- theDefs display decls
+  ; let defsViaCL     = flip map defs $ \x -> case toCLDef_maybe x of
+          Nothing -> x
+          Just d  -> fromCLDef d
+  ; display "Typechecked defs via CatLang" env defsViaCL
+  ; return (defsViaCL, env, rulebase)
+  }
+
 theDiffs :: DisplayLint a
          -> [TDef]
          -> GblSymTab

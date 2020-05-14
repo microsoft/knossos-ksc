@@ -1,5 +1,5 @@
 -- Ksc.CatLang: Language for compilation to categories
-module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs ) where
+module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs, toCLDef_maybe, fromCLDef ) where
 
 import Prelude hiding( (<>) )
 import Lang
