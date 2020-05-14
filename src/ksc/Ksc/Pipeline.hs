@@ -294,6 +294,19 @@ displayCppGenCompileAndRun compilername verbosity file files = do
   ; Cgen.runExe exefile
   }
 
+displayCppGenCompileAndRunViaCatLang :: HasCallStack
+                                     => String
+                                     -> Maybe Int
+                                     -> [String]
+                                     -> String
+                                     -> IO String
+displayCppGenCompileAndRunViaCatLang compilername verbosity file files = do
+  { exefile <- displayCppGenAndCompileDefsDiffs
+                   theDefsViaCatLang theDiffs
+                   (Cgen.compile compilername) ".exe" verbosity file files
+  ; Cgen.runExe exefile
+  }
+
 displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
 displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
   { output <- displayCppGenCompileAndRun compilername verbosity files file
