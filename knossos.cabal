@@ -12,6 +12,7 @@ executable ksc
                  CSE
                  Cgen
                  KMonad
+                 Ksc.CatLang
                  Ksc.Futhark
                  Ksc.Pipeline
                  Lang

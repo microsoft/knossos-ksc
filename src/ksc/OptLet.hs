@@ -5,11 +5,11 @@
 	     ScopedTypeVariables #-}
 
 module OptLet( optLets
-             , Subst, InScopeSet, emptyInScopeSet
+             , Subst, InScopeSet, emptyInScopeSet, mkInScopeSet
              , mkEmptySubst, lookupSubst
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
-             , substExpr, substVar, notInScope )
+             , substExpr, substVar, notInScope, notInScopeTV )
              where
 
 import Lang
@@ -223,12 +223,12 @@ zapSubst (S { s_in_scope = in_scope })
 -- * It clones the binder if it is already in scope
 -- * Extends the substitution and the in-scope set as appropriate
 substBndr :: TVar -> Subst -> (TVar, Subst)
-substBndr (TVar ty v) (S { s_in_scope = in_scope, s_env = env })
+substBndr tv (S { s_in_scope = in_scope, s_env = env })
   = (tv', S { s_env      = env'
             , s_in_scope = is' })
   where
-    (is', tv') = notInScopeTV in_scope v ty
-    env' = M.insert v (Var tv') env
+    (is', tv') = notInScopeTV in_scope tv
+    env' = M.insert (tVarVar tv) (Var tv') env
 
 substVar :: Subst -> TVar -> TExpr
 substVar subst tv = case lookupSubst (tVarVar tv) subst of
@@ -254,8 +254,8 @@ substExpr subst e
                       where
                         (v', subst') = substBndr v subst
 
-notInScopeTV :: InScopeSet -> Var -> Type -> (InScopeSet, TVar)
-notInScopeTV is v ty
+notInScopeTV :: InScopeSet -> TVar -> (InScopeSet, TVar)
+notInScopeTV is (TVar ty v)
   = (v' `S.insert` is, TVar ty v')
   where
     v' = notInScope v is

@@ -8,9 +8,10 @@ import ANF (anfDefs)
 import qualified Cgen
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
+import Ksc.CatLang
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
-             FunId(UserFun), TDef,
+             FunId(UserFun), TDef, Pretty,
              def_fun, displayN, partitionDecls,
              pps, ppr, renderSexp)
 import LangUtils (GblSymTab, emptyGblST, extendGblST)
@@ -41,7 +42,10 @@ demo d = runKM (demoN (Just 999) BasicAD [d])
 
 demoN :: Maybe Int -> ADPlan -> [Decl] -> KM ()
 demoN verbosity adp decls
-  = let disp = displayPassM verbosity in
+  = let disp = displayPassM verbosity
+        dispNoLint :: Pretty def => String -> [def] -> KMT IO ()
+        dispNoLint = displayPassMNoLint verbosity
+    in
     do { flip mapM_ verbosity $ \v -> do
            banner "Original declarations"
            displayN (take v decls)
@@ -51,6 +55,11 @@ demoN verbosity adp decls
              rulebase     = mkRuleBase rules
 
        ; disp "Typechecked declarations" env defs
+
+       ; let cl_defs = toCLDefs defs
+       ; dispNoLint "toCLDefs" cl_defs
+
+       ; disp "fromCLDefs" env (fromCLDefs cl_defs)
 
        ; (env1, opt_defs) <- optDefs rulebase env defs
        ; disp "Optimized original definition" env1 opt_defs
@@ -87,11 +96,15 @@ demoN verbosity adp decls
 type DisplayLintT m a = String -> GblSymTab -> [TDef] -> KMT m a
 type DisplayLint a = DisplayLintT IO a
 
+displayPassMNoLint :: Pretty def => Maybe Int -> String -> [def] -> KMT IO ()
+displayPassMNoLint mverbosity what decls
+  = do flip mapM_ mverbosity $ \verbosity -> do
+         banner what
+         displayN (take verbosity decls)
+
 displayPassM :: Maybe Int -> DisplayLint ()
 displayPassM mverbosity what env decls
-  = do { flip mapM_ mverbosity $ \verbosity -> do
-           banner what
-           displayN (take verbosity decls)
+  = do { displayPassMNoLint mverbosity what decls
        ; lintDefs what env decls
     }
 
