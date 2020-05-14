@@ -258,8 +258,22 @@ displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO ()
 displayCppGenNoDiffs =
   displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> [String] -> String -> IO String
-displayCppGenAndCompile compile ext verbosity files file = do {
+displayCppGenAndCompileDefsDiffs
+  :: HasCallStack
+  => (DisplayLint () -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase))
+  -> (DisplayLint ()
+      -> [TDef]
+      -> GblSymTab
+      -> RuleBase
+      -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+  -> (String -> String -> IO String)
+  -> String
+  -> Maybe Int
+  -> [String]
+  -> String
+  -> IO String
+displayCppGenAndCompileDefsDiffs
+  generateDefs generateDiffs compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
@@ -267,9 +281,12 @@ displayCppGenAndCompile compile ext verbosity files file = do {
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGenDefsDiffs theDefs theDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; displayCppGenDefsDiffs generateDefs generateDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
   ; compiler cppfile exefile
   }
+
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> [String] -> String -> IO String
+displayCppGenAndCompile = displayCppGenAndCompileDefsDiffs theDefs theDiffs
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
 displayCppGenCompileAndRun compilername verbosity file files = do
