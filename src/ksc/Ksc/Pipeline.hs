@@ -193,6 +193,7 @@ defsAndDiffs display decls = do {
   ; (defs, env, rulebase) <- theDefs display decls
   ; theDiffs display defs env rulebase
   }
+
 anfOptAndCse :: DisplayLint a
              -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
 anfOptAndCse display rulebase env4 alldefs =
