@@ -10,6 +10,7 @@ import Parse (parseE)
 import Opt
 import Ksc.Pipeline (demoFFilter,
                      displayCppGenCompileAndRun,
+                     displayCppGenCompileAndRunViaCatLang,
                      displayCppGenAndCompile,
                      displayCppGenNoDiffs,
                      genFuthark, ignoreMain)
@@ -242,10 +243,11 @@ demoFOnTestPrograms ksTests = do
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
 dropWhile1 f = tail . dropWhile f
 
-testRunKS :: String -> String -> IO ()
-testRunKS compiler ksFile = do
+testRunKSVia :: (String -> Maybe int -> [String] -> FilePath -> IO String)
+             -> String -> [Char] -> IO ()
+testRunKSVia via_ compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
-  output <- displayCppGenCompileAndRun compiler Nothing ["src/runtime/prelude"] ksTest
+  output <- via_ compiler Nothing ["src/runtime/prelude"] ksTest
 
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
@@ -272,6 +274,12 @@ testRunKS compiler ksFile = do
     _:_ -> do
       putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
       error ("These tests failed:\n" ++ unlines failures)
+
+testRunKS :: String -> String -> IO ()
+testRunKS = testRunKSVia displayCppGenCompileAndRun
+
+testRunKSViaCatLang :: String -> String -> IO ()
+testRunKSViaCatLang = testRunKSVia displayCppGenCompileAndRunViaCatLang
 
 testHspec :: IO ()
 testHspec = do
