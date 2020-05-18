@@ -69,6 +69,11 @@ Should work with any compiler, linker and OS LLVM works with.
 # Prepare
 $ apt install clang ninja-build cmake lld
 $ git clone git@github.com:llvm/llvm-project.git
+
+# Make sure you got the right commit
+# Be sure to update this line when that changes
+$ git co -b ksc e03394c6a6f
+
 $ cd llvm-project
 $ mkdir build && cd build
 
