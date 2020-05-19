@@ -101,3 +101,16 @@ Compiling: g++ -fmax-errors=5 -fdiagnostics-color=always -Wall -Wno-unused -Wno-
 Running
 Hello world from TorchScript -> Knossos!
 ```
+
+#### How TorchScript JIT works
+
+[`torch.jit.script`](https://github.com/pytorch/pytorch/blob/f6f1384811b9cc722f650ed9ead8ee99938c009a/torch/jit/__init__.py#L1154)
+[calls
+`torch.jit.frontend.get_jit_def`](https://github.com/pytorch/pytorch/blob/f6f1384811b9cc722f650ed9ead8ee99938c009a/torch/jit/__init__.py#L1330)
+which [loads the original source
+code](https://github.com/pytorch/pytorch/blob/f6f1384811b9cc722f650ed9ead8ee99938c009a/torch/jit/frontend.py#L125-L141)
+so that it can translate it using the
+[`ExprBuilder`](https://github.com/pytorch/pytorch/blob/f6f1384811b9cc722f650ed9ead8ee99938c009a/torch/jit/frontend.py#L375)
+and
+[`StmtBuilder`](https://github.com/pytorch/pytorch/blob/f6f1384811b9cc722f650ed9ead8ee99938c009a/torch/jit/frontend.py#L255)
+classes.
