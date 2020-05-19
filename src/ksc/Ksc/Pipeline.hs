@@ -51,6 +51,7 @@ demoCL file
        ; displayPassM veryVerbose "fromCLDefs" env2
                        (fromCLDefs cl_defs)
 
+{-
        ; let (env3, ad_defs) = fwdAdDefs env2 cl_defs
        ; displayPassM veryVerbose "Forward tupled AD" env3 ad_defs
 
@@ -72,7 +73,7 @@ demoCL file
        ; (env9, opt_fs_defs) <- optDefs rulebase env8 fs_defs
        ; (env10, cse_fs_defs) <- cseDefs rulebase env9 opt_fs_defs
        ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env10 cse_fs_defs
-
+-}
      } }
 
 
