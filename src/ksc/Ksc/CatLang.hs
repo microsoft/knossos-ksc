@@ -213,7 +213,11 @@ prune env e
                             (to_cl_expr Pruned trimmed_env e)
   where
     fvs = freeVarsOf e
-    no_prune_reqd = all (\tv -> tv `S.member` fvs) env
+    no_prune_reqd = not prune_reqd
+    prune_reqd = case (e, env) of
+      (Var{}, [_]) -> False
+      (Var{}, _)   -> True
+      _            -> False
 
     trimmed_prs :: [(TVar,Int)]
     trimmed_prs = trim fvs 1 env
