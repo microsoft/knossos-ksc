@@ -19,10 +19,10 @@
 % The cateorical language
 \newcommand{\CatLang}{$\mathcal CL$}
 \newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
-\newcommand{\clcomp}{\,\circ\,}   % CL composition
+\newcommand{\clcomp}{\, ; \,}   % CL composition
 \newcommand{\ck}[1]{{\mathcal K}(#1)}   % CL constant
 \newcommand{\cid}{\mathcal{I}}   % CL function
-\newcommand{\cprune}[3]{\mathcal{P}[#1/#2]#3}   % CL function
+\newcommand{\cprune}[2]{\mathcal{P}[#1/#2]}   % CL function
 \newcommand{\cfun}[1]{{\mathcal F}(#1)}   % CL function
 \newcommand{\clet}[3]{{\mathcal L}(#1,#2,#3)}   % CL let
 \newcommand{\cbuild}[3]{{\mathcal B}(#1,#2,#3)}   % CL build
@@ -1229,7 +1229,7 @@ $$
         \mathit{def} & ::= & f {:} S \darrow T = c \\
         c & ::= & \cid & \mbox{Identity} \\
           & |   & \ck{k} & \mbox{Constant} \\
-          & |   & \cprune{i_1,\ldots,i_m}{n}{c} & \mbox{Pruning} (0 \leq m \leq n) \\
+          & |   & \cprune{i_1,\ldots,i_m}{n}& \mbox{Pruning} (0 \leq m \leq n) \\
           & |   & \cfun{f} & \mbox{Function constant} \\
           & |   & c_1 \clcomp c_2  & \mbox{Composition} \\
           & |   & (c_1,\ldots, c_n) & \mbox{Tuple} \\
@@ -1245,18 +1245,18 @@ $$
 % --------------------- Semantics
 \begin{figure}
 \fbox{\begin{minipage}{\columnwidth}
-\mbox{{\bf Semantics (aka conversion from \CatLang):}\; \fbox{$c \capply e = e$}}
+\mbox{{\bf Semantics (aka conversion from \CatLang):}\; \fbox{$e \capply c = e$}}
 $$
 \begin{array}{r@{\hspace{1mm}}c@{\hspace{1mm}}l}
-   \cid \capply t & = & t \\
-   \cprune{i_1,\ldots,i_m}{n}{c} \capply t & = & c \capply (\sel{i_1}{n}(t), \ldots, \sel{i_m}{n}(t)) \\
-   \ck{k} \capply t & = & k \\
-   \cfun{f} \capply t & = & f(t) \\
-   (c_1 \clcomp c_2) \capply t & = & c_1 \capply (c_2 \capply t) \\
-   (c_1,\ldots, c_n) \capply t & = & (c_1 \capply t,\ldots, c_n \capply t) \\
-   \cif{c_1}{c_2}{c_3}\capply t & = & \lstinline|if|\; (c_1 \capply t) \; (c_2 \capply t)\; (c_3 \capply t) \\
-   \clet{x}{c_r}{c_b} \capply t & = & \lstinline|let|\;x\, = \, c_r\capply t \; \lstinline{in}\; c_b \capply (t \ctupx x) \\
-   \cbuild{c_s}{i}{c_e} \capply t & = & \lstinline|build|\;(c_x \capply t)\;(\lambda i. c_e \capply (t \ctupx i))
+   t \capply \cid & = & t \\
+   t \capply \cprune{i_1,\ldots,i_m}{n} & = & (\sel{i_1}{n}(t), \ldots, \sel{i_m}{n}(t)) \\
+   t \capply \ck{k} & = & k \\
+   t \capply \cfun{f} & = & f(t) \\
+   t \capply (c_1 \clcomp c_2)  & = & (t \capply c_1) \capply c_2 \\
+   t \capply (c_1,\ldots, c_n)  & = & (t \capply c_1,\ldots, t \capply c_n) \\
+   t \capply \cif{c_1}{c_2}{c_3} & = & \lstinline|if|\; (t \capply c_1) \; (t \capply c_2)\; (t \capply c_3) \\
+   t \capply \clet{x}{c_r}{c_b} & = & \lstinline|let|\;x\, = \, t \capply c_r \; \lstinline{in}\;  (t \ctupx x) \capply c_b \\
+   t \capply \cbuild{c_s}{i}{c_e} & = & \lstinline|build|\;(t \capply c_x)\;(\lambda i. (t \ctupx i) \capply c_e)
 \end{array}
 $$
 \mbox{\bf Conversion to \CatLang}
@@ -1308,8 +1308,9 @@ $$
   \begin{gather*}
     \infer{\Gamma \vdash \cid : S \darrow S}
           {} \qquad
-    \infer{\Gamma \vdash \cprune{i_1, \ldots, i_m}{n}{c} : (s_1, \ldots, s_n) \darrow T}
-          {\Gamma \vdash c : (s_{i_1},\ldots,s_{i_m}) \darrow T}
+    \\[1mm]
+    \infer{\Gamma \vdash \cprune{i_1, \ldots, i_m}{n} : (s_1, \ldots, s_n) \darrow (s_{i_1}, \ldots, s_{i_m})}
+          {}
    \\[1mm]
     \infer{\Gamma \vdash \cfun{f} : S \darrow T}
           {f : S \to T \in \Gamma} \qquad
@@ -1317,7 +1318,7 @@ $$
           {}
    \\[1mm]
    \infer{\Gamma \vdash c_1 \clcomp c_2 : S \darrow T}
-   {\Gamma \vdash c_1 : R \darrow T \quad \Gamma \vdash c_2 : S \darrow R}
+   {\Gamma \vdash c_1 : S \darrow R \quad \Gamma \vdash c_2 : R \darrow T}
    \\[1mm]
    \infer{\Gamma \vdash (c_1, \ldots, c_n) : S \darrow (T_1, \ldots, T_n)}
     {\Gamma \vdash c_1:S \darrow T_1 \quad \ldots \quad \Gamma \vdash c_n:S \darrow T_n}

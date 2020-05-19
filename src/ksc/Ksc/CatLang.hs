@@ -4,7 +4,8 @@
 
 -- Ksc.CatLang: Language for compilation to categories
 module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs, toCLDef_maybe, fromCLDef
-                  , fwdAdDefs, revAdDefs, fsAdDefs) where
+--                  , fwdAdDefs, revAdDefs, fsAdDefs
+     ) where
 
 import Prelude hiding( (<>) )
 import Lang
@@ -17,10 +18,10 @@ import Data.List( mapAccumL )
 
 data CLExpr
   = CLId
-  | CLPrune [Int] Int CLExpr         -- ?
+  | CLPrune [Int] Int
   | CLKonst Konst
   | CLCall Type FunId            -- The Type is the result type
-  | CLComp CLExpr CLExpr         -- Composition
+  | CLComp CLExpr CLExpr         -- Reverse composition, c1;c2
   | CLTuple [CLExpr]             -- Tuple
   | CLIf CLExpr CLExpr CLExpr    -- If
   | CLLet TVar CLExpr CLExpr     -- Let $var = $rhs in $body
@@ -41,9 +42,9 @@ mkCLComp e1 e2  = CLComp e1 e2
 
 clResultType :: CLExpr -> [Type] -> Type
 clResultType CLId             tys = mkTupleTy tys
-clResultType (CLPrune ts _ c) tys = clResultType c (pick ts tys)
+clResultType (CLPrune ts _)   tys = mkTupleTy (pick ts tys)
 clResultType (CLKonst k)      _   = typeofKonst k
-clResultType (CLComp c1 c2)   tys = clResultType c1 [clResultType c2 tys]
+clResultType (CLComp c1 c2)   tys = clResultType c2 [clResultType c1 tys]
 clResultType (CLTuple cs)     tys = mkTupleTy [clResultType c tys | c <- cs]
 clResultType (CLLet tv _ b)   tys = clResultType b (typeof tv : tys)
 clResultType (CLBuild _ _ b)  tys = TypeVec (clResultType b (TypeInteger : tys))
@@ -74,7 +75,7 @@ pprCLExpr :: Prec -> CLExpr -> SDoc
 pprCLExpr p c@(CLComp {})
   = parensIf p precOne $
     sep [ pprCLExpr precTwo c1
-        , vcat [ text "." <+> pprCLExpr precTwo c
+        , vcat [ text ";" <+> pprCLExpr precTwo c
                | c <- cs ] ]
   where
     (c1,cs) = case collect c of
@@ -87,11 +88,9 @@ pprCLExpr p c@(CLComp {})
 pprCLExpr _ CLId           = text "Id"
 pprCLExpr _ (CLKonst k)    = ppr k
 pprCLExpr _ (CLCall _ f)   = ppr f
-pprCLExpr p (CLPrune ts n c) = parensIf p precOne $
-                               sep [ text "Prune" <> char '['
-                                     <> cat (punctuate comma (map ppr ts))
-                                     <> char '/' <> int n <> char ']'
-                                   , nest 2 (pprCLExpr precOne c) ]
+pprCLExpr p (CLPrune ts n) = sep [ text "Prune" <> char '['
+                                   <> cat (punctuate comma (map ppr ts))
+                                   <> char '/' <> int n <> char ']' ]
 pprCLExpr _ (CLTuple cs)
   | [] <- cs  = text "[]"
   | [c] <- cs = char '[' <+> pprCLExpr precZero c <+> char ']'
@@ -194,7 +193,7 @@ to_cl_call pruned env f e
         CLFold t (toCLExpr (t:env) body) (toCLExpr env acc) (toCLExpr env v)
 
   | TFun ty (Fun fun_id) <- f
-  = CLCall ty fun_id `mkCLComp` to_cl_expr pruned env e
+  = to_cl_expr pruned env e`mkCLComp` CLCall ty fun_id
 
   | TFun _ (GradFun _ _) <- f
   = pprPanic "toCLExpr Call of GradFun" (ppr call)
@@ -209,7 +208,7 @@ prune :: [TVar] -> TExpr -> CLExpr
 prune env e
   | no_prune_reqd = to_cl_expr Pruned env e
   | otherwise     = CLPrune trim_indices (length env)
-                            (to_cl_expr Pruned trimmed_env e)
+                    `mkCLComp` to_cl_expr Pruned trimmed_env e
   where
     fvs = freeVarsOf e
     no_prune_reqd = all (\tv -> tv `S.member` fvs) env
@@ -262,47 +261,51 @@ fromCLDef (CLDef { cldef_fun = f
         , def_res_ty = res_ty
         , def_rhs    = UserRhs rhs' }
   where
+    pexp = case pat of
+      VarPat v  -> Var v
+      TupPat ts -> Tuple (map Var ts)
     pvs = patVars pat
-    rhs' = fromCLExpr (mkInScopeSet pvs) (map Var pvs) rhs
 
-fromCLExpr :: InScopeSet -> [TExpr] -> CLExpr -> TExpr
+    rhs' = fromCLExpr (mkInScopeSet pvs) pexp rhs
+
+fromCLExpr :: InScopeSet -> TExpr -> CLExpr -> TExpr
 -- (fromCLExpr is arg c)
 -- We may freely duplicate 'arg', so make sure that all
 -- of the TExprs in 'arg' are trivial -- usually variables --
 -- and hence can be duplicated without dupliating work
 fromCLExpr _  _   (CLKonst k)      = Konst k
-fromCLExpr _  arg CLId             = mkTuple arg
-fromCLExpr is arg (CLPrune ts _ c) = fromCLExpr is (pick ts arg) c
-fromCLExpr is arg (CLTuple es)     = Tuple (map (fromCLExpr is arg) es)
-fromCLExpr is arg (CLIf b t e)     = If (fromCLExpr is arg b)
+fromCLExpr _  arg CLId             = arg
+fromCLExpr is arg (CLPrune ts n)   = mkTuple (pick ts (Ksc.CatLang.splitTuple arg n))
+fromCLExpr is arg (CLTuple es)     = makeArgDupable is arg $ \is arg ->
+                                     Tuple (map (fromCLExpr is arg) es)
+fromCLExpr is arg (CLIf b t e)     = makeArgDupable is arg $ \ is arg ->
+                                     If (fromCLExpr is arg b)
                                         (fromCLExpr is arg t)
                                         (fromCLExpr is arg e)
 
 fromCLExpr _  arg (CLCall ty f)
-  = Call (TFun ty (Fun f)) (mkTuple arg)
+  = Call (TFun ty (Fun f)) arg
 
 fromCLExpr is arg (CLComp e1 e2)
-  | CLCall ty f <- e1   -- Shortcut to avoid an unnecessary let
-  = Call (TFun ty (Fun f)) (fromCLExpr is arg e2)
-  | otherwise
-  = mkTempLet is "ax" (fromCLExpr is arg e2) $ \ is v2 ->
-    fromCLExpr is [v2] e1
+  = fromCLExpr is (fromCLExpr is arg e1) e2
 
 fromCLExpr is arg (CLLet tv rhs body)
-  = Let tv' rhs' (fromCLExpr is' (Var tv' : arg) body)
+  = Let tv' rhs' (fromCLExpr is' (pTupCons (Var tv') arg) body)
   where
     rhs'      = fromCLExpr is arg rhs
     (is', tv') = notInScopeTV is tv
 
 fromCLExpr is arg (CLBuild size tv elt)
-  = pBuild (fromCLExpr is arg size)
-           (Lam tv' (fromCLExpr is' (Var tv' : arg) elt))
+  = makeArgDupable is arg $ \is arg ->
+    pBuild (fromCLExpr is arg size)
+           (Lam tv' (fromCLExpr is' (pTupCons (Var tv') arg) elt))
   where
     (is', tv') = notInScopeTV is tv
 
 fromCLExpr is arg (CLFold t lam acc v)
-  = mkPrimCall3 "fold"
-          (Lam t' (fromCLExpr is' (Var t' : arg) lam))
+  = makeArgDupable is arg $ \is arg ->
+    mkPrimCall3 "fold"
+          (Lam t' (fromCLExpr is' (pTupCons (Var t') arg) lam))
           (fromCLExpr is arg acc)
           (fromCLExpr is arg v)
   where
@@ -312,7 +315,7 @@ fromCLExpr is arg (CLFold t lam acc v)
 --   Forward AD, tupled
 --   S => T  =   (S, dS) -> (T, dT)
 -------------------------------------------
-
+{-
 
 fwdAdDefs :: GblSymTab -> [CLDef] -> (GblSymTab, [TDef])
 fwdAdDefs gst cldefs
@@ -341,7 +344,7 @@ fwdAdExpr is s ds (CLIf a b c) = If (fromCLExpr is s a)
 
 --  (.) :: (b => c) -> (a => b) -> (a => c)
 --  (f . g) <ft> s = f <ft> (g <ft> s)
-fwdAdExpr is s ds (CLComp f g)
+fwdAdExpr is s ds (CLComp g f)
   = mkPairLet is "gr" "dgr" (fwdAdExpr is s ds g) $ \is a da ->
     fwdAdExpr is [a] [da] f
 
@@ -427,7 +430,7 @@ revAdExpr is s dt (CLIf a b c) = If (fromCLExpr is s a)
 --                           db = f <r> (b,dc)
 --                       in
 --                       g <r> (a,db)
-revAdExpr is s dt (CLComp f g)
+revAdExpr is s dt (CLComp g f)
   = mkTempLet is "b"  (fromCLExpr is s g)     $ \ is b ->
     mkTempLet is "db" (revAdExpr is [b] dt f) $ \ is db ->
     revAdExpr is s db g
@@ -644,7 +647,7 @@ fsAdExpr _ _ e@(CLIf {}) = pprPanic "fsAdExpr:If" (ppr e)
 --                            dtf = f <sr> (dt,xf)
 --                            dtg = g <sr> (dtf,xg)
 --                        in dtg
-fsAdExpr gst tys (CLComp f g)
+fsAdExpr gst tys (CLComp g f)
   = SR { sr_fwd = \ is s ->
                   mkXPairLet is "rg" "xg" (g_empx, fwd_g is s)    $ \is rg xg ->
                   mkXPairLet is "rf" "xf" (f_empx, fwd_f is [rg]) $ \_  rf xf ->
@@ -794,57 +797,6 @@ funXShape gst fn arg_ty
   where
     fs_fn = DrvFun fn (AD { adPlan = SplitAD, adDir = Fwd })
 
------------------------------------------------
--- Utilities
------------------------------------------------
-
-pick :: Pretty a => [Int] -> [a] -> [a]
--- Pick the specifed items from the list
-pick ts es = [ get t | t <- ts ]
-  where
-    get t | t > length es = pprTrace "pick" (ppr ts $$ ppr es) (head es)
-          | otherwise     = es !! (t-1)
-
-findIndex :: Eq a => [(a,b)] -> a -> Maybe b
-findIndex prs i
-  = go prs
-  where
-    go [] = Nothing
-    go ((a,b):prs) | a ==i     = Just b
-                   | otherwise = go prs
-
-tupLen :: TExpr -> Int
-tupLen e = case typeof e of
-             TypeTuple tys -> length tys
-             x -> pprTrace "fsAdExpr:CLLet" (ppr x $$ ppr e) 0
-
-mkTempLets :: InScopeSet -> String -> [TExpr]
-           -> ([TExpr] -> TExpr) -> TExpr
-mkTempLets _ _ [] thing_inside
-  = thing_inside []
-mkTempLets is s (e:es) thing_inside
-  = mkTempLet is   s e      $ \ is' ve ->
-    mkTempLets is' s es  $ \ ves ->
-    thing_inside (ve : ves)
-
-mkPairLet :: InScopeSet -> String -> String -> TExpr
-          -> (InScopeSet -> TExpr -> TExpr -> TExpr)
-          -> TExpr
-mkPairLet is sf ss e thing_inside
-  = mkTempLet is "t" e        $ \is ve ->
-    mkTempLet is sf (pFst ve) $ \is vf ->
-    mkTempLet is ss (pSnd ve) $ \is vs ->
-    thing_inside is vf vs
-
-mkTempLet :: InScopeSet -> String -> TExpr
-          -> (InScopeSet -> TExpr -> TExpr) -> TExpr
-mkTempLet is s e thing_inside
-  | isTrivial e = thing_inside is e
-  | otherwise   = Let tv' e $
-                  thing_inside is' (Var tv')
-  where
-    (is', tv') = notInScopeTV is tv
-    tv = TVar (typeof e) (Simple s)
 
 mkXFwdPair :: TExpr -> [(XShape,TExpr)] -> TExpr
 mkXFwdPair r prs
@@ -888,8 +840,114 @@ splitXTuple x bs
     do_one :: Int -> XShape -> (Int, TExpr)
     do_one i XNonEmpty = (i+1, pSel i nval x)
     do_one i XEmpty    = (i,   unitExpr)
+-}
+
+-----------------------------------------------
+-- Utilities
+-----------------------------------------------
+
 
 splitTuple :: TExpr -> Int -> [TExpr]
+-- Expects e to be a tuple-typed expression;
+-- returns its n components.
+-- May duplicate e
 splitTuple _ 0 = []
 splitTuple e 1 = [e]
+splitTuple (Tuple es) n
+  | n == length es = es
+  | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
+splitTuple (Call f a) n
+  | f `isThePrimFun` "tupCons"
+  , Tuple [e1,es] <- a
+  = e1 : Ksc.CatLang.splitTuple es (n-1)
 splitTuple e n = [ pSel i n e | i <- [1..n] ]
+
+splitTupleK :: InScopeSet -> TExpr -> Int
+            -> (InScopeSet -> [TExpr] -> TExpr)
+            -> TExpr
+-- Expects e to be a tuple-typed expression;
+-- returns its n components.
+-- May duplicate e
+splitTupleK is _ 0 thing_inside = thing_inside is []
+splitTupleK is e 1 thing_inside = thing_inside is [e]
+splitTupleK is (Tuple es) n thing_inside
+  | n == length es = thing_inside is es
+  | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
+
+splitTupleK is (Call f a) n thing_inside
+ | f `isThePrimFun` "tupCons"
+ , Tuple [e1,es] <- a
+ = splitTupleK is es (n-1) $ \ is es ->
+   thing_inside is (e1 : es)
+
+splitTupleK is e n thing_inside
+  = mkTempLet is "tx" e $ \ is v ->
+    thing_inside is [ pSel i n v | i <- [1..n] ]
+
+pick :: Pretty a => [Int] -> [a] -> [a]
+-- Pick the specifed items from the list
+pick ts es = [ get t | t <- ts ]
+  where
+    get t | t > length es = pprTrace "pick" (ppr ts $$ ppr es) (head es)
+          | otherwise     = es !! (t-1)
+
+findIndex :: Eq a => [(a,b)] -> a -> Maybe b
+findIndex prs i
+  = go prs
+  where
+    go [] = Nothing
+    go ((a,b):prs) | a ==i     = Just b
+                   | otherwise = go prs
+
+tupLen :: TExpr -> Int
+tupLen e = case typeof e of
+             TypeTuple tys -> length tys
+             x -> pprTrace "fsAdExpr:CLLet" (ppr x $$ ppr e) 0
+
+makeArgDupable :: InScopeSet -> TExpr
+               -> (InScopeSet -> TExpr -> TExpr)
+               -> TExpr
+makeArgDupable is e thing_inside
+  | isDupable e
+  = thing_inside is e
+  | Let v r b <- e
+  = Let v r $
+    makeArgDupable (v `extendInScopeSet` is) b $ \ is b ->
+    thing_inside is b
+  | otherwise
+  = mkTempLet is "ax" e thing_inside
+
+isDupable (Tuple es) = all isTrivial es
+isDupable (Call f a) = f `isThePrimFun` "tupCons"
+                     && isDupable a
+isDupable e = False
+
+mkTempLets :: InScopeSet -> String -> [TExpr]
+           -> ([TExpr] -> TExpr) -> TExpr
+mkTempLets _ _ [] thing_inside
+  = thing_inside []
+mkTempLets is s (e:es) thing_inside
+  = mkTempLet is   s e      $ \ is' ve ->
+    mkTempLets is' s es  $ \ ves ->
+    thing_inside (ve : ves)
+
+mkPairLet :: InScopeSet -> String -> String -> TExpr
+          -> (InScopeSet -> TExpr -> TExpr -> TExpr)
+          -> TExpr
+mkPairLet is sf ss e thing_inside
+  = mkTempLet is "t" e        $ \is ve ->
+    mkTempLet is sf (pFst ve) $ \is vf ->
+    mkTempLet is ss (pSnd ve) $ \is vs ->
+    thing_inside is vf vs
+
+mkTempLet :: InScopeSet -> String -> TExpr
+          -> (InScopeSet -> TExpr -> TExpr) -> TExpr
+mkTempLet is s e thing_inside
+  | isTrivial e = thing_inside is e
+  | otherwise   = Let tv' e $
+                  thing_inside is' (Var tv')
+  where
+    (is', tv') = notInScopeTV is tv
+    tv = TVar (typeof e) (Simple s)
+
+
