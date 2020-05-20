@@ -26,7 +26,10 @@ module LangUtils (
   GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
   stInsertFun,
   LclSymTab, extendLclST,
-  SymTab(..), newSymTab, emptySymTab
+  SymTab(..), newSymTab, emptySymTab,
+
+  -- Other utility functions
+  isSingleton, count
 
   ) where
 
@@ -34,6 +37,18 @@ import Lang
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Test.Hspec
+
+
+-----------------------------------------------
+--     Utility functions
+-----------------------------------------------
+
+isSingleton :: [a] -> Bool
+isSingleton [x] = True
+isSingleton _   = False
+
+count :: (a->Bool) -> [a] -> Int
+count f = length . filter f
 
 -----------------------------------------------
 --     Functions over expressions

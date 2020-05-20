@@ -263,7 +263,7 @@ notInScopeTV is (TVar ty v)
 notInScope :: Var -> InScopeSet -> Var
 -- Find a variant of the input Var that is not in the in-scope set
 --
--- Do this by adding "_1", "_2" etc
+-- Do this by adding "1", "2" etc
 notInScope v in_scope
   | not (v `S.member` in_scope)
   = v
@@ -280,23 +280,19 @@ notInScope v in_scope
           | otherwise                = var'
           where
             var' = rebuild str'
-            str' = prefix ++ '_' : show n
+            str' = prefix ++ show n
 
     (prefix, _n) = parse_suffix [] (reverse str)
 
     parse_suffix :: String          -- Digits parsed from RH end (in order)
                  -> String          -- String being parsed (reversed)
-                 -> (String, Int)   -- String before "_", plus number found after
-    -- E.g. parse_suffix "foo_23" = ("foo",    23)
+                 -> (String, Int)   -- String before number, plus number found after
+    -- E.g. parse_suffix "foo23"  = ("foo",    23)
     --      parse_suffix "wombat" = ("wombat", 0)
     parse_suffix ds (c:cs)
-      | c == '_'
-      , not (null ds)
-      = (reverse cs, read ds)
-      | isDigit c
-      = parse_suffix (c:ds) cs
-    parse_suffix ds cs
-      = (reverse cs ++ ds, 0)
+      | isDigit c      = parse_suffix (c:ds) cs
+      | not (null ds)  = (reverse (c:cs), read ds)
+    parse_suffix ds cs = (reverse cs ++ ds, 0)
 
 optLetsE :: Subst -> ExprX OccAnald -> TExpr
 -- This function inline let-bindings that are only used once
@@ -405,6 +401,6 @@ inline_me_help rhs
   | isTrivial rhs   = True   -- RHS is trivial, see isTrivial for what that means
   | isKZero rhs     = True   -- Inline zeros, as they will very likely disappear
   | TypeLM {} <- typeof rhs = True   -- Always inline linear maprs (might not do this in future)
-  | Tuple ts <- rhs              -- Always inline tuples whose fields are all trivial
-  , all inline_me_help ts = True  -- See Note [Inline tuples]
+  | Tuple ts <- rhs                  -- Always inline tuples whose fields are all trivial
+  , all inline_me_help ts = True     -- See Note [Inline tuples]
   | otherwise             = False

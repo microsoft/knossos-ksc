@@ -24,11 +24,13 @@ import           Test.Hspec
 mkGradType :: ADPlan -> Type -> Type -> Type
 mkGradType BasicAD s ty = TypeLM s ty
 mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
+mkGradType SplitAD _ _ = error "mkGradType:SplitAD"  -- Doesn't make sense
   -- For TupleAD, mkGradType s t = (t, s -o t)
 
 mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
 mkGradTuple TupleAD p lm = Tuple [p, lm]
+mkGradTuple SplitAD _ _ = error "mkGradTuple:SplitAD"  -- Doesn't make sense
 
 data Phase = Parsed | Typed | OccAnald
 
@@ -143,6 +145,9 @@ data ExprX p
   | Assert (ExprX p) (ExprX p)
   | Dummy (MTypeX p)
 
+unitExpr :: ExprX p
+unitExpr = Tuple []
+
 instance InPhase p => Show (ExprX p) where
   show e = pps e
 
@@ -175,6 +180,9 @@ data TypeX
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
 
   | TypeUnknown
+
+unitType :: TypeX
+unitType = TypeTuple []
 
 deriving instance Eq  Type
 deriving instance Ord Type
@@ -234,9 +242,9 @@ tangentType :: HasCallStack => Type -> Type
 tangentType TypeFloat      = TypeFloat
 tangentType (TypeVec t)    = TypeVec (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
-tangentType TypeInteger    = TypeTuple []
-tangentType TypeBool       = TypeTuple []
-tangentType TypeString     = TypeTuple []
+tangentType TypeInteger    = unitType
+tangentType TypeBool       = unitType
+tangentType TypeString     = unitType
 tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
@@ -267,7 +275,7 @@ data FunId = UserFun String   -- UserFuns have a Def
                 Int      -- Arity
            deriving( Eq, Ord, Show )
 
-data Fun = Fun      FunId         -- The function              f(x)
+data Fun = Fun      FunId         -- The function f(x)
          | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
@@ -294,7 +302,7 @@ funIdOfFun = \case
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
 
-data ADPlan = BasicAD | TupleAD
+data ADPlan = BasicAD | TupleAD | SplitAD
   deriving( Eq, Ord, Show )
 
 data ADDir = Fwd | Rev
@@ -311,11 +319,14 @@ data Var
   | Grad   String ADPlan  -- Derivative of x
   deriving( Eq, Ord, Show )
 
-nameOfVar :: Var -> String
-nameOfVar = \case
+varName :: Var -> String
+varName = \case
   Simple s -> s
   Delta s  -> s
   Grad s _ -> s
+
+tVarName :: TVarX -> String
+tVarName tv = varName (tVarVar tv)
 
 data Konst = KInteger Integer   -- :: TypeInteger
            | KFloat   Double    -- :: TypeFloat
@@ -601,6 +612,9 @@ punctuate (SDoc p) ss =
 comma :: SDoc
 comma = text ","
 
+dcolon :: SDoc
+dcolon = text "::"
+
 empty :: SDoc
 empty = SDoc (\_ -> PP.empty)
 
@@ -706,6 +720,7 @@ instance Pretty ADDir where
 instance Pretty ADPlan where
   ppr BasicAD = empty
   ppr TupleAD = char 't'
+  ppr SplitAD = char 's'
 
 instance Pretty Var where
   ppr (Simple s) = text s
@@ -822,9 +837,11 @@ pprCall prec f e = mode
   (case (e, isInfix @p f) of
     (Tuple [e1, e2], Just prec')
       -> parensIf prec prec' $
-         sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
+         sep [pprExpr prec' e1
+             , char '`'<> pprFunOcc @p f <> char '`'
+               <+> pprExpr prec' e2]
     _ -> parensIf prec precCall $
-         cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
+         cat [pprFunOcc @p f, nest 2 (case e of { Tuple {} -> ppr e; _ -> parens (ppr e) })]
   )
  where
   pp_args = ppr e
@@ -858,8 +875,8 @@ isInfixFun (Fun (PrimFun s))
 isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
-parensIf ctxt inner doc | ctxt >= inner    = parens doc
-                        | otherwise        = doc
+parensIf ctxt inner doc | ctxt >= inner = parens doc
+                        | otherwise     = doc
 
 instance InPhase p => Pretty (DeclX p) where
   ppr (DefDecl d)  = ppr d
@@ -882,7 +899,7 @@ pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
                     2 (parens (pprTVar vs))
-               , nest 2 (text "=" <+> ppr rhs) ])
+               , nest 2 (text "=" <+> pprExpr precZero rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
 
@@ -935,8 +952,8 @@ hspec = do
       e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
-    test e  "g( i )"
-    test e2 "f( (g( i ), _t1, 5) )"
+    test e  "g(i)"
+    test e2 "f(g(i), _t1, 5)"
 
   describe "eqType" $
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)

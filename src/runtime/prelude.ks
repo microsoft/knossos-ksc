@@ -1,5 +1,8 @@
+;; ---------------- Addition --------------
 ;; add :: Number x Number -> Number
 ;; add (x, y) = x + y
+
+;; ------- Addition: Float ------
 (edef add Float (Float Float))
 (edef D$add (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$add (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
@@ -10,6 +13,18 @@
   ((dx1 (get$1$2 dxt))
    (dx2 (get$2$2 dxt)))
   (add dx1 dx2)))
+
+; Tupled forward add
+(def
+ fwdt$add (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+ (let
+  ((dx1 (get$1$2 dxt))
+   (dx2 (get$2$2 dxt)))
+  (tuple (add (get$1$2 xt) (get$2$2 xt))
+         (add dx1 dx2))))
+
+; Reverse add
 (def
  rev$add (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
@@ -17,6 +32,24 @@
   ((d_dadd drt))
   (tuple d_dadd d_dadd)))
 
+; Split add
+; fwds$add :: (F,F) -> (F, ())
+; revs$add :: (dF, ()) -> (dF,dF)
+
+(def
+ fwds$add (Tuple Float (Tuple))
+ (xt : (Tuple Float Float))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt)))
+  (tuple (add x1 x2) (tuple))))
+
+(def
+ revs$add (Tuple Float Float)
+ (dr : Float)
+ (tuple dr dr))
+
+;; ------- Addition: Integer ------
 (edef add Integer (Integer Integer))
 (edef D$add (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef Dt$add (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -29,6 +62,7 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; ---------------- Subtraction --------------
 ;; sub :: Number x Number -> Number
 ;; sub (x, y) = x - y
 (edef sub Float (Float Float))
@@ -60,8 +94,11 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; ---------------- Division --------------
 ;; div :: Number x Number -> Number
 ;; div (x, y) = x / y
+
+;; ------- Division: Float ------
 (edef div Float (Float Float))
 (edef D$div (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$div (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
@@ -76,6 +113,21 @@
   (div (sub (mul x2 dx1)
                   (mul x1 dx2))
           (mul x2 x2))))
+
+; Tupled forward divide
+(def
+ fwdt$div (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt))
+   (dx1 (get$1$2 dxt))
+   (dx2 (get$2$2 dxt)))
+  (tuple (div x1 x2)
+         (div (sub (mul x2 dx1)
+                         (mul x1 dx2))
+                 (mul x2 x2)))))
+
 (def
  rev$div (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
@@ -86,6 +138,8 @@
   (tuple (div d_ddiv x2)
          (neg (div (mul x1 d_ddiv)
                          (mul x2 x2))))))
+
+;; ------- Division: Integer ------
 (edef div Integer (Integer Integer))
 (edef D$div (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef Dt$div (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -94,12 +148,19 @@
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
+ fwdt$div (Tuple Integer (Tuple))
+ ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
+ (tuple (div xt) (tuple)))
+(def
  rev$div (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; ---------------- Multiplication --------------
 ;; mul :: Number x Number -> Number
 ;; mul (x, y) = x * y
+
+;; ------- Multiplication: Float ------
 (edef mul Float (Float Float))
 (edef D$mul (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$mul (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
@@ -112,6 +173,19 @@
    (dx1 (get$1$2 dxt))
    (dx2 (get$2$2 dxt)))
   (add (mul x2 dx1) (mul x1 dx2))))
+
+; Tupled forward multiply
+(def
+ fwdt$mul (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt))
+   (dx1 (get$1$2 dxt))
+   (dx2 (get$2$2 dxt)))
+  (tuple (mul x1 x2) (add (mul x2 dx1) (mul x1 dx2)))))
+
+; Reverse multiply
 (def
  rev$mul (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
@@ -121,6 +195,28 @@
    (d_dmul drt))
   (tuple (mul d_dmul x2) (mul d_dmul x1))))
 
+; Split forward multiply
+;    fwds$mul :: (F,F) -> (F, (F,F))
+;    revs$mul :: (dF, (F,F)) -> (dF,dF)
+(def
+ fwds$mul (Tuple Float (Tuple Float Float))
+ (xt : (Tuple Float Float))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt)))
+  (tuple (mul x1 x2) (tuple x1 x2))))
+
+(def
+ revs$mul (Tuple Float Float)
+ (xt : (Tuple Float (Tuple Float Float)))
+ (let
+  ((dr (get$1$2 xt))
+   (x  (get$2$2 xt))
+   (x1 (get$1$2 x))
+   (x2 (get$2$2 x)))
+  (tuple (mul dr x2) (mul dr x1))))
+
+;; ------- Multiplication: Integer ------
 (edef mul Integer (Integer Integer))
 (edef D$mul (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef Dt$mul (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -129,10 +225,15 @@
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
+ fwdt$mul (Tuple Integer (Tuple))
+ ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
+ (tuple (mul xt) (tuple)))
+(def
  rev$mul (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; ----------------- Negation --------------------------
 ;; neg :: Number -> Number
 ;; neg x = -x
 (edef neg Float (Float))
@@ -166,6 +267,7 @@
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
 
+;; ----------------- Relational operators --------------------------
 (edef gt Bool (Integer Integer))
 (edef D$gt (LM (Tuple Integer Integer) Bool) (Integer Integer))
 (edef Dt$gt (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
@@ -314,6 +416,8 @@
 (edef to_float Float (Integer))
 (edef D$to_float (LM Integer Float) (Integer))
 (def fwd$to_float Float ((x : Integer) (dx : (Tuple))) 0.0)
+(def fwdt$to_float (Tuple Float Float) ((x : Integer) (dx : (Tuple)))
+     (tuple (to_float x) 0.0))
 (def rev$to_float (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
 (edef Dt$to_float (Tuple Float (LM Integer Float)) (Integer))
 

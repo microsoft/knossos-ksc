@@ -27,10 +27,63 @@ import GHC.Stack (HasCallStack)
 --  The demo driver
 -------------------------------------
 
+demoCL :: String -> IO ()
+demoCL file
+  = do { pr_decls <- parseF "src/runtime/prelude.ks"
+       ; my_decls <- parseF ("test/ksc/" ++ file ++ ".ks")
+       ; runKM $
+
+    do { banner "Original decls"
+       ; displayN my_decls
+
+       ; (env1, pr_tc) <- annotDecls emptyGblST pr_decls
+       ; (env2, my_tc) <- annotDecls env1       my_decls
+       ; let (_pr_rules, _pr_defs) = partitionDecls pr_tc
+             (_my_rules, my_defs)  = partitionDecls my_tc
+             rulebase              = mkRuleBase (_pr_rules ++ _my_rules)
+
+       ; displayPassM veryVerbose "Typechecked declarations" env2 my_defs
+
+       ; banner "toCLDefs"
+       ; let cl_defs = toCLDefs my_defs
+       ; displayN cl_defs
+
+       ; displayPassM veryVerbose "fromCLDefs" env2
+                       (fromCLDefs cl_defs)
+
+{-
+       ; let (env3, ad_defs) = fwdAdDefs env2 cl_defs
+       ; displayPassM veryVerbose "Forward tupled AD" env3 ad_defs
+
+       ; (env4, opt_ad_defs) <- optDefs rulebase env3 ad_defs
+       ; displayPassM veryVerbose "Optimized forward tupled AD " env4 opt_ad_defs
+
+       ; let (env5, rev_defs) = revAdDefs env4 cl_defs
+       ; displayPassM veryVerbose "Reverse AD" env5 rev_defs
+
+       ; (env6, opt_rev_defs) <- optDefs rulebase env5 rev_defs
+       ; displayPassM veryVerbose "Optimized reverse AD " env5 opt_rev_defs
+
+       ; (env7, cse_rev_defs) <- cseDefs rulebase env6 opt_rev_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env7 cse_rev_defs
+
+       ; let (env8, fs_defs) = fsAdDefs env7 cl_defs
+       ; displayPassM veryVerbose "Split AD" env8 fs_defs
+
+       ; (env9, opt_fs_defs) <- optDefs rulebase env8 fs_defs
+       ; (env10, cse_fs_defs) <- cseDefs rulebase env9 opt_fs_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env10 cse_fs_defs
+-}
+     } }
+
+
+veryVerbose :: Maybe Int
+veryVerbose = Just 999
+
 demoF :: ADPlan -> [String] -> IO ()
 -- Read source code from specified input files, optimise,
 -- differentiate, optimise, and display results of each step
-demoF = demoFFilter (Just 999) id
+demoF = demoFFilter veryVerbose id
 
 demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> [String] -> IO ()
 demoFFilter verbosity theFilter adp files = do

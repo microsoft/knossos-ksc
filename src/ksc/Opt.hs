@@ -183,23 +183,29 @@ rewriteCall _ fun (If e1 e2 e3)
 rewriteCall env (TFun _ (Fun fun)) arg
   = optFun env fun arg
 
-rewriteCall env (TFun ty (GradFun f adm)) arg
-  = optGradFun (optEnvInScope env) adm ty f arg
+rewriteCall env (TFun ty (GradFun f adp)) arg
+  = optGradFun (optEnvInScope env) adp ty f arg
 
-rewriteCall _ f@(TFun (TypeLM _ _) _) _
-  = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
-
-rewriteCall _ _ _
-  = Nothing
+rewriteCall env (TFun ty (DrvFun f adm)) arg
+  = optDrvFun (optEnvInScope env) adm ty f arg
 
 -----------------------
 optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
 
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
-optFun _ (SelFun i _) arg
+optFun _ (SelFun i n) arg
+  | n == 1, i == 1
+  = Just arg
+
   | Tuple es <- arg
   , i <= length es
   = Just (es !! (i-1))
+
+  | Call tupCons (Tuple [e,es]) <- arg
+  , tupCons `isThePrimFun` "tupCons"
+  = case i of
+      1 -> Just e
+      _ -> Just (pSel (i-1) (n-1) es)
 
   | otherwise
   = Nothing
@@ -237,6 +243,10 @@ optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
           , ""
           , "    https://github.com/microsoft/knossos-ksc/pull/61/commits/29c2ab04568e17b953d3fe942aba5881ab15e1f8#r309892713"
           ]
+
+optPrimFun _ "tupTail" (Tuple es)
+  | [_,e2] <- es = Just e2
+  | _:es2  <- es = Just (Tuple es2)
 
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type
@@ -332,6 +342,20 @@ optPrimFun _ "lmAdd" (Tuple [ Call hcat1 (Tuple ps)
   = Just (lmHCat (zipWith (\ pi qi -> lmAdds [pi, qi]) ps qs))
 
 optPrimFun _ _ _ = Nothing
+
+----------------------
+optDrvFun :: HasCallStack => InScopeSet -> ADMode
+                          -> Type -> FunId -> TExpr -> Maybe TExpr
+optDrvFun _ (AD BasicAD Fwd) _ (SelFun i n) (Tuple [_,ds])
+  = Just (pSel i n ds)
+optDrvFun _ (AD TupleAD Fwd) _ (SelFun i n) (Tuple [s,ds])
+  = Just (Tuple [pSel i n s, pSel i n ds])
+optDrvFun _ (AD BasicAD Rev) _ (SelFun i n) (Tuple [s,dt])
+  = Just (mkTuple (map mk_dr [1..n]))    -- Returns (0,0,dt,0)
+  where
+    mk_dr j | i==j      = dt
+            | otherwise = mkTangentZero (pSel j n s)
+optDrvFun _ _ _ _ _ = Nothing
 
 ----------------------
 optLMCompose :: TExpr -> TExpr -> Maybe TExpr
@@ -553,6 +577,7 @@ optGradFun env TupleAD ty f args
 
 optGradFun _ BasicAD  _ (SelFun i n) args = optGradSel  i n args
 optGradFun _ BasicAD ty (PrimFun f)  args = optGradPrim ty f args
+optGradFun _ SplitAD _ _ _ = error "optGradFun:SplitAD" -- Doesn't make sense
 
 type TBinds = [(TVar, TExpr)]
 

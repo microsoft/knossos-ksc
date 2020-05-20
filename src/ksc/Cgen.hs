@@ -199,7 +199,7 @@ params_withPackedParams param = case typeof param of
   TypeTuple tys ->
     let params  = zipWith mkParam [1..] tys
         mkParam i ty = TVar ty (Simple name)
-          where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
+          where name = tVarName param ++ "arg" ++ show i
         packParams = Let param (Tuple (map Var params))
     in (params, ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
@@ -525,6 +525,8 @@ cgenUserFun (f, ty) = case f of
   DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenFunId (s, ty)
   DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId (s, ty)
   DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId (s, ty)
+  DrvFun   s (AD SplitAD Fwd) -> "revsf$" ++ cgenFunId (s, ty)
+  DrvFun   s (AD SplitAD Rev) -> "revsr$" ++ cgenFunId (s, ty)
 
 cgenAnyFun :: HasCallStack => (TFun, Type) -> CType -> String
 cgenAnyFun (tf, ty) cftype = case tf of
