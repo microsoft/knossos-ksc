@@ -40,7 +40,7 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: Fun
-        , def_args   :: TVarX  -- See Note [Function arity]
+        , def_pat    :: Pat       -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
@@ -64,6 +64,21 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
+data Pat = VarPat TVar     -- A single variable
+         | TupPat [TVar]   -- A tuple of variables
+         deriving( Eq )
+
+patType :: Pat -> Type
+patType (VarPat v) = typeof v
+patType (TupPat vs) = mkTupleTy (map typeof vs)
+
+patVars :: Pat -> [TVar]
+patVars (VarPat v) = [v]
+patVars (TupPat vs) = vs
+
+instance Show Pat where
+  show p = pps p
+
 data TVarX = TVar TypeX Var
 type TVar = TVarX
 
@@ -86,7 +101,6 @@ type family MTypeX p where
 
 {- Note [Function arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
 All functions are functions of a single argument, regardless of whether
 they were given multiple arguments in the surface syntax.  If the
 surface syntax def takes multiple arguments then we generate code to
@@ -416,6 +430,18 @@ dropLast :: [a] -> [a]
 -- No-op for empty list
 dropLast xs = take (length xs - 1) xs
 
+pSel :: Int -> Int -> TExpr -> TExpr
+pSel i n e = Call (TFun el_ty
+                        (Fun (SelFun i n))) e
+           where
+             el_ty = case typeof e of
+                        TypeTuple ts -> ts !! (i-1)
+                        _ -> TypeUnknown  -- Better error from Lint
+
+pFst,pSnd :: TExpr -> TExpr
+pFst   = pSel 1 2
+pSnd   = pSel 2 2
+
 -----------------------------------------------
 --  Finding the type of an expression
 -----------------------------------------------
@@ -425,6 +451,9 @@ class HasType b where
 
 instance HasType TVar where
   typeof tv = tVarType tv
+
+instance HasType Pat where
+  typeof pat = patType pat
 
 instance HasType TypedExpr where
   typeof (TE _ ty) = ty
@@ -729,6 +758,9 @@ pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
 
+instance Pretty Pat where
+  pprPrec _ p = pprPat True p
+
 instance Pretty TVar where
   pprPrec _ (TVar _ v) = ppr v
 
@@ -869,22 +901,30 @@ instance InPhase p => Pretty (DefX p) where
   ppr def = pprDef def
 
 pprDef :: InPhase p => DefX p -> SDoc
-pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
+pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
   = case rhs of
       EDefRhs -> parens $
                  sep [ text "edef", ppr f
                      , pprParendType res_ty
-                     , parens ((pprParendType . tVarType) vs) ]
+                     , parens (pprParendType (typeof vs)) ]
 
       UserRhs rhs -> mode
           (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
-                        , parens ((parens . pprTVar) vs)
+                        , parens (pprPat False vs)
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
-                    2 (parens (pprTVar vs))
+                    2 (parens (pprPat False vs))
                , nest 2 (text "=" <+> ppr rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
+
+pprPat :: Bool -> Pat -> SDoc
+          -- True <=> wrap tuple pattern in parens
+pprPat _          (VarPat v)  = pprTVar v
+pprPat tup_parens (TupPat vs) = mb_parens $ pprList (parens . pprTVar) vs
+  where
+    mb_parens d | tup_parens = parens d
+                | otherwise  = d
 
 instance InPhase p => Pretty (RuleX p) where
   ppr (Rule { ru_name = name, ru_qvars = qvars

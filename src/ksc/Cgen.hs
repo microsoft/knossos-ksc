@@ -168,7 +168,7 @@ cgenDefs defs = concatMap cdecl $
  where
   env = Map.fromList (mapMaybe (\(Def { def_fun = f
                                       , def_rhs = rhs
-                                      , def_args = arg
+                                      , def_pat = arg
                                       }) ->
                                   case rhs of
                                     UserRhs _ -> Just ((f, typeof arg), ())
@@ -193,6 +193,10 @@ that we chose are not used in the function body by using substExpr.
 ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
 ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
 
+params_withPackedParamsPat :: Pat -> ([TVarX], TExpr -> TExpr)
+params_withPackedParamsPat (TupPat vs)    = (vs, id)
+params_withPackedParamsPat (VarPat param) = params_withPackedParams param
+
 params_withPackedParams :: TVarX -> ([TVarX], TExpr -> TExpr)
 params_withPackedParams param = case typeof param of
   -- See Note [Unpack tuple arguments]
@@ -208,10 +212,10 @@ mkCTypedVar :: TVar -> String
 mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 
 cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (Def { def_fun = f, def_args = param
+cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
   let cf                         = cgenUserFun (f, typeof param)
-      (params, withPackedParams) = params_withPackedParams param
+      (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype =
         runM $ cgenExpr env (withPackedParams body)
       cvars       = map mkCTypedVar params

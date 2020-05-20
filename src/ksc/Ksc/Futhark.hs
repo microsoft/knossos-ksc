@@ -13,6 +13,7 @@ import qualified Lang                    as L
 import Lang (Pretty(..), text, render, empty, parensIf,
              (<>), (<+>), ($$), parens, brackets, punctuate, sep,
              integer, double, comma)
+import qualified LangUtils               as LU
 
 --------------------------
 -- Futhark AST definition
@@ -379,7 +380,8 @@ toCall f@(L.TFun _ L.DrvFun{}) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toFuthark :: L.TDef -> Def
-toFuthark (L.Def f args res_ty (L.UserRhs e)) =
+toFuthark d = case LU.oneArgifyDef d of {
+  L.Def f (L.VarPat args) res_ty (L.UserRhs e) ->
   DefFun entry fname []
   [param] res_ty' (toFutharkExp e)
   where fname = toTypedName f (L.typeof args)
@@ -390,5 +392,5 @@ toFuthark (L.Def f args res_ty (L.UserRhs e)) =
         res_ty' = case entry of Entry -> Nothing
                                 NotEntry -> Just $ toFutharkType res_ty
         param = toFutharkParam args
-toFuthark d =
-  DefComment $ render $ ppr d
+; d -> DefComment $ render $ ppr d
+}

@@ -42,11 +42,11 @@ gradDefs adp = mapMaybe (gradDef adp)
 
 gradDef :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDef adp
-        (Def { def_fun = f@(Fun{}), def_args = params
+        (Def { def_fun = f@(Fun{}), def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
     Def { def_fun    = gradF adp f
-        , def_args   = params
+        , def_pat    = VarPat params
         , def_res_ty = mkGradType adp s_ty res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs)) }
   where
@@ -57,6 +57,9 @@ gradDef adp
     lets = [ (gradTVar adp s params,
               mkGradTuple adp (Var params) (lmOne (typeof params)))
            ]
+
+gradDef adp def@(Def { def_pat = TupPat {} })
+  = gradDef adp (oneArgifyDef def)
 
 gradDef _ _ = Nothing
 
@@ -246,15 +249,18 @@ lmVCat_AD TupleAD ms = Tuple [ Tuple  (map pFst ms)
 
 applyD :: ADDir -> TDef -> TDef
 
+applyD dir def@(Def { def_pat = TupPat {} })
+  = applyD dir (oneArgifyDef def)
+
 -- Forward
 --   D$f  :: S1 S2       -> ((S1,S2) -o T)
 --  Dt$f  :: S1 S2       -> (T, (S1,S2) -o T)
 -- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
 -- fwdt$f :: (S1, S2) (dS1, dS2) -> (T, dT)
 applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
-                , def_args = x, def_rhs = UserRhs rhs })
+                , def_pat = VarPat x, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Fwd)
-        , def_args   = x_dx
+        , def_pat   = VarPat x_dx
         , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dx
         , def_res_ty = t }
   where
@@ -282,9 +288,9 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 --   D$f :: S1 S2    -> ((S1,S2) -o T)
 -- rev$f :: (S1, S2) dT -> (dS1,dS2)
 applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
-                , def_args = x, def_rhs = UserRhs rhs })
+                , def_pat = VarPat x, def_rhs = UserRhs rhs })
   = Def { def_fun    = DrvFun f (AD adp Rev)
-        , def_args   = x_dr
+        , def_pat    = VarPat x_dr
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
         , def_res_ty = tangentType (mkTupleTy [typeof x]) }
   where

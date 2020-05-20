@@ -5,7 +5,6 @@ import Prelude hiding( (<>) )
 import Lang
 import LangUtils
 import Prim
-import OptLet
 import qualified Data.Set as S
 import Data.Maybe( mapMaybe )
 
@@ -23,7 +22,7 @@ data CLExpr
   -- ^ Fold (Lam $t body) $acc $vector
 
 data CLDef = CLDef { cldef_fun    :: FunId
-                   , cldef_arg    :: TVar    -- Arg type S
+                   , cldef_arg    :: Pat     -- Arg type S
                    , cldef_rhs    :: CLExpr
                    , cldef_res_ty :: Type }  -- Result type T
 
@@ -43,7 +42,7 @@ instance Pretty CLDef where
              , cldef_rhs = rhs
              , cldef_res_ty = res_ty })
      = sep [ hang (text "def" <+> ppr f <+> pprParendType res_ty)
-                2 (parens (pprTVar arg))
+                2 (parens (pprPat False arg))
            , nest 2 (text "=" <+> ppr rhs) ]
 
 instance Pretty CLExpr where
@@ -105,15 +104,15 @@ toCLDefs :: [TDef] -> [CLDef]
 toCLDefs defs = mapMaybe toCLDef_maybe defs
 
 toCLDef_maybe :: TDef -> Maybe CLDef
-toCLDef_maybe  (Def { def_fun  = fun
-                    , def_args = arg
+toCLDef_maybe  (Def { def_fun    = fun
+                    , def_pat    = pat
                     , def_res_ty = res_ty
-                    , def_rhs  = rhs })
+                    , def_rhs    = rhs })
   | Fun f     <- fun
   , UserRhs e <- rhs
   = Just CLDef { cldef_fun = f
-               , cldef_arg = arg
-               , cldef_rhs = toCLExpr [arg] e
+               , cldef_arg = pat
+               , cldef_rhs = toCLExpr (patVars pat) e
                , cldef_res_ty = res_ty }
   | otherwise
   = Nothing
@@ -223,15 +222,16 @@ fromCLDefs cldefs = map fromCLDef cldefs
 
 fromCLDef :: CLDef -> TDef
 fromCLDef (CLDef { cldef_fun = f
-                 , cldef_arg = arg
+                 , cldef_arg = pat
                  , cldef_rhs = rhs
                  , cldef_res_ty = res_ty })
   = Def { def_fun    = Fun f
-        , def_args   = arg
+        , def_pat    = pat
         , def_res_ty = res_ty
         , def_rhs    = UserRhs rhs' }
   where
-    rhs' = fromCLExpr (mkInScopeSet [arg]) [Var arg] rhs
+    pvs = patVars pat
+    rhs' = fromCLExpr (mkInScopeSet pvs) (map Var pvs) rhs
 
 fromCLExpr :: InScopeSet -> [TExpr] -> CLExpr -> TExpr
 -- (fromCLExpr is arg c)

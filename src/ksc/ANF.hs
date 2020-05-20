@@ -19,11 +19,11 @@ anfDefs defs = runAnf $
 -----------------------------------------------
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
 anfD :: Monad m => TDef -> AnfMT Typed m TDef
-anfD def@(Def { def_rhs  = rhs
-              , def_args = args })
+anfD def@(Def { def_rhs = rhs
+              , def_pat = pat })
   = case rhs of
       UserRhs expr ->
-        do { expr' <- anfExpr (mkEmptySubst [args]) expr
+        do { expr' <- anfExpr (mkEmptySubst (patVars pat)) expr
            ; return (def { def_rhs = UserRhs expr' }) }
 
       EDefRhs{} -> return def
