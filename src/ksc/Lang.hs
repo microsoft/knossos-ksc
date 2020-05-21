@@ -424,7 +424,7 @@ class HasType b where
   typeof :: HasCallStack => b -> Type
 
 instance HasType TVar where
-  typeof (TVar ty _) = ty
+  typeof tv = tVarType tv
 
 instance HasType TypedExpr where
   typeof (TE _ ty) = ty
