@@ -96,12 +96,14 @@ def make_list(node):
     print("WARNING: Lists aren't correctly translated yet, " + node.kind() )
     # build n (lam (ni : Integer) (to_float (mul ni ni))))
     value = node.outputsAt(0)
+
+    list_size = str(sum(1 for _ in node.inputs()))
     return [
         sexpdata.Symbol("\n"),
         sexpdata.Symbol("_" + value.debugName()),
         [
             sexpdata.Symbol("build"),
-            sexpdata.Symbol("1"),
+            sexpdata.Symbol(list_size),
             [
                 sexpdata.Symbol("lam"),
                 [
