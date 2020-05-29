@@ -321,11 +321,11 @@ fwdAdDefs gst cldefs
 
 fwdAdDef :: CLDef -> TDef
 fwdAdDef (CLDef { cldef_fun = f
-                , cldef_arg = TVar ty v
+                , cldef_arg = VarPat (TVar ty v)
                 , cldef_rhs = rhs
                 , cldef_res_ty = res_ty })
   = Def { def_fun    = DrvFun f (AD { adPlan = TupleAD, adDir = Fwd })
-        , def_args   = arg'
+        , def_pat    = VarPat arg'
         , def_res_ty = tangentPair res_ty
         , def_rhs    = UserRhs rhs' }
   where
@@ -403,11 +403,11 @@ revAdDefs gst cldefs
 
 revAdDef :: CLDef -> TDef
 revAdDef (CLDef { cldef_fun = f
-                , cldef_arg = TVar arg_ty v
+                , cldef_arg = VarPat (TVar arg_ty v)
                 , cldef_rhs = rhs
                 , cldef_res_ty = res_ty })
   = Def { def_fun    = DrvFun f (AD { adPlan = BasicAD, adDir = Rev })
-        , def_args   = arg'
+        , def_pat    = VarPat arg'
         , def_res_ty = tangentType arg_ty
         , def_rhs    = UserRhs rhs' }
   where
@@ -532,7 +532,7 @@ fsAdDefs gst cldefs = (gst', concat defs)
 -------------------
 fsAdDef :: GblSymTab -> CLDef -> (GblSymTab, [TDef])
 fsAdDef gst (CLDef { cldef_fun = f
-                   , cldef_arg = arg
+                   , cldef_arg = VarPat arg
                    , cldef_rhs = rhs
                    , cldef_res_ty = res_ty })
   = ( extendGblST gst [fwd_def, rev_def]
@@ -543,7 +543,7 @@ fsAdDef gst (CLDef { cldef_fun = f
     SR { sr_fwd = fwd, sr_rev = rev, sr_empx = emp } = fsAdExpr gst [arg_ty] rhs
 
     fwd_def = Def { def_fun    = DrvFun f (AD { adPlan = SplitAD, adDir = Fwd })
-                  , def_args   = arg
+                  , def_pat    = VarPat arg
                   , def_res_ty = fwd_rhs_ty
                   , def_rhs    = UserRhs final_fwd_rhs }
     fwd_in_scope   = mkInScopeSet [arg]
@@ -558,7 +558,7 @@ fsAdDef gst (CLDef { cldef_fun = f
              _ -> pprPanic "fsAdDef" (ppr fwd_rhs_ty)
 
     rev_def = Def { def_fun    = DrvFun f (AD { adPlan = SplitAD, adDir = Rev })
-                  , def_args   = rev_arg
+                  , def_pat    = VarPat rev_arg
                   , def_res_ty = tangentType (typeof arg)
                   , def_rhs    = UserRhs rev_rhs }
 
@@ -734,7 +734,7 @@ fsAdExpr gst tys (CLTuple cs)
                     | (sr,(dt,x)) <- srs `zip` (dts `zip` xs) ]
       where
        -- We should probably use lets for these
-       dts = splitTuple  dt (length cs)
+       dts = Ksc.CatLang.splitTuple dt (length cs)
        xs  = splitXTuple x  emps
 
 
