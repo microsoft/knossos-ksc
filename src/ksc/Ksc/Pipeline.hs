@@ -70,8 +70,10 @@ demoCL file
        ; displayPassM veryVerbose "Split AD" env8 fs_defs
 
        ; (env9, opt_fs_defs) <- optDefs rulebase env8 fs_defs
+       ; displayPassM veryVerbose "Optimized split AD" env9 opt_fs_defs
+
        ; (env10, cse_fs_defs) <- cseDefs rulebase env9 opt_fs_defs
-       ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env10 cse_fs_defs
+       ; displayPassM veryVerbose "Optimized and CSE'd split AD" env10 cse_fs_defs
 
      } }
 
