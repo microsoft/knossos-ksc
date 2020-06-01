@@ -86,6 +86,10 @@ splitTuple e 1 = [e]
 splitTuple (Tuple es) n
   | n == length es = es
   | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
+splitTuple (Call f a) n
+  | f `isThePrimFun` "tupCons"
+  , Tuple [e1,es] <- a
+  = e1 : splitTuple es (n-1)
 splitTuple e n = [ pSel i n e | i <- [1..n] ]
 
 -----------------------------------------------

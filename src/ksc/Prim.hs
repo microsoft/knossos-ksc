@@ -283,10 +283,6 @@ lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
 lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
-isThePrimFun :: TFun -> String -> Bool
-isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
-isThePrimFun _ _ = False
-
 isLMOne :: TExpr -> Bool
 isLMOne (Call f _) = f `isThePrimFun` "lmOne"
 isLMOne _ = False

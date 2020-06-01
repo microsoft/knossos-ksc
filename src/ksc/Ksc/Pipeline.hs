@@ -51,13 +51,13 @@ demoCL file
        ; displayPassM veryVerbose "fromCLDefs" env2
                        (fromCLDefs cl_defs)
 
-{-
        ; let (env3, ad_defs) = fwdAdDefs env2 cl_defs
        ; displayPassM veryVerbose "Forward tupled AD" env3 ad_defs
 
        ; (env4, opt_ad_defs) <- optDefs rulebase env3 ad_defs
        ; displayPassM veryVerbose "Optimized forward tupled AD " env4 opt_ad_defs
 
+{-
        ; let (env5, rev_defs) = revAdDefs env4 cl_defs
        ; displayPassM veryVerbose "Reverse AD" env5 rev_defs
 

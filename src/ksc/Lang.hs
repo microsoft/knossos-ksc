@@ -295,6 +295,9 @@ data Fun = Fun      FunId         -- The function f(x)
                                   --   Rev <=> reverse mode f`(x,dr)
          deriving( Eq, Ord, Show )
 
+data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
+  deriving (Eq, Ord)  -- type of the function.
+
 isUserFun :: FunId -> Bool
 isUserFun = \case
   UserFun{} -> True
@@ -313,6 +316,10 @@ funIdOfFun = \case
   GradFun f _ -> f
   DrvFun f _  -> f
 
+isThePrimFun :: TFun -> String -> Bool
+isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
+isThePrimFun _ _ = False
+
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
 
@@ -321,10 +328,6 @@ data ADPlan = BasicAD | TupleAD | SplitAD
 
 data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
-
-data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
-  deriving (Eq, Ord)  -- type of the function.
-
 
 data Var
   = Simple String         -- x

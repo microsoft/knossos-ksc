@@ -4,7 +4,8 @@
 
 -- Ksc.CatLang: Language for compilation to categories
 module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs, toCLDef_maybe, fromCLDef
---                  , fwdAdDefs, revAdDefs, fsAdDefs
+                  , fwdAdDefs
+                  -- , revAdDefs, fsAdDefs
      ) where
 
 import Prelude hiding( (<>) )
@@ -16,6 +17,12 @@ import qualified Data.Set as S
 import Data.Maybe( mapMaybe )
 import Data.List( mapAccumL )
 
+data CLBndr = CLB TVar CLEnv
+data CLEnv
+  = CleEmpty   -- Environment is the empty tuple
+  | CleSingle  -- Environment is a singleton value
+  | CleMulti   -- Environment is a n-tuple, n >= 2
+
 data CLExpr
   = CLId
   | CLPrune [Int] Int
@@ -24,9 +31,9 @@ data CLExpr
   | CLComp CLExpr CLExpr         -- Reverse composition, c1;c2
   | CLTuple [CLExpr]             -- Tuple
   | CLIf CLExpr CLExpr CLExpr    -- If
-  | CLLet TVar CLExpr CLExpr     -- Let $var = $rhs in $body
-  | CLBuild CLExpr TVar CLExpr   -- Build $size (Lam ($var : Integer) $body)
-  | CLFold TVar CLExpr CLExpr CLExpr
+  | CLLet CLBndr CLExpr CLExpr   -- Let $var = $rhs in $body
+  | CLBuild CLExpr CLBndr CLExpr -- Build $size (Lam ($var : Integer) $body)
+  | CLFold CLBndr CLExpr CLExpr CLExpr
   -- ^ Fold (Lam $t body) $acc $vector
 
 data CLDef = CLDef { cldef_fun    :: FunId
@@ -54,6 +61,12 @@ clResultType (CLFold t l _ _) tys = clResultType l (typeof t : tys)
 
 foldUnimplemented :: String -> error
 foldUnimplemented s = error (s ++ ": CLFold not yet implemented")
+
+instance HasType CLBndr where
+  typeof (CLB tv _) = typeof tv
+
+instance Pretty CLBndr where
+  ppr (CLB tv _) = ppr tv
 
 -----------------------------------------------
 --  Pretty printing
@@ -88,7 +101,7 @@ pprCLExpr p c@(CLComp {})
 pprCLExpr _ CLId           = text "Id"
 pprCLExpr _ (CLKonst k)    = ppr k
 pprCLExpr _ (CLCall _ f)   = ppr f
-pprCLExpr p (CLPrune ts n) = sep [ text "Prune" <> char '['
+pprCLExpr _ (CLPrune ts n) = sep [ text "Prune" <> char '['
                                    <> cat (punctuate comma (map ppr ts))
                                    <> char '/' <> int n <> char ']' ]
 pprCLExpr _ (CLTuple cs)
@@ -138,12 +151,14 @@ toCLDef_maybe  (Def { def_fun    = fun
   | otherwise
   = Nothing
 
+type Gamma = [TVar]   -- The environment
+
 data EnvPruned = Pruned | NotPruned
 
-toCLExpr :: [TVar] -> TExpr -> CLExpr
+toCLExpr :: Gamma -> TExpr -> CLExpr
 toCLExpr = to_cl_expr NotPruned
 
-to_cl_expr :: EnvPruned -> [TVar] -> TExpr -> CLExpr
+to_cl_expr :: EnvPruned -> Gamma -> TExpr -> CLExpr
 
 to_cl_expr Pruned [w] (Var v) | v == w = CLId
 to_cl_expr Pruned env (Var v)    = pprPanic "toCLExpr:var" (ppr v $$ ppr env)
@@ -160,7 +175,7 @@ to_cl_expr pruned env (Assert _ e) = to_cl_expr pruned env e
 to_cl_expr Pruned env (If e1 e2 e3)
   = CLIf (toCLExpr env e1) (toCLExpr env e2) (toCLExpr env e3)
 to_cl_expr Pruned env (Let tv rhs body)
-  = CLLet tv (toCLExpr env rhs) (toCLExpr (tv:env) body)
+  = CLLet (mkCLBndr env tv) (toCLExpr env rhs) (toCLExpr (tv:env) body)
 
 to_cl_expr _ _ e@(Lam {})    =  pprPanic "toCLExpr Lam" (ppr e)
 to_cl_expr _ _ e@(App {})    =  pprPanic "toCLExpr App" (ppr e)
@@ -169,7 +184,7 @@ to_cl_expr _ _ e@(Dummy {})  =  pprPanic "toCLExpr Dummy" (ppr e)
 to_cl_expr NotPruned env e = prune env e
 
 ---------------
-to_cl_call :: EnvPruned -> [TVar] -> TFun -> TExpr -> CLExpr
+to_cl_call :: EnvPruned -> Gamma -> TFun -> TExpr -> CLExpr
 -- Calls:
 --   * for build, prune before the build
 --   * for other calls, prune in the argument
@@ -179,7 +194,8 @@ to_cl_call pruned env f e
   , Tuple [n, Lam tvi body] <- e
   = case pruned of
       NotPruned -> prune env call
-      Pruned    -> CLBuild (toCLExpr env n) tvi (toCLExpr (tvi:env) body)
+      Pruned    -> CLBuild (toCLExpr env n) (mkCLBndr env tvi)
+                           (toCLExpr (tvi:env) body)
 
   | f `isThePrimFun` "sumbuild"
   , Tuple [n, lam] <- e
@@ -189,8 +205,8 @@ to_cl_call pruned env f e
   , Tuple [Lam t body, acc, v] <- e
   = case pruned of
       NotPruned -> prune env call
-      Pruned    ->
-        CLFold t (toCLExpr (t:env) body) (toCLExpr env acc) (toCLExpr env v)
+      Pruned    -> CLFold (mkCLBndr env t) (toCLExpr (t:env) body)
+                          (toCLExpr env acc) (toCLExpr env v)
 
   | TFun ty (Fun fun_id) <- f
   = to_cl_expr pruned env e`mkCLComp` CLCall ty fun_id
@@ -202,8 +218,16 @@ to_cl_call pruned env f e
   where
     call = Call f e
 
+mkCLBndr :: Gamma -> TVar -> CLBndr
+mkCLBndr env tv = CLB tv extend_flag
+  where
+    extend_flag = case env of
+                    []  -> CleEmpty
+                    [_] -> CleSingle
+                    _   -> CleMulti
+
 ---------------
-prune :: [TVar] -> TExpr -> CLExpr
+prune :: Gamma -> TExpr -> CLExpr
 -- See Note [Pruning]
 prune env e
   | no_prune_reqd = to_cl_expr Pruned env e
@@ -218,7 +242,7 @@ prune env e
 
     (trimmed_env, trim_indices) = unzip trimmed_prs
 
-    trim :: S.Set TVar -> Int -> [TVar] -> [(TVar,Int)]
+    trim :: S.Set TVar -> Int -> Gamma -> [(TVar,Int)]
     trim _ _ [] = []
     trim fvs n (tv:tvs)
       | tv `S.member` fvs = (tv,n) : trim (tv `S.delete` fvs) (n+1) tvs
@@ -273,49 +297,58 @@ fromCLExpr :: InScopeSet -> TExpr -> CLExpr -> TExpr
 -- We may freely duplicate 'arg', so make sure that all
 -- of the TExprs in 'arg' are trivial -- usually variables --
 -- and hence can be duplicated without dupliating work
-fromCLExpr _  _   (CLKonst k)      = Konst k
-fromCLExpr _  arg CLId             = arg
-fromCLExpr is arg (CLPrune ts n)   = mkTuple (pick ts (Ksc.CatLang.splitTuple arg n))
-fromCLExpr is arg (CLTuple es)     = makeArgDupable is arg $ \is arg ->
-                                     Tuple (map (fromCLExpr is arg) es)
-fromCLExpr is arg (CLIf b t e)     = makeArgDupable is arg $ \ is arg ->
-                                     If (fromCLExpr is arg b)
-                                        (fromCLExpr is arg t)
-                                        (fromCLExpr is arg e)
-
-fromCLExpr _  arg (CLCall ty f)
-  = Call (TFun ty (Fun f)) arg
+fromCLExpr _  _   (CLKonst k)    = Konst k
+fromCLExpr _  arg CLId           = arg
+fromCLExpr _  arg (CLCall ty f)  = Call (TFun ty (Fun f)) arg
+fromCLExpr _  arg (CLPrune ts n) = mkTuple (pick ts (splitTuple arg n))
+fromCLExpr is arg (CLTuple es)   = makeArgDupable is arg $ \is arg ->
+                                   Tuple (map (fromCLExpr is arg) es)
+fromCLExpr is arg (CLIf b t e)   = makeArgDupable is arg $ \ is arg ->
+                                   If (fromCLExpr is arg b)
+                                      (fromCLExpr is arg t)
+                                      (fromCLExpr is arg e)
 
 fromCLExpr is arg (CLComp e1 e2)
   = fromCLExpr is (fromCLExpr is arg e1) e2
 
-fromCLExpr is arg (CLLet tv rhs body)
-  = Let tv' rhs' (fromCLExpr is' (pTupCons (Var tv') arg) body)
+fromCLExpr is arg (CLLet (CLB tv ext) rhs body)
+  = Let tv' (fromCLExpr is arg rhs)
+            (fromCLExpr is' arg' body)
   where
-    rhs'      = fromCLExpr is arg rhs
     (is', tv') = notInScopeTV is tv
+    arg'       = clExtendTV ext tv arg
 
-fromCLExpr is arg (CLBuild size tv elt)
+fromCLExpr is arg (CLBuild size (CLB tv ext) elt)
   = makeArgDupable is arg $ \is arg ->
     pBuild (fromCLExpr is arg size)
-           (Lam tv' (fromCLExpr is' (pTupCons (Var tv') arg) elt))
+           (Lam tv' (fromCLExpr is' arg' elt))
   where
     (is', tv') = notInScopeTV is tv
+    arg'       = clExtendTV ext tv arg
 
-fromCLExpr is arg (CLFold t lam acc v)
+fromCLExpr is arg (CLFold (CLB tv ext) lam acc v)
   = makeArgDupable is arg $ \is arg ->
     mkPrimCall3 "fold"
-          (Lam t' (fromCLExpr is' (pTupCons (Var t') arg) lam))
+          (Lam tv' (fromCLExpr is' arg' lam))
           (fromCLExpr is arg acc)
           (fromCLExpr is arg v)
   where
-    (is', t') = notInScopeTV is t
+    (is', tv') = notInScopeTV is tv
+    arg'       = clExtendTV ext tv arg
+
+clExtendTV :: CLEnv -> TVar -> TExpr -> TExpr
+clExtendTV ext tv arg = clExtend ext (Var tv) arg
+
+clExtend :: CLEnv -> TExpr -> TExpr -> TExpr
+clExtend CleEmpty  arg  _    = arg
+clExtend CleSingle arg1 arg2 = Tuple [ arg1, arg2 ]
+clExtend CleMulti  arg args  = pTupCons arg args
+
 
 -------------------------------------------
 --   Forward AD, tupled
 --   S => T  =   (S, dS) -> (T, dT)
 -------------------------------------------
-{-
 
 fwdAdDefs :: GblSymTab -> [CLDef] -> (GblSymTab, [TDef])
 fwdAdDefs gst cldefs
@@ -324,20 +357,23 @@ fwdAdDefs gst cldefs
 
 fwdAdDef :: CLDef -> TDef
 fwdAdDef (CLDef { cldef_fun = f
-                , cldef_arg = TVar ty v
+                , cldef_arg = pat
                 , cldef_rhs = rhs
                 , cldef_res_ty = res_ty })
   = Def { def_fun    = DrvFun f (AD { adPlan = TupleAD, adDir = Fwd })
-        , def_args   = arg'
+        , def_pat    = TupPat [s, ds]
         , def_res_ty = tangentPair res_ty
         , def_rhs    = UserRhs rhs' }
   where
-    arg' = TVar (tangentPair ty) v
-    rhs' = mkPairLet (mkInScopeSet [arg']) "x" "dx" (Var arg') $ \ is x dx ->
-           fwdAdExpr is [x] [dx] rhs
+    arg_ty = typeof pat
+    s    = mkTVar arg_ty               "s"
+    ds   = mkTVar (tangentType arg_ty) "ds"
+    is   = mkInScopeSet [s,ds]
+    rhs' = fwdAdExpr is (Var s) (Var ds) rhs
 
-fwdAdExpr :: InScopeSet -> [TExpr] -> [TExpr] -> CLExpr -> TExpr
+fwdAdExpr :: InScopeSet -> TExpr -> TExpr -> CLExpr -> TExpr
 fwdAdExpr _  _ _  (CLKonst k)  = Tuple [ Konst k, mkTangentZero (Konst k) ]
+fwdAdExpr _ s ds  CLId         = Tuple [s, ds]
 fwdAdExpr is s ds (CLIf a b c) = If (fromCLExpr is s a)
                                     (fwdAdExpr is s ds b)
                                     (fwdAdExpr is s ds c)
@@ -346,17 +382,15 @@ fwdAdExpr is s ds (CLIf a b c) = If (fromCLExpr is s a)
 --  (f . g) <ft> s = f <ft> (g <ft> s)
 fwdAdExpr is s ds (CLComp g f)
   = mkPairLet is "gr" "dgr" (fwdAdExpr is s ds g) $ \is a da ->
-    fwdAdExpr is [a] [da] f
+    fwdAdExpr is a da f
 
-fwdAdExpr _ s ds CLId
-  = Tuple [mkTuple s, mkTuple ds]
-
-fwdAdExpr is s ds (CLPrune ts _ c)
-  = fwdAdExpr is (pick ts s) (pick ts ds) c
+fwdAdExpr _ s ds (CLPrune ts n)
+  = mkTuple [ mkTuple (pick ts (splitTuple s n))
+            , mkTuple (pick ts (splitTuple ds n)) ]
 
 fwdAdExpr _ s ds (CLCall ty f)
   = Call (TFun (tangentPair ty) fwd_fun)
-         (Tuple [mkTuple s, mkTuple ds])
+         (Tuple [s, ds])
   where
     fwd_fun = DrvFun f ad_mode
     ad_mode = AD { adPlan = TupleAD, adDir = Fwd }
@@ -373,19 +407,21 @@ fwdAdExpr is s ds (CLTuple cs)
 
 --  (let x = c in b) <ft> (s,ds) = let (x,dx) = c <ft> (s,ds)
 --                                 in b <ft> (x:s, dx:ds)
-fwdAdExpr is s ds (CLLet tv rhs body)
+fwdAdExpr is s ds (CLLet (CLB tv ext) rhs body)
   = mkPairLet is nm ("d" ++ nm) (fwdAdExpr is s ds rhs) $ \ is x dx ->
-    fwdAdExpr is (x:s) (dx:ds) body
+    fwdAdExpr is (clExtend ext x s) (clExtend ext dx ds) body
   where
     nm = tVarName tv
 
 --  (build s i e) <> (s,ds) = let (n,_) = c <f> (s,ds)
 --                            in unzip (build n (\i. e <f> (i:s, ():ds))
-fwdAdExpr is s ds (CLBuild n tvi elt)
+fwdAdExpr is s ds (CLBuild n (CLB tvi ext) elt)
   = mkTempLet is "np" (fwdAdExpr is s ds n) $ \ is np ->
     let (is', tvi') = notInScopeTV is tvi
+        s'  = clExtendTV ext tvi' s
+        ds' = clExtend   ext unitExpr ds
     in pUnzip $ pBuild (pFst np) $
-       Lam tvi' (fwdAdExpr is' (Var tvi' : s) (unitExpr:ds) elt)
+       Lam tvi' (fwdAdExpr is' s' ds' elt)
 
 fwdAdExpr _ _ _ CLFold{} = foldUnimplemented "fwdAdExpr"
 
@@ -393,6 +429,8 @@ fwdAdExpr _ _ _ CLFold{} = foldUnimplemented "fwdAdExpr"
 tangentPair :: Type -> Type
 tangentPair ty = TypeTuple [ty, tangentType ty]
 
+
+{-
 
 -------------------------------------------
 --     Reverse AD, not tupled
@@ -847,27 +885,12 @@ splitXTuple x bs
 -----------------------------------------------
 
 
-splitTuple :: TExpr -> Int -> [TExpr]
--- Expects e to be a tuple-typed expression;
--- returns its n components.
--- May duplicate e
-splitTuple _ 0 = []
-splitTuple e 1 = [e]
-splitTuple (Tuple es) n
-  | n == length es = es
-  | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
-splitTuple (Call f a) n
-  | f `isThePrimFun` "tupCons"
-  , Tuple [e1,es] <- a
-  = e1 : Ksc.CatLang.splitTuple es (n-1)
-splitTuple e n = [ pSel i n e | i <- [1..n] ]
-
 splitTupleK :: InScopeSet -> TExpr -> Int
             -> (InScopeSet -> [TExpr] -> TExpr)
             -> TExpr
+-- Just like LangUtils.splitTuple, but does not duplicate e
 -- Expects e to be a tuple-typed expression;
 -- returns its n components.
--- May duplicate e
 splitTupleK is _ 0 thing_inside = thing_inside is []
 splitTupleK is e 1 thing_inside = thing_inside is [e]
 splitTupleK is (Tuple es) n thing_inside
@@ -917,10 +940,11 @@ makeArgDupable is e thing_inside
   | otherwise
   = mkTempLet is "ax" e thing_inside
 
+isDupable :: TExpr -> Bool
 isDupable (Tuple es) = all isTrivial es
 isDupable (Call f a) = f `isThePrimFun` "tupCons"
                      && isDupable a
-isDupable e = False
+isDupable _ = False
 
 mkTempLets :: InScopeSet -> String -> [TExpr]
            -> ([TExpr] -> TExpr) -> TExpr
