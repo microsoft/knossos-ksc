@@ -57,13 +57,13 @@ demoCL file
        ; (env4, opt_ad_defs) <- optDefs rulebase env3 ad_defs
        ; displayPassM veryVerbose "Optimized forward tupled AD " env4 opt_ad_defs
 
-{-
        ; let (env5, rev_defs) = revAdDefs env4 cl_defs
        ; displayPassM veryVerbose "Reverse AD" env5 rev_defs
 
        ; (env6, opt_rev_defs) <- optDefs rulebase env5 rev_defs
        ; displayPassM veryVerbose "Optimized reverse AD " env5 opt_rev_defs
 
+{-
        ; (env7, cse_rev_defs) <- cseDefs rulebase env6 opt_rev_defs
        ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env7 cse_rev_defs
 

@@ -4,8 +4,8 @@
 
 -- Ksc.CatLang: Language for compilation to categories
 module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs, toCLDef_maybe, fromCLDef
-                  , fwdAdDefs
-                  -- , revAdDefs, fsAdDefs
+                  , fwdAdDefs, revAdDefs
+--                  , fsAdDefs
      ) where
 
 import Prelude hiding( (<>) )
@@ -344,6 +344,12 @@ clExtend CleEmpty  arg  _    = arg
 clExtend CleSingle arg1 arg2 = Tuple [ arg1, arg2 ]
 clExtend CleMulti  arg args  = pTupCons arg args
 
+clSplit :: CLEnv -> TExpr
+        -> (TExpr, TExpr)  -- Head and tail of tuple
+clSplit CleEmpty arg  = pprPanic "clSplit" (ppr arg)
+clSplit CleSingle arg = (arg, Tuple [])
+clSplit CleMulti  arg = (pTupHead arg, pTupTail arg)
+
 
 -------------------------------------------
 --   Forward AD, tupled
@@ -430,8 +436,6 @@ tangentPair :: Type -> Type
 tangentPair ty = TypeTuple [ty, tangentType ty]
 
 
-{-
-
 -------------------------------------------
 --     Reverse AD, not tupled
 --     S => T  =   (S, dT) -> dS
@@ -444,21 +448,39 @@ revAdDefs gst cldefs
 
 revAdDef :: CLDef -> TDef
 revAdDef (CLDef { cldef_fun = f
-                , cldef_arg = TVar arg_ty v
+                , cldef_arg = pat
                 , cldef_rhs = rhs
                 , cldef_res_ty = res_ty })
   = Def { def_fun    = DrvFun f (AD { adPlan = BasicAD, adDir = Rev })
-        , def_args   = arg'
-        , def_res_ty = tangentType arg_ty
+        , def_pat    = TupPat [s_arg, dt]
+        , def_res_ty = tangentType s_ty
         , def_rhs    = UserRhs rhs' }
   where
-    arg' = TVar (TypeTuple [arg_ty, tangentType res_ty]) (Simple "arg")
-    nm   = varName v
-    rhs' = mkPairLet (mkInScopeSet [arg']) nm "dr" (Var arg') $ \ is x dr ->
-           revAdExpr is [x] dr rhs
+    s_ty  = typeof pat
+    dt_ty = tangentType res_ty
 
-revAdExpr :: InScopeSet -> [TExpr] -> TExpr -> CLExpr -> TExpr
-revAdExpr _  s _  (CLKonst _)  = mkTangentZero (mkTuple s)
+    xs        = patVars pat
+    is1       = mkInScopeSet xs
+    (is2, s)  = notInScopeTV is1 (mkTVar s_ty  "s")
+    (is3, dt) = notInScopeTV is2 (mkTVar dt_ty "dt")
+
+    (s_arg, prs) = case pat of
+                     VarPat x  -> (x, [])
+                     TupPat xs -> (s, mkSelPrs xs s)
+
+    rhs'   = mkLets prs $
+             revAdExpr is3 (mkTuple (map Var xs)) (Var dt) rhs
+
+
+mkSelPrs :: [TVar] -> TVar -> [(TVar,TExpr)]
+mkSelPrs xs s = [(x, pSel i n sexpr) | (x,i) <- xs `zip` [1..]]
+  where
+    n     = length xs
+    sexpr = Var s
+
+revAdExpr :: InScopeSet -> TExpr -> TExpr -> CLExpr -> TExpr
+revAdExpr _  s _  (CLKonst _)  = mkTangentZero s
+revAdExpr _ _ dt  CLId         = dt
 revAdExpr is s dt (CLIf a b c) = If (fromCLExpr is s a)
                                     (revAdExpr is s dt b)
                                     (revAdExpr is s dt c)
@@ -468,27 +490,24 @@ revAdExpr is s dt (CLIf a b c) = If (fromCLExpr is s a)
 --                           db = f <r> (b,dc)
 --                       in
 --                       g <r> (a,db)
+-- Note the duplication of g
 revAdExpr is s dt (CLComp g f)
-  = mkTempLet is "b"  (fromCLExpr is s g)     $ \ is b ->
-    mkTempLet is "db" (revAdExpr is [b] dt f) $ \ is db ->
+  = mkTempLet is "b"  (fromCLExpr is s g)   $ \ is b ->
+    mkTempLet is "db" (revAdExpr is b dt f) $ \ is db ->
     revAdExpr is s db g
 
-revAdExpr _ _ dt CLId
-  = dt
-
-revAdExpr is s dt (CLPrune ts _ c)
-  = mkTempLet is "dps" (revAdExpr is (pick ts s) dt c) $ \ _ dps ->
-    let do_one (s,i)
-          | Just j <- find i ts = pSel j n dps
+revAdExpr _ s dt (CLPrune ts n_s)
+  = let do_one (s,i)
+          | Just j <- find i ts = pSel j n_t dt
           | otherwise           = mkTangentZero s
-    in mkTuple (map do_one (s `zip` [1..]))
+    in mkTuple (map do_one (splitTuple s n_s `zip` [1..]))
   where
-    n = length ts
+    n_t = length ts
 
 revAdExpr _ s dt (CLCall _ f)
-  = Call (TFun res_ty rev_fun) (Tuple [mkTuple s, dt])
+  = Call (TFun res_ty rev_fun) (Tuple [s, dt])
   where
-    res_ty  = tangentType (typeof (mkTuple s))
+    res_ty  = tangentType (typeof s)
     rev_fun = DrvFun f ad_mode
     ad_mode = AD { adPlan = BasicAD, adDir = Rev }
 
@@ -505,26 +524,30 @@ revAdExpr is s dt (CLTuple cs)
     n = length cs
 
 --  (build sz (\i.e) <r> (s,dt)
---    = sumbuild (sz <> s) (\i. (e <r> (i:s, dt[i])))
-revAdExpr is s dt (CLBuild sz tvi elt)
+--    = sumbuild (sz <> s) (\i. tail (e <r> (i:s, dt[i])))
+revAdExpr is s dt (CLBuild sz (CLB tvi ext) elt)
   = pSumBuild (fromCLExpr is s sz) $
-      Lam tvi' $ pTupTail $
-      revAdExpr is' (Var tvi' : s)
-                (pIndex (Var tvi') dt) elt
+      Lam tvi' $ snd $ clSplit ext $
+      revAdExpr is' s' dt' elt
   where
     (is', tvi') = notInScopeTV is tvi
+    s'  = clExtendTV ext tvi' s
+    dt' = pIndex (Var tvi') dt
 
 --  (let x = c in b) <r> (s,dt) = let x         = c <> s
 --                                    (dxb:dsb) = b <r> (x:s, dt)
 --                                    dsx       = c <r> (s,dxb)
 --                                in
 --                                dsb + dsx
-revAdExpr is s dt (CLLet tv rhs body)
+revAdExpr is s dt (CLLet (CLB tv ext) rhs body)
   = mkTempLet is (tVarName tv) (fromCLExpr is s rhs) $ \is x ->
-    mkTempLet is "dx" (revAdExpr is (x : s) dt body) $ \ is dx ->
-    pAdd (pTupTail dx) (revAdExpr is s (pTupHead dx) rhs)
+    mkTempLet is "dx" (revAdExpr is (clExtend ext x s) dt body) $ \ is dx ->
+    let (dxb, dsb) = clSplit ext dx
+    in pAdd dsb (revAdExpr is s dxb rhs)
 
 revAdExpr _ _ _ CLFold{} = foldUnimplemented "revAdExpr"
+
+{-
 
 --------------------------------------------
 --   Spilt AD
@@ -884,28 +907,6 @@ splitXTuple x bs
 -- Utilities
 -----------------------------------------------
 
-
-splitTupleK :: InScopeSet -> TExpr -> Int
-            -> (InScopeSet -> [TExpr] -> TExpr)
-            -> TExpr
--- Just like LangUtils.splitTuple, but does not duplicate e
--- Expects e to be a tuple-typed expression;
--- returns its n components.
-splitTupleK is _ 0 thing_inside = thing_inside is []
-splitTupleK is e 1 thing_inside = thing_inside is [e]
-splitTupleK is (Tuple es) n thing_inside
-  | n == length es = thing_inside is es
-  | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
-
-splitTupleK is (Call f a) n thing_inside
- | f `isThePrimFun` "tupCons"
- , Tuple [e1,es] <- a
- = splitTupleK is es (n-1) $ \ is es ->
-   thing_inside is (e1 : es)
-
-splitTupleK is e n thing_inside
-  = mkTempLet is "tx" e $ \ is v ->
-    thing_inside is [ pSel i n v | i <- [1..n] ]
 
 pick :: Pretty a => [Int] -> [a] -> [a]
 -- Pick the specifed items from the list
