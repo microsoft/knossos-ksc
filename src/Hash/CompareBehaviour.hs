@@ -11,6 +11,9 @@ import HtmlCombinators (table, th, td, writeFileHTML, forEach, inList,
                         annotating, tdCenter, inFoldable, setFromIterator)
 import Text.Blaze.Html5 hiding (table, th, td, map)
 
+-- | This is the entry point to this module.  Provide a file path and
+-- it will write an HTML file which shows the comparison of the
+-- hashing functions.
 writeAwfFormatExpressionsHTML :: FilePath -> IO ()
 writeAwfFormatExpressionsHTML = flip writeFileHTML awfFormatExpressionsHTML
 

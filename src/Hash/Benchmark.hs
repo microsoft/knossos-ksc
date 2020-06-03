@@ -12,28 +12,10 @@ import Expr (Expr, Path, exprSize)
 import Hash (Hash, castHash, deBruijnHash, combinedHash, naiveHashNested,
              {-genExprNumVars,-} genExprLinearNumVars)
 
--- We apply the argument to the function here.  If we do it at the
--- call site then GHC may float it outside of the timing loop!
--- Therefore it's important that this function not be inlined.
-{-# NOINLINE evalHashResult #-}
-evalHashResult :: (e -> [(Hash, Path, Expr a)]) -> e -> IO ()
-evalHashResult a e = let !_ = seqHashResult (a e)
-                     in return ()
-
-seqHashResult :: [(Hash, Path, Expr a)] -> ()
-seqHashResult = let f a (hash, _path, _expr) =
-                      let !_ = hash in a
-                in foldl' f ()
-
-times :: Monad m => Int -> s -> (s -> m s) -> m s
-times n s f = times_f 0 s
-  where times_f m s_ =
-          if m >= n
-          then return s_
-          else do
-            s' <- f s_
-            times_f (m + 1) s'
-
+-- | This is the entry point to the module.  When run it will
+-- benchmark the algorithms on a random set of expressions.  The data
+-- from the run will be written out to a directory whose name is
+-- displayed at the end of the run.
 benchmark :: IO ()
 benchmark = do
   let totalExpressions     = 1000
@@ -134,3 +116,25 @@ gnuplotFile results =
 
           where title = quote (algorithmName ++ " "
                                ++ show varCount ++ " variables")
+
+-- We apply the argument to the function here.  If we do it at the
+-- call site then GHC may float it outside of the timing loop!
+-- Therefore it's important that this function not be inlined.
+{-# NOINLINE evalHashResult #-}
+evalHashResult :: (e -> [(Hash, Path, Expr a)]) -> e -> IO ()
+evalHashResult a e = let !_ = seqHashResult (a e)
+                     in return ()
+
+seqHashResult :: [(Hash, Path, Expr a)] -> ()
+seqHashResult = let f a (hash, _path, _expr) =
+                      let !_ = hash in a
+                in foldl' f ()
+
+times :: Monad m => Int -> s -> (s -> m s) -> m s
+times n s f = times_f 0 s
+  where times_f m s_ =
+          if m >= n
+          then return s_
+          else do
+            s' <- f s_
+            times_f (m + 1) s'
