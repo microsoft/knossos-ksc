@@ -313,8 +313,35 @@ cgenExprR env = \case
         ret
         (mkCType ty)
 
+  -- Special case for literal tuples.  Don't unpack with std::get.
+  -- Just use the tuple components as the arguments.
+  Call tf t@(Tuple vs) -> do
+    cgvs <- mapM (cgenExprR env) vs
+    let cgargtype = typeof t
+    let cdecls = map getDecl cgvs
+    let ctypes = map getType cgvs
 
+    let cftype = ctypeofFun env (tf, cgargtype) ctypes
 
+    v        <- freshCVar
+    bumpmark <- freshCVar
+
+    let dogc = Cgen.isScalar cftype
+    let gc tag =  if dogc
+                    then tag ++ "(" ++ bumpmark ++ ");\n"
+                    else ""
+
+    let cf = cgenAnyFun (tf, cgargtype) cftype
+
+    return $ CG
+      (  intercalate "\n" cdecls
+      ++ gc "$MRK"
+      ++ cgenType cftype ++ " " ++ v ++ " = "
+      ++ cf ++ "(" ++ intercalate ", " (map getExpr cgvs) ++ ");\n"
+      ++ gc "$REL"
+      )
+      v
+      cftype
 
   Call tf@(TFun _ fun) vs -> do
     cgvs_tys <- do cgv <- cgenExprR env vs; return (cgv, typeof vs)
