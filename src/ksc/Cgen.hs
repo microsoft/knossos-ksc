@@ -379,7 +379,7 @@ cgenExprR env = \case
       (  cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ case (not (isSelFun (funIdOfFun fun)), (\(v, ty) -> (getExpr v, ty)) cgvs_tys) of
+      ++ case (not (isSelFun (funIdOfFun fun)), (\(v, ty) -> (getExpr v, ty)) (cgvs, cgargtype)) of
           -- Untuple argument for C++ call
           --
           -- Calls of a tuple argument have their argument list
