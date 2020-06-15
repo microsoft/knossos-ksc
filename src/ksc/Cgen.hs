@@ -378,20 +378,20 @@ cgenExprR env = \case
       (  cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ case (not (isSelFun (funIdOfFun fun)), (getExpr cgvs, cgargtype)) of
+      ++ case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
           -- Untuple argument for C++ call
           --
           -- Calls of a tuple argument have their argument list
           -- unpacked.  See Note [Unpack tuple arguments].
           -- SelFuns translate to C++ get, so they don't have their
           -- argument lists unpacked!
-          (True, (cexpr, TypeTuple ts))
+          (True, cexpr, TypeTuple ts)
             -> cf ++ "("
                ++ intercalate ","
                       (flip map [0..length ts - 1] $ \i ->
                           "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
                ++ ");\n"
-          (_, (cexpr, _)) -> cf ++ "(" ++ cexpr ++ ");\n"
+          (_, cexpr, _) -> cf ++ "(" ++ cexpr ++ ");\n"
       ++ gc "$REL"
       )
       v
