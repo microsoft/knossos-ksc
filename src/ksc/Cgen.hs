@@ -361,7 +361,6 @@ cgenExprR env = \case
     cgvs_tys <- do cgv <- cgenExprR env vs; return (cgv, typeof vs)
     let (cgvs, cgargtype) = cgvs_tys
     let cdecls = getDecl cgvs
-    let cexprs_tys = (\(v, ty) -> (getExpr v, ty)) cgvs_tys
     let ctypes = getType cgvs
 
     let cftype = ctypeofFun env (tf, cgargtype) [ctypes]
@@ -380,7 +379,7 @@ cgenExprR env = \case
       (  cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ case (not (isSelFun (funIdOfFun fun)), cexprs_tys) of
+      ++ case (not (isSelFun (funIdOfFun fun)), (\(v, ty) -> (getExpr v, ty)) cgvs_tys) of
           -- Untuple argument for C++ call
           --
           -- Calls of a tuple argument have their argument list
