@@ -370,7 +370,7 @@ cgenExprR env = \case
           -- Untuple argument for C++ call
           --
           -- Calls of a tuple argument have their argument list
-          -- unpacked.  See the explanation in cgenDefE above.
+          -- unpacked.  See Note [Unpack tuple arguments].
           -- SelFuns translate to C++ get, so they don't have their
           -- argument lists unpacked!
           (True, (cexpr, TypeTuple ts))
