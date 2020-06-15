@@ -358,8 +358,7 @@ cgenExprR env = \case
       cftype
 
   Call tf@(TFun _ fun) vs -> do
-    cgvs_tys <- do cgv <- cgenExprR env vs; return (cgv, typeof vs)
-    let (cgvs, cgargtype) = cgvs_tys
+    (cgvs, cgargtype) <- do cgv <- cgenExprR env vs; return (cgv, typeof vs)
     let cdecls = getDecl cgvs
     let ctypes = getType cgvs
 
