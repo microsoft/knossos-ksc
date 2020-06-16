@@ -439,7 +439,6 @@ cgenExprR env = \case
       lvar
       tybody
 
-  -- Tuple [t] -> cgenExpr env t -- Don't detuple willy-nilly
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs
     let cdecls = map getDecl cgvs
