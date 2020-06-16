@@ -162,6 +162,13 @@ cstMaybeLookupFun = Map.lookup
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
+gcMarker :: Bool -> M (String -> String)
+gcMarker dogc = do
+  bumpmark <- freshCVar
+  return (\tag -> if dogc
+                  then tag ++ "(" ++ bumpmark ++ ");\n"
+                  else "")
+
 cgenDefs :: [TDef] -> [String]
 cgenDefs defs = concatMap cdecl $
                 filter isUserDef defs
@@ -299,12 +306,9 @@ cgenExprR env = \case
 
     let cretty = cgenType $ mkCType ty
     ret  <- freshCVar
-    bumpmark <- freshCVar
 
     let dogc = True
-    let gc tag =  if dogc
-                    then tag ++ "(" ++ bumpmark ++ ");\n"
-                    else ""
+    gc <- gcMarker dogc
 
     return $ CG
         (  "/*sumbuild*/\n"
@@ -350,12 +354,9 @@ cgenExprR env = \case
     let cftype = ctypeofFun env (tf, cgargtype) ctypes
 
     v        <- freshCVar
-    bumpmark <- freshCVar
 
     let dogc = Cgen.isScalar cftype
-    let gc tag =  if dogc
-                    then tag ++ "(" ++ bumpmark ++ ");\n"
-                    else ""
+    gc       <- gcMarker dogc
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
 
@@ -378,12 +379,9 @@ cgenExprR env = \case
     let cftype = ctypeofFun env (tf, cgargtype) [ctypes]
 
     v        <- freshCVar
-    bumpmark <- freshCVar
 
     let dogc = Cgen.isScalar cftype
-    let gc tag =  if dogc
-                    then tag ++ "(" ++ bumpmark ++ ");\n"
-                    else ""
+    gc       <- gcMarker dogc
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
 
