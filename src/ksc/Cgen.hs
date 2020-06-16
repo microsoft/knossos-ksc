@@ -309,7 +309,14 @@ cgenExprR env = \case
         ++ "{\n"
         ++ "   " ++ varcty ++ " " ++ cgenVar var ++ " = 0;\n"
         ++ "   do {\n"
-        ++ "     $MRK(" ++ bumpmark ++ ");\n" -- TODO: this is just to declare it
+        -- We don't actually want to mark the allocator here.  We want
+        -- to mark it after the first time round the loop, below.  On
+        -- the other hand, we need to *declare* the variable
+        -- "bumpmark" somewhere outside the "if" because it is used in
+        -- both branches.  We use $MRK here then as a cheeky way of
+        -- declaring "bumpmark".  TODO: Make a cleaner way of doing
+        -- this.
+        ++ "     $MRK(" ++ bumpmark ++ ");\n"
         ++       bodydecl
         --       First time round, deep copy it, put it in the ret, then mark the allocator
         ++ "     if (" ++ cgenVar var ++ " == 0) {\n"
