@@ -301,6 +301,11 @@ cgenExprR env = \case
     ret  <- freshCVar
     bumpmark <- freshCVar
 
+    let dogc = True
+    let gc tag =  if dogc
+                    then tag ++ "(" ++ bumpmark ++ ");\n"
+                    else ""
+
     return $ CG
         (  "/*sumbuild*/\n"
         ++ szdecl
@@ -316,16 +321,16 @@ cgenExprR env = \case
         -- both branches.  We use $MRK here then as a cheeky way of
         -- declaring "bumpmark".  TODO: Make a cleaner way of doing
         -- this.
-        ++ "     $MRK(" ++ bumpmark ++ ");\n"
+        ++ "     " ++ gc "$MRK"
         ++       bodydecl
         --       First time round, deep copy it, put it in the ret, then mark the allocator
         ++ "     if (" ++ cgenVar var ++ " == 0) {\n"
         ++ "       " ++ ret ++ " = inflated_deep_copy(" ++ bodyex ++ ");\n"
-        ++ "       $MRK(" ++ bumpmark ++ ");\n"
+        ++ "       " ++ gc "$MRK"
         ++ "     } else {\n"
         ++ "       inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");\n"
         --         Release the allocator back to where it was on iter 0
-        ++ "       $REL(" ++ bumpmark ++ ");\n"
+        ++ "       " ++ gc "$REL"
         ++ "     }\n"
         ++ "   } while (++" ++ cgenVar var ++ " < " ++ szex ++ ");\n"
         ++ "}\n"
