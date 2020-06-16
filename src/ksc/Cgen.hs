@@ -283,7 +283,7 @@ cgenExprR env = \case
     cvar <- freshCVar
 
     return $ CG
-        (  "/*build*/\n"
+        (  cComment "build" ++ "\n"
         ++ szdecl
         ++ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
         ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
@@ -311,7 +311,7 @@ cgenExprR env = \case
     gc <- gcMarker dogc
 
     return $ CG
-        (  "/*sumbuild*/\n"
+        (  cComment "sumbuild" ++ "\n"
         ++ szdecl
         ++ "KS_ASSERT(" ++ szex ++ " > 0);\n"
         ++ cretty ++ " " ++ ret ++ ";\n"
@@ -414,7 +414,7 @@ cgenExprR env = \case
     lvar                       <- freshCVar
 
     return $ CG
-      (  "/**Let**/"
+      (  cComment "Let"
       ++ cgenType tybody
       ++ " "
       ++ lvar
@@ -457,7 +457,7 @@ cgenExprR env = \case
         (params, withPackedParams) = params_withPackedParams param
     (CG cdecl cexpr ctype) <- cgenExprR env (withPackedParams body)
     return $ CG
-      (     "/**Lam**/"
+      (     cComment "Lam"
       ++    "auto"
       `spc` lvar
       ++    " = [=]("
@@ -685,7 +685,7 @@ cgenKonst = \case
   KInteger i -> show i
   KFloat   f -> show f
   KString  s -> show s
-  KBool    b -> if b then "1 /* TRUE */" else "0 /* FALSE */"
+  KBool    b -> if b then "1 " ++ cComment "TRUE" else "0 " ++ cComment "FALSE"
 
 cgenVar :: Var -> String
 cgenVar = render . ppr
