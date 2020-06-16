@@ -188,6 +188,19 @@ arguments, not one tuple.
 We choose N names for the argument variables and pack them into a
 tuple before emitting the function body.  We ensure that the names
 that we chose are not used in the function body by using substExpr.
+
+A consequence of this translation is that we have to unpack tuples in
+*calls* too.  When 'x' of type 'Tuple [S1, ..., SN]', 'Call f x' needs
+to be rewritten to a C++ call like
+
+    f(get<0>(x), ..., get<N-1>(x))
+
+There is special case when x is a literal tuple.  In that case we take
+the tuple components directly for the arguments of 'f'.  This seems to
+be particularly important for avoiding a 5x slowdown.  See
+
+    https://github.com/microsoft/knossos-ksc/pull/315
+
 -}
 
 ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
@@ -314,7 +327,8 @@ cgenExprR env = \case
         (mkCType ty)
 
   -- Special case for literal tuples.  Don't unpack with std::get.
-  -- Just use the tuple components as the arguments.
+  -- Just use the tuple components as the arguments.  See Note [Unpack
+  -- tuple arguments]
   Call tf t@(Tuple vs) -> do
     cgvs <- mapM (cgenExprR env) vs
     let cgargtype = typeof t
