@@ -5,6 +5,7 @@ let sin__af = f64.sin
 let cos__af = f64.cos
 let tanh__af = const 1f64 -- FIXME
 let sum = f64.sum
+let sum__avf = f64.sum
 let to_float__ai = r64
 let neg (x: f64) = -x
 let lgamma__af = f64.lgamma

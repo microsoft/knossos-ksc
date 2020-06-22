@@ -186,4 +186,6 @@ inline auto D$to_float(int d) { return LM::Zero<int, double>(); }
 
 inline bool or$abb(int b1, int b2)  { return b1 || b2; }
 inline bool and$abb(int b1, int b2) { return b1 && b2; }
+
+inline double sum$avf(vec<double> v1) { return sum(v1); }
 }
