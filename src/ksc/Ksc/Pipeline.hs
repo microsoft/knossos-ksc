@@ -142,6 +142,28 @@ demoN verbosity adp decls
 
        ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
        ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
+
+       ; let (env3, ad_defs) = fwdAdDefs env2 cl_defs
+       ; disp "Forward tupled AD (CatLang)" env3 ad_defs
+
+       ; (env4, opt_ad_defs) <- optDefs rulebase env3 ad_defs
+       ; disp "Optimized forward tupled AD (CatLang)" env4 opt_ad_defs
+
+       ; let (env5, rev_defs) = revAdDefs env4 cl_defs
+       ; disp "Reverse AD (CatLang)" env5 rev_defs
+
+       ; (env6, opt_rev_defs) <- optDefs rulebase env5 rev_defs
+       ; disp "Optimized reverse AD (CatLang)" env5 opt_rev_defs
+
+       ; (env7, cse_rev_defs) <- cseDefs rulebase env6 opt_rev_defs
+       ; disp "Optimized (CSE'd) reverse AD (CatLang)" env7 cse_rev_defs
+
+       ; let (env8, fs_defs) = fsAdDefs env7 cl_defs
+       ; disp "Split AD (CatLang)" env8 fs_defs
+
+       ; (env9, opt_fs_defs) <- optDefs rulebase env8 fs_defs
+       ; (env10, cse_fs_defs) <- cseDefs rulebase env9 opt_fs_defs
+       ; disp "Optimized (CSE'd) split AD (CatLang)" env10 cse_fs_defs
        }
 
 type DisplayLintT m a = String -> GblSymTab -> [TDef] -> KMT m a
