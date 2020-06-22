@@ -1,8 +1,10 @@
 ; Copyright (c) Microsoft Corporation.
 ; Licensed under the MIT license.
+#| Temporarily disabled until CatLang supports sum of Integer
 (def h Integer ((y : Integer))
     (sum (build 3 (lam (y3 : Integer) (add y 2))))
     )
+|#
 
 (def f Float (x : Float)
     ($trace (mul x x))
