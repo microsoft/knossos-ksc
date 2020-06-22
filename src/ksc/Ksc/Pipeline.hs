@@ -63,7 +63,6 @@ demoCL file
        ; (env6, opt_rev_defs) <- optDefs rulebase env5 rev_defs
        ; displayPassM veryVerbose "Optimized reverse AD " env5 opt_rev_defs
 
-{-
        ; (env7, cse_rev_defs) <- cseDefs rulebase env6 opt_rev_defs
        ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env7 cse_rev_defs
 
@@ -73,7 +72,6 @@ demoCL file
        ; (env9, opt_fs_defs) <- optDefs rulebase env8 fs_defs
        ; (env10, cse_fs_defs) <- cseDefs rulebase env9 opt_fs_defs
        ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env10 cse_fs_defs
--}
      } }
 
 

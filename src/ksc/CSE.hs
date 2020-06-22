@@ -3,7 +3,6 @@
 module CSE where
 
 import Lang
-import Prim
 import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
 import LangUtils( GblSymTab, substEMayCapture )
 import Rules

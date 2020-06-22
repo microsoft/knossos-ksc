@@ -258,7 +258,7 @@ optPrimFun _ "ts_add" (Tuple [e1, e2])
 -- RULE: (a1,a2) + (b1,b2) = (a1+a2, b1+b2)
 optPrimFun _ "ts_add" (Tuple [Tuple es1, Tuple es2])
   | length es1 == length es2
-  = Just (Tuple (zipWith pAdd es1 es2))
+  = Just (Tuple (zipWith pTsAdd es1 es2))
 
 -- RULE: x+0 = 0+x = x
 optPrimFun _ "ts_add" (Tuple [x, y]) =
@@ -331,7 +331,7 @@ optPrimFun _ "lmAdd" (Tuple [p,q])
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
   , typeof t1 == typeof t2
-  = Just $ lmScale (typeof t1) (pAdd x y)
+  = Just $ lmScale (typeof t1) (pTsAdd x y)
 
 -- Add(HCat(p1, p2, ...), HCat(q1, q2, ...)) = Hcat(Add(p1, q1), Add(p2, q2), ...)
 optPrimFun _ "lmAdd" (Tuple [ Call hcat1 (Tuple ps)
@@ -541,7 +541,7 @@ optSumBuild sz i e
   = Just $ sz' sz e
     where sz' = case typeof e of
                   TypeInteger -> pMulii
-                  _ -> pScale . pToFloat
+                  _ -> pTsScale . pToFloat
 
 -- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
 --       = let i = ej in e
@@ -746,13 +746,13 @@ optLMApplyCall _ _ "lmOne" t dx
     Just dx
 
 optLMApplyCall _ dir "lmAdd" (Tuple [f,g]) dx
-  = Just (pAdd (lmApply_Dir dir f dx) (lmApply_Dir dir g dx))
+  = Just (pTsAdd (lmApply_Dir dir f dx) (lmApply_Dir dir g dx))
 
 optLMApplyCall _ Fwd "lmCompose" (Tuple [f,g]) dx = Just (lmApply f (lmApply g dx))
 optLMApplyCall _ Rev "lmCompose" (Tuple [f,g]) dx = Just (lmApplyR (lmApplyR dx f) g)
 
 optLMApplyCall _ _ "lmScale" (Tuple [_ty, x]) dx
-  = Just (pScale x dx)
+  = Just (pTsScale x dx)
 
 optLMApplyCall _ Fwd "lmVCat" (Tuple es) dx = do_prod Fwd es dx
 optLMApplyCall _ Rev "lmVCat" (Tuple es) dx = do_sum  Rev es dx
@@ -778,7 +778,7 @@ do_prod dir es dx = Just (Tuple [lmApply_Dir dir e dx | e <- es])
 
 do_sum :: ADDir -> [TExpr] -> TExpr -> Maybe TExpr
 do_sum dir es dx
-  = Just $ foldr1 pAdd $ zipWith (lmApply_Dir dir) es dxs
+  = Just $ foldr1 pTsAdd $ zipWith (lmApply_Dir dir) es dxs
   where
     n = length es
 
@@ -874,7 +874,7 @@ hspec = do
         optPrimFun emptyInScopeSet "lmAdd"
             (Tuple [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)])
         `shouldBe`
-        Just (lmScale TypeFloat (pAdd (kTFloat 1.3) (kTFloat 0.4)))
+        Just (lmScale TypeFloat (pTsAdd (kTFloat 1.3) (kTFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat

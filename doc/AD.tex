@@ -1278,7 +1278,7 @@ T(x_1\tcolon\tau_1, \ldots, x_n\tcolon\tau_n) & = & (\tau_1, \ldots, \tau_n) \\
 \multicolumn{3}{c}{\fbox{If $\Gamma \vdash e:\tau$ then $\KC{e}\Gamma : T(\Gamma) \darrow \tau$}} \\
   \KC{k}{\Gamma} & = & \ck{k} \\
   \KC{x}{\Gamma} & = & \cfun{\pi(\Gamma,x)} \\
-  \KC{f(e)}{\Gamma} & = & \cfun{f} \clcomp \KC{e}{\Gamma} \\
+  \KC{f(e)}{\Gamma} & = & \KC{e}{\Gamma} \clcomp \cfun{f} \\
   \KC{\lstinline|if|\;e_1\;e_2\;e_3}{\Gamma} \\
      \multicolumn{3}{l}{\hspace{2cm} = \cif{\KC{e_1}{\Gamma}}{\KC{e_2}{\Gamma}}{\KC{e_3}{\Gamma}}} \\
   \KC{(e_1, \ldots, e_n)}{\Gamma} & = & (\KC{e_1}{\Gamma}, \ldots, \KC{e_n}{\Gamma}) \\

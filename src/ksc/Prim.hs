@@ -345,10 +345,12 @@ pDiag = mkPrimCall3 "diag"
 ---------------------------
 -- "User-defined" functions
 ---------------------------
-pAdd, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
-pAdd   = mkPrimCall2 "ts_add"
+pTsAdd, pTsScale :: HasCallStack => TExpr -> TExpr -> TExpr
+pTsAdd   = mkPrimCall2 "ts_add"
+pTsScale = mkPrimCall2 "ts_scale"
+
+pEqual :: HasCallStack => TExpr -> TExpr -> TExpr
 pEqual = mkPrimCall2 "eq"
-pScale = mkPrimCall2 "ts_scale"
 
 pNeg :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "ts_neg"
@@ -360,7 +362,8 @@ pIndex :: TExpr -> TExpr -> TExpr
 pIndex = mkPrimCall2 "index"
 
 pSum :: TExpr -> TExpr
-pSum = mkPrimCall1 "sum"
+-- pSum = mkPrimCall1 "sum"
+pSum = userCall "sum" TypeFloat
 
 pTupCons :: TExpr -> TExpr -> TExpr
 -- Put arg1 on the front of the tuple arg2
@@ -412,6 +415,8 @@ pMulff x1 x2 = userCall "mul" TypeFloat (Tuple [x1, x2])
 
 primCallResultTy_maybe :: HasCallStack => Fun -> Type
                        -> Either SDoc Type
+-- Precondition: isUserFun (funIdOfFun fun) = False
+-- So fun_id is PrimFun or SelFun
 primCallResultTy_maybe fun arg_ty
   = case fun of
       Fun (PrimFun f)
@@ -444,16 +449,40 @@ primCallResultTy_maybe fun arg_ty
 
         | AD SplitAD Fwd <- adm
         , Right t_ty <- primCallResultTy_maybe (Fun f) arg_ty
-        -> Right (TypeTuple [t_ty, unitType])  -- Not clear this is always right
-                                               -- What is the X type for a primitive?
+        , Just x_ty <- xfType f arg_ty
+        -> Right (TypeTuple [t_ty, x_ty])
 
         | AD SplitAD Rev <- adm
-        -> Right arg_ty
+        , Just ds <- xrType f arg_ty
+        -> Right ds
 
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
+
+xfType :: FunId -> Type -> Maybe Type
+xfType (PrimFun fun) arg = primFunXFType fun arg
+xfType _ _ = Nothing
+
+primFunXFType :: PrimFun -> Type -> Maybe Type
+primFunXFType fun arg
+  = case (fun, arg) of
+     ("index", TypeTuple [TypeInteger, TypeVec _]) -> Just (TypeTuple [TypeInteger, TypeInteger])
+               -- X = (size of vector, index)
+     _ -> pprTrace "primFunXFType: no XType" (ppr fun <+> ppr arg)
+          Nothing
+
+xrType :: FunId -> Type -> Maybe Type
+xrType (PrimFun fun) arg = primFunXRType fun arg
+xrType _ _ = Nothing
+
+primFunXRType :: PrimFun -> Type -> Maybe Type
+primFunXRType fun arg
+  = case (fun, arg) of
+     ("index", TypeTuple [dt, TypeTuple [TypeInteger, TypeInteger]]) -> Just (TypeTuple [unitType, TypeVec dt])
+     _ -> pprTrace "primFunXType: no XType" (ppr fun <+> ppr arg)
+          Nothing
 
 selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
 selCallResultTy_maybe i n arg_ty
@@ -572,9 +601,15 @@ primFunCallResultTy_maybe fun args
                       , s_dt `eqType` (TypeTuple [s'0, dt])
                        -> Just TypeFloat
 
+      -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
+      ("pr"       , _)                                     -> Just TypeInteger
+      -- (print a b c) prints its arguments to stdout with no separators
+      ("print"    , _)                                     -> Just TypeInteger
+
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , t)                                       -> Just t
 
+      -- Polymorphic functions over vectors
       ("constVec" , TypeTuple [TypeInteger, t])              -> Just (TypeVec t)
       ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeVec t)
       ("diag"     , TypeTuple [TypeInteger,
@@ -582,24 +617,20 @@ primFunCallResultTy_maybe fun args
                                 TypeLam TypeInteger t])      -> Just (TypeVec (TypeVec t))
       ("build"    , TypeTuple
                      [TypeInteger, TypeLam TypeInteger t])   -> Just (TypeVec t)
-
-      -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
-      ("pr"       , _)                                     -> Just TypeInteger
-      -- (print a b c) prints its arguments to stdout with no separators
-      ("print"    , _)                                     -> Just TypeInteger
       ("sumbuild" , TypeTuple
                      [TypeInteger, TypeLam TypeInteger t]) -> Just t
       ("index"    , TypeTuple [TypeInteger, TypeVec t])    -> Just t
       ("size"     , TypeVec _)                             -> Just TypeSize
-      ("sum"      , TypeVec t)                             -> Just t
-
+--      ("sum"      , TypeVec t)                             -> Just t
       ("unzip"    , TypeVec (TypeTuple ts))                -> Just (TypeTuple (map TypeVec ts))
 
+      -- Polymorphic tangent-space functions
       ("ts_scale" , TypeTuple [TypeFloat,   t]           ) -> Just t
       ("ts_add"   , TypeTuple [t, dt]                    ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing
       ("ts_neg"   , t                                    ) -> Just t
+
       -- For eq and ne we check that the two arguments have the same type
       ("eq"       , TypeTuple [t1, t2]                   )
         | t1 `eqType` t2 -> Just TypeBool
@@ -629,7 +660,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "index"
                        , "tupCons", "tupTail"
                        , "size"
-                       , "sum"
+--                       , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "ts_neg"
                        , "ts_add"

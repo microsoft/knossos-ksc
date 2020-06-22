@@ -805,7 +805,7 @@ instance Pretty TypeX where
   pprPrec p (TypeVec ty)      = parensIf p precTyApp $
                                 text "Vec" <+> pprParendType ty
   pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
-                                     (parens (pprList pprParendType tys))
+                                     (parens (pprList ppr tys))
   pprPrec p (TypeLam from to) = parensIf p precZero $
                                 text "Lam" <+> ppr from <+> ppr to
   pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t

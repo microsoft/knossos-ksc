@@ -242,7 +242,7 @@ userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
 userCallResultTy_maybe fn env arg_ty
   = case lookupGblST (fn, arg_ty) env of
       Just def -> userCallResultTy_help def arg_ty
-      Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
+      Nothing  -> Left (text "Not in scope: userCall:" <+> ppr (fn,arg_ty) $$ ppr env)
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
