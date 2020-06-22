@@ -36,6 +36,9 @@
      (let ((a  (get$1$2 a_b))
            (b  (get$2$2 a_b)))
     (tuple (mul$R$VecR dr b) (mul$R$VecR dr a))))
+(def fwdt$dot (Tuple Float Float)
+     ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
+     (tuple (dot a_b) (fwd$dot a_b da_db)))
 
 (def dot Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dot (index i a) (index i b)))))
@@ -65,6 +68,9 @@
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
           ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
+(def fwdt$mul$Mat$Vec (Tuple (Vec Float) (Vec Float))
+     ((M_v : (Tuple (Vec (Vec Float)) (Vec Float))) (dM_dv : (Tuple (Vec (Vec Float)) (Vec Float))))
+     (tuple (mul$Mat$Vec M_v) (fwd$mul$Mat$Vec M_v dM_dv)))
 
 
 
