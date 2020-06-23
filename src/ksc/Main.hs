@@ -286,12 +286,17 @@ testHspec = do
   summary <- runSpec Main.hspec defaultConfig
   when (not (isSuccess summary)) (fail "Hspec tests failed.  See message above")
 
-testC :: String -> [String] -> IO ()
-testC compiler fsTestKs = do
+testsThatDoNoCodegen :: IO [String]
+testsThatDoNoCodegen = do
   testHspec
   ksTestFiles_ <- ksTestFiles "test/ksc/"
   testRoundTrip ksTestFiles_
   demoFOnTestPrograms ksTestFiles_
+  return ksTestFiles_
+
+testC :: String -> [String] -> IO ()
+testC compiler fsTestKs = do
+  ksTestFiles_ <- testsThatDoNoCodegen
   compileKscPrograms compiler ksTestFiles_
   testRunKS compiler "test/ksc/gmm.ks"
   testRunKS compiler "test/ksc/fold.ks"
