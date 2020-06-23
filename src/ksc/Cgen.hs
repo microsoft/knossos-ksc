@@ -736,6 +736,15 @@ readProcessEnvPrintStderr executable args env = do
   when (exitCode /= ExitSuccess) $ error "Compilation failed"
   return stdout
 
+readProcessPrintStderrOnFail
+  :: FilePath -> [String] -> IO String
+readProcessPrintStderrOnFail executable args = do
+  (exitCode, stdout, stderr) <- readProcessEnv executable args Nothing
+  when (exitCode /= ExitSuccess) $ do
+    putStr stderr
+    error "Compilation failed"
+  return stdout
+
 readProcessPrintStderr :: FilePath -> [String] -> IO String
 readProcessPrintStderr executable args =
   readProcessEnvPrintStderr executable args Nothing
