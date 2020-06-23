@@ -141,7 +141,7 @@ gatherErrors :: Show a => [Maybe a] -> Either String ()
 gatherErrors errors =
   case Data.Maybe.catMaybes errors of
     []     -> return ()
-    errors -> Left ("Had errors in:\n" ++ unlines (map show errors))
+    errors -> Left ("\n\n\n--- The errors were as follows ---\n\n" ++ unlines (map show errors))
 
 dropExtensionOrFail :: String -> FilePath -> IO String
 dropExtensionOrFail ext path =
