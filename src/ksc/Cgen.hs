@@ -720,13 +720,18 @@ runExe exefile = do
   putStrLn "Running"
   readProcessPrintStderr exefile []
 
+readProcessEnv
+  :: FilePath -> [String] -> Maybe [(String, String)] -> IO (ExitCode, String, String)
+readProcessEnv executable args env = do
+  let stdin = ""
+  System.Process.readCreateProcessWithExitCode
+    (System.Process.proc executable args) { System.Process.env = env }
+    stdin
+
 readProcessEnvPrintStderr
   :: FilePath -> [String] -> Maybe [(String, String)] -> IO String
 readProcessEnvPrintStderr executable args env = do
-  let stdin = ""
-  (exitCode, stdout, stderr) <- System.Process.readCreateProcessWithExitCode
-    (System.Process.proc executable args) { System.Process.env = env }
-    stdin
+  (exitCode, stdout, stderr) <- readProcessEnv executable args env
   putStr stderr
   when (exitCode /= ExitSuccess) $ error "Compilation failed"
   return stdout
