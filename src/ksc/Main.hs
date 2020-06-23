@@ -42,6 +42,8 @@ main = do
   System.Environment.getArgs >>= \case
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
+    ["--test-except-codegen"]
+      -> do { _ <- testsThatDoNoCodegen; return () }
     [ "--profile",
       "--ks-file-without-extension", source,
       "--proffile", proffile,
