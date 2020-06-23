@@ -295,6 +295,25 @@ data Fun = Fun      FunId         -- The function f(x)
                                   --   Rev <=> reverse mode f`(x,dr)
          deriving( Eq, Ord, Show )
 
+{- Note [Derived functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Fun f :: S -> T
+
+GradFun f BasicAD         D$f :: S -> LM S T             Derivative via linar map
+GradFun f TupleAD         Dt$f :: S -> (S, LM S T)       Tupled derivative via linear map
+
+DrvFun f (AD BasicAD Fwd) fwd$f :: (S,dS) -> dT          Forward derivative
+DrvFun f (AD BasicAD Rev) rev$f :: (S,dT) -> dS          Reverse derivative
+
+DrvFun f (AD TupleAD Fwd) fwdt$f :: (S,ds) -> (T,dT)     Forward derivative, tupled
+DrvFun f (AD TupleAD Rev) revt$f :: (S,dT) -> (T,dS)     Forward derivative, tupled
+
+DrvFun f (AD SplitAD Fwd) fwds$f :: S -> (T,X)           Forward split derivative
+                                                            X may be an empty tuple
+DrvFun f (AD SplitAD Rev) revs$f :: (dT,X) -> dS         Reverse split derivative
+                                 :: dT -> dS                If X=()
+-}
+
 data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
   deriving (Eq, Ord)  -- type of the function.
 

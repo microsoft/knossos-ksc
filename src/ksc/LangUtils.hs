@@ -214,7 +214,8 @@ fortunately all functions have explicitly-declared types.
 
 -- Global symbol table
 type GblSymTab = M.Map (Fun, Type) TDef
-   -- Maps a function to its definition, which lets us
+   -- Maps a (function, arg-type) pair to its definition,
+   -- which lets us
    --   * Find its return type
    --   * Inline it
    -- Domain is UserFun, and perhaps the Grad of PrimFuns

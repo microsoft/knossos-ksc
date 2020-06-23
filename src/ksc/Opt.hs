@@ -19,6 +19,7 @@ import KMonad
 import Debug.Trace
 import Test.Hspec
 import Data.List( mapAccumR )
+import qualified Data.Set as S
 
 optTrace :: msg -> a -> a
 optTrace _msg t = t -- trace msg t
@@ -179,6 +180,14 @@ rewriteCall _ fun (Let v r arg)
 rewriteCall _ fun (If e1 e2 e3)
   = Just (If e1 (Call fun e2) (Call fun e3))
 
+-- Inline any white-listed function
+rewriteCall env (TFun _ fun) arg
+  | funIdOfFun fun `S.member` inlineWhiteList
+  , let arg_ty = typeof arg
+  , Just fun_def <- lookupGblST (fun, arg_ty) (optGblST env)
+  , Def { def_pat = pat, def_rhs = UserRhs body } <- fun_def
+  = Just (inlineCall env pat body arg)
+
 rewriteCall env (TFun _ (Fun fun)) arg
   = optFun env fun arg
 
@@ -187,6 +196,10 @@ rewriteCall env (TFun ty (GradFun f adp)) arg
 
 rewriteCall env (TFun ty (DrvFun f adm)) arg
   = optDrvFun (optEnvInScope env) adm ty f arg
+
+inlineWhiteList :: S.Set FunId
+inlineWhiteList = S.fromList [ UserFun "add", UserFun "mul" ]
+
 
 -----------------------
 optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr

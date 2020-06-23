@@ -9,6 +9,39 @@ import LangUtils
 import GHC.Stack
 import Data.Maybe
 
+{- Note [Primitive functions and user-defined functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A "primitive" function, foo, behaves like this:
+
+* Its FunId is (PrimFun "foo")
+
+* It has a polymorphic type.  If its type was monomorphic,
+  you could define it via edef in prelude.ks
+
+* Its type is given by primFunCallResultTy_maybe
+
+* It is dealt with specially by the code generator;
+  it has no definition in KSC.
+
+* It has derived forms
+     GradFun (PrimFun "foo") adp    -- D$foo, etc
+     DrvFun (PrimFun "foo") adm     -- fwd$foo, etc
+  Their types too are computed by primFunCallResultTy_maybe
+
+* These derived forms are typically inlined in Opt.
+
+A user-defined function, bar, behaves like this:
+
+* Its FunId is (UserFun "bar")
+
+* It may or may not have a definition in KSC.  If it is edef'd it
+  doesn't; in that case the code generator must deal with them
+  specially.
+
+* User-defined functions can still have custom rewrite rules
+  in Opt.hs
+-}
+
 --------------------------------------------
 --  Simple call construction
 --------------------------------------------
