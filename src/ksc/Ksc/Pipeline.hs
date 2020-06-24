@@ -36,42 +36,47 @@ demoCL file
     do { banner "Original decls"
        ; displayN my_decls
 
-       ; (env1, pr_tc) <- annotDecls emptyGblST pr_decls
-       ; (env2, my_tc) <- annotDecls env1       my_decls
+       ; (env, pr_tc) <- annotDecls emptyGblST pr_decls
+       ; (env, my_tc) <- annotDecls env       my_decls
        ; let (_pr_rules, _pr_defs) = partitionDecls pr_tc
              (_my_rules, my_defs)  = partitionDecls my_tc
              rulebase              = mkRuleBase (_pr_rules ++ _my_rules)
 
-       ; displayPassM veryVerbose "Typechecked declarations" env2 my_defs
+       ; displayPassM veryVerbose "Typechecked declarations" env my_defs
+
+       -- Optimise before converting to CL, to get rid of
+       -- $inline, which we can't differentiate
+       ; (env, opt_my_defs) <- optDefs rulebase env my_defs
+       ; displayPassM veryVerbose "Optimized original declarations" env opt_my_defs
 
        ; banner "toCLDefs"
-       ; let cl_defs = toCLDefs my_defs
+       ; let cl_defs = toCLDefs opt_my_defs
        ; displayN cl_defs
 
-       ; displayPassM veryVerbose "fromCLDefs" env2
+       ; displayPassM veryVerbose "fromCLDefs" env
                        (fromCLDefs cl_defs)
 
-       ; let (env3, ad_defs) = fwdAdDefs env2 cl_defs
-       ; displayPassM veryVerbose "Forward tupled AD" env3 ad_defs
+       ; (env, ad_defs) <- return (fwdAdDefs env cl_defs)
+       ; displayPassM veryVerbose "Forward tupled AD" env ad_defs
 
-       ; (env4, opt_ad_defs) <- optDefs rulebase env3 ad_defs
-       ; displayPassM veryVerbose "Optimized forward tupled AD " env4 opt_ad_defs
+       ; (env, opt_ad_defs) <- optDefs rulebase env ad_defs
+       ; displayPassM veryVerbose "Optimized forward tupled AD " env opt_ad_defs
 
-       ; let (env5, rev_defs) = revAdDefs env4 cl_defs
-       ; displayPassM veryVerbose "Reverse AD" env5 rev_defs
+       ; (env, rev_defs) <- return (revAdDefs env cl_defs)
+       ; displayPassM veryVerbose "Reverse AD" env rev_defs
 
-       ; (env6, opt_rev_defs) <- optDefs rulebase env5 rev_defs
-       ; displayPassM veryVerbose "Optimized reverse AD " env5 opt_rev_defs
+       ; (env, opt_rev_defs) <- optDefs rulebase env rev_defs
+       ; displayPassM veryVerbose "Optimized reverse AD " env opt_rev_defs
 
-       ; (env7, cse_rev_defs) <- cseDefs rulebase env6 opt_rev_defs
-       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env7 cse_rev_defs
+       ; (env, cse_rev_defs) <- cseDefs rulebase env opt_rev_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env cse_rev_defs
 
-       ; let (env8, fs_defs) = fsAdDefs env7 cl_defs
-       ; displayPassM veryVerbose "Split AD" env8 fs_defs
+       ; (env, fs_defs) <- return (fsAdDefs env cl_defs)
+       ; displayPassM veryVerbose "Split AD" env fs_defs
 
-       ; (env9, opt_fs_defs) <- optDefs rulebase env8 fs_defs
-       ; (env10, cse_fs_defs) <- cseDefs rulebase env9 opt_fs_defs
-       ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env10 cse_fs_defs
+       ; (env, opt_fs_defs) <- optDefs rulebase env fs_defs
+       ; (env, cse_fs_defs) <- cseDefs rulebase env opt_fs_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env cse_fs_defs
      } }
 
 

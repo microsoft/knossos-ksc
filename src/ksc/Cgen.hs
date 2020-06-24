@@ -20,7 +20,7 @@ import qualified System.Process
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 
 import           Lang                    hiding ( (<>) )
-import qualified OptLet
+import qualified LangUtils as L
 
 import Debug.Trace
 
@@ -191,7 +191,7 @@ that we chose are not used in the function body by using substExpr.
 -}
 
 ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
-ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
+ensureDon'tReuseParams = L.substExpr . L.mkEmptySubst
 
 params_withPackedParamsPat :: Pat -> ([TVarX], TExpr -> TExpr)
 params_withPackedParamsPat (TupPat vs)    = (vs, id)
@@ -253,7 +253,8 @@ cgenExprR env = \case
   Var (TVar ty v)               -> return $ CG "" (cgenVar v) (mkCType ty)
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
+  Call (TFun (TypeVec ty) (Fun (PrimFun (Builtin "build"))))
+       (Tuple [sz, Lam (TVar vty var) body]) -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -278,7 +279,8 @@ cgenExprR env = \case
         (mkCType (TypeVec ty))
 
   -- Special case for sumbuild -- inline the loop
-  Call (TFun ty (Fun (PrimFun "sumbuild"))) (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
+  Call (TFun ty (Fun (PrimFun (Builtin "sumbuild"))))
+       (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
     CG szdecl szex _szty <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -518,8 +520,8 @@ cgenFunId = \case
   (UserFun fun, TypeTuple [])  -> mangleFun fun
   (UserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
   (UserFun fun, ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
-  (PrimFun fun, _ty) -> fun
-  (SelFun i _, _ty)  -> "ks::get<" ++ show (i - 1) ++ ">"
+  (PrimFun (Builtin fun), _ty) -> fun
+  (PrimFun (Sel i _),    _ty)  -> "ks::get<" ++ show (i - 1) ++ ">"
 
 cgenUserFun :: HasCallStack => (Fun, Type) -> String
 cgenUserFun (f, ty) = case f of
@@ -534,12 +536,12 @@ cgenUserFun (f, ty) = case f of
 
 cgenAnyFun :: HasCallStack => (TFun, Type) -> CType -> String
 cgenAnyFun (tf, ty) cftype = case tf of
-  TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
-  TFun ty (Fun (PrimFun "build")) ->
+  TFun _ (Fun (PrimFun (Builtin "lmApply"))) -> "lmApply"
+  TFun ty (Fun (PrimFun (Builtin "build"))) ->
     case ty of
       TypeVec t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _         -> error ("Unexpected type for build: " ++ show ty)
-  TFun ty (Fun (PrimFun "sumbuild")) -> -- TODO: remove special case
+  TFun ty (Fun (PrimFun (Builtin "sumbuild"))) -> -- TODO: remove special case
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
@@ -588,7 +590,7 @@ ctypeofFun env (TFun ty f, argty) ctys = case cstMaybeLookupFun (f, argty) env o
     ctypeofFun1 ty f ctys
 
 ctypeofFun1 :: HasCallStack => Type -> Fun -> [CType] -> CType
-ctypeofFun1 ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
+ctypeofFun1 ty (Fun (PrimFun (Builtin name))) ctys = ctypeofPrimFun ty name ctys
 ctypeofFun1 (TypeLM _ _) (GradFun f _) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 (TypeLM _ _) f ctys =
   error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
@@ -596,7 +598,7 @@ ctypeofFun1 (TypeLM _ _) f ctys =
     (map show ctys)
 ctypeofFun1 ty _ _ = mkCType ty
 
-ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
+ctypeofPrimFun :: HasCallStack => Type -> BuiltinFunName -> [CType] -> CType
 ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
   ("lmApply"  , _         ) -> mkCType ty
   ("lmOne"    , [ct]      ) -> LMOne (stripCType ct)
@@ -624,10 +626,10 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "ts_add"  , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
-  (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"   , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun (Builtin "ts_add")  , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun (Builtin "$trace")  , [CType ty]          ) -> LMOne ty
+  (PrimFun (Builtin "size")    , [CType ty]          ) -> LMZero ty TypeInteger
+  (PrimFun (Builtin "index")   , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)

@@ -198,7 +198,7 @@ to_cl_call pruned env f e
       Pruned    -> CLFold t (toCLExpr (t:env) body)
                             (toCLExpr env acc) (toCLExpr env v)
 
-  | TFun _ (Fun (SelFun i n)) <- f
+  | TFun _ (Fun (PrimFun (Sel i n))) <- f
   = to_cl_expr pruned env e `mkCLComp` CLPrune [i] n
 
   | TFun ty (Fun fun_id) <- f
@@ -632,11 +632,13 @@ fsAdDef gst (CLDef { cldef_fun = f
 -------------------
 fsAdExpr :: GblSymTab -> GammaShape -> CLExpr -> SplitResult
 -- This is the main workhorse
--- The [Type] is the type of the argument tuple at that point
+-- The GammaShape is the type of the argument tuple at that point
 
-fsAdExpr _ _ (CLKonst k)
-  = SR { sr_fwd  = \ _ _   -> Konst k
-       , sr_rev  = \ _ _ _ -> mkTangentZero (Konst k)
+fsAdExpr _ gs (CLKonst k)
+  = assert (text "fsAdExpr:CLConst") (null gs) $
+           -- GammaShape is [] so result dT is ()
+    SR { sr_fwd  = \ _ _   -> Konst k
+       , sr_rev  = \ _ _ _ -> Tuple []
        , sr_empx = XEmpty }
 
 fsAdExpr _ _ CLId
@@ -817,7 +819,9 @@ funXShape gst fn arg_ty
         -> case x of
              TypeTuple [] -> XEmpty
              _            -> XNonEmpty
-      _ -> pprPanic "hasEmptyX" (ppr fn <+> ppr fs_fn <+> ppr arg_ty)
+        | otherwise
+        -> pprPanic "hasEmptyX" (ppr fn <+> ppr fs_fn <+> ppr arg_ty)
+      Left _ -> pprPanic "hasEmptyX:" (quotes (ppr fs_fn) <+> text "is not in scope")
            -- Not in GST, or bad shape
   where
     fs_fn = DrvFun fn (AD { adPlan = SplitAD, adDir = Fwd })

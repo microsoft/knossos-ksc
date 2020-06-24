@@ -20,6 +20,7 @@ module LangUtils (
   InScopeSet, emptyInScopeSet, mkInScopeSet, extendInScopeSet,
   notInScope, notInScopeTV, notInScopeTVs,
   notFreeIn, newVarNotIn, freeVarsOf,
+  inlineCall,
 
   -- Tests
   LangUtils.hspec, test_FreeIn,
@@ -30,19 +31,30 @@ module LangUtils (
   LclSymTab, extendLclST,
   SymTab(..), newSymTab, emptySymTab,
 
+  -- OptEnv
+  OptEnv(..), optEnvInScope, emptyOptEnv, optZapSubst, optSubstBndr,
+
   -- Other utility functions
   isSingleton, count,
 
   -- OneArg
-  oneArgifyDef
+  oneArgifyDef,
+
+  -- Construction
+  makeAtomic,
+
+  -- Substitution
+  Subst, mkEmptySubst, lookupSubst, extendSubstMap, substVar,
+  substExpr, substBndr
 
   ) where
 
 import Lang
+import Rules
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char( isDigit )
-import Data.List( mapAccumL )
+import Data.List( mapAccumL, mapAccumR )
 import Test.Hspec
 
 
@@ -349,3 +361,172 @@ oneArgifyDef def@(Def { def_pat = TupPat tvs, def_rhs = UserRhs rhs })
                             | (tv, i) <- tvs `zip` [1..] ]
 
 oneArgifyDef def = def
+
+-----------------------------------------------
+--     inlineCall
+-----------------------------------------------
+
+inlineCall :: InScopeSet
+           -> Pat -> TExpr  -- Function parameters and body
+           -> TExpr            -- Arguments
+           -> TExpr
+inlineCall _ (VarPat tv) body arg
+  = Let tv arg body
+
+inlineCall in_scope (TupPat tvs) body arg
+  = mkLets (fresh_tvs `zip` args) $
+    -- See Note [Avoid name clashes in inlineCall]
+    mkLets [ (tv, Var fresh_tv)
+           | (tv,fresh_tv) <- tvs `zip` fresh_tvs
+           , tv /= fresh_tv ]
+    body
+  where
+    args = splitTuple arg (length tvs)
+    (_, fresh_tvs) = notInScopeTVs in_scope tvs
+
+{- Note [Avoid name clashes in inlineCall]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have the call (f e1 e2),
+  where e1 and e2 mention variables p, q
+  f is defined by  def f (p,q) = rhs
+Then we want to generate
+  let p' = e1
+      q' = e2
+  in let
+      p = p'
+      q = q'
+  in rhs
+to avoid accidental capture of p,q.
+-}
+
+type TBinds = [(TVar, TExpr)]
+
+makeAtomic :: Bool           -- True => add a fresh binding regardless
+           -> InScopeSet     -- Do not chose these as binders
+           -> [TExpr]        -- Arguments
+           -> (TBinds, [TExpr])
+makeAtomic always_bind in_scope args
+  = (binds, new_args)
+  where
+    ((_,binds), new_args) = mapAccumR do_arg (in_scope, []) args
+    do_arg :: (InScopeSet, TBinds) -> TExpr -> ((InScopeSet, TBinds), TExpr)
+    do_arg (in_scope, binds) arg
+       | not always_bind
+       , isTrivial arg = ((in_scope, binds), arg)
+       | otherwise     = ((in_scope', bind:binds), Var tv)
+       where
+         tv = TVar (typeof arg) (notInScope argVar in_scope)
+         bind = (tv, arg)
+         in_scope' = extendInScopeSet tv in_scope
+
+-----------------------------------------------
+--     OptEnv
+-----------------------------------------------
+
+data OptEnv = OptEnv { optRuleBase :: RuleBase
+                     , optGblST    :: GblSymTab
+                     , optSubst    :: Subst }
+
+optEnvInScope :: OptEnv -> InScopeSet
+optEnvInScope env = substInScope (optSubst env)
+
+emptyOptEnv :: OptEnv
+emptyOptEnv = OptEnv { optRuleBase = mkRuleBase []
+                     , optGblST    = emptyGblST
+                     , optSubst    = mkEmptySubst [] }
+
+optZapSubst :: OptEnv -> OptEnv
+optZapSubst env@(OptEnv { optSubst = subst })
+  = env { optSubst = zapSubst subst }
+
+optSubstBndr :: TVar -> OptEnv -> (TVar, OptEnv)
+optSubstBndr tv env@(OptEnv { optSubst = subst })
+  = (tv', env { optSubst = subst' })
+  where
+    (tv', subst') = substBndr tv subst
+
+
+-------------------------
+-- Substitution
+-------------------------
+
+{- Note [Capture-avoiding substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+ f(x) = let y = x+1 in
+        let x = x*2 in
+        y * x * x
+
+We do not want to substitute for the 'y' giving
+ f(x) = let y = x+1 in
+        let x = x*2 in
+        (x+1) * x * x
+
+because those two x's are quite different! In this bogus result,
+the 'x' in the (x+1) has been captured by the inner binding for 'x'.
+
+We must instead rename the inner 'x' so we get
+ f(x) = let y   = x+1 in
+        let x_1 = x*2 in
+        (x+1) * x_1 * x_1
+-}
+
+data Subst
+  = S { s_env      :: M.Map Var TExpr   -- Keys are Vars not TVars
+      , s_in_scope :: InScopeSet        -- Don't bother to compare the types
+    }
+
+substInScope :: Subst -> InScopeSet
+substInScope = s_in_scope
+
+mkEmptySubst :: [TVar] -> Subst
+mkEmptySubst tvs
+  = S { s_env = M.empty
+      , s_in_scope = mkInScopeSet tvs }
+
+lookupSubst :: Var -> Subst -> Maybe TExpr
+lookupSubst v (S { s_env = env }) = v `M.lookup` env
+
+extendSubstMap :: Var -> TExpr -> Subst -> Subst
+extendSubstMap v e subst@(S { s_env = env })
+  = subst { s_env = M.insert v e env }
+
+zapSubst :: Subst -> Subst
+-- Zap the substitution, but preserve the in-scope set
+zapSubst (S { s_in_scope = in_scope })
+  = S { s_env = M.empty, s_in_scope = in_scope }
+
+-- * It applies the substitution to the type of the binder
+-- * It clones the binder if it is already in scope
+-- * Extends the substitution and the in-scope set as appropriate
+substBndr :: TVar -> Subst -> (TVar, Subst)
+substBndr tv (S { s_in_scope = in_scope, s_env = env })
+  = (tv', S { s_env      = env'
+            , s_in_scope = is' })
+  where
+    (is', tv') = notInScopeTV in_scope tv
+    env' = M.insert (tVarVar tv) (Var tv') env
+
+substVar :: Subst -> TVar -> TExpr
+substVar subst tv = case lookupSubst (tVarVar tv) subst of
+                      Just e  -> e
+                      Nothing -> Var tv
+
+substExpr :: Subst -> TExpr -> TExpr
+substExpr subst e
+  = go e
+  where
+    go (Var tv)       = substVar subst tv
+    go (Dummy ty)     = Dummy ty
+    go (Konst k)      = Konst k
+    go (Call f es)    = Call f (go es)
+    go (If b t e)     = If (go b) (go t) (go e)
+    go (Tuple es)     = Tuple (map go es)
+    go (App e1 e2)    = App (go e1) (go e2)
+    go (Assert e1 e2) = Assert (go e1) (go e2)
+    go (Let v r b)    = Let v' (go r) (substExpr subst' b)
+                      where
+                        (v', subst') = substBndr v subst
+    go (Lam v e)      = Lam v' (substExpr subst' e)
+                      where
+                        (v', subst') = substBndr v subst

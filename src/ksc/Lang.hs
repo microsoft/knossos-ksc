@@ -280,13 +280,16 @@ eqSize (Konst k1) (Konst k2) = traceWhenUnequal "eqSize" k1 k2 $ k1 == k2
 eqSize _e1 _e2 = -- trace ("[Punting eqSize " ++ pps _e1 ++ " == " ++ pps _e2 ++ "]")
                  True
 
-type PrimFun = String
+type UserFunName    = String
+type BuiltinFunName = String
 
-data FunId = UserFun String   -- UserFuns have a Def
-           | PrimFun PrimFun  -- PrimFuns do not have a Def
-           | SelFun
-                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
-                Int      -- Arity
+data PrimFun = Builtin BuiltinFunName
+             | Sel Int      -- Index; 1-indexed, so (Sel 1 2) is fst
+                   Int      -- Arity
+             deriving( Eq, Ord, Show )
+
+data FunId = UserFun UserFunName   -- UserFuns have a Def/EDef
+           | PrimFun PrimFun       -- PrimFuns do not have a Def
            deriving( Eq, Ord, Show )
 
 data Fun = Fun      FunId         -- The function f(x)
@@ -301,6 +304,7 @@ Fun f :: S -> T
 
 GradFun f BasicAD         D$f :: S -> LM S T             Derivative via linar map
 GradFun f TupleAD         Dt$f :: S -> (S, LM S T)       Tupled derivative via linear map
+GradFun f SplitAD         NOT USED
 
 DrvFun f (AD BasicAD Fwd) fwd$f :: (S,dS) -> dT          Forward derivative
 DrvFun f (AD BasicAD Rev) rev$f :: (S,dT) -> dS          Reverse derivative
@@ -321,13 +325,12 @@ isUserFun :: FunId -> Bool
 isUserFun = \case
   UserFun{} -> True
   PrimFun{} -> False
-  SelFun{}  -> False
 
 isSelFun :: FunId -> Bool
 isSelFun = \case
   UserFun{} -> False
-  PrimFun{} -> False
-  SelFun{}  -> True
+  PrimFun (Sel {}) -> True
+  PrimFun (Builtin {}) -> False
 
 funIdOfFun :: Fun -> FunId
 funIdOfFun = \case
@@ -336,7 +339,7 @@ funIdOfFun = \case
   DrvFun f _  -> f
 
 isThePrimFun :: TFun -> String -> Bool
-isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
+isThePrimFun (TFun _ (Fun (PrimFun (Builtin f1)))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
@@ -400,7 +403,7 @@ partitionDecls = foldr declX ([], [])
 -----------------------------------------------
 
 mkPrimFun :: String -> Fun
-mkPrimFun fname = Fun (PrimFun fname)
+mkPrimFun fname = Fun (PrimFun (Builtin fname))
 
 mkPrimTFun :: Type -> String -> TFun
 mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
@@ -475,7 +478,7 @@ pSel i n e
     es !! (i-1)
 
   | otherwise
-  = Call (TFun el_ty (Fun (SelFun i n))) e
+  = Call (TFun el_ty (Fun (PrimFun (Sel i n)))) e
   where
     el_ty = case typeof e of
                TypeTuple ts -> ts !! (i-1)
@@ -599,6 +602,9 @@ double d = SDoc (\_ -> PP.double d)
 
 parens :: SDoc -> SDoc
 parens (SDoc d) = SDoc (PP.parens . d)
+
+quotes :: SDoc -> SDoc
+quotes (SDoc d) = SDoc (PP.quotes . d)
 
 cat :: [SDoc] -> SDoc
 cat ss = SDoc
@@ -788,6 +794,9 @@ instance Pretty Var where
   ppr (Delta  d) = text "d$" <> text d
   ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
 
+instance Pretty PrimFun where
+  ppr = pprPrimFun
+
 instance Pretty FunId where
   ppr = pprFunId
 
@@ -796,8 +805,11 @@ instance Pretty Fun where
 
 pprFunId :: FunId -> SDoc
 pprFunId (UserFun s ) = text s
-pprFunId (PrimFun p ) = text p
-pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
+pprFunId (PrimFun p ) = ppr p
+
+pprPrimFun :: PrimFun -> SDoc
+pprPrimFun (Builtin f) = text f
+pprPrimFun (Sel i n)   = text "get$" <> int i <> char '$' <> int n
 
 pprFun :: Fun -> SDoc
 pprFun (Fun s)                   = ppr s
@@ -933,7 +945,7 @@ isInfix f = isInfixFun (fst (getFun @p f))
 
 -- TODO: this is rather out of date, and it's not clear we need to keep it...
 isInfixFun :: Fun -> Maybe Prec
-isInfixFun (Fun (PrimFun s))
+isInfixFun (Fun (PrimFun (Builtin s)))
     | s == "eq"     = Just precOne
     | s == "ts_add" = Just precTwo
 isInfixFun _ = Nothing

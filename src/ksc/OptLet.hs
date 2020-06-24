@@ -4,12 +4,7 @@
              PatternSynonyms,
 	     ScopedTypeVariables #-}
 
-module OptLet( optLets
-             , Subst
-             , mkEmptySubst, lookupSubst
-             , substInScope, extendInScopeSet
-             , substBndr, extendSubstMap, zapSubst
-             , substExpr, substVar )
+module OptLet( optLets )
              where
 
 import Lang
@@ -155,90 +150,6 @@ union = M.unionWith (+)
 unions :: [OccMap] -> OccMap
 unions = foldr union M.empty
 
--------------------------
--- Substitute trivials
--------------------------
-
-{- Note [Capture-avoiding substitution]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
- f(x) = let y = x+1 in
-        let x = x*2 in
-        y * x * x
-
-We do not want to substitute for the 'y' giving
- f(x) = let y = x+1 in
-        let x = x*2 in
-        (x+1) * x * x
-
-because those two x's are quite different! In this bogus result,
-the 'x' in the (x+1) has been captured by the inner binding for 'x'.
-
-We must instead rename the inner 'x' so we get
- f(x) = let y   = x+1 in
-        let x_1 = x*2 in
-        (x+1) * x_1 * x_1
--}
-
-data Subst
-  = S { s_env      :: M.Map Var TExpr   -- Keys are Vars not TVars
-      , s_in_scope :: InScopeSet        -- Don't bother to compare the types
-    }
-
-substInScope :: Subst -> InScopeSet
-substInScope = s_in_scope
-
-mkEmptySubst :: [TVar] -> Subst
-mkEmptySubst tvs
-  = S { s_env = M.empty
-      , s_in_scope = mkInScopeSet tvs }
-
-lookupSubst :: Var -> Subst -> Maybe TExpr
-lookupSubst v (S { s_env = env }) = v `M.lookup` env
-
-extendSubstMap :: Var -> TExpr -> Subst -> Subst
-extendSubstMap v e subst@(S { s_env = env })
-  = subst { s_env = M.insert v e env }
-
-zapSubst :: Subst -> Subst
--- Zap the substitution, but preserve the in-scope set
-zapSubst (S { s_in_scope = in_scope })
-  = S { s_env = M.empty, s_in_scope = in_scope }
-
--- * It applies the substitution to the type of the binder
--- * It clones the binder if it is already in scope
--- * Extends the substitution and the in-scope set as appropriate
-substBndr :: TVar -> Subst -> (TVar, Subst)
-substBndr tv (S { s_in_scope = in_scope, s_env = env })
-  = (tv', S { s_env      = env'
-            , s_in_scope = is' })
-  where
-    (is', tv') = notInScopeTV in_scope tv
-    env' = M.insert (tVarVar tv) (Var tv') env
-
-substVar :: Subst -> TVar -> TExpr
-substVar subst tv = case lookupSubst (tVarVar tv) subst of
-                      Just e  -> e
-                      Nothing -> Var tv
-
-substExpr :: Subst -> TExpr -> TExpr
-substExpr subst e
-  = go e
-  where
-    go (Var tv)       = substVar subst tv
-    go (Dummy ty)     = Dummy ty
-    go (Konst k)      = Konst k
-    go (Call f es)    = Call f (go es)
-    go (If b t e)     = If (go b) (go t) (go e)
-    go (Tuple es)     = Tuple (map go es)
-    go (App e1 e2)    = App (go e1) (go e2)
-    go (Assert e1 e2) = Assert (go e1) (go e2)
-    go (Let v r b)    = Let v' (go r) (substExpr subst' b)
-                      where
-                        (v', subst') = substBndr v subst
-    go (Lam v e)      = Lam v' (substExpr subst' e)
-                      where
-                        (v', subst') = substBndr v subst
 
 optLetsE :: Subst -> ExprX OccAnald -> TExpr
 -- This function inline let-bindings that are only used once

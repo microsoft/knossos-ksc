@@ -7,7 +7,7 @@
 module ANF where
 
 import Lang
-import OptLet( Subst, mkEmptySubst, substBndr, substVar )
+import LangUtils( Subst, mkEmptySubst, substBndr, substVar )
 import KMonad
 import Control.Monad( ap )
 

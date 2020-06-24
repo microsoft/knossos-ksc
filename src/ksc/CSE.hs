@@ -3,8 +3,7 @@
 module CSE where
 
 import Lang
-import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
-import LangUtils( GblSymTab, substEMayCapture )
+import LangUtils
 import Rules
 import ANF
 import Opt

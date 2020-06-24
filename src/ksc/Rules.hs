@@ -4,7 +4,6 @@
 module Rules( RuleBase, tryRules, mkRuleBase ) where
 
 import Lang
-import LangUtils ()
 import Control.Monad( guard )
 import Data.Map as M
 
