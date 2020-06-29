@@ -1550,6 +1550,303 @@ def RFold_recursive (S, Vec n dB, dA) ((f : F) (f_ : F_) (i : Integer) (v : Vec 
 \end{verbatim}
 \caption{Reverse mode derivative for fold}
 \end{figure*}
+
+\newcommand{\proctype}[3]{#2 \vdash #1 \dashv #3}
+
+\section{Procedure language}
+
+The typing judgement for a procedure $p$ is of the form
+$\proctype{p}{\Gamma}{\Delta}$.
+
+Here the ``context'' $\Gamma$ contains the types of the free
+variables, those which the procedure uses on the right hand side of an
+$=$ sign but that were not bound on the left hand side earlier in the
+procedure.  The ``co-context'' $\Delta$ contains the types of the
+``cofree'' variables, i.e. those which are bound on the left hand side
+of an $=$ sign but that are not used on the right hand side later in
+the procedure.
+
+The requirement that there are no compound expressions in the
+procedure language leads to very verbose code, analogous to ANF.  The
+reverse mode AD pass relies critically on this property, so although
+we could relax the condition and permit nested subexpressions we would
+have to apply an explicit ANF pass before applying the reverse mode
+transform.  We will live with the verbosity for now.
+
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+$$
+      \begin{array}{rcll}
+        \multicolumn{4}{l}{\mbox{\bf Atoms}} \\
+        f,g,h & ::= & \multicolumn{2}{l}{\mbox{Function}} \\
+        x,y,z & ::= & \multicolumn{2}{l}{\mbox{Variable}} \\
+        k & ::= & \multicolumn{2}{l}{\mbox{Literal constant}} \\
+        \\
+        \multicolumn{4}{l}{\mbox{\bf Terms}} \\
+        \mathit{statement} & ::= & x = Call \; f \; y & \mbox{Function call}\\
+          & |   & x = Const \; k & \mbox{Constant} \\
+          & |   & Elim \; y & \mbox{Elimination} \\
+          & |   & x = Dup \; y & \mbox{Duplication} \\
+          & |   & x = (y, z) & \mbox{Tuple constructor} \\
+          & |   & (x, y) = z & \mbox{Tuple pattern match} \\
+          & |   & x = Inl \; y & \mbox{Sum constructor}\\
+          & |   & x = Inr \; y & \mbox{Sum constructor}\\
+          & |   & Case \; x \; (Inl \; x \; procedure) (Inr \; y \; procedure)
+        & \mbox{Sum pattern match}\\
+        \\
+        \mathit{procedure} & ::= & statement \\
+          & |   & procedure \; ; \; procedure \\
+        \\
+        \multicolumn{4}{l}{\mbox{\bf Types}} \\
+        \tau & ::= & \real & \mbox{Real numbers} \\
+        & | & (\tau_1, \tau_2) & \mbox{Pairs} \\
+        & | & \tau_1 \oplus \tau_2 & \mbox{Sums} \\
+      \end{array}
+ $$
+\end{minipage}}
+\caption{Syntax of the procedure language}
+\end{figure*}
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+  \begin{center}{\large \fbox{$\proctype{p}{\Gamma}{\Delta}$}}\end{center}
+
+  \begin{gather*}
+    \infer{\proctype{b = Call \; f \; a}{a : S}{b : T}}
+          {f : S \to T}
+   \\[1mm]
+    \infer{\proctype{t = Dup \; s}{a : S}{t : (S, S)}}
+          {} \qquad
+   \\[1mm]
+   \infer{\proctype{a = Const \; k}{}{a : T}}
+         {k : T}
+   \\[1mm]
+   \infer{\proctype{Elim \; a}{a : T}{}}
+         {}
+   \\[1mm]
+   \infer{\proctype{b = (a_1, a_2)}{a_1 : T_1, a_2 : T_2}{b : (T_1, T_2)}}
+         {}
+   \\[1mm]
+   \infer{\proctype{(a_1, a_2) = b}{b : (T_1, T_2)}{a_1 : T_1, a_2 : T_2}}
+         {}
+   \\[1mm]
+   \infer{\proctype{a = Inl \; b}{b : T_1}{a : T_1 \oplus T_2}}
+         {}
+   \\[1mm]
+   \infer{\proctype{a = Inr \; b}{b : T_2}{a : T_1 \oplus T_2}}
+         {}
+   \\[1mm]
+   \infer{\proctype{p_1; p_2}{\Gamma_1, \Gamma_2}{\Delta_1, \Delta_2}}
+         {\proctype{p1}{\Gamma_1}{\Xi, \Delta_1}
+           \;\;\;\;
+           \proctype{p2}{\Gamma_2, \Xi}{\Delta_2}
+         }
+  \end{gather*}
+\end{minipage}}
+  \caption{Type system for procedure language}
+\end{figure*}
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\columnwidth}
+      {``$y = 5 + 6$''} \\
+\[
+ \begin{array}{rcl}
+   x_1 & = & Const \; 5 \\
+   x_2 & = & Const \; 6 \\
+   t  & = & (x_1, x_2) \\
+   y  & = & Call \; add \; t \\
+   \vdash & \cdot & \dashv y : \real \\
+ \end{array}
+\]
+  \end{minipage}}
+  \fbox{\begin{minipage}{\columnwidth}
+      {``$(x, y) = (r \cos \theta, r \sin \theta)$''} \\
+\[
+ \begin{array}{rcl}
+   (r_1, r_2) & = & Dup \; r \\
+   (\theta_1, \theta_2) & = & Dup \; \theta \\
+   ct  & = & Call \; cos \; \theta_1 \\
+   st  & = & Call \; sin \; \theta_2 \\
+   rct & = & (r_1, ct) \\
+   rst & = & (r_2, st) \\
+   x & = & Call \; mul \; rct \\
+   y & = & Call \; mul \; rst \\
+   r : \real, \; \theta : \real \vdash & \cdot & \dashv x : \real, \; y : \real \\
+ \end{array}
+\]
+  \end{minipage}}
+  \fbox{\begin{minipage}{\columnwidth}
+      {``$r = x^2 + \sin{xy} + 1$''} \\
+\[
+ \begin{array}{rcl}
+   (x_1, x_2) & = & Dup \; x \\
+   (x_3, x_4)  & = & Dup \; x_1 \\
+   xx  & = & (x_2, x_3) \\
+   xsq  & = & Call \; mul \; xx \\
+   xy   & = & (x_4, y) \\
+   xmuly & = & Call \; mul \; xy \\
+   sinxy & = & Call \; sin \; xmuly \\
+   o & = & Const \; 1 \\
+   sinxy1 & = & Call \; add \; sinxy \; o \\
+   r & = & Call \; add \; xsq \; sinxy1 \\
+   x : \real, \; y : \real \vdash & \cdot & \dashv r : \real \\
+ \end{array}
+\]
+  \end{minipage}}
+  \caption{Example procedures}
+\end{figure*}
+
+% Tangent types. Upsilon looks a bit like a T.
+\newcommand{\TT}{\Upsilon}
+\newcommand{\emptycontext}{\emptyset}
+\newcommand{\fwdsplit}[1]{F \lb #1 \rb}
+\newcommand{\revsplit}[1]{R \lb #1 \rb}
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+$$
+      \begin{array}{c|rcl|c|rcl|c|rcl}
+%        \multicolumn{12}{c}{\mbox{\bf Reverse mode}} \\
+
+        \Gamma &
+        \multicolumn{3}{c|}{\proctype{p}{\Gamma}{\Delta}} &
+        \Delta &
+        \multicolumn{3}{c|}{\proctype{\fwdsplit{p}}{\Gamma}{\Delta, \TT_p}} &
+        \TT_p &
+        \multicolumn{3}{c}{\proctype{\revsplit{p}}{\bar{\Delta}, \TT_p}{\bar{\Gamma}}} \\
+
+        \hline
+
+        a &
+        b & = & Call \; f \; a &
+        b &
+        bt & = & Call \; rf\$f \; a &
+        t_{b;a} &
+        bt' & = & (\bar{b}, t_{b;a}) \\
+
+        &
+        & & &
+        &
+        (b, t_{b;a}) & = & bt &
+        &
+        \bar{a} & = & Call \; rr\$f \; bt' \\
+
+        \hline
+
+        s &
+        t & = & Dup \; s &
+        t &
+        t & = & Dup \; s &
+        \emptycontext &
+        \bar{s} & = & Call \; add \; \bar{t} \\
+
+        \hline
+
+        \emptycontext &
+        a & = & Const \; k &
+        a &
+        a & = & Const \; k &
+        \emptycontext &
+        & & Elim \; \bar{a} \\
+
+        \hline
+
+        a &
+        & & Elim \; a &
+        &
+        & & Elim \; a &
+        \emptycontext &
+        \bar{a} & = & Const \; 0 \\
+
+        \hline
+
+        a_1, a_2 &
+        b & = & (a_1, a_2) &
+        b &
+        b & = & (a_1, a_2) &
+        \emptycontext &
+        (\bar{a}_1, \bar{a}_2) & = & \bar{b} \\
+
+        \hline
+
+        b &
+        (a_1, a_2) & = & b &
+        a_1, a_2 &
+        (a_1, a_2) & = & b &
+        \emptycontext &
+        \bar{b} & = & (\bar{a}_1, \bar{a}_2) \\
+
+        \hline
+
+        b &
+        a & = & Inl \; b &
+        a &
+        a & = & Inl \; b &
+        \emptycontext &
+        \multicolumn{3}{c}{Case \; \bar{a}} \\
+
+        & & & & & & & & &
+
+        \multicolumn{3}{c}{(Inl \; \bar{b})} \\
+
+        & & & & & & & & &
+
+        \multicolumn{3}{c}{(Inr \; \bar{z} \; (Elim \; \bar{z}; \bar{b} = Const \; 0))} \\
+
+        \hline
+
+        b &
+        a & = & Inr \; b &
+        a &
+        a & = & Inr \; b &
+        \emptycontext &
+        \multicolumn{3}{c}{Case \; \bar{a}} \\
+
+        & & & & & & & & &
+
+        \multicolumn{3}{c}{(Inl \; \bar{z} \; (Elim \; \bar{z}; \bar{b} = Const \; 0))} \\
+
+        & & & & & & & & &
+
+        \multicolumn{3}{c}{(Inr \; \bar{b})} \\
+
+        \hline
+
+        %% \Gamma_1 &
+        %% \multicolumn{3}{c|}{p1} &
+        %% \Delta_1, \Xi &
+        %% \multicolumn{3}{c|}{rf\$p1} &
+        %% \TT_{p1} &
+        %% \multicolumn{3}{c}{rr\$p1} \\
+
+        %% \hline
+
+        %% \Gamma_2, \Xi &
+        %% \multicolumn{3}{c|}{p2} &
+        %% \Delta_2 &
+        %% \multicolumn{3}{c|}{rf\$p2} &
+        %% \TT_{p2} &
+        %% \multicolumn{3}{c}{rr\$p2} \\
+
+        %% \hline
+
+        \Gamma_1, \Gamma_2 &
+        \multicolumn{3}{c|}{p1;p2} &
+        \Delta_1, \Delta_2 &
+        \multicolumn{3}{c|}{\fwdsplit{p1};\fwdsplit{p2}} &
+        \TT_{p1}, \TT_{p2} &
+        \multicolumn{3}{c}{\revsplit{p2};\revsplit{p1}}
+      \end{array}
+$$
+      \begin{minipage}{\textwidth}
+        $t_{b;a}$ is a fresh variable name, $\bar{\cdot}$ bars all the
+        variables in collection of variables it applies to
+      \end{minipage}
+\end{minipage}}
+\caption{Procedure language reverse mode translation rules}
+\end{figure*}
+
 \section{Demo}
 
 You can run the prototype by saying {\tt ghci Main}.
