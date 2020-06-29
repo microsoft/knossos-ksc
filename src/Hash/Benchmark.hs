@@ -90,12 +90,32 @@ benchmark = do
 
     return (algorithm_, var_, filename)
 
-  writeFile (benchmarksDir ++ "/benchmarks.gnuplot") (gnuplotFile results)
+  let gnuplotFilename    = benchmarksDir ++ "/benchmarks.gnuplot"
+      gnuplotPngFilename = benchmarksDir ++ "/benchmarks-png.gnuplot"
 
-  putStrLn ("I put stuff in " ++ benchmarksDir ++ ".  Try running the following:")
-  putStrLn ("DISPLAY=:0 gnuplot --persist "
-            ++ benchmarksDir
-            ++ "/benchmarks.gnuplot")
+      gnuplotFileContent = gnuplotFile results
+      (outputPng, gnuplotPngFileContent) = gnuplotFilePng benchmarksDir results
+
+  writeFile gnuplotFilename gnuplotFileContent
+  writeFile gnuplotPngFilename gnuplotPngFileContent
+
+  putStrLn ("I put stuff in " ++ benchmarksDir ++ ".")
+  putStrLn "If you have an X server and you want a live graph view run:"
+  putStrLn ("DISPLAY=:0 gnuplot --persist " ++ gnuplotFilename)
+  putStrLn "If you want to generate a PNG run:"
+  putStrLn ("gnuplot " ++ gnuplotPngFilename)
+  putStrLn ("You will find the output PNG in " ++ outputPng)
+
+gnuplotFilePng :: String
+               -> [((String, b, String), (Int, String), String)]
+               -> (String, String)
+gnuplotFilePng benchmarksDir results = (outputPng, unlines [
+    "set terminal pngcairo size 1024,768"
+  , "set output \"" ++ outputPng ++ "\""
+  , gnuplotFile results
+  ])
+  where outputPng = benchmarksDir ++ "/benchmark.png"
+
 
 gnuplotFile :: [((String, b, String), (Int, String), String)] -> String
 gnuplotFile results =
