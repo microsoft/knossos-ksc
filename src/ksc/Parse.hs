@@ -1,8 +1,8 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
-	     ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
+             PatternSynonyms,
+	     ScopedTypeVariables #-}
 
 module Parse  where
 
@@ -85,7 +85,6 @@ Notes:
 
 
 import Lang hiding (parens)
-import LangUtils (newVarNotIn)
 import Prim
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError )
@@ -220,7 +219,7 @@ pKExpr =   pIfThenElse
        <|> pCall
        <|> pTuple
 
-pType :: Parser (TypeX)
+pType :: Parser TypeX
 pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
     <|> (pReserved "String"  >> return TypeString)
@@ -296,19 +295,12 @@ pDef = do { pReserved "def"
           ; xs <- pParams
           ; rhs <- pExpr
           -- See Note [Function arity]
-          ; let (param, argUnpackingLets) = case xs of
-                  [x] -> (x, id)
-                  xs  -> let argVar = newVarNotIn (TypeTuple (map typeof xs))
-                                                  (Tuple (map Var xs))
-                         in (argVar,
-                             let n = length xs
-                                 pSel i n e = Call (Fun (SelFun i n)) e
-                             in mkLets (flip map (zip [1..] xs) $ \(i, tv) ->
-                                 (tVarVar tv, pSel i n (Var (tVarVar argVar)))))
-
-          ; return (Def { def_fun = mk_fun f
-                        , def_args = param
-                        , def_rhs = UserRhs (argUnpackingLets rhs)
+          ; let pat = case xs of
+                  [x] -> VarPat x
+                  xs  -> TupPat xs
+          ; return (Def { def_fun    = mk_fun f
+                        , def_pat    = pat
+                        , def_rhs    = UserRhs rhs
                         , def_res_ty = ty }) }
 
 pRule :: Parser Rule
@@ -328,7 +320,7 @@ pEdef = do { pReserved "edef"
            ; return (Def { def_fun = mk_fun name
                          , def_res_ty = returnType
                          -- See note [Function arity]
-                         , def_args = mkTVar (mkTupleTy argTypes) "edefArgVar"
+                         , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")
                          , def_rhs = EDefRhs }) }
 
 allNames :: [String]

@@ -1,6 +1,6 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE LambdaCase, FlexibleInstances, TypeApplications, PatternSynonyms  #-}
+{-# LANGUAGE LambdaCase, FlexibleInstances, PatternSynonyms  #-}
 
 module Cgen where
 
@@ -162,13 +162,20 @@ cstMaybeLookupFun = Map.lookup
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
+gcMarker :: Bool -> M (String -> String)
+gcMarker dogc = do
+  bumpmark <- freshCVar
+  return (\tag -> if dogc
+                  then tag ++ "(" ++ bumpmark ++ ");\n"
+                  else "")
+
 cgenDefs :: [TDef] -> [String]
 cgenDefs defs = concatMap cdecl $
                 filter isUserDef defs
  where
   env = Map.fromList (mapMaybe (\(Def { def_fun = f
                                       , def_rhs = rhs
-                                      , def_args = arg
+                                      , def_pat = arg
                                       }) ->
                                   case rhs of
                                     UserRhs _ -> Just ((f, typeof arg), ())
@@ -188,10 +195,27 @@ arguments, not one tuple.
 We choose N names for the argument variables and pack them into a
 tuple before emitting the function body.  We ensure that the names
 that we chose are not used in the function body by using substExpr.
+
+A consequence of this translation is that we have to unpack tuples in
+*calls* too.  When 'x' of type 'Tuple [S1, ..., SN]', 'Call f x' needs
+to be rewritten to a C++ call like
+
+    f(get<0>(x), ..., get<N-1>(x))
+
+There is special case when x is a literal tuple.  In that case we take
+the tuple components directly for the arguments of 'f'.  This seems to
+be particularly important for avoiding a 5x slowdown.  See
+
+    https://github.com/microsoft/knossos-ksc/pull/315
+
 -}
 
 ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
 ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
+
+params_withPackedParamsPat :: Pat -> ([TVarX], TExpr -> TExpr)
+params_withPackedParamsPat (TupPat vs)    = (vs, id)
+params_withPackedParamsPat (VarPat param) = params_withPackedParams param
 
 params_withPackedParams :: TVarX -> ([TVarX], TExpr -> TExpr)
 params_withPackedParams param = case typeof param of
@@ -208,10 +232,10 @@ mkCTypedVar :: TVar -> String
 mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 
 cgenDefE :: CST -> TDef -> CGenResult
-cgenDefE env (Def { def_fun = f, def_args = param
+cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
   let cf                         = cgenUserFun (f, typeof param)
-      (params, withPackedParams) = params_withPackedParams param
+      (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype =
         runM $ cgenExpr env (withPackedParams body)
       cvars       = map mkCTypedVar params
@@ -259,9 +283,9 @@ cgenExprR env = \case
     cvar <- freshCVar
 
     return $ CG
-        (  "/*build*/\n"
+        (  cComment "build" ++ "\n"
         ++ szdecl
-        ++ "vec<" ++ (cgenType $ mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
+        ++ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
         ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
                   ++ cvar ++ " < " ++ szex ++ ";"
                   ++ " ++" ++ cvar ++ ") {\n"
@@ -282,26 +306,35 @@ cgenExprR env = \case
 
     let cretty = cgenType $ mkCType ty
     ret  <- freshCVar
-    bumpmark <- freshCVar
+
+    let dogc = True
+    gc <- gcMarker dogc
 
     return $ CG
-        (  "/*sumbuild*/\n"
+        (  cComment "sumbuild" ++ "\n"
         ++ szdecl
         ++ "KS_ASSERT(" ++ szex ++ " > 0);\n"
         ++ cretty ++ " " ++ ret ++ ";\n"
         ++ "{\n"
         ++ "   " ++ varcty ++ " " ++ cgenVar var ++ " = 0;\n"
         ++ "   do {\n"
-        ++ "     $MRK(" ++ bumpmark ++ ");\n" -- TODO: this is just to declare it
+        -- We don't actually want to mark the allocator here.  We want
+        -- to mark it after the first time round the loop, below.  On
+        -- the other hand, we need to *declare* the variable
+        -- "bumpmark" somewhere outside the "if" because it is used in
+        -- both branches.  We use $MRK here then as a cheeky way of
+        -- declaring "bumpmark".  TODO: Make a cleaner way of doing
+        -- this.
+        ++ "     " ++ gc "$MRK"
         ++       bodydecl
         --       First time round, deep copy it, put it in the ret, then mark the allocator
         ++ "     if (" ++ cgenVar var ++ " == 0) {\n"
         ++ "       " ++ ret ++ " = inflated_deep_copy(" ++ bodyex ++ ");\n"
-        ++ "       $MRK(" ++ bumpmark ++ ");\n"
+        ++ "       " ++ gc "$MRK"
         ++ "     } else {\n"
         ++ "       inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");\n"
         --         Release the allocator back to where it was on iter 0
-        ++ "       $REL(" ++ bumpmark ++ ");\n"
+        ++ "       " ++ gc "$REL"
         ++ "     }\n"
         ++ "   } while (++" ++ cgenVar var ++ " < " ++ szex ++ ");\n"
         ++ "}\n"
@@ -309,25 +342,46 @@ cgenExprR env = \case
         ret
         (mkCType ty)
 
+  -- Special case for literal tuples.  Don't unpack with std::get.
+  -- Just use the tuple components as the arguments.  See Note [Unpack
+  -- tuple arguments]
+  Call tf t@(Tuple vs) -> do
+    cgvs <- mapM (cgenExprR env) vs
+    let cgargtype = typeof t
+    let cdecls = map getDecl cgvs
+    let ctypes = map getType cgvs
 
+    let cftype = ctypeofFun env (tf, cgargtype) ctypes
 
+    v        <- freshCVar
+
+    let dogc = Cgen.isScalar cftype
+    gc       <- gcMarker dogc
+
+    let cf = cgenAnyFun (tf, cgargtype) cftype
+
+    return $ CG
+      (  intercalate "\n" cdecls
+      ++ gc "$MRK"
+      ++ cgenType cftype ++ " " ++ v ++ " = "
+      ++ cf ++ "(" ++ intercalate ", " (map getExpr cgvs) ++ ");\n"
+      ++ gc "$REL"
+      )
+      v
+      cftype
 
   Call tf@(TFun _ fun) vs -> do
-    cgvs_tys <- do cgv <- cgenExprR env vs; return (cgv, typeof vs)
-    let (cgvs, cgargtype) = cgvs_tys
+    cgvs <- cgenExprR env vs
+    let cgargtype = typeof vs
     let cdecls = getDecl cgvs
-    let cexprs_tys = (\(v, ty) -> (getExpr v, ty)) cgvs_tys
     let ctypes = getType cgvs
 
     let cftype = ctypeofFun env (tf, cgargtype) [ctypes]
 
     v        <- freshCVar
-    bumpmark <- freshCVar
 
     let dogc = Cgen.isScalar cftype
-    let gc tag =  if dogc
-                    then tag ++ "(" ++ bumpmark ++ ");\n"
-                    else ""
+    gc       <- gcMarker dogc
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
 
@@ -335,20 +389,20 @@ cgenExprR env = \case
       (  cdecls
       ++ gc "$MRK"
       ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ case (not (isSelFun (funIdOfFun fun)), cexprs_tys) of
+      ++ case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
           -- Untuple argument for C++ call
           --
           -- Calls of a tuple argument have their argument list
-          -- unpacked.  See the explanation in cgenDefE above.
+          -- unpacked.  See Note [Unpack tuple arguments].
           -- SelFuns translate to C++ get, so they don't have their
           -- argument lists unpacked!
-          (True, (cexpr, TypeTuple ts))
+          (True, cexpr, TypeTuple ts)
             -> cf ++ "("
                ++ intercalate ","
                       (flip map [0..length ts - 1] $ \i ->
                           "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
                ++ ");\n"
-          (_, (cexpr, _)) -> cf ++ "(" ++ cexpr ++ ");\n"
+          (_, cexpr, _) -> cf ++ "(" ++ cexpr ++ ");\n"
       ++ gc "$REL"
       )
       v
@@ -360,7 +414,7 @@ cgenExprR env = \case
     lvar                       <- freshCVar
 
     return $ CG
-      (  "/**Let**/"
+      (  cComment "Let"
       ++ cgenType tybody
       ++ " "
       ++ lvar
@@ -385,7 +439,6 @@ cgenExprR env = \case
       lvar
       tybody
 
-  -- Tuple [t] -> cgenExpr env t -- Don't detuple willy-nilly
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs
     let cdecls = map getDecl cgvs
@@ -403,7 +456,7 @@ cgenExprR env = \case
         (params, withPackedParams) = params_withPackedParams param
     (CG cdecl cexpr ctype) <- cgenExprR env (withPackedParams body)
     return $ CG
-      (     "/**Lam**/"
+      (     cComment "Lam"
       ++    "auto"
       `spc` lvar
       ++    " = [=]("
@@ -503,7 +556,7 @@ mangleType = \case
     TypeInteger   -> "i"
     TypeFloat     -> "f"
     TypeString    -> "s"
-    TypeTuple tys -> "<" ++ (concatMap mangleType tys) ++ ">"
+    TypeTuple tys -> "<" ++ concatMap mangleType tys ++ ">"
     TypeVec ty    -> "v" ++ mangleType ty
     TypeLam a b   -> "l<" ++ mangleType a ++ mangleType b ++ ">"
     TypeLM _ _    -> error "Can't mangle TypeLM"
@@ -631,7 +684,7 @@ cgenKonst = \case
   KInteger i -> show i
   KFloat   f -> show f
   KString  s -> show s
-  KBool    b -> if b then "1 /* TRUE */" else "0 /* FALSE */"
+  KBool    b -> if b then "1 " ++ cComment "TRUE" else "0 " ++ cComment "FALSE"
 
 cgenVar :: Var -> String
 cgenVar = render . ppr
@@ -714,15 +767,29 @@ runExe exefile = do
   putStrLn "Running"
   readProcessPrintStderr exefile []
 
+readProcessEnv
+  :: FilePath -> [String] -> Maybe [(String, String)] -> IO (ExitCode, String, String)
+readProcessEnv executable args env = do
+  let stdin = ""
+  System.Process.readCreateProcessWithExitCode
+    (System.Process.proc executable args) { System.Process.env = env }
+    stdin
+
 readProcessEnvPrintStderr
   :: FilePath -> [String] -> Maybe [(String, String)] -> IO String
 readProcessEnvPrintStderr executable args env = do
-  let stdin = ""
-  (exitCode, stdout, stderr) <- System.Process.readCreateProcessWithExitCode
-    (System.Process.proc executable args) { System.Process.env = env }
-    stdin
+  (exitCode, stdout, stderr) <- readProcessEnv executable args env
   putStr stderr
   when (exitCode /= ExitSuccess) $ error "Compilation failed"
+  return stdout
+
+readProcessPrintStderrOnFail
+  :: FilePath -> [String] -> IO String
+readProcessPrintStderrOnFail executable args = do
+  (exitCode, stdout, stderr) <- readProcessEnv executable args Nothing
+  when (exitCode /= ExitSuccess) $ do
+    putStr stderr
+    error "Compilation failed"
   return stdout
 
 readProcessPrintStderr :: FilePath -> [String] -> IO String

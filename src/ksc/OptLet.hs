@@ -1,23 +1,21 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
-	     ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
+             PatternSynonyms,
+	     ScopedTypeVariables #-}
 
 module OptLet( optLets
-             , Subst, InScopeSet, emptyInScopeSet
+             , Subst
              , mkEmptySubst, lookupSubst
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
-             , substExpr, substVar, notInScope )
+             , substExpr, substVar )
              where
 
 import Lang
-import LangUtils( isTrivial )
+import LangUtils
 import Prim
 import qualified Data.Map as M
-import qualified Data.Set as S
-import Data.Char( isDigit )
 
 optLets :: Subst -> TExpr -> TExpr
 optLets subst rhs
@@ -182,11 +180,6 @@ We must instead rename the inner 'x' so we get
         (x+1) * x_1 * x_1
 -}
 
-type InScopeSet = S.Set Var
-
-emptyInScopeSet :: InScopeSet
-emptyInScopeSet = S.empty
-
 data Subst
   = S { s_env      :: M.Map Var TExpr   -- Keys are Vars not TVars
       , s_in_scope :: InScopeSet        -- Don't bother to compare the types
@@ -194,13 +187,6 @@ data Subst
 
 substInScope :: Subst -> InScopeSet
 substInScope = s_in_scope
-
-mkInScopeSet :: [TVar] -> InScopeSet
-mkInScopeSet tvs = S.fromList (map tVarVar tvs)
-
-extendInScopeSet :: TVar -> InScopeSet -> InScopeSet
-extendInScopeSet tv in_scope
-  = tVarVar tv `S.insert` in_scope
 
 mkEmptySubst :: [TVar] -> Subst
 mkEmptySubst tvs
@@ -223,12 +209,12 @@ zapSubst (S { s_in_scope = in_scope })
 -- * It clones the binder if it is already in scope
 -- * Extends the substitution and the in-scope set as appropriate
 substBndr :: TVar -> Subst -> (TVar, Subst)
-substBndr (TVar ty v) (S { s_in_scope = in_scope, s_env = env })
+substBndr tv (S { s_in_scope = in_scope, s_env = env })
   = (tv', S { s_env      = env'
             , s_in_scope = is' })
   where
-    (is', tv') = notInScopeTV in_scope v ty
-    env' = M.insert v (Var tv') env
+    (is', tv') = notInScopeTV in_scope tv
+    env' = M.insert (tVarVar tv) (Var tv') env
 
 substVar :: Subst -> TVar -> TExpr
 substVar subst tv = case lookupSubst (tVarVar tv) subst of
@@ -253,50 +239,6 @@ substExpr subst e
     go (Lam v e)      = Lam v' (substExpr subst' e)
                       where
                         (v', subst') = substBndr v subst
-
-notInScopeTV :: InScopeSet -> Var -> Type -> (InScopeSet, TVar)
-notInScopeTV is v ty
-  = (v' `S.insert` is, TVar ty v')
-  where
-    v' = notInScope v is
-
-notInScope :: Var -> InScopeSet -> Var
--- Find a variant of the input Var that is not in the in-scope set
---
--- Do this by adding "_1", "_2" etc
-notInScope v in_scope
-  | not (v `S.member` in_scope)
-  = v
-  | otherwise
-  = try (S.size in_scope)
-  where
-    (str, rebuild) = case v of
-            Simple s -> (s, Simple)
-            Delta  s -> (s, Delta)
-            Grad s m -> (s, \s' -> Grad s' m)
-
-    try :: Int -> Var
-    try n | var' `S.member` in_scope = try (n+1)
-          | otherwise                = var'
-          where
-            var' = rebuild str'
-            str' = prefix ++ '_' : show n
-
-    (prefix, _n) = parse_suffix [] (reverse str)
-
-    parse_suffix :: [Char]          -- Digits parsed from RH end (in order)
-                 -> String          -- String being parsed (reversed)
-                 -> (String, Int)   -- String before "_", plus number found after
-    -- E.g. parse_suffix "foo_23" = ("foo",    23)
-    --      parse_suffix "wombat" = ("wombat", 0)
-    parse_suffix ds (c:cs)
-      | c == '_'
-      , not (null ds)
-      = (reverse cs, read ds)
-      | isDigit c
-      = parse_suffix (c:ds) cs
-    parse_suffix ds cs
-      = (reverse cs ++ ds, 0)
 
 optLetsE :: Subst -> ExprX OccAnald -> TExpr
 -- This function inline let-bindings that are only used once

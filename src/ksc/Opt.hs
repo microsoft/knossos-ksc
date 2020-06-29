@@ -2,9 +2,9 @@
 
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
-	     ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
+             PatternSynonyms,
+	     ScopedTypeVariables #-}
 
 module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
 
@@ -19,7 +19,6 @@ import KMonad
 import Debug.Trace
 import Test.Hspec
 import Data.List( mapAccumR )
-import qualified Data.Set as Set
 
 optTrace :: msg -> a -> a
 optTrace _msg t = t -- trace msg t
@@ -57,10 +56,10 @@ optDefs rb gst (def:defs) = do { (gst1, def')  <- optDef  rb gst def
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> KM (GblSymTab, TDef)
-optDef rb gst def@(Def { def_args = args, def_rhs = UserRhs rhs })
+optDef rb gst def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
   = do { -- The variables brought into scope by the argument list are
-         -- the names of the arguments themselves (args)
-         let varsBroughtIntoScopeByArgs = mkEmptySubst [args]
+         -- the names of the arguments themselves (pat)
+         let varsBroughtIntoScopeByArgs = mkEmptySubst (patVars pat)
              env = OptEnv { optRuleBase = rb
                           , optGblST = gst
                           , optSubst = varsBroughtIntoScopeByArgs }
@@ -208,8 +207,8 @@ optFun _ (SelFun i _) arg
 optFun env (PrimFun "$inline") arg
   | Call (TFun _ fun) inner_arg <- arg
   , Just fun_def <- lookupGblST (fun, typeof inner_arg) (optGblST env)
-  , Def { def_args = bndrs, def_rhs = UserRhs body } <- fun_def
-  = Just (inlineCall bndrs body inner_arg)
+  , Def { def_pat = pat, def_rhs = UserRhs body } <- fun_def
+  = Just (inlineCall env pat body inner_arg)
 
 -- Other prims are determined by their args
 optFun env (PrimFun f) e
@@ -379,22 +378,38 @@ optLMCompose f g
   = Nothing
 
 -----------------------
-inlineCall :: TVar -> TExpr  -- Function parameters and body
+inlineCall :: OptEnv
+           -> Pat -> TExpr  -- Function parameters and body
            -> TExpr            -- Arguments
            -> TExpr
-inlineCall bndrs body args
-  = possiblyTrace $
-    mkLet bndrs args body
-  where traceMessage =
-          ("inlineCall is known to be flaky.\n"
-           ++ "See https://github.com/microsoft/knossos-ksc/issues/93")
-        possiblyTrace = if bindersIntersectArgs
-                        then trace traceMessage
-                        else id
-        bindersIntersectArgs =
-          not (Set.null (bindersSet `Set.intersection` argsSet))
-          where bindersSet = Set.fromList [bndrs]
-                argsSet    = freeVarsOf args
+inlineCall _ (VarPat tv) body arg
+  = Let tv arg body
+
+inlineCall env (TupPat tvs) body arg
+  = mkLets (fresh_tvs `zip` args) $
+    -- See Note [Avoid name clashes in inlineCall]
+    mkLets [ (tv, Var fresh_tv)
+           | (tv,fresh_tv) <- tvs `zip` fresh_tvs
+           , tv /= fresh_tv ]
+    body
+  where
+    args = splitTuple arg (length tvs)
+    (_, fresh_tvs) = notInScopeTVs (optEnvInScope env) tvs
+
+{- Note [Avoid name clashes in inlineCall]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have the call (f e1 e2),
+  where e1 and e2 mention variables p, q
+  f is defined by  def f (p,q) = rhs
+Then we want to generate
+  let p' = e1
+      q' = e2
+  in let
+      p = p'
+      q = q'
+  in rhs
+to avoid accidental capture of p,q.
+-}
 
 -----------------------
 optSum :: TExpr -> Maybe TExpr

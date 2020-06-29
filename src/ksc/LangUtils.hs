@@ -2,13 +2,13 @@
 -- Licensed under the MIT license.
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_GHC -Wno-orphans        #-}
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
-	     ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
+             PatternSynonyms,
+	     ScopedTypeVariables #-}
 
 module LangUtils (
   -- Functions over expressions
-  isTrivial,
+  isTrivial, splitTuple,
 
   -- Substitution
   substEMayCapture,
@@ -17,6 +17,8 @@ module LangUtils (
   cmpExpr,
 
   -- Free vars
+  InScopeSet, emptyInScopeSet, mkInScopeSet, extendInScopeSet,
+  notInScope, notInScopeTV, notInScopeTVs,
   notFreeIn, newVarNotIn, freeVarsOf,
 
   -- Tests
@@ -26,13 +28,18 @@ module LangUtils (
   GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
   stInsertFun,
   LclSymTab, extendLclST,
-  SymTab(..), newSymTab, emptySymTab
+  SymTab(..), newSymTab, emptySymTab,
+
+  -- OneArg
+  oneArgifyDef
 
   ) where
 
 import Lang
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Char( isDigit )
+import Data.List( mapAccumL )
 import Test.Hspec
 
 -----------------------------------------------
@@ -50,6 +57,21 @@ isTrivial _ = False
 isDummy :: TExpr -> Bool
 isDummy (Dummy {}) = True
 isDummy _          = False
+
+-----------------------------------------------
+--     Tuples
+-----------------------------------------------
+
+splitTuple :: TExpr -> Int -> [TExpr]
+-- Expects e to be a tuple-typed expression;
+-- returns its n components.
+-- May duplicate e
+splitTuple _ 0 = []
+splitTuple e 1 = [e]
+splitTuple (Tuple es) n
+  | n == length es = es
+  | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
+splitTuple e n = [ pSel i n e | i <- [1..n] ]
 
 -----------------------------------------------
 --     Substitution
@@ -209,7 +231,7 @@ newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
 stInsertFun :: TDef -> GblSymTab -> GblSymTab
-stInsertFun def@(Def { def_fun = f, def_args = arg }) = M.insert (f, tVarType arg) def
+stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (f, patType arg) def
 
 lookupGblST :: HasCallStack => (Fun, Type) -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
@@ -225,3 +247,89 @@ extendLclST lst vars = foldl add lst vars
   where
     add :: LclSymTab -> TVar -> LclSymTab
     add env (TVar ty v) = M.insert v ty env
+
+
+-----------------------------------------------
+--     InScopeSet, and name clash resolution
+-----------------------------------------------
+
+type InScopeSet = S.Set Var
+
+emptyInScopeSet :: InScopeSet
+emptyInScopeSet = S.empty
+
+mkInScopeSet :: [TVar] -> InScopeSet
+mkInScopeSet tvs = S.fromList (map tVarVar tvs)
+
+extendInScopeSet :: TVar -> InScopeSet -> InScopeSet
+extendInScopeSet tv in_scope
+  = tVarVar tv `S.insert` in_scope
+
+
+notInScopeTVs :: InScopeSet -> [TVar] -> (InScopeSet, [TVar])
+notInScopeTVs is tvs = mapAccumL notInScopeTV is tvs
+
+notInScopeTV :: InScopeSet -> TVar -> (InScopeSet, TVar)
+notInScopeTV is (TVar ty v)
+  = (v' `S.insert` is, TVar ty v')
+  where
+    v' = notInScope v is
+
+notInScope :: Var -> InScopeSet -> Var
+-- Find a variant of the input Var that is not in the in-scope set
+--
+-- Do this by adding "_1", "_2" etc
+notInScope v in_scope
+  | not (v `S.member` in_scope)
+  = v
+  | otherwise
+  = try (S.size in_scope)
+  where
+    (str, rebuild) = case v of
+            Simple s -> (s, Simple)
+            Delta  s -> (s, Delta)
+            Grad s m -> (s, \s' -> Grad s' m)
+
+    try :: Int -> Var
+    try n | var' `S.member` in_scope = try (n+1)
+          | otherwise                = var'
+          where
+            var' = rebuild str'
+            str' = prefix ++ '_' : show n
+
+    (prefix, _n) = parse_suffix [] (reverse str)
+
+    parse_suffix :: String          -- Digits parsed from RH end (in order)
+                 -> String          -- String being parsed (reversed)
+                 -> (String, Int)   -- String before "_", plus number found after
+    -- E.g. parse_suffix "foo_23" = ("foo",    23)
+    --      parse_suffix "wombat" = ("wombat", 0)
+    parse_suffix ds (c:cs)
+      | c == '_'
+      , not (null ds)
+      = (reverse cs, read ds)
+      | isDigit c
+      = parse_suffix (c:ds) cs
+    parse_suffix ds cs
+      = (reverse cs ++ ds, 0)
+
+
+-----------------------------------------------
+--     oneArgifyDef
+-----------------------------------------------
+
+oneArgifyDef :: TDef -> TDef
+oneArgifyDef def@(Def { def_pat = TupPat tvs, def_rhs = UserRhs rhs })
+  = def { def_pat = VarPat argVar
+        , def_rhs = UserRhs (add_unpacking rhs) }
+  where
+     in_scope = mkInScopeSet tvs
+     argVar = TVar ty (notInScope (Simple "_t") in_scope)
+     ty = mkTupleTy (map typeof tvs)
+
+     n = length tvs
+
+     add_unpacking = mkLets [ (tv, pSel i n (Var argVar))
+                            | (tv, i) <- tvs `zip` [1..] ]
+
+oneArgifyDef def = def

@@ -1,7 +1,6 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
-{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
-             PatternSynonyms, StandaloneDeriving,
+{-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
 	     ScopedTypeVariables, TypeApplications #-}
 
 module Annotate (
@@ -49,10 +48,10 @@ annotDecls gbl_env decls
     -- We don't have a type-checked body yet, but that
     -- doesn't matter because we aren't doing inlining
     mk_rec_def :: DefX Parsed -> TcM TDef
-    mk_rec_def (Def { def_fun = fun, def_args = args, def_res_ty = res_ty })
+    mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
-         tcArg args $ \args' ->
-         do { return (Def { def_fun = fun, def_args = args'
+         tcPat pat $ \pat' ->
+         do { return (Def { def_fun = fun, def_pat = pat'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
 
@@ -84,22 +83,22 @@ tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
 
 tcDef :: InPhase p => DefX p -> TcM TDef
 tcDef (Def { def_fun    = fun
-           , def_args   = vars
+           , def_pat   = pat
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
-    do { tcArg vars $ \vars' ->
+    do { tcPat pat $ \pat' ->
     do { rhs' <- tcRhs fun rhs res_ty
-       ; return (Def { def_fun = fun, def_args = vars'
+       ; return (Def { def_fun = fun, def_pat = pat'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
 
 -- CPS form of extendLclSTM.  Formerly types could contain expressions
 -- so they were typechecked.  The name of this function is a vestige
 -- of those times.
-tcArg :: TVarX -> (TVar -> TcM a) -> TcM a
-tcArg tv continueWithArg
-  = do { extendLclSTM [tv] $ continueWithArg tv }
+tcPat :: Pat -> (Pat -> TcM a) -> TcM a
+tcPat pat continueWithArg
+  = do { extendLclSTM (patVars pat) $ continueWithArg pat }
 
 tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
@@ -243,14 +242,14 @@ userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
 userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
-                           , def_args = params })
+                           , def_pat = pat })
                       args
   = case check_args bndr_tys arg_tys of
       Just err -> Left err
       Nothing  -> Right ret_ty
   where
-    bndr_tys   = tVarType params
-    arg_tys    = typeof args
+    bndr_tys = patType pat
+    arg_tys  = typeof args
 
     check_args :: Type -> Type -> Maybe SDoc
     -- Return (Just err) if there's a wrong-ness

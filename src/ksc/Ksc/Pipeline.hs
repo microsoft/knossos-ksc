@@ -8,9 +8,10 @@ import ANF (anfDefs)
 import qualified Cgen
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
+import Ksc.CatLang
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
-             FunId(UserFun), TDef,
+             FunId(UserFun), TDef, Pretty,
              def_fun, displayN, partitionDecls,
              pps, ppr, renderSexp)
 import LangUtils (GblSymTab, emptyGblST, extendGblST)
@@ -41,7 +42,10 @@ demo d = runKM (demoN (Just 999) BasicAD [d])
 
 demoN :: Maybe Int -> ADPlan -> [Decl] -> KM ()
 demoN verbosity adp decls
-  = let disp = displayPassM verbosity in
+  = let disp = displayPassM verbosity
+        dispNoLint :: Pretty def => String -> [def] -> KMT IO ()
+        dispNoLint = displayPassMNoLint verbosity
+    in
     do { flip mapM_ verbosity $ \v -> do
            banner "Original declarations"
            displayN (take v decls)
@@ -51,6 +55,11 @@ demoN verbosity adp decls
              rulebase     = mkRuleBase rules
 
        ; disp "Typechecked declarations" env defs
+
+       ; let cl_defs = toCLDefs defs
+       ; dispNoLint "toCLDefs" cl_defs
+
+       ; disp "fromCLDefs" env (fromCLDefs cl_defs)
 
        ; (env1, opt_defs) <- optDefs rulebase env defs
        ; disp "Optimized original definition" env1 opt_defs
@@ -87,11 +96,15 @@ demoN verbosity adp decls
 type DisplayLintT m a = String -> GblSymTab -> [TDef] -> KMT m a
 type DisplayLint a = DisplayLintT IO a
 
+displayPassMNoLint :: Pretty def => Maybe Int -> String -> [def] -> KMT IO ()
+displayPassMNoLint mverbosity what decls
+  = do flip mapM_ mverbosity $ \verbosity -> do
+         banner what
+         displayN (take verbosity decls)
+
 displayPassM :: Maybe Int -> DisplayLint ()
 displayPassM mverbosity what env decls
-  = do { flip mapM_ mverbosity $ \verbosity -> do
-           banner what
-           displayN (take verbosity decls)
+  = do { displayPassMNoLint mverbosity what decls
        ; lintDefs what env decls
     }
 
@@ -118,6 +131,17 @@ theDefs display decls = do {
   ; let rulebase      = mkRuleBase rules
   ; display "Typechecked defs" env defs
   ; return (defs, env, rulebase)
+  }
+
+theDefsViaCatLang :: DisplayLint a
+                  -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
+theDefsViaCatLang display decls = do {
+  (defs, env, rulebase) <- theDefs display decls
+  ; let defsViaCL     = flip map defs $ \x -> case toCLDef_maybe x of
+          Nothing -> x
+          Just d  -> fromCLDef d
+  ; display "Typechecked defs via CatLang" env defsViaCL
+  ; return (defsViaCL, env, rulebase)
   }
 
 theDiffs :: DisplayLint a
@@ -169,6 +193,7 @@ defsAndDiffs display decls = do {
   ; (defs, env, rulebase) <- theDefs display decls
   ; theDiffs display defs env rulebase
   }
+
 anfOptAndCse :: DisplayLint a
              -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
 anfOptAndCse display rulebase env4 alldefs =
@@ -185,13 +210,17 @@ anfOptAndCse display rulebase env4 alldefs =
   ; return cse
   }
 
-displayCppGenDiffs :: (DisplayLint ()
-                       -> [TDef]
-                       -> GblSymTab
-                       -> RuleBase
-                       -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
-                   -> Maybe Int -> [String] -> String -> String -> IO ()
-displayCppGenDiffs generateDiffs verbosity ksFiles ksofile cppfile =
+displayCppGenDefsDiffs ::
+  (DisplayLint ()
+   -> [Decl]
+   -> KMT IO ([TDef], GblSymTab, RuleBase))
+  -> (DisplayLint ()
+   -> [TDef]
+   -> GblSymTab
+   -> RuleBase
+   -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+  -> Maybe Int -> [String] -> String -> String -> IO ()
+displayCppGenDefsDiffs generateDefs generateDiffs verbosity ksFiles ksofile cppfile =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
       display = displayPassM verbosity
   in
@@ -203,7 +232,7 @@ displayCppGenDiffs generateDiffs verbosity ksFiles ksofile cppfile =
   ; let (main, decls)    = moveMain decls0
   ; dd main
 
-  ; (defs, env, rulebase) <- theDefs display decls
+  ; (defs, env, rulebase) <- generateDefs display decls
   ; (env3, defs, optdiffs, rulebase) <- generateDiffs display defs env rulebase
 
   ; (env4, ann_main) <- annotDecls env3 main
@@ -217,26 +246,64 @@ displayCppGenDiffs generateDiffs verbosity ksFiles ksofile cppfile =
   ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
 
+displayCppGenDiffs :: (DisplayLint ()
+                       -> [TDef]
+                       -> GblSymTab
+                       -> RuleBase
+                       -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+                   -> Maybe Int -> [String] -> String -> String -> IO ()
+displayCppGenDiffs = displayCppGenDefsDiffs theDefs
+
 displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO ()
 displayCppGenNoDiffs =
   displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> [String] -> String -> IO String
-displayCppGenAndCompile compile ext verbosity files file = do {
+displayCppGenAndCompileDefsDiffs
+  :: HasCallStack
+  => (DisplayLint () -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase))
+  -> (DisplayLint ()
+      -> [TDef]
+      -> GblSymTab
+      -> RuleBase
+      -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+  -> (String -> String -> IO String)
+  -> String
+  -> Maybe Int
+  -> [String]
+  -> String
+  -> IO String
+displayCppGenAndCompileDefsDiffs
+  generateDefs generateDiffs compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
-  ; let outfile = ("obj/" ++ file)
-  ; let exefile = ("obj/" ++ file ++ ext)
+  ; let outfile = "obj/" ++ file
+  ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGenDiffs theDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; displayCppGenDefsDiffs generateDefs generateDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
   ; compiler cppfile exefile
   }
+
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> [String] -> String -> IO String
+displayCppGenAndCompile = displayCppGenAndCompileDefsDiffs theDefs theDiffs
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
 displayCppGenCompileAndRun compilername verbosity file files = do
   { exefile <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file files
+  ; Cgen.runExe exefile
+  }
+
+displayCppGenCompileAndRunViaCatLang :: HasCallStack
+                                     => String
+                                     -> Maybe Int
+                                     -> [String]
+                                     -> String
+                                     -> IO String
+displayCppGenCompileAndRunViaCatLang compilername verbosity file files = do
+  { exefile <- displayCppGenAndCompileDefsDiffs
+                   theDefsViaCatLang theDiffs
+                   (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }
 

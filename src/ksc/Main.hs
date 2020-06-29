@@ -10,6 +10,7 @@ import Parse (parseE)
 import Opt
 import Ksc.Pipeline (demoFFilter,
                      displayCppGenCompileAndRun,
+                     displayCppGenCompileAndRunViaCatLang,
                      displayCppGenAndCompile,
                      displayCppGenNoDiffs,
                      genFuthark, ignoreMain)
@@ -41,6 +42,8 @@ main = do
   System.Environment.getArgs >>= \case
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
+    ["--test-except-codegen"]
+      -> do { _ <- testsThatDoNoCodegen; return () }
     [ "--profile",
       "--ks-file-without-extension", source,
       "--proffile", proffile,
@@ -138,7 +141,7 @@ gatherErrors :: Show a => [Maybe a] -> Either String ()
 gatherErrors errors =
   case Data.Maybe.catMaybes errors of
     []     -> return ()
-    errors -> Left ("Had errors in:\n" ++ unlines (map show errors))
+    errors -> Left ("\n\n\n--- The errors were as follows ---\n\n" ++ unlines (map show errors))
 
 dropExtensionOrFail :: String -> FilePath -> IO String
 dropExtensionOrFail ext path =
@@ -219,22 +222,22 @@ futharkCompileKscPrograms ksFiles = do
 
   testOn ksFiles $ \ksFile -> do
         ksTest <- dropExtensionOrFail "ks" ksFile
-        (if ksFile `elem` testsThatDon'tWorkWithFuthark
+        if ksFile `elem` testsThatDon'tWorkWithFuthark
          then putStrLn ("Skipping " ++ ksFile
                         ++ " because it is known not to work with Futhark")
          else do
             genFuthark ["src/runtime/prelude"] ksTest
-            Cgen.readProcessPrintStderr
+            Cgen.readProcessPrintStderrOnFail
               "futhark-0.11.2-linux-x86_64/bin/futhark"
               ["check", "obj/" ++ ksTest ++ ".fut"]
-            return ())
+            return ()
 
 demoFOnTestPrograms :: [String] -> IO ()
 demoFOnTestPrograms ksTests = do
   let ksTestsInModes :: [(String, ADPlan)]
       ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
 
-  testOn ksTestsInModes $ \(ksTest, adp) -> do
+  testOn ksTestsInModes $ \(ksTest, adp) ->
         demoFFilter Nothing ignoreMain adp ["src/runtime/prelude.ks", ksTest]
 
 -- Drop items from the list while the condition is satisfied, and also
@@ -242,10 +245,11 @@ demoFOnTestPrograms ksTests = do
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
 dropWhile1 f = tail . dropWhile f
 
-testRunKS :: String -> String -> IO ()
-testRunKS compiler ksFile = do
+testRunKSVia :: (String -> Maybe int -> [String] -> FilePath -> IO String)
+             -> String -> [Char] -> IO ()
+testRunKSVia via_ compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
-  output <- displayCppGenCompileAndRun compiler Nothing ["src/runtime/prelude"] ksTest
+  output <- via_ compiler Nothing ["src/runtime/prelude"] ksTest
 
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
@@ -273,20 +277,33 @@ testRunKS compiler ksFile = do
       putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
       error ("These tests failed:\n" ++ unlines failures)
 
+testRunKS :: String -> String -> IO ()
+testRunKS = testRunKSVia displayCppGenCompileAndRun
+
+testRunKSViaCatLang :: String -> String -> IO ()
+testRunKSViaCatLang = testRunKSVia displayCppGenCompileAndRunViaCatLang
+
 testHspec :: IO ()
 testHspec = do
   summary <- runSpec Main.hspec defaultConfig
   when (not (isSuccess summary)) (fail "Hspec tests failed.  See message above")
 
-testC :: String -> [String] -> IO ()
-testC compiler fsTestKs = do
+testsThatDoNoCodegen :: IO [String]
+testsThatDoNoCodegen = do
   testHspec
   ksTestFiles_ <- ksTestFiles "test/ksc/"
   testRoundTrip ksTestFiles_
   demoFOnTestPrograms ksTestFiles_
+  return ksTestFiles_
+
+testC :: String -> [String] -> IO ()
+testC compiler fsTestKs = do
+  ksTestFiles_ <- testsThatDoNoCodegen
   compileKscPrograms compiler ksTestFiles_
   testRunKS compiler "test/ksc/gmm.ks"
   testRunKS compiler "test/ksc/fold.ks"
+  testRunKSViaCatLang compiler "test/ksc/gmm.ks"
+  testRunKSViaCatLang compiler "test/ksc/fold.ks"
   compileKscPrograms compiler fsTestKs
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()

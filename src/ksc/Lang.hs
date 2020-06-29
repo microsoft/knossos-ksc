@@ -40,7 +40,7 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: Fun
-        , def_args   :: TVarX  -- See Note [Function arity]
+        , def_pat    :: Pat       -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
@@ -64,6 +64,21 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
+data Pat = VarPat TVar     -- A single variable
+         | TupPat [TVar]   -- A tuple of variables
+         deriving( Eq )
+
+patType :: Pat -> Type
+patType (VarPat v) = typeof v
+patType (TupPat vs) = mkTupleTy (map typeof vs)
+
+patVars :: Pat -> [TVar]
+patVars (VarPat v) = [v]
+patVars (TupPat vs) = vs
+
+instance Show Pat where
+  show p = pps p
+
 data TVarX = TVar TypeX Var
 type TVar = TVarX
 
@@ -86,7 +101,6 @@ type family MTypeX p where
 
 {- Note [Function arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
 All functions are functions of a single argument, regardless of whether
 they were given multiple arguments in the surface syntax.  If the
 surface syntax def takes multiple arguments then we generate code to
@@ -169,7 +183,7 @@ data TypeX
   | TypeString
   | TypeTuple [TypeX]
 
-  | TypeVec (TypeX)
+  | TypeVec TypeX
 
   | TypeLam TypeX TypeX  -- Domain -> Range
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
@@ -416,6 +430,18 @@ dropLast :: [a] -> [a]
 -- No-op for empty list
 dropLast xs = take (length xs - 1) xs
 
+pSel :: Int -> Int -> TExpr -> TExpr
+pSel i n e = Call (TFun el_ty
+                        (Fun (SelFun i n))) e
+           where
+             el_ty = case typeof e of
+                        TypeTuple ts -> ts !! (i-1)
+                        _ -> TypeUnknown  -- Better error from Lint
+
+pFst,pSnd :: TExpr -> TExpr
+pFst   = pSel 1 2
+pSnd   = pSel 2 2
+
 -----------------------------------------------
 --  Finding the type of an expression
 -----------------------------------------------
@@ -424,7 +450,10 @@ class HasType b where
   typeof :: HasCallStack => b -> Type
 
 instance HasType TVar where
-  typeof (TVar ty _) = ty
+  typeof tv = tVarType tv
+
+instance HasType Pat where
+  typeof pat = patType pat
 
 instance HasType TypedExpr where
   typeof (TE _ ty) = ty
@@ -438,8 +467,8 @@ instance HasType TExpr where
   typeof (Var b)       = typeof b
   typeof (Call f _)    = typeof f
   typeof (App f _)     = case typeof f of
-                            TypeLam _ res -> res
-                            _ -> pprPanic "typeof:app " (vcat [ppr f, ppr (typeof f)])
+    TypeLam _ res -> res
+    _ -> pprPanic "typeof:app " (vcat [ppr f, ppr (typeof f)])
   typeof (Tuple es)    = TypeTuple $ map typeof es
   typeof (Lam b e)     = TypeLam (typeof b) (typeof e)
   typeof (Let _ _ e2)  = typeof e2
@@ -452,10 +481,6 @@ instance HasType Type where
 -- ToDo: delete this if no longer needed
 makeIfType :: HasCallStack => Type -> Type -> Type
 makeIfType ty1 ty2 = traceWhenUnequal "makeIfType" ty1 ty2 ty2
-
-getLM :: HasCallStack => Type -> Type
-getLM (TypeLM s t) = TypeLM s t
-getLM t            = error $ "Wanted TypeLM, got " ++ pps t
 
 unzipLMType :: Type -> Maybe (Type, Type)
 unzipLMType = \case
@@ -647,7 +672,7 @@ instance InPhase Parsed where
 instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
-  pprFunOcc (TFun _ f) = ppr f
+  pprFunOcc  = ppr
 
   getMType ty              = Just ty
   getVar     (TVar ty var) = (var, Just ty)
@@ -657,7 +682,7 @@ instance InPhase Typed where
 instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
-  pprFunOcc (TFun _ f) = ppr f
+  pprFunOcc = ppr
 
   getMType   ty                 = Just ty
   getVar     (TVar ty var)      = (var, Just ty)
@@ -733,6 +758,9 @@ pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
 
+instance Pretty Pat where
+  pprPrec _ p = pprPat True p
+
 instance Pretty TVar where
   pprPrec _ (TVar _ v) = ppr v
 
@@ -746,19 +774,19 @@ instance Pretty Konst where
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
 instance Pretty TypeX where
-  pprPrec p (TypeVec ty)         = parensIf p precTyApp $
-                                   text "Vec" <+> pprParendType ty
-  pprPrec _ (TypeTuple tys)      = mode (parens (text "Tuple" <+> pprList pprParendType tys))
-                                        (parens (pprList pprParendType tys))
-  pprPrec p (TypeLam from to)    = parensIf p precZero $
-                                   text "Lam" <+> ppr from <+> ppr to
-  pprPrec p (TypeLM s t)         = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
-  pprPrec _ TypeFloat            = text "Float"
-  pprPrec _ TypeInteger          = text "Integer"
-  pprPrec _ TypeSize             = text "Size"
-  pprPrec _ TypeString           = text "String"
-  pprPrec _ TypeBool             = text "Bool"
-  pprPrec _ TypeUnknown          = text "UNKNOWN"
+  pprPrec p (TypeVec ty)      = parensIf p precTyApp $
+                                text "Vec" <+> pprParendType ty
+  pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
+                                     (parens (pprList pprParendType tys))
+  pprPrec p (TypeLam from to) = parensIf p precZero $
+                                text "Lam" <+> ppr from <+> ppr to
+  pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
+  pprPrec _ TypeFloat         = text "Float"
+  pprPrec _ TypeInteger       = text "Integer"
+  pprPrec _ TypeSize          = text "Size"
+  pprPrec _ TypeString        = text "String"
+  pprPrec _ TypeBool          = text "Bool"
+  pprPrec _ TypeUnknown       = text "UNKNOWN"
 
 pprParendType :: TypeX -> SDoc
 pprParendType = pprPrec precTop
@@ -857,7 +885,7 @@ isInfix f = isInfixFun (fst (getFun @p f))
 -- TODO: this is rather out of date, and it's not clear we need to keep it...
 isInfixFun :: Fun -> Maybe Prec
 isInfixFun (Fun (PrimFun s))
-    | s == "eq"   = Just precOne
+    | s == "eq"     = Just precOne
     | s == "ts_add" = Just precTwo
 isInfixFun _ = Nothing
 
@@ -873,22 +901,30 @@ instance InPhase p => Pretty (DefX p) where
   ppr def = pprDef def
 
 pprDef :: InPhase p => DefX p -> SDoc
-pprDef (Def { def_fun = f, def_args = vs, def_res_ty = res_ty, def_rhs = rhs })
+pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
   = case rhs of
       EDefRhs -> parens $
                  sep [ text "edef", ppr f
                      , pprParendType res_ty
-                     , parens ((pprParendType . tVarType) vs) ]
+                     , parens (pprParendType (typeof vs)) ]
 
       UserRhs rhs -> mode
           (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
-                        , parens ((parens . pprTVar) vs)
+                        , parens (pprPat False vs)
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
-                    2 (parens (pprTVar vs))
+                    2 (parens (pprPat False vs))
                , nest 2 (text "=" <+> ppr rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
+
+pprPat :: Bool -> Pat -> SDoc
+          -- True <=> wrap tuple pattern in parens
+pprPat _          (VarPat v)  = pprTVar v
+pprPat tup_parens (TupPat vs) = mb_parens $ pprList (parens . pprTVar) vs
+  where
+    mb_parens d | tup_parens = parens d
+                | otherwise  = d
 
 instance InPhase p => Pretty (RuleX p) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
