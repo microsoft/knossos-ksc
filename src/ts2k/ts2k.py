@@ -91,9 +91,21 @@ def make_print(node):
     mangled_id = managleDebugName(node.inputsAt(0).debugName())
     return [sexpdata.Symbol("print"), sexpdata.Symbol(mangled_id)]
 
+def make_list_init_inner(values, i, rescue):
+    value = values[0]
+    rhs = sexpdata.Symbol(rescue) # How do we handled index out of range?
+    if (len(values) > 1):
+        rhs = make_list_init_inner(values[1:], i + 1, rescue)
+    return [sexpdata.Symbol("if"), [sexpdata.Symbol("eq"), sexpdata.Symbol("ni"), i], sexpdata.Symbol(managleDebugName(value.debugName())), rhs]
+
+def make_list_init(values):
+    # We may switch to vector literals later: https://github.com/microsoft/knossos-ksc/issues/310
+    # in the meantime here's a quick-and-dirty translation to chained if
+    # CAUTION: if it goes out of range it uses the first value!
+    return make_list_init_inner(values, 0, managleDebugName(values[0].debugName()))
 
 def make_list(node):
-    print("WARNING: Lists aren't correctly translated yet, " + node.kind() )
+    # print("WARNING: Lists aren't correctly translated yet, " + node.kind() )
     # build n (lam (ni : Integer) (to_float (mul ni ni))))
     value = node.outputsAt(0)
 
@@ -111,11 +123,7 @@ def make_list(node):
                     sexpdata.Symbol(":"),
                     sexpdata.Symbol("Integer")
                 ],
-                # this bit is just exploring, need to replace with actual values
-                [
-                    sexpdata.Symbol("to_float"),
-                    sexpdata.Symbol("ni")
-                ]
+                make_list_init(list(node.inputs()))
             ]
         ]
     ]    
