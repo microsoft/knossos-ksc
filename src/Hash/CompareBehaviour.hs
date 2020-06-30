@@ -9,6 +9,7 @@ import Expr (Expr, Path, showExpr,
 
 import HtmlCombinators (table, th, td, writeFileHTML, forEach, inList,
                         annotating, tdCenter, inFoldable, setFromIterator)
+import Lens.Micro
 import Text.Blaze.Html5 hiding (table, th, td, map)
 
 -- | This is the entry point to this module.  Provide a file path and
@@ -52,25 +53,24 @@ awfFormatExpressionHTML e =
                   (True,  False) -> mempty
 
   where algorithms = ( ("Compositional", castHash)
-                     , ("Combined", combinedHash)
-                     , ("DeBruijn", deBruijnHash)
-                     , ("Naive with binders 1", naiveHashWithBinders)
-                     , ("Naive with binders 2", naiveHashWithBinders2) )
+                     , ( ("Combined", combinedHash)
+                       , ("DeBruijn", deBruijnHash)
+                       , ("Naive with binders 1", naiveHashWithBinders)
+                       , ("Naive with binders 2", naiveHashWithBinders2) ) )
 
         groupsOfAlgorithm algorithm =
           ((map . map) fst
            . normalizedGroupedEquivalentSubexpressions
            . algorithm) e
 
-        (tom'sGroups, _, _, _, _) = groupsPerAlgorithm
+        (tom'sGroups, _) = groupsPerAlgorithm
 
         groupsPerAlgorithm = mapRow (groupsOfAlgorithm . snd) algorithms
 
         allGroups = setFromIterator $ forEach (inRow groupsPerAlgorithm) inList
 
-        inRow (a1, a2, a3, a4, a5) = inList [a1, a2, a3, a4, a5]
-
-        mapRow f (a1, a2, a3, a4, a5) = (f a1, f a2, f a3, f a4, f a5)
+        inRow (t, ts) = inList (t : toListOf each ts)
+        mapRow f (t, ts) = (f t, over each f ts)
 
 printGroups :: Ord hash => [(hash, Path, Expr String)] -> IO ()
 printGroups = mapM_ (\x -> putStrLn "" >> mapM_ putStrLn x)

@@ -18,7 +18,8 @@ library
                        transformers,
                        clock,
                        temporary,
-                       blaze-html
+                       blaze-html,
+                       microlens
   default-language:    Haskell2010
   ghc-options: -Werror -Wall
 
@@ -35,6 +36,7 @@ executable hash
                        transformers,
                        clock,
                        temporary,
-                       blaze-html
+                       blaze-html,
+                       microlens
   default-language:    Haskell2010
   ghc-options: -Werror -Wall
