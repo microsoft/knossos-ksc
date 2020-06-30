@@ -243,10 +243,10 @@ castHashExplicit =
             castHashExplicit (Apr:path) bvEnv e
 
 -- | Whether two expressions are alpha-equivalent, implemented using
--- 'castHash'
+-- 'castHashTop'
 alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
                                    => Expr a -> Expr a -> Bool
-alphaEquivalentAccordingToHashExpr = (==) `on` castHash
+alphaEquivalentAccordingToHashExpr = (==) `on` castHashTop
 
 -- | Makes binders unique whilst preserving alpha-equivalence.  The
 -- binders are replaced with integers starting from zero and
@@ -556,9 +556,9 @@ prop_uniquifyBindersIdempotent = withTests numRandomTests $ property $ do
 
   massageVariables uniquifyBinders_expr === uniquifyBinders uniquifyBinders_expr
 
--- | A sanity check for both uniquifyBinders and castHash: uniquifying
+-- | A sanity check for both uniquifyBinders and castHashTop: uniquifying
 -- binders should preserve alpha-equivalence and this equivalence
--- should be picked up by castHash.
+-- should be picked up by castHashTop.
 prop_hashUniquifyBinders :: Property
 prop_hashUniquifyBinders = withTests numRandomTests $ property $ do
   expr <- forAll genExpr
@@ -566,7 +566,7 @@ prop_hashUniquifyBinders = withTests numRandomTests $ property $ do
   assert (alphaEquivalentAccordingToHashExpr (uniquifyBinders expr)
                                              (massageVariables expr))
 
--- | A check for whether castHash respects alpha-equivalence (as
+-- | A check for whether castHashTop respects alpha-equivalence (as
 -- defined above) by checking it against alpha-equivalence in terms of
 -- uniquifyBinders, which is presumably easier to get right.
 prop_hashAlphaEquivalence :: Property
