@@ -1,6 +1,6 @@
 module CompareBehaviour where
 
-import Hash (castHash,combinedHash,deBruijnHash,
+import Hash (castHash,castHashOptimized,combinedHash,deBruijnHash,
              naiveHashWithBinders, naiveHashWithBinders2,
              normalizedGroupedEquivalentSubexpressions)
 import Expr (Expr, Path, showExpr,
@@ -53,7 +53,8 @@ awfFormatExpressionHTML e =
                   (True,  False) -> mempty
 
   where algorithms = ( ("Compositional", castHash)
-                     , ( ("Combined", combinedHash)
+                     , ( ("Compositional-Optimized", castHashOptimized)
+                       , ("Combined", combinedHash)
                        , ("DeBruijn", deBruijnHash)
                        , ("Naive with binders 1", naiveHashWithBinders)
                        , ("Naive with binders 2", naiveHashWithBinders2) ) )

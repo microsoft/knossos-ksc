@@ -9,7 +9,7 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, Path, exprSize)
-import Hash (Hash, castHash, deBruijnHash, combinedHash, naiveHashNested,
+import Hash (Hash, castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested,
              {-genExprNumVars,-} genExprLinearNumVars)
 
 -- | This is the entry point to the module.  When run it will
@@ -25,6 +25,7 @@ benchmark = do
       genExpr = Gen.resize 1000 . genExprLinearNumVars
 
       algorithms = [ ("Compositional", castHash,   "green")
+                   , ("Compositional-Optimized", castHashOptimized,   "black")
                    , ("DeBruijn", deBruijnHash,    "red")
                    , ("Combined", combinedHash,    "blue")
                    , ("Naive",    naiveHashNested, "orange") ]

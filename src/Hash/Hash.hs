@@ -46,7 +46,7 @@
 -- hashing algorithms
 --
 --     > import CompareBehaviour
---     > writeAWFFormatExpressionsHtml "filename.html"
+--     > writeAwfFormatExpressionsHTML "filename.html"
 --
 -- The sub-expression hashing algorithms are
 --
@@ -83,6 +83,7 @@ import GHC.Generics (Generic)
 import Data.Function (on)
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
+import Data.Maybe as Maybe
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              example1, example2, example3, example4)
@@ -241,6 +242,172 @@ castHashExplicit =
             castHashExplicit (Apl:path) bvEnv f
           (variablesHashE, structureHashE, depthE, subExprHashesE) =
             castHashExplicit (Apr:path) bvEnv e
+
+
+type TwoHashes = (Hash, Hash)
+type HashMapping = (Hash, Hash, Hash)
+
+hashMappingApply :: HashMapping -> TwoHashes -> TwoHashes
+hashMappingApply (a, b, _) (x_1, x_2) = (a * x_1 + b, x_2)
+
+hashMappingApplyInverse :: HashMapping -> TwoHashes -> TwoHashes
+hashMappingApplyInverse (_, b, aInv) (x_1, x_2) = ((x_1 - b) * aInv, x_2)
+
+hashMappingCompose :: HashMapping -> HashMapping -> HashMapping
+hashMappingCompose (a1, b1, aInv1) (a2, b2, aInv2) = (a1 * a2, a2 * b1 + b2, aInv1 * aInv2)
+
+inverseOfThree :: Hash
+inverseOfThree = -6148914691236517205
+
+hashMappingIden :: HashMapping
+hashMappingIden = (1, 0, 1)
+
+hashMappingL :: HashMapping
+hashMappingL = (3, 1, inverseOfThree)
+
+hashMappingR :: HashMapping
+hashMappingR = (3, 2, inverseOfThree)
+
+type LazyMap a = (HashMapping, Map a TwoHashes, TwoHashes)
+
+computeEntryHash :: (Ord a, Hashable a) => a -> TwoHashes -> TwoHashes
+computeEntryHash key (value_1, value_2) =
+  (hash (key, value_1), hash (key, value_2))
+
+lazyMapSingleton :: (Ord a, Hashable a) => a -> TwoHashes -> LazyMap a
+lazyMapSingleton key value =
+    (hashMappingIden, Map.singleton key value, computeEntryHash key value)
+
+lazyMapLookup :: (Ord a, Hashable a) => LazyMap a -> a -> Maybe TwoHashes
+lazyMapLookup (hashMapping, innerMap, _) key =
+  fmap (hashMappingApply hashMapping) (Map.lookup key innerMap)
+
+lazyMapKeys :: (Ord a, Hashable a) => LazyMap a -> [a]
+lazyMapKeys (_, innerMap, _) =
+  Map.keys innerMap
+
+lazyMapSize :: (Ord a, Hashable a) => LazyMap a -> Int
+lazyMapSize (_, innerMap, _) =
+  Map.size innerMap
+
+lazyMapHash :: (Ord a, Hashable a) => LazyMap a -> TwoHashes
+lazyMapHash (hashMapping, _, (entriesHash_1, entriesHash_2)) =
+  (hash (hashMapping, entriesHash_1), entriesHash_2)
+
+lazyMapApplyHashMapping :: (Ord a, Hashable a) => LazyMap a -> HashMapping -> LazyMap a
+lazyMapApplyHashMapping (hashMapping, innerMap, entriesHash) otherMapping =
+  ((hashMappingCompose hashMapping otherMapping), innerMap, entriesHash)
+
+lazyMapInsert :: (Ord a, Hashable a) => LazyMap a -> a -> (Hash, Hash) -> LazyMap a
+lazyMapInsert (hashMapping, innerMap, (entriesHash_1, entriesHash_2)) key value =
+  let value' = hashMappingApplyInverse hashMapping value in
+    let (entryHash_1, entryHash_2) = computeEntryHash key value' in
+      (hashMapping, Map.insert key value' innerMap, (entriesHash_1 + entryHash_1, entriesHash_2 + entryHash_2))
+
+lazyMapDelete :: (Ord a, Hashable a) => LazyMap a -> a -> LazyMap a
+lazyMapDelete (hashMapping, innerMap, entriesHash) key =
+  case (Map.lookup key innerMap) of
+    Nothing -> (hashMapping, innerMap, entriesHash)
+    Just value ->
+      let (entriesHash_1, entriesHash_2) = entriesHash in
+        let (entryHash_1, entryHash_2) = computeEntryHash key value in
+          (hashMapping, Map.delete key innerMap, (entriesHash_1 - entryHash_1, entriesHash_2 - entryHash_2))
+
+lazyMapInsertAll :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> LazyMap a
+lazyMapInsertAll (hashMapping, innerMap, _) otherLazyMap =
+  foldr (\(key, value) lazyMap -> lazyMapInsert lazyMap key (hashMappingApply hashMapping value)) otherLazyMap (Map.assocs innerMap)
+
+updateMaps :: (Ord a, Hashable a) => a -> (LazyMap a, Map a (TwoHashes, TwoHashes), LazyMap a) -> (LazyMap a, Map a (TwoHashes, TwoHashes), LazyMap a)
+updateMaps key (onlySmall, intersection, onlyLarge) =
+  case (lazyMapLookup onlyLarge key) of
+    Nothing -> (onlySmall, intersection, onlyLarge)
+    Just valueLarge  -> (lazyMapDelete onlySmall key, Map.insert key ((Maybe.fromJust (lazyMapLookup onlySmall key)), valueLarge) intersection, lazyMapDelete onlyLarge key)
+
+splitMapsSmallAndLarge :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> (LazyMap a, Map a (TwoHashes, TwoHashes), LazyMap a)
+splitMapsSmallAndLarge mapSmall mapLarge =
+  foldr updateMaps (mapSmall, Map.empty, mapLarge) (lazyMapKeys mapSmall)
+
+hashCombine :: Hash -> Hash -> Hash
+hashCombine l r = hashExprO (AppO (Just l) (Just r))
+
+hashCombineRev :: Hash -> Hash -> Hash
+hashCombineRev l r = hashExprO (AppO (Just r) (Just l))
+
+sumHashEntries :: (Ord a, Hashable a) => Map a TwoHashes -> TwoHashes
+sumHashEntries mp =
+  let hashes = map (\(key, value) -> computeEntryHash key value) (Map.assocs mp) in
+    (sum (map fst hashes), sum (map snd hashes))
+
+liftToPairs :: (Ord a) => (a -> a -> a) -> ((a, a) -> (a, a) -> (a, a))
+liftToPairs f =
+  \(x_1, x_2) (y_1, y_2) -> (case x_2 == y_2 of
+    True -> (f x_1 y_1, x_2)
+    False -> error "Something bad happened")
+
+lazyMapsCombineSmallToLarge :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> HashMapping -> (Hash -> Hash -> Hash) -> HashMapping -> LazyMap a
+lazyMapsCombineSmallToLarge lazyMapSmall lazyMapLarge applySmall applyIntersection applyLarge =
+  let (hashMappingSmall, _, _) = lazyMapSmall in
+    let (hashMappingLarge, _, _) = lazyMapLarge in
+      let applyIntersection' = (\(valueSmall, valueLarge) -> (liftToPairs applyIntersection) (hashMappingApply hashMappingSmall valueSmall) (hashMappingApply hashMappingLarge valueLarge)) in
+        let (onlySmall, intersection, onlyLarge) = splitMapsSmallAndLarge lazyMapSmall lazyMapLarge in
+          let intersectionCombined = Map.map applyIntersection' intersection in
+            let lazyMapOnlySmall = lazyMapApplyHashMapping onlySmall applySmall in
+              let lazyMapOnlyLarge = lazyMapApplyHashMapping onlyLarge applyLarge in
+                let lazyMapIntersection = (hashMappingIden, intersectionCombined, sumHashEntries intersectionCombined) in
+                  lazyMapInsertAll lazyMapOnlySmall (lazyMapInsertAll lazyMapIntersection lazyMapOnlyLarge)
+
+lazyMapsCombine :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> LazyMap a
+lazyMapsCombine lazyMapLeft lazyMapRight =
+  case lazyMapSize lazyMapLeft < lazyMapSize lazyMapRight of
+    True  -> lazyMapsCombineSmallToLarge lazyMapLeft lazyMapRight hashMappingL hashCombine hashMappingR
+    False -> lazyMapsCombineSmallToLarge lazyMapRight lazyMapLeft hashMappingR hashCombineRev hashMappingL
+
+castHashOptimized :: (Ord a, Hashable a)
+         => Expr a -> [(Hash, Path, Expr a)]
+castHashOptimized e = exprs
+  where (_m, _b, _depth, exprs) = castHashOptimizedExplicit ([], 1) Map.empty e
+
+castHashOptimizedExplicit :: (Ord a, Hashable a)
+                 => (Path, Hash)
+                 -> Map a Hash
+                 -> Expr a
+                 -> (LazyMap a, Hash, Int, [(Hash, Path, Expr a)])
+castHashOptimizedExplicit =
+  let subExprHash_ variablesHash structureHash =
+        hash (lazyMapHash variablesHash, structureHash)
+
+  in \(path, pathHash) bvEnv expr -> case expr of
+  Var x   -> (variablesHash, structureHash, 0, hashes)
+    where variablesHash = lazyMapSingleton x ((hashExprO VarO), hash (Map.lookup x bvEnv))
+          structureHash = hashExprO VarO
+          subExprHash   = subExprHash_ variablesHash structureHash
+          subExprHashes = []
+          hashes        = (subExprHash, path, expr) : subExprHashes
+
+  Lam x e -> (variablesHash, structureHash, depth + 1, hashes)
+    where variablesHash = lazyMapDelete variablesHashE x
+          structureHash = hashExprOWithSalt depth (LamO hashX structureHashE)
+          (variablesHashE, structureHashE, depth, subExprHashes) =
+            castHashOptimizedExplicit ((L:path), (hash (pathHash, L))) (Map.insert x pathHash bvEnv) e
+          subExprHash   = subExprHash_ variablesHash structureHash
+          hashes        = (subExprHash, path, expr) : subExprHashes
+          hashX = fmap fst (lazyMapLookup variablesHashE x)
+
+  App f e -> (variablesHash, structureHash, max depthF depthE + 1, hashes)
+    where variablesHash = lazyMapsCombine variablesHashF variablesHashE
+
+          structureHash =
+            hashExprOWithSalt (hashWithSalt depthF depthE)
+                             (AppO (Just structureHashF) (Just structureHashE))
+
+          subExprHashes = subExprHashesF ++ subExprHashesE
+          subExprHash   = subExprHash_ variablesHash structureHash
+          hashes        = (subExprHash, path, expr) : subExprHashes
+
+          (variablesHashF, structureHashF, depthF, subExprHashesF) =
+            castHashOptimizedExplicit ((Apl:path), (hash (pathHash, Apl))) bvEnv f
+          (variablesHashE, structureHashE, depthE, subExprHashesE) =
+            castHashOptimizedExplicit ((Apr:path), (hash (pathHash, Apr))) bvEnv e
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
@@ -621,3 +788,10 @@ mergeMaps :: Ord k => (MergeMaps l r -> a) -> Map k l -> Map k r -> Map k a
 mergeMaps f = Merge.merge (Merge.mapMissing (\_ l -> f (LeftOnly l)))
                           (Merge.mapMissing (\_ r -> f (RightOnly r)))
                           (Merge.zipWithMatched (\_ l r -> f (Both l r)))
+
+-- | Shows equivalence of castHash hash and castHashOptimized hash
+prop_equivCastFast :: Property
+prop_equivCastFast = withTests numRandomTests $ property $ do
+  let n = normalizedGroupedEquivalentSubexpressions
+  expr <- forAll genExpr
+  n (castHash expr) === n (castHashOptimized expr)
