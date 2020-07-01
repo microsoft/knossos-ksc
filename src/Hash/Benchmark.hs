@@ -10,7 +10,7 @@ import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, Path, exprSize)
 import Hash (Hash, castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested,
-             {-genExprNumVars,-} genExprLinearNumVars)
+             genExprNumVars {-, genExprLinearNumVars-})
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
@@ -22,7 +22,7 @@ benchmark = do
       samplesPerExpression = 10
       iterationsPerSample  = 10
 
-      genExpr = Gen.resize 1000 . genExprLinearNumVars
+      genExpr = Gen.resize 1000 . genExprNumVars
 
       algorithms = [ ("Compositional", castHash,   "green")
                    , ("Compositional-Optimized", castHashOptimized,   "black")
