@@ -73,6 +73,7 @@ module Hash where
 
 import Hedgehog hiding (Var)
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -761,13 +762,17 @@ genExprWithVars vars = genExprWithVars_vars
 -- | Generate expressions that are completely unbalanced, for testing
 -- the worst cases of some of our hashing algorithms.
 genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr a)
-genExprWithVarsLinear vars =
-  Gen.choice ([ Var <$> Gen.element vars ]
-             ++ replicate 22 recurse)
+genExprWithVarsLinear vars = do
+  size <- Gen.int (Range.linear 0 1000)
+  genExprWithVarsLinearSize size vars
 
-  where e = genExprWithVarsLinear vars
-        recurse = App <$> (Lam <$> Gen.element vars <*> e)
-                      <*> (Var <$> Gen.element vars)
+genExprWithVarsLinearSize :: MonadGen m => Int -> [a] -> m (Expr a)
+genExprWithVarsLinearSize size vars =
+  if size <= 0
+  then Var <$> Gen.element vars
+  else App <$> (Lam <$> Gen.element vars <*> e)
+           <*> (Var <$> Gen.element vars)
+  where e = genExprWithVarsLinearSize (size -1) vars
 
 -- | Generates random expressions for testing
 genExpr :: MonadGen m => m (Expr Char)
