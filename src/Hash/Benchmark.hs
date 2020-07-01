@@ -18,7 +18,7 @@ import Hash (Hash, castHash, castHashOptimized, deBruijnHash, combinedHash, naiv
 -- displayed at the end of the run.
 benchmark :: IO ()
 benchmark = do
-  let totalExpressions     = 10
+  let totalExpressions     = 100
       samplesPerExpression = 10
       iterationsPerSample  = 100
 
