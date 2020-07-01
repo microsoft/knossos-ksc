@@ -64,7 +64,8 @@ benchmark = do
                 min minSoFar elapsed_micro)
 
       putStrLn ("Parameter set "
-                 ++ show i ++ "/" ++ show (length allParams))
+                 ++ show i ++ "/" ++ show (length allParams)
+                 ++ " (" ++ algorithmName ++ ")")
       putStrLn ("Generated " ++ show (length rest)
                 ++ " out of " ++ show totalExpressions ++ " expressions")
 
