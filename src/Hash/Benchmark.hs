@@ -20,7 +20,7 @@ benchmark :: IO ()
 benchmark = do
   let totalExpressions     = 100
       samplesPerExpression = 10
-      iterationsPerSample  = 100
+      iterationsPerSample  = 10
 
       genExpr = Gen.resize 1000 . genExprLinearNumVars
 

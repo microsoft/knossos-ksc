@@ -763,7 +763,7 @@ genExprWithVars vars = genExprWithVars_vars
 -- the worst cases of some of our hashing algorithms.
 genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr a)
 genExprWithVarsLinear vars = do
-  size <- Gen.int (Range.linear 0 1000)
+  size <- Gen.int (Range.linear 0 2000)
   genExprWithVarsLinearSize size vars
 
 genExprWithVarsLinearSize :: MonadGen m => Int -> [a] -> m (Expr a)
