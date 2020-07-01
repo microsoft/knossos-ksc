@@ -18,7 +18,7 @@ import Hash (Hash, castHash, castHashOptimized, deBruijnHash, combinedHash, naiv
 -- displayed at the end of the run.
 benchmark :: IO ()
 benchmark = do
-  let totalExpressions     = 1000
+  let totalExpressions     = 10
       samplesPerExpression = 10
       iterationsPerSample  = 100
 
@@ -30,7 +30,7 @@ benchmark = do
                    , ("Combined", combinedHash,    "blue")
                    , ("Naive",    naiveHashNested, "orange") ]
 
-      varCounts = [ (10, "1"), (100, "4") ]
+      varCounts = [ (10, "1") {-, (100, "4")-} ]
 
       allParams = (,) <$> algorithms <*> varCounts
 
