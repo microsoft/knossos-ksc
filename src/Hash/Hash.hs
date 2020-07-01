@@ -748,16 +748,21 @@ prop_hashAlphaEquivalence = withTests numRandomTests $ property $ do
 
 -- | Generates random expressions for testing
 genExprWithVars :: MonadGen m => [v] -> m (Expr v)
-genExprWithVars vars = genExprWithVars_vars
-  -- Hedgehog has an example for exactly this use case!
-  --
-  -- http://hackage.haskell.org/package/hedgehog-1.0.2/docs/Hedgehog-Gen.html#v:recursive
-  where genExprWithVars_vars = Gen.recursive
-          Gen.choice
-          [ Var <$> Gen.element vars ]
-          [ Gen.subtermM genExprWithVars_vars (\e -> Lam <$> Gen.element vars <*> pure e)
-          , Gen.subterm2 genExprWithVars_vars genExprWithVars_vars App
-          ]
+genExprWithVars vars = do
+  size <- Gen.int (Range.linear 0 2000)
+  genExprWithVarsSize size vars
+
+genExprWithVarsSize :: MonadGen m => Int -> [v] -> m (Expr v)
+genExprWithVarsSize size vars =
+  if size <= 0
+  then Var <$> Gen.element vars
+  else Gen.choice
+       [ do sizeL <- Gen.int (Range.constant 0 size)
+            let sizeR = size - sizeL
+            App <$> genExprWithVarsSize sizeL vars
+                <*> genExprWithVarsSize sizeR vars
+       , do Lam <$> Gen.element vars <*> genExprWithVarsSize (size - 1) vars
+       ]
 
 -- | Generate expressions that are completely unbalanced, for testing
 -- the worst cases of some of our hashing algorithms.
