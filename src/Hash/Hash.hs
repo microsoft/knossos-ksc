@@ -374,15 +374,15 @@ lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
     False -> lazyMapsCombineSmallToLarge lazyMapRight lazyMapLeft (hashStepRight subtreeSize) hashCombineRev
 
 castHashOptimized :: (Ord a, Hashable a)
-         => Expr a -> [(Hash, Path, Expr a)]
+                  => Expr a -> [(Hash, Path, Expr a)]
 castHashOptimized e = exprs
   where (_m, _b, _depth, _subtreeSize, exprs) = castHashOptimizedExplicit ([], 1) Map.empty e
 
 castHashOptimizedExplicit :: (Ord a, Hashable a)
-                 => (Path, Hash)
-                 -> Map a Hash
-                 -> Expr a
-                 -> (LazyMap a, Hash, Int, Int, [(Hash, Path, Expr a)])
+                          => (Path, Hash)
+                          -> Map a Hash
+                          -> Expr a
+                          -> (LazyMap a, Hash, Int, Int, [(Hash, Path, Expr a)])
 castHashOptimizedExplicit =
   let subExprHash_ variablesHash structureHash =
         hash (snd variablesHash, structureHash)
