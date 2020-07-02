@@ -247,12 +247,14 @@ castHashExplicit =
 -- It would be cleared to name the components of this pair though.
 type TwoHashes = (Hash, Hash)
 
--- | Now comes the type that does all the heavy-lifting. It's a map from keys to `TwoHashes`,
--- that, additionally to insert / lookup / delete, supports the following operations in O(1)
--- time:
---   - compute `(sum hash (key_i, first_value_i), sum hash (key_i, second_value_i))`
+-- | Now comes the type that does all the heavy-lifting. It's a map
+-- from keys to `TwoHashes`, that, additionally to insert / lookup /
+-- delete, supports the following operations in O(1) time:
+--   - compute `(sum hash (key_i, first_value_i), sum hash (key_i,
+--     second_value_i))`
 --
--- This is done by maintaining these sums as we go (the last two elements of the tuple).
+-- This is done by maintaining these sums as we go (the last two
+-- elements of the tuple).
 type LazyMap a = (Map a TwoHashes, TwoHashes)
 
 -- | Here we just lift some simple `Map` utils to `LazyMap`.
@@ -296,7 +298,12 @@ lazyMapDelete key (innerMap, entriesHash) =
       Nothing -> (newInnerMap, entriesHash)
       Just value -> (newInnerMap, subtractEntryHash entriesHash (key, value))
 
-lazyMapInsertWith :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> a -> TwoHashes -> LazyMap a -> LazyMap a
+lazyMapInsertWith :: (Ord a, Hashable a)
+                  => (TwoHashes -> TwoHashes)
+                  -> a
+                  -> TwoHashes
+                  -> LazyMap a
+                  -> LazyMap a
 lazyMapInsertWith f key value (innerMap, entriesHash) =
   let (ret, newInnerMap) = Map.insertLookupWithKey (\_ _ oldValue -> f oldValue) key value innerMap in
     case ret of
@@ -304,16 +311,27 @@ lazyMapInsertWith f key value (innerMap, entriesHash) =
       Just oldValue -> (newInnerMap, addEntryHash (subtractEntryHash entriesHash (key, oldValue)) (key, f oldValue))
 
 -- | Helper for `updateMapsSmallAndLarge`.
-updateMaps :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> (TwoHashes -> TwoHashes -> TwoHashes) -> (a, TwoHashes) -> LazyMap a -> LazyMap a
+updateMaps :: (Ord a, Hashable a)
+           => (TwoHashes -> TwoHashes)
+           -> (TwoHashes -> TwoHashes -> TwoHashes)
+           -> (a, TwoHashes)
+           -> LazyMap a
+           -> LazyMap a
 updateMaps fOnlySmall fIntersection (key, value) mapLarge =
   lazyMapInsertWith (fIntersection value) key (fOnlySmall value) mapLarge
 
 -- | Update the larger map by iterating through the entries of the smaller map.
-updateMapsSmallAndLarge :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> (TwoHashes -> TwoHashes -> TwoHashes) -> LazyMap a -> LazyMap a -> LazyMap a
+updateMapsSmallAndLarge :: (Ord a, Hashable a)
+                        => (TwoHashes -> TwoHashes)
+                        -> (TwoHashes -> TwoHashes -> TwoHashes)
+                        -> LazyMap a
+                        -> LazyMap a
+                        -> LazyMap a
 updateMapsSmallAndLarge fOnlySmall fIntersection mapSmall mapLarge =
   foldr (updateMaps fOnlySmall fIntersection) mapLarge (lazyMapAssocs mapSmall)
 
--- | Helpers used to combine two hashes; `hashCombineRev` does the same but reversed the argument order.
+-- | Helpers used to combine two hashes; `hashCombineRev` does the
+-- same but reversed the argument order.
 
 hashCombine :: Hash -> Hash -> Hash
 hashCombine l r = hashExprO (AppO (Just l) (Just r))
@@ -328,7 +346,12 @@ liftToFirst :: (a -> a) -> ((a, b) -> (a, b))
 liftToFirst f = \(x, y) -> (f x, y)
 
 -- | Combines two lazy maps in time proportional to the smaller one.
-lazyMapsCombineSmallToLarge :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> (Hash -> Hash) -> (Hash -> Hash -> Hash) -> LazyMap a
+lazyMapsCombineSmallToLarge :: (Ord a, Hashable a)
+                            => LazyMap a
+                            -> LazyMap a
+                            -> (Hash -> Hash)
+                            -> (Hash -> Hash -> Hash)
+                            -> LazyMap a
 lazyMapsCombineSmallToLarge lazyMapSmall lazyMapLarge fOnlySmall fIntersection =
   updateMapsSmallAndLarge (liftToFirst fOnlySmall) (liftToPairs fIntersection) lazyMapSmall lazyMapLarge
 
@@ -340,7 +363,11 @@ hashStepRight :: Int -> Hash -> Hash
 hashStepRight subtreeSize h =
   hash (hashExprO (AppO Nothing (Just h)), subtreeSize)
 
-lazyMapsCombine :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> Int -> LazyMap a
+lazyMapsCombine :: (Ord a, Hashable a)
+                => LazyMap a
+                -> LazyMap a
+                -> Int
+                -> LazyMap a
 lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
   case lazyMapSize lazyMapLeft < lazyMapSize lazyMapRight of
     True  -> lazyMapsCombineSmallToLarge lazyMapLeft lazyMapRight (hashStepLeft subtreeSize) hashCombine
