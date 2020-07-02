@@ -291,9 +291,10 @@ lazyMapInsert key value (innerMap, entriesHash) =
 
 lazyMapDelete :: (Ord a, Hashable a) => a -> LazyMap a -> LazyMap a
 lazyMapDelete key (innerMap, entriesHash) =
-  case (Map.lookup key innerMap) of
-    Nothing -> (innerMap, entriesHash)
-    Just value -> (Map.delete key innerMap, subtractEntryHash entriesHash (key, value))
+  let (ret, newInnerMap) = Map.updateLookupWithKey (\_ _ -> Nothing) key innerMap in
+    case ret of
+      Nothing -> (newInnerMap, entriesHash)
+      Just value -> (newInnerMap, subtractEntryHash entriesHash (key, value))
 
 lazyMapInsertWith :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> a -> TwoHashes -> LazyMap a -> LazyMap a
 lazyMapInsertWith f key value (innerMap, entriesHash) =
