@@ -317,8 +317,8 @@ updateMaps :: (Ord a, Hashable a)
            -> (a, TwoHashes)
            -> LazyMap a
            -> LazyMap a
-updateMaps fOnlySmall fIntersection (key, value) mapLarge =
-  lazyMapInsertWith (fIntersection value) key (fOnlySmall value) mapLarge
+updateMaps fOnlySmall fIntersection (key, value) =
+  lazyMapInsertWith (fIntersection value) key (fOnlySmall value)
 
 -- | Update the larger map by iterating through the entries of the smaller map.
 updateMapsSmallAndLarge :: (Ord a, Hashable a)
@@ -389,7 +389,7 @@ castHashOptimizedExplicit =
 
   in \(path, pathHash) bvEnv expr -> case expr of
   Var x   -> (variablesHash, structureHash, 0, 1, hashes)
-    where variablesHash = lazyMapSingleton x ((hashExprO VarO), hash (Map.lookup x bvEnv))
+    where variablesHash = lazyMapSingleton x (hashExprO VarO, hash (Map.lookup x bvEnv))
           structureHash = hashExprO VarO
           subExprHash   = subExprHash_ variablesHash structureHash
           subExprHashes = []
@@ -399,7 +399,7 @@ castHashOptimizedExplicit =
     where variablesHash = lazyMapDelete x variablesHashE
           structureHash = hashExprOWithSalt hashSalt (LamO hashX structureHashE)
           (variablesHashE, structureHashE, depth, subtreeSizeE, subExprHashes) =
-            castHashOptimizedExplicit ((L:path), (hash (pathHash, L))) (Map.insert x pathHash bvEnv) e
+            castHashOptimizedExplicit (L:path, hash (pathHash, L)) (Map.insert x pathHash bvEnv) e
           subtreeSize   = subtreeSizeE + 1
           hashSalt = hash (depth, lazyMapSize variablesHash)
           subExprHash   = subExprHash_ variablesHash structureHash
@@ -419,9 +419,9 @@ castHashOptimizedExplicit =
           hashes        = (subExprHash, path, expr) : subExprHashes
 
           (variablesHashF, structureHashF, depthF, subtreeSizeF, subExprHashesF) =
-            castHashOptimizedExplicit ((Apl:path), (hash (pathHash, Apl))) bvEnv f
+            castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f
           (variablesHashE, structureHashE, depthE, subtreeSizeE, subExprHashesE) =
-            castHashOptimizedExplicit ((Apr:path), (hash (pathHash, Apr))) bvEnv e
+            castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
