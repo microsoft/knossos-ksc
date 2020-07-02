@@ -267,44 +267,50 @@ lazyMapLookup :: (Ord a, Hashable a) => a -> LazyMap a -> Maybe TwoHashes
 lazyMapLookup key (innerMap, _) = Map.lookup key innerMap
 
 -- | A helper to hash a `LazyMap` entry.
-computeEntryHash :: (Ord a, Hashable a) => a -> TwoHashes -> TwoHashes
-computeEntryHash key (value_1, value_2) =
+computeEntryHash :: (Hashable a) => (a, TwoHashes) -> TwoHashes
+computeEntryHash (key, (value_1, value_2)) =
   (hash (key, value_1), hash (key, value_2))
+
+addEntryHash :: (Hashable a) => TwoHashes -> (a, TwoHashes) -> TwoHashes
+addEntryHash (entriesHash_1, entriesHash_2) entry =
+  let (entryHash_1, entryHash_2) = computeEntryHash entry in
+    (entriesHash_1 + entryHash_1, entriesHash_2 + entryHash_2)
+
+subtractEntryHash :: (Hashable a) => TwoHashes -> (a, TwoHashes) -> TwoHashes
+subtractEntryHash (entriesHash_1, entriesHash_2) entry =
+  let (entryHash_1, entryHash_2) = computeEntryHash entry in
+    (entriesHash_1 - entryHash_1, entriesHash_2 - entryHash_2)
 
 lazyMapSingleton :: (Ord a, Hashable a) => a -> TwoHashes -> LazyMap a
 lazyMapSingleton key value =
-    (Map.singleton key value, computeEntryHash key value)
+    (Map.singleton key value, computeEntryHash (key, value))
 
 lazyMapInsert :: (Ord a, Hashable a) => a -> TwoHashes -> LazyMap a -> LazyMap a
-lazyMapInsert key value (innerMap, (entriesHash_1, entriesHash_2)) =
-  let (entryHash_1, entryHash_2) = computeEntryHash key value in
-    (Map.insert key value innerMap, (entriesHash_1 + entryHash_1, entriesHash_2 + entryHash_2))
-
-lazyMapInsertAll :: (Ord a, Hashable a) => [(a, TwoHashes)] -> LazyMap a -> LazyMap a
-lazyMapInsertAll entries otherLazyMap =
-  foldr (\(key, value) lazyMap -> lazyMapInsert key value lazyMap) otherLazyMap entries
+lazyMapInsert key value (innerMap, entriesHash) =
+  (Map.insert key value innerMap, addEntryHash entriesHash (key, value))
 
 lazyMapDelete :: (Ord a, Hashable a) => a -> LazyMap a -> LazyMap a
 lazyMapDelete key (innerMap, entriesHash) =
   case (Map.lookup key innerMap) of
     Nothing -> (innerMap, entriesHash)
-    Just value ->
-      let (entriesHash_1, entriesHash_2) = entriesHash
-          (entryHash_1, entryHash_2) = computeEntryHash key value
-      in
-          (Map.delete key innerMap, (entriesHash_1 - entryHash_1, entriesHash_2 - entryHash_2))
+    Just value -> (Map.delete key innerMap, subtractEntryHash entriesHash (key, value))
 
--- | Helper for `splitMapsSmallAndLarge`.
-updateMaps :: (Ord a, Hashable a) => (a, TwoHashes) -> ([(a, TwoHashes)], [(a, (TwoHashes, TwoHashes))], LazyMap a) -> ([(a, TwoHashes)], [(a, (TwoHashes, TwoHashes))], LazyMap a)
-updateMaps (key, value) (onlySmall, intersection, onlyLarge) =
-  case (lazyMapLookup key onlyLarge) of
-    Nothing -> ((key, value) : onlySmall, intersection, onlyLarge)
-    Just valueLarge  -> (onlySmall, (key, (value, valueLarge)) : intersection, lazyMapDelete key onlyLarge)
+lazyMapInsertWith :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> a -> TwoHashes -> LazyMap a -> LazyMap a
+lazyMapInsertWith f key value (innerMap, entriesHash) =
+  let (ret, newInnerMap) = Map.insertLookupWithKey (\_ _ oldValue -> f oldValue) key value innerMap in
+    case ret of
+      Nothing -> (newInnerMap, addEntryHash entriesHash (key, value))
+      Just oldValue -> (newInnerMap, addEntryHash (subtractEntryHash entriesHash (key, oldValue)) (key, f oldValue))
+
+-- | Helper for `updateMapsSmallAndLarge`.
+updateMaps :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> (TwoHashes -> TwoHashes -> TwoHashes) -> (a, TwoHashes) -> LazyMap a -> LazyMap a
+updateMaps fOnlySmall fIntersection (key, value) mapLarge =
+  lazyMapInsertWith (fIntersection value) key (fOnlySmall value) mapLarge
 
 -- | Splits maps into "in small map only", "intersection" and "in large map only".
-splitMapsSmallAndLarge :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> ([(a, TwoHashes)], [(a, (TwoHashes, TwoHashes))], LazyMap a)
-splitMapsSmallAndLarge mapSmall mapLarge =
-  foldr updateMaps ([], [], mapLarge) (lazyMapAssocs mapSmall)
+updateMapsSmallAndLarge :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> (TwoHashes -> TwoHashes -> TwoHashes) -> LazyMap a -> LazyMap a -> LazyMap a
+updateMapsSmallAndLarge fOnlySmall fIntersection mapSmall mapLarge =
+  foldr (updateMaps fOnlySmall fIntersection) mapLarge (lazyMapAssocs mapSmall)
 
 -- | Helpers used to combine two hashes; `hashCombineRev` does the same but reversed the argument order.
 
@@ -320,19 +326,10 @@ liftToPairs f = \(x_1, y) (x_2, _) -> (f x_1 x_2, y)
 liftToFirst :: (a -> a) -> ((a, b) -> (a, b))
 liftToFirst f = \(x, y) -> (f x, y)
 
-liftToSecond :: (b -> b) -> ((a, b) -> (a, b))
-liftToSecond f = \(x, y) -> (x, f y)
-
 -- | Combines two lazy maps in time proportional to the smaller one.
 lazyMapsCombineSmallToLarge :: (Ord a, Hashable a) => LazyMap a -> LazyMap a -> (Hash -> Hash) -> (Hash -> Hash -> Hash) -> LazyMap a
-lazyMapsCombineSmallToLarge lazyMapSmall lazyMapLarge applySmall applyIntersection =
-  let applySmall' = liftToSecond (liftToFirst applySmall)
-      applyIntersection' = (\(key, (valueSmall, valueLarge)) -> (key, (liftToPairs applyIntersection) valueSmall valueLarge))
-      (onlySmallList, intersectionList, onlyLarge) = splitMapsSmallAndLarge lazyMapSmall lazyMapLarge
-      onlySmallList' = map applySmall' onlySmallList
-      intersectionList' = map applyIntersection' intersectionList
-  in
-    lazyMapInsertAll (onlySmallList' ++ intersectionList') onlyLarge
+lazyMapsCombineSmallToLarge lazyMapSmall lazyMapLarge fOnlySmall fIntersection =
+  updateMapsSmallAndLarge (liftToFirst fOnlySmall) (liftToPairs fIntersection) lazyMapSmall lazyMapLarge
 
 hashStepLeft :: Int -> Hash -> Hash
 hashStepLeft subtreeSize h =
