@@ -293,8 +293,8 @@ lazyMapInsert key value (innerMap, entriesHash) =
 
 lazyMapDelete :: (Ord a, Hashable a) => a -> LazyMap a -> LazyMap a
 lazyMapDelete key (innerMap, entriesHash) =
-  let (ret, newInnerMap) = Map.updateLookupWithKey (\_ _ -> Nothing) key innerMap in
-    case ret of
+  let (ret, newInnerMap) = Map.updateLookupWithKey (\_ _ -> Nothing) key innerMap
+  in case ret of
       Nothing -> (newInnerMap, entriesHash)
       Just value -> (newInnerMap, subtractEntryHash entriesHash (key, value))
 
@@ -305,10 +305,14 @@ lazyMapInsertWith :: (Ord a, Hashable a)
                   -> LazyMap a
                   -> LazyMap a
 lazyMapInsertWith f key value (innerMap, entriesHash) =
-  let (ret, newInnerMap) = Map.insertLookupWithKey (\_ _ oldValue -> f oldValue) key value innerMap in
-    case ret of
+  let (ret, newInnerMap) =
+        Map.insertLookupWithKey (\_ _ -> f) key value innerMap
+  in case ret of
       Nothing -> (newInnerMap, addEntryHash entriesHash (key, value))
-      Just oldValue -> (newInnerMap, addEntryHash (subtractEntryHash entriesHash (key, oldValue)) (key, f oldValue))
+      Just oldValue ->
+        (newInnerMap,
+         addEntryHash (subtractEntryHash entriesHash (key, oldValue))
+                      (key, f oldValue))
 
 -- | Helper for `updateMapsSmallAndLarge`.
 updateMaps :: (Ord a, Hashable a)
@@ -353,7 +357,10 @@ lazyMapsCombineSmallToLarge :: (Ord a, Hashable a)
                             -> (Hash -> Hash -> Hash)
                             -> LazyMap a
 lazyMapsCombineSmallToLarge lazyMapSmall lazyMapLarge fOnlySmall fIntersection =
-  updateMapsSmallAndLarge (liftToFirst fOnlySmall) (liftToPairs fIntersection) lazyMapSmall lazyMapLarge
+  updateMapsSmallAndLarge (liftToFirst fOnlySmall)
+                          (liftToPairs fIntersection)
+                          lazyMapSmall
+                          lazyMapLarge
 
 hashStepLeft :: Int -> Hash -> Hash
 hashStepLeft subtreeSize h =
@@ -370,13 +377,21 @@ lazyMapsCombine :: (Ord a, Hashable a)
                 -> LazyMap a
 lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
   case lazyMapSize lazyMapLeft < lazyMapSize lazyMapRight of
-    True  -> lazyMapsCombineSmallToLarge lazyMapLeft lazyMapRight (hashStepLeft subtreeSize) hashCombine
-    False -> lazyMapsCombineSmallToLarge lazyMapRight lazyMapLeft (hashStepRight subtreeSize) hashCombineRev
+    True  -> lazyMapsCombineSmallToLarge lazyMapLeft
+                                         lazyMapRight
+                                         (hashStepLeft subtreeSize)
+                                         hashCombine
+
+    False -> lazyMapsCombineSmallToLarge lazyMapRight
+                                         lazyMapLeft
+                                         (hashStepRight subtreeSize)
+                                         hashCombineRev
 
 castHashOptimized :: (Ord a, Hashable a)
                   => Expr a -> [(Hash, Path, Expr a)]
 castHashOptimized e = exprs
-  where (_m, _b, _depth, _subtreeSize, exprs) = castHashOptimizedExplicit ([], 1) Map.empty e
+  where (_m, _b, _depth, _subtreeSize, exprs) =
+          castHashOptimizedExplicit ([], 1) Map.empty e
 
 castHashOptimizedExplicit :: (Ord a, Hashable a)
                           => (Path, Hash)
@@ -389,7 +404,8 @@ castHashOptimizedExplicit =
 
   in \(path, pathHash) bvEnv expr -> case expr of
   Var x   -> (variablesHash, structureHash, 0, 1, hashes)
-    where variablesHash = lazyMapSingleton x (hashExprO VarO, hash (Map.lookup x bvEnv))
+    where variablesHash = lazyMapSingleton x (hashExprO VarO,
+                                              hash (Map.lookup x bvEnv))
           structureHash = hashExprO VarO
           subExprHash   = subExprHash_ variablesHash structureHash
           subExprHashes = []
@@ -399,18 +415,22 @@ castHashOptimizedExplicit =
     where variablesHash = lazyMapDelete x variablesHashE
           structureHash = hashExprOWithSalt hashSalt (LamO hashX structureHashE)
           (variablesHashE, structureHashE, depth, subtreeSizeE, subExprHashes) =
-            castHashOptimizedExplicit (L:path, hash (pathHash, L)) (Map.insert x pathHash bvEnv) e
+            castHashOptimizedExplicit (L:path, hash (pathHash, L))
+                                      (Map.insert x pathHash bvEnv)
+                                      e
           subtreeSize   = subtreeSizeE + 1
           hashSalt = hash (depth, lazyMapSize variablesHash)
           subExprHash   = subExprHash_ variablesHash structureHash
           hashes        = (subExprHash, path, expr) : subExprHashes
           hashX = fmap fst (lazyMapLookup x variablesHashE)
 
-  App f e -> (variablesHash, structureHash, max depthF depthE + 1, subtreeSize, hashes)
+  App f e ->
+    (variablesHash, structureHash, max depthF depthE + 1, subtreeSize, hashes)
     where variablesHash = lazyMapsCombine variablesHashF variablesHashE subtreeSize
 
           structureHash =
-            hashExprOWithSalt hashSalt (AppO (Just structureHashF) (Just structureHashE))
+            hashExprOWithSalt hashSalt
+                              (AppO (Just structureHashF) (Just structureHashE))
 
           subtreeSize   = subtreeSizeF + subtreeSizeE + 1
           hashSalt = hash (hashWithSalt depthF depthE, lazyMapSize variablesHash)
@@ -418,10 +438,10 @@ castHashOptimizedExplicit =
           subExprHash   = subExprHash_ variablesHash structureHash
           hashes        = (subExprHash, path, expr) : subExprHashes
 
-          (variablesHashF, structureHashF, depthF, subtreeSizeF, subExprHashesF) =
-            castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f
-          (variablesHashE, structureHashE, depthE, subtreeSizeE, subExprHashesE) =
-            castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e
+          (variablesHashF, structureHashF, depthF, subtreeSizeF, subExprHashesF)
+            = castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f
+          (variablesHashE, structureHashE, depthE, subtreeSizeE, subExprHashesE)
+            = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
