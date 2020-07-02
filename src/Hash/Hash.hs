@@ -307,7 +307,7 @@ updateMaps :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> (TwoHashes -> T
 updateMaps fOnlySmall fIntersection (key, value) mapLarge =
   lazyMapInsertWith (fIntersection value) key (fOnlySmall value) mapLarge
 
--- | Splits maps into "in small map only", "intersection" and "in large map only".
+-- | Update the larger map by iterating through the entries of the smaller map.
 updateMapsSmallAndLarge :: (Ord a, Hashable a) => (TwoHashes -> TwoHashes) -> (TwoHashes -> TwoHashes -> TwoHashes) -> LazyMap a -> LazyMap a -> LazyMap a
 updateMapsSmallAndLarge fOnlySmall fIntersection mapSmall mapLarge =
   foldr (updateMaps fOnlySmall fIntersection) mapLarge (lazyMapAssocs mapSmall)
