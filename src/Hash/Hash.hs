@@ -343,10 +343,10 @@ hashCombine l r = hashExprO (AppO (Just l) (Just r))
 hashCombineRev :: Hash -> Hash -> Hash
 hashCombineRev l r = hashExprO (AppO (Just r) (Just l))
 
-liftToPairs :: (a -> a -> a) -> ((a, a) -> (a, a) -> (a, a))
+liftToPairs :: (a -> b -> c) -> (a, z) -> (b, ignored) -> (c, z)
 liftToPairs f = \(x_1, y) (x_2, _) -> (f x_1 x_2, y)
 
-liftToFirst :: (a -> a) -> ((a, b) -> (a, b))
+liftToFirst :: (a -> a') -> (a, b) -> (a', b)
 liftToFirst f = \(x, y) -> (f x, y)
 
 -- | Combines two lazy maps in time proportional to the smaller one.
