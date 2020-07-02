@@ -419,10 +419,10 @@ castHashOptimizedExplicit =
                                       (Map.insert x pathHash bvEnv)
                                       e
           subtreeSize   = subtreeSizeE + 1
-          hashSalt = hash (depth, lazyMapSize variablesHash)
+          hashSalt      = hash (depth, lazyMapSize variablesHash)
           subExprHash   = subExprHash_ variablesHash structureHash
           hashes        = (subExprHash, path, expr) : subExprHashes
-          hashX = fmap fst (lazyMapLookup x variablesHashE)
+          hashX         = fmap fst (lazyMapLookup x variablesHashE)
 
   App f e ->
     (variablesHash, structureHash, max depthF depthE + 1, subtreeSize, hashes)
@@ -433,7 +433,8 @@ castHashOptimizedExplicit =
                               (AppO (Just structureHashF) (Just structureHashE))
 
           subtreeSize   = subtreeSizeF + subtreeSizeE + 1
-          hashSalt = hash (hashWithSalt depthF depthE, lazyMapSize variablesHash)
+          hashSalt      = hash (hashWithSalt depthF depthE,
+                                lazyMapSize variablesHash)
           subExprHashes = subExprHashesF ++ subExprHashesE
           subExprHash   = subExprHash_ variablesHash structureHash
           hashes        = (subExprHash, path, expr) : subExprHashes
