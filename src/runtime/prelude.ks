@@ -174,6 +174,11 @@
   (tuple (sub (get$1$2 xt) (get$2$2 xt))
          (sub dxt)))
 
+(def fwds$sub (Tuple Float (Tuple)) ((x1 : Float) (x2 : Float))
+     (tuple (sub x1 x2) (tuple)))
+
+(def revs$sub (Tuple Float Float) (d_dr : Float)
+     (tuple d_dr (neg d_dr)))
 
 ;; ------------------------------------------
 ;;         sub :: (Integer, Integer) -> Integer
@@ -317,7 +322,7 @@
 
 (def
  revs$div (Tuple (Tuple) (Tuple))
- ((dr : (Tuple)) (x : (Tuple)))
+ (dr : (Tuple))
  (tuple (tuple) (tuple)))
 
 ;; ------------------------------------------
@@ -417,7 +422,7 @@
 
 (def
  revs$mul (Tuple (Tuple) (Tuple))
- (xt : (Tuple (Tuple) (Tuple)))
+ (d_dr : (Tuple))
  (tuple (tuple) (tuple)))
 
 ;; ------------------------------------------
@@ -650,6 +655,12 @@
      (let (ex (exp x))
        (tuple ex (mul x ex))))
 
+(def fwds$exp (Tuple Float Float) (x : Float)
+     (let (exp_x (exp x))
+       (tuple exp_x exp_x)))
+
+(def revs$exp Float ((d_dr : Float) (exp_x : Float))
+     (mul exp_x d_dr))
 
 ;; ------------------------------------------
 ;;         sin, cos, tanh :: Float -> Float
@@ -723,6 +734,10 @@
      (tuple (to_float x) 0.0))
 (def rev$to_float (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
 (edef Dt$to_float (Tuple Float (LM Integer Float)) (Integer))
+(def fwds$to_float (Tuple Float (Tuple)) (x : Integer)
+     (tuple (to_float x) (tuple)))
+(def revs$to_float (Tuple) (d_dr : Float)
+     (tuple))
 
 ;; ------------------------------------------
 ;;         lgamma :: Float -> Float

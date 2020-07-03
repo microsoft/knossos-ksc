@@ -40,6 +40,15 @@
      ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
      (tuple (dot a_b) (fwd$dot a_b da_db)))
 
+(def fwds$dot (Tuple Float (Tuple (Vec Float) (Vec Float)))
+     (a_b : (Tuple (Vec Float) (Vec Float)))
+     (tuple (dot a_b) a_b))
+
+(def revs$dot (Tuple (Vec Float) (Vec Float))
+     ((d_dr : Float) (a_b : Tuple (Vec Float) (Vec Float)))
+     (let ((a (get$1$2 a_b))
+           (b (get$2$2 a_b)))
+       (tuple (mul$R$VecR d_dr b) (mul$R$VecR d_dr a))))
 
 (def dot Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dot (index i a) (index i b)))))
