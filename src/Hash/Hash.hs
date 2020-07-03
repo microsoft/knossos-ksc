@@ -501,15 +501,15 @@ deBruijnHashExplicit = \env path expr -> case expr of
           subExpressionHashes = []
           l_ret = (hash', path, expr) : subExpressionHashes
   Lam x e -> (hash', depth', l_ret)
-    where (hashE, depthE, subExpressionHashesE) =
+    where (!hashE, !depthE, subExpressionHashesE) =
             deBruijnHashExplicit (dbAddVar x env) (L:path) e
           depth' = depthE + 1
           hash' = hash ("lam", hashE, depth')
           subExpressionHashes = subExpressionHashesE
           l_ret = (hash', path, expr) : subExpressionHashes
   App f e -> (hash', depth', l_ret)
-    where (hashF, depthF, lF) = deBruijnHashExplicit env (Apl:path) f
-          (hashE, depthE, lE) = deBruijnHashExplicit env (Apr:path) e
+    where (!hashF, !depthF, lF) = deBruijnHashExplicit env (Apl:path) f
+          (!hashE, !depthE, lE) = deBruijnHashExplicit env (Apr:path) e
           depth' = max depthF depthE + 1
           hash'  = hash ("app", hashF, hashE, depth')
           subExpressionHashes = lF ++ lE
