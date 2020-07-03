@@ -116,12 +116,12 @@ type Hash = Int
 -- compositional, not this single hash value.
 castHashTop :: (Ord a, Hashable a) => Expr a -> Hash
 castHashTop e = hash (Map.toList m, h)
-  where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e
+  where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e []
 
 castHash :: (Ord a, Hashable a)
          => Expr a -> [(Hash, Path, Expr a)]
 castHash e = exprs
-  where (_m, _h, _depth, exprs) = castHashExplicit [] Map.empty e
+  where (_m, _h, _depth, exprs) = castHashExplicit [] Map.empty e []
 
 -- | The implementation of the alpha-equivalence-respecting hashing
 -- function.
@@ -198,6 +198,7 @@ castHashExplicit :: (Ord a, Hashable a)
                  => Path
                  -> Map a Path
                  -> Expr a
+                 -> [(Hash, Path, Expr a)]
                  -> (Map a Hash, Hash, Int, [(Hash, Path, Expr a)])
 castHashExplicit =
   let subExprHash_ variablesHash structureHash bvEnv =
@@ -205,19 +206,19 @@ castHashExplicit =
               structureHash,
               filter ((`elem` Map.keys variablesHash) . fst) (Map.toList bvEnv))
 
-  in \path bvEnv expr -> case expr of
+  in \path bvEnv expr hashesIn -> case expr of
   Var x   -> (variablesHash, structureHash, 0, hashes)
     where variablesHash = Map.singleton x (hashExprO VarO)
           structureHash = hashExprO VarO
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
-          subExprHashes = []
+          subExprHashes = hashesIn
           hashes        = (subExprHash, path, expr) : subExprHashes
 
   Lam x e -> (variablesHash, structureHash, depth + 1, hashes)
     where variablesHash = Map.delete x variablesHashE
           structureHash = hashExprOWithSalt depth (LamO hashX structureHashE)
           (variablesHashE, structureHashE, depth, subExprHashes) =
-            castHashExplicit (L:path) (addLocn x path bvEnv) e
+            castHashExplicit (L:path) (addLocn x path bvEnv) e hashesIn
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
           hashes        = (subExprHash, path, expr) : subExprHashes
 
@@ -234,14 +235,14 @@ castHashExplicit =
             hashExprOWithSalt (hashWithSalt depthF depthE)
                              (AppO (Just structureHashF) (Just structureHashE))
 
-          subExprHashes = subExprHashesF ++ subExprHashesE
+          subExprHashes = subExprHashesE
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
           hashes        = (subExprHash, path, expr) : subExprHashes
 
           (variablesHashF, structureHashF, depthF, subExprHashesF) =
-            castHashExplicit (Apl:path) bvEnv f
+            castHashExplicit (Apl:path) bvEnv f hashesIn
           (variablesHashE, structureHashE, depthE, subExprHashesE) =
-            castHashExplicit (Apr:path) bvEnv e
+            castHashExplicit (Apr:path) bvEnv e subExprHashesF
 
 
 -- | We have pairs of hashes in many places, so here's a type for that.
@@ -487,34 +488,35 @@ uniquifyBindersExplicit m n = \case
 -- Subexpressions"
 deBruijnHash :: (Hashable a, Ord a) => Expr a -> [(Hash, Path, Expr a)]
 deBruijnHash expr = es
-  where (_, _, es) = deBruijnHashExplicit Map.empty [] expr
+  where (_, _, es) = deBruijnHashExplicit Map.empty [] [] expr
 
 deBruijnHashExplicit :: (Hashable a, Ord a)
                      => Map.Map a Int
                      -> Path
+                     -> [(Hash, Path, Expr a)]
                      -> Expr a
                      -> (Hash, Int, [(Hash, Path, Expr a)])
-deBruijnHashExplicit = \env path expr -> case expr of
+deBruijnHashExplicit = \env path hashesIn expr -> case expr of
   Var x -> (hash', depth', l_ret)
     where hash' = case dbLookupVar x env of
             Nothing -> hash ("free", x, depth')
             Just i  -> hash ("bound", i, depth')
           depth' = 0 :: Int
-          subExpressionHashes = []
+          subExpressionHashes = hashesIn
           l_ret = (hash', path, expr) : subExpressionHashes
   Lam x e -> (hash', depth', l_ret)
     where (!hashE, !depthE, subExpressionHashesE) =
-            deBruijnHashExplicit (dbAddVar x env) (L:path) e
+            deBruijnHashExplicit (dbAddVar x env) (L:path) hashesIn e
           depth' = depthE + 1
           hash' = hash ("lam", hashE, depth')
           subExpressionHashes = subExpressionHashesE
           l_ret = (hash', path, expr) : subExpressionHashes
   App f e -> (hash', depth', l_ret)
-    where (!hashF, !depthF, lF) = deBruijnHashExplicit env (Apl:path) f
-          (!hashE, !depthE, lE) = deBruijnHashExplicit env (Apr:path) e
+    where (!hashF, !depthF, lF) = deBruijnHashExplicit env (Apl:path) hashesIn f
+          (!hashE, !depthE, lE) = deBruijnHashExplicit env (Apr:path) lF e
           depth' = max depthF depthE + 1
           hash'  = hash ("app", hashF, hashE, depth')
-          subExpressionHashes = lF ++ lE
+          subExpressionHashes = lE
           l_ret = (hash', path, expr) : subExpressionHashes
 
 dbAddVar :: Ord k => k -> Map k Int -> Map k Int
@@ -616,71 +618,73 @@ naiveHashNestedExplicit path expr hashesIn =
 naiveHashWithBinders :: (Ord a, Hashable a)
                      => Expr a -> [(Hash, Path, Expr a)]
 naiveHashWithBinders e = exprs
-  where (_h, _depth, exprs) = naiveHashWithBindersExplicit [] Map.empty e
+  where (_h, _depth, exprs) = naiveHashWithBindersExplicit [] Map.empty [] e
 
 naiveHashWithBindersExplicit :: (Ord a, Hashable a)
                              => Path
                              -> Map a Path
+                             -> [(Hash, Path, Expr a)]
                              -> Expr a
                              -> (Hash, Int, [(Hash, Path, Expr a)])
-naiveHashWithBindersExplicit location env expr = case expr of
+naiveHashWithBindersExplicit location env hashesIn expr = case expr of
   Var x -> (hash', depth', l_ret)
     where hash' = hash $ case Map.lookup x env of
             Nothing -> hash ("free", x, depth')
             Just p  -> hash ("bound", p, depth')
           depth' = 0
-          subExpressionHashes = []
+          subExpressionHashes = hashesIn
           l_ret = (hash', location, expr) : subExpressionHashes
   Lam x e -> (hash', depth', l_ret)
     where (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBindersExplicit (L:location) (Map.insert x location env) e
+            naiveHashWithBindersExplicit (L:location) (Map.insert x location env) hashesIn e
           hash' = hash ("lam", hashE, depth')
           depth' = depthE + 1
           subExpressionHashes = subExpressionHashesE
           l_ret = (hash', location, expr) : subExpressionHashes
   App f e -> (hash', depth', l_ret)
     where (hashF, depthF, subExpressionHashesF) =
-            naiveHashWithBindersExplicit (Apl:location) env f
+            naiveHashWithBindersExplicit (Apl:location) env hashesIn f
           (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBindersExplicit (Apr:location) env e
+            naiveHashWithBindersExplicit (Apr:location) env subExpressionHashesF e
           hash' = hash ("app", hashF, hashE, depth')
-          subExpressionHashes = subExpressionHashesF ++ subExpressionHashesE
+          subExpressionHashes = subExpressionHashesE
           depth' = max depthF depthE + 1
           l_ret = (hash', location, expr) : subExpressionHashes
 
 naiveHashWithBinders2 :: (Ord a, Hashable a)
                      => Expr a -> [(Hash, Path, Expr a)]
 naiveHashWithBinders2 e = exprs
-  where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty e
+  where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty [] e
 
 naiveHashWithBinders2Explicit :: (Ord a, Hashable a)
                               => Path
                               -> Map a Path
+                              -> [(Hash, Path, Expr a)]
                               -> Expr a
                               -> (Hash, Int, [(Hash, Path, Expr a)])
-naiveHashWithBinders2Explicit location env expr = case expr of
+naiveHashWithBinders2Explicit location env hashesIn expr = case expr of
   Var x -> (hash', depth', l_ret)
     where hash' = hash $ case Map.lookup x env of
             Nothing -> hash ("free", x, depth')
             Just p  -> hash ("bound", p, depth')
           depth' = 0
-          subExpressionHashes = []
+          subExpressionHashes = hashesIn
           l_ret = (hash', location, expr) : subExpressionHashes
   Lam x e -> (hash', depth', l_ret)
     where (hashE, depthE, subExpressionHashesE) =
             naiveHashWithBindersExplicit (L:location)
-                                         (Map.insert x [] (Map.map (L:) env)) e
+                                         (Map.insert x [] (Map.map (L:) env)) hashesIn e
           hash' = hash ("lam", hashE, depth')
           depth' = depthE + 1
           subExpressionHashes = subExpressionHashesE
           l_ret = (hash', location, expr) : subExpressionHashes
   App f e -> (hash', depth', l_ret)
     where (hashF, depthF, subExpressionHashesF) =
-            naiveHashWithBindersExplicit (Apl:location) (Map.map (Apl:) env) f
+            naiveHashWithBindersExplicit (Apl:location) (Map.map (Apl:) env) hashesIn f
           (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBindersExplicit (Apr:location) (Map.map (Apr:) env) e
+            naiveHashWithBindersExplicit (Apr:location) (Map.map (Apr:) env) subExpressionHashesF e
           hash' = hash ("app", hashF, hashE, depth')
-          subExpressionHashes = subExpressionHashesF ++ subExpressionHashesE
+          subExpressionHashes = subExpressionHashesE
           depth' = max depthF depthE + 1
           l_ret = (hash', location, expr) : subExpressionHashes
 
