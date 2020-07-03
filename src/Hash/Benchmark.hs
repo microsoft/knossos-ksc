@@ -19,10 +19,10 @@ import Hash (Hash, castHash, castHashOptimized, deBruijnHash, combinedHash, naiv
 benchmark :: IO ()
 benchmark = do
   let totalExpressions     = 100
-      samplesPerExpression = 10
-      iterationsPerSample  = 10
+      samplesPerExpression = 500
+      iterationsPerSample  = 20
 
-      genExpr = Gen.resize 1000 . genExprLinearNumVars
+      genExpr = Gen.resize 2 . genExprLinearNumVars
 
       algorithms = [ ("Compositional", castHash,   "green")
                    , ("Compositional-Optimized", castHashOptimized,   "black")
