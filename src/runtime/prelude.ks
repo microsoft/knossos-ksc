@@ -307,6 +307,19 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+(def
+ fwds$div (Tuple Integer (Tuple))
+ (xt : (Tuple Integer Integer))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt)))
+  (tuple (div x1 x2) (tuple))))
+
+(def
+ revs$div (Tuple (Tuple) (Tuple))
+ ((dr : (Tuple)) (x : (Tuple)))
+ (tuple (tuple) (tuple)))
+
 ;; ------------------------------------------
 ;;         div :: (Float, Float) -> Float
 ;; ------------------------------------------
@@ -393,6 +406,19 @@
  rev$mul (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
+(def
+ fwds$mul (Tuple Integer (Tuple))
+ (xt : (Tuple Integer Integer))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt)))
+  (tuple (mul x1 x2) (tuple))))
+
+(def
+ revs$mul (Tuple (Tuple) (Tuple))
+ (xt : (Tuple (Tuple) (Tuple)))
+ (tuple (tuple) (tuple)))
 
 ;; ------------------------------------------
 ;;         neg :: Float -> Float
