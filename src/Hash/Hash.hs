@@ -593,9 +593,9 @@ naiveHashNestedExplicit path expr =
   let subExprHash thisHash subExpressionHashes
         = (thisHash, (thisHash, path, expr) : subExpressionHashes)
   in case expr of
-  Var{}   -> subExprHash thisHash subExpressionHashes
+  Var x   -> subExprHash thisHash subExpressionHashes
     where subExpressionHashes = []
-          thisHash = 0
+          thisHash = hash x
 
   Lam x e -> subExprHash thisHash subExpressionHashes
     where (h, subExpressionHashes) = naiveHashNestedExplicit (L:path) e
