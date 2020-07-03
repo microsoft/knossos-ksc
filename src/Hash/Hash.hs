@@ -396,24 +396,25 @@ castHashOptimized :: (Ord a, Hashable a)
                   => Expr a -> [(Hash, Path, Expr a)]
 castHashOptimized e = exprs
   where (_m, _b, _depth, _subtreeSize, exprs) =
-          castHashOptimizedExplicit ([], 1) Map.empty e
+          castHashOptimizedExplicit ([], 1) Map.empty e []
 
 castHashOptimizedExplicit :: (Ord a, Hashable a)
                           => (Path, Hash)
                           -> Map a Hash
                           -> Expr a
+                          -> [(Hash, Path, Expr a)]
                           -> (LazyMap a, Hash, Int, Int, [(Hash, Path, Expr a)])
 castHashOptimizedExplicit =
   let subExprHash_ (LazyMap _ sndVariablesHash) structureHash =
         hash (sndVariablesHash, structureHash)
 
-  in \(path, pathHash) bvEnv expr -> case expr of
+  in \(path, pathHash) bvEnv expr hashesIn -> case expr of
   Var x   -> (variablesHash, structureHash, 0, 1, hashes)
     where variablesHash = lazyMapSingleton x (TwoHashes (hashExprO VarO)
                                                     (hash (Map.lookup x bvEnv)))
           structureHash = hashExprO VarO
           subExprHash   = subExprHash_ variablesHash structureHash
-          subExprHashes = []
+          subExprHashes = hashesIn
           hashes        = (subExprHash, path, expr) : subExprHashes
 
   Lam x e -> (variablesHash, structureHash, depth + 1, subtreeSize, hashes)
@@ -423,6 +424,7 @@ castHashOptimizedExplicit =
             castHashOptimizedExplicit (L:path, hash (pathHash, L))
                                       (Map.insert x pathHash bvEnv)
                                       e
+                                      hashesIn
           subtreeSize   = subtreeSizeE + 1
           hashSalt      = hash (depth, lazyMapSize variablesHash)
           subExprHash   = subExprHash_ variablesHash structureHash
@@ -441,14 +443,14 @@ castHashOptimizedExplicit =
           subtreeSize   = subtreeSizeF + subtreeSizeE + 1
           hashSalt      = hash (hashWithSalt depthF depthE,
                                 lazyMapSize variablesHash)
-          subExprHashes = subExprHashesF ++ subExprHashesE
+          subExprHashes = subExprHashesE
           subExprHash   = subExprHash_ variablesHash structureHash
           hashes        = (subExprHash, path, expr) : subExprHashes
 
           (!variablesHashF, !structureHashF, !depthF, !subtreeSizeF, subExprHashesF)
-            = castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f
+            = castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f hashesIn
           (!variablesHashE, !structureHashE, !depthE, !subtreeSizeE, subExprHashesE)
-            = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e
+            = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e subExprHashesF
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
