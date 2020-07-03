@@ -583,17 +583,29 @@ naiveHash = \case
   App f e -> hash (naiveHash f, naiveHash e)
 
 naiveHashNested :: Hashable a => Expr a -> [(Hash, Path, Expr a)]
-naiveHashNested = naiveHashNestedExplicit []
+naiveHashNested = snd . naiveHashNestedExplicit []
 
 naiveHashNestedExplicit :: Hashable a
                         => Path
                         -> Expr a
-                        -> [(Hash, Path, Expr a)]
-naiveHashNestedExplicit path expr = (naiveHash expr, path, expr) : case expr of
-  Var{}   -> []
-  Lam _ e -> naiveHashNestedExplicit (L:path) e
-  App f e -> naiveHashNestedExplicit (Apl:path) f
-             ++ naiveHashNestedExplicit (Apr:path) e
+                        -> (Hash, [(Hash, Path, Expr a)])
+naiveHashNestedExplicit path expr =
+  let subExprHash thisHash subExpressionHashes
+        = (thisHash, (thisHash, path, expr) : subExpressionHashes)
+  in case expr of
+  Var{}   -> subExprHash thisHash subExpressionHashes
+    where subExpressionHashes = []
+          thisHash = 0
+
+  Lam x e -> subExprHash thisHash subExpressionHashes
+    where (h, subExpressionHashes) = naiveHashNestedExplicit (L:path) e
+          thisHash                 = hash (x, h)
+
+  App f e -> subExprHash thisHash subExpressionHashes
+    where subExpressionHashes  = subExpressionHashesL ++ subExpressionHashesR
+          (hL, subExpressionHashesL) = naiveHashNestedExplicit (Apl:path) f
+          (hR, subExpressionHashesR) = naiveHashNestedExplicit (Apr:path) e
+          thisHash                   = hash (hL, hR)
 
 naiveHashWithBinders :: (Ord a, Hashable a)
                      => Expr a -> [(Hash, Path, Expr a)]
