@@ -738,11 +738,13 @@ prop_stablePaths = withTests numRandomTests $ property $ do
   let h = castHash expr
       d = deBruijnHash expr
       c = combinedHash expr
+      n = naiveHashNested expr
       n1 = naiveHashWithBinders expr
       n2 = naiveHashWithBinders2 expr
 
   paths h === paths d
   paths h === paths c
+  paths h === paths n
   paths h === paths n1
   paths h === paths n2
 
