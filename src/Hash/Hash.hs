@@ -525,7 +525,7 @@ dbLookupVar v env = fmap (Map.size env -) (Map.lookup v env)
 
 combinedHash :: (Ord a, Hashable a) => Expr a -> [(Hash, Path, Expr a)]
 combinedHash expr = es
-  where (_, _, _, es) = combinedHashExplicit Map.empty Map.empty [] expr
+  where (_, _, _, es) = combinedHashExplicit Map.empty Map.empty [] expr []
 
 -- | (Still broken) DeBruijn + free-var-hash algorithm from "Finding
 -- Identical Subexpressions"
@@ -537,8 +537,9 @@ combinedHashExplicit :: (Hashable a, Ord a)
                      -> Map.Map a Path
                      -> Path
                      -> Expr a
+                     -> [(Hash, Path, Expr a)]
                      -> (Hash, Set a, Int, [(Hash, Path, Expr a)])
-combinedHashExplicit = \env fvEnv location expr ->
+combinedHashExplicit = \env fvEnv location expr hashesIn ->
   let fvHash freeVars = map (flip Map.lookup fvEnv) (Set.toList freeVars)
   in case expr of
   Var x -> (dbHash', freeVars', depth', l_ret)
@@ -548,13 +549,13 @@ combinedHashExplicit = \env fvEnv location expr ->
           depth' = 0 :: Int
           freeVars' = Set.singleton x
           jointHash' = hash (dbHash', fvHash freeVars')
-          subExpressionHashes = []
+          subExpressionHashes = hashesIn
           l_ret = (jointHash', location, expr) : subExpressionHashes
   Lam x e -> (dbHash', freeVars', depth', l_ret)
     where (dbHashE, freeVarsE, depthE, subExpressionHashesE) =
             combinedHashExplicit (dbAddVar x env)
                                  (addLocn x location fvEnv)
-                                 (L:location) e
+                                 (L:location) e hashesIn
           depth' = depthE + 1
           dbHash' = hash ("lam", dbHashE, depth')
           jointHash' = hash (dbHash', fvHash freeVars')
@@ -563,14 +564,14 @@ combinedHashExplicit = \env fvEnv location expr ->
           l_ret = (jointHash', location, expr) : subExpressionHashes
   App f e -> (dbHash', freeVars', depth', l_ret)
     where (dbHashF, freeVarsF, depthF, subExpressionHashesF)  =
-            combinedHashExplicit env fvEnv (Apl:location) f
+            combinedHashExplicit env fvEnv (Apl:location) f hashesIn
           (dbHashE, freeVarsE, depthE, subExpressionHashesE) =
-            combinedHashExplicit env fvEnv (Apr:location)  e
+            combinedHashExplicit env fvEnv (Apr:location)  e subExpressionHashesF
           depth'  = max depthF depthE + 1
           dbHash' = hash ("app", dbHashF, dbHashE, depth')
           jointHash' = hash (dbHash', fvHash freeVars')
           freeVars' = Set.union freeVarsF freeVarsE
-          subExpressionHashes = subExpressionHashesF ++ subExpressionHashesE
+          subExpressionHashes = subExpressionHashesE
           l_ret = (jointHash', location, expr) : subExpressionHashes
 
 addLocn :: Ord k => k -> a -> Map k a -> Map k a
