@@ -2,6 +2,11 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
+-- Constructs that CatLang-based AD doesn't yet handle:
+--
+-- Primitive functions: $inline, size, $trace
+-- Language constructs: if
+
 -- Ksc.CatLang: Language for compilation to categories
 module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs, toCLDef_maybe, fromCLDef
                     , fwdAdDefs
