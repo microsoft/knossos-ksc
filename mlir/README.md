@@ -34,7 +34,10 @@ We may in the future decide to use the [Rise](https://github.com/rise-lang/mlir)
 
 ## Building Ksc-MLIR
 
-This setup assumes that you have [built](https://mlir.llvm.org/getting_started/) LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. To build and launch the tests, run
+This setup assumes that you have built LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. 
+Instructions below.
+
+To build and launch the tests, run
 
 ```sh
 # Prepare
@@ -64,6 +67,9 @@ $ ./bin/ksc-mlir LLVM foo.ks # Spits out LLVM IR
 Should work with any compiler, linker and OS LLVM works with.
 
 ## Building LLVM/MLIR
+See https://mlir.llvm.org/getting_started for more, 
+but this is a useful summary.
+*Note that you need to checkout the right commit as below.*
 
 ```bash
 # Prepare
@@ -72,7 +78,7 @@ $ git clone git@github.com:llvm/llvm-project.git
 
 # Make sure you got the right commit
 # Be sure to update this line when that changes
-$ git co -b ksc e03394c6a6f
+$ git checkout -b ksc e03394c6a6f
 
 $ cd llvm-project
 $ mkdir build && cd build
