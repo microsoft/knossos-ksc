@@ -6,7 +6,8 @@
 #endif
 
 //We're avoiding requiring projects files so we specify the exact location, is there a better way of doing this?
-let extendedPath = @"dotnet/sdk/NuGetFallbackFolder/microsoft.netcore.app/2.2.0/ref/netcoreapp2.2/"
+let netCore310Path = @"dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/"
+let netCore220Path = @"dotnet/sdk/NuGetFallbackFolder/microsoft.netcore.app/2.2.0/ref/netcoreapp2.2/"
 
 open FSharp.Compiler.SourceCodeServices
 open lispgen
@@ -24,16 +25,26 @@ let parseAndCheckFiles files =
     *)
     let sysLib nm =
         if System.Environment.OSVersion.Platform = System.PlatformID.Win32NT then
-            let windowsReferencePath =
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) ++ extendedPath
-            if not (Directory.Exists windowsReferencePath) then
-                failwithf "Can't find .NET Core references, ensure they're installed. Looking in%s%s" System.Environment.NewLine windowsReferencePath 
-            windowsReferencePath ++ nm + ".dll"
+
+            let windowsPaths = [
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) ++ netCore310Path
+                System.Environment.GetFolderPath(System.Environment.SpecialFolder.ProgramFiles) ++ netCore220Path
+            ]
+
+            windowsPaths
+            |> List.tryFind (Directory.Exists)
+            |> (function
+                | Some path -> path ++ nm + ".dll"
+                | None ->
+                    failwithf
+                        "Can't find .NET Core references, ensure they're installed. Looked in:\n%s"
+                        (windowsPaths |> String.concat "\n")
+            )
         else
             let otherPaths = [
-                "/usr/share/" ++ extendedPath //WSL/Ubuntu install
-                "/usr/share/local/" ++ extendedPath //macOS install
-                "/usr/share/dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref/netcoreapp3.1/"  // Newer .NET version in WSL/Ubuntu
+                "/usr/share/" ++ netCore310Path  // Newer .NET version in WSL/Ubuntu
+                "/usr/share/" ++ netCore220Path //WSL/Ubuntu install
+                "/usr/share/local/" ++ netCore220Path //macOS install
             ]
             otherPaths
             |> List.tryFind (Directory.Exists)
