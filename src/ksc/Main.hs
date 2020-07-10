@@ -42,6 +42,8 @@ main = do
   System.Environment.getArgs >>= \case
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
+    ["--test-except-codegen"]
+      -> do { _ <- testsThatDoNoCodegen; return () }
     [ "--profile",
       "--ks-file-without-extension", source,
       "--proffile", proffile,
@@ -139,7 +141,7 @@ gatherErrors :: Show a => [Maybe a] -> Either String ()
 gatherErrors errors =
   case Data.Maybe.catMaybes errors of
     []     -> return ()
-    errors -> Left ("Had errors in:\n" ++ unlines (map show errors))
+    errors -> Left ("\n\n\n--- The errors were as follows ---\n\n" ++ unlines (map show errors))
 
 dropExtensionOrFail :: String -> FilePath -> IO String
 dropExtensionOrFail ext path =
@@ -225,7 +227,7 @@ futharkCompileKscPrograms ksFiles = do
                         ++ " because it is known not to work with Futhark")
          else do
             genFuthark ["src/runtime/prelude"] ksTest
-            Cgen.readProcessPrintStderr
+            Cgen.readProcessPrintStderrOnFail
               "futhark-0.11.2-linux-x86_64/bin/futhark"
               ["check", "obj/" ++ ksTest ++ ".fut"]
             return ()
@@ -286,12 +288,17 @@ testHspec = do
   summary <- runSpec Main.hspec defaultConfig
   when (not (isSuccess summary)) (fail "Hspec tests failed.  See message above")
 
-testC :: String -> [String] -> IO ()
-testC compiler fsTestKs = do
+testsThatDoNoCodegen :: IO [String]
+testsThatDoNoCodegen = do
   testHspec
   ksTestFiles_ <- ksTestFiles "test/ksc/"
   testRoundTrip ksTestFiles_
   demoFOnTestPrograms ksTestFiles_
+  return ksTestFiles_
+
+testC :: String -> [String] -> IO ()
+testC compiler fsTestKs = do
+  ksTestFiles_ <- testsThatDoNoCodegen
   compileKscPrograms compiler ksTestFiles_
   testRunKS compiler "test/ksc/gmm.ks"
   testRunKS compiler "test/ksc/fold.ks"

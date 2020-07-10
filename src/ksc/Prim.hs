@@ -353,18 +353,6 @@ pUnzip = mkPrimCall1 "unzip"
 pSize :: TExpr -> TExpr
 pSize e = mkPrimCall1 "size" e
 
-pSel :: Int -> Int -> TExpr -> TExpr
-pSel i n e = Call (TFun el_ty
-                        (Fun (SelFun i n))) e
-           where
-             el_ty = case typeof e of
-                        TypeTuple ts -> ts !! (i-1)
-                        _ -> TypeUnknown  -- Better error from Lint
-
-pFst,pSnd :: TExpr -> TExpr
-pFst   = pSel 1 2
-pSnd   = pSel 2 2
-
 pToFloat :: TExpr -> TExpr
 pToFloat from = userCall "to_float" TypeFloat from
 
