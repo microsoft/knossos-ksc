@@ -16,12 +16,12 @@ Expr::Ptr parse(const string &code) {
     cout << " -- Tokens\n";
   p.tokenise();
   if (verbose > 2)
-    p.getRootToken()->dump();
+    p.getRootToken()->dump(std::cout);
   if (verbose > 1)
     cout << " -- AST\n";
   p.parse();
   if (verbose > 1)
-    p.getRootNode()->dump();
+    p.getRootNode()->dump(std::cout);
   return p.moveRoot();
 }
 
@@ -62,7 +62,7 @@ void test_lexer() {
   auto root = l.lex();
   if (verbose > 2) {
     cout << " -- Tokens\n";
-    root->dump();
+    root->dump(std::cout);
   }
 
   // Root can have many exprs, here only one

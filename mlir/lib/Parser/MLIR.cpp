@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <numeric>
+#include <iostream>
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"

@@ -672,183 +672,189 @@ Expr::Ptr Parser::parseSum(const Token *tok) {
 
 //================================================ Dumps tokens, nodes to stdout
 
-void Token::dump(size_t tab) const {
-  if (isValue) {
-    cout << string(tab, ' ') << "tok(" << getValue().data() << ")\n";
-    return;
-  }
+std::ostream& Token::dump(std::ostream& s, size_t tab) const {
+  if (isValue)
+    return s << string(tab, ' ') << "tok(" << getValue().data() << ")\n";
 
-  cout << string(tab, ' ') << "enter\n";
+  s << string(tab, ' ') << "enter\n";
   tab += 2;
   for (auto &t : children)
-    t->dump(tab);
+    t->dump(s, tab);
   tab -= 2;
-  cout << string(tab, ' ') << "exit\n";
+  return s << string(tab, ' ') << "exit\n";
 }
 
-void Type::dump() const {
+std::ostream& Type::dump(std::ostream& s) const {
   if (type == Vector) {
-    cout << "Vector( ";
-    subTypes[0].dump();
-    cout << " )";
-  } else if (type == Tuple) {
-    cout << "Tuple{ ";
-    for (auto &t: subTypes) {
-      t.dump();
-      cout << " ";
-    }
-    cout << "}";
-  } else {
-    cout << Type2Str(type);
-  }
+    s << "Vector( ";
+    subTypes[0].dump(std::cout);
+    return s << " )";
+  } 
+  if (type == Tuple) {
+    s << "Tuple{ ";
+    for (auto &t: subTypes)
+      t.dump(s) << " ";
+    return s << "}";
+  } 
+  
+  return s << Type2Str(type);
 }
 
-void Expr::dump(size_t tab) const {
-  cout << string(tab, ' ') << "type [";
-  type.dump();
-  cout << "]" << endl;
+std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "type [";
+  type.dump(s);
+  return s << "]" << endl;
 }
 
-void Block::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Block:" << endl;
+std::ostream&  Block::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Block:" << endl;
   for (auto &op : operands)
-    op->dump(tab + 2);
+    op->dump(s, tab + 2);
 }
 
-void Literal::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Literal:" << endl;
-  cout << string(tab + 2, ' ') << "value [" << value << "]" << endl;
-  Expr::dump(tab + 2);
+std::ostream& Literal::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Literal:" << endl;
+  s << string(tab + 2, ' ') << "value [" << value << "]" << endl;
+  return Expr::dump(s, tab + 2);
 }
 
-void Variable::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Variable:" << endl;
-  cout << string(tab + 2, ' ') << "name [" << name << "]" << endl;
-  Expr::dump(tab + 2);
+std::ostream& Variable::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Variable:" << endl;
+  s << string(tab + 2, ' ') << "name [" << name << "]" << endl;
+  Expr::dump(s, tab + 2);
   if (init)
-    init->dump(tab + 2);
+    init->dump(s, tab + 2);
+  return s;
 }
 
-void Let::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Let:" << endl;
-  Expr::dump(tab + 2);
+std::ostream&  Let::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Let:" << endl;
+  Expr::dump(s, tab + 2);
   for (auto &v: vars)
-    v->dump(tab + 2);
+    v->dump(s, tab + 2);
   if (expr)
-    expr->dump(tab + 2);
+    expr->dump(s, tab + 2);
+  return s;
 }
 
-void Operation::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Operation:" << endl;
-  cout << string(tab + 2, ' ') << "name [" << name << "]" << endl;
-  Expr::dump(tab + 2);
+std::ostream& Operation::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Operation:" << endl;
+  s << string(tab + 2, ' ') << "name [" << name << "]" << endl;
+  Expr::dump(s, tab + 2);
   for (auto &op : operands)
-    op->dump(tab + 2);
+    op->dump(s, tab + 2);
+  return s;
 }
 
-void Declaration::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Declaration:" << endl;
-  cout << string(tab + 2, ' ') << "name [" << name << "]" << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Types: [ ";
-  for (auto ty : argTypes) {
-    ty.dump();
-    cout << " ";
-  }
-  cout << "]" << endl;
+std::ostream& Declaration::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Declaration:" << endl;
+  s << string(tab + 2, ' ') << "name [" << name << "]" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Types: [ ";
+  for (auto ty : argTypes)
+    ty.dump(s) << " ";
+  return s << "]" << endl;
 }
 
-void Definition::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Definition:" << endl;
-  cout << string(tab + 2, ' ') << "name [" << proto->getName().data() << "]"
+std::ostream& Definition::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Definition:" << endl;
+  s << string(tab + 2, ' ') << "name [" << proto->getName().data() << "]"
        << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Arguments:" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Arguments:" << endl;
   for (auto &op : arguments)
-    op->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "Implementation:" << endl;
-  impl->dump(tab + 4);
+    op->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Implementation:" << endl;
+  return impl->dump(s, tab + 4);
 }
 
-void Condition::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Condition:" << endl;
-  cond->dump(tab + 2);
-  cout << string(tab + 2, ' ') << "True branch:" << endl;
-  ifBlock->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "False branch:" << endl;
-  elseBlock->dump(tab + 4);
+std::ostream& Condition::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Condition:" << endl;
+  cond->dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "True branch:" << endl;
+  ifBlock->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "False branch:" << endl;
+  elseBlock->dump(s, tab + 4);
+  return s;
 }
 
-void Build::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Build:" << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Range:" << endl;
-  range->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "Induction:" << endl;
-  var->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "Body:" << endl;
-  expr->dump(tab + 4);
+std::ostream& Build::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Build:" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Range:" << endl;
+  range->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Induction:" << endl;
+  var->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Body:" << endl;
+  return expr->dump(s, tab + 4);
 }
 
-void Tuple::dump(size_t tab) const {
+std::ostream& Tuple::dump(std::ostream& s, size_t tab) const {
   cout << string(tab, ' ') << "Tuple:" << endl;
-  Expr::dump(tab + 2);
+  Expr::dump(s, tab + 2);
   cout << string(tab + 2, ' ') << "Values:" << endl;
   for (auto &el: elements)
-    el->dump(tab + 4);
+    el->dump(s, tab + 4);
+  return s;
 }
 
-void Index::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Index:" << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Value:" << endl;
-  index->dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Vector:" << endl;
-  var->dump(tab + 2);
+std::ostream& Index::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Index:" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Value:" << endl;
+  index->dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Vector:" << endl;
+  var->dump(s, tab + 2);
+  return s;
 }
 
-void Size::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Size:" << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Vector:" << endl;
-  var->dump(tab + 2);
+std::ostream& Size::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Size:" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Vector:" << endl;
+  var->dump(s, tab + 2);
+  return s;
 }
 
-void Get::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Get:" << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "index [" << index << "]" << endl;
-  cout << string(tab + 2, ' ') << "From:" << endl;
-  expr->dump(tab + 4);
+std::ostream& Get::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Get:" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "index [" << index << "]" << endl;
+  s << string(tab + 2, ' ') << "From:" << endl;
+  expr->dump(s, tab + 4);
+  return s;
 }
 
-void Fold::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Fold:" << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Lambda:" << endl;
-  body->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "Accumulator:" << endl;
-  acc->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "Vector:" << endl;
-  vector->dump(tab + 4);
+std::ostream& Fold::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Fold:" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Lambda:" << endl;
+  body->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Accumulator:" << endl;
+  acc->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Vector:" << endl;
+  vector->dump(s, tab + 4);
+  return s;
 }
 
-void Print::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Print:" << endl;
-  Expr::dump(tab + 2);
+std::ostream& Print::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Print:" << endl;
+  Expr::dump(s, tab + 2);
   for (auto &el: exprs)
-    el->dump(tab + 4);
+    el->dump(s, tab + 4);
+  return s;
 }
 
-void Rule::dump(size_t tab) const {
-  cout << string(tab, ' ') << "Rule:" << endl;
-  cout << string(tab + 2, ' ') << "name [" << name << "]"
+std::ostream&  Rule::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Rule:" << endl;
+  s << string(tab + 2, ' ') << "name [" << name << "]"
        << endl;
-  Expr::dump(tab + 2);
-  cout << string(tab + 2, ' ') << "Variable:" << endl;
-  variable->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "Pattern:" << endl;
-  pattern->dump(tab + 4);
-  cout << string(tab + 2, ' ') << "Result:" << endl;
-  result->dump(tab + 4);
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Variable:" << endl;
+  variable->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Pattern:" << endl;
+  pattern->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Result:" << endl;
+  result->dump(s, tab + 4);
+  return s;
 }
