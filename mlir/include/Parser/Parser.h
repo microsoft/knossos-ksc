@@ -142,16 +142,16 @@ class Parser {
               .Case("edef", Keyword::EDEF)
               .Case("def", Keyword::DEF)
               .Case("if", Keyword::IF)
-              .Case("build", Keyword::BUILD)
-              .Case("index", Keyword::INDEX)
-              .Case("size", Keyword::SIZE)
+              .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
+              .Case("index", Keyword::INDEX) // TODO: Prim not reserved word
+              .Case("size", Keyword::SIZE) // TODO: Prim not reserved word
               .Case("tuple", Keyword::TUPLE)
               .StartsWith("get$", Keyword::GET)
               .Case("fold", Keyword::FOLD)
               .Case("print", Keyword::PRINT)
               .Case("rule", Keyword::RULE)
               // Stdlib hack
-              .Case("sum", Keyword::SUM)
+              .Case("sum", Keyword::SUM) // TODO: Prim not reserved word
               .Default(Keyword::NA);
   }
   /// Simple symbol table for parsing only (no validation)
