@@ -59,7 +59,7 @@ struct Token {
   const bool isValue;
   size_t size() const { return children.size(); }
 
-  void dump(size_t tab = 0) const;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const;
 
 private:
   std::string value;
