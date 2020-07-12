@@ -66,7 +66,7 @@ struct Type {
   static bool isScalar(ValidType type) {
     return type >= None && type <= LAST_SCALAR;
   }
-  void dump() const;
+  std::ostream& dump(std::ostream& s) const;
   // Vector accessor
   const Type &getSubType() const {
     assert(type == Vector);
@@ -124,7 +124,7 @@ struct Expr {
   const Location loc;
 
   virtual ~Expr() = default;
-  virtual void dump(size_t tab = 0) const;
+  virtual std::ostream& dump(std::ostream& s, size_t tab = 0) const;
 
 protected:
   Expr(Type type, Kind kind) : kind(kind), type(type) {}
@@ -156,7 +156,7 @@ struct Block : public Expr {
   }
   size_t size() const { return operands.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Block; }
@@ -176,7 +176,7 @@ struct Literal : public Expr {
 
   llvm::StringRef getValue() const { return value; }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Literal; }
@@ -211,7 +211,7 @@ struct Variable : public Expr {
   Expr *getInit() const { return init.get(); }
   llvm::StringRef getName() const { return name; }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Variable; }
@@ -241,7 +241,7 @@ struct Let : public Expr {
   Expr *getExpr() const { return expr.get(); }
   size_t size() const { return vars.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Let; }
@@ -288,7 +288,7 @@ struct Operation : public Expr {
     return operandType;
   }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -374,7 +374,7 @@ struct Declaration : public Expr {
   llvm::StringRef getName() const { return name; }
   size_t size() const { return argTypes.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -417,7 +417,7 @@ struct Definition : public Expr {
   llvm::StringRef getName() const { return proto->getName(); }
   size_t size() const { return arguments.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -447,7 +447,7 @@ struct Condition : public Expr {
   Expr *getElseBlock() const { return elseBlock.get(); }
   Expr *getCond() const { return cond.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -473,7 +473,7 @@ struct Build : public Expr {
   Expr *getVariable() const { return var.get(); }
   Expr *getExpr() const { return expr.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Build; }
@@ -504,7 +504,7 @@ struct Tuple : public Expr {
   }
   size_t size() const { return elements.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Tuple; }
@@ -530,7 +530,7 @@ struct Index : public Expr {
   Expr *getIndex() const { return index.get(); }
   Expr *getVariable() const { return var.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Index; }
@@ -552,7 +552,7 @@ struct Size : public Expr {
 
   Expr *getVariable() const { return var.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Size; }
@@ -581,7 +581,7 @@ struct Get : public Expr {
     return tuple->getElement(index-1);
   }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Get; }
@@ -613,7 +613,7 @@ struct Fold : public Expr {
   Expr *getAcc() const { return acc.get(); }
   Expr *getBody() const { return body.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Fold; }
@@ -638,7 +638,7 @@ struct Print : public Expr {
   llvm::ArrayRef<Expr::Ptr> getExprs() const { return exprs; }
   size_t size() const { return exprs.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -666,7 +666,7 @@ struct Rule : public Expr {
   Expr *getPattern() const { return pattern.get(); }
   Expr *getResult() const { return result.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
