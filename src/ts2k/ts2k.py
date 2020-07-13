@@ -56,19 +56,16 @@ symbolLook = {
     "Tensor": [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")]  # float vs integer?
 }
 
+def managleDebugName(name):
+    return "_" + name.replace(".", "_")
+
 def make_arg(input):
     # [input.debugName(), " :", input.type()]
     return [
-        sexpdata.Symbol(input.debugName()),
+        sexpdata.Symbol(managleDebugName(input.debugName())),
         sexpdata.Symbol(":"),
         symbolLook[str(input.type())]
     ]
-
-
-
-
-def managleDebugName(name):
-    return "_" + name.replace(".", "_")
 
 def make_constant(node):
 
