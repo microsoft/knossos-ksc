@@ -52,5 +52,6 @@
         "array": "cpp",
         "iterator": "cpp"
     },
-    "search.usePCRE2": true
+    "search.usePCRE2": true,
+    "cmake.sourceDirectory": "${workspaceFolder}/mlir"
 }
