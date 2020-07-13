@@ -60,7 +60,6 @@ def managleDebugName(name):
     return "_" + name.replace(".", "_")
 
 def make_arg(input):
-    # [input.debugName(), " :", input.type()]
     return [
         sexpdata.Symbol(managleDebugName(input.debugName())),
         sexpdata.Symbol(":"),
@@ -86,7 +85,7 @@ def make_constant(node):
 
 def make_print(node):
     mangled_id = managleDebugName(node.inputsAt(0).debugName())
-    return [sexpdata.Symbol("print"), sexpdata.Symbol(mangled_id)]
+    return sexpdata.Symbol("print"), sexpdata.Symbol(mangled_id)
 
 def make_list_init_inner(values, i, rescue):
     value = values[0]
@@ -132,6 +131,19 @@ def make_tensor(node):
         sexpdata.Symbol(managleDebugName(value.debugName())),
         sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))]
 
+def make_add(node):
+    print("WARNING: aten::add just returns unmodified tensor")
+    value = node.outputsAt(0)
+
+    return [
+        sexpdata.Symbol("\n"),
+        sexpdata.Symbol(managleDebugName(value.debugName())),
+        sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))]
+
+def make_return(node):
+    mangled_id = managleDebugName(node.inputsAt(0).debugName())
+    return sexpdata.Symbol(mangled_id)
+
 def make_default(node):
     print("TODO:" + node.kind() )
     return sexpdata.Symbol("")
@@ -149,7 +161,9 @@ lookups = {
     'prim::Constant': make_constant,
     'prim::Print': make_print,
     'prim::ListConstruct': make_list,
-    'aten::tensor': make_tensor
+    'aten::tensor': make_tensor,
+    'aten::add': make_add,
+    'prim::Return': make_return
 }
 
 
@@ -162,14 +176,27 @@ def ts2ks(function):
 
     args = [make_arg(item) for item in function.graph.inputs() ]
 
-    stuff = list(function.graph.nodes())[0:-1]
+    all_nodes = list(function.graph.nodes()) # arbitrary treat N-1 as binds
 
-    binds = [make_node(node) for node in stuff]
-    op = make_node(list(function.graph.nodes())[-1])
+    binds = [make_node(node) for node in all_nodes if node.kind() != 'prim::Print']
+
+    #ops = [make_node(node) for node in all_nodes if node.kind() == 'prim::Print']
+    #returnVal = make_node(function.graph.return_node())
+    #ops.append(returnVal)
+
+    
+    # HACK: if last operation is print, we want that otherwise it's a return value.
+    # need to think about interaction between imperative Python and pure Knossos
+    if (list(function.graph.nodes())[-1].kind() == 'prim::Print'):
+        op = make_node(list(function.graph.nodes())[-1])
+        return_type = sexpdata.Symbol("Integer")
+    else:
+        op = make_node(function.graph.return_node())
+        return_type = [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")] # Actually lookup!
 
     body = [sexpdata.Symbol("\n"), sexpdata.Symbol("let"), binds, sexpdata.Symbol("\n"), op]
 
-    whole_exp = [sexpdata.Symbol('def'), name, sexpdata.Symbol("Integer"), args, body]
+    whole_exp = [sexpdata.Symbol('def'), name, return_type, args, body]
 
     output.write(sexpdata.dumps(whole_exp))
 
