@@ -14,8 +14,7 @@
 obj/
 Debug/
 Release/
-mlir/build
-
+build/
 
 # nuget packages
 /packages/
