@@ -68,7 +68,7 @@ def make_arg(input):
 
 
 def managleDebugName(name):
-    return "_" + name
+    return "_" + name.replace(".", "_")
 
 def make_constant(node):
 
@@ -105,8 +105,6 @@ def make_list_init(values):
     return make_list_init_inner(values, 0, managleDebugName(values[0].debugName()))
 
 def make_list(node):
-    # print("WARNING: Lists aren't correctly translated yet, " + node.kind() )
-    # build n (lam (ni : Integer) (to_float (mul ni ni))))
     value = node.outputsAt(0)
 
     list_size = str(sum(1 for _ in node.inputs()))
@@ -128,6 +126,15 @@ def make_list(node):
         ]
     ]    
 
+def make_tensor(node):
+    # tensors aren't explicitly modelled in Knossos yet, leave them as identify over a (jagged) list for now
+    value = node.outputsAt(0)
+
+    return [
+        sexpdata.Symbol("\n"),
+        sexpdata.Symbol(managleDebugName(value.debugName())),
+        sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))]
+
 def make_default(node):
     print("TODO:" + node.kind() )
     return sexpdata.Symbol("")
@@ -144,7 +151,8 @@ def make_default(node):
 lookups = {
     'prim::Constant': make_constant,
     'prim::Print': make_print,
-    'prim::ListConstruct': make_list
+    'prim::ListConstruct': make_list,
+    'aten::tensor': make_tensor
 }
 
 
