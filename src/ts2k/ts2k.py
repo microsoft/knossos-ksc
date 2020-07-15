@@ -53,7 +53,7 @@ output.write("\n")
 output.write("\n")
 
 symbolLook = {
-    "Tensor": [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")]  # float vs integer?
+    "Tensor": [sexpdata.Symbol("Vec"), [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")]]  # float vs integer? also determine rank instead of hardcode
 }
 
 def managleDebugName(name):
@@ -144,6 +144,21 @@ def make_return(node):
     mangled_id = managleDebugName(node.inputsAt(0).debugName())
     return sexpdata.Symbol(mangled_id)
 
+def make_callfunction(node):
+    value = node.outputsAt(0)
+    function_name_constant = node.inputsAt(0).node()
+    input1 = node.inputsAt(1) # TODO: get all inputs instead of just first, 0th is function name itself
+    function_name = function_name_constant.s("name")
+    sexpdata.Symbol("XXXYCX")
+    return [
+        sexpdata.Symbol("\n"),
+        sexpdata.Symbol(managleDebugName(value.debugName())),
+        [ # get a function call - brackets are escaped by sexpdata
+            sexpdata.Symbol(function_name),
+            sexpdata.Symbol(managleDebugName(input1.debugName())),
+        ]
+    ]
+
 def make_default(node):
     print("TODO:" + node.kind() )
     return sexpdata.Symbol("")
@@ -163,7 +178,8 @@ lookups = {
     'prim::ListConstruct': make_list,
     'aten::tensor': make_tensor,
     'aten::add': make_add,
-    'prim::Return': make_return
+    'prim::Return': make_return,
+    'prim::CallFunction': make_callfunction
 }
 
 
@@ -192,7 +208,7 @@ def ts2ks(function):
         return_type = sexpdata.Symbol("Integer")
     else:
         op = make_node(function.graph.return_node())
-        return_type = [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")] # Actually lookup!
+        return_type = [sexpdata.Symbol("Vec"), [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")]] # Actually lookup!
 
     body = [sexpdata.Symbol("\n"), sexpdata.Symbol("let"), binds, sexpdata.Symbol("\n"), op]
 
