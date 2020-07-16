@@ -229,21 +229,28 @@ def main():
     print(f"Loading image {input_file}")
     input = np.asarray(Image.open(input_file)).transpose((2, 0, 1))[None, :, :, :] / 255.0 # NCHW
 
-    if args.model == "resnet_v2":
-        from resnet_v2 import Resnet50 as resnet
+    if model == "resnet_v2":
         weights = resnet50_v2_weights_from_pytorch(weights)
-    elif args.model == "resnet_py":
+    elif model == "resnet_py":
+        weights = resnet50_py_weights_from_pytorch(weights)
+    class_names = get_class_name_dict(imagenet_class_names_file)
+    return weights, class_names, input
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py"])
+    args = parser.parse_args()
+
+    weights, class_names, input = get_weights_labels_input(args.model)
+    if args.model == "resnet_py":
         import sys
         sys.path.append("examples/dl-resnet")
         from resnet import resnet
-        weights = resnet50_py_weights_from_pytorch(weights)
-    
-    if args.model == "resnet_py":
         out = resnet(input, weights)
         out = out.data
     else:
+        from resnet_v2 import Resnet50 as resnet
         out = resnet(weights, input)
-    class_names = get_class_name_dict(imagenet_class_names_file)
     top5 = out.ravel().argsort()[-5:][::-1]
     print("\n".join([f"score={out[0, i]}, {class_names[str(i)]}" for i in top5]))
     assert class_names[str(top5[0])] == ["n03661043", "library"]
