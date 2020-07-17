@@ -497,7 +497,6 @@ Expr::Ptr Parser::parseDecl(const Token *tok) {
   auto decl =
       make_unique<Declaration>(name->getValue(), type);
   assert(decl);
-
   // Vector and Tuples can be declared bare
   if (args->getChild(0)->isValue &&
       !Type::isScalar(Str2Type(args->getChild(0)->getValue())))
