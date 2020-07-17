@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.ks": "ks-lisp",
         "tuple": "cpp",
         "utility": "cpp",
         "random": "cpp",
@@ -50,8 +51,20 @@
         "xtree": "cpp",
         "xutility": "cpp",
         "array": "cpp",
-        "iterator": "cpp"
+        "iterator": "cpp",
+        "*.tcc": "cpp",
+        "bitset": "cpp",
+        "cctype": "cpp",
+        "chrono": "cpp",
+        "cinttypes": "cpp",
+        "clocale": "cpp",
+        "ctime": "cpp",
+        "cwctype": "cpp",
+        "string_view": "cpp",
+        "fstream": "cpp",
+        "optional": "cpp"
     },
     "search.usePCRE2": true,
-    "cmake.sourceDirectory": "${workspaceFolder}/mlir"
+    "cmake.sourceDirectory": "${workspaceFolder}/mlir",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }
