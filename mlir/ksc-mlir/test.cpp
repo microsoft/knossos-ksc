@@ -95,36 +95,36 @@ void test_lexer() {
 
 void test_parser_block() {
   cout << "\n == test_parser_block\n";
-  const Expr::Ptr tree = parse("(10.0 42 \"\" \" \" \"Hello\" \"Hello world\")");
+  const Expr::Ptr tree = parse("(tuple 10.0 42 \"\" \" \" \"Hello\" \"Hello world\")");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
   assert(root);
   // Kind is Block and has 1 sub-expr
-  Block* block = llvm::dyn_cast<Block>(root->getOperand(0));
-  assert(block);
+  Tuple* tuple = llvm::dyn_cast<Tuple>(root->getOperand(0));
+  assert(tuple);
   // Block has 6 literals
-  Literal* op0 = llvm::dyn_cast<Literal>(block->getOperand(0));
+  Literal* op0 = llvm::dyn_cast<Literal>(tuple->getElement(0));
   assert(op0);
   assert(op0->getValue() == "10.0");
   assert(op0->getType() == Type::Float);
-  Literal* op1 = llvm::dyn_cast<Literal>(block->getOperand(1));
+  Literal* op1 = llvm::dyn_cast<Literal>(tuple->getElement(1));
   assert(op1);
   assert(op1->getValue() == "42");
   assert(op1->getType() == Type::Integer);
-  Literal* op2 = llvm::dyn_cast<Literal>(block->getOperand(2));
+  Literal* op2 = llvm::dyn_cast<Literal>(tuple->getElement(2));
   assert(op2);
   assert(op2->getValue() == "");
   assert(op2->getType() == Type::String);
-  Literal* op3 = llvm::dyn_cast<Literal>(block->getOperand(3));
+  Literal* op3 = llvm::dyn_cast<Literal>(tuple->getElement(3));
   assert(op3);
   assert(op3->getValue() == " ");
   assert(op3->getType() == Type::String);
-  Literal* op4 = llvm::dyn_cast<Literal>(block->getOperand(4));
+  Literal* op4 = llvm::dyn_cast<Literal>(tuple->getElement(4));
   assert(op4);
   assert(op4->getValue() == "Hello");
   assert(op4->getType() == Type::String);
-  Literal* op5 = llvm::dyn_cast<Literal>(block->getOperand(5));
+  Literal* op5 = llvm::dyn_cast<Literal>(tuple->getElement(5));
   assert(op5);
   assert(op5->getValue() == "Hello world");
   assert(op5->getType() == Type::String);
@@ -252,7 +252,7 @@ void test_parser_cond() {
   cout << "\n == test_parser_cond\n";
   const Expr::Ptr tree = parse("(edef fun Integer (Integer))"
                                "(def fun Integer ((x : Integer)) (add@ii x 10))"
-                               "(if (true) (fun 10) (add@ii 10 10))");
+                               "(if true (fun 10) (add@ii 10 10))");
 
   // Root can have many exprs, here only 3
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -261,9 +261,7 @@ void test_parser_cond() {
   Condition* cond = llvm::dyn_cast<Condition>(root->getOperand(2));
   assert(cond);
   // Condition block is Bool true
-  Block* c = llvm::dyn_cast<Block>(cond->getCond());
-  assert(c);
-  auto condVal = llvm::dyn_cast<Literal>(c->getOperand(0));
+  auto condVal = llvm::dyn_cast<Literal>(cond->getCond());
   assert(condVal);
   assert(condVal->getValue() == "true");
   assert(condVal->getType() == Type::Bool);
@@ -294,7 +292,7 @@ void test_parser_cond() {
 
 void test_parser_rule() {
   cout << "\n == test_parser_rule\n";
-  const Expr::Ptr tree = parse("((rule \"mul2\" (v : Float) (mul@ff v 2.0) (add@ff v v)))");
+  const Expr::Ptr tree = parse("(rule \"mul2\" (v : Float) (mul@ff v 2.0) (add@ff v v))");
 
   // Root can have many exprs, here only 3
   Block* root = llvm::dyn_cast<Block>(tree.get());

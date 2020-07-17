@@ -30,12 +30,6 @@ CHECK-NEXT: OK
 CHECK: test_parser_build
 CHECK-NEXT: OK
 
-CHECK: test_parser_index
-CHECK-NEXT: OK
-
-CHECK: test_parser_size
-CHECK-NEXT: OK
-
 CHECK: test_parser_vector
 CHECK-NEXT: OK
 
