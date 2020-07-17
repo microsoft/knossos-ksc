@@ -11,6 +11,43 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 
+#include <stdio.h>
+#include <execinfo.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <iostream>
+
+inline void ks_backtrace()
+{
+  void *array[10];
+
+  // get void*'s for all entries on the stack
+  size_t size = backtrace(array, sizeof array / sizeof array[0]);
+
+  // print out all the frames to stderr
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+}
+
+struct asserter {
+  std::ostream* s;
+  asserter() {
+    s = &std::cerr;
+    *s << "\nASSERT FAIL: ";
+  }
+  ~asserter() {
+    std::cerr << std::endl;
+    ks_backtrace();
+    assert(false); 
+  }
+  template <class T>
+  std::ostream& operator<<(const T& t) { return *s << t; }
+};
+
+// ASSERT(p) << msg;
+#define ASSERT(p) if (p) ; else asserter()
+
+
 namespace Knossos {
 namespace AST {
 
@@ -43,7 +80,7 @@ struct Type {
 
   /// Scalar constructor
   Type(ValidType type) : type(type) {
-    assert(isScalar() && "Wrong ctor");
+    ASSERT(isScalar()) << "Type: Scalar constructor called for non-Scalar type: " << type;
   }
   /// Vector constructor
   Type(ValidType type, Type subTy) : type(type) {
@@ -67,6 +104,17 @@ struct Type {
     return type >= None && type <= LAST_SCALAR;
   }
   std::ostream& dump(std::ostream& s) const;
+
+  bool isInteger() {
+    return type == Integer;
+  }
+  bool isFloat() {
+    return type == Float;
+  }
+  bool isVector() {
+    return type == Vector;
+  }
+
   // Vector accessor
   const Type &getSubType() const {
     assert(type == Vector);
@@ -105,8 +153,6 @@ struct Expr {
     Operation,
     Rule,
     Build,
-    Index,
-    Size,
     Tuple,
     Get,
     Fold,
@@ -117,6 +163,9 @@ struct Expr {
 
   /// valid types, for safety checks
   Type getType() const { return type; }
+
+  /// Set type
+  void setType(Type type) { this->type = type; }
 
   /// Type of the node, for quick access
   const Kind kind;
@@ -273,7 +322,7 @@ struct Operation : public Expr {
   };
   Operation(llvm::StringRef name, Opcode opcode, Type type = Type::None)
       : Expr(type, Kind::Operation), name(name), opcode(opcode),
-        operandType(Type::None) { }
+        operandType(Type::None) { }  // TODO: remove operandType
 
   void addOperand(Expr::Ptr op) { operands.push_back(std::move(op)); }
   llvm::ArrayRef<Expr::Ptr> getOperands() const { return operands; }
@@ -513,57 +562,9 @@ private:
   std::vector<Expr::Ptr> elements;
 };
 
-/// Index, ex: (index N vector)
-///
-/// Extract the Nth index from a vector
-/// Note: index range is [0, N-1]
-struct Index : public Expr {
-  using Ptr = std::unique_ptr<Index>;
-  Index(Expr::Ptr index, Expr::Ptr var)
-      : Expr(Type::None, Kind::Index), index(std::move(index)),
-        var(std::move(var)) {
-    assert(this->index->getType() == Type::Integer && "Invalid index type");
-    assert(this->var->getType() == Type::Vector && "Invalid variable type");
-    type = this->var->getType().getSubType();
-  }
-
-  Expr *getIndex() const { return index.get(); }
-  Expr *getVariable() const { return var.get(); }
-
-  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) { return c->kind == Kind::Index; }
-
-private:
-  Expr::Ptr index;
-  Expr::Ptr var;
-};
-
-/// Size, ex: (index N vector)
-///
-/// Extract the Nth index from a vector
-struct Size : public Expr {
-  using Ptr = std::unique_ptr<Size>;
-  Size(Expr::Ptr var)
-      : Expr(Type::Integer, Kind::Size), var(std::move(var)) {
-    assert(this->var->getType() == Type::Vector && "Invalid variable type");
-  }
-
-  Expr *getVariable() const { return var.get(); }
-
-  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) { return c->kind == Kind::Size; }
-
-private:
-  Expr::Ptr var;
-};
-
 /// Get, ex: (get$7$9 tuple)
 ///
-/// Extract the Nth index from a vector.
+/// Extract the Nth element from a tuple. 
 /// Note: index range is [1, N]
 struct Get : public Expr {
   using Ptr = std::unique_ptr<Get>;

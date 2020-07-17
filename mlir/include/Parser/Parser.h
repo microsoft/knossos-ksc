@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <iosfwd>
 
 #include "AST.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -65,6 +66,11 @@ private:
   std::string value;
   std::vector<Ptr> children;
 };
+
+inline std::ostream& operator<<(std::ostream& s, Token const* tok) 
+{
+  return tok->dump(s);
+}
 
 /// Tokenise the text into recursive tokens grouped by parenthesis.
 ///
@@ -143,8 +149,6 @@ class Parser {
               .Case("def", Keyword::DEF)
               .Case("if", Keyword::IF)
               .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
-              .Case("index", Keyword::INDEX) // TODO: Prim not reserved word
-              .Case("size", Keyword::SIZE) // TODO: Prim not reserved word
               .Case("tuple", Keyword::TUPLE)
               .StartsWith("get$", Keyword::GET)
               .Case("fold", Keyword::FOLD)
@@ -194,8 +198,6 @@ class Parser {
   Expr::Ptr parseDef(const Token *tok);
   Expr::Ptr parseCond(const Token *tok);
   Expr::Ptr parseBuild(const Token *tok);
-  Expr::Ptr parseIndex(const Token *tok);
-  Expr::Ptr parseSize(const Token *tok);
   Expr::Ptr parseTuple(const Token *tok);
   Expr::Ptr parseGet(const Token *tok);
   Expr::Ptr parseFold(const Token *tok);

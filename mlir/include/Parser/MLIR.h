@@ -59,8 +59,6 @@ class Generator {
   Values buildLiteral(const AST::Literal*);
   Values buildVariable(const AST::Variable*);
   Values buildBuild(const AST::Build*);
-  Values buildIndex(const AST::Index*);
-  Values buildSize(const AST::Size*);
   Values buildTuple(const AST::Tuple*);
   Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
