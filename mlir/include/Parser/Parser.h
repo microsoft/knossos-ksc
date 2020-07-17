@@ -53,7 +53,7 @@ struct Token {
   }
   llvm::ArrayRef<Ptr> getTail() const {
     assert(!isValue && "No children in a value token");
-    assert(children.size() > 1 && "No tail");
+    assert(children.size() > 0 && "No tail");
     return llvm::ArrayRef<Ptr>(children).slice(1);
   }
 
