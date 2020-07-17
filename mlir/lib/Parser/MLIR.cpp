@@ -244,10 +244,6 @@ Values Generator::buildNode(const AST::Expr* node) {
     return buildVariable(llvm::dyn_cast<AST::Variable>(node));
   if (AST::Build::classof(node))
     return buildBuild(llvm::dyn_cast<AST::Build>(node));
-  if (AST::Index::classof(node))
-    return buildIndex(llvm::dyn_cast<AST::Index>(node));
-  if (AST::Size::classof(node))
-    return buildSize(llvm::dyn_cast<AST::Size>(node));
   if (AST::Tuple::classof(node))
     return buildTuple(llvm::dyn_cast<AST::Tuple>(node));
   if (AST::Get::classof(node))
@@ -281,6 +277,26 @@ Values Generator::buildLiteral(const AST::Literal* lit) {
 Values Generator::buildOp(const AST::Operation* op) {
   auto operation = op->getName();
 
+  if (op->getOpcode() == AST::Operation::Opcode::MAYBE_CALL) {
+    if (operation == "index") {
+      assert(op->size() == 2);
+      auto idx = Single(buildNode(op->getOperand(0)));
+      auto vec = Single(buildNode(op->getOperand(1)));
+      auto indTy = builder.getIndexType();
+      auto indIdx = builder.create<mlir::IndexCastOp>(UNK, idx, indTy);
+      mlir::ValueRange rangeIdx {indIdx};
+      return {builder.create<mlir::LoadOp>(UNK, vec, rangeIdx)};
+    }
+
+    if (operation == "size") {
+      auto vec = Single(buildNode(op->getOperand(0)));
+      // FIXME: Support multi-dimensional vectors
+      auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
+      auto intTy = builder.getIntegerType(64);
+      return {builder.create<mlir::IndexCastOp>(UNK, dim, intTy)};
+    }
+  }
+
   // Function call
   if (functions.count(operation)) {
     auto func = functions[operation];
@@ -308,17 +324,19 @@ Values Generator::buildOp(const AST::Operation* op) {
   }
 
   // Check types
-  auto opty = op->getOperandType();
-  bool isInt = (opty == AST::Type::Integer);
-  bool isBool = (opty == AST::Type::Bool);
-  bool isFloat = (opty == AST::Type::Float);
-  assert(isInt || isBool || isFloat && "Invalid type for operation");
-
   if (op->size() == 1) {
     // Unary operations
-    auto arg = Single(buildNode(op->getOperand(0)));
+    auto op0 = op->getOperand(0);
+    auto arg = Single(buildNode(op0));
+
+    auto opty = op0->getType();
+    bool isInt = (opty == AST::Type::Integer);
+    bool isBool = (opty == AST::Type::Bool);
+    bool isFloat = (opty == AST::Type::Float);
+    ASSERT(isInt || isBool || isFloat) << "Invalid type for operation";
+
     if (op->getOpcode() != AST::Operation::Opcode::TOF)
-      assert(isFloat && "Invalid type for operation");
+      ASSERT(op->getType() == AST::Type::Float) << "Invalid type for operation";
 
     switch(op->getOpcode()) {
       case AST::Operation::Opcode::ABS:
@@ -340,8 +358,19 @@ Values Generator::buildOp(const AST::Operation* op) {
   } else if (op->size() == 2) {
     // Binary operations
     // Note: these do not support tuples natively
-    auto lhs = Single(buildNode(op->getOperand(0)));
-    auto rhs = Single(buildNode(op->getOperand(1)));
+    auto op0 = op->getOperand(0);
+    auto op1 = op->getOperand(1);
+
+    auto lhs = Single(buildNode(op0));
+    auto rhs = Single(buildNode(op1));
+
+    ASSERT(op0->getType() == op1->getType()) << "Binary ops must have matching types";
+
+    auto opty = op0->getType();
+    bool isInt = (opty == AST::Type::Integer);
+    bool isBool = (opty == AST::Type::Bool);
+    bool isFloat = (opty == AST::Type::Float);
+    ASSERT(isInt || isBool || isFloat) << "Invalid type for operation";
 
     switch(op->getOpcode()) {
       // Arithmetic
@@ -521,25 +550,6 @@ Values Generator::buildBuild(const AST::Build* b) {
   // EXIT BLOCK: change insertion point before returning the final vector
   builder.setInsertionPointToEnd(exitBlock);
   return {memrefCastForCall(vec)};
-}
-
-// Builds index access to vectors
-Values Generator::buildIndex(const AST::Index* i) {
-  auto idx = Single(buildNode(i->getIndex()));
-  auto vec = Single(buildNode(i->getVariable()));
-  auto indTy = builder.getIndexType();
-  auto indIdx = builder.create<mlir::IndexCastOp>(UNK, idx, indTy);
-  mlir::ValueRange rangeIdx {indIdx};
-  return {builder.create<mlir::LoadOp>(UNK, vec, rangeIdx)};
-}
-
-// Builds size of vector operator
-Values Generator::buildSize(const AST::Size* s) {
-  auto vec = Single(buildNode(s->getVariable()));
-  // FIXME: Support multi-dimensional vectors
-  auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
-  auto intTy = builder.getIntegerType(64);
-  return {builder.create<mlir::IndexCastOp>(UNK, dim, intTy)};
 }
 
 // Builds tuple creation
