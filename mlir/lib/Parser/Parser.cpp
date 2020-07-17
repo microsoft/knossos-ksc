@@ -262,6 +262,10 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
       break;
   }
 
+  // User-defined functions overwrite builtins
+  if (functions.exists(value))
+    return parseCall(tok);
+
   // Everything else is a function call: (fun 10.0 42 "Hello")
   // Operations: reserved keywords like add, mul, etc.
   Operation::Opcode op = isReservedOp(value);
@@ -346,7 +350,7 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
   }
 
   // Variable use: name (without quotes)
-  ASSERT(variables.exists(value)) << "Variable not declared: " << value;
+  ASSERT(variables.exists(value)) << "Variable not declared [" << value << "]";
   auto val = variables.get(value);
   // Create new node, referencing existing variable
   assert(Variable::classof(val));
@@ -639,7 +643,7 @@ Expr::Ptr Parser::parseRule(const Token *tok) {
   const Token *name = tok->getChild(1);
   assert(name->isValue);
   llvm::StringRef unquoted = unquote(name->getValue());
-  auto var = parseToken(tok->getChild(2));
+  auto var = parseVariable(tok->getChild(2));
   auto pat = parseToken(tok->getChild(3));
   auto res = parseToken(tok->getChild(4));
   auto rule =

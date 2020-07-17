@@ -3,7 +3,6 @@
 
 (edef foo Integer (Integer))
 (edef bar Integer (Integer))
-(edef eq Bool (Integer Integer))
 
 (def main Integer () (
 ; MLIR: func @main() -> i64 {
