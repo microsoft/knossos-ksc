@@ -4,9 +4,6 @@
 (edef to_float Float (Integer))
 ; MLIR:   func @to_float(i64) -> f64
 
-(edef add@ii Integer (Integer Integer))
-; MLIR:   func @"add@ii"(i64, i64) -> i64
-
 ; Length of the vector comes from a function argument
 ; build structure is the same, tested below
 (def argLen (Vec Float) (N : Integer)
