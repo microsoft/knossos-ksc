@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   }
   ifstream file(filename.str());
   if (!file.is_open()) {
-    cout << "Invalid filename!\n";
+    cerr << "Invalid filename [" << filename.str() << "]!\n";
     help();
     return 1;
   }
