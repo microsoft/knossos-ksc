@@ -1,0 +1,9 @@
+
+# Copy this file to "user.cmake" (which is gitignored by default)
+# And edit to match your configuration.
+
+# This is really much better than environment variables
+
+set(LLVM "$ENV{HOME}/dev/llvm-project/awf-build")
+set(MLIR_DIR "${LLVM}/lib/cmake/mlir")
+set(LLVM_EXTERNAL_LIT "${LLVM}/bin/llvm-lit")

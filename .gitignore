@@ -3,6 +3,9 @@
 .vscode/
 .ionide/
 
+# User-specific cmake config
+user.cmake
+
 # Prerequisites
 *.d
 
