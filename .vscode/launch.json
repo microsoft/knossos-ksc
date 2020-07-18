@@ -19,12 +19,12 @@
 			"preLaunchTask": "npm-watch"
 		},
 		{
-			"name": "C++ Launch (Windows)",
+			"name": "C++ ksc-mlir",
 			"cwd": "${workspaceRoot}",
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bin/ksc-mlir",
-			"args": ["MLIR", "${workspaceFolder}/mlir/test/Ksc/build.ks"],
+			"args": ["MLIR", "${workspaceFolder}/mlir/test/Ksc/ops.ks"],
 			"miDebuggerPath": "/usr/bin/gdb",
 			"externalConsole": false,
 			"logging": {
