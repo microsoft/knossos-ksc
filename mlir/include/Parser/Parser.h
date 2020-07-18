@@ -106,16 +106,9 @@ class Parser {
   Expr::Ptr rootE;
   Lexer lex;
 
-  // TODO: Use polymorphic operations in Knossos
-  llvm::StringRef opName(llvm::StringRef name) const {
-    size_t at = name.find('@');
-    if (at != llvm::StringRef::npos)
-      return name.substr(0, at);
-    return name;
-  }
   // Lookup table of reserved operations and keywords
   Operation::Opcode isReservedOp(llvm::StringRef name) const {
-    return llvm::StringSwitch<Operation::Opcode>(opName(name))
+    return llvm::StringSwitch<Operation::Opcode>(name)
               .Case("add", Operation::Opcode::ADD)
               .Case("sub", Operation::Opcode::SUB)
               .Case("mul", Operation::Opcode::MUL)
