@@ -58,7 +58,7 @@
 ; LLVM: define i64 @main(i64 %0) {
 
 ; Creating a 10-element vector of integers, from 0 to 9
-(let (v (build 10 (lam (i : Integer) (add@ii i argc)))) (add@ii (size v) (index 5 v)))
+(let (v (build 10 (lam (i : Integer) (add i argc)))) (add (size v) (index 5 v)))
 ; MLIR:   %c10{{.*}} = constant 10 : i64
 ; MLIR:   %[[idxV:[0-9]+]] = index_cast %c10{{.*}} : i64 to index
 ; MLIR:   %[[vec:[0-9]+]] = alloc(%[[idxV]]) : memref<?xi64>

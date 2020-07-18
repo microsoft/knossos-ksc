@@ -46,13 +46,13 @@
 ; MLIR: %[[ret:[ci_0-9]+]] = constant 42 : i64
 
 ; Creating tuple of two elements, extracting each one, and returning the sum
-        (t (tuple (add@ii argc argc) 10.0 23)))
+        (t (tuple (add argc argc) 10.0 23)))
 ; MLIR: %[[add:[0-9]+]] = addi %arg0, %arg0 : i64
 ; MLIR: %cst = constant 1.000000e+01 : f64
 ; MLIR: %c23{{.*}} = constant 23 : i64
 ; LLVM: %[[add:[0-9]+]] = add i64 %0, %0
 
-        (mul@ii (get$1$3 t) (get$3$3 t))
+        (mul (get$1$3 t) (get$3$3 t))
 ; MLIR: %[[mul:[0-9]+]] = muli %[[add]], %c23{{.*}} : i64
 ; MLIR: return %[[mul]] : i64
 ; LLVM: %[[mul:[0-9]+]] = mul i64 %[[add]], 23

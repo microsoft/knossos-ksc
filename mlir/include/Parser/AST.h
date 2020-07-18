@@ -100,6 +100,11 @@ protected:
   std::vector<Type> subTypes;
 };
 
+inline std::ostream& operator<<(std::ostream& s, Type const& t)
+{
+  return t.dump(s);
+}
+
 /// A node in the AST.
 struct Expr {
   using Ptr = std::unique_ptr<Expr>;
@@ -265,7 +270,7 @@ private:
   Expr::Ptr expr;
 };
 
-/// Operation, ex: (add x 3), (neg (mul@ff (sin x) d_dcos)))
+/// Operation, ex: (add x 3), (neg (mul (sin x) d_dcos)))
 /// Call, ex: (fwd$to_float 10 dx)
 ///
 /// Represent native operations (add, mul) and calls.
@@ -409,12 +414,12 @@ struct Definition : public Expr {
   using Ptr = std::unique_ptr<Definition>;
   Definition(llvm::StringRef name, Type type)
       : Expr(type, Kind::Definition) {
-    proto = std::make_unique<Declaration>(name, type);
+    decl = std::make_unique<Declaration>(name, type);
   }
 
   /// Arguments and return type (for name and type validation)
   void addArgument(Expr::Ptr node) {
-    proto->addArgType(node->getType());
+    decl->addArgType(node->getType());
     arguments.push_back(std::move(node));
   }
   llvm::ArrayRef<Expr::Ptr> getArguments() const { return arguments; }
@@ -427,8 +432,8 @@ struct Definition : public Expr {
     impl = std::move(expr);
   }
   Expr *getImpl() const { return impl.get(); }
-  Declaration *getProto() const { return proto.get(); }
-  llvm::StringRef getName() const { return proto->getName(); }
+  Declaration *getDeclaration() const { return decl.get(); }
+  llvm::StringRef getName() const { return decl->getName(); }
   size_t size() const { return arguments.size(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
@@ -440,7 +445,7 @@ struct Definition : public Expr {
 
 private:
   Expr::Ptr impl;
-  Declaration::Ptr proto;
+  Declaration::Ptr decl;
   std::vector<Expr::Ptr> arguments;
 };
 
@@ -615,7 +620,7 @@ private:
   std::vector<Expr::Ptr> exprs;
 };
 
-/// Rule, ex: (rule "mul2" (v : Float) (mul@ff v 2.0) (add v v))
+/// Rule, ex: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
 ///
 /// Rules express ways to transform the graph. They need a special
 /// MLIR dialect to be represented and cannot be lowered to LLVM.

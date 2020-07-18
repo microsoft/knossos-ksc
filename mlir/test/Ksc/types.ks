@@ -10,7 +10,7 @@
 ; LLVM:     declare { double*, double*, i64, [1 x i64], [1 x i64] } @fun2(double* %0, double* %1, i64 %2, i64 %3, i64 %4)
 
 (def fun@ii Integer ((ai : Integer) (bi : Integer) (ci : Integer)) (
-  (add@ii (mul@ii ai bi) ci)
+  (add (mul ai bi) ci)
 ))
 ; MLIR:       func @"fun@ii"(%arg0: i64, %arg1: i64, %arg2: i64) -> i64 {
 ; MLIR-NEXT:    %[[mul:[0-9]+]] = muli %arg0, %arg1 : i64
@@ -25,7 +25,7 @@
 ; LLVM-NEXT:  }
 
 (def fun@ff Float ((af : Float) (bf : Float) (cf : Float)) (
-  (add@ff (mul@ff af bf) cf)
+  (add (mul af bf) cf)
 ))
 ; MLIR:       func @"fun@ff"(%arg0: f64, %arg1: f64, %arg2: f64) -> f64 {
 ; MLIR-NEXT:    %[[mul:[0-9]+]] = mulf %arg0, %arg1 : f64
