@@ -394,7 +394,9 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 
     // Validate types
     for (const auto &it : llvm::zip(o->getOperands(), decl->getArgTypes()))
-      ASSERT(get<0>(it)->getType() == get<1>(it)) << "Type mismatch in call of " << name << ":" << tok;
+      ASSERT(get<0>(it)->getType() == get<1>(it)) 
+                  << "Type mismatch at " << tok << "\n" 
+                  << get<0>(it)->getType() << " != " << get<1>(it);
   }
   ASSERT(o->getType() != Type::None) << "Unknown function [" << name << "]\n";
 
@@ -535,7 +537,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
     assert(a->kind == Expr::Kind::Variable);
     node->addArgument(move(a));
   }
-  functions.set(name->getValue().str(), node->getProto());
+  functions.set(name->getValue().str(), node->getDeclaration());
 
   // Function body is a block, create one if single expr
   auto body = parseToken(expr);
@@ -553,7 +555,7 @@ Expr::Ptr Parser::parseCond(const Token *tok) {
   return make_unique<Condition>(move(c), move(i), move(e));
 }
 
-// Loops, ex: (build N (lam (i : Integer) (add@ii i i)))
+// Loops, ex: (build N (lam (i : Integer) (add i i)))
 Expr::Ptr Parser::parseBuild(const Token *tok) {
   assert(tok->size() == 3);
 
@@ -637,7 +639,7 @@ Expr::Ptr Parser::parsePrint(const Token *tok) {
   return print;
 }
 
-// Rule: (rule "mul2" (v : Float) (mul@ff v 2.0) (add v v))
+// Rule: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
 Expr::Ptr Parser::parseRule(const Token *tok) {
   assert(tok->size() == 5);
   const Token *name = tok->getChild(1);
@@ -770,7 +772,7 @@ std::ostream& Declaration::dump(std::ostream& s, size_t tab) const {
 
 std::ostream& Definition::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Definition:" << endl;
-  s << string(tab + 2, ' ') << "name [" << proto->getName().data() << "]"
+  s << string(tab + 2, ' ') << "name [" << decl->getName().data() << "]"
        << endl;
   Expr::dump(s, tab + 2);
   s << string(tab + 2, ' ') << "Arguments:" << endl;

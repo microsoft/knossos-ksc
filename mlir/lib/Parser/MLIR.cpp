@@ -187,7 +187,7 @@ mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
 mlir::FuncOp Generator::buildDef(const AST::Definition* def) {
   // Make sure we have its declaration cached
   if (!functions.count(def->getName()))
-    buildDecl(def->getProto());
+    buildDecl(def->getDeclaration());
   auto func = functions[def->getName()];
   assert(func);
 

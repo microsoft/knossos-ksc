@@ -6,7 +6,7 @@
 ; LLVM: declare double @print(double %0)
 
 (def fun Integer ((x : Integer) (y : Float))
-                 (add@ii x 10))
+                 (add x 10))
 ; MLIR: func @fun(%arg0: i64, %arg1: f64) -> i64 {
 ; MLIR-NEXT:  %c10{{.*}} = constant 10 : i64
 ; MLIR-NEXT:  %[[add:[0-9]+]] = addi %arg0, %c10{{.*}} : i64
