@@ -145,7 +145,7 @@ void test_parser_let() {
   assert(def->getType() == Type::Integer);
   Variable* x = llvm::dyn_cast<Variable>(def->getVariable(0));
   assert(x->getType() == Type::Integer);
-  Operation* expr = llvm::dyn_cast<Operation>(def->getExpr());
+  Call* expr = llvm::dyn_cast<Call>(def->getExpr());
   assert(expr);
   assert(expr->getName() == "add");
   assert(expr->getType() == Type::Integer);
@@ -196,7 +196,7 @@ void test_parser_def() {
   assert(def->size() == 2);
   Variable* x = llvm::dyn_cast<Variable>(def->getArgument(0));
   assert(x->getType() == Type::Integer);
-  Operation* expr = llvm::dyn_cast<Operation>(def->getImpl());
+  Call* expr = llvm::dyn_cast<Call>(def->getImpl());
   assert(expr);
   assert(expr->getName() == "add");
   assert(expr->getType() == Type::Integer);
@@ -227,12 +227,12 @@ void test_parser_decl_def_use() {
   assert(main->getType() == Type::Integer);
   assert(main->size() == 0);
   // And its implementation
-  Operation* impl = llvm::dyn_cast<Operation>(main->getImpl());
+  Call* impl = llvm::dyn_cast<Call>(main->getImpl());
   assert(impl);
   assert(impl->getName() == "add");
   assert(impl->getType() == Type::Integer);
   // Arg1 is a call to fun
-  Operation* call = llvm::dyn_cast<Operation>(impl->getOperand(0));
+  Call* call = llvm::dyn_cast<Call>(impl->getOperand(0));
   assert(call);
   assert(call->getName() == "fun");
   assert(call->getType() == Type::Integer);
@@ -266,7 +266,7 @@ void test_parser_cond() {
   assert(condVal->getValue() == "true");
   assert(condVal->getType() == Type::Bool);
   // If block is "fun" call
-  Operation* call = llvm::dyn_cast<Operation>(cond->getIfBlock());
+  Call* call = llvm::dyn_cast<Call>(cond->getIfBlock());
   assert(call);
   assert(call->getName() == "fun");
   assert(call->getType() == Type::Integer);
@@ -275,7 +275,7 @@ void test_parser_cond() {
   assert(arg->getValue() == "10");
   assert(arg->getType() == Type::Integer);
   // Else block is an "add" op
-  Operation* expr = llvm::dyn_cast<Operation>(cond->getElseBlock());
+  Call* expr = llvm::dyn_cast<Call>(cond->getElseBlock());
   assert(expr);
   assert(expr->getName() == "add");
   assert(expr->getType() == Type::Integer);
@@ -307,8 +307,8 @@ void test_parser_rule() {
   assert(var->getName() == "v");
   assert(var->getType() == Type::Float);
   // From/To patterns
-  Operation *from = llvm::dyn_cast<Operation>(rule->getPattern());
-  Operation *to = llvm::dyn_cast<Operation>(rule->getResult());
+  Call *from = llvm::dyn_cast<Call>(rule->getPattern());
+  Call *to = llvm::dyn_cast<Call>(rule->getResult());
   assert(from && to);
   assert(from->getName() == "mul");
   assert(from->getType() == Type::Float);
@@ -366,7 +366,7 @@ void test_parser_build() {
   assert(range->getType() == Type::Integer);
   Variable* v = llvm::dyn_cast<Variable>(build->getVariable());
   assert(v->getType() == Type::Integer);
-  Operation* expr = llvm::dyn_cast<Operation>(build->getExpr());
+  Call* expr = llvm::dyn_cast<Call>(build->getExpr());
   assert(expr);
   assert(expr->getName() == "add");
   assert(expr->getType() == Type::Integer);
@@ -467,7 +467,7 @@ void test_parser_tuple() {
          type.getSubType(1) == Type::Bool &&
          type.getSubType(2) == Type::Integer);
   // Check elements are correct
-  Operation* op = llvm::dyn_cast<Operation>(tuple->getElement(0));
+  Call* op = llvm::dyn_cast<Call>(tuple->getElement(0));
   assert(op->getName() == "add");
   assert(llvm::dyn_cast<Literal>(op->getOperand(0))->getValue() == "3.14");
   assert(llvm::dyn_cast<Literal>(op->getOperand(1))->getValue() == "2.72");
@@ -549,7 +549,7 @@ void test_parser_fold() {
   assert(letX->getName() == "x");
   assert(Get::classof(letX->getInit()));
   // Lambda operation
-  Operation* op = llvm::dyn_cast<Operation>(let->getExpr());
+  Call* op = llvm::dyn_cast<Call>(let->getExpr());
   assert(op);
   assert(op->getType() == Type::Float);
   assert(op->getName() == "mul");
@@ -601,7 +601,7 @@ void test_parser_sum() {
   assert(init1->getType() == Type::Float);
   assert(init1->getValue() == "0.0");
   // Lambda operation
-  Operation* op = llvm::dyn_cast<Operation>(fold->getBody());
+  Call* op = llvm::dyn_cast<Call>(fold->getBody());
   assert(op);
   assert(op->getType() == Type::Float);
   assert(op->getName() == "add");

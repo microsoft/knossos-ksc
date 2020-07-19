@@ -120,7 +120,7 @@ struct Expr {
     Declaration,
     Definition,
     Condition,
-    Operation,
+    Call,
     Rule,
     Build,
     Tuple,
@@ -270,108 +270,37 @@ private:
   Expr::Ptr expr;
 };
 
-/// Operation, ex: (add x 3), (neg (mul (sin x) d_dcos)))
+/// Call, ex: (add x 3), (neg (mul (sin x) d_dcos)))
 /// Call, ex: (fwd$to_float 10 dx)
 ///
 /// Represent native operations (add, mul) and calls.
 ///
-/// For native, all types must match and the return type is defined by
-/// the operation type (arithmetic, comparison, conversion, etc).
-/// For calls, return type and operand types must match declaration.
-struct Operation : public Expr {
-  using Ptr = std::unique_ptr<Operation>;
-  enum class Opcode {
-      // Binary
-      ADD, SUB, MUL, DIV, AND,  OR,
-      // Comparison
-      EQ,   NE, LTE, GTE,  LT,  GT,
-      // Unary (native to MLIR)
-      ABS, NEG, EXP, LOG, TOF, TOI,
-      // None (ie. a function call or not an operation at all)
-      MAYBE_CALL
-  };
-  Operation(llvm::StringRef name, Opcode opcode, Type type = Type::None)
-      : Expr(type, Kind::Operation), name(name), opcode(opcode),
-        operandType(Type::None) { }  // TODO: remove operandType
-
+/// Return type and operand types must match declaration.
+struct Call : public Expr {
+  using Ptr = std::unique_ptr<Call>;
+  Call(llvm::StringRef name, Type type = Type::None)
+      : Expr(type, Kind::Call), name(name) { } 
+  
   void addOperand(Expr::Ptr op) { operands.push_back(std::move(op)); }
   llvm::ArrayRef<Expr::Ptr> getOperands() const { return operands; }
   llvm::StringRef getName() const { return name; }
-  Opcode getOpcode() const { return opcode; }
+  
   size_t size() const { return operands.size(); }
   Expr *getOperand(size_t idx) const {
     assert(idx < operands.size() && "Offset error");
     return operands[idx].get();
   }
-  Type getOperandType() const {
-    return operandType;
-  }
-
+  
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
-    return c->kind == Kind::Operation;
-  }
-
-  // Types depend on the operation
-  // FIXME: devise a better polymorphism strategy
-  void inferTypes() {
-    // Type already infered, stop.
-    if (type != Type::None)
-      return;
-
-    // Call types are defined, not infered
-    if (opcode == Opcode::MAYBE_CALL)
-      return;
-
-    // Check and infer operand types
-    inferOperandType();
-
-    // Infer return type
-    switch (opcode) {
-      case Opcode::EQ:
-      case Opcode::NE:
-      case Opcode::LTE:
-      case Opcode::GTE:
-      case Opcode::LT:
-      case Opcode::GT:
-      case Opcode::AND:
-      case Opcode::OR:
-        type = Type::Bool;
-        break;
-      case Opcode::TOF:
-        type = Type::Float;
-        break;
-      case Opcode::TOI:
-        type = Type::Integer;
-        break;
-      default: // Polymorphic
-        type = operandType;
-        break;
-    }
+    return c->kind == Kind::Call;
   }
 
 private:
-  void inferOperandType() {
-    // Call types are defined, not infered
-    if (opcode == Opcode::MAYBE_CALL)
-      return;
-    assert(operands.size()  > 0 && "No operands on operation");
-    assert(operands.size() <= 2 && "Too many operands on operation");
-
-    // Binary operations must match at lowering time (already resolved)
-    if (operands.size() == 2)
-      assert(operands[0]->getType() == operands[1]->getType() &&
-             "Different type operands");
-
-    operandType = operands[0]->getType();
-  }
-
   std::string name;
   std::vector<Expr::Ptr> operands;
-  Opcode opcode;
-  Type operandType;
 };
 
 /// Declaration, ex: (edef max Float (Float Float))

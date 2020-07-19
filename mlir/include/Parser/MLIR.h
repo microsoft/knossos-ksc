@@ -53,7 +53,8 @@ class Generator {
   // Function level builders
   Values buildNode(const AST::Expr*);
   Values buildBlock(const AST::Block*);
-  Values buildOp(const AST::Operation*);
+  Values buildCall(const AST::Call*);
+  mlir::Value buildArg(const AST::Call*, size_t);
   Values buildCond(const AST::Condition*);
   Values buildLet(const AST::Let*);
   Values buildLiteral(const AST::Literal*);

@@ -106,29 +106,6 @@ class Parser {
   Expr::Ptr rootE;
   Lexer lex;
 
-  // Lookup table of reserved operations and keywords
-  Operation::Opcode isReservedOp(llvm::StringRef name) const {
-    return llvm::StringSwitch<Operation::Opcode>(name)
-              .Case("add", Operation::Opcode::ADD)
-              .Case("sub", Operation::Opcode::SUB)
-              .Case("mul", Operation::Opcode::MUL)
-              .Case("div", Operation::Opcode::DIV)
-              .Case("and", Operation::Opcode::AND)
-              .Case("or", Operation::Opcode::OR)
-              .Case("eq", Operation::Opcode::EQ)
-              .Case("ne", Operation::Opcode::NE)
-              .Case("lte", Operation::Opcode::LTE)
-              .Case("gte", Operation::Opcode::GTE)
-              .Case("lt", Operation::Opcode::LT)
-              .Case("gt", Operation::Opcode::GT)
-              .Case("abs", Operation::Opcode::ABS)
-              .Case("neg", Operation::Opcode::NEG)
-              .Case("exp", Operation::Opcode::EXP)
-              .Case("log", Operation::Opcode::LOG)
-              .Case("to_float", Operation::Opcode::TOF)
-              .Case("to_int", Operation::Opcode::TOI)
-              .Default(Operation::Opcode::MAYBE_CALL);
-  }
   enum class Keyword {
        LET,  EDEF, DEF,   IF, BUILD, INDEX,
       SIZE, TUPLE, GET, FOLD, PRINT,  RULE, NA,
@@ -184,7 +161,6 @@ class Parser {
   Expr::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);
   Expr::Ptr parseCall(const Token *tok);
-  Expr::Ptr parseOperation(const Token *tok, Operation::Opcode op);
   Expr::Ptr parseVariable(const Token *tok);
   Expr::Ptr parseLet(const Token *tok);
   Expr::Ptr parseDecl(const Token *tok);
