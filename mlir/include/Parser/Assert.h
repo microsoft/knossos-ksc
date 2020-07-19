@@ -18,12 +18,12 @@ Note:
 
 */
 
-#define ASSERT(p) if (p) ; else asserter()
+#define ASSERT(p) if (p) ; else asserter(#p, __FILE__, __LINE__)
 
 struct asserter {
   std::ostream* s;
  
-  asserter();
+  asserter(char const* expr, char const* file, int line);
   ~asserter();
  
   template <class T>

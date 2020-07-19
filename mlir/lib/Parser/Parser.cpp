@@ -6,6 +6,8 @@
 using namespace std;
 using namespace Knossos::AST;
 
+#define PARSE_ASSERT(p) ASSERT(p) << "\nToken: " << tok << std::endl
+
 //================================================ Helpers
 
 static Type::ValidType Str2Type(llvm::StringRef ty) {
@@ -27,6 +29,7 @@ static Type::ValidType Str2Type(llvm::StringRef ty) {
     return Type::LM;
   return Type::None;
 }
+
 
 static const string Type2Str(Type::ValidType type) {
   switch (type) {
@@ -100,7 +103,7 @@ static Literal::Ptr getZero(Type type) {
     case Type::String:
       return make_unique<Literal>("", Type::String);
     default:
-      assert(0 && "Invalid zero type");
+      ASSERT(0) << "Invalid zero type [" << type << "]";
   }
 }
 
@@ -122,7 +125,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       case '#':
         if (code[pos+1] != '|')
           break;
-        assert(multiLineComments == 0);
+        PARSE_ASSERT(multiLineComments == 0);
         pos += 2; // consume #|
         multiLineComments = 1;
         // Multi-line comment
@@ -279,7 +282,7 @@ Type Parser::parseType(const Token *tok) {
   // Scalar type
   if (tok->isValue) {
     Type::ValidType ty = Str2Type(tok->getValue());
-    ASSERT(ty <= Type::LAST_SCALAR) << "Non-scalar types must be parenthesised"; // TODO print tok.
+    PARSE_ASSERT(ty <= Type::LAST_SCALAR) << "Non-scalar types must be parenthesised";
     return Type(ty);
   }
 
@@ -328,7 +331,7 @@ Type Parser::parseRelaxedType(vector<const Token *> toks) {
 
 // Values (variable names, literals, type names)
 Expr::Ptr Parser::parseValue(const Token *tok) {
-  assert(tok->isValue);
+  PARSE_ASSERT(tok->isValue);
   string value = tok->getValue().str();
 
   // Literals: 10.0 42 "Hello" (not hello, that's a variable use)
@@ -341,10 +344,10 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
   }
 
   // Variable use: name (without quotes)
-  ASSERT(variables.exists(value)) << "Variable not declared [" << value << "]";
+  PARSE_ASSERT(variables.exists(value)) << "Variable not declared [" << value << "]";
   auto val = variables.get(value);
   // Create new node, referencing existing variable
-  assert(Variable::classof(val));
+  PARSE_ASSERT(Variable::classof(val));
   return unique_ptr<Expr>(new Variable(value, val->getType()));
 }
 
@@ -416,16 +419,16 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 #undef RETURN
 
   // Fall through to non-prims
-  ASSERT(functions.exists(name)) << "Unrecognized function: " << name;
+  PARSE_ASSERT(functions.exists(name)) << "Unrecognized function: " << name;
   
   Declaration* decl = llvm::dyn_cast<Declaration>(functions.get(name));
-  ASSERT(decl) << "Function [" << name << "] found but not declared?";
+  PARSE_ASSERT(decl) << "Function [" << name << "] found but not declared?";
 
   o->setType(decl->getType());
 
   // Validate types
   for (const auto &it : llvm::zip(o->getOperands(), decl->getArgTypes()))
-    ASSERT(get<0>(it)->getType() == get<1>(it)) 
+    PARSE_ASSERT(get<0>(it)->getType() == get<1>(it)) 
                 << "Type mismatch at " << tok << "\n" 
                 << get<0>(it)->getType() << " != " << get<1>(it);
 
@@ -439,7 +442,7 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 // ... (let ((v value)) body) ...  ; definition
 //           ^^^^^^^^^
 Expr::Ptr Parser::parseVariable(const Token *tok) {
-  assert(tok->size() > 1);
+  PARSE_ASSERT(tok->size() > 1);
   llvm::ArrayRef<Token::Ptr> children = tok->getChildren();
   string value = children[0]->getValue().str();
 
@@ -456,7 +459,7 @@ Expr::Ptr Parser::parseVariable(const Token *tok) {
         toks.push_back(tok->getChild(i));
       type = parseRelaxedType(toks);
     }
-    assert(type != Type::None);
+    PARSE_ASSERT(type != Type::None);
     auto var = unique_ptr<Variable>(new Variable(value, type));
     variables.set(value, var.get());
     return var;
@@ -472,19 +475,18 @@ Expr::Ptr Parser::parseVariable(const Token *tok) {
     return var;
   }
 
-  tok->dump(std::cerr);
-  assert(0 && "Invalid variable declaration/definition");
+  PARSE_ASSERT(0) << "Invalid variable declaration/definition";
 }
 
 // Variable declaration: (let (x 10) (add x 10))
 Expr::Ptr Parser::parseLet(const Token *tok) {
-  assert(tok->size() == 3);
+  PARSE_ASSERT(tok->size() == 3);
   const Token *bond = tok->getChild(1);
-  assert(!bond->isValue);
+  PARSE_ASSERT(!bond->isValue);
   vector<Expr::Ptr> vars;
   // Single variable binding
   if (bond->getChild(0)->isValue) {
-    assert(bond->size() == 2);
+    PARSE_ASSERT(bond->size() == 2);
     vars.push_back(parseVariable(bond));
   // Multiple variables
   } else {
@@ -502,17 +504,17 @@ Expr::Ptr Parser::parseLet(const Token *tok) {
 
 // Declares a function (and add it to symbol table)
 Expr::Ptr Parser::parseDecl(const Token *tok) {
-  assert(tok->size() == 4);
+  PARSE_ASSERT(tok->size() == 4);
   const Token *name = tok->getChild(1);
   const Token *ty = tok->getChild(2);
   const Token *args = tok->getChild(3);
-  ASSERT(name->isValue) << "Parsing decl";
+  PARSE_ASSERT(name->isValue) << "Parsing decl";
   auto type = parseType(ty);
-  ASSERT(type != Type::None && !args->isValue) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT(type != Type::None && !args->isValue) << "Parsing decl [" << name << "]";
 
   auto decl =
       make_unique<Declaration>(name->getValue(), type);
-  assert(decl);
+  PARSE_ASSERT(decl);
 
   // Vector and Tuples can be declared bare
   if (args->getChild(0)->isValue &&
@@ -529,12 +531,12 @@ Expr::Ptr Parser::parseDecl(const Token *tok) {
 // Defines a function (checks from|adds to symbol table)
 // (def name type args expr)
 Expr::Ptr Parser::parseDef(const Token *tok) {
-  assert(tok->size() == 5);
+  PARSE_ASSERT(tok->size() == 5);
   const Token *name = tok->getChild(1);
   const Token *type = tok->getChild(2);
   const Token *args = tok->getChild(3);
   const Token *expr = tok->getChild(4);
-  assert(name->isValue && !args->isValue);
+  PARSE_ASSERT(name->isValue && !args->isValue);
   vector<Expr::Ptr> arguments;
   // If there is only one child
   if (args->size() && args->getChild(0)->isValue)
@@ -548,7 +550,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
   auto node = make_unique<Definition>(name->getValue(),
                                       parseType(type));
   for (auto &a : arguments) {
-    assert(a->kind == Expr::Kind::Variable);
+    PARSE_ASSERT(a->kind == Expr::Kind::Variable);
     node->addArgument(move(a));
   }
   functions.set(name->getValue().str(), node->getDeclaration());
@@ -562,7 +564,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
 
 // Conditional: (if (cond) (true block) (false block))
 Expr::Ptr Parser::parseCond(const Token *tok) {
-  assert(tok->size() == 4);
+  PARSE_ASSERT(tok->size() == 4);
   auto c = parseToken(tok->getChild(1));
   auto i = parseToken(tok->getChild(2));
   auto e = parseToken(tok->getChild(3));
@@ -571,20 +573,20 @@ Expr::Ptr Parser::parseCond(const Token *tok) {
 
 // Loops, ex: (build N (lam (i : Integer) (add i i)))
 Expr::Ptr Parser::parseBuild(const Token *tok) {
-  assert(tok->size() == 3);
+  PARSE_ASSERT(tok->size() == 3);
 
   // Range (can be dynamic)
   auto range = parseToken(tok->getChild(1));
 
   // Lambda (induction variable and loop body)
   const Token *lam = tok->getChild(2);
-  assert(!lam->isValue);
-  assert(lam->getChild(0)->isValue && lam->getChild(0)->getValue() == "lam");
+  PARSE_ASSERT(!lam->isValue);
+  PARSE_ASSERT(lam->getChild(0)->isValue && lam->getChild(0)->getValue() == "lam");
   const Token *bond = lam->getChild(1);
   const Token *expr = lam->getChild(2);
   auto var = parseVariable(bond);
-  assert(var->kind == Expr::Kind::Variable);
-  assert(var->getType() == AST::Type::Integer);
+  PARSE_ASSERT(var->kind == Expr::Kind::Variable);
+  PARSE_ASSERT(var->getType() == AST::Type::Integer);
   llvm::dyn_cast<Variable>(var.get())->setInit(getZero(Type::Integer));
   auto body = parseToken(expr);
   return make_unique<Build>(move(range), move(var), move(body));
@@ -592,8 +594,8 @@ Expr::Ptr Parser::parseBuild(const Token *tok) {
 
 // Tuple, ex: (tuple 10.0 42 (add 1.0 2.0))
 Expr::Ptr Parser::parseTuple(const Token *tok) {
-  assert(tok->size() > 2);
-  assert(tok->getChild(0)->isValue);
+  PARSE_ASSERT(tok->size() > 2);
+  PARSE_ASSERT(tok->getChild(0)->isValue);
   std::vector<Expr::Ptr> elements;
   for (auto &c: tok->getTail())
     elements.push_back(parseToken(c.get()));
@@ -602,8 +604,8 @@ Expr::Ptr Parser::parseTuple(const Token *tok) {
 
 // Index, ex: (get$7$9 tuple)
 Expr::Ptr Parser::parseGet(const Token *tok) {
-  assert(tok->size() == 2);
-  assert(tok->getChild(0)->isValue);
+  PARSE_ASSERT(tok->size() == 2);
+  PARSE_ASSERT(tok->getChild(0)->isValue);
   llvm::StringRef get = tok->getChild(0)->getValue();
   size_t dollar1 = get.find('$');
   size_t dollar2 = get.find('$', dollar1+1);
@@ -617,14 +619,14 @@ Expr::Ptr Parser::parseGet(const Token *tok) {
 
 // Fold, ex: (fold (lambda) init vector)
 Expr::Ptr Parser::parseFold(const Token *tok) {
-  assert(tok->size() == 4);
+  PARSE_ASSERT(tok->size() == 4);
   // Lambda format: (lam (acc_x : (Tuple AccTy ElmTy)) (expr))
   const Token *lam = tok->getChild(1);
-  assert(!lam->isValue);
-  assert(lam->getChild(0)->isValue && lam->getChild(0)->getValue() == "lam");
+  PARSE_ASSERT(!lam->isValue);
+  PARSE_ASSERT(lam->getChild(0)->isValue && lam->getChild(0)->getValue() == "lam");
   auto var = parseVariable(lam->getChild(1));
-  assert(var->kind == Expr::Kind::Variable);
-  assert(var->getType() == Type::Tuple);
+  PARSE_ASSERT(var->kind == Expr::Kind::Variable);
+  PARSE_ASSERT(var->getType() == Type::Tuple);
   auto accTy = var->getType().getSubType(0);
   auto elmTy = var->getType().getSubType(1);
   // Variable initialiser is (init, zero)
@@ -635,10 +637,10 @@ Expr::Ptr Parser::parseFold(const Token *tok) {
   llvm::dyn_cast<Variable>(var.get())->setInit(move(init));
   // Lambda body has same as accTy
   auto body = parseToken(lam->getChild(2));
-  assert(body->getType() == accTy);
+  PARSE_ASSERT(body->getType() == accTy);
   auto vector = parseToken(tok->getChild(3));
-  assert(vector->getType() == Type::Vector);
-  assert(vector->getType().getSubType() == elmTy);
+  PARSE_ASSERT(vector->getType() == Type::Vector);
+  PARSE_ASSERT(vector->getType().getSubType() == elmTy);
   return make_unique<Fold>(accTy, move(body), move(var), move(vector));
 }
 
@@ -655,9 +657,9 @@ Expr::Ptr Parser::parsePrint(const Token *tok) {
 
 // Rule: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
 Expr::Ptr Parser::parseRule(const Token *tok) {
-  assert(tok->size() == 5);
+  PARSE_ASSERT(tok->size() == 5);
   const Token *name = tok->getChild(1);
-  assert(name->isValue);
+  PARSE_ASSERT(name->isValue);
   llvm::StringRef unquoted = unquote(name->getValue());
   auto var = parseVariable(tok->getChild(2));
   auto pat = parseToken(tok->getChild(3));
@@ -677,10 +679,10 @@ Expr::Ptr Parser::parseRule(const Token *tok) {
 
 // Vector Reduction Sum, ex: (fold (add) 0.0 vector)
 Expr::Ptr Parser::parseSum(const Token *tok) {
-  assert(tok->size() == 2);
+  PARSE_ASSERT(tok->size() == 2);
   // Vector
   auto vec = parseToken(tok->getChild(1));
-  assert(vec->getType() == Type::Vector);
+  PARSE_ASSERT(vec->getType() == Type::Vector);
   auto elmTy = vec->getType().getSubType();
   // Accumulator & element (same type)
   auto type = Type(Type::Tuple, vector<Type>{ elmTy, elmTy });
