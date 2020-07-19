@@ -356,7 +356,7 @@ Values Generator::buildCall(const AST::Call* call) {
 
   // Function call -- not a prim, should be known
   if (functions.count(name) == 0) {
-    asserter a;
+    asserter a("", __FILE__, __LINE__);
     a << "Unknown function [" << std::string(name) << "(";
     for(size_t i = 0; i < arity; ++i) {
       a << call->getOperand(i)->getType();

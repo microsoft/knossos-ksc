@@ -5,17 +5,17 @@
 
 void ks_backtrace();
 
-asserter::asserter()
+asserter::asserter(char const* expr, char const* file, int line)
 {
     s = &std::cerr;
-    *s << "\n" << "KSC: ASSERT FAIL: ";
+    *s << "\n" << "KSC: "<< file << ":" << line << ": ASSERT FAIL[" << expr << "]";
 }
 
 asserter::~asserter()
 {
     std::cerr << std::endl;
     ks_backtrace();
-    assert(false);
+    exit(1);
 }
 
 #if 1
