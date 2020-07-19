@@ -218,7 +218,7 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
   // If the first expr is not a value, this is a block of blocks
   auto head = tok->getHead();
   if (!head->isValue) {
-    std::cerr << "NON-VALUE HEAD!\n"; 
+    std::cerr << "NON-VALUE HEAD!\n" << tok; 
     // Simple pass-through
     if (tok->size() == 1)
       return parseToken(head);
@@ -262,16 +262,7 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
       break;
   }
 
-  // User-defined functions overwrite builtins
-  if (functions.exists(value))
-    return parseCall(tok);
-
   // Everything else is a function call: (fun 10.0 42 "Hello")
-  // Operations: reserved keywords like add, mul, etc.
-  Operation::Opcode op = isReservedOp(value);
-  if (op != Operation::Opcode::MAYBE_CALL)
-    return parseOperation(tok, op);
-
   return parseCall(tok);
 }
 
@@ -362,61 +353,84 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
 Expr::Ptr Parser::parseCall(const Token *tok) {
   string name = tok->getHead()->getValue().str();
 
-  // Grab the operands
-  Operation *o = new Operation(name, Operation::Opcode::MAYBE_CALL, Type::None);
+  // Construct with no type, no operands
+  Call *o = new Call(name, Type::None);
 
-  // Argument handling
+  // Add operands
   for (auto &c : tok->getTail())
     o->addOperand(parseToken(c.get()));
 
-  // Now infer and check type
-  // Special case "Prim" functions with generic arguments
-  if (name == "size") {
-    // size :: Vector 't -> Integer
-    ASSERT(o->size() == 1) << "(size v)";
-    ASSERT(o->getOperand(0)->getType().isVector());
-    o->setType(Type::Integer);
-  }
-  else if (name == "index") {
-    // index :: (Integer, Vector 't) -> 't 
-    ASSERT(o->size() == 2) << "(index i v)";
-    ASSERT(o->getOperand(0)->getType().isInteger());
-    ASSERT(o->getOperand(1)->getType().isVector());
-    o->setType(o->getOperand(1)->getType().getSubType());
-  }
-  else {
-    ASSERT(functions.exists(name)) << "Unrecognized function: " << name;
-    
-    Declaration* decl = llvm::dyn_cast<Declaration>(functions.get(name));
-    ASSERT(decl) << "Function [" << name << "] found but not declared?";
+#define IF_MATCH_1(NAME, ARGTYPE_0)\
+  if (o->size() == 1 && name == NAME &&\
+      o->getOperand(0)->getType() == Type::ARGTYPE_0)
 
-    o->setType(decl->getType());
+#define IF_MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1)\
+  if (o->size() == 2 && name == NAME &&\
+      o->getOperand(0)->getType() == Type::ARGTYPE_0 &&\
+      o->getOperand(1)->getType() == Type::ARGTYPE_1)
 
-    // Validate types
-    for (const auto &it : llvm::zip(o->getOperands(), decl->getArgTypes()))
-      ASSERT(get<0>(it)->getType() == get<1>(it)) 
-                  << "Type mismatch at " << tok << "\n" 
-                  << get<0>(it)->getType() << " != " << get<1>(it);
-  }
-  ASSERT(o->getType() != Type::None) << "Unknown function [" << name << "]\n";
+#define RETURN(TYPE) { o->setType(TYPE); return unique_ptr<Expr>(o); }
+
+  // TODO: Dedup this with Generator::buildCall
+  // TODO: Move all to prelude once polymorphic
+  IF_MATCH_1("abs", Float)  RETURN(Type::Float);
+  IF_MATCH_1("neg", Float)  RETURN(Type::Float);
+  IF_MATCH_1("exp", Float)  RETURN(Type::Float);
+  IF_MATCH_1("log", Float)  RETURN(Type::Float);
+
+  IF_MATCH_1("to_float", Integer) RETURN(Type::Float);
+  IF_MATCH_1("to_int", Float)     RETURN(Type::Float);
+
+  IF_MATCH_2("add", Integer, Integer)   RETURN(Type::Integer);
+  IF_MATCH_2("add", Float, Float)       RETURN(Type::Float);
+  IF_MATCH_2("sub", Integer, Integer)   RETURN(Type::Integer);
+  IF_MATCH_2("sub", Float, Float)       RETURN(Type::Float);
+  IF_MATCH_2("mul", Integer, Integer)   RETURN(Type::Integer);
+  IF_MATCH_2("mul", Float, Float)       RETURN(Type::Float);
+  IF_MATCH_2("div", Integer, Integer)   RETURN(Type::Integer);
+  IF_MATCH_2("div", Float, Float)       RETURN(Type::Float);
+
+  IF_MATCH_2("and", Bool, Bool)   RETURN(Type::Bool);
+  IF_MATCH_2("or", Bool, Bool)    RETURN(Type::Bool);
+
+  // Comparison
+  IF_MATCH_2("eq", Integer, Integer)   RETURN(Type::Bool);
+  IF_MATCH_2("eq", Float, Float)       RETURN(Type::Bool);
+  IF_MATCH_2("ne", Integer, Integer)   RETURN(Type::Bool);
+  IF_MATCH_2("ne", Float, Float)       RETURN(Type::Bool);
+  IF_MATCH_2("lte", Integer, Integer)  RETURN(Type::Bool);
+  IF_MATCH_2("lte", Float, Float)      RETURN(Type::Bool);
+  IF_MATCH_2("gte", Integer, Integer)  RETURN(Type::Bool);
+  IF_MATCH_2("gte", Float, Float)      RETURN(Type::Bool);
+  IF_MATCH_2("gt", Integer, Integer)   RETURN(Type::Bool);
+  IF_MATCH_2("gt", Float, Float)       RETURN(Type::Bool);
+  IF_MATCH_2("lt", Integer, Integer)   RETURN(Type::Bool);
+  IF_MATCH_2("lt", Float, Float)       RETURN(Type::Bool);
+
+  // Prims
+  IF_MATCH_1("size", Vector)               RETURN(Type::Integer)
+  IF_MATCH_2("index", Integer, Vector)     RETURN(o->getOperand(1)->getType().getSubType())
+
+#undef IF_MATCH_1
+#undef IF_MATCH_2
+#undef RETURN
+
+  // Fall through to non-prims
+  ASSERT(functions.exists(name)) << "Unrecognized function: " << name;
+  
+  Declaration* decl = llvm::dyn_cast<Declaration>(functions.get(name));
+  ASSERT(decl) << "Function [" << name << "] found but not declared?";
+
+  o->setType(decl->getType());
+
+  // Validate types
+  for (const auto &it : llvm::zip(o->getOperands(), decl->getArgTypes()))
+    ASSERT(get<0>(it)->getType() == get<1>(it)) 
+                << "Type mismatch at " << tok << "\n" 
+                << get<0>(it)->getType() << " != " << get<1>(it);
 
   return unique_ptr<Expr>(o);
 }
-
-// Operations (op arg1 arg2 ...), retTy = argnTy
-Expr::Ptr Parser::parseOperation(const Token *tok, Operation::Opcode op) {
-  assert(!tok->isValue && tok->size() > 1);
-  assert(tok->getHead()->isValue);
-  llvm::StringRef name = tok->getHead()->getValue();
-
-  Operation *o = new Operation(name, op);
-  for (auto &c : tok->getTail())
-    o->addOperand(parseToken(c.get()));
-  // Infer types
-  o->inferTypes();
-  return unique_ptr<Expr>(o);
-}
-
 
 
 // Variables can be declarations or definitions, depending on the arguments
@@ -576,7 +590,7 @@ Expr::Ptr Parser::parseBuild(const Token *tok) {
   return make_unique<Build>(move(range), move(var), move(body));
 }
 
-// Tuple, ex: (tuple 10.0 42 (add@ff 1.0 2.0))
+// Tuple, ex: (tuple 10.0 42 (add 1.0 2.0))
 Expr::Ptr Parser::parseTuple(const Token *tok) {
   assert(tok->size() > 2);
   assert(tok->getChild(0)->isValue);
@@ -677,7 +691,7 @@ Expr::Ptr Parser::parseSum(const Token *tok) {
   auto init = make_unique<Tuple>(move(initArgs));
   llvm::dyn_cast<Variable>(var.get())->setInit(move(init));
   // Add Lambda: (add (get$1$2 acc_x) (get$2$2 acc_x))
-  auto add = make_unique<Operation>("add", Operation::Opcode::ADD, elmTy);
+  auto add = make_unique<Call>("add", elmTy);
   add->addOperand(make_unique<Get>(1, 2, make_unique<Variable>("acc_x", type)));
   add->addOperand(make_unique<Get>(2, 2, make_unique<Variable>("acc_x", type)));
   // Return fold
@@ -751,8 +765,8 @@ std::ostream&  Let::dump(std::ostream& s, size_t tab) const {
   return s;
 }
 
-std::ostream& Operation::dump(std::ostream& s, size_t tab) const {
-  s << string(tab, ' ') << "Operation:" << endl;
+std::ostream& Call::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Call:" << endl;
   s << string(tab + 2, ' ') << "name [" << name << "]" << endl;
   Expr::dump(s, tab + 2);
   for (auto &op : operands)
