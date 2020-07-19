@@ -24,7 +24,7 @@
 
 ; Build, call round-trip, use
 (def t$fun3 Float ((i : Float) (j : Float) (k : Float))
-    (add@ff i (get$2$2 (t$swap (tuple j k))))
+    (add i (get$2$2 (t$swap (tuple j k))))
 )
 ; MLIR: func @t$fun3(%arg0: f64, %arg1: f64, %arg2: f64) -> f64 {
 ; MLIR:   %[[call:[0-9]+]]:2 = call @t$swap(%arg1, %arg2) : (f64, f64) -> (f64, f64)
