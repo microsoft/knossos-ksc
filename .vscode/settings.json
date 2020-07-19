@@ -62,7 +62,8 @@
         "cwctype": "cpp",
         "string_view": "cpp",
         "fstream": "cpp",
-        "optional": "cpp"
+        "optional": "cpp",
+        "*.inc": "cpp"
     },
     "search.usePCRE2": true,
     "cmake.sourceDirectory": "${workspaceFolder}",
