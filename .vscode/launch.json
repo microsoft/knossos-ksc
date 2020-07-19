@@ -24,7 +24,8 @@
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bin/ksc-mlir",
-			"args": ["MLIR", "${workspaceFolder}/mlir/test/Ksc/ops.ks"],
+			"_args": ["TEST"],
+			"args": ["MLIR", "${workspaceFolder}/mlir/test/Ksc/tuple.ks"],
 			"miDebuggerPath": "/usr/bin/gdb",
 			"externalConsole": false,
 			"logging": {
