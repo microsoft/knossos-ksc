@@ -15,7 +15,7 @@ if [ ! -d llvm-project ]; then
   git clone https://github.com/llvm/llvm-project
 fi
 cd llvm-project
-git co -b ksc-mlir "$GOOD_HASH"
+git checkout -b ksc-mlir "$GOOD_HASH"
 mkdir build && cd build
 cmake -G Ninja ../llvm \
         -DLLVM_ENABLE_PROJECTS=mlir \
