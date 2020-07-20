@@ -10,6 +10,9 @@ jobs:
 
   steps:
 
+  - script: sh ./test/builds/install_linux_mlir.sh || (sleep 30 && sh ./test/builds/install_linux_mlir.sh) || (sleep 30 && sh ./test/builds/install_linux_mlir.sh)
+    displayName: 'Install dependencies'
+
   - script: sh ./test/builds/build_and_test_mlir.sh
     displayName: Building LLVM/MLIR
 
