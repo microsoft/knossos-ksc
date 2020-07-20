@@ -9,7 +9,9 @@ fi
 # Clone LLVM and build MLIR
 # This configuration requires clang+lld
 if [ ! -d llvm-project ]; then
-  git clone git@github.com:llvm/llvm-project.git
+  #git clone git@github.com:llvm/llvm-project.git
+  # Trialing HTTPS to ease building on hosted build agents
+  git clone https://github.com/llvm/llvm-project
 fi
 cd llvm-project
 git co -b ksc-mlir "$GOOD_HASH"
