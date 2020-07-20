@@ -1,7 +1,8 @@
 set -e
 
 # Known good git commit for LLVM
-GOOD_HASH=462b960de8c
+# GOOD_HASH=462b960de8c
+GOOD_HASH=e03394c6a6f
 if [ "$1" != "" ]; then
   GOOD_HASH="$1"
 fi
