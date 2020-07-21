@@ -13,12 +13,18 @@ export LLVM_BUILD="$LLVM_BUILD"
 
 # Clone Knossos and build ksc-mlir
 # This configuration requires clang+lld
-if [ ! -d knossos-ksc ]; then
-  git clone https://github.com/microsoft/knossos-ksc.git
+#if [ ! -d knossos-ksc ]; then
+#  git clone https://github.com/microsoft/knossos-ksc.git
+#fi
+#cd knossos-ksc/mlir
+
+if [ ! -f "SYNTAX.md" ]; then
+  echo "SYNTAX.md isn't present, is this a Knossos repository? Aborting"
+  return 1
 fi
-cd knossos-ksc/mlir
+cd mlir
 KSC_MLIR_SRC="$(pwd)"
-git pull
+#git pull
 rm -rf build
 mkdir build && cd build
 cmake -G Ninja "$KSC_MLIR_SRC" \
