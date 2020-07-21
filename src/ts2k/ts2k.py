@@ -89,7 +89,7 @@ def make_print(node):
 
 def make_list_init_inner(values, i, rescue):
     value = values[0]
-    rhs = sexpdata.Symbol(rescue) # How do we handled index out of range?
+    rhs = [sexpdata.Symbol("assert"), sexpdata.Symbol("false"), sexpdata.Symbol(rescue)]
     if (len(values) > 1):
         rhs = make_list_init_inner(values[1:], i + 1, rescue)
     return [sexpdata.Symbol("if"), [sexpdata.Symbol("eq"), sexpdata.Symbol("ni"), i], sexpdata.Symbol(managleDebugName(value.debugName())), rhs]
@@ -149,7 +149,6 @@ def make_callfunction(node):
     function_name_constant = node.inputsAt(0).node()
     input1 = node.inputsAt(1) # TODO: get all inputs instead of just first, 0th is function name itself
     function_name = function_name_constant.s("name")
-    sexpdata.Symbol("XXXYCX")
     return [
         sexpdata.Symbol("\n"),
         sexpdata.Symbol(managleDebugName(value.debugName())),
@@ -160,7 +159,7 @@ def make_callfunction(node):
     ]
 
 def make_default(node):
-    print("TODO:" + node.kind() )
+    print("WARNING, unimplmented node kind:" + node.kind() )
     return sexpdata.Symbol("")
 
 
