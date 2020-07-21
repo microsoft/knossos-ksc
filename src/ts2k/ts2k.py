@@ -182,7 +182,7 @@ lookups = {
 }
 
 
-def make_node(node):
+def translate_node(node):
     return lookups.get(node.kind(), make_default)(node)
 
 
@@ -193,21 +193,22 @@ def ts2ks(function):
 
     all_nodes = list(function.graph.nodes()) # arbitrary treat N-1 as binds
 
-    binds = [make_node(node) for node in all_nodes if node.kind() != 'prim::Print']
+    binds = [translate_node(node) for node in all_nodes if node.kind() != 'prim::Print']
 
-    #ops = [make_node(node) for node in all_nodes if node.kind() == 'prim::Print']
-    #returnVal = make_node(function.graph.return_node())
+    #ops = [translate_node(node) for node in all_nodes if node.kind() == 'prim::Print']
+    #returnVal = translate_node(function.graph.return_node())
     #ops.append(returnVal)
 
     
     # HACK: if last operation is print, we want that otherwise it's a return value.
     # need to think about interaction between imperative Python and pure Knossos
     if (list(function.graph.nodes())[-1].kind() == 'prim::Print'):
-        op = make_node(list(function.graph.nodes())[-1])
+        op = translate_node(list(function.graph.nodes())[-1])
         return_type = sexpdata.Symbol("Integer")
     else:
-        op = make_node(function.graph.return_node())
-        return_type = [sexpdata.Symbol("Vec"), [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")]] # Actually lookup!
+        return_node = function.graph.return_node()
+        op = translate_node(return_node)
+        return_type = symbolLook[str(return_node.inputsAt(0).type())]
 
     body = [sexpdata.Symbol("\n"), sexpdata.Symbol("let"), binds, sexpdata.Symbol("\n"), op]
 
