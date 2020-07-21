@@ -23,5 +23,5 @@ jobs:
     displayName: Building LLVM/MLIR
     condition: ne(variables.CACHE_RESTORED, 'true')
 
-  - script: sh ./test/builds/build_and_test_kscmlir.sh
-    displayName: Testing Ksc MLIR
+  # - script: sh ./test/builds/build_and_test_kscmlir.sh
+  #   displayName: Testing Ksc MLIR
