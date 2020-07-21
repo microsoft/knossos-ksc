@@ -13,7 +13,7 @@ jobs:
   - task: Cache@2
     inputs:
       key: 'llvm_mlir | "$(Agent.OS)" | e03394c6a6f'
-      path: $(Pipeline.Workspace)/llvm-project
+      path: llvm-project
       cacheHitVar: CACHE_RESTORED
 
   - script: sh ./test/builds/install_linux_mlir.sh || (sleep 30 && sh ./test/builds/install_linux_mlir.sh) || (sleep 30 && sh ./test/builds/install_linux_mlir.sh)
