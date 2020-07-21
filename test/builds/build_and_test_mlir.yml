@@ -10,6 +10,7 @@ jobs:
 
   steps:
 
+  # hash code is currently manual, keep in sync with the .sh scripts
   - task: Cache@2
     inputs:
       key: 'llvm_mlir | "$(Agent.OS)" | e03394c6a6f'
@@ -23,5 +24,5 @@ jobs:
     displayName: Building LLVM/MLIR
     condition: ne(variables.CACHE_RESTORED, 'true')
 
-  # - script: sh ./test/builds/build_and_test_kscmlir.sh
-  #   displayName: Testing Ksc MLIR
+  - script: sh ./test/builds/build_and_test_kscmlir.sh
+    displayName: Testing Ksc MLIR
