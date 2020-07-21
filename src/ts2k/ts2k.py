@@ -191,21 +191,21 @@ def ts2ks(function):
 
     args = [make_arg(item) for item in function.graph.inputs() ]
 
-    all_nodes = list(function.graph.nodes()) # arbitrary treat N-1 as binds
+    all_nodes = list(function.graph.nodes())
 
     binds = [translate_node(node) for node in all_nodes if node.kind() != 'prim::Print']
-
-    #ops = [translate_node(node) for node in all_nodes if node.kind() == 'prim::Print']
-    #returnVal = translate_node(function.graph.return_node())
-    #ops.append(returnVal)
-
+    print_count = sum(1 for node in all_nodes if node.kind() == 'prim::Print')
     
     # HACK: if last operation is print, we want that otherwise it's a return value.
     # need to think about interaction between imperative Python and pure Knossos
     if (list(function.graph.nodes())[-1].kind() == 'prim::Print'):
+        if (print_count > 1):
+            print("WARNING: multiple print statements used, only final one currently translated")
         op = translate_node(list(function.graph.nodes())[-1])
         return_type = sexpdata.Symbol("Integer")
     else:
+        if (print_count > 0):
+            print("WARNING: print statement currently only supported as final operation")
         return_node = function.graph.return_node()
         op = translate_node(return_node)
         return_type = symbolLook[str(return_node.inputsAt(0).type())]
