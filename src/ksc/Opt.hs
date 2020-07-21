@@ -275,10 +275,20 @@ optPrimFun _ "size" (Call build (Tuple [n,_]))
   | build `isThePrimFun` "build"
   = Just n
 
+-- RULE: size (constVec (n, _)) = n
+optPrimFun _ "size" (Call constVec (Tuple [n,_]))
+  | constVec `isThePrimFun` "constVec"
+  = Just n
+
 -- RULE: index j (build n f) = f j
 optPrimFun _ "index" (Tuple [ ei, arr ])
   | Just (_, i, e) <- isBuild_maybe arr
   = Just (Let i ei e)
+
+-- RULE: index j (constVec (n, v)) = v
+optPrimFun _ "index" (Tuple [_, Call constVec (Tuple [_, v])])
+  | constVec `isThePrimFun` "constVec"
+  = Just v
 
 -- RULE: sum (build n (\i. if (i==ej) then v else 0)
 --  = let i = ej in v

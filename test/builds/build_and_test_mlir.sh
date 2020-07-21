@@ -1,18 +1,21 @@
 set -e
 
 # Known good git commit for LLVM
-GOOD_HASH=462b960de8c
 if [ "$1" != "" ]; then
   GOOD_HASH="$1"
+  echo "Using GOOD_HASH=$1 from command line"
+else
+  GOOD_HASH=$(cat "${0%/*}/../../etc/llvm-branch.txt")
+  echo "Using GOOD_HASH=${GOOD_HASH} from ${0%/*}/../../etc/llvm-branch.txt"
 fi
 
 # Clone LLVM and build MLIR
 # This configuration requires clang+lld
 if [ ! -d llvm-project ]; then
-  git clone git@github.com:llvm/llvm-project.git
+  git clone https://github.com/llvm/llvm-project
 fi
 cd llvm-project
-git co -b ksc-mlir "$GOOD_HASH"
+git checkout -b ksc-mlir "$GOOD_HASH"
 mkdir build && cd build
 cmake -G Ninja ../llvm \
         -DLLVM_ENABLE_PROJECTS=mlir \
