@@ -1,10 +1,12 @@
 set -e
 
 # Known good git commit for LLVM
-# Make sure to keep in sync with .yml build scripts
-GOOD_HASH=e03394c6a6f
 if [ "$1" != "" ]; then
   GOOD_HASH="$1"
+  echo "Using GOOD_HASH=$1 from command line"
+else
+  GOOD_HASH=$(cat "${0%/*}/../../etc/llvm-branch.txt")
+  echo "Using GOOD_HASH=${GOOD_HASH} from ${0%/*}/../../etc/llvm-branch.txt"
 fi
 
 # Clone LLVM and build MLIR
