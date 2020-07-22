@@ -17,9 +17,13 @@
        (sub x y)))
 
 (def main Integer ()
-  (pr "Constant folding"
-      (long_expr 42 38)
-      "Common sub-expression elimination"
-      (repeated_expr 17 31)
-      "Dead code elimination"
-      (useless_expr 21 137)))
+  (print  "Constant folding"
+          (long_expr 42 38)
+          "\n"
+          "Common sub-expression elimination"
+          (repeated_expr 17 31)
+          "\n"
+          "Dead code elimination"
+          (useless_expr 21 137)
+          "\n"
+          ))
