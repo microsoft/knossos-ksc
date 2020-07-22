@@ -353,8 +353,6 @@ callPrimFun op _ (L.Tuple [x, y])
                         , ("ne" , "!=")
                         ]
 
-callPrimFun "pr" _ es = toFutharkExp es
-
 callPrimFun f _ args =
   Call (Var (escape f)) [toFutharkExp args]
 
@@ -387,7 +385,7 @@ toFuthark d = case LU.oneArgifyDef d of {
   where fname = toTypedName f (L.typeof args)
         entry = if fname == "main" then Entry else NotEntry
         -- We do not insert a return type annotation on entry points
-        -- because they use the 'pr' pseudo-function, which we
+        -- because they use the 'print' pseudo-function, which we
         -- translate in a non-type-preserving way.
         res_ty' = case entry of Entry -> Nothing
                                 NotEntry -> Just $ toFutharkType res_ty

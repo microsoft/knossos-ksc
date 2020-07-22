@@ -105,9 +105,11 @@
         (rev$prod_fold (tuple v c) 1.0) "\n"
         "checked (should be small)"
         checked "\n"
-        "TESTS FOLLOW" "\n"
-        "fwd OK" "\n"
-        everything_works_as_expected  "\n"
-        "rev OK" "\n"
+        "TESTS FOLLOW"
+        "\n----\n"
+        "fwd OK\n"
+        everything_works_as_expected
+        "\n----\n"
+        "rev OK\n"
         rev_ok "\n"
         )))

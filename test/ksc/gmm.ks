@@ -276,27 +276,36 @@
         )
       (print x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
+          "\n----\n" 
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           ; see https://github.com/awf/knossos/issues/281 (D$gmm_knossos_gmm_objective x alphas mus qs ls wishart)
 
           (tuple "gmm_at_theta:" gmm_at_theta)
+          "\n----\n" 
           (tuple "gmm_at_theta_plus_dtheta:" gmm_at_theta_plus_dtheta)
+          "\n----\n" 
           (tuple "gmm_fwd:" gmm_fwd)
+          "\n----\n" 
           (tuple "gmm_fd:" gmm_fd)
+          "\n----\n" 
 
           (tuple "grad_gmm:" grad_gmm)
+          "\n----\n" 
           (tuple "dtheta:" dtheta)
+          "\n----\n" 
           (tuple "rev_ok:" rev_ok)
+          "\n----\n" 
 
-          (tuple "Checked, should be small:" checked)
+          "Checked, should be small:" checked
 
+          "\n----\n" 
           "TESTS FOLLOW"
-          "Golden test GMM objective"
-          golden_test_gmm_objective
-          "Reverse mode as expected"
-          everything_works_as_expected_reverse
-          "Forward mode as expected"
-          everything_works_as_expected
-          "Not impossibly good"
-          (not_ impossibly_good)
+          "\n----\n" 
+          "Golden test GMM objective\n"          golden_test_gmm_objective
+          "\n----\n" 
+          "Reverse mode as expected\n"           everything_works_as_expected_reverse
+          "\n----\n" 
+          "Forward mode as expected\n"           everything_works_as_expected
+          "\n----\n" 
+          "Not impossibly good\n"                (not_ impossibly_good)
           )))
