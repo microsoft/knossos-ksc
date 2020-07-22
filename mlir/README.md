@@ -57,6 +57,7 @@ $ ./bin/ksc-mlir TEST -vvv # Runs the unit tests
 $ ./bin/ksc-mlir AST foo.ks # Spits out AST
 $ ./bin/ksc-mlir MLIR foo.ks # Spits out MLIR
 $ ./bin/ksc-mlir LLVM foo.ks # Spits out LLVM IR
+$ lli foo.ll ; echo $? # Run llvm and echo exit code
 ```
 
 **Tested with:**
