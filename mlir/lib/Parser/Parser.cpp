@@ -361,12 +361,12 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
   for (auto &c : tok->getTail())
     o->addOperand(parseToken(c.get()));
 
-#define IF_MATCH_1(NAME, ARGTYPE_0)\
-  if (o->size() == 1 && name == NAME &&\
+#define MATCH_1(NAME, ARGTYPE_0)\
+     (o->size() == 1 && name == NAME &&\
       o->getOperand(0)->getType() == Type::ARGTYPE_0)
 
-#define IF_MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1)\
-  if (o->size() == 2 && name == NAME &&\
+#define MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1)\
+     (o->size() == 2 && name == NAME &&\
       o->getOperand(0)->getType() == Type::ARGTYPE_0 &&\
       o->getOperand(1)->getType() == Type::ARGTYPE_1)
 
@@ -375,48 +375,48 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
   // TODO: Dedup this with Generator::buildCall
   // TODO: Move all to prelude once polymorphic
   // TODO: expose the "if", just have the conditional
-  IF_MATCH_1("abs", Float)  RETURN(Type::Float);
-  IF_MATCH_1("neg", Float)  RETURN(Type::Float);
-  IF_MATCH_1("exp", Float)  RETURN(Type::Float);
-  IF_MATCH_1("log", Float)  RETURN(Type::Float);
+  if (MATCH_1("abs", Float))  RETURN(Type::Float);
+  if (MATCH_1("neg", Float))  RETURN(Type::Float);
+  if (MATCH_1("exp", Float))  RETURN(Type::Float);
+  if (MATCH_1("log", Float))  RETURN(Type::Float);
 
-  IF_MATCH_1("to_float", Integer) RETURN(Type::Float);
-  IF_MATCH_1("to_int", Float)     RETURN(Type::Float);
+  if (MATCH_1("to_float", Integer)) RETURN(Type::Float);
+  if (MATCH_1("to_int", Float))     RETURN(Type::Float);
 
-  IF_MATCH_2("add", Integer, Integer)   RETURN(Type::Integer);
-  IF_MATCH_2("add", Float, Float)       RETURN(Type::Float);
-  IF_MATCH_2("sub", Integer, Integer)   RETURN(Type::Integer);
-  IF_MATCH_2("sub", Float, Float)       RETURN(Type::Float);
-  IF_MATCH_2("mul", Integer, Integer)   RETURN(Type::Integer);
-  IF_MATCH_2("mul", Float, Float)       RETURN(Type::Float);
-  IF_MATCH_2("div", Integer, Integer)   RETURN(Type::Integer);
-  IF_MATCH_2("div", Float, Float)       RETURN(Type::Float);
+  if (MATCH_2("add", Integer, Integer))   RETURN(Type::Integer);
+  if (MATCH_2("add", Float, Float))       RETURN(Type::Float);
+  if (MATCH_2("sub", Integer, Integer))   RETURN(Type::Integer);
+  if (MATCH_2("sub", Float, Float))       RETURN(Type::Float);
+  if (MATCH_2("mul", Integer, Integer))   RETURN(Type::Integer);
+  if (MATCH_2("mul", Float, Float))       RETURN(Type::Float);
+  if (MATCH_2("div", Integer, Integer))   RETURN(Type::Integer);
+  if (MATCH_2("div", Float, Float))       RETURN(Type::Float);
 
-  IF_MATCH_2("and", Bool, Bool)   RETURN(Type::Bool);
-  IF_MATCH_2("or", Bool, Bool)    RETURN(Type::Bool);
+  if (MATCH_2("and", Bool, Bool))   RETURN(Type::Bool);
+  if (MATCH_2("or", Bool, Bool))    RETURN(Type::Bool);
 
   // Comparison
-  IF_MATCH_2("eq", Integer, Integer)   RETURN(Type::Bool);
-  IF_MATCH_2("eq", Float, Float)       RETURN(Type::Bool);
-  IF_MATCH_2("ne", Integer, Integer)   RETURN(Type::Bool);
-  IF_MATCH_2("ne", Float, Float)       RETURN(Type::Bool);
-  IF_MATCH_2("lte", Integer, Integer)  RETURN(Type::Bool);
-  IF_MATCH_2("lte", Float, Float)      RETURN(Type::Bool);
-  IF_MATCH_2("gte", Integer, Integer)  RETURN(Type::Bool);
-  IF_MATCH_2("gte", Float, Float)      RETURN(Type::Bool);
-  IF_MATCH_2("gt", Integer, Integer)   RETURN(Type::Bool);
-  IF_MATCH_2("gt", Float, Float)       RETURN(Type::Bool);
-  IF_MATCH_2("lt", Integer, Integer)   RETURN(Type::Bool);
-  IF_MATCH_2("lt", Float, Float)       RETURN(Type::Bool);
+  if (MATCH_2("eq", Integer, Integer))   RETURN(Type::Bool);
+  if (MATCH_2("eq", Float, Float))       RETURN(Type::Bool);
+  if (MATCH_2("ne", Integer, Integer))   RETURN(Type::Bool);
+  if (MATCH_2("ne", Float, Float))       RETURN(Type::Bool);
+  if (MATCH_2("lte", Integer, Integer))  RETURN(Type::Bool);
+  if (MATCH_2("lte", Float, Float))      RETURN(Type::Bool);
+  if (MATCH_2("gte", Integer, Integer))  RETURN(Type::Bool);
+  if (MATCH_2("gte", Float, Float))      RETURN(Type::Bool);
+  if (MATCH_2("gt", Integer, Integer))   RETURN(Type::Bool);
+  if (MATCH_2("gt", Float, Float))       RETURN(Type::Bool);
+  if (MATCH_2("lt", Integer, Integer))   RETURN(Type::Bool);
+  if (MATCH_2("lt", Float, Float))       RETURN(Type::Bool);
 
   // Prims
-  IF_MATCH_1("size", Vector)               RETURN(Type::Integer);
-  IF_MATCH_2("index", Integer, Vector)     RETURN(o->getOperand(1)->getType().getSubType());
+  if (MATCH_1("size", Vector))               RETURN(Type::Integer);
+  if (MATCH_2("index", Integer, Vector))     RETURN(o->getOperand(1)->getType().getSubType());
 
-  if (name == "print")                 RETURN(Type::Integer); // Any number of args, any type...
+  if (name == "print") RETURN(Type::Integer); // Any number of args, any type...
 
-#undef IF_MATCH_1
-#undef IF_MATCH_2
+#undef MATCH_1
+#undef MATCH_2
 #undef RETURN
 
   // Fall through to non-prims
