@@ -117,16 +117,18 @@ struct Expr {
     Literal,
     Variable,
     Let,
-    Declaration,
-    Definition,
     Condition,
     Call,
+    // TODO: Lambda,
+    Declaration,
+    Definition,
     Rule,
-    Build,
+    // Tuple prims
     Tuple,
     Get,
+    // Prims
+    Build,
     Fold,
-    /// Unused below (TODO: Implement those)
     Print,
     Assert
   };
@@ -139,7 +141,8 @@ struct Expr {
 
   /// Type of the node, for quick access
   const Kind kind;
-  /// Future place for source location
+
+  /// TODO: Future place for source location
   const Location loc;
 
   virtual ~Expr() = default;
@@ -266,7 +269,7 @@ struct Let : public Expr {
   static bool classof(const Expr *c) { return c->kind == Kind::Let; }
 
 private:
-  std::vector<Expr::Ptr> vars;
+  std::vector<Expr::Ptr> vars;  // TODO: make a vector of vars
   Expr::Ptr expr;
 };
 
@@ -375,7 +378,7 @@ struct Definition : public Expr {
 private:
   Expr::Ptr impl;
   Declaration::Ptr decl;
-  std::vector<Expr::Ptr> arguments;
+  std::vector<Expr::Ptr> arguments; // TODO: make Variables
 };
 
 /// Condition, ex: (if (or x y) (add x y) 0)
