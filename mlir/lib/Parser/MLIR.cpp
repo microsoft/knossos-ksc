@@ -278,8 +278,7 @@ Values Generator::buildLiteral(const AST::Literal* lit) {
 }
 
 // Build from one Argument (Operand) of a call
-mlir::Value Generator::buildArg(const AST::Call* call, size_t i) 
-{
+mlir::Value Generator::buildArg(const AST::Call* call, size_t i) {
   return Single(buildNode(call->getOperand(i)));
 }
 
@@ -289,59 +288,59 @@ Values Generator::buildCall(const AST::Call* call) {
   size_t arity = call->size();
 
   // Various functions get special treatment, e.g. primitive arithmetic, array access etc
-#define IF_MATCH_1(NAME, TYPE)\
-    if (arity == 1 && name == NAME &&\
+#define MATCH_1(NAME, TYPE)\
+       (arity == 1 && name == NAME &&\
         call->getOperand(0)->getType() == AST::Type::TYPE)
 #define CREATE_1(MLIR_OP)\
-      return {builder.create<mlir::MLIR_OP>(UNK, buildArg(call,0))}
+      {builder.create<mlir::MLIR_OP>(UNK, buildArg(call,0))}
 
-#define IF_MATCH_2(NAME, TYPE0, TYPE1)\
-    if (arity == 2 && name == NAME &&\
+#define MATCH_2(NAME, TYPE0, TYPE1)\
+       (arity == 2 && name == NAME &&\
         call->getOperand(0)->getType() == AST::Type::TYPE0 &&\
         call->getOperand(1)->getType() == AST::Type::TYPE1)
 #define CREATE_2(MLIR_OP)\
-      return {builder.create<mlir::MLIR_OP>(UNK, buildArg(call,0), buildArg(call,1))}
+      {builder.create<mlir::MLIR_OP>(UNK, buildArg(call,0), buildArg(call,1))}
 
-  IF_MATCH_1("abs", Float)  CREATE_1(AbsFOp);
-  IF_MATCH_1("neg", Float)  CREATE_1(NegFOp);
-  IF_MATCH_1("exp", Float)  CREATE_1(ExpOp);
-  IF_MATCH_1("log", Float)  CREATE_1(LogOp);
+  if (MATCH_1("abs", Float))  return CREATE_1(AbsFOp);
+  if (MATCH_1("neg", Float))  return CREATE_1(NegFOp);
+  if (MATCH_1("exp", Float))  return CREATE_1(ExpOp);
+  if (MATCH_1("log", Float))  return CREATE_1(LogOp);
 
-  IF_MATCH_1("to_float", Integer) 
+  if (MATCH_1("to_float", Integer)) 
     return {builder.create<mlir::SIToFPOp>(UNK, buildArg(call,0), builder.getF64Type())};
 
-  IF_MATCH_1("to_int", Float)  assert(0 && "Cast to_int not implemented yet");
+  if (MATCH_1("to_int", Float))  assert(0 && "Cast to_int not implemented yet");
   
-  IF_MATCH_2("add", Integer, Integer)   CREATE_2(AddIOp);
-  IF_MATCH_2("add", Float, Float)       CREATE_2(AddFOp);
-  IF_MATCH_2("sub", Integer, Integer)   CREATE_2(SubIOp);
-  IF_MATCH_2("sub", Float, Float)       CREATE_2(SubFOp);
-  IF_MATCH_2("mul", Integer, Integer)   CREATE_2(MulIOp);
-  IF_MATCH_2("mul", Float, Float)       CREATE_2(MulFOp);
-  IF_MATCH_2("div", Integer, Integer)   CREATE_2(SignedDivIOp);
-  IF_MATCH_2("div", Float, Float)       CREATE_2(DivFOp);
+  if (MATCH_2("add", Integer, Integer))   return CREATE_2(AddIOp);
+  if (MATCH_2("add", Float, Float))       return CREATE_2(AddFOp);
+  if (MATCH_2("sub", Integer, Integer))   return CREATE_2(SubIOp);
+  if (MATCH_2("sub", Float, Float))       return CREATE_2(SubFOp);
+  if (MATCH_2("mul", Integer, Integer))   return CREATE_2(MulIOp);
+  if (MATCH_2("mul", Float, Float))       return CREATE_2(MulFOp);
+  if (MATCH_2("div", Integer, Integer))   return CREATE_2(SignedDivIOp);
+  if (MATCH_2("div", Float, Float))       return CREATE_2(DivFOp);
 
-  IF_MATCH_2("and", Bool, Bool)   CREATE_2(AndOp);
-  IF_MATCH_2("or", Bool, Bool)    CREATE_2(OrOp);
+  if (MATCH_2("and", Bool, Bool))   return CREATE_2(AndOp);
+  if (MATCH_2("or", Bool, Bool))    return CREATE_2(OrOp);
 
     // Comparison
 #define CREATE_CMP(MLIR_OP, CMP)\
-       return {builder.create<mlir::MLIR_OP>(UNK, mlir::CMP, buildArg(call,0), buildArg(call,1))}
+        {builder.create<mlir::MLIR_OP>(UNK, mlir::CMP, buildArg(call,0), buildArg(call,1))}
+  if (MATCH_2("eq", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::eq);
+  if (MATCH_2("eq", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::OEQ);
+  if (MATCH_2("ne", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::ne);
+  if (MATCH_2("ne", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::ONE);
+  if (MATCH_2("lte", Integer, Integer))  return CREATE_CMP(CmpIOp, CmpIPredicate::sle);
+  if (MATCH_2("lte", Float, Float))      return CREATE_CMP(CmpFOp, CmpFPredicate::OLE);
+  if (MATCH_2("gte", Integer, Integer))  return CREATE_CMP(CmpIOp, CmpIPredicate::sge);
+  if (MATCH_2("gte", Float, Float))      return CREATE_CMP(CmpFOp, CmpFPredicate::OGE);
+  if (MATCH_2("gt", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::sgt);
+  if (MATCH_2("gt", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::OGT);
+  if (MATCH_2("lt", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::slt);
+  if (MATCH_2("lt", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::OLT);
+#undef CREATE_CMP
 
-  IF_MATCH_2("eq", Integer, Integer)   CREATE_CMP(CmpIOp, CmpIPredicate::eq);
-  IF_MATCH_2("eq", Float, Float)       CREATE_CMP(CmpFOp, CmpFPredicate::OEQ);
-  IF_MATCH_2("ne", Integer, Integer)   CREATE_CMP(CmpIOp, CmpIPredicate::ne);
-  IF_MATCH_2("ne", Float, Float)       CREATE_CMP(CmpFOp, CmpFPredicate::ONE);
-  IF_MATCH_2("lte", Integer, Integer)  CREATE_CMP(CmpIOp, CmpIPredicate::sle);
-  IF_MATCH_2("lte", Float, Float)      CREATE_CMP(CmpFOp, CmpFPredicate::OLE);
-  IF_MATCH_2("gte", Integer, Integer)  CREATE_CMP(CmpIOp, CmpIPredicate::sge);
-  IF_MATCH_2("gte", Float, Float)      CREATE_CMP(CmpFOp, CmpFPredicate::OGE);
-  IF_MATCH_2("gt", Integer, Integer)   CREATE_CMP(CmpIOp, CmpIPredicate::sgt);
-  IF_MATCH_2("gt", Float, Float)       CREATE_CMP(CmpFOp, CmpFPredicate::OGT);
-  IF_MATCH_2("lt", Integer, Integer)   CREATE_CMP(CmpIOp, CmpIPredicate::slt);
-  IF_MATCH_2("lt", Float, Float)       CREATE_CMP(CmpFOp, CmpFPredicate::OLT);
-
-  IF_MATCH_2("index", Integer, Vector) {
+  if (MATCH_2("index", Integer, Vector)) {
     auto idx = buildArg(call,0);
     auto vec = buildArg(call,1);
     auto indTy = builder.getIndexType();
@@ -350,7 +349,7 @@ Values Generator::buildCall(const AST::Call* call) {
     return {builder.create<mlir::LoadOp>(UNK, vec, rangeIdx)};
   }
 
-  IF_MATCH_1("size", Vector) {
+  if (MATCH_1("size", Vector)) {
     auto vec = buildArg(call,0);
     // FIXME: Support multi-dimensional vectors
     auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
@@ -370,7 +369,7 @@ Values Generator::buildCall(const AST::Call* call) {
       //argTypes.append(tys.begin(), tys.end());
     }
 
-    // Return the nummber of elements
+    // Return the number of elements
     auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
     auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
     return {elms};
@@ -379,6 +378,11 @@ Values Generator::buildCall(const AST::Call* call) {
     //auto type = builder.getFunctionType(argTypes, retTy);
     //func = mlir::FuncOp::create(UNK, "print", type);
   }
+
+#undef MATCH_1
+#undef MATCH_2
+#undef CREATE_1
+#undef CREATE_2
 
   // Function call -- not a prim, should be known
   if (functions.count(name) != 0)
