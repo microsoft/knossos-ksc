@@ -54,6 +54,8 @@ main = do
       -> generateCppWithoutDiffs rest
     "--compile-and-run":rest
       -> compileAndRun rest
+    ["--test-gmm"]
+      -> testRunKS "g++-7" "test/ksc/gmm.ks"
 
     _ -> fail "Unknown arguments"
 
@@ -101,7 +103,7 @@ option s = do
 
 testWithfsTest :: String -> IO ()
 testWithfsTest fsTestKs = do
-  futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
+  -- futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
   let compiler = "g++-7"
   testC compiler [fsTestKs]
 
@@ -243,7 +245,7 @@ demoFOnTestPrograms ksTests = do
 -- Drop items from the list while the condition is satisfied, and also
 -- drop the first element satisfying the condition, if any.
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
-dropWhile1 f = tail . dropWhile f
+dropWhile1 pred = tail . dropWhile pred
 
 testRunKSVia :: (String -> Maybe int -> [String] -> FilePath -> IO String)
              -> String -> [Char] -> IO ()
@@ -255,15 +257,15 @@ testRunKSVia via_ compiler ksFile = do
 
       groupedTestResults = group testResults
         where group = \case
-                "----":testName:"----":testResult:rest ->
-                  (testName, boolOfIntString testResult):group rest
+                "----":testName:testResult:rest ->
+                  (testName, boolOfIntString testName testResult):group rest
                 [] -> []
-                _ -> error "Unexpected test result structure"
+                s -> error ("Unexpected test result structure [" ++ (intercalate "\n" s) ++ "]")
 
-              boolOfIntString = \case
+              boolOfIntString context = \case
                 "0" -> False
                 "1" -> True
-                s   -> error ("boolOfIntString: Unexpected " ++ s)
+                s   -> error ("boolOfIntString: Unexpected " ++ s ++ " at " ++ context)
 
       failed   = not . snd
       failures = map fst (filter failed groupedTestResults)
