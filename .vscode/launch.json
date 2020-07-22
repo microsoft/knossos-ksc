@@ -25,7 +25,7 @@
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bin/ksc-mlir",
 			"_args": ["TEST"],
-			"args": ["MLIR", "${workspaceFolder}/mlir/test/Ksc/tuple.ks"],
+			"args": ["MLIR", "${workspaceFolder}/mlir/test/Ksc/print.ks"],
 			"miDebuggerPath": "/usr/bin/gdb",
 			"externalConsole": false,
 			"logging": {

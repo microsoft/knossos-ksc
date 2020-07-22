@@ -51,6 +51,12 @@ Types Generator::ConvertType(const AST::Type &type, size_t dim) {
     }
     return subTys;
   }
+  case AST::Type::String: {
+    // TODO: do better
+    std::cerr << "[String!]";
+    auto i8 = builder.getIntegerType(8);
+    return {mlir::MemRefType::get(-1, i8)};
+  }
   default:
     assert(0 && "Unsupported type");
   }
@@ -250,8 +256,6 @@ Values Generator::buildNode(const AST::Expr* node) {
     return buildGet(llvm::dyn_cast<AST::Get>(node));
   if (AST::Fold::classof(node))
     return buildFold(llvm::dyn_cast<AST::Fold>(node));
-  if (AST::Print::classof(node))
-    return buildPrint(llvm::dyn_cast<AST::Print>(node));
   assert(0 && "unexpected node");
 }
 
@@ -354,8 +358,34 @@ Values Generator::buildCall(const AST::Call* call) {
     return {builder.create<mlir::IndexCastOp>(UNK, dim, intTy)};
   }
 
+  mlir::FuncOp func = 0;
+  if (name == "print") {
+    // Cons up the FuncOp now. 
+    Types argTypes;
+    for (auto &op: call->getOperands()) {
+      if (op->getType() == AST::Type::String)
+        continue;
+      buildNode(op.get());
+      //auto tys = ConvertType(op->getType());
+      //argTypes.append(tys.begin(), tys.end());
+    }
+
+    // Return the nummber of elements
+    auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
+    auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
+    return {elms};
+
+    //auto retTy = ConvertType(call->getType());
+    //auto type = builder.getFunctionType(argTypes, retTy);
+    //func = mlir::FuncOp::create(UNK, "print", type);
+  }
+
   // Function call -- not a prim, should be known
-  if (functions.count(name) == 0) {
+  if (functions.count(name) != 0)
+    func = functions[name];
+  
+  if (!func) {
+    // Didn't find it... assert
     asserter a("", __FILE__, __LINE__);
     a << "Unknown function [" << std::string(name) << "(";
     for(size_t i = 0; i < arity; ++i) {
@@ -366,11 +396,14 @@ Values Generator::buildCall(const AST::Call* call) {
     a << "]";
   }
 
-  auto func = functions[name];
-
   // Operands (tuples expand into individual operands)
   Values operands;
   for (auto &arg: call->getOperands()) {
+    if (arg->getType() == AST::Type::String) {
+      std::cerr << "[STRING!]";
+      continue;
+    }
+
     auto range = buildNode(arg.get());
     // Tuples
     if (range.size() > 1)
@@ -632,23 +665,6 @@ mlir::Attribute Generator::getAttr(const AST::Expr* op) {
   default:
     assert(0 && "Unimplemented literal type");
   }
-}
-
-// Builds print
-Values Generator::buildPrint(const AST::Print* p) {
-  if (p->size() > 0) {
-    for (auto &op: p->getExprs()) {
-      // For now, we ignore string operations
-      if (op->getType() == AST::Type::String)
-        continue;
-      buildNode(op.get());
-    }
-  }
-  // Return the nummber of elements
-  size_t len = p->getExprs().size();
-  auto att = builder.getIntegerAttr(builder.getIntegerType(64), len);
-  auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
-  return {elms};
 }
 
 //============================================================ MLIR from AST
