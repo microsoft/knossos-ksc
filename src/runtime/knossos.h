@@ -1579,22 +1579,6 @@ namespace ks
 		return LM::One<T>::mk(a);
 	}
 
-	// ========================= Printing primitive for KS files ===============
-	template <class T>
-	int pr(T a)
-	{
-		std::cout << a << std::endl;
-		return 0;
-	}
-
-	template <class T, class... Ts>
-	int pr(T a, Ts... t)
-	{
-		pr(a);
-		std::cout << "----\n";
-		return 1 + pr(t...);
-	}
-
 	template <class T>
 	int print(T a)
 	{
