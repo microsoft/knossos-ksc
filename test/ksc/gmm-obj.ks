@@ -182,6 +182,6 @@
           (wishart (tuple 3.1 7))
         )
 
-      (pr x
+      (print x
           (gmm_knossos_gmm_objective x alphas mus qs ls wishart)
           )))

@@ -63,7 +63,6 @@ class Generator {
   Values buildTuple(const AST::Tuple*);
   Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
-  Values buildPrint(const AST::Print*);
 
   // Variables
   void declareVariable(llvm::StringRef name, Values vals);

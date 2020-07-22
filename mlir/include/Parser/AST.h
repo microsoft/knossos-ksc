@@ -129,7 +129,6 @@ struct Expr {
     // Prims
     Build,
     Fold,
-    Print,
     Assert
   };
 
@@ -525,31 +524,6 @@ private:
   Expr::Ptr body;
   Expr::Ptr acc;
   Expr::Ptr vector;
-};
-
-/// Print, ex: (pr expr0 expr1 expr2 ...)
-///
-/// Prints values (numbers, strings, vectors, tuples) to stdout
-/// FIXME: The actual printing is not working, for now we just lower the
-/// expressions as if they did anything.
-struct Print : public Expr {
-  using Ptr = std::unique_ptr<Print>;
-  Print() : Expr(Type::None, Kind::Rule) {}
-
-  void addExpr(Expr::Ptr expr) { exprs.push_back(std::move(expr)); }
-  Expr *getExpr(size_t i) const { return exprs[i].get(); }
-  llvm::ArrayRef<Expr::Ptr> getExprs() const { return exprs; }
-  size_t size() const { return exprs.size(); }
-
-  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) {
-    return c->kind == Kind::Rule;
-  }
-
-private:
-  std::vector<Expr::Ptr> exprs;
 };
 
 /// Rule, ex: (rule "mul2" (v : Float) (mul v 2.0) (add v v))

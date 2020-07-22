@@ -108,7 +108,7 @@ class Parser {
 
   enum class Keyword {
        LET,  EDEF, DEF,   IF, BUILD, INDEX,
-      SIZE, TUPLE, GET, FOLD, PRINT,  RULE, NA,
+      SIZE, TUPLE, GET, FOLD, RULE, NA,
       // Stdlib hack
       SUM
   };
@@ -122,8 +122,6 @@ class Parser {
               .Case("tuple", Keyword::TUPLE)
               .StartsWith("get$", Keyword::GET) // TODO: Prim not reserved word
               .Case("fold", Keyword::FOLD) // TODO: Prim not reserved word
-              .Case("print", Keyword::PRINT) // TODO: Prim not reserved word
-              .Case("pr", Keyword::PRINT) // TODO: Prim not reserved word
               .Case("rule", Keyword::RULE)
               // Stdlib hack
               .Case("sum", Keyword::SUM) // TODO: Prim not reserved word
@@ -171,7 +169,6 @@ class Parser {
   Expr::Ptr parseTuple(const Token *tok);
   Expr::Ptr parseGet(const Token *tok);
   Expr::Ptr parseFold(const Token *tok);
-  Expr::Ptr parsePrint(const Token *tok);
   Expr::Ptr parseRule(const Token *tok);
   // Standard library parsers
   Expr::Ptr parseSum(const Token *tok);

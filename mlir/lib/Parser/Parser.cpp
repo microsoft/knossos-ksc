@@ -256,8 +256,6 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
       return parseBuild(tok);
     case Parser::Keyword::FOLD:
       return parseFold(tok);
-    case Parser::Keyword::PRINT:
-      return parsePrint(tok);
     case Parser::Keyword::SUM:
       return parseSum(tok);
     case Parser::Keyword::NA:
@@ -376,6 +374,7 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 
   // TODO: Dedup this with Generator::buildCall
   // TODO: Move all to prelude once polymorphic
+  // TODO: expose the "if", just have the conditional
   IF_MATCH_1("abs", Float)  RETURN(Type::Float);
   IF_MATCH_1("neg", Float)  RETURN(Type::Float);
   IF_MATCH_1("exp", Float)  RETURN(Type::Float);
@@ -411,8 +410,10 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
   IF_MATCH_2("lt", Float, Float)       RETURN(Type::Bool);
 
   // Prims
-  IF_MATCH_1("size", Vector)               RETURN(Type::Integer)
-  IF_MATCH_2("index", Integer, Vector)     RETURN(o->getOperand(1)->getType().getSubType())
+  IF_MATCH_1("size", Vector)               RETURN(Type::Integer);
+  IF_MATCH_2("index", Integer, Vector)     RETURN(o->getOperand(1)->getType().getSubType());
+
+  if (name == "print")                 RETURN(Type::Integer); // Any number of args, any type...
 
 #undef IF_MATCH_1
 #undef IF_MATCH_2
@@ -644,17 +645,6 @@ Expr::Ptr Parser::parseFold(const Token *tok) {
   return make_unique<Fold>(accTy, move(body), move(var), move(vector));
 }
 
-// Print: ex (print foo bar baz)
-Expr::Ptr Parser::parsePrint(const Token *tok) {
-  // Empty print returns nothing
-  if (tok->size() == 0)
-    return make_unique<Block>();
-  auto print = make_unique<Print>();
-  for (auto &t: tok->getTail())
-    print->addExpr(parseToken(t.get()));
-  return print;
-}
-
 // Rule: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
 Expr::Ptr Parser::parseRule(const Token *tok) {
   PARSE_ASSERT(tok->size() == 5);
@@ -846,14 +836,6 @@ std::ostream& Fold::dump(std::ostream& s, size_t tab) const {
   acc->dump(s, tab + 4);
   s << string(tab + 2, ' ') << "Vector:" << endl;
   vector->dump(s, tab + 4);
-  return s;
-}
-
-std::ostream& Print::dump(std::ostream& s, size_t tab) const {
-  s << string(tab, ' ') << "Print:" << endl;
-  Expr::dump(s, tab + 2);
-  for (auto &el: exprs)
-    el->dump(s, tab + 4);
   return s;
 }
 
