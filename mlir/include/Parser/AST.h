@@ -47,16 +47,13 @@ struct Type {
   Type(ValidType type) : type(type) {
     ASSERT(isScalar()) << "Type: Scalar constructor called for non-Scalar type: " << type;
   }
-  /// Vector constructor
-  Type(ValidType type, Type subTy) : type(type) {
-    assert(type == Vector && "Wrong ctor");
-    subTypes.push_back(subTy);
-  }
-  /// Tuple constructor
+
+  /// Compound type constructor
   Type(ValidType type, std::vector<Type> subTys) : type(type) {
-    assert(type == Tuple && subTys.size() > 1 && "Wrong ctor");
+    ASSERT(!isScalar()) << "Compound ctor called for Scalar type";
     subTypes = subTys;
   }
+
   /// Utilities
   bool isScalar() const {
     return type >= None && type <= LAST_SCALAR;
@@ -70,16 +67,6 @@ struct Type {
   }
   std::ostream& dump(std::ostream& s) const;
 
-  bool isInteger() {
-    return type == Integer;
-  }
-  bool isFloat() {
-    return type == Float;
-  }
-  bool isVector() {
-    return type == Vector;
-  }
-
   // Vector accessor
   const Type &getSubType() const {
     assert(type == Vector);
@@ -87,12 +74,26 @@ struct Type {
   }
   // Tuple accessor
   const Type &getSubType(size_t idx) const {
-    assert(type == Tuple);
     return subTypes[idx];
   }
   llvm::ArrayRef<Type> getSubTypes() const {
-    assert(type == Tuple);
     return subTypes;
+  }
+
+  static Type makeVector(Type type) {
+    return Type(Vector, {type});
+  }
+
+  static Type makeTuple(std::vector<Type> types) {
+    return Type(Tuple, types);
+  }
+
+  static Type makeLambda(Type s, Type t) {
+    return Type(Lambda, {s, t});
+  }
+
+  static Type makeLM(Type s, Type t) {
+    return Type(LM, {s, t});
   }
 
 protected:
@@ -416,8 +417,10 @@ private:
 struct Build : public Expr {
   using Ptr = std::unique_ptr<Build>;
   Build(Expr::Ptr range, Expr::Ptr var, Expr::Ptr expr)
-      : Expr(Type(Type::Vector, expr->getType()), Kind::Build), range(std::move(range)),
-        var(std::move(var)), expr(std::move(expr)) {}
+      : Expr(Type::makeVector(expr->getType()), Kind::Build), 
+        range(std::move(range)),
+        var(std::move(var)), 
+        expr(std::move(expr)) {}
 
   Expr *getRange() const { return range.get(); }
   Expr *getVariable() const { return var.get(); }
@@ -440,7 +443,8 @@ private:
 struct Tuple : public Expr {
   using Ptr = std::unique_ptr<Tuple>;
   Tuple(std::vector<Expr::Ptr> &&elements)
-      : Expr(Type::None, Kind::Tuple), elements(std::move(elements)) {
+      : Expr(Type::None, Kind::Tuple), 
+        elements(std::move(elements)) {
     std::vector<Type> types;
     for (auto &el: this->elements)
       types.push_back(el->getType());
