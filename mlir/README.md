@@ -85,16 +85,20 @@ $ cd llvm-project
 $ mkdir build && cd build
 
 # Build
-$ cmake -G Ninja ../llvm \
-        -DLLVM_ENABLE_PROJECTS=mlir \
-        -DLLVM_BUILD_EXAMPLES=ON \
-        -DLLVM_TARGETS_TO_BUILD="X86" \
+$ cmake ../llvm \
+        -G Ninja \
         -DCMAKE_BUILD_TYPE=Debug \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
         -DCMAKE_C_COMPILER=clang \
         -DCMAKE_CXX_COMPILER=clang++ \
+        -DLLVM_ENABLE_PROJECTS=mlir \
+        -DLLVM_BUILD_EXAMPLES=OFF \
+        -DLLVM_TARGETS_TO_BUILD="X86" \
+        -DLLVM_ENABLE_ASSERTIONS=ON \
         -DLLVM_ENABLE_LLD=ON
 $ ninja check-mlir
+
+# To install, one can change the prefix with: 
+$ cmake -DCMAKE_INSTALL_PREFIX=/tmp/llvm -P cmake_install.cmake
 ```
 
 # Implementation Details
