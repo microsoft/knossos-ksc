@@ -285,8 +285,7 @@ Type Parser::parseType(const Token *tok) {
   }
 
   // Empty type
-  if (tok->size() == 0)
-    return Type::None;
+  PARSE_ASSERT(tok->size() != 0) << "Empty Type decl"; 
 
   // Vector or Tuple (recursive)
   auto type = Str2Type(tok->getChild(0)->getValue());
@@ -505,13 +504,14 @@ Expr::Ptr Parser::parseLet(const Token *tok) {
 
 // Declares a function (and add it to symbol table)
 Expr::Ptr Parser::parseDecl(const Token *tok) {
-  PARSE_ASSERT(tok->size() == 4);
+  PARSE_ASSERT(tok->size() == 4) << "Decl should be (edef name type args)";
   const Token *name = tok->getChild(1);
   const Token *ty = tok->getChild(2);
   const Token *args = tok->getChild(3);
-  PARSE_ASSERT(name->isValue) << "Parsing decl";
+  PARSE_ASSERT(name->isValue) << "Decl should be (edef name type args)";
   auto type = parseType(ty);
-  PARSE_ASSERT(type != Type::None && !args->isValue) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT(type != Type::None) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT(!args->isValue) << "Parsing decl [" << name << "]";
 
   auto decl =
       make_unique<Declaration>(name->getValue(), type);
