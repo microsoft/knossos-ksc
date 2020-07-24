@@ -6,7 +6,7 @@
 using namespace std;
 using namespace Knossos::AST;
 
-#define PARSE_ASSERT(p) ASSERT(p) << "\nToken: " << tok << std::endl
+#define PARSE_ASSERT(p) ASSERT(p) << "\nAT: " << tok << std::endl << "FAILED: "
 
 //================================================ Helpers
 
@@ -27,6 +27,7 @@ static Type::ValidType Str2Type(llvm::StringRef ty) {
     return Type::Lambda;
   if (ty == "LM")
     return Type::LM;
+
   return Type::None;
 }
 
@@ -286,28 +287,28 @@ Type Parser::parseType(const Token *tok) {
 
   // Empty type
   PARSE_ASSERT(tok->size() != 0) << "Empty Type decl"; 
+  size_t nargs = tok->size() - 1;
 
-  // Vector or Tuple (recursive)
   auto type = Str2Type(tok->getChild(0)->getValue());
+
   if (type == AST::Type::Vector) {
-    auto element = tok->getChild(1);
-    if (element->isValue) // Vector of scalar
-      return Type(type, Str2Type(element->getValue()));
-    else                  // Vector of vector
-      return Type(type, parseType(element));
+    PARSE_ASSERT(nargs == 1) << "Vector needs one type argument";
+    return Type::makeVector(parseType(tok->getChild(1)));
   }
+
   if (type == AST::Type::Tuple) {
     std::vector<Type> types;
-    for (auto &c: tok->getTail()) {
-      if (c->isValue)     // Scalar
-        types.push_back(Str2Type(c->getValue()));
-      else                // Tuple or Vector
-        types.push_back(parseType(c.get()));
-    }
+    for (auto &c: tok->getTail())
+      types.push_back(parseType(c.get()));
     return Type(type, move(types));
   }
 
-  return Type::None;
+  if (type == AST::Type::Lambda || type == AST::Type::LM) {
+    PARSE_ASSERT(nargs == 2) << "Lambda/LM need two type arguments";
+    return Type(type, {parseType(tok->getChild(1)), parseType(tok->getChild(2))});
+  }
+
+  PARSE_ASSERT(0) << "Unknown type";
 }
 
 // Parses relaxed type declarations (vector, tuples)
@@ -316,7 +317,7 @@ Type Parser::parseRelaxedType(vector<const Token *> toks) {
   auto ty = toks[0]->getValue();
   if (ty == "Vec") {
     assert(toks.size() == 2 && "Invalid relaxed vector syntax");
-    return Type(Type::Vector, parseType(toks[1]));
+    return Type(Type::Vector, {parseType(toks[1])});
   } else if (ty == "Tuple") {
     vector<Type> tys;
     for (size_t i=1, e=toks.size(); i<e; i++)
@@ -475,7 +476,7 @@ Expr::Ptr Parser::parseVariable(const Token *tok) {
     return var;
   }
 
-  PARSE_ASSERT(0) << "Invalid variable declaration/definition";
+  PARSE_ASSERT(0) << "Invalid variable declaration (v : Type) / definition (v value)";
 }
 
 // Variable declaration: (let (x 10) (add x 10))
