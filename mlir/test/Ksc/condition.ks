@@ -20,13 +20,13 @@
 
 ; All constant expressions
         (c (if (eq 10 20) (foo 30) (bar 40)))
-; MLIR: %c30{{.*}} = constant 30 : i64
-; MLIR: %[[foo1:[0-9]+]] = call @foo(%c30{{.*}}) : (i64) -> i64
-; MLIR: %c40{{.*}} = constant 40 : i64
-; MLIR: %[[bar1:[0-9]+]] = call @bar(%c40{{.*}}) : (i64) -> i64
-; MLIR: %c10{{.*}} = constant 10 : i64
-; MLIR: %c20{{.*}} = constant 20 : i64
-; MLIR: %[[eq1:[0-9]+]] = cmpi "eq", %c10{{.*}}, %c20{{.*}} : i64
+; MLIR-DAG: %c30{{.*}} = constant 30 : i64
+; MLIR-DAG: %[[foo1:[0-9]+]] = call @foo(%c30{{.*}}) : (i64) -> i64
+; MLIR-DAG: %c40{{.*}} = constant 40 : i64
+; MLIR-DAG: %[[bar1:[0-9]+]] = call @bar(%c40{{.*}}) : (i64) -> i64
+; MLIR-DAG: %c10{{.*}} = constant 10 : i64
+; MLIR-DAG: %c20{{.*}} = constant 20 : i64
+; MLIR-DAG: %[[eq1:[0-9]+]] = cmpi "eq", %c10{{.*}}, %c20{{.*}} : i64
 ; MLIR: %[[sel1:[0-9]+]] = select %[[eq1]], %[[foo1]], %[[bar1]] : i64
 
 ; LLVM: %[[foo1:[0-9]+]] = call i64 @foo(i64 30)

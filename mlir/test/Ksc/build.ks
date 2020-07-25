@@ -76,13 +76,13 @@
 ; MLIR:   %[[incr:[0-9]+]] = addi %[[ivBody]], %[[one]] : i64
 ; MLIR:   br ^[[headBB]](%[[incr]] : i64)
 ; MLIR: ^[[tailBB]]: // pred: ^[[headBB]]
-; MLIR:   %[[cast:[0-9]+]] = memref_cast %[[vec]] : memref<?xi64> to memref<?xi64>
-; MLIR:   %[[dim:[0-9]+]] = dim %[[cast]], 0 : memref<?xi64>
-; MLIR:   %[[dimcast:[0-9]+]] = index_cast %[[dim]] : index to i64
-; MLIR:   %[[five:[ci_0-9]+]] = constant 5 : i64
-; MLIR:   %[[idxR:[0-9]+]] = index_cast %c5_i64 : i64 to index
-; MLIR:   %[[idx:[0-9]+]] = load %[[cast]][%[[idxR]]] : memref<?xi64>
-; MLIR:   %[[ret:[0-9]+]] = addi %[[dimcast]], %[[idx]] : i64
+; MLIR-DAG:   %[[cast:[0-9]+]] = memref_cast %[[vec]] : memref<?xi64> to memref<?xi64>
+; MLIR-DAG:   %[[dim:[0-9]+]] = dim %[[cast]], 0 : memref<?xi64>
+; MLIR-DAG:   %[[dimcast:[0-9]+]] = index_cast %[[dim]] : index to i64
+; MLIR-DAG:   %[[five:[ci_0-9]+]] = constant 5 : i64
+; MLIR-DAG:   %[[idxR:[0-9]+]] = index_cast %c5_i64 : i64 to index
+; MLIR-DAG:   %[[idx:[0-9]+]] = load %[[cast]][%[[idxR]]] : memref<?xi64>
+; MLIR-DAG:   %[[ret:[0-9]+]] = addi %[[dimcast]], %[[idx]] : i64
 ; MLIR:   return %[[ret]] : i64
 
 ; LLVM:   %[[vec:[0-9]+]] = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i64 1) to i64), i64 10))
