@@ -39,7 +39,7 @@ void build(const string &code, bool fromMLIR=false, bool emitLLVM=false) {
   else
     module = g.build(tree.get());
   if (verbose > 0) {
-    module.dump();
+    module.print(llvm::outs());
     cout << endl;
   }
 
@@ -48,7 +48,7 @@ void build(const string &code, bool fromMLIR=false, bool emitLLVM=false) {
       cout << " -- LLVM\n";
     auto llvm = g.emitLLVM();
     if (verbose > 0) {
-      llvm->dump();
+      llvm->print(llvm::outs());
       cout << endl;
     }
   }

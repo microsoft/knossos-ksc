@@ -708,7 +708,7 @@ std::ostream& Token::dump(std::ostream& s, size_t tab) const {
 std::ostream& Type::dump(std::ostream& s) const {
   if (type == Vector) {
     s << "(Vector ";
-    subTypes[0].dump(std::cout);
+    subTypes[0].dump(s);
     return s << " )";
   } 
   if (type == Tuple) {
@@ -811,9 +811,9 @@ std::ostream& Build::dump(std::ostream& s, size_t tab) const {
 }
 
 std::ostream& Tuple::dump(std::ostream& s, size_t tab) const {
-  cout << string(tab, ' ') << "Tuple:" << endl;
+  s << string(tab, ' ') << "Tuple:" << endl;
   Expr::dump(s, tab + 2);
-  cout << string(tab + 2, ' ') << "Values:" << endl;
+  s << string(tab + 2, ' ') << "Values:" << endl;
   for (auto &el: elements)
     el->dump(s, tab + 4);
   return s;
