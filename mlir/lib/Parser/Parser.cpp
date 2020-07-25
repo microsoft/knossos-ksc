@@ -413,8 +413,15 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
   if (MATCH_1("size", Vector))               RETURN(Type::Integer);
   if (MATCH_2("index", Integer, Vector))     RETURN(o->getOperand(1)->getType().getSubType());
 
-  if (name == "print") RETURN(Type::Integer); // Any number of args, any type...
+  if (name == "print") RETURN(Type::Integer); 
 
+  if (name == "ts_add" && o->size() == 2) {
+    Type ty0 = o->getOperand(0)->getType();
+    Type ty1 = o->getOperand(1)->getType();
+    PARSE_ASSERT(ty0.tangentType() == ty1) << "ts_add defined between tangentType and type";
+    RETURN(ty0);
+  }
+  
 #undef MATCH_1
 #undef MATCH_2
 #undef RETURN
