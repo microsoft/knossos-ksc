@@ -3,6 +3,7 @@ trigger: none
 jobs:
 
 - job: 'Ubuntu'
+  timeoutInMinutes: 180
   workspace:
     clean: all
   pool:
