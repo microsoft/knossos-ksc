@@ -110,6 +110,8 @@ inline std::ostream& operator<<(std::ostream& s, Type const& t)
   return t.dump(s);
 }
 
+std::string Type2Str(Type::ValidType type);
+
 /// Tangent type is an AD concept, but very built in
 inline Type Type::tangentType() const
 {
