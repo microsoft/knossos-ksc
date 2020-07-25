@@ -43,13 +43,15 @@ struct Type {
     LM
   };
 
+  Type() : type(None) {}
+
   /// Scalar constructor
   Type(ValidType type) : type(type) {
     ASSERT(isScalar()) << "Type: Scalar constructor called for non-Scalar type: " << type;
   }
 
   /// Compound type constructor
-  Type(ValidType type, std::vector<Type> subTys) : type(type) {
+  Type(ValidType type, std::vector<Type> const& subTys) : type(type) {
     ASSERT(!isScalar()) << "Compound ctor called for Scalar type";
     subTypes = subTys;
   }
@@ -84,7 +86,7 @@ struct Type {
     return Type(Vector, {type});
   }
 
-  static Type makeTuple(std::vector<Type> types) {
+  static Type makeTuple(std::vector<Type> const& types) {
     return Type(Tuple, types);
   }
 
@@ -96,6 +98,8 @@ struct Type {
     return Type(LM, {s, t});
   }
 
+  Type tangentType() const;
+
 protected:
   ValidType type;
   std::vector<Type> subTypes;
@@ -104,6 +108,23 @@ protected:
 inline std::ostream& operator<<(std::ostream& s, Type const& t)
 {
   return t.dump(s);
+}
+
+/// Tangent type is an AD concept, but very built in
+inline Type Type::tangentType() const
+{
+  switch (type) {
+    case Float:
+      return Float;
+    case Vector:
+      return makeVector(getSubType().tangentType());
+    case Tuple: {
+      std::vector<Type> newsubTypes {subTypes.size()};
+      std::transform(subTypes.begin(), subTypes.end(), newsubTypes.begin(), [](Type const& t) { return t.tangentType(); });
+      return makeTuple(newsubTypes);
+    }
+  }
+  return Type::None;
 }
 
 /// A node in the AST.
