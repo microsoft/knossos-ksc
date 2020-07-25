@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
       cerr << "ERROR: LLVM lowering failed\n";
       return 1;
     }
-    llvm->print(llvm::outs(), nullptr);
+    llvm->print(llvm::outs(), nullptr, false, true);
   }
 
   return 0;
