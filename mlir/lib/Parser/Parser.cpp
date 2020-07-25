@@ -695,7 +695,7 @@ Expr::Ptr Parser::parseSum(const Token *tok) {
 
 std::ostream& Token::dump(std::ostream& s, size_t tab) const {
   if (isValue)
-    return s << "\"" << getValue().data() << "\"";
+    return s << getValue().data();
 
   s << "(";
   tab += 2;
