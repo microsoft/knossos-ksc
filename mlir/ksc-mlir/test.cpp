@@ -48,7 +48,7 @@ void build(const string &code, bool fromMLIR=false, bool emitLLVM=false) {
       cout << " -- LLVM\n";
     auto llvm = g.emitLLVM();
     if (verbose > 0) {
-      llvm->print(llvm::outs());
+      llvm->print(llvm::outs(), nullptr, false, true);
       cout << endl;
     }
   }
