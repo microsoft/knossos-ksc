@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (action == Action::EMIT_MLIR) {
-    module.dump();
+    module.print(llvm::outs());
   } 
   else if (action == Action::EMIT_LLVM) {
     auto llvm = g.emitLLVM();
@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
       cerr << "ERROR: LLVM lowering failed\n";
       return 1;
     }
-    llvm->dump();
+    llvm->print(llvm::outs(), nullptr);
   }
 
   return 0;
