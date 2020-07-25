@@ -34,19 +34,20 @@ We may in the future decide to use the [Rise](https://github.com/rise-lang/mlir)
 
 ## Building Ksc-MLIR
 
-This setup assumes that you have built LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. 
-Instructions below.
+This setup assumes that you have built a specific checkout of LLVM and MLIR in `$BUILD_DIR`. 
+See instructions below.
 
 To build and launch the tests, run
 
 ```sh
 # Prepare
-$ export LLVM=/path/to/llvm-project/build
-$ cd path/to/knossos-ksc/mlir
+$ cd path/to/knossos-ksc
+$ cp user.cmake.template user.cmake
+EDIT user.cmake to add path to LLVM
 $ mkdir build && cd build
 
 # Build
-$ cmake -G Ninja .. -DMLIR_DIR=$LLVM/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=$LLVM/bin/llvm-lit
+$ cmake -G Ninja ..
 $ ninja ksc-mlir
 
 # Test
