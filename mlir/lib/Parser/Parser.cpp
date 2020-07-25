@@ -693,16 +693,52 @@ Expr::Ptr Parser::parseSum(const Token *tok) {
 
 //================================================ Dumps tokens, nodes to stdout
 
-std::ostream& Token::dump(std::ostream& s, size_t tab) const {
-  if (isValue)
-    return s << getValue().data();
+Token::ppresult Token::pprint(Token const* tok, int indent, int width)
+{
+  const int tab = 2;
 
-  s << "(";
-  tab += 2;
-  for (auto &t : children)
-    t->dump(s, tab) << "\n" << string(tab, ' ');
-  tab -= 2;
-  return s << ")";
+  if (tok->isValue)
+    return {tok->getValue().data(), tok->getValue().size()};
+
+  int mywidth = 1; // for parens
+  int maxwidth = 0;
+  bool first = true;
+  std::vector<std::string> strs;
+  for (auto& t : tok->children) {
+    ppresult p = pprint(t.get(), indent+tab, width);
+    if (p.width > maxwidth)
+      maxwidth = p.width;
+    mywidth += (first ? 0 : 1) + p.width;
+    strs.push_back(p.s);
+    first = false;
+  }
+
+  int available_width = width - indent;
+  ppresult ret;
+  std::string sep;
+  if (mywidth < available_width) {
+    sep = " ";
+    ret.width = mywidth;
+  } else {
+    sep = "\n" + std::string(indent, ' ');
+    ret.width = maxwidth;
+  }
+
+  first = true;
+  ret.s = "(";
+  for (auto &s : strs) {
+    if (!first) 
+      ret.s += sep;
+    ret.s += s;
+    first = false;
+  }
+  ret.s += ")";
+
+  return ret;  
+}
+
+std::ostream& Token::dump(std::ostream& s) const {
+  return s << pprint(this, 0, 80).s << std::endl;
 }
 
 std::ostream& Type::dump(std::ostream& s) const {
