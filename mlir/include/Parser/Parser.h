@@ -60,16 +60,30 @@ struct Token {
   const bool isValue;
   size_t size() const { return children.size(); }
 
-  std::ostream& dump(std::ostream& s, size_t tab = 0) const;
+  std::ostream& dump(std::ostream& s) const;
+
+  std::string pprint(int width = 80) const;
 
 private:
   std::string value;
   std::vector<Ptr> children;
+
+  struct ppresult {
+    std::string s;
+    int width;
+  };
+
+  static ppresult pprint(Token const* tok, int indent = 0, int width = 80);
 };
 
 inline std::ostream& operator<<(std::ostream& s, Token const* tok) 
 {
   return tok->dump(s);
+}
+
+inline std::string Token::pprint(int width) const
+{
+  return pprint(this, 0, width).s;
 }
 
 /// Tokenise the text into recursive tokens grouped by parenthesis.

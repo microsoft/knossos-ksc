@@ -614,6 +614,21 @@ void test_parser_sum() {
   cout << "    OK\n";
 }
 
+void test_pprint()
+{
+  cout << "\n == test_pprint\n";
+  Lexer l("(def f1 Integer ((x : Integer) (y : Integer)) (add x y))\n"
+          "(def f2 Float ((x : Integer) (y : Integer)) (if t (add x y) (mul x y))");
+  auto root = l.lex();
+  cout << " -- Tokens\n";
+  cout << root->pprint(80) << endl;
+  cout << " -- Tokens\n";
+  cout << root->pprint(60) << endl;
+  cout << " -- Tokens\n";
+  cout << root->pprint(40) << endl;
+  cout << "     OK\n";
+}
+
 int test_all(int v=0) {
   verbose = v;
 
@@ -634,6 +649,7 @@ int test_all(int v=0) {
   test_parser_get();
   test_parser_fold();
   test_parser_sum();
+  test_pprint();
 
   cout << "\nAll tests OK\n";
   return 0;
