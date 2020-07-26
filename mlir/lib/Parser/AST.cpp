@@ -6,7 +6,7 @@
 using namespace std;
 using namespace Knossos::AST;
 
-string Knossos::AST::Type2Str(Type::ValidType type) {
+char const* Knossos::AST::ValidType2Str(Type::ValidType type) {
   switch (type) {
   case Type::None:
     return "none";
@@ -42,7 +42,7 @@ std::ostream& Type::dump(std::ostream& s) const {
     return s << "}";
   } 
   
-  return s << Type2Str(type);
+  return s << ValidType2Str(type);
 }
 
 std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
