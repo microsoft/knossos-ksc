@@ -6,7 +6,7 @@
 using namespace std;
 using namespace Knossos::AST;
 
-string Type2Str(Type::ValidType type) {
+string Knossos::AST::Type2Str(Type::ValidType type) {
   switch (type) {
   case Type::None:
     return "none";

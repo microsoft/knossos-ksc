@@ -358,25 +358,41 @@ Values Generator::buildCall(const AST::Call* call) {
   }
 
   mlir::FuncOp func = 0;
-  if (name == "print") {
-    // Cons up the FuncOp now. 
-    Types argTypes;
-    for (auto &op: call->getOperands()) {
-      if (op->getType() == AST::Type::String)
-        continue;
+  if (name == "num-args") {
+    for (auto &op: call->getOperands())
       buildNode(op.get());
-      //auto tys = ConvertType(op->getType());
-      //argTypes.append(tys.begin(), tys.end());
-    }
 
     // Return the number of elements
     auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
     auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
     return {elms};
+  }
 
-    //auto retTy = ConvertType(call->getType());
-    //auto type = builder.getFunctionType(argTypes, retTy);
-    //func = mlir::FuncOp::create(UNK, "print", type);
+  if (name == "print" && arity == 1) {
+    // Cons up the FuncOp now.
+    auto arg = call->getOperand(0);
+    AST::Type type = arg->getType(); 
+    auto tys = ConvertType(type);
+
+    if (type == AST::Type::String) {
+      auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
+      auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
+      return {elms};
+    }
+
+    auto node = buildNode(arg);
+
+    int retval = 1;
+    auto att = builder.getIntegerAttr(builder.getIntegerType(64), retval);
+    auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
+    return {elms};
+
+/*
+
+    auto retTy = ConvertType(call->getType());
+    auto ftype = builder.getFunctionType(tys, retTy);
+    func = mlir::FuncOp::create(UNK, "print", ftype);
+    */
   }
 
 #undef MATCH_1
@@ -390,14 +406,14 @@ Values Generator::buildCall(const AST::Call* call) {
   
   if (!func) {
     // Didn't find it... assert
-    asserter a("", __FILE__, __LINE__);
-    a << "Unknown function [" << std::string(name) << "(";
+    asserter a("Unknown function", __FILE__, __LINE__);
+    a << " " << std::string(name) << "(";
     for(size_t i = 0; i < arity; ++i) {
       a << call->getOperand(i)->getType();
       if (i+1 < arity)
         a << ", ";
     } 
-    a << "]";
+    a << ")]";
   }
 
   // Operands (tuples expand into individual operands)

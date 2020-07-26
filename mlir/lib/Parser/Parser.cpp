@@ -330,6 +330,19 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
 // Checks types agains symbol table
 Expr::Ptr Parser::parseCall(const Token *tok) {
   string name = tok->getHead()->getValue().str();
+  int arity = tok->size() - 1;
+
+  if (name == "print" && arity > 1) {
+    // Multiple args to print, repeat calls to print, and add their returns
+    Call *o = new Call("num-args", Type::Integer);
+    // Add operands
+    for (auto &c : tok->getTail()) {
+      Call *op = new Call("print", Type::Integer);
+      op->addOperand(parseToken(c.get()));
+      o->addOperand(unique_ptr<Expr>(op));
+    }
+    return unique_ptr<Expr>(o);
+  }
 
   // Construct with no type, no operands
   Call *o = new Call(name, Type::None);
@@ -339,11 +352,11 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
     o->addOperand(parseToken(c.get()));
 
 #define MATCH_1(NAME, ARGTYPE_0)\
-     (o->size() == 1 && name == NAME &&\
+     (arity == 1 && name == NAME &&\
       o->getOperand(0)->getType() == Type::ARGTYPE_0)
 
 #define MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1)\
-     (o->size() == 2 && name == NAME &&\
+     (arity == 2 && name == NAME &&\
       o->getOperand(0)->getType() == Type::ARGTYPE_0 &&\
       o->getOperand(1)->getType() == Type::ARGTYPE_1)
 
@@ -351,7 +364,9 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 
   // TODO: Dedup this with Generator::buildCall
   // TODO: Move all to prelude once polymorphic
-  // TODO: expose the "if", just have the conditional
+
+  if (name == "print" && arity == 1)  RETURN(Type::Integer);
+
   if (MATCH_1("abs", Float))  RETURN(Type::Float);
   if (MATCH_1("neg", Float))  RETURN(Type::Float);
   if (MATCH_1("exp", Float))  RETURN(Type::Float);
@@ -390,14 +405,25 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
   if (MATCH_1("size", Vector))               RETURN(Type::Integer);
   if (MATCH_2("index", Integer, Vector))     RETURN(o->getOperand(1)->getType().getSubType());
 
-  if (name == "print") RETURN(Type::Integer); 
-
-  if (name == "ts_add" && o->size() == 2) {
+  // ts_add(T, dT)
+  if (name == "ts_add" && arity == 2) {
     Type ty0 = o->getOperand(0)->getType();
     Type ty1 = o->getOperand(1)->getType();
     PARSE_ASSERT(ty0.tangentType() == ty1) << "ts_add defined between tangentType and type";
     RETURN(ty0);
   }
+  
+  // sum(T, T, T...)
+  if (name == "sum" && arity > 1) {
+    Type ty0 = o->getOperand(0)->getType();
+    for(int i = 1; i < arity; ++i)
+      PARSE_ASSERT(o->getOperand(i)->getType() == ty0);
+    RETURN(ty0);
+  }
+  
+  // num-args(T1, ..., Tn)
+  if (name == "num-args")
+    RETURN(Type::Integer);
   
 #undef MATCH_1
 #undef MATCH_2
