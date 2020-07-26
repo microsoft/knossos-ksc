@@ -4,9 +4,10 @@
 #include "Parser/AST.h"
 
 using namespace std;
-using namespace Knossos::AST;
 
-char const* Knossos::AST::ValidType2Str(Type::ValidType type) {
+namespace Knossos { namespace AST {
+
+char const* ValidType2Str(Type::ValidType type) {
   switch (type) {
   case Type::None:
     return "none";
@@ -45,6 +46,19 @@ std::ostream& Type::dump(std::ostream& s) const {
   return s << ValidType2Str(type);
 }
 
+std::ostream& operator<<(std::ostream& s, Signature const& t)
+{
+  s << t.name << "(";
+  bool first = true;
+  for(auto ty : t.argTypes) {
+    if (!first)
+      s << ",";
+    s << ty;
+    first = false;
+  }
+  return s << ")";
+}
+
 std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "type [";
   type.dump(s);
@@ -53,8 +67,10 @@ std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
 
 std::ostream&  Block::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Block:" << endl;
-  for (auto &op : operands)
+  for (auto &op : operands) {
     op->dump(s, tab + 2);
+  }
+  return s;
 }
 
 std::ostream& Literal::dump(std::ostream& s, size_t tab) const {
@@ -84,8 +100,8 @@ std::ostream&  Let::dump(std::ostream& s, size_t tab) const {
 
 std::ostream& Call::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Call:" << endl;
-  s << string(tab + 2, ' ') << "name [" << name << "]" << endl;
   Expr::dump(s, tab + 2);
+  decl->dump(s, tab + 2);
   for (auto &op : operands)
     op->dump(s, tab + 2);
   return s;
@@ -177,3 +193,60 @@ std::ostream&  Rule::dump(std::ostream& s, size_t tab) const {
   result->dump(s, tab + 4);
   return s;
 }
+
+// Mangle to be consistent with Cgen.hs:mangleType
+std::string mangleType(Type const& t)
+{
+  switch (t.getValidType()) {
+    case Type::Bool: return "b";
+    case Type::Integer: return "i";
+    case Type::Float: return "f";
+    case Type::String: return "s";
+  }
+
+  if (t.isTuple()) {
+    std::string ret = "<";
+    for(auto &ty: t.getSubTypes())
+      ret += mangleType(ty);
+    return ret + ">";
+  }
+
+  if (t.isVector())
+    return "v" + mangleType(t.getSubType());
+
+  ASSERT(0) << "Cannot mangle type " << t;
+  return "*FAIL*";
+}
+
+std::string translate(char c)
+{
+  switch (c) {
+    case '@': return "$a";
+    case ',': return "$_";
+    case '[': return "$6";
+    case ']': return "$9";
+    case '<': return "$d";
+    case '>': return "$b";
+    case '*': return "$x";
+  }
+  return std::string(1, c);
+}
+
+std::string encodeName(std::string const& s)
+{
+    std::string ret;
+    for(auto c: s)
+      ret += translate(c);
+    return ret;
+}
+
+std::string Declaration::getMangledName() const {
+  if (argTypes.size() == 0)
+    return name;
+  std::string ret = name + "@";
+  for(auto &ty: argTypes)
+      ret += mangleType(ty);
+  return encodeName(ret);
+}
+
+}}

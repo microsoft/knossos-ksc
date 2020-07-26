@@ -117,6 +117,7 @@ int main(int argc, char **argv) {
       return 1;
     }
     if (action == Action::EMIT_AST) {
+      p.getExtraDecls()->dump(std::cout);
       p.getRootNode()->dump(std::cout);
       return 0;
     }
@@ -126,7 +127,7 @@ int main(int argc, char **argv) {
   Generator g;
   mlir::ModuleOp module;
   if (source == Source::KSC)
-    module = g.build(p.getRootNode());
+    module = g.build(p.getExtraDecls(), p.getRootNode());
   else if (source == Source::MLIR)
     module = g.build(code);
 
