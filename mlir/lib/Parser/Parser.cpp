@@ -566,7 +566,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
   }
   Signature sig {name->getValue().str(), argTypes};
   function_decls[sig] = node->getDeclaration();
-
+  
   // Function body is a block, create one if single expr
   auto body = parseToken(expr);
   node->setImpl(move(body));
