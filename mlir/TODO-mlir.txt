@@ -1,7 +1,8 @@
 TODO-mlir.txt
 
+- Remove more keywords: sum, fold, build, get, tuple
 - Location info
 - Hash consing
 - Python binding
-- Fix print, hence strings.
+- Fix print, hence strings -- https://stackoverflow.com/questions/1061753/how-can-i-implement-a-string-data-type-in-llvm
 - Undo untupling
