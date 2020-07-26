@@ -7,7 +7,7 @@
       42
       (add argc (index 1 argv)))
 )
-; MLIR: func @f(%arg0: i64, %arg1: memref<?xi64>) -> i64 {
+; MLIR: func @f$aivi(%arg0: i64, %arg1: memref<?xi64>) -> i64 {
 ;         Strings are ignored, for now
 ; MLIR:   %cst = constant 1.000000e+01 : f64
 ; MLIR:   %c42{{.*}} = constant 42 : i64
@@ -18,7 +18,7 @@
 ; MLIR:   %c4{{.*}} = constant 4 : i64
 ; MLIR:   return %c4{{.*}} : i64
 
-; LLVM: define i64 @f(i64 %0, i64* %1,
+; LLVM: define i64 @"f$aivi"(i64 %0, i64* %1,
 ; LLVM:   %[[gep:[0-9]+]] = getelementptr i64, i64* %{{.*}}, i64 1
 ; LLVM:   %[[load:[0-9]+]] = load i64, i64* %[[gep]]
 ; LLVM:   %[[add:[0-9]+]] = add i64 %0, %[[load]]
