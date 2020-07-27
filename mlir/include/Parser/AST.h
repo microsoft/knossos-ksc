@@ -624,7 +624,7 @@ private:
   Expr::Ptr vector;
 };
 
-/// Print, ex: (pr expr0 expr1 expr2 ...)
+/// Print, ex: (print expr0 expr1 expr2 ...)
 ///
 /// Prints values (numbers, strings, vectors, tuples) to stdout
 /// FIXME: The actual printing is not working, for now we just lower the

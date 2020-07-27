@@ -149,7 +149,6 @@ class Parser {
               .StartsWith("get$", Keyword::GET)
               .Case("fold", Keyword::FOLD)
               .Case("print", Keyword::PRINT)
-              .Case("pr", Keyword::PRINT)
               .Case("rule", Keyword::RULE)
               // Stdlib hack
               .Case("sum", Keyword::SUM)

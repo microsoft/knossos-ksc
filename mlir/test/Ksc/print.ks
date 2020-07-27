@@ -6,7 +6,7 @@
 ; for strings is not trivial, and we do not need it yet, so we blisfully ignore.
 
 (def main Integer ((argc : Integer) (argv : Vec Integer))
-  (pr "Hello world"
+  (print "Hello world"
       10.0
       42
       (add argc (index 1 argv)))
