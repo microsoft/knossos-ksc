@@ -39,7 +39,7 @@ hspec = do
 
 main :: IO ()
 main = do
-  System.Environment.getArgs >>= \case
+  System.Environment.getArgs >>= \args -> case args of
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
     ["--test-except-codegen"]
@@ -59,7 +59,7 @@ main = do
           testRunKS "g++-7" "test/ksc/gmm.ks"
           testRunKS "g++-7" "test/ksc/fold.ks"
          
-    _ -> fail "Unknown arguments"
+    _ -> fail ("Unknown arguments: " ++ intercalate " " args)
 
 parseErr :: Parsec [String] () a -> [String] -> a
 parseErr p s = either (error . show) id (parse p "" s)
@@ -258,11 +258,11 @@ testRunKSVia via_ compiler ksFile = do
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
       groupedTestResults = group testResults
-        where group = \case
+        where group lines = case lines of
                 "----":testName:testResult:rest ->
-                  (testName, boolOfIntString testName testResult):group rest
+                  (testName, boolOfIntString testResult):group rest
                 [] -> []
-                s -> error ("Unexpected test result structure [" ++ (intercalate "\n" s) ++ "]")
+                _ -> error ("Unexpected test result structure" ++ unlines lines)
 
               boolOfIntString context = \case
                 "0" -> False
