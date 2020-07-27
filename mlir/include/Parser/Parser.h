@@ -70,7 +70,7 @@ private:
 
   struct ppresult {
     std::string s;
-    int width;
+    size_t width;
   };
 
   static ppresult pprint(Token const* tok, int indent = 0, int width = 80);
