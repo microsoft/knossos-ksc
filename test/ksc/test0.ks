@@ -29,17 +29,17 @@
 
 (def main Integer ()
     (print ; No grad.  See https://github.com/awf/knossos/issues/281 (D$f 9.0)
-        (f 9.0)
-        (fwd$f 9.0 1.0)
-        (build 4 (lam (i : Integer) i))
+        (f 9.0) "\n"
+        (fwd$f 9.0 1.0) "\n"
+        (build 4 (lam (i : Integer) i)) "\n"
         (e (build 7 (lam (i : Integer) i))
            (tuple (build 13 (lam (i : Integer) (build 7 (lam (i : Integer) 3.3))))
-                  (tuple 23 (build 13 (lam (i : Integer) (to_float i))))))
-        (tuple "CHECK=" ($check (lam (x : Float) (f x))
+                  (tuple 23 (build 13 (lam (i : Integer) (to_float i))))))  "\n"
+        "CHECK=" ($check (lam (x : Float) (f x))
                                 (lam (t : Tuple Float Float) (rev$f t))
                                 (tuple 1.1)
                                 1.1
                                 (tuple 0.00001)
-                                0.3))
+                                0.3)  "\n"
     )
 )

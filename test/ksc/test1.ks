@@ -20,14 +20,15 @@
 (def main Integer ()
     (let ((x 1.1)
           (y 2.2)
-          (delta 0.0001))
+          (delta 0.0001)
+          (nl "\n"))
       (print
-        (f (a 3.0) (b 2.3))
-        (f 0.0 1.0)
+        (f (a 3.0) (b 2.3)) nl 
+        (f 0.0 1.0) nl
         ; See https://github.com/awf/knossos/issues/281 (D$f 1.1 2.2 )
-        (g x y)
-        "FD=" (div (sub (f x (add y delta)) (f x y)) delta)
-        (fwd$f (tuple x y) (tuple delta delta))
+        (g x y) nl
+        "FD=" (div (sub (f x (add y delta)) (f x y)) delta) 
+        " vs " (fwd$f (tuple x y) (tuple delta delta)) nl
         "CHECK=" ($check (lam (t : Tuple Float Float) (f1 t))
                          (lam (t : Tuple (Tuple Float Float) Float) (rev$f1 t))
                          (tuple x y)
