@@ -274,7 +274,7 @@
           (tolerance 0.0001)
           (everything_works_as_expected_reverse (lt checked tolerance))
         )
-      (pr x
+      (print x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
           "\n----\n" 
           (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))

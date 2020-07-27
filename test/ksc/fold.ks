@@ -86,7 +86,7 @@
               (lt (abs (sub actual expected))
                       (mul (add (abs expected) (abs actual))
                          tolerance)))))
-       (pr
+       (print
         "v"
         v
         "c"

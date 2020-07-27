@@ -21,7 +21,7 @@
     (let ((x 1.1)
           (y 2.2)
           (delta 0.0001))
-      (pr
+      (print
         (f (a 3.0) (b 2.3))
         (f 0.0 1.0)
         ; See https://github.com/awf/knossos/issues/281 (D$f 1.1 2.2 )

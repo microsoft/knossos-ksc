@@ -20,7 +20,7 @@
   (index x (build y (lam (i : Integer) i)))) ; x
 
 (def main Integer ()
-  (pr "Eliding build for size const"
+  (print "Eliding build for size const"
       (size_build)
       "Eliding build for size arg"
       (size_build_var 4)
