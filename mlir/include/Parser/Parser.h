@@ -25,8 +25,8 @@ namespace AST {
 /// Do not confuse with "continuation values", those are higher level.
 struct Token {
   using Ptr = std::unique_ptr<Token>;
-  Token(std::string str) : isValue(true), value(str) {}
-  Token() : isValue(false) {}
+  Token(size_t line, std::string str) : isValue(true), value(str), line(line) {}
+  Token(size_t line = 0) : isValue(false), line(line) {}
 
   void addChild(Token::Ptr tok) {
     assert(!isValue && "Can't add children to values");
@@ -57,7 +57,10 @@ struct Token {
     return llvm::ArrayRef<Ptr>(children).slice(1);
   }
 
+  size_t getLine() const  { return line; }
+
   const bool isValue;
+
   size_t size() const { return children.size(); }
 
   std::ostream& dump(std::ostream& s) const;
@@ -67,6 +70,7 @@ struct Token {
 private:
   std::string value;
   std::vector<Ptr> children;
+  int line;
 
   struct ppresult {
     std::string s;
@@ -94,15 +98,13 @@ class Lexer {
   size_t len;
   Token::Ptr root;
   size_t multiLineComments;
+  size_t line_number;
 
   /// Build a tree of tokens
   size_t lexToken(Token *tok, size_t pos);
 
 public:
-  Lexer(std::string &&code)
-      : code(code), len(code.size()), root(new Token()), multiLineComments(0) {
-    assert(len > 0 && "Empty code?");
-  }
+  Lexer(std::string &&code);
 
   Token::Ptr lex() {
     lexToken(root.get(), 0);

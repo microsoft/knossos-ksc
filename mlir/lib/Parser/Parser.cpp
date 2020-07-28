@@ -6,7 +6,7 @@
 using namespace std;
 using namespace Knossos::AST;
 
-#define PARSE_ASSERT(p) ASSERT(p) << "\nAT: " << tok << std::endl << "FAILED: "
+#define PARSE_ASSERT(p) ASSERT(p) << "\nLine " << tok->getLine() << ":" << tok << std::endl << "FAILED: "
 
 //================================================ Helpers
 
@@ -81,6 +81,16 @@ static Literal::Ptr getZero(Type type) {
 
 //================================================ Lex source into Tokens
 
+Lexer::Lexer(std::string &&code)
+    : code(code)
+    , len(code.size())
+    , root(new Token())
+    , multiLineComments(0)
+    , line_number(1) 
+{
+  assert(len > 0 && "Empty code?");
+}
+
 // Lex a token out, recurse if another entry point is found
 size_t Lexer::lexToken(Token *tok, size_t pos) {
   const char TAB = 0x09;
@@ -95,7 +105,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
         tokenStart = ++pos;
       break;
     case '#':
-      if (code[pos+1] != '|')
+      if (pos+1 < len && code[pos+1] != '|')
         break;
       PARSE_ASSERT(multiLineComments == 0);
       pos += 2; // consume #|
@@ -104,7 +114,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       while (multiLineComments) {
         switch (code[pos]) {
         case '|':
-          if (code[pos+1] == '#') {
+          if (pos+1 < len && code[pos+1] == '#') {
             multiLineComments--;
             pos++;
           }
@@ -117,15 +127,18 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
           }
           pos++;
           break;
+        case '\n':
+          ++line_number;
         default:
           pos++;
         }
       }
       tokenStart = pos;
       break;
+    case '\n':
+      ++line_number;
     case TAB:
     case SPC:
-    case '\n':
     case '\r':
       // "Whitespace" is allowed inside strings
       if (isInString) {
@@ -135,7 +148,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       // Maybe end of a value
       if (tokenStart != pos) {
         tok->addChild(
-            make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
+            make_unique<Token>(line_number, code.substr(tokenStart, pos - tokenStart)));
       }
       // Or end of a token, which we ignore
       tokenStart = ++pos;
@@ -144,13 +157,13 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       // Maybe end of a value
       if (tokenStart != pos) {
         tok->addChild(
-            make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
+            make_unique<Token>(line_number, code.substr(tokenStart, pos - tokenStart)));
       }
       // Finished parsing this token
       return ++pos;
     case '(': {
       // Recurse into sub-tokens
-      auto t = make_unique<Token>();
+      auto t = make_unique<Token>(line_number);
       tokenStart = pos = lexToken(t.get(), pos + 1);
       tok->addChild(move(t));
       break;
@@ -161,7 +174,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
         size_t start = tokenStart - 1;
         size_t length = (pos - start + 1);
         tok->addChild(
-            make_unique<Token>(code.substr(start, length)));
+            make_unique<Token>(line_number, code.substr(start, length)));
       }
       tokenStart = ++pos;
       isInString = !isInString;
@@ -606,8 +619,8 @@ Expr::Ptr Parser::parseBuild(const Token *tok) {
 
 // Tuple, ex: (tuple 10.0 42 (add 1.0 2.0))
 Expr::Ptr Parser::parseTuple(const Token *tok) {
-  PARSE_ASSERT(tok->size() > 2);
-  PARSE_ASSERT(tok->getChild(0)->isValue);
+  PARSE_ASSERT(tok->size() > 0);
+  PARSE_ASSERT(tok->getChild(0)->isValue && tok->getChild(0)->getValue() == "tuple");
   std::vector<Expr::Ptr> elements;
   for (auto &c: tok->getTail())
     elements.push_back(parseToken(c.get()));
