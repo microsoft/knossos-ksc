@@ -118,7 +118,7 @@ struct Type {
   Type tangentType() const;
 
   bool operator<(const Type& that) const {
-    return type < that.type || (that == that.type && subTypes < that.subTypes);
+    return type < that.type || (type == that.type && subTypes < that.subTypes);
   }
 
   bool operator==(const Type& that) const {
