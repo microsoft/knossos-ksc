@@ -74,7 +74,7 @@ operations with strings available (such as concat, substr, etc).
 
 `String` literals are values encompassed by quotes, for example: `"Hello world"`.
 
-The only operation that works with strings is print (`(pr)`).
+The only operation that works with strings is print (`(print)`).
 
 Strings are also used in `(rule)` names, as to not pollute the symbol space
 (variables and functions).
@@ -388,7 +388,7 @@ The syntax is: `(fname arg0 arg1 ...)`
 ; Print the reduced value
 (def tsum_print () ((a : (Vec Float)) (b : (Vec Float)))
                 (let (s (tsum_list a b))
-                     (pr
+                     (print
                         (get$1$2 s)
                         " "
                         (get$2$2 s)
@@ -524,10 +524,10 @@ if condition doesn't hold. Returns the value and type returned by `(expr)`.
 
 Syntax: `(assert (cond) (expr))`
 
-#### pr
+#### print
 
 Prints a list of values of numeric or string types, from literals, expressions, etc.
 
 Returns the number of elements printed as Integer.
 
-Syntax: `(pr value expr literal ... )`
+Syntax: `(print value expr literal ... )`
