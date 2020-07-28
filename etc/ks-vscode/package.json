@@ -1,5 +1,6 @@
 {
     "name": "ks-lisp",
+    "extensionKind": ["ui"],
     "displayName": "Knossos KS",
     "description": "Lisp-like IR for Knossos",
     "version": "0.0.1",
