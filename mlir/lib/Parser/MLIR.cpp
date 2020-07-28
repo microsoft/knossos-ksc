@@ -108,10 +108,8 @@ void Generator::serialiseArgs(const AST::Definition *def, mlir::Block &entry) {
 static void dedup_declarations(vector<mlir::FuncOp> &decl, vector<mlir::FuncOp> def) {
   for (auto &d: def) {
     auto it = std::find(decl.begin(), decl.end(), d);
-    if (it != decl.end()) {
-      std::cerr << "[RMDUP]";
+    if (it != decl.end())
       decl.erase(it);
-    }
   }
 }
 
