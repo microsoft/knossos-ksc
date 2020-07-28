@@ -163,7 +163,7 @@ class Parser {
   Symbols variables{true};
   Symbols rules;
 
-  std::map<Signature, Declaration*> thefunctions;
+  std::map<Signature, Declaration*> function_decls;
 
   // Build AST nodes from Tokens
   Expr::Ptr parseToken(const Token *tok);

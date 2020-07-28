@@ -177,7 +177,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
 //
 Declaration *Parser::addExtraDecl(std::string name, std::vector<Type> argTypes, Type returnType) {
   Signature sig {name, argTypes};
-  auto& decl = thefunctions[sig];
+  auto& decl = function_decls[sig];
   if (decl) {
     std::cerr << "[addExtraDecl: already present: " << sig << "]";
     return decl;
@@ -357,8 +357,8 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 
   // Look up this function
   Signature sig {name, types};
-  auto decl_iter = thefunctions.find(sig);
-  if (decl_iter != thefunctions.end())
+  auto decl_iter = function_decls.find(sig);
+  if (decl_iter != function_decls.end())
     // Non need to typecheck, the lookup succeeded.
     return make_unique<Call>(decl_iter->second, move(operands));
 
@@ -533,8 +533,7 @@ Expr::Ptr Parser::parseDecl(const Token *tok) {
       decl->addArgType(parseType(c.get()));
 
   Signature sig{name->getValue().str(), decl->getArgTypes()};
-  thefunctions.insert({sig, decl.get()});
-  // decl->dump(std::cerr << "INSDECL{") << tok << "}";
+  function_decls[sig] = decl.get();
   return decl;
 }
 
@@ -566,7 +565,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
     node->addArgument(move(a));
   }
   Signature sig {name->getValue().str(), argTypes};
-  thefunctions[sig] = node->getDeclaration();
+  function_decls[sig] = node->getDeclaration();
 
   // Function body is a block, create one if single expr
   auto body = parseToken(expr);

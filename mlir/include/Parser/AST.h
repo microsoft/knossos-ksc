@@ -343,7 +343,6 @@ private:
   Expr::Ptr expr;
 };
 
-// Call moved below decl, to hold back-pointer. 
 /// Declaration, ex: (edef max Float (Float Float))
 ///
 /// Declares a function (external or posterior). Will be used for lookup during
@@ -377,6 +376,7 @@ struct Declaration : public Expr {
   }
 
 private:
+  // TODO: use Signature here
   std::string name;
   std::vector<Type> argTypes;   
 };
@@ -458,7 +458,7 @@ struct Definition : public Expr {
 
 private:
   Declaration::Ptr decl;
-  std::vector<Variable::Ptr> arguments; // TODO: make Variables
+  std::vector<Variable::Ptr> arguments;
   Expr::Ptr impl;
 };
 

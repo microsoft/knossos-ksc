@@ -67,9 +67,8 @@ std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
 
 std::ostream&  Block::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Block:" << endl;
-  for (auto &op : operands) {
+  for (auto &op : operands)
     op->dump(s, tab + 2);
-  }
   return s;
 }
 

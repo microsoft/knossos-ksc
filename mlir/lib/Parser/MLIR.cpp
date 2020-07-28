@@ -108,10 +108,8 @@ void Generator::serialiseArgs(const AST::Definition *def, mlir::Block &entry) {
 static void dedup_declarations(vector<mlir::FuncOp> &decl, vector<mlir::FuncOp> def) {
   for (auto &d: def) {
     auto it = std::find(decl.begin(), decl.end(), d);
-    if (it != decl.end()) {
-      std::cerr << "[RMDUP]";
+    if (it != decl.end())
       decl.erase(it);
-    }
   }
 }
 
@@ -363,7 +361,7 @@ Values Generator::buildCall(const AST::Call* call) {
   if (name == "print") {
     for (auto &op: call->getOperands())
       if (!op.get()->getType().isString())
-      buildNode(op.get());
+        buildNode(op.get());
 
     // Return the number of elements
     auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
@@ -377,9 +375,7 @@ Values Generator::buildCall(const AST::Call* call) {
 #undef CREATE_2
 
   // Function call -- not a prim, should be known
-  mlir::FuncOp func = 0;
-  if (functions.count(name_mangled) != 0)
-    func = functions[name_mangled];
+  mlir::FuncOp func = functions[name_mangled];
   
   if (!func) {
     // Didn't find it... assert
