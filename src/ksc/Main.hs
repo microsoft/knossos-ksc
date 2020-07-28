@@ -258,13 +258,13 @@ testRunKSVia via_ compiler ksFile = do
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
       groupedTestResults = group testResults
-        where group lines = case lines of
+        where group ls = case ls of
                 "----":testName:testResult:rest ->
                   (testName, boolOfIntString testResult):group rest
                 [] -> []
-                _ -> error ("Unexpected test result structure" ++ unlines lines)
+                _ -> error ("Unexpected test result structure" ++ unlines ls)
 
-              boolOfIntString context = \case
+              boolOfIntString context = case context of
                 "0" -> False
                 "1" -> True
                 s   -> error ("boolOfIntString: Unexpected " ++ s ++ " at " ++ context)
