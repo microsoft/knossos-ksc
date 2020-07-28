@@ -8,7 +8,7 @@
      (fold (lam (acc_x : (Tuple Integer Integer))
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
-                  (mul@ii (add@ii acc x) closure)))
+                  (mul (add acc x) closure)))
            1
            v
      )
@@ -70,7 +70,7 @@
 ; MLIR: func @main() -> i64 {
 ; LLVM: define i64 @main() {
 
-  (let ((vec (build 10 (lam (i : Integer) (add@ii i i))))
+  (let ((vec (build 10 (lam (i : Integer) (add i i))))
         (m   (prod_fold vec 2)))
     m)
 

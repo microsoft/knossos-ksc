@@ -1,0 +1,11 @@
+
+# Copy "user.cmake.template" to "user.cmake" (which is gitignored by default)
+# And edit to match your configuration.
+
+# In contrast to environment variables, this allows different configs
+# in different checkouts, and means the choice is documented in one's
+# filesystem.
+
+set(LLVM "PATH_TO_LLVM_BUILD")
+set(MLIR_DIR "${LLVM}/lib/cmake/mlir")
+set(LLVM_EXTERNAL_LIT "${LLVM}/bin/llvm-lit")

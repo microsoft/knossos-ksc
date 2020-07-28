@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <iosfwd>
 
 #include "AST.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -52,19 +53,38 @@ struct Token {
   }
   llvm::ArrayRef<Ptr> getTail() const {
     assert(!isValue && "No children in a value token");
-    assert(children.size() > 1 && "No tail");
+    assert(children.size() > 0 && "No tail");
     return llvm::ArrayRef<Ptr>(children).slice(1);
   }
 
   const bool isValue;
   size_t size() const { return children.size(); }
 
-  void dump(size_t tab = 0) const;
+  std::ostream& dump(std::ostream& s) const;
+
+  std::string pprint(int width = 80) const;
 
 private:
   std::string value;
   std::vector<Ptr> children;
+
+  struct ppresult {
+    std::string s;
+    size_t width;
+  };
+
+  static ppresult pprint(Token const* tok, int indent = 0, int width = 80);
 };
+
+inline std::ostream& operator<<(std::ostream& s, Token const* tok) 
+{
+  return tok->dump(s);
+}
+
+inline std::string Token::pprint(int width) const
+{
+  return pprint(this, 0, width).s;
+}
 
 /// Tokenise the text into recursive tokens grouped by parenthesis.
 ///
@@ -100,39 +120,9 @@ class Parser {
   Expr::Ptr rootE;
   Lexer lex;
 
-  // TODO: Use polymorphic operations in Knossos
-  llvm::StringRef opName(llvm::StringRef name) const {
-    size_t at = name.find('@');
-    if (at != llvm::StringRef::npos)
-      return name.substr(0, at);
-    return name;
-  }
-  // Lookup table of reserved operations and keywords
-  Operation::Opcode isReservedOp(llvm::StringRef name) const {
-    return llvm::StringSwitch<Operation::Opcode>(opName(name))
-              .Case("add", Operation::Opcode::ADD)
-              .Case("sub", Operation::Opcode::SUB)
-              .Case("mul", Operation::Opcode::MUL)
-              .Case("div", Operation::Opcode::DIV)
-              .Case("and", Operation::Opcode::AND)
-              .Case("or", Operation::Opcode::OR)
-              .Case("eq", Operation::Opcode::EQ)
-              .Case("ne", Operation::Opcode::NE)
-              .Case("lte", Operation::Opcode::LTE)
-              .Case("gte", Operation::Opcode::GTE)
-              .Case("lt", Operation::Opcode::LT)
-              .Case("gt", Operation::Opcode::GT)
-              .Case("abs", Operation::Opcode::ABS)
-              .Case("neg", Operation::Opcode::NEG)
-              .Case("exp", Operation::Opcode::EXP)
-              .Case("log", Operation::Opcode::LOG)
-              .Case("to_float", Operation::Opcode::TOF)
-              .Case("to_int", Operation::Opcode::TOI)
-              .Default(Operation::Opcode::MAYBE_CALL);
-  }
   enum class Keyword {
        LET,  EDEF, DEF,   IF, BUILD, INDEX,
-      SIZE, TUPLE, GET, FOLD, PRINT,  RULE, NA,
+      SIZE, TUPLE, GET, FOLD, RULE, NA,
       // Stdlib hack
       SUM
   };
@@ -142,16 +132,13 @@ class Parser {
               .Case("edef", Keyword::EDEF)
               .Case("def", Keyword::DEF)
               .Case("if", Keyword::IF)
-              .Case("build", Keyword::BUILD)
-              .Case("index", Keyword::INDEX)
-              .Case("size", Keyword::SIZE)
+              .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
               .Case("tuple", Keyword::TUPLE)
-              .StartsWith("get$", Keyword::GET)
-              .Case("fold", Keyword::FOLD)
-              .Case("print", Keyword::PRINT)
+              .StartsWith("get$", Keyword::GET) // TODO: Prim not reserved word
+              .Case("fold", Keyword::FOLD) // TODO: Prim not reserved word
               .Case("rule", Keyword::RULE)
               // Stdlib hack
-              .Case("sum", Keyword::SUM)
+              .Case("sum", Keyword::SUM) // TODO: Prim not reserved word
               .Default(Keyword::NA);
   }
   /// Simple symbol table for parsing only (no validation)
@@ -187,19 +174,15 @@ class Parser {
   Expr::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);
   Expr::Ptr parseCall(const Token *tok);
-  Expr::Ptr parseOperation(const Token *tok, Operation::Opcode op);
   Expr::Ptr parseVariable(const Token *tok);
   Expr::Ptr parseLet(const Token *tok);
   Expr::Ptr parseDecl(const Token *tok);
   Expr::Ptr parseDef(const Token *tok);
   Expr::Ptr parseCond(const Token *tok);
   Expr::Ptr parseBuild(const Token *tok);
-  Expr::Ptr parseIndex(const Token *tok);
-  Expr::Ptr parseSize(const Token *tok);
   Expr::Ptr parseTuple(const Token *tok);
   Expr::Ptr parseGet(const Token *tok);
   Expr::Ptr parseFold(const Token *tok);
-  Expr::Ptr parsePrint(const Token *tok);
   Expr::Ptr parseRule(const Token *tok);
   // Standard library parsers
   Expr::Ptr parseSum(const Token *tok);

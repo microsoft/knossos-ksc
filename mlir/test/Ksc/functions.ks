@@ -39,7 +39,7 @@
 ; LLVM-NEXT:  }
 
 ; Direct declaration with use
-(def bar Integer ((y : Integer)) (add@ii y 40))
+(def bar Integer ((y : Integer)) (add y 40))
 ; MLIR:       func @bar(%arg0: i64) -> i64 {
 ; MLIR-NEXT:    %c40{{.*}} = constant 40 : i64
 ; MLIR-NEXT:    %[[add:[0-9]+]] = addi %arg0, %c40{{.*}} : i64
@@ -52,7 +52,7 @@
 ; LLVM-NEXT:  }
 
 ; Single variable can be bare
-(def baz Integer (z : Integer) (add@ii z 50))
+(def baz Integer (z : Integer) (add z 50))
 ; MLIR:       func @baz(%arg0: i64) -> i64 {
 ; MLIR-NEXT:    %c50{{.*}} = constant 50 : i64
 ; MLIR-NEXT:    %0 = addi %arg0, %c50{{.*}} : i64

@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
   // FIXME: registering dialects must happen before building the context
   // Create a more logical API that doesn't require it to be done by the caller
   mlir::registerAllDialects();
-  // FIXME: Move Knossos::MLIR to mlir::knossos
+
   mlir::registerDialect<mlir::knossos::KnossosDialect>();
 
   // Unit tests
@@ -74,6 +74,10 @@ int main(int argc, char **argv) {
         v = 2;
       else if (arg == "-vvv")
         v = 3;
+      else {
+        std::cerr << "bad argument [" << arg << "]" << std::endl;
+        return 2;
+      }
     }
     return test_all(v);
   }
@@ -96,7 +100,7 @@ int main(int argc, char **argv) {
   }
   ifstream file(filename.str());
   if (!file.is_open()) {
-    cout << "Invalid filename!\n";
+    cerr << "Invalid filename [" << filename.str() << "]!\n";
     help();
     return 1;
   }
@@ -113,7 +117,7 @@ int main(int argc, char **argv) {
       return 1;
     }
     if (action == Action::EMIT_AST) {
-      p.getRootNode()->dump();
+      p.getRootNode()->dump(std::cout);
       return 0;
     }
   }
@@ -131,14 +135,15 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (action == Action::EMIT_MLIR) {
-    module.dump();
-  } else if (action == Action::EMIT_LLVM) {
+    module.print(llvm::outs());
+  } 
+  else if (action == Action::EMIT_LLVM) {
     auto llvm = g.emitLLVM();
     if (!llvm) {
       cerr << "ERROR: LLVM lowering failed\n";
       return 1;
     }
-    llvm->dump();
+    llvm->print(llvm::outs(), nullptr, false, true);
   }
 
   return 0;

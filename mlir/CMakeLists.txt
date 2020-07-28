@@ -13,6 +13,11 @@ if(POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
 endif()
 
+# Requirements from LLVM
+set(CMAKE_CXX_STANDARD 14 CACHE STRING "C++ standard to conform to")
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(CMAKE_CXX_EXTENSIONS NO)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 project(knossos-dialect LANGUAGES CXX C)

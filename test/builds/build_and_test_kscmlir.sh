@@ -22,7 +22,7 @@ if [ ! -f "SYNTAX.md" ]; then
   echo "SYNTAX.md isn't present, is this a Knossos repository? Aborting"
   return 1
 fi
-cd mlir
+touch user.cmake
 KSC_MLIR_SRC="$(pwd)"
 #git pull
 rm -rf build

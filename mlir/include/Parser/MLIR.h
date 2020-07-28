@@ -53,18 +53,16 @@ class Generator {
   // Function level builders
   Values buildNode(const AST::Expr*);
   Values buildBlock(const AST::Block*);
-  Values buildOp(const AST::Operation*);
+  Values buildCall(const AST::Call*);
+  mlir::Value buildArg(const AST::Call*, size_t);
   Values buildCond(const AST::Condition*);
   Values buildLet(const AST::Let*);
   Values buildLiteral(const AST::Literal*);
   Values buildVariable(const AST::Variable*);
   Values buildBuild(const AST::Build*);
-  Values buildIndex(const AST::Index*);
-  Values buildSize(const AST::Size*);
   Values buildTuple(const AST::Tuple*);
   Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
-  Values buildPrint(const AST::Print*);
 
   // Variables
   void declareVariable(llvm::StringRef name, Values vals);

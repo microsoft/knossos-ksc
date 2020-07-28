@@ -1,10 +1,6 @@
 ; RUN: ksc-mlir MLIR %s 2>&1 | FileCheck %s --check-prefix=MLIR
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
-; Print does not work for now, it only lowers the non-string expressions and
-; does not print at all. This is a TODO item on the compiler, but MLIR support
-; for strings is not trivial, and we do not need it yet, so we blisfully ignore.
-
 (def main Integer ((argc : Integer) (argv : Vec Integer))
   (print "Hello world"
       10.0

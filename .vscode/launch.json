@@ -17,6 +17,21 @@
 				"${workspaceFolder}/etc/ks-vscode/out/**/*.js"
 			],
 			"preLaunchTask": "npm-watch"
+		},
+		{
+			"name": "C++ ksc-mlir",
+			"cwd": "${workspaceRoot}",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/bin/ksc-mlir",
+			"_args": ["TEST"],
+			"args": ["MLIR", "${workspaceFolder}/mlir/test/Ksc/print.ks"],
+			"miDebuggerPath": "/usr/bin/gdb",
+			"externalConsole": false,
+			"logging": {
+			  "moduleLoad": false,
+			  "trace": true
+			}
 		}
 	]
 }

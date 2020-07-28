@@ -1,0 +1,7 @@
+TODO-mlir.txt
+
+- Location info
+- Hash consing
+- Python binding
+- Fix print, hence strings.
+- Undo untupling

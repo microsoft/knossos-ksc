@@ -11,6 +11,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Casting.h"
 
+#include "Assert.h"
+
 namespace Knossos {
 namespace AST {
 
@@ -41,20 +43,19 @@ struct Type {
     LM
   };
 
+  Type() : type(None) {}
+
   /// Scalar constructor
   Type(ValidType type) : type(type) {
-    assert(isScalar() && "Wrong ctor");
+    ASSERT(isScalar()) << "Type: Scalar constructor called for non-Scalar type: " << type;
   }
-  /// Vector constructor
-  Type(ValidType type, Type subTy) : type(type) {
-    assert(type == Vector && "Wrong ctor");
-    subTypes.push_back(subTy);
-  }
-  /// Tuple constructor
-  Type(ValidType type, std::vector<Type> subTys) : type(type) {
-    assert(type == Tuple && subTys.size() > 1 && "Wrong ctor");
+
+  /// Compound type constructor
+  Type(ValidType type, std::vector<Type> const& subTys) : type(type) {
+    ASSERT(!isScalar()) << "Compound ctor called for Scalar type";
     subTypes = subTys;
   }
+
   /// Utilities
   bool isScalar() const {
     return type >= None && type <= LAST_SCALAR;
@@ -66,7 +67,8 @@ struct Type {
   static bool isScalar(ValidType type) {
     return type >= None && type <= LAST_SCALAR;
   }
-  void dump() const;
+  std::ostream& dump(std::ostream& s) const;
+
   // Vector accessor
   const Type &getSubType() const {
     assert(type == Vector);
@@ -74,18 +76,58 @@ struct Type {
   }
   // Tuple accessor
   const Type &getSubType(size_t idx) const {
-    assert(type == Tuple);
     return subTypes[idx];
   }
   llvm::ArrayRef<Type> getSubTypes() const {
-    assert(type == Tuple);
     return subTypes;
   }
+
+  static Type makeVector(Type type) {
+    return Type(Vector, {type});
+  }
+
+  static Type makeTuple(std::vector<Type> const& types) {
+    return Type(Tuple, types);
+  }
+
+  static Type makeLambda(Type s, Type t) {
+    return Type(Lambda, {s, t});
+  }
+
+  static Type makeLM(Type s, Type t) {
+    return Type(LM, {s, t});
+  }
+
+  Type tangentType() const;
 
 protected:
   ValidType type;
   std::vector<Type> subTypes;
 };
+
+inline std::ostream& operator<<(std::ostream& s, Type const& t)
+{
+  return t.dump(s);
+}
+
+char const* ValidType2Str(Type::ValidType type);
+
+/// Tangent type is an AD concept, but very built-in
+inline Type Type::tangentType() const
+{
+  switch (type) {
+    case Float:
+      return Float;
+    case Vector:
+      return makeVector(getSubType().tangentType());
+    case Tuple: {
+      std::vector<Type> newsubTypes {subTypes.size()};
+      std::transform(subTypes.begin(), subTypes.end(), newsubTypes.begin(), [](Type const& t) { return t.tangentType(); });
+      return makeTuple(newsubTypes);
+    }
+  }
+  return Type::None;
+}
 
 /// A node in the AST.
 struct Expr {
@@ -99,32 +141,35 @@ struct Expr {
     Literal,
     Variable,
     Let,
+    Condition,
+    Call,
+    // TODO: Lambda,
     Declaration,
     Definition,
-    Condition,
-    Operation,
     Rule,
-    Build,
-    Index,
-    Size,
+    // Tuple prims
     Tuple,
     Get,
+    // Prims
+    Build,
     Fold,
-    /// Unused below (TODO: Implement those)
-    Print,
     Assert
   };
 
   /// valid types, for safety checks
   Type getType() const { return type; }
 
+  /// Set type
+  void setType(Type type) { this->type = type; }
+
   /// Type of the node, for quick access
   const Kind kind;
-  /// Future place for source location
+
+  /// TODO: Future place for source location
   const Location loc;
 
   virtual ~Expr() = default;
-  virtual void dump(size_t tab = 0) const;
+  virtual std::ostream& dump(std::ostream& s, size_t tab = 0) const;
 
 protected:
   Expr(Type type, Kind kind) : kind(kind), type(type) {}
@@ -156,7 +201,7 @@ struct Block : public Expr {
   }
   size_t size() const { return operands.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Block; }
@@ -176,7 +221,7 @@ struct Literal : public Expr {
 
   llvm::StringRef getValue() const { return value; }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Literal; }
@@ -211,7 +256,7 @@ struct Variable : public Expr {
   Expr *getInit() const { return init.get(); }
   llvm::StringRef getName() const { return name; }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Variable; }
@@ -241,118 +286,47 @@ struct Let : public Expr {
   Expr *getExpr() const { return expr.get(); }
   size_t size() const { return vars.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Let; }
 
 private:
-  std::vector<Expr::Ptr> vars;
+  std::vector<Expr::Ptr> vars;  // TODO: make a vector of vars
   Expr::Ptr expr;
 };
 
-/// Operation, ex: (add x 3), (neg (mul@ff (sin x) d_dcos)))
+/// Call, ex: (add x 3), (neg (mul (sin x) d_dcos)))
 /// Call, ex: (fwd$to_float 10 dx)
 ///
 /// Represent native operations (add, mul) and calls.
 ///
-/// For native, all types must match and the return type is defined by
-/// the operation type (arithmetic, comparison, conversion, etc).
-/// For calls, return type and operand types must match declaration.
-struct Operation : public Expr {
-  using Ptr = std::unique_ptr<Operation>;
-  enum class Opcode {
-      // Binary
-      ADD, SUB, MUL, DIV, AND,  OR,
-      // Comparison
-      EQ,   NE, LTE, GTE,  LT,  GT,
-      // Unary (native to MLIR)
-      ABS, NEG, EXP, LOG, TOF, TOI,
-      // None (ie. a function call or not an operation at all)
-      MAYBE_CALL
-  };
-  Operation(llvm::StringRef name, Opcode opcode, Type type = Type::None)
-      : Expr(type, Kind::Operation), name(name), opcode(opcode),
-        operandType(Type::None) { }
-
+/// Return type and operand types must match declaration.
+struct Call : public Expr {
+  using Ptr = std::unique_ptr<Call>;
+  Call(llvm::StringRef name, Type type = Type::None)
+      : Expr(type, Kind::Call), name(name) { } 
+  
   void addOperand(Expr::Ptr op) { operands.push_back(std::move(op)); }
   llvm::ArrayRef<Expr::Ptr> getOperands() const { return operands; }
   llvm::StringRef getName() const { return name; }
-  Opcode getOpcode() const { return opcode; }
+  
   size_t size() const { return operands.size(); }
   Expr *getOperand(size_t idx) const {
     assert(idx < operands.size() && "Offset error");
     return operands[idx].get();
   }
-  Type getOperandType() const {
-    return operandType;
-  }
-
-  void dump(size_t tab = 0) const override;
+  
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
-    return c->kind == Kind::Operation;
-  }
-
-  // Types depend on the operation
-  // FIXME: devise a better polymorphism strategy
-  void inferTypes() {
-    // Type already infered, stop.
-    if (type != Type::None)
-      return;
-
-    // Call types are defined, not infered
-    if (opcode == Opcode::MAYBE_CALL)
-      return;
-
-    // Check and infer operand types
-    inferOperandType();
-
-    // Infer return type
-    switch (opcode) {
-      case Opcode::EQ:
-      case Opcode::NE:
-      case Opcode::LTE:
-      case Opcode::GTE:
-      case Opcode::LT:
-      case Opcode::GT:
-      case Opcode::AND:
-      case Opcode::OR:
-        type = Type::Bool;
-        break;
-      case Opcode::TOF:
-        type = Type::Float;
-        break;
-      case Opcode::TOI:
-        type = Type::Integer;
-        break;
-      default: // Polymorphic
-        type = operandType;
-        break;
-    }
+    return c->kind == Kind::Call;
   }
 
 private:
-  void inferOperandType() {
-    // Call types are defined, not infered
-    if (opcode == Opcode::MAYBE_CALL)
-      return;
-    assert(operands.size()  > 0 && "No operands on operation");
-    assert(operands.size() <= 2 && "Too many operands on operation");
-
-    // Binary operations must match at lowering time (already resolved)
-    if (operands.size() == 2)
-      assert(operands[0]->getType() == operands[1]->getType() &&
-             "Different type operands");
-
-    operandType = operands[0]->getType();
-  }
-
   std::string name;
   std::vector<Expr::Ptr> operands;
-  Opcode opcode;
-  Type operandType;
 };
 
 /// Declaration, ex: (edef max Float (Float Float))
@@ -374,7 +348,7 @@ struct Declaration : public Expr {
   llvm::StringRef getName() const { return name; }
   size_t size() const { return argTypes.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -395,12 +369,12 @@ struct Definition : public Expr {
   using Ptr = std::unique_ptr<Definition>;
   Definition(llvm::StringRef name, Type type)
       : Expr(type, Kind::Definition) {
-    proto = std::make_unique<Declaration>(name, type);
+    decl = std::make_unique<Declaration>(name, type);
   }
 
   /// Arguments and return type (for name and type validation)
   void addArgument(Expr::Ptr node) {
-    proto->addArgType(node->getType());
+    decl->addArgType(node->getType());
     arguments.push_back(std::move(node));
   }
   llvm::ArrayRef<Expr::Ptr> getArguments() const { return arguments; }
@@ -413,11 +387,11 @@ struct Definition : public Expr {
     impl = std::move(expr);
   }
   Expr *getImpl() const { return impl.get(); }
-  Declaration *getProto() const { return proto.get(); }
-  llvm::StringRef getName() const { return proto->getName(); }
+  Declaration *getDeclaration() const { return decl.get(); }
+  llvm::StringRef getName() const { return decl->getName(); }
   size_t size() const { return arguments.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -426,8 +400,8 @@ struct Definition : public Expr {
 
 private:
   Expr::Ptr impl;
-  Declaration::Ptr proto;
-  std::vector<Expr::Ptr> arguments;
+  Declaration::Ptr decl;
+  std::vector<Expr::Ptr> arguments; // TODO: make Variables
 };
 
 /// Condition, ex: (if (or x y) (add x y) 0)
@@ -447,7 +421,7 @@ struct Condition : public Expr {
   Expr *getElseBlock() const { return elseBlock.get(); }
   Expr *getCond() const { return cond.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {
@@ -466,14 +440,16 @@ private:
 struct Build : public Expr {
   using Ptr = std::unique_ptr<Build>;
   Build(Expr::Ptr range, Expr::Ptr var, Expr::Ptr expr)
-      : Expr(Type(Type::Vector, expr->getType()), Kind::Build), range(std::move(range)),
-        var(std::move(var)), expr(std::move(expr)) {}
+      : Expr(Type::makeVector(expr->getType()), Kind::Build), 
+        range(std::move(range)),
+        var(std::move(var)), 
+        expr(std::move(expr)) {}
 
   Expr *getRange() const { return range.get(); }
   Expr *getVariable() const { return var.get(); }
   Expr *getExpr() const { return expr.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Build; }
@@ -490,7 +466,8 @@ private:
 struct Tuple : public Expr {
   using Ptr = std::unique_ptr<Tuple>;
   Tuple(std::vector<Expr::Ptr> &&elements)
-      : Expr(Type::None, Kind::Tuple), elements(std::move(elements)) {
+      : Expr(Type::None, Kind::Tuple), 
+        elements(std::move(elements)) {
     std::vector<Type> types;
     for (auto &el: this->elements)
       types.push_back(el->getType());
@@ -504,7 +481,7 @@ struct Tuple : public Expr {
   }
   size_t size() const { return elements.size(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Tuple; }
@@ -513,57 +490,9 @@ private:
   std::vector<Expr::Ptr> elements;
 };
 
-/// Index, ex: (index N vector)
-///
-/// Extract the Nth index from a vector
-/// Note: index range is [0, N-1]
-struct Index : public Expr {
-  using Ptr = std::unique_ptr<Index>;
-  Index(Expr::Ptr index, Expr::Ptr var)
-      : Expr(Type::None, Kind::Index), index(std::move(index)),
-        var(std::move(var)) {
-    assert(this->index->getType() == Type::Integer && "Invalid index type");
-    assert(this->var->getType() == Type::Vector && "Invalid variable type");
-    type = this->var->getType().getSubType();
-  }
-
-  Expr *getIndex() const { return index.get(); }
-  Expr *getVariable() const { return var.get(); }
-
-  void dump(size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) { return c->kind == Kind::Index; }
-
-private:
-  Expr::Ptr index;
-  Expr::Ptr var;
-};
-
-/// Size, ex: (index N vector)
-///
-/// Extract the Nth index from a vector
-struct Size : public Expr {
-  using Ptr = std::unique_ptr<Size>;
-  Size(Expr::Ptr var)
-      : Expr(Type::Integer, Kind::Size), var(std::move(var)) {
-    assert(this->var->getType() == Type::Vector && "Invalid variable type");
-  }
-
-  Expr *getVariable() const { return var.get(); }
-
-  void dump(size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) { return c->kind == Kind::Size; }
-
-private:
-  Expr::Ptr var;
-};
-
 /// Get, ex: (get$7$9 tuple)
 ///
-/// Extract the Nth index from a vector.
+/// Extract the Nth element from a tuple. 
 /// Note: index range is [1, N]
 struct Get : public Expr {
   using Ptr = std::unique_ptr<Get>;
@@ -581,7 +510,7 @@ struct Get : public Expr {
     return tuple->getElement(index-1);
   }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Get; }
@@ -613,7 +542,7 @@ struct Fold : public Expr {
   Expr *getAcc() const { return acc.get(); }
   Expr *getBody() const { return body.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Fold; }
@@ -624,32 +553,7 @@ private:
   Expr::Ptr vector;
 };
 
-/// Print, ex: (print expr0 expr1 expr2 ...)
-///
-/// Prints values (numbers, strings, vectors, tuples) to stdout
-/// FIXME: The actual printing is not working, for now we just lower the
-/// expressions as if they did anything.
-struct Print : public Expr {
-  using Ptr = std::unique_ptr<Print>;
-  Print() : Expr(Type::None, Kind::Rule) {}
-
-  void addExpr(Expr::Ptr expr) { exprs.push_back(std::move(expr)); }
-  Expr *getExpr(size_t i) const { return exprs[i].get(); }
-  llvm::ArrayRef<Expr::Ptr> getExprs() const { return exprs; }
-  size_t size() const { return exprs.size(); }
-
-  void dump(size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) {
-    return c->kind == Kind::Rule;
-  }
-
-private:
-  std::vector<Expr::Ptr> exprs;
-};
-
-/// Rule, ex: (rule "mul2" (v : Float) (mul@ff v 2.0) (add v v))
+/// Rule, ex: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
 ///
 /// Rules express ways to transform the graph. They need a special
 /// MLIR dialect to be represented and cannot be lowered to LLVM.
@@ -666,7 +570,7 @@ struct Rule : public Expr {
   Expr *getPattern() const { return pattern.get(); }
   Expr *getResult() const { return result.get(); }
 
-  void dump(size_t tab = 0) const override;
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) {

@@ -3,6 +3,9 @@
 .vscode/
 .ionide/
 
+# User-specific cmake config
+user.cmake
+
 # Prerequisites
 *.d
 
@@ -14,6 +17,7 @@
 obj/
 Debug/
 Release/
+build/
 
 # nuget packages
 /packages/
