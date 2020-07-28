@@ -62,7 +62,7 @@ function needLineBreak(state) {
         || currentOp == "" && insideLetBind
         || currentOp == "" && insideDefArgs
         || currentOp == "def"
-        || currentOp == "pr";
+        || currentOp == "print";
 }
 function formatOpenList(state, token) {
     const charIsEscaped = state.escaped;

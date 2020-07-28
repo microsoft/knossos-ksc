@@ -33,14 +33,14 @@ suite('Knossos IR Formatter Extension Tests', function() {
 
   test('Handle let correctly', function() {
     const formattedDocument = formatKnossosIR(`
-(let ((a 1.0) (b 2.0) (c (add a b))) (pr c))`);
+(let ((a 1.0) (b 2.0) (c (add a b))) (print c))`);
     const expectedFormattedDocument = `
 (let 
   (
     (a 1.0) 
     (b 2.0) 
     (c (add a b))) 
-  (pr c))`;
+  (print c))`;
     assert.equal(formattedDocument, expectedFormattedDocument);
   });
 
@@ -53,11 +53,11 @@ suite('Knossos IR Formatter Extension Tests', function() {
   assert.equal(formattedDocument, expectedFormattedDocument);
   });
 
-  test('Handle pr correctly', function() {
+  test('Handle print correctly', function() {
     const formattedDocument = formatKnossosIR(`
-(pr (add x y) (sub x y))`);
+(print (add x y) (sub x y))`);
     const expectedFormattedDocument = `
-(pr 
+(print 
   (add x y) 
   (sub x y))`;
     assert.equal(formattedDocument, expectedFormattedDocument);

@@ -69,7 +69,7 @@ function needLineBreak(state: any) {
 						|| currentOp == "" && insideLetBind
 						|| currentOp == "" && insideDefArgs
 						|| currentOp == "def"
-						|| currentOp == "pr";
+						|| currentOp == "print";
 }
 
 function formatOpenList(state: any, token: string) {
