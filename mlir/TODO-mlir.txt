@@ -6,3 +6,4 @@ TODO-mlir.txt
 - Python binding
 - Fix print, hence strings -- https://stackoverflow.com/questions/1061753/how-can-i-implement-a-string-data-type-in-llvm
 - Undo untupling
+- Fix tuples
