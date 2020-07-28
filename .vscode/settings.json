@@ -1,6 +1,6 @@
 {
     "files.associations": {
-        "*.ks": "lisp",
+        "*.ks": "ks-lisp",
         "*.inc": "cpp",
         "tuple": "cpp",
         "utility": "cpp",
