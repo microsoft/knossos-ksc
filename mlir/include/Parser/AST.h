@@ -95,7 +95,7 @@ struct Type {
   const Type &getSubType(size_t idx) const {
     return subTypes[idx];
   }
-  llvm::ArrayRef<Type> getSubTypes() const {
+  std::vector<Type> const& getSubTypes() const {
     return subTypes;
   }
 
@@ -187,9 +187,6 @@ struct Expr {
     Declaration,
     Definition,
     Rule,
-    // Tuple prims
-    Tuple,
-    Get,
     // Prims
     Build,
     Fold,
@@ -357,7 +354,7 @@ struct Declaration : public Expr {
       : Expr(type, Kind::Declaration), name(name), argTypes(move(argTypes)) {}
 
   void addArgType(Type opt) { argTypes.push_back(opt); }
-  llvm::ArrayRef<Type> getArgTypes() const { return argTypes; }
+  std::vector<Type> const& getArgTypes() const { return argTypes; }
   Type getArgType(size_t idx) const {
     assert(idx < argTypes.size() && "Offset error");
     return argTypes[idx];
@@ -519,96 +516,43 @@ private:
   Expr::Ptr expr;
 };
 
-/// Tuple, ex: (tuple 10.0 42 (add@ff 1.0 2.0))
-///
-/// Builds a tuple, inferring the types
-struct Tuple : public Expr {
-  using Ptr = std::unique_ptr<Tuple>;
-  Tuple(std::vector<Expr::Ptr> &&elements)
-      : Expr(Kind::Tuple), 
-        elements(std::move(elements)) {
-    std::vector<Type> types;
-    for (auto &el: this->elements)
-      types.push_back(el->getType());
-    type = { Type::Tuple, std::move(types) };
-  }
 
-  llvm::ArrayRef<Expr::Ptr> getElements() const { return elements; }
-  Expr *getElement(size_t idx) {
-    assert(idx < elements.size() && "Offset error");
-    return elements[idx].get();
-  }
-  size_t size() const { return elements.size(); }
-
-  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) { return c->kind == Kind::Tuple; }
-
-private:
-  std::vector<Expr::Ptr> elements;
-};
-
-/// Get, ex: (get$7$9 tuple)
-///
-/// Extract the Nth element from a tuple. 
-/// Note: index range is [1, N]
-struct Get : public Expr {
-  using Ptr = std::unique_ptr<Get>;
-  Get(size_t index, size_t max, Expr::Ptr expr)
-      : Expr(Kind::Get), index(index), expr(std::move(expr)) {
-    assert(this->expr->getType() == Type::Tuple && "Invalid expriable type");
-    assert(index > 0 && index <= max && "Out of bounds tuple index");
-    type = this->expr->getType().getSubType(index-1);
-  }
-
-  size_t getIndex() const { return index; }
-  Expr *getExpr() const { return expr.get(); }
-  Expr *getElement() const {
-    auto tuple = llvm::dyn_cast<Tuple>(expr.get());
-    return tuple->getElement(index-1);
-  }
-
-  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
-
-  /// LLVM RTTI
-  static bool classof(const Expr *c) { return c->kind == Kind::Get; }
-
-private:
-  size_t index;
-  Expr::Ptr expr;
-};
-
-/// Fold, ex: (fold (lambda) init vector)
+/// Fold, ex: (fold (lam (acc elm) body) init vector)
 ///
 /// Reduce pattern. Initialises an accumulator (acc) with (init), loops over the
 /// (vector), using (lambda) to update the accumulator value. The signature
 /// of the (lambda) MUST be:
-///   (lam AccType (acc_i : (Tuple AccType ElmType)) (expr))
-/// for (vector) of type "(Vec ElmType)" and (acc) with type "AccType".
+///   (lam AccType ((acc : AccType) (elm : ElmType))) (expr))
+/// for (vector) of type "(Vec ElmType)" and (init) with type "AccType".
 ///
 /// Fold will iterare the vector, calling the lambda like:
 /// for elm in vector:
-///   acc = lambda((tuple acc elm))
+///   acc = lambda(acc elm)
 /// Then return (acc).
 struct Fold : public Expr {
   using Ptr = std::unique_ptr<Fold>;
-  Fold(Type type, Expr::Ptr body, Expr::Ptr acc, Expr::Ptr vector)
-      : Expr(type, Kind::Fold), body(std::move(body)),
-      acc(std::move(acc)), vector(std::move(vector)) {}
+  Fold(Type type, Variable::Ptr acc, Variable::Ptr elm, Expr::Ptr body, Expr::Ptr vector)
+      : Expr(type, Kind::Fold)
+      , acc(std::move(acc))
+      , elm(std::move(elm))
+      , body(std::move(body))
+      , vector(std::move(vector)) 
+      {}
 
-  Expr *getVector() const { return vector.get(); }
-  Expr *getAcc() const { return acc.get(); }
+  Variable *getAcc() const { return acc.get(); }
+  Variable *getElm() const { return elm.get(); }
   Expr *getBody() const { return body.get(); }
-
+  Expr *getVector() const { return vector.get(); }
+ 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
   /// LLVM RTTI
   static bool classof(const Expr *c) { return c->kind == Kind::Fold; }
 
 private:
+  Variable::Ptr acc;
+  Variable::Ptr elm;
   Expr::Ptr body;
-  Expr::Ptr acc;
   Expr::Ptr vector;
 };
 

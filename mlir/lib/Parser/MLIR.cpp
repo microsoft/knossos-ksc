@@ -25,40 +25,44 @@ using namespace std;
 //============================================================ Helpers
 
 // Convert from AST type to MLIR
-Types Generator::ConvertType(const AST::Type &type, size_t dim) {
+mlir::Type Generator::ConvertType(const AST::Type &type, size_t dim) {
   switch (type.getValidType()) {
   case AST::Type::None:
-    return {};
+    return mlir::Type();
   case AST::Type::Bool:
-    return {builder.getI1Type()};
+    return builder.getI1Type();
   case AST::Type::Integer:
-    return {builder.getIntegerType(64)};
+    return builder.getIntegerType(64);
   case AST::Type::Float:
-    return {builder.getF64Type()};
+    return builder.getF64Type();
   case AST::Type::Vector:
     // FIXME: support nested vectors
     assert(!type.getSubType().isVector());
     if (dim)
-      return {mlir::MemRefType::get(dim, ConvertType(type.getSubType())[0])};
+      return mlir::MemRefType::get(dim, ConvertType(type.getSubType()));
     else
-      return {mlir::MemRefType::get(-1, ConvertType(type.getSubType())[0])};
-  case AST::Type::Tuple: {
-    // FIXME: support nested tuples
-    Types subTys;
-    for (auto &ts: type.getSubTypes()) {
-      auto tys = ConvertType(ts);
-      subTys.append(tys.begin(), tys.end());
-    }
-    return subTys;
+      return mlir::MemRefType::get(-1, ConvertType(type.getSubType()));
+  case AST::Type::Tuple: {    
+    std::vector<mlir::Type> subTys;
+    for (auto &ty: type.getSubTypes())     
+      subTys.push_back(ConvertType(ty));
+
+    return builder.getTupleType(subTys);
   }
   case AST::Type::String: {
     // TODO: do better
     std::cerr << "[String!]";
     auto i8 = builder.getIntegerType(8);
-    return {mlir::MemRefType::get(-1, i8)};
+    return mlir::MemRefType::get(-1, i8);
+  }
+  case AST::Type::LM: {
+    // TODO: do better
+    std::cerr << "[LM!]";
+    auto i8 = builder.getIntegerType(8);
+    return mlir::MemRefType::get(-1, i8);
   }
   default:
-    assert(0 && "Unsupported type");
+    ASSERT(0) << "Unsupported type: " << type;
   }
 }
 
@@ -70,38 +74,6 @@ mlir::Value Generator::memrefCastForCall(mlir::Value orig) {
   auto subTy = type.getElementType();
   auto newTy = mlir::MemRefType::get(-1, subTy);
   return builder.create<mlir::MemRefCastOp>(UNK, orig, newTy);
-}
-
-// Tuple arguments are serialised, but still accessed by the tuple name (via
-// get), so we need to add the same number of arguments as the function
-// declaration (flattened tuple), with each argument as a value of the tuple.
-//
-// Example: fun(float a, tuple<int, float> b, bool c) -> (f0, i1, f2, b3)
-//    Then: a = f0, b = { i1, f2 }, c = b3
-void Generator::serialiseArgs(const AST::Definition *def, mlir::Block &entry) {
-  // Get all serialised arguments
-  auto serialised = entry.getArguments();
-  size_t idx = 0, last = serialised.size() - 1;
-
-  // For each declared variable, initialise it with the right number of arguments
-  for (auto &arg: def->getArguments()) {
-    auto var = llvm::dyn_cast<AST::Variable>(arg.get());
-    assert(var && idx <= last);
-    // Non-tuple args are simple
-    if (!var->getType().isTuple()) {
-      declareVariable(var->getName(), {serialised[idx++]});
-      continue;
-    }
-
-    // Tuples need to know how many arguments, recursively, they have
-    auto type = ConvertType(arg->getType());
-    Values args;
-    size_t end = idx + type.size();
-    while (idx < end)
-      args.push_back(serialised[idx++]);
-    declareVariable(var->getName(), args);
-    idx += type.size();
-  }
 }
 
 // Inefficient but will do for now
@@ -132,10 +104,6 @@ static double toDouble(llvm::StringRef str) {
 static mlir::Value Single(const Values &v) {
   assert(v.size() == 1);
   return v[0];
-}
-static mlir::Type Single(const Types &t) {
-  assert(t.size() == 1);
-  return t[0];
 }
 
 //============================================================ MLIR Generator
@@ -177,13 +145,13 @@ void Generator::buildGlobal(const AST::Block* block) {
 // Declaration only, no need for basic blocks
 mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
   assert(!functions.count(decl->getMangledName()) && "Duplicated function declaration");
-  Types argTypes;
-  for (auto &t: decl->getArgTypes()) {
-    auto tys = ConvertType(t);
-    argTypes.append(tys.begin(), tys.end());
-  }
+   
+  std::vector<mlir::Type> argTypes;
+  for (auto &t: decl->getArgTypes())
+    argTypes.push_back(ConvertType(t));
+
   auto retTy = ConvertType(decl->getType());
-  auto type = builder.getFunctionType(argTypes, retTy);
+  auto type = builder.getFunctionType(argTypes, {retTy});
   auto func = mlir::FuncOp::create(UNK, decl->getMangledName(), type);
   ASSERT(func);
   functions[decl->getMangledName()]= func;
@@ -203,21 +171,33 @@ mlir::FuncOp Generator::buildDef(const AST::Definition* def) {
   // First basic block, with args
   auto &entryBlock = *func.addEntryBlock();
   builder.setInsertionPointToStart(&entryBlock);
-  serialiseArgs(def, entryBlock);
+
+  // Get all serialised arguments
+  auto serialised = entryBlock.getArguments();
+  size_t idx = 0;
+  size_t last = serialised.size() - 1;
+
+  // For each declared variable, initialise it with the right number of arguments
+  for (auto &arg: def->getArguments()) {
+    auto var = llvm::dyn_cast<AST::Variable>(arg.get());
+    ASSERT(var) << "Not a variable: " << *arg.get();
+    ASSERT(idx <= last) << "Bad index: " << idx << "/" << last;
+    declareVariable(var->getName(), {serialised[idx++]});
+  }
 
   // Lower body
   currentFunc = func;
-  auto last = buildNode(def->getImpl());
+  auto impl = buildNode(def->getImpl());
 
   // Return the last value
-  builder.create<mlir::ReturnOp>(UNK, last);
+  builder.create<mlir::ReturnOp>(UNK, impl);
   return func;
 }
 
 // Declare a variable
 void Generator::declareVariable(std::string const& name,
                                      Values vals) {
-  assert(!vals.empty() && "Variable must have initialiser");
+  ASSERT(!vals.empty()) << "Variable must have initialiser: " << name;
   variables[name] = vals;
 }
 
@@ -230,7 +210,7 @@ void Generator::declareVariable(const AST::Variable* var,
 
 // Get the variable assigned value
 Values Generator::buildVariable(const AST::Variable* var) {
-  assert(variables.count(var->getName()) && "Variable not declared");
+  ASSERT(variables.count(var->getName())) << "Variable not declared: " << *var;
   return variables[var->getName()];
 }
 
@@ -250,10 +230,6 @@ Values Generator::buildNode(const AST::Expr* node) {
     return buildVariable(llvm::dyn_cast<AST::Variable>(node));
   if (AST::Build::classof(node))
     return buildBuild(llvm::dyn_cast<AST::Build>(node));
-  if (AST::Tuple::classof(node))
-    return buildTuple(llvm::dyn_cast<AST::Tuple>(node));
-  if (AST::Get::classof(node))
-    return buildGet(llvm::dyn_cast<AST::Get>(node));
   if (AST::Fold::classof(node))
     return buildFold(llvm::dyn_cast<AST::Fold>(node));
   assert(0 && "unexpected node");
@@ -273,7 +249,7 @@ Values Generator::buildBlock(const AST::Block* block) {
 // Builds literals
 Values Generator::buildLiteral(const AST::Literal* lit) {
   assert(lit->getType().isScalar() && "Only scalar literals supported");
-  mlir::Type type = Single(ConvertType(lit->getType()));
+  mlir::Type type = ConvertType(lit->getType());
   return {builder.create<mlir::ConstantOp>(UNK, type, getAttr(lit))};
 }
 
@@ -389,7 +365,7 @@ Values Generator::buildCall(const AST::Call* call) {
     a << ") -> "<<name_mangled<<"]";
   }
 
-  // Operands (tuples expand into individual operands)
+  // Operands
   Values operands;
   for (auto &arg: call->getOperands()) {
     if (arg->getType() == AST::Type::String) {
@@ -397,17 +373,15 @@ Values Generator::buildCall(const AST::Call* call) {
       continue;
     }
 
-    auto range = buildNode(arg.get());
-    // Tuples
-    if (range.size() > 1)
-      operands.append(range.begin(), range.end());
+    auto value = Single(buildNode(arg.get()));
+
     // Static vectors need to be made dynamic
-    else if (Single(range).getType().isa<mlir::MemRefType>() &&
-              Single(range).getType().cast<mlir::MemRefType>().getDimSize(0) != -1)
-      operands.push_back(memrefCastForCall(Single(range)));
+    if (value.getType().isa<mlir::MemRefType>() &&
+        value.getType().cast<mlir::MemRefType>().getDimSize(0) != -1)
+      operands.push_back(memrefCastForCall(value));
     // Everything else
     else
-      operands.push_back(Single(range));
+      operands.push_back(value);
   }
   assert(func.getNumArguments() == operands.size() && "Arguments mismatch");
 
@@ -463,7 +437,7 @@ Values Generator::buildBuild(const AST::Build* b) {
   auto dim = Single(buildNode(b->getRange()));
   auto indTy = builder.getIndexType();
   auto dimIdx = builder.create<mlir::IndexCastOp>(UNK, dim, indTy);
-  auto elmTy = Single(ConvertType(b->getExpr()->getType()));
+  auto elmTy = ConvertType(b->getExpr()->getType());
   auto ivTy = dim.getType();
   auto vecTy = mlir::MemRefType::get(-1, elmTy);
   mlir::ValueRange dimArg {dimIdx};
@@ -517,59 +491,28 @@ Values Generator::buildBuild(const AST::Build* b) {
   return {memrefCastForCall(vec)};
 }
 
-// Builds tuple creation
-Values Generator::buildTuple(const AST::Tuple* t) {
-  auto type = ConvertType(t->getType());
-  Values elms;
-  // Nested tuples are serialised into one long list
-  for (auto &e: t->getElements()) {
-    elms.push_back(Single(buildNode(e.get())));
-  }
-  return mlir::ValueRange{elms};
-}
-
-// Builds index access to tuples
-Values Generator::buildGet(const AST::Get* g) {
-  // A get on a variable, returns the Nth element declared
-  auto var = llvm::dyn_cast<AST::Variable>(g->getExpr());
-  if (var) {
-    auto tuple = variables[var->getName()];
-    return {tuple[g->getIndex()-1]};
-  }
-
-  // Calls return multiple values, we need to lower the call first
-  auto call = llvm::dyn_cast<AST::Call>(g->getExpr());
-  if (call) {
-    auto res = buildNode(call);
-    return {res[g->getIndex()-1]};
-  }
-
-  // A get on a constant, just returns the element directly
-  return buildNode(g->getElement());
-}
-
 // Builds fold
 // FIXME: use loop.for, common up with build
+// (fold (lam ((acc : A) (elm : T)) body [:A]) init [:A] vec [:V<T>])))
 Values Generator::buildFold(const AST::Fold* f) {
   // Fold needs a tuple of two variables: the accumulator and the induction
-  auto v = f->getVector();
-  auto acc = llvm::dyn_cast<AST::Variable>(f->getAcc());
-  assert(acc && "Wrong AST node for vector and/or accumulator");
+  AST::Expr* v = f->getVector();
+  AST::Variable* acc = f->getAcc();
+  AST::Variable* elm = f->getElm();
+  assert(v && acc && "Wrong AST node for vector and/or accumulator");
   assert(f->getType().isScalar() && "Bad accumulator type in fold");
-  assert(acc->getType() == AST::Type::Tuple && "Bad accumulator type in fold");
-  assert(f->getType() == acc->getType().getSubType(0));
-  assert(v->getType() == AST::Type::Vector && "Bad vector type in fold");
-  assert(v->getType().getSubType() == acc->getType().getSubType(1));
+  assert(f->getType() == acc->getType());
+  assert(v->getType().isVector() && "Bad vector type in fold");
+  assert(v->getType().getSubType() == elm->getType());
 
   // We can't build the variable here yet because this is an SSA representation
   // and the body will get the wrong reference, so we just initialise the
   // accumulator (the element x will be initialised by the load block)
-  auto init = buildNode(acc->getInit());
-
+  auto accinit = Single(buildNode(acc->getInit()));
+  
   // Context variables: vector (and elm type), max, IV init to zero
   auto ivTy = builder.getIntegerType(64);
-  auto accTy = init[0].getType();
-  auto elmTy = init[1].getType();
+  auto accTy = accinit.getType();
   auto vec = Single(buildNode(v));
   auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
   auto max = builder.create<mlir::IndexCastOp>(UNK, dim, ivTy);
@@ -580,16 +523,21 @@ Values Generator::buildFold(const AST::Fold* f) {
   auto headBlock = currentFunc.addBlock();
   headBlock->addArgument(accTy);
   headBlock->addArgument(ivTy);
+  
   auto loadBlock = currentFunc.addBlock();
+  auto elminit = Single(buildNode(elm->getInit()));
+  auto elmTy = elminit.getType();
   loadBlock->addArgument(accTy);
   loadBlock->addArgument(ivTy);
+  
   auto bodyBlock = currentFunc.addBlock();
   bodyBlock->addArgument(accTy);
   bodyBlock->addArgument(elmTy);
   bodyBlock->addArgument(ivTy);
+  
   auto tailBlock = currentFunc.addBlock();
   tailBlock->addArgument(accTy);
-  mlir::ValueRange indArg {init[0], zero};
+  mlir::ValueRange indArg {accinit, zero};
   builder.create<mlir::BranchOp>(UNK, headBlock, indArg);
 
   // The head block only checks the condition, we can't load anything until
@@ -622,7 +570,8 @@ Values Generator::buildFold(const AST::Fold* f) {
   auto bodyAcc = bodyBlock->getArgument(0);
   auto bodyElm = bodyBlock->getArgument(1);
   auto bodyIv = bodyBlock->getArgument(2);
-  declareVariable(acc->getName(), {bodyAcc, bodyElm});
+  declareVariable(acc->getName(), {bodyAcc});
+  declareVariable(elm->getName(), {bodyElm});
   auto newAcc = Single(buildNode(f->getBody()));
 
   // Increment IV

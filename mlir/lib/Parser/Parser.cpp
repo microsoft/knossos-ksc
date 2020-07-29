@@ -10,6 +10,25 @@ using namespace Knossos::AST;
 
 //================================================ Helpers
 
+static bool startsWith(std::string const& s, std::string const& prefix)
+{
+  // TODO: wrap ifdef DEBUG
+  // TODO: utils.h
+  static bool tested = false;
+  if (!tested) {
+    tested = true;
+    ASSERT(startsWith("", ""));
+    ASSERT(startsWith("aa", "a"));
+    ASSERT(startsWith("get$1$2", "get$"));
+    ASSERT(startsWith("get$1$2", "get$1$2"));
+    ASSERT(!startsWith("get$1$2", "get$1$2."));
+    ASSERT(!startsWith("a", "aa"));
+    ASSERT(!startsWith("a", "b"));
+  }
+
+  return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
+}
+
 static Type::ValidType Str2Type(llvm::StringRef ty) {
   if (ty == "String")
     return Type::String;
@@ -31,10 +50,10 @@ static Type::ValidType Str2Type(llvm::StringRef ty) {
   return Type::None;
 }
 
-static size_t toIndex(llvm::StringRef str) {
+static size_t toIndex(Token const* tok, llvm::StringRef str) {
   size_t idx = 0;
   bool failed = str.getAsInteger(0, idx);
-  assert(!failed && "Bad index conversion");
+  PARSE_ASSERT(!failed) << "Bad index conversion [" << str.str() << "]";
   return idx;
 }
 
@@ -198,6 +217,7 @@ Declaration *Parser::addExtraDecl(std::string name, std::vector<Type> argTypes, 
 
   // Not present, cons one up
   decl = new Declaration(name, returnType, argTypes);
+  // std::cerr << "add decl " << *decl << endl;
   extraDecls->addOperand(Expr::Ptr(decl));
   
   return decl;
@@ -247,16 +267,13 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
     return parseLet(tok);
   case Parser::Keyword::IF:
     return parseCond(tok);
-  case Parser::Keyword::TUPLE:
-    return parseTuple(tok);
 
   // "Prims": Polymorphic functions, rather than builtins
-  case Parser::Keyword::GET:
-    return parseGet(tok);
   case Parser::Keyword::BUILD:
     return parseBuild(tok);
   case Parser::Keyword::FOLD:
     return parseFold(tok);
+
   case Parser::Keyword::NA:
     // It's not a reserved keyword, try other constructs
     break;
@@ -267,11 +284,11 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
 }
 
 // Values (variable names, literals, type names)
-Expr::Ptr Parser::parseBlock(const Token *tok) {
+Block::Ptr Parser::parseBlock(const Token *tok) {
   Block *b = new Block();
   for (auto &c : tok->getChildren())
     b->addOperand(parseToken(c.get()));
-  return unique_ptr<Expr>(b);
+  return unique_ptr<Block>(b);
 }
 
 // Parses type declarations (vector, tuples)
@@ -392,6 +409,24 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
   if (name == "print")
     // Cons up a new decl for this combination of print and Type
     return mkCall(Integer);
+
+  if (name == "tuple")
+    return mkCall(Type::makeTuple(types));
+
+  if (arity == 1 && startsWith(name, "get$")) {
+    size_t dollar1 = name.find('$');
+    size_t dollar2 = name.find('$', dollar1 + 1);
+    PARSE_ASSERT(dollar2 != std::string::npos) << "get$ without second $ [" << name << "]";
+    auto indexStr = name.substr(dollar1 + 1, dollar2 - dollar1 - 1);
+    auto maxStr = name.substr(dollar2 + 1);
+    size_t idx = toIndex(tok, indexStr);
+    size_t max = toIndex(tok, maxStr);
+
+    PARSE_ASSERT(types[0].isTuple()) << "Get on non-tuple";
+    PARSE_ASSERT(idx >= 1 && idx <= types[0].getSubTypes().size()) << "Get at index " << idx << " of " << *operands[0];
+
+    return mkCall(types[0].getSubType(idx-1));
+  }
 
 #define MATCH_1(NAME, ARGTYPE_0) \
   (arity == 1 && name == NAME && \
@@ -617,56 +652,40 @@ Expr::Ptr Parser::parseBuild(const Token *tok) {
   return make_unique<Build>(move(range), move(var), move(body));
 }
 
-// Tuple, ex: (tuple 10.0 42 (add 1.0 2.0))
-Expr::Ptr Parser::parseTuple(const Token *tok) {
-  PARSE_ASSERT(tok->size() > 0);
-  PARSE_ASSERT(tok->getChild(0)->isValue && tok->getChild(0)->getValue() == "tuple");
-  std::vector<Expr::Ptr> elements;
-  for (auto &c: tok->getTail())
-    elements.push_back(parseToken(c.get()));
-  return make_unique<Tuple>(move(elements));
-}
-
-// Index, ex: (get$7$9 tuple)
-Expr::Ptr Parser::parseGet(const Token *tok) {
-  PARSE_ASSERT(tok->size() == 2);
-  PARSE_ASSERT(tok->getChild(0)->isValue);
-  llvm::StringRef get = tok->getChild(0)->getValue();
-  size_t dollar1 = get.find('$');
-  size_t dollar2 = get.find('$', dollar1 + 1);
-  llvm::StringRef indexStr = get.substr(dollar1 + 1, dollar2 - dollar1 - 1);
-  llvm::StringRef maxStr = get.substr(dollar2 + 1);
-  size_t idx = toIndex(indexStr);
-  size_t max = toIndex(maxStr);
-  auto var = parseToken(tok->getChild(1));
-  return make_unique<Get>(idx, max, move(var));
-}
-
-// Fold, ex: (fold (lambda) init vector)
+// Fold, ex: (fold lam init vector)
+// lam:  (lam ((acc : AccTy) (elm : ElmTy)) expr)
 Expr::Ptr Parser::parseFold(const Token *tok) {
   PARSE_ASSERT(tok->size() == 4);
-  // Lambda format: (lam (acc_x : (Tuple AccTy ElmTy)) (expr))
+  // Lambda format: (lam ((acc : AccTy) (x : ElmTy)) expr)
   const Token *lam = tok->getChild(1);
-  PARSE_ASSERT(!lam->isValue);
+  PARSE_ASSERT(lam->size() == 3);
   PARSE_ASSERT(lam->getChild(0)->isValue && lam->getChild(0)->getValue() == "lam");
-  auto var = parseVariable(lam->getChild(1));
-  PARSE_ASSERT(var->kind == Expr::Kind::Variable);
-  PARSE_ASSERT(var->getType() == Type::Tuple);
-  auto accTy = var->getType().getSubType(0);
-  auto elmTy = var->getType().getSubType(1);
-  // Variable initialiser is (init, zero)
-  vector<Expr::Ptr> initArgs;
-  initArgs.push_back(parseToken(tok->getChild(2)));
-  initArgs.push_back(getZero(elmTy));
-  auto init = make_unique<Tuple>(move(initArgs));
-  llvm::dyn_cast<Variable>(var.get())->setInit(move(init));
+
+  auto vars = lam->getChild(1);
+  PARSE_ASSERT(vars->size() == 2);
+
+  auto acc = parseVariable(vars->getChild(0));
+  PARSE_ASSERT(acc->kind == Expr::Kind::Variable);
+  auto accTy = acc->getType();
+
+  auto elm = parseVariable(vars->getChild(1));
+  PARSE_ASSERT(elm->kind == Expr::Kind::Variable);
+  auto elmTy = elm->getType();
+
+  Expr::Ptr init = parseToken(tok->getChild(2));
+  acc->setInit(move(init));
+  elm->setInit(getZero(elmTy)); // TODO: need this init?
+
   // Lambda body has same as accTy
   auto body = parseToken(lam->getChild(2));
   PARSE_ASSERT(body->getType() == accTy);
+
+  // Vector has element types elmTy
   auto vector = parseToken(tok->getChild(3));
   PARSE_ASSERT(vector->getType() == Type::Vector);
   PARSE_ASSERT(vector->getType().getSubType() == elmTy);
-  return make_unique<Fold>(accTy, move(body), move(var), move(vector));
+
+  return make_unique<Fold>(accTy, move(acc), move(elm), move(body), move(vector));
 }
 
 // Rule: (rule "mul2" (v : Float) (mul v 2.0) (add v v))

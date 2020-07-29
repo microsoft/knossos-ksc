@@ -31,16 +31,14 @@ char const* ValidType2Str(Type::ValidType type) {
 }
 
 std::ostream& Type::dump(std::ostream& s) const {
-  if (type == Vector) {
-    s << "(Vector ";
-    subTypes[0].dump(s);
-    return s << " )";
-  } 
+  if (type == Vector)
+    return s << "(Vector " << subTypes[0] << ")";
+
   if (type == Tuple) {
-    s << "Tuple{ ";
+    s << "(Tuple";
     for (auto &t: subTypes)
-      t.dump(s) << " ";
-    return s << "}";
+      s << " " << t;
+    return s << ")";
   } 
   
   return s << ValidType2Str(type);
@@ -48,11 +46,11 @@ std::ostream& Type::dump(std::ostream& s) const {
 
 std::ostream& operator<<(std::ostream& s, Signature const& t)
 {
-  s << t.name << "(";
+  s << "(" << t.name;
   bool first = true;
   for(auto ty : t.argTypes) {
     if (!first)
-      s << ",";
+      s << " ";
     s << ty;
     first = false;
   }
@@ -60,9 +58,7 @@ std::ostream& operator<<(std::ostream& s, Signature const& t)
 }
 
 std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
-  s << string(tab, ' ') << "type [";
-  type.dump(s);
-  return s << "]" << endl;
+  return s << string(tab, ' ') << "type [" << type << "]" << endl;
 }
 
 std::ostream&  Block::dump(std::ostream& s, size_t tab) const {
@@ -147,24 +143,6 @@ std::ostream& Build::dump(std::ostream& s, size_t tab) const {
   var->dump(s, tab + 4);
   s << string(tab + 2, ' ') << "Body:" << endl;
   return expr->dump(s, tab + 4);
-}
-
-std::ostream& Tuple::dump(std::ostream& s, size_t tab) const {
-  s << string(tab, ' ') << "Tuple:" << endl;
-  Expr::dump(s, tab + 2);
-  s << string(tab + 2, ' ') << "Values:" << endl;
-  for (auto &el: elements)
-    el->dump(s, tab + 4);
-  return s;
-}
-
-std::ostream& Get::dump(std::ostream& s, size_t tab) const {
-  s << string(tab, ' ') << "Get:" << endl;
-  Expr::dump(s, tab + 2);
-  s << string(tab + 2, ' ') << "index [" << index << "]" << endl;
-  s << string(tab + 2, ' ') << "From:" << endl;
-  expr->dump(s, tab + 4);
-  return s;
 }
 
 std::ostream& Fold::dump(std::ostream& s, size_t tab) const {

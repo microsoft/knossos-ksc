@@ -101,30 +101,30 @@ void test_parser_block() {
   Block* root = llvm::dyn_cast<Block>(tree.get());
   assert(root);
   // Kind is Block and has 1 sub-expr
-  Tuple* tuple = llvm::dyn_cast<Tuple>(root->getOperand(0));
+  Call* tuple = llvm::dyn_cast<Call>(root->getOperand(0));
   assert(tuple);
   // Block has 6 literals
-  Literal* op0 = llvm::dyn_cast<Literal>(tuple->getElement(0));
+  Literal* op0 = llvm::dyn_cast<Literal>(tuple->getOperand(0));
   assert(op0);
   assert(op0->getValue() == "10.0");
   assert(op0->getType() == Type::Float);
-  Literal* op1 = llvm::dyn_cast<Literal>(tuple->getElement(1));
+  Literal* op1 = llvm::dyn_cast<Literal>(tuple->getOperand(1));
   assert(op1);
   assert(op1->getValue() == "42");
   assert(op1->getType() == Type::Integer);
-  Literal* op2 = llvm::dyn_cast<Literal>(tuple->getElement(2));
+  Literal* op2 = llvm::dyn_cast<Literal>(tuple->getOperand(2));
   assert(op2);
   assert(op2->getValue() == "");
   assert(op2->getType() == Type::String);
-  Literal* op3 = llvm::dyn_cast<Literal>(tuple->getElement(3));
+  Literal* op3 = llvm::dyn_cast<Literal>(tuple->getOperand(3));
   assert(op3);
   assert(op3->getValue() == " ");
   assert(op3->getType() == Type::String);
-  Literal* op4 = llvm::dyn_cast<Literal>(tuple->getElement(4));
+  Literal* op4 = llvm::dyn_cast<Literal>(tuple->getOperand(4));
   assert(op4);
   assert(op4->getValue() == "Hello");
   assert(op4->getType() == Type::String);
-  Literal* op5 = llvm::dyn_cast<Literal>(tuple->getElement(5));
+  Literal* op5 = llvm::dyn_cast<Literal>(tuple->getOperand(5));
   assert(op5);
   assert(op5->getValue() == "Hello world");
   assert(op5->getType() == Type::String);
@@ -459,7 +459,7 @@ void test_parser_tuple() {
   Block* root = llvm::dyn_cast<Block>(tree.get());
   assert(root);
   // Kind is Tuple
-  Tuple* tuple = llvm::dyn_cast<Tuple>(root->getOperand(0));
+  Call* tuple = llvm::dyn_cast<Call>(root->getOperand(0));
   assert(tuple);
   auto type = tuple->getType();
   assert(type == Type::Tuple &&
@@ -467,12 +467,12 @@ void test_parser_tuple() {
          type.getSubType(1) == Type::Bool &&
          type.getSubType(2) == Type::Integer);
   // Check elements are correct
-  Call* op = llvm::dyn_cast<Call>(tuple->getElement(0));
+  Call* op = llvm::dyn_cast<Call>(tuple->getOperand(0));
   assert(op->getDeclaration()->getName() == "add");
   assert(llvm::dyn_cast<Literal>(op->getOperand(0))->getValue() == "3.14");
   assert(llvm::dyn_cast<Literal>(op->getOperand(1))->getValue() == "2.72");
-  assert(llvm::dyn_cast<Literal>(tuple->getElement(1))->getValue() == "false");
-  assert(llvm::dyn_cast<Literal>(tuple->getElement(2))->getValue() == "42");
+  assert(llvm::dyn_cast<Literal>(tuple->getOperand(1))->getValue() == "false");
+  assert(llvm::dyn_cast<Literal>(tuple->getOperand(2))->getValue() == "42");
   cout << "    OK\n";
 }
 
@@ -484,12 +484,10 @@ void test_parser_get() {
   Block* root = llvm::dyn_cast<Block>(tree.get());
   assert(root);
   // Kind is Get
-  Get* get = llvm::dyn_cast<Get>(root->getOperand(0));
+  Call* get = llvm::dyn_cast<Call>(root->getOperand(0));
   assert(get);
-  assert(get->getIndex() == 2);
-  Literal* elm = llvm::dyn_cast<Literal>(get->getElement());
-  assert(elm);
-  assert(elm->getType() == Type::Bool && elm->getValue() == "false");
+
+  // (get (tuple)) rule is now outside lowering.
   cout << "    OK\n";
 }
 
@@ -524,13 +522,13 @@ void test_parser_fold() {
   assert(acc->getType() == Type::Tuple);
   assert(acc->getType().getSubType(0) == Type::Float);
   assert(acc->getType().getSubType(1) == Type::Float);
-  Tuple* init = llvm::dyn_cast<Tuple>(acc->getInit());
+  Call* init = llvm::dyn_cast<Call>(acc->getInit());
   assert(init);
-  Literal* init0 = llvm::dyn_cast<Literal>(init->getElement(0));
+  Literal* init0 = llvm::dyn_cast<Literal>(init->getOperand(0));
   assert(init0);
   assert(init0->getType() == Type::Float);
   assert(init0->getValue() == "1.0");
-  Literal* init1 = llvm::dyn_cast<Literal>(init->getElement(1));
+  Literal* init1 = llvm::dyn_cast<Literal>(init->getOperand(1));
   assert(init1);
   assert(init1->getType() == Type::Float);
   assert(init1->getValue() == "0.0");
@@ -542,12 +540,12 @@ void test_parser_fold() {
   assert(letAcc);
   assert(letAcc->getType() == Type::Float);
   assert(letAcc->getName() == "acc");
-  assert(Get::classof(letAcc->getInit()));
+  assert(Call::classof(letAcc->getInit()));
   Variable* letX = llvm::dyn_cast<Variable>(let->getVariable(1));
   assert(letX);
   assert(letX->getType() == Type::Float);
   assert(letX->getName() == "x");
-  assert(Get::classof(letX->getInit()));
+  assert(Call::classof(letX->getInit()));
   // Lambda operation
   Call* op = llvm::dyn_cast<Call>(let->getExpr());
   assert(op);

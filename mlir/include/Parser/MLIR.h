@@ -22,7 +22,6 @@ namespace Knossos {
 namespace MLIR {
 
 // MLIR generator
-using Types = llvm::SmallVector<mlir::Type, 4>;
 using Values = llvm::SmallVector<mlir::Value, 4>;
 class Generator {
   // The main module
@@ -41,7 +40,7 @@ class Generator {
   std::map<std::string, Values> variables;
 
   // Helpers
-  Types ConvertType(const AST::Type &type, size_t dim=0);
+  mlir::Type ConvertType(const AST::Type &type, size_t dim=0);
   mlir::Value memrefCastForCall(mlir::Value orig);
   mlir::Attribute getAttr(const AST::Expr* op);
 
@@ -60,8 +59,6 @@ class Generator {
   Values buildLiteral(const AST::Literal*);
   Values buildVariable(const AST::Variable*);
   Values buildBuild(const AST::Build*);
-  Values buildTuple(const AST::Tuple*);
-  Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
 
   // Variables

@@ -119,7 +119,7 @@ public:
 /// The parser will take ownership of the Tokens.
 class Parser {
   Token::Ptr rootT;
-  Expr::Ptr rootE;
+  Block::Ptr rootE;
   Block::Ptr extraDecls;
   Lexer lex;
 
@@ -135,9 +135,8 @@ class Parser {
               .Case("rule", Keyword::RULE)
               .Case("let", Keyword::LET)
               .Case("if", Keyword::IF)
+
               .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
-              .Case("tuple", Keyword::TUPLE)
-              .StartsWith("get$", Keyword::GET) // TODO: Prim not reserved word
               .Case("fold", Keyword::FOLD) // TODO: Prim not reserved word
               .Default(Keyword::NA);
   }
@@ -172,7 +171,7 @@ class Parser {
   // Specific Token parsers
   Type parseType(const Token *tok);
   Type parseRelaxedType(std::vector<const Token *> toks);
-  Expr::Ptr parseBlock(const Token *tok);
+  Block::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);
   Expr::Ptr parseCall(const Token *tok);
   Variable::Ptr parseVariable(const Token *tok);
@@ -181,8 +180,6 @@ class Parser {
   Expr::Ptr parseDef(const Token *tok);
   Expr::Ptr parseCond(const Token *tok);
   Expr::Ptr parseBuild(const Token *tok);
-  Expr::Ptr parseTuple(const Token *tok);
-  Expr::Ptr parseGet(const Token *tok);
   Expr::Ptr parseFold(const Token *tok);
   Expr::Ptr parseRule(const Token *tok);
 
