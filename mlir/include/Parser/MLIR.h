@@ -22,7 +22,6 @@ namespace Knossos {
 namespace MLIR {
 
 // MLIR generator
-using Types = llvm::SmallVector<mlir::Type, 4>;
 using Values = llvm::SmallVector<mlir::Value, 4>;
 class Generator {
   // The main module
@@ -37,11 +36,11 @@ class Generator {
   mlir::FuncOp currentFunc;
 
   // Cache for functions and variables
-  std::map<llvm::StringRef, mlir::FuncOp> functions;
-  std::map<llvm::StringRef, Values> variables;
+  std::map<std::string, mlir::FuncOp> functions;
+  std::map<std::string, Values> variables;
 
   // Helpers
-  Types ConvertType(const AST::Type &type, size_t dim=0);
+  mlir::Type ConvertType(const AST::Type &type, size_t dim=0);
   mlir::Value memrefCastForCall(mlir::Value orig);
   mlir::Attribute getAttr(const AST::Expr* op);
 
@@ -60,12 +59,10 @@ class Generator {
   Values buildLiteral(const AST::Literal*);
   Values buildVariable(const AST::Variable*);
   Values buildBuild(const AST::Build*);
-  Values buildTuple(const AST::Tuple*);
-  Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
 
   // Variables
-  void declareVariable(llvm::StringRef name, Values vals);
+  void declareVariable(std::string const& name, Values vals);
   void declareVariable(const AST::Variable* var, Values vals = {});
 
   // Argument serialisation (tuples)
@@ -77,7 +74,7 @@ public:
   // Build from MLIR source
   const mlir::ModuleOp build(const std::string& mlir);
   // Build from KSC AST
-  const mlir::ModuleOp build(const AST::Expr* root);
+  const mlir::ModuleOp build(const AST::Block* extraDecls, const AST::Expr* root);
   // Emit LLVM IR
   std::unique_ptr<llvm::Module> emitLLVM(int optLevel=0);
 };

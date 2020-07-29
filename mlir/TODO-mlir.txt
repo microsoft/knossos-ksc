@@ -1,7 +1,11 @@
 TODO-mlir.txt
 
+- Implement prelude.
+- Remove more keywords: sum, fold, build, get, tuple
 - Location info
 - Hash consing
 - Python binding
-- Fix print, hence strings.
-- Undo untupling
+- Restore "sum" 
+- Fix print, hence strings -- https://stackoverflow.com/questions/1061753/how-can-i-implement-a-string-data-type-in-llvm
+- Undo untupling - handle tuples https://mlir.llvm.org/docs/LangRef/#standard-types
+                    https://mlir.llvm.org/doxygen/classmlir_1_1TupleType.html 

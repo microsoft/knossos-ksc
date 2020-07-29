@@ -2,20 +2,18 @@
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
 (def prod_fold Integer ((v : (Vec Integer)) (closure : Integer))
-; MLIR: func @prod_fold(%arg0: memref<?xi64>, %arg1: i64) -> i64 {
-; LLVM: define i64 @prod_fold(i64* %0, i64* %1, i64 %2, i64 %3, i64 %4, i64 %5) {
+; MLIR: func @prod_fold$avii(%arg0: memref<?xi64>, %arg1: i64) -> i64 {
+; LLVM: define i64 @"prod_fold$avii"(i64* %0, i64* %1, i64 %2, i64 %3, i64 %4, i64 %5) {
 
-     (fold (lam (acc_x : (Tuple Integer Integer))
-                (let ((acc (get$1$2 acc_x))
-                      (x   (get$2$2 acc_x)))
-                  (mul (add acc x) closure)))
+     (fold (lam ((acc : Integer) (x : Integer))
+                  (mul (add acc x) closure))
            1
            v
      )
 ; MLIR:   %c1{{.*}} = constant 1 : i64
-; MLIR:   %c0{{.*}} = constant 0 : i64
 ; MLIR:   %[[DI:[0-9]+]] = dim %arg0, 0 : memref<?xi64>
 ; MLIR:   %[[dim:[0-9]+]] = index_cast %[[DI]] : index to i64
+; MLIR:   %c0{{.*}} = constant 0 : i64
 ; MLIR:   %c0{{.*}} = constant 0 : i64
 ; MLIR:   br ^[[headBB:bb[0-9]+]](%c1{{.*}}, %c0{{.*}} : i64, i64)
 ; MLIR: ^[[headBB]](%[[hAcc:[0-9]+]]: i64, %[[hIv:[0-9]+]]: i64):	// 2 preds: ^bb0, ^bb3
@@ -81,7 +79,7 @@
 ; ... build ...
 ; MLIR:  %[[cast:[0-9]+]] = memref_cast %[[vec]] : memref<?xi64> to memref<?xi64>
 ; MLIR:  %c2{{.*}} = constant 2 : i64
-; MLIR:  %[[ret:[0-9]+]] = call @prod_fold(%[[cast]], %c2{{.*}}) : (memref<?xi64>, i64) -> i64
+; MLIR:  %[[ret:[0-9]+]] = call @prod_fold$avii(%[[cast]], %c2{{.*}}) : (memref<?xi64>, i64) -> i64
 ; MLIR:  return %[[ret]] : i64
 
 ; LLVM converts memref<?xi64> into a bunch of insertvalue / extractvalue
@@ -89,7 +87,7 @@
 ; LLVM: insertvalue
 ; ... build ...
 ; LLVM: extractvalue
-; LLVM: %[[ret:[0-9]+]] = call i64 @prod_fold(
+; LLVM: %[[ret:[0-9]+]] = call i64 @"prod_fold$avii"(
 ; LLVM: ret i64 %[[ret]]
 
 )

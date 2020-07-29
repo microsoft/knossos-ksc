@@ -25,8 +25,8 @@ namespace AST {
 /// Do not confuse with "continuation values", those are higher level.
 struct Token {
   using Ptr = std::unique_ptr<Token>;
-  Token(std::string str) : isValue(true), value(str) {}
-  Token() : isValue(false) {}
+  Token(size_t line, std::string str) : isValue(true), value(str), line(line) {}
+  Token(size_t line = 0) : isValue(false), line(line) {}
 
   void addChild(Token::Ptr tok) {
     assert(!isValue && "Can't add children to values");
@@ -57,7 +57,10 @@ struct Token {
     return llvm::ArrayRef<Ptr>(children).slice(1);
   }
 
+  size_t getLine() const  { return line; }
+
   const bool isValue;
+
   size_t size() const { return children.size(); }
 
   std::ostream& dump(std::ostream& s) const;
@@ -67,6 +70,7 @@ struct Token {
 private:
   std::string value;
   std::vector<Ptr> children;
+  int line;
 
   struct ppresult {
     std::string s;
@@ -94,15 +98,13 @@ class Lexer {
   size_t len;
   Token::Ptr root;
   size_t multiLineComments;
+  size_t line_number;
 
   /// Build a tree of tokens
   size_t lexToken(Token *tok, size_t pos);
 
 public:
-  Lexer(std::string &&code)
-      : code(code), len(code.size()), root(new Token()), multiLineComments(0) {
-    assert(len > 0 && "Empty code?");
-  }
+  Lexer(std::string &&code);
 
   Token::Ptr lex() {
     lexToken(root.get(), 0);
@@ -117,28 +119,25 @@ public:
 /// The parser will take ownership of the Tokens.
 class Parser {
   Token::Ptr rootT;
-  Expr::Ptr rootE;
+  Block::Ptr rootE;
+  Block::Ptr extraDecls;
   Lexer lex;
 
+  // TODO: Add lam
   enum class Keyword {
        LET,  EDEF, DEF,   IF, BUILD, INDEX,
       SIZE, TUPLE, GET, FOLD, RULE, NA,
-      // Stdlib hack
-      SUM
   };
   Keyword isReservedWord(std::string name) const {
     return llvm::StringSwitch<Keyword>(name)
-              .Case("let", Keyword::LET)
               .Case("edef", Keyword::EDEF)
               .Case("def", Keyword::DEF)
-              .Case("if", Keyword::IF)
-              .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
-              .Case("tuple", Keyword::TUPLE)
-              .StartsWith("get$", Keyword::GET) // TODO: Prim not reserved word
-              .Case("fold", Keyword::FOLD) // TODO: Prim not reserved word
               .Case("rule", Keyword::RULE)
-              // Stdlib hack
-              .Case("sum", Keyword::SUM) // TODO: Prim not reserved word
+              .Case("let", Keyword::LET)
+              .Case("if", Keyword::IF)
+
+              .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
+              .Case("fold", Keyword::FOLD) // TODO: Prim not reserved word
               .Default(Keyword::NA);
   }
   /// Simple symbol table for parsing only (no validation)
@@ -162,34 +161,37 @@ class Parser {
     bool reassign;
     std::map<std::string, Expr*> symbols;
   };
-  Symbols functions;
   Symbols variables{true};
   Symbols rules;
+
+  std::map<Signature, Declaration*> function_decls;
 
   // Build AST nodes from Tokens
   Expr::Ptr parseToken(const Token *tok);
   // Specific Token parsers
   Type parseType(const Token *tok);
   Type parseRelaxedType(std::vector<const Token *> toks);
-  Expr::Ptr parseBlock(const Token *tok);
+  Block::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);
   Expr::Ptr parseCall(const Token *tok);
-  Expr::Ptr parseVariable(const Token *tok);
+  Variable::Ptr parseVariable(const Token *tok);
   Expr::Ptr parseLet(const Token *tok);
   Expr::Ptr parseDecl(const Token *tok);
   Expr::Ptr parseDef(const Token *tok);
   Expr::Ptr parseCond(const Token *tok);
   Expr::Ptr parseBuild(const Token *tok);
-  Expr::Ptr parseTuple(const Token *tok);
-  Expr::Ptr parseGet(const Token *tok);
   Expr::Ptr parseFold(const Token *tok);
   Expr::Ptr parseRule(const Token *tok);
-  // Standard library parsers
-  Expr::Ptr parseSum(const Token *tok);
 
 public:
-  Parser(std::string code)
-      : rootT(nullptr), rootE(nullptr), lex(std::move(code)) {}
+  Parser(std::string code): 
+      rootT(nullptr), 
+      rootE(nullptr),
+      extraDecls(nullptr),
+      lex(std::move(code)) 
+      {
+        extraDecls = std::make_unique<Block>();
+      }
 
   void tokenise() {
     assert(!rootT && "Won't overwrite root token");
@@ -209,6 +211,10 @@ public:
   Expr::Ptr moveRoot() {
     return std::move(rootE);
   }
+  const Block* getExtraDecls() {
+    return extraDecls.get();
+  }
+  Declaration* addExtraDecl(std::string name, std::vector<Type> types, Type returnType);
 };
 
 } // namespace AST
