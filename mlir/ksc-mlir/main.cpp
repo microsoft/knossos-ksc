@@ -1,8 +1,8 @@
-#include "Parser/MLIR.h"
-#include "Parser/Parser.h"
-#include "Knossos/KnossosDialect.h"
 #include <iostream>
 #include <fstream>
+
+#include "Parser/Parser.h"
+#include "Parser/MLIR.h"
 
 using namespace Knossos::AST;
 using namespace Knossos::MLIR;
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
   // Create a more logical API that doesn't require it to be done by the caller
   mlir::registerAllDialects();
 
-  mlir::registerDialect<mlir::knossos::KnossosDialect>();
+  // mlir::registerDialect<mlir::knossos::KnossosDialect>();
 
   // Unit tests
   // FIXME: Use gtest or similar
