@@ -79,14 +79,13 @@ $ apt install clang ninja-build cmake lld
 $ git clone git@github.com:llvm/llvm-project.git
 
 # Make sure you got the right commit
-# Be sure to update this line when that changes
-$ git checkout -b ksc `cat $KNOSSOS/etc/llvm-brach.txt`
+$ git checkout -b ksc `cat $KNOSSOS/etc/llvm-branch.txt`
 
 $ cd llvm-project
 $ mkdir build && cd build
 
 # Build
-$ sh $KNOSSOS/mlir/run-cmake-in-llvm
+$ . $KNOSSOS/mlir/run-cmake-in-llvm.sh
 $ ninja check-mlir
 
 # To install, one can change the prefix with: 
