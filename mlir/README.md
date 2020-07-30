@@ -80,22 +80,13 @@ $ git clone git@github.com:llvm/llvm-project.git
 
 # Make sure you got the right commit
 # Be sure to update this line when that changes
-$ git checkout -b ksc e03394c6a6f
+$ git checkout -b ksc `cat $KNOSSOS/etc/llvm-brach.txt`
 
 $ cd llvm-project
 $ mkdir build && cd build
 
 # Build
-$ cmake ../llvm \
-        -G Ninja \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DCMAKE_C_COMPILER=clang \
-        -DCMAKE_CXX_COMPILER=clang++ \
-        -DLLVM_ENABLE_PROJECTS=mlir \
-        -DLLVM_BUILD_EXAMPLES=OFF \
-        -DLLVM_TARGETS_TO_BUILD="X86" \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
-        -DLLVM_ENABLE_LLD=ON
+$ sh $KNOSSOS/mlir/run-cmake-in-llvm
 $ ninja check-mlir
 
 # To install, one can change the prefix with: 
