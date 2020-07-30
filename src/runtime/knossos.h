@@ -202,6 +202,11 @@ namespace ks
 		typedef tuple<T, Ts...> type;
 	};
 
+	// This needs to be declared before tuple_print in order to support printing of nested tuples
+	// (gcc will accept the code even without this declaration, but clang will not).
+	template <class... Ts>
+	std::ostream& operator<<(std::ostream& s, tuple<Ts...> const& t);
+
 	template <size_t i, class... Ts>
 	std::ostream& tuple_print(std::ostream& s, tuple<Ts...> const& t)
 	{

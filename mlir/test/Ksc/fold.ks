@@ -1,4 +1,4 @@
-; RUN: ksc-mlir MLIR %s 2>&1 | FileCheck %s --check-prefix=MLIR
+m; RUN: ksc-mlir MLIR %s 2>&1 | FileCheck %s --check-prefix=MLIR
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
 (def prod_fold Integer ((v : (Vec Integer)) (closure : Integer))
@@ -11,7 +11,8 @@
            v
      )
 ; MLIR:   %c1{{.*}} = constant 1 : i64
-; MLIR:   %[[DI:[0-9]+]] = dim %arg0, 0 : memref<?xi64>
+; MLIR:   %c0{{.*}} = constant 0 : i64
+; MLIR:   %[[DI:[0-9]+]] = dim %arg0, %c0 : memref<?xi64>
 ; MLIR:   %[[dim:[0-9]+]] = index_cast %[[DI]] : index to i64
 ; MLIR:   %c0{{.*}} = constant 0 : i64
 ; MLIR:   %c0{{.*}} = constant 0 : i64

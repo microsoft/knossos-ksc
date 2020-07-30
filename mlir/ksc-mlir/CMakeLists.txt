@@ -6,7 +6,6 @@ set(LIBS
         MLIRExecutionEngine
         MLIRTargetLLVMIR
         MLIROptLib
-        MLIRKnossos
         )
 add_llvm_executable(ksc-mlir main.cpp test.cpp)
 
