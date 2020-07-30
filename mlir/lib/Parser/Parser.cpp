@@ -31,7 +31,6 @@ static Type::ValidType Str2Type(llvm::StringRef ty) {
   return Type::None;
 }
 
-
 static size_t toIndex(llvm::StringRef str) {
   size_t idx = 0;
   bool failed = str.getAsInteger(0, idx);
@@ -39,7 +38,7 @@ static size_t toIndex(llvm::StringRef str) {
   return idx;
 }
 
-static Type LiteralType(llvm::StringRef str) {
+static Type::ValidType LiteralType(llvm::StringRef str) {
   // String
   if (str[0] == '"' && str[str.size() - 1] == '"')
     return Type::String;
@@ -58,11 +57,6 @@ static Type LiteralType(llvm::StringRef str) {
   return Type::None;
 }
 
-static bool isLiteralOrType(llvm::StringRef str) {
-  return Str2Type(str) != Type::None ||
-         LiteralType(str) != Type::None;
-}
-
 static llvm::StringRef unquote(llvm::StringRef original) {
   size_t start = 0, len = original.size();
   if (original.front() == '"') { start++; len--; }
@@ -71,17 +65,17 @@ static llvm::StringRef unquote(llvm::StringRef original) {
 }
 
 static Literal::Ptr getZero(Type type) {
-  switch(type) {
-    case Type::Integer:
-      return make_unique<Literal>("0", Type::Integer);
-    case Type::Float:
-      return make_unique<Literal>("0.0", Type::Float);
-    case Type::Bool:
-      return make_unique<Literal>("false", Type::Bool);
-    case Type::String:
-      return make_unique<Literal>("", Type::String);
-    default:
-      ASSERT(0) << "Invalid zero type [" << type << "]";
+  switch (type.getValidType()) {
+  case Type::Integer:
+    return make_unique<Literal>("0", Type::Integer);
+  case Type::Float:
+    return make_unique<Literal>("0.0", Type::Float);
+  case Type::Bool:
+    return make_unique<Literal>("false", Type::Bool);
+  case Type::String:
+    return make_unique<Literal>("", Type::String);
+  default:
+    ASSERT(0) << "Invalid zero type [" << type << "]";
   }
 }
 
@@ -95,89 +89,105 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
   bool isInString = false;
   while (pos < len) {
     switch (code[pos]) {
-      case ';':
-        // Comment, to the end of the line
-        while (code[pos] != '\n')
-          tokenStart = ++pos;
+    case ';':
+      // Comment, to the end of the line
+      while (code[pos] != '\n')
+        tokenStart = ++pos;
+      break;
+    case '#':
+      if (code[pos+1] != '|')
         break;
-      case '#':
-        if (code[pos+1] != '|')
-          break;
-        PARSE_ASSERT(multiLineComments == 0);
-        pos += 2; // consume #|
-        multiLineComments = 1;
-        // Multi-line comment
-        while (multiLineComments) {
-          switch (code[pos]) {
-            case '|':
-              if (code[pos+1] == '#') {
-                multiLineComments--;
-                pos++;
-              }
-              pos++;
-              break;
-            case '#':
-              if (code[pos+1] == '|') {
-                multiLineComments++;
-                pos++;
-              }
-              pos++;
-              break;
-            default:
-              pos++;
+      PARSE_ASSERT(multiLineComments == 0);
+      pos += 2; // consume #|
+      multiLineComments = 1;
+      // Multi-line comment
+      while (multiLineComments) {
+        switch (code[pos]) {
+        case '|':
+          if (code[pos+1] == '#') {
+            multiLineComments--;
+            pos++;
           }
-        }
-        tokenStart = pos;
-        break;
-      case TAB:
-      case SPC:
-      case '\n':
-      case '\r':
-        // "Whitespace" is allowed inside strings
-        if (isInString) {
           pos++;
           break;
+        case '#':
+          if (code[pos+1] == '|') {
+            multiLineComments++;
+            pos++;
+          }
+          pos++;
+          break;
+        default:
+          pos++;
         }
-        // Maybe end of a value
-        if (tokenStart != pos) {
-          tok->addChild(
-              make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
-        }
-        // Or end of a token, which we ignore
-        tokenStart = ++pos;
-        break;
-      case ')':
-        // Maybe end of a value
-        if (tokenStart != pos) {
-          tok->addChild(
-              make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
-        }
-        // Finished parsing this token
-        return ++pos;
-      case '(': {
-        // Recurse into sub-tokens
-        auto t = make_unique<Token>();
-        tokenStart = pos = lexToken(t.get(), pos + 1);
-        tok->addChild(move(t));
+      }
+      tokenStart = pos;
+      break;
+    case TAB:
+    case SPC:
+    case '\n':
+    case '\r':
+      // "Whitespace" is allowed inside strings
+      if (isInString) {
+        pos++;
         break;
       }
-      case '"':
-        if (isInString) {
-          // Strings need to capture the quotes, too
-          size_t start = tokenStart - 1;
-          size_t length = (pos - start + 1);
-          tok->addChild(
-              make_unique<Token>(code.substr(start, length)));
-        }
-        tokenStart = ++pos;
-        isInString = !isInString;
-        break;
-      default:
-        // These are text, so we keep reading
-        pos++;
+      // Maybe end of a value
+      if (tokenStart != pos) {
+        tok->addChild(
+            make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
+      }
+      // Or end of a token, which we ignore
+      tokenStart = ++pos;
+      break;
+    case ')':
+      // Maybe end of a value
+      if (tokenStart != pos) {
+        tok->addChild(
+            make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
+      }
+      // Finished parsing this token
+      return ++pos;
+    case '(': {
+      // Recurse into sub-tokens
+      auto t = make_unique<Token>();
+      tokenStart = pos = lexToken(t.get(), pos + 1);
+      tok->addChild(move(t));
+      break;
+    }
+    case '"':
+      if (isInString) {
+        // Strings need to capture the quotes, too
+        size_t start = tokenStart - 1;
+        size_t length = (pos - start + 1);
+        tok->addChild(
+            make_unique<Token>(code.substr(start, length)));
+      }
+      tokenStart = ++pos;
+      isInString = !isInString;
+      break;
+    default:
+      // These are text, so we keep reading
+      pos++;
     }
   }
   return pos;
+}
+
+//
+Declaration *Parser::addExtraDecl(std::string name, std::vector<Type> argTypes, Type returnType) {
+  Signature sig {name, argTypes};
+  auto& decl = function_decls[sig];
+  if (decl) {
+    std::cerr << "[addExtraDecl: already present: " << sig << "]";
+    return decl;
+  }
+
+  // Not present, cons one up
+  decl = new Declaration(name, returnType, argTypes);
+  extraDecls->addOperand(Expr::Ptr(decl));
+  
+  return decl;
 }
 
 //================================================ Parse Tokens into Exprs
@@ -192,14 +202,14 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
 
   // Empty block
   if (tok->size() == 0) {
-    std::cerr << "EMPTY BLOCK!\n"; 
+    std::cerr << "EMPTY BLOCK!\n";
     return unique_ptr<Expr>(new Block());
   }
 
   // If the first expr is not a value, this is a block of blocks
   auto head = tok->getHead();
   if (!head->isValue) {
-    std::cerr << "NON-VALUE HEAD!\n" << tok; 
+    std::cerr << "NON-VALUE HEAD!\n" << tok;
     // Simple pass-through
     if (tok->size() == 1)
       return parseToken(head);
@@ -213,32 +223,30 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
 
   // Constructs: let, edef, def, if, fold, etc.
   switch (isReservedWord(value)) {
-    // "Builtins": Core language constructs
-    case Parser::Keyword::EDEF:
-      return parseDecl(tok);
-    case Parser::Keyword::DEF:
-      return parseDef(tok);
-    case Parser::Keyword::RULE:
-      return parseRule(tok);
-    case Parser::Keyword::LET:
-      return parseLet(tok);
-    case Parser::Keyword::IF:
-      return parseCond(tok);
-    case Parser::Keyword::TUPLE:
-      return parseTuple(tok);
+  // "Builtins": Core language constructs
+  case Parser::Keyword::EDEF:
+    return parseDecl(tok);
+  case Parser::Keyword::DEF:
+    return parseDef(tok);
+  case Parser::Keyword::RULE:
+    return parseRule(tok);
+  case Parser::Keyword::LET:
+    return parseLet(tok);
+  case Parser::Keyword::IF:
+    return parseCond(tok);
+  case Parser::Keyword::TUPLE:
+    return parseTuple(tok);
 
-    // "Prims": Polymorphic functions, rather than builtins 
-    case Parser::Keyword::GET:
-      return parseGet(tok);
-    case Parser::Keyword::BUILD:
-      return parseBuild(tok);
-    case Parser::Keyword::FOLD:
-      return parseFold(tok);
-    case Parser::Keyword::SUM:
-      return parseSum(tok);
-    case Parser::Keyword::NA:
-      // It's not a reserved keyword, try other constructs
-      break;
+  // "Prims": Polymorphic functions, rather than builtins
+  case Parser::Keyword::GET:
+    return parseGet(tok);
+  case Parser::Keyword::BUILD:
+    return parseBuild(tok);
+  case Parser::Keyword::FOLD:
+    return parseFold(tok);
+  case Parser::Keyword::NA:
+    // It's not a reserved keyword, try other constructs
+    break;
   }
 
   // Everything else is a function call: (fun 10.0 42 "Hello")
@@ -263,7 +271,7 @@ Type Parser::parseType(const Token *tok) {
   }
 
   // Empty type
-  PARSE_ASSERT(tok->size() != 0) << "Empty Type decl"; 
+  PARSE_ASSERT(tok->size() != 0) << "Empty Type decl";
   size_t nargs = tok->size() - 1;
 
   auto type = Str2Type(tok->getChild(0)->getValue());
@@ -310,7 +318,8 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
   string value = tok->getValue().str();
 
   // Literals: 10.0 42 "Hello" (not hello, that's a variable use)
-  Type ty = LiteralType(value);
+  Type::ValidType ty = LiteralType(value);
+    
   if (ty != Type::None) {
     // Trim quotes "" from strings before creating constant
     if (ty == Type::String)
@@ -332,118 +341,106 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
   string name = tok->getHead()->getValue().str();
   int arity = tok->size() - 1;
 
-  if (name == "print" && arity > 1) {
-    // Multiple args to print, repeat calls to print, and add their returns
-    Call *o = new Call("num-args", Type::Integer);
-    // Add operands
-    for (auto &c : tok->getTail()) {
-      Call *op = new Call("print", Type::Integer);
-      op->addOperand(parseToken(c.get()));
-      o->addOperand(unique_ptr<Expr>(op));
-    }
-    return unique_ptr<Expr>(o);
-  }
-
-  // Construct with no type, no operands
-  Call *o = new Call(name, Type::None);
-
-  // Add operands
+  Declaration* decl = nullptr;
+  
+  // Collect operands
+  std::vector<Expr::Ptr> operands;
+  operands.reserve(arity);
   for (auto &c : tok->getTail())
-    o->addOperand(parseToken(c.get()));
+    operands.push_back(parseToken(c.get()));
 
-#define MATCH_1(NAME, ARGTYPE_0)\
-     (arity == 1 && name == NAME &&\
-      o->getOperand(0)->getType() == Type::ARGTYPE_0)
+  // Extract types
+  std::vector<Type> types;
+  types.reserve(arity);
+  for (auto &arg : operands)
+    types.push_back(arg->getType());
 
-#define MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1)\
-     (arity == 2 && name == NAME &&\
-      o->getOperand(0)->getType() == Type::ARGTYPE_0 &&\
-      o->getOperand(1)->getType() == Type::ARGTYPE_1)
+  // Look up this function
+  Signature sig {name, types};
+  auto decl_iter = function_decls.find(sig);
+  if (decl_iter != function_decls.end())
+    // Non need to typecheck, the lookup succeeded.
+    return make_unique<Call>(decl_iter->second, move(operands));
 
-#define RETURN(TYPE) { o->setType(TYPE); return unique_ptr<Expr>(o); }
+  // Function wasn't found - it may be a Prim that we handle here.
 
-  // TODO: Dedup this with Generator::buildCall
-  // TODO: Move all to prelude once polymorphic
+  // Helper to construct the call
+  auto mkCall = [&name, &types, &operands, this](Type const& type) {
+    Declaration* decl = addExtraDecl(name, types, type);
+    return make_unique<Call>(decl, move(operands));
+  };
 
-  if (name == "print" && arity == 1)  RETURN(Type::Integer);
+  // TODO: should these be in Type?
+  const auto Bool = Type(Type::Bool);
+  const auto Float = Type(Type::Float);
+  const auto Integer = Type(Type::Integer);
 
-  if (MATCH_1("abs", Float))  RETURN(Type::Float);
-  if (MATCH_1("neg", Float))  RETURN(Type::Float);
-  if (MATCH_1("exp", Float))  RETURN(Type::Float);
-  if (MATCH_1("log", Float))  RETURN(Type::Float);
+  // print(T1, ..., Tn) -> Integer
+  if (name == "print")
+    // Cons up a new decl for this combination of print and Type
+    return mkCall(Integer);
 
-  if (MATCH_1("to_float", Integer)) RETURN(Type::Float);
-  if (MATCH_1("to_int", Float))     RETURN(Type::Float);
+#define MATCH_1(NAME, ARGTYPE_0) \
+  (arity == 1 && name == NAME && \
+   types[0] == Type::ARGTYPE_0)
 
-  if (MATCH_2("add", Integer, Integer))   RETURN(Type::Integer);
-  if (MATCH_2("add", Float, Float))       RETURN(Type::Float);
-  if (MATCH_2("sub", Integer, Integer))   RETURN(Type::Integer);
-  if (MATCH_2("sub", Float, Float))       RETURN(Type::Float);
-  if (MATCH_2("mul", Integer, Integer))   RETURN(Type::Integer);
-  if (MATCH_2("mul", Float, Float))       RETURN(Type::Float);
-  if (MATCH_2("div", Integer, Integer))   RETURN(Type::Integer);
-  if (MATCH_2("div", Float, Float))       RETURN(Type::Float);
+#define MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1) \
+  (arity == 2 && name == NAME &&            \
+   types[0] == Type::ARGTYPE_0 &&           \
+   types[1] == Type::ARGTYPE_1)
 
-  if (MATCH_2("and", Bool, Bool))   RETURN(Type::Bool);
-  if (MATCH_2("or", Bool, Bool))    RETURN(Type::Bool);
+  if (MATCH_1("abs", Float))     return mkCall(Float);
+  if (MATCH_1("neg", Float))     return mkCall(Float);
+  if (MATCH_1("exp", Float))     return mkCall(Float);
+  if (MATCH_1("log", Float))     return mkCall(Float);
+
+  if (MATCH_1("to_float", Integer))   return mkCall(Float);
+  if (MATCH_1("to_int", Float))       return mkCall(Float);
+
+  if (MATCH_2("add", Integer, Integer))   return mkCall(Integer);
+  if (MATCH_2("add", Float, Float))       return mkCall(Float);
+  if (MATCH_2("sub", Integer, Integer))   return mkCall(Integer);
+  if (MATCH_2("sub", Float, Float))       return mkCall(Float);
+  if (MATCH_2("mul", Integer, Integer))   return mkCall(Integer);
+  if (MATCH_2("mul", Float, Float))       return mkCall(Float);
+  if (MATCH_2("div", Integer, Integer))   return mkCall(Integer);
+  if (MATCH_2("div", Float, Float))       return mkCall(Float);
+  if (MATCH_2("and", Bool, Bool))         return mkCall(Bool);
+  if (MATCH_2("or", Bool, Bool))          return mkCall(Bool);
 
   // Comparison
-  if (MATCH_2("eq", Integer, Integer))   RETURN(Type::Bool);
-  if (MATCH_2("eq", Float, Float))       RETURN(Type::Bool);
-  if (MATCH_2("ne", Integer, Integer))   RETURN(Type::Bool);
-  if (MATCH_2("ne", Float, Float))       RETURN(Type::Bool);
-  if (MATCH_2("lte", Integer, Integer))  RETURN(Type::Bool);
-  if (MATCH_2("lte", Float, Float))      RETURN(Type::Bool);
-  if (MATCH_2("gte", Integer, Integer))  RETURN(Type::Bool);
-  if (MATCH_2("gte", Float, Float))      RETURN(Type::Bool);
-  if (MATCH_2("gt", Integer, Integer))   RETURN(Type::Bool);
-  if (MATCH_2("gt", Float, Float))       RETURN(Type::Bool);
-  if (MATCH_2("lt", Integer, Integer))   RETURN(Type::Bool);
-  if (MATCH_2("lt", Float, Float))       RETURN(Type::Bool);
+  if (MATCH_2("eq", Integer, Integer))      return mkCall(Bool);
+  if (MATCH_2("eq", Float, Float))          return mkCall(Bool);
+  if (MATCH_2("ne", Integer, Integer))      return mkCall(Bool);
+  if (MATCH_2("ne", Float, Float))          return mkCall(Bool);
+  if (MATCH_2("lte", Integer, Integer))     return mkCall(Bool);
+  if (MATCH_2("lte", Float, Float))         return mkCall(Bool);
+  if (MATCH_2("gte", Integer, Integer))     return mkCall(Bool);
+  if (MATCH_2("gte", Float, Float))         return mkCall(Bool);
+  if (MATCH_2("gt", Integer, Integer))      return mkCall(Bool);
+  if (MATCH_2("gt", Float, Float))          return mkCall(Bool);
+  if (MATCH_2("lt", Integer, Integer))      return mkCall(Bool);
+  if (MATCH_2("lt", Float, Float))          return mkCall(Bool);
 
   // Prims
-  if (MATCH_1("size", Vector))               RETURN(Type::Integer);
-  if (MATCH_2("index", Integer, Vector))     RETURN(o->getOperand(1)->getType().getSubType());
+  if (MATCH_1("size", Vector))             return mkCall(Integer);
+  if (MATCH_2("index", Integer, Vector))   return mkCall(types[1].getSubType());
+  if (MATCH_1("sum", Vector))              return mkCall(types[0].getSubType());
 
   // ts_add(T, dT)
   if (name == "ts_add" && arity == 2) {
-    Type ty0 = o->getOperand(0)->getType();
-    Type ty1 = o->getOperand(1)->getType();
-    PARSE_ASSERT(ty0.tangentType() == ty1) << "ts_add defined between tangentType and type";
-    RETURN(ty0);
+    Type ty0 = types[0];
+    Type ty1 = types[1];
+    PARSE_ASSERT(ty1 == ty0.tangentType()) << "ts_add defined between tangentType and type";
+    return mkCall(ty0);
   }
-  
-  // sum(T, T, T...)
-  if (name == "sum" && arity > 1) {
-    Type ty0 = o->getOperand(0)->getType();
-    for(int i = 1; i < arity; ++i)
-      PARSE_ASSERT(o->getOperand(i)->getType() == ty0);
-    RETURN(ty0);
-  }
-  
-  // num-args(T1, ..., Tn)
-  if (name == "num-args")
-    RETURN(Type::Integer);
-  
+
 #undef MATCH_1
 #undef MATCH_2
-#undef RETURN
+#undef mkCall
 
-  // Fall through to non-prims
-  PARSE_ASSERT(functions.exists(name)) << "Unrecognized function: " << name;
-  
-  Declaration* decl = llvm::dyn_cast<Declaration>(functions.get(name));
-  PARSE_ASSERT(decl) << "Function [" << name << "] found but not declared?";
-
-  o->setType(decl->getType());
-
-  // Validate types
-  for (const auto &it : llvm::zip(o->getOperands(), decl->getArgTypes()))
-    PARSE_ASSERT(get<0>(it)->getType() == get<1>(it)) 
-                << "Type mismatch at " << tok << "\n" 
-                << get<0>(it)->getType() << " != " << get<1>(it);
-
-  return unique_ptr<Expr>(o);
+  // Nothing matched...
+  PARSE_ASSERT(0) << "Unrecognized function: " << sig;
 }
 
 
@@ -452,7 +449,7 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 //              ^^^^^^^^^^
 // ... (let ((v value)) body) ...  ; definition
 //           ^^^^^^^^^
-Expr::Ptr Parser::parseVariable(const Token *tok) {
+Variable::Ptr Parser::parseVariable(const Token *tok) {
   PARSE_ASSERT(tok->size() > 1);
   llvm::ArrayRef<Token::Ptr> children = tok->getChildren();
   string value = children[0]->getValue().str();
@@ -470,7 +467,7 @@ Expr::Ptr Parser::parseVariable(const Token *tok) {
         toks.push_back(tok->getChild(i));
       type = parseRelaxedType(toks);
     }
-    PARSE_ASSERT(type != Type::None);
+    PARSE_ASSERT(!type.isNone());
     auto var = unique_ptr<Variable>(new Variable(value, type));
     variables.set(value, var.get());
     return var;
@@ -499,7 +496,7 @@ Expr::Ptr Parser::parseLet(const Token *tok) {
   if (bond->getChild(0)->isValue) {
     PARSE_ASSERT(bond->size() == 2);
     vars.push_back(parseVariable(bond));
-  // Multiple variables
+    // Multiple variables
   } else {
     for (auto &c: bond->getChildren())
       vars.push_back(parseVariable(c.get()));
@@ -521,11 +518,10 @@ Expr::Ptr Parser::parseDecl(const Token *tok) {
   const Token *args = tok->getChild(3);
   PARSE_ASSERT(name->isValue) << "Decl should be (edef name type args)";
   auto type = parseType(ty);
-  PARSE_ASSERT(type != Type::None) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT(!type.isNone()) << "Parsing decl [" << name << "]";
   PARSE_ASSERT(!args->isValue) << "Parsing decl [" << name << "]";
 
-  auto decl =
-      make_unique<Declaration>(name->getValue(), type);
+  auto decl = make_unique<Declaration>(name->getValue(), type);
   PARSE_ASSERT(decl);
 
   // Vector and Tuples can be declared bare
@@ -536,7 +532,8 @@ Expr::Ptr Parser::parseDecl(const Token *tok) {
     for (auto &c : args->getChildren())
       decl->addArgType(parseType(c.get()));
 
-  functions.set(name->getValue().str(), decl.get());
+  Signature sig{name->getValue().str(), decl->getArgTypes()};
+  function_decls[sig] = decl.get();
   return decl;
 }
 
@@ -549,7 +546,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
   const Token *args = tok->getChild(3);
   const Token *expr = tok->getChild(4);
   PARSE_ASSERT(name->isValue && !args->isValue);
-  vector<Expr::Ptr> arguments;
+  vector<Variable::Ptr> arguments;
   // If there is only one child
   if (args->size() && args->getChild(0)->isValue)
     arguments.push_back(parseVariable(args));
@@ -561,11 +558,14 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
   // Create node early, to allow recursion
   auto node = make_unique<Definition>(name->getValue(),
                                       parseType(type));
+  std::vector<Type> argTypes;
   for (auto &a : arguments) {
     PARSE_ASSERT(a->kind == Expr::Kind::Variable);
+    argTypes.push_back(a->getType());
     node->addArgument(move(a));
   }
-  functions.set(name->getValue().str(), node->getDeclaration());
+  Signature sig {name->getValue().str(), argTypes};
+  function_decls[sig] = node->getDeclaration();
 
   // Function body is a block, create one if single expr
   auto body = parseToken(expr);
@@ -599,7 +599,7 @@ Expr::Ptr Parser::parseBuild(const Token *tok) {
   auto var = parseVariable(bond);
   PARSE_ASSERT(var->kind == Expr::Kind::Variable);
   PARSE_ASSERT(var->getType() == AST::Type::Integer);
-  llvm::dyn_cast<Variable>(var.get())->setInit(getZero(Type::Integer));
+  llvm::dyn_cast<Variable>(var.get())->setInit(getZero(Type(Type::Integer)));
   auto body = parseToken(expr);
   return make_unique<Build>(move(range), move(var), move(body));
 }
@@ -620,9 +620,9 @@ Expr::Ptr Parser::parseGet(const Token *tok) {
   PARSE_ASSERT(tok->getChild(0)->isValue);
   llvm::StringRef get = tok->getChild(0)->getValue();
   size_t dollar1 = get.find('$');
-  size_t dollar2 = get.find('$', dollar1+1);
-  llvm::StringRef indexStr = get.substr(dollar1+1, dollar2-dollar1-1);
-  llvm::StringRef maxStr = get.substr(dollar2+1);
+  size_t dollar2 = get.find('$', dollar1 + 1);
+  llvm::StringRef indexStr = get.substr(dollar1 + 1, dollar2 - dollar1 - 1);
+  llvm::StringRef maxStr = get.substr(dollar2 + 1);
   size_t idx = toIndex(indexStr);
   size_t max = toIndex(maxStr);
   auto var = parseToken(tok->getChild(1));
@@ -671,36 +671,6 @@ Expr::Ptr Parser::parseRule(const Token *tok) {
   return rule;
 }
 
-//================================================ Standard library
-
-// This is a hack, given that some polymorphic methods are not in prelude.ks
-// but C++ headers (knossos.h) and we can't replicate it here. So we lower those
-// special cases here as simple as we can, and hope one day they'll move out of
-// the headers.
-
-// Vector Reduction Sum, ex: (fold (add) 0.0 vector)
-Expr::Ptr Parser::parseSum(const Token *tok) {
-  PARSE_ASSERT(tok->size() == 2);
-  // Vector
-  auto vec = parseToken(tok->getChild(1));
-  PARSE_ASSERT(vec->getType() == Type::Vector);
-  auto elmTy = vec->getType().getSubType();
-  // Accumulator & element (same type)
-  auto type = Type(Type::Tuple, vector<Type>{ elmTy, elmTy });
-  auto var = unique_ptr<Variable>(new Variable("acc_x", type));
-  vector<Expr::Ptr> initArgs;
-  initArgs.push_back(getZero(elmTy));
-  initArgs.push_back(getZero(elmTy));
-  auto init = make_unique<Tuple>(move(initArgs));
-  llvm::dyn_cast<Variable>(var.get())->setInit(move(init));
-  // Add Lambda: (add (get$1$2 acc_x) (get$2$2 acc_x))
-  auto add = make_unique<Call>("add", elmTy);
-  add->addOperand(make_unique<Get>(1, 2, make_unique<Variable>("acc_x", type)));
-  add->addOperand(make_unique<Get>(2, 2, make_unique<Variable>("acc_x", type)));
-  // Return fold
-  return make_unique<Fold>(elmTy, move(add), move(var), move(vec));
-}
-
 //================================================ Dumps tokens, nodes to stdout
 
 Token::ppresult Token::pprint(Token const* tok, int indent, int width)
@@ -737,14 +707,14 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
   first = true;
   ret.s = "(";
   for (auto &s : strs) {
-    if (!first) 
+    if (!first)
       ret.s += sep;
     ret.s += s;
     first = false;
   }
   ret.s += ")";
 
-  return ret;  
+  return ret;
 }
 
 std::ostream& Token::dump(std::ostream& s) const {

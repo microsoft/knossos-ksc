@@ -118,27 +118,25 @@ public:
 class Parser {
   Token::Ptr rootT;
   Expr::Ptr rootE;
+  Block::Ptr extraDecls;
   Lexer lex;
 
+  // TODO: Add lam
   enum class Keyword {
        LET,  EDEF, DEF,   IF, BUILD, INDEX,
       SIZE, TUPLE, GET, FOLD, RULE, NA,
-      // Stdlib hack
-      SUM
   };
   Keyword isReservedWord(std::string name) const {
     return llvm::StringSwitch<Keyword>(name)
-              .Case("let", Keyword::LET)
               .Case("edef", Keyword::EDEF)
               .Case("def", Keyword::DEF)
+              .Case("rule", Keyword::RULE)
+              .Case("let", Keyword::LET)
               .Case("if", Keyword::IF)
               .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
               .Case("tuple", Keyword::TUPLE)
               .StartsWith("get$", Keyword::GET) // TODO: Prim not reserved word
               .Case("fold", Keyword::FOLD) // TODO: Prim not reserved word
-              .Case("rule", Keyword::RULE)
-              // Stdlib hack
-              .Case("sum", Keyword::SUM) // TODO: Prim not reserved word
               .Default(Keyword::NA);
   }
   /// Simple symbol table for parsing only (no validation)
@@ -162,9 +160,10 @@ class Parser {
     bool reassign;
     std::map<std::string, Expr*> symbols;
   };
-  Symbols functions;
   Symbols variables{true};
   Symbols rules;
+
+  std::map<Signature, Declaration*> function_decls;
 
   // Build AST nodes from Tokens
   Expr::Ptr parseToken(const Token *tok);
@@ -174,7 +173,7 @@ class Parser {
   Expr::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);
   Expr::Ptr parseCall(const Token *tok);
-  Expr::Ptr parseVariable(const Token *tok);
+  Variable::Ptr parseVariable(const Token *tok);
   Expr::Ptr parseLet(const Token *tok);
   Expr::Ptr parseDecl(const Token *tok);
   Expr::Ptr parseDef(const Token *tok);
@@ -184,12 +183,16 @@ class Parser {
   Expr::Ptr parseGet(const Token *tok);
   Expr::Ptr parseFold(const Token *tok);
   Expr::Ptr parseRule(const Token *tok);
-  // Standard library parsers
-  Expr::Ptr parseSum(const Token *tok);
 
 public:
-  Parser(std::string code)
-      : rootT(nullptr), rootE(nullptr), lex(std::move(code)) {}
+  Parser(std::string code): 
+      rootT(nullptr), 
+      rootE(nullptr),
+      extraDecls(nullptr),
+      lex(std::move(code)) 
+      {
+        extraDecls = std::make_unique<Block>();
+      }
 
   void tokenise() {
     assert(!rootT && "Won't overwrite root token");
@@ -209,6 +212,10 @@ public:
   Expr::Ptr moveRoot() {
     return std::move(rootE);
   }
+  const Block* getExtraDecls() {
+    return extraDecls.get();
+  }
+  Declaration* addExtraDecl(std::string name, std::vector<Type> types, Type returnType);
 };
 
 } // namespace AST

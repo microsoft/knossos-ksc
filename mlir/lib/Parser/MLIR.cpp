@@ -26,7 +26,7 @@ using namespace std;
 
 // Convert from AST type to MLIR
 Types Generator::ConvertType(const AST::Type &type, size_t dim) {
-  switch (type) {
+  switch (type.getValidType()) {
   case AST::Type::None:
     return {};
   case AST::Type::Bool:
@@ -37,7 +37,7 @@ Types Generator::ConvertType(const AST::Type &type, size_t dim) {
     return {builder.getF64Type()};
   case AST::Type::Vector:
     // FIXME: support nested vectors
-    assert(type.getSubType() != AST::Type::Vector);
+    assert(!type.getSubType().isVector());
     if (dim)
       return {mlir::MemRefType::get(dim, ConvertType(type.getSubType())[0])};
     else
@@ -88,7 +88,7 @@ void Generator::serialiseArgs(const AST::Definition *def, mlir::Block &entry) {
     auto var = llvm::dyn_cast<AST::Variable>(arg.get());
     assert(var && idx <= last);
     // Non-tuple args are simple
-    if (var->getType() != AST::Type::Tuple) {
+    if (!var->getType().isTuple()) {
       declareVariable(var->getName(), {serialised[idx++]});
       continue;
     }
@@ -176,7 +176,7 @@ void Generator::buildGlobal(const AST::Block* block) {
 
 // Declaration only, no need for basic blocks
 mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
-  assert(!functions.count(decl->getName()) && "Duplicated function declaration");
+  assert(!functions.count(decl->getMangledName()) && "Duplicated function declaration");
   Types argTypes;
   for (auto &t: decl->getArgTypes()) {
     auto tys = ConvertType(t);
@@ -184,17 +184,20 @@ mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
   }
   auto retTy = ConvertType(decl->getType());
   auto type = builder.getFunctionType(argTypes, retTy);
-  auto func = mlir::FuncOp::create(UNK, decl->getName(), type);
-  functions.insert({decl->getName(), func});
+  auto func = mlir::FuncOp::create(UNK, decl->getMangledName(), type);
+  ASSERT(func);
+  functions[decl->getMangledName()]= func;
   return func;
 }
 
 // Definition of the whole function starts here
 mlir::FuncOp Generator::buildDef(const AST::Definition* def) {
+
   // Make sure we have its declaration cached
-  if (!functions.count(def->getName()))
+  if (!functions.count(def->getMangledName()))
     buildDecl(def->getDeclaration());
-  auto func = functions[def->getName()];
+
+  auto func = functions[def->getMangledName()];
   assert(func);
 
   // First basic block, with args
@@ -212,13 +215,10 @@ mlir::FuncOp Generator::buildDef(const AST::Definition* def) {
 }
 
 // Declare a variable
-void Generator::declareVariable(llvm::StringRef name,
+void Generator::declareVariable(std::string const& name,
                                      Values vals) {
   assert(!vals.empty() && "Variable must have initialiser");
-  auto res = variables.insert({name, vals});
-  // Already exists, replace
-  if (!res.second)
-    variables[name] = vals;
+  variables[name] = vals;
 }
 
 void Generator::declareVariable(const AST::Variable* var,
@@ -284,7 +284,8 @@ mlir::Value Generator::buildArg(const AST::Call* call, size_t i) {
 
 // Builds calls
 Values Generator::buildCall(const AST::Call* call) {
-  auto name = call->getName();
+  auto name = call->getDeclaration()->getName();
+  auto name_mangled = call->getDeclaration()->getMangledName();
   size_t arity = call->size();
 
   // Various functions get special treatment, e.g. primitive arithmetic, array access etc
@@ -357,42 +358,15 @@ Values Generator::buildCall(const AST::Call* call) {
     return {builder.create<mlir::IndexCastOp>(UNK, dim, intTy)};
   }
 
-  mlir::FuncOp func = 0;
-  if (name == "num-args") {
+  if (name == "print") {
     for (auto &op: call->getOperands())
-      buildNode(op.get());
+      if (!op.get()->getType().isString())
+        buildNode(op.get());
 
     // Return the number of elements
     auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
     auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
     return {elms};
-  }
-
-  if (name == "print" && arity == 1) {
-    // Cons up the FuncOp now.
-    auto arg = call->getOperand(0);
-    AST::Type type = arg->getType(); 
-    auto tys = ConvertType(type);
-
-    if (type == AST::Type::String) {
-      auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
-      auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
-      return {elms};
-    }
-
-    auto node = buildNode(arg);
-
-    int retval = 1;
-    auto att = builder.getIntegerAttr(builder.getIntegerType(64), retval);
-    auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
-    return {elms};
-
-/*
-
-    auto retTy = ConvertType(call->getType());
-    auto ftype = builder.getFunctionType(tys, retTy);
-    func = mlir::FuncOp::create(UNK, "print", ftype);
-    */
   }
 
 #undef MATCH_1
@@ -401,8 +375,7 @@ Values Generator::buildCall(const AST::Call* call) {
 #undef CREATE_2
 
   // Function call -- not a prim, should be known
-  if (functions.count(name) != 0)
-    func = functions[name];
+  mlir::FuncOp func = functions[name_mangled];
   
   if (!func) {
     // Didn't find it... assert
@@ -413,7 +386,7 @@ Values Generator::buildCall(const AST::Call* call) {
       if (i+1 < arity)
         a << ", ";
     } 
-    a << ")]";
+    a << ") -> "<<name_mangled<<"]";
   }
 
   // Operands (tuples expand into individual operands)
@@ -669,7 +642,7 @@ Values Generator::buildFold(const AST::Fold* f) {
 mlir::Attribute Generator::getAttr(const AST::Expr* op) {
   auto lit = llvm::dyn_cast<AST::Literal>(op);
   assert(lit && "Can only get attributes from lits");
-  switch (lit->getType()) {
+  switch (lit->getType().getValidType()) {
   case AST::Type::Bool:
     if (lit->getValue() == "true")
       return builder.getBoolAttr(true);
@@ -689,11 +662,16 @@ mlir::Attribute Generator::getAttr(const AST::Expr* op) {
 
 //============================================================ MLIR from AST
 
-const mlir::ModuleOp Generator::build(const AST::Expr* root) {
+const mlir::ModuleOp Generator::build(const AST::Block* extraDecls, const AST::Expr* root) {
   module = mlir::ModuleOp::create(UNK);
+
+  if (extraDecls)
+    buildGlobal(extraDecls);
+
   assert(root->kind == AST::Expr::Kind::Block);
   auto rB = llvm::dyn_cast<AST::Block>(root);
   buildGlobal(rB);
+
   if (mlir::failed(mlir::verify(*module))) {
     module->dump();
     return nullptr;

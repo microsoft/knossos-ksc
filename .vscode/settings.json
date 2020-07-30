@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.ks": "ks-lisp",
+        "*.inc": "cpp",
         "tuple": "cpp",
         "utility": "cpp",
         "random": "cpp",
@@ -63,7 +64,11 @@
         "string_view": "cpp",
         "fstream": "cpp",
         "optional": "cpp",
-        "*.inc": "cpp"
+        "*.def": "cpp",
+        "complex": "cpp",
+        "future": "cpp",
+        "*.txt": "cpp",
+        "ratio": "cpp"
     },
     "search.usePCRE2": true,
     "cmake.sourceDirectory": "${workspaceFolder}",
