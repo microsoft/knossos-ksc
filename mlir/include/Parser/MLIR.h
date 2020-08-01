@@ -79,7 +79,7 @@ public:
   // Build from KSC AST
   const mlir::ModuleOp build(const AST::Block* extraDecls, const AST::Expr* root);
   // Emit LLVM IR
-  std::unique_ptr<llvm::Module> emitLLVM(int optLevel=0);
+  std::unique_ptr<llvm::Module> emitLLVM(int optLevel);
 };
 
 } // namespace MLIR

@@ -25,35 +25,6 @@ Expr::Ptr parse(const string &code) {
   return p.moveRoot();
 }
 
-void build(const string &code, bool fromMLIR=false, bool emitLLVM=false) {
-  Expr::Ptr tree;
-  if (!fromMLIR)
-    tree = parse(code);
-
-  Generator g;
-  if (verbose > 0)
-    cout << " -- MLIR\n";
-  mlir::ModuleOp module;
-  if (fromMLIR)
-    module = g.build(code);
-  else
-    module = g.build(nullptr, tree.get());
-  if (verbose > 0) {
-    module.print(llvm::outs());
-    cout << endl;
-  }
-
-  if (emitLLVM) {
-    if (verbose > 0)
-      cout << " -- LLVM\n";
-    auto llvm = g.emitLLVM();
-    if (verbose > 0) {
-      llvm->print(llvm::outs(), nullptr, false, true);
-      cout << endl;
-    }
-  }
-}
-
 // ======================================================= Lexer test
 
 void test_lexer() {
