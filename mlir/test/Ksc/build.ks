@@ -20,7 +20,7 @@
 ; build structure is the same, tested below
 (def copyVec (Vec Float) (v : (Vec Float))
   (build (size v) (lam (i : Integer) (index i v))))
-; MLIR: func @copyVec(%arg0: memref<?xf64>) -> memref<?xf64> {
+; MLIR-LABEL: func @copyVec$avf(%arg0: memref<?xf64>) -> memref<?xf64> {
 ; MLIR:   %c0 = constant 0 : index
 ; MLIR:   dim %arg0, %c0 : memref<?xf64>
 ; MLIR:   index_cast %{{[0-9]+}} : i64 to index
@@ -34,7 +34,7 @@
 ; Size direct from a build
 (def sizeBuild Integer ((x : Integer) (N : Integer))
   (size (build N (lam (i : Integer) i))))
-; MLIR: func @sizeBuild(%arg0: i64, %arg1: i64) -> i64 {
+; MLIR-LABEL: func @sizeBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
 ; MLIR:   %c0 = constant 0 : index
 ; MLIR:   %{{.*}} = dim %{{.*}}, %c0 : memref<?xi64>
 

@@ -1,6 +1,12 @@
 ; RUN: ksc-mlir MLIR %s 2>&1 | FileCheck %s --check-prefix=MLIR
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
+(def f Float (t : (Tuple Float Integer))
+    (get$1$2 t))
+
+(def f2 Float ()
+    (get$1$2 (tuple 1.2 2.3)))
+
 ; Tuple argument
 (edef tfun1 Float (Tuple Integer Float))
 ; MLIR: func @tfun1$a$dif$b(i64, f64) -> f64
