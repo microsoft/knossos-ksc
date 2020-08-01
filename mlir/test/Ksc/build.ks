@@ -21,7 +21,8 @@
 (def copyVec (Vec Float) (v : (Vec Float))
   (build (size v) (lam (i : Integer) (index i v))))
 ; MLIR: func @copyVec$avf(%arg0: memref<?xf64>) -> memref<?xf64> {
-; MLIR:   dim %arg0, 0 : memref<?xf64>
+; MLIR:   %c0 = constant 0 : index
+; MLIR:   dim %arg0, %c0 : memref<?xf64>
 ; MLIR:   index_cast %{{[0-9]+}} : i64 to index
 ; MLIR:   alloc(%{{[0-9]+}}) : memref<?xf64>
 
@@ -35,6 +36,8 @@
   (size (build N (lam (i : Integer) i))))
 ; MLIR: func @sizeBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
 ; MLIR:   %{{.*}} = dim %{{.*}}, 0 : memref<?xi64>
+; MLIR:   %c0 = constant 0 : index
+; MLIR:   %{{.*}} = dim %{{.*}}, %c0 : memref<?xi64>
 
 ; LLVM: define i64 @"sizeBuild$aii"(i64 %0, i64 %1) {
 ; LLVM:   %[[size:[0-9]+]] = extractvalue { i64*, i64*, i64, [1 x i64], [1 x i64] } %{{.*}}, 3, 0
@@ -79,7 +82,8 @@
 ; MLIR:   br ^[[headBB]](%[[incr]] : i64)
 ; MLIR: ^[[tailBB]]: // pred: ^[[headBB]]
 ; MLIR-DAG:   %[[cast:[0-9]+]] = memref_cast %[[vec]] : memref<?xi64> to memref<?xi64>
-; MLIR-DAG:   %[[dim:[0-9]+]] = dim %[[cast]], 0 : memref<?xi64>
+; MLIR-DAG:   %c0 = constant 0 : index
+; MLIR-DAG:   %[[dim:[0-9]+]] = dim %[[cast]], %c0 : memref<?xi64>
 ; MLIR-DAG:   %[[dimcast:[0-9]+]] = index_cast %[[dim]] : index to i64
 ; MLIR-DAG:   %[[five:[ci_0-9]+]] = constant 5 : i64
 ; MLIR-DAG:   %[[idxR:[0-9]+]] = index_cast %c5_i64 : i64 to index
