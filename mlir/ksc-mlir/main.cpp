@@ -41,6 +41,9 @@ int main(int argc, char **argv) {
 
   // Action
   Action action = Action::NONE;
+
+  int optlevel = 0;
+  
   string aStr(argv[1]);
   if (aStr == "TEST")
     action = Action::TEST;
@@ -139,7 +142,7 @@ int main(int argc, char **argv) {
     module.print(llvm::outs());
   } 
   else if (action == Action::EMIT_LLVM) {
-    auto llvm = g.emitLLVM();
+    auto llvm = g.emitLLVM(optlevel);
     if (!llvm) {
       cerr << "ERROR: LLVM lowering failed\n";
       return 1;
