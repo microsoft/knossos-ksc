@@ -36,7 +36,10 @@
   (size (build N (lam (i : Integer) i))))
 ; MLIR: func @sizeBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
 ; MLIR:   %c0 = constant 0 : index
-; MLIR:   %{{.*}} = dim %{{.*}}, %c0 : memref<?xi64>
+; MLIR:   %[[sz:[0-9]+]] = dim %{{.*}}, %c0 : memref<?xi64>
+; MLIR:   %[[ret:[0-9]+]] = index_cast %[[sz]] : index to i64
+; MLIR:   return %[[ret]] : i64
+
 
 ; LLVM: define i64 @"sizeBuild$aii"(i64 %0, i64 %1) {
 ; LLVM:   %[[size:[0-9]+]] = extractvalue { i64*, i64*, i64, [1 x i64], [1 x i64] } %{{.*}}, 3, 0
