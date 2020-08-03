@@ -118,10 +118,10 @@ public:
 /// Identify each token as an AST node and build it.
 /// The parser will take ownership of the Tokens.
 class Parser {
-  Token::Ptr rootT;
-  Expr::Ptr rootE;
-  Block::Ptr extraDecls;
   Lexer lex;
+  Token::Ptr rootT;
+  Block::Ptr rootE;
+  Block::Ptr extraDecls;
 
   // TODO: Add lam
   enum class Keyword {
@@ -172,19 +172,19 @@ class Parser {
   // Specific Token parsers
   Type parseType(const Token *tok);
   Type parseRelaxedType(std::vector<const Token *> toks);
-  Expr::Ptr parseBlock(const Token *tok);
-  Expr::Ptr parseValue(const Token *tok);
-  Expr::Ptr parseCall(const Token *tok);
+  Block::Ptr parseBlock(const Token *tok);
+  Expr::Ptr parseValue(const Token *tok);  // Literal or Variable use
+  Call::Ptr parseCall(const Token *tok);
   Variable::Ptr parseVariable(const Token *tok);
-  Expr::Ptr parseLet(const Token *tok);
-  Expr::Ptr parseDecl(const Token *tok);
-  Expr::Ptr parseDef(const Token *tok);
-  Expr::Ptr parseCond(const Token *tok);
-  Expr::Ptr parseBuild(const Token *tok);
-  Expr::Ptr parseTuple(const Token *tok);
-  Expr::Ptr parseGet(const Token *tok);
-  Expr::Ptr parseFold(const Token *tok);
-  Expr::Ptr parseRule(const Token *tok);
+  Let::Ptr parseLet(const Token *tok);
+  Declaration::Ptr parseDecl(const Token *tok);
+  Definition::Ptr parseDef(const Token *tok);
+  Rule::Ptr parseRule(const Token *tok);
+  Condition::Ptr parseCond(const Token *tok);
+  Build::Ptr parseBuild(const Token *tok);
+  Tuple::Ptr parseTuple(const Token *tok);
+  Get::Ptr parseGet(const Token *tok);
+  Fold::Ptr parseFold(const Token *tok);
 
 public:
   Parser(std::string code): 

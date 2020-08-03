@@ -289,7 +289,7 @@ Expr::Ptr Parser::parseBlock(const Token *tok) {
   Block *b = new Block();
   for (auto &c : tok->getChildren())
     b->addOperand(parseToken(c.get()));
-  return unique_ptr<Expr>(b);
+  return unique_ptr<Block>(b);
 }
 
 // Parses type declarations (vector, tuples)
@@ -371,7 +371,7 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
 
 // Calls (fun arg1 arg2 ...)
 // Checks types agains symbol table
-Expr::Ptr Parser::parseCall(const Token *tok) {
+Call::Ptr Parser::parseCall(const Token *tok) {
   PARSE_ENTER;
 
   string name = tok->getHead()->getValue().str();
@@ -525,7 +525,7 @@ Variable::Ptr Parser::parseVariable(const Token *tok) {
 }
 
 // Variable declaration: (let (x 10) (add x 10))
-Expr::Ptr Parser::parseLet(const Token *tok) {
+Let::Ptr Parser::parseLet(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 3);
@@ -551,7 +551,7 @@ Expr::Ptr Parser::parseLet(const Token *tok) {
 }
 
 // Declares a function (and add it to symbol table)
-Expr::Ptr Parser::parseDecl(const Token *tok) {
+Declaration::Ptr Parser::parseDecl(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 4) << "Decl should be (edef name type args)";
@@ -584,7 +584,7 @@ Expr::Ptr Parser::parseDecl(const Token *tok) {
 
 // Defines a function (checks from|adds to symbol table)
 // (def name type args expr)
-Expr::Ptr Parser::parseDef(const Token *tok) {
+Definition::Ptr Parser::parseDef(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 5);
@@ -616,7 +616,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
   }
   Signature sig {name->getValue().str(), argTypes};
   function_decls[sig] = node->getDeclaration();
-
+  
   // Function body is a block, create one if single expr
   auto body = parseToken(expr);
   node->setImpl(move(body));
@@ -625,7 +625,7 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
 }
 
 // Conditional: (if (cond) (true block) (false block))
-Expr::Ptr Parser::parseCond(const Token *tok) {
+Condition::Ptr Parser::parseCond(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 4);
@@ -636,7 +636,7 @@ Expr::Ptr Parser::parseCond(const Token *tok) {
 }
 
 // Loops, ex: (build N (lam (i : Integer) (add i i)))
-Expr::Ptr Parser::parseBuild(const Token *tok) {
+Build::Ptr Parser::parseBuild(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 3);
@@ -659,7 +659,7 @@ Expr::Ptr Parser::parseBuild(const Token *tok) {
 }
 
 // Tuple, ex: (tuple 10.0 42 (add 1.0 2.0))
-Expr::Ptr Parser::parseTuple(const Token *tok) {
+Tuple::Ptr Parser::parseTuple(const Token *tok) {
   PARSE_ASSERT(tok->size() > 0);
   PARSE_ASSERT(tok->getChild(0)->isValue && tok->getChild(0)->getValue() == "tuple");
   std::vector<Expr::Ptr> elements;
@@ -669,7 +669,7 @@ Expr::Ptr Parser::parseTuple(const Token *tok) {
 }
 
 // Index, ex: (get$7$9 tuple)
-Expr::Ptr Parser::parseGet(const Token *tok) {
+Get::Ptr Parser::parseGet(const Token *tok) {
   PARSE_ASSERT(tok->size() == 2);
   PARSE_ASSERT(tok->getChild(0)->isValue);
   llvm::StringRef get = tok->getChild(0)->getValue();
@@ -684,7 +684,7 @@ Expr::Ptr Parser::parseGet(const Token *tok) {
 }
 
 // Fold, ex: (fold (lambda) init vector)
-Expr::Ptr Parser::parseFold(const Token *tok) {
+Fold::Ptr Parser::parseFold(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 4);
@@ -713,7 +713,7 @@ Expr::Ptr Parser::parseFold(const Token *tok) {
 }
 
 // Rule: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
-Expr::Ptr Parser::parseRule(const Token *tok) {
+Rule::Ptr Parser::parseRule(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 5);
