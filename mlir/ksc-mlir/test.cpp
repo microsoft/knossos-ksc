@@ -10,8 +10,10 @@ static int verbose = 0;
 
 // ======================================================= Helpers
 
-Expr::Ptr parse(const string &code) {
-  Parser p(code);
+#define LOC() Location { __FILE__, __LINE__, 0 }
+
+Expr::Ptr parse(const Location& loc, const string &code) {
+  Parser p(loc, code);
   if (verbose > 2)
     cout << " -- Tokens\n";
   p.tokenise();
@@ -29,7 +31,7 @@ Expr::Ptr parse(const string &code) {
 
 void test_lexer() {
   cout << "\n == test_lexer\n";
-  Lexer l("(def f1 Integer ((x : Integer) (y : Integer)) (add x y))");
+  Lexer l(LOC(), "(def f1 Integer ((x : Integer) (y : Integer)) (add x y))");
   auto root = l.lex();
   if (verbose > 2) {
     cout << " -- Tokens\n";
@@ -66,7 +68,7 @@ void test_lexer() {
 
 void test_parser_block() {
   cout << "\n == test_parser_block\n";
-  const Expr::Ptr tree = parse("(tuple 10.0 42 \"\" \" \" \"Hello\" \"Hello world\")");
+  const Expr::Ptr tree = parse(LOC(), "(tuple 10.0 42 \"\" \" \" \"Hello\" \"Hello world\")");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -104,7 +106,7 @@ void test_parser_block() {
 
 void test_parser_let() {
   cout << "\n == test_parser_let\n";
-  const Expr::Ptr tree = parse("(let (x 10) (add x 10))");
+  const Expr::Ptr tree = parse(LOC(), "(let (x 10) (add x 10))");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -133,7 +135,7 @@ void test_parser_let() {
 
 void test_parser_decl() {
   cout << "\n == test_parser_decl\n";
-  const Expr::Ptr tree = parse("(edef fun Float (Integer String Bool))");
+  const Expr::Ptr tree = parse(LOC(), "(edef fun Float (Integer String Bool))");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -153,7 +155,7 @@ void test_parser_decl() {
 void test_parser_def() {
   cout << "\n == test_parser_def\n";
   const Expr::Ptr tree =
-      parse("(def fun Integer ((x : Integer) (y : Integer)) (add x 10))");
+      parse(LOC(), "(def fun Integer ((x : Integer) (y : Integer)) (add x 10))");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -184,8 +186,8 @@ void test_parser_def() {
 
 void test_parser_decl_def_use() {
   cout << "\n == test_parser_decl_def_use\n";
-  const Expr::Ptr tree = parse("(edef fun Integer (Integer))"
-                               "(def fun Integer ((x : Integer)) (add x 10))"
+  const Expr::Ptr tree = parse(LOC(), "(edef fun Integer (Integer))\n"
+                               "(def fun Integer ((x : Integer)) (add x 10))\n"
                                "(def main Integer () (add (fun 10) 10)");
 
   // Root can have many exprs, here only 3
@@ -221,7 +223,7 @@ void test_parser_decl_def_use() {
 
 void test_parser_cond() {
   cout << "\n == test_parser_cond\n";
-  const Expr::Ptr tree = parse("(edef fun Integer (Integer))"
+  const Expr::Ptr tree = parse(LOC(), "(edef fun Integer (Integer))"
                                "(def fun Integer ((x : Integer)) (add x 10))"
                                "(if true (fun 10) (add 10 10))");
 
@@ -263,7 +265,7 @@ void test_parser_cond() {
 
 void test_parser_rule() {
   cout << "\n == test_parser_rule\n";
-  const Expr::Ptr tree = parse("(rule \"mul2\" (v : Float) (mul v 2.0) (add v v))");
+  const Expr::Ptr tree = parse(LOC(), "(rule \"mul2\" (v : Float) (mul v 2.0) (add v v))");
 
   // Root can have many exprs, here only 3
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -292,7 +294,7 @@ void test_parser_rule() {
 
 void test_parser_vector_type() {
   cout << "\n == test_parser_vector_type\n";
-  const Expr::Ptr tree = parse("(edef foo (Vec Float) (Vec Float)) "
+  const Expr::Ptr tree = parse(LOC(), "(edef foo (Vec Float) (Vec Float))\n"
                                "(edef bar (Vec (Vec Float)) (Integer (Vec Float) Float))");
 
   // Root can have many exprs, here two
@@ -320,7 +322,7 @@ void test_parser_vector_type() {
 
 void test_parser_build() {
   cout << "\n == test_parser_build\n";
-  const Expr::Ptr tree = parse("(build 10 (lam (i : Integer) (add i i))))");
+  const Expr::Ptr tree = parse(LOC(), "(build 10 (lam (i : Integer) (add i i))))");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -354,7 +356,7 @@ void test_parser_build() {
 
 void test_parser_vector() {
   cout << "\n == test_parser_vector\n";
-  const Expr::Ptr tree = parse("(edef foo (Vec Float) (Vec Float)) "
+  const Expr::Ptr tree = parse(LOC(), "(edef foo (Vec Float) (Vec Float)) "
                                "(edef bar (Vec (Vec Float)) (Integer (Vec Float) Float))");
 
   // Root can have many exprs, here two
@@ -382,8 +384,8 @@ void test_parser_vector() {
 
 void test_parser_tuple_type() {
   cout << "\n == test_parser_tuple_type\n";
-  const Expr::Ptr tree = parse("(edef foo (Tuple Float Float) (Tuple Float Float)) "
-                               "(edef bar Float (Integer (Tuple Float Float) Float)) "
+  const Expr::Ptr tree = parse(LOC(), "(edef foo (Tuple Float Float) (Tuple Float Float))\n"
+                               "(edef bar Float (Integer (Tuple Float Float) Float))\n"
                                "(edef baz Bool (Tuple Float (Tuple Integer Float)))");
 
   // Root can have many exprs, here two
@@ -424,7 +426,7 @@ void test_parser_tuple_type() {
 
 void test_parser_tuple() {
   cout << "\n == test_parser_tuple\n";
-  const Expr::Ptr tree = parse("(tuple (add 3.14 2.72) false 42)");
+  const Expr::Ptr tree = parse(LOC(), "(tuple (add 3.14 2.72) false 42)");
 
   // Root can have many exprs, here two
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -449,7 +451,7 @@ void test_parser_tuple() {
 
 void test_parser_get() {
   cout << "\n == test_parser_get\n";
-  const Expr::Ptr tree = parse("(get$2$3 (tuple (add 3.14 2.72) false 42))");
+  const Expr::Ptr tree = parse(LOC(), "(get$2$3 (tuple (add 3.14 2.72) false 42))");
 
   // Root can have many exprs, here two
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -466,10 +468,11 @@ void test_parser_get() {
 
 void test_parser_fold() {
   cout << "\n == test_parser_fold\n";
-  const Expr::Ptr tree = parse("(def fun Float (v : (Vec Float))"
-                               "(fold (lam (acc_x : (Tuple Float Float))"
-                               "   (let ((acc (get$1$2 acc_x))"
-                               "         (x   (get$2$2 acc_x)))"
+  const Expr::Ptr tree = parse(LOC(), "\n"
+                               "(def fun Float (v : (Vec Float))\n"
+                               " (fold (lam (acc_x : (Tuple Float Float))\n"
+                               "   (let ((acc (get$1$2 acc_x))\n"
+                               "         (x   (get$2$2 acc_x)))\n"
                                "         (mul acc x)))"
                                "    1.0"
                                "    v))");
@@ -538,7 +541,8 @@ void test_parser_fold() {
 void test_pprint()
 {
   cout << "\n == test_pprint\n";
-  Lexer l("(def f1 Integer ((x : Integer) (y : Integer)) (add x y))\n"
+  Lexer l(LOC(), "\n"
+          "(def f1 Integer ((x : Integer) (y : Integer)) (add x y))\n"
           "(def f2 Float ((x : Integer) (y : Integer)) (if t (add x y) (mul x y))");
   auto root = l.lex();
   cout << " -- Tokens\n";

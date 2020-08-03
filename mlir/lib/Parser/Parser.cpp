@@ -6,7 +6,12 @@
 using namespace std;
 using namespace Knossos::AST;
 
-#define PARSE_ASSERT(p) ASSERT(p) << "\nLine " << tok->getLine() << ":" << tok << std::endl << "FAILED: "
+std::ostream& Location::dump(std::ostream& s) const
+{
+  return s << *filename << ":" << line << ":" << column;
+}
+
+#define PARSE_ASSERT(p) ASSERT(p) << "\nat " << tok << "\n" << tok->getLocation() << ": error: "
 
 //================================================ Helpers
 
@@ -81,12 +86,22 @@ static Literal::Ptr getZero(Type type) {
 
 //================================================ Lex source into Tokens
 
-Lexer::Lexer(std::string &&code)
+Lexer::Lexer(std::string const& filename, std::string const& code)
     : code(code)
     , len(code.size())
-    , root(new Token())
+    , loc {filename, 1, 0 } 
+    , root(new Token(loc))
     , multiLineComments(0)
-    , line_number(1) 
+{
+  assert(len > 0 && "Empty code?");
+}
+
+Lexer::Lexer(Location const& loc, std::string const& code)
+    : code(code)
+    , len(code.size())
+    , loc(loc)
+    , root(new Token(loc))
+    , multiLineComments(0)
 {
   assert(len > 0 && "Empty code?");
 }
@@ -128,15 +143,16 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
           pos++;
           break;
         case '\n':
-          ++line_number;
+          loc.nl();
         default:
           pos++;
+          loc.inc();
         }
       }
       tokenStart = pos;
       break;
     case '\n':
-      ++line_number;
+      loc.nl();
     case TAB:
     case SPC:
     case '\xc2': // TODO other non-printing spaces?
@@ -149,7 +165,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       // Maybe end of a value
       if (tokenStart != pos) {
         tok->addChild(
-            make_unique<Token>(line_number, code.substr(tokenStart, pos - tokenStart)));
+            make_unique<Token>(loc, code.substr(tokenStart, pos - tokenStart)));
       }
       // Or end of a token, which we ignore
       tokenStart = ++pos;
@@ -158,13 +174,13 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       // Maybe end of a value
       if (tokenStart != pos) {
         tok->addChild(
-            make_unique<Token>(line_number, code.substr(tokenStart, pos - tokenStart)));
+            make_unique<Token>(loc, code.substr(tokenStart, pos - tokenStart)));
       }
       // Finished parsing this token
       return ++pos;
     case '(': {
       // Recurse into sub-tokens
-      auto t = make_unique<Token>(line_number);
+      auto t = make_unique<Token>(loc);
       tokenStart = pos = lexToken(t.get(), pos + 1);
       tok->addChild(move(t));
       break;
@@ -175,7 +191,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
         size_t start = tokenStart - 1;
         size_t length = (pos - start + 1);
         tok->addChild(
-            make_unique<Token>(line_number, code.substr(start, length)));
+            make_unique<Token>(loc, code.substr(start, length)));
       }
       tokenStart = ++pos;
       isInString = !isInString;
@@ -587,7 +603,7 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
 Definition::Ptr Parser::parseDef(const Token *tok) {
   PARSE_ENTER;
 
-  PARSE_ASSERT(tok->size() == 5);
+  PARSE_ASSERT(tok->size() == 5) << "Expect def to have 4 parts (def name Type args body)";
   const Token *name = tok->getChild(1);
   const Token *tok_type = tok->getChild(2);
   const Token *args = tok->getChild(3);
@@ -596,6 +612,7 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   PARSE_ASSERT(name->isValue);
 
   auto type = parseType(tok_type);
+  PARSE_ASSERT(!type.isNone()) << "Unknown return type [" << tok_type << "]";
 
   vector<Variable::Ptr> arguments;
   // Single var: (v 2.3)
@@ -619,6 +636,8 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   
   // Function body is a block, create one if single expr
   auto body = parseToken(expr);
+  PARSE_ASSERT(type == body->getType()) << "Return type declared as [" << type << "], but body has type [" << body->getType() << "]";
+
   node->setImpl(move(body));
 
   return node;
@@ -776,6 +795,5 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
 }
 
 std::ostream& Token::dump(std::ostream& s) const {
-  return s << pprint(this, 0, 80).s << std::endl;
+  return s << pprint(this, 0, 80).s;
 }
-
