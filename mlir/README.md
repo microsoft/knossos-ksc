@@ -41,7 +41,7 @@ To build and launch the tests, run
 
 ```sh
 # Prepare
-$ cd path/to/knossos-ksc
+$ cd <<path/to/knossos-ksc>>
 $ cp user.cmake.template user.cmake
 EDIT user.cmake to add path to LLVM
 $ mkdir build && cd build
@@ -80,17 +80,15 @@ $ git clone git@github.com:llvm/llvm-project.git
 
 # Make sure you got the right commit
 # Be sure to update this line when that changes
+$ KNOSSOS=<<path to knossos>>
+$ cd llvm-project
 $ git checkout -b ksc `cat $KNOSSOS/etc/llvm-branch.txt`
 
-$ cd llvm-project
 $ mkdir build && cd build
 
 # Build
 $ . $KNOSSOS/mlir/run-cmake-in-llvm.sh
 $ ninja check-mlir
-
-# To install, one can change the prefix with: 
-$ cmake -DCMAKE_INSTALL_PREFIX=/tmp/llvm -P cmake_install.cmake
 ```
 
 # Implementation Details
