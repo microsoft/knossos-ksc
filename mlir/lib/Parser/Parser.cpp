@@ -284,7 +284,7 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
 }
 
 // Values (variable names, literals, type names)
-Expr::Ptr Parser::parseBlock(const Token *tok) {
+Block::Ptr Parser::parseBlock(const Token *tok) {
   PARSE_ENTER;
   Block *b = new Block();
   for (auto &c : tok->getChildren())
