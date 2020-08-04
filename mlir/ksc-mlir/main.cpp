@@ -29,7 +29,7 @@ enum class Action {
 
 void help() {
   cout << "Unit Test Syntax: ksc-mlir TEST [-v(v(v))]\n";
-  cout << " Compiler Syntax: ksc-mlir AST|MLIR|LLVM <filename.ks>\n";
+  cout << " Compiler Syntax: ksc-mlir AST|MLIR|LLVM [-v(v(v))] <filename.ks>\n";
 }
 
 int main(int argc, char **argv) {
@@ -44,7 +44,8 @@ int main(int argc, char **argv) {
 
   int optlevel = 0;
   
-  string aStr(argv[1]);
+  size_t nextarg = 1;
+  string aStr(argv[nextarg++]);
   if (aStr == "TEST")
     action = Action::TEST;
   else if (aStr == "AST")
@@ -59,6 +60,21 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  int verbosity = 0;
+  if (nextarg < argc && argv[nextarg][0] == '-') {
+    string arg(argv[nextarg++]);
+    if (arg == "-v")
+      verbosity = 1;
+    else if (arg == "-vv")
+      verbosity = 2;
+    else if (arg == "-vvv")
+      verbosity = 3;
+    else {
+      std::cerr << "ksc-mlir: bad switch [" << arg << "]" << std::endl;
+      return 2;
+    }
+  }
+
   // FIXME: registering dialects must happen before building the context
   // Create a more logical API that doesn't require it to be done by the caller
   mlir::registerAllDialects();
@@ -67,31 +83,16 @@ int main(int argc, char **argv) {
 
   // Unit tests
   // FIXME: Use gtest or similar
-  if (action == Action::TEST) {
-    int v=0;
-    if (argc > 2) {
-      string arg(argv[2]);
-      if (arg == "-v")
-        v = 1;
-      else if (arg == "-vv")
-        v = 2;
-      else if (arg == "-vvv")
-        v = 3;
-      else {
-        std::cerr << "bad argument [" << arg << "]" << std::endl;
-        return 2;
-      }
-    }
-    return test_all(v);
-  }
+  if (action == Action::TEST)
+    return test_all(verbosity);
 
   // Filename
-  if (argc < 3) {
+  if (!(nextarg < argc)) {
     help();
     return 1;
   }
   auto source = Source::NONE;
-  llvm::StringRef filename(argv[2]);
+  llvm::StringRef filename(argv[nextarg++]);
   if (filename.endswith(".ks"))
     source = Source::KSC;
   else if (filename.endswith(".mlir"))
@@ -113,7 +114,7 @@ int main(int argc, char **argv) {
   string code((istreambuf_iterator<char>(file)),istreambuf_iterator<char>());
 
   // Parse and output AST if requested
-  Parser p(filename.str(), code);
+  Parser p(Location {filename.str(), 1, 0}, code, verbosity);
   if (source == Source::KSC) {
     p.parse();
     if (!p.getRootNode()) {

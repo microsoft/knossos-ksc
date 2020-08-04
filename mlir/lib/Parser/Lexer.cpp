@@ -3,10 +3,11 @@
 #include <iostream>
 
 #include "Parser/Lexer.h"
+#include "Parser/Assert.h"
 
 using namespace std;
-using namespace Knossos::AST;
 
+namespace Knossos { namespace AST {
 std::ostream& Location::dump(std::ostream& s) const
 {
   return s << *filename << ":" << line << ":" << column;
@@ -14,122 +15,123 @@ std::ostream& Location::dump(std::ostream& s) const
 
 //================================================ Lex source into Tokens
 
-Lexer::Lexer(std::string const& filename, std::string const& code)
-    : code(code)
-    , len(code.size())
-    , loc {filename, 1, 0 } 
-    , root(new Token(loc))
-    , multiLineComments(0)
-{
-  assert(len > 0 && "Empty code?");
-}
-
 Lexer::Lexer(Location const& loc, std::string const& code)
     : code(code)
     , len(code.size())
     , loc(loc)
-    , root(new Token(loc))
-    , multiLineComments(0)
+    , pos(0)
+    , depth(0)
+    , verbosity(0)
 {
-  assert(len > 0 && "Empty code?");
+}
+
+char Lexer::get()
+{
+  ASSERT(pos < len) << "\n" << loc << ": Unexpected end of file";
+  char c = code[pos];
+  ++pos;
+  loc.inc();
+  if (c == '\n')
+    loc.nl();
+  return c;
+}
+
+char Lexer::peek(int offset)
+{
+  ASSERT(pos+offset < len) << "\n" << loc << ": Unexpected end of file";
+  return code[pos+offset];
+}
+
+bool isValidIdentifierChar(char c)
+{
+    if (isalnum(c)) return true;
+    // TODO: This could be much faster..
+    static std::string chars("!@$%^&*{}[]:.,<>?/'|=+-_~`");
+    return chars.find(c) != std::string::npos; 
 }
 
 // Lex a token out, recurse if another entry point is found
-size_t Lexer::lexToken(Token *tok, size_t pos) {
-  const char TAB = 0x09;
-  const char SPC = 0x20;
-  size_t tokenStart = pos;
-  bool isInString = false;
+Token::Ptr Lexer::lex()
+{
+  ++depth;
+  Token* tok = new Token(loc);
   while (pos < len) {
-    switch (code[pos]) {
-    case ';':
-      // Comment, to the end of the line
-      while (code[pos] != '\n')
-        tokenStart = ++pos;
+    if (peek() == ')')
       break;
+    
+    Location cloc = loc;
+    char c = get();
+    switch (c) {
+      case '"': {
+        // No comments inside strings
+        // Newlines allowed inside strings
+        auto start = pos - 1;
+        do {
+            c = get();
+            // Skip \"
+            if (c == '\\' && peek() == '"')
+              get();
+        } while (c != '"');
+
+        // Strings need to capture the quotes, too
+        auto str = code.substr(start, pos - start);
+        auto child = make_unique<Token>(cloc, str);
+        tok->addChild(move(child));
+        break;
+    }
+
+    case ';': {
+        // Comment, to the end of the line
+        while (get() != '\n');
+        break;
+    }
+
     case '#':
-      if (pos+1 < len && code[pos+1] != '|')
-        break;
-      assert(multiLineComments == 0);
-      pos += 2; // consume #|
-      multiLineComments = 1;
-      // Multi-line comment
-      while (multiLineComments) {
-        switch (code[pos]) {
-        case '|':
-          if (pos+1 < len && code[pos+1] == '#') {
-            multiLineComments--;
-            pos++;
-          }
-          pos++;
-          break;
-        case '#':
-          if (code[pos+1] == '|') {
-            multiLineComments++;
-            pos++;
-          }
-          pos++;
-          break;
-        case '\n':
-          loc.nl();
-        default:
-          pos++;
-          loc.inc();
+        if (peek() == '|') {
+            // Multi-line comment
+            int commentDepth = 1;
+            do {
+                c = get();
+                if (c == '#' && peek() == '|')
+                ++commentDepth;
+                if (c == '|' && peek() == '#')
+                --commentDepth;
+            } while (commentDepth > 0);
+            c = get();
+            assert(c == '#');
         }
-      }
-      tokenStart = pos;
-      break;
-    case '\n':
-      loc.nl();
-    case TAB:
-    case SPC:
-    case '\xc2': // TODO other non-printing spaces?
-    case '\r':
-      // "Whitespace" is allowed inside strings
-      if (isInString) {
-        pos++;
         break;
-      }
-      // Maybe end of a value
-      if (tokenStart != pos) {
-        tok->addChild(
-            make_unique<Token>(loc, code.substr(tokenStart, pos - tokenStart)));
-      }
-      // Or end of a token, which we ignore
-      tokenStart = ++pos;
-      break;
-    case ')':
-      // Maybe end of a value
-      if (tokenStart != pos) {
-        tok->addChild(
-            make_unique<Token>(loc, code.substr(tokenStart, pos - tokenStart)));
-      }
-      // Finished parsing this token
-      return ++pos;
+
     case '(': {
       // Recurse into sub-tokens
-      auto t = make_unique<Token>(loc);
-      tokenStart = pos = lexToken(t.get(), pos + 1);
-      tok->addChild(move(t));
+      tok->addChild(lex());
+      c = get();
+      assert(c == ')');
       break;
     }
-    case '"':
-      if (isInString) {
-        // Strings need to capture the quotes, too
-        size_t start = tokenStart - 1;
-        size_t length = (pos - start + 1);
-        tok->addChild(
-            make_unique<Token>(loc, code.substr(start, length)));
-      }
-      tokenStart = ++pos;
-      isInString = !isInString;
+
+    case '\n':
+    case '\t':
+    case ' ':
+    case '\xc2': // TODO other non-printing spaces?
+    case '\r':
       break;
+
     default:
-      // These are text, so we keep reading
-      pos++;
+      if (isValidIdentifierChar(c)) {
+        auto start = pos-1;
+        while (isValidIdentifierChar(peek()))
+          get();
+        auto t = make_unique<Token>(cloc, code.substr(start, pos - start));
+        tok->addChild(move(t));
+      }
+      else
+        ASSERT(0) << "\n" << loc << ": Unhandled character [" << c << "]";
     }
   }
-  return pos;
+  if (verbosity+1 > depth) tok->dump(std::cerr << std::string(depth, '-'), depth) << "\n";
+  --depth;
+  return Token::Ptr(tok);
 }
 
 
@@ -179,8 +181,8 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
   return ret;
 }
 
-std::ostream& Token::dump(std::ostream& s) const {
-  return s << pprint(this, 0, 80).s;
+std::ostream& Token::dump(std::ostream& s, size_t indent) const {
+  return s << pprint(this, indent, 80).s;
 }
 
 }} // namespace

@@ -13,7 +13,7 @@ static int verbose = 0;
 #define LOC() Location { __FILE__, __LINE__, 0 }
 
 Expr::Ptr parse(const Location& loc, const string &code) {
-  Parser p(loc, code);
+  Parser p(loc, code, verbose);
   if (verbose > 2)
     cout << " -- Tokens\n";
   p.tokenise();
@@ -186,9 +186,10 @@ void test_parser_def() {
 
 void test_parser_decl_def_use() {
   cout << "\n == test_parser_decl_def_use\n";
-  const Expr::Ptr tree = parse(LOC(), "(edef fun Integer (Integer))\n"
+  const Expr::Ptr tree = parse(LOC(), 
+                               "(edef fun Integer (Integer))\n"
                                "(def fun Integer ((x : Integer)) (add x 10))\n"
-                               "(def main Integer () (add (fun 10) 10)");
+                               "(def main Integer () (add (fun 10) 10))");
 
   // Root can have many exprs, here only 3
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -543,7 +544,7 @@ void test_pprint()
   cout << "\n == test_pprint\n";
   Lexer l(LOC(), "\n"
           "(def f1 Integer ((x : Integer) (y : Integer)) (add x y))\n"
-          "(def f2 Float ((x : Integer) (y : Integer)) (if t (add x y) (mul x y))");
+          "(def f2 Float ((x : Integer) (y : Integer)) (if t (add x y) (mul x y)))");
   auto root = l.lex();
   cout << " -- Tokens\n";
   cout << root->pprint(80) << endl;

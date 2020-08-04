@@ -39,7 +39,7 @@
 ; LLVM-NEXT:    ret double %[[add]]
 ; LLVM-NEXT:  }
 
-(def main Integer () (
+(def main Integer ()
 ; MLIR:      func @main() -> i64 {
 ; LLVM:      define i64 @main() {
 
