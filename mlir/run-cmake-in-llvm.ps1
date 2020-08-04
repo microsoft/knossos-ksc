@@ -1,5 +1,5 @@
 # Powershell syntax, use 
-#   tr '`' '\\' < mlir/run-cmake-in-llvm.batsh | sh -x
+#  sh mlir/run-cmake-in-llvm.sh | sh -x
 # to run in bash
 
 cmake ../llvm`
