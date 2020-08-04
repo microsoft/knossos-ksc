@@ -85,7 +85,7 @@ struct Token {
 
   size_t size() const { return children.size(); }
 
-  std::ostream& dump(std::ostream& s) const;
+  std::ostream& dump(std::ostream& s, size_t indent = 0) const;
 
   std::string pprint(int width = 80) const;
 
@@ -121,21 +121,24 @@ class Lexer {
   std::string code;
   size_t len;
   Location loc;
-  Token::Ptr root; // TODO move to lex()
   size_t multiLineComments;
+  size_t pos;
+  size_t depth;
+  int verbosity;
 
-  /// Build a tree of tokens
-  size_t lexToken(Token *tok, size_t pos);
+  char get();
+  char peek(int offset = 0);
 
 public:
-  Lexer(std::string const& filename, std::string const& code);
   Lexer(Location const& loc, std::string const& code);
 
-  Token::Ptr lex() {
-    lexToken(root.get(), 0);
-    assert(multiLineComments == 0);
-    return std::move(root);
+  void setVerbosity(int v) {
+      verbosity = v;
   }
+
+  Token::Ptr lex();
 };
+
+}} // namespace
 
 #endif

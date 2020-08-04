@@ -15,6 +15,7 @@
 #include "AST.h"
 #include "Lexer.h"
 
+namespace Knossos { namespace AST {
 
 //================================================ Parse Tokens into Nodes
 
@@ -90,21 +91,14 @@ class Parser {
   Fold::Ptr parseFold(const Token *tok);
 
 public:
-  Parser(std::string const& filename, std::string const& code): 
-      rootT(nullptr), 
-      rootE(nullptr),
-      extraDecls(nullptr),
-      lex(filename, code) 
-      {
-        extraDecls = std::make_unique<Block>();
-      }
-  Parser(Location const& loc, std::string const& code): 
+  Parser(Location const& loc, std::string const& code, int verbosity): 
       rootT(nullptr), 
       rootE(nullptr),
       extraDecls(nullptr),
       lex(loc, code) 
       {
         extraDecls = std::make_unique<Block>();
+        lex.setVerbosity(verbosity);
       }
 
   void tokenise() {
