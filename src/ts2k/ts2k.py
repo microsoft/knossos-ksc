@@ -9,9 +9,12 @@ import argparse
 parser = argparse.ArgumentParser(description='Convert TorchScript to Knossos IR')
 parser.add_argument('--input_file', required=True, help='TorchScript [file_path].py')
 parser.add_argument('--output_file', required=True, help='Knossos IR [file_path].ks')
+parser.add_argument('--generate_edef', action='store_true', help="Generate edef, otherwise default to pass-through")
 args = parser.parse_args()
 
+input_file_path = args.input_file
 filename = args.output_file
+generate_edef = args.generate_edef
 
 os.makedirs(os.path.dirname(filename), exist_ok=True)
 output = open(filename, "w")
@@ -20,13 +23,15 @@ output = open(filename, "w")
 nl = "\n"
 tab = "\t"
 
-input_file_path = args.input_file
+
 module_name = "DynamicLoadedModule"
 
 spec = importlib.util.spec_from_file_location(module_name, input_file_path)
 dynamicModule = importlib.util.module_from_spec(spec)
 # We deliberately don't make visible via sys.modules[module_name] = module
 spec.loader.exec_module(dynamicModule)
+
+add_edef = "(edef addATEN (Vec (Vec Float)) ((Vec (Vec Float)) Float))"
 
 
 # load all TorchScript methods in target modules
@@ -132,13 +137,24 @@ def make_tensor(node):
         sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))]
 
 def make_add(node):
-    print("WARNING: aten::add just returns unmodified tensor")
     value = node.outputsAt(0)
-
-    return [
-        sexpdata.Symbol("\n"),
-        sexpdata.Symbol(managleDebugName(value.debugName())),
-        sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))]
+    if generate_edef:
+         return [
+            sexpdata.Symbol("\n"),
+            sexpdata.Symbol(managleDebugName(value.debugName())),
+            [
+                sexpdata.Symbol("addATEN"),
+                sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName())),
+                sexpdata.Symbol(managleDebugName(node.inputsAt(1).debugName()))
+            ]
+        ]
+    else:
+        print("WARNING: aten::add just returns unmodified tensor, consider using --generate_edef")
+        return [
+            sexpdata.Symbol("\n"),
+            sexpdata.Symbol(managleDebugName(value.debugName())),
+            sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))
+        ]
 
 def make_return(node):
     mangled_id = managleDebugName(node.inputsAt(0).debugName())
@@ -185,6 +201,10 @@ lookups = {
 def translate_node(node):
     return lookups.get(node.kind(), make_default)(node)
 
+if generate_edef:
+    output.write(add_edef)
+    output.write("\n")
+    output.write("\n")
 
 def ts2ks(function):
     name = sexpdata.Symbol(function.name)
