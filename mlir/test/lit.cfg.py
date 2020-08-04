@@ -28,7 +28,7 @@ config.test_source_root = os.path.dirname(__file__)
 config.knossos_root = os.path.join(config.test_source_root + "/../..")
 
 # test_exec_root: The root path where tests should be run.
-config.test_exec_root = os.path.join(config.ksc_obj_root, 'test')
+config.test_exec_root = os.path.join(config.ksc_obj_root, 'mlir/test')
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 config.substitutions.append(('%shlibext', config.llvm_shlib_ext))

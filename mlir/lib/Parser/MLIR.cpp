@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <numeric>
+#include <iostream>
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -25,7 +26,7 @@ using namespace std;
 
 // Convert from AST type to MLIR
 Types Generator::ConvertType(const AST::Type &type, size_t dim) {
-  switch (type) {
+  switch (type.getValidType()) {
   case AST::Type::None:
     return {};
   case AST::Type::Bool:
@@ -36,7 +37,7 @@ Types Generator::ConvertType(const AST::Type &type, size_t dim) {
     return {builder.getF64Type()};
   case AST::Type::Vector:
     // FIXME: support nested vectors
-    assert(type.getSubType() != AST::Type::Vector);
+    assert(!type.getSubType().isVector());
     if (dim)
       return {mlir::MemRefType::get(dim, ConvertType(type.getSubType())[0])};
     else
@@ -49,6 +50,12 @@ Types Generator::ConvertType(const AST::Type &type, size_t dim) {
       subTys.append(tys.begin(), tys.end());
     }
     return subTys;
+  }
+  case AST::Type::String: {
+    // TODO: do better
+    std::cerr << "[String!]";
+    auto i8 = builder.getIntegerType(8);
+    return {mlir::MemRefType::get(-1, i8)};
   }
   default:
     assert(0 && "Unsupported type");
@@ -81,7 +88,7 @@ void Generator::serialiseArgs(const AST::Definition *def, mlir::Block &entry) {
     auto var = llvm::dyn_cast<AST::Variable>(arg.get());
     assert(var && idx <= last);
     // Non-tuple args are simple
-    if (var->getType() != AST::Type::Tuple) {
+    if (!var->getType().isTuple()) {
       declareVariable(var->getName(), {serialised[idx++]});
       continue;
     }
@@ -169,7 +176,7 @@ void Generator::buildGlobal(const AST::Block* block) {
 
 // Declaration only, no need for basic blocks
 mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
-  assert(!functions.count(decl->getName()) && "Duplicated function declaration");
+  assert(!functions.count(decl->getMangledName()) && "Duplicated function declaration");
   Types argTypes;
   for (auto &t: decl->getArgTypes()) {
     auto tys = ConvertType(t);
@@ -177,17 +184,20 @@ mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
   }
   auto retTy = ConvertType(decl->getType());
   auto type = builder.getFunctionType(argTypes, retTy);
-  auto func = mlir::FuncOp::create(UNK, decl->getName(), type);
-  functions.insert({decl->getName(), func});
+  auto func = mlir::FuncOp::create(UNK, decl->getMangledName(), type);
+  ASSERT(func);
+  functions[decl->getMangledName()]= func;
   return func;
 }
 
 // Definition of the whole function starts here
 mlir::FuncOp Generator::buildDef(const AST::Definition* def) {
+
   // Make sure we have its declaration cached
-  if (!functions.count(def->getName()))
-    buildDecl(def->getProto());
-  auto func = functions[def->getName()];
+  if (!functions.count(def->getMangledName()))
+    buildDecl(def->getDeclaration());
+
+  auto func = functions[def->getMangledName()];
   assert(func);
 
   // First basic block, with args
@@ -205,13 +215,10 @@ mlir::FuncOp Generator::buildDef(const AST::Definition* def) {
 }
 
 // Declare a variable
-void Generator::declareVariable(llvm::StringRef name,
+void Generator::declareVariable(std::string const& name,
                                      Values vals) {
   assert(!vals.empty() && "Variable must have initialiser");
-  auto res = variables.insert({name, vals});
-  // Already exists, replace
-  if (!res.second)
-    variables[name] = vals;
+  variables[name] = vals;
 }
 
 void Generator::declareVariable(const AST::Variable* var,
@@ -233,8 +240,8 @@ Values Generator::buildNode(const AST::Expr* node) {
     return buildBlock(llvm::dyn_cast<AST::Block>(node));
   if (AST::Literal::classof(node))
     return buildLiteral(llvm::dyn_cast<AST::Literal>(node));
-  if (AST::Operation::classof(node))
-    return buildOp(llvm::dyn_cast<AST::Operation>(node));
+  if (AST::Call::classof(node))
+    return buildCall(llvm::dyn_cast<AST::Call>(node));
   if (AST::Let::classof(node))
     return buildLet(llvm::dyn_cast<AST::Let>(node));
   if (AST::Condition::classof(node))
@@ -243,18 +250,12 @@ Values Generator::buildNode(const AST::Expr* node) {
     return buildVariable(llvm::dyn_cast<AST::Variable>(node));
   if (AST::Build::classof(node))
     return buildBuild(llvm::dyn_cast<AST::Build>(node));
-  if (AST::Index::classof(node))
-    return buildIndex(llvm::dyn_cast<AST::Index>(node));
-  if (AST::Size::classof(node))
-    return buildSize(llvm::dyn_cast<AST::Size>(node));
   if (AST::Tuple::classof(node))
     return buildTuple(llvm::dyn_cast<AST::Tuple>(node));
   if (AST::Get::classof(node))
     return buildGet(llvm::dyn_cast<AST::Get>(node));
   if (AST::Fold::classof(node))
     return buildFold(llvm::dyn_cast<AST::Fold>(node));
-  if (AST::Print::classof(node))
-    return buildPrint(llvm::dyn_cast<AST::Print>(node));
   assert(0 && "unexpected node");
 }
 
@@ -276,149 +277,143 @@ Values Generator::buildLiteral(const AST::Literal* lit) {
   return {builder.create<mlir::ConstantOp>(UNK, type, getAttr(lit))};
 }
 
-// Builds operations/calls
-Values Generator::buildOp(const AST::Operation* op) {
-  auto operation = op->getName();
+// Build from one Argument (Operand) of a call
+mlir::Value Generator::buildArg(const AST::Call* call, size_t i) {
+  return Single(buildNode(call->getOperand(i)));
+}
 
-  // Function call
-  if (functions.count(operation)) {
-    auto func = functions[operation];
+// Builds calls
+Values Generator::buildCall(const AST::Call* call) {
+  auto name = call->getDeclaration()->getName();
+  auto name_mangled = call->getDeclaration()->getMangledName();
+  size_t arity = call->size();
 
-    // Operands (tuples expand into individual operands)
-    Values operands;
-    for (auto &arg: op->getOperands()) {
-      auto range = buildNode(arg.get());
-      // Tuples
-      if (range.size() > 1)
-        operands.append(range.begin(), range.end());
-      // Static vectors need to be made dynamic
-      else if (Single(range).getType().isa<mlir::MemRefType>() &&
-               Single(range).getType().cast<mlir::MemRefType>().getDimSize(0) != -1)
-        operands.push_back(memrefCastForCall(Single(range)));
-      // Everything else
-      else
-        operands.push_back(Single(range));
-    }
-    assert(func.getNumArguments() == operands.size() && "Arguments mismatch");
+  // Various functions get special treatment, e.g. primitive arithmetic, array access etc
+#define MATCH_1(NAME, TYPE)\
+       (arity == 1 && name == NAME &&\
+        call->getOperand(0)->getType() == AST::Type::TYPE)
+#define CREATE_1(MLIR_OP)\
+      {builder.create<mlir::MLIR_OP>(UNK, buildArg(call,0))}
 
-    // Function
-    auto call = builder.create<mlir::CallOp>(UNK, func, operands);
-    return call.getResults();
+#define MATCH_2(NAME, TYPE0, TYPE1)\
+       (arity == 2 && name == NAME &&\
+        call->getOperand(0)->getType() == AST::Type::TYPE0 &&\
+        call->getOperand(1)->getType() == AST::Type::TYPE1)
+#define CREATE_2(MLIR_OP)\
+      {builder.create<mlir::MLIR_OP>(UNK, buildArg(call,0), buildArg(call,1))}
+
+  if (MATCH_1("abs", Float))  return CREATE_1(AbsFOp);
+  if (MATCH_1("neg", Float))  return CREATE_1(NegFOp);
+  if (MATCH_1("exp", Float))  return CREATE_1(ExpOp);
+  if (MATCH_1("log", Float))  return CREATE_1(LogOp);
+
+  if (MATCH_1("to_float", Integer)) 
+    return {builder.create<mlir::SIToFPOp>(UNK, buildArg(call,0), builder.getF64Type())};
+
+  if (MATCH_1("to_int", Float))  assert(0 && "Cast to_int not implemented yet");
+  
+  if (MATCH_2("add", Integer, Integer))   return CREATE_2(AddIOp);
+  if (MATCH_2("add", Float, Float))       return CREATE_2(AddFOp);
+  if (MATCH_2("sub", Integer, Integer))   return CREATE_2(SubIOp);
+  if (MATCH_2("sub", Float, Float))       return CREATE_2(SubFOp);
+  if (MATCH_2("mul", Integer, Integer))   return CREATE_2(MulIOp);
+  if (MATCH_2("mul", Float, Float))       return CREATE_2(MulFOp);
+  if (MATCH_2("div", Integer, Integer))   return CREATE_2(SignedDivIOp);
+  if (MATCH_2("div", Float, Float))       return CREATE_2(DivFOp);
+
+  if (MATCH_2("and", Bool, Bool))   return CREATE_2(AndOp);
+  if (MATCH_2("or", Bool, Bool))    return CREATE_2(OrOp);
+
+    // Comparison
+#define CREATE_CMP(MLIR_OP, CMP)\
+        {builder.create<mlir::MLIR_OP>(UNK, mlir::CMP, buildArg(call,0), buildArg(call,1))}
+  if (MATCH_2("eq", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::eq);
+  if (MATCH_2("eq", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::OEQ);
+  if (MATCH_2("ne", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::ne);
+  if (MATCH_2("ne", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::ONE);
+  if (MATCH_2("lte", Integer, Integer))  return CREATE_CMP(CmpIOp, CmpIPredicate::sle);
+  if (MATCH_2("lte", Float, Float))      return CREATE_CMP(CmpFOp, CmpFPredicate::OLE);
+  if (MATCH_2("gte", Integer, Integer))  return CREATE_CMP(CmpIOp, CmpIPredicate::sge);
+  if (MATCH_2("gte", Float, Float))      return CREATE_CMP(CmpFOp, CmpFPredicate::OGE);
+  if (MATCH_2("gt", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::sgt);
+  if (MATCH_2("gt", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::OGT);
+  if (MATCH_2("lt", Integer, Integer))   return CREATE_CMP(CmpIOp, CmpIPredicate::slt);
+  if (MATCH_2("lt", Float, Float))       return CREATE_CMP(CmpFOp, CmpFPredicate::OLT);
+#undef CREATE_CMP
+
+  if (MATCH_2("index", Integer, Vector)) {
+    auto idx = buildArg(call,0);
+    auto vec = buildArg(call,1);
+    auto indTy = builder.getIndexType();
+    auto indIdx = builder.create<mlir::IndexCastOp>(UNK, idx, indTy);
+    mlir::ValueRange rangeIdx {indIdx};
+    return {builder.create<mlir::LoadOp>(UNK, vec, rangeIdx)};
   }
 
-  // Check types
-  auto opty = op->getOperandType();
-  bool isInt = (opty == AST::Type::Integer);
-  bool isBool = (opty == AST::Type::Bool);
-  bool isFloat = (opty == AST::Type::Float);
-  assert(isInt || isBool || isFloat && "Invalid type for operation");
-
-  if (op->size() == 1) {
-    // Unary operations
-    auto arg = Single(buildNode(op->getOperand(0)));
-    if (op->getOpcode() != AST::Operation::Opcode::TOF)
-      assert(isFloat && "Invalid type for operation");
-
-    switch(op->getOpcode()) {
-      case AST::Operation::Opcode::ABS:
-        return {builder.create<mlir::AbsFOp>(UNK, arg)};
-      case AST::Operation::Opcode::NEG:
-        return {builder.create<mlir::NegFOp>(UNK, arg)};
-      case AST::Operation::Opcode::EXP:
-        return {builder.create<mlir::ExpOp>(UNK, arg)};
-      case AST::Operation::Opcode::LOG:
-        return {builder.create<mlir::LogOp>(UNK, arg)};
-      case AST::Operation::Opcode::TOF:
-        return {builder.create<mlir::SIToFPOp>(UNK, arg, builder.getF64Type())};
-      case AST::Operation::Opcode::TOI:
-        assert(0 && "Cast to_int not implemented yet");
-      default:
-        assert(0 && "Unknown unary operation");
-    }
-
-  } else if (op->size() == 2) {
-    // Binary operations
-    // Note: these do not support tuples natively
-    auto lhs = Single(buildNode(op->getOperand(0)));
-    auto rhs = Single(buildNode(op->getOperand(1)));
-
-    switch(op->getOpcode()) {
-      // Arithmetic
-      case AST::Operation::Opcode::ADD:
-        if (isInt)
-          return {builder.create<mlir::AddIOp>(UNK, lhs, rhs)};
-        else
-          return {builder.create<mlir::AddFOp>(UNK, lhs, rhs)};
-      case AST::Operation::Opcode::SUB:
-        if (isInt)
-          return {builder.create<mlir::SubIOp>(UNK, lhs, rhs)};
-        else
-          return {builder.create<mlir::SubFOp>(UNK, lhs, rhs)};
-      case AST::Operation::Opcode::MUL:
-        if (isInt)
-          return {builder.create<mlir::MulIOp>(UNK, lhs, rhs)};
-        else
-          return {builder.create<mlir::MulFOp>(UNK, lhs, rhs)};
-      case AST::Operation::Opcode::DIV:
-        if (isInt)
-          return {builder.create<mlir::SignedDivIOp>(UNK, lhs, rhs)};
-        else
-          return {builder.create<mlir::DivFOp>(UNK, lhs, rhs)};
-      case AST::Operation::Opcode::AND:
-        assert(isBool && "Wrong type for logical AND");
-        return {builder.create<mlir::AndOp>(UNK, lhs, rhs)};
-      case AST::Operation::Opcode::OR:
-        assert(isBool && "Wrong type for logical OR");
-        return {builder.create<mlir::OrOp>(UNK, lhs, rhs)};
-
-      // Comparison
-      case AST::Operation::Opcode::EQ:
-        if (isInt)
-          return {builder.create<mlir::CmpIOp>(UNK, mlir::CmpIPredicate::eq,
-                                               lhs, rhs)};
-        else
-          return {builder.create<mlir::CmpFOp>(UNK, mlir::CmpFPredicate::OEQ,
-                                               lhs, rhs)};
-      case AST::Operation::Opcode::NE:
-        if (isInt)
-          return {builder.create<mlir::CmpIOp>(UNK, mlir::CmpIPredicate::ne,
-                                               lhs, rhs)};
-        else
-          return {builder.create<mlir::CmpFOp>(UNK, mlir::CmpFPredicate::ONE,
-                                               lhs, rhs)};
-      case AST::Operation::Opcode::LTE:
-        if (isInt)
-          return {builder.create<mlir::CmpIOp>(UNK, mlir::CmpIPredicate::sle,
-                                               lhs, rhs)};
-        else
-          return {builder.create<mlir::CmpFOp>(UNK, mlir::CmpFPredicate::OLE,
-                                               lhs, rhs)};
-      case AST::Operation::Opcode::GTE:
-        if (isInt)
-          return {builder.create<mlir::CmpIOp>(UNK, mlir::CmpIPredicate::sge,
-                                               lhs, rhs)};
-        else
-          return {builder.create<mlir::CmpFOp>(UNK, mlir::CmpFPredicate::OGE,
-                                               lhs, rhs)};
-      case AST::Operation::Opcode::GT:
-        if (isInt)
-          return {builder.create<mlir::CmpIOp>(UNK, mlir::CmpIPredicate::sgt,
-                                               lhs, rhs)};
-        else
-          return {builder.create<mlir::CmpFOp>(UNK, mlir::CmpFPredicate::OGT,
-                                               lhs, rhs)};
-      case AST::Operation::Opcode::LT:
-        if (isInt)
-          return {builder.create<mlir::CmpIOp>(UNK, mlir::CmpIPredicate::slt,
-                                               lhs, rhs)};
-        else
-          return {builder.create<mlir::CmpFOp>(UNK, mlir::CmpFPredicate::OLT,
-                                               lhs, rhs)};
-      default:
-        assert(0 && "Unknown binary operation");
-    }
+  if (MATCH_1("size", Vector)) {
+    auto vec = buildArg(call,0);
+    // FIXME: Support multi-dimensional vectors
+    auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
+    auto intTy = builder.getIntegerType(64);
+    return {builder.create<mlir::IndexCastOp>(UNK, dim, intTy)};
   }
-  assert(0 && "Unknown operation");
+
+  if (name == "print") {
+    for (auto &op: call->getOperands())
+      if (!op.get()->getType().isString())
+        buildNode(op.get());
+
+    // Return the number of elements
+    auto att = builder.getIntegerAttr(builder.getIntegerType(64), arity);
+    auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
+    return {elms};
+  }
+
+#undef MATCH_1
+#undef MATCH_2
+#undef CREATE_1
+#undef CREATE_2
+
+  // Function call -- not a prim, should be known
+  mlir::FuncOp func = functions[name_mangled];
+  
+  if (!func) {
+    // Didn't find it... assert
+    asserter a("Unknown function", __FILE__, __LINE__);
+    a << " " << std::string(name) << "(";
+    for(size_t i = 0; i < arity; ++i) {
+      a << call->getOperand(i)->getType();
+      if (i+1 < arity)
+        a << ", ";
+    } 
+    a << ") -> "<<name_mangled<<"]";
+  }
+
+  // Operands (tuples expand into individual operands)
+  Values operands;
+  for (auto &arg: call->getOperands()) {
+    if (arg->getType() == AST::Type::String) {
+      std::cerr << "[STRING!]";
+      continue;
+    }
+
+    auto range = buildNode(arg.get());
+    // Tuples
+    if (range.size() > 1)
+      operands.append(range.begin(), range.end());
+    // Static vectors need to be made dynamic
+    else if (Single(range).getType().isa<mlir::MemRefType>() &&
+              Single(range).getType().cast<mlir::MemRefType>().getDimSize(0) != -1)
+      operands.push_back(memrefCastForCall(Single(range)));
+    // Everything else
+    else
+      operands.push_back(Single(range));
+  }
+  assert(func.getNumArguments() == operands.size() && "Arguments mismatch");
+
+  // Function
+  auto mlir_call = builder.create<mlir::CallOp>(UNK, func, operands);
+  return mlir_call.getResults();
 }
 
 // Builds variable declarations
@@ -522,25 +517,6 @@ Values Generator::buildBuild(const AST::Build* b) {
   return {memrefCastForCall(vec)};
 }
 
-// Builds index access to vectors
-Values Generator::buildIndex(const AST::Index* i) {
-  auto idx = Single(buildNode(i->getIndex()));
-  auto vec = Single(buildNode(i->getVariable()));
-  auto indTy = builder.getIndexType();
-  auto indIdx = builder.create<mlir::IndexCastOp>(UNK, idx, indTy);
-  mlir::ValueRange rangeIdx {indIdx};
-  return {builder.create<mlir::LoadOp>(UNK, vec, rangeIdx)};
-}
-
-// Builds size of vector operator
-Values Generator::buildSize(const AST::Size* s) {
-  auto vec = Single(buildNode(s->getVariable()));
-  // FIXME: Support multi-dimensional vectors
-  auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
-  auto intTy = builder.getIntegerType(64);
-  return {builder.create<mlir::IndexCastOp>(UNK, dim, intTy)};
-}
-
 // Builds tuple creation
 Values Generator::buildTuple(const AST::Tuple* t) {
   auto type = ConvertType(t->getType());
@@ -561,10 +537,10 @@ Values Generator::buildGet(const AST::Get* g) {
     return {tuple[g->getIndex()-1]};
   }
 
-  // Operations return multiple values, we need to lower the op first
-  auto op = llvm::dyn_cast<AST::Operation>(g->getExpr());
-  if (op) {
-    auto res = buildNode(op);
+  // Calls return multiple values, we need to lower the call first
+  auto call = llvm::dyn_cast<AST::Call>(g->getExpr());
+  if (call) {
+    auto res = buildNode(call);
     return {res[g->getIndex()-1]};
   }
 
@@ -666,7 +642,7 @@ Values Generator::buildFold(const AST::Fold* f) {
 mlir::Attribute Generator::getAttr(const AST::Expr* op) {
   auto lit = llvm::dyn_cast<AST::Literal>(op);
   assert(lit && "Can only get attributes from lits");
-  switch (lit->getType()) {
+  switch (lit->getType().getValidType()) {
   case AST::Type::Bool:
     if (lit->getValue() == "true")
       return builder.getBoolAttr(true);
@@ -684,30 +660,18 @@ mlir::Attribute Generator::getAttr(const AST::Expr* op) {
   }
 }
 
-// Builds print
-Values Generator::buildPrint(const AST::Print* p) {
-  if (p->size() > 0) {
-    for (auto &op: p->getExprs()) {
-      // For now, we ignore string operations
-      if (op->getType() == AST::Type::String)
-        continue;
-      buildNode(op.get());
-    }
-  }
-  // Return the nummber of elements
-  size_t len = p->getExprs().size();
-  auto att = builder.getIntegerAttr(builder.getIntegerType(64), len);
-  auto elms = builder.create<mlir::ConstantOp>(UNK, builder.getIntegerType(64), att);
-  return {elms};
-}
-
 //============================================================ MLIR from AST
 
-const mlir::ModuleOp Generator::build(const AST::Expr* root) {
+const mlir::ModuleOp Generator::build(const AST::Block* extraDecls, const AST::Expr* root) {
   module = mlir::ModuleOp::create(UNK);
+
+  if (extraDecls)
+    buildGlobal(extraDecls);
+
   assert(root->kind == AST::Expr::Kind::Block);
   auto rB = llvm::dyn_cast<AST::Block>(root);
   buildGlobal(rB);
+
   if (mlir::failed(mlir::verify(*module))) {
     module->dump();
     return nullptr;

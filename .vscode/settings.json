@@ -1,5 +1,7 @@
 {
     "files.associations": {
+        "*.ks": "ks-lisp",
+        "*.inc": "cpp",
         "tuple": "cpp",
         "utility": "cpp",
         "random": "cpp",
@@ -50,7 +52,25 @@
         "xtree": "cpp",
         "xutility": "cpp",
         "array": "cpp",
-        "iterator": "cpp"
+        "iterator": "cpp",
+        "*.tcc": "cpp",
+        "bitset": "cpp",
+        "cctype": "cpp",
+        "chrono": "cpp",
+        "cinttypes": "cpp",
+        "clocale": "cpp",
+        "ctime": "cpp",
+        "cwctype": "cpp",
+        "string_view": "cpp",
+        "fstream": "cpp",
+        "optional": "cpp",
+        "*.def": "cpp",
+        "complex": "cpp",
+        "future": "cpp",
+        "*.txt": "cpp",
+        "ratio": "cpp"
     },
-    "search.usePCRE2": true
+    "search.usePCRE2": true,
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }

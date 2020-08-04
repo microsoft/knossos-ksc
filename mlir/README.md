@@ -34,16 +34,20 @@ We may in the future decide to use the [Rise](https://github.com/rise-lang/mlir)
 
 ## Building Ksc-MLIR
 
-This setup assumes that you have [built](https://mlir.llvm.org/getting_started/) LLVM and MLIR in `$BUILD_DIR` and installed them to `$PREFIX`. To build and launch the tests, run
+This setup assumes that you have built a specific checkout of LLVM and MLIR in `$BUILD_DIR`. 
+See instructions below.
+
+To build and launch the tests, run
 
 ```sh
 # Prepare
-$ export LLVM=/path/to/llvm-project/build
-$ cd path/to/knossos-ksc/mlir
+$ cd path/to/knossos-ksc
+$ cp user.cmake.template user.cmake
+EDIT user.cmake to add path to LLVM
 $ mkdir build && cd build
 
 # Build
-$ cmake -G Ninja .. -DMLIR_DIR=$LLVM/lib/cmake/mlir -DLLVM_EXTERNAL_LIT=$LLVM/bin/llvm-lit
+$ cmake -G Ninja ..
 $ ninja ksc-mlir
 
 # Test
@@ -54,6 +58,7 @@ $ ./bin/ksc-mlir TEST -vvv # Runs the unit tests
 $ ./bin/ksc-mlir AST foo.ks # Spits out AST
 $ ./bin/ksc-mlir MLIR foo.ks # Spits out MLIR
 $ ./bin/ksc-mlir LLVM foo.ks # Spits out LLVM IR
+$ lli foo.ll ; echo $? # Run llvm and echo exit code
 ```
 
 **Tested with:**
@@ -64,6 +69,9 @@ $ ./bin/ksc-mlir LLVM foo.ks # Spits out LLVM IR
 Should work with any compiler, linker and OS LLVM works with.
 
 ## Building LLVM/MLIR
+See https://mlir.llvm.org/getting_started for more, 
+but this is a useful summary.
+*Note that you need to checkout the right commit as below.*
 
 ```bash
 # Prepare
@@ -72,22 +80,17 @@ $ git clone git@github.com:llvm/llvm-project.git
 
 # Make sure you got the right commit
 # Be sure to update this line when that changes
-$ git co -b ksc e03394c6a6f
+$ git checkout -b ksc `cat $KNOSSOS/etc/llvm-branch.txt`
 
 $ cd llvm-project
 $ mkdir build && cd build
 
 # Build
-$ cmake -G Ninja ../llvm \
-        -DLLVM_ENABLE_PROJECTS=mlir \
-        -DLLVM_BUILD_EXAMPLES=ON \
-        -DLLVM_TARGETS_TO_BUILD="X86" \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DLLVM_ENABLE_ASSERTIONS=ON \
-        -DCMAKE_C_COMPILER=clang \
-        -DCMAKE_CXX_COMPILER=clang++ \
-        -DLLVM_ENABLE_LLD=ON
+$ . $KNOSSOS/mlir/run-cmake-in-llvm.sh
 $ ninja check-mlir
+
+# To install, one can change the prefix with: 
+$ cmake -DCMAKE_INSTALL_PREFIX=/tmp/llvm -P cmake_install.cmake
 ```
 
 # Implementation Details

@@ -531,8 +531,6 @@ primFunCallResultTy_maybe fun args
       ("build"    , TypeTuple
                      [TypeInteger, TypeLam TypeInteger t])   -> Just (TypeVec t)
 
-      -- (pr a b c) prints its arguments to stdout, with banners.  We should deprecate it.
-      ("pr"       , _)                                     -> Just TypeInteger
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                     -> Just TypeInteger
       ("sumbuild" , TypeTuple
@@ -564,7 +562,6 @@ isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
                        , "$trace"   -- ($trace f args)            Print and return (f args)
-                       , "pr"       -- (pr "msg" 3)               Print "msg\n---3\n"
                        , "print"    -- (print "msg" 3)            Print "msg3"
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))

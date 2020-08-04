@@ -243,9 +243,9 @@ If you prefer block comments then use pairs of #| and |#
 ; the resulting C++ file and thus the entry point of the compiled
 ; binary.
 ;
-; You can use the pr function for printing values.
+; You can use the print function for printing values.
 (def main Integer ()
-     (pr "Hello world"))
+     (print "Hello world"))
 
 ; Python equivalent
 ;

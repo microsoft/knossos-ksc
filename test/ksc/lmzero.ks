@@ -4,4 +4,4 @@
   (build (mul 2 (size x)) (lam (i : Integer) 1.0)))
 
 (def main Integer ()
-  (pr 1.1))
+  (print 1.1))

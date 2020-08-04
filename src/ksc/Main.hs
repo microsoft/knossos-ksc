@@ -39,7 +39,7 @@ hspec = do
 
 main :: IO ()
 main = do
-  System.Environment.getArgs >>= \case
+  System.Environment.getArgs >>= \args -> case args of
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
     ["--test-except-codegen"]
@@ -54,8 +54,12 @@ main = do
       -> generateCppWithoutDiffs rest
     "--compile-and-run":rest
       -> compileAndRun rest
-
-    _ -> fail "Unknown arguments"
+    ["--test-run-ks"]
+      -> do 
+          testRunKS "g++-7" "test/ksc/gmm.ks"
+          testRunKS "g++-7" "test/ksc/fold.ks"
+         
+    _ -> fail ("Unknown arguments: " ++ intercalate " " args)
 
 parseErr :: Parsec [String] () a -> [String] -> a
 parseErr p s = either (error . show) id (parse p "" s)
@@ -101,7 +105,7 @@ option s = do
 
 testWithfsTest :: String -> IO ()
 testWithfsTest fsTestKs = do
-  futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
+  -- futharkCompileKscPrograms =<< ksTestFiles "test/ksc/"
   let compiler = "g++-7"
   testC compiler [fsTestKs]
 
@@ -243,7 +247,7 @@ demoFOnTestPrograms ksTests = do
 -- Drop items from the list while the condition is satisfied, and also
 -- drop the first element satisfying the condition, if any.
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
-dropWhile1 f = tail . dropWhile f
+dropWhile1 pred = tail . dropWhile pred
 
 testRunKSVia :: (String -> Maybe int -> [String] -> FilePath -> IO String)
              -> String -> [Char] -> IO ()
@@ -254,16 +258,16 @@ testRunKSVia via_ compiler ksFile = do
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
       groupedTestResults = group testResults
-        where group = \case
-                "----":testName:"----":testResult:rest ->
+        where group ls = case ls of
+                "----":testName:testResult:rest ->
                   (testName, boolOfIntString testResult):group rest
                 [] -> []
-                _ -> error "Unexpected test result structure"
+                _ -> error ("Unexpected test result structure" ++ unlines ls)
 
-              boolOfIntString = \case
+              boolOfIntString context = case context of
                 "0" -> False
                 "1" -> True
-                s   -> error ("boolOfIntString: Unexpected " ++ s)
+                s   -> error ("boolOfIntString: Unexpected " ++ s ++ " at " ++ context)
 
       failed   = not . snd
       failures = map fst (filter failed groupedTestResults)

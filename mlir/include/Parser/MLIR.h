@@ -37,8 +37,8 @@ class Generator {
   mlir::FuncOp currentFunc;
 
   // Cache for functions and variables
-  std::map<llvm::StringRef, mlir::FuncOp> functions;
-  std::map<llvm::StringRef, Values> variables;
+  std::map<std::string, mlir::FuncOp> functions;
+  std::map<std::string, Values> variables;
 
   // Helpers
   Types ConvertType(const AST::Type &type, size_t dim=0);
@@ -53,21 +53,19 @@ class Generator {
   // Function level builders
   Values buildNode(const AST::Expr*);
   Values buildBlock(const AST::Block*);
-  Values buildOp(const AST::Operation*);
+  Values buildCall(const AST::Call*);
+  mlir::Value buildArg(const AST::Call*, size_t);
   Values buildCond(const AST::Condition*);
   Values buildLet(const AST::Let*);
   Values buildLiteral(const AST::Literal*);
   Values buildVariable(const AST::Variable*);
   Values buildBuild(const AST::Build*);
-  Values buildIndex(const AST::Index*);
-  Values buildSize(const AST::Size*);
   Values buildTuple(const AST::Tuple*);
   Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
-  Values buildPrint(const AST::Print*);
 
   // Variables
-  void declareVariable(llvm::StringRef name, Values vals);
+  void declareVariable(std::string const& name, Values vals);
   void declareVariable(const AST::Variable* var, Values vals = {});
 
   // Argument serialisation (tuples)
@@ -79,7 +77,7 @@ public:
   // Build from MLIR source
   const mlir::ModuleOp build(const std::string& mlir);
   // Build from KSC AST
-  const mlir::ModuleOp build(const AST::Expr* root);
+  const mlir::ModuleOp build(const AST::Block* extraDecls, const AST::Expr* root);
   // Emit LLVM IR
   std::unique_ptr<llvm::Module> emitLLVM(int optLevel=0);
 };

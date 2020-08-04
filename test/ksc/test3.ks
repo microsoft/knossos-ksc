@@ -32,7 +32,7 @@
           (delta 0.00001)
           (dv (build 4 (lam (i : Integer) (mul (to_float i) delta))))
           (dq (build 8 (lam (i : Integer) (div delta (to_float (add 3 i)))))))
-        (pr 1
+        (print 1
             ; (D$f v1 v1)
             ; (D$g 1.1)
             (fwd$g 1.1 0.001)

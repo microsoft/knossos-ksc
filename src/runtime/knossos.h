@@ -202,6 +202,11 @@ namespace ks
 		typedef tuple<T, Ts...> type;
 	};
 
+	// This needs to be declared before tuple_print in order to support printing of nested tuples
+	// (gcc will accept the code even without this declaration, but clang will not).
+	template <class... Ts>
+	std::ostream& operator<<(std::ostream& s, tuple<Ts...> const& t);
+
 	template <size_t i, class... Ts>
 	std::ostream& tuple_print(std::ostream& s, tuple<Ts...> const& t)
 	{
@@ -1577,22 +1582,6 @@ namespace ks
 	{
 		std::cout << "Grad Trace[" << a << "]" << std::endl;
 		return LM::One<T>::mk(a);
-	}
-
-	// ========================= Printing primitive for KS files ===============
-	template <class T>
-	int pr(T a)
-	{
-		std::cout << a << std::endl;
-		return 0;
-	}
-
-	template <class T, class... Ts>
-	int pr(T a, Ts... t)
-	{
-		pr(a);
-		std::cout << "----\n";
-		return 1 + pr(t...);
 	}
 
 	template <class T>

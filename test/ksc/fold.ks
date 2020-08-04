@@ -86,32 +86,23 @@
               (lt (abs (sub actual expected))
                       (mul (add (abs expected) (abs actual))
                          tolerance)))))
-       (pr
-        "v"
-        v
-        "c"
-        c
-        "dv"
-        dv
-        "dc"
-        dc
-        "fold(x)"
-        fold_x
-        "fold(x + dx)"
-        fold_xpd
-        "fwd fold"
-        fold_fwd
-        "fd fold"
-        fold_fd
-        "fwd - fd"
-        (sub fold_fwd fold_fd)
-        "rev fold"
-        (rev$prod_fold (tuple v c) 1.0)
-        "checked (should be small)"
-        checked
+       (print
+        "v = " v "\n"
+        "c = " c "\n"
+        "dv = " dv "\n"
+        "dc = " dc "\n"
+        "fold(x) = " fold_x "\n"
+        "fold(x + dx) = " fold_xpd "\n"
+        "fwd fold = " fold_fwd "\n"
+        "fd fold = " fold_fd "\n"
+        "fwd - fd = " (sub fold_fwd fold_fd) "\n"
+        "rev fold = " (rev$prod_fold (tuple v c) 1.0) "\n"
+        "checked (should be small) = " checked "\n" 
         "TESTS FOLLOW"
-        "fwd OK"
+        "\n----\n"
+        "fwd OK\n"
         everything_works_as_expected
-        "rev OK"
-        rev_ok
+        "\n----\n"
+        "rev OK\n"
+        rev_ok "\n"
         )))
