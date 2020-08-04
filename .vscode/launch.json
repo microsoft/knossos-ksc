@@ -25,13 +25,29 @@
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bin/ksc-mlir",
 			"_args": ["TEST"],
-			"args": ["AST", "${workspaceFolder}/mlir/test/Ksc/build.ks"],
-			"miDebuggerPath": "/usr/bin/gdb",
+			"args": ["LLVM", "${workspaceFolder}/mlir/test/Ksc/tuple.ks"],
+			"_miDebuggerPath": "/usr/bin/gdb",
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			],
 			"externalConsole": false,
 			"logging": {
 			  "moduleLoad": false,
 			  "trace": true
 			}
+		},
+		{
+			"name": "lldb ksc-mlir",
+			"cwd": "${workspaceRoot}",
+			"type": "lldb",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/bin/ksc-mlir",
+			"args": "LLVM ${workspaceFolder}/mlir/test/Ksc/tuple.ks"
 		}
 	]
 }

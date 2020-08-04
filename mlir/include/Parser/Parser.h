@@ -15,6 +15,31 @@
 
 namespace Knossos {
 namespace AST {
+  
+/// Code location.
+struct Location {
+  std::shared_ptr<std::string> filename;
+  size_t line;
+  size_t column;
+
+  Location(const std::string& s, size_t line, size_t column):
+    filename(std::make_shared<std::string>(s)),
+    line(line),
+    column(column)
+  {}
+
+  void nl() {
+    ++line;
+    column = 1;
+  }
+  void inc() {
+    ++column;
+  }
+
+  std::ostream& dump(std::ostream&) const;
+};
+
+inline std::ostream& operator<<(std::ostream& s, Location const& loc) { return loc.dump(s); }
 
 //================================================ Tokeniser / Lexer
 
@@ -25,8 +50,10 @@ namespace AST {
 /// Do not confuse with "continuation values", those are higher level.
 struct Token {
   using Ptr = std::unique_ptr<Token>;
-  Token(std::string str) : isValue(true), value(str) {}
-  Token() : isValue(false) {}
+  Token(Location loc, std::string str) : isValue(true), value(str), loc(loc) {}
+  Token(Location loc) : isValue(false), loc(loc) {}
+
+  const bool isValue;
 
   void addChild(Token::Ptr tok) {
     assert(!isValue && "Can't add children to values");
@@ -57,17 +84,21 @@ struct Token {
     return llvm::ArrayRef<Ptr>(children).slice(1);
   }
 
-  const bool isValue;
+  Location const& getLocation() const  { return loc; }
+
   size_t size() const { return children.size(); }
 
   std::ostream& dump(std::ostream& s) const;
 
   std::string pprint(int width = 80) const;
 
+
 private:
   std::string value;
   std::vector<Ptr> children;
+  Location loc;
 
+  // Pretty printing
   struct ppresult {
     std::string s;
     size_t width;
@@ -92,17 +123,16 @@ inline std::string Token::pprint(int width) const
 class Lexer {
   std::string code;
   size_t len;
-  Token::Ptr root;
+  Location loc;
+  Token::Ptr root; // TODO move to lex()
   size_t multiLineComments;
 
   /// Build a tree of tokens
   size_t lexToken(Token *tok, size_t pos);
 
 public:
-  Lexer(std::string &&code)
-      : code(code), len(code.size()), root(new Token()), multiLineComments(0) {
-    assert(len > 0 && "Empty code?");
-  }
+  Lexer(std::string const& filename, std::string const& code);
+  Lexer(Location const& loc, std::string const& code);
 
   Token::Ptr lex() {
     lexToken(root.get(), 0);
@@ -116,10 +146,10 @@ public:
 /// Identify each token as an AST node and build it.
 /// The parser will take ownership of the Tokens.
 class Parser {
-  Token::Ptr rootT;
-  Expr::Ptr rootE;
-  Block::Ptr extraDecls;
   Lexer lex;
+  Token::Ptr rootT;
+  Block::Ptr rootE;
+  Block::Ptr extraDecls;
 
   // TODO: Add lam
   enum class Keyword {
@@ -170,26 +200,34 @@ class Parser {
   // Specific Token parsers
   Type parseType(const Token *tok);
   Type parseRelaxedType(std::vector<const Token *> toks);
-  Expr::Ptr parseBlock(const Token *tok);
-  Expr::Ptr parseValue(const Token *tok);
-  Expr::Ptr parseCall(const Token *tok);
+  Block::Ptr parseBlock(const Token *tok);
+  Expr::Ptr parseValue(const Token *tok);  // Literal or Variable use
+  Call::Ptr parseCall(const Token *tok);
   Variable::Ptr parseVariable(const Token *tok);
-  Expr::Ptr parseLet(const Token *tok);
-  Expr::Ptr parseDecl(const Token *tok);
-  Expr::Ptr parseDef(const Token *tok);
-  Expr::Ptr parseCond(const Token *tok);
-  Expr::Ptr parseBuild(const Token *tok);
-  Expr::Ptr parseTuple(const Token *tok);
-  Expr::Ptr parseGet(const Token *tok);
-  Expr::Ptr parseFold(const Token *tok);
-  Expr::Ptr parseRule(const Token *tok);
+  Let::Ptr parseLet(const Token *tok);
+  Declaration::Ptr parseDecl(const Token *tok);
+  Definition::Ptr parseDef(const Token *tok);
+  Rule::Ptr parseRule(const Token *tok);
+  Condition::Ptr parseCond(const Token *tok);
+  Build::Ptr parseBuild(const Token *tok);
+  Tuple::Ptr parseTuple(const Token *tok);
+  Get::Ptr parseGet(const Token *tok);
+  Fold::Ptr parseFold(const Token *tok);
 
 public:
-  Parser(std::string code): 
+  Parser(std::string const& filename, std::string const& code): 
       rootT(nullptr), 
       rootE(nullptr),
       extraDecls(nullptr),
-      lex(std::move(code)) 
+      lex(filename, code) 
+      {
+        extraDecls = std::make_unique<Block>();
+      }
+  Parser(Location const& loc, std::string const& code): 
+      rootT(nullptr), 
+      rootE(nullptr),
+      extraDecls(nullptr),
+      lex(loc, code) 
       {
         extraDecls = std::make_unique<Block>();
       }

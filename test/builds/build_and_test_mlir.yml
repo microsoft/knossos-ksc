@@ -15,7 +15,7 @@ jobs:
 
   - task: Cache@2
     inputs:
-      key: 'llvm_mlir | "$(Agent.OS)" | $(LLVM_BRANCH)'
+      key: 'llvm_mlir | "$(Agent.OS)" | "$(LLVM_BRANCH)"'
       path: llvm-project
       cacheHitVar: CACHE_RESTORED
 

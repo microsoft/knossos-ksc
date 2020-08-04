@@ -6,7 +6,12 @@
 using namespace std;
 using namespace Knossos::AST;
 
-#define PARSE_ASSERT(p) ASSERT(p) << "\nAT: " << tok << std::endl << "FAILED: "
+std::ostream& Location::dump(std::ostream& s) const
+{
+  return s << *filename << ":" << line << ":" << column;
+}
+
+#define PARSE_ASSERT(p) ASSERT(p) << "\nat " << tok << "\n" << tok->getLocation() << ": error: "
 
 //================================================ Helpers
 
@@ -81,6 +86,26 @@ static Literal::Ptr getZero(Type type) {
 
 //================================================ Lex source into Tokens
 
+Lexer::Lexer(std::string const& filename, std::string const& code)
+    : code(code)
+    , len(code.size())
+    , loc {filename, 1, 0 } 
+    , root(new Token(loc))
+    , multiLineComments(0)
+{
+  assert(len > 0 && "Empty code?");
+}
+
+Lexer::Lexer(Location const& loc, std::string const& code)
+    : code(code)
+    , len(code.size())
+    , loc(loc)
+    , root(new Token(loc))
+    , multiLineComments(0)
+{
+  assert(len > 0 && "Empty code?");
+}
+
 // Lex a token out, recurse if another entry point is found
 size_t Lexer::lexToken(Token *tok, size_t pos) {
   const char TAB = 0x09;
@@ -95,7 +120,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
         tokenStart = ++pos;
       break;
     case '#':
-      if (code[pos+1] != '|')
+      if (pos+1 < len && code[pos+1] != '|')
         break;
       PARSE_ASSERT(multiLineComments == 0);
       pos += 2; // consume #|
@@ -104,7 +129,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       while (multiLineComments) {
         switch (code[pos]) {
         case '|':
-          if (code[pos+1] == '#') {
+          if (pos+1 < len && code[pos+1] == '#') {
             multiLineComments--;
             pos++;
           }
@@ -117,15 +142,20 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
           }
           pos++;
           break;
+        case '\n':
+          loc.nl();
         default:
           pos++;
+          loc.inc();
         }
       }
       tokenStart = pos;
       break;
+    case '\n':
+      loc.nl();
     case TAB:
     case SPC:
-    case '\n':
+    case '\xc2': // TODO other non-printing spaces?
     case '\r':
       // "Whitespace" is allowed inside strings
       if (isInString) {
@@ -135,7 +165,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       // Maybe end of a value
       if (tokenStart != pos) {
         tok->addChild(
-            make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
+            make_unique<Token>(loc, code.substr(tokenStart, pos - tokenStart)));
       }
       // Or end of a token, which we ignore
       tokenStart = ++pos;
@@ -144,13 +174,13 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
       // Maybe end of a value
       if (tokenStart != pos) {
         tok->addChild(
-            make_unique<Token>(code.substr(tokenStart, pos - tokenStart)));
+            make_unique<Token>(loc, code.substr(tokenStart, pos - tokenStart)));
       }
       // Finished parsing this token
       return ++pos;
     case '(': {
       // Recurse into sub-tokens
-      auto t = make_unique<Token>();
+      auto t = make_unique<Token>(loc);
       tokenStart = pos = lexToken(t.get(), pos + 1);
       tok->addChild(move(t));
       break;
@@ -161,7 +191,7 @@ size_t Lexer::lexToken(Token *tok, size_t pos) {
         size_t start = tokenStart - 1;
         size_t length = (pos - start + 1);
         tok->addChild(
-            make_unique<Token>(code.substr(start, length)));
+            make_unique<Token>(loc, code.substr(start, length)));
       }
       tokenStart = ++pos;
       isInString = !isInString;
@@ -191,9 +221,29 @@ Declaration *Parser::addExtraDecl(std::string name, std::vector<Type> argTypes, 
 }
 
 //================================================ Parse Tokens into Exprs
+struct ParseEnter {
+  static int verbose;
+  static int indent;
+
+  ParseEnter(char const* function, const Token* tok) { 
+    ++indent;
+    if (verbose > 0) 
+      std::cerr 
+        << std::string(indent, ' ') 
+        << "Enter [" << function << "]:" << tok; 
+  }
+  ~ParseEnter() {
+    --indent;
+  }
+};
+int ParseEnter::indent = 0;
+int ParseEnter::verbose = 0;
+#define PARSE_ENTER ParseEnter parse_enter { __FUNCTION__, tok }
 
 // Creates an Expr for each token, validating
 Expr::Ptr Parser::parseToken(const Token *tok) {
+  PARSE_ENTER;
+
   // Values are all strings (numbers will be converted later)
   // They could be variable use, type names, literals
   if (tok->isValue) {
@@ -209,10 +259,6 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
   // If the first expr is not a value, this is a block of blocks
   auto head = tok->getHead();
   if (!head->isValue) {
-    std::cerr << "NON-VALUE HEAD!\n" << tok;
-    // Simple pass-through
-    if (tok->size() == 1)
-      return parseToken(head);
     // This is an actual block
     return parseBlock(tok);
   }
@@ -254,15 +300,17 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
 }
 
 // Values (variable names, literals, type names)
-Expr::Ptr Parser::parseBlock(const Token *tok) {
+Block::Ptr Parser::parseBlock(const Token *tok) {
+  PARSE_ENTER;
   Block *b = new Block();
   for (auto &c : tok->getChildren())
     b->addOperand(parseToken(c.get()));
-  return unique_ptr<Expr>(b);
+  return unique_ptr<Block>(b);
 }
 
 // Parses type declarations (vector, tuples)
 Type Parser::parseType(const Token *tok) {
+  PARSE_ENTER;
   // Scalar type
   if (tok->isValue) {
     Type::ValidType ty = Str2Type(tok->getValue());
@@ -314,6 +362,8 @@ Type Parser::parseRelaxedType(vector<const Token *> toks) {
 
 // Values (variable names, literals, type names)
 Expr::Ptr Parser::parseValue(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->isValue);
   string value = tok->getValue().str();
 
@@ -337,7 +387,9 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
 
 // Calls (fun arg1 arg2 ...)
 // Checks types agains symbol table
-Expr::Ptr Parser::parseCall(const Token *tok) {
+Call::Ptr Parser::parseCall(const Token *tok) {
+  PARSE_ENTER;
+
   string name = tok->getHead()->getValue().str();
   int arity = tok->size() - 1;
 
@@ -450,6 +502,8 @@ Expr::Ptr Parser::parseCall(const Token *tok) {
 // ... (let ((v value)) body) ...  ; definition
 //           ^^^^^^^^^
 Variable::Ptr Parser::parseVariable(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->size() > 1);
   llvm::ArrayRef<Token::Ptr> children = tok->getChildren();
   string value = children[0]->getValue().str();
@@ -487,7 +541,9 @@ Variable::Ptr Parser::parseVariable(const Token *tok) {
 }
 
 // Variable declaration: (let (x 10) (add x 10))
-Expr::Ptr Parser::parseLet(const Token *tok) {
+Let::Ptr Parser::parseLet(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->size() == 3);
   const Token *bond = tok->getChild(1);
   PARSE_ASSERT(!bond->isValue);
@@ -511,14 +567,19 @@ Expr::Ptr Parser::parseLet(const Token *tok) {
 }
 
 // Declares a function (and add it to symbol table)
-Expr::Ptr Parser::parseDecl(const Token *tok) {
+Declaration::Ptr Parser::parseDecl(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->size() == 4) << "Decl should be (edef name type args)";
   const Token *name = tok->getChild(1);
   const Token *ty = tok->getChild(2);
   const Token *args = tok->getChild(3);
+
   PARSE_ASSERT(name->isValue) << "Decl should be (edef name type args)";
+
   auto type = parseType(ty);
   PARSE_ASSERT(!type.isNone()) << "Parsing decl [" << name << "]";
+
   PARSE_ASSERT(!args->isValue) << "Parsing decl [" << name << "]";
 
   auto decl = make_unique<Declaration>(name->getValue(), type);
@@ -539,25 +600,31 @@ Expr::Ptr Parser::parseDecl(const Token *tok) {
 
 // Defines a function (checks from|adds to symbol table)
 // (def name type args expr)
-Expr::Ptr Parser::parseDef(const Token *tok) {
-  PARSE_ASSERT(tok->size() == 5);
+Definition::Ptr Parser::parseDef(const Token *tok) {
+  PARSE_ENTER;
+
+  PARSE_ASSERT(tok->size() == 5) << "Expect def to have 4 parts (def name Type args body)";
   const Token *name = tok->getChild(1);
-  const Token *type = tok->getChild(2);
+  const Token *tok_type = tok->getChild(2);
   const Token *args = tok->getChild(3);
   const Token *expr = tok->getChild(4);
-  PARSE_ASSERT(name->isValue && !args->isValue);
+  
+  PARSE_ASSERT(name->isValue);
+
+  auto type = parseType(tok_type);
+  PARSE_ASSERT(!type.isNone()) << "Unknown return type [" << tok_type << "]";
+
   vector<Variable::Ptr> arguments;
-  // If there is only one child
+  // Single var: (v 2.3)
   if (args->size() && args->getChild(0)->isValue)
     arguments.push_back(parseVariable(args));
-  // Or if there are many
+  // Many vars: ((a 1) (b 2))
   else
     for (auto &a : args->getChildren())
       arguments.push_back(parseVariable(a.get()));
 
   // Create node early, to allow recursion
-  auto node = make_unique<Definition>(name->getValue(),
-                                      parseType(type));
+  auto node = make_unique<Definition>(name->getValue(), type);
   std::vector<Type> argTypes;
   for (auto &a : arguments) {
     PARSE_ASSERT(a->kind == Expr::Kind::Variable);
@@ -566,16 +633,20 @@ Expr::Ptr Parser::parseDef(const Token *tok) {
   }
   Signature sig {name->getValue().str(), argTypes};
   function_decls[sig] = node->getDeclaration();
-
+  
   // Function body is a block, create one if single expr
   auto body = parseToken(expr);
+  PARSE_ASSERT(type == body->getType()) << "Return type declared as [" << type << "], but body has type [" << body->getType() << "]";
+
   node->setImpl(move(body));
 
   return node;
 }
 
 // Conditional: (if (cond) (true block) (false block))
-Expr::Ptr Parser::parseCond(const Token *tok) {
+Condition::Ptr Parser::parseCond(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->size() == 4);
   auto c = parseToken(tok->getChild(1));
   auto i = parseToken(tok->getChild(2));
@@ -584,7 +655,9 @@ Expr::Ptr Parser::parseCond(const Token *tok) {
 }
 
 // Loops, ex: (build N (lam (i : Integer) (add i i)))
-Expr::Ptr Parser::parseBuild(const Token *tok) {
+Build::Ptr Parser::parseBuild(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->size() == 3);
 
   // Range (can be dynamic)
@@ -605,9 +678,9 @@ Expr::Ptr Parser::parseBuild(const Token *tok) {
 }
 
 // Tuple, ex: (tuple 10.0 42 (add 1.0 2.0))
-Expr::Ptr Parser::parseTuple(const Token *tok) {
-  PARSE_ASSERT(tok->size() > 2);
-  PARSE_ASSERT(tok->getChild(0)->isValue);
+Tuple::Ptr Parser::parseTuple(const Token *tok) {
+  PARSE_ASSERT(tok->size() > 0);
+  PARSE_ASSERT(tok->getChild(0)->isValue && tok->getChild(0)->getValue() == "tuple");
   std::vector<Expr::Ptr> elements;
   for (auto &c: tok->getTail())
     elements.push_back(parseToken(c.get()));
@@ -615,7 +688,7 @@ Expr::Ptr Parser::parseTuple(const Token *tok) {
 }
 
 // Index, ex: (get$7$9 tuple)
-Expr::Ptr Parser::parseGet(const Token *tok) {
+Get::Ptr Parser::parseGet(const Token *tok) {
   PARSE_ASSERT(tok->size() == 2);
   PARSE_ASSERT(tok->getChild(0)->isValue);
   llvm::StringRef get = tok->getChild(0)->getValue();
@@ -630,7 +703,9 @@ Expr::Ptr Parser::parseGet(const Token *tok) {
 }
 
 // Fold, ex: (fold (lambda) init vector)
-Expr::Ptr Parser::parseFold(const Token *tok) {
+Fold::Ptr Parser::parseFold(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->size() == 4);
   // Lambda format: (lam (acc_x : (Tuple AccTy ElmTy)) (expr))
   const Token *lam = tok->getChild(1);
@@ -657,7 +732,9 @@ Expr::Ptr Parser::parseFold(const Token *tok) {
 }
 
 // Rule: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
-Expr::Ptr Parser::parseRule(const Token *tok) {
+Rule::Ptr Parser::parseRule(const Token *tok) {
+  PARSE_ENTER;
+
   PARSE_ASSERT(tok->size() == 5);
   const Token *name = tok->getChild(1);
   PARSE_ASSERT(name->isValue);
@@ -718,6 +795,5 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
 }
 
 std::ostream& Token::dump(std::ostream& s) const {
-  return s << pprint(this, 0, 80).s << std::endl;
+  return s << pprint(this, 0, 80).s;
 }
-

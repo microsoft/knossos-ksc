@@ -16,13 +16,6 @@
 namespace Knossos {
 namespace AST {
 
-/// Code location, for MLIR generation
-struct Location {
-  std::string filename = "";
-  size_t line = 0;
-  size_t column = 0;
-};
-
 /// Type checking occurs from bottom up. Each node is responsible for its own
 /// checks and, if valid, their return type can be used for the parents.
 /// Function and variable types are checked by the symbol table
@@ -204,9 +197,6 @@ struct Expr {
 
   /// Type of the node, for quick access
   const Kind kind;
-
-  /// TODO: Future place for source location
-  const Location loc;
 
   virtual ~Expr() = default;
   virtual std::ostream& dump(std::ostream& s, size_t tab = 0) const;

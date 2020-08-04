@@ -41,6 +41,9 @@ int main(int argc, char **argv) {
 
   // Action
   Action action = Action::NONE;
+
+  int optlevel = 0;
+  
   string aStr(argv[1]);
   if (aStr == "TEST")
     action = Action::TEST;
@@ -106,10 +109,11 @@ int main(int argc, char **argv) {
   }
 
   // Read whole file into a string
+  // TODO: Don't
   string code((istreambuf_iterator<char>(file)),istreambuf_iterator<char>());
 
   // Parse and output AST if requested
-  Parser p(code);
+  Parser p(filename.str(), code);
   if (source == Source::KSC) {
     p.parse();
     if (!p.getRootNode()) {
@@ -139,7 +143,7 @@ int main(int argc, char **argv) {
     module.print(llvm::outs());
   } 
   else if (action == Action::EMIT_LLVM) {
-    auto llvm = g.emitLLVM();
+    auto llvm = g.emitLLVM(optlevel);
     if (!llvm) {
       cerr << "ERROR: LLVM lowering failed\n";
       return 1;
