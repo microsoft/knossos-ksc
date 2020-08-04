@@ -21,7 +21,7 @@
   |# comment
 |#
 
-(def main Integer #| inline multi-line comment |# () 42) ; Mid-line comment
+(def main Integer#| inline multi-line comment |# () 42) ; Mid-line comment
 ; MLIR:       func @main() -> i64 {
 ; MLIR-NEXT:    %c42{{.*}} = constant 42 : i64
 ; MLIR-NEXT:    return %c42{{.*}} : i64

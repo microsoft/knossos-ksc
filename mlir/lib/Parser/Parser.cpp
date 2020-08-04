@@ -6,7 +6,8 @@
 using namespace std;
 using namespace Knossos::AST;
 
-#define PARSE_ASSERT(p) ASSERT(p) << "\nat " << tok << "\n" << tok->getLocation() << ": error: "
+#define PARSE_ASSERT2(p, loctok) ASSERT(p) << "\nat " << tok << "\n" << loctok->getLocation() << ": error: "
+#define PARSE_ASSERT(p) PARSE_ASSERT2(p, tok)
 
 //================================================ Helpers
 
@@ -367,7 +368,7 @@ Call::Ptr Parser::parseCall(const Token *tok) {
 #undef mkCall
 
   // Nothing matched...
-  PARSE_ASSERT(0) << "Unrecognized function: " << sig;
+  PARSE_ASSERT2(0, tok->getHead()) << "Unrecognized function: " << sig;
 }
 
 
@@ -421,11 +422,11 @@ Let::Ptr Parser::parseLet(const Token *tok) {
 
   PARSE_ASSERT(tok->size() == 3);
   const Token *bond = tok->getChild(1);
-  PARSE_ASSERT(!bond->isValue);
+  PARSE_ASSERT2(!bond->isValue, bond);
   vector<Expr::Ptr> vars;
   // Single variable binding
   if (bond->getChild(0)->isValue) {
-    PARSE_ASSERT(bond->size() == 2);
+    PARSE_ASSERT2(bond->size() == 2, bond) << "Binding (v val), not [" << bond << "]";
     vars.push_back(parseVariable(bond));
     // Multiple variables
   } else {
@@ -450,12 +451,12 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
   const Token *ty = tok->getChild(2);
   const Token *args = tok->getChild(3);
 
-  PARSE_ASSERT(name->isValue) << "Decl should be (edef name type args)";
+  PARSE_ASSERT2(name->isValue, name) << "Decl should be (edef name type args)";
 
   auto type = parseType(ty);
-  PARSE_ASSERT(!type.isNone()) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT2(!type.isNone(), ty) << "Parsing decl [" << name << "]";
 
-  PARSE_ASSERT(!args->isValue) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT2(!args->isValue, args) << "Parsing decl [" << name << "]";
 
   auto decl = make_unique<Declaration>(name->getValue(), type);
   PARSE_ASSERT(decl);
@@ -482,12 +483,12 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   const Token *name = tok->getChild(1);
   const Token *tok_type = tok->getChild(2);
   const Token *args = tok->getChild(3);
-  const Token *expr = tok->getChild(4);
+  const Token *tok_body = tok->getChild(4);
   
-  PARSE_ASSERT(name->isValue);
+  PARSE_ASSERT2(name->isValue, name) << "Def name should be a value, not [" << name << "]";
 
   auto type = parseType(tok_type);
-  PARSE_ASSERT(!type.isNone()) << "Unknown return type [" << tok_type << "]";
+  PARSE_ASSERT2(!type.isNone(), tok_type) << "Unknown return type [" << tok_type << "]";
 
   vector<Variable::Ptr> arguments;
   // Single var: (v 2.3)
@@ -510,8 +511,8 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   function_decls[sig] = node->getDeclaration();
   
   // Function body is a block, create one if single expr
-  auto body = parseToken(expr);
-  PARSE_ASSERT(type == body->getType()) << "Return type declared as [" << type << "], but body has type [" << body->getType() << "]";
+  auto body = parseToken(tok_body);
+  PARSE_ASSERT2(type == body->getType(), tok_body) << "Return type declared as [" << type << "], but body has type [" << body->getType() << "]";
 
   node->setImpl(move(body));
 

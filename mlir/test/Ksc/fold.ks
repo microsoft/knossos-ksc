@@ -1,4 +1,4 @@
-m; RUN: ksc-mlir MLIR %s 2>&1 | FileCheck %s --check-prefix=MLIR
+; RUN: ksc-mlir MLIR %s 2>&1 | FileCheck %s --check-prefix=MLIR
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
 (def prod_fold Integer ((v : (Vec Integer)) (closure : Integer))
