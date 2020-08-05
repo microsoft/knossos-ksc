@@ -1,11 +1,19 @@
 TODO-mlir.txt
 
+- Implement MLIR->KS
 - Implement prelude.
+- Fix print, hence strings -- https://stackoverflow.com/questions/1061753/how-can-i-implement-a-string-data-type-in-llvm
 - Remove more keywords: sum, fold, build, get, tuple
-- Location info
-- Hash consing
+- Add keyword: assert, lam
+- Pretty-print AST as KS
 - Python binding
 - Restore "sum" 
-- Fix print, hence strings -- https://stackoverflow.com/questions/1061753/how-can-i-implement-a-string-data-type-in-llvm
 - Undo untupling - handle tuples https://mlir.llvm.org/docs/LangRef/#standard-types
                     https://mlir.llvm.org/doxygen/classmlir_1_1TupleType.html 
+- Implement AD
+- Implement lambda lifting
+- Hash consing
+- Implement rules
+
+Done:
+- Location info
