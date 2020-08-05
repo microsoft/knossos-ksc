@@ -63,12 +63,12 @@ symbolLook = {
     "Tensor": [sexpdata.Symbol("Vec"), [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")]]  # float vs integer? also determine rank instead of hardcode
 }
 
-def managleDebugName(name):
+def mangleDebugName(name):
     return "_" + name.replace(".", "_")
 
 def make_arg(input):
     return [
-        sexpdata.Symbol(managleDebugName(input.debugName())),
+        sexpdata.Symbol(mangleDebugName(input.debugName())),
         sexpdata.Symbol(":"),
         symbolLook[str(input.type())]
     ]
@@ -91,7 +91,7 @@ def make_constant(node):
     return [sexpdata.Symbol("\n"), sexpdata.Symbol("_" + value.debugName()), literal]    
 
 def make_print(node):
-    mangled_id = managleDebugName(node.inputsAt(0).debugName())
+    mangled_id = mangleDebugName(node.inputsAt(0).debugName())
     return sexpdata.Symbol("print"), sexpdata.Symbol(mangled_id)
 
 def make_list_init_inner(values, i, rescue):
@@ -99,13 +99,13 @@ def make_list_init_inner(values, i, rescue):
     rhs = [sexpdata.Symbol("assert"), sexpdata.Symbol("false"), sexpdata.Symbol(rescue)]
     if (len(values) > 1):
         rhs = make_list_init_inner(values[1:], i + 1, rescue)
-    return [sexpdata.Symbol("if"), [sexpdata.Symbol("eq"), sexpdata.Symbol("ni"), i], sexpdata.Symbol(managleDebugName(value.debugName())), rhs]
+    return [sexpdata.Symbol("if"), [sexpdata.Symbol("eq"), sexpdata.Symbol("ni"), i], sexpdata.Symbol(mangleDebugName(value.debugName())), rhs]
 
 def make_list_init(values):
     # We may switch to vector literals later: https://github.com/microsoft/knossos-ksc/issues/310
     # in the meantime here's a quick-and-dirty translation to chained if
     # CAUTION: if it goes out of range it uses the first value!
-    return make_list_init_inner(values, 0, managleDebugName(values[0].debugName()))
+    return make_list_init_inner(values, 0, mangleDebugName(values[0].debugName()))
 
 def make_list(node):
     value = node.outputsAt(0)
@@ -135,31 +135,31 @@ def make_tensor(node):
 
     return [
         sexpdata.Symbol("\n"),
-        sexpdata.Symbol(managleDebugName(value.debugName())),
-        sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))]
+        sexpdata.Symbol(mangleDebugName(value.debugName())),
+        sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName()))]
 
 def make_add(node):
     value = node.outputsAt(0)
     if generate_edef:
          return [
             sexpdata.Symbol("\n"),
-            sexpdata.Symbol(managleDebugName(value.debugName())),
+            sexpdata.Symbol(mangleDebugName(value.debugName())),
             [
                 sexpdata.Symbol("addATEN"),
-                sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName())),
-                sexpdata.Symbol(managleDebugName(node.inputsAt(1).debugName()))
+                sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())),
+                sexpdata.Symbol(mangleDebugName(node.inputsAt(1).debugName()))
             ]
         ]
     else:
         print("WARNING: aten::add just returns unmodified tensor, consider using --generate_edef")
         return [
             sexpdata.Symbol("\n"),
-            sexpdata.Symbol(managleDebugName(value.debugName())),
-            sexpdata.Symbol(managleDebugName(node.inputsAt(0).debugName()))
+            sexpdata.Symbol(mangleDebugName(value.debugName())),
+            sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName()))
         ]
 
 def make_return(node):
-    mangled_id = managleDebugName(node.inputsAt(0).debugName())
+    mangled_id = mangleDebugName(node.inputsAt(0).debugName())
     return sexpdata.Symbol(mangled_id)
 
 def make_callfunction(node):
@@ -169,10 +169,10 @@ def make_callfunction(node):
     function_name = function_name_constant.s("name")
     return [
         sexpdata.Symbol("\n"),
-        sexpdata.Symbol(managleDebugName(value.debugName())),
+        sexpdata.Symbol(mangleDebugName(value.debugName())),
         [ # get a function call - brackets are escaped by sexpdata
             sexpdata.Symbol(function_name),
-            sexpdata.Symbol(managleDebugName(input1.debugName())),
+            sexpdata.Symbol(mangleDebugName(input1.debugName())),
         ]
     ]
 
