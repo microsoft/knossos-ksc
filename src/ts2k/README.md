@@ -3,7 +3,7 @@
 TorchScript https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html provides a way to get the full code graph which we can convert to Knossos IR.
 
 
-To demo, just `python src\ts2k\ts2k.py --input_file=test.py --output_file=test.ks`.
+To demo, create a test.py file
 
 ```python
 @torch.jit.script
@@ -16,6 +16,10 @@ def main():
     t2 = f(t)
     print("Hello world from TorchScript -> Knossos!")
 ```
+
+and run with
+
+`python src/ts2k/ts2k.py --input_file=test.py --output_file=test.ks`
 
 Which converts to this TorchScript graph:
 
