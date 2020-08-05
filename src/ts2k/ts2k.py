@@ -16,7 +16,9 @@ input_file_path = args.input_file
 filename = args.output_file
 generate_edef = args.generate_edef
 
-os.makedirs(os.path.dirname(filename), exist_ok=True)
+directory = os.path.dirname(filename)
+if (directory != ""):
+    os.makedirs(directory, exist_ok=True)
 output = open(filename, "w")
 
 # Newline constant for s-expr printing
