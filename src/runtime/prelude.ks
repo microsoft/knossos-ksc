@@ -295,8 +295,8 @@
 
 
 (edef max Float (Float Float))
-(edef D$max (LM Float Float) (Float Float))
-(edef Dt$max (Tuple Float (LM Float Float)) (Float Float))
+(edef D$max (LM (Tuple Float Float) Float) (Float Float))
+(edef Dt$max (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
 
 (edef $ranhashdoub Float (Integer))
 (edef D$$ranhashdoub (LM Integer Float) (Integer))
