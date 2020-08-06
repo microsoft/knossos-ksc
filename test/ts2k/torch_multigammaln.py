@@ -2,12 +2,14 @@
 # https://github.com/scipy/scipy/blob/c1372d8aa90a73d8a52f135529293ff4edb98fc8/scipy/special/spfun_stats.py
 
 import numpy as np
-#from scipy.special import gammaln as loggam
+
+# from scipy.special import gammaln as loggam
 import torch
 import math
 
+
 @torch.jit.script
-def multigammaln(a, d:int):
+def multigammaln(a, d: int):
     # Python builtin <built-in function array> is currently not supported in Torchscript:
     # https://github.com/pytorch/pytorch/issues/32268
 
@@ -25,6 +27,11 @@ def multigammaln(a, d:int):
 
     # Even if this works, it's going to be super slow!
 
-    res = (d * (d-1) * 0.25) * math.log(math.pi)
-    res += torch.sum(torch.tensor([math.lgamma(float(a[j-1]) - ((j - 1.)/2)) for j in range(1, d+1)]), dim=0)
+    res = (d * (d - 1) * 0.25) * math.log(math.pi)
+    res += torch.sum(
+        torch.tensor(
+            [math.lgamma(float(a[j - 1]) - ((j - 1.0) / 2)) for j in range(1, d + 1)]
+        ),
+        dim=0,
+    )
     return res
