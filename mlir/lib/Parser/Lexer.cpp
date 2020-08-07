@@ -1,6 +1,7 @@
 
 /* Copyright Microsoft Corp. 2020 */
 #include <iostream>
+#include <iomanip>
 
 #include "Parser/Lexer.h"
 #include "Parser/Assert.h"
@@ -126,7 +127,9 @@ Token::Ptr Lexer::lex()
         tok->addChild(move(t));
       }
       else
-        ASSERT(0) << "\n" << loc << ": Unhandled character [" << c << "]";
+        ASSERT(0) << "\n" << cloc << ": Unhandled character [" << c << "], code " << (0xff & c) 
+                  << " 0x" << setw(2) << setfill('0') << hex << (0xff & c);
+        // Should restore stream flags, but exiting anyway.  Wow, ostream formatting...
     }
   }
   if (verbosity+1 > depth) tok->dump(std::cerr << std::string(depth, '-'), depth) << "\n";
