@@ -1,13 +1,67 @@
-# Compiler with automatic differentiation
+# Knossos-KSC.  
+
+#### Compile a lisp-like IR with automatic differentiation and user-defined rewrites.
 
 This project is a functional compiler and code-gen tool that will
-accelerate writing AI algorithms as well as making them easier.  The
-output of code-gen is C++ code. We envisage that it will have
-interfaces for popular languages such as Python, Julia and F# which
-will make it easier for a wide variety of programmers to leverage the
-benefits.
+accelerate writing AI algorithms as well as making them easier.   The core is a lisp-like IR that can be translated from high-level 
+languages, and can be linked to a variety of backends to generate code.
 
-## Read this first
+Currently implemented frontends are
+ * Julia: j2ks
+ * F#: f2k
+ * TorchScript: ts2k
+ * KS-Lisp: The IR itself is exchanged in a lisp-like text format (see below).  
+
+Current backends:
+ * CPU/C++: Written in Haskell KSC CGen.hs
+ * GPU/Futhark: Also in Haskell KSC
+ * MLIR: Written in C++ /mlir folder
+
+Current transformers:
+ * KSC: Various Autodiff and optimization transforms, in Haskell 
+
+#### KS-Lisp: A low-sugar IR
+
+It is not particularly intended to be user-friendly, and is "low sugar",  but lispers may like to play with it.  There's a VS Code extension in etc/ks-vscode.
+
+The lisp-like IR is extremely simple -- all the language builtins are 
+in this code:
+```lisp
+;; Externally defined function "sqrt" returns a Float, takes two Float
+(edef atan2 Float (Float Float)) 
+
+#| Block comments
+ -- User-defined function f 
+ takes an Integer and Vector of (Float Float) pairs
+ and returns a Float
+|#
+(def f Float ((i : Integer) (v : Vector (Tuple Float Float)))
+  (assert (gt i 0) ; (assert TEST BODY)
+     (if (eq i 0)  ; (if TEST THENBODY ELSEBODY)
+        ; "then" branch
+        (let (tmp (index 0 v)) ; (let (VAR VAL) BODY)
+           (mul (get$1 tmp) 2.0)) ; no builtins -- e.g. mul is a function
+        ; "else" branch
+        (let ((t1 (index 0 v)) ; (let ((VAR1 VAL1) ... (VARn VALn)) BODY)
+              (t2 (f (sub i 1) v)))
+          t2))))
+
+;; Rewrite rule
+(rule "mul.commute" ((a : Float) (b : Float)) (mul a b) (mul b a))
+
+;; And compilation produces f and its derivative, as if
+(edef rev$f
+    (Tuple (Tuple) (Vector (Tuple Float Float))) ; df is tangent-type of inputs (dInteger = void)
+    (Tuple (i : Integer) (v : Vector (Tuple Float Float))) ; inputs in a tuple
+    (df: Float)) ; df    
+```
+See [the ksc syntax primer](test/ksc/syntax-primer.ks) for an
+introduction to the syntax of `.ks` files.  [The ksc test
+directory](test/ksc) provides more examples of the constructs
+available when writing `.ks` files.
+
+
+## INSTALLATION/BUILDING
 
 ### If you experience any difficulty getting started
 
@@ -204,11 +258,6 @@ command line
 ## ksc basics
 
 ### Syntax of .ks files
-
-See [the ksc syntax primer](test/ksc/syntax-primer.ks) for an
-introduction to the syntax of `.ks` files.  [The ksc test
-directory](test/ksc) provides more examples of the constructs
-available when writing `.ks` files.
 
 In the compiler, the IR is defined in [`Lang.hs`](src/ksc/Lang.hs).
 The syntax is defined by the parser in

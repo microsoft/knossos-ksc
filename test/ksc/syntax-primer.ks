@@ -1,6 +1,6 @@
 ; ksc syntax primer
 
-; Basic syntax, definining and calling functions
+; Basic syntax, defining and calling functions
 
 ; The basic building block of ksc syntax is the S-expression (also are
 ; used in Lisp and Scheme).  That means that every language construct
@@ -171,7 +171,7 @@ If you prefer block comments then use pairs of #| and |#
 
 ; There is a problem with both the Knossos and the Python
 ; implementations of triangle0.  They are recursive but not tail
-; recursive.  Therefore they consume stack space.  One tends to right
+; recursive.  Therefore they consume stack space.  One tends to write
 ; such functions in tail-recursive form if possible.  For more
 ; information on tail recursion see the Wikipedia article.
 ;
