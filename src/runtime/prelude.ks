@@ -330,7 +330,7 @@
      ((xt : Tuple Bool Bool) (dxt : Tuple Bool Bool))
      (tuple))
 (def rev$or (Tuple (Tuple) (Tuple))
-     ((xt : Tuple Bool Bool) (d_dbool : Tuple))
+     ((xt : Tuple Bool Bool) (d_dbool : (Tuple)))
      (tuple (tuple) (tuple)))
 
 (edef and Bool (Bool Bool))
@@ -340,5 +340,5 @@
      ((xt : Tuple Bool Bool) (dxt : Tuple Bool Bool))
      (tuple))
 (def rev$and (Tuple (Tuple) (Tuple))
-     ((xt : Tuple Bool Bool) (d_dbool : Tuple))
+     ((xt : Tuple Bool Bool) (d_dbool : (Tuple)))
      (tuple (tuple) (tuple)))
