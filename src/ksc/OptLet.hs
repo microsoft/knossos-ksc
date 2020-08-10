@@ -111,8 +111,16 @@ occAnalE (Let tv (Tuple es) body)
     (tv',   vstv) = occAnalTv tv
     (es',   vsr)  = unzip (map occAnalE es)
     (body', vsb)  = occAnalE body
-    vs | n == 0    = tv `M.delete` vsb
-       | otherwise = (tv `M.delete` vsb)
+    vsb_no_tv     = tv `M.delete` vsb
+    vs | n == 0    = vsb_no_tv
+
+       -- See Note [Making optLets idempotent]
+       | n == 1    = vsb_no_tv
+                     `union` vstv
+                     `union` unions vsr
+
+       -- Note [Inline tuples], item (2)
+       | otherwise = vsb_no_tv
                      `union` vstv
                      `union` markMany (unions vsr)
 
@@ -213,11 +221,13 @@ duplicate the expensive calls.  Our strategy is as follows:
          in ...get$1$2(t)...get$2$2(t)....get$1$2(t)...
 
  2. We prevent t1 and t2 from being reinlined into the tuple by
- marking them as "occurring many times" in occAnalE.
+    marking them as "occurring many times" via the 'markMany' call
+    in the Let case of occAnalE.  But see also
+    Note [Making optLets idempotent]
 
  3. t is inlined into the body, either by a sufficiently smart
- compiler pass, or, as is the case at the time of writing, an explicit
- $inline call.
+    compiler pass, or, as is the case at the time of writing, an
+    explicit $inline call.
 
  4. The calls to get can be eliminated.
 
@@ -241,9 +251,23 @@ can be rewritten to
 (Again, at the time of writing, the call to f must be marked with
 $inline.)
 
-Some of this is discussed at
 
- https://github.com/awf/knossos/pull/426
+Some of this is discussed at https://github.com/awf/knossos/pull/426
+
+Note [Making optLets idempotent]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  let x = ex in
+  let y = ey in
+  let p = (x,y) in
+  f p
+Here p occurs just once, and so will be inlined by optLetsE.  But
+then x and y will both occur once, and so should be inlined as well.
+To avoid having to run optLets repeatedly, we do the 'markMany'
+call only for things that are used more than once.  This is enough
+to make optLets idempotent.
+
+See https://github.com/microsoft/knossos-ksc/issues/327
 
 -}
 
