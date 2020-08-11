@@ -14,6 +14,20 @@
           (index ki image))
        ))))))
 
+(def matrix_multiply_matrix
+     (Vec (Vec Float))
+     ((x : Vec (Vec Float))
+      (y : Vec (Vec Float)))
+   (let ((rx (size x))
+         (rycx (size y))
+         (cy (size (index 0 y))))
+     (build rx (lam (rxi   : Integer)
+     (build cy (lam (cyi : Integer)
+     (sumbuild rycx (lam (rycx : Integer)
+         (mul (index rycx (index rxi  x))
+              (index cy   (index rycx y)))
+       ))))))))
+
 (def matrix_multiply_transpose
      (Vec Float)
      ((w : Vec (Vec Float))
@@ -34,6 +48,33 @@
      (build (div (size image) 2) (lam (ni : Integer)
        (max_ (index (mul 2 ni) image)
              (index (add 1 (mul 2 ni)) image)))))
+
+; The two input vectors have different lengths which makes it hard to
+; find an optimisation rule to optimise the reverse mode "linear map
+; AD" code.
+(def maxpoolVec
+     (Vec Float)
+     ((image : (Vec Float))
+      (image2 : (Vec Float)))
+     (build (div (size image) 2) (lam (ni : Integer)
+         (max_ (max_ (index (mul 2 ni) image)
+                     (index (add 1 (mul 2 ni)) image))
+               (index ni image2)))))
+
+
+(def maxpoolVec_ANF
+     (Vec Float)
+     ((image : (Vec Float))
+      (image2 : (Vec Float)))
+     (build (div (size image) 2) (lam (ni : Integer)
+         (let ((ni2 (mul 2 ni))
+               (ni21 (add ni2 1))
+               (image_ni2 (index ni2 image))
+               (image_ni21 (index ni21 image))
+               (image2_ni (index ni image2))
+               (m1 (max_ image_ni2 image_ni21))
+               (m2 (max_ m1 image2_ni)))
+           m2))))
 
 ; This function stands in for one that could actually be expensive
 (def expensive Float ((x1 : Float) (x2 : Float)) 0.0)
