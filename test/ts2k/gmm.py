@@ -6,8 +6,7 @@ import math
 import torch_multigammaln
 import torch
 
-print("Start transform, currently breaks the PyTorch Script compiler")
-
+# print("Start transform, currently breaks the PyTorch Script compiler")
 
 @torch.jit.script
 def logsumexp(x):
@@ -116,12 +115,7 @@ def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
     sum_qs = torch.sum(icf[:, :d], 1)
     Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
 
-    # xcentered = torch.stack(tuple( x[i] - means for i in range(n) ))
-    intermediate = []
-    for i in range(n):
-        intermediate[i] = x[i] - means
-    xcentered = torch.stack(tuple(intermediate))
-
+    xcentered = torch.stack(tuple( x[i] - means for i in range(n) ))
     Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
     sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
     inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
@@ -144,10 +138,16 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
 
     Qdiags = torch.exp(icf[:, :d])
     sum_qs = torch.sum(icf[:, :d], 1)
-
+    Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
+    
     # x = [constructL(d, curr_icf) for curr_icf in icf]
 
-    icf_intermediate = []
+    intermediate = []
+    for i in range(n):
+        intermediate[i] = x[i] - means
+    #tuple(intermediate)
+    #xcentered = torch.stack(intermediate)
+    #xcentered = torch.stack(tuple(intermediate))
     # for curr_icf in icf:
     #    icf_intermediate.append(constructL(d, curr_icf))
     # Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
