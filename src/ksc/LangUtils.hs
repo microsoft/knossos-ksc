@@ -315,7 +315,7 @@ notInScope v in_scope
   | not (v `S.member` in_scope)
   = v
   | otherwise
-  = try (S.size in_scope)
+  = try (n+1)
   where
     (str, rebuild) = case v of
             Simple s -> (s, Simple)
@@ -329,7 +329,7 @@ notInScope v in_scope
             var' = rebuild str'
             str' = prefix ++ show n
 
-    (prefix, _n) = parse_suffix [] (reverse str)
+    (prefix, n) = parse_suffix [] (reverse str)
 
     parse_suffix :: String          -- Digits parsed from RH end (in order)
                  -> String          -- String being parsed (reversed)

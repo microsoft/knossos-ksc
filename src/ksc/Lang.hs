@@ -524,6 +524,9 @@ instance HasType TExpr where
 instance HasType Type where
   typeof t = t
 
+instance HasType Konst where
+  typeof k = typeofKonst k
+
 -- ToDo: delete this if no longer needed
 makeIfType :: HasCallStack => Type -> Type -> Type
 makeIfType ty1 ty2 = traceWhenUnequal "makeIfType" ty1 ty2 ty2
@@ -682,6 +685,9 @@ comma = text ","
 dcolon :: SDoc
 dcolon = text "::"
 
+equals :: SDoc
+equals = text "="
+
 empty :: SDoc
 empty = SDoc (\_ -> PP.empty)
 
@@ -822,6 +828,9 @@ instance Pretty Pat where
 
 instance Pretty TVar where
   pprPrec _ (TVar _ v) = ppr v
+
+pprTypedTVar :: TVar -> SDoc
+pprTypedTVar v = ppr v <+> dcolon <+> ppr (typeof v)
 
 instance Pretty TFun where
   ppr (TFun _ f) = ppr f

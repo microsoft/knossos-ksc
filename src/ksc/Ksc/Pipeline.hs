@@ -9,6 +9,7 @@ import qualified Cgen
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
+import Ksc.SingleUse
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
              FunId(UserFun), TDef, Pretty,
@@ -79,6 +80,55 @@ demoCL file
        ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env cse_fs_defs
      } }
 
+
+demoSU :: String -> IO ()
+demoSU file
+  = do { pr_decls <- parseF "src/runtime/prelude.ks"
+       ; my_decls <- parseF ("test/ksc/" ++ file ++ ".ks")
+       ; runKM $
+
+    do { banner "Original decls"
+       ; displayN my_decls
+
+       ; (env, pr_tc) <- annotDecls emptyGblST pr_decls
+       ; (env, my_tc) <- annotDecls env       my_decls
+       ; let (_pr_rules, _pr_defs) = partitionDecls pr_tc
+             (_my_rules, my_defs)  = partitionDecls my_tc
+--             rulebase              = mkRuleBase (_pr_rules ++ _my_rules)
+
+       ; displayPassM veryVerbose "Typechecked declarations" env my_defs
+
+       ; banner "toSUDefs"
+       ; let su_defs = toSUDefs my_defs
+       ; displayN su_defs
+
+{-
+       ; displayPassM veryVerbose "fromCLDefs" env
+                       (fromCLDefs cl_defs)
+
+       ; (env, ad_defs) <- return (fwdAdDefs env cl_defs)
+       ; displayPassM veryVerbose "Forward tupled AD" env ad_defs
+
+       ; (env, opt_ad_defs) <- optDefs rulebase env ad_defs
+       ; displayPassM veryVerbose "Optimized forward tupled AD " env opt_ad_defs
+
+       ; (env, rev_defs) <- return (revAdDefs env cl_defs)
+       ; displayPassM veryVerbose "Reverse AD" env rev_defs
+
+       ; (env, opt_rev_defs) <- optDefs rulebase env rev_defs
+       ; displayPassM veryVerbose "Optimized reverse AD " env opt_rev_defs
+
+       ; (env, cse_rev_defs) <- cseDefs rulebase env opt_rev_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) reverse AD " env cse_rev_defs
+
+       ; (env, fs_defs) <- return (fsAdDefs env cl_defs)
+       ; displayPassM veryVerbose "Split AD" env fs_defs
+
+       ; (env, opt_fs_defs) <- optDefs rulebase env fs_defs
+       ; (env, cse_fs_defs) <- cseDefs rulebase env opt_fs_defs
+       ; displayPassM veryVerbose "Optimized (CSE'd) split AD" env cse_fs_defs
+  -}
+   } }
 
 veryVerbose :: Maybe Int
 veryVerbose = Just 999
