@@ -4,7 +4,7 @@
 
 -- Ksc.SingleUse: Language for compilation to the SingleUse language
 module Ksc.SingleUse(
-     SUDef, toSUDefs
+     SUDef, toSUDefs, fromSUDefs
      ) where
 
 import Prelude hiding( (<>) )
@@ -40,6 +40,18 @@ suSeq SUNop s2 = s2
 suSeq s1 SUNop = s1
 suSeq s1 s2    = SUSeq s1 s2
 
+headStmts :: SUStmts -> (SUStmts, SUStmts)
+-- If headStmts s = (s1,s2)
+-- Then   s = s1 `suSeq` s2
+-- and    s is not a Seq
+-- and    s is SUNop only if s is SUNop
+headStmts ss = go ss SUNop
+  where
+    go (SUSeq s1 s2) tail = go s1 (s2 `suSeq` tail)
+    go SUNop         SUNop = (SUNop, SUNop)
+    go SUNop         tail  = go tail SUNop
+    go s             tail  = (s, tail)
+
 -----------------------------------------------
 --  Pretty printing
 -----------------------------------------------
@@ -74,9 +86,18 @@ pprLhs :: TVar -> SDoc
 pprLhs v = parens (pprTypedTVar v) <+> equals
 
 
------------------------------------------------
---  Conversion to SU
------------------------------------------------
+{- *********************************************************************
+*                                                                      *
+*                 Conversion SU -> KSC                                 *
+*                                                                      *
+********************************************************************* -}
+
+-- In these functions
+--   TVar  is *before* substitution
+--   SUVar is *after*  substition
+
+type SUVar = TVar  -- After substitution
+                   -- See sue_env
 
 toSUDefs :: [TDef] -> [SUDef]
 toSUDefs defs = mapMaybe toSUDef_maybe defs
@@ -84,13 +105,16 @@ toSUDefs defs = mapMaybe toSUDef_maybe defs
 toSUDef_maybe :: TDef -> Maybe SUDef
 toSUDef_maybe  (Def { def_fun    = fun
                     , def_pat    = pat
+                    , def_res_ty = res_ty
                     , def_rhs    = rhs })
   | Fun f     <- fun
   , UserRhs e <- rhs
   , let (stmts, (arg,res)) = runSUM is0 $
                              do { arg <- unpackArg pat
-                                ; dropDead emptySUEnv pvs e
-                                ; res <- toSUStmts emptySUEnv e
+                                ; res <- newSUVar res_ty "arg"
+                                ; let env = initSUEnv res
+                                ; dropDead env pvs e
+                                ; toSUStmts env e
                                 ; return (arg,res) }
   = Just SUDef { sudef_fun  = f
                , sudef_arg  = arg
@@ -104,7 +128,7 @@ toSUDef_maybe  (Def { def_fun    = fun
 
 unpackArg :: Pat -> SUM TVar
 unpackArg (VarPat v)  = return v
-unpackArg (TupPat vs) = do { arg <- newTVar tup_ty "arg"
+unpackArg (TupPat vs) = do { arg <- newSUVar tup_ty "arg"
                            ; emitStmt (SUUnpack vs arg)
                            ; return arg }
                       where
@@ -119,20 +143,28 @@ dropDead env vs e = emitStmts [ SUElim (lookupSUEnv env v)
     fvs = freeVarsOf e
 
 --------------------------
-type SUEnv = M.Map TVar TVar    -- Maps source-language TVars to target-language ones
+data SUEnv
+  = SUE { sue_subst :: M.Map TVar SUVar   -- Substitution
+        , sue_res   :: SUVar }            -- Where to put the result
 
-emptySUEnv :: SUEnv
-emptySUEnv = M.empty
+initSUEnv :: SUVar -> SUEnv
+initSUEnv res_var = SUE { sue_subst = M.empty, sue_res = res_var }
 
-lookupSUEnv :: SUEnv -> TVar -> TVar
+lookupSUEnv :: SUEnv -> TVar -> SUVar
 lookupSUEnv env v
-  = case M.lookup v env of
+  = case M.lookup v (sue_subst env) of
       Nothing -> v
       Just v' -> v'
 
-extendSUEnv :: SUEnv -> [(TVar,TVar)] -> SUEnv
-extendSUEnv env prs
-  = foldr (\(v1,v2) env -> M.insert v1 v2 env) env prs
+extendSUEnv :: SUEnv -> [(TVar,SUVar)] -> SUEnv
+extendSUEnv env@(SUE { sue_subst = subst })  prs
+  = env { sue_subst = foldr (\(v1,v2) s -> M.insert v1 v2 s) subst prs }
+
+resultVar :: SUEnv -> SUVar
+resultVar env = sue_res env
+
+setResultVar :: SUEnv -> SUVar -> SUEnv
+setResultVar env var = env { sue_res = var }
 
 ------------------------
 -- Simple monad for conversion
@@ -159,10 +191,15 @@ runSUM is (SUM f) = (stmts, r)
     (_, stmts, r) = f is
 
 
-newTVar :: Type -> String -> SUM TVar
-newTVar ty str
+newSUVar :: Type -> String -> SUM SUVar
+newSUVar ty str
   = SUM (\is -> let (is', tv) = notInScopeTV is (mkTVar ty str)
                 in (is', SUNop, tv))
+
+cloneTVar :: TVar -> SUM SUVar
+cloneTVar tv
+  = SUM (\is -> let (is', tv') = notInScopeTV is tv
+                in (is', SUNop, tv'))
 
 emitStmts :: [SUStmts] -> SUM ()
 emitStmts = foldr ((>>) . emitStmt) (return ())
@@ -170,52 +207,53 @@ emitStmts = foldr ((>>) . emitStmt) (return ())
 emitStmt :: SUStmts -> SUM ()
 emitStmt ss = SUM (\is -> (is, ss, ()))
 
-forkSUM :: SUM a -> SUM (SUStmts, a)
-forkSUM (SUM f) = SUM (\is -> let (_, ss, r) = f is
-                              in (is, SUNop, (ss,r)))
+emitCopy :: SUVar -> SUVar -> SUM ()
+emitCopy v1 v2 | v1 == v2  = return ()
+               | otherwise = emitStmt (SUCopy v1 v2)
+
+forkSUM :: SUM () -> SUM SUStmts
+forkSUM (SUM f) = SUM (\is -> let (_, ss, _) = f is
+                              in (is, SUNop, ss))
 
 --------------------------
 -- toSUStmts: the main conversion function
 --------------------------
 
-toSUStmts :: SUEnv -> TExpr -> SUM TVar
+toSUStmts :: SUEnv -> TExpr -> SUM ()
 
-toSUStmts _ (Konst k)
-  = do { res <- newTVar (typeof k) "res"
-       ; emitStmt (SUKonst res k)
-       ; return res}
+toSUStmts env (Konst k)
+  = emitStmt (SUKonst (resultVar env) k)
+
 toSUStmts env (Var v)
-  = return (lookupSUEnv env v)
+  = emitCopy (resultVar env) (lookupSUEnv env v)
 
 toSUStmts env (Tuple es)
   = do { prs <- split env es
        ; vs <- mapM do_one prs
-       ; tres <- newTVar (mkTupleTy (map typeof vs)) "tres"
-       ; emitStmt (SUPack tres vs)
-       ; return tres }
+       ; emitStmt (SUPack (resultVar env) vs) }
   where
-    do_one (env,e) = toSUStmts env e
+    do_one (env,e) = do { tmp <- newSUVar (typeof e) "t"
+                        ; toSUStmts (setResultVar env tmp) e
+                        ; return tmp }
 
-toSUStmts env (Call (TFun res_ty fun) e)
-  = do { arg <- toSUStmts env e
-       ; res <- newTVar res_ty "cres"
-       ; emitStmt (SUCall res fun arg)
-       ; return res }
+toSUStmts env (Call (TFun _ fun) e)
+  = do { arg <- newSUVar (typeof e) "a"
+       ; toSUStmts (setResultVar env arg) e
+       ; emitStmt (SUCall (resultVar env) fun arg) }
 
 toSUStmts env (Let v rhs body)
-  = do { v' <- toSUStmts env rhs
+  = do { v' <- cloneTVar v
+       ; toSUStmts (setResultVar env v') rhs
        ; let env' = extendSUEnv env [(v,v')]
        ; dropDead env' [v] body
        ; toSUStmts env' body }
 
 toSUStmts env (If b e1 e2)
-  = do { bv <- toSUStmts env b
-       ; (s1,v1) <- forkSUM (toSUStmts env e1)
-       ; (s2,_)  <- forkSUM (do { v2 <- toSUStmts env e2
-                                ; unless (v1 == v2) $
-                                  emitStmt (SUCopy v1 v2) })
-       ; emitStmt (SUIf bv s1 s2)
-       ; return v1 }
+  = do { bv <- newSUVar (typeof b) "b"
+       ; toSUStmts (setResultVar env bv) b
+       ; s1 <- forkSUM (toSUStmts env e1)
+       ; s2 <- forkSUM (toSUStmts env e2)
+       ; emitStmt (SUIf bv s1 s2) }
 
 toSUStmts _ e@(Assert {}) = pprPanic "toSUStmts" (ppr e)
 toSUStmts _ e@(Lam {})    = pprPanic "toSUStmts" (ppr e)
@@ -252,9 +290,53 @@ split env es
   dup :: TVar -> SUM ((TVar,TVar), (TVar,TVar))
   dup v = do { let ty  = typeof v
                    str = tVarName v
-             ; v1  <- newTVar ty str
-             ; v2  <- newTVar ty str
-             ; tmp <- newTVar (mkTupleTy [ty,ty]) "tmp"
-             ; emitStmt (suSeq (SUDup tmp v)
+             ; v1  <- newSUVar ty str
+             ; v2  <- newSUVar ty str
+             ; tmp <- newSUVar (mkTupleTy [ty,ty]) "tmp"
+             ; emitStmt (suSeq (SUDup tmp (lookupSUEnv env v))
                                (SUUnpack [v1,v2] tmp))
              ; return ((v,v1),(v,v2)) }
+
+
+
+{- *********************************************************************
+*                                                                      *
+*                 Conversion SU -> KSC                                 *
+*                                                                      *
+********************************************************************* -}
+
+fromSUDefs :: [SUDef] -> [TDef]
+fromSUDefs cldefs = map fromSUDef cldefs
+
+fromSUDef :: SUDef -> TDef
+fromSUDef (SUDef { sudef_fun = f
+                 , sudef_arg = arg
+                 , sudef_body = body
+                 , sudef_res = res })
+  = Def { def_fun    = Fun f
+        , def_pat    = pat
+        , def_res_ty = typeof res
+        , def_rhs    = UserRhs (fromSUStmts body' (Var res)) }
+  where
+    -- This bit sees if 'arg' is immediately unpacked;
+    -- if so, use a TupPat
+    (pat, body') = case headStmts body of
+                     (SUUnpack pvs arg', ss)
+                        | arg == arg' -> (TupPat pvs, ss)
+                     _                -> (VarPat arg, body)
+
+fromSUStmts :: SUStmts -> TExpr -> TExpr
+fromSUStmts SUNop           e = e
+fromSUStmts (SUSeq s1 s2)   e = fromSUStmts s1 (fromSUStmts s2 e)
+fromSUStmts (SUCall r f a)  e = Let r (Call (TFun (typeof r) f) (Var a)) e
+fromSUStmts (SUKonst x k)   e = Let x (Konst k) e
+fromSUStmts (SUCopy x y)    e = Let x (Var y) e
+fromSUStmts (SUElim {})     e = e
+fromSUStmts (SUDup t y)     e = Let t (Tuple [Var y, Var y]) e
+fromSUStmts (SUPack x ys)   e = Let x (Tuple (map Var ys))   e
+fromSUStmts (SUUnpack xs y) e = mkLets prs e
+  where n = length xs
+        prs = [ (x, pSel i n (Var y)) | (x,i) <- xs `zip` [1..] ]
+
+fromSUStmts (SUIf b s1 s2) e = If (Var b) (fromSUStmts s1 e) (fromSUStmts s2 e)
+                               -- NB: duplicates e, which may a problem one day

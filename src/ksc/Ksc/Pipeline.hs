@@ -94,7 +94,7 @@ demoSU file
        ; (env, my_tc) <- annotDecls env       my_decls
        ; let (_pr_rules, _pr_defs) = partitionDecls pr_tc
              (_my_rules, my_defs)  = partitionDecls my_tc
---             rulebase              = mkRuleBase (_pr_rules ++ _my_rules)
+             rulebase              = mkRuleBase (_pr_rules ++ _my_rules)
 
        ; displayPassM veryVerbose "Typechecked declarations" env my_defs
 
@@ -102,10 +102,13 @@ demoSU file
        ; let su_defs = toSUDefs my_defs
        ; displayN su_defs
 
-{-
-       ; displayPassM veryVerbose "fromCLDefs" env
-                       (fromCLDefs cl_defs)
+       ; let rt_defs = fromSUDefs su_defs  -- "rt" short for "round trip"
+       ; displayPassM veryVerbose "fromSUDefs" env rt_defs
 
+       ; (env, opt_rt_defs) <- optDefs rulebase env rt_defs
+       ; displayPassM veryVerbose "Optimized fromSUDefs" env opt_rt_defs
+
+{-
        ; (env, ad_defs) <- return (fwdAdDefs env cl_defs)
        ; displayPassM veryVerbose "Forward tupled AD" env ad_defs
 
