@@ -2,6 +2,7 @@
 #pragma once
 
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include <tuple>
 #include <set>
@@ -1533,6 +1534,27 @@ namespace ks
 
 	inline int to_integer(int d) { return d; }
 	inline auto D$to_integer(int d) { return LM::Zero<int, int>(); }
+
+	template<size_t I, typename TupleType>
+	auto unzip_element(vec<TupleType> const& v)
+	{
+		vec<std::tuple_element_t<I, TupleType>> ret(v.size());
+		for (int i = 0; i != v.size(); ++i)
+		{
+			ret[i] = std::get<I>(v[i]);
+		}
+		return ret;
+	}
+	template<typename TupleType, size_t... Indices>
+	auto unzip_impl(vec<TupleType> const& v, std::index_sequence<Indices...>)
+	{
+		return std::make_tuple(unzip_element<Indices>(v)...);
+	}
+	template <class... Types>
+	auto unzip(vec<tuple<Types...>> const& v)
+	{
+		return unzip_impl(v, std::index_sequence_for<Types...>{});
+	}
 
 	/*
 		template <class I, class Vec>
