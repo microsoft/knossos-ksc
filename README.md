@@ -1,10 +1,9 @@
-# Knossos-KSC.  
+# Knossos-KSC  
 
 #### Compile a lisp-like IR with automatic differentiation and user-defined rewrites.
 
 This project is a functional compiler and code-gen tool that will
-accelerate writing AI algorithms as well as making them easier.   The core is a lisp-like IR that can be translated from high-level 
-languages, and can be linked to a variety of backends to generate code.
+accelerate writing AI algorithms as well as making them easier.   The core is a lisp-like IR that can be translated from high-level languages, and can be linked to a variety of backends to generate code.
 
 Currently implemented frontends are
  * Julia: j2ks
@@ -13,50 +12,74 @@ Currently implemented frontends are
  * KS-Lisp: The IR itself is exchanged in a lisp-like text format (see below).  
 
 Current backends:
- * CPU/C++: Written in Haskell KSC CGen.hs
- * GPU/Futhark: Also in Haskell KSC
- * MLIR: Written in C++ /mlir folder
+ * CPU/C++: In src/ksc and src/runtime
+ * GPU/Futhark: Also in src/ksc
+ * MLIR: In mlir
 
 Current transformers:
  * KSC: Various Autodiff and optimization transforms, in Haskell 
 
-#### KS-Lisp: A low-sugar IR
+### KS-Lisp: A low-sugar IR
 
-It is not particularly intended to be user-friendly, and is "low sugar",  but lispers may like to play with it.  There's a VS Code extension in etc/ks-vscode.
+The text form of the IR is "low sugar", focused more on simplicty than user-friendliness.
+However it *is* human writable, and lispers in particular may like to play with it.
+There's a VS Code syntax highlighter extension in etc/ks-vscode.
 
-The lisp-like IR is extremely simple -- all the language builtins are 
-in this code:
-```lisp
+The AST has just a few concepts: Lambda, Call, Let binding, Conditionals, Constants, Assert, 
+Top-level function definitions, and Rewrite rules.
+
+It's also strongly typed, using a bare set of types: Vector, Tuple, and Values (Float, Integer, String).  However, unlike say MLIR, these are composable, so e.g. we can have a (Vec (Tuple Float (Vec Float))).
+[It's a TODO to replace Vec with Tensor]
+
+The IR is pure functional, so functions may be called more than once or not at all depending on the use of their outputs.  Values are passed and returned "as if" by value, although the optimizer reserves the right implement this using refcounting/copy/move, as long as the semantics are preserved.
+
+The lisp-like IR is extremely simple -- all the language builtins are in this code:
+```scheme
 ;; Externally defined function "sqrt" returns a Float, takes two Float
 (edef atan2 Float (Float Float)) 
 
 #| Block comments
  -- User-defined function f 
- takes an Integer and Vector of (Float Float) pairs
- and returns a Float
+ takes an Integer and Vec of (Float Float) pairs
+ and returns a pair of String and Float
 |#
-(def f Float ((i : Integer) (v : Vector (Tuple Float Float)))
-  (assert (gt i 0) ; (assert TEST BODY)
-     (if (eq i 0)  ; (if TEST THENBODY ELSEBODY)
-        ; "then" branch
-        (let (tmp (index 0 v)) ; (let (VAR VAL) BODY)
-           (mul (get$1 tmp) 2.0)) ; no builtins -- e.g. mul is a function
-        ; "else" branch
-        (let ((t1 (index 0 v)) ; (let ((VAR1 VAL1) ... (VARn VALn)) BODY)
-              (t2 (f (sub i 1) v)))
+(def myfun                                       ; function name
+  (Tuple String Float)                           ; return type
+  ((i : Integer) (v : Vec (Tuple Float Float)))  ; arguments
+  (assert (gt i 0)                               ; (assert TEST BODY)
+     (if (eq i 0)                                ; (if TEST TEXPR FEXPR)
+        ; "then" br
+        (tuple "fred"                            ; tuple constructor
+           (let (tmp (index 0 v))                ; (let (VAR VAL) BODY)
+             (mul (get$1$2 tmp) 2.0)) )          ; no builtins -- even mul is a function
+        ; "else" br
+        (let ((t1 (index 0 v))                   ; (let ((VAR1 VAL1) ... (VARn VALn)) BODY)
+              (t2 (myfun (sub i 1) v)))          ; Recursive call to myfun
           t2))))
 
 ;; Rewrite rule
-(rule "mul.commute" ((a : Float) (b : Float)) (mul a b) (mul b a))
+(rule "mul.commute"                     ; rule name
+    ((a : Float) (b : Float))           ; free variables
+    (mul a b)                           ; pattern to match
+    (mul b a))                          ; replacement
+; Rules are *not* applied exhaustively, that's very intentionally left up to the compiler.  
+; For example the rule above, if matched exhaustively would not terminate.
 
-;; And compilation produces f and its derivative, as if
-(edef rev$f
-    (Tuple (Tuple) (Vector (Tuple Float Float))) ; df is tangent-type of inputs (dInteger = void)
-    (Tuple (i : Integer) (v : Vector (Tuple Float Float))) ; inputs in a tuple
-    (df: Float)) ; df    
+;; And compilation produces f and various derivatives, as if
+(edef rev$myfun ; classic reverse mode.  If f :: S -> T, then rev$f :: (S, dT) -> dS
+    (Tuple (Tuple) (Vec (Tuple Float Float))) ; dS is tangent-type of inputs (dInteger = void)
+    ((#|s  |# (Tuple Integer (Vec (Tuple Float Float)))) ; inputs in a single tuple
+     (#|dt |# (Tuple (Tuple) Float)))) ; dT is tangent type of returns
+
+(edef D$myfun  ; linear map as per Elliot.  If f :: S->T, D$f :: S -> (LM dS dT) where LM is linear map
+    (LM
+      (Tuple (Tuple) (Vec (Tuple Float Float))) ; dS
+      (Tuple (Tuple) Float) ; dT
+    )
+    (Integer (Vec (Tuple Float Float)))) ; inputs as normal (not single-tupled)
 ```
-See [the ksc syntax primer](test/ksc/syntax-primer.ks) for an
-introduction to the syntax of `.ks` files.  [The ksc test
+See [the ksc syntax primer](test/ksc/syntax-primer.ks) for a longer
+introduction to the `ks` language.  [The ksc test
 directory](test/ksc) provides more examples of the constructs
 available when writing `.ks` files.
 
@@ -135,20 +158,14 @@ sh ./ghcup install-cabal 3.0.0.0
 ~/.ghcup/bin/cabal v2-update
 ```
 
-### Cloning knossos
-
-```
-git clone https://github.com/microsoft/knossos-ksc
-cd knossos-ksc
-```
-
-## Building
+### Building
 
 Build knossos in the `knossos-ksc` folder as follows.  If the
 versions of ghc and cabal you installed above are on your `PATH` then
 it will be sufficient to do
 
 ```sh
+cd knossos-ksc
 cabal v2-build --ghc-option=-Wwarn
 ```
 
@@ -160,7 +177,7 @@ to use the following, more explicit, command line.
 ~/.ghcup/bin/cabal v2-build --ghc-option=-Wwarn --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc
 ```
 
-It will build a lot of packages, which will look a bit like
+On the first run, it will build a lot of packages, which will look a bit like
 
 ```
 - call-stack-0.2.0 (lib) (requires build)
@@ -176,29 +193,32 @@ Completed    setenv-0.1.1.3 (lib)
 ...
 ```
 
-Then it will build knossos.
+Then, and on subsequent runs, it will build knossos, which should have output as follows
+```
+Building executable 'ksc' for knossos-0.0.0.1..
+[ 1 of 17] Compiling KMonad           ( src/ksc/KMonad.hs, ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.6.5/knossos-0.0.0.1/x/ksc/build/ksc/ksc-tmp/KMonad.o )
+...
+[17 of 17] Compiling Main             ( src/ksc/Main.hs, ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.6.5/knossos-0.0.0.1/x/ksc/build/ksc/ksc-tmp/Main.o )
+Linking ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.6.5/knossos-0.0.0.1/x/ksc/build/ksc/ksc
+```
 
-## The ksc executable
-
-### Compiling the ksc executable
+### Installing the ksc executable
 
 To create the `ksc` executable run the following.  If the versions of
 ghc and cabal you installed above are on your `PATH` then it will be
 sufficient to do
 
 ```
-# Delete the old ksc binary, if it exists
-rm ksc
-cabal v2-install --installdir=.
+mkdir -p build/bin  # Share build dir with ksc-mlir
+rm ksc # Delete the old ksc binary, if it exists
+cabal v2-install --installdir=build/bin
 ```
 
 Those who installed cabal and ghc via ghcup might need to use the
-following, more explicit, command line.
+following, more explicit, command line at the last stage
 
 ```
-# Delete the old ksc binary, if it exists
-rm ksc
-~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=.
+~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=build/bin
 ```
 
 ### Running the ksc executable
@@ -209,7 +229,7 @@ Run the `ksc` executable as follows to differentiate, compile and run
 a `.ks` program.  This example runs `hello-world.ks`.
 
 ```
-./ksc --compile-and-run \
+./build/bin/ksc --compile-and-run \
   --ks-source-file src/runtime/prelude.ks \
   --ks-source-file test/ksc/hello-world.ks \
   --ks-output-file obj/test/ksc/hello-world.kso \
@@ -221,7 +241,7 @@ a `.ks` program.  This example runs `hello-world.ks`.
 or with PowerShell syntax:
 
 ```
-./ksc --compile-and-run `
+./build/bin/ksc --compile-and-run `
   --ks-source-file src/runtime/prelude.ks `
   --ks-source-file test/ksc/hello-world.ks `
   --ks-output-file obj/test/ksc/hello-world.kso `
@@ -230,12 +250,32 @@ or with PowerShell syntax:
   --exe-output-file obj/test/ksc/hello-world.exe
 ```
 
+Which should produce output like this:
+```
+read decls
+Linted Typechecked defs
+Linted Grad
+Linted Grad tupled
+Linted Optgrad
+Linted Optgrad tupled
+Linted Diffs
+Linted OptDiffs
+Linted CSE
+Writing to obj/test/ksc/hello-world.kso
+Writing to obj/test/ksc/hello-world.cpp
+Compiling: g++ -fmax-errors=5 -fdiagnostics-color=always -Wall -Wno-unused -Wno-maybe-uninitialized -Isrc/runtime -O3 -g -std=c++17 -o obj/test/ksc/hello-world.exe obj/test/ksc/hello-world.cpp
+Running
+
+Hello world!
+If you are seeing this output then knossos-ksc has successfully compiled and run the hello-world.ks program!
+```
+
 #### Tests
 
 To run the ksc self-tests use the command line
 
 ```
-./ksc --test --fs-test out.fs
+./build/bin/ksc --test --fs-test out.fs
 ```
 
 (Don't worry if the final test, of `out.fs`, fails.  It is a test for
@@ -248,14 +288,14 @@ i.e. to type check and apply ksc's heuristic optimisations, use the
 command line
 
 ```
-./ksc --generate-cpp-without-diffs \
+./build/bin/ksc --generate-cpp-without-diffs \
   --ks-source-file src/runtime/prelude.ks \
   --ks-source-file input.ks \
   --ks-output-file output.ks \
   --cpp-output-file output.cpp
 ```
 
-## ksc basics
+## KSC Internals
 
 ### Syntax of .ks files
 
