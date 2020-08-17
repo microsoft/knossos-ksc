@@ -118,7 +118,7 @@ following this guide, whether you were successful or not, please
 
 Many thanks, the Knossos team.
 
-## Installing dependencies
+### Installing dependencies
 
 Knossos `ksc` requires reasonably up-to-date versions of ghc, cabal
 and g++.   The following are sufficient
@@ -129,7 +129,7 @@ and g++.   The following are sufficient
 
 This section describes how to get them.
 
-### Windows
+#### Windows
 Install [Chocolatey](https://chocolatey.org/), then:
 ```cmd
 choco install ghc --version 8.6.5 -y
@@ -139,7 +139,7 @@ choco install msys2
 refreshenv
 ```
 
-### Ubuntu
+#### Ubuntu
 
 You ought to use Ubuntu version >= 18.04 because older Ubuntus don't
 have g++ >= 7.  Ubuntu 18.04 under WSL works perfectly fine.  The
