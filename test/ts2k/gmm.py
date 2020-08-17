@@ -6,8 +6,6 @@ import math
 import torch_multigammaln
 import torch
 
-# print("Start transform, currently breaks the PyTorch Script compiler")
-
 @torch.jit.script
 def logsumexp(x):
     mx = torch.max(x)
@@ -140,12 +138,15 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
     sum_qs = torch.sum(icf[:, :d], 1)
     Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
     
-    # x = [constructL(d, curr_icf) for curr_icf in icf]
+    # GeneratorExp aren't supported: 
+    # Tensor cannot be used as a tuple
+    #
+    # but I believe we don't need to do the tuple()
 
-    intermediate = []
+    xcentered_intermediate = []
     for i in range(n):
-        intermediate[i] = x[i] - means
-    xcentered = torch.stack(intermediate)
+        xcentered_intermediate[i] = x[i] - means
+    xcentered = torch.stack(xcentered_intermediate)
 
     Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
     sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
