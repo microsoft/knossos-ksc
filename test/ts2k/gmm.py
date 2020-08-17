@@ -27,7 +27,7 @@ def logsumexpvec(x):
 
 
 @torch.jit.script
-def log_gamma_distrib(a, p):
+def log_gamma_distrib(a, p:int):
     # return scipy_special.multigammaln(a, p)
     return torch_multigammaln.multigammaln(a, p)
 
@@ -39,7 +39,7 @@ def sqsum(x):
 
 
 @torch.jit.script
-def log_wishart_prior(p, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
+def log_wishart_prior(p:int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf) -> int:
     n = p + wishart_m + 1
     k = icf.shape[0]
 
@@ -145,29 +145,21 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
     intermediate = []
     for i in range(n):
         intermediate[i] = x[i] - means
-    #tuple(intermediate)
-    #xcentered = torch.stack(intermediate)
-    #xcentered = torch.stack(tuple(intermediate))
-    # for curr_icf in icf:
-    #    icf_intermediate.append(constructL(d, curr_icf))
-    # Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
-    # Ls = torch.stack(icf_intermediate)
+    xcentered = torch.stack(intermediate)
 
-    # #xcentered = torch.stack(tuple( x[i] - means for i in range(n) ))
-    # intermediate = []
-    # for i in range(n):
-    #     intermediate[i] = x[i] - means
-    # xcentered = torch.stack(tuple(intermediate) )
-
-    # Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
-    # sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
-    # inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
-    # lse = logsumexpvec(inner_term)
-    # slse = torch.sum(lse)
-
-    # CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
-    # return CONSTANT + slse - n * logsumexp(alphas) \
-    #     + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
+    sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
+    inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
+    lse = logsumexpvec(inner_term)
+    slse = torch.sum(lse)
+    
+    CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
+    return (
+        CONSTANT
+        + slse
+        - n * logsumexp(alphas)
+        + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    )
 
 
 print("Second step")
