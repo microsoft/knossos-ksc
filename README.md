@@ -210,15 +210,14 @@ sufficient to do
 
 ```
 mkdir -p build/bin  # Share build dir with ksc-mlir
-rm ksc # Delete the old ksc binary, if it exists
-cabal v2-install --installdir=build/bin
+cabal v2-install --installdir=build/bin --overwrite-policy=always
 ```
 
 Those who installed cabal and ghc via ghcup might need to use the
 following, more explicit, command line at the last stage
 
 ```
-~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=build/bin
+~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=build/bin --overwrite-policy=always
 ```
 
 ### Running the ksc executable
