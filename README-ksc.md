@@ -1,6 +1,6 @@
 #### KSC Installation
 
-## Installing dependencies
+### Installing dependencies
 
 Knossos `ksc` requires reasonably up-to-date versions of ghc, cabal
 and g++.   The following are sufficient
@@ -11,7 +11,7 @@ and g++.   The following are sufficient
 
 This section describes how to get them.
 
-### Windows
+#### Windows
 Install [Chocolatey](https://chocolatey.org/), then:
 ```cmd
 choco install ghc --version 8.6.5 -y
@@ -21,7 +21,7 @@ choco install msys2
 refreshenv
 ```
 
-### Ubuntu
+#### Ubuntu
 
 You ought to use Ubuntu version >= 18.04 because older Ubuntus don't
 have g++ >= 7.  Ubuntu 18.04 under WSL works perfectly fine.  The
@@ -92,15 +92,14 @@ sufficient to do
 
 ```
 mkdir -p build/bin  # Share build dir with ksc-mlir
-rm ksc # Delete the old ksc binary, if it exists
-cabal v2-install --installdir=build/bin
+cabal v2-install --installdir=build/bin --overwrite-policy=always
 ```
 
 Those who installed cabal and ghc via ghcup might need to use the
 following, more explicit, command line at the last stage
 
 ```
-~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=build/bin
+~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=build/bin --overwrite-policy=always
 ```
 
 ### Compiler pipeline
