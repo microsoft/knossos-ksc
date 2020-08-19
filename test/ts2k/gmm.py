@@ -92,7 +92,8 @@ def constructL(d: int, icf):
         constructL_Lparamidx_update, col = make_L_col_lifted(
             d, icf, constructL_Lparamidx, i
         )
-        columns[i] = col
+        # columns[i] = col
+        columns.append(col)
         constructL_Lparamidx = constructL_Lparamidx_update
 
     return torch.stack(columns, -1)
@@ -145,7 +146,8 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
 
     xcentered_intermediate = []
     for i in range(n):
-        xcentered_intermediate[i] = x[i] - means
+        # xcentered_intermediate[i] = x[i] - means
+        xcentered_intermediate.append(x[i] - means)
     xcentered = torch.stack(xcentered_intermediate)
 
     Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
@@ -165,3 +167,19 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
 
 print("Second step")
 print(gmm_objective2.graph)
+
+# extracted from adbench test
+alphas = torch.tensor([-0.6490,  1.1812, -0.7585], dtype=torch.float64, requires_grad=True)
+means = torch.tensor([[0.0923, 0.1863],
+        [0.3456, 0.3968],
+        [0.5388, 0.4192]], dtype=torch.float64, requires_grad=True)
+icf = torch.tensor([[ 0.5864, -0.8519,  0.8003],
+        [-1.5094,  0.8759, -0.2428],
+        [ 0.1668, -1.9654, -1.2701]], dtype=torch.float64, requires_grad=True)
+x = torch.tensor([[1.1752, 2.0292]], dtype=torch.float64)
+wishart_gamma = torch.tensor(1., dtype=torch.float64)
+wishart_m = torch.tensor(0., dtype=torch.float64)
+
+gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m)
+
+# backward(retain_graph = True)
