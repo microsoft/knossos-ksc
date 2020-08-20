@@ -188,8 +188,10 @@ result = gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m)
 
 print(result)
 
+print(means.grad)
+
 result.backward()
 
-print(result)
+print(means.grad)
 
 # backward(retain_graph = True)
