@@ -207,9 +207,7 @@ struct PositionalEncoding <: Op
 end
 
 function (self::PositionalEncoding)(xs :: Array{Vec})
-    # Compute the positional encodings once in log space.
-    len = length(xs)
-    positions = 0:len-1
+    positions = (1:length(xs)) .- 1
     # need this for bit-for-bit equality to python:
     # divs = exp.(range(0.0,-log(10000); length=(d_model ÷ 2)+1))[1:end-1]
     divs = exp.(range(0,-log(10000); length=self.d_model ÷ 2))
