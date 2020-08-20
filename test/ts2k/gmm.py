@@ -37,7 +37,7 @@ def sqsum(x):
 
 
 @torch.jit.script
-def log_wishart_prior(p:int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf) -> int:
+def log_wishart_prior(p:int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
     n = p + wishart_m + 1
     k = icf.shape[0]
 
@@ -50,6 +50,10 @@ def log_wishart_prior(p:int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf) -> i
     )
 
     C = n * p * (math.log(wishart_gamma / math.sqrt(2)))
+
+
+    stuff = out - k * (C - log_gamma_distrib(0.5 * n, p))
+
     return out - k * (C - log_gamma_distrib(0.5 * n, p))
 
 
@@ -165,7 +169,7 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
     )
 
 
-print("Second step")
+# print("Second step")
 print(gmm_objective2.graph)
 
 # extracted from adbench test
@@ -180,6 +184,12 @@ x = torch.tensor([[1.1752, 2.0292]], dtype=torch.float64)
 wishart_gamma = torch.tensor(1., dtype=torch.float64)
 wishart_m = torch.tensor(0., dtype=torch.float64)
 
-gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m)
+result = gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m)
+
+print(result)
+
+result.backward()
+
+print(result)
 
 # backward(retain_graph = True)
