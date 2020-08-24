@@ -7,9 +7,12 @@
 
 #%%
 
+from typing import TextIO
 from collections import namedtuple
-import re
+
 import warnings
+import sys
+import re
 
 import onnx
 
@@ -29,8 +32,6 @@ import warnings
 warnings.filterwarnings("always")
 
 # help(onnx.defs.get_all_schemas()[0])
-
-# %%
 
 #%%
 def onnxAttrType_to_Type(ty):
@@ -147,80 +148,85 @@ def test_all_combinations_type_constraints():
 
 test_all_combinations_type_constraints()
 
-prelude = open("onnx-prelude.ks", "w")
+def onnx_schemas_to_prelude(prelude : TextIO):
+    out = []
+    for s in onnx.defs.get_all_schemas():
+        print(f";; Doing {s.name} # line \"{s.file}\" {s.line}")
+        prelude.write(f";; Doing {s.name} # line \"{s.file}\" {s.line}\n")
 
-out = []
-for s in onnx.defs.get_all_schemas():
-    print(f";; Doing {s.name} # line \"{s.file}\" {s.line}")
-    prelude.write(f";; Doing {s.name} # line \"{s.file}\" {s.line}\n")
+        # 0: Some special-cases
+        if s.name == "Constant":
+            out.append(";; Constant")
+            continue
 
-    # 0: Some special-cases
-    if s.name == "Constant":
-        out.append(";; Constant")
-        continue
+        # Gather type constraints
+        all_signatures = all_combinations_type_constraints(s.type_constraints)
 
-    # Gather type constraints
-    all_signatures = all_combinations_type_constraints(s.type_constraints)
+        if len(s.type_constraints) > 1:
+            print(f"Found {len(all_signatures)} signatures")
+            for tc in s.type_constraints:
+                print("TC:", tc.type_param_str, "|", tc.allowed_type_strs, "|", tc.description)    
 
-    if len(s.type_constraints) > 1:
-        print(f"Found {len(all_signatures)} signatures")
-        for tc in s.type_constraints:
-            print("TC:", tc.type_param_str, "|", tc.allowed_type_strs, "|", tc.description)    
+        for sig in all_signatures:
+            # Gather (Tn, Type) pairs into dict
+            typeStrDict = {tc.name:tc.ty for tc in sig}
 
-    for sig in all_signatures:
-        # Gather (Tn, Type) pairs into dict
-        typeStrDict = {tc.name:tc.ty for tc in sig}
+            # 1: Assemble arguments.  Knossos treats "inputs" and "attributes" uniformly.
+            args = []
+            # 1.1: Inputs
+            for i in s.inputs:
+                ty = typeStrDict.get(i.typeStr)
+                if ty == None:
+                    tys = set([onnxType_to_Type(ty) for ty in i.types])
+                    if len(tys) > 1:
+                        print(f"multiple types but no type constraints at {s.name}, input {i.name}: {tys}")
+                        ty = tys.pop()
+                arg = Var(i.name, ty, True)
+                args.append(arg)
 
-        # 1: Assemble arguments.  Knossos treats "inputs" and "attributes" uniformly.
-        args = []
-        # 1.1: Inputs
-        for i in s.inputs:
-            ty = typeStrDict.get(i.typeStr)
-            if ty == None:
-                tys = set([onnxType_to_Type(ty) for ty in i.types])
-                if len(tys) > 1:
-                    print(f"multiple types but no type constraints at {s.name}, input {i.name}: {tys}")
-                    ty = tys.pop()
-            arg = Var(i.name, ty, True)
-            args.append(arg)
+            # 1.2: Attributes
+            for key in s.attributes:
+                a = s.attributes[key]
+                arg = Var(a.name, onnxAttrType_to_Type(a.type), True)
+                args.append(arg)
 
-        # 1.2: Attributes
-        for key in s.attributes:
-            a = s.attributes[key]
-            arg = Var(a.name, onnxAttrType_to_Type(a.type), True)
-            args.append(arg)
-
-        # 1.1: Outputs
-        return_type = Type.Tuple()
-        if len(s.outputs) != 1:
-            warnings.warn("TODO: multiple return types")
-    
-        for o in s.outputs:
-            # FormalParameter(pybind11_builtins.pybind11_object)
-            # |  description
-            # |  isHomogeneous
-            # |  name
-            # |  option
-            # |  typeStr   # Alias for the type, referred to in type constraints
-            # |  types
-            
-            ty = typeStrDict.get(o.typeStr)
-            if ty == None:
-                tys = set([onnxType_to_Type(ty) for ty in o.types])
-                if len(tys) > 1:
-                    print(f"multiple return types but no type constraints at {s.name}, output {o.name}: {tys}")
-                    ty = tys.pop()
-            return_type = ty
-
-        # 2: Def vs edef
-        if s.has_function:
-            print(f";; has body: {type(s.function_body)}", file=prelude)
-
-        obj = EDef(s.name, return_type, args)
-
-        pprint(obj, stream=prelude, width=120, indent=2)
-
-    if s.has_type_and_shape_inference_function:
-        pass # out.append(EDef("shape$" + s.name, Type.Float, [Type.Float, Type.Vec(Type.Float)]))
+            # 1.1: Outputs
+            return_type = Type.Tuple()
+            if len(s.outputs) != 1:
+                warnings.warn("TODO: multiple return types")
         
-prelude.close()
+            for o in s.outputs:
+                # FormalParameter(pybind11_builtins.pybind11_object)
+                # |  description
+                # |  isHomogeneous
+                # |  name
+                # |  option
+                # |  typeStr   # Alias for the type, referred to in type constraints
+                # |  types
+                
+                ty = typeStrDict.get(o.typeStr)
+                if ty == None:
+                    tys = set([onnxType_to_Type(ty) for ty in o.types])
+                    if len(tys) > 1:
+                        print(f"multiple return types but no type constraints at {s.name}, output {o.name}: {tys}")
+                        ty = tys.pop()
+                return_type = ty
+
+            # 2: Def vs edef
+            if s.has_function:
+                print(f";; has body: {type(s.function_body)}", file=prelude)
+
+            obj = EDef(s.name, return_type, args)
+
+            pprint(obj, stream=prelude, width=120, indent=2)
+
+        if s.has_type_and_shape_inference_function:
+            pass # out.append(EDef("shape$" + s.name, Type.Float, [Type.Float, Type.Vec(Type.Float)]))
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        filename = "etc/onnx-prelude.ks"
+    else:
+        filename = sys.argv[1]
+    with open(filename, "w") as prelude:
+        onnx_schemas_to_prelude(prelude)
