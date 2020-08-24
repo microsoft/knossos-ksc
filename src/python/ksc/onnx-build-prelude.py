@@ -34,6 +34,12 @@ warnings.filterwarnings("always")
 # help(onnx.defs.get_all_schemas()[0])
 
 #%%
+def comment(s : str):
+    """
+    Make a LISP inline comment from str
+    """
+    return f"#|{s}|#"
+
 def onnxAttrType_to_Type(ty):
     assert isinstance(ty, onnx.defs.OpSchema.AttrType)
     if ty == ty.FLOAT:
@@ -74,47 +80,66 @@ def onnxAttrType_to_Type(ty):
     print(ty)
     raise NotImplementedError(f"didn't handle {ty}")
 
-def onnxType_to_Type(ty : str):
+def onnxType_to_Type_with_mangler(ty : str):
+    """
+    Convert ty to KS type, and record any transformations (E.g. Complex->(Tuple Float Float)) in "mangler"
+    """
     if ty.startswith('tensor('):
+        # tensor -> Vec for now, but see great renaming
         assert ty.endswith(')')
-        return Type.Vec(onnxType_to_Type(ty[7:-1]))
+        mangler,elty = onnxType_to_Type_with_mangler(ty[7:-1])
+        return mangler, Type.Vec(elty)
 
     if ty.startswith('seq('):
+        # seq -> Vec
         assert ty.endswith(')')
-        return Type.Vec(onnxType_to_Type(ty[4:-1]))
+        mangler,elty = onnxType_to_Type_with_mangler(ty[4:-1])
+        return "seq$"+mangler, Type.Vec(elty)
 
     if ty.startswith('map('):
+        # map -> Vec Tuple
         assert ty.endswith(')')
-        return Type.Vec(onnxType_to_Type("tuple(" + ty[4:-1] + ")"))
+        mangler,elty = onnxType_to_Type_with_mangler("tuple(" + ty[4:-1] + ")")
+        return "map$"+mangler, Type.Vec(elty)
 
     if ty.startswith('tuple('):
         assert ty.endswith(')')
         args = ty[6:-1]
-        tys = [onnxType_to_Type(s) for s in re.split(', *', args)]
-        return Type.Tuple(*tys)
+        manglers_and_tys = [onnxType_to_Type_with_mangler(s) for s in re.split(', *', args)]
+        manglers = "".join([x[0] for x in manglers_and_tys])
+        tys = [x[1] for x in manglers_and_tys]
+        return f"{manglers}",Type.Tuple(*tys)
 
     if ty in ['double', 'float', 'float16']:
-        return Type.Float
+        return "",Type.Float
 
     if ty in ['complex64', 'complex128']:
-        # TODO: functions taking these types will need some mangling
-        print(f"Note: complex args converted to tuple")
-        return Type.Tuple(Type.Float,Type.Float)
+        return "cplx$",Type.Tuple(Type.Float,Type.Float)
 
     if ty in ['int64', 'int32', 'int16', 'int8', 
               'uint64', 'uint32', 'uint16', 'uint8']:
-        return Type.Integer
+        return "",Type.Integer
 
     if ty == 'string':
-        return Type.String
+        return "",Type.String
 
     if ty == 'bool':
-        return Type.Bool
+        return "",Type.Bool
 
-    print(ty)
     raise NotImplementedError(f"didn't convert '{ty}''")
 
+def onnxType_to_Type(ty : str):
+    return onnxType_to_Type_with_mangler(ty)[1]
+
 TypeConstraintParam = namedtuple('TypeConstraintParam', ['name', 'ty'])
+
+def TCPs_from_tc(type_constraint):
+    """
+    Take type_constraint(type_param_str, allowed_type_strs) and return list of TypeConstraintParam
+    """
+    tys = type_constraint.allowed_type_strs # Get all ONNX types
+    tys = set([onnxType_to_Type_with_mangler(ty) for ty in tys]) # Convert to Knossos and uniquify
+    return [ TypeConstraintParam(type_constraint.type_param_str, ty) for ty in tys ] # make list
 
 def all_combinations_type_constraints(type_constraints):
     """
@@ -131,12 +156,12 @@ def all_combinations_type_constraints(type_constraints):
     if len(type_constraints) == 0:
         return [[]]
 
-    tc = type_constraints[0]  # Generate all combinations from head and tail
-    tys = tc.allowed_type_strs # Get all ONNX types
-    tys = set([onnxType_to_Type(ty) for ty in tys]) # Convert to Knossos and uniquify
-    tcs = [ TypeConstraintParam(tc.type_param_str, ty) for ty in tys ]
+    # Generate all combinations from head and tail
+    tcps = TCPs_from_tc(type_constraints[0])
     tails = all_combinations_type_constraints(type_constraints[1:])
-    return [ [x] + tail for x in tcs for tail in tails ]
+    return [ [x] + tail 
+               for x in tcps
+                 for tail in tails ]
 
 def test_all_combinations_type_constraints():
     print("Test test_all_combinations_type_constraints")
@@ -149,23 +174,69 @@ def test_all_combinations_type_constraints():
 test_all_combinations_type_constraints()
 
 def onnx_schemas_to_prelude(prelude : TextIO):
-    out = []
-    for s in onnx.defs.get_all_schemas():
-        print(f";; Doing {s.name} # line \"{s.file}\" {s.line}")
-        prelude.write(f";; Doing {s.name} # line \"{s.file}\" {s.line}\n")
+    def writeln(line):
+        prelude.write(line + "\n")
 
-        # 0: Some special-cases
-        if s.name == "Constant":
-            out.append(";; Constant")
+    print("Processing:", end='')
+    for s in onnx.defs.get_all_schemas():
+        print(f" {s.name}", end='')
+
+        # 0. Send the doc
+        writeln(f";; Doing {s.name} # line \"{s.file}\" {s.line}")
+
+        for doc in s.doc.splitlines():
+            writeln(f";; {doc}")
+
+        writeln(f";; Type constraints:")
+        for tc in s.type_constraints:
+            writeln(f";; {tc.type_param_str} | {tc.allowed_type_strs} | {tc.description}")
+
+        # 0.1 Some special-cases, which are assumed "hand-written" in the output
+        if s.name in ["Constant", "ZipMap", 
+                      "SequenceEmpty", "Cast", "CastMap", 
+                      # "EyeLike", 
+                      "TreeEnsembleClassifier", "LinearClassifier", "SVMClassifier",
+                      "LabelEncoder", "CategoryMapper", 
+                      "If"]:
+            print("!", end='')
+            writeln(f";; SPECIAL: {s.name}")
             continue
 
-        # Gather type constraints
-        all_signatures = all_combinations_type_constraints(s.type_constraints)
+        out_type_from_sig = None
+        if s.name == "ConcatFromSequence":
+            # Onnx type constraints can't express S: seq<'t> -> T: 't
+            def ConcatFromSequence_type(tys):
+                return Type.Index(tys[0])
+            out_type_from_sig = lambda tys: ConcatFromSequence_type(tys)
 
-        if len(s.type_constraints) > 1:
-            print(f"Found {len(all_signatures)} signatures")
-            for tc in s.type_constraints:
-                print("TC:", tc.type_param_str, "|", tc.allowed_type_strs, "|", tc.description)    
+        if s.name == "DictVectorizer":
+            def DictVectorizer_type(tys):
+                # Vec (Tuple key value)
+                kv = Type.Index(tys[0])
+                value_ty = kv.children[1]
+                return Type.Vec(value_ty)
+            out_type_from_sig = lambda tys: DictVectorizer_type(tys)
+
+        if s.name == "SplitToSequence":
+            out_type_from_sig = lambda tys: Type.Vec(tys[0])
+
+        if s.name == "SequenceAt":
+            out_type_from_sig = lambda tys: Type.Index(tys[0])
+
+        if s.name == "SequenceConstruct":
+            out_type_from_sig = lambda tys: Type.Vec(tys[0])
+
+        # SequenceAt, SequenceConstruct, SequenceEmpty, NonMaxSuppression, TreeEnsembleRegressor
+
+        # Gather type constraints
+        output_typeStrs = set([o.typeStr for o in s.outputs])
+        input_typeStrs = set([o.typeStr for o in s.inputs])
+        input_type_constraints = list(filter(lambda tc: tc.type_param_str in input_typeStrs, s.type_constraints))
+        
+        all_signatures = all_combinations_type_constraints(input_type_constraints)
+
+        if len(all_signatures) > 1:
+            print(f"[x{len(all_signatures)}]", end='')
 
         for sig in all_signatures:
             # Gather (Tn, Type) pairs into dict
@@ -173,15 +244,23 @@ def onnx_schemas_to_prelude(prelude : TextIO):
 
             # 1: Assemble arguments.  Knossos treats "inputs" and "attributes" uniformly.
             args = []
+
+            def onnxTypes_to_mangler_and_Type(typeStr, types):
+                mangler_and_ty = typeStrDict.get(typeStr)
+                if mangler_and_ty != None:
+                    return mangler_and_ty
+                tys = set([onnxType_to_Type_with_mangler(ty) for ty in types])
+                if len(tys) > 1:
+                    writeln(f";; WARN: multiple types but no type constraints at {s.name}: {tys}")
+                mangler_and_ty = tys.pop()
+                assert mangler_and_ty != None
+                return mangler_and_ty
+
             # 1.1: Inputs
             for i in s.inputs:
-                ty = typeStrDict.get(i.typeStr)
-                if ty == None:
-                    tys = set([onnxType_to_Type(ty) for ty in i.types])
-                    if len(tys) > 1:
-                        print(f"multiple types but no type constraints at {s.name}, input {i.name}: {tys}")
-                        ty = tys.pop()
-                arg = Var(i.name, ty, True)
+                mangler,ty = onnxTypes_to_mangler_and_Type(i.typeStr, i.types)
+                annot = comment(mangler) if mangler != '' else ''
+                arg = Var(i.name + annot, ty, True)
                 args.append(arg)
 
             # 1.2: Attributes
@@ -191,37 +270,43 @@ def onnx_schemas_to_prelude(prelude : TextIO):
                 args.append(arg)
 
             # 1.1: Outputs
-            return_type = Type.Tuple()
-            if len(s.outputs) != 1:
-                warnings.warn("TODO: multiple return types")
-        
-            for o in s.outputs:
-                # FormalParameter(pybind11_builtins.pybind11_object)
-                # |  description
-                # |  isHomogeneous
-                # |  name
-                # |  option
-                # |  typeStr   # Alias for the type, referred to in type constraints
-                # |  types
-                
-                ty = typeStrDict.get(o.typeStr)
-                if ty == None:
-                    tys = set([onnxType_to_Type(ty) for ty in o.types])
-                    if len(tys) > 1:
-                        print(f"multiple return types but no type constraints at {s.name}, output {o.name}: {tys}")
-                        ty = tys.pop()
-                return_type = ty
+            return_types = []
+            if out_type_from_sig == None:
+                for o in s.outputs:
+                    mangler,ty = onnxTypes_to_mangler_and_Type(o.typeStr, o.types)
+                    if mangler != '':
+                        writeln(f";; NOTE: output mangler {mangler}")
+                    return_types.append(ty)
+            else:
+                return_types = [out_type_from_sig([v.type for v in args])]
+
+            if len(return_types) > 1:
+                return_type = Type.Tuple(*return_types)
+                writeln(f";; NOTE: multiple outputs as tuple")
+            elif len(return_types) == 1:
+                return_type = return_types[0]
+            else:
+                return_type = Type.Tuple()  # Empty tuple is Knossos "unit" type
+
+            # Grab any manglers
+            manglers = set([onnxType_to_Type_with_mangler(ty)[0] for ty in i.types for i in s.inputs + s.outputs])
+            if '' in manglers:
+                manglers.remove('')
+            if len(manglers) > 0:
+                writeln(f";; NOTE: manglers {manglers}")
 
             # 2: Def vs edef
             if s.has_function:
-                print(f";; has body: {type(s.function_body)}", file=prelude)
+                writeln(f";; has body: {type(s.function_body)}")
 
             obj = EDef(s.name, return_type, args)
 
-            pprint(obj, stream=prelude, width=120, indent=2)
+            pprint(obj, stream=prelude, width=180, indent=2)
 
         if s.has_type_and_shape_inference_function:
             pass # out.append(EDef("shape$" + s.name, Type.Float, [Type.Float, Type.Vec(Type.Float)]))
+
+    print("... done")
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -230,3 +315,5 @@ if __name__ == '__main__':
         filename = sys.argv[1]
     with open(filename, "w") as prelude:
         onnx_schemas_to_prelude(prelude)
+
+# %%
