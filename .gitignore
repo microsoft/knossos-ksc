@@ -103,3 +103,6 @@ __pycache__/
 # Ionide F# VS Code extension
 .fake
 .ionide
+
+# ONNX generated prelude
+etc/onnx-prelude-autogen.ks
