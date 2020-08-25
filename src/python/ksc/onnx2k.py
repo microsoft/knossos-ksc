@@ -5,6 +5,12 @@
 # https://github.com/onnx/onnx/blob/master/docs/IR.md
 # https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/onnx.in.proto
 
+# TODO:
+# - Emit "def" FunctionProtos in prelude
+# - Add pre/post comments to expressions, and emit argument names as comments
+# - roundtrip test
+# - Fix pylint on TensorProto.FLOAT
+
 #%%
 
 from collections import namedtuple
