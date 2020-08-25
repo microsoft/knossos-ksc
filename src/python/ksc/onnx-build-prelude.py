@@ -10,6 +10,24 @@
 from typing import TextIO
 from collections import namedtuple
 
+def f(x,y):
+    return x*sin(x) + 2*y
+def f_grad(x,y):
+    s,c = Math.sincos(x)
+    return (x*c + s, 2)
+
+f(2,3)
+
+f_grad_ks = Knossos.grad(f)  # Perform AD, maybe apply sensible rewrites
+assert f_grad_ks(2,3) == (3.4, 2)
+
+f_fast,f_fast_grad = Knossos.opt((f, f_grad_ks), "4 hours") # RLO, time limit 
+
+f_fast(2,3)
+f_fast_grad(2,3)
+
+
+
 import warnings
 import sys
 import re
@@ -41,6 +59,10 @@ def comment(s : str):
     return f"#|{s}|#"
 
 def onnxAttrType_to_Type(ty):
+    """
+    Convert ONNX AttrType to KS Type.
+    Currently collapses 
+    """
     assert isinstance(ty, onnx.defs.OpSchema.AttrType)
     if ty == ty.FLOAT:
         return Type.Float
@@ -193,7 +215,9 @@ def onnx_schemas_to_prelude(prelude : TextIO):
         for tc in s.type_constraints:
             writeln(f";; {tc.type_param_str} | {tc.allowed_type_strs} | {tc.description}")
 
-        # 0.1 Some special-cases, which are assumed "hand-written" in the output
+        # 0.1 Some special-cases, which are assumed "hand-written" in the output,
+        # e.g. output type depends on some runtime value.
+        # We can relax this if we assume the runtime values are always constants -- e.g. some attrs
         if s.name in ["Constant", "ZipMap", 
                       "SequenceEmpty", "Cast", "CastMap", 
                       # "EyeLike", 
@@ -268,7 +292,7 @@ def onnx_schemas_to_prelude(prelude : TextIO):
             # 1.2: Attributes
             for key in s.attributes:
                 a = s.attributes[key]
-                arg = Var(a.name, onnxAttrType_to_Type(a.type), True)
+                arg = Var(a.name + comment("attr"), onnxAttrType_to_Type(a.type), True)
                 args.append(arg)
 
             # 1.1: Outputs
