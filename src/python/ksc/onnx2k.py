@@ -37,7 +37,6 @@ import resource
 sys.setrecursionlimit(10**6)
 
 ############################################################################
-
 def encode_name(name: str):
     if re.match("^[0-9]", name):
         return "%" + name
@@ -80,31 +79,35 @@ def convertType(proto):
     ety = convertElementType(proto.tensor_type.elem_type)
     return Type.Vec(ety)
 
+def get_values(init):
+    """
+    Get values from a TensorProto
+    """
+    # https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/onnx.in.proto#L448
+    
+    if init.data_type == TensorProto.INT64:
+        return [Const(i) for i in init.int64_data]
+
+    raise NotImplementedError(f"Type {init.data_type}")
 
 def emit_inits(inits, body):
-    if len(inits) == 0:
-        return body
-    init = inits[0]
-    return Let(useVar(init.name), Const(f"{init.dims}@{init.data_type}"),
-               emit_inits(inits[1:], body))
+    """
+    Emit initializers
+    """
+    for init in reversed(inits):
+        var = useVar(init.name)
+        if len(init.dims) == 1 and init.dims[0] < 16:
+            # Putative vec constructor
+            value = Call("vec", get_values(init))
+        else:
+            value = Const(f"{init.dims}@{convertElementType(init.data_type)}")
+        body = Let(var, value, body)
+    return body
 
 def onnx2ks(g):
     """
     Convert ONNX graph g into Knossos Expr.
-
-    
     """
-    inputs = {}
-    for i in g.input:
-        inputs[i.name] = convertType(i.type)
-
-    input_inits = []
-    internal_inits = []
-    for init in g.initializer:
-        if init.name in inputs:
-            input_inits.append(init)
-        else:
-            internal_inits.append(init)
 
     # ONNX graph nodes are toplologically sorted, so just run through in reverse order
     # making a chain of lets.
@@ -136,9 +139,17 @@ def onnx2ks(g):
                 
                 body = Let(tmp, rhs, body)
 
+    inputs = set([i.name for i in g.input])
+
+    inits = {init.name:init for init in g.initializer}
+
+    internal_inits = []
+    for init in g.initializer:
+        if init.name not in inputs:
+            internal_inits.append(init)
 
     # value_infos -> types
-    args = [defVar(name, ty) for name,ty in inputs.items()]
+    args = [defVar(i.name, convertType(i.type)) for i in g.input]
     ex = emit_inits(internal_inits, body)
 
     # (def GraphName None args body)
@@ -146,21 +157,27 @@ def onnx2ks(g):
 
     # (def main None () 
     #     (GraphName initializers.. ) )
-    main_body = Call(g.name, [useVar(i.name) for i in input_inits])
-    main = Def("main", None, [], emit_inits(input_inits, main_body))
+    main_body = Call(g.name, [useVar(i.name) for i in g.input])
+    input_inits = [inits[i.name] for i in g.input if i.name in inits]
+    main_args = [arg for arg in args if arg.name not in inits]
+    main = Def("main", None, main_args, emit_inits(input_inits, main_body))
 
     return (decl,main)
 
 if __name__ == "__main__":
-    nargs = len(sys.argv) - 1
+    argv = sys.argv
+
+    argv = ['*EXE*', 'test/onnx2k/mnist-7.onnx', 'obj/']
+
+    nargs = len(argv) - 1
     if nargs == 0:
-        filename = "test/onnx2k/bertsquad-10.onnx"
+        filename = "/dev/stdin"
     else:
-        filename = sys.argv[1]
+        filename = argv[1]
 
     ofn = None
     if nargs == 2:
-        ofn = sys.argv[2]
+        ofn = argv[2]
         if ofn.endswith("/"):
             ofn = ofn + re.sub(r'\.onnx$','.ks',filename)
 
