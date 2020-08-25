@@ -88,6 +88,9 @@ def get_values(init):
     if init.data_type == TensorProto.INT64:
         return [Const(i) for i in init.int64_data]
 
+    if init.data_type == TensorProto.FLOAT:
+        return [Const(i) for i in init.float_data]
+
     raise NotImplementedError(f"Type {init.data_type}")
 
 def emit_inits(inits, body):
@@ -167,7 +170,8 @@ def onnx2ks(g):
 if __name__ == "__main__":
     argv = sys.argv
 
-    argv = ['*EXE*', 'test/onnx2k/mnist-7.onnx', 'obj/']
+    if len(argv) == 1:
+        argv = ['*EXE*', 'test/onnx2k/mnist-7.onnx', 'obj/']
 
     nargs = len(argv) - 1
     if nargs == 0:
