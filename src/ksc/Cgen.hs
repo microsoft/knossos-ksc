@@ -317,7 +317,6 @@ cgenExprR env = \case
         ++ cretty ++ " " ++ ret ++ ";\n"
         ++ "{\n"
         ++ "   " ++ varcty ++ " " ++ cgenVar var ++ " = 0;\n"
-        ++ "   do {\n"
         -- We don't actually want to mark the allocator here.  We want
         -- to mark it after the first time round the loop, below.  On
         -- the other hand, we need to *declare* the variable
@@ -325,12 +324,13 @@ cgenExprR env = \case
         -- both branches.  We use $MRK here then as a cheeky way of
         -- declaring "bumpmark".  TODO: Make a cleaner way of doing
         -- this.
-        ++ "     " ++ gc "$MRK"
+        ++ "   " ++ gc "$MRK"
+        ++ "   do {\n"
         ++       bodydecl
         --       First time round, deep copy it, put it in the ret, then mark the allocator
         ++ "     if (" ++ cgenVar var ++ " == 0) {\n"
         ++ "       " ++ ret ++ " = inflated_deep_copy(" ++ bodyex ++ ");\n"
-        ++ "       " ++ gc "$MRK"
+        ++ "       " ++ gc "$MOVEMRK"
         ++ "     } else {\n"
         ++ "       inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");\n"
         --         Release the allocator back to where it was on iter 0
