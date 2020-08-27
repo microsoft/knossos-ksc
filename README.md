@@ -21,7 +21,7 @@ Current transformers:
 
 ### KS-Lisp: A low-sugar IR
 
-The text form of the IR is "low sugar", focused more on simplicty than user-friendliness.
+The text form of the IR is "low sugar", focused more on simplicity than user-friendliness.
 However it *is* human writable, and lispers in particular may like to play with it.
 There's a VS Code syntax highlighter extension in etc/ks-vscode.
 
