@@ -27,7 +27,6 @@ def multigammaln(a, d: int):
 
     # Even if this works, it's going to be super slow!
 
-
     print(a)
 
     res = (d * (d - 1) * 0.25) * math.log(math.pi)
