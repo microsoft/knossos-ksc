@@ -70,11 +70,18 @@ from ksc.utils import paren
 #         ^^^^^^^^ ^^^^^^^^^^
 #         cond     body
 
+def comment(s : str)
+    return f"#|{s}|#"
+
 class Expr:
     '''Base class for AST nodes.'''
+    comments: str * str
+    
     def __init__(self, *args):
+        comments = ("","")
         for (nt,v) in zip(self.__annotations__, args):
-            setattr(self, nt, v)
+            if nt != "comments":
+                setattr(self, nt, v)
 
     def __eq__(self, that):
         if type(self) != type(that):
@@ -92,8 +99,31 @@ class Expr:
         for nt in self.__annotations__:
             yield getattr(self, nt)
 
+    def _pre_comment(self):
+        return comments[0]+' ' if comments[0] else ""
+
+    def _post_comment(self):
+        return ' '+comments[1] if comments[1] else ""
+
     def __str__(self):
-        return paren(type(self).__name__ + ' ' + ' '.join(str(node) for node in self.nodes()))
+        return paren(self._pre_comment() + 
+                     type(self).__name__ + ' ' + 
+                     ' '.join(str(node) for node in self.nodes())) + 
+                     self._post_comment()
+
+    def pre_comment(self, s : str):
+        """
+        Attach a comment string to be printed before this expr
+        """
+        comments[0] = s
+        return self
+
+    def post_comment(self, s : str):
+        """
+        Attach a comment string to be printed after this expr
+        """
+        comments[1] = s
+        return self
 
 class Def(Expr):
     '''Def(name, return_type, args, body). 
@@ -113,6 +143,7 @@ class EDef(Expr):
     '''Edef(name, return_type, args). 
     Example:
     ```
+    (edef add   (Vec Float)  (Float (Vec Float)) )
     (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
           ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           name  return_type  args
@@ -257,9 +288,13 @@ def pystr(expr, indent=0):
 @pystr.register(Def)
 def _(ex, indent):
     indent += 1
-    return "def " + ex.name + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
+    _pre_com = "# " + comments[0] + nl(indent) if comments[0] else ""
+    _post_com = nl(indent) + "# " + comments[1] if comments[1] else ""
+    return _pre_com \
+           + "def " + ex.name + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
            + pystr(ex.return_type, indent) + ":" \
-           + nl(indent+1) + pystr(ex.body, indent+1)
+           + nl(indent+1) + pystr(ex.body, indent+1) \
+           + _post_com
 
 @pystr.register(EDef)
 def _(ex, indent):

@@ -34,12 +34,6 @@ warnings.filterwarnings("always")
 # help(onnx.defs.get_all_schemas()[0])
 
 #%%
-def comment(s : str):
-    """
-    Make a LISP inline comment from str
-    """
-    return f"#|{s}|#"
-
 def onnxAttrType_to_Type(ty):
     """
     Convert ONNX AttrType to KS Type.
@@ -267,14 +261,15 @@ def onnx_schemas_to_prelude(prelude : TextIO):
             # 1.1: Inputs
             for i in s.inputs:
                 mangler,ty = onnxTypes_to_mangler_and_Type(i.typeStr, i.types)
-                annot = comment(mangler) if mangler != '' else ''
-                arg = Var(i.name + annot, ty, True)
+                ty_annot = ty.pre_comment(mangler) if mangler != '' else ty
+                arg = Var(i.name, ty, True)
                 args.append(arg)
 
             # 1.2: Attributes
             for key in s.attributes:
                 a = s.attributes[key]
-                arg = Var(a.name + comment("attr"), onnxAttrType_to_Type(a.type), True)
+                ty = ty.pre_comment("attr")
+                arg = Var(a.name, ty, True)
                 args.append(arg)
 
             # 1.1: Outputs
