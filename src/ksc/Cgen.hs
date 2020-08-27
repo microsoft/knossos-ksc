@@ -317,14 +317,7 @@ cgenExprR env = \case
         ++ cretty ++ " " ++ ret ++ ";\n"
         ++ "{\n"
         ++ "   " ++ varcty ++ " " ++ cgenVar var ++ " = 0;\n"
-        -- We don't actually want to mark the allocator here.  We want
-        -- to mark it after the first time round the loop, below.  On
-        -- the other hand, we need to *declare* the variable
-        -- "bumpmark" somewhere outside the "if" because it is used in
-        -- both branches.  We use $MRK here then as a cheeky way of
-        -- declaring "bumpmark".  TODO: Make a cleaner way of doing
-        -- this.
-        ++ "   " ++ gc "$MRK"
+        ++ "   " ++ gc "$DECLAREMRK"
         ++ "   do {\n"
         ++       bodydecl
         --       First time round, deep copy it, put it in the ret, then mark the allocator

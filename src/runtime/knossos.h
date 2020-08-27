@@ -271,6 +271,7 @@ namespace ks
 	inline alloc_mark_t mark_bump_allocator_if_present() { return g_alloc.mark(); }
 	inline void reset_bump_allocator_if_present(alloc_mark_t top) { g_alloc.reset(top); }
 #define $MRK(var) alloc_mark_t var = mark_bump_allocator_if_present()
+#define $DECLAREMRK(var) alloc_mark_t var
 #define $MOVEMRK(var) var = mark_bump_allocator_if_present()
 #define $REL(var) reset_bump_allocator_if_present(var)
 #else
@@ -278,6 +279,7 @@ namespace ks
 	inline alloc_mark_t mark_bump_allocator_if_present() { return 0; }
 	inline void reset_bump_allocator_if_present(alloc_mark_t top) { }
 #define $MRK(var)
+#define $DECLAREMRK(var)
 #define $MOVEMRK(var)
 #define $REL(var)
 #endif
