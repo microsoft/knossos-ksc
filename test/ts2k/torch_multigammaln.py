@@ -23,11 +23,9 @@ def multigammaln(a, d: int):
     # res = (d * (d-1) * 0.25) * np.log(np.pi)
     # res += np.sum(loggam([(a - (j - 1.)/2) for j in range(1, d+1)]), axis=0)
 
-    print("WARNING: untested multigammaln port")
+    print("WARNING: minimally test multigammaln port")
 
-    # Even if this works, it's going to be super slow!
-
-    print(a)
+    # Need to check relative performance
 
     res = (d * (d - 1) * 0.25) * math.log(math.pi)
     res += torch.sum(

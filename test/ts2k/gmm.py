@@ -52,8 +52,6 @@ def log_wishart_prior(p: int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
 
     C = n * p * (math.log(wishart_gamma / math.sqrt(2)))
 
-    stuff = out - k * (C - log_gamma_distrib(0.5 * n, p))
-
     return out - k * (C - log_gamma_distrib(0.5 * n, p))
 
 
@@ -168,8 +166,6 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
         + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
     )
 
-
-# print("Second step")
 print(gmm_objective2.graph)
 
 # extracted from adbench test
@@ -196,8 +192,6 @@ print(result)
 
 print(means.grad)
 
-result.backward()
+result.backward(retain_graph = True)
 
 print(means.grad)
-
-# backward(retain_graph = True)
