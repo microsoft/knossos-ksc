@@ -10,24 +10,6 @@
 from typing import TextIO
 from collections import namedtuple
 
-def f(x,y):
-    return x*sin(x) + 2*y
-def f_grad(x,y):
-    s,c = Math.sincos(x)
-    return (x*c + s, 2)
-
-f(2,3)
-
-f_grad_ks = Knossos.grad(f)  # Perform AD, maybe apply sensible rewrites
-assert f_grad_ks(2,3) == (3.4, 2)
-
-f_fast,f_fast_grad = Knossos.opt((f, f_grad_ks), "4 hours") # RLO, time limit 
-
-f_fast(2,3)
-f_fast_grad(2,3)
-
-
-
 import warnings
 import sys
 import re
