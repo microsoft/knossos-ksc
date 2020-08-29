@@ -7,6 +7,7 @@ class Type:
         "Integer": 0,
         "Float": 0,
         "Bool": 0,
+        "String": 0,
         "Lam": 2, # TODO: Lambda args are in reverse order, prefer src -> dst
         "LM": 2 # Linear map, used in AD
     }
@@ -28,7 +29,7 @@ class Type:
         return Type("LM", [return_type, arg_type]) 
 
     @staticmethod
-    def Index(vec):
+    def Index(vec):  # TODO: Call this elem_type for consistency with ksc-MLIR?
         if vec is None:
             return None
         assert vec.kind == "Vec"
@@ -43,13 +44,21 @@ class Type:
         self.children = children
 
     @property
+    def is_scalar(self):
+        return self.kind in ["Integer", "Float", "Bool", "String"]
+
+    @property
+    def is_lam_or_LM(self):
+        return self.kind == "Lam" or self.kind == "LM"
+
+    @property
     def return_type(self):
-        assert self.kind == "Lam" or self.kind == "LM"
+        assert self.is_lam_or_LM
         return self.children[0]
 
     @property
     def arg_type(self):
-        assert self.kind == "Lam" or self.kind == "LM"
+        assert self.is_lam_or_LM
         return self.children[1]
 
     def accept_value_of_type(self, other):
@@ -68,7 +77,7 @@ class Type:
             return sum([c.num_elements(assumed_vector_size) for c in self.children])
         elif self.kind == "Vec":
             return assumed_vector_size * self.children[0].num_elements(assumed_vector_size)
-        elif self.kind in ["Integer", "Float", "Bool", "Lam", "LM"]:
+        elif self.is_scalar or self.is_lam_or_LM:
             return 1
 
     def all_element_types(self):
@@ -84,7 +93,7 @@ class Type:
         if self.kind == "Vec":
             child_ndim = self.children[0].ndim
             return child_ndim + 1 if child_ndim is not None else None
-        elif self.kind in ["Integer", "Float", "Bool"]:
+        elif self.is_scalar:
             return 0
         return None
 
@@ -97,7 +106,7 @@ class Type:
         return (c for c in self.children)
 
     def shortstr(self, tb="<", te=">"):
-        el_types = {"Integer": "i", "Bool": "b", "Float": "f", "Lam": "l", "LM": "l"}
+        el_types = {"Integer": "i", "Bool": "b", "String" : "s", "Float": "f", "Lam": "l", "LM": "l"}
         if self.kind in el_types:
             return el_types[self.kind]
         if self.kind == "Tuple":
@@ -114,7 +123,7 @@ class Type:
         if len(self.children) == 0 and (self.kind != "Tuple"):
             return self.kind
         elems = [str(c) for c in self.children]
-        if self.kind == "Lam" or self.kind == "LM":
+        if self.is_lam_or_LM:
             elems = ["{}({})".format(*elems)]
         return "({})".format(" ".join([self.kind] + elems))
 
@@ -129,7 +138,7 @@ class Type:
             return True
         if other is None or self.kind != other.kind:
             return False
-        if self.kind in ["Integer", "Float", "Bool"]:
+        if self.is_scalar:
             return True
         if self.kind == "Tuple" and len(self.children) != len(other.children):
             return False
@@ -141,3 +150,4 @@ class Type:
 Type.Integer = Type("Integer")
 Type.Float = Type("Float")
 Type.Bool = Type("Bool")
+Type.String = Type("String")
