@@ -29,7 +29,7 @@ class Type:
         return Type("LM", [return_type, arg_type]) 
 
     @staticmethod
-    def Index(vec):  # TODO: Call this elem_type for sonsistency with ksc-MLIR?
+    def Index(vec):  # TODO: Call this elem_type for consistency with ksc-MLIR?
         if vec is None:
             return None
         assert vec.kind == "Vec"
