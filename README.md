@@ -39,7 +39,7 @@ The lisp-like IR is extremely simple -- all the language builtins are in this co
 (edef atan2 Float (Float Float)) 
 
 #| Block comments
- -- User-defined function f 
+ -- User-defined function myfun 
  takes an Integer and Vec of (Float Float) pairs
  and returns a pair of String and Float
 |#
