@@ -36,7 +36,7 @@ def sqsum(x):
     # Python builtin <built-in function sum> is currently not supported in Torchscript
     return torch.sum(x ** 2)
 
-
+# TODO: pass only Qdiag and icf (as is done in the F#) - AWF
 @torch.jit.script
 def log_wishart_prior(p: int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
     n = p + wishart_m + 1
@@ -67,7 +67,6 @@ def make_L_col_lifted(d: int, icf, constructL_Lparamidx: int, i: int):
 
     constructL_Lparamidx += nelems
     return (constructL_Lparamidx, col)
-
 
 @torch.jit.script
 def constructL(d: int, icf):
