@@ -26,7 +26,7 @@ def logsumexpvec(x):
 
 
 @torch.jit.script
-def log_gamma_distrib(a, p: int):
+def log_gamma_distrib(a:torch.Tensor, p: int):
     # return scipy_special.multigammaln(a, p)
     return torch_multigammaln.multigammaln(a, p)
 
@@ -89,11 +89,9 @@ def constructL(d: int, icf):
 
     columns = []
     for i in range(0, d):
-        # for i in range(0, 3):
         constructL_Lparamidx_update, col = make_L_col_lifted(
             d, icf, constructL_Lparamidx, i
         )
-        # columns[i] = col
         columns.append(col)
         constructL_Lparamidx = constructL_Lparamidx_update
 
@@ -144,12 +142,7 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
     # Tensor cannot be used as a tuple
     #
     # but I believe we don't need to do the tuple()
-
-    xcentered_intermediate = []
-    for i in range(n):
-        # xcentered_intermediate[i] = x[i] - means
-        xcentered_intermediate.append(x[i] - means)
-    xcentered = torch.stack(xcentered_intermediate)
+    xcentered = torch.stack([x[i] - means for i in range(n)])
 
     Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
     sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
