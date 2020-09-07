@@ -184,7 +184,7 @@ cgenDefs defs = concatMap cdecl $
                                     UserRhs _ -> Just ((f, typeof arg), ())
                                     _         -> Nothing) defs)
 
-  cdecl def = [cgenDefE env def]
+  cdecl def = cgenDefE env def ++ [ "" ]
 
 {- Note [Unpack tuple arguments]
 
@@ -232,7 +232,7 @@ params_withPackedParams param = case typeof param of
 mkCTypedVar :: TVar -> String
 mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 
-cgenDefE :: CST -> TDef -> String
+cgenDefE :: CST -> TDef -> [String]
 cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
   let cf                         = cgenUserFun (f, typeof param)
@@ -242,18 +242,11 @@ cgenDefE env (Def { def_fun = f, def_pat = param
       cbody       = cbodydecl ++ [ "return (" ++ cbodyexpr ++ ");" ]
       cvars       = map mkCTypedVar params
       cftypealias = "ty$" ++ cf
-  in  (     "typedef "
-      ++    cgenType cbodytype
-      `spc` cftypealias
-      ++    ";\n"
-      ++    cftypealias
-      `spc` cf
-      ++    "("
-      ++    intercalate ", " cvars
-      ++    ") {\n"
-      ++    unlines (indent cbody)
-      ++    "}\n"
-      )
+  in (  [ "typedef " ++ cgenType cbodytype `spc` cftypealias ++ ";",
+          cftypealias `spc` cf ++ "(" ++ intercalate ", " cvars ++ ") {" ]
+     ++ indent cbody
+     ++ [ "}" ]
+     )
 
 cgenDefE _ def = pprPanic "cgenDefE" (ppr def)
   -- Should not happen because of the 'filter isUserDef' in cgenDefs
