@@ -47,13 +47,13 @@ occAnalT (TypeTuple tys)
     (tys', vs_s) = unzip (map occAnalT tys)
 
 occAnalT (TypeLM ty1 ty2)
-  = (TypeLM ty1' ty2', M.union vs1 vs2)
+  = (TypeLM ty1' ty2', union vs1 vs2)
   where
     (ty1', vs1) = occAnalT ty1
     (ty2', vs2) = occAnalT ty2
 
 occAnalT (TypeLam ty1 ty2)
-  = (TypeLam ty1' ty2', M.union vs1 vs2)
+  = (TypeLam ty1' ty2', union vs1 vs2)
   where
     (ty1', vs1) = occAnalT ty1
     (ty2', vs2) = occAnalT ty2
@@ -70,19 +70,19 @@ occAnalE (Konst k)  = (Konst k, M.empty)
 occAnalE (Dummy ty) = (Dummy ty, M.empty)
 
 occAnalE (App e1 e2)
-  = (App e1' e2', M.union vs1 vs2)
+  = (App e1' e2', union vs1 vs2)
   where
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
 occAnalE (Assert e1 e2)
-  = (Assert e1' e2', M.union vs1 vs2)
+  = (Assert e1' e2', union vs1 vs2)
   where
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
 occAnalE (Lam tv e)
-  = (Lam tv' e', vs2 `M.union` markMany (tv `M.delete` vs))
+  = (Lam tv' e', vs2 `union` markMany (tv `M.delete` vs))
     -- If a variable is used under a lambda
     -- we must not inline it uncritically, lest
     -- we duplcate work.   E.g.
@@ -143,7 +143,7 @@ occAnalE (Let tv rhs body)
                      `union` vstv `union` vsr
 
 occAnalE (If b t e)
-  = (If b' t' e', vsb `M.union` vst `M.union` vse)
+  = (If b' t' e', vsb `union` (M.unionWith max vst vse))
   where
     (b', vsb) = occAnalE b
     (t', vst) = occAnalE t
