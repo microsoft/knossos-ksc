@@ -28,7 +28,9 @@ optLets subst rhs
 occAnal :: TExpr -> ExprX OccAnald
 occAnal e = fst (occAnalE e)
 
-type OccMap = M.Map TVar Int  -- How often each free variable occurs
+-- Maps a free variable to its number of syntactic occurrences
+-- (but using max for the branches of an If)
+type OccMap = M.Map TVar Int  
 
 occAnalTv :: TVar -> (TVarX, OccMap)
 occAnalTv (TVar ty v) = (TVar ty' v, vs)
@@ -42,18 +44,18 @@ occAnalT (TypeVec ty)
     (ty', vs) = occAnalT ty
 
 occAnalT (TypeTuple tys)
-  = (TypeTuple tys', unions vs_s)
+  = (TypeTuple tys', unionsOccMap vs_s)
   where
     (tys', vs_s) = unzip (map occAnalT tys)
 
 occAnalT (TypeLM ty1 ty2)
-  = (TypeLM ty1' ty2', M.union vs1 vs2)
+  = (TypeLM ty1' ty2', unionOccMap vs1 vs2)
   where
     (ty1', vs1) = occAnalT ty1
     (ty2', vs2) = occAnalT ty2
 
 occAnalT (TypeLam ty1 ty2)
-  = (TypeLam ty1' ty2', M.union vs1 vs2)
+  = (TypeLam ty1' ty2', unionOccMap vs1 vs2)
   where
     (ty1', vs1) = occAnalT ty1
     (ty2', vs2) = occAnalT ty2
@@ -70,19 +72,19 @@ occAnalE (Konst k)  = (Konst k, M.empty)
 occAnalE (Dummy ty) = (Dummy ty, M.empty)
 
 occAnalE (App e1 e2)
-  = (App e1' e2', M.union vs1 vs2)
+  = (App e1' e2', unionOccMap vs1 vs2)
   where
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
 occAnalE (Assert e1 e2)
-  = (Assert e1' e2', M.union vs1 vs2)
+  = (Assert e1' e2', unionOccMap vs1 vs2)
   where
     (e1', vs1) = occAnalE e1
     (e2', vs2) = occAnalE e2
 
 occAnalE (Lam tv e)
-  = (Lam tv' e', vs2 `M.union` markMany (tv `M.delete` vs))
+  = (Lam tv' e', vs2 `unionOccMap` markMany (tv `M.delete` vs))
     -- If a variable is used under a lambda
     -- we must not inline it uncritically, lest
     -- we duplcate work.   E.g.
@@ -96,7 +98,7 @@ occAnalE (Lam tv e)
 occAnalE (Call f e) = (Call f e', vs)
                      where
                        (e',vs) = occAnalE e
-occAnalE (Tuple es) = (Tuple es', unions vs)
+occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
 
@@ -121,13 +123,13 @@ occAnalE (Let tv (Tuple es) body)
 
        -- See Note [Making optLets idempotent]
        | n == 1    = vsb_no_tv
-                     `union` vstv
-                     `union` unions vsr
+                     `unionOccMap` vstv
+                     `unionOccMap` unionsOccMap vsr
 
        -- Note [Inline tuples], item (2)
        | otherwise = vsb_no_tv
-                     `union` vstv
-                     `union` markMany (unions vsr)
+                     `unionOccMap` vstv
+                     `unionOccMap` markMany (unionsOccMap vsr)
 
 occAnalE (Let tv rhs body)
   = (Let (n, tv') rhs' body', vs)
@@ -140,10 +142,10 @@ occAnalE (Let tv rhs body)
     (body', vsb)  = occAnalE body
     vs | n == 0    = tv `M.delete` vsb
        | otherwise = (tv `M.delete` vsb)
-                     `union` vstv `union` vsr
+                     `unionOccMap` vstv `unionOccMap` vsr
 
 occAnalE (If b t e)
-  = (If b' t' e', vsb `M.union` vst `M.union` vse)
+  = (If b' t' e', vsb `unionOccMap` (M.unionWith max vst vse))
   where
     (b', vsb) = occAnalE b
     (t', vst) = occAnalE t
@@ -157,11 +159,14 @@ markMany m = M.map (const manyOcc) m
 manyOcc :: Int
 manyOcc = 100   -- Obviously ad-hoc; anything >= 2 should be fine
 
-union :: OccMap -> OccMap -> OccMap
-union = M.unionWith (+)
+unionOccMap :: OccMap -> OccMap -> OccMap
+-- Add occurrences when a variable appears in both subexpressions
+-- (we can't just use M.union as this would only count the
+-- first subexpression when a variable appears in both)
+unionOccMap = M.unionWith (+)
 
-unions :: [OccMap] -> OccMap
-unions = foldr union M.empty
+unionsOccMap :: [OccMap] -> OccMap
+unionsOccMap = foldr unionOccMap M.empty
 
 -------------------------
 -- Substitute trivials
