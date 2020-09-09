@@ -2,7 +2,7 @@
 ; causes our our codegen to produce deltaVecs that are tricky to get
 ; rid of.
 
-(def matrix_multiply
+(def mul_mat_vec
      (Vec Float)
      ((w : Vec (Vec Float))
       (image : Vec Float))
@@ -14,7 +14,7 @@
           (index ki image))
        ))))))
 
-(def matrix_multiply_matrix
+(def mul_mat_mat
      (Vec (Vec Float))
      ((x : Vec (Vec Float))
       (y : Vec (Vec Float)))
@@ -28,7 +28,7 @@
               (index cy   (index rycx y)))
        ))))))))
 
-(def matrix_multiply_transpose
+(def mul_vec_mat
      (Vec Float)
      ((w : Vec (Vec Float))
       (image : Vec Float))
