@@ -116,6 +116,9 @@ makeUnionType ty1 ty2 =
 spc :: String -> String -> String
 spc x y = x ++ " " ++ y
 
+indent :: [String] -> [String]
+indent = map ("  " ++)
+
 -------------- State for var generator
 
 type M = S.State Int
@@ -131,20 +134,20 @@ freshCVar = do
 
 -------------------- Cgen
 
--- CGenResult is (C declaration, C expression, CType)
--- e.g. ("double r; if (b) { r = 1; } else { r = 2; };",
+-- CGenResult is (C declarations, C expression, CType)
+-- e.g. (["double r; if (b) { r = 1; } else { r = 2; };"],
 --       "r",
 --       TypeDouble)
--- e.g. ("",         -- simple constant needs no pre-declaration
+-- e.g. ([],         -- simple constant needs no pre-declaration
 --       "1.0",      -- this is what we use at the occurrence
 --       TypeDouble)
--- e.g. ("typedef LM::HCat<LM::VCat<LM::One, LM::Zero>,LM::Zero> v12_t;
---        v12_t v12 = v12_t::mk(a,b);",
+-- e.g. (["typedef LM::HCat<LM::VCat<LM::One, LM::Zero>,LM::Zero> v12_t;",
+--        "v12_t v12 = v12_t::mk(a,b);"]
 --       "v12",      -- this is what we use at the occurrence
 --       LMHCat [LMVCat [LMOne, LMZero], LMZero])
-data CGenResult = CG String String CType -- TODO: rename CG CGenResult
+data CGenResult = CG [String] String CType -- TODO: rename CG CGenResult
 
-getDecl :: CGenResult -> String
+getDecl :: CGenResult -> [String]
 getDecl (CG dc _ _) = dc
 
 getExpr :: CGenResult -> String
@@ -162,12 +165,12 @@ cstMaybeLookupFun = Map.lookup
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
-gcMarker :: Bool -> M (String -> String)
+gcMarker :: Bool -> M (String -> [String])
 gcMarker dogc = do
   bumpmark <- freshCVar
   return (\tag -> if dogc
-                  then tag ++ "(" ++ bumpmark ++ ");\n"
-                  else "")
+                  then [ tag ++ "(" ++ bumpmark ++ ");" ]
+                  else [])
 
 cgenDefs :: [TDef] -> [String]
 cgenDefs defs = concatMap cdecl $
@@ -181,9 +184,7 @@ cgenDefs defs = concatMap cdecl $
                                     UserRhs _ -> Just ((f, typeof arg), ())
                                     _         -> Nothing) defs)
 
-  cdecl def =
-    let (CG cdecl_ _cfun _ctype) = cgenDefE env def
-    in [cdecl_]
+  cdecl def = cgenDefE env def ++ [ "" ]
 
 {- Note [Unpack tuple arguments]
 
@@ -231,33 +232,21 @@ params_withPackedParams param = case typeof param of
 mkCTypedVar :: TVar -> String
 mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 
-cgenDefE :: CST -> TDef -> CGenResult
+cgenDefE :: CST -> TDef -> [String]
 cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
   let cf                         = cgenUserFun (f, typeof param)
       (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype =
         runM $ cgenExpr env (withPackedParams body)
+      cbody       = cbodydecl ++ [ "return (" ++ cbodyexpr ++ ");" ]
       cvars       = map mkCTypedVar params
       cftypealias = "ty$" ++ cf
-  in  CG
-        (     "typedef "
-        ++    cgenType cbodytype
-        `spc` cftypealias
-        ++    ";\n"
-        ++    cftypealias
-        `spc` cf
-        ++    "("
-        ++    intercalate ", " cvars
-        ++    ") {\n"
-        ++    cbodydecl
-        ++    "return ("
-        ++    cbodyexpr
-        ++    ");\n"
-        ++    "}\n"
-        )
-        cf
-        (TypeDef cftypealias cbodytype)
+  in (  [ "typedef " ++ cgenType cbodytype `spc` cftypealias ++ ";",
+          cftypealias `spc` cf ++ "(" ++ intercalate ", " cvars ++ ") {" ]
+     ++ indent cbody
+     ++ [ "}" ]
+     )
 
 cgenDefE _ def = pprPanic "cgenDefE" (ppr def)
   -- Should not happen because of the 'filter isUserDef' in cgenDefs
@@ -267,10 +256,10 @@ cgenExpr = cgenExprR
 
 cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
 cgenExprR env = \case
-  Konst k -> return $ CG "" (cgenKonst k) (mkCType $ typeofKonst k)
+  Konst k -> return $ CG [] (cgenKonst k) (mkCType $ typeofKonst k)
   Dummy ty ->
-    let cty = mkCType ty in return $ CG "" (cgenType cty ++ "{}") cty
-  Var (TVar ty v)               -> return $ CG "" (cgenVar v) (mkCType ty)
+    let cty = mkCType ty in return $ CG [] (cgenType cty ++ "{}") cty
+  Var (TVar ty v)               -> return $ CG [] (cgenVar v) (mkCType ty)
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
@@ -283,16 +272,17 @@ cgenExprR env = \case
     cvar <- freshCVar
 
     return $ CG
-        (  cComment "build" ++ "\n"
+        (  [ cComment "build" ]
         ++ szdecl
-        ++ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");\n"
-        ++ "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
-                  ++ cvar ++ " < " ++ szex ++ ";"
-                  ++ " ++" ++ cvar ++ ") {\n"
-        ++ ("   " ++ varcty ++ " " ++ cgenVar var ++ " = " ++ cvar ++ ";\n" )
-        ++ "   " ++ bodydecl ++ "\n"
-        ++ "   " ++ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";\n"
-        ++ "}\n"
+        ++ [ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");",
+             "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
+                    ++ cvar ++ " < " ++ szex ++ ";"
+                    ++ " ++" ++ cvar ++ ") {" ]
+        ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = " ++ cvar ++ ";" ]
+                  ++ bodydecl
+                  ++ [ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";" ]
+                  )
+        ++ [ "}" ]
         )
         ret
         (mkCType (TypeVec ty))
@@ -311,26 +301,28 @@ cgenExprR env = \case
     gc <- gcMarker dogc
 
     return $ CG
-        (  cComment "sumbuild" ++ "\n"
+        (  [ cComment "sumbuild" ]
         ++ szdecl
-        ++ "KS_ASSERT(" ++ szex ++ " > 0);\n"
-        ++ cretty ++ " " ++ ret ++ ";\n"
-        ++ "{\n"
-        ++ "   " ++ varcty ++ " " ++ cgenVar var ++ " = 0;\n"
-        ++ "   " ++ gc "$DECLAREMRK"
-        ++ "   do {\n"
-        ++       bodydecl
-        --       First time round, deep copy it, put it in the ret, then mark the allocator
-        ++ "     if (" ++ cgenVar var ++ " == 0) {\n"
-        ++ "       " ++ ret ++ " = inflated_deep_copy(" ++ bodyex ++ ");\n"
-        ++ "       " ++ gc "$MOVEMRK"
-        ++ "     } else {\n"
-        ++ "       inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");\n"
-        --         Release the allocator back to where it was on iter 0
-        ++ "       " ++ gc "$REL"
-        ++ "     }\n"
-        ++ "   } while (++" ++ cgenVar var ++ " < " ++ szex ++ ");\n"
-        ++ "}\n"
+        ++ [  "KS_ASSERT(" ++ szex ++ " > 0);",
+              cretty ++ " " ++ ret ++ ";",
+              "{" ]
+        ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;" ]
+                  ++ gc "$DECLAREMRK"
+                  ++ [ "do {" ]
+                  ++ indent (  bodydecl
+                            -- First time round, deep copy it, put it in the ret, then mark the allocator
+                            ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
+                            ++ indent (  [ ret ++ " = inflated_deep_copy(" ++ bodyex ++ ");" ]
+                                      ++ gc "$MOVEMRK" )
+                            ++ [ "} else {" ]
+                            ++ indent (  [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");" ]
+                                     -- Release the allocator back to where it was on iter 0
+                                      ++ gc "$REL" )
+                            ++ [ "}" ]
+                            )
+                  ++ [ "} while (++" ++ cgenVar var ++ " < " ++ szex ++ ");" ]
+                  )
+        ++ [ "}" ]
         )
         ret
         (mkCType ty)
@@ -354,10 +346,10 @@ cgenExprR env = \case
     let cf = cgenAnyFun (tf, cgargtype) cftype
 
     return $ CG
-      (  intercalate "\n" cdecls
+      (  concat cdecls
       ++ gc "$MRK"
-      ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ cf ++ "(" ++ intercalate ", " (map getExpr cgvs) ++ ");\n"
+      ++ [ cgenType cftype ++ " " ++ v ++ " = "
+                ++ cf ++ "(" ++ intercalate ", " (map getExpr cgvs) ++ ");" ]
       ++ gc "$REL"
       )
       v
@@ -381,21 +373,21 @@ cgenExprR env = \case
     return $ CG
       (  cdecls
       ++ gc "$MRK"
-      ++ cgenType cftype ++ " " ++ v ++ " = "
-      ++ case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
-          -- Untuple argument for C++ call
-          --
-          -- Calls of a tuple argument have their argument list
-          -- unpacked.  See Note [Unpack tuple arguments].
-          -- SelFuns translate to C++ get, so they don't have their
-          -- argument lists unpacked!
-          (True, cexpr, TypeTuple ts)
-            -> cf ++ "("
-               ++ intercalate ","
-                      (flip map [0..length ts - 1] $ \i ->
-                          "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
-               ++ ");\n"
-          (_, cexpr, _) -> cf ++ "(" ++ cexpr ++ ");\n"
+      ++ [  cgenType cftype ++ " " ++ v ++ " = "
+              ++ (case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
+                  -- Untuple argument for C++ call
+                  --
+                  -- Calls of a tuple argument have their argument list
+                  -- unpacked.  See Note [Unpack tuple arguments].
+                  -- SelFuns translate to C++ get, so they don't have their
+                  -- argument lists unpacked!
+                  (True, cexpr, TypeTuple ts)
+                    -> cf ++ "("
+                      ++ intercalate ","
+                              (flip map [0..length ts - 1] $ \i ->
+                                  "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
+                      ++ ");"
+                  (_, cexpr, _) -> cf ++ "(" ++ cexpr ++ ");") ]
       ++ gc "$REL"
       )
       v
@@ -407,27 +399,13 @@ cgenExprR env = \case
     lvar                       <- freshCVar
 
     return $ CG
-      (  cComment "Let"
-      ++ cgenType tybody
-      ++ " "
-      ++ lvar
-      ++ ";\n"
-      ++ "{\n"
+      (  [ cComment "Let" ++ cgenType tybody ++ " " ++ lvar ++ ";",
+           "{" ]
       ++ decle1
-      ++ "\n"
-      ++ cgenType type1
-      ++ " "
-      ++ cgenVar v
-      ++ " = "
-      ++ ve1
-      ++ ";\n"
+      ++ [ cgenType type1 ++ " " ++ cgenVar v ++ " = " ++ ve1 ++ ";" ]
       ++ declbody
-      ++ "\n"
-      ++ lvar
-      ++ " = "
-      ++ vbody
-      ++ ";\n"
-      ++ "}\n"
+      ++ [ lvar ++ " = " ++ vbody ++ ";",
+           "}" ]
       )
       lvar
       tybody
@@ -439,7 +417,7 @@ cgenExprR env = \case
     let ctypes = map getType cgvs
     let ctype  = CTuple ctypes
 
-    return $ CG (unlines cdecls)
+    return $ CG (concat cdecls)
                 ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
                 ctype
 
@@ -449,17 +427,13 @@ cgenExprR env = \case
         (params, withPackedParams) = params_withPackedParams param
     (CG cdecl cexpr ctype) <- cgenExprR env (withPackedParams body)
     return $ CG
-      (     cComment "Lam"
-      ++    "auto"
-      `spc` lvar
-      ++    " = [=]("
-      ++    intercalate ", " (map mkCTypedVar params)
-      ++    ") { "  -- TODO: capture only freeVars here
-      ++    cdecl
-      ++    "   return ("
-      ++    cexpr
-      ++    ");"
-      ++    "};\n"
+      (  [ cComment "Lam" ++ "auto" `spc` lvar ++ " = [=](" -- TODO: capture only freeVars here
+              ++ intercalate ", " (map mkCTypedVar params)
+              ++ ") {" ]
+      ++ indent (  cdecl
+                ++ [ "return (" ++ cexpr ++ ");" ]
+                )
+      ++ [ "};" ]
       )
       lvar
       (CFunction vtype ctype)
@@ -477,35 +451,15 @@ cgenExprR env = \case
           _           -> "" -- Ugh.
 
     return $ CG
-      (     declc -- emit condition generation
-      ++    cgenType crettype
-      `spc` cret
-      ++    ";\n" -- emit decl for "return" type
-      ++    "if ("
-      ++    vc
-      ++    ") {"
-      ++    "  "
-      ++    declt
-      ++    ";\n" -- compute true value
-      ++    "  "
-      ++    cret
-      ++    dotv
-      ++    "= "
-      ++    "("
-      ++    vt
-      ++    ");\n" -- assign to "return"
-      ++    "} else {\n" -- else
-      ++    "  "
-      ++    declf
-      ++    ";\n" -- compute false value
-      ++    "  "
-      ++    cret
-      ++    dotv
-      ++    "= "
-      ++    "("
-      ++    vf
-      ++    ");\n" -- assign to "return"
-      ++    "}\n" -- phew
+      (  declc -- emit condition generation
+      ++ [ cgenType crettype `spc` cret ++ ";", -- emit decl for "return" type
+           "if (" ++ vc ++ ") {" ]
+      ++ indent (  declt  -- compute true value
+                ++ [ cret ++ dotv ++ " = (" ++ vt ++ ");" ]) -- assign to "return"
+      ++ [ "} else {" ]
+      ++ indent (  declf  -- compute false value
+                ++ [ cret ++ dotv ++ " = (" ++ vf ++ ");" ]) -- assign to "return"
+      ++ [ "}" ]
       )
       cret
       crettype
@@ -515,7 +469,10 @@ cgenExprR env = \case
     case tycond of CType TypeBool -> return ()
                    _              -> error "tycond was not TypeBool"
     (CG declbody vbody tybody          ) <- cgenExprR env body
-    return $ CG (declcond `spc` "KS_ASSERT(" ++ vcond ++ ");\n" ++ declbody)
+    return $ CG (  declcond
+                ++ [ "KS_ASSERT(" ++ vcond ++ ");" ]
+                ++ declbody
+                )
                 vbody
                 tybody
 
