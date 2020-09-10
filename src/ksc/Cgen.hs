@@ -165,12 +165,20 @@ cstMaybeLookupFun = Map.lookup
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
-gcMarker :: Bool -> M (String -> [String])
-gcMarker dogc = do
+gcMarker :: Bool -> String -> M (String -> [String])
+gcMarker dogc allocVar = do
   bumpmark <- freshCVar
   return (\tag -> if dogc
-                  then [ tag ++ "(" ++ bumpmark ++ ");" ]
+                  then [ tag ++ "(" ++ bumpmark ++ ", " ++ allocVar ++ ");" ]
                   else [])
+
+allocatorParameterName :: String
+allocatorParameterName = "$alloc"
+
+cgenArgList :: TFun -> [String] -> String
+cgenArgList tf cargs = if funUsesAllocator tf
+                       then allocatorParameterName ++ concatMap (", " ++) cargs
+                       else intercalate ", " cargs
 
 cgenDefs :: [TDef] -> [String]
 cgenDefs defs = concatMap cdecl $
@@ -242,8 +250,9 @@ cgenDefE env (Def { def_fun = f, def_pat = param
       cbody       = cbodydecl ++ [ "return (" ++ cbodyexpr ++ ");" ]
       cvars       = map mkCTypedVar params
       cftypealias = "ty$" ++ cf
+      cparams     = "ks::allocator * " ++ allocatorParameterName ++ concatMap (", " ++) cvars
   in (  [ "typedef " ++ cgenType cbodytype `spc` cftypealias ++ ";",
-          cftypealias `spc` cf ++ "(" ++ intercalate ", " cvars ++ ") {" ]
+          cftypealias `spc` cf ++ "(" ++ cparams ++ ") {" ]
      ++ indent cbody
      ++ [ "}" ]
      )
@@ -274,7 +283,7 @@ cgenExprR env = \case
     return $ CG
         (  [ cComment "build" ]
         ++ szdecl
-        ++ [ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ szex ++ ");",
+        ++ [ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ allocatorParameterName ++ ", " ++ szex ++ ");",
              "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
                     ++ cvar ++ " < " ++ szex ++ ";"
                     ++ " ++" ++ cvar ++ ") {" ]
@@ -298,7 +307,7 @@ cgenExprR env = \case
     ret  <- freshCVar
 
     let dogc = True
-    gc <- gcMarker dogc
+    gc <- gcMarker dogc allocatorParameterName
 
     return $ CG
         (  [ cComment "sumbuild" ]
@@ -312,7 +321,7 @@ cgenExprR env = \case
                   ++ indent (  bodydecl
                             -- First time round, deep copy it, put it in the ret, then mark the allocator
                             ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
-                            ++ indent (  [ ret ++ " = inflated_deep_copy(" ++ bodyex ++ ");" ]
+                            ++ indent (  [ ret ++ " = inflated_deep_copy(" ++ allocatorParameterName ++ ", " ++ bodyex ++ ");" ]
                                       ++ gc "$MOVEMRK" )
                             ++ [ "} else {" ]
                             ++ indent (  [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");" ]
@@ -341,7 +350,7 @@ cgenExprR env = \case
     v        <- freshCVar
 
     let dogc = Cgen.isScalar cftype
-    gc       <- gcMarker dogc
+    gc       <- gcMarker dogc allocatorParameterName
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
 
@@ -349,7 +358,7 @@ cgenExprR env = \case
       (  concat cdecls
       ++ gc "$MRK"
       ++ [ cgenType cftype ++ " " ++ v ++ " = "
-                ++ cf ++ "(" ++ intercalate ", " (map getExpr cgvs) ++ ");" ]
+                ++ cf ++ "(" ++ cgenArgList tf (map getExpr cgvs) ++ ");" ]
       ++ gc "$REL"
       )
       v
@@ -366,15 +375,10 @@ cgenExprR env = \case
     v        <- freshCVar
 
     let dogc = Cgen.isScalar cftype
-    gc       <- gcMarker dogc
+    gc       <- gcMarker dogc allocatorParameterName
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
-
-    return $ CG
-      (  cdecls
-      ++ gc "$MRK"
-      ++ [  cgenType cftype ++ " " ++ v ++ " = "
-              ++ (case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
+    let cargs = case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
                   -- Untuple argument for C++ call
                   --
                   -- Calls of a tuple argument have their argument list
@@ -382,12 +386,15 @@ cgenExprR env = \case
                   -- SelFuns translate to C++ get, so they don't have their
                   -- argument lists unpacked!
                   (True, cexpr, TypeTuple ts)
-                    -> cf ++ "("
-                      ++ intercalate ","
-                              (flip map [0..length ts - 1] $ \i ->
-                                  "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
-                      ++ ");"
-                  (_, cexpr, _) -> cf ++ "(" ++ cexpr ++ ");") ]
+                    -> (flip map [0..length ts - 1] $ \i ->
+                           "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
+                  (_, cexpr, _) -> [cexpr]
+
+    return $ CG
+      (  cdecls
+      ++ gc "$MRK"
+      ++ [  cgenType cftype ++ " " ++ v ++ " = "
+              ++ cf ++ "(" ++ cgenArgList tf cargs ++ ");" ]
       ++ gc "$REL"
       )
       v
@@ -542,6 +549,12 @@ cgenAnyFun (tf, ty) cftype = case tf of
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun (f, ty)
 
+funUsesAllocator :: HasCallStack => TFun -> Bool
+funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
+  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "fold", "FFold", "$trace"]
+funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
+funUsesAllocator _ = True
+
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
   CType  ty -> cgenTypeLang ty
@@ -668,9 +681,9 @@ cppGenWithFiles ksofile cppfile defs = do
         , "// type for it.  int is a reasonable choice.  In the future"
         , "// should try to improve the compile pipeline so it doesn't"
         , "// always insert a call to ks::main()."
-        , "namespace ks { int main(); }"
+        , "namespace ks { int main(allocator *); }"
         , "int main() {"
-        , "  ks::main();"
+        , "  ks::main(ks::globalAllocator());"
         , "  return 0;"
         , "}"
         ]
