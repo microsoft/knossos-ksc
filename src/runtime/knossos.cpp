@@ -2,9 +2,7 @@
 #include "knossos.h"
 
 namespace ks {
-#ifdef BUMPY
 	allocator g_alloc{ 1'000'000'000 };
-#endif
 
 	int log_indent = 8;
 	bool do_log = false;
