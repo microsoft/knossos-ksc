@@ -33,7 +33,7 @@ rev$mul$Mat$Vec$a$dvvfvf$bvf(std::tuple<vec<vec<double>>, vec<double>> const& M_
 	int c = size(v);
 	vec<vec<double>> retM(r);
 	for(int i = 0; i < r; ++i)
-		retM[i] = v*dr[i];
+		retM[i] = ts_scale(dr[i], v);
 
 	vec<double> retv(c);
 	for(int i = 0; i < c; ++i) {

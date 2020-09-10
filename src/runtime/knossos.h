@@ -769,7 +769,7 @@ namespace ks
 
 	// Elementwise addition
 	template <class T>
-	vec<T> operator+(vec<T> const& a, vec<T> const& b)
+	vec<T> ts_add(vec<T> const& a, vec<T> const& b)
 	{
 		if (a.is_zero())
 			return b;
@@ -782,37 +782,6 @@ namespace ks
 
 		for (int i = 0; i < a.size(); ++i)
 			ret[i] = ts_add(a[i], b[i]);
-		return ret;
-	}
-
-	// Addition of a scalar
-	template <class T>
-	vec<T> operator+(vec<T> const& a, T const& b)
-	{
-		if (a.is_zero())
-			return inflated_deep_copy(a) + b;
-
-		KS_ASSERT(a.size() != 0);
-		vec<T> ret{ a.size() };
-
-		for (int i = 0; i < a.size(); ++i)
-			ret[i] = ts_add(a[i], b);
-		return ret;
-	}
-
-	// Subtraction of a scalar
-	template <class T>
-	vec<T> operator-(vec<T> const& a, T const& b)
-	{
-		KS_ASSERT(false); // Can't handle zero_t - const?
-		if (a.is_zero())
-			return inflated_deep_copy(a) + b;
-
-		KS_ASSERT(a.size() != 0);
-		vec<T> ret = vec<T>::create(a.size());
-
-		for (int i = 0; i < a.size(); ++i)
-			ret[i] = a[i] - b;
 		return ret;
 	}
 
@@ -832,20 +801,6 @@ namespace ks
 		for (int i = 0; i < size; ++i)
 			ret[i] = ts_scale(val, v[i]);
 		return ret;
-	}
-
-	// Scale a vec
-	template <class T>
-	vec<T> operator*(double val, vec<T> const& v)
-	{
-		return ts_scale(val, v);
-	}
-
-	// Scale a vec
-	template <class T>
-	vec<T> operator*(vec<T> const& v, double val)
-	{
-		return ts_scale(val, v);
 	}
 
 	// sum of elements
@@ -1528,10 +1483,10 @@ namespace ks
         inline tuple<> ts_neg(tuple<> d) { return d; }
 
         template <class U0, class... Us>
-        inline tuple<U0, Us...> ts_neg(tuple<U0, Us...> t) { return prepend(neg(head(t)), neg(tail(t))); }
+        inline tuple<U0, Us...> ts_neg(tuple<U0, Us...> t) { return prepend(ts_neg(head(t)), ts_neg(tail(t))); }
 
         template <class T>
-        inline vec<T> ts_neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return neg(v[i]); }); }
+        inline vec<T> ts_neg(vec<T> v) { return build<T>(v.size(), [v](int i){ return ts_neg(v[i]); }); }
 
 	inline int to_size(int d) { return d; }
 	inline auto D$to_size(int d) { return LM::Zero<int, int>(); }
