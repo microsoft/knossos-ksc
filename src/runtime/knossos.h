@@ -16,9 +16,6 @@
 
 using std::tuple;
 
-// Enable bump allocator.  See mark/reset below.
-#define BUMPY
-
 #define COMMENT(x)
 
 // KS_ASSERT
@@ -233,7 +230,6 @@ namespace ks
 	}
 
 	// ===============================  Allocator  ==================================
-#ifdef BUMPY
 	struct allocator {
 		size_t max_size;
 		unsigned char* buf;
@@ -268,21 +264,12 @@ namespace ks
 
 	extern allocator g_alloc;
 	typedef size_t alloc_mark_t;
-	inline alloc_mark_t mark_bump_allocator_if_present() { return g_alloc.mark(); }
-	inline void reset_bump_allocator_if_present(alloc_mark_t top) { g_alloc.reset(top); }
-#define $MRK(var) alloc_mark_t var = mark_bump_allocator_if_present()
+	inline alloc_mark_t mark_bump_allocator() { return g_alloc.mark(); }
+	inline void reset_bump_allocator(alloc_mark_t top) { g_alloc.reset(top); }
+#define $MRK(var) alloc_mark_t var = mark_bump_allocator()
 #define $DECLAREMRK(var) alloc_mark_t var
-#define $MOVEMRK(var) var = mark_bump_allocator_if_present()
-#define $REL(var) reset_bump_allocator_if_present(var)
-#else
-	typedef size_t alloc_mark_t;
-	inline alloc_mark_t mark_bump_allocator_if_present() { return 0; }
-	inline void reset_bump_allocator_if_present(alloc_mark_t top) { }
-#define $MRK(var)
-#define $DECLAREMRK(var)
-#define $MOVEMRK(var)
-#define $REL(var)
-#endif
+#define $MOVEMRK(var) var = mark_bump_allocator()
+#define $REL(var) reset_bump_allocator(var)
 
 
 	// ===============================  Zero  ==================================
@@ -404,13 +391,9 @@ namespace ks
 	template <class T>
 	class vec
 	{
-#ifdef BUMPY
 		//TODO Full set of 5 ctors/assigners
 		size_t size_;
 		T* data_;
-#else
-		std::vector<T> data_;
-#endif
 		// Runtime flag indicating this is an all-zero vector.  
 		// TODO: Ideally this would propagate nicely through the type system, 
 		// without a runtime flag but, need to pass initializer lists through
@@ -424,7 +407,6 @@ namespace ks
 
 		typedef T value_type;
 
-#ifdef BUMPY
 		vec() :
 			size_{ 0 },
 			data_{ nullptr },
@@ -507,25 +489,6 @@ namespace ks
 		}
 
 		int size() const { return int(size_); }
-
-#else
-		vec() {}
-
-		vec(size_t  size) : data_(size), is_zero_(false) {}
-
-		vec(std::vector<T> const& that) :data_{ that } {}
-
-		int size() const { return static_cast<int>(data_.size()); }
-
-		vec& operator=(const vec<T>& that)
-		{
-			KS_ASSERT(that.size() != 0 || that.is_zero_);
-			data_ = that.data_;
-			is_zero_ = that.is_zero_;
-			return *this;
-		}
-
-#endif
 
 		T& operator[](int i) { if (is_zero_) return z_; else return data_[i]; }
 		T const& operator[](int i) const {  if (is_zero_) return z_; else return data_[i]; }
@@ -690,10 +653,10 @@ namespace ks
 		T ret = inflated_deep_copy(f0);
 		for (int i = 1; i < size; ++i)
 		{
-			auto mark = mark_bump_allocator_if_present();
+			auto mark = mark_bump_allocator();
 			T fi = f(i);
 			inplace_add_t<T>::go(&ret, fi);
-			reset_bump_allocator_if_present(mark);
+			reset_bump_allocator(mark);
 		}
 		return ret;
 	}
@@ -1640,9 +1603,9 @@ namespace ks
 	double benchmark(std::function<void(int)> f);
 #define BENCHMARK(CODE) ks::benchmark(ks::repeat([&]() { CODE; }))
 	/* e.g:
-		alloc_mark_t mark = mark_bump_allocator_if_present();
+		alloc_mark_t mark = mark_bump_allocator();
 		BENCHMARK(
-			reset_bump_allocator_if_present(mark);
+			reset_bump_allocator(mark);
 			c$68 = gmm_knossos_gmm_objective(c$62, c$63, c$64, c$65, c$66, c$67)
 		);
 	*/
