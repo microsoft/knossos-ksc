@@ -137,7 +137,7 @@ namespace py = pybind11;
 
 {generated_cpp_source}
 
-int ks::main() {{ return 0; }};
+int ks::main(ks::allocator *) {{ return 0; }};
 
 /* template<typename T>
 void declare_vec(py::module &m, std::string typestr) {{
@@ -145,7 +145,7 @@ void declare_vec(py::module &m, std::string typestr) {{
   std::string pyclass_name = std::string("vec_") + typestr;
   py::class_<Class>(m, pyclass_name.c_str(), py::module_local())
     .def(py::init<>())
-    .def(py::init<std::vector<T> const&>())
+    .def(py::init([](std::vector<T> const& v) {{ return ks::vec<T>(ks::globalAllocator(), v); }}))
     .def("is_zero",     &Class::is_zero)
     .def("__getitem__", [](const ks::vec<T> &a, const int &b) {{
 	return a[b];
@@ -153,8 +153,13 @@ void declare_vec(py::module &m, std::string typestr) {{
     .def("__len__", [](const ks::vec<T> &a) {{ return a.size(); }});
 }} */
 
+template<typename RetType, typename... ParamTypes>
+auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {{
+  return [f](ParamTypes... params) {{ return f(ks::globalAllocator(), params...); }};
+}}
+
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
-  m.def("main", &ks::{name_to_call});
+  m.def("main", withGlobalAllocator(&ks::{name_to_call}));
 }}
 """.format(
         generated_cpp_source=generate_cpp_from_ks(ks_str),
