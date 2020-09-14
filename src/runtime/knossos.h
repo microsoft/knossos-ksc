@@ -532,17 +532,17 @@ namespace ks
 		vec<T> ret = vec<T>::create(alloc, size);
 
 		for (int i = 0; i < size; ++i)
-			ret[i] = T{ f(i) };
+			ret[i] = T{ f(alloc, i) };
 		return ret;
 	}
 
 	template <class T, class F, class A>
-        A fold(F f, A z, vec<T> v)
+        A fold(allocator * alloc, F f, A z, vec<T> v)
 	{
           A acc = z;
 
           for (int i = 0; i < v.size(); i++) {
-            acc = f(acc, v[i]);
+            acc = f(alloc, acc, v[i]);
           }
 
           return acc;
@@ -554,14 +554,14 @@ namespace ks
 
 	  for (int i = 0; i < v.size(); i++) {
 	    forward_pass[i] = acc;
-	    acc = f(acc, v[i]);
+	    acc = f(alloc, acc, v[i]);
 	  }
 
 	  S dScope = s_zero;
 	  auto dv = vec<dT>(alloc, v.size());
 
 	  for (int i = v.size() - 1; i >= 0; i--) {
-            tuple<S, tuple<dA, dT>> f_call = f_(tuple(forward_pass[i], v[i]), dr);
+            tuple<S, tuple<dA, dT>> f_call = f_(alloc, tuple(forward_pass[i], v[i]), dr);
 
 	    S  f_call_dScope = std::get<0>(f_call);
 	    dA f_call_dacc   = std::get<0>(std::get<1>(f_call));
@@ -577,18 +577,18 @@ namespace ks
 
         // Probably should implement this as a loop
         template <class T, class F, class F_, class A, class dA, class dT>
-        dA FFold_recursive(int i, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
+        dA FFold_recursive(allocator * alloc, int i, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
           if (i == v.size()) {
             return dacc;
           } else {
-            dA fwd_f = f_(tuple(acc, v[i]), tuple(dacc, dv[i]));
-            return FFold_recursive(i + 1, f, f(acc, v[i]), v, f_, fwd_f, dv);
+            dA fwd_f = f_(alloc, tuple(acc, v[i]), tuple(dacc, dv[i]));
+            return FFold_recursive(alloc, i + 1, f, f(alloc, acc, v[i]), v, f_, fwd_f, dv);
           }
         }
 
         template <class T, class F, class F_, class A, class dA, class dT>
-        dA FFold(F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
-          return FFold_recursive(0, f, acc, v, f_, dacc, dv);
+        dA FFold(allocator * alloc, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
+          return FFold_recursive(alloc, 0, f, acc, v, f_, dacc, dv);
         }
 
 	// specialize zero(vec<T>)
@@ -639,14 +639,14 @@ namespace ks
 		}
 
 		if (size == 1)
-			return T{f(0)};
+			return T{f(alloc, 0)};
 
-		T f0 = f(0);
+		T f0 = f(alloc, 0);
 		T ret = inflated_deep_copy(alloc, f0);
 		for (int i = 1; i < size; ++i)
 		{
 			auto mark = alloc->mark();
-			T fi = f(i);
+			T fi = f(alloc, i);
 			inplace_add_t<T>::go(&ret, fi);
 			alloc->reset(mark);
 		}
@@ -706,7 +706,7 @@ namespace ks
 	{
 		KS_ASSERT(rows == cols);
 		typedef decltype(f(int{})) T;
-		return build<vec<T>>(alloc, rows, [cols,f,alloc](int i) { 
+		return build<vec<T>>(alloc, rows, [cols,f](allocator * alloc, int i) { 
 					return deltaVec(alloc, cols, i, f(i)); 
 		});
 	}
@@ -1157,7 +1157,7 @@ namespace ks
 			To Apply(allocator * alloc, From x) const
 			{
 				Functor/*std::function<L(int)>*/ f1 = f;
-				return build<LTo>(alloc, n, [x, f1, alloc](int i) {
+				return build<LTo>(alloc, n, [x, f1](allocator * alloc, int i) {
 					auto lm = f1(i);
 					return lmApply(alloc, lm, x);
 				});
@@ -1229,7 +1229,7 @@ namespace ks
 					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
 				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
 				std::function<L(int)> f_local = f;  // TODO: use sumbuild
-				return sumbuild<LFrom>(alloc, n, [f_local,x,alloc](int i) { return lmApply(alloc, f_local(i), x[i]); });
+				return sumbuild<LFrom>(alloc, n, [f_local,x](allocator * alloc, int i) { return lmApply(alloc, f_local(i), x[i]); });
 			}
 		};
 
@@ -1441,7 +1441,7 @@ namespace ks
         inline tuple<U0, Us...> ts_neg(allocator * alloc, tuple<U0, Us...> t) { return prepend(ts_neg(alloc, head(t)), ts_neg(alloc, tail(t))); }
 
         template <class T>
-        inline vec<T> ts_neg(allocator * alloc, vec<T> v) { return build<T>(alloc, v.size(), [v, alloc](int i){ return ts_neg(alloc, v[i]); }); }
+        inline vec<T> ts_neg(allocator * alloc, vec<T> v) { return build<T>(alloc, v.size(), [v](allocator * alloc, int i){ return ts_neg(alloc, v[i]); }); }
 
 	inline int to_size(int d) { return d; }
 	inline auto D$to_size(int d) { return LM::Zero<int, int>(); }
@@ -1559,7 +1559,7 @@ namespace ks
 
 #define $BENCH$al$d$d$bf$b(alloc, FUN) ks::benchmark(ks::repeat([&]() { \
 																								$MRK(t, alloc); \
-																								FUN(); \
+																								FUN(alloc); \
 																								$REL(t, alloc); \
 																						}))
 
@@ -1600,6 +1600,12 @@ namespace ks
 	}
 
 	// ===============================  Derivative check  ================================
+	template<class Functor, class X>
+	auto applyWithAllocator(allocator * alloc, Functor f, const X & x)
+	{
+		return std::apply(f, std::tuple_cat(std::make_tuple(alloc), x));
+	}
+
   //  Check derivatives:
   // 
 	//    delta_f = f(x+dx) - f(x) ~= D$f * dx
@@ -1615,11 +1621,11 @@ namespace ks
 	template <class Functor, class RevFunctor, class X, class X_, class Dx, class Df>
         double $check(allocator * alloc, Functor f, RevFunctor rev_f, X x, X_ x_, Dx dx, Df df)
 	{
-		auto f_x = std::apply(f, x);
-		auto f_x_plus_dx = std::apply(f, ts_add(alloc, x, dx));
+		auto f_x = applyWithAllocator(alloc, f, x);
+		auto f_x_plus_dx = applyWithAllocator(alloc, f, ts_add(alloc, x, dx));
 		auto delta_f = f_x_plus_dx - f_x;
 		double d1 = dot(delta_f, df);
-		auto dfJ = std::apply(rev_f, std::make_tuple(x_, df));
+		auto dfJ = applyWithAllocator(alloc, rev_f, std::make_tuple(x_, df));
 		double d2 = dot(dfJ, dx);
 
 		/*
