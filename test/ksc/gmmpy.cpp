@@ -18,12 +18,17 @@ void declare_vec(py::module &m, std::string typestr) {
   std::string pyclass_name = std::string("vec_") + typestr;
   py::class_<Class>(m, pyclass_name.c_str())
     .def(py::init<>())
-    .def(py::init<std::vector<T> const&>())
+    .def(py::init([](std::vector<T> const& v) { return ks::vec<T>(ks::globalAllocator(), v); }))
     .def("is_zero",     &Class::is_zero)
     .def("__getitem__", [](const ks::vec<T> &a, const int &b) {
 	return a[b];
       })
     .def("__len__", [](const ks::vec<T> &a) { return a.size(); });
+}
+
+template<typename RetType, typename... ParamTypes>
+auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
+  return [f](ParamTypes... params) { return f(ks::globalAllocator(), params...); };
 }
 
 // In the future it might make more sense to move the vec type
@@ -42,6 +47,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("gmm_knossos_gmm_objective", &ks::gmm_knossos_gmm_objective$avvfvfvvfvvfvvf$dfi$b);
-  m.def("rev_gmm_knossos_gmm_objective", &ks::rev$gmm_knossos_gmm_objective$a$dvvfvfvvfvvfvvf$dfi$b$bf);
+  m.def("gmm_knossos_gmm_objective", withGlobalAllocator(&ks::gmm_knossos_gmm_objective$avvfvfvvfvvfvvf$dfi$b));
+  m.def("rev_gmm_knossos_gmm_objective", withGlobalAllocator(&ks::rev$gmm_knossos_gmm_objective$a$dvvfvfvvfvvfvvf$dfi$b$bf));
 }
