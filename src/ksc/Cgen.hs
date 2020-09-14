@@ -435,7 +435,8 @@ cgenExprR env = \case
     (CG cdecl cexpr ctype) <- cgenExprR env (withPackedParams body)
     return $ CG
       (  [ cComment "Lam" ++ "auto" `spc` lvar ++ " = [=](" -- TODO: capture only freeVars here
-              ++ intercalate ", " (map mkCTypedVar params)
+              ++ "ks::allocator * " ++ allocatorParameterName
+              ++ concatMap ((", " ++) . mkCTypedVar) params
               ++ ") {" ]
       ++ indent (  cdecl
                 ++ [ "return (" ++ cexpr ++ ");" ]
@@ -551,7 +552,7 @@ cgenAnyFun (tf, ty) cftype = case tf of
 
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "fold", "FFold", "$trace"]
+  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
