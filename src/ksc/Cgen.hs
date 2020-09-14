@@ -349,7 +349,7 @@ cgenExprR env = \case
 
     v        <- freshCVar
 
-    let dogc = Cgen.isScalar cftype
+    let dogc = Cgen.isScalar cftype && funUsesAllocator tf
     gc       <- gcMarker dogc allocatorParameterName
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
@@ -374,7 +374,7 @@ cgenExprR env = \case
 
     v        <- freshCVar
 
-    let dogc = Cgen.isScalar cftype
+    let dogc = Cgen.isScalar cftype && funUsesAllocator tf
     gc       <- gcMarker dogc allocatorParameterName
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
