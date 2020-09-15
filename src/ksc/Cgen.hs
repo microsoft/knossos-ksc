@@ -165,12 +165,24 @@ cstMaybeLookupFun = Map.lookup
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
-gcMarker :: Bool -> String -> M (String -> [String])
+gcMarker :: Bool -> String -> M ((String -> String -> String) -> [String])
 gcMarker dogc allocVar = do
   bumpmark <- freshCVar
-  return (\tag -> if dogc
-                  then [ tag ++ "(" ++ bumpmark ++ ", " ++ allocVar ++ ");" ]
-                  else [])
+  return (\gcfun -> if dogc
+                    then [ gcfun bumpmark allocVar ]
+                    else [])
+
+markAllocator :: String -> String -> String
+markAllocator bumpmark allocVar = "ks::alloc_mark_t " ++ bumpmark ++ " = " ++ allocVar ++ "->mark();"
+
+releaseAllocator :: String -> String -> String
+releaseAllocator bumpmark allocVar = allocVar ++ "->reset(" ++ bumpmark ++ ");"
+
+declareMark :: String -> String -> String
+declareMark bumpmark _ = "ks::alloc_mark_t " ++ bumpmark ++ ";"
+
+moveMark :: String -> String -> String
+moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
 
 allocatorParameterName :: String
 allocatorParameterName = "$alloc"
@@ -316,17 +328,17 @@ cgenExprR env = \case
               cretty ++ " " ++ ret ++ ";",
               "{" ]
         ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;" ]
-                  ++ gc "$DECLAREMRK"
+                  ++ gc declareMark
                   ++ [ "do {" ]
                   ++ indent (  bodydecl
                             -- First time round, deep copy it, put it in the ret, then mark the allocator
                             ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
                             ++ indent (  [ ret ++ " = inflated_deep_copy(" ++ allocatorParameterName ++ ", " ++ bodyex ++ ");" ]
-                                      ++ gc "$MOVEMRK" )
+                                      ++ gc moveMark )
                             ++ [ "} else {" ]
                             ++ indent (  [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");" ]
                                      -- Release the allocator back to where it was on iter 0
-                                      ++ gc "$REL" )
+                                      ++ gc releaseAllocator )
                             ++ [ "}" ]
                             )
                   ++ [ "} while (++" ++ cgenVar var ++ " < " ++ szex ++ ");" ]
@@ -356,10 +368,10 @@ cgenExprR env = \case
 
     return $ CG
       (  concat cdecls
-      ++ gc "$MRK"
+      ++ gc markAllocator
       ++ [ cgenType cftype ++ " " ++ v ++ " = "
                 ++ cf ++ "(" ++ cgenArgList tf (map getExpr cgvs) ++ ");" ]
-      ++ gc "$REL"
+      ++ gc releaseAllocator
       )
       v
       cftype
@@ -392,10 +404,10 @@ cgenExprR env = \case
 
     return $ CG
       (  cdecls
-      ++ gc "$MRK"
+      ++ gc markAllocator
       ++ [  cgenType cftype ++ " " ++ v ++ " = "
               ++ cf ++ "(" ++ cgenArgList tf cargs ++ ");" ]
-      ++ gc "$REL"
+      ++ gc releaseAllocator
       )
       v
       cftype
