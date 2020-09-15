@@ -230,36 +230,44 @@ namespace ks
 	}
 
 	// ===============================  Allocator  ==================================
-	struct allocator {
-		size_t max_size;
-		unsigned char* buf;
-		size_t top;
-
+	class allocator {
+		size_t max_size_;
+		unsigned char* buf_;
+		size_t top_;
+		size_t peak_;
+	
+	public:
 		allocator(size_t max_size) :
-			max_size(max_size),
-			buf(new unsigned char[max_size]),
-			top(0)
+			max_size_(max_size),
+			buf_(new unsigned char[max_size]),
+			top_(0),
+			peak_(0)
 		{}
 		~allocator() {
-			delete[] buf;
+			delete[] buf_;
 		}
 		void* allocate(size_t size)
 		{
 			KS_ASSERT(size < 1000000);
-			void* ret = buf + top;
-			top += ((size + 15) / 16) * 16;
-			KS_ASSERT(top < max_size);
+			void* ret = buf_ + top_;
+			top_ += ((size + 15) / 16) * 16;
+			if (top_ > peak_) {
+				peak_ = top_;
+				KS_ASSERT(top_ < max_size_);
+			}
 			return ret;
 		}
 
-		size_t mark() { return top;  }
+		size_t mark() const { return top_;  }
 
-		void* top_ptr() { return buf + top; }
+		void* top_ptr() const { return buf_ + top_; }
 
-		void reset(size_t top_ = 0)
+		void reset(size_t top = 0)
 		{
-			top = top_;
+			top_ = top;
 		}
+
+		size_t peak() const { return peak_; }
 	};
 
 	typedef size_t alloc_mark_t;
