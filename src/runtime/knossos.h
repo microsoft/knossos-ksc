@@ -262,8 +262,6 @@ namespace ks
 		}
 	};
 
-	allocator * globalAllocator();
-
 	typedef size_t alloc_mark_t;
 
 	// ===============================  Zero  ==================================
@@ -614,7 +612,6 @@ namespace ks
 			if (t2.is_zero()) return;
 
 			if (t1->is_zero()) {
-				std::cerr << "aliasing: " << &t2[0] << ", mark at " << (char*)globalAllocator()->top_ptr() - (char*)&t2[0] << std::endl;
 				*t1 = t2; // TODO: memory aliasing here?   When we free, this will get lost.  We need another heap....
 				return;
 			}

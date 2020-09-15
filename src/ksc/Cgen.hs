@@ -696,7 +696,8 @@ cppGenWithFiles ksofile cppfile defs = do
         , "// always insert a call to ks::main()."
         , "namespace ks { int main(allocator *); }"
         , "int main() {"
-        , "  ks::main(ks::globalAllocator());"
+        , "  ks::allocator alloc{ 1'000'000'000 };"
+        , "  ks::main(&alloc);"
         , "  return 0;"
         , "}"
         ]

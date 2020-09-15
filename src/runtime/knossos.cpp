@@ -2,9 +2,6 @@
 #include "knossos.h"
 
 namespace ks {
-	allocator g_alloc{ 1'000'000'000 };
-	allocator * globalAllocator() { return &g_alloc; }
-
 	int log_indent = 8;
 	bool do_log = false;
 	std::set<void*> objects;

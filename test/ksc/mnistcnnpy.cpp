@@ -8,13 +8,15 @@ namespace py = pybind11;
 
 int ks::main(ks::allocator *) { return 0; };
 
+ks::allocator g_alloc{ 1'000'000'000 };
+
 template<typename T>
 void declare_vec(py::module &m, std::string typestr) {
   using Class = ks::vec<T>;
   std::string pyclass_name = std::string("vec_") + typestr;
   py::class_<Class>(m, pyclass_name.c_str())
     .def(py::init<>())
-    .def(py::init([](std::vector<T> const& v) { return ks::vec<T>(ks::globalAllocator(), v); }))
+    .def(py::init([](std::vector<T> const& v) { return ks::vec<T>(&g_alloc, v); }))
     .def("is_zero",     &Class::is_zero)
     .def("__getitem__", [](const ks::vec<T> &a, const int &b) {
 	return a[b];
@@ -24,7 +26,7 @@ void declare_vec(py::module &m, std::string typestr) {
 
 template<typename RetType, typename... ParamTypes>
 auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f](ParamTypes... params) { return f(ks::globalAllocator(), params...); };
+  return [f](ParamTypes... params) { return f(&g_alloc, params...); };
 }
 
 // In the future it might make more sense to move the vec type
