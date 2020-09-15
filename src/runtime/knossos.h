@@ -265,11 +265,6 @@ namespace ks
 	allocator * globalAllocator();
 
 	typedef size_t alloc_mark_t;
-#define $MRK(var, alloc) alloc_mark_t var = alloc->mark()
-#define $DECLAREMRK(var, alloc) alloc_mark_t var
-#define $MOVEMRK(var, alloc) var = alloc->mark()
-#define $REL(var, alloc) alloc->reset(var)
-
 
 	// ===============================  Zero  ==================================
 	// This template to be overloaded when e.g. a vector of T needs to use val to discover a size
@@ -1558,10 +1553,10 @@ namespace ks
 	*/
 
 #define $BENCH$al$d$d$bf$b(alloc, FUN) ks::benchmark(ks::repeat([&]() { \
-																								$MRK(t, alloc); \
-																								FUN(alloc); \
-																								$REL(t, alloc); \
-																						}))
+																		auto t = (alloc)->mark(); \
+																		FUN(alloc); \
+																		(alloc)->reset(t); \
+																		}))
 
 	// ===============================  Dot ===========================================
   inline double dot(double t1, double t2) { return t1 * t2; }
