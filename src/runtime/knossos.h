@@ -1459,7 +1459,7 @@ namespace ks
 	template <class... Types>
 	auto unzip(allocator * alloc, vec<tuple<Types...>> const& v)
 	{
-		return unzip_impl(v, std::index_sequence_for<Types...>{});
+		return unzip_impl(alloc, v, std::index_sequence_for<Types...>{});
 	}
 
 	/*
