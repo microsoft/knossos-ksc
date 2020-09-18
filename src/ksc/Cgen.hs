@@ -165,25 +165,6 @@ cstMaybeLookupFun = Map.lookup
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
-gcMarker :: Bool -> String -> M ((String -> String -> String) -> [String])
-gcMarker dogc allocVar = do
-  bumpmark <- freshCVar
-  return (\gcfun -> if dogc
-                    then [ gcfun bumpmark allocVar ]
-                    else [])
-
-markAllocator :: String -> String -> String
-markAllocator bumpmark allocVar = "ks::alloc_mark_t " ++ bumpmark ++ " = " ++ allocVar ++ "->mark();"
-
-releaseAllocator :: String -> String -> String
-releaseAllocator bumpmark allocVar = allocVar ++ "->reset(" ++ bumpmark ++ ");"
-
-declareMark :: String -> String -> String
-declareMark bumpmark _ = "ks::alloc_mark_t " ++ bumpmark ++ ";"
-
-moveMark :: String -> String -> String
-moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
-
 allocatorParameterName :: String
 allocatorParameterName = "$alloc"
 
@@ -252,6 +233,14 @@ params_withPackedParams param = case typeof param of
 mkCTypedVar :: TVar -> String
 mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 
+wrapWithMarkReset :: [String] -> CType -> [String]
+wrapWithMarkReset [] _ = []
+wrapWithMarkReset cdecls ctype = if Cgen.isScalar ctype
+                                 then (  [  "ks::alloc_mark_t $allocmrk = " ++ allocatorParameterName ++ "->mark();" ]
+                                      ++ cdecls
+                                      ++ [ allocatorParameterName ++ "->reset($allocmrk);" ] )
+                                 else cdecls
+
 cgenDefE :: CST -> TDef -> [String]
 cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
@@ -259,7 +248,7 @@ cgenDefE env (Def { def_fun = f, def_pat = param
       (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype =
         runM $ cgenExpr env (withPackedParams body)
-      cbody       = cbodydecl ++ [ "return (" ++ cbodyexpr ++ ");" ]
+      cbody       = wrapWithMarkReset cbodydecl cbodytype ++ [ "return (" ++ cbodyexpr ++ ");" ]
       cvars       = map mkCTypedVar params
       cftypealias = "ty$" ++ cf
       cparams     = "ks::allocator * " ++ allocatorParameterName ++ concatMap (", " ++) cvars
@@ -317,9 +306,7 @@ cgenExprR env = \case
 
     let cretty = cgenType $ mkCType ty
     ret  <- freshCVar
-
-    let dogc = True
-    gc <- gcMarker dogc allocatorParameterName
+    bumpmark <- freshCVar
 
     return $ CG
         (  [ cComment "sumbuild" ]
@@ -327,18 +314,18 @@ cgenExprR env = \case
         ++ [  "KS_ASSERT(" ++ szex ++ " > 0);",
               cretty ++ " " ++ ret ++ ";",
               "{" ]
-        ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;" ]
-                  ++ gc declareMark
-                  ++ [ "do {" ]
+        ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;",
+                       "ks::alloc_mark_t " ++ bumpmark ++ ";",
+                       "do {" ]
                   ++ indent (  bodydecl
                             -- First time round, deep copy it, put it in the ret, then mark the allocator
                             ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
-                            ++ indent (  [ ret ++ " = inflated_deep_copy(" ++ allocatorParameterName ++ ", " ++ bodyex ++ ");" ]
-                                      ++ gc moveMark )
+                            ++ indent [ ret ++ " = inflated_deep_copy(" ++ allocatorParameterName ++ ", " ++ bodyex ++ ");",
+                                        bumpmark ++ " = " ++ allocatorParameterName ++ "->mark();" ]
                             ++ [ "} else {" ]
-                            ++ indent (  [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");" ]
-                                     -- Release the allocator back to where it was on iter 0
-                                      ++ gc releaseAllocator )
+                            ++ indent [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");",
+                                      -- Release the allocator back to where it was on iter 0
+                                        allocatorParameterName ++ "->reset(" ++ bumpmark ++ ");" ]
                             ++ [ "}" ]
                             )
                   ++ [ "} while (++" ++ cgenVar var ++ " < " ++ szex ++ ");" ]
@@ -361,17 +348,12 @@ cgenExprR env = \case
 
     v        <- freshCVar
 
-    let dogc = Cgen.isScalar cftype && funUsesAllocator tf
-    gc       <- gcMarker dogc allocatorParameterName
-
     let cf = cgenAnyFun (tf, cgargtype) cftype
 
     return $ CG
       (  concat cdecls
-      ++ gc markAllocator
       ++ [ cgenType cftype ++ " " ++ v ++ " = "
                 ++ cf ++ "(" ++ cgenArgList tf (map getExpr cgvs) ++ ");" ]
-      ++ gc releaseAllocator
       )
       v
       cftype
@@ -385,9 +367,6 @@ cgenExprR env = \case
     let cftype = ctypeofFun env (tf, cgargtype) [ctypes]
 
     v        <- freshCVar
-
-    let dogc = Cgen.isScalar cftype && funUsesAllocator tf
-    gc       <- gcMarker dogc allocatorParameterName
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
     let cargs = case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
@@ -404,10 +383,8 @@ cgenExprR env = \case
 
     return $ CG
       (  cdecls
-      ++ gc markAllocator
       ++ [  cgenType cftype ++ " " ++ v ++ " = "
               ++ cf ++ "(" ++ cgenArgList tf cargs ++ ");" ]
-      ++ gc releaseAllocator
       )
       v
       cftype
