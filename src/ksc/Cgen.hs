@@ -165,6 +165,18 @@ cstMaybeLookupFun = Map.lookup
 cComment :: String -> String
 cComment s = "/* " ++ s ++ " */"
 
+markAllocator :: String -> String -> String
+markAllocator bumpmark allocVar = "ks::alloc_mark_t " ++ bumpmark ++ " = " ++ allocVar ++ "->mark();"
+
+resetAllocator :: String -> String -> String
+resetAllocator bumpmark allocVar = allocVar ++ "->reset(" ++ bumpmark ++ ");"
+
+declareMark :: String -> String
+declareMark bumpmark = "ks::alloc_mark_t " ++ bumpmark ++ ";"
+
+moveMark :: String -> String -> String
+moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
+
 allocatorParameterName :: String
 allocatorParameterName = "$alloc"
 
@@ -236,9 +248,9 @@ mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 wrapWithMarkReset :: [String] -> CType -> [String]
 wrapWithMarkReset [] _ = []
 wrapWithMarkReset cdecls ctype = if Cgen.isScalar ctype
-                                 then (  [  "ks::alloc_mark_t $allocmrk = " ++ allocatorParameterName ++ "->mark();" ]
+                                 then (  [ markAllocator "$allocmrk" allocatorParameterName ]
                                       ++ cdecls
-                                      ++ [ allocatorParameterName ++ "->reset($allocmrk);" ] )
+                                      ++ [ resetAllocator "$allocmrk" allocatorParameterName ] )
                                  else cdecls
 
 cgenDefE :: CST -> TDef -> [String]
@@ -315,17 +327,17 @@ cgenExprR env = \case
               cretty ++ " " ++ ret ++ ";",
               "{" ]
         ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;",
-                       "ks::alloc_mark_t " ++ bumpmark ++ ";",
+                       declareMark bumpmark,
                        "do {" ]
                   ++ indent (  bodydecl
                             -- First time round, deep copy it, put it in the ret, then mark the allocator
                             ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
                             ++ indent [ ret ++ " = inflated_deep_copy(" ++ allocatorParameterName ++ ", " ++ bodyex ++ ");",
-                                        bumpmark ++ " = " ++ allocatorParameterName ++ "->mark();" ]
+                                        moveMark bumpmark allocatorParameterName ]
                             ++ [ "} else {" ]
                             ++ indent [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");",
                                       -- Release the allocator back to where it was on iter 0
-                                        allocatorParameterName ++ "->reset(" ++ bumpmark ++ ");" ]
+                                        resetAllocator bumpmark allocatorParameterName ]
                             ++ [ "}" ]
                             )
                   ++ [ "} while (++" ++ cgenVar var ++ " < " ++ szex ++ ");" ]
