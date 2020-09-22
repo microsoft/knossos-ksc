@@ -1553,6 +1553,93 @@ def RFold_recursive (S, Vec n dB, dA) ((f : F) (f_ : F_) (i : Integer) (v : Vec 
 
 \newcommand{\proctype}[3]{#2 \vdash #1 \dashv #3}
 
+\section{Looping in split mode}
+
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+      {\bf nTimes} \\
+\[
+ \begin{array}{rcl}
+   n & : & Integer \\
+   sInitial & : & s \\
+   f & : & s \to s \textrm{ (known function)}\\
+   \mathrm{nTimes} \,\, n \,\, sInitial \,\, f & : & s
+ \end{array}
+\]
+      {\bf fwdpass\$nTimes} \\
+\[
+ \begin{array}{rcl}
+   n & : & Integer \\
+   sInitial & : & s \\
+   f & : & s \to s \textrm{ (known function)} \\
+   \mathrm{fwdpass\$nTimes} \,\, n  \,\, sInitial \,\, f & : &
+   (s, \vector{BOG[f]})
+ \end{array}
+ \]
+      {\bf revpass\$nTimes} \\
+\[
+ \begin{array}{rcl}
+   dds' & : & \tangent{s} \\
+   bog' & : & \vector{BOG[f]} \\
+   \mathrm{revpass\$nTimes} \,\, (bog', dds') & : & ((), \tangent{s}, ())
+ \end{array}
+\]
+  \end{minipage}}
+  \caption{Typing rules for nTimes}
+\end{figure*}
+
+\begin{figure*}
+  \begin{minipage}{\textwidth}
+      {\bf Semantics of nTimes}
+
+      \newcommand{\gradS}[2]{\nabla_{#1}\lb #2 \rb}
+      \newcommand{\gradV}[1]{\nabla#1}
+
+\[
+      \begin{array}{rcll}
+        \mathrm{nTimes} \,\, 0 \,\, sInitial \,\, f & = & sInitial \\
+        \mathrm{nTimes} \,\, n \,\, sInitial \,\, f & = &
+        f(\mathrm{nTimes} \,\, (n-1) \,\, sInitial \,\, f) & \textrm{if
+          $n > 0$}\\
+        \mathrm{nTimes} \,\, n \,\, sInitial \,\, f & = &
+        \mathrm{undefined} & \textrm{if $n < 0$}\\
+      \end{array}
+      \]
+\\
+\begin{minipage}{\textwidth}
+      {\bf fwdpass\$nTimes}
+\begin{verbatim}
+
+fwdpass$nTimes n a f =
+  let (_, bog', a') = nTimes n (0, uninitializedVector n, a) (\(i, bog, a) ->
+                          let (a', bogf) = fwdpass$f a
+                              bog'       = setAt i bog bogf
+                              i'         = i + 1
+                          in (i', bog', a'))
+  in (bog', a')
+
+\end{verbatim}
+\end{minipage}
+\\
+\begin{minipage}{\textwidth}
+      {\bf fwdpass\$nTimes}
+\begin{verbatim}
+
+revpass$nTimes (bog', dda') =
+  let (_, _, dda) = nTimes (size bog') (size bog', bog', dda')  n (\(i', bog', dda') ->
+                        let i    = i' - 1
+                            bogf = index i bog'
+                            bog  = bog'
+                            dda  = revpass$f(bogf, dda')
+                        in (i, bog, dda)
+  in ((), dda, ())
+
+\end{verbatim}
+\end{minipage}
+\end{minipage}
+\caption{Behaviour of nTimes}
+\end{figure*}
+
 \section{Procedure language}
 
 The typing judgement for a procedure $p$ is of the form
