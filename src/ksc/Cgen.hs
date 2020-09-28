@@ -139,6 +139,14 @@ freshCVar = do
 
 -------------------- Cgen
 
+data AllocatorUsage = DoesNotUseAllocator | UsesAllocator | UsesAndResetsAllocator
+
+combineUsage :: AllocatorUsage -> AllocatorUsage -> AllocatorUsage
+combineUsage UsesAllocator _ = UsesAllocator
+combineUsage _ UsesAllocator = UsesAllocator
+combineUsage DoesNotUseAllocator DoesNotUseAllocator = DoesNotUseAllocator
+combineUsage _ _ = UsesAndResetsAllocator
+
 -- CGenResult is (C declarations, C expression, CType)
 -- e.g. (["double r; if (b) { r = 1; } else { r = 2; };"],
 --       "r",
@@ -150,16 +158,19 @@ freshCVar = do
 --        "v12_t v12 = v12_t::mk(a,b);"]
 --       "v12",      -- this is what we use at the occurrence
 --       LMHCat [LMVCat [LMOne, LMZero], LMZero])
-data CGenResult = CG [String] String CType -- TODO: rename CG CGenResult
+data CGenResult = CG [String] String CType AllocatorUsage -- TODO: rename CG CGenResult
 
 getDecl :: CGenResult -> [String]
-getDecl (CG dc _ _) = dc
+getDecl (CG dc _ _ _) = dc
 
 getExpr :: CGenResult -> String
-getExpr (CG _ ex _) = ex
+getExpr (CG _ ex _ _) = ex
 
 getType :: CGenResult -> CType
-getType (CG _ _ ty) = ty
+getType (CG _ _ ty _) = ty
+
+getAllocatorUsage :: CGenResult -> AllocatorUsage
+getAllocatorUsage (CG _ _ _ au) = au
 
 type CSTKey = (Fun, Type)
 type CST    = Map.Map CSTKey ()
@@ -250,22 +261,14 @@ params_withPackedParams param = case typeof param of
 mkCTypedVar :: TVar -> String
 mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 
-wrapWithMarkReset :: [String] -> CType -> [String]
-wrapWithMarkReset [] _ = []
-wrapWithMarkReset cdecls ctype = if Cgen.isScalar ctype
-                                 then (  [ markAllocator "$allocmrk" allocatorParameterName ]
-                                      ++ cdecls
-                                      ++ [ resetAllocator "$allocmrk" allocatorParameterName ] )
-                                 else cdecls
-
 cgenDefE :: CST -> TDef -> [String]
 cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
   let cf                         = cgenUserFun (f, typeof param)
       (params, withPackedParams) = params_withPackedParamsPat param
-      CG cbodydecl cbodyexpr cbodytype =
+      CG cbodydecl cbodyexpr cbodytype _callocusage =
         runM $ cgenExpr env (withPackedParams body)
-      cbody       = wrapWithMarkReset cbodydecl cbodytype ++ [ "return (" ++ cbodyexpr ++ ");" ]
+      cbody       = cbodydecl ++ [ "return (" ++ cbodyexpr ++ ");" ]
       cvars       = map mkCTypedVar params
       cftypealias = "ty$" ++ cf
       cparams     = "ks::allocator * " ++ allocatorParameterName ++ concatMap (", " ++) cvars
@@ -282,18 +285,37 @@ cgenExpr :: CST -> TExpr -> M CGenResult
 cgenExpr = cgenExprR
 
 cgenExprR :: HasCallStack => CST -> TExpr -> M CGenResult
-cgenExprR env = \case
-  Konst k -> return $ CG [] (cgenKonst k) (mkCType $ typeofKonst k)
+cgenExprR env e = do
+  cg <- cgenExprWithoutResettingAlloc env e
+  cgenWrapWithMarkReset cg
+
+cgenWrapWithMarkReset :: HasCallStack => CGenResult -> M CGenResult
+cgenWrapWithMarkReset (CG decl expr ty UsesAllocator)
+  | Cgen.isScalar ty = do
+      bumpmark <- freshCVar
+      return $ CG
+        (  [ markAllocator bumpmark allocatorParameterName ]
+        ++ decl
+        ++ [ resetAllocator bumpmark allocatorParameterName ]
+        )
+        expr
+        ty
+        UsesAndResetsAllocator
+cgenWrapWithMarkReset x = return x
+
+cgenExprWithoutResettingAlloc :: HasCallStack => CST -> TExpr -> M CGenResult
+cgenExprWithoutResettingAlloc env = \case
+  Konst k -> return $ CG [] (cgenKonst k) (mkCType $ typeofKonst k) DoesNotUseAllocator
   Dummy ty ->
-    let cty = mkCType ty in return $ CG [] (cgenType cty ++ "{}") cty
-  Var (TVar ty v)               -> return $ CG [] (cgenVar v) (mkCType ty)
+    let cty = mkCType ty in return $ CG [] (cgenType cty ++ "{}") cty DoesNotUseAllocator
+  Var (TVar ty v)               -> return $ CG [] (cgenVar v) (mkCType ty) DoesNotUseAllocator
 
   -- Special case for build -- inline the loop
   Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
-    CG szdecl szex _szty <- cgenExprR env sz
+    CG szdecl szex _szty _szau <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
-    CG bodydecl bodyex _bodyty <- cgenExprR env body
+    CG bodydecl bodyex _bodyty _bodyau <- cgenExprR env body
 
     ret  <- freshCVar
     cvar <- freshCVar
@@ -313,13 +335,14 @@ cgenExprR env = \case
         )
         ret
         (mkCType (TypeVec ty))
+        UsesAllocator
 
   -- Special case for sumbuild -- inline the loop
   Call (TFun ty (Fun (PrimFun "sumbuild"))) (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
-    CG szdecl szex _szty <- cgenExprR env sz
+    CG szdecl szex _szty _szau <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
-    CG bodydecl bodyex _bodyty <- cgenExprR env body
+    CG bodydecl bodyex _bodyty _bodyau <- cgenExprR env body
 
     let cretty = cgenType $ mkCType ty
     ret  <- freshCVar
@@ -351,6 +374,7 @@ cgenExprR env = \case
         )
         ret
         (mkCType ty)
+        (if Cgen.isScalar (mkCType ty) then UsesAndResetsAllocator else UsesAllocator)
 
   -- Special case for literal tuples.  Don't unpack with std::get.
   -- Just use the tuple components as the arguments.  See Note [Unpack
@@ -360,6 +384,7 @@ cgenExprR env = \case
     let cgargtype = typeof t
     let cdecls = map getDecl cgvs
     let ctypes = map getType cgvs
+    let callocusage = map getAllocatorUsage cgvs
 
     let cftype = ctypeofFun env (tf, cgargtype) ctypes
 
@@ -374,12 +399,14 @@ cgenExprR env = \case
       )
       v
       cftype
+      (foldr combineUsage (funAllocatorUsage tf cftype) callocusage)
 
   Call tf@(TFun _ fun) vs -> do
     cgvs <- cgenExprR env vs
     let cgargtype = typeof vs
     let cdecls = getDecl cgvs
     let ctypes = getType cgvs
+    let callocusage = getAllocatorUsage cgvs
 
     let cftype = ctypeofFun env (tf, cgargtype) [ctypes]
 
@@ -405,10 +432,11 @@ cgenExprR env = \case
       )
       v
       cftype
+      (funAllocatorUsage tf cftype `combineUsage` callocusage)
 
   Let (TVar _ v) e1 body -> do
-    (CG decle1   ve1   type1 ) <- cgenExprR env e1
-    (CG declbody vbody tybody) <- cgenExprR env body
+    (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
+    (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
     lvar                       <- freshCVar
 
     return $ CG
@@ -422,23 +450,26 @@ cgenExprR env = \case
       )
       lvar
       tybody
+      (allocusagee1 `combineUsage` allocusagebody)
 
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs
     let cdecls = map getDecl cgvs
     let cexprs = map getExpr cgvs
     let ctypes = map getType cgvs
+    let callocusage = map getAllocatorUsage cgvs
     let ctype  = CTuple ctypes
 
     return $ CG (concat cdecls)
                 ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
                 ctype
+                (foldr combineUsage DoesNotUseAllocator callocusage)
 
   Lam param@(TVar tyv _) body -> do
     lvar <- freshCVar
     let vtype = mkCType tyv
         (params, withPackedParams) = params_withPackedParams param
-    (CG cdecl cexpr ctype) <- cgenExprR env (withPackedParams body)
+    (CG cdecl cexpr ctype _callocusage) <- cgenExprR env (withPackedParams body)
     return $ CG
       (  [ cComment "Lam" ++ "auto" `spc` lvar ++ " = [=](" -- TODO: capture only freeVars here
               ++ "ks::allocator * " ++ allocatorParameterName
@@ -451,14 +482,15 @@ cgenExprR env = \case
       )
       lvar
       (CFunction vtype ctype)
+      DoesNotUseAllocator
 
 
   If c texpr fexpr -> do
     cret              <- freshCVar
 
-    (CG declc vc _  ) <- cgenExprR env c
-    (CG declt vt tyt) <- cgenExprR env texpr
-    (CG declf vf tyf) <- cgenExprR env fexpr
+    (CG declc vc _   auc) <- cgenExprR env c
+    (CG declt vt tyt aut) <- cgenExprR env texpr
+    (CG declf vf tyf auf) <- cgenExprR env fexpr
     let crettype = makeUnionType tyt tyf
     let dotv = case crettype of
           LMVariant _ -> ".v"  -- TODO: Ugh. Fix c++ to not require this.
@@ -477,12 +509,13 @@ cgenExprR env = \case
       )
       cret
       crettype
+      (auc `combineUsage` aut `combineUsage` auf)
 
   Assert cond body -> do
-    (CG declcond vcond tycond) <- cgenExprR env cond
+    (CG declcond vcond tycond aucond) <- cgenExprR env cond
     case tycond of CType TypeBool -> return ()
                    _              -> error "tycond was not TypeBool"
-    (CG declbody vbody tybody          ) <- cgenExprR env body
+    (CG declbody vbody tybody aubody) <- cgenExprR env body
     return $ CG (  makeBlock (  declcond
                              ++ [ "KS_ASSERT(" ++ vcond ++ ");" ]
                              )
@@ -490,6 +523,7 @@ cgenExprR env = \case
                 )
                 vbody
                 tybody
+                (aucond `combineUsage` aubody)
 
   App{} -> error "App"
 
@@ -562,6 +596,12 @@ funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
   not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
+
+funAllocatorUsage :: HasCallStack => TFun -> CType -> AllocatorUsage
+funAllocatorUsage tf ty
+  | not $ funUsesAllocator tf = DoesNotUseAllocator
+  | Cgen.isScalar ty = UsesAndResetsAllocator
+  | otherwise = UsesAllocator
 
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
