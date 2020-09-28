@@ -1610,13 +1610,13 @@ def RFold_recursive (S, Vec n dB, dA) ((f : F) (f_ : F_) (i : Integer) (v : Vec 
       {\bf fwdpass\$nTimes}
 \begin{verbatim}
 
-fwdpass$nTimes n a f =
-  let (_, bog', a') = nTimes n (0, uninitializedVector n, a) (\(i, bog, a) ->
-                          let (a', bogf) = fwdpass$f a
+fwdpass$nTimes n s f =
+  let (_, bog', s') = nTimes n (0, uninitializedVector n, s) (\(i, bog, s) ->
+                          let (s', bogf) = fwdpass$f s
                               bog'       = setAt i bog bogf
                               i'         = i + 1
-                          in (i', bog', a'))
-  in (bog', a')
+                          in (i', bog', s'))
+  in (bog', s')
 
 \end{verbatim}
 \end{minipage}
@@ -1625,14 +1625,14 @@ fwdpass$nTimes n a f =
       {\bf fwdpass\$nTimes}
 \begin{verbatim}
 
-revpass$nTimes (bog', dda') =
-  let (_, _, dda) = nTimes (size bog') (size bog', bog', dda')  n (\(i', bog', dda') ->
+revpass$nTimes (bog', dds') =
+  let (_, _, dds) = nTimes (size bog') (size bog', bog', dds')  n (\(i', bog', dds') ->
                         let i    = i' - 1
                             bogf = index i bog'
                             bog  = bog'
-                            dda  = revpass$f(bogf, dda')
-                        in (i, bog, dda)
-  in ((), dda, ())
+                            dds  = revpass$f(bogf, dds')
+                        in (i, bog, dds)
+  in ((), dds, ())
 
 \end{verbatim}
 \end{minipage}
