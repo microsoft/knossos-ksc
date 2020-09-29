@@ -119,6 +119,11 @@ spc x y = x ++ " " ++ y
 indent :: [String] -> [String]
 indent = map ("  " ++)
 
+makeBlock :: [String] -> [String]
+makeBlock [] = []
+makeBlock [line] = [line]
+makeBlock lines = [ "{" ] ++ indent lines ++ [ "}" ]
+
 -------------- State for var generator
 
 type M = S.State Int
@@ -478,8 +483,9 @@ cgenExprR env = \case
     case tycond of CType TypeBool -> return ()
                    _              -> error "tycond was not TypeBool"
     (CG declbody vbody tybody          ) <- cgenExprR env body
-    return $ CG (  declcond
-                ++ [ "KS_ASSERT(" ++ vcond ++ ");" ]
+    return $ CG (  makeBlock (  declcond
+                             ++ [ "KS_ASSERT(" ++ vcond ++ ");" ]
+                             )
                 ++ declbody
                 )
                 vbody
