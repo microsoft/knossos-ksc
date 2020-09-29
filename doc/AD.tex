@@ -1599,7 +1599,7 @@ def RFold_recursive (S, Vec n dB, dA) ((f : F) (f_ : F_) (i : Integer) (v : Vec 
       \begin{array}{rcll}
         \mathrm{nTimes} \,\, 0 \,\, sInitial \,\, f & = & sInitial \\
         \mathrm{nTimes} \,\, n \,\, sInitial \,\, f & = &
-        f(\mathrm{nTimes} \,\, (n-1) \,\, sInitial \,\, f) & \textrm{if
+        \mathrm{nTimes} \,\, (n-1) \,\, f(sInitial) \,\, f & \textrm{if
           $n > 0$}\\
         \mathrm{nTimes} \,\, n \,\, sInitial \,\, f & = &
         \mathrm{undefined} & \textrm{if $n < 0$}\\
