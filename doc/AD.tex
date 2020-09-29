@@ -1640,6 +1640,93 @@ revr$nTimes (bog', dds') =
 \caption{Behaviour of nTimes}
 \end{figure*}
 
+\begin{figure*}
+  \fbox{\begin{minipage}{\textwidth}
+      {\bf ccl} \\
+\[
+ \begin{array}{rcl}
+   n & : & Integer \\
+   sInitial & : & s \\
+   f & : & (Integer, s) \to s \textrm{ (known function)}\\
+   \mathrm{ccl} \,\, n \,\, sInitial \,\, f & : & s
+ \end{array}
+\]
+      {\bf revf\$ccl} \\
+\[
+ \begin{array}{rcl}
+   n & : & Integer \\
+   sInitial & : & s \\
+   f & : & (Integer, s) \to s \textrm{ (known function)} \\
+   \mathrm{revf\$ccl} \,\, n  \,\, sInitial \,\, f & : & (s, (n, s))
+ \end{array}
+ \]
+      {\bf revr\$ccl} \\
+\[
+ \begin{array}{rcl}
+   n    & : & Integer \\
+   s    & : & s \\
+   dds' & : & \tangent{s} \\
+   \mathrm{revr\$ccl} \,\, ((n, s), dds') & : & ((), \tangent{s}, ())
+ \end{array}
+\]
+  \end{minipage}}
+  \caption{Typing rules for ccl}
+\end{figure*}
+
+\begin{figure*}
+  \begin{minipage}{\textwidth}
+      {\bf Semantics of ccl}
+
+      \newcommand{\gradS}[2]{\nabla_{#1}\lb #2 \rb}
+      \newcommand{\gradV}[1]{\nabla#1}
+
+\[
+      \begin{array}{rcll}
+        \mathrm{ccl} \,\, 0 \,\, sInitial \,\, f & = & sInitial \\
+        \mathrm{ccl} \,\, n \,\, sInitial \,\, f & = &
+        \mathrm{ccl} \,\, (n-1) \,\, f(n-1, sInitial) \,\, f & \textrm{if
+          $n > 0$}\\
+        \mathrm{ccl} \,\, n \,\, sInitial \,\, f & = &
+        \mathrm{undefined} & \textrm{if $n < 0$}\\
+      \end{array}
+      \]
+\\
+\begin{minipage}{\textwidth}
+      {\bf revf\$ccl}
+\begin{verbatim}
+
+revf$ccl n s f = (ccl n s f, (n, s))
+
+\end{verbatim}
+\end{minipage}
+\\
+\begin{minipage}{\textwidth}
+      {\bf revr\$ccl}
+\begin{verbatim}
+
+revr$ccl ((n, s), dds') =
+  let (_, dds) = ccl n (s, dds') (\(i, (s, dds')) ->
+                        let (s', bogf) = revf$f s
+                            dds        = revr$f(bogf, dds')
+                        in (s', dds)
+  in ((), dds, ())
+
+\end{verbatim}
+
+This form of reverse pass is only correct if $revr\$f$ is
+commutative in the sense that
+
+\[
+\forall
+bog1, bog2, dds' \,\,
+revr\$f(bog1, revr\$f(bog2, dds'))
+= revr\$f(bog2, revr\$f(bog1, dds'))
+\]
+\end{minipage}
+\end{minipage}
+\caption{Behaviour of ccl}
+\end{figure*}
+
 \section{Procedure language}
 
 The typing judgement for a procedure $p$ is of the form
