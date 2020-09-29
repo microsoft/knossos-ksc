@@ -64,9 +64,11 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
-data Pat = VarPat TVar     -- A single variable
-         | TupPat [TVar]   -- A tuple of variables
-         deriving( Eq )
+data PatG v = VarPat v     -- A single variable
+            | TupPat [v]   -- A tuple of variables
+            deriving( Eq )
+
+type Pat = PatG TVar
 
 patType :: Pat -> Type
 patType (VarPat v) = typeof v
