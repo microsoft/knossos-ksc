@@ -1566,22 +1566,22 @@ def RFold_recursive (S, Vec n dB, dA) ((f : F) (f_ : F_) (i : Integer) (v : Vec 
    \mathrm{nTimes} \,\, n \,\, sInitial \,\, f & : & s
  \end{array}
 \]
-      {\bf fwdpass\$nTimes} \\
+      {\bf revf\$nTimes} \\
 \[
  \begin{array}{rcl}
    n & : & Integer \\
    sInitial & : & s \\
    f & : & s \to s \textrm{ (known function)} \\
-   \mathrm{fwdpass\$nTimes} \,\, n  \,\, sInitial \,\, f & : &
+   \mathrm{revf\$nTimes} \,\, n  \,\, sInitial \,\, f & : &
    (s, \vector{BOG[f]})
  \end{array}
  \]
-      {\bf revpass\$nTimes} \\
+      {\bf revr\$nTimes} \\
 \[
  \begin{array}{rcl}
    dds' & : & \tangent{s} \\
    bog' & : & \vector{BOG[f]} \\
-   \mathrm{revpass\$nTimes} \,\, (bog', dds') & : & ((), \tangent{s}, ())
+   \mathrm{revr\$nTimes} \,\, (bog', dds') & : & ((), \tangent{s}, ())
  \end{array}
 \]
   \end{minipage}}
@@ -1607,12 +1607,12 @@ def RFold_recursive (S, Vec n dB, dA) ((f : F) (f_ : F_) (i : Integer) (v : Vec 
       \]
 \\
 \begin{minipage}{\textwidth}
-      {\bf fwdpass\$nTimes}
+      {\bf revf\$nTimes}
 \begin{verbatim}
 
-fwdpass$nTimes n s f =
+revf$nTimes n s f =
   let (_, bog', s') = nTimes n (0, uninitializedVector n, s) (\(i, bog, s) ->
-                          let (s', bogf) = fwdpass$f s
+                          let (s', bogf) = revf$f s
                               bog'       = setAt i bog bogf
                               i'         = i + 1
                           in (i', bog', s'))
@@ -1622,15 +1622,15 @@ fwdpass$nTimes n s f =
 \end{minipage}
 \\
 \begin{minipage}{\textwidth}
-      {\bf revpass\$nTimes}
+      {\bf revr\$nTimes}
 \begin{verbatim}
 
-revpass$nTimes (bog', dds') =
+revr$nTimes (bog', dds') =
   let (_, _, dds) = nTimes (size bog') (size bog', bog', dds')  n (\(i', bog', dds') ->
                         let i    = i' - 1
                             bogf = index i bog'
                             bog  = bog'
-                            dds  = revpass$f(bogf, dds')
+                            dds  = revr$f(bogf, dds')
                         in (i, bog, dds)
   in ((), dds, ())
 
