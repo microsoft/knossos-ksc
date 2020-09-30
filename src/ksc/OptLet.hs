@@ -179,7 +179,6 @@ zapSubst :: Subst -> Subst
 zapSubst (S { s_in_scope = in_scope })
   = S { s_env = M.empty, s_in_scope = in_scope }
 
--- * It applies the substitution to the type of the binder
 -- * It clones the binder if it is already in scope
 -- * Extends the substitution and the in-scope set as appropriate
 substBndr :: TVar -> Subst -> (TVar, Subst)
