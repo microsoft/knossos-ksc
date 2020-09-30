@@ -32,9 +32,6 @@ occAnal e = fst (occAnalE e)
 -- (but using max for the branches of an If)
 type OccMap = M.Map TVar Int
 
-occAnalTv :: TVar -> (TVarX, OccMap)
-occAnalTv tv = (tv, M.empty)
-
 occAnalE :: TExpr -> (ExprX OccAnald, OccMap)
 occAnalE (Var v)    = (Var v, M.singleton v 1)
 occAnalE (Konst k)  = (Konst k, M.empty)
@@ -62,7 +59,7 @@ occAnalE (Lam tv e)
   where
     e' :: ExprX OccAnald
     (e', vs)   = occAnalE e
-    (tv', vs2) = occAnalTv tv
+    (tv', vs2) = (tv, M.empty)
 
 occAnalE (Call f e) = (Call f e', vs)
                      where
@@ -84,7 +81,7 @@ occAnalE (Let tv (Tuple es) body)
     n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (tv',   vstv) = occAnalTv tv
+    (tv',   vstv) = (tv, M.empty)
     (es',   vsr)  = unzip (map occAnalE es)
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
@@ -106,7 +103,7 @@ occAnalE (Let tv rhs body)
     n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (tv',   vstv) = occAnalTv tv
+    (tv',   vstv) = (tv, M.empty)
     (rhs',  vsr)  = occAnalE rhs
     (body', vsb)  = occAnalE body
     vs | n == 0    = tv `M.delete` vsb
