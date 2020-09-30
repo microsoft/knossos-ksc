@@ -33,7 +33,7 @@ occAnal e = fst (occAnalE e)
 type OccMap = M.Map TVar Int  
 
 occAnalTv :: TVar -> (TVarX, OccMap)
-occAnalTv (TVar ty v) = (TVar ty v, M.empty)
+occAnalTv tv = (tv, M.empty)
 
 occAnalE :: TExpr -> (ExprX OccAnald, OccMap)
 occAnalE (Var v)    = (Var v, M.singleton v 1)
