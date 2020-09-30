@@ -50,7 +50,7 @@ occAnalE (Assert e1 e2)
     (e2', vs2) = occAnalE e2
 
 occAnalE (Lam tv e)
-  = (Lam tv' e', vs2 `unionOccMap` markMany (tv `M.delete` vs))
+  = (Lam tv e', markMany (tv `M.delete` vs))
     -- If a variable is used under a lambda
     -- we must not inline it uncritically, lest
     -- we duplcate work.   E.g.
@@ -59,7 +59,6 @@ occAnalE (Lam tv e)
   where
     e' :: ExprX OccAnald
     (e', vs)   = occAnalE e
-    (tv', vs2) = (tv, M.empty)
 
 occAnalE (Call f e) = (Call f e', vs)
                      where
@@ -69,7 +68,7 @@ occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
                         (es', vs) = unzip (map occAnalE es)
 
 occAnalE (Let tv (Tuple es) body)
-  = (Let (n, tv') (Tuple es') body', vs)
+  = (Let (n, tv) (Tuple es') body', vs)
   -- When a tuple is on the RHS of a let we want to prevent its
   -- contents from being inlined back into it because we generally
   -- want to fuse tuple construction with a function call that
@@ -81,7 +80,6 @@ occAnalE (Let tv (Tuple es) body)
     n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (tv',   vstv) = (tv, M.empty)
     (es',   vsr)  = unzip (map occAnalE es)
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
@@ -89,26 +87,23 @@ occAnalE (Let tv (Tuple es) body)
 
        -- See Note [Making optLets idempotent]
        | n == 1    = vsb_no_tv
-                     `unionOccMap` vstv
                      `unionOccMap` unionsOccMap vsr
 
        -- Note [Inline tuples], item (2)
        | otherwise = vsb_no_tv
-                     `unionOccMap` vstv
                      `unionOccMap` markMany (unionsOccMap vsr)
 
 occAnalE (Let tv rhs body)
-  = (Let (n, tv') rhs' body', vs)
+  = (Let (n, tv) rhs' body', vs)
   where
     n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (tv',   vstv) = (tv, M.empty)
     (rhs',  vsr)  = occAnalE rhs
     (body', vsb)  = occAnalE body
     vs | n == 0    = tv `M.delete` vsb
        | otherwise = (tv `M.delete` vsb)
-                     `unionOccMap` vstv `unionOccMap` vsr
+                     `unionOccMap` vsr
 
 occAnalE (If b t e)
   = (If b' t' e', vsb `unionOccMap` (M.unionWith max vst vse))
