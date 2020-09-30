@@ -30,7 +30,7 @@ occAnal e = fst (occAnalE e)
 
 -- Maps a free variable to its number of syntactic occurrences
 -- (but using max for the branches of an If)
-type OccMap = M.Map TVar Int  
+type OccMap = M.Map TVar Int
 
 occAnalTv :: TVar -> (TVarX, OccMap)
 occAnalTv tv = (tv, M.empty)
