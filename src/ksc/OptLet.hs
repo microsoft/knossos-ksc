@@ -38,33 +38,7 @@ occAnalTv (TVar ty v) = (TVar ty' v, vs)
     (ty', vs) = occAnalT ty
 
 occAnalT :: Type -> (TypeX, OccMap)
-occAnalT (TypeVec ty)
-  = (TypeVec ty', vs)
-  where
-    (ty', vs) = occAnalT ty
-
-occAnalT (TypeTuple tys)
-  = (TypeTuple tys', unionsOccMap vs_s)
-  where
-    (tys', vs_s) = unzip (map occAnalT tys)
-
-occAnalT (TypeLM ty1 ty2)
-  = (TypeLM ty1' ty2', unionOccMap vs1 vs2)
-  where
-    (ty1', vs1) = occAnalT ty1
-    (ty2', vs2) = occAnalT ty2
-
-occAnalT (TypeLam ty1 ty2)
-  = (TypeLam ty1' ty2', unionOccMap vs1 vs2)
-  where
-    (ty1', vs1) = occAnalT ty1
-    (ty2', vs2) = occAnalT ty2
-
-occAnalT TypeBool    = (TypeBool,    M.empty)
-occAnalT TypeInteger = (TypeInteger, M.empty)
-occAnalT TypeFloat   = (TypeFloat,   M.empty)
-occAnalT TypeString  = (TypeString,  M.empty)
-occAnalT TypeUnknown = (TypeUnknown, M.empty)
+occAnalT ty = (ty, M.empty)
 
 occAnalE :: TExpr -> (ExprX OccAnald, OccMap)
 occAnalE (Var v)    = (Var v, M.singleton v 1)
