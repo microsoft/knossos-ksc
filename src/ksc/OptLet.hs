@@ -35,10 +35,7 @@ type OccMap = M.Map TVar Int
 occAnalTv :: TVar -> (TVarX, OccMap)
 occAnalTv (TVar ty v) = (TVar ty' v, vs)
   where
-    (ty', vs) = occAnalT ty
-
-occAnalT :: Type -> (TypeX, OccMap)
-occAnalT ty = (ty, M.empty)
+    (ty', vs) = (ty, M.empty)
 
 occAnalE :: TExpr -> (ExprX OccAnald, OccMap)
 occAnalE (Var v)    = (Var v, M.singleton v 1)
