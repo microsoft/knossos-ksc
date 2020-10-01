@@ -405,7 +405,7 @@ cgenExprWithoutResettingAlloc env = \case
       )
       v
       cftype
-      (foldr combineUsage (funAllocatorUsage tf cftype) callocusage)
+      (foldr (<>) (funAllocatorUsage tf cftype) callocusage)
 
   Call tf@(TFun _ fun) vs -> do
     cgvs <- cgenExprR env vs
@@ -438,7 +438,7 @@ cgenExprWithoutResettingAlloc env = \case
       )
       v
       cftype
-      (funAllocatorUsage tf cftype `combineUsage` callocusage)
+      (funAllocatorUsage tf cftype <> callocusage)
 
   Let (TVar _ v) e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
@@ -456,7 +456,7 @@ cgenExprWithoutResettingAlloc env = \case
       )
       lvar
       tybody
-      (allocusagee1 `combineUsage` allocusagebody)
+      (allocusagee1 <> allocusagebody)
 
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs
@@ -469,7 +469,7 @@ cgenExprWithoutResettingAlloc env = \case
     return $ CG (concat cdecls)
                 ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
                 ctype
-                (foldr combineUsage DoesNotUseAllocator callocusage)
+                (foldr (<>) mempty callocusage)
 
   Lam param@(TVar tyv _) body -> do
     lvar <- freshCVar
@@ -515,7 +515,7 @@ cgenExprWithoutResettingAlloc env = \case
       )
       cret
       crettype
-      (auc `combineUsage` aut `combineUsage` auf)
+      (auc <> aut <> auf)
 
   Assert cond body -> do
     (CG declcond vcond tycond aucond) <- cgenExprR env cond
@@ -529,7 +529,7 @@ cgenExprWithoutResettingAlloc env = \case
                 )
                 vbody
                 tybody
-                (aucond `combineUsage` aubody)
+                (aucond <> aubody)
 
   App{} -> error "App"
 
