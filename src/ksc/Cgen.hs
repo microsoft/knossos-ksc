@@ -390,7 +390,7 @@ cgenExprWithoutResettingAlloc env = \case
     let cgargtype = typeof t
     let cdecls = map getDecl cgvs
     let ctypes = map getType cgvs
-    let callocusage = map getAllocatorUsage cgvs
+    let callocusage = mconcat (map getAllocatorUsage cgvs)
 
     let cftype = ctypeofFun env (tf, cgargtype) ctypes
 
@@ -405,7 +405,7 @@ cgenExprWithoutResettingAlloc env = \case
       )
       v
       cftype
-      (funAllocatorUsage tf cftype <> mconcat callocusage)
+      (funAllocatorUsage tf cftype <> callocusage)
 
   Call tf@(TFun _ fun) vs -> do
     cgvs <- cgenExprR env vs
@@ -463,13 +463,13 @@ cgenExprWithoutResettingAlloc env = \case
     let cdecls = map getDecl cgvs
     let cexprs = map getExpr cgvs
     let ctypes = map getType cgvs
-    let callocusage = map getAllocatorUsage cgvs
+    let callocusage = mconcat (map getAllocatorUsage cgvs)
     let ctype  = CTuple ctypes
 
     return $ CG (concat cdecls)
                 ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
                 ctype
-                (mconcat callocusage)
+                callocusage
 
   Lam param@(TVar tyv _) body -> do
     lvar <- freshCVar
