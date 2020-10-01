@@ -405,7 +405,7 @@ cgenExprWithoutResettingAlloc env = \case
       )
       v
       cftype
-      (funAllocatorUsage tf cftype <> foldr (<>) mempty callocusage)
+      (funAllocatorUsage tf cftype <> mconcat callocusage)
 
   Call tf@(TFun _ fun) vs -> do
     cgvs <- cgenExprR env vs
@@ -469,7 +469,7 @@ cgenExprWithoutResettingAlloc env = \case
     return $ CG (concat cdecls)
                 ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
                 ctype
-                (foldr (<>) mempty callocusage)
+                (mconcat callocusage)
 
   Lam param@(TVar tyv _) body -> do
     lvar <- freshCVar
