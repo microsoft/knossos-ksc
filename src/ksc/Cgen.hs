@@ -405,7 +405,7 @@ cgenExprWithoutResettingAlloc env = \case
       )
       v
       cftype
-      (foldr (<>) (funAllocatorUsage tf cftype) callocusage)
+      (funAllocatorUsage tf cftype <> foldr (<>) mempty callocusage)
 
   Call tf@(TFun _ fun) vs -> do
     cgvs <- cgenExprR env vs
