@@ -390,7 +390,7 @@ cgenExprWithoutResettingAlloc env = \case
     let cgargtype = typeof t
     let cdecls = map getDecl cgvs
     let ctypes = map getType cgvs
-    let callocusage = mconcat (map getAllocatorUsage cgvs)
+    let callocusage = foldMap getAllocatorUsage cgvs
 
     let cftype = ctypeofFun env (tf, cgargtype) ctypes
 
@@ -463,7 +463,7 @@ cgenExprWithoutResettingAlloc env = \case
     let cdecls = map getDecl cgvs
     let cexprs = map getExpr cgvs
     let ctypes = map getType cgvs
-    let callocusage = mconcat (map getAllocatorUsage cgvs)
+    let callocusage = foldMap getAllocatorUsage cgvs
     let ctype  = CTuple ctypes
 
     return $ CG (concat cdecls)
