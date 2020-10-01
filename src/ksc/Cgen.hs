@@ -141,6 +141,12 @@ freshCVar = do
 
 data AllocatorUsage = DoesNotUseAllocator | UsesAllocator | UsesAndResetsAllocator
 
+instance Semigroup AllocatorUsage where
+  (<>) = combineUsage
+
+instance Monoid AllocatorUsage where
+  mempty = DoesNotUseAllocator
+
 combineUsage :: AllocatorUsage -> AllocatorUsage -> AllocatorUsage
 combineUsage UsesAllocator _ = UsesAllocator
 combineUsage _ UsesAllocator = UsesAllocator
