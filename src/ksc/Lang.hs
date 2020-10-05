@@ -687,10 +687,7 @@ instance InPhase OccAnald where
   getMType   ty                 = Just ty
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun, Just ty)
-  getLetBndr (_, tv)            = (tVarVar tv,   Nothing)
-  -- This last case is awkward. _ty :: TypeX OccAnald
-  -- and we could convert it to a Type, but it does not
-  -- see worth the bother.  Nothing is fine, actually
+  getLetBndr (_, TVar ty var)   = (var, Just ty)
 
 pprMTypeX :: forall p. InPhase p => MTypeX p -> SDoc
 pprMTypeX mty = case getMType @p mty of
