@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
              ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable #-}
 
 module Lang where
 
@@ -10,7 +11,9 @@ import           Prelude                 hiding ( (<>) )
 
 import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint               ( Doc )
+import           Data.Foldable                  ( toList )
 import           Data.List                      ( intersperse )
+import qualified Data.List.NonEmpty            as NEL
 import           KMonad
 
 import qualified Data.Map as M
@@ -23,12 +26,12 @@ import           Test.Hspec
 
 mkGradType :: ADPlan -> Type -> Type -> Type
 mkGradType BasicAD s ty = TypeLM s ty
-mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
+mkGradType TupleAD s ty = TypeTuple (nonEmptyList ty [TypeLM s ty])
   -- For TupleAD, mkGradType s t = (t, s -o t)
 
 mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
-mkGradTuple TupleAD p lm = Tuple [p, lm]
+mkGradTuple TupleAD p lm = Tuple (nonEmptyList p [lm])
 
 data Phase = Parsed | Typed | OccAnald
 
@@ -149,7 +152,7 @@ data ExprX p
   = Konst Konst
   | Var  (VarX p)
   | Call (FunX p) (ExprX p)  -- f e
-  | Tuple [ExprX p]          -- (e1, ..., en)
+  | Tuple (NonSingletonList (ExprX p)) -- (e1, ..., en)
   | Lam TVarX (ExprX p)      -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
   | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
@@ -176,12 +179,25 @@ unzipTEs (TE e t : tes) = (e:es, t:ts)
   where
     (es, ts) = unzipTEs tes
 
+data NonSingletonList a = NonSingletonList (Maybe (NEL.NonEmpty a))
+  deriving (Eq, Ord, Functor, Foldable)
+
+emptyList :: NonSingletonList a
+emptyList = NonSingletonList Nothing
+
+nonEmptyList :: a -> [a] -> NonSingletonList a
+nonEmptyList a as = NonSingletonList (Just (a NEL.:| as))
+
+(!!!) :: NonSingletonList p -> Int -> p
+NonSingletonList Nothing   !!! _ = error "!!! of empty list"
+NonSingletonList (Just xs) !!! n = xs NEL.!! n
+
 data TypeX
   = TypeBool
   | TypeInteger
   | TypeFloat
   | TypeString
-  | TypeTuple [TypeX]
+  | TypeTuple (NonSingletonList TypeX)
 
   | TypeVec TypeX
 
@@ -247,10 +263,10 @@ tangentType :: HasCallStack => Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
 tangentType (TypeVec t)    = TypeVec (tangentType t)
-tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
-tangentType TypeInteger    = TypeTuple []
-tangentType TypeBool       = TypeTuple []
-tangentType TypeString     = TypeTuple []
+tangentType (TypeTuple ts) = TypeTuple (fmap tangentType ts)
+tangentType TypeInteger    = TypeTuple emptyList
+tangentType TypeBool       = TypeTuple emptyList
+tangentType TypeString     = TypeTuple emptyList
 tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
@@ -418,12 +434,14 @@ zeroFloat :: TExpr
 zeroFloat = Konst (KFloat 0.0)
 
 mkTuple :: [ExprX p] -> ExprX p
-mkTuple [e] = e
-mkTuple es  = Tuple es
+mkTuple []     = Tuple emptyList
+mkTuple [e]    = e
+mkTuple (e:es) = Tuple (nonEmptyList e es)
 
 mkTupleTy :: [Type] -> Type
-mkTupleTy [t] = t
-mkTupleTy ts  = TypeTuple ts
+mkTupleTy []      = TypeTuple emptyList
+mkTupleTy [_]     = error "Not permitted" -- FIXME: Deal with this
+mkTupleTy (t1:ts) = TypeTuple (nonEmptyList t1 ts)
 
 dropLast :: [a] -> [a]
 -- Drop the last element of a list.
@@ -435,7 +453,7 @@ pSel i n e = Call (TFun el_ty
                         (Fun (SelFun i n))) e
            where
              el_ty = case typeof e of
-                        TypeTuple ts -> ts !! (i-1)
+                        TypeTuple ts -> ts !!! (i-1)
                         _ -> TypeUnknown  -- Better error from Lint
 
 pFst,pSnd :: TExpr -> TExpr
@@ -469,7 +487,7 @@ instance HasType TExpr where
   typeof (App f _)     = case typeof f of
     TypeLam _ res -> res
     _ -> pprPanic "typeof:app " (vcat [ppr f, ppr (typeof f)])
-  typeof (Tuple es)    = TypeTuple $ map typeof es
+  typeof (Tuple es)    = TypeTuple $ fmap typeof es
   typeof (Lam b e)     = TypeLam (typeof b) (typeof e)
   typeof (Let _ _ e2)  = typeof e2
   typeof (Assert _ e)  = typeof e
@@ -776,8 +794,9 @@ instance Pretty Konst where
 instance Pretty TypeX where
   pprPrec p (TypeVec ty)      = parensIf p precTyApp $
                                 text "Vec" <+> pprParendType ty
-  pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
-                                     (parens (pprList pprParendType tys))
+  pprPrec _ (TypeTuple tys)   =
+    mode (parens (text "Tuple" <+> pprNonSingletonList pprParendType tys))
+         (parens (pprNonSingletonList pprParendType tys))
   pprPrec p (TypeLam from to) = parensIf p precZero $
                                 text "Lam" <+> ppr from <+> ppr to
   pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
@@ -787,6 +806,9 @@ instance Pretty TypeX where
   pprPrec _ TypeString        = text "String"
   pprPrec _ TypeBool          = text "Bool"
   pprPrec _ TypeUnknown       = text "UNKNOWN"
+
+instance Pretty a => Pretty (NonSingletonList a) where
+  pprPrec p = pprPrec p . toList
 
 pprParendType :: TypeX -> SDoc
 pprParendType = pprPrec precTop
@@ -819,7 +841,7 @@ pprExpr _ (Dummy ty) = char '<' <> pprMTypeX @phase ty <> char '>'
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
-  where rest = pprList ppr es
+  where rest = pprNonSingletonList ppr es
 pprExpr _ (Lam v e) =  mode (parens $ text "lam" <+> parens (pprTVar v) <+> ppr e)
                             (parens $ text "lam" <+> vcat [parens (pprTVar v), ppr e])
 pprExpr p (Let v e1 e2) = mode
@@ -852,7 +874,7 @@ pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
   (parens $ pprFunOcc @p f <+> pp_args_tuple)
   (case (e, isInfix @p f) of
-    (Tuple [e1, e2], Just prec')
+    (Tuple (NonSingletonList (Just (e1 NEL.:| [e2]))), Just prec')
       -> parensIf prec prec' $
          sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
     _ -> parensIf prec precCall $
@@ -864,8 +886,7 @@ pprCall prec f e = mode
   -- pp_args_tuple unpacks a literal tuple of arguments to multiple
   -- surface syntax arguments.  See Note [Function arity].
   pp_args_tuple = case e of
-    Tuple [_] -> pp_args
-    Tuple es  -> sep (map ppr es)
+    Tuple es  -> sep (map ppr (toList es))
     _         -> pp_args
 
 pprLetSexp :: forall p. InPhase p => LetBndrX p -> ExprX p -> ExprX p -> SDoc
@@ -953,6 +974,9 @@ pprList ppr ps = mode (sep pps) (sep $ punctuate comma pps)
   where
    pps = map ppr ps
 
+pprNonSingletonList :: (p -> SDoc) -> NonSingletonList p -> SDoc
+pprNonSingletonList ppr = pprList ppr . toList
+
 instance Pretty a => Pretty [a] where
   ppr xs = char '[' <> pprList ppr xs <> char ']'
 
@@ -972,14 +996,11 @@ hspec = do
   let var s = Var (Simple s)
   let e,e2 :: Expr
       e  = Call (Fun (UserFun "g")) (var "i")
-      e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
+      e2 = Call (Fun (UserFun "f")) (Tuple (nonEmptyList e [var "_t1", kInt 5]))
 
   describe "Pretty" $ do
     test e  "g( i )"
     test e2 "f( (g( i ), _t1, 5) )"
-
-  describe "eqType" $
-    it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
 
 test_Pretty :: IO ()
 test_Pretty = Test.Hspec.hspec Lang.hspec
@@ -1037,7 +1058,7 @@ cmpExpr e1
          Konst {} -> GT
          Var {}  -> GT
          Call {} -> GT
-         Tuple es2 -> gos es1 subst es2
+         Tuple es2 -> gos (toList es1) subst (toList es2)
          _        -> LT
 
    go (Lam b1 e1) subst e2

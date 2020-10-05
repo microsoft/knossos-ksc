@@ -39,6 +39,7 @@ import Lang
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Char( isDigit )
+import Data.Foldable( toList )
 import Data.List( mapAccumL )
 import Test.Hspec
 
@@ -47,7 +48,7 @@ import Test.Hspec
 -----------------------------------------------
 
 isTrivial :: TExpr -> Bool
-isTrivial (Tuple [])    = True
+isTrivial (Tuple (NonSingletonList Nothing)) = True
 isTrivial (Var {})      = True
 isTrivial (Konst {})    = True
 isTrivial (Call f args) = isDummy args
@@ -69,7 +70,7 @@ splitTuple :: TExpr -> Int -> [TExpr]
 splitTuple _ 0 = []
 splitTuple e 1 = [e]
 splitTuple (Tuple es) n
-  | n == length es = es
+  | n == length es = toList es
   | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
 splitTuple e n = [ pSel i n e | i <- [1..n] ]
 
@@ -89,7 +90,7 @@ substEMayCapture subst (Var v)        = case M.lookup v subst of
                                Nothing -> Var v
 substEMayCapture subst (Call f es)    = Call f (substEMayCapture subst es)
 substEMayCapture subst (If b t e)     = If (substEMayCapture subst b) (substEMayCapture subst t) (substEMayCapture subst e)
-substEMayCapture subst (Tuple es)     = Tuple (map (substEMayCapture subst) es)
+substEMayCapture subst (Tuple es)     = Tuple (fmap (substEMayCapture subst) es)
 substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEMayCapture subst e2)
 substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (substEMayCapture subst e2)
 substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
@@ -107,7 +108,7 @@ freeVarsOf = go
    go (Var v)        = S.singleton v
    go (Konst _)      = S.empty
    go (Dummy _)      = S.empty
-   go (Tuple es)     = S.unions (map go es)
+   go (Tuple es)     = S.unions (fmap go es)
    go (If b t e)     = go b `S.union` go t `S.union` go e
    go (Call _ es)    = go es
    go (App f a)      = go f `S.union` go a
@@ -148,7 +149,7 @@ hspec = do
         fun :: String -> TFun
         fun s = TFun TypeFloat (Fun (UserFun s))
         e  = Call (fun "f") (Var (var "i"))
-        e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
+        e2 = Call (fun "f") (Tuple (nonEmptyList (Var (var "_t1")) [kInt 5]))
     describe "notFreeIn" $ do
       it ("i notFreeIn " ++ show (ppr (e::TExpr))) $
         (var "i" `notFreeIn` e) `shouldBe` False
