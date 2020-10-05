@@ -80,18 +80,18 @@ occAnalE (Let tv rhs@(Tuple _) body)
     n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (rhs', uvsr)  = occAnalE rhs
+    (rhs', vsr)   = occAnalE rhs
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
     vs | n == 0    = vsb_no_tv
 
        -- See Note [Making optLets idempotent]
        | n == 1    = vsb_no_tv
-                     `unionOccMap` uvsr
+                     `unionOccMap` vsr
 
        -- Note [Inline tuples], item (2)
        | otherwise = vsb_no_tv
-                     `unionOccMap` markMany uvsr
+                     `unionOccMap` markMany vsr
 
 occAnalE (Let tv rhs body)
   = (Let (n, tv) rhs' body', vs)
