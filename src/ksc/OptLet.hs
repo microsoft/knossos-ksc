@@ -224,7 +224,7 @@ optLetsE = go
     go subst (Let (n, (TVar ty v)) r b)
       = go_let (go subst r)
       where
-        ty' = go_ty subst ty
+        ty' = ty
         tv' = TVar ty' v
         (tv'', subst') = substBndr tv' subst
 
@@ -244,19 +244,8 @@ optLetsE = go
     go subst (Lam (TVar ty v) e) = Lam tv'' (go subst' e)
                                  where
                                    (tv'', subst') = substBndr tv' subst
-                                   ty' = go_ty subst ty
+                                   ty' = ty
                                    tv' = TVar ty' v
-
-    go_ty :: Subst -> TypeX -> Type
-    go_ty subst (TypeTuple tys)   = TypeTuple (map (go_ty subst) tys)
-    go_ty subst (TypeVec ty)      = TypeVec (go_ty subst ty)
-    go_ty subst (TypeLM  ty1 ty2) = TypeLM (go_ty subst ty1) (go_ty subst ty2)
-    go_ty subst (TypeLam ty1 ty2) = TypeLam (go_ty subst ty1) (go_ty subst ty2)
-    go_ty _ TypeBool    = TypeBool
-    go_ty _ TypeInteger = TypeInteger
-    go_ty _ TypeFloat   = TypeFloat
-    go_ty _ TypeString  = TypeString
-    go_ty _ TypeUnknown = TypeUnknown
 
 {- Note [Inline tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~
