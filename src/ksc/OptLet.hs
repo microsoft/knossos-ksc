@@ -67,7 +67,7 @@ occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
 
-occAnalE (Let tv (Tuple es) body)
+occAnalE (Let tv rhs@(Tuple _) body)
   = (Let (n, tv) rhs' body', vs)
   -- When a tuple is on the RHS of a let we want to prevent its
   -- contents from being inlined back into it because we generally
@@ -80,10 +80,8 @@ occAnalE (Let tv (Tuple es) body)
     n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (es',   vsr)  = unzip (map occAnalE es)
+    (rhs', uvsr)  = occAnalE rhs
     (body', vsb)  = occAnalE body
-    uvsr          = unionsOccMap vsr
-    rhs'          = Tuple es'
     vsb_no_tv     = tv `M.delete` vsb
     vs | n == 0    = vsb_no_tv
 
