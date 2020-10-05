@@ -67,8 +67,8 @@ occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
 
-occAnalE (Let tv (Tuple es) body)
-  = (Let (n, tv) (Tuple es') body', vs)
+occAnalE (Let tv rhs@(Tuple _) body)
+  = (Let (n, tv) rhs' body', vs)
   -- When a tuple is on the RHS of a let we want to prevent its
   -- contents from being inlined back into it because we generally
   -- want to fuse tuple construction with a function call that
@@ -80,18 +80,18 @@ occAnalE (Let tv (Tuple es) body)
     n = case tv `M.lookup` vsb of
           Just n  -> n
           Nothing -> 0
-    (es',   vsr)  = unzip (map occAnalE es)
+    (rhs', vsr)   = occAnalE rhs
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
     vs | n == 0    = vsb_no_tv
 
        -- See Note [Making optLets idempotent]
        | n == 1    = vsb_no_tv
-                     `unionOccMap` unionsOccMap vsr
+                     `unionOccMap` vsr
 
        -- Note [Inline tuples], item (2)
        | otherwise = vsb_no_tv
-                     `unionOccMap` markMany (unionsOccMap vsr)
+                     `unionOccMap` markMany vsr
 
 occAnalE (Let tv rhs body)
   = (Let (n, tv) rhs' body', vs)
