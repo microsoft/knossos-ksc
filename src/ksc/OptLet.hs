@@ -240,10 +240,9 @@ optLetsE = go
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
     go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
-    go subst (Lam (TVar ty v) e) = Lam tv'' (go subst' e)
+    go subst (Lam tv' e)    = Lam tv'' (go subst' e)
                                  where
                                    (tv'', subst') = substBndr tv' subst
-                                   tv' = TVar ty v
 
 {- Note [Inline tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~
