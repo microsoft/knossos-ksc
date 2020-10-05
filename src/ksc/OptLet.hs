@@ -82,16 +82,17 @@ occAnalE (Let tv (Tuple es) body)
           Nothing -> 0
     (es',   vsr)  = unzip (map occAnalE es)
     (body', vsb)  = occAnalE body
+    uvsr          = unionsOccMap vsr
     vsb_no_tv     = tv `M.delete` vsb
     vs | n == 0    = vsb_no_tv
 
        -- See Note [Making optLets idempotent]
        | n == 1    = vsb_no_tv
-                     `unionOccMap` unionsOccMap vsr
+                     `unionOccMap` uvsr
 
        -- Note [Inline tuples], item (2)
        | otherwise = vsb_no_tv
-                     `unionOccMap` markMany (unionsOccMap vsr)
+                     `unionOccMap` markMany uvsr
 
 occAnalE (Let tv rhs body)
   = (Let (n, tv) rhs' body', vs)
