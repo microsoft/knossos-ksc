@@ -129,7 +129,7 @@ gradFold BasicAD s ti body acc v =
   `lmCompose`
   args
   where body' = mkLet (gradTVar BasicAD s' ti)
-                      (lmHCat [lmZero s (Var ti), lmOne (typeof ti)])
+                      (lmHCat (Two (lmZero s (Var ti)) (lmOne (typeof ti))))
                 $ gradE BasicAD s' body
         s' = Tuple (Two s (Var ti))
 
@@ -148,11 +148,11 @@ gradFold BasicAD s ti body acc v =
           where
             adjustGrad v = mkLet (grad s' v) (adjust (grad s v))
             grad = gradTVar BasicAD
-            adjust v = Var v `lmCompose` lmHCat [lmOne (typeof s), lmZero (Var ti) s]
+            adjust v = Var v `lmCompose` lmHCat (Two (lmOne (typeof s)) (lmZero (Var ti) s))
 
         args = lmVCat
-               [ lmOne (typeof s)
-               , lmVCat (map (gradE BasicAD s) [acc, v]) ]
+               (Two (lmOne (typeof s))
+                    (lmVCat (fmap (gradE BasicAD s) (Two acc v))))
 
 -- Just a dummy for tuple mode.  We don't calculate it properly yet.
 gradFold TupleAD s _ti _body acc _v =

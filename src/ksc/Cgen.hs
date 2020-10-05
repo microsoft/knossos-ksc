@@ -251,15 +251,17 @@ ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
 ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
 
 params_withPackedParamsPat :: Pat -> ([TVarX], TExpr -> TExpr)
-params_withPackedParamsPat (TupPat vs)    = (vs, id)
+params_withPackedParamsPat (TupPat vs)    = (toList vs, id)
 params_withPackedParamsPat (VarPat param) = params_withPackedParams param
+
+oneToInfinity :: (Num a, Enum a) => NonSingletonList a
+oneToInfinity = NonSingletonList (Just (1, 2, [3..]))
 
 params_withPackedParams :: TVarX -> ([TVarX], TExpr -> TExpr)
 params_withPackedParams param = case typeof param of
   -- See Note [Unpack tuple arguments]
   TypeTuple tys ->
-    let oneToInfinity = NonSingletonList (Just (1, 2, [3..]))
-        params  = zipWithNonSingletonList mkParam oneToInfinity tys
+    let params  = zipWithNonSingletonList mkParam oneToInfinity tys
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
         packParams = Let param (Tuple (fmap Var params))

@@ -305,7 +305,8 @@ pDef = do { pReserved "def"
           -- See Note [Function arity]
           ; let pat = case xs of
                   [x] -> VarPat x
-                  xs  -> TupPat xs
+                  []  -> TupPat emptyList
+                  (x0:x1:xs) -> TupPat (nonEmptyList x0 x1 xs)
           ; return (Def { def_fun    = mk_fun f
                         , def_pat    = pat
                         , def_rhs    = UserRhs rhs

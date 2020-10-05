@@ -68,16 +68,16 @@ isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
 data Pat = VarPat TVar     -- A single variable
-         | TupPat [TVar]   -- A tuple of variables
+         | TupPat (NonSingletonList TVar) -- A tuple of variables
          deriving( Eq )
 
 patType :: Pat -> Type
 patType (VarPat v) = typeof v
-patType (TupPat vs) = mkTupleTy (map typeof vs)
+patType (TupPat vs) = TypeTuple (fmap typeof vs)
 
 patVars :: Pat -> [TVar]
 patVars (VarPat v) = [v]
-patVars (TupPat vs) = vs
+patVars (TupPat vs) = toList vs
 
 instance Show Pat where
   show p = pps p
@@ -173,8 +173,9 @@ data TypedExpr = TE TExpr Type   -- A pair of an expression and its type
 exprOf :: TypedExpr -> TExpr
 exprOf (TE e _) = e
 
-unzipTEs :: [TypedExpr] -> ([TExpr], [Type])
-unzipTEs = unzip . fmap (\(TE a b) -> (a, b))
+unzipTEs :: NonSingletonList TypedExpr
+         -> (NonSingletonList TExpr, NonSingletonList Type)
+unzipTEs = unzipNonSingletonList . fmap (\(TE a b) -> (a, b))
 
 newtype NonSingletonList a = NonSingletonList (Maybe (a, a, [a]))
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
@@ -202,13 +203,37 @@ NonSingletonList (Just (_, _, as)) !!! n = as !! (n - 2)
 
 unzipNonSingletonList :: NonSingletonList (a, b)
                       -> (NonSingletonList a, NonSingletonList b)
-unzipNonSingletonList = error "Unimpl"
+unzipNonSingletonList (NonSingletonList Nothing) =
+  (NonSingletonList Nothing, NonSingletonList Nothing)
+unzipNonSingletonList (NonSingletonList (Just ((a0, b0), (a1, b1), as_bs))) =
+  (NonSingletonList (Just (a0, a1, as)), NonSingletonList (Just (b0, b1, bs)))
+  where (as, bs) = unzip as_bs
+
+zipWithApplyNonSingletonList :: NonSingletonList (a -> b)
+                             -> NonSingletonList a
+                             -> NonSingletonList b
+zipWithApplyNonSingletonList (NonSingletonList Nothing) _ =
+  NonSingletonList Nothing
+zipWithApplyNonSingletonList _ (NonSingletonList Nothing) =
+  NonSingletonList Nothing
+zipWithApplyNonSingletonList (NonSingletonList (Just (a0, a1, as)))
+                             (NonSingletonList (Just (b0, b1, bs)))=
+  NonSingletonList (Just ((a0 b0), (a1 b1), zipWith ($) as bs))
 
 zipWithNonSingletonList :: (a -> b -> c)
                         -> NonSingletonList a
                         -> NonSingletonList b
                         -> NonSingletonList c
-zipWithNonSingletonList = error "Unimpl"
+zipWithNonSingletonList f a b = (f <$> a) `zipWithApplyNonSingletonList` b
+
+zipWith3NonSingletonList :: (a -> b -> c -> d)
+                         -> NonSingletonList a
+                         -> NonSingletonList b
+                         -> NonSingletonList c
+                         -> NonSingletonList d
+zipWith3NonSingletonList f a b c =
+  ((f <$> a) `zipWithApplyNonSingletonList` b) `zipWithApplyNonSingletonList` c
+
 
 data TypeX
   = TypeBool
@@ -458,7 +483,7 @@ mkTuple (e0:e1:es) = Tuple (nonEmptyList e0 e1 es)
 
 mkTupleTy :: [Type] -> Type
 mkTupleTy []      = TypeTuple emptyList
-mkTupleTy [_]     = error "Not permitted" -- FIXME: Deal with this
+mkTupleTy [t]     = t
 mkTupleTy (t0:t1:ts) = TypeTuple (nonEmptyList t0 t1 ts)
 
 dropLast :: [a] -> [a]
@@ -958,7 +983,7 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens
 pprPat _          (VarPat v)  = pprTVar v
-pprPat tup_parens (TupPat vs) = mb_parens $ pprList (parens . pprTVar) vs
+pprPat tup_parens (TupPat vs) = mb_parens $ pprList (parens . pprTVar) (toList vs)
   where
     mb_parens d | tup_parens = parens d
                 | otherwise  = d

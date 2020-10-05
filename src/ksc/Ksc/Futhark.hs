@@ -5,6 +5,7 @@
 module Ksc.Futhark (toFuthark, Def) where
 
 import           Data.Int
+import           Data.Foldable           (toList)
 import           Data.List
 import           Prelude                 hiding ( (<>) )
 
@@ -14,6 +15,7 @@ import Lang (Pretty(..), text, render, empty, parensIf,
              (<>), (<+>), ($$), parens, brackets, punctuate, sep,
              integer, double, comma)
 import qualified LangUtils               as LU
+import           Prim                    (oneTo)
 
 --------------------------
 -- Futhark AST definition
@@ -46,7 +48,7 @@ data Const = ConstI8 Int8
          deriving (Eq, Ord, Show)
 
 data Pat = PatId Name
-         | PatTuple [Name]
+         | PatTuple (L.NonSingletonList Name)
          | PatAscript Pat Type
          deriving (Eq, Ord, Show)
 
@@ -56,7 +58,7 @@ data Exp = Var Name
          | If Exp Exp Exp
          | Let Pat Exp Exp
          | BinOp String Exp Exp
-         | ExpTuple [Exp]
+         | ExpTuple (L.NonSingletonList Exp)
          | Call Exp [Exp]
          | Lambda [Pat] Exp
          | Project Exp String
@@ -67,7 +69,8 @@ data Exp = Var Name
 data Dim = DimAny | DimConst Int32 | DimNamed Name
           deriving (Eq, Ord, Show)
 
-data Type = I8 | I32 | F32 | F64 | Bool | Tuple [Type] | Array Dim Type
+data Type = I8 | I32 | F32 | F64 | Bool | Tuple (L.NonSingletonList Type)
+          | Array Dim Type
           deriving (Eq, Ord, Show)
 
 ------------------------------
@@ -89,7 +92,7 @@ instance Pretty Type where
   ppr F64 = text "f64"
   ppr Bool = text "bool"
   ppr (Tuple ts) =
-    parens $ sep $ punctuate comma $ map ppr ts
+    parens $ sep $ punctuate comma $ map ppr (toList ts)
   ppr (Array d t) =
     brackets (ppr d) <> ppr t
 
@@ -122,7 +125,7 @@ instance Pretty Const where
 
 instance Pretty Pat where
   ppr (PatId v) = text v
-  ppr (PatTuple pats) = sep $ intersperse (text ", ") $ map ppr pats
+  ppr (PatTuple pats) = sep $ intersperse (text ", ") $ map ppr (toList pats)
   ppr (PatAscript p t) = parens $ ppr p <> text ":" <+> ppr t
 
 precedence, rprecedence :: String -> Int
@@ -167,7 +170,7 @@ instance Pretty Exp where
     parensIf p (precedence op) $
     pprPrec (precedence op) e1 <+> text op <+> pprPrec (rprecedence op) e2
   pprPrec _ (ExpTuple es) =
-    parens $ sep $ punctuate comma $ map ppr es
+    parens $ sep $ punctuate comma $ map ppr (toList es)
   pprPrec p (Call f args) =
     parensIf p 10 $
     ppr f <+> sep (map (pprPrec 10) args)
@@ -231,7 +234,7 @@ toFutharkType :: L.Type -> Type
 toFutharkType L.TypeInteger    = I32
 toFutharkType L.TypeFloat      = F64
 toFutharkType L.TypeBool       = Bool
-toFutharkType (L.TypeTuple ts) = Tuple $ map toFutharkType ts
+toFutharkType (L.TypeTuple ts) = Tuple $ fmap toFutharkType ts
 toFutharkType (L.TypeVec t)    = Array DimAny $ toFutharkType t
 toFutharkType L.TypeString     = Array DimAny I8
 toFutharkType t =
@@ -259,7 +262,7 @@ binopFunction op t1 (Array _ t2) =
 binopFunction op (Tuple ts1) (Tuple ts2)  =
   Lambda [PatId "x" `PatAscript` Tuple ts1,
           PatId "y" `PatAscript` Tuple ts2] $
-  ExpTuple $ zipWith3 f [(1::Int)..] ts1 ts2
+  ExpTuple $ L.zipWith3NonSingletonList f Cgen.oneToInfinity ts1 ts2
   where f i t1 t2 =
           Call (binopFunction op t1 t2) [Project (Var "x") (show i),
                                          Project (Var "y") (show i)]
@@ -273,7 +276,7 @@ zeroValue F64 = Const $ ConstF64 0
 zeroValue Bool = Const $ ConstBool False
 zeroValue (Array _ t) = Call (Var "replicate") [d, zeroValue t]
   where d = Const $ ConstI32 0
-zeroValue (Tuple ts) = ExpTuple $ map zeroValue ts
+zeroValue (Tuple ts) = ExpTuple $ fmap zeroValue ts
 
 toFutharkExp :: L.TExpr -> Exp
 toFutharkExp (L.Konst k) = Const $ toFutharkConst k
@@ -282,7 +285,7 @@ toFutharkExp (L.If cond te fe) = If (toFutharkExp cond) (toFutharkExp te) (toFut
 toFutharkExp (L.Let (L.TVar _ v) e1 body) =
   Let (PatId (toName v)) (toFutharkExp e1) (toFutharkExp body)
 toFutharkExp (L.Tuple es) =
-  ExpTuple $ map toFutharkExp es
+  ExpTuple $ fmap toFutharkExp es
 toFutharkExp (L.Lam (L.TVar _ v) body) =
   Lambda [PatId $ toName v] $ toFutharkExp body
 toFutharkExp (L.Assert _ e) =
@@ -299,35 +302,35 @@ letPat x e f = Let (PatId x) e $ f $ Var x
 -- | Split sumbuilds of tuples into independent sumbuilds, to avoid
 -- confusing the Futhark compiler.
 sumbuild :: L.Type -> Exp -> Exp
-sumbuild (L.TypeTuple []) _ =
-  ExpTuple []
+sumbuild (L.TypeTuple L.Zero) _ =
+  ExpTuple L.Zero
 sumbuild (L.TypeTuple ts) xs =
   letPat "xs" xs $ \xs' ->
-  ExpTuple $ zipWith sumbuild ts
-  [Call (Var "map") [SectionProject (show i), xs'] | i <- [1..length ts] ]
+  ExpTuple $ L.zipWithNonSingletonList sumbuild ts
+  (fmap (\i -> Call (Var "map") [SectionProject (show i), xs']) (oneTo (length ts)))
 sumbuild ret xs =
   Call (Var "sumbuild") [binopFunction "+" ret' ret', zeroValue ret', xs]
   where ret' = toFutharkType ret
 
 callPrimFun :: String -> L.Type -> L.TExpr -> Exp
-callPrimFun "deltaVec" (L.TypeVec ret) (L.Tuple [n, i, v]) =
+callPrimFun "deltaVec" (L.TypeVec ret) (L.Tuple (L.Three n i v)) =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
                          toFutharkExp i,
                          toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "delta" ret (L.Tuple [i, j, v]) =
+callPrimFun "delta" ret (L.Tuple (L.Three i j v)) =
   Call (Var "delta") [zeroValue ret',
                       toFutharkExp i,
                       toFutharkExp j,
                       toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "sumbuild" ret (L.Tuple [n, f]) =
+callPrimFun "sumbuild" ret (L.Tuple (L.Two n f)) =
   sumbuild ret $ Call (Var "tabulate") [toFutharkExp n, toFutharkExp f]
 
-callPrimFun "index" _ (L.Tuple [i, arr]) =
+callPrimFun "index" _ (L.Tuple (L.Two i arr)) =
   case toFutharkExp arr of
     Index arr' is ->
       Index arr' $ is ++ [toFutharkExp i]
@@ -338,7 +341,7 @@ callPrimFun "index" _ (L.Tuple [i, arr]) =
 -- relational operators are overloaded.  Since the only overloaded
 -- Futhark functions are the magical built-in infix operators, we map
 -- these functions to those.
-callPrimFun op _ (L.Tuple [x, y])
+callPrimFun op _ (L.Tuple (L.Two x y))
   | Just op' <- lookup op binOpPrimFuns =
       -- This might be a vectorised operator - if so, we have to put
       -- enough 'map2's on top to make the types work out.

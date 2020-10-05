@@ -320,13 +320,14 @@ notInScope v in_scope
 -----------------------------------------------
 
 oneArgifyDef :: TDef -> TDef
-oneArgifyDef def@(Def { def_pat = TupPat tvs, def_rhs = UserRhs rhs })
+oneArgifyDef def@(Def { def_pat = TupPat tvs', def_rhs = UserRhs rhs })
   = def { def_pat = VarPat argVar
         , def_rhs = UserRhs (add_unpacking rhs) }
   where
+     tvs = toList tvs'
      in_scope = mkInScopeSet tvs
      argVar = TVar ty (notInScope (Simple "_t") in_scope)
-     ty = mkTupleTy (map typeof tvs)
+     ty = TypeTuple (fmap typeof tvs')
 
      n = length tvs
 
