@@ -331,7 +331,7 @@ applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
   = Def { def_fun    = DrvFun f (AD adp Rev)
         , def_pat    = VarPat x_dr
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
-        , def_res_ty = tangentType (mkTupleTy [typeof x]) }
+        , def_res_ty = tangentType (typeof x) }
   where
     x_dr = newVarNotIn (TypeTuple [typeof x, typeof dr])
                        (Tuple (map Var [x,dr]))
