@@ -6,6 +6,7 @@ module Rules( RuleBase, tryRules, mkRuleBase ) where
 import Lang
 import LangUtils ()
 import Control.Monad( guard )
+import Data.Foldable as F
 import Data.Map as M
 
 newtype RuleBase = Rules [TRule]
@@ -80,7 +81,7 @@ match_e vsubst tsubst (If e1a e1b e1c) (If e2a e2b e2c)
        ; match_e vsubst tsubst2 e1c e2c }
 
 match_e vsubst tsubst (Tuple es1) (Tuple es2)
-  = match_es vsubst tsubst es1 es2
+  = match_es vsubst tsubst (F.toList es1) (F.toList es2)
 
 match_e vsubst tsubst (Lam v1 e1) (Lam v2 e2)
   = match_e (M.insert v1 v2 vsubst) tsubst e1 e2

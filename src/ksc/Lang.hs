@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
              ScopedTypeVariables, TypeApplications #-}
-{-# LANGUAGE DeriveFunctor, DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 module Lang where
 
@@ -26,12 +26,12 @@ import           Test.Hspec
 
 mkGradType :: ADPlan -> Type -> Type -> Type
 mkGradType BasicAD s ty = TypeLM s ty
-mkGradType TupleAD s ty = TypeTuple (nonEmptyList ty [TypeLM s ty])
+mkGradType TupleAD s ty = TypeTuple (nonEmptyList ty (TypeLM s ty) [])
   -- For TupleAD, mkGradType s t = (t, s -o t)
 
 mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
-mkGradTuple TupleAD p lm = Tuple (nonEmptyList p [lm])
+mkGradTuple TupleAD p lm = Tuple (nonEmptyList p lm [])
 
 data Phase = Parsed | Typed | OccAnald
 
@@ -179,18 +179,39 @@ unzipTEs (TE e t : tes) = (e:es, t:ts)
   where
     (es, ts) = unzipTEs tes
 
-data NonSingletonList a = NonSingletonList (Maybe (NEL.NonEmpty a))
-  deriving (Eq, Ord, Functor, Foldable)
+newtype NonSingletonList a = NonSingletonList (Maybe (a, a, [a]))
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+pattern Zero :: NonSingletonList a
+pattern Zero = NonSingletonList Nothing
+
+pattern Two :: a -> a -> NonSingletonList a
+pattern Two x0 x1 = NonSingletonList (Just (x0, x1, []))
+
+pattern Three :: a -> a -> a -> NonSingletonList a
+pattern Three x0 x1 x2 = NonSingletonList (Just (x0, x1, [x2]))
 
 emptyList :: NonSingletonList a
 emptyList = NonSingletonList Nothing
 
-nonEmptyList :: a -> [a] -> NonSingletonList a
-nonEmptyList a as = NonSingletonList (Just (a NEL.:| as))
+nonEmptyList :: a -> a -> [a] -> NonSingletonList a
+nonEmptyList a0 a1 as = NonSingletonList (Just (a0, a1, as))
 
 (!!!) :: NonSingletonList p -> Int -> p
 NonSingletonList Nothing   !!! _ = error "!!! of empty list"
-NonSingletonList (Just xs) !!! n = xs NEL.!! n
+NonSingletonList (Just (a, _, _)) !!! 0 = a
+NonSingletonList (Just (_, a, _)) !!! 1 = a
+NonSingletonList (Just (_, _, as)) !!! n = as !! (n - 2)
+
+unzipNonSingletonList :: NonSingletonList (a, b)
+                      -> (NonSingletonList a, NonSingletonList b)
+unzipNonSingletonList = error "Unimpl"
+
+zipWithNonSingletonList :: (a -> b -> c)
+                        -> NonSingletonList a
+                        -> NonSingletonList b
+                        -> NonSingletonList c
+zipWithNonSingletonList = error "Unimpl"
 
 data TypeX
   = TypeBool
@@ -436,12 +457,12 @@ zeroFloat = Konst (KFloat 0.0)
 mkTuple :: [ExprX p] -> ExprX p
 mkTuple []     = Tuple emptyList
 mkTuple [e]    = e
-mkTuple (e:es) = Tuple (nonEmptyList e es)
+mkTuple (e0:e1:es) = Tuple (nonEmptyList e0 e1 es)
 
 mkTupleTy :: [Type] -> Type
 mkTupleTy []      = TypeTuple emptyList
 mkTupleTy [_]     = error "Not permitted" -- FIXME: Deal with this
-mkTupleTy (t1:ts) = TypeTuple (nonEmptyList t1 ts)
+mkTupleTy (t0:t1:ts) = TypeTuple (nonEmptyList t0 t1 ts)
 
 dropLast :: [a] -> [a]
 -- Drop the last element of a list.
@@ -505,8 +526,10 @@ unzipLMType = \case
   TypeLM s t -> Just (s, t)
   _          -> Nothing
 
-unzipLMTypes :: HasCallStack => [Type] -> Maybe ([Type], [Type])
-unzipLMTypes = fmap unzip . mapM unzipLMType
+unzipLMTypes :: HasCallStack
+             => NonSingletonList Type
+             -> Maybe (NonSingletonList Type, NonSingletonList Type)
+unzipLMTypes = fmap NEL.unzip . mapM unzipLMType
 
 typeofKonst :: Konst -> Type
 typeofKonst (KInteger _) = TypeInteger
@@ -870,7 +893,7 @@ pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
   (parens $ pprFunOcc @p f <+> pp_args_tuple)
   (case (e, isInfix @p f) of
-    (Tuple (NonSingletonList (Just (e1 NEL.:| [e2]))), Just prec')
+    (Tuple (NonSingletonList (Just (e1, e2, []))), Just prec')
       -> parensIf prec prec' $
          sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
     _ -> parensIf prec precCall $
@@ -992,7 +1015,7 @@ hspec = do
   let var s = Var (Simple s)
   let e,e2 :: Expr
       e  = Call (Fun (UserFun "g")) (var "i")
-      e2 = Call (Fun (UserFun "f")) (Tuple (nonEmptyList e [var "_t1", kInt 5]))
+      e2 = Call (Fun (UserFun "f")) (Tuple (nonEmptyList e (var "_t1") [kInt 5]))
 
   describe "Pretty" $ do
     test e  "g( i )"

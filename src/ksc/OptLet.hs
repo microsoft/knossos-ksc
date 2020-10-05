@@ -15,6 +15,7 @@ module OptLet( optLets
 import Lang
 import LangUtils
 import Prim
+import qualified Data.Foldable as F
 import qualified Data.Map as M
 
 optLets :: Subst -> TExpr -> TExpr
@@ -63,9 +64,9 @@ occAnalE (Lam tv e)
 occAnalE (Call f e) = (Call f e', vs)
                      where
                        (e',vs) = occAnalE e
-occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
+occAnalE (Tuple es) = (Tuple es', unionsOccMap (F.toList vs))
                       where
-                        (es', vs) = unzip (map occAnalE es)
+                        (es', vs) = unzipNonSingletonList (fmap occAnalE es)
 
 occAnalE (Let tv rhs@(Tuple _) body)
   = (Let (n, tv) rhs' body', vs)
@@ -203,7 +204,7 @@ substExpr subst e
     go (Konst k)      = Konst k
     go (Call f es)    = Call f (go es)
     go (If b t e)     = If (go b) (go t) (go e)
-    go (Tuple es)     = Tuple (map go es)
+    go (Tuple es)     = Tuple (fmap go es)
     go (App e1 e2)    = App (go e1) (go e2)
     go (Assert e1 e2) = Assert (go e1) (go e2)
     go (Let v r b)    = Let v' (go r) (substExpr subst' b)
@@ -237,7 +238,7 @@ optLetsE = go
     go _ubst (Konst k)      = Konst k
     go subst (Call f es)    = Call f (go subst es)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)
-    go subst (Tuple es)     = Tuple (map (go subst) es)
+    go subst (Tuple es)     = Tuple (fmap (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
     go subst (Assert e1 e2) = Assert (go subst e1) (go subst e2)
     go subst (Lam tv e)     = Lam tv' (go subst' e)

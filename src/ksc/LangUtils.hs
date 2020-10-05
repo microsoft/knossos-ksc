@@ -149,7 +149,7 @@ hspec = do
         fun :: String -> TFun
         fun s = TFun TypeFloat (Fun (UserFun s))
         e  = Call (fun "f") (Var (var "i"))
-        e2 = Call (fun "f") (Tuple (nonEmptyList (Var (var "_t1")) [kInt 5]))
+        e2 = Call (fun "f") (Tuple (nonEmptyList (Var (var "_t1")) (kInt 5) []))
     describe "notFreeIn" $ do
       it ("i notFreeIn " ++ show (ppr (e::TExpr))) $
         (var "i" `notFreeIn` e) `shouldBe` False

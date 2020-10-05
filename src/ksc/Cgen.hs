@@ -10,6 +10,7 @@ import           Prelude                 hiding ( lines
                                                 )
 
 import qualified Data.Map                      as Map
+import           Data.Foldable                  ( toList )
 import           Data.List                      ( intercalate )
 import           Data.Maybe                     ( mapMaybe )
 import           Control.Monad                  ( when )
@@ -25,7 +26,7 @@ import qualified OptLet
 import Debug.Trace
 
 data CType =  CType Type
-            | CTuple [CType]
+            | CTuple (NonSingletonList CType)
             | CFunction CType CType
             | TypeDef String CType
             | UseTypeDef String
@@ -58,7 +59,7 @@ isScalar = \case
   LMVariant _   -> False
 
 mkCType :: Type -> CType
-mkCType (TypeTuple ts) = CTuple $ map mkCType ts
+mkCType (TypeTuple ts) = CTuple $ fmap mkCType ts
 mkCType ty             = CType ty
 
 stripTypeDef :: HasCallStack => CType -> CType
@@ -68,7 +69,7 @@ stripTypeDef t             = t
 stripCType :: CType -> Type
 stripCType = \case
   CType  ty     -> ty
-  CTuple tys    -> TypeTuple $ map stripCType tys
+  CTuple tys    -> TypeTuple $ fmap stripCType tys
   TypeDef _ cty -> stripCType cty
   _             -> error "LM/Function type in stripCType"
 
@@ -91,7 +92,7 @@ makeUnionType (CTuple ts) (CTuple us) =
   if ts == us
   then CTuple ts
   else
-    CTuple $ zipWith makeUnionType ts us
+    CTuple $ zipWithNonSingletonList makeUnionType ts us
 
 makeUnionType ty1 ty2 =
   if ty1 == ty2
@@ -257,11 +258,13 @@ params_withPackedParams :: TVarX -> ([TVarX], TExpr -> TExpr)
 params_withPackedParams param = case typeof param of
   -- See Note [Unpack tuple arguments]
   TypeTuple tys ->
-    let params  = zipWith mkParam [1..] tys
+    let oneToInfinity = NonSingletonList (Just (1, 2, [3..]))
+        params  = zipWithNonSingletonList mkParam oneToInfinity tys
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
-        packParams = Let param (Tuple (map Var params))
-    in (params, ensureDon'tReuseParams params . packParams)
+        packParams = Let param (Tuple (fmap Var params))
+        paramsL = toList params
+    in (paramsL, ensureDon'tReuseParams paramsL . packParams)
   _             -> ([param], id)
 
 mkCTypedVar :: TVar -> String
@@ -317,7 +320,7 @@ cgenExprWithoutResettingAlloc env = \case
   Var (TVar ty v)               -> return $ CG [] (cgenVar v) (mkCType ty) DoesNotUseAllocator
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
+  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple (Two sz (Lam (TVar vty var) body))) -> do
     CG szdecl szex _szty _szau <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -344,7 +347,7 @@ cgenExprWithoutResettingAlloc env = \case
         UsesAllocator
 
   -- Special case for sumbuild -- inline the loop
-  Call (TFun ty (Fun (PrimFun "sumbuild"))) (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
+  Call (TFun ty (Fun (PrimFun "sumbuild"))) (Tuple (Two sz(Lam (TVar vty var@(Simple _)) body))) -> do
     CG szdecl szex _szty _szau <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -386,10 +389,10 @@ cgenExprWithoutResettingAlloc env = \case
   -- Just use the tuple components as the arguments.  See Note [Unpack
   -- tuple arguments]
   Call tf t@(Tuple vs) -> do
-    cgvs <- mapM (cgenExprR env) vs
+    cgvs <- fmap toList (mapM (cgenExprR env) vs)
     let cgargtype = typeof t
-    let cdecls = map getDecl cgvs
-    let ctypes = map getType cgvs
+    let cdecls = map getDecl (toList cgvs)
+    let ctypes = map getType (toList cgvs)
     let callocusage = foldMap getAllocatorUsage cgvs
 
     let cftype = ctypeofFun env (tf, cgargtype) ctypes
@@ -460,9 +463,9 @@ cgenExprWithoutResettingAlloc env = \case
 
   Tuple vs  -> do
     cgvs <- mapM (cgenExprR env) vs
-    let cdecls = map getDecl cgvs
-    let cexprs = map getExpr cgvs
-    let ctypes = map getType cgvs
+    let cdecls = map getDecl (toList cgvs)
+    let cexprs = map getExpr (toList cgvs)
+    let ctypes = fmap getType cgvs
     let callocusage = foldMap getAllocatorUsage cgvs
     let ctype  = CTuple ctypes
 
@@ -569,7 +572,7 @@ mangleType = \case
 
 cgenFunId :: (FunId, Type) -> String
 cgenFunId = \case
-  (UserFun fun, TypeTuple [])  -> mangleFun fun
+  (UserFun fun, TypeTuple Zero)  -> mangleFun fun
   (UserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
   (UserFun fun, ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
   (PrimFun fun, _ty) -> fun
@@ -612,7 +615,7 @@ funAllocatorUsage tf ty
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
   CType  ty -> cgenTypeLang ty
-  CTuple ts -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
+  CTuple ts -> "tuple<" ++ intercalate "," (map cgenType (toList ts)) ++ ">"
   CFunction s t ->
     "std::function<" ++ cgenType t ++ "(" ++ cgenType s ++ ")>"
   TypeDef s _     -> s
@@ -635,8 +638,7 @@ cgenTypeLang = \case
   TypeFloat     -> "double" -- TODO: make these all ks_Float etc, and add typedefs in knossos.h
   TypeInteger   -> "int"
   TypeString    -> "std::string"
-  TypeTuple [t] -> cgenTypeLang t
-  TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
+  TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang (toList ts)) ++ ">"
   TypeVec t     -> "vec<" ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"

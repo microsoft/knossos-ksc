@@ -156,6 +156,14 @@ lexer = Tok.makeTokenParser langDef
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
 
+manyNot1 :: Parser a -> Parser (NonSingletonList a)
+manyNot1 p = do
+  xs <- many p
+  case xs of
+    []       -> pure emptyList
+    x0:x1:xs -> pure (nonEmptyList x0 x1 xs)
+    [_]      -> fail "singleton"
+
 pReserved :: String -> Parser ()
 pReserved = Tok.reserved lexer
 
@@ -231,7 +239,7 @@ pTypes = parens (many pType)
 
 pKType :: Parser TypeX
 pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
-       <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
+       <|> (do { pReserved "Tuple"; tys <- manyNot1 pType; return (TypeTuple tys) })
        <|> (do { pReserved "LM"; s <- pType; t <- pType ; return (TypeLM s t) })
        <|> (do { pReserved "Lam"; s <- pType; t <- pType ; return (TypeLam s t) })
        <|> pType
@@ -262,7 +270,7 @@ pAssert = do { pReserved "assert"
 pTuple :: Parser (ExprX Parsed)
 -- (assert e1 e2)
 pTuple = do { pReserved "tuple"
-            ; es <- many pExpr
+            ; es <- manyNot1 pExpr
             ; return $ Tuple es }
 
 pLam :: Parser (ExprX Parsed)

@@ -14,7 +14,7 @@ data CLExpr
   | CLKonst Konst
   | CLCall Type FunId            -- The Type is the result type
   | CLComp CLExpr CLExpr         -- Composition
-  | CLTuple [CLExpr]             -- Tuple
+  | CLTuple (NonSingletonList CLExpr)             -- Tuple
   | CLIf CLExpr CLExpr CLExpr    -- If
   | CLLet TVar CLExpr CLExpr     -- Let $var = $rhs in $body
   | CLBuild CLExpr TVar CLExpr   -- Build $size (Lam ($var : Integer) $body)
@@ -71,9 +71,10 @@ pprCLExpr p (CLPrune ts n c) = parensIf p precOne $
                                      <> char '/' <> int n <> char ']'
                                    , nest 2 (pprCLExpr precOne c) ]
 pprCLExpr _ (CLTuple cs)
-  | [] <- cs  = text "[]"
-  | [c] <- cs = char '[' <+> pprCLExpr precZero c <+> char ']'
-  | (c1:rest) <- cs = cat ( [ char '[' <+> pprCLExpr precZero c1 ] ++
+  | NonSingletonList Nothing <- cs  = text "[]"
+  | NonSingletonList (Just (c1, c2, rest_)) <- cs =
+      let rest = c2:rest_
+      in cat ( [ char '[' <+> pprCLExpr precZero c1 ] ++
                             [ char ',' <+> pprCLExpr precZero c | c <- rest ] ) <+> char ']'
 
 pprCLExpr p (CLIf b t e) = parensIf p precZero $
@@ -128,7 +129,7 @@ to_cl_expr Pruned [w] (Var v) | v == w = CLId
 to_cl_expr Pruned env (Var v)    = pprPanic "toCLExpr:var" (ppr v $$ ppr env)
 to_cl_expr Pruned []  (Konst k)  = CLKonst k
 to_cl_expr Pruned env (Konst k)  = pprPanic "toCLExpr:konst" (ppr k $$ ppr env)
-to_cl_expr Pruned env (Tuple es) = CLTuple (map (toCLExpr env) es)
+to_cl_expr Pruned env (Tuple es) = CLTuple (fmap (toCLExpr env) es)
 to_cl_expr pruned env (Call f e) = to_cl_call pruned env f e
 
 -- We shouldn't do this because asserts can be essential to good
@@ -155,17 +156,17 @@ to_cl_call :: EnvPruned -> [TVar] -> TFun -> TExpr -> CLExpr
 
 to_cl_call pruned env f e
   | f `isThePrimFun` "build"
-  , Tuple [n, Lam tvi body] <- e
+  , Tuple (Two n (Lam tvi body)) <- e
   = case pruned of
       NotPruned -> prune env call
       Pruned    -> CLBuild (toCLExpr env n) tvi (toCLExpr (tvi:env) body)
 
   | f `isThePrimFun` "sumbuild"
-  , Tuple [n, lam] <- e
+  , Tuple (Two n lam) <- e
   = to_cl_expr pruned env (pSum (pBuild n lam))
 
   | f `isThePrimFun` "fold"
-  , Tuple [Lam t body, acc, v] <- e
+  , Tuple (Three (Lam t body) acc v) <- e
   = case pruned of
       NotPruned -> prune env call
       Pruned    ->
@@ -241,7 +242,7 @@ fromCLExpr :: InScopeSet -> [TExpr] -> CLExpr -> TExpr
 fromCLExpr _  _   (CLKonst k)      = Konst k
 fromCLExpr _  arg CLId             = mkTuple arg
 fromCLExpr is arg (CLPrune ts _ c) = fromCLExpr is (pick ts arg) c
-fromCLExpr is arg (CLTuple es)     = Tuple (map (fromCLExpr is arg) es)
+fromCLExpr is arg (CLTuple es)     = Tuple (fmap (fromCLExpr is arg) es)
 fromCLExpr is arg (CLIf b t e)     = If (fromCLExpr is arg b)
                                         (fromCLExpr is arg t)
                                         (fromCLExpr is arg e)

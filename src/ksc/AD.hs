@@ -70,7 +70,7 @@ gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
 gradE adp s (Var tv)       = Var (gradTVar adp s tv)
 gradE adp s (Dummy ty)     = Dummy (mkGradType adp (typeof s) ty)
 gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
-gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
+gradE adp s (Tuple es)     = lmVCat_AD adp (fmap (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
 gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 gradE adp s (Let v e1 e2)  = gradLet adp s v e1 e2
@@ -86,17 +86,17 @@ gradE adp s (Call f arg)
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE adp s (Call f (Tuple [n, Lam ti body]))
+gradE adp s (Call f (Tuple (Two n (Lam ti body))))
   | f `isThePrimFun` "build"
   = gradBuild adp s n ti body
 
 -- TODO: I'm not very happy about this rule, which effectively
 -- undoes sum (build e) --> sumbuild e
-gradE adp s (Call f (Tuple [n, body]))
+gradE adp s (Call f (Tuple (Two n body)))
   | f `isThePrimFun` "sumbuild"
   = gradE adp s (pSum (pBuild n body))
 
-gradE adp s (Call f (Tuple [Lam ti body, acc, v]))
+gradE adp s (Call f (Tuple (Three (Lam ti body) acc v)))
   | f `isThePrimFun` "fold"
   = gradFold adp s ti body acc v
 
@@ -112,15 +112,15 @@ gradBuild BasicAD s n ti body
 
 gradBuild TupleAD s n ti body
   = mkLet p (pUnzip (pBuild n (Lam ti grad_body))) $
-    Tuple [ pFst (Var p)
-          , lmVCatV (pSnd (Var p)) ]
+    Tuple (Two (pFst (Var p))
+               (lmVCatV (pSnd (Var p))))
   where
      t_ty = typeof body
      p = TVar res_ty resVar
-     res_ty = TypeTuple [ TypeVec t_ty
-                        , TypeVec (TypeLM (typeof s) t_ty) ]
+     res_ty = TypeTuple (Two (TypeVec t_ty)
+                             (TypeVec (TypeLM (typeof s) t_ty)))
      grad_body = mkLet (gradTVar TupleAD s ti)
-                       (Tuple [Var ti, lmZero s (Var ti)]) $
+                       (Tuple (Two (Var ti) (lmZero s (Var ti)))) $
                  gradE TupleAD s body
 ---------------
 gradFold :: ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
@@ -131,7 +131,7 @@ gradFold BasicAD s ti body acc v =
   where body' = mkLet (gradTVar BasicAD s' ti)
                       (lmHCat [lmZero s (Var ti), lmOne (typeof ti)])
                 $ gradE BasicAD s' body
-        s' = Tuple [s, Var ti]
+        s' = Tuple (Two s (Var ti))
 
         -- The gradded free variables occurring in `body'` are linear
         -- maps whose domain is `s'` (because they were created with
@@ -156,7 +156,7 @@ gradFold BasicAD s ti body acc v =
 
 -- Just a dummy for tuple mode.  We don't calculate it properly yet.
 gradFold TupleAD s _ti _body acc _v =
-  lmDummyFold (TypeTuple [t_acc, TypeLM (typeof s) t_acc])
+  lmDummyFold (TypeTuple (Two t_acc (TypeLM (typeof s) t_acc)))
   where t_acc = typeof acc
 
 ---------------
@@ -169,7 +169,7 @@ gradCall BasicAD s f args
 gradCall TupleAD s f args
   = mkLets (case grad_arg_let of { Just p -> [p]; Nothing -> [] }) $
     mkLet res_tv (Call gf pFst_grad_arg) $
-    Tuple [ pFst (Var res_tv), lmCompose (pSnd (Var res_tv)) (pSnd grad_arg) ]
+    Tuple (Two (pFst (Var res_tv)) (lmCompose (pSnd (Var res_tv)) (pSnd grad_arg)))
   where
     gf     = gradTFun TupleAD f (typeof args)
     res_ty = typeof f
@@ -233,10 +233,10 @@ If <gradded rhs> mentions x, it should be the x from the outer
 scope, the locally bound x!  See test/ksc/test0, test_inline2
 -}
 
-lmVCat_AD :: ADPlan -> [TExpr] -> TExpr
+lmVCat_AD :: ADPlan -> NonSingletonList TExpr -> TExpr
 lmVCat_AD BasicAD ms = lmVCat ms
-lmVCat_AD TupleAD ms = Tuple [ Tuple  (map pFst ms)
-                             , lmVCat (map pSnd ms) ]
+lmVCat_AD TupleAD ms = Tuple (Two (Tuple  (fmap pFst ms))
+                                  (lmVCat (fmap pSnd ms)))
 
 
 
@@ -264,8 +264,8 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
         , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dx
         , def_res_ty = t }
   where
-    x_dx = newVarNotIn (TypeTuple [typeof x, typeof dx])
-                       (Tuple (map Var [x,dx]))
+    x_dx = newVarNotIn (TypeTuple (Two (typeof x) (typeof dx)))
+                       (Tuple (fmap Var (Two x dx)))
 
     dx = to_delta x
 
@@ -278,9 +278,9 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
     (perhapsFstToo, lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (id, rhs, tangentType t)
-            (TupleAD, TypeTuple [t, _]) -> (\lmrhs -> Tuple [pFst rhs, lmrhs],
+            (TupleAD, TypeTuple (Two t _)) -> (\lmrhs -> Tuple (Two (pFst rhs) lmrhs),
                                             pSnd rhs,
-                                            TypeTuple [t, tangentType t])
+                                            TypeTuple (Two t (tangentType t)))
             (adp    , t               )
               -> error ("Unexpected combination of AD plan and result type:"
                        ++ show adp ++ " " ++ show t)
@@ -294,8 +294,8 @@ applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
         , def_res_ty = tangentType (typeof x) }
   where
-    x_dr = newVarNotIn (TypeTuple [typeof x, typeof dr])
-                       (Tuple (map Var [x,dr]))
+    x_dr = newVarNotIn (TypeTuple (Two (typeof x) (typeof dr)))
+                       (Tuple (fmap Var (Two x dr)))
 
     extract2args = mkLets [ (x,  pFst (Var x_dr))
                           , (dr, pSnd (Var x_dr)) ]
@@ -304,7 +304,7 @@ applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
     (lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (rhs,      t)
-            (TupleAD, TypeTuple [t, _]) -> (pSnd rhs, t)
+            (TupleAD, TypeTuple (Two t _)) -> (pSnd rhs, t)
             (adp    , t               )
               -> error ("Unexpected combination of AD plan and result type:"
                        ++ show adp ++ " " ++ show t)
