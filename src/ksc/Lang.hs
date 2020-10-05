@@ -13,7 +13,6 @@ import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint               ( Doc )
 import           Data.Foldable                  ( toList )
 import           Data.List                      ( intersperse )
-import qualified Data.List.NonEmpty            as NEL
 import           KMonad
 
 import qualified Data.Map as M
@@ -551,7 +550,7 @@ unzipLMType = \case
 unzipLMTypes :: HasCallStack
              => NonSingletonList Type
              -> Maybe (NonSingletonList Type, NonSingletonList Type)
-unzipLMTypes = fmap NEL.unzip . mapM unzipLMType
+unzipLMTypes = fmap unzipNonSingletonList . mapM unzipLMType
 
 typeofKonst :: Konst -> Type
 typeofKonst (KInteger _) = TypeInteger
