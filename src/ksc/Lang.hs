@@ -174,10 +174,7 @@ exprOf :: TypedExpr -> TExpr
 exprOf (TE e _) = e
 
 unzipTEs :: [TypedExpr] -> ([TExpr], [Type])
-unzipTEs []             = ([],[])
-unzipTEs (TE e t : tes) = (e:es, t:ts)
-  where
-    (es, ts) = unzipTEs tes
+unzipTEs = unzip . fmap (\(TE a b) -> (a, b))
 
 newtype NonSingletonList a = NonSingletonList (Maybe (a, a, [a]))
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
