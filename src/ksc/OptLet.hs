@@ -224,13 +224,12 @@ optLetsE = go
     go subst (Let (n, (TVar ty v)) r b)
       = go_let (go subst r)
       where
-        ty' = ty
-        tv' = TVar ty' v
+        tv' = TVar ty v
         (tv'', subst') = substBndr tv' subst
 
         go_let (Let b1 r1 r2)  = Let b1 r1 (go_let r2)
         go_let r'
-          | inline_me n ty' r' = go (extendSubstMap v r' subst) b
+          | inline_me n ty r'  = go (extendSubstMap v r' subst) b
           | otherwise          = Let tv'' r' (go subst' b)
 
     go subst (Var tv)       = substVar subst tv
@@ -244,8 +243,7 @@ optLetsE = go
     go subst (Lam (TVar ty v) e) = Lam tv'' (go subst' e)
                                  where
                                    (tv'', subst') = substBndr tv' subst
-                                   ty' = ty
-                                   tv' = TVar ty' v
+                                   tv' = TVar ty v
 
 {- Note [Inline tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~
