@@ -214,7 +214,7 @@ substExpr subst e
                         (v', subst') = substBndr v subst
 
 optLetsE :: Subst -> ExprX OccAnald -> TExpr
--- This function inline let-bindings that are only used once
+-- This function inlines let-bindings that are only used once
 -- or whose RHS is trivial (see inline_me for exactly what.
 -- Take care: see Note [Capture-avoiding substitution]
 optLetsE = go
