@@ -294,6 +294,12 @@ isBuild_maybe (Call f (Tuple [n,Lam i e]))
   = Just (n, i, e)
 isBuild_maybe _ = Nothing
 
+isConstVec_maybe :: TExpr -> Maybe (TExpr, TExpr)
+isConstVec_maybe (Call f (Tuple [n, v]))
+  | f `isThePrimFun` "constVec"
+  = Just (n, v)
+isConstVec_maybe _ = Nothing
+
 lmDelta :: TExpr -> TExpr -> TExpr -> TExpr
 lmDelta t i j = If (pEqual i j) (lmOne ty) (lmZero t t)
   where
