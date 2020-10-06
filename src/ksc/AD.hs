@@ -41,7 +41,10 @@ gradDefs :: HasCallStack => ADPlan -> [TDef] -> [TDef]
 gradDefs adp = mapMaybe (gradDef adp)
 
 gradDef :: HasCallStack => ADPlan -> TDef -> Maybe TDef
-gradDef adp
+gradDef adp = gradDefInner adp . oneArgifyDef
+
+gradDefInner :: HasCallStack => ADPlan -> TDef -> Maybe TDef
+gradDefInner adp
         (Def { def_fun = f@(Fun{}), def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
@@ -58,10 +61,11 @@ gradDef adp
               mkGradTuple adp (Var params) (lmOne (typeof params)))
            ]
 
-gradDef adp def@(Def { def_pat = TupPat {} })
-  = gradDef adp (oneArgifyDef def)
+gradDefInner _ (Def { def_pat = TupPat {} })
+  = error $ unlines [ "gradDefInner: TupPat encountered\n"
+                    , "This should not occur." ]
 
-gradDef _ _ = Nothing
+gradDefInner _ _ = Nothing
 
 
 -- s -> (Expr :: t) -> (Expr :: s -o t)
@@ -73,7 +77,9 @@ gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
 gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
 gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
-gradE adp s (Let v e1 e2)  = gradLet adp s v e1 e2
+gradE adp s (Let (VarPat v) e1 e2) = gradLet adp s v e1 e2
+gradE _   _ e@(Let (TupPat _) _ _) =
+  pprPanic "gradE: TupPat encountered. This should not occur." (ppr e)
 gradE _   _ (App{})        = error "gradE of App not yet supported"
 
 -- Currently ignoring $inline when gradding.  Perhaps we should

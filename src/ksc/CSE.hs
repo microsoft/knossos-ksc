@@ -2,6 +2,7 @@
 -- Licensed under the MIT license.
 module CSE where
 
+import Ksc.Traversal( traverseState )
 import Lang
 import Prim
 import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
@@ -14,9 +15,9 @@ import qualified Data.Map as M
 
 {- Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Let-bindings have two cases
+Let-bindings have three cases
 
-* SUBSTITUTE: applies when the RHS is a variable
+* SUBSTITUTE: applies when the LHS is a variable and the RHS is a variable
 
      let x = y in ...(h x)....
 
@@ -36,12 +37,27 @@ Let-bindings have two cases
    Here we CSE y1's rhs to 'x1', and then we must add (y1->x1) to
    the substitution so that we can CSE the binding for y2.
 
-* EXTEND THE REVERSE MAPPING: applies in all other cases
+* EXTEND THE REVERSE MAPPING:
 
-     let x = e in ...e...
+     let p = e in ...e...
 
-  Here we want to extend the /reverse mapping (cs_map)/ so that
-  we CSE e to x.
+  where 'e' is not a variable.
+
+  Here we want to extend the /reverse mapping (cs_map)/ so that we
+  replace occurrences of the expression 'e' with 'p'.  More precisely
+  since 'p' is a pattern, we create an expression 'pe' from 'p', and
+  replace 'e' with 'pe'.
+
+* PATTERN BINDINGS: That leaves one case un-handled
+
+     let (x1,x2) = y in ...
+
+  where the LHS is a tuple pattern and the RHS is a variable.
+  We can't use SUBSTITUTE because the LHS is a tuple.  We don't
+  want to use EXTEND because tha would replace occurences of 'y'
+  with (x1,x2) which is not what we want at all.
+
+  So in this final case we just proceed to CSE the body.
 
 Notice that
   - The SUBSTITUTE situation extends the substitution (cs_subst)
@@ -73,7 +89,7 @@ data CSEnv
             -- The substitution maps variables to
             -- /trivial/ OutExprs, not arbitrary expressions
 
-       , cs_map   :: M.Map TExpr TVar   -- The reverse mapping
+       , cs_map   :: M.Map TExpr Pat   -- The reverse mapping
        }
 
 cseDefs :: RuleBase -> GblSymTab -> [TDef]
@@ -109,17 +125,21 @@ cseE :: CSEnv -> TExpr -> TExpr
 
 cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
      (Let tv rhs body)
-  = case cseE_check cse_env rhs of
-    var_rhs@(Var _) ->
+  = case (tv, cseE_check cse_env rhs) of
+    (VarPat tv, var_rhs@(Var _)) ->
       -- See Note [CSE for bindings] (SUBSTITUTE)
       let v        = tVarVar tv
           subst'   = extendSubstMap v var_rhs subst
           body_env = cse_env { cs_subst = subst' }
       in cseE_check body_env body
 
-    rhs' ->
+    (pat@(TupPat _), rhs'@(Var _)) ->
+      -- See Note [CSE for bindings) (PATTERN BINDINGS)
+      Let pat rhs' (cseE_check cse_env body)
+
+    (_, rhs') ->
       -- See Note [CSE for bindings] (EXTEND THE REVERSE MAPPING)
-      let (tv', subst') = substBndr tv subst
+      let (tv', subst') = traverseState substBndr tv subst
           rev_map'      = M.insert rhs' tv' rev_map
           body_env      = CS { cs_subst = subst', cs_map = rev_map' }
       in Let tv' rhs' (cseE_check body_env body)
@@ -130,7 +150,8 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
  | Call eq (Tuple [Var v1, Var v2]) <- cond'
  , eq `isThePrimFun` "eq"
- , let replace_v1_with_v2 v = if v == v1 then v2 else v
+ , let replace_v1_with_v2 (VarPat v1') | v1' == v1 = VarPat v2
+       replace_v1_with_v2 original = original
  , let cse_env' = cse_env { cs_map = M.map replace_v1_with_v2 rev_map }
  = Assert cond' (cseE cse_env' body)
 
@@ -167,7 +188,7 @@ cseE_check :: CSEnv -> TExpr -> TExpr
 -- Look up the entire expression in the envt
 cseE_check cse_env e
   = case M.lookup e' (cs_map cse_env) of
-      Just e'' -> Var e''
+      Just e'' -> patToExpr e''
       Nothing  -> e'
   where
     e' = cseE cse_env e
