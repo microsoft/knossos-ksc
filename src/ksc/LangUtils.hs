@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
              PatternSynonyms,
 	     ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module LangUtils (
   -- Functions over expressions
@@ -31,7 +32,8 @@ module LangUtils (
   SymTab(..), newSymTab, emptySymTab,
 
   -- OneArg
-  oneArgifyDef
+  oneArgifyDef,
+  oneArgifyExpr
 
   ) where
 
@@ -95,8 +97,8 @@ substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (subs
 substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
 substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
                                           substEMayCapture (subst M.\\ bindersAsMap v) b
-  where bindersAsMap :: TVar -> M.Map TVar ()
-        bindersAsMap = flip M.singleton ()
+  where bindersAsMap :: PatG TVar -> M.Map TVar ()
+        bindersAsMap = M.fromList . map (\x -> (x, ())) . patVars
 
 -----------------------------------------------
 --     Free variables
@@ -113,7 +115,7 @@ freeVarsOf = go
    go (If b t e)     = go b `S.union` go t `S.union` go e
    go (Call _ es)    = go es
    go (App f a)      = go f `S.union` go a
-   go (Let v r b)    = go r `S.union` (S.delete v $ go b)
+   go (Let v r b)    = go r `S.union` (go b S.\\ S.fromList (patVars v))
    go (Lam v e)      = S.delete v $ go e
    go (Assert e1 e2) = go e1 `S.union` go e2
 
@@ -128,7 +130,7 @@ notFreeIn = go
    go v (If b t e)   = go v b && go v t && go v e
    go v (Call _ e)   = go v e
    go v (App f a)    = go v f && go v a
-   go v (Let v2 r b) = go v r && (v == v2 || go v b)
+   go v (Let v2 r b) = go v r && (v `elem` patVars v2 || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Assert e1 e2) = go v e1 && go v e2
 
@@ -323,17 +325,19 @@ notInScope v in_scope
 oneArgifyDef :: TDef -> TDef
 oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
   = def { def_pat = VarPat argVar
-        , def_rhs = UserRhs (add_unpacking rhs) }
+        , def_rhs = UserRhs (add_unpacking (oneArgifyExpr in_scope rhs)) }
   where
-     (argVar, add_unpacking) = case pat of
-       VarPat v -> (argVar, add_unpacking)
+     (argVar, add_unpacking, in_scope) = case pat of
+       VarPat v -> (argVar, add_unpacking, in_scope)
          where
            argVar = v
            add_unpacking = id
-       TupPat tvs -> (argVar, add_unpacking)
+           in_scope = mempty
+       TupPat tvs -> (argVar, add_unpacking, in_scope')
          where
            in_scope = mkInScopeSet (patVars pat)
            argVar = TVar ty (notInScope (Simple "_t") in_scope)
+           in_scope' = extendInScopeSet argVar in_scope
            ty = mkTupleTy (map typeof tvs)
 
            n = length tvs
@@ -342,3 +346,29 @@ oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
                                   | (tv, i) <- tvs `zip` [1..] ]
 
 oneArgifyDef def = def
+
+oneArgifyExpr :: InScopeSet -> TExpr -> TExpr
+oneArgifyExpr in_scope = \case
+     Call f e -> Call f (oneArgifyExpr in_scope e)
+     Tuple es -> Tuple (fmap (oneArgifyExpr in_scope) es)
+     Lam v e  -> Lam v (oneArgifyExpr in_scope' e)
+       where in_scope' = extendInScopeSet v in_scope
+     App f e  -> App (oneArgifyExpr in_scope f) (oneArgifyExpr in_scope e)
+     Let (VarPat v) r b ->
+       Let (VarPat v) (oneArgifyExpr in_scope r) (oneArgifyExpr in_scope' b)
+       where in_scope' = extendInScopeSet v in_scope
+     Let (TupPat t) r b ->
+       mkLet fresh r
+       $ mkLets (map (\(i, v) -> (v, pSel i n (Var fresh))) (zip [1..] t))
+       $ oneArgifyExpr in_scope' b
+       where fresh = TVar ty (notInScope (Simple "_t") in_scope)
+             ty = typeof r
+             in_scope' = S.fromList (map tVarVar t) `S.union` in_scope
+             n = length t
+     If c t f  -> If (oneArgifyExpr in_scope c)
+                     (oneArgifyExpr in_scope t)
+                     (oneArgifyExpr in_scope f)
+     Assert c b -> Assert (oneArgifyExpr in_scope c) (oneArgifyExpr in_scope b)
+     Konst k -> Konst k
+     Var v   -> Var v
+     Dummy d -> Dummy d

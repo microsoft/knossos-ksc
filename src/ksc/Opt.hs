@@ -15,6 +15,7 @@ import Prim
 import Rules
 import OptLet
 import KMonad
+import Ksc.Traversal( traverseState )
 
 import Debug.Trace
 import Test.Hspec
@@ -128,7 +129,7 @@ optE env
          (tv', env') = optSubstBndr tv env
     go (Let tv rhs body)  = Let tv' (go rhs) (optE env' body)
        where
-         (tv', env') = optSubstBndr tv env
+         (tv', env') = traverseState optSubstBndr tv env
     go (If b t e)         = optIf (go b) (go t) (go e)
     go (Call f arg)       = optCall (optZapSubst env) f (go arg)
 

@@ -441,13 +441,19 @@ cgenExprWithoutResettingAlloc env = \case
       cftype
       (funAllocatorUsage tf cftype <> callocusage)
 
-  Let v e1 body -> do
+  Let pat e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
     lvar                       <- freshCVar
 
-    let cgenBinder = cgenVar (tVarVar v)
-        cgenType_  = cgenType type1
+    let cgenType_ = case pat of
+          VarPat _ -> cgenType type1
+          TupPat _ -> "auto"
+        cgenBinder = case pat of
+          VarPat v -> cgenVar (tVarVar v)
+          TupPat vs -> "["
+                       ++ intercalate ", " (map (cgenVar . tVarVar) vs)
+                       ++ "]"
 
     return $ CG
       (  [ cComment "Let" ++ cgenType tybody ++ " " ++ lvar ++ ";",

@@ -15,6 +15,8 @@ module OptLet( optLets
 import Lang
 import LangUtils
 import Prim
+import Ksc.Traversal (traverseState)
+import           Data.List (foldl')
 import qualified Data.Map as M
 
 optLets :: Subst -> TExpr -> TExpr
@@ -68,7 +70,7 @@ occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
                         (es', vs) = unzip (map occAnalE es)
 
 occAnalE (Let tv rhs body)
-  = (Let (n, tv) rhs' body', vs)
+  = (Let n_tv rhs' body', vs)
   -- When a tuple is on the RHS of a let we want to prevent its
   -- contents from being inlined back into it because we generally
   -- want to fuse tuple construction with a function call that
@@ -77,20 +79,30 @@ occAnalE (Let tv rhs body)
   --
   -- See Note [Inline tuples]
   where
-    n = case tv `M.lookup` vsb of
-          Just n  -> n
-          Nothing -> 0
+    n_tv = fmap annotate_tv_with_occ_count tv
+
+    annotate_tv_with_occ_count :: TVar -> (Int, TVar)
+    annotate_tv_with_occ_count tv' = (n, tv')
+      where n = case tv' `M.lookup` vsb of
+              Just n  -> n
+              Nothing -> 0
+
     (rhs', vsr)   = occAnalE rhs
     (body', vsb)  = occAnalE body
-    vsb_no_tv     = tv `M.delete` vsb
 
-    binding_dead  = n == 0
+    without_any_of :: Ord k => M.Map k a -> [k] -> M.Map k a
+    without_any_of = foldl' (flip M.delete)
+
+    vsb_no_tv     = vsb `without_any_of` patVars tv
+
+    binding_dead  = all ((== 0) . fst) n_tv
 
     vs | binding_dead
                    = vsb_no_tv
 
        -- Note [Inline tuples], Item (1)
-       | Tuple _ <- rhs
+       | VarPat (n, _) <- n_tv
+       , Tuple _ <- rhs
        , n > 1     = vsb_no_tv
                      `unionOccMap` markMany vsr
 
@@ -201,7 +213,7 @@ substExpr subst e
     go (Assert e1 e2) = Assert (go e1) (go e2)
     go (Let v r b)    = Let v' (go r) (substExpr subst' b)
                       where
-                        (v', subst') = substBndr v subst
+                        (v', subst') = traverseState substBndr v subst
     go (Lam v e)      = Lam v' (substExpr subst' e)
                       where
                         (v', subst') = substBndr v subst
@@ -217,12 +229,19 @@ optLetsE = go
     go subst (Let pat r b)
       = go_let (go subst r)
       where
-        (tv'', subst') = (\(_, tVar) -> substBndr tVar) pat subst
+        (tv'', subst') = traverseState (\(_, tVar) -> substBndr tVar) pat subst
 
         go_let (Let b1 r1 r2)  = Let b1 r1 (go_let r2)
         go_let r'
-          | (n, TVar _ v)      <- pat
+          | VarPat (n, TVar _ v) <- pat
           , inline_me n r'     = go (extendSubstMap v r' subst) b
+          | TupPat ns_vs <- pat
+          , let binding_dead   = all ((== 0) . fst) ns_vs
+          , binding_dead
+          -- If none of the variables that are bound in the tuple
+          -- pattern occur in the body then we simply ignore the
+          -- binding entirely.
+          = go subst b
           | otherwise          = Let tv'' r' (go subst' b)
 
     go subst (Var tv)       = substVar subst tv
@@ -300,7 +319,7 @@ Therefore we only mark x and y as occurring many times if p is used
 more than once.  Then if each of p, x and y occur only once they will
 all be inlined.  Specifically, we do the 'markMany' call exactly for
 those variables occuring in a literal tuple which itself is bound to a
-variable used more than once.  [Item (2)]
+variable (not a tuple pattern) used more than once.  [Item (2)]
 
 Some of this is discussed at https://github.com/awf/knossos/pull/426
 and https://github.com/microsoft/knossos-ksc/issues/327

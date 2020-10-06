@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
              ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Lang where
 
@@ -66,9 +67,13 @@ isUserDef _ = False
 
 data PatG v = VarPat v     -- A single variable
             | TupPat [v]   -- A tuple of variables
-            deriving( Eq )
+            deriving( Eq, Functor, Foldable, Traversable )
 
 type Pat = PatG TVar
+
+patTypeG :: forall p. InPhase p => PatG (LetBndrX p) -> Maybe Type
+patTypeG (VarPat v)  = snd (getLetBndr @p v)
+patTypeG (TupPat vs) = TypeTuple <$> mapM (snd . getLetBndr @p) vs
 
 patType :: Pat -> Type
 patType (VarPat v) = typeof v
@@ -77,6 +82,10 @@ patType (TupPat vs) = mkTupleTy (map typeof vs)
 patVars :: PatG v -> [v]
 patVars (VarPat v) = [v]
 patVars (TupPat vs) = vs
+
+patToExpr :: Pat -> TExpr
+patToExpr (VarPat v)  = Var v
+patToExpr (TupPat vs) = Tuple (map Var vs)
 
 instance Show Pat where
   show p = pps p
@@ -154,7 +163,10 @@ data ExprX p
   | Tuple [ExprX p]          -- (e1, ..., en)
   | Lam TVarX (ExprX p)      -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
-  | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
+  | Let (PatG (LetBndrX p)) (ExprX p) (ExprX p)
+  -- ^ let x = e1 in e2
+  --   or let (x1, ..., x2) = e1 in e2
+  --   (both non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)
   | Assert (ExprX p) (ExprX p)
   | Dummy (MTypeX p)
@@ -396,7 +408,7 @@ mkDummy :: Type -> TExpr
 mkDummy ty = Dummy ty
 
 mkLet :: LetBndrX p -> ExprX p -> ExprX p -> ExprX p
-mkLet = Let
+mkLet = Let . VarPat
 
 mkLets :: HasCallStack => [(LetBndrX p, ExprX p)] -> ExprX p -> ExprX p
 mkLets xs e = foldr (uncurry mkLet) e xs
@@ -828,7 +840,7 @@ pprExpr p (Let v e1 e2) = mode
     precZero
     (vcat
       [ text "let"
-        <+> (bracesSp $ sep [pprLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
+        <+> (bracesSp $ sep [pprPatLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
       , ppr e2
       ]
     )
@@ -867,7 +879,8 @@ pprCall prec f e = mode
     Tuple es  -> sep (map ppr es)
     _         -> pp_args
 
-pprLetSexp :: forall p. InPhase p => LetBndrX p -> ExprX p -> ExprX p -> SDoc
+pprLetSexp :: forall p. InPhase p
+           => PatG (LetBndrX p) -> ExprX p -> ExprX p -> SDoc
 pprLetSexp v e =
       go [(v,e)]
     where
@@ -875,7 +888,7 @@ pprLetSexp v e =
       go binds body =
             parens $ sep [text "let", parens $ vcat (map parenBind $ reverse binds),
                         ppr body]
-      parenBind (v,e) = parens $ (ppr . fst . getLetBndr @p) v <+> ppr e
+      parenBind (v,e) = parens $ pprPatLetBndr @p v <+> ppr e
 
 
 isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
@@ -924,6 +937,10 @@ pprPat tup_parens (TupPat vs) = mb_parens $ pprList (parens . pprTVar) vs
   where
     mb_parens d | tup_parens = parens d
                 | otherwise  = d
+
+pprPatLetBndr :: forall phase. InPhase phase => PatG (LetBndrX phase) -> SDoc
+pprPatLetBndr (VarPat v)  = pprLetBndr @phase v
+pprPatLetBndr (TupPat vs) = parens (pprList (pprLetBndr @phase) vs)
 
 instance InPhase p => Pretty (RuleX p) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
@@ -1065,10 +1082,28 @@ cmpExpr e1
      = case e2 of
          If {}     -> LT
          Assert {} -> LT
-         Let b2 r2 e2
-           -> go r1 subst r2 `thenCmp`
-              (typeof b1 `compare` typeof b2) `thenCmp`
-              go e1 (M.insert (tVarVar b2) b1 subst) e2
+         Let b2 r2 e2 -> case (b1, b2) of
+           (VarPat _,  TupPat _)  -> LT
+           (TupPat _,  VarPat _)  -> GT
+           (VarPat v1, VarPat v2) ->
+             go r1 subst r2 `thenCmp`
+             (typeof v1 `compare` typeof v2) `thenCmp`
+             go e1 (M.insert (tVarVar v1) v2 subst) e2
+           (TupPat t1, TupPat t2) ->
+             -- These annotations "@[]" are optional and serve to
+             -- inform us that we're taking the length of genuine
+             -- lists here.  There's no funny business going on via
+             -- the Foldable type class.
+             case compare (length @[] t1) (length @[] t2) of
+               LT -> LT
+               GT -> GT
+               EQ ->
+                 go r1 subst r2 `thenCmp`
+                 (map typeof t1 `compare` map typeof t2) `thenCmp`
+                 go e1 (M.fromList
+                         (zipWith (\tv1 tv2 -> (tVarVar tv1, tv2)) t1 t2)
+                         `M.union` subst) e2
+
          _ -> GT
 
    go (If e1c e1t e1f) subst e2

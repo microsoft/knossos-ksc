@@ -6,6 +6,7 @@
 
 module ANF where
 
+import Ksc.Traversal( traverseState )
 import Lang
 import OptLet( Subst, mkEmptySubst, substBndr, substVar )
 import KMonad
@@ -45,7 +46,7 @@ anfE subst (Call fun es@(Tuple _))
                          = Call fun <$> anfE  subst es
 anfE subst (Call fun es) = Call fun <$> anfE1 subst es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
-                               ; let (v', subst') = substBndr v subst
+                               ; let (v', subst') = traverseState substBndr v subst
                                ; emit v' r'
                                ; anfE subst' e }
 anfE subst (If b t e)     = do { t' <- anfExpr subst t
@@ -72,7 +73,7 @@ atomise (Var v)   = return (Var v)
 atomise (Konst k) = return (Konst k)
 atomise (Lam x e) = return (Lam x e) -- Don't separate build from lambda
 atomise e         = do { (b,v) <- newVar e
-                       ; emit b e
+                       ; emit (VarPat b) e
                        ; return (Var v) }
 
 {- Note [Cloning during ANF]
@@ -105,10 +106,10 @@ function.  Many of our optimisation rules match on the call of a
 function on a literal tuple.
 -}
 
-data FloatDef p = FD (LetBndrX p) (ExprX p)
+data FloatDef p = FD (PatG (LetBndrX p)) (ExprX p)
 
 instance InPhase p => Pretty (FloatDef p) where
-  pprPrec _ (FD b e) = pprLetBndr @p b <+> char '=' <+> ppr e
+  pprPrec _ (FD b e) = pprPatLetBndr @p b <+> char '=' <+> ppr e
 
 newtype AnfMT p m a = AnfM (KMT m ([FloatDef p], a))
 
@@ -142,7 +143,7 @@ wrapLets (AnfM m) = AnfM $ do { (fs, e) <- m
 wrap :: [FloatDef p] -> ExprX p -> ExprX p
 wrap fs e = foldr (\(FD v r) b -> Let v r b) e fs
 
-emit :: Monad m => LetBndrX p -> ExprX p -> AnfMT p m ()
+emit :: Monad m => PatG (LetBndrX p) -> ExprX p -> AnfMT p m ()
 emit v r = AnfM (return ([FD v r], ()))
 
 ---------------------------------
