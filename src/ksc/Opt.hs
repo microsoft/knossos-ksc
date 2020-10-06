@@ -793,13 +793,12 @@ do_prod_v env dir e dx
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
   | TypeVec {} <- typeof e
+  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $ mkLets binds $
     pBuild (pSize ve) $ Lam indexTVar $
     lmApply_Dir dir (pIndex (Var indexTVar) ve) vdx
 
   | otherwise = Nothing
-  where
-    (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
 
 do_sum_v :: InScopeSet -> ADDir -> TExpr -> TExpr -> Maybe TExpr
 do_sum_v env dir e dx
@@ -811,6 +810,7 @@ do_sum_v env dir e dx
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
   | TypeVec {} <- typeof e
+  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $
     mkLets binds $
     pSumBuild (pSize vm) $ Lam indexTVar $
@@ -818,8 +818,6 @@ do_sum_v env dir e dx
                     (pIndex (Var indexTVar) vdx)
 
   | otherwise = Nothing
-  where
-    (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
 
 do_fold :: ADDir
         -> TExpr
