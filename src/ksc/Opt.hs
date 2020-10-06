@@ -464,6 +464,12 @@ optBuild _ _ e
   = Just $ pZero (.. the build)
 -}
 
+-- RULE: build sz (\i. e) = constVec sz e
+--       (if i is not free in e)
+optBuild sz i e
+  | i `notFreeIn` e
+  = Just $ pConstVec sz e
+
 -- RULE: build sz (\i. delta i ex eb)  =  let i = ex in
 --                                        deltaVec sz i eb
 --       (if i is not free in ex)
@@ -790,6 +796,9 @@ do_prod_v env dir e dx
   = Just $ mkLets binds $
     pBuild n $ Lam i $
     lmApply_Dir dir body vdx
+  
+  | Just (n, v) <- isConstVec_maybe e
+  = Just $ pConstVec n (lmApply_Dir dir v dx)
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
   | TypeVec {} <- typeof e
@@ -807,6 +816,12 @@ do_sum_v env dir e dx
   = Just $ mkLets binds $
     pSumBuild n $ Lam i $
     lmApply_Dir dir body (pIndex (Var i) vdx)
+  
+  | Just (n, v) <- isConstVec_maybe e
+  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [dx]
+  = Just $ mkLets binds $
+    pSumBuild n $ Lam indexTVar $
+    lmApply_Dir dir v (pIndex (Var indexTVar) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
   | TypeVec {} <- typeof e
