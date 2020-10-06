@@ -257,7 +257,7 @@ fromCLExpr is arg (CLComp e1 e2)
     fromCLExpr is [v2] e1
 
 fromCLExpr is arg (CLLet tv rhs body)
-  = Let tv' rhs' (fromCLExpr is' (Var tv' : arg) body)
+  = mkLet tv' rhs' (fromCLExpr is' (Var tv' : arg) body)
   where
     rhs'      = fromCLExpr is arg rhs
     (is', tv') = notInScopeTV is tv
@@ -291,7 +291,7 @@ mkTempLet :: InScopeSet -> String -> TExpr
           -> (InScopeSet -> TExpr -> TExpr) -> TExpr
 mkTempLet is s e thing_inside
   | isTrivial e = thing_inside is e
-  | otherwise   = Let tv' e $
+  | otherwise   = mkLet tv' e $
                   thing_inside is' (Var tv')
   where
     (is', tv') = notInScopeTV is tv

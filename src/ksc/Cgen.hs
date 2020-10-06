@@ -261,7 +261,7 @@ params_withPackedParams param = case typeof param of
     let params  = zipWith mkParam [1..] tys
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
-        packParams = Let param (Tuple (map Var params))
+        packParams = mkLet param (Tuple (map Var params))
     in (params, ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 

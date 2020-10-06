@@ -126,7 +126,7 @@ getZero tangent_type e
 mkAtomicNoFVs :: TExpr -> (TExpr -> TExpr) -> TExpr
 mkAtomicNoFVs e body
   | isTrivial e = body e
-  | otherwise   = Let ev e (body (Var ev))
+  | otherwise   = mkLet ev e (body (Var ev))
   where
     ev = TVar (typeof e) argVar
 
