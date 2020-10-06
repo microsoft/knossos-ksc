@@ -126,7 +126,7 @@ optE env
     go (Lam tv e)         = Lam tv' (optE env' e)
        where
          (tv', env') = optSubstBndr tv env
-    go (Let tv rhs body)  = mkLet tv' (go rhs) (optE env' body)
+    go (Let tv rhs body)  = Let tv' (go rhs) (optE env' body)
        where
          (tv', env') = optSubstBndr tv env
     go (If b t e)         = optIf (go b) (go t) (go e)
@@ -144,7 +144,7 @@ optCall env fun opt_args
 
 --------------
 optApp :: OptEnv -> TExpr -> TExpr -> TExpr
-optApp env (Lam v e) a = Let v (optE env a) (optE env e)
+optApp env (Lam v e) a = mkLet v (optE env a) (optE env e)
 optApp _ f a         = App f a
 
 --------------
@@ -297,7 +297,7 @@ optPrimFun _ "size" (Call constVec (Tuple [n,_]))
 -- RULE: index j (build n f) = f j
 optPrimFun _ "index" (Tuple [ ei, arr ])
   | Just (_, i, e) <- isBuild_maybe arr
-  = Just (Let i ei e)
+  = Just (mkLet i ei e)
 
 -- RULE: index j (constVec (n, v)) = v
 optPrimFun _ "index" (Tuple [_, Call constVec (Tuple [_, v])])
@@ -407,7 +407,7 @@ inlineCall :: OptEnv
            -> TExpr            -- Arguments
            -> TExpr
 inlineCall _ (VarPat tv) body arg
-  = Let tv arg body
+  = mkLet tv arg body
 
 inlineCall env (TupPat tvs) body arg
   = mkLets (fresh_tvs `zip` args) $
@@ -493,7 +493,7 @@ optBuild sz i e
   , delta `isThePrimFun` "delta"
   , Just ex <- ok_eq e1 e2
   , i `notFreeIn` ex
-  = Just $ Let i ex $ pDeltaVec sz (Var i) eb
+  = Just $ mkLet i ex $ pDeltaVec sz (Var i) eb
   where
     -- We want this to work for both (\i. delta i j e)
     --                           and (\j. delta i j e)
@@ -562,7 +562,7 @@ optSumBuild _ i (Call delta (Tuple [Var i1, ej, e]))
   | delta `isThePrimFun` "delta"
   , i == i1
   , i `notFreeIn` ej
-  = Just (Let i ej e)
+  = Just (mkLet i ej e)
 
 -- RULE: sumbuild n (\i. deltaVec n i e)
 --       = build n (\i. e)
