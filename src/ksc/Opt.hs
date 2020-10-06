@@ -430,6 +430,10 @@ optSum e
   | Just (n, i, body) <- isBuild_maybe e
   = Just $ pSumBuild n (Lam i body)
 
+optSum e
+  | Just (n, v) <- isConstVec_maybe e
+  = Just $ sumOfConstVec n v
+
 -- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
 
 -- RULE: sum (diag sz f)  =  build sz f
@@ -443,6 +447,12 @@ optSum (Call deltaVec (Tuple [_, _, e]))
   = Just e
 
 optSum _ = Nothing
+
+-----------------------
+sumOfConstVec :: TExpr -> TExpr -> TExpr
+sumOfConstVec n v = case typeof v of
+  TypeInteger -> pMulii n v
+  _ -> pScale (pToFloat n) v
 
 -----------------------
 optBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
@@ -524,10 +534,7 @@ optSumBuild n i (Tuple es)
 optSumBuild sz i e
   | TVar TypeInteger _ <- i
   , i `notFreeIn` e
-  = Just $ sz' sz e
-    where sz' = case typeof e of
-                  TypeInteger -> pMulii
-                  _ -> pScale . pToFloat
+  = Just $ sumOfConstVec sz e
 
 -- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
 --       = let i = ej in e
