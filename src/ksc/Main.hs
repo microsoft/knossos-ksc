@@ -55,10 +55,10 @@ main = do
     "--compile-and-run":rest
       -> compileAndRun rest
     ["--test-run-ks"]
-      -> do 
+      -> do
           testRunKS "g++-7" "test/ksc/gmm.ks"
           testRunKS "g++-7" "test/ksc/fold.ks"
-         
+
     _ -> fail ("Unknown arguments: " ++ intercalate " " args)
 
 parseErr :: Parsec [String] () a -> [String] -> a
