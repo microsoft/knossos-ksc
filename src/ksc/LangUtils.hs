@@ -94,7 +94,9 @@ substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEM
 substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (substEMayCapture subst e2)
 substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
 substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
-                                          substEMayCapture (v `M.delete` subst) b
+                                          substEMayCapture (subst M.\\ bindersAsMap v) b
+  where bindersAsMap :: TVar -> M.Map TVar ()
+        bindersAsMap = flip M.singleton ()
 
 -----------------------------------------------
 --     Free variables
