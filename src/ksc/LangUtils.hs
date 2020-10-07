@@ -319,17 +319,24 @@ notInScope v in_scope
 -----------------------------------------------
 
 oneArgifyDef :: TDef -> TDef
-oneArgifyDef def@(Def { def_pat = TupPat tvs, def_rhs = UserRhs rhs })
+oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
   = def { def_pat = VarPat argVar
         , def_rhs = UserRhs (add_unpacking rhs) }
   where
-     in_scope = mkInScopeSet tvs
-     argVar = TVar ty (notInScope (Simple "_t") in_scope)
-     ty = mkTupleTy (map typeof tvs)
+     (argVar, add_unpacking) = case pat of
+       VarPat v -> (argVar, add_unpacking)
+         where
+           argVar = v
+           add_unpacking = id
+       TupPat tvs -> (argVar, add_unpacking)
+         where
+           in_scope = mkInScopeSet (patVars pat)
+           argVar = TVar ty (notInScope (Simple "_t") in_scope)
+           ty = mkTupleTy (map typeof tvs)
 
-     n = length tvs
+           n = length tvs
 
-     add_unpacking = mkLets [ (tv, pSel i n (Var argVar))
-                            | (tv, i) <- tvs `zip` [1..] ]
+           add_unpacking = mkLets [ (tv, pSel i n (Var argVar))
+                                  | (tv, i) <- tvs `zip` [1..] ]
 
 oneArgifyDef def = def
