@@ -154,6 +154,8 @@ optIf (Konst (KBool False)) _ e = e
 optIf (Let v r b)           t e = Let v r   (optIf b t e)
 optIf (Assert e1 e2)        t e = Assert e1 (optIf e2 t e)
 optIf e_cond e_then e_else
+  | e_then == e_else
+  = e_then
   | Just (ei, ej) <- isEqualityCall e_cond
   , isKZero e_else
   = pDelta ei ej e_then
