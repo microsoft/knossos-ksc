@@ -446,11 +446,14 @@ cgenExprWithoutResettingAlloc env = \case
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
     lvar                       <- freshCVar
 
+    let cgenBinder = cgenVar v
+        cgenType_  = cgenType type1
+
     return $ CG
       (  [ cComment "Let" ++ cgenType tybody ++ " " ++ lvar ++ ";",
            "{" ]
       ++ decle1
-      ++ [ cgenType type1 ++ " " ++ cgenVar v ++ " = " ++ ve1 ++ ";" ]
+      ++ [ cgenType_ ++ " " ++ cgenBinder ++ " = " ++ ve1 ++ ";" ]
       ++ declbody
       ++ [ lvar ++ " = " ++ vbody ++ ";",
            "}" ]
