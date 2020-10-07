@@ -441,12 +441,12 @@ cgenExprWithoutResettingAlloc env = \case
       cftype
       (funAllocatorUsage tf cftype <> callocusage)
 
-  Let (TVar _ v) e1 body -> do
+  Let v e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
     lvar                       <- freshCVar
 
-    let cgenBinder = cgenVar v
+    let cgenBinder = cgenVar (tVarVar v)
         cgenType_  = cgenType type1
 
     return $ CG
