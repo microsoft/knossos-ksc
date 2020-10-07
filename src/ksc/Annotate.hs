@@ -50,7 +50,7 @@ annotDecls gbl_env decls
     mk_rec_def :: DefX Parsed -> TcM TDef
     mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
-         tcPat pat $ \pat' ->
+         tcWithPat pat $ \pat' ->
          do { return (Def { def_fun = fun, def_pat = pat'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
@@ -87,17 +87,16 @@ tcDef (Def { def_fun    = fun
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
-    do { tcPat pat $ \pat' ->
+    do { tcWithPat pat $ \pat' ->
     do { rhs' <- tcRhs fun rhs res_ty
        ; return (Def { def_fun = fun, def_pat = pat'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
 
--- CPS form of extendLclSTM.  Formerly types could contain expressions
--- so they were typechecked.  The name of this function is a vestige
--- of those times.
-tcPat :: Pat -> (Pat -> TcM a) -> TcM a
-tcPat pat continueWithArg
+-- Adds the variables in the pattern to the symbol table and
+-- runs the continuation on the pattern.
+tcWithPat :: Pat -> (Pat -> TcM a) -> TcM a
+tcWithPat pat continueWithArg
   = do { extendLclSTM (patVars pat) $ continueWithArg pat }
 
 tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
