@@ -86,7 +86,8 @@ occAnalE (Let tv rhs@(Tuple _) body)
     vs | n == 0    = vsb_no_tv
 
        -- See Note [Inline tuples], Item (2)
-       | n == 1    = vsb_no_tv
+       | Tuple _ <- rhs
+       , n == 1    = vsb_no_tv
                      `unionOccMap` vsr
 
        -- Note [Inline tuples], Item (1)
@@ -102,6 +103,9 @@ occAnalE (Let tv rhs body)
     (rhs',  vsr)  = occAnalE rhs
     (body', vsb)  = occAnalE body
     vs | n == 0    = tv `M.delete` vsb
+       | Tuple _ <- rhs
+       , n == 1    = (tv `M.delete` vsb)
+                     `unionOccMap` vsr
        | otherwise = (tv `M.delete` vsb)
                      `unionOccMap` vsr
 
