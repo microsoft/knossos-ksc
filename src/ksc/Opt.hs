@@ -155,11 +155,27 @@ optIf (Let v r b)           t e = Let v r   (optIf b t e)
 optIf (Assert e1 e2)        t e = Assert e1 (optIf e2 t e)
 optIf e_cond e_then e_else
   | e_then == e_else
+  -- See Note [Conditionals with equal branches]
+  -- NB: (==) on expressions does equality modulo alpha (see Lang.hs)
   = e_then
   | Just (ei, ej) <- isEqualityCall e_cond
   , isKZero e_else
   = pDelta ei ej e_then
 optIf b                     t e = If b t e
+
+{- Note [Conditionals with equal branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Examples of this are sometimes produced by AD, e.g.
+    (def rev$not_ (Tuple)  (_t1 : (Tuple Bool (Tuple)))
+            (if (get$1$2 _t1) (tuple) (tuple)))
+
+which we would like to simplify to
+    (def rev$not_ (Tuple) (_t1 : (Tuple Bool (Tuple))) (tuple))
+
+This pattern becomes especially common when defining shape$ functions,
+because for most conditionals the shape of the result does not depend
+on the condition.
+-}
 
 --------------
 -- 'rewriteCall' performs one rewrite, returning (Just e) if
