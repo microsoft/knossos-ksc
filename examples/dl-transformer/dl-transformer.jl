@@ -8,6 +8,8 @@ const Mat = Array{Float64, 2}
 const Ten3 = Array{Float64, 3}
 const Ten4 = Array{Float64, 4}
 
+rep(x,n) = [x for _ in 1:n]
+
 randg(dims; μ=0.1, σ=1e-3) = rand(Gaussian(μ, σ), dims...);
 
 function softmax(x :: Vec) 
@@ -227,3 +229,10 @@ function test_PositionalEncoding()
 end
 test_PositionalEncoding()
 
+##
+using PlotlyJS
+d125 = Dropout(MersenneTwister(125), 0.0)
+pe = PositionalEncoding(d125, 20)
+y = pe(rep(zeros(20), 100))
+
+plot(scatter(y = hcat(y...)))
