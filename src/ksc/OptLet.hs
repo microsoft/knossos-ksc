@@ -102,11 +102,12 @@ occAnalE (Let tv rhs body)
           Nothing -> 0
     (rhs',  vsr)  = occAnalE rhs
     (body', vsb)  = occAnalE body
-    vs | n == 0    = tv `M.delete` vsb
+    vsb_no_tv     = tv `M.delete` vsb
+    vs | n == 0    = vsb_no_tv
        | Tuple _ <- rhs
-       , n == 1    = (tv `M.delete` vsb)
+       , n == 1    = vsb_no_tv
                      `unionOccMap` vsr
-       | otherwise = (tv `M.delete` vsb)
+       | otherwise = vsb_no_tv
                      `unionOccMap` vsr
 
 occAnalE (If b t e)
