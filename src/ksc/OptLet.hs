@@ -67,7 +67,7 @@ occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
                       where
                         (es', vs) = unzip (map occAnalE es)
 
-occAnalE (Let tv rhs@(Tuple _) body)
+occAnalE (Let tv rhs body)
   = (Let (n, tv) rhs' body', vs)
   -- When a tuple is on the RHS of a let we want to prevent its
   -- contents from being inlined back into it because we generally
@@ -96,27 +96,6 @@ occAnalE (Let tv rhs@(Tuple _) body)
                      `unionOccMap` vsr
 
        -- Note [Inline tuples], Item (1)
-       | otherwise = vsb_no_tv
-                     `unionOccMap` markManyIfTuple vsr
-
-occAnalE (Let tv rhs body)
-  = (Let (n, tv) rhs' body', vs)
-  where
-    n = case tv `M.lookup` vsb of
-          Just n  -> n
-          Nothing -> 0
-    (rhs',  vsr)  = occAnalE rhs
-    (body', vsb)  = occAnalE body
-    vsb_no_tv     = tv `M.delete` vsb
-    markManyIfTuple | Tuple _ <- rhs
-                    = markMany
-                    | otherwise
-                    = id
-
-    vs | n == 0    = vsb_no_tv
-       | Tuple _ <- rhs
-       , n == 1    = vsb_no_tv
-                     `unionOccMap` vsr
        | otherwise = vsb_no_tv
                      `unionOccMap` markManyIfTuple vsr
 
