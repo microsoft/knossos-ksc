@@ -119,20 +119,21 @@ cseE :: CSEnv -> TExpr -> TExpr
 
 cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
      (Let tv rhs body)
+  = case M.lookup rhs' rev_map of
+    Just rhs'' ->
+      -- First case: CSE fires
+      -- Extend the substitution, drop the let
+      let subst'   = extendSubstMap v rhs'' subst
+          body_env = cse_env { cs_subst = subst' }
+      in cseE_check body_env body
 
-  -- First case: CSE fires
-  -- Extend the substitution, drop the let
-  | Just rhs'' <- M.lookup rhs' rev_map
-  , let subst'   = extendSubstMap v rhs'' subst
-        body_env = cse_env { cs_subst = subst' }
-  = cseE_check body_env body
-
-  -- Second case: CSE does not fire
-  -- Clone, extend the reverse-map, retain the let
-  | let (tv', subst') = substBndr tv subst
-        rev_map'      = M.insert rhs' (Var tv') rev_map
-        body_env      = CS { cs_subst = subst', cs_map = rev_map' }
-  = Let tv' rhs' (cseE_check body_env body)
+    Nothing ->
+      -- Second case: CSE does not fire
+      -- Clone, extend the reverse-map, retain the let
+      let (tv', subst') = substBndr tv subst
+          rev_map'      = M.insert rhs' (Var tv') rev_map
+          body_env      = CS { cs_subst = subst', cs_map = rev_map' }
+      in Let tv' rhs' (cseE_check body_env body)
   where
     -- First, CSE the RHS
     rhs' = cseE cse_env rhs
