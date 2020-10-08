@@ -123,7 +123,8 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
     Just rhs'' ->
       -- First case: CSE fires
       -- Extend the substitution, drop the let
-      let subst'   = extendSubstMap v rhs'' subst
+      let v        = tVarVar tv
+          subst'   = extendSubstMap v rhs'' subst
           body_env = cse_env { cs_subst = subst' }
       in cseE_check body_env body
 
@@ -137,7 +138,6 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
   where
     -- First, CSE the RHS
     rhs' = cseE cse_env rhs
-    v    = tVarVar tv
 
 -- Special case for (assert (e1 == e2) body)
 -- where we want to CSE e2 into e1
