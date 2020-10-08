@@ -83,6 +83,11 @@ occAnalE (Let tv rhs@(Tuple _) body)
     (rhs', vsr)   = occAnalE rhs
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
+    markManyIfTuple | Tuple _ <- rhs
+                    = markMany
+                    | otherwise
+                    = id
+
     vs | n == 0    = vsb_no_tv
 
        -- See Note [Inline tuples], Item (2)
@@ -92,7 +97,7 @@ occAnalE (Let tv rhs@(Tuple _) body)
 
        -- Note [Inline tuples], Item (1)
        | otherwise = vsb_no_tv
-                     `unionOccMap` markMany vsr
+                     `unionOccMap` markManyIfTuple vsr
 
 occAnalE (Let tv rhs body)
   = (Let (n, tv) rhs' body', vs)
@@ -103,12 +108,17 @@ occAnalE (Let tv rhs body)
     (rhs',  vsr)  = occAnalE rhs
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
+    markManyIfTuple | Tuple _ <- rhs
+                    = markMany
+                    | otherwise
+                    = id
+
     vs | n == 0    = vsb_no_tv
        | Tuple _ <- rhs
        , n == 1    = vsb_no_tv
                      `unionOccMap` vsr
        | otherwise = vsb_no_tv
-                     `unionOccMap` vsr
+                     `unionOccMap` markManyIfTuple vsr
 
 occAnalE (If b t e)
   = (If b' t' e', vsb `unionOccMap` (M.unionWith max vst vse))
