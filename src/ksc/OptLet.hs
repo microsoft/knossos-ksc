@@ -214,15 +214,15 @@ optLetsE = go
   where
     go :: Subst -> ExprX OccAnald -> TExpr
 
-    go subst (Let (n, (TVar ty v)) r b)
+    go subst (Let pat r b)
       = go_let (go subst r)
       where
-        tv' = TVar ty v
-        (tv'', subst') = substBndr tv' subst
+        (tv'', subst') = (\(_, tVar) -> substBndr tVar) pat subst
 
         go_let (Let b1 r1 r2)  = Let b1 r1 (go_let r2)
         go_let r'
-          | inline_me n ty r'  = go (extendSubstMap v r' subst) b
+          | (n, TVar ty v)     <- pat
+          , inline_me n ty r'  = go (extendSubstMap v r' subst) b
           | otherwise          = Let tv'' r' (go subst' b)
 
     go subst (Var tv)       = substVar subst tv
