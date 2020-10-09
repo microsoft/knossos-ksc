@@ -14,11 +14,13 @@
 \usepackage{enumitem}
 \setlist[itemize,1]{itemsep=4pt}
 
-\renewcommand{\arraystretch}{1.2}
+\renewcommand{\arraystretch}{1.5}
+
+\newcommand{\ksc}{\texttt{ksc}}
 
 % The cateorical language
-\newcommand{\CatLang}{$\mathcal CL$}
 \newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
+\newcommand{\CatLang}{$\mathcal CL$}
 \newcommand{\clcomp}{\, ; \,}   % CL composition
 \newcommand{\ck}[1]{{\mathcal K}(#1)}   % CL constant
 \newcommand{\cid}{\mathcal{I}}   % CL function
@@ -2021,120 +2023,134 @@ $$
 \caption{Procedure language reverse mode translation rules}
 \end{figure*}
 
-\section{Demo}
 
-You can run the prototype by saying {\tt ghci Main}.
+\section{BOG-style AD for ksc}
 
-The function {\tt demo :: Def -> IO ()} runs the
-prototype on the function provided as example.
-Thus:
-{\small
-\begin{verbatim}
-bash$ ghci Main
+\newcommand{\fbog}[1]{#1_{\mathit{fbog}}}
+\newcommand{\rbog}[1]{#1_{\mathit{rbog}}}
+\newcommand{\gradfbog}[1]{\nabla_{\! f}\lb #1 \rb}  % grad[#1]
+\newcommand{\gradrbog}[3]{\nabla_{\! r}\lb #1 \rb\,#2\,#3}  % grad[#1]
+\newcommand{\bog}[1]{{\mathcal B}[e]}
+\newcommand{\append}{+\!\!+}
 
-*Main> demo ex2
+\newenvironment{codearray}[1]
+               {\renewcommand{\arraystretch}{1.0} \begin{array}[t]{@{}#1}}
+               {\end{array}}
 
-----------------------------
-Original definition
-----------------------------
-fun f2(x)
-  = let { y = x * x }
-    let { z = x + y }
-    y * z
 
-----------------------------
-Anf-ised original definition
-----------------------------
-fun f2(x)
-  = let { y = x * x }
-    let { z = x + y }
-    y * z
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+      This figure assumes the single-use dialect of \ksc{},
+      in which every binder is used at most once.
+$$
+\begin{codearray}{ll}
+  \mbox{\bf Original function}   & f : S \to T \\
+  & f(x) = e \\[1mm]
+  \mbox{\bf Forward BOG}  & \fbog{f} : S \to (T,\bog{e}) \\
+  & \fbog{f}(s) = \gradfbog{e} \\[1mm]
+\end{codearray} \\
+$$
+If $e : T$ then $\gradfbog{e} : (T,\bog{e})$
+$$
+      \begin{array}{rcll}
+        \gradfbog{k} & = & (k,()) \\
+        \gradfbog{x} & = & (x,()) \\
+%
+        \gradfbog{f(e)} & = & \begin{codearray}{l}
+          \mbox{\lstinline|let $\;(a,b_1) = \gradfbog{e}\;$ in|} \\
+          \mbox{\lstinline|let $\;(r,b_2) = \fbog{f}(a)\;$ in|} \\
+          (r, (b_1,b_2))
+          \end{codearray} \\
+%
+        \gradfbog{(e_1,e_2)} & = & \begin{codearray}{l}
+          \mbox{\lstinline|let $\;(a_1,b_1) = \gradfbog{e_1}\;$ in|} \\
+          \mbox{\lstinline|let $\;(a_2,b_2) = \gradfbog{e_2}\;$ in|} \\
+          ((a_1,a_2), (b_1,b_2))
+          \end{codearray} \\
+%
+        \gradfbog{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}
+        & = & \begin{codearray}{l}
+           \mbox{\lstinline|let $\;(x,b_1) = \gradfbog{e_1}\;$ in|} \\
+           \mbox{\lstinline|let $\;(r,b_2) = \gradfbog{e_2}\;$ in|} \\
+           (r, (b_1,b_2))
+           \end{codearray} \\
+%
+        \gradfbog{\mbox{\lstinline|let $\;(x,y)$ = $e_1\;$ in $\;e_2$|}}
+        & = & \begin{codearray}{l}
+           \mbox{\lstinline|let $\;(xy,b_1) = \gradfbog{e_1}\;$ in|} \\
+           \mbox{\lstinline|let $\;(x,y) = xy\;$ in|} \\
+           \mbox{\lstinline|let $\;(r,b_2) = \gradfbog{e_2}\;$ in|} \\
+           (r, (b_1,b_2))
+           \end{codearray}
+%        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e})  \\
+%        \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e})
+      \end{array}
+$$
+\end{minipage}}
+\caption{BOG-style AD for ksc: forward} \label{fig:ksc-bog-ad-fwd}
+\end{figure}
 
-----------------------------
-The full Jacobian (unoptimised)
-----------------------------
-fun Df2(x)
-  = let { Dx = lmOne() }
-    let { y = x * x }
-    let { Dy = lmCompose(D*(x, x), lmVCat(Dx, Dx)) }
-    let { z = x + y }
-    let { Dz = lmCompose(D+(x, y), lmVCat(Dx, Dy)) }
-    lmCompose(D*(y, z), lmVCat(Dy, Dz))
+\begin{figure}
+  \fbox{\begin{minipage}{\columnwidth}
+      This figure assumes the single-use dialect of \ksc{},
+      in which every binder is used at most once.
+$$
+\begin{codearray}{ll}
+  \mbox{\bf Original function}   & f : S \to T \\
+  & f(x) = e \\[1mm]
+  \mbox{\bf Reverse BOG}  & \rbog{f} : (\tangent{T},\bog{e}) \to \tangent{S} \\
+  & \rbog{f}(\gradf{t},b) = \mbox{\lstinline|let $\gradrbog{e}{\gradf{t}}{b}\;$ in $\;\gradf{x}$|}
+\end{codearray} \\
+$$
+If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
+      then $\gradrbog{e}{\gradf{t}}{b}$ is a set of bindings that,
+       for every free variable $x{:}S$ of $e$, binds $\gradf{x}{:}\tangent{S}$
+$$
+      \begin{array}{rcll}
+        \gradrbog{k}{\gradf{t}}{b} & = & \{ \} \\
+%
+        \gradrbog{x}{\gradf{t}}{b} & = & \{ \gradf{x} = \gradf{t} \} \\
+%
+        \gradrbog{f(e)}{\gradf{t}}{b} & = & \begin{codearray}{lll}
+          \{ & (b_1,b_2) = b \\
+          ;  & \gradf{a} = \rbog{f}(\gradf{t},b_2) & \} \\
+          \multicolumn{3}{l}{\append \; \gradrbog{e}{\gradf{a}}{b_1}}
+          \end{codearray} \\
+%
+        \gradrbog{(e_1,e_2)}{\gradf{t}}{b} & = &
+                   \begin{codearray}{lll}
+          \{ & (\gradf{t_1},\gradf{t_2}) = \gradf{t} \\
+          ;  & (\gradf{b_1},\gradf{b_2}) = b & \} \\
+          \multicolumn{3}{l}{\append \; \gradrbog{e_1}{\gradf{t_1}}{b_1}} \\
+          \multicolumn{3}{l}{\append \; \gradrbog{e_2}{\gradf{t_2}}{b_2}}
+          \end{codearray} \\
+%
+        \gradrbog{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}{\gradf{t}}{b}
+        & = & \begin{codearray}{lll}
+           \{ & (b_1,b_2) = b & \} \\
+           \multicolumn{3}{l}{\append \; \gradrbog{e_2}{\gradf{t}}{b_2}} \\
+           \multicolumn{3}{l}{\append \; \gradrbog{e_1}{\gradf{x}}{b_1}}
+           \end{codearray} \\
+        %
+%
+        \gradrbog{\mbox{\lstinline|let $\;(x,y)$ = $e_1\;$ in $\;e_2$|}}{\gradf{t}}{b}
+        & = & \begin{codearray}{lll}
+           \{ & (b_1,b_2) = b & \} \\
+           \multicolumn{3}{l}{\append \; \gradrbog{e_2}{\gradf{t}}{b_2}} \\
+           \{ & \gradf{xy} = (\gradf{x},\gradf{y}) & \} \\
+           \multicolumn{3}{l}{\append \; \gradrbog{e_1}{\gradf{xy}}{b_1}}
+           \end{codearray} \\
+        %
+      \end{array}
+$$
+\end{minipage}}
+\caption{BOG-style AD for ksc: reverse} \label{fig:ksc-bog-ad-rev}
+\end{figure}
 
-----------------------------
-The full Jacobian (optimised)
-----------------------------
-fun Df2(x)
-  = let { y = x * x }
-    lmScale( (x + y) * (x + x) + (x + y) * (x + x) )
+See Figures~\ref{fig:ksc-bog-ad-fwd} and \ref{fig:ksc-bog-ad-rev} for BOG-style AD for \ksc.  This Figure
+assumes that the input language is a \emph{single-use dialect} of \ksc,
+in which every binder is used exactly once.  (Or at most once, I'm not quite sure yet.)
 
-----------------------------
-Forward derivative (unoptimised)
-----------------------------
-fun f2'(x, dx)
-  = lmApply(let { y = x * x }
-            lmScale( (x + y) * (x + x) +
-                     (x + y) * (x + x) ),
-            dx)
-
-----------------------------
-Forward-mode derivative (optimised)
-----------------------------
-fun f2'(x, dx)
-  = let { y = x * x }
-    ((x + y) * (x + x) + (x + y) * (x + x)) * dx
-
-----------------------------
-Forward-mode derivative (CSE'd)
-----------------------------
-fun f2'(x, dx)
-  = let { t1 = x + x * x }
-    let { t2 = x + x }
-    (t1 * t2 + t1 * t2) * dx
-
-----------------------------
-Transposed Jacobian
-----------------------------
-fun Rf2(x)
-  = lmTranspose( let { y = x * x }
-                 lmScale( (x + y) * (x + x) +
-                         (x + y) * (x + x) ) )
-
-----------------------------
-Optimised transposed Jacobian
-----------------------------
-fun Rf2(x)
-  = let { y = x * x }
-    lmScale( (x + y) * (x + x) +
-             (x + y) * (x + x) )
-
-----------------------------
-Reverse-mode derivative (unoptimised)
-----------------------------
-fun f2`(x, dr)
-  = lmApply(let { y = x * x }
-            lmScale( (x + y) * (x + x) +
-                     (x + y) * (x + x) ),
-            dr)
-
-----------------------------
-Reverse-mode derivative (optimised)
-----------------------------
-fun f2`(x, dr)
-  = let { y = x * x }
-    ((x + y) * (x + x) +
-     (x + y) * (x + x)) * dr
-
-----------------------------
-Reverse-mode derivative (CSE'd)
-----------------------------
-
-fun f2`(x, dr)
-  = let { t1 = x + x * x }
-    let { t2 = x + x }
-    (t1 * t2 + t1 * t2) * dr
-\end{verbatim}
-}
 
 \end{document}
 
