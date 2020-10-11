@@ -2029,9 +2029,10 @@ $$
 \newcommand{\fbog}[1]{#1_{\mathit{fbog}}}
 \newcommand{\rbog}[1]{#1_{\mathit{rbog}}}
 \newcommand{\gradfbog}[1]{\nabla_{\! f}\lb #1 \rb}  % grad[#1]
-\newcommand{\gradrbog}[3]{\nabla_{\! r}\lb #1 \rb\,#2\,#3}  % grad[#1]
+\newcommand{\gradrbog}[3]{\nabla_{\! r}\lb #1 \rb\;#2\;#3}  % grad[#1]
 \newcommand{\bog}[1]{{\mathcal B}[e]}
 \newcommand{\append}{+\!\!+}
+\newcommand{\freevars}[1]{\mathit{fvs}(#1)}
 
 \newenvironment{codearray}[1]
                {\renewcommand{\arraystretch}{1.0} \begin{array}[t]{@{}#1}}
@@ -2045,7 +2046,7 @@ $$
 $$
 \begin{codearray}{ll}
   \mbox{\bf Original function}   & f : S \to T \\
-  & f(x) = e \\[1mm]
+  & f(s) = e \\[1mm]
   \mbox{\bf Forward BOG}  & \fbog{f} : S \to (T,\bog{e}) \\
   & \fbog{f}(s) = \gradfbog{e} \\[1mm]
 \end{codearray} \\
@@ -2081,7 +2082,25 @@ $$
            \mbox{\lstinline|let $\;(x,y) = xy\;$ in|} \\
            \mbox{\lstinline|let $\;(r,b_2) = \gradfbog{e_2}\;$ in|} \\
            (r, (b_1,b_2))
-           \end{codearray}
+           \end{codearray} \\
+%
+       \gradfbog{\mbox{\lstinline|build $\;e_1\;(\lambda i.\, e_2)$ |}} & = \vspace{-2mm}\\
+       \multicolumn{3}{l}{\qquad \begin{codearray}{lll}
+         \mbox{\lstinline|let $\;n = e_1\;$ in|} \\
+         \mbox{\lstinline|let $\;(r,ba)\;$ = unzip (build $\;n\;(\lambda i.\,\gradfbog{e_2})$) in|} \\
+           (r, (n,ba))
+           \end{codearray}} \\
+%
+       \multicolumn{3}{l}{\gradfbog{\mbox{
+             \lstinline|case $\;e_1\;$ of \{ Inl x $\rightarrow e_2$; Inr y $\rightarrow e_3$ \}|}} = \vspace{-2mm}}
+      \\
+       \multicolumn{3}{l}{\begin{codearray}{l}
+       \qquad   \mbox{\lstinline|case $\;e_1\;$ of|} \\
+       \qquad   \quad \mbox{\lstinline|Inl $\;x \rightarrow\;$ let $\;(r_2,b) = \gradfbog{e_2}\;$
+                                                           in $\;(r_2,\;$Inl$\;b)$|} \\
+       \qquad  \quad \mbox{\lstinline|Inr $\;y \rightarrow\;$ let $\;(r_3,b) = \gradfbog{e_3}\;$
+                                                           in $\;(r_3,\;$Inr$\;b)$|} \\
+           \end{codearray}}
 %        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e})  \\
 %        \grad{\lambda i \dot e} & = & \lmlam(\lambda i\dot \grad{e})
       \end{array}
@@ -2097,14 +2116,14 @@ $$
 $$
 \begin{codearray}{ll}
   \mbox{\bf Original function}   & f : S \to T \\
-  & f(x) = e \\[1mm]
+  & f(s) = e \\[1mm]
   \mbox{\bf Reverse BOG}  & \rbog{f} : (\tangent{T},\bog{e}) \to \tangent{S} \\
   & \rbog{f}(\gradf{t},b) = \mbox{\lstinline|let $\gradrbog{e}{\gradf{t}}{b}\;$ in $\;\gradf{x}$|}
 \end{codearray} \\
 $$
 If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
       then $\gradrbog{e}{\gradf{t}}{b}$ is a set of bindings that,
-       for every free variable $x{:}S$ of $e$, binds $\gradf{x}{:}\tangent{S}$
+       for every free variable $x{:}X$ of $e$, binds $\gradf{x}{:}\tangent{X}$
 $$
       \begin{array}{rcll}
         \gradrbog{k}{\gradf{t}}{b} & = & \{ \} \\
@@ -2137,11 +2156,32 @@ $$
         & = & \begin{codearray}{lll}
            \{ & (b_1,b_2) = b & \} \\
            \multicolumn{3}{l}{\append \; \gradrbog{e_2}{\gradf{t}}{b_2}} \\
-           \{ & \gradf{xy} = (\gradf{x},\gradf{y}) & \} \\
-           \multicolumn{3}{l}{\append \; \gradrbog{e_1}{\gradf{xy}}{b_1}}
+           \multicolumn{3}{l}{\append \; \gradrbog{e_1}{(\gradf{x},\gradf{y})}{b_1}}
            \end{codearray} \\
-        %
-      \end{array}
+%
+       \gradrbog{\mbox{\lstinline|build $\;e_1\;(\lambda i.\, e_2)$ |}}{\gradf{t}}{b} & = \vspace{-2mm}\\
+       \multicolumn{3}{l}{\qquad
+         \begin{codearray}{l@{\hspace{1mm}}l@{\hspace{1mm}}l}
+           \{ & (n,ba) = b \\
+           ; & \overline{v}  =
+               \begin{codearray}{l}
+                  \mbox{\lstinline{sumbuild n}} \\
+                     \quad \mbox{\lstinline|($\lambda i.$
+                     let $\;\gradrbog{e_2}{(\gradf{t}[i])}{(ba[i])}\;$ in $\;\overline{v})$|}
+               \end{codearray} & \} \\
+           \end{codearray}
+       } \\
+       \multicolumn{3}{l}{\qquad \mbox{where}\; \overline{v} = \freevars{e_2}} \\
+%
+       \multicolumn{3}{l}{\gradrbog{\mbox{\lstinline|case $\;e_1\;$ of
+             \{ Inl x $\rightarrow e_2$; Inr y $\rightarrow e_3$ \}|}}{\gradf{t}}{b} = \vspace{-2mm}} \\
+       \multicolumn{3}{l}{\qquad \{ \; \overline{v} = \begin{codearray}{l}
+         \mbox{\lstinline|case $\;b\;$ of|} \\
+         \quad \mbox{\lstinline|Inl $\;b_2\;\rightarrow \;$ let $\;\gradrbog{e_2}{\gradf{t}}{b_2}\;$ in $\;\overline{v}$|} \\
+         \quad \mbox{\lstinline|Inr $\;b_3\;\rightarrow \;$ let $\;\gradrbog{e_3}{\gradf{t}}{b_3}\;$ in $\;\overline{v}$|} \\
+         \end{codearray} \} }
+      \\
+\end{array}
 $$
 \end{minipage}}
 \caption{BOG-style AD for ksc: reverse} \label{fig:ksc-bog-ad-rev}
@@ -2150,6 +2190,13 @@ $$
 See Figures~\ref{fig:ksc-bog-ad-fwd} and \ref{fig:ksc-bog-ad-rev} for BOG-style AD for \ksc.  This Figure
 assumes that the input language is a \emph{single-use dialect} of \ksc,
 in which every binder is used exactly once.  (Or at most once, I'm not quite sure yet.)
+
+Where is this assumption used?   The reverse-pass transformation $\gradrbog{e}$ creates
+a let-binding for every occurrence of a variable in $e$.  If any variable occurs more than
+once, these bindings will conflict, or (equally bad) one will shadow the other so
+that the earlier one is ignored.  Instead we rely on uses of \lstinline|dup| to
+duplicate binders; in the reverse pass $\rbog{\lstinline|dup|}$ adds up the
+contribution of the two occurrences.
 
 
 \end{document}
