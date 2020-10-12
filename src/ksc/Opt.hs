@@ -186,14 +186,10 @@ on the condition.
 rewriteCall :: HasCallStack => OptEnv -> TFun -> TExpr -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
--- Just for unary functions so far
--- Could do this for n-ary functions but beware shadowing
 rewriteCall _ fun (Let v r arg)
   = Just (Let v r (Call fun arg))
 
 -- RULE: f( if e1 then e2 else e3 )  =  if e1 then f(e2) else f(e3)
--- Again unary functions only (notably fst, snd)
--- For nary functions worry about code duplication.
 rewriteCall _ fun (If e1 e2 e3)
   = Just (If e1 (Call fun e2) (Call fun e3))
 
