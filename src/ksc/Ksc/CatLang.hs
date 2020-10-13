@@ -178,6 +178,8 @@ to_cl_call pruned env f e
   = pprPanic "toCLExpr Call of GradFun" (ppr call)
   | TFun _ (DrvFun _ _) <- f
   = pprPanic "toCLExpr Call of DrvFun" (ppr call)
+  | TFun _ (ShapeFun _) <- f
+  = pprPanic "toCLExpr Call of ShapeFun" (ppr call)
   where
     call = Call f e
 

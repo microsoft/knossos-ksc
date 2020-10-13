@@ -67,6 +67,7 @@ mk_fun f = case find_dollar f of
              Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
              Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
              Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
+             Just ("shape", s) -> ShapeFun (mk_fun s)
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
@@ -412,6 +413,11 @@ primCallResultTy_maybe fun arg_ty
         -> Right (tangentType s)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
+      
+      ShapeFun f
+        -> case primCallResultTy_maybe f arg_ty of
+            Left err -> Left err
+            Right res_ty -> Right (mkShapeType res_ty)
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 

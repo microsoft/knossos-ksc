@@ -296,6 +296,7 @@ data Fun = Fun      FunId         -- The function              f(x)
          | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
+         | ShapeFun Fun
          deriving( Eq, Ord, Show )
 
 isUserFun :: FunId -> Bool
@@ -315,6 +316,7 @@ funIdOfFun = \case
   Fun f       -> f
   GradFun f _ -> f
   DrvFun f _  -> f
+  ShapeFun f  -> funIdOfFun f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -768,6 +770,7 @@ pprFun (Fun s)                   = ppr s
 pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
+pprFun (ShapeFun f)              = text "shape$" <> ppr f
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p

@@ -377,6 +377,9 @@ toCall f@(L.TFun _ L.GradFun{}) args =
 toCall f@(L.TFun _ L.DrvFun{}) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
+toCall f@(L.TFun _ L.ShapeFun{}) args =
+  Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
+
 toFuthark :: L.TDef -> Def
 toFuthark d = case LU.oneArgifyDef d of {
   L.Def f (L.VarPat args) res_ty (L.UserRhs e) ->
