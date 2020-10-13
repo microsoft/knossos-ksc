@@ -322,6 +322,60 @@ notInScope v in_scope
 --     oneArgifyDef
 -----------------------------------------------
 
+{-
+Note [Replacing TupPat with nested Let]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+oneArgifyDef transforms a Def to an equivalent Def in which TupPat
+does not appear. The rationale is as follows.
+
+Expr supports tuple patterns. That is, one can write
+
+  1. let (x1, ..., xn) = rhs in body
+
+instead of
+
+  2. let r = rhs
+         x1 = get$1$n r
+         ...
+         xn = get$n$n r
+     in body
+
+When we come to implement AD based on Single Use Language the form 2
+will be more than a simple convenience, it will be essential for the
+algorithm to generate efficient code.
+
+On the other hand, for AD based on linear maps and for CatLang there's
+no great urgency to support differentiating code which contains tuple
+patterns.  Therefore for convenience we just translate tuple patterns
+into nested lets before running those parts of the code.  We can
+always revisit this decision later.
+
+Specifically, oneArgifyDef does these two things:
+
+* Makes the Def have a VarPat.  We transform
+
+   f (a,b,c) = rhs
+      ===>
+   f s = let a = get$1$3 s in
+            let b = get$2$3 s in
+            let c = get$3$3 s in
+            rhs
+
+* Expands any tuple-let into a bunch of non-tuple lets
+
+   let (a,b) = rhs in body
+      ===>
+   let t = rhs in
+   let a = get$1$2 t
+   let b = get$2$2 t in
+   body
+
+-}
+
+-- Replaces all occurrences of TupPat in the Def (including the
+-- def_pat of the Def itself) with nested Lets.  See Note [Replacing
+-- TupPat with nested Let].
 oneArgifyDef :: TDef -> TDef
 oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
   = def { def_pat = VarPat argVar
@@ -347,6 +401,8 @@ oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
 
 oneArgifyDef def = def
 
+-- Replaces all occurrences of TupPat in the Expr with nested Lets.
+-- See Note [Replacing TupPat with nested Let].
 oneArgifyExpr :: InScopeSet -> TExpr -> TExpr
 oneArgifyExpr in_scope = \case
      Call f e -> Call f (oneArgifyExpr in_scope e)
