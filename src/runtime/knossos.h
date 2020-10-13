@@ -1332,6 +1332,37 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
+	tuple<> shape(allocator *, bool const&) { return {}; }
+	tuple<> shape(allocator *, int const&) { return {}; }
+	tuple<> shape(allocator *, double const&) { return {}; }
+
+	template<class T>
+	auto shape(allocator * alloc, vec<T> const& v) {
+		vec<decltype(shape(alloc, v[0]))> s(alloc, v.size());
+		for (int ii = 0; ii != v.size(); ++ii) {
+			s[ii] = shape(alloc, v[ii]);
+		}
+		return s;
+	}
+
+	template<class TupleType, size_t... Indices>
+	auto shape_impl(allocator * alloc, TupleType const& t, std::index_sequence<Indices...>) {
+		return std::make_tuple(shape(alloc, std::get<Indices>(t))...);
+	}
+
+	template<class... Types>
+	auto shape(allocator * alloc, tuple<Types...> const& t) {
+		return shape_impl(alloc, t, std::index_sequence_for<Types...>{});
+	}
+
+	auto shape(allocator *) { return tuple<>{}; }
+
+	template<class T1, class T2, class... Ts>
+	auto shape(allocator * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
+		return std::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
+	}
+
+
 	template <class T>
 	T ts_scale(allocator *, double s, T const& t)
 	{

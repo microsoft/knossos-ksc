@@ -31,6 +31,17 @@ mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
 mkGradTuple TupleAD p lm = Tuple [p, lm]
 
+mkShapeType :: Type -> Type
+mkShapeType TypeBool = TypeTuple []
+mkShapeType TypeInteger = TypeTuple []
+mkShapeType TypeFloat = TypeTuple []
+mkShapeType TypeString = TypeTuple []
+mkShapeType (TypeTuple ts) = TypeTuple (map mkShapeType ts)
+mkShapeType (TypeVec vt) = TypeVec (mkShapeType vt)
+mkShapeType (TypeLam _ _) = TypeUnknown
+mkShapeType (TypeLM _ _) = TypeUnknown  -- TBD
+mkShapeType TypeUnknown = TypeUnknown
+
 data Phase = Parsed | Typed | OccAnald
 
 data DeclX p = RuleDecl (RuleX p)
