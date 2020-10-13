@@ -40,6 +40,8 @@ gradTVar adp s (TVar ty v) = mkGradTVar adp (typeof s) (gradV adp v) ty
 gradDefs :: HasCallStack => ADPlan -> [TDef] -> [TDef]
 gradDefs adp = mapMaybe (gradDef adp)
 
+-- We oneArgifyDef before gradDef.  See Note [Replacing TupPat with
+-- nested Let].
 gradDef :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDef adp = gradDefInner adp . oneArgifyDef
 
@@ -62,6 +64,8 @@ gradDefInner adp
            ]
 
 gradDefInner _ (Def { def_pat = TupPat {} })
+  -- TupPat should not appear.  See Note [Replacing TupPat with nested
+  -- Let]
   = error $ unlines [ "gradDefInner: TupPat encountered\n"
                     , "This should not occur." ]
 
@@ -79,6 +83,8 @@ gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
 gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 gradE adp s (Let (VarPat v) e1 e2) = gradLet adp s v e1 e2
 gradE _   _ e@(Let (TupPat _) _ _) =
+  -- TupPat should not appear.  See Note [Replacing TupPat with nested
+  -- Let]
   pprPanic "gradE: TupPat encountered. This should not occur." (ppr e)
 gradE _   _ (App{})        = error "gradE of App not yet supported"
 
