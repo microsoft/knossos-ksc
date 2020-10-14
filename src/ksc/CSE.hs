@@ -5,7 +5,7 @@ module CSE where
 import Lang
 import Prim
 import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
-import LangUtils( GblSymTab, substEMayCapture )
+import LangUtils( GblSymTab )
 import Rules
 import ANF
 import Opt
@@ -74,7 +74,7 @@ Note [CSE of assert]
 When we encounter (assert (eq e1 e2) body) we would like to use the
 information that e1 is equal to e2 to simplify body.  Therefore if e1
 and e2 are both variables (say v1 and v2) we tweak the reverse map so
-that anywhere its values mentioned v1 they mention v2 instead.
+to change entries that used to say v1 to say v2 instead.
 
 -}
 
@@ -83,7 +83,7 @@ data CSEnv
             -- The substitution maps variables to
             -- /trivial/ OutExprs, not arbitrary expressions
 
-       , cs_map   :: M.Map TExpr TExpr   -- The reverse mapping
+       , cs_map   :: M.Map TExpr TVar   -- The reverse mapping
        }
 
 cseDefs :: RuleBase -> GblSymTab -> [TDef]
@@ -124,7 +124,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
       -- First case: CSE fires
       -- Extend the substitution, drop the let
       let v        = tVarVar tv
-          subst'   = extendSubstMap v rhs'' subst
+          subst'   = extendSubstMap v (Var rhs'') subst
           body_env = cse_env { cs_subst = subst' }
       in cseE_check body_env body
 
@@ -132,7 +132,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
       -- Second case: CSE does not fire
       -- Clone, extend the reverse-map, retain the let
       let (tv', subst') = substBndr tv subst
-          rev_map'      = M.insert rhs' (Var tv') rev_map
+          rev_map'      = M.insert rhs' tv' rev_map
           body_env      = CS { cs_subst = subst', cs_map = rev_map' }
       in Let tv' rhs' (cseE_check body_env body)
   where
@@ -145,7 +145,8 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
  | Call eq (Tuple [Var v1, Var v2]) <- cond'
  , eq `isThePrimFun` "eq"
- , let cse_env' = cse_env { cs_map = M.map (substAssert v1 v2) rev_map }
+ , let replace_v1_with_v2 v = if v == v1 then v2 else v
+ , let cse_env' = cse_env { cs_map = M.map replace_v1_with_v2 rev_map }
  = Assert cond' (cseE cse_env' body)
 
  | otherwise
@@ -181,10 +182,7 @@ cseE_check :: CSEnv -> TExpr -> TExpr
 -- Look up the entire expression in the envt
 cseE_check cse_env e
   = case M.lookup e' (cs_map cse_env) of
-      Just e'' -> e''
+      Just e'' -> Var e''
       Nothing  -> e'
   where
     e' = cseE cse_env e
-
-substAssert :: TVar -> TVar -> TExpr -> TExpr
-substAssert v1 v2 = substEMayCapture (M.insert v1 (Var v2) M.empty)
