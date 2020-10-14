@@ -221,8 +221,8 @@ optLetsE = go
 
         go_let (Let b1 r1 r2)  = Let b1 r1 (go_let r2)
         go_let r'
-          | (n, TVar ty v)     <- pat
-          , inline_me n ty r'  = go (extendSubstMap v r' subst) b
+          | (n, TVar _ v)      <- pat
+          , inline_me n r'     = go (extendSubstMap v r' subst) b
           | otherwise          = Let tv'' r' (go subst' b)
 
     go subst (Var tv)       = substVar subst tv
@@ -307,8 +307,8 @@ and https://github.com/microsoft/knossos-ksc/issues/327
 
 -}
 
-inline_me :: Int -> TypeX -> TExpr -> Bool
-inline_me n _ty rhs
+inline_me :: Int -> TExpr -> Bool
+inline_me n rhs
   | n==0            = True   -- Dead code
   | n==1            = True   -- Used exactly once
   | otherwise       = inline_me_help rhs
