@@ -5,7 +5,7 @@ module CSE where
 import Lang
 import Prim
 import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
-import LangUtils( GblSymTab, substEMayCapture )
+import LangUtils( GblSymTab )
 import Rules
 import ANF
 import Opt
@@ -133,7 +133,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 cseE cse_env@(CS { cs_map = rev_map }) (Assert e1 e2)
  | Call eq (Tuple [e1a, e1b]) <- e1'
  , eq `isThePrimFun` "eq"
- , let cse_env' = cse_env { cs_map = M.map (substAssert e1a e1b) rev_map }
+ , let cse_env' = cse_env { cs_map = substAssert e1a e1b rev_map }
  = Assert e1' (cseE cse_env' e2)
 
  | otherwise
@@ -174,7 +174,7 @@ cseE_check cse_env e
   where
     e' = cseE cse_env e
 
-substAssert :: TExpr -> TExpr -> TExpr -> TExpr
-substAssert (Var v) e1b = substEMayCapture (M.insert v e1b M.empty)
-substAssert e1a (Var v) = substEMayCapture (M.insert v e1a M.empty)
+substAssert :: TExpr -> TExpr -> M.Map TExpr TExpr -> M.Map TExpr TExpr
+substAssert (Var v) e1b = M.insert e1b (Var v)
+substAssert e1a (Var v) = M.insert e1a (Var v)
 substAssert _ _ = \e -> e
