@@ -85,11 +85,11 @@ occAnalE (Let tv rhs@(Tuple _) body)
     vsb_no_tv     = tv `M.delete` vsb
     vs | n == 0    = vsb_no_tv
 
-       -- See Note [Making optLets idempotent]
+       -- See Note [Inline tuples], Item (2)
        | n == 1    = vsb_no_tv
                      `unionOccMap` vsr
 
-       -- Note [Inline tuples], item (2)
+       -- Note [Inline tuples], Item (1)
        | otherwise = vsb_no_tv
                      `unionOccMap` markMany vsr
 
@@ -247,37 +247,38 @@ optLetsE = go
 {- Note [Inline tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Consider
- let t = (expensive1(x), expensive2(x))
- in ...get$1$2(t)...get$2$2(t)....get$1$2(t)...
 
-We want to optimise away the calls to the gets but we don't want to
-duplicate the expensive calls.  Our strategy is as follows:
+  let x = ex in
+  let y = ey in
+  let p = (x,y) in
+  ... p ... p ...
 
- 1. The ANF pass rewrites f to
+There are two valid ways we could inline these let bindings, firstly
 
-  f(x) = let t1 = expensive1(x)
-             t2 = expensive2(x)
-             t  = (t1, t2)
-         in ...get$1$2(t)...get$2$2(t)....get$1$2(t)...
+  let p = (ex,ey) in
+  ... p ... p ...
 
- 2. We prevent t1 and t2 from being reinlined into the tuple by
-    marking them as "occurring many times" via the 'markMany' call
-    in the Let case of occAnalE.  But see also
-    Note [Making optLets idempotent]
+and secondly
 
- 3. t is inlined into the body, either by a sufficiently smart
-    compiler pass, or, as is the case at the time of writing, an
-    explicit $inline call.
+  let x = ex in
+  let y = ey in
+  ... (x,y) ... (x,y) ...
 
- 4. The calls to get can be eliminated.
+We want to choose the second way because we hope that the tuple
+constructor will fuse with a tuple selector in the body (perhaps from
+a function inlined either by a sufficiently smart compiler pass, or,
+as is the case at the time of writing, an explicit $inline call).
+
+We achieve this by marking x and y as occurring many times so that
+they are not inlined back into the tuple. [Item (1)]
 
 This has the beneficial consequence that redundant work can be
 eliminated, for example if we wrote
 
- let t = (expensive1(x), expensive2(x), expensive3(x))
+ let t = (ex, ey, ez)
  in ...get$1$3(t)...get$2$3(t)....get$1$3(t)...
 
-then this transformation avoids ever calculating expensive3(x).
+then ANF followed by this transformation avoids us ever evaluating ez.
 Furthermore we can obtain cross-function slicing by inlining an entire
 function.  For example
 
@@ -291,23 +292,26 @@ can be rewritten to
 (Again, at the time of writing, the call to f must be marked with
 $inline.)
 
+On the other hand if p only occurs once then we want to transform
 
-Some of this is discussed at https://github.com/awf/knossos/pull/426
-
-Note [Making optLets idempotent]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
   let x = ex in
   let y = ey in
   let p = (x,y) in
-  f p
-Here p occurs just once, and so will be inlined by optLetsE.  But
-then x and y will both occur once, and so should be inlined as well.
-To avoid having to run optLets repeatedly, we do the 'markMany'
-call only for things that are used more than once.  This is enough
-to make optLets idempotent.
+  ... p ...
 
-See https://github.com/microsoft/knossos-ksc/issues/327
+to
+
+  ... (x,y) ...
+
+Therefore we only mark x and y as occurring many times if p is used
+more than once.  Then all of p, x and y occur only once and they will
+all be inlined.  (It is not OK to only mark x and y as occurring many
+times if p itself would be *inlined*: its RHS is a tuple of variables
+- it would always be inlined.  See the implementation of
+inline_me_help.) [Item (2)]
+
+Some of this is discussed at https://github.com/awf/knossos/pull/426
+and https://github.com/microsoft/knossos-ksc/issues/327
 
 -}
 
