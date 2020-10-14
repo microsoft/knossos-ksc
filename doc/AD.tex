@@ -2075,16 +2075,17 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
        for every free variable $x{:}X$ of $e$, binds $\gradf{x}{:}\tangent{X}$
 }
 \\
+% Constant, k
 \eq<   \gradfbog{k}  === (k,())>
 &
 \eq<   \gradrbog{k}{\gradf{t}}{b}   === \{ \} >
 \\
-	
+% Variable use, x
 \eq<   \gradfbog{x}   ===  (x,()) >
 &
 \eq<   \gradrbog{x}{\gradf{t}}{b}    ===   \{ \gradf{x} = \gradf{t} \}   >
 \\
-	
+% f(e)	
 \eq<   \gradfbog{f(e)} === \begin{codearray}{l}
 					          \mbox{\lstinline|let $\;(a,b_e) = \gradfbog{e}\;$ in|} \\
 					          \mbox{\lstinline|let $\;(r,b_f) = \fbog{f}(a)\;$ in|} \\
@@ -2098,7 +2099,7 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
                                         \multicolumn{3}{l}{\append \; \gradrbog{e}{\gradf{a}}{b_e}}
                                         \end{codearray}
 >\\
-
+% (e_1,e_2)
 \eq<       \gradfbog{(e_1,e_2)}  ===  \begin{codearray}{l}
                                     \mbox{\lstinline|let $\;(a_1,b_1) = \gradfbog{e_1}\;$ in|} \\
                                     \mbox{\lstinline|let $\;(a_2,b_2) = \gradfbog{e_2}\;$ in|} \\
@@ -2113,7 +2114,7 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
                     \multicolumn{3}{l}{\append \; \gradrbog{e_2}{\gradf{t_2}}{b_2}}
                     \end{codearray} 
 >\\
-%
+% let x = e1 in e2
 \eq<       \gradfbog{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}} ===
 							           \begin{codearray}{l}
 							           \mbox{\lstinline|let $\;(x,b_1) = \gradfbog{e_1}\;$ in|} \\
