@@ -14,7 +14,7 @@ import qualified Data.Map as M
 
 {- Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Let-bindings have two cases, implemented by addBinding.
+Let-bindings have two cases
 
 * SUBSTITUTE: applies when the RHS is a variable
 
@@ -22,8 +22,9 @@ Let-bindings have two cases, implemented by addBinding.
 
   Here we want to extend the /substitution/ with x -> y, so that the
   (h x) in the body might CSE with an enclosing (let v = h y in ...).
-  NB: the substitution maps InIds, so we extend the substitution with
-      a binding for the original InId 'x'
+  We also drop the binding for x.
+  NB: the substitution maps Vars, so we extend the substitution with
+      a binding for the original Var 'x'
 
   How can we have a variable on the RHS? Doesn't the simplifier inline them?
   No: the original RHS might have been (g z) which has CSE'd
@@ -41,17 +42,6 @@ Let-bindings have two cases, implemented by addBinding.
 
   Here we want to extend the /reverse mapping (cs_map)/ so that
   we CSE the (h y) call to x.
-
-  Note that we use EXTEND even for a trivial expression, provided it
-  is not a variable or literal. In particular this /includes/ type
-  applications. This can be important (Trac #13156); e.g.
-     case f @ Int of { r1 ->
-     case f @ Int of { r2 -> ...
-  Here we want to common-up the two uses of (f @ Int) so we can
-  remove one of the case expressions.
-
-  See also Note [Corner case for case expressions] for another
-  reason not to use SUBSTITUTE for all trivial expressions.
 
 Notice that
   - The SUBSTITUTE situation extends the substitution (cs_subst)
@@ -121,12 +111,14 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
      (Let tv rhs body)
   = case cseE_check cse_env rhs of
     var_rhs@(Var _) ->
+      -- See Note [CSE for bindings] (SUBSTITUTE)
       let v        = tVarVar tv
           subst'   = extendSubstMap v var_rhs subst
           body_env = cse_env { cs_subst = subst' }
       in cseE_check body_env body
 
     rhs' ->
+      -- See Note [CSE for bindings] (EXTEND THE REVERSE MAPPING)
       let (tv', subst') = substBndr tv subst
           rev_map'      = M.insert rhs' tv' rev_map
           body_env      = CS { cs_subst = subst', cs_map = rev_map' }
