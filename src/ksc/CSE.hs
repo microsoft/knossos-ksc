@@ -66,6 +66,16 @@ applies only to the /bindings/ of the program, and we leave it to the
 simplifier to propate effects to the RULES.  Finally, it doesn't seem
 worth the effort to discard the nested bindings because the simplifier
 will do it next.
+
+
+Note [CSE of assert]
+~~~~~~~~~~~~~~~~~~~~
+
+When we encounter (assert (eq e1 e2) body) we would like to use the
+information that e1 is equal to e2 to simplify body.  Therefore if e1
+and e2 are both variables (say v1 and v2) we tweak the reverse map so
+that anywhere its values mentioned v1 they mention v2 instead.
+
 -}
 
 data CSEnv
@@ -130,6 +140,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 
 -- Special case for (assert (e1 == e2) body)
 -- where we want to CSE e2 into e1
+-- See Note [CSE of assert]
 cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
  | Call eq (Tuple [Var v1, Var v2]) <- cond'
  , eq `isThePrimFun` "eq"
