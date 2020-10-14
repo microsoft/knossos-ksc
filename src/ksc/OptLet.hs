@@ -93,7 +93,7 @@ occAnalE (Let tv rhs body)
 
        -- Note [Inline tuples], Item (1)
        | Tuple _ <- rhs
-                   = vsb_no_tv
+       , n > 1     = vsb_no_tv
                      `unionOccMap` markMany vsr
 
        | otherwise = vsb_no_tv
