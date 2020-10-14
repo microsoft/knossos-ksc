@@ -84,7 +84,10 @@ occAnalE (Let tv rhs body)
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
 
-    vs | n == 0    = vsb_no_tv
+    binding_dead  = n == 0
+
+    vs | binding_dead
+                   = vsb_no_tv
 
        -- Note [Inline tuples], Item (1)
        | Tuple _ <- rhs
