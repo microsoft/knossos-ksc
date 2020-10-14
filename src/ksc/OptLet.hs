@@ -83,10 +83,6 @@ occAnalE (Let tv rhs body)
     (rhs', vsr)   = occAnalE rhs
     (body', vsb)  = occAnalE body
     vsb_no_tv     = tv `M.delete` vsb
-    markManyIfTuple | Tuple _ <- rhs
-                    = markMany
-                    | otherwise
-                    = id
 
     vs | n == 0    = vsb_no_tv
 
@@ -96,8 +92,12 @@ occAnalE (Let tv rhs body)
                      `unionOccMap` vsr
 
        -- Note [Inline tuples], Item (1)
+       | Tuple _ <- rhs
+                   = vsb_no_tv
+                     `unionOccMap` markMany vsr
+
        | otherwise = vsb_no_tv
-                     `unionOccMap` markManyIfTuple vsr
+                     `unionOccMap` vsr
 
 occAnalE (If b t e)
   = (If b' t' e', vsb `unionOccMap` (M.unionWith max vst vse))
