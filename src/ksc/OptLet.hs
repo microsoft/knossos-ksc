@@ -71,13 +71,6 @@ occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
 
 occAnalE (Let tv rhs body)
   = (Let n_tv rhs' body', vs)
-  -- When a tuple is on the RHS of a let we want to prevent its
-  -- contents from being inlined back into it because we generally
-  -- want to fuse tuple construction with a function call that
-  -- dismantles it.  In order to stop the contents being inlined we
-  -- pretend that it occurs many times.
-  --
-  -- See Note [Inline tuples]
   where
     n_tv = fmap annotate_tv_with_occ_count tv
 
@@ -101,6 +94,12 @@ occAnalE (Let tv rhs body)
                    = vsb_no_tv
 
        -- Note [Inline tuples], Item (1)
+       --
+       -- When a tuple is on the RHS of a let we want to prevent its
+       -- contents from being inlined back into it because we generally
+       -- want to fuse tuple construction with a function call that
+       -- dismantles it.  In order to stop the contents being inlined we
+       -- pretend that it occurs many times.
        | VarPat (n, _) <- n_tv
        , Tuple _ <- rhs
        , n > 1     = vsb_no_tv
