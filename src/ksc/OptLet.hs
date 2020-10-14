@@ -92,10 +92,6 @@ occAnalE (Let tv rhs body)
                      `unionOccMap` markMany vsr
 
        -- See Note [Inline tuples], Item (2)
-       | Tuple _ <- rhs
-       , n == 1    = vsb_no_tv
-                     `unionOccMap` vsr
-
        | otherwise = vsb_no_tv
                      `unionOccMap` vsr
 
@@ -298,11 +294,10 @@ to
   ... (ex,ey) ...
 
 Therefore we only mark x and y as occurring many times if p is used
-more than once.  Then all of p, x and y occur only once and they will
-all be inlined.  (It is not OK to only mark x and y as occurring many
-times if p itself would be *inlined*: its RHS is a tuple of variables
-- it would always be inlined.  See the implementation of
-inline_me_help.) [Item (2)]
+more than once.  Then if each of p, x and y occur only once they will
+all be inlined.  Specifically, we do the 'markMany' call exactly for
+those variables occuring in a literal tuple which itself is bound to a
+variable used more than once.  [Item (2)]
 
 Some of this is discussed at https://github.com/awf/knossos/pull/426
 and https://github.com/microsoft/knossos-ksc/issues/327
