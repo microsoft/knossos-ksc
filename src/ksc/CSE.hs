@@ -124,7 +124,8 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
       -- First case: CSE fires
       -- Extend the substitution, drop the let
       let v        = tVarVar tv
-          subst'   = extendSubstMap v (Var rhs'') subst
+          var_rhs  = Var rhs''
+          subst'   = extendSubstMap v var_rhs subst
           body_env = cse_env { cs_subst = subst' }
       in cseE_check body_env body
 
