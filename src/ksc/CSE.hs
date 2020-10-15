@@ -130,16 +130,16 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 
 -- Special case for (assert (e1 == e2) body)
 -- where we want to CSE e2 into e1
-cseE cse_env@(CS { cs_map = rev_map }) (Assert e1 e2)
- | Call eq (Tuple [e1a, e1b]) <- e1'
+cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
+ | Call eq (Tuple [e1, e2]) <- cond'
  , eq `isThePrimFun` "eq"
- , let cse_env' = cse_env { cs_map = M.map (substAssert e1a e1b) rev_map }
- = Assert e1' (cseE cse_env' e2)
+ , let cse_env' = cse_env { cs_map = M.map (substAssert e1 e2) rev_map }
+ = Assert cond' (cseE cse_env' body)
 
  | otherwise
- = Assert e1' (cseE cse_env e2)
+ = Assert cond' (cseE cse_env body)
  where
-   e1' = cseE cse_env e1
+   cond' = cseE cse_env cond
 
 cseE cse_env (If e1 e2 e3)
   = If (cseE_check cse_env e1)
