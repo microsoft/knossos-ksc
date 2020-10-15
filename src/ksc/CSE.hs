@@ -133,7 +133,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
  | Call eq (Tuple [Var v1, Var v2]) <- cond'
  , eq `isThePrimFun` "eq"
- , let cse_env' = cse_env { cs_map = M.map (substAssert (Var v1) (Var v2)) rev_map }
+ , let cse_env' = cse_env { cs_map = M.map (substAssert v1 v2) rev_map }
  = Assert cond' (cseE cse_env' body)
 
  | otherwise
@@ -174,7 +174,5 @@ cseE_check cse_env e
   where
     e' = cseE cse_env e
 
-substAssert :: TExpr -> TExpr -> TExpr -> TExpr
-substAssert (Var v) e1b = substEMayCapture (M.insert v e1b M.empty)
-substAssert e1a (Var v) = substEMayCapture (M.insert v e1a M.empty)
-substAssert _ _ = \e -> e
+substAssert :: TVar -> TVar -> TExpr -> TExpr
+substAssert v1 v2 = substEMayCapture (M.insert v1 (Var v2) M.empty)
