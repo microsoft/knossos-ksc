@@ -1,10 +1,11 @@
 // This is a copy of AST.h with getters/setters etc stripped.
+// It may drift from the precise AST defined there, but tries
+// to represent the best current or near-future intentions.
 
 // All "Ptr"s are currently unique_ptrs, later implementations 
 // might hash-cons and do something different.
 
-// Type: Scalars don't need the vector of subTypes, 
-// but it's cheap and simple to store an empty vector.
+// Type
 struct Type {
   enum Type_t {
     None,
@@ -18,58 +19,68 @@ struct Type {
     LinearMap  // Opaque type of "any" linear map
   };
   Type_t type;
+  // Sybtypes (e.g. Tuple T1 T2)
+  // Scalars don't need the vector of subTypes, 
+  // but it's cheap and simple to store an empty vector.
   std::vector<Type> subTypes;
 };
 
-/// A node in the AST.
+// A node in the AST.
 struct Expr {
+  // Every node has a type, which may start as None,
+  // And then be propagated by type propagation
   Type type;
 };
 
-/// Literals, ex: "Hello", 10.0, 123, false
+// Literals, ex: "Hello", 10.0, 123, false
 struct Literal : public Expr {
   std::string value;
 };
 
-/// Named variables, ex:
-///   str in (let (str "Hello") (print str))
-///     x in (def a (x : Float) x)
+// A variable use or definition
+//     x in (add 2 x) ; type is implicit
+//     x in (def a (x : Float) 2) ; type is explicit
 struct Variable : public Expr {
   std::string name;
+};
+
+// Variable binding, ex:
+//   str in (let (str "Hello") (print str))
+struct Binding : public Expr {
+  Variable var;
   Expr::Ptr init;
 };
 
-/// Let, ex: (let (x 10) (add x 10))
+// Let, ex: (let (x 10) (add x 10))
 struct Let : public Expr {
-  std::vector<Expr::Ptr> vars;  // TODO: make a vector of vars
+  std::vector<Binding::Ptr> vars;
   Expr::Ptr expr;
 };
 
-struct Signature {
+// Declaration, ex: (edef max Float (Float Float))
+struct Declaration : public Expr {
   std::string name;
   std::vector<Type> argTypes;
 };
 
-/// Declaration, ex: (edef max Float (Float Float))
-struct Declaration : public Expr {
-  Signature sig;
-};
-
-/// Call, ex: (add x 3), (neg (mul (sin x) d_dcos)))
-/// Call, ex: (fwd$to_float 10 dx)
+/// Call
+//    (add x 3)
+//    (fwd$to_float 10 dx)
 struct Call : public Expr {
-  Declaration* decl; // A pointer to the corresponding decl, owned elsewhere 
+  Declaration* decl; // A pointer to the corresponding decl, owned by e.g. Definition
   std::vector<Expr::Ptr> operands;
 };
 
-/// Definition, ex: (def fwd$to_float Float ((x : Integer) (dx : (Tuple))) 0.0)
+/// Definition, 
+//   (def fwd$to_float Float ((x : Integer) (dx : (Tuple))) 0.0)
 struct Definition : public Expr {
-  Declaration::Ptr decl;
+  Declaration::Ptr decl; 
   std::vector<Variable::Ptr> arguments;
   Expr::Ptr impl;
 };
 
-/// Condition, ex: (if (or x y) (add x y) 0)
+// Condition
+//    (if (or x y) (add x y) 0)
 struct Condition : public Expr {
   Expr::Ptr cond;
   Expr::Ptr ifBlock;
@@ -77,13 +88,13 @@ struct Condition : public Expr {
 };
 
 
-/// Rule, ex: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
-///
-/// Rules express ways to transform the graph. They need a special
-/// MLIR dialect to be represented and cannot be lowered to LLVM.
+// Rule
+//    (rule "mul2" (v : Float) (mul v 2.0) (add v v))
+//
+// Rules express ways to transform the graph. 
 struct Rule : public Expr {
   std::string name;
-  Expr::Ptr variable;
+  std::vector<Variable::Ptr> variables;
   Expr::Ptr pattern;
   Expr::Ptr result;
 };
