@@ -18,6 +18,24 @@
 
 \newcommand{\ksc}{\texttt{ksc}}
 
+\newcommand{\vecl}[1]{\begin{codearray}{l}#1\end{codearray}}
+
+% The KS language
+\def\kskeyword#1{\mathtt{\textcolor{teal}{#1}}}
+\def\ksid#1{\mathsf{#1}}
+
+\def\kslet #1 = #2 #3{\kskeyword{let}\;#1 = #2\; \kskeyword{in} \;#3}
+\def\ksletnl#1 = #2 #3{\vecl{
+    \kskeyword{let}\;#1 = #2\; \kskeyword{in} \\
+    #3
+}}
+\def\ksif#1#2#3{\kskeyword{if}\;#1\;#2\;#3}
+\def\ksifnl#1#2#3{\vecl{\kskeyword{if}\;#1\\\quad #2\\\quad #3}}
+\newcommand{\ksbuild}[3]{\ksid{build} \; #1 \; (\lambda #2.\, #3)}
+\newcommand{\kssumbuild}[3]{\ksid{sumbuild} \; #1 \; (\lambda #2.\, #3)}
+\newcommand{\ksunzip}[1]{\ksid{unzip}(#1)}
+
+
 % The cateorical language
 \newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
 \newcommand{\CatLang}{$\mathcal CL$}
@@ -152,7 +170,7 @@ $$
           & |   & (e_1,e_2) & \mbox{Pair} \\
           & |   & \lambda x \dot e & \mbox{Lambda} \\
           & |   & e_1 \; e_2 & \mbox{Application} \\
-          & |   & \mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|} \\
+          & |   & \kslet x = {e_1} {e_2} \\
           & |   & \mbox{\lstinline|if $\;b\;$ then $\;e_1\;$ else $\;e_2$|} \\
         \\
         \multicolumn{4}{l}{\mbox{\bf Types}} \\
@@ -691,7 +709,7 @@ $$
   \mbox{\bf Original function}   & f : S \to T \\
   & f(x) = e \\[2mm]
   \mbox{\bf Full Jacobian}       & \gradf{f}  :  S \to (S \linto T) \\
-  & \mbox{\lstinline|$\gradf{f}(x)$ = let $\;\gradf{x}$ = $\lmone\;$ in $\;\grad{e}$|} \\[2mm]
+  & \gradf{f}(x) = \kslet {\gradf x} = {\lmone} {\grad{e}} \\[2mm]
   \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,S) \to T \\
   & \fwdDf{f}(x,dx) = \gradf{f}(x) \lmapply  dx \\[2mm]
   \mbox{\bf Reverse derivative}  & \revDf{f} : (S,T) \to S \\
@@ -2039,22 +2057,6 @@ $$
                {\renewcommand{\arraystretch}{1.0} \begin{array}[t]{@{}#1}}
                {\end{array}}
 
-\newcommand{\vecl}[1]{\begin{codearray}{l}#1\end{codearray}}
-
-% The language
-\def\kskeyword#1{\mathtt{#1}}
-\def\ksid#1{\mathsf{#1}}
-\def\kslet #1 = #2 #3{\kskeyword{let}\;#1 = #2\; \kskeyword{in} \;#3}
-\def\ksletnl#1 = #2 #3{\vecl{
-    \kskeyword{let}\;#1 = #2\; \kskeyword{in} \\
-    #3
-}}
-\def\ksif#1#2#3{\kskeyword{if}\;#1\;#2\;#3}
-\def\ksifnl#1#2#3{\vecl{\kskeyword{if}\;#1\\\quad #2\\\quad #3}}
-\newcommand{\ksbuild}[3]{\ksid{build} \; #1 \; (\lambda #2.\, #3)}
-\newcommand{\kssumbuild}[3]{\ksid{sumbuild} \; #1 \; (\lambda #2.\, #3)}
-\newcommand{\ksunzip}[1]{\ksid{unzip}(#1)}
-
 \begin{figure*}
   \def\mcol#1{\multicolumn{3}{l}{#1}}
   \def\mkhead#1{\multicolumn{3}{l}{\begin{minipage}[t]{0.45\columnwidth}#1\end{minipage}}}
@@ -2248,7 +2250,10 @@ Note: In place of $\bog{e}$ (a data structure) we could use a partial applicatio
 \def\doexpr#1#2#3#4#5#6{
   % Expr & Fwd & RevArgs & Rev
   $#1$ & \multicolumn{2}{l}{$\gradfbog{e} = #2$}
-       & $\gradrbog{e} \; #3 \; #4 \; #5$ & $=$ & $#6$
+       & \multicolumn{3}{l}{$\gradrbog{e} \; #3 \; #4 \; #5 = #6$}
+}
+\def\comment#1{
+  \multicolumn{6}{l}{#1}\\
 }
 
   \fbox{\begin{minipage}{\textwidth}
@@ -2265,7 +2270,7 @@ $$
 \def\dt{\gradf t}
 \def\de{\gradf e}
 
-\begin{tabular}[t]{rclrcl}
+\begin{tabular}[t]{lclrcl}
 \mkhead{
 \text{\bf Forward BOG}
 \begin{align*}
@@ -2287,7 +2292,8 @@ and $\body : \tangent S$\\
 then $\gradrbogcps{e} \de b \body $ is ... 
 }
 \\
-Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\ 
+Expression $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\ 
+\hline
 % Constant, k
 \doexpr k {
   (k,())
@@ -2295,20 +2301,22 @@ Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
 \de {()} \body
    \body
 \\
+\hline
 % Variable use, x
-\multicolumn{6}{l}{Note: Use of $x$ becomes binding of $\gradf x$: \hspace*{15mm}~}\\
-\doexpr x {
+\comment{Note: Use of $\underline{x}$ becomes binding of $\underline{\gradf x}$, which will be used in $\body$}
+\doexpr {\underline{x}} {
   (x,())
 }
 \de b \body {
-   \ksletnl {\gradf x} = {\dt} {
+   \ksletnl {\underline{\gradf x}} = {\dt} {
      \body
     }
   }
 \\
+\hline
 % let x = e1 in e2
-\multicolumn{6}{l}{Note: Binding of $x$ becomes use of $\gradf x$: \hspace*{15mm}~}\\
-\doexpr{\kslet x = {e_1} {e_2}} {
+\comment{Note: Binding of $\underline{x}$ becomes use of $\underline{\gradf x}$, in the caller's body}
+\doexpr{\kslet \underline{x} = {e_1} {e_2}} {
                          \ksletnl (x,b_1) = \gradfbog{e_1} {
                          \ksletnl (r,b_2) = \gradfbog{e_2} {
 							           (r, (b_1,b_2))
@@ -2317,7 +2325,7 @@ Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
  \de {(b_1,b_2)} \body {
                           \vecl{
                           \gradrbogcps{e_2} {\de_2} {b_2} (\\
-                          \quad  \gradrbogcps{e_1} {\gradf x} {b_1} \body\\
+                          \quad  \gradrbogcps{e_1} {\underline{\gradf x}} {b_1} \body\\
                           )
 }}
 \\ 
@@ -2337,7 +2345,9 @@ Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
  \quad    \gradrbogcps{e_1}{(\gradf{x},\gradf{y})}{b_1} 
       \body\\
    )}
-   } \\
+   } 
+\\
+\hline
 % f(e)	
 \doexpr {f(e)} {
     \ksletnl (a,b_e) = {\gradfbog{e}} {
@@ -2352,6 +2362,7 @@ Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
     }
   }
 \\
+\hline
 % (e_1,e_2)
 \doexpr{(e_1,e_2)} {
     \ksletnl (a_1,b_1) = {\gradfbog{e_1}} {
@@ -2368,6 +2379,7 @@ Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
     }
   }
 \\
+\hline
 % if p et ef
 \doexpr{\ksif p {e_t} {e_f}}{
   \ksifnl p {
@@ -2380,14 +2392,15 @@ Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
     }
   }
 }
-\de {(b_p, b_{\kskeyword{if}})} \body {
+\de {(b_p, b_{tf})} \body {
   \ksifnl {b_p} {
-    \gradrbogcps{e_t} \de {\pi_1(b_{\kskeyword{if}})} \body
+    \gradrbogcps{e_t} \de {\pi_1(b_{tf})} \body
   } {
-    \gradrbogcps{e_f} \de {\pi_2(b_{\kskeyword{if}})} \body
+    \gradrbogcps{e_f} \de {\pi_2(b_{tf})} \body
   }
 }
 \\
+\hline
 % if bogp
 %   R[et] de (get$t bogif) body
 %   R[ef] de (get$f bogif) body
@@ -2398,6 +2411,9 @@ Expr $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
 %   R[ef] de bogif body
 
 % build e1 (\lambda i . e2) 
+\comment{Note: Build with ``inlined'' lambda has a special rule, 
+build with top-level function doesn't need one\footnote
+{https://github.com/microsoft/knossos-ksc/pull/407}}
 \doexpr{\ksbuild {e_1} i {e_2}} {
   \ksletnl n = {e_1} {
     \ksletnl rbs = {\ksbuild n i {\gradfbog{e_2}}} {
