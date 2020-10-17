@@ -271,7 +271,7 @@ extendInScopeSet tv in_scope
   = tVarVar tv `S.insert` in_scope
 
 
-notInScopeTVs :: InScopeSet -> [TVar] -> (InScopeSet, [TVar])
+notInScopeTVs :: Traversable t => InScopeSet -> t TVar -> (InScopeSet, t TVar)
 notInScopeTVs is tvs = mapAccumL notInScopeTV is tvs
 
 notInScopeTV :: InScopeSet -> TVar -> (InScopeSet, TVar)
