@@ -1,4 +1,3 @@
-
 \documentclass[sigplan,review]{acmart}
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
@@ -18,11 +17,18 @@
 
 \newcommand{\ksc}{\texttt{ksc}}
 
+\newenvironment{codearray}[1]
+               {\renewcommand{\arraystretch}{1.08} \begin{array}[t]{@{}#1}}
+               {\end{array}}
+
+
 \newcommand{\vecl}[1]{\begin{codearray}{l}#1\end{codearray}}
 
 % The KS language
 \def\kskeyword#1{\mathtt{\textcolor{teal}{#1}}}
 \def\ksid#1{\mathsf{#1}}
+
+\def\ksVec#1{\ksid{Vec}~#1}
 
 \def\kslet #1 = #2 #3{\kskeyword{let}\;#1 = #2\; \kskeyword{in} \;#3}
 \def\ksletnl#1 = #2 #3{\vecl{
@@ -2045,6 +2051,8 @@ $$
 
 \newcommand{\fbog}[1]{#1_{\mathit{fbog}}}
 \newcommand{\rbog}[1]{#1_{\mathit{rbog}}}
+\newcommand{\fbogid}[1]{\ksid{#1}_{\mathit{fbog}}}
+\newcommand{\rbogid}[1]{\ksid{#1}_{\mathit{rbog}}}
 \newcommand{\gradfbog}[1]{\nabla_{\! f}\lb #1 \rb}  % grad[#1]
 \newcommand{\gradrbog}[1]{\nabla_{\! r}\lb #1 \rb}  % grad[#1]
 \newcommand{\gradrbogEB}[3]{\nabla_{\! r}\lb #1 \rb\;#2\;#3}  % grad[#1]
@@ -2052,10 +2060,6 @@ $$
 \newcommand{\bog}[1]{{\mathcal B}[e]}
 \newcommand{\append}{+\!\!+}
 \newcommand{\freevars}[1]{\mathit{fvs}(#1)}
-
-\newenvironment{codearray}[1]
-               {\renewcommand{\arraystretch}{1.0} \begin{array}[t]{@{}#1}}
-               {\end{array}}
 
 \begin{figure*}
   \def\mcol#1{\multicolumn{3}{l}{#1}}
@@ -2230,7 +2234,7 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
 See Figure~\ref{fig:ksc-bog-ad} for BOG-style AD for \ksc.
 This Figure
 assumes that the input language is a \emph{single-use dialect} of \ksc,
-in which every binder is used exactly once.  (Or at most once, I'm not quite sure yet.)
+in which every binder is used exactly once.
 
 Where is this assumption used?   The reverse-pass transformation $\gradrbogEB{e}$ creates
 a let-binding for every occurrence of a variable in $e$.  If any variable occurs more than
@@ -2243,53 +2247,51 @@ Note: In place of $\bog{e}$ (a data structure) we could use a partial applicatio
 
 
 \begin{figure*}
+  \small
   \def\mcol#1{\multicolumn{3}{l}{#1}}
-  \def\mkhead#1{\multicolumn{3}{l}{\begin{minipage}[t]{0.45\columnwidth}#1\end{minipage}}}
+  \def\mkhead#1{\multicolumn{3}{l}{\begin{minipage}[t]{0.45\linewidth}#1\end{minipage}}}
   \def\cps<#1===#2>{$#1$   &   $=$   &    $#2$}
+
+\def\doexprbase#1#2#3{
+  $\vecl{#1}$ & \multicolumn{2}{l}{$\vecl{#2}$} & \multicolumn{3}{l}{$\vecl{#3}$}
+}
 
 \def\doexpr#1#2#3#4#5#6{
   % Expr & Fwd & RevArgs & Rev
-  $#1$ & \multicolumn{2}{l}{$\gradfbog{e} = #2$}
-       & \multicolumn{3}{l}{$\gradrbog{e} \; #3 \; #4 \; #5 = #6$}
+  \doexprbase{#1}
+    {\gradfbog{e} = #2}
+    {\gradrbog{e} \; #3 \; #4 \; #5 = #6}
 }
 \def\comment#1{
-  \multicolumn{6}{l}{#1}\\
+  \multicolumn{6}{l}{\parbox{\linewidth}{#1}}\\
 }
-
-  \fbox{\begin{minipage}{\textwidth}
-      This figure assumes the single-use dialect of \ksc{},
-      in which every binder is used at most once.
-$$
-\begin{codearray}{ll}
-  \mbox{\bf Original function}   & f : S \to T \\
-  & f(s) = e \\[1mm]
-\end{codearray} 
-$$
 
 \def\body{\sigma}
 \def\dt{\gradf t}
 \def\de{\gradf e}
 
 \begin{tabular}[t]{lclrcl}
-\mkhead{
-\text{\bf Forward BOG}
-\begin{align*}
- &\fbog{f} : S \to (T,\bog{e})\\
- &\fbog{f}(s) = \gradfbog{e} 
-\end{align*}
-If $e : T$ then $\gradfbog{e} : (T,\bog{e})$
-} &
-\mkhead{
-\text{\bf Reverse BOG}
-\begin{align*}
- &\rbog{f} : (\tangent{T},\bog{e}) \to \tangent{S} \\
- &\rbog{f}(\gradf{t},b) = \gradrbogcps{e} \dt b {\gradf s}
-\end{align*}
-If $e : E$ 
-and $\de{:}\tangent{E}$ 
-and $b{:}\bog{e}$ 
-and $\body : \tangent S$\\
-then $\gradrbogcps{e} \de b \body $ is ... 
+
+\doexprbase{
+  \text{\bf Original function}\\
+      f : S \to T \\
+   f(s) = e
+} {
+  \text{\bf Forward BOG}\\
+  \fbog{f} : S \to (T,\bog{e})\\
+  \fbog{f}(s) = \gradfbog{e} \\
+  \text{If $e : T$ then $\gradfbog{e} : (T,\bog{e})$} 
+} {
+  \text{\bf Reverse BOG}\\
+  \rbog{f} : (\tangent{T},\bog{e}) \to \tangent{S} \\
+  \rbog{f}(\gradf{t},b) = \gradrbogcps{e} \dt b {\gradf s}\\
+  \text{If $e : E$
+        and $\de{:}\tangent{E}$ 
+        and $b{:}\bog{e}$ 
+        and $\body : \tangent S$}\\
+  \text{
+        then $\gradrbogcps{e} \de b \body $ is ... 
+  }
 }
 \\
 Expression $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\ 
@@ -2303,26 +2305,31 @@ Expression $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
 \\
 \hline
 % Variable use, x
-\comment{Note: Use of $\underline{x}$ becomes binding of $\underline{\gradf x}$, which will be used in $\body$}
+\\[-10pt]
+\comment{
+Note: Use of $\underline{x}$ becomes binding of $\underline{\gradf x}$, which will be used in $\body$.  
+If $x$ is unused, it won't be bound in the reverse pass. 
+If it's used twice, there will be shadowing definitions, hence incorrect gradients, so we use $\ksid{dup}$.
+}
 \doexpr {\underline{x}} {
   (x,())
 }
 \de b \body {
-   \ksletnl {\underline{\gradf x}} = {\dt} {
+   \ksletnl {\underline{\gradf x}} = {\de} {
      \body
     }
   }
 \\
 \hline
 % let x = e1 in e2
-\comment{Note: Binding of $\underline{x}$ becomes use of $\underline{\gradf x}$, in the caller's body}
+\comment{Note: Binding of $\underline{x}$ becomes use of $\underline{\gradf x}$ in the body of $e_2$'s reverse-pass.}
 \doexpr{\kslet \underline{x} = {e_1} {e_2}} {
                          \ksletnl (x,b_1) = \gradfbog{e_1} {
                          \ksletnl (r,b_2) = \gradfbog{e_2} {
 							           (r, (b_1,b_2))
                          }}
 }
- \de {(b_1,b_2)} \body {
+ {\de_2} {(b_1,b_2)} \body {
                           \vecl{
                           \gradrbogcps{e_2} {\de_2} {b_2} (\\
                           \quad  \gradrbogcps{e_1} {\underline{\gradf x}} {b_1} \body\\
@@ -2330,7 +2337,7 @@ Expression $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
 }}
 \\ 
 % let (x, y) = e1 in e2
-\doexpr{\kslet {(x,y)} = {e_1} {e_2}} {
+\doexpr{\kslet {(\underline x,\underline y)} = {e_1} {e_2}} {
     \ksletnl (xy,b_1) = {\gradfbog{e_1}} {
       \ksletnl (x,y) = {xy} {
         \ksletnl (r,b_2) = {\gradfbog{e_2}} {
@@ -2342,23 +2349,23 @@ Expression $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
 {\de_2} {(b_1,b_2)} \body {
   \vecl{
    \gradrbogcps{e_2}{\de_2}{b_2} (\\
- \quad    \gradrbogcps{e_1}{(\gradf{x},\gradf{y})}{b_1} 
+ \quad    \gradrbogcps{e_1}{(\underline{\gradf x},\underline{\gradf y})}{b_1} 
       \body\\
    )}
    } 
 \\
 \hline
 % f(e)	
-\doexpr {f(e)} {
-    \ksletnl (a,b_e) = {\gradfbog{e}} {
-      \ksletnl (r,b_f) = {\fbog{f}(a)} {
-        (r, (b_e,b_f))
+\doexpr {f(a)} {
+    \ksletnl (v_a,b_a) = {\gradfbog{a}} {
+      \ksletnl (r,b_f) = {\fbog{f}(v_a)} {
+        (r, (b_a,b_f))
       }
     }
   }
-  \de {(b_e, b_f)} \body {
-    \ksletnl{\gradf f} = {\rbog f(\de, b_e)} {
-      \gradrbogcps{e} {\gradf f} {b_f} \body
+  \de {(b_a, b_f)} \body {
+    \ksletnl{\gradf f} = {\rbog f(\de, b_a)} {
+      \gradrbogcps{a} {\gradf f} {b_f} \body
     }
   }
 \\
@@ -2398,17 +2405,13 @@ Expression $e$ & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
   } {
     \gradrbogcps{e_f} \de {\pi_2(b_{tf})} \body
   }
-}
-\\
-\hline
-% if bogp
-%   R[et] de (get$t bogif) body
-%   R[ef] de (get$f bogif) body
-
 % -- But if typeof(BOG$t) == typeof(BOG$f), optimize to
 % if bogp
 %   R[et] de bogif body
 %   R[ef] de bogif body
+}
+\\
+\hline
 
 % build e1 (\lambda i . e2) 
 \comment{Note: Build with ``inlined'' lambda has a special rule, 
@@ -2416,19 +2419,17 @@ build with top-level function doesn't need one\footnote
 {https://github.com/microsoft/knossos-ksc/pull/407}}
 \doexpr{\ksbuild {e_1} i {e_2}} {
   \ksletnl n = {e_1} {
-    \ksletnl rbs = {\ksbuild n i {\gradfbog{e_2}}} {
-      \ksletnl (r,bs) = {\ksunzip{rbs}} {
-        (r, (n,bs))
+    \ksletnl \mathbf{rb} = {\ksbuild n i {\gradfbog{e_2}}} {
+      \ksletnl (\mathbf{r},\mathbf{b}) = {\ksunzip{\mathbf{rb}}} {
+        (\mathbf{r}, (n,\mathbf{b}))
       }
     }
   }
 }
-\de {(n, bs)} \body {% continued on next line
-\vecl{{}\\
-\hspace{-25mm}  \kssumbuild n i {\gradrbogcps {e_2} {\de[i]} {bs[i]} \body}
-}}\\
-
-
+\de {(n, bs)} \body {\\
+  \quad \kssumbuild n i {\gradrbogcps {e_2} {\de[i]} {bs[i]} \body}
+}\\
+\hline
 % % case e1 of { Inl x el; Inr y er }
 % \mkhead{
 % \begin{multline*}
@@ -2460,8 +2461,47 @@ build with top-level function doesn't need one\footnote
 %     \end{multline*}
 % }\\
 \end{tabular}
-\end{minipage}}
-\caption{BOG-style AD for ksc, continuation-passing style} \label{fig:ksc-bog-ad-cps}
+\caption{BOG-style AD for ksc core language, continuation-passing style, for the single-use dialect of \ksc{},
+      in which every binder is used exactly once.
+} \label{fig:ksc-bog-ad-cps}
+
+\begin{tabular}{llllll}
+  \hline
+  Definition & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
+  \hline
+  % dup
+  \doexprbase{\vecl{
+    \ksid{dup} : T \to (T, T)\\
+    \ksid{dup}(x) = (x, x)
+  }} {
+    \fbogid{dup}(x) = ((x, x), ())
+  } {
+    \rbogid{dup}((\dt_1, \dt_2), ()) = \dt_1 + \dt_2
+  }\\
+  \hline
+  % build
+  \doexprbase{\vecl{
+    \ksid{build} : (E, \mathbb N, (E, \mathbb N) \to T) \to \ksVec T\\
+    \ksid{build}(env, n, f) = \dots\\
+    f : (E, \mathbb N) \to T \\
+    \fbog f : (E, \mathbb N) \to (T, \bog f)\\
+    \rbog f : (\tangent{T}, \bog f) \to (\tangent{E}, ())
+  }} {
+    \vecl{
+      \fbogid{build}(env, n, f) =\\
+      \quad \ksletnl bs = {\ksid{build}(env, n, \fbog f)} {
+        \ksletnl (r,ba) = {\ksid{unzip}(bs)} {
+          (r, (n, ba))
+        }
+      }
+    }
+  } {
+    \rbogid{build}(\mathbf\dt, (n, ba)) = \\
+    \quad  \kssumbuild n i {\rbog{f}(\dt[i], ba[i])}
+    }\\
+  \hline
+\end{tabular}
+\caption{BOG-style AD for some ksc primitive functions} \label{fig:ksc-bog-ad-cps}
 \end{figure*}
 
 
