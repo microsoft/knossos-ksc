@@ -55,7 +55,7 @@ def parens(hangindent, *docs):
         RPAREN
     ])))
 
-def parens1(hangindent, *docs):
+def parens_interline(hangindent, *docs):
     return parens(hangindent, *intersperse(LINE, docs))
 
 def interline(*docs):
@@ -101,7 +101,7 @@ def pretty_Expr(ex, ctx):
         return parens(2,
                     pp_reserved("rule"), LINE,
                     pp_string(ex.name), LINE,
-                    parens1(1, *map(pp, ex.args)), LINE,
+                    parens_interline(1, *map(pp, ex.args)), LINE,
                     pp(ex.e1), LINE,
                     pp(ex.e2))
 
@@ -127,10 +127,14 @@ def pretty_Expr(ex, ctx):
     # This saves horizontal space, and may be easier to read
     # TODO: gather lets so above is let ((a 1) (b 2))?
     if isinstance(ex, Let):
+        if isinstance(ex.vars, list):
+            vars = parens_interline(2, *map(pp, ex.vars))
+        else:
+            vars = pp(ex.vars)
         return parens(0,
                     pp_reserved("let"),
                     ' ',
-                    hang(0, parens(2, pp(ex.var), LINE, pp(ex.rhs))),
+                    hang(0, parens(2, vars, LINE, pp(ex.rhs))),
                     HARDLINE,
                     pp(ex.body))
 
@@ -149,9 +153,10 @@ def pretty_Expr(ex, ctx):
 
     # Call name args
     if isinstance(ex, Call):
-        return nest(ctx.indent, parens1(2,
-            pp_function_name(ex.name),
-            *map(pp, ex.args)))
+        return nest(ctx.indent, 
+                    parens_interline(2,
+                                pp_function_name(ex.name),
+                                *map(pp, ex.args)))
 
     # Lambda arg body
     if isinstance(ex, Lam):
