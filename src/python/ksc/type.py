@@ -147,6 +147,7 @@ class Type:
     def __hash__(self):
         return hash(str(self))
 
+Type.String = Type("String")
 Type.Integer = Type("Integer")
 Type.Float = Type("Float")
 Type.Bool = Type("Bool")
