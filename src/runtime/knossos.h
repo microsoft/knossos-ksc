@@ -832,32 +832,6 @@ namespace ks
 		}
 
 		// ---------------- Scale  ------------------
-		template <class scale_t, class From, class To>
-		To Scale_aux(scale_t val, From const&);
-
-		// General case for Scale_aux<tuple>.
-		// Scale first element, then scale tail.
-		template <class scale_t, class... Ts>
-		tuple<Ts...> Scale_aux(scale_t val, tuple<Ts...> const& t)
-		{
-			return prepend(Scale_aux(val, head(t)),
-				Scale_aux(val, tail(t)));
-		}
-
-		// Base case for Scale_aux<Tuple>.  Empty tuple * val = empty tuple.
-		template <class scale_t>
-		tuple<> Scale_aux(scale_t val, tuple<> const& t)
-		{
-			return t;
-		}
-
-		// Scale anything else
-		template <class scale_t, class From, class To>
-		To Scale_aux(scale_t val, From const& t)
-		{
-			return To{ val * t };
-		}
-
 		struct Scale
 		{
 			typedef double scale_t;
