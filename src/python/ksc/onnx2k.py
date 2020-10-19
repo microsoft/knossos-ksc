@@ -19,7 +19,7 @@ import inspect
 import re
 import warnings
 
-import onnx
+import onnx, onnx.numpy_helper
 
 from ksc.utils import paren
 from ksc.type import Type
@@ -85,19 +85,42 @@ def convertType(proto):
     ety = convertElementType(proto.tensor_type.elem_type)
     return Type.Vec(ety)
 
+def get_value(init):
+    """
+    Get scalar value from a TensorProto
+    """
+    # https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/onnx.in.proto#L448
+    # Find https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/mapping.py#L49 
+    
+    a = onnx.numpy_helper.to_array(init)
+
+    ksty = convertElementType(init.data_type)
+
+    if ksty == Type.Bool:
+        return Const(bool(a))
+
+    if ksty == Type.Float:
+        return Const(float(a))
+
+    if ksty == Type.Integer:
+        return Const(int(a))
+
+    field = onnx.mapping.STORAGE_TENSOR_TYPE_TO_FIELD[init.data_type]
+    if not field:
+        raise NotImplementedError(f"field Type {field} {init.data_type}, {init}")
+
+    value = getattr(init, field)
+    if not value:
+        raise NotImplementedError(f"value {init.int32_data} {field} {value} {init.data_type}\n{init}")
+
+    return Const(value)
+
 def get_values(init):
     """
     Get values from a TensorProto
     """
-    # https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/onnx.in.proto#L448
-    
-    if init.data_type == TensorProto.INT64:
-        return [Const(i) for i in init.int64_data]
-
-    if init.data_type == TensorProto.FLOAT:
-        return [Const(i) for i in init.float_data]
-
-    raise NotImplementedError(f"Type {init.data_type}")
+    a = onnx.numpy_helper.to_array(init)
+    return [Const(v) for v in a]
 
 def emit_inits(inits, body):
     """
@@ -108,8 +131,12 @@ def emit_inits(inits, body):
         if len(init.dims) == 1 and init.dims[0] < 16:
             # Putative vec constructor
             value = Call("vec", get_values(init))
+
+        elif len(init.dims) == 0:
+            value = get_value(init)
         else:
             value = Const(f"{init.dims}@{convertElementType(init.data_type)}")
+
         body = Let(var, value, body)
     return body
 
