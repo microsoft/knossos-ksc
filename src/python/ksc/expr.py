@@ -2,7 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import Union
+from typing import Union, List
 from ksc.type import Type
 from ksc.utils import paren
 
@@ -176,7 +176,7 @@ class Call(Expr):
     ```
     '''
     name: str
-    args: list
+    args: List[Expr]
 
 class Lam(Expr):
     '''Lam(arg, body).
@@ -191,15 +191,20 @@ class Lam(Expr):
     body: Expr
 
 class Let(Expr):
-    '''Let(var, rhs, body). 
+    '''Let(vars, rhs, body). 
     Example:
     ```
     (let (a    1)   (add a a))
           ^    ^    ^^^^^^^^^
           var  rhs  body
     ```
+    ```
+    (let ((a b)  (tuple p q))   (add a a))
+          ^      ^              ^^^^^^^^^
+          var    rhs            body
+    ```
     '''
-    var: Var
+    vars: Union[Var, List[Var]]
     rhs: Expr
     body: Expr
 
