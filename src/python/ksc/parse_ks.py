@@ -138,6 +138,7 @@ def parse_expr(se):
         ans = parse_expr(se[2])
         for b in bindings[::-1]:
             check(len(b) == 2, "Let bindings should be pairs", b, "in", se)
+            # TODO: bindings could be tupled
             var = Var(parse_name(b[0]), None, False)
             rhs = parse_expr(b[1])
             ans = Let(var, rhs, ans)
