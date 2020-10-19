@@ -5,7 +5,22 @@
 {
 	"version": "0.2.0",
 	"configurations": [
-        {
+		{
+			"name": "Python: Current File",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"args": [
+				"test/onnx2k/bert-tiny-uncased_L_3_H_128_A_2_V_30528_S_512_Dp_0.1_optimized_layer_norm_opset12_bw.onnx",
+				"obj/test/onnx2k/bert-tiny-bw.ks"
+			],
+			"env" : {
+				"PYTHONPATH": "./src/python"
+			},
+			"console": "integratedTerminal",
+			"justMyCode": false
+		},
+		{
 			"name": "Run Extension",
 			"type": "extensionHost",
 			"request": "launch",
@@ -24,8 +39,13 @@
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bin/ksc-mlir",
-			"_args": ["TEST"],
-			"args": ["LLVM", "${workspaceFolder}/mlir/test/Ksc/tuple.ks"],
+			"_args": [
+				"TEST"
+			],
+			"args": [
+				"LLVM",
+				"${workspaceFolder}/mlir/test/Ksc/tuple.ks"
+			],
 			"_miDebuggerPath": "/usr/bin/gdb",
 			"MIMode": "gdb",
 			"setupCommands": [
@@ -37,8 +57,8 @@
 			],
 			"externalConsole": false,
 			"logging": {
-			  "moduleLoad": false,
-			  "trace": true
+				"moduleLoad": false,
+				"trace": true
 			}
 		},
 		{
