@@ -125,28 +125,19 @@ def onnx2ks(g):
         op = node.op_type
         args = [useVar(i) for i in node.input]
         rhs = Call(op, args)
+        # (let ((out1 ... outN) (op args))
+        #   body)
 
-        if len(node.output) == 1:
-            # (let (out (op args)) rest)
-            out = useVar(node.output[0])
-            if body == None:
-                body = Let(out, rhs, out) # Preserve the variable name, for debugging
-            else:
-                body = Let(out, rhs, body)
-        else:
-            if body == None:
-                body = rhs # Just emit the rhs tuple
-            else:
-                # (let (tmp (op args))
-                # (let (out1 (get$1 tmp))
-                #       ...
-                # (let (outN (get$N tmp))
-                #   body)
-                tmp = useVar("tmp")
-                for i,o in enumerate(node.output):
-                    body = Let(useVar(o), Call(f"get${i}", [tmp]), body)
-                
-                body = Let(tmp, rhs, body)
+        vars = [useVar(o) for o in node.output]
+        if len(vars) == 1:
+            vars = vars[0]
+
+        if body == None:
+            # Innermost body: just reference the output vars
+            body = vars 
+
+        # Wrap previous body in a let
+        body = Let(vars, rhs, body)
 
     inputs = set([i.name for i in g.input])
 
