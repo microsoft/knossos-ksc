@@ -11,6 +11,8 @@ from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If
 from ksc.parse_ks import parse_ks_file
 
 def handle_let(let_var, let_expr, body, indent=4):
+    if isinstance(let_var, list):
+        raise NotImplementedError("tuple-bound let") 
     joiner = "\n" + (" " * indent)
     lambda_expr = joiner.join([
         f"let(var={let_expr},",
@@ -122,7 +124,7 @@ class Translator:
         # (let ((var expr) ...) body)
         if isinstance(ex, Let):
             return handle_let(
-                ex.var,
+                ex.vars,
                 self.handle_body(ex.rhs, indent+2),
                 self.handle_body(ex.body, indent+2),
                 indent=indent+2 # inner most indent
