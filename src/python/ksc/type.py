@@ -21,12 +21,12 @@ class Type:
         return Type("Tuple", args)
 
     @staticmethod
-    def Lam(return_type, arg_type):
-        return Type("Lam", [return_type, arg_type])
+    def Lam(type, arg_type):
+        return Type("Lam", [type, arg_type])
 
     @staticmethod
-    def LM(return_type, arg_type):
-        return Type("LM", [return_type, arg_type]) 
+    def LM(type, arg_type):
+        return Type("LM", [type, arg_type]) 
 
     @staticmethod
     def Index(vec):
@@ -34,6 +34,16 @@ class Type:
             return None
         assert vec.kind == "Vec"
         return vec.children[0]
+
+    @staticmethod
+    def fromValue(val):
+        if isinstance(val, int):
+            return Type.Integer
+        if isinstance(val, float):
+            return Type.Float
+        if isinstance(val, str):
+            return Type.String
+        raise NotImplementedError(f"Typeof {val}")
 
     def __init__(self, kind, children=[]):
         if kind not in Type.node_kinds:
