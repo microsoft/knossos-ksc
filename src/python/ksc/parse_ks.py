@@ -5,6 +5,20 @@ import sexpdata
 from ksc.type import Type
 from ksc.utils import ensure_list_of_lists
 from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import pystr
+
+# Pretty printing
+# Importing prettyprint to get the decorated printers for Expression and Type
+import ksc.prettyprint # pylint: disable=unused-import
+
+# Import the prettyprinter routines we use explicitly in this file
+from prettyprinter import cpprint, pprint, pformat
+
+# Needed this in order to see the error messages when pprint fails
+import warnings
+warnings.filterwarnings("always")
+
+
 
 #####################################################################
 ## S-expression Utils
@@ -225,4 +239,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
