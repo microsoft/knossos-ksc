@@ -35,6 +35,7 @@ tab = "\t"
 from contextlib import contextmanager
 
 # https://stackoverflow.com/a/41904558/35544
+# submodule_search_locations doesn't work for this
 @contextmanager
 def add_to_path(p):
     import sys
@@ -90,7 +91,10 @@ symbolLook = {
     "Tensor": [
         sexpdata.Symbol("Vec"),
         [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
-    ]  # float vs integer? also determine rank instead of hardcode
+    ],  # float vs integer? also determine rank instead of hardcode
+    "int" : [
+        sexpdata.Symbol("Integer")
+    ]
 }
 
 
