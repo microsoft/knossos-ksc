@@ -128,14 +128,17 @@ def emit_inits(inits, body):
     """
     for init in reversed(inits):
         var = useVar(init.name)
+
         if len(init.dims) == 1 and init.dims[0] < 16:
             # Putative vec constructor
             value = Call("vec", get_values(init))
 
         elif len(init.dims) == 0:
             value = get_value(init)
+
         else:
-            value = Const(f"{init.dims}@{convertElementType(init.data_type)}")
+            nptype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[init.data_type] 
+            value = Call(f"load-from-onnx-{nptype}", [*(Const(x) for x in init.dims), Const(var.name)])
 
         body = Let(var, value, body)
     return body
