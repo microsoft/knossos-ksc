@@ -11,6 +11,7 @@
 #include <iostream>
 #include <random>
 #include <cmath>
+#include <cstring>
 #include <string>
 #include <chrono>
 
@@ -250,7 +251,7 @@ namespace ks
 		{
 			KS_ASSERT(size < 1000000);
 			void* ret = buf_ + top_;
-			top_ += ((size + 15) / 16) * 16;
+			top_ += padded_size(size);
 			if (top_ > peak_) {
 				peak_ = top_;
 				KS_ASSERT(top_ < max_size_);
@@ -258,9 +259,13 @@ namespace ks
 			return ret;
 		}
 
+		static size_t padded_size(size_t size) { return ((size + 15) / 16) * 16; }
+
 		size_t mark() const { return top_;  }
 
 		void* top_ptr() const { return buf_ + top_; }
+
+		void* marked_ptr(size_t m) const { return buf_ + m; }
 
 		void reset(size_t top = 0)
 		{
@@ -430,10 +435,14 @@ namespace ks
 
 		void allocate(allocator * alloc, size_t size)
 		{
-			void *storage = alloc->allocate(sizeof(T) * size);
+			void *storage = alloc->allocate(bytes_required(size));
 			this->size_ = size;
 			this->data_ = (T*)storage;
 			this->is_zero_ = false;
+		}
+
+		static size_t bytes_required(size_t size) {
+			return sizeof(T) * size;
 		}
 
                 // We can efficiently copy construct (i.e. from a vec
@@ -484,6 +493,9 @@ namespace ks
 		}
 
 		int size() const { return int(size_); }
+
+		T* data() { return data_; }
+		const T* data() const { return data_; }
 
 		T& operator[](int i) { if (is_zero_) return z_; else return data_[i]; }
 		T const& operator[](int i) const {  if (is_zero_) return z_; else return data_[i]; }
@@ -621,6 +633,209 @@ namespace ks
 		for (int i = 0; i < t.size(); ++i)
 			ret[i] = inflated_deep_copy(alloc, t[i]);
 		return ret;
+	}
+
+	// The number of bytes that would be required from the
+	// allocator to store an inflated copy of the given object
+	template<class T>
+	size_t inflated_bytes(T const&) { return 0; }
+
+	template<class TupleT, size_t... Indices>
+	size_t inflated_bytes_tupleimpl(TupleT const& t, std::index_sequence<Indices...>) {
+		return ((size_t)0 + ... + inflated_bytes(std::get<Indices>(t)));
+	}
+	template<class... Types>
+	size_t inflated_bytes(tuple<Types...> const& t) {
+		return inflated_bytes_tupleimpl(t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	size_t inflated_bytes(vec<T> const& v) {
+		int sz = v.size();
+		size_t ret = allocator::padded_size(vec<T>::bytes_required(sz));
+		for (int i = 0; i != sz; ++i) {
+			ret += inflated_bytes(v[i]);
+		}
+		return ret;
+	}
+
+	// ===============================  Copydown  ==================================
+
+	struct prepare_copydown_state
+	{
+		unsigned char * subobjectDestination;   // destination of the next vec subobject
+		                                        // (updated whenever we encounter a vec during iteration over subobjects)
+		unsigned char * const startOfDestination;   // destination of first vec in the iteration sequence
+		allocator * alloc;
+	};
+
+	template<class T>
+	void prepare_copydown_inplace(prepare_copydown_state *, T *) {
+		/* There's nothing to do unless T has a vec subobject. */
+	}
+
+	template<class TupleT, size_t... Indices>
+	void prepare_copydown_inplace_tupleimpl(prepare_copydown_state * dest, TupleT * t, std::index_sequence<Indices...>) {
+		((prepare_copydown_inplace(dest, &std::get<Indices>(*t))), ...);
+	}
+
+	template<class... Types>
+	void prepare_copydown_inplace(prepare_copydown_state * dest, tuple<Types...> * t) {
+		prepare_copydown_inplace_tupleimpl(dest, t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	void prepare_copydown_inplace(prepare_copydown_state * dest, vec<T> * v) {
+		/* Note that this function modifies *v in-place. That's OK
+		   provided that *v lives either
+		   - on the stack; or
+		   - in the allocator's buffer *after* dest->startOfDestination,
+		   because in the latter case, all of this memory will be overwritten
+		   by the copydown anyway, or freed when the allocator is reset.
+		   We'll make sure that this function is never called with an argument
+		   that lives in the allocator's buffer before dest->startOfDestination.
+		   */
+		if (v->is_zero()) {
+			int sz = v->size();
+			if (sz != 0) {
+				T zero_value = (*v)[0];
+				/* When we do the copydown, we'll be making sz copies
+				   of zero_value. We need to make sure that none of those
+				   copies will overwrite data referred to by zero_value.
+				   The strictest condition applies when the final copy
+				   is made, so we can start by assuming that the first
+				   (sz - 1) copies will be fine. */
+				dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz))
+						+ (sz - 1) * inflated_bytes(zero_value);
+				prepare_copydown_inplace(dest, &zero_value);
+				*v = vec<T>(zero_tag, zero_value, sz);
+			}
+		} else {
+			void * sourceData = v->data();
+			if (sourceData < dest->startOfDestination) {
+				/* This data lives before the copydown location in the buffer.
+				   We assume that this means it can't contain any pointers to
+				   data after the copydown location, so we don't need to move
+				   any of the data belonging to subobjects of *v.
+				   That's fortunate, because we wouldn't be allowed to modify
+				   objects before the copydown location even if we wanted to. */
+				dest->subobjectDestination += inflated_bytes(*v);
+			} else {
+				int sz = v->size();
+				if (sourceData < dest->subobjectDestination) {
+					/* This source overlaps the desination of another subobject that comes
+					   earlier in the iteration order. We need to move it out of the way. */
+					if (dest->alloc->top_ptr() < dest->subobjectDestination) {
+						/* Make sure we're not about to copy to a place which is still
+						   in the way! */
+						dest->alloc->allocate(dest->subobjectDestination - (unsigned char*)dest->alloc->top_ptr());
+					}
+					*v = vec<T>(dest->alloc, sz);
+					std::memcpy(v->data(), sourceData, sz * (int)sizeof(T));
+				}
+				dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz));
+				for (int i = 0; i != sz; ++i) {
+					prepare_copydown_inplace(dest, &((*v)[i]));
+				}
+			}
+		}
+	}
+
+	/* Copy some of the data referred to by val if necessary,
+	   returning a modified version of val which meets the
+	   precondition for copydown_by_memmove below.
+
+	   This function works by calculating where the eventual
+	   destination will be for the data of each vec subobject.
+	   This involves replicating the sequence of allocations
+	   that will take place, but without actually calling
+	   an allocator.
+
+	   Assumes that "mark" is not in the middle of an allocation
+	   (see comment for copydown_by_memmove). */
+	template<class T>
+	T prepare_copydown(allocator * alloc, alloc_mark_t mark, T val) {
+		unsigned char * start = static_cast<unsigned char*>(alloc->marked_ptr(mark));
+		prepare_copydown_state dest{ start, start, alloc };
+		prepare_copydown_inplace(&dest, &val);
+		return val;
+	}
+
+	template<class T>
+	void copydown_by_memmove_inplace(allocator *, T *) { }
+
+	template<class TupleType, size_t... Indices>
+	void copydown_by_memmove_inplace_tuple(allocator * alloc, TupleType * t, std::index_sequence<Indices...>) {
+		((copydown_by_memmove_inplace(alloc, &std::get<Indices>(*t))), ...);
+	}
+	template<class... Types>
+	void copydown_by_memmove_inplace(allocator * alloc, tuple<Types...> * t) {
+		copydown_by_memmove_inplace_tuple(alloc, t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	void copydown_by_memmove_inplace(allocator * alloc, vec<T> * v) {
+		int sz = v->size();
+		if (v->is_zero()) {
+			if (sz != 0) {
+				T elem = (*v)[0];
+				*v = vec<T>(alloc, sz);
+				for (int i = 0; i != sz; ++i) {
+					(*v)[i] = elem;
+				}
+			}
+		} else {
+			T* oldData = v->data();
+			*v = vec<T>(alloc, sz);
+			std::memmove(v->data(), oldData, static_cast<size_t>(sz) * sizeof(T));
+		}
+		for (int i = 0; i != sz; ++i) {
+			copydown_by_memmove_inplace(alloc, &((*v)[i]));
+		}
+	}
+
+	/* Perform a copydown by iterating over the subobjects of val;
+	   for each subobject which is a vec, copy its data to the
+	   desired position using memmove.
+
+	   Precondition: for each vec<T> suboject v, there must be no
+	   overlap between the intervals
+	     [v.data(), v.data() + v.size()*sizeof(T)) and
+	     [alloc->marked_ptr(mark), newvdata)
+	   where newvdata is the intended new value of v.data() after
+	   copydown.
+	   (If this condition was not satisfied, then v's data would
+	   be overwritten before we got the chance to move it, because
+	   the interval [alloc->marked_ptr(mark), newvdata) contains
+	   the destinations of subobjects which come before v in the
+	   iteration order.)
+
+	   If we assume that "mark" is always at the boundary of an
+	   allocation, not in the middle of one, then the precondition
+	   reduces to ensuring that v.data() is not in the interval
+	   [alloc->marked_ptr(mark), newvdata).
+	   */
+	template<class T>
+	T copydown_by_memmove(allocator * alloc, alloc_mark_t mark, T val)
+	{
+		alloc->reset(mark);
+		copydown_by_memmove_inplace(alloc, &val);
+		return val;
+	}
+
+	/* Make a deep copy of the given object such that its allocations
+	   start at the marked position, then reset the allocator to
+	   the endpoint of the allocations for this object. That is, we
+	   reclaim (and may overwrite) all of the memory of existing objects
+	   which come after the marked position in the buffer.
+
+	   Note that the original object val may itself refer to memory
+	   which overlaps the copydown destination. */
+	template<class T>
+	T copydown(allocator * alloc, alloc_mark_t mark, T const& val)
+	{
+		T modified_val = prepare_copydown(alloc, mark, val);
+		return copydown_by_memmove(alloc, mark, modified_val);
 	}
 
 	// specialize inplace_add(vec<T>*,vec<T>)
