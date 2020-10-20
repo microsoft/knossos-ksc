@@ -164,24 +164,27 @@ def make_list_init(values):
 def make_list(node):
     value = node.outputsAt(0)
 
-    list_size = str(sum(1 for _ in node.inputs()))
-    return [
-        sexpdata.Symbol("\n"),
-        sexpdata.Symbol("_" + value.debugName()),
-        [
-            sexpdata.Symbol("build"),
-            sexpdata.Symbol(list_size),
+    list_size = sum(1 for _ in node.inputs())
+    if list_size == 0:
+        return [] # may not be very practical on the Knossos side, some of the TorchScript workarounds currently mutates in place
+    else:
+        return [
+            sexpdata.Symbol("\n"),
+            sexpdata.Symbol("_" + value.debugName()),
             [
-                sexpdata.Symbol("lam"),
+                sexpdata.Symbol("build"),
+                sexpdata.Symbol(str(list_size)),
                 [
-                    sexpdata.Symbol("ni"),
-                    sexpdata.Symbol(":"),
-                    sexpdata.Symbol("Integer"),
+                    sexpdata.Symbol("lam"),
+                    [
+                        sexpdata.Symbol("ni"),
+                        sexpdata.Symbol(":"),
+                        sexpdata.Symbol("Integer"),
+                    ],
+                    make_list_init(list(node.inputs())),
                 ],
-                make_list_init(list(node.inputs())),
             ],
-        ],
-    ]
+        ]
 
 
 def make_tensor(node):
