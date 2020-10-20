@@ -114,7 +114,10 @@ def pretty_Expr(ex, ctx):
 
     # Constants just use str()
     if isinstance(ex, Const):
-        return repr(ex.value)
+        if isinstance(ex.value, str):
+            return f"\"{ex.value}\""
+        else:
+            return repr(ex.value)
 
     # Let bindings are printed with no indent, so e.g. print as
     # (let (a  1)
