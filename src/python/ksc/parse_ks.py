@@ -186,12 +186,34 @@ def parse_tld(se):
 ################################################################
 import argparse
 import sys
+import re
 
 def s_exps_from_string(string_or_stream):
     return sexpdata.Parser(string_or_stream, nil=None, true="true", false="false", line_comment=";").parse()
 
-def parse_ks_file(string_or_stream):
-    for s_exp in s_exps_from_string(string_or_stream):
+def strip_block_comments(string):
+    # Strip block comments
+    regex = r"""\#\|               # hash bar
+                    (
+                        [^\|\#]+    # Seq of (not bar or hash)
+                    |               # or...
+                        (\|(?!\#))  # (bar not followed by hash)
+                    |               # or...
+                        (\#(?!\|))  # (hash not followed by bar)
+                    )*             # many times 
+                    \|\#           # bar hash
+                """
+    regex = re.compile(regex, flags=re.DOTALL | re.VERBOSE)
+    while True:
+        string, n = re.subn(regex, '', string)
+        if n == 0:
+            # print(f"Zapped {n} block comment(s)")
+            return string    
+
+def parse_ks_string(string):
+    string = strip_block_comments(string)
+
+    for s_exp in s_exps_from_string(string):
         try:
             yield parse_tld(s_exp)
             
@@ -199,16 +221,19 @@ def parse_ks_file(string_or_stream):
             print("ERROR at ", s_exp)
             print(sys.exc_info()[1])
 
+def parse_ks_file(filename):
+    with open(filename) as f:
+        ks_str = f.read()
+        return parse_ks_string(ks_str)
+
 def main():
-    parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
-    parser.add_argument("input_ks_file", type=str)
+    parser = argparse.ArgumentParser(prog="parse_ks.py", description=__doc__)
+    parser.add_argument("input_ks_file", nargs='?', type=str, default="test/ksc/syntax-primer.ks")
     args = parser.parse_args()
 
-    with open(args.input_ks_file) as f:
-        ks_str = f.read()
-        for x in parse_ks_file(ks_str):
-            cpprint(x)
-            print(pystr(x, 0))
+    for x in parse_ks_file(args.input_ks_file):
+        cpprint(x)
+        print(pystr(x, 0))
 
 if __name__ == "__main__":
     sys.exit(main())
