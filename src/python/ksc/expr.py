@@ -245,6 +245,10 @@ class Assert(Expr):
 # way to write recursive tree transformations.
 
 from functools import singledispatch
+
+def pyname(s : str) -> str:
+    return s.replace('$','_s')
+
 def nl(indent):
     return "\n" + "  " * indent
 
@@ -259,23 +263,30 @@ def pystr(expr, indent=0):
     # Default implementation, for types not specialized below
     return str(expr)
 
+@pystr.register(Type)
+def _(ty, indent):
+    if len(ty.children) == 0 and (ty.kind != "Tuple"):
+        return ty.kind
+    elems = [pystr(c, indent+1) for c in ty.children]
+    return ty.kind + "[" + ",".join(map(pystr, elems)) + "]"    
+
 @pystr.register(Def)
 def _(ex, indent):
     indent += 1
-    return "def " + ex.name + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
+    return "def " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
            + pystr(ex.return_type, indent) + ":" \
            + nl(indent+1) + pystr(ex.body, indent+1)
 
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "edef " + ex.name + "(" + pystr_intercomma(indent, ex.args) + ") -> "\
+    return "#edef " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.args) + ") -> "\
            + pystr(ex.return_type, indent) + nl(indent)
 
 @pystr.register(Rule)
 def _(ex, indent):
     indent += 1
-    return "@rule\ndef " + ex.name + " " + "(" + pystr(ex.args, indent) + ")" + ":" + nl(indent) \
+    return "@rule\ndef " + pyname(ex.name) + " " + "(" + pystr(ex.args, indent) + ")" + ":" + nl(indent) \
            + pystr(ex.e1, indent+1) + nl(indent) \
            + "<===> " + nl(indent) \
            + pystr(ex.e2, indent+1)
@@ -287,24 +298,24 @@ def _(ex, indent):
 @pystr.register(Var)
 def _(ex, indent):
     if ex.decl:
-        return ex.name + ": " + str(ex.type)
+        return pyname(ex.name) + ": " + pystr(ex.type, indent)
     else:
-        return ex.name
+        return pyname(ex.name)
 
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
-    return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
+    return pystr(pyname(ex.name), indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
 def _(ex, indent):
     indent += 1
-    return "{lambda (" + pystr(ex.arg, indent) + "): " + nl(indent+1)\
-            + pystr(ex.body, indent+1) + "}"
+    return "lambda " + pyname(ex.arg.name) + ": " + nl(indent+1)\
+            + "(" + pystr(ex.body, indent+1) + ")"
 
 @pystr.register(Let)
 def _(ex, indent):
-    return pystr(ex.var, indent) + " = " + pystr(ex.rhs, indent+1) + nl(indent) \
+    return pystr(ex.vars, indent) + " = " + pystr(ex.rhs, indent+1) + nl(indent) \
          + pystr(ex.body, indent)
 
 @pystr.register(If)
