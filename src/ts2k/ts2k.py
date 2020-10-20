@@ -97,6 +97,14 @@ symbolLook = {
     ]
 }
 
+# We're going to have to break out the data structure at some point, for now, hardcode
+# No recursive literals
+symbolLook["Tuple[int, Tensor]"] = [
+    sexpdata.Symbol("Tuple"),
+    symbolLook["int"],
+    symbolLook["Tensor"]
+]
+
 
 def mangleDebugName(name):
     return "_" + name.replace(".", "_")
@@ -177,7 +185,7 @@ def make_list(node):
 
 
 def make_tensor(node):
-    # tensors aren't explicitly modelled in Knossos yet, leave them as identify over a (jagged) list for now
+    # tensors aren't explicitly modelled in Knossos yet, leave them as identity over a (jagged) list for now
     value = node.outputsAt(0)
 
     return [
