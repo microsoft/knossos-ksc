@@ -8,7 +8,7 @@ import ksc.backends
 from ksc.backends import specs
 from ksc.type import Type
 from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If
-from ksc.parse_ks import parse_ks_file
+from ksc.parse_ks import parse_ks_string
 
 def handle_let(let_var, let_expr, body, indent=4):
     if isinstance(let_var, list):
@@ -197,7 +197,7 @@ def {name}({args}):
 
     def parse_defs(self, string_or_stream):
         defs_to_process = []
-        for tld in parse_ks_file(string_or_stream):
+        for tld in parse_ks_string(string_or_stream):
             if isinstance(tld, EDef):
                 name = tld.name
                 py_name = self.normalize_def_name(name)
@@ -205,7 +205,7 @@ def {name}({args}):
                     # if it is built-in no need to edef
                     print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)                    
                     continue
-                edef = _EDef(name, py_name, tld.return_type)
+                edef = _EDef(name, py_name, tld.type)
                 self._edefs[name] = edef
             elif isinstance(tld, Def):
                 name = tld.name

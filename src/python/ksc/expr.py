@@ -18,12 +18,12 @@ from ksc.utils import paren
 # Def: Function definition
 # (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
 #      ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
-#      name  return_type  args                            body
+#      name  type  args                            body
 #
 # Edef: Declaration for externally-supplied function
 # (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
 #       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#       name  return_type  args
+#       name  type  args
 #
 # Rule: Rewrite rule for the Knossos optimizer 
 # (rule "add0"  (a : Float) (add a 0) a)
@@ -72,8 +72,10 @@ from ksc.utils import paren
 
 class Expr:
     '''Base class for AST nodes.'''
-    def __init__(self, *args):
-        for (nt,v) in zip(self.__annotations__, args):
+    type: Type
+
+    def __init__(self, **args):
+        for (nt,v) in args.items():
             setattr(self, nt, v)
 
     def __eq__(self, that):
@@ -96,31 +98,35 @@ class Expr:
         return paren(type(self).__name__ + ' ' + ' '.join(str(node) for node in self.nodes()))
 
 class Def(Expr):
-    '''Def(name, return_type, args, body). 
+    '''Def(name, type, args, body). 
     Example:
     ```
     (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
-         name  return_type  args                            body
+         name  type  args                            body
     ```
     '''
     name: str
-    return_type: Type
     args: list
     body: Expr
 
+    def __init__(self, name, type, args, body):
+        super().__init__(type=type, name=name, args=args, body=body)
+
 class EDef(Expr):
-    '''Edef(name, return_type, args). 
+    '''Edef(name, type, args). 
     Example:
     ```
     (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
           ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          name  return_type  args
+          name  type  args
     ```
     '''
     name: str
-    return_type: Type
     args: list
+
+    def __init__(self, name, type, args):
+        super().__init__(type=type, name=name, args=args)
 
 class Rule(Expr):
     '''Rule(name, args, e1, e2). 
@@ -136,6 +142,9 @@ class Rule(Expr):
     e1: Expr
     e2: Expr
 
+    def __init__(self, name, args, e1, e2):
+        super().__init__(type=None, name=name, args=args, e1=e1, e2=e2)
+
 class Const(Expr):
     '''Const(value). 
     Examples:
@@ -146,6 +155,9 @@ class Const(Expr):
     ```
     '''
     value: Union[int, str, float, bool]
+
+    def __init__(self, value):
+        super().__init__(type=Type.fromValue(value), value=value)
 
     def __str__(self):
         return repr(self.value)
@@ -163,8 +175,10 @@ class Var(Expr):
     ```
     '''
     name: str
-    type: Type
     decl: bool
+
+    def __init__(self, name, type, decl):
+        super().__init__(type=type, name=name, decl=decl)
 
 class Call(Expr):
     '''Call(name, args). 
@@ -178,6 +192,9 @@ class Call(Expr):
     name: str
     args: List[Expr]
 
+    def __init__(self, name, args):
+        super().__init__(name=name, args=args)
+
 class Lam(Expr):
     '''Lam(arg, body).
      Example:
@@ -189,6 +206,9 @@ class Lam(Expr):
     '''
     arg: Var
     body: Expr
+
+    def __init__(self, arg, body):
+        super().__init__(type=None, arg=arg, body=body)
 
 class Let(Expr):
     '''Let(vars, rhs, body). 
@@ -208,6 +228,10 @@ class Let(Expr):
     rhs: Expr
     body: Expr
 
+    def __init__(self, vars, rhs, body):
+        super().__init__(type=None, vars=vars, rhs=rhs, body=body)
+
+
 class If(Expr):
     '''If(cond, t_body, f_body). 
     Example:
@@ -221,6 +245,9 @@ class If(Expr):
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
 
+    def __init__(self, cond, t_body, f_body):
+        super().__init__(type=None, cond=cond, t_body=t_body, f_body=f_body)
+
 class Assert(Expr):
     '''Assert(cond, body).
     Example:
@@ -233,6 +260,8 @@ class Assert(Expr):
     cond: Expr    # Condition
     body: Expr    # Value if true
 
+    def __init__(self, cond, body):
+        super().__init__(type=None, cond=cond, body=body)
 
 #####################################################################
 # pystr:
@@ -274,14 +303,14 @@ def _(ty, indent):
 def _(ex, indent):
     indent += 1
     return "def " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
-           + pystr(ex.return_type, indent) + ":" \
+           + pystr(ex.type, indent) + ":" \
            + nl(indent+1) + pystr(ex.body, indent+1)
 
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
     return "#edef " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.args) + ") -> "\
-           + pystr(ex.return_type, indent) + nl(indent)
+           + pystr(ex.type, indent) + nl(indent)
 
 @pystr.register(Rule)
 def _(ex, indent):
@@ -328,3 +357,8 @@ def _(ex, indent):
     indent += 1
     return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) \
             + pystr(ex.body, indent)
+
+if __name__ == "__main__":
+    from ksc.parse_ks import parse_ks_file
+    for decl in parse_ks_file("test/ksc/syntax-primer.ks"):
+        print(pystr(decl))
