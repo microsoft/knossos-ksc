@@ -1,9 +1,10 @@
 import pytest
+import re
 
 from ksc.type import Type
 from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 
-from ksc.parse_ks import parse_tld, parse_expr, ParseError, s_exps_from_string
+from ksc.parse_ks import parse_tld, parse_expr, ParseError, s_exps_from_string, strip_block_comments
 
 def expr(s):
     return parse_expr(s_exps_from_string(s)[0])
@@ -61,6 +62,30 @@ def test_errors():
         expr("(let (a) 2)")
     with pytest.raises(ParseError, match='Constant tuple should be all the same type'):
         expr("(2 2 3.2)")
+
+def check(pattern, s):
+    assert re.match(re.compile(pattern, flags=re.DOTALL | re.MULTILINE), strip_block_comments(s))
+
+def test_comments():
+    check(r"^A  1$", "A #| b |# 1")
+    check(r"^\s+stay\s+$", """
+            #| go | 
+        ;      # go |#
+        stay
+            #|O1  | #|O2|C2|#|# 
+            """)
+    check(r"^\s+a\s+b\s+c\s+d\s+$", """
+    #| x | 
+;      # y |#
+a
+    #|O1  | #|O2|C2|#|# b
+c #|# |#d
+    #|d  | #||#|#
+
+
+    #|  | #||#|#
+    """)
+
 
 if __name__ == "__main__":
     test_parses()
