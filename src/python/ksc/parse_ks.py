@@ -195,7 +195,7 @@ def strip_block_comments(string):
     # Strip block comments
     regex = r"""\#\|               # hash bar
                     (
-                        [^\|\#]+    # Seq of (not bar or hash)
+                        [^\|\#]     # (not bar or hash)
                     |               # or...
                         (\|(?!\#))  # (bar not followed by hash)
                     |               # or...
@@ -206,9 +206,10 @@ def strip_block_comments(string):
     regex = re.compile(regex, flags=re.DOTALL | re.VERBOSE)
     while True:
         string, n = re.subn(regex, '', string)
+#       print(f"Zapped {n} block comment(s)")
         if n == 0:
-            # print(f"Zapped {n} block comment(s)")
             return string    
+
 
 def parse_ks_string(string):
     string = strip_block_comments(string)
@@ -234,6 +235,8 @@ def main():
     for x in parse_ks_file(args.input_ks_file):
         cpprint(x)
         print(pystr(x, 0))
+
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
