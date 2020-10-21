@@ -195,7 +195,7 @@ def strip_block_comments(string):
     # Strip block comments
     regex = r"""\#\|               # hash bar
                     (
-                        [^\|\#]     # (not bar or hash)
+                        [^\|\#]     # (not bar or hash)  Do not be tempted to suffix with "+" - bad perf
                     |               # or...
                         (\|(?!\#))  # (bar not followed by hash)
                     |               # or...
