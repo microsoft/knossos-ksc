@@ -38,10 +38,10 @@ Let-bindings have two cases
 
 * EXTEND THE REVERSE MAPPING: applies in all other cases
 
-     let x = h y in ...(h y)...
+     let x = e in ...e...
 
   Here we want to extend the /reverse mapping (cs_map)/ so that
-  we CSE the (h y) call to x.
+  we CSE e to x.
 
 Notice that
   - The SUBSTITUTE situation extends the substitution (cs_subst)
