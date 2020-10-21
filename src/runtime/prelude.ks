@@ -1,3 +1,23 @@
+(def not Bool (p : Bool) (if p false true))
+
+;; neg :: Number -> Number
+;; neg x = -x
+(edef neg Float (Float))
+(edef D$neg (LM Float Float) (Float))
+(edef Dt$neg (Tuple Float (LM Float Float)) (Float))
+(def fwd$neg Float ((x : Float) (dx : Float))
+     (neg dx))
+(def rev$neg Float ((x : Float) (d_dneg : Float))
+     (neg d_dneg))
+
+(edef neg Integer (Integer))
+(edef D$neg (LM Integer Integer) (Integer))
+(edef Dt$neg (Tuple Integer (LM Integer Integer)) (Integer))
+(def fwd$neg (Tuple) ((x : Integer) (dx : (Tuple)))
+     (tuple))
+(def rev$neg (Tuple) ((x : Integer) (d_dneg : (Tuple)))
+     (tuple))
+
 ;; add :: Number x Number -> Number
 ;; add (x, y) = x + y
 (edef add Float (Float Float))
@@ -60,6 +80,42 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; mul :: Number x Number -> Number
+;; mul (x, y) = x * y
+(edef mul Float (Float Float))
+(edef D$mul (LM (Tuple Float Float) Float) (Float Float))
+(edef Dt$mul (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
+(def
+ fwd$mul Float
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt))
+   (dx1 (get$1$2 dxt))
+   (dx2 (get$2$2 dxt)))
+  (add (mul x2 dx1) (mul x1 dx2))))
+(def
+ rev$mul (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (drt : Float))
+ (let
+  ((x1 (get$1$2 xt))
+   (x2 (get$2$2 xt))
+   (d_dmul drt))
+  (tuple (mul d_dmul x2) (mul d_dmul x1))))
+
+(edef mul Integer (Integer Integer))
+(edef D$mul (LM (Tuple Integer Integer) Integer) (Integer Integer))
+(edef Dt$mul (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
+(def
+ fwd$mul (Tuple)
+ ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
+  (tuple))
+(def
+ rev$mul (Tuple (Tuple) (Tuple))
+ ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
+  (tuple (tuple) (tuple)))
+
+
 ;; div :: Number x Number -> Number
 ;; div (x, y) = x / y
 (edef div Float (Float Float))
@@ -98,59 +154,32 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
-;; mul :: Number x Number -> Number
-;; mul (x, y) = x * y
-(edef mul Float (Float Float))
-(edef D$mul (LM (Tuple Float Float) Float) (Float Float))
-(edef Dt$mul (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
-(def
- fwd$mul Float
- ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
- (let
-  ((x1 (get$1$2 xt))
-   (x2 (get$2$2 xt))
-   (dx1 (get$1$2 dxt))
-   (dx2 (get$2$2 dxt)))
-  (add (mul x2 dx1) (mul x1 dx2))))
-(def
- rev$mul (Tuple Float Float)
- ((xt : (Tuple Float Float)) (drt : Float))
- (let
-  ((x1 (get$1$2 xt))
-   (x2 (get$2$2 xt))
-   (d_dmul drt))
-  (tuple (mul d_dmul x2) (mul d_dmul x1))))
 
-(edef mul Integer (Integer Integer))
-(edef D$mul (LM (Tuple Integer Integer) Integer) (Integer Integer))
-(edef Dt$mul (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
+;; eq :: Number x Number -> Bool
+;; eq (x, y) = x > y
+(edef eq Bool (Float Float))
+(edef D$eq (LM (Tuple Float Float) Bool) (Float Float))
+(edef Dt$eq (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
 (def
- fwd$mul (Tuple)
+ fwd$eq (Tuple)
+ ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+  (tuple))
+(def
+ rev$eq (Tuple Float Float)
+ ((xt : (Tuple Float Float)) (drt : (Tuple)))
+  (tuple 0.0 0.0))
+
+(edef eq Bool (Integer Integer))
+(edef D$eq (LM (Tuple Integer Integer) Bool) (Integer Integer))
+(edef Dt$eq (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+(def
+ fwd$eq (Tuple)
  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
   (tuple))
 (def
- rev$mul (Tuple (Tuple) (Tuple))
+ rev$eq (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
-
-;; neg :: Number -> Number
-;; neg x = -x
-(edef neg Float (Float))
-(edef D$neg (LM Float Float) (Float))
-(edef Dt$neg (Tuple Float (LM Float Float)) (Float))
-(def fwd$neg Float ((x : Float) (dx : Float))
-     (neg dx))
-(def rev$neg Float ((x : Float) (d_dneg : Float))
-     (neg d_dneg))
-
-(edef neg Integer (Integer))
-(edef D$neg (LM Integer Integer) (Integer))
-(edef Dt$neg (Tuple Integer (LM Integer Integer)) (Integer))
-(def fwd$neg (Tuple) ((x : Integer) (dx : (Tuple)))
-     (tuple))
-(def rev$neg (Tuple) ((x : Integer) (d_dneg : (Tuple)))
-     (tuple))
-
 
 ;; gt :: Number x Number -> Bool
 ;; gt (x, y) = x > y
