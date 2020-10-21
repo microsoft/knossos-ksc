@@ -417,7 +417,7 @@ primCallResultTy_maybe fun arg_ty
       ShapeFun f
         -> case primCallResultTy_maybe f arg_ty of
             Left err -> Left err
-            Right res_ty -> Right (mkShapeType res_ty)
+            Right res_ty -> Right (shapeType res_ty)
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
@@ -551,7 +551,7 @@ primFunCallResultTy_maybe fun args
       ("sumbuild" , TypeTuple
                      [TypeInteger, TypeLam TypeInteger t]) -> Just t
       ("index"    , TypeTuple [TypeInteger, TypeVec t])    -> Just t
-      ("shape"    , t)                                     -> Just (mkShapeType t)
+      ("shape"    , t)                                     -> Just (shapeType t)
       ("size"     , TypeVec _)                             -> Just TypeSize
       ("sum"      , TypeVec t)                             -> Just t
 
