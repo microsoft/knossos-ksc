@@ -232,6 +232,10 @@ optLetsE = go
 
         go_let (Let b1 r1 r2)  = Let b1 r1 (go_let r2)
         go_let r'
+          -- Note that as well as performing inlining, this clause also
+          -- implicitly drops dead code, because bindings that are
+          -- used zero times will be "inlined" into their zero uses,
+          -- removing them.
           | VarPat (n, TVar _ v) <- pat
           , inline_me n r'     = go (extendSubstMap v r' subst) b
           | TupPat ns_vs <- pat
