@@ -30,17 +30,6 @@ mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
 mkGradTuple TupleAD p lm = Tuple [p, lm]
 
-mkShapeType :: Type -> Type
-mkShapeType TypeBool = TypeTuple []
-mkShapeType TypeInteger = TypeTuple []
-mkShapeType TypeFloat = TypeTuple []
-mkShapeType TypeString = TypeTuple []
-mkShapeType (TypeTuple ts) = TypeTuple (map mkShapeType ts)
-mkShapeType (TypeVec vt) = TypeVec (mkShapeType vt)
-mkShapeType (TypeLam _ _) = TypeUnknown
-mkShapeType (TypeLM _ _) = TypeUnknown  -- TBD
-mkShapeType TypeUnknown = TypeUnknown
-
 data Phase = Parsed | Typed | OccAnald
 
 data DeclX p = RuleDecl (RuleX p)
@@ -265,6 +254,50 @@ tangentType TypeString     = TypeTuple []
 tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
+
+-----------------------------------
+--- Shapes
+-----------------------------------
+
+shapeType :: Type -> Type
+shapeType TypeBool = TypeTuple []
+shapeType TypeInteger = TypeTuple []
+shapeType TypeFloat = TypeTuple []
+shapeType TypeString = TypeTuple []
+shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
+shapeType (TypeVec vt) = TypeVec (shapeType vt)
+shapeType (TypeLam _ _) = TypeUnknown
+shapeType (TypeLM _ _) = TypeUnknown  -- TBD
+shapeType TypeUnknown = TypeUnknown
+
+{- Note [Shapes]
+~~~~~~~~~~~~~~~~
+We define a primitive function
+   shape :: T -> Sh(T)
+which takes a value and returns the "shape" of the value. Here Sh(T) is
+the shape-type of T (defined analogously to the tangent-type of T),
+and is implemented by shapeType :: Type -> Type
+
+For example
+    T         Sh(T)
+  Float     ()
+  Vec T     Vec Sh(T)
+  (T1 T2)   (Sh(T1), Sh(T2))
+
+For every function
+   f :: S -> T
+   f(x) = rhs
+we can generate a companion function
+   shape$f :: S -> Sh(T)
+   shape$f(x) = shape(rhs)
+which we hope to optimize by pushing the shape call down using optimization
+rules.
+
+One potential use of shape$f is to allow a caller of f to precalculate
+the amount of memory required to hold the result of f. However, the function
+shape$f may itself involve allocating memory in the heap.
+-}
+
 
 -- eqType is currently == but coud be more complicated if we do size
 -- types
