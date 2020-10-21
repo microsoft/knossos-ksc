@@ -117,16 +117,16 @@ class EDef(Expr):
     '''Edef(name, type, args). 
     Example:
     ```
-    (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
+    (edef add   (Vec Float)  ((Float) ((Vec Float))) )
           ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          name  type  args
+          name  type         arg_types
     ```
     '''
     name: str
-    args: list
+    arg_types: List[Type]
 
-    def __init__(self, name, type, args):
-        super().__init__(type=type, name=name, args=args)
+    def __init__(self, name, type, arg_types):
+        super().__init__(type=type, name=name, arg_types=arg_types)
 
 class Rule(Expr):
     '''Rule(name, args, e1, e2). 
@@ -179,6 +179,12 @@ class Var(Expr):
 
     def __init__(self, name, type, decl):
         super().__init__(type=type, name=name, decl=decl)
+
+    def __str__(self):
+        if self.decl:
+            return self.name + " : " + str(self.type)
+        else:
+            return self.name
 
 class Call(Expr):
     '''Call(name, args). 
@@ -275,6 +281,8 @@ class Assert(Expr):
 
 from functools import singledispatch
 
+from ksc.expr import Expr, Def, EDef, Call, Const, Var, If
+
 def pyname(s : str) -> str:
     return s.replace('$','_s')
 
@@ -285,7 +293,7 @@ def pystr_intercomma(indent, exprs):
     return ", ".join([pystr(ex, indent) for ex in exprs])
 
 @singledispatch
-def pystr(expr, indent=0):
+def pystr(expr, indent):
     """
     Expression to string, formatted in a loose python-like syntax
     """
@@ -297,7 +305,7 @@ def _(ty, indent):
     if len(ty.children) == 0 and (ty.kind != "Tuple"):
         return ty.kind
     elems = [pystr(c, indent+1) for c in ty.children]
-    return ty.kind + "[" + ",".join(map(pystr, elems)) + "]"    
+    return ty.kind + "[" + ",".join(map(lambda x: pystr(x,indent+1), elems)) + "]"    
 
 @pystr.register(Def)
 def _(ex, indent):
@@ -309,7 +317,7 @@ def _(ex, indent):
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "#edef " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.args) + ") -> "\
+    return "#edef " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.arg_types) + ") -> "\
            + pystr(ex.type, indent) + nl(indent)
 
 @pystr.register(Rule)
@@ -361,4 +369,5 @@ def _(ex, indent):
 if __name__ == "__main__":
     from ksc.parse_ks import parse_ks_file
     for decl in parse_ks_file("test/ksc/syntax-primer.ks"):
-        print(pystr(decl))
+        print(decl)
+        print(pystr(decl,0))  # Pystr here doesn't get dispatched properly... singledispacth sees __main__.Def, not ksc.expr.def

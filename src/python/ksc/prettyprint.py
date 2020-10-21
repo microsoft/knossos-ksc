@@ -94,7 +94,8 @@ def pretty_Expr(ex, ctx):
         return parens(2,
                     pp_reserved("edef"), LINE,
                     pp_function_name(ex.name), LINE,
-                    parens_interline(1, *map(pp, ex.args)))
+                    pp(ex.type), LINE,
+                    parens_interline(1, *map(pp, ex.arg_types)))
 
     if isinstance(ex, Rule):
         return parens(2,
