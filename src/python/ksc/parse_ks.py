@@ -110,7 +110,7 @@ def parse_expr(se):
     if isinstance(se, sexpdata.Symbol):
         return Var(se.value(), None, False)
 
-    # "1.2", "1", "'string'"
+    # "1.2", "1", "\"string\"""
     if not isinstance(se, list):
         return Const(se)
 
