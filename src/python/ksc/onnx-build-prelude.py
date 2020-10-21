@@ -4,6 +4,31 @@
 # References:
 # https://github.com/onnx/onnx/blob/master/docs/IR.md
 # https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/onnx.in.proto
+#
+# This is largely a run-once script.  Its main task is to produce a consistent set of Knossos
+# edefs for the current onnx schemas found in "onnx.defs.get_all_schemas()", and place them
+# in "etc/onnx-prelude-autogen.ks".   It needs to handle a few concepts that don't translate
+# well, such as:
+#
+#  - Attributes and inputs
+#    KS has only inputs, constant parameters can be optimized by OTP
+#
+#  - Type constraints
+#    ONNX has some slightly tricky rules to declare the same op over multiple types.
+#    Knossos has ad-hoc overloading, so we just emit the same name with each acceptable type combo.
+#    This leads to 25 decls for SequenceInsert, but it's seriously not a biggie in the scheme 
+#    of things.  Think of it as C++ templates.
+#
+#  - Optional inputs
+#    Emits one type signature for each callable version of the function
+#
+#  - Optional outputs
+#    Emits versions of the function of the form "take1$foo" to auto-discard the outputs.
+#
+# Because it's a "run rarely" script, there are various manual hints to generate the
+# right thing, and anthing "too hard" has been manually handled in "etc/onnx-prelude.ks"
+#
+
 
 #%%
 
@@ -44,7 +69,6 @@ def comment(s : str):
 def onnxAttrType_to_Type(ty):
     """
     Convert ONNX AttrType to KS Type.
-    Currently collapses 
     """
     assert isinstance(ty, OpSchema.AttrType)
     if ty == ty.FLOAT:
@@ -68,19 +92,10 @@ def onnxAttrType_to_Type(ty):
     if ty == ty.GRAPH:
         return Type.Lam(None, None)
 
-    #   class AttrType(object):
-    #     FLOAT: 'OpSchema.AttrType' = ...
-    #     INT: 'OpSchema.AttrType' = ...
-    #     STRING: 'OpSchema.AttrType' = ...
-    #     TENSOR: 'OpSchema.AttrType' = ...
-    #     GRAPH: 'OpSchema.AttrType' = ...
-    #     SPARSE_TENSOR: 'OpSchema.AttrType' = ...
-    #     FLOATS: 'OpSchema.AttrType' = ...
-    #     INTS: 'OpSchema.AttrType' = ...
-    #     STRINGS: 'OpSchema.AttrType' = ...
-    #     TENSORS: 'OpSchema.AttrType' = ...
-    #     GRAPHS: 'OpSchema.AttrType' = ...
-    #     SPARSE_TENSORS: 'OpSchema.AttrType' = ...
+    # TODOS:
+    #     ty.SPARSE_TENSOR
+    #     ty.SPARSE_TENSORS
+    #     ty.GRAPHS
 
     print(ty)
     raise NotImplementedError(f"didn't handle {ty}")
@@ -212,6 +227,7 @@ def onnx_schemas_to_prelude(prelude : TextIO):
             writeln(f";; SPECIAL: {s.name}")
             continue
 
+        # 0.2 Further special cases, which just need some help in inferring the output type
         out_type_from_sig = None
         if s.name == "ConcatFromSequence":
             # Onnx type constraints can't express S: seq<'t> -> T: 't
