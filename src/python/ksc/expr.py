@@ -18,12 +18,12 @@ from ksc.utils import paren
 # Def: Function definition
 # (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
 #      ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
-#      name  type  args                            body
+#      name  type         args                            body
 #
 # Edef: Declaration for externally-supplied function
-# (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
-#       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#       name  type  args
+# (edef add   (Vec Float)  (Float (Vec Float)) )
+#       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^
+#       name  type         arg_types
 #
 # Rule: Rewrite rule for the Knossos optimizer 
 # (rule "add0"  (a : Float) (add a 0) a)
@@ -56,9 +56,13 @@ from ksc.utils import paren
 #      arg            body
 #
 # Let: Variable binding with scope limited to "body".
-# (let (a    1)   (add a a))
-#       ^    ^    ^^^^^^^^^
-#       var  rhs  body
+# (let (a     1)   (add a a))
+#       ^     ^    ^^^^^^^^^
+#       vars  rhs  body
+# Tuple-unpacking form:
+# (let ((a b)  tup)   (add a a))
+#       ^      ^      ^^^^^^^^^
+#       vars   rhs    body
 #
 # If: We could just consider "if" to be another function call, but it defines sequencing.
 # (if (eq a a) "good"  "bad")
@@ -97,53 +101,6 @@ class Expr:
     def __str__(self):
         return paren(type(self).__name__ + ' ' + ' '.join(str(node) for node in self.nodes()))
 
-class Def(Expr):
-    '''Def(name, type, args, body). 
-    Example:
-    ```
-    (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
-         ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
-         name  type  args                            body
-    ```
-    '''
-    name: str
-    args: list
-    body: Expr
-
-    def __init__(self, name, type, args, body):
-        super().__init__(type=type, name=name, args=args, body=body)
-
-class EDef(Expr):
-    '''Edef(name, type, args). 
-    Example:
-    ```
-    (edef add   (Vec Float)  ((Float) ((Vec Float))) )
-          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          name  type         arg_types
-    ```
-    '''
-    name: str
-    arg_types: List[Type]
-
-    def __init__(self, name, type, arg_types):
-        super().__init__(type=type, name=name, arg_types=arg_types)
-
-class Rule(Expr):
-    '''Rule(name, args, e1, e2). 
-    Example:
-    ```
-    (rule "add0"  (a : Float) (add a 0) a)
-          ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
-          name    args        e1        e2
-    ```
-    '''
-    name: str
-    args: list
-    e1: Expr
-    e2: Expr
-
-    def __init__(self, name, args, e1, e2):
-        super().__init__(type=None, name=name, args=args, e1=e1, e2=e2)
 
 class Const(Expr):
     '''Const(value). 
@@ -229,10 +186,10 @@ class Let(Expr):
     ```
     (let ((a b)  (tuple p q))   (add a a))
           ^      ^              ^^^^^^^^^
-          var    rhs            body
+          vars   rhs            body
     ```
     '''
-    vars: Union[Var, List[Var]]
+    vars: Union[Var, List[Var]]  # TODO: Just List[Var]?  Not really as detupling is different from straight assignment
     rhs: Expr
     body: Expr
 
@@ -271,6 +228,54 @@ class Assert(Expr):
 
     def __init__(self, cond, body):
         super().__init__(type=None, cond=cond, body=body)
+
+class Def(Expr):
+    '''Def(name, type, args, body). 
+    Example:
+    ```
+    (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
+         ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+         name  type         args                            body
+    ```
+    '''
+    name: str
+    args: List[Var]
+    body: Expr
+
+    def __init__(self, name, type, args, body):
+        super().__init__(type=type, name=name, args=args, body=body)
+
+class EDef(Expr):
+    '''Edef(name, type, args). 
+    Example:
+    ```
+    (edef add   (Vec Float)  ((Float) ((Vec Float))) )
+          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          name  type         arg_types
+    ```
+    '''
+    name: str
+    arg_types: List[Type]
+
+    def __init__(self, name, type, arg_types):
+        super().__init__(type=type, name=name, arg_types=arg_types)
+
+class Rule(Expr):
+    '''Rule(name, args, e1, e2). 
+    Example:
+    ```
+    (rule "add0"  (a : Float) (add a 0) a)
+          ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
+          name    args        e1        e2
+    ```
+    '''
+    name: str
+    args: list
+    e1: Expr
+    e2: Expr
+
+    def __init__(self, name, args, e1, e2):
+        super().__init__(type=None, name=name, args=args, e1=e1, e2=e2)
 
 #####################################################################
 # pystr:
