@@ -14,16 +14,22 @@
 #%%
 
 from collections import namedtuple
+from itertools import chain
+from typing import List
+
 import sys
 import inspect
 import re
 import warnings
 
-import onnx, onnx.numpy_helper
+import onnx, onnx.numpy_helper, onnx.helper
 
 from ksc.utils import paren
 from ksc.type import Type
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import pystr
+from ksc.parse_ks import parse_ks_file
+from ksc.typeannot import typeannot_decls
 
 # Pretty printing
 # Importing prettyprint to get the decorated printers for Expression and Type
@@ -56,7 +62,7 @@ def defVar(name: str, ty : Type):
     return Var(encode_name(name), ty, True)
 
 # See https://github.com/onnx/onnx/blob/master/onnx/mapping.py
-from onnx import TensorProto
+from onnx import TensorProto, AttributeProto
 TENSOR_TYPE_TO_KS_TYPE = {
     int(TensorProto.FLOAT): Type.Float,
     int(TensorProto.UINT8): Type.Integer,
@@ -115,6 +121,15 @@ def get_value(init):
 
     return Const(value)
 
+def exprFromAttr(attr : AttributeProto):
+    val = onnx.helper.get_attribute_value(attr)
+    if isinstance(val, list):
+        return Call("vec", [Const(v) for v in val])
+    else:
+        if isinstance(val, bytes):
+            val = val.decode("ascii")
+        return Const(val)
+
 def get_values(init):
     """
     Get values from a TensorProto
@@ -143,7 +158,26 @@ def emit_inits(inits, body):
         body = Let(var, value, body)
     return body
 
-def onnx2ks(g):
+def get_default_value(schema, attr):
+    if attr.default_value.type != AttributeProto.UNDEFINED:
+        return exprFromAttr(attr.default_value)
+
+    print(f"** Attribute {attr.name} of op {schema.name} has no default value -- special casing")
+
+    # TODO: Formalize this, at least into prelude
+    if schema.name == "MaxPool":
+        if attr.name == "dilations":
+            return Call("vec", [Const(1), Const(1)])
+
+    if schema.name == "Conv":
+        if attr.name == "pads":
+            return Call("vec", [Const(-1), Const(-1)])
+
+    print(schema.doc)
+
+    raise NotImplementedError()       
+
+def onnx2ks(symtab, g):
     """
     Convert ONNX graph g into Knossos Expr.
     """
@@ -152,15 +186,39 @@ def onnx2ks(g):
     # making a chain of lets.
     body = None
     for node in reversed(g.node):
-        op = node.op_type
+        s = onnx.defs.get_schema(node.op_type)
+
+        # Gather args from input
         args = [useVar(i) for i in node.input]
-        rhs = Call(op, args)
+
+        # Gather attributes. 
+        # - Some are set on the node.
+        node_attrs = dict()
+        for n in node.attribute:
+            node_attrs[n.name] = exprFromAttr(n)
+
+        # - The rest are defaulted
+        for name,attr in s.attributes.items():
+            if name in node_attrs:
+                args += [node_attrs[name]]
+            else:
+                args += [get_default_value(s, attr)]
+
+        n_outputs = len(node.output)
+        if n_outputs == len(s.outputs):
+            name = s.name
+        else:
+            name = f"take{n_outputs}${s.name}"
+
+        rhs = Call(name, args) 
+
         # (let ((out1 ... outN) (op args))
         #   body)
-
         vars = [useVar(o) for o in node.output]
         if len(vars) == 1:
             vars = vars[0]
+        else:
+             print(vars)
 
         if body == None:
             # Innermost body: just reference the output vars
@@ -192,7 +250,11 @@ def onnx2ks(g):
     main_args = [arg for arg in args if arg.name not in inits]
     main = Def("main", None, main_args, emit_inits(input_inits, main_body))
 
-    return (decl,main)
+    decls = [decl, main]
+
+    typeannot_decls(decls, symtab)
+
+    return decls
 
 if __name__ == "__main__":
     argv = sys.argv
@@ -212,10 +274,20 @@ if __name__ == "__main__":
         if ofn.endswith("/"):
             ofn = ofn + re.sub(r'\.onnx$','.ks',filename)
 
+    symtab = dict()
+
+    print(f"onnx2ks: Reading prelude")
+
+    prelude_decls = parse_ks_file("etc/onnx-prelude.ks")
+    typeannot_decls(prelude_decls, symtab)
+
+    prelude_decls = parse_ks_file("etc/onnx-prelude-autogen.ks")
+    typeannot_decls(prelude_decls, symtab)
+
     print(f"onnx2ks: Reading from {filename}")
     model = onnx.load(filename)
     #try:
-    obj = onnx2ks(model.graph)
+    obj = onnx2ks(symtab, model.graph)
     # except:
     #     print(model)
     #     print("***ERROR***")
