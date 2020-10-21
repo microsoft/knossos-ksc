@@ -5,7 +5,7 @@ module CSE where
 import Lang
 import Prim
 import OptLet( Subst, substBndr, lookupSubst, mkEmptySubst, extendSubstMap )
-import LangUtils( GblSymTab, substEMayCapture )
+import LangUtils( GblSymTab )
 import Rules
 import ANF
 import Opt
@@ -14,7 +14,7 @@ import qualified Data.Map as M
 
 {- Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Let-bindings have two cases, implemented by addBinding.
+Let-bindings have two cases
 
 * SUBSTITUTE: applies when the RHS is a variable
 
@@ -22,8 +22,9 @@ Let-bindings have two cases, implemented by addBinding.
 
   Here we want to extend the /substitution/ with x -> y, so that the
   (h x) in the body might CSE with an enclosing (let v = h y in ...).
-  NB: the substitution maps InIds, so we extend the substitution with
-      a binding for the original InId 'x'
+  We also drop the binding for x.
+  NB: the substitution maps Vars, so we extend the substitution with
+      a binding for the original Var 'x'
 
   How can we have a variable on the RHS? Doesn't the simplifier inline them?
   No: the original RHS might have been (g z) which has CSE'd
@@ -42,17 +43,6 @@ Let-bindings have two cases, implemented by addBinding.
   Here we want to extend the /reverse mapping (cs_map)/ so that
   we CSE the (h y) call to x.
 
-  Note that we use EXTEND even for a trivial expression, provided it
-  is not a variable or literal. In particular this /includes/ type
-  applications. This can be important (Trac #13156); e.g.
-     case f @ Int of { r1 ->
-     case f @ Int of { r2 -> ...
-  Here we want to common-up the two uses of (f @ Int) so we can
-  remove one of the case expressions.
-
-  See also Note [Corner case for case expressions] for another
-  reason not to use SUBSTITUTE for all trivial expressions.
-
 Notice that
   - The SUBSTITUTE situation extends the substitution (cs_subst)
   - The EXTEND situation extends the reverse mapping (cs_map)
@@ -66,6 +56,16 @@ applies only to the /bindings/ of the program, and we leave it to the
 simplifier to propate effects to the RULES.  Finally, it doesn't seem
 worth the effort to discard the nested bindings because the simplifier
 will do it next.
+
+
+Note [CSE of assert]
+~~~~~~~~~~~~~~~~~~~~
+
+When we encounter (assert (eq e1 e2) body) we would like to use the
+information that e1 is equal to e2 to simplify body.  Therefore if e1
+and e2 are both variables (say v1 and v2) we tweak the reverse map so
+to change entries that used to say v1 to say v2 instead.
+
 -}
 
 data CSEnv
@@ -73,7 +73,7 @@ data CSEnv
             -- The substitution maps variables to
             -- /trivial/ OutExprs, not arbitrary expressions
 
-       , cs_map   :: M.Map TExpr TExpr   -- The reverse mapping
+       , cs_map   :: M.Map TExpr TVar   -- The reverse mapping
        }
 
 cseDefs :: RuleBase -> GblSymTab -> [TDef]
@@ -109,37 +109,35 @@ cseE :: CSEnv -> TExpr -> TExpr
 
 cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
      (Let tv rhs body)
+  = case cseE_check cse_env rhs of
+    var_rhs@(Var _) ->
+      -- See Note [CSE for bindings] (SUBSTITUTE)
+      let v        = tVarVar tv
+          subst'   = extendSubstMap v var_rhs subst
+          body_env = cse_env { cs_subst = subst' }
+      in cseE_check body_env body
 
-  -- First case: CSE fires
-  -- Extend the substitution, drop the let
-  | Just rhs'' <- M.lookup rhs' rev_map
-  , let subst'   = extendSubstMap v rhs'' subst
-        body_env = cse_env { cs_subst = subst' }
-  = cseE_check body_env body
-
-  -- Second case: CSE does not fire
-  -- Clone, extend the reverse-map, retain the let
-  | let (tv', subst') = substBndr tv subst
-        rev_map'      = M.insert rhs' (Var tv') rev_map
-        body_env      = CS { cs_subst = subst', cs_map = rev_map' }
-  = Let tv' rhs' (cseE_check body_env body)
-  where
-    -- First, CSE the RHS
-    rhs' = cseE cse_env rhs
-    v    = tVarVar tv
+    rhs' ->
+      -- See Note [CSE for bindings] (EXTEND THE REVERSE MAPPING)
+      let (tv', subst') = substBndr tv subst
+          rev_map'      = M.insert rhs' tv' rev_map
+          body_env      = CS { cs_subst = subst', cs_map = rev_map' }
+      in Let tv' rhs' (cseE_check body_env body)
 
 -- Special case for (assert (e1 == e2) body)
 -- where we want to CSE e2 into e1
-cseE cse_env@(CS { cs_map = rev_map }) (Assert e1 e2)
- | Call eq (Tuple [e1a, e1b]) <- e1'
+-- See Note [CSE of assert]
+cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
+ | Call eq (Tuple [Var v1, Var v2]) <- cond'
  , eq `isThePrimFun` "eq"
- , let cse_env' = cse_env { cs_map = M.map (substAssert e1a e1b) rev_map }
- = Assert e1' (cseE cse_env' e2)
+ , let replace_v1_with_v2 v = if v == v1 then v2 else v
+ , let cse_env' = cse_env { cs_map = M.map replace_v1_with_v2 rev_map }
+ = Assert cond' (cseE cse_env' body)
 
  | otherwise
- = Assert e1' (cseE cse_env e2)
+ = Assert cond' (cseE cse_env body)
  where
-   e1' = cseE cse_env e1
+   cond' = cseE cse_env cond
 
 cseE cse_env (If e1 e2 e3)
   = If (cseE_check cse_env e1)
@@ -169,12 +167,7 @@ cseE_check :: CSEnv -> TExpr -> TExpr
 -- Look up the entire expression in the envt
 cseE_check cse_env e
   = case M.lookup e' (cs_map cse_env) of
-      Just e'' -> e''
+      Just e'' -> Var e''
       Nothing  -> e'
   where
     e' = cseE cse_env e
-
-substAssert :: TExpr -> TExpr -> TExpr -> TExpr
-substAssert (Var v) e1b = substEMayCapture (M.insert v e1b M.empty)
-substAssert e1a (Var v) = substEMayCapture (M.insert v e1a M.empty)
-substAssert _ _ = \e -> e

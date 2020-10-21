@@ -126,7 +126,7 @@ means the same thing as
 
     (f (tuple e1 ... en))
 
-if n /= 2.  Nested unpacking is not supported, yet.
+if n /= 1.  Nested unpacking is not supported, yet.
 
 -}
 

@@ -237,7 +237,7 @@ fromCLExpr :: InScopeSet -> [TExpr] -> CLExpr -> TExpr
 -- (fromCLExpr is arg c)
 -- We may freely duplicate 'arg', so make sure that all
 -- of the TExprs in 'arg' are trivial -- usually variables --
--- and hence can be duplicated without dupliating work
+-- and hence can be duplicated without duplicating work
 fromCLExpr _  _   (CLKonst k)      = Konst k
 fromCLExpr _  arg CLId             = mkTuple arg
 fromCLExpr is arg (CLPrune ts _ c) = fromCLExpr is (pick ts arg) c

@@ -203,9 +203,10 @@ allocatorParameterName :: String
 allocatorParameterName = "$alloc"
 
 cgenArgList :: TFun -> [String] -> String
-cgenArgList tf cargs = if funUsesAllocator tf
-                       then allocatorParameterName ++ concatMap (", " ++) cargs
-                       else intercalate ", " cargs
+cgenArgList tf cargs = intercalate ", " (allocatorIfUsed ++ cargs)
+  where allocatorIfUsed = if funUsesAllocator tf
+                          then [allocatorParameterName]
+                          else []
 
 cgenDefs :: [TDef] -> [String]
 cgenDefs defs = concatMap cdecl $

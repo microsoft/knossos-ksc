@@ -208,6 +208,13 @@ The syntax is defined by the parser in
 [`Main.hs`](src/ksc/Main.hs) checks that they agree.
 
 
+## Continuous integration
+
+knossos-ksc has a [continuous integration build set up on Azure
+DevOps](https://msrcambridge.visualstudio.com/Knossos/_build?definitionId=277).
+To manually run a CI build click "Run pipeline", type the name of your
+branch under "Branch/tag", and click "Run".
+
 ## Code of Conduct
 
 Collaboration on this project is subject to the [Microsoft Open Source

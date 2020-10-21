@@ -154,10 +154,28 @@ optIf (Konst (KBool False)) _ e = e
 optIf (Let v r b)           t e = Let v r   (optIf b t e)
 optIf (Assert e1 e2)        t e = Assert e1 (optIf e2 t e)
 optIf e_cond e_then e_else
+  | e_then == e_else
+  -- See Note [Conditionals with equal branches]
+  -- NB: (==) on expressions does equality modulo alpha (see Lang.hs)
+  = e_then
   | Just (ei, ej) <- isEqualityCall e_cond
   , isKZero e_else
   = pDelta ei ej e_then
 optIf b                     t e = If b t e
+
+{- Note [Conditionals with equal branches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Examples of this are sometimes produced by AD, e.g.
+    (def rev$not_ (Tuple)  (_t1 : (Tuple Bool (Tuple)))
+            (if (get$1$2 _t1) (tuple) (tuple)))
+
+which we would like to simplify to
+    (def rev$not_ (Tuple) (_t1 : (Tuple Bool (Tuple))) (tuple))
+
+This pattern becomes especially common when defining shape$ functions,
+because for most conditionals the shape of the result does not depend
+on the condition.
+-}
 
 --------------
 -- 'rewriteCall' performs one rewrite, returning (Just e) if
@@ -168,14 +186,10 @@ optIf b                     t e = If b t e
 rewriteCall :: HasCallStack => OptEnv -> TFun -> TExpr -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
--- Just for unary functions so far
--- Could do this for n-ary functions but beware shadowing
 rewriteCall _ fun (Let v r arg)
   = Just (Let v r (Call fun arg))
 
 -- RULE: f( if e1 then e2 else e3 )  =  if e1 then f(e2) else f(e3)
--- Again unary functions only (notably fst, snd)
--- For nary functions worry about code duplication.
 rewriteCall _ fun (If e1 e2 e3)
   = Just (If e1 (Call fun e2) (Call fun e3))
 
@@ -430,6 +444,10 @@ optSum e
   | Just (n, i, body) <- isBuild_maybe e
   = Just $ pSumBuild n (Lam i body)
 
+optSum e
+  | Just (n, v) <- isConstVec_maybe e
+  = Just $ sumOfConstVec n v
+
 -- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
 
 -- RULE: sum (diag sz f)  =  build sz f
@@ -445,6 +463,12 @@ optSum (Call deltaVec (Tuple [_, _, e]))
 optSum _ = Nothing
 
 -----------------------
+sumOfConstVec :: TExpr -> TExpr -> TExpr
+sumOfConstVec n v = case typeof v of
+  TypeInteger -> pMulii n v
+  _ -> pScale (pToFloat n) v
+
+-----------------------
 optBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
 
 -- RULE: build sz (\i. <zero>)  =  <zero>
@@ -453,6 +477,12 @@ optBuild _ _ e
   | isKZero e
   = Just $ pZero (.. the build)
 -}
+
+-- RULE: build sz (\i. e) = constVec sz e
+--       (if i is not free in e)
+optBuild sz i e
+  | i `notFreeIn` e
+  = Just $ pConstVec sz e
 
 -- RULE: build sz (\i. delta i ex eb)  =  let i = ex in
 --                                        deltaVec sz i eb
@@ -524,10 +554,7 @@ optSumBuild n i (Tuple es)
 optSumBuild sz i e
   | TVar TypeInteger _ <- i
   , i `notFreeIn` e
-  = Just $ sz' sz e
-    where sz' = case typeof e of
-                  TypeInteger -> pMulii
-                  _ -> pScale . pToFloat
+  = Just $ sumOfConstVec sz e
 
 -- RULE: sumbuild n (\i. delta i ej e)    where i is not free in ej
 --       = let i = ej in e
@@ -783,16 +810,18 @@ do_prod_v env dir e dx
   = Just $ mkLets binds $
     pBuild n $ Lam i $
     lmApply_Dir dir body vdx
+  
+  | Just (n, v) <- isConstVec_maybe e
+  = Just $ pConstVec n (lmApply_Dir dir v dx)
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
   | TypeVec {} <- typeof e
+  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $ mkLets binds $
     pBuild (pSize ve) $ Lam indexTVar $
     lmApply_Dir dir (pIndex (Var indexTVar) ve) vdx
 
   | otherwise = Nothing
-  where
-    (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
 
 do_sum_v :: InScopeSet -> ADDir -> TExpr -> TExpr -> Maybe TExpr
 do_sum_v env dir e dx
@@ -801,9 +830,16 @@ do_sum_v env dir e dx
   = Just $ mkLets binds $
     pSumBuild n $ Lam i $
     lmApply_Dir dir body (pIndex (Var i) vdx)
+  
+  | Just (n, v) <- isConstVec_maybe e
+  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [dx]
+  = Just $ mkLets binds $
+    pSumBuild n $ Lam indexTVar $
+    lmApply_Dir dir v (pIndex (Var indexTVar) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
   | TypeVec {} <- typeof e
+  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $
     mkLets binds $
     pSumBuild (pSize vm) $ Lam indexTVar $
@@ -811,8 +847,6 @@ do_sum_v env dir e dx
                     (pIndex (Var indexTVar) vdx)
 
   | otherwise = Nothing
-  where
-    (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
 
 do_fold :: ADDir
         -> TExpr
