@@ -200,6 +200,8 @@ class Call(Expr):
 
     def __init__(self, name, args):
         super().__init__(name=name, args=args)
+        for a in args:
+            assert isinstance(a, Expr)
 
 class Lam(Expr):
     '''Lam(arg, body).
@@ -236,6 +238,7 @@ class Let(Expr):
 
     def __init__(self, vars, rhs, body):
         super().__init__(type=None, vars=vars, rhs=rhs, body=body)
+        assert isinstance(vars,Var)
 
 
 class If(Expr):
