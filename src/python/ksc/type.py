@@ -8,9 +8,17 @@ class Type:
         "Float": 0,
         "Bool": 0,
         "String": 0,
-        "Lam": 2, # TODO: Lambda args are in reverse order, prefer src -> dst
+        "Lam": 2, 
         "LM": 2 # Linear map, used in AD
     }
+
+    def __init__(self, kind, children=[]):
+        if kind not in Type.node_kinds:
+            raise ValueError("bad kind:", kind)
+        assert kind == "Tuple" or (Type.node_kinds[kind] == len(children)), (kind, len(children)) # dont' check for 1-tuple
+        assert all((ch is None or isinstance(ch, Type)) for ch in children)
+        self.kind = kind
+        self.children = children
 
     @staticmethod
     def Vec(elem_type):
@@ -21,12 +29,12 @@ class Type:
         return Type("Tuple", args)
 
     @staticmethod
-    def Lam(type, arg_type):
-        return Type("Lam", [type, arg_type])
+    def Lam(arg_type, return_type):
+        return Type("Lam", [arg_type, return_type])
 
     @staticmethod
-    def LM(type, arg_type):
-        return Type("LM", [type, arg_type]) 
+    def LM(arg_type, return_type):
+        return Type("LM", [arg_type, return_type]) 
 
     @staticmethod
     def Index(vec):
@@ -37,7 +45,9 @@ class Type:
 
     @staticmethod
     def fromValue(val):
-        if isinstance(val, int):
+        if isinstance(val, (bool, np.bool)):
+            return Type.Bool
+        if isinstance(val, (int, np.integer)):
             return Type.Integer
         if isinstance(val, float):
             return Type.Float
@@ -45,23 +55,15 @@ class Type:
             return Type.String
         raise NotImplementedError(f"Typeof {val}")
 
-    def __init__(self, kind, children=[]):
-        if kind not in Type.node_kinds:
-            raise ValueError("bad kind:", kind)
-        assert kind == "Tuple" or (Type.node_kinds[kind] == len(children)), (kind, len(children)) # dont' check for 1-tuple
-        assert all((ch is None or isinstance(ch, Type)) for ch in children)
-        self.kind = kind
-        self.children = children
-
     @property
     def return_type(self):
         assert self.kind == "Lam" or self.kind == "LM"
-        return self.children[0]
+        return self.children[1]
 
     @property
     def arg_type(self):
         assert self.kind == "Lam" or self.kind == "LM"
-        return self.children[1]
+        return self.children[0]
 
     def accept_value_of_type(self, other):
         """ Finds if a variable of type 'other' can fit into this type.  """
@@ -107,6 +109,10 @@ class Type:
         assert self.kind == "Tuple"
         return (c for c in self.children)
 
+    def Child(self, i):
+        assert self.kind == "Tuple"
+        return self.children[i]
+
     def shortstr(self, tb="<", te=">"):
         el_types = {"String": "s", "Integer": "i", "Bool": "b", "Float": "f", "Lam": "l", "LM": "l"}
         if self.kind in el_types:
@@ -125,8 +131,6 @@ class Type:
         if len(self.children) == 0 and (self.kind != "Tuple"):
             return self.kind
         elems = [str(c) for c in self.children]
-        if self.kind == "Lam" or self.kind == "LM":
-            elems = ["{}({})".format(*elems)]
         return "({})".format(" ".join([self.kind] + elems))
 
     def __repr__(self):
