@@ -1521,17 +1521,17 @@ namespace ks
 	}
 
 	template <class T>
-	int print(T a)
+	int print(ks::allocator *, T a)
 	{
 		std::cout << a;
 		return 0;
 	}
 
 	template <class T, class... Ts>
-	int print(T a, Ts... t)
+	int print(ks::allocator *$alloc, T a, Ts... t)
 	{
-		print(a);
-		return 1 + print(t...);
+		print($alloc, a);
+		return 1 + print($alloc, t...);
 	}
 
 	// =========================== Timing ===============================
