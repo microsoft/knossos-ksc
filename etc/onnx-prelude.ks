@@ -1,4 +1,4 @@
-s;; Loaders first
+;; Loaders first
 (edef load-from-onnx-float32 (Vec Float) (Integer String))
 (edef load-from-onnx-float32 (Vec Float) (Integer Integer String))
 (edef load-from-onnx-float32 (Vec Float) (Integer Integer Integer String))
