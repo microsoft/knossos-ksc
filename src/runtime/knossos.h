@@ -710,33 +710,34 @@ namespace ks
 				prepare_copydown_inplace(dest, &zero_value);
 				*v = vec<T>(zero_tag, zero_value, sz);
 			}
+			return;
+		}
+		
+		void * sourceData = v->data();
+		if (sourceData < dest->startOfDestination) {
+			/* This data lives before the copydown location in the buffer.
+			   We assume that this means it can't contain any pointers to
+			   data after the copydown location, so we don't need to move
+			   any of the data belonging to subobjects of *v.
+			   That's fortunate, because we wouldn't be allowed to modify
+			   objects before the copydown location even if we wanted to. */
+			dest->subobjectDestination += inflated_bytes(*v);
 		} else {
-			void * sourceData = v->data();
-			if (sourceData < dest->startOfDestination) {
-				/* This data lives before the copydown location in the buffer.
-				   We assume that this means it can't contain any pointers to
-				   data after the copydown location, so we don't need to move
-				   any of the data belonging to subobjects of *v.
-				   That's fortunate, because we wouldn't be allowed to modify
-				   objects before the copydown location even if we wanted to. */
-				dest->subobjectDestination += inflated_bytes(*v);
-			} else {
-				int sz = v->size();
-				if (sourceData < dest->subobjectDestination) {
-					/* This source overlaps the desination of another subobject that comes
-					   earlier in the iteration order. We need to move it out of the way. */
-					if (dest->alloc->top_ptr() < dest->subobjectDestination) {
-						/* Make sure we're not about to copy to a place which is still
-						   in the way! */
-						dest->alloc->allocate(dest->subobjectDestination - (unsigned char*)dest->alloc->top_ptr());
-					}
-					*v = vec<T>(dest->alloc, sz);
-					std::memcpy(v->data(), sourceData, sz * (int)sizeof(T));
+			int sz = v->size();
+			if (sourceData < dest->subobjectDestination) {
+				/* This source overlaps the desination of another subobject that comes
+				   earlier in the iteration order. We need to move it out of the way. */
+				if (dest->alloc->top_ptr() < dest->subobjectDestination) {
+					/* Make sure we're not about to copy to a place which is still
+					   in the way! */
+					dest->alloc->allocate(dest->subobjectDestination - (unsigned char*)dest->alloc->top_ptr());
 				}
-				dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz));
-				for (int i = 0; i != sz; ++i) {
-					prepare_copydown_inplace(dest, &((*v)[i]));
-				}
+				*v = vec<T>(dest->alloc, sz);
+				std::memcpy(v->data(), sourceData, sz * (int)sizeof(T));
+			}
+			dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz));
+			for (int i = 0; i != sz; ++i) {
+				prepare_copydown_inplace(dest, &((*v)[i]));
 			}
 		}
 	}
