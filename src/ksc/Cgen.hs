@@ -600,7 +600,7 @@ cgenAnyFun (tf, ty) cftype = case tf of
 
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace"]
+  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace", "print"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
