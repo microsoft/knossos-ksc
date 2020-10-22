@@ -377,11 +377,12 @@ def onnx_schemas_to_prelude(prelude : TextIO):
                 for k in range(n_optional+1):
                     arg_types = input_arg_types[:n_args-k] + attr_arg_types
                     obj = EDef(name, return_type, arg_types)
-                    pprint(obj, stream=prelude, width=180, ribbon_width=180, indent=2)
+                    pprint(obj, stream=prelude, width=1024, ribbon_width=1024, indent=2)
 
         if s.has_type_and_shape_inference_function:
-            writeln(f"; shape${s.name}\n")
             pass # out.append(EDef("shape$" + s.name, Type.Float, [Type.Float, Type.Vec(Type.Float)]))
+        else:
+            writeln(f"; No shape function for {s.name}\n")
 
         writeln("\n")
 
