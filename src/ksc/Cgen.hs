@@ -383,6 +383,22 @@ cgenExprWithoutResettingAlloc env = \case
         (mkCType ty)
         (if Cgen.isScalar (mkCType ty) then UsesAndResetsAllocator else UsesAllocator)
 
+  -- Special case for copydown. Mark the allocator before evaluating the
+  -- expression, then copydown the result to the marked position.
+  Call (TFun _ (Fun (PrimFun "$copydown"))) e -> do
+    CG cdecl cexpr ctype callocusage <- cgenExprR env e
+    ret <- freshCVar
+    bumpmark <- freshCVar
+    return $ CG
+        (  [ cComment "Explicitly-requested copydown",
+             markAllocator bumpmark allocatorParameterName ]
+        ++ cdecl
+        ++ [ cgenType ctype ++ " " ++ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ cexpr ++ ");" ]
+        )
+        ret
+        ctype
+        ((if Cgen.isScalar ctype then UsesAndResetsAllocator else UsesAllocator) <> callocusage)
+
   -- Special case for literal tuples.  Don't unpack with std::get.
   -- Just use the tuple components as the arguments.  See Note [Unpack
   -- tuple arguments]
@@ -698,10 +714,11 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "ts_add"  , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
-  (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"   , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun "ts_add"   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty
+  (PrimFun "$copydown", [CType ty]          ) -> LMOne ty
+  (PrimFun "size"     , [CType ty]          ) -> LMZero ty TypeInteger
+  (PrimFun "index"    , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
