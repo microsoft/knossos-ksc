@@ -265,7 +265,7 @@ namespace ks
 
 		void* top_ptr() const { return buf_ + top_; }
 
-		void* marked_ptr(size_t m) const { return buf_ + m; }
+		void* ptr_at(size_t m) const { return buf_ + m; }
 
 		void reset(size_t top = 0)
 		{
@@ -755,7 +755,7 @@ namespace ks
 	   (see comment for copydown_by_memmove). */
 	template<class T>
 	T prepare_copydown(allocator * alloc, alloc_mark_t mark, T val) {
-		unsigned char * start = static_cast<unsigned char*>(alloc->marked_ptr(mark));
+		unsigned char * start = static_cast<unsigned char*>(alloc->ptr_at(mark));
 		prepare_copydown_state dest{ start, start, alloc };
 		prepare_copydown_inplace(&dest, &val);
 		return val;
@@ -798,22 +798,22 @@ namespace ks
 	   for each subobject which is a vec, copy its data to the
 	   desired position using memmove.
 
-	   Precondition: for each vec<T> suboject v, there must be no
+	   Precondition: for each vec<T> subobject v, there must be no
 	   overlap between the intervals
 	     [v.data(), v.data() + v.size()*sizeof(T)) and
-	     [alloc->marked_ptr(mark), newvdata)
+	     [alloc->ptr_at(mark), newvdata)
 	   where newvdata is the intended new value of v.data() after
 	   copydown.
 	   (If this condition was not satisfied, then v's data would
 	   be overwritten before we got the chance to move it, because
-	   the interval [alloc->marked_ptr(mark), newvdata) contains
+	   the interval [alloc->ptr_at(mark), newvdata) contains
 	   the destinations of subobjects which come before v in the
 	   iteration order.)
 
 	   If we assume that "mark" is always at the boundary of an
 	   allocation, not in the middle of one, then the precondition
 	   reduces to ensuring that v.data() is not in the interval
-	   [alloc->marked_ptr(mark), newvdata).
+	   [alloc->ptr_at(mark), newvdata).
 	   */
 	template<class T>
 	T copydown_by_memmove(allocator * alloc, alloc_mark_t mark, T val)
