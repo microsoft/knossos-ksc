@@ -661,6 +661,36 @@ namespace ks
 
 	// ===============================  Copydown  ==================================
 
+	// Tests if any of the memory referred to by val overlaps the
+	// range [start, end)
+	template<class T>
+	bool memory_overlaps(const void* /*start*/, const void* /*end*/, T const& /*val*/) {
+		return false;
+	}
+
+	template<class TupleT, size_t... Indices>
+	bool memory_overlaps_tupleimpl(const void* start, const void* end, TupleT const& t, std::index_sequence<Indices...>) {
+		return (memory_overlaps(start, end, std::get<Indices>(t)) || ...);
+	}
+	template<class... Types>
+	bool memory_overlaps(const void* start, const void* end, tuple<Types...> const& t) {
+		return memory_overlaps_tupleimpl(start, end, t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	bool memory_overlaps(const void* start, const void* end, vec<T> const& v) {
+		if (v.is_zero()) {
+			return v.size() != 0 && memory_overlaps(start, end, v[0]);
+		}
+
+		for (int i = 0; i != v.size(); ++i) {
+			if (memory_overlaps(start, end, v[i])) {
+				return true;
+			}
+		}
+		return v.data() < end && v.data() + v.size() > start;
+	}
+
 	struct prepare_copydown_state
 	{
 		unsigned char * subobjectDestination;   // destination of the next vec subobject
@@ -721,6 +751,7 @@ namespace ks
 			   any of the data belonging to subobjects of *v.
 			   That's fortunate, because we wouldn't be allowed to modify
 			   objects before the copydown location even if we wanted to. */
+			KS_ASSERT(!memory_overlaps(dest->startOfDestination, dest->subobjectDestination, *v));
 			dest->subobjectDestination += inflated_bytes(*v);
 		} else {
 			int sz = v->size();
