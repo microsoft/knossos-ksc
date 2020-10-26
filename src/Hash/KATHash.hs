@@ -44,9 +44,7 @@ removeFromVMP :: Ord v
               => v
               -> Map v (Int, Positions)
               -> (Map v (Int, Positions), (Int, Positions))
-removeFromVMP v m = case Map.lookup v m of
-  Nothing -> (m, (0, EmptyPL))
-  Just p  -> (Map.delete v m, p)
+removeFromVMP v m = (Map.delete v m, fromMaybe (0, EmptyPL) (Map.lookup v m))
 
 removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
 removeFromVM3 v m = (Map.delete v m, Map.lookup v m)
