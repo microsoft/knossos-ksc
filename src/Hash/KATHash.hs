@@ -5,6 +5,7 @@ module KATHash where
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 
 import Expr (Expr(Var, Lam, App))
 import Merge
@@ -37,9 +38,7 @@ data Structure3
   deriving (Eq, Show)
 
 removeFromVM :: Ord v => v -> Map v Positions -> (Map v Positions, Positions)
-removeFromVM v m = case Map.lookup v m of
-  Nothing -> (m, EmptyPL)
-  Just p  -> (Map.delete v m, p)
+removeFromVM v m = (Map.delete v m, fromMaybe EmptyPL (Map.lookup v m))
 
 removeFromVMP :: Ord v
               => v
