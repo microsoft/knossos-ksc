@@ -49,9 +49,6 @@ removeFromVMP v m = (Map.delete v m, fromMaybe (0, EmptyPL) (Map.lookup v m))
 removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
 removeFromVM3 v m = (Map.delete v m, Map.lookup v m)
 
-unionVM :: Ord v => (Map v Positions -> Map v Positions -> Map v Positions)
-unionVM = Map.unionWith UnionPL
-
 unionVM2 :: Ord k
          => Map k Positions
          -> Map k Positions
@@ -74,12 +71,6 @@ unionVM3 = mergeMaps
                 Both l r -> BothPL l r
             )
 
-findSingleton :: Map p Positions -> p
-findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
-  [(v, _)] -> v
-  [] -> error "Expected map to be non-empty"
-  _:_:_ -> error "Expected map not to have multiple elements"
-
 findSingleton2 :: Map p Positions -> p
 findSingleton2 m = case (filter (isSinglePL2 . snd) . Map.toList) m of
   [(v, _)] -> v
@@ -93,21 +84,6 @@ findSingleton3 m = case Map.toList m of
   [] -> error "Expected map to be non-empty"
   _:_:_ -> error "Expected map not to have multiple elements"
 
--- This has terrible time complexity
-isSinglePL :: Positions -> Bool
-isSinglePL = \case
-  SinglePL -> True
-  UnionPL p1 p2 -> (isSinglePL p1 && isSinglePL p2)
-                   || (isSinglePL p1 && isEmptyPL p2)
-                   || (isEmptyPL p1 && isSinglePL p2)
-  _ -> False
-
-isEmptyPL :: Positions -> Bool
-isEmptyPL = \case
-  EmptyPL -> True
-  UnionPL p1 p2 -> isEmptyPL p1 && isEmptyPL p2
-  _ -> False
-
 isSinglePL2 :: Positions -> Bool
 isSinglePL2 = \case
   SinglePL -> True
@@ -115,18 +91,6 @@ isSinglePL2 = \case
 
 extendVM :: Ord k => Map k a -> k -> a -> Map k a
 extendVM m x p = Map.insert x p m
-
-pickL :: Positions -> Positions
-pickL = \case
-  ShiftLeftPL pl -> pl
-  UnionPL pl1 pl2 -> UnionPL (pickL pl1) (pickL pl2)
-  _ -> EmptyPL
-
-pickR :: Positions -> Positions
-pickR = \case
-  ShiftRightPL pr -> pr
-  UnionPL pl pr -> UnionPL (pickR pl) (pickR pr)
-  _ -> EmptyPL
 
 pickL2 :: Positions -> Positions
 pickL2 = \case
@@ -151,37 +115,6 @@ pickR3 = \case
   RightOnlyPL pr -> Just pr
   BothPL _ pr -> Just pr
   _ -> Nothing
-
-summariseExprCorrectness :: Ord name
-                         => Expr name
-                         -> (Structure, Map name Positions)
-summariseExprCorrectness = \case
-  Var v   -> (SVar, Map.singleton v SinglePL)
-  Lam x e ->
-    let (str_body, map_body) = summariseExprCorrectness e
-        (e_map, x_pos) = removeFromVM x map_body
-    in (SLam x_pos str_body, e_map)
-  App e1 e2 ->
-    let (str1, map1) = summariseExprCorrectness e1
-        (str2, map2) = summariseExprCorrectness e2
-        map1_shift = Map.map ShiftLeftPL map1
-        map2_shift = Map.map ShiftRightPL map2
-    in (SApp str1 str2, unionVM map1_shift map2_shift)
-
-rebuild :: Ord name
-        => (name -> name)
-        -> name
-        -> (Structure, Map name Positions)
-        -> Expr name
-rebuild freshen fresh (structure, m) = case structure of
-  SVar -> Var (findSingleton m)
-  SLam p s -> Lam x (rebuild freshen fresher (s, extendVM m x p))
-    where x = fresh
-          fresher = freshen fresh
-  SApp s1 s2 -> App (rebuild freshen fresh (s1, m1))
-                    (rebuild freshen fresh (s2, m2))
-    where m1 = Map.map pickL m
-          m2 = Map.map pickR m
 
 summariseExprCorrectness2 :: Ord name
                           => Expr name

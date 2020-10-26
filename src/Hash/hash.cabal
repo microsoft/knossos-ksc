@@ -9,6 +9,7 @@ library
   exposed-modules:     Hash,
                        HtmlCombinators,
                        KATHash,
+                       KATHash1,
                        Merge,
                        CompareBehaviour,
                        Expr,

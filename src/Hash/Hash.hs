@@ -88,6 +88,7 @@ import Data.Ord (comparing)
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              example1, example2, example3, example4)
 import qualified KATHash
+import qualified KATHash1
 import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
@@ -461,12 +462,11 @@ alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
                                    => Expr a -> Expr a -> Bool
 alphaEquivalentAccordingToHashExpr = (==) `on` castHashTop
 
-alphaEquivalentAccordingToSummariseExprCorrectness :: Ord name
-                                                   => Expr name
-                                                   -> Expr name
-                                                   -> Bool
-alphaEquivalentAccordingToSummariseExprCorrectness =
-  (==) `on` KATHash.summariseExprCorrectness
+alphaEquivalentAccordingToSummariseExpr :: Ord name
+                                        => Expr name
+                                        -> Expr name
+                                        -> Bool
+alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHash1.summariseExpr
 
 -- | Makes binders unique whilst preserving alpha-equivalence.  The
 -- binders are replaced with integers starting from zero and
@@ -828,14 +828,14 @@ prop_hashAlphaEquivalence2 = withTests numRandomTests $ property $ do
 
   -- Or can use Hedgehog's "diff"
   alphaEquivalentAccordingToUniquifyBinders expr1 expr2
-    === alphaEquivalentAccordingToSummariseExprCorrectness expr1 expr2
+    === alphaEquivalentAccordingToSummariseExpr expr1 expr2
 
 prop_rebuild :: Property
 prop_rebuild = withTests numRandomTests $ property $ do
   expr1Char <- forAll genExpr
   let expr1 = fmap ord expr1Char
-      esummary = KATHash.summariseExprCorrectness expr1
-      expr2 = KATHash.rebuild (+1) (0 :: Int) esummary
+      esummary = KATHash1.summariseExpr expr1
+      expr2 = KATHash1.rebuild (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 prop_rebuild2 :: Property
