@@ -866,8 +866,21 @@ namespace ks
 	template<class T>
 	T copydown(allocator * alloc, alloc_mark_t mark, T const& val)
 	{
+#ifdef CHECK_COPYDOWN_CORRECTNESS   // performs a (slow!) check that the result of a copydown is equal to the original
+		alloc_mark_t originalTop = alloc->mark();
+		alloc->allocate(inflated_bytes(val));  // ensure that safe_copy does not overlap any temporary allocations that might be made during copydown
+		T safe_copy = inflated_deep_copy(alloc, val);
+		alloc->reset(originalTop);
+#endif
 		T modified_val = prepare_copydown(alloc, mark, val);
-		return copydown_by_memmove(alloc, mark, modified_val);
+		T ret = copydown_by_memmove(alloc, mark, modified_val);
+#ifdef CHECK_COPYDOWN_CORRECTNESS
+		if (ret != safe_copy) {
+			std::cerr << "Detected an incorrect copydown" << std::endl;
+			abort();
+		}
+#endif
+		return ret;
 	}
 
 	// specialize inplace_add(vec<T>*,vec<T>)
