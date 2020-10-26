@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module KATHash where
+module KATHashFast where
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -59,11 +59,11 @@ applyPrefixNoSkip prefix positions =
         positions
         prefix
 
-unionVMFast :: Ord k
+unionVM :: Ord k
             => (Prefix, Map k UnprefixPositions)
             -> (Prefix, Map k UnprefixPositions)
             -> (Prefix, Map k UnprefixPositions)
-unionVMFast ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
+unionVM ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
   where ((prefix_bigger, map_bigger), (prefix_smaller, map_smaller),
          next_prefix_bigger, bothPLBiggerFirst, smallerOnlyPL) =
           if Map.size map1 > Map.size map2
@@ -82,19 +82,19 @@ unionVMFast ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
 
         new_prefix = next_prefix_bigger `consPrefix` prefix_bigger
 
-summariseExprFast :: Ord name
-                  => Expr name
-                  -> (Structure, (Prefix, Map name UnprefixPositions))
-summariseExprFast = \case
+summariseExpr :: Ord name
+              => Expr name
+              -> (Structure, (Prefix, Map name UnprefixPositions))
+summariseExpr = \case
   Var v   -> (SVar, ([], Map.singleton v (0, HerePL)))
   Lam x e ->
-    let (str_body, (prefix, map_body)) = summariseExprFast e
+    let (str_body, (prefix, map_body)) = summariseExpr e
         (e_map, mskip_pos) = removeFromVM3 x map_body
     in (SLam (fmap (applyPrefix prefix) mskip_pos) str_body, (prefix, e_map))
   App e1 e2 ->
-    let (str1, map1) = summariseExprFast e1
-        (str2, map2) = summariseExprFast e2
-    in (SApp str1 str2, unionVMFast map1 map2)
+    let (str1, map1) = summariseExpr e1
+        (str2, map2) = summariseExpr e2
+    in (SApp str1 str2, unionVM map1 map2)
 
 fastTo3 :: (Structure, (Prefix, Map name UnprefixPositions))
         -> (Structure, Map name Positions)

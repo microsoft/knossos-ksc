@@ -87,10 +87,10 @@ import Data.Ord (comparing)
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              example1, example2, example3, example4)
-import qualified KATHash
 import qualified KATHash1
 import qualified KATHash2
 import qualified KATHash3
+import qualified KATHashFast
 import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
@@ -860,7 +860,7 @@ prop_fastMatches3 :: Property
 prop_fastMatches3 = withTests numRandomTests $ property $ do
   expr1 <- forAll genExpr
   let summary1 = KATHash3.summariseExpr expr1
-      summary2 = KATHash.fastTo3 (KATHash.summariseExprFast expr1)
+      summary2 = KATHashFast.fastTo3 (KATHashFast.summariseExpr expr1)
   summary1 === summary2
 
 -- | Generates random expressions for testing

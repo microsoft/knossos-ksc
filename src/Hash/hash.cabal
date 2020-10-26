@@ -8,10 +8,10 @@ library
   hs-source-dirs:      .
   exposed-modules:     Hash,
                        HtmlCombinators,
-                       KATHash,
                        KATHash1,
                        KATHash2,
                        KATHash3,
+                       KATHashFast,
                        Merge,
                        CompareBehaviour,
                        Expr,
