@@ -89,6 +89,7 @@ import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              example1, example2, example3, example4)
 import qualified KATHash
 import qualified KATHash1
+import qualified KATHash2
 import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
@@ -842,8 +843,8 @@ prop_rebuild2 :: Property
 prop_rebuild2 = withTests numRandomTests $ property $ do
   expr1Char <- forAll genExpr
   let expr1 = fmap ord expr1Char
-      esummary = KATHash.summariseExprCorrectness2 expr1
-      expr2 = KATHash.rebuild2 (+1) (0 :: Int) esummary
+      esummary = KATHash2.summariseExpr expr1
+      expr2 = KATHash2.rebuild2 (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 prop_rebuild3 :: Property

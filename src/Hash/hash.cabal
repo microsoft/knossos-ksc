@@ -10,6 +10,7 @@ library
                        HtmlCombinators,
                        KATHash,
                        KATHash1,
+                       KATHash2,
                        Merge,
                        CompareBehaviour,
                        Expr,
