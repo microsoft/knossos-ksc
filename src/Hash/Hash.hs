@@ -74,6 +74,7 @@ module Hash where
 import Hedgehog hiding (Var)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+import Data.Char (ord)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -453,33 +454,71 @@ castHashOptimizedExplicit =
           (!variablesHashE, !structureHashE, !depthE, !subtreeSizeE, subExprHashesE)
             = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e subExprHashesF
 
-type Positions = [Path]
+data Positions
+  = EmptyPL
+  | SinglePL
+  | ShiftLeftPL Positions
+  | ShiftRightPL Positions
+  | UnionPL Positions Positions
+  deriving (Eq, Show)
 
 data Structure
   = SVar
   | SLam Positions Structure
   | SApp Structure Structure
-  deriving Eq
+  deriving (Eq, Show)
 
-removeFromVM :: Ord v => v -> Map v [path] -> (Map v [path], [path])
+removeFromVM :: Ord v => v -> Map v Positions -> (Map v Positions, Positions)
 removeFromVM v m = case Map.lookup v m of
-  Nothing -> (m, [])
+  Nothing -> (m, EmptyPL)
   Just p  -> (Map.delete v m, p)
 
-shiftLeftPL :: Positions -> Positions
-shiftLeftPL  = map (Apl:)
+unionVM :: Ord v => (Map v Positions -> Map v Positions -> Map v Positions)
+unionVM = Map.unionWith UnionPL
 
-shiftRightPL :: Positions -> Positions
-shiftRightPL = map (Apr:)
+findSingleton :: Map p Positions -> p
+findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
+  [(v, _)] -> v
+  [] -> error "Expected map to be non-empty"
+  _:_:_ -> error "Expected map not to have multiple elements"
 
-unionVM :: Ord v => (Map v [path] -> Map v [path] -> Map v [path])
-unionVM = Map.unionWith (++)
+  where
+
+-- This has terrible time complexity
+isSinglePL :: Positions -> Bool
+isSinglePL = \case
+  SinglePL -> True
+  UnionPL p1 p2 -> (isSinglePL p1 && isSinglePL p2)
+                   || (isSinglePL p1 && isEmptyPL p2)
+                   || (isEmptyPL p1 && isSinglePL p2)
+  _ -> False
+
+isEmptyPL :: Positions -> Bool
+isEmptyPL = \case
+  EmptyPL -> True
+  UnionPL p1 p2 -> isEmptyPL p1 && isEmptyPL p2
+  _ -> False
+
+extendVM :: Ord k => Map k a -> k -> a -> Map k a
+extendVM m x p = Map.insert x p m
+
+pickL :: Positions -> Positions
+pickL = \case
+  ShiftLeftPL pl -> pl
+  UnionPL pl1 pl2 -> UnionPL (pickL pl1) (pickL pl2)
+  _ -> EmptyPL
+
+pickR :: Positions -> Positions
+pickR = \case
+  ShiftRightPL pl -> pl
+  UnionPL pl1 pl2 -> UnionPL (pickR pl1) (pickR pl2)
+  _ -> EmptyPL
 
 summariseExprCorrectness :: Ord name
                          => Expr name
                          -> (Structure, Map name Positions)
 summariseExprCorrectness = \case
-  Var v   -> (SVar, Map.singleton v [[]])
+  Var v   -> (SVar, Map.singleton v SinglePL)
   Lam x e ->
     let (str_body, map_body) = summariseExprCorrectness e
         (e_map, x_pos) = removeFromVM x map_body
@@ -487,9 +526,24 @@ summariseExprCorrectness = \case
   App e1 e2 ->
     let (str1, map1) = summariseExprCorrectness e1
         (str2, map2) = summariseExprCorrectness e2
-        map1_shift = Map.map shiftLeftPL map1
-        map2_shift = Map.map shiftRightPL map2
-    in (SApp str1 str2, Map.unionWith (++) map1_shift map2_shift)
+        map1_shift = Map.map ShiftLeftPL map1
+        map2_shift = Map.map ShiftRightPL map2
+    in (SApp str1 str2, unionVM map1_shift map2_shift)
+
+rebuild :: Ord name
+        => (name -> name)
+        -> name
+        -> (Structure, Map name Positions)
+        -> Expr name
+rebuild freshen fresh (structure, m) = case structure of
+  SVar -> Var (findSingleton m)
+  SLam p s -> Lam x (rebuild freshen fresher (s, extendVM m x p))
+    where x = fresh
+          fresher = freshen fresh
+  SApp s1 s2 -> App (rebuild freshen fresh (s1, m1))
+                    (rebuild freshen fresh (s2, m2))
+    where m1 = Map.map pickL m
+          m2 = Map.map pickR m
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
@@ -865,6 +919,14 @@ prop_hashAlphaEquivalence2 = withTests numRandomTests $ property $ do
   -- Or can use Hedgehog's "diff"
   alphaEquivalentAccordingToUniquifyBinders expr1 expr2
     === alphaEquivalentAccordingToSummariseExprCorrectness expr1 expr2
+
+prop_rebuild :: Property
+prop_rebuild = withTests numRandomTests $ property $ do
+  expr1Char <- forAll genExpr
+  let expr1 = fmap ord expr1Char
+      esummary = summariseExprCorrectness expr1
+      expr2 = rebuild (+1) (0 :: Int) esummary
+  assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 -- | Generates random expressions for testing
 genExprWithVarsTest :: MonadGen m => [v] -> m (Expr v)
