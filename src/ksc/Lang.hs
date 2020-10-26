@@ -279,10 +279,13 @@ the shape-type of T (defined analogously to the tangent-type of T),
 and is implemented by shapeType :: Type -> Type
 
 For example
-    T         Sh(T)
+  --------------------------
+  T         Sh(T)
+  --------------------------
   Float     ()
   Vec T     Vec Sh(T)
   (T1 T2)   (Sh(T1), Sh(T2))
+  --------------------------
 
 For every function
    f :: S -> T
