@@ -727,19 +727,20 @@ namespace ks
 		   */
 		if (v->is_zero()) {
 			int sz = v->size();
-			if (sz != 0) {
-				T zero_value = (*v)[0];
-				/* When we do the copydown, we'll be making sz copies
-				   of zero_value. We need to make sure that none of those
-				   copies will overwrite data referred to by zero_value.
-				   The strictest condition applies when the final copy
-				   is made, so we can start by assuming that the first
-				   (sz - 1) copies will be fine. */
-				dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz))
-						+ (sz - 1) * inflated_bytes(zero_value);
-				prepare_copydown_inplace(dest, &zero_value);
-				*v = vec<T>(zero_tag, zero_value, sz);
+			if (sz == 0) {
+				return;   // no data to be copied
 			}
+			T zero_value = (*v)[0];
+			/* When we do the copydown, we'll be making sz copies
+			   of zero_value. We need to make sure that none of those
+			   copies will overwrite data referred to by zero_value.
+			   The strictest condition applies when the final copy
+			   is made, so we can start by assuming that the first
+			   (sz - 1) copies will be fine. */
+			dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz))
+					+ (sz - 1) * inflated_bytes(zero_value);
+			prepare_copydown_inplace(dest, &zero_value);
+			*v = vec<T>(zero_tag, zero_value, sz);
 			return;
 		}
 		
