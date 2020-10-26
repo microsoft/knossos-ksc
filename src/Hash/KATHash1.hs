@@ -25,16 +25,7 @@ data Structure
 removeFromVM :: Ord v => v -> Map v Positions -> (Map v Positions, Positions)
 removeFromVM v m = (Map.delete v m, fromMaybe EmptyPL (Map.lookup v m))
 
-removeFromVMP :: Ord v
-              => v
-              -> Map v (Int, Positions)
-              -> (Map v (Int, Positions), (Int, Positions))
-removeFromVMP v m = (Map.delete v m, fromMaybe (0, EmptyPL) (Map.lookup v m))
-
-removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
-removeFromVM3 v m = (Map.delete v m, Map.lookup v m)
-
-unionVM :: Ord v => (Map v Positions -> Map v Positions -> Map v Positions)
+unionVM :: Ord k => Map k Positions -> Map k Positions -> Map k Positions
 unionVM = Map.unionWith UnionPL
 
 findSingleton :: Map p Positions -> p

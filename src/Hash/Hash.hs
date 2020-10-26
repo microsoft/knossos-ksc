@@ -845,7 +845,7 @@ prop_rebuild2 = withTests numRandomTests $ property $ do
   expr1Char <- forAll genExpr
   let expr1 = fmap ord expr1Char
       esummary = KATHash2.summariseExpr expr1
-      expr2 = KATHash2.rebuild2 (+1) (0 :: Int) esummary
+      expr2 = KATHash2.rebuild (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 prop_rebuild3 :: Property

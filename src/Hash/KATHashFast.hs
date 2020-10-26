@@ -7,29 +7,50 @@ import qualified Data.Map.Strict as Map
 import Data.List (foldl')
 
 import Expr (Expr(Var, Lam, App))
-import Merge
 import KATHash3 (Positions(..), Structure(..))
 
-removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
-removeFromVM3 v m = (Map.delete v m, Map.lookup v m)
+{- Positions and Structure reused from KATHash3
 
-unionVM3 :: Ord k
-         => Map k Positions
-         -> Map k Positions
-         -> Map k Positions
-unionVM3 = mergeMaps
-            (\case
-                LeftOnly l -> LeftOnlyPL l
-                RightOnly r -> RightOnlyPL r
-                Both l r -> BothPL l r
-            )
+data Positions
+  = HerePL
+  | LeftOnlyPL Positions
+  | RightOnlyPL Positions
+  | BothPL Positions Positions
+  deriving (Eq, Show)
 
-findSingleton3 :: Map p Positions -> p
-findSingleton3 m = case Map.toList m of
-  [(v, HerePL)] -> v
-  [(_, _)] -> error "Expected HerePL"
-  [] -> error "Expected map to be non-empty"
-  _:_:_ -> error "Expected map not to have multiple elements"
+data Structure
+  = SVar
+  | SLam (Maybe Positions) Structure
+  | SApp Structure Structure
+  deriving (Eq, Show)
+
+-}
+
+removeFromVM :: Ord v => v -> Map v p -> (Map v p, Maybe p)
+removeFromVM v m = (Map.delete v m, Map.lookup v m)
+
+unionVM :: Ord k
+            => (Prefix, Map k UnprefixPositions)
+            -> (Prefix, Map k UnprefixPositions)
+            -> (Prefix, Map k UnprefixPositions)
+unionVM ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
+  where ((prefix_bigger, map_bigger), (prefix_smaller, map_smaller),
+         next_prefix_bigger, bothPLBiggerFirst, smallerOnlyPL) =
+          if Map.size map1 > Map.size map2
+          then (ml, mr, DirL, BothPL, RightOnlyPL)
+          else (mr, ml, DirR, flip BothPL, LeftOnlyPL)
+
+        new_map = foldl' (flip add_smaller) map_bigger (Map.toList map_smaller)
+
+        add_smaller (v, vv_smaller) = Map.alter (f vv_smaller) v
+        f vv_smaller x = Just (lengthPrefix new_prefix, new_positions)
+          where new_positions = case x of
+                  Nothing -> smallerOnlyPL (applyPrefix prefix_smaller vv_smaller)
+                  Just vv_bigger -> bothPLBiggerFirst
+                                        (applyPrefix prefix_bigger vv_bigger)
+                                        (applyPrefix prefix_smaller vv_smaller)
+
+        new_prefix = next_prefix_bigger `consPrefix` prefix_bigger
 
 extendVM :: Ord k => Map k a -> k -> a -> Map k a
 extendVM m x p = Map.insert x p m
@@ -59,29 +80,6 @@ applyPrefixNoSkip prefix positions =
         positions
         prefix
 
-unionVM :: Ord k
-            => (Prefix, Map k UnprefixPositions)
-            -> (Prefix, Map k UnprefixPositions)
-            -> (Prefix, Map k UnprefixPositions)
-unionVM ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
-  where ((prefix_bigger, map_bigger), (prefix_smaller, map_smaller),
-         next_prefix_bigger, bothPLBiggerFirst, smallerOnlyPL) =
-          if Map.size map1 > Map.size map2
-          then (ml, mr, DirL, BothPL, RightOnlyPL)
-          else (mr, ml, DirR, flip BothPL, LeftOnlyPL)
-
-        new_map = foldl' (flip add_smaller) map_bigger (Map.toList map_smaller)
-
-        add_smaller (v, vv_smaller) = Map.alter (f vv_smaller) v
-        f vv_smaller x = Just (lengthPrefix new_prefix, new_positions)
-          where new_positions = case x of
-                  Nothing -> smallerOnlyPL (applyPrefix prefix_smaller vv_smaller)
-                  Just vv_bigger -> bothPLBiggerFirst
-                                        (applyPrefix prefix_bigger vv_bigger)
-                                        (applyPrefix prefix_smaller vv_smaller)
-
-        new_prefix = next_prefix_bigger `consPrefix` prefix_bigger
-
 summariseExpr :: Ord name
               => Expr name
               -> (Structure, (Prefix, Map name UnprefixPositions))
@@ -89,13 +87,16 @@ summariseExpr = \case
   Var v   -> (SVar, ([], Map.singleton v (0, HerePL)))
   Lam x e ->
     let (str_body, (prefix, map_body)) = summariseExpr e
-        (e_map, mskip_pos) = removeFromVM3 x map_body
+        (e_map, mskip_pos) = removeFromVM x map_body
     in (SLam (fmap (applyPrefix prefix) mskip_pos) str_body, (prefix, e_map))
   App e1 e2 ->
     let (str1, map1) = summariseExpr e1
         (str2, map2) = summariseExpr e2
     in (SApp str1 str2, unionVM map1 map2)
 
+-- We don't implement rebuild here, we just show that the result of
+-- KATHash3.summariseExpr can be recovered from the result of
+-- KATHashFast.summariseExpr
 fastTo3 :: (Structure, (Prefix, Map name UnprefixPositions))
         -> (Structure, Map name Positions)
 fastTo3 (structure, (prefix, m)) = (structure, m')

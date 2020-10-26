@@ -26,45 +26,36 @@ data Structure
 removeFromVM :: Ord v => v -> Map v Positions -> (Map v Positions, Positions)
 removeFromVM v m = (Map.delete v m, fromMaybe EmptyPL (Map.lookup v m))
 
-removeFromVMP :: Ord v
-              => v
-              -> Map v (Int, Positions)
-              -> (Map v (Int, Positions), (Int, Positions))
-removeFromVMP v m = (Map.delete v m, fromMaybe (0, EmptyPL) (Map.lookup v m))
-
-unionVM2 :: Ord k
-         => Map k Positions
-         -> Map k Positions
-         -> Map k Positions
-unionVM2 = mergeMaps
+unionVM :: Ord k => Map k Positions -> Map k Positions -> Map k Positions
+unionVM = Merge.mergeMaps
             (\case
                 LeftOnly l -> ShiftLeftPL l
                 RightOnly r -> ShiftRightPL r
                 Both l r -> UnionPL l r
             )
 
-findSingleton2 :: Map p Positions -> p
-findSingleton2 m = case (filter (isSinglePL2 . snd) . Map.toList) m of
+findSingleton :: Map p Positions -> p
+findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
   [(v, _)] -> v
   [] -> error "Expected map to be non-empty"
   _:_:_ -> error "Expected map not to have multiple elements"
 
-isSinglePL2 :: Positions -> Bool
-isSinglePL2 = \case
+isSinglePL :: Positions -> Bool
+isSinglePL = \case
   SinglePL -> True
   _ -> False
 
 extendVM :: Ord k => Map k a -> k -> a -> Map k a
 extendVM m x p = Map.insert x p m
 
-pickL2 :: Positions -> Positions
-pickL2 = \case
+pickL :: Positions -> Positions
+pickL = \case
   ShiftLeftPL pl -> pl
   UnionPL pl _ -> pl
   _ -> EmptyPL
 
-pickR2 :: Positions -> Positions
-pickR2 = \case
+pickR :: Positions -> Positions
+pickR = \case
   ShiftRightPL pr -> pr
   UnionPL _ pr -> pr
   _ -> EmptyPL
@@ -81,19 +72,19 @@ summariseExpr = \case
   App e1 e2 ->
     let (str1, map1) = summariseExpr e1
         (str2, map2) = summariseExpr e2
-    in (SApp str1 str2, unionVM2 map1 map2)
+    in (SApp str1 str2, unionVM map1 map2)
 
-rebuild2 :: Ord name
-         => (name -> name)
-         -> name
-         -> (Structure, Map name Positions)
-         -> Expr name
-rebuild2 freshen fresh (structure, m) = case structure of
-  SVar -> Var (findSingleton2 m)
-  SLam p s -> Lam x (rebuild2 freshen fresher (s, extendVM m x p))
+rebuild :: Ord name
+        => (name -> name)
+        -> name
+        -> (Structure, Map name Positions)
+        -> Expr name
+rebuild freshen fresh (structure, m) = case structure of
+  SVar -> Var (findSingleton m)
+  SLam p s -> Lam x (rebuild freshen fresher (s, extendVM m x p))
     where x = fresh
           fresher = freshen fresh
-  SApp s1 s2 -> App (rebuild2 freshen fresh (s1, m1))
-                    (rebuild2 freshen fresh (s2, m2))
-    where m1 = Map.map pickL2 m
-          m2 = Map.map pickR2 m
+  SApp s1 s2 -> App (rebuild freshen fresh (s1, m1))
+                    (rebuild freshen fresh (s2, m2))
+    where m1 = Map.map pickL m
+          m2 = Map.map pickR m

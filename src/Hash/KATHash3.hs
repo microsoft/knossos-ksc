@@ -24,11 +24,8 @@ data Structure
 removeFromVM :: Ord v => v -> Map v p -> (Map v p, Maybe p)
 removeFromVM v m = (Map.delete v m, Map.lookup v m)
 
-unionVM :: Ord k
-         => Map k Positions
-         -> Map k Positions
-         -> Map k Positions
-unionVM = mergeMaps
+unionVM :: Ord k => Map k Positions -> Map k Positions -> Map k Positions
+unionVM = Merge.mergeMaps
             (\case
                 LeftOnly l -> LeftOnlyPL l
                 RightOnly r -> RightOnlyPL r
@@ -72,10 +69,10 @@ summariseExpr = \case
     in (SApp str1 str2, unionVM map1 map2)
 
 rebuild :: Ord name
-         => (name -> name)
-         -> name
-         -> (Structure, Map name Positions)
-         -> Expr name
+        => (name -> name)
+        -> name
+        -> (Structure, Map name Positions)
+        -> Expr name
 rebuild freshen fresh (structure, m) = case structure of
   SVar -> Var (findSingleton m)
   SLam mp s -> Lam x (rebuild freshen fresher (s, m'))
@@ -84,6 +81,6 @@ rebuild freshen fresh (structure, m) = case structure of
           m' = case mp of Nothing -> m
                           Just p -> extendVM m x p
   SApp s1 s2 -> App (rebuild freshen fresh (s1, m1))
-                     (rebuild freshen fresh (s2, m2))
+                    (rebuild freshen fresh (s2, m2))
     where m1 = Map.mapMaybe pickL m
           m2 = Map.mapMaybe pickR m
