@@ -468,10 +468,36 @@ data Structure
   | SApp Structure Structure
   deriving (Eq, Show)
 
+data Positions3
+  = HerePL
+  | LeftOnlyPL Positions3
+  | RightOnlyPL Positions3
+  | BothPL Positions3 Positions3
+  deriving (Eq, Show)
+
+data Structure3
+  = SVar3
+  | SLam3 (Maybe Positions3) Structure3
+  | SApp3 Structure3 Structure3
+  deriving (Eq, Show)
+
 removeFromVM :: Ord v => v -> Map v Positions -> (Map v Positions, Positions)
 removeFromVM v m = case Map.lookup v m of
   Nothing -> (m, EmptyPL)
   Just p  -> (Map.delete v m, p)
+
+removeFromVMP :: Ord v
+              => v
+              -> Map v (Int, Positions)
+              -> (Map v (Int, Positions), (Int, Positions))
+removeFromVMP v m = case Map.lookup v m of
+  Nothing -> (m, (0, EmptyPL))
+  Just p  -> (Map.delete v m, p)
+
+removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
+removeFromVM3 v m = case Map.lookup v m of
+  Nothing -> (m, Nothing)
+  Just p  -> (Map.delete v m, Just p)
 
 unionVM :: Ord v => (Map v Positions -> Map v Positions -> Map v Positions)
 unionVM = Map.unionWith UnionPL
@@ -487,6 +513,17 @@ unionVM2 = mergeMaps
                 Both l r -> UnionPL l r
             )
 
+unionVM3 :: Ord k
+         => Map k Positions3
+         -> Map k Positions3
+         -> Map k Positions3
+unionVM3 = mergeMaps
+            (\case
+                LeftOnly l -> LeftOnlyPL l
+                RightOnly r -> RightOnlyPL r
+                Both l r -> BothPL l r
+            )
+
 findSingleton :: Map p Positions -> p
 findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
   [(v, _)] -> v
@@ -496,6 +533,13 @@ findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
 findSingleton2 :: Map p Positions -> p
 findSingleton2 m = case (filter (isSinglePL2 . snd) . Map.toList) m of
   [(v, _)] -> v
+  [] -> error "Expected map to be non-empty"
+  _:_:_ -> error "Expected map not to have multiple elements"
+
+findSingleton3 :: Map p Positions3 -> p
+findSingleton3 m = case Map.toList m of
+  [(v, HerePL)] -> v
+  [(_, _)] -> error "Expected HerePL"
   [] -> error "Expected map to be non-empty"
   _:_:_ -> error "Expected map not to have multiple elements"
 
@@ -545,6 +589,18 @@ pickR2 = \case
   ShiftRightPL pr -> pr
   UnionPL _ pr -> pr
   _ -> EmptyPL
+
+pickL3 :: Positions3 -> Maybe Positions3
+pickL3 = \case
+  LeftOnlyPL pl -> Just pl
+  BothPL pl _ -> Just pl
+  _ -> Nothing
+
+pickR3 :: Positions3 -> Maybe Positions3
+pickR3 = \case
+  RightOnlyPL pr -> Just pr
+  BothPL _ pr -> Just pr
+  _ -> Nothing
 
 summariseExprCorrectness :: Ord name
                          => Expr name
@@ -605,6 +661,37 @@ rebuild2 freshen fresh (structure, m) = case structure of
                     (rebuild2 freshen fresh (s2, m2))
     where m1 = Map.map pickL2 m
           m2 = Map.map pickR2 m
+
+summariseExprCorrectness3 :: Ord name
+                          => Expr name
+                          -> (Structure3, Map name Positions3)
+summariseExprCorrectness3 = \case
+  Var v   -> (SVar3, Map.singleton v HerePL)
+  Lam x e ->
+    let (str_body, map_body) = summariseExprCorrectness3 e
+        (e_map, x_pos) = removeFromVM3 x map_body
+    in (SLam3 x_pos str_body, e_map)
+  App e1 e2 ->
+    let (str1, map1) = summariseExprCorrectness3 e1
+        (str2, map2) = summariseExprCorrectness3 e2
+    in (SApp3 str1 str2, unionVM3 map1 map2)
+
+rebuild3 :: Ord name
+         => (name -> name)
+         -> name
+         -> (Structure3, Map name Positions3)
+         -> Expr name
+rebuild3 freshen fresh (structure, m) = case structure of
+  SVar3 -> Var (findSingleton3 m)
+  SLam3 mp s -> Lam x (rebuild3 freshen fresher (s, m'))
+    where x = fresh
+          fresher = freshen fresh
+          m' = case mp of Nothing -> m
+                          Just p -> extendVM m x p
+  SApp3 s1 s2 -> App (rebuild3 freshen fresh (s1, m1))
+                     (rebuild3 freshen fresh (s2, m2))
+    where m1 = Map.mapMaybe pickL3 m
+          m2 = Map.mapMaybe pickR3 m
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
@@ -995,6 +1082,14 @@ prop_rebuild2 = withTests numRandomTests $ property $ do
   let expr1 = fmap ord expr1Char
       esummary = summariseExprCorrectness2 expr1
       expr2 = rebuild2 (+1) (0 :: Int) esummary
+  assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+
+prop_rebuild3 :: Property
+prop_rebuild3 = withTests numRandomTests $ property $ do
+  expr1Char <- forAll genExpr
+  let expr1 = fmap ord expr1Char
+      esummary = summariseExprCorrectness3 expr1
+      expr2 = rebuild3 (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 -- | Generates random expressions for testing
