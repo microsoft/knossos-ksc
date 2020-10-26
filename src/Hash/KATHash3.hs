@@ -21,7 +21,7 @@ data Structure
   | SApp Structure Structure
   deriving (Eq, Show)
 
-removeFromVM :: Ord v => v -> Map v p -> (Map v p, Maybe p)
+removeFromVM :: Ord v => v -> Map v positions -> (Map v positions, Maybe positions)
 removeFromVM v m = (Map.delete v m, Map.lookup v m)
 
 unionVM :: Ord k => Map k Positions -> Map k Positions -> Map k Positions

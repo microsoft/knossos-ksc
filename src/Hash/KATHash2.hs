@@ -11,10 +11,10 @@ import Merge
 
 data Positions
   = EmptyPL
-  | SinglePL
-  | ShiftLeftPL Positions
-  | ShiftRightPL Positions
-  | UnionPL Positions Positions
+  | HerePL
+  | LeftOnlyPL Positions
+  | RightOnlyPL Positions
+  | BothPL Positions Positions
   deriving (Eq, Show)
 
 data Structure
@@ -29,20 +29,20 @@ removeFromVM v m = (Map.delete v m, fromMaybe EmptyPL (Map.lookup v m))
 unionVM :: Ord k => Map k Positions -> Map k Positions -> Map k Positions
 unionVM = Merge.mergeMaps
             (\case
-                LeftOnly l -> ShiftLeftPL l
-                RightOnly r -> ShiftRightPL r
-                Both l r -> UnionPL l r
+                LeftOnly l -> LeftOnlyPL l
+                RightOnly r -> RightOnlyPL r
+                Both l r -> BothPL l r
             )
 
 findSingleton :: Map p Positions -> p
-findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
+findSingleton m = case (filter (isHerePL . snd) . Map.toList) m of
   [(v, _)] -> v
   [] -> error "Expected map to be non-empty"
   _:_:_ -> error "Expected map not to have multiple elements"
 
-isSinglePL :: Positions -> Bool
-isSinglePL = \case
-  SinglePL -> True
+isHerePL :: Positions -> Bool
+isHerePL = \case
+  HerePL -> True
   _ -> False
 
 extendVM :: Ord k => Map k a -> k -> a -> Map k a
@@ -50,21 +50,21 @@ extendVM m x p = Map.insert x p m
 
 pickL :: Positions -> Positions
 pickL = \case
-  ShiftLeftPL pl -> pl
-  UnionPL pl _ -> pl
+  LeftOnlyPL pl -> pl
+  BothPL pl _ -> pl
   _ -> EmptyPL
 
 pickR :: Positions -> Positions
 pickR = \case
-  ShiftRightPL pr -> pr
-  UnionPL _ pr -> pr
+  RightOnlyPL pr -> pr
+  BothPL _ pr -> pr
   _ -> EmptyPL
 
 summariseExpr :: Ord name
               => Expr name
               -> (Structure, Map name Positions)
 summariseExpr = \case
-  Var v   -> (SVar, Map.singleton v SinglePL)
+  Var v   -> (SVar, Map.singleton v HerePL)
   Lam x e ->
     let (str_body, map_body) = summariseExpr e
         (e_map, x_pos) = removeFromVM x map_body
