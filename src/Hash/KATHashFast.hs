@@ -2,6 +2,9 @@
 
 module KATHashFast where
 
+import Hedgehog hiding (Var)
+import qualified Hedgehog.Gen as Gen
+
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (foldl')
@@ -52,11 +55,9 @@ unionVM ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
 
         new_prefix = next_prefix_bigger `consPrefix` prefix_bigger
 
-extendVM :: Ord k => Map k a -> k -> a -> Map k a
-extendVM m x p = Map.insert x p m
-
 data Dir = DirL | DirR
 type Prefix = [Dir]
+
 type UnprefixPositions = (Int, Positions)
 
 consPrefix :: Dir -> Prefix -> Prefix
@@ -65,26 +66,62 @@ consPrefix = (:)
 lengthPrefix :: Prefix -> Int
 lengthPrefix = length
 
+emptyPrefix :: Prefix
+emptyPrefix = []
+
+hereUnprefixPositions :: UnprefixPositions
+hereUnprefixPositions = (0, HerePL)
+
+-- `applyPrefix prefix (toIgnore, positions)` applies `prefix` to
+-- `positions`, except it ignores the last `toIgnore` elements of
+-- `prefix`.
 applyPrefix :: Prefix -> UnprefixPositions -> Positions
-applyPrefix prefix (skip, positions) = applyPrefixNoSkip taken positions
-  where n = length prefix
-        toTake = n - skip
-        taken = if toTake < 0
-                then error "toTake < 0"
-                else take toTake prefix
+applyPrefix prefix (toIgnore, positions) =
+  applyAllPrefix (dropFromEnd toIgnore prefix)
+  where dropFromEnd n xs = if toTake < 0
+                           then error "toTake < 0"
+                           else take toTake xs
+          where toTake = length xs - n
 
-applyPrefixNoSkip :: Prefix -> Positions -> Positions
-applyPrefixNoSkip prefix positions =
-  foldr (\case DirL -> LeftOnlyPL
-               DirR -> RightOnlyPL)
-        positions
-        prefix
+        applyAllPrefix :: Prefix -> Positions
+        applyAllPrefix = foldr (\case DirL -> LeftOnlyPL
+                                      DirR -> RightOnlyPL)
+                               positions
 
+prop_applyPrefix :: TestLimit -> Property
+prop_applyPrefix count = withTests count $ property $ do
+  p <- forAll genPosition
+  let prefix = [DirL, DirR, DirR, DirR]
+
+  applyPrefix prefix (0, p) === LeftOnlyPL (RightOnlyPL (RightOnlyPL (RightOnlyPL p)))
+  applyPrefix prefix (1, p) === LeftOnlyPL (RightOnlyPL (RightOnlyPL p))
+  applyPrefix prefix (2, p) === LeftOnlyPL (RightOnlyPL p)
+  applyPrefix prefix (3, p) === LeftOnlyPL p
+  applyPrefix prefix (4, p) === p
+
+-- This fast version has the desirable property that neither the
+-- Positions nor Structure from the earlier version need to change.
+--
+-- Instead of changing Positions and Structure it adds more to the
+-- return value.  The original version returned
+--
+--     (Structure, Map name Positions)
+--
+-- This one returns
+--
+--     (Structure, (Prefix, Map name PrefixPositions))
+--
+-- (Prefix, Map name PrefixPositions) encodes exactly the same
+-- information as `Map name Positions` but does so in a way that is
+-- amenable to merging by "accumulation into the smaller map".
+--
+-- If you want to recover a `Map name Positions` from a `(Prefix, Map
+-- name PrefixPositions)` then you can use `prefixMapToMap`.
 summariseExpr :: Ord name
               => Expr name
               -> (Structure, (Prefix, Map name UnprefixPositions))
 summariseExpr = \case
-  Var v   -> (SVar, ([], Map.singleton v (0, HerePL)))
+  Var v   -> (SVar, (emptyPrefix, Map.singleton v hereUnprefixPositions))
   Lam x e ->
     let (str_body, (prefix, map_body)) = summariseExpr e
         (e_map, mskip_pos) = removeFromVM x map_body
@@ -94,10 +131,22 @@ summariseExpr = \case
         (str2, map2) = summariseExpr e2
     in (SApp str1 str2, unionVM map1 map2)
 
+prefixMapToMap :: (Prefix, Map k UnprefixPositions)
+               -> Map k Positions
+prefixMapToMap (prefix, m) = Map.map (applyPrefix prefix) m
+
 -- We don't implement rebuild here, we just show that the result of
 -- KATHash3.summariseExpr can be recovered from the result of
 -- KATHashFast.summariseExpr
 fastTo3 :: (Structure, (Prefix, Map name UnprefixPositions))
         -> (Structure, Map name Positions)
-fastTo3 (structure, (prefix, m)) = (structure, m')
-  where m' = Map.map (applyPrefix prefix) m
+fastTo3 (structure, prefixMap) = (structure, prefixMapToMap prefixMap)
+
+genPosition :: Gen Positions
+genPosition = Gen.recursive
+  Gen.choice
+  [ pure HerePL ]
+  [ Gen.subterm genPosition LeftOnlyPL
+  , Gen.subterm genPosition RightOnlyPL
+  , Gen.subterm2 genPosition genPosition BothPL
+  ]

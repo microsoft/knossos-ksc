@@ -925,3 +925,6 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
   let n = normalizedGroupedEquivalentSubexpressions
   expr <- forAll genExpr
   n (castHash expr) === n (castHashOptimized expr)
+
+prop_applyPrefix :: Property
+prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests
