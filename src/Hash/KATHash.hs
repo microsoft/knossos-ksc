@@ -8,41 +8,15 @@ import Data.List (foldl')
 
 import Expr (Expr(Var, Lam, App))
 import Merge
-
-data Positions
-  = EmptyPL
-  | SinglePL
-  | ShiftLeftPL Positions
-  | ShiftRightPL Positions
-  | UnionPL Positions Positions
-  deriving (Eq, Show)
-
-data Structure
-  = SVar
-  | SLam Positions Structure
-  | SApp Structure Structure
-  deriving (Eq, Show)
-
-data Positions3
-  = HerePL
-  | LeftOnlyPL Positions3
-  | RightOnlyPL Positions3
-  | BothPL Positions3 Positions3
-  deriving (Eq, Show)
-
-data Structure3
-  = SVar3
-  | SLam3 (Maybe Positions3) Structure3
-  | SApp3 Structure3 Structure3
-  deriving (Eq, Show)
+import KATHash3 (Positions(..), Structure(..))
 
 removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
 removeFromVM3 v m = (Map.delete v m, Map.lookup v m)
 
 unionVM3 :: Ord k
-         => Map k Positions3
-         -> Map k Positions3
-         -> Map k Positions3
+         => Map k Positions
+         -> Map k Positions
+         -> Map k Positions
 unionVM3 = mergeMaps
             (\case
                 LeftOnly l -> LeftOnlyPL l
@@ -50,73 +24,19 @@ unionVM3 = mergeMaps
                 Both l r -> BothPL l r
             )
 
-findSingleton2 :: Map p Positions -> p
-findSingleton2 m = case (filter (isSinglePL2 . snd) . Map.toList) m of
-  [(v, _)] -> v
-  [] -> error "Expected map to be non-empty"
-  _:_:_ -> error "Expected map not to have multiple elements"
-
-findSingleton3 :: Map p Positions3 -> p
+findSingleton3 :: Map p Positions -> p
 findSingleton3 m = case Map.toList m of
   [(v, HerePL)] -> v
   [(_, _)] -> error "Expected HerePL"
   [] -> error "Expected map to be non-empty"
   _:_:_ -> error "Expected map not to have multiple elements"
 
-isSinglePL2 :: Positions -> Bool
-isSinglePL2 = \case
-  SinglePL -> True
-  _ -> False
-
 extendVM :: Ord k => Map k a -> k -> a -> Map k a
 extendVM m x p = Map.insert x p m
 
-pickL3 :: Positions3 -> Maybe Positions3
-pickL3 = \case
-  LeftOnlyPL pl -> Just pl
-  BothPL pl _ -> Just pl
-  _ -> Nothing
-
-pickR3 :: Positions3 -> Maybe Positions3
-pickR3 = \case
-  RightOnlyPL pr -> Just pr
-  BothPL _ pr -> Just pr
-  _ -> Nothing
-
-summariseExprCorrectness3 :: Ord name
-                          => Expr name
-                          -> (Structure3, Map name Positions3)
-summariseExprCorrectness3 = \case
-  Var v   -> (SVar3, Map.singleton v HerePL)
-  Lam x e ->
-    let (str_body, map_body) = summariseExprCorrectness3 e
-        (e_map, x_pos) = removeFromVM3 x map_body
-    in (SLam3 x_pos str_body, e_map)
-  App e1 e2 ->
-    let (str1, map1) = summariseExprCorrectness3 e1
-        (str2, map2) = summariseExprCorrectness3 e2
-    in (SApp3 str1 str2, unionVM3 map1 map2)
-
-rebuild3 :: Ord name
-         => (name -> name)
-         -> name
-         -> (Structure3, Map name Positions3)
-         -> Expr name
-rebuild3 freshen fresh (structure, m) = case structure of
-  SVar3 -> Var (findSingleton3 m)
-  SLam3 mp s -> Lam x (rebuild3 freshen fresher (s, m'))
-    where x = fresh
-          fresher = freshen fresh
-          m' = case mp of Nothing -> m
-                          Just p -> extendVM m x p
-  SApp3 s1 s2 -> App (rebuild3 freshen fresh (s1, m1))
-                     (rebuild3 freshen fresh (s2, m2))
-    where m1 = Map.mapMaybe pickL3 m
-          m2 = Map.mapMaybe pickR3 m
-
 data Dir = DirL | DirR
 type Prefix = [Dir]
-type UnprefixPositions = (Int, Positions3)
+type UnprefixPositions = (Int, Positions)
 
 consPrefix :: Dir -> Prefix -> Prefix
 consPrefix = (:)
@@ -124,7 +44,7 @@ consPrefix = (:)
 lengthPrefix :: Prefix -> Int
 lengthPrefix = length
 
-applyPrefix :: Prefix -> UnprefixPositions -> Positions3
+applyPrefix :: Prefix -> UnprefixPositions -> Positions
 applyPrefix prefix (skip, positions) = applyPrefixNoSkip taken positions
   where n = length prefix
         toTake = n - skip
@@ -132,7 +52,7 @@ applyPrefix prefix (skip, positions) = applyPrefixNoSkip taken positions
                 then error "toTake < 0"
                 else take toTake prefix
 
-applyPrefixNoSkip :: Prefix -> Positions3 -> Positions3
+applyPrefixNoSkip :: Prefix -> Positions -> Positions
 applyPrefixNoSkip prefix positions =
   foldr (\case DirL -> LeftOnlyPL
                DirR -> RightOnlyPL)
@@ -164,19 +84,19 @@ unionVMFast ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
 
 summariseExprFast :: Ord name
                   => Expr name
-                  -> (Structure3, (Prefix, Map name UnprefixPositions))
+                  -> (Structure, (Prefix, Map name UnprefixPositions))
 summariseExprFast = \case
-  Var v   -> (SVar3, ([], Map.singleton v (0, HerePL)))
+  Var v   -> (SVar, ([], Map.singleton v (0, HerePL)))
   Lam x e ->
     let (str_body, (prefix, map_body)) = summariseExprFast e
         (e_map, mskip_pos) = removeFromVM3 x map_body
-    in (SLam3 (fmap (applyPrefix prefix) mskip_pos) str_body, (prefix, e_map))
+    in (SLam (fmap (applyPrefix prefix) mskip_pos) str_body, (prefix, e_map))
   App e1 e2 ->
     let (str1, map1) = summariseExprFast e1
         (str2, map2) = summariseExprFast e2
-    in (SApp3 str1 str2, unionVMFast map1 map2)
+    in (SApp str1 str2, unionVMFast map1 map2)
 
-fastTo3 :: (Structure3, (Prefix, Map name UnprefixPositions))
-        -> (Structure3, Map name Positions3)
+fastTo3 :: (Structure, (Prefix, Map name UnprefixPositions))
+        -> (Structure, Map name Positions)
 fastTo3 (structure, (prefix, m)) = (structure, m')
   where m' = Map.map (applyPrefix prefix) m

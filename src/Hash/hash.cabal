@@ -11,6 +11,7 @@ library
                        KATHash,
                        KATHash1,
                        KATHash2,
+                       KATHash3,
                        Merge,
                        CompareBehaviour,
                        Expr,
