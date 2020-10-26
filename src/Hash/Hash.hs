@@ -453,11 +453,56 @@ castHashOptimizedExplicit =
           (!variablesHashE, !structureHashE, !depthE, !subtreeSizeE, subExprHashesE)
             = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e subExprHashesF
 
+type Positions = [Path]
+
+data Structure
+  = SVar
+  | SLam Positions Structure
+  | SApp Structure Structure
+  deriving Eq
+
+removeFromVM :: Ord v => v -> Map v [path] -> (Map v [path], [path])
+removeFromVM v m = case Map.lookup v m of
+  Nothing -> (m, [])
+  Just p  -> (Map.delete v m, p)
+
+shiftLeftPL :: Positions -> Positions
+shiftLeftPL  = map (Apl:)
+
+shiftRightPL :: Positions -> Positions
+shiftRightPL = map (Apr:)
+
+unionVM :: Ord v => (Map v [path] -> Map v [path] -> Map v [path])
+unionVM = Map.unionWith (++)
+
+summariseExprCorrectness :: Ord name
+                         => Expr name
+                         -> (Structure, Map name Positions)
+summariseExprCorrectness = \case
+  Var v   -> (SVar, Map.singleton v [[]])
+  Lam x e ->
+    let (str_body, map_body) = summariseExprCorrectness e
+        (e_map, x_pos) = removeFromVM x map_body
+    in (SLam x_pos str_body, e_map)
+  App e1 e2 ->
+    let (str1, map1) = summariseExprCorrectness e1
+        (str2, map2) = summariseExprCorrectness e2
+        map1_shift = Map.map shiftLeftPL map1
+        map2_shift = Map.map shiftRightPL map2
+    in (SApp str1 str2, Map.unionWith (++) map1_shift map2_shift)
+
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
 alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
                                    => Expr a -> Expr a -> Bool
 alphaEquivalentAccordingToHashExpr = (==) `on` castHashTop
+
+alphaEquivalentAccordingToSummariseExprCorrectness :: Ord name
+                                                   => Expr name
+                                                   -> Expr name
+                                                   -> Bool
+alphaEquivalentAccordingToSummariseExprCorrectness =
+  (==) `on` summariseExprCorrectness
 
 -- | Makes binders unique whilst preserving alpha-equivalence.  The
 -- binders are replaced with integers starting from zero and
@@ -688,6 +733,8 @@ naiveHashWithBinders2Explicit location env hashesIn expr = case expr of
           depth' = max depthF depthE + 1
           l_ret = (hash', location, expr) : subExpressionHashes
 
+
+
 normalizedGroupedEquivalentSubexpressions
   :: Ord hash => [(hash, Path, expr)] -> [[(Path, expr)]]
 normalizedGroupedEquivalentSubexpressions =
@@ -809,6 +856,15 @@ prop_hashAlphaEquivalence = withTests numRandomTests $ property $ do
   -- Or can use Hedgehog's "diff"
   alphaEquivalentAccordingToUniquifyBinders expr1 expr2
     === alphaEquivalentAccordingToHashExpr expr1 expr2
+
+prop_hashAlphaEquivalence2 :: Property
+prop_hashAlphaEquivalence2 = withTests numRandomTests $ property $ do
+  expr1 <- forAll genExpr
+  expr2 <- forAll genExpr
+
+  -- Or can use Hedgehog's "diff"
+  alphaEquivalentAccordingToUniquifyBinders expr1 expr2
+    === alphaEquivalentAccordingToSummariseExprCorrectness expr1 expr2
 
 -- | Generates random expressions for testing
 genExprWithVarsTest :: MonadGen m => [v] -> m (Expr v)
