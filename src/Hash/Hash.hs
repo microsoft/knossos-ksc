@@ -495,9 +495,7 @@ removeFromVMP v m = case Map.lookup v m of
   Just p  -> (Map.delete v m, p)
 
 removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
-removeFromVM3 v m = case Map.lookup v m of
-  Nothing -> (m, Nothing)
-  Just p  -> (Map.delete v m, Just p)
+removeFromVM3 v m = (Map.delete v m, Map.lookup v m)
 
 unionVM :: Ord v => (Map v Positions -> Map v Positions -> Map v Positions)
 unionVM = Map.unionWith UnionPL
