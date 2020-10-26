@@ -79,7 +79,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Data.Map.Merge.Strict as Merge
 import Data.Hashable (Hashable, hash, hashWithSalt)
 import GHC.Generics (Generic)
 import Data.Function (on)
@@ -88,6 +87,8 @@ import Data.Ord (comparing)
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              example1, example2, example3, example4)
+import qualified KATHash
+import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
 -- clearer.  If it doesn't help I may just get rid of it.
@@ -454,243 +455,6 @@ castHashOptimizedExplicit =
           (!variablesHashE, !structureHashE, !depthE, !subtreeSizeE, subExprHashesE)
             = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e subExprHashesF
 
-data Positions
-  = EmptyPL
-  | SinglePL
-  | ShiftLeftPL Positions
-  | ShiftRightPL Positions
-  | UnionPL Positions Positions
-  deriving (Eq, Show)
-
-data Structure
-  = SVar
-  | SLam Positions Structure
-  | SApp Structure Structure
-  deriving (Eq, Show)
-
-data Positions3
-  = HerePL
-  | LeftOnlyPL Positions3
-  | RightOnlyPL Positions3
-  | BothPL Positions3 Positions3
-  deriving (Eq, Show)
-
-data Structure3
-  = SVar3
-  | SLam3 (Maybe Positions3) Structure3
-  | SApp3 Structure3 Structure3
-  deriving (Eq, Show)
-
-removeFromVM :: Ord v => v -> Map v Positions -> (Map v Positions, Positions)
-removeFromVM v m = case Map.lookup v m of
-  Nothing -> (m, EmptyPL)
-  Just p  -> (Map.delete v m, p)
-
-removeFromVMP :: Ord v
-              => v
-              -> Map v (Int, Positions)
-              -> (Map v (Int, Positions), (Int, Positions))
-removeFromVMP v m = case Map.lookup v m of
-  Nothing -> (m, (0, EmptyPL))
-  Just p  -> (Map.delete v m, p)
-
-removeFromVM3 :: Ord v => v -> Map v p -> (Map v p, Maybe p)
-removeFromVM3 v m = (Map.delete v m, Map.lookup v m)
-
-unionVM :: Ord v => (Map v Positions -> Map v Positions -> Map v Positions)
-unionVM = Map.unionWith UnionPL
-
-unionVM2 :: Ord k
-         => Map k Positions
-         -> Map k Positions
-         -> Map k Positions
-unionVM2 = mergeMaps
-            (\case
-                LeftOnly l -> ShiftLeftPL l
-                RightOnly r -> ShiftRightPL r
-                Both l r -> UnionPL l r
-            )
-
-unionVM3 :: Ord k
-         => Map k Positions3
-         -> Map k Positions3
-         -> Map k Positions3
-unionVM3 = mergeMaps
-            (\case
-                LeftOnly l -> LeftOnlyPL l
-                RightOnly r -> RightOnlyPL r
-                Both l r -> BothPL l r
-            )
-
-findSingleton :: Map p Positions -> p
-findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
-  [(v, _)] -> v
-  [] -> error "Expected map to be non-empty"
-  _:_:_ -> error "Expected map not to have multiple elements"
-
-findSingleton2 :: Map p Positions -> p
-findSingleton2 m = case (filter (isSinglePL2 . snd) . Map.toList) m of
-  [(v, _)] -> v
-  [] -> error "Expected map to be non-empty"
-  _:_:_ -> error "Expected map not to have multiple elements"
-
-findSingleton3 :: Map p Positions3 -> p
-findSingleton3 m = case Map.toList m of
-  [(v, HerePL)] -> v
-  [(_, _)] -> error "Expected HerePL"
-  [] -> error "Expected map to be non-empty"
-  _:_:_ -> error "Expected map not to have multiple elements"
-
--- This has terrible time complexity
-isSinglePL :: Positions -> Bool
-isSinglePL = \case
-  SinglePL -> True
-  UnionPL p1 p2 -> (isSinglePL p1 && isSinglePL p2)
-                   || (isSinglePL p1 && isEmptyPL p2)
-                   || (isEmptyPL p1 && isSinglePL p2)
-  _ -> False
-
-isEmptyPL :: Positions -> Bool
-isEmptyPL = \case
-  EmptyPL -> True
-  UnionPL p1 p2 -> isEmptyPL p1 && isEmptyPL p2
-  _ -> False
-
-isSinglePL2 :: Positions -> Bool
-isSinglePL2 = \case
-  SinglePL -> True
-  _ -> False
-
-extendVM :: Ord k => Map k a -> k -> a -> Map k a
-extendVM m x p = Map.insert x p m
-
-pickL :: Positions -> Positions
-pickL = \case
-  ShiftLeftPL pl -> pl
-  UnionPL pl1 pl2 -> UnionPL (pickL pl1) (pickL pl2)
-  _ -> EmptyPL
-
-pickR :: Positions -> Positions
-pickR = \case
-  ShiftRightPL pr -> pr
-  UnionPL pl pr -> UnionPL (pickR pl) (pickR pr)
-  _ -> EmptyPL
-
-pickL2 :: Positions -> Positions
-pickL2 = \case
-  ShiftLeftPL pl -> pl
-  UnionPL pl _ -> pl
-  _ -> EmptyPL
-
-pickR2 :: Positions -> Positions
-pickR2 = \case
-  ShiftRightPL pr -> pr
-  UnionPL _ pr -> pr
-  _ -> EmptyPL
-
-pickL3 :: Positions3 -> Maybe Positions3
-pickL3 = \case
-  LeftOnlyPL pl -> Just pl
-  BothPL pl _ -> Just pl
-  _ -> Nothing
-
-pickR3 :: Positions3 -> Maybe Positions3
-pickR3 = \case
-  RightOnlyPL pr -> Just pr
-  BothPL _ pr -> Just pr
-  _ -> Nothing
-
-summariseExprCorrectness :: Ord name
-                         => Expr name
-                         -> (Structure, Map name Positions)
-summariseExprCorrectness = \case
-  Var v   -> (SVar, Map.singleton v SinglePL)
-  Lam x e ->
-    let (str_body, map_body) = summariseExprCorrectness e
-        (e_map, x_pos) = removeFromVM x map_body
-    in (SLam x_pos str_body, e_map)
-  App e1 e2 ->
-    let (str1, map1) = summariseExprCorrectness e1
-        (str2, map2) = summariseExprCorrectness e2
-        map1_shift = Map.map ShiftLeftPL map1
-        map2_shift = Map.map ShiftRightPL map2
-    in (SApp str1 str2, unionVM map1_shift map2_shift)
-
-rebuild :: Ord name
-        => (name -> name)
-        -> name
-        -> (Structure, Map name Positions)
-        -> Expr name
-rebuild freshen fresh (structure, m) = case structure of
-  SVar -> Var (findSingleton m)
-  SLam p s -> Lam x (rebuild freshen fresher (s, extendVM m x p))
-    where x = fresh
-          fresher = freshen fresh
-  SApp s1 s2 -> App (rebuild freshen fresh (s1, m1))
-                    (rebuild freshen fresh (s2, m2))
-    where m1 = Map.map pickL m
-          m2 = Map.map pickR m
-
-summariseExprCorrectness2 :: Ord name
-                          => Expr name
-                          -> (Structure, Map name Positions)
-summariseExprCorrectness2 = \case
-  Var v   -> (SVar, Map.singleton v SinglePL)
-  Lam x e ->
-    let (str_body, map_body) = summariseExprCorrectness2 e
-        (e_map, x_pos) = removeFromVM x map_body
-    in (SLam x_pos str_body, e_map)
-  App e1 e2 ->
-    let (str1, map1) = summariseExprCorrectness2 e1
-        (str2, map2) = summariseExprCorrectness2 e2
-    in (SApp str1 str2, unionVM2 map1 map2)
-
-rebuild2 :: Ord name
-         => (name -> name)
-         -> name
-         -> (Structure, Map name Positions)
-         -> Expr name
-rebuild2 freshen fresh (structure, m) = case structure of
-  SVar -> Var (findSingleton2 m)
-  SLam p s -> Lam x (rebuild2 freshen fresher (s, extendVM m x p))
-    where x = fresh
-          fresher = freshen fresh
-  SApp s1 s2 -> App (rebuild2 freshen fresh (s1, m1))
-                    (rebuild2 freshen fresh (s2, m2))
-    where m1 = Map.map pickL2 m
-          m2 = Map.map pickR2 m
-
-summariseExprCorrectness3 :: Ord name
-                          => Expr name
-                          -> (Structure3, Map name Positions3)
-summariseExprCorrectness3 = \case
-  Var v   -> (SVar3, Map.singleton v HerePL)
-  Lam x e ->
-    let (str_body, map_body) = summariseExprCorrectness3 e
-        (e_map, x_pos) = removeFromVM3 x map_body
-    in (SLam3 x_pos str_body, e_map)
-  App e1 e2 ->
-    let (str1, map1) = summariseExprCorrectness3 e1
-        (str2, map2) = summariseExprCorrectness3 e2
-    in (SApp3 str1 str2, unionVM3 map1 map2)
-
-rebuild3 :: Ord name
-         => (name -> name)
-         -> name
-         -> (Structure3, Map name Positions3)
-         -> Expr name
-rebuild3 freshen fresh (structure, m) = case structure of
-  SVar3 -> Var (findSingleton3 m)
-  SLam3 mp s -> Lam x (rebuild3 freshen fresher (s, m'))
-    where x = fresh
-          fresher = freshen fresh
-          m' = case mp of Nothing -> m
-                          Just p -> extendVM m x p
-  SApp3 s1 s2 -> App (rebuild3 freshen fresh (s1, m1))
-                     (rebuild3 freshen fresh (s2, m2))
-    where m1 = Map.mapMaybe pickL3 m
-          m2 = Map.mapMaybe pickR3 m
-
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
 alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
@@ -702,7 +466,7 @@ alphaEquivalentAccordingToSummariseExprCorrectness :: Ord name
                                                    -> Expr name
                                                    -> Bool
 alphaEquivalentAccordingToSummariseExprCorrectness =
-  (==) `on` summariseExprCorrectness
+  (==) `on` KATHash.summariseExprCorrectness
 
 -- | Makes binders unique whilst preserving alpha-equivalence.  The
 -- binders are replaced with integers starting from zero and
@@ -1018,7 +782,7 @@ prop_stablePaths = withTests numRandomTests $ property $ do
   paths h === paths n2
 
 numRandomTests :: TestLimit
-numRandomTests = 100 * 1000
+numRandomTests = 100 * 100
 
 -- | A sanity check for uniquifyBinders: it should be idempotent
 prop_uniquifyBindersIdempotent :: Property
@@ -1070,25 +834,32 @@ prop_rebuild :: Property
 prop_rebuild = withTests numRandomTests $ property $ do
   expr1Char <- forAll genExpr
   let expr1 = fmap ord expr1Char
-      esummary = summariseExprCorrectness expr1
-      expr2 = rebuild (+1) (0 :: Int) esummary
+      esummary = KATHash.summariseExprCorrectness expr1
+      expr2 = KATHash.rebuild (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 prop_rebuild2 :: Property
 prop_rebuild2 = withTests numRandomTests $ property $ do
   expr1Char <- forAll genExpr
   let expr1 = fmap ord expr1Char
-      esummary = summariseExprCorrectness2 expr1
-      expr2 = rebuild2 (+1) (0 :: Int) esummary
+      esummary = KATHash.summariseExprCorrectness2 expr1
+      expr2 = KATHash.rebuild2 (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 prop_rebuild3 :: Property
 prop_rebuild3 = withTests numRandomTests $ property $ do
   expr1Char <- forAll genExpr
   let expr1 = fmap ord expr1Char
-      esummary = summariseExprCorrectness3 expr1
-      expr2 = rebuild3 (+1) (0 :: Int) esummary
+      esummary = KATHash.summariseExprCorrectness3 expr1
+      expr2 = KATHash.rebuild3 (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+
+prop_fastMatches3 :: Property
+prop_fastMatches3 = withTests numRandomTests $ property $ do
+  expr1 <- forAll genExpr
+  let summary1 = KATHash.summariseExprCorrectness3 expr1
+      summary2 = KATHash.fastTo3 (KATHash.summariseExprFast expr1)
+  summary1 === summary2
 
 -- | Generates random expressions for testing
 genExprWithVarsTest :: MonadGen m => [v] -> m (Expr v)
@@ -1145,16 +916,6 @@ genExprNumVars n = genExprWithVars (map show [1..n])
 
 genExprLinearNumVars :: MonadGen m => Int -> m (Expr String)
 genExprLinearNumVars n = genExprWithVarsLinear (map show [1..n])
-
--- A slightly nicer API for merging maps
-data MergeMaps l r = LeftOnly l
-                   | Both l r
-                   | RightOnly r
-
-mergeMaps :: Ord k => (MergeMaps l r -> a) -> Map k l -> Map k r -> Map k a
-mergeMaps f = Merge.merge (Merge.mapMissing (\_ l -> f (LeftOnly l)))
-                          (Merge.mapMissing (\_ r -> f (RightOnly r)))
-                          (Merge.zipWithMatched (\_ l r -> f (Both l r)))
 
 -- | Shows equivalence of castHash hash and castHashOptimized hash
 prop_equivCastFast :: Property

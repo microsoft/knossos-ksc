@@ -8,6 +8,8 @@ library
   hs-source-dirs:      .
   exposed-modules:     Hash,
                        HtmlCombinators,
+                       KATHash,
+                       Merge,
                        CompareBehaviour,
                        Expr,
                        Benchmark
