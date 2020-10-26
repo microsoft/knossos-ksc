@@ -476,13 +476,28 @@ removeFromVM v m = case Map.lookup v m of
 unionVM :: Ord v => (Map v Positions -> Map v Positions -> Map v Positions)
 unionVM = Map.unionWith UnionPL
 
+unionVM2 :: Ord k
+         => Map k Positions
+         -> Map k Positions
+         -> Map k Positions
+unionVM2 = mergeMaps
+            (\case
+                LeftOnly l -> ShiftLeftPL l
+                RightOnly r -> ShiftRightPL r
+                Both l r -> UnionPL l r
+            )
+
 findSingleton :: Map p Positions -> p
 findSingleton m = case (filter (isSinglePL . snd) . Map.toList) m of
   [(v, _)] -> v
   [] -> error "Expected map to be non-empty"
   _:_:_ -> error "Expected map not to have multiple elements"
 
-  where
+findSingleton2 :: Map p Positions -> p
+findSingleton2 m = case (filter (isSinglePL2 . snd) . Map.toList) m of
+  [(v, _)] -> v
+  [] -> error "Expected map to be non-empty"
+  _:_:_ -> error "Expected map not to have multiple elements"
 
 -- This has terrible time complexity
 isSinglePL :: Positions -> Bool
@@ -499,6 +514,11 @@ isEmptyPL = \case
   UnionPL p1 p2 -> isEmptyPL p1 && isEmptyPL p2
   _ -> False
 
+isSinglePL2 :: Positions -> Bool
+isSinglePL2 = \case
+  SinglePL -> True
+  _ -> False
+
 extendVM :: Ord k => Map k a -> k -> a -> Map k a
 extendVM m x p = Map.insert x p m
 
@@ -510,8 +530,20 @@ pickL = \case
 
 pickR :: Positions -> Positions
 pickR = \case
-  ShiftRightPL pl -> pl
-  UnionPL pl1 pl2 -> UnionPL (pickR pl1) (pickR pl2)
+  ShiftRightPL pr -> pr
+  UnionPL pl pr -> UnionPL (pickR pl) (pickR pr)
+  _ -> EmptyPL
+
+pickL2 :: Positions -> Positions
+pickL2 = \case
+  ShiftLeftPL pl -> pl
+  UnionPL pl _ -> pl
+  _ -> EmptyPL
+
+pickR2 :: Positions -> Positions
+pickR2 = \case
+  ShiftRightPL pr -> pr
+  UnionPL _ pr -> pr
   _ -> EmptyPL
 
 summariseExprCorrectness :: Ord name
@@ -544,6 +576,35 @@ rebuild freshen fresh (structure, m) = case structure of
                     (rebuild freshen fresh (s2, m2))
     where m1 = Map.map pickL m
           m2 = Map.map pickR m
+
+summariseExprCorrectness2 :: Ord name
+                          => Expr name
+                          -> (Structure, Map name Positions)
+summariseExprCorrectness2 = \case
+  Var v   -> (SVar, Map.singleton v SinglePL)
+  Lam x e ->
+    let (str_body, map_body) = summariseExprCorrectness2 e
+        (e_map, x_pos) = removeFromVM x map_body
+    in (SLam x_pos str_body, e_map)
+  App e1 e2 ->
+    let (str1, map1) = summariseExprCorrectness2 e1
+        (str2, map2) = summariseExprCorrectness2 e2
+    in (SApp str1 str2, unionVM2 map1 map2)
+
+rebuild2 :: Ord name
+         => (name -> name)
+         -> name
+         -> (Structure, Map name Positions)
+         -> Expr name
+rebuild2 freshen fresh (structure, m) = case structure of
+  SVar -> Var (findSingleton2 m)
+  SLam p s -> Lam x (rebuild2 freshen fresher (s, extendVM m x p))
+    where x = fresh
+          fresher = freshen fresh
+  SApp s1 s2 -> App (rebuild2 freshen fresh (s1, m1))
+                    (rebuild2 freshen fresh (s2, m2))
+    where m1 = Map.map pickL2 m
+          m2 = Map.map pickR2 m
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
@@ -926,6 +987,14 @@ prop_rebuild = withTests numRandomTests $ property $ do
   let expr1 = fmap ord expr1Char
       esummary = summariseExprCorrectness expr1
       expr2 = rebuild (+1) (0 :: Int) esummary
+  assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+
+prop_rebuild2 :: Property
+prop_rebuild2 = withTests numRandomTests $ property $ do
+  expr1Char <- forAll genExpr
+  let expr1 = fmap ord expr1Char
+      esummary = summariseExprCorrectness2 expr1
+      expr2 = rebuild2 (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 -- | Generates random expressions for testing
