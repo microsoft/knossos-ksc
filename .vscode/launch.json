@@ -10,8 +10,8 @@
 			"name": "Python: onnx2ks",
 			"type": "python",
 			"request": "launch",
-			"program": "src/python/ksc/onnx2k.py",
-			"args0": [
+			"program": "src/onnx2ks/onnx2ks.py",
+			"args": [
 				"test/onnx2k/mnist-7.onnx", 
 				"obj/test/onnx2k/mnist-7.ks"
 			],
@@ -19,7 +19,7 @@
 				"../onnxruntime/onnxruntime/test/testdata/bert_toy_optimized.onnx",
 				"obj/test/onnx2k/onnxruntime/test/testdata/bert_toy_optimized.ks"
 			],
-			"args": [
+			"args2": [
 				"../onnxruntime/onnxruntime/test/testdata/bert_toy_postprocessed.onnx",
 				"obj/test/onnx2k/onnxruntime/test/testdata/bert_toy_postprocessed.ks"
 			],
@@ -27,6 +27,18 @@
 				"test/onnx2k/bert-tiny-uncased_L_3_H_128_A_2_V_30528_S_512_Dp_0.1_optimized_layer_norm_opset12_bw.onnx",
 				"obj/test/onnx2k/bert-tiny-bw.ks"
 			],
+			"env" : {
+				"PYTHONPATH": "./src/python"
+			},
+			"console": "integratedTerminal",
+			"justMyCode": false
+		},
+		{
+			"name": "Python: onnx-build-prelude",
+			"type": "python",
+			"request": "launch",
+			"program": "src/onnx2ks/onnx-build-prelude.py",
+			"args": [],
 			"env" : {
 				"PYTHONPATH": "./src/python"
 			},
