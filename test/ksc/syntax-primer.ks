@@ -130,6 +130,13 @@ If you prefer block comments then use pairs of #| and |#
 ;     else:
 ;         return f2
 
+; Tuples can be bound
+(def let_tupled Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
+     (let (((b2 s2) (tuple b s))
+           (i2 (add i 10))
+           ((f2 s2) (tuple (add f 10.0) "Hello"))
+           (s3 "Hello"))
+       f2))
 
 ; Vectors are created with the "build" function.
 ;
