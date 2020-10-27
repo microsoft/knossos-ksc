@@ -32,7 +32,12 @@ executable hash
   main-is:             Main.hs
   other-modules:       Benchmark,
                        Expr,
-                       Hash
+                       Hash,
+                       KATHash1,
+                       KATHash2,
+                       KATHash3,
+                       KATHashFast,
+                       Merge
   hs-source-dirs:      .
   build-depends:       base,
                        containers >= 0.5.9,
