@@ -47,7 +47,7 @@ benchmark = do
     results <- times totalExpressions [] $ \rest -> do
       expression <- Gen.sample (genExpr varCount)
 
-      (n, tsum, tsquaredsum, tmin) <- benchmarkOne algorithm expression
+      (n, tsum, tsquaredsum, tmin) <- benchmarkOne (seqHashResult . algorithm) expression
 
       putStrLn ("Parameter set "
                  ++ show i ++ "/" ++ show (length allParams)
@@ -94,14 +94,17 @@ benchmark = do
   putStrLn ("gnuplot " ++ gnuplotPngFilename)
   putStrLn ("You will find the output PNG in " ++ outputPng)
 
-benchmarkOne :: (e -> [(Hash, Path, Expr a)])
-             -> e
-             -> IO (Int, Double, Double, Double)
+-- Runs algorithm on expression and produces timing statistics.
+--
+-- benchmarkOne will seq the result of `algorithm expression`.  It is
+-- the caller's responsibility to ensure that this causes *all*
+-- desired work to be performed.
+benchmarkOne :: (e -> r) -> e -> IO (Int, Double, Double, Double)
 benchmarkOne algorithm expression =
   times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
         start <- Clock.getTime Clock.Monotonic
         times iterationsPerSample () $ \() ->
-          evaluate (seqHashResult . algorithm) expression
+          evaluate algorithm expression
         stop <- Clock.getTime Clock.Monotonic
 
         let elapsed_micro = iterationsElapsed_micro / fromIntegral iterationsPerSample
