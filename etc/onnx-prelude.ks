@@ -3,6 +3,87 @@
 (edef load-from-onnx-float32 (Vec Float) (Integer Integer String))
 (edef load-from-onnx-float32 (Vec Float) (Integer Integer Integer String))
 (edef load-from-onnx-float32 (Vec Float) (Integer Integer Integer Integer String))
+(edef load-from-onnx-int64 (Vec Integer) (Integer String))
+(edef load-from-onnx-int64 (Vec Integer) (Integer Integer String))
+(edef load-from-onnx-int64 (Vec Integer) (Integer Integer Integer String))
+(edef load-from-onnx-int64 (Vec Integer) (Integer Integer Integer Integer String))
+
+;; Constant
+;; https://github.com/onnx/onnx/blob/master/docs/Operators.md#constant
+(def Constant Float (v : Float)  v)
+(def Constant Integer (v : Integer)  v)
+(def Constant (Vec Float) (v : Vec Float) v)
+(def Constant (Vec Integer) (v : Vec Integer) v)
+
+;; Broadcast versions of some builtins
+(edef Sub (Vec Integer) (Integer (Vec Integer)))
+
+(edef Sub (Vec Float) (Float (Vec Float)))
+(edef Sub Float (Float Float))
+
+(edef Mul Float (Float Float))
+(edef Mul (Vec Float) (Float (Vec Float)))
+(edef Mul (Vec Float) ((Vec Float) Float))
+(edef Mul (Vec Float) ((Vec Integer) (Vec Float)))
+
+(edef Min (Vec Float) ((Vec Float) (Vec Float)))
+(edef Min (Vec Float) (Float (Vec Float)))
+
+(edef Equal (Vec Bool) (Float (Vec Float)))
+(edef Equal (Vec Bool) ((Vec Float) Float))
+(edef Equal (Vec Bool) (Integer (Vec Integer)))
+(edef Equal (Vec Bool) ((Vec Integer) Integer))
+
+
+;; Doing Cast # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/tensor/defs.cc" 88
+;; 
+;; The operator casts the elements of a given input tensor to a data type
+;; specified by the 'to' argument and returns an output tensor of the same size in
+;; the converted type. The 'to' argument must be one of the data types specified
+;; in the 'DataType' enum field in the TensorProto message.
+;; 
+; [see https://github.com/onnx/onnx/blob/2cee65c7eaa4b4fa8f6e23ef7e4b546395b9b7f1/onnx/onnx.in.proto#L116]
+;;
+;; Casting from string tensor in plain (e.g., "3.14" and "1000") and scientific numeric representations
+;; (e.g., "1e-5" and "1E8") to float types is supported. For example, converting string "100.5" to an integer may
+;; result 100. There are some string literals reserved for special floating-point values;
+;; "+INF" (and "INF"), "-INF", and "NaN" are positive infinity, negative infinity, and not-a-number, respectively.
+;; Any string which can exactly match "+INF" in a case-insensitive way would be mapped to positive infinite. Similarly,
+;; this case-insensitive rule is applied to "INF" and "NaN". When casting from numeric tensors
+;; to string tensors, plain floating-point representation (such as "314.15926") would be used. 
+;; Converting non-numerical-literal string such as "Hello World!" is an undefined behavior. Cases 
+;; of converting string representing floating-point arithmetic value, such as "2.718", to INT is an undefined behavior.
+;; 
+;; Conversion from a numerical type to any numerical type is always allowed.
+;; User must be aware of precision loss and value change caused by range difference between two types.
+;; For example, a 64-bit float 3.1415926459 may be round to a 32-bit float 3.141592. Similarly, converting
+;; an integer 36 to Boolean may produce 1 because we truncate bits which can't be stored in the targeted type.
+;; Type constraints:
+;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(bool)', 'tensor(string)'] | Constrain input types. Casting from complex is not supported.
+;; T2 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(bool)', 'tensor(string)'] | Constrain output types. Casting to complex is not supported.
+;; WARN: multiple types but no type constraints at Cast: {('', Type.Vec(Type.Float)), ('', Type.Vec(Type.String)), ('', Type.Vec(Type.Integer)), ('', Type.Vec(Type.Bool))}
+
+;; Special-cased in onnx2ks as output type depends on a potentially runtime value...
+
+(edef Cast_FLOATS (Vec Float) ((Vec Bool)))
+(edef Cast_FLOATS (Vec Float) ((Vec String)))
+(edef Cast_FLOATS (Vec Float) ((Vec Integer)))
+(edef Cast_FLOATS (Vec Float) ((Vec Float)))
+
+(edef Cast_INTS (Vec Integer) ((Vec Bool)))
+(edef Cast_INTS (Vec Integer) ((Vec String)))
+(edef Cast_INTS (Vec Integer) ((Vec Integer)))
+(edef Cast_INTS (Vec Integer) ((Vec Float)))
+
+(edef Cast_FLOAT Float ((Vec Bool)))
+(edef Cast_FLOAT Float ((Vec String)))
+(edef Cast_FLOAT Float ((Vec Integer)))
+(edef Cast_FLOAT Float ((Vec Float)))
+
+(edef Cast_INT Integer ((Vec Bool)))
+(edef Cast_INT Integer ((Vec String)))
+(edef Cast_INT Integer ((Vec Integer)))
+(edef Cast_INT Integer ((Vec Float)))
 
 
 ;; Doing If # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/controlflow/defs.cc" 423
@@ -449,36 +530,3 @@
   (Vec (Vec (Tuple Integer (Vec Float))))
   (#|X|# (Vec Float)
    #|classlabels_int64s|# (Vec Integer)))
-
-;; Doing Cast # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/tensor/defs.cc" 88
-;; 
-;; The operator casts the elements of a given input tensor to a data type
-;; specified by the 'to' argument and returns an output tensor of the same size in
-;; the converted type. The 'to' argument must be one of the data types specified
-;; in the 'DataType' enum field in the TensorProto message.
-;; 
-;; Casting from string tensor in plain (e.g., "3.14" and "1000") and scientific numeric representations
-;; (e.g., "1e-5" and "1E8") to float types is supported. For example, converting string "100.5" to an integer may
-;; result 100. There are some string literals reserved for special floating-point values;
-;; "+INF" (and "INF"), "-INF", and "NaN" are positive infinity, negative infinity, and not-a-number, respectively.
-;; Any string which can exactly match "+INF" in a case-insensitive way would be mapped to positive infinite. Similarly,
-;; this case-insensitive rule is applied to "INF" and "NaN". When casting from numeric tensors
-;; to string tensors, plain floating-point representation (such as "314.15926") would be used. 
-;; Converting non-numerical-literal string such as "Hello World!" is an undefined behavior. Cases 
-;; of converting string representing floating-point arithmetic value, such as "2.718", to INT is an undefined behavior.
-;; 
-;; Conversion from a numerical type to any numerical type is always allowed.
-;; User must be aware of precision loss and value change caused by range difference between two types.
-;; For example, a 64-bit float 3.1415926459 may be round to a 32-bit float 3.141592. Similarly, converting
-;; an integer 36 to Boolean may produce 1 because we truncate bits which can't be stored in the targeted type.
-;; Type constraints:
-;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(bool)', 'tensor(string)'] | Constrain input types. Casting from complex is not supported.
-;; T2 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(bool)', 'tensor(string)'] | Constrain output types. Casting to complex is not supported.
-;; WARN: multiple types but no type constraints at Cast: {('', Type.Vec(Type.Float)), ('', Type.Vec(Type.String)), ('', Type.Vec(Type.Integer)), ('', Type.Vec(Type.Bool))}
-(edef Cast (Vec Float) (#|input|# (Vec Bool) #|to|# Integer))
-;; WARN: multiple types but no type constraints at Cast: {('', Type.Vec(Type.Float)), ('', Type.Vec(Type.String)), ('', Type.Vec(Type.Integer)), ('', Type.Vec(Type.Bool))}
-(edef Cast (Vec Float) (#|input|# (Vec String) #|to|# Integer))
-;; WARN: multiple types but no type constraints at Cast: {('', Type.Vec(Type.Float)), ('', Type.Vec(Type.String)), ('', Type.Vec(Type.Integer)), ('', Type.Vec(Type.Bool))}
-(edef Cast (Vec Float) (#|input|# (Vec Integer) #|to|# Integer))
-;; WARN: multiple types but no type constraints at Cast: {('', Type.Vec(Type.Float)), ('', Type.Vec(Type.String)), ('', Type.Vec(Type.Integer)), ('', Type.Vec(Type.Bool))}
-(edef Cast (Vec Float) (#|input|# (Vec Float) #|to|# Integer))
