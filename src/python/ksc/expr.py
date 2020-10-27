@@ -134,7 +134,7 @@ class Var(Expr):
     name: str
     decl: bool
 
-    def __init__(self, name, type, decl):
+    def __init__(self, name, type=None, decl=False):
         super().__init__(type=type, name=name, decl=decl)
 
     def __str__(self):
@@ -195,8 +195,6 @@ class Let(Expr):
 
     def __init__(self, vars, rhs, body):
         super().__init__(type=None, vars=vars, rhs=rhs, body=body)
-        assert isinstance(vars,Var)
-
 
 class If(Expr):
     '''If(cond, t_body, f_body). 
