@@ -24,8 +24,6 @@ benchmark = do
       -- genExpr = Gen.resize 2 . genExprLinearNumVars
 
       totalExpressions     = 100
-      samplesPerExpression = 100
-      iterationsPerSample  = 10
       genExpr = Gen.resize 15 . genExprNumVars
 
       algorithms = [ ("Compositional", castHash,   "green")
@@ -38,8 +36,6 @@ benchmark = do
 
       allParams = (,) <$> algorithms <*> varCounts
 
-      infinity = 1e60
-
       enumFrom1 :: [a] -> [(Int, a)]
       enumFrom1 = zip [1..]
 
@@ -51,21 +47,7 @@ benchmark = do
     results <- times totalExpressions [] $ \rest -> do
       expression <- Gen.sample (genExpr varCount)
 
-      (n, tsum, tsquaredsum, tmin) <- times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
-        start <- Clock.getTime Clock.Monotonic
-        times iterationsPerSample () $ \() ->
-          evalHashResult algorithm expression
-        stop <- Clock.getTime Clock.Monotonic
-
-        let elapsed_micro = iterationsElapsed_micro / fromIntegral iterationsPerSample
-              where iterationsElapsed = Clock.diffTimeSpec stop start
-                    iterationsElapsed_nano = Clock.toNanoSecs iterationsElapsed
-                    iterationsElapsed_micro = fromIntegral iterationsElapsed_nano / 1e3
-
-        return (n + 1,
-                t + elapsed_micro,
-                tsquared + elapsed_micro * elapsed_micro,
-                min minSoFar elapsed_micro)
+      (n, tsum, tsquaredsum, tmin) <- benchmarkOne algorithm expression
 
       putStrLn ("Parameter set "
                  ++ show i ++ "/" ++ show (length allParams)
@@ -111,6 +93,31 @@ benchmark = do
   putStrLn "If you want to generate a PNG run:"
   putStrLn ("gnuplot " ++ gnuplotPngFilename)
   putStrLn ("You will find the output PNG in " ++ outputPng)
+
+benchmarkOne :: (e -> [(Hash, Path, Expr a)])
+             -> e
+             -> IO (Int, Double, Double, Double)
+benchmarkOne algorithm expression =
+  times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
+        start <- Clock.getTime Clock.Monotonic
+        times iterationsPerSample () $ \() ->
+          evalHashResult algorithm expression
+        stop <- Clock.getTime Clock.Monotonic
+
+        let elapsed_micro = iterationsElapsed_micro / fromIntegral iterationsPerSample
+              where iterationsElapsed = Clock.diffTimeSpec stop start
+                    iterationsElapsed_nano = Clock.toNanoSecs iterationsElapsed
+                    iterationsElapsed_micro = fromIntegral iterationsElapsed_nano / 1e3
+
+        return (n + 1,
+                t + elapsed_micro,
+                tsquared + elapsed_micro * elapsed_micro,
+                min minSoFar elapsed_micro)
+
+
+  where samplesPerExpression = 10
+        infinity = 1e60
+        iterationsPerSample  = 10
 
 gnuplotFilePng :: String
                -> [((String, b, String), (Int, String), String)]
