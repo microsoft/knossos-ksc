@@ -39,11 +39,11 @@ class Type:
     def fromValue(val):
         if isinstance(val, int):
             return Type.Integer
-        if isinstance(val, float):
+        if isinstance(val, (float, np.float32)):
             return Type.Float
         if isinstance(val, str):
             return Type.String
-        raise NotImplementedError(f"Typeof {val}")
+        raise NotImplementedError(f"Typeof {type(val)}")
 
     def __init__(self, kind, children=[]):
         if kind not in Type.node_kinds:
