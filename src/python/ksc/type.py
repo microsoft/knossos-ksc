@@ -49,11 +49,11 @@ class Type:
             return Type.Bool
         if isinstance(val, (int, np.integer)):
             return Type.Integer
-        if isinstance(val, float):
+        if isinstance(val, (float, np.float32)):
             return Type.Float
         if isinstance(val, str):
             return Type.String
-        raise NotImplementedError(f"Typeof {val}")
+        raise NotImplementedError(f"Typeof {type(val)}")
 
     @property
     def is_scalar(self):
