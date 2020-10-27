@@ -150,7 +150,7 @@ def parse_expr(se):
     if head == _let:
         bindings = ensure_list_of_lists(se[1])
         ans = parse_expr(se[2])
-        for b in bindings[::-1]:
+        for b in reversed(bindings):
             check(len(b) == 2, "Let bindings should be pairs", b, "in", se)
             if isinstance(b[0], list):
                 vars = [Var(parse_name(v)) for v in b[0]]
