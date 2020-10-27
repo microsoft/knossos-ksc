@@ -25,6 +25,7 @@ import warnings
 import numpy as np
 
 import onnx, onnx.numpy_helper, onnx.helper
+from onnx import TensorProto, AttributeProto
 
 import onnxruntime.capi.onnxruntime_pybind11_state as ort
 from   onnxruntime.capi.onnxruntime_pybind11_state.schemadef import OpSchema
@@ -54,20 +55,33 @@ import resource
 sys.setrecursionlimit(10**6)
 
 ############################################################################
-def encode_name(name: str):
-    if re.match("^[0-9]", name):
-        return "%" + name
-    else:
-        return name
+ATTR_TYPE_TO_KS_TYPE = {
+    OpSchema.AttrType.FLOAT: Type.Float,
+    OpSchema.AttrType.INT: Type.Integer,
+    OpSchema.AttrType.STRING: Type.String,
+    OpSchema.AttrType.TENSOR: Type.Vec(Type.Float),
+    OpSchema.AttrType.FLOATS: Type.Vec(Type.Float),
+    OpSchema.AttrType.INTS: Type.Vec(Type.Integer),
+    OpSchema.AttrType.STRINGS: Type.Vec(Type.String),
+    OpSchema.AttrType.TENSORS: Type.Vec(Type.Vec(Type.Float)),
+    OpSchema.AttrType.GRAPH: Type.Lam(None, None)
+}
 
-def useVar(name: str):
-    return Var(encode_name(name), None, False)
+def onnxAttrType_to_Type(ty):
+    """
+    Convert ONNX AttrType to KS Type.
+    # TODOS:
+    #     ty.SPARSE_TENSOR
+    #     ty.SPARSE_TENSORS
+    #     ty.GRAPHS
+    """
+    assert isinstance(ty, OpSchema.AttrType)
+    kstype = ATTR_TYPE_TO_KS_TYPE[ty]
 
-def defVar(name: str, ty : Type):
-    return Var(encode_name(name), ty, True)
+    return kstype
+
 
 # See https://github.com/onnx/onnx/blob/master/onnx/mapping.py
-from onnx import TensorProto, AttributeProto
 TENSOR_TYPE_TO_KS_TYPE = {
     int(TensorProto.FLOAT): Type.Float,
     int(TensorProto.UINT8): Type.Integer,
@@ -86,14 +100,14 @@ TENSOR_TYPE_TO_KS_TYPE = {
     int(TensorProto.STRING): Type.String
 }
 
-def convertElementType(ety):
+def onnxTensorType_to_Type(ety):
     ty = TENSOR_TYPE_TO_KS_TYPE.get(ety)
     if ty != None:
         return ty
     raise NotImplementedError(f"type {ety}")
 
-def convertType(proto):
-    ety = convertElementType(proto.tensor_type.elem_type)
+def onnxTensorElementType_to_Type(proto):
+    ety = onnxTensorType_to_Type(proto.tensor_type.elem_type)
     return Type.Vec(ety)
 
 def get_value(init):
@@ -105,7 +119,7 @@ def get_value(init):
     
     a = onnx.numpy_helper.to_array(init)
 
-    ksty = convertElementType(init.data_type)
+    ksty = onnxTensorType_to_Type(init.data_type)
 
     if ksty == Type.Bool:
         return Const(bool(a))
@@ -126,17 +140,19 @@ def get_value(init):
 
     return Const(value)
 
-def get_values(init):
-    """
-    Get values from a TensorProto
-    """
-    a = onnx.numpy_helper.to_array(init)
-    return [Const(v) for v in a]
+def mkVec(val):
+    if isinstance(val, (list, np.ndarray)):
+        return Call("vec", [Const(v) for v in val])
+    else:
+        return Call("vec", [Const(val)])
 
 def exprFromTensorProto(val, name):
+    """
+    Make KS values from a TensorProto
+    """
     if len(val.dims) == 1 and val.dims[0] < 16:
         # vec constructor
-        return Call("vec", get_values(val))
+        return mkVec(onnx.numpy_helper.to_array(val))
 
     if len(val.dims) == 0:
         return get_value(val)
@@ -149,14 +165,16 @@ def exprFromAttrVal(val):
         return exprFromTensorProto(val, "?exprFromAttrVal?")
 
     if isinstance(val, list):
-        return Call("vec", [Const(v) for v in val])
+        return mkVec(val)
 
     if isinstance(val, bytes):
         val = val.decode("ascii")
     return Const(val)
 
 def exprFromAttr(attr : AttributeProto):
-    return exprFromAttrVal(onnx.helper.get_attribute_value(attr))
+    # ty = onnxAttrType_to_Type(attr.type)
+    a = onnx.helper.get_attribute_value(attr)
+    return exprFromAttrVal(a)
 
 
 def emit_inits(inits, body):
@@ -172,14 +190,25 @@ def emit_inits(inits, body):
     return body
 
 def get_attribute_default_value(attr):
-    if hasattr(attr, "_default_value"):
-        return onnx.AttributeProto().ParseFromString(attr._default_value)
-    return None
+    if not hasattr(attr, "_default_value"):
+        return None
+
+    val = onnx.AttributeProto().ParseFromString(attr._default_value)
+    # ParseFromString may produce values which don't match the actual type
+    ty = onnxAttrType_to_Type(attr.type)
+    if ty.is_scalar:
+        assert Type.fromValue(val) == ty
+        return Const(val)
+
+    if ty.is_vec:
+        return mkVec(val)
+ 
+    return val
 
 def get_default_value(schema, attr):
     val = get_attribute_default_value(attr)
     if val != None:
-        return exprFromAttrVal(val)
+        return val
 
     print(f"** Attribute {attr.name} of op {schema.name} has no default value -- special casing")
 
@@ -205,6 +234,18 @@ def get_all_schemas():
             pass
         schemas[name] = s
     return schemas
+
+def encode_name(name: str):
+    if re.match("^[0-9]", name):
+        return "%" + name
+    else:
+        return name
+
+def useVar(name: str):
+    return Var(encode_name(name), None, False)
+
+def defVar(name: str, ty : Type):
+    return Var(encode_name(name), ty, True)
 
 def onnx2ks(g):
     """
@@ -302,7 +343,7 @@ def onnx2ks(g):
             internal_inits.append(init)
 
     # value_infos -> types
-    args = [defVar(i.name, convertType(i.type)) for i in g.input]
+    args = [defVar(i.name, onnxTensorElementType_to_Type(i.type)) for i in g.input]
 
     body = Let(Var("$beg_of_internal_inits #|Begin of internal initializers|# "), Const(99999), body)
     ex = emit_inits(internal_inits, body)
