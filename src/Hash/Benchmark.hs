@@ -101,7 +101,7 @@ benchmarkOne algorithm expression =
   times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
         start <- Clock.getTime Clock.Monotonic
         times iterationsPerSample () $ \() ->
-          evalHashResult algorithm expression
+          evaluate (seqHashResult . algorithm) expression
         stop <- Clock.getTime Clock.Monotonic
 
         let elapsed_micro = iterationsElapsed_micro / fromIntegral iterationsPerSample
@@ -153,9 +153,11 @@ gnuplotFile results =
 -- We apply the argument to the function here.  If we do it at the
 -- call site then GHC may float it outside of the timing loop!
 -- Therefore it's important that this function not be inlined.
-{-# NOINLINE evalHashResult #-}
-evalHashResult :: (e -> [(Hash, Path, Expr a)]) -> e -> IO ()
-evalHashResult a e = let !_ = seqHashResult (a e)
+-- It seems it's also important for it to return IO so as not to be
+-- floated outside the timing loop.
+{-# NOINLINE evaluate #-}
+evaluate :: (e -> a) -> e -> IO ()
+evaluate a e = let !_ = a e
                      in return ()
 
 seqHashResult :: [(Hash, Path, Expr a)] -> ()
