@@ -173,13 +173,29 @@ def _(ex, symtab):
 @typeannot.register(Let)
 def _(ex, symtab):
     ex.rhs = typeannot(ex.rhs, symtab)
-    assert isinstance(ex.vars, Var)
-    ex.vars.type = ex.rhs.type
-    local_st = symtab.copy()
-    local_st[ex.vars.name] = ex.vars.type
-    ex.body = typeannot(ex.body, local_st)
-    ex.type = ex.body.type
-    return ex
+
+    # Single var assignment
+    if isinstance(ex.vars, Var):
+        ex.vars.type = ex.rhs.type
+        local_st = symtab.copy()
+        local_st[ex.vars.name] = ex.vars.type
+        ex.body = typeannot(ex.body, local_st)
+        ex.type = ex.body.type
+        return ex
+
+    # Tuple assignment -- incoming type should be tuple of same size
+    if isinstance(ex.vars, list):
+        assert len(ex.vars) == len(ex.rhs.type) if ex.rhs.type else True
+        local_st = symtab.copy()
+        for i,var in enumerate(ex.vars):
+            var.type = ex.rhs.type.Child(i) if ex.rhs.type else None
+            local_st[var.name] = var.type
+        
+        ex.body = typeannot(ex.body, local_st)
+        ex.type = ex.body.type
+        return ex
+
+    assert False # Bad var   
 
 @typeannot.register(If)
 def _(ex, symtab):
