@@ -500,6 +500,20 @@ namespace ks
 				return zero(data_[0]);
 			}
 		}
+
+		bool operator == (vec const& other) const {
+			if (size() != other.size()) {
+				return false;
+			}
+			for (int i = 0; i != size(); ++i) {
+				if ((*this)[i] != other[i]) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		bool operator != (vec const& other) const { return !(*this == other); }
 	};
 
 	template <class T>

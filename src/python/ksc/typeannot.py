@@ -27,6 +27,9 @@ import resource
 # resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY,resource.RLIM_INFINITY))
 sys.setrecursionlimit(10**6)
 
+def warn(msg):
+    print("ksc: warning: ", msg)
+
 import re
 ks_prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 
@@ -128,9 +131,23 @@ def _(ex, symtab):
 
 @typeannot.register(Var)
 def _(ex, symtab):
-    if not ex.decl:
-        ex.type = symtab[ex.name]
-    assert ex.type != None
+    if ex.decl:
+        if not ex.type:
+            warn(f"Variable decl {ex.name} without type")
+        return ex
+
+    # Use, not declaration -- should find it in the symbol table
+    if ex.name not in symtab:
+        warn(f"Variable not found {ex.name}")
+        return ex
+    
+    ex.type = symtab[ex.name]
+
+    if ex.type == None:
+        # Don't warn, this is because of an earlier error
+        #  warn(f"Variable found, but type {ex.name}")
+        pass
+
     return ex
 
 @typeannot.register(Call)
@@ -138,6 +155,12 @@ def _(ex, symtab):
     for a in ex.args:
         typeannot(a, symtab)
     argtypes = tuple(a.type for a in ex.args)
+
+    if None in argtypes:
+        # Annotation failed further down, just silently exit
+        ex.type = None
+        return ex
+
     key = ex.name, argtypes
 
     # Check symbol table first
@@ -153,14 +176,22 @@ def _(ex, symtab):
         ex.type = prim
         return ex
 
-    argtypess = ",".join(map(pformat, argtypes))
+    argtypes_str = " ".join(map(pformat, argtypes))
+    warn(f"Couldn't find operator: ({ex.name} {argtypes_str})")
+    # Print near misses
     for key,val in symtab.items():
         if isinstance(key, tuple):
-            key=key[0]
-        if key.startswith(ex.name):
-            print(f"Found {key}({val})")
+            name = key[0]
+            found_args = " ".join(map(pformat, key[1]))
+        else:
+            name = key
+            found_args = ""
 
-    raise TypeError(f"Couldn't find {ex.name}({argtypess})")
+        if name.startswith(ex.name):
+            warn(f"   Found ({name} {found_args}) -> {val}")
+
+    ex.type = None
+    return ex
 
 @typeannot.register(Lam)
 def _(ex, symtab):
@@ -173,13 +204,29 @@ def _(ex, symtab):
 @typeannot.register(Let)
 def _(ex, symtab):
     ex.rhs = typeannot(ex.rhs, symtab)
-    assert isinstance(ex.vars, Var)
-    ex.vars.type = ex.rhs.type
-    local_st = symtab.copy()
-    local_st[ex.vars.name] = ex.vars.type
-    ex.body = typeannot(ex.body, local_st)
-    ex.type = ex.body.type
-    return ex
+
+    # Single var assignment
+    if isinstance(ex.vars, Var):
+        ex.vars.type = ex.rhs.type
+        local_st = symtab.copy()
+        local_st[ex.vars.name] = ex.vars.type
+        ex.body = typeannot(ex.body, local_st)
+        ex.type = ex.body.type
+        return ex
+
+    # Tuple assignment -- incoming type should be tuple of same size
+    if isinstance(ex.vars, list):
+        assert len(ex.vars) == len(ex.rhs.type) if ex.rhs.type else True
+        local_st = symtab.copy()
+        for i,var in enumerate(ex.vars):
+            var.type = ex.rhs.type.Child(i) if ex.rhs.type else None
+            local_st[var.name] = var.type
+        
+        ex.body = typeannot(ex.body, local_st)
+        ex.type = ex.body.type
+        return ex
+
+    assert False # Bad var   
 
 @typeannot.register(If)
 def _(ex, symtab):
