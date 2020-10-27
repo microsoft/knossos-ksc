@@ -33,9 +33,9 @@ removeFromVM :: Ord v => v -> Map v p -> (Map v p, Maybe p)
 removeFromVM v m = (Map.delete v m, Map.lookup v m)
 
 unionVM :: Ord k
-            => (Prefix, Map k UnprefixPositions)
-            -> (Prefix, Map k UnprefixPositions)
-            -> (Prefix, Map k UnprefixPositions)
+        => (Prefix, Map k UnprefixPositions)
+        -> (Prefix, Map k UnprefixPositions)
+        -> (Prefix, Map k UnprefixPositions)
 unionVM ml@(_, map1) mr@(_, map2) = (new_prefix, new_map)
   where ((prefix_bigger, map_bigger), (prefix_smaller, map_smaller),
          next_prefix_bigger, bothPLBiggerFirst, smallerOnlyPL) =
