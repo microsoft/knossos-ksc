@@ -23,7 +23,9 @@ benchmark = do
       -- iterationsPerSample  = 20
       -- genExpr = Gen.resize 2 . genExprLinearNumVars
 
-      totalExpressions     = 100
+      totalExpressions     = 10
+      samplesPerExpression = 10
+      iterationsPerSample  = 10
       genExpr = Gen.resize 15 . genExprNumVars
 
       algorithms = [ ("Compositional", castHash,   "green")
@@ -47,7 +49,10 @@ benchmark = do
     results <- times totalExpressions [] $ \rest -> do
       expression <- Gen.sample (genExpr varCount)
 
-      (n, tsum, tsquaredsum, tmin) <- benchmarkOne (seqHashResult . algorithm) expression
+      r <- benchmarkOne samplesPerExpression
+                        iterationsPerSample
+                        (seqHashResult . algorithm)
+                        expression
 
       putStrLn ("Parameter set "
                  ++ show i ++ "/" ++ show (length allParams)
@@ -55,11 +60,7 @@ benchmark = do
       putStrLn ("Generated " ++ show (length rest)
                 ++ " out of " ++ show totalExpressions ++ " expressions")
 
-      let n' = fromIntegral n
-          mean     = tsum / n'
-          variance = tsquaredsum / n' - mean * mean
-          stddev   = sqrt variance
-
+      let (n, mean, tmin, variance, stddev) = stats r
           showFloat = printf "%.0f" :: Double -> String
 
       putStrLn ("Count: "    ++ show n)
@@ -94,13 +95,27 @@ benchmark = do
   putStrLn ("gnuplot " ++ gnuplotPngFilename)
   putStrLn ("You will find the output PNG in " ++ outputPng)
 
--- Runs algorithm on expression and produces timing statistics.
+type AggregateStatistics = (Int, Double, Double, Double)
+
+stats :: AggregateStatistics -> (Int, Double, Double, Double, Double)
+stats (n, tsum, tsquaredsum, tmin) = (n, mean, tmin, variance, stddev)
+  where n' = fromIntegral n
+        mean     = tsum / n'
+        variance = tsquaredsum / n' - mean * mean
+        stddev   = sqrt variance
+
+-- Runs algorithm on expression and produces aggregate timing
+-- statistics.
 --
 -- benchmarkOne will seq the result of `algorithm expression`.  It is
 -- the caller's responsibility to ensure that this causes *all*
 -- desired work to be performed.
-benchmarkOne :: (e -> r) -> e -> IO (Int, Double, Double, Double)
-benchmarkOne algorithm expression =
+benchmarkOne :: Int
+             -> Int
+             -> (e -> r)
+             -> e
+             -> IO AggregateStatistics
+benchmarkOne samplesPerExpression iterationsPerSample algorithm expression =
   times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
         start <- Clock.getTime Clock.Monotonic
         times iterationsPerSample () $ \() ->
@@ -117,10 +132,7 @@ benchmarkOne algorithm expression =
                 tsquared + elapsed_micro * elapsed_micro,
                 min minSoFar elapsed_micro)
 
-
-  where samplesPerExpression = 10
-        infinity = 1e60
-        iterationsPerSample  = 10
+  where infinity = 1e60
 
 gnuplotFilePng :: String
                -> [((String, b, String), (Int, String), String)]
