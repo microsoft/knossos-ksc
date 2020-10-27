@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
              PatternSynonyms,
 	     ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module LangUtils (
   -- Functions over expressions
@@ -31,7 +32,8 @@ module LangUtils (
   SymTab(..), newSymTab, emptySymTab,
 
   -- OneArg
-  oneArgifyDef
+  oneArgifyDef,
+  oneArgifyExpr
 
   ) where
 
@@ -94,7 +96,9 @@ substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEM
 substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (substEMayCapture subst e2)
 substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
 substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
-                                          substEMayCapture (v `M.delete` subst) b
+                                          substEMayCapture (subst M.\\ bindersAsMap v) b
+  where bindersAsMap :: PatG TVar -> M.Map TVar ()
+        bindersAsMap = M.fromList . map (\x -> (x, ())) . patVars
 
 -----------------------------------------------
 --     Free variables
@@ -111,7 +115,7 @@ freeVarsOf = go
    go (If b t e)     = go b `S.union` go t `S.union` go e
    go (Call _ es)    = go es
    go (App f a)      = go f `S.union` go a
-   go (Let v r b)    = go r `S.union` (S.delete v $ go b)
+   go (Let v r b)    = go r `S.union` (go b S.\\ S.fromList (patVars v))
    go (Lam v e)      = S.delete v $ go e
    go (Assert e1 e2) = go e1 `S.union` go e2
 
@@ -126,7 +130,7 @@ notFreeIn = go
    go v (If b t e)   = go v b && go v t && go v e
    go v (Call _ e)   = go v e
    go v (App f a)    = go v f && go v a
-   go v (Let v2 r b) = go v r && (v == v2 || go v b)
+   go v (Let v2 r b) = go v r && (v `elem` patVars v2 || go v b)
    go v (Lam v2 e)   = v == v2 || go v e
    go v (Assert e1 e2) = go v e1 && go v e2
 
@@ -318,18 +322,109 @@ notInScope v in_scope
 --     oneArgifyDef
 -----------------------------------------------
 
+{-
+Note [Replacing TupPat with nested Let]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+oneArgifyDef transforms a Def to an equivalent Def in which TupPat
+does not appear. The rationale is as follows.
+
+Expr supports tuple patterns. That is, one can write
+
+  1. let (x1, ..., xn) = rhs in body
+
+instead of
+
+  2. let r = rhs
+         x1 = get$1$n r
+         ...
+         xn = get$n$n r
+     in body
+
+When we come to implement AD based on Single Use Language the form 2
+will be more than a simple convenience, it will be essential for the
+algorithm to generate efficient code.
+
+On the other hand, for AD based on linear maps and for CatLang there's
+no great urgency to support differentiating code which contains tuple
+patterns.  Therefore for convenience we just translate tuple patterns
+into nested lets before running those parts of the code.  We can
+always revisit this decision later.
+
+Specifically, oneArgifyDef does these two things:
+
+* Makes the Def have a VarPat.  We transform
+
+   f (a,b,c) = rhs
+      ===>
+   f s = let a = get$1$3 s in
+            let b = get$2$3 s in
+            let c = get$3$3 s in
+            rhs
+
+* Expands any tuple-let into a bunch of non-tuple lets
+
+   let (a,b) = rhs in body
+      ===>
+   let t = rhs in
+   let a = get$1$2 t
+   let b = get$2$2 t in
+   body
+
+-}
+
+-- Replaces all occurrences of TupPat in the Def (including the
+-- def_pat of the Def itself) with nested Lets.  See Note [Replacing
+-- TupPat with nested Let].
 oneArgifyDef :: TDef -> TDef
-oneArgifyDef def@(Def { def_pat = TupPat tvs, def_rhs = UserRhs rhs })
+oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
   = def { def_pat = VarPat argVar
-        , def_rhs = UserRhs (add_unpacking rhs) }
+        , def_rhs = UserRhs (add_unpacking (oneArgifyExpr in_scope rhs)) }
   where
-     in_scope = mkInScopeSet tvs
-     argVar = TVar ty (notInScope (Simple "_t") in_scope)
-     ty = mkTupleTy (map typeof tvs)
+     (argVar, add_unpacking, in_scope) = case pat of
+       VarPat v -> (argVar, add_unpacking, in_scope)
+         where
+           argVar = v
+           add_unpacking = id
+           in_scope = mempty
+       TupPat tvs -> (argVar, add_unpacking, in_scope')
+         where
+           in_scope = mkInScopeSet (patVars pat)
+           argVar = TVar ty (notInScope (Simple "_t") in_scope)
+           in_scope' = extendInScopeSet argVar in_scope
+           ty = mkTupleTy (map typeof tvs)
 
-     n = length tvs
+           n = length tvs
 
-     add_unpacking = mkLets [ (tv, pSel i n (Var argVar))
-                            | (tv, i) <- tvs `zip` [1..] ]
+           add_unpacking = mkLets [ (tv, pSel i n (Var argVar))
+                                  | (tv, i) <- tvs `zip` [1..] ]
 
 oneArgifyDef def = def
+
+-- Replaces all occurrences of TupPat in the Expr with nested Lets.
+-- See Note [Replacing TupPat with nested Let].
+oneArgifyExpr :: InScopeSet -> TExpr -> TExpr
+oneArgifyExpr in_scope = \case
+     Call f e -> Call f (oneArgifyExpr in_scope e)
+     Tuple es -> Tuple (fmap (oneArgifyExpr in_scope) es)
+     Lam v e  -> Lam v (oneArgifyExpr in_scope' e)
+       where in_scope' = extendInScopeSet v in_scope
+     App f e  -> App (oneArgifyExpr in_scope f) (oneArgifyExpr in_scope e)
+     Let (VarPat v) r b ->
+       Let (VarPat v) (oneArgifyExpr in_scope r) (oneArgifyExpr in_scope' b)
+       where in_scope' = extendInScopeSet v in_scope
+     Let (TupPat t) r b ->
+       mkLet fresh r
+       $ mkLets (map (\(i, v) -> (v, pSel i n (Var fresh))) (zip [1..] t))
+       $ oneArgifyExpr in_scope' b
+       where fresh = TVar ty (notInScope (Simple "_t") in_scope)
+             ty = typeof r
+             in_scope' = S.fromList (map tVarVar t) `S.union` in_scope
+             n = length t
+     If c t f  -> If (oneArgifyExpr in_scope c)
+                     (oneArgifyExpr in_scope t)
+                     (oneArgifyExpr in_scope f)
+     Assert c b -> Assert (oneArgifyExpr in_scope c) (oneArgifyExpr in_scope b)
+     Konst k -> Konst k
+     Var v   -> Var v
+     Dummy d -> Dummy d

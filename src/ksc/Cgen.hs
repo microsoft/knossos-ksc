@@ -261,7 +261,7 @@ params_withPackedParams param = case typeof param of
     let params  = zipWith mkParam [1..] tys
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
-        packParams = Let param (Tuple (map Var params))
+        packParams = mkLet param (Tuple (map Var params))
     in (params, ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 
@@ -441,16 +441,25 @@ cgenExprWithoutResettingAlloc env = \case
       cftype
       (funAllocatorUsage tf cftype <> callocusage)
 
-  Let (TVar _ v) e1 body -> do
+  Let pat e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
     lvar                       <- freshCVar
+
+    let cgenType_ = case pat of
+          VarPat _ -> cgenType type1
+          TupPat _ -> "auto"
+        cgenBinder = case pat of
+          VarPat v -> cgenVar (tVarVar v)
+          TupPat vs -> "["
+                       ++ intercalate ", " (map (cgenVar . tVarVar) vs)
+                       ++ "]"
 
     return $ CG
       (  [ cComment "Let" ++ cgenType tybody ++ " " ++ lvar ++ ";",
            "{" ]
       ++ decle1
-      ++ [ cgenType type1 ++ " " ++ cgenVar v ++ " = " ++ ve1 ++ ";" ]
+      ++ [ cgenType_ ++ " " ++ cgenBinder ++ " = " ++ ve1 ++ ";" ]
       ++ declbody
       ++ [ lvar ++ " = " ++ vbody ++ ";",
            "}" ]
@@ -600,7 +609,7 @@ cgenAnyFun (tf, ty) cftype = case tf of
 
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace"]
+  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace", "print"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 

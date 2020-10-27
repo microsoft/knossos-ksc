@@ -26,9 +26,7 @@
 (def
  fwd$add Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
- (let
-  ((dx1 (get$1$2 dxt))
-   (dx2 (get$2$2 dxt)))
+ (let ((dx1 dx2) dxt)
   (add dx1 dx2)))
 (def
  rev$add (Tuple Float Float)
@@ -58,8 +56,7 @@
  fwd$sub Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
  (let
-  ((dx1 (get$1$2 dxt))
-   (dx2 (get$2$2 dxt)))
+  ((dx1 dx2) dxt)
   (sub dx1 dx2)))
 (def
  rev$sub (Tuple Float Float)
@@ -98,10 +95,10 @@
  rev$mul (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
-  ((x1 (get$1$2 xt))
-   (x2 (get$2$2 xt))
+  (((x1 x2) xt)
    (d_dmul drt))
   (tuple (mul d_dmul x2) (mul d_dmul x1))))
+
 
 (edef mul Integer (Integer Integer))
 (edef D$mul (LM (Tuple Integer Integer) Integer) (Integer Integer))
@@ -125,10 +122,8 @@
  fwd$div Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
  (let
-  ((x1 (get$1$2 xt))
-   (x2 (get$2$2 xt))
-   (dx1 (get$1$2 dxt))
-   (dx2 (get$2$2 dxt)))
+  (((x1 x2) xt)
+   ((dx1 dx2) dxt))
   (div (sub (mul x2 dx1)
                   (mul x1 dx2))
           (mul x2 x2))))
@@ -136,8 +131,7 @@
  rev$div (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
-  ((x1 (get$1$2 xt))
-   (x2 (get$2$2 xt))
+  (((x1 x2) xt)
    (d_ddiv drt))
   (tuple (div d_ddiv x2)
          (neg (div (mul x1 d_ddiv)

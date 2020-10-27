@@ -45,7 +45,10 @@ x : Vec (Vec Float)
         |   <var> <exrp>1 ... <expr>n      calls, n >= 1
         |   <expr>
 
-<binds> ::= (<var> <expr>)
+<binds> ::= (<pat> <expr>)
+
+<pat> := <var>
+      | (<var>1 ... <var>n)
 
 An example
   (def f7 ((x : Vec Float) (y : Vec Float))
@@ -272,17 +275,27 @@ pLam = do { pReserved "lam"
           ; e <- pExpr
           ; return $ Lam bndr e }
 
-pBind :: Parser (Var, ExprX Parsed)
--- var rhs
-pBind = do { v <- pIdentifier
+pPat :: Parser (PatG Var)
+-- var or (var1 ... varn)
+pPat =     (VarPat <$> pVar)
+       <|> (TupPat <$> parens pTuplePat)
+
+pTuplePat :: Parser [Var]
+-- var1 ... varn
+pTuplePat = do { es <- many pIdentifier
+               ; return $ map Simple es }
+
+pBind :: Parser (PatG Var, ExprX Parsed)
+-- var rhs or (var1 ... varn) rhs
+pBind = do { pat <- pPat
            ; e <- pExpr
-          ; return (Simple v, e) }
+           ; return (pat, e) }
 
 pLet :: Parser (ExprX Parsed)
 -- (let (x r) b)
 pLet = do { pReserved "let"
-          ; pairs <- parens $ do { b <- pBind
-                                 ; return [b] }
+          ; pairs <- parens $ (try $ do { b <- pBind
+                                        ; return [b] })
                           <|> many (parens pBind)
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
