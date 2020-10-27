@@ -59,7 +59,7 @@ from prettyprinter import cpprint, pprint, pformat
 import warnings
 warnings.filterwarnings("always")
 
-from ksc.onnx2k import get_all_schemas, get_attribute_default_value
+from onnx2ks import get_all_schemas, get_attribute_default_value, onnxAttrType_to_Type
 
 #%%
 def comment(s : str):
@@ -67,40 +67,6 @@ def comment(s : str):
     Make a LISP inline comment from str
     """
     return f"#|{s}|#"
-
-def onnxAttrType_to_Type(ty):
-    """
-    Convert ONNX AttrType to KS Type.
-    """
-    assert isinstance(ty, OpSchema.AttrType)
-    if ty == ty.FLOAT:
-        return Type.Float
-    if ty == ty.INT:
-        return Type.Integer
-    if ty == ty.STRING:
-        return Type.String
-    if ty == ty.TENSOR:
-        return Type.Vec(Type.Float)
-
-    if ty == ty.FLOATS:
-        return Type.Vec(Type.Float)
-    if ty == ty.INTS:
-        return Type.Vec(Type.Integer)
-    if ty == ty.STRINGS:
-        return Type.Vec(Type.String)
-    if ty == ty.TENSORS:
-        return Type.Vec(Type.Vec(Type.Float))
-
-    if ty == ty.GRAPH:
-        return Type.Lam(None, None)
-
-    # TODOS:
-    #     ty.SPARSE_TENSOR
-    #     ty.SPARSE_TENSORS
-    #     ty.GRAPHS
-
-    print(ty)
-    raise NotImplementedError(f"didn't handle {ty}")
 
 def onnxType_to_Type_with_mangler(ty : str):
     """
