@@ -1,6 +1,14 @@
 import numpy as np
 
 class Type:
+    """
+    Knossos AST node type.  Grouped into
+        Scalars: Float, Integer, Bool, String
+        Vec 'T
+        Tuple 'T1 .. 'Tn
+        Lam S T
+        LM  S T
+    """
     node_kinds = {
         "Vec": 1, # one child (Type)
         "Tuple": -1, # special case two or more
@@ -20,31 +28,42 @@ class Type:
         self.kind = kind
         self.children = children
 
+    ################
+    ## Constructors
+
     @staticmethod
     def Vec(elem_type):
+        """
+        Constructor: Type.Vec(T)
+        """
         return Type("Vec", [elem_type])
 
     @staticmethod
     def Tuple(*args):
+        """
+        Constructor: Type.Tuple(T1, ..., Tn)
+        """
         return Type("Tuple", args)
 
     @staticmethod
     def Lam(arg_type, return_type):
+        """
+        Constructor: Type.Lam(S, T)
+        """
         return Type("Lam", [arg_type, return_type])
 
     @staticmethod
     def LM(arg_type, return_type):
+        """
+        Constructor: Type.LM(S, T)
+        """
         return Type("LM", [arg_type, return_type]) 
 
     @staticmethod
-    def Index(vec):  # TODO: Call this elem_type for consistency with ksc-MLIR?
-        if vec is None:
-            return None
-        assert vec.kind == "Vec"
-        return vec.children[0]
-
-    @staticmethod
     def fromValue(val):
+        """
+        Construct type from a value
+        """
         if isinstance(val, (bool, np.bool)):
             return Type.Bool
         if isinstance(val, (int, np.integer)):
@@ -55,6 +74,9 @@ class Type:
             return Type.String
         raise NotImplementedError(f"Typeof {type(val)}")
 
+    ################
+    ## Predicates
+    
     @property
     def is_scalar(self):
         return self.kind in ["Integer", "Float", "Bool", "String"]
@@ -64,14 +86,12 @@ class Type:
         return self.kind == "Lam" or self.kind == "LM"
 
     @property
-    def return_type(self):
-        assert self.is_lam_or_LM
-        return self.children[1]
+    def is_vec(self):
+        return self.kind == "Vec"
 
     @property
-    def arg_type(self):
-        assert self.is_lam_or_LM
-        return self.children[0]
+    def is_tuple(self):
+        return self.kind == "Tuple"
 
     def accept_value_of_type(self, other):
         """ Finds if a variable of type 'other' can fit into this type.  """
@@ -83,6 +103,28 @@ class Type:
             # Rules out different size tuples
             return False
         return all(c.accept_value_of_type(o) for c, o in zip(self.children, other.children))
+
+    #################
+    ## Accessors
+    @staticmethod
+    def Index(vec):  # TODO: Call this elem_type for consistency with ksc-MLIR?
+        """
+        Index: Element type of a vector
+        """
+        if vec is None:
+            return None
+        assert vec.kind == "Vec"
+        return vec.children[0]
+
+    @property
+    def return_type(self):
+        assert self.is_lam_or_LM
+        return self.children[1]
+
+    @property
+    def arg_type(self):
+        assert self.is_lam_or_LM
+        return self.children[0]
 
     def num_elements(self, assumed_vector_size=100):
         if self.kind == "Tuple":
