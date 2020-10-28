@@ -28,7 +28,7 @@ data CType =  CType Type
             | CTuple [CType]
             | CFunction CType CType
             | TypeDef String CType
-            | UseTypeDef String
+            | UseTypeDef String Type  -- See Note [Function return types]
             | LMZero Type Type
             | LMOne Type
             | LMScale Type
@@ -39,6 +39,19 @@ data CType =  CType Type
             | LMAdd [CType]
             | LMVariant [CType]
             deriving (Eq, Ord, Show)
+
+{- Note [Function return types]
+
+A CType of (UseTypeDef name type) represents the return type of a def.
+The "type" argument is the return type as declared in the ks file.
+The C++ return type (for which "name" is a typedef) will only be known
+once code has been generated for the function.
+
+But even though a given ks type may be implemented by more than one
+possible C++ type, we can still use the ks type for determining whether
+the return value might refer to allocated memory:
+see Note [Allocator usage of types].
+-}
 
 mkCType :: Type -> CType
 mkCType (TypeTuple ts) = CTuple $ map mkCType ts
@@ -62,11 +75,11 @@ cgenIsLM = \case
   CTuple ts           -> any cgenIsLM ts
   CFunction _ _       -> False
   TypeDef   _ ty      -> cgenIsLM ty
-  UseTypeDef s        -> error ("Don't know; it's a UseTypeDef: " ++ s)
+  UseTypeDef s _      -> error ("Don't know; it's a UseTypeDef: " ++ s)
   _                   -> True
 
 isUseTypeDef :: CType -> Bool
-isUseTypeDef (UseTypeDef _) = True
+isUseTypeDef (UseTypeDef _ _) = True
 isUseTypeDef _ = False
 
 makeUnionType :: HasCallStack => CType -> CType -> CType
@@ -173,20 +186,20 @@ allocatorUsageOfType = \case
 
 allocatorUsageOfCType :: CType -> AllocatorUsage
 allocatorUsageOfCType = \case
-  CType  t      -> allocatorUsageOfType t
-  CTuple ts     -> foldMap allocatorUsageOfCType ts
-  CFunction _ _ -> UsesAllocator
-  TypeDef   _ t -> allocatorUsageOfCType t
-  UseTypeDef _  -> UsesAllocator
-  LMZero _ _    -> UsesAllocator
-  LMOne _       -> UsesAllocator
-  LMScale  _    -> UsesAllocator
-  LMHCat   _    -> UsesAllocator
-  LMVCat   _    -> UsesAllocator
-  LMBuild  _    -> UsesAllocator
-  LMCompose _ _ -> UsesAllocator
-  LMAdd     _   -> UsesAllocator
-  LMVariant _   -> UsesAllocator
+  CType  t       -> allocatorUsageOfType t
+  CTuple ts      -> foldMap allocatorUsageOfCType ts
+  CFunction _ _  -> UsesAllocator
+  TypeDef   _ t  -> allocatorUsageOfCType t
+  UseTypeDef _ t -> allocatorUsageOfType t
+  LMZero _ _     -> UsesAllocator
+  LMOne _        -> UsesAllocator
+  LMScale  _     -> UsesAllocator
+  LMHCat   _     -> UsesAllocator
+  LMVCat   _     -> UsesAllocator
+  LMBuild  _     -> UsesAllocator
+  LMCompose _ _  -> UsesAllocator
+  LMAdd     _    -> UsesAllocator
+  LMVariant _    -> UsesAllocator
 
 -- CGenResult is (C declarations, C expression, CType)
 -- e.g. (["double r; if (b) { r = 1; } else { r = 2; };"],
@@ -214,9 +227,9 @@ getAllocatorUsage :: CGenResult -> AllocatorUsage
 getAllocatorUsage (CG _ _ _ au) = au
 
 type CSTKey = (Fun, Type)
-type CST    = Map.Map CSTKey ()
+type CST    = Map.Map CSTKey Type
 
-cstMaybeLookupFun :: HasCallStack => CSTKey -> CST -> Maybe ()
+cstMaybeLookupFun :: HasCallStack => CSTKey -> CST -> Maybe Type
 cstMaybeLookupFun = Map.lookup
 
 cComment :: String -> String
@@ -246,10 +259,11 @@ cgenDefs defs = concatMap cdecl $
  where
   env = Map.fromList (mapMaybe (\(Def { def_fun = f
                                       , def_rhs = rhs
+                                      , def_res_ty = res_ty
                                       , def_pat = arg
                                       }) ->
                                   case rhs of
-                                    UserRhs _ -> Just ((f, typeof arg), ())
+                                    UserRhs _ -> Just ((f, typeof arg), res_ty)
                                     _         -> Nothing) defs)
 
   cdecl def = cgenDefE env def ++ [ "" ]
@@ -708,7 +722,7 @@ cgenType = \case
   CFunction s t ->
     "std::function<" ++ cgenType t ++ "(" ++ cgenType s ++ ")>"
   TypeDef s _     -> s
-  UseTypeDef s    -> s
+  UseTypeDef s _  -> s
   LMZero s t      -> lmt "Zero" [s, t]
   LMOne t         -> lmt "One" [t]
   LMScale t       -> lmt "Scale" [t]
@@ -738,8 +752,8 @@ cgenTypeLang = \case
 
 ctypeofFun :: HasCallStack => CST -> (TFun, Type) -> [CType] -> CType
 ctypeofFun env (TFun ty f, argty) ctys = case cstMaybeLookupFun (f, argty) env of
-  Just _ -> -- trace ("Found fun " ++ show f) $
-    UseTypeDef ("ty$" ++ cgenUserFun (f, argty))
+  Just ret_ty -> -- trace ("Found fun " ++ show f) $
+    UseTypeDef ("ty$" ++ cgenUserFun (f, argty)) ret_ty
   Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
 
