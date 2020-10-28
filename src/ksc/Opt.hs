@@ -673,6 +673,7 @@ optGradPrim _ "index" (Tuple [i,v])
 
 
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
+optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "ts_neg" _ = Just (lmScale a (kTFloat $ -1.0))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 

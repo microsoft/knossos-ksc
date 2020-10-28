@@ -518,6 +518,11 @@ primFunCallResultTy_maybe fun args
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , t)                                     -> Just t
 
+      -- ($copydown e) requests a copydown of the result of e, in order to reduce memory
+      -- usage as far as possible. (In particular, this should reclaim any memory allocated
+      -- for temporary variables during the evaluation of e.)
+      ("$copydown", t)                                     -> Just t
+
       -- ($check f rev$f s s' ds dt) verifies the derivatives rev$f at s in directions ds,dt.
       -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
       -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s))
@@ -576,6 +581,7 @@ primFunCallResultTy_maybe fun args
 
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args
+                       , "$copydown"-- ($copydown e)              Requests copydown of e
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
                        , "$trace"   -- ($trace f args)            Print and return (f args)
                        , "print"    -- (print "msg" 3)            Print "msg3"

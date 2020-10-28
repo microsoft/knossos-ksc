@@ -308,6 +308,7 @@ testC compiler fsTestKs = do
   testRunKS compiler "test/ksc/fold.ks"
   testRunKSViaCatLang compiler "test/ksc/gmm.ks"
   testRunKSViaCatLang compiler "test/ksc/fold.ks"
+  testRunKS compiler "test/ksc/copydown.ks"
   compileKscPrograms compiler fsTestKs
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
