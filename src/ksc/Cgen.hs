@@ -40,12 +40,24 @@ data CType =  CType Type
             | LMVariant [CType]
             deriving (Eq, Ord, Show)
 
-isScalar :: CType -> Bool
-isScalar = \case
-  CType  t      -> Lang.isScalar t
-  CTuple ts     -> all Cgen.isScalar ts
+typeIsStackOnly :: Type -> Bool
+typeIsStackOnly = \case
+  TypeBool      -> True
+  TypeInteger   -> True
+  TypeFloat     -> True
+  TypeString    -> True
+  TypeTuple ts  -> all typeIsStackOnly ts
+  TypeVec    {} -> False
+  TypeLam {}    -> False
+  TypeLM     {} -> False
+  TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
+
+ctypeIsStackOnly :: CType -> Bool
+ctypeIsStackOnly = \case
+  CType  t      -> typeIsStackOnly t
+  CTuple ts     -> all ctypeIsStackOnly ts
   CFunction _ _ -> False
-  TypeDef   _ t -> Cgen.isScalar t
+  TypeDef   _ t -> ctypeIsStackOnly t
   UseTypeDef _  -> False
   LMZero _ _    -> False
   LMOne _       -> False
@@ -298,7 +310,7 @@ cgenExprR env e = do
 
 cgenWrapWithMarkReset :: HasCallStack => CGenResult -> M CGenResult
 cgenWrapWithMarkReset (CG decl expr ty UsesAllocator)
-  | Cgen.isScalar ty = do
+  | ctypeIsStackOnly ty = do
       bumpmark <- freshCVar
       return $ CG
         (  [ markAllocator bumpmark allocatorParameterName ]
@@ -381,7 +393,7 @@ cgenExprWithoutResettingAlloc env = \case
         )
         ret
         (mkCType ty)
-        (if Cgen.isScalar (mkCType ty) then UsesAndResetsAllocator else UsesAllocator)
+        (if ctypeIsStackOnly (mkCType ty) then UsesAndResetsAllocator else UsesAllocator)
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
@@ -397,7 +409,7 @@ cgenExprWithoutResettingAlloc env = \case
         )
         ret
         ctype
-        ((if Cgen.isScalar ctype then UsesAndResetsAllocator else UsesAllocator) <> callocusage)
+        ((if ctypeIsStackOnly ctype then UsesAndResetsAllocator else UsesAllocator) <> callocusage)
 
   -- Special case for literal tuples.  Don't unpack with std::get.
   -- Just use the tuple components as the arguments.  See Note [Unpack
@@ -633,7 +645,7 @@ funUsesAllocator _ = True
 funAllocatorUsage :: HasCallStack => TFun -> CType -> AllocatorUsage
 funAllocatorUsage tf ty
   | not $ funUsesAllocator tf = DoesNotUseAllocator
-  | Cgen.isScalar ty = UsesAndResetsAllocator
+  | ctypeIsStackOnly ty = UsesAndResetsAllocator
   | otherwise = UsesAllocator
 
 cgenType :: HasCallStack => CType -> String
