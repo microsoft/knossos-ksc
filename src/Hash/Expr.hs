@@ -17,7 +17,7 @@ data Expr a =
     Var a
   | Lam a (Expr a)
   | App (Expr a) (Expr a)
-  deriving (Functor, Show, Eq)
+  deriving (Functor, Show, Read, Eq)
 
 exprSize :: Expr a -> Int
 exprSize = \case
