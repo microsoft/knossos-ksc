@@ -5,6 +5,7 @@ module Benchmark where
 import qualified Hedgehog.Gen as Gen
 import Data.List (intercalate, foldl')
 import qualified System.Clock as Clock
+import Text.Read (readMaybe)
 import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
 
@@ -134,6 +135,31 @@ benchmarkOne samplesPerExpression iterationsPerSample algorithm expression =
                 min minSoFar elapsed_micro)
 
   where infinity = 1e60
+
+benchmarkManyReadFile :: Read e
+                      => [(FilePath, a)]
+                      -> Int
+                      -> Int
+                      -> (e -> r)
+                      -> IO [(AggregateStatistics, a)]
+benchmarkManyReadFile filepaths samplesPerExpression iterationsElapsed algorithm =
+  flip mapM filepaths $ \(filepath, extraData) -> do
+    b <- benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm
+    pure (b, extraData)
+
+benchmarkOneReadFile :: Read e
+                     => FilePath
+                     -> Int
+                     -> Int
+                     -> (e -> r)
+                     -> IO AggregateStatistics
+benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm = do
+  filecontents <- readFile filepath
+  expr <- case readMaybe filecontents of
+    Nothing   -> error ("Couldn't read the expression in " ++ filepath)
+    Just expr -> pure expr
+
+  benchmarkOne samplesPerExpression iterationsElapsed algorithm expr
 
 gnuplotFilePng :: String
                -> [((String, b, String), (Int, String), String)]
