@@ -54,26 +54,31 @@ def log_wishart_prior(p: int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
 
     return out - k * (C - log_gamma_distrib(0.5 * n, p))
 
+@torch.jit.script
+def tri(n:int):
+    return int(n * (n - 1) /2)
 
 @torch.jit.script
-def make_L_col_lifted(d: int, icf, constructL_Lparamidx: int, i: int):
+def make_L_col_lifted(d: int, icf, i: int):
+    
     nelems = d - i - 1
+    Lparamidx = d + tri(i+1)
+
     col = torch.cat(
         [
             torch.zeros(i + 1, dtype=torch.float64),
-            icf[constructL_Lparamidx : (constructL_Lparamidx + nelems)],
+            icf[Lparamidx : (Lparamidx + nelems)],
         ]
     )
-
-    constructL_Lparamidx += nelems
-    return (constructL_Lparamidx, col)
+    
+    return col
 
 @torch.jit.script
 def constructL(d: int, icf):
-    # constructL.Lparamidx = d
-    constructL_Lparamidx = d
 
     # torch.jit.frontend.UnsupportedNodeError: function definitions aren't supported:
+
+    print("d" + str(d))
 
     # def make_L_col(i):
     #     nelems = d - i - 1
@@ -89,11 +94,10 @@ def constructL(d: int, icf):
 
     columns = []
     for i in range(0, d):
-        constructL_Lparamidx_update, col = make_L_col_lifted(
-            d, icf, constructL_Lparamidx, i
+        col = make_L_col_lifted(
+            d, icf, i
         )
         columns.append(col)
-        constructL_Lparamidx = constructL_Lparamidx_update
 
     return torch.stack(columns, -1)
 
@@ -104,29 +108,7 @@ def Qtimesx(Qdiag, L, x):
     return Qdiag * x + f
 
 
-# @torch.jit.script
-# def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
-#     n = x.shape[0]
-#     d = x.shape[1]
 
-#     Qdiags = torch.exp(icf[:, :d])
-#     sum_qs = torch.sum(icf[:, :d], 1)
-#     Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
-
-#     xcentered = torch.stack(tuple(x[i] - means for i in range(n)))
-#     Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
-#     sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
-#     inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
-#     lse = logsumexpvec(inner_term)
-#     slse = torch.sum(lse)
-
-#     CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
-#     return (
-#         CONSTANT
-#         + slse
-#         - n * logsumexp(alphas)
-#         + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
-#     )
 
 
 @torch.jit.script
@@ -144,6 +126,29 @@ def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
     # but I believe we don't need to do the tuple()
     xcentered = torch.stack([x[i] - means for i in range(n)])
 
+    Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
+    sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
+    inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
+    lse = logsumexpvec(inner_term)
+    slse = torch.sum(lse)
+
+    CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
+    return (
+        CONSTANT
+        + slse
+        - n * logsumexp(alphas)
+        + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    )
+
+def gmm_objective_reference(alphas, means, icf, x, wishart_gamma, wishart_m):
+    n = x.shape[0]
+    d = x.shape[1]
+
+    Qdiags = torch.exp(icf[:, :d])
+    sum_qs = torch.sum(icf[:, :d], 1)
+    Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
+
+    xcentered = torch.stack(tuple(x[i] - means for i in range(n)))
     Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
     sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
     inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
