@@ -2,6 +2,8 @@
 
 module KATHash3 where
 
+import Hedgehog hiding (Var)
+
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 
@@ -84,3 +86,20 @@ rebuild freshen fresh (structure, m) = case structure of
                     (rebuild freshen fresh (s2, m2))
     where m1 = Map.mapMaybe pickL m
           m2 = Map.mapMaybe pickR m
+
+rebuildSApp :: Map k Positions -> (Map k Positions, Map k Positions)
+rebuildSApp m = (Map.mapMaybe pickL m, Map.mapMaybe pickR m)
+
+prop_rebuildSApp3_inverse :: Gen (Expr Char) -> TestLimit -> Property
+prop_rebuildSApp3_inverse gen count = withTests count $ property $ do
+  e1 <- forAll gen
+  e2 <- forAll gen
+
+  let (_, m1) = summariseExpr e1
+      (_, m2) = summariseExpr e2
+      (_, m) = summariseExpr (App e1 e2)
+
+      (m1', m2') = rebuildSApp m
+
+  m1 === m1'
+  m2 === m2'

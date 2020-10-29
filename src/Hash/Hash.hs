@@ -938,6 +938,10 @@ xprop_equivCastFast = withTests numRandomTests $ property $ do
 prop_applyPrefix :: Property
 prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests
 
+prop_rebuildSApp3_inverse :: Property
+prop_rebuildSApp3_inverse =
+  KATHash3.prop_rebuildSApp3_inverse genExpr numRandomTests
+
 prop_rebuildSApp_inverse :: Property
 prop_rebuildSApp_inverse =
   KATHashFastOrig.prop_rebuildSApp_inverse genExpr numRandomTests
