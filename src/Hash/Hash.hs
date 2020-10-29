@@ -91,6 +91,7 @@ import qualified KATHash1
 import qualified KATHash2
 import qualified KATHash3
 import qualified KATHashFast
+import qualified KATHashFastOrig
 import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
@@ -854,6 +855,14 @@ prop_rebuild3 = withTests numRandomTests $ property $ do
   let expr1 = fmap ord expr1Char
       esummary = KATHash3.summariseExpr expr1
       expr2 = KATHash3.rebuild (+1) (0 :: Int) esummary
+  assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+
+prop_rebuildFastOrig :: Property
+prop_rebuildFastOrig = withTests numRandomTests $ property $ do
+  expr1Char <- forAll genExpr
+  let expr1 = fmap ord expr1Char
+      esummary = KATHashFastOrig.summariseExpr expr1
+      expr2 = KATHashFastOrig.rebuild (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 prop_fastMatches3 :: Property

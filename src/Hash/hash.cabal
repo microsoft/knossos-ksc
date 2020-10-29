@@ -12,6 +12,7 @@ library
                        KATHash2,
                        KATHash3,
                        KATHashFast,
+                       KATHashFastOrig,
                        Merge,
                        CompareBehaviour,
                        Expr,
@@ -37,6 +38,7 @@ executable hash
                        KATHash2,
                        KATHash3,
                        KATHashFast,
+                       KATHashFastOrig,
                        Merge
   hs-source-dirs:      .
   build-depends:       base,
