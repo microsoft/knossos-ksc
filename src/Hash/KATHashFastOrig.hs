@@ -30,16 +30,6 @@ structureTag = \case
 removeFromVM :: Ord v => v -> Map v positions -> (Map v positions, Maybe positions)
 removeFromVM v m = (Map.delete v m, Map.lookup v m)
 
-{-
-unionVM :: Ord k => Map k Positions -> Map k Positions -> Map k Positions
-unionVM = Merge.mergeMaps
-            (\case
-                LeftOnly l -> LeftOnlyPL l
-                RightOnly r -> RightOnlyPL r
-                Both l r -> BothPL l r
-            )
--}
-
 findSingleton :: Map p Positions -> p
 findSingleton m = case Map.toList m of
   [(v, HerePL)] -> v
