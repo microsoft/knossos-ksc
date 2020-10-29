@@ -2,6 +2,8 @@
 
 module KATHashFastOrig where
 
+import Hedgehog hiding (Var)
+
 import Data.Map.Strict (Map, mapMaybe)
 import qualified Data.Map.Strict as Map
 import Data.List (foldl')
@@ -80,7 +82,14 @@ rebuild freshen fresh (structure, m) = case structure of
                           Just p -> extendVM m x p
   SApp tag left_bigger s1 s2 -> App (rebuild freshen fresh (s1, m1))
                                     (rebuild freshen fresh (s2, m2))
-    where small_m = mapMaybe upd_small m
+    where (m1, m2) = rebuildSApp m tag left_bigger
+
+rebuildSApp :: Map k Positions
+            -> StructureTag
+            -> Bool
+            -> (Map k Positions, Map k Positions)
+rebuildSApp m tag left_bigger = (m1, m2)
+  where   small_m = mapMaybe upd_small m
           big_m   = mapMaybe upd_big m
           (m1, m2) = if left_bigger
                      then (big_m, small_m)
@@ -93,3 +102,21 @@ rebuild freshen fresh (structure, m) = case structure of
           upd_big :: Positions -> Maybe Positions
           upd_big (JoinPL ptag mpt _) | ptag == tag = mpt
           upd_big pt = Just pt
+
+prop_rebuildSApp_inverse :: Gen (Expr Char) -> TestLimit -> Property
+prop_rebuildSApp_inverse gen count = withTests count $ property $ do
+  e1 <- forAll gen
+  e2 <- forAll gen
+
+  let (_, m1) = summariseExpr e1
+      (_, m2) = summariseExpr e2
+      (s, m) = summariseExpr (App e1 e2)
+
+      left_bigger = case s of
+        SApp _ left_bigger_ _ _ -> left_bigger_
+        _ -> error "Unexpected shape of Structure"
+
+      (m1', m2') = rebuildSApp m (structureTag s) left_bigger
+
+  m1 === m1'
+  m2 === m2'

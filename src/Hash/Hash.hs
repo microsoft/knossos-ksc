@@ -929,11 +929,15 @@ genExprLinearNumVars :: MonadGen m => Int -> m (Expr String)
 genExprLinearNumVars n = genExprWithVarsLinear (map show [1..n])
 
 -- | Shows equivalence of castHash hash and castHashOptimized hash
-prop_equivCastFast :: Property
-prop_equivCastFast = withTests numRandomTests $ property $ do
+xprop_equivCastFast :: Property
+xprop_equivCastFast = withTests numRandomTests $ property $ do
   let n = normalizedGroupedEquivalentSubexpressions
   expr <- forAll genExpr
   n (castHash expr) === n (castHashOptimized expr)
 
 prop_applyPrefix :: Property
 prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests
+
+prop_rebuildSApp_inverse :: Property
+prop_rebuildSApp_inverse =
+  KATHashFastOrig.prop_rebuildSApp_inverse genExpr numRandomTests
