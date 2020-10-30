@@ -242,18 +242,6 @@ deriving instance Show (RuleX Parsed)
 pattern TypeSize :: TypeX
 pattern TypeSize = TypeInteger
 
-isScalar :: Type -> Bool
-isScalar = \case
-  TypeBool      -> True
-  TypeInteger   -> True
-  TypeFloat     -> True
-  TypeString    -> True
-  TypeTuple ts  -> all isScalar ts
-  TypeVec    {} -> False
-  TypeLam {}    -> False
-  TypeLM     {} -> error "Shouldn't see TypeLM at this stage of codegen"
-  TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
-
 ----------------------------------
 --- Tangent space
 

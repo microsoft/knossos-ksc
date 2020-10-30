@@ -40,23 +40,6 @@ data CType =  CType Type
             | LMVariant [CType]
             deriving (Eq, Ord, Show)
 
-isScalar :: CType -> Bool
-isScalar = \case
-  CType  t      -> Lang.isScalar t
-  CTuple ts     -> all Cgen.isScalar ts
-  CFunction _ _ -> False
-  TypeDef   _ t -> Cgen.isScalar t
-  UseTypeDef _  -> False
-  LMZero _ _    -> False
-  LMOne _       -> False
-  LMScale  _    -> False
-  LMHCat   _    -> False
-  LMVCat   _    -> False
-  LMBuild  _    -> False
-  LMCompose _ _ -> False
-  LMAdd     _   -> False
-  LMVariant _   -> False
-
 mkCType :: Type -> CType
 mkCType (TypeTuple ts) = CTuple $ map mkCType ts
 mkCType ty             = CType ty
@@ -152,6 +135,58 @@ combineUsage UsesAllocator _ = UsesAllocator
 combineUsage _ UsesAllocator = UsesAllocator
 combineUsage DoesNotUseAllocator DoesNotUseAllocator = DoesNotUseAllocator
 combineUsage _ _ = UsesAndResetsAllocator
+
+{- Note [Allocator usage of types]
+
+The function allocatorUsageOfCType describes whether
+a value of a given type may refer to allocated memory.
+Or, equivalently, it describes whether making a (deep)
+copy of a value requires an allocator.
+
+Note that this ought to a property of the C++ type, not
+the ks type: in general a Type may be implemented by more
+than one possible CType. But currently we have
+
+  allocatorUsageOfType ty == allocatorUsageOfCType cty
+
+whenever cty implements the ks type ty. In future we
+might want to allow these to differ, so that a ks type
+which normally uses an allocator can be implemented
+by a C++ type which does not require allocation.
+However it should still always be the case that
+
+  allocatorUsageOfType ty == DoesNotUseAllocator
+    => allocatorUsageOfCType cty == DoesNotUseAllocator
+-}
+
+allocatorUsageOfType :: Type -> AllocatorUsage
+allocatorUsageOfType = \case
+  TypeBool      -> DoesNotUseAllocator
+  TypeInteger   -> DoesNotUseAllocator
+  TypeFloat     -> DoesNotUseAllocator
+  TypeString    -> DoesNotUseAllocator
+  TypeTuple ts  -> foldMap allocatorUsageOfType ts
+  TypeVec    {} -> UsesAllocator
+  TypeLam {}    -> UsesAllocator
+  TypeLM     {} -> UsesAllocator
+  TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
+
+allocatorUsageOfCType :: CType -> AllocatorUsage
+allocatorUsageOfCType = \case
+  CType  t      -> allocatorUsageOfType t
+  CTuple ts     -> foldMap allocatorUsageOfCType ts
+  CFunction _ _ -> UsesAllocator
+  TypeDef   _ t -> allocatorUsageOfCType t
+  UseTypeDef _  -> UsesAllocator
+  LMZero _ _    -> UsesAllocator
+  LMOne _       -> UsesAllocator
+  LMScale  _    -> UsesAllocator
+  LMHCat   _    -> UsesAllocator
+  LMVCat   _    -> UsesAllocator
+  LMBuild  _    -> UsesAllocator
+  LMCompose _ _ -> UsesAllocator
+  LMAdd     _   -> UsesAllocator
+  LMVariant _   -> UsesAllocator
 
 -- CGenResult is (C declarations, C expression, CType)
 -- e.g. (["double r; if (b) { r = 1; } else { r = 2; };"],
@@ -298,7 +333,7 @@ cgenExprR env e = do
 
 cgenWrapWithMarkReset :: HasCallStack => CGenResult -> M CGenResult
 cgenWrapWithMarkReset (CG decl expr ty UsesAllocator)
-  | Cgen.isScalar ty = do
+  | DoesNotUseAllocator <- allocatorUsageOfCType ty = do
       bumpmark <- freshCVar
       return $ CG
         (  [ markAllocator bumpmark allocatorParameterName ]
@@ -355,6 +390,11 @@ cgenExprWithoutResettingAlloc env = \case
     ret  <- freshCVar
     bumpmark <- freshCVar
 
+    -- The allocator usage will be at least UsesAndResetsAllocator
+    -- here, because our implementation marks/resets the allocator
+    -- even when the result type is a scalar.
+    let allocusage = allocatorUsageOfCType (mkCType ty) <> UsesAndResetsAllocator
+
     return $ CG
         (  [ cComment "sumbuild" ]
         ++ szdecl
@@ -381,12 +421,12 @@ cgenExprWithoutResettingAlloc env = \case
         )
         ret
         (mkCType ty)
-        (if Cgen.isScalar (mkCType ty) then UsesAndResetsAllocator else UsesAllocator)
+        allocusage
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
   Call (TFun _ (Fun (PrimFun "$copydown"))) e -> do
-    CG cdecl cexpr ctype callocusage <- cgenExprR env e
+    CG cdecl cexpr ctype _callocusage <- cgenExprR env e
     ret <- freshCVar
     bumpmark <- freshCVar
     return $ CG
@@ -397,7 +437,7 @@ cgenExprWithoutResettingAlloc env = \case
         )
         ret
         ctype
-        ((if Cgen.isScalar ctype then UsesAndResetsAllocator else UsesAllocator) <> callocusage)
+        (allocatorUsageOfCType ctype <> UsesAndResetsAllocator)
 
   -- Special case for literal tuples.  Don't unpack with std::get.
   -- Just use the tuple components as the arguments.  See Note [Unpack
@@ -624,6 +664,32 @@ cgenAnyFun (tf, ty) cftype = case tf of
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun (f, ty)
 
+{- Note [Allocator usage of function calls]
+
+Every function takes an allocator as its first argument, with the
+exception of a few special primitive functions.
+
+The caller of a function does not know whether the allocator
+argument will actually be used inside the function. But we can
+make some assumptions based on the function return type. There
+are two cases:
+
+ 1. If the return value may refer to allocated memory
+    (allocatorUsageOfCType returns UsesAllocator):
+    In this case we have to assume that the allocator will
+    be used by the function.
+
+ 2. If the return value cannot refer to allocated memory
+    (allocatorUsageOfCType returns DoesNotUseAllocator):
+    In this case our calling convention is that, if the
+    function does use the allocator, then it must reset
+    the allocator to its initial position before returning.
+    So in this case we know that the allocator usage of
+    the function is UsesAndResetsAllocator.
+    (Note: the usage can never be DoesNotUseAllocator because
+    the allocator argument is still passed to the function.)
+-}
+
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
   not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace", "print"]
@@ -632,9 +698,9 @@ funUsesAllocator _ = True
 
 funAllocatorUsage :: HasCallStack => TFun -> CType -> AllocatorUsage
 funAllocatorUsage tf ty
+  -- See Note [Allocator usage of function calls]
   | not $ funUsesAllocator tf = DoesNotUseAllocator
-  | Cgen.isScalar ty = UsesAndResetsAllocator
-  | otherwise = UsesAllocator
+  | otherwise = allocatorUsageOfCType ty <> UsesAndResetsAllocator
 
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
