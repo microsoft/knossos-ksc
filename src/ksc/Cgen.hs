@@ -228,9 +228,6 @@ markAllocator bumpmark allocVar = "ks::alloc_mark_t " ++ bumpmark ++ " = " ++ al
 resetAllocator :: String -> String -> String
 resetAllocator bumpmark allocVar = allocVar ++ "->reset(" ++ bumpmark ++ ");"
 
-declareMark :: String -> String
-declareMark bumpmark = "ks::alloc_mark_t " ++ bumpmark ++ ";"
-
 moveMark :: String -> String -> String
 moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
 
@@ -402,16 +399,18 @@ cgenExprWithoutResettingAlloc env = \case
               cretty ++ " " ++ ret ++ ";",
               "{" ]
         ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;",
-                       declareMark bumpmark,
+                       markAllocator bumpmark allocatorParameterName,
                        "do {" ]
                   ++ indent (  bodydecl
-                            -- First time round, deep copy it, put it in the ret, then mark the allocator
+                               -- Make a deep copy on the first iteration, using a copydown to
+                               -- reclaim other memory allocated in that iteration.
+                               -- Subsequent iterations can then accumulate into this copy.
                             ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
-                            ++ indent [ ret ++ " = inflated_deep_copy(" ++ allocatorParameterName ++ ", " ++ bodyex ++ ");",
+                            ++ indent [ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ bodyex ++ ");",
                                         moveMark bumpmark allocatorParameterName ]
                             ++ [ "} else {" ]
                             ++ indent [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");",
-                                      -- Release the allocator back to where it was on iter 0
+                                      -- Release the allocator back to where it was after iter 0
                                         resetAllocator bumpmark allocatorParameterName ]
                             ++ [ "}" ]
                             )
