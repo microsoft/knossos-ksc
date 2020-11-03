@@ -32,7 +32,7 @@ awfFormatExpressionsHTML =
                       , ("Example 6", example6)
                       , ("Example 7", example7) ]
 
-awfFormatExpressionHTML :: Expr String -> Html
+awfFormatExpressionHTML :: Expr h String -> Html
 awfFormatExpressionHTML e =
   table $ annotating tr $ \tr_ -> do
      tr_ $ annotating th $ \th_ -> do
@@ -73,7 +73,7 @@ awfFormatExpressionHTML e =
         inRow (t, ts) = inList (t : toListOf each ts)
         mapRow f (t, ts) = (f t, over each f ts)
 
-printGroups :: Ord hash => [(hash, Path, Expr String)] -> IO ()
+printGroups :: Ord hash => [(hash, Path, Expr h String)] -> IO ()
 printGroups = mapM_ (\x -> putStrLn "" >> mapM_ putStrLn x)
               . (map . map) (\(path, z) -> showExpr z ++ " [" ++ showPath path ++ "]")
               . normalizedGroupedEquivalentSubexpressions
@@ -105,8 +105,8 @@ cross :: Html
 cross = preEscapedToHtml "&#10060;"
 
 showGroupsHTML :: Ord hash
-               => (Expr String -> [(hash, Path, b)])
-               -> Expr String
+               => (Expr h String -> [(hash, Path, b)])
+               -> Expr h String
                -> Html
 showGroupsHTML algorithm e =
   ((\lines_ ->

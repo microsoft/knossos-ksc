@@ -118,15 +118,15 @@ prop_applyPrefix count = withTests count $ property $ do
 -- If you want to recover a `Map name Positions` from a `(Prefix, Map
 -- name PrefixPositions)` then you can use `prefixMapToMap`.
 summariseExpr :: Ord name
-              => Expr name
+              => Expr h name
               -> (Structure, (Prefix, Map name UnprefixPositions))
 summariseExpr = \case
-  Var v   -> (SVar, (emptyPrefix, Map.singleton v hereUnprefixPositions))
-  Lam x e ->
+  Var _ v   -> (SVar, (emptyPrefix, Map.singleton v hereUnprefixPositions))
+  Lam _ x e ->
     let (str_body, (prefix, map_body)) = summariseExpr e
         (e_map, mskip_pos) = removeFromVM x map_body
     in (SLam (fmap (applyPrefix prefix) mskip_pos) str_body, (prefix, e_map))
-  App e1 e2 ->
+  App _ e1 e2 ->
     let (str1, map1) = summariseExpr e1
         (str2, map2) = summariseExpr e2
     in (SApp str1 str2, unionVM map1 map2)

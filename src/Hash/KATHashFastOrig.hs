@@ -43,15 +43,15 @@ extendVM :: Ord k => Map k a -> k -> a -> Map k a
 extendVM m x p = Map.insert x p m
 
 summariseExpr :: Ord name
-              => Expr name
+              => Expr h name
               -> (Structure, Map name Positions)
 summariseExpr = \case
-  Var v   -> (SVar, Map.singleton v HerePL)
-  Lam x e ->
+  Var _ v   -> (SVar, Map.singleton v HerePL)
+  Lam _ x e ->
     let (str_body, map_body) = summariseExpr e
         (e_map, x_pos) = removeFromVM x map_body
     in (SLam (structureTag str_body) x_pos str_body, e_map)
-  App e1 e2 ->
+  App _ e1 e2 ->
     let (str1, map1) = summariseExpr e1
         (str2, map2) = summariseExpr e2
         app_depth = max (structureTag str1) (structureTag str2) + 1
@@ -72,16 +72,16 @@ rebuild :: Ord name
         => (name -> name)
         -> name
         -> (Structure, Map name Positions)
-        -> Expr name
+        -> Expr () name
 rebuild freshen fresh (structure, m) = case structure of
-  SVar -> Var (findSingleton m)
-  SLam _ mp s -> Lam x (rebuild freshen fresher (s, m'))
+  SVar -> Var () (findSingleton m)
+  SLam _ mp s -> Lam () x (rebuild freshen fresher (s, m'))
     where x = fresh
           fresher = freshen fresh
           m' = case mp of Nothing -> m
                           Just p -> extendVM m x p
-  SApp tag left_bigger s1 s2 -> App (rebuild freshen fresh (s1, m1))
-                                    (rebuild freshen fresh (s2, m2))
+  SApp tag left_bigger s1 s2 -> App () (rebuild freshen fresh (s1, m1))
+                                       (rebuild freshen fresh (s2, m2))
     where (m1, m2) = rebuildSApp m tag left_bigger
 
 rebuildSApp :: Map k Positions
@@ -103,14 +103,14 @@ rebuildSApp m tag left_bigger = (m1, m2)
           upd_big (JoinPL ptag mpt _) | ptag == tag = mpt
           upd_big pt = Just pt
 
-prop_rebuildSApp_inverse :: Gen (Expr Char) -> TestLimit -> Property
+prop_rebuildSApp_inverse :: Gen (Expr () Char) -> TestLimit -> Property
 prop_rebuildSApp_inverse gen count = withTests count $ property $ do
   e1 <- forAll gen
   e2 <- forAll gen
 
   let (_, m1) = summariseExpr e1
       (_, m2) = summariseExpr e2
-      (s, m) = summariseExpr (App e1 e2)
+      (s, m) = summariseExpr (App () e1 e2)
 
       left_bigger = case s of
         SApp _ left_bigger_ _ _ -> left_bigger_

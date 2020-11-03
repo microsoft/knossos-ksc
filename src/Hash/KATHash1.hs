@@ -70,15 +70,15 @@ pickR = \case
   _ -> EmptyPL
 
 summariseExpr :: Ord name
-              => Expr name
+              => Expr h name
               -> (Structure, Map name Positions)
 summariseExpr = \case
-  Var v   -> (SVar, Map.singleton v SinglePL)
-  Lam x e ->
+  Var _ v   -> (SVar, Map.singleton v SinglePL)
+  Lam _ x e ->
     let (str_body, map_body) = summariseExpr e
         (e_map, x_pos) = removeFromVM x map_body
     in (SLam x_pos str_body, e_map)
-  App e1 e2 ->
+  App _ e1 e2 ->
     let (str1, map1) = summariseExpr e1
         (str2, map2) = summariseExpr e2
         map1_shift = Map.map ShiftLeftPL map1
@@ -89,13 +89,13 @@ rebuild :: Ord name
         => (name -> name)
         -> name
         -> (Structure, Map name Positions)
-        -> Expr name
+        -> Expr () name
 rebuild freshen fresh (structure, m) = case structure of
-  SVar -> Var (findSingleton m)
-  SLam p s -> Lam x (rebuild freshen fresher (s, extendVM m x p))
+  SVar -> Var () (findSingleton m)
+  SLam p s -> Lam () x (rebuild freshen fresher (s, extendVM m x p))
     where x = fresh
           fresher = freshen fresh
-  SApp s1 s2 -> App (rebuild freshen fresh (s1, m1))
-                    (rebuild freshen fresh (s2, m2))
+  SApp s1 s2 -> App () (rebuild freshen fresh (s1, m1))
+                       (rebuild freshen fresh (s2, m2))
     where m1 = Map.map pickL m
           m2 = Map.map pickR m

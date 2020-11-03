@@ -143,7 +143,7 @@ benchmarkOne samplesPerExpression iterationsPerSample algorithm expression =
 benchmarkManyReadFile :: [(FilePath, a)]
                       -> Int
                       -> Int
-                      -> (Expr String -> r)
+                      -> (Expr () String -> r)
                       -> IO [(AggregateStatistics, a)]
 benchmarkManyReadFile = benchmarkManyReadFileG
 
@@ -213,7 +213,7 @@ evaluate :: (e -> a) -> e -> IO ()
 evaluate a e = let !_ = a e
                      in return ()
 
-seqHashResult :: [(Hash, Path, Expr a)] -> ()
+seqHashResult :: [(Hash, Path, Expr h a)] -> ()
 seqHashResult = let f a (hash, _path, _expr) =
                       let !_ = hash in a
                 in foldl' f ()

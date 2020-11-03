@@ -120,12 +120,12 @@ type Hash = Int
 -- Combines the variables hash and structure hash into a single hash
 -- value.  NB it is the triple returned by 'castHashExplicit' that is
 -- compositional, not this single hash value.
-castHashTop :: (Ord a, Hashable a) => Expr a -> Hash
+castHashTop :: (Ord a, Hashable a) => Expr h a -> Hash
 castHashTop e = hash (Map.toList m, h)
   where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e []
 
 castHash :: (Ord a, Hashable a)
-         => Expr a -> [(Hash, Path, Expr a)]
+         => Expr h a -> [(Hash, Path, Expr h a)]
 castHash e = exprs
   where (_m, _h, _depth, exprs) = castHashExplicit [] Map.empty e []
 
@@ -203,9 +203,9 @@ castHash e = exprs
 castHashExplicit :: (Ord a, Hashable a)
                  => Path
                  -> Map a Path
-                 -> Expr a
-                 -> [(Hash, Path, Expr a)]
-                 -> (Map a Hash, Hash, Int, [(Hash, Path, Expr a)])
+                 -> Expr h a
+                 -> [(Hash, Path, Expr h a)]
+                 -> (Map a Hash, Hash, Int, [(Hash, Path, Expr h a)])
 castHashExplicit =
   let subExprHash_ variablesHash structureHash bvEnv =
         hash (Map.toList variablesHash,
@@ -213,14 +213,14 @@ castHashExplicit =
               filter ((`elem` Map.keys variablesHash) . fst) (Map.toList bvEnv))
 
   in \path bvEnv expr hashesIn -> case expr of
-  Var x   -> (variablesHash, structureHash, 0, hashes)
+  Var _ x   -> (variablesHash, structureHash, 0, hashes)
     where variablesHash = Map.singleton x (hashExprO VarO)
           structureHash = hashExprO VarO
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
           subExprHashes = hashesIn
           hashes        = (subExprHash, path, expr) : subExprHashes
 
-  Lam x e -> (variablesHash, structureHash, depth + 1, hashes)
+  Lam _ x e -> (variablesHash, structureHash, depth + 1, hashes)
     where variablesHash = Map.delete x variablesHashE
           structureHash = hashExprOWithSalt depth (LamO hashX structureHashE)
           (variablesHashE, structureHashE, depth, subExprHashes) =
@@ -230,7 +230,7 @@ castHashExplicit =
 
           hashX = Map.lookup x variablesHashE
 
-  App f e -> (variablesHash, structureHash, max depthF depthE + 1, hashes)
+  App _ f e -> (variablesHash, structureHash, max depthF depthE + 1, hashes)
     where variablesHash = mergeMaps (\case
                  LeftOnly  l   -> hashExprO (AppO (Just l) Nothing)
                  RightOnly r   -> hashExprO (AppO Nothing (Just r))
@@ -400,7 +400,7 @@ lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
                                          hashCombineRev
 
 castHashOptimized :: (Ord a, Hashable a)
-                  => Expr a -> [(Hash, Path, Expr a)]
+                  => Expr h a -> [(Hash, Path, Expr h a)]
 castHashOptimized e = exprs
   where (_m, _b, _depth, _subtreeSize, exprs) =
           castHashOptimizedExplicit ([], 1) Map.empty e []
@@ -408,15 +408,15 @@ castHashOptimized e = exprs
 castHashOptimizedExplicit :: (Ord a, Hashable a)
                           => (Path, Hash)
                           -> Map a Hash
-                          -> Expr a
-                          -> [(Hash, Path, Expr a)]
-                          -> (LazyMap a, Hash, Int, Int, [(Hash, Path, Expr a)])
+                          -> Expr h a
+                          -> [(Hash, Path, Expr h a)]
+                          -> (LazyMap a, Hash, Int, Int, [(Hash, Path, Expr h a)])
 castHashOptimizedExplicit =
   let subExprHash_ (LazyMap _ sndVariablesHash) structureHash =
         hash (sndVariablesHash, structureHash)
 
   in \(path, pathHash) bvEnv expr hashesIn -> case expr of
-  Var x   -> (variablesHash, structureHash, 0, 1, hashes)
+  Var _ x   -> (variablesHash, structureHash, 0, 1, hashes)
     where variablesHash = lazyMapSingleton x (TwoHashes (hashExprO VarO)
                                                     (hash (Map.lookup x bvEnv)))
           structureHash = hashExprO VarO
@@ -424,7 +424,7 @@ castHashOptimizedExplicit =
           subExprHashes = hashesIn
           hashes        = (subExprHash, path, expr) : subExprHashes
 
-  Lam x e -> (variablesHash, structureHash, depth + 1, subtreeSize, hashes)
+  Lam _ x e -> (variablesHash, structureHash, depth + 1, subtreeSize, hashes)
     where variablesHash = lazyMapDelete x variablesHashE
           structureHash = hashExprOWithSalt hashSalt (LamO hashX structureHashE)
           (!variablesHashE, !structureHashE, !depth, !subtreeSizeE, subExprHashes) =
@@ -439,7 +439,7 @@ castHashOptimizedExplicit =
           hashX         = fmap fst_ (lazyMapLookup x variablesHashE)
             where fst_ (TwoHashes h _) = h
 
-  App f e ->
+  App _ f e ->
     (variablesHash, structureHash, max depthF depthE + 1, subtreeSize, hashes)
     where variablesHash = lazyMapsCombine variablesHashF variablesHashE subtreeSize
 
@@ -462,12 +462,12 @@ castHashOptimizedExplicit =
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
 alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
-                                   => Expr a -> Expr a -> Bool
+                                   => Expr h a -> Expr h a -> Bool
 alphaEquivalentAccordingToHashExpr = (==) `on` castHashTop
 
 alphaEquivalentAccordingToSummariseExpr :: Ord name
-                                        => Expr name
-                                        -> Expr name
+                                        => Expr h name
+                                        -> Expr h name
                                         -> Bool
 alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHash1.summariseExpr
 
@@ -477,53 +477,53 @@ alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHash1.summariseExpr
 --
 -- In consequence, two expressions are alpha-equivalent if they are
 -- equal under @uniqifyBinders@.
-uniquifyBinders :: Ord a => Expr a -> Expr (Either a Int)
+uniquifyBinders :: Ord a => Expr h a -> Expr h (Either a Int)
 uniquifyBinders = fst . uniquifyBindersExplicit Map.empty 0
 
 -- | The internals of 'uniquifyBinders'
 uniquifyBindersExplicit :: Ord a
                         => Map.Map a Int
                         -> Int
-                        -> Expr a
-                        -> (Expr (Either a Int), Int)
+                        -> Expr h a
+                        -> (Expr h (Either a Int), Int)
 uniquifyBindersExplicit m n = \case
-  Var x -> case Map.lookup x m of
-    Nothing -> (Var (Left x), n)
-    Just i  -> (Var (Right i), n)
-  Lam x e -> (Lam (Right n) e', n')
+  Var h x -> case Map.lookup x m of
+    Nothing -> (Var h (Left x), n)
+    Just i  -> (Var h (Right i), n)
+  Lam h x e -> (Lam h (Right n) e', n')
     where (e', n') = uniquifyBindersExplicit (Map.insert x n m) (n+1) e
-  App f x -> (App f' x', n'')
+  App h f x -> (App h f' x', n'')
     where (f', n')  = uniquifyBindersExplicit m n f
           (x', n'') = uniquifyBindersExplicit m n' x
 
 -- | (Broken) DeBruijin Algorithm from "Finding Identical
 -- Subexpressions"
-deBruijnHash :: (Hashable a, Ord a) => Expr a -> [(Hash, Path, Expr a)]
+deBruijnHash :: (Hashable a, Ord a) => Expr h a -> [(Hash, Path, Expr h a)]
 deBruijnHash expr = es
   where (_, _, es) = deBruijnHashExplicit Map.empty [] [] expr
 
 deBruijnHashExplicit :: (Hashable a, Ord a)
                      => Map.Map a Int
                      -> Path
-                     -> [(Hash, Path, Expr a)]
-                     -> Expr a
-                     -> (Hash, Int, [(Hash, Path, Expr a)])
+                     -> [(Hash, Path, Expr h a)]
+                     -> Expr h a
+                     -> (Hash, Int, [(Hash, Path, Expr h a)])
 deBruijnHashExplicit = \env path hashesIn expr -> case expr of
-  Var x -> (hash', depth', l_ret)
+  Var _ x -> (hash', depth', l_ret)
     where hash' = case dbLookupVar x env of
             Nothing -> hash ("free", x, depth')
             Just i  -> hash ("bound", i, depth')
           depth' = 0 :: Int
           subExpressionHashes = hashesIn
           l_ret = (hash', path, expr) : subExpressionHashes
-  Lam x e -> (hash', depth', l_ret)
+  Lam _ x e -> (hash', depth', l_ret)
     where (!hashE, !depthE, subExpressionHashesE) =
             deBruijnHashExplicit (dbAddVar x env) (L:path) hashesIn e
           depth' = depthE + 1
           hash' = hash ("lam", hashE, depth')
           subExpressionHashes = subExpressionHashesE
           l_ret = (hash', path, expr) : subExpressionHashes
-  App f e -> (hash', depth', l_ret)
+  App _ f e -> (hash', depth', l_ret)
     where (!hashF, !depthF, lF) = deBruijnHashExplicit env (Apl:path) hashesIn f
           (!hashE, !depthE, lE) = deBruijnHashExplicit env (Apr:path) lF e
           depth' = max depthF depthE + 1
@@ -537,7 +537,7 @@ dbAddVar v env = Map.insert v (Map.size env) env
 dbLookupVar :: Ord k => k -> Map k Int -> Maybe Int
 dbLookupVar v env = fmap (Map.size env -) (Map.lookup v env)
 
-combinedHash :: (Ord a, Hashable a) => Expr a -> [(Hash, Path, Expr a)]
+combinedHash :: (Ord a, Hashable a) => Expr h a -> [(Hash, Path, Expr h a)]
 combinedHash expr = es
   where (_, _, _, es) = combinedHashExplicit Map.empty Map.empty [] expr []
 
@@ -550,13 +550,13 @@ combinedHashExplicit :: (Hashable a, Ord a)
                      => Map.Map a Int
                      -> Map.Map a Path
                      -> Path
-                     -> Expr a
-                     -> [(Hash, Path, Expr a)]
-                     -> (Hash, Set a, Int, [(Hash, Path, Expr a)])
+                     -> Expr h a
+                     -> [(Hash, Path, Expr h a)]
+                     -> (Hash, Set a, Int, [(Hash, Path, Expr h a)])
 combinedHashExplicit = \env fvEnv location expr hashesIn ->
   let fvHash freeVars = map (flip Map.lookup fvEnv) (Set.toList freeVars)
   in case expr of
-  Var x -> (dbHash', freeVars', depth', l_ret)
+  Var _ x -> (dbHash', freeVars', depth', l_ret)
     where dbHash' = case dbLookupVar x env of
             Nothing -> hash ("free", x, depth')
             Just i  -> hash ("bound", i, depth')
@@ -565,7 +565,7 @@ combinedHashExplicit = \env fvEnv location expr hashesIn ->
           jointHash' = hash (dbHash', fvHash freeVars')
           subExpressionHashes = hashesIn
           l_ret = (jointHash', location, expr) : subExpressionHashes
-  Lam x e -> (dbHash', freeVars', depth', l_ret)
+  Lam _ x e -> (dbHash', freeVars', depth', l_ret)
     where (dbHashE, freeVarsE, depthE, subExpressionHashesE) =
             combinedHashExplicit (dbAddVar x env)
                                  (addLocn x location fvEnv)
@@ -576,7 +576,7 @@ combinedHashExplicit = \env fvEnv location expr hashesIn ->
           freeVars' = Set.delete x freeVarsE
           subExpressionHashes = subExpressionHashesE
           l_ret = (jointHash', location, expr) : subExpressionHashes
-  App f e -> (dbHash', freeVars', depth', l_ret)
+  App _ f e -> (dbHash', freeVars', depth', l_ret)
     where (dbHashF, freeVarsF, depthF, subExpressionHashesF)  =
             combinedHashExplicit env fvEnv (Apl:location) f hashesIn
           (dbHashE, freeVarsE, depthE, subExpressionHashesE) =
@@ -593,33 +593,33 @@ addLocn = Map.insert
 
 -- | The most basic hash one could think of.  Is not intended to
 -- respect any kind of equivalences.
-naiveHash :: Hashable a => Expr a -> Hash
+naiveHash :: Hashable a => Expr h a -> Hash
 naiveHash = \case
-  Var x   -> hash x
-  Lam x e -> hash (x, naiveHash e)
-  App f e -> hash (naiveHash f, naiveHash e)
+  Var _ x   -> hash x
+  Lam _ x e -> hash (x, naiveHash e)
+  App _ f e -> hash (naiveHash f, naiveHash e)
 
-naiveHashNested :: Hashable a => Expr a -> [(Hash, Path, Expr a)]
+naiveHashNested :: Hashable a => Expr h a -> [(Hash, Path, Expr h a)]
 naiveHashNested e = snd (naiveHashNestedExplicit [] e [])
 
 naiveHashNestedExplicit :: Hashable a
                         => Path
-                        -> Expr a
-                        -> [(Hash, Path, Expr a)]
-                        -> (Hash, [(Hash, Path, Expr a)])
+                        -> Expr h a
+                        -> [(Hash, Path, Expr h a)]
+                        -> (Hash, [(Hash, Path, Expr h a)])
 naiveHashNestedExplicit path expr hashesIn =
   let subExprHash thisHash subExpressionHashes
         = (thisHash, (thisHash, path, expr) : subExpressionHashes)
   in case expr of
-  Var x   -> subExprHash thisHash subExpressionHashes
+  Var _ x   -> subExprHash thisHash subExpressionHashes
     where subExpressionHashes = hashesIn
           thisHash = hash x
 
-  Lam x e -> subExprHash thisHash subExpressionHashes
+  Lam _ x e -> subExprHash thisHash subExpressionHashes
     where (h, subExpressionHashes) = naiveHashNestedExplicit (L:path) e hashesIn
           thisHash                 = hash (x, h)
 
-  App f e -> subExprHash thisHash subExpressionHashes
+  App _ f e -> subExprHash thisHash subExpressionHashes
     where subExpressionHashes  = subExpressionHashesR
           (hL, subExpressionHashesL) =
             naiveHashNestedExplicit (Apl:path) f hashesIn
@@ -628,32 +628,32 @@ naiveHashNestedExplicit path expr hashesIn =
           thisHash                   = hash (hL, hR)
 
 naiveHashWithBinders :: (Ord a, Hashable a)
-                     => Expr a -> [(Hash, Path, Expr a)]
+                     => Expr h a -> [(Hash, Path, Expr h a)]
 naiveHashWithBinders e = exprs
   where (_h, _depth, exprs) = naiveHashWithBindersExplicit [] Map.empty [] e
 
 naiveHashWithBindersExplicit :: (Ord a, Hashable a)
                              => Path
                              -> Map a Path
-                             -> [(Hash, Path, Expr a)]
-                             -> Expr a
-                             -> (Hash, Int, [(Hash, Path, Expr a)])
+                             -> [(Hash, Path, Expr h a)]
+                             -> Expr h a
+                             -> (Hash, Int, [(Hash, Path, Expr h a)])
 naiveHashWithBindersExplicit location env hashesIn expr = case expr of
-  Var x -> (hash', depth', l_ret)
+  Var _ x -> (hash', depth', l_ret)
     where hash' = hash $ case Map.lookup x env of
             Nothing -> hash ("free", x, depth')
             Just p  -> hash ("bound", p, depth')
           depth' = 0
           subExpressionHashes = hashesIn
           l_ret = (hash', location, expr) : subExpressionHashes
-  Lam x e -> (hash', depth', l_ret)
+  Lam _ x e -> (hash', depth', l_ret)
     where (hashE, depthE, subExpressionHashesE) =
             naiveHashWithBindersExplicit (L:location) (Map.insert x location env) hashesIn e
           hash' = hash ("lam", hashE, depth')
           depth' = depthE + 1
           subExpressionHashes = subExpressionHashesE
           l_ret = (hash', location, expr) : subExpressionHashes
-  App f e -> (hash', depth', l_ret)
+  App _ f e -> (hash', depth', l_ret)
     where (hashF, depthF, subExpressionHashesF) =
             naiveHashWithBindersExplicit (Apl:location) env hashesIn f
           (hashE, depthE, subExpressionHashesE) =
@@ -664,25 +664,25 @@ naiveHashWithBindersExplicit location env hashesIn expr = case expr of
           l_ret = (hash', location, expr) : subExpressionHashes
 
 naiveHashWithBinders2 :: (Ord a, Hashable a)
-                     => Expr a -> [(Hash, Path, Expr a)]
+                     => Expr h a -> [(Hash, Path, Expr h a)]
 naiveHashWithBinders2 e = exprs
   where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty [] e
 
 naiveHashWithBinders2Explicit :: (Ord a, Hashable a)
                               => Path
                               -> Map a Path
-                              -> [(Hash, Path, Expr a)]
-                              -> Expr a
-                              -> (Hash, Int, [(Hash, Path, Expr a)])
+                              -> [(Hash, Path, Expr h a)]
+                              -> Expr h a
+                              -> (Hash, Int, [(Hash, Path, Expr h a)])
 naiveHashWithBinders2Explicit location env hashesIn expr = case expr of
-  Var x -> (hash', depth', l_ret)
+  Var _ x -> (hash', depth', l_ret)
     where hash' = hash $ case Map.lookup x env of
             Nothing -> hash ("free", x, depth')
             Just p  -> hash ("bound", p, depth')
           depth' = 0
           subExpressionHashes = hashesIn
           l_ret = (hash', location, expr) : subExpressionHashes
-  Lam x e -> (hash', depth', l_ret)
+  Lam _ x e -> (hash', depth', l_ret)
     where (hashE, depthE, subExpressionHashesE) =
             naiveHashWithBindersExplicit (L:location)
                                          (Map.insert x [] (Map.map (L:) env)) hashesIn e
@@ -690,7 +690,7 @@ naiveHashWithBinders2Explicit location env hashesIn expr = case expr of
           depth' = depthE + 1
           subExpressionHashes = subExpressionHashesE
           l_ret = (hash', location, expr) : subExpressionHashes
-  App f e -> (hash', depth', l_ret)
+  App _ f e -> (hash', depth', l_ret)
     where (hashF, depthF, subExpressionHashesF) =
             naiveHashWithBindersExplicit (Apl:location) (Map.map (Apl:) env) hashesIn f
           (hashE, depthE, subExpressionHashesE) =
@@ -713,7 +713,7 @@ normalizedGroupedEquivalentSubexpressions =
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'uniquifyBinders'
-alphaEquivalentAccordingToUniquifyBinders :: Ord a => Expr a -> Expr a -> Bool
+alphaEquivalentAccordingToUniquifyBinders :: Ord a => Expr () a -> Expr () a -> Bool
 alphaEquivalentAccordingToUniquifyBinders = (==) `on` uniquifyBinders
 
 testEverythingInFileStartingWith'prop_' :: IO Bool
@@ -726,23 +726,23 @@ prop_uniquifyBindersExamples :: Property
 prop_uniquifyBindersExamples = withTests 1 $ property $ do
   let b = Right -- "bound"
       f = Left  -- "free"
-      examples = [ (Lam "x"   (Var "x"),
-                    Lam (b 0) (Var (b 0)))
+      examples = [ (Lam () "x"   (Var () "x"),
+                    Lam () (b 0) (Var () (b 0)))
 
-                 , (Lam "x"   (Var "y"),
-                    Lam (b 0) (Var (f "y")))
+                 , (Lam () "x"   (Var () "y"),
+                    Lam () (b 0) (Var () (f "y")))
 
-                 , (Lam "x"   (Lam "y"   (Var "x")),
-                    Lam (b 0) (Lam (b 1) (Var (b 0))))
+                 , (Lam () "x"   (Lam () "y"   (Var () "x")),
+                    Lam () (b 0) (Lam () (b 1) (Var () (b 0))))
 
-                 , (Lam "x"   (Lam "x"   (Var "x")),
-                    Lam (b 0) (Lam (b 1) (Var (b 1))))
+                 , (Lam () "x"   (Lam () "x"   (Var () "x")),
+                    Lam () (b 0) (Lam () (b 1) (Var () (b 1))))
 
-                 , (Lam "x"   (App (Var "x")   (Var "x")),
-                    Lam (b 0) (App (Var (b 0)) (Var (b 0))))
+                 , (Lam () "x"   (App () (Var () "x")   (Var () "x")),
+                    Lam () (b 0) (App () (Var () (b 0)) (Var () (b 0))))
 
-                 , (App (Lam "x"   (Var "x"))   (Lam "x"   (Var "x")),
-                    App (Lam (b 0) (Var (b 0))) (Lam (b 1) (Var (b 1))))
+                 , (App () (Lam () "x"   (Var () "x"))   (Lam () "x"   (Var () "x")),
+                    App () (Lam () (b 0) (Var () (b 0))) (Lam () (b 1) (Var () (b 1))))
                  ]
 
   flip mapM_ examples $ \(expression, uniquified) ->
@@ -873,59 +873,59 @@ prop_fastMatches3 = withTests numRandomTests $ property $ do
   summary1 === summary2
 
 -- | Generates random expressions for testing
-genExprWithVarsTest :: MonadGen m => [v] -> m (Expr v)
+genExprWithVarsTest :: MonadGen m => [v] -> m (Expr () v)
 genExprWithVarsTest vars = genExprWithVars_vars
 -- Hedgehog has an example for exactly this use case!
 --
 -- http://hackage.haskell.org/package/hedgehog-1.0.2/docs/Hedgehog-Gen.html#v:recursive
   where genExprWithVars_vars = Gen.recursive
           Gen.choice
-          [ Var <$> Gen.element vars ]
-          [ Gen.subtermM genExprWithVars_vars (\e -> Lam <$> Gen.element vars <*> pure e)
-          , Gen.subterm2 genExprWithVars_vars genExprWithVars_vars App
+          [ Var () <$> Gen.element vars ]
+          [ Gen.subtermM genExprWithVars_vars (\e -> Lam () <$> Gen.element vars <*> pure e)
+          , Gen.subterm2 genExprWithVars_vars genExprWithVars_vars (App ())
           ]
 
 -- | Generates random expressions for benchmarking
-genExprWithVars :: MonadGen m => [v] -> m (Expr v)
+genExprWithVars :: MonadGen m => [v] -> m (Expr () v)
 genExprWithVars vars = do
   size <- Gen.int (Range.linear 0 2000)
   genExprWithVarsSize size vars
 
-genExprWithVarsSize :: MonadGen m => Int -> [v] -> m (Expr v)
+genExprWithVarsSize :: MonadGen m => Int -> [v] -> m (Expr () v)
 genExprWithVarsSize size vars =
   if size <= 0
-  then Var <$> Gen.element vars
+  then Var () <$> Gen.element vars
   else Gen.choice
        [ do sizeL <- Gen.int (Range.constant 0 size)
             let sizeR = size - sizeL
-            App <$> genExprWithVarsSize sizeL vars
-                <*> genExprWithVarsSize sizeR vars
-       , do Lam <$> Gen.element vars <*> genExprWithVarsSize (size - 1) vars
+            App () <$> genExprWithVarsSize sizeL vars
+                   <*> genExprWithVarsSize sizeR vars
+       , do Lam () <$> Gen.element vars <*> genExprWithVarsSize (size - 1) vars
        ]
 
 -- | Generate expressions that are completely unbalanced, for
 -- benchmarking the worst cases of some of our hashing algorithms.
-genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr a)
+genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr () a)
 genExprWithVarsLinear vars = do
   size <- Gen.int (Range.linear 0 2000)
   genExprWithVarsLinearSize size vars
 
-genExprWithVarsLinearSize :: MonadGen m => Int -> [a] -> m (Expr a)
+genExprWithVarsLinearSize :: MonadGen m => Int -> [a] -> m (Expr () a)
 genExprWithVarsLinearSize size vars =
   if size <= 0
-  then Var <$> Gen.element vars
-  else App <$> (Lam <$> Gen.element vars <*> e)
-           <*> (Var <$> Gen.element vars)
+  then Var () <$> Gen.element vars
+  else App () <$> (Lam () <$> Gen.element vars <*> e)
+              <*> (Var () <$> Gen.element vars)
   where e = genExprWithVarsLinearSize (size -1) vars
 
 -- | Generates random expressions for testing
-genExpr :: MonadGen m => m (Expr Char)
+genExpr :: MonadGen m => m (Expr () Char)
 genExpr = genExprWithVarsTest ['u'..'z']
 
-genExprNumVars :: MonadGen m => Int -> m (Expr String)
+genExprNumVars :: MonadGen m => Int -> m (Expr () String)
 genExprNumVars n = genExprWithVars (map show [1..n])
 
-genExprLinearNumVars :: MonadGen m => Int -> m (Expr String)
+genExprLinearNumVars :: MonadGen m => Int -> m (Expr () String)
 genExprLinearNumVars n = genExprWithVarsLinear (map show [1..n])
 
 -- | Shows equivalence of castHash hash and castHashOptimized hash

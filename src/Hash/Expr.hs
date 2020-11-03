@@ -13,17 +13,17 @@ import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 
 -- | Simple lambda expression type
-data Expr a =
-    Var a
-  | Lam a (Expr a)
-  | App (Expr a) (Expr a)
+data Expr h a =
+    Var h a
+  | Lam h a (Expr h a)
+  | App h (Expr h a) (Expr h a)
   deriving (Functor, Show, Read, Eq)
 
-exprSize :: Expr a -> Int
+exprSize :: Expr h a -> Int
 exprSize = \case
-  Var _ -> 1
-  Lam _ e -> 1 + exprSize e
-  App f x -> 1 + exprSize f + exprSize x
+  Var _ _ -> 1
+  Lam _ _ e -> 1 + exprSize e
+  App _ f x -> 1 + exprSize f + exprSize x
 
 showPath :: Path -> String
 showPath = concatMap show . reverse
@@ -40,25 +40,25 @@ type Path = [Step]
 -- subexpression identification algorithms do their job regardless of
 -- well-typedness.
 
-showExpr :: Expr String -> String
+showExpr :: Expr h String -> String
 showExpr = \case
-  Var x   -> x
-  Lam x e -> "(lam " ++ x ++ " " ++ showExpr e ++ ")"
-  App f e -> "(" ++ showExpr f ++ " " ++ showExpr e ++ ")"
+  Var _ x   -> x
+  Lam _ x e -> "(lam " ++ x ++ " " ++ showExpr e ++ ")"
+  App _ f e -> "(" ++ showExpr f ++ " " ++ showExpr e ++ ")"
 
 -- | Render the Expr to Html.  The subtrees that occur at the end of
 -- any of the paths are colored.
-highlightedExprColor :: String -> [Path] -> Expr String -> H.Html
+highlightedExprColor :: String -> [Path] -> Expr h String -> H.Html
 highlightedExprColor color paths =
   if [] `elem` paths
   then highlight . H.toHtml . showExpr
   else \case
-    Var x   -> H.toHtml x
-    Lam x e -> do
+    Var _ x   -> H.toHtml x
+    Lam _ x e -> do
       H.toHtml ("(lam " ++ x ++ " ")
       recurse (\case { L:xs -> Just xs; _ -> Nothing }) e
       H.toHtml ")"
-    App f e -> do
+    App _ f e -> do
       H.toHtml "("
       recurse (\case { Apl:xs -> Just xs; _ -> Nothing }) f
       H.toHtml " "
@@ -70,57 +70,59 @@ highlightedExprColor color paths =
 
         recurse g = highlightedExprColor color (mapMaybe g paths)
 
-highlightedExpr :: [Path] -> Expr String -> H.Html
+highlightedExpr :: [Path] -> Expr h String -> H.Html
 highlightedExpr = highlightedExprColor "#bbbbff"
 
-example1 :: Expr String
-example1 = (Lam "x" (Var "x" .+ Var "x"))
-           `App`
-           (Lam "y" (Var "y" .+ Var "y"))
+app_ :: Expr () a -> Expr () a -> Expr () a
+app_ = App ()
 
-example2 :: Expr String
-example2 = Lam "x" ((Var "x" .+ Var "x")
-                    `App` (Lam "x" (Var "x" .+ Var "x"))
-                    `App` (Var "x" .+ Var "x"))
+example1 :: Expr () String
+example1 = (Lam () "x" (Var () "x" .+ Var () "x"))
+           `app_`
+           (Lam () "y" (Var () "y" .+ Var () "y"))
 
-example3 :: Expr String
-example3 = (Lam "x" (Var "x" .+ (Var "y" .+ Var "3")))
-           `App` (Var "y" .+ Var "3")
-           `App` (Lam "y" (Var "y" .+ Var "3"))
+example2 :: Expr () String
+example2 = Lam () "x" ((Var () "x" .+ Var () "x")
+                    `app_` (Lam () "x" (Var () "x" .+ Var () "x"))
+                    `app_` (Var () "x" .+ Var () "x"))
 
-example4 :: Expr String
-example4 = Lam "x" (sin_ (Var "x")
-                    .+ (Lam "y" (sin_ (Var "x") .+ Var "y")
-                         `App` Var "3"))
+example3 :: Expr () String
+example3 = (Lam () "x" (Var () "x" .+ (Var () "y" .+ Var () "3")))
+           `app_` (Var () "y" .+ Var () "3")
+           `app_` (Lam () "y" (Var () "y" .+ Var () "3"))
 
-example5 :: Expr String
-example5 = ((Var "x" .+ Var "1") .* Var "y")
+example4 :: Expr () String
+example4 = Lam () "x" (sin_ (Var () "x")
+                    .+ (Lam () "y" (sin_ (Var () "x") .+ Var () "y")
+                         `app_` Var () "3"))
+
+example5 :: Expr () String
+example5 = ((Var () "x" .+ Var () "1") .* Var () "y")
            ./
-           (Lam "tmp" (Expr.atan2 (Var "tmp") (Var "tmp" .* Var "y"))
-            `App`
-           (Var "x" .+ Var "1"))
+           (Lam () "tmp" (Expr.atan2 (Var () "tmp") (Var () "tmp" .* Var () "y"))
+            `app_`
+           (Var () "x" .+ Var () "1"))
 
+example6 :: Expr () String
+example6 = (Var () "x" .+ Var () "x") `app_` (Var () "x" .+ Var () "x")
 
-example6 :: Expr String
-example6 = (Var "x" .+ Var "x") `App` (Var "x" .+ Var "x")
+example7 :: Expr () String
+example7 = (Lam () "x" (Var () "x" .+ Var () "x")) `app_` (Lam () "x" (Var () "x" .+ Var () "x"))
 
-example7 :: Expr String
-example7 = (Lam "x" (Var "x" .+ Var "x")) `App` (Lam "x" (Var "x" .+ Var "x"))
+binOp :: String -> Expr () String -> Expr () String -> Expr () String
+binOp opName e1 e2 = Var () opName `app_` e1 `app_` e2
 
-binOp :: String -> Expr String -> Expr String -> Expr String
-binOp opName e1 e2 = Var opName `App` e1 `App` e2
-
-(.+) :: Expr String -> Expr String -> Expr String
+(.+) :: Expr () String -> Expr () String -> Expr () String
 (.+) = binOp "add"
 
-(.*) :: Expr String -> Expr String -> Expr String
+(.*) :: Expr () String -> Expr () String -> Expr () String
 (.*) = binOp "mul"
 
-(./) :: Expr String -> Expr String -> Expr String
+(./) :: Expr () String -> Expr () String -> Expr () String
 (./) = binOp "div"
 
-atan2 :: Expr String -> Expr String -> Expr String
+atan2 :: Expr () String -> Expr () String -> Expr () String
 atan2 = binOp "atan2"
 
-sin_ :: Expr String -> Expr String
-sin_ = (Var "sin" `App`)
+sin_ :: Expr () String -> Expr () String
+sin_ = (Var () "sin" `app_`)
