@@ -15,6 +15,7 @@ module Main where
 import Benchmark
 import Expr (exprSize, Expr)
 import Hash (castHashOptimized, deBruijnHash, deBruijnNestedHash, naiveHashNested, Hash)
+import qualified Hash
 
 import System.Environment (getArgs)
 
@@ -52,4 +53,5 @@ main = do
       print_stats_row deBruijnNestedHash
       print_stats_row castHashOptimized
     ["random"] -> Benchmark.benchmark
+    ["test"] -> Hash.testEverythingInFileStartingWith'prop_' >> pure ()
     _ -> putStrLn "Unsupported argument"
