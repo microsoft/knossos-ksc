@@ -134,8 +134,8 @@ castHashTop e = hash (Map.toList m, h)
   where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e
 
 castHash :: (Ord a, Hashable a)
-         => Expr h a -> [(Hash, Path, Expr () a)]
-castHash e = allHashResults e_
+         => Expr h a -> Expr Hash a
+castHash e = e_
   where (_, _, _, e_) = castHashExplicit [] Map.empty e
 
 -- | The implementation of the alpha-equivalence-respecting hashing
@@ -406,8 +406,8 @@ lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
                                          hashCombineRev
 
 castHashOptimized :: (Ord a, Hashable a)
-                  => Expr h a -> [(Hash, Path, Expr () a)]
-castHashOptimized e = allHashResults exprs
+                  => Expr h a -> Expr Hash a
+castHashOptimized e = exprs
   where (_m, _b, _depth, _subtreeSize, exprs) =
           castHashOptimizedExplicit ([], 1) Map.empty e
 
@@ -497,8 +497,8 @@ uniquifyBindersExplicit m n = \case
 
 -- | (Broken) DeBruijin Algorithm from "Finding Identical
 -- Subexpressions"
-deBruijnHash :: (Hashable a, Ord a) => Expr h a -> [(Hash, Path, Expr () a)]
-deBruijnHash expr = allHashResults es
+deBruijnHash :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
+deBruijnHash expr = es
   where (_, _, es) = deBruijnHashExplicit Map.empty [] expr
 
 deBruijnHashExplicit :: (Hashable a, Ord a)
@@ -529,8 +529,8 @@ dbAddVar v env = Map.insert v (Map.size env) env
 dbLookupVar :: Ord k => k -> Map k Int -> Maybe Int
 dbLookupVar v env = fmap (Map.size env -) (Map.lookup v env)
 
-combinedHash :: (Ord a, Hashable a) => Expr h a -> [(Hash, Path, Expr () a)]
-combinedHash expr = allHashResults es
+combinedHash :: (Ord a, Hashable a) => Expr h a -> Expr Hash a
+combinedHash expr = es
   where (_, _, _, es) = combinedHashExplicit Map.empty Map.empty [] expr
 
 -- | (Still broken) DeBruijn + free-var-hash algorithm from "Finding
@@ -584,8 +584,8 @@ naiveHash = \case
   Lam _ x e -> hash (x, naiveHash e)
   App _ f e -> hash (naiveHash f, naiveHash e)
 
-naiveHashNested :: Hashable a => Expr h a -> [(Hash, Path, Expr () a)]
-naiveHashNested e = allHashResults es
+naiveHashNested :: Hashable a => Expr h a -> Expr Hash a
+naiveHashNested e = es
   where (_, es) = naiveHashNestedExplicit [] e
 
 naiveHashNestedExplicit :: Hashable a
@@ -609,8 +609,8 @@ naiveHashNestedExplicit path expr =
           thisHash                   = hash (hL, hR)
 
 naiveHashWithBinders :: (Ord a, Hashable a)
-                     => Expr h a -> [(Hash, Path, Expr () a)]
-naiveHashWithBinders e = allHashResults exprs
+                     => Expr h a -> Expr Hash a
+naiveHashWithBinders e = exprs
   where (_h, _depth, exprs) = naiveHashWithBindersExplicit [] Map.empty e
 
 naiveHashWithBindersExplicit :: (Ord a, Hashable a)
@@ -638,8 +638,8 @@ naiveHashWithBindersExplicit location env expr = case expr of
           depth' = max depthF depthE + 1
 
 naiveHashWithBinders2 :: (Ord a, Hashable a)
-                     => Expr h a -> [(Hash, Path, Expr () a)]
-naiveHashWithBinders2 e = allHashResults exprs
+                     => Expr h a -> Expr Hash a
+naiveHashWithBinders2 e = exprs
   where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty e
 
 naiveHashWithBinders2Explicit :: (Ord a, Hashable a)
@@ -719,7 +719,7 @@ prop_uniquifyBindersExamples = withTests 1 $ property $ do
 -- examples
 prop_compareSubExpressionHashes :: Property
 prop_compareSubExpressionHashes = withTests 1 $ property $ do
-  let n = normalizedGroupedEquivalentSubexpressions
+  let n = normalizedGroupedEquivalentSubexpressions . allHashResults
 
   n (castHash example1) === n (combinedHash example1)
   n (castHash example2) === n (combinedHash example2)
@@ -734,7 +734,7 @@ prop_compareSubExpressionHashes = withTests 1 $ property $ do
 -- easily.
 prop_stablePaths :: Property
 prop_stablePaths = withTests numRandomTests $ property $ do
-  let paths = map (\(_, path, _) -> path)
+  let paths = map (\(_, path, _) -> path) . allHashResults
 
   expr <- forAll genExpr
 
@@ -898,7 +898,7 @@ genExprLinearNumVars n = genExprWithVarsLinear (map show [1..n])
 -- | Shows equivalence of castHash hash and castHashOptimized hash
 xprop_equivCastFast :: Property
 xprop_equivCastFast = withTests numRandomTests $ property $ do
-  let n = normalizedGroupedEquivalentSubexpressions
+  let n = normalizedGroupedEquivalentSubexpressions . allHashResults
   expr <- forAll genExpr
   n (castHash expr) === n (castHashOptimized expr)
 

@@ -11,7 +11,8 @@ import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, Path, exprSize)
 import Hash (Hash, castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested,
-             genExprNumVars {-, genExprLinearNumVars-})
+             genExprNumVars {-, genExprLinearNumVars-},
+             allHashResults)
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
@@ -52,7 +53,8 @@ benchmark = do
 
       r <- benchmarkOne samplesPerExpression
                         iterationsPerSample
-                        (seqHashResult . algorithm)
+                        -- TODO: Replace these with a top
+                        (seqHashResult . allHashResults . algorithm)
                         expression
 
       putStrLn ("Parameter set "

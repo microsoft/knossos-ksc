@@ -2,7 +2,8 @@ module CompareBehaviour where
 
 import Hash (castHash,castHashOptimized,combinedHash,deBruijnHash,
              naiveHashWithBinders, naiveHashWithBinders2,
-             normalizedGroupedEquivalentSubexpressions)
+             normalizedGroupedEquivalentSubexpressions,
+             allHashResults)
 import Expr (Expr, Path, showExpr,
              example1,example2,example3,example4,example5,example6,example7,
              highlightedExprColor, highlightedExpr, showPath)
@@ -66,7 +67,7 @@ awfFormatExpressionHTML e =
 
         (tom'sGroups, _) = groupsPerAlgorithm
 
-        groupsPerAlgorithm = mapRow (groupsOfAlgorithm . snd) algorithms
+        groupsPerAlgorithm = mapRow (groupsOfAlgorithm . (allHashResults .) . snd) algorithms
 
         allGroups = setFromIterator $ forEach (inRow groupsPerAlgorithm) inList
 
@@ -84,7 +85,7 @@ showMany =
     p (toHtml (expressionName ++ ": " ++ showExpr expression))
     forEach (inList algorithms) $ \(algorithmName, algorithm) -> do
         p (b (toHtml algorithmName))
-        showGroupsHTML algorithm expression
+        showGroupsHTML (allHashResults . algorithm) expression
 
   where examples   = [ ("Example 4", example4) ]
         algorithms = [ ("Compositional", castHash)
