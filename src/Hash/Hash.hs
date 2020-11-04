@@ -660,41 +660,39 @@ naiveHashWithBindersExplicit location env expr = case expr of
           depth' = max depthF depthE + 1
 
 naiveHashWithBinders2 :: (Ord a, Hashable a)
-                     => Expr h a -> [(Hash, Path, Expr h a)]
-naiveHashWithBinders2 e = exprs
-  where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty [] e
+                     => Expr h a -> [(Hash, Path, Expr () a)]
+naiveHashWithBinders2 e = f (allHashResults exprs)
+  where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty e
+        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+        -- Warning: This mapAnnotation is slow, but it isn't involved
+        -- in the benchmark and will likely disappear soon anyway.
+        -- The reverse is also a pain.
+        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 naiveHashWithBinders2Explicit :: (Ord a, Hashable a)
                               => Path
                               -> Map a Path
-                              -> [(Hash, Path, Expr h a)]
                               -> Expr h a
-                              -> (Hash, Int, [(Hash, Path, Expr h a)])
-naiveHashWithBinders2Explicit location env hashesIn expr = case expr of
-  Var _ x -> (hash', depth', l_ret)
+                              -> (Hash, Int, Expr Hash a)
+naiveHashWithBinders2Explicit location env expr = case expr of
+  Var _ x -> (hash', depth', Var hash' x)
     where hash' = hash $ case Map.lookup x env of
             Nothing -> hash ("free", x, depth')
             Just p  -> hash ("bound", p, depth')
           depth' = 0
-          subExpressionHashes = hashesIn
-          l_ret = (hash', location, expr) : subExpressionHashes
-  Lam _ x e -> (hash', depth', l_ret)
+  Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
     where (hashE, depthE, subExpressionHashesE) =
             naiveHashWithBinders2Explicit (L:location)
-                                         (Map.insert x [] (Map.map (L:) env)) hashesIn e
+                                         (Map.insert x [] (Map.map (L:) env)) e
           hash' = hash ("lam", hashE, depth')
           depth' = depthE + 1
-          subExpressionHashes = subExpressionHashesE
-          l_ret = (hash', location, expr) : subExpressionHashes
-  App _ f e -> (hash', depth', l_ret)
+  App _ f e -> (hash', depth', App hash' subExpressionHashesF subExpressionHashesE)
     where (hashF, depthF, subExpressionHashesF) =
-            naiveHashWithBinders2Explicit (Apl:location) (Map.map (Apl:) env) hashesIn f
+            naiveHashWithBinders2Explicit (Apl:location) (Map.map (Apl:) env) f
           (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBinders2Explicit (Apr:location) (Map.map (Apr:) env) subExpressionHashesF e
+            naiveHashWithBinders2Explicit (Apr:location) (Map.map (Apr:) env) e
           hash' = hash ("app", hashF, hashE, depth')
-          subExpressionHashes = subExpressionHashesE
           depth' = max depthF depthE + 1
-          l_ret = (hash', location, expr) : subExpressionHashes
 
 
 
