@@ -123,12 +123,32 @@ type Hash = Int
 -- compositional, not this single hash value.
 castHashTop :: (Ord a, Hashable a) => Expr h a -> Hash
 castHashTop e = hash (Map.toList m, h)
-  where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e []
+  where (m, h, _depth, _exprs) = (m_, h_, i_, f (allHashResults e_) ++ extra)
+        path = []
+        bvEnv = Map.empty
+        expr = e
+        extra = []
+        (m_, h_, i_, e_) = castHashExplicit_replacement path bvEnv expr
+        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+        -- Warning: This mapAnnotation is slow, but it isn't involved
+        -- in the benchmark and will likely disappear soon anyway.
+        -- The reverse is also a pain.
+        f = map (\(h__, p, es) -> (h__, reverse p, mapAnnotation (const ()) es))
 
 castHash :: (Ord a, Hashable a)
          => Expr h a -> [(Hash, Path, Expr () a)]
 castHash e = exprs
-  where (_m, _h, _depth, exprs) = castHashExplicit [] Map.empty e []
+  where (_m, _h, _depth, exprs) = (m_, h_, i_, f (allHashResults e_) ++ extra)
+        path = []
+        bvEnv = Map.empty
+        expr = e
+        extra = []
+        (m_, h_, i_, e_) = castHashExplicit_replacement path bvEnv expr
+        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+        -- Warning: This mapAnnotation is slow, but it isn't involved
+        -- in the benchmark and will likely disappear soon anyway.
+        -- The reverse is also a pain.
+        f = map (\(h__, p, es) -> (h__, reverse p, mapAnnotation (const ()) es))
 
 -- | The implementation of the alpha-equivalence-respecting hashing
 -- function.
@@ -201,21 +221,6 @@ castHash e = exprs
 --
 -- (*) the map operations are actually logarithmic, not constant, but
 -- we probably don't care about that.
-castHashExplicit :: (Ord a, Hashable a)
-                 => Path
-                 -> Map a Path
-                 -> Expr ignored a
-                 -> [(Hash, Path, Expr () a)]
-                 -> (Map a Hash, Hash, Int, [(Hash, Path, Expr () a)])
-castHashExplicit path bvEnv expr extra =
-  let (m, h, i, e) = castHashExplicit_replacement path bvEnv expr
-      allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-      -- Warning: This mapAnnotation is slow, but it isn't involved
-      -- in the benchmark and will likely disappear soon anyway.
-      -- The reverse is also a pain.
-      f = map (\(h_, p, es) -> (h_, reverse p, mapAnnotation (const ()) es))
-  in (m, h, i, f (allHashResults e) ++ extra)
-
 castHashExplicit_replacement :: (Ord a, Hashable a)
                  => Path
                  -> Map a Path
