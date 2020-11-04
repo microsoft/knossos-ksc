@@ -499,38 +499,36 @@ uniquifyBindersExplicit m n = \case
 
 -- | (Broken) DeBruijin Algorithm from "Finding Identical
 -- Subexpressions"
-deBruijnHash :: (Hashable a, Ord a) => Expr h a -> [(Hash, Path, Expr h a)]
-deBruijnHash expr = es
-  where (_, _, es) = deBruijnHashExplicit Map.empty [] [] expr
+deBruijnHash :: (Hashable a, Ord a) => Expr h a -> [(Hash, Path, Expr () a)]
+deBruijnHash expr = f (allHashResults es)
+  where (_, _, es) = deBruijnHashExplicit Map.empty [] expr
+        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+        -- Warning: This mapAnnotation is slow, but it isn't involved
+        -- in the benchmark and will likely disappear soon anyway.
+        -- The reverse is also a pain.
+        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 deBruijnHashExplicit :: (Hashable a, Ord a)
                      => Map.Map a Int
                      -> Path
-                     -> [(Hash, Path, Expr h a)]
                      -> Expr h a
-                     -> (Hash, Int, [(Hash, Path, Expr h a)])
-deBruijnHashExplicit = \env path hashesIn expr -> case expr of
-  Var _ x -> (hash', depth', l_ret)
+                     -> (Hash, Int, Expr Hash a)
+deBruijnHashExplicit = \env path expr -> case expr of
+  Var _ x -> (hash', depth', Var hash' x)
     where hash' = case dbLookupVar x env of
             Nothing -> hash ("free", x, depth')
             Just i  -> hash ("bound", i, depth')
           depth' = 0 :: Int
-          subExpressionHashes = hashesIn
-          l_ret = (hash', path, expr) : subExpressionHashes
-  Lam _ x e -> (hash', depth', l_ret)
+  Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
     where (!hashE, !depthE, subExpressionHashesE) =
-            deBruijnHashExplicit (dbAddVar x env) (L:path) hashesIn e
+            deBruijnHashExplicit (dbAddVar x env) (L:path) e
           depth' = depthE + 1
           hash' = hash ("lam", hashE, depth')
-          subExpressionHashes = subExpressionHashesE
-          l_ret = (hash', path, expr) : subExpressionHashes
-  App _ f e -> (hash', depth', l_ret)
-    where (!hashF, !depthF, lF) = deBruijnHashExplicit env (Apl:path) hashesIn f
-          (!hashE, !depthE, lE) = deBruijnHashExplicit env (Apr:path) lF e
+  App _ f e -> (hash', depth', App hash' lF lE)
+    where (!hashF, !depthF, lF) = deBruijnHashExplicit env (Apl:path) f
+          (!hashE, !depthE, lE) = deBruijnHashExplicit env (Apr:path) e
           depth' = max depthF depthE + 1
           hash'  = hash ("app", hashF, hashE, depth')
-          subExpressionHashes = lE
-          l_ret = (hash', path, expr) : subExpressionHashes
 
 dbAddVar :: Ord k => k -> Map k Int -> Map k Int
 dbAddVar v env = Map.insert v (Map.size env) env
