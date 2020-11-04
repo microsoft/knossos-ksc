@@ -113,6 +113,14 @@ hashExprOWithSalt = hashWithSalt
 
 type Hash = Int
 
+allHashResults :: Expr b a -> [(b, Path, Expr () a)]
+allHashResults = f . allHashResults_
+  where allHashResults_ = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+        -- Warning: This mapAnnotation is slow, but it isn't involved
+        -- in the benchmark and will likely disappear soon anyway.
+        -- The reverse is also a pain.
+        f = map (\(h__, p, es) -> (h__, reverse p, mapAnnotation (const ()) es))
+
 -- | A hashing function for expressions.  It respects
 -- alpha-equivalence, that is, expressions should have the same value
 -- under this function if and only if they are alpha-equivalent
@@ -127,13 +135,8 @@ castHashTop e = hash (Map.toList m, h)
 
 castHash :: (Ord a, Hashable a)
          => Expr h a -> [(Hash, Path, Expr () a)]
-castHash e = f (allHashResults e_)
+castHash e = allHashResults e_
   where (_, _, _, e_) = castHashExplicit_replacement [] Map.empty e
-        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-        -- Warning: This mapAnnotation is slow, but it isn't involved
-        -- in the benchmark and will likely disappear soon anyway.
-        -- The reverse is also a pain.
-        f = map (\(h__, p, es) -> (h__, reverse p, mapAnnotation (const ()) es))
 
 -- | The implementation of the alpha-equivalence-respecting hashing
 -- function.
@@ -404,14 +407,9 @@ lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
 
 castHashOptimized :: (Ord a, Hashable a)
                   => Expr h a -> [(Hash, Path, Expr () a)]
-castHashOptimized e = f (allHashResults exprs)
+castHashOptimized e = allHashResults exprs
   where (_m, _b, _depth, _subtreeSize, exprs) =
           castHashOptimizedExplicit_replacement ([], 1) Map.empty e
-        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-        -- Warning: This mapAnnotation is slow, but it isn't involved
-        -- in the benchmark and will likely disappear soon anyway.
-        -- The reverse is also a pain.
-        f = map (\(h__, p, es) -> (h__, reverse p, mapAnnotation (const ()) es))
 
 castHashOptimizedExplicit_replacement :: (Ord a, Hashable a)
                                       => (Path, Hash)
@@ -500,13 +498,8 @@ uniquifyBindersExplicit m n = \case
 -- | (Broken) DeBruijin Algorithm from "Finding Identical
 -- Subexpressions"
 deBruijnHash :: (Hashable a, Ord a) => Expr h a -> [(Hash, Path, Expr () a)]
-deBruijnHash expr = f (allHashResults es)
+deBruijnHash expr = allHashResults es
   where (_, _, es) = deBruijnHashExplicit Map.empty [] expr
-        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-        -- Warning: This mapAnnotation is slow, but it isn't involved
-        -- in the benchmark and will likely disappear soon anyway.
-        -- The reverse is also a pain.
-        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 deBruijnHashExplicit :: (Hashable a, Ord a)
                      => Map.Map a Int
@@ -537,13 +530,8 @@ dbLookupVar :: Ord k => k -> Map k Int -> Maybe Int
 dbLookupVar v env = fmap (Map.size env -) (Map.lookup v env)
 
 combinedHash :: (Ord a, Hashable a) => Expr h a -> [(Hash, Path, Expr () a)]
-combinedHash expr = f (allHashResults es)
+combinedHash expr = allHashResults es
   where (_, _, _, es) = combinedHashExplicit Map.empty Map.empty [] expr
-        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-        -- Warning: This mapAnnotation is slow, but it isn't involved
-        -- in the benchmark and will likely disappear soon anyway.
-        -- The reverse is also a pain.
-        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 -- | (Still broken) DeBruijn + free-var-hash algorithm from "Finding
 -- Identical Subexpressions"
@@ -597,13 +585,8 @@ naiveHash = \case
   App _ f e -> hash (naiveHash f, naiveHash e)
 
 naiveHashNested :: Hashable a => Expr h a -> [(Hash, Path, Expr () a)]
-naiveHashNested e = f (allHashResults es)
+naiveHashNested e = allHashResults es
   where (_, es) = naiveHashNestedExplicit [] e
-        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-        -- Warning: This mapAnnotation is slow, but it isn't involved
-        -- in the benchmark and will likely disappear soon anyway.
-        -- The reverse is also a pain.
-        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 naiveHashNestedExplicit :: Hashable a
                         => Path
@@ -627,13 +610,8 @@ naiveHashNestedExplicit path expr =
 
 naiveHashWithBinders :: (Ord a, Hashable a)
                      => Expr h a -> [(Hash, Path, Expr () a)]
-naiveHashWithBinders e = f (allHashResults exprs)
+naiveHashWithBinders e = allHashResults exprs
   where (_h, _depth, exprs) = naiveHashWithBindersExplicit [] Map.empty e
-        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-        -- Warning: This mapAnnotation is slow, but it isn't involved
-        -- in the benchmark and will likely disappear soon anyway.
-        -- The reverse is also a pain.
-        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 naiveHashWithBindersExplicit :: (Ord a, Hashable a)
                              => Path
@@ -661,13 +639,8 @@ naiveHashWithBindersExplicit location env expr = case expr of
 
 naiveHashWithBinders2 :: (Ord a, Hashable a)
                      => Expr h a -> [(Hash, Path, Expr () a)]
-naiveHashWithBinders2 e = f (allHashResults exprs)
+naiveHashWithBinders2 e = allHashResults exprs
   where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty e
-        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
-        -- Warning: This mapAnnotation is slow, but it isn't involved
-        -- in the benchmark and will likely disappear soon anyway.
-        -- The reverse is also a pain.
-        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 naiveHashWithBinders2Explicit :: (Ord a, Hashable a)
                               => Path
