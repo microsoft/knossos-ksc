@@ -960,9 +960,11 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
   let castHash_groups = n (castHash expr)
       castHashOptimized_groups = n (castHashOptimized expr)
       spjLocallyNameless_groups = n (spjLocallyNameless expr)
+      deBruijnNestedHash_groups = n (deBruijnNestedHash expr)
 
   castHash_groups === castHashOptimized_groups
   castHash_groups === spjLocallyNameless_groups
+  castHash_groups === deBruijnNestedHash_groups
 
 prop_applyPrefix :: Property
 prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests
