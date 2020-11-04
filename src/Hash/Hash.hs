@@ -403,64 +403,15 @@ lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
                                          hashCombineRev
 
 castHashOptimized :: (Ord a, Hashable a)
-                  => Expr h a -> [(Hash, Path, Expr h a)]
-castHashOptimized e = exprs
+                  => Expr h a -> [(Hash, Path, Expr () a)]
+castHashOptimized e = f (allHashResults exprs)
   where (_m, _b, _depth, _subtreeSize, exprs) =
-          castHashOptimizedExplicit ([], 1) Map.empty e []
-
-castHashOptimizedExplicit :: (Ord a, Hashable a)
-                          => (Path, Hash)
-                          -> Map a Hash
-                          -> Expr h a
-                          -> [(Hash, Path, Expr h a)]
-                          -> (LazyMap a, Hash, Int, Int, [(Hash, Path, Expr h a)])
-castHashOptimizedExplicit =
-  let subExprHash_ (LazyMap _ sndVariablesHash) structureHash =
-        hash (sndVariablesHash, structureHash)
-
-  in \(path, pathHash) bvEnv expr hashesIn -> case expr of
-  Var _ x   -> (variablesHash, structureHash, 0, 1, hashes)
-    where variablesHash = lazyMapSingleton x (TwoHashes (hashExprO VarO)
-                                                    (hash (Map.lookup x bvEnv)))
-          structureHash = hashExprO VarO
-          subExprHash   = subExprHash_ variablesHash structureHash
-          subExprHashes = hashesIn
-          hashes        = (subExprHash, path, expr) : subExprHashes
-
-  Lam _ x e -> (variablesHash, structureHash, depth + 1, subtreeSize, hashes)
-    where variablesHash = lazyMapDelete x variablesHashE
-          structureHash = hashExprOWithSalt hashSalt (LamO hashX structureHashE)
-          (!variablesHashE, !structureHashE, !depth, !subtreeSizeE, subExprHashes) =
-            castHashOptimizedExplicit (L:path, hash (pathHash, L))
-                                      (Map.insert x pathHash bvEnv)
-                                      e
-                                      hashesIn
-          subtreeSize   = subtreeSizeE + 1
-          hashSalt      = hash (depth, lazyMapSize variablesHash)
-          subExprHash   = subExprHash_ variablesHash structureHash
-          hashes        = (subExprHash, path, expr) : subExprHashes
-          hashX         = fmap fst_ (lazyMapLookup x variablesHashE)
-            where fst_ (TwoHashes h _) = h
-
-  App _ f e ->
-    (variablesHash, structureHash, max depthF depthE + 1, subtreeSize, hashes)
-    where variablesHash = lazyMapsCombine variablesHashF variablesHashE subtreeSize
-
-          structureHash =
-            hashExprOWithSalt hashSalt
-                              (AppO (Just structureHashF) (Just structureHashE))
-
-          subtreeSize   = subtreeSizeF + subtreeSizeE + 1
-          hashSalt      = hash (hashWithSalt depthF depthE,
-                                lazyMapSize variablesHash)
-          subExprHashes = subExprHashesE
-          subExprHash   = subExprHash_ variablesHash structureHash
-          hashes        = (subExprHash, path, expr) : subExprHashes
-
-          (!variablesHashF, !structureHashF, !depthF, !subtreeSizeF, subExprHashesF)
-            = castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f hashesIn
-          (!variablesHashE, !structureHashE, !depthE, !subtreeSizeE, subExprHashesE)
-            = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e subExprHashesF
+          castHashOptimizedExplicit_replacement ([], 1) Map.empty e
+        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+        -- Warning: This mapAnnotation is slow, but it isn't involved
+        -- in the benchmark and will likely disappear soon anyway.
+        -- The reverse is also a pain.
+        f = map (\(h__, p, es) -> (h__, reverse p, mapAnnotation (const ()) es))
 
 castHashOptimizedExplicit_replacement :: (Ord a, Hashable a)
                                       => (Path, Hash)
