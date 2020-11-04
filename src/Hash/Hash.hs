@@ -131,12 +131,12 @@ allHashResults = f . allHashResults_
 -- compositional, not this single hash value.
 castHashTop :: (Ord a, Hashable a) => Expr h a -> Hash
 castHashTop e = hash (Map.toList m, h)
-  where (m, h, _depth, _exprs) = castHashExplicit_replacement [] Map.empty e
+  where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e
 
 castHash :: (Ord a, Hashable a)
          => Expr h a -> [(Hash, Path, Expr () a)]
 castHash e = allHashResults e_
-  where (_, _, _, e_) = castHashExplicit_replacement [] Map.empty e
+  where (_, _, _, e_) = castHashExplicit [] Map.empty e
 
 -- | The implementation of the alpha-equivalence-respecting hashing
 -- function.
@@ -209,12 +209,12 @@ castHash e = allHashResults e_
 --
 -- (*) the map operations are actually logarithmic, not constant, but
 -- we probably don't care about that.
-castHashExplicit_replacement :: (Ord a, Hashable a)
+castHashExplicit :: (Ord a, Hashable a)
                  => Path
                  -> Map a Path
                  -> Expr ignored a
                  -> (Map a Hash, Hash, Int, Expr Hash a)
-castHashExplicit_replacement =
+castHashExplicit =
   let subExprHash_ variablesHash structureHash bvEnv =
         hash (Map.toList variablesHash,
               structureHash,
@@ -232,7 +232,7 @@ castHashExplicit_replacement =
     where variablesHash = Map.delete x variablesHashE
           structureHash = hashExprOWithSalt depth (LamO hashX structureHashE)
           (variablesHashE, structureHashE, depth, subExpr) =
-            castHashExplicit_replacement (L:path) (addLocn x path bvEnv) e
+            castHashExplicit (L:path) (addLocn x path bvEnv) e
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
 
           hashX = Map.lookup x variablesHashE
@@ -252,9 +252,9 @@ castHashExplicit_replacement =
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
 
           (variablesHashF, structureHashF, depthF, subExprF) =
-            castHashExplicit_replacement (Apl:path) bvEnv f
+            castHashExplicit (Apl:path) bvEnv f
           (variablesHashE, structureHashE, depthE, subExprE) =
-            castHashExplicit_replacement (Apr:path) bvEnv e
+            castHashExplicit (Apr:path) bvEnv e
 
 
 -- | We have pairs of hashes in many places, so here's a type for that.
@@ -409,14 +409,14 @@ castHashOptimized :: (Ord a, Hashable a)
                   => Expr h a -> [(Hash, Path, Expr () a)]
 castHashOptimized e = allHashResults exprs
   where (_m, _b, _depth, _subtreeSize, exprs) =
-          castHashOptimizedExplicit_replacement ([], 1) Map.empty e
+          castHashOptimizedExplicit ([], 1) Map.empty e
 
-castHashOptimizedExplicit_replacement :: (Ord a, Hashable a)
-                                      => (Path, Hash)
-                                      -> Map a Hash
-                                      -> Expr h a
-                                      -> (LazyMap a, Hash, Int, Int, Expr Hash a)
-castHashOptimizedExplicit_replacement =
+castHashOptimizedExplicit :: (Ord a, Hashable a)
+                          => (Path, Hash)
+                          -> Map a Hash
+                          -> Expr h a
+                          -> (LazyMap a, Hash, Int, Int, Expr Hash a)
+castHashOptimizedExplicit =
   let subExprHash_ (LazyMap _ sndVariablesHash) structureHash =
         hash (sndVariablesHash, structureHash)
 
@@ -431,7 +431,7 @@ castHashOptimizedExplicit_replacement =
     where variablesHash = lazyMapDelete x variablesHashE
           structureHash = hashExprOWithSalt hashSalt (LamO hashX structureHashE)
           (!variablesHashE, !structureHashE, !depth, !subtreeSizeE, subExprHashes) =
-            castHashOptimizedExplicit_replacement (L:path, hash (pathHash, L))
+            castHashOptimizedExplicit (L:path, hash (pathHash, L))
                                                   (Map.insert x pathHash bvEnv)
                                                   e
           subtreeSize   = subtreeSizeE + 1
@@ -454,9 +454,9 @@ castHashOptimizedExplicit_replacement =
           subExprHash   = subExprHash_ variablesHash structureHash
 
           (!variablesHashF, !structureHashF, !depthF, !subtreeSizeF, subExprHashesF)
-            = castHashOptimizedExplicit_replacement (Apl:path, hash (pathHash, Apl)) bvEnv f
+            = castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f
           (!variablesHashE, !structureHashE, !depthE, !subtreeSizeE, subExprHashesE)
-            = castHashOptimizedExplicit_replacement (Apr:path, hash (pathHash, Apr)) bvEnv e
+            = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'castHashTop'
