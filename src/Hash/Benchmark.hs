@@ -158,6 +158,14 @@ benchmarkManyReadFileG filepaths samplesPerExpression iterationsElapsed algorith
     b <- benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm
     pure (b, extraData)
 
+readExpr :: Read e => FilePath -> IO e
+readExpr filepath = do
+  filecontents <- readFile filepath
+
+  case readMaybe filecontents of
+    Nothing   -> error ("Couldn't read the expression in " ++ filepath)
+    Just expr -> pure expr
+
 benchmarkOneReadFile :: Read e
                      => FilePath
                      -> Int
@@ -165,10 +173,7 @@ benchmarkOneReadFile :: Read e
                      -> (e -> r)
                      -> IO AggregateStatistics
 benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm = do
-  filecontents <- readFile filepath
-  expr <- case readMaybe filecontents of
-    Nothing   -> error ("Couldn't read the expression in " ++ filepath)
-    Just expr -> pure expr
+  expr <- readExpr filepath
 
   benchmarkOne samplesPerExpression iterationsElapsed algorithm expr
 
