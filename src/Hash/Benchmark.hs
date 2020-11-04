@@ -158,8 +158,11 @@ benchmarkManyReadFileG filepaths samplesPerExpression iterationsElapsed algorith
     b <- benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm
     pure (b, extraData)
 
-readExpr :: Read e => FilePath -> IO e
-readExpr filepath = do
+readExpr :: FilePath -> IO (Expr () String)
+readExpr = readExprG
+
+readExprG :: Read e => FilePath -> IO e
+readExprG filepath = do
   filecontents <- readFile filepath
 
   case readMaybe filecontents of
@@ -173,7 +176,7 @@ benchmarkOneReadFile :: Read e
                      -> (e -> r)
                      -> IO AggregateStatistics
 benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm = do
-  expr <- readExpr filepath
+  expr <- readExprG filepath
 
   benchmarkOne samplesPerExpression iterationsElapsed algorithm expr
 

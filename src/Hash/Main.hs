@@ -8,8 +8,6 @@
 --
 --    https://github.com/microsoft/knossos-ksc#compiling-the-ksc-executable
 
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Main where
 
 import Benchmark
@@ -29,25 +27,21 @@ process_stats aggregate_stats =
   let (_, mean, _, _, stddev) = Benchmark.stats aggregate_stats in (round mean, round stddev)
 
 print_expr_sizes :: [FilePath] -> IO ()
-print_expr_sizes paths =
-  let exprs :: IO [Expr () String] = sequence (map readExpr paths) in
-    fmap (map exprSize) exprs
-    >>= print
+print_expr_sizes paths = do
+  exprs <- traverse readExpr paths
+  print (map exprSize exprs)
 
 print_stats_row :: (Expr () String -> Expr Hash String) -> IO ()
-print_stats_row algorithm =
+print_stats_row algorithm = do
   let testcases = map (\path -> (path, ())) testcase_paths
-      result = Benchmark.benchmarkManyReadFile testcases 50 50 (seqHashResult . algorithm)
-  in
-    fmap (map (\(aggregate_stats, ()) -> process_stats aggregate_stats)) result
-    >>= print
-
+  result <- Benchmark.benchmarkManyReadFile testcases 50 50 (seqHashResult . algorithm)
+  print (map (\(aggregate_stats, ()) -> process_stats aggregate_stats) result)
 
 main :: IO ()
-main =
+main = do
   print testcase_names
-  >> print_expr_sizes testcase_paths
-  >> print_stats_row naiveHashNested
-  >> print_stats_row deBruijnHash
-  >> print_stats_row deBruijnNestedHash
-  >> print_stats_row castHashOptimized
+  print_expr_sizes testcase_paths
+  print_stats_row naiveHashNested
+  print_stats_row deBruijnHash
+  print_stats_row deBruijnNestedHash
+  print_stats_row castHashOptimized
