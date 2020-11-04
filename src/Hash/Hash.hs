@@ -596,32 +596,33 @@ naiveHash = \case
   Lam _ x e -> hash (x, naiveHash e)
   App _ f e -> hash (naiveHash f, naiveHash e)
 
-naiveHashNested :: Hashable a => Expr h a -> [(Hash, Path, Expr h a)]
-naiveHashNested e = snd (naiveHashNestedExplicit [] e [])
+naiveHashNested :: Hashable a => Expr h a -> [(Hash, Path, Expr () a)]
+naiveHashNested e = f (allHashResults es)
+  where (_, es) = naiveHashNestedExplicit [] e
+        allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+        -- Warning: This mapAnnotation is slow, but it isn't involved
+        -- in the benchmark and will likely disappear soon anyway.
+        -- The reverse is also a pain.
+        f = map (\(h__, p, es_) -> (h__, reverse p, mapAnnotation (const ()) es_))
 
 naiveHashNestedExplicit :: Hashable a
                         => Path
                         -> Expr h a
-                        -> [(Hash, Path, Expr h a)]
-                        -> (Hash, [(Hash, Path, Expr h a)])
-naiveHashNestedExplicit path expr hashesIn =
-  let subExprHash thisHash subExpressionHashes
-        = (thisHash, (thisHash, path, expr) : subExpressionHashes)
-  in case expr of
-  Var _ x   -> subExprHash thisHash subExpressionHashes
-    where subExpressionHashes = hashesIn
-          thisHash = hash x
+                        -> (Hash, Expr Hash a)
+naiveHashNestedExplicit path expr =
+  case expr of
+  Var _ x   -> (thisHash, Var thisHash x)
+    where thisHash = hash x
 
-  Lam _ x e -> subExprHash thisHash subExpressionHashes
-    where (h, subExpressionHashes) = naiveHashNestedExplicit (L:path) e hashesIn
+  Lam _ x e -> (thisHash, Lam thisHash x subExpressionHashes)
+    where (h, subExpressionHashes) = naiveHashNestedExplicit (L:path) e
           thisHash                 = hash (x, h)
 
-  App _ f e -> subExprHash thisHash subExpressionHashes
-    where subExpressionHashes  = subExpressionHashesR
-          (hL, subExpressionHashesL) =
-            naiveHashNestedExplicit (Apl:path) f hashesIn
+  App _ f e -> (thisHash, App thisHash subExpressionHashesL subExpressionHashesR)
+    where (hL, subExpressionHashesL) =
+            naiveHashNestedExplicit (Apl:path) f
           (hR, subExpressionHashesR) =
-            naiveHashNestedExplicit (Apr:path) e subExpressionHashesL
+            naiveHashNestedExplicit (Apr:path) e
           thisHash                   = hash (hL, hR)
 
 naiveHashWithBinders :: (Ord a, Hashable a)
