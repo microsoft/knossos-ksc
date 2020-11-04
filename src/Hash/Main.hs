@@ -8,11 +8,15 @@
 --
 --    https://github.com/microsoft/knossos-ksc#compiling-the-ksc-executable
 
+{-# LANGUAGE LambdaCase #-}
+
 module Main where
 
 import Benchmark
 import Expr (exprSize, Expr)
 import Hash (castHashOptimized, deBruijnHash, deBruijnNestedHash, naiveHashNested, Hash)
+
+import System.Environment (getArgs)
 
 
 testcase_names :: [String]
@@ -39,9 +43,13 @@ print_stats_row algorithm = do
 
 main :: IO ()
 main = do
-  print testcase_names
-  print_expr_sizes testcase_paths
-  print_stats_row naiveHashNested
-  print_stats_row deBruijnHash
-  print_stats_row deBruijnNestedHash
-  print_stats_row castHashOptimized
+  getArgs >>= \case
+    ["manual"] -> do
+      print testcase_names
+      print_expr_sizes testcase_paths
+      print_stats_row naiveHashNested
+      print_stats_row deBruijnHash
+      print_stats_row deBruijnNestedHash
+      print_stats_row castHashOptimized
+    ["random"] -> Benchmark.benchmark
+    _ -> putStrLn "Unsupported argument"
