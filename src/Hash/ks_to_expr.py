@@ -91,15 +91,15 @@ def convert_expr_list(exprs: List[ksc.Expr]) -> Term:
 
 def term_to_string(term: Term) -> (str, int):
     if isinstance(term, Var):
-        return f'Var "{term.name}"', 1
+        return f'Var () "{term.name}"', 1
     elif isinstance(term, Lam):
         body_str, body_size = term_to_string(term.body)
-        return f'Lam "{term.var_name}" ({body_str})', 1 + body_size
+        return f'Lam () "{term.var_name}" ({body_str})', 1 + body_size
     elif isinstance(term, App):
         left_str, left_size = term_to_string(term.left)
         right_str, right_size = term_to_string(term.right)
 
-        return f'App ({left_str}) ({right_str})', 1 + left_size + right_size
+        return f'App () ({left_str}) ({right_str})', 1 + left_size + right_size
     else:
         assert False, f"Unknown term type: {term}"
 
