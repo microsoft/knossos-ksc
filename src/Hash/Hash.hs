@@ -86,7 +86,8 @@ import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
-             example1, example2, example3, example4)
+             example1, example2, example3, example4,
+             allSubexprs, annotation, mapAnnotation)
 import qualified KATHash1
 import qualified KATHash2
 import qualified KATHash3
@@ -125,7 +126,7 @@ castHashTop e = hash (Map.toList m, h)
   where (m, h, _depth, _exprs) = castHashExplicit [] Map.empty e []
 
 castHash :: (Ord a, Hashable a)
-         => Expr h a -> [(Hash, Path, Expr h a)]
+         => Expr h a -> [(Hash, Path, Expr () a)]
 castHash e = exprs
   where (_m, _h, _depth, exprs) = castHashExplicit [] Map.empty e []
 
@@ -203,34 +204,48 @@ castHash e = exprs
 castHashExplicit :: (Ord a, Hashable a)
                  => Path
                  -> Map a Path
-                 -> Expr h a
-                 -> [(Hash, Path, Expr h a)]
-                 -> (Map a Hash, Hash, Int, [(Hash, Path, Expr h a)])
-castHashExplicit =
+                 -> Expr ignored a
+                 -> [(Hash, Path, Expr () a)]
+                 -> (Map a Hash, Hash, Int, [(Hash, Path, Expr () a)])
+castHashExplicit path bvEnv expr extra =
+  let (m, h, i, e) = castHashExplicit_replacement path bvEnv expr
+      allHashResults = fmap (\(p, se) -> (annotation se, p, se)) . allSubexprs
+      -- Warning: This mapAnnotation is slow, but it isn't involved
+      -- in the benchmark and will likely disappear soon anyway.
+      -- The reverse is also a pain.
+      f = map (\(h_, p, es) -> (h_, reverse p, mapAnnotation (const ()) es))
+  in (m, h, i, f (allHashResults e) ++ extra)
+
+castHashExplicit_replacement :: (Ord a, Hashable a)
+                 => Path
+                 -> Map a Path
+                 -> Expr ignored a
+                 -> (Map a Hash, Hash, Int, Expr Hash a)
+castHashExplicit_replacement =
   let subExprHash_ variablesHash structureHash bvEnv =
         hash (Map.toList variablesHash,
               structureHash,
               filter ((`elem` Map.keys variablesHash) . fst) (Map.toList bvEnv))
 
-  in \path bvEnv expr hashesIn -> case expr of
-  Var _ x   -> (variablesHash, structureHash, 0, hashes)
+  in \path bvEnv expr -> case expr of
+  Var _ x   -> (variablesHash, structureHash, 0,
+                Var subExprHash x)
     where variablesHash = Map.singleton x (hashExprO VarO)
           structureHash = hashExprO VarO
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
-          subExprHashes = hashesIn
-          hashes        = (subExprHash, path, expr) : subExprHashes
 
-  Lam _ x e -> (variablesHash, structureHash, depth + 1, hashes)
+  Lam _ x e -> (variablesHash, structureHash, depth + 1,
+                Lam subExprHash x subExpr)
     where variablesHash = Map.delete x variablesHashE
           structureHash = hashExprOWithSalt depth (LamO hashX structureHashE)
-          (variablesHashE, structureHashE, depth, subExprHashes) =
-            castHashExplicit (L:path) (addLocn x path bvEnv) e hashesIn
+          (variablesHashE, structureHashE, depth, subExpr) =
+            castHashExplicit_replacement (L:path) (addLocn x path bvEnv) e
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
-          hashes        = (subExprHash, path, expr) : subExprHashes
 
           hashX = Map.lookup x variablesHashE
 
-  App _ f e -> (variablesHash, structureHash, max depthF depthE + 1, hashes)
+  App _ f e -> (variablesHash, structureHash, max depthF depthE + 1,
+                App subExprHash subExprF subExprE)
     where variablesHash = mergeMaps (\case
                  LeftOnly  l   -> hashExprO (AppO (Just l) Nothing)
                  RightOnly r   -> hashExprO (AppO Nothing (Just r))
@@ -241,14 +256,12 @@ castHashExplicit =
             hashExprOWithSalt (hashWithSalt depthF depthE)
                              (AppO (Just structureHashF) (Just structureHashE))
 
-          subExprHashes = subExprHashesE
           subExprHash   = subExprHash_ variablesHash structureHash bvEnv
-          hashes        = (subExprHash, path, expr) : subExprHashes
 
-          (variablesHashF, structureHashF, depthF, subExprHashesF) =
-            castHashExplicit (Apl:path) bvEnv f hashesIn
-          (variablesHashE, structureHashE, depthE, subExprHashesE) =
-            castHashExplicit (Apr:path) bvEnv e subExprHashesF
+          (variablesHashF, structureHashF, depthF, subExprF) =
+            castHashExplicit_replacement (Apl:path) bvEnv f
+          (variablesHashE, structureHashE, depthE, subExprE) =
+            castHashExplicit_replacement (Apr:path) bvEnv e
 
 
 -- | We have pairs of hashes in many places, so here's a type for that.

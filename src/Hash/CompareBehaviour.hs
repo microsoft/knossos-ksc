@@ -32,7 +32,7 @@ awfFormatExpressionsHTML =
                       , ("Example 6", example6)
                       , ("Example 7", example7) ]
 
-awfFormatExpressionHTML :: Expr h String -> Html
+awfFormatExpressionHTML :: Expr () String -> Html
 awfFormatExpressionHTML e =
   table $ annotating tr $ \tr_ -> do
      tr_ $ annotating th $ \th_ -> do

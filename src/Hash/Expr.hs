@@ -6,6 +6,7 @@ module Expr where
 
 import Data.Hashable (Hashable)
 import GHC.Generics (Generic)
+import Control.Arrow (first)
 import Data.Maybe (mapMaybe)
 import Data.String (fromString)
 
@@ -33,6 +34,28 @@ data Step = Apl | Apr | L deriving (Generic, Show, Eq, Ord)
 instance Hashable Step where
 
 type Path = [Step]
+
+mapAnnotation :: (h -> h') -> Expr h a -> Expr h' a
+mapAnnotation f = \case
+  Var h a -> Var (f h) a
+  Lam h x e -> Lam (f h) x (mapAnnotation f e)
+  App h e1 e2 -> App (f h) (mapAnnotation f e1) (mapAnnotation f e2)
+
+-- I'm not convinced that fmapping the return value is better than
+-- passing down an accumulating path, but it is marginally easier to
+-- write.
+allSubexprs :: Expr h a -> [(Path, Expr h a)]
+allSubexprs e = ([], e) : case e of
+  Var _ _ -> []
+  Lam _ _ e' -> (map . first) (L:) (allSubexprs e')
+  App _ e1 e2 -> (map . first) (Apr:) (allSubexprs e2)
+                ++ (map . first) (Apl:) (allSubexprs e1)
+
+annotation :: Expr h a -> h
+annotation = \case
+  Var h _   -> h
+  Lam h _ _ -> h
+  App h _ _ -> h
 
 -- Example expressions from "Finding Identical Subexpressions"
 --
