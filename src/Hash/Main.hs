@@ -13,7 +13,7 @@
 module Main where
 
 import Benchmark
-import Expr (exprSize, Expr, Path)
+import Expr (exprSize, Expr)
 import Hash (castHashOptimized, deBruijnHash, deBruijnNestedHash, naiveHashNested, Hash)
 
 
@@ -30,11 +30,11 @@ process_stats aggregate_stats =
 
 print_expr_sizes :: [FilePath] -> IO ()
 print_expr_sizes paths =
-  let exprs :: IO [Expr String] = sequence (map readExpr paths) in
+  let exprs :: IO [Expr () String] = sequence (map readExpr paths) in
     fmap (map exprSize) exprs
     >>= print
 
-print_stats_row :: (Expr String -> [(Hash, Path, Expr a)]) -> IO ()
+print_stats_row :: (Expr () String -> Expr Hash String) -> IO ()
 print_stats_row algorithm =
   let testcases = map (\path -> (path, ())) testcase_paths
       result = Benchmark.benchmarkManyReadFile testcases 50 50 (seqHashResult . algorithm)

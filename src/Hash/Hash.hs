@@ -523,24 +523,22 @@ deBruijnHashExplicit = \env path expr -> case expr of
           depth' = max depthF depthE + 1
           hash'  = hash ("app", hashF, hashE, depth')
 
-deBruijnNestedHash :: (Hashable a, Ord a) => Expr a -> [(Hash, Path, Expr a)]
-deBruijnNestedHash expr = deBruijnNestedHashExplicit [] [] expr
+deBruijnNestedHash :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
+deBruijnNestedHash = deBruijnNestedHashExplicit []
 
 deBruijnNestedHashExplicit :: (Hashable a, Ord a)
                            => Path
-                           -> [(Hash, Path, Expr a)]
-                           -> Expr a
-                           -> [(Hash, Path, Expr a)]
-deBruijnNestedHashExplicit = \path hashesIn expr ->
-  let (hash', _, _) = head (deBruijnHash expr)
+                           -> Expr h a
+                           -> Expr Hash a
+deBruijnNestedHashExplicit = \path expr ->
+  let hash' = annotation (deBruijnHash expr)
       allHashes = case expr of
-        Var _ -> hashesIn
-        Lam _ e -> deBruijnNestedHashExplicit (L:path) hashesIn e
-        App f e ->
-          let lF = deBruijnNestedHashExplicit (Apl:path) hashesIn f in
-            deBruijnNestedHashExplicit (Apr:path) lF e
-  in
-    (hash', path, expr) : allHashes
+        Var _ x -> Var hash' x
+        Lam _ x e -> Lam hash' x (deBruijnNestedHashExplicit (L:path) e)
+        App _ f e ->
+          App hash' (deBruijnNestedHashExplicit (Apl:path) f)
+                    (deBruijnNestedHashExplicit (Apr:path) e)
+  in allHashes
 
 dbAddVar :: Ord k => k -> Map k Int -> Map k Int
 dbAddVar v env = Map.insert v (Map.size env) env
