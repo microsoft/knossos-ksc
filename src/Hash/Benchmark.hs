@@ -3,16 +3,15 @@
 module Benchmark where
 
 import qualified Hedgehog.Gen as Gen
-import Data.List (intercalate, foldl')
+import Data.List (intercalate)
 import qualified System.Clock as Clock
 import Text.Read (readMaybe)
 import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
 
-import Expr (Expr, Path, exprSize)
-import Hash (Hash, castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested,
-             genExprNumVars {-, genExprLinearNumVars-},
-             allHashResults)
+import Expr (Expr, exprSize)
+import Hash (castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested,
+             genExprNumVars {-, genExprLinearNumVars-})
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
@@ -53,8 +52,7 @@ benchmark = do
 
       r <- benchmarkOne samplesPerExpression
                         iterationsPerSample
-                        -- TODO: Replace these with a top
-                        (seqHashResult . allHashResults . algorithm)
+                        (seqHashResult . algorithm)
                         expression
 
       putStrLn ("Parameter set "
@@ -215,10 +213,8 @@ evaluate :: (e -> a) -> e -> IO ()
 evaluate a e = let !_ = a e
                      in return ()
 
-seqHashResult :: [(Hash, Path, Expr h a)] -> ()
-seqHashResult = let f a (hash, _path, _expr) =
-                      let !_ = hash in a
-                in foldl' f ()
+seqHashResult :: Expr h a -> ()
+seqHashResult = flip seq ()
 
 times :: Monad m => Int -> s -> (s -> m s) -> m s
 times n s f = times_f 0 s

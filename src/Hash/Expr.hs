@@ -15,9 +15,9 @@ import qualified Text.Blaze.Html5.Attributes as A
 
 -- | Simple lambda expression type
 data Expr h a =
-    Var h a
-  | Lam h a (Expr h a)
-  | App h (Expr h a) (Expr h a)
+    Var !h !a
+  | Lam !h !a !(Expr h a)
+  | App !h !(Expr h a) !(Expr h a)
   deriving (Functor, Show, Read, Eq)
 
 exprSize :: Expr h a -> Int
