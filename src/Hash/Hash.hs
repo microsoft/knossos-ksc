@@ -682,7 +682,7 @@ naiveHashWithBinders2Explicit location env hashesIn expr = case expr of
           l_ret = (hash', location, expr) : subExpressionHashes
   Lam _ x e -> (hash', depth', l_ret)
     where (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBindersExplicit (L:location)
+            naiveHashWithBinders2Explicit (L:location)
                                          (Map.insert x [] (Map.map (L:) env)) hashesIn e
           hash' = hash ("lam", hashE, depth')
           depth' = depthE + 1
@@ -690,9 +690,9 @@ naiveHashWithBinders2Explicit location env hashesIn expr = case expr of
           l_ret = (hash', location, expr) : subExpressionHashes
   App _ f e -> (hash', depth', l_ret)
     where (hashF, depthF, subExpressionHashesF) =
-            naiveHashWithBindersExplicit (Apl:location) (Map.map (Apl:) env) hashesIn f
+            naiveHashWithBinders2Explicit (Apl:location) (Map.map (Apl:) env) hashesIn f
           (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBindersExplicit (Apr:location) (Map.map (Apr:) env) subExpressionHashesF e
+            naiveHashWithBinders2Explicit (Apr:location) (Map.map (Apr:) env) subExpressionHashesF e
           hash' = hash ("app", hashF, hashE, depth')
           subExpressionHashes = subExpressionHashesE
           depth' = max depthF depthE + 1
