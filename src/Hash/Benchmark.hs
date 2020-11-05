@@ -103,6 +103,10 @@ benchmark = do
       , pdStyle = varCountSymbol
       }
 
+  makeGnuplot benchmarksDir results
+
+makeGnuplot :: FilePath -> [PlotDataset] -> IO ()
+makeGnuplot benchmarksDir results = do
   let gnuplotFilename    = benchmarksDir ++ "/benchmarks.gnuplot"
       gnuplotPngFilename = benchmarksDir ++ "/benchmarks-png.gnuplot"
 
