@@ -26,19 +26,19 @@ data BenchmarkConfig = BenchmarkConfig
 -- displayed at the end of the run.
 benchmark :: IO ()
 benchmark = do
-  let --bc = BenchmarkConfig
-      --  { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
-      --  , bcTotalExpressions     = 100
-      --  , bcSamplesPerExpression = 20
-      --  , bcIterationsPerSample  = 20
-      --  }
-
-      bc = BenchmarkConfig
-        { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
-        , bcTotalExpressions     = 1000
-        , bcSamplesPerExpression = 20
-        , bcIterationsPerSample  = 20
-        }
+  let bcs = [ BenchmarkConfig
+              { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
+              , bcTotalExpressions     = 10
+              , bcSamplesPerExpression = 20
+              , bcIterationsPerSample  = 20
+              }
+            , BenchmarkConfig
+              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
+              , bcTotalExpressions     = 10
+              , bcSamplesPerExpression = 20
+              , bcIterationsPerSample  = 20
+              }
+            ]
 
       algorithms = [ -- Hash.deBruijnNestedHash is slower than
                      -- Hash.spjLocallyNameless so we don't need it
@@ -56,8 +56,8 @@ benchmark = do
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
-  results <- benchmarkThis benchmarksDir algorithms varCounts bc
-  makeGnuplot benchmarksDir results
+  results <- mapM (benchmarkThis benchmarksDir algorithms varCounts) bcs
+  mapM_ (makeGnuplot benchmarksDir) results
 
 benchmarkThis :: FilePath
               -> [(String, Expr () String -> Expr hash string, String)]
