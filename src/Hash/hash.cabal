@@ -51,4 +51,4 @@ executable hash
                        blaze-html,
                        microlens
   default-language:    Haskell2010
-  ghc-options: -Werror -Wall
+  ghc-options: -Werror -Wall -O2
