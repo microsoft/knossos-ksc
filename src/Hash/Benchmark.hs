@@ -197,6 +197,9 @@ gnuplotFile :: [((String, b, String), (Int, String), String)] -> String
 gnuplotFile results =
   unlines [ "set xlabel \"Number of nodes in expression\""
           , "set ylabel \"Time taken to hash all subexpressions / us"
+          , "set logscale xy 2"
+          , "set key left top"
+          , "set xrange [64:]"
           , "plot " ++ intercalate ", " (fmap plotComponent results)
           ]
 
