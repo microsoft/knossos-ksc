@@ -10,7 +10,7 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, exprSize)
-import Hash (castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested)
+import Hash (castHashOptimized, deBruijnHash,  naiveHashNested)
 import qualified Hash
 
 -- | This is the entry point to the module.  When run it will
@@ -29,10 +29,15 @@ benchmark = do
       iterationsPerSample  = 10
       genExpr = Gen.resize 15 . genExprNumVars
 
-      algorithms = [ ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
-                   , ("SPJ locally nameless", Hash.spjLocallyNameless, "dark-yellow")
-                   , ("Compositional", castHash,   "green")
-                   , ("Combined", combinedHash,    "blue")
+      algorithms = [ -- Hash.deBruijnNestedHash is slower than
+                     -- Hash.spjLocallyNameless so we don't need it
+                   --   ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
+                     ("SPJ locally nameless", Hash.spjLocallyNameless, "dark-yellow")
+                   -- castHash is slower than castHashOptimized so
+                   -- we don't need it
+                   -- , ("Compositional", castHash,   "green")
+                   -- combinedHash is slow and broken. We don't want it
+                   -- , ("Combined", combinedHash,    "blue")
                    , ("Compositional-Optimized", castHashOptimized,   "black")
                    , ("DeBruijn", deBruijnHash,    "red")
                    , ("Naive",    naiveHashNested, "orange") ]
