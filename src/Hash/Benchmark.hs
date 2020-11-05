@@ -10,8 +10,8 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory)
 
 import Expr (Expr, exprSize)
-import Hash (castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested,
-             genExprNumVars {-, genExprLinearNumVars-})
+import Hash (castHash, castHashOptimized, deBruijnHash, combinedHash, naiveHashNested)
+import qualified Hash
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
@@ -29,10 +29,12 @@ benchmark = do
       iterationsPerSample  = 10
       genExpr = Gen.resize 15 . genExprNumVars
 
-      algorithms = [ ("Compositional", castHash,   "green")
+      algorithms = [ ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
+                   , ("SPJ locally nameless", Hash.spjLocallyNameless, "dark-yellow")
+                   , ("Compositional", castHash,   "green")
+                   , ("Combined", combinedHash,    "blue")
                    , ("Compositional-Optimized", castHashOptimized,   "black")
                    , ("DeBruijn", deBruijnHash,    "red")
-                   , ("Combined", combinedHash,    "blue")
                    , ("Naive",    naiveHashNested, "orange") ]
 
       varCounts = [ (10, "1") {-, (100, "4")-} ]
