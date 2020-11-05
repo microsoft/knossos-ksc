@@ -7,7 +7,7 @@ import Data.List (intercalate)
 import qualified System.Clock as Clock
 import Text.Read (readMaybe)
 import Text.Printf (printf)
-import System.IO.Temp (createTempDirectory)
+import System.IO.Temp (createTempDirectory, emptyTempFile)
 
 import Expr (Expr, exprSize)
 import Hash (castHashOptimized, deBruijnHash,  naiveHashNested)
@@ -15,6 +15,7 @@ import qualified Hash
 
 data BenchmarkConfig = BenchmarkConfig
   { bcGenExpr              :: Int -> IO (Expr () String)
+  , bcGenName              :: String
   , bcTotalExpressions     :: Int
   , bcSamplesPerExpression :: Int
   , bcIterationsPerSample  :: Int
@@ -28,12 +29,14 @@ benchmark :: IO ()
 benchmark = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
+              , bcGenName = "unbalanced expressions"
               , bcTotalExpressions     = 10
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
+              , bcGenName = "balanced expressions"
               , bcTotalExpressions     = 10
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
@@ -56,8 +59,11 @@ benchmark = do
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
-  results <- mapM (benchmarkThis benchmarksDir algorithms varCounts) bcs
-  mapM_ (makeGnuplot benchmarksDir) results
+  results_genNames <- flip mapM bcs $ \bc -> do
+    results <- benchmarkThis benchmarksDir algorithms varCounts bc
+    pure (results, bcGenName bc)
+  flip mapM_ results_genNames $ \(results, genName) ->
+    makeGnuplot benchmarksDir genName results
 
 benchmarkThis :: FilePath
               -> [(String, Expr () String -> Expr hash string, String)]
@@ -100,7 +106,8 @@ benchmarkThis benchmarksDir algorithms varCounts bc = do
 
     let textOutput = flip concatMap results $ \(size, time) ->
           show size ++ " " ++  show time ++ "\n"
-        filename = benchmarksDir ++ "/" ++ algorithmName ++ show varCount ++ ".dat"
+
+    filename <- emptyTempFile benchmarksDir (algorithmName ++ show varCount ++ ".dat")
 
     writeFile filename textOutput
 
@@ -113,13 +120,13 @@ benchmarkThis benchmarksDir algorithms varCounts bc = do
 
   pure results
 
-makeGnuplot :: FilePath -> [PlotDataset] -> IO ()
-makeGnuplot benchmarksDir results = do
-  let gnuplotFilename    = benchmarksDir ++ "/benchmarks.gnuplot"
-      gnuplotPngFilename = benchmarksDir ++ "/benchmarks-png.gnuplot"
+makeGnuplot :: FilePath -> String -> [PlotDataset] -> IO ()
+makeGnuplot benchmarksDir xlabel results = do
+  gnuplotFilename <- emptyTempFile benchmarksDir "benchmarks.gnuplot"
+  gnuplotPngFilename <- emptyTempFile benchmarksDir "benchmarks-png.gnuplot"
 
-      gnuplotFileContent = gnuplotFile results
-      (outputPng, gnuplotPngFileContent) = gnuplotFilePng benchmarksDir results
+  let gnuplotFileContent = gnuplotFile xlabel results
+      (outputPng, gnuplotPngFileContent) = gnuplotFilePng benchmarksDir xlabel results
 
   writeFile gnuplotFilename gnuplotFileContent
   writeFile gnuplotPngFilename gnuplotPngFileContent
@@ -216,18 +223,19 @@ benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm =
   benchmarkOne samplesPerExpression iterationsElapsed algorithm expr
 
 gnuplotFilePng :: String
+               -> String
                -> [PlotDataset]
                -> (String, String)
-gnuplotFilePng benchmarksDir results = (outputPng, unlines [
+gnuplotFilePng benchmarksDir xlabel results = (outputPng, unlines [
     "set terminal pngcairo size 1024,768"
   , "set output \"" ++ outputPng ++ "\""
-  , gnuplotFile results
+  , gnuplotFile xlabel results
   ])
   where outputPng = benchmarksDir ++ "/benchmark.png"
 
-gnuplotFile :: [PlotDataset] -> String
-gnuplotFile results =
-  unlines [ "set xlabel \"Number of nodes in expression\""
+gnuplotFile :: String -> [PlotDataset] -> String
+gnuplotFile xlabel results =
+  unlines [ "set xlabel \"Number of nodes in expression (" ++ xlabel ++ ")\""
           , "set ylabel \"Time taken to hash all subexpressions / us"
           , "set logscale xy 2"
           , "set key left top"
@@ -236,10 +244,10 @@ gnuplotFile results =
           ]
 
 data PlotDataset = PlotDataset
-  { pdFile  :: String
-  , pdTitle :: String
-  , pdColor :: String
-  , pdStyle :: String
+  { pdFile   :: String
+  , pdTitle  :: String
+  , pdColor  :: String
+  , pdStyle  :: String
   }
 
 plotDataset :: PlotDataset -> String
