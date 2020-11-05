@@ -13,21 +13,32 @@ import Expr (Expr, exprSize)
 import Hash (castHashOptimized, deBruijnHash,  naiveHashNested)
 import qualified Hash
 
+data BenchmarkConfig a = BenchmarkConfig
+  { bcGenExpr              :: Int -> IO (Expr () String)
+  , bcTotalExpressions     :: Int
+  , bcSamplesPerExpression :: Int
+  , bcIterationsPerSample  :: Int
+  }
+
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
 -- from the run will be written out to a directory whose name is
 -- displayed at the end of the run.
 benchmark :: IO ()
 benchmark = do
-  let -- totalExpressions     = 100
-      -- samplesPerExpression = 500
-      -- iterationsPerSample  = 20
-      -- genExpr = Gen.resize 2 . genExprLinearNumVars
+  let --bc = BenchmarkConfig
+      --  { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
+      --  , bcTotalExpressions     = 100
+      --  , bcSamplesPerExpression = 20
+      --  , bcIterationsPerSample  = 20
+      --  }
 
-      totalExpressions     = 10
-      samplesPerExpression = 10
-      iterationsPerSample  = 10
-      genExpr = Gen.resize 15 . genExprNumVars
+      bc = BenchmarkConfig
+        { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
+        , bcTotalExpressions     = 1000
+        , bcSamplesPerExpression = 20
+        , bcIterationsPerSample  = 20
+        }
 
       algorithms = [ -- Hash.deBruijnNestedHash is slower than
                      -- Hash.spjLocallyNameless so we don't need it
@@ -54,11 +65,11 @@ benchmark = do
   results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
     let (varCount, varCountSymbol) = var_
         (algorithmName, algorithm, algorithmColor) = algorithm_
-    results <- times totalExpressions [] $ \rest -> do
-      expression <- Gen.sample (genExpr varCount)
+    results <- times (bcTotalExpressions bc) [] $ \rest -> do
+      expression <- bcGenExpr bc varCount
 
-      r <- benchmarkOne samplesPerExpression
-                        iterationsPerSample
+      r <- benchmarkOne (bcSamplesPerExpression bc)
+                        (bcIterationsPerSample bc)
                         (seqHashResult . algorithm)
                         expression
 
@@ -66,7 +77,7 @@ benchmark = do
                  ++ show i ++ "/" ++ show (length allParams)
                  ++ " (" ++ algorithmName ++ ")")
       putStrLn ("Generated " ++ show (length rest)
-                ++ " out of " ++ show totalExpressions ++ " expressions")
+                ++ " out of " ++ show (bcTotalExpressions bc) ++ " expressions")
 
       let (n, mean, tmin, variance, stddev) = stats r
           showFloat = printf "%.0f" :: Double -> String
