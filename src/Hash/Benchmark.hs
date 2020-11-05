@@ -55,12 +55,19 @@ benchmark = do
 
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
-      allParams = (,) <$> algorithms <*> varCounts
+  benchmarksDir <- createTempDirectory "." "benchmarks"
+  benchmarkThis benchmarksDir algorithms varCounts bc
+
+benchmarkThis :: FilePath
+              -> [(String, Expr () String -> Expr hash string, String)]
+              -> [(Int, String)]
+              -> BenchmarkConfig
+              -> IO ()
+benchmarkThis benchmarksDir algorithms varCounts bc = do
+  let allParams = (,) <$> algorithms <*> varCounts
 
       enumFrom1 :: [a] -> [(Int, a)]
       enumFrom1 = zip [1..]
-
-  benchmarksDir <- createTempDirectory "." "benchmarks"
 
   results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
     let (varCount, varCountSymbol) = var_
