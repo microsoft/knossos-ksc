@@ -52,8 +52,8 @@ benchmark = do
   benchmarksDir <- createTempDirectory "." "benchmarks"
 
   results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
-    let (varCount, _) = var_
-        (algorithmName, algorithm, _) = algorithm_
+    let (varCount, varCountSymbol) = var_
+        (algorithmName, algorithm, algorithmColor) = algorithm_
     results <- times totalExpressions [] $ \rest -> do
       expression <- Gen.sample (genExpr varCount)
 
@@ -85,7 +85,12 @@ benchmark = do
 
     writeFile filename textOutput
 
-    return (algorithm_, var_, filename)
+    return PlotDataset
+      { pdFile  = filename
+      , pdTitle = algorithmName ++ " " ++ show varCount ++ " variables"
+      , pdColor = algorithmColor
+      , pdStyle = varCountSymbol
+      }
 
   let gnuplotFilename    = benchmarksDir ++ "/benchmarks.gnuplot"
       gnuplotPngFilename = benchmarksDir ++ "/benchmarks-png.gnuplot"
@@ -188,7 +193,7 @@ benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm =
   benchmarkOne samplesPerExpression iterationsElapsed algorithm expr
 
 gnuplotFilePng :: String
-               -> [((String, b, String), (Int, String), String)]
+               -> [PlotDataset]
                -> (String, String)
 gnuplotFilePng benchmarksDir results = (outputPng, unlines [
     "set terminal pngcairo size 1024,768"
@@ -197,28 +202,15 @@ gnuplotFilePng benchmarksDir results = (outputPng, unlines [
   ])
   where outputPng = benchmarksDir ++ "/benchmark.png"
 
-
-gnuplotFile :: [((String, b, String), (Int, String), String)] -> String
+gnuplotFile :: [PlotDataset] -> String
 gnuplotFile results =
   unlines [ "set xlabel \"Number of nodes in expression\""
           , "set ylabel \"Time taken to hash all subexpressions / us"
           , "set logscale xy 2"
           , "set key left top"
           , "set xrange [64:]"
-          , "plot " ++ intercalate ", " (fmap plotComponent results)
+          , "plot " ++ intercalate ", " (fmap plotDataset results)
           ]
-
-  where plotComponent ((algorithmName, _, algorithmColor),
-                       (varCount, varCountSymbol),
-                       filename) =
-          plotDataset PlotDataset
-            { pdFile  = filename
-            , pdTitle = title
-            , pdColor = algorithmColor
-            , pdStyle = varCountSymbol
-            }
-
-          where title = algorithmName ++ " " ++ show varCount ++ " variables"
 
 data PlotDataset = PlotDataset
   { pdFile  :: String
