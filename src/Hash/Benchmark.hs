@@ -208,18 +208,31 @@ gnuplotFile results =
           , "plot " ++ intercalate ", " (fmap plotComponent results)
           ]
 
-  where quote s = "\"" ++ s ++ "\""
-
-        plotComponent ((algorithmName, _, algorithmColor),
+  where plotComponent ((algorithmName, _, algorithmColor),
                        (varCount, varCountSymbol),
                        filename) =
-          intercalate " " [ quote filename
-                          , "title " ++ title
-                          , "lt rgb " ++ quote algorithmColor
-                          , "pt " ++ varCountSymbol ]
+          plotDataset PlotDataset
+            { pdFile  = filename
+            , pdTitle = title
+            , pdColor = algorithmColor
+            , pdStyle = varCountSymbol
+            }
 
-          where title = quote (algorithmName ++ " "
-                               ++ show varCount ++ " variables")
+          where title = algorithmName ++ " " ++ show varCount ++ " variables"
+
+data PlotDataset = PlotDataset
+  { pdFile  :: String
+  , pdTitle :: String
+  , pdColor :: String
+  , pdStyle :: String
+  }
+
+plotDataset :: PlotDataset -> String
+plotDataset pd = intercalate " " [ quote (pdFile pd)
+                                 , "title " ++ quote (pdTitle pd)
+                                 , "lt rgb " ++ quote (pdColor pd)
+                                 , "pt " ++ pdStyle pd ]
+  where quote s = "\"" ++ s ++ "\""
 
 -- We apply the argument to the function here.  If we do it at the
 -- call site then GHC may float it outside of the timing loop!
