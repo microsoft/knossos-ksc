@@ -56,13 +56,14 @@ benchmark = do
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
-  benchmarkThis benchmarksDir algorithms varCounts bc
+  results <- benchmarkThis benchmarksDir algorithms varCounts bc
+  makeGnuplot benchmarksDir results
 
 benchmarkThis :: FilePath
               -> [(String, Expr () String -> Expr hash string, String)]
               -> [(Int, String)]
               -> BenchmarkConfig
-              -> IO ()
+              -> IO [PlotDataset]
 benchmarkThis benchmarksDir algorithms varCounts bc = do
   let allParams = (,) <$> algorithms <*> varCounts
 
@@ -110,7 +111,7 @@ benchmarkThis benchmarksDir algorithms varCounts bc = do
       , pdStyle = varCountSymbol
       }
 
-  makeGnuplot benchmarksDir results
+  pure results
 
 makeGnuplot :: FilePath -> [PlotDataset] -> IO ()
 makeGnuplot benchmarksDir results = do
