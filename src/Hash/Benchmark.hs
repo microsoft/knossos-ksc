@@ -13,7 +13,7 @@ import Expr (Expr, exprSize)
 import Hash (castHashOptimized, deBruijnHash,  naiveHashNested)
 import qualified Hash
 
-data BenchmarkConfig a = BenchmarkConfig
+data BenchmarkConfig = BenchmarkConfig
   { bcGenExpr              :: Int -> IO (Expr () String)
   , bcTotalExpressions     :: Int
   , bcSamplesPerExpression :: Int
