@@ -40,7 +40,7 @@ removeFromVM :: (Hashable v, Ord v) => v -> VarMap v -> (VarMap v, Maybe Positio
 removeFromVM key vm@(VM entries existingHash)
   | Just pt <- Map.lookup key entries
   = (VM (key `Map.delete` entries) (existingHash `xor` entryHash key pt),
-     Map.lookup key entries)
+     Just pt)
   | otherwise
   = (vm, Nothing)
 
