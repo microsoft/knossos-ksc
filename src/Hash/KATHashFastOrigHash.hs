@@ -89,8 +89,7 @@ summariseExpr = \case
   App _ e1 e2 ->
     let (str1, map1, e1') = summariseExpr e1
         (str2, map2, e2') = summariseExpr e2
-        app_depth = --max (structureTag str1) (structureTag str2) + 1
-          hash (structureTag str1, 0 :: Int, structureTag str2, 0 :: Int)
+        app_depth = hash (structureTag str1, 0 :: Int, structureTag str2, 0 :: Int)
         tag = app_depth
         str = mkSApp tag left_bigger str1 str2
         vm = foldl' add_kv big_vm (toListVM small_vm)
