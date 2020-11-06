@@ -942,11 +942,15 @@ genExprWithVarsLinear vars = do
 
 genExprWithVarsLinearSize :: MonadGen m => Int -> [a] -> m (Expr () a)
 genExprWithVarsLinearSize size vars =
+  genExprWithVarsLinearSizeG size (Gen.element vars) (Gen.element vars)
+
+genExprWithVarsLinearSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
+genExprWithVarsLinearSizeG size vars binders =
   if size <= 0
-  then Var () <$> Gen.element vars
-  else App () <$> (Lam () <$> Gen.element vars <*> e)
-              <*> (Var () <$> Gen.element vars)
-  where e = genExprWithVarsLinearSize (size -1) vars
+  then Var () <$> vars
+  else App () <$> (Lam () <$> binders <*> e)
+              <*> (Var () <$> vars)
+  where e = genExprWithVarsLinearSizeG (size -1) vars binders
 
 -- | Generates random expressions for testing
 genExpr :: MonadGen m => m (Expr () Char)
