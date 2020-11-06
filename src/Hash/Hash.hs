@@ -938,10 +938,6 @@ genExprWithVarsSizeG size vars binders =
 genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr () a)
 genExprWithVarsLinear vars = do
   size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsLinearSize size vars
-
-genExprWithVarsLinearSize :: MonadGen m => Int -> [a] -> m (Expr () a)
-genExprWithVarsLinearSize size vars =
   genExprWithVarsLinearSizeG size (Gen.element vars) (Gen.element vars)
 
 genExprWithVarsLinearSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
