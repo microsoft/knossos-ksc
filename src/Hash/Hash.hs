@@ -977,6 +977,9 @@ genExprNumVars' n = genExprWithVars' [1..n] (n+1) (+1)
 genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
 genExprLinearNumVars n = genExprWithVarsLinear [1..n]
 
+genExprLinearNumVars' :: MonadGen m => Int -> m (Expr () Int)
+genExprLinearNumVars' n = genExprWithVarsLinear' [1..n] (n+1) (+1)
+
 -- | Shows equivalence of castHash hash and castHashOptimized hash
 prop_equivCastFast :: Property
 prop_equivCastFast = withTests numRandomTests $ property $ do

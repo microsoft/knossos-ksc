@@ -30,15 +30,29 @@ benchmark :: IO ()
 benchmark = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
-              , bcGenName = "unbalanced expressions"
+              , bcGenName = "unbalanced expressions (old generator)"
               , bcTotalExpressions     = 10
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
-              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
-              , bcGenName = "balanced expressions"
+              { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars'
+              , bcGenName = "unbalanced expressions (new generator)"
               , bcTotalExpressions     = 10
+              , bcSamplesPerExpression = 20
+              , bcIterationsPerSample  = 20
+              }
+            , BenchmarkConfig
+              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars'
+              , bcGenName = "balanced expressions (old generator)"
+              , bcTotalExpressions     = 100
+              , bcSamplesPerExpression = 20
+              , bcIterationsPerSample  = 20
+              }
+            , BenchmarkConfig
+              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
+              , bcGenName = "balanced expressions (new generator)"
+              , bcTotalExpressions     = 100
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
               }
