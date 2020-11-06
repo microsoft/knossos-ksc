@@ -60,19 +60,24 @@ benchmark = do
 
       totalExpressions = 100
 
+      veryBad   = "red"
+      prettyBad = "orange"
+      good      = "green"
+      baseline  = "blue"
+
       algorithms = [ -- Hash.deBruijnNestedHash is slower than
                      -- Hash.spjLocallyNameless so we don't need it
                    --   ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
-                     ("SPJ locally nameless", Hash.spjLocallyNameless, "dark-yellow")
+                     ("SPJ locally nameless", Hash.spjLocallyNameless, baseline)
                    -- castHash is slower than castHashOptimized so
                    -- we don't need it
                    -- , ("Compositional", castHash,   "green")
                    -- combinedHash is slow and broken. We don't want it
                    -- , ("Combined", combinedHash,    "blue")
                    , ("Compositional-Optimized", castHashOptimized,   "black")
-                   , ("KATHash as in paper", KATHashFastOrigHash.katHash,   "green")
-                   , ("DeBruijn", deBruijnHash,    "red")
-                   , ("Naive",    naiveHashNested, "orange") ]
+                   , ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
+                   , ("DeBruijn", deBruijnHash,    prettyBad)
+                   , ("Naive",    naiveHashNested, veryBad) ]
 
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
