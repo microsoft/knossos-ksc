@@ -902,10 +902,6 @@ genExprWithVarsTest vars = genExprWithVars_vars
 genExprWithVars :: MonadGen m => [v] -> m (Expr () v)
 genExprWithVars vars = do
   size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsSize size vars
-
-genExprWithVarsSize :: MonadGen m => Int -> [v] -> m (Expr () v)
-genExprWithVarsSize size vars =
   genExprWithVarsSizeG size (Gen.element vars) (Gen.element vars)
 
 genExprWithVarsSizeG :: MonadGen m => Int -> m v -> m v -> m (Expr () v)
