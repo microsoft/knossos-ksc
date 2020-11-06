@@ -31,32 +31,34 @@ benchmark = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
               , bcGenName = "unbalanced expressions (old generator)"
-              , bcTotalExpressions     = 10
+              , bcTotalExpressions     = totalExpressions
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars'
               , bcGenName = "unbalanced expressions (new generator)"
-              , bcTotalExpressions     = 10
+              , bcTotalExpressions     = totalExpressions
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars'
               , bcGenName = "balanced expressions (old generator)"
-              , bcTotalExpressions     = 100
+              , bcTotalExpressions     = totalExpressions
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
               , bcGenName = "balanced expressions (new generator)"
-              , bcTotalExpressions     = 100
+              , bcTotalExpressions     = totalExpressions
               , bcSamplesPerExpression = 20
               , bcIterationsPerSample  = 20
               }
             ]
+
+      totalExpressions = 100
 
       algorithms = [ -- Hash.deBruijnNestedHash is slower than
                      -- Hash.spjLocallyNameless so we don't need it
