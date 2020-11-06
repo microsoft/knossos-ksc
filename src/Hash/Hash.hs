@@ -946,11 +946,11 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
   let n = normalizedGroupedEquivalentSubexpressions . allHashResults
   expr <- forAll (fmap uniquifyBinders genExpr)
   let castHash_groups = n (castHash expr)
-      castHashOptimized_groups = n (castHashOptimized expr)
+      --castHashOptimized_groups = n (castHashOptimized expr)
       spjLocallyNameless_groups = n (spjLocallyNameless expr)
       deBruijnNestedHash_groups = n (deBruijnNestedHash expr)
 
-  castHash_groups === castHashOptimized_groups
+  --castHash_groups === castHashOptimized_groups
   castHash_groups === spjLocallyNameless_groups
   castHash_groups === deBruijnNestedHash_groups
 
