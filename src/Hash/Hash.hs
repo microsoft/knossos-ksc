@@ -905,15 +905,18 @@ genExprWithVars vars = do
   genExprWithVarsSize size vars
 
 genExprWithVarsSize :: MonadGen m => Int -> [v] -> m (Expr () v)
-genExprWithVarsSize size vars =
+genExprWithVarsSize size = genExprWithVarsSizeG size . Gen.element
+
+genExprWithVarsSizeG :: MonadGen m => Int -> m v -> m (Expr () v)
+genExprWithVarsSizeG size vars =
   if size <= 0
-  then Var () <$> Gen.element vars
+  then Var () <$> vars
   else Gen.choice
        [ do sizeL <- Gen.int (Range.constant 0 size)
             let sizeR = size - sizeL
-            App () <$> genExprWithVarsSize sizeL vars
-                   <*> genExprWithVarsSize sizeR vars
-       , do Lam () <$> Gen.element vars <*> genExprWithVarsSize (size - 1) vars
+            App () <$> genExprWithVarsSizeG sizeL vars
+                   <*> genExprWithVarsSizeG sizeR vars
+       , do Lam () <$> vars <*> genExprWithVarsSizeG (size - 1) vars
        ]
 
 -- | Generate expressions that are completely unbalanced, for
