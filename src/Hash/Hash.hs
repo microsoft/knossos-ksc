@@ -95,6 +95,7 @@ import qualified KATHash3
 import qualified KATHashFast
 import qualified KATHashFastOrig
 import qualified KATHashFastOrigHash
+import KATHashFastOrigHash (thenHash)
 import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
@@ -110,8 +111,8 @@ instance (Hashable v, Hashable expr) => Hashable (ExprO v expr)
 hashExprO :: ExprO (Maybe Hash) Hash -> Hash
 hashExprO = \case
   VarO -> 0
-  LamO v e   -> hash (1 :: Int, 0 :: Int, hash v, 0 :: Int, hash e, 0 :: Int)
-  AppO e1 e2 -> hash (2 :: Int, 0 :: Int, hash e1, 0 :: Int, hash e2, 0 :: Int)
+  LamO v e   -> hash (1 :: Int) `thenHash` v `thenHash` hash e
+  AppO e1 e2 -> hash (2 :: Int) `thenHash` e1 `thenHash` e2
 
 type Hash = Int
 
