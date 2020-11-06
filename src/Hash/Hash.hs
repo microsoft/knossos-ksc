@@ -74,6 +74,7 @@ module Hash where
 import Hedgehog hiding (Var)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+import Control.Monad.Trans.State
 import Data.Char (ord)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -903,6 +904,22 @@ genExprWithVars :: MonadGen m => [v] -> m (Expr () v)
 genExprWithVars vars = do
   size <- Gen.int (Range.linear 0 2000)
   genExprWithVarsSizeG size (Gen.element vars) (Gen.element vars)
+
+genExprWithVars' :: MonadGen m
+                 => [v] -> v -> (v -> v) -> m (Expr () v)
+genExprWithVars' inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
+  size <- Gen.int (Range.linear 0 2000)
+
+  let freshVar = do
+        (inScope', fresh') <- get
+        put (fresh':inScope', freshen fresh')
+        pure fresh'
+
+  let elementInScope = do
+        (inScope', _) <- get
+        Gen.element inScope'
+
+  genExprWithVarsSizeG size elementInScope freshVar
 
 genExprWithVarsSizeG :: MonadGen m => Int -> m v -> m v -> m (Expr () v)
 genExprWithVarsSizeG size vars binders =
