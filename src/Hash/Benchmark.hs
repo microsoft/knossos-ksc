@@ -12,6 +12,7 @@ import System.IO.Temp (createTempDirectory, emptyTempFile)
 import Expr (Expr, exprSize)
 import Hash (castHashOptimized, deBruijnHash,  naiveHashNested)
 import qualified Hash
+import qualified KATHashFastOrigHash
 
 data BenchmarkConfig = BenchmarkConfig
   { bcGenExpr              :: Int -> IO (Expr () String)
@@ -53,6 +54,7 @@ benchmark = do
                    -- combinedHash is slow and broken. We don't want it
                    -- , ("Combined", combinedHash,    "blue")
                    , ("Compositional-Optimized", castHashOptimized,   "black")
+                   , ("KATHash as in paper", KATHashFastOrigHash.katHash,   "green")
                    , ("DeBruijn", deBruijnHash,    "red")
                    , ("Naive",    naiveHashNested, "orange") ]
 
