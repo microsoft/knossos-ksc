@@ -955,6 +955,9 @@ genExpr = genExprWithVarsTest ['u'..'z']
 genExprNumVars :: MonadGen m => Int -> m (Expr () Int)
 genExprNumVars n = genExprWithVars [1..n]
 
+genExprNumVars' :: MonadGen m => Int -> m (Expr () Int)
+genExprNumVars' n = genExprWithVars' [1..n] (n+1) (+1)
+
 genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
 genExprLinearNumVars n = genExprWithVarsLinear [1..n]
 
