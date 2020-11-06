@@ -53,5 +53,5 @@ main = do
       print_stats_row deBruijnNestedHash
       print_stats_row castHashOptimized
     ["random"] -> Benchmark.benchmark
-    ["test"] -> Hash.testEverythingInFileStartingWith'prop_' >> pure ()
+    ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
     _ -> putStrLn "Unsupported argument"

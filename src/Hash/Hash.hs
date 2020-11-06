@@ -730,8 +730,8 @@ normalizedGroupedEquivalentSubexpressions =
 alphaEquivalentAccordingToUniquifyBinders :: Ord a => Expr () a -> Expr () a -> Bool
 alphaEquivalentAccordingToUniquifyBinders = (==) `on` uniquifyBinders
 
-testEverythingInFileStartingWith'prop_' :: IO Bool
-testEverythingInFileStartingWith'prop_' = checkParallel $$(discover)
+testEverythingInFileStartingWith'prop_' :: IO ()
+testEverythingInFileStartingWith'prop_' = checkParallel $$(discover) >> pure ()
 
 -- | Some specific test cases that demonstrate how 'uniquifyBinders'
 -- works.  Please suggest more examples if you have ones that would be
