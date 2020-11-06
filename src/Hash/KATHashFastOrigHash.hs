@@ -44,15 +44,6 @@ removeFromVM key vm@(VM entries existingHash)
   | otherwise
   = (vm, Nothing)
 
-findSingleton :: Map p Positions -> p
-findSingleton m = case Map.toList m of
-  [(v, _HerePL)] -> v
-  [] -> error "Expected map to be non-empty"
-  _:_:_ -> error "Expected map not to have multiple elements"
-
-extendVM :: Ord k => Map k a -> k -> a -> Map k a
-extendVM m x p = Map.insert x p m
-
 entryHash :: Hashable name => name -> Positions -> Hash
 entryHash key pos = hash (key, 0 :: Int, pos, 0 :: Int)
 
