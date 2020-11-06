@@ -450,21 +450,18 @@ castHashOptimizedExplicit =
           (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashesE)
             = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e
 
-type HashCode = (Int, Hash)
-
 spjLocallyNameless :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
 spjLocallyNameless = mapAnnotation hash . spjLocallyNamelessExplicit
 
-spjLocallyNamelessExplicit :: (Ord a, Hashable a) => Expr h a -> Expr HashCode a
+spjLocallyNamelessExplicit :: (Ord a, Hashable a) => Expr h a -> Expr Hash a
 -- Decorates an expression with a
 -- hash-code at every node
-spjLocallyNamelessExplicit (Var _ n)     = Var (0, hash n) n
+spjLocallyNamelessExplicit (Var _ n)     = Var (hash n) n
 spjLocallyNamelessExplicit (App _ e1 e2) = App h he1 he2
   where
         he1 = spjLocallyNamelessExplicit e1
         he2 = spjLocallyNamelessExplicit e2
-        h =   ((1 + (max `on` (fst . annotation)) he1 he2),
-               hash ("App", annotation he1, annotation he2))
+        h =   hashExprO (AppO (Just (annotation he1)) (Just (annotation he2)))
 
 spjLocallyNamelessExplicit e_@(Lam _ n e) = Lam h n (spjLocallyNamelessExplicit e)
   where
@@ -473,14 +470,13 @@ spjLocallyNamelessExplicit e_@(Lam _ n e) = Lam h n (spjLocallyNamelessExplicit 
 
     -- Does not return a decorated expression, only a hash code
     -- All nested lambdas are dealt with via deBruijn
-    hashOnly env (Var _ n')     = (0, case lookupEnv env n' of
+    hashOnly env (Var _ n')    = case lookupEnv env n' of
       Just h' -> h'
-      Nothing -> hash n')
-    hashOnly env (App _ e1 e2) = (1 + (max `on` fst) h1 h2,
-                              hash ("App", h1, h2))
+      Nothing -> hash n'
+    hashOnly env (App _ e1 e2) = hashExprO (AppO (Just h1) (Just h2))
       where h1 = hashOnly env e1
             h2 = hashOnly env e2
-    hashOnly env (Lam _ n' e')   = (fst h' + 1, hash ("Lam", h'))
+    hashOnly env (Lam _ n' e') = hashExprO (LamO Nothing h')
       where h' = hashOnly (extendEnv env n') e'
 
     lookupEnv (_, env) n' = Map.lookup n' env
