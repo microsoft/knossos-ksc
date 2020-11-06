@@ -82,7 +82,14 @@ benchmarkThis benchmarksDir algorithms varCounts bc = do
     let (varCount, varCountSymbol) = var_
         (algorithmName, algorithm, algorithmColor) = algorithm_
     results <- times (bcTotalExpressions bc) [] $ \rest -> do
-      expression <- bcGenExpr bc varCount
+      -- We force the expression after generating it.  The Expr type
+      -- is strict, that is forcing it forces everything it contains,
+      -- therefore no time is wasted forcing it in the hashing
+      -- algorithm itself.  On the other hand adding this bang pattern
+      -- made absolutely no difference to the benchmarks.  The
+      -- expression must be generated already forced.  But it's nice
+      -- to keep this hear for clarity.
+      !expression <- bcGenExpr bc varCount
 
       r <- benchmarkOne (bcSamplesPerExpression bc)
                         (bcIterationsPerSample bc)
