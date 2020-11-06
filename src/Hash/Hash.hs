@@ -940,6 +940,22 @@ genExprWithVarsLinear vars = do
   size <- Gen.int (Range.linear 0 2000)
   genExprWithVarsLinearSizeG size (Gen.element vars) (Gen.element vars)
 
+genExprWithVarsLinear' :: MonadGen m
+                       => [a] -> a -> (a -> a) -> m (Expr () a)
+genExprWithVarsLinear' inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
+  size <- Gen.int (Range.linear 0 2000)
+
+  let freshVar = do
+        (inScope', fresh') <- get
+        put (fresh':inScope', freshen fresh')
+        pure fresh'
+
+  let elementInScope = do
+        (inScope', _) <- get
+        Gen.element inScope'
+
+  genExprWithVarsLinearSizeG size elementInScope freshVar
+
 genExprWithVarsLinearSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
 genExprWithVarsLinearSizeG size vars binders =
   if size <= 0
