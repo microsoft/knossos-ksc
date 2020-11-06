@@ -15,7 +15,7 @@ import qualified Hash
 import qualified KATHashFastOrigHash
 
 data BenchmarkConfig = BenchmarkConfig
-  { bcGenExpr              :: Int -> IO (Expr () String)
+  { bcGenExpr              :: Int -> IO (Expr () Int)
   , bcGenName              :: String
   , bcTotalExpressions     :: Int
   , bcSamplesPerExpression :: Int
@@ -68,7 +68,7 @@ benchmark = do
     makeGnuplot benchmarksDir genName results
 
 benchmarkThis :: FilePath
-              -> [(String, Expr () String -> Expr hash string, String)]
+              -> [(String, Expr () Int -> Expr hash string, String)]
               -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]

@@ -952,11 +952,11 @@ genExprWithVarsLinearSize size vars =
 genExpr :: MonadGen m => m (Expr () Char)
 genExpr = genExprWithVarsTest ['u'..'z']
 
-genExprNumVars :: MonadGen m => Int -> m (Expr () String)
-genExprNumVars n = genExprWithVars (map show [1..n])
+genExprNumVars :: MonadGen m => Int -> m (Expr () Int)
+genExprNumVars n = genExprWithVars [1..n]
 
-genExprLinearNumVars :: MonadGen m => Int -> m (Expr () String)
-genExprLinearNumVars n = genExprWithVarsLinear (map show [1..n])
+genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
+genExprLinearNumVars n = genExprWithVarsLinear [1..n]
 
 -- | Shows equivalence of castHash hash and castHashOptimized hash
 prop_equivCastFast :: Property
