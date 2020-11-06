@@ -93,6 +93,7 @@ import qualified KATHash2
 import qualified KATHash3
 import qualified KATHashFast
 import qualified KATHashFastOrig
+import qualified KATHashFastOrigHash
 import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
@@ -949,10 +950,12 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
       --castHashOptimized_groups = n (castHashOptimized expr)
       spjLocallyNameless_groups = n (spjLocallyNameless expr)
       deBruijnNestedHash_groups = n (deBruijnNestedHash expr)
+      katHashFastOrigHash_groups = n (KATHashFastOrigHash.katHash expr)
 
   --castHash_groups === castHashOptimized_groups
   castHash_groups === spjLocallyNameless_groups
   castHash_groups === deBruijnNestedHash_groups
+  castHash_groups === katHashFastOrigHash_groups
 
 prop_applyPrefix :: Property
 prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests
