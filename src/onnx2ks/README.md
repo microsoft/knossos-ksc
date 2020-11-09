@@ -11,6 +11,6 @@ $ pip install ./build/Linux/RelWithDebInfo/dist/onnxruntime-1.5.2-cp38-cp38-linu
 
 And ensure you're using the compatible ONNX
 ```sh
-$ cd cmake/external/onnx
+$ cd ../onnxruntime/cmake/external/onnx
 $ python setup.py install
 ```
