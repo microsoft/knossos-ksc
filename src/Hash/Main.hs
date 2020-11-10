@@ -13,7 +13,7 @@
 
 module Main where
 
-import Benchmark
+import qualified Benchmark
 import Expr (exprSize, Expr)
 import qualified Data.Foldable
 import qualified Hash
@@ -50,36 +50,35 @@ expressions = Expressions
   , eGMM      = "gmm"
   }
 
-testcase_names :: [String]
-testcase_names = Data.Foldable.toList expressions
-
-testcase_paths :: [FilePath]
-testcase_paths =
-  map (\name -> "./exprs/" ++ name ++ ".expr") testcase_names
+testcase_path :: String -> FilePath
+testcase_path = \name -> "./exprs/" ++ name ++ ".expr"
 
 process_stats :: Benchmark.AggregateStatistics -> (Int, Int)
 process_stats aggregate_stats =
   let (_, mean, _, _, stddev) = Benchmark.stats aggregate_stats in (round mean, round stddev)
 
-print_expr_sizes :: [FilePath] -> IO ()
-print_expr_sizes paths = do
-  exprs <- traverse readExpr paths
-  print (map exprSize exprs)
-
-print_stats_row :: (Expr () String -> Expr Hash.Hash String) -> IO ()
-print_stats_row algorithm = do
-  result <- flip traverse testcase_paths (\t -> Benchmark.benchmarkOneReadFile t 50 50 (seqHashResult . algorithm))
-  print (map process_stats result)
-
 main :: IO ()
 main = do
   getArgs >>= \case
     ["manual"] -> do
-      print testcase_names
-      print_expr_sizes testcase_paths
+      loadedExpressions <- flip traverse expressions $ \name -> do
+        expr <- Benchmark.readExpr (testcase_path name)
+        pure (name, expr)
+
+      putStrLn "Expressions:"
+      flip Data.Foldable.traverse_ loadedExpressions $ \(name, expr) -> do
+        putStrLn (name ++ " (size " ++ show (exprSize expr) ++ ")")
+      putStrLn ""
+
       flip Data.Foldable.traverse_ algorithms $ \(algorithmName, algorithm) -> do
-        putStr (algorithmName ++ ": ")
-        print_stats_row algorithm
+        putStrLn ("Algorithm " ++ algorithmName ++ ": ")
+
+        flip Data.Foldable.traverse_ loadedExpressions $ \(name, expr) -> do
+          putStr (name ++ ": ")
+          stats_ <- Benchmark.benchmarkOne 50 50 (Benchmark.seqHashResult . algorithm) expr
+          print (process_stats stats_)
+        putStrLn ""
+
     ["random"] -> Benchmark.benchmark
     ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
     _ -> putStrLn "Unsupported argument"
