@@ -1,8 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Benchmark where
 
 import qualified Hedgehog.Gen as Gen
+import qualified Data.Foldable
+import Data.Hashable (Hashable)
 import Data.List (intercalate)
 import qualified System.Clock as Clock
 import Text.Read (readMaybe)
@@ -21,6 +24,40 @@ data BenchmarkConfig = BenchmarkConfig
   , bcSamplesPerExpression :: Int
   , bcIterationsPerSample  :: Int
   }
+
+data Algorithms a = Algorithms
+  { aSPJLocallyNameless :: a
+  , aCastHashOptimized  :: a
+  , aKATHashFromPaper   :: a
+  , aDeBrujinHash       :: a
+  , aNaiveHashNested    :: a
+  -- Hash.deBruijnNestedHash is slower than Hash.spjLocallyNameless so
+  -- we don't need it
+  -- , aDeBruijnNested     :: a
+  -- castHash is slower than castHashOptimized so we don't need it
+  -- , aCastHash           :: a
+  -- combinedHash is slow and broken. We don't want it
+  -- , aCombinedHash       :: a
+  }
+  deriving (Functor, Foldable, Traversable)
+
+algorithms_ :: (Hashable a, Ord a)
+            => Algorithms (String, Expr h a -> Expr Hash.Hash a, String)
+algorithms_ = Algorithms
+  { aSPJLocallyNameless = ("SPJ locally nameless", Hash.spjLocallyNameless, baseline)
+  , aCastHashOptimized  = ("Compositional-Optimized", castHashOptimized, "black")
+  , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
+  , aDeBrujinHash       = ("de Bruijn", deBruijnHash, prettyBad)
+  , aNaiveHashNested    = ("Naive", naiveHashNested, veryBad)
+  -- , aDeBruijnNested     = ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
+  -- , aCastHash           = ("Compositional", castHash,   "green")
+  -- , aCombinedHash       = ("Combined", combinedHash,    "blue")
+  }
+  where
+      veryBad   = "red"
+      prettyBad = "orange"
+      good      = "green"
+      baseline  = "blue"
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
@@ -60,25 +97,7 @@ benchmark = do
 
       totalExpressions = 100
 
-      veryBad   = "red"
-      prettyBad = "orange"
-      good      = "green"
-      baseline  = "blue"
-
-      algorithms = [ -- Hash.deBruijnNestedHash is slower than
-                     -- Hash.spjLocallyNameless so we don't need it
-                   --   ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
-                     ("SPJ locally nameless", Hash.spjLocallyNameless, baseline)
-                   -- castHash is slower than castHashOptimized so
-                   -- we don't need it
-                   -- , ("Compositional", castHash,   "green")
-                   -- combinedHash is slow and broken. We don't want it
-                   -- , ("Combined", combinedHash,    "blue")
-                   , ("Compositional-Optimized", castHashOptimized,   "black")
-                   , ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
-                   , ("DeBruijn", deBruijnHash,    prettyBad)
-                   , ("Naive",    naiveHashNested, veryBad) ]
-
+      algorithms = Data.Foldable.toList algorithms_
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
   benchmarksDir <- createTempDirectory "." "benchmarks"

@@ -14,19 +14,11 @@
 module Main where
 
 import qualified Benchmark
-import Expr (exprSize, Expr)
+import Expr (exprSize)
 import qualified Data.Foldable
 import qualified Hash
 
 import System.Environment (getArgs)
-
-data Algorithms a = Algorithms
-  { aNaiveNested    :: a
-  , aDeBrujin       :: a
-  , aDeBruijnNested :: a
-  , aCastHashOpt    :: a
-  }
-  deriving (Functor, Foldable, Traversable)
 
 data Expressions a = Expressions
   { eMnistCNN :: a
@@ -34,14 +26,6 @@ data Expressions a = Expressions
   , eGMM      :: a
   }
   deriving (Functor, Foldable, Traversable)
-
-algorithms :: Algorithms (String, Expr h String -> Expr Hash.Hash String)
-algorithms = Algorithms
-  { aNaiveNested    = ("Naive nested", Hash.naiveHashNested)
-  , aDeBrujin       = ("de Bruijn", Hash.deBruijnHash)
-  , aDeBruijnNested = ("de Bruijn nested", Hash.deBruijnNestedHash)
-  , aCastHashOpt    = ("CAST Hash Optimized", Hash.castHashOptimized)
-  }
 
 expressions :: Expressions String
 expressions = Expressions
@@ -57,10 +41,8 @@ process_stats :: Benchmark.AggregateStatistics -> (Int, Int)
 process_stats aggregate_stats =
   let (_, mean, _, _, stddev) = Benchmark.stats aggregate_stats in (round mean, round stddev)
 
-main :: IO ()
-main = do
-  getArgs >>= \case
-    ["manual"] -> do
+specific_benchmarks :: IO ()
+specific_benchmarks = do
       loadedExpressions <- flip traverse expressions $ \name -> do
         expr <- Benchmark.readExpr (testcase_path name)
         pure (name, expr)
@@ -70,7 +52,7 @@ main = do
         putStrLn (name ++ " (size " ++ show (exprSize expr) ++ ")")
       putStrLn ""
 
-      flip Data.Foldable.traverse_ algorithms $ \(algorithmName, algorithm) -> do
+      flip Data.Foldable.traverse_ Benchmark.algorithms_ $ \(algorithmName, algorithm, _) -> do
         putStrLn ("Algorithm " ++ algorithmName ++ ": ")
 
         flip Data.Foldable.traverse_ loadedExpressions $ \(name, expr) -> do
@@ -79,6 +61,10 @@ main = do
           print (process_stats stats_)
         putStrLn ""
 
+main :: IO ()
+main = do
+  getArgs >>= \case
+    ["manual"] -> specific_benchmarks
     ["random"] -> Benchmark.benchmark
     ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
     _ -> putStrLn "Unsupported argument"
