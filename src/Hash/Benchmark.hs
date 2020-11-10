@@ -177,6 +177,9 @@ stats (n, tsum, tsquaredsum, tmin) = (n, mean, tmin, variance, stddev)
         variance = tsquaredsum / n' - mean * mean
         stddev   = sqrt variance
 
+-- This is probably the entry point you want to use to benchmark an
+-- algorithm on a list of expressions each read from a FilePath.
+--
 -- Runs algorithm on expression and produces aggregate timing
 -- statistics.
 --
@@ -207,28 +210,6 @@ benchmarkOne samplesPerExpression iterationsPerSample algorithm expression =
                 min minSoFar elapsed_micro)
 
   where infinity = 1e60
-
--- This is probably the entry point you want to use to benchmark an
--- algorithm on a list of expressions each read from a FilePath.  You
--- can attached some additional data that is passed through unchanged.
--- If you don't want to pass through anything just use ().
-benchmarkManyReadFile :: [(FilePath, a)]
-                      -> Int
-                      -> Int
-                      -> (Expr () String -> r)
-                      -> IO [(AggregateStatistics, a)]
-benchmarkManyReadFile = benchmarkManyReadFileG
-
-benchmarkManyReadFileG :: Read e
-                       => [(FilePath, a)]
-                       -> Int
-                       -> Int
-                       -> (e -> r)
-                       -> IO [(AggregateStatistics, a)]
-benchmarkManyReadFileG filepaths samplesPerExpression iterationsElapsed algorithm =
-  flip mapM filepaths $ \(filepath, extraData) -> do
-    b <- benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm
-    pure (b, extraData)
 
 readExpr :: FilePath -> IO (Expr () String)
 readExpr = readExprG

@@ -38,9 +38,8 @@ print_expr_sizes paths = do
 
 print_stats_row :: (Expr () String -> Expr Hash String) -> IO ()
 print_stats_row algorithm = do
-  let testcases = map (\path -> (path, ())) testcase_paths
-  result <- Benchmark.benchmarkManyReadFile testcases 50 50 (seqHashResult . algorithm)
-  print (map (\(aggregate_stats, ()) -> process_stats aggregate_stats) result)
+  result <- flip traverse testcase_paths (\t -> Benchmark.benchmarkOneReadFile t 50 50 (seqHashResult . algorithm))
+  print (map process_stats result)
 
 main :: IO ()
 main = do
