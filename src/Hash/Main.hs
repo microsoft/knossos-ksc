@@ -35,12 +35,12 @@ data Expressions a = Expressions
   }
   deriving (Functor, Foldable, Traversable)
 
-algorithms :: Algorithms (Expr h String -> Expr Hash.Hash String)
+algorithms :: Algorithms (String, Expr h String -> Expr Hash.Hash String)
 algorithms = Algorithms
-  { aNaiveNested    = Hash.naiveHashNested
-  , aDeBrujin       = Hash.deBruijnHash
-  , aDeBruijnNested = Hash.deBruijnNestedHash
-  , aCastHashOpt    = Hash.castHashOptimized
+  { aNaiveNested    = ("Naive nested", Hash.naiveHashNested)
+  , aDeBrujin       = ("de Bruijn", Hash.deBruijnHash)
+  , aDeBruijnNested = ("de Bruijn nested", Hash.deBruijnNestedHash)
+  , aCastHashOpt    = ("CAST Hash Optimized", Hash.castHashOptimized)
   }
 
 expressions :: Expressions String
@@ -77,7 +77,9 @@ main = do
     ["manual"] -> do
       print testcase_names
       print_expr_sizes testcase_paths
-      mapM_ print_stats_row algorithms
+      flip Data.Foldable.traverse_ algorithms $ \(algorithmName, algorithm) -> do
+        putStr (algorithmName ++ ": ")
+        print_stats_row algorithm
     ["random"] -> Benchmark.benchmark
     ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
     _ -> putStrLn "Unsupported argument"
