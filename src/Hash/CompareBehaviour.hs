@@ -1,7 +1,7 @@
 module CompareBehaviour where
 
 import Hash (castHash,castHashOptimized,combinedHash,deBruijnHash,
-             naiveHashWithBinders, naiveHashWithBinders2,
+             structuralHashWithBinders, structuralHashWithBinders2,
              normalizedGroupedEquivalentSubexpressions,
              allHashResults)
 import Expr (Expr, Path, showExpr,
@@ -57,8 +57,8 @@ awfFormatExpressionHTML e =
                      , ( ("Compositional-Optimized", castHashOptimized)
                        , ("Combined", combinedHash)
                        , ("DeBruijn", deBruijnHash)
-                       , ("Naive with binders 1", naiveHashWithBinders)
-                       , ("Naive with binders 2", naiveHashWithBinders2) ) )
+                       , ("Structural with binders 1", structuralHashWithBinders)
+                       , ("Structural with binders 2", structuralHashWithBinders2) ) )
 
         groupsOfAlgorithm algorithm =
           ((map . map) fst

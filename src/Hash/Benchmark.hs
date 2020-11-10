@@ -13,7 +13,7 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory, emptyTempFile)
 
 import Expr (Expr, exprSize)
-import Hash (castHashOptimized, deBruijnHash,  naiveHashNested)
+import Hash (castHashOptimized, deBruijnHash,  structuralHashNested)
 import qualified Hash
 import qualified KATHashFastOrigHash
 
@@ -30,7 +30,7 @@ data Algorithms a = Algorithms
   , aCastHashOptimized  :: a
   , aKATHashFromPaper   :: a
   , aDeBrujinHash       :: a
-  , aNaiveHashNested    :: a
+  , aStructuralHashNested    :: a
   -- Hash.deBruijnNestedHash is slower than Hash.spjLocallyNameless so
   -- we don't need it
   -- , aDeBruijnNested     :: a
@@ -47,8 +47,8 @@ algorithms_ = Algorithms
   { aSPJLocallyNameless = ("SPJ locally nameless", Hash.spjLocallyNameless, baseline)
   , aCastHashOptimized  = ("Compositional-Optimized", castHashOptimized, "black")
   , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
-  , aDeBrujinHash       = ("de Bruijn", deBruijnHash, prettyBad)
-  , aNaiveHashNested    = ("Naive", naiveHashNested, veryBad)
+  , aDeBrujinHash       = ("de Bruijn*", deBruijnHash, prettyBad)
+  , aStructuralHashNested    = ("Structural*", structuralHashNested, veryBad)
   -- , aDeBruijnNested     = ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
   -- , aCastHash           = ("Compositional", castHash,   "green")
   -- , aCombinedHash       = ("Combined", combinedHash,    "blue")

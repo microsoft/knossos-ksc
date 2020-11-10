@@ -626,47 +626,47 @@ addLocn = Map.insert
 
 -- | The most basic hash one could think of.  Is not intended to
 -- respect any kind of equivalences.
-naiveHash :: Hashable a => Expr h a -> Hash
-naiveHash = \case
+structuralHash :: Hashable a => Expr h a -> Hash
+structuralHash = \case
   Var _ x   -> hash x
-  Lam _ x e -> hash (x, naiveHash e)
-  App _ f e -> hash (naiveHash f, naiveHash e)
+  Lam _ x e -> hash (x, structuralHash e)
+  App _ f e -> hash (structuralHash f, structuralHash e)
 
-naiveHashNested :: Hashable a => Expr h a -> Expr Hash a
-naiveHashNested e = es
-  where (_, es) = naiveHashNestedExplicit [] e
+structuralHashNested :: Hashable a => Expr h a -> Expr Hash a
+structuralHashNested e = es
+  where (_, es) = structuralHashNestedExplicit [] e
 
-naiveHashNestedExplicit :: Hashable a
+structuralHashNestedExplicit :: Hashable a
                         => Path
                         -> Expr h a
                         -> (Hash, Expr Hash a)
-naiveHashNestedExplicit path expr =
+structuralHashNestedExplicit path expr =
   case expr of
   Var _ x   -> (thisHash, Var thisHash x)
     where thisHash = hash x
 
   Lam _ x e -> (thisHash, Lam thisHash x subExpressionHashes)
-    where (h, subExpressionHashes) = naiveHashNestedExplicit (L:path) e
+    where (h, subExpressionHashes) = structuralHashNestedExplicit (L:path) e
           thisHash                 = hash (x, h)
 
   App _ f e -> (thisHash, App thisHash subExpressionHashesL subExpressionHashesR)
     where (hL, subExpressionHashesL) =
-            naiveHashNestedExplicit (Apl:path) f
+            structuralHashNestedExplicit (Apl:path) f
           (hR, subExpressionHashesR) =
-            naiveHashNestedExplicit (Apr:path) e
+            structuralHashNestedExplicit (Apr:path) e
           thisHash                   = hash (hL, hR)
 
-naiveHashWithBinders :: (Ord a, Hashable a)
+structuralHashWithBinders :: (Ord a, Hashable a)
                      => Expr h a -> Expr Hash a
-naiveHashWithBinders e = exprs
-  where (_h, _depth, exprs) = naiveHashWithBindersExplicit [] Map.empty e
+structuralHashWithBinders e = exprs
+  where (_h, _depth, exprs) = structuralHashWithBindersExplicit [] Map.empty e
 
-naiveHashWithBindersExplicit :: (Ord a, Hashable a)
+structuralHashWithBindersExplicit :: (Ord a, Hashable a)
                              => Path
                              -> Map a Path
                              -> Expr h a
                              -> (Hash, Int, Expr Hash a)
-naiveHashWithBindersExplicit location env expr = case expr of
+structuralHashWithBindersExplicit location env expr = case expr of
   Var _ x -> (hash', depth', Var hash' x)
     where hash' = hash $ case Map.lookup x env of
             Nothing -> hash ("free", x, depth')
@@ -674,28 +674,28 @@ naiveHashWithBindersExplicit location env expr = case expr of
           depth' = 0
   Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
     where (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBindersExplicit (L:location) (Map.insert x location env) e
+            structuralHashWithBindersExplicit (L:location) (Map.insert x location env) e
           hash' = hash ("lam", hashE, depth')
           depth' = depthE + 1
   App _ f e -> (hash', depth', App hash' subExpressionHashesF subExpressionHashesE)
     where (hashF, depthF, subExpressionHashesF) =
-            naiveHashWithBindersExplicit (Apl:location) env f
+            structuralHashWithBindersExplicit (Apl:location) env f
           (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBindersExplicit (Apr:location) env e
+            structuralHashWithBindersExplicit (Apr:location) env e
           hash' = hash ("app", hashF, hashE, depth')
           depth' = max depthF depthE + 1
 
-naiveHashWithBinders2 :: (Ord a, Hashable a)
+structuralHashWithBinders2 :: (Ord a, Hashable a)
                      => Expr h a -> Expr Hash a
-naiveHashWithBinders2 e = exprs
-  where (_h, _depth, exprs) = naiveHashWithBinders2Explicit [] Map.empty e
+structuralHashWithBinders2 e = exprs
+  where (_h, _depth, exprs) = structuralHashWithBinders2Explicit [] Map.empty e
 
-naiveHashWithBinders2Explicit :: (Ord a, Hashable a)
+structuralHashWithBinders2Explicit :: (Ord a, Hashable a)
                               => Path
                               -> Map a Path
                               -> Expr h a
                               -> (Hash, Int, Expr Hash a)
-naiveHashWithBinders2Explicit location env expr = case expr of
+structuralHashWithBinders2Explicit location env expr = case expr of
   Var _ x -> (hash', depth', Var hash' x)
     where hash' = hash $ case Map.lookup x env of
             Nothing -> hash ("free", x, depth')
@@ -703,15 +703,15 @@ naiveHashWithBinders2Explicit location env expr = case expr of
           depth' = 0
   Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
     where (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBinders2Explicit (L:location)
+            structuralHashWithBinders2Explicit (L:location)
                                          (Map.insert x [] (Map.map (L:) env)) e
           hash' = hash ("lam", hashE, depth')
           depth' = depthE + 1
   App _ f e -> (hash', depth', App hash' subExpressionHashesF subExpressionHashesE)
     where (hashF, depthF, subExpressionHashesF) =
-            naiveHashWithBinders2Explicit (Apl:location) (Map.map (Apl:) env) f
+            structuralHashWithBinders2Explicit (Apl:location) (Map.map (Apl:) env) f
           (hashE, depthE, subExpressionHashesE) =
-            naiveHashWithBinders2Explicit (Apr:location) (Map.map (Apr:) env) e
+            structuralHashWithBinders2Explicit (Apr:location) (Map.map (Apr:) env) e
           hash' = hash ("app", hashF, hashE, depth')
           depth' = max depthF depthE + 1
 
@@ -728,7 +728,7 @@ normalizedGroupedEquivalentSubexpressions =
 
 -- | Whether two expressions are alpha-equivalent, implemented using
 -- 'uniquifyBinders'
-alphaEquivalentAccordingToUniquifyBinders :: Ord a => Expr () a -> Expr () a -> Bool
+alphaEquivalentAccordingToUniquifyBinders :: (Eq h, Ord a) => Expr h a -> Expr h a -> Bool
 alphaEquivalentAccordingToUniquifyBinders = (==) `on` uniquifyBinders
 
 testEverythingInFileStartingWith'prop_' :: IO ()
@@ -789,9 +789,9 @@ prop_stablePaths = withTests numRandomTests $ property $ do
   let h = castHash expr
       d = deBruijnHash expr
       c = combinedHash expr
-      n = naiveHashNested expr
-      n1 = naiveHashWithBinders expr
-      n2 = naiveHashWithBinders2 expr
+      n = structuralHashNested expr
+      n1 = structuralHashWithBinders expr
+      n2 = structuralHashWithBinders2 expr
 
   paths h === paths d
   paths h === paths c
