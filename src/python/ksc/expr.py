@@ -358,7 +358,11 @@ def _(ex, indent):
 
 @pystr.register(Let)
 def _(ex, indent):
-    return pystr(ex.vars, indent) + " = " + pystr(ex.rhs, indent+1) + nl(indent) \
+    if isinstance(ex.vars, list):
+        var_str = ",".join(pystr(v, indent) for v in ex.vars)
+    else:
+        var_str = pystr(ex.vars, indent)
+    return var_str + " = " + pystr(ex.rhs, indent+1) + nl(indent) \
          + pystr(ex.body, indent)
 
 @pystr.register(If)

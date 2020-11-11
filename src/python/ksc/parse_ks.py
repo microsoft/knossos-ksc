@@ -153,12 +153,14 @@ def parse_expr(se):
     if head == _let:
         bindings = ensure_list_of_lists(se[1])
         ans = parse_expr(se[2])
-        for b in bindings[::-1]:
+        for b in reversed(bindings):
             check(len(b) == 2, "Let bindings should be pairs", b, "in", se)
-            # TODO: bindings could be tupled
-            var = Var(parse_name(b[0]), None, False)
+            if isinstance(b[0], list):
+                vars = [Var(parse_name(v)) for v in b[0]]
+            else:
+                vars = Var(parse_name(b[0]))
             rhs = parse_expr(b[1])
-            ans = Let(var, rhs, ans)
+            ans = Let(vars, rhs, ans)
         return ans
 
     # Lam(var, type, body)
@@ -224,6 +226,7 @@ def parse_ks_string(string):
         except ParseError:
             print("ERROR at ", s_exp)
             print(sys.exc_info()[1])
+            raise ParseError()
 
 def parse_ks_file(filename):
     with open(filename) as f:

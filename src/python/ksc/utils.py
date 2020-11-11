@@ -13,6 +13,8 @@ def ensure_list_of_lists(l):
 
        ensure_list_of_lists([])    = []
        ensure_list_of_lists([1])   = [[1]]
+       ensure_list_of_lists([1,2])   = [[1,2]]
+
        ensure_list_of_lists([[1]]) = [[1]]
        ensure_list_of_lists([[1,2]])        = [[1, 2]]
        ensure_list_of_lists([[1,2], [3,4]]) = [[1, 2], [3, 4]]
