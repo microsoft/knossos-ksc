@@ -261,8 +261,8 @@ castHashExplicit =
 data TwoHashes = TwoHashes !Hash !Hash
 
 instance Hashable TwoHashes where
-  hash (TwoHashes h1 h2) = hash (h1, h2)
-  hashWithSalt s (TwoHashes h1 h2) = hashWithSalt s (h1, h2)
+  hash (TwoHashes h1 h2) = hash h1 `thenHash` h2
+  hashWithSalt s (TwoHashes h1 h2) = hashWithSalt s h1 `thenHash` h2
 
 -- | Now comes the type that does all the heavy-lifting. It's a map
 -- from keys to `TwoHashes`, that, additionally to insert / lookup /
@@ -288,7 +288,7 @@ lazyMapLookup key (LazyMap innerMap _) = Map.lookup key innerMap
 -- | A helper to hash a `LazyMap` entry.
 computeEntryHash :: (Hashable a) => (a, TwoHashes) -> TwoHashes
 computeEntryHash (key, TwoHashes value_1 value_2) =
-  TwoHashes (hash (key, value_1)) (hash (key, value_2))
+  TwoHashes (hash key `thenHash` value_1) (hash key `thenHash` value_2)
 
 addEntryHash :: (Hashable a) => TwoHashes -> (a, TwoHashes) -> TwoHashes
 addEntryHash (TwoHashes entriesHash_1 entriesHash_2) entry =
@@ -381,11 +381,11 @@ lazyMapsCombineSmallToLarge lazyMapSmall lazyMapLarge fOnlySmall fIntersection =
 
 hashStepLeft :: Int -> Hash -> Hash
 hashStepLeft subtreeSize h =
-  hash (hashExprO (AppO (Just h) Nothing), subtreeSize)
+  hashExprO (AppO (Just h) Nothing) `thenHash` subtreeSize
 
 hashStepRight :: Int -> Hash -> Hash
 hashStepRight subtreeSize h =
-  hash (hashExprO (AppO Nothing (Just h)), subtreeSize)
+  hashExprO (AppO Nothing (Just h)) `thenHash` subtreeSize
 
 lazyMapsCombine :: (Ord a, Hashable a)
                 => LazyMap a
@@ -417,7 +417,7 @@ castHashOptimizedExplicit :: (Ord a, Hashable a)
                           -> (LazyMap a, Hash, Int, Expr Hash a)
 castHashOptimizedExplicit =
   let subExprHash_ (LazyMap _ sndVariablesHash) structureHash =
-        hash (sndVariablesHash, structureHash)
+        hash sndVariablesHash `thenHash` structureHash
 
   in \pathHash bvEnv expr -> case expr of
   Var _ x   -> (variablesHash, structureHash, 1, Var subExprHash x)
@@ -430,7 +430,7 @@ castHashOptimizedExplicit =
     where variablesHash = lazyMapDelete x variablesHashE
           structureHash = hashExprO (LamO hashX structureHashE)
           (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashes) =
-            castHashOptimizedExplicit (hash (pathHash, L))
+            castHashOptimizedExplicit (hash pathHash `thenHash` L)
                                                   (Map.insert x pathHash bvEnv)
                                                   e
           subtreeSize   = subtreeSizeE + 1
@@ -449,9 +449,9 @@ castHashOptimizedExplicit =
           subExprHash   = subExprHash_ variablesHash structureHash
 
           (!variablesHashF, !structureHashF, !subtreeSizeF, subExprHashesF)
-            = castHashOptimizedExplicit (hash (pathHash, Apl)) bvEnv f
+            = castHashOptimizedExplicit (hash pathHash `thenHash` Apl) bvEnv f
           (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashesE)
-            = castHashOptimizedExplicit (hash (pathHash, Apr)) bvEnv e
+            = castHashOptimizedExplicit (hash pathHash `thenHash` Apr) bvEnv e
 
 spjLocallyNameless :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
 spjLocallyNameless = mapAnnotation hash . spjLocallyNamelessExplicit
