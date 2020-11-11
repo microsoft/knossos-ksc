@@ -408,10 +408,10 @@ castHashOptimized :: (Ord a, Hashable a)
                   => Expr h a -> Expr Hash a
 castHashOptimized e = exprs
   where (_m, _b, _subtreeSize, exprs) =
-          castHashOptimizedExplicit ([], 1) Map.empty e
+          castHashOptimizedExplicit 1 Map.empty e
 
 castHashOptimizedExplicit :: (Ord a, Hashable a)
-                          => (Path, Hash)
+                          => Hash
                           -> Map a Hash
                           -> Expr h a
                           -> (LazyMap a, Hash, Int, Expr Hash a)
@@ -419,7 +419,7 @@ castHashOptimizedExplicit =
   let subExprHash_ (LazyMap _ sndVariablesHash) structureHash =
         hash (sndVariablesHash, structureHash)
 
-  in \(path, pathHash) bvEnv expr -> case expr of
+  in \pathHash bvEnv expr -> case expr of
   Var _ x   -> (variablesHash, structureHash, 1, Var subExprHash x)
     where variablesHash = lazyMapSingleton x (TwoHashes (hashExprO VarO)
                                                     (hash (Map.lookup x bvEnv)))
@@ -430,7 +430,7 @@ castHashOptimizedExplicit =
     where variablesHash = lazyMapDelete x variablesHashE
           structureHash = hashExprO (LamO hashX structureHashE)
           (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashes) =
-            castHashOptimizedExplicit (L:path, hash (pathHash, L))
+            castHashOptimizedExplicit (hash (pathHash, L))
                                                   (Map.insert x pathHash bvEnv)
                                                   e
           subtreeSize   = subtreeSizeE + 1
@@ -449,9 +449,9 @@ castHashOptimizedExplicit =
           subExprHash   = subExprHash_ variablesHash structureHash
 
           (!variablesHashF, !structureHashF, !subtreeSizeF, subExprHashesF)
-            = castHashOptimizedExplicit (Apl:path, hash (pathHash, Apl)) bvEnv f
+            = castHashOptimizedExplicit (hash (pathHash, Apl)) bvEnv f
           (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashesE)
-            = castHashOptimizedExplicit (Apr:path, hash (pathHash, Apr)) bvEnv e
+            = castHashOptimizedExplicit (hash (pathHash, Apr)) bvEnv e
 
 spjLocallyNameless :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
 spjLocallyNameless = mapAnnotation hash . spjLocallyNamelessExplicit
