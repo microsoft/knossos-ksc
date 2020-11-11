@@ -1066,6 +1066,7 @@ namespace ks
 	tuple<> shape(allocator *, bool const&) { return {}; }
 	tuple<> shape(allocator *, int const&) { return {}; }
 	tuple<> shape(allocator *, double const&) { return {}; }
+	tuple<> shape(allocator *, std::string const&) { return {}; }
 
 	template<class T>
 	auto shape(allocator * alloc, vec<T> const& v) {
