@@ -16,6 +16,7 @@ import Expr (Expr, exprSize)
 import Hash (castHashOptimized, deBruijnHash,  structuralHashNested)
 import qualified Hash
 import qualified KATHashFastOrigHash
+import qualified KATHashFasterOrigHash
 
 data BenchmarkConfig = BenchmarkConfig
   { bcGenExpr              :: Int -> IO (Expr () Int)
@@ -29,6 +30,7 @@ data Algorithms a = Algorithms
   { aSPJLocallyNameless :: a
   , aCastHashOptimized  :: a
   , aKATHashFromPaper   :: a
+  , aKATHashFromPaperFaster :: a
   , aDeBrujinHash       :: a
   , aStructuralHashNested    :: a
   -- Hash.deBruijnNestedHash is slower than Hash.spjLocallyNameless so
@@ -47,6 +49,7 @@ algorithms_ = Algorithms
   { aSPJLocallyNameless = ("SPJ locally nameless", Hash.spjLocallyNameless, baseline)
   , aCastHashOptimized  = ("Compositional-Optimized", castHashOptimized, "black")
   , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
+  , aKATHashFromPaperFaster = ("KATHash alterF", KATHashFasterOrigHash.katHash, "yellow")
   , aDeBrujinHash       = ("de Bruijn*", deBruijnHash, prettyBad)
   , aStructuralHashNested    = ("Structural*", structuralHashNested, veryBad)
   -- , aDeBruijnNested     = ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
