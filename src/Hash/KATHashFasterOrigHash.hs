@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
 module KATHashFasterOrigHash where
@@ -15,7 +16,7 @@ type Structure = Hash
 type Positions = Hash
 type StructureTag = Structure
 
-data VarMap name = VM (Map name Positions) Hash
+data VarMap name = VM !(Map name Positions) !Hash
 
 -- Data.Hashable.Hash is an FNV-1 hash.  It has the property that x
 -- `hashWithSalt` (x `hashWithSalt` y) == y that is undesirable for
@@ -47,12 +48,10 @@ structureTag = id
 
 removeFromVM :: (Hashable v, Ord v) => v -> VarMap v -> (VarMap v, Maybe Positions)
 removeFromVM key (VM entries existingHash)
-  = munge (Map.alterF (\mp -> (f mp, Nothing)) key entries)
-  where munge ((h, p), b) = (VM b h, p)
-        f :: Maybe Positions -> (Hash, Maybe Positions)
-        f = \case
-          Nothing -> (existingHash, Nothing)
-          Just pt  -> (existingHash `xor` entryHash key pt, Just pt)
+  = munge (Map.updateLookupWithKey delete key entries)
+  where munge (Nothing, m) = (VM m existingHash, Nothing)
+        munge (Just pt, m) = (VM m (existingHash `xor` entryHash key pt), Just pt)
+        delete _ _ = Nothing
 
 entryHash :: Hashable name => name -> Positions -> Hash
 entryHash key pos = hash key `thenHash` pos
@@ -92,19 +91,19 @@ summariseExpr = \case
         positionMap = singletonVM v mkHerePL
     in (structure, positionMap, Var (hash structure `thenHash` hashVM positionMap) v)
   Lam _ x e ->
-    let (str_body, map_body, e') = summariseExpr e
-        (e_map, x_pos) = removeFromVM x map_body
-        structure = mkSLam (structureTag str_body) x_pos str_body
+    let (!str_body, !map_body, !e') = summariseExpr e
+        (!e_map, !x_pos) = removeFromVM x map_body
+        !structure = mkSLam (structureTag str_body) x_pos str_body
         positionMap = e_map
     in (structure, positionMap, Lam (hash structure `thenHash` hashVM positionMap) x e')
   App _ e1 e2 ->
-    let (str1, map1, e1') = summariseExpr e1
-        (str2, map2, e2') = summariseExpr e2
-        app_depth = hash (structureTag str1) `thenHash` structureTag str2
+    let (!str1, !map1, !e1') = summariseExpr e1
+        (!str2, !map2, !e2') = summariseExpr e2
+        !app_depth = hash (structureTag str1) `thenHash` structureTag str2
         tag = app_depth
-        str = mkSApp tag left_bigger str1 str2
-        vm = foldl' add_kv big_vm (toListVM small_vm)
-        left_bigger = sizeVM map1 >= sizeVM map2
+        !str = mkSApp tag left_bigger str1 str2
+        !vm = foldl' add_kv big_vm (toListVM small_vm)
+        !left_bigger = sizeVM map1 >= sizeVM map2
 
         (big_vm, small_vm) = if left_bigger
                              then (map1, map2)
