@@ -480,12 +480,13 @@ spjLocallyNamelessExplicit e_@(Lam _ n e) = Lam h n (spjLocallyNamelessExplicit 
       where h1 = hashOnly env e1
             h2 = hashOnly env e2
     hashOnly env (Lam _ n' e') = hashExprO (LamO Nothing h')
-      where h' = hashOnly (extendEnv env n') e'
+      where !env' = (extendEnv env n')
+            h' = hashOnly env' e'
 
     lookupEnv (_, env) n' = Map.lookup n' env
 
     extendEnv (i, env) n'
-      = (i+1, Map.insert n' (hash i) env)
+      = ((,) $! (i+1)) $! Map.insert n' (hash i) env
 
     emptyEnv = (0 :: Int, Map.empty)
 
