@@ -13,11 +13,12 @@
 
 module Main where
 
+import qualified Collision
 import qualified Benchmark
 import Expr (exprSize)
-import qualified Data.Foldable
 import qualified Hash
 
+import qualified Data.Foldable
 import System.Environment (getArgs)
 
 data Expressions a = Expressions
@@ -67,4 +68,5 @@ main = do
     ["manual"] -> specific_benchmarks
     ["random"] -> Benchmark.benchmark
     ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
+    ["collisions"] -> Collision.collisions
     _ -> putStrLn "Unsupported argument"

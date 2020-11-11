@@ -6,7 +6,8 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      .
-  exposed-modules:     Hash,
+  exposed-modules:     Collision,
+                       Hash,
                        HtmlCombinators,
                        KATHash1,
                        KATHash2,
@@ -33,6 +34,7 @@ library
 executable hash
   main-is:             Main.hs
   other-modules:       Benchmark,
+                       Collision,
                        Expr,
                        Hash,
                        KATHash1,
