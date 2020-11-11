@@ -68,7 +68,7 @@ demoN verbosity adp decls
        ; disp "Anf-ised original definition" env1 anf_defs
 
        ; let grad_defs = gradDefs adp anf_defs
-             env2      = env1 `extendGblST` grad_defs
+             env2      = extendGblST env1 grad_defs
        ; disp "The full Jacobian (unoptimised)" env2 grad_defs
 
        ; (env3, opt_grad_defs) <- optDefs rulebase env2 grad_defs
@@ -151,7 +151,7 @@ theDiffs :: DisplayLint a
          -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase)
 theDiffs display defs env rulebase = do {
   ; let grad_defs = gradDefs BasicAD defs
-        env1 = env `extendGblST` grad_defs
+        env1 = extendGblST env grad_defs
   ; display "Grad" env1 grad_defs
 
   -- We generate grad_defs_tupled even though we do not use it yet.
@@ -165,7 +165,7 @@ theDiffs display defs env rulebase = do {
   -- Nonetheless, it's good to generate optgrad_tupled here so that
   -- the tests will run on it and we can be sure it typechecks.
   ; let grad_defs_tupled = gradDefs TupleAD defs
-        env15 = env1 `extendGblST` grad_defs_tupled
+        env15 = extendGblST env1 grad_defs_tupled
   ; display "Grad tupled" env15 grad_defs_tupled
 
   ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
