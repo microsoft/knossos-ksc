@@ -33,7 +33,7 @@ from transformers import BertModel, BertForQuestionAnswering, BertConfig, BertTo
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-for d in range(1,3):
+for d in range(1,24):
     # Initializing a BERT bert-base-uncased style configuration
     configuration = BertConfig(num_hidden_layers = d)
     # Initializing a model from the bert-base-uncased style configuration
@@ -44,5 +44,6 @@ for d in range(1,3):
     dest = Path("obj/hf-bert-to-onnx")
     dest.mkdir(parents=True,exist_ok=True)
 
+    print("*** ", d)
     print("hf-bert-to-onnx: Saving onnx")
     convert_pytorch(p, opset=11, output=dest / f'bert{d}.onnx', use_external_format=True)
