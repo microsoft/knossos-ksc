@@ -87,23 +87,23 @@ summariseExpr :: (Hashable name, Ord name)
               -> (Structure, VarMap name, Expr Hash name)
 summariseExpr = \case
   Var _ v   ->
-    let structure   = mkSVar
-        positionMap = singletonVM v mkHerePL
+    let !structure   = mkSVar
+        !positionMap = singletonVM v mkHerePL
     in (structure, positionMap, Var (hash structure `thenHash` hashVM positionMap) v)
   Lam _ x e ->
-    let (!str_body, !map_body, !e') = summariseExpr e
-        (!e_map, !x_pos) = removeFromVM x map_body
+    let (str_body, map_body, e') = summariseExpr e
+        (e_map, x_pos) = removeFromVM x map_body
         !structure = mkSLam (structureTag str_body) x_pos str_body
-        positionMap = e_map
+        !positionMap = e_map
     in (structure, positionMap, Lam (hash structure `thenHash` hashVM positionMap) x e')
   App _ e1 e2 ->
-    let (!str1, !map1, !e1') = summariseExpr e1
-        (!str2, !map2, !e2') = summariseExpr e2
-        !app_depth = hash (structureTag str1) `thenHash` structureTag str2
+    let (str1, map1, e1') = summariseExpr e1
+        (str2, map2, e2') = summariseExpr e2
+        app_depth = hash (structureTag str1) `thenHash` structureTag str2
         tag = app_depth
         !str = mkSApp tag left_bigger str1 str2
         !vm = foldl' add_kv big_vm (toListVM small_vm)
-        !left_bigger = sizeVM map1 >= sizeVM map2
+        left_bigger = sizeVM map1 >= sizeVM map2
 
         (big_vm, small_vm) = if left_bigger
                              then (map1, map2)
