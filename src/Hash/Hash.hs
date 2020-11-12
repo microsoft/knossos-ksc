@@ -849,37 +849,28 @@ prop_hashAlphaEquivalence2 = withTests numRandomTests $ property $ do
   alphaEquivalentAccordingToUniquifyBinders expr1 expr2
     === alphaEquivalentAccordingToSummariseExpr expr1 expr2
 
-prop_rebuild :: Property
-prop_rebuild = withTests numRandomTests $ property $ do
+propG_rebuild :: (Expr () Int -> t)
+              -> ((Int -> Int) -> Int -> t -> Expr () Int)
+              -> Property
+propG_rebuild summariseExpr rebuild = withTests numRandomTests $ property $ do
   expr1Char <- forAll genExpr
   let expr1 = fmap ord expr1Char
-      esummary = KATHash1.summariseExpr expr1
-      expr2 = KATHash1.rebuild (+1) (0 :: Int) esummary
+      esummary = summariseExpr expr1
+      expr2 = rebuild (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+
+prop_rebuild :: Property
+prop_rebuild = propG_rebuild KATHash1.summariseExpr KATHash1.rebuild
 
 prop_rebuild2 :: Property
-prop_rebuild2 = withTests numRandomTests $ property $ do
-  expr1Char <- forAll genExpr
-  let expr1 = fmap ord expr1Char
-      esummary = KATHash2.summariseExpr expr1
-      expr2 = KATHash2.rebuild (+1) (0 :: Int) esummary
-  assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+prop_rebuild2 = propG_rebuild KATHash2.summariseExpr KATHash2.rebuild
 
 prop_rebuild3 :: Property
-prop_rebuild3 = withTests numRandomTests $ property $ do
-  expr1Char <- forAll genExpr
-  let expr1 = fmap ord expr1Char
-      esummary = KATHash3.summariseExpr expr1
-      expr2 = KATHash3.rebuild (+1) (0 :: Int) esummary
-  assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+prop_rebuild3 = propG_rebuild KATHash3.summariseExpr KATHash3.rebuild
 
 prop_rebuildFastOrig :: Property
-prop_rebuildFastOrig = withTests numRandomTests $ property $ do
-  expr1Char <- forAll genExpr
-  let expr1 = fmap ord expr1Char
-      esummary = KATHashFastOrig.summariseExpr expr1
-      expr2 = KATHashFastOrig.rebuild (+1) (0 :: Int) esummary
-  assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
+prop_rebuildFastOrig =
+  propG_rebuild KATHashFastOrig.summariseExpr KATHashFastOrig.rebuild
 
 prop_fastMatches3 :: Property
 prop_fastMatches3 = withTests numRandomTests $ property $ do
