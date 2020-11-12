@@ -27,12 +27,12 @@ data BenchmarkConfig = BenchmarkConfig
   }
 
 data Algorithms a = Algorithms
-  { aLocallyNameless :: a
-  , aCastHashOptimized  :: a
-  , aKATHashFromPaper   :: a
+  { aLocallyNameless        :: a
+  , aCastHashOptimized      :: a
+  , aKATHashFromPaper       :: a
   , aKATHashFromPaperFaster :: a
-  , aDeBrujinHash       :: a
-  , aStructuralHashNested    :: a
+  , aDeBrujinHash           :: a
+  , aStructuralHashNested   :: a
   -- Hash.deBruijnNestedHash is slower than Hash.locallyNameless so
   -- we don't need it
   -- , aDeBruijnNested     :: a
@@ -50,8 +50,8 @@ algorithms_ = Algorithms
   , aCastHashOptimized  = ("CAST Optimized", castHashOptimized, "black")
   , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
   , aKATHashFromPaperFaster = ("KATHash optimized", KATHashFasterOrigHash.katHash, "yellow")
-  , aDeBrujinHash       = ("de Bruijn*", deBruijnHash, prettyBad)
-  , aStructuralHashNested    = ("Structural*", structuralHashNested, veryBad)
+  , aDeBrujinHash           = ("de Bruijn*", deBruijnHash, prettyBad)
+  , aStructuralHashNested   = ("Structural*", structuralHashNested, veryBad)
   -- , aDeBruijnNested     = ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
   -- , aCastHash           = ("Compositional", castHash,   "green")
   -- , aCombinedHash       = ("Combined", combinedHash,    "blue")
