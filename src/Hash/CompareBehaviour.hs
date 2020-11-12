@@ -16,14 +16,14 @@ import Text.Blaze.Html5 hiding (table, th, td, map)
 -- | This is the entry point to this module.  Provide a file path and
 -- it will write an HTML file which shows the comparison of the
 -- hashing functions.
-writeAwfFormatExpressionsHTML :: FilePath -> IO ()
-writeAwfFormatExpressionsHTML = flip writeFileHTML awfFormatExpressionsHTML
+writeFormatExpressionsHTML :: FilePath -> IO ()
+writeFormatExpressionsHTML = flip writeFileHTML formatExpressionsHTML
 
-awfFormatExpressionsHTML :: Html
-awfFormatExpressionsHTML =
+formatExpressionsHTML :: Html
+formatExpressionsHTML =
   forEach (inList expressions) $ \(expressionName, expression) -> do
     p (toHtml expressionName)
-    awfFormatExpressionHTML expression
+    formatExpressionHTML expression
 
   where expressions = [ ("Example 1", example1)
                       , ("Example 2", example2)
@@ -33,8 +33,8 @@ awfFormatExpressionsHTML =
                       , ("Example 6", example6)
                       , ("Example 7", example7) ]
 
-awfFormatExpressionHTML :: Expr () String -> Html
-awfFormatExpressionHTML e =
+formatExpressionHTML :: Expr () String -> Html
+formatExpressionHTML e =
   table $ annotating tr $ \tr_ -> do
      tr_ $ annotating th $ \th_ -> do
        th_ (code (toHtml (showExpr e)))

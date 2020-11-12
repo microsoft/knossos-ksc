@@ -46,7 +46,7 @@
 -- hashing algorithms
 --
 --     > import CompareBehaviour
---     > writeAwfFormatExpressionsHTML "filename.html"
+--     > writeFormatExpressionsHTML "filename.html"
 --
 -- The sub-expression hashing algorithms are (this list is out of date)
 --
