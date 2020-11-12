@@ -47,7 +47,7 @@ algorithms_ :: (Hashable a, Ord a)
             => Algorithms (String, Expr h a -> Expr Hash.Hash a, String)
 algorithms_ = Algorithms
   { aLocallyNameless    = ("Locally nameless", Hash.locallyNameless, baseline)
-  , aCastHashOptimized  = ("Compositional-Optimized", castHashOptimized, "black")
+  , aCastHashOptimized  = ("CAST Optimized", castHashOptimized, "black")
   , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
   , aKATHashFromPaperFaster = ("KATHash optimized", KATHashFasterOrigHash.katHash, "yellow")
   , aDeBrujinHash       = ("de Bruijn*", deBruijnHash, prettyBad)
