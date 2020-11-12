@@ -208,7 +208,7 @@ stats (n, tsum, tsquaredsum, tmin) = (n, mean, tmin, variance, stddev)
 -- benchmarkOne will seq the result of `algorithm expression`.  It is
 -- the caller's responsibility to ensure that this causes *all*
 -- desired work to be performed.  If you're not sure on this point
--- please ask Tom Ellis (toelli).
+-- please ask the author.
 benchmarkOne :: Int
              -> Int
              -> (e -> r)

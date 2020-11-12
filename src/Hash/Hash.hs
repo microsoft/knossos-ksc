@@ -50,7 +50,7 @@
 --
 -- The sub-expression hashing algorithms are (this list is out of date)
 --
--- * castHash (Tom's structural and free-vars hash)
+-- * castHash (structural and free-vars hash)
 -- * deBruijnHash (known to be broken)
 -- * combinedHash (deBruijnHash plus a free variable hash -- known to be broken)
 --

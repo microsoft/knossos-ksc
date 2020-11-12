@@ -41,7 +41,7 @@ awfFormatExpressionHTML e =
        forEach (inRow algorithms) $ \(algorithmName, _) ->
          th_ (toHtml algorithmName)
      forEach (inFoldable allGroups) $ \group -> do
-         let shouldBePresent = group `elem` tom'sGroups
+         let shouldBePresent = group `elem` castGroups
              color = if shouldBePresent then green else red
          tr_ $ do
            td $ code $ highlightedExprColor color (map reverse group) e
@@ -65,7 +65,7 @@ awfFormatExpressionHTML e =
            . normalizedGroupedEquivalentSubexpressions
            . algorithm) e
 
-        (tom'sGroups, _) = groupsPerAlgorithm
+        (castGroups, _) = groupsPerAlgorithm
 
         groupsPerAlgorithm = mapRow (groupsOfAlgorithm . (allHashResults .) . snd) algorithms
 
