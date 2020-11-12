@@ -148,14 +148,17 @@ def parse_expr(se):
 
     # Let(var, rhs, body)
     if head == _let:
-        bindings = ensure_list_of_lists(se[1])
-        ans = parse_expr(se[2])
-        for b in bindings[::-1]:
-            check(len(b) == 2, "Let bindings should be pairs", b, "in", se)
-            # TODO: bindings could be tupled
-            var = Var(parse_name(b[0]), None, False)
-            rhs = parse_expr(b[1])
-            ans = Let(var, rhs, ans)
+        check(len(se) == 3, "Let should have 2 terms (let (<binding>) body) in", se)
+        binding = se[1]
+        check(len(binding) == 2, "Let bindings should be pairs", binding, "in", se)
+        lhs = binding[0]
+        if isinstance(lhs, list):
+            vars = [Var(parse_name(v)) for v in lhs]
+        else:
+            vars = Var(parse_name(lhs))
+        rhs = parse_expr(binding[1])
+        body = parse_expr(se[2])
+        ans = Let(vars, rhs, body)
         return ans
 
     # Lam(var, type, body)
