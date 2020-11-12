@@ -3,10 +3,12 @@
 
 module KATHashFasterOrigHash where
 
+import KATHashFastOrigHash (thenHash)
+
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Bits (xor)
-import Data.Hashable (Hashable, hash, hashWithSalt)
+import Data.Hashable (Hashable, hash)
 import Data.List (foldl')
 
 import Expr (Expr(Var, Lam, App))
@@ -17,16 +19,6 @@ type Positions = Hash
 type StructureTag = Structure
 
 data VarMap name = VM !(Map name Positions) !Hash
-
--- Data.Hashable.Hash is an FNV-1 hash.  It has the property that x
--- `hashWithSalt` (x `hashWithSalt` y) == y that is undesirable for
--- compositionally hashing trees.  Tom Minka spotted that the
--- implementation below turns it into an FNV-1a hash which doesn't
--- have the undesirable property.
-thenHash :: Hashable a => Hash -> a -> Hash
-thenHash x y = (x `hashWithSalt` y) `hashWithSalt` (0 :: Int)
-
-infixl `thenHash`
 
 mkSVar :: Structure
 mkSVar = hash "SVar"
