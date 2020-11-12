@@ -12,8 +12,8 @@
 			"request": "launch",
 			"program": "src/onnx2ks/onnx2ks.py",
 			"args": [
-				"test/onnx2k/super_resolution.onnx", 
-				"obj/"
+				"obj/hf-bert-to-onnx/bert3.onnx", 
+				"obj/hf-bert-to-onnx/bert3"
 			],
 			"env" : {
 				"PYTHONPATH": "./src/python"
