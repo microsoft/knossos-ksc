@@ -48,7 +48,7 @@
 --     > import CompareBehaviour
 --     > writeAwfFormatExpressionsHTML "filename.html"
 --
--- The sub-expression hashing algorithms are
+-- The sub-expression hashing algorithms are (this list is out of date)
 --
 -- * castHash (Tom's structural and free-vars hash)
 -- * deBruijnHash (known to be broken)
