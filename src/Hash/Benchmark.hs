@@ -27,13 +27,13 @@ data BenchmarkConfig = BenchmarkConfig
   }
 
 data Algorithms a = Algorithms
-  { aSPJLocallyNameless :: a
+  { aLocallyNameless :: a
   , aCastHashOptimized  :: a
   , aKATHashFromPaper   :: a
   , aKATHashFromPaperFaster :: a
   , aDeBrujinHash       :: a
   , aStructuralHashNested    :: a
-  -- Hash.deBruijnNestedHash is slower than Hash.spjLocallyNameless so
+  -- Hash.deBruijnNestedHash is slower than Hash.locallyNameless so
   -- we don't need it
   -- , aDeBruijnNested     :: a
   -- castHash is slower than castHashOptimized so we don't need it
@@ -46,7 +46,7 @@ data Algorithms a = Algorithms
 algorithms_ :: (Hashable a, Ord a)
             => Algorithms (String, Expr h a -> Expr Hash.Hash a, String)
 algorithms_ = Algorithms
-  { aSPJLocallyNameless = ("SPJ locally nameless", Hash.spjLocallyNameless, baseline)
+  { aLocallyNameless    = ("Locally nameless", Hash.locallyNameless, baseline)
   , aCastHashOptimized  = ("Compositional-Optimized", castHashOptimized, "black")
   , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
   , aKATHashFromPaperFaster = ("KATHash optimized", KATHashFasterOrigHash.katHash, "yellow")

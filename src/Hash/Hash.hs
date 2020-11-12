@@ -453,20 +453,20 @@ castHashOptimizedExplicit =
           (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashesE)
             = castHashOptimizedExplicit (hash pathHash `thenHash` Apr) bvEnv e
 
-spjLocallyNameless :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
-spjLocallyNameless = mapAnnotation hash . spjLocallyNamelessExplicit
+locallyNameless :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
+locallyNameless = mapAnnotation hash . locallyNamelessExplicit
 
-spjLocallyNamelessExplicit :: (Ord a, Hashable a) => Expr h a -> Expr Hash a
+locallyNamelessExplicit :: (Ord a, Hashable a) => Expr h a -> Expr Hash a
 -- Decorates an expression with a
 -- hash-code at every node
-spjLocallyNamelessExplicit (Var _ n)     = Var (hash n) n
-spjLocallyNamelessExplicit (App _ e1 e2) = App h he1 he2
+locallyNamelessExplicit (Var _ n)     = Var (hash n) n
+locallyNamelessExplicit (App _ e1 e2) = App h he1 he2
   where
-        he1 = spjLocallyNamelessExplicit e1
-        he2 = spjLocallyNamelessExplicit e2
+        he1 = locallyNamelessExplicit e1
+        he2 = locallyNamelessExplicit e2
         h =   hashExprO (AppO (Just (annotation he1)) (Just (annotation he2)))
 
-spjLocallyNamelessExplicit e_@(Lam _ n e) = Lam h n (spjLocallyNamelessExplicit e)
+locallyNamelessExplicit e_@(Lam _ n e) = Lam h n (locallyNamelessExplicit e)
   where
     h = hashOnly emptyEnv e_
         -- Yikes!  A second full traversal of e
@@ -989,12 +989,12 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
   expr <- forAll (fmap uniquifyBinders genExpr)
   let castHash_groups = n (castHash expr)
       --castHashOptimized_groups = n (castHashOptimized expr)
-      spjLocallyNameless_groups = n (spjLocallyNameless expr)
+      locallyNameless_groups = n (locallyNameless expr)
       deBruijnNestedHash_groups = n (deBruijnNestedHash expr)
       katHashFastOrigHash_groups = n (KATHashFastOrigHash.katHash expr)
 
   --castHash_groups === castHashOptimized_groups
-  castHash_groups === spjLocallyNameless_groups
+  castHash_groups === locallyNameless_groups
   castHash_groups === deBruijnNestedHash_groups
   castHash_groups === katHashFastOrigHash_groups
 
