@@ -265,7 +265,7 @@ def onnx2ks(g):
         s = schemas[opname]
         name = s.name
 
-        # Gather args from input
+        # Collect args from input
         args = [useVar(i) for i in node.input]
 
         # Special cases
@@ -287,7 +287,7 @@ def onnx2ks(g):
             name = "Cast_" + out_type
 
         else:
-            # Gather attributes. 
+            # Collect attributes. 
             # - Some are set on the node.
             node_attrs = dict()
             for n in node.attribute:
@@ -435,10 +435,11 @@ if __name__ == "__main__":
         # And load again...
         decls = parse_ks_file(outbase + ".ks")
 
-    # Pretty print
-    for decl in decls:
-        cpprint(decl, width=132, ribbon_width=132)
-        print('')
+    if False:
+        # Pretty print
+        for decl in decls:
+            cpprint(decl, width=132, ribbon_width=132)
+            print('')
 
 
 
