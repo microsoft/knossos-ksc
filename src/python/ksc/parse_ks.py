@@ -195,7 +195,7 @@ def strip_block_comments(string):
             # print(f"Zapped {n} block comment(s)")
             return string    
 
-def parse_ks_file(string_or_stream):
+def parse_ks_string(string_or_stream):
     string = strip_block_comments(string_or_stream)
 
     for s_exp in s_exps_from_string(string):
@@ -206,29 +206,20 @@ def parse_ks_file(string_or_stream):
             print("ERROR at ", s_exp)
             print(sys.exc_info()[1])
 
-def parse_ks_string(string):
-    string = strip_block_comments(string)
-
-    for s_exp in s_exps_from_string(string):
-        try:
-            yield parse_tld(s_exp)
-            
-        except ParseError:
-            print("ERROR at ", s_exp)
-            print(sys.exc_info()[1])
+def parse_ks_file(string_or_stream):
+    return parse_ks_string(string_or_stream)
 
 def parse_ks_filename(filename):
     with open(filename) as f:
         ks_str = f.read()
-        return parse_ks_string(ks_str)
+        return parse_ks_file(ks_str)
 
 def main():
     parser = argparse.ArgumentParser(prog="parse_ks.py", description=__doc__)
     parser.add_argument("input_ks_file", nargs='?', type=str, default="test/ksc/syntax-primer.ks")
     args = parser.parse_args()
 
-    for x in parse_ks_file(args.input_ks_file):
-        cpprint(x)
+    for x in parse_ks_filename(args.input_ks_file):
         print(pystr(x, 0))
 
 if __name__ == "__main__":
