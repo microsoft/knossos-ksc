@@ -22,8 +22,6 @@ data BenchmarkConfig = BenchmarkConfig
   { bcGenExpr              :: Int -> IO (Expr () Int)
   , bcGenName              :: String
   , bcTotalExpressions     :: Int
-  , bcSamplesPerExpression :: Int
-  , bcIterationsPerSample  :: Int
   }
 
 data Algorithms a = Algorithms
@@ -72,29 +70,21 @@ benchmark = do
               { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
               , bcGenName = "unbalanced expressions (old generator)"
               , bcTotalExpressions     = totalExpressions
-              , bcSamplesPerExpression = 20
-              , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars'
               , bcGenName = "unbalanced expressions (new generator)"
               , bcTotalExpressions     = totalExpressions
-              , bcSamplesPerExpression = 20
-              , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars'
               , bcGenName = "balanced expressions (old generator)"
               , bcTotalExpressions     = totalExpressions
-              , bcSamplesPerExpression = 20
-              , bcIterationsPerSample  = 20
               }
             , BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
               , bcGenName = "balanced expressions (new generator)"
               , bcTotalExpressions     = totalExpressions
-              , bcSamplesPerExpression = 20
-              , bcIterationsPerSample  = 20
               }
             ]
 
