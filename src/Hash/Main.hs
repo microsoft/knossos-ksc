@@ -25,6 +25,7 @@ data Expressions a = Expressions
   { eMnistCNN :: a
   , eGMMRev   :: a
   , eGMM      :: a
+  , eBERTs    :: [a]
   }
   deriving (Functor, Foldable, Traversable)
 
@@ -33,6 +34,7 @@ expressions = Expressions
   { eMnistCNN = "mnistcnn"
   , eGMMRev   = "gmm-rev"
   , eGMM      = "gmm"
+  , eBERTs    = []
   }
 
 testcase_path :: String -> FilePath
