@@ -85,12 +85,12 @@ benchmark (runs, minimumMeasureableTime_seconds, totalExpressions) = do
               , bcTotalExpressions     = totalExpressions
               }
             , BenchmarkConfig
-              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars'
+              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
               , bcGenName = "balanced expressions (old generator)"
               , bcTotalExpressions     = totalExpressions
               }
             , BenchmarkConfig
-              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
+              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars'
               , bcGenName = "balanced expressions (new generator)"
               , bcTotalExpressions     = totalExpressions
               }
