@@ -10,6 +10,7 @@ import qualified KATHashFastOrigHash
 import Data.Bits
 import Data.Function (on)
 import Data.Hashable (Hashable)
+import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
 import Control.Monad (when)
 import System.IO.Temp (createTempDirectory, emptyTempFile)
@@ -75,8 +76,37 @@ collisions = do
         unwords [show bw, show mlogp, show bw, "\n"]
 
   resultsDir <- createTempDirectory "." "benchmarks"
-  datFile <- emptyTempFile resultsDir "collisions.dat"
+  datFile    <- emptyTempFile resultsDir "collisions.dat"
+  gnuplotFilename <- emptyTempFile resultsDir "collisions.gnuplot"
+  gnuplotPngFilename <- emptyTempFile resultsDir "collisions-png.gnuplot"
+  outputPng <- emptyTempFile resultsDir "collisions.png"
 
   writeFile datFile textOutput
+  writeFile gnuplotFilename (gnuplotFileContents datFile)
+  writeFile gnuplotPngFilename (gnuplotFilePng outputPng datFile)
 
   putStrLn ("I put stuff in " ++ resultsDir)
+  putStrLn "If you have an X server and you want a live graph view run:"
+  putStrLn ("DISPLAY=:0 gnuplot --persist " ++ gnuplotFilename)
+  putStrLn "If you want to generate a PNG run:"
+  putStrLn ("gnuplot " ++ gnuplotPngFilename)
+  putStrLn ("You will find the output PNG in " ++ outputPng)
+
+gnuplotFileContents :: String -> String
+gnuplotFileContents datFile =
+  unlines [ "set key left top"
+          , "set xlabel \"Hash width / bits\""
+          , "set ylabel \"-log_2 expressions per collision (balanced expressions)"
+          , "plot "
+            ++ intercalate ", " [ quote datFile ++ " using 2 title \"KAT hash actual\""
+                                , quote datFile ++ " using 3 title \"Perfectly random\"" ]
+
+          ]
+  where quote s = "\"" ++ s ++ "\""
+
+gnuplotFilePng :: String -> String -> String
+gnuplotFilePng outputPng datFile = unlines
+  [ "set terminal pngcairo size 1024,768"
+  , "set output \"" ++ outputPng ++ "\""
+  , gnuplotFileContents datFile
+  ]
