@@ -12,6 +12,7 @@ import Data.Function (on)
 import Data.Hashable (Hashable)
 import qualified Data.Map.Strict as Map
 import Control.Monad (when)
+import System.IO.Temp (createTempDirectory, emptyTempFile)
 
 import Hedgehog hiding (Var)
 import qualified Hedgehog.Gen as Gen
@@ -69,3 +70,13 @@ collisions = do
     putStrLn ("Bit width " ++ show width ++ ": "
               ++ "Proportion 1/2 ^ " ++ show logProb ++ " hashes collide."
              ++ "  Uniformly random would be 1/2 ^ " ++ show width)
+
+  let textOutput = flip concatMap (Map.toList m''') $ \(bw, mlogp) ->
+        unwords [show bw, show mlogp, show bw, "\n"]
+
+  resultsDir <- createTempDirectory "." "benchmarks"
+  datFile <- emptyTempFile resultsDir "collisions.dat"
+
+  writeFile datFile textOutput
+
+  putStrLn ("I put stuff in " ++ resultsDir)
