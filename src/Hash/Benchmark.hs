@@ -215,7 +215,7 @@ benchmarkOne :: Int
              -> e
              -> IO AggregateStatistics
 benchmarkOne samplesPerExpression iterationsPerSample algorithm expression =
-  times samplesPerExpression (0 :: Int, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
+  times samplesPerExpression (0, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
         start <- Clock.getTime Clock.Monotonic
         times iterationsPerSample () $ \() ->
           evaluate algorithm expression
