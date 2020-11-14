@@ -100,26 +100,25 @@ benchmark (runs, minimumMeasureableTime_seconds, totalExpressions) = do
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
-  results_genNames <- flip mapM bcs $ \bc -> do
-    results <- benchmarkThis runs minimumMeasureableTime_seconds
+  results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
+    results <- benchmarkThis (show i ++ "/" ++ show (length bcs))
+                             runs minimumMeasureableTime_seconds
                              benchmarksDir algorithms varCounts bc
     pure (results, bcGenName bc)
   flip mapM_ results_genNames $ \(results, genName) ->
     makeGnuplot benchmarksDir genName results
 
-benchmarkThis :: Int
+benchmarkThis :: String
+              -> Int
               -> Double
               -> FilePath
               -> [(String, Expr () Int -> Expr hash string, String)]
               -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]
-benchmarkThis runs minimumMeasureableTime_seconds
+benchmarkThis expressionSet runs minimumMeasureableTime_seconds
               benchmarksDir algorithms varCounts bc = do
   let allParams = (,) <$> algorithms <*> varCounts
-
-      enumFrom1 :: [a] -> [(Int, a)]
-      enumFrom1 = zip [1..]
 
   results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
     let (varCount, varCountSymbol) = var_
@@ -147,6 +146,7 @@ benchmarkThis runs minimumMeasureableTime_seconds
                          (seqHashResult . algorithm)
                          expression
 
+      putStrLn ("Expression set " ++ expressionSet)
       putStrLn ("Parameter set "
                  ++ show i ++ "/" ++ show (length allParams)
                  ++ " (" ++ algorithmName ++ ")")
@@ -348,3 +348,6 @@ times n s f = times_f 0 s
           else do
             s' <- f s_
             times_f (m + 1) s'
+
+enumFrom1 :: [a] -> [(Int, a)]
+enumFrom1 = zip [1..]
