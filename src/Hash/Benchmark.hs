@@ -66,7 +66,7 @@ fast :: BenchmarkParams
 fast = (3, 0.01, 10)
 
 full :: BenchmarkParams
-full = (10, 0.5, 100)
+full = (10, 0.1, 100)
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
