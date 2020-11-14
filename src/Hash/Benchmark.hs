@@ -60,12 +60,20 @@ algorithms_ = Algorithms
       good      = "green"
       baseline  = "blue"
 
+type BenchmarkParams = (Int, Double, Int)
+
+fast :: BenchmarkParams
+fast = (3, 0.01, 10)
+
+full :: BenchmarkParams
+full = (10, 0.5, 100)
+
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
 -- from the run will be written out to a directory whose name is
 -- displayed at the end of the run.
-benchmark :: IO ()
-benchmark = do
+benchmark :: (Int, Double, Int) -> IO ()
+benchmark (runs, minimumMeasureableTime_seconds, totalExpressions) = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
               , bcGenName = "unbalanced expressions (old generator)"
@@ -88,24 +96,26 @@ benchmark = do
               }
             ]
 
-      totalExpressions = 100
-
       algorithms = Data.Foldable.toList algorithms_
       varCounts = [ (10, "1") {-, (100, "4")-} ]
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
   results_genNames <- flip mapM bcs $ \bc -> do
-    results <- benchmarkThis benchmarksDir algorithms varCounts bc
+    results <- benchmarkThis runs minimumMeasureableTime_seconds
+                             benchmarksDir algorithms varCounts bc
     pure (results, bcGenName bc)
   flip mapM_ results_genNames $ \(results, genName) ->
     makeGnuplot benchmarksDir genName results
 
-benchmarkThis :: FilePath
+benchmarkThis :: Int
+              -> Double
+              -> FilePath
               -> [(String, Expr () Int -> Expr hash string, String)]
               -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]
-benchmarkThis benchmarksDir algorithms varCounts bc = do
+benchmarkThis runs minimumMeasureableTime_seconds
+              benchmarksDir algorithms varCounts bc = do
   let allParams = (,) <$> algorithms <*> varCounts
 
       enumFrom1 :: [a] -> [(Int, a)]
@@ -124,8 +134,7 @@ benchmarkThis benchmarksDir algorithms varCounts bc = do
       -- to keep this hear for clarity.
       !expression <- bcGenExpr bc varCount
 
-      let minimumMeasureableTime_seconds = 0.5
-          minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
+      let minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
 
       (repeats, firstStats) <- benchmarkUntil minimumMeasureableTime_micro
                                               1
@@ -133,7 +142,7 @@ benchmarkThis benchmarksDir algorithms varCounts bc = do
                                               expression
 
       r <- benchmarkMore firstStats
-                         9
+                         (runs - 1)
                          repeats
                          (seqHashResult . algorithm)
                          expression

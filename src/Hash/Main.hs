@@ -68,7 +68,8 @@ main :: IO ()
 main = do
   getArgs >>= \case
     ["manual"] -> specific_benchmarks
-    ["random"] -> Benchmark.benchmark
+    ["random", "fast"] -> Benchmark.benchmark Benchmark.fast
+    ["random", "full"] -> Benchmark.benchmark Benchmark.full
     ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
     ["collisions", "fast"] -> Collision.collisions 4
     ["collisions", "full"] -> Collision.collisions 16
