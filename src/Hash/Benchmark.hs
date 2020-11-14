@@ -214,8 +214,17 @@ benchmarkOne :: Int
              -> (e -> r)
              -> e
              -> IO AggregateStatistics
-benchmarkOne samplesPerExpression iterationsPerSample algorithm expression =
-  times samplesPerExpression (0, 0, 0, infinity) $ \(n, !t, !tsquared, !minSoFar) -> do
+benchmarkOne = benchmarkMore (0, 0, 0, infinity)
+  where infinity = 1e60
+
+benchmarkMore :: AggregateStatistics
+              -> Int
+              -> Int
+              -> (e -> r)
+              -> e
+              -> IO AggregateStatistics
+benchmarkMore already samplesPerExpression iterationsPerSample algorithm expression =
+  times samplesPerExpression already $ \(n, !t, !tsquared, !minSoFar) -> do
         start <- Clock.getTime Clock.Monotonic
         times iterationsPerSample () $ \() ->
           evaluate algorithm expression
@@ -230,8 +239,6 @@ benchmarkOne samplesPerExpression iterationsPerSample algorithm expression =
                 t + elapsed_micro,
                 tsquared + elapsed_micro * elapsed_micro,
                 min minSoFar elapsed_micro)
-
-  where infinity = 1e60
 
 readExpr :: FilePath -> IO (Expr () String)
 readExpr = readExprG
