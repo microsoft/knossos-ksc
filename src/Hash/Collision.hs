@@ -4,12 +4,13 @@ import qualified Hash
 
 import qualified Benchmark
 import Expr
+import Hash (Hash)
 import qualified KATHashFastOrigHash
 
 import Data.Bits
+import Data.Function (on)
 import Data.Hashable (Hashable)
 import qualified Data.Map.Strict as Map
-import Data.List (foldl')
 import Control.Monad (when)
 
 import Hedgehog hiding (Var)
@@ -27,27 +28,34 @@ genNotAlphaEquiv gen = do
 
   pure (expr1, expr2)
 
+restrictToBits :: Int -> Hash -> Hash
+restrictToBits i h = h `shiftL` (bitsize - i)
+  where bitsize = finiteBitSize (0 :: Hash)
+
 collisions :: IO ()
 collisions = do
-  let count = 100
+  let maxBits = 16
+      count   = 2 ^ (maxBits + 2)
+      emptyMap :: Map.Map Int Int
+      emptyMap = Map.fromList (map (\i -> (i, 0)) [0..maxBits])
 
-  (_, m) <- Benchmark.times count (0 :: Int, Map.fromList (map (\i -> (i :: Int, 0 :: Int)) [0..64])) $ \(loopCount, m) -> do
-    when (loopCount `mod` 100 == 0) $
+  (_, m) <- Benchmark.times count (0 :: Int, emptyMap) $ \(loopCount, m) -> do
+    when (loopCount `mod` 100 == 0) $ do
+      let percentComplete :: Double
+          percentComplete = fromIntegral loopCount / fromIntegral count * 100
+
       putStrLn ("Iteration " ++ show loopCount ++ "/" ++ show count
-               ++ " (" ++ show (fromIntegral loopCount / fromIntegral count * 100 :: Double)
-               ++ "% complete)")
+               ++ " (" ++ show percentComplete ++ "% complete)")
 
     (expr1, expr2) <- Gen.sample (genNotAlphaEquiv (Hash.genExprNumVars' 10))
 
     let h1 = annotation (KATHashFastOrigHash.katHash expr1)
         h2 = annotation (KATHashFastOrigHash.katHash expr2)
 
-        bitsize = 64
-
-        m'' = (\f -> foldl' f m [0..bitsize]) $ \m' i ->
-                if h1 `shiftL` (bitsize - i) == h2 `shiftL` (bitsize - i)
-                then Map.adjust (+1) i m'
-                else m'
+        m'' = Map.mapWithKey (\i v -> if ((==) `on` restrictToBits i) h1 h2
+                                      then v+1
+                                      else v)
+                            m
 
     pure (loopCount + 1, m'')
 
