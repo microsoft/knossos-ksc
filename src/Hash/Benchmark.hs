@@ -240,6 +240,28 @@ benchmarkMore already samplesPerExpression iterationsPerSample algorithm express
                 tsquared + elapsed_micro * elapsed_micro,
                 min minSoFar elapsed_micro)
 
+benchmarkUntil :: Double
+               -> Integer
+               -> (e -> r)
+               -> e
+               -> IO (Integer, AggregateStatistics)
+benchmarkUntil minimumMeasurableTime_micro repeats f x = do
+  start <- Clock.getTime Clock.Monotonic
+  times repeats () $ \() ->
+    evaluate f x
+  stop <- Clock.getTime Clock.Monotonic
+
+  let iterationsElapsed_micro = fromIntegral iterationsElapsed_nano / 1e3
+        where iterationsElapsed = Clock.diffTimeSpec stop start
+              iterationsElapsed_nano = Clock.toNanoSecs iterationsElapsed
+
+      elapsed_micro = iterationsElapsed_micro / fromIntegral repeats
+
+  if iterationsElapsed_micro < minimumMeasurableTime_micro
+  then benchmarkUntil minimumMeasurableTime_micro (2 * repeats) f x
+  else pure (repeats,
+             (1, elapsed_micro, elapsed_micro * elapsed_micro, elapsed_micro))
+
 readExpr :: FilePath -> IO (Expr () String)
 readExpr = readExprG
 
@@ -310,7 +332,7 @@ evaluate a e = let !_ = a e
 seqHashResult :: Expr h a -> ()
 seqHashResult = flip seq ()
 
-times :: Monad m => Int -> s -> (s -> m s) -> m s
+times :: (Ord a, Num a, Monad m) => a -> s -> (s -> m s) -> m s
 times n s f = times_f 0 s
   where times_f m s_ =
           if m >= n
