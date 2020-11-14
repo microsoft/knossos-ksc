@@ -70,5 +70,6 @@ main = do
     ["manual"] -> specific_benchmarks
     ["random"] -> Benchmark.benchmark
     ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
-    ["collisions"] -> Collision.collisions
+    ["collisions", "fast"] -> Collision.collisions 4
+    ["collisions", "full"] -> Collision.collisions 16
     _ -> putStrLn "Unsupported argument"
