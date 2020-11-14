@@ -134,10 +134,19 @@ benchmarkThis benchmarksDir algorithms varCounts bc = do
       -- to keep this hear for clarity.
       !expression <- bcGenExpr bc varCount
 
-      r <- benchmarkOne (bcSamplesPerExpression bc)
-                        (bcIterationsPerSample bc)
-                        (seqHashResult . algorithm)
-                        expression
+      let minimumMeasureableTime_seconds = 0.5
+          minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
+
+      (repeats, firstStats) <- benchmarkUntil minimumMeasureableTime_micro
+                                              1
+                                              (seqHashResult . algorithm)
+                                              expression
+
+      r <- benchmarkMore firstStats
+                         9
+                         repeats
+                         (seqHashResult . algorithm)
+                         expression
 
       putStrLn ("Parameter set "
                  ++ show i ++ "/" ++ show (length allParams)
@@ -210,7 +219,7 @@ stats (n, tsum, tsquaredsum, tmin) = (n, mean, tmin, variance, stddev)
 -- desired work to be performed.  If you're not sure on this point
 -- please ask the author.
 benchmarkOne :: Int
-             -> Int
+             -> Integer
              -> (e -> r)
              -> e
              -> IO AggregateStatistics
@@ -219,7 +228,7 @@ benchmarkOne = benchmarkMore (0, 0, 0, infinity)
 
 benchmarkMore :: AggregateStatistics
               -> Int
-              -> Int
+              -> Integer
               -> (e -> r)
               -> e
               -> IO AggregateStatistics
@@ -276,7 +285,7 @@ readExprG filepath = do
 benchmarkOneReadFile :: Read e
                      => FilePath
                      -> Int
-                     -> Int
+                     -> Integer
                      -> (e -> r)
                      -> IO AggregateStatistics
 benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm = do

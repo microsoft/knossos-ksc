@@ -36,7 +36,8 @@ restrictToBits i h = h `shiftL` (bitsize - i)
 
 collisions :: Int -> IO ()
 collisions maxBits = do
-  let count   = 2 ^ (maxBits + 2)
+  let count :: Int
+      count = 2 ^ (maxBits + 2)
       emptyMap :: Map.Map Int Int
       emptyMap = Map.fromList (map (\i -> (i, 0)) [0..maxBits])
 
