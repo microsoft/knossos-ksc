@@ -318,7 +318,7 @@ gnuplotFile xlabel results =
   unlines [ "set xlabel \"Number of nodes in expression (" ++ xlabel ++ ")\""
           , "set ylabel \"Time taken to hash all subexpressions / us"
           , "set logscale xy 2"
-          , "set key left top"
+          , "set key right bottom"
           , "set xrange [64:]"
           , "plot " ++ intercalate ", " (fmap plotDataset results)
           ]
