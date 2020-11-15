@@ -894,11 +894,6 @@ genExprWithVarsTest vars = genExprWithVars_vars
           ]
 
 -- | Generates random expressions for benchmarking
-genExprWithVars :: MonadGen m => [v] -> m (Expr () v)
-genExprWithVars vars = do
-  size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsSizeG size (Gen.element vars) (Gen.element vars)
-
 genExprWithVars' :: (Integral v, MonadGen m)
                  => [v] -> v -> (v -> v) -> m (Expr () v)
 genExprWithVars' inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
@@ -930,13 +925,6 @@ genExprWithVarsSizeG size vars binders =
                    <*> genExprWithVarsSizeG sizeR vars binders
        , do Lam () <$> binders <*> genExprWithVarsSizeG (size - 1) vars binders
        ]
-
--- | Generate expressions that are completely unbalanced, for
--- benchmarking the worst cases of some of our hashing algorithms.
-genExprWithVarsLinear :: MonadGen m => [a] -> m (Expr () a)
-genExprWithVarsLinear vars = do
-  size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsLinearSizeG size (Gen.element vars) (Gen.element vars)
 
 genExprWithVarsLinear' :: (Integral a, MonadGen m)
                        => a -> (a -> a) -> m (Expr () a)
@@ -970,17 +958,11 @@ genExprWithVarsLinearSizeG size vars binders =
 genExpr :: MonadGen m => m (Expr () Char)
 genExpr = genExprWithVarsTest ['u'..'z']
 
-genExprNumVars :: MonadGen m => Int -> m (Expr () Int)
-genExprNumVars n = genExprWithVars [1..n]
-
 genExprNumVars' :: MonadGen m => Int -> m (Expr () Int)
 genExprNumVars' n = genExprWithVars' [1..n] (n+1) (+1)
 
 genExprNumVarsSize' :: MonadGen m => Int -> Int -> m (Expr () Int)
 genExprNumVarsSize' n size = genExprWithVarsSize' size (n+1) (+1)
-
-genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
-genExprLinearNumVars n = genExprWithVarsLinear [1..n]
 
 genExprLinearNumVars' :: MonadGen m => Int -> m (Expr () Int)
 genExprLinearNumVars' n = genExprWithVarsLinear' (n+1) (+1)
