@@ -902,7 +902,11 @@ genExprWithVars' :: MonadGen m
                  => [v] -> v -> (v -> v) -> m (Expr () v)
 genExprWithVars' inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
   size <- Gen.int (Range.linear 0 2000)
+  genExprWithVarsSize' size inScope fresh freshen
 
+genExprWithVarsSize' :: MonadGen m
+                     => Int -> [v] -> v -> (v -> v) -> m (Expr () v)
+genExprWithVarsSize' size inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
   let freshVar = do
         (inScope', fresh') <- get
         put (fresh':inScope', freshen fresh')
@@ -935,9 +939,14 @@ genExprWithVarsLinear vars = do
 
 genExprWithVarsLinear' :: MonadGen m
                        => [a] -> a -> (a -> a) -> m (Expr () a)
-genExprWithVarsLinear' inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
+genExprWithVarsLinear' inScope fresh freshen = do
   size <- Gen.int (Range.linear 0 2000)
+  genExprWithVarsLinearSize' size inScope fresh freshen
 
+genExprWithVarsLinearSize' :: MonadGen m
+                           => Int -> [a] -> a -> (a -> a) -> m (Expr () a)
+genExprWithVarsLinearSize' size inScope fresh freshen =
+  flip evalStateT (inScope, fresh) $ do
   let freshVar = do
         (inScope', fresh') <- get
         put (fresh':inScope', freshen fresh')
@@ -967,11 +976,18 @@ genExprNumVars n = genExprWithVars [1..n]
 genExprNumVars' :: MonadGen m => Int -> m (Expr () Int)
 genExprNumVars' n = genExprWithVars' [1..n] (n+1) (+1)
 
+genExprNumVarsSize' :: MonadGen m => Int -> Int -> m (Expr () Int)
+genExprNumVarsSize' n size = genExprWithVarsSize' size [1..n] (n+1) (+1)
+
 genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
 genExprLinearNumVars n = genExprWithVarsLinear [1..n]
 
 genExprLinearNumVars' :: MonadGen m => Int -> m (Expr () Int)
 genExprLinearNumVars' n = genExprWithVarsLinear' [1..n] (n+1) (+1)
+
+genExprLinearNumVarsSize' :: MonadGen m => Int -> Int -> m (Expr () Int)
+genExprLinearNumVarsSize' n size =
+  genExprWithVarsLinearSize' size [1..n] (n+1) (+1)
 
 -- | Shows equivalence of castHash hash and the other algorithms
 prop_equivCastFast :: Property
