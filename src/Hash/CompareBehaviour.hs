@@ -1,6 +1,6 @@
 module CompareBehaviour where
 
-import Hash (castHash,castHashOptimized,combinedHash,deBruijnHash,
+import Hash (combinedHash,deBruijnHash,
              structuralHashWithBinders, structuralHashWithBinders2,
              normalizedGroupedEquivalentSubexpressions,
              allHashResults)
@@ -12,6 +12,8 @@ import HtmlCombinators (table, th, td, writeFileHTML, forEach, inList,
                         annotating, tdCenter, inFoldable, setFromIterator)
 import Lens.Micro
 import Text.Blaze.Html5 hiding (table, th, td, map)
+
+import qualified KATHashFasterOrigHash
 
 -- | This is the entry point to this module.  Provide a file path and
 -- it will write an HTML file which shows the comparison of the
@@ -53,9 +55,8 @@ formatExpressionHTML e =
                   (True,  True)  -> tick
                   (True,  False) -> mempty
 
-  where algorithms = ( ("Compositional", castHash)
-                     , ( ("Compositional-Optimized", castHashOptimized)
-                       , ("Combined", combinedHash)
+  where algorithms = ( ("KATHash", KATHashFasterOrigHash.katHash)
+                     , ( ("Combined", combinedHash)
                        , ("DeBruijn", deBruijnHash)
                        , ("Structural with binders 1", structuralHashWithBinders)
                        , ("Structural with binders 2", structuralHashWithBinders2) ) )
@@ -88,7 +89,7 @@ showMany =
         showGroupsHTML (allHashResults . algorithm) expression
 
   where examples   = [ ("Example 4", example4) ]
-        algorithms = [ ("Compositional", castHash)
+        algorithms = [ ("KATHash", KATHashFasterOrigHash.katHash)
                      , ("Combined", combinedHash)
                      , ("DeBruijn", deBruijnHash)
                      ]

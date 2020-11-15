@@ -80,14 +80,13 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Hashable (Hashable, hash, hashWithSalt)
+import Data.Hashable (Hashable, hash)
 import GHC.Generics (Generic)
 import Data.Function (on)
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
-             example1, example2, example3, example4,
              allSubexprs, annotation, mapAnnotation)
 import qualified KATHash1
 import qualified KATHash2
@@ -97,7 +96,6 @@ import qualified KATHashFastOrig
 import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
 import KATHashFastOrigHash (thenHash)
-import Merge
 
 -- | A helper type that is intended to make the hashing algorithm
 -- clearer.  If it doesn't help I may just get rid of it.
@@ -124,335 +122,6 @@ allHashResults = f . allHashResults_
         -- in the benchmark and will likely disappear soon anyway.
         -- The reverse is also a pain.
         f = map (\(h__, p, es) -> (h__, reverse p, mapAnnotation (const ()) es))
-
--- | A hashing function for expressions.  It respects
--- alpha-equivalence, that is, expressions should have the same value
--- under this function if and only if they are alpha-equivalent
--- (modulo hash collision, which we expect to be very rare).
---
--- Combines the variables hash and structure hash into a single hash
--- value.  NB it is the triple returned by 'castHashExplicit' that is
--- compositional, not this single hash value.
-castHashTop :: (Ord a, Hashable a) => Expr h a -> Hash
-castHashTop e = hash (Map.toList m, h)
-  where (m, h, _exprs) = castHashExplicit [] Map.empty e
-
-castHash :: (Ord a, Hashable a)
-         => Expr h a -> Expr Hash a
-castHash e = e_
-  where (_, _, e_) = castHashExplicit [] Map.empty e
-
--- | The implementation of the alpha-equivalence-respecting hashing
--- function.
---
--- It assigns to each subtree a value which is a triple containing
---
---     (variables hash, structure hash, depth)
---
--- "depth" is the usual depth of a tree-like structure.  It seems to
--- be important to mix the depth into the hash when hashing recursive
--- data structures (in general, not just lambda-expression-like data
--- structures).  The other components will be explained below.
---
--- "castHash" means "compositional AST hash".
--- The important property that it satisfies is compositionality: the
--- value assigned to each subtree can be calculated from the values
--- assigned to its direct children and nothing else.  Compositionality
--- is desirable because it implies that when creating a new expression
--- that reuses parts of an old one we can avoid rerunning the parts of
--- the hash computation on parts of the expression that have not
--- changed.  (It requires decorating sub-expressions with their hash
--- value and is not implemented in this file but is a straightforward
--- standard technique)
---
--- The "variables hash" and "structure hash" are two values that are
--- computed for each subexpression.  Taken together they uniquely
--- identify that subexpression up to alpha-equivalence (modulo hash
--- collisions).  The "variables hash" contains information sufficient
--- to determine the placement of free variables in the expression, and
--- the "structure hash" determines everything else about the
--- expression (the "structure").  Treating the two values separately
--- is what allows @castHash@ to respect alpha-equivalence.
---
--- The "structure hash" is a hash that uniquely determines the
--- "structure" of the lambda expression up to the names of the
--- variables.  Included in "structure" are the positions of free
--- variables, but not their names, and the positions of bound
--- variables, and which binder they refer to, but not their names.
--- (This implies that bound variables with different binders are
--- distinguishable, but free variables are not distinguishable).  For
--- example, the expressions
---
---     (lam x. (x + x + Y + Z)) Y
---
--- and
---
---     (lam z. (z + z + U + U)) V
---
--- have the same structure, but
---
---     (lam z. (z + U + U + U)) V
---
--- Does not.
---
--- The "variables hash" is a map from the name of variables to the
--- hash of the collection of variable nodes in which that variable
--- name occur in the expression.  Important properties of the
--- variables hash are that
---
--- * each variable node in the expression is referenced by exactly one
--- entry in the variables hash.
---
--- * each entry in the variables hash only refers to variable nodes
--- that actually occur in the expression
---
--- Complexity: essentially constant(*) work is done at each node
--- *except* when merging the variables hash at App nodes.  That work
--- is linear in the number of free variables.  I haven't yet thought
--- much more about the implications of that on our use case.
---
--- (*) the map operations are actually logarithmic, not constant, but
--- we probably don't care about that.
-castHashExplicit :: (Ord a, Hashable a)
-                 => Path
-                 -> Map a Path
-                 -> Expr ignored a
-                 -> (Map a Hash, Hash, Expr Hash a)
-castHashExplicit =
-  let subExprHash_ variablesHash structureHash bvEnv =
-        hash (Map.toList variablesHash,
-              structureHash,
-              filter ((`elem` Map.keys variablesHash) . fst) (Map.toList bvEnv))
-
-  in \path bvEnv expr -> case expr of
-  Var _ x   -> (variablesHash, structureHash, Var subExprHash x)
-    where variablesHash = Map.singleton x (hashExprO VarO)
-          structureHash = hashExprO VarO
-          subExprHash   = subExprHash_ variablesHash structureHash bvEnv
-
-  Lam _ x e -> (variablesHash, structureHash, Lam subExprHash x subExpr)
-    where variablesHash = Map.delete x variablesHashE
-          structureHash = hashExprO (LamO hashX structureHashE)
-          (variablesHashE, structureHashE, subExpr) =
-            castHashExplicit (L:path) (addLocn x path bvEnv) e
-          subExprHash   = subExprHash_ variablesHash structureHash bvEnv
-
-          hashX = Map.lookup x variablesHashE
-
-  App _ f e -> (variablesHash, structureHash, App subExprHash subExprF subExprE)
-    where variablesHash = mergeMaps (\case
-                 LeftOnly  l   -> hashExprO (AppO (Just l) Nothing)
-                 RightOnly r   -> hashExprO (AppO Nothing (Just r))
-                 Both      l r -> hashExprO (AppO (Just l) (Just r)))
-              variablesHashF variablesHashE
-
-          structureHash =
-            hashExprO        (AppO (Just structureHashF) (Just structureHashE))
-
-          subExprHash   = subExprHash_ variablesHash structureHash bvEnv
-
-          (variablesHashF, structureHashF, subExprF) =
-            castHashExplicit (Apl:path) bvEnv f
-          (variablesHashE, structureHashE, subExprE) =
-            castHashExplicit (Apr:path) bvEnv e
-
-
--- | We have pairs of hashes in many places, so here's a type for that.
--- It would be cleared to name the components of this pair though.
-data TwoHashes = TwoHashes !Hash !Hash
-
-instance Hashable TwoHashes where
-  hash (TwoHashes h1 h2) = hash h1 `thenHash` h2
-  hashWithSalt s (TwoHashes h1 h2) = hashWithSalt s h1 `thenHash` h2
-
--- | Now comes the type that does all the heavy-lifting. It's a map
--- from keys to `TwoHashes`, that, additionally to insert / lookup /
--- delete, supports the following operations in O(1) time:
---   - compute `(sum hash (key_i, first_value_i), sum hash (key_i,
---     second_value_i))`
---
--- This is done by maintaining these sums as we go (the last two
--- elements of the tuple).
-data LazyMap a = LazyMap !(Map a TwoHashes) !TwoHashes
-
--- | Here we just lift some simple `Map` utils to `LazyMap`.
-
-lazyMapAssocs :: (Ord a, Hashable a) => LazyMap a -> [(a, TwoHashes)]
-lazyMapAssocs (LazyMap m _) = Map.assocs m
-
-lazyMapSize :: (Ord a, Hashable a) => LazyMap a -> Int
-lazyMapSize (LazyMap m _) = Map.size m
-
-lazyMapLookup :: (Ord a, Hashable a) => a -> LazyMap a -> Maybe TwoHashes
-lazyMapLookup key (LazyMap innerMap _) = Map.lookup key innerMap
-
--- | A helper to hash a `LazyMap` entry.
-computeEntryHash :: (Hashable a) => (a, TwoHashes) -> TwoHashes
-computeEntryHash (key, TwoHashes value_1 value_2) =
-  TwoHashes (hash key `thenHash` value_1) (hash key `thenHash` value_2)
-
-addEntryHash :: (Hashable a) => TwoHashes -> (a, TwoHashes) -> TwoHashes
-addEntryHash (TwoHashes entriesHash_1 entriesHash_2) entry =
-  let TwoHashes entryHash_1 entryHash_2 = computeEntryHash entry in
-    TwoHashes (entriesHash_1 + entryHash_1) (entriesHash_2 + entryHash_2)
-
-subtractEntryHash :: (Hashable a) => TwoHashes -> (a, TwoHashes) -> TwoHashes
-subtractEntryHash (TwoHashes entriesHash_1 entriesHash_2) entry =
-  let (TwoHashes entryHash_1 entryHash_2) = computeEntryHash entry in
-    TwoHashes (entriesHash_1 - entryHash_1) (entriesHash_2 - entryHash_2)
-
-lazyMapSingleton :: (Ord a, Hashable a) => a -> TwoHashes -> LazyMap a
-lazyMapSingleton key value =
-    LazyMap (Map.singleton key value) (computeEntryHash (key, value))
-
-lazyMapInsert :: (Ord a, Hashable a) => a -> TwoHashes -> LazyMap a -> LazyMap a
-lazyMapInsert key value (LazyMap innerMap entriesHash) =
-  LazyMap (Map.insert key value innerMap) (addEntryHash entriesHash (key, value))
-
-lazyMapDelete :: (Ord a, Hashable a) => a -> LazyMap a -> LazyMap a
-lazyMapDelete key (LazyMap innerMap entriesHash) =
-  let (ret, newInnerMap) = Map.updateLookupWithKey (\_ _ -> Nothing) key innerMap
-  in case ret of
-      Nothing -> LazyMap newInnerMap entriesHash
-      Just value -> LazyMap newInnerMap (subtractEntryHash entriesHash (key, value))
-
-lazyMapInsertWith :: (Ord a, Hashable a)
-                  => (TwoHashes -> TwoHashes)
-                  -> a
-                  -> TwoHashes
-                  -> LazyMap a
-                  -> LazyMap a
-lazyMapInsertWith f key value (LazyMap innerMap entriesHash) =
-  let (ret, newInnerMap) =
-        Map.insertLookupWithKey (\_ _ -> f) key value innerMap
-  in case ret of
-      Nothing -> LazyMap newInnerMap (addEntryHash entriesHash (key, value))
-      Just oldValue ->
-        LazyMap newInnerMap
-         (addEntryHash (subtractEntryHash entriesHash (key, oldValue))
-                       (key, f oldValue))
-
--- | Helper for `updateMapsSmallAndLarge`.
-updateMaps :: (Ord a, Hashable a)
-           => (TwoHashes -> TwoHashes)
-           -> (TwoHashes -> TwoHashes -> TwoHashes)
-           -> (a, TwoHashes)
-           -> LazyMap a
-           -> LazyMap a
-updateMaps fOnlySmall fIntersection (key, value) =
-  lazyMapInsertWith (fIntersection value) key (fOnlySmall value)
-
--- | Update the larger map by iterating through the entries of the smaller map.
-updateMapsSmallAndLarge :: (Ord a, Hashable a)
-                        => (TwoHashes -> TwoHashes)
-                        -> (TwoHashes -> TwoHashes -> TwoHashes)
-                        -> LazyMap a
-                        -> LazyMap a
-                        -> LazyMap a
-updateMapsSmallAndLarge fOnlySmall fIntersection mapSmall mapLarge =
-  foldr (updateMaps fOnlySmall fIntersection) mapLarge (lazyMapAssocs mapSmall)
-
--- | Helpers used to combine two hashes; `hashCombineRev` does the
--- same but reversed the argument order.
-
-hashCombine :: Hash -> Hash -> Hash
-hashCombine l r = hashExprO (AppO (Just l) (Just r))
-
-hashCombineRev :: Hash -> Hash -> Hash
-hashCombineRev l r = hashExprO (AppO (Just r) (Just l))
-
-liftToPairs :: (Hash -> Hash -> Hash) -> TwoHashes -> TwoHashes -> TwoHashes
-liftToPairs f = \(TwoHashes x_1 y) (TwoHashes x_2 _) -> TwoHashes (f x_1 x_2) y
-
-liftToFirst :: (Hash -> Hash) -> TwoHashes -> TwoHashes
-liftToFirst f = \(TwoHashes x y) -> TwoHashes (f x) y
-
--- | Combines two lazy maps in time proportional to the smaller one.
-lazyMapsCombineSmallToLarge :: (Ord a, Hashable a)
-                            => LazyMap a
-                            -> LazyMap a
-                            -> (Hash -> Hash)
-                            -> (Hash -> Hash -> Hash)
-                            -> LazyMap a
-lazyMapsCombineSmallToLarge lazyMapSmall lazyMapLarge fOnlySmall fIntersection =
-  updateMapsSmallAndLarge (liftToFirst fOnlySmall)
-                          (liftToPairs fIntersection)
-                          lazyMapSmall
-                          lazyMapLarge
-
-hashStepLeft :: Int -> Hash -> Hash
-hashStepLeft subtreeSize h =
-  hashExprO (AppO (Just h) Nothing) `thenHash` subtreeSize
-
-hashStepRight :: Int -> Hash -> Hash
-hashStepRight subtreeSize h =
-  hashExprO (AppO Nothing (Just h)) `thenHash` subtreeSize
-
-lazyMapsCombine :: (Ord a, Hashable a)
-                => LazyMap a
-                -> LazyMap a
-                -> Int
-                -> LazyMap a
-lazyMapsCombine lazyMapLeft lazyMapRight subtreeSize =
-  case lazyMapSize lazyMapLeft < lazyMapSize lazyMapRight of
-    True  -> lazyMapsCombineSmallToLarge lazyMapLeft
-                                         lazyMapRight
-                                         (hashStepLeft subtreeSize)
-                                         hashCombine
-
-    False -> lazyMapsCombineSmallToLarge lazyMapRight
-                                         lazyMapLeft
-                                         (hashStepRight subtreeSize)
-                                         hashCombineRev
-
-castHashOptimized :: (Ord a, Hashable a)
-                  => Expr h a -> Expr Hash a
-castHashOptimized e = exprs
-  where (_m, _b, _subtreeSize, exprs) =
-          castHashOptimizedExplicit 1 Map.empty e
-
-castHashOptimizedExplicit :: (Ord a, Hashable a)
-                          => Hash
-                          -> Map a Hash
-                          -> Expr h a
-                          -> (LazyMap a, Hash, Int, Expr Hash a)
-castHashOptimizedExplicit =
-  let subExprHash_ (LazyMap _ sndVariablesHash) structureHash =
-        hash sndVariablesHash `thenHash` structureHash
-
-  in \pathHash bvEnv expr -> case expr of
-  Var _ x   -> (variablesHash, structureHash, 1, Var subExprHash x)
-    where variablesHash = lazyMapSingleton x (TwoHashes (hashExprO VarO)
-                                                    (hash (Map.lookup x bvEnv)))
-          structureHash = hashExprO VarO
-          subExprHash   = subExprHash_ variablesHash structureHash
-
-  Lam _ x e -> (variablesHash, structureHash, subtreeSize, Lam subExprHash x subExprHashes)
-    where variablesHash = lazyMapDelete x variablesHashE
-          structureHash = hashExprO (LamO hashX structureHashE)
-          (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashes) =
-            castHashOptimizedExplicit (hash pathHash `thenHash` L)
-                                                  (Map.insert x pathHash bvEnv)
-                                                  e
-          subtreeSize   = subtreeSizeE + 1
-          subExprHash   = subExprHash_ variablesHash structureHash
-          hashX         = fmap fst_ (lazyMapLookup x variablesHashE)
-            where fst_ (TwoHashes h _) = h
-
-  App _ f e ->
-    (variablesHash, structureHash, subtreeSize, App subExprHash subExprHashesF subExprHashesE)
-    where variablesHash = lazyMapsCombine variablesHashF variablesHashE subtreeSize
-
-          structureHash =
-            hashExprO (AppO (Just structureHashF) (Just structureHashE))
-
-          subtreeSize   = subtreeSizeF + subtreeSizeE + 1
-          subExprHash   = subExprHash_ variablesHash structureHash
-
-          (!variablesHashF, !structureHashF, !subtreeSizeF, subExprHashesF)
-            = castHashOptimizedExplicit (hash pathHash `thenHash` Apl) bvEnv f
-          (!variablesHashE, !structureHashE, !subtreeSizeE, subExprHashesE)
-            = castHashOptimizedExplicit (hash pathHash `thenHash` Apr) bvEnv e
 
 locallyNameless :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
 locallyNameless = mapAnnotation hash . locallyNamelessExplicit
@@ -491,11 +160,9 @@ locallyNamelessExplicit e_@(Lam _ n e) = Lam h n (locallyNamelessExplicit e)
 
     emptyEnv = (0 :: Int, Map.empty)
 
--- | Whether two expressions are alpha-equivalent, implemented using
--- 'castHashTop'
 alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
                                    => Expr h a -> Expr h a -> Bool
-alphaEquivalentAccordingToHashExpr = (==) `on` castHashTop
+alphaEquivalentAccordingToHashExpr = (==) `on` KATHashFasterOrigHash.katHashTop
 
 alphaEquivalentAccordingToSummariseExpr :: Ord name
                                         => Expr h name
@@ -760,18 +427,6 @@ prop_uniquifyBindersExamples = withTests 1 $ property $ do
   flip mapM_ examples $ \(expression, uniquified) ->
     uniquifyBinders expression === uniquified
 
--- | Shows when our hashing functions argree and disagree on our
--- examples
-prop_compareSubExpressionHashes :: Property
-prop_compareSubExpressionHashes = withTests 1 $ property $ do
-  let n = normalizedGroupedEquivalentSubexpressions . allHashResults
-
-  n (castHash example1) === n (combinedHash example1)
-  n (castHash example2) === n (combinedHash example2)
-  n (castHash example3) === n (combinedHash example3)
-
-  n (castHash example4) /== n (combinedHash example4)
-
 -- | Checks that the paths come out of the algorithms in the same
 -- order (which just so happens to be depth first preorder).  This is
 -- not an essential property of the algorithms, but it's nice that
@@ -783,18 +438,16 @@ prop_stablePaths = withTests numRandomTests $ property $ do
 
   expr <- forAll genExpr
 
-  let h = castHash expr
-      d = deBruijnHash expr
+  let d = deBruijnHash expr
       c = combinedHash expr
       n = structuralHashNested expr
       n1 = structuralHashWithBinders expr
       n2 = structuralHashWithBinders2 expr
 
-  paths h === paths d
-  paths h === paths c
-  paths h === paths n
-  paths h === paths n1
-  paths h === paths n2
+  paths d === paths c
+  paths d === paths n
+  paths d === paths n1
+  paths d === paths n2
 
 numRandomTests :: TestLimit
 numRandomTests = 100 * 100
@@ -971,18 +624,14 @@ prop_equivCastFast :: Property
 prop_equivCastFast = withTests numRandomTests $ property $ do
   let n = normalizedGroupedEquivalentSubexpressions . allHashResults
   expr <- forAll (fmap uniquifyBinders genExpr)
-  let castHash_groups = n (castHash expr)
-      --castHashOptimized_groups = n (castHashOptimized expr)
-      locallyNameless_groups = n (locallyNameless expr)
+  let locallyNameless_groups = n (locallyNameless expr)
       deBruijnNestedHash_groups = n (deBruijnNestedHash expr)
       katHashFastOrigHash_groups = n (KATHashFastOrigHash.katHash expr)
       katHashFasterOrigHash_groups = n (KATHashFasterOrigHash.katHash expr)
 
-  --castHash_groups === castHashOptimized_groups
-  castHash_groups === locallyNameless_groups
-  castHash_groups === deBruijnNestedHash_groups
-  castHash_groups === katHashFastOrigHash_groups
-  castHash_groups === katHashFasterOrigHash_groups
+  locallyNameless_groups === deBruijnNestedHash_groups
+  locallyNameless_groups === katHashFastOrigHash_groups
+  locallyNameless_groups === katHashFasterOrigHash_groups
 
 prop_applyPrefix :: Property
 prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests

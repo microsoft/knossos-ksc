@@ -13,7 +13,7 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory, emptyTempFile)
 
 import Expr (Expr, exprSize)
-import Hash (castHashOptimized, deBruijnHash,  structuralHashNested)
+import Hash (deBruijnHash,  structuralHashNested)
 import qualified Hash
 import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
@@ -25,7 +25,6 @@ data BenchmarkConfig = BenchmarkConfig
 
 data Algorithms a = Algorithms
   { aLocallyNameless        :: a
-  , aCastHashOptimized      :: a
   , aKATHashFromPaper       :: a
   , aKATHashFromPaperFaster :: a
   , aDeBrujinHash           :: a
@@ -44,7 +43,6 @@ algorithms_ :: (Hashable a, Ord a)
             => Algorithms (String, Expr h a -> Expr Hash.Hash a, String)
 algorithms_ = Algorithms
   { aLocallyNameless    = ("Locally nameless", Hash.locallyNameless, baseline)
-  , aCastHashOptimized  = ("CAST Optimized", castHashOptimized, "black")
   , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, paper)
   , aKATHashFromPaperFaster = ("KATHash optimized", KATHashFasterOrigHash.katHash, good)
   , aDeBrujinHash           = ("de Bruijn*", deBruijnHash, prettyBad)

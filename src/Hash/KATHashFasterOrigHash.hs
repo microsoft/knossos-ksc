@@ -12,6 +12,7 @@ import Data.Hashable (Hashable, hash)
 import Data.List (foldl')
 
 import Expr (Expr(Var, Lam, App))
+import qualified Expr
 
 type Hash = Int
 type Structure = Hash
@@ -108,3 +109,6 @@ summariseExpr = \case
 katHash :: (Ord name, Hashable name) => Expr h name -> Expr Hash name
 katHash e = e'
   where (_, _, e') = summariseExpr e
+
+katHashTop :: (Ord name, Hashable name) => Expr h name -> Hash
+katHashTop = Expr.annotation . katHash
