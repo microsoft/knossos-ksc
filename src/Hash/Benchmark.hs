@@ -190,7 +190,7 @@ makeGnuplot benchmarksDir xlabel results = do
 
   putStrLn ("I put stuff in " ++ benchmarksDir ++ ".")
   putStrLn "If you have an X server and you want a live graph view run:"
-  putStrLn ("DISPLAY=:0 gnuplot --persist " ++ gnuplotFilename)
+  putStrLn ("gnuplot --persist " ++ gnuplotFilename)
   putStrLn "If you want to generate a PNG run:"
   putStrLn ("gnuplot " ++ gnuplotPngFilename)
   putStrLn ("You will find the output PNG in " ++ outputPng)
