@@ -72,7 +72,7 @@ full = (10, 0.1, 1000 * 1000, 1.1)
 -- from the run will be written out to a directory whose name is
 -- displayed at the end of the run.
 benchmark :: BenchmarkParams -> IO ()
-benchmark (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScale) = do
+benchmark bps = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = \n size ->
                   Gen.sample (Hash.genExprLinearNumVarsSize n size)
@@ -90,26 +90,22 @@ benchmark (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScale) =
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
   results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
-    results <- benchmarkThis sizeScale maximumTime_micro
+    results <- benchmarkThis bps
                              (show i ++ "/" ++ show (length bcs))
-                             runs minimumMeasureableTime_seconds
                              benchmarksDir algorithms varCounts bc
     pure (results, bcGenName bc)
   flip mapM_ results_genNames $ \(results, genName) ->
     makeGnuplot benchmarksDir genName results
 
-benchmarkThis :: Double
-              -> Double
+benchmarkThis :: BenchmarkParams
               -> String
-              -> Int
-              -> Double
               -> FilePath
               -> [(String, Expr () Int -> Expr hash string, String)]
               -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]
-benchmarkThis sizeScale maximumTime_micro expressionSet runs
-              minimumMeasureableTime_seconds
+benchmarkThis (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScale)
+              expressionSet
               benchmarksDir algorithms varCounts bc = do
   let allParams = (,) <$> algorithms <*> varCounts
 
