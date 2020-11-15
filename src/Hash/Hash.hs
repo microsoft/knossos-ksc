@@ -634,26 +634,23 @@ structuralHash = \case
 
 structuralHashNested :: Hashable a => Expr h a -> Expr Hash a
 structuralHashNested e = es
-  where (_, es) = structuralHashNestedExplicit [] e
+  where (_, es) = structuralHashNestedExplicit e
 
 structuralHashNestedExplicit :: Hashable a
-                        => Path
-                        -> Expr h a
+                        => Expr h a
                         -> (Hash, Expr Hash a)
-structuralHashNestedExplicit path expr =
+structuralHashNestedExplicit expr =
   case expr of
   Var _ x   -> (thisHash, Var thisHash x)
     where thisHash = hash x
 
   Lam _ x e -> (thisHash, Lam thisHash x subExpressionHashes)
-    where (h, subExpressionHashes) = structuralHashNestedExplicit (L:path) e
-          thisHash                 = hash (x, h)
+    where (h, subExpressionHashes) = structuralHashNestedExplicit e
+          thisHash                 = h `thenHash` x
 
   App _ f e -> (thisHash, App thisHash subExpressionHashesL subExpressionHashesR)
-    where (hL, subExpressionHashesL) =
-            structuralHashNestedExplicit (Apl:path) f
-          (hR, subExpressionHashesR) =
-            structuralHashNestedExplicit (Apr:path) e
+    where (hL, subExpressionHashesL) = structuralHashNestedExplicit f
+          (hR, subExpressionHashesR) = structuralHashNestedExplicit e
           thisHash                   = hash (hL, hR)
 
 structuralHashWithBinders :: (Ord a, Hashable a)
