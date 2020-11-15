@@ -34,7 +34,7 @@ expressions = Expressions
   { eMnistCNN = "mnistcnn"
   , eGMMRev   = "gmm-rev"
   , eGMM      = "gmm"
-  , eBERTs    = []
+  , eBERTs    = map (\i -> "bert/bert" ++ show i) [1 :: Int .. 23]
   }
 
 testcase_path :: String -> FilePath
