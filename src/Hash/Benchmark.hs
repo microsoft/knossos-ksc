@@ -91,7 +91,7 @@ benchmark :: BenchmarkParams -> IO ()
 benchmark bps = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = \n size ->
-                  Gen.sample (Hash.genExprLinearNumVarsSize n size)
+                  Gen.sample (Hash.genExprUnbalancedNumVarsSize n size)
               , bcGenName = "unbalanced expressions"
               }
             , BenchmarkConfig

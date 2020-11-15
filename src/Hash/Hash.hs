@@ -926,15 +926,15 @@ genExprWithVarsSizeG size vars binders =
        , do Lam () <$> binders <*> genExprWithVarsSizeG (size - 1) vars binders
        ]
 
-genExprWithVarsLinear' :: (Integral a, MonadGen m)
+genExprWithVarsUnbalanced' :: (Integral a, MonadGen m)
                        => a -> (a -> a) -> m (Expr () a)
-genExprWithVarsLinear' fresh freshen = do
+genExprWithVarsUnbalanced' fresh freshen = do
   size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsLinearSize' size fresh freshen
+  genExprWithVarsUnbalancedSize' size fresh freshen
 
-genExprWithVarsLinearSize' :: (MonadGen m, Integral a)
+genExprWithVarsUnbalancedSize' :: (MonadGen m, Integral a)
                            => Int -> a -> (a -> a) -> m (Expr () a)
-genExprWithVarsLinearSize' size fresh freshen = flip evalStateT fresh $ do
+genExprWithVarsUnbalancedSize' size fresh freshen = flip evalStateT fresh $ do
   let freshVar = do
         fresh' <- get
         put (freshen fresh')
@@ -944,15 +944,15 @@ genExprWithVarsLinearSize' size fresh freshen = flip evalStateT fresh $ do
         fresh' <- get
         Gen.integral (Range.constant 0 (fresh' - 1))
 
-  genExprWithVarsLinearSizeG size elementInScope freshVar
+  genExprWithVarsUnbalancedSizeG size elementInScope freshVar
 
-genExprWithVarsLinearSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
-genExprWithVarsLinearSizeG size vars binders =
+genExprWithVarsUnbalancedSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
+genExprWithVarsUnbalancedSizeG size vars binders =
   if size <= 1
   then Var () <$> vars
   else App () <$> (Lam () <$> binders <*> e)
               <*> (Var () <$> vars)
-  where e = genExprWithVarsLinearSizeG (size - 3) vars binders
+  where e = genExprWithVarsUnbalancedSizeG (size - 3) vars binders
 
 -- | Generates random expressions for testing
 genExpr :: MonadGen m => m (Expr () Char)
@@ -964,12 +964,12 @@ genExprNumVars n = genExprWithVars' [1..n] (n+1) (+1)
 genExprNumVarsSize :: MonadGen m => Int -> Int -> m (Expr () Int)
 genExprNumVarsSize n size = genExprWithVarsSize' size (n+1) (+1)
 
-genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
-genExprLinearNumVars n = genExprWithVarsLinear' (n+1) (+1)
+genExprUnbalancedNumVars :: MonadGen m => Int -> m (Expr () Int)
+genExprUnbalancedNumVars n = genExprWithVarsUnbalanced' (n+1) (+1)
 
-genExprLinearNumVarsSize :: MonadGen m => Int -> Int -> m (Expr () Int)
-genExprLinearNumVarsSize n size =
-  genExprWithVarsLinearSize' size (n+1) (+1)
+genExprUnbalancedNumVarsSize :: MonadGen m => Int -> Int -> m (Expr () Int)
+genExprUnbalancedNumVarsSize n size =
+  genExprWithVarsUnbalancedSize' size (n+1) (+1)
 
 -- | Shows equivalence of castHash hash and the other algorithms
 prop_equivCastFast :: Property
