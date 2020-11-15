@@ -309,16 +309,16 @@ structuralHashNestedExplicit :: Hashable a
 structuralHashNestedExplicit expr =
   case expr of
   Var _ x   -> (thisHash, Var thisHash x)
-    where !thisHash = hash x
+    where !thisHash = hash "Var" `thenHash` x
 
   Lam _ x e -> (thisHash, Lam thisHash x subExpressionHashes)
     where (h, subExpressionHashes) = structuralHashNestedExplicit e
-          !thisHash                = h `thenHash` x
+          !thisHash                = hash "Lam" `thenHash` x `thenHash` h
 
   App _ f e -> (thisHash, App thisHash subExpressionHashesL subExpressionHashesR)
     where (hL, subExpressionHashesL) = structuralHashNestedExplicit f
           (hR, subExpressionHashesR) = structuralHashNestedExplicit e
-          !thisHash                  = hL `thenHash` hR
+          !thisHash                  = hash "App" `thenHash` hL `thenHash` hR
 
 normalizedGroupedEquivalentSubexpressions
   :: Ord hash => [(hash, Path, expr)] -> [[(Path, expr)]]
