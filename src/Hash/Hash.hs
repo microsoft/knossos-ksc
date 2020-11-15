@@ -921,11 +921,11 @@ genExprWithVarsSize' size fresh freshen = flip evalStateT fresh $ do
 
 genExprWithVarsSizeG :: MonadGen m => Int -> m v -> m v -> m (Expr () v)
 genExprWithVarsSizeG size vars binders =
-  if size <= 0
+  if size <= 1
   then Var () <$> vars
   else Gen.choice
-       [ do sizeL <- Gen.int (Range.constant 0 size)
-            let sizeR = size - sizeL
+       [ do sizeL <- Gen.int (Range.constant 1 (size - 2))
+            let sizeR = size - sizeL - 1
             App () <$> genExprWithVarsSizeG sizeL vars binders
                    <*> genExprWithVarsSizeG sizeR vars binders
        , do Lam () <$> binders <*> genExprWithVarsSizeG (size - 1) vars binders
@@ -960,11 +960,11 @@ genExprWithVarsLinearSize' size fresh freshen = flip evalStateT fresh $ do
 
 genExprWithVarsLinearSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
 genExprWithVarsLinearSizeG size vars binders =
-  if size <= 0
+  if size <= 1
   then Var () <$> vars
   else App () <$> (Lam () <$> binders <*> e)
               <*> (Var () <$> vars)
-  where e = genExprWithVarsLinearSizeG (size -1) vars binders
+  where e = genExprWithVarsLinearSizeG (size - 3) vars binders
 
 -- | Generates random expressions for testing
 genExpr :: MonadGen m => m (Expr () Char)
