@@ -899,23 +899,23 @@ genExprWithVars vars = do
   size <- Gen.int (Range.linear 0 2000)
   genExprWithVarsSizeG size (Gen.element vars) (Gen.element vars)
 
-genExprWithVars' :: MonadGen m
+genExprWithVars' :: (Integral v, MonadGen m)
                  => [v] -> v -> (v -> v) -> m (Expr () v)
 genExprWithVars' inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
   size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsSize' size inScope fresh freshen
+  genExprWithVarsSize' size fresh freshen
 
-genExprWithVarsSize' :: MonadGen m
-                     => Int -> [v] -> v -> (v -> v) -> m (Expr () v)
-genExprWithVarsSize' size inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
+genExprWithVarsSize' :: (Integral v, MonadGen m)
+                     => Int -> v -> (v -> v) -> m (Expr () v)
+genExprWithVarsSize' size fresh freshen = flip evalStateT fresh $ do
   let freshVar = do
-        (inScope', fresh') <- get
-        put (fresh':inScope', freshen fresh')
+        fresh' <- get
+        put (freshen fresh')
         pure fresh'
 
   let elementInScope = do
-        (inScope', _) <- get
-        Gen.element inScope'
+        fresh' <- get
+        Gen.integral (Range.constant 0 (fresh' - 1))
 
   genExprWithVarsSizeG size elementInScope freshVar
 
@@ -938,24 +938,23 @@ genExprWithVarsLinear vars = do
   size <- Gen.int (Range.linear 0 2000)
   genExprWithVarsLinearSizeG size (Gen.element vars) (Gen.element vars)
 
-genExprWithVarsLinear' :: MonadGen m
-                       => [a] -> a -> (a -> a) -> m (Expr () a)
-genExprWithVarsLinear' inScope fresh freshen = do
+genExprWithVarsLinear' :: (Integral a, MonadGen m)
+                       => a -> (a -> a) -> m (Expr () a)
+genExprWithVarsLinear' fresh freshen = do
   size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsLinearSize' size inScope fresh freshen
+  genExprWithVarsLinearSize' size fresh freshen
 
-genExprWithVarsLinearSize' :: MonadGen m
-                           => Int -> [a] -> a -> (a -> a) -> m (Expr () a)
-genExprWithVarsLinearSize' size inScope fresh freshen =
-  flip evalStateT (inScope, fresh) $ do
+genExprWithVarsLinearSize' :: (MonadGen m, Integral a)
+                           => Int -> a -> (a -> a) -> m (Expr () a)
+genExprWithVarsLinearSize' size fresh freshen = flip evalStateT fresh $ do
   let freshVar = do
-        (inScope', fresh') <- get
-        put (fresh':inScope', freshen fresh')
+        fresh' <- get
+        put (freshen fresh')
         pure fresh'
 
   let elementInScope = do
-        (inScope', _) <- get
-        Gen.element inScope'
+        fresh' <- get
+        Gen.integral (Range.constant 0 (fresh' - 1))
 
   genExprWithVarsLinearSizeG size elementInScope freshVar
 
@@ -978,17 +977,17 @@ genExprNumVars' :: MonadGen m => Int -> m (Expr () Int)
 genExprNumVars' n = genExprWithVars' [1..n] (n+1) (+1)
 
 genExprNumVarsSize' :: MonadGen m => Int -> Int -> m (Expr () Int)
-genExprNumVarsSize' n size = genExprWithVarsSize' size [1..n] (n+1) (+1)
+genExprNumVarsSize' n size = genExprWithVarsSize' size (n+1) (+1)
 
 genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
 genExprLinearNumVars n = genExprWithVarsLinear [1..n]
 
 genExprLinearNumVars' :: MonadGen m => Int -> m (Expr () Int)
-genExprLinearNumVars' n = genExprWithVarsLinear' [1..n] (n+1) (+1)
+genExprLinearNumVars' n = genExprWithVarsLinear' (n+1) (+1)
 
 genExprLinearNumVarsSize' :: MonadGen m => Int -> Int -> m (Expr () Int)
 genExprLinearNumVarsSize' n size =
-  genExprWithVarsLinearSize' size [1..n] (n+1) (+1)
+  genExprWithVarsLinearSize' size (n+1) (+1)
 
 -- | Shows equivalence of castHash hash and the other algorithms
 prop_equivCastFast :: Property
