@@ -1,7 +1,6 @@
 module CompareBehaviour where
 
 import Hash (combinedHash,deBruijnHash,
-             structuralHashWithBinders, structuralHashWithBinders2,
              normalizedGroupedEquivalentSubexpressions,
              allHashResults)
 import Expr (Expr, Path, showExpr,
@@ -57,9 +56,7 @@ formatExpressionHTML e =
 
   where algorithms = ( ("KATHash", KATHashFasterOrigHash.katHash)
                      , ( ("Combined", combinedHash)
-                       , ("DeBruijn", deBruijnHash)
-                       , ("Structural with binders 1", structuralHashWithBinders)
-                       , ("Structural with binders 2", structuralHashWithBinders2) ) )
+                       , ("DeBruijn", deBruijnHash) ) )
 
         groupsOfAlgorithm algorithm =
           ((map . map) fst

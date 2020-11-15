@@ -320,67 +320,6 @@ structuralHashNestedExplicit expr =
           (hR, subExpressionHashesR) = structuralHashNestedExplicit e
           !thisHash                  = hL `thenHash` hR
 
-structuralHashWithBinders :: (Ord a, Hashable a)
-                     => Expr h a -> Expr Hash a
-structuralHashWithBinders e = exprs
-  where (_h, _depth, exprs) = structuralHashWithBindersExplicit [] Map.empty e
-
-structuralHashWithBindersExplicit :: (Ord a, Hashable a)
-                             => Path
-                             -> Map a Path
-                             -> Expr h a
-                             -> (Hash, Int, Expr Hash a)
-structuralHashWithBindersExplicit location env expr = case expr of
-  Var _ x -> (hash', depth', Var hash' x)
-    where hash' = hash $ case Map.lookup x env of
-            Nothing -> hash ("free", x, depth')
-            Just p  -> hash ("bound", p, depth')
-          depth' = 0
-  Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
-    where (hashE, depthE, subExpressionHashesE) =
-            structuralHashWithBindersExplicit (L:location) (Map.insert x location env) e
-          hash' = hash ("lam", hashE, depth')
-          depth' = depthE + 1
-  App _ f e -> (hash', depth', App hash' subExpressionHashesF subExpressionHashesE)
-    where (hashF, depthF, subExpressionHashesF) =
-            structuralHashWithBindersExplicit (Apl:location) env f
-          (hashE, depthE, subExpressionHashesE) =
-            structuralHashWithBindersExplicit (Apr:location) env e
-          hash' = hash ("app", hashF, hashE, depth')
-          depth' = max depthF depthE + 1
-
-structuralHashWithBinders2 :: (Ord a, Hashable a)
-                     => Expr h a -> Expr Hash a
-structuralHashWithBinders2 e = exprs
-  where (_h, _depth, exprs) = structuralHashWithBinders2Explicit [] Map.empty e
-
-structuralHashWithBinders2Explicit :: (Ord a, Hashable a)
-                              => Path
-                              -> Map a Path
-                              -> Expr h a
-                              -> (Hash, Int, Expr Hash a)
-structuralHashWithBinders2Explicit location env expr = case expr of
-  Var _ x -> (hash', depth', Var hash' x)
-    where hash' = hash $ case Map.lookup x env of
-            Nothing -> hash ("free", x, depth')
-            Just p  -> hash ("bound", p, depth')
-          depth' = 0
-  Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
-    where (hashE, depthE, subExpressionHashesE) =
-            structuralHashWithBinders2Explicit (L:location)
-                                         (Map.insert x [] (Map.map (L:) env)) e
-          hash' = hash ("lam", hashE, depth')
-          depth' = depthE + 1
-  App _ f e -> (hash', depth', App hash' subExpressionHashesF subExpressionHashesE)
-    where (hashF, depthF, subExpressionHashesF) =
-            structuralHashWithBinders2Explicit (Apl:location) (Map.map (Apl:) env) f
-          (hashE, depthE, subExpressionHashesE) =
-            structuralHashWithBinders2Explicit (Apr:location) (Map.map (Apr:) env) e
-          hash' = hash ("app", hashF, hashE, depth')
-          depth' = max depthF depthE + 1
-
-
-
 normalizedGroupedEquivalentSubexpressions
   :: Ord hash => [(hash, Path, expr)] -> [[(Path, expr)]]
 normalizedGroupedEquivalentSubexpressions =
@@ -441,13 +380,9 @@ prop_stablePaths = withTests numRandomTests $ property $ do
   let d = deBruijnHash expr
       c = combinedHash expr
       n = structuralHashNested expr
-      n1 = structuralHashWithBinders expr
-      n2 = structuralHashWithBinders2 expr
 
   paths d === paths c
   paths d === paths n
-  paths d === paths n1
-  paths d === paths n2
 
 numRandomTests :: TestLimit
 numRandomTests = 100 * 100
