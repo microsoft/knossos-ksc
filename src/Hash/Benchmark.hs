@@ -19,7 +19,7 @@ import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
 
 data BenchmarkConfig = BenchmarkConfig
-  { bcGenExpr              :: Int -> IO (Expr () Int)
+  { bcGenExpr              :: Int -> Int -> IO (Expr () Int)
   , bcGenName              :: String
   , bcTotalExpressions     :: Int
   }
@@ -60,37 +60,29 @@ algorithms_ = Algorithms
       good      = "green"
       baseline  = "blue"
 
-type BenchmarkParams = (Int, Double, Int)
+type BenchmarkParams = (Int, Double, Int, Double)
 
 fast :: BenchmarkParams
-fast = (3, 0.01, 10)
+fast = (3, 0.01, 1000, 1000)
 
 full :: BenchmarkParams
-full = (10, 0.1, 100)
+full = (10, 0.1, 1000, 1000 * 100)
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
 -- from the run will be written out to a directory whose name is
 -- displayed at the end of the run.
-benchmark :: (Int, Double, Int) -> IO ()
-benchmark (runs, minimumMeasureableTime_seconds, totalExpressions) = do
+benchmark :: BenchmarkParams -> IO ()
+benchmark (runs, minimumMeasureableTime_seconds, totalExpressions, maximumTime_micro) = do
   let bcs = [ BenchmarkConfig
-              { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars
-              , bcGenName = "unbalanced expressions (old generator)"
-              , bcTotalExpressions     = totalExpressions
-              }
-            , BenchmarkConfig
-              { bcGenExpr = Gen.sample . Gen.resize 10 . Hash.genExprLinearNumVars'
+              { bcGenExpr = \n size ->
+                  Gen.sample (Hash.genExprLinearNumVarsSize' n size)
               , bcGenName = "unbalanced expressions (new generator)"
               , bcTotalExpressions     = totalExpressions
               }
             , BenchmarkConfig
-              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars
-              , bcGenName = "balanced expressions (old generator)"
-              , bcTotalExpressions     = totalExpressions
-              }
-            , BenchmarkConfig
-              { bcGenExpr = Gen.sample . Gen.resize 15 . Hash.genExprNumVars'
+              { bcGenExpr = \n size ->
+                  Gen.sample (Hash.genExprNumVarsSize' n size)
               , bcGenName = "balanced expressions (new generator)"
               , bcTotalExpressions     = totalExpressions
               }
@@ -101,14 +93,16 @@ benchmark (runs, minimumMeasureableTime_seconds, totalExpressions) = do
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
   results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
-    results <- benchmarkThis (show i ++ "/" ++ show (length bcs))
+    results <- benchmarkThis maximumTime_micro
+                             (show i ++ "/" ++ show (length bcs))
                              runs minimumMeasureableTime_seconds
                              benchmarksDir algorithms varCounts bc
     pure (results, bcGenName bc)
   flip mapM_ results_genNames $ \(results, genName) ->
     makeGnuplot benchmarksDir genName results
 
-benchmarkThis :: String
+benchmarkThis :: Double
+              -> String
               -> Int
               -> Double
               -> FilePath
@@ -116,55 +110,62 @@ benchmarkThis :: String
               -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]
-benchmarkThis expressionSet runs minimumMeasureableTime_seconds
+benchmarkThis maximumTime_micro expressionSet runs minimumMeasureableTime_seconds
               benchmarksDir algorithms varCounts bc = do
   let allParams = (,) <$> algorithms <*> varCounts
 
   results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
     let (varCount, varCountSymbol) = var_
         (algorithmName, algorithm, algorithmColor) = algorithm_
-    results <- times (bcTotalExpressions bc) [] $ \rest -> do
-      -- We force the expression after generating it.  The Expr type
-      -- is strict, that is forcing it forces everything it contains,
-      -- therefore no time is wasted forcing it in the hashing
-      -- algorithm itself.  On the other hand adding this bang pattern
-      -- made absolutely no difference to the benchmarks.  The
-      -- expression must be generated already forced.  But it's nice
-      -- to keep this hear for clarity.
-      !expression <- bcGenExpr bc varCount
+    results <- times (bcTotalExpressions bc) (64, False, []) $ \a@(size, done, rest) -> do
+      if done
+        then pure a
+        else do
 
-      let minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
+        -- We force the expression after generating it.  The Expr type
+        -- is strict, that is forcing it forces everything it contains,
+        -- therefore no time is wasted forcing it in the hashing
+        -- algorithm itself.  On the other hand adding this bang pattern
+        -- made absolutely no difference to the benchmarks.  The
+        -- expression must be generated already forced.  But it's nice
+        -- to keep this hear for clarity.
+        !expression <- bcGenExpr bc varCount size
 
-      (repeats, firstStats) <- benchmarkUntil minimumMeasureableTime_micro
-                                              1
-                                              (seqHashResult . algorithm)
-                                              expression
+        let minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
+  
+        (repeats, firstStats) <- benchmarkUntil minimumMeasureableTime_micro
+                                                1
+                                                (seqHashResult . algorithm)
+                                                expression
+  
+        r <- benchmarkMore firstStats
+                           (runs - 1)
+                           repeats
+                           (seqHashResult . algorithm)
+                           expression
+  
+        putStrLn ("Expression set " ++ expressionSet)
+        putStrLn ("Parameter set "
+                   ++ show i ++ "/" ++ show (length allParams)
+                   ++ " (" ++ algorithmName ++ ")")
+        putStrLn ("Generated " ++ show (length rest)
+                  ++ " out of " ++ show (bcTotalExpressions bc) ++ " expressions")
+  
+        let (n, mean, tmin, variance, stddev) = stats r
+            showFloat = printf "%.0f" :: Double -> String
+  
+        putStrLn ("Count: "    ++ show n)
+        putStrLn ("Mean: "     ++ showFloat mean     ++ "us")
+        putStrLn ("Min: "      ++ showFloat tmin     ++ "us")
+        putStrLn ("Variance: " ++ showFloat variance ++ "us^2")
+        putStrLn ("Std dev: "  ++ showFloat stddev   ++ "us")
+  
+        let done' = tmin > maximumTime_micro -- longer than 1 second
+            size' = floor (fromIntegral size * 1.1 :: Double) + 1
 
-      r <- benchmarkMore firstStats
-                         (runs - 1)
-                         repeats
-                         (seqHashResult . algorithm)
-                         expression
-
-      putStrLn ("Expression set " ++ expressionSet)
-      putStrLn ("Parameter set "
-                 ++ show i ++ "/" ++ show (length allParams)
-                 ++ " (" ++ algorithmName ++ ")")
-      putStrLn ("Generated " ++ show (length rest)
-                ++ " out of " ++ show (bcTotalExpressions bc) ++ " expressions")
-
-      let (n, mean, tmin, variance, stddev) = stats r
-          showFloat = printf "%.0f" :: Double -> String
-
-      putStrLn ("Count: "    ++ show n)
-      putStrLn ("Mean: "     ++ showFloat mean     ++ "us")
-      putStrLn ("Min: "      ++ showFloat tmin     ++ "us")
-      putStrLn ("Variance: " ++ showFloat variance ++ "us^2")
-      putStrLn ("Std dev: "  ++ showFloat stddev   ++ "us")
-
-      return ((exprSize expression, tmin):rest)
-
-    let textOutput = flip concatMap results $ \(size, time) ->
+        return (size', done', (exprSize expression, tmin):rest)
+  
+    let textOutput = flip concatMap (case results of (_, _, r) -> r) $ \(size, time) ->
           show size ++ " " ++  show time ++ "\n"
 
     filename <- emptyTempFile benchmarksDir (algorithmName ++ show varCount ++ ".dat")
