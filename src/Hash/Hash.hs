@@ -95,6 +95,7 @@ import qualified KATHash3
 import qualified KATHashFast
 import qualified KATHashFastOrig
 import qualified KATHashFastOrigHash
+import qualified KATHashFasterOrigHash
 import KATHashFastOrigHash (thenHash)
 import Merge
 
@@ -999,11 +1000,13 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
       locallyNameless_groups = n (locallyNameless expr)
       deBruijnNestedHash_groups = n (deBruijnNestedHash expr)
       katHashFastOrigHash_groups = n (KATHashFastOrigHash.katHash expr)
+      katHashFasterOrigHash_groups = n (KATHashFasterOrigHash.katHash expr)
 
   --castHash_groups === castHashOptimized_groups
   castHash_groups === locallyNameless_groups
   castHash_groups === deBruijnNestedHash_groups
   castHash_groups === katHashFastOrigHash_groups
+  castHash_groups === katHashFasterOrigHash_groups
 
 prop_applyPrefix :: Property
 prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests
