@@ -76,13 +76,13 @@ benchmark :: BenchmarkParams -> IO ()
 benchmark (runs, minimumMeasureableTime_seconds, totalExpressions, maximumTime_micro) = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = \n size ->
-                  Gen.sample (Hash.genExprLinearNumVarsSize' n size)
+                  Gen.sample (Hash.genExprLinearNumVarsSize n size)
               , bcGenName = "unbalanced expressions (new generator)"
               , bcTotalExpressions     = totalExpressions
               }
             , BenchmarkConfig
               { bcGenExpr = \n size ->
-                  Gen.sample (Hash.genExprNumVarsSize' n size)
+                  Gen.sample (Hash.genExprNumVarsSize n size)
               , bcGenName = "balanced expressions (new generator)"
               , bcTotalExpressions     = totalExpressions
               }

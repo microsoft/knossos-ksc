@@ -958,17 +958,17 @@ genExprWithVarsLinearSizeG size vars binders =
 genExpr :: MonadGen m => m (Expr () Char)
 genExpr = genExprWithVarsTest ['u'..'z']
 
-genExprNumVars' :: MonadGen m => Int -> m (Expr () Int)
-genExprNumVars' n = genExprWithVars' [1..n] (n+1) (+1)
+genExprNumVars :: MonadGen m => Int -> m (Expr () Int)
+genExprNumVars n = genExprWithVars' [1..n] (n+1) (+1)
 
-genExprNumVarsSize' :: MonadGen m => Int -> Int -> m (Expr () Int)
-genExprNumVarsSize' n size = genExprWithVarsSize' size (n+1) (+1)
+genExprNumVarsSize :: MonadGen m => Int -> Int -> m (Expr () Int)
+genExprNumVarsSize n size = genExprWithVarsSize' size (n+1) (+1)
 
-genExprLinearNumVars' :: MonadGen m => Int -> m (Expr () Int)
-genExprLinearNumVars' n = genExprWithVarsLinear' (n+1) (+1)
+genExprLinearNumVars :: MonadGen m => Int -> m (Expr () Int)
+genExprLinearNumVars n = genExprWithVarsLinear' (n+1) (+1)
 
-genExprLinearNumVarsSize' :: MonadGen m => Int -> Int -> m (Expr () Int)
-genExprLinearNumVarsSize' n size =
+genExprLinearNumVarsSize :: MonadGen m => Int -> Int -> m (Expr () Int)
+genExprLinearNumVarsSize n size =
   genExprWithVarsLinearSize' size (n+1) (+1)
 
 -- | Shows equivalence of castHash hash and the other algorithms

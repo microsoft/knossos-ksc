@@ -49,7 +49,7 @@ collisions maxBits = do
       putStrLn ("Iteration " ++ show loopCount ++ "/" ++ show count
                ++ " (" ++ show percentComplete ++ "% complete)")
 
-    (expr1, expr2) <- Gen.sample (genNotAlphaEquiv (Hash.genExprNumVars' 10))
+    (expr1, expr2) <- Gen.sample (genNotAlphaEquiv (Hash.genExprNumVars 10))
 
     let h1 = annotation (KATHashFastOrigHash.katHash expr1)
         h2 = annotation (KATHashFastOrigHash.katHash expr2)
