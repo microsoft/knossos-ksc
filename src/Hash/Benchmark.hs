@@ -59,20 +59,20 @@ algorithms_ = Algorithms
       good      = "green"
       baseline  = "blue"
 
-type BenchmarkParams = (Int, Double, Double)
+type BenchmarkParams = (Int, Double, Double, Double)
 
 fast :: BenchmarkParams
-fast = (3, 0.01, 1000)
+fast = (3, 0.01, 1000, 1.4)
 
 full :: BenchmarkParams
-full = (10, 0.1, 1000 * 100)
+full = (10, 0.1, 1000 * 1000, 1.1)
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
 -- from the run will be written out to a directory whose name is
 -- displayed at the end of the run.
 benchmark :: BenchmarkParams -> IO ()
-benchmark (runs, minimumMeasureableTime_seconds, maximumTime_micro) = do
+benchmark (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScale) = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = \n size ->
                   Gen.sample (Hash.genExprLinearNumVarsSize n size)
@@ -90,7 +90,7 @@ benchmark (runs, minimumMeasureableTime_seconds, maximumTime_micro) = do
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
   results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
-    results <- benchmarkThis maximumTime_micro
+    results <- benchmarkThis sizeScale maximumTime_micro
                              (show i ++ "/" ++ show (length bcs))
                              runs minimumMeasureableTime_seconds
                              benchmarksDir algorithms varCounts bc
@@ -99,6 +99,7 @@ benchmark (runs, minimumMeasureableTime_seconds, maximumTime_micro) = do
     makeGnuplot benchmarksDir genName results
 
 benchmarkThis :: Double
+              -> Double
               -> String
               -> Int
               -> Double
@@ -107,61 +108,61 @@ benchmarkThis :: Double
               -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]
-benchmarkThis maximumTime_micro expressionSet runs minimumMeasureableTime_seconds
+benchmarkThis sizeScale maximumTime_micro expressionSet runs
+              minimumMeasureableTime_seconds
               benchmarksDir algorithms varCounts bc = do
   let allParams = (,) <$> algorithms <*> varCounts
 
   results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
     let (varCount, varCountSymbol) = var_
         (algorithmName, algorithm, algorithmColor) = algorithm_
-    results <- loop (64, False, []) $ \a@(size, done, rest) -> do
-      if done
-        then pure (Right a)
-        else do
+    results <- loop (64, []) $ \(size, rest) -> do
+      -- We force the expression after generating it.  The Expr type
+      -- is strict, that is forcing it forces everything it contains,
+      -- therefore no time is wasted forcing it in the hashing
+      -- algorithm itself.  On the other hand adding this bang pattern
+      -- made absolutely no difference to the benchmarks.  The
+      -- expression must be generated already forced.  But it's nice
+      -- to keep this hear for clarity.
+      !expression <- bcGenExpr bc varCount size
 
-        -- We force the expression after generating it.  The Expr type
-        -- is strict, that is forcing it forces everything it contains,
-        -- therefore no time is wasted forcing it in the hashing
-        -- algorithm itself.  On the other hand adding this bang pattern
-        -- made absolutely no difference to the benchmarks.  The
-        -- expression must be generated already forced.  But it's nice
-        -- to keep this hear for clarity.
-        !expression <- bcGenExpr bc varCount size
+      let minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
 
-        let minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
-  
-        (repeats, firstStats) <- benchmarkUntil minimumMeasureableTime_micro
-                                                1
-                                                (seqHashResult . algorithm)
-                                                expression
-  
-        r <- benchmarkMore firstStats
-                           (runs - 1)
-                           repeats
-                           (seqHashResult . algorithm)
-                           expression
-  
-        putStrLn ("Expression set " ++ expressionSet)
-        putStrLn ("Parameter set "
-                   ++ show i ++ "/" ++ show (length allParams)
-                   ++ " (" ++ algorithmName ++ ")")
-        putStrLn ("Generated " ++ show (length rest) ++ " expressions")
-  
-        let (n, mean, tmin, variance, stddev) = stats r
-            showFloat = printf "%.0f" :: Double -> String
-  
-        putStrLn ("Count: "    ++ show n)
-        putStrLn ("Mean: "     ++ showFloat mean     ++ "us")
-        putStrLn ("Min: "      ++ showFloat tmin     ++ "us")
-        putStrLn ("Variance: " ++ showFloat variance ++ "us^2")
-        putStrLn ("Std dev: "  ++ showFloat stddev   ++ "us")
-  
-        let done' = tmin > maximumTime_micro -- longer than 1 second
-            size' = floor (fromIntegral size * 1.1 :: Double) + 1
+      (repeats, firstStats) <- benchmarkUntil minimumMeasureableTime_micro
+                                              1
+                                              (seqHashResult . algorithm)
+                                              expression
 
-        return (Left (size', done', (exprSize expression, tmin):rest))
-  
-    let textOutput = flip concatMap (case results of (_, _, r) -> r) $ \(size, time) ->
+      r <- benchmarkMore firstStats
+                         (runs - 1)
+                         repeats
+                         (seqHashResult . algorithm)
+                         expression
+
+      putStrLn ("Expression set " ++ expressionSet)
+      putStrLn ("Parameter set "
+                 ++ show i ++ "/" ++ show (length allParams)
+                 ++ " (" ++ algorithmName ++ ")")
+      putStrLn ("Generated " ++ show (length rest) ++ " expressions")
+
+      let (n, mean, tmin, variance, stddev) = stats r
+          showFloat = printf "%.0f" :: Double -> String
+
+      putStrLn ("Count: "    ++ show n)
+      putStrLn ("Mean: "     ++ showFloat mean     ++ "us")
+      putStrLn ("Min: "      ++ showFloat tmin     ++ "us")
+      putStrLn ("Variance: " ++ showFloat variance ++ "us^2")
+      putStrLn ("Std dev: "  ++ showFloat stddev   ++ "us")
+
+      let done = tmin > maximumTime_micro
+          size' = floor (fromIntegral size * sizeScale) + 1
+          rest' = (exprSize expression, tmin):rest
+
+      pure $ if done
+             then Right rest'
+             else Left (size', rest')
+
+    let textOutput = flip concatMap results $ \(size, time) ->
           show size ++ " " ++  show time ++ "\n"
 
     filename <- emptyTempFile benchmarksDir (algorithmName ++ show varCount ++ ".dat")
