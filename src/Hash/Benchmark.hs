@@ -21,7 +21,6 @@ import qualified KATHashFasterOrigHash
 data BenchmarkConfig = BenchmarkConfig
   { bcGenExpr              :: Int -> Int -> IO (Expr () Int)
   , bcGenName              :: String
-  , bcTotalExpressions     :: Int
   }
 
 data Algorithms a = Algorithms
@@ -60,31 +59,29 @@ algorithms_ = Algorithms
       good      = "green"
       baseline  = "blue"
 
-type BenchmarkParams = (Int, Double, Int, Double)
+type BenchmarkParams = (Int, Double, Double)
 
 fast :: BenchmarkParams
-fast = (3, 0.01, 1000, 1000)
+fast = (3, 0.01, 1000)
 
 full :: BenchmarkParams
-full = (10, 0.1, 1000, 1000 * 100)
+full = (10, 0.1, 1000 * 100)
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
 -- from the run will be written out to a directory whose name is
 -- displayed at the end of the run.
 benchmark :: BenchmarkParams -> IO ()
-benchmark (runs, minimumMeasureableTime_seconds, totalExpressions, maximumTime_micro) = do
+benchmark (runs, minimumMeasureableTime_seconds, maximumTime_micro) = do
   let bcs = [ BenchmarkConfig
               { bcGenExpr = \n size ->
                   Gen.sample (Hash.genExprLinearNumVarsSize n size)
               , bcGenName = "unbalanced expressions (new generator)"
-              , bcTotalExpressions     = totalExpressions
               }
             , BenchmarkConfig
               { bcGenExpr = \n size ->
                   Gen.sample (Hash.genExprNumVarsSize n size)
               , bcGenName = "balanced expressions (new generator)"
-              , bcTotalExpressions     = totalExpressions
               }
             ]
 
@@ -117,9 +114,9 @@ benchmarkThis maximumTime_micro expressionSet runs minimumMeasureableTime_second
   results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
     let (varCount, varCountSymbol) = var_
         (algorithmName, algorithm, algorithmColor) = algorithm_
-    results <- times (bcTotalExpressions bc) (64, False, []) $ \a@(size, done, rest) -> do
+    results <- loop (64, False, []) $ \a@(size, done, rest) -> do
       if done
-        then pure a
+        then pure (Right a)
         else do
 
         -- We force the expression after generating it.  The Expr type
@@ -148,8 +145,7 @@ benchmarkThis maximumTime_micro expressionSet runs minimumMeasureableTime_second
         putStrLn ("Parameter set "
                    ++ show i ++ "/" ++ show (length allParams)
                    ++ " (" ++ algorithmName ++ ")")
-        putStrLn ("Generated " ++ show (length rest)
-                  ++ " out of " ++ show (bcTotalExpressions bc) ++ " expressions")
+        putStrLn ("Generated " ++ show (length rest) ++ " expressions")
   
         let (n, mean, tmin, variance, stddev) = stats r
             showFloat = printf "%.0f" :: Double -> String
@@ -163,7 +159,7 @@ benchmarkThis maximumTime_micro expressionSet runs minimumMeasureableTime_second
         let done' = tmin > maximumTime_micro -- longer than 1 second
             size' = floor (fromIntegral size * 1.1 :: Double) + 1
 
-        return (size', done', (exprSize expression, tmin):rest)
+        return (Left (size', done', (exprSize expression, tmin):rest))
   
     let textOutput = flip concatMap (case results of (_, _, r) -> r) $ \(size, time) ->
           show size ++ " " ++  show time ++ "\n"
@@ -352,3 +348,10 @@ times n s f = times_f 0 s
 
 enumFrom1 :: [a] -> [(Int, a)]
 enumFrom1 = zip [1..]
+
+loop :: Monad m => a -> (a -> m (Either a b)) -> m b
+loop a f = do
+  e <- f a
+  case e of
+    Left a' -> loop a' f
+    Right b -> pure b
