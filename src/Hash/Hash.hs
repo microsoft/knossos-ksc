@@ -199,28 +199,25 @@ uniquifyBindersExplicit m n = \case
 -- Subexpressions"
 deBruijnHash :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
 deBruijnHash expr = es
-  where (_, _, es) = deBruijnHashExplicit Map.empty expr
+  where (_, es) = deBruijnHashExplicit Map.empty expr
 
 deBruijnHashExplicit :: (Hashable a, Ord a)
                      => Map.Map a Int
                      -> Expr h a
-                     -> (Hash, Int, Expr Hash a)
+                     -> (Hash, Expr Hash a)
 deBruijnHashExplicit = \env expr -> case expr of
-  Var _ x -> (hash', depth', Var hash' x)
+  Var _ x -> (hash', Var hash' x)
     where !hash' = case dbLookupVar x env of
-            Nothing -> hash "free" `thenHash` x `thenHash` depth'
-            Just i  -> hash "bound" `thenHash` i `thenHash` depth'
-          depth' = 0 :: Int
-  Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
-    where (hashE, depthE, subExpressionHashesE) =
+            Nothing -> hash "free" `thenHash` x
+            Just i  -> hash "bound" `thenHash` i
+  Lam _ x e -> (hash', Lam hash' x subExpressionHashesE)
+    where (hashE, subExpressionHashesE) =
             deBruijnHashExplicit (dbAddVar x env) e
-          !depth' = depthE + 1
-          !hash'  = hash "lam" `thenHash` hashE `thenHash` depth'
-  App _ f e -> (hash', depth', App hash' lF lE)
-    where (hashF, depthF, lF) = deBruijnHashExplicit env f
-          (hashE, depthE, lE) = deBruijnHashExplicit env e
-          !depth' = max depthF depthE + 1
-          !hash'  = hash "app" `thenHash` hashF `thenHash` hashE `thenHash` depth'
+          !hash'  = hash "lam" `thenHash` hashE
+  App _ f e -> (hash', App hash' lF lE)
+    where (hashF, lF) = deBruijnHashExplicit env f
+          (hashE, lE) = deBruijnHashExplicit env e
+          !hash'  = hash "app" `thenHash` hashF `thenHash` hashE
 
 deBruijnNestedHash :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
 deBruijnNestedHash = deBruijnNestedHashExplicit
