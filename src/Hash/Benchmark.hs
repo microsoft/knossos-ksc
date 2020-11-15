@@ -157,13 +157,12 @@ benchmarkThis bps
                  ++ " (" ++ algorithmName ++ ")")
       putStrLn ("Generated " ++ show (length rest) ++ " expressions")
 
-      let (n, mean, tmin, variance, stddev) = stats r
+      let (n, mean, tmin, _, stddev) = stats r
           showFloat = printf "%.0f" :: Double -> String
 
       putStrLn ("Count: "    ++ show n)
       putStrLn ("Mean: "     ++ showFloat mean     ++ "us")
       putStrLn ("Min: "      ++ showFloat tmin     ++ "us")
-      putStrLn ("Variance: " ++ showFloat variance ++ "us^2")
       putStrLn ("Std dev: "  ++ showFloat stddev   ++ "us")
 
       let done = tmin > maximumTime_micro bps
