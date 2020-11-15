@@ -556,20 +556,19 @@ deBruijnHashExplicit = \env expr -> case expr of
           hash'  = hash ("app", hashF, hashE, depth')
 
 deBruijnNestedHash :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
-deBruijnNestedHash = deBruijnNestedHashExplicit []
+deBruijnNestedHash = deBruijnNestedHashExplicit
 
 deBruijnNestedHashExplicit :: (Hashable a, Ord a)
-                           => Path
-                           -> Expr h a
+                           => Expr h a
                            -> Expr Hash a
-deBruijnNestedHashExplicit = \path expr ->
+deBruijnNestedHashExplicit = \expr ->
   let hash' = annotation (deBruijnHash expr)
       allHashes = case expr of
         Var _ x -> Var hash' x
-        Lam _ x e -> Lam hash' x (deBruijnNestedHashExplicit (L:path) e)
+        Lam _ x e -> Lam hash' x (deBruijnNestedHashExplicit e)
         App _ f e ->
-          App hash' (deBruijnNestedHashExplicit (Apl:path) f)
-                    (deBruijnNestedHashExplicit (Apr:path) e)
+          App hash' (deBruijnNestedHashExplicit f)
+                    (deBruijnNestedHashExplicit e)
   in allHashes
 
 dbAddVar :: Ord k => k -> Map k Int -> Map k Int
