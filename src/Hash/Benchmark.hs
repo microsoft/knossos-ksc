@@ -157,17 +157,18 @@ benchmarkThis bps
                  ++ " (" ++ algorithmName ++ ")")
       putStrLn ("Generated " ++ show (length rest) ++ " expressions")
 
-      let (n, mean, tmin, _, stddev) = stats r
+      let (n, mean_micro, tmin_micro, _, stddev_micro) = stats r
           showFloat = printf "%.0f" :: Double -> String
 
       putStrLn ("Count: "    ++ show n)
-      putStrLn ("Mean: "     ++ showFloat mean     ++ "us")
-      putStrLn ("Min: "      ++ showFloat tmin     ++ "us")
-      putStrLn ("Std dev: "  ++ showFloat stddev   ++ "us")
+      putStrLn ("Mean: "     ++ showFloat mean_micro ++ "us")
+      putStrLn ("Min: "      ++ showFloat tmin_micro ++ "us")
+      putStrLn ("Std dev: "  ++ showFloat stddev_micro ++ "us")
 
-      let done = tmin > maximumTime_micro bps
+      let done = tmin_micro > maximumTime_micro bps
           size' = floor (fromIntegral size * sizeScale bps) + 1
-          rest' = (exprSize expression, tmin):rest
+          tmin_secs = tmin_micro / (1000 * 1000)
+          rest' = (exprSize expression, tmin_secs):rest
 
       pure $ if done
              then Right rest'
@@ -315,7 +316,9 @@ gnuplotFilePng benchmarksDir xlabel results = (outputPng, unlines [
 gnuplotFile :: String -> [PlotDataset] -> String
 gnuplotFile xlabel results =
   unlines [ "set xlabel \"Number of nodes in expression (" ++ xlabel ++ ")\""
-          , "set ylabel \"Time taken to hash all subexpressions / us"
+          , "set ylabel \"Time taken to hash all subexpressions / s"
+          , "set format y '%.0se%S'"
+          , "set format x '%.0se%S'"
           , "set logscale xy 2"
           , "set key right bottom"
           , "set xrange [64:]"
