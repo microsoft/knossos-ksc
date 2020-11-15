@@ -642,16 +642,16 @@ structuralHashNestedExplicit :: Hashable a
 structuralHashNestedExplicit expr =
   case expr of
   Var _ x   -> (thisHash, Var thisHash x)
-    where thisHash = hash x
+    where !thisHash = hash x
 
   Lam _ x e -> (thisHash, Lam thisHash x subExpressionHashes)
     where (h, subExpressionHashes) = structuralHashNestedExplicit e
-          thisHash                 = h `thenHash` x
+          !thisHash                = h `thenHash` x
 
   App _ f e -> (thisHash, App thisHash subExpressionHashesL subExpressionHashesR)
     where (hL, subExpressionHashesL) = structuralHashNestedExplicit f
           (hR, subExpressionHashesR) = structuralHashNestedExplicit e
-          thisHash                   = hash (hL, hR)
+          !thisHash                  = hL `thenHash` hR
 
 structuralHashWithBinders :: (Ord a, Hashable a)
                      => Expr h a -> Expr Hash a
