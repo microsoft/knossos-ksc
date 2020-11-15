@@ -212,8 +212,9 @@ deBruijnHashExplicit = \env expr -> case expr of
             Just i  -> hash "bound" `thenHash` i
   Lam _ x e -> (hash', Lam hash' x subExpressionHashesE)
     where (hashE, subExpressionHashesE) =
-            deBruijnHashExplicit (dbAddVar x env) e
+            deBruijnHashExplicit env' e
           !hash'  = hash "lam" `thenHash` hashE
+          !env'   = dbAddVar x env
   App _ f e -> (hash', App hash' lF lE)
     where (hashF, lF) = deBruijnHashExplicit env f
           (hashE, lE) = deBruijnHashExplicit env e
