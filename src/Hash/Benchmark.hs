@@ -135,7 +135,7 @@ benchmarkThis bps
       -- algorithm itself.  On the other hand adding this bang pattern
       -- made absolutely no difference to the benchmarks.  The
       -- expression must be generated already forced.  But it's nice
-      -- to keep this hear for clarity.
+      -- to keep this here for clarity.
       !expression <- bcGenExpr bc varCount size
 
       let minimumMeasureableTime_micro = minimumMeasurableTime_secs bps * 1000 * 1000
