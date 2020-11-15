@@ -319,7 +319,7 @@ gnuplotFile xlabel results =
           , "set ylabel \"Time taken to hash all subexpressions / s"
           , "set format y '%.0se%S'"
           , "set format x '%.0se%S'"
-          , "set logscale xy 2"
+          , "set logscale xy 10"
           , "set key right bottom"
           , "set xrange [64:]"
           , "plot " ++ intercalate ", " (fmap plotDataset results)
