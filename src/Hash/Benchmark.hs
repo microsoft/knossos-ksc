@@ -60,13 +60,28 @@ algorithms_ = Algorithms
       baseline  = "blue"
       paper     = "purple"
 
-type BenchmarkParams = (Int, Double, Double, Double)
+data BenchmarkParams = BenchmarkParams
+  { runsToMinimizeOver :: Int
+  , minimumMeasurableTime_secs :: Double
+  , maximumTime_micro :: Double
+  , sizeScale :: Double
+  }
 
 fast :: BenchmarkParams
-fast = (3, 0.01, 1000, 1.4)
+fast = BenchmarkParams
+  { runsToMinimizeOver = 3
+  , minimumMeasurableTime_secs = 0.01
+  , maximumTime_micro = 1000
+  , sizeScale = 1.4
+  }
 
 full :: BenchmarkParams
-full = (10, 0.1, 1000 * 1000, 1.1)
+full = BenchmarkParams
+  { runsToMinimizeOver = 10
+  , minimumMeasurableTime_secs = 0.1
+  , maximumTime_micro = 1000 * 1000
+  , sizeScale = 1.1
+  }
 
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
@@ -105,7 +120,7 @@ benchmarkThis :: BenchmarkParams
               -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]
-benchmarkThis (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScale)
+benchmarkThis bps
               expressionSet
               benchmarksDir algorithms varCounts bc = do
   let allParams = (,) <$> algorithms <*> varCounts
@@ -123,7 +138,7 @@ benchmarkThis (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScal
       -- to keep this hear for clarity.
       !expression <- bcGenExpr bc varCount size
 
-      let minimumMeasureableTime_micro = minimumMeasureableTime_seconds * 1000 * 1000
+      let minimumMeasureableTime_micro = minimumMeasurableTime_secs bps * 1000 * 1000
 
       (repeats, firstStats) <- benchmarkUntil minimumMeasureableTime_micro
                                               1
@@ -131,7 +146,7 @@ benchmarkThis (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScal
                                               expression
 
       r <- benchmarkMore firstStats
-                         (runs - 1)
+                         (runsToMinimizeOver bps - 1)
                          repeats
                          (seqHashResult . algorithm)
                          expression
@@ -151,8 +166,8 @@ benchmarkThis (runs, minimumMeasureableTime_seconds, maximumTime_micro, sizeScal
       putStrLn ("Variance: " ++ showFloat variance ++ "us^2")
       putStrLn ("Std dev: "  ++ showFloat stddev   ++ "us")
 
-      let done = tmin > maximumTime_micro
-          size' = floor (fromIntegral size * sizeScale) + 1
+      let done = tmin > maximumTime_micro bps
+          size' = floor (fromIntegral size * sizeScale bps) + 1
           rest' = (exprSize expression, tmin):rest
 
       pure $ if done
