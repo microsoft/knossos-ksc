@@ -540,20 +540,20 @@ deBruijnHashExplicit :: (Hashable a, Ord a)
                      -> (Hash, Int, Expr Hash a)
 deBruijnHashExplicit = \env expr -> case expr of
   Var _ x -> (hash', depth', Var hash' x)
-    where hash' = case dbLookupVar x env of
-            Nothing -> hash ("free", x, depth')
-            Just i  -> hash ("bound", i, depth')
+    where !hash' = case dbLookupVar x env of
+            Nothing -> hash "free" `thenHash` x `thenHash` depth'
+            Just i  -> hash "bound" `thenHash` i `thenHash` depth'
           depth' = 0 :: Int
   Lam _ x e -> (hash', depth', Lam hash' x subExpressionHashesE)
-    where (!hashE, !depthE, subExpressionHashesE) =
+    where (hashE, depthE, subExpressionHashesE) =
             deBruijnHashExplicit (dbAddVar x env) e
-          depth' = depthE + 1
-          hash' = hash ("lam", hashE, depth')
+          !depth' = depthE + 1
+          !hash'  = hash "lam" `thenHash` hashE `thenHash` depth'
   App _ f e -> (hash', depth', App hash' lF lE)
-    where (!hashF, !depthF, lF) = deBruijnHashExplicit env f
-          (!hashE, !depthE, lE) = deBruijnHashExplicit env e
-          depth' = max depthF depthE + 1
-          hash'  = hash ("app", hashF, hashE, depth')
+    where (hashF, depthF, lF) = deBruijnHashExplicit env f
+          (hashE, depthE, lE) = deBruijnHashExplicit env e
+          !depth' = max depthF depthE + 1
+          !hash'  = hash "app" `thenHash` hashF `thenHash` hashE `thenHash` depth'
 
 deBruijnNestedHash :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
 deBruijnNestedHash = deBruijnNestedHashExplicit
