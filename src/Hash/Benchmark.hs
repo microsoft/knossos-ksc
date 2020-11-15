@@ -326,10 +326,10 @@ gnuplotFile xlabel results =
           ]
 
 data PlotDataset = PlotDataset
-  { pdFile   :: String
-  , pdTitle  :: String
-  , pdColor  :: String
-  , pdStyle  :: String
+  { pdFile  :: String
+  , pdTitle :: String
+  , pdColor :: String
+  , pdStyle :: String
   }
 
 plotDataset :: PlotDataset -> String
