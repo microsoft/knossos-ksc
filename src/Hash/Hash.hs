@@ -144,8 +144,8 @@ locallyNamelessExplicit e_@(Lam _ n e) = Lam h n (locallyNamelessExplicit e)
     -- Does not return a decorated expression, only a hash code
     -- All nested lambdas are dealt with via deBruijn
     hashOnly env (Var _ n')    = case lookupEnv env n' of
-      Just h' -> h'
-      Nothing -> hash n'
+      Just h' -> hash "free" `thenHash` h'
+      Nothing -> hash "bound" `thenHash` hash n'
     hashOnly env (App _ e1 e2) = hashExprO (AppO (Just h1) (Just h2))
       where h1 = hashOnly env e1
             h2 = hashOnly env e2
