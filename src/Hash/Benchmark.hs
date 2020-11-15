@@ -45,8 +45,8 @@ algorithms_ :: (Hashable a, Ord a)
 algorithms_ = Algorithms
   { aLocallyNameless    = ("Locally nameless", Hash.locallyNameless, baseline)
   , aCastHashOptimized  = ("CAST Optimized", castHashOptimized, "black")
-  , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, good)
-  , aKATHashFromPaperFaster = ("KATHash optimized", KATHashFasterOrigHash.katHash, "yellow")
+  , aKATHashFromPaper   = ("KATHash as in paper", KATHashFastOrigHash.katHash, paper)
+  , aKATHashFromPaperFaster = ("KATHash optimized", KATHashFasterOrigHash.katHash, good)
   , aDeBrujinHash           = ("de Bruijn*", deBruijnHash, prettyBad)
   , aStructuralHashNested   = ("Structural*", structuralHashNested, veryBad)
   -- , aDeBruijnNested     = ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")
@@ -58,6 +58,7 @@ algorithms_ = Algorithms
       prettyBad = "orange"
       good      = "green"
       baseline  = "blue"
+      paper     = "purple"
 
 type BenchmarkParams = (Int, Double, Double, Double)
 
