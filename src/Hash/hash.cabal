@@ -59,4 +59,4 @@ executable hash
                        microlens,
                        random
   default-language:    Haskell2010
-  ghc-options: -Werror -Wall -O2
+  ghc-options: -Werror -Wall -O2 -rtsopts
