@@ -116,7 +116,7 @@ benchmarkThis :: BenchmarkParams
               -> IO [PlotDataset]
 benchmarkThis bps
               expressionSet
-              benchmarksDir algorithms varCounts bc = do
+              benchmarksDir algorithms bc = do
   let allParams = algorithms
 
   results <- flip mapM (enumFrom1 allParams) $ \(i, algorithm_) -> do
