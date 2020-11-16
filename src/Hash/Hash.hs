@@ -206,7 +206,7 @@ deBruijnHashExplicit :: (Hashable a, Ord a)
                      => Map.Map a Int
                      -> Expr h a
                      -> (Hash, Expr Hash a)
-deBruijnHashExplicit = \env expr -> case expr of
+deBruijnHashExplicit = \env -> \case
   Var _ x -> (hash', Var hash' x)
     where !hash' = case dbLookupVar x env of
             Nothing -> hash "free" `thenHash` x
@@ -258,9 +258,9 @@ combinedHashExplicit :: (Hashable a, Ord a)
                      -> Path
                      -> Expr h a
                      -> (Hash, Set a, Int, Expr Hash a)
-combinedHashExplicit = \env fvEnv location expr ->
+combinedHashExplicit = \env fvEnv location ->
   let fvHash freeVars = map (flip Map.lookup fvEnv) (Set.toList freeVars)
-  in case expr of
+  in \case
   Var _ x -> (dbHash', freeVars', depth', Var jointHash' x)
     where dbHash' = case dbLookupVar x env of
             Nothing -> hash ("free", x, depth')
@@ -305,8 +305,7 @@ structuralHashNested e = es
 structuralHashNestedExplicit :: Hashable a
                         => Expr h a
                         -> (Hash, Expr Hash a)
-structuralHashNestedExplicit expr =
-  case expr of
+structuralHashNestedExplicit = \case
   Var _ x   -> (thisHash, Var thisHash x)
     where !thisHash = hash "Var" `thenHash` x
 
