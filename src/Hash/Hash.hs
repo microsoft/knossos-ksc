@@ -290,14 +290,6 @@ combinedHashExplicit = \env fvEnv location ->
 addLocn :: Ord k => k -> a -> Map k a -> Map k a
 addLocn = Map.insert
 
--- | The most basic hash one could think of.  Is not intended to
--- respect any kind of equivalences.
-structuralHash :: Hashable a => Expr h a -> Hash
-structuralHash = \case
-  Var _ x   -> hash "Var" `thenHash` x
-  Lam _ x e -> hash "Lam" `thenHash` x `thenHash` structuralHash e
-  App _ f e -> hash "App" `thenHash` structuralHash f `thenHash` structuralHash e
-
 structuralHashNested :: Hashable a => Expr h a -> Expr Hash a
 structuralHashNested e = es
   where (_, es) = structuralHashNestedExplicit e
