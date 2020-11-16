@@ -85,6 +85,7 @@ import GHC.Generics (Generic)
 import Data.Function (on)
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
+import System.Random (Random, randomRIO, randomIO)
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              allSubexprs, annotation, mapAnnotation)
@@ -507,25 +508,34 @@ genExprWithVarsSizeG size vars binders =
        , do Lam () <$> binders <*> genExprWithVarsSizeG (size - 1) vars binders
        ]
 
-genExprWithVarsUnbalanced' :: (Integral a, MonadGen m)
-                       => a -> (a -> a) -> m (Expr () a)
-genExprWithVarsUnbalanced' fresh freshen = do
-  size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsUnbalancedSize' size fresh freshen
+genExprWithVarsSize :: (Random a, Integral a)
+                    => Int -> a -> IO (Expr () a)
+genExprWithVarsSize size fresh =
+  if size <= 1
+  then Var () <$> vars
+  else do
+    app <- randomIO
+    if app
+      then do
+      sizeL <- randomRIO (1, size - 2)
+      let sizeR = size - sizeL - 1
+      App () <$> genExprWithVarsSize sizeL fresh
+             <*> genExprWithVarsSize sizeR fresh
+      else
+      Lam () <$> binders <*> genExprWithVarsSize (size - 1) (fresh + 1)
+  where vars    = randomRIO (0, fresh - 1)
+        binders = pure fresh
 
-genExprWithVarsUnbalancedSize' :: (MonadGen m, Integral a)
-                           => Int -> a -> (a -> a) -> m (Expr () a)
-genExprWithVarsUnbalancedSize' size fresh freshen = flip evalStateT fresh $ do
-  let freshVar = do
-        fresh' <- get
-        put (freshen fresh')
-        pure fresh'
-
-  let elementInScope = do
-        fresh' <- get
-        Gen.integral (Range.constant 0 (fresh' - 1))
-
-  genExprWithVarsUnbalancedSizeG size elementInScope freshVar
+genExprWithVarsUnbalancedSize :: (Random a, Integral a)
+                              => Int -> a -> IO (Expr () a)
+genExprWithVarsUnbalancedSize size fresh =
+  if size <= 1
+  then Var () <$> vars
+  else App () <$> (Lam () <$> binders <*> e)
+              <*> (Var () <$> vars)
+  where vars    = randomRIO (0, fresh - 1)
+        binders = pure fresh
+        e = genExprWithVarsUnbalancedSize (size - 3) (fresh + 1)
 
 genExprWithVarsUnbalancedSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
 genExprWithVarsUnbalancedSizeG size vars binders =
@@ -541,16 +551,6 @@ genExpr = genExprWithVarsTest ['u'..'z']
 
 genExprNumVars :: MonadGen m => Int -> m (Expr () Int)
 genExprNumVars n = genExprWithVars' [1..n] (n+1) (+1)
-
-genExprNumVarsSize :: MonadGen m => Int -> Int -> m (Expr () Int)
-genExprNumVarsSize n size = genExprWithVarsSize' size (n+1) (+1)
-
-genExprUnbalancedNumVars :: MonadGen m => Int -> m (Expr () Int)
-genExprUnbalancedNumVars n = genExprWithVarsUnbalanced' (n+1) (+1)
-
-genExprUnbalancedNumVarsSize :: MonadGen m => Int -> Int -> m (Expr () Int)
-genExprUnbalancedNumVarsSize n size =
-  genExprWithVarsUnbalancedSize' size (n+1) (+1)
 
 -- | Shows equivalence of castHash hash and the other algorithms
 prop_equivCastFast :: Property

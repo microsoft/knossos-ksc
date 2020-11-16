@@ -3,7 +3,6 @@
 
 module Benchmark where
 
-import qualified Hedgehog.Gen as Gen
 import qualified Data.Foldable
 import Data.Hashable (Hashable)
 import Data.List (intercalate)
@@ -88,13 +87,11 @@ full = BenchmarkParams
 benchmark :: BenchmarkParams -> IO ()
 benchmark bps = do
   let bcs = [ BenchmarkConfig
-              { bcGenExpr = \n size ->
-                  Gen.sample (Hash.genExprUnbalancedNumVarsSize n size)
+              { bcGenExpr = \n size -> Hash.genExprWithVarsUnbalancedSize size n
               , bcGenName = "unbalanced expressions"
               }
             , BenchmarkConfig
-              { bcGenExpr = \n size ->
-                  Gen.sample (Hash.genExprNumVarsSize n size)
+              { bcGenExpr = \n size -> Hash.genExprWithVarsSize size n
               , bcGenName = "balanced expressions"
               }
             ]
