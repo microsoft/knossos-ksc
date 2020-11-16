@@ -135,6 +135,11 @@ benchmarkThis bps
       -- made absolutely no difference to the benchmarks.  Presumably
       -- the expression is generated already in forced state.  But
       -- it's nice to keep this here for clarity.
+      putStrLn ("Expression set " ++ expressionSet)
+      putStrLn ("Parameter set "
+                 ++ show i ++ "/" ++ show (length allParams)
+                 ++ " (" ++ algorithmName ++ ")")
+      putStrLn ("Generated " ++ show (length rest) ++ " expressions")
       putStrLn ("Generating expression of approximate size " ++ show size ++ "...")
       !expression <- bcGenExpr bc varCount size
       let !exprSize' = exprSize expression
@@ -152,12 +157,6 @@ benchmarkThis bps
                          repeats
                          (seqHashResult . algorithm)
                          expression
-
-      putStrLn ("Expression set " ++ expressionSet)
-      putStrLn ("Parameter set "
-                 ++ show i ++ "/" ++ show (length allParams)
-                 ++ " (" ++ algorithmName ++ ")")
-      putStrLn ("Generated " ++ show (length rest) ++ " expressions")
 
       let (n, mean_micro, tmin_micro, _, stddev_micro) = stats r
           showFloat = printf "%.0f" :: Double -> String
