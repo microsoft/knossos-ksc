@@ -189,20 +189,20 @@ benchmarkThis bps
 makeGnuplot :: FilePath -> String -> [PlotDataset] -> IO ()
 makeGnuplot benchmarksDir xlabel results = do
   gnuplotFilename <- emptyTempFile benchmarksDir "benchmarks.gnuplot"
-  gnuplotPngFilename <- emptyTempFile benchmarksDir "benchmarks-png.gnuplot"
+  gnuplotPdfFilename <- emptyTempFile benchmarksDir "benchmarks-pdf.gnuplot"
 
   let gnuplotFileContent = gnuplotFile xlabel results
-      (outputPng, gnuplotPngFileContent) = gnuplotFilePng benchmarksDir xlabel results
+      (outputPdf, gnuplotPdfFileContent) = gnuplotFilePdf benchmarksDir xlabel results
 
   writeFile gnuplotFilename gnuplotFileContent
-  writeFile gnuplotPngFilename gnuplotPngFileContent
+  writeFile gnuplotPdfFilename gnuplotPdfFileContent
 
   putStrLn ("I put stuff in " ++ benchmarksDir ++ ".")
   putStrLn "If you have an X server and you want a live graph view run:"
   putStrLn ("gnuplot --persist " ++ gnuplotFilename)
-  putStrLn "If you want to generate a PNG run:"
-  putStrLn ("gnuplot " ++ gnuplotPngFilename)
-  putStrLn ("You will find the output PNG in " ++ outputPng)
+  putStrLn "If you want to generate a PDF run:"
+  putStrLn ("gnuplot " ++ gnuplotPdfFilename)
+  putStrLn ("You will find the output PDF in " ++ outputPdf)
 
 type AggregateStatistics = (Int, Double, Double, Double)
 
@@ -298,16 +298,16 @@ benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm =
 
   benchmarkOne samplesPerExpression iterationsElapsed algorithm expr
 
-gnuplotFilePng :: String
+gnuplotFilePdf :: String
                -> String
                -> [PlotDataset]
                -> (String, String)
-gnuplotFilePng benchmarksDir xlabel results = (outputPng, unlines [
-    "set terminal pngcairo size 1024,768"
-  , "set output \"" ++ outputPng ++ "\""
+gnuplotFilePdf benchmarksDir xlabel results = (outputPdf, unlines [
+    "set terminal pdf font \"Helvetica,13\""
+  , "set output \"" ++ outputPdf ++ "\""
   , gnuplotFile xlabel results
   ])
-  where outputPng = benchmarksDir ++ "/benchmark.png"
+  where outputPdf = benchmarksDir ++ "/benchmark.pdf"
 
 gnuplotFile :: String -> [PlotDataset] -> String
 gnuplotFile xlabel results =
@@ -315,9 +315,10 @@ gnuplotFile xlabel results =
           , "set ylabel \"Time taken to hash all subexpressions (s)"
           , "set format y '%.0se%S'"
           , "set format x '%.0se%S'"
+          , "set size 1,1"
           , "set logscale xy 10"
           , "set key right bottom"
-          , "set xrange [64:]"
+          , "set yrange [1e-6:1]"
           , "plot " ++ intercalate ", " (fmap plotDataset results)
           ]
 
