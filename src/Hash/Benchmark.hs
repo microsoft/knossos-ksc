@@ -13,14 +13,14 @@ import Text.Printf (printf)
 import System.IO.Temp (createTempDirectory, emptyTempFile)
 
 import Expr (Expr, exprSize)
-import Hash (deBruijnHash,  structuralHashNested)
+import Hash (deBruijnHash, structuralHashNested)
 import qualified Hash
 import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
 
 data BenchmarkConfig = BenchmarkConfig
-  { bcGenExpr              :: Int -> Int -> IO (Expr () Int)
-  , bcGenName              :: String
+  { bcGenExpr :: Int -> Int -> IO (Expr () Int)
+  , bcGenName :: String
   }
 
 data Algorithms a = Algorithms
