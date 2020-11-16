@@ -97,14 +97,13 @@ benchmark bps = do
             ]
 
       algorithms = Data.Foldable.toList algorithms_
-      varCounts = [ (10, "1") {-, (100, "4")-} ]
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
   results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
     results <- benchmarkThis bps
                              (show i ++ "/" ++ show (length bcs)
                               ++ " (" ++ bcGenName bc ++ ")")
-                             benchmarksDir algorithms varCounts bc
+                             benchmarksDir algorithms bc
     pure (results, bcGenName bc)
   flip mapM_ results_genNames $ \(results, genName) ->
     makeGnuplot benchmarksDir genName results
@@ -113,17 +112,15 @@ benchmarkThis :: BenchmarkParams
               -> String
               -> FilePath
               -> [(String, Expr () Int -> Expr hash string, String)]
-              -> [(Int, String)]
               -> BenchmarkConfig
               -> IO [PlotDataset]
 benchmarkThis bps
               expressionSet
               benchmarksDir algorithms varCounts bc = do
-  let allParams = (,) <$> algorithms <*> varCounts
+  let allParams = algorithms
 
-  results <- flip mapM (enumFrom1 allParams) $ \(i, (algorithm_, var_)) -> do
-    let (varCount, varCountSymbol) = var_
-        (algorithmName, algorithm, algorithmColor) = algorithm_
+  results <- flip mapM (enumFrom1 allParams) $ \(i, algorithm_) -> do
+    let (algorithmName, algorithm, algorithmColor) = algorithm_
     results <- loop (64, []) $ \(size, rest) -> do
       -- We force the expression after generating it.  The Expr type
       -- is strict, that is forcing it forces everything it contains,
@@ -138,7 +135,7 @@ benchmarkThis bps
                  ++ " (" ++ algorithmName ++ ")")
       putStrLn ("Generated " ++ show (length rest) ++ " expressions")
       putStrLn ("Generating expression of approximate size " ++ show size ++ "...")
-      !expression <- bcGenExpr bc varCount size
+      !expression <- bcGenExpr bc 10 size
       let !exprSize' = exprSize expression
       putStrLn ("done.  Size was " ++ show exprSize')
 
@@ -175,15 +172,16 @@ benchmarkThis bps
     let textOutput = flip concatMap results $ \(size, time) ->
           show size ++ " " ++  show time ++ "\n"
 
-    filename <- emptyTempFile benchmarksDir (algorithmName ++ show varCount ++ ".dat")
+    filename <- emptyTempFile benchmarksDir (algorithmName ++ ".dat")
 
     writeFile filename textOutput
 
     return PlotDataset
       { pdFile  = filename
-      , pdTitle = algorithmName ++ " " ++ show varCount ++ " variables"
+      , pdTitle = algorithmName
       , pdColor = algorithmColor
-      , pdStyle = varCountSymbol
+      , pdStyle = "7"
+      , pdSize  = "0.5"
       }
 
   pure results
@@ -328,13 +326,15 @@ data PlotDataset = PlotDataset
   , pdTitle :: String
   , pdColor :: String
   , pdStyle :: String
+  , pdSize  :: String
   }
 
 plotDataset :: PlotDataset -> String
 plotDataset pd = intercalate " " [ quote (pdFile pd)
                                  , "title " ++ quote (pdTitle pd)
                                  , "lt rgb " ++ quote (pdColor pd)
-                                 , "pt " ++ pdStyle pd ]
+                                 , "pt " ++ pdStyle pd
+                                 , "ps " ++ pdSize pd ]
   where quote s = "\"" ++ s ++ "\""
 
 -- We apply the argument to the function here.  If we do it at the
