@@ -132,9 +132,9 @@ benchmarkThis bps
       -- is strict, that is forcing it forces everything it contains,
       -- therefore no time is wasted forcing it in the hashing
       -- algorithm itself.  On the other hand adding this bang pattern
-      -- made absolutely no difference to the benchmarks.  The
-      -- expression must be generated already forced.  But it's nice
-      -- to keep this here for clarity.
+      -- made absolutely no difference to the benchmarks.  Presumably
+      -- the expression is generated already in forced state.  But
+      -- it's nice to keep this here for clarity.
       putStrLn ("Generating expression of approximate size " ++ show size ++ "...")
       !expression <- bcGenExpr bc varCount size
       let !exprSize' = exprSize expression
