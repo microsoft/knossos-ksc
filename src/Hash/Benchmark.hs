@@ -53,8 +53,8 @@ algorithms_ = Algorithms
   where
       veryBad   = "red"
       prettyBad = "orange"
-      good      = "green"
-      baseline  = "blue"
+      good      = "web-green"
+      baseline  = "web-blue"
       paper     = "purple"
 
 data BenchmarkParams = BenchmarkParams
