@@ -576,3 +576,8 @@ prop_rebuildSApp3_inverse =
 prop_rebuildSApp_inverse :: Property
 prop_rebuildSApp_inverse =
   KATHashFastOrig.prop_rebuildSApp_inverse genExpr numRandomTests
+
+prop_fastFaster :: Property
+prop_fastFaster = withTests numRandomTests $ property $ do
+  expr <- forAll genExpr
+  KATHashFastOrigHash.katHash expr === KATHashFasterOrigHash.katHash expr
