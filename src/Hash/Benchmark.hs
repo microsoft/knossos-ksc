@@ -106,7 +106,7 @@ benchmark bps = do
   results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
     results <- benchmarkThis bps
                              (show i ++ "/" ++ show (length bcs)
-                              ++ " " ++ bcGenName bc)
+                              ++ " (" ++ bcGenName bc ++ ")")
                              benchmarksDir algorithms varCounts bc
     pure (results, bcGenName bc)
   flip mapM_ results_genNames $ \(results, genName) ->
