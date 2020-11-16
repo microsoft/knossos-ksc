@@ -105,7 +105,8 @@ benchmark bps = do
   benchmarksDir <- createTempDirectory "." "benchmarks"
   results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
     results <- benchmarkThis bps
-                             (show i ++ "/" ++ show (length bcs))
+                             (show i ++ "/" ++ show (length bcs)
+                              ++ " " ++ bcGenName bc)
                              benchmarksDir algorithms varCounts bc
     pure (results, bcGenName bc)
   flip mapM_ results_genNames $ \(results, genName) ->
@@ -134,7 +135,10 @@ benchmarkThis bps
       -- made absolutely no difference to the benchmarks.  The
       -- expression must be generated already forced.  But it's nice
       -- to keep this here for clarity.
+      putStrLn ("Generating expression of approximate size " ++ show size ++ "...")
       !expression <- bcGenExpr bc varCount size
+      let !exprSize' = exprSize expression
+      putStrLn ("done.  Size was " ++ show exprSize')
 
       let minimumMeasureableTime_micro = minimumMeasurableTime_secs bps * 1000 * 1000
 
