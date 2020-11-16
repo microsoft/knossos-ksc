@@ -169,7 +169,7 @@ benchmarkThis bps
       let done = tmin_micro > maximumTime_micro bps
           size' = floor (fromIntegral size * sizeScale bps) + 1
           tmin_secs = tmin_micro / (1000 * 1000)
-          rest' = (exprSize expression, tmin_secs):rest
+          rest' = (exprSize', tmin_secs):rest
 
       pure $ if done
              then Right rest'
