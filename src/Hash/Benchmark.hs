@@ -314,7 +314,7 @@ gnuplotFilePng benchmarksDir xlabel results = (outputPng, unlines [
 gnuplotFile :: String -> [PlotDataset] -> String
 gnuplotFile xlabel results =
   unlines [ "set xlabel \"Number of nodes in expression (" ++ xlabel ++ ")\""
-          , "set ylabel \"Time taken to hash all subexpressions / s"
+          , "set ylabel \"Time taken to hash all subexpressions (s)"
           , "set format y '%.0se%S'"
           , "set format x '%.0se%S'"
           , "set logscale xy 10"
