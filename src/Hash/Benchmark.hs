@@ -18,6 +18,13 @@ import Hash (deBruijnHash, structuralHashNested)
 import qualified Hash
 import qualified KATHashOptimizedHash
 
+data BenchmarkParams = BenchmarkParams
+  { runsToMinimizeOver :: Int
+  , minimumMeasurableTime_secs :: Double
+  , maximumTime_micro :: Double
+  , sizeScale :: Double
+  }
+
 data ExpressionGenerator = ExpressionGenerator
   { bcGenExpr :: Int -> Int -> IO (Expr () Int)
   , bcGenName :: String
@@ -57,13 +64,6 @@ algorithms_ = Algorithms
       good      = "web-green"
       baseline  = "web-blue"
       --paper     = "purple"
-
-data BenchmarkParams = BenchmarkParams
-  { runsToMinimizeOver :: Int
-  , minimumMeasurableTime_secs :: Double
-  , maximumTime_micro :: Double
-  , sizeScale :: Double
-  }
 
 fast :: BenchmarkParams
 fast = BenchmarkParams
