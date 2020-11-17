@@ -183,7 +183,7 @@ benchmarkThis bps
       , pdTitle = algorithmName
       , pdColor = algorithmColor
       , pdStyle = "7"
-      , pdSize  = "0.5"
+      , pdSize  = "0.25"
       }
 
   pure results
