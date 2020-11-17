@@ -10,7 +10,7 @@ library
                        Hash,
                        HtmlCombinators,
                        KATHashInefficient,
-                       KATHashFastOrig,
+                       KATHashEfficient,
                        KATHashFastOrigHash,
                        KATHashFasterOrigHash,
                        Merge,
@@ -37,7 +37,7 @@ executable hash
                        Expr,
                        Hash,
                        KATHashInefficient,
-                       KATHashFastOrig,
+                       KATHashEfficient,
                        KATHashFastOrigHash,
                        KATHashFasterOrigHash,
                        Merge

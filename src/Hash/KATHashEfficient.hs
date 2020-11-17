@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module KATHashFastOrig where
+module KATHashEfficient where
 
 import Hedgehog hiding (Var)
 

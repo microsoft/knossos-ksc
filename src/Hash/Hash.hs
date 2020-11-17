@@ -90,7 +90,7 @@ import System.Random (Random, randomRIO, randomIO)
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              allSubexprs, annotation, mapAnnotation)
 import qualified KATHashInefficient
-import qualified KATHashFastOrig
+import qualified KATHashEfficient
 import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
 import KATHashFastOrigHash (thenHash)
@@ -435,7 +435,7 @@ prop_rebuild3 = propG_rebuild KATHashInefficient.summariseExpr KATHashInefficien
 
 prop_rebuildFastOrig :: Property
 prop_rebuildFastOrig =
-  propG_rebuild KATHashFastOrig.summariseExpr KATHashFastOrig.rebuild
+  propG_rebuild KATHashEfficient.summariseExpr KATHashEfficient.rebuild
 
 -- | Generates random expressions for testing
 genExprWithVarsTest :: MonadGen m => [v] -> m (Expr () v)
@@ -547,7 +547,7 @@ prop_rebuildSApp3_inverse =
 
 prop_rebuildSApp_inverse :: Property
 prop_rebuildSApp_inverse =
-  KATHashFastOrig.prop_rebuildSApp_inverse genExpr numRandomTests
+  KATHashEfficient.prop_rebuildSApp_inverse genExpr numRandomTests
 
 prop_fastFaster :: Property
 prop_fastFaster = withTests numRandomTests $ property $ do
