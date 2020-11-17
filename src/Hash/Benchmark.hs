@@ -26,7 +26,7 @@ data BenchmarkConfig = BenchmarkConfig
 
 data Algorithms a = Algorithms
   { aLocallyNameless        :: a
-  , aKATHashFromPaper       :: a
+  --, aKATHashFromPaper       :: a
   , aKATHashFromPaperFaster :: a
   , aDeBrujinHash           :: a
   , aStructuralHashNested   :: a
@@ -44,7 +44,7 @@ algorithms_ :: (Hashable a, Ord a)
             => Algorithms (String, Expr h a -> Expr Hash.Hash a, String)
 algorithms_ = Algorithms
   { aLocallyNameless    = ("Locally nameless", Hash.locallyNameless, baseline)
-  , aKATHashFromPaper   = ("KATHash as in paper (will not have this one on final version)", KATHashFastOrigHash.katHash, paper)
+  , --aKATHashFromPaper   = ("KATHash as in paper (will not have this one on final version)", KATHashFastOrigHash.katHash, paper)
   , aKATHashFromPaperFaster = ("KATHash", KATHashFasterOrigHash.katHash, good)
   , aDeBrujinHash           = ("de Bruijn*", deBruijnHash, prettyBad)
   , aStructuralHashNested   = ("Structural*", structuralHashNested, veryBad)
