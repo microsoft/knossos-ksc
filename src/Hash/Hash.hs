@@ -149,41 +149,6 @@ locallyNamelessExplicit e_@(Lam _ n e) = Lam h n (locallyNamelessExplicit e)
 
     emptyEnv = (0 :: Int, Map.empty)
 
-alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
-                                   => Expr h a -> Expr h a -> Bool
-alphaEquivalentAccordingToHashExpr = (==) `on` KATHashOptimizedHash.katHashTop
-
-alphaEquivalentAccordingToSummariseExpr :: Ord name
-                                        => Expr h name
-                                        -> Expr h name
-                                        -> Bool
-alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHashInefficient.summariseExpr
-
--- | Makes binders unique whilst preserving alpha-equivalence.  The
--- binders are replaced with integers starting from zero and
--- increasing in left-to-right depth-first order.
---
--- In consequence, two expressions are alpha-equivalent if they are
--- equal under @uniqifyBinders@.
-uniquifyBinders :: Ord a => Expr h a -> Expr h (Either a Int)
-uniquifyBinders = fst . uniquifyBindersExplicit Map.empty 0
-
--- | The internals of 'uniquifyBinders'
-uniquifyBindersExplicit :: Ord a
-                        => Map.Map a Int
-                        -> Int
-                        -> Expr h a
-                        -> (Expr h (Either a Int), Int)
-uniquifyBindersExplicit m n = \case
-  Var h x -> case Map.lookup x m of
-    Nothing -> (Var h (Left x), n)
-    Just i  -> (Var h (Right i), n)
-  Lam h x e -> (Lam h (Right n) e', n')
-    where (e', n') = uniquifyBindersExplicit (Map.insert x n m) (n+1) e
-  App h f x -> (App h f' x', n'')
-    where (f', n')  = uniquifyBindersExplicit m n f
-          (x', n'') = uniquifyBindersExplicit m n' x
-
 -- | (Broken) DeBruijin Algorithm from "Finding Identical
 -- Subexpressions"
 deBruijnHash :: (Hashable a, Ord a) => Expr h a -> Expr Hash a
@@ -254,6 +219,46 @@ structuralHashNestedExplicit = \case
           (hR, subExpressionHashesR) = structuralHashNestedExplicit e
           !thisHash                  = hash "App" `thenHash` hL `thenHash` hR
 
+alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
+                                   => Expr h a -> Expr h a -> Bool
+alphaEquivalentAccordingToHashExpr = (==) `on` KATHashOptimizedHash.katHashTop
+
+alphaEquivalentAccordingToSummariseExpr :: Ord name
+                                        => Expr h name
+                                        -> Expr h name
+                                        -> Bool
+alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHashInefficient.summariseExpr
+
+-- | Whether two expressions are alpha-equivalent, implemented using
+-- 'uniquifyBinders'
+alphaEquivalentAccordingToUniquifyBinders :: (Eq h, Ord a) => Expr h a -> Expr h a -> Bool
+alphaEquivalentAccordingToUniquifyBinders = (==) `on` uniquifyBinders
+
+-- | Makes binders unique whilst preserving alpha-equivalence.  The
+-- binders are replaced with integers starting from zero and
+-- increasing in left-to-right depth-first order.
+--
+-- In consequence, two expressions are alpha-equivalent if they are
+-- equal under @uniqifyBinders@.
+uniquifyBinders :: Ord a => Expr h a -> Expr h (Either a Int)
+uniquifyBinders = fst . uniquifyBindersExplicit Map.empty 0
+
+-- | The internals of 'uniquifyBinders'
+uniquifyBindersExplicit :: Ord a
+                        => Map.Map a Int
+                        -> Int
+                        -> Expr h a
+                        -> (Expr h (Either a Int), Int)
+uniquifyBindersExplicit m n = \case
+  Var h x -> case Map.lookup x m of
+    Nothing -> (Var h (Left x), n)
+    Just i  -> (Var h (Right i), n)
+  Lam h x e -> (Lam h (Right n) e', n')
+    where (e', n') = uniquifyBindersExplicit (Map.insert x n m) (n+1) e
+  App h f x -> (App h f' x', n'')
+    where (f', n')  = uniquifyBindersExplicit m n f
+          (x', n'') = uniquifyBindersExplicit m n' x
+
 normalizedGroupedEquivalentSubexpressions
   :: Ord hash => [(hash, Path, expr)] -> [[(Path, expr)]]
 normalizedGroupedEquivalentSubexpressions =
@@ -262,11 +267,6 @@ normalizedGroupedEquivalentSubexpressions =
   . (map . map) (\(_, path, z) -> (path, z))
   . groupBy ((==) `on` (\(x, _, _) -> x))
   . sortBy (comparing (\(x, _, _) -> x))
-
--- | Whether two expressions are alpha-equivalent, implemented using
--- 'uniquifyBinders'
-alphaEquivalentAccordingToUniquifyBinders :: (Eq h, Ord a) => Expr h a -> Expr h a -> Bool
-alphaEquivalentAccordingToUniquifyBinders = (==) `on` uniquifyBinders
 
 testEverythingInFileStartingWith'prop_' :: IO ()
 testEverythingInFileStartingWith'prop_' = checkParallel $$(discover) >> pure ()
