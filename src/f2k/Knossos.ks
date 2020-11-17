@@ -63,6 +63,8 @@
 
 ; mul Mat Vec
 (edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
+(def shape$mul$Mat$Vec (Vec (Tuple)) ((m : Vec (Vec Float)) (v : Vec Float))
+    (constVec (size m) (tuple)))
 
 (edef D$mul$Mat$Vec (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
           ((Vec (Vec Float)) (Vec Float)))
@@ -82,6 +84,9 @@
 
 (edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
           ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
+(def shape$rev$mul$Mat$Vec (Tuple (Vec (Vec (Tuple))) (Vec (Tuple)))
+          ((M_v : (Tuple (Vec (Vec Float)) (Vec Float))) (dr : Vec Float))
+    (shape M_v))
 
 (def mvmul (Vec Float) ((a : Vec (Vec Float)) (b : Vec Float))
    (mul$Mat$Vec a b))
