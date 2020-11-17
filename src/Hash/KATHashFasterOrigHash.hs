@@ -3,7 +3,7 @@
 
 module KATHashFasterOrigHash where
 
-import KATHashFastOrigHash (thenHash)
+import KATHashFastOrigHash (thenHash, Hash, Positions, Structure, StructureTag)
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -13,11 +13,6 @@ import Data.List (foldl')
 
 import Expr (Expr(Var, Lam, App))
 import qualified Expr
-
-type Hash = Int
-type Structure = Hash
-type Positions = Hash
-type StructureTag = Structure
 
 data VarMap name = VM !(Map name Positions) !Hash
 
