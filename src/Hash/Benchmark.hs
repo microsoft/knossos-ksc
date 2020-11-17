@@ -18,7 +18,7 @@ import Hash (deBruijnHash, structuralHashNested)
 import qualified Hash
 import qualified KATHashOptimizedHash
 
-data BenchmarkConfig = BenchmarkConfig
+data ExpressionGenerator = ExpressionGenerator
   { bcGenExpr :: Int -> Int -> IO (Expr () Int)
   , bcGenName :: String
   }
@@ -87,11 +87,11 @@ full = BenchmarkParams
 -- displayed at the end of the run.
 benchmark :: BenchmarkParams -> IO ()
 benchmark bps = do
-  let bcs = [ BenchmarkConfig
+  let bcs = [ ExpressionGenerator
               { bcGenExpr = \n size -> Hash.genExprWithVarsUnbalancedSize size n
               , bcGenName = "unbalanced expressions"
               }
-            , BenchmarkConfig
+            , ExpressionGenerator
               { bcGenExpr = \n size -> Hash.genExprWithVarsSize size n
               , bcGenName = "balanced expressions"
               }
@@ -113,7 +113,7 @@ benchmarkThis :: BenchmarkParams
               -> String
               -> FilePath
               -> [(String, Expr () Int -> Expr hash string, String)]
-              -> BenchmarkConfig
+              -> ExpressionGenerator
               -> IO [PlotDataset]
 benchmarkThis bps
               expressionSet
