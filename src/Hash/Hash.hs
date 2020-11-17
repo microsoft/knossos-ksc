@@ -1,17 +1,9 @@
--- | A proof-of-concept for a lambda expression hashing algorithm.  It
--- is explained below that the hashing function is compositional and
--- respects alpha-equivalence, what these concepts mean, and why they
--- are important.  There are test cases that demonstrate some
--- behaviour and check alpha-equivalence is indeed respected.  The
--- latter is done by comparing to the behaviour of an
--- alpha-equivalence check implemented in terms of an independent
--- function which gives each binder a unique name ('uniqifyBinders').
+-- | A proof-of-concept for a lambda expression hashing algorithm.
 --
 -- Being compositional implies that the hashing function can be used
 -- during expression rewriting without recalculating the entire hash.
 -- This allows us to avoid doing O(N) work at each node to recalculate
--- the subexpression hashes each time the expression changes. More is
--- explained below.
+-- the subexpression hashes each time the expression changes.
 --
 -- # How to run it
 --
@@ -47,19 +39,6 @@
 --
 --     > import CompareBehaviour
 --     > writeFormatExpressionsHTML "filename.html"
---
--- The sub-expression hashing algorithms are (this list is out of date)
---
--- * castHash (structural and free-vars hash)
--- * deBruijnHash (known to be broken)
---
--- The following example expressions have been transferred from
--- OneNote
---
--- * expression1
--- * expression2
--- * expression3
--- * expression4
 
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
