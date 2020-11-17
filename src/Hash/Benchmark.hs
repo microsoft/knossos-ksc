@@ -81,28 +81,29 @@ full = BenchmarkParams
   , sizeScale = 1.1
   }
 
+expressionSets :: [ExpressionGenerator]
+expressionSets = [ ExpressionGenerator
+                   { bcGenExpr = \n size -> Hash.genExprWithVarsUnbalancedSize size n
+                   , bcGenName = "unbalanced expressions"
+                   }
+                 , ExpressionGenerator
+                   { bcGenExpr = \n size -> Hash.genExprWithVarsSize size n
+                   , bcGenName = "balanced expressions"
+                   }
+                ]
+
 -- | This is the entry point to the module.  When run it will
 -- benchmark the algorithms on a random set of expressions.  The data
 -- from the run will be written out to a directory whose name is
 -- displayed at the end of the run.
 benchmark :: BenchmarkParams -> IO ()
 benchmark bps = do
-  let bcs = [ ExpressionGenerator
-              { bcGenExpr = \n size -> Hash.genExprWithVarsUnbalancedSize size n
-              , bcGenName = "unbalanced expressions"
-              }
-            , ExpressionGenerator
-              { bcGenExpr = \n size -> Hash.genExprWithVarsSize size n
-              , bcGenName = "balanced expressions"
-              }
-            ]
-
-      algorithms = Data.Foldable.toList algorithms_
+  let algorithms = Data.Foldable.toList algorithms_
 
   benchmarksDir <- createTempDirectory "." "benchmarks"
-  results_genNames <- flip mapM (enumFrom1 bcs) $ \(i, bc) -> do
+  results_genNames <- flip mapM (enumFrom1 expressionSets) $ \(i, bc) -> do
     results <- benchmarkThis bps
-                             (show i ++ "/" ++ show (length bcs)
+                             (show i ++ "/" ++ show (length expressionSets)
                               ++ " (" ++ bcGenName bc ++ ")")
                              benchmarksDir algorithms bc
     pure (results, bcGenName bc)
