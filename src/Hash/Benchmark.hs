@@ -335,6 +335,11 @@ gnuplotFile xlabel results =
           , "set key right bottom"
           , "set yrange [1e-6:1]"
           , "plot " ++ intercalate ", " (fmap plotDataset results)
+                    ++ ", "
+                    ++ intercalate ", "
+                    [ "[x=500:] x / 100000000 title \"x\" at begin lt rgb \"gray\""
+                    , "[x=500:] x**2 / 100000000 title \"x^2\" at begin lt rgb \"gray\""
+                    , "[x=500:] x * log(x) ** 2 / 100000000 lt rgb \"gray\" title \"x log^2(x)\" at begin" ]
           ]
 
 data PlotDataset = PlotDataset
