@@ -72,8 +72,6 @@ module Hash where
 
 import Hedgehog hiding (Var)
 import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
-import Control.Monad.Trans.State
 import Data.Char (ord)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -397,38 +395,11 @@ genExprWithVarsTest vars = genExprWithVars_vars
           , Gen.subterm2 genExprWithVars_vars genExprWithVars_vars (App ())
           ]
 
--- | Generates random expressions for benchmarking
-genExprWithVars' :: (Integral v, MonadGen m)
-                 => [v] -> v -> (v -> v) -> m (Expr () v)
-genExprWithVars' inScope fresh freshen = flip evalStateT (inScope, fresh) $ do
-  size <- Gen.int (Range.linear 0 2000)
-  genExprWithVarsSize' size fresh freshen
-
-genExprWithVarsSize' :: (Integral v, MonadGen m)
-                     => Int -> v -> (v -> v) -> m (Expr () v)
-genExprWithVarsSize' size fresh freshen = flip evalStateT fresh $ do
-  let freshVar = do
-        fresh' <- get
-        put (freshen fresh')
-        pure fresh'
-
-  let elementInScope = do
-        fresh' <- get
-        Gen.integral (Range.constant 0 (fresh' - 1))
-
-  genExprWithVarsSizeG size elementInScope freshVar
-
-genExprWithVarsSizeG :: MonadGen m => Int -> m v -> m v -> m (Expr () v)
-genExprWithVarsSizeG size vars binders =
-  if size <= 1
-  then Var () <$> vars
-  else Gen.choice
-       [ do sizeL <- Gen.int (Range.constant 1 (size - 2))
-            let sizeR = size - sizeL - 1
-            App () <$> genExprWithVarsSizeG sizeL vars binders
-                   <*> genExprWithVarsSizeG sizeR vars binders
-       , do Lam () <$> binders <*> genExprWithVarsSizeG (size - 1) vars binders
-       ]
+genExprWithVars :: (Random v, Integral v)
+                => v -> IO (Expr () v)
+genExprWithVars fresh = do
+  size <- randomRIO (0, 2000)
+  genExprWithVarsSize size fresh
 
 genExprWithVarsSize :: (Random a, Integral a)
                     => Int -> a -> IO (Expr () a)
@@ -459,20 +430,12 @@ genExprWithVarsUnbalancedSize size fresh =
         binders = pure fresh
         e = genExprWithVarsUnbalancedSize (size - 3) (fresh + 1)
 
-genExprWithVarsUnbalancedSizeG :: MonadGen m => Int -> m a -> m a -> m (Expr () a)
-genExprWithVarsUnbalancedSizeG size vars binders =
-  if size <= 1
-  then Var () <$> vars
-  else App () <$> (Lam () <$> binders <*> e)
-              <*> (Var () <$> vars)
-  where e = genExprWithVarsUnbalancedSizeG (size - 3) vars binders
-
 -- | Generates random expressions for testing
 genExpr :: MonadGen m => m (Expr () Char)
 genExpr = genExprWithVarsTest ['u'..'z']
 
-genExprNumVars :: MonadGen m => Int -> m (Expr () Int)
-genExprNumVars n = genExprWithVars' [1..n] (n+1) (+1)
+genExprNumVars :: Int -> IO (Expr () Int)
+genExprNumVars n = genExprWithVars (n+1)
 
 -- | Shows equivalence of castHash hash and the other algorithms
 prop_equivCastFast :: Property

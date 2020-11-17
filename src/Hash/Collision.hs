@@ -15,20 +15,16 @@ import qualified Data.Map.Strict as Map
 import Control.Monad (when)
 import System.IO.Temp (createTempDirectory, emptyTempFile)
 
-import Hedgehog hiding (Var)
-import qualified Hedgehog.Gen as Gen
-
-
-genNotAlphaEquiv :: (MonadGen m, Hashable a, Ord a, Eq h)
+genNotAlphaEquiv :: (Monad m, Hashable a, Ord a, Eq h)
                  => m (Expr h a)
                  -> m (Expr h a, Expr h a)
 genNotAlphaEquiv gen = do
   expr1 <- gen
   expr2 <- gen
 
-  when (Hash.alphaEquivalentAccordingToUniquifyBinders expr1 expr2) Gen.discard
-
-  pure (expr1, expr2)
+  if Hash.alphaEquivalentAccordingToUniquifyBinders expr1 expr2
+    then genNotAlphaEquiv gen
+    else pure (expr1, expr2)
 
 restrictToBits :: Int -> Hash -> Hash
 restrictToBits i h = h `shiftL` (bitsize - i)
@@ -49,7 +45,7 @@ collisions maxBits = do
       putStrLn ("Iteration " ++ show loopCount ++ "/" ++ show count
                ++ " (" ++ show percentComplete ++ "% complete)")
 
-    (expr1, expr2) <- Gen.sample (genNotAlphaEquiv (Hash.genExprNumVars 10))
+    (expr1, expr2) <- genNotAlphaEquiv (Hash.genExprNumVars 10)
 
     let h1 = annotation (KATHashEfficientHash.katHash expr1)
         h2 = annotation (KATHashEfficientHash.katHash expr2)
