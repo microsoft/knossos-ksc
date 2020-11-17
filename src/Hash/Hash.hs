@@ -89,10 +89,7 @@ import System.Random (Random, randomRIO, randomIO)
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              allSubexprs, annotation, mapAnnotation)
-import qualified KATHash1
-import qualified KATHash2
 import qualified KATHash3
-import qualified KATHashFast
 import qualified KATHashFastOrig
 import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
@@ -169,7 +166,7 @@ alphaEquivalentAccordingToSummariseExpr :: Ord name
                                         => Expr h name
                                         -> Expr h name
                                         -> Bool
-alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHash1.summariseExpr
+alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHash3.summariseExpr
 
 -- | Makes binders unique whilst preserving alpha-equivalence.  The
 -- binders are replaced with integers starting from zero and
@@ -433,25 +430,12 @@ propG_rebuild summariseExpr rebuild = withTests numRandomTests $ property $ do
       expr2 = rebuild (+1) (0 :: Int) esummary
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
-prop_rebuild :: Property
-prop_rebuild = propG_rebuild KATHash1.summariseExpr KATHash1.rebuild
-
-prop_rebuild2 :: Property
-prop_rebuild2 = propG_rebuild KATHash2.summariseExpr KATHash2.rebuild
-
 prop_rebuild3 :: Property
 prop_rebuild3 = propG_rebuild KATHash3.summariseExpr KATHash3.rebuild
 
 prop_rebuildFastOrig :: Property
 prop_rebuildFastOrig =
   propG_rebuild KATHashFastOrig.summariseExpr KATHashFastOrig.rebuild
-
-prop_fastMatches3 :: Property
-prop_fastMatches3 = withTests numRandomTests $ property $ do
-  expr1 <- forAll genExpr
-  let summary1 = KATHash3.summariseExpr expr1
-      summary2 = KATHashFast.fastTo3 (KATHashFast.summariseExpr expr1)
-  summary1 === summary2
 
 -- | Generates random expressions for testing
 genExprWithVarsTest :: MonadGen m => [v] -> m (Expr () v)
@@ -556,9 +540,6 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
   locallyNameless_groups === deBruijnNestedHash_groups
   locallyNameless_groups === katHashFastOrigHash_groups
   locallyNameless_groups === katHashFasterOrigHash_groups
-
-prop_applyPrefix :: Property
-prop_applyPrefix = KATHashFast.prop_applyPrefix numRandomTests
 
 prop_rebuildSApp3_inverse :: Property
 prop_rebuildSApp3_inverse =
