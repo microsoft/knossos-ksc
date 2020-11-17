@@ -78,7 +78,6 @@ import Data.Char (ord)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Hashable (Hashable, hash)
-import GHC.Generics (Generic)
 import Data.Function (on)
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
@@ -98,9 +97,6 @@ data ExprO v expr =
     VarO
   | LamO v expr
   | AppO (Maybe expr) (Maybe expr)
-  deriving Generic
-
-instance (Hashable v, Hashable expr) => Hashable (ExprO v expr)
 
 hashExprO :: ExprO (Maybe Hash) Hash -> Hash
 hashExprO = \case
