@@ -52,7 +52,6 @@
 --
 -- * castHash (structural and free-vars hash)
 -- * deBruijnHash (known to be broken)
--- * combinedHash (deBruijnHash plus a free variable hash -- known to be broken)
 --
 -- The following example expressions have been transferred from
 -- OneNote
@@ -78,8 +77,6 @@ import Control.Monad.Trans.State
 import Data.Char (ord)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Data.Hashable (Hashable, hash)
 import GHC.Generics (Generic)
 import Data.Function (on)
@@ -87,7 +84,7 @@ import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 import System.Random (Random, randomRIO, randomIO)
 
-import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
+import Expr (Expr(Var, Lam, App), Path,
              allSubexprs, annotation, mapAnnotation)
 import qualified KATHashInefficient
 import qualified KATHashEfficient
@@ -240,50 +237,6 @@ dbAddVar v env = Map.insert v (Map.size env) env
 dbLookupVar :: Ord k => k -> Map k Int -> Maybe Int
 dbLookupVar v env = fmap (Map.size env -) (Map.lookup v env)
 
-combinedHash :: (Ord a, Hashable a) => Expr h a -> Expr Hash a
-combinedHash expr = es
-  where (_, _, _, es) = combinedHashExplicit Map.empty Map.empty [] expr
-
--- | (Still broken) DeBruijn + free-var-hash algorithm from "Finding
--- Identical Subexpressions"
---
--- fvEnv isn't really the right name. It actually maps *bound*
--- variables (to their binding locations).
-combinedHashExplicit :: (Hashable a, Ord a)
-                     => Map.Map a Int
-                     -> Map.Map a Path
-                     -> Path
-                     -> Expr h a
-                     -> (Hash, Set a, Int, Expr Hash a)
-combinedHashExplicit = \env fvEnv location ->
-  let fvHash freeVars = map (flip Map.lookup fvEnv) (Set.toList freeVars)
-  in \case
-  Var _ x -> (dbHash', freeVars', depth', Var jointHash' x)
-    where dbHash' = case dbLookupVar x env of
-            Nothing -> hash ("free", x, depth')
-            Just i  -> hash ("bound", i, depth')
-          depth' = 0 :: Int
-          freeVars' = Set.singleton x
-          jointHash' = hash (dbHash', fvHash freeVars')
-  Lam _ x e -> (dbHash', freeVars', depth', Lam jointHash' x subExpressionHashesE)
-    where (dbHashE, freeVarsE, depthE, subExpressionHashesE) =
-            combinedHashExplicit (dbAddVar x env)
-                                 (addLocn x location fvEnv)
-                                 (L:location) e
-          depth' = depthE + 1
-          dbHash' = hash ("lam", dbHashE, depth')
-          jointHash' = hash (dbHash', fvHash freeVars')
-          freeVars' = Set.delete x freeVarsE
-  App _ f e -> (dbHash', freeVars', depth', App jointHash' subExpressionHashesF subExpressionHashesE)
-    where (dbHashF, freeVarsF, depthF, subExpressionHashesF)  =
-            combinedHashExplicit env fvEnv (Apl:location) f
-          (dbHashE, freeVarsE, depthE, subExpressionHashesE) =
-            combinedHashExplicit env fvEnv (Apr:location)  e
-          depth'  = max depthF depthE + 1
-          dbHash' = hash ("app", dbHashF, dbHashE, depth')
-          jointHash' = hash (dbHash', fvHash freeVars')
-          freeVars' = Set.union freeVarsF freeVarsE
-
 addLocn :: Ord k => k -> a -> Map k a -> Map k a
 addLocn = Map.insert
 
@@ -365,10 +318,8 @@ prop_stablePaths = withTests numRandomTests $ property $ do
   expr <- forAll genExpr
 
   let d = deBruijnHash expr
-      c = combinedHash expr
       n = structuralHashNested expr
 
-  paths d === paths c
   paths d === paths n
 
 numRandomTests :: TestLimit

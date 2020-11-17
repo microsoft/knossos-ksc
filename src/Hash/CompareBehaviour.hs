@@ -1,6 +1,6 @@
 module CompareBehaviour where
 
-import Hash (combinedHash,deBruijnHash,
+import Hash (deBruijnHash,
              normalizedGroupedEquivalentSubexpressions,
              allHashResults)
 import Expr (Expr, Path, showExpr,
@@ -9,7 +9,6 @@ import Expr (Expr, Path, showExpr,
 
 import HtmlCombinators (table, th, td, writeFileHTML, forEach, inList,
                         annotating, tdCenter, inFoldable, setFromIterator)
-import Lens.Micro
 import Text.Blaze.Html5 hiding (table, th, td, map)
 
 import qualified KATHashOptimizedHash
@@ -55,8 +54,7 @@ formatExpressionHTML e =
                   (True,  False) -> mempty
 
   where algorithms = ( ("KATHash", KATHashOptimizedHash.katHash)
-                     , ( ("Combined", combinedHash)
-                       , ("DeBruijn", deBruijnHash) ) )
+                     , ("DeBruijn", deBruijnHash) )
 
         groupsOfAlgorithm algorithm =
           ((map . map) fst
@@ -69,8 +67,8 @@ formatExpressionHTML e =
 
         allGroups = setFromIterator $ forEach (inRow groupsPerAlgorithm) inList
 
-        inRow (t, ts) = inList (t : toListOf each ts)
-        mapRow f (t, ts) = (f t, over each f ts)
+        inRow (t, ts) = inList [t, ts]
+        mapRow f (t, ts) = (f t, f ts)
 
 printGroups :: Ord hash => [(hash, Path, Expr h String)] -> IO ()
 printGroups = mapM_ (\x -> putStrLn "" >> mapM_ putStrLn x)
@@ -87,7 +85,6 @@ showMany =
 
   where examples   = [ ("Example 4", example4) ]
         algorithms = [ ("KATHash", KATHashOptimizedHash.katHash)
-                     , ("Combined", combinedHash)
                      , ("DeBruijn", deBruijnHash)
                      ]
 
