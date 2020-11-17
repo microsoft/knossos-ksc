@@ -6,7 +6,7 @@ module Benchmark where
 import qualified Data.Foldable
 import Data.Hashable (Hashable)
 import Data.List (intercalate)
-import qualified GHC.Stats
+--import qualified GHC.Stats
 import qualified System.Clock as Clock
 import Text.Read (readMaybe)
 import Text.Printf (printf)
@@ -263,12 +263,12 @@ benchmarkUntil :: Double
                -> IO (Integer, AggregateStatistics)
 benchmarkUntil minimumMeasurableTime_micro repeats f x = do
   System.Mem.performMajorGC
-  gcStart_nano <- fmap GHC.Stats.gc_elapsed_ns GHC.Stats.getRTSStats
+  --gcStart_nano <- fmap GHC.Stats.gc_elapsed_ns GHC.Stats.getRTSStats
   start <- Clock.getTime Clock.Monotonic
   times repeats () $ \() ->
     evaluate f x
   stop <- Clock.getTime Clock.Monotonic
-  gcStop_nano <- fmap GHC.Stats.gc_elapsed_ns GHC.Stats.getRTSStats
+  --gcStop_nano <- fmap GHC.Stats.gc_elapsed_ns GHC.Stats.getRTSStats
 
   let iterationsElapsed_micro = fromIntegral iterationsElapsed_nano / 1e3
         where iterationsElapsed = Clock.diffTimeSpec stop start
@@ -276,6 +276,7 @@ benchmarkUntil minimumMeasurableTime_micro repeats f x = do
 
       elapsed_micro = iterationsElapsed_micro / fromIntegral repeats
 
+{-
       gcElapsed_micro = fromIntegral (gcStop_nano - gcStart_nano) / 1000
 
       showFloat = printf "%.0f" :: Double -> String
@@ -285,6 +286,7 @@ benchmarkUntil minimumMeasurableTime_micro repeats f x = do
   putStrLn ("Productivity: "
             ++ showFloat ((1 - (gcElapsed_micro / elapsed_micro)) * 100)
             ++ "%")
+-}
 
   if iterationsElapsed_micro < minimumMeasurableTime_micro
   then benchmarkUntil minimumMeasurableTime_micro (2 * repeats) f x
