@@ -305,17 +305,6 @@ readExprG filepath = do
     Nothing   -> error ("Couldn't read the expression in " ++ filepath)
     Just expr -> pure expr
 
-benchmarkOneReadFile :: Read e
-                     => FilePath
-                     -> Int
-                     -> Integer
-                     -> (e -> r)
-                     -> IO AggregateStatistics
-benchmarkOneReadFile filepath samplesPerExpression iterationsElapsed algorithm = do
-  expr <- readExprG filepath
-
-  benchmarkOne samplesPerExpression iterationsElapsed algorithm expr
-
 gnuplotFilePdf :: String
                -> String
                -> [PlotDataset]
