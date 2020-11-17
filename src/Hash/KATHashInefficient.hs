@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module KATHash3 where
+module KATHashInefficient where
 
 import Hedgehog hiding (Var)
 

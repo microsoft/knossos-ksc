@@ -89,7 +89,7 @@ import System.Random (Random, randomRIO, randomIO)
 
 import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              allSubexprs, annotation, mapAnnotation)
-import qualified KATHash3
+import qualified KATHashInefficient
 import qualified KATHashFastOrig
 import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
@@ -166,7 +166,7 @@ alphaEquivalentAccordingToSummariseExpr :: Ord name
                                         => Expr h name
                                         -> Expr h name
                                         -> Bool
-alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHash3.summariseExpr
+alphaEquivalentAccordingToSummariseExpr = (==) `on` KATHashInefficient.summariseExpr
 
 -- | Makes binders unique whilst preserving alpha-equivalence.  The
 -- binders are replaced with integers starting from zero and
@@ -431,7 +431,7 @@ propG_rebuild summariseExpr rebuild = withTests numRandomTests $ property $ do
   assert (alphaEquivalentAccordingToUniquifyBinders expr1 expr2)
 
 prop_rebuild3 :: Property
-prop_rebuild3 = propG_rebuild KATHash3.summariseExpr KATHash3.rebuild
+prop_rebuild3 = propG_rebuild KATHashInefficient.summariseExpr KATHashInefficient.rebuild
 
 prop_rebuildFastOrig :: Property
 prop_rebuildFastOrig =
@@ -543,7 +543,7 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
 
 prop_rebuildSApp3_inverse :: Property
 prop_rebuildSApp3_inverse =
-  KATHash3.prop_rebuildSApp3_inverse genExpr numRandomTests
+  KATHashInefficient.prop_rebuildSApp3_inverse genExpr numRandomTests
 
 prop_rebuildSApp_inverse :: Property
 prop_rebuildSApp_inverse =
