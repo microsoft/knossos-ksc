@@ -16,7 +16,6 @@ import qualified System.Mem
 import Expr (Expr, exprSize)
 import Hash (deBruijnHash, structuralHashNested)
 import qualified Hash
-import qualified KATHashFastOrigHash
 import qualified KATHashFasterOrigHash
 
 data BenchmarkConfig = BenchmarkConfig
@@ -57,7 +56,7 @@ algorithms_ = Algorithms
       prettyBad = "orange"
       good      = "web-green"
       baseline  = "web-blue"
-      paper     = "purple"
+      --paper     = "purple"
 
 data BenchmarkParams = BenchmarkParams
   { runsToMinimizeOver :: Int
