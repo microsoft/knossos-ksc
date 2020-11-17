@@ -13,6 +13,7 @@ library
                        KATHashEfficient,
                        KATHashEfficientHash,
                        KATHashOptimizedHash,
+                       ManualBenchmark,
                        Merge,
                        CompareBehaviour,
                        Expr,
@@ -40,6 +41,7 @@ executable hash
                        KATHashEfficient,
                        KATHashEfficientHash,
                        KATHashOptimizedHash,
+                       ManualBenchmark,
                        Merge
   hs-source-dirs:      .
   build-depends:       base,
