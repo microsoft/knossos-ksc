@@ -91,9 +91,9 @@ import Expr (Expr(Var, Lam, App), Path, Step(Apl, Apr, L),
              allSubexprs, annotation, mapAnnotation)
 import qualified KATHashInefficient
 import qualified KATHashEfficient
-import qualified KATHashFastOrigHash
-import qualified KATHashFasterOrigHash
-import KATHashFastOrigHash (thenHash)
+import qualified KATHashEfficientHash
+import qualified KATHashOptimizedHash
+import KATHashEfficientHash (thenHash)
 
 -- | A helper type that is intended to make the hashing algorithm
 -- clearer.  If it doesn't help I may just get rid of it.
@@ -160,7 +160,7 @@ locallyNamelessExplicit e_@(Lam _ n e) = Lam h n (locallyNamelessExplicit e)
 
 alphaEquivalentAccordingToHashExpr :: (Ord a, Hashable a)
                                    => Expr h a -> Expr h a -> Bool
-alphaEquivalentAccordingToHashExpr = (==) `on` KATHashFasterOrigHash.katHashTop
+alphaEquivalentAccordingToHashExpr = (==) `on` KATHashOptimizedHash.katHashTop
 
 alphaEquivalentAccordingToSummariseExpr :: Ord name
                                         => Expr h name
@@ -534,11 +534,11 @@ prop_equivCastFast = withTests numRandomTests $ property $ do
   expr <- forAll (fmap uniquifyBinders genExpr)
   let locallyNameless_groups = n (locallyNameless expr)
       deBruijnNestedHash_groups = n (deBruijnNestedHash expr)
-      katHashFastOrigHash_groups = n (KATHashFastOrigHash.katHash expr)
-      katHashFasterOrigHash_groups = n (KATHashFasterOrigHash.katHash expr)
+      katHashEfficientHash_groups = n (KATHashEfficientHash.katHash expr)
+      katHashFasterOrigHash_groups = n (KATHashOptimizedHash.katHash expr)
 
   locallyNameless_groups === deBruijnNestedHash_groups
-  locallyNameless_groups === katHashFastOrigHash_groups
+  locallyNameless_groups === katHashEfficientHash_groups
   locallyNameless_groups === katHashFasterOrigHash_groups
 
 prop_rebuildSApp3_inverse :: Property
@@ -552,4 +552,4 @@ prop_rebuildSApp_inverse =
 prop_fastFaster :: Property
 prop_fastFaster = withTests numRandomTests $ property $ do
   expr <- forAll genExpr
-  KATHashFastOrigHash.katHash expr === KATHashFasterOrigHash.katHash expr
+  KATHashEfficientHash.katHash expr === KATHashOptimizedHash.katHash expr

@@ -1,9 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 
-module KATHashFasterOrigHash where
+module KATHashOptimizedHash where
 
-import KATHashFastOrigHash (thenHash, Hash, Positions, Structure, StructureTag)
+import KATHashEfficientHash (thenHash, Hash, Positions, Structure, StructureTag)
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map

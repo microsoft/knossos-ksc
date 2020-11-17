@@ -11,8 +11,8 @@ library
                        HtmlCombinators,
                        KATHashInefficient,
                        KATHashEfficient,
-                       KATHashFastOrigHash,
-                       KATHashFasterOrigHash,
+                       KATHashEfficientHash,
+                       KATHashOptimizedHash,
                        Merge,
                        CompareBehaviour,
                        Expr,
@@ -38,8 +38,8 @@ executable hash
                        Hash,
                        KATHashInefficient,
                        KATHashEfficient,
-                       KATHashFastOrigHash,
-                       KATHashFasterOrigHash,
+                       KATHashEfficientHash,
+                       KATHashOptimizedHash,
                        Merge
   hs-source-dirs:      .
   build-depends:       base,

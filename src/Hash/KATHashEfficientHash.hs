@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module KATHashFastOrigHash where
+module KATHashEfficientHash where
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map

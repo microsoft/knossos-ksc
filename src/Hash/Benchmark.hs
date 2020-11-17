@@ -16,7 +16,7 @@ import qualified System.Mem
 import Expr (Expr, exprSize)
 import Hash (deBruijnHash, structuralHashNested)
 import qualified Hash
-import qualified KATHashFasterOrigHash
+import qualified KATHashOptimizedHash
 
 data BenchmarkConfig = BenchmarkConfig
   { bcGenExpr :: Int -> Int -> IO (Expr () Int)
@@ -44,7 +44,7 @@ algorithms_ :: (Hashable a, Ord a)
 algorithms_ = Algorithms
   { aLocallyNameless    = ("Locally nameless", Hash.locallyNameless, baseline)
   --, aKATHashFromPaper   = ("KATHash as in paper (will not have this one on final version)", KATHashFastOrigHash.katHash, paper)
-  , aKATHashFromPaperFaster = ("KATHash", KATHashFasterOrigHash.katHash, good)
+  , aKATHashFromPaperFaster = ("KATHash", KATHashOptimizedHash.katHash, good)
   , aDeBrujinHash           = ("de Bruijn*", deBruijnHash, prettyBad)
   , aStructuralHashNested   = ("Structural*", structuralHashNested, veryBad)
   -- , aDeBruijnNested     = ("de Bruijn nested", Hash.deBruijnNestedHash, "magenta")

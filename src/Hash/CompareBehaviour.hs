@@ -12,7 +12,7 @@ import HtmlCombinators (table, th, td, writeFileHTML, forEach, inList,
 import Lens.Micro
 import Text.Blaze.Html5 hiding (table, th, td, map)
 
-import qualified KATHashFasterOrigHash
+import qualified KATHashOptimizedHash
 
 -- | This is the entry point to this module.  Provide a file path and
 -- it will write an HTML file which shows the comparison of the
@@ -54,7 +54,7 @@ formatExpressionHTML e =
                   (True,  True)  -> tick
                   (True,  False) -> mempty
 
-  where algorithms = ( ("KATHash", KATHashFasterOrigHash.katHash)
+  where algorithms = ( ("KATHash", KATHashOptimizedHash.katHash)
                      , ( ("Combined", combinedHash)
                        , ("DeBruijn", deBruijnHash) ) )
 
@@ -86,7 +86,7 @@ showMany =
         showGroupsHTML (allHashResults . algorithm) expression
 
   where examples   = [ ("Example 4", example4) ]
-        algorithms = [ ("KATHash", KATHashFasterOrigHash.katHash)
+        algorithms = [ ("KATHash", KATHashOptimizedHash.katHash)
                      , ("Combined", combinedHash)
                      , ("DeBruijn", deBruijnHash)
                      ]

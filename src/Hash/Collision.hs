@@ -5,7 +5,7 @@ import qualified Hash
 import qualified Benchmark
 import Expr
 import Hash (Hash)
-import qualified KATHashFastOrigHash
+import qualified KATHashEfficientHash
 
 import Data.Bits
 import Data.Function (on)
@@ -51,8 +51,8 @@ collisions maxBits = do
 
     (expr1, expr2) <- Gen.sample (genNotAlphaEquiv (Hash.genExprNumVars 10))
 
-    let h1 = annotation (KATHashFastOrigHash.katHash expr1)
-        h2 = annotation (KATHashFastOrigHash.katHash expr2)
+    let h1 = annotation (KATHashEfficientHash.katHash expr1)
+        h2 = annotation (KATHashEfficientHash.katHash expr2)
 
         m'' = Map.mapWithKey (\i v -> if ((==) `on` restrictToBits i) h1 h2
                                       then v+1
