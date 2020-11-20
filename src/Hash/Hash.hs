@@ -416,6 +416,28 @@ genExpr = genExprWithVarsTest ['u'..'z']
 genExprNumVars :: Int -> IO (Expr () Int)
 genExprNumVars n = genExprWithVars (n+1)
 
+genExprHardPair :: Int -> IO (Expr () Int, Expr () Int)
+genExprHardPair size =
+  let wrapWithApp expr = App () expr (Var () 2)
+      wrapWithLam expr = Lam () size expr
+      baseExpr1 = Lam () 1 (App () (Var () 1) (App () (Var () 1) (Var () 1)))
+      baseExpr2 = Lam () 1 (App () (App () (Var () 1) (Var () 1)) (Var () 1))
+  in
+    if size <= 6
+      then pure (baseExpr1, baseExpr2)
+    else if size == 7
+      then pure (wrapWithLam baseExpr1, wrapWithLam baseExpr2)
+    else do
+      app <- randomIO
+
+      if app
+      then do
+        (expr1, expr2) <- genExprHardPair (size - 2)
+        pure (wrapWithApp expr1, wrapWithApp expr2)
+      else do
+        (expr1, expr2) <- genExprHardPair (size - 1)
+        pure (wrapWithLam expr1, wrapWithLam expr2)
+
 -- | Shows equivalence of castHash hash and the other algorithms
 prop_equivCastFast :: Property
 prop_equivCastFast = withTests numRandomTests $ property $ do

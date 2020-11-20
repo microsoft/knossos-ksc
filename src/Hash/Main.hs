@@ -24,6 +24,6 @@ main = do
     ["random", "fast"] -> Benchmark.benchmark Benchmark.fast
     ["random", "full"] -> Benchmark.benchmark Benchmark.full
     ["test"] -> Hash.testEverythingInFileStartingWith'prop_'
-    ["collisions", "fast"] -> Collision.collisions 4
-    ["collisions", "full"] -> Collision.collisions 16
+    ["collisions", "fast"] -> Collision.collisions 1
+    ["collisions", "full"] -> Collision.collisions 10
     _ -> putStrLn "Unsupported argument"
