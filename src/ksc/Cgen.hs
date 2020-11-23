@@ -855,8 +855,8 @@ cppGen defs =
 ksoGen :: [TDef] -> String
 ksoGen = unlines . map (renderSexp . ppr)
 
-cppGenWithFilesResults :: String -> String -> [TDef] -> IO (String, String)
-cppGenWithFilesResults ksofile cppfile defs = do
+cppGenWithFiles :: String -> String -> [TDef] -> IO (String, String)
+cppGenWithFiles ksofile cppfile defs = do
   let cppcontents = cppGen defs
       ksocontents = ksoGen defs
 
