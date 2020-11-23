@@ -290,12 +290,12 @@ displayCppGenAndCompileDefsDiffs
       -> GblSymTab
       -> RuleBase
       -> KMT IO (GblSymTab, [TDef], RuleBase))
-  -> (String -> String -> IO String)
+  -> (String -> String -> IO a)
   -> String
   -> Maybe Int
   -> [String]
   -> String
-  -> IO String
+  -> IO a
 displayCppGenAndCompileDefsDiffs
   generateDefs generateDiffs generateShapes compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
@@ -309,7 +309,7 @@ displayCppGenAndCompileDefsDiffs
   ; compiler cppfile exefile
   }
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> [String] -> String -> IO String
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String -> Maybe Int -> [String] -> String -> IO a
 displayCppGenAndCompile = displayCppGenAndCompileDefsDiffs theDefs theDiffs theShapes
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
