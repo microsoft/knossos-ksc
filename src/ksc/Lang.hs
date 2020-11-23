@@ -103,13 +103,6 @@ tVarVar (TVar _ v) = v
 tVarType :: TVarX -> TypeX
 tVarType (TVar ty _) = ty
 
--- MTypeX pm
---   pm controls whether the type is there at all
-type family MTypeX p where
-  MTypeX Parsed   = ()
-  MTypeX Typed    = Type
-  MTypeX OccAnald = Type
-
 {- Note [Function arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 All functions are functions of a single argument, regardless of whether
@@ -169,7 +162,7 @@ data ExprX p
   --   (both non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)
   | Assert (ExprX p) (ExprX p)
-  | Dummy (MTypeX p)
+  | Dummy Type
 
 instance InPhase p => Show (ExprX p) where
   show e = pps e
@@ -705,7 +698,6 @@ class InPhase p where
   pprLetBndr :: LetBndrX p -> SDoc  -- Print with its type
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
 
-  getMType   :: MTypeX p   -> Maybe Type
   getVar     :: VarX p     -> (Var, Maybe Type)
   getFun     :: FunX p     -> (Fun, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
@@ -715,7 +707,6 @@ instance InPhase Parsed where
   pprLetBndr = ppr
   pprFunOcc  = ppr
 
-  getMType _      = Nothing
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
@@ -725,7 +716,6 @@ instance InPhase Typed where
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
 
-  getMType ty              = Just ty
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun, Just ty)
   getLetBndr (TVar ty var) = (var, Just ty)
@@ -735,15 +725,9 @@ instance InPhase OccAnald where
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
 
-  getMType   ty                 = Just ty
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun, Just ty)
   getLetBndr (_, TVar ty var)   = (var, Just ty)
-
-pprMTypeX :: forall p. InPhase p => MTypeX p -> SDoc
-pprMTypeX mty = case getMType @p mty of
-                 Just ty -> ppr ty
-                 Nothing -> empty
 
 pprTFun :: TFun -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
@@ -864,7 +848,7 @@ pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
-pprExpr _ (Dummy ty) = char '<' <> pprMTypeX @phase ty <> char '>'
+pprExpr _ (Dummy ty) = char '<' <> ppr ty <> char '>'
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
