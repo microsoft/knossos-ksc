@@ -824,8 +824,8 @@ createDirectoryWriteFile filepath contents = do
   makeDirectoryForFile filepath
   writeFile filepath contents
 
-cppGenWithFiles :: String -> String -> [TDef] -> IO ()
-cppGenWithFiles ksofile cppfile defs = do
+cppGen :: [TDef] -> String
+cppGen defs =
   let lines =
         [
         "#include \"knossos.h\"",
@@ -850,11 +850,21 @@ cppGenWithFiles ksofile cppfile defs = do
         , "}"
         ]
 
+  in unlines (lines ++ lls ++ tail)
+
+ksoGen :: [TDef] -> String
+ksoGen = unlines . map (renderSexp . ppr)
+
+cppGenWithFiles :: String -> String -> [TDef] -> IO ()
+cppGenWithFiles ksofile cppfile defs = do
+  let cppcontents = cppGen defs
+      ksocontents = ksoGen defs
+
   putStrLn $ "Writing to " ++ ksofile
-  createDirectoryWriteFile ksofile (unlines (map (renderSexp . ppr) defs))
+  createDirectoryWriteFile ksofile ksocontents
 
   putStrLn $ "Writing to " ++ cppfile
-  createDirectoryWriteFile cppfile (unlines (lines ++ lls ++ tail))
+  createDirectoryWriteFile cppfile cppcontents
 
 compile :: String -> String -> String -> IO String
 compile = compileWithOpts []
