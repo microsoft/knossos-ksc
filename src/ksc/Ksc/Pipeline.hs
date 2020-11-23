@@ -262,7 +262,7 @@ displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFil
 
   ; cse <- anfOptAndCse display rulebase env5 alldefs
 
-  ; liftIO (Cgen.cppGenWithFilesResults ksofile cppfile cse)
+  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
 
 displayCppGenDiffs :: (DisplayLint ()
