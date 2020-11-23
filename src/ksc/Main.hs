@@ -72,7 +72,8 @@ generateCppWithoutDiffs = parseErr p
           cppout <- option "cpp-output-file"
 
           return (Ksc.Pipeline.displayCppGenNoDiffs
-                   Nothing input ksout cppout)
+                   Nothing input ksout cppout
+                 >> pure ())
 
 compileAndRun :: [String] -> IO ()
 compileAndRun = parseErr p
@@ -315,7 +316,7 @@ profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["src/runtime/prelude"] source
+  (exe, _) <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["src/runtime/prelude"] source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out

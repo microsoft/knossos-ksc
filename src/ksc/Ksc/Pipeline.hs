@@ -237,7 +237,7 @@ displayCppGenDefsDiffs ::
    -> GblSymTab
    -> RuleBase
    -> KMT IO (GblSymTab, [TDef], RuleBase))
-  -> Maybe Int -> [String] -> String -> String -> IO ()
+  -> Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFiles ksofile cppfile =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
       display = displayPassM verbosity
@@ -262,7 +262,7 @@ displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFil
 
   ; cse <- anfOptAndCse display rulebase env5 alldefs
 
-  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
+  ; liftIO (Cgen.cppGenWithFilesResults ksofile cppfile cse)
   }
 
 displayCppGenDiffs :: (DisplayLint ()
@@ -270,10 +270,10 @@ displayCppGenDiffs :: (DisplayLint ()
                        -> GblSymTab
                        -> RuleBase
                        -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
-                   -> Maybe Int -> [String] -> String -> String -> IO ()
+                   -> Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGenDiffs diffs = displayCppGenDefsDiffs theDefs diffs theShapes
 
-displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO ()
+displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGenNoDiffs =
   displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
 
@@ -295,7 +295,7 @@ displayCppGenAndCompileDefsDiffs
   -> Maybe Int
   -> [String]
   -> String
-  -> IO a
+  -> IO (a, (String, String))
 displayCppGenAndCompileDefsDiffs
   generateDefs generateDiffs generateShapes compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
@@ -305,16 +305,17 @@ displayCppGenAndCompileDefsDiffs
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity (ksFiles ++ [ksFile]) ksofile cppfile
-  ; compiler cppfile exefile
+  ; outputFileContents <- displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; compilerResult <- compiler cppfile exefile
+  ; pure (compilerResult, outputFileContents)
   }
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String -> Maybe Int -> [String] -> String -> IO a
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String -> Maybe Int -> [String] -> String -> IO (a, (String, String))
 displayCppGenAndCompile = displayCppGenAndCompileDefsDiffs theDefs theDiffs theShapes
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
 displayCppGenCompileAndRun compilername verbosity file files = do
-  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file files
+  { (exefile, _) <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }
 
@@ -325,7 +326,7 @@ displayCppGenCompileAndRunViaCatLang :: HasCallStack
                                      -> String
                                      -> IO String
 displayCppGenCompileAndRunViaCatLang compilername verbosity file files = do
-  { exefile <- displayCppGenAndCompileDefsDiffs
+  { (exefile, _) <- displayCppGenAndCompileDefsDiffs
                    theDefsViaCatLang theDiffs theShapes
                    (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
