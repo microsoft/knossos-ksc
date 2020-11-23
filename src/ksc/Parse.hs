@@ -42,6 +42,7 @@ x : Vec (Vec Float)
         |   lam <var> <expr>
         |   if <expr> <expr> <expr>
         |   tuple <expr>1 ... <expr>n      n >= 0
+        |   $dummy <type>
         |   <var> <exrp>1 ... <expr>n      calls, n >= 1
         |   <expr>
 
@@ -146,7 +147,7 @@ langDef = Tok.LanguageDef
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
-                          , "let", "if", "assert", "call", "tuple", ":"
+                          , "let", "if", "assert", "call", "tuple", ":", "$dummy"
                           , "Integer", "Float", "Vec", "Lam", "String", "true", "false"
                           ]
   , Tok.reservedOpNames = []
@@ -221,6 +222,7 @@ pKExpr =   pIfThenElse
        <|> pAssert
        <|> pCall
        <|> pTuple
+       <|> pDummy
 
 pType :: Parser TypeX
 pType = (pReserved "Integer" >> return TypeInteger)
@@ -267,6 +269,12 @@ pTuple :: Parser (ExprX Parsed)
 pTuple = do { pReserved "tuple"
             ; es <- many pExpr
             ; return $ Tuple es }
+
+pDummy :: Parser (ExprX Parsed)
+-- (assert e1 e2)
+pDummy = do { pReserved "$dummy"
+            ; ty <- pType
+            ; return $ Dummy ty }
 
 pLam :: Parser (ExprX Parsed)
 -- (lam i e)
