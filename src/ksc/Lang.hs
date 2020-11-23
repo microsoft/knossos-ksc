@@ -961,8 +961,8 @@ pprPat tup_parens (TupPat vs) = mb_parens $ pprList (parens . pprTVar) vs
                 | otherwise  = d
 
 pprPatLetBndr :: forall phase. InPhase phase => PatG (LetBndrX phase) -> SDoc
-pprPatLetBndr (VarPat v)  = pprLetBndr @phase v
-pprPatLetBndr (TupPat vs) = parens (pprList (pprLetBndr @phase) vs)
+pprPatLetBndr (VarPat v)  = (ppr . fst . getLetBndr @phase) v
+pprPatLetBndr (TupPat vs) = parens (pprList (ppr . fst . getLetBndr @phase) vs)
 
 instance InPhase p => Pretty (RuleX p) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
