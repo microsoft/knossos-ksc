@@ -857,6 +857,11 @@ ksoGen = unlines . map (renderSexp . ppr)
 
 cppGenWithFiles :: String -> String -> [TDef] -> IO ()
 cppGenWithFiles ksofile cppfile defs = do
+  cppGenWithFilesResults ksofile cppfile defs
+  pure ()
+
+cppGenWithFilesResults :: String -> String -> [TDef] -> IO (String, String)
+cppGenWithFilesResults ksofile cppfile defs = do
   let cppcontents = cppGen defs
       ksocontents = ksoGen defs
 
@@ -865,6 +870,8 @@ cppGenWithFiles ksofile cppfile defs = do
 
   putStrLn $ "Writing to " ++ cppfile
   createDirectoryWriteFile cppfile cppcontents
+
+  pure (cppcontents, ksocontents)
 
 compile :: String -> String -> String -> IO String
 compile = compileWithOpts []
