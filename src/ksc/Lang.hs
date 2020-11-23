@@ -848,7 +848,7 @@ pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
-pprExpr _ (Dummy ty) = char '<' <> ppr ty <> char '>'
+pprExpr _ (Dummy ty) = parens $ text "$dummy" <+> ppr ty
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
