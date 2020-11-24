@@ -24,20 +24,18 @@ refreshenv
 #### Ubuntu
 
 You ought to use Ubuntu version >= 18.04 because older Ubuntus don't
-have g++ >= 7.  Ubuntu 18.04 and 20.04 under WSL and WSL2 work perfectly fine.  The
+have g++ >= 7.  Ubuntu 18.04 and 20.04 under WSL2 work perfectly fine.  The
 simplest way to get ghc and cabal is to install specific versions
-using [ghcup](https://gitlab.haskell.org/haskell/ghcup) as detailed
-below.
+from a [specific personal package archive
+(PPA)](https://launchpad.net/~hvr/+archive/ubuntu/ghc/) as detailed
+below.  (Please note that cabal from the PPA
+[will not work on WSL1](https://github.com/haskell/cabal/issues/6551)).
 
 ```sh
+sudo add-apt-repository ppa:hvr/ghc
 sudo apt-get update
-sudo apt-get install build-essential libgmp-dev
-
-# NB Installing 8.6.5 has copious ouput
-curl https://raw.githubusercontent.com/haskell/ghcup/c2bc5941f076f1fa9c62169f6217acac8dd62fc8/ghcup > ghcup
-sh ./ghcup install 8.6.5
-sh ./ghcup install-cabal 3.0.0.0
-~/.ghcup/bin/cabal v2-update
+sudo apt install ghc-8.6.5 cabal-install-3.0 g++
+/opt/cabal/bin/cabal-3.0 v2-update
 ```
 
 ### Building
@@ -56,7 +54,7 @@ their `PATH` so that command will run fine.  Ubuntu users might need
 to use the following, more explicit, command line.
 
 ```
-~/.ghcup/bin/cabal v2-build --ghc-option=-Wwarn --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc
+/opt/cabal/bin/cabal-3.0 v2-build --ghc-option=-Wwarn --with-ghc /opt/ghc/bin/ghc-8.6.5
 ```
 
 On the first run, it will build a lot of packages, which will look a bit like
@@ -95,11 +93,11 @@ mkdir -p build/bin  # Share build dir with ksc-mlir
 cabal v2-install --installdir=build/bin --overwrite-policy=always
 ```
 
-Those who installed cabal and ghc via ghcup might need to use the
+Those who installed cabal and ghc via the PPA might need to use the
 following, more explicit, command line at the last stage
 
 ```
-~/.ghcup/bin/cabal v2-install --with-ghc ~/.ghcup/ghc/8.6.5/bin/ghc --installdir=build/bin --overwrite-policy=always
+/opt/cabal/bin/cabal-3.0 v2-install --with-ghc /opt/ghc/bin/ghc-8.6.5 --installdir=build/bin --overwrite-policy=always
 ```
 
 ### Compiler pipeline
