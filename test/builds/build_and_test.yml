@@ -1,5 +1,8 @@
 trigger: none
 
+pr:
+- "*"
+
 jobs:
 
 - job: 'Ubuntu'
