@@ -24,7 +24,7 @@ refreshenv
 #### Ubuntu
 
 You ought to use Ubuntu version >= 18.04 because older Ubuntus don't
-have g++ >= 7.  Ubuntu 18.04 under WSL works perfectly fine.  The
+have g++ >= 7.  Ubuntu 18.04 and 20.04 under WSL and WSL2 work perfectly fine.  The
 simplest way to get ghc and cabal is to install specific versions
 using [ghcup](https://gitlab.haskell.org/haskell/ghcup) as detailed
 below.
