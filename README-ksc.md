@@ -90,14 +90,14 @@ sufficient to do
 
 ```
 mkdir -p build/bin  # Share build dir with ksc-mlir
-cabal v2-install --installdir=build/bin --overwrite-policy=always
+cabal v2-install --installdir=build/bin --overwrite-policy=always --install-method=copy
 ```
 
 Those who installed cabal and ghc via the PPA might need to use the
 following, more explicit, command line at the last stage
 
 ```
-/opt/cabal/bin/cabal-3.0 v2-install --with-ghc /opt/ghc/bin/ghc-8.6.5 --installdir=build/bin --overwrite-policy=always
+/opt/cabal/bin/cabal-3.0 v2-install --with-ghc /opt/ghc/bin/ghc-8.6.5 --installdir=build/bin --overwrite-policy=always --install-method=copy
 ```
 
 ### Compiler pipeline
