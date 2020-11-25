@@ -39,6 +39,7 @@ from contextlib import contextmanager
 @contextmanager
 def add_to_path(p):
     import sys
+
     old_path = sys.path
     old_modules = sys.modules
     sys.modules = old_modules.copy()
@@ -92,9 +93,7 @@ symbolLook = {
         sexpdata.Symbol("Vec"),
         [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
     ],  # float vs integer? also determine rank instead of hardcode
-    "int" : [
-        sexpdata.Symbol("Integer")
-    ]
+    "int": [sexpdata.Symbol("Integer")],
 }
 
 # We're going to have to break out the data structure at some point, for now, hardcode
@@ -102,7 +101,7 @@ symbolLook = {
 symbolLook["Tuple[int, Tensor]"] = [
     sexpdata.Symbol("Tuple"),
     symbolLook["int"],
-    symbolLook["Tensor"]
+    symbolLook["Tensor"],
 ]
 
 
@@ -166,7 +165,9 @@ def make_list(node):
 
     list_size = sum(1 for _ in node.inputs())
     if list_size == 0:
-        return [] # may not be very practical on the Knossos side, some of the TorchScript workarounds currently mutates in place
+        return (
+            []
+        )  # may not be very practical on the Knossos side, some of the TorchScript workarounds currently mutates in place
     else:
         return [
             sexpdata.Symbol("\n"),
