@@ -72,7 +72,8 @@ generateCppWithoutDiffs = parseErr p
           cppout <- option "cpp-output-file"
 
           return (Ksc.Pipeline.displayCppGenNoDiffs
-                   Nothing input ksout cppout)
+                   Nothing input ksout cppout
+                 >> pure ())
 
 compileAndRun :: [String] -> IO ()
 compileAndRun = parseErr p
@@ -158,7 +159,12 @@ compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   testOn ksFiles $ \ksFile -> do
         ksTest <- dropExtensionOrFail "ks" ksFile
-        displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ["src/runtime/prelude"] ksTest
+        (_, (_, ksoContents)) <- displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ["src/runtime/prelude"] ksTest
+        case parseE ksoContents of
+          Left e -> error ("Generated .kso failed to parse:\n"
+                           ++ ksoContents ++ "\n"
+                           ++ e)
+          Right _ -> pure ()
 
 testRoundTrip :: [String] -> IO ()
 testRoundTrip ksFiles = do
@@ -308,13 +314,14 @@ testC compiler fsTestKs = do
   testRunKS compiler "test/ksc/fold.ks"
   testRunKSViaCatLang compiler "test/ksc/gmm.ks"
   testRunKSViaCatLang compiler "test/ksc/fold.ks"
+  testRunKS compiler "test/ksc/copydown.ks"
   compileKscPrograms compiler fsTestKs
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do
   let compiler = "g++-7"
 
-  exe <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["src/runtime/prelude"] source
+  (exe, _) <- displayCppGenAndCompile (Cgen.compileWithProfiling compiler) ".exe" Nothing ["src/runtime/prelude"] source
   Cgen.readProcessEnvPrintStderr exe [] (Just [("CPUPROFILE", proffile)])
   withOutputFileStream proflines $ \std_out -> createProcess
     (proc "google-pprof" ["--text", "--lines", exe, proffile]) { std_out = std_out

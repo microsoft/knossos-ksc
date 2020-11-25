@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances, LambdaCase,
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
              ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Lang where
 
@@ -64,17 +65,27 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
-data Pat = VarPat TVar     -- A single variable
-         | TupPat [TVar]   -- A tuple of variables
-         deriving( Eq )
+data PatG v = VarPat v     -- A single variable
+            | TupPat [v]   -- A tuple of variables
+            deriving( Eq, Functor, Foldable, Traversable )
+
+type Pat = PatG TVar
+
+patTypeG :: forall p. InPhase p => PatG (LetBndrX p) -> Maybe Type
+patTypeG (VarPat v)  = snd (getLetBndr @p v)
+patTypeG (TupPat vs) = TypeTuple <$> mapM (snd . getLetBndr @p) vs
 
 patType :: Pat -> Type
 patType (VarPat v) = typeof v
 patType (TupPat vs) = mkTupleTy (map typeof vs)
 
-patVars :: Pat -> [TVar]
+patVars :: PatG v -> [v]
 patVars (VarPat v) = [v]
 patVars (TupPat vs) = vs
+
+patToExpr :: Pat -> TExpr
+patToExpr (VarPat v)  = Var v
+patToExpr (TupPat vs) = Tuple (map Var vs)
 
 instance Show Pat where
   show p = pps p
@@ -91,13 +102,6 @@ tVarVar (TVar _ v) = v
 
 tVarType :: TVarX -> TypeX
 tVarType (TVar ty _) = ty
-
--- MTypeX pm
---   pm controls whether the type is there at all
-type family MTypeX p where
-  MTypeX Parsed   = ()
-  MTypeX Typed    = Type
-  MTypeX OccAnald = Type
 
 {- Note [Function arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -152,10 +156,13 @@ data ExprX p
   | Tuple [ExprX p]          -- (e1, ..., en)
   | Lam TVarX (ExprX p)      -- Lambda-bound variable is typed from birth
   | App (ExprX p) (ExprX p)
-  | Let (LetBndrX p) (ExprX p) (ExprX p)    -- let x = e1 in e2  (non-recursive)
+  | Let (PatG (LetBndrX p)) (ExprX p) (ExprX p)
+  -- ^ let x = e1 in e2
+  --   or let (x1, ..., x2) = e1 in e2
+  --   (both non-recursive)
   | If (ExprX p) (ExprX p) (ExprX p)
   | Assert (ExprX p) (ExprX p)
-  | Dummy (MTypeX p)
+  | Dummy Type
 
 instance InPhase p => Show (ExprX p) where
   show e = pps e
@@ -228,18 +235,6 @@ deriving instance Show (RuleX Parsed)
 pattern TypeSize :: TypeX
 pattern TypeSize = TypeInteger
 
-isScalar :: Type -> Bool
-isScalar = \case
-  TypeBool      -> True
-  TypeInteger   -> True
-  TypeFloat     -> True
-  TypeString    -> True
-  TypeTuple ts  -> all isScalar ts
-  TypeVec    {} -> False
-  TypeLam {}    -> False
-  TypeLM     {} -> error "Shouldn't see TypeLM at this stage of codegen"
-  TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
-
 ----------------------------------
 --- Tangent space
 
@@ -254,6 +249,53 @@ tangentType TypeString     = TypeTuple []
 tangentType TypeUnknown    = TypeUnknown
 tangentType t              = pprPanic "tangentType" (ppr t)
                                -- TypeLM, TypeLam
+
+-----------------------------------
+--- Shapes
+-----------------------------------
+
+shapeType :: Type -> Type
+shapeType TypeBool = TypeTuple []
+shapeType TypeInteger = TypeTuple []
+shapeType TypeFloat = TypeTuple []
+shapeType TypeString = TypeTuple []
+shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
+shapeType (TypeVec vt) = TypeVec (shapeType vt)
+shapeType (TypeLam _ _) = TypeUnknown
+shapeType (TypeLM _ _) = TypeUnknown  -- TBD
+shapeType TypeUnknown = TypeUnknown
+
+{- Note [Shapes]
+~~~~~~~~~~~~~~~~
+We define a primitive function
+   shape :: T -> Sh(T)
+which takes a value and returns the "shape" of the value. Here Sh(T) is
+the shape-type of T (defined analogously to the tangent-type of T),
+and is implemented by shapeType :: Type -> Type
+
+For example
+  --------------------------
+  T         Sh(T)
+  --------------------------
+  Float     ()
+  Vec T     Vec Sh(T)
+  (T1 T2)   (Sh(T1), Sh(T2))
+  --------------------------
+
+For every function
+   f :: S -> T
+   f(x) = rhs
+we can generate a companion function
+   shape$f :: S -> Sh(T)
+   shape$f(x) = shape(rhs)
+which we hope to optimize by pushing the shape call down using optimization
+rules.
+
+One potential use of shape$f is to allow a caller of f to precalculate
+the amount of memory required to hold the result of f. However, the function
+shape$f may itself involve allocating memory in the heap.
+-}
+
 
 -- eqType is currently == but coud be more complicated if we do size
 -- types
@@ -285,6 +327,7 @@ data Fun = Fun      FunId         -- The function              f(x)
          | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
+         | ShapeFun Fun
          deriving( Eq, Ord, Show )
 
 isUserFun :: FunId -> Bool
@@ -304,6 +347,7 @@ funIdOfFun = \case
   Fun f       -> f
   GradFun f _ -> f
   DrvFun f _  -> f
+  ShapeFun f  -> funIdOfFun f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -394,7 +438,7 @@ mkDummy :: Type -> TExpr
 mkDummy ty = Dummy ty
 
 mkLet :: LetBndrX p -> ExprX p -> ExprX p -> ExprX p
-mkLet = Let
+mkLet = Let . VarPat
 
 mkLets :: HasCallStack => [(LetBndrX p, ExprX p)] -> ExprX p -> ExprX p
 mkLets xs e = foldr (uncurry mkLet) e xs
@@ -654,7 +698,6 @@ class InPhase p where
   pprLetBndr :: LetBndrX p -> SDoc  -- Print with its type
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
 
-  getMType   :: MTypeX p   -> Maybe Type
   getVar     :: VarX p     -> (Var, Maybe Type)
   getFun     :: FunX p     -> (Fun, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
@@ -664,7 +707,6 @@ instance InPhase Parsed where
   pprLetBndr = ppr
   pprFunOcc  = ppr
 
-  getMType _      = Nothing
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
@@ -674,7 +716,6 @@ instance InPhase Typed where
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
 
-  getMType ty              = Just ty
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun, Just ty)
   getLetBndr (TVar ty var) = (var, Just ty)
@@ -684,18 +725,9 @@ instance InPhase OccAnald where
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
 
-  getMType   ty                 = Just ty
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun, Just ty)
-  getLetBndr (_, tv)            = (tVarVar tv,   Nothing)
-  -- This last case is awkward. _ty :: TypeX OccAnald
-  -- and we could convert it to a Type, but it does not
-  -- see worth the bother.  Nothing is fine, actually
-
-pprMTypeX :: forall p. InPhase p => MTypeX p -> SDoc
-pprMTypeX mty = case getMType @p mty of
-                 Just ty -> ppr ty
-                 Nothing -> empty
+  getLetBndr (_, TVar ty var)   = (var, Just ty)
 
 pprTFun :: TFun -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
@@ -757,6 +789,7 @@ pprFun (Fun s)                   = ppr s
 pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
+pprFun (ShapeFun f)              = text "shape$" <> ppr f
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -815,7 +848,7 @@ pprTVar (TVar ty v) = ppr v <+> text ":" <+> ppr ty
 
 pprExpr :: forall phase. InPhase phase => Prec -> ExprX phase -> SDoc
 pprExpr _ (Var   v ) = pprVar @phase v
-pprExpr _ (Dummy ty) = char '<' <> pprMTypeX @phase ty <> char '>'
+pprExpr _ (Dummy ty) = parens $ text "$dummy" <+> ppr ty
 pprExpr p (Konst k ) = pprPrec p k
 pprExpr p (Call f e) = pprCall p f e
 pprExpr _ (Tuple es) = mode (parens $ text "tuple" <+> rest) (parens rest)
@@ -829,7 +862,7 @@ pprExpr p (Let v e1 e2) = mode
     precZero
     (vcat
       [ text "let"
-        <+> (bracesSp $ sep [pprLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
+        <+> (bracesSp $ sep [pprPatLetBndr @phase v, nest 2 (text "=" <+> ppr e1)])
       , ppr e2
       ]
     )
@@ -868,7 +901,8 @@ pprCall prec f e = mode
     Tuple es  -> sep (map ppr es)
     _         -> pp_args
 
-pprLetSexp :: forall p. InPhase p => LetBndrX p -> ExprX p -> ExprX p -> SDoc
+pprLetSexp :: forall p. InPhase p
+           => PatG (LetBndrX p) -> ExprX p -> ExprX p -> SDoc
 pprLetSexp v e =
       go [(v,e)]
     where
@@ -876,7 +910,7 @@ pprLetSexp v e =
       go binds body =
             parens $ sep [text "let", parens $ vcat (map parenBind $ reverse binds),
                         ppr body]
-      parenBind (v,e) = parens $ (ppr . fst . getLetBndr @p) v <+> ppr e
+      parenBind (v,e) = parens $ pprPatLetBndr @p v <+> ppr e
 
 
 isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
@@ -925,6 +959,10 @@ pprPat tup_parens (TupPat vs) = mb_parens $ pprList (parens . pprTVar) vs
   where
     mb_parens d | tup_parens = parens d
                 | otherwise  = d
+
+pprPatLetBndr :: forall phase. InPhase phase => PatG (LetBndrX phase) -> SDoc
+pprPatLetBndr (VarPat v)  = (ppr . fst . getLetBndr @phase) v
+pprPatLetBndr (TupPat vs) = parens (pprList (ppr . fst . getLetBndr @phase) vs)
 
 instance InPhase p => Pretty (RuleX p) where
   ppr (Rule { ru_name = name, ru_qvars = qvars
@@ -1066,10 +1104,28 @@ cmpExpr e1
      = case e2 of
          If {}     -> LT
          Assert {} -> LT
-         Let b2 r2 e2
-           -> go r1 subst r2 `thenCmp`
-              (typeof b1 `compare` typeof b2) `thenCmp`
-              go e1 (M.insert (tVarVar b2) b1 subst) e2
+         Let b2 r2 e2 -> case (b1, b2) of
+           (VarPat _,  TupPat _)  -> LT
+           (TupPat _,  VarPat _)  -> GT
+           (VarPat v1, VarPat v2) ->
+             go r1 subst r2 `thenCmp`
+             (typeof v1 `compare` typeof v2) `thenCmp`
+             go e1 (M.insert (tVarVar v1) v2 subst) e2
+           (TupPat t1, TupPat t2) ->
+             -- These annotations "@[]" are optional and serve to
+             -- inform us that we're taking the length of genuine
+             -- lists here.  There's no funny business going on via
+             -- the Foldable type class.
+             case compare (length @[] t1) (length @[] t2) of
+               LT -> LT
+               GT -> GT
+               EQ ->
+                 go r1 subst r2 `thenCmp`
+                 (map typeof t1 `compare` map typeof t2) `thenCmp`
+                 go e1 (M.fromList
+                         (zipWith (\tv1 tv2 -> (tVarVar tv1, tv2)) t1 t2)
+                         `M.union` subst) e2
+
          _ -> GT
 
    go (If e1c e1t e1f) subst e2

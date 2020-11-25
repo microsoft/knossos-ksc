@@ -11,6 +11,7 @@
 #include <iostream>
 #include <random>
 #include <cmath>
+#include <cstring>
 #include <string>
 #include <chrono>
 
@@ -250,7 +251,7 @@ namespace ks
 		{
 			KS_ASSERT(size < 1000000);
 			void* ret = buf_ + top_;
-			top_ += ((size + 15) / 16) * 16;
+			top_ += padded_size(size);
 			if (top_ > peak_) {
 				peak_ = top_;
 				KS_ASSERT(top_ < max_size_);
@@ -258,9 +259,13 @@ namespace ks
 			return ret;
 		}
 
+		static size_t padded_size(size_t size) { return ((size + 15) / 16) * 16; }
+
 		size_t mark() const { return top_;  }
 
 		void* top_ptr() const { return buf_ + top_; }
+
+		void* ptr_at(size_t m) const { return buf_ + m; }
 
 		void reset(size_t top = 0)
 		{
@@ -430,10 +435,14 @@ namespace ks
 
 		void allocate(allocator * alloc, size_t size)
 		{
-			void *storage = alloc->allocate(sizeof(T) * size);
+			void *storage = alloc->allocate(bytes_required(size));
 			this->size_ = size;
 			this->data_ = (T*)storage;
 			this->is_zero_ = false;
+		}
+
+		static size_t bytes_required(size_t size) {
+			return sizeof(T) * size;
 		}
 
                 // We can efficiently copy construct (i.e. from a vec
@@ -485,6 +494,9 @@ namespace ks
 
 		int size() const { return int(size_); }
 
+		T* data() { return data_; }
+		const T* data() const { return data_; }
+
 		T& operator[](int i) { if (is_zero_) return z_; else return data_[i]; }
 		T const& operator[](int i) const {  if (is_zero_) return z_; else return data_[i]; }
 
@@ -500,6 +512,20 @@ namespace ks
 				return zero(data_[0]);
 			}
 		}
+
+		bool operator == (vec const& other) const {
+			if (size() != other.size()) {
+				return false;
+			}
+			for (int i = 0; i != size(); ++i) {
+				if ((*this)[i] != other[i]) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		bool operator != (vec const& other) const { return !(*this == other); }
 	};
 
 	template <class T>
@@ -606,6 +632,255 @@ namespace ks
 
 		for (int i = 0; i < t.size(); ++i)
 			ret[i] = inflated_deep_copy(alloc, t[i]);
+		return ret;
+	}
+
+	// The number of bytes that would be required from the
+	// allocator to store an inflated copy of the given object
+	template<class T>
+	size_t inflated_bytes(T const&) { return 0; }
+
+	template<class TupleT, size_t... Indices>
+	size_t inflated_bytes_tupleimpl(TupleT const& t, std::index_sequence<Indices...>) {
+		return ((size_t)0 + ... + inflated_bytes(std::get<Indices>(t)));
+	}
+	template<class... Types>
+	size_t inflated_bytes(tuple<Types...> const& t) {
+		return inflated_bytes_tupleimpl(t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	size_t inflated_bytes(vec<T> const& v) {
+		int sz = v.size();
+		size_t ret = allocator::padded_size(vec<T>::bytes_required(sz));
+		for (int i = 0; i != sz; ++i) {
+			ret += inflated_bytes(v[i]);
+		}
+		return ret;
+	}
+
+	// ===============================  Copydown  ==================================
+
+	// Tests if any of the memory referred to by val overlaps the
+	// range [start, end)
+	template<class T>
+	bool memory_overlaps(const void* /*start*/, const void* /*end*/, T const& /*val*/) {
+		return false;
+	}
+
+	template<class TupleT, size_t... Indices>
+	bool memory_overlaps_tupleimpl(const void* start, const void* end, TupleT const& t, std::index_sequence<Indices...>) {
+		return (memory_overlaps(start, end, std::get<Indices>(t)) || ...);
+	}
+	template<class... Types>
+	bool memory_overlaps(const void* start, const void* end, tuple<Types...> const& t) {
+		return memory_overlaps_tupleimpl(start, end, t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	bool memory_overlaps(const void* start, const void* end, vec<T> const& v) {
+		if (v.is_zero()) {
+			return v.size() != 0 && memory_overlaps(start, end, v[0]);
+		}
+
+		for (int i = 0; i != v.size(); ++i) {
+			if (memory_overlaps(start, end, v[i])) {
+				return true;
+			}
+		}
+		return v.data() < end && v.data() + v.size() > start;
+	}
+
+	struct prepare_copydown_state
+	{
+		unsigned char * subobjectDestination;   // destination of the next vec subobject
+		                                        // (updated whenever we encounter a vec during iteration over subobjects)
+		unsigned char * const startOfDestination;   // destination of first vec in the iteration sequence
+		allocator * alloc;
+	};
+
+	template<class T>
+	void prepare_copydown_inplace(prepare_copydown_state *, T *) {
+		/* There's nothing to do unless T has a vec subobject. */
+	}
+
+	template<class TupleT, size_t... Indices>
+	void prepare_copydown_inplace_tupleimpl(prepare_copydown_state * dest, TupleT * t, std::index_sequence<Indices...>) {
+		((prepare_copydown_inplace(dest, &std::get<Indices>(*t))), ...);
+	}
+
+	template<class... Types>
+	void prepare_copydown_inplace(prepare_copydown_state * dest, tuple<Types...> * t) {
+		prepare_copydown_inplace_tupleimpl(dest, t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	void prepare_copydown_inplace(prepare_copydown_state * dest, vec<T> * v) {
+		/* Note that this function modifies *v in-place. That's OK
+		   provided that *v lives either
+		   - on the stack; or
+		   - in the allocator's buffer *after* dest->startOfDestination,
+		   because in the latter case, all of this memory will be overwritten
+		   by the copydown anyway, or freed when the allocator is reset.
+		   We'll make sure that this function is never called with an argument
+		   that lives in the allocator's buffer before dest->startOfDestination.
+		   */
+		if (v->is_zero()) {
+			int sz = v->size();
+			if (sz == 0) {
+				return;   // no data to be copied
+			}
+			T zero_value = (*v)[0];
+			/* When we do the copydown, we'll be making sz copies
+			   of zero_value. We need to make sure that none of those
+			   copies will overwrite data referred to by zero_value.
+			   The strictest condition applies when the final copy
+			   is made, so we can start by assuming that the first
+			   (sz - 1) copies will be fine. */
+			dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz))
+					+ (sz - 1) * inflated_bytes(zero_value);
+			prepare_copydown_inplace(dest, &zero_value);
+			*v = vec<T>(zero_tag, zero_value, sz);
+			return;
+		}
+		
+		void * sourceData = v->data();
+		if (sourceData < dest->startOfDestination) {
+			/* This data lives before the copydown location in the buffer.
+			   We assume that this means it can't contain any pointers to
+			   data after the copydown location, so we don't need to move
+			   any of the data belonging to subobjects of *v.
+			   That's fortunate, because we wouldn't be allowed to modify
+			   objects before the copydown location even if we wanted to. */
+			KS_ASSERT(!memory_overlaps(dest->startOfDestination, dest->subobjectDestination, *v));
+			dest->subobjectDestination += inflated_bytes(*v);
+		} else {
+			int sz = v->size();
+			if (sourceData < dest->subobjectDestination) {
+				/* This source overlaps the desination of another subobject that comes
+				   earlier in the iteration order. We need to move it out of the way. */
+				if (dest->alloc->top_ptr() < dest->subobjectDestination) {
+					/* Make sure we're not about to copy to a place which is still
+					   in the way! */
+					dest->alloc->allocate(dest->subobjectDestination - (unsigned char*)dest->alloc->top_ptr());
+				}
+				*v = vec<T>(dest->alloc, sz);
+				std::memcpy(v->data(), sourceData, sz * (int)sizeof(T));
+			}
+			dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz));
+			for (int i = 0; i != sz; ++i) {
+				prepare_copydown_inplace(dest, &((*v)[i]));
+			}
+		}
+	}
+
+	/* Copy some of the data referred to by val if necessary,
+	   returning a modified version of val which meets the
+	   precondition for copydown_by_memmove below.
+
+	   This function works by calculating where the eventual
+	   destination will be for the data of each vec subobject.
+	   This involves replicating the sequence of allocations
+	   that will take place, but without actually calling
+	   an allocator.
+
+	   Assumes that "mark" is not in the middle of an allocation
+	   (see comment for copydown_by_memmove). */
+	template<class T>
+	T prepare_copydown(allocator * alloc, alloc_mark_t mark, T val) {
+		unsigned char * start = static_cast<unsigned char*>(alloc->ptr_at(mark));
+		prepare_copydown_state dest{ start, start, alloc };
+		prepare_copydown_inplace(&dest, &val);
+		return val;
+	}
+
+	template<class T>
+	void copydown_by_memmove_inplace(allocator *, T *) { }
+
+	template<class TupleType, size_t... Indices>
+	void copydown_by_memmove_inplace_tuple(allocator * alloc, TupleType * t, std::index_sequence<Indices...>) {
+		((copydown_by_memmove_inplace(alloc, &std::get<Indices>(*t))), ...);
+	}
+	template<class... Types>
+	void copydown_by_memmove_inplace(allocator * alloc, tuple<Types...> * t) {
+		copydown_by_memmove_inplace_tuple(alloc, t, std::index_sequence_for<Types...>{});
+	}
+
+	template<class T>
+	void copydown_by_memmove_inplace(allocator * alloc, vec<T> * v) {
+		int sz = v->size();
+		if (v->is_zero()) {
+			if (sz != 0) {
+				T elem = (*v)[0];
+				*v = vec<T>(alloc, sz);
+				for (int i = 0; i != sz; ++i) {
+					(*v)[i] = elem;
+				}
+			}
+		} else {
+			T* oldData = v->data();
+			*v = vec<T>(alloc, sz);
+			std::memmove(v->data(), oldData, static_cast<size_t>(sz) * sizeof(T));
+		}
+		for (int i = 0; i != sz; ++i) {
+			copydown_by_memmove_inplace(alloc, &((*v)[i]));
+		}
+	}
+
+	/* Perform a copydown by iterating over the subobjects of val;
+	   for each subobject which is a vec, copy its data to the
+	   desired position using memmove.
+
+	   Precondition: for each vec<T> subobject v, there must be no
+	   overlap between the intervals
+	     [v.data(), v.data() + v.size()*sizeof(T)) and
+	     [alloc->ptr_at(mark), newvdata)
+	   where newvdata is the intended new value of v.data() after
+	   copydown.
+	   (If this condition was not satisfied, then v's data would
+	   be overwritten before we got the chance to move it, because
+	   the interval [alloc->ptr_at(mark), newvdata) contains
+	   the destinations of subobjects which come before v in the
+	   iteration order.)
+
+	   If we assume that "mark" is always at the boundary of an
+	   allocation, not in the middle of one, then the precondition
+	   reduces to ensuring that v.data() is not in the interval
+	   [alloc->ptr_at(mark), newvdata).
+	   */
+	template<class T>
+	T copydown_by_memmove(allocator * alloc, alloc_mark_t mark, T val)
+	{
+		alloc->reset(mark);
+		copydown_by_memmove_inplace(alloc, &val);
+		return val;
+	}
+
+	/* Make a deep copy of the given object such that its allocations
+	   start at the marked position, then reset the allocator to
+	   the endpoint of the allocations for this object. That is, we
+	   reclaim (and may overwrite) all of the memory of existing objects
+	   which come after the marked position in the buffer.
+
+	   Note that the original object val may itself refer to memory
+	   which overlaps the copydown destination. */
+	template<class T>
+	T copydown(allocator * alloc, alloc_mark_t mark, T const& val)
+	{
+#ifdef CHECK_COPYDOWN_CORRECTNESS   // performs a (slow!) check that the result of a copydown is equal to the original
+		alloc_mark_t originalTop = alloc->mark();
+		alloc->allocate(inflated_bytes(val));  // ensure that safe_copy does not overlap any temporary allocations that might be made during copydown
+		T safe_copy = inflated_deep_copy(alloc, val);
+		alloc->reset(originalTop);
+#endif
+		T modified_val = prepare_copydown(alloc, mark, val);
+		T ret = copydown_by_memmove(alloc, mark, modified_val);
+#ifdef CHECK_COPYDOWN_CORRECTNESS
+		if (ret != safe_copy) {
+			std::cerr << "Detected an incorrect copydown" << std::endl;
+			abort();
+		}
+#endif
 		return ret;
 	}
 
@@ -786,537 +1061,39 @@ namespace ks
 		return s << "]";
 	}
 
-	// ===============================  Linear maps ==================================
-	namespace LM
-	{
-		// ---------------- One  ------------------
-		template <class T>
-		struct One
-		{
-			typedef T To;
-			typedef T From;
-
-			static One mk(T) { return One{}; }
-
-			To Apply(allocator *, From f) const { return f; }
-		};
-
-		template <class T>
-		std::ostream &operator<<(std::ostream &s, One<T> const &t)
-		{
-			return s << "One" <<
-				//"<" << type_to_string<T>::name() << ">"
-				"";
-		}
-
-		// ---------------- Zero  ------------------
-		template <class From_t, class To_t>
-		struct Zero
-		{
-			typedef To_t To;
-			typedef From_t From;
-
-			static Zero mk(From, To) { return Zero{}; }
-
-			To Apply(allocator *, From f) const {
-				return zero(To{});
-			}
-		};
-
-		template <class From, class To>
-		std::ostream &operator<<(std::ostream &s, Zero<From, To> const &t)
-		{
-			return s << "Zero" <<
-				//"<" << type_to_string<From>::name() << "," << type_to_string<From>::name() << ">"
-				"";
-		}
-
-		// ---------------- Scale  ------------------
-		template <class scale_t, class From, class To>
-		To Scale_aux(scale_t val, From const&);
-
-		// General case for Scale_aux<tuple>.
-		// Scale first element, then scale tail.
-		template <class scale_t, class... Ts>
-		tuple<Ts...> Scale_aux(scale_t val, tuple<Ts...> const& t)
-		{
-			return prepend(Scale_aux(val, head(t)),
-				Scale_aux(val, tail(t)));
-		}
-
-		// Base case for Scale_aux<Tuple>.  Empty tuple * val = empty tuple.
-		template <class scale_t>
-		tuple<> Scale_aux(scale_t val, tuple<> const& t)
-		{
-			return t;
-		}
-
-		// Scale anything else
-		template <class scale_t, class From, class To>
-		To Scale_aux(scale_t val, From const& t)
-		{
-			return To{ val * t };
-		}
-
-		struct Scale
-		{
-			typedef double scale_t;
-			scale_t val;
-
-			typedef double To;
-			typedef double From;
-
-			static Scale mk(scale_t val) { return Scale{ val }; }
-
-			To Apply(allocator *, From f) const { return val * f; }
-		};
-
-		inline std::ostream &operator<<(std::ostream &s, Scale const &t)
-		{
-			return s << "Scale" <<
-				"(" << t.val << ")";
-		}
-
-		// ---------------- Add ------------------
-		template <class LM1, class LM2>
-		struct Add {
-			LM1 lm1;
-			LM2 lm2;
-
-			typedef typename LM1::From From1;
-			typedef typename LM1::To To1;
-
-			typedef typename LM2::From From2;
-			typedef typename LM2::To To2;
-
-			static_assert(std::is_same<From1, From2>::value, "To1==To2");
-			static_assert(std::is_same<To1, To2>::value, "To1==To2");
-
-			typedef From1 From;
-			typedef To1 To;
-
-			static Add mk(LM1 lm1, LM2 lm2) { return Add{ lm1, lm2 }; }
-
-			To Apply(allocator * alloc, From f) const { return ts_add(alloc, lm1.Apply(alloc, f), lm2.Apply(alloc, f)); }
-		};
-
-		template <class T1, class T2>
-		std::ostream &operator<<(std::ostream &s, Add<T1, T2> const &t)
-		{
-			return s << "Add" <<
-				//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-				"(" << t.lm1 << "," << t.lm2 << ")";
-		}
-
-		// ---------------- HCat ------------------
-
-		// Helper to gather "From" information from the incoming types
-		template <class T>
-		struct HCat_infer_From {
-		};
-
-		template <>
-		struct HCat_infer_From<tuple<>> {
-			typedef tuple<> type;
-		};
-
-		template <class T, class... Ts>
-		struct HCat_infer_From<tuple<T, Ts...>> {
-			typedef typename T::From From;
-			typedef typename HCat_infer_From<tuple<Ts...>>::type Froms;
-			typedef typename tuple_prepend<From, Froms>::type type;
-		};
-
-		namespace test_HCat_infer_From {
-			struct A {
-				typedef int From;
-			};
-			struct B {
-				typedef float From;
-			};
-			typedef typename HCat_infer_From<tuple<A, B, A>>::type ABA;
-			static_assert(std::is_same<ABA, tuple<int, float, int>>::value);
-		};
-
-		template <class Tuple>
-		struct HCat_infer_To {
-			// Will fail if Tuple doesn't have at least one element
-			typedef typename std::tuple_element<0, Tuple>::type T0;
-			typedef typename T0::To type;
-		};
-
-		template <class... LMs>
-		struct HCat {
-			static constexpr size_t n = sizeof...(LMs);
-
-			typedef tuple<LMs...> Tup;
-
-			Tup lms;
-
-			typedef typename HCat_infer_To<Tup>::type To;
-			typedef typename HCat_infer_From<Tup>::type From;
-
-			static HCat mk(LMs... lm) { return HCat{ { lm... } }; }
-
-			To Apply(allocator * alloc, From const& f) const {
-				static_assert(n > 1);
-				typedef typename std::tuple_element<0, Tup>::type T0;
-				To a0 = head(lms).Apply(alloc, typename T0::From{ head(f) });
-				return Apply_aux<1>(alloc, a0, f);
-			}
-
-			template <size_t i>
-			To Apply_aux(allocator * alloc, To accum, From const& f) const {
-				typedef typename std::tuple_element<i, Tup>::type T0;
-				To ai = std::get<i>(lms).Apply(alloc, typename T0::From{ std::get<i>(f) });
-				if constexpr (i + 1 < n)
-					return Apply_aux<i + 1>(alloc, ts_add(alloc, accum, ai), f);
-				else
-					return ts_add(alloc, accum, ai);
-			}
-		};
-
-		template <class T, class... Ts>
-		std::ostream &operator<<(std::ostream &s, HCat<T, Ts...> const &t)
-		{
-			s << "HCat";
-			//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-			;
-			return tuple_print<0>(s << "(", t.lms) << ")";
-		}
-
-		// ---------------- VCat ------------------
-
-		// Helper to gather "From" information from the incoming types
-		template <class T>
-		struct VCat_infer_To {
-		};
-
-		template <>
-		struct VCat_infer_To<tuple<>> {
-			typedef tuple<> type;
-		};
-
-		template <class T, class... Ts>
-		struct VCat_infer_To<tuple<T, Ts...>> {
-			typedef typename T::To To;
-			typedef typename VCat_infer_To<tuple<Ts...>>::type Tos;
-			typedef typename tuple_prepend<To, Tos>::type type;
-		};
-
-		namespace test_VCat_infer_To {
-			struct A {
-				typedef int To;
-			};
-			struct B {
-				typedef float To;
-			};
-			typedef typename VCat_infer_To<tuple<A, B, A>>::type ABA;
-			static_assert(std::is_same<ABA, tuple<int, float, int>>::value);
-		};
-
-		template <class Tuple>
-		struct VCat_infer_From {
-			// Will fail if Tuple doesn't have at least one element
-			typedef typename std::tuple_element<0, Tuple>::type T0;
-			typedef typename T0::From type;
-		};
-
-		template <class... LMs>
-		struct VCat {
-			static constexpr size_t n = sizeof...(LMs);
-
-			typedef tuple<LMs...> Tup;
-
-			Tup lms;
-
-			typedef typename VCat_infer_To<Tup>::type To;
-			typedef typename VCat_infer_From<Tup>::type From;
-
-			static VCat mk(LMs... lm) { return VCat{ { lm... } }; }
-
-			To Apply(allocator * alloc, From const& f) const {
-				static_assert(n > 1);
-				To ret;
-				Apply_aux<0>(alloc, f, &ret);
-				return ret;
-			}
-
-			template <size_t i>
-			void Apply_aux(allocator * alloc, From const& f, To* ret) const
-			{
-				typedef typename std::tuple_element<i, Tup>::type LM;
-				typedef typename LM::To type;
-				type ai = std::get<i>(lms).Apply(alloc, f);
-				std::get<i>(*ret) = type{ ai };
-				if constexpr (i + 1 < n) {
-					Apply_aux<i + 1>(alloc, f, ret);
-				}
-			}
-			/*
-						template <size_t i>
-						To Apply_aux(allocator * alloc, zero_t<To> accum, From const& f) const {
-							if constexpr (i < n) {
-								// Accumulator could be zero if first terms are zero,
-								// just move on to case 1
-								auto ai = std::get<i>(lms).Apply(alloc, std::get<i>(f));
-								return Apply_aux<i + 1>(alloc, ai, f);
-							}
-							else
-								return accum;
-						}
-			*/
-		};
-
-		template <class T, class... Ts>
-		std::ostream &operator<<(std::ostream &s, VCat<T, Ts...> const &t)
-		{
-			s << "VCat";
-			//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-			;
-			return tuple_print<0>(s << "(", t.lms) << ")";
-		}
-
-		// ---------------- Compose ------------------
-		template <class Lbc, class Lab>
-		struct Compose
-		{
-			Lbc bc;
-			Lab ab;
-
-			typedef typename Lbc::From B1;
-			typedef typename Lbc::To C;
-
-			typedef typename Lab::From A;
-			typedef typename Lab::To B2;
-
-			static_assert(std::is_same<B1, B2>::value, "LM::Compose: From2 != To1");
-
-			typedef A From;
-			typedef C To;
-
-			static Compose mk(Lbc bc, Lab ab) { return Compose{ bc, ab }; }
-
-			To Apply(allocator * alloc, From f) const {
-				auto g = ab.Apply(alloc, f);
-				return bc.Apply(alloc, g);
-			}
-		};
-
-		template <class T1, class T2>
-		std::ostream &operator<<(std::ostream &s, Compose<T1, T2> const &t)
-		{
-			return s << "Compose" <<
-				//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-				"(" << t.bc << "," << t.ab << ")";
-		}
-
-		// ---------------- SelFun ------------------
-		template <typename Tuple, typename Ti>
-		struct SelFun
-		{
-			typedef Tuple From;
-			typedef Ti To;
-
-			int index;
-
-			static SelFun mk(int index, int n) { return SelFun{ index }; }
-
-			To Apply(allocator *, From f) const { return std::get(f, index); }
-		};
-
-		template <class Tuple, class Ti>
-		std::ostream &operator<<(std::ostream &s, SelFun<Tuple, Ti> const &t)
-		{
-			return s << "SelFun" <<
-				//  "<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-				"(" << t.index << ")";
-		}
-
-
-		// ---------------- Build ------------------
-		template <typename Functor>
-		struct Build
-		{
-			typedef typename std::invoke_result<Functor, int>::type L;
-
-			typedef typename L::To LTo;
-
-			typedef typename L::From From;
-			typedef vec<LTo> To;
-
-			int n;
-			Functor/*std::function<L(int)>*/ f;
-
-			template <class Functor2>
-			static Build mk(int n, Functor2 f) {
-				KS_ASSERT(n != 0);
-				return Build{ n, f };
-			}
-
-			To Apply(allocator * alloc, From x) const
-			{
-				Functor/*std::function<L(int)>*/ f1 = f;
-				return build<LTo>(alloc, n, [x, f1](allocator * alloc, int i) {
-					auto lm = f1(i);
-					return lmApply(alloc, lm, x);
-				});
-			}
-		};
-
-		template <class L>
-		std::ostream &operator<<(std::ostream &s, Build<L> const &t)
-		{
-			return s << "Build" <<
-				"<" << type_to_string<typename Build<L>::To>::name() << ">" <<
-				"(" << t.n << ", <ftype>)";
-		}
-
-		// ---------------- BuildT ------------------
-		template <typename Functor>
-		struct BuildT
-		{
-			typedef typename std::invoke_result<Functor, int>::type L;
-
-			typedef typename L::From LFrom;
-
-			typedef vec<typename L::From> From;
-			typedef typename L::To To;
-
-			int n;
-			Functor /*std::function<L(int)>*/ f;
-
-			BuildT() : n{ 0 }
-			{
-				ENTER; //  std::cerr << std::string(3 + indent++, '.') << "[build() " << this << "]\n";
-			}
-
-			BuildT(const BuildT& that) :
-				n(that.n),
-				f(that.f)
-			{
-				ENTER;
-			}
-
-			BuildT& operator=(const BuildT& that)
-			{
-				n = that.n;
-				f = that.f;
-				return *this;
-			}
-
-			template <class Functor2>
-			BuildT(int n, Functor2 f) :
-				n(n),
-				f(f)
-			{
-				ENTER;
-				//std::cerr << std::string(3+indent++, '.') << "[build " << this << "]\n";
-			}
-
-			~BuildT()
-			{
-				LEAVE;
-				//std::cerr << std::string(3+ --indent, '.') << "[~build " << this << "]\n";
-			}
-
-			template <class Functor2>
-			static BuildT mk(int n, Functor2 f) { return BuildT{ n, f }; }
-
-			To Apply(allocator * alloc, From x) const
-			{
-				if (n != x.size())
-					std::cerr << "BuildT:" << n << " != " << x.size() << std::endl;
-				ASSERT(n == x.size());        // TODO: copying arrays here -- should not need to..
-				std::function<L(int)> f_local = f;  // TODO: use sumbuild
-				return sumbuild<LFrom>(alloc, n, [f_local,x](allocator * alloc, int i) { return lmApply(alloc, f_local(i), x[i]); });
-			}
-		};
-
-		template <class L>
-		std::ostream &operator<<(std::ostream &s, BuildT<L> const &t)
-		{
-			return s << "BuildT" <<
-				"<" << type_to_string<typename BuildT<L>::To>::name() << ">" <<
-				"(" << t.n << ", <ftype>)";
-		}
-
-		// ---------------- Variant ------------------
-		template <class L1, class L2>
-		struct Variant
-		{
-			std::variant<L1, L2> v;
-
-			typedef typename L1::From From;
-			typedef typename L1::To To;
-
-			static_assert(std::is_same<typename L1::From, typename L2::From>::value, "To1==To2");
-			static_assert(std::is_same<typename L1::To, typename L2::To>::value, "To1==To2");
-
-			//TODO
-			//Variant& operator=(const L1& l1) { v = l1; return *this; }
-			//Variant& operator=(const L2& l2) { v = l2; return *this; }
-
-			To Apply(allocator * alloc, From f) const {
-				if (v.index() == 0) return std::get<0>(v).Apply(alloc, f);
-				if (v.index() == 1) return std::get<1>(v).Apply(alloc, f);
-				throw std::string("Bad Variant");
-			}
-		};
-
-		template <size_t n, class T, class... Ts>
-		struct variant_print {
-			static std::ostream& go(std::ostream &s, std::variant<T, Ts...> const & v)
-			{
-				if (v.index() == n - 1)
-					s << (n - 1) << ":" << std::get<n - 1>(v);
-				return variant_print<n - 1, T, Ts...>::go(s, v);
-			}
-		};
-
-		template <class T, class... Ts>
-		struct variant_print<0, T, Ts...> {
-			static std::ostream& go(std::ostream &s, std::variant<T, Ts...> const & v)
-			{
-				return s;
-			}
-		};
-
-		template <class T, class... Ts>
-		std::ostream &operator<<(std::ostream &s, std::variant<T, Ts...> const & v)
-		{
-			constexpr size_t n = std::variant_size<std::variant<T, Ts...>>::value;
-			return variant_print<n, T, Ts...>::go(s, v);
-		}
-
-		template <class T1, class T2>
-		std::ostream &operator<<(std::ostream &s, Variant<T1, T2> const &t)
-		{
-			return s << "Variant" <<
-				//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
-				"{" << t.v << "}";
-		}
-
-		// ---------------- lmApply ------------------
-		template <class LM>
-		typename LM::To lmApply(allocator * alloc, LM lm, typename LM::From a) {
-			return typename LM::To{ lm.Apply(alloc, a) };
-		}
-
-	} // namespace LM
-
-	DECLARE_TYPE_TO_STRING(LM::One, T);
-	DECLARE_TYPE_TO_STRING2(LM::Zero, From, To);
-	DECLARE_TYPE_TO_STRING(LM::Build, L);
-	DECLARE_TYPE_TO_STRING(LM::BuildT, L);
-	DECLARE_TYPE_TO_STRING_Pack(LM::HCat);
-	DECLARE_TYPE_TO_STRING_Pack(LM::VCat);
-	DECLARE_TYPE_TO_STRING2(LM::VCat, From, To);
-	DECLARE_TYPE_TO_STRING2(LM::Compose, From, To);
-	DECLARE_TYPE_TO_STRING2(LM::Variant, From, To);
-	DECLARE_TYPE_TO_STRING2(LM::Add, From, To);
-
 	// ===============================  Primitives  ==================================
+
+	tuple<> shape(allocator *, bool const&) { return {}; }
+	tuple<> shape(allocator *, int const&) { return {}; }
+	tuple<> shape(allocator *, double const&) { return {}; }
+	tuple<> shape(allocator *, std::string const&) { return {}; }
+
+	template<class T>
+	auto shape(allocator * alloc, vec<T> const& v) {
+		vec<decltype(shape(alloc, v[0]))> s(alloc, v.size());
+		for (int ii = 0; ii != v.size(); ++ii) {
+			s[ii] = shape(alloc, v[ii]);
+		}
+		return s;
+	}
+
+	template<class TupleType, size_t... Indices>
+	auto shape_impl(allocator * alloc, TupleType const& t, std::index_sequence<Indices...>) {
+		return std::make_tuple(shape(alloc, std::get<Indices>(t))...);
+	}
+
+	template<class... Types>
+	auto shape(allocator * alloc, tuple<Types...> const& t) {
+		return shape_impl(alloc, t, std::index_sequence_for<Types...>{});
+	}
+
+	auto shape(allocator *) { return tuple<>{}; }
+
+	template<class T1, class T2, class... Ts>
+	auto shape(allocator * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
+		return std::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
+	}
+
 
 	template <class T>
 	T ts_scale(allocator *, double s, T const& t)
@@ -1341,12 +1118,6 @@ namespace ks
 		int ts_scale(allocator *, int const& t1, int const& t2)
 	{
 		return t1 * t2;
-	}
-
-	template <class T1, class T2>
-	auto D$ts_scale(T1 t1, T2 t2)
-	{
-		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(t2), LM::Scale::mk(t1));
 	}
 
 	template <class T>
@@ -1422,18 +1193,12 @@ namespace ks
 	}
 
 	inline double abs$af(allocator *, double d) { return d > 0 ? d : -d; }
-	inline auto D$abs$af(allocator *, double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
 
 	inline double max$aff(allocator *, double a, double b) { return a > b ? a : b; }
-	inline auto D$max$aff(allocator *, double a, double b) {
-		double s = a > b ? 1.0 : 0.0;
-		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(s), LM::Scale::mk(1.0 - s));
-	}
 
 	inline int ts_neg(allocator *, int d) { return -d; }
 
 	inline double ts_neg(allocator *, double d) { return -d; }
-	inline auto D$ts_neg(allocator *, double d) { return LM::Scale::mk(-1.0); }
 
         inline tuple<> ts_neg(allocator *, tuple<> d) { return d; }
 
@@ -1443,11 +1208,7 @@ namespace ks
         template <class T>
         inline vec<T> ts_neg(allocator * alloc, vec<T> v) { return build<T>(alloc, v.size(), [v](allocator * alloc, int i){ return ts_neg(alloc, v[i]); }); }
 
-	inline int to_size(int d) { return d; }
-	inline auto D$to_size(int d) { return LM::Zero<int, int>(); }
-
 	inline int to_integer(int d) { return d; }
-	inline auto D$to_integer(int d) { return LM::Zero<int, int>(); }
 
 	template<size_t I, typename TupleType>
 	auto unzip_element(allocator * alloc, vec<TupleType> const& v)
@@ -1469,24 +1230,6 @@ namespace ks
 	{
 		return unzip_impl(alloc, v, std::index_sequence_for<Types...>{});
 	}
-
-	/*
-		template <class I, class Vec>
-		using D_t$index = LM::HCat<LM::Zero<I, typename Vec::value_type>,
-								   LM::Build<std::function<LM::Scale(I)>>>;
-
-		template <class I, class Vec>
-		D_t$index<I, Vec>
-		D$index(I i, Vec const & v)
-		{
-			typedef typename Vec::value_type T;
-			auto di = LM::Zero<I, T>::mk();
-			auto delta = [i](I ii) { return LM::Scale<T,T,double>::mk(T{}, T{}, ii == i ? 1.0 : 0.0); };
-			auto df = LM::Build<std::function<LM::Scale<T,T,double>(I)>>::mk(delta);
-			return D_t$index<I, Vec>::mk(di, df);
-		}
-
-	*/
 
 	// ========================= Random primitives ============
         // ranhash functions from
@@ -1513,12 +1256,6 @@ namespace ks
 		return a;
 	}
 
-	template <class T>
-	LM::One<T> D$$trace(T const& a)
-	{
-		std::cout << "Grad Trace[" << a << "]" << std::endl;
-		return LM::One<T>::mk(a);
-	}
 
 	template <class T>
 	int print(T a)
@@ -1638,5 +1375,7 @@ namespace ks
 		return std::abs(d1 - d2)/(std::abs(d1) + std::abs(d2));
 	}
 } // namespace ks
+
+#include "knossos-lm.h"
 
 #include "knossos-prelude.h"

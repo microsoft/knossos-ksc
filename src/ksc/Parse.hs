@@ -42,10 +42,14 @@ x : Vec (Vec Float)
         |   lam <var> <expr>
         |   if <expr> <expr> <expr>
         |   tuple <expr>1 ... <expr>n      n >= 0
+        |   $dummy <type>
         |   <var> <exrp>1 ... <expr>n      calls, n >= 1
         |   <expr>
 
-<binds> ::= (<var> <expr>)
+<binds> ::= (<pat> <expr>)
+
+<pat> := <var>
+      | (<var>1 ... <var>n)
 
 An example
   (def f7 ((x : Vec Float) (y : Vec Float))
@@ -143,7 +147,7 @@ langDef = Tok.LanguageDef
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
-                          , "let", "if", "assert", "call", "tuple", ":"
+                          , "let", "if", "assert", "call", "tuple", ":", "$dummy"
                           , "Integer", "Float", "Vec", "Lam", "String", "true", "false"
                           ]
   , Tok.reservedOpNames = []
@@ -218,6 +222,7 @@ pKExpr =   pIfThenElse
        <|> pAssert
        <|> pCall
        <|> pTuple
+       <|> pDummy
 
 pType :: Parser TypeX
 pType = (pReserved "Integer" >> return TypeInteger)
@@ -265,6 +270,12 @@ pTuple = do { pReserved "tuple"
             ; es <- many pExpr
             ; return $ Tuple es }
 
+pDummy :: Parser (ExprX Parsed)
+-- (assert e1 e2)
+pDummy = do { pReserved "$dummy"
+            ; ty <- pType
+            ; return $ Dummy ty }
+
 pLam :: Parser (ExprX Parsed)
 -- (lam i e)
 pLam = do { pReserved "lam"
@@ -272,17 +283,27 @@ pLam = do { pReserved "lam"
           ; e <- pExpr
           ; return $ Lam bndr e }
 
-pBind :: Parser (Var, ExprX Parsed)
--- var rhs
-pBind = do { v <- pIdentifier
+pPat :: Parser (PatG Var)
+-- var or (var1 ... varn)
+pPat =     (VarPat <$> pVar)
+       <|> (TupPat <$> parens pTuplePat)
+
+pTuplePat :: Parser [Var]
+-- var1 ... varn
+pTuplePat = do { es <- many pIdentifier
+               ; return $ map Simple es }
+
+pBind :: Parser (PatG Var, ExprX Parsed)
+-- var rhs or (var1 ... varn) rhs
+pBind = do { pat <- pPat
            ; e <- pExpr
-          ; return (Simple v, e) }
+           ; return (pat, e) }
 
 pLet :: Parser (ExprX Parsed)
 -- (let (x r) b)
 pLet = do { pReserved "let"
-          ; pairs <- parens $ do { b <- pBind
-                                 ; return [b] }
+          ; pairs <- parens $ (try $ do { b <- pBind
+                                        ; return [b] })
                           <|> many (parens pBind)
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }

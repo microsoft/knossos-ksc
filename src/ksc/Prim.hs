@@ -67,6 +67,7 @@ mk_fun f = case find_dollar f of
              Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
              Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
              Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
+             Just ("shape", s) -> ShapeFun (mk_fun s)
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
@@ -126,7 +127,7 @@ getZero tangent_type e
 mkAtomicNoFVs :: TExpr -> (TExpr -> TExpr) -> TExpr
 mkAtomicNoFVs e body
   | isTrivial e = body e
-  | otherwise   = Let ev e (body (Var ev))
+  | otherwise   = mkLet ev e (body (Var ev))
   where
     ev = TVar (typeof e) argVar
 
@@ -356,6 +357,9 @@ pSumBuild = mkPrimCall2 "sumbuild"
 pUnzip :: TExpr -> TExpr
 pUnzip = mkPrimCall1 "unzip"
 
+pShape :: TExpr -> TExpr
+pShape = mkPrimCall1 "shape"
+
 pSize :: TExpr -> TExpr
 pSize e = mkPrimCall1 "size" e
 
@@ -409,6 +413,11 @@ primCallResultTy_maybe fun arg_ty
         -> Right (tangentType s)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
+      
+      ShapeFun f
+        -> case primCallResultTy_maybe f arg_ty of
+            Left err -> Left err
+            Right res_ty -> Right (shapeType res_ty)
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
@@ -509,6 +518,11 @@ primFunCallResultTy_maybe fun args
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , t)                                     -> Just t
 
+      -- ($copydown e) requests a copydown of the result of e, in order to reduce memory
+      -- usage as far as possible. (In particular, this should reclaim any memory allocated
+      -- for temporary variables during the evaluation of e.)
+      ("$copydown", t)                                     -> Just t
+
       -- ($check f rev$f s s' ds dt) verifies the derivatives rev$f at s in directions ds,dt.
       -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
       -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s))
@@ -542,6 +556,7 @@ primFunCallResultTy_maybe fun args
       ("sumbuild" , TypeTuple
                      [TypeInteger, TypeLam TypeInteger t]) -> Just t
       ("index"    , TypeTuple [TypeInteger, TypeVec t])    -> Just t
+      ("shape"    , t)                                     -> Just (shapeType t)
       ("size"     , TypeVec _)                             -> Just TypeSize
       ("sum"      , TypeVec t)                             -> Just t
 
@@ -566,6 +581,7 @@ primFunCallResultTy_maybe fun args
 
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args
+                       , "$copydown"-- ($copydown e)              Requests copydown of e
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
                        , "$trace"   -- ($trace f args)            Print and return (f args)
                        , "print"    -- (print "msg" 3)            Print "msg3"
@@ -573,6 +589,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
+                       , "shape"
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors

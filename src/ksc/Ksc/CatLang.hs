@@ -119,8 +119,10 @@ toCLDef_maybe  (Def { def_fun    = fun
 
 data EnvPruned = Pruned | NotPruned
 
+-- CatLang doesn't support tuple patterns in lets yet, but it could
+-- and if we do anything serious with CatLang then it *should*.
 toCLExpr :: [TVar] -> TExpr -> CLExpr
-toCLExpr = to_cl_expr NotPruned
+toCLExpr env = to_cl_expr NotPruned env . oneArgifyExpr (mkInScopeSet env)
 
 to_cl_expr :: EnvPruned -> [TVar] -> TExpr -> CLExpr
 
@@ -138,8 +140,10 @@ to_cl_expr pruned env (Assert _ e) = to_cl_expr pruned env e
 
 to_cl_expr Pruned env (If e1 e2 e3)
   = CLIf (toCLExpr env e1) (toCLExpr env e2) (toCLExpr env e3)
-to_cl_expr Pruned env (Let tv rhs body)
+to_cl_expr Pruned env (Let (VarPat tv) rhs body)
   = CLLet tv (toCLExpr env rhs) (toCLExpr (tv:env) body)
+
+to_cl_expr Pruned _ e@(Let (TupPat _) _ _) = pprPanic "toCLExpr Let TupPat" (ppr e)
 
 to_cl_expr _ _ e@(Lam {})    =  pprPanic "toCLExpr Lam" (ppr e)
 to_cl_expr _ _ e@(App {})    =  pprPanic "toCLExpr App" (ppr e)
@@ -178,6 +182,8 @@ to_cl_call pruned env f e
   = pprPanic "toCLExpr Call of GradFun" (ppr call)
   | TFun _ (DrvFun _ _) <- f
   = pprPanic "toCLExpr Call of DrvFun" (ppr call)
+  | TFun _ (ShapeFun _) <- f
+  = pprPanic "toCLExpr Call of ShapeFun" (ppr call)
   where
     call = Call f e
 
@@ -257,7 +263,7 @@ fromCLExpr is arg (CLComp e1 e2)
     fromCLExpr is [v2] e1
 
 fromCLExpr is arg (CLLet tv rhs body)
-  = Let tv' rhs' (fromCLExpr is' (Var tv' : arg) body)
+  = mkLet tv' rhs' (fromCLExpr is' (Var tv' : arg) body)
   where
     rhs'      = fromCLExpr is arg rhs
     (is', tv') = notInScopeTV is tv
@@ -291,7 +297,7 @@ mkTempLet :: InScopeSet -> String -> TExpr
           -> (InScopeSet -> TExpr -> TExpr) -> TExpr
 mkTempLet is s e thing_inside
   | isTrivial e = thing_inside is e
-  | otherwise   = Let tv' e $
+  | otherwise   = mkLet tv' e $
                   thing_inside is' (Var tv')
   where
     (is', tv') = notInScopeTV is tv

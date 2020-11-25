@@ -85,9 +85,14 @@ match_e vsubst tsubst (Tuple es1) (Tuple es2)
 match_e vsubst tsubst (Lam v1 e1) (Lam v2 e2)
   = match_e (M.insert v1 v2 vsubst) tsubst e1 e2
 
-match_e vsubst tsubst (Let v1 e1 b1) (Let v2 e2 b2)
+match_e vsubst tsubst (Let (VarPat v1) e1 b1) (Let (VarPat v2) e2 b2)
   = do { tsubst1 <- match_e vsubst tsubst e1 e2
        ; match_e (M.insert v1 v2 vsubst) tsubst1 b1 b2 }
+
+match_e vsubst tsubst (Let (TupPat vs1) e1 b1) (Let (TupPat vs2) e2 b2)
+  | length vs1 == length vs2
+  = do { tsubst1 <- match_e vsubst tsubst e1 e2
+       ; match_e (M.fromList (zip vs1 vs2) `M.union` vsubst) tsubst1 b1 b2 }
 
 match_e _ _ _ _ = Nothing
 

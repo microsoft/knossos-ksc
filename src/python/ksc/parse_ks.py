@@ -171,12 +171,34 @@ def parse_tld(se):
 ################################################################
 import argparse
 import sys
+import re
 
 def s_exps_from_string(string_or_stream):
     return sexpdata.Parser(string_or_stream, nil=None, true="true", false="false", line_comment=";").parse()
 
-def parse_ks_file(string_or_stream):
-    for s_exp in s_exps_from_string(string_or_stream):
+def strip_block_comments(string):
+    # Strip block comments
+    regex = r"""\#\|               # hash bar
+                    (
+                        [^\|\#]     # (not bar or hash)  Do not be tempted to suffix with "+" - bad perf
+                    |               # or...
+                        (\|(?!\#))  # (bar not followed by hash)
+                    |               # or...
+                        (\#(?!\|))  # (hash not followed by bar)
+                    )*             # many times 
+                    \|\#           # bar hash
+                """
+    regex = re.compile(regex, flags=re.DOTALL | re.VERBOSE)
+    while True:
+        string, n = re.subn(regex, '', string)
+        if n == 0:
+            # print(f"Zapped {n} block comment(s)")
+            return string    
+
+def parse_ks_string(string_or_stream):
+    string = strip_block_comments(string_or_stream)
+
+    for s_exp in s_exps_from_string(string):
         try:
             yield parse_tld(s_exp)
             
@@ -184,16 +206,21 @@ def parse_ks_file(string_or_stream):
             print("ERROR at ", s_exp)
             print(sys.exc_info()[1])
 
+def parse_ks_file(string_or_stream):
+    return parse_ks_string(string_or_stream)
+
+def parse_ks_filename(filename):
+    with open(filename) as f:
+        ks_str = f.read()
+        return parse_ks_file(ks_str)
+
 def main():
-    parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
-    parser.add_argument("input_ks_file", type=str)
+    parser = argparse.ArgumentParser(prog="parse_ks.py", description=__doc__)
+    parser.add_argument("input_ks_file", nargs='?', type=str, default="test/ksc/syntax-primer.ks")
     args = parser.parse_args()
 
-    with open(args.input_ks_file) as f:
-        ks_str = f.read()
-        print(ks_str)
-        print("--------------->")
-        [print(pystr(x, 0), "\n") for x in parse_ks_file(ks_str)]
+    for x in parse_ks_filename(args.input_ks_file):
+        print(pystr(x, 0))
 
 if __name__ == "__main__":
     sys.exit(main())

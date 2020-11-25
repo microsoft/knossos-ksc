@@ -28,7 +28,7 @@ data CType =  CType Type
             | CTuple [CType]
             | CFunction CType CType
             | TypeDef String CType
-            | UseTypeDef String
+            | UseTypeDef String Type  -- See Note [Function return types]
             | LMZero Type Type
             | LMOne Type
             | LMScale Type
@@ -40,22 +40,18 @@ data CType =  CType Type
             | LMVariant [CType]
             deriving (Eq, Ord, Show)
 
-isScalar :: CType -> Bool
-isScalar = \case
-  CType  t      -> Lang.isScalar t
-  CTuple ts     -> all Cgen.isScalar ts
-  CFunction _ _ -> False
-  TypeDef   _ t -> Cgen.isScalar t
-  UseTypeDef _  -> False
-  LMZero _ _    -> False
-  LMOne _       -> False
-  LMScale  _    -> False
-  LMHCat   _    -> False
-  LMVCat   _    -> False
-  LMBuild  _    -> False
-  LMCompose _ _ -> False
-  LMAdd     _   -> False
-  LMVariant _   -> False
+{- Note [Function return types]
+
+A CType of (UseTypeDef name type) represents the return type of a def.
+The "type" argument is the return type as declared in the ks file.
+The C++ return type (for which "name" is a typedef) will only be known
+once code has been generated for the function.
+
+But even though a given ks type may be implemented by more than one
+possible C++ type, we can still use the ks type for determining whether
+the return value might refer to allocated memory:
+see Note [Allocator usage of types].
+-}
 
 mkCType :: Type -> CType
 mkCType (TypeTuple ts) = CTuple $ map mkCType ts
@@ -79,11 +75,11 @@ cgenIsLM = \case
   CTuple ts           -> any cgenIsLM ts
   CFunction _ _       -> False
   TypeDef   _ ty      -> cgenIsLM ty
-  UseTypeDef s        -> error ("Don't know; it's a UseTypeDef: " ++ s)
+  UseTypeDef s _      -> error ("Don't know; it's a UseTypeDef: " ++ s)
   _                   -> True
 
 isUseTypeDef :: CType -> Bool
-isUseTypeDef (UseTypeDef _) = True
+isUseTypeDef (UseTypeDef _ _) = True
 isUseTypeDef _ = False
 
 makeUnionType :: HasCallStack => CType -> CType -> CType
@@ -153,6 +149,58 @@ combineUsage _ UsesAllocator = UsesAllocator
 combineUsage DoesNotUseAllocator DoesNotUseAllocator = DoesNotUseAllocator
 combineUsage _ _ = UsesAndResetsAllocator
 
+{- Note [Allocator usage of types]
+
+The function allocatorUsageOfCType describes whether
+a value of a given type may refer to allocated memory.
+Or, equivalently, it describes whether making a (deep)
+copy of a value requires an allocator.
+
+Note that this ought to a property of the C++ type, not
+the ks type: in general a Type may be implemented by more
+than one possible CType. But currently we have
+
+  allocatorUsageOfType ty == allocatorUsageOfCType cty
+
+whenever cty implements the ks type ty. In future we
+might want to allow these to differ, so that a ks type
+which normally uses an allocator can be implemented
+by a C++ type which does not require allocation.
+However it should still always be the case that
+
+  allocatorUsageOfType ty == DoesNotUseAllocator
+    => allocatorUsageOfCType cty == DoesNotUseAllocator
+-}
+
+allocatorUsageOfType :: Type -> AllocatorUsage
+allocatorUsageOfType = \case
+  TypeBool      -> DoesNotUseAllocator
+  TypeInteger   -> DoesNotUseAllocator
+  TypeFloat     -> DoesNotUseAllocator
+  TypeString    -> DoesNotUseAllocator
+  TypeTuple ts  -> foldMap allocatorUsageOfType ts
+  TypeVec    {} -> UsesAllocator
+  TypeLam {}    -> UsesAllocator
+  TypeLM     {} -> UsesAllocator
+  TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
+
+allocatorUsageOfCType :: CType -> AllocatorUsage
+allocatorUsageOfCType = \case
+  CType  t       -> allocatorUsageOfType t
+  CTuple ts      -> foldMap allocatorUsageOfCType ts
+  CFunction _ _  -> UsesAllocator
+  TypeDef   _ t  -> allocatorUsageOfCType t
+  UseTypeDef _ t -> allocatorUsageOfType t
+  LMZero _ _     -> UsesAllocator
+  LMOne _        -> UsesAllocator
+  LMScale  _     -> UsesAllocator
+  LMHCat   _     -> UsesAllocator
+  LMVCat   _     -> UsesAllocator
+  LMBuild  _     -> UsesAllocator
+  LMCompose _ _  -> UsesAllocator
+  LMAdd     _    -> UsesAllocator
+  LMVariant _    -> UsesAllocator
+
 -- CGenResult is (C declarations, C expression, CType)
 -- e.g. (["double r; if (b) { r = 1; } else { r = 2; };"],
 --       "r",
@@ -179,9 +227,9 @@ getAllocatorUsage :: CGenResult -> AllocatorUsage
 getAllocatorUsage (CG _ _ _ au) = au
 
 type CSTKey = (Fun, Type)
-type CST    = Map.Map CSTKey ()
+type CST    = Map.Map CSTKey Type
 
-cstMaybeLookupFun :: HasCallStack => CSTKey -> CST -> Maybe ()
+cstMaybeLookupFun :: HasCallStack => CSTKey -> CST -> Maybe Type
 cstMaybeLookupFun = Map.lookup
 
 cComment :: String -> String
@@ -192,9 +240,6 @@ markAllocator bumpmark allocVar = "ks::alloc_mark_t " ++ bumpmark ++ " = " ++ al
 
 resetAllocator :: String -> String -> String
 resetAllocator bumpmark allocVar = allocVar ++ "->reset(" ++ bumpmark ++ ");"
-
-declareMark :: String -> String
-declareMark bumpmark = "ks::alloc_mark_t " ++ bumpmark ++ ";"
 
 moveMark :: String -> String -> String
 moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
@@ -214,10 +259,11 @@ cgenDefs defs = concatMap cdecl $
  where
   env = Map.fromList (mapMaybe (\(Def { def_fun = f
                                       , def_rhs = rhs
+                                      , def_res_ty = res_ty
                                       , def_pat = arg
                                       }) ->
                                   case rhs of
-                                    UserRhs _ -> Just ((f, typeof arg), ())
+                                    UserRhs _ -> Just ((f, typeof arg), res_ty)
                                     _         -> Nothing) defs)
 
   cdecl def = cgenDefE env def ++ [ "" ]
@@ -261,7 +307,7 @@ params_withPackedParams param = case typeof param of
     let params  = zipWith mkParam [1..] tys
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
-        packParams = Let param (Tuple (map Var params))
+        packParams = mkLet param (Tuple (map Var params))
     in (params, ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 
@@ -298,7 +344,7 @@ cgenExprR env e = do
 
 cgenWrapWithMarkReset :: HasCallStack => CGenResult -> M CGenResult
 cgenWrapWithMarkReset (CG decl expr ty UsesAllocator)
-  | Cgen.isScalar ty = do
+  | DoesNotUseAllocator <- allocatorUsageOfCType ty = do
       bumpmark <- freshCVar
       return $ CG
         (  [ markAllocator bumpmark allocatorParameterName ]
@@ -355,6 +401,11 @@ cgenExprWithoutResettingAlloc env = \case
     ret  <- freshCVar
     bumpmark <- freshCVar
 
+    -- The allocator usage will be at least UsesAndResetsAllocator
+    -- here, because our implementation marks/resets the allocator
+    -- even when the result type is a scalar.
+    let allocusage = allocatorUsageOfCType (mkCType ty) <> UsesAndResetsAllocator
+
     return $ CG
         (  [ cComment "sumbuild" ]
         ++ szdecl
@@ -362,16 +413,18 @@ cgenExprWithoutResettingAlloc env = \case
               cretty ++ " " ++ ret ++ ";",
               "{" ]
         ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;",
-                       declareMark bumpmark,
+                       markAllocator bumpmark allocatorParameterName,
                        "do {" ]
                   ++ indent (  bodydecl
-                            -- First time round, deep copy it, put it in the ret, then mark the allocator
+                               -- Make a deep copy on the first iteration, using a copydown to
+                               -- reclaim other memory allocated in that iteration.
+                               -- Subsequent iterations can then accumulate into this copy.
                             ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
-                            ++ indent [ ret ++ " = inflated_deep_copy(" ++ allocatorParameterName ++ ", " ++ bodyex ++ ");",
+                            ++ indent [ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ bodyex ++ ");",
                                         moveMark bumpmark allocatorParameterName ]
                             ++ [ "} else {" ]
                             ++ indent [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");",
-                                      -- Release the allocator back to where it was on iter 0
+                                      -- Release the allocator back to where it was after iter 0
                                         resetAllocator bumpmark allocatorParameterName ]
                             ++ [ "}" ]
                             )
@@ -381,7 +434,23 @@ cgenExprWithoutResettingAlloc env = \case
         )
         ret
         (mkCType ty)
-        (if Cgen.isScalar (mkCType ty) then UsesAndResetsAllocator else UsesAllocator)
+        allocusage
+
+  -- Special case for copydown. Mark the allocator before evaluating the
+  -- expression, then copydown the result to the marked position.
+  Call (TFun _ (Fun (PrimFun "$copydown"))) e -> do
+    CG cdecl cexpr ctype _callocusage <- cgenExprR env e
+    ret <- freshCVar
+    bumpmark <- freshCVar
+    return $ CG
+        (  [ cComment "Explicitly-requested copydown",
+             markAllocator bumpmark allocatorParameterName ]
+        ++ cdecl
+        ++ [ cgenType ctype ++ " " ++ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ cexpr ++ ");" ]
+        )
+        ret
+        ctype
+        (allocatorUsageOfCType ctype <> UsesAndResetsAllocator)
 
   -- Special case for literal tuples.  Don't unpack with std::get.
   -- Just use the tuple components as the arguments.  See Note [Unpack
@@ -441,16 +510,25 @@ cgenExprWithoutResettingAlloc env = \case
       cftype
       (funAllocatorUsage tf cftype <> callocusage)
 
-  Let (TVar _ v) e1 body -> do
+  Let pat e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
     lvar                       <- freshCVar
+
+    let cgenType_ = case pat of
+          VarPat _ -> cgenType type1
+          TupPat _ -> "auto"
+        cgenBinder = case pat of
+          VarPat v -> cgenVar (tVarVar v)
+          TupPat vs -> "["
+                       ++ intercalate ", " (map (cgenVar . tVarVar) vs)
+                       ++ "]"
 
     return $ CG
       (  [ cComment "Let" ++ cgenType tybody ++ " " ++ lvar ++ ";",
            "{" ]
       ++ decle1
-      ++ [ cgenType type1 ++ " " ++ cgenVar v ++ " = " ++ ve1 ++ ";" ]
+      ++ [ cgenType_ ++ " " ++ cgenBinder ++ " = " ++ ve1 ++ ";" ]
       ++ declbody
       ++ [ lvar ++ " = " ++ vbody ++ ";",
            "}" ]
@@ -584,6 +662,7 @@ cgenUserFun (f, ty) = case f of
   DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenFunId (s, ty)
   DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId (s, ty)
   DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId (s, ty)
+  ShapeFun ff   -> "shape$" ++ cgenUserFun (ff, ty)
 
 cgenAnyFun :: HasCallStack => (TFun, Type) -> CType -> String
 cgenAnyFun (tf, ty) cftype = case tf of
@@ -598,17 +677,43 @@ cgenAnyFun (tf, ty) cftype = case tf of
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun (f, ty)
 
+{- Note [Allocator usage of function calls]
+
+Every function takes an allocator as its first argument, with the
+exception of a few special primitive functions.
+
+The caller of a function does not know whether the allocator
+argument will actually be used inside the function. But we can
+make some assumptions based on the function return type. There
+are two cases:
+
+ 1. If the return value may refer to allocated memory
+    (allocatorUsageOfCType returns UsesAllocator):
+    In this case we have to assume that the allocator will
+    be used by the function.
+
+ 2. If the return value cannot refer to allocated memory
+    (allocatorUsageOfCType returns DoesNotUseAllocator):
+    In this case our calling convention is that, if the
+    function does use the allocator, then it must reset
+    the allocator to its initial position before returning.
+    So in this case we know that the allocator usage of
+    the function is UsesAndResetsAllocator.
+    (Note: the usage can never be DoesNotUseAllocator because
+    the allocator argument is still passed to the function.)
+-}
+
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace"]
+  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace", "print"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
 funAllocatorUsage :: HasCallStack => TFun -> CType -> AllocatorUsage
 funAllocatorUsage tf ty
+  -- See Note [Allocator usage of function calls]
   | not $ funUsesAllocator tf = DoesNotUseAllocator
-  | Cgen.isScalar ty = UsesAndResetsAllocator
-  | otherwise = UsesAllocator
+  | otherwise = allocatorUsageOfCType ty <> UsesAndResetsAllocator
 
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
@@ -617,7 +722,7 @@ cgenType = \case
   CFunction s t ->
     "std::function<" ++ cgenType t ++ "(" ++ cgenType s ++ ")>"
   TypeDef s _     -> s
-  UseTypeDef s    -> s
+  UseTypeDef s _  -> s
   LMZero s t      -> lmt "Zero" [s, t]
   LMOne t         -> lmt "One" [t]
   LMScale t       -> lmt "Scale" [t]
@@ -647,8 +752,8 @@ cgenTypeLang = \case
 
 ctypeofFun :: HasCallStack => CST -> (TFun, Type) -> [CType] -> CType
 ctypeofFun env (TFun ty f, argty) ctys = case cstMaybeLookupFun (f, argty) env of
-  Just _ -> -- trace ("Found fun " ++ show f) $
-    UseTypeDef ("ty$" ++ cgenUserFun (f, argty))
+  Just ret_ty -> -- trace ("Found fun " ++ show f) $
+    UseTypeDef ("ty$" ++ cgenUserFun (f, argty)) ret_ty
   Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
 
@@ -689,10 +794,11 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "ts_add"  , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun "$trace"  , [CType ty]          ) -> LMOne ty
-  (PrimFun "size"    , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"   , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun "ts_add"   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty
+  (PrimFun "$copydown", [CType ty]          ) -> LMOne ty
+  (PrimFun "size"     , [CType ty]          ) -> LMZero ty TypeInteger
+  (PrimFun "index"    , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
@@ -718,8 +824,8 @@ createDirectoryWriteFile filepath contents = do
   makeDirectoryForFile filepath
   writeFile filepath contents
 
-cppGenWithFiles :: String -> String -> [TDef] -> IO ()
-cppGenWithFiles ksofile cppfile defs = do
+cppGen :: [TDef] -> String
+cppGen defs =
   let lines =
         [
         "#include \"knossos.h\"",
@@ -744,11 +850,23 @@ cppGenWithFiles ksofile cppfile defs = do
         , "}"
         ]
 
+  in unlines (lines ++ lls ++ tail)
+
+ksoGen :: [TDef] -> String
+ksoGen = unlines . map (renderSexp . ppr)
+
+cppGenWithFiles :: String -> String -> [TDef] -> IO (String, String)
+cppGenWithFiles ksofile cppfile defs = do
+  let cppcontents = cppGen defs
+      ksocontents = ksoGen defs
+
   putStrLn $ "Writing to " ++ ksofile
-  createDirectoryWriteFile ksofile (unlines (map (renderSexp . ppr) defs))
+  createDirectoryWriteFile ksofile ksocontents
 
   putStrLn $ "Writing to " ++ cppfile
-  createDirectoryWriteFile cppfile (unlines (lines ++ lls ++ tail))
+  createDirectoryWriteFile cppfile cppcontents
+
+  pure (cppcontents, ksocontents)
 
 compile :: String -> String -> String -> IO String
 compile = compileWithOpts []
