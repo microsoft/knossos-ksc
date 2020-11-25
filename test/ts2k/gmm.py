@@ -78,8 +78,6 @@ def constructL(d: int, icf):
 
     # torch.jit.frontend.UnsupportedNodeError: function definitions aren't supported:
 
-    print("d" + str(d))
-
     # def make_L_col(i):
     #     nelems = d - i - 1
     #     col = torch.cat([
