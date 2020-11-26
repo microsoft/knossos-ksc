@@ -54,24 +54,27 @@ def log_wishart_prior(p: int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
 
     return out - k * (C - log_gamma_distrib(0.5 * n, p))
 
+@torch.jit.script
+def tri(n:int):
+    return int(n * (n - 1) /2)
 
 @torch.jit.script
-def make_L_col_lifted(d: int, icf, constructL_Lparamidx: int, i: int):
+def make_L_col_lifted(d: int, icf, i: int):
+    
     nelems = d - i - 1
+    Lparamidx = d + tri(i+1)
+
     col = torch.cat(
         [
             torch.zeros(i + 1, dtype=torch.float64),
-            icf[constructL_Lparamidx : (constructL_Lparamidx + nelems)],
+            icf[Lparamidx : (Lparamidx + nelems)],
         ]
     )
-
-    constructL_Lparamidx += nelems
-    return (constructL_Lparamidx, col)
+    
+    return col
 
 @torch.jit.script
 def constructL(d: int, icf):
-    # constructL.Lparamidx = d
-    constructL_Lparamidx = d
 
     # torch.jit.frontend.UnsupportedNodeError: function definitions aren't supported:
 
@@ -89,11 +92,10 @@ def constructL(d: int, icf):
 
     columns = []
     for i in range(0, d):
-        constructL_Lparamidx_update, col = make_L_col_lifted(
-            d, icf, constructL_Lparamidx, i
+        col = make_L_col_lifted(
+            d, icf, i
         )
         columns.append(col)
-        constructL_Lparamidx = constructL_Lparamidx_update
 
     return torch.stack(columns, -1)
 
@@ -104,33 +106,11 @@ def Qtimesx(Qdiag, L, x):
     return Qdiag * x + f
 
 
-# @torch.jit.script
-def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
-    n = x.shape[0]
-    d = x.shape[1]
 
-    Qdiags = torch.exp(icf[:, :d])
-    sum_qs = torch.sum(icf[:, :d], 1)
-    Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
-
-    xcentered = torch.stack(tuple(x[i] - means for i in range(n)))
-    Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
-    sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
-    inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
-    lse = logsumexpvec(inner_term)
-    slse = torch.sum(lse)
-
-    CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
-    return (
-        CONSTANT
-        + slse
-        - n * logsumexp(alphas)
-        + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
-    )
 
 
 @torch.jit.script
-def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
+def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
     n = x.shape[0]
     d = x.shape[1]
 
@@ -158,32 +138,25 @@ def gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m):
         + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
     )
 
-print(gmm_objective2.graph)
+def gmm_objective_reference(alphas, means, icf, x, wishart_gamma, wishart_m):
+    n = x.shape[0]
+    d = x.shape[1]
 
-# extracted from adbench test
-alphas = torch.tensor(
-    [-0.6490, 1.1812, -0.7585], dtype=torch.float64, requires_grad=True
-)
-means = torch.tensor(
-    [[0.0923, 0.1863], [0.3456, 0.3968], [0.5388, 0.4192]],
-    dtype=torch.float64,
-    requires_grad=True,
-)
-icf = torch.tensor(
-    [[0.5864, -0.8519, 0.8003], [-1.5094, 0.8759, -0.2428], [0.1668, -1.9654, -1.2701]],
-    dtype=torch.float64,
-    requires_grad=True,
-)
-x = torch.tensor([[1.1752, 2.0292]], dtype=torch.float64)
-wishart_gamma = torch.tensor(1.0, dtype=torch.float64)
-wishart_m = torch.tensor(0.0, dtype=torch.float64)
+    Qdiags = torch.exp(icf[:, :d])
+    sum_qs = torch.sum(icf[:, :d], 1)
+    Ls = torch.stack([constructL(d, curr_icf) for curr_icf in icf])
 
-result = gmm_objective2(alphas, means, icf, x, wishart_gamma, wishart_m)
+    xcentered = torch.stack(tuple(x[i] - means for i in range(n)))
+    Lxcentered = Qtimesx(Qdiags, Ls, xcentered)
+    sqsum_Lxcentered = torch.sum(Lxcentered ** 2, 2)
+    inner_term = alphas + sum_qs - 0.5 * sqsum_Lxcentered
+    lse = logsumexpvec(inner_term)
+    slse = torch.sum(lse)
 
-print(result)
-
-print(means.grad)
-
-result.backward(retain_graph = True)
-
-print(means.grad)
+    CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
+    return (
+        CONSTANT
+        + slse
+        - n * logsumexp(alphas)
+        + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    )
