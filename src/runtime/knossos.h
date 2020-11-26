@@ -286,17 +286,17 @@ namespace ks
 		}
 	};
 
-	class mem_ref : public allocator_base
+	class allocator_ref : public allocator_base
 	{
 	public:
-		mem_ref(unsigned char * buf, size_t size) :
-			allocator_base(buf, size, size) // We don't need to track peak memory usage for mem_ref, so can set peak=size to minimize overhead.
+		allocator_ref(unsigned char * buf, size_t size) :
+			allocator_base(buf, size, size) // We don't need to track peak memory usage for allocator_ref, so can set peak=size to minimize overhead.
 		{ }
-	};
 
-	mem_ref allocateMemRef(allocator_base * alloc, size_t numBytes) {
-		return mem_ref((unsigned char*)alloc->allocate(numBytes), numBytes);
-	}
+		static allocator_ref create_from_allocation(allocator_base * alloc, size_t numBytes) {
+			return allocator_ref((unsigned char*)alloc->allocate(numBytes), numBytes);
+		}
+	};
 
 	// ===============================  Zero  ==================================
 	// This template to be overloaded when e.g. a vector of T needs to use val to discover a size
