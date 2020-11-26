@@ -68,6 +68,7 @@ mk_fun f = case find_dollar f of
              Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
              Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
              Just ("shape", s) -> ShapeFun (mk_fun s)
+             Just ("dps", s)  -> DpsFun  (mk_fun s)
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
@@ -419,7 +420,56 @@ primCallResultTy_maybe fun arg_ty
             Left err -> Left err
             Right res_ty -> Right (shapeType res_ty)
 
+      DpsFun f
+        -- see Note [Parameters of DPS functions]
+        | TypeTuple [TypeAllocator, arg2_ty] <- arg_ty
+        , Just undps_argty <- undpsArgType f arg2_ty
+        -> primCallResultTy_maybe f undps_argty
+
+        | otherwise
+        -> Left (text "Ill-typed call to:" <+> ppr fun)
+
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
+
+{- Note [Parameters of DPS functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A DPS function must have exactly two parameters. The first parameter is
+of type Allocator: this is the destination into which the result of
+the function should be written. The second parameter consists of all
+of the parameters of the corresponding non-DPS function (in the form
+of a tuple, unless the non-DPS function has exactly one parameter).
+
+There is a difficulty for functions which take a lambda parameter.
+In some cases (such as dps$build), the implementation should use DPS
+when calling the lambda; this means that the lambda itself has
+different parameters in the DPS version. But in other cases the
+implementation will not use DPS when calling the lambda
+(for example in dps$sumbuild -- in fact an ideal implemention of
+dps$sumbuild would use DPS for the first iteration only).
+
+Ideally a lambda would be implemented as a vtable-like object
+which provides access to both DPS and non-DPS implementations, as per
+https://github.com/microsoft/knossos-ksc/issues/406
+For the moment, we have to assume that any lambda has the correct
+parameters for the way that it will actually be used.
+The function undpsArgType translates from the DPS version to
+the non-DPS version.
+-}
+
+undpsArgType :: Fun -> Type -> Maybe Type
+undpsArgType f (TypeTuple ts) = fmap TypeTuple (traverse (undpsArgType f) ts)
+undpsArgType (Fun (PrimFun fname)) (TypeLam s t)
+  | TypeTuple [TypeAllocator, s'] <- s
+  , primFunUsesDpsLambda fname
+  = Just $ TypeLam s' t
+  | not (primFunUsesDpsLambda fname)
+  = Just $ TypeLam s t
+undpsArgType _ TypeLam{} = Nothing
+undpsArgType _ t = Just t
+
+primFunUsesDpsLambda :: PrimFun -> Bool
+primFunUsesDpsLambda "build" = True
+primFunUsesDpsLambda _ = False
 
 selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
 selCallResultTy_maybe i n (TypeTuple arg_tys)
@@ -577,6 +627,8 @@ primFunCallResultTy_maybe fun args
 
       ("delta"    , TypeTuple
                      [TypeInteger, TypeInteger, t])        -> Just t
+      ("$allocateAndEmplace", TypeTuple
+                  [TypeInteger, TypeLam TypeAllocator t])  -> Just t
       _ -> Nothing
 
 isPrimFun :: String -> Bool
@@ -600,4 +652,5 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale"
                        , "lmZero", "lmOne"
+                       , "$allocateAndEmplace"
                        ]

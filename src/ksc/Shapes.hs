@@ -17,6 +17,9 @@ shapeDef :: HasCallStack => TDef -> Maybe TDef
 shapeDef (Def { def_fun = ShapeFun _ })
   = Nothing
 
+shapeDef (Def { def_fun = DpsFun _ })
+  = Nothing
+
 shapeDef (Def { def_fun = f
               , def_pat = VarPat params
               , def_rhs = UserRhs def_rhs

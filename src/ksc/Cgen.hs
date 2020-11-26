@@ -182,6 +182,7 @@ allocatorUsageOfType = \case
   TypeVec    {} -> UsesAllocator
   TypeLam {}    -> UsesAllocator
   TypeLM     {} -> UsesAllocator
+  TypeAllocator -> UsesAllocator
   TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
 
 allocatorUsageOfCType :: CType -> AllocatorUsage
@@ -390,6 +391,37 @@ cgenExprWithoutResettingAlloc env = \case
         (mkCType (TypeVec ty))
         UsesAllocator
 
+  Call (TFun (TypeVec ty) (DpsFun (Fun (PrimFun "build")))) (Tuple [dest, Tuple [sz, Lam (TVar (TypeTuple [TypeAllocator, vty]) var) body]]) -> do
+    CG destdecl destex _destty _destau <- cgenExprR env dest
+    CG szdecl szex _szty _szau <- cgenExprR env sz
+    let varty = mkCType vty
+    let varcty = cgenType varty
+    CG bodydecl bodyex _bodyty _bodyau <- cgenExprR env body
+
+    ret  <- freshCVar
+    cvar <- freshCVar
+
+    return $ CG
+        (  [ cComment "DPS build" ]
+        ++ destdecl
+        ++ szdecl
+        ++ [ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ destex ++ ", " ++ szex ++ ");",
+             "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
+                    ++ cvar ++ " < " ++ szex ++ ";"
+                    ++ " ++" ++ cvar ++ ") {" ]
+        ++ indent (  [ "std::tuple<ks::allocator_ref *, " ++ varcty ++ "> " ++ cgenVar var ++ "(" ++ destex ++ ", " ++ cvar ++ ");" ]
+                  ++ bodydecl
+                  ++ [ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";" ]
+                  )
+        ++ [ "}" ]
+        )
+        ret
+        (mkCType (TypeVec ty))
+        UsesAllocator
+
+  Call (TFun _ (DpsFun (Fun (PrimFun "build")))) _ -> do
+    error "Unexpected pattern for dps$build"
+
   -- Special case for sumbuild -- inline the loop
   Call (TFun ty (Fun (PrimFun "sumbuild"))) (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
     CG szdecl szex _szty _szau <- cgenExprR env sz
@@ -451,6 +483,27 @@ cgenExprWithoutResettingAlloc env = \case
         ret
         ctype
         (allocatorUsageOfCType ctype <> UsesAndResetsAllocator)
+  
+  -- Special case for $allocateAndEmplace -- inline the lambda body.
+  Call (TFun _ (Fun (PrimFun "$allocateAndEmplace"))) (Tuple [bytes, Lam (TVar TypeAllocator var@(Simple _)) body]) -> do
+    CG bytesdecl bytesexpr _bytesty _bytesau <- cgenExprR env bytes
+    CG bodydecl bodyexpr bodyty _bodyau <- cgenExprR env body
+    ret <- freshCVar
+    allocvar <- freshCVar
+    return $ CG
+        (  [ cComment "$allocateAndEmplace",
+             cgenType bodyty ++ " " ++ ret ++ ";",
+             "{" ]
+        ++ indent (  bytesdecl
+                  ++ [ "ks::allocator_ref " ++ allocvar ++ " = ks::allocator_ref::create_from_allocation(" ++ allocatorParameterName ++ ", " ++ bytesexpr ++ ");",
+                       "ks::allocator_ref * " ++ cgenVar var ++ " = &" ++ allocvar ++ ";" ]
+                  ++ bodydecl
+                  ++ [ ret ++ " = " ++ bodyexpr ++ ";" ] )
+        ++ [ "}" ]
+        )
+        ret
+        bodyty
+        UsesAllocator
 
   -- Special case for literal tuples.  Don't unpack with std::get.
   -- Just use the tuple components as the arguments.  See Note [Unpack
@@ -644,6 +697,7 @@ mangleType = \case
     TypeVec ty    -> "v" ++ mangleType ty
     TypeLam a b   -> "l<" ++ mangleType a ++ mangleType b ++ ">"
     TypeLM _ _    -> error "Can't mangle TypeLM"
+    TypeAllocator -> "a"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
 
 cgenFunId :: (FunId, Type) -> String
@@ -663,6 +717,7 @@ cgenUserFun (f, ty) = case f of
   DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId (s, ty)
   DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId (s, ty)
   ShapeFun ff   -> "shape$" ++ cgenUserFun (ff, ty)
+  DpsFun ff     -> "dps$" ++ cgenUserFun (ff, ty)
 
 cgenAnyFun :: HasCallStack => (TFun, Type) -> CType -> String
 cgenAnyFun (tf, ty) cftype = case tf of
@@ -748,7 +803,8 @@ cgenTypeLang = \case
   TypeUnknown   -> "void"
   TypeLam from to ->
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
-  TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
+  TypeLM s t    -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
+  TypeAllocator -> "ks::allocator_ref *"
 
 ctypeofFun :: HasCallStack => CST -> (TFun, Type) -> [CType] -> CType
 ctypeofFun env (TFun ty f, argty) ctys = case cstMaybeLookupFun (f, argty) env of

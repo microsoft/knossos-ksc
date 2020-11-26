@@ -195,6 +195,7 @@ data TypeX
   | TypeLam TypeX TypeX  -- Domain -> Range
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
 
+  | TypeAllocator
   | TypeUnknown
 
 deriving instance Eq  Type
@@ -263,6 +264,7 @@ shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
 shapeType (TypeVec vt) = TypeVec (shapeType vt)
 shapeType (TypeLam _ _) = TypeUnknown
 shapeType (TypeLM _ _) = TypeUnknown  -- TBD
+shapeType TypeAllocator = TypeUnknown
 shapeType TypeUnknown = TypeUnknown
 
 {- Note [Shapes]
@@ -328,6 +330,7 @@ data Fun = Fun      FunId         -- The function              f(x)
          | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
          | ShapeFun Fun
+         | DpsFun   Fun
          deriving( Eq, Ord, Show )
 
 isUserFun :: FunId -> Bool
@@ -348,6 +351,7 @@ funIdOfFun = \case
   GradFun f _ -> f
   DrvFun f _  -> f
   ShapeFun f  -> funIdOfFun f
+  DpsFun f    -> funIdOfFun f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -790,6 +794,7 @@ pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
 pprFun (ShapeFun f)              = text "shape$" <> ppr f
+pprFun (DpsFun f)                = text "dps$" <> ppr f
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -819,6 +824,7 @@ instance Pretty TypeX where
   pprPrec _ TypeSize          = text "Size"
   pprPrec _ TypeString        = text "String"
   pprPrec _ TypeBool          = text "Bool"
+  pprPrec _ TypeAllocator     = text "Allocator"
   pprPrec _ TypeUnknown       = text "UNKNOWN"
 
 pprParendType :: TypeX -> SDoc

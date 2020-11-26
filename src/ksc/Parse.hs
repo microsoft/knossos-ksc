@@ -229,6 +229,7 @@ pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
     <|> (pReserved "String"  >> return TypeString)
     <|> (pReserved "Bool"    >> return TypeBool)
+    <|> (pReserved "Allocator" >> return TypeAllocator)
     <|> parens pKType
 
 pTypes :: Parser [TypeX]
