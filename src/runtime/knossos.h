@@ -231,22 +231,20 @@ namespace ks
 	}
 
 	// ===============================  Allocator  ==================================
-	class allocator {
+	class allocator_base {
 		size_t max_size_;
 		unsigned char* buf_;
 		size_t top_;
 		size_t peak_;
 	
 	public:
-		allocator(size_t max_size) :
+		allocator_base(unsigned char * buf, size_t max_size, size_t peak = 0) :
 			max_size_(max_size),
-			buf_(new unsigned char[max_size]),
+			buf_(buf),
 			top_(0),
-			peak_(0)
+			peak_(peak)
 		{}
-		~allocator() {
-			delete[] buf_;
-		}
+
 		void* allocate(size_t size)
 		{
 			KS_ASSERT(size < 1000000);
@@ -276,6 +274,29 @@ namespace ks
 	};
 
 	typedef size_t alloc_mark_t;
+
+	class allocator : public allocator_base
+	{
+	public:
+		allocator(size_t max_size) :
+			allocator_base(new unsigned char[max_size], max_size)
+		{}
+		~allocator() {
+			delete[] static_cast<unsigned char*>(ptr_at(0));
+		}
+	};
+
+	class mem_ref : public allocator_base
+	{
+	public:
+		mem_ref(unsigned char * buf, size_t size) :
+			allocator_base(buf, size, size) // We don't need to track peak memory usage for mem_ref, so can set peak=size to minimize overhead.
+		{ }
+	};
+
+	mem_ref allocateMemRef(allocator_base * alloc, size_t numBytes) {
+		return mem_ref((unsigned char*)alloc->allocate(numBytes), numBytes);
+	}
 
 	// ===============================  Zero  ==================================
 	// This template to be overloaded when e.g. a vector of T needs to use val to discover a size
@@ -319,13 +340,13 @@ namespace ks
 	// ===============================  Inflated deep copy  ==================================
 
 	template <class T>
-	T inflated_deep_copy(allocator *, T z)
+	T inflated_deep_copy(allocator_base *, T z)
 	{
 		return z;
 	}
 
 	template <class T, class... Ts>
-	tuple<T, Ts...> inflated_deep_copy(allocator * alloc, tuple<T, Ts...> val)
+	tuple<T, Ts...> inflated_deep_copy(allocator_base * alloc, tuple<T, Ts...> val)
 	{
 		return prepend(inflated_deep_copy(alloc, head(val)), inflated_deep_copy(alloc, tail(val)));
 	}
@@ -428,12 +449,12 @@ namespace ks
 		{
 		}
 
-		vec(allocator * alloc, size_t  size) {
+		vec(allocator_base * alloc, size_t  size) {
 			allocate(alloc, size);
 			z_ = T{};
 		}
 
-		void allocate(allocator * alloc, size_t size)
+		void allocate(allocator_base * alloc, size_t size)
 		{
 			void *storage = alloc->allocate(bytes_required(size));
 			this->size_ = size;
@@ -473,7 +494,7 @@ namespace ks
                 // copy all the data item by item to give a C++ a
                 // chance to auto-convert it.
 		template <class U>
-		vec(allocator * alloc, vec<U> const& that) : vec{ alloc, that.size() }
+		vec(allocator_base * alloc, vec<U> const& that) : vec{ alloc, that.size() }
 		{
 			KS_ASSERT(size_ != 0);
 			for (int i = 0; i < that.size(); ++i)
@@ -485,7 +506,7 @@ namespace ks
                 // allocate and copy because we have no guarantee
                 // that the std::vector will not mutate or vanish
                 // beneath our feet.
-		vec(allocator * alloc, std::vector<T> const& that) : vec{ alloc, that.size() }
+		vec(allocator_base * alloc, std::vector<T> const& that) : vec{ alloc, that.size() }
 		{
 			// Copying from std vector - allocate.
 			for (size_t i = 0; i < that.size(); ++i)
@@ -500,7 +521,10 @@ namespace ks
 		T& operator[](int i) { if (is_zero_) return z_; else return data_[i]; }
 		T const& operator[](int i) const {  if (is_zero_) return z_; else return data_[i]; }
 
-		static vec<T> create(allocator * alloc, size_t size);
+		static vec<T> create(allocator_base * alloc, size_t size)
+		{
+			return vec<T>(alloc, size);
+		}
 
 		bool is_zero() const { return is_zero_; }
 
@@ -545,12 +569,6 @@ namespace ks
 #endif
 
 		return v[i];
-	}
-
-	template <class T>
-	vec<T> vec<T>::create(allocator * alloc, size_t size)
-	{
-		return vec<T>{ alloc, size };
 	}
 
 	template <class T, class F>
@@ -626,7 +644,7 @@ namespace ks
 	}
 
 	template <class T>
-	vec<T> inflated_deep_copy(allocator * alloc, vec<T> t)
+	vec<T> inflated_deep_copy(allocator_base * alloc, vec<T> t)
 	{
 		vec<T> ret = vec<T>::create(alloc, t.size());
 
@@ -1063,13 +1081,13 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
-	tuple<> shape(allocator *, bool const&) { return {}; }
-	tuple<> shape(allocator *, int const&) { return {}; }
-	tuple<> shape(allocator *, double const&) { return {}; }
-	tuple<> shape(allocator *, std::string const&) { return {}; }
+	tuple<> shape(allocator_base *, bool const&) { return {}; }
+	tuple<> shape(allocator_base *, int const&) { return {}; }
+	tuple<> shape(allocator_base *, double const&) { return {}; }
+	tuple<> shape(allocator_base *, std::string const&) { return {}; }
 
 	template<class T>
-	auto shape(allocator * alloc, vec<T> const& v) {
+	auto shape(allocator_base * alloc, vec<T> const& v) {
 		vec<decltype(shape(alloc, v[0]))> s(alloc, v.size());
 		for (int ii = 0; ii != v.size(); ++ii) {
 			s[ii] = shape(alloc, v[ii]);
@@ -1078,19 +1096,19 @@ namespace ks
 	}
 
 	template<class TupleType, size_t... Indices>
-	auto shape_impl(allocator * alloc, TupleType const& t, std::index_sequence<Indices...>) {
+	auto shape_impl(allocator_base * alloc, TupleType const& t, std::index_sequence<Indices...>) {
 		return std::make_tuple(shape(alloc, std::get<Indices>(t))...);
 	}
 
 	template<class... Types>
-	auto shape(allocator * alloc, tuple<Types...> const& t) {
+	auto shape(allocator_base * alloc, tuple<Types...> const& t) {
 		return shape_impl(alloc, t, std::index_sequence_for<Types...>{});
 	}
 
-	auto shape(allocator *) { return tuple<>{}; }
+	auto shape(allocator_base *) { return tuple<>{}; }
 
 	template<class T1, class T2, class... Ts>
-	auto shape(allocator * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
+	auto shape(allocator_base * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
 		return std::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
 	}
 
