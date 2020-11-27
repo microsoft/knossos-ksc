@@ -188,7 +188,7 @@ def compute_ks_str(f, nodes, arg_types):
             # Update the template
             template = template.format(
                 body=joiner.join([
-                    f"(let (({var_name} {current_expr}))",
+                    f"(let ({var_name} {current_expr})",
                     "{body}",
                     ")"
                 ])
