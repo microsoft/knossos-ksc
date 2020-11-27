@@ -18,7 +18,7 @@ def test_afe():
 (def shape$add Integer ((a : Float) (b : Float)) 0)
 
 (def afe Float ((x : Float))
-  (let ((a (div 1.0 x)))
+  (let (a (div 1.0 x))
     (div a (add 1.0 a))
   )
 )
@@ -49,15 +49,15 @@ def test_outer_product():
 (def shape$mul Integer ((a : Float) (b : Float)) 0)
 (def outer_product (Vec (Vec Float))
  ((var0 : (Tuple (Vec Float) (Vec Float))))
-    (let ((x (get$1$2 var0))
-          (y (get$2$2 var0))
-          (m (size x))
-          (n (size y)))
+    (let (x (get$1$2 var0))
+    (let (y (get$2$2 var0))
+    (let (m (size x))
+    (let (n (size y))
             (build m (lam (i : Integer)
               (build n (lam (j : Integer)
                 (mul
                   (index i x)
-                  (index j y))))))))
+                  (index j y)))))))))))
 """
     args = [AbstractValue(((100,), (100,)), Type.Tuple(Type.Vec(Type.Float), Type.Vec(Type.Float)))]
     assert compute_cost(ks_str, "outer_product", args) == 50102.4
@@ -90,11 +90,11 @@ def test_rot():
 
 (def rot (Tuple (Vec Float) (Vec Float))
          ((var0 : (Tuple (Vec Float) (Vec Float) Float Float)))
-    (let ((x (get$1$4 var0))
-          (y (get$2$4 var0))
-          (c (get$3$4 var0))
-          (s (get$4$4 var0))
-          (n (size x)))
+    (let (x (get$1$4 var0))
+    (let (y (get$2$4 var0))
+    (let (c (get$3$4 var0))
+    (let (s (get$4$4 var0))
+    (let (n (size x))
       (tuple
         (build n (lam (var1 : Integer)
           (add
@@ -103,7 +103,7 @@ def test_rot():
         (build n (lam (i : Integer)
           (add
               (mul (neg s) (index i x))
-              (mul c (index i y))))))))
+              (mul c (index i y))))))))))))
 """
     args = [
         AbstractValue(

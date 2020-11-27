@@ -10,15 +10,11 @@ from ksc.tracing.functions import core
 
 def test_get_shape():
     ks_str = """
-(def get_shape (Tuple Integer Integer Integer Integer) ((x : (Vec (Vec (Vec (Vec Float))))))
-  (let ((v0 (index 0 x)))
-  (let ((v1 (index 0 v0)))
-    (let ((v2 (index 0 v1)))
-      (tuple (size x) (size v0) (size v1) (size v2))
-      )
-    )
-  )
-)
+(def get_shape (Tuple Integer Integer Integer Integer) (x : (Vec (Vec (Vec (Vec Float)))))
+  (let (v0 (index 0 x))
+  (let (v1 (index 0 v0))
+  (let (v2 (index 0 v1))
+      (tuple (size x) (size v0) (size v1) (size v2))))))
 """
     x = AbstractValue((1, 3, 224, 224), Type.Vec(Type.Vec(Type.Vec(Type.Vec(Type.Float)))))
     m = translate_and_import(ks_str, "abstract")

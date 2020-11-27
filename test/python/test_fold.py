@@ -1,7 +1,8 @@
 from ksc.utils import translate_and_import
 
 def test_fold():
-    ks_str = """(edef add Integer (Integer Integer))
+    ks_str = """
+(edef add Integer (Integer Integer))
 (edef sub Integer (Integer Integer))
 (edef mul Integer (Integer Integer))
 (edef div Integer (Integer Integer))
@@ -11,12 +12,12 @@ def test_fold():
 
 (def test Integer ((n : Integer))
     (fold (lam (s_x : (Tuple Integer Integer))
-        (let ((count (get$1$2 s_x))
-              (x     (get$2$2 s_x)))
+        (let (count (get$1$2 s_x))
+        (let (x     (get$2$2 s_x))
             (if (eq (mod x 3) 0)
                     (add count 1)
                     count
-            )))
+            ))))
         0
         (build n (lam (i : Integer) i))
     )
