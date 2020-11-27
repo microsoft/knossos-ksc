@@ -99,7 +99,7 @@ def jit_and_execute_annonymous_function(body, backend):
     return value
 
 class VarNameGenerator:
-    def __init__(self, prefix="v"):
+    def __init__(self, prefix="tmpvar__"):
         self.index = 0
         self.prefix = prefix
 
