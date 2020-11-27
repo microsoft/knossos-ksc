@@ -705,7 +705,7 @@ are two cases:
 
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace", "print"]
+  not $ fname `elem` ["index", "size", "eq", "ne", "$trace", "print"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
