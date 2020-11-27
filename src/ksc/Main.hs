@@ -159,7 +159,12 @@ compileKscPrograms :: String -> [String] -> IO ()
 compileKscPrograms compilername ksFiles = do
   testOn ksFiles $ \ksFile -> do
         ksTest <- dropExtensionOrFail "ks" ksFile
-        displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ["src/runtime/prelude"] ksTest
+        (_, (_, ksoContents)) <- displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ["src/runtime/prelude"] ksTest
+        case parseE ksoContents of
+          Left e -> error ("Generated .kso failed to parse:\n"
+                           ++ ksoContents ++ "\n"
+                           ++ e)
+          Right _ -> pure ()
 
 testRoundTrip :: [String] -> IO ()
 testRoundTrip ksFiles = do

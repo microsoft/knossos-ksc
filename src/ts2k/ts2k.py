@@ -5,6 +5,7 @@ import importlib.util
 import sys
 import inspect
 import argparse
+from pathlib import Path
 
 parser = argparse.ArgumentParser(description="Convert TorchScript to Knossos IR")
 parser.add_argument("--input_file", required=True, help="TorchScript [file_path].py")
@@ -17,25 +18,47 @@ parser.add_argument(
 args = parser.parse_args()
 
 input_file_path = args.input_file
-filename = args.output_file
+output_file_path = args.output_file
 generate_edef = args.generate_edef
 
-directory = os.path.dirname(filename)
-if directory != "":
-    os.makedirs(directory, exist_ok=True)
-output = open(filename, "w")
+input_directory = os.path.dirname(input_file_path)
+
+output_directory = os.path.dirname(output_file_path)
+if output_directory != "":
+    os.makedirs(output_directory, exist_ok=True)
+output = open(output_file_path, "w")
 
 # Newline constant for s-expr printing
 nl = "\n"
 tab = "\t"
 
+from contextlib import contextmanager
+
+# https://stackoverflow.com/a/41904558/35544
+# submodule_search_locations doesn't work for this
+@contextmanager
+def add_to_path(p):
+    import sys
+
+    old_path = sys.path
+    old_modules = sys.modules
+    sys.modules = old_modules.copy()
+    sys.path = sys.path[:]
+    sys.path.insert(0, p)
+    try:
+        yield
+    finally:
+        sys.path = old_path
+        sys.modules = old_modules
+
 
 module_name = "DynamicLoadedModule"
 
-spec = importlib.util.spec_from_file_location(module_name, input_file_path)
-dynamicModule = importlib.util.module_from_spec(spec)
-# We deliberately don't make visible via sys.modules[module_name] = module
-spec.loader.exec_module(dynamicModule)
+with add_to_path(input_directory):
+    spec = importlib.util.spec_from_file_location(module_name, Path(input_file_path))
+    dynamicModule = importlib.util.module_from_spec(spec)
+    # We deliberately don't make visible via sys.modules[module_name] = module
+    spec.loader.exec_module(dynamicModule)
 
 add_edef = "(edef addATEN (Vec (Vec Float)) ((Vec (Vec Float)) Float))"
 
@@ -69,8 +92,17 @@ symbolLook = {
     "Tensor": [
         sexpdata.Symbol("Vec"),
         [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
-    ]  # float vs integer? also determine rank instead of hardcode
+    ],  # float vs integer? also determine rank instead of hardcode
+    "int": [sexpdata.Symbol("Integer")],
 }
+
+# We're going to have to break out the data structure at some point, for now, hardcode
+# No recursive literals
+symbolLook["Tuple[int, Tensor]"] = [
+    sexpdata.Symbol("Tuple"),
+    symbolLook["int"],
+    symbolLook["Tensor"],
+]
 
 
 def mangleDebugName(name):
@@ -131,28 +163,33 @@ def make_list_init(values):
 def make_list(node):
     value = node.outputsAt(0)
 
-    list_size = str(sum(1 for _ in node.inputs()))
-    return [
-        sexpdata.Symbol("\n"),
-        sexpdata.Symbol("_" + value.debugName()),
-        [
-            sexpdata.Symbol("build"),
-            sexpdata.Symbol(list_size),
+    list_size = sum(1 for _ in node.inputs())
+    if list_size == 0:
+        return (
+            []
+        )  # may not be very practical on the Knossos side, some of the TorchScript workarounds currently mutates in place
+    else:
+        return [
+            sexpdata.Symbol("\n"),
+            sexpdata.Symbol("_" + value.debugName()),
             [
-                sexpdata.Symbol("lam"),
+                sexpdata.Symbol("build"),
+                sexpdata.Symbol(str(list_size)),
                 [
-                    sexpdata.Symbol("ni"),
-                    sexpdata.Symbol(":"),
-                    sexpdata.Symbol("Integer"),
+                    sexpdata.Symbol("lam"),
+                    [
+                        sexpdata.Symbol("ni"),
+                        sexpdata.Symbol(":"),
+                        sexpdata.Symbol("Integer"),
+                    ],
+                    make_list_init(list(node.inputs())),
                 ],
-                make_list_init(list(node.inputs())),
             ],
-        ],
-    ]
+        ]
 
 
 def make_tensor(node):
-    # tensors aren't explicitly modelled in Knossos yet, leave them as identify over a (jagged) list for now
+    # tensors aren't explicitly modelled in Knossos yet, leave them as identity over a (jagged) list for now
     value = node.outputsAt(0)
 
     return [

@@ -32,8 +32,8 @@ namespace ks
 
 			static Zero mk(From, To) { return Zero{}; }
 
-			To Apply(allocator *, From f) const {
-				return zero(To{});
+			To Apply(allocator * alloc, From f) const {
+				return zero(alloc, To{});
 			}
 		};
 
