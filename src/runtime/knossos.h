@@ -301,40 +301,40 @@ namespace ks
 	// ===============================  Zero  ==================================
 	// This template to be overloaded when e.g. a vector of T needs to use val to discover a size
 	template <class T>
-	T zero(T const& val)
+	T zero(allocator * alloc, T const& val)
 	{
 		KS_ASSERT(false && "Need to overload zero for this type");
 		return T{};
 	}
 
 	template <>
-	double zero(double const& val)
+	double zero(allocator *, double const& val)
 	{
 		return 0.0;
 	}
 
 	template <>
-	int zero(int const& val)
+	int zero(allocator *, int const& val)
 	{
 		return 0;
 	}
 
-	tuple<> zero(tuple<> const& val)
+	tuple<> zero(allocator *, tuple<> const& val)
 	{
 		return tuple<> ();
 	}
 
 	template <class... Ts>
-	tuple<Ts...> zero(tuple<Ts...> const& val)
+	tuple<Ts...> zero(allocator * alloc, tuple<Ts...> const& val)
 	{
-		return prepend(zero(head(val)), zero(tail(val)));
+		return prepend(zero(alloc, head(val)), zero(alloc, tail(val)));
 	}
 
 	// Zero of multiple args is a tuple
 	template <class T1, class T2, class... Ts>
-	tuple<T1, T2, Ts...> zero(T1 const& t1, T2 const& t2, Ts const&... ts) 
+	tuple<T1, T2, Ts...> zero(allocator * alloc, T1 const& t1, T2 const& t2, Ts const&... ts) 
 	{
-		return zero(std::make_tuple(t1, t2, ts...));
+		return zero(alloc, std::make_tuple(t1, t2, ts...));
 	}
 
 	// ===============================  Inflated deep copy  ==================================
@@ -528,12 +528,12 @@ namespace ks
 
 		bool is_zero() const { return is_zero_; }
 
-		T zero_element() const {
+		T zero_element(allocator * alloc) const {
 			if (is_zero())
 				return z_;
 			else {
 				KS_ASSERT(size() > 0);
-				return zero(data_[0]);
+				return zero(alloc, data_[0]);
 			}
 		}
 
@@ -638,9 +638,9 @@ namespace ks
 
 	// specialize zero(vec<T>)
 	template <class T>
-	vec<T> zero(vec<T> const& val)
+	vec<T> zero(allocator * alloc, vec<T> const& val)
 	{
-		return vec<T> {zero_tag, val.zero_element(), (size_t)val.size()};
+		return vec<T> {zero_tag, val.zero_element(alloc), (size_t)val.size()};
 	}
 
 	template <class T>
@@ -928,7 +928,7 @@ namespace ks
 		if (size == 0)
 		{
 			std::cerr << "hope this is ok";
-			return zero(T{});
+			return zero(alloc, T{});
 		}
 
 		if (size == 1)
@@ -947,16 +947,16 @@ namespace ks
 	}
 
 	template <class T>
-	T delta(int i, int j, T val)
+	T delta(allocator * alloc, int i, int j, T val)
 	{
-		return (i == j) ? val : zero(val);
+		return (i == j) ? val : zero(alloc, val);
 	}
 
 	template <class T>
 	vec<T> deltaVec(allocator * alloc, int n, int i, T val)
 	{
 		vec<T> ret(alloc, n);
-		T z = zero(val);
+		T z = zero(alloc, val);
 		for(int j = 0; j < n; ++j)
 			if (j != i)
 			  ret[j] = z;
@@ -1057,10 +1057,10 @@ namespace ks
 	{
 		if (v.is_zero()) {
 			std::cerr <<"okkk?";
-			return zero(T{});
+			return zero(alloc, T{});
 		}
 
-		if (v.size() == 0) { return zero(T{}); }
+		if (v.size() == 0) { return zero(alloc, T{}); }
 
 		if (v.size() == 1) return v[0];
 		T ret = ts_add(alloc, v[0], v[1]);
