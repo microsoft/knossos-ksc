@@ -177,7 +177,7 @@ class Var(Expr):
     name: str
     decl: bool
 
-    def __init__(self, name, type, decl):
+    def __init__(self, name, type=None, decl=False):
         super().__init__(type=type, name=name, decl=decl)
 
     def __str__(self):
