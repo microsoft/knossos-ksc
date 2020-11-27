@@ -203,12 +203,7 @@ def parse_ks_string(string_or_stream):
     string = strip_block_comments(string_or_stream)
 
     for s_exp in s_exps_from_string(string):
-        try:
-            yield parse_tld(s_exp)
-            
-        except ParseError:
-            print("ERROR at ", s_exp)
-            print(sys.exc_info()[1])
+        yield parse_tld(s_exp)
 
 def parse_ks_file(string_or_stream):
     return parse_ks_string(string_or_stream)
