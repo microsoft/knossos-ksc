@@ -657,7 +657,7 @@ optGradPrim _ "ts_add" arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
 optGradPrim _ "sum" e
-  | TypeVec t <- typeof e
+  | TypeTensor 1 t <- typeof e
   = Just (lmBuildT (pSize e) (Lam (TVar TypeSize $ Simple "sum$i")
                              (lmOne t)))
 
@@ -817,7 +817,7 @@ do_prod_v env dir e dx
   = Just $ pConstVec n (lmApply_Dir dir v dx)
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
-  | TypeVec {} <- typeof e
+  | TypeTensor 1 _ <- typeof e
   , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $ mkLets binds $
     pBuild (pSize ve) $ Lam indexTVar $
@@ -840,7 +840,7 @@ do_sum_v env dir e dx
     lmApply_Dir dir v (pIndex (Var indexTVar) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
-  | TypeVec {} <- typeof e
+  | TypeTensor 1 _ <- typeof e
   , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $
     mkLets binds $

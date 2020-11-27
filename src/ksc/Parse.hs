@@ -235,7 +235,8 @@ pTypes :: Parser [TypeX]
 pTypes = parens (many pType)
 
 pKType :: Parser TypeX
-pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeVec ty) })
+pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeTensor 1 ty) })
+       <|> (do { pReserved "Tensor"; d <- pInteger; ty <- pType; return (TypeTensor d ty)})
        <|> (do { pReserved "Tuple"; tys <- many pType; return (TypeTuple tys) })
        <|> (do { pReserved "LM"; s <- pType; t <- pType ; return (TypeLM s t) })
        <|> (do { pReserved "Lam"; s <- pType; t <- pType ; return (TypeLam s t) })

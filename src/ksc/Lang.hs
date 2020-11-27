@@ -190,7 +190,7 @@ data TypeX
   | TypeString
   | TypeTuple [TypeX]
 
-  | TypeVec TypeX
+  | TypeTensor Integer TypeX
 
   | TypeLam TypeX TypeX  -- Domain -> Range
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
@@ -241,7 +241,7 @@ pattern TypeSize = TypeInteger
 tangentType :: HasCallStack => Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
-tangentType (TypeVec t)    = TypeVec (tangentType t)
+tangentType (TypeTensor d t) = TypeTensor d (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
 tangentType TypeInteger    = TypeTuple []
 tangentType TypeBool       = TypeTuple []
@@ -260,7 +260,7 @@ shapeType TypeInteger = TypeTuple []
 shapeType TypeFloat = TypeTuple []
 shapeType TypeString = TypeTuple []
 shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
-shapeType (TypeVec vt) = TypeVec (shapeType vt)
+shapeType (TypeTensor d vt) = TypeTensor d (shapeType vt)
 shapeType (TypeLam _ _) = TypeUnknown
 shapeType (TypeLM _ _) = TypeUnknown  -- TBD
 shapeType TypeUnknown = TypeUnknown
@@ -807,8 +807,10 @@ instance Pretty Konst where
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
 instance Pretty TypeX where
-  pprPrec p (TypeVec ty)      = parensIf p precTyApp $
+  pprPrec p (TypeTensor 1 ty) = parensIf p precTyApp $
                                 text "Vec" <+> pprParendType ty
+  pprPrec p (TypeTensor d ty) = parensIf p precTyApp $
+                                text "Tensor" <+> integer d <+> pprParendType ty
   pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
                                      (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to) = parensIf p precZero $

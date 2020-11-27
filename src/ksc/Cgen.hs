@@ -179,7 +179,7 @@ allocatorUsageOfType = \case
   TypeFloat     -> DoesNotUseAllocator
   TypeString    -> DoesNotUseAllocator
   TypeTuple ts  -> foldMap allocatorUsageOfType ts
-  TypeVec    {} -> UsesAllocator
+  TypeTensor {} -> UsesAllocator
   TypeLam {}    -> UsesAllocator
   TypeLM     {} -> UsesAllocator
   TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
@@ -364,7 +364,7 @@ cgenExprWithoutResettingAlloc env = \case
   Var (TVar ty v)               -> return $ CG [] (cgenVar v) (mkCType ty) DoesNotUseAllocator
 
   -- Special case for build -- inline the loop
-  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
+  Call (TFun (TypeTensor 1 ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
     CG szdecl szex _szty _szau <- cgenExprR env sz
     let varty = mkCType vty
     let varcty = cgenType varty
@@ -387,7 +387,7 @@ cgenExprWithoutResettingAlloc env = \case
         ++ [ "}" ]
         )
         ret
-        (mkCType (TypeVec ty))
+        (mkCType (TypeTensor 1 ty))
         UsesAllocator
 
   -- Special case for sumbuild -- inline the loop
@@ -641,7 +641,8 @@ mangleType = \case
     TypeFloat     -> "f"
     TypeString    -> "s"
     TypeTuple tys -> "<" ++ concatMap mangleType tys ++ ">"
-    TypeVec ty    -> "v" ++ mangleType ty
+    TypeTensor 1 ty -> "v" ++ mangleType ty
+    TypeTensor d ty -> "T" ++ show d ++ mangleType ty
     TypeLam a b   -> "l<" ++ mangleType a ++ mangleType b ++ ">"
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
@@ -669,8 +670,8 @@ cgenAnyFun (tf, ty) cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
     case ty of
-      TypeVec t -> "build<" ++ cgenType (mkCType t) ++ ">"
-      _         -> error ("Unexpected type for build: " ++ show ty)
+      TypeTensor 1 t -> "build<" ++ cgenType (mkCType t) ++ ">"
+      _              -> error ("Unexpected type for build: " ++ show ty)
   TFun ty (Fun (PrimFun "sumbuild")) -> -- TODO: remove special case
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
@@ -743,7 +744,8 @@ cgenTypeLang = \case
   TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
-  TypeVec t     -> "vec<" ++ cgenTypeLang t ++ ">"
+  TypeTensor 1 t -> "vec<" ++ cgenTypeLang t ++ ">"
+  TypeTensor d t -> "tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
   TypeLam from to ->
@@ -798,7 +800,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty
   (PrimFun "$copydown", [CType ty]          ) -> LMOne ty
   (PrimFun "size"     , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"    , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun "index"    , [CType (TypeTensor 1 t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)

@@ -98,7 +98,7 @@ getZero tangent_type e
             TypeFloat    -> Konst (KFloat 0.0)
             TypeString   -> Konst (KString "")
             TypeBool     -> Konst (KBool False)
-            TypeVec _    -> mkAtomicNoFVs e $ \ e ->
+            TypeTensor 1 _ -> mkAtomicNoFVs e $ \ e ->
                             pConstVec (pSize e) (go (pIndex (kInt 1) e))
             TypeTuple ts
                | Tuple es <- e
@@ -445,7 +445,7 @@ primFunCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
 primFunCallResultTy_maybe "fold" args
   | TypeTuple [f,acc,v] <- args
   , TypeLam (TypeTuple [a1, b1]) a2 <- f
-  , TypeVec b2 <- v
+  , TypeTensor 1 b2 <- v
   , b1 `eqType` b2
   , Just a <- eqTypes a1 [a2, acc]
   = Just a
@@ -459,7 +459,7 @@ primFunCallResultTy_maybe "lmFold" args
   , TypeTuple [a3, b1] <- t
   , Just a <- eqTypes a1 [a2, a3, acc]
   , Just _ <- eqTypes ds_zero [tangentType s1]
-  , v_ty@(TypeVec b2) <- v
+  , v_ty@(TypeTensor 1 b2) <- v
   , b2 `eqType` b1
   = Just (TypeLM (TypeTuple [s1, TypeTuple [a, v_ty]]) a)
   | otherwise = Nothing
@@ -509,11 +509,11 @@ primFunCallResultTy_maybe fun args
       ("lmVCat"   , TypeTuple tys) | Just (ss,ts) <- unzipLMTypes tys
                                      , (s1:ss1) <- ss
                                      , all (== s1) ss1     -> Just (TypeLM s1 (TypeTuple ts))
-      ("lmVCatV"  , TypeVec (TypeLM s t))                  -> Just (TypeLM s (TypeVec t))
+      ("lmVCatV"  , TypeTensor 1 (TypeLM s t))             -> Just (TypeLM s (TypeTensor 1 t))
       ("lmHCat"   , TypeTuple tys) | Just (ss,ts) <- unzipLMTypes tys
                                      , (t1:ts1) <- ts
                                      , all (== t1) ts1     -> Just (TypeLM (TypeTuple ss) t1)
-      ("lmHCatV"  , TypeVec (TypeLM t s))                  -> Just (TypeLM (TypeVec t) s)
+      ("lmHCatV"  , TypeTensor 1 (TypeLM t s))             -> Just (TypeLM (TypeTensor 1 t) s)
 
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , t)                                     -> Just t
@@ -543,24 +543,24 @@ primFunCallResultTy_maybe fun args
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , t)                                       -> Just t
 
-      ("constVec" , TypeTuple [TypeInteger, t])              -> Just (TypeVec t)
-      ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeVec t)
+      ("constVec" , TypeTuple [TypeInteger, t])              -> Just (TypeTensor 1 t)
+      ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeTensor 1 t)
       ("diag"     , TypeTuple [TypeInteger,
                                 TypeInteger,
-                                TypeLam TypeInteger t])      -> Just (TypeVec (TypeVec t))
+                                TypeLam TypeInteger t])      -> Just (TypeTensor 1 (TypeTensor 1 t))
       ("build"    , TypeTuple
-                     [TypeInteger, TypeLam TypeInteger t])   -> Just (TypeVec t)
+                     [TypeInteger, TypeLam TypeInteger t])   -> Just (TypeTensor 1 t)
 
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                     -> Just TypeInteger
       ("sumbuild" , TypeTuple
                      [TypeInteger, TypeLam TypeInteger t]) -> Just t
-      ("index"    , TypeTuple [TypeInteger, TypeVec t])    -> Just t
+      ("index"    , TypeTuple [TypeInteger, TypeTensor 1 t]) -> Just t
       ("shape"    , t)                                     -> Just (shapeType t)
-      ("size"     , TypeVec _)                             -> Just TypeSize
-      ("sum"      , TypeVec t)                             -> Just t
+      ("size"     , TypeTensor 1 _)                        -> Just TypeSize
+      ("sum"      , TypeTensor 1 t)                        -> Just t
 
-      ("unzip"    , TypeVec (TypeTuple ts))                -> Just (TypeTuple (map TypeVec ts))
+      ("unzip"    , TypeTensor d (TypeTuple ts))           -> Just (TypeTuple (map (TypeTensor d) ts))
 
       ("ts_scale" , TypeTuple [TypeFloat,   t]           ) -> Just t
       ("ts_add"   , TypeTuple [t, dt]                    ) -> if dt == tangentType t
