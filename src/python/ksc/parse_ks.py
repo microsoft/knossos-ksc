@@ -9,23 +9,29 @@ from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 #####################################################################
 ## S-expression Utils
 
+# Raise ParseError if cond not true
+def check(cond, *message):
+    def tostr(s):
+        if isinstance(s, (sexpdata.SExpBase, list)):
+            return sexpdata.dumps(s)
+        else:
+            return s
+
+    if not cond:
+        message = [tostr(s) for s in message]
+        raise ParseError(*message)
+
 # Parse a fixed-length s-exp into a list given a set of parsers, e.g.
 # parse_seq(se, parse_name, parse_int, parse_int)
 # would accept (fred 3 4)
 def parse_seq(se, *parsers):
-    if len(se) != len(parsers):
-        raise ParseError("Cannot parse ", se, " with ", parsers)
+    check(len(se) == len(parsers), "Cannot parse ", se, " with ", parsers)
 
     return [parser(term) for (parser, term) in zip(parsers, se)]
 
 # Exception for parse errors
 class ParseError(Exception):
     pass
-
-# Raise ParseError if cond not true
-def check(cond, *message):
-    if not cond:
-        raise ParseError(*message)
 
 # Reserved word constants
 _def = sexpdata.Symbol("def")
@@ -134,7 +140,7 @@ def parse_expr(se):
 
     # Let(var, rhs, body)
     if head == _let:
-        check(len(se) == 3, "Let should have 2 terms (let (<binding>) body) in", se)
+        check(len(se) == 3, f"Let should have 2 terms (let (<binding>) body), not {len(se)-1} in", se)
         binding = se[1]
         check(len(binding) == 2, "Let bindings should be pairs", binding, "in", se)
         lhs = binding[0]
