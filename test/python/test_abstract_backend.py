@@ -17,7 +17,7 @@ def test_get_shape():
       (tuple (size x) (size v0) (size v1) (size v2))))))
 """
     x = AbstractValue((1, 3, 224, 224), Type.Vec(Type.Vec(Type.Vec(Type.Vec(Type.Float)))))
-    m = translate_and_import(ks_str, "abstract")
+    m = translate_and_import(__file__, ks_str, "abstract")
     with ExecutionContext():
         assert m.get_shape(x).data == (1, 3, 224, 224)
 
@@ -28,7 +28,7 @@ def test_get_tuple_element():
 )
 """
     d = AbstractValue.from_data(((1, 2,), 3))
-    m = translate_and_import(ks_str, "abstract")
+    m = translate_and_import(__file__, ks_str, "abstract")
     with ExecutionContext():
         assert m.flatten(d).data == (1, 2, 3)
 
@@ -45,7 +45,7 @@ def test_tuple_of_tensors():
     (get$2$2 x)
 )
 """
-    m = translate_and_import(ks_str, "abstract")
+    m = translate_and_import(__file__, ks_str, "abstract")
     x = AbstractValue.from_data((np.random.normal(0, 1, (3, 4)), np.random.normal(0, 1, (4,))))
     with ExecutionContext():
         assert m.fst(x).shape_type == ((3, 4), Type.Vec(Type.Vec(Type.Float)))
@@ -63,7 +63,7 @@ def test_if_then_else():
     (if (lt x 0) -1.0 (if (eq x 0) 0.0 1.0))
 )
 """
-    m = translate_and_import(ks_str, "abstract")
+    m = translate_and_import(__file__, ks_str, "abstract")
     with ExecutionContext():
         assert m.sign(2.0) == 1.0
         assert m.sign(-5.0) == -1.0

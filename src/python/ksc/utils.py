@@ -42,9 +42,9 @@ def import_module_from_path(module_name, path):
     spec.loader.exec_module(py_out)
     return py_out
 
-def translate_and_import(*args):
+def translate_and_import(source_file_name, *args):
     from ksc.translate import translate
-    py_out = translate(*args, with_main=False)
+    py_out = translate(*args, source_file_name, with_main=False)
     with NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(py_out)
     print(f.name)

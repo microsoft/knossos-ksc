@@ -31,7 +31,7 @@ def test_conv1d():
               (mul image_noi (index kni (index li (index ki kernels)))))
             )))))))))))))))))
         """
-    py_out = translate_and_import(ks_str, "common")
+    py_out = translate_and_import(__file__, ks_str, "common")
     image = np.random.normal(0, 1, (1, 100))
     kernel = np.array(
       [[[-0.5, 0, 0.5]],

@@ -9,6 +9,12 @@ from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 #####################################################################
 ## S-expression Utils
 
+parser_source_file = "<unknown>"
+
+# Exception for parse errors
+class ParseError(Exception):
+    pass
+
 # Raise ParseError if cond not true
 def check(cond, *message):
     def tostr(s):
@@ -18,8 +24,8 @@ def check(cond, *message):
             return s
 
     if not cond:
-        message = [tostr(s) for s in message]
-        raise ParseError(*message)
+        message = "".join(tostr(s) for s in message)
+        raise ParseError(f"{parser_source_file}: {message}")
 
 # Parse a fixed-length s-exp into a list given a set of parsers, e.g.
 # parse_seq(se, parse_name, parse_int, parse_int)
@@ -28,10 +34,6 @@ def parse_seq(se, *parsers):
     check(len(se) == len(parsers), "Cannot parse ", se, " with ", parsers)
 
     return [parser(term) for (parser, term) in zip(parsers, se)]
-
-# Exception for parse errors
-class ParseError(Exception):
-    pass
 
 # Reserved word constants
 _def = sexpdata.Symbol("def")
@@ -176,7 +178,7 @@ def parse_tld(se):
     if head == _rule:
         return Rule(*parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr))
 
-    raise ParseError("unrecognised top-level definition:", se)
+    check(False, "unrecognised top-level definition:", se)
 
 ################################################################
 import argparse
@@ -205,7 +207,10 @@ def strip_block_comments(string):
             # print(f"Zapped {n} block comment(s)")
             return string    
 
-def parse_ks_string(string_or_stream):
+def parse_ks_string(string_or_stream, source_file_name):
+    global parser_source_file
+    parser_source_file = source_file_name
+
     string = strip_block_comments(string_or_stream)
 
     for s_exp in s_exps_from_string(string):
@@ -215,6 +220,9 @@ def parse_ks_file(string_or_stream):
     return parse_ks_string(string_or_stream)
 
 def parse_ks_filename(filename):
+    global parser_source_file
+    parser_source_file = source_file_name
+
     with open(filename) as f:
         ks_str = f.read()
         return parse_ks_file(ks_str)

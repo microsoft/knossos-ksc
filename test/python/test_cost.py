@@ -24,7 +24,7 @@ def test_afe():
 )
 """
     with ExecutionContext() as ctx:
-        m = translate_and_import(ks_str, "abstract")
+        m = translate_and_import(__file__, ks_str, "abstract")
         m.afe(AbstractValue((), Type.Float))
     assert ctx.costs[None] == 5.1
 
