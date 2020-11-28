@@ -155,11 +155,14 @@ def get_tuple_element(i, tup):
     exec_ctx.accumulate_cost("select", tup.context, exec_ctx.config["select_cost"])
     return AbstractValue(el_shape, el_type, el_data, tup.context)
 
-def let(var, body):
+def let(tupled, var, body):
     context = check_args_and_get_context("let", [var])
     exec_ctx = current_execution_context()
     exec_ctx.accumulate_cost("let", context, exec_ctx.config["let_cost"])
-    return body(var)
+    if tupled:
+        return body(*var)
+    else:
+        return body(var)
 
 def if_then_else(cond, then_branch, else_branch):
     context = check_args_and_get_context("if", [cond])
