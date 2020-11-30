@@ -66,7 +66,7 @@ optDef rb gst def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
                           , optSubst = varsBroughtIntoScopeByArgs }
        ; rhs' <- simplify env rhs
        ; let def' = def { def_rhs = UserRhs rhs' }
-       ; return (extendGblST gst [def'], def') }
+       ; return (stInsertFun def' gst, def') }
 
 optDef _ gst def = return (gst,def)
 
