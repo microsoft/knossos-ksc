@@ -148,7 +148,6 @@ void declare_vec(py::module &m, std::string typestr) {{
   py::class_<Class>(m, pyclass_name.c_str(), py::module_local())
     .def(py::init<>())
     .def(py::init([](std::vector<T> const& v) {{ return ks::vec<T>(&g_alloc, v); }}))
-    .def("is_zero",     &Class::is_zero)
     .def("__getitem__", [](const ks::vec<T> &a, const int &b) {{
 	return a[b];
       }})

@@ -411,23 +411,12 @@ namespace ks
 	};
 
 	// ===============================  Vector class ==================================
-	struct zero_tag_t {};
-	const struct zero_tag_t zero_tag;
-
 	template <class T>
 	class vec
 	{
 		//TODO Full set of 5 ctors/assigners
 		size_t size_;
 		T* data_;
-		// Runtime flag indicating this is an all-zero vector.  
-		// TODO: Ideally this would propagate nicely through the type system, 
-		// without a runtime flag but, need to pass initializer lists through
-		// zero_t {}
-		// As is, many instances are collapsed statically and the remainder 
-		// come through here.
-		bool is_zero_ = false;
-		T z_; // ToDo save this cost.
 
 	public:
 
@@ -435,23 +424,12 @@ namespace ks
 
 		vec() :
 			size_{ 0 },
-			data_{ nullptr },
-			is_zero_{ false },
-			z_{T{}}
-		{
-		}
-
-		vec(zero_tag_t, T const& z, size_t size) :
-			size_{ size },
-			data_{ nullptr },
-			is_zero_{ true },
-			z_(z)
+			data_{ nullptr }
 		{
 		}
 
 		vec(allocator_base * alloc, size_t  size) {
 			allocate(alloc, size);
-			z_ = T{};
 		}
 
 		void allocate(allocator_base * alloc, size_t size)
@@ -459,7 +437,6 @@ namespace ks
 			void *storage = alloc->allocate(bytes_required(size));
 			this->size_ = size;
 			this->data_ = (T*)storage;
-			this->is_zero_ = false;
 		}
 
 		static size_t bytes_required(size_t size) {
@@ -484,8 +461,6 @@ namespace ks
 			// in mutating sumbuild) where we promise to
 			// be careful.
 			this->data_ = that.data_;
-			this->is_zero_ = that.is_zero_;
-			this->z_ = that.z_;
 			return *this;
 		}
 
@@ -518,23 +493,17 @@ namespace ks
 		T* data() { return data_; }
 		const T* data() const { return data_; }
 
-		T& operator[](int i) { if (is_zero_) return z_; else return data_[i]; }
-		T const& operator[](int i) const {  if (is_zero_) return z_; else return data_[i]; }
+		T& operator[](int i) { return data_[i]; }
+		T const& operator[](int i) const { return data_[i]; }
 
 		static vec<T> create(allocator_base * alloc, size_t size)
 		{
 			return vec<T>(alloc, size);
 		}
 
-		bool is_zero() const { return is_zero_; }
-
 		T zero_element(allocator * alloc) const {
-			if (is_zero())
-				return z_;
-			else {
-				KS_ASSERT(size() > 0);
-				return zero(alloc, data_[0]);
-			}
+			KS_ASSERT(size() > 0);
+			return zero(alloc, data_[0]);
 		}
 
 		bool operator == (vec const& other) const {
@@ -636,13 +605,6 @@ namespace ks
           return FFold_recursive(alloc, 0, f, acc, v, f_, dacc, dv);
         }
 
-	// specialize zero(vec<T>)
-	template <class T>
-	vec<T> zero(allocator * alloc, vec<T> const& val)
-	{
-		return vec<T> {zero_tag, val.zero_element(alloc), (size_t)val.size()};
-	}
-
 	template <class T>
 	vec<T> inflated_deep_copy(allocator_base * alloc, vec<T> t)
 	{
@@ -697,10 +659,6 @@ namespace ks
 
 	template<class T>
 	bool memory_overlaps(const void* start, const void* end, vec<T> const& v) {
-		if (v.is_zero()) {
-			return v.size() != 0 && memory_overlaps(start, end, v[0]);
-		}
-
 		for (int i = 0; i != v.size(); ++i) {
 			if (memory_overlaps(start, end, v[i])) {
 				return true;
@@ -743,25 +701,6 @@ namespace ks
 		   We'll make sure that this function is never called with an argument
 		   that lives in the allocator's buffer before dest->startOfDestination.
 		   */
-		if (v->is_zero()) {
-			int sz = v->size();
-			if (sz == 0) {
-				return;   // no data to be copied
-			}
-			T zero_value = (*v)[0];
-			/* When we do the copydown, we'll be making sz copies
-			   of zero_value. We need to make sure that none of those
-			   copies will overwrite data referred to by zero_value.
-			   The strictest condition applies when the final copy
-			   is made, so we can start by assuming that the first
-			   (sz - 1) copies will be fine. */
-			dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz))
-					+ (sz - 1) * inflated_bytes(zero_value);
-			prepare_copydown_inplace(dest, &zero_value);
-			*v = vec<T>(zero_tag, zero_value, sz);
-			return;
-		}
-		
 		void * sourceData = v->data();
 		if (sourceData < dest->startOfDestination) {
 			/* This data lives before the copydown location in the buffer.
@@ -827,19 +766,9 @@ namespace ks
 	template<class T>
 	void copydown_by_memmove_inplace(allocator * alloc, vec<T> * v) {
 		int sz = v->size();
-		if (v->is_zero()) {
-			if (sz != 0) {
-				T elem = (*v)[0];
-				*v = vec<T>(alloc, sz);
-				for (int i = 0; i != sz; ++i) {
-					(*v)[i] = elem;
-				}
-			}
-		} else {
-			T* oldData = v->data();
-			*v = vec<T>(alloc, sz);
-			std::memmove(v->data(), oldData, static_cast<size_t>(sz) * sizeof(T));
-		}
+		T* oldData = v->data();
+		*v = vec<T>(alloc, sz);
+		std::memmove(v->data(), oldData, static_cast<size_t>(sz) * sizeof(T));
 		for (int i = 0; i != sz; ++i) {
 			copydown_by_memmove_inplace(alloc, &((*v)[i]));
 		}
@@ -909,14 +838,6 @@ namespace ks
 		{
 			int n = t2.size();
 			KS_ASSERT(t1->size() == n);
-
-			if (t2.is_zero()) return;
-
-			if (t1->is_zero()) {
-				*t1 = t2; // TODO: memory aliasing here?   When we free, this will get lost.  We need another heap....
-				return;
-			}
-
 			for (int i = 0; i < n; ++i)
 				ks::inplace_add_t<T>::go(&(*t1)[i], t2[i]);
 		}
@@ -965,18 +886,6 @@ namespace ks
 		return ret;
 	}
 
-	vec<double> constVec(allocator * alloc, int n, double val)
-	{
-          if (val == 0.0) {
-            return vec<double>(zero_tag, 0.0, n);
-          } else {
-		vec<double> ret(alloc, n);
-		for(int j = 0; j < n; ++j)
-			ret[j] = val;
-		return ret;
-          }
-	}
-
 	template <class T>
 	vec<T> constVec(allocator * alloc, int n, T val)
 	{
@@ -1004,6 +913,13 @@ namespace ks
 		});
 	}
 
+	// specialize zero(vec<T>)
+	template <class T>
+	vec<T> zero(allocator * alloc, vec<T> const& val)
+	{
+		return constVec(alloc, val.size(), val.zero_element(alloc));
+	}
+
 
 	// -- Specialize type_to_string
 	template <typename T>
@@ -1019,12 +935,6 @@ namespace ks
 	template <class T>
 	vec<T> ts_add(allocator * alloc, vec<T> const& a, vec<T> const& b)
 	{
-		if (a.is_zero())
-			return b;
-
-		if (b.is_zero())
-			return a;
-
 		KS_ASSERT(a.size() == b.size());
 		vec<T> ret = vec<T>::create(alloc, a.size());
 
@@ -1040,9 +950,6 @@ namespace ks
 	template <class T>
 	vec<T> ts_scale(allocator * alloc, double val, vec<T> const& v)
 	{
-		if (v.is_zero())
-			return v;
-
 		KS_ASSERT(v.size() != 0);
 		int size = v.size();
 		vec<T> ret = vec<T>::create(alloc, size);
@@ -1055,11 +962,6 @@ namespace ks
 	template <class T>
 	T sum(allocator * alloc, vec<T> const& v)
 	{
-		if (v.is_zero()) {
-			std::cerr <<"okkk?";
-			return zero(alloc, T{});
-		}
-
 		if (v.size() == 0) { return zero(alloc, T{}); }
 
 		if (v.size() == 1) return v[0];
@@ -1073,7 +975,6 @@ namespace ks
 	std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
 	{
 		s << "[";
-		if (v.is_zero()) return s << "ZERO(" << v.size() << ")]";
 		for (int i = 0; i < v.size(); ++i)
 			s << (i > 0 ? ", " : "") << v[i];
 		return s << "]";
