@@ -190,7 +190,7 @@ data TypeX
   | TypeString
   | TypeTuple [TypeX]
 
-  | TypeTensor Integer TypeX
+  | TypeTensor Int TypeX
 
   | TypeLam TypeX TypeX  -- Domain -> Range
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
@@ -810,7 +810,7 @@ instance Pretty TypeX where
   pprPrec p (TypeTensor 1 ty) = parensIf p precTyApp $
                                 text "Vec" <+> pprParendType ty
   pprPrec p (TypeTensor d ty) = parensIf p precTyApp $
-                                text "Tensor" <+> integer d <+> pprParendType ty
+                                text "Tensor" <+> int d <+> pprParendType ty
   pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
                                      (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to) = parensIf p precZero $
