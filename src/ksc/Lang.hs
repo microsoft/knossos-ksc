@@ -807,7 +807,7 @@ instance Pretty Konst where
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
 instance Pretty TypeX where
-  pprPrec p (TypeTensor 1 ty) = parensIf p precTyApp $
+  pprPrec p (TypeTensor 1 ty) = parensIf p precTyApp $    -- TODO: remove this special case once other Knossos compoennts understand Tensor
                                 text "Vec" <+> pprParendType ty
   pprPrec p (TypeTensor d ty) = parensIf p precTyApp $
                                 text "Tensor" <+> int d <+> pprParendType ty
