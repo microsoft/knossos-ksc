@@ -299,7 +299,7 @@ namespace ks
 	};
 
 	// ===============================  Zero  ==================================
-	// This template to be overloaded when e.g. a vector of T needs to use val to discover a size
+	// This template to be overloaded when e.g. a tensor of T needs to use val to discover a size
 	template <class T>
 	T zero(allocator * alloc, T const& val)
 	{
@@ -410,36 +410,118 @@ namespace ks
 		}
 	};
 
-	// ===============================  Vector class ==================================
-	template <class T>
-	class vec
+	// ===============================  Tensor class ==================================
+	template<size_t Dummy> using int_t = int;
+
+	template<typename T> struct tensor_dimension_base;
+
+	template<size_t... Indices>
+	struct tensor_dimension_base<std::index_sequence<Indices...>>
 	{
-		size_t size_;
+		using index_type = std::tuple<int_t<Indices>...>;
+
+		static int num_elements(index_type const& size) {
+			return (1 * ... * std::get<Indices>(size));
+		}
+
+		static std::string index_to_string(index_type const& i) {
+			std::string ret = ("(" + ... + (std::to_string(std::get<Indices>(i)) + ","));
+			ret.back() = ')'; // replaces final comma
+			return ret;
+		}
+
+		static void check_index_in_range(index_type const& i, index_type const& tensor_size) {
+			if (((std::get<Indices>(i) >= std::get<Indices>(tensor_size)) || ...)) {
+				std::cerr << "ERROR: Accessing element " << index_to_string(i) << " of tensor of size " << index_to_string(tensor_size) << std::endl;
+				abort();
+			}
+		}
+	};
+
+	template<size_t Dim>
+	struct tensor_dimension : public tensor_dimension_base<std::make_index_sequence<Dim>>
+	{
+		static_assert(Dim >= 2u);
+
+		using base = tensor_dimension_base<std::make_index_sequence<Dim>>;
+		using typename base::index_type;
+
+		template<typename IndexType>
+		static int flatten_index_recursive(IndexType const& index, IndexType const& tensor_size) {
+			/* flatten_index({i1, i2, i3}, {s1, s2, s3})
+			           = i3 + s3 * i2 + s3 * s2 * i1
+			           = i3 + s3 * (i2 + s2 * i1)
+			           = i3 + s3 * flatten_index({i1, i2}, {s1, s2})
+			    See specialization tensor_dimension<1> for the base case
+			       flatten_index({i1}, {s1}) = i1 */
+			return std::get<Dim - 1u>(index) + std::get<Dim - 1u>(tensor_size) *
+					tensor_dimension<Dim - 1u>::flatten_index_recursive(index, tensor_size);
+		}
+
+		static int flatten_index(index_type index, index_type tensor_size) {
+#ifndef NDEBUG
+			base::check_index_in_range(index, tensor_size);
+#endif
+			return flatten_index_recursive(index, tensor_size);
+		}
+	};
+
+	// Dimension 1 is a special case because we don't use 1-tuples, so
+	// the index_type is a plain int.
+	template<>
+	struct tensor_dimension<1>
+	{
+		using index_type = int;
+
+		static int num_elements(index_type size) { return size; }
+
+		template<typename IndexType>
+		static int flatten_index_recursive(IndexType const& index, IndexType const& /*tensor_size*/) {
+			return std::get<0>(index);
+		}
+
+		static int flatten_index(index_type index, index_type tensor_size) {
+#ifndef NDEBUG
+			if (index >= tensor_size) {
+				std::cerr << "ERROR: Accessing element " << index << " of tensor of size " << tensor_size << std::endl;
+				abort();
+			}
+#endif
+			return index;
+		}
+	};
+
+	template <size_t Dim, class T>
+	class tensor
+	{
+		using dimension = tensor_dimension<Dim>;
+
+		typename dimension::index_type size_;
 		T* data_;
 
 	public:
-
+		typedef typename dimension::index_type index_type;
 		typedef T value_type;
 
-		vec() :
-			size_{ 0 },
+		tensor() :
+			size_{},
 			data_{ nullptr }
 		{
 		}
 
-		vec(allocator_base * alloc, size_t  size) {
-			allocate(alloc, size);
+		tensor(allocator_base * alloc, index_type dims) {
+			allocate(alloc, dims);
 		}
 
-		void allocate(allocator_base * alloc, size_t size)
+		void allocate(allocator_base * alloc, index_type size)
 		{
 			void *storage = alloc->allocate(bytes_required(size));
 			this->size_ = size;
 			this->data_ = (T*)storage;
 		}
 
-		static size_t bytes_required(size_t size) {
-			return sizeof(T) * size;
+		static size_t bytes_required(index_type size) {
+			return sizeof(T) * static_cast<size_t>(dimension::num_elements(size));
 		}
 
                 // We cannot efficiently construct from a std::vector.
@@ -447,14 +529,16 @@ namespace ks
                 // allocate and copy because we have no guarantee
                 // that the std::vector will not mutate or vanish
                 // beneath our feet.
-		vec(allocator_base * alloc, std::vector<T> const& that) : vec{ alloc, that.size() }
+		tensor(allocator_base * alloc, std::vector<T> const& that) : tensor{ alloc, that.size() }
 		{
+			static_assert(Dim == 1);
 			// Copying from std vector - allocate.
 			for (size_t i = 0; i < that.size(); ++i)
 				data_[i] = that[i];
 		}
 
-		int size() const { return int(size_); }
+		index_type size() const { return size_; }
+		int num_elements() const { return dimension::num_elements(size_); }
 
 		T* data() { return data_; }
 		const T* data() const { return data_; }
@@ -462,48 +546,47 @@ namespace ks
 		T& operator[](int i) { return data_[i]; }
 		T const& operator[](int i) const { return data_[i]; }
 
-		static vec<T> create(allocator_base * alloc, size_t size)
+		T const& index(index_type i) const {
+			return data_[dimension::flatten_index(i, size_)];
+		}
+
+		static tensor<Dim, T> create(allocator_base * alloc, index_type size)
 		{
-			return vec<T>(alloc, size);
+			return tensor<Dim, T>(alloc, size);
 		}
 
 		T zero_element(allocator * alloc) const {
-			KS_ASSERT(size() > 0);
+			KS_ASSERT(num_elements() > 0);
 			return zero(alloc, data_[0]);
 		}
 
-		bool operator == (vec const& other) const {
+		bool operator == (tensor const& other) const {
 			if (size() != other.size()) {
 				return false;
 			}
-			for (int i = 0; i != size(); ++i) {
-				if ((*this)[i] != other[i]) {
+			for (int i = 0, ne = num_elements(); i != ne; ++i) {
+				if (data_[i] != other.data_[i]) {
 					return false;
 				}
 			}
 			return true;
 		}
 
-		bool operator != (vec const& other) const { return !(*this == other); }
+		bool operator != (tensor const& other) const { return !(*this == other); }
 	};
 
-	template <class T>
-	int size(vec<T> const & v)
+	template<class T> using vec = tensor<1, T>;
+
+	template<size_t Dim, class T>
+	auto size(tensor<Dim, T> const & t)
 	{
-		return v.size();
+		return t.size();
 	}
 
-	template <class T>
-	T const &index(int i, vec<T> const & v)
+	template <size_t Dim, class T>
+	T const &index(typename tensor<Dim, T>::index_type i, tensor<Dim, T> const & t)
 	{
-#ifndef NDEBUG
-		if (i >= v.size()) {
-			std::cerr << "ERROR: Accessing element " << i << " of vec of length " << v.size() << std::endl;
-			throw "oiks";
-		}
-#endif
-
-		return v[i];
+		return t.index(i);
 	}
 
 	template <class T, class F>
@@ -571,12 +654,12 @@ namespace ks
           return FFold_recursive(alloc, 0, f, acc, v, f_, dacc, dv);
         }
 
-	template <class T>
-	vec<T> inflated_deep_copy(allocator_base * alloc, vec<T> t)
+	template <size_t Dim, class T>
+	tensor<Dim, T> inflated_deep_copy(allocator_base * alloc, tensor<Dim, T> t)
 	{
-		vec<T> ret = vec<T>::create(alloc, t.size());
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
 
-		for (int i = 0; i < t.size(); ++i)
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
 			ret[i] = inflated_deep_copy(alloc, t[i]);
 		return ret;
 	}
@@ -595,12 +678,12 @@ namespace ks
 		return inflated_bytes_tupleimpl(t, std::index_sequence_for<Types...>{});
 	}
 
-	template<class T>
-	size_t inflated_bytes(vec<T> const& v) {
-		int sz = v.size();
-		size_t ret = allocator::padded_size(vec<T>::bytes_required(sz));
-		for (int i = 0; i != sz; ++i) {
-			ret += inflated_bytes(v[i]);
+	template<size_t Dim, class T>
+	size_t inflated_bytes(tensor<Dim, T> const& t) {
+		int ne = t.num_elements();
+		size_t ret = allocator::padded_size(sizeof(T) * ne);
+		for (int i = 0; i != ne; ++i) {
+			ret += inflated_bytes(t[i]);
 		}
 		return ret;
 	}
@@ -623,27 +706,28 @@ namespace ks
 		return memory_overlaps_tupleimpl(start, end, t, std::index_sequence_for<Types...>{});
 	}
 
-	template<class T>
-	bool memory_overlaps(const void* start, const void* end, vec<T> const& v) {
-		for (int i = 0; i != v.size(); ++i) {
-			if (memory_overlaps(start, end, v[i])) {
+	template<size_t Dim, class T>
+	bool memory_overlaps(const void* start, const void* end, tensor<Dim, T> const& t) {
+		int num_elements = t.num_elements();
+		for (int i = 0; i != num_elements; ++i) {
+			if (memory_overlaps(start, end, t[i])) {
 				return true;
 			}
 		}
-		return v.data() < end && v.data() + v.size() > start;
+		return t.data() < end && t.data() + num_elements > start;
 	}
 
 	struct prepare_copydown_state
 	{
-		unsigned char * subobjectDestination;   // destination of the next vec subobject
-		                                        // (updated whenever we encounter a vec during iteration over subobjects)
-		unsigned char * const startOfDestination;   // destination of first vec in the iteration sequence
+		unsigned char * subobjectDestination;   // destination of the next tensor subobject
+		                                        // (updated whenever we encounter a tensor during iteration over subobjects)
+		unsigned char * const startOfDestination;   // destination of first tensor in the iteration sequence
 		allocator * alloc;
 	};
 
 	template<class T>
 	void prepare_copydown_inplace(prepare_copydown_state *, T *) {
-		/* There's nothing to do unless T has a vec subobject. */
+		/* There's nothing to do unless T has a tensor subobject. */
 	}
 
 	template<class TupleT, size_t... Indices>
@@ -656,8 +740,8 @@ namespace ks
 		prepare_copydown_inplace_tupleimpl(dest, t, std::index_sequence_for<Types...>{});
 	}
 
-	template<class T>
-	void prepare_copydown_inplace(prepare_copydown_state * dest, vec<T> * v) {
+	template<size_t Dim, class T>
+	void prepare_copydown_inplace(prepare_copydown_state * dest, tensor<Dim, T> * t) {
 		/* Note that this function modifies *v in-place. That's OK
 		   provided that *v lives either
 		   - on the stack; or
@@ -667,7 +751,7 @@ namespace ks
 		   We'll make sure that this function is never called with an argument
 		   that lives in the allocator's buffer before dest->startOfDestination.
 		   */
-		void * sourceData = v->data();
+		void * sourceData = t->data();
 		if (sourceData < dest->startOfDestination) {
 			/* This data lives before the copydown location in the buffer.
 			   We assume that this means it can't contain any pointers to
@@ -675,10 +759,10 @@ namespace ks
 			   any of the data belonging to subobjects of *v.
 			   That's fortunate, because we wouldn't be allowed to modify
 			   objects before the copydown location even if we wanted to. */
-			KS_ASSERT(!memory_overlaps(dest->startOfDestination, dest->subobjectDestination, *v));
-			dest->subobjectDestination += inflated_bytes(*v);
+			KS_ASSERT(!memory_overlaps(dest->startOfDestination, dest->subobjectDestination, *t));
+			dest->subobjectDestination += inflated_bytes(*t);
 		} else {
-			int sz = v->size();
+			int num_elements = t->num_elements();
 			if (sourceData < dest->subobjectDestination) {
 				/* This source overlaps the desination of another subobject that comes
 				   earlier in the iteration order. We need to move it out of the way. */
@@ -687,12 +771,12 @@ namespace ks
 					   in the way! */
 					dest->alloc->allocate(dest->subobjectDestination - (unsigned char*)dest->alloc->top_ptr());
 				}
-				*v = vec<T>(dest->alloc, sz);
-				std::memcpy(v->data(), sourceData, sz * (int)sizeof(T));
+				*t = tensor<Dim, T>(dest->alloc, t->size());
+				std::memcpy(t->data(), sourceData, num_elements * (int)sizeof(T));
 			}
-			dest->subobjectDestination += allocator::padded_size(vec<T>::bytes_required(sz));
-			for (int i = 0; i != sz; ++i) {
-				prepare_copydown_inplace(dest, &((*v)[i]));
+			dest->subobjectDestination += allocator::padded_size(sizeof(T) * num_elements);
+			for (int i = 0; i != num_elements; ++i) {
+				prepare_copydown_inplace(dest, &((*t)[i]));
 			}
 		}
 	}
@@ -702,7 +786,7 @@ namespace ks
 	   precondition for copydown_by_memmove below.
 
 	   This function works by calculating where the eventual
-	   destination will be for the data of each vec subobject.
+	   destination will be for the data of each tensor subobject.
 	   This involves replicating the sequence of allocations
 	   that will take place, but without actually calling
 	   an allocator.
@@ -729,26 +813,26 @@ namespace ks
 		copydown_by_memmove_inplace_tuple(alloc, t, std::index_sequence_for<Types...>{});
 	}
 
-	template<class T>
-	void copydown_by_memmove_inplace(allocator * alloc, vec<T> * v) {
-		int sz = v->size();
-		T* oldData = v->data();
-		*v = vec<T>(alloc, sz);
-		std::memmove(v->data(), oldData, static_cast<size_t>(sz) * sizeof(T));
-		for (int i = 0; i != sz; ++i) {
-			copydown_by_memmove_inplace(alloc, &((*v)[i]));
+	template<size_t Dim, class T>
+	void copydown_by_memmove_inplace(allocator * alloc, tensor<Dim, T> * t) {
+		int num_elements = t->num_elements();
+		T* oldData = t->data();
+		*t = tensor<Dim, T>(alloc, t->size());
+		std::memmove(t->data(), oldData, sizeof(T) * static_cast<size_t>(num_elements));
+		for (int i = 0; i != num_elements; ++i) {
+			copydown_by_memmove_inplace(alloc, &((*t)[i]));
 		}
 	}
 
 	/* Perform a copydown by iterating over the subobjects of val;
-	   for each subobject which is a vec, copy its data to the
+	   for each subobject which is a tensor, copy its data to the
 	   desired position using memmove.
 
-	   Precondition: for each vec<T> subobject v, there must be no
+	   Precondition: for each tensor<T> subobject t, there must be no
 	   overlap between the intervals
-	     [v.data(), v.data() + v.size()*sizeof(T)) and
+	     [t.data(), t.data() + t.num_elements()*sizeof(T)) and
 	     [alloc->ptr_at(mark), newvdata)
-	   where newvdata is the intended new value of v.data() after
+	   where newvdata is the intended new value of t.data() after
 	   copydown.
 	   (If this condition was not satisfied, then v's data would
 	   be overwritten before we got the chance to move it, because
@@ -758,7 +842,7 @@ namespace ks
 
 	   If we assume that "mark" is always at the boundary of an
 	   allocation, not in the middle of one, then the precondition
-	   reduces to ensuring that v.data() is not in the interval
+	   reduces to ensuring that t.data() is not in the interval
 	   [alloc->ptr_at(mark), newvdata).
 	   */
 	template<class T>
@@ -797,14 +881,13 @@ namespace ks
 		return ret;
 	}
 
-	// specialize inplace_add(vec<T>*,vec<T>)
-	template <class T>
-	struct inplace_add_t<vec<T>> {
-		static void go(vec<T> *t1, const vec<T> &t2)
+	// specialize inplace_add(tensor<Dim,T>*,tensor<Dim,T>)
+	template <size_t Dim, class T>
+	struct inplace_add_t<tensor<Dim, T>> {
+		static void go(tensor<Dim, T> *t1, const tensor<Dim, T> &t2)
 		{
-			int n = t2.size();
-			KS_ASSERT(t1->size() == n);
-			for (int i = 0; i < n; ++i)
+			KS_ASSERT(t1->size() == t2.size());
+			for (int i = 0, n = t1->num_elements(); i < n; ++i)
 				ks::inplace_add_t<T>::go(&(*t1)[i], t2[i]);
 		}
 	};
@@ -861,32 +944,37 @@ namespace ks
 		});
 	}
 
-	// specialize zero(vec<T>)
-	template <class T>
-	vec<T> zero(allocator * alloc, vec<T> const& val)
+	// specialize zero(tensor<Dim,T>)
+	template <size_t Dim, class T>
+	tensor<Dim, T> zero(allocator * alloc, tensor<Dim, T> const& val)
 	{
-		return constVec(alloc, val.size(), val.zero_element(alloc));
+		tensor<Dim, T> ret(alloc, val.size());
+		auto z = val.zero_element(alloc);
+		for (int i = 0; i != ret.num_elements(); ++i) {
+			ret[i] = z;
+		}
+		return ret;
 	}
 
 
 	// -- Specialize type_to_string
-	template <typename T>
-	struct type_to_string<ks::vec<T>>
+	template <size_t Dim, typename T>
+	struct type_to_string<ks::tensor<Dim, T>>
 	{
 		static std::string name()
 		{
-			return "vec<" + type_to_string<T>::name() + ">";
+			return "tensor<" + std::to_string(Dim) + ", " + type_to_string<T>::name() + ">";
 		}
 	};
 
 	// Elementwise addition
-	template <class T>
-	vec<T> ts_add(allocator * alloc, vec<T> const& a, vec<T> const& b)
+	template <size_t Dim, class T>
+	tensor<Dim, T> ts_add(allocator * alloc, tensor<Dim, T> const& a, tensor<Dim, T> const& b)
 	{
 		KS_ASSERT(a.size() == b.size());
-		vec<T> ret = vec<T>::create(alloc, a.size());
+		auto ret = tensor<Dim, T>::create(alloc, a.size());
 
-		for (int i = 0; i < a.size(); ++i)
+		for (int i = 0, ne = a.num_elements(); i != ne; ++i)
 			ret[i] = ts_add(alloc, a[i], b[i]);
 		return ret;
 	}
@@ -894,15 +982,13 @@ namespace ks
 	template <class T>
 	T ts_scale(allocator * alloc, double s, T const& t);
 
-	// Scale a vec
-	template <class T>
-	vec<T> ts_scale(allocator * alloc, double val, vec<T> const& v)
+	// Scale a tensor
+	template <size_t Dim, class T>
+	tensor<Dim, T> ts_scale(allocator * alloc, double val, tensor<Dim, T> const& t)
 	{
-		KS_ASSERT(v.size() != 0);
-		int size = v.size();
-		vec<T> ret = vec<T>::create(alloc, size);
-		for (int i = 0; i < size; ++i)
-			ret[i] = ts_scale(alloc, val, v[i]);
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
+			ret[i] = ts_scale(alloc, val, t[i]);
 		return ret;
 	}
 
@@ -935,11 +1021,11 @@ namespace ks
 	tuple<> shape(allocator_base *, double const&) { return {}; }
 	tuple<> shape(allocator_base *, std::string const&) { return {}; }
 
-	template<class T>
-	auto shape(allocator_base * alloc, vec<T> const& v) {
-		vec<decltype(shape(alloc, v[0]))> s(alloc, v.size());
-		for (int ii = 0; ii != v.size(); ++ii) {
-			s[ii] = shape(alloc, v[ii]);
+	template<size_t Dim, class T>
+	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
+		tensor<Dim, decltype(shape(alloc, t[0]))> s(alloc, t.size());
+		for (int ii = 0, ne = t.num_elements(); ii != ne; ++ii) {
+			s[ii] = shape(alloc, t[ii]);
 		}
 		return s;
 	}
@@ -1072,30 +1158,35 @@ namespace ks
         template <class U0, class... Us>
         inline tuple<U0, Us...> ts_neg(allocator * alloc, tuple<U0, Us...> t) { return prepend(ts_neg(alloc, head(t)), ts_neg(alloc, tail(t))); }
 
-        template <class T>
-        inline vec<T> ts_neg(allocator * alloc, vec<T> v) { return build<T>(alloc, v.size(), [v](allocator * alloc, int i){ return ts_neg(alloc, v[i]); }); }
+	template <size_t Dim, class T>
+	inline tensor<Dim, T> ts_neg(allocator * alloc, tensor<Dim, T> t) {
+		tensor<Dim, T> ret(alloc, t.size());
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+			ret[i] = ts_neg(alloc, t[i]);
+		}
+	}
 
 	inline int to_integer(int d) { return d; }
 
-	template<size_t I, typename TupleType>
-	auto unzip_element(allocator * alloc, vec<TupleType> const& v)
+	template<size_t I, size_t Dim, typename TupleType>
+	auto unzip_element(allocator * alloc, tensor<Dim, TupleType> const& t)
 	{
-		vec<std::tuple_element_t<I, TupleType>> ret(alloc, v.size());
-		for (int i = 0; i != v.size(); ++i)
+		tensor<Dim, std::tuple_element_t<I, TupleType>> ret(alloc, t.size());
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
 		{
-			ret[i] = std::get<I>(v[i]);
+			ret[i] = std::get<I>(t[i]);
 		}
 		return ret;
 	}
-	template<typename TupleType, size_t... Indices>
-	auto unzip_impl(allocator * alloc, vec<TupleType> const& v, std::index_sequence<Indices...>)
+	template<typename TupleType, size_t Dim, size_t... Indices>
+	auto unzip_impl(allocator * alloc, tensor<Dim, TupleType> const& t, std::index_sequence<Indices...>)
 	{
-		return std::make_tuple(unzip_element<Indices>(alloc, v)...);
+		return std::make_tuple(unzip_element<Indices>(alloc, t)...);
 	}
-	template <class... Types>
-	auto unzip(allocator * alloc, vec<tuple<Types...>> const& v)
+	template <size_t Dim, class... Types>
+	auto unzip(allocator * alloc, tensor<Dim, tuple<Types...>> const& t)
 	{
-		return unzip_impl(alloc, v, std::index_sequence_for<Types...>{});
+		return unzip_impl(alloc, t, std::index_sequence_for<Types...>{});
 	}
 
 	// ========================= Random primitives ============
@@ -1188,14 +1279,14 @@ namespace ks
 		return dot(head(t1), head(t2)) + dot(tail(t1), tail(t2));
 	}
 
-	template <class T1, class T2>
-	inline double dot(vec<T1> t1, vec<T2> t2)
+	template <size_t Dim, class T1, class T2>
+	inline double dot(tensor<Dim, T1> t1, tensor<Dim, T2> t2)
 	{
 		double ret = 0;
 
 		KS_ASSERT(t1.size() == t2.size());
 
-		for (int i = 0; i < t1.size(); i++)
+		for (int i = 0, ne = t1.num_elements(); i < ne; i++)
 		{
 			ret += dot(t1[i], t2[i]);
 		}
