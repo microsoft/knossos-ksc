@@ -51,7 +51,13 @@ cabal v2-build --ghc-option=-Wwarn
 
 `choco` users on Windows should find that cabal and ghc are already on
 their `PATH` so that command will run fine.  Ubuntu users might need
-to use the following, more explicit, command line.
+to put it on their `PATH` with
+
+```
+export PATH=/opt/ghc/8.6.5/bin:/opt/cabal/3.0/bin:$PATH
+```
+
+or use the following, more explicit, command line.
 
 ```
 /opt/cabal/bin/cabal-3.0 v2-build --ghc-option=-Wwarn --with-ghc /opt/ghc/bin/ghc-8.6.5
