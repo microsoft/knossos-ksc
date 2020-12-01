@@ -4,7 +4,7 @@ Expr: lightweight classes implementing the Knossos IR
 
 from typing import Union, List
 from ksc.type import Type
-from ksc.utils import paren
+from ksc.utils import paren, KRecord
 
 #####################################################################
 # 
@@ -70,32 +70,22 @@ from ksc.utils import paren
 #         ^^^^^^^^ ^^^^^^^^^^
 #         cond     body
 
-class Expr:
+class Expr(KRecord):
     '''Base class for AST nodes.'''
-    type: Type
 
-    def __init__(self, **args):
-        for (nt,v) in args.items():
-            setattr(self, nt, v)
-
-    def __eq__(self, that):
-        if type(self) != type(that):
-            return False
-
-        for nt in self.__annotations__:
-            if getattr(self, nt) != getattr(that,nt):
-                return False
-        return True
+    type: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
 
     def nodes(self):
         """
         Return child nodes of this expr
         """
+        assert False # TODO: remove this method
         for nt in self.__annotations__:
             yield getattr(self, nt)
 
     def __str__(self):
-        return paren(type(self).__name__ + ' ' + ' '.join(str(node) for node in self.nodes()))
+        nodes = (str(getattr(self, nt)) for nt in self.__annotations__)
+        return paren(type(self).__name__ + ' ' + ' '.join(nodes))
 
 class Def(Expr):
     '''Def(name, type, args, body). 
