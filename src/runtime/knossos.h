@@ -414,7 +414,6 @@ namespace ks
 	template <class T>
 	class vec
 	{
-		//TODO Full set of 5 ctors/assigners
 		size_t size_;
 		T* data_;
 
@@ -441,39 +440,6 @@ namespace ks
 
 		static size_t bytes_required(size_t size) {
 			return sizeof(T) * size;
-		}
-
-                // We can efficiently copy construct (i.e. from a vec
-                // of the same type).  We just use operator=.
-		vec(vec<T> const& that) 
-		{
-			this->operator=(that);
-		}
-
-                // operator= is fast because it merely involves
-                // assigning small things
-		vec& operator=(const vec<T>& that)
-		{
-			this->size_ = that.size_;
-			// Yes, this will alias, but there is no
-			// deletion, and mutation only happens under
-			// controlled circumstances (inplace_add used
-			// in mutating sumbuild) where we promise to
-			// be careful.
-			this->data_ = that.data_;
-			return *this;
-		}
-
-                // We cannot efficiently construct from a vec of a
-                // different type.  Instead we have to allocate and
-                // copy all the data item by item to give a C++ a
-                // chance to auto-convert it.
-		template <class U>
-		vec(allocator_base * alloc, vec<U> const& that) : vec{ alloc, that.size() }
-		{
-			KS_ASSERT(size_ != 0);
-			for (int i = 0; i < that.size(); ++i)
-				this->data_[i] = that[i];
 		}
 
                 // We cannot efficiently construct from a std::vector.
