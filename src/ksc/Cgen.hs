@@ -641,7 +641,6 @@ mangleType = \case
     TypeFloat     -> "f"
     TypeString    -> "s"
     TypeTuple tys -> "<" ++ concatMap mangleType tys ++ ">"
-    TypeTensor 1 ty -> "v" ++ mangleType ty
     TypeTensor d ty -> "T" ++ show d ++ mangleType ty
     TypeLam a b   -> "l<" ++ mangleType a ++ mangleType b ++ ">"
     TypeLM _ _    -> error "Can't mangle TypeLM"
