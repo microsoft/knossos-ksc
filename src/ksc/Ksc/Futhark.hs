@@ -232,7 +232,7 @@ toFutharkType L.TypeInteger    = I32
 toFutharkType L.TypeFloat      = F64
 toFutharkType L.TypeBool       = Bool
 toFutharkType (L.TypeTuple ts) = Tuple $ map toFutharkType ts
-toFutharkType (L.TypeVec t)    = Array DimAny $ toFutharkType t
+toFutharkType (L.TypeTensor 1 t) = Array DimAny $ toFutharkType t
 toFutharkType L.TypeString     = Array DimAny I8
 toFutharkType t =
   error $ "toFutharkType: unhandled " ++ show t
@@ -311,7 +311,7 @@ sumbuild ret xs =
   where ret' = toFutharkType ret
 
 callPrimFun :: String -> L.Type -> L.TExpr -> Exp
-callPrimFun "deltaVec" (L.TypeVec ret) (L.Tuple [n, i, v]) =
+callPrimFun "deltaVec" (L.TypeTensor 1 ret) (L.Tuple [n, i, v]) =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
                          toFutharkExp i,

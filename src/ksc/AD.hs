@@ -129,8 +129,8 @@ gradBuild TupleAD s n ti body
   where
      t_ty = typeof body
      p = TVar res_ty resVar
-     res_ty = TypeTuple [ TypeVec t_ty
-                        , TypeVec (TypeLM (typeof s) t_ty) ]
+     res_ty = TypeTuple [ TypeTensor 1 t_ty
+                        , TypeTensor 1 (TypeLM (typeof s) t_ty) ]
      grad_body = mkLet (gradTVar TupleAD s ti)
                        (Tuple [Var ti, lmZero s (Var ti)]) $
                  gradE TupleAD s body
