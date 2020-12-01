@@ -8,7 +8,7 @@ import argparse
 from pathlib import Path
 from contextlib import contextmanager
 
-from lib import *
+from lib import ts2ks
 
 parser = argparse.ArgumentParser(description="Convert TorchScript to Knossos IR")
 parser.add_argument("--input_file", required=True, help="TorchScript [file_path].py")
