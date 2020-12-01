@@ -401,7 +401,7 @@ if __name__ == "__main__":
     print(f"onnx2ks: Reading from {filename}")
     model = onnx.load(filename)
 
-    print(f"onnx2ks: Writing graph to {filename}.txt")
+    print(f"onnx2ks: Writing graph to {outbase}.onnx.txt")
     with open(outbase + ".onnx.txt", "w") as out:
         out.write(onnx.helper.printable_graph(model.graph))
 
