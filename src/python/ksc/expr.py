@@ -364,4 +364,4 @@ if __name__ == "__main__":
     from ksc.parse_ks import parse_ks_file
     for decl in parse_ks_file("test/ksc/syntax-primer.ks"):
         print(decl)
-        print(pystr(decl,0))  # Pystr here doesn't get dispatched properly... singledispacth sees __main__.Def, not ksc.expr.def
+        print(pystr(decl,0))  # Pystr here doesn't get dispatched properly... singledispatch sees __main__.Def, not ksc.expr.def
