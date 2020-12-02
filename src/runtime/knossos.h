@@ -812,22 +812,12 @@ namespace ks
 	template <class T, class F>
 	T sumbuild(allocator * alloc, int size, F f)
 	{
-		if (size == 0)
-		{
-			std::cerr << "hope this is ok";
-			return zero(alloc, T{});
-		}
-
-		if (size == 1)
-			return T{f(alloc, 0)};
-
-		T f0 = f(alloc, 0);
-		T ret = inflated_deep_copy(alloc, f0);
-		for (int i = 1; i < size; ++i)
-		{
-			auto mark = alloc->mark();
-			T fi = f(alloc, i);
-			inplace_add_t<T>::go(&ret, fi);
+		KS_ASSERT(size > 0);
+		alloc_mark_t mark = alloc->mark();
+		T ret = copydown(alloc, mark, f(alloc, 0));
+		mark = alloc->mark();
+		for (int i = 1; i != size; ++i) {
+			inplace_add_t<T>::go(&ret, f(alloc, i));
 			alloc->reset(mark);
 		}
 		return ret;
