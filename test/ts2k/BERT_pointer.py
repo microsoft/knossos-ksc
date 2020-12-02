@@ -1,7 +1,8 @@
+import sys
 import torch
 from transformers import BertConfig, BertScriptableForQuestionAnswering
 
-from ts2ks.ts2ks import ts2ks
+from ts2ks import ts2ks, ts2ks_fromgraph
 
 #configuration = BertConfig(num_hidden_layers = 1)
 config = BertConfig(num_hidden_layers = 1)
@@ -26,7 +27,13 @@ scripted = torch.jit.script(model)
 
 #print(scripted.graph)
 
-print(scripted.inlined_graph)
+#print(scripted.inlined_graph)
+
+
+generate_edef = False
+    
+
+ts2ks_fromgraph(sys.stdout, generate_edef, "BertScriptableForQuestionAnswering", scripted.inlined_graph)
 
 #print(main.graph)
 
