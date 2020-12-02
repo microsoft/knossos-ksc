@@ -599,6 +599,42 @@ namespace ks
 		return ret;
 	}
 
+	template<size_t Dim>
+	struct build_t
+	{
+		static_assert(Dim >= 2u);
+
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			for (int i = 0; i != thisDimension; ++i) {
+				build_t<Dim - 1u>::do_build(alloc, size, data, f, higherDimensionIndices..., i);
+			}
+		}
+	};
+
+	template<>
+	struct build_t<1>
+	{
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			for (int i = 0; i != thisDimension; ++i) {
+				*(*data)++ = f(alloc, higherDimensionIndices..., i);
+			}
+		}
+	};
+
+	template <class T, class F, class ...SizeTypes>
+	tensor<sizeof...(SizeTypes), T> build(allocator * alloc, std::tuple<SizeTypes...> size, F f)
+	{
+		constexpr auto Dim = sizeof...(SizeTypes);
+		tensor<Dim, T> ret = tensor<Dim, T>::create(alloc, size);
+		T* retData = ret.data();
+		build_t<Dim>::do_build(alloc, size, &retData, f);
+		return ret;
+	}
+
 	template <class T, class F, class A>
         A fold(allocator * alloc, F f, A z, vec<T> v)
 	{
