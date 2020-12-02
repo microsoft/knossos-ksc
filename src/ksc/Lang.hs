@@ -229,12 +229,6 @@ deriving instance Show (DefX Parsed)
 deriving instance Show (DeclX Parsed)
 deriving instance Show (RuleX Parsed)
 
--- TypeSize is used to document when an integer represents a Size.
--- It's too viral to use a separate Integer type because most integer operations
--- need to be supported, e.g. the size of a lower-triangular matrix is d*(d+1)/2
-pattern TypeSize :: TypeX
-pattern TypeSize = TypeInteger
-
 ----------------------------------
 --- Tangent space
 
@@ -429,7 +423,7 @@ argVar :: Var
 argVar = Simple "ksc$argVar"
 
 indexTVar :: TVar
-indexTVar = TVar TypeSize (Simple "ksc$indexTVar")
+indexTVar = TVar TypeInteger (Simple "ksc$indexTVar")
 
 mkArgVar :: Int -> Var
 mkArgVar n = Simple ("ksc$argVar" ++ show n)
@@ -818,7 +812,6 @@ instance Pretty TypeX where
   pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
   pprPrec _ TypeFloat         = text "Float"
   pprPrec _ TypeInteger       = text "Integer"
-  pprPrec _ TypeSize          = text "Size"
   pprPrec _ TypeString        = text "String"
   pprPrec _ TypeBool          = text "Bool"
   pprPrec _ TypeUnknown       = text "UNKNOWN"
