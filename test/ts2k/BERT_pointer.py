@@ -1,6 +1,8 @@
 import torch
 from transformers import BertConfig, BertScriptableForQuestionAnswering
 
+from ts2ks.ts2ks import ts2ks
+
 #configuration = BertConfig(num_hidden_layers = 1)
 config = BertConfig(num_hidden_layers = 1)
 model = BertScriptableForQuestionAnswering(config)
