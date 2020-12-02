@@ -557,7 +557,7 @@ primFunCallResultTy_maybe fun args
                      [TypeInteger, TypeLam TypeInteger t]) -> Just t
       ("index"    , TypeTuple [TypeInteger, TypeTensor 1 t]) -> Just t
       ("shape"    , t)                                     -> Just (shapeType t)
-      ("size"     , TypeTensor 1 _)                        -> Just TypeSize
+      ("size"     , TypeTensor 1 _)                        -> Just TypeInteger
       ("sum"      , TypeTensor 1 t)                        -> Just t
 
       ("unzip"    , TypeTensor d (TypeTuple ts))           -> Just (TypeTuple (map (TypeTensor d) ts))

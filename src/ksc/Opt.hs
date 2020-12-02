@@ -658,7 +658,7 @@ optGradPrim _ "ts_add" arg
 
 optGradPrim _ "sum" e
   | TypeTensor 1 t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeSize $ Simple "sum$i")
+  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "sum$i")
                              (lmOne t)))
 
 optGradPrim _ "size" e
