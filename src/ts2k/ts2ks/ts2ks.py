@@ -1,16 +1,16 @@
 import sexpdata
 import functools
 
+# Background reading
+# https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
+# https://pytorch.org/docs/master/jit.html#interpreting-graphs
+# https://github.com/pytorch/pytorch/blob/8fe2a5e91b79e3f9b6f6c632fdf7f39ec3bf4fca/torch/csrc/jit/ir/ir.h
+
 # Newline constant for s-expr printing
 nl = "\n"
 tab = "\t"
 
 add_edef = "(edef addATEN (Vec (Vec Float)) ((Vec (Vec Float)) Float))"
-
-# https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
-# https://pytorch.org/docs/master/jit.html#interpreting-graphs
-# https://github.com/pytorch/pytorch/blob/8fe2a5e91b79e3f9b6f6c632fdf7f39ec3bf4fca/torch/csrc/jit/ir/ir.h
-
 
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
