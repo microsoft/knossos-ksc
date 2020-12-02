@@ -230,6 +230,38 @@ deriving instance Show (DeclX Parsed)
 deriving instance Show (RuleX Parsed)
 
 ----------------------------------
+--- Tensor properties
+----------------------------------
+
+{- Note [Size and index types of tensors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally, tensor elements are indexed by tuples of integers,
+with the size of the tuple being the number of dimensions of
+the tensor. The same type (a tuple of integers) is used to
+represent the size of the tensor.
+
+The 1-dimensional case is special because we avoid the
+use of 1-tuples. In this case, the index/size type is a
+plain integer.
+-}
+
+tensorIndexType :: Int -> Type
+tensorIndexType 1 = TypeInteger
+tensorIndexType d = TypeTuple (replicate d TypeInteger)
+
+tensorDimensionFromIndexType :: Type -> Maybe Int
+tensorDimensionFromIndexType TypeInteger = Just 1
+tensorDimensionFromIndexType (TypeTuple ts)
+  | all (`eqType` TypeInteger) ts
+  = Just (length ts)
+tensorDimensionFromIndexType _ = Nothing
+
+tensorTypeFromIndexType :: Type -> Type -> Maybe Type
+tensorTypeFromIndexType indexType elementType
+  | Just d <- tensorDimensionFromIndexType indexType = Just (TypeTensor d elementType)
+  | otherwise = Nothing
+
+----------------------------------
 --- Tangent space
 
 tangentType :: HasCallStack => Type -> Type
