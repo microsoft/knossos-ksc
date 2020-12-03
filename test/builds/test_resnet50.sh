@@ -8,7 +8,7 @@ python3 -m pip install -U Pillow jax==0.1.57 jaxlib==0.1.37
 
 echo Installing ksc...
 cd ./src/python
-python3 -m pip install .
+python3 -m pip install --editable .
 cd ../..
 
 echo Translating Knossos to Python

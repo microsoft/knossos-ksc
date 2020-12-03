@@ -6,7 +6,7 @@ python3 -m pip install pytest numpy
 
 echo Installing ksc...
 cd ./src/python
-python3 -m pip install .
+python3 -m pip install --editable .
 cd ../..
 
 echo Running pytest
