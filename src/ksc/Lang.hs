@@ -257,9 +257,8 @@ tensorDimensionFromIndexType (TypeTuple ts)
 tensorDimensionFromIndexType _ = Nothing
 
 tensorTypeFromIndexType :: Type -> Type -> Maybe Type
-tensorTypeFromIndexType indexType elementType
-  | Just d <- tensorDimensionFromIndexType indexType = Just (TypeTensor d elementType)
-  | otherwise = Nothing
+tensorTypeFromIndexType indexType elementType =
+  fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType indexType)
 
 ----------------------------------
 --- Tangent space
