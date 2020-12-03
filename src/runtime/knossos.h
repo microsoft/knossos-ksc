@@ -491,6 +491,12 @@ namespace ks
 		}
 	};
 
+	template<typename T> struct dimension_of_tensor_index_type : std::tuple_size<T> {};
+	template<> struct dimension_of_tensor_index_type<int> : std::integral_constant<size_t, 1u> {};
+
+	template<size_t I, typename TupleType> int get_dimension(TupleType const& t) { return std::get<I>(t); }
+	template<size_t I> int get_dimension(int val) { static_assert(I == 0); return val; }
+
 	template <size_t Dim, class T>
 	class tensor
 	{
@@ -928,18 +934,69 @@ namespace ks
 		}
 	};
 
-	template <class T, class F>
-	T sumbuild(allocator * alloc, int size, F f)
+	/* A sumbuild is implemented by deep-copying the result of the
+	   first iteration (using a copydown), then accumulating
+	   subsequent iterations into this result using inplace_add.
+	   See the 1-dimensional base case sumbuild_t<1>::do_sumbuild
+	   for the simplest example. */
+	template<size_t Dim>
+	struct sumbuild_t
 	{
-		KS_ASSERT(size > 0);
-		alloc_mark_t mark = alloc->mark();
-		T ret = copydown(alloc, mark, f(alloc, 0));
-		mark = alloc->mark();
-		for (int i = 1; i != size; ++i) {
-			inplace_add_t<T>::go(&ret, f(alloc, i));
-			alloc->reset(mark);
+		static_assert(Dim >= 2u);
+
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static T do_sumbuild(allocator * alloc, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			KS_ASSERT(thisDimension > 0);
+			T ret = sumbuild_t<Dim - 1>::template do_sumbuild<T>(alloc, size, f, higherDimensionIndices..., 0);
+			for (int i = 1; i != thisDimension; ++i) {
+				sumbuild_t<Dim - 1>::inplace_sumbuild(alloc, &ret, size, f, higherDimensionIndices..., i);
+			}
+			return ret;
 		}
-		return ret;
+
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static void inplace_sumbuild(allocator * alloc, T* result, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			for (int i = 0; i != thisDimension; ++i) {
+				sumbuild_t<Dim - 1>::inplace_sumbuild(alloc, result, size, f, higherDimensionIndices..., i);
+			}
+		}
+	};
+
+	template<>
+	struct sumbuild_t<1>
+	{
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static T do_sumbuild(allocator * alloc, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(size);
+			KS_ASSERT(thisDimension > 0);
+			alloc_mark_t mark0 = alloc->mark();
+			T ret = copydown(alloc, mark0, f(alloc, higherDimensionIndices..., 0));
+			alloc_mark_t mark1 = alloc->mark();
+			for (int i = 1; i != thisDimension; ++i) {
+				inplace_add(&ret, f(alloc, higherDimensionIndices..., i));
+				alloc->reset(mark1);
+			}
+			return ret;
+		}
+
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static void inplace_sumbuild(allocator * alloc, T* result, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(size);
+			alloc_mark_t mark = alloc->mark();
+			for (int i = 0; i != thisDimension; ++i) {
+				inplace_add(result, f(alloc, higherDimensionIndices..., i));
+				alloc->reset(mark);
+			}
+		}
+	};
+
+	template <class T, class F, class Size>
+	T sumbuild(allocator * alloc, Size size, F f)
+	{
+		constexpr size_t Dim = dimension_of_tensor_index_type<Size>::value;
+		return sumbuild_t<Dim>::template do_sumbuild<T>(alloc, size, f);
 	}
 
 	template <class T>
@@ -1029,15 +1086,16 @@ namespace ks
 	}
 
 	// sum of elements
-	template <class T>
-	T sum(allocator * alloc, vec<T> const& v)
+	template <size_t Dim, class T>
+	T sum(allocator * alloc, tensor<Dim, T> const& t)
 	{
-		if (v.size() == 0) { return zero(alloc, T{}); }
+		int ne = t.num_elements();
+		if (ne == 0) { return zero(alloc, T{}); }
 
-		if (v.size() == 1) return v[0];
-		T ret = ts_add(alloc, v[0], v[1]);
-		for (int i = 2; i < v.size(); ++i)
-			ret = ts_add(alloc, ret, v[i]);
+		if (ne == 1) return t[0];
+		T ret = ts_add(alloc, t[0], t[1]);
+		for (int i = 2; i < ne; ++i)
+			ret = ts_add(alloc, ret, t[i]);
 		return ret;
 	}
 
