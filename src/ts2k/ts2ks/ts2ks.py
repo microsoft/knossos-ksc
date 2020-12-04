@@ -21,6 +21,13 @@ symbolLook = {
         [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
     ],  # float vs integer? also determine rank instead of hardcode
     "int": [sexpdata.Symbol("Integer")],
+    "Optional[Tensor]": [ # Just say optionals are required for now. TODO: don't do this!
+        sexpdata.Symbol("Vec"),
+        [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
+    ],  # float vs integer? also determine rank instead of hardcode
+    "Optional[bool]": [ # Just say optionals are required for now. TODO: don't do this!
+        sexpdata.Symbol("Bool")
+    ],
 }
 
 # We're going to have to break out the data structure at some point, for now, hardcode
@@ -31,16 +38,29 @@ symbolLook["Tuple[int, Tensor]"] = [
     symbolLook["Tensor"],
 ]
 
+# hardcoding BertScriptableForQuestionAnswering TODO: getting urgent now to break up the return type and transform
+symbolLook["Tuple[Optional[Tensor], Tensor, Tensor, Optional[List[Tensor]], Optional[List[Tensor]]]"] = [
+    sexpdata.Symbol("Tuple"),
+    symbolLook["Tensor"],
+    symbolLook["Tensor"],
+    sexpdata.Symbol("Vec"), [symbolLook["Tensor"]],
+    sexpdata.Symbol("Vec"), [symbolLook["Tensor"]],
+]
+#
+
 
 def mangleDebugName(name):
     return "_" + name.replace(".", "_")
 
 
 def make_arg(input):
+    type_lookup = str(input.type())
+    if "Optional" in type_lookup:
+        print("WARNING: treated as required:" + type_lookup)
     return [
         sexpdata.Symbol(mangleDebugName(input.debugName())),
         sexpdata.Symbol(":"),
-        symbolLook[str(input.type())],
+        symbolLook[type_lookup],
     ]
 
 
