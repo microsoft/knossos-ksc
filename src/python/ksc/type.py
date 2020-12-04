@@ -115,6 +115,10 @@ class Type:
         assert self.kind == "Tuple"
         return (c for c in self.children)
 
+    def tuple_elem(self, i):
+        assert self.kind == "Tuple"
+        return self.children[i]
+
     def shortstr(self, tb="<", te=">"):
         el_types = {"Integer": "i", "Bool": "b", "String" : "s", "Float": "f", "Lam": "l", "LM": "l"}
         if self.kind in el_types:

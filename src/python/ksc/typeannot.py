@@ -44,7 +44,7 @@ def ks_prim_lookup(name, tys):
             n = int(m.group(1))
             max = int(m.group(2))
             assert len(tys[0]) == max
-            return tys[0].Child(n-1)
+            return tys[0].tuple_elem(n-1)
 
     # vec
     if name == "vec":
@@ -95,7 +95,7 @@ def typeannot(ex, symtab):
     Fill "type" field of expr, propagating from incoming dict
     """
     # Default implementation, for types not specialized below
-    assert ex.type != None
+    assert ex.type_ != None
     return ex
 
 @typeannot.register(Def)
@@ -103,23 +103,23 @@ def _(ex, symtab):
     # name args body
     local_st = symtab.copy()
     for a in ex.args:
-        local_st[a.name] = a.type
+        local_st[a.name] = a.type_
     ex.body = typeannot(ex.body, local_st)
-    if ex.type == None:
-        ex.type = ex.body.type
+    if ex.type_ == None:
+        ex.type_ = ex.body.type_
     else:
-        assert ex.type == ex.body.type
+        assert ex.type_ == ex.body.type_
     
-    argtypes = tuple(a.type for a in ex.args)
-    symtab[ex.name, argtypes] = ex.type
+    argtypes = tuple(a.type_ for a in ex.args)
+    symtab[ex.name, argtypes] = ex.type_
     return ex
 
 @typeannot.register(EDef)
 def _(ex, symtab):
     key = ex.name, tuple(ex.arg_types)
-    if key in symtab and symtab[key] != ex.type:
-        raise NotImplementedError(f"Double edef: {key}\n -> {symtab[key]}\n vs {ex.type}")
-    symtab[key] = ex.type
+    if key in symtab and symtab[key] != ex.type_:
+        raise NotImplementedError(f"Double edef: {key}\n -> {symtab[key]}\n vs {ex.type_}")
+    symtab[key] = ex.type_
     return ex
 
 @typeannot.register(Rule)
@@ -129,20 +129,20 @@ def _(ex, symtab):
 @typeannot.register(Var)
 def _(ex, symtab):
     if not ex.decl:
-        ex.type = symtab[ex.name]
-    assert ex.type != None
+        ex.type_ = symtab[ex.name]
+    assert ex.type_ != None
     return ex
 
 @typeannot.register(Call)
 def _(ex, symtab):
     for a in ex.args:
         typeannot(a, symtab)
-    argtypes = tuple(a.type for a in ex.args)
+    argtypes = tuple(a.type_ for a in ex.args)
     key = ex.name, argtypes
 
     # Check symbol table first
     if key in symtab:
-        ex.type = symtab[key]
+        ex.type_ = symtab[key]
         return ex
 
     # TODO: do "derived functions", e.g. shape$foo, grad$foo? 
@@ -150,7 +150,7 @@ def _(ex, symtab):
     # Try prim lookup
     prim = ks_prim_lookup(ex.name, argtypes)
     if prim != None:
-        ex.type = prim
+        ex.type_ = prim
         return ex
 
     argtypess = ",".join(map(pformat, argtypes))
@@ -160,14 +160,14 @@ def _(ex, symtab):
         if key.startswith(ex.name):
             print(f"Found {key}({val})")
 
-    raise TypeError(f"Couldn't find {ex.name}({argtypess})")
+    raise TypeError(f"Couldn't find {ex.name}({argtypess}) in ", pystr(ex, 2))
 
 @typeannot.register(Lam)
 def _(ex, symtab):
     local_st = symtab.copy()
-    local_st[ex.arg.name] = ex.arg.type
+    local_st[ex.arg.name] = ex.arg.type_
     ex.body = typeannot(ex.body, local_st)
-    ex.type = Type.Lam(ex.arg.type, ex.body.type)
+    ex.type_ = Type.Lam(ex.arg.type_, ex.body.type_)
     return ex
 
 @typeannot.register(Let)
@@ -176,23 +176,23 @@ def _(ex, symtab):
 
     # Single var assignment
     if isinstance(ex.vars, Var):
-        ex.vars.type = ex.rhs.type
+        ex.vars.type_ = ex.rhs.type_
         local_st = symtab.copy()
-        local_st[ex.vars.name] = ex.vars.type
+        local_st[ex.vars.name] = ex.vars.type_
         ex.body = typeannot(ex.body, local_st)
-        ex.type = ex.body.type
+        ex.type_ = ex.body.type_
         return ex
 
     # Tuple assignment -- incoming type should be tuple of same size
     if isinstance(ex.vars, list):
-        assert len(ex.vars) == len(ex.rhs.type) if ex.rhs.type else True
+        assert len(ex.vars) == len(ex.rhs.type_) if ex.rhs.type_ else True
         local_st = symtab.copy()
         for i,var in enumerate(ex.vars):
-            var.type = ex.rhs.type.Child(i) if ex.rhs.type else None
-            local_st[var.name] = var.type
+            var.type_ = ex.rhs.type_.tuple_elem(i) if ex.rhs.type_ else None
+            local_st[var.name] = var.type_
         
         ex.body = typeannot(ex.body, local_st)
-        ex.type = ex.body.type
+        ex.type_ = ex.body.type_
         return ex
 
     assert False # Bad var   
@@ -200,19 +200,19 @@ def _(ex, symtab):
 @typeannot.register(If)
 def _(ex, symtab):
     ex.cond = typeannot(ex.cond, symtab)
-    assert ex.cond.type == Type.Bool
+    assert ex.cond.type_ == Type.Bool
     ex.t_body = typeannot(ex.t_body, symtab)
     ex.f_body = typeannot(ex.f_body, symtab)
-    assert ex.t_body.type == ex.f_body.type
-    ex.type = ex.t_body.type
+    assert ex.t_body.type_ == ex.f_body.type_
+    ex.type_ = ex.t_body.type_
     return ex
 
 @typeannot.register(Assert)
 def _(ex, symtab):
     ex.cond = typeannot(ex.cond, symtab)
-    assert ex.cond.type == Type.Bool
+    assert ex.cond.type_ == Type.Bool
     ex.body = typeannot(ex.body, symtab)
-    ex.type = ex.body.type
+    ex.type_ = ex.body.type_
     return ex
 
 def typeannot_decls(decls : List[Expr], symtab = dict()):
@@ -221,11 +221,11 @@ def typeannot_decls(decls : List[Expr], symtab = dict()):
     return symtab
 
 if __name__ == "__main__":
-    from ksc.parse_ks import parse_ks_file
+    from ksc.parse_ks import parse_ks_filename
     symtab = dict()
-    decls_prelude = parse_ks_file("src/runtime/prelude.ks")
+    decls_prelude = parse_ks_filename("src/runtime/prelude.ks")
     typeannot_decls(decls_prelude, symtab)
-    decls_file = list(parse_ks_file("test/ksc/gmm-obj.ks"))
+    decls_file = list(parse_ks_filename("test/ksc/gmm-obj.ks"))
     typeannot_decls(decls_file, symtab)
     for decl in decls_file:
         cpprint(decl)
