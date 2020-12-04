@@ -73,7 +73,7 @@ def interline(*docs):
 # def _(ex, indent):
 #     indent += 1
 #     return "def " + ex.name + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
-#            + pystr(ex.type, indent) + ":" \
+#            + pystr(ex.return_type, indent) + ":" \
 #            + nl(indent+1) + pystr(ex.body, indent+1)
 
 # Declare pretty printer for our Expressions
@@ -86,7 +86,7 @@ def pretty_Expr(ex, ctx):
         return parens(2,
                     pp_reserved("def"), ' ',
                     hang(0, concat([pp_function_name(ex.name), LINE,
-                                    pp(ex.type), LINE,
+                                    pp(ex.return_type), LINE,
                                     parens_interline(1, *map(pp, ex.args))])), HARDLINE,
                     pp(ex.body))
 
@@ -94,7 +94,7 @@ def pretty_Expr(ex, ctx):
         return parens(2,
                     pp_reserved("edef"), LINE,
                     pp_function_name(ex.name), LINE,
-                    pp(ex.type), LINE,
+                    pp(ex.return_type), LINE,
                     parens_interline(1, *map(pp, ex.arg_types)))
 
     if isinstance(ex, Rule):
@@ -109,7 +109,7 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, Var):
         v = pp_variable(ex.name)
         if ex.decl:
-            return parens(1, v, ' : ', pp(ex.type))
+            return parens(1, v, ' : ', pp(ex.type_))
         else:
             return v
 

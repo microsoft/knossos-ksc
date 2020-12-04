@@ -21,12 +21,12 @@ class Type:
         return Type("Tuple", args)
 
     @staticmethod
-    def Lam(type, arg_type):
-        return Type("Lam", [type, arg_type])
+    def Lam(return_type, arg_type):
+        return Type("Lam", [return_type, arg_type])
 
     @staticmethod
-    def LM(type, arg_type):
-        return Type("LM", [type, arg_type]) 
+    def LM(return_type, arg_type):
+        return Type("LM", [return_type, arg_type]) 
 
     @staticmethod
     def Index(vec):  # TODO: Call this elem_type for consistency with ksc-MLIR?
