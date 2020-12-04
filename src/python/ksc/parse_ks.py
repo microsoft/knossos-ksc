@@ -4,7 +4,7 @@ import sexpdata
 
 from ksc.type import Type
 from ksc.utils import ensure_list_of_lists
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert, pystr
 
 #####################################################################
 ## S-expression Utils
@@ -217,15 +217,12 @@ def parse_ks_string(string_or_stream, source_file_name):
         yield parse_tld(s_exp)
 
 def parse_ks_file(string_or_stream):
-    return parse_ks_string(string_or_stream)
+    return parse_ks_string(string_or_stream, "<unknown>")
 
 def parse_ks_filename(filename):
-    global parser_source_file
-    parser_source_file = source_file_name
-
     with open(filename) as f:
         ks_str = f.read()
-        return parse_ks_file(ks_str)
+        return parse_ks_string(ks_str, filename)
 
 def main():
     parser = argparse.ArgumentParser(prog="parse_ks.py", description=__doc__)
