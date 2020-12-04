@@ -80,7 +80,7 @@ def type_to_sample(arg_type):
 def args_to_sample_values(args):
     arg_types = []
     for arg in args:
-        sample = type_to_sample(arg.type)
+        sample = type_to_sample(arg.type_)
         arg_types.append((arg.name, sample))
     return arg_types
 
@@ -210,7 +210,7 @@ def {name}({args}):
                     # if it is built-in no need to edef
                     print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)                    
                     continue
-                edef = _EDef(name, py_name, tld.type)
+                edef = _EDef(name, py_name, tld.return_type)
                 self._edefs[name] = edef
             elif isinstance(tld, Def):
                 name = tld.name
