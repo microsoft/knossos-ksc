@@ -16,8 +16,7 @@
 (edef log_softmax (Vec (Vec Float)) ((Vec (Vec Float))))
 
 (def Dense (Vec (Vec Float)) ((weights : (Tuple (Vec (Vec Float)) (Vec Float))) (input : (Vec (Vec Float))))
-  (let ((W (get$1$2 weights))
-        (b (get$2$2 weights)))
+  (let ((W b) weights)
     (broadcast_add (dot input (transpose W)) b) ; transpose W to keep the shape consistent with pytorch
   )
 )
@@ -91,12 +90,12 @@
                        )
                        (input : (Vec (Vec (Vec (Vec Float)))))
                        )
-  (let ((conv_1_weights (get$1$6 weights))
-        (norm_1_weights (get$2$6 weights))
-        (conv_2_weights (get$3$6 weights))
-        (norm_2_weights (get$4$6 weights))
-        (conv_3_weights (get$5$6 weights))
-        (norm_3_weights (get$6$6 weights)))
+  (let ((conv_1_weights
+         norm_1_weights
+         conv_2_weights
+         norm_2_weights
+         conv_3_weights
+         norm_3_weights) weights)
     (batch_norm_2d norm_3_weights
       (conv_2d_no_bias (tuple 1 1) (tuple 1 1) (tuple (tuple 0 0) (tuple 0 0)) conv_3_weights
         (relu
@@ -135,17 +134,18 @@
                                )
                                (input : (Vec (Vec (Vec (Vec Float)))))
                                )
-  (let ((conv_block_weights (get$1$3 weights))
-        (shortcut_conv_weights (get$2$3 weights))
-        (shortcut_norm_weights (get$3$3 weights)))
-    (let ((main (ConvBlock strides conv_block_weights input))
-          (shortcut (batch_norm_2d shortcut_norm_weights
+  (let ((conv_block_weights 
+         shortcut_conv_weights
+         shortcut_norm_weights) 
+        weights)
+  (let (main (ConvBlock strides conv_block_weights input))
+  (let (shortcut (batch_norm_2d shortcut_norm_weights
                       (conv_2d_no_bias (tuple 1 1) strides (tuple (tuple 0 0) (tuple 0 0)) shortcut_conv_weights
                         input
                       )
-                    )))
+                    ))
       (relu (add main shortcut))
-    )
+    ))
   )
 )
 
@@ -161,7 +161,7 @@
                                    )
                                    (input : (Vec (Vec (Vec (Vec Float)))))
                                   )
-  (let ((main (ConvBlock (tuple 1 1) weights input)))
+  (let (main (ConvBlock (tuple 1 1) weights input))
     (relu(add main input))
   )
 )
@@ -206,13 +206,14 @@
   ;                            (if (eq i 1) (tuple 128 128 512)
   ;                            (if (eq i 2) (tuple 256 256 1024)
   ;                            (tuple 512 512 2048)))))))
-  (let ((blocks_strides_vec (build 4 (lam (i : Integer)
+  (let (blocks_strides_vec (build 4 (lam (i : Integer)
                               (if (eq i 0) (tuple 1 1) (tuple 2 2)))))
-        (normalization_weights   (get$1$5 weights))
-        (conv_weights            (get$2$5 weights))
-        (batch_norm_weights      (get$3$5 weights))
-        (residual_blcoks_weights (get$4$5 weights))
-        (final_dense_weights     (get$5$5 weights)))
+  (let ((normalization_weights   
+         conv_weights            
+         batch_norm_weights      
+         residual_blcoks_weights 
+         final_dense_weights) 
+         weights)
     (log_softmax
       (Dense final_dense_weights
         (flatten
@@ -249,13 +250,10 @@
                               )
                             )
                           ))
-              (let ((x (get$1$2 x_filters_strides_weights))
-                    (filters_strides_weights (get$2$2 x_filters_strides_weights)))
-                (let ((strides (get$1$2 filters_strides_weights))
-                      (weights (get$2$2 filters_strides_weights)))
-                  (let ((conv_block_weights (get$1$2 weights))
-                        (identity_blocks_weights (get$2$2 weights)))
-                    (let ((conv_block_out (ConvResidualBlock strides conv_block_weights x)))
+              (let ((x filters_strides_weights) x_filters_strides_weights)
+              (let ((strides weights) filters_strides_weights)
+              (let ((conv_block_weights identity_blocks_weights) weights)
+              (let (conv_block_out (ConvResidualBlock strides conv_block_weights x))
                       (fold (lam (x_weights :
                                     (Tuple
                                       (Vec (Vec (Vec (Vec Float))))
@@ -268,8 +266,7 @@
                                         (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                       )
                                     ))
-                        (let ((x (get$1$2 x_weights))
-                              (identity_block_weights (get$2$2 x_weights)))
+                        (let ((x identity_block_weights) x_weights)
                           (IdentityResidualBlock identity_block_weights x)
                         )) ; end of lam (x_weights)
                         conv_block_out
@@ -294,5 +291,4 @@
       )
     )
   )
-)
-
+))

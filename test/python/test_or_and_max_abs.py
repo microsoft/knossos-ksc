@@ -7,7 +7,7 @@ def test_abs():
     (abs x)
 )
 """
-    py_out = translate_and_import(ks_str, "common")
+    py_out = translate_and_import(__file__, ks_str, "common")
     assert py_out.test(0) == 0
     assert py_out.test(1) == 1
     assert py_out.test(-1) == 1
@@ -19,7 +19,7 @@ def test_max():
     (max (max x y) z)
 )
 """
-    py_out = translate_and_import(ks_str, "common")
+    py_out = translate_and_import(__file__, ks_str, "common")
     x, y, z = 1, 2, -1
     assert py_out.test(x, y, z) == 2
 
@@ -32,7 +32,7 @@ def test_or():
     (or (lt x 0) (gt x 0))
 )
 """
-    py_out = translate_and_import(ks_str, "common")
+    py_out = translate_and_import(__file__, ks_str, "common")
     assert py_out.test(1) == True
     assert py_out.test(0) == False
     assert py_out.test(-1) == True
@@ -46,7 +46,7 @@ def test_and():
     (and (gt x 0) (lt x 2))
 )
 """
-    py_out = translate_and_import(ks_str, "common")
+    py_out = translate_and_import(__file__, ks_str, "common")
     assert py_out.test(0) == False
     assert py_out.test(1) == True
     assert py_out.test(2) == False

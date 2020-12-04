@@ -99,7 +99,7 @@ def jit_and_execute_annonymous_function(body, backend):
     return value
 
 class VarNameGenerator:
-    def __init__(self, prefix="v"):
+    def __init__(self, prefix="tmpvar__"):
         self.index = 0
         self.prefix = prefix
 
@@ -188,7 +188,7 @@ def compute_ks_str(f, nodes, arg_types):
             # Update the template
             template = template.format(
                 body=joiner.join([
-                    f"(let (({var_name} {current_expr}))",
+                    f"(let ({var_name} {current_expr})",
                     "{body}",
                     ")"
                 ])

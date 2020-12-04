@@ -82,8 +82,11 @@ def make_tuple(*args):
 def get_tuple_element(i, tup):
     return tup[i]
 
-def let(var, body):
-    return body(var)
+def let(tupled, var, body):
+    if tupled:
+        return body(*var)
+    else:
+        return body(var)
 
 def if_then_else(cond, then_branch, else_branch):
     return then_branch() if cond else else_branch()

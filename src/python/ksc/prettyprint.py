@@ -55,7 +55,7 @@ def parens(hangindent, *docs):
         RPAREN
     ])))
 
-def parens1(hangindent, *docs):
+def parens_interline(hangindent, *docs):
     return parens(hangindent, *intersperse(LINE, docs))
 
 def interline(*docs):
@@ -87,7 +87,7 @@ def pretty_Expr(ex, ctx):
                     pp_reserved("def"), ' ',
                     hang(0, concat([pp_function_name(ex.name), LINE,
                                     pp(ex.return_type), LINE,
-                                    parens1(1, *map(pp, ex.args))])), HARDLINE,
+                                    parens_interline(1, *map(pp, ex.args))])), HARDLINE,
                     pp(ex.body))
 
     if isinstance(ex, EDef):
@@ -95,13 +95,13 @@ def pretty_Expr(ex, ctx):
                     pp_reserved("edef"), LINE,
                     pp_function_name(ex.name), LINE,
                     pp(ex.return_type), LINE,
-                    parens1(1, *map(pp, ex.args)))
+                    parens_interline(1, *map(pp, ex.arg_types)))
 
     if isinstance(ex, Rule):
         return parens(2,
                     pp_reserved("rule"), LINE,
                     pp_string(ex.name), LINE,
-                    parens1(1, *map(pp, ex.args)), LINE,
+                    parens_interline(1, *map(pp, ex.args)), LINE,
                     pp(ex.e1), LINE,
                     pp(ex.e2))
 
@@ -109,13 +109,16 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, Var):
         v = pp_variable(ex.name)
         if ex.decl:
-            return parens(1, v, ' : ', pp(ex.type))
+            return parens(1, v, ' : ', pp(ex.type_))
         else:
             return v
 
     # Constants just use str()
     if isinstance(ex, Const):
-        return repr(ex.value)
+        if isinstance(ex.value, str):
+            return f"\"{ex.value}\""
+        else:
+            return repr(ex.value)
 
     # Let bindings are printed with no indent, so e.g. print as
     # (let (a  1)
@@ -124,10 +127,14 @@ def pretty_Expr(ex, ctx):
     # This saves horizontal space, and may be easier to read
     # TODO: gather lets so above is let ((a 1) (b 2))?
     if isinstance(ex, Let):
+        if isinstance(ex.vars, list):
+            vars = parens_interline(2, *map(pp, ex.vars))
+        else:
+            vars = pp(ex.vars)
         return parens(0,
                     pp_reserved("let"),
                     ' ',
-                    hang(0, parens(2, pp(ex.var), LINE, pp(ex.rhs))),
+                    hang(0, parens(2, vars, LINE, pp(ex.rhs))),
                     HARDLINE,
                     pp(ex.body))
 
@@ -146,9 +153,10 @@ def pretty_Expr(ex, ctx):
 
     # Call name args
     if isinstance(ex, Call):
-        return nest(ctx.indent, parens1(2,
-            pp_function_name(ex.name),
-            *map(pp, ex.args)))
+        return nest(ctx.indent, 
+                    parens_interline(2,
+                                pp_function_name(ex.name),
+                                *map(pp, ex.args)))
 
     # Lambda arg body
     if isinstance(ex, Lam):
@@ -199,12 +207,12 @@ if __name__ == "__main__":
             ((x : Float) 
              (y : Vec Integer)
              (t : (Tuple Float Float))) 
-            (let ((l (lam (i : Integer) (add i 1)))
-                  (b 2))
+            (let (l (lam (i : Integer) (add i 1)))
+            (let (b 2)
               (assert (gt b 0) 
                  (tuple 
                     (if (lt 1 b) x (add x (get$1$2 t))) 
-                    (mul b (get$1$2 t))))))
+                    (mul b (get$1$2 t)))))))
     """)
     cpprint(e, width=40)
     cpprint(e, width=60)

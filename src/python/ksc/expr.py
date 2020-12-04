@@ -2,9 +2,9 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import Union
+from typing import Union, List
 from ksc.type import Type
-from ksc.utils import paren
+from ksc.utils import paren, KRecord
 
 #####################################################################
 # 
@@ -70,30 +70,26 @@ from ksc.utils import paren
 #         ^^^^^^^^ ^^^^^^^^^^
 #         cond     body
 
-class Expr:
+class Expr(KRecord):
     '''Base class for AST nodes.'''
-    def __init__(self, *args):
-        for (nt,v) in zip(self.__annotations__, args):
-            setattr(self, nt, v)
 
-    def __eq__(self, that):
-        if type(self) != type(that):
-            return False
+    type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
 
-        for nt in self.__annotations__:
-            if getattr(self, nt) != getattr(that,nt):
-                return False
-        return True
+    def __init__(self, **args):
+        self.type_ = None
+        super().__init__(**args)
 
     def nodes(self):
         """
         Return child nodes of this expr
         """
+        assert False # TODO: remove this method
         for nt in self.__annotations__:
             yield getattr(self, nt)
 
     def __str__(self):
-        return paren(type(self).__name__ + ' ' + ' '.join(str(node) for node in self.nodes()))
+        nodes = (str(getattr(self, nt)) for nt in self.__annotations__)
+        return paren(type(self).__name__ + ' ' + ' '.join(nodes))
 
 class Def(Expr):
     '''Def(name, return_type, args, body). 
@@ -109,18 +105,24 @@ class Def(Expr):
     args: list
     body: Expr
 
+    def __init__(self, name, return_type, args, body):
+        super().__init__(name=name, return_type=return_type, args=args, body=body)
+
 class EDef(Expr):
     '''Edef(name, return_type, args). 
     Example:
     ```
-    (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
+    (edef add   (Vec Float)  (Float (Vec Float)) )
           ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          name  return_type  args
+          name  return_type  arg_types
     ```
     '''
     name: str
     return_type: Type
-    args: list
+    arg_types: List[Type]
+
+    def __init__(self, name, return_type, arg_types):
+        super().__init__(name=name, return_type=return_type, arg_types=arg_types)
 
 class Rule(Expr):
     '''Rule(name, args, e1, e2). 
@@ -136,6 +138,9 @@ class Rule(Expr):
     e1: Expr
     e2: Expr
 
+    def __init__(self, name, args, e1, e2):
+        super().__init__(name=name, args=args, e1=e1, e2=e2)
+
 class Const(Expr):
     '''Const(value). 
     Examples:
@@ -146,6 +151,9 @@ class Const(Expr):
     ```
     '''
     value: Union[int, str, float, bool]
+
+    def __init__(self, value):
+        super().__init__(type_=Type.fromValue(value), value=value)
 
     def __str__(self):
         return repr(self.value)
@@ -163,8 +171,16 @@ class Var(Expr):
     ```
     '''
     name: str
-    type: Type
     decl: bool
+
+    def __init__(self, name, type=None, decl=False):
+        super().__init__(type_=type, name=name, decl=decl)
+
+    def __str__(self):
+        if self.decl:
+            return self.name + " : " + str(self.type_)
+        else:
+            return self.name
 
 class Call(Expr):
     '''Call(name, args). 
@@ -176,7 +192,10 @@ class Call(Expr):
     ```
     '''
     name: str
-    args: list
+    args: List[Expr]
+
+    def __init__(self, name, args):
+        super().__init__(name=name, args=args)
 
 class Lam(Expr):
     '''Lam(arg, body).
@@ -190,18 +209,30 @@ class Lam(Expr):
     arg: Var
     body: Expr
 
+    def __init__(self, arg, body):
+        super().__init__(type_=None, arg=arg, body=body)
+
 class Let(Expr):
-    '''Let(var, rhs, body). 
+    '''Let(vars, rhs, body). 
     Example:
     ```
     (let (a    1)   (add a a))
           ^    ^    ^^^^^^^^^
           var  rhs  body
     ```
+    ```
+    (let ((a b)  (tuple p q))   (add a a))
+          ^      ^              ^^^^^^^^^
+          var    rhs            body
+    ```
     '''
-    var: Var
+    vars: Union[Var, List[Var]]
     rhs: Expr
     body: Expr
+
+    def __init__(self, vars, rhs, body):
+        super().__init__(vars=vars, rhs=rhs, body=body)
+
 
 class If(Expr):
     '''If(cond, t_body, f_body). 
@@ -216,6 +247,9 @@ class If(Expr):
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
 
+    def __init__(self, cond, t_body, f_body):
+        super().__init__(cond=cond, t_body=t_body, f_body=f_body)
+
 class Assert(Expr):
     '''Assert(cond, body).
     Example:
@@ -228,6 +262,8 @@ class Assert(Expr):
     cond: Expr    # Condition
     body: Expr    # Value if true
 
+    def __init__(self, cond, body):
+        super().__init__(cond=cond, body=body)
 
 #####################################################################
 # pystr:
@@ -240,6 +276,12 @@ class Assert(Expr):
 # way to write recursive tree transformations.
 
 from functools import singledispatch
+
+from ksc.expr import Expr, Def, EDef, Call, Const, Var, If
+
+def pyname(s : str) -> str:
+    return s.replace('$','_s')
+
 def nl(indent):
     return "\n" + "  " * indent
 
@@ -247,30 +289,37 @@ def pystr_intercomma(indent, exprs):
     return ", ".join([pystr(ex, indent) for ex in exprs])
 
 @singledispatch
-def pystr(expr, indent=0):
+def pystr(expr, indent):
     """
     Expression to string, formatted in a loose python-like syntax
     """
     # Default implementation, for types not specialized below
     return str(expr)
 
+@pystr.register(Type)
+def _(ty, indent):
+    if len(ty.children) == 0 and (ty.kind != "Tuple"):
+        return ty.kind
+    elems = [pystr(c, indent+1) for c in ty.children]
+    return ty.kind + "[" + ",".join(map(lambda x: pystr(x,indent+1), elems)) + "]"    
+
 @pystr.register(Def)
 def _(ex, indent):
     indent += 1
-    return "def " + ex.name + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
+    return "def " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
            + pystr(ex.return_type, indent) + ":" \
            + nl(indent+1) + pystr(ex.body, indent+1)
 
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "edef " + ex.name + "(" + pystr_intercomma(indent, ex.args) + ") -> "\
+    return "#edef " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.arg_types) + ") -> "\
            + pystr(ex.return_type, indent) + nl(indent)
 
 @pystr.register(Rule)
 def _(ex, indent):
     indent += 1
-    return "@rule\ndef " + ex.name + " " + "(" + pystr(ex.args, indent) + ")" + ":" + nl(indent) \
+    return "@rule\ndef " + pyname(ex.name) + " " + "(" + pystr(ex.args, indent) + ")" + ":" + nl(indent) \
            + pystr(ex.e1, indent+1) + nl(indent) \
            + "<===> " + nl(indent) \
            + pystr(ex.e2, indent+1)
@@ -282,24 +331,28 @@ def _(ex, indent):
 @pystr.register(Var)
 def _(ex, indent):
     if ex.decl:
-        return ex.name + ": " + str(ex.type)
+        return pyname(ex.name) + ": " + pystr(ex.type_, indent)
     else:
-        return ex.name
+        return pyname(ex.name)
 
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
-    return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
+    return pystr(pyname(ex.name), indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
 def _(ex, indent):
     indent += 1
-    return "{lambda (" + pystr(ex.arg, indent) + "): " + nl(indent+1)\
-            + pystr(ex.body, indent+1) + "}"
+    return "lambda " + pyname(ex.arg.name) + ": " + nl(indent+1)\
+            + "(" + pystr(ex.body, indent+1) + ")"
 
 @pystr.register(Let)
 def _(ex, indent):
-    return pystr(ex.var, indent) + " = " + pystr(ex.rhs, indent+1) + nl(indent) \
+    if isinstance(ex.vars, list):
+        var_str = ",".join(pystr(v, indent) for v in ex.vars)
+    else:
+        var_str = pystr(ex.vars, indent)
+    return var_str + " = " + pystr(ex.rhs, indent+1) + nl(indent) \
          + pystr(ex.body, indent)
 
 @pystr.register(If)
@@ -312,3 +365,9 @@ def _(ex, indent):
     indent += 1
     return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) \
             + pystr(ex.body, indent)
+
+if __name__ == "__main__":
+    from ksc.parse_ks import parse_ks_file
+    for decl in parse_ks_file("test/ksc/syntax-primer.ks"):
+        print(decl)
+        print(pystr(decl,0))  # Pystr here doesn't get dispatched properly... singledispatch sees __main__.Def, not ksc.expr.def

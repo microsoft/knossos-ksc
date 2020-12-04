@@ -8,6 +8,48 @@ from tempfile import NamedTemporaryFile
 
 from ksc.type import Type
 
+class KRecord:
+    """
+    A smoother namedtuple -- like https://pythonhosted.org/pyrecord but using the existing class syntax.
+    Like a 3.7 dataclass, but don't need to decorate each derived class
+
+    Derive a class from KRecord, declare its fields, and use keyword args in __init__
+
+    def MyClass(KRecord):
+        cost: float
+        names: List[String]
+
+        def __init__(cost, names):
+            super().__init__(cost=cost, names=names)
+
+    And now you have a nice little record class.
+
+    Construct a MyClass:
+        a = MyClass(1.3, ["fred", "conor", "una"])
+
+    Compare two MyClasses
+        if a == b: ...
+    
+    Etc
+    """
+
+    def __init__(self, **args):
+        for (nt,v) in args.items():
+            # assert nt in self.__annotations__  # <- This check will fail for chains of derived classes -- only the deepest has __annotations__ ready yet.
+            setattr(self, nt, v)
+
+    def __eq__(self, that):
+        if type(self) != type(that):
+            return False
+
+        for nt in self.__annotations__:
+            if getattr(self, nt) != getattr(that,nt):
+                return False
+        return True
+
+
+
+
 def ensure_list_of_lists(l):
     """return input, wrapped in a singleton list if its first element is not a list
 
@@ -42,9 +84,9 @@ def import_module_from_path(module_name, path):
     spec.loader.exec_module(py_out)
     return py_out
 
-def translate_and_import(*args):
+def translate_and_import(source_file_name, *args):
     from ksc.translate import translate
-    py_out = translate(*args, with_main=False)
+    py_out = translate(*args, source_file_name, with_main=False)
     with NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(py_out)
     print(f.name)
