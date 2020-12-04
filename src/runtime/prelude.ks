@@ -12,7 +12,7 @@
  rev$add (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
-  ((d_dadd drt))
+  (d_dadd drt)
   (tuple d_dadd d_dadd)))
 
 (edef add Integer (Integer Integer))
@@ -42,7 +42,7 @@
  rev$sub (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
  (let
-  ((d_dsub drt))
+  (d_dsub drt)
   (tuple d_dsub (neg d_dsub))))
 
 (edef sub Integer (Integer Integer))
@@ -65,21 +65,19 @@
 (def
  fwd$div Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
- (let
-  (((x1 x2) xt)
-   ((dx1 dx2) dxt))
+ (let ((x1 x2) xt)
+ (let ((dx1 dx2) dxt)
   (div (sub (mul x2 dx1)
                   (mul x1 dx2))
-          (mul x2 x2))))
+          (mul x2 x2)))))
 (def
  rev$div (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
- (let
-  (((x1 x2) xt)
-   (d_ddiv drt))
+ (let ((x1 x2) xt)
+ (let (d_ddiv drt)
   (tuple (div d_ddiv x2)
          (neg (div (mul x1 d_ddiv)
-                         (mul x2 x2))))))
+                         (mul x2 x2)))))))
 (edef div Integer (Integer Integer))
 (edef D$div (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef Dt$div (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -100,17 +98,16 @@
 (def
  fwd$mul Float
  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
- (let
-  (((x1 x2) xt)
-   ((dx1 dx2) dxt))
-  (add (mul x2 dx1) (mul x1 dx2))))
+ (let ((x1 x2) xt)
+ (let ((dx1 dx2) dxt)
+  (add (mul x2 dx1) (mul x1 dx2)))))
+
 (def
  rev$mul (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : Float))
- (let
-  (((x1 x2) xt)
-   (d_dmul drt))
-  (tuple (mul d_dmul x2) (mul d_dmul x1))))
+ (let ((x1 x2) xt)
+ (let (d_dmul drt)
+  (tuple (mul d_dmul x2) (mul d_dmul x1)))))
 
 (edef mul Integer (Integer Integer))
 (edef D$mul (LM (Tuple Integer Integer) Integer) (Integer Integer))
@@ -123,6 +120,7 @@
  rev$mul (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
 
 ;; neg :: Number -> Number
 ;; neg x = -x
@@ -274,16 +272,15 @@
 
 (edef tanh Float (Float))
 (def fwd$tanh Float ((x : Float) (dx : Float))
-     (let ((tanh_x (tanh x))
-           (tanh_x_2 (mul tanh_x tanh_x)))
-       (mul tanh_x_2 dx)))
+     (let (tanh_x (tanh x))
+     (let (tanh_x_2 (mul tanh_x tanh_x))
+       (mul tanh_x_2 dx))))
 (def rev$tanh Float ((x : Float) (d_dr : Float))
-     (let ((tanh_x (tanh x))
-           (tanh_x_2 (mul tanh_x tanh_x)))
-       (mul tanh_x_2 d_dr)))
+     (let (tanh_x (tanh x))
+     (let (tanh_x_2 (mul tanh_x tanh_x))
+       (mul tanh_x_2 d_dr))))
 (edef D$tanh (LM Float Float) (Float))
 (edef Dt$tanh (Tuple Float (LM Float Float)) (Float))
-
 
 (edef max Float (Float Float))
 (edef D$max (LM (Tuple Float Float) Float) (Float Float))
