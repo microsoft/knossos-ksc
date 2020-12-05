@@ -74,6 +74,7 @@ class Expr(KRecord):
     '''Base class for AST nodes.'''
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
+    # TODO: lift Def,EDef,Rule to "ASTNode" and make Expr an "ASTNode".
 
     def __init__(self, **args):
         self.type_ = None
