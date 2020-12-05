@@ -271,3 +271,9 @@ If you prefer block comments then use pairs of #| and |#
 (def fwd$my_log Float ((x : Float) (dx : Float)) (div dx x))
 (def rev$my_log Float ((x : Float) (d_dmy_log : Float)) (div d_dmy_log x))
 (edef Dt$my_log (Tuple Float (LM Float Float)) (Float))
+
+
+;; Edge cases
+(def f Integer (f : Lam Integer Integer) 
+     (f 2) ; not a recursive call
+     )
