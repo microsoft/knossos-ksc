@@ -141,31 +141,32 @@
   (tuple (tuple) (tuple)))
 
 
-;; eq :: Number x Number -> Bool
-;; eq (x, y) = x > y
-(edef eq Bool (Float Float))
-(edef D$eq (LM (Tuple Float Float) Bool) (Float Float))
-(edef Dt$eq (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
-(def
- fwd$eq (Tuple)
- ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
-  (tuple))
-(def
- rev$eq (Tuple Float Float)
- ((xt : (Tuple Float Float)) (drt : (Tuple)))
-  (tuple 0.0 0.0))
+; TODO: MOVEEQ 'eq' is primitive in Haskell at the moment
+; ;; eq :: Number x Number -> Bool
+; ;; eq (x, y) = x > y
+; (edef eq Bool (Float Float))
+; (edef D$eq (LM (Tuple Float Float) Bool) (Float Float))
+; (edef Dt$eq (Tuple Bool (LM (Tuple Float Float) Bool)) (Float Float))
+; (def
+;  fwd$eq (Tuple)
+;  ((xt : (Tuple Float Float)) (dxt : (Tuple Float Float)))
+;   (tuple))
+; (def
+;  rev$eq (Tuple Float Float)
+;  ((xt : (Tuple Float Float)) (drt : (Tuple)))
+;   (tuple 0.0 0.0))
 
-(edef eq Bool (Integer Integer))
-(edef D$eq (LM (Tuple Integer Integer) Bool) (Integer Integer))
-(edef Dt$eq (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
-(def
- fwd$eq (Tuple)
- ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
-  (tuple))
-(def
- rev$eq (Tuple (Tuple) (Tuple))
- ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
-  (tuple (tuple) (tuple)))
+; (edef eq Bool (Integer Integer))
+; (edef D$eq (LM (Tuple Integer Integer) Bool) (Integer Integer))
+; (edef Dt$eq (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
+; (def
+;  fwd$eq (Tuple)
+;  ((xt : (Tuple Integer Integer)) (dxt : (Tuple (Tuple) (Tuple))))
+;   (tuple))
+; (def
+;  rev$eq (Tuple (Tuple) (Tuple))
+;  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
+;   (tuple (tuple) (tuple)))
 
 ;; gt :: Number x Number -> Bool
 ;; gt (x, y) = x > y

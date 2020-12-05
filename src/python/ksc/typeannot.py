@@ -67,7 +67,6 @@ def ks_prim_lookup(name, tys):
         return Type.Vec(tys[1].lam_return_type)
 
     # fold : Lam (Tuple State T) State, State, Vec T -> State
-
     if n == 3 and name == "fold":
         assert tys[0].kind == "Lam"
         assert tys[0].lam_arg_type.tuple_len() == 2
@@ -78,20 +77,27 @@ def ks_prim_lookup(name, tys):
         assert tys[2].is_vec_of(tyT)
         return tyState
 
+    # eq : T, T -> Bool
+    if n == 2 and name == "eq":
+        assert tys[0] == tys[1] # TODO: MOVEEQ Move eq to prelude
+        return Type.Bool
+
     # Polymorphic arithmetic
-    if n == 1 and name == "sum":
+    # sum : Vec T -> T
+    if n == 1 and name == "sum" and tys[0].is_vec:
         return Type.Index(tys[0])
 
+    # ts_add : T, dT -> T
     if n == 2 and name == "ts_add":
         # assert tys[0] == tys[1] TODO: check rhs is tangent_type
         return tys[0]
 
+    # ts_add : Float, dT -> dT
     if n == 2 and name == "ts_scale":
         assert tys[0].kind == "Float"
-        # assert tys[0] == tys[1] TODO: check rhs is tangent_type
         return tys[1]
 
-    # Print
+    # print : T... -> Int
     if name == "print":
         return Type.Integer
 
@@ -114,12 +120,21 @@ def typeannot(ex, symtab):
 
 @typeannot.register(Def)
 def _(ex, symtab):
-    # name args body
+    # (def name retun_type args body)
     assert ex.return_type != None
 
-    # Add this function's name to symtab for recursive calls
+    # Add this function's name to symtab
+    # Do it before entering body, allowing for recursive calls
     argtypes = tuple(a.type_ for a in ex.args)
-    symtab[ex.name, argtypes] = ex.return_type
+    
+    # Check for redefinition with different return type 
+    signature = (ex.name, argtypes)
+    if signature in symtab:
+        old_type = symtab[signature]
+        if old_type != ex.return_type:
+            raise TypeError(f"Redefinition of {ex.name}({argtypes}) with different return type {old_type} -> {ex.return_type}")
+    
+    symtab[signature] = ex.return_type
 
     # local_st: local symbol table to recurse into the body
     local_st = symtab.copy()
@@ -142,10 +157,11 @@ def _(ex, symtab):
 
 @typeannot.register(EDef)
 def _(ex, symtab):
-    key = ex.name, tuple(ex.arg_types)
-    if key in symtab and symtab[key] != ex.return_type:
+    # (edef name retun_type arg_types)
+    signature = ex.name, tuple(ex.arg_types)
+    if signature in symtab and symtab[signature] != ex.return_type:
         raise NotImplementedError(f"Double edef: {key}\n -> {symtab[key]}\n vs {ex.return_type}")
-    symtab[key] = ex.return_type
+    symtab[signature] = ex.return_type
     return ex
 
 @typeannot.register(Rule)
@@ -155,9 +171,10 @@ def _(ex, symtab):
 
 @typeannot.register(Var)
 def _(ex, symtab):
-    if not ex.decl:
+    if ex.decl:
+        assert ex.type_ != None
+    else:
         ex.type_ = symtab[ex.name]
-    assert ex.type_ != None
     return ex
 
 @typeannot.register(Call)
@@ -180,14 +197,18 @@ def _(ex, symtab):
         ex.type_ = prim
         return ex
 
-    argtypess = ",".join(map(pformat, argtypes))
+    # Not found, show what was found to improve error message
+    argtypes_str = ",".join(map(pformat, argtypes))
+    print(f"typeannot: at ", pystr(ex, 2))
+    print(f"typeannot: Couldn't find {ex.name}({argtypes_str}) ")
+    print(f"typeannot: Near misses:")
     for key,val in symtab.items():
         if isinstance(key, tuple):
             key=key[0]
-        if key.startswith(ex.name):
-            print(f"Found {key}({val})")
+        if key.startswith(ex.name): # TODO: soundex match here?
+            print(f"typeannot:   {key}({val})")
 
-    raise TypeError(f"Couldn't find {ex.name}({argtypess}) in ", pystr(ex, 2))
+    raise TypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))
 
 @typeannot.register(Lam)
 def _(ex, symtab):

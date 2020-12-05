@@ -130,6 +130,7 @@ class Type:
         return self.children[0]
 
     def num_elements(self, assumed_vector_size=100):
+        # TODO: Move to cost.py, assumed_vector_size is not a core concept
         if self.kind == "Tuple":
             return sum([c.num_elements(assumed_vector_size) for c in self.children])
         elif self.kind == "Vec":
@@ -138,6 +139,7 @@ class Type:
             return 1
 
     def all_element_types(self):
+        # TODO: rename to "element_types_as_set", probably move elsewhere
         if self.kind == "Tuple":
             return set([t for c in self.children for t in c.all_element_types()])
         elif self.kind == "Vec":
@@ -155,10 +157,12 @@ class Type:
         return None
 
     def __len__(self):
+        # TODO: remove, replaced by tuple_len 
         assert self.kind == "Tuple"
         return len(self.children)
 
     def __iter__(self):
+        # TODO: rename to tuple_elements
         assert self.kind == "Tuple"
         return (c for c in self.children)
 
@@ -203,7 +207,8 @@ class Type:
             return True
         if other is None or self.kind != other.kind:
             return False
-        if self.is_scalar:
+        # Now self.kind == other.kind
+        if self.is_scalar: 
             return True
         if self.kind == "Tuple" and len(self.children) != len(other.children):
             return False
