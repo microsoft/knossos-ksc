@@ -89,6 +89,9 @@ class Type:
     def is_vec(self):
         return self.kind == "Vec"
 
+    def is_vec_of(self, ty):
+        return self.is_vec and self.children[0] == ty
+
     @property
     def is_tuple(self):
         return self.kind == "Tuple"
@@ -117,12 +120,12 @@ class Type:
         return vec.children[0]
 
     @property
-    def return_type(self):
+    def lam_return_type(self):
         assert self.is_lam_or_LM
         return self.children[1]
 
     @property
-    def arg_type(self):
+    def lam_arg_type(self):
         assert self.is_lam_or_LM
         return self.children[0]
 
@@ -158,6 +161,10 @@ class Type:
     def __iter__(self):
         assert self.kind == "Tuple"
         return (c for c in self.children)
+
+    def tuple_len(self):
+        assert self.kind == "Tuple"
+        return len(self.children)
 
     def tuple_elem(self, i):
         assert self.kind == "Tuple"
