@@ -55,14 +55,28 @@ def ks_prim_lookup(name, tys):
         assert tys[0].kind == "Vec"
         return Type.Integer
 
+    # index : Int, Vec T -> T
     if n == 2 and name == "index":
         assert tys[0].kind == "Integer"
         return Type.Index(tys[1])
 
+    # build : Int, Lam Int T -> Vec T
     if n == 2 and name == "build":
         assert tys[0].kind == "Integer"
         assert tys[1].kind == "Lam"
-        return Type.Vec(tys[1].return_type)
+        return Type.Vec(tys[1].lam_return_type)
+
+    # fold : Lam (Tuple State T) State, State, Vec T -> State
+
+    if n == 3 and name == "fold":
+        assert tys[0].kind == "Lam"
+        assert tys[0].lam_arg_type.tuple_len() == 2
+        tyState = tys[0].lam_arg_type.tuple_elem(0)
+        tyT = tys[0].lam_arg_type.tuple_elem(1)
+        assert tys[0].lam_return_type == tyState
+        assert tys[1] == tyState
+        assert tys[2].is_vec_of(tyT)
+        return tyState
 
     # Polymorphic arithmetic
     if n == 1 and name == "sum":
@@ -101,29 +115,42 @@ def typeannot(ex, symtab):
 @typeannot.register(Def)
 def _(ex, symtab):
     # name args body
+    assert ex.return_type != None
+
+    # Add this function's name to symtab for recursive calls
+    argtypes = tuple(a.type_ for a in ex.args)
+    symtab[ex.name, argtypes] = ex.return_type
+
+    # local_st: local symbol table to recurse into the body
     local_st = symtab.copy()
+    # Add args to local_st, after function was added to global st. 
+    # This defines that
+    #   (def f Integer (f : Lam Integer Integer) (f 2))
+    # is not a recursive call to f, but a call to the argument f
     for a in ex.args:
         local_st[a.name] = a.type_
+
+    # Recurse into body
     ex.body = typeannot(ex.body, local_st)
-    if ex.type_ == None:
-        ex.type_ = ex.body.type_
-    else:
-        assert ex.type_ == ex.body.type_
+
+    # And check the inferred type matches the decl
+    if ex.return_type != ex.body.type_:
+        raise TypeError(f"In definition of '{ex.name}', inferred return type {ex.body.type_}\n" +
+                        f"does not match declaration {ex.return_type}")
     
-    argtypes = tuple(a.type_ for a in ex.args)
-    symtab[ex.name, argtypes] = ex.type_
     return ex
 
 @typeannot.register(EDef)
 def _(ex, symtab):
     key = ex.name, tuple(ex.arg_types)
-    if key in symtab and symtab[key] != ex.type_:
-        raise NotImplementedError(f"Double edef: {key}\n -> {symtab[key]}\n vs {ex.type_}")
-    symtab[key] = ex.type_
+    if key in symtab and symtab[key] != ex.return_type:
+        raise NotImplementedError(f"Double edef: {key}\n -> {symtab[key]}\n vs {ex.return_type}")
+    symtab[key] = ex.return_type
     return ex
 
 @typeannot.register(Rule)
 def _(ex, symtab):
+    # TODO: Typeannot for rules
     return ex
 
 @typeannot.register(Var)
@@ -185,7 +212,7 @@ def _(ex, symtab):
 
     # Tuple assignment -- incoming type should be tuple of same size
     if isinstance(ex.vars, list):
-        assert len(ex.vars) == len(ex.rhs.type_) if ex.rhs.type_ else True
+        assert len(ex.vars) == ex.rhs.type_.tuple_len() if ex.rhs.type_ else True
         local_st = symtab.copy()
         for i,var in enumerate(ex.vars):
             var.type_ = ex.rhs.type_.tuple_elem(i) if ex.rhs.type_ else None
@@ -219,13 +246,3 @@ def typeannot_decls(decls : List[Expr], symtab = dict()):
     for decl in decls:
         typeannot(decl, symtab)
     return symtab
-
-if __name__ == "__main__":
-    from ksc.parse_ks import parse_ks_filename
-    symtab = dict()
-    decls_prelude = parse_ks_filename("src/runtime/prelude.ks")
-    typeannot_decls(decls_prelude, symtab)
-    decls_file = list(parse_ks_filename("test/ksc/gmm-obj.ks"))
-    typeannot_decls(decls_file, symtab)
-    for decl in decls_file:
-        cpprint(decl)
