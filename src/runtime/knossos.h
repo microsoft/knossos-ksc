@@ -851,14 +851,6 @@ namespace ks
 		return ret;
 	}
 
-	template <class T, class dT>
-        vec<dT> fwd$constVec(allocator * alloc, std::tuple<int, T> n_val, std::tuple<std::tuple<>, dT> unit_dval)
-	{
-                auto n = std::get<0>(n_val);
-                auto dval = std::get<1>(unit_dval);
-		return constVec(alloc, n, dval);
-	}
-
 	template <class F>
 	auto diag(allocator * alloc, int rows, int cols, F f)
 	{
