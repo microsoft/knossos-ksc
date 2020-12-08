@@ -190,9 +190,25 @@ def make_callfunction(node):
         ],
     ]
 
+def make_if(node):
+    identifier = None
+    if (node.outputsSize() == 0):
+        identifier = "_" + "dummy" # we're likely to need to make them unique
+    else:
+        identifier = "_" + node.outputsAt(0).debugName()
+
+    return [
+        sexpdata.Symbol("\n"),
+        sexpdata.Symbol(identifier),
+        [
+            sexpdata.Symbol("if"),
+            [sexpdata.Symbol("false")]
+        ],     
+    ]    
+
 
 def make_default(node):
-    print("WARNING, unimplmented node kind:" + node.kind())
+    print("WARNING, unimplmented node kind: " + node.kind())
     return sexpdata.Symbol("")
 
 
@@ -223,6 +239,7 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
         "aten::add": functools.partial(make_add, generate_edefs),
         "prim::Return": make_return,
         "prim::CallFunction": make_callfunction,
+        "prim::If": make_if,
     }
 
     def translate_node(node):
@@ -267,6 +284,6 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
 
     output.write(sexpdata.dumps(whole_exp))
 
-# TODO: make an options named tuple
+# TODO: make an configuration named tuple rather than passing flags
 def ts2ks(output, generate_edefs, function):
     ts2ks_fromgraph(output, generate_edefs, function.name, function.graph)
