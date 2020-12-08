@@ -1,0 +1,19 @@
+name: Build LaTeX document
+on:
+  push:
+    paths:
+    - 'doc/AD.tex'
+jobs:
+  build_latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v2
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v2
+        with:
+          root_file: doc/AD.tex
+      - uses: actions/upload-artifact@v2
+        with:
+          name: AD.pdf
+          path: AD.pdf
