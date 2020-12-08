@@ -15,6 +15,7 @@ executable ksc
                  Ksc.CatLang
                  Ksc.Futhark
                  Ksc.Pipeline
+                 Ksc.Traversal
                  Lang
                  LangUtils
                  Opt
@@ -22,6 +23,7 @@ executable ksc
                  Parse
                  Prim
                  Rules
+                 Shapes
   hs-source-dirs: src/ksc
   build-depends: base >= 4.9,
                  pretty >= 1.1,

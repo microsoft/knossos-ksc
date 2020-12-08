@@ -67,6 +67,7 @@ mk_fun f = case find_dollar f of
              Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
              Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
              Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
+             Just ("shape", s) -> ShapeFun (mk_fun s)
              Just ("get", s) -> Fun     (mk_sel_fun s)
              _               -> Fun     (mk_fun_id f)
   where
@@ -97,7 +98,7 @@ getZero tangent_type e
             TypeFloat    -> Konst (KFloat 0.0)
             TypeString   -> Konst (KString "")
             TypeBool     -> Konst (KBool False)
-            TypeVec _    -> mkAtomicNoFVs e $ \ e ->
+            TypeTensor 1 _ -> mkAtomicNoFVs e $ \ e ->
                             pConstVec (pSize e) (go (pIndex (kInt 1) e))
             TypeTuple ts
                | Tuple es <- e
@@ -126,7 +127,7 @@ getZero tangent_type e
 mkAtomicNoFVs :: TExpr -> (TExpr -> TExpr) -> TExpr
 mkAtomicNoFVs e body
   | isTrivial e = body e
-  | otherwise   = Let ev e (body (Var ev))
+  | otherwise   = mkLet ev e (body (Var ev))
   where
     ev = TVar (typeof e) argVar
 
@@ -356,6 +357,9 @@ pSumBuild = mkPrimCall2 "sumbuild"
 pUnzip :: TExpr -> TExpr
 pUnzip = mkPrimCall1 "unzip"
 
+pShape :: TExpr -> TExpr
+pShape = mkPrimCall1 "shape"
+
 pSize :: TExpr -> TExpr
 pSize e = mkPrimCall1 "size" e
 
@@ -409,6 +413,11 @@ primCallResultTy_maybe fun arg_ty
         -> Right (tangentType s)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
+      
+      ShapeFun f
+        -> case primCallResultTy_maybe f arg_ty of
+            Left err -> Left err
+            Right res_ty -> Right (shapeType res_ty)
 
       Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
@@ -436,7 +445,7 @@ primFunCallResultTy_maybe :: PrimFun -> Type -> Maybe Type
 primFunCallResultTy_maybe "fold" args
   | TypeTuple [f,acc,v] <- args
   , TypeLam (TypeTuple [a1, b1]) a2 <- f
-  , TypeVec b2 <- v
+  , TypeTensor 1 b2 <- v
   , b1 `eqType` b2
   , Just a <- eqTypes a1 [a2, acc]
   = Just a
@@ -450,7 +459,7 @@ primFunCallResultTy_maybe "lmFold" args
   , TypeTuple [a3, b1] <- t
   , Just a <- eqTypes a1 [a2, a3, acc]
   , Just _ <- eqTypes ds_zero [tangentType s1]
-  , v_ty@(TypeVec b2) <- v
+  , v_ty@(TypeTensor 1 b2) <- v
   , b2 `eqType` b1
   = Just (TypeLM (TypeTuple [s1, TypeTuple [a, v_ty]]) a)
   | otherwise = Nothing
@@ -500,14 +509,19 @@ primFunCallResultTy_maybe fun args
       ("lmVCat"   , TypeTuple tys) | Just (ss,ts) <- unzipLMTypes tys
                                      , (s1:ss1) <- ss
                                      , all (== s1) ss1     -> Just (TypeLM s1 (TypeTuple ts))
-      ("lmVCatV"  , TypeVec (TypeLM s t))                  -> Just (TypeLM s (TypeVec t))
+      ("lmVCatV"  , TypeTensor 1 (TypeLM s t))             -> Just (TypeLM s (TypeTensor 1 t))
       ("lmHCat"   , TypeTuple tys) | Just (ss,ts) <- unzipLMTypes tys
                                      , (t1:ts1) <- ts
                                      , all (== t1) ts1     -> Just (TypeLM (TypeTuple ss) t1)
-      ("lmHCatV"  , TypeVec (TypeLM t s))                  -> Just (TypeLM (TypeVec t) s)
+      ("lmHCatV"  , TypeTensor 1 (TypeLM t s))             -> Just (TypeLM (TypeTensor 1 t) s)
 
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , t)                                     -> Just t
+
+      -- ($copydown e) requests a copydown of the result of e, in order to reduce memory
+      -- usage as far as possible. (In particular, this should reclaim any memory allocated
+      -- for temporary variables during the evaluation of e.)
+      ("$copydown", t)                                     -> Just t
 
       -- ($check f rev$f s s' ds dt) verifies the derivatives rev$f at s in directions ds,dt.
       -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
@@ -529,23 +543,24 @@ primFunCallResultTy_maybe fun args
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , t)                                       -> Just t
 
-      ("constVec" , TypeTuple [TypeInteger, t])              -> Just (TypeVec t)
-      ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeVec t)
+      ("constVec" , TypeTuple [TypeInteger, t])              -> Just (TypeTensor 1 t)
+      ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeTensor 1 t)
       ("diag"     , TypeTuple [TypeInteger,
                                 TypeInteger,
-                                TypeLam TypeInteger t])      -> Just (TypeVec (TypeVec t))
+                                TypeLam TypeInteger t])      -> Just (TypeTensor 1 (TypeTensor 1 t))
       ("build"    , TypeTuple
-                     [TypeInteger, TypeLam TypeInteger t])   -> Just (TypeVec t)
+                     [TypeInteger, TypeLam TypeInteger t])   -> Just (TypeTensor 1 t)
 
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                     -> Just TypeInteger
       ("sumbuild" , TypeTuple
                      [TypeInteger, TypeLam TypeInteger t]) -> Just t
-      ("index"    , TypeTuple [TypeInteger, TypeVec t])    -> Just t
-      ("size"     , TypeVec _)                             -> Just TypeSize
-      ("sum"      , TypeVec t)                             -> Just t
+      ("index"    , TypeTuple [TypeInteger, TypeTensor 1 t]) -> Just t
+      ("shape"    , t)                                     -> Just (shapeType t)
+      ("size"     , TypeTensor 1 _)                        -> Just TypeInteger
+      ("sum"      , TypeTensor 1 t)                        -> Just t
 
-      ("unzip"    , TypeVec (TypeTuple ts))                -> Just (TypeTuple (map TypeVec ts))
+      ("unzip"    , TypeTensor d (TypeTuple ts))           -> Just (TypeTuple (map (TypeTensor d) ts))
 
       ("ts_scale" , TypeTuple [TypeFloat,   t]           ) -> Just t
       ("ts_add"   , TypeTuple [t, dt]                    ) -> if dt == tangentType t
@@ -566,6 +581,7 @@ primFunCallResultTy_maybe fun args
 
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args
+                       , "$copydown"-- ($copydown e)              Requests copydown of e
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
                        , "$trace"   -- ($trace f args)            Print and return (f args)
                        , "print"    -- (print "msg" 3)            Print "msg3"
@@ -573,6 +589,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
+                       , "shape"
                        , "size"
                        , "sum"
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors

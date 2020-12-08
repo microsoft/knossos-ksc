@@ -104,3 +104,5 @@ __pycache__/
 # Ionide F# VS Code extension
 .fake
 .ionide
+src/python/ksc.egg-info/
+src/python/dist/ksc-0.5-py3.6.egg

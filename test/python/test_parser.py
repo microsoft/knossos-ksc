@@ -1,9 +1,10 @@
 import pytest
+import re
 
 from ksc.type import Type
 from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 
-from ksc.parse_ks import parse_tld, parse_expr, ParseError, s_exps_from_string
+from ksc.parse_ks import parse_tld, parse_expr, ParseError, s_exps_from_string, strip_block_comments
 
 def expr(s):
     return parse_expr(s_exps_from_string(s)[0])
@@ -37,8 +38,9 @@ def test_parses():
     assert expr("(if a a b)") == If(Var_a, Var_a, Var_b)
     assert expr("(let (a b) a)") == Let(Var_a, Var_b, Var_a)
     assert expr("(lam (a : Float) a)") == Lam(Var_a_Float, Var_a)
-    assert expr("(let ((a b) (b 3)) a)") == \
-                Let(Var_a, Var_b, Let(Var_b, Const(3), Var_a))
+    assert expr("(let ((a b) (tuple 1 2)) a)") == \
+                Let([Var_a, Var_b], Call("tuple", [Const(1), Const(2)]), 
+                    Var_a)
 
 def test_expr():
     Var_a_Float = Var("a", Type.Float, True)
@@ -61,6 +63,30 @@ def test_errors():
         expr("(let (a) 2)")
     with pytest.raises(ParseError, match='Constant tuple should be all the same type'):
         expr("(2 2 3.2)")
+
+def check(pattern, s):
+    assert re.match(re.compile(pattern, flags=re.DOTALL | re.MULTILINE), strip_block_comments(s))
+
+def test_comments():
+    check(r"^A  1$", "A #| b |# 1")
+    check(r"^\s+stay\s+$", """
+            #| go | 
+        ;      # go |#
+        stay
+            #|O1  | #|O2|C2|#|# 
+            """)
+    check(r"^\s+a\s+b\s+c\s+d\s+$", """
+    #| x | 
+;      # y |#
+a
+    #|O1  | #|O2|C2|#|# b
+c #|# |#d
+    #|d  | #||#|#
+
+
+    #|  | #||#|#
+    """)
+
 
 if __name__ == "__main__":
     test_parses()

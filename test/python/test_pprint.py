@@ -25,12 +25,12 @@ def test_pprint():
             ((x : Float) 
              (y : Vec Integer)
              (t : (Tuple Float Float))) 
-            (let ((l (lam (i : Integer) (add i 1)))
-                  (b 2))
+            (let (l (lam (i : Integer) (add i 1)))
+            (let (b 2)
               (assert (gt b 0) 
                  (tuple 
                     (if (lt 1 b) x (add x (get$1$2 t))) 
-                    (mul b (get$1$2 t))))))
+                    (mul b (get$1$2 t)))))))
     """
     e = tld(s)
     print("-------STR:")

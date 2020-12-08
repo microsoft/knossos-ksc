@@ -107,15 +107,15 @@ If you prefer block comments then use pairs of #| and |#
 ;   the opposite way round from what you might expect if you are used
 ;   to "v[i]" notation.
 ;
-; To create new variables use "let"
+; To bind variables use "let"
 (def let_and_types Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
-     (let ((b2 (or b false))
-           (i2 (add i 10))
-           (f2 (add f 10.0))
-           (s2 "Hello"))
+     (let (b2 (or b false))
+     (let (i2 (add i 10))
+     (let (f2 (add f 10.0))
+     (let (s2 "Hello")
        (if (and (gte i 0) (lt i (size v)))
            (index i v)
-           f2)))
+           f2))))))
 
 ; Python equivalent
 ;
@@ -130,6 +130,13 @@ If you prefer block comments then use pairs of #| and |#
 ;     else:
 ;         return f2
 
+; Tuples can be bound
+(def let_tupled Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
+     (let ((b2 s2) (tuple b s))
+     (let (i2 (add i 10))
+     (let ((f2 s2) (tuple (add f 10.0) "Hello"))
+     (let (s3 "Hello")
+       f2)))))
 
 ; Vectors are created with the "build" function.
 ;
@@ -224,8 +231,7 @@ If you prefer block comments then use pairs of #| and |#
 ; This example calculates the sum of the elements in a vector.
 (def fold_example Float (v : Vec Float)
      (fold (lam (s_vi : Tuple Float Float)
-                (let ((s (get$1$2 s_vi))
-                      (vi (get$2$2 s_vi)))
+                (let ((s vi) s_vi)
                   (add s vi)))
            0.0
            v))

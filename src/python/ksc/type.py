@@ -35,6 +35,16 @@ class Type:
         assert vec.kind == "Vec"
         return vec.children[0]
 
+    @staticmethod
+    def fromValue(val):
+        if isinstance(val, int):
+            return Type.Integer
+        if isinstance(val, float):
+            return Type.Float
+        if isinstance(val, str):
+            return Type.String
+        raise NotImplementedError(f"Typeof {val}")
+
     def __init__(self, kind, children=[]):
         if kind not in Type.node_kinds:
             raise ValueError("bad kind:", kind)
@@ -147,6 +157,7 @@ class Type:
     def __hash__(self):
         return hash(str(self))
 
+Type.String = Type("String")
 Type.Integer = Type("Integer")
 Type.Float = Type("Float")
 Type.Bool = Type("Bool")

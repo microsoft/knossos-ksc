@@ -19,6 +19,7 @@ import qualified Ksc.Futhark
 import Parse (parseF)
 import Rules (RuleBase, mkRuleBase)
 import Opt (optDefs)
+import Shapes (shapeDefs)
 
 import Data.List (partition, intercalate)
 import GHC.Stack (HasCallStack)
@@ -68,7 +69,7 @@ demoN verbosity adp decls
        ; disp "Anf-ised original definition" env1 anf_defs
 
        ; let grad_defs = gradDefs adp anf_defs
-             env2      = env1 `extendGblST` grad_defs
+             env2      = extendGblST env1 grad_defs
        ; disp "The full Jacobian (unoptimised)" env2 grad_defs
 
        ; (env3, opt_grad_defs) <- optDefs rulebase env2 grad_defs
@@ -151,7 +152,7 @@ theDiffs :: DisplayLint a
          -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase)
 theDiffs display defs env rulebase = do {
   ; let grad_defs = gradDefs BasicAD defs
-        env1 = env `extendGblST` grad_defs
+        env1 = extendGblST env grad_defs
   ; display "Grad" env1 grad_defs
 
   -- We generate grad_defs_tupled even though we do not use it yet.
@@ -165,7 +166,7 @@ theDiffs display defs env rulebase = do {
   -- Nonetheless, it's good to generate optgrad_tupled here so that
   -- the tests will run on it and we can be sure it typechecks.
   ; let grad_defs_tupled = gradDefs TupleAD defs
-        env15 = env1 `extendGblST` grad_defs_tupled
+        env15 = extendGblST env1 grad_defs_tupled
   ; display "Grad tupled" env15 grad_defs_tupled
 
   ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
@@ -184,6 +185,18 @@ theDiffs display defs env rulebase = do {
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
   ; return (env3, defs, optdiffs, rulebase)
+  }
+
+theShapes :: DisplayLint a
+         -> [TDef]
+         -> GblSymTab
+         -> RuleBase
+         -> KMT IO (GblSymTab, [TDef], RuleBase)
+theShapes display defs env rulebase = do {
+  ; let shape_defs = shapeDefs defs
+        env1 = extendGblST env shape_defs
+  ; display "Shapes" env1 shape_defs
+  ; return (env1, shape_defs, rulebase)
   }
 
 defsAndDiffs :: DisplayLint a
@@ -219,8 +232,13 @@ displayCppGenDefsDiffs ::
    -> GblSymTab
    -> RuleBase
    -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
-  -> Maybe Int -> [String] -> String -> String -> IO ()
-displayCppGenDefsDiffs generateDefs generateDiffs verbosity ksFiles ksofile cppfile =
+  -> (DisplayLint ()
+   -> [TDef]
+   -> GblSymTab
+   -> RuleBase
+   -> KMT IO (GblSymTab, [TDef], RuleBase))
+  -> Maybe Int -> [String] -> String -> String -> IO (String, String)
+displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFiles ksofile cppfile =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
       display = displayPassM verbosity
   in
@@ -234,14 +252,15 @@ displayCppGenDefsDiffs generateDefs generateDiffs verbosity ksFiles ksofile cppf
 
   ; (defs, env, rulebase) <- generateDefs display decls
   ; (env3, defs, optdiffs, rulebase) <- generateDiffs display defs env rulebase
+  ; (env4, shapedefs, rulebase) <- generateShapes display (defs ++ optdiffs) env3 rulebase
 
-  ; (env4, ann_main) <- annotDecls env3 main
+  ; (env5, ann_main) <- annotDecls env4 main
 
   ; let (_rules, main_tdef) = partitionDecls ann_main
 
-  ; let alldefs = defs ++ optdiffs ++ main_tdef
+  ; let alldefs = defs ++ optdiffs ++ shapedefs ++ main_tdef
 
-  ; cse <- anfOptAndCse display rulebase env4 alldefs
+  ; cse <- anfOptAndCse display rulebase env5 alldefs
 
   ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
@@ -251,10 +270,10 @@ displayCppGenDiffs :: (DisplayLint ()
                        -> GblSymTab
                        -> RuleBase
                        -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
-                   -> Maybe Int -> [String] -> String -> String -> IO ()
-displayCppGenDiffs = displayCppGenDefsDiffs theDefs
+                   -> Maybe Int -> [String] -> String -> String -> IO (String, String)
+displayCppGenDiffs diffs = displayCppGenDefsDiffs theDefs diffs theShapes
 
-displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO ()
+displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGenNoDiffs =
   displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
 
@@ -266,14 +285,19 @@ displayCppGenAndCompileDefsDiffs
       -> GblSymTab
       -> RuleBase
       -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
-  -> (String -> String -> IO String)
+  -> (DisplayLint ()
+      -> [TDef]
+      -> GblSymTab
+      -> RuleBase
+      -> KMT IO (GblSymTab, [TDef], RuleBase))
+  -> (String -> String -> IO a)
   -> String
   -> Maybe Int
   -> [String]
   -> String
-  -> IO String
+  -> IO (a, (String, String))
 displayCppGenAndCompileDefsDiffs
-  generateDefs generateDiffs compile ext verbosity files file = do {
+  generateDefs generateDiffs generateShapes compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
@@ -281,16 +305,17 @@ displayCppGenAndCompileDefsDiffs
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; displayCppGenDefsDiffs generateDefs generateDiffs verbosity (ksFiles ++ [ksFile]) ksofile cppfile
-  ; compiler cppfile exefile
+  ; outputFileContents <- displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; compilerResult <- compiler cppfile exefile
+  ; pure (compilerResult, outputFileContents)
   }
 
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO String) -> String -> Maybe Int -> [String] -> String -> IO String
-displayCppGenAndCompile = displayCppGenAndCompileDefsDiffs theDefs theDiffs
+displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String -> Maybe Int -> [String] -> String -> IO (a, (String, String))
+displayCppGenAndCompile = displayCppGenAndCompileDefsDiffs theDefs theDiffs theShapes
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
 displayCppGenCompileAndRun compilername verbosity file files = do
-  { exefile <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file files
+  { (exefile, _) <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }
 
@@ -301,8 +326,8 @@ displayCppGenCompileAndRunViaCatLang :: HasCallStack
                                      -> String
                                      -> IO String
 displayCppGenCompileAndRunViaCatLang compilername verbosity file files = do
-  { exefile <- displayCppGenAndCompileDefsDiffs
-                   theDefsViaCatLang theDiffs
+  { (exefile, _) <- displayCppGenAndCompileDefsDiffs
+                   theDefsViaCatLang theDiffs theShapes
                    (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }

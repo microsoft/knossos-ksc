@@ -232,7 +232,7 @@ toFutharkType L.TypeInteger    = I32
 toFutharkType L.TypeFloat      = F64
 toFutharkType L.TypeBool       = Bool
 toFutharkType (L.TypeTuple ts) = Tuple $ map toFutharkType ts
-toFutharkType (L.TypeVec t)    = Array DimAny $ toFutharkType t
+toFutharkType (L.TypeTensor 1 t) = Array DimAny $ toFutharkType t
 toFutharkType L.TypeString     = Array DimAny I8
 toFutharkType t =
   error $ "toFutharkType: unhandled " ++ show t
@@ -279,8 +279,9 @@ toFutharkExp :: L.TExpr -> Exp
 toFutharkExp (L.Konst k) = Const $ toFutharkConst k
 toFutharkExp (L.Var v) = Var $ toName v
 toFutharkExp (L.If cond te fe) = If (toFutharkExp cond) (toFutharkExp te) (toFutharkExp fe)
-toFutharkExp (L.Let (L.TVar _ v) e1 body) =
+toFutharkExp (L.Let (L.VarPat (L.TVar _ v)) e1 body) =
   Let (PatId (toName v)) (toFutharkExp e1) (toFutharkExp body)
+toFutharkExp (L.Let (L.TupPat _) _e1 _body) = error "Unimplemented"
 toFutharkExp (L.Tuple es) =
   ExpTuple $ map toFutharkExp es
 toFutharkExp (L.Lam (L.TVar _ v) body) =
@@ -310,7 +311,7 @@ sumbuild ret xs =
   where ret' = toFutharkType ret
 
 callPrimFun :: String -> L.Type -> L.TExpr -> Exp
-callPrimFun "deltaVec" (L.TypeVec ret) (L.Tuple [n, i, v]) =
+callPrimFun "deltaVec" (L.TypeTensor 1 ret) (L.Tuple [n, i, v]) =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
                          toFutharkExp i,
@@ -375,6 +376,9 @@ toCall f@(L.TFun _ L.GradFun{}) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall f@(L.TFun _ L.DrvFun{}) args =
+  Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
+
+toCall f@(L.TFun _ L.ShapeFun{}) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toFuthark :: L.TDef -> Def

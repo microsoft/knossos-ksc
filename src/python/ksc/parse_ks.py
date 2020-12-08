@@ -4,19 +4,12 @@ import sexpdata
 
 from ksc.type import Type
 from ksc.utils import ensure_list_of_lists
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert, pystr
 
 #####################################################################
 ## S-expression Utils
 
-# Parse a fixed-length s-exp into a list given a set of parsers, e.g.
-# parse_seq(se, parse_name, parse_int, parse_int)
-# would accept (fred 3 4)
-def parse_seq(se, *parsers):
-    if len(se) != len(parsers):
-        raise ParseError("Cannot parse ", se, " with ", parsers)
-
-    return [parser(term) for (parser, term) in zip(parsers, se)]
+parser_source_file = "<unknown>"
 
 # Exception for parse errors
 class ParseError(Exception):
@@ -24,8 +17,23 @@ class ParseError(Exception):
 
 # Raise ParseError if cond not true
 def check(cond, *message):
+    def tostr(s):
+        if isinstance(s, (sexpdata.SExpBase, list)):
+            return sexpdata.dumps(s)
+        else:
+            return s
+
     if not cond:
-        raise ParseError(*message)
+        message = "".join(tostr(s) for s in message)
+        raise ParseError(f"{parser_source_file}: {message}")
+
+# Parse a fixed-length s-exp into a list given a set of parsers, e.g.
+# parse_seq(se, parse_name, parse_int, parse_int)
+# would accept (fred 3 4)
+def parse_seq(se, *parsers):
+    check(len(se) == len(parsers), "Cannot parse ", se, " with ", parsers)
+
+    return [parser(term) for (parser, term) in zip(parsers, se)]
 
 # Reserved word constants
 _def = sexpdata.Symbol("def")
@@ -134,13 +142,17 @@ def parse_expr(se):
 
     # Let(var, rhs, body)
     if head == _let:
-        bindings = ensure_list_of_lists(se[1])
-        ans = parse_expr(se[2])
-        for b in bindings[::-1]:
-            check(len(b) == 2, "Let bindings should be pairs", b, "in", se)
-            var = Var(parse_name(b[0]), None, False)
-            rhs = parse_expr(b[1])
-            ans = Let(var, rhs, ans)
+        check(len(se) == 3, f"Let should have 2 terms (let (<binding>) body), not {len(se)-1} in", se)
+        binding = se[1]
+        check(len(binding) == 2, "Let bindings should be pairs", binding, "in", se)
+        lhs = binding[0]
+        if isinstance(lhs, list):
+            vars = [Var(parse_name(v)) for v in lhs]
+        else:
+            vars = Var(parse_name(lhs))
+        rhs = parse_expr(binding[1])
+        body = parse_expr(se[2])
+        ans = Let(vars, rhs, body)
         return ans
 
     # Lam(var, type, body)
@@ -166,34 +178,59 @@ def parse_tld(se):
     if head == _rule:
         return Rule(*parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr))
 
-    raise ParseError("unrecognised top-level definition:", se)
+    check(False, "unrecognised top-level definition:", se)
 
 ################################################################
 import argparse
 import sys
+import re
 
 def s_exps_from_string(string_or_stream):
     return sexpdata.Parser(string_or_stream, nil=None, true="true", false="false", line_comment=";").parse()
 
+def strip_block_comments(string):
+    # Strip block comments
+    regex = r"""\#\|               # hash bar
+                    (
+                        [^\|\#]     # (not bar or hash)  Do not be tempted to suffix with "+" - bad perf
+                    |               # or...
+                        (\|(?!\#))  # (bar not followed by hash)
+                    |               # or...
+                        (\#(?!\|))  # (hash not followed by bar)
+                    )*             # many times 
+                    \|\#           # bar hash
+                """
+    regex = re.compile(regex, flags=re.DOTALL | re.VERBOSE)
+    while True:
+        string, n = re.subn(regex, '', string)
+        if n == 0:
+            # print(f"Zapped {n} block comment(s)")
+            return string    
+
+def parse_ks_string(string_or_stream, source_file_name):
+    global parser_source_file
+    parser_source_file = source_file_name
+
+    string = strip_block_comments(string_or_stream)
+
+    for s_exp in s_exps_from_string(string):
+        yield parse_tld(s_exp)
+
 def parse_ks_file(string_or_stream):
-    for s_exp in s_exps_from_string(string_or_stream):
-        try:
-            yield parse_tld(s_exp)
-            
-        except ParseError:
-            print("ERROR at ", s_exp)
-            print(sys.exc_info()[1])
+    return parse_ks_string(string_or_stream, "<unknown>")
+
+def parse_ks_filename(filename):
+    with open(filename) as f:
+        ks_str = f.read()
+        return parse_ks_string(ks_str, filename)
 
 def main():
-    parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
-    parser.add_argument("input_ks_file", type=str)
+    parser = argparse.ArgumentParser(prog="parse_ks.py", description=__doc__)
+    parser.add_argument("input_ks_file", nargs='?', type=str, default="test/ksc/syntax-primer.ks")
     args = parser.parse_args()
 
-    with open(args.input_ks_file) as f:
-        ks_str = f.read()
-        print(ks_str)
-        print("--------------->")
-        [print(pystr(x, 0), "\n") for x in parse_ks_file(ks_str)]
+    for x in parse_ks_filename(args.input_ks_file):
+        print(pystr(x, 0))
 
 if __name__ == "__main__":
     sys.exit(main())

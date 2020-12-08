@@ -46,6 +46,8 @@
 
 ; mul Mat Vec
 (edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
+(def shape$mul$Mat$Vec (Vec (Tuple)) ((m : (Vec (Vec Float))) (v : (Vec Float)))
+          (constVec (size m) (tuple)))
 
 (edef D$mul$Mat$Vec (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
           ((Vec (Vec Float)) (Vec Float)))
@@ -168,7 +170,7 @@
 
 (def main Integer ()
     (let ((D 64)
-          (N 100)
+          (N 5)
           (K 64)
           (seed 0)
           (scale_unity 1.0)
@@ -183,5 +185,5 @@
         )
 
       (print x
-          (gmm_knossos_gmm_objective x alphas mus qs ls wishart)
+          (rev$gmm_knossos_gmm_objective (tuple x alphas mus qs ls wishart) 1.0)
           )))

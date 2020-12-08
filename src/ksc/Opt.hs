@@ -15,6 +15,7 @@ import Prim
 import Rules
 import OptLet
 import KMonad
+import Ksc.Traversal( traverseState )
 
 import Debug.Trace
 import Test.Hspec
@@ -126,9 +127,9 @@ optE env
     go (Lam tv e)         = Lam tv' (optE env' e)
        where
          (tv', env') = optSubstBndr tv env
-    go (Let tv rhs body)  = mkLet tv' (go rhs) (optE env' body)
+    go (Let tv rhs body)  = Let tv' (go rhs) (optE env' body)
        where
-         (tv', env') = optSubstBndr tv env
+         (tv', env') = traverseState optSubstBndr tv env
     go (If b t e)         = optIf (go b) (go t) (go e)
     go (Call f arg)       = optCall (optZapSubst env) f (go arg)
 
@@ -144,7 +145,7 @@ optCall env fun opt_args
 
 --------------
 optApp :: OptEnv -> TExpr -> TExpr -> TExpr
-optApp env (Lam v e) a = Let v (optE env a) (optE env e)
+optApp env (Lam v e) a = mkLet v (optE env a) (optE env e)
 optApp _ f a         = App f a
 
 --------------
@@ -186,14 +187,10 @@ on the condition.
 rewriteCall :: HasCallStack => OptEnv -> TFun -> TExpr -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
--- Just for unary functions so far
--- Could do this for n-ary functions but beware shadowing
 rewriteCall _ fun (Let v r arg)
   = Just (Let v r (Call fun arg))
 
 -- RULE: f( if e1 then e2 else e3 )  =  if e1 then f(e2) else f(e3)
--- Again unary functions only (notably fst, snd)
--- For nary functions worry about code duplication.
 rewriteCall _ fun (If e1 e2 e3)
   = Just (If e1 (Call fun e2) (Call fun e3))
 
@@ -301,7 +298,7 @@ optPrimFun _ "size" (Call constVec (Tuple [n,_]))
 -- RULE: index j (build n f) = f j
 optPrimFun _ "index" (Tuple [ ei, arr ])
   | Just (_, i, e) <- isBuild_maybe arr
-  = Just (Let i ei e)
+  = Just (mkLet i ei e)
 
 -- RULE: index j (constVec (n, v)) = v
 optPrimFun _ "index" (Tuple [_, Call constVec (Tuple [_, v])])
@@ -411,7 +408,7 @@ inlineCall :: OptEnv
            -> TExpr            -- Arguments
            -> TExpr
 inlineCall _ (VarPat tv) body arg
-  = Let tv arg body
+  = mkLet tv arg body
 
 inlineCall env (TupPat tvs) body arg
   = mkLets (fresh_tvs `zip` args) $
@@ -497,7 +494,7 @@ optBuild sz i e
   , delta `isThePrimFun` "delta"
   , Just ex <- ok_eq e1 e2
   , i `notFreeIn` ex
-  = Just $ Let i ex $ pDeltaVec sz (Var i) eb
+  = Just $ mkLet i ex $ pDeltaVec sz (Var i) eb
   where
     -- We want this to work for both (\i. delta i j e)
     --                           and (\j. delta i j e)
@@ -566,7 +563,7 @@ optSumBuild _ i (Call delta (Tuple [Var i1, ej, e]))
   | delta `isThePrimFun` "delta"
   , i == i1
   , i `notFreeIn` ej
-  = Just (Let i ej e)
+  = Just (mkLet i ej e)
 
 -- RULE: sumbuild n (\i. deltaVec n i e)
 --       = build n (\i. e)
@@ -660,8 +657,8 @@ optGradPrim _ "ts_add" arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
 optGradPrim _ "sum" e
-  | TypeVec t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeSize $ Simple "sum$i")
+  | TypeTensor 1 t <- typeof e
+  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "sum$i")
                              (lmOne t)))
 
 optGradPrim _ "size" e
@@ -676,6 +673,7 @@ optGradPrim _ "index" (Tuple [i,v])
 
 
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
+optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "ts_neg" _ = Just (lmScale a (kTFloat $ -1.0))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 
@@ -819,7 +817,7 @@ do_prod_v env dir e dx
   = Just $ pConstVec n (lmApply_Dir dir v dx)
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
-  | TypeVec {} <- typeof e
+  | TypeTensor 1 _ <- typeof e
   , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $ mkLets binds $
     pBuild (pSize ve) $ Lam indexTVar $
@@ -842,7 +840,7 @@ do_sum_v env dir e dx
     lmApply_Dir dir v (pIndex (Var indexTVar) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
-  | TypeVec {} <- typeof e
+  | TypeTensor 1 _ <- typeof e
   , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $
     mkLets binds $

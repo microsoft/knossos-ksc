@@ -100,7 +100,7 @@ def need_let(a, b):
 
 def test_need_let(backend):
     out = need_let(3, 1)
-    assert "(let ((v0 (square a)))" in out.creator._jitted.ks_str
+    assert "(let (tmpvar__0 (square a))" in out.creator._jitted.ks_str
     assert out.get_data_with_backend(backend) == 17 # 9 + 8
 
 @ksc.trace

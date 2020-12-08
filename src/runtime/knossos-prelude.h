@@ -10,13 +10,13 @@ double edef_example$af(allocator *, double x) { return x; }
 double fwd$edef_example$aff(allocator *, double x, double dx) { return dx; }
 double rev$edef_example$aff(allocator *, double x, double ddr) { return ddr; }
 
-double dot$avfvf(allocator *, vec<double> const& a, vec<double> const& b)
+double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
 {
 	return dot(a,b);
 }
 
 vec<double> 
-mul$Mat$Vec$avvfvf(allocator * alloc, vec<vec<double>> const& M, vec<double> const& v)
+mul$Mat$Vec$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> const& v)
 {
 	int r = size(M);
 	vec<double> ret(alloc, r);
@@ -26,7 +26,7 @@ mul$Mat$Vec$avvfvf(allocator * alloc, vec<vec<double>> const& M, vec<double> con
 }
 
 tuple<vec<vec<double>>,vec<double>> 
-rev$mul$Mat$Vec$a$dvvfvf$bvf(allocator * alloc, std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
+rev$mul$Mat$Vec$a$dT1T1fT1f$bT1f(allocator * alloc, std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
 {
         auto [M, v] = M_v;
 	int r = size(M);
@@ -133,13 +133,6 @@ inline double sub$aff(allocator *, double t1, double t2)
 	return t1 - t2;
 }
 
-inline auto D$sub$aff(allocator *, double, double)
-{
-	typedef LM::Scale M1;
-	typedef LM::Scale M2;
-	return LM::HCat<M1, M2>::mk(M1::mk(1.0), M2::mk(-1.0));
-}
-
 inline int sub$aii(allocator *, int t1, int t2)
 {
 	return t1 - t2;
@@ -153,12 +146,6 @@ inline double div$aff(allocator *, double t1, double t2)
 inline int div$aii(allocator *, int t1, int t2)
 {
 	return t1 / t2;
-}
-
-inline
-auto D$div$aff(allocator *, double t1, double t2)
-{
-	return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(1.0 / t2), LM::Scale::mk(-1.0 / (t1*t1)));
 }
 
 inline double neg$af(allocator *, double t)
@@ -179,11 +166,10 @@ inline double tanh$af(allocator *, double d) { return tanh(d); }
 inline double lgamma$af(allocator *, double d) { return lgamma(d); }
 
 inline double to_float$ai(allocator *, int d) { return d; }
-inline auto D$to_float$ai(allocator *, int d) { return LM::Zero<int, double>(); }
-
 inline double to_float(allocator *, int d) { return d; }
-inline auto D$to_float(allocator *, int d) { return LM::Zero<int, double>(); }
 
 inline bool or$abb(allocator *, int b1, int b2)  { return b1 || b2; }
 inline bool and$abb(allocator *, int b1, int b2) { return b1 && b2; }
 }
+
+#include "knossos-prelude-lm.h"

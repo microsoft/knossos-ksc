@@ -1,7 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
-	     ScopedTypeVariables, TypeApplications #-}
+	     ScopedTypeVariables, TypeApplications, AllowAmbiguousTypes #-}
 
 module Annotate (
   annotDecls, lintDefs
@@ -50,7 +50,7 @@ annotDecls gbl_env decls
     mk_rec_def :: DefX Parsed -> TcM TDef
     mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
-         tcPat pat $ \pat' ->
+         tcWithPat pat $ \pat' ->
          do { return (Def { def_fun = fun, def_pat = pat'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
@@ -87,18 +87,64 @@ tcDef (Def { def_fun    = fun
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
-    do { tcPat pat $ \pat' ->
+    do { tcWithPat pat $ \pat' ->
     do { rhs' <- tcRhs fun rhs res_ty
        ; return (Def { def_fun = fun, def_pat = pat'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
 
--- CPS form of extendLclSTM.  Formerly types could contain expressions
--- so they were typechecked.  The name of this function is a vestige
--- of those times.
-tcPat :: Pat -> (Pat -> TcM a) -> TcM a
-tcPat pat continueWithArg
+-- Adds the variables in the pattern to the symbol table and
+-- runs the continuation on the pattern.
+tcWithPat :: Pat -> (Pat -> TcM a) -> TcM a
+tcWithPat pat continueWithArg
   = do { extendLclSTM (patVars pat) $ continueWithArg pat }
+
+-- Checks that the type of pat matches expected_ty and if so returns
+-- the type-annotated Pat.
+tcPat :: forall p. InPhase p => PatG (LetBndrX p) -> Type -> TcM Pat
+tcPat pat expected_ty
+  = do { let annotated_ty = patTypeG @p pat
+       ; pat_ty <- checkTypes_maybe annotated_ty expected_ty let_binding_mismatch
+       ; case pat of
+           VarPat v  -> pure $ VarPat (tvar @p pat_ty v)
+           TupPat vs -> tcTupPat @p vs pat_ty
+       }
+       where let_binding_mismatch =
+               text "Let binding mis-match for" <+> pprPatLetBndr @p pat
+
+-- Checks that the fields of a tuple pattern, vs, match pat_ty, and if
+-- so returns the type-annotated Pat.
+tcTupPat :: forall p. InPhase p
+         => [LetBndrX p]
+         -> TypeX
+         -> TcM Pat
+tcTupPat vs pat_ty
+  = addCtxt (text "When matching the rhs of the binding for"
+             <+> pprPatLetBndr @p (TupPat vs)) $
+    case pat_ty of
+      TypeTuple ts -> tcTupPatTup @p vs ts
+      not_tuple_ty -> addErr (expected_tuple_type not_tuple_ty)
+  where expected_tuple_type ty =
+          vcat [ text "Expected tuple type but got:"
+               , ppr ty ]
+
+-- Checks that the fields of a tuple pattern, vs, match the entries of
+-- a tuple type, ts, and if so returns the type-annotated Pat.
+tcTupPatTup :: forall p. InPhase p
+            => [LetBndrX p]
+            -> [TypeX]
+            -> TcM Pat
+tcTupPatTup vs ts
+  = if sizes_match
+    then pure $ TupPat (zipWith (tvar @p) ts vs)
+    else addErr expected_tuple_type_of_matching_size
+  where sizes_match = length vs == length ts
+        expected_tuple_type_of_matching_size =
+          vcat [ text "Expected tuple type of matching size but got:"
+               , ppr (TypeTuple ts) ]
+
+tvar :: forall p. InPhase p => Type -> LetBndrX p -> TVarX
+tvar t v = TVar t (fst (getLetBndr @p v))
 
 tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
@@ -149,15 +195,13 @@ tcExpr (Call fx es)
        ; return (TE call' res_ty) }
 
 tcExpr (Let vx rhs body)
-  = do { let (var, mb_ty) = getLetBndr @p vx
-       ; TE arhs rhs_ty <- addCtxt (text "In the rhs of the binding for:" <+> ppr var) $
+  = do { TE arhs rhs_ty <- addCtxt (text "In the rhs of the binding for:" <+> pprPatLetBndr @p vx) $
                            tcExpr rhs
-       ; rhs_ty <- checkTypes_maybe mb_ty rhs_ty $
-         text "Let binding mis-match for" <+> ppr var
-       ; let tvar = TVar rhs_ty var
-       ; TE abody tybody <- extendLclSTM [tvar] (tcExpr body)
+       ; pat <- tcPat @p vx rhs_ty
+       ; let tvars = patVars pat
+       ; TE abody tybody <- extendLclSTM tvars (tcExpr body)
 
-       ; return (TE (Let tvar arhs abody) tybody) }
+       ; return (TE (Let pat arhs abody) tybody) }
 
 tcExpr (Tuple es)
   = do { pairs <- mapM tcExpr es
@@ -198,11 +242,7 @@ tcExpr (App fun arg)
                    ; return TypeUnknown }
        ; return (TE (App afun aarg) res_ty) }
 
-tcExpr (Dummy m_ty)
-  = case getMType @p m_ty of
-      Just ty -> return (TE (Dummy ty) ty)
-      Nothing -> do { addErr (text "Dummy var in untyped code")
-                    ; return (TE (Dummy TypeUnknown) TypeUnknown) }
+tcExpr (Dummy ty) = return (TE (Dummy ty) ty)
 
 tcVar :: Var -> Maybe Type -> TcM Type
 tcVar var mb_ty
