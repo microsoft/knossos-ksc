@@ -2194,7 +2194,7 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
                 \end{codearray} & \biggr\} \\
             \end{codearray}
 \end{multline*}
-\hspace{3em} where $\overline{v} = \freevars{e_2}$
+\hspace{3em} where $\overline{v} = \gradf{\freevars{e_2}}$
 } \\
 % case e1 of { Inl x el; Inr y er }
 \mkhead{
@@ -2225,6 +2225,7 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
          \append \; \gradrbogEB{e_1}{\gradf{xy}}{b_1}
          \end{codearray}
     \end{multline*}
+\hspace{3em} where $\overline{v} = \gradf{\freevars{e_l}} = \gradf{\freevars{e_r}}$
 }\\
 \end{tabular}
 \end{minipage}}
