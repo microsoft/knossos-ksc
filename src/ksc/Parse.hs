@@ -269,13 +269,13 @@ pAssert = do { pReserved "assert"
              ; return $ Assert e1 e2 }
 
 pTuple :: Parser (ExprX Parsed)
--- (assert e1 e2)
+-- (tuple e1 ... en)
 pTuple = do { pReserved "tuple"
             ; es <- many pExpr
             ; return $ Tuple es }
 
 pDummy :: Parser (ExprX Parsed)
--- (assert e1 e2)
+-- ($dummy type)
 pDummy = do { pReserved "$dummy"
             ; ty <- pType
             ; return $ Dummy ty }
