@@ -2186,15 +2186,15 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
         \gradrbogEB{\mbox{\lstinline|build $\;e_1\;(\lambda i.\, e_2)$ |}}{\gradf{t}}{b} = \\
           \begin{codearray}{l@{\hspace{1mm}}l@{\hspace{1mm}}l}
             \bigl\{ & (n,ba) = b \\
-            ; & \overline{v}  =
+            ; & \gradf{\overline{v}}  =
                 \begin{codearray}{l}
                    \mbox{\lstinline{sumbuild n}} \\
                       \quad \mbox{\lstinline|($\lambda i.$
-                      let $\;\gradrbogEB{e_2}{(\gradf{t}[i])}{(ba[i])}\;$ in $\;\overline{v})$|}
+                      let $\;\gradrbogEB{e_2}{(\gradf{t}[i])}{(ba[i])}\;$ in $\;\gradf{\overline{v}})$|}
                 \end{codearray} & \biggr\} \\
             \end{codearray}
 \end{multline*}
-\hspace{3em} where $\overline{v} = \gradf{\freevars{e_2}}$
+\hspace{3em} where $\overline{v} = \freevars{e_2}$
 } \\
 % case e1 of { Inl x el; Inr y er }
 \mkhead{
@@ -2217,15 +2217,15 @@ If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
               \{ Inl x $\rightarrow e_2$; Inr y $\rightarrow e_3$ \}|}}{\gradf{t}}{b} =\\
           \begin{codearray}{l}
            \{\, (b_1,b_2) = b \\
-            ;\, (\gradf{xy}, \overline{v}) = \begin{codearray}{l}
+            ;\, (\gradf{xy}, \gradf{\overline{v}}) = \begin{codearray}{l}
          \mbox{\lstinline|case $\;b_2\;$ of|} \\
-         \quad \mbox{\lstinline|Inl $\;b_l\rightarrow \;$ let $\;\gradrbogEB{e_l}{\gradf{t}}{b_l}\;$ in $\;($Inl$\;\gradf{x},\overline{v})$|} \\
-         \quad \mbox{\lstinline|Inr $\;b_r\rightarrow \;$ let $\;\gradrbogEB{e_r}{\gradf{t}}{b_r}\;$ in $\;($Inr$\;\gradf{y},\overline{v})$|}\, \} \\
+         \quad \mbox{\lstinline|Inl $\;b_l\rightarrow \;$ let $\;\gradrbogEB{e_l}{\gradf{t}}{b_l}\;$ in $\;($Inl$\;\gradf{x},\gradf{\overline{v}})$|} \\
+         \quad \mbox{\lstinline|Inr $\;b_r\rightarrow \;$ let $\;\gradrbogEB{e_r}{\gradf{t}}{b_r}\;$ in $\;($Inr$\;\gradf{y},\gradf{\overline{v}})$|}\, \} \\
            \end{codearray} \\
          \append \; \gradrbogEB{e_1}{\gradf{xy}}{b_1}
          \end{codearray}
     \end{multline*}
-\hspace{3em} where $\overline{v} = \gradf{\freevars{e_l}} = \gradf{\freevars{e_r}}$
+\hspace{3em} where $\overline{v} = \freevars{e_l} = \freevars{e_r}$
 }\\
 \end{tabular}
 \end{minipage}}
