@@ -372,7 +372,7 @@
 (edef D$and (LM (Tuple Bool Bool) Bool) (Bool Bool))
 (edef Dt$and (Tuple Bool (LM (Tuple Bool Bool) Bool)) (Bool Bool))
 (def fwd$and (Tuple)
-     ((xt : Tuple Bool Bool) (dxt : Tuple Bool Bool))
+     ((xt : Tuple Bool Bool) (dxt : Tuple (Tuple) (Tuple)))
      (tuple))
 (def rev$and (Tuple (Tuple) (Tuple))
      ((xt : Tuple Bool Bool) (d_dbool : (Tuple)))
