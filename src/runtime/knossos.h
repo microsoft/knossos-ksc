@@ -494,8 +494,9 @@ namespace ks
 	template<typename T> struct dimension_of_tensor_index_type : std::tuple_size<T> {};
 	template<> struct dimension_of_tensor_index_type<int> : std::integral_constant<size_t, 1u> {};
 
-	// Get the ith dimension of a tensor index object. In the multi-dimensional case
-	// this is simply a wrapper for std::get.
+	// Get the ith dimension of a tensor index object:
+	//   get_dimension<I>(tuple<int, ..., int> t) = get<I>(t)
+	//   get_dimension<0>(int t) = t
 	template<size_t I, typename TupleType> int get_dimension(TupleType const& t) { return std::get<I>(t); }
 	template<size_t I> int get_dimension(int val) { static_assert(I == 0); return val; }
 
@@ -939,8 +940,28 @@ namespace ks
 	/* A sumbuild is implemented by deep-copying the result of the
 	   first iteration (using a copydown), then accumulating
 	   subsequent iterations into this result using inplace_add.
-	   See the 1-dimensional base case sumbuild_t<1>::do_sumbuild
-	   for the simplest example. */
+
+	   e.g. for a 2-dimensional sumbuild, size {4, 3}, there is
+	   the following sequence of calls to f (ignoring the allocator
+	   argument for simplicity):
+	   
+			ret = copydown(f(0, 0))      }
+			inplace_add(&ret, f(0, 1))   }  called by sumbuild_t<1>::do_sumbuild({4, 3}, f, 0)
+			inplace_add(&ret, f(0, 2))   }
+
+			inplace_add(&ret, f(1, 0))   }
+			inplace_add(&ret, f(1, 1))   }  called by sumbuild_t<1>::inplace_sumbuild({4, 3}, f, 1)
+			inplace_add(&ret, f(1, 2))   }
+
+			inplace_add(&ret, f(2, 0))   }
+			inplace_add(&ret, f(2, 1))   }  called by sumbuild_t<1>::inplace_sumbuild({4, 3}, f, 2)
+			inplace_add(&ret, f(2, 2))   }
+
+			inplace_add(&ret, f(3, 0))   }
+			inplace_add(&ret, f(3, 1))   }  called by sumbuild_t<1>::inplace_sumbuild({4, 3}, f, 3)
+			inplace_add(&ret, f(3, 2))   }
+	*/
+
 	template<size_t Dim>
 	struct sumbuild_t
 	{
