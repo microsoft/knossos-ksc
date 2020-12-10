@@ -494,6 +494,8 @@ namespace ks
 	template<typename T> struct dimension_of_tensor_index_type : std::tuple_size<T> {};
 	template<> struct dimension_of_tensor_index_type<int> : std::integral_constant<size_t, 1u> {};
 
+	// Get the ith dimension of a tensor index object. In the multi-dimensional case
+	// this is simply a wrapper for std::get.
 	template<size_t I, typename TupleType> int get_dimension(TupleType const& t) { return std::get<I>(t); }
 	template<size_t I> int get_dimension(int val) { static_assert(I == 0); return val; }
 
@@ -949,18 +951,16 @@ namespace ks
 			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
 			KS_ASSERT(thisDimension > 0);
 			T ret = sumbuild_t<Dim - 1>::template do_sumbuild<T>(alloc, size, f, higherDimensionIndices..., 0);
-			for (int i = 1; i != thisDimension; ++i) {
+			for (int i = 1; i != thisDimension; ++i)
 				sumbuild_t<Dim - 1>::inplace_sumbuild(alloc, &ret, size, f, higherDimensionIndices..., i);
-			}
 			return ret;
 		}
 
 		template<class T, class F, class Size, class ...HigherDimensionIndices>
 		static void inplace_sumbuild(allocator * alloc, T* result, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
 			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
-			for (int i = 0; i != thisDimension; ++i) {
+			for (int i = 0; i != thisDimension; ++i)
 				sumbuild_t<Dim - 1>::inplace_sumbuild(alloc, result, size, f, higherDimensionIndices..., i);
-			}
 		}
 	};
 
