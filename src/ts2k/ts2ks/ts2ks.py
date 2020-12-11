@@ -251,7 +251,7 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
         return lookups.get(node.kind(), make_default)(node)
 
     def make_binds(nodes):
-        return [translate_node(functools.partial(make_binds), node) for node in nodes if node.kind() != "prim::Print"]
+        return [translate_node(make_binds, node) for node in nodes if node.kind() != "prim::Print"]
 
     binds = make_binds(all_nodes)
     
