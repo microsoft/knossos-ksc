@@ -190,19 +190,34 @@ def make_callfunction(node):
         ],
     ]
 
-def make_if(node):
+def make_if(make_binds, node):
     identifier = None
     if (node.outputsSize() == 0):
         identifier = "_" + "dummy" # we're likely to need to make them unique
     else:
         identifier = "_" + node.outputsAt(0).debugName()
 
+    blocks = list(node.blocks())
+
+    success_branch = make_binds(blocks[0].nodes())
+    success_branch_return = make_return(blocks[0].returnNode())
+
+    failure_branch = make_binds(blocks[1].nodes())
+    failure_branch_return = make_return(blocks[1].returnNode())
+
     return [
         sexpdata.Symbol("\n"),
         sexpdata.Symbol(identifier),
         [
             sexpdata.Symbol("if"),
-            [sexpdata.Symbol("false")]
+            [sexpdata.Symbol("false")],
+            sexpdata.Symbol("\n\t"),
+            success_branch,
+            [success_branch_return],
+            sexpdata.Symbol("\n\t"),
+            failure_branch,
+            [failure_branch_return],
+            sexpdata.Symbol("\n"),
         ],     
     ]    
 
@@ -210,18 +225,6 @@ def make_if(node):
 def make_default(node):
     print("WARNING, unimplmented node kind: " + node.kind())
     return sexpdata.Symbol("")
-
-
-# prim::Constant
-# prim::ListConstruct
-# prim::ListConstruct
-# prim::ListConstruct
-# aten::tensor
-# prim::CallFunction
-# prim::Print
-
-
-
 
 def write_edefs(output):
     output.write(add_edef)
@@ -231,37 +234,39 @@ def write_edefs(output):
 
 def ts2ks_fromgraph(output, generate_edefs, name, graph):
 
-    lookups = {
-        "prim::Constant": make_constant,
-        "prim::Print": make_print,
-        "prim::ListConstruct": make_list,
-        "aten::tensor": make_tensor,
-        "aten::add": functools.partial(make_add, generate_edefs),
-        "prim::Return": make_return,
-        "prim::CallFunction": make_callfunction,
-        "prim::If": make_if,
-    }
-
-    def translate_node(node):
-        return lookups.get(node.kind(), make_default)(node)
-
-    name = sexpdata.Symbol(name)
-
-    args = [make_arg(input) for input in graph.inputs() if (not input.type().str().startswith("__torch__.transformers"))] # filtering self, TODO: look for better way
-
     all_nodes = list(graph.nodes())
 
-    binds = [translate_node(node) for node in all_nodes if node.kind() != "prim::Print"]
+    def translate_node(make_binds, node):
+        lookups = {
+            "prim::Constant": make_constant,
+            "prim::Print": make_print,
+            "prim::ListConstruct": make_list,
+            "aten::tensor": make_tensor,
+            "aten::add": functools.partial(make_add, generate_edefs),
+            "prim::Return": make_return,
+            "prim::CallFunction": make_callfunction,
+            "prim::If": functools.partial(make_if, make_binds),
+        }
+
+        return lookups.get(node.kind(), make_default)(node)
+
+    def make_binds(nodes):
+        return [translate_node(functools.partial(make_binds), node) for node in nodes if node.kind() != "prim::Print"]
+
+    binds = make_binds(all_nodes)
+    
+    args = [make_arg(input) for input in graph.inputs() if (not input.type().str().startswith("__torch__.transformers"))] # filtering self, TODO: look for better way
+
     print_count = sum(1 for node in all_nodes if node.kind() == "prim::Print")
 
     # HACK: if last operation is print, we want that otherwise it's a return value.
     # need to think about interaction between imperative Python and pure Knossos
-    if list(graph.nodes())[-1].kind() == "prim::Print":
+    if all_nodes[-1].kind() == "prim::Print":
         if print_count > 1:
             print(
                 "WARNING: multiple print statements used, only final one currently translated"
             )
-        op = translate_node(list(graph.nodes())[-1])
+        op = translate_node(make_binds, all_nodes[-1])
         return_type = sexpdata.Symbol("Integer")
     else:
         if print_count > 0:
@@ -269,7 +274,7 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
                 "WARNING: print statement currently only supported as final operation"
             )
         return_node = graph.return_node()
-        op = translate_node(return_node)
+        op = translate_node(make_binds, return_node)
         return_type = symbolLook[str(return_node.inputsAt(0).type())]
 
     body = [
@@ -280,7 +285,9 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
         op,
     ]
 
-    whole_exp = [sexpdata.Symbol("def"), name, return_type, args, body]
+    name_as_symbol = sexpdata.Symbol(name)
+
+    whole_exp = [sexpdata.Symbol("def"), name_as_symbol, return_type, args, body]
 
     output.write(sexpdata.dumps(whole_exp))
 
