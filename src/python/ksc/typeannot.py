@@ -266,4 +266,3 @@ def _(ex, symtab):
 def typeannot_decls(decls : List[Expr], symtab = dict()):
     for decl in decls:
         typeannot(decl, symtab)
-    return symtab
