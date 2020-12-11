@@ -1,5 +1,5 @@
 """
-typeannot: Type annotation for Knossos IR
+type_propagate: Type propagation for Knossos IR
 """
 
 import itertools
@@ -110,7 +110,7 @@ class TypeError(RuntimeError):
     pass
 
 @singledispatch
-def typeannot(ex, symtab):
+def type_propagate(ex, symtab):
     """
     Fill "type" field of expr, propagating from incoming dict
     """
@@ -118,7 +118,7 @@ def typeannot(ex, symtab):
     assert ex.type_ != None
     return ex
 
-@typeannot.register(Def)
+@type_propagate.register(Def)
 def _(ex, symtab):
     # (def name retun_type args body)
     assert ex.return_type != None
@@ -146,7 +146,7 @@ def _(ex, symtab):
         local_st[a.name] = a.type_
 
     # Recurse into body
-    ex.body = typeannot(ex.body, local_st)
+    ex.body = type_propagate(ex.body, local_st)
 
     # And check the inferred type matches the decl
     if ex.return_type != ex.body.type_:
@@ -155,7 +155,7 @@ def _(ex, symtab):
     
     return ex
 
-@typeannot.register(EDef)
+@type_propagate.register(EDef)
 def _(ex, symtab):
     # (edef name retun_type arg_types)
     signature = ex.name, tuple(ex.arg_types)
@@ -164,12 +164,12 @@ def _(ex, symtab):
     symtab[signature] = ex.return_type
     return ex
 
-@typeannot.register(Rule)
+@type_propagate.register(Rule)
 def _(ex, symtab):
     # TODO: Typeannot for rules
     return ex
 
-@typeannot.register(Var)
+@type_propagate.register(Var)
 def _(ex, symtab):
     if ex.decl:
         assert ex.type_ != None
@@ -177,10 +177,10 @@ def _(ex, symtab):
         ex.type_ = symtab[ex.name]
     return ex
 
-@typeannot.register(Call)
+@type_propagate.register(Call)
 def _(ex, symtab):
     for a in ex.args:
-        typeannot(a, symtab)
+        type_propagate(a, symtab)
     argtypes = tuple(a.type_ for a in ex.args)
     key = ex.name, argtypes
 
@@ -199,35 +199,35 @@ def _(ex, symtab):
 
     # Not found, show what was found to improve error message
     argtypes_str = ",".join(map(pformat, argtypes))
-    print(f"typeannot: at ", pystr(ex, 2))
-    print(f"typeannot: Couldn't find {ex.name}({argtypes_str}) ")
-    print(f"typeannot: Near misses:")
+    print(f"type_propagate: at ", pystr(ex, 2))
+    print(f"type_propagate: Couldn't find {ex.name}({argtypes_str}) ")
+    print(f"type_propagate: Near misses:")
     for key,val in symtab.items():
         if isinstance(key, tuple):
             key=key[0]
         if key.startswith(ex.name): # TODO: soundex match here?
-            print(f"typeannot:   {key}({val})")
+            print(f"type_propagate:   {key}({val})")
 
     raise TypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))
 
-@typeannot.register(Lam)
+@type_propagate.register(Lam)
 def _(ex, symtab):
     local_st = symtab.copy()
     local_st[ex.arg.name] = ex.arg.type_
-    ex.body = typeannot(ex.body, local_st)
+    ex.body = type_propagate(ex.body, local_st)
     ex.type_ = Type.Lam(ex.arg.type_, ex.body.type_)
     return ex
 
-@typeannot.register(Let)
+@type_propagate.register(Let)
 def _(ex, symtab):
-    ex.rhs = typeannot(ex.rhs, symtab)
+    ex.rhs = type_propagate(ex.rhs, symtab)
 
     # Single var assignment
     if isinstance(ex.vars, Var):
         ex.vars.type_ = ex.rhs.type_
         local_st = symtab.copy()
         local_st[ex.vars.name] = ex.vars.type_
-        ex.body = typeannot(ex.body, local_st)
+        ex.body = type_propagate(ex.body, local_st)
         ex.type_ = ex.body.type_
         return ex
 
@@ -239,30 +239,30 @@ def _(ex, symtab):
             var.type_ = ex.rhs.type_.tuple_elem(i) if ex.rhs.type_ else None
             local_st[var.name] = var.type_
         
-        ex.body = typeannot(ex.body, local_st)
+        ex.body = type_propagate(ex.body, local_st)
         ex.type_ = ex.body.type_
         return ex
 
     assert False # Bad var   
 
-@typeannot.register(If)
+@type_propagate.register(If)
 def _(ex, symtab):
-    ex.cond = typeannot(ex.cond, symtab)
+    ex.cond = type_propagate(ex.cond, symtab)
     assert ex.cond.type_ == Type.Bool
-    ex.t_body = typeannot(ex.t_body, symtab)
-    ex.f_body = typeannot(ex.f_body, symtab)
+    ex.t_body = type_propagate(ex.t_body, symtab)
+    ex.f_body = type_propagate(ex.f_body, symtab)
     assert ex.t_body.type_ == ex.f_body.type_
     ex.type_ = ex.t_body.type_
     return ex
 
-@typeannot.register(Assert)
+@type_propagate.register(Assert)
 def _(ex, symtab):
-    ex.cond = typeannot(ex.cond, symtab)
+    ex.cond = type_propagate(ex.cond, symtab)
     assert ex.cond.type_ == Type.Bool
-    ex.body = typeannot(ex.body, symtab)
+    ex.body = type_propagate(ex.body, symtab)
     ex.type_ = ex.body.type_
     return ex
 
-def typeannot_decls(decls : List[Expr], symtab = dict()):
+def type_propagate_decls(decls : List[Expr], symtab = dict()):
     for decl in decls:
-        typeannot(decl, symtab)
+        type_propagate(decl, symtab)
