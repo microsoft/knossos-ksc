@@ -25,6 +25,8 @@ struct Type {
   std::vector<Type> subTypes;
 };
 
+typedef std::string Name; // Might later be atomized
+
 // A node in the AST.
 struct Expr {
   // Every node has a type, which may start as None,
@@ -41,7 +43,7 @@ struct Literal : public Expr {
 //     x in (add 2 x) ; type is implicit
 //     x in (def a (x : Float) 2) ; type is explicit
 struct Variable : public Expr {
-  std::string name;
+  Name name;
 };
 
 // Variable binding, ex:
@@ -59,7 +61,7 @@ struct Let : public Expr {
 
 // Declaration, ex: (edef max Float (Float Float))
 struct Declaration : public Expr {
-  std::string name;
+  Name name;
   std::vector<Type> argTypes;
 };
 
@@ -93,7 +95,7 @@ struct Condition : public Expr {
 //
 // Rules express ways to transform the graph. 
 struct Rule : public Expr {
-  std::string name;
+  Name name;
   std::vector<Variable::Ptr> variables;
   Expr::Ptr pattern;
   Expr::Ptr result;
