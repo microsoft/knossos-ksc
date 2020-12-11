@@ -561,6 +561,12 @@ namespace ks
 			return data_[dimension::flatten_index(i, size_)];
 		}
 
+		void set_if_index_is_in_range(index_type i, T const& val) {
+			if (dimension::index_is_in_range(i, size_)) {
+				data_[dimension::flatten_index(i, size_)] = val;
+			}
+		}
+
 		static tensor<Dim, T> create(allocator_base * alloc, index_type size)
 		{
 			return tensor<Dim, T>(alloc, size);
@@ -1028,25 +1034,22 @@ namespace ks
 		return (i == j) ? val : zero(alloc, val);
 	}
 
-	template <class T>
-	vec<T> deltaVec(allocator * alloc, int n, int i, T val)
+	template <class SizeType, class T>
+	auto constVec(allocator * alloc, SizeType size, T val)
 	{
-		vec<T> ret(alloc, n);
-		T z = zero(alloc, val);
-		for(int j = 0; j < n; ++j)
-			if (j != i)
-			  ret[j] = z;
-			else
-			  ret[j] = val;
+		constexpr size_t Dim = dimension_of_tensor_index_type<SizeType>::value;
+		tensor<Dim, T> ret(alloc, size);
+		for(int j = 0, ne = ret.num_elements(); j != ne; ++j)
+			ret[j] = val;
 		return ret;
 	}
 
-	template <class T>
-	vec<T> constVec(allocator * alloc, int n, T val)
+	template <class SizeType, class T>
+	auto deltaVec(allocator * alloc, SizeType size, SizeType index, T val)
 	{
-		vec<T> ret(alloc, n);
-		for(int j = 0; j < n; ++j)
-			ret[j] = val;
+		constexpr size_t Dim = dimension_of_tensor_index_type<SizeType>::value;
+		tensor<Dim, T> ret = constVec(alloc, size, zero(alloc, val));
+		ret.set_if_index_is_in_range(index, val);
 		return ret;
 	}
 
