@@ -430,11 +430,10 @@ namespace ks
 			return ret;
 		}
 
-		static void check_index_in_range(index_type const& i, index_type const& tensor_size) {
-			if (((std::get<Indices>(i) >= std::get<Indices>(tensor_size)) || ...)) {
-				std::cerr << "ERROR: Accessing element " << index_to_string(i) << " of tensor of size " << index_to_string(tensor_size) << std::endl;
-				abort();
-			}
+		static bool index_is_in_range(index_type const& i, index_type const& tensor_size) {
+			return (
+				(std::get<Indices>(i) >= 0 && std::get<Indices>(i) < std::get<Indices>(tensor_size)) && ...
+			);
 		}
 	};
 
@@ -459,9 +458,6 @@ namespace ks
 		}
 
 		static int flatten_index(index_type index, index_type tensor_size) {
-#ifndef NDEBUG
-			base::check_index_in_range(index, tensor_size);
-#endif
 			return flatten_index_recursive(index, tensor_size);
 		}
 	};
@@ -475,18 +471,18 @@ namespace ks
 
 		static int num_elements(index_type size) { return size; }
 
+		static std::string index_to_string(index_type i) { return std::to_string(i); }
+
+		static bool index_is_in_range(index_type index, index_type tensor_size) {
+			return index >= 0 && index < tensor_size;
+		}
+
 		template<typename IndexType>
 		static int flatten_index_recursive(IndexType const& index, IndexType const& /*tensor_size*/) {
 			return std::get<0>(index);
 		}
 
 		static int flatten_index(index_type index, index_type tensor_size) {
-#ifndef NDEBUG
-			if (index >= tensor_size) {
-				std::cerr << "ERROR: Accessing element " << index << " of tensor of size " << tensor_size << std::endl;
-				abort();
-			}
-#endif
 			return index;
 		}
 	};
@@ -556,6 +552,12 @@ namespace ks
 		T const& operator[](int i) const { return data_[i]; }
 
 		T const& index(index_type i) const {
+#ifndef NDEBUG
+			if (!dimension::index_is_in_range(i, size_)) {
+				std::cerr << "ERROR: Accessing element " << dimension::index_to_string(i) << " of tensor of size " << dimension::index_to_string(size_) << std::endl;
+				abort();
+			}
+#endif
 			return data_[dimension::flatten_index(i, size_)];
 		}
 
