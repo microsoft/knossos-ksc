@@ -106,7 +106,7 @@ def ks_prim_lookup(name, tys):
 ############################################################################
 from functools import singledispatch
 
-class TypeError(RuntimeError):
+class KSTypeError(RuntimeError):
     pass
 
 @singledispatch
@@ -132,7 +132,7 @@ def _(ex, symtab):
     if signature in symtab:
         old_type = symtab[signature]
         if old_type != ex.return_type:
-            raise TypeError(f"Redefinition of {ex.name}({argtypes}) with different return type {old_type} -> {ex.return_type}")
+            raise KSTypeError(f"Redefinition of {ex.name}({argtypes}) with different return type {old_type} -> {ex.return_type}")
     
     symtab[signature] = ex.return_type
 
@@ -150,7 +150,7 @@ def _(ex, symtab):
 
     # And check the inferred type matches the decl
     if ex.return_type != ex.body.type_:
-        raise TypeError(f"In definition of '{ex.name}', inferred return type {ex.body.type_}\n" +
+        raise KSTypeError(f"In definition of '{ex.name}', inferred return type {ex.body.type_}\n" +
                         f"does not match declaration {ex.return_type}")
     
     return ex
@@ -160,7 +160,7 @@ def _(ex, symtab):
     # (edef name retun_type arg_types)
     signature = ex.name, tuple(ex.arg_types)
     if signature in symtab and symtab[signature] != ex.return_type:
-        raise NotImplementedError(f"Double edef: {key}\n -> {symtab[key]}\n vs {ex.return_type}")
+        raise KSTypeError(f"Double definition: {signature}\n -> {symtab[signature]}\n vs {ex.return_type}")
     symtab[signature] = ex.return_type
     return ex
 
@@ -208,7 +208,7 @@ def _(ex, symtab):
         if key.startswith(ex.name): # TODO: soundex match here?
             print(f"type_propagate:   {key}({val})")
 
-    raise TypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))
+    raise KSTypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))
 
 @type_propagate.register(Lam)
 def _(ex, symtab):
