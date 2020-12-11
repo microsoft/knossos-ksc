@@ -3,7 +3,7 @@
 ## Installing
 In this directory
 ```
-pip install -U .
+pip install --editable .
 ```
 
 ## Compiling ksc from Python

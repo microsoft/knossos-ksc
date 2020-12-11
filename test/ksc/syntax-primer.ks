@@ -107,15 +107,15 @@ If you prefer block comments then use pairs of #| and |#
 ;   the opposite way round from what you might expect if you are used
 ;   to "v[i]" notation.
 ;
-; To create new variables use "let"
+; To bind variables use "let"
 (def let_and_types Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
-     (let ((b2 (or b false))
-           (i2 (add i 10))
-           (f2 (add f 10.0))
-           (s2 "Hello"))
+     (let (b2 (or b false))
+     (let (i2 (add i 10))
+     (let (f2 (add f 10.0))
+     (let (s2 "Hello")
        (if (and (gte i 0) (lt i (size v)))
            (index i v)
-           f2)))
+           f2))))))
 
 ; Python equivalent
 ;
@@ -130,6 +130,13 @@ If you prefer block comments then use pairs of #| and |#
 ;     else:
 ;         return f2
 
+; Tuples can be bound
+(def let_tupled Float ((b : Bool) (s : String) (i : Integer) (f : Float) (v : Vec Float))
+     (let ((b2 s2) (tuple b s))
+     (let (i2 (add i 10))
+     (let ((f2 s2) (tuple (add f 10.0) "Hello"))
+     (let (s3 "Hello")
+       f2)))))
 
 ; Vectors are created with the "build" function.
 ;
@@ -221,13 +228,15 @@ If you prefer block comments then use pairs of #| and |#
 ; where s0 is the initial state, f maps from state and element to
 ; state and v is a vector to loop over.
 ;
-; This example calculates the sum of the elements in a vector.
-(def fold_example Float (v : Vec Float)
-     (fold (lam (s_vi : Tuple Float Float)
-                (let ((s (get$1$2 s_vi))
-                      (vi (get$2$2 s_vi)))
-                  (add s vi)))
-           0.0
+; This example calculates (the number of positive elements, and their product) in a vector.
+(def fold_example (Tuple Integer Float) (v : Vec Float)
+     (fold (lam (s_vi : Tuple (Tuple Integer Float) Float)
+                (let ((s vi) s_vi)
+                (let ((s_num s_prod) s)
+                  (if (gt vi 0.0) 
+                    (tuple (add s_num 1) (mul s_prod vi))
+                    (tuple s_num s_prod)))))
+           (tuple 0 1.0)
            v))
 
 ; Python equivalent
@@ -259,9 +268,19 @@ If you prefer block comments then use pairs of #| and |#
 ; can provide its name and type with an "edef" declaration, and then
 ; use it as though it were a function you had defined yourself.  An
 ; "edef" is somewhat like a C function declaration.  You can even define
-; manual derivatives for your function.
+; manual derivatives (i.e. using "def") for your function.
 (edef my_log Float (Float))
-(edef D$my_log (LM Float Float) (Float))
-(def fwd$my_log Float ((x : Float) (dx : Float)) (div dx x))
-(def rev$my_log Float ((x : Float) (d_dmy_log : Float)) (div d_dmy_log x))
-(edef Dt$my_log (Tuple Float (LM Float Float)) (Float))
+(edef D$my_log (LM Float Float) (Float)) ; External definition of Jacobian
+(edef Dt$my_log (Tuple Float (LM Float Float)) (Float)) ; and its transpose
+
+;; KS-visible definition of forward derivative
+(def fwd$my_log Float ((x : Float) (dx : Float)) 
+     (div dx x))
+;; KS-visible definition of reverse derivative
+(def rev$my_log Float ((x : Float) (d_dmy_log : Float)) 
+     (div d_dmy_log x))
+
+;; Edge cases
+; (def f Integer (f : Lam Integer Integer) 
+;      (f 2) ; not a recursive call
+;      )

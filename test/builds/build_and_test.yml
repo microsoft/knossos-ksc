@@ -6,7 +6,7 @@ jobs:
   workspace:
     clean: all
   pool:
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'ubuntu-18.04'
 
   steps:
 
@@ -52,7 +52,7 @@ jobs:
   - script: sh ./test/builds/test_resnet50.sh
     displayName: Testing Resnet50 through ksc
 
-  - script: ./ksc --profile --ks-file-without-extension test/ksc/gmm-obj --proffile prof-obj.out --proffunctions prof-obj-functions.txt --proflines prof-obj-lines.txt && ./ksc --profile --ks-file-without-extension test/ksc/gmm-rev --proffile prof-rev.out  --proffunctions prof-rev-functions.txt --proflines prof-rev-lines.txt
+  - script: ./ksc --profile --ks-file-without-extension test/ksc/run-gmm-obj-for-profiling --proffile prof-obj.out --proffunctions prof-obj-functions.txt --proflines prof-obj-lines.txt && ./ksc --profile --ks-file-without-extension test/ksc/run-gmm-rev-for-profiling --proffile prof-rev.out  --proffunctions prof-rev-functions.txt --proflines prof-rev-lines.txt
     displayName: gperftools
 
   - script: sh test/builds/publish_artifact.sh

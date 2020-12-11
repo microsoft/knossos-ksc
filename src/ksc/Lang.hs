@@ -190,7 +190,7 @@ data TypeX
   | TypeString
   | TypeTuple [TypeX]
 
-  | TypeVec TypeX
+  | TypeTensor Int TypeX
 
   | TypeLam TypeX TypeX  -- Domain -> Range
   | TypeLM  TypeX TypeX   -- Linear map  Src -o Target
@@ -229,11 +229,36 @@ deriving instance Show (DefX Parsed)
 deriving instance Show (DeclX Parsed)
 deriving instance Show (RuleX Parsed)
 
--- TypeSize is used to document when an integer represents a Size.
--- It's too viral to use a separate Integer type because most integer operations
--- need to be supported, e.g. the size of a lower-triangular matrix is d*(d+1)/2
-pattern TypeSize :: TypeX
-pattern TypeSize = TypeInteger
+----------------------------------
+--- Tensor properties
+----------------------------------
+
+{- Note [Size and index types of tensors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally, tensor elements are indexed by tuples of integers,
+with the size of the tuple being the number of dimensions of
+the tensor. The same type (a tuple of integers) is used to
+represent the size of the tensor.
+
+The 1-dimensional case is special because we avoid the
+use of 1-tuples. In this case, the index/size type is a
+plain integer.
+-}
+
+tensorIndexType :: Int -> Type
+tensorIndexType 1 = TypeInteger
+tensorIndexType d = TypeTuple (replicate d TypeInteger)
+
+tensorDimensionFromIndexType :: Type -> Maybe Int
+tensorDimensionFromIndexType TypeInteger = Just 1
+tensorDimensionFromIndexType (TypeTuple ts)
+  | all (`eqType` TypeInteger) ts
+  = Just (length ts)
+tensorDimensionFromIndexType _ = Nothing
+
+tensorTypeFromIndexType :: Type -> Type -> Maybe Type
+tensorTypeFromIndexType indexType elementType =
+  fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType indexType)
 
 ----------------------------------
 --- Tangent space
@@ -241,7 +266,7 @@ pattern TypeSize = TypeInteger
 tangentType :: HasCallStack => Type -> Type
 -- We can't differentiate Integer, Bool etc.
 tangentType TypeFloat      = TypeFloat
-tangentType (TypeVec t)    = TypeVec (tangentType t)
+tangentType (TypeTensor d t) = TypeTensor d (tangentType t)
 tangentType (TypeTuple ts) = TypeTuple (map tangentType ts)
 tangentType TypeInteger    = TypeTuple []
 tangentType TypeBool       = TypeTuple []
@@ -260,7 +285,7 @@ shapeType TypeInteger = TypeTuple []
 shapeType TypeFloat = TypeTuple []
 shapeType TypeString = TypeTuple []
 shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
-shapeType (TypeVec vt) = TypeVec (shapeType vt)
+shapeType (TypeTensor d vt) = TypeTensor d (shapeType vt)
 shapeType (TypeLam _ _) = TypeUnknown
 shapeType (TypeLM _ _) = TypeUnknown  -- TBD
 shapeType TypeUnknown = TypeUnknown
@@ -429,7 +454,7 @@ argVar :: Var
 argVar = Simple "ksc$argVar"
 
 indexTVar :: TVar
-indexTVar = TVar TypeSize (Simple "ksc$indexTVar")
+indexTVar = TVar TypeInteger (Simple "ksc$indexTVar")
 
 mkArgVar :: Int -> Var
 mkArgVar n = Simple ("ksc$argVar" ++ show n)
@@ -807,8 +832,10 @@ instance Pretty Konst where
   pprPrec _ (KBool b)    = text (case b of { True -> "true"; False -> "false" })
 
 instance Pretty TypeX where
-  pprPrec p (TypeVec ty)      = parensIf p precTyApp $
+  pprPrec p (TypeTensor 1 ty) = parensIf p precTyApp $    -- TODO: remove this special case once other Knossos components understand Tensor
                                 text "Vec" <+> pprParendType ty
+  pprPrec p (TypeTensor d ty) = parensIf p precTyApp $
+                                text "Tensor" <+> int d <+> pprParendType ty
   pprPrec _ (TypeTuple tys)   = mode (parens (text "Tuple" <+> pprList pprParendType tys))
                                      (parens (pprList pprParendType tys))
   pprPrec p (TypeLam from to) = parensIf p precZero $
@@ -816,7 +843,6 @@ instance Pretty TypeX where
   pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
   pprPrec _ TypeFloat         = text "Float"
   pprPrec _ TypeInteger       = text "Integer"
-  pprPrec _ TypeSize          = text "Size"
   pprPrec _ TypeString        = text "String"
   pprPrec _ TypeBool          = text "Bool"
   pprPrec _ TypeUnknown       = text "UNKNOWN"

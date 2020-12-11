@@ -17,7 +17,6 @@ void declare_vec(py::module &m, std::string typestr) {
   py::class_<Class>(m, pyclass_name.c_str())
     .def(py::init<>())
     .def(py::init([](std::vector<T> const& v) { return ks::vec<T>(&g_alloc, v); }))
-    .def("is_zero",     &Class::is_zero)
     .def("__getitem__", [](const ks::vec<T> &a, const int &b) {
 	return a[b];
       })
@@ -37,6 +36,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("conv2d", withGlobalAllocator(&ks::conv2d$avvvvfvfvvvf));
-  m.def("mnist", withGlobalAllocator(&ks::mnist$avvvfvvvvfvfvvvvfvfvvvvfvfvvfvf));
+  m.def("conv2d", withGlobalAllocator(&ks::conv2d$aT1T1T1T1fT1fT1T1T1f));
+  m.def("mnist", withGlobalAllocator(&ks::mnist$aT1T1T1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1fT1f));
 }

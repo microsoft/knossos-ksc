@@ -2,8 +2,6 @@
 
 set -e
 
-echo ----- add gcc7 repo -----
-sudo add-apt-repository ppa:jonathonf/gcc-7.1
 echo ----- add ghc repo -----
 sudo add-apt-repository ppa:hvr/ghc -y
 echo ----- apt-get update -----

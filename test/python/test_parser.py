@@ -38,8 +38,9 @@ def test_parses():
     assert expr("(if a a b)") == If(Var_a, Var_a, Var_b)
     assert expr("(let (a b) a)") == Let(Var_a, Var_b, Var_a)
     assert expr("(lam (a : Float) a)") == Lam(Var_a_Float, Var_a)
-    assert expr("(let ((a b) (b 3)) a)") == \
-                Let(Var_a, Var_b, Let(Var_b, Const(3), Var_a))
+    assert expr("(let ((a b) (tuple 1 2)) a)") == \
+                Let([Var_a, Var_b], Call("tuple", [Const(1), Const(2)]), 
+                    Var_a)
 
 def test_expr():
     Var_a_Float = Var("a", Type.Float, True)

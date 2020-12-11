@@ -200,6 +200,9 @@ rewriteCall env (TFun _ (Fun fun)) arg
 rewriteCall env (TFun ty (GradFun f adm)) arg
   = optGradFun (optEnvInScope env) adm ty f arg
 
+rewriteCall _ (TFun _ (DrvFun f adm)) arg
+  = optDrvFun adm f arg
+
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
   = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
 
@@ -657,8 +660,8 @@ optGradPrim _ "ts_add" arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
 optGradPrim _ "sum" e
-  | TypeVec t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeSize $ Simple "sum$i")
+  | TypeTensor 1 t <- typeof e
+  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "sum$i")
                              (lmOne t)))
 
 optGradPrim _ "size" e
@@ -676,6 +679,20 @@ optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "ts_neg" _ = Just (lmScale a (kTFloat $ -1.0))
 optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
+
+
+-----------------------
+optDrvFun :: HasCallStack => ADMode -> FunId -> TExpr -> Maybe TExpr
+optDrvFun (AD BasicAD dir) (PrimFun f) args = optDrvPrim dir f args
+optDrvFun _ _ _ = Nothing
+
+optDrvPrim :: HasCallStack => ADDir -> PrimFun -> TExpr -> Maybe TExpr
+
+optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv]) = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
+optDrvPrim Rev "constVec" (Tuple [_n_v, ddr]) = Just $ Tuple [ Tuple [], pSum ddr ]
+optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv]) = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
+optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr]) = Just $ Tuple [ Tuple [], Tuple [], pIndex (pSel 2 3 n_i_v) ddr ]
+optDrvPrim _ _ _ = Nothing
 
 ---------------
 -- Called for (lmApply lm dx)
@@ -817,7 +834,7 @@ do_prod_v env dir e dx
   = Just $ pConstVec n (lmApply_Dir dir v dx)
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
-  | TypeVec {} <- typeof e
+  | TypeTensor 1 _ <- typeof e
   , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $ mkLets binds $
     pBuild (pSize ve) $ Lam indexTVar $
@@ -840,7 +857,7 @@ do_sum_v env dir e dx
     lmApply_Dir dir v (pIndex (Var indexTVar) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
-  | TypeVec {} <- typeof e
+  | TypeTensor 1 _ <- typeof e
   , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
   = Just $
     mkLets binds $

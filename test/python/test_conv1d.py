@@ -15,23 +15,23 @@ def test_conv1d():
 
 (def conv1d (Vec (Vec Float)) ((kernels : (Vec (Vec (Vec Float))))
                                (image : (Vec (Vec Float))))
-  (let ((k (size kernels))
-        (kernels_elt (index 0 kernels))
-        (kn (size (index 0 kernels_elt)))
-        (l  (size image))
-        (n  (size (index 0 image))))
+  (let (k (size kernels))
+  (let (kernels_elt (index 0 kernels))
+  (let (kn (size (index 0 kernels_elt)))
+  (let (l  (size image))
+  (let (n  (size (index 0 image)))
     (build k (lam (ki : Integer)
       (build n (lam (ni : Integer)
         (sumbuild kn (lam (kni : Integer)
           (sumbuild l  (lam (li  : Integer)
-            (let ((knc (div kn 2))
-                  (noi (sub (add ni knc) kni))
-                  (outside_image (or (lt noi 0) (gte noi n)))
-                  (image_noi
-                  (if outside_image 0.0 (index noi (index li image)))))
-              (mul image_noi (index kni (index li (index ki kernels))))
-        )))))))))))"""
-    py_out = translate_and_import(ks_str, "common")
+            (let (knc (div kn 2))
+            (let (noi (sub (add ni knc) kni))
+            (let (outside_image (or (lt noi 0) (gte noi n)))
+            (let (image_noi (if outside_image 0.0 (index noi (index li image))))
+              (mul image_noi (index kni (index li (index ki kernels)))))
+            )))))))))))))))))
+        """
+    py_out = translate_and_import(__file__, ks_str, "common")
     image = np.random.normal(0, 1, (1, 100))
     kernel = np.array(
       [[[-0.5, 0, 0.5]],

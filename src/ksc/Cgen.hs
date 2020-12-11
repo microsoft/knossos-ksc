@@ -179,7 +179,7 @@ allocatorUsageOfType = \case
   TypeFloat     -> DoesNotUseAllocator
   TypeString    -> DoesNotUseAllocator
   TypeTuple ts  -> foldMap allocatorUsageOfType ts
-  TypeVec    {} -> UsesAllocator
+  TypeTensor {} -> UsesAllocator
   TypeLam {}    -> UsesAllocator
   TypeLM     {} -> UsesAllocator
   TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
@@ -362,79 +362,6 @@ cgenExprWithoutResettingAlloc env = \case
   Dummy ty ->
     let cty = mkCType ty in return $ CG [] (cgenType cty ++ "{}") cty DoesNotUseAllocator
   Var (TVar ty v)               -> return $ CG [] (cgenVar v) (mkCType ty) DoesNotUseAllocator
-
-  -- Special case for build -- inline the loop
-  Call (TFun (TypeVec ty) (Fun (PrimFun "build"))) (Tuple [sz, Lam (TVar vty var) body]) -> do
-    CG szdecl szex _szty _szau <- cgenExprR env sz
-    let varty = mkCType vty
-    let varcty = cgenType varty
-    CG bodydecl bodyex _bodyty _bodyau <- cgenExprR env body
-
-    ret  <- freshCVar
-    cvar <- freshCVar
-
-    return $ CG
-        (  [ cComment "build" ]
-        ++ szdecl
-        ++ [ "vec<" ++ cgenType (mkCType ty) ++ "> " ++ ret ++ "(" ++ allocatorParameterName ++ ", " ++ szex ++ ");",
-             "for(" ++ varcty ++ " " ++ cvar ++ " = 0;"
-                    ++ cvar ++ " < " ++ szex ++ ";"
-                    ++ " ++" ++ cvar ++ ") {" ]
-        ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = " ++ cvar ++ ";" ]
-                  ++ bodydecl
-                  ++ [ ret ++ "[" ++ cvar ++ "] = " ++ bodyex ++ ";" ]
-                  )
-        ++ [ "}" ]
-        )
-        ret
-        (mkCType (TypeVec ty))
-        UsesAllocator
-
-  -- Special case for sumbuild -- inline the loop
-  Call (TFun ty (Fun (PrimFun "sumbuild"))) (Tuple [sz, Lam (TVar vty var@(Simple _)) body]) -> do
-    CG szdecl szex _szty _szau <- cgenExprR env sz
-    let varty = mkCType vty
-    let varcty = cgenType varty
-    CG bodydecl bodyex _bodyty _bodyau <- cgenExprR env body
-
-    let cretty = cgenType $ mkCType ty
-    ret  <- freshCVar
-    bumpmark <- freshCVar
-
-    -- The allocator usage will be at least UsesAndResetsAllocator
-    -- here, because our implementation marks/resets the allocator
-    -- even when the result type is a scalar.
-    let allocusage = allocatorUsageOfCType (mkCType ty) <> UsesAndResetsAllocator
-
-    return $ CG
-        (  [ cComment "sumbuild" ]
-        ++ szdecl
-        ++ [  "KS_ASSERT(" ++ szex ++ " > 0);",
-              cretty ++ " " ++ ret ++ ";",
-              "{" ]
-        ++ indent (  [ varcty ++ " " ++ cgenVar var ++ " = 0;",
-                       markAllocator bumpmark allocatorParameterName,
-                       "do {" ]
-                  ++ indent (  bodydecl
-                               -- Make a deep copy on the first iteration, using a copydown to
-                               -- reclaim other memory allocated in that iteration.
-                               -- Subsequent iterations can then accumulate into this copy.
-                            ++ [ "if (" ++ cgenVar var ++ " == 0) {" ]
-                            ++ indent [ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ bodyex ++ ");",
-                                        moveMark bumpmark allocatorParameterName ]
-                            ++ [ "} else {" ]
-                            ++ indent [ "inplace_add_t<"++ cretty ++">::go(&" ++ ret ++ ", " ++ bodyex ++ ");",
-                                      -- Release the allocator back to where it was after iter 0
-                                        resetAllocator bumpmark allocatorParameterName ]
-                            ++ [ "}" ]
-                            )
-                  ++ [ "} while (++" ++ cgenVar var ++ " < " ++ szex ++ ");" ]
-                  )
-        ++ [ "}" ]
-        )
-        ret
-        (mkCType ty)
-        allocusage
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
@@ -641,7 +568,7 @@ mangleType = \case
     TypeFloat     -> "f"
     TypeString    -> "s"
     TypeTuple tys -> "<" ++ concatMap mangleType tys ++ ">"
-    TypeVec ty    -> "v" ++ mangleType ty
+    TypeTensor d ty -> "T" ++ show d ++ mangleType ty
     TypeLam a b   -> "l<" ++ mangleType a ++ mangleType b ++ ">"
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
@@ -669,8 +596,8 @@ cgenAnyFun (tf, ty) cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
     case ty of
-      TypeVec t -> "build<" ++ cgenType (mkCType t) ++ ">"
-      _         -> error ("Unexpected type for build: " ++ show ty)
+      TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
+      _              -> error ("Unexpected type for build: " ++ show ty)
   TFun ty (Fun (PrimFun "sumbuild")) -> -- TODO: remove special case
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
@@ -705,7 +632,7 @@ are two cases:
 
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "delta", "$trace", "print"]
+  not $ fname `elem` ["index", "size", "eq", "ne", "$trace", "print"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
@@ -743,7 +670,7 @@ cgenTypeLang = \case
   TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
-  TypeVec t     -> "vec<" ++ cgenTypeLang t ++ ">"
+  TypeTensor d t -> "tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
   TypeLam from to ->
@@ -798,7 +725,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty
   (PrimFun "$copydown", [CType ty]          ) -> LMOne ty
   (PrimFun "size"     , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"    , [CType (TypeVec t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun "index"    , [CType (TypeTensor 1 t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
