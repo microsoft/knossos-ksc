@@ -73,5 +73,26 @@
           (eq (sumbuild (size t) (lam (ijk : (Tuple Integer Integer Integer))
                   (index ijk t)))
               (sum t))
+        
+          "\n----\n"
+          "Tensor constVec\n"
+          (eq (constVec (tuple 2 3) 2.0)
+              (build (tuple 2 3) (lam (ij : (Tuple Integer Integer)) 2.0)))
+        
+          "\n----\n"
+          "Tensor deltaVec\n"
+          (eq (deltaVec (tuple 2 4) (tuple 1 2) 2.0)
+              (build (tuple 2 4) (lam (ij : (Tuple Integer Integer))
+                  (if (eq ij (tuple 1 2)) 2.0 0.0))))
+        
+          "\n----\n"
+          "Tensor deltaVec with index 0 out of range\n"
+          (eq (deltaVec (tuple 2 4) (tuple 2 1) 2.0)
+              (build (tuple 2 4) (lam (ij : (Tuple Integer Integer)) 0.0)))
+        
+          "\n----\n"
+          "Tensor deltaVec with index 1 out of range\n"
+          (eq (deltaVec (tuple 2 4) (tuple 0 4) 2.0)
+              (build (tuple 2 4) (lam (ij : (Tuple Integer Integer)) 0.0)))
       ))))))
 
