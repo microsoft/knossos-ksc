@@ -22,7 +22,12 @@ import inspect
 import re
 import warnings
 
+import numpy as np
+
 import onnx, onnx.numpy_helper, onnx.helper
+
+import onnxruntime.capi.onnxruntime_pybind11_state as ort
+from   onnxruntime.capi.onnxruntime_pybind11_state.schemadef import OpSchema
 
 from ksc.utils import paren
 from ksc.type import Type
@@ -121,21 +126,38 @@ def get_value(init):
 
     return Const(value)
 
-def exprFromAttr(attr : AttributeProto):
-    val = onnx.helper.get_attribute_value(attr)
-    if isinstance(val, list):
-        return Call("vec", [Const(v) for v in val])
-    else:
-        if isinstance(val, bytes):
-            val = val.decode("ascii")
-        return Const(val)
-
 def get_values(init):
     """
     Get values from a TensorProto
     """
     a = onnx.numpy_helper.to_array(init)
     return [Const(v) for v in a]
+
+def exprFromTensorProto(val, name):
+    if len(val.dims) == 1 and val.dims[0] < 16:
+        # vec constructor
+        return Call("vec", get_values(val))
+
+    if len(val.dims) == 0:
+        return get_value(val)
+
+    nptype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[val.data_type] 
+    return Call(f"load-from-onnx-{nptype}", [*(Const(x) for x in val.dims), Const(name)])
+
+def exprFromAttrVal(val):
+    if isinstance(val, onnx.TensorProto):
+        return exprFromTensorProto(val, "?exprFromAttrVal?")
+
+    if isinstance(val, list):
+        return Call("vec", [Const(v) for v in val])
+
+    if isinstance(val, bytes):
+        val = val.decode("ascii")
+    return Const(val)
+
+def exprFromAttr(attr : AttributeProto):
+    return exprFromAttrVal(onnx.helper.get_attribute_value(attr))
+
 
 def emit_inits(inits, body):
     """
@@ -144,65 +166,99 @@ def emit_inits(inits, body):
     for init in reversed(inits):
         var = useVar(init.name)
 
-        if len(init.dims) == 1 and init.dims[0] < 16:
-            # Putative vec constructor
-            value = Call("vec", get_values(init))
-
-        elif len(init.dims) == 0:
-            value = get_value(init)
-
-        else:
-            nptype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[init.data_type] 
-            value = Call(f"load-from-onnx-{nptype}", [*(Const(x) for x in init.dims), Const(var.name)])
+        value = exprFromTensorProto(init, var.name)
 
         body = Let(var, value, body)
     return body
 
+def get_attribute_default_value(attr):
+    if hasattr(attr, "_default_value"):
+        return onnx.AttributeProto().ParseFromString(attr._default_value)
+    return None
+
 def get_default_value(schema, attr):
-    if attr.default_value.type != AttributeProto.UNDEFINED:
-        return exprFromAttr(attr.default_value)
+    val = get_attribute_default_value(attr)
+    if val != None:
+        return exprFromAttrVal(val)
 
     print(f"** Attribute {attr.name} of op {schema.name} has no default value -- special casing")
 
     # TODO: Formalize this, at least into prelude
     if schema.name == "MaxPool":
         if attr.name == "dilations":
-            return Call("vec", [Const(1), Const(1)])
+            return exprFromAttrVal([1, 1])
 
     if schema.name == "Conv":
         if attr.name == "pads":
-            return Call("vec", [Const(-1), Const(-1)])
+            return exprFromAttrVal([-1, -1])
 
     print(schema.doc)
 
     raise NotImplementedError()       
+
+def get_all_schemas():
+    # Form schema group, take latest version
+    schemas = dict()
+    for s in ort.get_all_operator_schema():
+        name = s.name if s.domain == "" else s.domain + "." + s.name
+        if name in schemas and s.since_version < schemas[name].since_version:
+            pass
+        schemas[name] = s
+    return schemas
 
 def onnx2ks(g):
     """
     Convert ONNX graph g into Knossos Expr.
     """
 
-    # ONNX graph nodes are toplologically sorted, so just run through in reverse order
+    schemas = get_all_schemas()
+
+    # ONNX graph nodes are topologically sorted, so just run through in reverse order
     # making a chain of lets.
     body = None
     for node in reversed(g.node):
-        s = onnx.defs.get_schema(node.op_type)
+        opname = node.op_type if not node.domain else node.domain + "." + node.op_type 
+        s = schemas[opname]
+        name = s.name
 
         # Gather args from input
         args = [useVar(i) for i in node.input]
 
-        # Gather attributes. 
-        # - Some are set on the node.
-        node_attrs = dict()
-        for n in node.attribute:
-            node_attrs[n.name] = exprFromAttr(n)
+        # Special cases
+        if opname == "Constant":
+            # Constant: exactly one of the optionals should be set
+            assert len(node.attribute) == 1
+            n = node.attribute[0]
+            args = [exprFromAttr(n)]
 
-        # - The rest are defaulted
-        for name,attr in s.attributes.items():
-            if name in node_attrs:
-                args += [node_attrs[name]]
-            else:
-                args += [get_default_value(s, attr)]
+        elif opname == "Cast":
+            # Cast: output type depends on input value.  We postpend the type to the name
+            assert len(node.attribute) == 1
+            n = node.attribute[0]
+            assert n.type == OpSchema.AttrType.INT
+            out_type = OpSchema.AttrType(n.i)
+            out_type = str(out_type)
+            assert out_type.startswith("AttrType.")
+            out_type = out_type[9:]
+            name = "Cast_" + out_type
+
+        else:
+            # Gather attributes. 
+            # - Some are set on the node.
+            node_attrs = dict()
+            for n in node.attribute:
+                val = exprFromAttr(n)
+                node_attrs[n.name] = val
+                if n.name not in s.attributes:
+                    warnings.warn(f"Attribute {n.name} not in schema for {opname} -- adding arg anyway")
+                    args += [val]
+
+            # - The rest are defaulted
+            for attrname,attr in s.attributes.items():
+                if attrname in node_attrs:
+                    args += [node_attrs[attrname]]
+                else:
+                    args += [get_default_value(s, attr)]
 
         # Are we dropping optional outputs?   
         # This is typically only known at the call site.
@@ -210,10 +266,8 @@ def onnx2ks(g):
         # otherwise type annotation would have to happen 
         # at more than one place 
         n_outputs = len(node.output)
-        if n_outputs == len(s.outputs):
-            name = s.name
-        else:
-            name = f"take{n_outputs}${s.name}"
+        if n_outputs < len(s.outputs):
+            name = f"take{n_outputs}${name}"
 
         # Generate the call node
         rhs = Call(name, args) 
@@ -224,15 +278,18 @@ def onnx2ks(g):
         vars = [useVar(o) for o in node.output]
         if len(vars) == 1:
             vars = vars[0]
-        else:
-             print(vars)
 
         # First time round, this is the innermost body (or the last node in the graph): just reference the output vars
         if body == None:
-            body = vars 
+            if isinstance(vars, Var):
+                body = vars
+            else:
+                body = Call("tuple", vars)
 
         # Rest of the time, wrap previous body in a Let
         body = Let(vars, rhs, body)
+
+    body = Let(Var("$end_of_inits #|End of initializers|# "), Const(99999), body)
 
     # And now gather the initializers, and place in Lets
     inputs = set([i.name for i in g.input])
@@ -246,6 +303,8 @@ def onnx2ks(g):
 
     # value_infos -> types
     args = [defVar(i.name, convertType(i.type)) for i in g.input]
+
+    body = Let(Var("$beg_of_internal_inits #|Begin of internal initializers|# "), Const(99999), body)
     ex = emit_inits(internal_inits, body)
 
     # Emit a def for the whole graph
@@ -264,6 +323,8 @@ def onnx2ks(g):
     return [decl, main]
 
 if __name__ == "__main__":
+    import os
+
     argv = sys.argv
 
     if len(argv) == 1:
@@ -281,24 +342,43 @@ if __name__ == "__main__":
         if ofn.endswith("/"):
             ofn = ofn + re.sub(r'\.onnx$','.ks',filename)
 
+    type_annotate = True
 
-    # Load preludes
-    print(f"onnx2ks: Reading prelude")
-    symtab = dict()
-
-    prelude_decls = parse_ks_file("etc/onnx-prelude.ks")
-    typeannot_decls(prelude_decls, symtab)
-
-    prelude_decls = parse_ks_file("etc/onnx-prelude-autogen.ks")
-    typeannot_decls(prelude_decls, symtab)
+    def save(decls, ofn, msg):
+        print(f"onnx2ks: Writing to {ofn}")
+        os.makedirs(os.path.dirname(ofn), exist_ok=True)
+        with open(ofn, "w") as out:
+            out.write(f";; {msg}\n")
+            for decl in decls:
+                pprint(decl,width=256,ribbon_width=256,stream=out)
+                out.write("\n")
 
     # Load our file
     print(f"onnx2ks: Reading from {filename}")
     model = onnx.load(filename)
+
+    # Check model -- do ORT models need to be toposorted?
+    onnx.checker.check_model(model)
+
+    # Convert to untyped KS
     decls = onnx2ks(model.graph)
 
-    # Apply type annotations
-    typeannot_decls(decls, symtab)
+    if ofn:
+        save(decls, ofn + "_untyped.ks", f" untyped KS from {filename}")
+
+    if type_annotate:
+        # Load preludes
+        print(f"onnx2ks: Reading prelude")
+        symtab = dict()
+
+        prelude_decls = parse_ks_file("etc/onnx-prelude.ks")
+        typeannot_decls(prelude_decls, symtab)
+
+        prelude_decls = parse_ks_file("etc/onnx-prelude-autogen.ks")
+        typeannot_decls(prelude_decls, symtab)
+
+        # Apply type annotations
+        typeannot_decls(decls, symtab)
 
     # And save
     if ofn == None:
@@ -306,9 +386,6 @@ if __name__ == "__main__":
             cpprint(decl)
             print('')
     else:
-        print(f"onnx2ks: Writing to {ofn}")
-        with open(ofn, "w") as out:
-            out.write(f";; AUTOGENERATED FROM {filename}\n")
-            for decl in decls:
-                pprint(decl,width=256,ribbon_width=256,stream=out)
-                out.write("\n")
+        save(decls, ofn, f"AUTOGENERATED FROM {filename}")
+
+# %%
