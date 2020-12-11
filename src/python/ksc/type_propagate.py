@@ -121,12 +121,11 @@ def type_propagate(ex, symtab):
 @type_propagate.register(Def)
 def _(ex, symtab):
     # (def name retun_type args body)
-    assert ex.return_type != None
+    declared_return_type = ex.return_type != None
 
     # Add this function's name to symtab
-    # Do it before entering body, allowing for recursive calls
     argtypes = tuple(a.type_ for a in ex.args)
-    
+
     # Check for redefinition with different return type 
     signature = (ex.name, argtypes)
     if signature in symtab:
@@ -134,7 +133,9 @@ def _(ex, symtab):
         if old_type != ex.return_type:
             raise KSTypeError(f"Redefinition of {ex.name}({argtypes}) with different return type {old_type} -> {ex.return_type}")
     
-    symtab[signature] = ex.return_type
+    if declared_return_type:
+        # Do it before entering body, allowing for recursive calls
+        symtab[signature] = ex.return_type
 
     # local_st: local symbol table to recurse into the body
     # Add args to local_st, after function was added to global st. 
@@ -146,11 +147,16 @@ def _(ex, symtab):
     # Recurse into body
     ex.body = type_propagate(ex.body, local_st)
 
-    # And check the inferred type matches the decl
-    if ex.return_type != ex.body.type_:
-        raise KSTypeError(f"In definition of '{ex.name}', inferred return type {ex.body.type_}\n" +
-                        f"does not match declaration {ex.return_type}")
-    
+    if declared_return_type: 
+        # Check the inferred type matches the decl
+        if ex.return_type != ex.body.type_:
+            raise KSTypeError(f"In definition of '{ex.name}', inferred return type {ex.body.type_}\n" +
+                              f"does not match declaration {ex.return_type}")
+    else:
+        # Add to symtab after inference
+        ex.return_type = ex.body.type_
+        symtab[signature] = ex.return_type
+
     return ex
 
 @type_propagate.register(EDef)
