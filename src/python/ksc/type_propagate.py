@@ -137,13 +137,11 @@ def _(ex, symtab):
     symtab[signature] = ex.return_type
 
     # local_st: local symbol table to recurse into the body
-    local_st = symtab.copy()
     # Add args to local_st, after function was added to global st. 
     # This defines that
     #   (def f Integer (f : Lam Integer Integer) (f 2))
     # is not a recursive call to f, but a call to the argument f
-    for a in ex.args:
-        local_st[a.name] = a.type_
+    local_st = {**symtab, **{a.name:a.type_ for a in ex.args}}
 
     # Recurse into body
     ex.body = type_propagate(ex.body, local_st)
@@ -212,8 +210,7 @@ def _(ex, symtab):
 
 @type_propagate.register(Lam)
 def _(ex, symtab):
-    local_st = symtab.copy()
-    local_st[ex.arg.name] = ex.arg.type_
+    local_st = {**symtab, ex.arg.name: ex.arg.type_}
     ex.body = type_propagate(ex.body, local_st)
     ex.type_ = Type.Lam(ex.arg.type_, ex.body.type_)
     return ex
@@ -225,8 +222,7 @@ def _(ex, symtab):
     # Single var assignment
     if isinstance(ex.vars, Var):
         ex.vars.type_ = ex.rhs.type_
-        local_st = symtab.copy()
-        local_st[ex.vars.name] = ex.vars.type_
+        local_st = {**symtab, ex.vars.name: ex.vars.type_}
         ex.body = type_propagate(ex.body, local_st)
         ex.type_ = ex.body.type_
         return ex

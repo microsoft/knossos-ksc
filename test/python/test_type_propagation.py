@@ -19,6 +19,15 @@ def test_type_propagate_works():
     type_propagate_decls(decls)
     assert decls[0].return_type == Type.Float
 
+    symtab = dict()
+    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+    type_propagate_decls(decls_prelude, symtab)
+    decls = list(parse_ks_string("""
+    (def foo Float (a : Float) (add a 1.0))
+    """, __file__))
+    type_propagate_decls(decls, symtab)
+    assert decls[0].return_type == Type.Float
+
 def test_type_propagate_warnings():
     decls = list(parse_ks_string("""
     (def foo Float (a : Float) 1)
