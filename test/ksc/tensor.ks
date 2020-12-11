@@ -59,6 +59,19 @@
           (let (vvv_sum (ts_add vvv vvv2))
           (let (t_sum (ts_add t t2))
           (eq (index (tuple 1 3 2) t_sum)
-              (index 2 (index 3 (index 1 vvv_sum))))
-      ))))))))
+              (index 2 (index 3 (index 1 vvv_sum))))))
+
+          "\n----\n"
+          "Tensor sum\n"
+          (eq (sum t)
+              (sumbuild (size vvv) (lam (i : Integer)
+                  (sumbuild (size (index 0 vvv)) (lam (j : Integer)
+                      (sum (index j (index i vvv))))))))
+        
+          "\n----\n"
+          "Tensor sumbuild\n"
+          (eq (sumbuild (size t) (lam (ijk : (Tuple Integer Integer Integer))
+                  (index ijk t)))
+              (sum t))
+      ))))))
 
