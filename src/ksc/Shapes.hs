@@ -90,8 +90,11 @@ shapeCall tf e = pShape (Call tf e)  -- Fall back to calling the original functi
 shapeCallPrim :: HasCallStack => PrimFun -> TExpr -> Maybe TExpr
 shapeCallPrim "index" (Tuple [i, n]) = Just $ pIndex i (shapeE n)
 shapeCallPrim "build" (Tuple [sz, Lam i e2]) = Just $ pBuild sz (Lam i (shapeE e2))
-shapeCallPrim "sumbuild" (Tuple [_, Lam i e2]) = Just $ mkLet i (Konst (KInteger 0)) (shapeE e2)
-shapeCallPrim "sum" v = Just $ pIndex (Konst (KInteger 0)) (shapeE v)
+shapeCallPrim "sumbuild" (Tuple [n, Lam i e2])
+  = fmap (\d -> mkLet i (zeroIndexForDimension d) (shapeE e2)) (tensorDimensionFromIndexType_maybe (typeof n))
+shapeCallPrim "sum" v
+  | TypeTensor d _ <- typeof v
+  = Just $ pIndex (zeroIndexForDimension d) (shapeE v)
 shapeCallPrim "constVec" (Tuple [sz, v]) = Just $ pConstVec sz (shapeE v)
 shapeCallPrim "deltaVec" (Tuple [sz, _i, v]) = Just $ pConstVec sz (shapeE v)
 shapeCallPrim "ts_add" (Tuple [lhs, _]) = Just $ shapeE lhs
@@ -102,6 +105,10 @@ shapeCallPrim "unzip" v = Just $ pUnzip (shapeE v)
 shapeCallPrim "$trace" v = Just $ shapeE v
 shapeCallPrim "$copydown" v = Just $ shapeE v
 shapeCallPrim _ _ = Nothing
+
+zeroIndexForDimension :: Int -> TExpr
+zeroIndexForDimension 1 = Konst (KInteger 0)
+zeroIndexForDimension d = mkTuple (replicate d (Konst (KInteger 0)))
 
 -- Given a Type t, determines whether (shapeType t) is a unit type;
 -- if so then the unit value is returned.
