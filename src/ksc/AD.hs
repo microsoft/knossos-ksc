@@ -8,7 +8,7 @@ import LangUtils
 import Prim
 import GHC.Stack
 
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 
 -- for unit test
 --import Test.Hspec
@@ -129,8 +129,9 @@ gradBuild TupleAD s n ti body
   where
      t_ty = typeof body
      p = TVar res_ty resVar
-     res_ty = TypeTuple [ TypeTensor 1 t_ty
-                        , TypeTensor 1 (TypeLM (typeof s) t_ty) ]
+     d = fromMaybe 1 (tensorDimensionFromIndexType_maybe (typeof n))
+     res_ty = TypeTuple [ TypeTensor d t_ty
+                        , TypeTensor d (TypeLM (typeof s) t_ty) ]
      grad_body = mkLet (gradTVar TupleAD s ti)
                        (Tuple [Var ti, lmZero s (Var ti)]) $
                  gradE TupleAD s body
