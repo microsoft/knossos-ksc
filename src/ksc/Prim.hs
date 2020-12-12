@@ -543,24 +543,24 @@ primFunCallResultTy_maybe fun args
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , t)                                       -> Just t
 
-      ("constVec" , TypeTuple [sizeType, t])                 -> tensorTypeFromIndexType sizeType t
+      ("constVec" , TypeTuple [sizeType, t])                 -> tensorTypeFromIndexType_maybe sizeType t
       ("deltaVec" , TypeTuple [sizeType, indexType, t])
         | sizeType `eqType` indexType
-        -> tensorTypeFromIndexType indexType t
+        -> tensorTypeFromIndexType_maybe indexType t
       ("diag"     , TypeTuple [TypeInteger,
                                 TypeInteger,
                                 TypeLam TypeInteger t])      -> Just (TypeTensor 1 (TypeTensor 1 t))
       ("build"    , TypeTuple
                      [sizeType, TypeLam indexType t])
         | sizeType `eqType` indexType
-        -> tensorTypeFromIndexType indexType t
+        -> tensorTypeFromIndexType_maybe indexType t
 
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                     -> Just TypeInteger
       ("sumbuild" , TypeTuple
                      [sizeType, TypeLam indexType t])
         | sizeType `eqType` indexType
-        , isJust (tensorDimensionFromIndexType indexType)
+        , isJust (tensorDimensionFromIndexType_maybe indexType)
         -> Just t
       ("index"    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
