@@ -197,7 +197,14 @@ def make_if(make_binds, node):
     else:
         identifier = "_" + node.outputsAt(0).debugName()
 
-    blocks = list(node.blocks())
+    inputs_size = sum(1 for _ in node.inputs())
+
+    if (inputs_size != 1):
+        raise Exception("Only support conditionals with 1 input, this one had: " + str(inputs_size))
+
+    conditional = mangleDebugName(node.inputsAt(0).debugName())
+
+    blocks = list(node.blocks()) # TODO: check length exactly 2, only supporting if/else currently
 
     success_branch = make_binds(blocks[0].nodes())
     success_branch_return = make_return(blocks[0].returnNode())
@@ -210,7 +217,7 @@ def make_if(make_binds, node):
         sexpdata.Symbol(identifier),
         [
             sexpdata.Symbol("if"),
-            [sexpdata.Symbol("false")],
+            [sexpdata.Symbol(conditional)],
             sexpdata.Symbol("\n\t"),
             success_branch,
             [success_branch_return],
