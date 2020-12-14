@@ -204,7 +204,7 @@ def make_if(make_binds, node):
 
     conditional = mangleDebugName(node.inputsAt(0).debugName())
 
-    blocks = list(node.blocks()) # TODO: check length exactly 2, only supporting if/else currently
+    blocks = list(node.blocks()) # TODO: check length exactly 2, only supporting if/else currently. This is enough for BERT example
 
     success_branch = make_binds(blocks[0].nodes())
     success_branch_return = make_return(blocks[0].returnNode())
@@ -249,13 +249,13 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
             "prim::Print": make_print,
             "prim::ListConstruct": make_list,
             "aten::tensor": make_tensor,
-            "aten::add": functools.partial(make_add, generate_edefs),
+            "aten::add": functools.partial(make_add, generate_edef=generate_edefs),
             "prim::Return": make_return,
             "prim::CallFunction": make_callfunction,
-            "prim::If": functools.partial(make_if, make_binds),
+            "prim::If": functools.partial(make_if, make_binds=make_binds),
         }
 
-        return lookups.get(node.kind(), make_default)(node)
+        return lookups.get(node.kind(), make_default)(node=node)
 
     def make_binds(nodes):
         return [translate_node(make_binds, node) for node in nodes if node.kind() != "prim::Print"]
