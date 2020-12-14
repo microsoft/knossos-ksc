@@ -16,6 +16,7 @@
 from collections import namedtuple
 from itertools import chain
 from typing import List
+from types import SimpleNamespace
 
 import sys
 import inspect
@@ -200,8 +201,11 @@ def get_attribute_default_value(attr):
         return exprFromAttrVal(val)
     
     if ty.is_vec:
+        assert isinstance(val, list)
+        if isinstance(val[0], bytes):
+            val = [v.decode("ascii") for v in val]
         return mkVec(val)
- 
+
     return val
 
 def get_default_value(schema, attr):
@@ -222,9 +226,15 @@ def get_default_value(schema, attr):
         if attr.name == "output_shape":
             return exprFromAttrVal([-1, -1])
 
+    if schema.name == "SoftmaxCrossEntropyLossGrad" and attr.name == "ignore_index":
+        return Const(-1)
+
+    if schema.name == "SoftmaxCrossEntropyLoss" and attr.name == "ignore_index":
+        return Const(-1)
+
     print(schema.doc)
 
-    raise NotImplementedError()       
+    raise NotImplementedError(f"No default value for {schema.name} attr {attr.name}")
 
 def get_all_schemas():
     # Form schema group, take latest version
@@ -260,8 +270,16 @@ def onnx2ks(g):
     body = None
     for node in reversed(g.node):
         opname = node.op_type if not node.domain else node.domain + "." + node.op_type 
-        s = schemas[opname]
-        name = s.name
+        found_schema = opname in schemas
+        if not found_schema:
+            warnings.warn(f"Op {opname} not found -- just making a call")
+            s = SimpleNamespace()
+            s.name = opname
+            s.attributes = {}
+        else:
+            s = schemas[opname]
+    
+        name = opname
 
         # Collect args from input
         args = [useVar(i) for i in node.input]
@@ -308,7 +326,7 @@ def onnx2ks(g):
         # otherwise type annotation would have to happen 
         # at more than one place 
         n_outputs = len(node.output)
-        if n_outputs < len(s.outputs):
+        if found_schema and n_outputs < len(s.outputs):
             name = f"take{n_outputs}${name}"
 
         # Generate the call node
@@ -373,7 +391,10 @@ if __name__ == "__main__":
 
     if len(argv) == 1:
         os.makedirs('obj/test/onnx2ks', exist_ok=True)
-        argv = ['*EXE*', 'test/onnx2ks/mnist-7.onnx', 'obj/']
+        argv = ['*EXE*', 
+            #'test/onnx2ks/mnist-7.onnx', 
+            'test/onnx2k/bert-tiny-uncased_L_3_H_128_A_2_V_30528_S_512_Dp_0.1_optimized_layer_norm_opset12.onnx',
+            'obj/']
 
     nargs = len(argv) - 1
     if nargs == 0:
@@ -391,7 +412,6 @@ if __name__ == "__main__":
 
     def save(decls, ofn, msg):
         print(f"onnx2ks: Writing to {ofn}")
-        os.makedirs(os.path.dirname(ofn), exist_ok=True)
         with open(ofn, "w") as out:
             out.write(f";; {msg}\n")
             for decl in decls:
@@ -401,6 +421,11 @@ if __name__ == "__main__":
     # Load our file
     print(f"onnx2ks: Reading from {filename}")
     model = onnx.load(filename)
+
+    # Make output dir 
+    odir = os.path.dirname(outbase)
+    print(f"onnx2ks: Making output dir {odir}")
+    os.makedirs(odir, exist_ok=True)
 
     print(f"onnx2ks: Writing graph to {outbase}.onnx.txt")
     with open(outbase + ".onnx.txt", "w") as out:
