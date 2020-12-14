@@ -21,6 +21,7 @@ symbolLook = {
         [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
     ],  # float vs integer? also determine rank instead of hardcode
     "int": [sexpdata.Symbol("Integer")],
+    "float": [sexpdata.Symbol("Float")],
     "Optional[Tensor]": [ # Just say optionals are required for now. TODO: don't do this!
         sexpdata.Symbol("Vec"),
         [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
