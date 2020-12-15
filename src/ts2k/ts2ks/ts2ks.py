@@ -147,21 +147,35 @@ def make_tensor(node):
     ]
 
 
+def make_aten_function(node, value, function_name):
+    return [
+        sexpdata.Symbol("\n"),
+        sexpdata.Symbol(mangleDebugName(value.debugName())),
+        [
+            sexpdata.Symbol(function_name),
+            sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())),
+            sexpdata.Symbol(mangleDebugName(node.inputsAt(1).debugName())),
+        ],
+    ]
+
+def make_builtin_function(node, value, function_name):
+    return [
+        sexpdata.Symbol("\n"),
+        sexpdata.Symbol(mangleDebugName(value.debugName())),
+        [
+            sexpdata.Symbol(function_name),
+            sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())), # Assum arity 2, enoygh for now
+            sexpdata.Symbol(mangleDebugName(node.inputsAt(1).debugName())),
+        ]
+    ]
+
 def make_add(generate_edef, node):
     value = node.outputsAt(0)
     if generate_edef:
-        return [
-            sexpdata.Symbol("\n"),
-            sexpdata.Symbol(mangleDebugName(value.debugName())),
-            [
-                sexpdata.Symbol("addATEN"),
-                sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())),
-                sexpdata.Symbol(mangleDebugName(node.inputsAt(1).debugName())),
-            ],
-        ]
+        return make_aten_function(node, value, "addATEN")
     else:
         print(
-            "WARNING: aten::add just returns unmodified tensor, consider using --generate_edef"
+            "WARNING: aten::add built-in just returns unmodified tensor, consider using --generate_edef"
         )
         return [
             sexpdata.Symbol("\n"),
@@ -169,6 +183,19 @@ def make_add(generate_edef, node):
             sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())),
         ]
 
+def make_lt(generate_edef, node):
+    value = node.outputsAt(0)
+    if generate_edef:
+        return make_aten_function(node, value, "ltATEN")
+    else:
+        return make_builtin_function(node, value, "lt@ff")  # Assume floats, enough for now
+
+def make_mul(generate_edef, node):
+    value = node.outputsAt(0)
+    if generate_edef:
+        return make_aten_function(node, value, "mulATEN")
+    else:
+        return make_builtin_function(node, value, "mul@ff")  # Assume floats, enough for now
 
 def make_return(node):
     mangled_id = mangleDebugName(node.inputsAt(0).debugName())
@@ -251,6 +278,8 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
             "prim::ListConstruct": make_list,
             "aten::tensor": make_tensor,
             "aten::add": functools.partial(make_add, generate_edef=generate_edefs),
+            "aten::lt": functools.partial(make_lt, generate_edef=generate_edefs),
+            "aten::mul": functools.partial(make_mul, generate_edef=generate_edefs),
             "prim::Return": make_return,
             "prim::CallFunction": make_callfunction,
             "prim::If": functools.partial(make_if, make_binds=make_binds),
