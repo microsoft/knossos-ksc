@@ -15,6 +15,13 @@
 (def Constant (Vec Float) (v : Vec Float) v)
 (def Constant (Vec Integer) (v : Vec Integer) v)
 
+
+(def Identity Float (a : Float) a)
+
+
+;; Grads
+(edef TanhGrad (Vec Float) ((Vec Float) (Vec Float)))
+
 ;; Broadcast versions of some builtins
 (edef Sub (Vec Integer) (Integer (Vec Integer)))
 
@@ -24,7 +31,15 @@
 (edef Mul Float (Float Float))
 (edef Mul (Vec Float) (Float (Vec Float)))
 (edef Mul (Vec Float) ((Vec Float) Float))
-(edef Mul (Vec Float) ((Vec Integer) (Vec Float)))
+; (edef Mul (Vec Float) ((Vec Integer) (Vec Float)))
+
+(edef Div Float (Float Float))
+(edef Div (Vec Float) (Float (Vec Float)))
+(edef Div (Vec Float) ((Vec Float) Float))
+
+(edef Add Float (Float Float))
+(edef Add (Vec Float) (Float (Vec Float)))
+(edef Add (Vec Float) ((Vec Float) Float))
 
 (edef Min (Vec Float) ((Vec Float) (Vec Float)))
 (edef Min (Vec Float) (Float (Vec Float)))
@@ -33,6 +48,119 @@
 (edef Equal (Vec Bool) ((Vec Float) Float))
 (edef Equal (Vec Bool) (Integer (Vec Integer)))
 (edef Equal (Vec Bool) ((Vec Integer) Integer))
+
+;; Single-float overloads (i.e. a single float is passed as a rank-0 tensor)
+(edef Gather (Vec Float) ((Vec Float) Integer Integer))
+(edef com.microsoft.SoftmaxCrossEntropyLossGrad (Vec Float) (#|Vec|#Float (Vec Float) (Vec Integer) Integer String))
+(edef com.microsoft.MixedPrecisionScale (Vec Float) (#|Vec|#Float (Vec Float) Integer Integer))
+(edef com.microsoft.LayerNormalizationGrad (Tuple (Vec Float) (Vec Float) (Vec Float)) 
+                          ((Vec Float) (Vec Float) (Vec Float) (Vec Float) (Vec Float) Float Integer))
+(edef com.microsoft.GatherGrad (Vec Float) ((Vec Integer) #|Vec|#Integer (Vec Float) Integer))
+
+;; Variadics
+(edef Sum (Vec Float) ((Vec Float) (Vec Float)))
+(edef Sum (Vec Float) ((Vec Float) (Vec Float) (Vec Float)))
+(edef Sum (Vec Float) ((Vec Float) (Vec Float) (Vec Float) (Vec Float)))
+
+
+
+;; Doing Dropout # line "/home/awf/dev/onnxruntime/cmake/external/onnx/onnx/defs/nn/defs.cc" 1960
+; since_version 13
+;; 
+;; Dropout takes an input floating-point tensor, an optional input ratio (floating-point scalar) and an optional input training_mode (boolean scalar). It produces two tensor outputs,
+;; output (floating-point tensor) and mask (optional `Tensor<bool>`). If `training_mode` is true then the output Y will be a random dropout;
+;; Note that this Dropout scales the masked input data by the following equation, so to convert the trained model into inference mode,
+;; the user can simply not pass `training_mode` input or set it to false.
+;; ```
+;; output = scale * data * mask,
+;; ```
+;; where
+;; ```
+;; scale = 1. / (1. - ratio).
+;; ```
+;; This operator has **optional** inputs/outputs. See [the doc](IR.md) for more details about the representation of optional arguments. An empty string may be used in the place of an actual argument's name to indicate a missing argument. Trailing optional arguments (those not followed by an argument that is present) may also be simply omitted.
+;; Type constraints:
+;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
+;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)'] | Constrain input 'ratio' types to float tensors.
+;; T2 | ['tensor(bool)'] | Constrain output 'mask' types to boolean tensors.
+; #out=0 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef take1$Dropout (Vec Float) ((Vec Float) Float (Vec Bool) Integer))
+(edef take1$Dropout (Vec Float) ((Vec Float) Float Integer))
+(edef take1$Dropout (Vec Float) ((Vec Float) Integer))
+;; NOTE: multiple outputs as tuple
+; #out=1 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef Dropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Float (Vec Bool) Integer))
+(edef Dropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Float Integer))
+(edef Dropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Integer))
+; shape$Dropout
+
+;; Doing TrainableDropout # line "/home/awf/dev/onnxruntime/orttraining/orttraining/core/graph/training_op_defs.cc" 1379
+; since_version 9
+;; TrainableDropout
+;; Type constraints:
+;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
+;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input 'ratio' types to float tensors.
+;; T2 | ['tensor(bool)'] | Constrain output 'mask' types to boolean tensors.
+; #out=0 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Attr<Optional,seed,**MISSING**> 
+(edef take1$TrainableDropout (Vec Float) ((Vec Float) Float Integer))
+(edef take1$TrainableDropout (Vec Float) ((Vec Float) Integer))
+;; NOTE: multiple outputs as tuple
+; #out=1 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Attr<Optional,seed,**MISSING**> 
+(edef TrainableDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Float Integer))
+(edef TrainableDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Integer))
+; shape$TrainableDropout
+
+
+
+;; Doing com.microsoft.DropoutGrad # line "/home/awf/dev/onnxruntime/orttraining/orttraining/core/graph/training_op_defs.cc" 1450
+; since_version 1
+;; DropoutGrad
+;; Type constraints:
+;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
+;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input 'ratio' types to float tensors.
+;; T2 | ['tensor(bool)'] | Constrain 'mask' and 'training_mode' types to boolean tensors.
+; #out=0 ARGS: Arg<dy,(Vec Float),,single> Arg<mask,(Vec Bool),,single> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> 
+(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool) Float Bool))  ; TODO: why the extra integer?
+(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool) Float))
+(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool)))
+; shape$com.microsoft.DropoutGrad
+(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool) Float Bool Integer))  
+; TODO: why the extra integer?  needed in bert-tiny-bw 'com.microsoft.DropoutGrad(%445_grad, %446, dropout_ratio_27, dropout_training_mode_28, 0)'
+
+
+;; Doing com.microsoft.TrainableDropoutGrad # line "/home/awf/dev/onnxruntime/orttraining/orttraining/core/graph/training_op_defs.cc" 1418
+; since_version 1
+;; TrainableDropoutGrad
+;; Type constraints:
+;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
+;; T1 | ['tensor(float)'] | Constrain input 'ratio' types to float tensors.
+;; T2 | ['tensor(bool)'] | Constrain 'mask' types to boolean tensors.
+; #out=0 ARGS: Arg<dy,(Vec Float),,single> Arg<mask,(Vec Bool),,single> Arg<ratio,(Vec Float),,optional> 
+(edef com.microsoft.TrainableDropoutGrad (Vec Float) ((Vec Float) (Vec Bool) (Vec Float)))
+(edef com.microsoft.TrainableDropoutGrad (Vec Float) ((Vec Float) (Vec Bool)))
+; shape$com.microsoft.TrainableDropoutGrad
+
+
+;; Doing com.microsoft.BiasDropout # line "/home/awf/dev/onnxruntime/orttraining/orttraining/core/graph/training_op_defs.cc" 1103
+; since_version 1
+;; BiasDropout
+;; Type constraints:
+;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)'] | Constrain input and output types to float tensors.
+;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)'] | Constrain input 'ratio' types to float tensors.
+;; T2 | ['tensor(bool)'] | Constrain output 'mask' types to boolean tensors.
+; #out=0 ARGS: Arg<data,(Vec Float),,single> Arg<bias,(Vec Float),,single> Arg<residual,(Vec Float),,optional> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) (Vec Float) Float (Vec Bool) Integer))
+(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) (Vec Float) Float Integer))
+(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) (Vec Float) Integer))
+(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) Integer))
+;; NOTE: multiple outputs as tuple
+; #out=1 ARGS: Arg<data,(Vec Float),,single> Arg<bias,(Vec Float),,single> Arg<residual,(Vec Float),,optional> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) (Vec Float) Float (Vec Bool) Integer))
+(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) (Vec Float) Float Integer))
+(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) (Vec Float) Integer))
+(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) Integer))
+; shape$com.microsoft.BiasDropout
+
 
 
 ;; Doing Cast # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/tensor/defs.cc" 88
