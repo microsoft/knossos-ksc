@@ -188,14 +188,14 @@ def make_lt(generate_edef, node):
     if generate_edef:
         return make_aten_function(node, value, "ltATEN")
     else:
-        return make_builtin_function(node, value, "lt@ff")  # Assume floats, enough for now
+        return make_builtin_function(node, value, "lt")  # Assume floats, enough for now
 
 def make_mul(generate_edef, node):
     value = node.outputsAt(0)
     if generate_edef:
         return make_aten_function(node, value, "mulATEN")
     else:
-        return make_builtin_function(node, value, "mul@ff")  # Assume floats, enough for now
+        return make_builtin_function(node, value, "mul")  # Assume floats, enough for now
 
 def make_return(node):
     mangled_id = mangleDebugName(node.inputsAt(0).debugName())
@@ -221,7 +221,11 @@ def make_callfunction(node):
 def make_if(make_binds, node):
 
     def make_branch(block):
-        return make_binds(block.nodes()) + [make_return(block.returnNode())]
+        binds = make_binds(block.nodes())
+        if len(binds) > 0:
+            return [sexpdata.Symbol("let")] + binds + [make_return(block.returnNode())]
+        else:
+            return make_return(block.returnNode())
 
     identifier = None
     if (node.outputsSize() == 0):
@@ -246,7 +250,7 @@ def make_if(make_binds, node):
         sexpdata.Symbol(identifier),
         [
             sexpdata.Symbol("if"),
-            [sexpdata.Symbol(conditional)],
+            sexpdata.Symbol(conditional),
             sexpdata.Symbol("\n\t"),
             success_branch,
             sexpdata.Symbol("\n\t"),
