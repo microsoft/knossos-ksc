@@ -196,6 +196,10 @@ def onnx_schemas_to_prelude(prelude : TextIO):
         # We can relax this if we assume the runtime values are always constants -- e.g. some attrs
         if s.name in ["Constant", "If", "Loop", "Scan", 
                       "ZipMap", 
+                      # Dropout: "ratio" arg is float, not Tensor<float>.
+                      "Dropout", "TrainableDropout", "BiasDropout",
+                      "DropoutGrad", "TrainableDropoutGrad", "BiasDropoutGrad",
+                      
                       "SequenceEmpty", "Cast", "CastMap", 
                       # "EyeLike", 
                       "TreeEnsembleClassifier", "LinearClassifier", "SVMClassifier",
@@ -279,10 +283,10 @@ def onnx_schemas_to_prelude(prelude : TextIO):
                     opt = "variadic"
                     n_variadic += 1
                 if i.option == OpSchema.FormalParameterOption.Optional:
-                    n_optional += 1
                     opt = "optional"
+                    n_optional += 1
 
-                arg_comments += f"Arg<{i.name},{mangler},{opt}> "
+                arg_comments += f"Arg<{i.name},{ty},{mangler},{opt}> "
 
             # 1.2: Attributes
             attr_arg_names = []
@@ -378,5 +382,6 @@ if __name__ == '__main__':
         filename = sys.argv[1]
     with open(filename, "w") as prelude:
         onnx_schemas_to_prelude(prelude)
+    print(f"Wrote schemas to {filename}")
 
 # %%
