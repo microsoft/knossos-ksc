@@ -28,6 +28,15 @@ def test_type_propagate_works():
     type_propagate_decls(decls, symtab)
     assert decls[0].return_type == Type.Float
 
+def test_type_propagate_empty_return():
+    # Empty return type allowed
+    decls = list(parse_ks_string("""
+    (def foo None (a : Float) 1.0)
+    """, __file__))
+    type_propagate_decls(decls)
+    assert decls[0].return_type == Type.Float
+
+
 def test_type_propagate_warnings():
     decls = list(parse_ks_string("""
     (def foo Float (a : Float) 1)
