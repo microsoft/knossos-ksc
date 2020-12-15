@@ -16,7 +16,7 @@ def test_type_propagate_works():
     decls = list(parse_ks_string("""
     (def foo Float (a : Float) 1.0)
     """, __file__))
-    type_propagate_decls(decls)
+    type_propagate_decls(decls, {})
     assert decls[0].return_type == Type.Float
 
     symtab = dict()
@@ -33,7 +33,7 @@ def test_type_propagate_empty_return():
     decls = list(parse_ks_string("""
     (def foo None (a : Float) 1.0)
     """, __file__))
-    type_propagate_decls(decls)
+    type_propagate_decls(decls, {})
     assert decls[0].return_type == Type.Float
 
 
@@ -42,7 +42,7 @@ def test_type_propagate_warnings():
     (def foo Float (a : Float) 1)
     """, __file__))
     with pytest.raises(KSTypeError) as excinfo:
-        type_propagate_decls(decls)
+        type_propagate_decls(decls, {})
     assert "does not match declaration" in str(excinfo.value)
 
     decls = list(parse_ks_string("""
@@ -50,7 +50,7 @@ def test_type_propagate_warnings():
     (edef foo Integer (Float))
     """, __file__))
     with pytest.raises(KSTypeError) as excinfo:
-        type_propagate_decls(decls)
+        type_propagate_decls(decls, {})
     assert "Double definition" in str(excinfo.value)
 
     decls = list(parse_ks_string("""
@@ -58,5 +58,5 @@ def test_type_propagate_warnings():
     (def foo Integer (a : Float) 1)
     """, __file__))
     with pytest.raises(KSTypeError) as excinfo:
-        type_propagate_decls(decls)
+        type_propagate_decls(decls, {})
     assert "Redefinition of foo" in str(excinfo.value)

@@ -120,21 +120,21 @@ def type_propagate(ex, symtab):
 
 @type_propagate.register(Def)
 def _(ex, symtab):
-    # (def name retun_type args body)
+    # (def name return_type args body)
     declared_return_type = ex.return_type != None
 
-    # Add this function's name to symtab
+    # Name to look up is function "signature": name and argtypes
     argtypes = tuple(a.type_ for a in ex.args)
-
-    # Check for redefinition with different return type 
     signature = (ex.name, argtypes)
+
+    # Check for definition in symtab with different return type 
     if signature in symtab:
         old_type = symtab[signature]
         if old_type != ex.return_type:
             raise KSTypeError(f"Redefinition of {ex.name}({argtypes}) with different return type {old_type} -> {ex.return_type}")
     
     if declared_return_type:
-        # Do it before entering body, allowing for recursive calls
+        # Add to symtab before entering body, allowing for recursive calls
         symtab[signature] = ex.return_type
 
     # local_st: local symbol table to recurse into the body
@@ -265,6 +265,6 @@ def _(ex, symtab):
     ex.type_ = ex.body.type_
     return ex
 
-def type_propagate_decls(decls : List[Expr], symtab = dict()):
+def type_propagate_decls(decls : List[Expr], symtab):
     for decl in decls:
         type_propagate(decl, symtab)
