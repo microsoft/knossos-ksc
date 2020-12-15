@@ -219,6 +219,10 @@ def make_callfunction(node):
     ]
 
 def make_if(make_binds, node):
+
+    def make_branch(block):
+        return make_binds(block.nodes()) + [make_return(block.returnNode())]
+
     identifier = None
     if (node.outputsSize() == 0):
         identifier = "_" + "dummy" # we're likely to need to make them unique
@@ -234,11 +238,8 @@ def make_if(make_binds, node):
 
     blocks = list(node.blocks()) # TODO: check length exactly 2, only supporting if/else currently. This is enough for BERT example
 
-    success_branch = make_binds(blocks[0].nodes())
-    success_branch_return = make_return(blocks[0].returnNode())
-
-    failure_branch = make_binds(blocks[1].nodes())
-    failure_branch_return = make_return(blocks[1].returnNode())
+    success_branch = make_branch(blocks[0])
+    failure_branch = make_branch(blocks[1])
 
     return [
         sexpdata.Symbol("\n"),
@@ -248,10 +249,8 @@ def make_if(make_binds, node):
             [sexpdata.Symbol(conditional)],
             sexpdata.Symbol("\n\t"),
             success_branch,
-            [success_branch_return],
             sexpdata.Symbol("\n\t"),
             failure_branch,
-            [failure_branch_return],
             sexpdata.Symbol("\n"),
         ],     
     ]    
