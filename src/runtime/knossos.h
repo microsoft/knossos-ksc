@@ -549,7 +549,7 @@ namespace ks
 		const T* data() const { return data_; }
 
 		T& operator[](int i) { return data_[i]; }
-		T const& operator[](int i) const { return data_[i]; }
+		const T& operator[](int i) const { return data_[i]; }
 
 		T const& index(index_type i) const {
 #ifndef NDEBUG
@@ -712,8 +712,10 @@ namespace ks
 	{
 		auto ret = tensor<Dim, T>::create(alloc, t.size());
 
+		const T* indata = t.data();
+		T* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
-			ret[i] = inflated_deep_copy(alloc, t[i]);
+			outdata[i] = inflated_deep_copy(alloc, indata[i]);
 		return ret;
 	}
 
@@ -735,8 +737,9 @@ namespace ks
 	size_t inflated_bytes(tensor<Dim, T> const& t) {
 		int ne = t.num_elements();
 		size_t ret = allocator::padded_size(sizeof(T) * ne);
+		const T* tdata = t.data();
 		for (int i = 0; i != ne; ++i) {
-			ret += inflated_bytes(t[i]);
+			ret += inflated_bytes(tdata[i]);
 		}
 		return ret;
 	}
@@ -762,12 +765,13 @@ namespace ks
 	template<size_t Dim, class T>
 	bool memory_overlaps(const void* start, const void* end, tensor<Dim, T> const& t) {
 		int num_elements = t.num_elements();
+		const T* tdata = t.data();
 		for (int i = 0; i != num_elements; ++i) {
-			if (memory_overlaps(start, end, t[i])) {
+			if (memory_overlaps(start, end, tdata[i])) {
 				return true;
 			}
 		}
-		return t.data() < end && t.data() + num_elements > start;
+		return tdata < end && tdata + num_elements > start;
 	}
 
 	struct prepare_copydown_state
@@ -828,8 +832,9 @@ namespace ks
 				std::memcpy(t->data(), sourceData, num_elements * (int)sizeof(T));
 			}
 			dest->subobjectDestination += allocator::padded_size(sizeof(T) * num_elements);
+			T* tdata = t->data();
 			for (int i = 0; i != num_elements; ++i) {
-				prepare_copydown_inplace(dest, &((*t)[i]));
+				prepare_copydown_inplace(dest, &(tdata[i]));
 			}
 		}
 	}
@@ -872,8 +877,9 @@ namespace ks
 		T* oldData = t->data();
 		*t = tensor<Dim, T>(alloc, t->size());
 		std::memmove(t->data(), oldData, sizeof(T) * static_cast<size_t>(num_elements));
+		T* newData = t->data();
 		for (int i = 0; i != num_elements; ++i) {
-			copydown_by_memmove_inplace(alloc, &((*t)[i]));
+			copydown_by_memmove_inplace(alloc, &(newData[i]));
 		}
 	}
 
@@ -940,8 +946,10 @@ namespace ks
 		static void go(tensor<Dim, T> *t1, const tensor<Dim, T> &t2)
 		{
 			KS_ASSERT(t1->size() == t2.size());
+			T* t1data = t1->data();
+			const T* t2data = t2.data();
 			for (int i = 0, n = t1->num_elements(); i < n; ++i)
-				ks::inplace_add_t<T>::go(&(*t1)[i], t2[i]);
+				ks::inplace_add_t<T>::go(&t1data[i], t2data[i]);
 		}
 	};
 
@@ -1039,8 +1047,9 @@ namespace ks
 	{
 		constexpr size_t Dim = dimension_of_tensor_index_type<SizeType>::value;
 		tensor<Dim, T> ret(alloc, size);
+		T* retdata = ret.data();
 		for(int j = 0, ne = ret.num_elements(); j != ne; ++j)
-			ret[j] = val;
+			retdata[j] = val;
 		return ret;
 	}
 
@@ -1068,9 +1077,10 @@ namespace ks
 	tensor<Dim, T> zero(allocator * alloc, tensor<Dim, T> const& val)
 	{
 		tensor<Dim, T> ret(alloc, val.size());
+		T* retdata = ret.data();
 		auto z = val.zero_element(alloc);
 		for (int i = 0; i != ret.num_elements(); ++i) {
-			ret[i] = z;
+			retdata[i] = z;
 		}
 		return ret;
 	}
@@ -1092,9 +1102,12 @@ namespace ks
 	{
 		KS_ASSERT(a.size() == b.size());
 		auto ret = tensor<Dim, T>::create(alloc, a.size());
+		const T* adata = a.data();
+		const T* bdata = b.data();
+		T* retdata = ret.data();
 
 		for (int i = 0, ne = a.num_elements(); i != ne; ++i)
-			ret[i] = ts_add(alloc, a[i], b[i]);
+			retdata[i] = ts_add(alloc, adata[i], bdata[i]);
 		return ret;
 	}
 
@@ -1106,8 +1119,9 @@ namespace ks
 	tensor<Dim, T> ts_scale(allocator * alloc, double val, tensor<Dim, T> const& t)
 	{
 		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		T* retdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
-			ret[i] = ts_scale(alloc, val, t[i]);
+			retdata[i] = ts_scale(alloc, val, t[i]);
 		return ret;
 	}
 
@@ -1118,10 +1132,11 @@ namespace ks
 		int ne = t.num_elements();
 		if (ne == 0) { return zero(alloc, T{}); }
 
-		if (ne == 1) return t[0];
-		T ret = ts_add(alloc, t[0], t[1]);
+		const T* indata = t.data();
+		if (ne == 1) return indata[0];
+		T ret = ts_add(alloc, indata[0], indata[1]);
 		for (int i = 2; i < ne; ++i)
-			ret = ts_add(alloc, ret, t[i]);
+			ret = ts_add(alloc, ret, indata[i]);
 		return ret;
 	}
 
@@ -1143,9 +1158,11 @@ namespace ks
 
 	template<size_t Dim, class T>
 	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
-		tensor<Dim, decltype(shape(alloc, t[0]))> s(alloc, t.size());
+		const T* indata = t.data();
+		tensor<Dim, decltype(shape(alloc, *indata))> s(alloc, t.size());
+		auto* outdata = s.data();
 		for (int ii = 0, ne = t.num_elements(); ii != ne; ++ii) {
-			s[ii] = shape(alloc, t[ii]);
+			outdata[ii] = shape(alloc, indata[ii]);
 		}
 		return s;
 	}
@@ -1281,8 +1298,10 @@ namespace ks
 	template <size_t Dim, class T>
 	inline tensor<Dim, T> ts_neg(allocator * alloc, tensor<Dim, T> t) {
 		tensor<Dim, T> ret(alloc, t.size());
+		const T* indata = t.data();
+		T* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-			ret[i] = ts_neg(alloc, t[i]);
+			outdata[i] = ts_neg(alloc, indata[i]);
 		}
 	}
 
@@ -1292,9 +1311,11 @@ namespace ks
 	auto unzip_element(allocator * alloc, tensor<Dim, TupleType> const& t)
 	{
 		tensor<Dim, std::tuple_element_t<I, TupleType>> ret(alloc, t.size());
+		const TupleType* indata = t.data();
+		auto* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
 		{
-			ret[i] = std::get<I>(t[i]);
+			outdata[i] = std::get<I>(indata[i]);
 		}
 		return ret;
 	}
@@ -1406,9 +1427,11 @@ namespace ks
 
 		KS_ASSERT(t1.size() == t2.size());
 
+		const T1* t1data = t1.data();
+		const T2* t2data = t2.data();
 		for (int i = 0, ne = t1.num_elements(); i < ne; i++)
 		{
-			ret += dot(t1[i], t2[i]);
+			ret += dot(t1data[i], t2data[i]);
 		}
 
 		return ret;
