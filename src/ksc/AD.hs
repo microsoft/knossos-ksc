@@ -129,7 +129,8 @@ gradBuild TupleAD s n ti body
   where
      t_ty = typeof body
      p = TVar res_ty resVar
-     d = fromMaybe 1 (tensorDimensionFromIndexType_maybe (typeof n))
+     err = error $ "Unexpected size type in gradBuild: " ++ show (typeof n)
+     d = fromMaybe err (tensorDimensionFromIndexType_maybe (typeof n))
      res_ty = TypeTuple [ TypeTensor d t_ty
                         , TypeTensor d (TypeLM (typeof s) t_ty) ]
      grad_body = mkLet (gradTVar TupleAD s ti)
