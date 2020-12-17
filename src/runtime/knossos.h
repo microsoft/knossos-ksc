@@ -445,6 +445,9 @@ namespace ks
 		using base = tensor_dimension_base<std::make_index_sequence<Dim>>;
 		using typename base::index_type;
 
+		template<typename HigherIndexType>
+		static index_type tail(const HigherIndexType & i) { return ks::tail(i); }
+
 		template<typename IndexType>
 		static int flatten_index_recursive(IndexType const& index, IndexType const& tensor_size) {
 			/* flatten_index({i1, i2, i3}, {s1, s2, s3})
@@ -468,6 +471,8 @@ namespace ks
 	struct tensor_dimension<1>
 	{
 		using index_type = int;
+
+		static int tail(std::tuple<int, int> higherIndexType) { return std::get<1>(higherIndexType); }
 
 		static int num_elements(index_type size) { return size; }
 
@@ -518,6 +523,8 @@ namespace ks
 			allocate(alloc, dims);
 		}
 
+		tensor(index_type size, T * data) : size_(size), data_(data) {}
+
 		void allocate(allocator_base * alloc, index_type size)
 		{
 			void *storage = alloc->allocate(bytes_required(size));
@@ -543,13 +550,33 @@ namespace ks
 		}
 
 		index_type size() const { return size_; }
+		int outer_dimension() const { return get_dimension<0>(size_); }
 		int num_elements() const { return dimension::num_elements(size_); }
 
 		T* data() { return data_; }
 		const T* data() const { return data_; }
 
-		T& operator[](int i) { return data_[i]; }
-		const T& operator[](int i) const { return data_[i]; }
+		std::conditional_t<Dim == 1u, T&, tensor<Dim-1, T>> operator[](int i) {
+			if constexpr (Dim == 1u) {
+				return data_[i];
+			} else {
+				return subtensor(i);
+			}
+		}
+
+		std::conditional_t<Dim == 1u, const T&, tensor<Dim-1, T>> operator[](int i) const {
+			if constexpr (Dim == 1u) {
+				return data_[i];
+			} else {
+				return subtensor(i);
+			}
+		}
+
+		tensor<Dim-1, T> subtensor(int i) const {
+			static_assert(Dim >= 2u);
+			auto sz = tensor_dimension<Dim-1>::tail(size_);
+			return tensor<Dim-1, T>(sz, data_ + i * tensor_dimension<Dim-1>::num_elements(sz));
+		}
 
 		T const& index(index_type i) const {
 #ifndef NDEBUG
@@ -1140,11 +1167,11 @@ namespace ks
 		return ret;
 	}
 
-	template <class T>
-	std::ostream &operator<<(std::ostream &s, ks::vec<T> const &v)
+	template <size_t Dim, class T>
+	std::ostream &operator<<(std::ostream &s, ks::tensor<Dim, T> const &v)
 	{
 		s << "[";
-		for (int i = 0; i < v.size(); ++i)
+		for (int i = 0; i < v.outer_dimension(); ++i)
 			s << (i > 0 ? ", " : "") << v[i];
 		return s << "]";
 	}

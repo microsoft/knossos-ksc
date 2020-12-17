@@ -25,6 +25,8 @@
                 (let ((i j k) ijk)
                     (testElement i j k 2.5)))))
       (print
+          "t = " t
+
           "\n----\n" 
           "TESTS FOLLOW"
 
