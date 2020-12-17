@@ -22,11 +22,11 @@ symbolLook = {
     ],  # float vs integer? also determine rank instead of hardcode
     "int": [sexpdata.Symbol("Integer")],
     "float": [sexpdata.Symbol("Float")],
-    "Optional[Tensor]": [ # Just say optionals are required for now. TODO: don't do this!
+    "Optional[Tensor]": [  # Just say optionals are required for now. TODO: don't do this!
         sexpdata.Symbol("Vec"),
         [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
     ],  # float vs integer? also determine rank instead of hardcode
-    "Optional[bool]": [ # Just say optionals are required for now. TODO: don't do this!
+    "Optional[bool]": [  # Just say optionals are required for now. TODO: don't do this!
         sexpdata.Symbol("Bool")
     ],
 }
@@ -40,12 +40,16 @@ symbolLook["Tuple[int, Tensor]"] = [
 ]
 
 # hardcoding BertScriptableForQuestionAnswering TODO: getting urgent now to break up the return type and transform
-symbolLook["Tuple[Optional[Tensor], Tensor, Tensor, Optional[List[Tensor]], Optional[List[Tensor]]]"] = [
+symbolLook[
+    "Tuple[Optional[Tensor], Tensor, Tensor, Optional[List[Tensor]], Optional[List[Tensor]]]"
+] = [
     sexpdata.Symbol("Tuple"),
     symbolLook["Tensor"],
     symbolLook["Tensor"],
-    sexpdata.Symbol("Vec"), [symbolLook["Tensor"]],
-    sexpdata.Symbol("Vec"), [symbolLook["Tensor"]],
+    sexpdata.Symbol("Vec"),
+    [symbolLook["Tensor"]],
+    sexpdata.Symbol("Vec"),
+    [symbolLook["Tensor"]],
 ]
 #
 
@@ -158,16 +162,20 @@ def make_aten_function(node, value, function_name):
         ],
     ]
 
+
 def make_builtin_function(node, value, function_name):
     return [
         sexpdata.Symbol("\n"),
         sexpdata.Symbol(mangleDebugName(value.debugName())),
         [
             sexpdata.Symbol(function_name),
-            sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())), # Assum arity 2, enoygh for now
+            sexpdata.Symbol(
+                mangleDebugName(node.inputsAt(0).debugName())
+            ),  # Assum arity 2, enoygh for now
             sexpdata.Symbol(mangleDebugName(node.inputsAt(1).debugName())),
-        ]
+        ],
     ]
+
 
 def make_add(generate_edef, node):
     value = node.outputsAt(0)
@@ -183,6 +191,7 @@ def make_add(generate_edef, node):
             sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())),
         ]
 
+
 def make_lt(generate_edef, node):
     value = node.outputsAt(0)
     if generate_edef:
@@ -190,12 +199,16 @@ def make_lt(generate_edef, node):
     else:
         return make_builtin_function(node, value, "lt")  # Assume floats, enough for now
 
+
 def make_mul(generate_edef, node):
     value = node.outputsAt(0)
     if generate_edef:
         return make_aten_function(node, value, "mulATEN")
     else:
-        return make_builtin_function(node, value, "mul")  # Assume floats, enough for now
+        return make_builtin_function(
+            node, value, "mul"
+        )  # Assume floats, enough for now
+
 
 def make_return(node):
     mangled_id = mangleDebugName(node.inputsAt(0).debugName())
@@ -218,8 +231,8 @@ def make_callfunction(node):
         ],
     ]
 
-def make_if(make_binds, node):
 
+def make_if(make_binds, node):
     def make_branch(block):
         binds = make_binds(block.nodes())
         if len(binds) > 0:
@@ -228,19 +241,23 @@ def make_if(make_binds, node):
             return make_return(block.returnNode())
 
     identifier = None
-    if (node.outputsSize() == 0):
-        identifier = "_" + "dummy" # we're likely to need to make them unique
+    if node.outputsSize() == 0:
+        identifier = "_" + "dummy"  # we're likely to need to make them unique
     else:
         identifier = "_" + node.outputsAt(0).debugName()
 
     inputs_size = sum(1 for _ in node.inputs())
 
-    if (inputs_size != 1):
-        raise Exception("Only support conditionals with 1 input, this one had: " + str(inputs_size))
+    if inputs_size != 1:
+        raise Exception(
+            "Only support conditionals with 1 input, this one had: " + str(inputs_size)
+        )
 
     conditional = mangleDebugName(node.inputsAt(0).debugName())
 
-    blocks = list(node.blocks()) # TODO: check length exactly 2, only supporting if/else currently. This is enough for BERT example
+    blocks = list(
+        node.blocks()
+    )  # TODO: check length exactly 2, only supporting if/else currently. This is enough for BERT example
 
     success_branch = make_branch(blocks[0])
     failure_branch = make_branch(blocks[1])
@@ -256,13 +273,14 @@ def make_if(make_binds, node):
             sexpdata.Symbol("\n\t"),
             failure_branch,
             sexpdata.Symbol("\n"),
-        ],     
-    ]    
+        ],
+    ]
 
 
 def make_default(node):
     print("WARNING, unimplmented node kind: " + node.kind())
     return sexpdata.Symbol("")
+
 
 def write_edefs(output):
     output.write(add_edef)
@@ -291,11 +309,19 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
         return lookups.get(node.kind(), make_default)(node=node)
 
     def make_binds(nodes):
-        return [translate_node(make_binds, node) for node in nodes if node.kind() != "prim::Print"]
+        return [
+            translate_node(make_binds, node)
+            for node in nodes
+            if node.kind() != "prim::Print"
+        ]
 
     binds = make_binds(all_nodes)
-    
-    args = [make_arg(input) for input in graph.inputs() if (not input.type().str().startswith("__torch__.transformers"))] # filtering self, TODO: look for better way
+
+    args = [
+        make_arg(input)
+        for input in graph.inputs()
+        if (not input.type().str().startswith("__torch__.transformers"))
+    ]  # filtering self, TODO: look for better way
 
     print_count = sum(1 for node in all_nodes if node.kind() == "prim::Print")
 
@@ -330,6 +356,7 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
     whole_exp = [sexpdata.Symbol("def"), name_as_symbol, return_type, args, body]
 
     output.write(sexpdata.dumps(whole_exp))
+
 
 # TODO: make an configuration named tuple rather than passing flags
 def ts2ks(output, generate_edefs, function):
