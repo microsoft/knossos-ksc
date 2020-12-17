@@ -45,8 +45,6 @@ _lam = sexpdata.Symbol("lam")
 _tuple = sexpdata.Symbol("tuple")
 _rule = sexpdata.Symbol("rule")
 _colon = sexpdata.Symbol(":")
-_true = sexpdata.Symbol("true")
-_false = sexpdata.Symbol("false")
 
 def parse_type(se, allow_implicit_tuple=False):
     """ Converts an S-Expression representing a type, like (Vec Float) or (Tuple Float (Vec Float)),
@@ -102,13 +100,6 @@ def parse_args(se):
     return [parse_arg(arg) for arg in ensure_list_of_lists(se)]
 
 def parse_expr(se):
-    # Variable-like constants
-    if se == _true:
-        return Const(True)
-    
-    if se == _false:
-        return Const(False)
-    
     # Otherwise, "x" -> a variable use
     if isinstance(se, sexpdata.Symbol):
         return Var(se.value(), None, False)
