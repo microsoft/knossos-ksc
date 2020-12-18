@@ -44,44 +44,19 @@
 (def sqnorm Float ((v : Vec Float))
   (dot v v))
 
-; mul Mat Vec
-(edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
-(def shape$mul$Mat$Vec (Vec (Tuple)) ((m : (Vec (Vec Float))) (v : (Vec Float)))
-          (constVec (size m) (tuple)))
-
-(edef D$mul$Mat$Vec (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
-          ((Vec (Vec Float)) (Vec Float)))
-(edef Dt$mul$Mat$Vec (Tuple (Vec Float) (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
-          ((Vec (Vec Float)) (Vec Float)))
-
-(edef R$mul$Mat$Vec (LM (Vec Float) (Tuple (Vec (Vec Float)) (Vec Float)))
-          ((Vec (Vec Float)) (Vec Float)))
-
-(def fwd$mul$Mat$Vec (Vec Float)
-          ((M_v : (Tuple (Vec (Vec Float)) (Vec Float))) (dM_dv : (Tuple (Vec (Vec Float)) (Vec Float))))
-     (let ((M  (get$1$2 M_v))
-           (v  (get$2$2 M_v))
-           (dM (get$1$2 dM_dv))
-           (dv (get$2$2 dM_dv)))
-    (ts_add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
-
-(edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
-          ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
-
-
-(def gmm_knossos_makeQ (Vec (Vec Float)) ((q : Vec Float) (l : Vec Float))
+(def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
   (let ((D (size q))
         (triD (size l)))
   (assert (eq triD (gmm_knossos_tri D))
-    (build D (lam (i : Integer)
-        (build D (lam (j : Integer)
+    (build (tuple D D) (lam (ij : (Tuple Integer Integer))
+        (let ((i j) ij)
            (if (lt i j)
             0.0
             (if (eq i j)
               (exp (index i q))
               (index (add (sub (gmm_knossos_tri D) (gmm_knossos_tri (sub D j))) (sub (sub i j) 1)) l))
            )
-           )))))))
+           ))))))
 
 (def logsumexp Float ((v : Vec Float))
     (log (sum (exp$VecR v))))
@@ -135,8 +110,7 @@
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
-                                  (mahal_vec (mul$Mat$Vec Q
-                                                      (sub$VecR$VecR (index i x) (index k means)))))
+                                  (mahal_vec (mul Q (sub$VecR$VecR (index i x) (index k means)))))
                               (sub (add (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))
@@ -279,7 +253,7 @@
       (print x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
           "\n----\n" 
-          (mul$Mat$Vec (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
+          (mul (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           ; see https://github.com/awf/knossos/issues/281 (D$gmm_knossos_gmm_objective x alphas mus qs ls wishart)
 
           "gmm_at_theta = " gmm_at_theta
