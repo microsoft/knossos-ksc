@@ -9,12 +9,6 @@
 (def mul$R$VecR (Vec Float) ((r : Float) (a : Vec Float))
     (build (size a) (lam (i : Integer) (mul r (index i a)))))
 
-(def mul$R$VecVecR (Vec (Vec Float)) ((r : Float) (a : Vec (Vec Float)))
-    (build (size a) (lam (i : Integer) (mul$R$VecR r (index i a)))))
-
-(def mul$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (mul (index i a) (index i b)))))
-
 (def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
   (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
 
