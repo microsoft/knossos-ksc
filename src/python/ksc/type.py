@@ -68,7 +68,7 @@ class Type:
             return Type.Bool
         if isinstance(val, (int, np.integer)):
             return Type.Integer
-        if isinstance(val, (float, np.float32)):
+        if isinstance(val, (float, np.float)):
             return Type.Float
         if isinstance(val, str):
             return Type.String
