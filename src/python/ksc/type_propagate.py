@@ -65,6 +65,11 @@ def ks_prim_lookup(name, tys):
         assert tys[0].kind == "Integer"
         assert tys[1].kind == "Lam"
         return Type.Vec(tys[1].lam_return_type)
+    # sumbuild : Int, Lam Int T -> T (perhaps we should check T is sum-able?)
+    if n == 2 and name == "sumbuild":
+        assert tys[0].kind == "Integer"
+        assert tys[1].kind == "Lam"
+        return tys[1].lam_return_type
 
     # fold : Lam (Tuple State T) State, State, Vec T -> State
     if n == 3 and name == "fold":
