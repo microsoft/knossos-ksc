@@ -153,6 +153,12 @@ def parse_expr(se):
     if head == _let:
         check(len(se) == 3, f"Let should have 2 terms (let (<binding>) body), not {len(se)-1} in", se)
         binding = se[1]
+        if all(isinstance(b, list) and len(b)==2 for b in binding):
+            # Multiple variables bound. Turn into nested binds, building innermost first
+            orig_binding = binding
+            for b in reversed(binding[1:]):
+                se[2] = [sexpdata.Symbol("let"), b, se[2]]
+            binding = se[1] = binding[0]
         check(len(binding) == 2, "Let bindings should be pairs", binding, "in", se)
         lhs = binding[0]
         if isinstance(lhs, list):
