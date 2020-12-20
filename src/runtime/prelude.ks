@@ -47,6 +47,12 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+(edef add (Vec Float) ((Vec Float) (Vec Float))) ; extra for GMM
+(edef add (Vec (Vec Float)) ((Vec (Vec Float)) (Vec (Vec Float)))) ; extra for GMM
+(edef add (Tuple (Vec (Vec Float)) (Vec Float) (Vec (Vec Float)) (Vec (Vec Float)) (Vec (Vec Float)) (Tuple Float (Tuple))) ((Tuple (Vec (Vec Float)) (Vec Float) (Vec (Vec Float)) (Vec (Vec Float)) (Vec (Vec Float)) (Tuple Float (Tuple))) (Tuple (Vec (Vec Float)) (Vec Float) (Vec (Vec Float)) (Vec (Vec Float)) (Vec (Vec Float)) (Tuple Float (Tuple)))))
+
+(edef deltaVec (Vec Float) (Integer Integer Float)) ; extra for GMM
+
 ;; sub :: Number x Number -> Number
 ;; sub (x, y) = x - y
 (edef sub Float (Float Float))
