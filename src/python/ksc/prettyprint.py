@@ -40,6 +40,19 @@ def pp_reserved(s):
 def pp_function_name(s):
     return annotate(Token.NAME_FUNCTION, s)
 
+def mangle(t):
+    assert isinstance(t, Type)
+    if t.kind == "Float": return "f"
+    if t.kind == "Integer": return "i"
+    if t.kind == "Vec": return "v" + mangle(t.children[0])
+    if t.kind == "Tuple": return "".join(["t", str(len(t.children))] + [mangle(c) for c in t.children])
+    assert False
+
+def pp_mangled_function_name(s, ts):
+    if s in ["add", "sub", "mul", "div"]:
+        s = "".join([s, "$"] + [mangle(t) for t in ts])
+    return annotate(Token.NAME_FUNCTION, s)
+
 def pp_variable(s):
     return annotate(Token.NAME_VARIABLE, s)
 
@@ -157,7 +170,7 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, Call):
         return nest(ctx.indent, 
                     parens_interline(2,
-                                pp_function_name(ex.name),
+                                pp_mangled_function_name(ex.name, [c.type_ for c in ex.args]),
                                 *map(pp, ex.args)))
 
     # Lambda arg body
