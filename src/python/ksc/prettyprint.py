@@ -117,6 +117,8 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, Const):
         if isinstance(ex.value, str):
             return f"\"{ex.value}\""
+        elif isinstance(ex.value, bool):
+            return "true" if ex.value else "false"
         else:
             return repr(ex.value)
 
