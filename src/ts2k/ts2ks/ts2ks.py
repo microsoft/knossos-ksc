@@ -4,6 +4,7 @@ import torch
 
 from ksc.expr import Expr
 from ksc import utils
+from ksc.ks_function import KscFunction
 
 # Background reading
 # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
@@ -367,8 +368,9 @@ def ts2ks(output, generate_edefs, function):
     s = ts2ks_fromgraph(generate_edefs, function.name, function.graph)
     output.write(s)
 
-def ts2mod(function, arg_types):
+def ts2mod(function, arg_types, return_type):
     fn = torch.jit.script(function)
     ks_str = ts2ks_fromgraph(False, fn.name, fn.graph)
-    mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types)
-    return mod.main
+    mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True)
+
+    return KscFunction(mod)

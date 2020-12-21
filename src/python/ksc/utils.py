@@ -111,8 +111,8 @@ def get_ksc_paths():
     return ksc_path,ksc_runtime_dir
 
 
-def generate_cpp_from_ks(ks_str):
-    ksc_path,ksc_runtime_dir = get_ksc_paths()
+def generate_cpp_from_ks(ks_str, generate_derivatives = False):
+    ksc_path,_ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
@@ -121,7 +121,7 @@ def generate_cpp_from_ks(ks_str):
             with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
                 subprocess.run([
                     ksc_path,
-                    "--generate-cpp-without-diffs",
+                    "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
                     "--ks-source-file", "src/runtime/prelude.ks",
                     "--ks-source-file", fks.name,
                     "--ks-output-file", fkso.name,
@@ -177,19 +177,26 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
     except subprocess.CalledProcessError as e:
         print(f"cpp_str={cpp_str}")
         print(f"cpp_file={fcpp.name}")
-        print(e.output.decode('ascii'))
+        print(cmd)
+        print(e.output.decode('utf-8'))
+        print(e.stderr.decode('utf-8'))
 
         raise
-    finally:
-        os.unlink(fcpp.name)
+    
+    os.unlink(fcpp.name)
     return module_name, module_path
 
 def arg_type_strings(types):
     return "".join(t.shortstr() for t in types)
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, pybind11_path="pybind11"):
+def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, pybind11_path="pybind11"):
 
-    generated_cpp_source = generate_cpp_from_ks(ks_str)
+    generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives)
+
+    if generate_derivatives:
+        _fwd_name = "fwd$" + name_to_call + "$a" + arg_type_strings(arg_types) + arg_type_strings(arg_types)
+        rev_name = "rev$" + name_to_call + "$a" + arg_type_strings(arg_types) + return_type.shortstr()
+
     name_to_call=(name_to_call + "@" + arg_type_strings(arg_types)).replace("@", "$a")
 
     cpp_str = f"""
@@ -224,7 +231,10 @@ auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {{
 }}
 
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
-  m.def("main", withGlobalAllocator(&ks::{name_to_call}));
+  m.def("entry", withGlobalAllocator(&ks::{name_to_call}));
+#if {1 if generate_derivatives else 0}
+  m.def("rev_entry", withGlobalAllocator(&ks::{rev_name}));
+#endif
 }}
 """
     

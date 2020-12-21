@@ -62,3 +62,19 @@ class KsFunction:
             return self._py_mod.defs[name_to_call](*args)
         else:
             return self._py_mod.main(*args)
+
+
+class KscFunction:
+    """
+    Compiled KS function
+    """
+    def __init__(self, py_mod):
+        self._py_mod = py_mod
+
+    @property
+    def rev(self):
+        return self._py_mod.rev_entry
+
+    def __call__(self, *args):
+        return self._py_mod.entry(*args)
+

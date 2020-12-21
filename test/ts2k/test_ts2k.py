@@ -17,12 +17,31 @@ def relux(x: float):
     else:
         return x * x
 
+def grad_relux(x: float):
+    """
+    Hand-written gradient of relux, used to test AD
+    """
+    if x < 0.0:
+        return 0.1
+    else:
+        return 2 * x
+
 def f(x : float):
     r1 = relux(x)
     r2 = relux(-r1)
     return r2
 
-def test_ts2k_relux():
-    ks_relux = ts2mod(relux, [Type.Float])
+ks_relux = None
+def compile_relux():
+    global ks_relux
+    if ks_relux is None:
+        print("Compiling relux")
+        ks_relux = ts2mod(relux, [Type.Float], Type.Float)
 
+def test_ts2k_relux():
+    compile_relux()
     assert ks_relux(2.0) == relux(2.0)
+
+def test_ts2k_relux_grad():
+    compile_relux()
+    assert ks_relux.rev(1.3, 1.0) == grad_relux(1.3)
