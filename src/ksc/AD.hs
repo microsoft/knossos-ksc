@@ -6,6 +6,7 @@ module AD where
 import Lang
 import LangUtils
 import Prim
+import qualified OptLet
 import GHC.Stack
 
 import Data.Maybe (mapMaybe)
@@ -53,11 +54,14 @@ gradDefInner adp
     Def { def_fun    = gradF adp f
         , def_pat    = VarPat params
         , def_res_ty = mkGradType adp s_ty res_ty
-        , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs)) }
+        , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs')) }
   where
     s :: TExpr
     s = Var params
     s_ty = typeof s
+
+    -- See Note: [Shadowing after grad]
+    rhs' = OptLet.ensureDon'tReuseParams [params] rhs
 
     lets = [ (gradTVar adp s params,
               mkGradTuple adp (Var params) (lmOne (typeof params)))
@@ -243,6 +247,25 @@ whose RHS this is.
 
 If <gradded rhs> mentions x, it should be the x from the outer
 scope, the locally bound x!  See test/ksc/test0, test_inline2
+
+Unfortunately this trick is not sufficient to cope with lambdas in
+builds.  If we have
+
+    (def f ... (a : T)
+        ... (build 10 (lam (a : Integer) <body>)) ...)
+
+then in the transformed build there will still be a
+
+    (lam (a : Integer) <gradded body>)
+
+But when gradding the body we pass in the Shape of the function
+result, to use in calls to lmZero. Alas, this Shape contains (a:T)
+from the parameters to f.
+
+To avoid this we must ensure that the parameters to f do not clash
+with any bound variable in the body. We do so by giving all binders
+unique names before gradding.
+
 -}
 
 lmVCat_AD :: ADPlan -> [TExpr] -> TExpr

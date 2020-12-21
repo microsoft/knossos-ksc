@@ -4,3 +4,8 @@
 
 (def f Float ( x : Float )
      (let (y (mul x 2.0)) (add x y)))
+
+(def g (Vec Float) (a : Float)
+     (let (x a)
+       (build 10 (lam (a : Integer)
+                      (if (eq a 0) 0.0 x)))))
