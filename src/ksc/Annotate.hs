@@ -435,8 +435,8 @@ lookupLclTc v
   = do { st <- getSymTabTc
        ; case Map.lookup v (lclST st) of
            Nothing -> do {
-                             addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
-                                          , text "Envt:" <+> gblDoc st ])
+                             addErr (vcat [ text "In envionment:" <+> gblDoc st
+                                          , text "Not in scope: local var/tld:" <+> ppr v ])
                              ; return TypeUnknown
                              }
            Just ty -> return ty }
