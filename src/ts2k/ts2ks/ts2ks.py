@@ -1,5 +1,9 @@
 import sexpdata
 import functools
+import torch
+
+from ksc.expr import Expr
+from ksc import utils
 
 # Background reading
 # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
@@ -288,9 +292,7 @@ def write_edefs(output):
     output.write("\n")
 
 
-def ts2ks_fromgraph(output, generate_edefs, name, graph):
-
-    all_nodes = list(graph.nodes())
+def ts2ks_fromgraph(generate_edefs, name, graph):
 
     def translate_node(make_binds, node):
         lookups = {
@@ -314,6 +316,8 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
             for node in nodes
             if node.kind() != "prim::Print"
         ]
+
+    all_nodes = list(graph.nodes())
 
     binds = make_binds(all_nodes)
 
@@ -355,9 +359,16 @@ def ts2ks_fromgraph(output, generate_edefs, name, graph):
 
     whole_exp = [sexpdata.Symbol("def"), name_as_symbol, return_type, args, body]
 
-    output.write(sexpdata.dumps(whole_exp))
+    return sexpdata.dumps(whole_exp)
 
 
 # TODO: make an configuration named tuple rather than passing flags
 def ts2ks(output, generate_edefs, function):
-    ts2ks_fromgraph(output, generate_edefs, function.name, function.graph)
+    s = ts2ks_fromgraph(generate_edefs, function.name, function.graph)
+    output.write(s)
+
+def ts2mod(function, arg_types):
+    fn = torch.jit.script(function)
+    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph)
+    mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types)
+    return mod.main

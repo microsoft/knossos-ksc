@@ -1,7 +1,15 @@
 
-import ts2ks
+from ts2ks import ts2mod
 import torch
+from ksc import utils
+from ksc.type import Type
 
+def bar(a : int, x : float, b : str):
+    if a < 0:
+        t = -0.125*x
+    else:
+        t = 1/2 * x ** 2
+    return torch.sin(t)*t
 
 def relux(x: float):
     if x < 0.0:
@@ -14,14 +22,7 @@ def f(x : float):
     r2 = relux(-r1)
     return r2
 
+def test_ts2k_relux():
+    ks_relux = ts2mod(relux, [Type.Float])
 
-def test_ts2k():
-    val = f(2.0)
-    assert val == -0.4
-
-    f_fast = torch.jit.script(f)
-
-    val = f_fast(2.0)
-    assert val == -0.4
-
-    f_ks = ts2ks.ts2ks("obj/ts2ks_tmp", True, f_fast)
+    assert ks_relux(2.0) == relux(2.0)
