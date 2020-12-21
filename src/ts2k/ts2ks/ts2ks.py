@@ -102,7 +102,7 @@ def make_print(node):
 
 def make_list(node):
     value = node.outputsAt(0)
-    return Var(mangleDebugName(value.debugName())), Call("vec", [Var(mangleDebugName(i.debugName())) for i in node.inputs()])
+    return Var(mangleDebugName(value.debugName())), Call("Vec_init", [Var(mangleDebugName(i.debugName())) for i in node.inputs()])
 
 
 def make_tensor(node):
@@ -250,12 +250,18 @@ def ts2mod(function, arg_types, return_type):
 
 if __name__ == "__main__":
     def bar(a : int, x : float):
+        y = torch.tensor([[1.1, -1.2], [2.1, 2.2]], requires_grad=True)
+
+        b = len(y.size())
         if a < 0:
             t = -0.125*x
         else:
-            t = 1/2 * x ** 2
+            t = 1/2 * x ** b
         return torch.sin(t)*t
 
     fn = torch.jit.script(bar)
     ks_str = ts2ks_fromgraph(False, fn.name, fn.graph)
     print(ks_str)
+    ks_bar = ts2mod(bar, [Type.Integer, Type.Float], Type.Float)
+    ans = ks_bar(1,12.34)
+    print(ans)
