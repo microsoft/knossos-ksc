@@ -61,7 +61,7 @@ class KsFunction:
         if hasattr(self._py_mod, "defs"):
             return self._py_mod.defs[name_to_call](*args)
         else:
-            return self._py_mod.main(*args)
+            return self._py_mod.entry(*args)
 
 
 class KscFunction:
