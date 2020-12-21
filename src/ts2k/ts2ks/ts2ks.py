@@ -167,54 +167,6 @@ def make_aten_function(node, value, function_name):
         ],
     ]
 
-
-def make_builtin_function(node, value, function_name):
-    return [
-        sexpdata.Symbol("\n"),
-        sexpdata.Symbol(mangleDebugName(value.debugName())),
-        [
-            sexpdata.Symbol(function_name),
-            sexpdata.Symbol(
-                mangleDebugName(node.inputsAt(0).debugName())
-            ),  # Assum arity 2, enoygh for now
-            sexpdata.Symbol(mangleDebugName(node.inputsAt(1).debugName())),
-        ],
-    ]
-
-
-def make_add(generate_edef, node):
-    value = node.outputsAt(0)
-    if generate_edef:
-        return make_aten_function(node, value, "addATEN")
-    else:
-        print(
-            "WARNING: aten::add built-in just returns unmodified tensor, consider using --generate_edef"
-        )
-        return [
-            sexpdata.Symbol("\n"),
-            sexpdata.Symbol(mangleDebugName(value.debugName())),
-            sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())),
-        ]
-
-
-def make_lt(generate_edef, node):
-    value = node.outputsAt(0)
-    if generate_edef:
-        return make_aten_function(node, value, "ltATEN")
-    else:
-        return make_builtin_function(node, value, "lt")  # Assume floats, enough for now
-
-
-def make_mul(generate_edef, node):
-    value = node.outputsAt(0)
-    if generate_edef:
-        return make_aten_function(node, value, "mulATEN")
-    else:
-        return make_builtin_function(
-            node, value, "mul"
-        )  # Assume floats, enough for now
-
-
 def make_return(node):
     mangled_id = mangleDebugName(node.inputsAt(0).debugName())
     return sexpdata.Symbol(mangled_id)
@@ -282,11 +234,6 @@ def make_if(make_binds, node):
     ]
 
 
-def make_default(node):
-    print("WARNING, unimplmented node kind: " + node.kind())
-    return sexpdata.Symbol("")
-
-
 def write_edefs(output):
     output.write(add_edef)
     output.write("\n")
@@ -300,16 +247,21 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
             "prim::Constant": make_constant,
             "prim::Print": make_print,
             "prim::ListConstruct": make_list,
-            "aten::tensor": make_tensor,
-            "aten::add": functools.partial(make_add, generate_edef=generate_edefs),
-            "aten::lt": functools.partial(make_lt, generate_edef=generate_edefs),
-            "aten::mul": functools.partial(make_mul, generate_edef=generate_edefs),
             "prim::Return": make_return,
             "prim::CallFunction": make_callfunction,
             "prim::If": functools.partial(make_if, make_binds=make_binds),
         }
 
-        return lookups.get(node.kind(), make_default)(node=node)
+        kind = node.kind()
+        if kind in lookups:
+            return lookups[kind](node=node)
+
+        if kind.startswith("aten::"):
+            return make_aten_function(node, node.outputsAt(0), kind)
+
+        print("WARNING, unimplmented node kind: " + node.kind())
+        return sexpdata.Symbol("")
+
 
     def make_binds(nodes):
         return [

@@ -123,6 +123,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
                     ksc_path,
                     "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
                     "--ks-source-file", "src/runtime/prelude.ks",
+                    "--ks-source-file", "src/runtime/prelude-aten.ks",
                     "--ks-source-file", fks.name,
                     "--ks-output-file", fkso.name,
                     "--cpp-output-file", fcpp.name
