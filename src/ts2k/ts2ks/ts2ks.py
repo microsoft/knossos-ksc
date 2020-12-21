@@ -1,6 +1,5 @@
 from typing import List, Tuple
 
-import sexpdata
 import functools
 import torch
 
@@ -189,7 +188,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
             return make_aten_function(node, node.outputsAt(0), kind)
 
         print("WARNING, unimplmented node kind: " + node.kind())
-        return sexpdata.Symbol("ERR"), sexpdata.Symbol(node.kind()), 
+        return Var("ERR"), Var(node.kind())
 
 
     def make_binds(nodes) -> List[Tuple[Var, Expr]]:
