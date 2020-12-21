@@ -97,42 +97,56 @@ def translate_and_import(source_file_name, *args):
 def subprocess_run(cmd, env=None):
     return subprocess.run(cmd, stdout=subprocess.PIPE, env=env).stdout.decode().strip("\n")
 
-def generate_cpp_from_ks(ks_str):
-    if "KSC_PATH" in os.environ:
-        ksc_path = os.environ["KSC_PATH"]
-    else:
-        ksc_path = "./ksc"
-    with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
-        fks.write(ks_str)
-    with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
-        pass
-    with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
-        pass
-    try:
-        subprocess.check_call([
-            ksc_path,
-            "--generate-cpp-without-diffs",
-            "--ks-source-file", fks.name,
-            "--ks-output-file", fkso.name,
-            "--cpp-output-file", fcpp.name
-        ])
-    except subprocess.CalledProcessError:
-        print(f"ks_str={ks_str}")
-        raise
-    finally:
-        os.unlink(fks.name)
-    with open(fcpp.name) as f:
-        out = f.read()
-    # only delete these file if no error
-    os.unlink(fcpp.name)
-    os.unlink(fkso.name)
-    return out
-
-def build_py_module_from_cpp(cpp_str, pybind11_path):
+def get_ksc_paths():
     if "KSC_RUNTIME_DIR" in os.environ:
         ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
     else:
         ksc_runtime_dir = "./src/runtime"
+
+    if "KSC_PATH" in os.environ:
+        ksc_path = os.environ["KSC_PATH"]
+    else:
+        ksc_path = "./ksc"
+    
+    return ksc_path,ksc_runtime_dir
+
+
+def generate_cpp_from_ks(ks_str):
+    ksc_path,ksc_runtime_dir = get_ksc_paths()
+
+    with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
+        fks.write(ks_str)
+    try:
+        with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
+            with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
+                subprocess.run([
+                    ksc_path,
+                    "--generate-cpp-without-diffs",
+                    "--ks-source-file", "src/runtime/prelude.ks",
+                    "--ks-source-file", fks.name,
+                    "--ks-output-file", fkso.name,
+                    "--cpp-output-file", fcpp.name
+                ], capture_output=True, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"files {fks.name} {fkso.name} {fcpp.name}")
+        print(f"ks_str=\n{ks_str}")
+        print(e.output.decode('ascii'))
+        raise
+    finally:
+        os.unlink(fks.name)
+
+    # Read from CPP back to string
+    with open(fcpp.name) as f:
+        out = f.read()
+
+    # only delete these file if no error
+    os.unlink(fcpp.name)
+    os.unlink(fkso.name)
+
+    return out
+
+def build_py_module_from_cpp(cpp_str, pybind11_path):
+    _ksc_path,ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
         fcpp.write(cpp_str)
@@ -159,9 +173,12 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
                  f" -o {module_path} "
                + fcpp.name)
         print(cmd)
-        subprocess.check_call(cmd, shell=True)
-    except subprocess.CalledProcessError:
+        subprocess.run(cmd, shell=True, capture_output=True, check=True)
+    except subprocess.CalledProcessError as e:
         print(f"cpp_str={cpp_str}")
+        print(f"cpp_file={fcpp.name}")
+        print(e.output.decode('ascii'))
+
         raise
     finally:
         os.unlink(fcpp.name)
@@ -172,7 +189,10 @@ def arg_type_strings(types):
 
 def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, pybind11_path="pybind11"):
 
-    cpp_str = """
+    generated_cpp_source = generate_cpp_from_ks(ks_str)
+    name_to_call=(name_to_call + "@" + arg_type_strings(arg_types)).replace("@", "$a")
+
+    cpp_str = f"""
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/operators.h>
@@ -206,10 +226,8 @@ auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {{
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
   m.def("main", withGlobalAllocator(&ks::{name_to_call}));
 }}
-""".format(
-        generated_cpp_source=generate_cpp_from_ks(ks_str),
-        name_to_call=(name_to_call + "@" + arg_type_strings(arg_types)).replace("@", "$a")
-    )
+"""
+    
     module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path)
     return import_module_from_path(module_name, module_path)
 
