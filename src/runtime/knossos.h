@@ -1089,6 +1089,13 @@ namespace ks
 		return ret;
 	}
 
+	template <class T, typename ...ArgTypes>
+	vec<T> Vec_init(allocator * alloc, T arg0, ArgTypes... args)
+	{
+		std::vector<T> 	arr {{ arg0, args ... }};
+		return tensor<1,T>(alloc, arr);
+	}
+
 	template <class F>
 	auto diag(allocator * alloc, int rows, int cols, F f)
 	{

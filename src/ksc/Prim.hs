@@ -538,10 +538,10 @@ primFunCallResultTy_maybe fun args
                       , tangentType s' `eqType` ds'
                       , tangentType t `eqType` dt
                       , s_dt `eqType` (TypeTuple [s'0, dt])
-                       -> Just TypeFloat
+                                                           -> Just TypeFloat
 
       -- ($trace e) emits its argument's value to stdout and returns it
-      ("$trace"   , t)                                       -> Just t
+      ("$trace"   , t)                                     -> Just t
 
       ("constVec" , TypeTuple [sizeType, t])                 -> tensorTypeFromIndexType_maybe sizeType t
       ("deltaVec" , TypeTuple [sizeType, indexType, t])
@@ -549,7 +549,12 @@ primFunCallResultTy_maybe fun args
         -> tensorTypeFromIndexType_maybe indexType t
       ("diag"     , TypeTuple [TypeInteger,
                                 TypeInteger,
-                                TypeLam TypeInteger t])      -> Just (TypeTensor 1 (TypeTensor 1 t))
+                                TypeLam TypeInteger t])    -> Just (TypeTensor 1 (TypeTensor 1 t))
+
+      ("Vec_init" , TypeTuple vals)
+        | (s1:ss) <- vals
+        , all (== s1) ss                                   -> Just (TypeTensor 1 s1)
+
       ("build"    , TypeTuple
                      [sizeType, TypeLam indexType t])
         | sizeType `eqType` indexType
@@ -594,6 +599,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "$check"   -- ($check f rev$f x dx df)   Derivative check df' * D$f * dx
                        , "$trace"   -- ($trace f args)            Print and return (f args)
                        , "print"    -- (print "msg" 3)            Print "msg3"
+                       , "Vec_init" -- (Vec_init v1 ... vn)       Vector literal
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
                        , "fold"     -- (fold f z v)               (Left) fold over v
