@@ -2,9 +2,21 @@ import sexpdata
 import functools
 import torch
 
-from ksc.expr import Expr
 from ksc import utils
 from ksc.ks_function import KscFunction
+
+from ksc.type import Type
+from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+
+# Importing prettyprint to get the decorated printers for Expression and Type
+import ksc.prettyprint # pylint: disable=unused-import
+
+# Import the prettyprinter routines we use explicitly in this file
+from prettyprinter import cpprint, pformat
+
+# Needed this in order to see the error messages when pprint fails
+import warnings
+warnings.filterwarnings("always")
 
 # Background reading
 # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
@@ -15,64 +27,58 @@ from ksc.ks_function import KscFunction
 nl = "\n"
 tab = "\t"
 
-add_edef = "(edef addATEN (Vec (Vec Float)) ((Vec (Vec Float)) Float))"
-
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
 
+Type_Tensor = Type.Vec(Type.Vec(Type.Float))  # float vs integer? also determine rank instead of hardcode
 symbolLook = {
-    "Tensor": [
-        sexpdata.Symbol("Vec"),
-        [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
-    ],  # float vs integer? also determine rank instead of hardcode
-    "int": [sexpdata.Symbol("Integer")],
-    "float": [sexpdata.Symbol("Float")],
-    "Optional[Tensor]": [  # Just say optionals are required for now. TODO: don't do this!
-        sexpdata.Symbol("Vec"),
-        [sexpdata.Symbol("Vec"), sexpdata.Symbol("Float")],
-    ],  # float vs integer? also determine rank instead of hardcode
-    "Optional[bool]": [  # Just say optionals are required for now. TODO: don't do this!
-        sexpdata.Symbol("Bool")
-    ],
+    "Tensor": Type_Tensor,  # float vs integer? also determine rank instead of hardcode
+    "Optional[Tensor]": Type_Tensor,   # Just say optionals are required for now. TODO: don't do this!
+    "Optional[bool]": Type.Bool,  # Just say optionals are required for now. TODO: don't do this!
 }
 
 # We're going to have to break out the data structure at some point, for now, hardcode
 # No recursive literals
-symbolLook["Tuple[int, Tensor]"] = [
-    sexpdata.Symbol("Tuple"),
-    symbolLook["int"],
-    symbolLook["Tensor"],
-]
+symbolLook["Tuple[int, Tensor]"] = Type.Tuple(Type.Integer, Type_Tensor)
 
 # hardcoding BertScriptableForQuestionAnswering TODO: getting urgent now to break up the return type and transform
 symbolLook[
     "Tuple[Optional[Tensor], Tensor, Tensor, Optional[List[Tensor]], Optional[List[Tensor]]]"
-] = [
-    sexpdata.Symbol("Tuple"),
-    symbolLook["Tensor"],
-    symbolLook["Tensor"],
-    sexpdata.Symbol("Vec"),
-    [symbolLook["Tensor"]],
-    sexpdata.Symbol("Vec"),
-    [symbolLook["Tensor"]],
-]
-#
+] = Type.Tuple(
+        Type_Tensor,
+        Type_Tensor,
+        Type_Tensor,
+        Type.Vec(Type_Tensor),
+        Type.Vec(Type_Tensor)
+    )
 
+#
 
 def mangleDebugName(name):
     return "_" + name.replace(".", "_")
 
+def from_torch_type(t):
+    if t == torch._C.IntType.get():
+        return Type.Integer
+
+    if t == torch._C.FloatType.get():
+        return Type.Float
+
+    type_lookup = str(t)
+
+    if "Optional" in type_lookup:
+        print("WARNING: Optional argument treated as required:" + type_lookup)
+
+    return symbolLook[type_lookup]
 
 def make_arg(input):
-    type_lookup = str(input.type())
-    if "Optional" in type_lookup:
-        print("WARNING: treated as required:" + type_lookup)
+    input_type = from_torch_type(input.type())
+    name = mangleDebugName(input.debugName())
     return [
-        sexpdata.Symbol(mangleDebugName(input.debugName())),
+        sexpdata.Symbol(name),
         sexpdata.Symbol(":"),
-        symbolLook[type_lookup],
+        pformat(input_type),
     ]
-
 
 def make_constant(node):
 
@@ -162,8 +168,7 @@ def make_aten_function(node, value, function_name):
         sexpdata.Symbol(mangleDebugName(value.debugName())),
         [
             sexpdata.Symbol(function_name),
-            sexpdata.Symbol(mangleDebugName(node.inputsAt(0).debugName())),
-            sexpdata.Symbol(mangleDebugName(node.inputsAt(1).debugName())),
+            *[sexpdata.Symbol(mangleDebugName(i.debugName())) for i in node.inputs()]
         ],
     ]
 
@@ -233,13 +238,6 @@ def make_if(make_binds, node):
         ],
     ]
 
-
-def write_edefs(output):
-    output.write(add_edef)
-    output.write("\n")
-    output.write("\n")
-
-
 def ts2ks_fromgraph(generate_edefs, name, graph):
 
     def translate_node(make_binds, node):
@@ -290,7 +288,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
                 "WARNING: multiple print statements used, only final one currently translated"
             )
         op = translate_node(make_binds, all_nodes[-1])
-        return_type = sexpdata.Symbol("Integer")
+        return_type = Type.Integer
     else:
         if print_count > 0:
             print(
@@ -298,7 +296,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
             )
         return_node = graph.return_node()
         op = translate_node(make_binds, return_node)
-        return_type = symbolLook[str(return_node.inputsAt(0).type())]
+        return_type = from_torch_type(return_node.inputsAt(0).type())
 
     body = [
         sexpdata.Symbol("\n"),
@@ -310,7 +308,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
 
     name_as_symbol = sexpdata.Symbol(name)
 
-    whole_exp = [sexpdata.Symbol("def"), name_as_symbol, return_type, args, body]
+    whole_exp = [sexpdata.Symbol("def"), name_as_symbol, pformat(return_type), args, body]
 
     return sexpdata.dumps(whole_exp)
 
@@ -326,3 +324,15 @@ def ts2mod(function, arg_types, return_type):
     mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True)
 
     return KscFunction(mod)
+
+if __name__ == "__main__":
+    def bar(a : int, x : float):
+        if a < 0:
+            t = -0.125*x
+        else:
+            t = 1/2 * x ** 2
+        return torch.sin(t)*t
+
+    fn = torch.jit.script(bar)
+    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph)
+    print(ks_str)
