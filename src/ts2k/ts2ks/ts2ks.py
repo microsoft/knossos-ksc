@@ -27,6 +27,9 @@ warnings.filterwarnings("always")
 nl = "\n"
 tab = "\t"
 
+def to_sexp(ex):
+    return sexpdata.Symbol(pformat(ex)) # Hack to print it back into the sexpdata stream, while we move to Expr ctors
+
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
 
@@ -77,7 +80,7 @@ def make_arg(input):
     return [
         sexpdata.Symbol(name),
         sexpdata.Symbol(":"),
-        pformat(input_type),
+        to_sexp(input_type),
     ]
 
 def make_constant(node):
@@ -308,7 +311,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
 
     name_as_symbol = sexpdata.Symbol(name)
 
-    whole_exp = [sexpdata.Symbol("def"), name_as_symbol, pformat(return_type), args, body]
+    whole_exp = [sexpdata.Symbol("def"), name_as_symbol, to_sexp(return_type), args, body]
 
     return sexpdata.dumps(whole_exp)
 
