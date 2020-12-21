@@ -293,9 +293,6 @@ be particularly important for avoiding a 5x slowdown.  See
 
 -}
 
-ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
-ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
-
 params_withPackedParamsPat :: Pat -> ([TVarX], TExpr -> TExpr)
 params_withPackedParamsPat (TupPat vs)    = (vs, id)
 params_withPackedParamsPat (VarPat param) = params_withPackedParams param
@@ -308,7 +305,7 @@ params_withPackedParams param = case typeof param of
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
         packParams = mkLet param (Tuple (map Var params))
-    in (params, ensureDon'tReuseParams params . packParams)
+    in (params, OptLet.ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 
 mkCTypedVar :: TVar -> String
