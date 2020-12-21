@@ -197,6 +197,11 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
     if generate_derivatives:
         _fwd_name = "fwd$" + name_to_call + "$a" + arg_type_strings(arg_types) + arg_type_strings(arg_types)
         rev_name = "rev$" + name_to_call + "$a" + arg_type_strings(arg_types) + return_type.shortstr()
+        declare_derivatives = f"""
+          m.def("rev_entry", withGlobalAllocator(&ks::{rev_name}));
+        """
+    else:
+        declare_derivatives = ""
 
     name_to_call=(name_to_call + "@" + arg_type_strings(arg_types)).replace("@", "$a")
 
@@ -233,9 +238,7 @@ auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {{
 
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
   m.def("entry", withGlobalAllocator(&ks::{name_to_call}));
-#if {1 if generate_derivatives else 0}
-  m.def("rev_entry", withGlobalAllocator(&ks::{rev_name}));
-#endif
+  {declare_derivatives}
 }}
 """
     
