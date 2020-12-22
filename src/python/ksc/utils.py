@@ -8,7 +8,7 @@ import subprocess
 import sys
 from tempfile import NamedTemporaryFile
 
-from ksc.type import Type
+from ksc.type import Type, tangent_type
 
 class KRecord:
     """
@@ -187,23 +187,59 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
     os.unlink(fcpp.name)
     return module_name, module_path
 
-def arg_type_strings(types):
-    return "".join(t.shortstr() for t in types)
+def make_tuple_if_many(types):
+    if isinstance(types, list):
+        if len(types) > 1:
+            return Type.Tuple(*types)
+        else:
+            return types[0]
+    else:
+        return types
+
+def mangleType(ty):
+    return ty.shortstr()
+
+def mangleTypes(tys):
+    return "".join(mangleType(ty) for ty in tys)
+
+
+def encode_name(s : str) -> str:
+    # TODO: this could be faster
+    return s.\
+        replace('@',"$a").\
+        replace(',',"$_").\
+        replace('[',"$6").\
+        replace(']',"$9").\
+        replace('<',"$d").\
+        replace('>',"$b").\
+        replace('*',"$x").\
+        replace(':',"$8")
 
 def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, pybind11_path="pybind11"):
 
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives)
 
+    args_str = mangleTypes(arg_types)
+    name_str = encode_name(f"{name_to_call}@{args_str}")
+    declarations = f"""
+     m.def("entry", withGlobalAllocator(&ks::{name_str}));
+    """
+
     if generate_derivatives:
-        _fwd_name = "fwd$" + name_to_call + "$a" + arg_type_strings(arg_types) + arg_type_strings(arg_types)
-        rev_name = "rev$" + name_to_call + "$a" + arg_type_strings(arg_types) + return_type.shortstr()
-        declare_derivatives = f"""
+        darg_types = [tangent_type(ty) for ty in arg_types]
+        args_tuple_str = mangleType(make_tuple_if_many(arg_types))
+        dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
+        dreturn_type_str = mangleType(tangent_type(return_type))
+
+        fwd_name = encode_name(f"fwd${name_to_call}@{args_tuple_str}{dargs_tuple_str}")
+        declarations += f"""
+          m.def("fwd_entry", withGlobalAllocator(&ks::{fwd_name}));
+        """
+
+        rev_name = encode_name(f"rev${name_to_call}@{args_tuple_str}{dreturn_type_str}")
+        declarations += f"""
           m.def("rev_entry", withGlobalAllocator(&ks::{rev_name}));
         """
-    else:
-        declare_derivatives = ""
-
-    name_to_call=(name_to_call + "@" + arg_type_strings(arg_types)).replace("@", "$a")
 
     cpp_str = f"""
 #include <pybind11/pybind11.h>
@@ -237,8 +273,7 @@ auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {{
 }}
 
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
-  m.def("entry", withGlobalAllocator(&ks::{name_to_call}));
-  {declare_derivatives}
+  {declarations}
 }}
 """
     
