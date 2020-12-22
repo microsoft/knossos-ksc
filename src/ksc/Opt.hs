@@ -242,6 +242,11 @@ optPrimFun :: InScopeSet -> PrimFun -> TExpr -> Maybe TExpr
 
 -- Constant folding.
 -- TODO: match precision to target machine
+
+-- Don't try to constant-fold Vec_init
+optPrimFun _ "Vec_init" _args 
+  = Nothing 
+
 optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
   = Just . Konst . KFloat $
     case op of
@@ -250,8 +255,8 @@ optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
       s -> errorFor s
   where errorFor s = error $ unlines $
           [ "Failed constant folding [" ++ s ++ "]."
-          , "This error exists to prompt you, the ksc user,"
-          , "to go ahead and add a constant folding rule for"
+          , "This error exists to prompt us"
+          , "to add a constant folding rule for"
           , "this operation to ksc.  See also"
           , ""
           , "    https://github.com/microsoft/knossos-ksc/pull/61/commits/29c2ab04568e17b953d3fe942aba5881ab15e1f8#r309892713"
