@@ -602,7 +602,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "index"
                        , "shape"
                        , "size"
-                       , "sum"
+                       , "sum"      -- (sum t)                    Sum all elements in tensor
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "ts_neg"
                        , "ts_add"

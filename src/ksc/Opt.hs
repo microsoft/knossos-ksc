@@ -302,12 +302,12 @@ optPrimFun _ "size" (Call constVec (Tuple [n,_]))
   | constVec `isThePrimFun` "constVec"
   = Just n
 
--- RULE: index j (build n f) = f j
+-- RULE: index ei (build ns f) = f ei
 optPrimFun _ "index" (Tuple [ ei, arr ])
   | Just (_, i, e) <- isBuild_maybe arr
   = Just (mkLet i ei e)
 
--- RULE: index j (constVec (n, v)) = v
+-- RULE: index js (constVec (ns, v)) = v
 optPrimFun _ "index" (Tuple [_, Call constVec (Tuple [_, v])])
   | constVec `isThePrimFun` "constVec"
   = Just v
@@ -465,6 +465,7 @@ optSum _ = Nothing
 
 -----------------------
 sumOfConstVec :: TExpr -> TExpr -> TExpr
+sumOfConstVec (Tuple _) _ = error "sumOfConstVec (Tuple) unimplemented"
 sumOfConstVec n v = case typeof v of
   TypeInteger -> pMulii n v
   _ -> pScale (pToFloat n) v
@@ -643,7 +644,8 @@ optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
 
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 -- (+) :: (F,F) -> f
--- (D+)(x,y) :: (F,F) -o F
+-- (D+) :: (F,F) -> ((dF,dF) -o dF)
+-- (D+)(x,y) :: (dF,dF) -o dF
 optGradPrim _ "ts_add" arg
   | Tuple arg' <- arg
   , [t1, t2] <- map typeof arg'
@@ -655,13 +657,14 @@ optGradPrim _ "sum" e
                              (lmOne t)))
 
 optGradPrim _ "size" e
-  = Just $ lmZero e zeroInt
+  | TypeTensor d _ <- typeof e
+  = Just $ lmZero e (zeroIndex d)
 
 optGradPrim _ "index" (Tuple [i,v])
   = Just (lmHCat [ lmZero i vi
                  , lmBuildT (pSize v) (Lam ii (lmDelta vi (Var ii) i)) ])
   where
-    ii = TVar TypeInteger $ Simple "primDindex$i"
+    ii = TVar (typeof i) $ Simple "primDindex$ii"
     vi = pIndex i v
 
 
