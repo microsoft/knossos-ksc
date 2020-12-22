@@ -3,6 +3,7 @@ import importlib.util
 import os
 import numpy as np
 import subprocess
+import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
 
@@ -135,7 +136,9 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
     with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
         fcpp.write(cpp_str)
 
-    extension_suffix = subprocess_run(['python3-config', '--extension-suffix'])
+    extension_suffix = sysconfig.get_config_var('EXT_SUFFIX')
+    if extension_suffix is None:
+        extension_suffix = sysconfig.get_config_var('SO')
 
     with NamedTemporaryFile(mode="w", suffix=extension_suffix, delete=False) as fpymod:
         pass
