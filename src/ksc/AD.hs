@@ -242,7 +242,7 @@ to
 
 Note that the g$x defn comes first.  Why?  Because <gradded rhs>
 might mention x, either directly (remember this is a non-rec let)
-or via a cal to lmZero if 'x' is a parameter of the function in
+or via a call to lmZero if 'x' is a parameter of the function in
 whose RHS this is.
 
 If <gradded rhs> mentions x, it should be the x from the outer
