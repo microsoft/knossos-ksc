@@ -14,7 +14,7 @@ This section describes how to get them.
 #### Windows
 Install [Chocolatey](https://chocolatey.org/), then:
 ```cmd
-choco install ghc --version 8.6.5 -y
+choco install ghc --version 8.6.5 cabal --version 3.0.0.0 -y
 cabal v2-update
 choco install mingw --version 7.3.0 -y
 choco install msys2

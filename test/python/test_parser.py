@@ -34,6 +34,9 @@ def test_parses():
                Def("f", Type.Float, [Var_a_Float, Var_b_Float], 
                         Call("add", [Var_a, Var_b]))
 
+    assert tld("(def f Bool () true)") ==\
+               Def("f", Type.Bool, [], Const(True))
+
     assert expr("(assert a b)") == Assert(Var_a, Var_b)
     assert expr("(if a a b)") == If(Var_a, Var_a, Var_b)
     assert expr("(let (a b) a)") == Let(Var_a, Var_b, Var_a)

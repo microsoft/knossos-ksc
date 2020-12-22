@@ -249,16 +249,16 @@ tensorIndexType :: Int -> Type
 tensorIndexType 1 = TypeInteger
 tensorIndexType d = TypeTuple (replicate d TypeInteger)
 
-tensorDimensionFromIndexType :: Type -> Maybe Int
-tensorDimensionFromIndexType TypeInteger = Just 1
-tensorDimensionFromIndexType (TypeTuple ts)
+tensorDimensionFromIndexType_maybe :: Type -> Maybe Int
+tensorDimensionFromIndexType_maybe TypeInteger = Just 1
+tensorDimensionFromIndexType_maybe (TypeTuple ts)
   | all (`eqType` TypeInteger) ts
   = Just (length ts)
-tensorDimensionFromIndexType _ = Nothing
+tensorDimensionFromIndexType_maybe _ = Nothing
 
-tensorTypeFromIndexType :: Type -> Type -> Maybe Type
-tensorTypeFromIndexType indexType elementType =
-  fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType indexType)
+tensorTypeFromIndexType_maybe :: Type -> Type -> Maybe Type
+tensorTypeFromIndexType_maybe indexType elementType =
+  fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType_maybe indexType)
 
 ----------------------------------
 --- Tangent space
