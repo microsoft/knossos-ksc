@@ -132,15 +132,15 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
         print(f"files {fks.name} {fkso.name} {fcpp.name}")
         print(f"ks_str=\n{ks_str}")
         print(e.output.decode('ascii'))
+        print(e.stderr.decode('ascii'))
         raise
-    finally:
-        os.unlink(fks.name)
-
+    
     # Read from CPP back to string
     with open(fcpp.name) as f:
         out = f.read()
 
     # only delete these file if no error
+    os.unlink(fks.name)
     os.unlink(fcpp.name)
     os.unlink(fkso.name)
 
