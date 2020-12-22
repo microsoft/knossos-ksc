@@ -1,8 +1,9 @@
 
-from ts2ks import ts2mod
+import math
 import torch
 from ksc import utils
 from ksc.type import Type
+from ts2ks import ts2mod
 
 def bar(a : int, x : float, b : str):
     if a < 0:
@@ -45,3 +46,25 @@ def test_ts2k_relux():
 def test_ts2k_relux_grad():
     compile_relux()
     assert ks_relux.rev(1.3, 1.0) == grad_relux(1.3)
+
+def bar(a : int, x : float):
+    y = torch.tensor([[1.1, -1.2], [2.1, 2.2]])
+
+    b = len(y.size())
+    if a < 0:
+        t = -0.125*x
+    else:
+        t = 1/2 * x * float(b)
+    return math.sin(t)*t
+
+def test_bar():
+    ks_bar = ts2mod(bar, [Type.Integer, Type.Float], Type.Float)
+    ks_ans = ks_bar(1,12.34)
+    ans = bar(1,12.34)
+    assert ans == ks_ans
+
+# def test_Vec_init():
+#     def f(x : float):
+#         return torch.tensor([x, 2.2])
+
+#     ts2mod(f, [Type.Float], Type.Vec(Type.Float))
