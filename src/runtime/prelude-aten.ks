@@ -10,6 +10,12 @@
 (def aten::mul Float ((a : Float) (b : Float))
     (mul a b))
 
+(def aten::mul (Tensor 1 Float) ((a : Tensor 1 Float) (b : Float))
+    (ts_scale b a))
+
+(def aten::mul (Tensor 2 Float) ((a : Tensor 2 Float) (b : Float))
+    (ts_scale b a))
+
 (def aten::add Float ((a : Float) (b : Float))
     (add a b))
 
