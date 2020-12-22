@@ -23,8 +23,9 @@ import Data.List( mapAccumR )
 import Data.Sequence( mapWithIndex, fromList )
 import Data.Foldable (toList)
 
-optTrace :: msg -> a -> a
-optTrace _msg t = t -- trace msg t
+optTrace :: String -> a -> a
+optTrace _msg t = t
+--optTrace msg t = trace msg t
 
 data OptEnv = OptEnv { optRuleBase :: RuleBase
                      , optGblST    :: GblSymTab
