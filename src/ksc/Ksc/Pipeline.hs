@@ -9,7 +9,7 @@ import qualified Cgen
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
-import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
+import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD),
              Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
              FunId(UserFun), TDef, Pretty,
              def_fun, displayN, partitionDecls,
@@ -165,20 +165,20 @@ theDiffs display defs env rulebase = do {
   --
   -- Nonetheless, it's good to generate optgrad_tupled here so that
   -- the tests will run on it and we can be sure it typechecks.
-  ; let grad_defs_tupled = gradDefs TupleAD defs
-        env15 = extendGblST env1 grad_defs_tupled
-  ; display "Grad tupled" env15 grad_defs_tupled
+  -- ; let grad_defs_tupled = gradDefs TupleAD defs
+  --       env15 = extendGblST env1 grad_defs_tupled
+  -- ; display "Grad tupled" env15 grad_defs_tupled
 
-  ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
+  ; (env2, optgrad) <- optDefs rulebase env1 grad_defs
   ; display "Optgrad" env2 optgrad
 
-  ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
-  ; display "Optgrad tupled" env25 optgrad_tupled
+  -- ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
+  -- ; display "Optgrad tupled" env25 optgrad_tupled
 
   ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
-  ; display "Diffs" env25 diffs
+  ; display "Diffs" env2 diffs
 
-  ; (env3, optdiffs) <- optDefs rulebase env25 diffs
+  ; (env3, optdiffs) <- optDefs rulebase env2 diffs
   ; display "OptDiffs" env3 optdiffs
 
   -- Note optgrad removed from below as we can not currently
