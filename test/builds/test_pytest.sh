@@ -12,6 +12,11 @@ cd ../..
 echo Running pytest
 python3 -m pytest test/python
 
+echo Installing TS2KS...
+cd ./src/ts2k
+python3 -m pip install --editable .
+cd ../..
+
 echo Running pytest on ts2k
 python3 -m pytest test/ts2k
 
