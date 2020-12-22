@@ -2,7 +2,7 @@ set -e
 
 echo Installing dependencies...
 
-python3 -m pip install pytest numpy
+python3 -m pip install pytest numpy torch
 
 echo Installing ksc...
 cd ./src/python
