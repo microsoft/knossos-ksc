@@ -453,7 +453,7 @@ resVar = Simple "ksc$resVar"
 argVar :: Var
 argVar = Simple "ksc$argVar"
 
-indexTVar :: TVar
+indexTVar :: TVar -- AWFTODO
 indexTVar = TVar TypeInteger (Simple "ksc$indexTVar")
 
 mkArgVar :: Int -> Var
@@ -479,6 +479,9 @@ kFloat f = Konst (KFloat f)
 
 kTFloat :: Double -> TExpr
 kTFloat f = Konst (KFloat f)
+
+zeroIndex :: Int -> TExpr
+zeroIndex d = mkTuple $ replicate d $ zeroInt
 
 zeroInt :: TExpr
 zeroInt = Konst (KInteger 0)

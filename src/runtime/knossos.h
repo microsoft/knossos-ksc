@@ -678,6 +678,43 @@ namespace ks
 		build_t<Dim>::do_build(alloc, size, &retData, f);
 		return ret;
 	}
+	
+	template <class T>
+	vec<T> deltaVec(allocator * alloc, int n, int i, T val)
+	{
+		vec<T> ret(alloc, n);
+		T z = zero(alloc, val);
+		for(int j = 0; j < n; ++j)
+			if (j != i)
+			  ret[j] = z;
+			else
+			  ret[j] = val;
+		return ret;
+	}
+
+	template <class T, class ...SizeTypes>
+	tensor<sizeof...(SizeTypes), T> deltaVec(allocator * alloc, std::tuple<SizeTypes...> size, std::tuple<SizeTypes...> i, T val)
+	{
+		T z = zero(alloc, val);
+		return build<T>(alloc, size, [&val,&z,&i](allocator* alloc, SizeTypes... ii) { return (std::make_tuple(ii...) == i) ? val : z; });
+	}
+
+
+	template <class T>
+	vec<T> constVec(allocator * alloc, int size, T val)
+	{
+		vec<T> ret = vec<T>::create(alloc, size);
+
+		for (int i = 0; i < size; ++i)
+			ret[i] = val;
+		return ret;
+	}
+
+	template <class T, class ...SizeTypes>
+	tensor<sizeof...(SizeTypes), T> constVec(allocator * alloc, std::tuple<SizeTypes...> size, T val)
+	{
+		return build<T>(alloc, size, [&val](allocator* alloc, SizeTypes... i) { return val; });
+	}
 
 	template <class T, class F, class A>
         A fold(allocator * alloc, F f, A z, vec<T> v)

@@ -98,8 +98,8 @@ getZero tangent_type e
             TypeFloat    -> Konst (KFloat 0.0)
             TypeString   -> Konst (KString "")
             TypeBool     -> Konst (KBool False)
-            TypeTensor 1 _ -> mkAtomicNoFVs e $ \ e ->
-                            pConstVec (pSize e) (go (pIndex (kInt 1) e))
+            TypeTensor d _ -> mkAtomicNoFVs e $ \ e ->
+                            pConstVec (pSize e) (go (pIndex (zeroIndex d) e))
             TypeTuple ts
                | Tuple es <- e
                -> assert (text "splitTuple") (length ts == length es) $
@@ -606,7 +606,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "index"
                        , "shape"
                        , "size"
-                       , "sum"
+                       , "sum"      -- (sum t)                    Sum all elements in tensor
                        , "unzip"   -- Takes a vector of tuples to a tuple of vectors
                        , "ts_neg"
                        , "ts_add"

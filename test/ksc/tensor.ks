@@ -97,4 +97,3 @@
           (eq (deltaVec (tuple 2 4) (tuple 0 4) 2.0)
               (build (tuple 2 4) (lam (ij : (Tuple Integer Integer)) 0.0)))
       ))))))
-
