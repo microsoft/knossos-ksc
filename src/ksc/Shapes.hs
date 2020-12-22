@@ -103,10 +103,6 @@ shapeCallPrim "$trace" v = Just $ shapeE v
 shapeCallPrim "$copydown" v = Just $ shapeE v
 shapeCallPrim _ _ = Nothing
 
-zeroIndexForDimension :: Int -> TExpr
-zeroIndexForDimension 1 = Konst (KInteger 0)
-zeroIndexForDimension d = mkTuple (replicate d (Konst (KInteger 0)))
-
 -- Given a Type t, determines whether (shapeType t) is a unit type;
 -- if so then the unit value is returned.
 shapeIsUnit_maybe :: Type -> Maybe TExpr
