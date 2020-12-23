@@ -145,7 +145,7 @@ theDiffs :: DisplayLint a
          -> [TDef]
          -> GblSymTab
          -> RuleBase
-         -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase)
+         -> KMT IO (GblSymTab, [TDef])
 theDiffs display defs env rulebase = do {
   ; let grad_defs = gradDefs BasicAD defs
         env1 = extendGblST env grad_defs
@@ -180,7 +180,7 @@ theDiffs display defs env rulebase = do {
   -- Note optgrad removed from below as we can not currently
   -- codegen the optgrad for recursive functions
   -- [see https://github.com/awf/knossos/issues/281]
-  ; return (env3, defs, optdiffs, rulebase)
+  ; return (env3, optdiffs)
   }
 
 theShapes :: DisplayLint a
@@ -199,7 +199,8 @@ defsAndDiffs :: DisplayLint a
              -> KM (GblSymTab, [TDef], [TDef], RuleBase)
 defsAndDiffs display decls = do {
   ; (defs, env, rulebase) <- theDefs display decls
-  ; theDiffs display defs env rulebase
+  ; (env', optdiffs) <- theDiffs display defs env rulebase
+  ; pure (env', defs, optdiffs, rulebase)
   }
 
 anfOptAndCse :: DisplayLint a
@@ -226,7 +227,7 @@ displayCppGenDefsDiffs ::
    -> [TDef]
    -> GblSymTab
    -> RuleBase
-   -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+   -> KMT IO (GblSymTab, [TDef]))
   -> (DisplayLint ()
    -> [TDef]
    -> GblSymTab
@@ -245,7 +246,7 @@ displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFil
   ; dd main
 
   ; (defs, env, rulebase) <- generateDefs display decls
-  ; (env3, defs, optdiffs, rulebase) <- generateDiffs display defs env rulebase
+  ; (env3, optdiffs) <- generateDiffs display defs env rulebase
   ; (env4, shapedefs) <- generateShapes display (defs ++ optdiffs) env3
 
   ; (env5, ann_main) <- annotDecls env4 main
@@ -263,13 +264,13 @@ displayCppGenDiffs :: (DisplayLint ()
                        -> [TDef]
                        -> GblSymTab
                        -> RuleBase
-                       -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+                       -> KMT IO (GblSymTab, [TDef]))
                    -> Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGenDiffs diffs = displayCppGenDefsDiffs theDefs diffs theShapes
 
 displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGenNoDiffs =
-  displayCppGenDiffs (\_ defs env rulebase -> pure (env, defs, [], rulebase))
+  displayCppGenDiffs (\_ _ env _ -> pure (env, []))
 
 displayCppGenAndCompileDefsDiffs
   :: HasCallStack
@@ -278,7 +279,7 @@ displayCppGenAndCompileDefsDiffs
       -> [TDef]
       -> GblSymTab
       -> RuleBase
-      -> KMT IO (GblSymTab, [TDef], [TDef], RuleBase))
+      -> KMT IO (GblSymTab, [TDef]))
   -> (DisplayLint ()
       -> [TDef]
       -> GblSymTab
