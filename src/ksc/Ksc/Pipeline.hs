@@ -51,11 +51,7 @@ demoN verbosity adp decls
            banner "Original declarations"
            displayN (take v decls)
 
-       ; (env, tc_decls) <- annotDecls emptyGblST decls
-       ; let (rules, defs) = partitionDecls tc_decls
-             rulebase     = mkRuleBase rules
-
-       ; disp "Typechecked declarations" env defs
+       ; (defs, env, rulebase) <- theDefs disp decls
 
        ; let cl_defs = toCLDefs defs
        ; dispNoLint "toCLDefs" cl_defs
