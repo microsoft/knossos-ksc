@@ -9,6 +9,8 @@ from ksc.ks_function import KscFunction
 from ksc.type import Type
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 
+from ksc.type_propagate import type_propagate_decls
+
 # Importing prettyprint to get the decorated printers for Expression and Type
 import ksc.prettyprint # pylint: disable=unused-import
 
@@ -251,22 +253,32 @@ def ts2mod(function, arg_types, return_type):
 
 if __name__ == "__main__":
     from math import sin
+    torch.set_default_dtype(torch.float64)
     
     def bar(a : int, x : float):
-        y = torch.tensor([[1.1, -1.2], [2.1, 2.2]])
+        M = torch.tensor([[1.1, -x], [x+2.1, 2.2]])
+        v = torch.tensor([2.2,3.3])
 
-        b = len(y.size())
+        Mv = torch.matmul(M, v)
+
+        b = torch.dot(Mv, v)
+
         if a < 0:
             t = -0.125*x
         else:
             t = 1/2 * x * float(b)
-        return sin(t)*t
+        return sin(t) * t
 
     fn = torch.jit.script(bar)
     ks_str = ts2ks_fromgraph(False, fn.name, fn.graph)
-    print(ks_str)
-    ks_bar = ts2mod(bar, [Type.Integer, Type.Float], Type.Float)
-    ans = ks_bar(1,12.34)
+    print(pformat(ks_str))
+
+    ks_bar = ts2mod(bar)
+
+    a,b = 1,12.34
+
+    ans = bar(a,b)
     print(ans)
-    ans = bar(1,12.34)
+
+    ans = ks_bar(a,b)
     print(ans)
