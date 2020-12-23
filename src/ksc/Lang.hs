@@ -1024,11 +1024,14 @@ pprList ppr ps = mode (sep pps) (sep $ punctuate comma pps)
 instance Pretty a => Pretty [a] where
   ppr xs = char '[' <> pprList ppr xs <> char ']'
 
+kscLabel :: String -> SDoc
+kscLabel s = text ("ksc: " ++ s)
+
 pprTrace :: String -> SDoc -> a -> a
-pprTrace str doc = trace (render (sep [text str, nest 2 doc]))
+pprTrace str doc = trace (render (sep [kscLabel str, nest 2 doc]))
 
 pprPanic :: HasCallStack => String -> SDoc -> a
-pprPanic str doc = error (take 1000 $ render (sep [text str, nest 2 doc]))
+pprPanic str doc = error (take 1000 $ render (sep [kscLabel str, nest 2 doc]))
 
 pps :: Pretty a => a -> String
 pps = show . ppr
