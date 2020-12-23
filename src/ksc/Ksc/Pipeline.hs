@@ -186,13 +186,12 @@ theDiffs display defs env rulebase = do {
 theShapes :: DisplayLint a
          -> [TDef]
          -> GblSymTab
-         -> RuleBase
-         -> KMT IO (GblSymTab, [TDef], RuleBase)
-theShapes display defs env rulebase = do {
+         -> KMT IO (GblSymTab, [TDef])
+theShapes display defs env = do {
   ; let shape_defs = shapeDefs defs
         env1 = extendGblST env shape_defs
   ; display "Shapes" env1 shape_defs
-  ; return (env1, shape_defs, rulebase)
+  ; return (env1, shape_defs)
   }
 
 defsAndDiffs :: DisplayLint a
@@ -231,8 +230,7 @@ displayCppGenDefsDiffs ::
   -> (DisplayLint ()
    -> [TDef]
    -> GblSymTab
-   -> RuleBase
-   -> KMT IO (GblSymTab, [TDef], RuleBase))
+   -> KMT IO (GblSymTab, [TDef]))
   -> Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFiles ksofile cppfile =
   let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
@@ -248,7 +246,7 @@ displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFil
 
   ; (defs, env, rulebase) <- generateDefs display decls
   ; (env3, defs, optdiffs, rulebase) <- generateDiffs display defs env rulebase
-  ; (env4, shapedefs, rulebase) <- generateShapes display (defs ++ optdiffs) env3 rulebase
+  ; (env4, shapedefs) <- generateShapes display (defs ++ optdiffs) env3
 
   ; (env5, ann_main) <- annotDecls env4 main
 
@@ -284,8 +282,7 @@ displayCppGenAndCompileDefsDiffs
   -> (DisplayLint ()
       -> [TDef]
       -> GblSymTab
-      -> RuleBase
-      -> KMT IO (GblSymTab, [TDef], RuleBase))
+      -> KMT IO (GblSymTab, [TDef]))
   -> (String -> String -> IO a)
   -> String
   -> Maybe Int
