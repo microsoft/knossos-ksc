@@ -233,19 +233,30 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
     print(binds)
     body = make_lets(binds, op)
 
-    whole_exp = Def(name, return_type, args, body)
-
-    return pformat(whole_exp)
+    return Def(name, return_type, args, body)
 
 
 # TODO: make an configuration named tuple rather than passing flags
 def ts2ks(output, generate_edefs, function):
     s = ts2ks_fromgraph(generate_edefs, function.name, function.graph)
-    output.write(s)
+    output.write(pformat(s))
 
-def ts2mod(function, arg_types, return_type):
+def ts2mod(function):
     fn = torch.jit.script(function)
-    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph)
+    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph)
+
+    if False:
+        symtab = dict()
+        decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+        type_propagate_decls(decls_prelude, symtab)
+        decls_prelude_aten = list(parse_ks_filename("src/runtime/prelude-aten.ks"))
+        type_propagate_decls(decls_prelude_aten, symtab)
+
+        type_propagate_decls([ksc_def], symtab)
+
+    ks_str = pformat(ksc_def)
+    arg_types = [arg.type_ for arg in ksc_def.args]
+    return_type = ksc_def.return_type
     mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True)
 
     return KscFunction(mod)
