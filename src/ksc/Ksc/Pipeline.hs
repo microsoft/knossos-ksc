@@ -318,11 +318,23 @@ displayCppGenAndCompileVia generateDefs =
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String -> Maybe Int -> [String] -> String -> IO (a, (String, String))
 displayCppGenAndCompile = displayCppGenAndCompileVia theDefs
 
-displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
-displayCppGenCompileAndRun compilername verbosity file files = do
-  { (exefile, _) <- displayCppGenAndCompileVia theDefs (Cgen.compile compilername) ".exe" verbosity file files
+displayCppGenCompileAndRunVia :: HasCallStack
+                              => (DisplayLint ()
+                                  -> [Decl]
+                                  -> KMT IO ([TDef], GblSymTab, RuleBase))
+                              -> String
+                              -> Maybe Int
+                              -> [String]
+                              -> String
+                              -> IO String
+displayCppGenCompileAndRunVia generateDefs compilername verbosity file files = do
+  { (exefile, _) <- displayCppGenAndCompileVia generateDefs
+                    (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }
+
+displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
+displayCppGenCompileAndRun = displayCppGenCompileAndRunVia theDefs
 
 displayCppGenCompileAndRunViaCatLang :: HasCallStack
                                      => String
@@ -330,11 +342,8 @@ displayCppGenCompileAndRunViaCatLang :: HasCallStack
                                      -> [String]
                                      -> String
                                      -> IO String
-displayCppGenCompileAndRunViaCatLang compilername verbosity file files = do
-  { (exefile, _) <- displayCppGenAndCompileVia theDefsViaCatLang
-                   (Cgen.compile compilername) ".exe" verbosity file files
-  ; Cgen.runExe exefile
-  }
+displayCppGenCompileAndRunViaCatLang =
+  displayCppGenCompileAndRunVia theDefsViaCatLang
 
 displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
 displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
