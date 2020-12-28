@@ -3,6 +3,7 @@ import numpy as np
 
 import ksc
 from ksc.tracing.functions import math, nn
+from ksc.utils import Shape, TensorShape, ScalarShape
 
 
 @pytest.mark.parametrize(
@@ -28,4 +29,4 @@ def test_pooling(pooling, padding, expected_shape):
     x = np.random.uniform(0, 1, (1, 64, 112, 112))
     y = pooling(x, (3, 3), (2, 2), padding=padding) # padding needs to be a keyword argument
     print(y.shape_type)
-    assert y.shape_type.shape == expected_shape
+    assert y.shape_type.shape == TensorShape(expected_shape, ScalarShape)

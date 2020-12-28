@@ -4,7 +4,7 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type
+from ksc.type import Type, SizeType
 
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
@@ -43,38 +43,54 @@ def ks_prim_lookup(name, tys):
         if m:
             n = int(m.group(1))
             max = int(m.group(2))
-            assert len(tys[0]) == max
+            assert tys[0].tuple_len == max
             return tys[0].tuple_elem(n-1)
 
     # vec
-    if name == "vec":
+    if name == "Vec_init":
         assert all(ty == tys[0] for ty in tys)
-        return Type.Vec(tys[0])
+        return Type.Tensor(1, tys[0])
 
+    # size : Tensor N T -> Size
     if n == 1 and name == "size":
-        assert tys[0].kind == "Vec"
-        return Type.Integer
+        return SizeType.from_rank(tys[0].tensor_rank)
 
-    # index : Int, Vec T -> T
+    # index : Size, Tensor N T -> T
     if n == 2 and name == "index":
-        assert tys[0].kind == "Integer"
-        return Type.Index(tys[1])
+        assert tys[0] == SizeType.from_rank(tys[1].tensor_rank)
+        return tys[1].tensor_elem_type
 
-    # build : Int, Lam Int T -> Vec T
+    # build : Size, Lam IntTuple T -> Tensor T
     if n == 2 and name == "build":
-        assert tys[0].kind == "Integer"
-        assert tys[1].kind == "Lam"
-        return Type.Vec(tys[1].lam_return_type)
+        size_ty = tys[0]
+        lam_ty = tys[1]
+        assert lam_ty.lam_arg_type == size_ty
 
-    # fold : Lam (Tuple State T) State, State, Vec T -> State
+        rank = SizeType.get_rank(size_ty)
+        assert rank is not None
+        
+        elem_type = lam_ty.lam_return_type
+        return Type.Tensor(rank, elem_type)
+        
+    # constVec(n T)
+    if n == 2 and name == "constVec":
+        size_ty = tys[0]
+        elem_ty = tys[1]
+
+        rank = SizeType.get_rank(size_ty)
+        assert rank is not None
+        
+        return Type.Tensor(rank, elem_ty)
+
+    # fold : Lam (Tuple State T) State, State, Tensor T -> State
     if n == 3 and name == "fold":
-        assert tys[0].kind == "Lam"
-        assert tys[0].lam_arg_type.tuple_len() == 2
+        assert tys[0].is_lam_or_LM
+        assert tys[0].lam_arg_type.tuple_len == 2
         tyState = tys[0].lam_arg_type.tuple_elem(0)
         tyT = tys[0].lam_arg_type.tuple_elem(1)
         assert tys[0].lam_return_type == tyState
         assert tys[1] == tyState
-        assert tys[2].is_vec_of(tyT)
+        assert tys[2].is_tensor_of(tyT)
         return tyState
 
     # eq : T, T -> Bool
@@ -83,18 +99,23 @@ def ks_prim_lookup(name, tys):
         return Type.Bool
 
     # Polymorphic arithmetic
-    # sum : Vec T -> T
-    if n == 1 and name == "sum" and tys[0].is_vec:
-        return Type.Index(tys[0])
+    # sum : Tensor T -> T
+    if n == 1 and name == "sum" and tys[0].is_tensor:
+        return tys[0].tensor_elem_type
 
     # ts_add : T, dT -> T
     if n == 2 and name == "ts_add":
         # assert tys[0] == tys[1] TODO: check rhs is tangent_type
         return tys[0]
 
+    # ts_dot : T, T -> Float
+    if n == 2 and name == "ts_dot":
+        assert tys[0] == tys[1]
+        return Type.Float
+
     # ts_add : Float, dT -> dT
     if n == 2 and name == "ts_scale":
-        assert tys[0].kind == "Float"
+        assert tys[0] == Type.Float
         return tys[1]
 
     # print : T... -> Int
@@ -229,7 +250,7 @@ def _(ex, symtab):
 
     # Tuple assignment -- incoming type should be tuple of same size
     if isinstance(ex.vars, list):
-        assert len(ex.vars) == ex.rhs.type_.tuple_len() if ex.rhs.type_ else True
+        assert len(ex.vars) == ex.rhs.type_.tuple_len if ex.rhs.type_ else True
         local_st = symtab.copy()
         for i,var in enumerate(ex.vars):
             var.type_ = ex.rhs.type_.tuple_elem(i) if ex.rhs.type_ else None

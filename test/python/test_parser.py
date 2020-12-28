@@ -22,7 +22,7 @@ def test_parses():
                Def("f", Type.Float, [], Const(1.1))
 
     assert tld("(edef f Float ((Float) (Vec Float)))") ==\
-               EDef("f", Type.Float, [Type.Float, Type.Vec(Type.Float)])
+               EDef("f", Type.Float, [Type.Float, Type.Tensor(1, Type.Float)])
 
     assert tld("(rule \"f\" ((a : Float) (b : Float)) a b)") ==\
                Rule("f", [Var_a_Float, Var_b_Float], Var_a, Var_b)

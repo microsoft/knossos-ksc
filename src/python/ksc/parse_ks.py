@@ -46,37 +46,42 @@ _tuple = sexpdata.Symbol("tuple")
 _rule = sexpdata.Symbol("rule")
 _colon = sexpdata.Symbol(":")
 
-def parse_type(se, allow_implicit_tuple=False):
-    """ Converts an S-Expression representing a type, like (Vec Float) or (Tuple Float (Vec Float)),
-        into a Type object, e.g. Type.Vec(Type.Float) or Type.Tuple(Type.Float, Type.Vec(Type.Float)).
-
-        If allow_implicit_tuple is true, also converts a list of types into a Tuple, e.g.
-        (Float (Vec Float)) becomes Type.Tuple(Type.Float, Type.Vec(Type.Float)), i.e. as if
-        the S-Expression began with an extra "Tuple".
+def parse_type(se):
+    """ Converts an S-Expression representing a type, like (Tensor 1 Float) or (Tuple Float (Tensor 1 Float)),
+        into a Type object, e.g. Type.Tensor(1,Type.Float) or Type.Tuple(Type.Float, Type.Tensor(1,Type.Float)).
     """
     while isinstance(se, list) and len(se)==1:
         se=se[0] # Discard ((pointless)) brackets
+
     if isinstance(se, sexpdata.Symbol):
         return Type(se.value())
+
     if isinstance(se, list) and len(se)>0:
         if isinstance(se[0], sexpdata.Symbol):
             sym = se[0].value()
-            children = [parse_type(s, allow_implicit_tuple) for s in se[1:]]
-            if sym == "Vec" and len(se)==2:
-                return Type.Vec(*children)
             if sym == "Tuple":
-                return Type.Tuple(*children)
-            if sym == "Lam":
-                return Type.Lam(*children)
-            if sym == "LM":
-                return Type.LM(*children)
-            # Fall through in case it's a list of types with allow_implicit_tuple.
-        if allow_implicit_tuple:
-            return Type.Tuple(*[parse_type(s, allow_implicit_tuple) for s in se])
+                return Type.Tuple(*(parse_type(s) for s in se[1:]))
+            if sym == "Vec" and len(se)==2:
+                return Type.Tensor(1,parse_type(se[1]))
+            if sym == "Tensor" and len(se)==3:
+                return Type.Tensor(parse_int(se[1]),parse_type(se[2]))
+            if sym == "Lam" and len(se)==3:
+                return Type.Lam(parse_type(se[1]), parse_type(se[2]))
+            if sym == "LM" and len(se)==3:
+                return Type.LM(parse_type(se[1]), parse_type(se[2]))
+
     raise ValueError("Did not know how to parse type {}".format(se))
 
 def parse_types(ses):
     return list(map(parse_type, ses))
+
+# "1.3" -> int
+def parse_int(se):
+    if isinstance(se, int):
+        return se
+
+    assert re.match(r"^\d+$", se)
+    return int(se)
 
 # "x" -> string
 def parse_name(se):

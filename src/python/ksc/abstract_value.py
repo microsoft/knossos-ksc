@@ -1,46 +1,55 @@
 from collections import defaultdict
-from ksc.utils import ShapeType, shape_type_from_object
+from ksc.type import Type
+from ksc.utils import ShapeType, Shape, shape_type_from_object, shape_type_matches, ScalarShape
 
 def _cleanup_value(data):
-    _, type = shape_type_from_object(data)
-    if type.kind == "Tuple":
+    st = shape_type_from_object(data)
+    if st.type.is_tuple:
         return tuple(_cleanup_value(v) for v in data)
-    if type.kind == "Vec":
+    if st.type.is_tensor:
         return None
     return data
 
 class AbstractValue:
     def __init__(self, shape=None, type=None, data=None, context=None):
-        # handle scalar shape output by shape$ function
-        self._shape = () if shape == 0 else shape
+        assert shape_type_matches(shape, type)
+        self._shape = shape
         self._type = type
         self._data = data
         self._context = context
 
     @staticmethod
     def from_data(data, context=None):
-        shape, type = shape_type_from_object(data)
+        st = shape_type_from_object(data)
         data = _cleanup_value(data)
-        return AbstractValue(shape, type, data, context)
+        return AbstractValue(st.shape, st.type, data, context)
 
     @staticmethod
     def in_context(value, context):
         if not isinstance(value, AbstractValue):
             return AbstractValue.from_data(value, context)
-        shape, type = value.shape_type
-        return AbstractValue(shape, type, value.data, context)
+        st = value.shape_type
+        return AbstractValue(st.shape, st.type, value.data, context)
 
     @staticmethod
     def abstract_like(value):
         if not isinstance(value, AbstractValue):
-            shape, type = shape_type_from_object(value)
-            return AbstractValue(shape, type)
-        shape, type = value.shape_type
-        return AbstractValue(shape, type, context=value.context)
+            st = shape_type_from_object(value)
+            return AbstractValue(st.shape, st.type)
+        st = value.shape_type
+        return AbstractValue(st.shape, st.type, context=value.context)
 
     @property
-    def shape_type(self):
+    def shape_type(self) -> ShapeType:
         return ShapeType(self._shape, self._type)
+
+    @property
+    def get_shape(self) -> Shape:
+        return self._shape
+
+    @property
+    def get_type(self) -> Type:
+        return self._type
 
     @property
     def data(self):

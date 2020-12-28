@@ -121,59 +121,57 @@ The `to_float` construct converts an `Integer` into a `Float`. Ex:
 Composite types encompass other types in different ways. There are no composite
 type literals, they must be created using specific Knossos constructs.
 
-#### Vector
+#### Tensor
 
-`Vec` is a list of elements with the same type. Vectors are composable, so a 2D
-matrix can be created using a vector of vectors, and so on.
+`Tensor N` is a tensor of elements with the same type. Tensors are composable, so 
+can contain any type, e.g. Tensor(2, Tuple(Float, String, Tensor(3, FLoat)))
 
-The type declaration is simply: `(Vec Type)`. If `Type` is another vec, then by
-design, it has to have its own nested parenthesis: `(Vec (Vec Type))`.
+The type declaration is simply: `(Tensor N Type)`. 
 
-Vectors are unbound, ie. have no predetermined shape, nor a way to guarantee it
-at runtime. In practice, a multi-dimensional tensor could have each of the
-underlying vectors of a different size. It's up to the program to guarantee
-shape correctness.
-
-You can also have a vector of tuples: `(Vec (Tuple Float Integer))`.
+Tensors have no predetermined shape, nor a way to guarantee it at runtime. 
+A tensor of tensors will be jagged (aka ragged) by default: each of the
+inner Tensors could have a different size. 
 
 ##### build
 
-Vectors need to be created algorithmically, either as the result of a
-function or using the `(build N (lambda)))` construct. The parameter `N` has
-to be an integer and the `Lambda` has to have only one `Integer` argument.
+Tensors need to be created algorithmically, either as the result of a
+function or using the `(build Shape (lambda)))` construct. The parameter `N` has
+to be an integer or tuple of ints and the `Lambda` has to have only one `Shape` argument.
 
-The _induction variable_ passed to the `Lambda` will have the range `[0,N[`, ie.
+Each element of _induction variable_ passed to the `Lambda` will have the range `[0,N[`, ie.
 zero inclusive, N exclusive.
 
 ```
 ; Creating a 10-element vector of floats, from 0.0 to 9.0
-(let (v (build 10 (lam (i : Integer) (to_float i)))) v)
+(build 10 (lam (i : Integer) (to_float i)))
+; Creating a 5x7 matrix of ints
+(build (tuple 5 7) (lam ((i : Integer) (j : Integer)) i))
 ```
 
 ##### size
 
-Determining the runtime size of a vector requires the `(size vec)` construct.
-It returns the size of the array as an Integer.
+Determining the runtime size of a tensor requires the `(size t)` construct.
+It returns the size of the array as a tuple of Integers.
 
 ```
-; Returns the size of the second row of a (Vec (Vec Float))
+; Returns the size of the second row of a (Tensor 1 (Tensor 1 Float))
 (size (index 1 mat))
 ```
 
 ##### index
 
-Accessing elements of a vector requires the `(index N vec)` construct. `N` has
-to be an `Integer` between 0 and `(sub (size vec) 1)`.
+Accessing elements of a tensor requires the `(index (tuple N1 N2) t)` construct.
+Each `N` has to be an `Integer`, zero-based.
 
 ```
-; Returning the _3rd_ element in a (Vec Type)
+; Returning the _3rd_ element in a (Tensor 1 Type)
 (index 2 v)
 ```
 
 #### Tuple
 
 `Tuple` is a list of elements of (not-necessarily) different shapes. Tuples are
-composable, but unlike vectors, can nest at any element.
+composable, but unlike tensors, can nest at any element.
 
 The type declaration is a list of types: `(Tuple Type1 Type2 ...)`. Similarly,
 if the type is a tuple, it needs its own parenthesis: `(Tuple Type1 (Tuple
@@ -182,7 +180,7 @@ Type2 ...) ...)`.
 Tuples are bound, and require the exact number of elements as the declaration.
 There are no default assignment.
 
-You can also have a vector inside tuples: `(Tuple Float (Vec Integer) Bool)`.
+You can also have a tensor inside tuples: `(Tuple Float (Tensor 2 Integer) Bool)`.
 
 ##### tuple
 
@@ -199,7 +197,7 @@ arguments' types define the tuple's arguments, which are checked when used.
 Accessing elements of a tuple requires the `(get$i$N tup)` construct. `N` is the
 number of elements of the tuple and `i` is an Integer between 1 and `N`, inclusive.
 
-Unlike vectors, tuple _index_ starts at 1 and ends with N.
+Unlike tensors, tuple _index_ starts at 1 and ends with N.
 
 ```
 ; Returns the 7th element from a tuple of 9 elements
@@ -346,8 +344,8 @@ The arguments are bound on call and can be used inside the function body.
 ; Directly defines a zip function, from two vectors, build a third vector that
 ; holds a tuple for every pair of elements ({a[0], b[0]}, ... {a[N-1], b[N-1]})
 ; Asserts (size a) == (size b).
-(def zip@ff  (Vec (Tuple Float Float))
-             ((a : (Vec Float)) (b : (Vec Float)))
+(def zip@ff  (Tensor 1 (Tuple Float Float))
+             ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
              (assert (eq (size a) (size b))
                (build (size a) (lam (i : Integer)
                                (tuple (index i a) (index i b)))
@@ -369,7 +367,7 @@ The syntax is: `(fname arg0 arg1 ...)`
 (def tsum (Tuple Float Float)
           (
            (i : Integer)
-           (v : (Vec (Tuple Float Float)))
+           (v : (Tensor 1 (Tuple Float Float)))
            (acc : (Tuple Float Float))
           )
           ; One past last, tail return accumulated value
@@ -380,13 +378,13 @@ The syntax is: `(fname arg0 arg1 ...)`
 )
 
 ; Wrapper that zips two lists and calls tsum@ff
-(def tsum_list (Tuple Float Float) ((a : (Vec Float)) (b : (Vec Float)))
+(def tsum_list (Tuple Float Float) ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
                (assert (eq (size a) (size b))
                        (tsum (0 (zip@ff a b) (tuple 0.0 0.0))))
 )
 
 ; Print the reduced value
-(def tsum_print () ((a : (Vec Float)) (b : (Vec Float)))
+(def tsum_print () ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
                 (let (s (tsum_list a b))
                      (print
                         (get$1$2 s)
@@ -400,7 +398,7 @@ The syntax is: `(fname arg0 arg1 ...)`
 _Note: `tadd@ff` above is called with the accumulator and each element of the
 vector `v`, both of which are `(Tuple Float Float)`, while `zip@ff` is called
 with the two vectors `a` and `b` (and will assert if they're not the same),
-returning a `(Vec (Tuple Float Float))`, as expected._
+returning a `(Tensor 1 (Tuple Float Float))`, as expected._
 
 ### Variables
 
@@ -427,7 +425,7 @@ used in the `(expr)` block.
 
 ```
 ; `argc` and `argv` are valid throughout the body of `main`
-(def main Integer ((argc : Integer) (argv : (Vec String)))
+(def main Integer ((argc : Integer) (argv : (Tensor 1 String)))
                   ; Declares `a`, `b` and `c`
                   (let ((a 10) (b 12.3) (c (index 1 argv)))
                     ; Uses `a`, redefines `b`
@@ -487,7 +485,7 @@ return acc
 Example:
 ```
 ; Returns the product of all elements of `v` (multiply-reduce)
-(def prod_fold Float ((v : Vec Float))
+(def prod_fold Float ((v : Tensor 1 Float))
      (fold (lam (acc_x : (Tuple Float Float))
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))
@@ -502,7 +500,7 @@ Any existing variable in context (environment) can be used, for example:
 
 ```
 ; Returns prod(v) * pow(closure, size(v))
-(def prod_fold_closure Float ((v : Vec Float) (closure : Float))
+(def prod_fold_closure Float ((v : Tensor 1 Float) (closure : Float))
      (fold (lam (acc_x : Tuple Float Float)
                 (let ((acc (get$1$2 acc_x))
                       (x   (get$2$2 acc_x)))

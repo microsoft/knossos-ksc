@@ -1,6 +1,6 @@
 (def conv2d
      (Vec (Vec (Vec Float)))
-     ((kernels : Vec (Vec (Vec (Vec Float))))
+     ((kernels : Tensor 4 Float)
       (bias    : Vec Float)
       (image : Vec (Vec (Vec Float))))
   (let ((k (size kernels))
@@ -80,7 +80,7 @@
 
 (def dense3d
      (Vec Float)
-     ((w : Vec (Vec (Vec (Vec Float))))
+     ((w : Tensor 4 Float)
       (bias : Vec Float)
       (image : Vec (Vec (Vec Float))))
   (let ((o (size w))
@@ -119,11 +119,11 @@
 (def mnist
      (Vec Float)
      ((image : Vec (Vec (Vec Float)))
-      (k1  : Vec (Vec (Vec (Vec Float))))
+      (k1  : Tensor 4 Float)
       (bk1 : Vec Float)
-      (k2  : Vec (Vec (Vec (Vec Float))))
+      (k2  : Tensor 4 Float)
       (bk2 : Vec Float)
-      (d1  : Vec (Vec (Vec (Vec Float))))
+      (d1  : Tensor 4 Float)
       (bd1 : Vec Float)
       (d2  : Vec (Vec Float))
       (bd2 : Vec Float))

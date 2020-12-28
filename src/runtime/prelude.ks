@@ -118,11 +118,9 @@
 
 (def fwd$mul (Vec Float)
           ((M_v : (Tuple (Tensor 2 Float) (Vec Float))) (dM_dv : (Tuple (Tensor 2 Float) (Vec Float))))
-     (let ((M  (get$1$2 M_v))
-           (v  (get$2$2 M_v))
-           (dM (get$1$2 dM_dv))
-           (dv (get$2$2 dM_dv)))
-    (ts_add (mul dM v) (mul M dv))))
+     (let ((M v) M_v)
+     (let ((dM dv) dM_dv)
+        (ts_add (mul dM v) (mul M dv)))))
 
 (edef rev$mul (Tuple (Tensor 2 Float) (Vec Float))
           ((Tuple (Tensor 2 Float) (Vec Float)) (Vec Float)))
