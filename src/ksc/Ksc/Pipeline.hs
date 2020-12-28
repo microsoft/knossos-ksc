@@ -321,16 +321,17 @@ displayCppGenCompileAndRunVia :: HasCallStack
                               -> Maybe Int
                               -> [String]
                               -> String
-                              -> IO String
+                              -> IO (String, (String, String))
 displayCppGenCompileAndRunVia generateDefs compilername verbosity file files = do
-  { (exefile, _) <- displayCppGenAndCompileVia generateDefs
-                    (Cgen.compile compilername) ".exe" verbosity file files
-  ; Cgen.runExe exefile
+  { (exefile, cpp_kso) <- displayCppGenAndCompileVia generateDefs
+                          (Cgen.compile compilername) ".exe" verbosity file files
+  ; output <- Cgen.runExe exefile
+  ; pure (output, cpp_kso)
   }
 
 displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
 displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
-  { output <- displayCppGenCompileAndRunVia theDefs compilername verbosity files file
+  { (output, _) <- displayCppGenCompileAndRunVia theDefs compilername verbosity files file
   ; putStrLn "Done"
   ; putStr output
   }
