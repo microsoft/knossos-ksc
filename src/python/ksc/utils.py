@@ -228,12 +228,8 @@ def make_dims(val) -> Tuple[int]:
 
 class Shape:
     """
-    Shape classes.  Shapes in the abstract interpreter follow this algebra.
-    See also make_edef for the algebra of shapes within KS programs
-
-        Shape of scalar is      ScalarShape (constant initialized to ())
-        Shape of tuple is       tuple of Shape
-        Shape of tensor is      TensorShape(dims, element_shape)
+    Shape classes.  
+    Shapes in the abstract interpreter follow the algebra described in "make_edef"
     
     """
     pass
