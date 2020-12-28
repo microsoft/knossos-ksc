@@ -88,8 +88,8 @@ demoN verbosity adp decls
        ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
        }
 
-type DisplayLintT m a = String -> GblSymTab -> [TDef] -> KMT m a
-type DisplayLint a = DisplayLintT IO a
+type DisplayLintT m = String -> GblSymTab -> [TDef] -> KMT m ()
+type DisplayLint = DisplayLintT IO
 
 displayPassMNoLint :: Pretty def => Maybe Int -> String -> [def] -> KMT IO ()
 displayPassMNoLint mverbosity what decls
@@ -97,7 +97,7 @@ displayPassMNoLint mverbosity what decls
          banner what
          displayN (take verbosity decls)
 
-displayPassM :: Maybe Int -> DisplayLint ()
+displayPassM :: Maybe Int -> DisplayLint
 displayPassM mverbosity what env decls
   = do { displayPassMNoLint mverbosity what decls
        ; lintDefs what env decls
@@ -118,7 +118,7 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
-theDefs :: DisplayLint a
+theDefs :: DisplayLint
         -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
 theDefs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
@@ -128,7 +128,7 @@ theDefs display decls = do {
   ; return (defs, env, rulebase)
   }
 
-theDefsViaCatLang :: DisplayLint a
+theDefsViaCatLang :: DisplayLint
                   -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
 theDefsViaCatLang display decls = do {
   (defs, env, rulebase) <- theDefs display decls
@@ -139,7 +139,7 @@ theDefsViaCatLang display decls = do {
   ; return (defsViaCL, env, rulebase)
   }
 
-theDiffs :: DisplayLint a
+theDiffs :: DisplayLint
          -> [TDef]
          -> GblSymTab
          -> RuleBase
@@ -181,7 +181,7 @@ theDiffs display defs env rulebase = do {
   ; return (env3, optdiffs)
   }
 
-theShapes :: DisplayLint a
+theShapes :: DisplayLint
          -> [TDef]
          -> GblSymTab
          -> KMT IO (GblSymTab, [TDef])
@@ -192,7 +192,7 @@ theShapes display defs env = do {
   ; return (env1, shape_defs)
   }
 
-defsAndDiffs :: DisplayLint a
+defsAndDiffs :: DisplayLint
              -> [Decl]
              -> KM (GblSymTab, [TDef], [TDef], RuleBase)
 defsAndDiffs display decls = do {
@@ -201,7 +201,7 @@ defsAndDiffs display decls = do {
   ; pure (env', defs, optdiffs, rulebase)
   }
 
-anfOptAndCse :: DisplayLint a
+anfOptAndCse :: DisplayLint
              -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
 anfOptAndCse display rulebase env4 alldefs =
   do {
@@ -218,15 +218,15 @@ anfOptAndCse display rulebase env4 alldefs =
   }
 
 displayCppGenDefsDiffs ::
-  (DisplayLint ()
+  (DisplayLint
    -> [Decl]
    -> KMT IO ([TDef], GblSymTab, RuleBase))
-  -> (DisplayLint ()
+  -> (DisplayLint
    -> [TDef]
    -> GblSymTab
    -> RuleBase
    -> KMT IO (GblSymTab, [TDef]))
-  -> (DisplayLint ()
+  -> (DisplayLint
    -> [TDef]
    -> GblSymTab
    -> KMT IO (GblSymTab, [TDef]))
@@ -258,7 +258,7 @@ displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFil
   ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
   }
 
-displayCppGenDiffs :: (DisplayLint ()
+displayCppGenDiffs :: (DisplayLint
                        -> [TDef]
                        -> GblSymTab
                        -> RuleBase
@@ -272,13 +272,13 @@ displayCppGenNoDiffs =
 
 displayCppGenAndCompileDefsDiffs
   :: HasCallStack
-  => (DisplayLint () -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase))
-  -> (DisplayLint ()
+  => (DisplayLint -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase))
+  -> (DisplayLint
       -> [TDef]
       -> GblSymTab
       -> RuleBase
       -> KMT IO (GblSymTab, [TDef]))
-  -> (DisplayLint ()
+  -> (DisplayLint
       -> [TDef]
       -> GblSymTab
       -> KMT IO (GblSymTab, [TDef]))
@@ -303,7 +303,7 @@ displayCppGenAndCompileDefsDiffs
   }
 
 displayCppGenAndCompileVia :: HasCallStack
-                           => (DisplayLint ()
+                           => (DisplayLint
                                -> [Decl]
                                -> KMT IO ([TDef], GblSymTab, RuleBase))
                            -> (String -> String -> IO a)
@@ -319,7 +319,7 @@ displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String 
 displayCppGenAndCompile = displayCppGenAndCompileVia theDefs
 
 displayCppGenCompileAndRunVia :: HasCallStack
-                              => (DisplayLint ()
+                              => (DisplayLint
                                   -> [Decl]
                                   -> KMT IO ([TDef], GblSymTab, RuleBase))
                               -> String
