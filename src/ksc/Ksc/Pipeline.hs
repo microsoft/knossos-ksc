@@ -320,7 +320,7 @@ displayCppGenAndCompile = displayCppGenAndCompileVia theDefs
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
 displayCppGenCompileAndRun compilername verbosity file files = do
-  { (exefile, _) <- displayCppGenAndCompile (Cgen.compile compilername) ".exe" verbosity file files
+  { (exefile, _) <- displayCppGenAndCompileVia theDefs (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }
 
