@@ -259,8 +259,8 @@ testRunKSVia :: Ksc.Pipeline.GenerateDefs
              -> String -> [Char] -> IO ()
 testRunKSVia via_ compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
-  output <- Ksc.Pipeline.displayCppGenCompileAndRunVia
-                via_ compiler Nothing ["src/runtime/prelude"] ksTest
+  (output, _) <- Ksc.Pipeline.displayCppGenCompileAndRunVia
+                     via_ compiler Nothing ["src/runtime/prelude"] ksTest
 
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
