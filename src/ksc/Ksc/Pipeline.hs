@@ -333,21 +333,9 @@ displayCppGenCompileAndRunVia generateDefs compilername verbosity file files = d
   ; Cgen.runExe exefile
   }
 
-displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
-displayCppGenCompileAndRun = displayCppGenCompileAndRunVia theDefs
-
-displayCppGenCompileAndRunViaCatLang :: HasCallStack
-                                     => String
-                                     -> Maybe Int
-                                     -> [String]
-                                     -> String
-                                     -> IO String
-displayCppGenCompileAndRunViaCatLang =
-  displayCppGenCompileAndRunVia theDefsViaCatLang
-
 displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
 displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
-  { output <- displayCppGenCompileAndRun compilername verbosity files file
+  { output <- displayCppGenCompileAndRunVia theDefs compilername verbosity files file
   ; putStrLn "Done"
   ; putStr output
   }

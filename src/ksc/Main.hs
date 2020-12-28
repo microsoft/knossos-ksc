@@ -9,8 +9,6 @@ import LangUtils
 import Parse (parseE)
 import Opt
 import Ksc.Pipeline (demoFFilter,
-                     displayCppGenCompileAndRun,
-                     displayCppGenCompileAndRunViaCatLang,
                      displayCppGenAndCompile,
                      displayCppGenNoDiffs,
                      genFuthark, ignoreMain)
@@ -301,10 +299,12 @@ testRunKSVia via_ compiler ksFile = do
       error ("These tests failed:\n" ++ unlines failures)
 
 testRunKS :: String -> String -> IO ()
-testRunKS = testRunKSVia displayCppGenCompileAndRun
+testRunKS =
+  testRunKSVia (Ksc.Pipeline.displayCppGenCompileAndRunVia Ksc.Pipeline.theDefs)
 
 testRunKSViaCatLang :: String -> String -> IO ()
-testRunKSViaCatLang = testRunKSVia displayCppGenCompileAndRunViaCatLang
+testRunKSViaCatLang =
+  testRunKSVia (Ksc.Pipeline.displayCppGenCompileAndRunVia Ksc.Pipeline.theDefsViaCatLang)
 
 testHspec :: IO ()
 testHspec = do
