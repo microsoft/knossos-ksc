@@ -251,7 +251,9 @@ demoFOnTestPrograms ksTests = do
 -- Drop items from the list while the condition is satisfied, and also
 -- drop the first element satisfying the condition, if any.
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
-dropWhile1 pred = tail . dropWhile pred
+dropWhile1 pred xs = case dropWhile pred xs of
+  []  -> []
+  _:t -> t
 
 testRunKSVia :: Ksc.Pipeline.GenerateDefs
              -> String -> [Char] -> IO ()
