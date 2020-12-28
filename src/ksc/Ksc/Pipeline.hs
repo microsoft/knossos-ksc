@@ -47,7 +47,7 @@ demoN verbosity adp decls
         dispNoLint :: Pretty def => String -> [def] -> KMT IO ()
         dispNoLint = displayPassMNoLint verbosity
     in
-    do { displayPassMNoLint verbosity "Original declarations" decls
+    do { dispNoLint "Original declarations" decls
 
        ; (defs, env, rulebase) <- theDefs disp decls
 
