@@ -302,8 +302,21 @@ displayCppGenAndCompileDefsDiffs
   ; pure (compilerResult, outputFileContents)
   }
 
+displayCppGenAndCompileVia :: HasCallStack
+                           => (DisplayLint ()
+                               -> [Decl]
+                               -> KMT IO ([TDef], GblSymTab, RuleBase))
+                           -> (String -> String -> IO a)
+                           -> String
+                           -> Maybe Int
+                           -> [String]
+                           -> String
+                           -> IO (a, (String, String))
+displayCppGenAndCompileVia generateDefs =
+  displayCppGenAndCompileDefsDiffs generateDefs theDiffs theShapes
+
 displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String -> Maybe Int -> [String] -> String -> IO (a, (String, String))
-displayCppGenAndCompile = displayCppGenAndCompileDefsDiffs theDefs theDiffs theShapes
+displayCppGenAndCompile = displayCppGenAndCompileVia theDefs
 
 displayCppGenCompileAndRun :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO String
 displayCppGenCompileAndRun compilername verbosity file files = do
@@ -318,8 +331,7 @@ displayCppGenCompileAndRunViaCatLang :: HasCallStack
                                      -> String
                                      -> IO String
 displayCppGenCompileAndRunViaCatLang compilername verbosity file files = do
-  { (exefile, _) <- displayCppGenAndCompileDefsDiffs
-                   theDefsViaCatLang theDiffs theShapes
+  { (exefile, _) <- displayCppGenAndCompileVia theDefsViaCatLang
                    (Cgen.compile compilername) ".exe" verbosity file files
   ; Cgen.runExe exefile
   }
