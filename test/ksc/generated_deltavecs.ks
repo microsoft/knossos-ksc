@@ -110,3 +110,5 @@
               (if outside_image 0.0 (index noi (index li image)))))
          (mul image_noi (index kni (index li (index ki kernels))))
          ))))))))))))
+
+(def main Integer () 0)

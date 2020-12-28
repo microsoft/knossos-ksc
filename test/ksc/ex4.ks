@@ -6,3 +6,5 @@
               (q (mul p (mul x 5.0)))
               (v (add (mul 2.0 (mul p q)) (mul 3.0 r))))
         v))
+
+(def main Integer () 0)

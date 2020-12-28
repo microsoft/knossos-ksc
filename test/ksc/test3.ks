@@ -40,3 +40,5 @@
             (sub (g 1.1001) (g 1.1))
             )))
 |#
+
+(def main Integer () 0)
