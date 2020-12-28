@@ -22,8 +22,8 @@ class Node(AbstractValue):
     def from_data(value):
         if isinstance(value, Node):
             return value
-        shape, type = utils.shape_type_from_object(value)
-        return Node("", shape, type, data=value)
+        st = utils.shape_type_from_object(value)
+        return Node("", st.shape, st.type, data=value)
 
     def add_user(self, node):
         self._users.append(node)
@@ -75,13 +75,13 @@ class Node(AbstractValue):
         return self._children[0]
 
     def __len__(self):
-        assert self._type.kind == "Tuple", f"Tried to call an iterator on a non-tuple {self}"
-        return len(self._type)
+        assert self._type.is_tuple, f"Tried to call an iterator on a non-tuple {self}"
+        return self._type.tuple_len
 
     def __iter__(self):
-        assert self._type.kind == "Tuple", f"Tried to call an iterator on a non-tuple {self}"
+        assert self._type.is_tuple, f"Tried to call an iterator on a non-tuple {self}"
         from ksc.tracing.functions import core
-        return (core.get_tuple_element(i, self) for i in range(len(self._type)))
+        return (core.get_tuple_element(i, self) for i in range(self._type.tuple_len))
 
     def __add__(self, other):
         from ksc.tracing.functions import core
@@ -118,47 +118,48 @@ class Node(AbstractValue):
 
     def __getitem__(self, index):
         from ksc.tracing.functions import core
-        if self._type.kind == "Tuple":
+        if self._type.is_tuple:
             if isinstance(index, slice):
                 return (core.get_tuple_element(i, self) for i in range(*index.indices(len(self._type.children))))
             return core.get_tuple_element(index, self)
-        elif self._type.kind == "Vec":
+        
+        if self._type.is_tensor:
+            if isinstance(index, slice):
+                raise NotImplementedError
             return core.get_vector_element(index, self)
-        else:
-            raise ValueError(f"Tried to call __getitem__ on {self} which is not Tuple or Vec.")
+        
+        raise ValueError(f"Tried to call __getitem__ on {self} which is not a Tuple.  Use index for tensors.")
 
     @property
-    def shape(self):
+    def shape_program(self):
         """ Note: in contrast to shape_type, this function returns a program to compute the shape
-        """
-        from ksc.tracing.functions import core
-        if self._type.kind not in ["Vec", "Tuple"]:
-            # because 0-tuple is not allowed in ks, we return an integer constant
-            return Node.from_data(0)
-        shape = core.type_recursion_helper(
-            tuple,
-            core.make_tuple,
-            lambda a, b: (a,) + b,
-            lambda x: core.make_tuple(*x) if isinstance(x, tuple) else x,
-            self
-        )
-        print(f"In shape: shape={shape}")
-        if isinstance(shape, tuple):
-            shape = core.make_tuple(*shape)
-        return shape
 
-    @property
-    def size(self):
-        """ returns a program to compute the number of elements
+        From make_edef:
+        ; shape algebra is as follows:
+        ;    shape of scalar is 0 TODO: make empty tuple
+        ;    shape of tensor is (tuple (tuple dim1 dim2 ... dimN) element_shape)
+        ;    shape of tuple is (tuple shape1 shape2 .. shapeN)
+
         """
         from ksc.tracing.functions import core
-        return core.type_recursion_helper(
-            lambda : Node.from_data(1),
-            sum,
-            core.mul,
-            lambda x: x,
-            self
-        )
+        if self.get_type.is_scalar:
+            return core.make_tuple()
+
+        if self.get_type.is_tensor:
+
+            dims = core.get_tensor_size(self) # ks::size
+            # TOUNDO: ks::size returns an int for rank 1,need to tuple it
+            if self.get_type.tensor_rank == 1:
+                dims = core.make_tuple(dims)
+
+            element = core.get_tensor_element0(self) # ks::index
+            return core.make_tuple(dims, element.shape_program)
+            
+        if self.get_type.is_tuple:
+            children = (core.get_tuple_element(i, self).shape_program for i in range(self.get_type.tuple_len))
+            return core.make_tuple(*children)
+
+        raise NotImplementedError
 
     def __repr__(self):
         if self._data is not None:

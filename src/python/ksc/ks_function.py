@@ -4,7 +4,11 @@ class KsFunction:
     def __init__(self, name, return_type, arg_name_types, ks_str, is_edef=False, is_builtin=False):
         self._name = name
         self._return_type = return_type
-        self._arg_names, self._arg_types = zip(*arg_name_types)
+        if len(arg_name_types) == 0:
+            self._arg_names = ()
+            self._arg_types = ()
+        else:
+            self._arg_names, self._arg_types = zip(*arg_name_types)
         self._is_edef = is_edef
         self._is_builtin = is_builtin
         self._ks_str = ks_str
@@ -43,7 +47,7 @@ class KsFunction:
 
     def __call__(self, *args, backend="jax"):
         for i, (arg, arg_type) in enumerate(zip(args, self._arg_types)):
-            _, actual_type = utils.shape_type_from_object(arg)
+            actual_type = utils.shape_type_from_object(arg).type
             assert actual_type == arg_type, f"In the {i+1}th argument of {self.name}, expected {arg_type} but got {actual_type}"
         ks_str = self.combined_ks_str()
         name_to_call = self.name

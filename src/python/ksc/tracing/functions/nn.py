@@ -11,30 +11,30 @@ from ksc.tracing.functions.type_propagation_rules import (
     conv_2d_type_prop_rule_from_padding_type
 )
 from ksc.tracing.node import Node
-from ksc.utils import ShapeType
+from ksc.utils import ShapeType, Shape, TensorShape, ScalarShape
 
 relu = make_edef(
     "relu", ["x"], elementwise,
-    lambda x: x.shape,
-    lambda x: x.size
+    lambda x: x.shape_program,
+    core.numel_program
 )
 
 sigmoid = make_edef(
     "sigmoid", ["x"], elementwise,
-    lambda x: x.shape,
-    lambda x: x.size
+    lambda x: x.shape_program,
+    core.numel_program
 )
 
 normalize_2d = make_edef(
     "normalize_2d", ["x", "weights"], first_arg,
-    lambda x, w: x.shape,
-    lambda x, w: x.size * 3
+    lambda x, w: x.shape_program,
+    lambda x, w: core.numel_program(x) * 3
 )
 
 batch_norm_2d = make_edef(
     "batch_norm_2d", ["x", "weights"], first_arg,
-    lambda x, w: x.shape,
-    lambda x, w: x.size * 10
+    lambda x, w: x.shape_program,
+    lambda x, w: core.numel_program(x) * 10
 )
 
 def _get_paddings(shape_in, shape_out, window_sizes, strides):
@@ -67,21 +67,21 @@ class RequirePadding2d(TraceableFunction):
     def _internal_shape_prop_function(self, *args):
         x = args[0]
         paddings = args[-1]
-        x_shape, x_type = x.shape_type
+        x_shape = x.get_shape
         pad_w, pad_h = paddings.data
-        b, c, w, h = x_shape
-        new_x_shape = (b, c, w + pad_w[0] + pad_w[1], h + pad_h[0] + pad_h[1])
-        new_x = Node(x.name, new_x_shape, x_type)
+        b, c, w, h = x_shape.dims
+        new_x_dims = (b, c, w + pad_w[0] + pad_w[1], h + pad_h[0] + pad_h[1])
+        new_x = Node(x.name, TensorShape(new_x_dims, x_shape.elem_shape), x.get_type)
         type_prop_rule = self._proto_shape_prop_function("VALID")
         return type_prop_rule(new_x, *args[1:-1])
 
     def trace(self, *args):
-        shape, type = self._shape_prop_function(*args)
+        st = self._shape_prop_function(*args)
         x = args[0]
         ksizes = args[-2]
         strides = args[-1]
-        w, h = x.shape_type.shape[2:]
-        w_o, h_o = shape[2:]
+        w, h = x.get_shape.dims[2:]
+        w_o, h_o = st.shape.dims[2:]
         paddings = _get_paddings((w, h), (w_o, h_o), ksizes, strides)
         print(f"In RequirePadding2d.trace(): padding_type={self.padding}, paddings={paddings}")
         body = self._internal_function(*args, paddings)
@@ -89,14 +89,15 @@ class RequirePadding2d(TraceableFunction):
 
         # specialize the name to avoid cache clash
         self._name = self._name.format(*paddings[0], *paddings[1])
-        return Trace(body, ShapeType(shape, type), shape_types)
+        return Trace(body, ShapeType(st.shape, st.type), shape_types)
 
 def cost_conv_2d_no_bias(c0, c1, c2):
     def f(x, weights, ksizes, strides, paddings):
-        b, c, w, h = x.shape
+        x_dims, _x_elshape = x.shape_program
+        b, c, w, h = x_dims
         k_w, k_h = ksizes
         stride_w, stride_h = strides
-        m = core.get_vector_size(weights)
+        m, _, _, _ = core.get_tensor_size(weights)
         w_o = core.to_float(w // stride_w)
         h_o = core.to_float(h // stride_h)
         flops = (core.to_float(b)
@@ -113,15 +114,17 @@ def _ceil_div(x, y):
     return (x + y - 1) // y
 
 def shape_conv_2d_no_bias(x, weights, ksizes, strides, paddings):
-    b, _, w, h = x.shape
-    m, _, _, _ = weights.shape
+    x_dims, x_elshape = x.shape_program
+    b, _, w, h = x_dims
+    weights_dims, _weights_elshape = weights.shape_program
+    m, _, _, _ = weights_dims
     pad_w, pad_h = paddings
     k_w, k_h = ksizes
     stride_w, stride_h = strides
     pad_w, pad_h = paddings
     w_new = _ceil_div(w + pad_w[0] + pad_w[1] - k_w + 1, stride_w)
     h_new = _ceil_div(h + pad_h[0] + pad_h[1] - k_h + 1, stride_h)
-    return core.make_tuple(b, m, w_new, h_new)
+    return core.make_tuple(core.make_tuple(b, m, w_new, h_new), x_elshape)
 
 def conv_2d_no_bias(x, weights, ksizes, strides, padding="SAME"):
     conv =RequirePadding2d(
@@ -157,6 +160,6 @@ def avg_pool(x, pool_size, strides, padding="VALID"):
 
 log_softmax = make_edef(
     "log_softmax", ["x"], first_arg,
-    lambda x: x.shape,
-    lambda x: x.size * 10
+    lambda x: x.shape_program,
+    lambda x: core.numel_program(x) * 10
 )

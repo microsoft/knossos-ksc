@@ -1,7 +1,6 @@
 import numpy as np
 from ksc.type import Type
-from ksc.utils import ShapeType
-
+from ksc.utils import ShapeType, TensorShape, ScalarShape
 
 def unique_element(s):
     assert len(s) == 1
@@ -38,12 +37,15 @@ def elementwise_or_scalar(*args):
             -> ValueError
     '''
     def _get_type(x):
-        '''Gets type if scalar, and element type if vector.'''
-        if x.kind == 'Vec':
-            return _get_type(x.children[0])
-        elif x.kind in ['Tuple', 'Bool', 'Lam']:
-            raise ValueError(f'Argument has unsupported type {x.kind}')
-        return x
+        '''Gets type if scalar, and element type if tensor.'''
+        if x.is_tensor:
+            return _get_type(x.tensor_elem_type)
+
+        if x.is_scalar:
+            return x
+
+        raise ValueError(f'Argument has unsupported type {x}')
+
     assert len(args) > 0
     # All types must be equal:
     types = set(_get_type(a.shape_type.type) for a in args)
@@ -63,59 +65,58 @@ def first_arg(*args):
     return args[0].shape_type
 
 def flatten_type_prop_rule(x):
-    x_shape, x_type = x.shape_type
-    el_type = unique_element_type([x_type])
-    out_shape = x_shape[:1] + (np.prod(x_shape[1:]),)
-    out_type = Type.Vec(Type.Vec(el_type))
+    el_type = unique_element_type([x.get_type])
+    assert el_type.is_scalar
+    dims = x.get_shape.dims
+    out_shape = TensorShape((dims[0], np.prod(dims[1:])), ScalarShape)
+    out_type = Type.Tensor(2, el_type)
     return ShapeType(out_shape, out_type)
 
 def keep_shape_prop_rule(new_type):
     def type_prop_rule(x):
-        x_shape, x_type = x.shape_type
         def to_new_type(type):
-            if type.kind == "Tuple":
-                return Type.Tuple(*[to_new_type(c) for c in type.children])
-            elif type.kind == "Vec":
-                return Type.Vec(to_new_type(type.children[0]))
+            if type.is_tuple:
+                return Type.Tuple(*[to_new_type(c) for c in type.tuple_elems()])
+            elif type.is_tensor:
+                return Type.Tensor(type.tensor_rank, to_new_type(type.tensor_elem_type))
             else:
                 return new_type
-        return ShapeType(x_shape, to_new_type(x_type))
+        return ShapeType(x.get_shape, to_new_type(x.get_type))
     return type_prop_rule
 
 def conv_2d_type_prop_rule_from_padding_type(padding):
     def type_prop_rule(x, weights, ksizes, strides):
+        assert x.get_type.tensor_elem_type.is_scalar
         stride_w, stride_h = strides.data
-        if weights.shape_type.type.kind == "Tuple":
+        if weights.get_type.is_tuple:
             # has bias
-            w_shape = weights.shape_type.shape[0]
+            w_shape = weights.get_shape[0]
         else:
-            w_shape = weights.shape_type.shape
+            w_shape = weights.get_shape
 
         k_w, k_h = ksizes.data
 
-        x_shape, x_type = x.shape_type
-        b, c1, w, h = x_shape
-        m, c2, k_w_, k_h_ = w_shape
+        b, c1, w, h = x.get_shape.dims
+        m, c2, k_w_, k_h_ = w_shape.dims
         assert (k_w, k_h) == (k_w_, k_h_), f"Expected kernel size {(k_w, k_h)}, but got {(k_w_, k_h_)}"
         assert c1 == c2, f"Expected {c2} input channels, but got {c1}"
         y_w = _get_output_length(w, k_w, stride_w, padding)
         y_h = _get_output_length(h, k_h, stride_h, padding)
-        out_shape = (b, m, y_w, y_h)
-        return ShapeType(out_shape, x_type)
+        out_shape = TensorShape((b, m, y_w, y_h), ScalarShape)
+        return ShapeType(out_shape, x.get_type)
     return type_prop_rule
 
 def pooling_type_prop_rule(padding):
     def type_prop_rule(x, pool_size, strides):
         pool_w, pool_h = pool_size.data
         stride_w, stride_h = strides.data
-        x_shape, x_type = x.shape_type
-        b, c, w, h = x_shape
+        b, c, w, h = x.get_shape.dims
 
         y_w = _get_output_length(w, pool_w, stride_w, padding)
         y_h = _get_output_length(h, pool_h, stride_h, padding)
 
-        out_shape = (b, c, y_w, y_h)
-        return ShapeType(out_shape, x_type)
+        out_shape = TensorShape((b, c, y_w, y_h), x.get_shape.elem_shape)
+        return ShapeType(out_shape, x.get_type)
     return type_prop_rule
 
 def _ceil_div(x, y):

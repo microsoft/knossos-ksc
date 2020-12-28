@@ -1,8 +1,10 @@
+from typing import Tuple
 from functools import wraps
-
+import numpy
 import ksc
 from ksc.abstract_value import AbstractValue, ExecutionContext, current_execution_context
-from ksc.type import Type
+from ksc.type import Type, SizeType
+from ksc.utils import ShapeType, Shape, TensorShape, make_dims
 
 from . import common
 from .common import (
@@ -68,7 +70,8 @@ def _get_edef(defs, name, type, py_name_for_concrete):
             with ExecutionContext():
                 # execute in a new context so that the cost of computing shape and cost
                 # is not accumulated
-                shape = _get_data(shape_def(*shape_cost_args))
+                ks_shape = _get_data(shape_def(*shape_cost_args))
+                shape = Shape.from_ks_shape(ks_shape, type)
                 cost = _get_data(cost_def(*shape_cost_args))
             exec_ctx = current_execution_context()
             exec_ctx.accumulate_cost(name, context, cost)
@@ -78,22 +81,25 @@ def _get_edef(defs, name, type, py_name_for_concrete):
     return f
 
 def index(i, v):
-    shape, type = v.shape_type
-    assert type.kind == "Vec", f"Called index on non-vector {v}"
+    st = v.shape_type
+    assert st.type.is_tensor, f"Called index on non-tensor {v}"
     exec_ctx = current_execution_context()
     exec_ctx.accumulate_cost(
         "index",
         v.context,
         exec_ctx.config["index_cost"]
     )
-    return AbstractValue(shape[1:], type.children[0], context=v.context)
+    return AbstractValue(st.shape.elem_shape, st.type.tensor_elem_type, context=v.context)
 
 def size(v):
-    shape, type = v.shape_type
-    assert type.kind == "Vec", f"Called size on non-vector {v}"
+    st = v.shape_type
+    assert st.type.is_tensor, f"Called size on non-tensor {v}"
     exec_ctx = current_execution_context()
     exec_ctx.accumulate_cost("size", v.context, exec_ctx.config["size_cost"])
-    return AbstractValue.from_data(shape[0], v.context)
+    if len(st.shape.dims) == 1: #TOUNDO: size(vec) returns int
+        return AbstractValue.from_data(st.shape.dims[0], v.context)
+    else:
+        return AbstractValue.from_data(st.shape.dims, v.context)
 
 def _compute_branch_cost(f):
     # evaluate f in a new context
@@ -106,33 +112,41 @@ def _compute_build_inner_cost(n, f):
     if n is None:
         exec_ctx = current_execution_context()
         n = exec_ctx.config["assumed_vector_size"]
-    i = AbstractValue((), Type.Integer)
-    el, cost = _compute_branch_cost(lambda: f(i))
-    return n, el, cost
 
-def build(n, f):
-    context = check_args_and_get_context("build", [n], concrete=None)
-    n, el, inner_cost = _compute_build_inner_cost(n, f)
+    dims = make_dims(n)
+
+    rank = len(dims)
+    nelem = numpy.prod(dims)
+
+    i = AbstractValue(Shape.of_size(rank), SizeType.from_rank(rank))
+    el, cost = _compute_branch_cost(lambda: f(i))
+    return dims, nelem, el, cost
+
+def build(sz, f):
+    context = check_args_and_get_context("build", [sz], concrete=None)
+    dims, nelem, el, inner_cost = _compute_build_inner_cost(sz, f)
     exec_ctx = current_execution_context()
     exec_ctx.accumulate_cost(
         "build",
         context,
-        exec_ctx.config["build_malloc_cost"] + n * inner_cost
+        exec_ctx.config["build_malloc_cost"] + nelem * inner_cost
     )
-    el_shape, el_type = el.shape_type
-    return AbstractValue((n,) + el_shape, Type.Vec(el_type), context=context)
+    
+    rank = len(dims)
+    ks_type = Type.Tensor(rank, el.get_type)
+    return AbstractValue(TensorShape(dims, el.get_shape), ks_type, context=context)
 
-def sumbuild(n, f):
-    context = check_args_and_get_context("sumbuild", [n], concrete=None)
-    n, el, inner_cost = _compute_build_inner_cost(n, f)
-    el_shape, el_type = el.shape_type
+def sumbuild(sz, f):
+    context = check_args_and_get_context("sumbuild", [sz], concrete=None)
+    _, nelem, el, inner_cost = _compute_build_inner_cost(sz, f)
+    elst = el.shape_type
     exec_ctx = current_execution_context()
     exec_ctx.accumulate_cost(
         "sumbuild",
         context,
-        n * inner_cost + (n - 1) * el_type.num_elements(assumed_vector_size=exec_ctx.config["assumed_vector_size"])
+        nelem * inner_cost + (nelem - 1) * elst.type.num_elements(assumed_vector_size=exec_ctx.config["assumed_vector_size"])
     )
-    return AbstractValue(el_shape, el_type, context=context)
+    return AbstractValue(elst.shape, elst.type, context=context)
 
 def fold(f, s0, xs):
     raise NotImplementedError

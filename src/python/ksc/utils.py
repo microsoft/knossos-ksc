@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from typing import Tuple, Union
 from collections import namedtuple
 import importlib.util
 import os
@@ -72,8 +74,6 @@ def ensure_list_of_lists(l):
 def paren(s):
     return "(" + s + ")"
 
-ShapeType = namedtuple("ShapeType", ["shape", "type"])
-
 PYTHON_MODULE_NAME = "ks_mod"
 
 def import_module_from_path(module_name, path):
@@ -88,7 +88,9 @@ def translate_and_import(source_file_name, *args):
     from ksc.translate import translate
     py_out = translate(*args, source_file_name, with_main=False)
     with NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(f"# AUTOGEN from {source_file_name} via ksc.utils.translate_and_import")
         f.write(py_out)
+
     print(f.name)
     return import_module_from_path(PYTHON_MODULE_NAME, f.name)
 
@@ -211,35 +213,110 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
     module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path)
     return import_module_from_path(module_name, module_path)
 
+def make_dims(val) -> Tuple[int]:
+    if isinstance(val, int):
+        return (val,)
+
+    if isinstance(val, list):
+        return tuple(*val)
+    
+    if isinstance(val, tuple):
+        assert (isinstance(v, int) for v in val)
+        return val
+
+    raise NotImplementedError("make_dims")
+
+class Shape:
+    """
+    Shape classes.  Shapes in the abstract interpreter follow this algebra.
+    See also make_edef for the algebra of shapes within KS programs
+
+        Shape of scalar is      ScalarShape (constant initialized to ())
+        Shape of tuple is       tuple of Shape
+        Shape of tensor is      TensorShape(dims, element_shape)
+    
+    """
+    pass
+
+    @staticmethod
+    def from_ks_shape(val, type):
+        """
+        Translate from ks_value as returned by shape_def to Shape class
+        """
+        if type.is_scalar:
+            assert val == ()
+            return ScalarShape
+
+        if type.is_tensor:
+            dims, el_shape = val
+            return TensorShape(dims, Shape.from_ks_shape(el_shape, type.tensor_elem_type))
+
+        if type.is_tuple:
+            assert isinstance(val, tuple)
+            assert len(val) == type.tuple_len
+            return tuple(Shape.from_ks_shape(val[i], type.tuple_elem(i)) for i in range(len(val)))
+
+        assert False
+
+    @staticmethod
+    def of_size(rank : int):
+        """
+        Make the shape of the return of the ks builtin "size" function, i.e. a Tuple of ScalarShapes
+        """
+        if rank == 1: 
+            return ScalarShape # Returns an int
+        else:
+            return tuple(ScalarShape for _ in range(rank)) 
+
+@dataclass(frozen=True)
+class TensorShape(Shape):
+    dims : Tuple[int]
+    elem_shape : Shape
+
+def make_TensorShape(dims: Union[int, Tuple[int]], elem_shape : Shape):
+    return TensorShape(make_dims(dims), elem_shape)
+
+ScalarShape = ()
+
+@dataclass(frozen=True)
+class ShapeType:
+    shape: Shape
+    type: Type
+
+def shape_type_matches(s : Shape, t : Type):
+    if t.is_tensor:
+        return isinstance(s, TensorShape) and len(s.dims) == t.tensor_rank \
+            and shape_type_matches(s.elem_shape, t.tensor_elem_type)
+
+    if t.is_tuple:
+        return isinstance(s, tuple) and all(shape_type_matches(sh, ty) for sh,ty in zip(s, t.tuple_elems()))
+
+    if t.is_scalar:
+        return s == ScalarShape
+
+    raise NotImplementedError
+
 def shape_type_from_object(o):
     # import here to avoid circular dependencies
     from ksc.abstract_value import AbstractValue
     if hasattr(o, "shape") and hasattr(o, "dtype"):
-        # numpy array-like object
-        if np.issubdtype(o.dtype, np.floating):
-            el_type = Type.Float
-        elif np.issubdtype(o.dtype, np.integer):
-            el_type = Type.Integer
-        elif np.issubdtype(o.dtype, np.bool_):
-            el_type = Type.Bool
-        else:
-            raise ValueError(f"Cannot handle element type {o.dtype}")
-        vec_type = el_type
-        for _ in range(o.ndim):
-            vec_type = Type.Vec(vec_type)
-        return ShapeType(o.shape, vec_type)
+        el = shape_type_from_object(np.asarray(o).flat[0].item())
+        return ShapeType(TensorShape(o.shape, el.shape), Type.Tensor(o.ndim, el.type))
     elif isinstance(o, AbstractValue):
         return o.shape_type
     elif hasattr(o, "data") and o.data is not None:
         # value node
         return shape_type_from_object(o.data)
     elif isinstance(o, list):
-        s0, t0 = shape_type_from_object(o[0])
-        assert all(shape_type_from_object(e) == (s0, t0) for e in o)
-        return ShapeType((len(o),) + s0, Type.Vec(t0))
+        el = shape_type_from_object(o[0])
+        assert all(shape_type_from_object(e) == el for e in o)
+        dims = make_dims(len(o))
+        return ShapeType(TensorShape(dims, el.shape), Type.Tensor(1, el.type))
     elif isinstance(o, tuple):
-        ss, ts = zip(*[shape_type_from_object(e) for e in o])
-        return ShapeType(tuple(ss), Type.Tuple(*ts))
+        els = tuple(shape_type_from_object(e) for e in o)
+        tup_shape = tuple(e.shape for e in els)
+        tup_type = Type.Tuple(*(e.type for e in els))
+        return ShapeType(tup_shape, tup_type)
     elif isinstance(o, bool):
         return ShapeType((), Type.Bool)
     elif isinstance(o, int):
@@ -248,3 +325,25 @@ def shape_type_from_object(o):
         return ShapeType((), Type.Float)
     else:
         raise ValueError(f"Cannot handle object {o}")
+
+def ndgrid_inds(sz):
+    """
+    Return a sequnce of tuples of indices as if generated by nested comprehensions.
+    Example:
+        ndgrid_inds((ni,nj))
+    Returns the same sequence as
+        [(i,j) for i in range(ni) for j in range(nj)]
+
+    The iterates are always tuples so
+        ndgrid_inds(4)
+    returns
+        [(0,), (1,), (2,), (3,)] 
+
+    """
+    if len(sz) == 1:
+        yield from ((i,) for i in range(sz[0]))
+    else:
+        for i in range(sz[0]):
+            for rest in ndgrid_inds(sz[1:]):
+                yield (i,) + rest
+

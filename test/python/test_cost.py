@@ -6,16 +6,16 @@ from ksc.abstract_value import AbstractValue, ExecutionContext
 from ksc.cost import compute_cost
 from ksc.tracing.functions import math
 from ksc.type import Type
-from ksc.utils import translate_and_import
+from ksc.utils import translate_and_import, TensorShape, ScalarShape, ShapeType
 
 def test_afe():
     ks_str = """
 (edef div Float (Float Float))
 (def cost$div Float ((a : Float) (b : Float)) 2.0)
-(def shape$div Integer ((a : Float) (b : Float)) 0)
+(def shape$div Integer ((a : Float) (b : Float)) (tuple))
 (edef add Float (Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
-(def shape$add Integer ((a : Float) (b : Float)) 0)
+(def shape$add Integer ((a : Float) (b : Float)) (tuple))
 
 (def afe Float ((x : Float))
   (let (a (div 1.0 x))
@@ -32,13 +32,16 @@ def test_build():
     ks_str = """
 (edef add Float (Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
-(def shape$add Integer ((a : Float) (b : Float)) 0)
+(def shape$add Integer ((a : Float) (b : Float)) (tuple))
 
 (def vec_vec_add (Vec Float) ((a : (Vec Float)) (b : (Vec Float)))
   (build (size a) (lam (i : Integer) (add (index i a) (index i b))))
 )
 """
-    args = [AbstractValue((100,), Type.Vec(Type.Float)), AbstractValue((100,), Type.Vec(Type.Float))]
+    args = [
+        AbstractValue(TensorShape((100,), ()), Type.Tensor(1, Type.Float)), 
+        AbstractValue(TensorShape((100,), ()), Type.Tensor(1, Type.Float))
+    ]
     cost = compute_cost(ks_str, "vec_vec_add", args)
     assert cost == 401.0 # (size_cost) + 100 + 100 * (two index and one add)
 
@@ -46,8 +49,8 @@ def test_outer_product():
     ks_str = """
 (edef mul Float (Float Float))
 (def cost$mul Float ((a : Float) (b : Float)) 2.0)
-(def shape$mul Integer ((a : Float) (b : Float)) 0)
-(def outer_product (Vec (Vec Float))
+(def shape$mul Integer ((a : Float) (b : Float)) (tuple))
+(def outer_product (Tensor 2 Float)
  ((var0 : (Tuple (Vec Float) (Vec Float))))
     (let (x (get$1$2 var0))
     (let (y (get$2$2 var0))
@@ -59,7 +62,7 @@ def test_outer_product():
                   (index i x)
                   (index j y)))))))))))
 """
-    args = [AbstractValue(((100,), (100,)), Type.Tuple(Type.Vec(Type.Float), Type.Vec(Type.Float)))]
+    args = [AbstractValue((TensorShape((100,), ()), TensorShape((100,), ())), Type.Tuple(Type.Tensor(1, Type.Float), Type.Tensor(1, Type.Float)))]
     assert compute_cost(ks_str, "outer_product", args) == 50102.4
 
 
@@ -67,26 +70,26 @@ def test_sumbuild():
     ks_str = """
 (edef add Float (Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
-(def shape$add Integer ((a : Float) (b : Float)) 0)
+(def shape$add Integer ((a : Float) (b : Float)) (tuple))
 
 (def sum_of_vec Float ((a : (Vec Float)))
   (sumbuild (size a) (lam (i : Integer) (index i a)))
 )
 """
-    args = [AbstractValue((100,), Type.Vec(Type.Float))]
+    args = [AbstractValue.abstract_like(np.ones(100))]
     assert compute_cost(ks_str, "sum_of_vec", args) == 200 # 100 * (index_cost) + 99 (for add) + (size_cost)
 
 def test_rot():
     ks_str = """
 (edef mul Float (Float Float))
 (def cost$mul Float ((a : Float) (b : Float)) 2.0)
-(def shape$mul Integer ((a : Float) (b : Float)) 0)
+(def shape$mul Integer ((a : Float) (b : Float)) (tuple))
 (edef add Float (Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
-(def shape$add Integer ((a : Float) (b : Float)) 0)
+(def shape$add Integer ((a : Float) (b : Float)) (tuple))
 (edef neg Float (Float))
 (def cost$neg Float ((a : Float)) 1.0)
-(def shape$neg Integer ((a : Float)) 0)
+(def shape$neg Integer ((a : Float)) (tuple))
 
 (def rot (Tuple (Vec Float) (Vec Float))
          ((var0 : (Tuple (Vec Float) (Vec Float) Float Float)))
@@ -106,20 +109,7 @@ def test_rot():
               (mul c (index i y))))))))))))
 """
     args = [
-        AbstractValue(
-            (
-                (100,),
-                (100,),
-                (),
-                ()
-            ),
-            Type.Tuple(
-                Type.Vec(Type.Float),
-                Type.Vec(Type.Float),
-                Type.Float,
-                Type.Float
-            )
-        )
+        AbstractValue.abstract_like((np.ones(100), np.ones(100), 1.1, 1.1))
     ]
     assert compute_cost(ks_str, "rot", args) == 1701.7
 
@@ -175,10 +165,10 @@ def test_if_then_else():
     ks_str = """
 (edef mul Integer (Integer Integer))
 (def cost$mul Float ((a : Integer) (b : Integer)) 2.0)
-(def shape$mul Integer ((a : Integer) (b : Integer)) 0)
+(def shape$mul Integer ((a : Integer) (b : Integer)) (tuple))
 (edef eq Bool (Float Float))
 (def cost$eq Float ((a : Float) (b : Float)) 1.0)
-(def shape$eq Integer ((a : Float) (b : Float)) 0)
+(def shape$eq Integer ((a : Float) (b : Float)) (tuple))
 
 (def select1 (Vec Integer) ((p : Bool) (x : (Vec Integer)))
   (if p
@@ -202,21 +192,21 @@ def test_if_then_else():
     cost1 = compute_cost(ks_str,
                          "select1",
                          [
-                             AbstractValue((), Type.Bool),
-                             AbstractValue((100,), Type.Vec(Type.Integer))
+                             AbstractValue(ScalarShape, Type.Bool),
+                             AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))
                          ]
     )
     cost2 = compute_cost(ks_str,
                          "select2",
                          [
-                             AbstractValue((), Type.Bool),
-                             AbstractValue((100,), Type.Vec(Type.Integer))
+                             AbstractValue(ScalarShape, Type.Bool),
+                             AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))
                          ]
     )
     cost3 = compute_cost(ks_str,
                          "select3",
                          [
-                             AbstractValue((100,), Type.Vec(Type.Integer))
+                             AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))
                          ]
     )
     assert cost1 == 302.0201

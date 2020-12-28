@@ -4,13 +4,13 @@ class Type:
     """
     Knossos AST node type.  Grouped into
         Scalars: Float, Integer, Bool, String
-        Vec 'T
+        Tensor N 'T
         Tuple 'T1 .. 'Tn
         Lam S T
         LM  S T
     """
     node_kinds = {
-        "Vec": 1, # one child (Type)
+        "Tensor": 2, # two children (Rank, Type)
         "Tuple": -1, # special case two or more
         "Integer": 0,
         "Float": 0,
@@ -23,8 +23,13 @@ class Type:
     def __init__(self, kind, children=[]):
         if kind not in Type.node_kinds:
             raise ValueError("bad kind:", kind)
-        assert kind == "Tuple" or (Type.node_kinds[kind] == len(children)), (kind, len(children)) # dont' check for 1-tuple
-        assert all((ch is None or isinstance(ch, Type)) for ch in children)
+        if kind != "Tuple":
+            assert Type.node_kinds[kind] == len(children) # dont' check for 1-tuple
+        if kind == "Tensor":
+            assert isinstance(children[0], int) and isinstance(children[1], Type)
+        else:
+            assert all((ch is None or isinstance(ch, Type)) for ch in children)
+        
         self.kind = kind
         self.children = children
 
@@ -32,11 +37,11 @@ class Type:
     ## Constructors
 
     @staticmethod
-    def Vec(elem_type):
+    def Tensor(rank, elem_type):
         """
-        Constructor: Type.Vec(T)
+        Constructor: Type.Tensor(rank, T)
         """
-        return Type("Vec", [elem_type])
+        return Type("Tensor", [rank, elem_type])
 
     @staticmethod
     def Tuple(*args):
@@ -59,6 +64,129 @@ class Type:
         """
         return Type("LM", [arg_type, return_type]) 
 
+    ################
+    ## Predicates
+    
+    @property
+    def is_scalar(self):
+        return self.kind in ["Integer", "Float", "Bool", "String"]
+
+    @property
+    def is_lam_or_LM(self):
+        return self.kind == "Lam" or self.kind == "LM"
+
+    @property
+    def is_tensor(self):
+        return self.kind == "Tensor"
+
+    @property
+    def is_tuple(self):
+        return self.kind == "Tuple"
+
+    def can_accept_value_of_type(self, other):
+        """ Finds if a variable of type 'other' can fit into this type.  """
+        if other is None: # Allow unknown arguments to fit into any (known) parameter
+            return True
+        if self.kind != other.kind:
+            return False
+        if len(self.children) != len(other.children):
+            # Rules out different size tuples
+            return False
+        return all(c.can_accept_value_of_type(o) for c, o in zip(self.children, other.children))
+
+    #################
+    ## Tensor methods
+    def is_tensor_of(self, ty):
+        return self.is_tensor and self.tensor_elem_type == ty
+
+    @property
+    def tensor_rank(self):
+        assert self.is_tensor 
+        return self.children[0]
+
+    @property
+    def tensor_elem_type(self):
+        assert self.is_tensor
+        return self.children[1]
+
+    @staticmethod
+    def Index(tensor):  # TODO: Call this elem_type for consistency with ksc-MLIR?
+        """
+        Index: Element type of a tensor
+        """
+        if tensor is None:
+            return None
+        return tensor.tensor_elem_type
+
+    #################
+    ## Tuple methods
+
+    @property
+    def tuple_len(self):
+        assert self.is_tuple
+        return len(self.children)
+
+    def tuple_elems(self):
+        assert self.is_tuple
+        return (c for c in self.children)
+
+    def tuple_elem(self, i):
+        assert self.is_tuple
+        return self.children[i]
+
+    #################
+    ## Lambda/LM methods
+
+    @property
+    def lam_return_type(self):
+        assert self.is_lam_or_LM
+        return self.children[1]
+
+    @property
+    def lam_arg_type(self):
+        assert self.is_lam_or_LM
+        return self.children[0]
+
+    #################
+    ## Accessors
+
+    def num_elements(self, assumed_vector_size=100):
+        # TODO: Move to cost.py, assumed_vector_size is not a core concept
+        if self.is_tuple:
+            return sum([c.num_elements(assumed_vector_size) for c in self.children])
+        elif self.is_tensor:
+            return assumed_vector_size ** self.tensor_rank * self.tensor_elem_type.num_elements(assumed_vector_size)
+        elif self.is_scalar or self.is_lam_or_LM:
+            return 1
+
+    def all_element_types(self):
+        # TODO: rename to "element_types_as_set", probably move elsewhere
+        if self.is_tuple:
+            return set([t for c in self.children for t in c.all_element_types()])
+        elif self.is_tensor:
+            return self.tensor_elem_type.all_element_types()
+        else:
+            return set([self])
+
+    def ndim_recursive(self):
+        if self.is_tensor:
+            child_ndim = self.tensor_elem_type.ndim_recursive()
+            return child_ndim + 1 if child_ndim is not None else 1
+        elif self.is_scalar:
+            return 0
+        return None
+
+    def shortstr(self, tb="<", te=">"):
+        el_types = {"Integer": "i", "Bool": "b", "String" : "s", "Float": "f", "Lam": "l", "LM": "l"}
+        if self.kind in el_types:
+            return el_types[self.kind]
+        if self.is_tuple:
+            return tb + "".join([c.shortstr() for c in self.children]) + te
+        if self.is_tensor:
+            return "T" + self.tensor_rank + self.tensor_elem_type.shortstr()
+        
+        raise ValueError(f"Unknown Type.{self.kind}")
+
     @staticmethod
     def fromValue(val):
         """
@@ -73,117 +201,6 @@ class Type:
         if isinstance(val, str):
             return Type.String
         raise NotImplementedError(f"Typeof {type(val)}")
-
-    ################
-    ## Predicates
-    
-    @property
-    def is_scalar(self):
-        return self.kind in ["Integer", "Float", "Bool", "String"]
-
-    @property
-    def is_lam_or_LM(self):
-        return self.kind == "Lam" or self.kind == "LM"
-
-    @property
-    def is_vec(self):
-        return self.kind == "Vec"
-
-    def is_vec_of(self, ty):
-        return self.is_vec and self.children[0] == ty
-
-    @property
-    def is_tuple(self):
-        return self.kind == "Tuple"
-
-    def accept_value_of_type(self, other):
-        """ Finds if a variable of type 'other' can fit into this type.  """
-        if other is None: # Allow unknown arguments to fit into any (known) parameter
-            return True
-        if self.kind != other.kind:
-            return False
-        if len(self.children) != len(other.children):
-            # Rules out different size tuples
-            return False
-        return all(c.accept_value_of_type(o) for c, o in zip(self.children, other.children))
-
-    #################
-    ## Accessors
-    @staticmethod
-    def Index(vec):  # TODO: Call this elem_type for consistency with ksc-MLIR?
-        """
-        Index: Element type of a vector
-        """
-        if vec is None:
-            return None
-        assert vec.kind == "Vec"
-        return vec.children[0]
-
-    @property
-    def lam_return_type(self):
-        assert self.is_lam_or_LM
-        return self.children[1]
-
-    @property
-    def lam_arg_type(self):
-        assert self.is_lam_or_LM
-        return self.children[0]
-
-    def num_elements(self, assumed_vector_size=100):
-        # TODO: Move to cost.py, assumed_vector_size is not a core concept
-        if self.kind == "Tuple":
-            return sum([c.num_elements(assumed_vector_size) for c in self.children])
-        elif self.kind == "Vec":
-            return assumed_vector_size * self.children[0].num_elements(assumed_vector_size)
-        elif self.is_scalar or self.is_lam_or_LM:
-            return 1
-
-    def all_element_types(self):
-        # TODO: rename to "element_types_as_set", probably move elsewhere
-        if self.kind == "Tuple":
-            return set([t for c in self.children for t in c.all_element_types()])
-        elif self.kind == "Vec":
-            return self.children[0].all_element_types()
-        else:
-            return set([self])
-
-    @property
-    def ndim(self):
-        if self.kind == "Vec":
-            child_ndim = self.children[0].ndim
-            return child_ndim + 1 if child_ndim is not None else None
-        elif self.is_scalar:
-            return 0
-        return None
-
-    def __len__(self):
-        # TODO: remove, replaced by tuple_len 
-        assert self.kind == "Tuple"
-        return len(self.children)
-
-    def __iter__(self):
-        # TODO: rename to tuple_elements
-        assert self.kind == "Tuple"
-        return (c for c in self.children)
-
-    def tuple_len(self):
-        assert self.kind == "Tuple"
-        return len(self.children)
-
-    def tuple_elem(self, i):
-        assert self.kind == "Tuple"
-        return self.children[i]
-
-    def shortstr(self, tb="<", te=">"):
-        el_types = {"Integer": "i", "Bool": "b", "String" : "s", "Float": "f", "Lam": "l", "LM": "l"}
-        if self.kind in el_types:
-            return el_types[self.kind]
-        if self.kind == "Tuple":
-            return tb + "".join([c.shortstr() for c in self.children]) + te
-        elif self.kind == "Vec":
-            return "v" + self.children[0].shortstr()
-        else:
-            raise ValueError(f"Unknown Type.{self.kind}")
 
     def shortstr_py_friendly(self):
         return self.shortstr("_t", "t_")
@@ -210,7 +227,7 @@ class Type:
         # Now self.kind == other.kind
         if self.is_scalar: 
             return True
-        if self.kind == "Tuple" and len(self.children) != len(other.children):
+        if self.is_tuple and len(self.children) != len(other.children):
             return False
         return all([c == o for c, o in zip(self.children, other.children)])
 
@@ -222,3 +239,23 @@ Type.Integer = Type("Integer")
 Type.Float = Type("Float")
 Type.Bool = Type("Bool")
 Type.String = Type("String")
+
+class SizeType:
+    @staticmethod
+    def from_rank(n : int) -> Type:
+        if n == 1:
+            return Type.Integer
+        else:
+            return Type.Tuple(*[Type.Integer for i in range(n)])
+
+    @staticmethod
+    def get_rank(ty : Type) -> int:
+        if ty == Type.Integer:
+            return 1
+        if ty.is_tuple and all(ty == Type.Integer for ty in ty.tuple_elems()):
+            return ty.tuple_len
+        return None
+
+    @staticmethod
+    def isa(ty : Type) -> bool:
+        return SizeType.get_rank(ty) is not None
