@@ -32,3 +32,5 @@
 (def fst_rev_f_inline_prim Float
      ((x : Float) (y : Float) (d_r : Float))
      (get$1$2 ($inline (rev_f x y d_r))))
+
+(def main Integer () 0)

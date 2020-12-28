@@ -29,3 +29,5 @@
   (let (mx (max$VecR a))
     (let (sum_exp_minus_x (sum (exp$Vec (sub$VecR$R a mx))))
         (add (log sum_exp_minus_x) mx))))
+
+(def main Integer () 0)

@@ -6,3 +6,5 @@
 ; file tests it (or at least the latter).
 
 (def f Float () 0.0)
+
+(def main Integer () 0)

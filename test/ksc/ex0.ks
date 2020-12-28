@@ -9,3 +9,5 @@
      (let (x a)
        (build 10 (lam (a : Integer)
                       (if (eq a 0) 0.0 x)))))
+
+(def main Integer () 0)

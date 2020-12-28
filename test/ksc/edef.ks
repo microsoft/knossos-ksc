@@ -9,3 +9,5 @@
 (edef rev$edef_example Float (Float Float))
 
 (def g Float ((x : Float) (y : Float)) (add (edef_example x) y))
+
+(def main Integer () 0)
