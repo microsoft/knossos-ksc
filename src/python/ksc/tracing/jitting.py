@@ -379,23 +379,40 @@ def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=Non
     """
     Declare a function/op/node for tracing and the abstract interpreter
 
-    (def name 
-        (x y)  ; arg_names
-        ... )
+        (def name 
+            (x y)  ; arg_names
+            ... )
 
-    ; traceable_shape_function should be an appropriate body for shape$name, returning a shape.
-    ; shape algebra is as follows:
-    ;    shape of scalar is 0 TODO: make empty tuple
-    ;    shape of tensor is (tuple (tuple dim1 dim2 ... dimN) element_shape)
-    ;    shape of tuple is (tuple shape1 shape2 .. shapeN)
-    ; This is slightly different from the Shape, TensorShape, etc hierarchy in Python, 
-    ; which uses stronger typing to aid refactoring.  Note too that tensor shape is assumed
-    ; non-jagged for now.  When we switch to jagged, tensor shape will be tensor of shapes,
-    ; using a constvec for non-jagged (e.g. "leaf" tensors of scalars)
-    (def shape$name (x y)
-        ...)
+    -- shape_prop_function 
+    Should be a python function taking AbstractValues, 
+    and returning a ShapeType of the result, e.g.
+        def mat_vec_mul_shape_propagate(M, v):
+            return ShapeType(M.get_shape.dims[0], v.get_type)
+
+    The algebra of these shape classes is:
+        Shape of scalar is      ScalarShape (constant initialized to ())
+        Shape of tuple is       tuple of Shape
+        Shape of tensor is      TensorShape(dims, element_shape)
+
+    Note that tensor shape is assumed non-jagged for now.  When we switch to
+    jagged, tensor shape will be tensor of shapes, using a constvec for efficient
+    representation of non-jagged tensors
+
+    -- traceable_shape_function
+    Should be an appropriate Node for shape$name, returning a shape.
+    The shape algebra restricted to KS datatypes is as follows:
+        shape of scalar   is (tuple)                              ;; empty tuple
+        shape of tensor   is (tuple (tuple dim1 dim2 ... dimN) element_shape)
+        shape of tuple    is (tuple shape1 shape2 .. shapeN)
+    The supplied body should be as if we had parsed code such as:
+    (def shape$mat_vec_mul ((x : Tensor 2 Float) (y : Tensor 1 Float))
+        (tuple (tuple (get$1$2 (size x)))  ;; shapes are more strict than "size", use singleton tuple for 1D vector  
+               (tuple)))   ;; and include the element shape, here shape of scalar
+    This will normally be created using the python node creators in ksc.tracing.core, e.g.
+    shape_mat_vec_mul = lambda x,y: core.make_tuple(core.make_tuple(x.shape_program[0][0]), y.shape_program[1]),
     
-    ; traceable_cost_function should be an appropriate body for cost$name, returning a float.
+    -- traceable_cost_function
+    Should be an appropriate Node for cost$name, returning a float.
     (def cost$name (x y)
         ...)    
     """
