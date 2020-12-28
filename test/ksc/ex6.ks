@@ -4,3 +4,5 @@
         (sum (build (size x)
                     (lam (i : Integer)
                          (mul (index i x) (index i y))))))
+
+(def main Integer () 0)

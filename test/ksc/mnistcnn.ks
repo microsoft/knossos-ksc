@@ -137,3 +137,5 @@
      (relu3d
      (conv2d k1 bk1 image
              ))))))))))
+
+(def main Integer () 0)

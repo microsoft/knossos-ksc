@@ -9,3 +9,5 @@
     ))))
 
 #| Tests capture-avoiding substitution |#
+
+(def main Integer () 0)

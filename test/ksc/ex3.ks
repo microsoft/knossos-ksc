@@ -3,3 +3,5 @@
 (def h Float ( (x : Float) (y : Float))
        (let (z (add x y))
             (mul y z)))
+
+(def main Integer () 0)
