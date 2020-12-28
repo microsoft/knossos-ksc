@@ -118,8 +118,10 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
     isMain _ = False
 
-theDefs :: DisplayLint
-        -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
+type GenerateDefs =
+  DisplayLint -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
+
+theDefs :: GenerateDefs
 theDefs display decls = do {
   ; (env, ann_decls) <- annotDecls emptyGblST decls
   ; let (rules, defs) = partitionDecls ann_decls
@@ -128,8 +130,7 @@ theDefs display decls = do {
   ; return (defs, env, rulebase)
   }
 
-theDefsViaCatLang :: DisplayLint
-                  -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
+theDefsViaCatLang :: GenerateDefs
 theDefsViaCatLang display decls = do {
   (defs, env, rulebase) <- theDefs display decls
   ; let defsViaCL     = flip map defs $ \x -> case toCLDef_maybe x of
@@ -218,9 +219,7 @@ anfOptAndCse display rulebase env4 alldefs =
   }
 
 displayCppGenDefsDiffs ::
-  (DisplayLint
-   -> [Decl]
-   -> KMT IO ([TDef], GblSymTab, RuleBase))
+     GenerateDefs
   -> (DisplayLint
    -> [TDef]
    -> GblSymTab
@@ -272,7 +271,7 @@ displayCppGenNoDiffs =
 
 displayCppGenAndCompileDefsDiffs
   :: HasCallStack
-  => (DisplayLint -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase))
+  => GenerateDefs
   -> (DisplayLint
       -> [TDef]
       -> GblSymTab
@@ -303,9 +302,7 @@ displayCppGenAndCompileDefsDiffs
   }
 
 displayCppGenAndCompileVia :: HasCallStack
-                           => (DisplayLint
-                               -> [Decl]
-                               -> KMT IO ([TDef], GblSymTab, RuleBase))
+                           => GenerateDefs
                            -> (String -> String -> IO a)
                            -> String
                            -> Maybe Int
@@ -319,9 +316,7 @@ displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String 
 displayCppGenAndCompile = displayCppGenAndCompileVia theDefs
 
 displayCppGenCompileAndRunVia :: HasCallStack
-                              => (DisplayLint
-                                  -> [Decl]
-                                  -> KMT IO ([TDef], GblSymTab, RuleBase))
+                              => GenerateDefs
                               -> String
                               -> Maybe Int
                               -> [String]
