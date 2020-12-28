@@ -28,7 +28,7 @@ jobs:
   - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
     displayName: 'Install dependencies'
 
-  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=.
+  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=.  --overwrite-policy=always --install-method=copy
     displayName: 'Can build with cabal'
 
   - script: ./ksc --test --fs-test out.ks
