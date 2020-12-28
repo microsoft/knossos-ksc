@@ -253,11 +253,12 @@ demoFOnTestPrograms ksTests = do
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
 dropWhile1 pred = tail . dropWhile pred
 
-testRunKSVia :: (String -> Maybe int -> [String] -> FilePath -> IO String)
+testRunKSVia :: Ksc.Pipeline.GenerateDefs
              -> String -> [Char] -> IO ()
 testRunKSVia via_ compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
-  output <- via_ compiler Nothing ["src/runtime/prelude"] ksTest
+  output <- Ksc.Pipeline.displayCppGenCompileAndRunVia
+                via_ compiler Nothing ["src/runtime/prelude"] ksTest
 
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
@@ -286,12 +287,10 @@ testRunKSVia via_ compiler ksFile = do
       error ("These tests failed:\n" ++ unlines failures)
 
 testRunKS :: String -> String -> IO ()
-testRunKS =
-  testRunKSVia (Ksc.Pipeline.displayCppGenCompileAndRunVia Ksc.Pipeline.theDefs)
+testRunKS = testRunKSVia Ksc.Pipeline.theDefs
 
 testRunKSViaCatLang :: String -> String -> IO ()
-testRunKSViaCatLang =
-  testRunKSVia (Ksc.Pipeline.displayCppGenCompileAndRunVia Ksc.Pipeline.theDefsViaCatLang)
+testRunKSViaCatLang = testRunKSVia Ksc.Pipeline.theDefsViaCatLang
 
 testHspec :: IO ()
 testHspec = do
