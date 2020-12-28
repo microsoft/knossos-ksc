@@ -47,13 +47,16 @@ optSubstBndr tv env@(OptEnv { optSubst = subst })
     (tv', subst') = substBndr tv subst
 
 ---------------
+mapAccumLM :: Monad m => (a -> b -> m(a, c)) -> a -> [b] -> m(a, [c])
+mapAccumLM _ a [] = return (a, [])
+mapAccumLM f a (x:xs) = do { (a', c) <- f a x
+                           ; (a'', cs) <- mapAccumLM f a' xs
+                           ; return (a'', c:cs) }
+
 optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
                         -> KM (GblSymTab, [TDef])
 -- Returned GblSymTab contains the optimised definitions
-optDefs _  gst [] = return (gst, [])
-optDefs rb gst (def:defs) = do { (gst1, def')  <- optDef  rb gst def
-                               ; (gst2, defs') <- optDefs rb gst1 defs
-                               ; return (gst2, def' : defs') }
+optDefs = mapAccumLM . optDef
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> KM (GblSymTab, TDef)
