@@ -600,6 +600,10 @@ mkTupleTy :: [Type] -> Type
 mkTupleTy [t] = t
 mkTupleTy ts  = TypeTuple ts
 
+mkPat :: [VarX p] -> PatG (VarX p)
+mkPat [v] = VarPat v
+mkPat vs  = TupPat vs
+
 dropLast :: [a] -> [a]
 -- Drop the last element of a list.
 -- No-op for empty list
