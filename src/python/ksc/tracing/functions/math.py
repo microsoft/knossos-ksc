@@ -46,18 +46,18 @@ broadcast_add = ksc.tracing.make_edef(
     lambda m, v: core.numel_program(m) 
 )
 
-def transpose_shape(s):
-    assert len(s.dims) == 2
-    m, n = s.dims
-    return TensorShape((n, m), s.elem_shape)
-
 def transpose_prop_rule(x):
     assert x.get_type.tensor_rank == 2
-    return ShapeType(transpose_shape(x), x.get_type)
+    def transpose_shape(s):
+        assert len(s.dims) == 2
+        m, n = s.dims
+        return TensorShape((n, m), s.elem_shape)
+
+    return ShapeType(transpose_shape(x.get_shape), x.get_type)
 
 transpose = ksc.tracing.make_edef(
     "transpose", ["x"], transpose_prop_rule,
-    lambda x: transpose_shape(x.shape_program),
+    lambda x: (lambda s: core.make_tuple(core.make_tuple(s[0][1], s[0][0]), s[1]))(x.shape_program),
     lambda x: Node.from_data(0)
 )
 
