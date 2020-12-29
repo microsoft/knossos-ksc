@@ -136,7 +136,7 @@ class Node(AbstractValue):
 
         From make_edef:
         ; shape algebra is as follows:
-        ;    shape of scalar is 0 TODO: make empty tuple
+        ;    shape of scalar is ()
         ;    shape of tensor is (tuple (tuple dim1 dim2 ... dimN) element_shape)
         ;    shape of tuple is (tuple shape1 shape2 .. shapeN)
 
