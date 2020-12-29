@@ -669,7 +669,6 @@ cgenTypeLang = \case
   TypeFloat     -> "double" -- TODO: make these all ks_Float etc, and add typedefs in knossos.h
   TypeInteger   -> "int"
   TypeString    -> "std::string"
-  TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
   TypeTensor d t -> "tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
