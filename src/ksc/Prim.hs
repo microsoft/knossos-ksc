@@ -194,7 +194,6 @@ lmHCatV :: HasCallStack => TExpr -> TExpr
 lmHCatV e  = mkPrimCall1 "lmHCatV" e
 
 lmVCat :: HasCallStack => [TExpr] -> TExpr
-lmVCat [e] = e
 lmVCat es  = mkPrimCall1 "lmVCat" (Tuple es)
 
 lmVCatV :: HasCallStack => TExpr -> TExpr

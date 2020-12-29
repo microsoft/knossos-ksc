@@ -339,7 +339,7 @@ optPrimFun _ "lmCompose"   (Tuple [f,g])  = optLMCompose f g
 optPrimFun _ "lmVCat" (Tuple es)
   | Just prs <- mapM isLMZero_maybe es
   , (s:_, ts) <- unzip prs
-  = Just $ lmZero s (mkTuple ts)
+  = Just $ lmZero s (Tuple ts)
 
 -- Add(0, x) = x = Add(x, 0)
 optPrimFun _ "lmAdd" (Tuple [p,q])
