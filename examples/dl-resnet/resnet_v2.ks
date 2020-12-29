@@ -9,7 +9,7 @@
 (edef conv_2d_no_bias (Tensor 4 Float) ((Tuple Integer Integer) (Tuple Integer Integer) (Tuple (Tuple Integer Integer) (Tuple Integer Integer)) (Tensor 4 Float) (Tensor 4 Float)))
 (edef batch_norm_2d (Tensor 4 Float) ((Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float)) (Tensor 4 Float)))
 (edef relu (Tensor 4 Float) ((Tensor 4 Float)))
-(edef to_float (Tensor 4 Float) (Tensor 4 Integer))
+(edef to_float (Tensor 4 Float) ((Tensor 4 Integer)))
 (edef max_pool_same (Tensor 4 Float) ((Tuple Integer Integer) (Tuple Integer Integer) (Tensor 4 Float)))
 (edef avg_pool_valid (Tensor 4 Float) ((Tuple Integer Integer) (Tuple Integer Integer) (Tensor 4 Float)))
 (edef flatten (Tensor 2 Float) ((Tensor 4 Float)))
