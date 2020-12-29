@@ -23,6 +23,7 @@ class Type:
     def __init__(self, kind, children=[]):
         if kind not in Type.node_kinds:
             raise ValueError("bad kind:", kind)
+
         if kind != "Tuple":
             assert Type.node_kinds[kind] == len(children) # dont' check for 1-tuple
         if kind == "Tensor":
