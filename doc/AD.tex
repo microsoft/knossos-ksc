@@ -1,4 +1,3 @@
-
 \documentclass[sigplan,review]{acmart}
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
@@ -15,11 +14,38 @@
 \usepackage{enumitem}
 \setlist[itemize,1]{itemsep=4pt}
 
-\renewcommand{\arraystretch}{1.2}
+\renewcommand{\arraystretch}{1.5}
+
+\newcommand{\ksc}{\texttt{ksc}}
+
+\newenvironment{codearray}[1]
+               {\renewcommand{\arraystretch}{1.08} \begin{array}[t]{@{}#1}}
+               {\end{array}}
+
+
+\newcommand{\vecl}[1]{\begin{codearray}{l}#1\end{codearray}}
+
+% The KS language
+\def\kskeyword#1{\mathtt{\textcolor{teal}{#1}}}
+\def\ksid#1{\mathsf{#1}}
+
+\def\ksVec#1{\ksid{Vec}~#1}
+
+\def\kslet #1 = #2 #3{\kskeyword{let}\;#1 = #2\; \kskeyword{in} \;#3}
+\def\ksletnl#1 = #2 #3{\vecl{
+    \kskeyword{let}\;#1 = #2\; \kskeyword{in} \\
+    #3
+}}
+\def\ksif#1#2#3{\kskeyword{if}\;#1\;#2\;#3}
+\def\ksifnl#1#2#3{\vecl{\kskeyword{if}\;#1\\\quad #2\\\quad #3}}
+\newcommand{\ksbuild}[3]{\ksid{build} \; #1 \; (\lambda #2.\, #3)}
+\newcommand{\kssumbuild}[3]{\ksid{sumbuild} \; #1 \; (\lambda #2.\, #3)}
+\newcommand{\ksunzip}[1]{\ksid{unzip}(#1)}
+
 
 % The cateorical language
-\newcommand{\CatLang}{$\mathcal CL$}
 \newcommand{\KC}[2]{{\mathcal C}\lb \, #1 \, \rb\,#2}
+\newcommand{\CatLang}{$\mathcal CL$}
 \newcommand{\clcomp}{\, ; \,}   % CL composition
 \newcommand{\ck}[1]{{\mathcal K}(#1)}   % CL constant
 \newcommand{\cid}{\mathcal{I}}   % CL function
@@ -71,7 +97,6 @@
 % With splitting
 \newcommand{\revfDf}[1]{\mathit{revf\$}#1}  % Reverse derivative, f`
 \newcommand{\revrDf}[1]{\mathit{revr\$}#1}  % Reverse derivative, f`
-
 
 \newcommand{\lb}{\llbracket}
 \newcommand{\rb}{\rrbracket}
@@ -152,7 +177,7 @@ $$
           & |   & (e_1,e_2) & \mbox{Pair} \\
           & |   & \lambda x \dot e & \mbox{Lambda} \\
           & |   & e_1 \; e_2 & \mbox{Application} \\
-          & |   & \mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|} \\
+          & |   & \kslet x = {e_1} {e_2} \\
           & |   & \mbox{\lstinline|if $\;b\;$ then $\;e_1\;$ else $\;e_2$|} \\
         \\
         \multicolumn{4}{l}{\mbox{\bf Types}} \\
@@ -691,7 +716,7 @@ $$
   \mbox{\bf Original function}   & f : S \to T \\
   & f(x) = e \\[2mm]
   \mbox{\bf Full Jacobian}       & \gradf{f}  :  S \to (S \linto T) \\
-  & \mbox{\lstinline|$\gradf{f}(x)$ = let $\;\gradf{x}$ = $\lmone\;$ in $\;\grad{e}$|} \\[2mm]
+  & \gradf{f}(x) = \kslet {\gradf x} = {\lmone} {\grad{e}} \\[2mm]
   \mbox{\bf Forward derivative}  & \fwdDf{f} : (S,S) \to T \\
   & \fwdDf{f}(x,dx) = \gradf{f}(x) \lmapply  dx \\[2mm]
   \mbox{\bf Reverse derivative}  & \revDf{f} : (S,T) \to S \\
@@ -2022,120 +2047,468 @@ $$
 \caption{Procedure language reverse mode translation rules}
 \end{figure*}
 
-\section{Demo}
 
-You can run the prototype by saying {\tt ghci Main}.
+\section{BOG-style AD for ksc}
 
-The function {\tt demo :: Def -> IO ()} runs the
-prototype on the function provided as example.
-Thus:
-{\small
-\begin{verbatim}
-bash$ ghci Main
+\newcommand{\fbog}[1]{#1_{\mathit{fbog}}}
+\newcommand{\rbog}[1]{#1_{\mathit{rbog}}}
+\newcommand{\fbogid}[1]{\ksid{#1}_{\mathit{fbog}}}
+\newcommand{\rbogid}[1]{\ksid{#1}_{\mathit{rbog}}}
+\newcommand{\gradfbog}[1]{\nabla_{\! f}\lb #1 \rb}  % grad[#1]
+\newcommand{\gradrbog}[1]{\nabla_{\! r}\lb #1 \rb}  % grad[#1]
+\newcommand{\gradrbogEB}[3]{\nabla_{\! r}\lb #1 \rb\;#2\;#3}  % grad[#1]
+\newcommand{\gradrbogcps}[4]{\nabla_{\! r}\lb #1 \rb\;#2\;#3\;#4}
+\newcommand{\bog}[1]{{\mathcal B}[e]}
+\newcommand{\append}{+\!\!+}
+\newcommand{\freevars}[1]{\mathit{fvs}(#1)}
 
-*Main> demo ex2
+\begin{figure*}
+  \def\mcol#1{\multicolumn{3}{l}{#1}}
+  \def\mkhead#1{\multicolumn{3}{l}{\begin{minipage}[t]{0.45\columnwidth}#1\end{minipage}}}
+  \def\eq<#1===#2>{$#1$   &   $=$   &    $#2$}
 
-----------------------------
-Original definition
-----------------------------
-fun f2(x)
-  = let { y = x * x }
-    let { z = x + y }
-    y * z
+  \fbox{\begin{minipage}{\textwidth}
+      This figure assumes the single-use dialect of \ksc{},
+      in which every binder is used at most once.
+$$
+\begin{codearray}{ll}
+  \mbox{\bf Original function}   & f : S \to T \\
+  & f(s) = e \\[1mm]
+\end{codearray} 
+$$
 
-----------------------------
-Anf-ised original definition
-----------------------------
-fun f2(x)
-  = let { y = x * x }
-    let { z = x + y }
-    y * z
-
-----------------------------
-The full Jacobian (unoptimised)
-----------------------------
-fun Df2(x)
-  = let { Dx = lmOne() }
-    let { y = x * x }
-    let { Dy = lmCompose(D*(x, x), lmVCat(Dx, Dx)) }
-    let { z = x + y }
-    let { Dz = lmCompose(D+(x, y), lmVCat(Dx, Dy)) }
-    lmCompose(D*(y, z), lmVCat(Dy, Dz))
-
-----------------------------
-The full Jacobian (optimised)
-----------------------------
-fun Df2(x)
-  = let { y = x * x }
-    lmScale( (x + y) * (x + x) + (x + y) * (x + x) )
-
-----------------------------
-Forward derivative (unoptimised)
-----------------------------
-fun f2'(x, dx)
-  = lmApply(let { y = x * x }
-            lmScale( (x + y) * (x + x) +
-                     (x + y) * (x + x) ),
-            dx)
-
-----------------------------
-Forward-mode derivative (optimised)
-----------------------------
-fun f2'(x, dx)
-  = let { y = x * x }
-    ((x + y) * (x + x) + (x + y) * (x + x)) * dx
-
-----------------------------
-Forward-mode derivative (CSE'd)
-----------------------------
-fun f2'(x, dx)
-  = let { t1 = x + x * x }
-    let { t2 = x + x }
-    (t1 * t2 + t1 * t2) * dx
-
-----------------------------
-Transposed Jacobian
-----------------------------
-fun Rf2(x)
-  = lmTranspose( let { y = x * x }
-                 lmScale( (x + y) * (x + x) +
-                         (x + y) * (x + x) ) )
-
-----------------------------
-Optimised transposed Jacobian
-----------------------------
-fun Rf2(x)
-  = let { y = x * x }
-    lmScale( (x + y) * (x + x) +
-             (x + y) * (x + x) )
-
-----------------------------
-Reverse-mode derivative (unoptimised)
-----------------------------
-fun f2`(x, dr)
-  = lmApply(let { y = x * x }
-            lmScale( (x + y) * (x + x) +
-                     (x + y) * (x + x) ),
-            dr)
-
-----------------------------
-Reverse-mode derivative (optimised)
-----------------------------
-fun f2`(x, dr)
-  = let { y = x * x }
-    ((x + y) * (x + x) +
-     (x + y) * (x + x)) * dr
-
-----------------------------
-Reverse-mode derivative (CSE'd)
-----------------------------
-
-fun f2`(x, dr)
-  = let { t1 = x + x * x }
-    let { t2 = x + x }
-    (t1 * t2 + t1 * t2) * dr
-\end{verbatim}
+\begin{tabular}[t]{rclrcl}
+\mkhead{
+\text{\bf Forward BOG}
+\begin{align*}
+ &\fbog{f} : S \to (T,\bog{e})\\
+ &\fbog{f}(s) = \gradfbog{e} 
+\end{align*}
+If $e : T$ then $\gradfbog{e} : (T,\bog{e})$
+} &
+\mkhead{
+\text{\bf Reverse BOG}
+\begin{align*}
+ &\rbog{f} : (\tangent{T},\bog{e}) \to \tangent{S} \\
+ &\rbog{f}(\gradf{t},b) = \mbox{\lstinline|let $\gradrbogEB{e}{\gradf{t}}{b}\;$ in $\;\gradf{s}$|}
+\end{align*}
+If $\Gamma \vdash e : T$ and $\gradf{t}{:}\tangent{T}$ and $b{:}\bog{e}$,
+      then $\gradrbogEB{e}{\gradf{t}}{b}$ is a set of bindings that,
+       for every free variable $x{:}X$ of $e$, binds $\gradf{x}{:}\tangent{X}$
 }
+\\
+% Constant, k
+\eq<   \gradfbog{k}  === (k,())>
+&
+\eq<   \gradrbogEB{k}{\gradf{t}}{b}   === \{ \} >
+\\
+% Variable use, x
+\eq<   \gradfbog{x}   ===  (x,()) >
+&
+\eq<   \gradrbogEB{x}{\gradf{t}}{b}    ===   \{ \gradf{x} = \gradf{t} \}   >
+\\
+% f(e)	
+\eq<   \gradfbog{f(e)} === \begin{codearray}{l}
+					          \mbox{\lstinline|let $\;(a,b_e) = \gradfbog{e}\;$ in|} \\
+					          \mbox{\lstinline|let $\;(r,b_f) = \fbog{f}(a)\;$ in|} \\
+					          (r, (b_e,b_f))
+					          \end{codearray} 
+>
+&
+\eq<   \gradrbogEB{f(e)}{\gradf{t}}{b} ===  \begin{codearray}{lll}
+                                        \{ & (b_e,b_f) = b \\
+                                        ;  & \gradf{a} = \rbog{f}(\gradf{t},b_f) & \} \\
+                                        \multicolumn{3}{l}{\append \; \gradrbogEB{e}{\gradf{a}}{b_e}}
+                                        \end{codearray}
+>\\
+% (e_1,e_2)
+\eq<       \gradfbog{(e_1,e_2)}  ===  \begin{codearray}{l}
+                                    \mbox{\lstinline|let $\;(a_1,b_1) = \gradfbog{e_1}\;$ in|} \\
+                                    \mbox{\lstinline|let $\;(a_2,b_2) = \gradfbog{e_2}\;$ in|} \\
+                                    ((a_1,a_2), (b_1,b_2))
+                                    \end{codearray} >
+&
+\eq<       \gradrbogEB{(e_1,e_2)}{\gradf{t}}{b} ===
+                    \begin{codearray}{lll}
+                    \{ & (\gradf{t_1},\gradf{t_2}) = \gradf{t} \\
+                    ;  & (b_1,b_2) = b & \} \\
+                    \multicolumn{3}{l}{\append \; \gradrbogEB{e_1}{\gradf{t_1}}{b_1}} \\
+                    \multicolumn{3}{l}{\append \; \gradrbogEB{e_2}{\gradf{t_2}}{b_2}}
+                    \end{codearray} 
+>\\
+% let x = e1 in e2
+\eq<       \gradfbog{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}} ===
+							           \begin{codearray}{l}
+							           \mbox{\lstinline|let $\;(x,b_1) = \gradfbog{e_1}\;$ in|} \\
+							           \mbox{\lstinline|let $\;(r,b_2) = \gradfbog{e_2}\;$ in|} \\
+							           (r, (b_1,b_2))
+							           \end{codearray}
+>
+&
+\eq<       \gradrbogEB{\mbox{\lstinline|let $\;x$ = $e_1\;$ in $\;e_2$|}}{\gradf{t}}{b} ===
+           \begin{codearray}{lll}
+           \{ & (b_1,b_2) = b & \} \\
+           \multicolumn{3}{l}{\append \; \gradrbogEB{e_2}{\gradf{t}}{b_2}} \\
+           \multicolumn{3}{l}{\append \; \gradrbogEB{e_1}{\gradf{x}}{b_1}}
+           \end{codearray}
+> \\ 
+
+% let (x, y) = e1 in e2
+\eq<    \gradfbog{\mbox{\lstinline|let $\;(x,y)$ = $e_1\;$ in $\;e_2$|}} === 
+		\begin{codearray}{l}
+            \mbox{\lstinline|let $\;(xy,b_1) = \gradfbog{e_1}\;$ in|} \\
+            \mbox{\lstinline|let $\;(x,y) = xy\;$ in|} \\
+            \mbox{\lstinline|let $\;(r,b_2) = \gradfbog{e_2}\;$ in|} \\
+            (r, (b_1,b_2))
+            \end{codearray}
+> &
+\eq<
+         \gradrbogEB{\mbox{\lstinline|let $\;(x,y)$ = $e_1\;$ in $\;e_2$|}}{\gradf{t}}{b}
+          ===  \begin{codearray}{lll}
+            \{ & (b_1,b_2) = b & \} \\
+            \multicolumn{3}{l}{\append \; \gradrbogEB{e_2}{\gradf{t}}{b_2}} \\
+            \multicolumn{3}{l}{\append \; \gradrbogEB{e_1}{(\gradf{x},\gradf{y})}{b_1}}
+            \end{codearray}
+> \\
+% build e1 (\lambda i . e2) 
+\mkhead{
+\begin{multline*}
+        \gradfbog{\mbox{\lstinline|build $\;e_1\;(\lambda i.\, e_2)$ |}} = \\
+        \begin{codearray}{lll}
+          \mbox{\lstinline|let $\;n = e_1\;$ in|} \\
+          \mbox{\lstinline|let $\;(r,ba)\;$ = unzip (build $\;n\;(\lambda i.\,\gradfbog{e_2})$) in|} \\
+            (r, (n,ba))
+            \end{codearray}
+\end{multline*}
+} &
+\mkhead{{}
+\begin{multline*}
+        \gradrbogEB{\mbox{\lstinline|build $\;e_1\;(\lambda i.\, e_2)$ |}}{\gradf{t}}{b} = \\
+          \begin{codearray}{l@{\hspace{1mm}}l@{\hspace{1mm}}l}
+            \bigl\{ & (n,ba) = b \\
+            ; & \gradf{\overline{v}}  =
+                \begin{codearray}{l}
+                   \mbox{\lstinline{sumbuild n}} \\
+                      \quad \mbox{\lstinline|($\lambda i.$
+                      let $\;\gradrbogEB{e_2}{(\gradf{t}[i])}{(ba[i])}\;$ in $\;\gradf{\overline{v}})$|}
+                \end{codearray} & \biggr\} \\
+            \end{codearray}
+\end{multline*}
+\hspace{3em} where $\overline{v} = \freevars{e_2}$
+} \\
+% case e1 of { Inl x el; Inr y er }
+\mkhead{
+\begin{multline*}
+\gradfbog{\mbox{
+              \lstinline|case $\;e_1\;$ of \{ Inl x $\rightarrow e_l$; Inr y $\rightarrow e_r$ \}|}} = \\
+        \begin{codearray}{l}
+        \qquad   \mbox{\lstinline|case $\;e_1\;$ of|} \\
+        \qquad   \quad \mbox{\lstinline|Inl $\;x \rightarrow\;$ let $\;(r_r,b_l) = \gradfbog{e_l}\;$
+                                                            in $\;(r_r,\;$Inl$\;b_l)$|} \\
+        \qquad  \quad \mbox{\lstinline|Inr $\;y \rightarrow\;$ let $\;(r_l,b_r) = \gradfbog{e_r}\;$
+                                                            in $\;(r_l,\;$Inr$\;b_r)$|} \\
+            \end{codearray}
+\end{multline*}
+}
+& 
+\mkhead{
+\begin{multline*}
+          \gradrbogEB{\mbox{\lstinline|case $\;e_1\;$ of
+              \{ Inl x $\rightarrow e_2$; Inr y $\rightarrow e_3$ \}|}}{\gradf{t}}{b} =\\
+          \begin{codearray}{l}
+           \{\, (b_1,b_2) = b \\
+            ;\, (\gradf{xy}, \gradf{\overline{v}}) = \begin{codearray}{l}
+         \mbox{\lstinline|case $\;b_2\;$ of|} \\
+         \quad \mbox{\lstinline|Inl $\;b_l\rightarrow \;$ let $\;\gradrbogEB{e_l}{\gradf{t}}{b_l}\;$ in $\;($Inl$\;\gradf{x},\gradf{\overline{v}})$|} \\
+         \quad \mbox{\lstinline|Inr $\;b_r\rightarrow \;$ let $\;\gradrbogEB{e_r}{\gradf{t}}{b_r}\;$ in $\;($Inr$\;\gradf{y},\gradf{\overline{v}})$|}\, \} \\
+           \end{codearray} \\
+         \append \; \gradrbogEB{e_1}{\gradf{xy}}{b_1}
+         \end{codearray}
+    \end{multline*}
+\hspace{3em} where $\overline{v} = \freevars{e_l} = \freevars{e_r}$ \\
+(note that it is a property of the single-use dialect that each branch
+of an if expression has the same free variables)
+}\\
+\end{tabular}
+\end{minipage}}
+\caption{BOG-style AD for ksc} \label{fig:ksc-bog-ad}
+\end{figure*}
+
+
+See Figure~\ref{fig:ksc-bog-ad} for BOG-style AD for \ksc.
+This Figure
+assumes that the input language is a \emph{single-use dialect} of \ksc,
+in which every binder is used exactly once.
+
+Where is this assumption used?   The reverse-pass transformation $\gradrbogEB{e}$ creates
+a let-binding for every occurrence of a variable in $e$.  If any variable occurs more than
+once, these bindings will conflict, or (equally bad) one will shadow the other so
+that the earlier one is ignored.  Instead we rely on uses of \lstinline|dup| to
+duplicate binders; in the reverse pass $\rbog{\lstinline|dup|}$ adds up the
+contribution of the two occurrences.
+
+Note: In place of $\bog{e}$ (a data structure) we could use a partial application of $e_{rbog}(\bog{e}) : \tangent{T} \rightarrow \tangent{S}$.
+
+
+\begin{figure*}
+  \small
+  \def\mcol#1{\multicolumn{3}{l}{#1}}
+  \def\mkhead#1{\multicolumn{3}{l}{\begin{minipage}[t]{0.45\linewidth}#1\end{minipage}}}
+  \def\cps<#1===#2>{$#1$   &   $=$   &    $#2$}
+
+\def\doexprbase#1#2#3{
+  $\vecl{#1}$ & \multicolumn{2}{l}{$\vecl{#2}$} & \multicolumn{3}{l}{$\vecl{#3}$}
+}
+
+\def\doexpr#1#2#3#4#5#6{
+  % Expr & Fwd & RevArgs & Rev
+  \doexprbase{#1}
+    {\gradfbog{e} = #2}
+    {\gradrbog{e} \; #3 \; #4 \; #5 = #6}
+}
+\def\comment#1{
+  \multicolumn{6}{l}{\parbox{\linewidth}{#1}}\\
+}
+
+\def\body{\sigma}
+\def\dt{\gradf t}
+\def\de{\gradf e}
+
+\begin{tabular}[t]{lclrcl}
+
+\doexprbase{
+  \text{\bf Original function}\\
+      f : S \to T \\
+   f(s) = e
+} {
+  \text{\bf Forward BOG}\\
+  \fbog{f} : S \to (T,\bog{e})\\
+  \fbog{f}(s) = \gradfbog{e} \\
+  \text{If $e : T$ then $\gradfbog{e} : (T,\bog{e})$} 
+} {
+  \text{\bf Reverse BOG}\\
+  \rbog{f} : (\tangent{T},\bog{e}) \to \tangent{S} \\
+  \rbog{f}(\gradf{t},b) = \gradrbogcps{e} \dt b {\gradf s}\\[2pt]
+  \parbox{0.45\linewidth}{
+    If $e : E$
+        and $\de{:}\tangent{E}$ 
+        and $b{:}\bog{e}$ 
+        and $\body : \tangent Q$
+        then $\gradrbogcps{e} \de b \body : \tangent Q$ evaluates $\body$ in
+         a context where all free variables of $\body$ are bound.
+  }
+}
+\\
+Expression $e$ & \multicolumn{2}{l}{ } & \multicolumn{3}{l}{ }\\ 
+\hline
+% Constant, k
+\doexpr k {
+  (k,())
+  }
+\de {()} \body
+   \body
+\\
+\hline
+% Variable use, x
+\\[-10pt]
+\comment{
+Note: Use of $\underline{x}$ becomes binding of $\underline{\gradf x}$, which will be used in $\body$.  
+If $x$ is unused, it won't be bound in the reverse pass. 
+If it's used twice, there will be shadowing definitions, hence incorrect gradients, so we use $\ksid{dup}$.
+}
+\doexpr {\underline{x}} {
+  (x,())
+}
+\de b \body {
+   \ksletnl {\underline{\gradf x}} = {\de} {
+     \body
+    }
+  }
+\\
+\hline
+% let x = e1 in e2
+\comment{Note: Binding of $\underline{x}$ becomes use of $\underline{\gradf x}$ in the body of $e_2$'s reverse-pass.}
+\doexpr{\kslet \underline{x} = {e_1} {e_2}} {
+                         \ksletnl (x,b_1) = \gradfbog{e_1} {
+                         \ksletnl (r,b_2) = \gradfbog{e_2} {
+							           (r, (b_1,b_2))
+                         }}
+}
+ {\de_2} {(b_1,b_2)} \body {
+                          \vecl{
+                          \gradrbogcps{e_2} {\de_2} {b_2} (\\
+                          \quad  \gradrbogcps{e_1} {\underline{\gradf x}} {b_1} \body\\
+                          )
+}}
+\\ 
+% let (x, y) = e1 in e2
+\doexpr{\kslet {(\underline x,\underline y)} = {e_1} {e_2}} {
+    \ksletnl (xy,b_1) = {\gradfbog{e_1}} {
+      \ksletnl (x,y) = {xy} {
+        \ksletnl (r,b_2) = {\gradfbog{e_2}} {
+            (r, (b_1,b_2))
+        }
+      }
+    }
+}
+{\de_2} {(b_1,b_2)} \body {
+  \vecl{
+   \gradrbogcps{e_2}{\de_2}{b_2} (\\
+ \quad    \gradrbogcps{e_1}{(\underline{\gradf x},\underline{\gradf y})}{b_1} 
+      \body\\
+   )}
+   } 
+\\
+\hline
+% f(e)	
+\doexpr {f(a)} {
+    \ksletnl (v_a,b_a) = {\gradfbog{a}} {
+      \ksletnl (r,b_f) = {\fbog{f}(v_a)} {
+        (r, (b_a,b_f))
+      }
+    }
+  }
+  \de {(b_a, b_f)} \body {
+    \ksletnl{\gradf f} = {\rbog f(\de, b_a)} {
+      \gradrbogcps{a} {\gradf f} {b_f} \body
+    }
+  }
+\\
+\hline
+% (e_1,e_2)
+\doexpr{(e_1,e_2)} {
+    \ksletnl (a_1,b_1) = {\gradfbog{e_1}} {
+      \ksletnl (a_2,b_2) = {\gradfbog{e_2}} {
+          ((a_1,a_2), (b_1,b_2))
+      }
+    }
+  }
+  {(\de_1, \de_2)} {(b_1, b_2)} \body {
+    \vecl{
+    \gradrbogcps{e_1} {\de_1} {b_1} (\\
+    \quad  \gradrbogcps{e_2} {\de_2} {b_2} \body\\
+    )
+    }
+  }
+\\
+\hline
+% if p et ef
+\doexpr{\ksif p {e_t} {e_f}}{
+  \ksifnl p {
+    \ksletnl (r, b_t) = \gradfbog{e_t} {
+    \quad  (r, (\kskeyword{true}, b_t))
+    }
+  } {
+    \ksletnl (r, b_f) = \gradfbog{e_f} {
+    \quad  (r, (\kskeyword{false}, b_f))
+    }
+  }
+}
+\de {(b_p, b_{tf})} \body {
+  \ksifnl {b_p} {
+    \gradrbogcps{e_t} \de {\pi_1(b_{tf})} \body
+  } {
+    \gradrbogcps{e_f} \de {\pi_2(b_{tf})} \body
+  }
+% -- But if typeof(BOG$t) == typeof(BOG$f), optimize to
+% if bogp
+%   R[et] de bogif body
+%   R[ef] de bogif body
+}
+\\
+\hline
+
+% build e1 (\lambda i . e2) 
+\comment{Note: Build with ``inlined'' lambda has a special rule, 
+build with top-level function doesn't need one (see below)}
+\doexpr{\ksbuild {e_1} i {e_2}} {
+  \ksletnl n = {e_1} {
+    \ksletnl \boldsymbol{rb} = {\ksbuild n i {\gradfbog{e_2}}} {
+      \ksletnl (\boldsymbol{r},\boldsymbol{b}) = {\ksunzip{\boldsymbol{rb}}} {
+        (\boldsymbol{r}, (n,\boldsymbol{b}))
+      }
+    }
+  }
+}
+\de {(n, bs)} \body {\\
+  \quad \kssumbuild n i {\gradrbogcps {e_2} {\de[i]} {bs[i]} \body}
+}\\
+\hline
+% % case e1 of { Inl x el; Inr y er }
+% \mkhead{
+% \begin{multline*}
+% \gradfbog{\mbox{
+%               \lstinline|case $\;e_1\;$ of \{ Inl x $\rightarrow e_l$; Inr y $\rightarrow e_r$ \}|}} = \\
+%         \begin{codearray}{l}
+%         \qquad   \mbox{\lstinline|case $\;e_1\;$ of|} \\
+%         \qquad   \quad \mbox{\lstinline|Inl $\;x \rightarrow\;$ let $\;(r_r,b_l) = \gradfbog{e_l}\;$
+%                                                             in $\;(r_r,\;$Inl$\;b_l)$|} \\
+%         \qquad  \quad \mbox{\lstinline|Inr $\;y \rightarrow\;$ let $\;(r_l,b_r) = \gradfbog{e_r}\;$
+%                                                             in $\;(r_l,\;$Inr$\;b_r)$|} \\
+%             \end{codearray}
+% \end{multline*}
+% }
+% & 
+% \mkhead{
+% \begin{multline*}
+%           \gradrbogcps{\mbox{\lstinline|case $\;e_1\;$ of
+%               \{ Inl x $\rightarrow e_2$; Inr y $\rightarrow e_3$ \}|}} \de b \body =\\
+%           \begin{codearray}{l}
+%            \{\, (b_1,b_2) = b \\
+%             ;\, (\gradf{xy}, \overline{v}) = \begin{codearray}{l}
+%          \mbox{\lstinline|case $\;b_2\;$ of|} \\
+%          \quad \mbox{\lstinline|Inl $\;b_l\rightarrow \;$ let $\;\gradrbogcps{e_l}{\gradf{t}}{b_l}\;$ in $\;($Inl$\;\gradf{x},\overline{v})$|} \\
+%          \quad \mbox{\lstinline|Inr $\;b_r\rightarrow \;$ let $\;\gradrbogcps{e_r}{\gradf{t}}{b_r}\;$ in $\;($Inr$\;\gradf{y},\overline{v})$|}\, \} \\
+%            \end{codearray} \\
+%          \append \; \gradrbogcps{e_1}{\gradf{xy}}{b_1}
+%          \end{codearray}
+%     \end{multline*}
+% }\\
+\end{tabular}
+\caption{BOG-style AD for ksc core language, continuation-passing style, for the single-use dialect of \ksc{},
+      in which every binder is used exactly once.
+} \label{fig:ksc-bog-ad-cps}
+
+\begin{tabular}{llllll}
+  \hline
+  Definition & \multicolumn{2}{l}{Forward} & \multicolumn{3}{l}{Reverse}\\
+  \hline
+  % dup
+  \doexprbase{\vecl{
+    \ksid{dup} : T \to (T, T)\\
+    \ksid{dup}(x) = (x, x)
+  }} {
+    \fbogid{dup}(x) = ((x, x), ())
+  } {
+    \rbogid{dup}((\dt_1, \dt_2), ()) = \dt_1 + \dt_2
+  }\\
+  \hline
+  % build
+  \doexprbase{\vecl{
+    \ksid{build} : (E, \mathbb N, (E, \mathbb N) \to T) \to \ksVec T\\
+    \ksid{build}(env, n, f) = \dots\\
+    f : (E, \mathbb N) \to T \\
+    \fbog f : (E, \mathbb N) \to (T, \bog f)\\
+    \rbog f : (\tangent{T}, \bog f) \to (\tangent{E}, ())
+  }} {
+    \vecl{
+      \fbogid{build}(env, n, f) =\\
+      \quad \ksletnl bs = {\ksid{build}(env, n, \fbog f)} {
+        \ksletnl (r,ba) = {\ksid{unzip}(bs)} {
+          (r, (n, ba))
+        }
+      }
+    }
+  } {
+    \rbogid{build}(\mathbf\dt, (n, ba)) = \\
+    \quad  \kssumbuild n i {\rbog{f}(\dt[i], ba[i])}
+    }\\
+  \hline
+\end{tabular}
+\caption{BOG-style AD for some ksc primitive functions} \label{fig:ksc-bog-ad-cps}
+\end{figure*}
+
+
 
 \end{document}
 
