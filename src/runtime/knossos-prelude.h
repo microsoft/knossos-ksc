@@ -75,7 +75,7 @@ double fwd$maximum(allocator *, vec<double> const& v, vec<double> const& dv)
 vec<double> rev$maximum(allocator * alloc, vec<double> const& v, double dr)
 {
     std::cerr << "[rev$maximum untested]";
-    size_t i = imaximum(v);
+    int i = imaximum(v);
     return deltaVec(alloc, size(v), i, dr);
 }
 

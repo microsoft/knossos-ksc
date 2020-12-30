@@ -5,7 +5,14 @@
 {
 	"version": "0.2.0",
 	"configurations": [
-        {
+		{
+			"name": "Python: Current File",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal"
+		},
+		{
 			"name": "Run Extension",
 			"type": "extensionHost",
 			"request": "launch",
@@ -24,8 +31,13 @@
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bin/ksc-mlir",
-			"_args": ["TEST"],
-			"args": ["LLVM", "${workspaceFolder}/mlir/test/Ksc/tuple.ks"],
+			"_args": [
+				"TEST"
+			],
+			"args": [
+				"LLVM",
+				"${workspaceFolder}/mlir/test/Ksc/tuple.ks"
+			],
 			"_miDebuggerPath": "/usr/bin/gdb",
 			"MIMode": "gdb",
 			"setupCommands": [
@@ -37,8 +49,8 @@
 			],
 			"externalConsole": false,
 			"logging": {
-			  "moduleLoad": false,
-			  "trace": true
+				"moduleLoad": false,
+				"trace": true
 			}
 		},
 		{

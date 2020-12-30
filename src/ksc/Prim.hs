@@ -509,11 +509,11 @@ primFunCallResultTy_maybe fun args
       ("lmVCat"   , TypeTuple tys) | Just (ss,ts) <- unzipLMTypes tys
                                      , (s1:ss1) <- ss
                                      , all (== s1) ss1     -> Just (TypeLM s1 (TypeTuple ts))
-      ("lmVCatV"  , TypeTensor 1 (TypeLM s t))             -> Just (TypeLM s (TypeTensor 1 t))
+      ("lmVCatV"  , TypeTensor d (TypeLM s t))             -> Just (TypeLM s (TypeTensor d t))
       ("lmHCat"   , TypeTuple tys) | Just (ss,ts) <- unzipLMTypes tys
                                      , (t1:ts1) <- ts
                                      , all (== t1) ts1     -> Just (TypeLM (TypeTuple ss) t1)
-      ("lmHCatV"  , TypeTensor 1 (TypeLM t s))             -> Just (TypeLM (TypeTensor 1 t) s)
+      ("lmHCatV"  , TypeTensor d (TypeLM t s))             -> Just (TypeLM (TypeTensor d t) s)
 
       -- ($inline f args) forces f to be inlined here
       ("$inline"  , t)                                     -> Just t
@@ -543,22 +543,31 @@ primFunCallResultTy_maybe fun args
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , t)                                       -> Just t
 
-      ("constVec" , TypeTuple [TypeInteger, t])              -> Just (TypeTensor 1 t)
-      ("deltaVec" , TypeTuple [TypeInteger, TypeInteger, t]) -> Just (TypeTensor 1 t)
+      ("constVec" , TypeTuple [sizeType, t])                 -> tensorTypeFromIndexType_maybe sizeType t
+      ("deltaVec" , TypeTuple [sizeType, indexType, t])
+        | sizeType `eqType` indexType
+        -> tensorTypeFromIndexType_maybe indexType t
       ("diag"     , TypeTuple [TypeInteger,
                                 TypeInteger,
                                 TypeLam TypeInteger t])      -> Just (TypeTensor 1 (TypeTensor 1 t))
       ("build"    , TypeTuple
-                     [TypeInteger, TypeLam TypeInteger t])   -> Just (TypeTensor 1 t)
+                     [sizeType, TypeLam indexType t])
+        | sizeType `eqType` indexType
+        -> tensorTypeFromIndexType_maybe indexType t
 
       -- (print a b c) prints its arguments to stdout with no separators
       ("print"    , _)                                     -> Just TypeInteger
       ("sumbuild" , TypeTuple
-                     [TypeInteger, TypeLam TypeInteger t]) -> Just t
-      ("index"    , TypeTuple [TypeInteger, TypeTensor 1 t]) -> Just t
+                     [sizeType, TypeLam indexType t])
+        | sizeType `eqType` indexType
+        , isJust (tensorDimensionFromIndexType_maybe indexType)
+        -> Just t
+      ("index"    , TypeTuple [indexType, TypeTensor d t])
+        | indexType `eqType` tensorIndexType d
+        -> Just t
       ("shape"    , t)                                     -> Just (shapeType t)
-      ("size"     , TypeTensor 1 _)                        -> Just TypeInteger
-      ("sum"      , TypeTensor 1 t)                        -> Just t
+      ("size"     , TypeTensor d _)                        -> Just (tensorIndexType d)
+      ("sum"      , TypeTensor _ t)                        -> Just t
 
       ("unzip"    , TypeTensor d (TypeTuple ts))           -> Just (TypeTuple (map (TypeTensor d) ts))
 

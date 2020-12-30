@@ -9,7 +9,8 @@ module OptLet( optLets
              , mkEmptySubst, lookupSubst
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
-             , substExpr, substVar )
+             , substExpr, substVar
+             , ensureDon'tReuseParams )
              where
 
 import Lang
@@ -216,6 +217,9 @@ substExpr subst e
     go (Lam v e)      = Lam v' (substExpr subst' e)
                       where
                         (v', subst') = substBndr v subst
+
+ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
+ensureDon'tReuseParams = substExpr . mkEmptySubst
 
 optLetsE :: Subst -> ExprX OccAnald -> TExpr
 -- This function inlines let-bindings that are only used once

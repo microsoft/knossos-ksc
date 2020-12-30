@@ -151,3 +151,5 @@
            (count (to_float (mul cm1 h)))
            (loss (neg (div total count))))
        loss))
+
+(def main Integer () 0)

@@ -100,7 +100,7 @@ def parse_args(se):
     return [parse_arg(arg) for arg in ensure_list_of_lists(se)]
 
 def parse_expr(se):
-    # "x" -> always a variable
+    # Otherwise, "x" -> a variable use
     if isinstance(se, sexpdata.Symbol):
         return Var(se.value(), None, False)
 

@@ -6,13 +6,13 @@ jobs:
   workspace:
     clean: all
   pool:
-    vmImage: 'ubuntu-16.04'
+    vmImage: 'ubuntu-18.04'
 
   steps:
 
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.6'
+      versionSpec: '3.7'
       architecture: 'x64'
 
   - task: UseDotNet@2
@@ -28,7 +28,7 @@ jobs:
   - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
     displayName: 'Install dependencies'
 
-  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=.
+  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=.  --overwrite-policy=always --install-method=copy
     displayName: 'Can build with cabal'
 
   - script: ./ksc --test --fs-test out.ks

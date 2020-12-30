@@ -9,3 +9,5 @@
 
 (def f Float ((x : Float) (n : Integer))
   (mul x (to_float n)))
+
+(def main Integer () 0)

@@ -2,9 +2,9 @@ from ksc.abstract_value import ExecutionContext
 from ksc.utils import translate_and_import
 
 def shape_from_type(arg_type, assumed_vector_size=100):
-    if arg_type.kind == "Tuple":
+    if arg_type.is_tuple:
         return tuple(shape_from_type(c) for c in arg_type.children)
-    if arg_type.kind == "Vec":
+    if arg_type.is_vec:
         child_shape = shape_from_type(arg_type.children[0])
         return (assumed_vector_size,) + child_shape
     else:

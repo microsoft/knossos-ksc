@@ -293,9 +293,6 @@ be particularly important for avoiding a 5x slowdown.  See
 
 -}
 
-ensureDon'tReuseParams :: [TVar] -> TExpr -> TExpr
-ensureDon'tReuseParams = OptLet.substExpr . OptLet.mkEmptySubst
-
 params_withPackedParamsPat :: Pat -> ([TVarX], TExpr -> TExpr)
 params_withPackedParamsPat (TupPat vs)    = (vs, id)
 params_withPackedParamsPat (VarPat param) = params_withPackedParams param
@@ -308,7 +305,7 @@ params_withPackedParams param = case typeof param of
         mkParam i ty = TVar ty (Simple name)
           where name = nameOfVar (tVarVar param) ++ "arg" ++ show i
         packParams = mkLet param (Tuple (map Var params))
-    in (params, ensureDon'tReuseParams params . packParams)
+    in (params, OptLet.ensureDon'tReuseParams params . packParams)
   _             -> ([param], id)
 
 mkCTypedVar :: TVar -> String
@@ -596,7 +593,7 @@ cgenAnyFun (tf, ty) cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
     case ty of
-      TypeTensor 1 t -> "build<" ++ cgenType (mkCType t) ++ ">"
+      TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _              -> error ("Unexpected type for build: " ++ show ty)
   TFun ty (Fun (PrimFun "sumbuild")) -> -- TODO: remove special case
     "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
@@ -670,7 +667,6 @@ cgenTypeLang = \case
   TypeString    -> "std::string"
   TypeTuple [t] -> cgenTypeLang t
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
-  TypeTensor 1 t -> "vec<" ++ cgenTypeLang t ++ ">"
   TypeTensor d t -> "tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
   TypeUnknown   -> "void"
