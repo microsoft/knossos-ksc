@@ -98,7 +98,7 @@ jobs:
   - task: PowerShell@2
     inputs:
       targetType: 'filePath'
-      filePath: .\test\build\mkdirs.ps1
+      filePath: .\test\builds\mkdirs.ps1
     displayName: 'Make directories'
 
   - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj/test/out.ks .\test\f2k\test0.fs
