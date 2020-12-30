@@ -1,3 +1,4 @@
+# Azure pipelines CI definition. See https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema
 trigger: none
 
 jobs:
@@ -18,6 +19,9 @@ jobs:
   - task: UseDotNet@2
     inputs:
       version: 3.1.100
+
+  - script: sh ./test/builds/mkdirs.sh
+    displayName: 'Make directories'
 
   - script: dotnet run --project src/f2k/f2k.fsproj SKIPPED obj/test/out.ks test/f2k/test0.fs
     env:
@@ -90,6 +94,12 @@ jobs:
   - task: UseDotNet@2
     inputs:
       version: 3.1.100
+
+  - task: PowerShell@2
+    inputs:
+      targetType: 'filePath'
+      filePath: .\test\build\mkdirs.ps1
+    displayName: 'Make directories'
 
   - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj/test/out.ks .\test\f2k\test0.fs
     env:
