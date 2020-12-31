@@ -15,7 +15,7 @@ double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
 	return dot(a,b);
 }
 
-vec<double> 
+vec<double>
 mul$Mat$Vec$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> const& v)
 {
 	int r = size(M);
