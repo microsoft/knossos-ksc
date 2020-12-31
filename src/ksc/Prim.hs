@@ -447,9 +447,7 @@ primFunCallResultTy_maybe "fold" args
   , TypeLam (TypeTuple [a1, b1]) a2 <- f
   , TypeTensor 1 b2 <- v
   , b1 `eqType` b2
-  , Just a <- eqTypes a1 [a2, acc]
-  = Just a
-  | otherwise = Nothing
+  = eqTypes a1 [a2, acc]
 
 primFunCallResultTy_maybe "lmFold" args
   | TypeTuple [ds_zero,f,f',acc,v] <- args
