@@ -38,18 +38,18 @@
 (def sqnorm Float ((v : Vec Float))
   (dot v v))
 
-(def gmm_knossos_makeQ (Vec (Vec Float)) ((q : Vec Float) (l : Vec Float))
+(def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
  (let (D (size q))
    (assert (eq (size l) (gmm_knossos_tri D))
-    (build D (lam (i : Integer)
-        (build D (lam (j : Integer)
+    (build (tuple D D) (lam (ij : Tuple Integer Integer)
+        (let ((i j) ij)
            (if (lt i j)
             0.0
             (if (eq i j)
               (exp (index i q))
               (index (add (gmm_knossos_tri (sub i 1)) j) l))
            )
-           )))))))
+           ))))))
 
 (def logsumexp Float ((v : Vec Float))
     (log (sum (exp$VecR v))))
