@@ -102,7 +102,7 @@ jobs:
       filePath: .\test\builds\mkdirs.ps1
     displayName: 'Make directories [userInstall]'
 
-  - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj/test/out.ks .\test\f2k\test0.fs
+  - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj\test\out.ks .\test\f2k\test0.fs
     env:
       # v Otherwise it wastes a bunch of time caching
       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
@@ -115,7 +115,7 @@ jobs:
   - script: refreshenv && ghc -main-is testWindows -isrc/ksc -Werror -Wunused-imports -Wunused-top-binds -Wmissing-signatures src/ksc/Main.hs
     displayName: 'GHC compile src/ksc/Main.hs [userTest]'
 
-  - script: src\ksc\Main.exe obj/test/out.ks
+  - script: src\ksc\Main.exe obj\test\out.ks
     displayName: 'ksc test [userTest]'
 
   - script: rm -rf *
