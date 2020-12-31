@@ -16,7 +16,7 @@ double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
 }
 
 vec<double>
-mul$Mat$Vec$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> const& v)
+mul$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> const& v)
 {
 	int r = size(M);
 	vec<double> ret(alloc, r);
@@ -26,7 +26,7 @@ mul$Mat$Vec$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> 
 }
 
 tuple<vec<vec<double>>,vec<double>> 
-rev$mul$Mat$Vec$a$dT1T1fT1f$bT1f(allocator * alloc, std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
+rev$mul$dT1T1fT1f$bT1f(allocator * alloc, std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
 {
         auto [M, v] = M_v;
 	int r = size(M);
