@@ -106,6 +106,29 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+; mul Mat Vec
+(edef mul (Vec Float) ((Vec (Vec Float)) (Vec Float)))
+(def shape$mul (Vec (Tuple)) ((m : (Vec (Vec Float))) (v : (Vec Float)))
+          (constVec (size m) (tuple)))
+
+(edef D$mul (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
+          ((Vec (Vec Float)) (Vec Float)))
+(edef Dt$mul (Tuple (Vec Float) (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
+          ((Vec (Vec Float)) (Vec Float)))
+
+(edef R$mul (LM (Vec Float) (Tuple (Vec (Vec Float)) (Vec Float)))
+          ((Vec (Vec Float)) (Vec Float)))
+
+(def fwd$mul (Vec Float)
+          ((M_v : (Tuple (Vec (Vec Float)) (Vec Float))) (dM_dv : (Tuple (Vec (Vec Float)) (Vec Float))))
+     (let ((M  (get$1$2 M_v))
+           (v  (get$2$2 M_v))
+           (dM (get$1$2 dM_dv))
+           (dv (get$2$2 dM_dv)))
+    (ts_add (mul dM v) (mul M dv))))
+
+(edef rev$mul (Tuple (Vec (Vec Float)) (Vec Float))
+          ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
 
 ;; div :: Number x Number -> Number
 ;; div (x, y) = x / y
