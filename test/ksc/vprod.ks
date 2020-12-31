@@ -13,8 +13,7 @@
 
 (def fprod Float (v : Vec Float)
      (fold (lam (acc_x : Tuple Float Float)
-                (let ((acc (get$1$2 acc_x))
-                      (x   (get$2$2 acc_x)))
+                (let ((acc x) acc_x)
                   (mul acc x)))
            1.0
            v))
