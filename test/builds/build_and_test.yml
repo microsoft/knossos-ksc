@@ -29,6 +29,7 @@ jobs:
       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
     displayName: 'F# to KS'
+    knossosUserTest: true
 
   - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
     displayName: 'Install dependencies'
