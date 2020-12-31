@@ -152,6 +152,7 @@ inline double exp$af(allocator *, double d) { return exp(d); }
 inline double log$af(allocator *, double d) { return log(d); }
 inline double sin$af(allocator *, double d) { return sin(d); }
 inline double cos$af(allocator *, double d) { return cos(d); }
+inline double cosh$af(allocator *, double d) { return cosh(d); }
 inline double tanh$af(allocator *, double d) { return tanh(d); }
 inline double lgamma$af(allocator *, double d) { return lgamma(d); }
 
