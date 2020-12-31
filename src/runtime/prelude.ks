@@ -328,15 +328,17 @@
 (def [rev cos] Float ((x : Float) (d_dcos : Float)) (neg (mul (sin x) d_dcos)))
 (edef [Dt cos] (Tuple Float (LM Float Float)) (Float))
 
+(edef cosh Float (Float))
+
 (edef tanh Float (Float))
 (def [fwd tanh] Float ((x : Float) (dx : Float))
-     (let (tanh_x (tanh x))
-     (let (tanh_x_2 (mul tanh_x tanh_x))
-       (mul tanh_x_2 dx))))
+     (let (cosh_x (cosh x))
+     (let (cosh_x_2 (mul cosh_x cosh_x))
+       (div dx cosh_x_2))))
 (def [rev tanh] Float ((x : Float) (d_dr : Float))
-     (let (tanh_x (tanh x))
-     (let (tanh_x_2 (mul tanh_x tanh_x))
-       (mul tanh_x_2 d_dr))))
+     (let (cosh_x (cosh x))
+     (let (cosh_x_2 (mul cosh_x cosh_x))
+       (div d_dr cosh_x_2))))
 (edef [D tanh] (LM Float Float) (Float))
 (edef [Dt tanh] (Tuple Float (LM Float Float)) (Float))
 
