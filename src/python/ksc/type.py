@@ -241,6 +241,7 @@ Type.Float = Type("Float")
 Type.Bool = Type("Bool")
 Type.String = Type("String")
 
+
 class SizeType:
     @staticmethod
     def from_rank(n : int) -> Type:
@@ -260,3 +261,15 @@ class SizeType:
     @staticmethod
     def isa(ty : Type) -> bool:
         return SizeType.get_rank(ty) is not None
+
+def tangent_type(ty : Type) -> Type:
+    if ty in (Type.String, Type.Integer, Type.Bool):
+        return Type.Tuple()
+    if ty == Type.Float:
+        return ty
+    if ty.is_tuple:
+        return Type.Tuple(tangent_type(ty) for ty in ty)
+    if ty.is_vec:
+        return Type.Vec(tangent_type(Type.Index(ty)))
+
+    raise NotImplementedError("tangent_type")
