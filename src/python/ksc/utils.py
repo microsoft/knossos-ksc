@@ -106,7 +106,7 @@ def get_ksc_paths():
     if "KSC_PATH" in os.environ:
         ksc_path = os.environ["KSC_PATH"]
     else:
-        ksc_path = "./ksc"
+        ksc_path = "./build/bin/ksc"
     
     return ksc_path,ksc_runtime_dir
 
@@ -206,8 +206,10 @@ def mangleTypes(tys):
 def encode_name(s : str) -> str:
     # TODO: this could be faster
     return s.\
+        replace('$',"$$").\
         replace('@',"$a").\
         replace(',',"$_").\
+        replace('.',"$o").\
         replace('[',"$6").\
         replace(']',"$9").\
         replace('<',"$d").\
