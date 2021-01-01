@@ -32,6 +32,7 @@ data CType =  CType Type
             | LMZero Type Type
             | LMOne Type
             | LMScale Type
+            | LMScaleR Type
             | LMHCat [CType]
             | LMVCat [CType]
             | LMBuild CType
@@ -194,6 +195,7 @@ allocatorUsageOfCType = \case
   LMZero _ _     -> UsesAllocator
   LMOne _        -> UsesAllocator
   LMScale  _     -> UsesAllocator
+  LMScaleR _     -> UsesAllocator
   LMHCat   _     -> UsesAllocator
   LMVCat   _     -> UsesAllocator
   LMBuild  _     -> UsesAllocator
@@ -630,7 +632,7 @@ are two cases:
 
 funUsesAllocator :: HasCallStack => TFun -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "$trace", "print"]
+  not $ fname `elem` ["index", "size", "eq", "ne", "$trace", "print", "ts_dot"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
@@ -651,6 +653,7 @@ cgenType = \case
   LMZero s t      -> lmt "Zero" [s, t]
   LMOne t         -> lmt "One" [t]
   LMScale t       -> lmt "Scale" [t]
+  LMScaleR t      -> lmt "ScaleR" [t]
   LMHCat   ts     -> lm "HCat" ts
   LMVCat   ts     -> lm "VCat" ts
   LMBuild  t      -> lm "Build" [t]
@@ -694,9 +697,11 @@ ctypeofFun1 ty _ _ = mkCType ty
 ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
 ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
   ("lmApply"  , _         ) -> mkCType ty
+  -- TODO: lmApplyR?
   ("lmOne"    , [ct]      ) -> LMOne (stripCType ct)
   ("lmZero"   , [cs, ct]  ) -> LMZero (stripCType cs) (stripCType ct)
   ("lmScale"  , [ct, CType TypeFloat]) -> LMScale (stripCType ct)
+  ("lmScaleR" , [ct]      ) -> LMScaleR (stripCType ct)
   ("lmHCat"   , _         ) -> LMHCat arg_types
   ("lmVCat"   , _         ) -> LMVCat arg_types
   ("lmCompose", [lm1, lm2]) -> LMCompose lm1 lm2
