@@ -276,7 +276,7 @@ userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
 userCallResultTy_maybe fn env args
   = case lookupGblST (fn, typeof args) env of
       Just def -> userCallResultTy_help def args
-      Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
+      Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn)
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
@@ -435,8 +435,7 @@ lookupLclTc v
   = do { st <- getSymTabTc
        ; case Map.lookup v (lclST st) of
            Nothing -> do {
-                             addErr (vcat [ text "In envionment:" <+> gblDoc st
-                                          , text "Not in scope: local var/tld:" <+> ppr v ])
+                             addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v ])
                              ; return TypeUnknown
                              }
            Just ty -> return ty }
@@ -458,6 +457,3 @@ lookupGblTc fun args
              -- Perhaps think about printing it only for failed lookup of userfun
              -- , text "ST keys:" <+> gblDoc st
              ]
-
-gblDoc :: SymTab -> SDoc
-gblDoc st = vcat (map (text . show) (Map.keys (gblST st)))
