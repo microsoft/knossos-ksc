@@ -99,7 +99,8 @@ def generate_cpp_from_ks(ks_str):
     if "KSC_PATH" in os.environ:
         ksc_path = os.environ["KSC_PATH"]
     else:
-        ksc_path = "./ksc"
+        ksc_path = "./build/bin/ksc"
+    
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
     with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:

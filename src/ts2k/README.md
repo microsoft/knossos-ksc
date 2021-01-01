@@ -78,7 +78,7 @@ python src\ts2k\ts2k.py --input_file=test/ts2k/test0.py --output_file=obj/test/t
 then (in PowerShell style)
 
 ```powershell
-./ksc --compile-and-run `
+./build/bin/ksc --compile-and-run `
   --ks-source-file src/runtime/prelude.ks `
   --ks-source-file obj/test/ts2k/ts2k_test.ks `
   --ks-output-file obj/test/ts2k/ts2k_test.kso `

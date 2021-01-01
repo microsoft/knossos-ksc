@@ -80,14 +80,13 @@ build/
 *.dyn_hi
 
 # TeX
-users/simonpj/AD.dvi
-users/simonpj/AD.log
-users/simonpj/AD.aux
-users/simonpj/AD.fdb*
-users/simonpj/AD.fls
-users/simonpj/AD.xdv
-users/simonpj/AD.pdf
+doc/AD.dvi
 doc/AD.log
+doc/AD.aux
+doc/AD.fdb*
+doc/AD.fls
+doc/AD.xdv
+doc/AD.pdf
 *.synctex(busy)
 *.synctex.gz
 *.xcp
@@ -104,5 +103,7 @@ __pycache__/
 # Ionide F# VS Code extension
 .fake
 .ionide
-src/python/ksc.egg-info/
-src/python/dist/ksc-0.5-py3.6.egg
+
+# Eggs
+*.egg-info/
+ksc-*.egg

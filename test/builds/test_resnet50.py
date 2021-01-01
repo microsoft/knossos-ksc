@@ -20,7 +20,7 @@ def _hash_file(path, chunk_size=65535):
     return hasher.hexdigest()
 
 def download_file(file_url, md5_hash):
-    local_filename = file_url.split("/")[-1]
+    local_filename = "obj/test/" + file_url.split("/")[-1]
     if not os.path.isfile(local_filename):
         print(f"Downloading {file_url} to {local_filename}")
         urlretrieve(file_url, local_filename)

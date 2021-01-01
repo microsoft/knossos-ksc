@@ -1,8 +1,8 @@
 set -e
 
 echo Installing dependencies...
+python3 -m pip install pytest numpy jax==0.1.57 jaxlib==0.1.37
 
-python3 -m pip install pytest numpy
 
 echo Installing ksc...
 cd ./src/python

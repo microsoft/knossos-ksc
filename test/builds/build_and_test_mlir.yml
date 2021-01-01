@@ -20,11 +20,11 @@ jobs:
       cacheHitVar: CACHE_RESTORED
 
   - script: sh ./test/builds/install_linux_mlir.sh || (sleep 30 && sh ./test/builds/install_linux_mlir.sh) || (sleep 30 && sh ./test/builds/install_linux_mlir.sh)
-    displayName: 'Install dependencies'
+    displayName: 'Install dependencies [userInstall]'
 
   - script: sh ./test/builds/build_and_test_mlir.sh $(LLVM_BRANCH)
-    displayName: Building LLVM/MLIR
+    displayName: Building LLVM/MLIR [userInstall]
     condition: ne(variables.CACHE_RESTORED, 'true')
 
   - script: sh ./test/builds/build_and_test_kscmlir.sh
-    displayName: Testing Ksc MLIR
+    displayName: Testing Ksc MLIR [userTest]
