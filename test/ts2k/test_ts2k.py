@@ -1,4 +1,3 @@
-
 import math
 import torch
 from ksc import utils
@@ -49,7 +48,7 @@ def compile_relux():
     global ks_relux
     if ks_relux is None:
         print("Compiling relux")
-        ks_relux = ts2mod(relux)
+        ks_relux = ts2mod(relux, (1.0,))
 
 def test_ts2k_relux():
     compile_relux()
@@ -85,14 +84,30 @@ def grad_bar(a : int, x : float):
     return dda,ddx
 
 def test_bar():
-    ks_bar = ts2mod(bar)
     a,x = 1,12.34
+    ks_bar = ts2mod(bar, (a,x))
     ks_ans = ks_bar(a,x)
     ans = bar(a,x)
     assert ans == ks_ans
 
     assert ks_bar.rev((a,x),1.0) == grad_bar(a,x)
 
+def far(x : torch.Tensor):
+    y = torch.mean(x)
+    if y < 0:
+        t = -0.125*x
+    else:
+        t = 1/2 * x ** 2
+    return torch.mean(torch.sin(t)*t)
+
+def test_far():
+    x = torch.randn(2,3)
+    ks_far = ts2mod(far, (x,))
+    ks_ans = ks_far(x)
+    ans = far(x)
+    assert ans == ks_ans
+
+    #assert ks_far.rev((a,x),1.0) == grad_far(a,x)
 
 # def test_Vec_init():
 #     def f(x : float):
