@@ -10,11 +10,6 @@ double edef_example$af(allocator *, double x) { return x; }
 double fwd$edef_example$aff(allocator *, double x, double dx) { return dx; }
 double rev$edef_example$aff(allocator *, double x, double ddr) { return ddr; }
 
-double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
-{
-	return dot(a,b);
-}
-
 vec<double>
 mul$Mat$Vec$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> const& v)
 {
@@ -31,14 +26,14 @@ mul$aT2fT1f(allocator * alloc, tensor<2, double> const& M, vec<double> const& v)
 	int r = M.outer_dimension();
 	vec<double> ret(alloc, r);
 	for(int i = 0; i < r; ++i)
-		ret[i] = dot(M[i], v);
+		ret[i] = ts_dot(M[i], v);
 	return ret;
 }
 
 tuple<vec<vec<double>>,vec<double>> 
 rev$mul$Mat$Vec$a$dT1T1fT1f$bT1f(allocator * alloc, std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
 {
-        auto [M, v] = M_v;
+    auto [M, v] = M_v;
 	int r = size(M);
 	int c = size(v);
 	vec<vec<double>> retM(alloc, r);
