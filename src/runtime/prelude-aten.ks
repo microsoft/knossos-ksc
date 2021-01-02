@@ -25,15 +25,46 @@
 (def aten::sin Float (a : Float)
     (sin a))
 
+(def aten::sin (Tensor 2 Float) (a : Tensor 2 Float)
+    (build (size a) (lam (ij : Tuple Integer Integer)
+        (sin (index ij a)))))
+
 (def aten::Float Float (a : Integer)
     (to_float a))
 (def aten::Float Float (a : Float)
     a)
 
-; (edef aten::pow Float (Float Integer))
+(def aten::Bool Bool (a : Bool)
+    a)
+(def aten::Bool Bool (a : Float)
+    (ne a 0.0))
 
-; (def D$aten::pow (LM Float Float) ((a : Float) (b : Integer))
-;     (LMScale (aten::pow a (sub b 1))))
+(def aten::mul (Tensor 2 Float) ((a : Tensor 2 Float) (b : Tensor 2 Float))
+    (build (size a) (lam (ij : Tuple Integer Integer)
+        (mul (index ij a) (index ij b)))))
+
+;; a^n
+(edef aten::pow (Tensor 2 Float) ((Tensor 2 Float) Integer))
+
+;; n*a^(n - 1) * dr
+(def rev$aten::pow (Tuple (Tensor 2 Float) (Tuple)) ((a_n : Tuple (Tensor 2 Float) Integer) (dr : Tensor 2 Float))
+    (let ((a n) a_n)
+    (let (nanm1 (ts_scale (to_float n) (aten::pow a (sub n 1))))
+    (tuple (aten::mul nanm1 dr)
+       (tuple)))))
+
+(def aten::prod Float (a : Tuple Float Float)
+    (mul (get$1$2 a) (get$2$2 a)))
+
+(def aten::prod Integer (a : Tuple Integer Integer)
+    (mul (get$1$2 a) (get$2$2 a)))
+
+(def aten::sum Float (a : Tensor 2 Float)
+    (sumbuild (size a) (lam (ij : Tuple Integer Integer)
+            (index ij a))))
+
+(def aten::mean Float ((a : Tensor 2 Float) (opt_dtype : Float))
+    (div (aten::sum a) (aten::Float (aten::prod (size a)))))
 
 (def Tensor_init (Tensor 2 Float) ((a : Vec (Vec Float)))
     (let (m (size a))
