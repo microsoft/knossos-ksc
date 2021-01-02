@@ -72,6 +72,14 @@ def ks_prim_lookup(name, tys):
         elem_type = lam_ty.lam_return_type
         return Type.Tensor(rank, elem_type)
         
+    # sumbuild : Size, Lam IntTuple T -> T
+    if n == 2 and name == "sumbuild":
+        size_ty = tys[0]
+        lam_ty = tys[1]
+        assert lam_ty.lam_arg_type == size_ty
+
+        return lam_ty.lam_return_type
+        
     # constVec(n T)
     if n == 2 and name == "constVec":
         size_ty = tys[0]
@@ -94,7 +102,7 @@ def ks_prim_lookup(name, tys):
         return tyState
 
     # eq : T, T -> Bool
-    if n == 2 and name == "eq":
+    if n == 2 and name in ("eq", "ne", "lt", "gt", "le", "ge"):
         assert tys[0] == tys[1] # TODO: MOVEEQ Move eq to prelude
         return Type.Bool
 
