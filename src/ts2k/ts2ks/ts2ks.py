@@ -5,6 +5,7 @@ import torch
 
 from ksc import utils
 from ksc.ks_function import KscFunction
+from ksc.parse_ks import parse_ks_filename
 
 from ksc.type import Type
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
@@ -33,10 +34,8 @@ tab = "\t"
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
 
-Type_Tensor = Type.Vec(Type.Vec(Type.Float))  # float vs integer? also determine rank instead of hardcode
+Type_Tensor = Type.Tensor(-1, Type.Float)  # float vs integer? also determine rank instead of hardcode
 symbolLook = {
-    "Tensor": Type_Tensor,  # float vs integer? also determine rank instead of hardcode
-    "Optional[Tensor]": Type_Tensor,   # Just say optionals are required for now. TODO: don't do this!
     "Optional[bool]": Type.Bool,  # Just say optionals are required for now. TODO: don't do this!
 }
 
@@ -51,21 +50,37 @@ symbolLook[
         Type_Tensor,
         Type_Tensor,
         Type_Tensor,
-        Type.Vec(Type_Tensor),
-        Type.Vec(Type_Tensor)
+        Type.Tensor(1, Type_Tensor),
+        Type.Tensor(1, Type_Tensor)
     )
 
 #
 
-def mangleDebugName(name):
-    return "_" + name.replace(".", "_")
+def mangled_name(node):
+    return "_" + utils.encode_name(node.debugName())
 
-def from_torch_type(t):
-    if t == torch._C.IntType.get():
+def from_torch_dtype(t):
+    if t == torch.int64:
         return Type.Integer
 
-    if t == torch._C.FloatType.get():
+    if t == torch.float64:
         return Type.Float
+
+    raise NotImplementedError
+
+def from_torch_type(t):
+    if type(t) == torch._C.IntType:
+        return Type.Integer
+
+    if type(t) == torch._C.FloatType:
+        return Type.Float
+
+    if type(t) == torch._C.TensorType:
+        if t.scalarType() is not None:
+            return Type.Tensor(-1, from_torch_type(t.scalarType()))
+        else:
+            print("Assuming Tensor type is float")
+            return Type.Tensor(-1, Type.Float)
 
     type_lookup = str(t)
 
@@ -74,9 +89,17 @@ def from_torch_type(t):
 
     return symbolLook[type_lookup]
 
-def make_arg(input):
-    input_type = from_torch_type(input.type())
-    name = mangleDebugName(input.debugName())
+def type_from_value(x):
+    if isinstance(x, torch.Tensor):
+        return Type.Tensor(len(x.size()), from_torch_dtype(x.dtype))
+
+    return Type.fromValue(x)
+
+def make_arg(input, example_input):
+    input_type = type_from_value(example_input)
+    input_type_2 = from_torch_type(input.type())
+    assert input_type.kind == input_type_2.kind
+    name = mangled_name(input)
     return Var(name, input_type, decl=True)
 
 def make_constant(node):
@@ -97,41 +120,34 @@ def make_constant(node):
     return Var("_" + value.debugName()), Const(literal)
 
 
-def make_print(node):
-    mangled_id = mangleDebugName(node.inputsAt(0).debugName())
-    return Var("print"), Var(mangled_id)
-
-
 def make_list(node):
     value = node.outputsAt(0)
-    return Var(mangleDebugName(value.debugName())), Call("Vec_init", [Var(mangleDebugName(i.debugName())) for i in node.inputs()])
+    return Var(mangled_name(value)), Call("Vec_init", [Var(mangled_name(i)) for i in node.inputs()])
 
 
 def make_tensor(node):
     # tensors aren't explicitly modelled in Knossos yet, leave them as identity over a (jagged) list for now
     value = node.outputsAt(0)
 
-    return Var(mangleDebugName(value.debugName())), Var(mangleDebugName(node.inputsAt(0).debugName()))
+    return Var(mangled_name(value)), Var(mangled_name(node.inputsAt(0)))
 
 
 def make_aten_function(node, value, function_name):
-    return Var(mangleDebugName(value.debugName())), Call(function_name, [Var(mangleDebugName(i.debugName())) for i in node.inputs()])
+    return Var(mangled_name(value)), Call(function_name, [Var(mangled_name(i)) for i in node.inputs()])
 
 
 def make_return(node):
-    mangled_id = mangleDebugName(node.inputsAt(0).debugName())
+    mangled_id = mangled_name(node.inputsAt(0))
     return Var(mangled_id)
 
 
 def make_callfunction(node):
     value = node.outputsAt(0)
+    assert len(list(node.outputs())) == 1 # Assemble into tuple for multiple outputs
     function_name_constant = node.inputsAt(0).node()
     function_name = function_name_constant.s("name")
-    input1 = node.inputsAt(
-        1
-    )  # TODO: get all inputs instead of just first, 0th is function name itself
-    assert len(list(node.inputs())) == 2
-    return Var(mangleDebugName(value.debugName())), Call(function_name, mangleDebugName(input1.debugName()))
+    return (Var(mangled_name(value)), 
+            Call(function_name, [Var(mangled_name(i)) for i in node.inputs()]))
 
 def make_lets(bindings, body) -> Expr:
     for (v,rhs) in reversed(bindings):
@@ -157,7 +173,7 @@ def make_if(make_binds, node):
             "Only support conditionals with 1 input, this one had: " + str(inputs_size)
         )
 
-    conditional = mangleDebugName(node.inputsAt(0).debugName())
+    conditional = mangled_name(node.inputsAt(0))
 
     blocks = list(
         node.blocks()
@@ -170,12 +186,11 @@ def make_if(make_binds, node):
                                success_branch,
                                failure_branch)
 
-def ts2ks_fromgraph(generate_edefs, name, graph):
+def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
 
     def translate_node(make_binds, node) -> Tuple[Var, Expr]:
         lookups = {
             "prim::Constant": make_constant,
-            "prim::Print": make_print,
             "prim::ListConstruct": make_list,
             "prim::Return": make_return,
             "prim::CallFunction": make_callfunction,
@@ -205,8 +220,8 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
     binds = make_binds(all_nodes)
 
     args = [
-        make_arg(input)
-        for input in graph.inputs()
+        make_arg(input, example)
+        for input,example in zip(graph.inputs(), example_inputs)
         if (not input.type().str().startswith("__torch__.transformers"))
     ]  # filtering self, TODO: look for better way
 
@@ -228,24 +243,23 @@ def ts2ks_fromgraph(generate_edefs, name, graph):
             )
         return_node = graph.return_node()
         op = translate_node(make_binds, return_node)
-        return_type = from_torch_type(return_node.inputsAt(0).type())
+        return_type = None #Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
 
-    print(binds)
     body = make_lets(binds, op)
 
     return Def(name, return_type, args, body)
 
 
 # TODO: make an configuration named tuple rather than passing flags
-def ts2ks(output, generate_edefs, function):
-    s = ts2ks_fromgraph(generate_edefs, function.name, function.graph)
+def ts2ks(output, generate_edefs, function, example_inputs):
+    s = ts2ks_fromgraph(generate_edefs, function.name, function.graph, example_inputs)
     output.write(pformat(s))
 
-def ts2mod(function):
+def ts2mod(function, example_inputs):
     fn = torch.jit.script(function)
-    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph)
+    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
 
-    if False:
+    if True:
         symtab = dict()
         decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
         type_propagate_decls(decls_prelude, symtab)
@@ -280,16 +294,36 @@ if __name__ == "__main__":
             t = 1/2 * x * float(b)
         return sin(t) * t
 
-    fn = torch.jit.script(bar)
-    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph)
+    def foo(x : torch.Tensor):
+        y = torch.mean(x)
+        if y < 0:
+            t = -0.125*x
+        else:
+            t = 1/2 * x ** 2
+        return torch.mean(torch.sin(t)*t)
+
+    x = torch.ones((2,3))
+
+    fn = torch.jit.script(foo)
+    print(fn.code)
+    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x,))
     print(pformat(ks_str))
 
-    ks_bar = ts2mod(bar)
+    
+    ks_fun = ts2mod(foo, example_inputs=(x,))
 
     a,b = 1,12.34
 
     ans = bar(a,b)
     print(ans)
 
-    ans = ks_bar(a,b)
+    ans = ks_fun(a,b)
+    print(ans)
+
+    btrace = torch.tensor(b, requires_grad=true)
+    y = bar(btrace)
+    dy = torch.autograd.grad(y, x)
+    print(dy)
+
+    ans = ks_fun.rev((a,b), 1.0)
     print(ans)
