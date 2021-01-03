@@ -174,8 +174,12 @@ def _(ex, symtab):
     local_st = {**symtab, **{a.name:a.type_ for a in ex.args}}
 
     # Recurse into body
-    ex.body = type_propagate(ex.body, local_st)
-
+    try:
+        ex.body = type_propagate(ex.body, local_st)
+    except KSTypeError as e:
+        ctx = f"In definition of {ex.name} {pformat(argtypes)}\n"
+        raise KSTypeError(ctx + str(e)) from e
+    
     if declared_return_type: 
         # Check the inferred type matches the decl
         if ex.return_type != ex.body.type_:
@@ -207,6 +211,8 @@ def _(ex, symtab):
     if ex.decl:
         assert ex.type_ != None
     else:
+        if ex.name not in symtab:
+            raise KSTypeError(f"Unknown symbol {ex.name}")
         ex.type_ = symtab[ex.name]
     return ex
 

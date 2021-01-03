@@ -21,7 +21,7 @@ def check(cond, *message):
         if isinstance(s, (sexpdata.SExpBase, list)):
             return sexpdata.dumps(s)
         else:
-            return s
+            return str(s)
 
     if not cond:
         message = "".join(tostr(s) for s in message)
