@@ -4,7 +4,7 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType
+from ksc.type import Type, SizeType, shape_type
 
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
@@ -55,6 +55,9 @@ def ks_prim_lookup(name, tys):
     if n == 1 and name == "size":
         return SizeType.from_rank(tys[0].tensor_rank)
 
+    if n == 1 and name == "shape":
+        return shape_type(tys[0])
+
     # index : Size, Tensor N T -> T
     if n == 2 and name == "index":
         assert tys[0] == SizeType.from_rank(tys[1].tensor_rank)
@@ -102,7 +105,7 @@ def ks_prim_lookup(name, tys):
         return tyState
 
     # eq : T, T -> Bool
-    if n == 2 and name in ("eq", "ne", "lt", "gt", "le", "ge"):
+    if n == 2 and name in ("eq", "lt", "gt", "lte", "gte"):
         assert tys[0] == tys[1] # TODO: MOVEEQ Move eq to prelude
         return Type.Bool
 
