@@ -319,7 +319,7 @@ if __name__ == "__main__":
     ans = foo(x)
     print("Python answer = ", ans.numpy())
 
-    kx = ks_fun._py_mod.Tensor_2_Float(x.data_ptr(), *x.shape) # TODO: auto-translate these
+    kx = ks_fun.adapt(x)
     ans = ks_fun(kx)
     print("Knossos answer = ", ans)
 
@@ -343,7 +343,7 @@ if __name__ == "__main__":
     import timeit
     def time_ks():
         ks_fun._py_mod.reset_allocator()
-        kx = ks_fun._py_mod.Tensor_2_Float(x.data_ptr(), *x.shape) # TODO: auto-translate these
+        kx = ks_fun.adapt(x)
         ans = ks_fun.rev(kx, 1.0)
 
     def time_pytorch():
