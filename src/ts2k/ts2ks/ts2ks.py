@@ -1,6 +1,7 @@
 from typing import List, Tuple
 
 import functools
+import numpy
 import torch
 
 from ksc import utils
@@ -302,28 +303,54 @@ if __name__ == "__main__":
             t = 1/2 * x ** 2
         return torch.mean(torch.sin(t)*t)
 
-    x = torch.ones((2,3))
+    # Compile function and gradients for example input of ones(2,3)
+    x_example = torch.ones((2,3))
 
     fn = torch.jit.script(foo)
     print(fn.code)
-    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x,))
+    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x_example,))
     print(pformat(ks_str))
-
     
-    ks_fun = ts2mod(foo, example_inputs=(x,))
+    ks_fun = ts2mod(foo, example_inputs=(x_example,))
 
-    a,b = 1,12.34
+    # Call the function at interesting inputs
+    x = torch.rand((4,4)) # TODO: check non-square
 
-    ans = bar(a,b)
-    print(ans)
+    ans = foo(x)
+    print("Python answer = ", ans.numpy())
 
-    ans = ks_fun(a,b)
-    print(ans)
+    kx = ks_fun._py_mod.Tensor_2_Float(x.data_ptr(), *x.shape) # TODO: auto-translate these
+    ans = ks_fun(kx)
+    print("Knossos answer = ", ans)
 
-    btrace = torch.tensor(b, requires_grad=true)
-    y = bar(btrace)
-    dy = torch.autograd.grad(y, x)
-    print(dy)
+    # Compute the gradient
+    ans = ks_fun.rev(kx, 1.0)
+    ansnp = numpy.array(ans, copy=False)
+    print("Knossos gradient = \n", ansnp)
 
-    ans = ks_fun.rev((a,b), 1.0)
-    print(ans)
+    # Compute the gradient using torch
+    xtrace = x.clone().detach().requires_grad_(True)
+    y = foo(xtrace)
+    dy = torch.autograd.grad(y, xtrace)
+    print("Torch gradient = \n", dy[0].numpy())
+
+    print("Gradient diff = \n", ansnp - dy[0].numpy())
+
+    #print(f"Knossos mem: {ks_fun._py_mod.allocator_top()}/{ks_fun._py_mod.allocator_peak()}")
+
+    x = torch.rand((16,16)) # TODO: check non-square
+
+    import timeit
+    def time_ks():
+        ks_fun._py_mod.reset_allocator()
+        kx = ks_fun._py_mod.Tensor_2_Float(x.data_ptr(), *x.shape) # TODO: auto-translate these
+        ans = ks_fun.rev(kx, 1.0)
+
+    def time_pytorch():
+        xtrace = x.clone().detach().requires_grad_(True)
+        y = foo(xtrace)
+        dy = torch.autograd.grad(y, xtrace)
+        
+    ntimes = 1000
+    print("time_ks= ", timeit.timeit(time_ks, number=ntimes))
+    print("time_pt= ", timeit.timeit(time_pytorch, number=ntimes))
