@@ -262,15 +262,16 @@ class SizeType:
     def isa(ty : Type) -> bool:
         return SizeType.get_rank(ty) is not None
 
+# See AD.hs:tangentType
 def tangent_type(ty : Type) -> Type:
     if ty in (Type.String, Type.Integer, Type.Bool):
         return Type.Tuple()
     if ty == Type.Float:
         return ty
     if ty.is_tuple:
-        return Type.Tuple(tangent_type(ty) for ty in ty)
-    if ty.is_vec:
-        return Type.Vec(tangent_type(Type.Index(ty)))
+        return Type.Tuple(tangent_type(ty) for ty in ty.children)
+    if ty.is_tensor:
+        return Type.Tensor(ty.tensor_rank, tangent_type(ty.tensor_elem_type))
 
     raise NotImplementedError("tangent_type")
 
