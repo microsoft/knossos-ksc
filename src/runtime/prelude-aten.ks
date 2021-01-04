@@ -37,7 +37,7 @@
 (def aten::Bool Bool (a : Bool)
     a)
 (def aten::Bool Bool (a : Float)
-    (ne a 0.0))
+    (not (eq a 0.0)))
 
 (def aten::mul (Tensor 2 Float) ((a : Tensor 2 Float) (b : Tensor 2 Float))
     (build (size a) (lam (ij : Tuple Integer Integer)
@@ -45,6 +45,9 @@
 
 ;; a^n
 (edef aten::pow (Tensor 2 Float) ((Tensor 2 Float) Integer))
+(def shape$aten::pow (Tensor 2 (Tuple)) ((a : Tensor 2 Float) (n : Integer))
+    (shape a))
+(edef D$aten::pow (LM (Tuple (Tensor 2 Float) Integer) (Tensor 2 Float)) ((Tensor 2 Float) Integer))
 
 ;; n*a^(n - 1) * dr
 (def rev$aten::pow (Tuple (Tensor 2 Float) (Tuple)) ((a_n : Tuple (Tensor 2 Float) Integer) (dr : Tensor 2 Float))
@@ -52,6 +55,12 @@
     (let (nanm1 (ts_scale (to_float n) (aten::pow a (sub n 1))))
     (tuple (aten::mul nanm1 dr)
        (tuple)))))
+
+(def fwd$aten::pow (Tensor 2 Float) ((a_n : Tuple (Tensor 2 Float) Integer) (da_n : (Tuple (Tensor 2 Float) (Tuple))))
+    (let ((a n) a_n)
+    (let ((da dn) da_n)
+    (let (nanm1 (ts_scale (to_float n) (aten::pow a (sub n 1))))
+    (aten::mul nanm1 da)))))
 
 (def aten::prod Float (a : Tuple Float Float)
     (mul (get$1$2 a) (get$2$2 a)))
