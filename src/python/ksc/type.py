@@ -273,3 +273,14 @@ def tangent_type(ty : Type) -> Type:
         return Type.Vec(tangent_type(Type.Index(ty)))
 
     raise NotImplementedError("tangent_type")
+
+# See Prim.hs:shapeType
+def shape_type(t : Type) -> Type:
+    if t.is_scalar:
+        return Type.Tuple()
+    if t.is_tuple:
+        return Type.Tuple(shape_type(t) for t in t.children)
+    if t.is_tensor:
+        return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
+
+    raise NotImplementedError
