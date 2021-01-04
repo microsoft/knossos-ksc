@@ -119,7 +119,8 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
     try:
         with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
             with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
-                subprocess.run([
+                print("generate_cpp_from_ks:", ksc_path, fks.name)
+                e = subprocess.run([
                     ksc_path,
                     "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
                     "--ks-source-file", "src/runtime/prelude.ks",
@@ -128,13 +129,16 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
                     "--ks-output-file", fkso.name,
                     "--cpp-output-file", fcpp.name
                 ], capture_output=True, check=True)
+                print(e.stdout.decode('ascii'))
+                print(e.stderr.decode('ascii'))
     except subprocess.CalledProcessError as e:
         print(f"files {fks.name} {fkso.name} {fcpp.name}")
         print(f"ks_str=\n{ks_str}")
         print(e.output.decode('ascii'))
         print(e.stderr.decode('ascii'))
         raise
-    
+
+
     # Read from CPP back to string
     with open(fcpp.name) as f:
         out = f.read()
@@ -165,7 +169,8 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
     try:
         cmd = (f"g++-7 -I{ksc_runtime_dir} -I{pybind11_path}/include "
                + python_includes
-               + " -Wall"
+               + " -Wall -Wno-unused-variable -Wno-unused-but-set-variable"
+                 " -fmax-errors=1"
                  " -std=c++17"
                  " -O3"
                  " -fPIC"
@@ -176,7 +181,6 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
         print(cmd)
         subprocess.run(cmd, shell=True, capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"cpp_str={cpp_str}")
         print(f"cpp_file={fcpp.name}")
         print(cmd)
         print(e.output.decode('utf-8'))
@@ -206,7 +210,6 @@ def mangleTypes(tys):
 def encode_name(s : str) -> str:
     # TODO: this could be faster
     return s.\
-        replace('$',"$$").\
         replace('@',"$a").\
         replace(',',"$_").\
         replace('.',"$o").\
@@ -221,10 +224,59 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
 
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives)
 
+    cpp_str = """
+#include <cstdint>
+
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/operators.h>
+
+namespace py = pybind11;
+""" + generated_cpp_source + """
+
+int ks::main(ks::allocator *) { return 0; };
+
+ks::allocator g_alloc{ 1'000'000'000 };
+
+template<typename T>
+void declare_tensor_2(py::module &m, char const* name) {
+  // Wrap ks_tensor<Dim, T> to point to supplied python memory
+  py::class_<ks::tensor<2, T>>(m, name, py::buffer_protocol(), py::module_local())
+    .def(py::init([](std::uintptr_t v, size_t m, size_t n) {
+        if (v < 1u<<24) {
+            // probably a misplaced size
+            throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
+        }
+        ks::tensor_dimension<2>::index_type size {m,n};
+        return ks::tensor<2, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data 
+    }))
+    // And describe buffer shape to Python
+    // Returned tensors will be living on g_alloc, so will become invalid after allocator_reset()
+    .def_buffer([](ks::tensor<2, T> &t) -> py::buffer_info {
+        return py::buffer_info(
+            t.data(),                               /* Pointer to buffer */
+            sizeof(T),                              /* Size of one scalar */
+            py::format_descriptor<T>::format(),     /* Python struct-style format descriptor */
+            2,                                      /* Number of dimensions */
+            { ks::get_dimension<0>(t.size()), ks::get_dimension<1>(t.size()) },         /* Buffer dimensions */
+            { sizeof(T) * ks::get_dimension<0>(t.size()),             /* Strides (in bytes) for each index */
+               sizeof(T) }
+        );
+    })
+    ;
+}
+
+// Convert functor to one which takes a first argument g_alloc 
+template<typename RetType, typename... ParamTypes>
+auto with_ks_allocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
+  return [f](ParamTypes... params) { return f(&g_alloc, params...); };
+}
+"""
+
     args_str = mangleTypes(arg_types)
     name_str = encode_name(f"{name_to_call}@{args_str}")
     declarations = f"""
-     m.def("entry", withGlobalAllocator(&ks::{name_str}));
+     m.def("entry", with_ks_allocator(&ks::{name_str}));
     """
 
     if generate_derivatives:
@@ -235,50 +287,31 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
 
         fwd_name = encode_name(f"fwd${name_to_call}@{args_tuple_str}{dargs_tuple_str}")
         declarations += f"""
-          m.def("fwd_entry", withGlobalAllocator(&ks::{fwd_name}));
+          m.def("fwd_entry", with_ks_allocator(&ks::{fwd_name}));
         """
 
         rev_name = encode_name(f"rev${name_to_call}@{args_tuple_str}{dreturn_type_str}")
         declarations += f"""
-          m.def("rev_entry", withGlobalAllocator(&ks::{rev_name}));
+          m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
         """
 
-    cpp_str = f"""
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/operators.h>
+    cpp_str += """
+PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
+    m.def("reset_allocator", []{g_alloc.reset();});
+    m.def("allocator_top", []{ return g_alloc.mark();});
+    m.def("allocator_peak", []{ return g_alloc.peak();});
 
-namespace py = pybind11;
+    declare_tensor_2<double>(m, "Tensor_2_Float");
+    declare_tensor_2<int>(m, "Tensor_2_Integer");
 
-{generated_cpp_source}
-
-int ks::main(ks::allocator *) {{ return 0; }};
-
-ks::allocator g_alloc{{ 1'000'000'000 }};
-
-/* template<typename T>
-void declare_vec(py::module &m, std::string typestr) {{
-  using Class = ks::vec<T>;
-  std::string pyclass_name = std::string("vec_") + typestr;
-  py::class_<Class>(m, pyclass_name.c_str(), py::module_local())
-    .def(py::init<>())
-    .def(py::init([](std::vector<T> const& v) {{ return ks::vec<T>(&g_alloc, v); }}))
-    .def("__getitem__", [](const ks::vec<T> &a, const int &b) {{
-	return a[b];
-      }})
-    .def("__len__", [](const ks::vec<T> &a) {{ return a.size(); }});
-}} */
-
-template<typename RetType, typename... ParamTypes>
-auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {{
-  return [f](ParamTypes... params) {{ return f(&g_alloc, params...); }};
-}}
-
-PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {{
-  {declarations}
-}}
+""" + declarations + """
+}
 """
-    
+
+    print("Saving to obj/pybind.cpp")    
+    with open("obj/pybind.cpp", "w") as fcpp:
+        fcpp.write(cpp_str)
+
     module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path)
     return import_module_from_path(module_name, module_path)
 
