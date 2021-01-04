@@ -184,7 +184,7 @@ class Type:
         if self.is_tuple:
             return tb + "".join([c.shortstr() for c in self.children]) + te
         if self.is_tensor:
-            return "T" + self.tensor_rank + self.tensor_elem_type.shortstr()
+            return f"T{self.tensor_rank}" + self.tensor_elem_type.shortstr()
         
         raise ValueError(f"Unknown Type.{self.kind}")
 
