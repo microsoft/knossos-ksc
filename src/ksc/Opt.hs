@@ -726,7 +726,7 @@ optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
 
 optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
 
-optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ f ++ " at " ++ show (typeof a)) Nothing
+optGradPrim _ f     a = optTrace("Opt.hs: INFO: No rewrite found for grad of prim " ++ f ++ " at " ++ show (typeof a)) Nothing
 
 
 -----------------------
