@@ -1100,6 +1100,19 @@ namespace ks
 		return sumbuild_t<Dim>::template do_sumbuild<T>(alloc, size, f);
 	}
 
+
+	// Elementwise map
+	template <size_t Dim, class T, class F>
+	tensor<Dim, T> elementwise_map(allocator * alloc, tensor<Dim, T> const& t, F f)
+	{
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		T const* tdata = t.data();
+		T* retdata = ret.data();
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
+			retdata[i] = f(tdata[i]);
+		return ret;
+	}
+
 	template <class T>
 	T delta(allocator * alloc, int i, int j, T val)
 	{
@@ -1200,6 +1213,21 @@ namespace ks
 	// sum of elements
 	template <size_t Dim, class T>
 	T sum(allocator * alloc, tensor<Dim, T> const& t)
+	{
+		int ne = t.num_elements();
+		if (ne == 0) { return zero(alloc, T{}); }
+
+		const T* indata = t.data();
+		if (ne == 1) return indata[0];
+		T ret = ts_add(alloc, indata[0], indata[1]);
+		for (int i = 2; i < ne; ++i)
+			ret = ts_add(alloc, ret, indata[i]);
+		return ret;
+	}
+
+	// sum of elements
+	template <size_t Dim, class T>
+	T fwd$sum(allocator * alloc, tensor<Dim, T> const& t)
 	{
 		int ne = t.num_elements();
 		if (ne == 0) { return zero(alloc, T{}); }
