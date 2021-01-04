@@ -98,9 +98,8 @@ getZero tangent_type e
             TypeFloat    -> Konst (KFloat 0.0)
             TypeString   -> Konst (KString "")
             TypeBool     -> Konst (KBool False)
-            TypeTensor 1 _ -> mkAtomicNoFVs e $ \ e ->
-                            pConstVec (pSize e) (go (pIndex (kInt 1) e))
-            TypeTensor _ _ -> tensorBug
+            TypeTensor d _ -> mkAtomicNoFVs e $ \ e ->
+                            pConstVec (pSize e) (go (pIndex (zeroIndexForDimension d) e))
             TypeTuple ts
                | Tuple es <- e
                -> assert (text "splitTuple") (length ts == length es) $
@@ -115,9 +114,6 @@ getZero tangent_type e
          where
            e_ty = typeof e
            panic = pprPanic "mkZero" (ppr e_ty $$ ppr e)
-           tensorBug = pprPanic ("Cannot handle mkZero of TypeTensor. This is a bug in ksc. "
-                                ++ "See https://github.com/microsoft/knossos-ksc/issues/506.")
-                                (ppr e_ty $$ ppr e)
 
 -- (mkAtomicNoFVs e body) returns the expression (let a = e in body a)
 -- where body :: TExpr -> TExpr is a function expecting an expression
