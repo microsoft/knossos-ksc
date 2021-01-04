@@ -702,8 +702,8 @@ optGradPrim (TypeLM a _) "ts_neg" _
   = Just (lmScale a (kTFloat $ -1.0))
 
 optGradPrim _ "sum" e
-  | TypeTensor 1 t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "sum$i")
+  | TypeTensor d t <- typeof e
+  = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$ii")
                              (lmOne t)))
 
 optGradPrim _ "size" e
@@ -903,11 +903,11 @@ do_prod_v env dir e dx
   = Just $ pConstVec n (lmApply_Dir dir v dx)
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
-  | TypeTensor 1 _ <- typeof e
-  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
+  | TypeTensor d _ <- typeof e
+  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet (indexTVar d) env) [e,dx]
   = Just $ mkLets binds $
-    pBuild (pSize ve) $ Lam indexTVar $
-    lmApply_Dir dir (pIndex (Var indexTVar) ve) vdx
+    pBuild (pSize ve) $ Lam (indexTVar d) $
+    lmApply_Dir dir (pIndex (Var $ indexTVar d) ve) vdx
 
   | otherwise = Nothing
 
@@ -920,19 +920,20 @@ do_sum_v env dir e dx
     lmApply_Dir dir body (pIndex (Var i) vdx)
   
   | Just (n, v) <- isConstVec_maybe e
-  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [dx]
+  , Just d <- tensorDimensionFromIndexType_maybe (typeof n)
+  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet  (indexTVar d) env) [dx]
   = Just $ mkLets binds $
-    pSumBuild n $ Lam indexTVar $
-    lmApply_Dir dir v (pIndex (Var indexTVar) vdx)
+    pSumBuild n $ Lam (indexTVar d) $
+    lmApply_Dir dir v (pIndex (Var $ indexTVar d) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
-  | TypeTensor 1 _ <- typeof e
-  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
+  | TypeTensor d _ <- typeof e
+  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet (indexTVar d) env) [e,dx]
   = Just $
     mkLets binds $
-    pSumBuild (pSize vm) $ Lam indexTVar $
-    lmApply_Dir dir (pIndex (Var indexTVar) vm)
-                    (pIndex (Var indexTVar) vdx)
+    pSumBuild (pSize vm) $ Lam (indexTVar d) $
+    lmApply_Dir dir (pIndex (Var (indexTVar d)) vm)
+                    (pIndex (Var (indexTVar d)) vdx)
 
   | otherwise = Nothing
 
