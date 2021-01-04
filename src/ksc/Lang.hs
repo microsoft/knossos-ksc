@@ -260,6 +260,11 @@ tensorTypeFromIndexType_maybe :: Type -> Type -> Maybe Type
 tensorTypeFromIndexType_maybe indexType elementType =
   fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType_maybe indexType)
 
+zeroIndexForDimension :: Int -> TExpr
+zeroIndexForDimension 1 = kInt 0
+zeroIndexForDimension d = mkTuple (replicate d (kInt 0))
+
+
 ----------------------------------
 --- Tangent space
 
