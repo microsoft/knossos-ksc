@@ -1,8 +1,14 @@
+import pytest
+
 import math
 import torch
+
+torch.set_default_dtype(torch.float64)
+
 from ksc import utils
 from ksc.type import Type
 from ts2ks import ts2mod
+
 
 def bar1(a : int, x : float, b : str):
     if a < 0:
@@ -103,9 +109,10 @@ def far(x : torch.Tensor):
 def test_far():
     x = torch.randn(2,3)
     ks_far = ts2mod(far, (x,))
-    ks_ans = ks_far(x)
+    ks_ans = ks_far(ks_far.adapt(x))
     ans = far(x)
-    assert ans == ks_ans
+    assert pytest.approx(ks_ans, 1e-8) == ans.item()
+
 
     #assert ks_far.rev((a,x),1.0) == grad_far(a,x)
 
