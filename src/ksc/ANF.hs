@@ -8,16 +8,15 @@ module ANF where
 
 import Data.Void (Void, absurd)
 
-import Ksc.Traversal( traverseState )
+import Ksc.Traversal( mapAccumLM, traverseState )
 import Lang
 import OptLet( Subst, mkEmptySubst, substBndr, substVar )
 import KMonad
 import Control.Monad( ap )
 
--- anfDefs :: (GenBndr p) => [DefX p] -> KM [DefX p]
-anfDefs :: Monad m => [TDef] -> KMT m [TDef]
-anfDefs defs = runAnf $
-               mapM anfD defs
+-- anfDefs :: (GenBndr p) => env -> [DefX p] -> KM (env, [DefX p])
+anfDefs :: Monad m => env -> [TDef] -> KMT m (env, [TDef])
+anfDefs = mapAccumLM anfDef
 
 anfDef :: Monad m => env -> TDef -> KMT m (env, TDef)
 anfDef env def = runAnf $ do { def' <- anfD def

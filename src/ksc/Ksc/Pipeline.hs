@@ -59,7 +59,7 @@ demoN verbosity adp decls
        ; (env1, opt_defs) <- optDefs rulebase env defs
        ; disp "Optimized original definition" env1 opt_defs
 
-       ; anf_defs <- anfDefs opt_defs
+       ; (_, anf_defs) <- anfDefs env1 opt_defs
        ; disp "Anf-ised original definition" env1 anf_defs
 
        ; let grad_defs = gradDefs adp anf_defs
@@ -209,7 +209,7 @@ anfOptAndCse display rulebase env4 alldefs =
   -- We use ANF to expose optimisation opportunities and use optDefs
   -- to take them.  See Note [Inline tuples] for the motiviation for
   -- doing ANF-then-optDefs.
-  ; anf_alldefs <- anfDefs alldefs
+  ; (env4, anf_alldefs) <- anfDefs env4 alldefs
   ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
 
   ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs

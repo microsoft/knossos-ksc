@@ -96,7 +96,7 @@ cseDefs :: RuleBase -> GblSymTab -> [TDef]
         -> KM (GblSymTab, [TDef])
 -- The returned GblSymTab contains the CSE'd definitions
 cseDefs rb gst defs
-  = do { anf_defs <- anfDefs defs
+  = do { (gst, anf_defs) <- anfDefs gst defs
 --       ; banner "ANF'd"
 --       ; displayN anf_defs
 
