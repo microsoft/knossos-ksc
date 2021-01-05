@@ -38,8 +38,10 @@ gradTVar adp s (TVar ty v) = mkGradTVar adp (typeof s) (gradV adp v) ty
 
 -------------------------------------------------
 
-gradDefs :: HasCallStack => ADPlan -> [TDef] -> [TDef]
-gradDefs adp = mapMaybe (gradDef adp)
+gradDefs :: HasCallStack => ADPlan -> GblSymTab -> [TDef] -> (GblSymTab, [TDef])
+gradDefs adp env def = (env', grad_defs)
+  where grad_defs = mapMaybe (gradDef adp) def
+        env' = extendGblST env grad_defs
 
 -- We noTupPatifyDef before gradDef.  See Note [Replacing TupPat with
 -- nested Let].
