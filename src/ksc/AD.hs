@@ -357,5 +357,5 @@ applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 
 applyD _ def = def
 
-applyDefs :: ADDir -> [TDef] -> [TDef]
-applyDefs dir = map (applyD dir)
+applyDefs :: Monad m => ADDir -> env -> [TDef] -> m (env, [TDef])
+applyDefs dir env defs = pure (env, map (applyD dir) defs)

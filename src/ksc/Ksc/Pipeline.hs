@@ -68,7 +68,7 @@ demoN verbosity adp decls
        ; (env3, opt_grad_defs) <- optDefs rulebase env2 grad_defs
        ; disp "The full Jacobian (optimised)" env3 opt_grad_defs
 
-       ; let der_fwd = applyDefs Fwd opt_grad_defs
+       ; (_, der_fwd) <- applyDefs Fwd env3 opt_grad_defs
        ; disp "Forward derivative (unoptimised)" env3 der_fwd
 
        ; (env4, opt_der_fwd) <- optDefs rulebase env3 der_fwd
@@ -77,7 +77,7 @@ demoN verbosity adp decls
        ; (env5, cse_fwd) <- cseDefs rulebase env4 opt_der_fwd
        ; disp "Forward-mode derivative (CSE'd)" env5 cse_fwd
 
-       ; let der_rev = applyDefs Rev opt_grad_defs
+       ; (_, der_rev) <- applyDefs Rev env3 opt_grad_defs
        ; disp "Reverse-mode derivative (unoptimised)" env3 der_rev
 
        ; (env7, opt_der_rev) <- optDefs rulebase env3 der_rev
@@ -167,8 +167,8 @@ theDiffs display defs env rulebase = do {
   ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
   ; display "Optgrad tupled" env25 optgrad_tupled
 
-  ; let der_fwd = applyDefs Fwd optgrad
-  ; let der_rev = applyDefs Rev optgrad
+  ; (_, der_fwd) <- applyDefs Fwd env25 optgrad
+  ; (_, der_rev) <- applyDefs Rev env25 optgrad
   ; let diffs = der_fwd ++ der_rev
   ; display "Diffs" env25 diffs
 
