@@ -8,8 +8,8 @@ import LangUtils
 import Prim
 import qualified OptLet
 import GHC.Stack
+import Ksc.Traversal (mapAccumLM)
 
-import Data.List (mapAccumL)
 import Data.Maybe (fromMaybe, catMaybes)
 
 -- for unit test
@@ -39,15 +39,17 @@ gradTVar adp s (TVar ty v) = mkGradTVar adp (typeof s) (gradV adp v) ty
 
 -------------------------------------------------
 
-gradDefs :: HasCallStack => ADPlan -> GblSymTab -> [TDef] -> (GblSymTab, [TDef])
-gradDefs adp env defs = (env', catMaybes grad_defs)
-  where (env', grad_defs) = mapAccumL (gradDef adp) env defs
+gradDefs :: (HasCallStack, Monad m)
+         => ADPlan -> GblSymTab -> [TDef] -> m (GblSymTab, [TDef])
+gradDefs adp env defs = do
+  { (env', grad_defs) <- mapAccumLM (gradDef adp) env defs
+  ; pure (env', catMaybes grad_defs) }
 
 -- We noTupPatifyDef before gradDef.  See Note [Replacing TupPat with
 -- nested Let].
-gradDef :: HasCallStack
-        => ADPlan -> GblSymTab -> TDef -> (GblSymTab, Maybe TDef)
-gradDef adp env def = (env', mgrad_def)
+gradDef :: (HasCallStack, Monad m)
+        => ADPlan -> GblSymTab -> TDef -> m (GblSymTab, Maybe TDef)
+gradDef adp env def = pure (env', mgrad_def)
   where mgrad_def = gradDefInner adp (noTupPatifyDef def)
         env' = maybe id stInsertFun mgrad_def env
 
