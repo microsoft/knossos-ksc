@@ -19,6 +19,11 @@ anfDefs :: Monad m => [TDef] -> KMT m [TDef]
 anfDefs defs = runAnf $
                mapM anfD defs
 
+anfDef :: Monad m => env -> TDef -> KMT m (env, TDef)
+anfDef env def = runAnf $ do { def' <- anfD def
+                             ; return (env, def')
+                             }
+
 -----------------------------------------------
 -- anfD :: (GenBndr p) => DefX p -> AnfM p (DefX p)
 anfD :: Monad m => TDef -> AnfMTL l m TDef
