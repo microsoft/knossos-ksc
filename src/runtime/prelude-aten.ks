@@ -7,6 +7,8 @@
 (def aten::lt Bool ((a : Integer) (b : Float))
     (lt (to_float a) b))
 
+
+;; mul
 (def aten::mul Float ((a : Float) (b : Float))
     (mul a b))
 
@@ -16,6 +18,10 @@
 (def aten::mul (Tensor 2 Float) ((a : Tensor 2 Float) (b : Float))
     (ts_scale b a))
 
+(def aten::mul (Tensor 2 Float) ((a : Tensor 2 Float) (b : Tensor 2 Float))
+    (build (size a) (lam (inds : Tuple Integer Integer)
+        (mul (index inds a) (index inds b)))))
+
 (def aten::add Float ((a : Float) (b : Float))
     (add a b))
 
@@ -24,10 +30,6 @@
 
 (def aten::sin Float (a : Float)
     (sin a))
-
-(def aten::sin (Tensor 2 Float) (a : Tensor 2 Float)
-    (build (size a) (lam (ij : Tuple Integer Integer)
-        (sin (index ij a)))))
 
 (def aten::Float Float (a : Integer)
     (to_float a))
@@ -39,9 +41,9 @@
 (def aten::Bool Bool (a : Float)
     (not (eq a 0.0)))
 
-(def aten::mul (Tensor 2 Float) ((a : Tensor 2 Float) (b : Tensor 2 Float))
+(def aten::sin (Tensor 2 Float) (a : Tensor 2 Float)
     (build (size a) (lam (ij : Tuple Integer Integer)
-        (mul (index ij a) (index ij b)))))
+        (sin (index ij a)))))
 
 ;; a^n
 (edef aten::pow (Tensor 2 Float) ((Tensor 2 Float) Integer))
