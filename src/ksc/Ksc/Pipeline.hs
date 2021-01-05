@@ -167,7 +167,9 @@ theDiffs display defs env rulebase = do {
   ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
   ; display "Optgrad tupled" env25 optgrad_tupled
 
-  ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
+  ; let der_fwd = applyDefs Fwd optgrad
+  ; let der_rev = applyDefs Rev optgrad
+  ; let diffs = der_fwd ++ der_rev
   ; display "Diffs" env25 diffs
 
   ; (env3, optdiffs) <- optDefs rulebase env25 diffs
