@@ -4,13 +4,16 @@ import inspect
 
 import numpy as np
 
+from ksc.type import Type
+from ksc.shape import ShapeType, shape_type_from_object
+
 from ksc.abstract_value import AbstractValue
 from ksc.ks_function import KsFunction
-from ksc.type import Type
+
 from ksc.tracing import node
 from ksc.tracing.function import Trace, TraceableFunction
-from ksc import utils
-from ksc.utils import ShapeType
+
+
 
 _jitted = {}
 
@@ -43,7 +46,7 @@ def get_or_trace_function(f, original_args):
         if key in _jitted:
             return _jitted[key]
 
-    inputs = [node.Node(n, *arg.shape_type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
+    inputs = [node.Node(n, arg.shape, arg.type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
 
     # trace the function
     trace = f.trace(*inputs)
@@ -78,7 +81,7 @@ def lift_constants(body):
             values.append(node.data)
     return arg_names, shape_types, values
 
-def jit_and_execute_annonymous_function(body, backend):
+def jit_and_execute_anonymous_function(body, backend):
     shape_type = body.shape_type
     arg_names, shape_types, values = lift_constants(body)
     trace = Trace(body, shape_type, shape_types)
@@ -87,14 +90,14 @@ def jit_and_execute_annonymous_function(body, backend):
     jitted = JittedFunction.from_trace(f, trace)
     # create a function node (which will be connected to
     # the jitted function through the origin attribute)
-    arg_nodes = [node.Node(n, s, t, data=v) for n, (s, t), v in zip(arg_names, shape_types, values)]
+    arg_nodes = [node.Node(n, st.shape, st.type, data=v) for n, st, v in zip(arg_names, shape_types, values)]
     _ = node.Node(jitted.name, shape_type.shape, shape_type.type, children=arg_nodes, jitted=jitted)
     if backend == "abstract":
         # wrap the concrete values in AbstractValue
         values = [AbstractValue.from_data(value) for value in values]
     v = jitted(*values, backend=backend)
-    s, t = utils.shape_type_from_object(v)
-    value = node.Node("_identity", s, t, data=v)
+    st = shape_type_from_object(v)
+    value = node.Node("_identity", st.shape, st.type, data=v)
     value._children = [jitted.origin]
     return value
 
@@ -118,18 +121,12 @@ def format_arg_list(arg_names, arg_types):
     return " ".join([f"({n} : {t})" for n, t in zip(arg_names, arg_types)])
 
 def format_constant(value):
-    _, type = utils.shape_type_from_object(value)
-    if type.kind == "Tuple":
+    type = shape_type_from_object(value).type
+    if type.is_tuple:
         args = " ".join([format_constant(v) for v in value])
         return f"(tuple {args})"
-    elif type.kind == "Vec":
-        n = len(value)
-        template = f"(build {n} (lam (i : Integer) {{body}}))"
-        for i in range(n - 1):
-            template = template.format(
-                body=f"(if (eq i {i}) {format_constant(value[i])} {{body}})"
-            )
-        return template.format(body=format_constant(value[-1]))
+    elif type.is_tensor:
+        return f"(Vec_init " + " ".join(format_constant(v) for v in value) + ")"
     else:
         return str(value)
 
@@ -146,7 +143,7 @@ def compute_ks_str(f, nodes, arg_types):
         return f"(edef {def_name} {f.return_type} ({arg_types}))"
 
     var_name_generator = VarNameGenerator()
-    _, return_type = nodes[-1].shape_type
+    return_type = nodes[-1].shape_type.type
     arg_name_types = format_arg_list(f.arg_names, arg_types)
     template = "\n".join(
         [f"(def {def_name} {return_type} ({arg_name_types})",
@@ -214,8 +211,8 @@ def compose_shape_propagation_function(f, trace):
                 return lambda args: args[arg_name_to_index[n.name]]
             else:
                 # constant
-                s, t = n.shape_type
-                new_node = node.Node("", s, t, n.data) # disconnect from the trace
+                st = n.shape_type
+                new_node = node.Node("", st.shape, st.type, n.data) # disconnect from the trace
                 return lambda args: new_node
         elif n.name == "_identity":
             assert len(n.children) == 1
@@ -230,8 +227,8 @@ def compose_shape_propagation_function(f, trace):
                 raise
             child_functions = [helper(c) for c in n.children]
             def prop(args):
-                s, t = node_prop(*[cf(args) for cf in child_functions])
-                return node.Node("", s, t)
+                st = node_prop(*[cf(args) for cf in child_functions])
+                return node.Node("", st.shape, st.type)
             return prop
     prop = helper(trace.body) # prop :: args -> Node
     return lambda *args: prop(args).shape_type
@@ -270,7 +267,7 @@ class JittedFunction(KsFunction):
                 if n.startswith("_anonymous")) + 1
             name = f"_anonymous_{index}"
         # append arg types
-        arg_types = tuple(t for _, t in trace.arg_shape_types)
+        arg_types = tuple(t.type for t in trace.arg_shape_types)
         if f.is_edef:
             if f.shape_def is not None:
                 called_functions[(f.shape_def.name, arg_types)] = f.shape_def
@@ -382,13 +379,54 @@ class JittedFunctionFromCall:
         return node.creator._jitted
 
 def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=None, traceable_cost_function=None):
+    """
+    Declare a function/op/node for tracing and the abstract interpreter
+
+        (def name 
+            (x y)  ; arg_names
+            ... )
+
+    -- shape_prop_function 
+    Should be a python function taking AbstractValues, 
+    and returning a ShapeType of the result, e.g.
+        def mat_vec_mul_shape_propagate(M, v):
+            return ShapeType(M.shape.dims[0], v.type)
+
+    The algebra of these shape classes is:
+        Shape of scalar is      ScalarShape (constant initialized to ())
+        Shape of tuple is       tuple of Shape
+        Shape of tensor is      TensorShape(dims, element_shape)
+
+    Note that tensor shape is assumed non-jagged for now.  When we switch to
+    jagged, tensor shape will be tensor of shapes, using a constvec for efficient
+    representation of non-jagged tensors
+
+    -- traceable_shape_function
+    Should be an appropriate Node for shape$name, returning a shape.
+    The shape algebra restricted to KS datatypes is as follows:
+        shape of scalar   is (tuple)                              ;; empty tuple
+        shape of tensor   is (tuple (tuple dim1 dim2 ... dimN) element_shape)
+        shape of tuple    is (tuple shape1 shape2 .. shapeN)
+    The supplied body should be as if we had parsed code such as:
+    (def shape$mat_vec_mul ((x : Tensor 2 Float) (y : Tensor 1 Float))
+        (tuple (tuple (get$1$2 (size x)))  ;; shapes are more strict than "size", use singleton tuple for 1D vector  
+               (tuple)))   ;; and include the element shape, here shape of scalar
+    This will normally be created using the python node creators in ksc.tracing.core, e.g.
+    shape_mat_vec_mul = lambda x,y: core.make_tuple(core.make_tuple(x.shape_program[0][0]), y.shape_program[1]),
+    
+    -- traceable_cost_function
+    Should be an appropriate Node for cost$name, returning a float.
+    (def cost$name (x y)
+        ...)    
+    """
+
     class F(TraceableFunction):
         is_edef = True
         is_builtin = False
         def __init__(self):
             super().__init__(name, arg_names=arg_names)
         def trace(self, *args):
-            shape, type = shape_prop_function(*args)
+            st = shape_prop_function(*args)
             self.shape_def = (
                 JittedFunctionFromCall(f"shape${name}", traceable_shape_function, args)
                 if traceable_shape_function is not None else None
@@ -399,12 +437,12 @@ def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=Non
             )
             body = node.Node(
                 name=name,
-                shape=shape,
-                type=type,
+                shape=st.shape,
+                type=st.type,
                 children=args,
                 shape_prop_function=shape_prop_function)
             shape_types = tuple(arg.shape_type for arg in args)
-            return Trace(body, ShapeType(shape, type), shape_types)
+            return Trace(body, ShapeType(st.shape, st.type), shape_types)
     d = {"F": F}
     arg_names_str = ", ".join(arg_names)
     exec(f"def wrapped({arg_names_str}): return F()({arg_names_str})", d)

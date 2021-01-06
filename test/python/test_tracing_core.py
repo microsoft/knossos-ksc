@@ -7,6 +7,7 @@ from ksc.tracing.node import Node
 from ksc.tracing.functions import core
 import ksc.tracing.functions as F
 from ksc.type import Type
+from ksc.shape import Shape, TensorShape, ScalarShape
 
 @pytest.fixture()
 def backend(pytestconfig):
@@ -135,14 +136,14 @@ def test_operator_overloading():
 def test_flatten():
     x = np.random.normal(0, 1, (3, 4, 5, 6))
     out = F.flatten(x)
-    assert out.shape_type.shape == (3, 4 * 5 * 6)
-    assert np.allclose(out.data, x.reshape((3, 4 * 5 * 6)))
+    assert out.shape_type.shape.dims == (3, 4 * 5 * 6)
+    np.testing.assert_array_equal(out.data, x.reshape((3, 4 * 5 * 6)))
     # creator of out is an anonymous function. So the shape$
     # function of flatten must be in before.
     before, _ = out.creator._jitted.all_called_functions()
     shape_def = next(f for key, f in before.items()
                      if key[0] == "shape$flatten")
-    assert shape_def(x) == (3, 4 * 5 * 6)
+    assert shape_def(x) == ((3, 4 * 5 * 6), ())
 
 def test_to_float():
     x = np.arange(9)
@@ -161,7 +162,7 @@ def my_flatten(a):
 def test_traced_flatten_shape():
     x1 = np.random.normal(0, 1, (2, 3, 4))
     o = my_flatten(x1)
-    assert o.shape_type.shape == (2, 12)
+    assert o.shape_type.shape == TensorShape((2, 12), ScalarShape)
     assert o.data.shape == (2, 12)
 
     jitted = o.creator._jitted
@@ -179,40 +180,46 @@ def test_reuse_result(backend):
     z = y - x
     assert z.get_data_with_backend(backend) == 48
 
-def test_get_vector_element():
+def test_get_tensor_element():
     xn = np.arange(24).reshape((2, 3, 4))
     x = Node.from_data(xn)
-    o = x[0]
-    assert o.shape_type.shape == (3, 4)
-    o = o[2]
-    assert o.shape_type.shape == (4,)
-    o = o[3]
-    assert o.shape_type.type == Type.Integer
-    assert o.shape_type.shape == ()
-    o.data == xn[0, 2, 3]
+    v = x[1,2,3]
+    assert v.data == 23
 
-def test_vector_size():
+    v0 = core.get_tensor_element0(x)
+    assert v0.data == 0.0
+
+    # TODO: add slicing tests when we have a "slice" primitive
+    # o = x[0]
+    # assert o.shape_type.shape == (3, 4)
+
+def test_tensor_size():
     xn = np.arange(24).reshape((2, 3, 4))
     x = Node.from_data(xn)
-    assert core.get_vector_size(x).data == 2
-    o = x[0]
-    assert core.get_vector_size(o).data == 3
-    o = o[2]
-    assert core.get_vector_size(o).data == 4
+    assert core.get_tensor_size(x).data == (2,3,4)
+
+def get_ks_shape(x):
+    return Shape.from_ks_shape(x.shape_program.data, x.type)
 
 def test_tensor_shape():
     x = Node.from_data(np.arange(24).reshape((2, 3, 4)))
-    assert x.shape.data == (2, 3, 4)
+    assert get_ks_shape(x) == TensorShape((2, 3, 4), ScalarShape)
 
     x = Node.from_data(np.random.normal(0, 1, (5, 3, 9)))
-    assert x.shape.data == (5, 3, 9)
+    assert get_ks_shape(x) == TensorShape((5, 3, 9), ScalarShape)
 
     x = Node.from_data((np.arange(6).reshape((2, 3)), np.arange(12).reshape((3, 4))))
-    assert x.shape.data == ((2, 3), (3, 4))
+    assert get_ks_shape(x) == (TensorShape((2, 3), ScalarShape), TensorShape((3, 4), ScalarShape))
 
 def test_tensor_num_elements():
     x = Node.from_data(np.arange(24).reshape((2, 3, 4)))
-    assert x.size.data == 24
+    assert core.numel_program(x).data == 24
+
+    x1 = Node.from_data([np.ones((2,3)) for _ in range(11)])
+    x2 = Node.from_data(np.ones((5,7)))
+    x = core.make_tuple(x2, x1)
+    assert core.numel_program(x).data == 5*7 + 2*3*11
+
 
 def test_floor_div(backend):
     x = Node.from_data(10)
@@ -221,7 +228,7 @@ def test_floor_div(backend):
 
 def test_elementwise_or_scalar():
     from ksc.tracing.functions.type_propagation_rules import elementwise_or_scalar
-    from ksc.utils import ShapeType
+    from ksc.shape import ShapeType
 
     f = Node.from_data(1.0)
     i = Node.from_data(1)

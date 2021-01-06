@@ -1,3 +1,7 @@
+import numpy as np
+
+from ksc.utils import ndgrid_inds
+
 def add(a, b):
     return a + b
 
@@ -58,8 +62,14 @@ def log(a):
 def to_float_i(a):
     return float(a)
 
-def build(n, f):
-    return [f(i) for i in range(n)]
+def build(sz, f):
+    # Integer sz will build a 1D tensor, as a list
+    if isinstance(sz, int):
+        return [f(i) for i in range(sz)]
+
+    # Tuple sz will build a n-D tensor, as a ndarray, so leaf type needs to be scalar
+    assert isinstance(sz, tuple)
+    return np.reshape([f(ind) for ind in ndgrid_inds(sz)], sz)
 
 def sumbuild(n, f):
     return sum(f(i) for i in range(n))
@@ -68,7 +78,15 @@ def index(i, v):
     return v[i]
 
 def size(v):
-    return len(v)
+    if isinstance(v, list):
+        return len(v)
+
+    #TOUNDO: size(Tensor 1 T) returns int
+    dims = v.shape
+    if len(dims) == 1:
+        return dims[0]
+    else:
+        return dims
 
 def fold(f, s0, xs):
     s = s0
