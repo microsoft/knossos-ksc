@@ -3,7 +3,7 @@ from ksc.type import Type
 from ksc.tracing.node import Node
 from ksc.tracing.functions import core
 from ksc.tracing.functions.type_propagation_rules import unique_element_type
-from ksc.utils import ShapeType, TensorShape, ScalarShape
+from ksc.shape import ShapeType, TensorShape, ScalarShape
 
 def mat_mat_mul_prop_rule(x, y):
     el_type = unique_element_type([x.type, y.type])

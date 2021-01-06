@@ -4,7 +4,7 @@ import numpy
 import ksc
 from ksc.abstract_value import AbstractValue, ExecutionContext, current_execution_context
 from ksc.type import Type, SizeType
-from ksc.utils import ShapeType, Shape, TensorShape, make_dims
+from ksc.shape import ShapeType, Shape, TensorShape, make_dims
 
 from . import common
 from .common import (
@@ -118,7 +118,7 @@ def _compute_build_inner_cost(n, f):
     rank = len(dims)
     nelem = numpy.prod(dims)
 
-    i = AbstractValue(Shape.of_size(rank), SizeType.from_rank(rank))
+    i = AbstractValue(Shape.of_Index_of_Tensor_of_scalar_of_rank(rank), SizeType.from_rank(rank))
     el, cost = _compute_branch_cost(lambda: f(i))
     return dims, nelem, el, cost
 

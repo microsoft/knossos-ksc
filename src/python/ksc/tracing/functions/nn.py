@@ -11,7 +11,7 @@ from ksc.tracing.functions.type_propagation_rules import (
     conv_2d_type_prop_rule_from_padding_type
 )
 from ksc.tracing.node import Node
-from ksc.utils import ShapeType, Shape, TensorShape, ScalarShape
+from ksc.shape import ShapeType, Shape, TensorShape, ScalarShape
 
 relu = make_edef(
     "relu", ["x"], elementwise,

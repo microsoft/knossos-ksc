@@ -2,7 +2,7 @@ from functools import reduce
 
 import ksc
 from ksc.type import Type, SizeType
-from ksc.utils import ShapeType, Shape, ScalarShape
+from ksc.shape import ShapeType, Shape, ScalarShape
 
 from ksc.tracing import node
 from ksc.tracing.node import Node
@@ -131,7 +131,8 @@ def get_tensor_size(x):
     def shape_prop_function(x : Node):
         x_type = x.type
         assert x_type.is_tensor
-        shape_of_result = Shape.of_size(x_type.tensor_rank)
+        # Even if tensor is of compound type, the *size* is just an ntuple of ints
+        shape_of_result = Shape.of_Index_of_Tensor_of_scalar_of_rank(x_type.tensor_rank)
         return ShapeType(shape_of_result, SizeType.from_rank(x_type.tensor_rank))
     f = make_builtin("size", ["x"], shape_prop_function)
     return f(x)

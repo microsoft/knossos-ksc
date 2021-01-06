@@ -1,6 +1,6 @@
 import numpy as np
 from ksc.type import Type
-from ksc.utils import ShapeType, TensorShape, ScalarShape
+from ksc.shape import ShapeType, TensorShape, ScalarShape
 
 def unique_element(s):
     assert len(s) == 1

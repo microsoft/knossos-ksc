@@ -247,7 +247,7 @@ class SizeType:
         if n == 1:
             return Type.Integer
         else:
-            return Type.Tuple(*[Type.Integer for i in range(n)])
+            return Type.Tuple(*tuple(Type.Integer for _ in range(n)))
 
     @staticmethod
     def get_rank(ty : Type) -> int:

@@ -7,7 +7,7 @@ from ksc.tracing.node import Node
 from ksc.tracing.functions import core
 import ksc.tracing.functions as F
 from ksc.type import Type
-from ksc.utils import Shape, TensorShape, ScalarShape
+from ksc.shape import Shape, TensorShape, ScalarShape
 
 @pytest.fixture()
 def backend(pytestconfig):
@@ -228,7 +228,7 @@ def test_floor_div(backend):
 
 def test_elementwise_or_scalar():
     from ksc.tracing.functions.type_propagation_rules import elementwise_or_scalar
-    from ksc.utils import ShapeType
+    from ksc.shape import ShapeType
 
     f = Node.from_data(1.0)
     i = Node.from_data(1)

@@ -1,6 +1,6 @@
 from collections import defaultdict
 from ksc.type import Type
-from ksc.utils import ShapeType, Shape, shape_type_from_object, shape_type_matches, ScalarShape
+from ksc.shape import ShapeType, Shape, shape_type_from_object, shape_type_matches, ScalarShape
 
 def _cleanup_value(data):
     st = shape_type_from_object(data)
