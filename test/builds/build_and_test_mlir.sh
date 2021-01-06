@@ -16,7 +16,7 @@ if [ ! -d llvm-project ]; then
 fi
 cd llvm-project
 git checkout -b ksc-mlir "$GOOD_HASH"
-mkdir build && cd build
+mkdir -p build && cd build
 cmake -G Ninja ../llvm \
         -DLLVM_ENABLE_PROJECTS=mlir \
         -DLLVM_BUILD_EXAMPLES=ON \

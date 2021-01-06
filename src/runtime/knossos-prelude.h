@@ -16,16 +16,6 @@ double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
 }
 
 vec<double>
-mul$Mat$Vec$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> const& v)
-{
-	int r = size(M);
-	vec<double> ret(alloc, r);
-	for(int i = 0; i < r; ++i)
-		ret[i] = dot(M[i], v);
-	return ret;
-}
-
-vec<double>
 mul$aT2fT1f(allocator * alloc, tensor<2, double> const& M, vec<double> const& v)
 {
 	int r = M.outer_dimension();
@@ -35,21 +25,25 @@ mul$aT2fT1f(allocator * alloc, tensor<2, double> const& M, vec<double> const& v)
 	return ret;
 }
 
-tuple<vec<vec<double>>,vec<double>> 
-rev$mul$Mat$Vec$a$dT1T1fT1f$bT1f(allocator * alloc, std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
+tuple<tensor<2, double>,vec<double>>
+rev$mul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2, double>, vec<double>> const& M_v, vec<double> const& dr)
 {
-        auto [M, v] = M_v;
-	int r = size(M);
+	auto [M, v] = M_v;
+	int r = M.outer_dimension();
 	int c = size(v);
-	vec<vec<double>> retM(alloc, r);
-	for(int i = 0; i < r; ++i)
-		retM[i] = ts_scale(alloc, dr[i], v);
+	tensor<2, double> retM(alloc, size(M));
+	for(int i = 0; i < r; ++i) {
+		// Inlined retM[i].assign(ts_scale(dr[i], v))
+		vec<double> retrow = retM[i];
+		for (int j = 0; j < c; ++j)
+			retrow[j] = dr[i] * v[j];
+	}
 
 	vec<double> retv(alloc, c);
 	for(int i = 0; i < c; ++i) {
 		double retvi = 0;
 		for(int j = 0; j < r; ++j)
-			retvi += M[j][i] * dr[j];
+			retvi += M.index(std::make_tuple(j, i)) * dr[j];
 		retv[i] = retvi;
 	}
 

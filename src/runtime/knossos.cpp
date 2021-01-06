@@ -35,16 +35,16 @@ namespace ks {
 			timer.reset();
 			f(n_repeats);
 			t = timer();
-			if (t > 0.5) {
+			if (t > 0.05) {
 				std::cerr << ", " << t << " sec at nruns = " << n_repeats << std::endl;
 				break;
 			}
 			std::cerr << ".";
 			n_repeats *= 2;
 		}
-		// if n_repeats > 1, we took at most 1 sec to do that number.
-		// Now spend 4 more seconds at most in sampling.
-		double time_to_sample = 4.0;
+		// if n_repeats > 1, we took at most 0.1 sec to do that number.
+		// Now spend 0.4 more seconds at most in sampling.
+		double time_to_sample = 0.4;
 		int n_samples = int(time_to_sample / t);
 
 		// Report minimum cost.  

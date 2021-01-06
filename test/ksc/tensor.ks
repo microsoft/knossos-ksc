@@ -9,6 +9,8 @@
               (mul 100.0 (to_float k)))
          c))
 
+(def zeroTensorInAD Float (m : Tensor 2 Float) 0.0)
+
 (def main Integer ()
     (let (vvv (build 2 (lam (i : Integer)
                   (build 4 (lam (j : Integer)

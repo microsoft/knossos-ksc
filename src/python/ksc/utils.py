@@ -7,6 +7,7 @@ import importlib.util
 import os
 import numpy as np
 import subprocess
+import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
 
@@ -104,6 +105,7 @@ def generate_cpp_from_ks(ks_str):
         ksc_path = os.environ["KSC_PATH"]
     else:
         ksc_path = "./build/bin/ksc"
+    
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
     with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
@@ -139,7 +141,9 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
     with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
         fcpp.write(cpp_str)
 
-    extension_suffix = subprocess_run(['python3-config', '--extension-suffix'])
+    extension_suffix = sysconfig.get_config_var('EXT_SUFFIX')
+    if extension_suffix is None:
+        extension_suffix = sysconfig.get_config_var('SO')
 
     with NamedTemporaryFile(mode="w", suffix=extension_suffix, delete=False) as fpymod:
         pass

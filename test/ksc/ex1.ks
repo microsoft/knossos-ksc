@@ -4,3 +4,5 @@
      (let (y (mul x x))
      (let (z (add x y))
      (mul y z))))
+
+(def main Integer () 0)

@@ -6,3 +6,5 @@
            (y2 (get$1$2 zt))
            (z  (get$2$2 zt)))
      (mul y2 z)))
+
+(def main Integer () 0)

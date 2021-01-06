@@ -12,3 +12,5 @@
        ( (x1 : Float) (x2 : Float) (x3 : Float) (x4 : Float)
          (x5 : Float) (x6 : Float) (x7 : Float) (x8 : Float))
        (times x1 (times x2 (times x3 (times x4 (times x5 (times x6 (times x7 x8))))))))
+
+(def main Integer () 0)

@@ -47,13 +47,16 @@ optSubstBndr tv env@(OptEnv { optSubst = subst })
     (tv', subst') = substBndr tv subst
 
 ---------------
+mapAccumLM :: Monad m => (a -> b -> m(a, c)) -> a -> [b] -> m(a, [c])
+mapAccumLM _ a [] = return (a, [])
+mapAccumLM f a (x:xs) = do { (a', c) <- f a x
+                           ; (a'', cs) <- mapAccumLM f a' xs
+                           ; return (a'', c:cs) }
+
 optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
                         -> KM (GblSymTab, [TDef])
 -- Returned GblSymTab contains the optimised definitions
-optDefs _  gst [] = return (gst, [])
-optDefs rb gst (def:defs) = do { (gst1, def')  <- optDef  rb gst def
-                               ; (gst2, defs') <- optDefs rb gst1 defs
-                               ; return (gst2, def' : defs') }
+optDefs = mapAccumLM . optDef
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> KM (GblSymTab, TDef)
@@ -160,6 +163,7 @@ optIf e_cond e_then e_else
   -- NB: (==) on expressions does equality modulo alpha (see Lang.hs)
   = e_then
   | Just (ei, ej) <- isEqualityCall e_cond
+  , TypeInteger <- typeof ei
   , isKZero e_else
   = pDelta ei ej e_then
 optIf b                     t e = If b t e
@@ -336,7 +340,7 @@ optPrimFun _ "lmCompose"   (Tuple [f,g])  = optLMCompose f g
 optPrimFun _ "lmVCat" (Tuple es)
   | Just prs <- mapM isLMZero_maybe es
   , (s:_, ts) <- unzip prs
-  = Just $ lmZero s (mkTuple ts)
+  = Just $ lmZero s (Tuple ts)
 
 -- Add(0, x) = x = Add(x, 0)
 optPrimFun _ "lmAdd" (Tuple [p,q])

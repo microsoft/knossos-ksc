@@ -5,3 +5,5 @@
 
 (def g Float (x : Vec Float)
     (sum (h x)))
+
+(def main Integer () 0)

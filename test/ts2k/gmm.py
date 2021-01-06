@@ -8,6 +8,7 @@ import torch
 
 
 @torch.jit.script
+#TODO: does Torch already do this maxing? AWF
 def logsumexp(x):
     mx = torch.max(x)
     emx = torch.exp(x - mx)
