@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Tuple, Union
 from collections import namedtuple
+import itertools
+
 import importlib.util
 import os
 import numpy as np
@@ -227,10 +229,6 @@ def ndgrid_inds(sz):
         [(0,), (1,), (2,), (3,)] 
 
     """
-    if len(sz) == 1:
-        yield from ((i,) for i in range(sz[0]))
-    else:
-        for i in range(sz[0]):
-            for rest in ndgrid_inds(sz[1:]):
-                yield (i,) + rest
+
+    return itertools.product(*map(range, sz))
 

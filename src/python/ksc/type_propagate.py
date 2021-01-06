@@ -113,7 +113,7 @@ def ks_prim_lookup(name, tys):
         assert tys[0] == tys[1]
         return Type.Float
 
-    # ts_add : Float, dT -> dT
+    # ts_scale : Float, dT -> dT
     if n == 2 and name == "ts_scale":
         assert tys[0] == Type.Float
         return tys[1]

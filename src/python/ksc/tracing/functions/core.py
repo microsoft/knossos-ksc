@@ -110,7 +110,7 @@ def make_builtin(name, arg_names, shape_prop_function):
     return Builtin()
 
 # ks::index
-def get_vector_element(index, x):
+def get_tensor_element(index, x):
     def shape_prop_function(index, x):
         xst = x.shape_type
         assert xst.type.is_tensor
@@ -119,12 +119,13 @@ def get_vector_element(index, x):
     return f(index, x)
 
 def get_tensor_element0(x):
+    # Get the (0,...,0) element of a tensor
     assert x.type.is_tensor
     dims = x.shape.dims
     if len(dims) == 1:
-        return get_vector_element(0, x)
+        return get_tensor_element(0, x)
     else:
-        return get_vector_element(tuple(0 for _ in dims), x)
+        return get_tensor_element(tuple(0 for _ in dims), x)
 
 # ks::size
 def get_tensor_size(x):

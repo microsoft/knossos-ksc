@@ -156,7 +156,7 @@ class Type:
         if self.is_tuple:
             return sum([c.num_elements(assumed_vector_size) for c in self.children])
         elif self.is_tensor:
-            return assumed_vector_size ** self.tensor_rank * self.tensor_elem_type.num_elements(assumed_vector_size)
+            return (assumed_vector_size ** self.tensor_rank) * self.tensor_elem_type.num_elements(assumed_vector_size)
         elif self.is_scalar or self.is_lam_or_LM:
             return 1
 

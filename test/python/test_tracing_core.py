@@ -137,7 +137,7 @@ def test_flatten():
     x = np.random.normal(0, 1, (3, 4, 5, 6))
     out = F.flatten(x)
     assert out.shape_type.shape.dims == (3, 4 * 5 * 6)
-    assert np.ma.allequal(out.data, x.reshape((3, 4 * 5 * 6)))
+    np.testing.assert_array_equal(out.data, x.reshape((3, 4 * 5 * 6)))
     # creator of out is an anonymous function. So the shape$
     # function of flatten must be in before.
     before, _ = out.creator._jitted.all_called_functions()
@@ -180,7 +180,7 @@ def test_reuse_result(backend):
     z = y - x
     assert z.get_data_with_backend(backend) == 48
 
-def test_get_vector_element():
+def test_get_tensor_element():
     xn = np.arange(24).reshape((2, 3, 4))
     x = Node.from_data(xn)
     v = x[1,2,3]

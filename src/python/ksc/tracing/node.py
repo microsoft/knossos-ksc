@@ -127,7 +127,7 @@ class Node(AbstractValue):
         if self._type.is_tensor:
             if isinstance(index, slice):
                 raise NotImplementedError
-            return core.get_vector_element(index, self)
+            return core.get_tensor_element(index, self)
         
         raise ValueError(f"Tried to call __getitem__ on {self} which is not a Tuple.  Use index for tensors.")
 
