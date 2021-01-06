@@ -53,7 +53,7 @@ class Shape:
         assert False
 
     @staticmethod
-    def of_Index_of_Tensor_of_scalar_of_rank(rank : int):
+    def of_Index_of_Tensor_of_rank(rank : int):
         """
         Make the shape of the return of the ks builtin "size" function, i.e. a Tuple of ScalarShapes
         """

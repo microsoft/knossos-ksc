@@ -132,7 +132,7 @@ def get_tensor_size(x):
         x_type = x.type
         assert x_type.is_tensor
         # Even if tensor is of compound type, the *size* is just an ntuple of ints
-        shape_of_result = Shape.of_Index_of_Tensor_of_scalar_of_rank(x_type.tensor_rank)
+        shape_of_result = Shape.of_Index_of_Tensor_of_rank(x_type.tensor_rank)
         return ShapeType(shape_of_result, SizeType.from_rank(x_type.tensor_rank))
     f = make_builtin("size", ["x"], shape_prop_function)
     return f(x)
