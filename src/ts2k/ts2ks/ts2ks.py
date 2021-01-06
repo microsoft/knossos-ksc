@@ -3,6 +3,7 @@ from typing import List, Tuple
 import functools
 import numpy
 import torch
+import torch.onnx
 
 from ksc import utils
 from ksc.ks_function import KscFunction
@@ -155,6 +156,59 @@ def make_lets(bindings, body) -> Expr:
         body = Let(v, rhs, body)
     return body
 
+def make_loop(make_binds, node):
+    # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md#loops
+    # %y_1, ..., %y_r = prim::Loop(%max_trip_count, %initial_condition, %x_1, ..., %x_r)
+    #                     block0(%i, %a_1, ..., %a_r):
+    #                         %b_1, ..., %b_m = some::node(%a_value_from_outer_block, %a_1)
+    #                         %iter_condition = some::other_node(%a_2)
+    #                         -> (%iter_condition, %b_1, ..., %b_r)
+    
+    # def foofilter_comp(xs: Tensor) -> Tensor:
+    #     _0 = annotate(List[Tensor], [])
+    #     _1 = ops.prim.min([9223372036854775807, torch.len(xs)])
+    #     for n in range(_1):
+    #         x = torch.select(xs, 0, n)
+    #         if bool(torch.lt(x, 0.)):
+    #             _2 = torch.mul(x, -0.125)
+    #         else:
+    #             _3 = torch.div(1, n)
+    #             _2 = torch.mul(torch.pow(x, 2), _3)
+    #         _4 = torch.append(_0, _2)
+    #     t = torch.tensor(_0, dtype=None, device=None, requires_grad=False)
+    #     _5 = torch.mean(torch.mul(torch.sin(t), t), dtype=None)
+    #     return _5
+
+    max_trip_count, initial_condition, *x_nodes = node.inputs()
+    y_nodes = tuple(node.outputs())
+    block0, = node.blocks()
+    i,*a_nodes = block0.inputs()
+    iter_condition, *b_nodes = block0.outputs()
+
+    # For now, match only the for loop version
+    assert make_constant(iter_condition.node())[1] == Const(True)
+    assert make_constant(initial_condition.node())[1] == Const(True)
+    assert len(x_nodes) == 0
+    assert len(a_nodes) == 0
+    assert len(b_nodes) == 0
+    assert len(y_nodes) == 0
+
+    body_nodes = list(block0.nodes())
+    last = body_nodes[-1]
+    assert last.kind() == 'aten::append'
+    l,item = last.inputs()
+    assert l.node().kind() == 'prim::ListConstruct'
+
+    def v(n):
+        return Var(mangled_name(n)) 
+
+    binds = make_binds(body_nodes[:-1])
+    lam_body = make_lets(binds, v(item))
+
+    lam = Lam(Var(mangled_name(i), Type.Integer), lam_body)
+
+    return v(l), Call("build", [v(max_trip_count), lam])
+
 def make_if(make_binds, node):
     def make_branch(block):
         binds = make_binds(block.nodes())
@@ -195,6 +249,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
             "prim::ListConstruct": make_list,
             "prim::Return": make_return,
             "prim::CallFunction": make_callfunction,
+            "prim::Loop": functools.partial(make_loop, make_binds=make_binds),
             "prim::If": functools.partial(make_if, make_binds=make_binds),
         }
 
@@ -295,6 +350,49 @@ if __name__ == "__main__":
             t = 1/2 * x * float(b)
         return sin(t) * t
 
+    def foofilter(xs : torch.Tensor):
+        t = torch.zeros(xs.shape)
+        for n,x in enumerate(xs):
+            if x < 0:
+                t[n] = -0.125*x 
+            else:
+                t[n] = 1/(n+1) * x ** 2
+
+        return torch.mean(torch.sin(t)*t)
+
+    def foofilter_comp(xs : torch.Tensor):
+        t = torch.tensor([(
+                 -0.125*x          if x < 0.0 
+            else  1/(n+1) * x ** 2).item()
+            for n,x in enumerate(xs)
+        ])
+        return torch.mean(torch.sin(t)*t)
+
+    def foofilter_mask(x : torch.Tensor):
+        mask = x < 0
+        t = mask *(-0.125*x) + (1-mask) * 1/2 * x ** 2
+        return torch.mean(torch.sin(t)*t)
+
+    x_example = torch.rand((23,))
+
+    fn = torch.jit.script(foofilter_comp)
+    print(fn.code)
+    # print(fn(x_example))
+
+    # #AWF: TODO: check "training" attribute -- does that enable faster AD?
+    # with open("/tmp/t.onnx", "w") as temp:
+    #     torch.onnx.export(model=fn, 
+    #                   args=x_example, 
+    #                   example_outputs=fn(x_example),
+    #                   f=temp, 
+    #                   verbose=True)
+    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x_example,))
+    print(pformat(ks_str))
+
+
+
+    print('\n\n*************************\n\n')
+
     def foo(x : torch.Tensor):
         y = torch.mean(x)
         if y < 0:
@@ -303,21 +401,27 @@ if __name__ == "__main__":
             t = 1/2 * x ** 2
         return torch.mean(torch.sin(t)*t)
 
+
     # Compile function and gradients for example input of ones(2,3)
     x_example = torch.ones((2,3))
 
     fn = torch.jit.script(foo)
     print(fn.code)
     ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x_example,))
-    print(pformat(ks_str))
-    
+    cpprint(ks_str)
+
+    # Compile function and gradients for example input of ones(2,3)
+    x_example = torch.ones((2,3))
     ks_fun = ts2mod(foo, example_inputs=(x_example,))
 
-    # Call the function at interesting inputs
+    # Call the function at different, interesting inputs
     x = torch.rand((4,4)) # TODO: check non-square
 
-    ans = foo(x)
+    ans = foo(x) 
     print("Python answer = ", ans.numpy())
+
+    ts_foo = torch.jit.script(foo)
+    print("TorchScript answer = ", ts_foo(x).numpy())
 
     kx = ks_fun.adapt(x)
     ans = ks_fun(kx)
@@ -337,20 +441,26 @@ if __name__ == "__main__":
     print("Gradient diff = \n", ansnp - dy[0].numpy())
 
     #print(f"Knossos mem: {ks_fun._py_mod.allocator_top()}/{ks_fun._py_mod.allocator_peak()}")
-
-    x = torch.rand((16,16)) # TODO: check non-square
-
     import timeit
-    def time_ks():
+    def time_ks(n):
+        x = torch.rand((n,n)) 
         ks_fun._py_mod.reset_allocator()
         kx = ks_fun.adapt(x)
         ans = ks_fun.rev(kx, 1.0)
+        #print(numpy.array(ans, copy=False))
 
-    def time_pytorch():
-        xtrace = x.clone().detach().requires_grad_(True)
-        y = foo(xtrace)
-        dy = torch.autograd.grad(y, xtrace)
-        
-    ntimes = 1000
-    print("time_ks= ", timeit.timeit(time_ks, number=ntimes))
-    print("time_pt= ", timeit.timeit(time_pytorch, number=ntimes))
+    def time_pytorch(n):
+        x = torch.rand((n,n)) 
+        x.requires_grad_(True)
+        y = ts_foo(x)
+        dy = torch.autograd.grad(y, x)
+        #print(dy)
+
+    size = 4
+    ntimes = 10000
+    print("time_ks= ", timeit.timeit(lambda: time_ks(size), number=ntimes))
+    print("time_pt= ", timeit.timeit(lambda: time_pytorch(size), number=ntimes))
+
+
+    # Next:
+    #  - foofilter
