@@ -26,13 +26,13 @@ def numel_program(node):
         numel(Tensor dims v) = prod(dims(v)) * numel(v[0,...,0])
 
     """
-    if node.get_type.is_scalar:
+    if node.type.is_scalar:
         return Node.from_data(1)
 
-    if node.get_type.is_tuple:
-        return sum(numel_program(get_tuple_element(i, node)) for i in range(node.get_type.tuple_len))
+    if node.type.is_tuple:
+        return sum(numel_program(get_tuple_element(i, node)) for i in range(node.type.tuple_len))
 
-    if node.get_type.is_tensor:
+    if node.type.is_tensor:
         # TODO is assuming scalar elts
         return reduce(mul, node.shape_program[0]) * numel_program(get_tensor_element0(node))
 
@@ -119,8 +119,8 @@ def get_vector_element(index, x):
     return f(index, x)
 
 def get_tensor_element0(x):
-    assert x.get_type.is_tensor
-    dims = x.get_shape.dims
+    assert x.type.is_tensor
+    dims = x.shape.dims
     if len(dims) == 1:
         return get_vector_element(0, x)
     else:
@@ -129,7 +129,7 @@ def get_tensor_element0(x):
 # ks::size
 def get_tensor_size(x):
     def shape_prop_function(x : Node):
-        x_type = x.get_type
+        x_type = x.type
         assert x_type.is_tensor
         shape_of_result = Shape.of_size(x_type.tensor_rank)
         return ShapeType(shape_of_result, SizeType.from_rank(x_type.tensor_rank))
@@ -139,8 +139,8 @@ def get_tensor_size(x):
 # "tuple"
 def make_tuple(*args):
     def shape_prop_function(*args):
-        shapes = tuple(arg.get_shape for arg in args)
-        types = tuple(arg.get_type for arg in args)
+        shapes = tuple(arg.shape for arg in args)
+        types = tuple(arg.type for arg in args)
         return ShapeType(shapes, Type.Tuple(*types))
     arg_names = [f"arg{i}" for i in range(len(args))]
     f = make_builtin("tuple", arg_names, shape_prop_function)
@@ -150,6 +150,6 @@ def make_tuple(*args):
 def get_tuple_element(index, x):
     tuple_size = len(x)
     def shape_prop_function(arg):
-        return ShapeType(arg.get_shape[index], arg.get_type.tuple_elem(index))
+        return ShapeType(arg.shape[index], arg.type.tuple_elem(index))
     f = make_builtin(f"get${index+1}${tuple_size}", ["x"], shape_prop_function)
     return f(x)

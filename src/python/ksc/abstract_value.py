@@ -44,11 +44,11 @@ class AbstractValue:
         return ShapeType(self._shape, self._type)
 
     @property
-    def get_shape(self) -> Shape:
+    def shape(self) -> Shape:
         return self._shape
 
     @property
-    def get_type(self) -> Type:
+    def type(self) -> Type:
         return self._type
 
     @property

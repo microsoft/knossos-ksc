@@ -43,7 +43,7 @@ def get_or_trace_function(f, original_args):
         if key in _jitted:
             return _jitted[key]
 
-    inputs = [node.Node(n, arg.get_shape, arg.get_type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
+    inputs = [node.Node(n, arg.shape, arg.type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
 
     # trace the function
     trace = f.trace(*inputs)
@@ -387,7 +387,7 @@ def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=Non
     Should be a python function taking AbstractValues, 
     and returning a ShapeType of the result, e.g.
         def mat_vec_mul_shape_propagate(M, v):
-            return ShapeType(M.get_shape.dims[0], v.get_type)
+            return ShapeType(M.shape.dims[0], v.type)
 
     The algebra of these shape classes is:
         Shape of scalar is      ScalarShape (constant initialized to ())

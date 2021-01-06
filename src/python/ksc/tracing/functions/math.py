@@ -6,30 +6,30 @@ from ksc.tracing.functions.type_propagation_rules import unique_element_type
 from ksc.utils import ShapeType, TensorShape, ScalarShape
 
 def mat_mat_mul_prop_rule(x, y):
-    el_type = unique_element_type([x.get_type, y.get_type])
+    el_type = unique_element_type([x.type, y.type])
     output_type = Type.Tensor(2, el_type)
     assert el_type.is_scalar
-    assert x.get_type.tensor_rank == 2
-    assert y.get_type.tensor_rank == 2
-    assert isinstance(x.get_shape, TensorShape) and len(x.get_shape.dims) == 2
-    assert isinstance(y.get_shape, TensorShape) and len(y.get_shape.dims) == 2
+    assert x.type.tensor_rank == 2
+    assert y.type.tensor_rank == 2
+    assert isinstance(x.shape, TensorShape) and len(x.shape.dims) == 2
+    assert isinstance(y.shape, TensorShape) and len(y.shape.dims) == 2
 
-    m, k1 = x.get_shape.dims
-    k2, n = y.get_shape.dims
+    m, k1 = x.shape.dims
+    k2, n = y.shape.dims
     assert k1 == k2
     out_shape = TensorShape((m, n), ScalarShape)
     return ShapeType(out_shape, output_type)
 
 def mat_vec_broadcast_prop_rule(m, v) -> ShapeType:
-    el_type = unique_element_type([m.get_type, v.get_type])
+    el_type = unique_element_type([m.type, v.type])
     assert el_type.is_scalar
-    assert m.get_type.tensor_rank == 2
-    assert v.get_type.tensor_rank == 1
-    assert isinstance(m.get_shape, TensorShape) and len(m.get_shape.dims) == 2
-    assert isinstance(v.get_shape, TensorShape) and len(v.get_shape.dims) == 1
+    assert m.type.tensor_rank == 2
+    assert v.type.tensor_rank == 1
+    assert isinstance(m.shape, TensorShape) and len(m.shape.dims) == 2
+    assert isinstance(v.shape, TensorShape) and len(v.shape.dims) == 1
 
-    assert m.get_shape.dims[1] == v.get_shape.dims[0]
-    return ShapeType(m.get_shape, Type.Tensor(2, el_type))
+    assert m.shape.dims[1] == v.shape.dims[0]
+    return ShapeType(m.shape, Type.Tensor(2, el_type))
 
 dot = ksc.tracing.make_edef(
     "dot", ["x", "y"], mat_mat_mul_prop_rule,
@@ -47,13 +47,13 @@ broadcast_add = ksc.tracing.make_edef(
 )
 
 def transpose_prop_rule(x):
-    assert x.get_type.tensor_rank == 2
+    assert x.type.tensor_rank == 2
     def transpose_shape(s):
         assert len(s.dims) == 2
         m, n = s.dims
         return TensorShape((n, m), s.elem_shape)
 
-    return ShapeType(transpose_shape(x.get_shape), x.get_type)
+    return ShapeType(transpose_shape(x.shape), x.type)
 
 transpose = ksc.tracing.make_edef(
     "transpose", ["x"], transpose_prop_rule,

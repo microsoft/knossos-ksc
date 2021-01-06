@@ -142,21 +142,21 @@ class Node(AbstractValue):
 
         """
         from ksc.tracing.functions import core
-        if self.get_type.is_scalar:
+        if self.type.is_scalar:
             return core.make_tuple()
 
-        if self.get_type.is_tensor:
+        if self.type.is_tensor:
 
             dims = core.get_tensor_size(self) # ks::size
             # TOUNDO: ks::size returns an int for rank 1,need to tuple it
-            if self.get_type.tensor_rank == 1:
+            if self.type.tensor_rank == 1:
                 dims = core.make_tuple(dims)
 
             element = core.get_tensor_element0(self) # ks::index
             return core.make_tuple(dims, element.shape_program)
             
-        if self.get_type.is_tuple:
-            children = (core.get_tuple_element(i, self).shape_program for i in range(self.get_type.tuple_len))
+        if self.type.is_tuple:
+            children = (core.get_tuple_element(i, self).shape_program for i in range(self.type.tuple_len))
             return core.make_tuple(*children)
 
         raise NotImplementedError

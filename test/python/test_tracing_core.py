@@ -199,7 +199,7 @@ def test_tensor_size():
     assert core.get_tensor_size(x).data == (2,3,4)
 
 def get_ks_shape(x):
-    return Shape.from_ks_shape(x.shape_program.data, x.get_type)
+    return Shape.from_ks_shape(x.shape_program.data, x.type)
 
 def test_tensor_shape():
     x = Node.from_data(np.arange(24).reshape((2, 3, 4)))

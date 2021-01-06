@@ -133,8 +133,8 @@ def build(sz, f):
     )
     
     rank = len(dims)
-    ks_type = Type.Tensor(rank, el.get_type)
-    return AbstractValue(TensorShape(dims, el.get_shape), ks_type, context=context)
+    ks_type = Type.Tensor(rank, el.type)
+    return AbstractValue(TensorShape(dims, el.shape), ks_type, context=context)
 
 def sumbuild(sz, f):
     context = check_args_and_get_context("sumbuild", [sz], concrete=None)
