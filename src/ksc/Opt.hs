@@ -74,6 +74,9 @@ simplify :: OptEnv -> TExpr -> KM TExpr
 simplify env rhs
   = do { let subst = optSubst env
 
+       -- We use ANF to expose optimisation opportunities and use
+       -- optLets and optE to take them.  See Note [Inline tuples] for
+       -- the motiviation for doing ANF-then-opt.
        ; rhs1 <- runAnf (anfExpr subst rhs)
 --       ; banner "ANF'd (1)"
 --       ; display rhs1
