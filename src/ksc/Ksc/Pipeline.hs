@@ -192,15 +192,6 @@ theShapes display defs env = do {
   ; return (env1, shape_defs)
   }
 
-defsAndDiffs :: DisplayLint
-             -> [Decl]
-             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
-defsAndDiffs display decls = do {
-  ; (defs, env, rulebase) <- theDefs display decls
-  ; (env', optdiffs) <- theDiffs display defs env rulebase
-  ; pure (env', defs, optdiffs, rulebase)
-  }
-
 anfOptAndCse :: DisplayLint
              -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
 anfOptAndCse display rulebase env4 alldefs =
@@ -346,7 +337,9 @@ futharkPipeline files
 
   ; let decls = ignoreMain decls0
 
-  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
+  ; (defs, env, rulebase) <- theDefs display decls
+  ; (env', optdiffs) <- theDiffs display defs env rulebase
+  ; let env3 = env'
 
   ; let env4 = env3
 
