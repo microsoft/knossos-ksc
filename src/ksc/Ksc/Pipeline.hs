@@ -339,13 +339,9 @@ futharkPipeline files
 
   ; (defs, env, rulebase) <- theDefs display decls
   ; (env', optdiffs) <- theDiffs display defs env rulebase
-  ; let env3 = env'
-
-  ; let env4 = env3
-
   ; let alldefs = defs ++ optdiffs
 
-  ; anfOptAndCse display rulebase env4 alldefs
+  ; anfOptAndCse display rulebase env' alldefs
   }
 
 -- | Read source code from specified input file, optimise,
