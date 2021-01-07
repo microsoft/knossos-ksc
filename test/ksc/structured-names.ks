@@ -1,5 +1,8 @@
 (def f Float (t : Tuple Float Integer) 0.0)
 
+(gdef fwd [f (Tuple Float Integer)])
+(gdef rev [f (Tuple Float Integer)])
+
 (def main Integer ()
      (let (f1     (f 0.0 0))
      (let (f2     ([f (Tuple Float Integer)] 0.0 0))

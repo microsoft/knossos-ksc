@@ -5,4 +5,7 @@
                     (lam (i : Integer)
                          (mul (index i x) (index i y))))))
 
+(gdef fwd [f7 (Tuple (Vec Float) (Vec Float))])
+(gdef rev [f7 (Tuple (Vec Float) (Vec Float))])
+
 (def main Integer () 0)

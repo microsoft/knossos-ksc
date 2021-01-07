@@ -3,33 +3,74 @@
 (def mkvec (Vec Float) ((n : Integer) (start : Float))
     (build n (lam (i : Integer) (add start (to_float i)))))
 
+(gdef fwd [mkvec (Tuple Integer Float)])
+(gdef rev [mkvec (Tuple Integer Float)])
+
 (def zerovec (Vec Float) (n : Integer)
     (build n (lam (i : Integer) 0.0)))
+
+(gdef fwd [zerovec Integer])
+(gdef rev [zerovec Integer])
+
 (def zerovecvec (Vec (Vec Float)) ((m : Integer) (n : Integer))
     (build m (lam (i : Integer) (zerovec n))))
+
+(gdef fwd [zerovecvec (Tuple Integer Integer)])
+(gdef rev [zerovecvec (Tuple Integer Integer)])
 
 (def test1 (Tuple (Vec Float) Integer (Vec Float)) (dummy : Integer)
     (tuple (mkvec 10 0.0) 25 (mkvec 5 50.0)))
 
+(gdef fwd [test1 Integer])
+(gdef rev [test1 Integer])
+
 (def test2_impl (Vec Float) (ignored : (Vec Float))
     (mkvec 10 0.0))
+
+(gdef fwd [test2_impl (Vec Float)])
+(gdef rev [test2_impl (Vec Float)])
+
 (def test2 (Vec Float) (dummy : Integer)
     (test2_impl (mkvec 2 100.0)))
 
+(gdef fwd [test2 Integer])
+(gdef rev [test2 Integer])
+
 (def test3_impl (Tuple (Vec Float) Integer (Vec Float)) (ignored : (Vec Float))
     (tuple (mkvec 10 0.0) 40 (mkvec 5 60.0)))
+
+(gdef fwd [test3_impl (Vec Float)])
+(gdef rev [test3_impl (Vec Float)])
+
 (def test3 (Tuple (Vec Float) Integer (Vec Float)) (dummy : Integer)
     (test3_impl (mkvec 2 100.0)))
 
+(gdef fwd [test3 Integer])
+(gdef rev [test3 Integer])
+
 (def test4_impl (Vec (Tuple (Vec Float) Integer (Vec Float))) (ignored : (Vec Float))
     (build 6 (lam (i : Integer) (tuple (mkvec 10 0.0) (add 40 i) (mkvec 5 (add 60.0 (to_float i)))))))
+
+(gdef fwd [test4_impl (Vec Float)])
+(gdef rev [test4_impl (Vec Float)])
+
 (def test4 (Vec (Tuple (Vec Float) Integer (Vec Float))) (dummy : Integer)
     (test4_impl (mkvec 2 100.0)))
 
+(gdef fwd [test4 Integer])
+(gdef rev [test4 Integer])
+
 (def test5_swap (Tuple (Vec Float) (Vec Float)) ((a : (Vec Float)) (b : (Vec Float)))
     (tuple b a))
+
+(gdef fwd [test5_swap (Tuple (Vec Float) (Vec Float))])
+(gdef rev [test5_swap (Tuple (Vec Float) (Vec Float))])
+
 (def test5 (Tuple (Vec Float) (Vec Float)) (dummy : Integer)
     (test5_swap (mkvec 10 0.0) (mkvec 8 50.0)))
+
+(gdef fwd [test5 Integer])
+(gdef rev [test5 Integer])
 
 (def test6_helper (Vec (Vec Float)) (a : (Vec (Vec Float)))
      (let (b (build 4 (lam (j : Integer) (mkvec 2 42.0))))
@@ -39,8 +80,15 @@
             (if (eq i 2)
                 (index 2 b)
                 (mkvec 8 0.0)))))))
+
+(gdef fwd [test6_helper (Vec (Vec Float))])
+(gdef rev [test6_helper (Vec (Vec Float))])
+
 (def test6 (Vec (Vec Float)) (dummy : Integer)
     (test6_helper (build 3 (lam (i : Integer) (mkvec 3 12.0)))))
+
+(gdef fwd [test6 Integer])
+(gdef rev [test6 Integer])
 
 (def test7 (Vec (Vec Float)) ((a : (Vec (Vec Float))) (dummy : Integer))
     (build 3 (lam (i : Integer)
@@ -50,6 +98,9 @@
                 (index 3 a)
                 (mkvec 3 10.0))))))
 
+(gdef fwd [test7 (Tuple (Vec (Vec Float)) Integer)])
+(gdef rev [test7 (Tuple (Vec (Vec Float)) Integer)])
+
 (def test8 (Vec (Vec Float)) ((a : (Vec (Vec Float))) (dummy : Integer))
     (build 4 (lam (i : Integer)
         (if (eq i 1)
@@ -58,11 +109,17 @@
                 (index 3 a)
                 (mkvec 3 10.0))))))
 
+(gdef fwd [test8 (Tuple (Vec (Vec Float)) Integer)])
+(gdef rev [test8 (Tuple (Vec (Vec Float)) Integer)])
+
 (def test9 (Vec (Vec Float)) (dummy : Integer)
     (build 10 (lam (i : Integer)
         (if (eq i 4)
             (zerovec 8)
             (mkvec 4 (mul (to_float i) 10.0))))))
+
+(gdef fwd [test9 Integer])
+(gdef rev [test9 Integer])
 
 (def test10 (Vec (Vec (Vec Float))) (dummy : Integer)
     (build 10 (lam (i : Integer)
@@ -70,6 +127,9 @@
             (zerovecvec 3 6)
             (build i (lam (j : Integer)
                 (mkvec 4 (mul (to_float (add i j)) 10.0))))))))
+
+(gdef fwd [test10 Integer])
+(gdef rev [test10 Integer])
 
 (def main Integer ()
       (print

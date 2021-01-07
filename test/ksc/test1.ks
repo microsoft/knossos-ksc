@@ -3,8 +3,14 @@
 (def a Float ((x : Float))
     (mul 3.0 x))
 
+(gdef fwd [a Float])
+(gdef rev [a Float])
+
 (def b Float ((y : Float))
     (mul 2.0 y))
+
+(gdef fwd [b Float])
+(gdef rev [b Float])
 
 (def g Float ((x : Float) (y : Float))
     (mul x y))
@@ -14,8 +20,14 @@
     (let (z (mul 5.0 x))
         (div (a z) (b y))))
 
+(gdef fwd [f1 (Tuple Float Float)])
+(gdef rev [f1 (Tuple Float Float)])
+
 (def f Float ((x : Float) (y : Float))
     (div x y))
+
+(gdef fwd [f (Tuple Float Float)])
+(gdef rev [f (Tuple Float Float)])
 
 (def main Integer ()
     (let ((x 1.1)

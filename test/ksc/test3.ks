@@ -4,15 +4,27 @@
     (if (lt 2 3) (index 0 x) 7.0)
 )
 
+(gdef fwd [f (Tuple (Vec Float) (Vec Float))])
+(gdef rev [f (Tuple (Vec Float) (Vec Float))])
+
 (def q (Vec Float) ((r : Float) (m : Integer) (a : Vec Float))
   (let (n (size a))
     (build (mul 2 n) (lam (i : Integer) (mul r (index (div i m) a))))))
 
+(gdef fwd [q (Tuple Float Integer (Vec Float))])
+(gdef rev [q (Tuple Float Integer (Vec Float))])
+
 (def mkvec (Vec Float) (n : Integer)
     (build n (lam (j : Integer) (to_float j))))
 
+(gdef fwd [mkvec Integer])
+(gdef rev [mkvec Integer])
+
 (def sqnorm Float (v : Vec Float)
   (sum (build (size v) (lam (i : Integer) (let (vi (index i v)) (mul vi vi))))))
+
+(gdef fwd [sqnorm (Vec Float)])
+(gdef rev [sqnorm (Vec Float)])
 
 #|
 
@@ -24,6 +36,9 @@
 (def g Float (gamma : Float)
     (let (v     (q gamma 3 (mkvec 3)))
          (sqnorm v)))
+
+(gdef fwd [g Float])
+(gdef rev [g Float])
 
 #|
 

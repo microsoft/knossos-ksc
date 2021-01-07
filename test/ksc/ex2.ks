@@ -7,4 +7,7 @@
            (z  (get$2$2 zt)))
      (mul y2 z)))
 
+(gdef fwd [f2a Float])
+(gdef rev [f2a Float])
+
 (def main Integer () 0)

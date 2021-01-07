@@ -39,9 +39,24 @@
        (index ki bias))
        ))))))))
 
+(gdef fwd [conv2d
+      (Tuple (Vec (Vec (Vec (Vec Float))))
+             (Vec Float)
+             (Vec (Vec (Vec Float))))])
+(gdef rev [conv2d
+      (Tuple (Vec (Vec (Vec (Vec Float))))
+             (Vec Float)
+             (Vec (Vec (Vec Float))))])
+
 (def max_ Float ((x : Float) (y : Float)) (if (gt x y) x y))
 
+(gdef fwd [max_ (Tuple Float Float)])
+(gdef rev [max_ (Tuple Float Float)])
+
 (def relu Float (x : Float) (max_ x 0.0))
+
+(gdef fwd [relu Float])
+(gdef rev [relu Float])
 
 (def relu3d (Vec (Vec (Vec Float)))
      (image : Vec (Vec (Vec Float)))
@@ -54,10 +69,16 @@
      (build m (lam (mi : Integer)
      (relu (index mi (index ni (index ki image))))))))))))
 
+(gdef fwd [relu3d (Vec (Vec (Vec Float)))])
+(gdef rev [relu3d (Vec (Vec (Vec Float)))])
+
 (def relu1d (Vec Float)
      (image : Vec Float)
      (build (size image) (lam (ki : Integer)
      (relu (index ki image)))))
+
+(gdef fwd [relu1d (Vec Float)])
+(gdef rev [relu1d (Vec Float)])
 
 (def maxpool
      (Vec (Vec (Vec Float)))
@@ -77,6 +98,9 @@
              (a11 (index (add 1 mid) (index (add 1 nid) (index li image)))))
          (max_ (max_ a00 a01) (max_ a10 a11))
          )))))))))
+
+(gdef fwd [maxpool (Vec (Vec (Vec Float)))])
+(gdef rev [maxpool (Vec (Vec (Vec Float)))])
 
 (def dense3d
      (Vec Float)
@@ -99,6 +123,15 @@
      (index oi bias))
      ))))
 
+(gdef fwd [dense3d
+      (Tuple (Vec (Vec (Vec (Vec Float))))
+             (Vec Float)
+             (Vec (Vec (Vec Float))))])
+(gdef rev [dense3d
+      (Tuple (Vec (Vec (Vec (Vec Float))))
+             (Vec Float)
+             (Vec (Vec (Vec Float))))])
+
 ; Just the matrix-vector multiply that we all know and love
 (def dense1d
      (Vec Float)
@@ -115,6 +148,15 @@
        ))
      (index oi bias))
      ))))
+
+(gdef fwd [dense1d
+      (Tuple (Vec (Vec Float))
+             (Vec Float)
+             (Vec Float))])
+(gdef rev [dense1d
+      (Tuple (Vec (Vec Float))
+             (Vec Float)
+             (Vec Float))])
 
 (def mnist
      (Vec Float)
@@ -137,5 +179,26 @@
      (relu3d
      (conv2d k1 bk1 image
              ))))))))))
+
+(gdef fwd [mnist
+     (Tuple (Vec (Vec (Vec Float)))
+            (Vec (Vec (Vec (Vec Float))))
+            (Vec Float)
+            (Vec (Vec (Vec (Vec Float))))
+            (Vec Float)
+            (Vec (Vec (Vec (Vec Float))))
+            (Vec Float)
+            (Vec (Vec Float))
+            (Vec Float))])
+(gdef rev [mnist
+     (Tuple (Vec (Vec (Vec Float)))
+            (Vec (Vec (Vec (Vec Float))))
+            (Vec Float)
+            (Vec (Vec (Vec (Vec Float))))
+            (Vec Float)
+            (Vec (Vec (Vec (Vec Float))))
+            (Vec Float)
+            (Vec (Vec Float))
+            (Vec Float))])
 
 (def main Integer () 0)

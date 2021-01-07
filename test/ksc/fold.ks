@@ -1,17 +1,26 @@
 (def f Float (t : Tuple Float (Tuple Float Float))
      0.0)
 
+(gdef fwd [f (Tuple Float (Tuple Float Float))])
+(gdef rev [f (Tuple Float (Tuple Float Float))])
+
 (def fold_f Float ((env : Float) (i : Integer) (v : Vec Float) (acc : Float))
      (if
          (eq i (size v))
          acc
        (fold_f env (add i 1) v (f (tuple env (tuple acc (index i v)))))))
 
+(gdef fwd [fold_f (Tuple Float Integer (Vec Float) Float)])
+(gdef rev [fold_f (Tuple Float Integer (Vec Float) Float)])
+
 (def prod Float ((i : Integer) (v : Vec Float) (acc : Float))
      (if
          (eq i (size v))
          acc
        (prod (add i 1) v (mul acc (index i v)))))
+
+(gdef fwd [prod (Tuple Integer (Vec Float) Float)])
+(gdef rev [prod (Tuple Integer (Vec Float) Float)])
 
 ; This ends up calculating prod(v) * pow(closure, size(v))
 (def prod_fold Float ((v : Vec Float) (closure : Float))
@@ -21,6 +30,9 @@
                   (mul (mul acc x) closure)))
            1.0
            v))
+
+(gdef fwd [prod_fold (Tuple (Vec Float) Float)])
+(gdef rev [prod_fold (Tuple (Vec Float) Float)])
 
 ;; Check that it works with an environment type that isn't its own
 ;; tangent type
@@ -32,6 +44,9 @@
            1.0
            v))
 
+(gdef fwd [prod_fold_integer_env (Tuple (Vec Float) Integer)])
+(gdef rev [prod_fold_integer_env (Tuple (Vec Float) Integer)])
+
 ;; Check that it works with an accumulator type that isn't its own
 ;; tangent type
 (def prod_fold_integer_acc Integer (v : Vec Float)
@@ -41,6 +56,9 @@
                   acc))
            1
            v))
+
+(gdef fwd [prod_fold_integer_acc (Vec Float)])
+(gdef rev [prod_fold_integer_acc (Vec Float)])
 
 ;; Check that it works with a vector element type that isn't its own
 ;; tangent type
@@ -52,14 +70,23 @@
            1.0
            v))
 
+(gdef fwd [prod_fold_integer_v (Vec Integer)])
+(gdef rev [prod_fold_integer_v (Vec Integer)])
+
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
        (mul ($ranhashdoub seed) scale))
+
+(gdef fwd [mkfloat (Tuple Integer Float)])
+(gdef rev [mkfloat (Tuple Integer Float)])
 
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
                         (scale : Float))
     (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
+
+(gdef fwd [mkvec (Tuple Integer Integer Float)])
+(gdef rev [mkvec (Tuple Integer Integer Float)])
 
 (def main Integer ()
      (let ((seed 20000)

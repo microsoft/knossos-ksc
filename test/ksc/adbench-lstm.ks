@@ -9,9 +9,15 @@
 (def sigmoid Float (x : Float)
      (div 1.0 (add 1.0 (exp (neg x)))))
 
+(gdef fwd [sigmoid Float])
+(gdef rev [sigmoid Float])
+
 (def exp$VecR (Vec Float) ((v : Vec Float))
  (let (n (size v))
   (build n (lam (i : Integer) (exp (index i v))))))
+
+(gdef fwd [exp$VecR (Vec Float)])
+(gdef rev [exp$VecR (Vec Float)])
 
 ; The other ADBench implementations add 2 to the logsumexp. It's not
 ; clear why they do that but we have to do the same to match.  See
@@ -19,6 +25,9 @@
 ;     https://github.com/awf/ADBench/issues/143
 (def logsumexp Float ((v : Vec Float))
     (log (add 2.0 (sum (exp$VecR v)))))
+
+(gdef fwd [logsumexp (Vec Float)])
+(gdef rev [logsumexp (Vec Float)])
 
 ; all Vecs size h
 (def lstm_model (Tuple (Vec Float) (Vec Float))
@@ -40,6 +49,31 @@
               (let ((outgate (sigmoid (add (mul (index hi input)  (index hi wo)) (index hi bo)))))
                 (mul outgate (tanh (index hi cell_out))))))))
        (tuple hidden_out cell_out)))
+
+(gdef fwd [lstm_model
+      (Tuple (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float))])
+(gdef rev [lstm_model
+      (Tuple (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float))])
 
 ; Return (Tuple (Vec h Float) (Vec l (Tuple (Vec h Float) (Vec h Float)))
 ; wf_bf_wi_bi_wo_bo_wc_bc_hidden_cell : Vec l <tuple of (Vec h)s>
@@ -92,6 +126,28 @@
                        (add (mul (index bi final_output) (index bi out_weight))
                             (index bi out_bias))))))
        (tuple output final_output_vec)))
+
+(gdef fwd [lstm_predict
+      (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)))
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float))])
+(gdef rev [lstm_predict
+      (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)))
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float))])
+
 
 ; sequence: Vec cm1 <tuple of (Vec h)s>
 (def lstm_objective Float
@@ -151,5 +207,26 @@
            (count (to_float (mul cm1 h)))
            (loss (neg (div total count))))
        loss))
+
+(gdef fwd [lstm_objective
+      (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)))
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec (Tuple (Vec Float) (Vec Float))))])
+(gdef rev [lstm_objective
+      (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)
+                         (Vec Float) (Vec Float)))
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec (Tuple (Vec Float) (Vec Float))))])
 
 (def main Integer () 0)

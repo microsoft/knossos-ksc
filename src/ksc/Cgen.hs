@@ -620,6 +620,7 @@ cgenUserFun f = case f of
   DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenBaseFun s
   DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenBaseFun s
   ShapeFun ff   -> "shape$" ++ cgenUserFun ff
+  CLFun s       -> "CL$" ++ cgenBaseFun s
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
 cgenAnyFun tf cftype = case tf of

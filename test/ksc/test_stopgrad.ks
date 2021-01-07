@@ -3,11 +3,17 @@
 (def tri Integer (n : Integer)
   (div (mul n (sub n 1)) 2))
 
+(gdef fwd [tri Integer])
+(gdef rev [tri Integer])
+
 ; NB This doesn't really test "stopgrad" per se anymore, but it is
 ; correct that we no longer try to differentiate with respect to
 ; Integer parameters
 
 (def f Float ((x : Float) (n : Integer))
   (mul x (to_float n)))
+
+(gdef fwd [f (Tuple Float Integer)])
+(gdef rev [f (Tuple Float Integer)])
 
 (def main Integer () 0)

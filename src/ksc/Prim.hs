@@ -406,6 +406,8 @@ primCallResultTy_maybe fun arg_ty
             Left err -> Left err
             Right res_ty -> Right (shapeType res_ty)
 
+      CLFun f -> primCallResultTy_maybe (Fun f) arg_ty
+
       Fun (BaseUserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
 selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
@@ -436,6 +438,7 @@ baseFunArgTy_maybe derivedFun derivedFunArgTy
                    $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
       GradFun{}  -> it's derivedFunArgTy
       ShapeFun f -> baseFunArgTy_maybe f derivedFunArgTy
+      CLFun{}    -> it's derivedFunArgTy
   where it's = pure
 
 ---------------------------------------

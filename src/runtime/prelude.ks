@@ -80,8 +80,14 @@
 (def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
   (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
 
+(gdef fwd [sub (Tuple (Tensor 1 Float) (Tensor 1 Float))])
+(gdef rev [sub (Tuple (Tensor 1 Float) (Tensor 1 Float))])
+
 (def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : Float))
   (build (size a) (lam (i : Integer) (sub (index i a) b))))
+
+(gdef fwd [sub (Tuple (Tensor 1 Float) Float)])
+(gdef rev [sub (Tuple (Tensor 1 Float) Float)])
 
 ;; mul :: Number x Number -> Number
 ;; mul (x, y) = x * y
@@ -314,6 +320,8 @@
 
 (def exp (Tensor 1 Float) ((v : Tensor 1 Float))
   (build (size v) (lam (i : Integer) (exp (index i v)))))
+(gdef fwd [exp (Tensor 1 Float)])
+(gdef rev [exp (Tensor 1 Float)])
 
 (edef sin Float (Float))
 (edef cos Float (Float))

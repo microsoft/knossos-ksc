@@ -5,11 +5,17 @@
            1.0
            (mul (index i v) (vprod (add i 1) v))))
 
+(gdef fwd [vprod (Tuple Integer (Vec Float))])
+(gdef rev [vprod (Tuple Integer (Vec Float))])
+
 (def aprod Float ( (i : Integer) (v : Vec Float) (acc : Float) )
        (if (eq i (size v))
            acc
          (let (acc (mul acc (index i v)))
             (aprod (add i 1) v acc))))
+
+(gdef fwd [aprod (Tuple Integer (Vec Float) Float)])
+(gdef rev [aprod (Tuple Integer (Vec Float) Float)])
 
 (def fprod Float (v : Vec Float)
      (fold (lam (acc_x : Tuple Float Float)
@@ -18,10 +24,19 @@
            1.0
            v))
 
+(gdef fwd [fprod (Vec Float)])
+(gdef rev [fprod (Vec Float)])
+
 (edef $BENCH Float ((Lam (Tuple) Float)))
 (def vchomp Float (_ : (Tuple (Tuple) (Vec Float))) 1.0)
+(gdef fwd [vchomp (Tuple (Tuple) (Vec Float))])
+(gdef rev [vchomp (Tuple (Tuple) (Vec Float))])
 (def achomp Float (_ : (Tuple (Tuple) (Vec Float) Float)) 1.0)
+(gdef fwd [achomp (Tuple (Tuple) (Vec Float) Float)])
+(gdef rev [achomp (Tuple (Tuple) (Vec Float) Float)])
 (def fchomp Float (_ : (Vec Float)) 1.0)
+(gdef fwd [fchomp (Vec Float)])
+(gdef rev [fchomp (Vec Float)])
 
 ;; run now takes about 40 sec.
 ;; Run with

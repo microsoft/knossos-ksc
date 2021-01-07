@@ -3,3 +3,6 @@
 (def main Integer () (print "Hello"))
 
 (def f String (s : String) s)
+
+(gdef fwd [f String])
+(gdef rev [f String])

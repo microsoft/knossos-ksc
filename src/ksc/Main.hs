@@ -8,9 +8,7 @@ import Lang
 import LangUtils
 import Parse (parseE)
 import Opt
-import Ksc.Pipeline (demoFFilter,
-                     displayCppGenAndCompile,
-                     displayCppGenNoDiffs,
+import Ksc.Pipeline (displayCppGenAndCompile,
                      genFuthark, ignoreMain)
 import qualified Ksc.Pipeline
 import qualified Cgen
@@ -75,7 +73,10 @@ generateCppWithoutDiffs = parseErr p
           ksout  <- option "ks-output-file"
           cppout <- option "cpp-output-file"
 
-          return (Ksc.Pipeline.displayCppGenNoDiffs
+          return (putStrLn "DEPRECATION WARNING:"
+                 >> putStrLn "--generate-cpp-without-diffs is no longer supported"
+                 >> putStrLn "Use --generate-cpp instead and use gdef to enable or suppress generated derivatives"
+                 >> Ksc.Pipeline.displayCppGen
                    Nothing input ksout cppout
                  >> pure ())
 
@@ -86,8 +87,7 @@ generateCpp = parseErr p
           ksout  <- option "ks-output-file"
           cppout <- option "cpp-output-file"
 
-          return (Ksc.Pipeline.displayCppGenDiffs
-                    Ksc.Pipeline.theDiffs Nothing input ksout cppout
+          return (Ksc.Pipeline.displayCppGen Nothing input ksout cppout
                  >> pure ())
 
 compileAndRun :: [String] -> IO ()
@@ -100,8 +100,7 @@ compileAndRun = parseErr p
           exeout   <- option "exe-output-file"
 
           return $ do
-            Ksc.Pipeline.displayCppGenDiffs
-               Ksc.Pipeline.theDiffs Nothing inputs ksout cppout
+            Ksc.Pipeline.displayCppGen Nothing inputs ksout cppout
             Cgen.compile compiler cppout exeout
             output <- Cgen.runExe exeout
             putStrLn output
@@ -245,14 +244,6 @@ futharkCompileKscPrograms ksFiles = do
               ["check", "obj/" ++ ksTest ++ ".fut"]
             return ()
 
-demoFOnTestPrograms :: [String] -> IO ()
-demoFOnTestPrograms ksTests = do
-  let ksTestsInModes :: [(String, ADPlan)]
-      ksTestsInModes = (,) <$> ksTests <*> [BasicAD, TupleAD]
-
-  testOn ksTestsInModes $ \(ksTest, adp) ->
-        demoFFilter Nothing ignoreMain adp ["src/runtime/prelude.ks", ksTest]
-
 -- Drop items from the list while the condition is satisfied, and also
 -- drop the first element satisfying the condition, if any.
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
@@ -260,13 +251,12 @@ dropWhile1 pred xs = case dropWhile pred xs of
   []  -> []
   _:t -> t
 
-testRunKSVia :: Ksc.Pipeline.GenerateDefs
-             -> String -> [Char] -> IO ()
-testRunKSVia via_ compiler ksFile = do
+testRunKS :: String -> [Char] -> IO ()
+testRunKS compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
   (output, (_, ksoContents)) <-
-      Ksc.Pipeline.displayCppGenCompileAndRunVia
-      via_ compiler Nothing ["src/runtime/prelude"] ksTest
+      Ksc.Pipeline.displayCppGenCompileAndRun
+      compiler Nothing ["src/runtime/prelude"] ksTest
 
   _ <- case parseE ksoContents of
           Left e -> error ("Generated .kso failed to parse:\n"
@@ -300,12 +290,6 @@ testRunKSVia via_ compiler ksFile = do
       putStrLn (unlines (reverse (take 30 (reverse (lines output)))))
       error ("These tests failed:\n" ++ unlines failures)
 
-testRunKS :: String -> String -> IO ()
-testRunKS = testRunKSVia Ksc.Pipeline.theDefs
-
-testRunKSViaCatLang :: String -> String -> IO ()
-testRunKSViaCatLang = testRunKSVia Ksc.Pipeline.theDefsViaCatLang
-
 testHspec :: IO ()
 testHspec = do
   summary <- runSpec Main.hspec defaultConfig
@@ -316,14 +300,12 @@ testsThatDoNoCodegen = do
   testHspec
   ksTestFiles_ <- ksTestFiles "test/ksc/"
   testRoundTrip ksTestFiles_
-  demoFOnTestPrograms ksTestFiles_
   return ksTestFiles_
 
 testC :: String -> [String] -> IO ()
 testC compiler fsTestKs = do
   ksTestFiles_ <- testsThatDoNoCodegen
   testOn ksTestFiles_ (testRunKS compiler)
-  testOn ksTestFiles_ (testRunKSViaCatLang compiler)
   testOn fsTestKs (testRunKS compiler)
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()

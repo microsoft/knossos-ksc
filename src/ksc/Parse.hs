@@ -10,7 +10,7 @@ module Parse  where
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Here's the BNF for our language:
 
-<decl> ::= <def> | <rule> | <edef>
+<decl> ::= <def> | <rule> | <edef> | <gdef>
 
 <rule> ::= ( rule <string> <params> <expr> <expr> )
 
@@ -18,6 +18,8 @@ Here's the BNF for our language:
 -- (def f Float ( (x : Float) (y : Vec Float) ) (...) )
 
 <edef> ::= ( edef <var> <type> <types> )
+
+<gdef> ::= ( gdef <derivation> <var> )
 
 <params> ::= <param> | ( <param_1> ... <param_n> )
 <param>  ::= ( <var> ":" <type> )
@@ -97,6 +99,7 @@ import Text.Parsec.String (Parser)
 
 import qualified Text.Parsec.Token as Tok
 
+import Data.Functor ( ($>) )
 import Control.Monad
 import Text.Read ( readMaybe )
 
@@ -375,6 +378,7 @@ pFunG pBase = try (brackets $
          <|> (pBaseDerivation "fwdt" DrvFun (AD TupleAD Fwd))
          <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
          <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
+         <|> (pReserved "CL"    >> CLFun    <$> pBase)
          <|> (pReserved "shape" >> ShapeFun <$> pFunG pBase)))
    <|> Fun <$> pBase
   where pBaseDerivation :: String
@@ -428,12 +432,28 @@ pEdef = do { pReserved "edef"
                          , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")
                          , def_rhs = EDefRhs }) }
 
+pDerivation :: Parser Derivation
+pDerivation =
+      (pReserved "fwd" $> DerivationDrvFun (AD BasicAD Fwd))
+  <|> (pReserved "rev" $> DerivationDrvFun (AD BasicAD Rev))
+  <|> (pReserved "CL"  $> DerivationCLFun)
+  <|> (pReserved "shape" $> DerivationShapeFun)
+
+pGDef :: Parser GDefX
+pGDef = do { pReserved "gdef"
+           ; d <- pDerivation
+           ; f <- pFunTyped
+           ; mk_fun_f <- pIsUserFun f
+           ; pure (GDef d mk_fun_f)
+           }
+
 
 pDecl :: Parser Decl
 pDecl = parens $
              (DefDecl  <$> pDef)
         <|>  (DefDecl  <$> pEdef)
         <|>  (RuleDecl <$> pRule)
+        <|>  (GDefDecl <$> pGDef)
 
 pDecls :: Parser [Decl]
 -- NB: `Tok.whiteSpace lexer` matches whitespace *or* comments

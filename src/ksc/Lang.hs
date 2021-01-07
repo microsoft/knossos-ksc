@@ -21,7 +21,7 @@ import           KMonad
 
 import           Data.Either                    ( partitionEithers )
 import qualified Data.Map as M
-import           Data.Maybe                     ( isJust )
+import           Data.Maybe                     ( isJust, mapMaybe )
 import           Debug.Trace                    ( trace )
 import           Test.Hspec
 
@@ -42,6 +42,7 @@ data Phase = Parsed | Typed | OccAnald
 
 data DeclX p = RuleDecl (RuleX p)
              | DefDecl  (DefX p)
+             | GDefDecl GDefX
 
 deriving instance (Eq (RuleX p), Eq (DefX p)) => Eq (DeclX p)
 deriving instance (Show (RuleX p), Show (DefX p)) => Show (DeclX p)
@@ -80,6 +81,14 @@ type TRhs  = RhsX Typed
 isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
+
+data Derivation = DerivationDrvFun ADMode
+                | DerivationCLFun
+                | DerivationShapeFun
+  deriving ( Show, Eq, Ord )
+
+data GDefX = GDef Derivation (UserFun Typed)
+  deriving ( Show, Eq, Ord )
 
 data PatG v = VarPat v     -- A single variable
             | TupPat [v]   -- A tuple of variables
@@ -417,6 +426,7 @@ data DerivedFun funid
                 | GradFun  funid ADPlan  -- Full Jacobian Df(x)
                 | DrvFun   funid ADMode  -- Derivative derivative f'(x,dx)
                                          --   Rev <=> reverse mode f`(x,dr)
+                | CLFun    funid         -- f(x), roundtripped through CatLang
                 | ShapeFun (DerivedFun funid)
                 deriving (Eq, Ord, Show)
 
@@ -451,6 +461,7 @@ baseFunFun f = \case
   GradFun fi p -> fmap (\f' -> GradFun f' p) (f fi)
   DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (f fi)
   ShapeFun ff  -> fmap ShapeFun (baseFunFun f ff)
+  CLFun fi     -> fmap CLFun (f fi)
 
 userFunBaseType :: forall p f. (InPhase p, Applicative f)
                 => (Maybe Type -> f Type)
@@ -497,6 +508,7 @@ perhapsUserFun = \case
                        (\f' -> Right $ DrvFun f' m)
                        (baseFunToBaseUserFunE f)
   ShapeFun f -> either (Left . ShapeFun) (Right . ShapeFun) (perhapsUserFun f)
+  CLFun f    -> either (Left . CLFun) (Right . CLFun) (baseFunToBaseUserFunE f)
 
 maybeUserFun :: Fun p -> Maybe (UserFun p)
 maybeUserFun f = case perhapsUserFun f of
@@ -529,6 +541,7 @@ baseFunOfFun = \case
   GradFun f _ -> f
   DrvFun f _  -> f
   ShapeFun f  -> baseFunOfFun f
+  CLFun f     -> f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -587,12 +600,20 @@ type TRule = RuleX Typed
 --  Simple functions over these types
 -----------------------------------------------
 
-partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p])
--- Separate the Rules, Defs
-partitionDecls = partitionEithers . map f
+partitionDeclsE :: [DeclX p] -> ([RuleX p], [Either (DefX p) GDefX])
+partitionDeclsE = partitionEithers . map f
   where
     f (RuleDecl r) = Left r
-    f (DefDecl  d) = Right d
+    f (DefDecl  d) = Right (Left d)
+    f (GDefDecl g) = Right (Right g)
+
+partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p])
+-- Separate the Rules, Defs
+partitionDecls decls = (r, mapMaybe keepDef dg)
+  where (r, dg) = partitionDeclsE decls
+        keepDef = \case
+          Left d  -> Just d
+          Right _ -> Nothing
 
 -----------------------------------------------
 --       Building values
@@ -1005,6 +1026,7 @@ pprDerivedFun f (GradFun  s adp)          = brackets (char 'D'   <> ppr adp <+> 
 pprDerivedFun f (DrvFun   s (AD adp Fwd)) = brackets (text "fwd" <> ppr adp <+> f s)
 pprDerivedFun f (DrvFun   s (AD adp Rev)) = brackets (text "rev" <> ppr adp <+> f s)
 pprDerivedFun f (ShapeFun sf)             = brackets (text "shape" <+> pprDerivedFun f sf)
+pprDerivedFun f (CLFun    s)              = brackets (text "CL" <+> f s)
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -1132,9 +1154,22 @@ parensIf ctxt inner doc | ctxt >= inner    = parens doc
 instance InPhase p => Pretty (DeclX p) where
   ppr (DefDecl d)  = ppr d
   ppr (RuleDecl r) = ppr r
+  ppr (GDefDecl g) = ppr g
 
 instance InPhase p => Pretty (DefX p) where
   ppr def = pprDef def
+
+instance Pretty GDefX where
+  ppr (GDef d f) = parens (text "gdef" <+> ppr d <+> ppr f)
+
+instance Pretty Derivation where
+  ppr = \case
+    DerivationDrvFun (AD BasicAD Fwd) -> text "fwd"
+    DerivationDrvFun (AD BasicAD Rev) -> text "rev"
+    DerivationDrvFun (AD TupleAD Fwd) -> text "fwdt"
+    DerivationDrvFun (AD TupleAD Rev) -> text "revt"
+    DerivationCLFun    -> text "CL"
+    DerivationShapeFun -> text "shape"
 
 pprDef :: forall p. InPhase p => DefX p -> SDoc
 pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })

@@ -1,94 +1,50 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Ksc.Pipeline where
 
 import Annotate (annotDecls, lintDefs)
-import AD (gradDefs, applyDefs)
-import ANF (anfDefs)
+import AD (gradDef, applyDef)
 import qualified Cgen
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
-import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
-             Decl, DeclX(DefDecl), DefX(Def), DerivedFun(Fun),
+import Ksc.Traversal (mapAccumLM)
+import Lang (Decl, DeclX(DefDecl), DefX(Def), DerivedFun(Fun),
              TDef, Pretty, BaseUserFun(BaseUserFunId),
              def_fun, displayN, partitionDecls,
-             pps, ppr, renderSexp)
-import LangUtils (GblSymTab, emptyGblST, extendGblST)
+             ppr, renderSexp, (<+>))
+import qualified Lang as L
+import LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
 import qualified Ksc.Futhark
 import Parse (parseF)
-import Rules (RuleBase, mkRuleBase)
+import Rules (mkRuleBase)
 import Opt (optDefs)
 import Shapes (shapeDefs)
 
 import Data.List (partition, intercalate)
+import qualified Data.Map as Map
 import GHC.Stack (HasCallStack)
 
 -------------------------------------
 --  The demo driver
 -------------------------------------
 
-demoF :: ADPlan -> [String] -> IO ()
--- Read source code from specified input files, optimise,
--- differentiate, optimise, and display results of each step
-demoF = demoFFilter (Just 999) id
+-- For example, load the cabal repl and try
+--
+--    demoF ["src/runtime/prelude.ks", "test/ksc/ex1.ks"]
+demoF :: [String] -> IO ()
+demoF files = runKM $ do
+  decls <- liftIO (fmap concat (mapM parseF files))
+  _ <- pipeline (Just 999) decls
+  pure ()
 
-demoFFilter :: Maybe Int -> ([Decl] -> [Decl]) -> ADPlan -> [String] -> IO ()
-demoFFilter verbosity theFilter adp files = do
-  defs <- fmap concat (mapM parseF files)
-  runKM (demoN verbosity adp (theFilter defs))
-
-demo :: Decl -> IO ()
-demo d = runKM (demoN (Just 999) BasicAD [d])
-
-demoN :: Maybe Int -> ADPlan -> [Decl] -> KM ()
-demoN verbosity adp decls
-  = let disp = displayPassM verbosity
-        dispNoLint :: Pretty def => String -> [def] -> KMT IO ()
-        dispNoLint = displayPassMNoLint verbosity
-    in
-    do { dispNoLint "Original declarations" decls
-
-       ; (defs, env, rulebase) <- theDefs disp decls
-
-       ; let cl_defs = toCLDefs defs
-       ; dispNoLint "toCLDefs" cl_defs
-
-       ; disp "fromCLDefs" env (fromCLDefs cl_defs)
-
-       ; (env1, opt_defs) <- optDefs rulebase env defs
-       ; disp "Optimized original definition" env1 opt_defs
-
-       ; anf_defs <- anfDefs opt_defs
-       ; disp "Anf-ised original definition" env1 anf_defs
-
-       ; let grad_defs = gradDefs adp anf_defs
-             env2      = extendGblST env1 grad_defs
-       ; disp "The full Jacobian (unoptimised)" env2 grad_defs
-
-       ; (env3, opt_grad_defs) <- optDefs rulebase env2 grad_defs
-       ; disp "The full Jacobian (optimised)" env3 opt_grad_defs
-
-       ; let der_fwd = applyDefs Fwd opt_grad_defs
-       ; disp "Forward derivative (unoptimised)" env3 der_fwd
-
-       ; (env4, opt_der_fwd) <- optDefs rulebase env3 der_fwd
-       ; disp "Forward-mode derivative (optimised)" env4 opt_der_fwd
-
-       ; (env5, cse_fwd) <- cseDefs rulebase env4 opt_der_fwd
-       ; disp "Forward-mode derivative (CSE'd)" env5 cse_fwd
-
-       ; let der_rev = applyDefs Rev opt_grad_defs
-       ; disp "Reverse-mode derivative (unoptimised)" env3 der_rev
-
-       ; (env7, opt_der_rev) <- optDefs rulebase env3 der_rev
-       ; disp "Reverse-mode derivative (optimised)" env7 opt_der_rev
-
-       ; (env8, cse_rev) <- cseDefs rulebase env7 opt_der_rev
-       ; disp "Reverse-mode derivative (CSE'd)" env8 cse_rev
-       }
+-------------------------------------
+-- Displaying passes
+-------------------------------------
 
 type DisplayLintT m = String -> GblSymTab -> [TDef] -> KMT m ()
 type DisplayLint = DisplayLintT IO
@@ -120,173 +76,26 @@ moveMain = partition isMain
     isMain (DefDecl (Def { def_fun = Fun (BaseUserFunId "main" _) })) = True
     isMain _ = False
 
-type GenerateDefs =
-  DisplayLint -> [Decl] -> KMT IO ([TDef], GblSymTab, RuleBase)
-
-theDefs :: GenerateDefs
-theDefs display decls = do {
-  ; (env, ann_decls) <- annotDecls emptyGblST decls
-  ; let (rules, defs) = partitionDecls ann_decls
-  ; let rulebase      = mkRuleBase rules
-  ; display "Typechecked defs" env defs
-  ; return (defs, env, rulebase)
-  }
-
-theDefsViaCatLang :: GenerateDefs
-theDefsViaCatLang display decls = do {
-  (defs, env, rulebase) <- theDefs display decls
-  ; let defsViaCL     = flip map defs $ \x -> case toCLDef_maybe x of
-          Nothing -> x
-          Just d  -> fromCLDef d
-  ; display "Typechecked defs via CatLang" env defsViaCL
-  ; return (defsViaCL, env, rulebase)
-  }
-
-theDiffs :: DisplayLint
-         -> [TDef]
-         -> GblSymTab
-         -> RuleBase
-         -> KMT IO (GblSymTab, [TDef])
-theDiffs display defs env rulebase = do {
-  ; let grad_defs = gradDefs BasicAD defs
-        env1 = extendGblST env grad_defs
-  ; display "Grad" env1 grad_defs
-
-  -- We generate grad_defs_tupled even though we do not use it yet.
-  -- We do not use it because
-  --
-  -- 1. lmApplys are not completely removed in forward mode, and
-  --
-  -- 2. lmApplys are deliberately not removed in reverse mode but we
-  -- don't yet implement the necessary LM constructors in C++.
-  --
-  -- Nonetheless, it's good to generate optgrad_tupled here so that
-  -- the tests will run on it and we can be sure it typechecks.
-  ; let grad_defs_tupled = gradDefs TupleAD defs
-        env15 = extendGblST env1 grad_defs_tupled
-  ; display "Grad tupled" env15 grad_defs_tupled
-
-  ; (env2, optgrad) <- optDefs rulebase env15 grad_defs
-  ; display "Optgrad" env2 optgrad
-
-  ; (env25, optgrad_tupled) <- optDefs rulebase env2 grad_defs_tupled
-  ; display "Optgrad tupled" env25 optgrad_tupled
-
-  ; let diffs = applyDefs Fwd optgrad ++ applyDefs Rev optgrad
-  ; display "Diffs" env25 diffs
-
-  ; (env3, optdiffs) <- optDefs rulebase env25 diffs
-  ; display "OptDiffs" env3 optdiffs
-
-  -- Note optgrad removed from below as we can not currently
-  -- codegen the optgrad for recursive functions
-  -- [see https://github.com/awf/knossos/issues/281]
-  ; return (env3, optdiffs)
-  }
-
-theShapes :: DisplayLint
-         -> [TDef]
-         -> GblSymTab
-         -> KMT IO (GblSymTab, [TDef])
-theShapes display defs env = do {
-  ; let shape_defs = shapeDefs defs
-        env1 = extendGblST env shape_defs
-  ; display "Shapes" env1 shape_defs
-  ; return (env1, shape_defs)
-  }
-
-defsAndDiffs :: DisplayLint
-             -> [Decl]
-             -> KM (GblSymTab, [TDef], [TDef], RuleBase)
-defsAndDiffs display decls = do {
-  ; (defs, env, rulebase) <- theDefs display decls
-  ; (env', optdiffs) <- theDiffs display defs env rulebase
-  ; pure (env', defs, optdiffs, rulebase)
-  }
-
-anfOptAndCse :: DisplayLint
-             -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
-anfOptAndCse display rulebase env4 alldefs =
-  do {
-  ; (env45, opt_alldefs) <- optDefs rulebase env4 alldefs
-
-  ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
-  ; display "CSE" env5 cse
-
-  ; return cse
-  }
-
-displayCppGenDefsDiffs ::
-     GenerateDefs
-  -> (DisplayLint
-   -> [TDef]
-   -> GblSymTab
-   -> RuleBase
-   -> KMT IO (GblSymTab, [TDef]))
-  -> (DisplayLint
-   -> [TDef]
-   -> GblSymTab
-   -> KMT IO (GblSymTab, [TDef]))
-  -> Maybe Int -> [String] -> String -> String -> IO (String, String)
-displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFiles ksofile cppfile =
-  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
-      display = displayPassM verbosity
-  in
+displayCppGen :: Maybe Int -> [String] -> String -> String -> IO (String, String)
+displayCppGen verbosity ksFiles ksofile cppfile =
   runKM $
   do {
   ; decls0 <- liftIO (fmap concat (mapM parseF ksFiles))
   ; liftIO $ putStrLn "read decls"
-
-  ; let (main, decls)    = moveMain decls0
-  ; dd main
-
-  ; (defs, env, rulebase) <- generateDefs display decls
-  ; (env3, optdiffs) <- generateDiffs display defs env rulebase
-  ; (env4, shapedefs) <- generateShapes display (defs ++ optdiffs) env3
-
-  ; (env5, ann_main) <- annotDecls env4 main
-
-  ; let (_rules, main_tdef) = partitionDecls ann_main
-
-  ; let alldefs = defs ++ optdiffs ++ shapedefs ++ main_tdef
-
-  ; cse <- anfOptAndCse display rulebase env5 alldefs
-
-  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
+  ; defs <- pipeline verbosity decls0
+  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile defs)
   }
 
-displayCppGenDiffs :: (DisplayLint
-                       -> [TDef]
-                       -> GblSymTab
-                       -> RuleBase
-                       -> KMT IO (GblSymTab, [TDef]))
-                   -> Maybe Int -> [String] -> String -> String -> IO (String, String)
-displayCppGenDiffs diffs = displayCppGenDefsDiffs theDefs diffs theShapes
-
-displayCppGenNoDiffs :: Maybe Int -> [String] -> String -> String -> IO (String, String)
-displayCppGenNoDiffs =
-  displayCppGenDiffs (\_ _ env _ -> pure (env, []))
-
-displayCppGenAndCompileDefsDiffs
+displayCppGenAndCompile
   :: HasCallStack
-  => GenerateDefs
-  -> (DisplayLint
-      -> [TDef]
-      -> GblSymTab
-      -> RuleBase
-      -> KMT IO (GblSymTab, [TDef]))
-  -> (DisplayLint
-      -> [TDef]
-      -> GblSymTab
-      -> KMT IO (GblSymTab, [TDef]))
-  -> (String -> String -> IO a)
+  => (String -> String -> IO a)
   -> String
   -> Maybe Int
   -> [String]
   -> String
   -> IO (a, (String, String))
-displayCppGenAndCompileDefsDiffs
-  generateDefs generateDiffs generateShapes compile ext verbosity files file = do {
+displayCppGenAndCompile
+  compile ext verbosity files file = do {
   ; let ksFile = file ++ ".ks"
   ; let ksFiles = map (++ ".ks") files
   ; let compiler = compile
@@ -294,34 +103,19 @@ displayCppGenAndCompileDefsDiffs
   ; let exefile = "obj/" ++ file ++ ext
   ; let ksofile = outfile ++ ".kso"
   ; let cppfile = outfile ++ ".cpp"
-  ; outputFileContents <- displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity (ksFiles ++ [ksFile]) ksofile cppfile
+  ; outputFileContents <- displayCppGen verbosity (ksFiles ++ [ksFile]) ksofile cppfile
   ; compilerResult <- compiler cppfile exefile
   ; pure (compilerResult, outputFileContents)
   }
 
-displayCppGenAndCompileVia :: HasCallStack
-                           => GenerateDefs
-                           -> (String -> String -> IO a)
-                           -> String
+displayCppGenCompileAndRun :: HasCallStack
+                           => String
                            -> Maybe Int
                            -> [String]
                            -> String
-                           -> IO (a, (String, String))
-displayCppGenAndCompileVia generateDefs =
-  displayCppGenAndCompileDefsDiffs generateDefs theDiffs theShapes
-
-displayCppGenAndCompile :: HasCallStack => (String -> String -> IO a) -> String -> Maybe Int -> [String] -> String -> IO (a, (String, String))
-displayCppGenAndCompile = displayCppGenAndCompileVia theDefs
-
-displayCppGenCompileAndRunVia :: HasCallStack
-                              => GenerateDefs
-                              -> String
-                              -> Maybe Int
-                              -> [String]
-                              -> String
-                              -> IO (String, (String, String))
-displayCppGenCompileAndRunVia generateDefs compilername verbosity file files = do
-  { (exefile, cpp_kso) <- displayCppGenAndCompileVia generateDefs
+                           -> IO (String, (String, String))
+displayCppGenCompileAndRun compilername verbosity file files = do
+  { (exefile, cpp_kso) <- displayCppGenAndCompile
                           (Cgen.compile compilername) ".exe" verbosity file files
   ; output <- Cgen.runExe exefile
   ; pure (output, cpp_kso)
@@ -329,13 +123,13 @@ displayCppGenCompileAndRunVia generateDefs compilername verbosity file files = d
 
 displayCppGenCompileAndRunWithOutput :: HasCallStack => String -> Maybe Int -> [String] -> String -> IO ()
 displayCppGenCompileAndRunWithOutput compilername verbosity files file = do
-  { (output, _) <- displayCppGenCompileAndRunVia theDefs compilername verbosity files file
+  { (output, _) <- displayCppGenCompileAndRun compilername verbosity files file
   ; putStrLn "Done"
   ; putStr output
   }
 
-doall :: HasCallStack => Int -> [String] -> String -> IO ()
-doall = displayCppGenCompileAndRunWithOutput "g++-7" . Just
+doall :: HasCallStack => Maybe Int -> [String] -> String -> IO ()
+doall = displayCppGenCompileAndRunWithOutput "g++-7"
 
 -------------------------------------
 -- The Futhark driver
@@ -343,19 +137,8 @@ doall = displayCppGenCompileAndRunWithOutput "g++-7" . Just
 futharkPipeline :: [FilePath] -> KM [TDef]
 futharkPipeline files
   = do
-  { let display = displayPassM Nothing
-
-  ; decls0 <- liftIO (fmap concat (mapM (parseF . (++ ".ks")) files))
-
-  ; let decls = ignoreMain decls0
-
-  ; (env3, defs, optdiffs, rulebase) <- defsAndDiffs display decls
-
-  ; let env4 = env3
-
-  ; let alldefs = defs ++ optdiffs
-
-  ; anfOptAndCse display rulebase env4 alldefs
+  { decls0 <- liftIO (fmap concat (mapM (parseF . (++ ".ks")) files))
+  ; pipeline Nothing decls0
   }
 
 -- | Read source code from specified input file, optimise,
@@ -378,3 +161,78 @@ genFuthark files file = do
     intercalate "\n\n" $
     prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
   where futfile = "obj/" ++ file ++ ".fut"
+
+-------------------------------------
+-- Main compiler pipeline
+-------------------------------------
+
+pipeline :: Maybe Int -> [Decl] -> KM [TDef]
+pipeline verbosity decls = do
+  { (env, concat->decls) <- mapAccumLM annotAndDeriveDecl emptyGblST decls
+  ; displayPassMNoLint verbosity "generated decls" decls
+  ; let (rules, defs) = partitionDecls decls
+  ; displayPassM verbosity "generated defs" env defs
+  ; let rulebase = mkRuleBase rules
+  ; (env, defs) <- optDefs rulebase env defs
+  ; displayPassM verbosity "opt decls" env defs
+  ; (_env, defs) <- cseDefs rulebase env defs
+  ; displayPassM verbosity "CSE decls" env defs
+  ; pure defs
+  }
+
+deriveDeclUsing :: Applicative f
+                => (env -> L.GDefX -> f (env, [L.TDecl]))
+                -> env
+                -> L.TDecl
+                -> f (env, [L.TDecl])
+deriveDeclUsing f env = \case
+  -- Pass the rules on through
+  r@L.RuleDecl{} -> pure (env, [r])
+  -- Existing defs just get passed straight through
+  d@DefDecl{} -> pure (env, [d])
+  -- gdefs get looked up
+  L.GDefDecl g -> f env g
+
+deriveDecl :: GblSymTab -> L.TDecl -> KM (GblSymTab, [L.TDecl])
+deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
+    { let tdef = case Map.lookup fun env of
+              Nothing -> error $ unwords
+                [ "Internal bug. Error when attempting to gdef."
+                ,  "TODO: This ought to have been caught by type checking." ]
+              Just tdef' -> tdef'
+
+    ; case derivation of
+        L.DerivationDrvFun (L.AD plan dir) -> do
+          { let mgradDef = gradDef plan tdef
+          ; let env' = maybe env (flip stInsertFun env) mgradDef
+          ; graddedDef <- case mgradDef of
+              Nothing -> do
+                { L.printK (L.vcat [ L.text "Couldn't grad"
+                                   , L.text "In gdef for" <+> ppr fun ])
+                ; error "Exiting" }
+              Just graddedDef' -> pure graddedDef'
+          ; let appliedDef = applyDef dir graddedDef
+          ; pure (stInsertFun appliedDef env', [DefDecl appliedDef])
+          }
+        L.DerivationCLFun
+          | Fun basefun <- fun
+          , let tdef' = case toCLDef_maybe tdef of
+                  Nothing -> error ("Couldn't derive CL of "
+                                    ++ L.render (ppr basefun))
+                  Just d  -> (fromCLDef d){ def_fun = L.CLFun basefun }
+          -> pure (stInsertFun tdef' env, [DefDecl tdef'])
+          | otherwise
+          -> error ("Was not base fun: " ++ L.render (ppr fun))
+
+        L.DerivationShapeFun ->
+          let shapeDef = shapeDefs [tdef]
+              env' = extendGblST env shapeDef
+          in pure (env', map DefDecl shapeDef)
+    }
+
+annotAndDeriveDecl :: GblSymTab -> L.Decl -> KM (GblSymTab, [L.TDecl])
+annotAndDeriveDecl env decl = do
+  { (env, tdecls) <- annotDecls env [decl]
+  ; (env, concat->tdecls) <- mapAccumLM deriveDecl env tdecls
+  ; pure (env, tdecls)
+  }

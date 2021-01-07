@@ -5,4 +5,7 @@
      (let (z (add x y))
      (mul y z))))
 
+(gdef fwd [g Float])
+(gdef rev [g Float])
+
 (def main Integer () 0)

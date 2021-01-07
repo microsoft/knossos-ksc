@@ -7,4 +7,7 @@
               (v (add (mul 2.0 (mul p q)) (mul 3.0 r))))
         v))
 
+(gdef fwd [f5 (Tuple Float Float)])
+(gdef rev [f5 (Tuple Float Float)])
+
 (def main Integer () 0)

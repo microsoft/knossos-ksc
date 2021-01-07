@@ -88,6 +88,8 @@ tcDeclX (DefDecl def)   = do { def' <- tcDef def
                              ; return (DefDecl def') }
 tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
                              ; return (RuleDecl rule') }
+tcDeclX (GDefDecl gdef) = do { gdef' <- tcGDef gdef
+                             ; return (GDefDecl gdef') }
 
 tcDef :: forall p. (Pretty (BaseUserFun p), InPhase p) => DefX p -> TcM TDef
 tcDef (Def { def_fun    = fun
@@ -178,6 +180,15 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
        ; return (Rule { ru_name = name, ru_qvars = qvars
                       , ru_lhs = lhs', ru_rhs = rhs' })
     }}
+
+tcGDef :: GDefX -> TcM GDefX
+tcGDef g@(GDef d f)
+  = do { env <- gblST <$> getSymTabTc
+       ; addCtxt (text "In the gdef for:" <+> ppr d <+> ppr f) $
+           case userCallDef_maybe f env of
+             Right _  -> pure g
+             Left err -> addErr err
+       }
 
 tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
                => UserFun p -> Type
@@ -450,6 +461,7 @@ extendGblEnv :: TDecl -> TcM a -> TcM a
 extendGblEnv (RuleDecl {}) = id
 extendGblEnv (DefDecl tdef)
   = modifyEnvTc (modifyGblST (stInsertFun tdef))
+extendGblEnv (GDefDecl {}) = id
 
 modifyEnvTc :: (SymTab -> SymTab) -> TcM a -> TcM a
 modifyEnvTc extend (TCM f)

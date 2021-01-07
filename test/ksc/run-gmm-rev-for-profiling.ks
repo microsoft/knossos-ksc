@@ -3,6 +3,9 @@
 (def gmm_knossos_tri Integer ((n : Integer))
   (div (mul n (sub n 1)) 2))
 
+(gdef fwd [gmm_knossos_tri Integer])
+(gdef rev [gmm_knossos_tri Integer])
+
 ; dot
 (edef dot Float ((Vec Float) (Vec Float)))
 (edef [D dot] (LM (Tuple (Vec Float) (Vec Float)) Float)
@@ -22,6 +25,9 @@
 (def sqnorm Float ((v : Vec Float))
   (dot v v))
 
+(gdef fwd [sqnorm (Vec Float)])
+(gdef rev [sqnorm (Vec Float)])
+
 (def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
  (let (D (size q))
    (assert (eq (size l) (gmm_knossos_tri D))
@@ -35,10 +41,16 @@
            )
            ))))))
 
+(gdef fwd [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
+(gdef rev [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
+
 (def logsumexp Float ((v : Vec Float))
   (let (maxv (max v))
     (add maxv
          (log (sum (exp (sub v maxv)))))))
+
+(gdef rev [logsumexp (Vec Float)])
+(gdef fwd [logsumexp (Vec Float)])
 
 
 ; wishart_m -> int
@@ -47,6 +59,9 @@
       (add out
          (sum (build p (lam (j : Integer)
                  (lgamma (sub a (mul 0.5 (to_float j))))))))))
+
+(gdef fwd [log_gamma_distrib (Tuple Float Integer)])
+(gdef rev [log_gamma_distrib (Tuple Float Integer)])
 
 (def log_wishart_prior Float ((wishart : Tuple Float Integer)
                               (log_Qdiag : Vec Float)
@@ -71,6 +86,9 @@
                   sum_qs))
             C)
     ))
+
+(gdef fwd [log_wishart_prior (Tuple (Tuple Float Integer) (Vec Float) (Vec Float))])
+(gdef rev [log_wishart_prior (Tuple (Tuple Float Integer) (Vec Float) (Vec Float))])
 
 (def gmm_knossos_gmm_objective Float
       ((x : Vec (Vec Float))        ; N x D
@@ -105,6 +123,22 @@
             (sum (build K (lam (k : Integer)
                     (log_wishart_prior wishart (index k qs) (index k ls))))))
     ))))
+
+(gdef fwd [gmm_knossos_gmm_objective
+      (Tuple (Vec (Vec Float))
+             (Vec Float)
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Tuple Float Integer))])
+
+(gdef rev [gmm_knossos_gmm_objective
+      (Tuple (Vec (Vec Float))
+             (Vec Float)
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Tuple Float Integer))])
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))

@@ -7,4 +7,7 @@
 
 (def f Float () 0.0)
 
+(gdef fwd [f (Tuple)])
+(gdef rev [f (Tuple)])
+
 (def main Integer () 0)

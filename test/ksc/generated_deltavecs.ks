@@ -14,6 +14,9 @@
           (index ki image))
        ))))))
 
+(gdef fwd [mul_mat_vec (Tuple (Vec (Vec Float)) (Vec Float))])
+(gdef rev [mul_mat_vec (Tuple (Vec (Vec Float)) (Vec Float))])
+
 (def mul_mat_mat
      (Vec (Vec Float))
      ((x : Vec (Vec Float))
@@ -28,6 +31,9 @@
               (index cy   (index rycx y)))
        ))))))))
 
+(gdef fwd [mul_mat_mat (Tuple (Vec (Vec Float)) (Vec (Vec Float)))])
+(gdef rev [mul_mat_mat (Tuple (Vec (Vec Float)) (Vec (Vec Float)))])
+
 (def mul_vec_mat
      (Vec Float)
      ((w : Vec (Vec Float))
@@ -40,7 +46,13 @@
           (index ki image))
        ))))))
 
+(gdef fwd [mul_vec_mat (Tuple (Vec (Vec Float)) (Vec Float))])
+(gdef rev [mul_vec_mat (Tuple (Vec (Vec Float)) (Vec Float))])
+
 (def max_ Float ((x1 : Float) (x2 : Float)) (if (gt x1 x2) x1 x2))
+
+(gdef fwd [max_ (Tuple Float Float)])
+(gdef rev [max_ (Tuple Float Float)])
 
 (def maxpool
      (Vec Float)
@@ -48,6 +60,9 @@
      (build (div (size image) 2) (lam (ni : Integer)
        (max_ (index (mul 2 ni) image)
              (index (add 1 (mul 2 ni)) image)))))
+
+(gdef fwd [maxpool (Vec Float)])
+(gdef rev [maxpool (Vec Float)])
 
 ; The two input vectors have different lengths which makes it hard to
 ; find an optimisation rule to optimise the reverse mode "linear map
@@ -61,6 +76,9 @@
                      (index (add 1 (mul 2 ni)) image))
                (index ni image2)))))
 
+
+(gdef fwd [maxpoolVec (Tuple (Vec Float) (Vec Float))])
+(gdef rev [maxpoolVec (Tuple (Vec Float) (Vec Float))])
 
 (def maxpoolVec_ANF
      (Vec Float)
@@ -76,8 +94,14 @@
                (m2 (max_ m1 image2_ni)))
            m2))))
 
+(gdef fwd [maxpoolVec_ANF (Tuple (Vec Float) (Vec Float))])
+(gdef rev [maxpoolVec_ANF (Tuple (Vec Float) (Vec Float))])
+
 ; This function stands in for one that could actually be expensive
 (def expensive Float ((x1 : Float) (x2 : Float)) 0.0)
+
+(gdef fwd [expensive (Tuple Float Float)])
+(gdef rev [expensive (Tuple Float Float)])
 
 ; An example to show that if we pool with an expensive function it's
 ; harder to eliminate the deltaVecs
@@ -87,6 +111,9 @@
      (build (div (size image) 2) (lam (ni : Integer)
        (expensive (index (mul 2 ni) image)
                   (index (add 1 (mul 2 ni)) image)))))
+
+(gdef fwd [expensivepool (Vec Float)])
+(gdef rev [expensivepool (Vec Float)])
 
 (def conv1d
      (Vec (Vec Float))
@@ -110,5 +137,8 @@
               (if outside_image 0.0 (index noi (index li image)))))
          (mul image_noi (index kni (index li (index ki kernels))))
          ))))))))))))
+
+(gdef fwd [conv1d (Tuple (Vec (Vec (Vec Float))) (Vec (Vec Float)))])
+(gdef rev [conv1d (Tuple (Vec (Vec (Vec Float))) (Vec (Vec Float)))])
 
 (def main Integer () 0)

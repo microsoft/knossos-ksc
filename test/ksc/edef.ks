@@ -9,5 +9,7 @@
 (edef [rev edef_example] Float (Float Float))
 
 (def g Float ((x : Float) (y : Float)) (add (edef_example x) y))
+(gdef fwd [g (Tuple Float Float)])
+(gdef rev [g (Tuple Float Float)])
 
 (def main Integer () 0)

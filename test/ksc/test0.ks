@@ -8,8 +8,14 @@
     ($trace (mul x x))
 )
 
+(gdef fwd [f Float])
+(gdef rev [f Float])
+
 (def g Float ((n : Integer) (m : Integer))
   (to_float (mul n m)))
+
+(gdef fwd [g (Tuple Integer Integer)])
+(gdef rev [g (Tuple Integer Integer)])
 
 (def e Float ((vn : Vec Integer)
               (t : Tuple (Vec (Vec Float))
@@ -20,12 +26,25 @@
   (add (sum (build n (lam (i : Integer) (to_float i))))
      (sum (build m (lam (j : Integer) (sum (get$2$2 (get$2$2 t)))))))))
 
+(gdef fwd [e (Tuple (Vec Integer)
+                    (Tuple (Vec (Vec Float))
+                           (Tuple Integer (Vec Float))))])
+(gdef rev [e (Tuple (Vec Integer)
+                    (Tuple (Vec (Vec Float))
+                           (Tuple Integer (Vec Float))))])
+
 (def test_inline (Vec Integer) (x : Vec Float)
     (build (size x) (lam (i : Integer) (mul i 2))))
+
+(gdef fwd [test_inline (Vec Float)])
+(gdef rev [test_inline (Vec Float)])
 
 (def test_inline2 Integer (x : Vec Float)
   (let (n1 (size x))
     (let (x 4) x)))
+
+(gdef fwd [test_inline2 (Vec Float)])
+(gdef rev [test_inline2 (Vec Float)])
 
 (def main Integer ()
     (print ; No grad.  See https://github.com/awf/knossos/issues/281 (D$f 9.0)

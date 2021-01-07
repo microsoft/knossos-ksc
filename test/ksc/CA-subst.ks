@@ -8,6 +8,9 @@
     (sum (build 3 (lam (y : Integer) (add z (div y y)))))
     ))))
 
+(gdef fwd [f (Tuple Integer Integer)])
+(gdef rev [f (Tuple Integer Integer)])
+
 #| Tests capture-avoiding substitution |#
 
 (def main Integer () 0)

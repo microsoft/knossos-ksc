@@ -381,6 +381,9 @@ toCall f@(L.TFun _ L.DrvFun{}) args =
 toCall f@(L.TFun _ L.ShapeFun{}) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
+toCall f@(L.TFun _ L.CLFun{}) args =
+  Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
+
 toFuthark :: L.TDef -> Def
 toFuthark d = case LU.noTupPatifyDef d of {
   L.Def f (L.VarPat args) res_ty (L.UserRhs e) ->

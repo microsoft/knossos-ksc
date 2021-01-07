@@ -5,11 +5,17 @@
                (let ((i j) ij)
                     (index j (index i vv))))))
 
+(gdef fwd [tensor2_from_vecvec (Tensor 1 (Tensor 1 Float))])
+(gdef rev [tensor2_from_vecvec (Tensor 1 (Tensor 1 Float))])
+
 (def tensor2_from_vecvec (Tensor 2 (Tuple Integer Float)) (vv : (Tensor 1 (Tensor 1 (Tuple Integer Float))))
     (build (tuple (size vv) (size (index 0 vv)))
            (lam (ij : (Tuple Integer Integer))
                (let ((i j) ij)
                     (index j (index i vv))))))
+
+(gdef fwd [tensor2_from_vecvec (Tensor 1 (Tensor 1 (Tuple Integer Float)))])
+(gdef rev [tensor2_from_vecvec (Tensor 1 (Tensor 1 (Tuple Integer Float)))])
 
 (def tensor2_from_vecvec (Tensor 2 (Tuple (Tuple Integer Float) (Tuple (Tuple Integer Integer) Float)))
          (vv : (Tensor 1 (Tensor 1 (Tuple (Tuple Integer Float) (Tuple (Tuple Integer Integer) Float)))))
@@ -17,6 +23,13 @@
            (lam (ij : (Tuple Integer Integer))
                (let ((i j) ij)
                     (index j (index i vv))))))
+
+(gdef fwd [tensor2_from_vecvec
+      (Tensor 1 (Tensor 1
+       (Tuple (Tuple Integer Float) (Tuple (Tuple Integer Integer) Float))))])
+(gdef rev [tensor2_from_vecvec
+      (Tensor 1 (Tensor 1
+       (Tuple (Tuple Integer Float) (Tuple (Tuple Integer Integer) Float))))])
 
 (def main Integer ()
     (print
