@@ -12,8 +12,6 @@ namespace py = pybind11;
 
 #include "adbench-lstm.cpp"
 
-int ks::main(ks::allocator *) { return 0; };
-
 ks::allocator g_alloc{ 1'000'000'000 };
 
 template<typename T>

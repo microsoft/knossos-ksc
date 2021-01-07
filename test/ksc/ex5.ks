@@ -5,3 +5,5 @@
 
 (def f6 Float ( (x : Vec Float) (y : Vec Float) )
         (sum (mulvec x y)))
+
+(def main Integer () 0)

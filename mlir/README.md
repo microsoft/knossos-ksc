@@ -44,7 +44,7 @@ To build and launch the tests, run
 $ cd <<path/to/knossos-ksc>>
 $ cp user.cmake.template user.cmake
 EDIT user.cmake to add path to LLVM
-$ mkdir build && cd build
+$ mkdir -p build && cd build
 
 # Build
 $ cmake -G Ninja ..
@@ -84,7 +84,7 @@ $ KNOSSOS=<<path to knossos>>
 $ cd llvm-project
 $ git checkout -b ksc `cat $KNOSSOS/etc/llvm-branch.txt`
 
-$ mkdir build && cd build
+$ mkdir -p build && cd build
 
 # Build
 $ . $KNOSSOS/mlir/run-cmake-in-llvm.sh

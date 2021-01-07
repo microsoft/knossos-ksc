@@ -31,7 +31,7 @@ _global_prime_index = 0
 
 def get_type(arg_type):
     return arg_type.kind
-    
+
 def get_shape_dtype(arg_type):
     global _global_prime_index
     kind = get_type(arg_type)
@@ -39,25 +39,22 @@ def get_shape_dtype(arg_type):
         return (), "np.int32"
     elif kind == "Float":
         return (), "np.float32"
-    elif kind == "Vec":
-        child_shape, child_type = get_shape_dtype(Type.Index(arg_type))
+    elif arg_type.is_tensor:
+        child_shape, child_type = get_shape_dtype(arg_type.tensor_elem_type)
         dim = _global_prime_list[_global_prime_index % len(_global_prime_list)]
         _global_prime_index += 1
         return (dim,) + child_shape, child_type
     else:
-        raise ValueError("Found {} in a Vec!".format(kind))
+        raise ValueError("Found {} in a Tensor!".format(kind))
 
-def is_tensor(arg_type):
-    type = get_type(arg_type)
-    if type != "Vec":
-        return False
-    child_type = Type.Index(arg_type)
-    if child_type.kind == "Vec":
-        return is_tensor(child_type)
-    elif child_type.kind in ["Integer", "Float"]:
-        return True
-    else:
-        return False
+def is_possibly_nested_tensor(arg_type):
+    """
+    True if arg_type is a (possibly nested) tensor of scalar numeric types
+    """
+    if arg_type.is_tensor:
+        return is_possibly_nested_tensor(arg_type.tensor_elem_type)
+    
+    return arg_type in (Type.Integer, Type.Float)    
 
 def type_to_sample(arg_type):
     type = get_type(arg_type)
@@ -67,14 +64,15 @@ def type_to_sample(arg_type):
         return "True"
     if type == "Float":
         return "np.random.uniform()"
-    if type == "Vec":
-        if is_tensor(arg_type):
+    if arg_type.is_tensor:
+        if is_possibly_nested_tensor(arg_type):
             shape, dtype = get_shape_dtype(arg_type)
             return "np.random.uniform(0, 1, {}).astype({})".format(shape, dtype)
         else:
-            return "[{} for _ in range(2)]".format(type_to_sample(Type.Index(arg_type)))
+            val = type_to_sample(arg_type.tensor_elem_type)
+            return f"[{val} for _ in range(2)]"
     elif type == "Tuple":
-        return "({})".format(",\n  ".join([type_to_sample(t) for t in arg_type]))
+        return "({})".format(",\n  ".join([type_to_sample(t) for t in arg_type.tuple_elems()]))
     assert False, arg_type
 
 def args_to_sample_values(args):

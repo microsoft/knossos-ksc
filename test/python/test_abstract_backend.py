@@ -5,18 +5,16 @@ import ksc
 from ksc.tracing.functions import math
 from ksc.abstract_value import AbstractValue, ExecutionContext
 from ksc.type import Type
-from ksc.utils import translate_and_import, shape_type_from_object
+from ksc.shape import shape_type_from_object, ShapeType, TensorShape
+from ksc.utils import translate_and_import 
 from ksc.tracing.functions import core
 
 def test_get_shape():
     ks_str = """
-(def get_shape (Tuple Integer Integer Integer Integer) (x : (Vec (Vec (Vec (Vec Float)))))
-  (let (v0 (index 0 x))
-  (let (v1 (index 0 v0))
-  (let (v2 (index 0 v1))
-      (tuple (size x) (size v0) (size v1) (size v2))))))
+(def get_shape (Tuple Integer Integer Integer Integer) (x : (Tensor 4 Float))
+   (size x))
 """
-    x = AbstractValue((1, 3, 224, 224), Type.Vec(Type.Vec(Type.Vec(Type.Vec(Type.Float)))))
+    x = AbstractValue(TensorShape((1, 3, 224, 224), ()), Type.Tensor(4, Type.Float))
     m = translate_and_import(__file__, ks_str, "abstract")
     with ExecutionContext():
         assert m.get_shape(x).data == (1, 3, 224, 224)
@@ -38,27 +36,27 @@ def test_get_tuple_element():
 
 def test_tuple_of_tensors():
     ks_str = """
-(def fst (Vec (Vec Float)) ((x : (Tuple (Vec (Vec Float)) (Vec Float))))
+(def fst (Tensor 2 Float) ((x : (Tuple (Tensor 2 Float) (Vec Float))))
     (get$1$2 x)
 )
-(def snd (Vec (Vec Float)) ((x : (Tuple (Vec (Vec Float)) (Vec Float))))
+(def snd (Tensor 2 Float) ((x : (Tuple (Tensor 2 Float) (Vec Float))))
     (get$2$2 x)
 )
 """
     m = translate_and_import(__file__, ks_str, "abstract")
     x = AbstractValue.from_data((np.random.normal(0, 1, (3, 4)), np.random.normal(0, 1, (4,))))
     with ExecutionContext():
-        assert m.fst(x).shape_type == ((3, 4), Type.Vec(Type.Vec(Type.Float)))
-        assert m.snd(x).shape_type == ((4,), Type.Vec(Type.Float))
+        assert m.fst(x).shape_type == ShapeType(TensorShape((3, 4), ()), Type.Tensor(2, Type.Float)) # (((3, 4),), Type.Tensor(2, Type.Float))
+        assert m.snd(x).shape_type == ShapeType(TensorShape((4,), ()), Type.Tensor(1, Type.Float))
 
 def test_if_then_else():
     ks_str = """
 (edef lt Bool (Float Float))
 (def cost$lt Float ((a : Float) (b : Float)) 1.0)
-(def shape$lt Integer ((a : Float) (b : Float)) 0)
+(def shape$lt Integer ((a : Float) (b : Float)) (tuple))
 (edef eq Bool (Float Float))
 (def cost$eq Float ((a : Float) (b : Float)) 1.0)
-(def shape$eq Integer ((a : Float) (b : Float)) 0)
+(def shape$eq Integer ((a : Float) (b : Float)) (tuple))
 (def sign Float ((x : Float))
     (if (lt x 0) -1.0 (if (eq x 0) 0.0 1.0))
 )
@@ -68,4 +66,4 @@ def test_if_then_else():
         assert m.sign(2.0) == 1.0
         assert m.sign(-5.0) == -1.0
         assert m.sign(0) == 0.0
-        assert m.sign(AbstractValue((), Type.Float)).shape_type == ((), Type.Float)
+        assert m.sign(AbstractValue((), Type.Float)).shape_type == ShapeType((), Type.Float)

@@ -1,21 +1,21 @@
 ; Use --backend jax_input_last because in the jax backend we switched to
 ; ordering arguments as (x, weights, ...)
 (edef eq Bool (Integer Integer))
-(edef add (Vec (Vec (Vec (Vec Float)))) ((Vec (Vec (Vec (Vec Float)))) (Vec (Vec (Vec (Vec Float))))))
-(edef normalize_2d (Vec (Vec (Vec (Vec Float)))) ((Tuple (Vec Float) (Vec Float)) (Vec (Vec (Vec (Vec Float))))))
-(edef dot (Vec (Vec Float)) ((Vec (Vec Float)) (Vec (Vec Float))))
-(edef transpose (Vec (Vec Float)) ((Vec (Vec Float))))
-(edef broadcast_add (Vec (Vec Float)) ((Vec (Vec Float)) (Vec Float)))
-(edef conv_2d_no_bias (Vec (Vec (Vec (Vec Float)))) ((Tuple Integer Integer) (Tuple Integer Integer) (Tuple (Tuple Integer Integer) (Tuple Integer Integer)) (Vec (Vec (Vec (Vec Float)))) (Vec (Vec (Vec (Vec Float))))))
-(edef batch_norm_2d (Vec (Vec (Vec (Vec Float)))) ((Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float)) (Vec (Vec (Vec (Vec Float))))))
-(edef relu (Vec (Vec (Vec (Vec Float)))) ((Vec (Vec (Vec (Vec Float))))))
-(edef to_float (Vec (Vec (Vec (Vec Float)))) ((Vec (Vec (Vec (Vec Integer))))))
-(edef max_pool_same (Vec (Vec (Vec (Vec Float)))) ((Tuple Integer Integer) (Tuple Integer Integer) (Vec (Vec (Vec (Vec Float))))))
-(edef avg_pool_valid (Vec (Vec (Vec (Vec Float)))) ((Tuple Integer Integer) (Tuple Integer Integer) (Vec (Vec (Vec (Vec Float))))))
-(edef flatten (Vec (Vec Float)) ((Vec (Vec (Vec (Vec Float))))))
-(edef log_softmax (Vec (Vec Float)) ((Vec (Vec Float))))
+(edef add (Tensor 4 Float) ((Tensor 4 Float) (Tensor 4 Float)))
+(edef normalize_2d (Tensor 4 Float) ((Tuple (Vec Float) (Vec Float)) (Tensor 4 Float)))
+(edef dot (Tensor 2 Float) ((Tensor 2 Float) (Tensor 2 Float)))
+(edef transpose (Tensor 2 Float) ((Tensor 2 Float)))
+(edef broadcast_add (Tensor 2 Float) ((Tensor 2 Float) (Vec Float)))
+(edef conv_2d_no_bias (Tensor 4 Float) ((Tuple Integer Integer) (Tuple Integer Integer) (Tuple (Tuple Integer Integer) (Tuple Integer Integer)) (Tensor 4 Float) (Tensor 4 Float)))
+(edef batch_norm_2d (Tensor 4 Float) ((Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float)) (Tensor 4 Float)))
+(edef relu (Tensor 4 Float) ((Tensor 4 Float)))
+(edef to_float (Tensor 4 Float) ((Tensor 4 Integer)))
+(edef max_pool_same (Tensor 4 Float) ((Tuple Integer Integer) (Tuple Integer Integer) (Tensor 4 Float)))
+(edef avg_pool_valid (Tensor 4 Float) ((Tuple Integer Integer) (Tuple Integer Integer) (Tensor 4 Float)))
+(edef flatten (Tensor 2 Float) ((Tensor 4 Float)))
+(edef log_softmax (Tensor 2 Float) ((Tensor 2 Float)))
 
-(def Dense (Vec (Vec Float)) ((weights : (Tuple (Vec (Vec Float)) (Vec Float))) (input : (Vec (Vec Float))))
+(def Dense (Tensor 2 Float) ((weights : (Tuple (Tensor 2 Float) (Vec Float))) (input : (Tensor 2 Float)))
   (let ((W b) weights)
     (broadcast_add (dot input (transpose W)) b) ; transpose W to keep the shape consistent with pytorch
   )
@@ -26,23 +26,23 @@
                  (Tuple
                    (Tuple                ; conv_block_xa_weights
                      (Tuple
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                    (Tensor 4 Float)    ; conv_1_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                    (Tensor 4 Float)    ; conv_2_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                    (Tensor 4 Float)    ; conv_3_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                      )
-                     (Vec (Vec (Vec (Vec Float)))) ; shortcut_conv_weights
+                     (Tensor 4 Float) ; shortcut_conv_weights
                      (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float)) ; shortcut_norm_weights
                    )
                    (Vec                  ; identity_block_xy_weights
                      (Tuple
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                    (Tensor 4 Float)    ; conv_1_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                    (Tensor 4 Float)    ; conv_2_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                    (Tensor 4 Float)    ; conv_3_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                      )
                    )
@@ -53,23 +53,23 @@
                      (Tuple
                        (Tuple                ; conv_block_xa_weights
                          (Tuple
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                    (Tensor 4 Float)    ; conv_1_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                    (Tensor 4 Float)    ; conv_2_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                    (Tensor 4 Float)    ; conv_3_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                          )
-                         (Vec (Vec (Vec (Vec Float)))) ; shortcut_conv_weights
+                         (Tensor 4 Float) ; shortcut_conv_weights
                          (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float)) ; shortcut_norm_weights
                        )
                        (Vec                  ; identity_block_xy_weights
                          (Tuple
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                    (Tensor 4 Float)    ; conv_1_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                    (Tensor 4 Float)    ; conv_2_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                    (Tensor 4 Float)    ; conv_3_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                          )
                        )
@@ -77,18 +77,18 @@
   (build (size vec1) (lam (i : Integer) (tuple (index i vec1) (index i vec2))))
 )
 
-(def ConvBlock (Vec (Vec (Vec (Vec Float)))) (
+(def ConvBlock (Tensor 4 Float) (
                        (strides : (Tuple Integer Integer))
                        (weights : (Tuple
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                    (Tensor 4 Float)    ; conv_1_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                    (Tensor 4 Float)    ; conv_2_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                    (Tensor 4 Float)    ; conv_3_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                   )
                        )
-                       (input : (Vec (Vec (Vec (Vec Float)))))
+                       (input : (Tensor 4 Float))
                        )
   (let ((conv_1_weights
          norm_1_weights
@@ -117,22 +117,22 @@
 )
 
 
-(def ConvResidualBlock (Vec (Vec (Vec (Vec Float)))) (
+(def ConvResidualBlock (Tensor 4 Float) (
                                (strides : (Tuple Integer Integer))
                                (weights : (Tuple
                                             (Tuple
-                                              (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                              (Tensor 4 Float)    ; conv_1_weights
                                               (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                              (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                              (Tensor 4 Float)    ; conv_2_weights
                                               (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                              (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                              (Tensor 4 Float)    ; conv_3_weights
                                               (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                             )
-                                            (Vec (Vec (Vec (Vec Float))))      ; shortcut_conv_weights
+                                            (Tensor 4 Float)      ; shortcut_conv_weights
                                             (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))    ; shortcut_norm_weights
                                           )
                                )
-                               (input : (Vec (Vec (Vec (Vec Float)))))
+                               (input : (Tensor 4 Float))
                                )
   (let ((conv_block_weights 
          shortcut_conv_weights
@@ -149,17 +149,17 @@
   )
 )
 
-(def IdentityResidualBlock (Vec (Vec (Vec (Vec Float)))) (
+(def IdentityResidualBlock (Tensor 4 Float) (
                                    (weights : (Tuple
-                                                (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                                (Tensor 4 Float)    ; conv_1_weights
                                                 (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                                (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                                (Tensor 4 Float)    ; conv_2_weights
                                                 (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                                (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                                (Tensor 4 Float)    ; conv_3_weights
                                                 (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                               )
                                    )
-                                   (input : (Vec (Vec (Vec (Vec Float)))))
+                                   (input : (Tensor 4 Float))
                                   )
   (let (main (ConvBlock (tuple 1 1) weights input))
     (relu(add main input))
@@ -167,39 +167,39 @@
 )
 
 
-(def Resnet50 (Vec (Vec Float)) ((weights :
+(def Resnet50 (Tensor 2 Float) ((weights :
                         (Tuple
                           (Tuple (Vec Float) (Vec Float)) ; mean and std for image normalization (not trainable)
-                          (Vec (Vec (Vec (Vec Float))))   ; conv_weights
+                          (Tensor 4 Float)   ; conv_weights
                           (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float)) ; batch_norm_weights
                           (Vec
                             (Tuple
                               (Tuple                ; conv_block_xa_weights
                                 (Tuple
-                                  (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                  (Tensor 4 Float)    ; conv_1_weights
                                   (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                  (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                  (Tensor 4 Float)    ; conv_2_weights
                                   (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                  (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                  (Tensor 4 Float)    ; conv_3_weights
                                   (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                 )
-                                (Vec (Vec (Vec (Vec Float))))      ; shortcut_conv_weights
+                                (Tensor 4 Float)      ; shortcut_conv_weights
                                 (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))    ; shortcut_norm_weights
                               )
                               (Vec                  ; identity_block_xy_weights
                                 (Tuple
-                                  (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                  (Tensor 4 Float)    ; conv_1_weights
                                   (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                  (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                  (Tensor 4 Float)    ; conv_2_weights
                                   (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                  (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                  (Tensor 4 Float)    ; conv_3_weights
                                   (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                 )
                               )
                             )
                           )
-                          (Tuple (Vec (Vec Float)) (Vec Float)))) ; final_dense_weights
-                      (input : (Vec (Vec (Vec (Vec Integer))))))
+                          (Tuple (Tensor 2 Float) (Vec Float)))) ; final_dense_weights
+                      (input : Tensor 4 Integer))
   ; no longer needed
   ;(let ((blocks_filters_vec (build 4 (lam (i : Integer)
   ;                            (if (eq i 0) (tuple 64 64 256)
@@ -220,30 +220,30 @@
           (avg_pool_valid (tuple 7 7) (tuple 1 1) ; pool_size=(7, 7), strides=(1, 1), padding='valid'
             (fold (lam (x_filters_strides_weights :
                           (Tuple
-                            (Vec (Vec (Vec (Vec Float))))               ; input
+                            (Tensor 4 Float)               ; input
                             (Tuple
                               (Tuple Integer Integer Integer)           ; filters
                               (Tuple Integer Integer)                   ; strides
                               (Tuple                                    ; weights
                                 (Tuple                ; conv_block_xa_weights
                                   (Tuple
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                    (Tensor 4 Float)    ; conv_1_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                    (Tensor 4 Float)    ; conv_2_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                    (Tensor 4 Float)    ; conv_3_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                   )
-                                  (Vec (Vec (Vec (Vec Float))))      ; shortcut_conv_weights
+                                  (Tensor 4 Float)      ; shortcut_conv_weights
                                   (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))    ; shortcut_norm_weights
                                 )
                                 (Vec                  ; identity_block_xy_weights
                                   (Tuple
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                    (Tensor 4 Float)    ; conv_1_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                    (Tensor 4 Float)    ; conv_2_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                    (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                    (Tensor 4 Float)    ; conv_3_weights
                                     (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                   )
                                 )
@@ -256,13 +256,13 @@
               (let (conv_block_out (ConvResidualBlock strides conv_block_weights x))
                       (fold (lam (x_weights :
                                     (Tuple
-                                      (Vec (Vec (Vec (Vec Float))))
+                                      (Tensor 4 Float)
                                       (Tuple
-                                        (Vec (Vec (Vec (Vec Float))))    ; conv_1_weights
+                                        (Tensor 4 Float)    ; conv_1_weights
                                         (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_1_weights
-                                        (Vec (Vec (Vec (Vec Float))))    ; conv_2_weights
+                                        (Tensor 4 Float)    ; conv_2_weights
                                         (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_2_weights
-                                        (Vec (Vec (Vec (Vec Float))))    ; conv_3_weights
+                                        (Tensor 4 Float)    ; conv_3_weights
                                         (Tuple (Vec Float) (Vec Float) (Vec Float) (Vec Float))  ; norm_3_weights
                                       )
                                     ))

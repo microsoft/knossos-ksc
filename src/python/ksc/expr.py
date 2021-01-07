@@ -299,10 +299,10 @@ def pystr(expr, indent):
 
 @pystr.register(Type)
 def _(ty, indent):
-    if len(ty.children) == 0 and (ty.kind != "Tuple"):
+    if ty.is_scalar:
         return ty.kind
     elems = [pystr(c, indent+1) for c in ty.children]
-    return ty.kind + "[" + ",".join(map(lambda x: pystr(x,indent+1), elems)) + "]"    
+    return ty.kind + "[" + ",".join(elems) + "]"    
 
 @pystr.register(Def)
 def _(ex, indent):

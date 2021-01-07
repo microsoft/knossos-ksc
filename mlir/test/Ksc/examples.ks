@@ -14,6 +14,8 @@
 ;  * $inline
 ; edef.ks:
 ;  * LM type
+; ex3.ks:
+;  * Unknown
 ; fold.ks:
 ;  * Tuple of Vectors
 ;  * $check, $ranhashdoub
@@ -55,7 +57,6 @@
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex0.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex1.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex2.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex3.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex4.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex5.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex6.ks > /dev/null

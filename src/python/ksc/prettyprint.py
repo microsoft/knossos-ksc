@@ -174,7 +174,7 @@ def pretty_Expr(ex, ctx):
 @register_pretty(Type)
 def pretty_Type(type, ctx):
     # Tuples can be hung
-    if type.kind == "Tuple":
+    if type.is_tuple:
         docs = [pretty_dispatch(c, ctx) for c in type.children]
         return group(align(nest(ctx.indent, concat([
                         LPAREN,
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     e = tld("""
         (def myfun (Tuple Float Float)
             ((x : Float) 
-             (y : Vec Integer)
+             (y : Tensor 1 Integer)
              (t : (Tuple Float Float))) 
             (let (l (lam (i : Integer) (add i 1)))
             (let (b 2)

@@ -9,8 +9,6 @@ import LangUtils
 import Parse (parseE)
 import Opt
 import Ksc.Pipeline (demoFFilter,
-                     displayCppGenCompileAndRun,
-                     displayCppGenCompileAndRunViaCatLang,
                      displayCppGenAndCompile,
                      displayCppGenNoDiffs,
                      genFuthark, ignoreMain)
@@ -155,17 +153,6 @@ dropExtensionOrFail ext path =
   else fail (path ++ " did not end with ." ++ ext)
   where pathWithoutExt = System.FilePath.dropExtension path
 
-compileKscPrograms :: String -> [String] -> IO ()
-compileKscPrograms compilername ksFiles = do
-  testOn ksFiles $ \ksFile -> do
-        ksTest <- dropExtensionOrFail "ks" ksFile
-        (_, (_, ksoContents)) <- displayCppGenAndCompile (Cgen.compileWithOpts ["-c"] compilername) ".obj" Nothing ["src/runtime/prelude"] ksTest
-        case parseE ksoContents of
-          Left e -> error ("Generated .kso failed to parse:\n"
-                           ++ ksoContents ++ "\n"
-                           ++ e)
-          Right _ -> pure ()
-
 testRoundTrip :: [String] -> IO ()
 testRoundTrip ksFiles = do
   testOn ksFiles $ \ksFile -> do
@@ -253,13 +240,23 @@ demoFOnTestPrograms ksTests = do
 -- Drop items from the list while the condition is satisfied, and also
 -- drop the first element satisfying the condition, if any.
 dropWhile1 :: (a -> Bool) -> [a] -> [a]
-dropWhile1 pred = tail . dropWhile pred
+dropWhile1 pred xs = case dropWhile pred xs of
+  []  -> []
+  _:t -> t
 
-testRunKSVia :: (String -> Maybe int -> [String] -> FilePath -> IO String)
+testRunKSVia :: Ksc.Pipeline.GenerateDefs
              -> String -> [Char] -> IO ()
 testRunKSVia via_ compiler ksFile = do
   let ksTest = System.FilePath.dropExtension ksFile
-  output <- via_ compiler Nothing ["src/runtime/prelude"] ksTest
+  (output, (_, ksoContents)) <-
+      Ksc.Pipeline.displayCppGenCompileAndRunVia
+      via_ compiler Nothing ["src/runtime/prelude"] ksTest
+
+  _ <- case parseE ksoContents of
+          Left e -> error ("Generated .kso failed to parse:\n"
+                           ++ ksoContents ++ "\n"
+                           ++ e)
+          Right _ -> pure ()
 
   let testResults = dropWhile1 (/= "TESTS FOLLOW") (lines output)
 
@@ -288,10 +285,10 @@ testRunKSVia via_ compiler ksFile = do
       error ("These tests failed:\n" ++ unlines failures)
 
 testRunKS :: String -> String -> IO ()
-testRunKS = testRunKSVia displayCppGenCompileAndRun
+testRunKS = testRunKSVia Ksc.Pipeline.theDefs
 
 testRunKSViaCatLang :: String -> String -> IO ()
-testRunKSViaCatLang = testRunKSVia displayCppGenCompileAndRunViaCatLang
+testRunKSViaCatLang = testRunKSVia Ksc.Pipeline.theDefsViaCatLang
 
 testHspec :: IO ()
 testHspec = do
@@ -309,15 +306,9 @@ testsThatDoNoCodegen = do
 testC :: String -> [String] -> IO ()
 testC compiler fsTestKs = do
   ksTestFiles_ <- testsThatDoNoCodegen
-  compileKscPrograms compiler ksTestFiles_
-  testRunKS compiler "test/ksc/gmm.ks"
-  testRunKS compiler "test/ksc/fold.ks"
-  testRunKSViaCatLang compiler "test/ksc/gmm.ks"
-  testRunKSViaCatLang compiler "test/ksc/fold.ks"
-  testRunKS compiler "test/ksc/copydown.ks"
-  testRunKS compiler "test/ksc/prim.ks"
-  testRunKS compiler "test/ksc/tensor.ks"
-  compileKscPrograms compiler fsTestKs
+  testOn ksTestFiles_ (testRunKS compiler)
+  testOn ksTestFiles_ (testRunKSViaCatLang compiler)
+  testOn fsTestKs (testRunKS compiler)
 
 profileArgs :: String -> FilePath -> FilePath -> FilePath -> IO ()
 profileArgs source proffile proffunctions proflines = do

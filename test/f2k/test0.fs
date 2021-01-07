@@ -13,3 +13,4 @@ let g x y = (f x) * y + System.Math.Sin x
 
 let h x = if x > 0.2 then g x 3.0 else f x
 
+let main = 0

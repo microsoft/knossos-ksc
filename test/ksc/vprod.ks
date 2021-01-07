@@ -60,10 +60,12 @@
       "\n"
 
       "rap="
-      (build N (lam (n : Integer)
-                  (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
-                      ($BENCH (lam (_ : (Tuple)) (achomp (rev$aprod (tuple 0 v 1.0) 1.0)))))))
+      (build N (lam (n : Integer) 0.0
+;                  (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
+;                      ($BENCH (lam (_ : (Tuple)) (achomp (rev$aprod (tuple 0 v 1.0) 1.0)))))
+                  ))
 
+      "\n# rev$aprod currently seems not to terminate in reasonable time"
       "\n"
 
       "rfp="

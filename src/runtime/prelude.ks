@@ -106,6 +106,24 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; mul Mat Vec
+(edef mul (Vec Float) ((Tensor 2 Float) (Vec Float)))
+(def shape$mul (Vec (Tuple)) ((m : (Tensor 2 Float)) (v : (Vec Float)))
+          (constVec (get$1$2 (size m)) (tuple)))
+
+(edef D$mul (LM (Tuple (Tensor 2 Float) (Vec Float)) (Vec Float))
+          ((Tensor 2 Float) (Vec Float)))
+(edef Dt$mul (Tuple (Vec Float) (LM (Tuple (Tensor 2 Float) (Vec Float)) (Vec Float)))
+          ((Tensor 2 Float) (Vec Float)))
+
+(def fwd$mul (Vec Float)
+          ((M_v : (Tuple (Tensor 2 Float) (Vec Float))) (dM_dv : (Tuple (Tensor 2 Float) (Vec Float))))
+     (let ((M v) M_v)
+     (let ((dM dv) dM_dv)
+        (ts_add (mul dM v) (mul M dv)))))
+
+(edef rev$mul (Tuple (Tensor 2 Float) (Vec Float))
+          ((Tuple (Tensor 2 Float) (Vec Float)) (Vec Float)))
 
 ;; div :: Number x Number -> Number
 ;; div (x, y) = x / y
@@ -352,7 +370,7 @@
 (edef D$and (LM (Tuple Bool Bool) Bool) (Bool Bool))
 (edef Dt$and (Tuple Bool (LM (Tuple Bool Bool) Bool)) (Bool Bool))
 (def fwd$and (Tuple)
-     ((xt : Tuple Bool Bool) (dxt : Tuple Bool Bool))
+     ((xt : Tuple Bool Bool) (dxt : Tuple (Tuple) (Tuple)))
      (tuple))
 (def rev$and (Tuple (Tuple) (Tuple))
      ((xt : Tuple Bool Bool) (d_dbool : (Tuple)))

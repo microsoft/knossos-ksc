@@ -29,8 +29,7 @@ There's a VS Code syntax highlighter extension in etc/ks-vscode.
 The AST has just a few concepts: Lambda, Call, Let binding, Conditionals, Constants, Assert, 
 Top-level function definitions, and Rewrite rules.
 
-It's also strongly typed, using a bare set of types: Vector, Tuple, and Values (Float, Integer, String).  However, unlike say MLIR, these are composable, so e.g. we can have a (Vec (Tuple Float (Vec Float))).
-[It's a TODO to replace Vec with Tensor]
+It's also strongly typed, using a bare set of types: Tensor, Tuple, and Values (Float, Integer, String).  However, unlike say MLIR, these are composable, so e.g. we can have a (Tensor 1 (Tuple Float (Tensor 2 Float))).  Tensors are annotated with their "rank" or number of dimensions.
 
 The IR is pure functional, so functions may be called more than once or not at all depending on the use of their outputs.  Values are passed and returned "as if" by value, although the optimizer reserves the right implement this using refcounting/copy/move, as long as the semantics are preserved.
 
@@ -41,12 +40,13 @@ The lisp-like IR is extremely simple -- all the language builtins are in this co
 
 #| Block comments
  -- User-defined function myfun 
- takes an Integer and Vec of (Float Float) pairs
+ takes an Integer and Tensor of (Float Float) pairs
  and returns a pair of String and Float
 |#
 (def myfun                                       ; function name
   (Tuple String Float)                           ; return type
-  ((i : Integer) (v : Vec (Tuple Float Float)))  ; arguments
+  ((i : Integer)                                 ; argument 1: int
+   (v : Tensor 1 (Tuple Float Float)))           ; argument 2: tensor of tuple
   (assert (gt i 0)                               ; (assert TEST BODY)
      (if (eq i 0)                                ; (if TEST TEXPR FEXPR)
         ; "then" br
@@ -68,16 +68,16 @@ The lisp-like IR is extremely simple -- all the language builtins are in this co
 
 ;; And compilation produces f and various derivatives, as if
 (edef rev$myfun ; classic reverse mode.  If f :: S -> T, then rev$f :: (S, dT) -> dS
-    (Tuple (Tuple) (Vec (Tuple Float Float))) ; dS is tangent-type of inputs (dInteger = void)
-    ((#|s  |# (Tuple Integer (Vec (Tuple Float Float)))) ; inputs in a single tuple
+    (Tuple (Tuple) (Tensor 1 (Tuple Float Float))) ; dS is tangent-type of inputs (dInteger = void)
+    ((#|s  |# (Tuple Integer (Tensor 1 (Tuple Float Float)))) ; inputs in a single tuple
      (#|dt |# (Tuple (Tuple) Float)))) ; dT is tangent type of returns
 
 (edef D$myfun  ; linear map as per Elliot.  If f :: S->T, D$f :: S -> (LM dS dT) where LM is linear map
     (LM
-      (Tuple (Tuple) (Vec (Tuple Float Float))) ; dS
+      (Tuple (Tuple) (Tensor 1 (Tuple Float Float))) ; dS
       (Tuple (Tuple) Float) ; dT
     )
-    (Integer (Vec (Tuple Float Float)))) ; inputs as normal (not single-tupled)
+    (Integer (Tensor 1 (Tuple Float Float)))) ; inputs as normal (not single-tupled)
 ```
 See [the ksc syntax primer](test/ksc/syntax-primer.ks) for a longer
 introduction to the `ks` language.  [The ksc test

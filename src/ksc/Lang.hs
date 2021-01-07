@@ -260,6 +260,11 @@ tensorTypeFromIndexType_maybe :: Type -> Type -> Maybe Type
 tensorTypeFromIndexType_maybe indexType elementType =
   fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType_maybe indexType)
 
+zeroIndexForDimension :: Int -> TExpr
+zeroIndexForDimension 1 = kInt 0
+zeroIndexForDimension d = mkTuple (replicate d (kInt 0))
+
+
 ----------------------------------
 --- Tangent space
 
@@ -300,11 +305,11 @@ and is implemented by shapeType :: Type -> Type
 
 For example
   --------------------------
-  T         Sh(T)
+  T           Sh(T)
   --------------------------
-  Float     ()
-  Vec T     Vec Sh(T)
-  (T1 T2)   (Sh(T1), Sh(T2))
+  Float       ()
+  Tensor N T  Tensor N Sh(T)
+  (T1 T2)     (Sh(T1), Sh(T2))
   --------------------------
 
 For every function
