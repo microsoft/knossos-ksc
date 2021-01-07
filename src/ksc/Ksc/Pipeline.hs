@@ -205,11 +205,7 @@ anfOptAndCse :: DisplayLint
              -> RuleBase -> GblSymTab -> [TDef] -> KM [TDef]
 anfOptAndCse display rulebase env4 alldefs =
   do {
-  -- We use ANF to expose optimisation opportunities and use optDefs
-  -- to take them.  See Note [Inline tuples] for the motiviation for
-  -- doing ANF-then-optDefs.
-  ; (env4, anf_alldefs) <- anfDefs env4 alldefs
-  ; (env45, opt_alldefs) <- optDefs rulebase env4 anf_alldefs
+  ; (env45, opt_alldefs) <- optDefs rulebase env4 alldefs
 
   ; (env5, cse) <- cseDefs rulebase env45 opt_alldefs
   ; display "CSE" env5 cse
