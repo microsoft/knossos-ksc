@@ -1,24 +1,29 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
+
+{-# LANGUAGE LambdaCase #-}
+
 module Ksc.Pipeline where
 
 import Annotate (annotDecls, lintDefs)
-import AD (gradDefs, applyDefs)
+import AD (gradDefs, applyDefs,gradDef,applyDef)
 import ANF (anfDefs)
 import qualified Cgen
 import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
+import Ksc.Traversal
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
              FunId(UserFun), TDef, Pretty,
              def_fun, displayN, partitionDecls,
              pps, ppr, renderSexp)
-import LangUtils (GblSymTab, emptyGblST, extendGblST)
+import qualified Lang as L
+import LangUtils (GblSymTab, emptyGblST, extendGblST,lookupGblST)
 import qualified Ksc.Futhark
 import Parse (parseF)
 import Rules (RuleBase, mkRuleBase)
-import Opt (optDefs)
+import Opt (optDefs, optDef)
 import Shapes (shapeDefs)
 
 import Data.List (partition, intercalate)
@@ -364,3 +369,74 @@ genFuthark files file = do
     intercalate "\n\n" $
     prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
   where futfile = "obj/" ++ file ++ ".fut"
+
+-------------------------------------
+-- New main compiler pipeline
+-------------------------------------
+
+newPipeline :: [Decl] -> KM [TDef]
+newPipeline decls = do
+  { (env, ann_decls) <- annotDecls emptyGblST decls
+  ; let (rules, defs) = partitionDecls ann_decls
+  ; let rulebase      = mkRuleBase rules
+  ; lintDefs "Typechecked defs" env defs
+
+  ; let f :: GblSymTab -> TDef -> KM (GblSymTab, [TDef])
+        f env = \case
+          -- We shouldn't see stubs at this point
+          Def _ _ _ L.StubRhs -> fail "Didn't expect to see a stub"
+          -- We don't emit edefs.  They exist just to get things into
+          -- the env.
+          Def{ L.def_rhs = L.EDefRhs } -> pure (env, [])
+          -- Existing defs just get passed straight through
+          d@Def{ L.def_rhs = L.UserRhs{} } -> pure (env, [d])
+          -- gdefs get looked up
+          Def { L.def_fun = fun
+              , L.def_pat = pat
+              , L.def_res_ty = _res_ty
+              , L.def_rhs = L.GDefRhs }
+            -> do
+            {
+            ; let unsupported c = fail ("Can't handle " ++ c ++ " yet")
+            ; let err c = fail ("gdef for " ++ c ++ " doesn't make sense")
+
+            ; case fun of
+                L.GradFun{} -> unsupported "GradFun"
+                L.DrvFun funId mode -> do
+                  { funName <- case funId of
+                      L.PrimFun{} -> err "DrvFun PrimFun"
+                      L.SelFun{} -> err "DrvFun SelFun"
+                      UserFun funName' -> pure funName'
+
+                  ; tdef <- case lookupGblST (Fun (L.UserFun funName),
+                                              L.typeof pat) env of
+                      -- Handle this error better
+                      Nothing -> fail ("Missing function: "
+                                       ++ show (funName, L.typeof pat))
+                      Just tdef' -> pure tdef'
+
+                  ; let L.AD plan dir = mode
+
+                  ; (_env, mgradDef) <- gradDef plan env tdef
+
+                  ; gradDef <- case mgradDef of
+                      Nothing -> fail ("Couldn't grat "
+                                       ++ show (funName, L.typeof pat))
+                      Just gradDef' -> pure gradDef'
+
+                  ; (_env, appliedDef) <- applyDef dir env gradDef
+
+                  ; (env, optDef) <- optDef rulebase env appliedDef
+
+                  ; pure (env, [optDef])
+                  }
+
+                L.ShapeFun{} -> unsupported "ShapeFun"
+                L.Fun{} -> err "Fun"
+
+            }
+
+  ; (_env, defs) <- mapAccumLM f emptyGblST defs
+
+  ; pure (concat defs)
+  }
