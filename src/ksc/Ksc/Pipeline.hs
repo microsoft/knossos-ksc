@@ -2,6 +2,7 @@
 -- Licensed under the MIT license.
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Ksc.Pipeline where
 
@@ -24,7 +25,7 @@ import qualified Ksc.Futhark
 import Parse (parseF)
 import Prim (extendGblST)
 import Rules (RuleBase, mkRuleBase)
-import Opt (optDefs, optDef)
+import Opt (optDefs)
 import Shapes (shapeDefs)
 
 import Data.List (partition, intercalate)
@@ -413,9 +414,7 @@ newPipeline decls = do
 
                   ; (_env, appliedDef) <- applyDef dir env gradDef
 
-                  ; (env, optDef) <- optDef rulebase env appliedDef
-
-                  ; pure (env, [optDef])
+                  ; pure (env, [appliedDef])
                   }
 
                 L.ShapeFun{} -> unsupported "ShapeFun"
@@ -423,7 +422,9 @@ newPipeline decls = do
 
             }
 
-  ; (_env, defs) <- mapAccumLM f env defs
+  ; (env, concat->defs) <- mapAccumLM f env defs
 
-  ; pure (concat defs)
+  ; (_env, defs) <- optDefs rulebase env defs
+
+  ; pure defs
   }
