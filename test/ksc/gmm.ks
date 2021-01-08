@@ -29,6 +29,9 @@
 (def sqnorm Float ((v : Vec Float))
   (dot v v))
 
+(gdef fwd$sqnorm Float ((Vec Float)))
+(gdef rev$sqnorm Float ((Vec Float)))
+
 (def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
   (let ((D (size q))
         (triD (size l)))
@@ -43,10 +46,16 @@
            )
            ))))))
 
+(gdef fwd$gmm_knossos_makeQ (Tensor 2 Float) ((Vec Float) (Vec Float)))
+(gdef rev$gmm_knossos_makeQ (Tensor 2 Float) ((Vec Float) (Vec Float)))
+
 (def logsumexp Float ((v : Vec Float))
   (let (maxv (max v))
     (add maxv
          (log (sum (exp (sub v maxv)))))))
+
+(gdef fwd$logsumexp Float ((Vec Float)))
+(gdef rev$logsumexp Float ((Vec Float)))
 
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
@@ -54,6 +63,9 @@
       (add out
          (sum (build p (lam (j : Integer)
                  (lgamma (sub a (mul 0.5 (to_float j))))))))))
+
+(gdef fwd$log_gamma_distrib Float (Float Integer))
+(gdef rev$log_gamma_distrib Float (Float Integer))
 
 (def log_wishart_prior Float ((wishart : Tuple Float Integer)
                               (log_Qdiag : Vec Float)
@@ -78,6 +90,13 @@
                   sum_qs))
             C)
     ))
+
+(gdef fwd$log_wishart_prior Float ((Tuple Float Integer)
+                                   (Vec Float)
+                                   (Vec Float)))
+(gdef rev$log_wishart_prior Float ((Tuple Float Integer)
+                                   (Vec Float)
+                                   (Vec Float)))
 
 (def gmm_knossos_gmm_objective Float
       ((x : Vec (Vec Float))        ; N x D
@@ -112,6 +131,22 @@
             (sum (build K (lam (k : Integer)
                     (log_wishart_prior wishart (index k qs) (index k ls))))))
     ))))
+
+(gdef fwd$gmm_knossos_gmm_objective Float
+      ((Vec (Vec Float))
+       (Vec Float)
+       (Vec (Vec Float))
+       (Vec (Vec Float))
+       (Vec (Vec Float))
+       (Tuple Float Integer)))
+
+(gdef rev$gmm_knossos_gmm_objective Float
+      ((Vec (Vec Float))
+       (Vec Float)
+       (Vec (Vec Float))
+       (Vec (Vec Float))
+       (Vec (Vec Float))
+       (Tuple Float Integer)))
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
