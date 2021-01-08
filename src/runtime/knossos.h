@@ -298,111 +298,6 @@ namespace ks
 		}
 	};
 
-	// ===============================  Zero  ==================================
-	// Return a zero value with the same shape as the input value
-	template <class T>
-	T zero(allocator * alloc, T const& val)
-	{
-		KS_ASSERT(false && "Need to overload zero for this type");
-		return T{};
-	}
-
-	template <>
-	double zero(allocator *, double const& val)
-	{
-		return 0.0;
-	}
-
-	template <>
-	int zero(allocator *, int const& val)
-	{
-		return 0;
-	}
-
-	tuple<> zero(allocator *, tuple<> const& val)
-	{
-		return tuple<> ();
-	}
-
-	template <class... Ts>
-	tuple<Ts...> zero(allocator * alloc, tuple<Ts...> const& val)
-	{
-		return prepend(zero(alloc, head(val)), zero(alloc, tail(val)));
-	}
-
-	// ===============================  Inflated deep copy  ==================================
-
-	template <class T>
-	T inflated_deep_copy(allocator_base *, T z)
-	{
-		return z;
-	}
-
-	template <class T, class... Ts>
-	tuple<T, Ts...> inflated_deep_copy(allocator_base * alloc, tuple<T, Ts...> val)
-	{
-		return prepend(inflated_deep_copy(alloc, head(val)), inflated_deep_copy(alloc, tail(val)));
-	}
-
-	// ===============================  Addition ==================================
-	// Adding is special because it needs to be defined before linear maps,
-	// And needs to be defined before any primitives are used in linear maps.
-	// ... At least for gcc, which seems to require more info at template decl time.
-
-	template <class T1, class T2>
-	T1 ts_add(allocator *, T1 t1, T2 t2) { return t1 + t2; }
-
-	template <class T1>
-	T1 ts_add(allocator *, T1 t1, tuple<> t2) { return t1; }
-
-	template <>
-	inline tuple<> ts_add(allocator *, tuple<> t1, tuple<> t2)
-	{
-		return tuple<>{};
-	}
-
-	template <class T0, class... Ts, class U0, class... Us>
-	auto ts_add(allocator * alloc, tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
-	{
-		return prepend(ts_add(alloc, head(t1), head(t2)),
-			ts_add(alloc, tail(t1), tail(t2)));
-	}
-
-	// ===============================  Inplace add ==================================
-	template <class T>
-	struct inplace_add_t {
-		static void go(T *t1, const T &t2) { *t1 += t2; }
-	};
-
-	template <class T>
-	void inplace_add(T* t1, T const& t2)
-	{
-		inplace_add_t<T>::go(t1, t2);
-	}
-
-	template <>
-	struct inplace_add_t<tuple<>> {
-		static void go(tuple<> *t1, const tuple<> &t2) { }
-	};
-
-	template <size_t i, class T, class... Ts>
-	void inplace_add_aux(tuple<T, Ts...> *t1, const tuple<T, Ts...> &t2)
-	{
-		static constexpr size_t n = sizeof...(Ts);
-
-		inplace_add(&std::get<i>(*t1), std::get<i>(t2));
-		if constexpr (i < n)
-			inplace_add_aux<i + 1>(t1, t2);
-	}
-
-	template <class T, class... Ts>
-	struct inplace_add_t<tuple<T, Ts...>> {
-		static void go(tuple<T, Ts...> *t1, const tuple<T, Ts...> &t2)
-		{
-			inplace_add_aux<0>(t1, t2);
-		}
-	};
-
 	// ===============================  Tensor class ==================================
 	template<size_t Dummy> using int_t = int;
 
@@ -621,106 +516,73 @@ namespace ks
 		return t.index(i);
 	}
 
-	template <class T, class F>
-	vec<T> build(allocator * alloc, int size, F f)
+	template <size_t Dim, class T>
+	std::ostream &operator<<(std::ostream &s, ks::tensor<Dim, T> const &v)
 	{
-		vec<T> ret = vec<T>::create(alloc, size);
-
-		for (int i = 0; i < size; ++i)
-			ret[i] = T{ f(alloc, i) };
-		return ret;
+		s << "[";
+		for (int i = 0; i < v.outer_dimension(); ++i)
+			s << (i > 0 ? ", " : "") << v[i];
+		return s << "]";
 	}
 
-	template<size_t Dim>
-	struct build_t
+	// -- Specialize type_to_string
+	template <size_t Dim, typename T>
+	struct type_to_string<ks::tensor<Dim, T>>
 	{
-		static_assert(Dim >= 2u);
-
-		template<class T, class F, class Size, class ...HigherDimensionIndices>
-		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
-			for (int i = 0; i != thisDimension; ++i) {
-				build_t<Dim - 1u>::do_build(alloc, size, data, f, higherDimensionIndices..., i);
-			}
+		static std::string name()
+		{
+			return "tensor<" + std::to_string(Dim) + ", " + type_to_string<T>::name() + ">";
 		}
 	};
 
-	template<>
-	struct build_t<1>
-	{
-		template<class T, class F, class Size, class ...HigherDimensionIndices>
-		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
-			for (int i = 0; i != thisDimension; ++i) {
-				*(*data)++ = f(alloc, higherDimensionIndices..., i);
-			}
+	// ===============================  Shape  ==================================
+
+	tuple<> shape(allocator_base *, bool const&) { return {}; }
+	tuple<> shape(allocator_base *, int const&) { return {}; }
+	tuple<> shape(allocator_base *, double const&) { return {}; }
+	tuple<> shape(allocator_base *, std::string const&) { return {}; }
+
+	template<size_t Dim, class T>
+	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
+		const T* indata = t.data();
+		tensor<Dim, decltype(shape(alloc, *indata))> s(alloc, t.size());
+		auto* outdata = s.data();
+		for (int ii = 0, ne = t.num_elements(); ii != ne; ++ii) {
+			outdata[ii] = shape(alloc, indata[ii]);
 		}
-	};
-
-	template <class T, class F, class ...SizeTypes>
-	tensor<sizeof...(SizeTypes), T> build(allocator * alloc, std::tuple<SizeTypes...> size, F f)
-	{
-		constexpr auto Dim = sizeof...(SizeTypes);
-		tensor<Dim, T> ret = tensor<Dim, T>::create(alloc, size);
-		T* retData = ret.data();
-		build_t<Dim>::do_build(alloc, size, &retData, f);
-		return ret;
+		return s;
 	}
 
-	template <class T, class F, class A>
-        A fold(allocator * alloc, F f, A z, vec<T> v)
-	{
-          A acc = z;
-
-          for (int i = 0; i < v.size(); i++) {
-            acc = f(alloc, acc, v[i]);
-          }
-
-          return acc;
+	template<class TupleType, size_t... Indices>
+	auto shape_impl(allocator_base * alloc, TupleType const& t, std::index_sequence<Indices...>) {
+		return std::make_tuple(shape(alloc, std::get<Indices>(t))...);
 	}
 
-        template <class T, class F, class F_, class A, class S, class dA, class dT>
-          tuple<S, tuple<dA, vec<dT>>> RFold(allocator * alloc, const dT &dummy, S s_zero, F f, F_ f_, A acc, vec<T> v, dA dr) {
-	  auto forward_pass = std::vector<A>(v.size());
+	template<class... Types>
+	auto shape(allocator_base * alloc, tuple<Types...> const& t) {
+		return shape_impl(alloc, t, std::index_sequence_for<Types...>{});
+	}
 
-	  for (int i = 0; i < v.size(); i++) {
-	    forward_pass[i] = acc;
-	    acc = f(alloc, acc, v[i]);
-	  }
+	auto shape(allocator_base *) { return tuple<>{}; }
 
-	  S dScope = s_zero;
-	  auto dv = vec<dT>(alloc, v.size());
+	template<class T1, class T2, class... Ts>
+	auto shape(allocator_base * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
+		return std::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
+	}
 
-	  for (int i = v.size() - 1; i >= 0; i--) {
-            tuple<S, tuple<dA, dT>> f_call = f_(alloc, tuple(forward_pass[i], v[i]), dr);
+	// ===============================  Inflated deep copy  ==================================
 
-	    S  f_call_dScope = std::get<0>(f_call);
-	    dA f_call_dacc   = std::get<0>(std::get<1>(f_call));
-	    dT f_call_dT     = std::get<1>(std::get<1>(f_call));
+	template <class T>
+	T inflated_deep_copy(allocator_base *, T z)
+	{
+		return z;
+	}
 
-	    dr = f_call_dacc;
-	    dScope = ts_add(alloc, dScope, f_call_dScope);
-	    dv[i] = f_call_dT;
-	  }
-
-          return tuple(dScope, tuple(dr, dv));
-        }
-
-        // Probably should implement this as a loop
-        template <class T, class F, class F_, class A, class dA, class dT>
-        dA FFold_recursive(allocator * alloc, int i, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
-          if (i == v.size()) {
-            return dacc;
-          } else {
-            dA fwd_f = f_(alloc, tuple(acc, v[i]), tuple(dacc, dv[i]));
-            return FFold_recursive(alloc, i + 1, f, f(alloc, acc, v[i]), v, f_, fwd_f, dv);
-          }
-        }
-
-        template <class T, class F, class F_, class A, class dA, class dT>
-        dA FFold(allocator * alloc, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
-          return FFold_recursive(alloc, 0, f, acc, v, f_, dacc, dv);
-        }
+	template <class T, class... Ts>
+	tuple<T, Ts...> inflated_deep_copy(allocator_base * alloc, tuple<T, Ts...> val)
+	{
+		return prepend(inflated_deep_copy(alloc, head(val)), inflated_deep_copy(alloc, tail(val)));
+	}
 
 	template <size_t Dim, class T>
 	tensor<Dim, T> inflated_deep_copy(allocator_base * alloc, tensor<Dim, T> t)
@@ -955,7 +817,85 @@ namespace ks
 		return ret;
 	}
 
-	// specialize inplace_add(tensor<Dim,T>*,tensor<Dim,T>)
+	// ===============================  Zero  ==================================
+	// Return a zero value with the same shape as the input value
+	template <class T>
+	T zero(allocator * alloc, T const& val)
+	{
+		KS_ASSERT(false && "Need to overload zero for this type");
+		return T{};
+	}
+
+	template <>
+	double zero(allocator *, double const& val)
+	{
+		return 0.0;
+	}
+
+	template <>
+	int zero(allocator *, int const& val)
+	{
+		return 0;
+	}
+
+	tuple<> zero(allocator *, tuple<> const& val)
+	{
+		return tuple<> ();
+	}
+
+	template <class... Ts>
+	tuple<Ts...> zero(allocator * alloc, tuple<Ts...> const& val)
+	{
+		return prepend(zero(alloc, head(val)), zero(alloc, tail(val)));
+	}
+
+	template <size_t Dim, class T>
+	tensor<Dim, T> zero(allocator * alloc, tensor<Dim, T> const& val)
+	{
+		tensor<Dim, T> ret(alloc, val.size());
+		T* retdata = ret.data();
+		const T* indata = val.data();
+		for (int i = 0; i != ret.num_elements(); ++i) {
+			retdata[i] = zero(alloc, indata[i]);
+		}
+		return ret;
+	}
+
+	// ===============================  Inplace add ==================================
+	template <class T>
+	struct inplace_add_t {
+		static void go(T *t1, const T &t2) { *t1 += t2; }
+	};
+
+	template <class T>
+	void inplace_add(T* t1, T const& t2)
+	{
+		inplace_add_t<T>::go(t1, t2);
+	}
+
+	template <>
+	struct inplace_add_t<tuple<>> {
+		static void go(tuple<> *t1, const tuple<> &t2) { }
+	};
+
+	template <size_t i, class T, class... Ts>
+	void inplace_add_aux(tuple<T, Ts...> *t1, const tuple<T, Ts...> &t2)
+	{
+		static constexpr size_t n = sizeof...(Ts);
+
+		inplace_add(&std::get<i>(*t1), std::get<i>(t2));
+		if constexpr (i < n)
+			inplace_add_aux<i + 1>(t1, t2);
+	}
+
+	template <class T, class... Ts>
+	struct inplace_add_t<tuple<T, Ts...>> {
+		static void go(tuple<T, Ts...> *t1, const tuple<T, Ts...> &t2)
+		{
+			inplace_add_aux<0>(t1, t2);
+		}
+	};
+
 	template <size_t Dim, class T>
 	struct inplace_add_t<tensor<Dim, T>> {
 		static void go(tensor<Dim, T> *t1, const tensor<Dim, T> &t2)
@@ -967,6 +907,144 @@ namespace ks
 				ks::inplace_add_t<T>::go(&t1data[i], t2data[i]);
 		}
 	};
+
+	// ============================  Tangent-space arithmetic ================================
+
+	template <class T1, class T2>
+	T1 ts_add(allocator *, T1 t1, T2 t2) { return t1 + t2; }
+
+	template <class T1>
+	T1 ts_add(allocator *, T1 t1, tuple<> t2) { return t1; }
+
+	template <>
+	inline tuple<> ts_add(allocator *, tuple<> t1, tuple<> t2)
+	{
+		return tuple<>{};
+	}
+
+	template <class T0, class... Ts, class U0, class... Us>
+	auto ts_add(allocator * alloc, tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
+	{
+		return prepend(ts_add(alloc, head(t1), head(t2)),
+			ts_add(alloc, tail(t1), tail(t2)));
+	}
+
+	template <size_t Dim, class T>
+	tensor<Dim, T> ts_add(allocator * alloc, tensor<Dim, T> const& a, tensor<Dim, T> const& b)
+	{
+		KS_ASSERT(a.size() == b.size());
+		auto ret = tensor<Dim, T>::create(alloc, a.size());
+		const T* adata = a.data();
+		const T* bdata = b.data();
+		T* retdata = ret.data();
+
+		for (int i = 0, ne = a.num_elements(); i != ne; ++i)
+			retdata[i] = ts_add(alloc, adata[i], bdata[i]);
+		return ret;
+	}
+
+	template <class T>
+	T ts_scale(allocator *, double s, T const& t)
+	{
+		return s * t;
+	}
+
+	template <>
+	inline tuple<> ts_scale(allocator *, double s, tuple<> const& t)
+	{
+		return t;
+	}
+
+	template <class U0, class... Us>
+	auto ts_scale(allocator * alloc, double s, tuple<U0, Us...> const& t)
+	{
+		return prepend(ts_scale(alloc, s, head(t)),
+			ts_scale(alloc, s, tail(t)));
+	}
+
+	inline
+		int ts_scale(allocator *, int const& t1, int const& t2)
+	{
+		return t1 * t2;
+	}
+
+	template <size_t Dim, class T>
+	tensor<Dim, T> ts_scale(allocator * alloc, double val, tensor<Dim, T> const& t)
+	{
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		T* retdata = ret.data();
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
+			retdata[i] = ts_scale(alloc, val, t[i]);
+		return ret;
+	}
+
+	inline int ts_neg(allocator *, int d) { return -d; }
+
+	inline double ts_neg(allocator *, double d) { return -d; }
+
+	inline tuple<> ts_neg(allocator *, tuple<> d) { return d; }
+
+	template <class U0, class... Us>
+	inline tuple<U0, Us...> ts_neg(allocator * alloc, tuple<U0, Us...> t) { return prepend(ts_neg(alloc, head(t)), ts_neg(alloc, tail(t))); }
+
+	template <size_t Dim, class T>
+	inline tensor<Dim, T> ts_neg(allocator * alloc, tensor<Dim, T> t) {
+		tensor<Dim, T> ret(alloc, t.size());
+		const T* indata = t.data();
+		T* outdata = ret.data();
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+			outdata[i] = ts_neg(alloc, indata[i]);
+		}
+	}
+
+	// =============================== Build ==================================
+	template <class T, class F>
+	vec<T> build(allocator * alloc, int size, F f)
+	{
+		vec<T> ret = vec<T>::create(alloc, size);
+
+		for (int i = 0; i < size; ++i)
+			ret[i] = T{ f(alloc, i) };
+		return ret;
+	}
+
+	template<size_t Dim>
+	struct build_t
+	{
+		static_assert(Dim >= 2u);
+
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			for (int i = 0; i != thisDimension; ++i) {
+				build_t<Dim - 1u>::do_build(alloc, size, data, f, higherDimensionIndices..., i);
+			}
+		}
+	};
+
+	template<>
+	struct build_t<1>
+	{
+		template<class T, class F, class Size, class ...HigherDimensionIndices>
+		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			for (int i = 0; i != thisDimension; ++i) {
+				*(*data)++ = f(alloc, higherDimensionIndices..., i);
+			}
+		}
+	};
+
+	template <class T, class F, class ...SizeTypes>
+	tensor<sizeof...(SizeTypes), T> build(allocator * alloc, std::tuple<SizeTypes...> size, F f)
+	{
+		constexpr auto Dim = sizeof...(SizeTypes);
+		tensor<Dim, T> ret = tensor<Dim, T>::create(alloc, size);
+		T* retData = ret.data();
+		build_t<Dim>::do_build(alloc, size, &retData, f);
+		return ret;
+	}
+
+	// =============================== Sumbuild ==================================
 
 	/* A sumbuild is implemented by deep-copying the result of the
 	   first iteration (using a copydown), then accumulating
@@ -1051,6 +1129,65 @@ namespace ks
 		return sumbuild_t<Dim>::template do_sumbuild<T>(alloc, size, f);
 	}
 
+	// =============================== Fold ==================================
+
+	template <class T, class F, class A>
+	A fold(allocator * alloc, F f, A z, vec<T> v)
+	{
+		A acc = z;
+
+		for (int i = 0; i < v.size(); i++) {
+			acc = f(alloc, acc, v[i]);
+		}
+
+		return acc;
+	}
+
+	template <class T, class F, class F_, class A, class S, class dA, class dT>
+	tuple<S, tuple<dA, vec<dT>>> RFold(allocator * alloc, const dT &dummy, S s_zero, F f, F_ f_, A acc, vec<T> v, dA dr) {
+		auto forward_pass = std::vector<A>(v.size());
+
+		for (int i = 0; i < v.size(); i++) {
+			forward_pass[i] = acc;
+			acc = f(alloc, acc, v[i]);
+		}
+
+		S dScope = s_zero;
+		auto dv = vec<dT>(alloc, v.size());
+
+		for (int i = v.size() - 1; i >= 0; i--) {
+			tuple<S, tuple<dA, dT>> f_call = f_(alloc, tuple(forward_pass[i], v[i]), dr);
+
+			S  f_call_dScope = std::get<0>(f_call);
+			dA f_call_dacc   = std::get<0>(std::get<1>(f_call));
+			dT f_call_dT     = std::get<1>(std::get<1>(f_call));
+
+			dr = f_call_dacc;
+			dScope = ts_add(alloc, dScope, f_call_dScope);
+			dv[i] = f_call_dT;
+		}
+
+		return tuple(dScope, tuple(dr, dv));
+	}
+
+	// Probably should implement this as a loop
+	template <class T, class F, class F_, class A, class dA, class dT>
+	dA FFold_recursive(allocator * alloc, int i, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
+		if (i == v.size()) {
+			return dacc;
+		} else {
+			dA fwd_f = f_(alloc, tuple(acc, v[i]), tuple(dacc, dv[i]));
+			return FFold_recursive(alloc, i + 1, f, f(alloc, acc, v[i]), v, f_, fwd_f, dv);
+		}
+	}
+
+	template <class T, class F, class F_, class A, class dA, class dT>
+	dA FFold(allocator * alloc, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
+		return FFold_recursive(alloc, 0, f, acc, v, f_, dacc, dv);
+	}
+
+	// ===============================  Primitives  ==================================
+
 	template <class T>
 	T delta(allocator * alloc, int i, int j, T val)
 	{
@@ -1087,59 +1224,6 @@ namespace ks
 		});
 	}
 
-	// specialize zero(tensor<Dim,T>)
-	template <size_t Dim, class T>
-	tensor<Dim, T> zero(allocator * alloc, tensor<Dim, T> const& val)
-	{
-		tensor<Dim, T> ret(alloc, val.size());
-		T* retdata = ret.data();
-		const T* indata = val.data();
-		for (int i = 0; i != ret.num_elements(); ++i) {
-			retdata[i] = zero(alloc, indata[i]);
-		}
-		return ret;
-	}
-
-
-	// -- Specialize type_to_string
-	template <size_t Dim, typename T>
-	struct type_to_string<ks::tensor<Dim, T>>
-	{
-		static std::string name()
-		{
-			return "tensor<" + std::to_string(Dim) + ", " + type_to_string<T>::name() + ">";
-		}
-	};
-
-	// Elementwise addition
-	template <size_t Dim, class T>
-	tensor<Dim, T> ts_add(allocator * alloc, tensor<Dim, T> const& a, tensor<Dim, T> const& b)
-	{
-		KS_ASSERT(a.size() == b.size());
-		auto ret = tensor<Dim, T>::create(alloc, a.size());
-		const T* adata = a.data();
-		const T* bdata = b.data();
-		T* retdata = ret.data();
-
-		for (int i = 0, ne = a.num_elements(); i != ne; ++i)
-			retdata[i] = ts_add(alloc, adata[i], bdata[i]);
-		return ret;
-	}
-
-	template <class T>
-	T ts_scale(allocator * alloc, double s, T const& t);
-
-	// Scale a tensor
-	template <size_t Dim, class T>
-	tensor<Dim, T> ts_scale(allocator * alloc, double val, tensor<Dim, T> const& t)
-	{
-		auto ret = tensor<Dim, T>::create(alloc, t.size());
-		T* retdata = ret.data();
-		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
-			retdata[i] = ts_scale(alloc, val, t[i]);
-		return ret;
-	}
-
 	// sum of elements
 	template <size_t Dim, class T>
 	T sum(allocator * alloc, tensor<Dim, T> const& t)
@@ -1153,76 +1237,6 @@ namespace ks
 		for (int i = 2; i < ne; ++i)
 			ret = ts_add(alloc, ret, indata[i]);
 		return ret;
-	}
-
-	template <size_t Dim, class T>
-	std::ostream &operator<<(std::ostream &s, ks::tensor<Dim, T> const &v)
-	{
-		s << "[";
-		for (int i = 0; i < v.outer_dimension(); ++i)
-			s << (i > 0 ? ", " : "") << v[i];
-		return s << "]";
-	}
-
-	// ===============================  Primitives  ==================================
-
-	tuple<> shape(allocator_base *, bool const&) { return {}; }
-	tuple<> shape(allocator_base *, int const&) { return {}; }
-	tuple<> shape(allocator_base *, double const&) { return {}; }
-	tuple<> shape(allocator_base *, std::string const&) { return {}; }
-
-	template<size_t Dim, class T>
-	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
-		const T* indata = t.data();
-		tensor<Dim, decltype(shape(alloc, *indata))> s(alloc, t.size());
-		auto* outdata = s.data();
-		for (int ii = 0, ne = t.num_elements(); ii != ne; ++ii) {
-			outdata[ii] = shape(alloc, indata[ii]);
-		}
-		return s;
-	}
-
-	template<class TupleType, size_t... Indices>
-	auto shape_impl(allocator_base * alloc, TupleType const& t, std::index_sequence<Indices...>) {
-		return std::make_tuple(shape(alloc, std::get<Indices>(t))...);
-	}
-
-	template<class... Types>
-	auto shape(allocator_base * alloc, tuple<Types...> const& t) {
-		return shape_impl(alloc, t, std::index_sequence_for<Types...>{});
-	}
-
-	auto shape(allocator_base *) { return tuple<>{}; }
-
-	template<class T1, class T2, class... Ts>
-	auto shape(allocator_base * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
-		return std::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
-	}
-
-
-	template <class T>
-	T ts_scale(allocator *, double s, T const& t)
-	{
-		return s * t;
-	}
-
-	template <>
-	inline tuple<> ts_scale(allocator *, double s, tuple<> const& t)
-	{
-		return t;
-	}
-
-	template <class U0, class... Us>
-	auto ts_scale(allocator * alloc, double s, tuple<U0, Us...> const& t)
-	{
-		return prepend(ts_scale(alloc, s, head(t)),
-			ts_scale(alloc, s, tail(t)));
-	}
-
-	inline
-		int ts_scale(allocator *, int const& t1, int const& t2)
-	{
-		return t1 * t2;
 	}
 
 	template <class T>
@@ -1300,25 +1314,6 @@ namespace ks
 	inline double abs$af(allocator *, double d) { return d > 0 ? d : -d; }
 
 	inline double max$aff(allocator *, double a, double b) { return a > b ? a : b; }
-
-	inline int ts_neg(allocator *, int d) { return -d; }
-
-	inline double ts_neg(allocator *, double d) { return -d; }
-
-        inline tuple<> ts_neg(allocator *, tuple<> d) { return d; }
-
-        template <class U0, class... Us>
-        inline tuple<U0, Us...> ts_neg(allocator * alloc, tuple<U0, Us...> t) { return prepend(ts_neg(alloc, head(t)), ts_neg(alloc, tail(t))); }
-
-	template <size_t Dim, class T>
-	inline tensor<Dim, T> ts_neg(allocator * alloc, tensor<Dim, T> t) {
-		tensor<Dim, T> ret(alloc, t.size());
-		const T* indata = t.data();
-		T* outdata = ret.data();
-		for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-			outdata[i] = ts_neg(alloc, indata[i]);
-		}
-	}
 
 	inline int to_integer(int d) { return d; }
 
