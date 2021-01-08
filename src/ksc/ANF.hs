@@ -34,6 +34,7 @@ anfD def@(Def { def_rhs = rhs
            ; return (def { def_rhs = UserRhs expr' }) }
 
       EDefRhs{} -> return def
+      GDefRhs{} -> return def
       StubRhs{} -> return def
 
 -- anfExpr :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)

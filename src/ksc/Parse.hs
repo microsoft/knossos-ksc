@@ -146,7 +146,7 @@ langDef = Tok.LanguageDef
   , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~[]"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
-  , Tok.reservedNames   = [ "def", "edef", "rule"
+  , Tok.reservedNames   = [ "def", "edef", "gdef", "rule"
                           , "let", "if", "assert", "call", "tuple", ":", "$dummy"
                           , "Integer", "Float", "Vec", "Lam", "String", "true", "false"
                           ]
@@ -348,6 +348,16 @@ pEdef = do { pReserved "edef"
                          , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")
                          , def_rhs = EDefRhs }) }
 
+pGdef :: Parser (DefX Parsed)
+pGdef = do { pReserved "gdef"
+           ; name       <- pIdentifier
+           ; returnType <- pType
+           ; argTypes   <- pTypes
+           ; return (Def { def_fun = mk_fun name
+                         , def_res_ty = returnType
+                         -- See note [Function arity]
+                         , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "gdefArgVar")
+                         , def_rhs = GDefRhs }) }
 
 pDecl :: Parser Decl
 pDecl = parens $

@@ -58,6 +58,7 @@ data RhsX p
                         --   without having a RHS
 
   | EDefRhs             -- An external definition: no RHS
+  | GDefRhs             -- A generated definition: no RHS
 
 type TRhs  = RhsX Typed
 
@@ -963,6 +964,11 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
   = case rhs of
       EDefRhs -> parens $
                  sep [ text "edef", ppr f
+                     , pprParendType res_ty
+                     , parens (pprParendType (typeof vs)) ]
+
+      GDefRhs -> parens $
+                 sep [ text "gdef", ppr f
                      , pprParendType res_ty
                      , parens (pprParendType (typeof vs)) ]
 

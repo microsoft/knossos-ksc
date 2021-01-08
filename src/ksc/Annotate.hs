@@ -153,6 +153,7 @@ tvar t v = TVar t (fst (getLetBndr @p v))
 tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
 tcRhs _ EDefRhs _ = return EDefRhs
+tcRhs _ GDefRhs _ = return GDefRhs
 tcRhs fun (UserRhs rhs) res_ty
   = do { TE rhs' rhs_ty <- tcExpr rhs
        ; checkTypes res_ty rhs_ty $
