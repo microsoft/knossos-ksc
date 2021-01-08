@@ -402,7 +402,7 @@ newPipeline decls = do
 
                   ; let L.AD plan dir = mode
 
-                  ; (_env, mgradDef) <- gradDef plan env tdef
+                  ; (env, mgradDef) <- gradDef plan env tdef
 
                   ; gradDef <- case mgradDef of
                       Nothing -> fail ("Couldn't grad "
@@ -430,5 +430,8 @@ newPipeline decls = do
   ; let (rules, defs) = partitionDecls decls'
   ; let rulebase = mkRuleBase rules
   ; (_env, defs) <- optDefs rulebase env defs
+  -- Linting after opt because otherwise we need D$ functions in the
+  -- env
+  ; lintDefs "optDefs" env defs
   ; pure defs
   }
