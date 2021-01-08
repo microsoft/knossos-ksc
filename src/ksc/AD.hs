@@ -352,5 +352,8 @@ applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 
 applyD _ def = def
 
+applyDef :: ADDir -> TDef -> TDef
+applyDef = applyD
+
 applyDefs :: ADDir -> [TDef] -> [TDef]
-applyDefs dir = map (applyD dir)
+applyDefs dir = map (applyDef dir)
