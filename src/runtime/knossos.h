@@ -299,7 +299,7 @@ namespace ks
 	};
 
 	// ===============================  Zero  ==================================
-	// This template to be overloaded when e.g. a tensor of T needs to use val to discover a size
+	// Return a zero value with the same shape as the input value
 	template <class T>
 	T zero(allocator * alloc, T const& val)
 	{
@@ -597,11 +597,6 @@ namespace ks
 		static tensor<Dim, T> create(allocator_base * alloc, index_type size)
 		{
 			return tensor<Dim, T>(alloc, size);
-		}
-
-		T zero_element(allocator * alloc) const {
-			KS_ASSERT(num_elements() > 0);
-			return zero(alloc, data_[0]);
 		}
 
 		bool operator == (tensor const& other) const {
@@ -1105,9 +1100,9 @@ namespace ks
 	{
 		tensor<Dim, T> ret(alloc, val.size());
 		T* retdata = ret.data();
-		auto z = val.zero_element(alloc);
+		const T* indata = val.data();
 		for (int i = 0; i != ret.num_elements(); ++i) {
-			retdata[i] = z;
+			retdata[i] = zero(alloc, indata[i]);
 		}
 		return ret;
 	}
@@ -1157,7 +1152,7 @@ namespace ks
 	T sum(allocator * alloc, tensor<Dim, T> const& t)
 	{
 		int ne = t.num_elements();
-		if (ne == 0) { return zero(alloc, T{}); }
+		KS_ASSERT(ne > 0);
 
 		const T* indata = t.data();
 		if (ne == 1) return indata[0];
