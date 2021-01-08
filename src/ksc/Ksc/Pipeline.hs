@@ -362,25 +362,22 @@ genFuthark files file = do
 
 newPipeline :: [Decl] -> KM [TDef]
 newPipeline decls = do
-  { (env, ann_decls) <- annotDecls emptyGblST decls
-  ; let (rules, defs) = partitionDecls ann_decls
-  ; let rulebase      = mkRuleBase rules
-  ; lintDefs "Typechecked defs" env defs
-
-  ; let f :: GblSymTab -> TDef -> KM (GblSymTab, [TDef])
+  { let f :: GblSymTab -> L.TDecl -> KM (GblSymTab, [L.TDecl])
         f env = \case
+          -- Pass the rules on through
+          r@L.RuleDecl{} -> pure (env, [r])
           -- We shouldn't see stubs at this point
-          Def _ _ _ L.StubRhs -> fail "Didn't expect to see a stub"
+          DefDecl (Def _ _ _ L.StubRhs) -> fail "Didn't expect to see a stub"
           -- We don't emit edefs.  They exist just to get things into
           -- the env.
-          Def{ L.def_rhs = L.EDefRhs } -> pure (env, [])
+          DefDecl (Def{ L.def_rhs = L.EDefRhs }) -> pure (env, [])
           -- Existing defs just get passed straight through
-          d@Def{ L.def_rhs = L.UserRhs{} } -> pure (env, [d])
+          DefDecl d@Def{ L.def_rhs = L.UserRhs{} } -> pure (env, [DefDecl d])
           -- gdefs get looked up
-          Def { L.def_fun = fun
-              , L.def_pat = pat
-              , L.def_res_ty = _res_ty
-              , L.def_rhs = L.GDefRhs }
+          DefDecl Def{ L.def_fun = fun
+                     , L.def_pat = pat
+                     , L.def_res_ty = _res_ty
+                     , L.def_rhs = L.GDefRhs }
             -> do
             {
             ; let unsupported c = fail ("Can't handle " ++ c ++ " yet")
@@ -414,7 +411,7 @@ newPipeline decls = do
 
                   ; (_env, appliedDef) <- applyDef dir env gradDef
 
-                  ; pure (env, [appliedDef])
+                  ; pure (env, [DefDecl appliedDef])
                   }
 
                 L.ShapeFun{} -> unsupported "ShapeFun"
@@ -422,9 +419,16 @@ newPipeline decls = do
 
             }
 
-  ; (env, concat->defs) <- mapAccumLM f env defs
+  ; let g :: GblSymTab -> L.Decl -> KM (GblSymTab, [L.TDecl])
+        g env decl = do
+          { (env', tdecls) <- annotDecls env [decl]
+          ; (env', concat->tdecls') <- mapAccumLM f env' tdecls
+          ; pure (env', tdecls')
+          }
 
+  ; (env, concat->decls') <- mapAccumLM g emptyGblST decls
+  ; let (rules, defs) = partitionDecls decls'
+  ; let rulebase = mkRuleBase rules
   ; (_env, defs) <- optDefs rulebase env defs
-
   ; pure defs
   }
