@@ -320,14 +320,6 @@ optPrimFun _ "deltaVec" (Tuple [n, _i, val])
   | isKZero val
   = Just $ pConstVec n val
 
--- RULE: zero (Int) = 0
-optPrimFun _ "zero" (Konst (KInteger _))
-  = Just (Konst (KInteger 0))
-
--- RULE: zero (Float) = 0.0
-optPrimFun _ "zero" (Konst (KFloat _))
-  = Just (Konst (KFloat 0))
-
 optPrimFun _ "sum"         arg           = optSum arg
 optPrimFun _ "build"       (Tuple [sz, Lam i e2]) = optBuild sz i e2
 optPrimFun _ "sumbuild"    (Tuple [sz, Lam i e2]) = optSumBuild sz i e2
@@ -478,13 +470,6 @@ sumOfConstVec n v = case typeof v of
 
 -----------------------
 optBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
-
--- RULE: build sz (\i. <zero>)  =  <zero>
-{-
-optBuild _ _ e
-  | isKZero e
-  = Just $ pZero (.. the build)
--}
 
 -- RULE: build sz (\i. e) = constVec sz e
 --       (if i is not free in e)
