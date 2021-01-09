@@ -20,10 +20,9 @@ import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              def_fun, displayN, partitionDecls,
              ppr, renderSexp, (<+>))
 import qualified Lang as L
-import LangUtils (GblSymTab, emptyGblST)
+import LangUtils (GblSymTab, emptyGblST, extendGblST)
 import qualified Ksc.Futhark
 import Parse (parseF)
-import Prim (extendGblST)
 import Rules (RuleBase, mkRuleBase)
 import Opt (optDefs)
 import Shapes (shapeDefs)

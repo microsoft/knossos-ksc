@@ -5,9 +5,8 @@
 module Prim where
 
 import Lang
-import LangUtils (isTrivial, GblSymTab)
+import LangUtils (isTrivial)
 import GHC.Stack
-import qualified Data.Map as M
 import Data.Maybe
 
 --------------------------------------------
@@ -397,41 +396,6 @@ pMulff x1 x2 = userCall "mul" TypeFloat (Tuple [x1, x2])
 --  For each primitve, we give its type
 --  And this is the /only/ place we do this
 ---------------------------------------------
-
-stInsertFun :: TDef -> GblSymTab -> GblSymTab
-stInsertFun (Def { def_fun = f@(DrvFun _ (AD BasicAD Fwd))
-                 , def_pat = arg
-                 , def_rhs = GDefRhs
-                 , def_res_ty = res_ty }) =
-  let arg_ty = typeof arg
-      darg_ty = TypeTuple [arg_ty, tangentType arg_ty]
-      dres_ty = tangentType res_ty
-      def = Def { def_fun = f
-                -- v duplication with Parse (also it's pretty redundant)
-                , def_pat = VarPat (mkTVar darg_ty "gdefArgVar")
-                , def_rhs = GDefRhs
-                , def_res_ty = dres_ty
-                }
-  in M.insert (f, darg_ty) def
-stInsertFun (Def { def_fun = f@(DrvFun _ (AD BasicAD Rev))
-                 , def_pat = arg
-                 , def_rhs = GDefRhs
-                 , def_res_ty = res_ty }) =
-  let arg_ty = typeof arg
-      darg_ty = TypeTuple [arg_ty, tangentType res_ty]
-      dres_ty = tangentType arg_ty
-      def = Def { def_fun = f
-                -- v duplication with Parse (also it's pretty redundant)
-                , def_pat = VarPat (mkTVar darg_ty "gdefArgVar")
-                , def_rhs = GDefRhs
-                , def_res_ty = dres_ty
-                }
-  in M.insert (f, darg_ty) def
-
-stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (f, patType arg) def
-
-extendGblST :: GblSymTab -> [TDef] -> GblSymTab
-extendGblST = foldl (flip stInsertFun)
 
 primCallResultTy_maybe :: HasCallStack => Fun -> Type
                        -> Either SDoc Type
