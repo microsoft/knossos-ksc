@@ -4,7 +4,7 @@
 	     ScopedTypeVariables, TypeApplications, AllowAmbiguousTypes #-}
 
 module Annotate (
-  annotDecls, lintDefs
+  annotDecls, lintDefs, userCallDef_maybe
   ) where
 
 import Lang
@@ -276,11 +276,11 @@ callResultTy_maybe env fun args
 --     The typecheck monad
 -----------------------------------------------
 
-userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
-                       -> Type -> Either SDoc Type
-userCallResultTy_maybe fn env args
+userCallDef_maybe :: HasCallStack => Fun -> GblSymTab
+                  -> Type -> Either SDoc TDef
+userCallDef_maybe fn env args
   = case lookupGblST (fn, typeof args) env of
-      Just def -> userCallResultTy_help def args
+      Just def -> Right def
       Nothing  -> Left (text "Not in scope: userCall:"
                         <+> ppr fn <+> ppr (typeof args) $$ message)
         where message = if null similarEnv
@@ -294,6 +294,12 @@ userCallResultTy_maybe fn env args
                 editDistance (render (ppr fn)) (render (ppr envfn))
                 <= configEditDistanceThreshold
               editDistance = E.levenshteinDistance E.defaultEditCosts
+
+userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
+                       -> Type -> Either SDoc Type
+userCallResultTy_maybe fn env args = do
+  { def <- userCallDef_maybe fn env args
+  ; userCallResultTy_help def args }
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
