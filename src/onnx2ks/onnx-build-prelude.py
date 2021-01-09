@@ -73,22 +73,21 @@ def onnxType_to_Type_with_mangler(ty : str):
     Convert ty to KS type, and record any transformations (E.g. Complex->(Tuple Float Float)) in "mangler"
     """
     if ty.startswith('tensor('):
-        # tensor -> Vec for now, but see great renaming
         assert ty.endswith(')')
         mangler,elty = onnxType_to_Type_with_mangler(ty[7:-1])
-        return mangler, Type.Vec(elty)
+        return mangler, Type.Tensor(-1, elty)
 
     if ty.startswith('seq('):
         # seq -> Vec
         assert ty.endswith(')')
         mangler,elty = onnxType_to_Type_with_mangler(ty[4:-1])
-        return "seq$"+mangler, Type.Vec(elty)
+        return "seq$"+mangler, Type.Tensor(1, elty)
 
     if ty.startswith('map('):
         # map -> Vec Tuple
         assert ty.endswith(')')
         mangler,elty = onnxType_to_Type_with_mangler("tuple(" + ty[4:-1] + ")")
-        return "map$"+mangler, Type.Vec(elty)
+        return "map$"+mangler, Type.Tensor(1, elty)
 
     if ty.startswith('tuple('):
         assert ty.endswith(')')
@@ -216,25 +215,25 @@ def onnx_schemas_to_prelude(prelude : TextIO):
         if s.name == "ConcatFromSequence":
             # Onnx type constraints can't express S: seq<'t> -> T: 't
             def ConcatFromSequence_type(tys):
-                return Type.Index(tys[0])
+                return tys[0].tensor_elem_type
             out_type_from_sig = lambda tys: ConcatFromSequence_type(tys)
 
         if s.name == "DictVectorizer":
             def DictVectorizer_type(tys):
                 # Vec (Tuple key value)
-                kv = Type.Index(tys[0])
-                value_ty = kv.children[1]
-                return Type.Vec(value_ty)
+                kv = tys[0].tensor_elem_type
+                value_ty = kv.tuple_elem(1)
+                return Type.Tensor(1, value_ty)
             out_type_from_sig = lambda tys: DictVectorizer_type(tys)
 
         if s.name == "SplitToSequence":
-            out_type_from_sig = lambda tys: Type.Vec(tys[0])
+            out_type_from_sig = lambda tys: Type.Tensor(1, tys[0])
 
         if s.name == "SequenceAt":
-            out_type_from_sig = lambda tys: Type.Index(tys[0])
+            out_type_from_sig = lambda tys: tys[0].tensor_elem_type
 
         if s.name == "SequenceConstruct":
-            out_type_from_sig = lambda tys: Type.Vec(tys[0])
+            out_type_from_sig = lambda tys: Type.Tensor(1, tys[0])
 
         # SequenceAt, SequenceConstruct, SequenceEmpty, NonMaxSuppression, TreeEnsembleRegressor
 

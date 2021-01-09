@@ -25,8 +25,12 @@ import warnings
 
 import numpy as np
 
-import onnx, onnx.numpy_helper, onnx.helper
+import onnx
 from onnx import TensorProto, AttributeProto
+
+import onnx.numpy_helper
+import onnx.helper
+import onnx.optimizer
 
 import onnxruntime.capi.onnxruntime_pybind11_state as ort
 from   onnxruntime.capi.onnxruntime_pybind11_state.schemadef import OpSchema
@@ -58,11 +62,11 @@ ATTR_TYPE_TO_KS_TYPE = {
     OpSchema.AttrType.FLOAT: Type.Float,
     OpSchema.AttrType.INT: Type.Integer,
     OpSchema.AttrType.STRING: Type.String,
-    OpSchema.AttrType.TENSOR: Type.Vec(Type.Float),
-    OpSchema.AttrType.FLOATS: Type.Vec(Type.Float),
-    OpSchema.AttrType.INTS: Type.Vec(Type.Integer),
-    OpSchema.AttrType.STRINGS: Type.Vec(Type.String),
-    OpSchema.AttrType.TENSORS: Type.Vec(Type.Vec(Type.Float)),
+    OpSchema.AttrType.TENSOR: Type.Tensor(-1, Type.Float),
+    OpSchema.AttrType.FLOATS: Type.Tensor(1, Type.Float),
+    OpSchema.AttrType.INTS: Type.Tensor(1, Type.Integer),
+    OpSchema.AttrType.STRINGS: Type.Tensor(1, Type.String),
+    OpSchema.AttrType.TENSORS: Type.Tensor(1, Type.Tensor(-1, Type.Float)),
     OpSchema.AttrType.GRAPH: Type.Lam(None, None)
 }
 
@@ -105,9 +109,10 @@ def onnxTensorType_to_Type(ety):
         return ty
     raise NotImplementedError(f"type {ety}")
 
-def onnxTensorElementType_to_Type(proto):
+def onnxType_to_Type(proto):
     ety = onnxTensorType_to_Type(proto.tensor_type.elem_type)
-    return Type.Vec(ety)
+    rank = len(proto.tensor_type.shape.dim)
+    return Type.Tensor(rank, ety)
 
 def get_value(init):
     """
@@ -141,9 +146,9 @@ def get_value(init):
 
 def mkVec(val):
     if isinstance(val, (list, np.ndarray)):
-        return Call("vec", [Const(v) for v in val])
+        return Call("Vec_init", [Const(v) for v in val])
     else:
-        return Call("vec", [Const(val)])
+        return Call("Vec_init", [Const(val)])
 
 def exprFromTensorProto(val, name):
     """
@@ -200,7 +205,7 @@ def get_attribute_default_value(attr):
     if ty.is_scalar:
         return exprFromAttrVal(val)
     
-    if ty.is_vec:
+    if ty.is_tensor:
         assert isinstance(val, list)
         if isinstance(val[0], bytes):
             val = [v.decode("ascii") for v in val]
@@ -263,11 +268,22 @@ def onnx2ks(g):
     Convert ONNX graph g into Knossos Expr.
     """
 
+    # names_to_value_infos = {x.name:x.type for x in g.value_info}
+
     schemas = get_all_schemas()
+
+    # Innermost body is "outputs"
+    output_vars = [useVar(o.name) for o in g.output]
+    output_types = tuple(onnxType_to_Type(o.type) for o in g.output)
+    if len(g.output) == 1:
+        body = output_vars[0]
+        body_type = output_types[0]
+    else:
+        body = Call("tuple", output_vars)
+        body_type = Type.Tuple(*output_types)
 
     # ONNX graph nodes are topologically sorted, so just run through in reverse order
     # making a chain of lets.
-    body = None
     for node in reversed(g.node):
         opname = node.op_type if not node.domain else node.domain + "." + node.op_type 
         found_schema = opname in schemas
@@ -339,13 +355,6 @@ def onnx2ks(g):
         if len(vars) == 1:
             vars = vars[0]
 
-        # First time round, this is the innermost body (or the last node in the graph): just reference the output vars
-        if body == None:
-            if isinstance(vars, Var):
-                body = vars
-            else:
-                body = Call("tuple", vars)
-
         # Rest of the time, wrap previous body in a Let
         body = Let(vars, rhs, body)
 
@@ -362,14 +371,14 @@ def onnx2ks(g):
             internal_inits.append(init)
 
     # value_infos -> types
-    args = [defVar(i.name, onnxTensorElementType_to_Type(i.type)) for i in g.input]
+    args = [defVar(i.name, onnxType_to_Type(i.type)) for i in g.input]
 
     body = Let(Var("$beg_of_internal_inits #|Begin of internal initializers|# "), Const(99999), body)
     ex = emit_inits(internal_inits, body)
 
     # Emit a def for the whole graph
     #    (def GraphName None args body)
-    decl = Def(g.name, None, args, ex)
+    decl = Def(g.name, body_type, args, ex)
 
     # And emit a "main" to call it with initializers
     # (def main None () 
@@ -377,7 +386,7 @@ def onnx2ks(g):
     main_body = Call(g.name, [useVar(i.name) for i in g.input])
     input_inits = [inits[i.name] for i in g.input if i.name in inits]
     main_args = [arg for arg in args if arg.name not in inits]
-    main = Def("main", None, main_args, emit_inits(input_inits, main_body))
+    main = Def("main", body_type, main_args, emit_inits(input_inits, main_body))
 
     # Collect the two decls 
     return [decl, main]
@@ -392,8 +401,8 @@ if __name__ == "__main__":
     if len(argv) == 1:
         os.makedirs('obj/test/onnx2ks', exist_ok=True)
         argv = ['*EXE*', 
-            #'test/onnx2ks/mnist-7.onnx', 
-            'test/onnx2k/bert-tiny-uncased_L_3_H_128_A_2_V_30528_S_512_Dp_0.1_optimized_layer_norm_opset12.onnx',
+            'test/onnx2ks/mnist-7.onnx', 
+            #'test/onnx2k/bert-tiny-uncased_L_3_H_128_A_2_V_30528_S_512_Dp_0.1_optimized_layer_norm_opset12.onnx',
             'obj/']
 
     nargs = len(argv) - 1
@@ -408,7 +417,7 @@ if __name__ == "__main__":
         if outbase.endswith("/"):
             outbase = outbase + re.sub(r'\.onnx$','',filename)
 
-    type_propagate = True
+    type_propagate = False # Let's use onnx shape inference
 
     def save(decls, ofn, msg):
         print(f"onnx2ks: Writing to {ofn}")
@@ -432,6 +441,12 @@ if __name__ == "__main__":
         out.write(onnx.helper.printable_graph(model.graph))
 
     # Convert to untyped KS
+    model = onnx.shape_inference.infer_shapes(model)
+
+    if False:
+        # Trying to fix non-topological sort from 
+        onnx.optimizer.optimize(model, ["extract_constant_to_initializer"]) 
+        onnx.checker.check_model(model)
     decls = onnx2ks(model.graph)
 
     if outbase:

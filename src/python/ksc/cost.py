@@ -4,8 +4,8 @@ from ksc.utils import translate_and_import
 def shape_from_type(arg_type, assumed_vector_size=100):
     if arg_type.is_tuple:
         return tuple(shape_from_type(c) for c in arg_type.children)
-    if arg_type.is_vec:
-        child_shape = shape_from_type(arg_type.children[0])
+    if arg_type.is_tensor:
+        child_shape = shape_from_type(arg_type.children[1])
         return (assumed_vector_size,) + child_shape
     else:
         return ()
