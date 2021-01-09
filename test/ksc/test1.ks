@@ -3,8 +3,12 @@
 (def a Float ((x : Float))
     (mul 3.0 x))
 
+(gdef rev$a Float (Float))
+
 (def b Float ((y : Float))
     (mul 2.0 y))
+
+(gdef rev$b Float (Float))
 
 (def g Float ((x : Float) (y : Float))
     (mul x y))

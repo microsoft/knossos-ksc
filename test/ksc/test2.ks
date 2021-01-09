@@ -5,6 +5,8 @@
         (mul (if (lt i 3) (add x 1.0) (mul 7.0 (to_float i))) y)
 )
 
+(gdef fwd$f1 Float (Float Float Integer))
+
 (def f2 Float ((x : Vec Float) (y : Vec Float) (i : Integer) )
         (mul (if (lt i 3) (index i x) 7.0) (index i y))
 )

@@ -7,6 +7,9 @@
 (def constVec_Float (Vec Float) ((n : Integer) (v : Float))
     (constVec n v))
 
+(gdef fwd$constVec_Float (Vec Float) (Integer Float))
+(gdef rev$constVec_Float (Vec Float) (Integer Float))
+
 (def constVec_VecFloat (Vec (Vec Float)) ((n : Integer) (v : (Vec Float)))
     (constVec n v))
 
@@ -21,6 +24,10 @@
     
 (def deltaVec_Float (Vec Float) ((n : Integer) (i : Integer) (v : Float))
     (deltaVec n i v))
+
+(gdef rev$deltaVec_Float (Vec Float) (Integer Integer Float))
+
+(gdef fwd$deltaVec_Float (Vec Float) (Integer Integer Float))
 
 (def deltaVec_VecFloat (Vec (Vec Float)) ((n : Integer) (i : Integer) (v : (Vec Float)))
     (deltaVec n i v))
@@ -64,6 +71,9 @@
          (mul (mul (sum vf) (index 0 sinv2))
             (sumbuild (size constVec2) (lam (i : Integer)
                 (mul (index i constVec2) (cos (add 0.5 (to_float i)))))))))))))))))
+
+(gdef fwd$testfunc Float (Float Float))
+(gdef rev$testfunc Float (Float Float))
 
 (def main Integer ()
      (let (seed 20000)

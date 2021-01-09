@@ -8,6 +8,9 @@
     ($trace (mul x x))
 )
 
+(gdef fwd$f Float (Float))
+(gdef rev$f Float (Float))
+
 (def g Float ((n : Integer) (m : Integer))
   (to_float (mul n m)))
 

@@ -5,6 +5,9 @@
         x 
         (mul x (f (sub n 1) x))))
 
+(gdef fwd$f Float (Integer Float))
+(gdef rev$f Float (Integer Float))
+
 (def main Integer ()
     (let ((n 7)
           (x 1.31))

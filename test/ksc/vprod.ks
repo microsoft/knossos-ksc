@@ -5,6 +5,8 @@
            1.0
            (mul (index i v) (vprod (add i 1) v))))
 
+(gdef rev$vprod Float (Integer (Vec Float)))
+
 (def aprod Float ( (i : Integer) (v : Vec Float) (acc : Float) )
        (if (eq i (size v))
            acc
@@ -18,6 +20,8 @@
                   (mul acc x)))
            1.0
            v))
+
+(gdef rev$fprod Float ((Vec Float)))
 
 (edef $BENCH Float ((Lam (Tuple) Float)))
 (def vchomp Float (_ : (Tuple (Tuple) (Vec Float))) 1.0)

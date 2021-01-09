@@ -22,6 +22,9 @@
            1.0
            v))
 
+(gdef fwd$prod_fold Float ((Vec Float) (Float)))
+(gdef rev$prod_fold Float ((Vec Float) (Float)))
+
 ;; Check that it works with an environment type that isn't its own
 ;; tangent type
 (def prod_fold_integer_env Float ((v : Vec Float) (ignored : Integer))
