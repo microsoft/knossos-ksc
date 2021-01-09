@@ -541,7 +541,8 @@ namespace ks
                 // allocate and copy because we have no guarantee
                 // that the std::vector will not mutate or vanish
                 // beneath our feet.
-		tensor(allocator_base * alloc, std::vector<T> const& that) : tensor{ alloc, that.size() }
+		tensor(allocator_base * alloc, std::vector<T> const& that) : 
+			tensor{ alloc, tensor_dimension<1>::index_type(that.size()) }
 		{
 			static_assert(Dim == 1);
 			// Copying from std vector - allocate.
