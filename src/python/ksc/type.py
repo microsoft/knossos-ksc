@@ -32,7 +32,7 @@ class Type:
             assert all((ch is None or isinstance(ch, Type)) for ch in children)
         
         self.kind = kind
-        self.children = children
+        self.children = children # TODO: change to _children and use tuple_elem or tensor_* or lambda_* to access
 
     ################
     ## Constructors
@@ -195,9 +195,9 @@ class Type:
         """
         if isinstance(val, (bool, np.bool)):
             return Type.Bool
-        if isinstance(val, (int, np.integer)):
+        if isinstance(val, (int, np.integer, np.int32, np.int64)):
             return Type.Integer
-        if isinstance(val, (float, np.float)):
+        if isinstance(val, (float, np.float, np.float32, np.float64)):
             return Type.Float
         if isinstance(val, str):
             return Type.String
