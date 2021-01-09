@@ -367,7 +367,7 @@ newPipeline decls = do
           -- Pass the rules on through
           r@L.RuleDecl{} -> pure (env, [r])
           -- We shouldn't see stubs at this point
-          DefDecl (Def _ _ _ L.StubRhs) -> fail "Didn't expect to see a stub"
+          DefDecl (Def{ L.def_rhs = L.StubRhs }) -> fail "Didn't expect to see a stub"
           -- We don't emit edefs.  They exist just to get things into
           -- the env.
           DefDecl (Def{ L.def_rhs = L.EDefRhs }) -> pure (env, [])
