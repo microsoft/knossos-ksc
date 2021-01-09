@@ -6,7 +6,7 @@
 
 module Ksc.Pipeline where
 
-import Annotate (annotDecls, lintDefs)
+import Annotate (annotDecls, lintDefs, userCallDef_maybe)
 import AD (gradDefs, applyDefs,gradDef,applyDef)
 import ANF (anfDefs)
 import qualified Cgen
@@ -18,9 +18,9 @@ import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
              FunId(UserFun), TDef, Pretty,
              def_fun, displayN, partitionDecls,
-             ppr, renderSexp)
+             ppr, renderSexp, (<+>))
 import qualified Lang as L
-import LangUtils (GblSymTab, emptyGblST, lookupGblST)
+import LangUtils (GblSymTab, emptyGblST)
 import qualified Ksc.Futhark
 import Parse (parseF)
 import Prim (extendGblST)
@@ -367,7 +367,11 @@ newPipeline decls = do
           -- Pass the rules on through
           r@L.RuleDecl{} -> pure (env, [r])
           -- We shouldn't see stubs at this point
-          DefDecl (Def{ L.def_rhs = L.StubRhs }) -> fail "Didn't expect to see a stub"
+          DefDecl (Def{ L.def_rhs = L.StubRhs, L.def_fun = fun })
+            -> do
+            L.printK (L.vcat [ L.text "The impossible happened!  The body of the function was a stub."
+                             , L.text "In the gdef of: " <+> ppr fun ])
+            error "Exiting"
           -- We don't emit edefs.  They exist just to get things into
           -- the env.
           DefDecl (Def{ L.def_rhs = L.EDefRhs }) -> pure (env, [])
@@ -380,33 +384,27 @@ newPipeline decls = do
                      , L.def_rhs = L.GDefRhs }
             -> do
             {
-            ; let unsupported c = fail ("Can't handle " ++ c ++ " yet")
-            ; let err c = fail ("gdef for " ++ c ++ " doesn't make sense")
+            ; let unsupported c = fail ("Can't gdef " ++ c ++ " yet")
 
             ; case fun of
                 L.GradFun{} -> unsupported "GradFun"
                 L.DrvFun funId mode -> do
-                  { funName <- case funId of
-                      L.PrimFun{} -> err "DrvFun PrimFun"
-                      L.SelFun{} -> err "DrvFun SelFun"
-                      UserFun funName' -> pure funName'
-
-                  ; tdef <- case lookupGblST (Fun (L.UserFun funName),
-                                              L.typeof pat) env of
-                      -- Handle this error better
-                      Nothing -> fail ("Missing function: "
-                                       ++ show (funName, L.typeof pat)
-                                       ++ "\n"
-                                       ++ show (ppr env))
-                      Just tdef' -> pure tdef'
+                  { tdef <- case userCallDef_maybe (Fun funId) env (L.typeof pat) of
+                      Left msg -> do
+                        { L.printK (L.vcat [ L.text "Error when attempting to gdef"
+                                           , msg ])
+                        ; error "Exiting" }
+                      Right tdef' -> pure tdef'
 
                   ; let L.AD plan dir = mode
 
                   ; (env, mgradDef) <- gradDef plan env tdef
 
                   ; gradDef <- case mgradDef of
-                      Nothing -> fail ("Couldn't grad "
-                                       ++ show (funName, L.typeof pat))
+                      Nothing -> do
+                        { L.printK (L.vcat [ L.text "Couldn't grad"
+                                         , L.text "In gdef for: " <+> ppr fun <+> ppr (L.typeof pat) ])
+                        ; error "Exiting" }
                       Just gradDef' -> pure gradDef'
 
                   ; (_env, appliedDef) <- applyDef dir env gradDef
@@ -415,8 +413,10 @@ newPipeline decls = do
                   }
 
                 L.ShapeFun{} -> unsupported "ShapeFun"
-                L.Fun{} -> err "Fun"
-
+                L.Fun{} -> do
+                  { L.printK (L.vcat [ L.text "I was asked to gdef a UserFun but that doesn't make sense"
+                                     , L.text "UserFun:" <+> ppr fun <+> ppr (L.typeof pat) ])
+                  ; error "Exiting" }
             }
 
   ; let g :: GblSymTab -> L.Decl -> KM (GblSymTab, [L.TDecl])
