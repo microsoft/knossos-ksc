@@ -359,11 +359,14 @@ isUserFun = \case
   PrimFun{} -> False
   SelFun{}  -> False
 
-isSelFun :: FunId -> Bool
-isSelFun = \case
-  UserFun{} -> False
-  PrimFun{} -> False
-  SelFun{}  -> True
+isDirectlySelFun :: Fun -> Bool
+isDirectlySelFun = \case
+  Fun (SelFun{})  -> True
+  Fun (UserFun{}) -> False
+  Fun (PrimFun{}) -> False
+  DrvFun{}        -> False
+  GradFun{}       -> False
+  ShapeFun{}      -> False
 
 funIdOfFun :: Fun -> FunId
 funIdOfFun = \case

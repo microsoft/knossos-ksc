@@ -413,7 +413,7 @@ cgenExprWithoutResettingAlloc env = \case
     v        <- freshCVar
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
-    let cargs = case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
+    let cargs = case (not (isDirectlySelFun fun), getExpr cgvs, cgargtype) of
                   -- Untuple argument for C++ call
                   --
                   -- Calls of a tuple argument have their argument list
