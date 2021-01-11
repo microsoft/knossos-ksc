@@ -1,6 +1,21 @@
 // C++ "runtime" for Knossos
 #pragma once
 
+/*
+Contents:
+- Utils
+- Allocator
+- Tensor class
+- Shape
+- Inflated deep copy
+- Copydown
+- Zero
+- Inplace add
+- Tangent-space arithmetic
+- Build, Sumbuild, Fold
+- Other primitives
+*/
+
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -33,8 +48,6 @@ namespace ks {
 		throw expr;
 	}
 };
-
-// ======================== Extra math =====================
 
 namespace ks
 {
