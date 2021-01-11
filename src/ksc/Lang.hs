@@ -359,6 +359,9 @@ isUserFun = \case
   PrimFun{} -> False
   SelFun{}  -> False
 
+isUltimatelyUserFun :: Fun -> Bool
+isUltimatelyUserFun = isUserFun . funIdOfFun
+
 isDirectlySelFun :: Fun -> Bool
 isDirectlySelFun = \case
   Fun (SelFun{})  -> True
