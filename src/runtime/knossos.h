@@ -330,13 +330,6 @@ namespace ks
 		return prepend(zero(alloc, head(val)), zero(alloc, tail(val)));
 	}
 
-	// Zero of multiple args is a tuple
-	template <class T1, class T2, class... Ts>
-	tuple<T1, T2, Ts...> zero(allocator * alloc, T1 const& t1, T2 const& t2, Ts const&... ts) 
-	{
-		return zero(alloc, std::make_tuple(t1, t2, ts...));
-	}
-
 	// ===============================  Inflated deep copy  ==================================
 
 	template <class T>
