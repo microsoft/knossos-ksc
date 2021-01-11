@@ -578,9 +578,9 @@ optSumBuild _ _ _ = Nothing
 
 -----------------------
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
-                           -> Type -> FunId -> TExpr -> Maybe TExpr
+                           -> Type -> Fun -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun _ _ _ (UserFun {}) _
+optGradFun _ _ _ (Fun (UserFun {})) _
   = Nothing
 
 -- From here on we have primitives or selection
@@ -590,14 +590,19 @@ optGradFun env TupleAD ty f args
   , Just opt_grad <- optGradFun env BasicAD lm_ty f new_args
   = Just $
     mkLets binds $
-    Tuple [ Call (TFun res_ty (Fun f)) new_args, opt_grad ]
+    Tuple [ Call (TFun res_ty f) new_args, opt_grad ]
   | otherwise
   = Nothing
   where
     (binds, [new_args]) = makeAtomic False env [args]
 
-optGradFun _ BasicAD  _ (SelFun i n) args = optGradSel  i n args
-optGradFun _ BasicAD ty (PrimFun f)  args = optGradPrim ty f args
+optGradFun _ BasicAD  _ (Fun (SelFun i n)) args = optGradSel  i n args
+optGradFun _ BasicAD ty (Fun (PrimFun f))  args = optGradPrim ty f args
+
+-- We don't make any attempt to optimise these.  That's probably fine.
+optGradFun _ _ _ (GradFun{}) _ = Nothing
+optGradFun _ _ _ (DrvFun{}) _ = Nothing
+optGradFun _ _ _ (ShapeFun{}) _ = Nothing
 
 type TBinds = [(TVar, TExpr)]
 
@@ -671,8 +676,8 @@ optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
 
 
 -----------------------
-optDrvFun :: HasCallStack => ADMode -> FunId -> TExpr -> Maybe TExpr
-optDrvFun (AD BasicAD dir) (PrimFun f) args = optDrvPrim dir f args
+optDrvFun :: HasCallStack => ADMode -> Fun -> TExpr -> Maybe TExpr
+optDrvFun (AD BasicAD dir) (Fun (PrimFun f)) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
 optDrvPrim :: HasCallStack => ADDir -> PrimFun -> TExpr -> Maybe TExpr

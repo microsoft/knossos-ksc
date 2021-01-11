@@ -347,8 +347,8 @@ data FunId = UserFun String   -- UserFuns have a Def
            deriving( Eq, Ord, Show )
 
 data Fun = Fun      FunId         -- The function              f(x)
-         | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
-         | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
+         | GradFun  Fun ADPlan    -- Full Jacobian Df(x)
+         | DrvFun   Fun ADMode    -- Derivative derivative f'(x,dx)
                                   --   Rev <=> reverse mode f`(x,dr)
          | ShapeFun Fun
          deriving( Eq, Ord, Show )
@@ -362,8 +362,8 @@ isUserFun = \case
 isUltimatelyUserFun :: Fun -> Bool
 isUltimatelyUserFun = \case
   Fun f       -> isUserFun f
-  GradFun f _ -> isUserFun f
-  DrvFun f _  -> isUserFun f
+  GradFun f _ -> isUltimatelyUserFun f
+  DrvFun f _  -> isUltimatelyUserFun f
   ShapeFun f  -> isUltimatelyUserFun f
 
 isDirectlySelFun :: Fun -> Bool

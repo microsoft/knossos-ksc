@@ -17,8 +17,7 @@ import Data.Maybe (mapMaybe, fromMaybe)
 --------------- Generate names for gradded indentifiers
 
 gradF :: HasCallStack => ADPlan -> Fun -> Fun
-gradF adm (Fun f) = GradFun f adm
-gradF _   f       = error ("gradF: bad function: " ++ show f)
+gradF adm f       = GradFun f adm
 
 gradV :: ADPlan -> Var -> Var
 gradV adp (Simple x) = Grad x adp
