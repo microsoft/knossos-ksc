@@ -360,7 +360,11 @@ isUserFun = \case
   SelFun{}  -> False
 
 isUltimatelyUserFun :: Fun -> Bool
-isUltimatelyUserFun = isUserFun . funIdOfFun
+isUltimatelyUserFun = \case
+  Fun f       -> isUserFun f
+  GradFun f _ -> isUserFun f
+  DrvFun f _  -> isUserFun f
+  ShapeFun f  -> isUltimatelyUserFun f
 
 isDirectlySelFun :: Fun -> Bool
 isDirectlySelFun = \case
@@ -370,13 +374,6 @@ isDirectlySelFun = \case
   DrvFun{}        -> False
   GradFun{}       -> False
   ShapeFun{}      -> False
-
-funIdOfFun :: Fun -> FunId
-funIdOfFun = \case
-  Fun f       -> f
-  GradFun f _ -> f
-  DrvFun f _  -> f
-  ShapeFun f  -> funIdOfFun f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
