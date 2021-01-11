@@ -12,7 +12,7 @@ data CLExpr
   = CLId
   | CLPrune [Int] Int CLExpr         -- ?
   | CLKonst Konst
-  | CLCall Type FunId            -- The Type is the result type
+  | CLCall Type Fun              -- The Type is the result type
   | CLComp CLExpr CLExpr         -- Composition
   | CLTuple [CLExpr]             -- Tuple
   | CLIf CLExpr CLExpr CLExpr    -- If
@@ -175,15 +175,9 @@ to_cl_call pruned env f e
       Pruned    ->
         CLFold t (toCLExpr (t:env) body) (toCLExpr env acc) (toCLExpr env v)
 
-  | TFun ty (Fun fun_id) <- f
-  = CLCall ty fun_id `mkCLComp` to_cl_expr pruned env e
+  | TFun ty fun <- f
+  = CLCall ty fun `mkCLComp` to_cl_expr pruned env e
 
-  | TFun _ (GradFun _ _) <- f
-  = pprPanic "toCLExpr Call of GradFun" (ppr call)
-  | TFun _ (DrvFun _ _) <- f
-  = pprPanic "toCLExpr Call of DrvFun" (ppr call)
-  | TFun _ (ShapeFun _) <- f
-  = pprPanic "toCLExpr Call of ShapeFun" (ppr call)
   where
     call = Call f e
 
@@ -253,11 +247,11 @@ fromCLExpr is arg (CLIf b t e)     = If (fromCLExpr is arg b)
                                         (fromCLExpr is arg e)
 
 fromCLExpr _  arg (CLCall ty f)
-  = Call (TFun ty (Fun f)) (mkTuple arg)
+  = Call (TFun ty f) (mkTuple arg)
 
 fromCLExpr is arg (CLComp e1 e2)
   | CLCall ty f <- e1   -- Shortcut to avoid an unnecessary let
-  = Call (TFun ty (Fun f)) (fromCLExpr is arg e2)
+  = Call (TFun ty f) (fromCLExpr is arg e2)
   | otherwise
   = mkTempLet is "ax" (fromCLExpr is arg e2) $ \ is v2 ->
     fromCLExpr is [v2] e1
