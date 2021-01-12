@@ -321,11 +321,8 @@ userCallResultTy_help (Def { def_fun  = fn
                            , def_res_ty = ret_ty
                            , def_pat = pat })
                       args
-  = check_args bndr_tys arg_tys
+  = check_args (patType pat) (typeof args)
   where
-    bndr_tys = patType pat
-    arg_tys  = typeof args
-
     check_args :: Type -> Type -> Either SDoc Type
     check_args bndr_ty arg_ty
       | bndr_ty `compatibleType` arg_ty
