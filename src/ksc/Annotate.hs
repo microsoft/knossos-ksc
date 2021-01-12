@@ -278,7 +278,7 @@ userCallResultTy_maybe fn env args
       Just def -> userCallResultTy_help def args
       Nothing  -> Left (text "Not in scope: userCall:"
                         <+> ppr fn <+> ppr (typeof args) $$ message)
-        where message = ppr env
+        where message = ppr (Map.keys env)
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
