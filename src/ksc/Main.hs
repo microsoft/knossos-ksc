@@ -40,6 +40,8 @@ main = do
   System.Environment.getArgs >>= \args -> case args of
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
+    ["--test-windows", "--fs-test", fsTest]
+      -> testWindowsWithfsTest fsTest
     ["--test-except-codegen"]
       -> do { _ <- testsThatDoNoCodegen; return () }
     [ "--profile",
