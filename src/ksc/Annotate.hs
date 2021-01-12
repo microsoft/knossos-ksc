@@ -277,7 +277,8 @@ userCallResultTy_maybe fn env args
   = case lookupGblST (fn, typeof args) env of
       Just def -> userCallResultTy_help def args
       Nothing  -> Left (text "Not in scope: userCall:"
-                        <+> ppr fn <+> ppr (typeof args) $$ ppr env)
+                        <+> ppr fn <+> ppr (typeof args) $$ message)
+        where message = ppr env
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
