@@ -118,5 +118,11 @@ jobs:
   - script: src\ksc\Main.exe obj\test\out.ks
     displayName: 'ksc test [userTest]'
 
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathToPublish: C:\ProgramData\chocolatey\logs\
+      artifactName: Artifact
+      targetPath: Artifact
+
   - script: rm -rf *
     displayName: 'Clean'
