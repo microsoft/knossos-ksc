@@ -92,37 +92,17 @@ jobs:
     vmImage: 'vs2017-win2016'
 
   steps:
-  - task: UseDotNet@2
-    inputs:
-      version: 3.1.100
-
   - task: PowerShell@2
     inputs:
       targetType: 'filePath'
       filePath: .\test\builds\mkdirs.ps1
     displayName: 'Make directories [userInstall]'
 
-  - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj\test\out.ks .\test\f2k\test0.fs
-    env:
-      # v Otherwise it wastes a bunch of time caching
-      # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
-      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-    displayName: 'F# to KS [userTest]'
-
   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
     displayName: 'Install dependencies [userInstall]'
-
-  - script: refreshenv && ghc -main-is testWindows -isrc/ksc -Werror -Wunused-imports -Wunused-top-binds -Wmissing-signatures src/ksc/Main.hs
-    displayName: 'GHC compile src/ksc/Main.hs [userTest]'
-
-  - script: src\ksc\Main.exe obj\test\out.ks
-    displayName: 'ksc test [userTest]'
 
   - task: PublishBuildArtifacts@1
     inputs:
       pathToPublish: C:\ProgramData\chocolatey\logs\
       artifactName: Artifact
       targetPath: Artifact
-
-  - script: rm -rf *
-    displayName: 'Clean'
