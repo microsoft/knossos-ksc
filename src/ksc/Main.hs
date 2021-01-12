@@ -115,11 +115,6 @@ testWindowsWithfsTest fsTestKs = do
   let compiler = "g++"
   testC compiler [fsTestKs]
 
-testWindows :: IO ()
-testWindows = do
-  [fsTestKs] <- System.Environment.getArgs
-  testWindowsWithfsTest fsTestKs
-
 ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do
   let last n xs = drop (length xs - n) xs
