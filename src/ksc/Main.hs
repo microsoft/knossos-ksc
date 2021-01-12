@@ -108,11 +108,15 @@ testWithfsTest fsTestKs = do
   let compiler = "g++-7"
   testC compiler [fsTestKs]
 
+testWindowsWithfsTest :: String -> IO ()
+testWindowsWithfsTest fsTestKs = do
+  let compiler = "g++"
+  testC compiler [fsTestKs]
+
 testWindows :: IO ()
 testWindows = do
-  let compiler = "g++"
   [fsTestKs] <- System.Environment.getArgs
-  testC compiler [fsTestKs]
+  testWindowsWithfsTest fsTestKs
 
 ksTestFiles :: String -> IO [String]
 ksTestFiles testDir = do
