@@ -322,19 +322,18 @@ userCallResultTy_help (Def { def_fun  = fn
                            , def_pat = pat })
                       args
   = case check_args bndr_tys arg_tys of
-      Just err -> Left err
-      Nothing  -> Right ret_ty
+      Left err -> Left err
+      Right () -> Right ret_ty
   where
     bndr_tys = patType pat
     arg_tys  = typeof args
 
-    check_args :: Type -> Type -> Maybe SDoc
-    -- Return (Just err) if there's a wrong-ness
+    check_args :: Type -> Type -> Either SDoc ()
     check_args bndr_ty arg_ty
       | bndr_ty `compatibleType` arg_ty
-      = Nothing
+      = Right ()
       | otherwise
-      = Just (hang (text "Type mis-match in argument"
+      = Left (hang (text "Type mis-match in argument"
                      <+> text "of call to" <+> ppr_fn)
                  2 (vcat [ text "Expected:" <+> ppr bndr_ty
                          , text "Actual:  " <+> ppr arg_ty ]))
