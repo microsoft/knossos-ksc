@@ -52,12 +52,6 @@ import warnings
 warnings.filterwarnings("always")
 
 ############################################################################
-# Oops, some of this code was written by functional programmers...
-import resource
-# resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY,resource.RLIM_INFINITY))
-sys.setrecursionlimit(10**6)
-
-############################################################################
 ATTR_TYPE_TO_KS_TYPE = {
     OpSchema.AttrType.FLOAT: Type.Float,
     OpSchema.AttrType.INT: Type.Integer,
