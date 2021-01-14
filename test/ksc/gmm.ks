@@ -9,8 +9,9 @@
 (gdef sufrevpass [gmm_knossos_tri Integer])
 (gdef sufrev [gmm_knossos_tri Integer])
 
-(def sub (Vec Float) ((a : Vec (Vec Float)) (j : Integer) (b : Vec Float))
-  (build (size b) (lam (i : Integer) (sub (index i (index j a)) (index i b)))))
+(def sub (Tuple (Vec (Vec Float)) (Vec Float)) ((a : Vec (Vec Float)) (j : Integer) (b : Vec Float))
+  (tuple a
+  (build (size b) (lam (i : Integer) (sub (index i (index j a)) (index i b))))))
 
 ; dot
 (edef dot Float ((Vec Float) (Vec Float)))
@@ -172,7 +173,8 @@
                           (let ((acc Ki xi alphasi meansi qsi lsi) s)
                           (let (inc (logsumexp (build Ki (lam (k : Integer)
                             (let ((Q         (gmm_knossos_makeQ (index k qsi) (index k lsi)))
-                                  (mahal_vec (mul Q (su bxi i (index k meansi)))))
+                                  ((xi1 thesub) (sub xi i (index k meansi)))
+                                  (mahal_vec (mul Q thesub)))
                               (sub (add (index k alphasi)
                                     ; (index k sum_qs)
                                     (sum (index k qsi))
