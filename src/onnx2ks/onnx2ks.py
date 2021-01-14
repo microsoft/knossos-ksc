@@ -103,7 +103,7 @@ TENSOR_TYPE_TO_KS_TYPE = {
 
 def onnxTensorType_to_Type(ety):
     ty = TENSOR_TYPE_TO_KS_TYPE.get(ety)
-    if ty != None:
+    if ty is not None:
         return ty
     raise NotImplementedError(f"type {ety}")
 
