@@ -150,7 +150,7 @@ def mkVec(val):
     else:
         return Call("Vec_init", [Const(val)])
 
-def exprFromTensorProto(val, name):
+def Expr_from_TensorProto(val, name):
     """
     Make KS values from a TensorProto
     """
@@ -164,9 +164,9 @@ def exprFromTensorProto(val, name):
     nptype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[val.data_type] 
     return Call(f"load-from-onnx-{nptype}", [*(Const(x) for x in val.dims), Const(name)])
 
-def exprFromAttrVal(val):
+def Expr_from_AttrVal(val):
     if isinstance(val, onnx.TensorProto):
-        return exprFromTensorProto(val, "?exprFromAttrVal?")
+        return Expr_from_TensorProto(val, "?Expr_from_AttrVal?")
 
     if isinstance(val, list):
         return mkVec(val)
@@ -175,10 +175,10 @@ def exprFromAttrVal(val):
         val = val.decode("ascii")
     return Const(val)
 
-def exprFromAttr(attr : AttributeProto):
+def Expr_from_Attr(attr : AttributeProto):
     # ty = onnxAttrType_to_Type(attr.type)
     a = onnx.helper.get_attribute_value(attr)
-    return exprFromAttrVal(a)
+    return Expr_from_AttrVal(a)
 
 
 def emit_inits(inits, body):
@@ -188,7 +188,7 @@ def emit_inits(inits, body):
     for init in reversed(inits):
         var = useVar(init.name)
 
-        value = exprFromTensorProto(init, var.name)
+        value = Expr_from_TensorProto(init, var.name)
 
         body = Let(var, value, body)
     return body
@@ -203,7 +203,7 @@ def get_attribute_default_value(attr):
 
     ty = onnxAttrType_to_Type(attr.type)
     if ty.is_scalar:
-        return exprFromAttrVal(val)
+        return Expr_from_AttrVal(val)
     
     if ty.is_tensor:
         assert isinstance(val, list)
@@ -223,13 +223,13 @@ def get_default_value(schema, attr):
     # TODO: Formalize this, at least into prelude
     if schema.name == "MaxPool":
         if attr.name == "dilations":
-            return exprFromAttrVal([1, 1])
+            return Expr_from_AttrVal([1, 1])
 
     if schema.name == "Conv" or schema.name == "ConvTranspose":
         if attr.name == "pads":
-            return exprFromAttrVal([-1, -1]) # TODO: this should either match dims, or maybe be empty
+            return Expr_from_AttrVal([-1, -1]) # TODO: this should either match dims, or maybe be empty
         if attr.name == "output_shape":
-            return exprFromAttrVal([-1, -1])
+            return Expr_from_AttrVal([-1, -1])
 
     if schema.name == "SoftmaxCrossEntropyLossGrad" and attr.name == "ignore_index":
         return Const(-1)
@@ -287,14 +287,16 @@ def onnx2ks(g):
     for node in reversed(g.node):
         opname = node.op_type if not node.domain else node.domain + "." + node.op_type 
         found_schema = opname in schemas
-        if not found_schema:
-            warnings.warn(f"Op {opname} not found -- just making a call")
+        if found_schema:
+            s = schemas[opname]
+        else:
+            # Not found, but let's try to proceed, consing up a
+            # fake object with the bare minimum number of fields.
+            warnings.warn(f"onnx2ks: Op {opname} not found -- just making a call")
             s = SimpleNamespace()
             s.name = opname
             s.attributes = {}
-        else:
-            s = schemas[opname]
-    
+
         name = opname
 
         # Collect args from input
@@ -305,7 +307,7 @@ def onnx2ks(g):
             # Constant: exactly one of the optionals should be set
             assert len(node.attribute) == 1
             n = node.attribute[0]
-            args = [exprFromAttr(n)]
+            args = [Expr_from_Attr(n)]
 
         elif opname == "Cast":
             # Cast: output type depends on input value.  We postpend the type to the name
@@ -323,7 +325,7 @@ def onnx2ks(g):
             # - Some are set on the node.
             node_attrs = dict()
             for n in node.attribute:
-                val = exprFromAttr(n)
+                val = Expr_from_Attr(n)
                 node_attrs[n.name] = val
                 if n.name not in s.attributes:
                     warnings.warn(f"Attribute {n.name} not in schema for {opname} -- adding arg anyway")
