@@ -772,10 +772,13 @@ namespace ks {
 	sufrevpass$setAt$aT2f$dii$b(allocator * alloc,
 		                    tensor<2, double> t,
 		                    ks::tuple<int, int> index) {
+		auto [i, j] = index;
+		auto tij = t.index(index);
+		t[i][j] = 0.0;
 		return ks::make_tuple(ks::make_tuple(ks::make_tuple(),
 		                                     ks::make_tuple()),
 		                       t,
-		                       t.index(index));
+		                       tij);
 	}
 
 	// The number of bytes that would be required from the
