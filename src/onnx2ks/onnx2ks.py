@@ -244,11 +244,11 @@ def get_default_value(schema, attr):
 def get_all_schemas():
     # Form schema group, take latest version
     schemas = dict()
-    for s in ort.get_all_operator_schema():
-        name = s.name if s.domain == "" else s.domain + "." + s.name
-        if name in schemas and s.since_version < schemas[name].since_version:
+    for schema in ort.get_all_operator_schema():
+        name = schema.name if schema.domain == "" else schema.domain + "." + schema.name
+        if name in schemas and schema.since_version < schemas[name].since_version:
             pass
-        schemas[name] = s
+        schemas[name] = schema
     return schemas
 
 def encode_name(name: str):
@@ -288,14 +288,14 @@ def onnx2ks(g):
         opname = node.op_type if not node.domain else node.domain + "." + node.op_type 
         found_schema = opname in schemas
         if found_schema:
-            s = schemas[opname]
+            schema = schemas[opname]
         else:
             # Not found, but let's try to proceed, consing up a
             # fake object with the bare minimum number of fields.
             warnings.warn(f"onnx2ks: Op {opname} not found -- just making a call")
-            s = SimpleNamespace()
-            s.name = opname
-            s.attributes = {}
+            schema = SimpleNamespace()
+            schema.name = opname
+            schema.attributes = {}
 
         name = opname
 
@@ -327,16 +327,16 @@ def onnx2ks(g):
             for n in node.attribute:
                 val = Expr_from_Attr(n)
                 node_attrs[n.name] = val
-                if n.name not in s.attributes:
+                if n.name not in schema.attributes:
                     warnings.warn(f"Attribute {n.name} not in schema for {opname} -- adding arg anyway")
                     args += [val]
 
             # - The rest are defaulted
-            for attrname,attr in s.attributes.items():
+            for attrname,attr in schema.attributes.items():
                 if attrname in node_attrs:
                     args += [node_attrs[attrname]]
                 else:
-                    args += [get_default_value(s, attr)]
+                    args += [get_default_value(schema, attr)]
 
         # Are we dropping optional outputs?   
         # This is typically only known at the call site.
@@ -344,7 +344,7 @@ def onnx2ks(g):
         # otherwise type annotation would have to happen 
         # at more than one place 
         n_outputs = len(node.output)
-        if found_schema and n_outputs < len(s.outputs):
+        if found_schema and n_outputs < len(schema.outputs):
             name = f"take{n_outputs}${name}"
 
         # Generate the call node
