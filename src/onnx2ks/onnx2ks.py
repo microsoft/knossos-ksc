@@ -79,9 +79,7 @@ def onnxAttrType_to_Type(ty):
     #     ty.GRAPHS
     """
     assert isinstance(ty, OpSchema.AttrType)
-    kstype = ATTR_TYPE_TO_KS_TYPE[ty]
-
-    return kstype
+    return ATTR_TYPE_TO_KS_TYPE[ty]
 
 
 # See https://github.com/onnx/onnx/blob/master/onnx/mapping.py
