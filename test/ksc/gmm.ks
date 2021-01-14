@@ -17,15 +17,15 @@
      ((a : Vec (Vec Float)) (j : Integer) (b : Vec Float))
   (tuple (sub$VecR$VecR a j b) j))
 
+(edef sub$VecR$VecR_helper
+      (Vec (Vec Float))
+      ((Vec (Vec Float)) (Vec Float) Integer))
+
 (def [sufrevpass [sub (Vec (Vec Float))]] (Tuple (Vec (Vec Float)) (Tuple) (Vec Float))
-     ((t : Tuple (Vec (Vec Float)) (Vec Float)) (j0 : Integer))
+     ((t : Tuple (Vec (Vec Float)) (Vec Float)) (j : Integer))
      (let ((t1 t2) t)
      (let (t2r (build (size t2) (lam (i : Integer) (neg (index i t2)))))
-     (let (t1r (build (size t1) (lam (j : Integer)
-               (build (size t2) (lam (i : Integer)
-                 (if (eq j j0)
-                     (add (index i (index j t1)) (index i t2))
-                   (index i (index j t1))))))))
+     (let (t1r (sub$VecR$VecR_helper t1 t2 j))
        (tuple t1r (tuple) t2r)))))
 
 ; dot

@@ -819,6 +819,17 @@ namespace ks {
 		                       tindex);
 	}
 
+	vec<vec<double>>
+	sub$VecR$VecR_helper$aT1T1fT1fi(allocator * alloc,
+	                                vec<vec<double>> t1,
+	                                vec<double> t2,
+	                                int j) {
+		for (int i = 0; i < t2.size(); i++) {
+			t1[j][i] += t2[i];
+		}
+		return t1;
+	}
+
 	// The number of bytes that would be required from the
 	// allocator to store an inflated copy of the given object
 	template<class T>
