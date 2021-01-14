@@ -452,7 +452,7 @@ lookupLclTc v
        ; case Map.lookup v (lclST st) of
            Nothing -> do {
                              addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
-                                          , text "Envt:" <+> gblDoc st ])
+                                          , text "Envt:" <+> lclDoc st ])
                              ; return TypeUnknown
                              }
            Just ty -> return ty }
@@ -475,5 +475,8 @@ lookupGblTc fun args
              -- , text "ST keys:" <+> gblDoc st
              ]
 
-gblDoc :: SymTab -> SDoc
-gblDoc st = vcat (map (text . show) (Map.keys (gblST st)))
+-- gblDoc :: SymTab -> SDoc
+-- gblDoc st = vcat (map (text . show) (Map.keys (gblST st)))
+
+lclDoc :: SymTab -> SDoc
+lclDoc st = vcat (map (text . show) (Map.keys (lclST st)))
