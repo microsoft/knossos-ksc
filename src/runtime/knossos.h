@@ -738,7 +738,7 @@ namespace ks {
 				ks::tuple<vec<double>, double> ddr,
 				int i) {
 		auto [v, vi] = ddr;
-		v[i] = vi;
+		v[i] += vi;
 		return ks::make_tuple(ks::make_tuple(), v);
 	}
 
