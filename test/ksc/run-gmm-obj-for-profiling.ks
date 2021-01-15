@@ -31,7 +31,7 @@
             0.0
             (if (eq i j)
               (exp (index i q))
-              (index (add (gmm_knossos_tri (sub i 1)) j) l))
+              (index (add (sub (gmm_knossos_tri D) (gmm_knossos_tri (sub D j))) (sub (sub i j) 1)) l))
            )
            ))))))
 
@@ -41,7 +41,6 @@
          (log (sum (exp (sub v maxv)))))))
 
 
-; TODO deriv lgamma - but no deriv wishart_m anyway.
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
     (let ((out (mul 0.28618247146235004 (to_float (mul p (sub p 1)))))) ; 0.25 log pi
