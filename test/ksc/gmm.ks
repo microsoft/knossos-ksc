@@ -120,9 +120,9 @@
     (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
 
 (def mkvecvec (Vec (Vec Float)) ((seed  : Integer)
-                                (n     : Integer)
-                                (m     : Integer)
-                                (scale : Float))
+                                 (n     : Integer)
+                                 (m     : Integer)
+                                 (scale : Float))
      (build n (lam (j : Integer) (mkvec (add (mul j m) seed) m scale))))
 
 (def not_ Bool (p : Bool) (if p false true))
