@@ -781,6 +781,44 @@ namespace ks {
 		                       tij);
 	}
 
+	tensor<1, double>
+	setAt$aiT1ff(allocator * alloc,
+			int index,
+			tensor<1, double> t,
+			double a) {
+		auto i = index;
+		// I do actually want to write here so can't use
+		// tensor.index(). Explain this better before merging
+		// (or come up with a genuinely-supported mutable
+		// tensor API)
+		t[i] = a;
+		return t;
+	}
+
+	std::tuple<tensor<1, double>, int>
+	suffwdpass$setAt$aiT1ff(allocator * alloc,
+			int index,
+			tensor<1, double> t,
+			double a) {
+		auto i = index;
+		t[i] = a;
+		return std::make_tuple(t, index);
+	}
+
+	std::tuple<std::tuple<>,
+	           tensor<1, double>,
+	           double>
+	sufrevpass$setAt$aT1fi(allocator * alloc,
+		                    tensor<1, double> t,
+		                    int index) {
+		auto i = index;
+		auto tindex = t.index(index);
+		t[i] = 0.0;
+		return std::make_tuple(std::make_tuple(),
+		                       t,
+		                       tindex);
+	}
+
 	// The number of bytes that would be required from the
 	// allocator to store an inflated copy of the given object
 	template<class T>

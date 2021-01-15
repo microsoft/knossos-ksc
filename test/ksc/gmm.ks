@@ -74,6 +74,14 @@
 (edef sufrevpass$setAt (Tuple (Tuple (Tuple) (Tuple)) (Tensor 2 Float) Float)
       ((Tensor 2 Float) (Tuple Integer Integer)))
 
+(edef setAt (Tensor 1 Float) (Integer (Tensor 1 Float) Float))
+
+(edef suffwdpass$setAt (Tuple (Tensor 1 Float) Integer)
+      (Integer (Tensor 1 Float) Float))
+
+(edef sufrevpass$setAt (Tuple (Tuple) (Tensor 1 Float) Float)
+      ((Tensor 1 Float) Integer))
+
 (def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
   (let ((D (size q))
         (triD (size l)))
@@ -185,27 +193,41 @@
                                                    (Vec (Vec Float)))
                                             Integer)
                           (let ((s i) s_i)
-                          (let ((acc Ki xi alphasi meansi qsi lsi) s)
-                          (let (thebuild (build Ki (lam (k : Integer)
-                            (let ((Q         (gmm_knossos_makeQ (index k qsi) (index k lsi)))
-                                  ((xi1 thesub) (sub xi i (index k meansi)))
+                          (let ((acc Ki xsi alphasi meansi qsi lsi) s)
+                          (let (initial_vec (constVec Ki 0.0))
+                          (let ((thebuild qsk1 lsk1 xsk11 ik1 meansk1 alphask1) (ifold Ki
+                            (lam (ss_k : Tuple (Tuple (Vec Float)
+                                                      (Vec (Vec Float))
+                                                      (Vec (Vec Float))
+                                                      (Vec (Vec Float))
+                                                      Integer
+                                                      (Vec (Vec Float))
+                                                      (Vec Float))
+                                               Integer)
+                            (let (((ss k) ss_k)
+                                  ((veck qsk lsk xsk ik meansk alphask) ss)
+                                  (Q         (gmm_knossos_makeQ (index k qsk) (index k lsk)))
+                                  ((xsk1 thesub) (sub xsk ik (index k meansk)))
                                   (mahal_vec (mul Q thesub))
-                                  (r (sub (add (index k alphasi) (sum (index k qsi)))
-                                          (mul 0.500000  (sqnorm mahal_vec)))))
-                              r
-                            ))))
+                                  (r (sub (add (index k alphask) (sum (index k qsk)))
+                                          (mul 0.500000  (sqnorm mahal_vec))))
+                                  (veck1 (setAt k veck r)))
+                              (tuple veck1 qsk lsk xsk1 ik meansk alphask)
+                            ))
+                            (tuple initial_vec qsi lsi xsi i meansi alphasi)
+                            ))
                           (let (inc (logsumexp thebuild))
-                           (tuple (add acc inc) Ki xi alphasi meansi qsi lsi)
-                          )))))
+                           (tuple (add acc inc) Ki xsk11 alphask1 meansk1 qsk1 lsk1)
+                          ))))))
                            (tuple 0.0 K x alphas means qs ls)
                            )
                     )
           )
             (add (add CONSTANT
                 (sub slse
-                  (mul (to_float N) (logsumexp alphas))))
+                  (mul (to_float N) (logsumexp alphas1))))
             (sum (build K (lam (k : Integer)
-                    (log_wishart_prior wishart (index k qs) (index k ls))))))
+                    (log_wishart_prior wishart (index k qs1) (index k ls1))))))
     ))))
 
 (gdef fwd [gmm_knossos_gmm_objective
