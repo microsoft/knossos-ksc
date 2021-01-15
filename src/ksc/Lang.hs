@@ -1145,7 +1145,7 @@ pprTrace :: String -> SDoc -> a -> a
 pprTrace str doc = trace (render (sep [text str, nest 2 doc]))
 
 pprPanic :: HasCallStack => String -> SDoc -> a
-pprPanic str doc = error (take 1000 $ render (sep [text str, nest 2 doc]))
+pprPanic str doc = error (render (sep [text str, nest 2 doc]))
 
 pps :: Pretty a => a -> String
 pps = show . ppr
