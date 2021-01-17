@@ -109,6 +109,10 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; mul Scalar Vec
+(def mul (Tensor 1 Float) ((r : Float) (a : Tensor 1 Float))
+    (build (size a) (lam (i : Integer) (mul r (index i a)))))
+
 ;; mul Mat Vec
 (edef mul (Vec Float) ((Tensor 2 Float) (Vec Float)))
 (def shape$mul (Vec (Tuple)) ((m : (Tensor 2 Float)) (v : (Vec Float)))
@@ -304,6 +308,9 @@
 (def fwd$exp Float ((x : Float) (dx : Float)) (mul (exp x) dx))
 (def rev$exp Float ((x : Float) (d_dexp : Float)) (mul (exp x) d_dexp))
 (edef Dt$exp (Tuple Float (LM Float Float)) (Float))
+
+(def exp (Tensor 1 Float) ((v : Tensor 1 Float))
+  (build (size v) (lam (i : Integer) (exp (index i v)))))
 
 (edef sin Float (Float))
 (edef cos Float (Float))
