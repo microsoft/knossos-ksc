@@ -3,15 +3,6 @@
 (def gmm_knossos_tri Integer ((n : Integer))
   (div (mul n (sub n 1)) 2))
 
-(def exp$VecR (Vec Float) ((v : Vec Float))
-  (build (size v) (lam (i : Integer) (exp (index i v)))))
-
-(def mul$R$VecR (Vec Float) ((r : Float) (a : Vec Float))
-    (build (size a) (lam (i : Integer) (mul r (index i a)))))
-
-(def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
-
 ; dot
 (edef dot Float ((Vec Float) (Vec Float)))
 (edef D$dot (LM (Tuple (Vec Float) (Vec Float)) Float)
@@ -29,7 +20,7 @@
                ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
      (let ((a  (get$1$2 a_b))
            (b  (get$2$2 a_b)))
-    (tuple (mul$R$VecR dr b) (mul$R$VecR dr a))))
+    (tuple (mul dr b) (mul dr a))))
 
 (def dot Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dot (index i a) (index i b)))))
@@ -55,7 +46,7 @@
 (def logsumexp Float ((v : Vec Float))
   (let (maxv (max v))
     (add maxv
-         (log (sum (exp$VecR (sub v (constVec (size v) maxv))))))))
+         (log (sum (exp (sub v (constVec (size v) maxv))))))))
 
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
@@ -72,7 +63,7 @@
           (wishart_gamma (get$1$2 wishart))
           (wishart_m     (get$2$2 wishart))
           (sum_qs        (sum log_Qdiag))
-          (Qdiag         (exp$VecR log_Qdiag))
+          (Qdiag         (exp log_Qdiag))
 
           (n  (add p (add wishart_m 1)))
           (C  (sub (mul (to_float (mul n p))
@@ -106,7 +97,7 @@
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
-                                  (mahal_vec (mul Q (sub$VecR$VecR (index i x) (index k means)))))
+                                  (mahal_vec (mul Q (sub (index i x) (index k means)))))
                               (sub (add (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))
