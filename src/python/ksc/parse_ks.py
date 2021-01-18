@@ -45,6 +45,7 @@ _lam = sexpdata.Symbol("lam")
 _tuple = sexpdata.Symbol("tuple")
 _rule = sexpdata.Symbol("rule")
 _colon = sexpdata.Symbol(":")
+_None = sexpdata.Symbol("None")
 
 def parse_type(se):
     """ Converts an S-Expression representing a type, like (Tensor 1 Float) or (Tuple Float (Tensor 1 Float)),
@@ -54,6 +55,8 @@ def parse_type(se):
         se=se[0] # Discard ((pointless)) brackets
 
     if isinstance(se, sexpdata.Symbol):
+        if se == _None:
+            return None
         return Type(se.value())
 
     if isinstance(se, list) and len(se)>0:

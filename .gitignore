@@ -104,6 +104,9 @@ __pycache__/
 .fake
 .ionide
 
+# ONNX generated prelude
+etc/onnx-prelude-autogen.ks
+
 # Eggs
 *.egg-info/
 ksc-*.egg

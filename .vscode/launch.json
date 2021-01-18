@@ -5,6 +5,34 @@
 {
 	"version": "0.2.0",
 	"configurations": [
+
+		{
+			"name": "Python: onnx2ks",
+			"type": "python",
+			"request": "launch",
+			"program": "src/onnx2ks/onnx2ks.py",
+			"args": [
+				"obj/hf-bert-to-onnx/bert3.onnx", 
+				"obj/hf-bert-to-onnx/bert3"
+			],
+			"env" : {
+				"PYTHONPATH": "./src/python"
+			},
+			"console": "integratedTerminal",
+			"justMyCode": false
+		},
+		{
+			"name": "Python: onnx-build-prelude",
+			"type": "python",
+			"request": "launch",
+			"program": "src/onnx2ks/onnx-build-prelude.py",
+			"args": [],
+			"env" : {
+				"PYTHONPATH": "./src/python"
+			},
+			"console": "integratedTerminal",
+			"justMyCode": false
+		},
 		{
 			"name": "Python: Current File",
 			"type": "python",

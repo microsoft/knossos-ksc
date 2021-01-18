@@ -9,6 +9,7 @@ Currently implemented frontends are
  * Julia: j2ks
  * F#: f2k
  * TorchScript: ts2k
+ * ONNX: onnx2ks
  * KS-Lisp: The IR itself is exchanged in a lisp-like text format (see below).  
 
 Current backends:
