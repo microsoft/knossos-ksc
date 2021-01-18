@@ -348,11 +348,6 @@ pEdef = do { pReserved "edef"
                          , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")
                          , def_rhs = EDefRhs }) }
 
-allNames :: [String]
--- An infinite list [a,b,c... aa, ba, ca, ..]
-allNames = [ c : cs
-           | cs <- "" : allNames
-           , c <- ['a'..'z'] ]
 
 pDecl :: Parser Decl
 pDecl = parens $

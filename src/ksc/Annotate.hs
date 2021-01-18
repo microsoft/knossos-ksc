@@ -15,6 +15,10 @@ import qualified Data.Map   as Map
 import GHC.Stack
 import Control.Monad( ap )
 import Data.List( intersperse )
+import qualified Text.EditDistance as E
+
+configEditDistanceThreshold :: Int
+configEditDistanceThreshold = 5
 
 -----------------------------------------------
 --     The type inference pass
@@ -276,7 +280,19 @@ userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
 userCallResultTy_maybe fn env args
   = case lookupGblST (fn, typeof args) env of
       Just def -> userCallResultTy_help def args
-      Nothing  -> Left (text "Not in scope: userCall:" <+> ppr fn $$ ppr env)
+      Nothing  -> Left (text "Not in scope: userCall:"
+                        <+> ppr fn <+> ppr (typeof args) $$ message)
+        where message = if null similarEnv
+                        then empty
+                        else text "Did you mean one of these:"
+                             $$ vcat similarEnv
+              similarEnv = (map (\(f, t) -> ppr f <+> ppr t)
+                            . filter similar
+                            . Map.keys) env
+              similar (envfn, _) =
+                editDistance (render (ppr fn)) (render (ppr envfn))
+                <= configEditDistanceThreshold
+              editDistance = E.levenshteinDistance E.defaultEditCosts
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type

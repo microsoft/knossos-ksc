@@ -40,6 +40,8 @@ main = do
   System.Environment.getArgs >>= \args -> case args of
     ["--test", "--fs-test", fsTest]
       -> testWithfsTest fsTest
+    ["--test-windows", "--fs-test", fsTest]
+      -> testWindowsWithfsTest fsTest
     ["--test-except-codegen"]
       -> do { _ <- testsThatDoNoCodegen; return () }
     [ "--profile",
@@ -108,10 +110,9 @@ testWithfsTest fsTestKs = do
   let compiler = "g++-7"
   testC compiler [fsTestKs]
 
-testWindows :: IO ()
-testWindows = do
+testWindowsWithfsTest :: String -> IO ()
+testWindowsWithfsTest fsTestKs = do
   let compiler = "g++"
-  [fsTestKs] <- System.Environment.getArgs
   testC compiler [fsTestKs]
 
 ksTestFiles :: String -> IO [String]
