@@ -824,8 +824,8 @@ namespace ks {
 	                                vec<vec<double>> t1,
 	                                vec<double> t2,
 	                                int j) {
-		auto t1ret = inflated_deep_copy(alloc, t1);
-		//auto t1ret = t1;
+		//auto t1ret = inflated_deep_copy(alloc, t1);
+		auto t1ret = t1;
 		for (int i = 0; i < t2.size(); i++) {
 			t1ret[j][i] += t2[i];
 		}
