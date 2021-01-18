@@ -45,7 +45,7 @@
 (def logsumexp Float ((v : Vec Float))
   (let (maxv (max v))
     (add maxv
-         (log (sum (exp (sub v (constVec (size v) maxv))))))))
+         (log (sum (exp (sub v maxv)))))))
 
 
 ; TODO deriv lgamma - but no deriv wishart_m anyway.

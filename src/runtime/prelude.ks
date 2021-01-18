@@ -80,6 +80,9 @@
 (def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
   (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
 
+(def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : Float))
+  (build (size a) (lam (i : Integer) (sub (index i a) b))))
+
 ;; mul :: Number x Number -> Number
 ;; mul (x, y) = x * y
 (edef mul Float (Float Float))
