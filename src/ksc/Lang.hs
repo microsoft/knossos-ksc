@@ -451,8 +451,8 @@ resVar = Simple "ksc$resVar"
 argVar :: Var
 argVar = Simple "ksc$argVar"
 
-indexTVar :: TVar
-indexTVar = TVar TypeInteger (Simple "ksc$indexTVar")
+indexTVar :: Int -> TVar
+indexTVar d = TVar (tensorIndexType d) (Simple "ksc$indexTVar")
 
 mkArgVar :: Int -> Var
 mkArgVar n = Simple ("ksc$argVar" ++ show n)
