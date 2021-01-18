@@ -46,7 +46,7 @@
 (def logsumexp Float ((v : Vec Float))
   (let (maxv (max v))
     (add maxv
-         (log (sum (exp (sub v (constVec (size v) maxv))))))))
+         (log (sum (exp (sub v maxv)))))))
 
 ; wishart_m -> int
 (def log_gamma_distrib Float ((a : Float) (p : Integer))
