@@ -177,8 +177,10 @@ $$
           & |   & (e_1,e_2) & \mbox{Pair} \\
           & |   & \lambda x \dot e & \mbox{Lambda} \\
           & |   & e_1 \; e_2 & \mbox{Application} \\
-          & |   & \kslet x = {e_1} {e_2} \\
+          & |   & \kslet pat = {e_1} {e_2} \\
           & |   & \mbox{\lstinline|if $\;b\;$ then $\;e_1\;$ else $\;e_2$|} \\
+        pat & ::= & x & \\
+            & |   & (x_1, x_2) & \mbox{Pattern matching} \\
         \\
         \multicolumn{4}{l}{\mbox{\bf Types}} \\
         \tau & ::= & \nat & \mbox{Natural numbers} \\
