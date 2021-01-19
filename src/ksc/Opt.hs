@@ -678,10 +678,14 @@ optDrvFun _ _ _ = Nothing
 
 optDrvPrim :: HasCallStack => ADDir -> PrimFun -> TExpr -> Maybe TExpr
 
-optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv]) = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
-optDrvPrim Rev "constVec" (Tuple [_n_v, ddr]) = Just $ Tuple [ Tuple [], pSum ddr ]
-optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv]) = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
-optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr]) = Just $ Tuple [ Tuple [], Tuple [], pIndex (pSel 2 3 n_i_v) ddr ]
+optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv])
+  = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
+optDrvPrim Rev "constVec" (Tuple [_n_v, ddr])
+  = Just $ Tuple [ Tuple [], pSum ddr ]
+optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv])
+  = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
+optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr])
+  = Just $ Tuple [ Tuple [], Tuple [], pIndex (pSel 2 3 n_i_v) ddr ]
 optDrvPrim _ _ _ = Nothing
 
 ---------------
