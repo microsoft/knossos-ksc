@@ -446,6 +446,7 @@ optSum e
 
 optSum e
   | Just (n, v) <- isConstVec_maybe e
+  , TypeInteger <- typeof n   -- TODO: multidimensional version
   = Just $ sumOfConstVec n v
 
 -- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
@@ -823,11 +824,12 @@ do_prod_v env dir e dx
   = Just $ pConstVec n (lmApply_Dir dir v dx)
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
-  | TypeTensor 1 _ <- typeof e
-  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
+  | TypeTensor d _ <- typeof e
+  , let i = indexTVar d
+  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet i env) [e,dx]
   = Just $ mkLets binds $
-    pBuild (pSize ve) $ Lam indexTVar $
-    lmApply_Dir dir (pIndex (Var indexTVar) ve) vdx
+    pBuild (pSize ve) $ Lam i $
+    lmApply_Dir dir (pIndex (Var i) ve) vdx
 
   | otherwise = Nothing
 
@@ -840,19 +842,22 @@ do_sum_v env dir e dx
     lmApply_Dir dir body (pIndex (Var i) vdx)
   
   | Just (n, v) <- isConstVec_maybe e
-  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [dx]
+  , Just d <- tensorDimensionFromIndexType_maybe (typeof n)
+  , let i = indexTVar d
+  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet i env) [dx]
   = Just $ mkLets binds $
-    pSumBuild n $ Lam indexTVar $
-    lmApply_Dir dir v (pIndex (Var indexTVar) vdx)
+    pSumBuild n $ Lam i $
+    lmApply_Dir dir v (pIndex (Var i) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
-  | TypeTensor 1 _ <- typeof e
-  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet indexTVar env) [e,dx]
+  | TypeTensor d _ <- typeof e
+  , let i = indexTVar d
+  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet i env) [e,dx]
   = Just $
     mkLets binds $
-    pSumBuild (pSize vm) $ Lam indexTVar $
-    lmApply_Dir dir (pIndex (Var indexTVar) vm)
-                    (pIndex (Var indexTVar) vdx)
+    pSumBuild (pSize vm) $ Lam i $
+    lmApply_Dir dir (pIndex (Var i) vm)
+                    (pIndex (Var i) vdx)
 
   | otherwise = Nothing
 
