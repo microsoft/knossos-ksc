@@ -8,6 +8,7 @@ import Lang
 import LangUtils (isTrivial)
 import GHC.Stack
 import Data.Maybe
+import Control.Monad (zipWithM)
 
 --------------------------------------------
 --  Simple call construction
@@ -586,6 +587,18 @@ primFunCallResultTy_maybe fun args
         | sizeType `eqType` indexType
         , isJust (tensorDimensionFromIndexType_maybe indexType)
         -> Just t
+      ("buildFromSparse", TypeTuple
+                         [resultShapeType@TypeTensor{}, loopSizeType, TypeLam loopIndexType t])
+        | loopSizeType `eqType` loopIndexType
+        , isJust (tensorDimensionFromIndexType_maybe loopIndexType)
+        -> buildFromSparseResultTy_maybe resultShapeType t
+      ("buildFromSparseTupled", TypeTuple
+                         [resultShapeType@TypeTuple{}, loopSizeType, TypeLam loopIndexType t])
+        | loopSizeType `eqType` loopIndexType
+        , isJust (tensorDimensionFromIndexType_maybe loopIndexType)
+        , TypeTuple shapes <- resultShapeType
+        , TypeTuple lamty <- t
+        -> fmap TypeTuple (zipWithM buildFromSparseResultTy_maybe shapes lamty)
       ("index"    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
         -> Just t
@@ -614,6 +627,13 @@ primFunCallResultTy_maybe fun args
                      [TypeInteger, TypeInteger, t])        -> Just t
       _ -> Nothing
 
+buildFromSparseResultTy_maybe :: Type -> Type -> Maybe Type
+buildFromSparseResultTy_maybe (TypeTensor d elemshapety) (TypeTuple [indexty, elemty])
+  | indexty `eqType` tensorIndexType d
+  , elemshapety `eqType` shapeType elemty
+  = Just (TypeTensor d elemty)
+buildFromSparseResultTy_maybe _ _ = Nothing
+
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args
                        , "$copydown"-- ($copydown e)              Requests copydown of e
@@ -623,6 +643,8 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "Vec_init" -- (Vec_init v1 ... vn)       Vector literal
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
+                       , "buildFromSparse" -- generalization of build
+                       , "buildFromSparseTupled" -- builds multiple tensors with a single loop
                        , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
                        , "shape"

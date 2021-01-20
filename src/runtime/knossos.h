@@ -477,6 +477,16 @@ namespace ks
 			return tensor<Dim-1, T>(sz, data_ + i * tensor_dimension<Dim-1>::num_elements(sz));
 		}
 
+		T& index(index_type i) {
+#ifndef NDEBUG
+			if (!dimension::index_is_in_range(i, size_)) {
+				std::cerr << "ERROR: Accessing element " << dimension::index_to_string(i) << " of tensor of size " << dimension::index_to_string(size_) << std::endl;
+				abort();
+			}
+#endif
+			return data_[dimension::flatten_index(i, size_)];
+		}
+
 		T const& index(index_type i) const {
 #ifndef NDEBUG
 			if (!dimension::index_is_in_range(i, size_)) {
@@ -580,6 +590,8 @@ namespace ks
 	auto shape(allocator_base * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
 		return ks::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
 	}
+
+	template<typename T> using shape_t = decltype(shape(nullptr, std::declval<T>()));
 
 	// ===============================  Inflated deep copy  ==================================
 
@@ -867,6 +879,44 @@ namespace ks
 		return ret;
 	}
 
+	template<typename T>
+	struct make_zero_t
+	{
+		static T ofShape(allocator_base *, std::tuple<>) { return 0; }
+	};
+
+	template<typename ...Ts>
+	struct make_zero_t<std::tuple<Ts...>>
+	{
+		template<size_t ...Indices>
+		static std::tuple<Ts...> ofShapeImpl(allocator_base * alloc, shape_t<std::tuple<Ts...>> const& shape, std::index_sequence<Indices...>) {
+			return std::make_tuple(make_zero_t<Ts>::ofShape(alloc, std::get<Indices>(shape))...);
+		}
+
+		static std::tuple<Ts...> ofShape(allocator_base * alloc, shape_t<std::tuple<Ts...>> const& shape) {
+			return ofShapeImpl(alloc, shape, std::index_sequence_for<Ts...>{});
+		}
+	};
+
+	template<size_t Dim, typename T>
+	struct make_zero_t<tensor<Dim, T>>
+	{
+		static tensor<Dim, T> ofShape(allocator_base * alloc, shape_t<tensor<Dim, T>> const& shape) {
+			tensor<Dim, T> ret(alloc, shape.size());
+			T* retdata = ret.data();
+			const shape_t<T>* shapedata = shape.data();
+			for(int j = 0, ne = ret.num_elements(); j != ne; ++j)
+				retdata[j] = make_zero_t<T>::ofShape(alloc, shapedata[j]);
+			return ret;
+		}
+	};
+
+	template<typename T>
+	T zeroOfShape(allocator_base * alloc, shape_t<T> const& shape)
+	{
+		return make_zero_t<T>::ofShape(alloc, shape);
+	}
+
 	// ===============================  Inplace add ==================================
 	template <class T>
 	struct inplace_add_t {
@@ -1127,6 +1177,79 @@ namespace ks
 	{
 		constexpr size_t Dim = dimension_of_tensor_index_type<Size>::value;
 		return sumbuild_t<Dim>::template do_sumbuild<T>(alloc, size, f);
+	}
+
+	// =============================== BuildFromSparse ==================================
+
+	template<size_t Dim>
+	struct buildFromSparse_t
+	{
+		static_assert(Dim >= 2u);
+
+		template<class T, class F, class LoopSize, class ...HigherDimensionIndices>
+		static void do_buildFromSparse(allocator * alloc, T* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(loopSize);
+			for (int i = 0; i != thisDimension; ++i)
+				buildFromSparse_t<Dim - 1>::do_buildFromSparse(alloc, acc, loopSize, f, higherDimensionIndices..., i);
+		}
+
+		template<class T, class F, class LoopSize, class ...HigherDimensionIndices>
+		static void do_buildFromSparseTupled(allocator * alloc, T* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(loopSize);
+			for (int i = 0; i != thisDimension; ++i)
+				buildFromSparse_t<Dim - 1>::do_buildFromSparseTupled(alloc, acc, loopSize, f, higherDimensionIndices..., i);
+		}	};
+
+	template<>
+	struct buildFromSparse_t<1>
+	{
+		template<size_t Dim, class T, class LambdaResultElementT>
+		static void buildFromSparse_addOneIteration(tensor<Dim, T>* accElement, LambdaResultElementT const& lambdaResultElement) {
+			inplace_add(&(accElement->index(std::get<0>(lambdaResultElement))), std::get<1>(lambdaResultElement));
+		}
+
+		template<class T, class LambdaResultT, size_t ...Indices>
+		static void buildFromSparseTupled_addOneIteration(T* acc, LambdaResultT const& lambdaResult, std::index_sequence<Indices...>) {
+			(buildFromSparse_addOneIteration(&std::get<Indices>(*acc), std::get<Indices>(lambdaResult)), ...);
+		}
+
+		template<size_t Dim, class T, class F, class LoopSize, class ...HigherDimensionIndices>
+		static void do_buildFromSparse(allocator * alloc, tensor<Dim, T>* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(loopSize);
+			alloc_mark_t mark = alloc->mark();
+			for (int i = 0; i != thisDimension; ++i) {
+				buildFromSparse_addOneIteration(acc, f(alloc, higherDimensionIndices..., i));
+				alloc->reset(mark);
+			}
+		}
+
+		template<class ...Ts, class F, class LoopSize, class ...HigherDimensionIndices>
+		static void do_buildFromSparseTupled(allocator * alloc, tuple<Ts...>* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
+			int thisDimension = get_dimension<sizeof...(HigherDimensionIndices)>(loopSize);
+			alloc_mark_t mark = alloc->mark();
+			for (int i = 0; i != thisDimension; ++i) {
+				buildFromSparseTupled_addOneIteration(acc, f(alloc, higherDimensionIndices..., i), std::index_sequence_for<Ts...>{});
+				alloc->reset(mark);
+			}
+		}
+	};
+
+	template<class ResultType, class ResultShape, class F, class LoopSize>
+	auto buildFromSparse(allocator * alloc, ResultShape const& resultShapes, LoopSize loopSize, F f)
+	{
+		constexpr size_t Dim = dimension_of_tensor_index_type<LoopSize>::value;
+		auto result = zeroOfShape<ResultType>(alloc, resultShapes);
+		buildFromSparse_t<Dim>::do_buildFromSparse(alloc, &result, loopSize, f);
+		return result;
+	}
+
+	template<class ResultType, class ResultShape, class F, class LoopSize>
+	auto buildFromSparseTupled(allocator * alloc, ResultShape const& resultShapes, LoopSize loopSize, F f)
+	{
+		constexpr size_t Dim = dimension_of_tensor_index_type<LoopSize>::value;
+		auto result = zeroOfShape<ResultType>(alloc, resultShapes);
+		buildFromSparse_t<Dim>::do_buildFromSparseTupled(alloc, &result, loopSize, f);
+		return result;
 	}
 
 	// =============================== Fold ==================================
