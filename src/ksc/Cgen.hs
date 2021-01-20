@@ -591,12 +591,13 @@ cgenUserFun (f, ty) = case f of
 cgenAnyFun :: HasCallStack => (TFun, Type) -> CType -> String
 cgenAnyFun (tf, ty) cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
-  TFun ty (Fun (PrimFun "build")) ->
-    case ty of
+  TFun retty (Fun (PrimFun "build")) ->
+    case retty of
       TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _              -> error ("Unexpected type for build: " ++ show ty)
-  TFun ty (Fun (PrimFun "sumbuild")) -> -- TODO: remove special case
-    "sumbuild<" ++ cgenType (mkCType ty) ++ ">"
+  TFun retty (Fun (PrimFun primname))
+    | primname `elem` ["sumbuild", "buildFromSparse", "buildFromSparseTupled"]
+    -> primname ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun (f, ty)
