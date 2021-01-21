@@ -29,4 +29,11 @@
 (gdef fwd [circumference2 Float])
 (gdef rev [circumference2 Float])
 
+(def g (Tuple Float Float Float Float) (x : Float)
+     (let (x1 (lgamma (add 1.0 x)))
+     (let (x2 (lgamma (add 2.0 x1)))
+     (let (x3 (lgamma (add 3.0 x2)))
+     (let (x4 (lgamma (add 4.0 x3)))
+       (tuple x1 x2 x3 x4))))))
+
 (def main Integer () 0)
