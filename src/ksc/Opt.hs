@@ -650,8 +650,8 @@ optGradPrim _ "ts_add" arg
   = Just (lmHCat [lmOne t1, lmOne t2])
 
 optGradPrim _ "sum" e
-  | TypeTensor 1 t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar TypeInteger $ Simple "sum$i")
+  | TypeTensor d t <- typeof e
+  = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$i")
                              (lmOne t)))
 
 optGradPrim _ "size" e
@@ -678,10 +678,14 @@ optDrvFun _ _ _ = Nothing
 
 optDrvPrim :: HasCallStack => ADDir -> PrimFun -> TExpr -> Maybe TExpr
 
-optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv]) = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
-optDrvPrim Rev "constVec" (Tuple [_n_v, ddr]) = Just $ Tuple [ Tuple [], pSum ddr ]
-optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv]) = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
-optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr]) = Just $ Tuple [ Tuple [], Tuple [], pIndex (pSel 2 3 n_i_v) ddr ]
+optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv])
+  = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
+optDrvPrim Rev "constVec" (Tuple [n_v, ddr])
+  = Just $ Tuple [ mkTangentZero (pSel 1 2 n_v), pSum ddr ]
+optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv])
+  = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
+optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr])
+  = Just $ Tuple [ mkTangentZero (pSel 1 3 n_i_v), mkTangentZero (pSel 2 3 n_i_v), pIndex (pSel 2 3 n_i_v) ddr ]
 optDrvPrim _ _ _ = Nothing
 
 ---------------

@@ -10,6 +10,9 @@
 (def constVec_VecFloat (Vec (Vec Float)) ((n : Integer) (v : (Vec Float)))
     (constVec n v))
 
+(def constVec_Tensor2Float (Tensor 2 Float) ((n : (Tuple Integer Integer)) (v : Float))
+    (constVec n v))
+
 (def build_constVec_Float (Vec Float) ((n : Integer) (v : Float))
     (build n (lam (i : Integer) v)))
 
@@ -22,12 +25,21 @@
 (def deltaVec_VecFloat (Vec (Vec Float)) ((n : Integer) (i : Integer) (v : (Vec Float)))
     (deltaVec n i v))
 
+(def deltaVec_Tensor2Float (Tensor 2 Float) ((n : (Tuple Integer Integer)) (i : (Tuple Integer Integer)) (v : Float))
+    (deltaVec n i v))
+
 (def build_deltaVec_Float (Vec Float) ((n : Integer) (i : Integer) (v : Float))
     (build n (lam (k : Integer) (if (eq i k) v 0.0))))
 
 (def build_deltaVec_VecFloat (Vec (Vec Float)) ((n : Integer) (i : Integer) (v : (Vec Float)))
     (let (zerov (build (size v) (lam (l : Integer) 0.0)))
         (build n (lam (k : Integer) (if (eq i k) v zerov)))))
+
+(def sum_VecFloat Float (v : (Vec Float))
+   (sum v))
+
+(def sum_Tensor2Float Float (v : (Tensor 2 Float))
+   (sum v))
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
