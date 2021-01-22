@@ -437,7 +437,6 @@ cgenExprWithoutResettingAlloc env = \case
   Let pat e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
-    lvar                       <- freshCVar
 
     let cgenType_ = case pat of
           VarPat _ -> cgenType type1
@@ -449,15 +448,11 @@ cgenExprWithoutResettingAlloc env = \case
                        ++ "]"
 
     return $ CG
-      (  [ cComment "Let" ++ cgenType tybody ++ " " ++ lvar ++ ";",
-           "{" ]
-      ++ decle1
+      (  decle1
       ++ [ cgenType_ ++ " " ++ cgenBinder ++ " = " ++ ve1 ++ ";" ]
       ++ declbody
-      ++ [ lvar ++ " = " ++ vbody ++ ";",
-           "}" ]
       )
-      lvar
+      vbody
       tybody
       (allocusagee1 <> allocusagebody)
 
