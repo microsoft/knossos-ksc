@@ -11,7 +11,7 @@ from ksc.tracing.functions.type_propagation_rules import (
     conv_2d_type_prop_rule_from_padding_type
 )
 from ksc.tracing.node import Node
-from ksc.utils import ShapeType, Shape, TensorShape, ScalarShape
+from ksc.shape import ShapeType, Shape, TensorShape, ScalarShape
 
 relu = make_edef(
     "relu", ["x"], elementwise,
@@ -67,11 +67,11 @@ class RequirePadding2d(TraceableFunction):
     def _internal_shape_prop_function(self, *args):
         x = args[0]
         paddings = args[-1]
-        x_shape = x.get_shape
+        x_shape = x.shape
         pad_w, pad_h = paddings.data
         b, c, w, h = x_shape.dims
         new_x_dims = (b, c, w + pad_w[0] + pad_w[1], h + pad_h[0] + pad_h[1])
-        new_x = Node(x.name, TensorShape(new_x_dims, x_shape.elem_shape), x.get_type)
+        new_x = Node(x.name, TensorShape(new_x_dims, x_shape.elem_shape), x.type)
         type_prop_rule = self._proto_shape_prop_function("VALID")
         return type_prop_rule(new_x, *args[1:-1])
 
@@ -80,7 +80,7 @@ class RequirePadding2d(TraceableFunction):
         x = args[0]
         ksizes = args[-2]
         strides = args[-1]
-        w, h = x.get_shape.dims[2:]
+        w, h = x.shape.dims[2:]
         w_o, h_o = st.shape.dims[2:]
         paddings = _get_paddings((w, h), (w_o, h_o), ksizes, strides)
         print(f"In RequirePadding2d.trace(): padding_type={self.padding}, paddings={paddings}")

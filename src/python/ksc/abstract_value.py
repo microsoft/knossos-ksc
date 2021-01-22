@@ -1,6 +1,6 @@
 from collections import defaultdict
 from ksc.type import Type
-from ksc.utils import ShapeType, Shape, shape_type_from_object, shape_type_matches, ScalarShape
+from ksc.shape import ShapeType, Shape, shape_type_from_object, shape_type_matches, ScalarShape
 
 def _cleanup_value(data):
     st = shape_type_from_object(data)
@@ -44,11 +44,11 @@ class AbstractValue:
         return ShapeType(self._shape, self._type)
 
     @property
-    def get_shape(self) -> Shape:
+    def shape(self) -> Shape:
         return self._shape
 
     @property
-    def get_type(self) -> Type:
+    def type(self) -> Type:
         return self._type
 
     @property

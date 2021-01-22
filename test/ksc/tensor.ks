@@ -9,6 +9,14 @@
               (mul 100.0 (to_float k)))
          c))
 
+(def zeroTensorInAD Float (m : Tensor 2 Float) 0.0)
+
+(def constTensor2 (Tensor 2 Float) ((ignored : Float))
+    (build (tuple 3 3) (lam (ij : (Tuple Integer Integer)) 0.0)))
+
+(def constvecInAD (Tensor 2 Float) ((v1 : Vec Float) (ignored : Integer))
+     (constVec (tuple (size v1) (size v1)) 2.0))
+
 (def main Integer ()
     (let (vvv (build 2 (lam (i : Integer)
                   (build 4 (lam (j : Integer)

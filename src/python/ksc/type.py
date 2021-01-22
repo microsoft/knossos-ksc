@@ -32,7 +32,7 @@ class Type:
             assert all((ch is None or isinstance(ch, Type)) for ch in children)
         
         self.kind = kind
-        self.children = children
+        self.children = children # TODO: change to _children and use tuple_elem or tensor_* or lambda_* to access
 
     ################
     ## Constructors
@@ -156,7 +156,7 @@ class Type:
         if self.is_tuple:
             return sum([c.num_elements(assumed_vector_size) for c in self.children])
         elif self.is_tensor:
-            return assumed_vector_size ** self.tensor_rank * self.tensor_elem_type.num_elements(assumed_vector_size)
+            return (assumed_vector_size ** self.tensor_rank) * self.tensor_elem_type.num_elements(assumed_vector_size)
         elif self.is_scalar or self.is_lam_or_LM:
             return 1
 
@@ -184,7 +184,7 @@ class Type:
         if self.is_tuple:
             return tb + "".join([c.shortstr() for c in self.children]) + te
         if self.is_tensor:
-            return f"T{self.tensor_rank}" + self.tensor_elem_type.shortstr()
+            return "T" + self.tensor_rank + self.tensor_elem_type.shortstr()
         
         raise ValueError(f"Unknown Type.{self.kind}")
 
@@ -195,9 +195,9 @@ class Type:
         """
         if isinstance(val, (bool, np.bool)):
             return Type.Bool
-        if isinstance(val, (int, np.integer)):
+        if isinstance(val, (int, np.integer, np.int32, np.int64)):
             return Type.Integer
-        if isinstance(val, (float, np.float)):
+        if isinstance(val, (float, np.float, np.float32, np.float64)):
             return Type.Float
         if isinstance(val, str):
             return Type.String
@@ -241,14 +241,13 @@ Type.Float = Type("Float")
 Type.Bool = Type("Bool")
 Type.String = Type("String")
 
-
 class SizeType:
     @staticmethod
     def from_rank(n : int) -> Type:
         if n == 1:
             return Type.Integer
         else:
-            return Type.Tuple(*[Type.Integer for i in range(n)])
+            return Type.Tuple(*tuple(Type.Integer for _ in range(n)))
 
     @staticmethod
     def get_rank(ty : Type) -> int:

@@ -7,7 +7,7 @@ from ksc.tracing.node import Node
 from ksc.tracing.functions import core
 import ksc.tracing.functions.math as M
 from ksc.type import Type
-from ksc.utils import Shape, TensorShape, ScalarShape
+from ksc.shape import Shape, TensorShape, ScalarShape
 
 def test_transpose():
     x = np.random.normal(0, 1, (3, 7))

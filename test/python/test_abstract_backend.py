@@ -5,7 +5,8 @@ import ksc
 from ksc.tracing.functions import math
 from ksc.abstract_value import AbstractValue, ExecutionContext
 from ksc.type import Type
-from ksc.utils import translate_and_import, shape_type_from_object, ShapeType, TensorShape
+from ksc.shape import shape_type_from_object, ShapeType, TensorShape
+from ksc.utils import translate_and_import 
 from ksc.tracing.functions import core
 
 def test_get_shape():

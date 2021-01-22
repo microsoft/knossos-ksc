@@ -6,7 +6,10 @@ from onnxruntime_tools.transformers.onnx_model_bert import BertOptimizationOptio
 from transformers.convert_graph_to_onnx import load_graph_from_args,convert_pytorch
 from pathlib import Path
 
-if False:
+
+do_base_cased = False
+
+if do_base_cased:
     print("hf-bert-to-onnx: Loading graph")
     nlp = load_graph_from_args("feature-extraction", "pt", "bert-base-cased")
     #!mkdir -p obj/bert-base-cased
@@ -28,21 +31,21 @@ if False:
         optimization_options=opt_options)
     opt_model.save_model_to_file(f'obj/bert-base-cased/bert.opt.{h}.onnx')
 
+else:
+    from transformers import BertModel, BertForQuestionAnswering, BertConfig, BertTokenizer, pipeline
 
-from transformers import BertModel, BertForQuestionAnswering, BertConfig, BertTokenizer, pipeline
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    for d in range(1,3):
+        # Initializing a BERT bert-base-uncased style configuration
+        configuration = BertConfig(num_hidden_layers = d)
+        # Initializing a model from the bert-base-uncased style configuration
+        model = BertForQuestionAnswering(configuration)
 
-for d in range(1,3):
-    # Initializing a BERT bert-base-uncased style configuration
-    configuration = BertConfig(num_hidden_layers = d)
-    # Initializing a model from the bert-base-uncased style configuration
-    model = BertForQuestionAnswering(configuration)
+        p = pipeline('question-answering',model=model,tokenizer=tokenizer)
 
-    p = pipeline('question-answering',model=model,tokenizer=tokenizer)
+        dest = Path("obj/hf-bert-to-onnx")
+        dest.mkdir(parents=True,exist_ok=True)
 
-    dest = Path("obj/hf-bert-to-onnx")
-    dest.mkdir(parents=True,exist_ok=True)
-
-    print("hf-bert-to-onnx: Saving onnx")
-    convert_pytorch(p, opset=11, output=dest / f'bert{d}.onnx', use_external_format=True)
+        print("hf-bert-to-onnx: Saving onnx")
+        convert_pytorch(p, opset=11, output=dest / f'bert{d}.onnx', use_external_format=True)

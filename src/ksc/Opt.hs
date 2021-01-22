@@ -170,6 +170,7 @@ optIf e_cond e_then e_else
   -- NB: (==) on expressions does equality modulo alpha (see Lang.hs)
   = e_then
   | Just (ei, ej) <- isEqualityCall e_cond
+  , TypeInteger <- typeof ei
   , isKZero e_else
   = pDelta ei ej e_then
 optIf b                     t e = If b t e
@@ -338,14 +339,6 @@ optPrimFun _ "deltaVec" (Tuple [n, _i, val])
   | isKZero val
   = Just $ pConstVec n val
 
--- RULE: zero (Int) = 0
-optPrimFun _ "zero" (Konst (KInteger _))
-  = Just (Konst (KInteger 0))
-
--- RULE: zero (Float) = 0.0
-optPrimFun _ "zero" (Konst (KFloat _))
-  = Just (Konst (KFloat 0))
-
 optPrimFun _ "sum"         arg           = optSum arg
 optPrimFun _ "build"       (Tuple [sz, Lam i e2]) = optBuild sz i e2
 optPrimFun _ "sumbuild"    (Tuple [sz, Lam i e2]) = optSumBuild sz i e2
@@ -476,6 +469,7 @@ optSum e
 
 optSum e
   | Just (n, v) <- isConstVec_maybe e
+  , TypeInteger <- typeof n   -- TODO: multidimensional version
   = Just $ sumOfConstVec n v
 
 -- RULE: sum (build n (\i. e)) = (sumbuild n (\i. e))
@@ -501,13 +495,6 @@ sumOfConstVec n v = case typeof v of
 
 -----------------------
 optBuild :: TExpr -> TVar -> TExpr -> Maybe TExpr
-
--- RULE: build sz (\i. <zero>)  =  <zero>
-{-
-optBuild _ _ e
-  | isKZero e
-  = Just $ pZero (.. the build)
--}
 
 -- RULE: build sz (\i. e) = constVec sz e
 --       (if i is not free in e)
@@ -908,10 +895,11 @@ do_prod_v env dir e dx
 
   -- (V(m) `lmApply` dx) = build n (\i. m[i] `lmApply` dx)
   | TypeTensor d _ <- typeof e
-  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet (indexTVar d) env) [e,dx]
+  , let i = indexTVar d
+  , let (binds, [ve, vdx]) = makeAtomic True (extendInScopeSet i env) [e,dx]
   = Just $ mkLets binds $
-    pBuild (pSize ve) $ Lam (indexTVar d) $
-    lmApply_Dir dir (pIndex (Var $ indexTVar d) ve) vdx
+    pBuild (pSize ve) $ Lam i $
+    lmApply_Dir dir (pIndex (Var i) ve) vdx
 
   | otherwise = Nothing
 
@@ -925,19 +913,21 @@ do_sum_v env dir e dx
   
   | Just (n, v) <- isConstVec_maybe e
   , Just d <- tensorDimensionFromIndexType_maybe (typeof n)
-  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet  (indexTVar d) env) [dx]
+  , let i = indexTVar d
+  , let (binds, [vdx]) = makeAtomic True (extendInScopeSet i env) [dx]
   = Just $ mkLets binds $
-    pSumBuild n $ Lam (indexTVar d) $
-    lmApply_Dir dir v (pIndex (Var $ indexTVar d) vdx)
+    pSumBuild n $ Lam i $
+    lmApply_Dir dir v (pIndex (Var i) vdx)
 
   -- (H(m) `lmApply` dx) = sumbuild n (\i. m[i] `lmApply` dx[i])
   | TypeTensor d _ <- typeof e
-  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet (indexTVar d) env) [e,dx]
+  , let i = indexTVar d
+  , let (binds, [vm, vdx]) = makeAtomic True (extendInScopeSet i env) [e,dx]
   = Just $
     mkLets binds $
-    pSumBuild (pSize vm) $ Lam (indexTVar d) $
-    lmApply_Dir dir (pIndex (Var (indexTVar d)) vm)
-                    (pIndex (Var (indexTVar d)) vdx)
+    pSumBuild (pSize vm) $ Lam i $
+    lmApply_Dir dir (pIndex (Var i) vm)
+                    (pIndex (Var i) vdx)
 
   | otherwise = Nothing
 

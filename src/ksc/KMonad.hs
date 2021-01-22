@@ -29,9 +29,6 @@ getUniq = KM (do { uniq <- get
                  ; put (uniq+1)
                  ; return uniq })
 
-setUniq :: Monad m => Uniq -> KMT m ()
-setUniq uniq = KM (put uniq)
-
 runKM :: Monad m => KMT m a -> m a
 runKM (KM km) = evalStateT km initialUniq
 

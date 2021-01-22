@@ -4,13 +4,16 @@ import inspect
 
 import numpy as np
 
+from ksc.type import Type
+from ksc.shape import ShapeType, shape_type_from_object
+
 from ksc.abstract_value import AbstractValue
 from ksc.ks_function import KsFunction
-from ksc.type import Type
+
 from ksc.tracing import node
 from ksc.tracing.function import Trace, TraceableFunction
-from ksc import utils
-from ksc.utils import ShapeType
+
+
 
 _jitted = {}
 
@@ -43,7 +46,7 @@ def get_or_trace_function(f, original_args):
         if key in _jitted:
             return _jitted[key]
 
-    inputs = [node.Node(n, arg.get_shape, arg.get_type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
+    inputs = [node.Node(n, arg.shape, arg.type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
 
     # trace the function
     trace = f.trace(*inputs)
@@ -78,7 +81,7 @@ def lift_constants(body):
             values.append(node.data)
     return arg_names, shape_types, values
 
-def jit_and_execute_annonymous_function(body, backend):
+def jit_and_execute_anonymous_function(body, backend):
     shape_type = body.shape_type
     arg_names, shape_types, values = lift_constants(body)
     trace = Trace(body, shape_type, shape_types)
@@ -93,7 +96,7 @@ def jit_and_execute_annonymous_function(body, backend):
         # wrap the concrete values in AbstractValue
         values = [AbstractValue.from_data(value) for value in values]
     v = jitted(*values, backend=backend)
-    st = utils.shape_type_from_object(v)
+    st = shape_type_from_object(v)
     value = node.Node("_identity", st.shape, st.type, data=v)
     value._children = [jitted.origin]
     return value
@@ -118,7 +121,7 @@ def format_arg_list(arg_names, arg_types):
     return " ".join([f"({n} : {t})" for n, t in zip(arg_names, arg_types)])
 
 def format_constant(value):
-    type = utils.shape_type_from_object(value).type
+    type = shape_type_from_object(value).type
     if type.is_tuple:
         args = " ".join([format_constant(v) for v in value])
         return f"(tuple {args})"
@@ -387,7 +390,7 @@ def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=Non
     Should be a python function taking AbstractValues, 
     and returning a ShapeType of the result, e.g.
         def mat_vec_mul_shape_propagate(M, v):
-            return ShapeType(M.get_shape.dims[0], v.get_type)
+            return ShapeType(M.shape.dims[0], v.type)
 
     The algebra of these shape classes is:
         Shape of scalar is      ScalarShape (constant initialized to ())

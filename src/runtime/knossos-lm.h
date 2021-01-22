@@ -33,7 +33,7 @@ namespace ks
 			static Zero mk(From, To) { return Zero{}; }
 
 			To Apply(allocator * alloc, From f) const {
-				return zero(alloc, To{});
+				return To{};  // TODO: Create a zero with the correct shape (this would require an extra parameter)
 			}
 		};
 

@@ -96,6 +96,14 @@ def parse_string(se):
     check(isinstance(se, str), "Expected string, got: ", se) 
     return se
 
+# "1.3" -> int
+def parse_int(se):
+    if isinstance(se, int):
+        return se
+
+    assert re.match(r"^\d+$", se)
+    return int(se)
+
 # "x : Float" -> Var(x, Type.Float)
 def parse_arg(arg):
     check(len(arg) >= 3, "Expect (arg : type), not: ", arg)

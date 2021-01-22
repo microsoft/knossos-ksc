@@ -4,7 +4,7 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType, shape_type
+from ksc.type import Type, SizeType
 
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
@@ -124,7 +124,7 @@ def ks_prim_lookup(name, tys):
         assert tys[0] == tys[1]
         return Type.Float
 
-    # ts_add : Float, dT -> dT
+    # ts_scale : Float, dT -> dT
     if n == 2 and name == "ts_scale":
         assert tys[0] == Type.Float
         return tys[1]

@@ -3,10 +3,10 @@ workspace:
 
 steps:
 - script: 'sh ./test/builds/build_linux.sh /opt/ghc/8.6.3/bin/ghc-8.6.3'
-  displayName: 'Build Main.hs'
+  displayName: 'Build Main.hs [userTest]'
 
 - script: src/ksc/Main
-  displayName: 'Run Main'
+  displayName: 'Run Main [userTest]'
 
 - script: rm -rf *
   displayName: 'Clean'

@@ -6,7 +6,8 @@ from ksc.abstract_value import AbstractValue, ExecutionContext
 from ksc.cost import compute_cost
 from ksc.tracing.functions import math
 from ksc.type import Type
-from ksc.utils import translate_and_import, TensorShape, ScalarShape, ShapeType
+from ksc.utils import translate_and_import
+from ksc.shape import Shape, TensorShape, ScalarShape, ShapeType
 
 def test_afe():
     ks_str = """

@@ -260,6 +260,11 @@ tensorTypeFromIndexType_maybe :: Type -> Type -> Maybe Type
 tensorTypeFromIndexType_maybe indexType elementType =
   fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType_maybe indexType)
 
+zeroIndexForDimension :: Int -> TExpr
+zeroIndexForDimension 1 = kInt 0
+zeroIndexForDimension d = mkTuple (replicate d (kInt 0))
+
+
 ----------------------------------
 --- Tangent space
 
@@ -331,13 +336,6 @@ eqTypes :: Type -> [Type] -> Maybe Type
 eqTypes x xs = if all (eqType x) xs
                then Just x
                else Nothing
-
-eqSize :: TExpr -> TExpr -> Bool
-eqSize (Konst k1) (Konst k2) = traceWhenUnequal "eqSize" k1 k2 $ k1 == k2
--- eqSize (Var v1) (Var v2) = traceWhenUnequal "eqSize" v1 v2 $ v1 == v2
--- Punt on all other size equality checks
-eqSize _e1 _e2 = -- trace ("[Punting eqSize " ++ pps _e1 ++ " == " ++ pps _e2 ++ "]")
-                 True
 
 type PrimFun = String
 

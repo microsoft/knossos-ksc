@@ -30,27 +30,6 @@ mul$aT2fT1f(allocator * alloc, tensor<2, double> const& M, vec<double> const& v)
 	return ret;
 }
 
-tuple<vec<vec<double>>,vec<double>> 
-rev$mul$Mat$Vec$a$dT1T1fT1f$bT1f(allocator * alloc, std::tuple<vec<vec<double>>, vec<double>> const& M_v, vec<double> const& dr)
-{
-    auto [M, v] = M_v;
-	int r = size(M);
-	int c = size(v);
-	vec<vec<double>> retM(alloc, r);
-	for(int i = 0; i < r; ++i)
-		retM[i] = ts_scale(alloc, dr[i], v);
-
-	vec<double> retv(alloc, c);
-	for(int i = 0; i < c; ++i) {
-		double retvi = 0;
-		for(int j = 0; j < r; ++j)
-			retvi += M[j][i] * dr[j];
-		retv[i] = retvi;
-	}
-
-	return std::make_tuple(retM,retv);
-}
-
 tuple<tensor<2, double>,vec<double>>
 rev$mul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2, double>, vec<double>> const& M_v, vec<double> const& dr)
 {
@@ -76,7 +55,7 @@ rev$mul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2, double>, vec<doub
 	return std::make_tuple(retM,retv);
 }
 
-size_t imaximum(vec<double> const &v)
+size_t imax$aT1f(allocator *, vec<double> const &v)
 {
     KS_ASSERT(size(v) > 0);
     size_t imax = 0;
@@ -90,23 +69,9 @@ size_t imaximum(vec<double> const &v)
     return imax;
 }
 
-double maximum(vec<double> const& v) 
+double max$aT1f(allocator * alloc, vec<double> const& v)
 {
-    return v[imaximum(v)];
-}
-
-double fwd$maximum(allocator *, vec<double> const& v, vec<double> const& dv) 
-{
-    std::cerr << "[fwd$maximum untested]";
-    size_t i = imaximum(v);
-    return dv[i];
-}
-
-vec<double> rev$maximum(allocator * alloc, vec<double> const& v, double dr)
-{
-    std::cerr << "[rev$maximum untested]";
-    int i = imaximum(v);
-    return deltaVec(alloc, size(v), i, dr);
+    return v[imax$aT1f(alloc, v)];
 }
 
 double digamma(allocator *, double x)

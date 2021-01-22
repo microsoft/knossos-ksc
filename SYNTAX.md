@@ -124,7 +124,7 @@ type literals, they must be created using specific Knossos constructs.
 #### Tensor
 
 `Tensor N` is a tensor of elements with the same type. Tensors are composable, so 
-can contain any type, e.g. Tensor(2, Tuple(Float, String, Tensor(3, FLoat)))
+can contain any type, e.g. Tensor 2 (Tuple Float String (Tensor 3 Float))
 
 The type declaration is simply: `(Tensor N Type)`. 
 
@@ -135,18 +135,22 @@ inner Tensors could have a different size.
 ##### build
 
 Tensors need to be created algorithmically, either as the result of a
-function or using the `(build Shape (lambda)))` construct. The parameter `N` has
-to be an integer or tuple of ints and the `Lambda` has to have only one `Shape` argument.
-
-Each element of _induction variable_ passed to the `Lambda` will have the range `[0,N[`, ie.
+function or using the `build` construct.  Build takes a size and a lambda, e.g.
+```lisp
+; Creating a 7-element vector
+(build 7 (lambda (i : Integer) (f i)))
+; Creating a 5x7 matrix 
+(build (tuple 7 5) (lambda (ij : Tuple Integer Integer) 
+  (let ((i j) ij)
+    (atan2 i j))))
+; Creating a 5x7 (ragged) matrix of i-element vectors of constants
+(build (tuple 7 5) (lambda (ij : Tuple Integer Integer) 
+  (let ((i j) ij)
+    (constVec i (to_float j)))))
+```
+Each element of _induction variable_ passed to the lambda will have the range `[0,N[`, ie.
 zero inclusive, N exclusive.
 
-```
-; Creating a 10-element vector of floats, from 0.0 to 9.0
-(build 10 (lam (i : Integer) (to_float i)))
-; Creating a 5x7 matrix of ints
-(build (tuple 5 7) (lam ((i : Integer) (j : Integer)) i))
-```
 
 ##### size
 

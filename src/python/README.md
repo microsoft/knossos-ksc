@@ -136,13 +136,13 @@ We will get another `ImportError` but that's fine. What is interesting this time
 
 
 ```lisp
-(def shape$add3@vvfvvfvvf (Tuple Integer Integer) ((a : (Tensor 2 Float)) (b : (Tensor 2 Float)) (c : (Tensor 2 Float)))
+(def shape$add3@T2fT2fT2f  (Tuple Integer Integer) ((a : (Tensor 2 Float)) (b : (Tensor 2 Float)) (c : (Tensor 2 Float)))
   (let ((v0 (index 0 a)))
   (tuple (size a) (size v0))
   )
 )
 
-(def cost$add3@vvfvvfvvf Integer ((a : (Tensor 2 Float)) (b : (Tensor 2 Float)) (c : (Tensor 2 Float)))
+(def cost$add3@T2fT2fT2f  Integer ((a : (Tensor 2 Float)) (b : (Tensor 2 Float)) (c : (Tensor 2 Float)))
   (let ((v0 (index 0 a)))
   (mul@ii (mul@ii (size a) (mul@ii (size v0) 1)) 2)
   )

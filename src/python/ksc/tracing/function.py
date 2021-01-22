@@ -2,7 +2,7 @@ from collections import namedtuple
 
 from ksc.tracing import jitting
 from ksc.tracing import node
-from ksc import utils
+from ksc.shape import shape_type_from_object
 
 Trace = namedtuple("Trace", ["body", "shape_type", "arg_shape_types"])
 
@@ -37,7 +37,7 @@ class TraceableFunction:
                 else:
                     converted_args.append(arg)
             else:
-                st = utils.shape_type_from_object(arg)
+                st = shape_type_from_object(arg)
                 converted_args.append(node.Node("", st.shape, st.type, data=arg))
             print(f"Processing the {i+1}th argument to {self.name} with {converted_args[-1].shape_type}")
         jitted = jitting.get_or_trace_function(self, converted_args)

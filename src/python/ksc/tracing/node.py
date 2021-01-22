@@ -5,7 +5,8 @@ from ksc.type import Type
 from ksc.abstract_value import AbstractValue
 from ksc.tracing import function
 from ksc.tracing import jitting
-from ksc import utils
+from ksc.shape import shape_type_from_object
+
 
 class Node(AbstractValue):
     def __init__(self, name, shape=None, type=None, data=None, children=[], jitted=None, shape_prop_function=None):
@@ -22,7 +23,7 @@ class Node(AbstractValue):
     def from_data(value):
         if isinstance(value, Node):
             return value
-        st = utils.shape_type_from_object(value)
+        st = shape_type_from_object(value)
         return Node("", st.shape, st.type, data=value)
 
     def add_user(self, node):
@@ -34,7 +35,7 @@ class Node(AbstractValue):
 
     def get_data_with_backend(self, backend):
         if self._data is not None and not self.data_ready:
-            value_node = jitting.jit_and_execute_annonymous_function(self.creator, backend)
+            value_node = jitting.jit_and_execute_anonymous_function(self.creator, backend)
             self._children = value_node.children
             self._data = value_node.data
         return self._data
@@ -126,7 +127,7 @@ class Node(AbstractValue):
         if self._type.is_tensor:
             if isinstance(index, slice):
                 raise NotImplementedError
-            return core.get_vector_element(index, self)
+            return core.get_tensor_element(index, self)
         
         raise ValueError(f"Tried to call __getitem__ on {self} which is not a Tuple.  Use index for tensors.")
 
@@ -142,21 +143,21 @@ class Node(AbstractValue):
 
         """
         from ksc.tracing.functions import core
-        if self.get_type.is_scalar:
+        if self.type.is_scalar:
             return core.make_tuple()
 
-        if self.get_type.is_tensor:
+        if self.type.is_tensor:
 
             dims = core.get_tensor_size(self) # ks::size
             # TOUNDO: ks::size returns an int for rank 1,need to tuple it
-            if self.get_type.tensor_rank == 1:
+            if self.type.tensor_rank == 1:
                 dims = core.make_tuple(dims)
 
             element = core.get_tensor_element0(self) # ks::index
             return core.make_tuple(dims, element.shape_program)
             
-        if self.get_type.is_tuple:
-            children = (core.get_tuple_element(i, self).shape_program for i in range(self.get_type.tuple_len))
+        if self.type.is_tuple:
+            children = (core.get_tuple_element(i, self).shape_program for i in range(self.type.tuple_len))
             return core.make_tuple(*children)
 
         raise NotImplementedError

@@ -1,66 +1,66 @@
 ;; Loaders first
-(edef load-from-onnx-float32 (Vec Float) (Integer String))
-(edef load-from-onnx-float32 (Vec Float) (Integer Integer String))
-(edef load-from-onnx-float32 (Vec Float) (Integer Integer Integer String))
-(edef load-from-onnx-float32 (Vec Float) (Integer Integer Integer Integer String))
-(edef load-from-onnx-int64 (Vec Integer) (Integer String))
-(edef load-from-onnx-int64 (Vec Integer) (Integer Integer String))
-(edef load-from-onnx-int64 (Vec Integer) (Integer Integer Integer String))
-(edef load-from-onnx-int64 (Vec Integer) (Integer Integer Integer Integer String))
+(edef load-from-onnx-float32 (Tensor 1 Float) (Integer String))
+(edef load-from-onnx-float32 (Tensor 2 Float) (Integer Integer String))
+(edef load-from-onnx-float32 (Tensor 3 Float) (Integer Integer Integer String))
+(edef load-from-onnx-float32 (Tensor 4 Float) (Integer Integer Integer Integer String))
+(edef load-from-onnx-int64 (Tensor 1 Integer) (Integer String))
+(edef load-from-onnx-int64 (Tensor 2 Integer) (Integer Integer String))
+(edef load-from-onnx-int64 (Tensor 3 Integer) (Integer Integer Integer String))
+(edef load-from-onnx-int64 (Tensor 4 Integer) (Integer Integer Integer Integer String))
 
 ;; Constant
 ;; https://github.com/onnx/onnx/blob/master/docs/Operators.md#constant
 (def Constant Float (v : Float)  v)
 (def Constant Integer (v : Integer)  v)
-(def Constant (Vec Float) (v : Vec Float) v)
-(def Constant (Vec Integer) (v : Vec Integer) v)
+(def Constant (Tensor 1 Float) (v : Tensor 1 Float) v)
+(def Constant (Tensor 1 Integer) (v : Tensor 1 Integer) v)
 
 
 (def Identity Float (a : Float) a)
 
 
 ;; Grads
-(edef TanhGrad (Vec Float) ((Vec Float) (Vec Float)))
+(edef TanhGrad (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float)))
 
 ;; Broadcast versions of some builtins
-(edef Sub (Vec Integer) (Integer (Vec Integer)))
+(edef Sub (Tensor -1 Integer) (Integer (Tensor -1 Integer)))
 
-(edef Sub (Vec Float) (Float (Vec Float)))
+(edef Sub (Tensor -1 Float) (Float (Tensor -1 Float)))
 (edef Sub Float (Float Float))
 
 (edef Mul Float (Float Float))
-(edef Mul (Vec Float) (Float (Vec Float)))
-(edef Mul (Vec Float) ((Vec Float) Float))
-; (edef Mul (Vec Float) ((Vec Integer) (Vec Float)))
+(edef Mul (Tensor -1 Float) (Float (Tensor -1 Float)))
+(edef Mul (Tensor -1 Float) ((Tensor -1 Float) Float))
+; (edef Mul (Tensor -1 Float) ((Tensor -1 Integer) (Tensor -1 Float)))
 
 (edef Div Float (Float Float))
-(edef Div (Vec Float) (Float (Vec Float)))
-(edef Div (Vec Float) ((Vec Float) Float))
+(edef Div (Tensor -1 Float) (Float (Tensor -1 Float)))
+(edef Div (Tensor -1 Float) ((Tensor -1 Float) Float))
 
 (edef Add Float (Float Float))
-(edef Add (Vec Float) (Float (Vec Float)))
-(edef Add (Vec Float) ((Vec Float) Float))
+(edef Add (Tensor -1 Float) (Float (Tensor -1 Float)))
+(edef Add (Tensor -1 Float) ((Tensor -1 Float) Float))
 
-(edef Min (Vec Float) ((Vec Float) (Vec Float)))
-(edef Min (Vec Float) (Float (Vec Float)))
+(edef Min (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float)))
+(edef Min (Tensor -1 Float) (Float (Tensor -1 Float)))
 
-(edef Equal (Vec Bool) (Float (Vec Float)))
-(edef Equal (Vec Bool) ((Vec Float) Float))
-(edef Equal (Vec Bool) (Integer (Vec Integer)))
-(edef Equal (Vec Bool) ((Vec Integer) Integer))
+(edef Equal (Tensor -1 Bool) (Float (Tensor -1 Float)))
+(edef Equal (Tensor -1 Bool) ((Tensor -1 Float) Float))
+(edef Equal (Tensor -1 Bool) (Integer (Tensor -1 Integer)))
+(edef Equal (Tensor -1 Bool) ((Tensor -1 Integer) Integer))
 
 ;; Single-float overloads (i.e. a single float is passed as a rank-0 tensor)
-(edef Gather (Vec Float) ((Vec Float) Integer Integer))
-(edef com.microsoft.SoftmaxCrossEntropyLossGrad (Vec Float) (#|Vec|#Float (Vec Float) (Vec Integer) Integer String))
-(edef com.microsoft.MixedPrecisionScale (Vec Float) (#|Vec|#Float (Vec Float) Integer Integer))
-(edef com.microsoft.LayerNormalizationGrad (Tuple (Vec Float) (Vec Float) (Vec Float)) 
-                          ((Vec Float) (Vec Float) (Vec Float) (Vec Float) (Vec Float) Float Integer))
-(edef com.microsoft.GatherGrad (Vec Float) ((Vec Integer) #|Vec|#Integer (Vec Float) Integer))
+(edef Gather (Tensor -1 Float) ((Tensor -1 Float) Integer Integer))
+(edef com.microsoft.SoftmaxCrossEntropyLossGrad (Tensor -1 Float) (#|Vec|#Float (Tensor -1 Float) (Tensor -1 Integer) Integer String))
+(edef com.microsoft.MixedPrecisionScale (Tensor -1 Float) (#|Vec|#Float (Tensor -1 Float) Integer Integer))
+(edef com.microsoft.LayerNormalizationGrad (Tuple (Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float)) 
+                          ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) Float Integer))
+(edef com.microsoft.GatherGrad (Tensor -1 Float) ((Tensor -1 Integer) #|Vec|#Integer (Tensor -1 Float) Integer))
 
 ;; Variadics
-(edef Sum (Vec Float) ((Vec Float) (Vec Float)))
-(edef Sum (Vec Float) ((Vec Float) (Vec Float) (Vec Float)))
-(edef Sum (Vec Float) ((Vec Float) (Vec Float) (Vec Float) (Vec Float)))
+(edef Sum (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float)))
+(edef Sum (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float)))
+(edef Sum (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float)))
 
 
 
@@ -83,15 +83,15 @@
 ;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
 ;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)'] | Constrain input 'ratio' types to float tensors.
 ;; T2 | ['tensor(bool)'] | Constrain output 'mask' types to boolean tensors.
-; #out=0 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
-(edef take1$Dropout (Vec Float) ((Vec Float) Float (Vec Bool) Integer))
-(edef take1$Dropout (Vec Float) ((Vec Float) Float Integer))
-(edef take1$Dropout (Vec Float) ((Vec Float) Integer))
+; #out=0 ARGS: Arg<data,(Tensor -1 Float),,single> Arg<ratio,(Tensor -1 Float),,optional> Arg<training_mode,(Tensor -1 Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef take1$Dropout (Tensor -1 Float) ((Tensor -1 Float) Float (Tensor -1 Bool) Integer))
+(edef take1$Dropout (Tensor -1 Float) ((Tensor -1 Float) Float Integer))
+(edef take1$Dropout (Tensor -1 Float) ((Tensor -1 Float) Integer))
 ;; NOTE: multiple outputs as tuple
-; #out=1 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
-(edef Dropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Float (Vec Bool) Integer))
-(edef Dropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Float Integer))
-(edef Dropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Integer))
+; #out=1 ARGS: Arg<data,(Tensor -1 Float),,single> Arg<ratio,(Tensor -1 Float),,optional> Arg<training_mode,(Tensor -1 Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef Dropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) Float (Tensor -1 Bool) Integer))
+(edef Dropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) Float Integer))
+(edef Dropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) Integer))
 ; shape$Dropout
 
 ;; Doing TrainableDropout # line "/home/awf/dev/onnxruntime/orttraining/orttraining/core/graph/training_op_defs.cc" 1379
@@ -101,13 +101,13 @@
 ;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
 ;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input 'ratio' types to float tensors.
 ;; T2 | ['tensor(bool)'] | Constrain output 'mask' types to boolean tensors.
-; #out=0 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Attr<Optional,seed,**MISSING**> 
-(edef take1$TrainableDropout (Vec Float) ((Vec Float) Float Integer))
-(edef take1$TrainableDropout (Vec Float) ((Vec Float) Integer))
+; #out=0 ARGS: Arg<data,(Tensor -1 Float),,single> Arg<ratio,(Tensor -1 Float),,optional> Attr<Optional,seed,**MISSING**> 
+(edef take1$TrainableDropout (Tensor -1 Float) ((Tensor -1 Float) Float Integer))
+(edef take1$TrainableDropout (Tensor -1 Float) ((Tensor -1 Float) Integer))
 ;; NOTE: multiple outputs as tuple
-; #out=1 ARGS: Arg<data,(Vec Float),,single> Arg<ratio,(Vec Float),,optional> Attr<Optional,seed,**MISSING**> 
-(edef TrainableDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Float Integer))
-(edef TrainableDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) Integer))
+; #out=1 ARGS: Arg<data,(Tensor -1 Float),,single> Arg<ratio,(Tensor -1 Float),,optional> Attr<Optional,seed,**MISSING**> 
+(edef TrainableDropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) Float Integer))
+(edef TrainableDropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) Integer))
 ; shape$TrainableDropout
 
 
@@ -119,12 +119,12 @@
 ;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
 ;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input 'ratio' types to float tensors.
 ;; T2 | ['tensor(bool)'] | Constrain 'mask' and 'training_mode' types to boolean tensors.
-; #out=0 ARGS: Arg<dy,(Vec Float),,single> Arg<mask,(Vec Bool),,single> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> 
-(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool) Float Bool))  ; TODO: why the extra integer?
-(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool) Float))
-(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool)))
+; #out=0 ARGS: Arg<dy,(Tensor -1 Float),,single> Arg<mask,(Tensor -1 Bool),,single> Arg<ratio,(Tensor -1 Float),,optional> Arg<training_mode,(Tensor -1 Bool),,optional> 
+(edef com.microsoft.DropoutGrad (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Bool) Float Bool))  ; TODO: why the extra integer?
+(edef com.microsoft.DropoutGrad (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Bool) Float))
+(edef com.microsoft.DropoutGrad (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Bool)))
 ; shape$com.microsoft.DropoutGrad
-(edef com.microsoft.DropoutGrad (Vec Float) ((Vec Float) (Vec Bool) Float Bool Integer))  
+(edef com.microsoft.DropoutGrad (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Bool) Float Bool Integer))  
 ; TODO: why the extra integer?  needed in bert-tiny-bw 'com.microsoft.DropoutGrad(%445_grad, %446, dropout_ratio_27, dropout_training_mode_28, 0)'
 
 
@@ -135,9 +135,9 @@
 ;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(bfloat16)'] | Constrain input and output types to float tensors.
 ;; T1 | ['tensor(float)'] | Constrain input 'ratio' types to float tensors.
 ;; T2 | ['tensor(bool)'] | Constrain 'mask' types to boolean tensors.
-; #out=0 ARGS: Arg<dy,(Vec Float),,single> Arg<mask,(Vec Bool),,single> Arg<ratio,(Vec Float),,optional> 
-(edef com.microsoft.TrainableDropoutGrad (Vec Float) ((Vec Float) (Vec Bool) (Vec Float)))
-(edef com.microsoft.TrainableDropoutGrad (Vec Float) ((Vec Float) (Vec Bool)))
+; #out=0 ARGS: Arg<dy,(Tensor -1 Float),,single> Arg<mask,(Tensor -1 Bool),,single> Arg<ratio,(Tensor -1 Float),,optional> 
+(edef com.microsoft.TrainableDropoutGrad (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Bool) (Tensor -1 Float)))
+(edef com.microsoft.TrainableDropoutGrad (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Bool)))
 ; shape$com.microsoft.TrainableDropoutGrad
 
 
@@ -148,17 +148,17 @@
 ;; T | ['tensor(float16)', 'tensor(float)', 'tensor(double)'] | Constrain input and output types to float tensors.
 ;; T1 | ['tensor(float16)', 'tensor(float)', 'tensor(double)'] | Constrain input 'ratio' types to float tensors.
 ;; T2 | ['tensor(bool)'] | Constrain output 'mask' types to boolean tensors.
-; #out=0 ARGS: Arg<data,(Vec Float),,single> Arg<bias,(Vec Float),,single> Arg<residual,(Vec Float),,optional> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
-(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) (Vec Float) Float (Vec Bool) Integer))
-(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) (Vec Float) Float Integer))
-(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) (Vec Float) Integer))
-(edef take1$com.microsoft.BiasDropout (Vec Float) ((Vec Float) (Vec Float) Integer))
+; #out=0 ARGS: Arg<data,(Tensor -1 Float),,single> Arg<bias,(Tensor -1 Float),,single> Arg<residual,(Tensor -1 Float),,optional> Arg<ratio,(Tensor -1 Float),,optional> Arg<training_mode,(Tensor -1 Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef take1$com.microsoft.BiasDropout (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) Float (Tensor -1 Bool) Integer))
+(edef take1$com.microsoft.BiasDropout (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) Float Integer))
+(edef take1$com.microsoft.BiasDropout (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) Integer))
+(edef take1$com.microsoft.BiasDropout (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Float) Integer))
 ;; NOTE: multiple outputs as tuple
-; #out=1 ARGS: Arg<data,(Vec Float),,single> Arg<bias,(Vec Float),,single> Arg<residual,(Vec Float),,optional> Arg<ratio,(Vec Float),,optional> Arg<training_mode,(Vec Bool),,optional> Attr<Optional,seed,**MISSING**> 
-(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) (Vec Float) Float (Vec Bool) Integer))
-(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) (Vec Float) Float Integer))
-(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) (Vec Float) Integer))
-(edef com.microsoft.BiasDropout (Tuple (Vec Float) (Vec Bool)) ((Vec Float) (Vec Float) Integer))
+; #out=1 ARGS: Arg<data,(Tensor -1 Float),,single> Arg<bias,(Tensor -1 Float),,single> Arg<residual,(Tensor -1 Float),,optional> Arg<ratio,(Tensor -1 Float),,optional> Arg<training_mode,(Tensor -1 Bool),,optional> Attr<Optional,seed,**MISSING**> 
+(edef com.microsoft.BiasDropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) Float (Tensor -1 Bool) Integer))
+(edef com.microsoft.BiasDropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) Float Integer))
+(edef com.microsoft.BiasDropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) (Tensor -1 Float) (Tensor -1 Float) Integer))
+(edef com.microsoft.BiasDropout (Tuple (Tensor -1 Float) (Tensor -1 Bool)) ((Tensor -1 Float) (Tensor -1 Float) Integer))
 ; shape$com.microsoft.BiasDropout
 
 
@@ -193,25 +193,71 @@
 
 ;; Special-cased in onnx2ks as output type depends on a potentially runtime value...
 
-(edef Cast_FLOATS (Vec Float) ((Vec Bool)))
-(edef Cast_FLOATS (Vec Float) ((Vec String)))
-(edef Cast_FLOATS (Vec Float) ((Vec Integer)))
-(edef Cast_FLOATS (Vec Float) ((Vec Float)))
+(edef Cast_FLOATS (Tensor -1 Float) ((Tensor -1 Bool)))
+(edef Cast_FLOATS (Tensor -1 Float) ((Tensor -1 String)))
+(edef Cast_FLOATS (Tensor -1 Float) ((Tensor -1 Integer)))
+(edef Cast_FLOATS (Tensor -1 Float) ((Tensor -1 Float)))
 
-(edef Cast_INTS (Vec Integer) ((Vec Bool)))
-(edef Cast_INTS (Vec Integer) ((Vec String)))
-(edef Cast_INTS (Vec Integer) ((Vec Integer)))
-(edef Cast_INTS (Vec Integer) ((Vec Float)))
+(edef Cast_INTS (Tensor -1 Integer) ((Tensor -1 Bool)))
+(edef Cast_INTS (Tensor -1 Integer) ((Tensor -1 String)))
+(edef Cast_INTS (Tensor -1 Integer) ((Tensor -1 Integer)))
+(edef Cast_INTS (Tensor -1 Integer) ((Tensor -1 Float)))
 
-(edef Cast_FLOAT Float ((Vec Bool)))
-(edef Cast_FLOAT Float ((Vec String)))
-(edef Cast_FLOAT Float ((Vec Integer)))
-(edef Cast_FLOAT Float ((Vec Float)))
+(edef Cast_FLOAT Float ((Tensor -1 Bool)))
+(edef Cast_FLOAT Float ((Tensor -1 String)))
+(edef Cast_FLOAT Float ((Tensor -1 Integer)))
+(edef Cast_FLOAT Float ((Tensor -1 Float)))
 
-(edef Cast_INT Integer ((Vec Bool)))
-(edef Cast_INT Integer ((Vec String)))
-(edef Cast_INT Integer ((Vec Integer)))
-(edef Cast_INT Integer ((Vec Float)))
+(edef Cast_INT Integer ((Tensor -1 Bool)))
+(edef Cast_INT Integer ((Tensor -1 String)))
+(edef Cast_INT Integer ((Tensor -1 Integer)))
+(edef Cast_INT Integer ((Tensor -1 Float)))
+
+
+;; Doing Reshape # line "/home/awf/dev/onnxruntime/cmake/external/onnx/onnx/defs/tensor/defs.cc" 262
+; since_version 13
+;; 
+;; Reshape the input tensor similar to numpy.reshape.
+;; First input is the data tensor, second input is a shape tensor which specifies the output shape. It outputs the reshaped tensor.
+;; At most one dimension of the new shape can be -1. In this case, the value is
+;; inferred from the size of the tensor and the remaining dimensions. A dimension
+;; could also be 0, in which case the actual dimension value is unchanged (i.e. taken
+;; from the input tensor).
+;; Type constraints:
+;; T | ['tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(bfloat16)', 'tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(string)', 'tensor(bool)', 'tensor(complex64)', 'tensor(complex128)'] | Constrain input and output types to all tensor types.
+;; NOTE: output mangler cplx$
+; #out=0 ARGS: Arg<data,(Tensor -1 (Tuple Float Float)),cplx$,single> Arg<shape,(Tensor -1 Integer),,single> 
+(edef Reshape (Tensor -1 (Tuple Float Float)) ((Tensor -1 (Tuple Float Float)) (Tensor 1 Integer)))
+(edef Reshape (Tensor -1 Integer)             ((Tensor -1 Integer) (Tensor 1 Integer)))
+(edef Reshape (Tensor -1 String)              ((Tensor -1 String) (Tensor 1 Integer)))
+(edef Reshape (Tensor -1 Bool)                ((Tensor -1 Bool) (Tensor 1 Integer)))
+(edef Reshape (Tensor -1 Float)               ((Tensor -1 Float) (Tensor 1 Integer)))
+
+
+;; Doing Unsqueeze # line "/home/awf/dev/onnxruntime/cmake/external/onnx/onnx/defs/tensor/defs.cc" 1763
+; since_version 13
+;; 
+;; Insert single-dimensional entries to the shape of an input tensor (`data`).
+;; Takes one required input `axes` - which contains a list of dimension indices and this operator will insert a dimension of value `1` into the corresponding index of the output tensor (`expanded`).
+;; 
+;; For example:
+;;   Given an input tensor (`data`) of shape [3, 4, 5], then
+;;   Unsqueeze(data, axes=[0, 4]) outputs a tensor (`expanded`) containing same data as `data` but with shape [1, 3, 4, 5, 1].
+;; 
+;; The input `axes` should not contain any duplicate entries. It is an error if it contains duplicates.
+;; The rank of the output tensor (`output_rank`) is the rank of the input tensor (`data`) plus the number of values in `axes`.
+;; Each value in `axes` should be within the (inclusive) range [-output_rank , output_rank - 1]. 
+;; The order of values in `axes` does not matter and can come in any order. 
+;; 
+;; Type constraints:
+;; T | ['tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(bfloat16)', 'tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(string)', 'tensor(bool)', 'tensor(complex64)', 'tensor(complex128)'] | Constrain input and output types to all tensor types.
+;; NOTE: output mangler cplx$
+;(edef Unsqueeze (Tensor -1 (Tuple Float Float)) ((Tensor -1 (Tuple Float Float)) (Tensor -1 Integer)))
+(edef Unsqueeze (Tensor -1 Integer) ((Tensor -1 Integer) (Tensor 1 Integer)))
+;(edef Unsqueeze (Tensor -1 String) ((Tensor -1 String) (Tensor -1 Integer)))
+;(edef Unsqueeze (Tensor -1 Bool) ((Tensor -1 Bool) (Tensor -1 Integer)))
+;(edef Unsqueeze (Tensor -1 Float) ((Tensor -1 Float) (Tensor -1 Integer)))
+
 
 
 ;; Doing If # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/controlflow/defs.cc" 423
@@ -220,7 +266,7 @@
 ;; V | ['tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(string)', 'tensor(bool)', 'tensor(complex64)', 'tensor(complex128)'] | All Tensor types
 ;; B | ['tensor(bool)'] | Only bool
 ;; WARN: multiple types but no type constraints at If: {('', Type.Vec(Type.Float)), ('', Type.Vec(Type.Integer)), ('', Type.Vec(Type.String)), ('', Type.Vec(Type.Bool)), ('cplx$', Type.Vec(Type.Tuple(Type.Float, Type.Float)))}
-(edef If (Vec Float) ((Vec Bool) (Lam (Vec Float) (Vec Float)) (Lam (Vec Float) (Vec Float))))
+(edef If (Tensor -1 Float) ((Tensor -1 Bool) (Lam (Tensor -1 Float) (Tensor -1 Float)) (Lam (Tensor -1 Float) (Tensor -1 Float))))
 
 ;; Doing Loop # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/controlflow/defs.cc" 614
 ;; 
@@ -362,16 +408,16 @@
 ;; I | ['tensor(int64)'] | tensor of int64, which should be a scalar.
 ;; B | ['tensor(bool)'] | tensor of bool, which should be a scalar.
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Loop (Vec String) ((Vec Integer) (Vec Bool) (Vec String) (Lam None None)))
+; (edef Loop (Tensor -1 String) ((Tensor -1 Integer) (Tensor -1 Bool) (Tensor -1 String) (Lam None None)))
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Loop (Vec Float) ((Vec Integer) (Vec Bool) (Vec Float) (Lam None None)))
+; (edef Loop (Tensor -1 Float) ((Tensor -1 Integer) (Tensor -1 Bool) (Tensor -1 Float) (Lam None None)))
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Loop (Vec Integer) ((Vec Integer) (Vec Bool) (Vec Integer) (Lam None None)))
+; (edef Loop (Tensor -1 Integer) ((Tensor -1 Integer) (Tensor -1 Bool) (Tensor -1 Integer) (Lam None None)))
 ; ;; NOTE: output mangler cplx$
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Loop (Vec (Tuple Float Float)) ((Vec Integer) (Vec Bool) (Vec (Tuple Float Float)) (Lam None None)))
+; (edef Loop (Tensor -1 (Tuple Float Float)) ((Tensor -1 Integer) (Tensor -1 Bool) (Tensor -1 (Tuple Float Float)) (Lam None None)))
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Loop (Vec Bool) ((Vec Integer) (Vec Bool) (Vec Bool) (Lam None None)))
+; (edef Loop (Tensor -1 Bool) ((Tensor -1 Integer) (Tensor -1 Bool) (Tensor -1 Bool) (Lam None None)))
 
 ;; Doing Scan # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/controlflow/defs.cc" 811
 ;; 
@@ -500,16 +546,16 @@
 ;; I | ['tensor(int64)'] | Int64 tensor
 ; ;; V | ['tensor(uint8)', 'tensor(uint16)', 'tensor(uint32)', 'tensor(uint64)', 'tensor(int8)', 'tensor(int16)', 'tensor(int32)', 'tensor(int64)', 'tensor(float16)', 'tensor(float)', 'tensor(double)', 'tensor(string)', 'tensor(bool)', 'tensor(complex64)', 'tensor(complex128)'] | All Tensor types
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Scan (Vec String) ((Vec String) (Lam (None) (None)) Integer (Vec Integer) (Vec Integer) (Vec Integer) (Vec Integer)))
+; (edef Scan (Tensor -1 String) ((Tensor -1 String) (Lam (None) (None)) Integer (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer)))
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Scan (Vec Integer) ((Vec Integer) (Lam (None) (None)) Integer (Vec Integer) (Vec Integer) (Vec Integer) (Vec Integer)))
+; (edef Scan (Tensor -1 Integer) ((Tensor -1 Integer) (Lam (None) (None)) Integer (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer)))
 ; ;; NOTE: output mangler cplx$
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Scan (Vec (Tuple Float Float)) ((Vec (Tuple Float Float)) (Lam (None) (None)) Integer (Vec Integer) (Vec Integer) (Vec Integer) (Vec Integer)))
+; (edef Scan (Tensor -1 (Tuple Float Float)) ((Tensor -1 (Tuple Float Float)) (Lam (None) (None)) Integer (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer)))
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Scan (Vec Bool) ((Vec Bool) (Lam (None) (None)) Integer (Vec Integer) (Vec Integer) (Vec Integer) (Vec Integer)))
+; (edef Scan (Tensor -1 Bool) ((Tensor -1 Bool) (Lam (None) (None)) Integer (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer)))
 ; ;; NOTE: manglers {'cplx$'}
-; (edef Scan (Vec Float) ((Vec Float) (Lam (None) (None)) Integer (Vec Integer) (Vec Integer) (Vec Integer) (Vec Integer)))
+; (edef Scan (Tensor -1 Float) ((Tensor -1 Float) (Lam (None) (None)) Integer (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer) (Tensor -1 Integer)))
 
 
 ;; Doing TreeEnsembleClassifier # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/traditionalml/defs.cc" 1003
@@ -531,45 +577,45 @@
 ;; NOTE: multiple outputs as tuple
 (edef
   TreeEnsembleClassifier
-  (Tuple (Vec Integer) (Vec Float))       ;; ints out
-  (#|X|# (Vec Integer)
-   #|base_values|# (Vec Float)
-   #|class_ids|# (Vec Integer)
-   #|class_nodeids|# (Vec Integer)
-   #|class_treeids|# (Vec Integer)
-   #|class_weights|# (Vec Float)
-   #|classlabels_int64s|# (Vec Integer)   ;; ints in
-   #|nodes_falsenodeids|# (Vec Integer)
-   #|nodes_featureids|# (Vec Integer)
-   #|nodes_hitrates|# (Vec Float)
-   #|nodes_missing_value_tracks_true|# (Vec Integer)
-   #|nodes_modes|# (Vec String)
-   #|nodes_nodeids|# (Vec Integer)
-   #|nodes_treeids|# (Vec Integer)
-   #|nodes_truenodeids|# (Vec Integer)
-   #|nodes_values|# (Vec Float)
+  (Tuple (Tensor -1 Integer) (Tensor -1 Float))       ;; ints out
+  (#|X|# (Tensor -1 Integer)
+   #|base_values|# (Tensor -1 Float)
+   #|class_ids|# (Tensor -1 Integer)
+   #|class_nodeids|# (Tensor -1 Integer)
+   #|class_treeids|# (Tensor -1 Integer)
+   #|class_weights|# (Tensor -1 Float)
+   #|classlabels_int64s|# (Tensor -1 Integer)   ;; ints in
+   #|nodes_falsenodeids|# (Tensor -1 Integer)
+   #|nodes_featureids|# (Tensor -1 Integer)
+   #|nodes_hitrates|# (Tensor -1 Float)
+   #|nodes_missing_value_tracks_true|# (Tensor -1 Integer)
+   #|nodes_modes|# (Tensor -1 String)
+   #|nodes_nodeids|# (Tensor -1 Integer)
+   #|nodes_treeids|# (Tensor -1 Integer)
+   #|nodes_truenodeids|# (Tensor -1 Integer)
+   #|nodes_values|# (Tensor -1 Float)
    #|post_transform|# String))
 ;; WARN: multiple types but no type constraints at TreeEnsembleClassifier: {('', Type.Vec(Type.Integer)), ('', Type.Vec(Type.String))}
 ;; NOTE: multiple outputs as tuple
 (edef
   TreeEnsembleClassifier
-  (Tuple (Vec String) (Vec Float))           ;; strings out
-  (#|X|# (Vec Float)
-   #|base_values|# (Vec Float)
-   #|class_ids|# (Vec Integer)
-   #|class_nodeids|# (Vec Integer)
-   #|class_treeids|# (Vec Integer)
-   #|class_weights|# (Vec Float)
-   #|classlabels_strings|# (Vec String)      ;; strings in
-   #|nodes_falsenodeids|# (Vec Integer)
-   #|nodes_featureids|# (Vec Integer)
-   #|nodes_hitrates|# (Vec Float)
-   #|nodes_missing_value_tracks_true|# (Vec Integer)
-   #|nodes_modes|# (Vec String)
-   #|nodes_nodeids|# (Vec Integer)
-   #|nodes_treeids|# (Vec Integer)
-   #|nodes_truenodeids|# (Vec Integer)
-   #|nodes_values|# (Vec Float)
+  (Tuple (Tensor -1 String) (Tensor -1 Float))           ;; strings out
+  (#|X|# (Tensor -1 Float)
+   #|base_values|# (Tensor -1 Float)
+   #|class_ids|# (Tensor -1 Integer)
+   #|class_nodeids|# (Tensor -1 Integer)
+   #|class_treeids|# (Tensor -1 Integer)
+   #|class_weights|# (Tensor -1 Float)
+   #|classlabels_strings|# (Tensor -1 String)      ;; strings in
+   #|nodes_falsenodeids|# (Tensor -1 Integer)
+   #|nodes_featureids|# (Tensor -1 Integer)
+   #|nodes_hitrates|# (Tensor -1 Float)
+   #|nodes_missing_value_tracks_true|# (Tensor -1 Integer)
+   #|nodes_modes|# (Tensor -1 String)
+   #|nodes_nodeids|# (Tensor -1 Integer)
+   #|nodes_treeids|# (Tensor -1 Integer)
+   #|nodes_truenodeids|# (Tensor -1 Integer)
+   #|nodes_values|# (Tensor -1 Float)
    #|post_transform|# String))
 
 
@@ -583,22 +629,22 @@
 ;; NOTE: multiple outputs as tuple
 (edef
   LinearClassifier
-  (Tuple (Vec String) (Vec Float))
-  (#|X|# (Vec Integer)
-   #|classlabels_strings|# (Vec String)
-   #|coefficients|# (Vec Float)
-   #|intercepts|# (Vec Float)
+  (Tuple (Tensor -1 String) (Tensor -1 Float))
+  (#|X|# (Tensor -1 Integer)
+   #|classlabels_strings|# (Tensor -1 String)
+   #|coefficients|# (Tensor -1 Float)
+   #|intercepts|# (Tensor -1 Float)
    #|multi_class|# Integer
    #|post_transform|# String))
 ;; WARN: multiple types but no type constraints at LinearClassifier: {('', Type.Vec(Type.String)), ('', Type.Vec(Type.Integer))}
 ;; NOTE: multiple outputs as tuple
 (edef
   LinearClassifier
-  (Tuple (Vec Integer) (Vec Float))
-  (#|X|# (Vec Float)
-   #|classlabels_ints|# (Vec Integer)
-   #|coefficients|# (Vec Float)
-   #|intercepts|# (Vec Float)
+  (Tuple (Tensor -1 Integer) (Tensor -1 Float))
+  (#|X|# (Tensor -1 Float)
+   #|classlabels_ints|# (Tensor -1 Integer)
+   #|coefficients|# (Tensor -1 Float)
+   #|intercepts|# (Tensor -1 Float)
    #|multi_class|# Integer
    #|post_transform|# String))
 
@@ -610,33 +656,33 @@
 ;; T2 | ['tensor(string)', 'tensor(int64)'] | The output type will be a tensor of strings or integers, depending on which of the the classlabels_* attributes is used. Its size will match the bactch size of the input.
 (edef
   SVMClassifier
-  (Tuple (Vec String) (Vec Float))
-  (#|X|# (Vec Integer)
-   #|classlabels_strings|# (Vec String)
-   #|coefficients|# (Vec Float)
-   #|kernel_params|# (Vec Float)
+  (Tuple (Tensor -1 String) (Tensor -1 Float))
+  (#|X|# (Tensor -1 Integer)
+   #|classlabels_strings|# (Tensor -1 String)
+   #|coefficients|# (Tensor -1 Float)
+   #|kernel_params|# (Tensor -1 Float)
    #|kernel_type|# String
    #|post_transform|# String
-   #|prob_a|# (Vec Float)
-   #|prob_b|# (Vec Float)
-   #|rho|# (Vec Float)
-   #|support_vectors|# (Vec Float)
-   #|vectors_per_class|# (Vec Integer)))
+   #|prob_a|# (Tensor -1 Float)
+   #|prob_b|# (Tensor -1 Float)
+   #|rho|# (Tensor -1 Float)
+   #|support_vectors|# (Tensor -1 Float)
+   #|vectors_per_class|# (Tensor -1 Integer)))
 
 (edef
   SVMClassifier
-  (Tuple (Vec Integer) (Vec Float))
-  (#|X|# (Vec Float)
-   #|classlabels_ints|# (Vec Integer)
-   #|coefficients|# (Vec Float)
-   #|kernel_params|# (Vec Float)
+  (Tuple (Tensor -1 Integer) (Tensor -1 Float))
+  (#|X|# (Tensor -1 Float)
+   #|classlabels_ints|# (Tensor -1 Integer)
+   #|coefficients|# (Tensor -1 Float)
+   #|kernel_params|# (Tensor -1 Float)
    #|kernel_type|# String
    #|post_transform|# String
-   #|prob_a|# (Vec Float)
-   #|prob_b|# (Vec Float)
-   #|rho|# (Vec Float)
-   #|support_vectors|# (Vec Float)
-   #|vectors_per_class|# (Vec Integer)))
+   #|prob_a|# (Tensor -1 Float)
+   #|prob_b|# (Tensor -1 Float)
+   #|rho|# (Tensor -1 Float)
+   #|support_vectors|# (Tensor -1 Float)
+   #|vectors_per_class|# (Tensor -1 Integer)))
 
 ;; Doing ZipMap # line "/tmp/pip-req-build-ule4rbb3/onnx/defs/traditionalml/defs.cc" 1166
 ;; 
@@ -650,11 +696,11 @@
 ;; NOTE: output mangler seq$map$
 (edef
   ZipMap
-  (Vec (Vec (Tuple String (Vec Float))))
-  (#|X|# (Vec Float)
-   #|classlabels_strings|# (Vec String)))
+  (Tensor -1 (Tensor -1 (Tuple String (Tensor -1 Float))))
+  (#|X|# (Tensor -1 Float)
+   #|classlabels_strings|# (Tensor -1 String)))
 (edef
   ZipMap
-  (Vec (Vec (Tuple Integer (Vec Float))))
-  (#|X|# (Vec Float)
-   #|classlabels_int64s|# (Vec Integer)))
+  (Tensor -1 (Tensor -1 (Tuple Integer (Tensor -1 Float))))
+  (#|X|# (Tensor -1 Float)
+   #|classlabels_int64s|# (Tensor -1 Integer)))

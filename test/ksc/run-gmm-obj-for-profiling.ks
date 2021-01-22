@@ -3,21 +3,6 @@
 (def gmm_knossos_tri Integer ((n : Integer))
   (div (mul n (sub n 1)) 2))
 
-(def exp$VecR (Vec Float) ((v : Vec Float))
-  (build (size v) (lam (i : Integer) (exp (index i v)))))
-
-(def mul$R$VecR (Vec Float) ((r : Float) (a : Vec Float))
-    (build (size a) (lam (i : Integer) (mul r (index i a)))))
-
-(def mul$R$VecVecR (Vec (Vec Float)) ((r : Float) (a : Vec (Vec Float)))
-    (build (size a) (lam (i : Integer) (mul$R$VecR r (index i a)))))
-
-(def mul$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (mul (index i a) (index i b)))))
-
-(def sub$VecR$VecR (Vec Float) ((a : Vec Float) (b : Vec Float))
-  (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
-
 ; dot
 (edef dot Float ((Vec Float) (Vec Float)))
 (edef D$dot (LM (Tuple (Vec Float) (Vec Float)) Float)
@@ -35,7 +20,7 @@
                ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
      (let ((a  (get$1$2 a_b))
            (b  (get$2$2 a_b)))
-    (tuple (mul$R$VecR dr b) (mul$R$VecR dr a))))
+    (tuple (mul dr b) (mul dr a))))
 
 (def dot Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
   (sum (build (size a) (lam (i : Integer) (dot (index i a) (index i b)))))
@@ -44,47 +29,24 @@
 (def sqnorm Float ((v : Vec Float))
   (dot v v))
 
-; mul Mat Vec
-(edef mul$Mat$Vec (Vec Float) ((Vec (Vec Float)) (Vec Float)))
-(def shape$mul$Mat$Vec (Vec (Tuple)) ((m : (Vec (Vec Float))) (v : (Vec Float)))
-          (constVec (size m) (tuple)))
-
-(edef D$mul$Mat$Vec (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float))
-          ((Vec (Vec Float)) (Vec Float)))
-(edef Dt$mul$Mat$Vec (Tuple (Vec Float) (LM (Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
-          ((Vec (Vec Float)) (Vec Float)))
-
-(edef R$mul$Mat$Vec (LM (Vec Float) (Tuple (Vec (Vec Float)) (Vec Float)))
-          ((Vec (Vec Float)) (Vec Float)))
-
-(def fwd$mul$Mat$Vec (Vec Float)
-          ((M_v : (Tuple (Vec (Vec Float)) (Vec Float))) (dM_dv : (Tuple (Vec (Vec Float)) (Vec Float))))
-     (let ((M  (get$1$2 M_v))
-           (v  (get$2$2 M_v))
-           (dM (get$1$2 dM_dv))
-           (dv (get$2$2 dM_dv)))
-    (ts_add (mul$Mat$Vec dM v) (mul$Mat$Vec M dv))))
-
-(edef rev$mul$Mat$Vec (Tuple (Vec (Vec Float)) (Vec Float))
-          ((Tuple (Vec (Vec Float)) (Vec Float)) (Vec Float)))
-
-
-
-(def gmm_knossos_makeQ (Vec (Vec Float)) ((q : Vec Float) (l : Vec Float))
+(def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
  (let (D (size q))
    (assert (eq (size l) (gmm_knossos_tri D))
-    (build D (lam (i : Integer)
-        (build D (lam (j : Integer)
+    (build (tuple D D) (lam (ij : Tuple Integer Integer)
+        (let ((i j) ij)
            (if (lt i j)
             0.0
             (if (eq i j)
               (exp (index i q))
               (index (add (gmm_knossos_tri (sub i 1)) j) l))
            )
-           )))))))
+           ))))))
 
 (def logsumexp Float ((v : Vec Float))
-    (log (sum (exp$VecR v))))
+  (let (maxv (max v))
+    (add maxv
+         (log (sum (exp (sub v maxv)))))))
+
 
 ; TODO deriv lgamma - but no deriv wishart_m anyway.
 ; wishart_m -> int
@@ -102,7 +64,7 @@
           (wishart_gamma (get$1$2 wishart))
           (wishart_m     (get$2$2 wishart))
           (sum_qs        (sum log_Qdiag))
-          (Qdiag         (exp$VecR log_Qdiag))
+          (Qdiag         (exp log_Qdiag))
 
           (n  (add p (add wishart_m 1)))
           (C  (sub (mul (to_float (mul n p))
@@ -136,8 +98,7 @@
           (slse     (sum (build N (lam (i : Integer)
                           (logsumexp (build K (lam (k : Integer)
                             (let ((Q         (gmm_knossos_makeQ (index k qs) (index k ls)))
-                                  (mahal_vec (mul$Mat$Vec Q
-                                                      (sub$VecR$VecR (index i x) (index k means)))))
+                                  (mahal_vec (mul Q (sub (index i x) (index k means)))))
                               (sub (add (index k alphas)
                                     ; (index k sum_qs)
                                     (sum (index k qs))

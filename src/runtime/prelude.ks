@@ -77,6 +77,12 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+(def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
+  (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
+
+(def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : Float))
+  (build (size a) (lam (i : Integer) (sub (index i a) b))))
+
 ;; mul :: Number x Number -> Number
 ;; mul (x, y) = x * y
 (edef mul Float (Float Float))
@@ -105,6 +111,10 @@
  rev$mul (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
+;; mul Scalar Vec
+(def mul (Tensor 1 Float) ((r : Float) (a : Tensor 1 Float))
+    (build (size a) (lam (i : Integer) (mul r (index i a)))))
 
 ;; mul Mat Vec
 (edef mul (Vec Float) ((Tensor 2 Float) (Vec Float)))
@@ -302,6 +312,9 @@
 (def rev$exp Float ((x : Float) (d_dexp : Float)) (mul (exp x) d_dexp))
 (edef Dt$exp (Tuple Float (LM Float Float)) (Float))
 
+(def exp (Tensor 1 Float) ((v : Tensor 1 Float))
+  (build (size v) (lam (i : Integer) (exp (index i v)))))
+
 (edef sin Float (Float))
 (edef cos Float (Float))
 
@@ -330,6 +343,15 @@
 (edef max Float (Float Float))
 (edef D$max (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$max (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
+
+(edef imax Integer ((Tensor 1 Float)))
+(edef max Float ((Tensor 1 Float)))
+(edef D$max (LM (Tensor 1 Float) Float) ((Tensor 1 Float)))
+(edef Dt$max (Tuple Float (LM (Tensor 1 Float) Float)) ((Tensor 1 Float)))
+(def fwd$max Float ((x : (Tensor 1 Float)) (dx : (Tensor 1 Float)))
+  (index (imax x) dx))
+(def rev$max (Tensor 1 Float) ((x : (Tensor 1 Float)) (d_dr : Float))
+  (deltaVec (size x) (imax x) d_dr))
 
 (edef $ranhashdoub Float (Integer))
 (edef D$$ranhashdoub (LM Integer Float) (Integer))
@@ -370,7 +392,7 @@
 (edef D$and (LM (Tuple Bool Bool) Bool) (Bool Bool))
 (edef Dt$and (Tuple Bool (LM (Tuple Bool Bool) Bool)) (Bool Bool))
 (def fwd$and (Tuple)
-     ((xt : Tuple Bool Bool) (dxt : Tuple Bool Bool))
+     ((xt : Tuple Bool Bool) (dxt : Tuple (Tuple) (Tuple)))
      (tuple))
 (def rev$and (Tuple (Tuple) (Tuple))
      ((xt : Tuple Bool Bool) (d_dbool : (Tuple)))

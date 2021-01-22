@@ -3,7 +3,7 @@ import numpy as np
 
 import ksc
 from ksc.tracing.functions import math, nn
-from ksc.utils import Shape, TensorShape, ScalarShape
+from ksc.shape import Shape, TensorShape, ScalarShape
 
 
 @pytest.mark.parametrize(

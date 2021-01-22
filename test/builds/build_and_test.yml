@@ -1,3 +1,4 @@
+# Azure pipelines CI definition. See https://docs.microsoft.com/en-us/azure/devops/pipelines/yaml-schema
 trigger: none
 
 jobs:
@@ -19,41 +20,45 @@ jobs:
     inputs:
       version: 3.1.100
 
-  - script: dotnet run --project src/f2k/f2k.fsproj SKIPPED out.ks test/f2k/test0.fs
+  - script: sh ./test/builds/mkdirs.sh
+    displayName: 'Make directories [userInstall]'
+
+  - script: dotnet run --project src/f2k/f2k.fsproj SKIPPED obj/test/out.ks test/f2k/test0.fs
     env:
       # v Otherwise it wastes a bunch of time caching
       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+    displayName: 'F# to KS [userTest]'
 
   - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
-    displayName: 'Install dependencies'
+    displayName: 'Install dependencies [userInstall]'
 
-  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=.  --overwrite-policy=always --install-method=copy
-    displayName: 'Can build with cabal'
+  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=build/bin  --overwrite-policy=always --install-method=copy
+    displayName: 'Can build with cabal [userTest]'
 
-  - script: ./ksc --test --fs-test out.ks
-    displayName: 'ksc test'
+  - script: ./build/bin/ksc --test --fs-test obj/test/out.ks
+    displayName: 'ksc test [userTest]'
 
   - script: git clone https://github.com/pybind/pybind11.git && cd pybind11 && git checkout c9d32a81f40ad540015814edf13b29980c63e39c
-    displayName: Cloning pybind11
-
-  - script: sh ./test/builds/build_and_test_mnistcnn.sh . pybind11
-    displayName: Testing MNIST CNN
-
-  - script: sh ./test/builds/build_and_test_adbench_lstm.sh . pybind11
-    displayName: Testing ADBench LSTM
-
-  - script: sh ./test/builds/build_and_test_gmm.sh . pybind11
-    displayName: Testing ADBench GMM
+    displayName: Cloning pybind11 [userInstall]
 
   - script: sh ./test/builds/test_pytest.sh
-    displayName: Testing ksc python package
+    displayName: Testing ksc python package [userTest]
+
+  - script: sh ./test/builds/build_and_test_mnistcnn.sh . pybind11
+    displayName: Testing MNIST CNN [userTest]
+
+  - script: sh ./test/builds/build_and_test_adbench_lstm.sh . pybind11
+    displayName: Testing ADBench LSTM [userTest]
+
+  - script: sh ./test/builds/build_and_test_gmm.sh . pybind11
+    displayName: Testing ADBench GMM [userTest]
 
   - script: sh ./test/builds/test_resnet50.sh
-    displayName: Testing Resnet50 through ksc
+    displayName: Testing Resnet50 through ksc [userTest]
 
-  - script: ./ksc --profile --ks-file-without-extension test/ksc/run-gmm-obj-for-profiling --proffile prof-obj.out --proffunctions prof-obj-functions.txt --proflines prof-obj-lines.txt && ./ksc --profile --ks-file-without-extension test/ksc/run-gmm-rev-for-profiling --proffile prof-rev.out  --proffunctions prof-rev-functions.txt --proflines prof-rev-lines.txt
-    displayName: gperftools
+  - script: ./build/bin/ksc --profile --ks-file-without-extension test/ksc/run-gmm-obj-for-profiling --proffile prof-obj.out --proffunctions prof-obj-functions.txt --proflines prof-obj-lines.txt && ./build/bin/ksc --profile --ks-file-without-extension test/ksc/run-gmm-rev-for-profiling --proffile prof-rev.out  --proffunctions prof-rev-functions.txt --proflines prof-rev-lines.txt
+    displayName: gperftools [userTest]
 
   - script: sh test/builds/publish_artifact.sh
 
@@ -91,20 +96,27 @@ jobs:
     inputs:
       version: 3.1.100
 
-  - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED out.ks .\test\f2k\test0.fs
+  - task: PowerShell@2
+    inputs:
+      targetType: 'filePath'
+      filePath: .\test\builds\mkdirs.ps1
+    displayName: 'Make directories [userInstall]'
+
+  - script: dotnet run --project .\src\f2k\f2k.fsproj SKIPPED obj\test\out.ks .\test\f2k\test0.fs
     env:
       # v Otherwise it wastes a bunch of time caching
       # See http://www.donovanbrown.com/post/Stop-wasting-time-during-NET-Core-builds
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+    displayName: 'F# to KS [userTest]'
 
   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
-    displayName: 'Install dependencies'
+    displayName: 'Install dependencies [userInstall]'
 
-  - script: refreshenv && ghc -main-is testWindows -isrc/ksc -Werror -Wunused-imports -Wunused-top-binds -Wmissing-signatures src/ksc/Main.hs
-    displayName: 'GHC compile src/ksc/Main.hs'
+  - script: refreshenv && cabal v2-install --installdir=build/bin --overwrite-policy=always --install-method=copy
+    displayName: 'GHC compile src/ksc/Main.hs [userTest]'
 
-  - script: src\ksc\Main.exe out.ks
-    displayName: 'ksc test'
+  - script: build\bin\ksc --test-windows --fs-test obj\test\out.ks
+    displayName: 'ksc test [userTest]'
 
   - script: rm -rf *
     displayName: 'Clean'

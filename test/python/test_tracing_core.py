@@ -7,7 +7,7 @@ from ksc.tracing.node import Node
 from ksc.tracing.functions import core
 import ksc.tracing.functions as F
 from ksc.type import Type
-from ksc.utils import Shape, TensorShape, ScalarShape
+from ksc.shape import Shape, TensorShape, ScalarShape
 
 @pytest.fixture()
 def backend(pytestconfig):
@@ -137,7 +137,7 @@ def test_flatten():
     x = np.random.normal(0, 1, (3, 4, 5, 6))
     out = F.flatten(x)
     assert out.shape_type.shape.dims == (3, 4 * 5 * 6)
-    assert np.ma.allequal(out.data, x.reshape((3, 4 * 5 * 6)))
+    np.testing.assert_array_equal(out.data, x.reshape((3, 4 * 5 * 6)))
     # creator of out is an anonymous function. So the shape$
     # function of flatten must be in before.
     before, _ = out.creator._jitted.all_called_functions()
@@ -180,7 +180,7 @@ def test_reuse_result(backend):
     z = y - x
     assert z.get_data_with_backend(backend) == 48
 
-def test_get_vector_element():
+def test_get_tensor_element():
     xn = np.arange(24).reshape((2, 3, 4))
     x = Node.from_data(xn)
     v = x[1,2,3]
@@ -199,7 +199,7 @@ def test_tensor_size():
     assert core.get_tensor_size(x).data == (2,3,4)
 
 def get_ks_shape(x):
-    return Shape.from_ks_shape(x.shape_program.data, x.get_type)
+    return Shape.from_ks_shape(x.shape_program.data, x.type)
 
 def test_tensor_shape():
     x = Node.from_data(np.arange(24).reshape((2, 3, 4)))
@@ -228,7 +228,7 @@ def test_floor_div(backend):
 
 def test_elementwise_or_scalar():
     from ksc.tracing.functions.type_propagation_rules import elementwise_or_scalar
-    from ksc.utils import ShapeType
+    from ksc.shape import ShapeType
 
     f = Node.from_data(1.0)
     i = Node.from_data(1)
