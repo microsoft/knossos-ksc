@@ -4,7 +4,7 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType
+from ksc.type import Type, SizeType, shape_type
 
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
@@ -88,6 +88,17 @@ def ks_prim_lookup(name, tys):
         size_ty = tys[0]
         elem_ty = tys[1]
 
+        rank = SizeType.get_rank(size_ty)
+        assert rank is not None
+        
+        return Type.Tensor(rank, elem_ty)
+
+    # deltaVec(n i v)
+    if n == 3 and name == "deltaVec":
+        size_ty = tys[0]
+        ind_ty = tys[1]
+        elem_ty = tys[2]
+        assert size_ty == ind_ty
         rank = SizeType.get_rank(size_ty)
         assert rank is not None
         

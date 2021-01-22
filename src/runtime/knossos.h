@@ -987,8 +987,9 @@ namespace ks
 	{
 		auto ret = tensor<Dim, T>::create(alloc, t.size());
 		T* retdata = ret.data();
+		T const* tdata = t.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
-			retdata[i] = ts_scale(alloc, val, t[i]);
+			retdata[i] = ts_scale(alloc, val, tdata[i]);
 		return ret;
 	}
 
