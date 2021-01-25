@@ -1325,6 +1325,19 @@ namespace ks
 
 	// ===============================  Primitives  ==================================
 
+	template <class T, typename ...ArgTypes>
+	vec<T> Vec_init(allocator * alloc, T arg0, ArgTypes... args)
+	{
+		constexpr int num_args = 1 + static_cast<int>(sizeof...(args));
+		T arr[num_args] = {arg0, args...};
+		tensor<1, T> ret(alloc, num_args);
+		T* retdata = ret.data();
+		for (int i = 0; i != num_args; ++i) {
+			retdata[i] = arr[i];
+		}
+		return ret;
+	}
+
 	template <class T>
 	T delta(allocator * alloc, int i, int j, T val)
 	{
