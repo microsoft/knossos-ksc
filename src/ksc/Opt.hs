@@ -23,10 +23,6 @@ import Data.List( mapAccumR )
 import Data.Sequence( mapWithIndex, fromList )
 import Data.Foldable (toList)
 
-optTrace :: String -> a -> a
-optTrace _msg t = t
---optTrace msg t = trace msg t
-
 data OptEnv = OptEnv { optRuleBase :: RuleBase
                      , optGblST    :: GblSymTab
                      , optSubst    :: Subst }
@@ -648,7 +644,7 @@ optGradSel i n arg
                        else lmZero (pSel j n arg) ti
            | j <- [1..n] ]
 
-optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
+optGradSel _ _ arg = trace ("GradSel failed" ++ pps arg) Nothing
 
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 -- (+) :: (F,F) -> f
@@ -683,6 +679,8 @@ optGradPrim (TypeLM _ _) "eq" e
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
 optGradPrim (TypeLM a _) "ts_neg" _ = Just (lmScale a (kTFloat $ -1.0))
+
+optGradPrim _ f _ = trace ("Note: optGradPrim: no pattern for " ++ show f) Nothing
 
 -----------------------
 optDrvFun :: HasCallStack => ADMode -> FunId -> TExpr -> Maybe TExpr
