@@ -16,4 +16,8 @@
 (gdef sufrevpass [g Float])
 (gdef sufrev [g Float])
 
+(def h Float (y : Float) (add 1.0 ($inline ($inline (f (add y y))))))
+
+(def i (Tuple Float Float) (y : Float) ($inline y y))
+
 (def main Integer () 0)
