@@ -214,12 +214,48 @@ allocatorUsageOfCType = \case
 --        "v12_t v12 = v12_t::mk(a,b);"]
 --       "v12",      -- this is what we use at the occurrence
 --       LMHCat [LMVCat [LMOne, LMZero], LMZero])
-data CGenResult = CG [String] String CType AllocatorUsage -- TODO: rename CG CGenResult
+data CGenResult = CG [String] CGenResultExpression CType AllocatorUsage -- TODO: rename CG CGenResult
+
+-- The "C expression" of a CGenResult can only be "trivial".  The
+-- CGenResultExpression type structurally enforces that condition.  In
+-- particular, the C expression can't contain arbitrary computation.
+-- If it could then we would have to be very careful not to duplicate
+-- it.
+--
+-- On the other hand, allowing arbitrary expressions could lead to
+-- nicer-looking C++ code.  For example, we could generate
+--
+--     g(f1(x1), f2(x2))
+--
+-- instead of
+--
+--     float fresh1 = f1(x1);
+--     float fresh2 = f2(x2);
+--     g(fresh1, freshf2);
+--
+-- Therefore if in the future we decide that we want nicer looking C++
+-- then we can revisit the restriction.
+data CGenResultExpression = CGREDummy CType
+                          | CGREKonst Konst
+                          | CGREVar Var
+                          | CGRETuple [CGenResultExpression]
+
+generateCGRE :: CGenResultExpression -> String
+generateCGRE = \case
+  CGREDummy cty -> cgenType cty ++ "{}"
+  CGREKonst k   -> cgenKonst k
+  CGREVar v     -> cgenVar v
+  CGRETuple rs  -> "std::make_tuple("
+                   ++ intercalate "," (map generateCGRE rs)
+                   ++ ")"
+
+cgreVar :: String -> CGenResultExpression
+cgreVar = CGREVar . Simple
 
 getDecl :: CGenResult -> [String]
 getDecl (CG dc _ _ _) = dc
 
-getExpr :: CGenResult -> String
+getExpr :: CGenResult -> CGenResultExpression
 getExpr (CG _ ex _ _) = ex
 
 getType :: CGenResult -> CType
@@ -320,7 +356,7 @@ cgenDefE env (Def { def_fun = f, def_pat = param
       (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype _callocusage =
         runM $ cgenExpr env (withPackedParams body)
-      cbody       = cbodydecl ++ [ "return (" ++ cbodyexpr ++ ");" ]
+      cbody       = cbodydecl ++ [ "return (" ++ generateCGRE cbodyexpr ++ ");" ]
       cvars       = map mkCTypedVar params
       cftypealias = "ty$" ++ cf
       cparams     = "ks::allocator * " ++ allocatorParameterName ++ concatMap (", " ++) cvars
@@ -357,10 +393,10 @@ cgenWrapWithMarkReset x = return x
 
 cgenExprWithoutResettingAlloc :: HasCallStack => CST -> TExpr -> M CGenResult
 cgenExprWithoutResettingAlloc env = \case
-  Konst k -> return $ CG [] (cgenKonst k) (mkCType $ typeofKonst k) DoesNotUseAllocator
+  Konst k -> return $ CG [] (CGREKonst k) (mkCType $ typeofKonst k) DoesNotUseAllocator
   Dummy ty ->
-    let cty = mkCType ty in return $ CG [] (cgenType cty ++ "{}") cty DoesNotUseAllocator
-  Var (TVar ty v)               -> return $ CG [] (cgenVar v) (mkCType ty) DoesNotUseAllocator
+    let cty = mkCType ty in return $ CG [] (CGREDummy cty) cty DoesNotUseAllocator
+  Var (TVar ty v)               -> return $ CG [] (CGREVar v) (mkCType ty) DoesNotUseAllocator
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
@@ -372,9 +408,9 @@ cgenExprWithoutResettingAlloc env = \case
         (  [ cComment "Explicitly-requested copydown",
              markAllocator bumpmark allocatorParameterName ]
         ++ cdecl
-        ++ [ cgenType ctype ++ " " ++ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ cexpr ++ ");" ]
+        ++ [ cgenType ctype ++ " " ++ ret ++ " = ks::copydown(" ++ allocatorParameterName ++ ", " ++ bumpmark ++ ", " ++ generateCGRE cexpr ++ ");" ]
         )
-        ret
+        (CGREVar (Simple ret))
         ctype
         (allocatorUsageOfCType ctype <> UsesAndResetsAllocator)
 
@@ -397,9 +433,9 @@ cgenExprWithoutResettingAlloc env = \case
     return $ CG
       (  concat cdecls
       ++ [ cgenType cftype ++ " " ++ v ++ " = "
-                ++ cf ++ "(" ++ cgenArgList tf (map getExpr cgvs) ++ ");" ]
+                ++ cf ++ "(" ++ cgenArgList tf (map (generateCGRE . getExpr) cgvs) ++ ");" ]
       )
-      v
+      (cgreVar v)
       cftype
       (funAllocatorUsage tf cftype <> callocusage)
 
@@ -424,22 +460,21 @@ cgenExprWithoutResettingAlloc env = \case
                   -- argument lists unpacked!
                   (True, cexpr, TypeTuple ts)
                     -> (flip map [0..length ts - 1] $ \i ->
-                           "std::get<" ++ show i ++ ">(" ++ cexpr ++ ")")
-                  (_, cexpr, _) -> [cexpr]
+                           "std::get<" ++ show i ++ ">(" ++ generateCGRE cexpr ++ ")")
+                  (_, cexpr, _) -> [generateCGRE cexpr]
 
     return $ CG
       (  cdecls
       ++ [  cgenType cftype ++ " " ++ v ++ " = "
               ++ cf ++ "(" ++ cgenArgList tf cargs ++ ");" ]
       )
-      v
+      (cgreVar v)
       cftype
       (funAllocatorUsage tf cftype <> callocusage)
 
   Let pat e1 body -> do
     (CG decle1   ve1   type1  allocusagee1)   <- cgenExprR env e1
     (CG declbody vbody tybody allocusagebody) <- cgenExprR env body
-    lvar                       <- freshCVar
 
     let cgenType_ = case pat of
           VarPat _ -> cgenType type1
@@ -451,15 +486,11 @@ cgenExprWithoutResettingAlloc env = \case
                        ++ "]"
 
     return $ CG
-      (  [ cComment "Let" ++ cgenType tybody ++ " " ++ lvar ++ ";",
-           "{" ]
-      ++ decle1
-      ++ [ cgenType_ ++ " " ++ cgenBinder ++ " = " ++ ve1 ++ ";" ]
+      (  decle1
+      ++ [ cgenType_ ++ " " ++ cgenBinder ++ " = " ++ generateCGRE ve1 ++ ";" ]
       ++ declbody
-      ++ [ lvar ++ " = " ++ vbody ++ ";",
-           "}" ]
       )
-      lvar
+      vbody
       tybody
       (allocusagee1 <> allocusagebody)
 
@@ -472,7 +503,7 @@ cgenExprWithoutResettingAlloc env = \case
     let ctype  = CTuple ctypes
 
     return $ CG (concat cdecls)
-                ("std::make_tuple(" ++ intercalate "," cexprs ++ ")")
+                (CGRETuple cexprs)
                 ctype
                 callocusage
 
@@ -487,11 +518,11 @@ cgenExprWithoutResettingAlloc env = \case
               ++ concatMap ((", " ++) . mkCTypedVar) params
               ++ ") {" ]
       ++ indent (  cdecl
-                ++ [ "return (" ++ cexpr ++ ");" ]
+                ++ [ "return (" ++ generateCGRE cexpr ++ ");" ]
                 )
       ++ [ "};" ]
       )
-      lvar
+      (cgreVar lvar)
       (CFunction vtype ctype)
       DoesNotUseAllocator
 
@@ -510,15 +541,15 @@ cgenExprWithoutResettingAlloc env = \case
     return $ CG
       (  declc -- emit condition generation
       ++ [ cgenType crettype `spc` cret ++ ";", -- emit decl for "return" type
-           "if (" ++ vc ++ ") {" ]
+           "if (" ++ generateCGRE vc ++ ") {" ]
       ++ indent (  declt  -- compute true value
-                ++ [ cret ++ dotv ++ " = (" ++ vt ++ ");" ]) -- assign to "return"
+                ++ [ cret ++ dotv ++ " = (" ++ generateCGRE vt ++ ");" ]) -- assign to "return"
       ++ [ "} else {" ]
       ++ indent (  declf  -- compute false value
-                ++ [ cret ++ dotv ++ " = (" ++ vf ++ ");" ]) -- assign to "return"
+                ++ [ cret ++ dotv ++ " = (" ++ generateCGRE vf ++ ");" ]) -- assign to "return"
       ++ [ "}" ]
       )
-      cret
+      (cgreVar cret)
       crettype
       (auc <> aut <> auf)
 
@@ -528,7 +559,7 @@ cgenExprWithoutResettingAlloc env = \case
                    _              -> error "tycond was not TypeBool"
     (CG declbody vbody tybody aubody) <- cgenExprR env body
     return $ CG (  makeBlock (  declcond
-                             ++ [ "KS_ASSERT(" ++ vcond ++ ");" ]
+                             ++ [ "KS_ASSERT(" ++ generateCGRE vcond ++ ");" ]
                              )
                 ++ declbody
                 )

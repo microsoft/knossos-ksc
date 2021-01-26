@@ -10,7 +10,7 @@ import GHC.Stack
 import Data.Maybe(mapMaybe)
 
 shapeDefs :: HasCallStack => [TDef] -> [TDef]
-shapeDefs = mapMaybe (shapeDef . oneArgifyDef)
+shapeDefs = mapMaybe (shapeDef . noTupPatifyDef)
 
 shapeDef :: HasCallStack => TDef -> Maybe TDef
 

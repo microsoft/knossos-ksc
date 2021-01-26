@@ -41,10 +41,10 @@ gradTVar adp s (TVar ty v) = mkGradTVar adp (typeof s) (gradV adp v) ty
 gradDefs :: HasCallStack => ADPlan -> [TDef] -> [TDef]
 gradDefs adp = mapMaybe (gradDef adp)
 
--- We oneArgifyDef before gradDef.  See Note [Replacing TupPat with
+-- We noTupPatifyDef before gradDef.  See Note [Replacing TupPat with
 -- nested Let].
 gradDef :: HasCallStack => ADPlan -> TDef -> Maybe TDef
-gradDef adp = gradDefInner adp . oneArgifyDef
+gradDef adp = gradDefInner adp . noTupPatifyDef
 
 gradDefInner :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDefInner adp
@@ -287,7 +287,7 @@ lmVCat_AD TupleAD ms = Tuple [ Tuple  (map pFst ms)
 applyD :: ADDir -> TDef -> TDef
 
 applyD dir def@(Def { def_pat = TupPat {} })
-  = applyD dir (oneArgifyDef def)
+  = applyD dir (noTupPatifyDef def)
 
 -- Forward
 --   D$f  :: S1 S2       -> ((S1,S2) -o T)
