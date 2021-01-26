@@ -51,16 +51,20 @@
     (build n (lam (j : Integer) (mkfloat (add j seed) scale))))
 
 (def testfunc Float ((v1 : Float) (v2 : Float))
-    (let (deltaVec1 (deltaVec_Float 5 3 v1))
-    (let (constVec2 (constVec_Float 6 v2))
-    (add (sumbuild (size deltaVec1) (lam (i : Integer)
+    (let (mv42 (mkvec 42 5 1.3))
+    (let (mv43 (mkvec 43 5 v2))
+    (let (deltaVec1 (ts_add mv42 (deltaVec_Float 5 3 v1)))
+    (let (v3 (mul v2 (ts_dot deltaVec1 mv43)))
+    (let (constVec2 (ts_scale v1 (constVec_Float 6 v3)))
+    (mul (sumbuild (size deltaVec1) (lam (i : Integer)
              (mul (index i deltaVec1) (cos (to_float i)))))
          (sumbuild (size constVec2) (lam (i : Integer)
-             (mul (index i constVec2) (cos (add 0.5 (to_float i))))))))))
+             (mul (index i constVec2) (cos (add 0.5 (to_float i)))))))))))))
 
 (def main Integer ()
      (let (seed 20000)
      (let (delta 0.0001)
+     (let (tolerance 0.0001)
 
      (let (x1  (mkfloat (add seed 0)       1.0))
      (let (x2  (mkfloat (add seed 1)       1.0))
@@ -77,9 +81,8 @@
      (let (test_fwd (fwd$testfunc x dx))
 
      (let (fwd_ok
-              (let (tolerance 0.00001)
               (lt (abs (sub test_fwd test_fd))
-                  (mul (add (abs test_fwd) (abs test_fd)) tolerance))))
+                  (mul (add (abs test_fwd) (abs test_fd)) tolerance)))
 
      (let (checked ($check  (lam (t : Tuple Float Float) (testfunc t))
                             (lam (t : Tuple (Tuple Float Float) Float) (rev$testfunc t))
@@ -87,7 +90,7 @@
                             x
                             dx
                             df))
-     (let (rev_ok (lt (abs checked) 0.00001))
+     (let (rev_ok (lt (abs checked) tolerance))
 
      (print
         "x = " x "\n"
@@ -102,10 +105,10 @@
 
         "TESTS FOLLOW"
         "\n----\n"
-        "fwd$deltaVec\n"
+        "fwd$testfunc\n"
         fwd_ok
         "\n----\n"
-        "rev$deltaVec\n"
+        "rev$testfunc\n"
         rev_ok
         "\n"
-        ))))))))))))))))))
+        )))))))))))))))))))
