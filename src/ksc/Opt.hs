@@ -658,7 +658,7 @@ optGradPrim _ "sum" e
 
 optGradPrim _ "size" e
   | TypeTensor d _ <- typeof e
-  = Just $ lmZero e (zeroIndex d)
+  = Just $ lmZero e (zeroIndexForDimension d)
 
 optGradPrim _ "index" (Tuple [i,v])
   = Just (lmHCat [ lmZero i vi
