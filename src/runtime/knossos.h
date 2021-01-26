@@ -820,7 +820,7 @@ namespace ks {
 	}
 
 	vec<vec<double>>
-	sub$VecR$VecR_helper$aT1T1fT1fi(allocator * alloc,
+	subIP_helper$aT1T1fT1fi(allocator * alloc,
 	                                vec<vec<double>> t1,
 	                                vec<double> t2,
 	                                int j) {

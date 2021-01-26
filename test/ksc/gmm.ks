@@ -9,23 +9,23 @@
 (gdef sufrevpass [gmm_knossos_tri Integer])
 (gdef sufrev [gmm_knossos_tri Integer])
 
-(def sub (Tuple (Vec (Vec Float)) (Vec Float)) ((a : Vec (Vec Float)) (j : Integer) (b : Vec Float))
+(def subIP (Tuple (Vec (Vec Float)) (Vec Float)) ((a : Vec (Vec Float)) (j : Integer) (b : Vec Float))
   (tuple a
   (build (size b) (lam (i : Integer) (sub (index i (index j a)) (index i b))))))
 
-(def [suffwdpass [sub (Vec (Vec Float))]] (Tuple (Tuple (Vec (Vec Float)) (Vec Float)) Integer)
+(def [suffwdpass [subIP (Vec (Vec Float))]] (Tuple (Tuple (Vec (Vec Float)) (Vec Float)) Integer)
      ((a : Vec (Vec Float)) (j : Integer) (b : Vec Float))
-  (tuple (sub$VecR$VecR a j b) j))
+  (tuple (subIP a j b) j))
 
-(edef sub$VecR$VecR_helper
+(edef subIP_helper
       (Vec (Vec Float))
       ((Vec (Vec Float)) (Vec Float) Integer))
 
-(def [sufrevpass [sub (Vec (Vec Float))]] (Tuple (Vec (Vec Float)) (Tuple) (Vec Float))
+(def [sufrevpass [subIP (Vec (Vec Float))]] (Tuple (Vec (Vec Float)) (Tuple) (Vec Float))
      ((t : Tuple (Vec (Vec Float)) (Vec Float)) (j : Integer))
      (let ((t1 t2) t)
      (let (t2r (build (size t2) (lam (i : Integer) (neg (index i t2)))))
-     (let (t1r (sub$VecR$VecR_helper t1 t2 j))
+     (let (t1r (subIP_helper t1 t2 j))
        (tuple t1r (tuple) t2r)))))
 
 ; dot
@@ -207,7 +207,7 @@
                             (let (((ss k) ss_k)
                                   ((veck qsk lsk xsk ik meansk alphask) ss)
                                   (Q         (gmm_knossos_makeQ (index k qsk) (index k lsk)))
-                                  ((xsk1 thesub) (sub xsk ik (index k meansk)))
+                                  ((xsk1 thesub) (subIP xsk ik (index k meansk)))
                                   (mahal_vec (mul Q thesub))
                                   (r (sub (add (index k alphask) (sum (index k qsk)))
                                           (mul 0.500000  (sqnorm mahal_vec))))
