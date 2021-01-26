@@ -556,6 +556,7 @@ primFunCallResultTy_maybe fun args
       ("Vec_init" , TypeTuple vals)
         | (s1:ss) <- vals
         , all (== s1) ss                                   -> Just (TypeTensor 1 s1)
+      ("Vec_init" , t)                                     -> Just (TypeTensor 1 t)
       ("build"    , TypeTuple
                      [sizeType, TypeLam indexType t])
         | sizeType `eqType` indexType

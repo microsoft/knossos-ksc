@@ -695,10 +695,12 @@ optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv])
 optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr])
   = Just $ Tuple [ mkTangentZero (pSel 1 3 n_i_v), mkTangentZero (pSel 2 3 n_i_v), pIndex (pSel 2 3 n_i_v) ddr ]
 
-optDrvPrim Fwd "Vec_init" (Tuple [Tuple _vs, dvs])
+optDrvPrim Fwd "Vec_init" (Tuple [_vs, dvs])
   = Just $ mkPrimCall "Vec_init" dvs
 optDrvPrim Rev "Vec_init" (Tuple [Tuple vs, ddr])
   = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kTInt $ toInteger i) ddr) $ fromList vs)
+optDrvPrim Rev "Vec_init" (Tuple [_v, ddr])
+  = Just $ pIndex (kTInt 0) ddr
 
 optDrvPrim _ _ _ = Nothing
 
