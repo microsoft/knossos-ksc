@@ -122,7 +122,7 @@ data EnvPruned = Pruned | NotPruned
 -- CatLang doesn't support tuple patterns in lets yet, but it could
 -- and if we do anything serious with CatLang then it *should*.
 toCLExpr :: [TVar] -> TExpr -> CLExpr
-toCLExpr env = to_cl_expr NotPruned env . oneArgifyExpr (mkInScopeSet env)
+toCLExpr env = to_cl_expr NotPruned env . noTupPatifyExpr (mkInScopeSet env)
 
 to_cl_expr :: EnvPruned -> [TVar] -> TExpr -> CLExpr
 

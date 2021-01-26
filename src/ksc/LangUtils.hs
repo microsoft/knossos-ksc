@@ -31,9 +31,9 @@ module LangUtils (
   LclSymTab, extendLclST,
   SymTab(..), newSymTab, emptySymTab,
 
-  -- OneArg
-  oneArgifyDef,
-  oneArgifyExpr
+  -- NoTupPat
+  noTupPatifyDef,
+  noTupPatifyExpr
 
   ) where
 
@@ -319,14 +319,14 @@ notInScope v in_scope
 
 
 -----------------------------------------------
---     oneArgifyDef
+--     noTupPatifyDef
 -----------------------------------------------
 
 {-
 Note [Replacing TupPat with nested Let]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-oneArgifyDef transforms a Def to an equivalent Def in which TupPat
+noTupPatifyDef transforms a Def to an equivalent Def in which TupPat
 does not appear. The rationale is as follows.
 
 Expr supports tuple patterns. That is, one can write
@@ -351,7 +351,7 @@ patterns.  Therefore for convenience we just translate tuple patterns
 into nested lets before running those parts of the code.  We can
 always revisit this decision later.
 
-Specifically, oneArgifyDef does these two things:
+Specifically, noTupPatifyDef does these two things:
 
 * Makes the Def have a VarPat.  We transform
 
@@ -376,10 +376,10 @@ Specifically, oneArgifyDef does these two things:
 -- Replaces all occurrences of TupPat in the Def (including the
 -- def_pat of the Def itself) with nested Lets.  See Note [Replacing
 -- TupPat with nested Let].
-oneArgifyDef :: TDef -> TDef
-oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
+noTupPatifyDef :: TDef -> TDef
+noTupPatifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
   = def { def_pat = VarPat argVar
-        , def_rhs = UserRhs (add_unpacking (oneArgifyExpr in_scope rhs)) }
+        , def_rhs = UserRhs (add_unpacking (noTupPatifyExpr in_scope rhs)) }
   where
      (argVar, add_unpacking, in_scope) = case pat of
        VarPat v -> (argVar, add_unpacking, in_scope)
@@ -399,32 +399,32 @@ oneArgifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
            add_unpacking = mkLets [ (tv, pSel i n (Var argVar))
                                   | (tv, i) <- tvs `zip` [1..] ]
 
-oneArgifyDef def = def
+noTupPatifyDef def = def
 
 -- Replaces all occurrences of TupPat in the Expr with nested Lets.
 -- See Note [Replacing TupPat with nested Let].
-oneArgifyExpr :: InScopeSet -> TExpr -> TExpr
-oneArgifyExpr in_scope = \case
-     Call f e -> Call f (oneArgifyExpr in_scope e)
-     Tuple es -> Tuple (fmap (oneArgifyExpr in_scope) es)
-     Lam v e  -> Lam v (oneArgifyExpr in_scope' e)
+noTupPatifyExpr :: InScopeSet -> TExpr -> TExpr
+noTupPatifyExpr in_scope = \case
+     Call f e -> Call f (noTupPatifyExpr in_scope e)
+     Tuple es -> Tuple (fmap (noTupPatifyExpr in_scope) es)
+     Lam v e  -> Lam v (noTupPatifyExpr in_scope' e)
        where in_scope' = extendInScopeSet v in_scope
-     App f e  -> App (oneArgifyExpr in_scope f) (oneArgifyExpr in_scope e)
+     App f e  -> App (noTupPatifyExpr in_scope f) (noTupPatifyExpr in_scope e)
      Let (VarPat v) r b ->
-       Let (VarPat v) (oneArgifyExpr in_scope r) (oneArgifyExpr in_scope' b)
+       Let (VarPat v) (noTupPatifyExpr in_scope r) (noTupPatifyExpr in_scope' b)
        where in_scope' = extendInScopeSet v in_scope
      Let (TupPat t) r b ->
        mkLet fresh r
        $ mkLets (map (\(i, v) -> (v, pSel i n (Var fresh))) (zip [1..] t))
-       $ oneArgifyExpr in_scope' b
+       $ noTupPatifyExpr in_scope' b
        where fresh = TVar ty (notInScope (Simple "_t") in_scope)
              ty = typeof r
              in_scope' = S.fromList (map tVarVar t) `S.union` in_scope
              n = length t
-     If c t f  -> If (oneArgifyExpr in_scope c)
-                     (oneArgifyExpr in_scope t)
-                     (oneArgifyExpr in_scope f)
-     Assert c b -> Assert (oneArgifyExpr in_scope c) (oneArgifyExpr in_scope b)
+     If c t f  -> If (noTupPatifyExpr in_scope c)
+                     (noTupPatifyExpr in_scope t)
+                     (noTupPatifyExpr in_scope f)
+     Assert c b -> Assert (noTupPatifyExpr in_scope c) (noTupPatifyExpr in_scope b)
      Konst k -> Konst k
      Var v   -> Var v
      Dummy d -> Dummy d
