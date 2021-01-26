@@ -12,7 +12,7 @@ double rev$edef_example$aff(allocator *, double x, double ddr) { return ddr; }
 
 double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
 {
-	return dot(a,b);
+	return ts_dot(a,b);
 }
 
 vec<double>
@@ -21,7 +21,7 @@ mul$aT2fT1f(allocator * alloc, tensor<2, double> const& M, vec<double> const& v)
 	int r = M.outer_dimension();
 	vec<double> ret(alloc, r);
 	for(int i = 0; i < r; ++i)
-		ret[i] = dot(M[i], v);
+		ret[i] = ts_dot(M[i], v);
 	return ret;
 }
 
