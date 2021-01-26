@@ -478,10 +478,6 @@ kFloat f = Konst (KFloat f)
 kTFloat :: Double -> TExpr
 kTFloat f = Konst (KFloat f)
 
-zeroIndexForDimension :: Int -> TExpr
-zeroIndexForDimension 1 = Konst (KInteger 0)
-zeroIndexForDimension d = mkTuple (replicate d (Konst (KInteger 0)))
-
 zeroInt :: TExpr
 zeroInt = Konst (KInteger 0)
 
