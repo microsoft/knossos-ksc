@@ -16,7 +16,7 @@ mul$Mat$Vec$aT1T1fT1f(allocator * alloc, vec<vec<double>> const& M, vec<double> 
 	int r = size(M);
 	vec<double> ret(alloc, r);
 	for(int i = 0; i < r; ++i)
-		ret[i] = ts_dot(M[i], v);
+		ret[i] = dot(M[i], v);
 	return ret;
 }
 

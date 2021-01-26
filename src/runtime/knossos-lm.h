@@ -65,27 +65,6 @@ namespace ks
 				"(" << t.val << ")";
 		}
 
-		// ---------------- ScaleR  ------------------
-		template <class T>
-		struct ScaleR
-		{
-			T val;
-
-			typedef double To;
-			typedef double From;
-
-			static ScaleR mk(allocator *, T val) { return ScaleR{ val }; }
-
-			T Apply(allocator *, double rhs) const { return rhs * val; }
-		};
-
-		template <class T>
-		inline std::ostream &operator<<(std::ostream &s, ScaleR<T> const &t)
-		{
-			return s << "ScaleR" <<
-				"(" << t.val << ")";
-		}
-
 		// ---------------- Add ------------------
 		template <class LM1, class LM2>
 		struct Add {
@@ -525,13 +504,13 @@ namespace ks
 	DECLARE_TYPE_TO_STRING2(LM::Variant, From, To);
 	DECLARE_TYPE_TO_STRING2(LM::Add, From, To);
 
-/*
+
 	template <class T1, class T2>
 	auto D$ts_scale(T1 t1, T2 t2)
 	{
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(t2), LM::Scale::mk(t1));
 	}
-*/
+
 	inline auto D$abs$af(allocator *, double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
 
 	inline auto D$max$aff(allocator *, double a, double b) {

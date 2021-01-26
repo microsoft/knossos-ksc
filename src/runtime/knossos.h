@@ -1259,6 +1259,59 @@ namespace ks
 		});
 	}
 
+	// specialize zero(tensor<Dim,T>)
+	template <size_t Dim, class T>
+	tensor<Dim, T> zero(allocator * alloc, tensor<Dim, T> const& val)
+	{
+		tensor<Dim, T> ret(alloc, val.size());
+		T* retdata = ret.data();
+		auto z = val.zero_element(alloc);
+		for (int i = 0; i != ret.num_elements(); ++i) {
+			retdata[i] = z;
+		}
+		return ret;
+	}
+
+
+	// -- Specialize type_to_string
+	template <size_t Dim, typename T>
+	struct type_to_string<ks::tensor<Dim, T>>
+	{
+		static std::string name()
+		{
+			return "tensor<" + std::to_string(Dim) + ", " + type_to_string<T>::name() + ">";
+		}
+	};
+
+	// Elementwise addition
+	template <size_t Dim, class T>
+	tensor<Dim, T> ts_add(allocator * alloc, tensor<Dim, T> const& a, tensor<Dim, T> const& b)
+	{
+		KS_ASSERT(a.size() == b.size());
+		auto ret = tensor<Dim, T>::create(alloc, a.size());
+		const T* adata = a.data();
+		const T* bdata = b.data();
+		T* retdata = ret.data();
+
+		for (int i = 0, ne = a.num_elements(); i != ne; ++i)
+			retdata[i] = ts_add(alloc, adata[i], bdata[i]);
+		return ret;
+	}
+
+	template <class T>
+	T ts_scale(allocator * alloc, double s, T const& t);
+
+	// Scale a tensor
+	template <size_t Dim, class T>
+	tensor<Dim, T> ts_scale(allocator * alloc, double val, tensor<Dim, T> const& t)
+	{
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		T* retdata = ret.data();
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
+			retdata[i] = ts_scale(alloc, val, t[i]);
+		return ret;
+	}
+
 	// sum of elements
 	template <size_t Dim, class T>
 	T sum(allocator * alloc, tensor<Dim, T> const& t)
@@ -1445,28 +1498,28 @@ namespace ks
 																		}))
 
 	// ===============================  Dot ===========================================
-    inline double ts_dot(double t1, double t2) { return t1 * t2; }
+  inline double dot(double t1, double t2) { return t1 * t2; }
 
 	template <class T>
-	inline double ts_dot(T t1, tuple<> t2)
+	inline double dot(T t1, tuple<> t2)
 	{
 		return 0.0;
 	}
 
 	template <class T>
-	inline double ts_dot(T t1, tuple<T> t2)
+	inline double dot(T t1, tuple<T> t2)
 	{
-		return ts_dot(t1,std::get<0>(t2));
+		return dot(t1,std::get<0>(t2));
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
-	inline double ts_dot(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
+	inline double dot(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
 	{
-		return ts_dot(head(t1), head(t2)) + ts_dot(tail(t1), tail(t2));
+		return dot(head(t1), head(t2)) + dot(tail(t1), tail(t2));
 	}
 
 	template <size_t Dim, class T1, class T2>
-	inline double ts_dot(tensor<Dim, T1> t1, tensor<Dim, T2> t2)
+	inline double dot(tensor<Dim, T1> t1, tensor<Dim, T2> t2)
 	{
 		double ret = 0;
 
@@ -1476,7 +1529,7 @@ namespace ks
 		const T2* t2data = t2.data();
 		for (int i = 0, ne = t1.num_elements(); i < ne; i++)
 		{
-			ret += ts_dot(t1data[i], t2data[i]);
+			ret += dot(t1data[i], t2data[i]);
 		}
 
 		return ret;
@@ -1507,9 +1560,9 @@ namespace ks
 		auto f_x = applyWithAllocator(alloc, f, x);
 		auto f_x_plus_dx = applyWithAllocator(alloc, f, ts_add(alloc, x, dx));
 		auto delta_f = f_x_plus_dx - f_x;
-		double d1 = ts_dot(delta_f, df);
+		double d1 = dot(delta_f, df);
 		auto dfJ = applyWithAllocator(alloc, rev_f, std::make_tuple(x_, df));
-		double d2 = ts_dot(dfJ, dx);
+		double d2 = dot(dfJ, dx);
 
 		/*
 		std::cout << "dfJ=" << dfJ << std::endl;
