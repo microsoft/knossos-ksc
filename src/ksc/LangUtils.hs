@@ -149,7 +149,7 @@ hspec :: Spec
 hspec = do
     let var :: String -> TVar
         var s = TVar TypeFloat (Simple s)
-        fun :: String -> TFun
+        fun :: String -> TFun Typed
         fun s = TFun TypeFloat (Fun (UserFun s))
         e  = Call (fun "f") (Var (var "i"))
         e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
@@ -198,7 +198,7 @@ fortunately all functions have explicitly-declared types.
 -}
 
 -- Global symbol table
-type GblSymTab = M.Map (Fun, Type) TDef
+type GblSymTab = M.Map (Fun Parsed, Type) TDef
    -- Maps a function to its definition, which lets us
    --   * Find its return type
    --   * Inline it
@@ -235,9 +235,9 @@ newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
 stInsertFun :: TDef -> GblSymTab -> GblSymTab
-stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (f, patType arg) def
+stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (toFunParsed f, patType arg) def
 
-lookupGblST :: HasCallStack => (Fun, Type) -> GblSymTab -> Maybe TDef
+lookupGblST :: HasCallStack => (Fun Parsed, Type) -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab

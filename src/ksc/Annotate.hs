@@ -55,7 +55,7 @@ annotDecls gbl_env decls
     mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
          tcWithPat pat $ \pat' ->
-         do { return (Def { def_fun = fun, def_pat = pat'
+         do { return (Def { def_fun = toFunTyped fun, def_pat = pat'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
 
@@ -93,7 +93,7 @@ tcDef (Def { def_fun    = fun
   = addCtxt (text "In the definition of" <+> ppr fun) $
     do { tcWithPat pat $ \pat' ->
     do { rhs' <- tcRhs fun rhs res_ty
-       ; return (Def { def_fun = fun, def_pat = pat'
+       ; return (Def { def_fun = toFunTyped fun, def_pat = pat'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
 
@@ -150,7 +150,7 @@ tcTupPatTup vs ts
 tvar :: forall p. InPhase p => Type -> LetBndrX p -> TVarX
 tvar t v = TVar t (fst (getLetBndr @p v))
 
-tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
+tcRhs :: InPhase p => Fun p -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
 tcRhs _ EDefRhs _ = return EDefRhs
 tcRhs fun (UserRhs rhs) res_ty
@@ -195,7 +195,7 @@ tcExpr (Call fx es)
 
        ; res_ty <- checkTypes_maybe mb_ty res_ty $
          text "Function call type mismatch for" <+> ppr fun
-       ; let call' = Call (TFun res_ty fun) (exprOf pairs)
+       ; let call' = Call (TFun res_ty (toFunTyped fun)) (exprOf pairs)
        ; return (TE call' res_ty) }
 
 tcExpr (Let vx rhs body)
@@ -261,7 +261,7 @@ tcVar var mb_ty
 -- It has special cases for a bunch opuilt-in functions with polymorphic
 -- types; that is, where the result type is a function of the argument types
 -- Otherwise it just looks in the global symbol table.
-callResultTy_maybe :: GblSymTab -> Fun -> Type
+callResultTy_maybe :: GblSymTab -> Fun Parsed -> Type
                    -> Either SDoc Type
 callResultTy_maybe env fun args
   | is_user_fun fun
@@ -275,7 +275,7 @@ callResultTy_maybe env fun args
 --     The typecheck monad
 -----------------------------------------------
 
-userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
+userCallResultTy_maybe :: HasCallStack => Fun Parsed -> GblSymTab
                        -> Type -> Either SDoc Type
 userCallResultTy_maybe fn env args
   = case lookupGblST (fn, typeof args) env of
@@ -457,7 +457,7 @@ lookupLclTc v
                              }
            Just ty -> return ty }
 
-lookupGblTc :: Fun -> TypedExpr -> TcM Type
+lookupGblTc :: Fun Parsed -> TypedExpr -> TcM Type
 lookupGblTc fun args
   = do { st <- getSymTabTc
        ; case callResultTy_maybe (gblST st) fun (typeof args) of

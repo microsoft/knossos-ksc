@@ -1,6 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE LambdaCase, FlexibleInstances, PatternSynonyms  #-}
+{-# LANGUAGE DataKinds  #-}
 
 module Cgen where
 
@@ -264,7 +265,7 @@ getType (CG _ _ ty _) = ty
 getAllocatorUsage :: CGenResult -> AllocatorUsage
 getAllocatorUsage (CG _ _ _ au) = au
 
-type CSTKey = (Fun, Type)
+type CSTKey = (Fun Typed, Type)
 type CST    = Map.Map CSTKey Type
 
 cstMaybeLookupFun :: HasCallStack => CSTKey -> CST -> Maybe Type
@@ -285,7 +286,7 @@ moveMark bumpmark allocVar = bumpmark ++ " = " ++ allocVar ++ "->mark();"
 allocatorParameterName :: String
 allocatorParameterName = "$alloc"
 
-cgenArgList :: TFun -> [String] -> String
+cgenArgList :: TFun p -> [String] -> String
 cgenArgList tf cargs = intercalate ", " (allocatorIfUsed ++ cargs)
   where allocatorIfUsed = if funUsesAllocator tf
                           then [allocatorParameterName]
@@ -604,7 +605,7 @@ mangleType = \case
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
 
-cgenFunId :: (FunId, Type) -> String
+cgenFunId :: (FunId p, Type) -> String
 cgenFunId = \case
   (UserFun fun, TypeTuple [])  -> mangleFun fun
   (UserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
@@ -612,7 +613,7 @@ cgenFunId = \case
   (PrimFun fun, _ty) -> fun
   (SelFun i _, _ty)  -> "ks::get<" ++ show (i - 1) ++ ">"
 
-cgenUserFun :: HasCallStack => (Fun, Type) -> String
+cgenUserFun :: HasCallStack => (Fun p, Type) -> String
 cgenUserFun (f, ty) = case f of
   Fun funId     -> cgenFunId (funId, ty)
   GradFun  s _  -> "D$" ++ cgenFunId (s, ty)
@@ -622,7 +623,7 @@ cgenUserFun (f, ty) = case f of
   DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId (s, ty)
   ShapeFun ff   -> "shape$" ++ cgenUserFun (ff, ty)
 
-cgenAnyFun :: HasCallStack => (TFun, Type) -> CType -> String
+cgenAnyFun :: HasCallStack => (TFun p, Type) -> CType -> String
 cgenAnyFun (tf, ty) cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun ty (Fun (PrimFun "build")) ->
@@ -661,13 +662,13 @@ are two cases:
     the allocator argument is still passed to the function.)
 -}
 
-funUsesAllocator :: HasCallStack => TFun -> Bool
+funUsesAllocator :: HasCallStack => TFun p -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
   not $ fname `elem` ["index", "size", "eq", "ne", "$trace", "print", "ts_dot"]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
-funAllocatorUsage :: HasCallStack => TFun -> CType -> AllocatorUsage
+funAllocatorUsage :: HasCallStack => TFun p -> CType -> AllocatorUsage
 funAllocatorUsage tf ty
   -- See Note [Allocator usage of function calls]
   | not $ funUsesAllocator tf = DoesNotUseAllocator
@@ -708,14 +709,14 @@ cgenTypeLang = \case
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
-ctypeofFun :: HasCallStack => CST -> (TFun, Type) -> [CType] -> CType
+ctypeofFun :: HasCallStack => CST -> (TFun Typed, Type) -> [CType] -> CType
 ctypeofFun env (TFun ty f, argty) ctys = case cstMaybeLookupFun (f, argty) env of
   Just ret_ty -> -- trace ("Found fun " ++ show f) $
     UseTypeDef ("ty$" ++ cgenUserFun (f, argty)) ret_ty
   Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
 
-ctypeofFun1 :: HasCallStack => Type -> Fun -> [CType] -> CType
+ctypeofFun1 :: HasCallStack => Type -> Fun Typed -> [CType] -> CType
 ctypeofFun1 ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
 ctypeofFun1 (TypeLM _ _) (GradFun f _) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 (TypeLM _ _) f ctys =
@@ -752,7 +753,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
 pattern RR :: TypeX
 pattern RR = TypeFloat
 
-ctypeofGradBuiltin :: HasCallStack => FunId -> [CType] -> CType
+ctypeofGradBuiltin :: HasCallStack => FunId Typed -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "ts_add"   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty

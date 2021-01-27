@@ -15,6 +15,7 @@ import           Data.List                      ( intersperse )
 import           KMonad
 
 import qualified Data.Map as M
+import           Data.Coerce
 import           Debug.Trace                    ( trace )
 import           Test.Hspec
 
@@ -40,7 +41,7 @@ type Decl  = DeclX Parsed
 type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
-  = Def { def_fun    :: Fun
+  = Def { def_fun    :: Fun p
         , def_pat    :: Pat       -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
@@ -145,9 +146,9 @@ type family LetBndrX p where
   LetBndrX OccAnald = (Int,TVarX)
 
 type family FunX p where
-  FunX Parsed   = Fun
-  FunX Typed    = TFun
-  FunX OccAnald = TFun
+  FunX Parsed   = Fun Parsed
+  FunX Typed    = TFun Typed
+  FunX OccAnald = TFun OccAnald
 
 data ExprX p
   = Konst Konst
@@ -339,33 +340,40 @@ eqTypes x xs = if all (eqType x) xs
 
 type PrimFun = String
 
-data FunId = UserFun String   -- UserFuns have a Def
-           | PrimFun PrimFun  -- PrimFuns do not have a Def
-           | SelFun
-                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
-                Int      -- Arity
+data FunId (p :: Phase)
+             = UserFun String   -- UserFuns have a Def
+             | PrimFun PrimFun  -- PrimFuns do not have a Def
+             | SelFun
+                  Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
+                  Int      -- Arity
            deriving( Eq, Ord, Show )
 
-data Fun = Fun      FunId         -- The function              f(x)
-         | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
-         | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
-                                  --   Rev <=> reverse mode f`(x,dr)
-         | ShapeFun Fun
-         deriving( Eq, Ord, Show )
+data Fun p = Fun      (FunId p)         -- The function              f(x)
+           | GradFun  (FunId p) ADPlan  -- Full Jacobian Df(x)
+           | DrvFun   (FunId p) ADMode  -- Derivative derivative f'(x,dx)
+                                        --   Rev <=> reverse mode f`(x,dr)
+           | ShapeFun (Fun p)
+           deriving( Eq, Ord, Show )
 
-isUserFun :: FunId -> Bool
+toFunParsed :: Fun p -> Fun Parsed
+toFunParsed = coerce
+
+toFunTyped :: Fun p -> Fun Typed
+toFunTyped = coerce
+
+isUserFun :: FunId p -> Bool
 isUserFun = \case
   UserFun{} -> True
   PrimFun{} -> False
   SelFun{}  -> False
 
-isSelFun :: FunId -> Bool
+isSelFun :: FunId p -> Bool
 isSelFun = \case
   UserFun{} -> False
   PrimFun{} -> False
   SelFun{}  -> True
 
-funIdOfFun :: Fun -> FunId
+funIdOfFun :: Fun p -> FunId p
 funIdOfFun = \case
   Fun f       -> f
   GradFun f _ -> f
@@ -381,9 +389,14 @@ data ADPlan = BasicAD | TupleAD
 data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
 
-data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
+data TFun p = TFun Type (Fun p)   -- Typed functions.  The type is the /return/
   deriving (Eq, Ord)  -- type of the function.
 
+typedTFunToOccAnaldTFun :: TFun Typed -> TFun OccAnald
+typedTFunToOccAnaldTFun = coerce
+
+occAnaldTFunToTypedTFun :: TFun OccAnald -> TFun Typed
+occAnaldTFunToTypedTFun = coerce
 
 data Var
   = Simple String         -- x
@@ -433,10 +446,10 @@ partitionDecls = foldr declX ([], [])
 --       Building values
 -----------------------------------------------
 
-mkPrimFun :: String -> Fun
+mkPrimFun :: String -> Fun p
 mkPrimFun fname = Fun (PrimFun fname)
 
-mkPrimTFun :: Type -> String -> TFun
+mkPrimTFun :: Type -> String -> TFun p
 mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
 
 mkVar :: String -> Var  -- Just a Simple var
@@ -525,7 +538,7 @@ instance HasType Pat where
 instance HasType TypedExpr where
   typeof (TE _ ty) = ty
 
-instance HasType TFun where
+instance HasType (TFun p) where
   typeof (TFun ty _) = ty
 
 instance HasType TExpr where
@@ -722,7 +735,7 @@ class InPhase p where
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
 
   getVar     :: VarX p     -> (Var, Maybe Type)
-  getFun     :: FunX p     -> (Fun, Maybe Type)
+  getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
 instance InPhase Parsed where
@@ -740,7 +753,7 @@ instance InPhase Typed where
   pprFunOcc  = ppr
 
   getVar     (TVar ty var) = (var, Just ty)
-  getFun     (TFun ty fun) = (fun, Just ty)
+  getFun     (TFun ty fun) = (toFunParsed fun, Just ty)
   getLetBndr (TVar ty var) = (var, Just ty)
 
 instance InPhase OccAnald where
@@ -749,10 +762,10 @@ instance InPhase OccAnald where
   pprFunOcc = ppr
 
   getVar     (TVar ty var)      = (var, Just ty)
-  getFun     (TFun ty fun)      = (fun, Just ty)
+  getFun     (TFun ty fun)      = (toFunParsed fun, Just ty)
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
-pprTFun :: TFun -> SDoc
+pprTFun :: InPhase p => TFun p -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
 
 
@@ -796,18 +809,18 @@ instance Pretty Var where
   ppr (Delta  d) = text "d$" <> text d
   ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
 
-instance Pretty FunId where
+instance Pretty (FunId p) where
   ppr = pprFunId
 
-instance Pretty Fun where
+instance Pretty (Fun p) where
   ppr = pprFun
 
-pprFunId :: FunId -> SDoc
+pprFunId :: FunId p -> SDoc
 pprFunId (UserFun s ) = text s
 pprFunId (PrimFun p ) = text p
 pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
-pprFun :: Fun -> SDoc
+pprFun :: Fun p -> SDoc
 pprFun (Fun s)                   = ppr s
 pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
 pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
@@ -820,7 +833,7 @@ instance Pretty Pat where
 instance Pretty TVar where
   pprPrec _ (TVar _ v) = ppr v
 
-instance Pretty TFun where
+instance InPhase p => Pretty (TFun p) where
   ppr (TFun _ f) = ppr f
 
 instance Pretty Konst where
@@ -941,7 +954,7 @@ isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
 isInfix f = isInfixFun (fst (getFun @p f))
 
 -- TODO: this is rather out of date, and it's not clear we need to keep it...
-isInfixFun :: Fun -> Maybe Prec
+isInfixFun :: Fun p -> Maybe Prec
 isInfixFun (Fun (PrimFun s))
     | s == "eq"     = Just precOne
     | s == "ts_add" = Just precTwo

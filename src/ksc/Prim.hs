@@ -1,6 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DataKinds #-}
 
 module Prim where
 
@@ -52,7 +53,7 @@ mkPrimCall7 f a b c d e g h = mkPrimCall f (Tuple [a, b, c, d, e, g, h])
 --  Parsing function names
 --------------------------------------------
 
-mk_fun :: String -> Fun
+mk_fun :: String -> Fun Parsed
 -- Parses the print-name of a top-level function into a Fun
 -- In particular,
 --
@@ -278,7 +279,7 @@ lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
 lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
-isThePrimFun :: TFun -> String -> Bool
+isThePrimFun :: TFun p -> String -> Bool
 isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
@@ -397,7 +398,7 @@ pMulff x1 x2 = userCall "mul" TypeFloat (Tuple [x1, x2])
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: HasCallStack => Fun -> Type
+primCallResultTy_maybe :: (HasCallStack, InPhase p) => Fun p -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
