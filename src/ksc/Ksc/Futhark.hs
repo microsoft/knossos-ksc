@@ -361,7 +361,7 @@ callPrimFun f _ args =
 -- Futhark has different semantics than the source language (and C++).
 -- In particular, no ad-hoc polymorphism.  We handle this on a
 -- case-by-case basis.
-toCall :: L.TFun -> L.TExpr -> Exp
+toCall :: L.InPhase p => L.TFun p -> L.TExpr -> Exp
 
 toCall (L.TFun _ (L.Fun (L.SelFun f _))) e =
   Project (toFutharkExp e) $ show f

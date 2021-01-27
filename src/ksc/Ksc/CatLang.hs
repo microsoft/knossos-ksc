@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+
 -- Ksc.CatLang: Language for compilation to categories
 module Ksc.CatLang( CLDef, toCLDefs, fromCLDefs, toCLDef_maybe, fromCLDef ) where
 
@@ -12,7 +14,7 @@ data CLExpr
   = CLId
   | CLPrune [Int] Int CLExpr         -- ?
   | CLKonst Konst
-  | CLCall Type FunId            -- The Type is the result type
+  | CLCall Type (FunId Typed)    -- The Type is the result type
   | CLComp CLExpr CLExpr         -- Composition
   | CLTuple [CLExpr]             -- Tuple
   | CLIf CLExpr CLExpr CLExpr    -- If
@@ -21,7 +23,7 @@ data CLExpr
   | CLFold TVar CLExpr CLExpr CLExpr
   -- ^ Fold (Lam $t body) $acc $vector
 
-data CLDef = CLDef { cldef_fun    :: FunId
+data CLDef = CLDef { cldef_fun    :: FunId Typed
                    , cldef_arg    :: Pat     -- Arg type S
                    , cldef_rhs    :: CLExpr
                    , cldef_res_ty :: Type }  -- Result type T
@@ -152,7 +154,7 @@ to_cl_expr _ _ e@(Dummy {})  =  pprPanic "toCLExpr Dummy" (ppr e)
 to_cl_expr NotPruned env e = prune env e
 
 ---------------
-to_cl_call :: EnvPruned -> [TVar] -> TFun -> TExpr -> CLExpr
+to_cl_call :: EnvPruned -> [TVar] -> TFun Typed -> TExpr -> CLExpr
 -- Calls:
 --   * for build, prune before the build
 --   * for other calls, prune in the argument
