@@ -112,10 +112,10 @@ cseDefs rb gst defs
       }
 
 cseD :: TDef -> TDef
-cseD def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
+cseD def@(Def { def_arg = bndr, def_rhs = UserRhs rhs })
   = def { def_rhs = UserRhs $ cseE init_env rhs }
   where
-    init_env = CS { cs_subst = mkEmptySubst (patVars pat)
+    init_env = CS { cs_subst = mkEmptySubst [bndr]
                   , cs_map   = M.empty }
 
 cseD def = def  -- EDefRhs, StubRhs

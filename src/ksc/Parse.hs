@@ -320,13 +320,19 @@ pDef = do { pReserved "def"
           ; xs <- pParams
           ; rhs <- pExpr
           -- See Note [Function arity]
-          ; let pat = case xs of
-                  [x] -> VarPat x
-                  xs  -> TupPat xs
+          ; let (arg,rhs') = oneify xs rhs
           ; return (Def { def_fun    = mk_fun f
-                        , def_pat    = pat
-                        , def_rhs    = UserRhs rhs
+                        , def_arg    = arg
+                        , def_rhs    = UserRhs rhs'
                         , def_res_ty = ty }) }
+  where
+    oneify :: [TVar] -> ExprX Parsed -> (TVar, ExprX Parsed)
+    oneify []  rhs = (voidArg, rhs)
+    oneify [x] rhs = (x,       rhs)
+    oneify xs  rhs = (arg, Let (TupPat (map tVarVar xs)) (Var (tVarVar arg)) rhs)
+      where
+        arg = TVar (mkTupleTy (map typeof xs)) (Simple "arg")
+    voidArg = TVar (mkTupleTy []) (Simple "arg")
 
 pRule :: Parser Rule
 pRule = do { pReserved "rule"
@@ -345,7 +351,7 @@ pEdef = do { pReserved "edef"
            ; return (Def { def_fun = mk_fun name
                          , def_res_ty = returnType
                          -- See note [Function arity]
-                         , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")
+                         , def_arg = mkTVar (mkTupleTy argTypes) "edefArgVar"
                          , def_rhs = EDefRhs }) }
 
 

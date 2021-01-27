@@ -383,7 +383,7 @@ toCall f@(L.TFun _ L.ShapeFun{}) args =
 
 toFuthark :: L.TDef -> Def
 toFuthark d = case LU.noTupPatifyDef d of {
-  L.Def f (L.VarPat args) res_ty (L.UserRhs e) ->
+  L.Def f args res_ty (L.UserRhs e) ->
   DefFun entry fname []
   [param] res_ty' (toFutharkExp e)
   where fname = toTypedName f (L.typeof args)

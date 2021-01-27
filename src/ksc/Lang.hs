@@ -41,7 +41,7 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: Fun
-        , def_pat    :: Pat       -- See Note [Function arity]
+        , def_arg    :: TVar      -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
@@ -959,19 +959,19 @@ instance InPhase p => Pretty (DefX p) where
   ppr def = pprDef def
 
 pprDef :: InPhase p => DefX p -> SDoc
-pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
+pprDef (Def { def_fun = f, def_arg = v, def_res_ty = res_ty, def_rhs = rhs })
   = case rhs of
       EDefRhs -> parens $
                  sep [ text "edef", ppr f
                      , pprParendType res_ty
-                     , parens (pprParendType (typeof vs)) ]
+                     , parens (pprParendType (typeof v)) ]
 
       UserRhs rhs -> mode
           (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
-                        , parens (pprPat False vs)
+                        , parens $ pprTVar v
                         , ppr rhs])
           (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
-                    2 (parens (pprPat False vs))
+                    2 (parens $ pprTVar v)
                , nest 2 (text "=" <+> ppr rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
