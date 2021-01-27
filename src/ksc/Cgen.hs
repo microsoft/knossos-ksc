@@ -579,6 +579,7 @@ mangleFun = substitute $ \case
     '<' -> Just "$d"
     '>' -> Just "$b"
     '*' -> Just "$x"
+    ':' -> Just "$8"
     _   -> Nothing
 
 -- | Produces a short string that uniquely identifies the input type.
