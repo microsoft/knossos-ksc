@@ -656,9 +656,7 @@ optGradPrim _ "sum" e
   = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$i")
                              (lmOne t)))
 
-optGradPrim _ "size" e
-  | TypeTensor d _ <- typeof e
-  = Just $ lmZero e (zeroIndexForDimension d)
+optGradPrim _ "size" e = Just $ lmZero e (mkZero (pSize e))
 
 optGradPrim _ "index" (Tuple [i,v])
   = Just (lmHCat [ lmZero i vi
