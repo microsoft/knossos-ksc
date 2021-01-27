@@ -752,7 +752,6 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty
   (PrimFun "$copydown", [CType ty]          ) -> LMOne ty
   (PrimFun "size"     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
-  (PrimFun "index"    , [CType (TypeTensor 1 t)]) -> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
