@@ -395,8 +395,6 @@ optLMCompose f g
   , Call scale2 (Tuple [t2, y]) <- g
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
-  , typeof x == TypeFloat
-  , typeof y == TypeFloat
   , typeof t1 == typeof t2
   = Just $ lmScale (typeof t1) (pMulff x y)
 
