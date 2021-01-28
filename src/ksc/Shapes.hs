@@ -90,11 +90,8 @@ shapeCall tf e = pShape (Call tf e)  -- Fall back to calling the original functi
 shapeCallPrim :: HasCallStack => PrimFun -> TExpr -> Maybe TExpr
 shapeCallPrim "index" (Tuple [i, n]) = Just $ pIndex i (shapeE n)
 shapeCallPrim "build" (Tuple [sz, Lam i e2]) = Just $ pBuild sz (Lam i (shapeE e2))
-shapeCallPrim "sumbuild" (Tuple [n, Lam i e2])
-  = fmap (\d -> mkLet i (zeroIndexForDimension d) (shapeE e2)) (tensorDimensionFromIndexType_maybe (typeof n))
-shapeCallPrim "sum" v
-  | TypeTensor d _ <- typeof v
-  = Just $ pIndex (zeroIndexForDimension d) (shapeE v)
+shapeCallPrim "sumbuild" (Tuple [sz, Lam i e2]) = Just $ mkLet i (mkZero sz) (shapeE e2)
+shapeCallPrim "sum" v = Just $ pIndex (mkZero (pSize v)) (shapeE v)
 shapeCallPrim "constVec" (Tuple [sz, v]) = Just $ pConstVec sz (shapeE v)
 shapeCallPrim "deltaVec" (Tuple [sz, _i, v]) = Just $ pConstVec sz (shapeE v)
 shapeCallPrim "ts_add" (Tuple [lhs, _]) = Just $ shapeE lhs

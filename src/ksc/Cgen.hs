@@ -581,6 +581,7 @@ mangleFun = substitute $ \case
     '<' -> Just "$d"
     '>' -> Just "$b"
     '*' -> Just "$x"
+    ':' -> Just "$8"
     _   -> Nothing
 
 -- | Produces a short string that uniquely identifies the input type.
@@ -756,8 +757,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "ts_add"   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty
   (PrimFun "$copydown", [CType ty]          ) -> LMOne ty
-  (PrimFun "size"     , [CType ty]          ) -> LMZero ty TypeInteger
-  (PrimFun "index"    , [CType (TypeTensor 1 t)])-> trace "LMIndex?" $ LMHCat [LMZero TypeInteger t, LMBuild (LMScale t)]
+  (PrimFun "size"     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)

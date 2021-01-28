@@ -20,6 +20,8 @@ import Ksc.Traversal( traverseState )
 import Debug.Trace
 import Test.Hspec
 import Data.List( mapAccumR )
+import Data.Sequence( mapWithIndex, fromList )
+import Data.Foldable( toList )
 
 optTrace :: String -> a -> a
 optTrace _msg t = t
@@ -249,6 +251,11 @@ optPrimFun :: InScopeSet -> PrimFun -> TExpr -> Maybe TExpr
 
 -- Constant folding.
 -- TODO: match precision to target machine
+
+-- Don't try to constant-fold Vec_init
+optPrimFun _ "Vec_init" _args 
+  = Nothing 
+
 optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
   = Just . Konst . KFloat $
     case op of
@@ -314,12 +321,12 @@ optPrimFun _ "size" (Call constVec (Tuple [n,_]))
   | constVec `isThePrimFun` "constVec"
   = Just n
 
--- RULE: index j (build n f) = f j
+-- RULE: index ei (build ns f) = f ei
 optPrimFun _ "index" (Tuple [ ei, arr ])
   | Just (_, i, e) <- isBuild_maybe arr
   = Just (mkLet i ei e)
 
--- RULE: index j (constVec (n, v)) = v
+-- RULE: index js (constVec (ns, v)) = v
 optPrimFun _ "index" (Tuple [_, Call constVec (Tuple [_, v])])
   | constVec `isThePrimFun` "constVec"
   = Just v
@@ -479,6 +486,7 @@ optSum _ = Nothing
 
 -----------------------
 sumOfConstVec :: TExpr -> TExpr -> TExpr
+sumOfConstVec (Tuple _) _ = error "sumOfConstVec (Tuple) unimplemented"
 sumOfConstVec n v = case typeof v of
   TypeInteger -> pMulii n v
   _ -> pScale (pToFloat n) v
@@ -657,7 +665,8 @@ optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
 
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 -- (+) :: (F,F) -> f
--- (D+)(x,y) :: (F,F) -o F
+-- (D+) :: (F,F) -> ((dF,dF) -o dF)
+-- (D+)(x,y) :: (dF,dF) -o dF
 optGradPrim _ "ts_add" arg
   | Tuple arg' <- arg
   , [t1, t2] <- map typeof arg'
@@ -682,14 +691,13 @@ optGradPrim _ "sum" e
   = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$i")
                              (lmOne t)))
 
-optGradPrim _ "size" e
-  = Just $ lmZero e zeroInt
+optGradPrim _ "size" e = Just $ lmZero e (mkZero (pSize e))
 
 optGradPrim _ "index" (Tuple [i,v])
   = Just (lmHCat [ lmZero i vi
                  , lmBuildT (pSize v) (Lam ii (lmDelta vi (Var ii) i)) ])
   where
-    ii = TVar TypeInteger $ Simple "primDindex$i"
+    ii = TVar (typeof i) $ Simple "primDindex$ii"
     vi = pIndex i v
 
 
@@ -711,10 +719,19 @@ optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv])
   = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
 optDrvPrim Rev "constVec" (Tuple [n_v, ddr])
   = Just $ Tuple [ mkTangentZero (pSel 1 2 n_v), pSum ddr ]
+
 optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv])
   = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
 optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr])
   = Just $ Tuple [ mkTangentZero (pSel 1 3 n_i_v), mkTangentZero (pSel 2 3 n_i_v), pIndex (pSel 2 3 n_i_v) ddr ]
+
+optDrvPrim Fwd "Vec_init" (Tuple [_vs, dvs])
+  = Just $ mkPrimCall "Vec_init" dvs
+optDrvPrim Rev "Vec_init" (Tuple [Tuple vs, ddr])
+  = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kTInt $ toInteger i) ddr) $ fromList vs)
+optDrvPrim Rev "Vec_init" (Tuple [_v, ddr])
+  = Just $ pIndex (kTInt 0) ddr
+
 optDrvPrim _ _ _ = Nothing
 
 ---------------
