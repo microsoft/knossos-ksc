@@ -143,8 +143,8 @@ optCall env fun opt_args
   | Just new_e <- rewriteCall env fun opt_args
   -- = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
   --                                , text "After: " <+> ppr new_e ])
-  = if (typeof (Call fun opt_args) == typeof (new_e)) 
-    then (optE env new_e)
+  = if typeof (Call fun opt_args) == typeof new_e
+    then optE env new_e
     else
       pprPanic "Rule changed type:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
                                           , text "After: " <+> ppr new_e ])   
@@ -356,8 +356,6 @@ optPrimFun _ "lmAdd" (Tuple [p,q])
   , Call scale2 (Tuple [t2, y]) <- q
   , scale1 `isThePrimFun` "lmScale"
   , scale2 `isThePrimFun` "lmScale"
-  , typeof x == TypeFloat
-  , typeof y == TypeFloat
   , typeof t1 == typeof t2
   = Just $ lmScale (typeof t1) (pAdd x y)
 
