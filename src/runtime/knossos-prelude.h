@@ -26,7 +26,7 @@ mul$aT2fT1f(allocator * alloc, tensor<2, double> const& M, vec<double> const& v)
 }
 
 tuple<tensor<2, double>,vec<double>>
-rev$mul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2, double>, vec<double>> const& M_v, vec<double> const& dr)
+rev$mul$a$dT2fT1f$bT1f(allocator * alloc, tuple<tensor<2, double>, vec<double>> const& M_v, vec<double> const& dr)
 {
 	auto [M, v] = M_v;
 	int r = M.outer_dimension();
@@ -43,11 +43,11 @@ rev$mul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2, double>, vec<doub
 	for(int i = 0; i < c; ++i) {
 		double retvi = 0;
 		for(int j = 0; j < r; ++j)
-			retvi += M.index(std::make_tuple(j, i)) * dr[j];
+			retvi += M.index(ks::make_tuple(j, i)) * dr[j];
 		retv[i] = retvi;
 	}
 
-	return std::make_tuple(retM,retv);
+	return ks::make_tuple(retM,retv);
 }
 
 size_t imax$aT1f(allocator *, vec<double> const &v)

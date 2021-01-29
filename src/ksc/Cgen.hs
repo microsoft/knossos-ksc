@@ -245,7 +245,7 @@ generateCGRE = \case
   CGREDummy cty -> cgenType cty ++ "{}"
   CGREKonst k   -> cgenKonst k
   CGREVar v     -> cgenVar v
-  CGRETuple rs  -> "std::make_tuple("
+  CGRETuple rs  -> "ks::make_tuple("
                    ++ intercalate "," (map generateCGRE rs)
                    ++ ")"
 
@@ -460,7 +460,7 @@ cgenExprWithoutResettingAlloc env = \case
                   -- argument lists unpacked!
                   (True, cexpr, TypeTuple ts)
                     -> (flip map [0..length ts - 1] $ \i ->
-                           "std::get<" ++ show i ++ ">(" ++ generateCGRE cexpr ++ ")")
+                           "ks::get<" ++ show i ++ ">(" ++ generateCGRE cexpr ++ ")")
                   (_, cexpr, _) -> [generateCGRE cexpr]
 
     return $ CG
