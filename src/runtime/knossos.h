@@ -3,6 +3,7 @@
 
 /*
 Contents:
+- Tuple
 - Utils
 - Allocator
 - Tensor class
@@ -45,14 +46,7 @@ namespace ks {
 		std::cerr << file << ":" << line << ":Assert failed [" << expr << "]\n";
 		throw expr;
 	}
-};
-
-namespace ks
-{
-	using std::tuple;
-	using std::make_tuple;
-	using std::get;
-
+	
 	extern int log_indent;
 	extern bool do_log;
 #define LOG(msg, n) if (!do_log) ; else { std::cerr << std::string((n), ' ') << msg << ":" << __FUNCTION__ << " " << this << std::endl; }
@@ -62,6 +56,81 @@ namespace ks
 #define ENTER { objects.insert(this); LOG("ctor", log_indent++); }
 #define NOTE { LOG("note " << (FIND ? (void*)this : (void*)0), log_indent); }
 #define LEAVE { LOG("dtor " << FIND, --log_indent);  objects.erase(this); }
+
+	// ===============================  Tuple  ==================================
+
+	// Trivially-copyable tuple type. For n <= 4, an n-tuple is just a struct with n public members
+	template<typename ...Ts> struct tuple;
+	template<> struct tuple<> {	};
+	template<typename T0> struct tuple<T0> { T0 t0; };
+	template<typename T0, typename T1> struct tuple<T0, T1> { T0 t0; T1 t1; };
+	template<typename T0, typename T1, typename T2> struct tuple<T0, T1, T2> { T0 t0; T1 t1; T2 t2; };
+	template<typename T0, typename T1, typename T2, typename T3> struct tuple<T0, T1, T2, T3> { T0 t0; T1 t1; T2 t2; T3 t3; };
+
+	template<typename T0, typename T1, typename T2, typename T3, typename T4, typename ...Ts>
+	struct tuple<T0, T1, T2, T3, T4, Ts...> {
+		tuple() { }
+		tuple(T0 t0, T1 t1, T2 t2, T3 t3, T4 t4, Ts ...ts) : t0(t0), t1(t1), t2(t2), t3(t3), others{t4, ts...} { }
+
+		T0 t0; T1 t1; T2 t2; T3 t3;
+		tuple<T4, Ts...> others;
+	};
+
+	template<typename ...Ts> ks::tuple<Ts...> make_tuple(Ts ...ts) {
+		return ks::tuple<Ts...>{ts...};
+	}
+
+	template<size_t I> struct get_helper_t
+	{
+		template<typename Tuple>
+		static auto const& get(Tuple const& t) {
+			return get_helper_t<I - 4>::get(t.others);
+		}
+	};
+	template<> struct get_helper_t<0> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t0; } };
+	template<> struct get_helper_t<1> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t1; } };
+	template<> struct get_helper_t<2> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t2; } };
+	template<> struct get_helper_t<3> { template<typename Tuple> static auto const& get(Tuple const& t) { return t.t3; } };
+
+	template<typename T> T& const_cast_deduce_type(T const& t) { return const_cast<T&>(t); }
+
+	template<size_t I, typename ...Ts> auto& get(tuple<Ts...> & t) {
+		return const_cast_deduce_type(get_helper_t<I>::get(t));
+	}
+	template<size_t I, typename ...Ts> auto const& get(tuple<Ts...> const& t) {
+		return get_helper_t<I>::get(t);
+	}
+	template<size_t I, typename ...Ts> auto&& get(tuple<Ts...> && t) {
+		return std::move(ks::get<I>(t));
+	}
+	template<size_t I, typename ...Ts> auto const&& get(tuple<Ts...> const&& t) {
+		return std::move(ks::get<I>(t));
+	}
+
+	template<typename TupleT, size_t ...Indices>
+	bool tuple_equal_impl(TupleT const& lhs, TupleT const& rhs, std::index_sequence<Indices...>) {
+		return ((ks::get<Indices>(lhs) == ks::get<Indices>(rhs)) && ...);
+	}
+	template<typename ...Ts>
+	bool operator == (tuple<Ts...> const& lhs, tuple<Ts...> const& rhs) {
+		return tuple_equal_impl(lhs, rhs, std::index_sequence_for<Ts...>{});
+	}
+	template<typename ...Ts>
+	bool operator != (tuple<Ts...> const& lhs, tuple<Ts...> const& rhs) {
+		return !(lhs == rhs);
+	}
+}
+
+namespace std {
+	/* Specialize tuple_size and tuple_element for our ks::tuple type, so that it works with structured bindings */
+
+	template<typename ...Ts> struct tuple_size<ks::tuple<Ts...>> : std::integral_constant<size_t, sizeof...(Ts)> { };
+
+	template<size_t I, typename ...Ts> struct tuple_element<I, ks::tuple<Ts...>> : std::tuple_element<I, std::tuple<Ts...>> { };
+	template<size_t I, typename ...Ts> struct tuple_element<I, const ks::tuple<Ts...>> : std::tuple_element<I, const std::tuple<Ts...>> { };
+}
+
+namespace ks {
 
 	// ===============================  String utils  ==================================
 
@@ -1156,7 +1225,7 @@ namespace ks
 		auto dv = vec<dT>(alloc, v.size());
 
 		for (int i = v.size() - 1; i >= 0; i--) {
-			tuple<S, tuple<dA, dT>> f_call = f_(alloc, tuple(forward_pass[i], v[i]), dr);
+			tuple<S, tuple<dA, dT>> f_call = f_(alloc, make_tuple(forward_pass[i], v[i]), dr);
 
 			S  f_call_dScope = ks::get<0>(f_call);
 			dA f_call_dacc   = ks::get<0>(ks::get<1>(f_call));
@@ -1167,7 +1236,7 @@ namespace ks
 			dv[i] = f_call_dT;
 		}
 
-		return tuple(dScope, tuple(dr, dv));
+		return make_tuple(dScope, make_tuple(dr, dv));
 	}
 
 	// Probably should implement this as a loop
@@ -1176,7 +1245,7 @@ namespace ks
 		if (i == v.size()) {
 			return dacc;
 		} else {
-			dA fwd_f = f_(alloc, tuple(acc, v[i]), tuple(dacc, dv[i]));
+			dA fwd_f = f_(alloc, make_tuple(acc, v[i]), make_tuple(dacc, dv[i]));
 			return FFold_recursive(alloc, i + 1, f, f(alloc, acc, v[i]), v, f_, fwd_f, dv);
 		}
 	}
