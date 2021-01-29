@@ -21,7 +21,11 @@ import Debug.Trace
 import Test.Hspec
 import Data.List( mapAccumR )
 import Data.Sequence( mapWithIndex, fromList )
-import Data.Foldable (toList)
+import Data.Foldable( toList )
+
+optTrace :: String -> a -> a
+optTrace _msg t = t
+-- optTrace msg t = trace msg t
 
 data OptEnv = OptEnv { optRuleBase :: RuleBase
                      , optGblST    :: GblSymTab
@@ -139,9 +143,13 @@ optE env
 optCall :: OptEnv -> TFun -> TExpr -> TExpr
 optCall env fun opt_args
   | Just new_e <- rewriteCall env fun opt_args
---  = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
---                                 , text "After: " <+> ppr new_e ])
-    = optE env new_e
+  -- = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
+  --                                , text "After: " <+> ppr new_e ])
+  = if typeof (Call fun opt_args) == typeof new_e
+    then optE env new_e
+    else
+      pprPanic "Rule changed type:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
+                                          , text "After: " <+> ppr new_e ])   
   | otherwise
   = Call fun opt_args
 
@@ -293,6 +301,13 @@ optPrimFun _ "ts_scale" (Tuple [x, y])
   --
   -- scale: (Float, t) -> t
   = Just $ mkZero y
+  | otherwise
+  = Nothing
+
+-- RULE: dot 0 y = 0
+optPrimFun _ "ts_dot" (Tuple [x, y])
+  | isKZero x || isKZero y
+  = Just $ zeroFloat
   | otherwise
   = Nothing
 
@@ -655,14 +670,26 @@ optGradPrim _ "ts_add" arg
   , [t1, t2] <- map typeof arg'
   = Just (lmHCat [lmOne t1, lmOne t2])
 
+-- ts_scale :: (Float, T) -> T
+optGradPrim (TypeLM _ _) "ts_scale" (Tuple [scalar, v])
+  | TypeFloat <- typeof scalar
+  = Just (lmHCat [lmScaleR v, lmScale (typeof v) scalar])
+
+-- ts_dot :: (T,T) -> Float
+-- D$ts_dot :: (T,T) -> (T,T) -o Float
+optGradPrim (TypeLM _ _) "ts_dot" (Tuple [v1, v2])
+  | typeof v1 == typeof v2
+  = Just (lmHCat [lmDot v2, lmDot v1])
+
+optGradPrim (TypeLM a _) "ts_neg" _
+  = Just (lmScale a (kTFloat $ -1.0))
+
 optGradPrim _ "sum" e
   | TypeTensor d t <- typeof e
   = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$ii")
                              (lmOne t)))
 
-optGradPrim _ "size" e
-  | TypeTensor d _ <- typeof e
-  = Just $ lmZero e (zeroIndexForDimension d)
+optGradPrim _ "size" e = Just $ lmZero e (mkZero (pSize e))
 
 optGradPrim _ "index" (Tuple [i,v])
   = Just (lmHCat [ lmZero i vi
@@ -677,10 +704,10 @@ optGradPrim (TypeLM _ _) "eq" e
   = Just (lmZero e (Konst (KBool True)))
 
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
-optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
-optGradPrim (TypeLM a _) "ts_neg" _ = Just (lmScale a (kTFloat $ -1.0))
 
-optGradPrim _ f _ = trace ("Note: optGradPrim: no pattern for " ++ show f) Nothing
+optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
+
+optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ f ++ " at " ++ show (typeof a)) Nothing
 
 -----------------------
 optDrvFun :: HasCallStack => ADMode -> FunId -> TExpr -> Maybe TExpr
@@ -689,14 +716,23 @@ optDrvFun _ _ _ = Nothing
 
 optDrvPrim :: HasCallStack => ADDir -> PrimFun -> TExpr -> Maybe TExpr
 
-optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv]) = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
-optDrvPrim Rev "constVec" (Tuple [_n_v, ddr]) = Just $ Tuple [ Tuple [], pSum ddr ]
+optDrvPrim Fwd "constVec" (Tuple [n_v, dn_dv])
+  = Just $ pConstVec (pSel 1 2 n_v) (pSel 2 2 dn_dv)
+optDrvPrim Rev "constVec" (Tuple [n_v, ddr])
+  = Just $ Tuple [ mkTangentZero (pSel 1 2 n_v), pSum ddr ]
 
-optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv]) = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
-optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr]) = Just $ Tuple [ Tuple [], Tuple [], pIndex (pSel 2 3 n_i_v) ddr ]
+optDrvPrim Fwd "deltaVec" (Tuple [n_i_v, dn_di_dv])
+  = Just $ pDeltaVec (pSel 1 3 n_i_v) (pSel 2 3 n_i_v) (pSel 3 3 dn_di_dv)
+optDrvPrim Rev "deltaVec" (Tuple [n_i_v, ddr])
+  = Just $ Tuple [ mkTangentZero (pSel 1 3 n_i_v), mkTangentZero (pSel 2 3 n_i_v), pIndex (pSel 2 3 n_i_v) ddr ]
 
-optDrvPrim Fwd "Vec_init" (Tuple [Tuple _vs, dvs]) = Just $ mkPrimCall "Vec_init" dvs
-optDrvPrim Rev "Vec_init" (Tuple [Tuple vs, ddr]) = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kTInt $ toInteger i) ddr) $ fromList vs)
+optDrvPrim Fwd "Vec_init" (Tuple [_vs, dvs])
+  = Just $ mkPrimCall "Vec_init" dvs
+
+optDrvPrim Rev "Vec_init" (Tuple [Tuple vs, ddr])
+  = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kTInt $ toInteger i) ddr) $ fromList vs)
+optDrvPrim Rev "Vec_init" (Tuple [_v, ddr])
+  = Just $ pIndex (kTInt 0) ddr
 
 optDrvPrim _ _ _ = Nothing
 
@@ -789,7 +825,24 @@ optLMApplyCall _ Fwd "lmCompose" (Tuple [f,g]) dx = Just (lmApply f (lmApply g d
 optLMApplyCall _ Rev "lmCompose" (Tuple [f,g]) dx = Just (lmApplyR (lmApplyR dx f) g)
 
 optLMApplyCall _ _ "lmScale" (Tuple [_ty, x]) dx
+  | TypeFloat == typeof x
   = Just (pScale x dx)
+
+optLMApplyCall _ Fwd "lmScaleR" v dx
+  | TypeFloat == typeof dx
+  = Just (pScale dx v)
+
+optLMApplyCall _ Rev "lmScaleR" dr v
+  | typeof dr == typeof v
+  = Just (pDot dr v)
+
+optLMApplyCall _ Fwd "lmDot" v1 v2
+  | typeof v1 == typeof v2
+  = Just (pDot v1 v2)
+
+optLMApplyCall _ Rev "lmDot" v r
+  | typeof r == TypeFloat
+  = Just (pScale r v)
 
 optLMApplyCall _ Fwd "lmVCat" (Tuple es) dx = do_prod Fwd es dx
 optLMApplyCall _ Rev "lmVCat" (Tuple es) dx = do_sum  Rev es dx
@@ -804,9 +857,12 @@ optLMApplyCall env Rev "lmHCatV" e dx = do_prod_v env Rev e dx
 optLMApplyCall _ dir "lmFold" (Tuple [sZero, Lam i m, Lam i' m', acc, v]) dx =
   do_fold dir sZero i m i' m' acc v dx
 
-optLMApplyCall _ _ _ _ _
-  = -- pprTrace ("No opt for LM apply of " ++ show fun)
-    --         (ppr arg)
+optLMApplyCall _ _ fun e arg
+  = optTrace ("No opt for LM apply of " ++
+              render (parens (text fun 
+                      <+> parens (ppr e <+> text ":" <+> ppr (typeof e))
+                      <+> text "to" 
+                      <+> parens (ppr arg <+> text ":" <+> ppr (typeof arg)))))
     Nothing
 
 ----------------------

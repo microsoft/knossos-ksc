@@ -174,12 +174,26 @@ lmZero_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmZero_Dir Fwd s t = lmZero s t
 lmZero_Dir Rev s t = lmZero t s
 
+-- lmOne S :: S -o S
 lmOne :: Type -> TExpr
 lmOne s = mkPrimCall1 "lmOne" (mkDummy s)
 
+-- lmScale S :: Float -> (S -o S)
+-- lmApply (lmScale S r) s = ts_scale r s
 lmScale :: HasCallStack => Type -> TExpr -> TExpr
--- lmScale :: Float -> (s -o s)
 lmScale s r = mkPrimCall1 "lmScale" (Tuple [mkDummy s, r])
+
+-- lmScaleR :: S -> (Float -o S)
+-- lmScaleR S :: Float -o S
+-- lmApply (lmScaleR S) r = ts_scale r s
+lmScaleR :: HasCallStack => TExpr -> TExpr
+lmScaleR v = mkPrimCall1 "lmScaleR" v
+
+-- lmDot :: S -> (S -o Float)
+-- lmDot s :: S -o Float
+-- lmApply (lmDot s) s' = ts_dot (s,s')
+lmDot :: HasCallStack => TExpr -> TExpr
+lmDot s = mkPrimCall1 "lmDot" s
 
 lmAdd :: HasCallStack => TExpr -> TExpr -> TExpr
 lmAdd = mkPrimCall2 "lmAdd"
@@ -336,10 +350,11 @@ pDiag = mkPrimCall3 "diag"
 ---------------------------
 -- "User-defined" functions
 ---------------------------
-pAdd, pEqual, pScale :: HasCallStack => TExpr -> TExpr -> TExpr
+pAdd, pEqual, pScale, pDot :: HasCallStack => TExpr -> TExpr -> TExpr
 pAdd   = mkPrimCall2 "ts_add"
 pEqual = mkPrimCall2 "eq"
 pScale = mkPrimCall2 "ts_scale"
+pDot   = mkPrimCall2 "ts_dot"
 
 pNeg :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 "ts_neg"
@@ -494,6 +509,8 @@ primFunCallResultTy_maybe fun args
       ("lmZero"   , TypeTuple [s, t])                      -> Just (TypeLM s t)
       ("lmOne"    , t)                                     -> Just (TypeLM t t)
       ("lmScale"  , TypeTuple [t, TypeFloat])              -> Just (TypeLM t t)
+      ("lmScaleR" , t)                                     -> Just (TypeLM TypeFloat t)
+      ("lmDot"    , t)                                     -> Just (TypeLM t TypeFloat)
 
       ("lmCompose", TypeTuple [TypeLM _ c, TypeLM a _])    -> Just (TypeLM a c)
       ("lmAdd"    , TypeTuple [TypeLM s1 t1, TypeLM _ _])  -> Just (TypeLM s1 t1)
@@ -545,7 +562,7 @@ primFunCallResultTy_maybe fun args
       -- ($trace e) emits its argument's value to stdout and returns it
       ("$trace"   , t)                                     -> Just t
 
-      ("constVec" , TypeTuple [sizeType, t])                 -> tensorTypeFromIndexType_maybe sizeType t
+      ("constVec" , TypeTuple [sizeType, t])               -> tensorTypeFromIndexType_maybe sizeType t
       ("deltaVec" , TypeTuple [sizeType, indexType, t])
         | sizeType `eqType` indexType
         -> tensorTypeFromIndexType_maybe indexType t
@@ -556,7 +573,7 @@ primFunCallResultTy_maybe fun args
       ("Vec_init" , TypeTuple vals)
         | (s1:ss) <- vals
         , all (== s1) ss                                   -> Just (TypeTensor 1 s1)
-
+      ("Vec_init" , t)                                     -> Just (TypeTensor 1 t)
       ("build"    , TypeTuple
                      [sizeType, TypeLam indexType t])
         | sizeType `eqType` indexType
@@ -579,6 +596,8 @@ primFunCallResultTy_maybe fun args
       ("unzip"    , TypeTensor d (TypeTuple ts))           -> Just (TypeTuple (map (TypeTensor d) ts))
 
       ("ts_scale" , TypeTuple [TypeFloat,   t]           ) -> Just t
+      ("ts_dot"   , TypeTuple [t1, t2])
+        | t1 `eqType` t2                                   -> Just TypeFloat
       ("ts_add"   , TypeTuple [t, dt]                    ) -> if dt == tangentType t
                                                                 then Just t
                                                                 else Nothing
@@ -609,12 +628,15 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "shape"
                        , "size"
                        , "sum"      -- (sum t)                    Sum all elements in tensor
-                       , "unzip"   -- Takes a vector of tuples to a tuple of vectors
+                       , "unzip"    -- Takes a vector of tuples to a tuple of vectors
                        , "ts_neg"
                        , "ts_add"
-                       , "eq", "ne", "delta", "deltaVec", "diag", "constVec"
+                       , "ts_scale"
+                       , "ts_dot"
+                       , "eq", "ne"
+                       , "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyR", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
-                       , "lmCompose", "lmAdd", "lmScale"
+                       , "lmCompose", "lmAdd", "lmScale", "lmScaleR"
                        , "lmZero", "lmOne"
                        ]
