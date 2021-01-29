@@ -30,8 +30,6 @@ Contents:
 #include <string>
 #include <chrono>
 
-using std::tuple;
-
 #define COMMENT(x)
 
 // KS_ASSERT
@@ -51,6 +49,10 @@ namespace ks {
 
 namespace ks
 {
+	using std::tuple;
+	using std::make_tuple;
+	using std::get;
+
 	extern int log_indent;
 	extern bool do_log;
 #define LOG(msg, n) if (!do_log) ; else { std::cerr << std::string((n), ' ') << msg << ":" << __FUNCTION__ << " " << this << std::endl; }
@@ -182,13 +184,13 @@ namespace ks
 	template < typename T, typename... Ts >
 	auto head(tuple<T, Ts...> const& t)
 	{
-		return  std::get<0>(t);
+		return  ks::get<0>(t);
 	}
 
 	template < std::size_t... Ns, typename... Ts >
 	auto tail_impl(std::index_sequence<Ns...>, tuple<Ts...> t)
 	{
-		return  std::make_tuple(std::get<Ns + 1u>(t)...);
+		return  ks::make_tuple(ks::get<Ns + 1u>(t)...);
 	}
 
 	template < typename... Ts >
@@ -200,7 +202,7 @@ namespace ks
 	template <typename T, typename... Ts >
 	auto prepend(T t, tuple<Ts...> tup)
 	{
-		return tuple_cat(std::make_tuple(t), tup);
+		return tuple_cat(ks::make_tuple(t), tup);
 	}
 
 	// Prepend at the type level, e.g. 
@@ -225,7 +227,7 @@ namespace ks
 		if constexpr(i < sizeof...(Ts))
 		{
 			if (i > 0) s << ",";
-			s << std::get<i>(t);
+			s << ks::get<i>(t);
 			tuple_print<i + 1>(s, t);
 		}
 		return s;
@@ -240,7 +242,7 @@ namespace ks
 	template < size_t N, class T >
 	auto get(T const& t)
 	{
-		return std::get<N>(t);
+		return ks::get<N>(t);
 	}
 
 	// ===============================  Allocator  ==================================
@@ -319,21 +321,21 @@ namespace ks
 	template<size_t... Indices>
 	struct tensor_dimension_base<std::index_sequence<Indices...>>
 	{
-		using index_type = std::tuple<int_t<Indices>...>;
+		using index_type = ks::tuple<int_t<Indices>...>;
 
 		static int num_elements(index_type const& size) {
-			return (1 * ... * std::get<Indices>(size));
+			return (1 * ... * ks::get<Indices>(size));
 		}
 
 		static std::string index_to_string(index_type const& i) {
-			std::string ret = ("(" + ... + (std::to_string(std::get<Indices>(i)) + ","));
+			std::string ret = ("(" + ... + (std::to_string(ks::get<Indices>(i)) + ","));
 			ret.back() = ')'; // replaces final comma
 			return ret;
 		}
 
 		static bool index_is_in_range(index_type const& i, index_type const& tensor_size) {
 			return (
-				(std::get<Indices>(i) >= 0 && std::get<Indices>(i) < std::get<Indices>(tensor_size)) && ...
+				(ks::get<Indices>(i) >= 0 && ks::get<Indices>(i) < ks::get<Indices>(tensor_size)) && ...
 			);
 		}
 	};
@@ -357,7 +359,7 @@ namespace ks
 			           = i3 + s3 * flatten_index({i1, i2}, {s1, s2})
 			    See specialization tensor_dimension<1> for the base case
 			       flatten_index({i1}, {s1}) = i1 */
-			return std::get<Dim - 1u>(index) + std::get<Dim - 1u>(tensor_size) *
+			return ks::get<Dim - 1u>(index) + ks::get<Dim - 1u>(tensor_size) *
 					tensor_dimension<Dim - 1u>::flatten_index_recursive(index, tensor_size);
 		}
 
@@ -373,7 +375,7 @@ namespace ks
 	{
 		using index_type = int;
 
-		static int tail(std::tuple<int, int> higherIndexType) { return std::get<1>(higherIndexType); }
+		static int tail(ks::tuple<int, int> higherIndexType) { return ks::get<1>(higherIndexType); }
 
 		static int num_elements(index_type size) { return size; }
 
@@ -385,7 +387,7 @@ namespace ks
 
 		template<typename IndexType>
 		static int flatten_index_recursive(IndexType const& index, IndexType const& /*tensor_size*/) {
-			return std::get<0>(index);
+			return ks::get<0>(index);
 		}
 
 		static int flatten_index(index_type index, index_type tensor_size) {
@@ -399,7 +401,7 @@ namespace ks
 	// Get the ith dimension of a tensor index object:
 	//   get_dimension<I>(tuple<int, ..., int> t) = get<I>(t)
 	//   get_dimension<0>(int t) = t
-	template<size_t I, typename TupleType> int get_dimension(TupleType const& t) { return std::get<I>(t); }
+	template<size_t I, typename TupleType> int get_dimension(TupleType const& t) { return ks::get<I>(t); }
 	template<size_t I> int get_dimension(int val) { static_assert(I == 0); return val; }
 
 	template <size_t Dim, class T>
@@ -569,7 +571,7 @@ namespace ks
 
 	template<class TupleType, size_t... Indices>
 	auto shape_impl(allocator_base * alloc, TupleType const& t, std::index_sequence<Indices...>) {
-		return std::make_tuple(shape(alloc, std::get<Indices>(t))...);
+		return ks::make_tuple(shape(alloc, ks::get<Indices>(t))...);
 	}
 
 	template<class... Types>
@@ -581,7 +583,7 @@ namespace ks
 
 	template<class T1, class T2, class... Ts>
 	auto shape(allocator_base * alloc, T1 const& t1, T2 const& t2, Ts const& ...ts) {
-		return std::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
+		return ks::make_tuple(shape(alloc, t1), shape(alloc, t2), shape(alloc, ts)...);
 	}
 
 	// ===============================  Inflated deep copy  ==================================
@@ -617,7 +619,7 @@ namespace ks
 
 	template<class TupleT, size_t... Indices>
 	size_t inflated_bytes_tupleimpl(TupleT const& t, std::index_sequence<Indices...>) {
-		return ((size_t)0 + ... + inflated_bytes(std::get<Indices>(t)));
+		return ((size_t)0 + ... + inflated_bytes(ks::get<Indices>(t)));
 	}
 	template<class... Types>
 	size_t inflated_bytes(tuple<Types...> const& t) {
@@ -646,7 +648,7 @@ namespace ks
 
 	template<class TupleT, size_t... Indices>
 	bool memory_overlaps_tupleimpl(const void* start, const void* end, TupleT const& t, std::index_sequence<Indices...>) {
-		return (memory_overlaps(start, end, std::get<Indices>(t)) || ...);
+		return (memory_overlaps(start, end, ks::get<Indices>(t)) || ...);
 	}
 	template<class... Types>
 	bool memory_overlaps(const void* start, const void* end, tuple<Types...> const& t) {
@@ -680,7 +682,7 @@ namespace ks
 
 	template<class TupleT, size_t... Indices>
 	void prepare_copydown_inplace_tupleimpl(prepare_copydown_state * dest, TupleT * t, std::index_sequence<Indices...>) {
-		((prepare_copydown_inplace(dest, &std::get<Indices>(*t))), ...);
+		((prepare_copydown_inplace(dest, &ks::get<Indices>(*t))), ...);
 	}
 
 	template<class... Types>
@@ -755,7 +757,7 @@ namespace ks
 
 	template<class TupleType, size_t... Indices>
 	void copydown_by_memmove_inplace_tuple(allocator * alloc, TupleType * t, std::index_sequence<Indices...>) {
-		((copydown_by_memmove_inplace(alloc, &std::get<Indices>(*t))), ...);
+		((copydown_by_memmove_inplace(alloc, &ks::get<Indices>(*t))), ...);
 	}
 	template<class... Types>
 	void copydown_by_memmove_inplace(allocator * alloc, tuple<Types...> * t) {
@@ -897,7 +899,7 @@ namespace ks
 	{
 		static constexpr size_t n = sizeof...(Ts);
 
-		inplace_add(&std::get<i>(*t1), std::get<i>(t2));
+		inplace_add(&ks::get<i>(*t1), ks::get<i>(t2));
 		if constexpr (i < n)
 			inplace_add_aux<i + 1>(t1, t2);
 	}
@@ -1031,7 +1033,7 @@ namespace ks
 
 		template<class T, class F, class Size, class ...HigherDimensionIndices>
 		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			int thisDimension = ks::get<sizeof...(HigherDimensionIndices)>(size);
 			for (int i = 0; i != thisDimension; ++i) {
 				build_t<Dim - 1u>::do_build(alloc, size, data, f, higherDimensionIndices..., i);
 			}
@@ -1043,7 +1045,7 @@ namespace ks
 	{
 		template<class T, class F, class Size, class ...HigherDimensionIndices>
 		static void do_build(allocator * alloc, Size const& size, T** data, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			int thisDimension = ks::get<sizeof...(HigherDimensionIndices)>(size);
 			for (int i = 0; i != thisDimension; ++i) {
 				*(*data)++ = f(alloc, higherDimensionIndices..., i);
 			}
@@ -1051,7 +1053,7 @@ namespace ks
 	};
 
 	template <class T, class F, class ...SizeTypes>
-	tensor<sizeof...(SizeTypes), T> build(allocator * alloc, std::tuple<SizeTypes...> size, F f)
+	tensor<sizeof...(SizeTypes), T> build(allocator * alloc, ks::tuple<SizeTypes...> size, F f)
 	{
 		constexpr auto Dim = sizeof...(SizeTypes);
 		tensor<Dim, T> ret = tensor<Dim, T>::create(alloc, size);
@@ -1094,7 +1096,7 @@ namespace ks
 
 		template<class T, class F, class Size, class ...HigherDimensionIndices>
 		static T do_sumbuild(allocator * alloc, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			int thisDimension = ks::get<sizeof...(HigherDimensionIndices)>(size);
 			KS_ASSERT(thisDimension > 0);
 			T ret = sumbuild_t<Dim - 1>::template do_sumbuild<T>(alloc, size, f, higherDimensionIndices..., 0);
 			for (int i = 1; i != thisDimension; ++i)
@@ -1104,7 +1106,7 @@ namespace ks
 
 		template<class T, class F, class Size, class ...HigherDimensionIndices>
 		static void inplace_sumbuild(allocator * alloc, T* result, Size const& size, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(size);
+			int thisDimension = ks::get<sizeof...(HigherDimensionIndices)>(size);
 			for (int i = 0; i != thisDimension; ++i)
 				sumbuild_t<Dim - 1>::inplace_sumbuild(alloc, result, size, f, higherDimensionIndices..., i);
 		}
@@ -1174,9 +1176,9 @@ namespace ks
 		for (int i = v.size() - 1; i >= 0; i--) {
 			tuple<S, tuple<dA, dT>> f_call = f_(alloc, tuple(forward_pass[i], v[i]), dr);
 
-			S  f_call_dScope = std::get<0>(f_call);
-			dA f_call_dacc   = std::get<0>(std::get<1>(f_call));
-			dT f_call_dT     = std::get<1>(std::get<1>(f_call));
+			S  f_call_dScope = ks::get<0>(f_call);
+			dA f_call_dacc   = ks::get<0>(ks::get<1>(f_call));
+			dT f_call_dT     = ks::get<1>(ks::get<1>(f_call));
 
 			dr = f_call_dacc;
 			dScope = ts_add(alloc, dScope, f_call_dScope);
@@ -1354,14 +1356,14 @@ namespace ks
 		auto* outdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
 		{
-			outdata[i] = std::get<I>(indata[i]);
+			outdata[i] = ks::get<I>(indata[i]);
 		}
 		return ret;
 	}
 	template<typename TupleType, size_t Dim, size_t... Indices>
 	auto unzip_impl(allocator * alloc, tensor<Dim, TupleType> const& t, std::index_sequence<Indices...>)
 	{
-		return std::make_tuple(unzip_element<Indices>(alloc, t)...);
+		return ks::make_tuple(unzip_element<Indices>(alloc, t)...);
 	}
 	template <size_t Dim, class... Types>
 	auto unzip(allocator * alloc, tensor<Dim, tuple<Types...>> const& t)
@@ -1450,7 +1452,7 @@ namespace ks
 	template <class T>
 	inline double ts_dot(T t1, tuple<T> t2)
 	{
-		return ts_dot(t1,std::get<0>(t2));
+		return ts_dot(t1,ks::get<0>(t2));
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
@@ -1477,10 +1479,16 @@ namespace ks
 	}
 
 	// ===============================  Derivative check  ================================
-	template<class Functor, class X>
-	auto applyWithAllocator(allocator * alloc, Functor f, const X & x)
+	template<class Functor, class X, size_t ...Indices>
+	auto applyWithAllocatorImpl(allocator * alloc, Functor f, const X & x, std::index_sequence<Indices...>)
 	{
-		return std::apply(f, std::tuple_cat(std::make_tuple(alloc), x));
+		return f(alloc, ks::get<Indices>(x)...);
+	}
+
+	template<class Functor, class ...Xs>
+	auto applyWithAllocator(allocator * alloc, Functor f, const ks::tuple<Xs...> & x)
+	{
+		return applyWithAllocatorImpl(alloc, f, x, std::index_sequence_for<Xs...>{});
 	}
 
   //  Check derivatives:
@@ -1502,7 +1510,7 @@ namespace ks
 		auto f_x_plus_dx = applyWithAllocator(alloc, f, ts_add(alloc, x, dx));
 		auto delta_f = f_x_plus_dx - f_x;
 		double d1 = ts_dot(delta_f, df);
-		auto dfJ = applyWithAllocator(alloc, rev_f, std::make_tuple(x_, df));
+		auto dfJ = applyWithAllocator(alloc, rev_f, ks::make_tuple(x_, df));
 		double d2 = ts_dot(dfJ, dx);
 
 		/*
