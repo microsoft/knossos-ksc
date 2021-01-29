@@ -139,6 +139,7 @@
 \newcommand{\lmscalar}[1]{{\mathcal S}(#1)}      % S(k)
 \newcommand{\lmlam}{{\mathcal L}}      % L(k)
 \newcommand{\lmlamt}{{\mathcal L'}}     % Transposed lambda
+\newcommand{\pairsplit}{\bigtriangledown\!\!\!\!\!\!\bigtriangleup}
 
 % \newcommand{\simon}[1]{{\color{red}SPJ: #1}}
 % \newcommand{\tom}[1]{{\color{red}TE: #1}}
@@ -358,6 +359,8 @@ passing through $z = g(p_x, p_y)$
     \mbox{Scale} & \lmscalar{\cdot} & : & \real \to (s \linto s) \\
     \mbox{VCat}      & (\lmvcat) & : & (s \linto t_1,\; s \linto t_2) \to (s \linto (t_1,t_2))
            & \mbox{Vertical juxtaposition} \\
+    \mbox{UnVCat}      & (\pairsplit) & : &   (s \linto (t_1,t_2)) \to (s \linto t_1,\; s \linto t_2)
+           & \mbox{Vertical split} \\
     \mbox{VCatV}      & \lmvcatv{\cdot} & : & \vector{(s \linto t)} \to (s \linto \vector{t})
            & \mbox{...vector version} \\
     \mbox{HCat}  & (\lmhcat) & : & (t_1 \linto s,\; t_2 \linto s) \to ((t_1,t_2) \linto s)
@@ -737,6 +740,12 @@ $$
         & = & \begin{array}[t]{l}
            \mbox{\lstinline|let $\;x\;$ = $\;e_1\;$ in|} \\
            \mbox{\lstinline|let $\;\gradf{x}\;$ = $\;\grad{e_1}\;$ in|} \\
+           \mbox{\lstinline|$\grad{e_2}$|}
+           \end{array} \\
+        \grad{\mbox{\lstinline|let $\;(x,y)$ = $e_1\;$ in $\;e_2$|}}
+        & = & \begin{array}[t]{l}
+           \mbox{\lstinline|let $\;(x,y)\;$ = $\;e_1\;$ in|} \\
+           \mbox{\lstinline|let $\;(\gradf{x},\gradf{y})\;$ = $\;\pairsplit(\grad{e_1})\;$ in|} \\
            \mbox{\lstinline|$\grad{e_2}$|}
            \end{array} \\
 %        \grad{\buildfun(e_n, \lambda i.e)} & = & \lmbuild(e_n, \lambda i. \grad{e})  \\
