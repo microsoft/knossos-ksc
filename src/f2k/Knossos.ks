@@ -26,8 +26,8 @@
 (edef pow@Float Float ((Float) (Float)))
 (edef D$pow@Float (LM (Tuple Float Float) Float) (Float Float))
 (edef Dt$pow@Float (Tuple Float (LM (Tuple Float Float) Float)) (Float Float))
-(edef fwd$pow@Float Float (Float Float Float Float))
-(edef rev$pow@Float (Tuple Float Float) (Float Float Float))
+(edef fwd$pow@Float Float ((Tuple Float Float) (Tuple Float Float)))
+(edef rev$pow@Float (Tuple Float Float) ((Tuple Float Float) Float))
 
 (def add@Float,Float Float ((a : Float) (b : Float))
    (add a b))
