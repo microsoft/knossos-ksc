@@ -3,31 +3,8 @@
 (def gmm_knossos_tri Integer ((n : Integer))
   (div (mul n (sub n 1)) 2))
 
-; dot
-(edef dot Float ((Vec Float) (Vec Float)))
-(edef D$dot (LM (Tuple (Vec Float) (Vec Float)) Float)
-             ((Vec Float) (Vec Float)))
-(edef Dt$dot (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
-              ((Vec Float) (Vec Float)))
-(edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
-(def fwd$dot Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
-     (let ((a  (get$1$2 a_b))
-           (b  (get$2$2 a_b))
-           (da (get$1$2 da_db))
-           (db (get$2$2 da_db)))
-    (add (dot a db) (dot da b))))
-(def rev$dot (Tuple (Vec Float) (Vec Float))
-               ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
-     (let ((a  (get$1$2 a_b))
-           (b  (get$2$2 a_b)))
-    (tuple (mul dr b) (mul dr a))))
-
-(def dot Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
-  (sum (build (size a) (lam (i : Integer) (dot (index i a) (index i b)))))
-  )
-
 (def sqnorm Float ((v : Vec Float))
-  (dot v v))
+  (ts_dot v v))
 
 (def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
  (let (D (size q))
