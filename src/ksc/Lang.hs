@@ -1049,11 +1049,7 @@ pprExpr _ (App e1 e2) =
 pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
   (parens $ pprFunOcc @p f <+> pp_args_tuple)
-  (case (e, isInfix @p f) of
-    (Tuple [e1, e2], Just prec')
-      -> parensIf prec prec' $
-         sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
-    _ -> parensIf prec precCall $
+  (parensIf prec precCall $
          cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
   )
  where
@@ -1077,16 +1073,6 @@ pprLetSexp v e =
                         ppr body]
       parenBind (v,e) = parens $ pprPatLetBndr @p v <+> ppr e
 
-
-isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
-isInfix f = isInfixFun (fst (getFun @p f))
-
--- TODO: this is rather out of date, and it's not clear we need to keep it...
-isInfixFun :: Fun p -> Maybe Prec
-isInfixFun (Fun (PrimFun s))
-    | s == "eq"     = Just precOne
-    | s == "ts_add" = Just precTwo
-isInfixFun _ = Nothing
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
 parensIf ctxt inner doc | ctxt >= inner    = parens doc
