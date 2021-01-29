@@ -23,8 +23,9 @@ import Data.List( mapAccumR )
 import Data.Sequence( mapWithIndex, fromList )
 import Data.Foldable( toList )
 
-optTrace :: msg -> a -> a
-optTrace _msg t = t -- trace msg t
+optTrace :: String -> a -> a
+optTrace _msg t = t
+-- optTrace msg t = trace msg t
 
 data OptEnv = OptEnv { optRuleBase :: RuleBase
                      , optGblST    :: GblSymTab
@@ -142,9 +143,13 @@ optE env
 optCall :: OptEnv -> TFun -> TExpr -> TExpr
 optCall env fun opt_args
   | Just new_e <- rewriteCall env fun opt_args
---  = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
---                                 , text "After: " <+> ppr new_e ])
-    = optE env new_e
+  -- = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
+  --                                , text "After: " <+> ppr new_e ])
+  = if typeof (Call fun opt_args) == typeof new_e
+    then optE env new_e
+    else
+      pprPanic "Rule changed type:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
+                                          , text "After: " <+> ppr new_e ])   
   | otherwise
   = Call fun opt_args
 
@@ -296,6 +301,13 @@ optPrimFun _ "ts_scale" (Tuple [x, y])
   --
   -- scale: (Float, t) -> t
   = Just $ mkZero y
+  | otherwise
+  = Nothing
+
+-- RULE: dot 0 y = 0
+optPrimFun _ "ts_dot" (Tuple [x, y])
+  | isKZero x || isKZero y
+  = Just $ zeroFloat
   | otherwise
   = Nothing
 
@@ -658,6 +670,20 @@ optGradPrim _ "ts_add" arg
   , [t1, t2] <- map typeof arg'
   = Just (lmHCat [lmOne t1, lmOne t2])
 
+-- ts_scale :: (Float, T) -> T
+optGradPrim (TypeLM _ _) "ts_scale" (Tuple [scalar, v])
+  | TypeFloat <- typeof scalar
+  = Just (lmHCat [lmScaleR v, lmScale (typeof v) scalar])
+
+-- ts_dot :: (T,T) -> Float
+-- D$ts_dot :: (T,T) -> (T,T) -o Float
+optGradPrim (TypeLM _ _) "ts_dot" (Tuple [v1, v2])
+  | typeof v1 == typeof v2
+  = Just (lmHCat [lmDot v2, lmDot v1])
+
+optGradPrim (TypeLM a _) "ts_neg" _
+  = Just (lmScale a (kTFloat $ -1.0))
+
 optGradPrim _ "sum" e
   | TypeTensor d t <- typeof e
   = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$i")
@@ -674,9 +700,10 @@ optGradPrim _ "index" (Tuple [i,v])
 
 
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
+
 optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
-optGradPrim (TypeLM a _) "ts_neg" _ = Just (lmScale a (kTFloat $ -1.0))
-optGradPrim _ f     _ = optTrace("No opt for grad of " ++ f) Nothing
+
+optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ f ++ " at " ++ show (typeof a)) Nothing
 
 
 -----------------------
@@ -794,7 +821,24 @@ optLMApplyCall _ Fwd "lmCompose" (Tuple [f,g]) dx = Just (lmApply f (lmApply g d
 optLMApplyCall _ Rev "lmCompose" (Tuple [f,g]) dx = Just (lmApplyR (lmApplyR dx f) g)
 
 optLMApplyCall _ _ "lmScale" (Tuple [_ty, x]) dx
+  | TypeFloat == typeof x
   = Just (pScale x dx)
+
+optLMApplyCall _ Fwd "lmScaleR" v dx
+  | TypeFloat == typeof dx
+  = Just (pScale dx v)
+
+optLMApplyCall _ Rev "lmScaleR" dr v
+  | typeof dr == typeof v
+  = Just (pDot dr v)
+
+optLMApplyCall _ Fwd "lmDot" v1 v2
+  | typeof v1 == typeof v2
+  = Just (pDot v1 v2)
+
+optLMApplyCall _ Rev "lmDot" v r
+  | typeof r == TypeFloat
+  = Just (pScale r v)
 
 optLMApplyCall _ Fwd "lmVCat" (Tuple es) dx = do_prod Fwd es dx
 optLMApplyCall _ Rev "lmVCat" (Tuple es) dx = do_sum  Rev es dx
@@ -809,9 +853,12 @@ optLMApplyCall env Rev "lmHCatV" e dx = do_prod_v env Rev e dx
 optLMApplyCall _ dir "lmFold" (Tuple [sZero, Lam i m, Lam i' m', acc, v]) dx =
   do_fold dir sZero i m i' m' acc v dx
 
-optLMApplyCall _ _ _ _ _
-  = -- pprTrace ("No opt for LM apply of " ++ show fun)
-    --         (ppr arg)
+optLMApplyCall _ _ fun e arg
+  = optTrace ("No opt for LM apply of " ++
+              render (parens (text fun 
+                      <+> parens (ppr e <+> text ":" <+> ppr (typeof e))
+                      <+> text "to" 
+                      <+> parens (ppr arg <+> text ":" <+> ppr (typeof arg)))))
     Nothing
 
 ----------------------
