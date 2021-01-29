@@ -181,6 +181,18 @@ namespace ks
 
 	// ===============================  Tuple utils  ==================================
 
+	template<typename TupleT, typename F, size_t ...Indices>
+	auto transform_tuple_impl(TupleT const& t, F f, std::index_sequence<Indices...>)
+	{
+		return ks::make_tuple(f(ks::get<Indices>(t))...);
+	}
+
+	template<typename ...Ts, typename F>
+	auto transform_tuple(tuple<Ts...> const& t, F f)
+	{
+		return transform_tuple_impl(t, f, std::index_sequence_for<Ts...>{});
+	}
+
 	template < typename T, typename... Ts >
 	auto head(tuple<T, Ts...> const& t)
 	{
@@ -198,23 +210,6 @@ namespace ks
 	{
 		return  tail_impl(std::make_index_sequence<sizeof...(Ts) - 1u>(), t);
 	}
-
-	template <typename T, typename... Ts >
-	auto prepend(T t, tuple<Ts...> tup)
-	{
-		return tuple_cat(ks::make_tuple(t), tup);
-	}
-
-	// Prepend at the type level, e.g. 
-	// decltype(prepend(A{}, B{}))
-	template <class A, class B>
-	struct tuple_prepend {
-	};
-
-	template <class T, class... Ts>
-	struct tuple_prepend<T, tuple<Ts...>> {
-		typedef tuple<T, Ts...> type;
-	};
 
 	// This needs to be declared before tuple_print in order to support printing of nested tuples
 	// (gcc will accept the code even without this declaration, but clang will not).
@@ -597,7 +592,7 @@ namespace ks
 	template <class T, class... Ts>
 	tuple<T, Ts...> inflated_deep_copy(allocator_base * alloc, tuple<T, Ts...> val)
 	{
-		return prepend(inflated_deep_copy(alloc, head(val)), inflated_deep_copy(alloc, tail(val)));
+		return transform_tuple(val, [alloc](auto const& elem) { return inflated_deep_copy(alloc, elem); });
 	}
 
 	template <size_t Dim, class T>
@@ -854,15 +849,10 @@ namespace ks
 		return 0;
 	}
 
-	tuple<> zero(allocator *, tuple<> const& val)
-	{
-		return tuple<> ();
-	}
-
 	template <class... Ts>
 	tuple<Ts...> zero(allocator * alloc, tuple<Ts...> const& val)
 	{
-		return prepend(zero(alloc, head(val)), zero(alloc, tail(val)));
+		return transform_tuple(val, [alloc](auto const& elem) { return zero(alloc, elem); });
 	}
 
 	template <size_t Dim, class T>
@@ -932,17 +922,16 @@ namespace ks
 	template <class T1>
 	T1 ts_add(allocator *, T1 t1, tuple<> t2) { return t1; }
 
-	template <>
-	inline tuple<> ts_add(allocator *, tuple<> t1, tuple<> t2)
+	template<class T1, class T2, size_t ...Indices>
+	auto ts_add_tuple(allocator * alloc, T1 const& t1, T2 const& t2, std::index_sequence<Indices...>)
 	{
-		return tuple<>{};
+		return ks::make_tuple(ts_add(alloc, ks::get<Indices>(t1), ks::get<Indices>(t2))...);
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
 	auto ts_add(allocator * alloc, tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
 	{
-		return prepend(ts_add(alloc, head(t1), head(t2)),
-			ts_add(alloc, tail(t1), tail(t2)));
+		return ts_add_tuple(alloc, t1, t2, std::index_sequence_for<T0, Ts...>{});
 	}
 
 	template <size_t Dim, class T>
@@ -965,17 +954,10 @@ namespace ks
 		return s * t;
 	}
 
-	template <>
-	inline tuple<> ts_scale(allocator *, double s, tuple<> const& t)
+	template <class... Us>
+	auto ts_scale(allocator * alloc, double s, tuple<Us...> const& t)
 	{
-		return t;
-	}
-
-	template <class U0, class... Us>
-	auto ts_scale(allocator * alloc, double s, tuple<U0, Us...> const& t)
-	{
-		return prepend(ts_scale(alloc, s, head(t)),
-			ts_scale(alloc, s, tail(t)));
+		return transform_tuple(t, [alloc, s](auto const& elem) { return ts_scale(alloc, s, elem); });
 	}
 
 	inline
@@ -1000,10 +982,10 @@ namespace ks
 
 	inline double ts_neg(allocator *, double d) { return -d; }
 
-	inline tuple<> ts_neg(allocator *, tuple<> d) { return d; }
-
-	template <class U0, class... Us>
-	inline tuple<U0, Us...> ts_neg(allocator * alloc, tuple<U0, Us...> t) { return prepend(ts_neg(alloc, head(t)), ts_neg(alloc, tail(t))); }
+	template <class... Us>
+	inline tuple<Us...> ts_neg(allocator * alloc, tuple<Us...> t) {
+		return transform_tuple(t, [alloc](auto const& elem) { return ts_neg(alloc, elem); });
+	}
 
 	template <size_t Dim, class T>
 	inline tensor<Dim, T> ts_neg(allocator * alloc, tensor<Dim, T> t) {
