@@ -341,7 +341,7 @@ instead of
          xn = get$n$n r
      in body
 
-When we come to implement AD based on Single Use Language the form 2
+When we come to implement AD based on Single Use Language the form 1
 will be more than a simple convenience, it will be essential for the
 algorithm to generate efficient code.
 
