@@ -474,11 +474,8 @@ lookupLclTc :: Var -> TcM Type
 lookupLclTc v
   = do { st <- getSymTabTc
        ; case Map.lookup v (lclST st) of
-           Nothing -> do {
-                             addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
-                                          , text "Envt:" <+> lclDoc st ])
-                             ; return TypeUnknown
-                             }
+           Nothing -> addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
+                                   , text "Envt:" <+> lclDoc st ])
            Just ty -> return ty }
 
 lookupGblTc :: Fun Parsed -> TypedExpr -> TcM (Fun Typed, Type)
@@ -492,8 +489,7 @@ lookupGblTc fun args
            Left fun' -> pure (fun', primCallResultTy_maybe fun' ty)
 
        ; res_ty <- case callResultTy_maybe of
-                     Left err -> do { addErr $ hang err 2 (mk_extra funTyped st)
-                                    ; return TypeUnknown }
+                     Left err -> addErr $ hang err 2 (mk_extra funTyped st)
                      Right res_ty -> return res_ty
        ; pure (funTyped, res_ty)
        }
