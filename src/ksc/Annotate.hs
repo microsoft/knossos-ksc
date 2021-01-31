@@ -135,7 +135,7 @@ tcTupPat vs pat_ty
              <+> pprPatLetBndr @p (TupPat vs)) $
     case pat_ty of
       TypeTuple ts -> tcTupPatTup @p vs ts
-      not_tuple_ty -> addErr (expected_tuple_type not_tuple_ty)
+      not_tuple_ty -> tcFail (expected_tuple_type not_tuple_ty)
   where expected_tuple_type ty =
           vcat [ text "Expected tuple type but got:"
                , ppr ty ]
@@ -149,7 +149,7 @@ tcTupPatTup :: forall p. InPhase p
 tcTupPatTup vs ts
   = if sizes_match
     then pure $ TupPat (zipWith (tvar @p) ts vs)
-    else addErr expected_tuple_type_of_matching_size
+    else tcFail expected_tuple_type_of_matching_size
   where sizes_match = length vs == length ts
         expected_tuple_type_of_matching_size =
           vcat [ text "Expected tuple type of matching size but got:"
@@ -187,7 +187,7 @@ tcGDef g@(GDef d f)
        ; addCtxt (text "In the gdef for:" <+> ppr d <+> ppr f) $
            case userCallDef_maybe f env of
              Right _  -> pure g
-             Left err -> addErr err
+             Left err -> tcFail err
        }
 
 tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
@@ -197,12 +197,12 @@ tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
   Right baseTy -> case addBaseTypeToUserFun @p fun baseTy of
     Right r -> pure r
     Left appliedTy ->
-      addErr (text "The base type did not match the applied type"
+      tcFail (text "The base type did not match the applied type"
               <+> text "in the call to" <+> ppr fun
               $$ text "The argument type was" <+> ppr arg_ty
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
-  Left err -> addErr err
+  Left err -> tcFail err
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
@@ -272,7 +272,7 @@ tcExpr (App fun arg)
               -> do { checkTypes ty1 arg_ty $
                       text "Function application mis-match"
                     ; return ty2 }
-           _ -> do { addErr (text "Function does not have function type" <+> ppr fun_ty)
+           _ -> do { tcFail (text "Function does not have function type" <+> ppr fun_ty)
                    ; return TypeUnknown }
        ; return (TE (App afun aarg) res_ty) }
 
@@ -404,8 +404,8 @@ runTc what init_env (TCM m)
   where
     (mb_res, rev_errs) = m init_env []
 
-addErr :: SDoc -> TcM a
-addErr d = TCM (\env ds -> (Nothing, mk_err env d : ds))
+tcFail :: SDoc -> TcM a
+tcFail d = TCM (\env ds -> (Nothing, mk_err env d : ds))
   where
     mk_err env d =  vcat (d : tce_ctxt env)
 
@@ -435,7 +435,7 @@ checkTypes exp_ty act_ty herald
   | exp_ty `compatibleType` act_ty
   = return ()
   | otherwise
-  = addErr $ hang herald 2 $
+  = tcFail $ hang herald 2 $
     vcat [ text "Expected type:" <+> ppr exp_ty
          , text "Actual type:  " <+> ppr act_ty ]
 
@@ -474,7 +474,7 @@ lookupLclTc :: Var -> TcM Type
 lookupLclTc v
   = do { st <- getSymTabTc
        ; case Map.lookup v (lclST st) of
-           Nothing -> addErr (vcat [ text "Not in scope: local var/tld:" <+> ppr v
+           Nothing -> tcFail (vcat [ text "Not in scope: local var/tld:" <+> ppr v
                                    , text "Envt:" <+> lclDoc st ])
            Just ty -> return ty }
 
@@ -489,7 +489,7 @@ lookupGblTc fun args
            Left fun' -> pure (fun', primCallResultTy_maybe fun' ty)
 
        ; res_ty <- case callResultTy_maybe of
-                     Left err -> addErr $ hang err 2 (mk_extra funTyped st)
+                     Left err -> tcFail $ hang err 2 (mk_extra funTyped st)
                      Right res_ty -> return res_ty
        ; pure (funTyped, res_ty)
        }
