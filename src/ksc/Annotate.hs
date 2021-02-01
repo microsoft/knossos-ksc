@@ -150,7 +150,7 @@ tcTupPatTup vs ts
 tvar :: forall p. InPhase p => Type -> LetBndrX p -> TVarX
 tvar t v = TVar t (fst (getLetBndr @p v))
 
-tcRhs :: InPhase p => Fun p -> RhsX p -> Type -> TcM TRhs
+tcRhs :: InPhase p => UserFun p -> RhsX p -> Type -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
 tcRhs _ EDefRhs _ = return EDefRhs
 tcRhs fun (UserRhs rhs) res_ty
@@ -275,7 +275,7 @@ callResultTy_maybe env fun args
 --     The typecheck monad
 -----------------------------------------------
 
-userCallResultTy_maybe :: HasCallStack => Fun Parsed -> GblSymTab
+userCallResultTy_maybe :: HasCallStack => UserFun Parsed -> GblSymTab
                        -> Type -> Either SDoc Type
 userCallResultTy_maybe fn env args
   = case lookupGblST (fn, typeof args) env of
