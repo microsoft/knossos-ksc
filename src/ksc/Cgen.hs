@@ -767,7 +767,7 @@ cgenKonst = \case
   KInteger i -> show i
   KFloat   f -> show f
   KString  s -> show s
-  KBool    b -> if b then "1 " ++ cComment "TRUE" else "0 " ++ cComment "FALSE"
+  KBool    b -> if b then "true" else "false"
 
 cgenVar :: Var -> String
 cgenVar = render . ppr
