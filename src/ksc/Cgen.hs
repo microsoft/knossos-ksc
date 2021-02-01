@@ -265,7 +265,7 @@ getType (CG _ _ ty _) = ty
 getAllocatorUsage :: CGenResult -> AllocatorUsage
 getAllocatorUsage (CG _ _ _ au) = au
 
-type CSTKey = (Fun Typed, Type)
+type CSTKey = (UserFun Typed, Type)
 type CST    = Map.Map CSTKey Type
 
 cstMaybeLookupFun :: HasCallStack => CSTKey -> CST -> Maybe Type

@@ -198,7 +198,7 @@ fortunately all functions have explicitly-declared types.
 -}
 
 -- Global symbol table
-type GblSymTab = M.Map (Fun Parsed, Type) TDef
+type GblSymTab = M.Map (UserFun Parsed, Type) TDef
    -- Maps a function to its definition, which lets us
    --   * Find its return type
    --   * Inline it
@@ -237,7 +237,7 @@ newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 stInsertFun :: TDef -> GblSymTab -> GblSymTab
 stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (toFunParsed f, patType arg) def
 
-lookupGblST :: HasCallStack => (Fun Parsed, Type) -> GblSymTab -> Maybe TDef
+lookupGblST :: HasCallStack => (UserFun Parsed, Type) -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab

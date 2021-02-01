@@ -41,7 +41,7 @@ type Decl  = DeclX Parsed
 type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
-  = Def { def_fun    :: Fun p
+  = Def { def_fun    :: UserFun p
         , def_pat    :: Pat       -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
@@ -354,6 +354,8 @@ data Fun p = Fun      (FunId p)         -- The function              f(x)
                                         --   Rev <=> reverse mode f`(x,dr)
            | ShapeFun (Fun p)
            deriving( Eq, Ord, Show )
+
+type UserFun = Fun
 
 toFunParsed :: Fun p -> Fun Parsed
 toFunParsed = coerce
