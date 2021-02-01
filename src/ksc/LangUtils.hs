@@ -150,7 +150,7 @@ hspec = do
     let var :: String -> TVar
         var s = TVar TypeFloat (Simple s)
         fun :: String -> TFun Typed
-        fun s = TFun TypeFloat (Fun (UserFun s))
+        fun s = TFun TypeFloat (Fun (BaseUserFun s))
         e  = Call (fun "f") (Var (var "i"))
         e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
     describe "notFreeIn" $ do

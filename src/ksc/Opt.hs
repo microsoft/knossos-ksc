@@ -243,7 +243,7 @@ optFun env (PrimFun "$inline") arg
 optFun env (PrimFun f) e
   = optPrimFun (optEnvInScope env) f e
 
-optFun _ (UserFun {}) _
+optFun _ (BaseUserFun {}) _
   = Nothing
 
 -----------------------
@@ -601,7 +601,7 @@ optSumBuild _ _ _ = Nothing
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
                            -> Type -> FunId Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun _ _ _ (UserFun {}) _
+optGradFun _ _ _ (BaseUserFun {}) _
   = Nothing
 
 -- From here on we have primitives or selection

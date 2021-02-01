@@ -369,7 +369,7 @@ toCall (L.TFun _ (L.Fun (L.SelFun f _))) e =
 toCall (L.TFun ret (L.Fun (L.PrimFun f))) args =
   callPrimFun f ret args
 
-toCall f@(L.TFun _ (L.Fun L.UserFun{})) args =
+toCall f@(L.TFun _ (L.Fun L.BaseUserFun{})) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall f@(L.TFun _ L.GradFun{}) args =
