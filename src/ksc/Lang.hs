@@ -341,7 +341,7 @@ eqTypes x xs = if all (eqType x) xs
 type PrimFun = String
 
 data FunId (p :: Phase)
-             = UserFun String   -- UserFuns have a Def
+             = BaseUserFun String   -- BaseUserFuns have a Def
              | PrimFun PrimFun  -- PrimFuns do not have a Def
              | SelFun
                   Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
@@ -363,13 +363,13 @@ toFunTyped = coerce
 
 isUserFun :: FunId p -> Bool
 isUserFun = \case
-  UserFun{} -> True
+  BaseUserFun{} -> True
   PrimFun{} -> False
   SelFun{}  -> False
 
 isSelFun :: FunId p -> Bool
 isSelFun = \case
-  UserFun{} -> False
+  BaseUserFun{} -> False
   PrimFun{} -> False
   SelFun{}  -> True
 
@@ -816,7 +816,7 @@ instance Pretty (Fun p) where
   ppr = pprFun
 
 pprFunId :: FunId p -> SDoc
-pprFunId (UserFun s ) = text s
+pprFunId (BaseUserFun s ) = text s
 pprFunId (PrimFun p ) = text p
 pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
@@ -1046,8 +1046,8 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (Fun (UserFun "g")) (var "i")
-      e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
+      e  = Call (Fun (BaseUserFun "g")) (var "i")
+      e2 = Call (Fun (BaseUserFun "f")) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"

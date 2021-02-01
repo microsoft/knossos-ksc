@@ -607,9 +607,9 @@ mangleType = \case
 
 cgenFunId :: (FunId p, Type) -> String
 cgenFunId = \case
-  (UserFun fun, TypeTuple [])  -> mangleFun fun
-  (UserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
-  (UserFun fun, ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
+  (BaseUserFun fun, TypeTuple [])  -> mangleFun fun
+  (BaseUserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
+  (BaseUserFun fun, ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
   (PrimFun fun, _ty) -> fun
   (SelFun i _, _ty)  -> "ks::get<" ++ show (i - 1) ++ ">"
 

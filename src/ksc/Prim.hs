@@ -21,7 +21,7 @@ primCall fun res_ty
 
 userCall :: String -> Type -> TExpr -> TExpr
 userCall fun res_ty
-  = Call (TFun res_ty (Fun (UserFun fun)))
+  = Call (TFun res_ty (Fun (BaseUserFun fun)))
 
 mkPrimCall :: HasCallStack => PrimFun -> TExpr -> TExpr
 mkPrimCall fun args
@@ -61,7 +61,7 @@ mk_fun :: String -> Fun Parsed
 --   * Recognises D$f as (Grad f Fwd) etc
 --     Keep this in sync with pprFun
 --
---   * Distinguishes PrimFun from UserFun
+--   * Distinguishes PrimFun from BaseUserFun
 mk_fun f = case find_dollar f of
              Just ("D",   s)  -> GradFun (mk_fun_id s) BasicAD
              Just ("Dt",   s) -> GradFun (mk_fun_id s) TupleAD
@@ -74,7 +74,7 @@ mk_fun f = case find_dollar f of
              _               -> Fun     (mk_fun_id f)
   where
     mk_fun_id f | isPrimFun f = PrimFun f
-                | otherwise   = UserFun f
+                | otherwise   = BaseUserFun f
     find_dollar f = case break (== '$') f of
                        (_, [])  -> Nothing  -- No $
                        (_, [_]) -> Nothing  -- Trailing $
@@ -438,7 +438,7 @@ primCallResultTy_maybe fun arg_ty
             Left err -> Left err
             Right res_ty -> Right (shapeType res_ty)
 
-      Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
+      Fun (BaseUserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
 selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
 selCallResultTy_maybe i n (TypeTuple arg_tys)
