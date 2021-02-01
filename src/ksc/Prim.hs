@@ -1,6 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 
 module Prim where
@@ -20,8 +21,9 @@ primCall fun res_ty
   = Call (TFun res_ty (Fun (PrimFun fun)))
 
 userCall :: String -> Type -> TExpr -> TExpr
-userCall fun res_ty
-  = Call (TFun res_ty (Fun (BaseUserFun fun)))
+userCall fun res_ty arg
+  = Call (TFun res_ty (Fun (BaseUserFun (BaseUserFunId fun arg_ty)))) arg
+  where arg_ty = typeof arg
 
 mkPrimCall :: HasCallStack => PrimFun -> TExpr -> TExpr
 mkPrimCall fun args
@@ -455,6 +457,19 @@ primFunCallResultTy fun args
                           (vcat [ text fun <+> ppr args
                                 , ppr (typeof args)])
                  TypeUnknown
+
+-- The type of the base function given that the derived function has
+-- argument type derivedFunArgTy
+baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc Type
+baseFunArgTy_maybe derivedFun derivedFunArgTy
+  = case derivedFun of
+      Fun{} -> Right derivedFunArgTy
+      DrvFun{} -> case derivedFunArgTy of
+        TypeTuple [baseArgTy', _] -> Right baseArgTy'
+        _ -> Left (text "baseFunArgTy_maybe: DrvFun:" <+> pprDerivedFun ppr derivedFun
+                   $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
+      GradFun{}  -> Right derivedFunArgTy
+      ShapeFun f -> baseFunArgTy_maybe f derivedFunArgTy
 
 ---------------------------------------
 -- This is the function that does the heavy lifting for primitives

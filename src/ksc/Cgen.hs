@@ -265,7 +265,7 @@ getType (CG _ _ ty _) = ty
 getAllocatorUsage :: CGenResult -> AllocatorUsage
 getAllocatorUsage (CG _ _ _ au) = au
 
-type CSTKey = (UserFun Typed, Type)
+type CSTKey = UserFun Typed
 type CST    = Map.Map CSTKey Type
 
 cstMaybeLookupFun :: HasCallStack => CSTKey -> CST -> Maybe Type
@@ -299,10 +299,9 @@ cgenDefs defs = concatMap cdecl $
   env = Map.fromList (mapMaybe (\(Def { def_fun = f
                                       , def_rhs = rhs
                                       , def_res_ty = res_ty
-                                      , def_pat = arg
                                       }) ->
                                   case rhs of
-                                    UserRhs _ -> Just ((f, typeof arg), res_ty)
+                                    UserRhs _ -> Just (f, res_ty)
                                     _         -> Nothing) defs)
 
   cdecl def = cgenDefE env def ++ [ "" ]
@@ -353,7 +352,7 @@ mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 cgenDefE :: CST -> TDef -> [String]
 cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
-  let cf                         = cgenUserFun (f, typeof param)
+  let cf                         = cgenUserFun (userFunToFun f)
       (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype _callocusage =
         runM $ cgenExpr env (withPackedParams body)
@@ -418,18 +417,17 @@ cgenExprWithoutResettingAlloc env = \case
   -- Special case for literal tuples.  Don't unpack with std::get.
   -- Just use the tuple components as the arguments.  See Note [Unpack
   -- tuple arguments]
-  Call tf t@(Tuple vs) -> do
+  Call tf (Tuple vs) -> do
     cgvs <- mapM (cgenExprR env) vs
-    let cgargtype = typeof t
     let cdecls = map getDecl cgvs
     let ctypes = map getType cgvs
     let callocusage = foldMap getAllocatorUsage cgvs
 
-    let cftype = ctypeofFun env (tf, cgargtype) ctypes
+    let cftype = ctypeofFun env tf ctypes
 
     v        <- freshCVar
 
-    let cf = cgenAnyFun (tf, cgargtype) cftype
+    let cf = cgenAnyFun tf cftype
 
     return $ CG
       (  concat cdecls
@@ -447,11 +445,11 @@ cgenExprWithoutResettingAlloc env = \case
     let ctypes = getType cgvs
     let callocusage = getAllocatorUsage cgvs
 
-    let cftype = ctypeofFun env (tf, cgargtype) [ctypes]
+    let cftype = ctypeofFun env tf [ctypes]
 
     v        <- freshCVar
 
-    let cf = cgenAnyFun (tf, cgargtype) cftype
+    let cf = cgenAnyFun tf cftype
     let cargs = case (not (isSelFun (baseFunOfFun fun)), getExpr cgvs, cgargtype) of
                   -- Untuple argument for C++ call
                   --
@@ -605,26 +603,26 @@ mangleType = \case
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
 
-cgenBaseFun :: (BaseFun p, Type) -> String
+cgenBaseFun :: BaseFun Typed -> String
 cgenBaseFun = \case
-  (BaseUserFun fun, TypeTuple [])  -> mangleFun fun
-  (BaseUserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
-  (BaseUserFun fun, ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
-  (PrimFun fun, _ty) -> fun
-  (SelFun i _, _ty)  -> "ks::get<" ++ show (i - 1) ++ ">"
+  (BaseUserFun (BaseUserFunId fun (TypeTuple [])))  -> mangleFun fun
+  (BaseUserFun (BaseUserFunId fun (TypeTuple tys))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
+  (BaseUserFun (BaseUserFunId fun ty))  -> mangleFun (fun ++ "@" ++ mangleType ty)
+  (PrimFun fun) -> fun
+  (SelFun i _)  -> "ks::get<" ++ show (i - 1) ++ ">"
 
-cgenUserFun :: HasCallStack => (Fun p, Type) -> String
-cgenUserFun (f, ty) = case f of
-  Fun funId     -> cgenBaseFun (funId, ty)
-  GradFun  s _  -> "D$" ++ cgenBaseFun (s, ty)
-  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenBaseFun (s, ty)
-  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenBaseFun (s, ty)
-  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenBaseFun (s, ty)
-  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenBaseFun (s, ty)
-  ShapeFun ff   -> "shape$" ++ cgenUserFun (ff, ty)
+cgenUserFun :: HasCallStack => Fun Typed -> String
+cgenUserFun f = case f of
+  Fun baseFun   -> cgenBaseFun baseFun
+  GradFun  s _  -> "D$" ++ cgenBaseFun s
+  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenBaseFun s
+  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenBaseFun s
+  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenBaseFun s
+  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenBaseFun s
+  ShapeFun ff   -> "shape$" ++ cgenUserFun ff
 
-cgenAnyFun :: HasCallStack => (TFun p, Type) -> CType -> String
-cgenAnyFun (tf, ty) cftype = case tf of
+cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
+cgenAnyFun tf cftype = case tf of
   TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
   TFun retty (Fun (PrimFun "build")) ->
     case retty of
@@ -635,7 +633,7 @@ cgenAnyFun (tf, ty) cftype = case tf of
     -> primname ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
-  TFun _            f                 -> cgenUserFun (f, ty)
+  TFun _            f                 -> cgenUserFun f
 
 {- Note [Allocator usage of function calls]
 
@@ -710,11 +708,14 @@ cgenTypeLang = \case
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
-ctypeofFun :: HasCallStack => CST -> (TFun Typed, Type) -> [CType] -> CType
-ctypeofFun env (TFun ty f, argty) ctys = case cstMaybeLookupFun (f, argty) env of
-  Just ret_ty -> -- trace ("Found fun " ++ show f) $
-    UseTypeDef ("ty$" ++ cgenUserFun (f, argty)) ret_ty
-  Nothing -> -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
+ctypeofFun :: HasCallStack => CST -> TFun Typed -> [CType] -> CType
+ctypeofFun env (TFun ty f) ctys
+  | Just f' <- maybeUserFun f
+  , Just ret_ty <- cstMaybeLookupFun f' env
+    -- trace ("Found fun " ++ show f) $
+  = UseTypeDef ("ty$" ++ cgenUserFun f) ret_ty
+  | otherwise
+  = -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
 
 ctypeofFun1 :: HasCallStack => Type -> Fun Typed -> [CType] -> CType
