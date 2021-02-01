@@ -452,7 +452,7 @@ cgenExprWithoutResettingAlloc env = \case
     v        <- freshCVar
 
     let cf = cgenAnyFun (tf, cgargtype) cftype
-    let cargs = case (not (isSelFun (funIdOfFun fun)), getExpr cgvs, cgargtype) of
+    let cargs = case (not (isSelFun (baseFunOfFun fun)), getExpr cgvs, cgargtype) of
                   -- Untuple argument for C++ call
                   --
                   -- Calls of a tuple argument have their argument list
@@ -605,8 +605,8 @@ mangleType = \case
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
 
-cgenFunId :: (FunId p, Type) -> String
-cgenFunId = \case
+cgenBaseFun :: (BaseFun p, Type) -> String
+cgenBaseFun = \case
   (BaseUserFun fun, TypeTuple [])  -> mangleFun fun
   (BaseUserFun fun, TypeTuple tys) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
   (BaseUserFun fun, ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
@@ -615,12 +615,12 @@ cgenFunId = \case
 
 cgenUserFun :: HasCallStack => (Fun p, Type) -> String
 cgenUserFun (f, ty) = case f of
-  Fun funId     -> cgenFunId (funId, ty)
-  GradFun  s _  -> "D$" ++ cgenFunId (s, ty)
-  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenFunId (s, ty)
-  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenFunId (s, ty)
-  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenFunId (s, ty)
-  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenFunId (s, ty)
+  Fun funId     -> cgenBaseFun (funId, ty)
+  GradFun  s _  -> "D$" ++ cgenBaseFun (s, ty)
+  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenBaseFun (s, ty)
+  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenBaseFun (s, ty)
+  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenBaseFun (s, ty)
+  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenBaseFun (s, ty)
   ShapeFun ff   -> "shape$" ++ cgenUserFun (ff, ty)
 
 cgenAnyFun :: HasCallStack => (TFun p, Type) -> CType -> String
@@ -754,7 +754,7 @@ ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
 pattern RR :: TypeX
 pattern RR = TypeFloat
 
-ctypeofGradBuiltin :: HasCallStack => FunId Typed -> [CType] -> CType
+ctypeofGradBuiltin :: HasCallStack => BaseFun Typed -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
   (PrimFun "ts_add"   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
   (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty

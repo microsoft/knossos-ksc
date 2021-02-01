@@ -220,7 +220,7 @@ toTypedName :: Pretty a => a -> L.TypeX -> Name
 toTypedName = toTypedNameString . render . ppr
 
 -- This leads to rather verbose mangled names for tuple types.
--- Alternatively we could take the Cgen.cgenFunId approach of
+-- Alternatively we could take the Cgen.cgenBaseFun approach of
 -- concatting the mangled tupled types, so TypeTuple [TypeInteger,
 -- TypeInteger] would give "ii" instead of "<ii>".
 toTypedNameString :: String -> L.TypeX -> Name

@@ -348,6 +348,8 @@ data FunId (p :: Phase)
                   Int      -- Arity
            deriving( Eq, Ord, Show )
 
+type BaseFun = FunId
+
 data Fun p = Fun      (FunId p)         -- The function              f(x)
            | GradFun  (FunId p) ADPlan  -- Full Jacobian Df(x)
            | DrvFun   (FunId p) ADMode  -- Derivative derivative f'(x,dx)
@@ -375,12 +377,12 @@ isSelFun = \case
   PrimFun{} -> False
   SelFun{}  -> True
 
-funIdOfFun :: Fun p -> FunId p
-funIdOfFun = \case
+baseFunOfFun :: Fun p -> BaseFun p
+baseFunOfFun = \case
   Fun f       -> f
   GradFun f _ -> f
   DrvFun f _  -> f
-  ShapeFun f  -> funIdOfFun f
+  ShapeFun f  -> baseFunOfFun f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )

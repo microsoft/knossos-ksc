@@ -14,7 +14,7 @@ data CLExpr
   = CLId
   | CLPrune [Int] Int CLExpr         -- ?
   | CLKonst Konst
-  | CLCall Type (FunId Typed)    -- The Type is the result type
+  | CLCall Type (BaseFun Typed)  -- The Type is the result type
   | CLComp CLExpr CLExpr         -- Composition
   | CLTuple [CLExpr]             -- Tuple
   | CLIf CLExpr CLExpr CLExpr    -- If

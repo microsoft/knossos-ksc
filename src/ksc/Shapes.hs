@@ -84,7 +84,7 @@ shapeCall (TFun _ (Fun (PrimFun f))) e
   = e'
 
 shapeCall (TFun ty f) e
-  | isUserFun (funIdOfFun f)
+  | isUserFun (baseFunOfFun f)
   = Call (TFun (shapeType ty) (ShapeFun f)) e
 
 shapeCall tf e = pShape (Call tf e)  -- Fall back to calling the original function and evaluating the shape of the returned object
