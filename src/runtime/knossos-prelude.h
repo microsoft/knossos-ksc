@@ -7,8 +7,8 @@ namespace ks {
 // tests but at the time of writing I didn't want to hold back
 // edef support any longer.
 double edef_example$af(allocator *, double x) { return x; }
-double fwd$edef_example$aff(allocator *, double x, double dx) { return dx; }
-double rev$edef_example$aff(allocator *, double x, double ddr) { return ddr; }
+double fwd$edef_example$af(allocator *, double x, double dx) { return dx; }
+double rev$edef_example$af(allocator *, double x, double ddr) { return ddr; }
 
 double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
 {
@@ -26,7 +26,7 @@ mul$aT2fT1f(allocator * alloc, tensor<2, double> const& M, vec<double> const& v)
 }
 
 tuple<tensor<2, double>,vec<double>>
-rev$mul$a$dT2fT1f$bT1f(allocator * alloc, tuple<tensor<2, double>, vec<double>> const& M_v, vec<double> const& dr)
+rev$mul$aT2fT1f(allocator * alloc, tuple<tensor<2, double>, vec<double>> const& M_v, vec<double> const& dr)
 {
 	auto [M, v] = M_v;
 	int r = M.outer_dimension();
@@ -75,12 +75,12 @@ double digamma(allocator *, double x)
 	throw "digamma unimp!\n";
 }
 
-double rev$lgamma$aff(allocator *, double x, double dr)
+double rev$lgamma$af(allocator *, double x, double dr)
 {
 	std::cerr << "rev$lgamma unimp!\n" << std::endl;
 	throw "rev$gamma unimp!\n";
 }
-double fwd$lgamma$aff(allocator *, double x, double dx)
+double fwd$lgamma$af(allocator *, double x, double dx)
 {
   if (dx == 0.0) {
     return 0.0;

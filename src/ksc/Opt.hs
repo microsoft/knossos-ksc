@@ -235,7 +235,8 @@ optFun _ (SelFun i _) arg
 -- $inline needs to look up the global symtab
 optFun env (PrimFun "$inline") arg
   | Call (TFun _ fun) inner_arg <- arg
-  , Just fun_def <- lookupGblST (toFunParsed fun, typeof inner_arg) (optGblST env)
+  , Just userFun <- maybeUserFun fun
+  , Just fun_def <- lookupGblST userFun (optGblST env)
   , Def { def_pat = pat, def_rhs = UserRhs body } <- fun_def
   = Just (inlineCall env pat body inner_arg)
 

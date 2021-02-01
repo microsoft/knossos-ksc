@@ -91,7 +91,7 @@ Notes:
 import Lang hiding (parens)
 import Prim
 
-import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError )
+import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
 import Text.Parsec.Char
 import Text.Parsec.String (Parser)
 
@@ -312,6 +312,11 @@ pLet = do { pReserved "let"
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
 
+pIsUserFun :: Fun Parsed -> Parser (UserFun Parsed)
+pIsUserFun fun = case maybeUserFun fun of
+  Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ show fun)
+  Just userFun -> pure userFun
+
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
 pDef = do { pReserved "def"
@@ -319,11 +324,12 @@ pDef = do { pReserved "def"
           ; ty <- pType
           ; xs <- pParams
           ; rhs <- pExpr
+          ; mk_fun_f <- pIsUserFun (mk_fun f)
           -- See Note [Function arity]
           ; let pat = case xs of
                   [x] -> VarPat x
                   xs  -> TupPat xs
-          ; return (Def { def_fun    = mk_fun f
+          ; return (Def { def_fun    = mk_fun_f
                         , def_pat    = pat
                         , def_rhs    = UserRhs rhs
                         , def_res_ty = ty }) }
@@ -342,7 +348,8 @@ pEdef = do { pReserved "edef"
            ; name       <- pIdentifier
            ; returnType <- pType
            ; argTypes   <- pTypes
-           ; return (Def { def_fun = mk_fun name
+           ; mk_fun_name <- pIsUserFun (mk_fun name)
+           ; return (Def { def_fun = mk_fun_name
                          , def_res_ty = returnType
                          -- See note [Function arity]
                          , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")

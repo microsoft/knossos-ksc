@@ -23,7 +23,7 @@ data CLExpr
   | CLFold TVar CLExpr CLExpr CLExpr
   -- ^ Fold (Lam $t body) $acc $vector
 
-data CLDef = CLDef { cldef_fun    :: FunId Typed
+data CLDef = CLDef { cldef_fun    :: BaseUserFun Typed
                    , cldef_arg    :: Pat     -- Arg type S
                    , cldef_rhs    :: CLExpr
                    , cldef_res_ty :: Type }  -- Result type T

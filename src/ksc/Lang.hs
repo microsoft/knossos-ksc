@@ -15,7 +15,7 @@ import           Data.List                      ( intersperse )
 import           KMonad
 
 import qualified Data.Map as M
-import           Data.Coerce
+import           Data.Maybe                     ( isJust )
 import           Debug.Trace                    ( trace )
 import           Test.Hspec
 
@@ -339,39 +339,125 @@ eqTypes x xs = if all (eqType x) xs
                else Nothing
 
 type PrimFun = String
+data BaseUserFunId = BaseUserFunId String Type
+  deriving (Show, Eq, Ord)
 
-data FunId (p :: Phase)
-             = BaseUserFun String   -- BaseUserFuns have a Def
-             | PrimFun PrimFun  -- PrimFuns do not have a Def
+type family BaseUserFun p where
+  BaseUserFun Parsed   = String
+  BaseUserFun OccAnald = BaseUserFunId
+  BaseUserFun Typed    = BaseUserFunId
+
+data BaseFun (p :: Phase)
+             = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
+             | PrimFun PrimFun      -- PrimFuns do not have a Def
              | SelFun
                   Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                   Int      -- Arity
-           deriving( Eq, Ord, Show )
 
-type BaseFun = FunId
+deriving instance Eq   (BaseFun Typed)
+deriving instance Ord  (BaseFun Typed)
+deriving instance Show (BaseFun Typed)
+deriving instance Eq   (BaseFun Parsed)
+deriving instance Ord  (BaseFun Parsed)
+deriving instance Show (BaseFun Parsed)
+deriving instance Eq   (BaseFun OccAnald)
+deriving instance Ord  (BaseFun OccAnald)
+deriving instance Show (BaseFun OccAnald)
 
-data Fun p = Fun      (FunId p)         -- The function              f(x)
-           | GradFun  (FunId p) ADPlan  -- Full Jacobian Df(x)
-           | DrvFun   (FunId p) ADMode  -- Derivative derivative f'(x,dx)
-                                        --   Rev <=> reverse mode f`(x,dr)
-           | ShapeFun (Fun p)
-           deriving( Eq, Ord, Show )
+data DerivedFun funid
+                = Fun      funid         -- The function              f(x)
+                | GradFun  funid ADPlan  -- Full Jacobian Df(x)
+                | DrvFun   funid ADMode  -- Derivative derivative f'(x,dx)
+                                         --   Rev <=> reverse mode f`(x,dr)
+                | ShapeFun (DerivedFun funid)
 
-type UserFun = Fun
+-- DerivedFun has just two instantiations
+--
+-- Fun p: these you can call hence are in the function field of a Call (in
+-- the guise of a TFun)
+--
+-- UserFun p: These you can def/edef and hence are the domain of the
+-- GblSymTab and CST and appear in the def_fun field of DefX.
+type UserFun p = DerivedFun (BaseUserFun p)
+type Fun     p = DerivedFun (BaseFun p)
 
-toFunParsed :: Fun p -> Fun Parsed
-toFunParsed = coerce
+deriving instance Eq   (Fun Typed)
+deriving instance Ord  (Fun Typed)
+deriving instance Show (Fun Typed)
+deriving instance Eq   (Fun Parsed)
+deriving instance Ord  (Fun Parsed)
+deriving instance Show (Fun Parsed)
+deriving instance Eq   (Fun OccAnald)
+deriving instance Ord  (Fun OccAnald)
+deriving instance Show (Fun OccAnald)
+deriving instance Eq   (DerivedFun BaseUserFunId)
+deriving instance Ord  (DerivedFun BaseUserFunId)
+deriving instance Show (DerivedFun BaseUserFunId)
+deriving instance Eq   (DerivedFun String)
+deriving instance Ord  (DerivedFun String)
+deriving instance Show (DerivedFun String)
 
-toFunTyped :: Fun p -> Fun Typed
-toFunTyped = coerce
+mapBaseUserFunBaseFun :: (BaseUserFun p -> BaseUserFun q) -> (BaseFun p -> BaseFun q)
+mapBaseUserFunBaseFun f = \case
+  BaseUserFun u -> BaseUserFun (f u)
+  PrimFun p    -> PrimFun p
+  SelFun i1 i2 -> SelFun i1 i2
 
-isUserFun :: FunId p -> Bool
-isUserFun = \case
-  BaseUserFun{} -> True
-  PrimFun{} -> False
-  SelFun{}  -> False
+mapBaseUserFunFun :: (BaseUserFun p -> BaseUserFun q) -> (Fun p -> Fun q)
+mapBaseUserFunFun = mapBaseFunFun . mapBaseUserFunBaseFun
 
-isSelFun :: FunId p -> Bool
+mapBaseFunFun :: (funid -> funid') -> (DerivedFun funid -> DerivedFun funid')
+mapBaseFunFun f = \case
+  Fun fi       -> Fun (f fi)
+  GradFun fi p -> GradFun (f fi) p
+  DrvFun fi p  -> DrvFun (f fi) p
+  ShapeFun ff  -> ShapeFun (mapBaseFunFun f ff)
+
+addBaseTypeToUserFun :: forall p. InPhase p => UserFun p -> Type -> UserFun Typed
+addBaseTypeToUserFun f t = mapBaseFunFun (flip (userFunAddType @p) t) f
+
+userFunToFun :: UserFun p -> Fun p
+userFunToFun = \case
+  Fun f -> Fun (BaseUserFun f)
+  GradFun f p -> GradFun (BaseUserFun f) p
+  DrvFun f m -> DrvFun (BaseUserFun f) m
+  ShapeFun f -> ShapeFun (userFunToFun f)
+
+-- A 'Fun p' is Either:
+--
+-- Right: a 'UserFun p', or
+-- Left:  a 'SelFun' or 'PrimFun' (with no Phase type label)
+perhapsUserFun :: Fun p -> Either (Fun q) (UserFun p)
+perhapsUserFun = \case
+  Fun f -> either (Left . Fun) (Right . Fun) (baseFunToBaseUserFunE f)
+  GradFun f p -> either (\f' -> Left $ GradFun f' p)
+                        (\f' -> Right $ GradFun f' p)
+                        (baseFunToBaseUserFunE f)
+  DrvFun f m -> either (\f' -> Left $ DrvFun f' m)
+                       (\f' -> Right $ DrvFun f' m)
+                       (baseFunToBaseUserFunE f)
+  ShapeFun f -> either (Left . ShapeFun) (Right . ShapeFun) (perhapsUserFun f)
+
+maybeUserFun :: Fun p -> Maybe (UserFun p)
+maybeUserFun f = case perhapsUserFun f of
+  Right f -> Just f
+  Left _ -> Nothing
+
+baseFunToBaseUserFunE :: BaseFun p -> Either (BaseFun q) (BaseUserFun p)
+baseFunToBaseUserFunE = \case
+  BaseUserFun u    -> Right u
+  PrimFun p    -> Left (PrimFun p)
+  SelFun i1 i2 -> Left (SelFun i1 i2)
+
+baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
+baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
+  Right u -> Just u
+  Left _  -> Nothing
+
+isBaseUserFun :: BaseFun p -> Bool
+isBaseUserFun = isJust . baseFunToBaseUserFun
+
+isSelFun :: BaseFun p -> Bool
 isSelFun = \case
   BaseUserFun{} -> False
   PrimFun{} -> False
@@ -394,13 +480,24 @@ data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
 
 data TFun p = TFun Type (Fun p)   -- Typed functions.  The type is the /return/
-  deriving (Eq, Ord)  -- type of the function.
 
+deriving instance Eq (TFun Parsed)
+deriving instance Eq (TFun Typed)
+deriving instance Eq (TFun OccAnald)
+deriving instance Ord (TFun Parsed)
+deriving instance Ord (TFun Typed)
+deriving instance Ord (TFun OccAnald)
+
+-- Morally this is just 'coerce' but I don't know how to persuade
+-- GHC's machinery to allow that.
 typedTFunToOccAnaldTFun :: TFun Typed -> TFun OccAnald
-typedTFunToOccAnaldTFun = coerce
+typedTFunToOccAnaldTFun (TFun t f) = TFun t (mapBaseUserFunFun id f)
 
+-- Morally this is just 'coerce' but I don't know how to persuade
+-- GHC's machinery to allow that.
 occAnaldTFunToTypedTFun :: TFun OccAnald -> TFun Typed
-occAnaldTFunToTypedTFun = coerce
+occAnaldTFunToTypedTFun (TFun t f) = TFun t (mapBaseUserFunFun id f)
+
 
 data Var
   = Simple String         -- x
@@ -737,37 +834,61 @@ class InPhase p where
   pprVar     :: VarX p -> SDoc      -- Just print it
   pprLetBndr :: LetBndrX p -> SDoc  -- Print with its type
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
+  pprBaseUserFun :: BaseUserFun p -> SDoc
 
   getVar     :: VarX p     -> (Var, Maybe Type)
   getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
+  userFunAddType :: BaseUserFun p -> Type -> BaseUserFun Typed
+
 instance InPhase Parsed where
   pprVar     = ppr
   pprLetBndr = ppr
   pprFunOcc  = ppr
+  pprBaseUserFun = text
 
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
 
+  userFunAddType = BaseUserFunId
+
 instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
+  -- For now we discard the type when pretty printing.  We have a
+  -- round-trip test that ensures that what we pretty print can be
+  -- parsed but we cannot yet parse function symbols annotated with
+  -- their types.  When that changes we will pretty print the type
+  -- here too.
+  pprBaseUserFun (BaseUserFunId name _) = text name
 
   getVar     (TVar ty var) = (var, Just ty)
-  getFun     (TFun ty fun) = (toFunParsed fun, Just ty)
+  getFun     (TFun ty fun) = (fun', Just ty)
+    where fun' = mapBaseUserFunFun (\(BaseUserFunId name _) -> name) fun
   getLetBndr (TVar ty var) = (var, Just ty)
+
+  userFunAddType (BaseUserFunId f _) ty = BaseUserFunId f ty
 
 instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
+  -- For now we discard the type when pretty printing.  We have a
+  -- round-trip test that ensures that what we pretty print can be
+  -- parsed but we cannot yet parse function symbols annotated with
+  -- their types.  When that changes we will pretty print the type
+  -- here too.
+  pprBaseUserFun (BaseUserFunId name _) = text name
 
   getVar     (TVar ty var)      = (var, Just ty)
-  getFun     (TFun ty fun)      = (toFunParsed fun, Just ty)
+  getFun     (TFun ty fun)      = (fun', Just ty)
+    where fun' = mapBaseUserFunFun (\(BaseUserFunId name _) -> name) fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
+
+  userFunAddType (BaseUserFunId f _) ty = BaseUserFunId f ty
 
 pprTFun :: InPhase p => TFun p -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
@@ -813,23 +934,26 @@ instance Pretty Var where
   ppr (Delta  d) = text "d$" <> text d
   ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
 
-instance Pretty (FunId p) where
-  ppr = pprFunId
+instance InPhase p => Pretty (BaseFun p) where
+  ppr = pprBaseFun
 
-instance Pretty (Fun p) where
-  ppr = pprFun
+instance Pretty funid => Pretty (DerivedFun funid) where
+  ppr = pprDerivedFun ppr
 
-pprFunId :: FunId p -> SDoc
-pprFunId (BaseUserFun s ) = text s
-pprFunId (PrimFun p ) = text p
-pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
+pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
+pprBaseFun (BaseUserFun s) = pprBaseUserFun @p s
+pprBaseFun (PrimFun p ) = text p
+pprBaseFun (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
-pprFun :: Fun p -> SDoc
-pprFun (Fun s)                   = ppr s
-pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
-pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
-pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
-pprFun (ShapeFun f)              = text "shape$" <> ppr f
+pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
+pprUserFun = pprDerivedFun (pprBaseUserFun @p)
+
+pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
+pprDerivedFun f (Fun s)                   = f s
+pprDerivedFun f (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> f s
+pprDerivedFun f (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> f s
+pprDerivedFun f (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> f s
+pprDerivedFun f (ShapeFun sf)             = text "shape$" <> pprDerivedFun f sf
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -975,23 +1099,29 @@ instance InPhase p => Pretty (DeclX p) where
 instance InPhase p => Pretty (DefX p) where
   ppr def = pprDef def
 
-pprDef :: InPhase p => DefX p -> SDoc
+pprDef :: forall p. InPhase p => DefX p -> SDoc
 pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
   = case rhs of
       EDefRhs -> parens $
-                 sep [ text "edef", ppr f
+                 sep [ text "edef", ppr fun_f
                      , pprParendType res_ty
                      , parens (pprParendType (typeof vs)) ]
 
       UserRhs rhs -> mode
-          (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
+          (parens $ sep [ text "def", pprFun_f <+> pprParendType res_ty
                         , parens (pprPat False vs)
                         , ppr rhs])
-          (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
+          (sep [ hang (text "def" <+> pprFun_f <+> pprParendType res_ty)
                     2 (parens (pprPat False vs))
                , nest 2 (text "=" <+> ppr rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
+
+    where fun_f = userFunToFun @p f
+          pprFun_f = pprUserFun @p f
+
+instance Pretty BaseUserFunId where
+  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
 
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens
