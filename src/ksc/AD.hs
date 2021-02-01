@@ -50,10 +50,10 @@ gradDef adp = gradDefInner adp . noTupPatifyDef
 
 gradDefInner :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDefInner adp
-        (Def { def_fun = f@(Fun{}), def_pat = VarPat params
+        (Def { def_fun = Fun f, def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
-    Def { def_fun    = gradF adp f
+    Def { def_fun    = GradFun f adp
         , def_pat    = VarPat params
         , def_res_ty = mkGradType adp s_ty res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs')) }
