@@ -269,7 +269,7 @@ callResultTy_maybe env fun args
   | otherwise
   = primCallResultTy_maybe fun (typeof args)
   where
-    is_user_fun = isUserFun . funIdOfFun
+    is_user_fun = isUserFun . baseFunOfFun
 
 -----------------------------------------------
 --     The typecheck monad

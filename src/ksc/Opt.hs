@@ -221,7 +221,7 @@ rewriteCall _ _ _
   = Nothing
 
 -----------------------
-optFun :: OptEnv -> FunId p -> TExpr -> Maybe TExpr
+optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
 
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
 optFun _ (SelFun i _) arg
@@ -599,7 +599,7 @@ optSumBuild _ _ _ = Nothing
 
 -----------------------
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
-                           -> Type -> FunId Typed -> TExpr -> Maybe TExpr
+                           -> Type -> BaseFun Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
 optGradFun _ _ _ (BaseUserFun {}) _
   = Nothing
@@ -707,7 +707,7 @@ optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ f ++ " at " ++ sh
 
 
 -----------------------
-optDrvFun :: HasCallStack => ADMode -> FunId p -> TExpr -> Maybe TExpr
+optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
 optDrvFun (AD BasicAD dir) (PrimFun f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
