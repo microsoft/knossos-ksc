@@ -32,7 +32,7 @@
         "\n----\n"
         "buildFromSparse builds a vector from a 2D list of pairs\n"
         (let (indexvals (tensor2_from_vecvec (Vec_init (Vec_init (tuple 1 1.0) (tuple 3 3.0) (tuple 0 5.0))
-                                             (Vec_init (tuple 1 1.5) (tuple 1 9.0) (tuple 0 -1.0)))))
+                                                       (Vec_init (tuple 1 1.5) (tuple 1 9.0) (tuple 0 -1.0)))))
              (eq (buildFromSparse (constVec 5 (tuple))
                                   (size indexvals)
                                   (lam (ij : (Tuple Integer Integer)) (index ij indexvals)))
