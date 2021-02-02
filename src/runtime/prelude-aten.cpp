@@ -43,7 +43,7 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,double> const& A, tensor<2,do
 tuple<tensor<2,double>,tensor<1,double>> 
 rev$aten$8$8matmul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2,double>, tensor<1,double>> const& M_v, tensor<1,double> const& dr)
 {
-    auto [M, v] = M_v;
+  auto [M, v] = M_v;
 	auto [r, c] = size(M);
 	KS_ASSERT(c == size(v));
 
@@ -77,10 +77,35 @@ typedef tensor<2, double> Mat;
 Mat
 aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 {
-	 if (dim == 1) {
-    	 KS_ASSERT(!"unimplemented")
+	int n = size(As);
+	if (n == 0)
+		return Mat{};
 
+	if (dim == 1) {
+		constexpr int Dim = 1;
+		auto sz_out = size(As[0]);
+		for(int ai = 1; ai < n; ++ai) {
+			auto sz = size(As[ai]);
+			KS_ASSERT(get_dimension<1-Dim>(sz_out) == get_dimension<1-Dim>(sz));
+			get_dimension<Dim>(sz_out) += get_dimension<Dim>(sz);
+		}
+
+		Mat retM(alloc, sz_out);
+		
+		Mat::index_type offset = {0,0};
+		for(int ai = 0; ai < n; ++ai) {
+			auto const& A = As[ai];
+			auto sz = size(A);
+			for(int i = 0; i < get_dimension<0>(sz); ++i)
+				for(int j = 0; j < get_dimension<1>(sz); ++j) 
+					retM[get_dimension<0>(offset) + i][get_dimension<1>(offset) + j] = A[i][j];
+				
+			get_dimension<Dim>(offset) += get_dimension<Dim>(sz);
+		}
+
+		return retM;
 	 }
+
 	 KS_ASSERT(false)
 }
 
