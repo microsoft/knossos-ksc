@@ -339,13 +339,13 @@ eqTypes x xs = if all (eqType x) xs
                else Nothing
 
 type PrimFun = String
-data BaseUserFunId = BaseUserFunId String Type
+data BaseUserFunId t = BaseUserFunId String t
   deriving (Show, Eq, Ord)
 
 type family BaseUserFun p where
   BaseUserFun Parsed   = String
-  BaseUserFun OccAnald = BaseUserFunId
-  BaseUserFun Typed    = BaseUserFunId
+  BaseUserFun OccAnald = BaseUserFunId Type
+  BaseUserFun Typed    = BaseUserFunId Type
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
@@ -390,9 +390,9 @@ deriving instance Show (Fun Parsed)
 deriving instance Eq   (Fun OccAnald)
 deriving instance Ord  (Fun OccAnald)
 deriving instance Show (Fun OccAnald)
-deriving instance Eq   (DerivedFun BaseUserFunId)
-deriving instance Ord  (DerivedFun BaseUserFunId)
-deriving instance Show (DerivedFun BaseUserFunId)
+deriving instance Eq   (DerivedFun (BaseUserFunId Type))
+deriving instance Ord  (DerivedFun (BaseUserFunId Type))
+deriving instance Show (DerivedFun (BaseUserFunId Type))
 deriving instance Eq   (DerivedFun String)
 deriving instance Ord  (DerivedFun String)
 deriving instance Show (DerivedFun String)
@@ -1120,7 +1120,7 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
     where fun_f = userFunToFun @p f
           pprFun_f = pprUserFun @p f
 
-instance Pretty BaseUserFunId where
+instance Pretty (BaseUserFunId Type) where
   ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
 
 pprPat :: Bool -> Pat -> SDoc
