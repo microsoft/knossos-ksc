@@ -182,13 +182,13 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
 tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
                => UserFun p -> Type
                -> TcM (UserFun Typed)
-tcUserFunArgTy fun ty = case baseFunArgTy_maybe fun ty of
+tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
   Right baseTy -> case addBaseTypeToUserFun @p fun baseTy of
     Right r -> pure r
     Left appliedTy ->
       addErr (text "The base type did not match the applied type"
               <+> text "in the call to" <+> ppr fun
-              $$ text "The argument type was" <+> ppr ty
+              $$ text "The argument type was" <+> ppr arg_ty
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
   Left err -> addErr err
