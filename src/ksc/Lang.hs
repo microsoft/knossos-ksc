@@ -424,14 +424,8 @@ baseFunFun f = \case
   DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (f fi)
   ShapeFun ff  -> fmap ShapeFun (baseFunFun f ff)
 
-userFunAddType :: forall p. InPhase p
-               => BaseUserFun p
-               -> Type
-               -> BaseUserFunId Type
-userFunAddType f t = T.mapOf (baseUserFunType @p) (const t) f
-
 addBaseTypeToUserFun :: forall p. InPhase p => UserFun p -> Type -> UserFun Typed
-addBaseTypeToUserFun f t = T.mapOf baseFunFun (flip (userFunAddType @p) t) f
+addBaseTypeToUserFun f t = T.mapOf baseFunFun (T.mapOf (baseUserFunType @p) (const t)) f
 
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = \case
