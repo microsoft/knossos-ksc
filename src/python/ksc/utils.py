@@ -100,22 +100,33 @@ def translate_and_import(source_file_name, *args):
 def subprocess_run(cmd, env=None):
     return subprocess.run(cmd, stdout=subprocess.PIPE, env=env).stdout.decode().strip("\n")
 
+def get_ksc_dir():
+    if "KSC_RUNTIME_DIR" in os.environ:
+        ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
+        ksc_src = os.path.dirname(ksc_runtime_dir)
+        return os.path.dirname(ksc_src)
+    
+    d = os.path.dirname(__file__)     # src/python/ksc
+    d = os.path.dirname(d)            # src/python
+    d = os.path.dirname(d)            # src
+    return os.path.dirname(d)
+
 def get_ksc_paths():
     if "KSC_RUNTIME_DIR" in os.environ:
         ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
     else:
-        ksc_runtime_dir = "./src/runtime"
+        ksc_runtime_dir = get_ksc_dir() + "/src/runtime"
 
     if "KSC_PATH" in os.environ:
         ksc_path = os.environ["KSC_PATH"]
     else:
-        ksc_path = "./build/bin/ksc"
+        ksc_path = get_ksc_dir() + "/build/bin/ksc"
     
     return ksc_path,ksc_runtime_dir
 
 
 def generate_cpp_from_ks(ks_str, generate_derivatives = False):
-    ksc_path,_ksc_runtime_dir = get_ksc_paths()
+    ksc_path,ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
@@ -126,8 +137,8 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
                 e = subprocess.run([
                     ksc_path,
                     "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
-                    "--ks-source-file", "src/runtime/prelude.ks",
-                    "--ks-source-file", "src/runtime/prelude-aten.ks",
+                    "--ks-source-file", ksc_runtime_dir+"/prelude.ks",
+                    "--ks-source-file", ksc_runtime_dir+"/prelude-aten.ks",
                     "--ks-source-file", fks.name,
                     "--ks-output-file", fkso.name,
                     "--cpp-output-file", fcpp.name
@@ -153,8 +164,9 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
 
     return out
 
-def build_py_module_from_cpp(cpp_str, pybind11_path):
+def build_py_module_from_cpp(cpp_str):
     _ksc_path,ksc_runtime_dir = get_ksc_paths()
+    pybind11_path = get_ksc_dir() + "/pybind11"
 
     with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
         fcpp.write(cpp_str)
@@ -169,7 +181,7 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
     module_name = os.path.basename(module_path).split(".")[0]
     python_includes = subprocess_run(
         [sys.executable, "-m", "pybind11", "--includes"],
-        env={"PYTHONPATH": "pybind11"}
+        env={"PYTHONPATH": pybind11_path}
     )
     try:
         cmd = (f"g++-7 -I{ksc_runtime_dir} -I{pybind11_path}/include "
@@ -225,58 +237,15 @@ def encode_name(s : str) -> str:
         replace('*',"$x").\
         replace(':',"$8")
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, pybind11_path="pybind11"):
+def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False):
 
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives)
 
-    cpp_str = """
-#include <cstdint>
+    cpp_str = f"""
+    #include "knossos-pybind.h"
+    {generated_cpp_source}
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/operators.h>
-
-namespace py = pybind11;
-""" + generated_cpp_source + """
-
-int ks::main(ks::allocator *) { return 0; };
-
-ks::allocator g_alloc{ 1'000'000'000 };
-
-template<typename T>
-void declare_tensor_2(py::module &m, char const* name) {
-  // Wrap ks_tensor<Dim, T> to point to supplied python memory
-  py::class_<ks::tensor<2, T>>(m, name, py::buffer_protocol(), py::module_local())
-    .def(py::init([](std::uintptr_t v, size_t m, size_t n) {
-        if (v < 1u<<24) {
-            // probably a misplaced size
-            throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
-        }
-        ks::tensor_dimension<2>::index_type size {m,n};
-        return ks::tensor<2, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data 
-    }))
-    // And describe buffer shape to Python
-    // Returned tensors will be living on g_alloc, so will become invalid after allocator_reset()
-    .def_buffer([](ks::tensor<2, T> &t) -> py::buffer_info {
-        return py::buffer_info(
-            t.data(),                               /* Pointer to buffer */
-            sizeof(T),                              /* Size of one scalar */
-            py::format_descriptor<T>::format(),     /* Python struct-style format descriptor */
-            2,                                      /* Number of dimensions */
-            { ks::get_dimension<0>(t.size()), ks::get_dimension<1>(t.size()) },         /* Buffer dimensions */
-            { sizeof(T) * ks::get_dimension<0>(t.size()),             /* Strides (in bytes) for each index */
-               sizeof(T) }
-        );
-    })
-    ;
-}
-
-// Convert functor to one which takes a first argument g_alloc 
-template<typename RetType, typename... ParamTypes>
-auto with_ks_allocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f](ParamTypes... params) { return f(&g_alloc, params...); };
-}
-"""
+    """
 
     args_str = mangleTypes(arg_types)
     name_str = encode_name(f"{name_to_call}@{args_str}")
@@ -306,6 +275,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     m.def("allocator_top", []{ return g_alloc.mark();});
     m.def("allocator_peak", []{ return g_alloc.peak();});
 
+    declare_tensor_1<double>(m, "Tensor_1_Float");
     declare_tensor_2<double>(m, "Tensor_2_Float");
     declare_tensor_2<int>(m, "Tensor_2_Integer");
 
@@ -313,11 +283,12 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 }
 """
 
-    print("Saving to obj/pybind.cpp")    
-    with open("obj/pybind.cpp", "w") as fcpp:
+    cpp_fname = "/tmp/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
+    print(f"Saving to {cpp_fname}")    
+    with open(cpp_fname, "w") as fcpp:
         fcpp.write(cpp_str)
 
-    module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path)
+    module_name, module_path = build_py_module_from_cpp(cpp_str)
     return import_module_from_path(module_name, module_path)
 
 def make_dims(val) -> Tuple[int]:
@@ -415,4 +386,5 @@ def ndgrid_inds(sz):
     """
 
     return itertools.product(*map(range, sz))
+
 
