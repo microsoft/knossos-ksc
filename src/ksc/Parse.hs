@@ -247,10 +247,10 @@ pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeTensor 1 ty) })
 
 pCall :: Parser (ExprX Parsed)
 -- Calls (f e), (f e1 e2), etc
-pCall = do { f <- pIdentifier
+pCall = do { f <- pFun
            ; es <- many pExpr
            -- See Note [Function arity]
-           ; return (Call (mk_fun f) (mkTuple es))
+           ; return (Call f (mkTuple es))
         }
 
 pIfThenElse :: Parser (ExprX Parsed)
@@ -350,14 +350,17 @@ mk_fun f = case find_dollar f of
                      (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
                      _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
 
+pFun :: Parser (Fun Parsed)
+pFun = mk_fun <$> pIdentifier
+
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
 pDef = do { pReserved "def"
-          ; f <- pIdentifier
+          ; f <- pFun
           ; ty <- pType
           ; xs <- pParams
           ; rhs <- pExpr
-          ; mk_fun_f <- pIsUserFun (mk_fun f)
+          ; mk_fun_f <- pIsUserFun f
           -- See Note [Function arity]
           ; let pat = case xs of
                   [x] -> VarPat x
@@ -378,10 +381,10 @@ pRule = do { pReserved "rule"
 
 pEdef :: Parser (DefX Parsed)
 pEdef = do { pReserved "edef"
-           ; name       <- pIdentifier
+           ; f          <- pFun
            ; returnType <- pType
            ; argTypes   <- pTypes
-           ; mk_fun_name <- pIsUserFun (mk_fun name)
+           ; mk_fun_name <- pIsUserFun f
            ; return (Def { def_fun = mk_fun_name
                          , def_res_ty = returnType
                          -- See note [Function arity]
