@@ -260,7 +260,7 @@ def _(ex, symtab):
     for key,val in symtab.items():
         if isinstance(key, tuple):
             key=key[0]
-        if editdistance.eval(key, ex.name) < 3:
+        if editdistance.eval(key, ex.name) < 2:
             print(f"type_propagate:   {key}({val})")
 
     argtypes_ks_str = " ".join(map(pformat, argtypes))

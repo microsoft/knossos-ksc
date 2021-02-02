@@ -49,7 +49,7 @@ class Type:
         """
         Constructor: Type.Tuple(T1, ..., Tn)
         """
-        return Type("Tuple", args)
+        return Type("Tuple", list(args))
 
     @staticmethod
     def Lam(arg_type, return_type):
@@ -268,7 +268,7 @@ def tangent_type(ty : Type) -> Type:
     if ty == Type.Float:
         return ty
     if ty.is_tuple:
-        return Type.Tuple(tangent_type(ty) for ty in ty.children)
+        return Type.Tuple(*(tangent_type(ty) for ty in ty.children))
     if ty.is_tensor:
         return Type.Tensor(ty.tensor_rank, tangent_type(ty.tensor_elem_type))
 
@@ -279,7 +279,7 @@ def shape_type(t : Type) -> Type:
     if t.is_scalar:
         return Type.Tuple()
     if t.is_tuple:
-        return Type.Tuple(shape_type(t) for t in t.children)
+        return Type.Tuple(*(shape_type(t) for t in t.children))
     if t.is_tensor:
         return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
 

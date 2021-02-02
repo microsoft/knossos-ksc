@@ -390,27 +390,46 @@ if __name__ == "__main__":
     import torch.nn.functional as F
     torch.set_default_dtype(torch.float64)
 
-    def lltm_forward_py(input, weights, bias, old_h, old_cell):
-        X = torch.cat([old_h, input], dim=1)
+    do_original = False
 
-        # Compute the input, output and candidate cell gates with one MM.
-        gate_weights = F.linear(X, weights, bias)
+    if do_original:
+        def lltm_forward_py_orig(input, weights, bias, old_h, old_cell):
+            X = torch.cat([old_h, input], dim=1)
 
-        # Split the combined gate weight matrix into its components.
-        gates = gate_weights.chunk(3, dim=1)
+            # Compute the input, output and candidate cell gates with one MM.
+            gate_weights = F.linear(X, weights, bias)
 
-        input_gate = torch.sigmoid(gates[0])
-        output_gate = torch.sigmoid(gates[1])
-        # Here we use an ELU instead of the usual tanh.
-        candidate_cell = F.elu(gates[2])
+            # Split the combined gate weight matrix into its components.
+            gates = gate_weights.chunk(3, dim=1)
 
-        # Compute the new cell state.
-        new_cell = old_cell + candidate_cell * input_gate
-        # Compute the new hidden state and output.
-        new_h = torch.tanh(new_cell) * output_gate
+            input_gate = torch.sigmoid(gates[0])
+            output_gate = torch.sigmoid(gates[1])
+            # Here we use an ELU instead of the usual tanh.
+            candidate_cell = F.elu(gates[2])
 
-        return new_h, new_cell
+            # Compute the new cell state.
+            new_cell = old_cell + candidate_cell * input_gate
+            # Compute the new hidden state and output.
+            new_h = torch.tanh(new_cell) * output_gate
 
+            return new_h, new_cell
+    else:
+        def lltm_forward_py(input, weights, bias, old_h, old_cell):
+            X = torch.cat([old_h, input], dim=1)
+
+            # Compute the input, output and candidate cell gates with one MM.
+            gate_weights = F.linear(X, weights, bias)
+
+            input_gate = torch.tanh(gate_weights)
+            output_gate = torch.tanh(gate_weights)
+            candidate_cell = torch.tanh(gate_weights)
+
+            # Compute the new cell state.
+            new_cell = old_cell + candidate_cell * input_gate
+            # Compute the new hidden state and output.
+            new_h = torch.tanh(new_cell) * output_gate
+
+            return new_h, new_cell
 
 
     lltm_forward = lltm_forward_py
@@ -420,11 +439,17 @@ if __name__ == "__main__":
             super(LLTM, self).__init__()
             self.input_features = input_features
             self.state_size = state_size
-            # 3 * state_size for input gate, output gate and candidate cell gate.
-            # input_features + state_size because we will multiply with [input, h].
-            self.weights = torch.nn.Parameter(
-                torch.empty(3 * state_size, input_features + state_size))
-            self.bias = torch.nn.Parameter(torch.empty(3 * state_size))
+            if do_original:
+                # 3 * state_size for input gate, output gate and candidate cell gate.
+                # input_features + state_size because we will multiply with [input, h].
+                self.weights = torch.nn.Parameter(
+                    torch.empty(3 * state_size, input_features + state_size))
+                self.bias = torch.nn.Parameter(torch.empty(3 * state_size))
+            else:
+                self.weights = torch.nn.Parameter(
+                    torch.empty(state_size, input_features + state_size))
+                self.bias = torch.nn.Parameter(torch.empty(state_size))
+
             self.reset_parameters()
 
         def reset_parameters(self):
