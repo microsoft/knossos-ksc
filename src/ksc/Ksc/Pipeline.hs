@@ -13,7 +13,7 @@ import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), DerivedFun(Fun),
-             TDef, Pretty,
+             TDef, Pretty, BaseUserFunId(BaseUserFunId),
              def_fun, displayN, partitionDecls,
              pps, ppr, renderSexp)
 import LangUtils (GblSymTab, emptyGblST, extendGblST)
@@ -117,7 +117,7 @@ moveMain :: [Decl]
             , [Decl])   -- All the rest
 moveMain = partition isMain
   where
-    isMain (DefDecl (Def { def_fun = Fun "main" })) = True
+    isMain (DefDecl (Def { def_fun = Fun (BaseUserFunId "main" _) })) = True
     isMain _ = False
 
 type GenerateDefs =

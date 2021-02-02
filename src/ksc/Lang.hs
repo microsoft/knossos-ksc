@@ -343,7 +343,7 @@ data BaseUserFunId t = BaseUserFunId String t
   deriving (Show, Eq, Ord)
 
 type family BaseUserFun p where
-  BaseUserFun Parsed   = String
+  BaseUserFun Parsed   = BaseUserFunId (Maybe Type)
   BaseUserFun OccAnald = BaseUserFunId Type
   BaseUserFun Typed    = BaseUserFunId Type
 
@@ -393,6 +393,9 @@ deriving instance Show (Fun OccAnald)
 deriving instance Eq   (DerivedFun (BaseUserFunId Type))
 deriving instance Ord  (DerivedFun (BaseUserFunId Type))
 deriving instance Show (DerivedFun (BaseUserFunId Type))
+deriving instance Eq   (DerivedFun (BaseUserFunId (Maybe Type)))
+deriving instance Ord  (DerivedFun (BaseUserFunId (Maybe Type)))
+deriving instance Show (DerivedFun (BaseUserFunId (Maybe Type)))
 deriving instance Eq   (DerivedFun String)
 deriving instance Ord  (DerivedFun String)
 deriving instance Show (DerivedFun String)
@@ -846,13 +849,13 @@ instance InPhase Parsed where
   pprVar     = ppr
   pprLetBndr = ppr
   pprFunOcc  = ppr
-  pprBaseUserFun = text
+  pprBaseUserFun (BaseUserFunId name _) = text name
 
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
 
-  userFunAddType = BaseUserFunId
+  userFunAddType (BaseUserFunId f _) = BaseUserFunId f
 
 instance InPhase Typed where
   pprVar  = ppr
@@ -867,7 +870,8 @@ instance InPhase Typed where
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
-    where fun' = mapBaseUserFunFun (\(BaseUserFunId name _) -> name) fun
+    where fun' = mapBaseUserFunFun (\(BaseUserFunId name ty)
+                                    -> BaseUserFunId name (Just ty)) fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
   userFunAddType (BaseUserFunId f _) ty = BaseUserFunId f ty
@@ -885,7 +889,8 @@ instance InPhase OccAnald where
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
-    where fun' = mapBaseUserFunFun (\(BaseUserFunId name _) -> name) fun
+    where fun' = mapBaseUserFunFun (\(BaseUserFunId name ty)
+                                    -> BaseUserFunId name (Just ty)) fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   userFunAddType (BaseUserFunId f _) ty = BaseUserFunId f ty
@@ -1123,6 +1128,11 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
 instance Pretty (BaseUserFunId Type) where
   ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
 
+instance Pretty (BaseUserFunId (Maybe Type)) where
+  ppr (BaseUserFunId f mty) = case mty of
+    Just ty -> ppr (BaseUserFunId f ty)
+    Nothing -> text f
+
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens
 pprPat _          (VarPat v)  = pprTVar v
@@ -1180,8 +1190,8 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (Fun (BaseUserFun "g")) (var "i")
-      e2 = Call (Fun (BaseUserFun "f")) (Tuple [e, var "_t1", kInt 5])
+      e  = Call (Fun (BaseUserFun (BaseUserFunId "g" Nothing))) (var "i")
+      e2 = Call (Fun (BaseUserFun (BaseUserFunId "f" Nothing))) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"
