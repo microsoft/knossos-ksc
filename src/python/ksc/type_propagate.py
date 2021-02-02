@@ -4,10 +4,12 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType, shape_type
+from ksc.type import Type, SizeType, shape_type, tangent_type
 
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
+
+import editdistance
 
 # Pretty printing
 # Importing prettyprint to get the decorated printers for Expression and Type
@@ -258,8 +260,19 @@ def _(ex, symtab):
     for key,val in symtab.items():
         if isinstance(key, tuple):
             key=key[0]
-        if key.startswith(ex.name): # TODO: soundex match here?
+        if editdistance.eval(key, ex.name) < 3:
             print(f"type_propagate:   {key}({val})")
+
+    argtypes_ks_str = " ".join(map(pformat, argtypes))
+    argtype_tuple = Type.Tuple(*argtypes) if len(argtypes) > 1 else argtypes[0]
+    argtypes_ks_tuple = pformat(argtype_tuple)
+    argtypes_ks_tangent_tuple = pformat(tangent_type(argtype_tuple))
+    
+    print(f"(edef {ex.name} RET ({argtypes_ks_str}))")
+    print(f"(edef D${ex.name} (LM {argtypes_ks_tangent_tuple} dRET) ({argtypes_ks_str}))")
+    print(f"(def rev${ex.name} {argtypes_ks_tangent_tuple} ((t : {argtypes_ks_tuple}) (dret : dRET))")
+    print(f"   )")
+
 
     raise KSTypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))
 
