@@ -75,7 +75,7 @@ mk_fun f = case find_dollar f of
              _               -> Fun     (mk_fun_id f)
   where
     mk_fun_id f | isPrimFun f = PrimFun f
-                | otherwise   = BaseUserFun f
+                | otherwise   = BaseUserFun (BaseUserFunId f Nothing)
     find_dollar f = case break (== '$') f of
                        (_, [])  -> Nothing  -- No $
                        (_, [_]) -> Nothing  -- Trailing $
