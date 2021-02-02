@@ -9,6 +9,8 @@ module Lang where
 
 import           Prelude                 hiding ( (<>) )
 
+import qualified Ksc.Traversal                  as T
+
 import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint               ( Doc )
 import           Data.List                      ( intersperse )
@@ -417,6 +419,12 @@ mapBaseFunFun f = \case
   GradFun fi p -> GradFun (f fi) p
   DrvFun fi p  -> DrvFun (f fi) p
   ShapeFun ff  -> ShapeFun (mapBaseFunFun f ff)
+
+userFunAddType :: forall p. InPhase p
+               => BaseUserFun p
+               -> Type
+               -> BaseUserFunId Type
+userFunAddType f t = T.mapOf (baseUserFunType @p) (const t) f
 
 addBaseTypeToUserFun :: forall p. InPhase p => UserFun p -> Type -> UserFun Typed
 addBaseTypeToUserFun f t = mapBaseFunFun (flip (userFunAddType @p) t) f
@@ -845,7 +853,9 @@ class InPhase p where
   getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
-  userFunAddType :: BaseUserFun p -> Type -> BaseUserFun Typed
+  baseUserFunType :: Functor f
+                  => (Maybe Type -> f Type)
+                  -> BaseUserFun p -> f (BaseUserFun Typed)
 
 instance InPhase Parsed where
   pprVar     = ppr
@@ -857,7 +867,7 @@ instance InPhase Parsed where
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
 
-  userFunAddType (BaseUserFunId f _) = BaseUserFunId f
+  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g t)
 
 instance InPhase Typed where
   pprVar  = ppr
@@ -876,7 +886,7 @@ instance InPhase Typed where
                                     -> BaseUserFunId name (Just ty)) fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
-  userFunAddType (BaseUserFunId f _) ty = BaseUserFunId f ty
+  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
 
 instance InPhase OccAnald where
   pprVar  = ppr
@@ -895,7 +905,7 @@ instance InPhase OccAnald where
                                     -> BaseUserFunId name (Just ty)) fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
-  userFunAddType (BaseUserFunId f _) ty = BaseUserFunId f ty
+  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
 
 pprTFun :: InPhase p => TFun p -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
