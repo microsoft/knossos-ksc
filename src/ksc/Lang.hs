@@ -342,10 +342,12 @@ type PrimFun = String
 data BaseUserFunId t = BaseUserFunId String t
   deriving (Show, Eq, Ord)
 
-type family BaseUserFun p where
-  BaseUserFun Parsed   = BaseUserFunId (Maybe Type)
-  BaseUserFun OccAnald = BaseUserFunId Type
-  BaseUserFun Typed    = BaseUserFunId Type
+type family BaseUserFunIdT p where
+  BaseUserFunIdT Parsed   = Maybe Type
+  BaseUserFunIdT OccAnald = Type
+  BaseUserFunIdT Typed    = Type
+
+type BaseUserFun p = BaseUserFunId (BaseUserFunIdT p)
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
