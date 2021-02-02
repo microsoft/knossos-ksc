@@ -1,3 +1,5 @@
+# %%
+
 from typing import List, Tuple
 
 import functools
@@ -36,27 +38,6 @@ tab = "\t"
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
 
-Type_Tensor = Type.Tensor(-1, Type.Float)  # float vs integer? also determine rank instead of hardcode
-symbolLook = {
-    "Optional[bool]": Type.Bool,  # Just say optionals are required for now. TODO: don't do this!
-}
-
-# We're going to have to break out the data structure at some point, for now, hardcode
-# No recursive literals
-symbolLook["Tuple[int, Tensor]"] = Type.Tuple(Type.Integer, Type_Tensor)
-
-# hardcoding BertScriptableForQuestionAnswering TODO: getting urgent now to break up the return type and transform
-symbolLook[
-    "Tuple[Optional[Tensor], Tensor, Tensor, Optional[List[Tensor]], Optional[List[Tensor]]]"
-] = Type.Tuple(
-        Type_Tensor,
-        Type_Tensor,
-        Type_Tensor,
-        Type.Tensor(1, Type_Tensor),
-        Type.Tensor(1, Type_Tensor)
-    )
-
-#
 
 def mangled_name(node):
     return "_" + utils.encode_name(node.debugName())
@@ -89,6 +70,29 @@ def from_torch_type(t):
     if "Optional" in type_lookup:
         print("WARNING: Optional argument treated as required:" + type_lookup)
 
+    assert False
+
+    Type_Tensor = Type.Tensor(-1, Type.Float)  # float vs integer? also determine rank instead of hardcode
+    symbolLook = {
+        "Optional[bool]": Type.Bool,  # Just say optionals are required for now. TODO: don't do this!
+    }
+
+    # We're going to have to break out the data structure at some point, for now, hardcode
+    # No recursive literals
+    symbolLook["Tuple[int, Tensor]"] = Type.Tuple(Type.Integer, Type_Tensor)
+
+    # hardcoding BertScriptableForQuestionAnswering TODO: getting urgent now to break up the return type and transform
+    symbolLook[
+        "Tuple[Optional[Tensor], Tensor, Tensor, Optional[List[Tensor]], Optional[List[Tensor]]]"
+    ] = Type.Tuple(
+            Type_Tensor,
+            Type_Tensor,
+            Type_Tensor,
+            Type.Tensor(1, Type_Tensor),
+            Type.Tensor(1, Type_Tensor)
+        )
+
+    #
     return symbolLook[type_lookup]
 
 def type_from_value(x):
@@ -104,6 +108,13 @@ def make_arg(input, example_input):
     name = mangled_name(input)
     return Var(name, input_type, decl=True)
 
+def var_or_constant(node):
+    val = node.toIValue()
+    if val is None:
+        return Var(mangled_name(node))
+    else:
+        return Const(val)
+
 def make_constant(node):
 
     value = node.outputsAt(0)
@@ -116,7 +127,7 @@ def make_constant(node):
             literal = 0.0
         else:
             literal = possibleLiteral
-    except RuntimeError:
+    except RuntimeError:  # TODO: do we have to try/except?
         literal = "FUNCTIONCALL"
 
     return Var("_" + value.debugName()), Const(literal)
@@ -124,24 +135,29 @@ def make_constant(node):
 
 def make_list(node):
     value = node.outputsAt(0)
-    return Var(mangled_name(value)), Call("Vec_init", [Var(mangled_name(i)) for i in node.inputs()])
+    return Var(mangled_name(value)), Call("Vec_init", [var_or_constant(i) for i in node.inputs()])
 
+def make_tuple(node):
+    value = node.outputsAt(0)
+    return Var(mangled_name(value)), Call("tuple", [var_or_constant(i) for i in node.inputs()])
 
 def make_tensor(node):
     # tensors aren't explicitly modelled in Knossos yet, leave them as identity over a (jagged) list for now
     value = node.outputsAt(0)
-
-    return Var(mangled_name(value)), Var(mangled_name(node.inputsAt(0)))
+    return Var(mangled_name(value)), var_or_constant(node.inputsAt(0))
 
 
 def make_aten_function(node, value, function_name):
-    return Var(mangled_name(value)), Call(function_name, [Var(mangled_name(i)) for i in node.inputs()])
+    return Var(mangled_name(value)), Call(function_name, [var_or_constant(i) for i in node.inputs()])
 
 
 def make_return(node):
     mangled_id = mangled_name(node.inputsAt(0))
     return Var(mangled_id)
-
+    
+def tail(iter):
+    next(iter)
+    return iter
 
 def make_callfunction(node):
     value = node.outputsAt(0)
@@ -149,7 +165,7 @@ def make_callfunction(node):
     function_name_constant = node.inputsAt(0).node()
     function_name = function_name_constant.s("name")
     return (Var(mangled_name(value)), 
-            Call(function_name, [Var(mangled_name(i)) for i in node.inputs()]))
+            Call(function_name, [var_or_constant(i) for i in tail(node.inputs()) ]))
 
 def make_lets(bindings, body) -> Expr:
     for (v,rhs) in reversed(bindings):
@@ -247,6 +263,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
         lookups = {
             "prim::Constant": make_constant,
             "prim::ListConstruct": make_list,
+            "prim::TupleConstruct": make_tuple,
             "prim::Return": make_return,
             "prim::CallFunction": make_callfunction,
             "prim::Loop": functools.partial(make_loop, make_binds=make_binds),
@@ -317,9 +334,10 @@ def ts2mod(function, example_inputs):
 
     if True:
         symtab = dict()
-        decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+        ksc_dir = utils.get_ksc_dir()
+        decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
         type_propagate_decls(decls_prelude, symtab)
-        decls_prelude_aten = list(parse_ks_filename("src/runtime/prelude-aten.ks"))
+        decls_prelude_aten = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude-aten.ks"))
         type_propagate_decls(decls_prelude_aten, symtab)
 
         type_propagate_decls([ksc_def], symtab)
@@ -331,8 +349,228 @@ def ts2mod(function, example_inputs):
 
     return KscFunction(mod)
 
+import time
+
+class time_sampler:
+    def __init__(self):
+        self.minimizing = True
+        if self.minimizing:
+            self.time = 1e10
+        else:
+            self.time = 0       
+            self.ncalls = 0
+
+    def duration(self):
+        if self.minimizing:
+            return self.time
+        else:
+            return self.time / self.ncalls
+
+    @property
+    def us(self):
+        return self.duration() * 1e6
+
+    def mark(self):
+        self.start = time.time()
+
+    def record(self):
+        delta = time.time() - self.start
+        if self.minimizing:
+            self.time = min(delta, self.time)
+        else:
+            self.time += delta
+            self.ncalls += 1
+
+# %%
 
 if __name__ == "__main__":
+# %%
+    import math
+    import torch
+    import torch.nn.functional as F
+    torch.set_default_dtype(torch.float64)
+
+    def lltm_forward_py(input, weights, bias, old_h, old_cell):
+        X = torch.cat([old_h, input], dim=1)
+
+        # Compute the input, output and candidate cell gates with one MM.
+        gate_weights = F.linear(X, weights, bias)
+
+        # Split the combined gate weight matrix into its components.
+        gates = gate_weights.chunk(3, dim=1)
+
+        input_gate = torch.sigmoid(gates[0])
+        output_gate = torch.sigmoid(gates[1])
+        # Here we use an ELU instead of the usual tanh.
+        candidate_cell = F.elu(gates[2])
+
+        # Compute the new cell state.
+        new_cell = old_cell + candidate_cell * input_gate
+        # Compute the new hidden state and output.
+        new_h = torch.tanh(new_cell) * output_gate
+
+        return new_h, new_cell
+
+
+
+    lltm_forward = lltm_forward_py
+
+    class LLTM(torch.nn.Module):
+        def __init__(self, input_features, state_size):
+            super(LLTM, self).__init__()
+            self.input_features = input_features
+            self.state_size = state_size
+            # 3 * state_size for input gate, output gate and candidate cell gate.
+            # input_features + state_size because we will multiply with [input, h].
+            self.weights = torch.nn.Parameter(
+                torch.empty(3 * state_size, input_features + state_size))
+            self.bias = torch.nn.Parameter(torch.empty(3 * state_size))
+            self.reset_parameters()
+
+        def reset_parameters(self):
+            stdv = 1.0 / math.sqrt(self.state_size)
+            for weight in self.parameters():
+                weight.data.uniform_(-stdv, +stdv)
+
+        def forward(self, input, state):
+            return lltm_forward(input, self.weights, self.bias, *state)
+
+    # run it...
+    batch_size = 16
+    input_features = 32
+    state_size = 128
+
+    X = torch.randn(batch_size, input_features)
+    h = torch.randn(batch_size, state_size)
+    C = torch.randn(batch_size, state_size)
+
+    rnn = LLTM(input_features, state_size)
+
+    def myloss(X, h, c):
+        new_h, new_C = rnn(X, (h, C))
+        return new_h.sum() + new_C.sum()
+    
+    def timeit(msg):
+        print('Timing: ', msg, lltm_forward)
+        forward = time_sampler()
+        backward = time_sampler()
+        nruns = 500
+        for _ in range(nruns):
+            forward.mark()
+            loss = myloss(X, h, C)
+            forward.record()
+
+            backward.mark()
+            loss.backward()
+            backward.record()
+
+        print(f'Forward: {forward.us:.3f} us | Backward {backward.us:.3f} us')
+
+    #timeit("py")
+
+    lltm_forward_ts = torch.jit.script(lltm_forward_py)
+    lltm_forward = lltm_forward_ts
+    # timeit("ts")
+#%%
+    example_inputs = (X, rnn.weights, rnn.bias, h, C)
+    fn = torch.jit.script(lltm_forward_py)
+    print(fn.graph)
+    #     graph(%input.1 : Tensor,
+    #       %weights.1 : Tensor,
+    #       %bias.1 : Tensor,
+    #       %old_h.1 : Tensor,
+    #       %old_cell.1 : Tensor):
+    #   %30 : Function = prim::Constant[name="elu"]()
+    #   %29 : bool = prim::Constant[value=0]()
+    #   %28 : float = prim::Constant[value=1.]()
+    #   %13 : Function = prim::Constant[name="linear"]()
+    #   %8 : int = prim::Constant[value=1]() # <ipython-input-4-ecbf56b83299>:7:38
+    #   %16 : int = prim::Constant[value=3]() # <ipython-input-4-ecbf56b83299>:12:31
+    #   %19 : int = prim::Constant[value=0]() # <ipython-input-4-ecbf56b83299>:14:37
+    #   %26 : int = prim::Constant[value=2]() # <ipython-input-4-ecbf56b83299>:17:33
+    #   %7 : Tensor[] = prim::ListConstruct(%old_h.1, %input.1)
+    #   %X.1 : Tensor = aten::cat(%7, %8) # <ipython-input-4-ecbf56b83299>:7:8
+    #   %gate_weights.1 : Tensor = prim::CallFunction(%13, %X.1, %weights.1, %bias.1) # <ipython-input-4-ecbf56b83299>:10:19
+    #   %gates.1 : Tensor[] = aten::chunk(%gate_weights.1, %16, %8) # <ipython-input-4-ecbf56b83299>:12:12
+    #   %20 : Tensor = aten::__getitem__(%gates.1, %19) # <ipython-input-4-ecbf56b83299>:14:31
+    #   %input_gate.1 : Tensor = aten::sigmoid(%20) # <ipython-input-4-ecbf56b83299>:14:17
+    #   %23 : Tensor = aten::__getitem__(%gates.1, %8) # <ipython-input-4-ecbf56b83299>:15:32
+    #   %output_gate.1 : Tensor = aten::sigmoid(%23) # <ipython-input-4-ecbf56b83299>:15:18
+    #   %27 : Tensor = aten::__getitem__(%gates.1, %26) # <ipython-input-4-ecbf56b83299>:17:27
+    #   %candidate_cell.1 : Tensor = prim::CallFunction(%30, %27, %28, %29) # <ipython-input-4-ecbf56b83299>:17:21
+    #   %35 : Tensor = aten::mul(%candidate_cell.1, %input_gate.1) # <ipython-input-4-ecbf56b83299>:20:26
+    #   %new_cell.1 : Tensor = aten::add(%old_cell.1, %35, %8) # <ipython-input-4-ecbf56b83299>:20:15
+    #   %39 : Tensor = aten::tanh(%new_cell.1) # <ipython-input-4-ecbf56b83299>:22:12
+    #   %new_h.1 : Tensor = aten::mul(%39, %output_gate.1) # <ipython-input-4-ecbf56b83299>:22:12
+    #   %44 : (Tensor, Tensor) = prim::TupleConstruct(%new_h.1, %new_cell.1)
+    #   return (%44)
+
+    ks_fun = ts2mod(lltm_forward_py, example_inputs=example_inputs)
+
+    def torch_from_ks(ks_object):
+        if isinstance(ks_object, tuple):
+            return tuple(torch_from_ks(ks) for ks in ks_object)
+        
+        return torch.from_numpy(numpy.array(ks_object, copy=True))
+
+    class KnossosLLTMFunction(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, input, weights, bias, old_h, old_cell):
+            args = (input, weights, bias, old_h, old_cell)
+            
+            ks_fun._py_mod.reset_allocator()
+            ks_args = (ks_fun.adapt(x) for x in args)
+            
+            # Call it
+            outputs = ks_fun(*ks_args)
+            
+            ctx.save_for_backward(*args)
+
+            return torch_from_ks(outputs)
+
+        @staticmethod
+        def backward(ctx, grad_h, grad_cell):
+            ks_args = tuple(ks_fun.adapt(x) for x in ctx.saved_tensors)
+            grad_args = (grad_h, grad_cell)
+            ks_grad_args = tuple(ks_fun.adapt(x) for x in grad_args)
+            outputs = ks_fun.rev(ks_args, ks_grad_args)
+
+            return torch_from_ks(outputs)
+
+    lltm_forward = KnossosLLTMFunction.apply
+    timeit("KS")
+
+    
+#%%
+    import torch.utils.cpp_extension
+    print("Compiling extension ...", end="")
+    lltm_cpp = torch.utils.cpp_extension.load(name="lltm_cpp", sources=["lltm.cpp"])
+    print("done.")
+
+    class LLTMFunction(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, input, weights, bias, old_h, old_cell):
+            outputs = lltm_cpp.forward(input, weights, bias, old_h, old_cell)
+            new_h, new_cell = outputs[:2]
+            variables = outputs[1:] + [weights]
+            ctx.save_for_backward(*variables)
+
+            return new_h, new_cell
+
+        @staticmethod
+        def backward(ctx, grad_h, grad_cell):
+            outputs = lltm_cpp.backward(
+                grad_h.contiguous(), grad_cell.contiguous(), *ctx.saved_tensors)
+            d_old_h, d_input, d_weights, d_bias, d_old_cell = outputs
+            return d_input, d_weights, d_bias, d_old_h, d_old_cell
+
+    lltm_forward = LLTMFunction.apply
+    timeit("native")
+
+
+#%%
+
+if __name__ == "x__main__":
     from math import sin
     torch.set_default_dtype(torch.float64)
     
@@ -464,3 +702,8 @@ if __name__ == "__main__":
 
     # Next:
     #  - foofilter
+
+
+
+# %%
+
