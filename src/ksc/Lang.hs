@@ -404,21 +404,25 @@ deriving instance Eq   (DerivedFun String)
 deriving instance Ord  (DerivedFun String)
 deriving instance Show (DerivedFun String)
 
-mapBaseUserFunBaseFun :: (BaseUserFun p -> BaseUserFun q) -> (BaseFun p -> BaseFun q)
-mapBaseUserFunBaseFun f = \case
-  BaseUserFun u -> BaseUserFun (f u)
-  PrimFun p    -> PrimFun p
-  SelFun i1 i2 -> SelFun i1 i2
+baseUserFunBaseFun :: Applicative f
+                   => (BaseUserFun p -> f (BaseUserFun q))
+                   -> (BaseFun p -> f (BaseFun q))
+baseUserFunBaseFun f = \case
+  BaseUserFun u -> BaseUserFun <$> f u
+  PrimFun p    -> pure (PrimFun p)
+  SelFun i1 i2 -> pure (SelFun i1 i2)
 
 mapBaseUserFunFun :: (BaseUserFun p -> BaseUserFun q) -> (Fun p -> Fun q)
-mapBaseUserFunFun = mapBaseFunFun . mapBaseUserFunBaseFun
+mapBaseUserFunFun = T.mapOf (baseFunFun . baseUserFunBaseFun)
 
-mapBaseFunFun :: (funid -> funid') -> (DerivedFun funid -> DerivedFun funid')
-mapBaseFunFun f = \case
-  Fun fi       -> Fun (f fi)
-  GradFun fi p -> GradFun (f fi) p
-  DrvFun fi p  -> DrvFun (f fi) p
-  ShapeFun ff  -> ShapeFun (mapBaseFunFun f ff)
+baseFunFun :: Functor f
+           => (funid -> f funid')
+           -> (DerivedFun funid -> f (DerivedFun funid'))
+baseFunFun f = \case
+  Fun fi       -> fmap Fun (f fi)
+  GradFun fi p -> fmap (\f' -> GradFun f' p) (f fi)
+  DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (f fi)
+  ShapeFun ff  -> fmap ShapeFun (baseFunFun f ff)
 
 userFunAddType :: forall p. InPhase p
                => BaseUserFun p
@@ -427,7 +431,7 @@ userFunAddType :: forall p. InPhase p
 userFunAddType f t = T.mapOf (baseUserFunType @p) (const t) f
 
 addBaseTypeToUserFun :: forall p. InPhase p => UserFun p -> Type -> UserFun Typed
-addBaseTypeToUserFun f t = mapBaseFunFun (flip (userFunAddType @p) t) f
+addBaseTypeToUserFun f t = T.mapOf baseFunFun (flip (userFunAddType @p) t) f
 
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = \case
