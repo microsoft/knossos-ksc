@@ -429,8 +429,23 @@ userFunBaseType :: forall p f. (InPhase p, Applicative f)
                 -> UserFun p -> f (UserFun Typed)
 userFunBaseType = baseFunFun . baseUserFunType @p
 
-addBaseTypeToUserFun :: forall p. InPhase p => UserFun p -> Type -> UserFun Typed
-addBaseTypeToUserFun f t = T.mapOf (userFunBaseType @p) (const t) f
+addBaseTypeToUserFun :: forall p. InPhase p
+                     => UserFun p -> Type -> Either Type (UserFun Typed)
+addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
+  []   -> Right fWithBaseType
+  -- We can only ever have one mismatched type but the type system
+  -- doesn't know this (affine traversals don't exist)
+  mismatchedAppliedTy:_ -> Left mismatchedAppliedTy
+  where (mismatchedAppliedTyL, fWithBaseType) =
+          T.traverseOf (userFunBaseType @p) g f
+
+        mismatchedAppliedTyF = \case
+          Just appliedTy -> if eqType appliedTy expectedBaseTy
+                            then []
+                            else [appliedTy]
+          Nothing -> []
+
+        g mt' = (mismatchedAppliedTyF mt', expectedBaseTy)
 
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = \case

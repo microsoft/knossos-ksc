@@ -183,7 +183,14 @@ tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
                => UserFun p -> Type
                -> TcM (UserFun Typed)
 tcUserFunArgTy fun ty = case baseFunArgTy_maybe fun ty of
-  Right baseTy -> pure (addBaseTypeToUserFun @p fun baseTy)
+  Right baseTy -> case addBaseTypeToUserFun @p fun baseTy of
+    Right r -> pure r
+    Left appliedTy ->
+      addErr (text "The base type did not match the applied type"
+              <+> text "in the call to" <+> ppr fun
+              $$ text "The argument type was" <+> ppr ty
+              $$ text "from which the base type was determined to be" <+> ppr baseTy
+              $$ text "but the applied type was" <+> ppr appliedTy)
   Left err -> addErr err
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr

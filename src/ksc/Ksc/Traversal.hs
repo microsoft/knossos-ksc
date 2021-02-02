@@ -13,3 +13,10 @@ mapOf :: ((a -> I.Identity b) -> (s -> I.Identity t))
       -> s
       -> t
 mapOf fmap' f = I.runIdentity . fmap' (I.Identity . f)
+
+traverseOf :: Applicative f
+           => ((a -> f b) -> (s -> f t))
+           -> (a -> f b)
+           -> s
+           -> f t
+traverseOf = id
