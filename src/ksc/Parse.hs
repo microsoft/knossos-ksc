@@ -317,6 +317,39 @@ pIsUserFun fun = case maybeUserFun fun of
   Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ show fun)
   Just userFun -> pure userFun
 
+--------------------------------------------
+--  Parsing function names
+--------------------------------------------
+
+mk_fun :: String -> Fun Parsed
+-- Parses the print-name of a top-level function into a Fun
+-- In particular,
+--
+--   * Recognises D$f as (Grad f Fwd) etc
+--     Keep this in sync with pprFun
+--
+--   * Distinguishes PrimFun from BaseUserFun
+mk_fun f = case find_dollar f of
+             Just ("D",   s)  -> GradFun (mk_fun_id s) BasicAD
+             Just ("Dt",   s) -> GradFun (mk_fun_id s) TupleAD
+             Just ("fwd", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Fwd)
+             Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
+             Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
+             Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
+             Just ("shape", s) -> ShapeFun (mk_fun s)
+             Just ("get", s) -> Fun     (mk_sel_fun s)
+             _               -> Fun     (mk_fun_id f)
+  where
+    mk_fun_id f | isPrimFun f = PrimFun f
+                | otherwise   = BaseUserFun (BaseUserFunId f Nothing)
+    find_dollar f = case break (== '$') f of
+                       (_, [])  -> Nothing  -- No $
+                       (_, [_]) -> Nothing  -- Trailing $
+                       (prefix, _ : suffix) -> Just (prefix, suffix)
+    mk_sel_fun s = case break (== '$') s of
+                     (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
+                     _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
+
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
 pDef = do { pReserved "def"
