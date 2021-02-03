@@ -4,6 +4,9 @@
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
              ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts #-}
+-- The instances we derive need UndecidableInstances to be enabled
+{-# LANGUAGE UndecidableInstances #-}
 
 module Lang where
 
@@ -39,6 +42,9 @@ data Phase = Parsed | Typed | OccAnald
 data DeclX p = RuleDecl (RuleX p)
              | DefDecl  (DefX p)
 
+deriving instance (Eq (RuleX p), Eq (DefX p)) => Eq (DeclX p)
+deriving instance (Show (RuleX p), Show (DefX p)) => Show (DeclX p)
+
 type Decl  = DeclX Parsed
 type TDecl = DeclX Typed
 
@@ -49,6 +55,9 @@ data DefX p  -- f x = e
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
   -- (via TVar) and result types (via TFun)
+
+deriving instance (Eq (BaseUserFunT p), Eq (RhsX p)) => Eq (DefX p)
+deriving instance (Show (BaseUserFunT p), Show (RhsX p)) => Show (DefX p)
 
 type Def  = DefX Parsed
 type TDef = DefX Typed
@@ -61,6 +70,9 @@ data RhsX p
                         --   without having a RHS
 
   | EDefRhs             -- An external definition: no RHS
+
+deriving instance Eq (ExprX p) => Eq (RhsX p)
+deriving instance Show (ExprX p) => Show (RhsX p)
 
 type TRhs  = RhsX Typed
 
@@ -93,10 +105,9 @@ patToExpr (TupPat vs) = Tuple (map Var vs)
 instance Show Pat where
   show p = pps p
 
-data TVarX = TVar TypeX Var
+data TVarX = TVar TypeX Var deriving (Eq, Ord)
 type TVar = TVarX
 
-deriving instance Ord TVar
 instance Show TVar where
   show e = pps e
 
@@ -167,6 +178,9 @@ data ExprX p
   | Assert (ExprX p) (ExprX p)
   | Dummy Type
 
+deriving instance Eq (ExprX Parsed)
+deriving instance Eq (ExprX OccAnald)
+
 instance InPhase p => Show (ExprX p) where
   show e = pps e
 
@@ -205,32 +219,6 @@ deriving instance Ord Type
 
 instance Show TypeX where
   show e = pps e
-
--- Round trip testing requires that two different DeclXs be checked
--- for equality.  If the equality check fails we'd like to print them
--- to see the differences.  Thus we add Eq and Show instances for
--- DeclX and other types that transitively need them.
-deriving instance Eq (RhsX Typed)
-deriving instance Eq (DefX Typed)
-deriving instance Eq (DeclX Typed)
-deriving instance Eq (RuleX Typed)
-
-deriving instance Show (RhsX Typed)
-deriving instance Show (DefX Typed)
-deriving instance Show (DeclX Typed)
-deriving instance Show (RuleX Typed)
-
-deriving instance Eq TVarX
-deriving instance Eq (ExprX Parsed)
-deriving instance Eq (RhsX Parsed)
-deriving instance Eq (DefX Parsed)
-deriving instance Eq (DeclX Parsed)
-deriving instance Eq (RuleX Parsed)
-
-deriving instance Show (RhsX Parsed)
-deriving instance Show (DefX Parsed)
-deriving instance Show (DeclX Parsed)
-deriving instance Show (RuleX Parsed)
 
 ----------------------------------
 --- Tensor properties
@@ -341,15 +329,16 @@ eqTypes x xs = if all (eqType x) xs
                else Nothing
 
 type PrimFun = String
-data BaseUserFunId t = BaseUserFunId String t
-  deriving (Show, Eq, Ord)
+data BaseUserFun p = BaseUserFunId String (BaseUserFunT p)
 
-type family BaseUserFunIdT p where
-  BaseUserFunIdT Parsed   = Maybe Type
-  BaseUserFunIdT OccAnald = Type
-  BaseUserFunIdT Typed    = Type
+deriving instance Eq (BaseUserFunT p) => Eq (BaseUserFun p)
+deriving instance Ord (BaseUserFunT p) => Ord (BaseUserFun p)
+deriving instance Show (BaseUserFunT p) => Show (BaseUserFun p)
 
-type BaseUserFun p = BaseUserFunId (BaseUserFunIdT p)
+type family BaseUserFunT p where
+  BaseUserFunT Parsed   = Maybe Type
+  BaseUserFunT OccAnald = Type
+  BaseUserFunT Typed    = Type
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
@@ -358,15 +347,9 @@ data BaseFun (p :: Phase)
                   Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
                   Int      -- Arity
 
-deriving instance Eq   (BaseFun Typed)
-deriving instance Ord  (BaseFun Typed)
-deriving instance Show (BaseFun Typed)
-deriving instance Eq   (BaseFun Parsed)
-deriving instance Ord  (BaseFun Parsed)
-deriving instance Show (BaseFun Parsed)
-deriving instance Eq   (BaseFun OccAnald)
-deriving instance Ord  (BaseFun OccAnald)
-deriving instance Show (BaseFun OccAnald)
+deriving instance Eq   (BaseUserFunT p) => Eq   (BaseFun p)
+deriving instance Ord  (BaseUserFunT p) => Ord  (BaseFun p)
+deriving instance Show (BaseUserFunT p) => Show (BaseFun p)
 
 data DerivedFun funid
                 = Fun      funid         -- The function              f(x)
@@ -374,6 +357,7 @@ data DerivedFun funid
                 | DrvFun   funid ADMode  -- Derivative derivative f'(x,dx)
                                          --   Rev <=> reverse mode f`(x,dr)
                 | ShapeFun (DerivedFun funid)
+                deriving (Eq, Ord, Show)
 
 -- DerivedFun has just two instantiations
 --
@@ -385,24 +369,10 @@ data DerivedFun funid
 type UserFun p = DerivedFun (BaseUserFun p)
 type Fun     p = DerivedFun (BaseFun p)
 
-deriving instance Eq   (Fun Typed)
-deriving instance Ord  (Fun Typed)
-deriving instance Show (Fun Typed)
-deriving instance Eq   (Fun Parsed)
-deriving instance Ord  (Fun Parsed)
-deriving instance Show (Fun Parsed)
-deriving instance Eq   (Fun OccAnald)
-deriving instance Ord  (Fun OccAnald)
-deriving instance Show (Fun OccAnald)
-deriving instance Eq   (DerivedFun (BaseUserFunId Type))
-deriving instance Ord  (DerivedFun (BaseUserFunId Type))
-deriving instance Show (DerivedFun (BaseUserFunId Type))
-deriving instance Eq   (DerivedFun (BaseUserFunId (Maybe Type)))
-deriving instance Ord  (DerivedFun (BaseUserFunId (Maybe Type)))
-deriving instance Show (DerivedFun (BaseUserFunId (Maybe Type)))
-deriving instance Eq   (DerivedFun String)
-deriving instance Ord  (DerivedFun String)
-deriving instance Show (DerivedFun String)
+baseUserFunT :: Functor f
+             => (BaseUserFunT p -> f (BaseUserFunT q))
+             -> BaseUserFun p -> f (BaseUserFun q)
+baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
 
 baseUserFunBaseFun :: Applicative f
                    => (BaseUserFun p -> f (BaseUserFun q))
@@ -512,22 +482,20 @@ data ADDir = Fwd | Rev
 
 data TFun p = TFun Type (Fun p)   -- Typed functions.  The type is the /return/
 
-deriving instance Eq (TFun Parsed)
-deriving instance Eq (TFun Typed)
-deriving instance Eq (TFun OccAnald)
-deriving instance Ord (TFun Parsed)
-deriving instance Ord (TFun Typed)
-deriving instance Ord (TFun OccAnald)
+deriving instance Eq (Fun p) => Eq (TFun p)
+deriving instance Ord (Fun p) => Ord (TFun p)
 
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
 typedTFunToOccAnaldTFun :: TFun Typed -> TFun OccAnald
-typedTFunToOccAnaldTFun (TFun t f) = TFun t (mapBaseUserFunFun id f)
+typedTFunToOccAnaldTFun (TFun t f) =
+  TFun t (T.mapOf (baseFunFun . baseUserFunBaseFun . baseUserFunT) id f)
 
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
 occAnaldTFunToTypedTFun :: TFun OccAnald -> TFun Typed
-occAnaldTFunToTypedTFun (TFun t f) = TFun t (mapBaseUserFunFun id f)
+occAnaldTFunToTypedTFun (TFun t f) =
+  TFun t (T.mapOf (baseFunFun . baseUserFunBaseFun . baseUserFunT) id f)
 
 
 data Var
@@ -555,6 +523,9 @@ data RuleX p = Rule { ru_name  :: String   -- Just for logging
                     , ru_rhs   :: ExprX p }
   -- When matching may bind any of the ru_qvars, which are typed,
   -- just like any other lambda-bound variable
+
+deriving instance Eq (ExprX p) => Eq (RuleX p)
+deriving instance Show (ExprX p) => Show (RuleX p)
 
 type Rule  = RuleX Parsed
 type TRule = RuleX Typed
@@ -1155,12 +1126,15 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
     where fun_f = userFunToFun @p f
           pprFun_f = pprUserFun @p f
 
-instance Pretty (BaseUserFunId Type) where
+instance Pretty (BaseUserFun Typed) where
   ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
 
-instance Pretty (BaseUserFunId (Maybe Type)) where
+instance Pretty (BaseUserFun OccAnald) where
+  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
+
+instance Pretty (BaseUserFun Parsed) where
   ppr (BaseUserFunId f mty) = case mty of
-    Just ty -> ppr (BaseUserFunId f ty)
+    Just ty -> ppr @(BaseUserFun Typed) (BaseUserFunId f ty)
     Nothing -> text f
 
 pprPat :: Bool -> Pat -> SDoc
