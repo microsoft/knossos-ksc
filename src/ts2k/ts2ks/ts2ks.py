@@ -418,6 +418,7 @@ if __name__ == "__main__":
 
             return new_h, new_cell
     else:
+        # Simpler model to test zero-runtime implementation
         def lltm_forward_py(input, weights, bias, old_h, old_cell):
             X = torch.cat([old_h, input], dim=1)
 
@@ -465,9 +466,9 @@ if __name__ == "__main__":
             return lltm_forward(input, self.weights, self.bias, *state)
 
     # run it...
-    batch_size = 16
-    input_features = 32
-    state_size = 128
+    batch_size = 8
+    input_features = 16
+    state_size = 30
 
     X = torch.randn(batch_size, input_features)
     h = torch.randn(batch_size, state_size)
@@ -483,7 +484,7 @@ if __name__ == "__main__":
         print('Timing: ', msg, lltm_forward)
         forward = time_sampler()
         backward = time_sampler()
-        nruns = 500
+        nruns = 50
         for _ in range(nruns):
             forward.mark()
             loss = myloss(X, h, C)
@@ -495,15 +496,15 @@ if __name__ == "__main__":
 
         print(f'Forward: {forward.us:.3f} us | Backward {backward.us:.3f} us')
 
-    #timeit("py")
+    timeit("py")
 
     lltm_forward_ts = torch.jit.script(lltm_forward_py)
     lltm_forward = lltm_forward_ts
-    # timeit("ts")
+    timeit("ts")
 #%%
     example_inputs = (X, rnn.weights, rnn.bias, h, C)
     fn = torch.jit.script(lltm_forward_py)
-    print(fn.graph)
+    #print(fn.graph)
     #     graph(%input.1 : Tensor,
     #       %weights.1 : Tensor,
     #       %bias.1 : Tensor,
@@ -567,7 +568,7 @@ if __name__ == "__main__":
             return torch_from_ks(outputs)
 
     lltm_forward = KnossosLLTMFunction.apply
-    timeit("KS")
+    timeit("Knossos")
 
     
 #%%
