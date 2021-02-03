@@ -298,10 +298,10 @@ cgenDefs defs = concatMap cdecl $
   env = Map.fromList (mapMaybe (\(Def { def_fun = f
                                       , def_rhs = rhs
                                       , def_res_ty = res_ty
-                                      , def_pat = arg
+                                      , def_arg = bndr
                                       }) ->
                                   case rhs of
-                                    UserRhs _ -> Just ((f, typeof arg), res_ty)
+                                    UserRhs _ -> Just ((f, typeof bndr), res_ty)
                                     _         -> Nothing) defs)
 
   cdecl def = cgenDefE env def ++ [ "" ]
@@ -331,10 +331,6 @@ be particularly important for avoiding a 5x slowdown.  See
 
 -}
 
-params_withPackedParamsPat :: Pat -> ([TVarX], TExpr -> TExpr)
-params_withPackedParamsPat (TupPat vs)    = (vs, id)
-params_withPackedParamsPat (VarPat param) = params_withPackedParams param
-
 params_withPackedParams :: TVarX -> ([TVarX], TExpr -> TExpr)
 params_withPackedParams param = case typeof param of
   -- See Note [Unpack tuple arguments]
@@ -350,10 +346,10 @@ mkCTypedVar :: TVar -> String
 mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 
 cgenDefE :: CST -> TDef -> [String]
-cgenDefE env (Def { def_fun = f, def_pat = param
+cgenDefE env (Def { def_fun = f, def_arg = param
                   , def_rhs = UserRhs body }) =
   let cf                         = cgenUserFun (f, typeof param)
-      (params, withPackedParams) = params_withPackedParamsPat param
+      (params, withPackedParams) = params_withPackedParams param
       CG cbodydecl cbodyexpr cbodytype _callocusage =
         runM $ cgenExpr env (withPackedParams body)
       cbody       = cbodydecl ++ [ "return (" ++ generateCGRE cbodyexpr ++ ");" ]

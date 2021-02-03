@@ -18,18 +18,14 @@ shapeDef (Def { def_fun = ShapeFun _ })
   = Nothing
 
 shapeDef (Def { def_fun = f
-              , def_pat = VarPat params
+              , def_arg = params
               , def_rhs = UserRhs def_rhs
               , def_res_ty = res_ty })
   = Just $
     Def { def_fun    = ShapeFun f
-        , def_pat    = VarPat params
+        , def_arg    = params
         , def_res_ty = shapeType res_ty
         , def_rhs    = UserRhs (mkLetForShapeOfParameter params (shapeE def_rhs)) }
-
-shapeDef (Def { def_pat = TupPat {} })
-  -- TupPat should not appear.  See Note [Replacing TupPat with nested Let] in LangUtils
-  = error "shapeDef: TupPat encountered.\nThis should not occur."
 
 shapeDef _ = Nothing
 

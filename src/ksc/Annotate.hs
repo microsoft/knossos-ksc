@@ -52,10 +52,10 @@ annotDecls gbl_env decls
     -- We don't have a type-checked body yet, but that
     -- doesn't matter because we aren't doing inlining
     mk_rec_def :: DefX Parsed -> TcM TDef
-    mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
+    mk_rec_def (Def { def_fun = fun, def_arg = arg, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr fun) $
-         tcWithPat pat $ \pat' ->
-         do { return (Def { def_fun = fun, def_pat = pat'
+         extendLclSTM [arg] $
+         do { return (Def { def_fun = fun, def_arg = arg
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
 
@@ -87,21 +87,14 @@ tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
 
 tcDef :: InPhase p => DefX p -> TcM TDef
 tcDef (Def { def_fun    = fun
-           , def_pat   = pat
+           , def_arg    = arg
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr fun) $
-    do { tcWithPat pat $ \pat' ->
+    extendLclSTM [arg] $
     do { rhs' <- tcRhs fun rhs res_ty
-       ; return (Def { def_fun = fun, def_pat = pat'
-                     , def_rhs = rhs', def_res_ty = res_ty })
-    }}
-
--- Adds the variables in the pattern to the symbol table and
--- runs the continuation on the pattern.
-tcWithPat :: Pat -> (Pat -> TcM a) -> TcM a
-tcWithPat pat continueWithArg
-  = do { extendLclSTM (patVars pat) $ continueWithArg pat }
+       ; return (Def { def_fun = fun, def_arg = arg
+                     , def_rhs = rhs', def_res_ty = res_ty }) }
 
 -- Checks that the type of pat matches expected_ty and if so returns
 -- the type-annotated Pat.
@@ -296,16 +289,16 @@ userCallResultTy_maybe fn env args
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
-userCallResultTy_help (Def { def_fun  = fn
+userCallResultTy_help (Def { def_fun    = fn
                            , def_res_ty = ret_ty
-                           , def_pat = pat })
-                      args
-  = case check_args bndr_tys arg_tys of
+                           , def_arg    = bndr })
+                      arg
+  = case check_args bndr_ty arg_ty of
       Just err -> Left err
       Nothing  -> Right ret_ty
   where
-    bndr_tys = patType pat
-    arg_tys  = typeof args
+    bndr_ty = tVarType bndr
+    arg_ty  = typeof arg
 
     check_args :: Type -> Type -> Maybe SDoc
     -- Return (Just err) if there's a wrong-ness

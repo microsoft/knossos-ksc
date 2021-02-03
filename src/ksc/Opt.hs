@@ -63,10 +63,10 @@ optDefs = mapAccumLM . optDef
 
 optDef :: HasCallStack => RuleBase -> GblSymTab -> TDef
                        -> KM (GblSymTab, TDef)
-optDef rb gst def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
+optDef rb gst def@(Def { def_arg = arg, def_rhs = UserRhs rhs })
   = do { -- The variables brought into scope by the argument list are
          -- the names of the arguments themselves (pat)
-         let varsBroughtIntoScopeByArgs = mkEmptySubst (patVars pat)
+         let varsBroughtIntoScopeByArgs = mkEmptySubst [arg]
              env = OptEnv { optRuleBase = rb
                           , optGblST = gst
                           , optSubst = varsBroughtIntoScopeByArgs }
@@ -236,8 +236,8 @@ optFun _ (SelFun i _) arg
 optFun env (PrimFun "$inline") arg
   | Call (TFun _ fun) inner_arg <- arg
   , Just fun_def <- lookupGblST (fun, typeof inner_arg) (optGblST env)
-  , Def { def_pat = pat, def_rhs = UserRhs body } <- fun_def
-  = Just (inlineCall env pat body inner_arg)
+  , Def { def_arg = bndr, def_rhs = UserRhs body } <- fun_def
+  = Just (inlineCall env bndr body inner_arg)
 
 -- Other prims are determined by their args
 optFun env (PrimFun f) e
@@ -422,37 +422,11 @@ optLMCompose f g
 
 -----------------------
 inlineCall :: OptEnv
-           -> Pat -> TExpr  -- Function parameters and body
-           -> TExpr            -- Arguments
+           -> TVar -> TExpr  -- Function parameter and body
+           -> TExpr          -- Arguments
            -> TExpr
-inlineCall _ (VarPat tv) body arg
-  = mkLet tv arg body
+inlineCall _ bndr body arg = mkLet bndr arg body
 
-inlineCall env (TupPat tvs) body arg
-  = mkLets (fresh_tvs `zip` args) $
-    -- See Note [Avoid name clashes in inlineCall]
-    mkLets [ (tv, Var fresh_tv)
-           | (tv,fresh_tv) <- tvs `zip` fresh_tvs
-           , tv /= fresh_tv ]
-    body
-  where
-    args = splitTuple arg (length tvs)
-    (_, fresh_tvs) = notInScopeTVs (optEnvInScope env) tvs
-
-{- Note [Avoid name clashes in inlineCall]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have the call (f e1 e2),
-  where e1 and e2 mention variables p, q
-  f is defined by  def f (p,q) = rhs
-Then we want to generate
-  let p' = e1
-      q' = e2
-  in let
-      p = p'
-      q = q'
-  in rhs
-to avoid accidental capture of p,q.
--}
 
 -----------------------
 optSum :: TExpr -> Maybe TExpr

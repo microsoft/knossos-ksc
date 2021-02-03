@@ -235,7 +235,7 @@ newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
 stInsertFun :: TDef -> GblSymTab -> GblSymTab
-stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (f, patType arg) def
+stInsertFun def@(Def { def_fun = f, def_arg = arg }) = M.insert (f, tVarType arg) def
 
 lookupGblST :: HasCallStack => (Fun, Type) -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
@@ -377,28 +377,6 @@ Specifically, noTupPatifyDef does these two things:
 -- def_pat of the Def itself) with nested Lets.  See Note [Replacing
 -- TupPat with nested Let].
 noTupPatifyDef :: TDef -> TDef
-noTupPatifyDef def@(Def { def_pat = pat, def_rhs = UserRhs rhs })
-  = def { def_pat = VarPat argVar
-        , def_rhs = UserRhs (add_unpacking (noTupPatifyExpr in_scope rhs)) }
-  where
-     (argVar, add_unpacking, in_scope) = case pat of
-       VarPat v -> (argVar, add_unpacking, in_scope)
-         where
-           argVar = v
-           add_unpacking = id
-           in_scope = mempty
-       TupPat tvs -> (argVar, add_unpacking, in_scope')
-         where
-           in_scope = mkInScopeSet (patVars pat)
-           argVar = TVar ty (notInScope (Simple "_t") in_scope)
-           in_scope' = extendInScopeSet argVar in_scope
-           ty = mkTupleTy (map typeof tvs)
-
-           n = length tvs
-
-           add_unpacking = mkLets [ (tv, pSel i n (Var argVar))
-                                  | (tv, i) <- tvs `zip` [1..] ]
-
 noTupPatifyDef def = def
 
 -- Replaces all occurrences of TupPat in the Expr with nested Lets.
