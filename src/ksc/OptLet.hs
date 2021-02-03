@@ -63,7 +63,7 @@ occAnalE (Lam tv e)
     e' :: ExprX OccAnald
     (e', vs)   = occAnalE e
 
-occAnalE (Call f e) = (Call (typedTFunToOccAnaldTFun f) e', vs)
+occAnalE (Call f e) = (Call (coerceTFun f) e', vs)
                      where
                        (e',vs) = occAnalE e
 occAnalE (Tuple es) = (Tuple es', unionsOccMap vs)
@@ -254,7 +254,7 @@ optLetsE = go
     go subst (Var tv)       = substVar subst tv
     go _ubst (Dummy ty)     = Dummy ty
     go _ubst (Konst k)      = Konst k
-    go subst (Call f es)    = Call (occAnaldTFunToTypedTFun f) (go subst es)
+    go subst (Call f es)    = Call (coerceTFun f) (go subst es)
     go subst (If b t e)     = If (go subst b) (go subst t) (go subst e)
     go subst (Tuple es)     = Tuple (map (go subst) es)
     go subst (App e1 e2)    = App (go subst e1) (go subst e2)
