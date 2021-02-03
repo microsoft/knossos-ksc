@@ -396,6 +396,11 @@ userFunBaseType :: forall p f. (InPhase p, Applicative f)
                 -> UserFun p -> f (UserFun Typed)
 userFunBaseType = baseFunFun . baseUserFunType @p
 
+funType :: Applicative f
+        => (BaseUserFunT p -> f (BaseUserFunT q))
+        -> Fun p -> f (Fun q)
+funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
+
 addBaseTypeToUserFun :: forall p. InPhase p
                      => UserFun p -> Type -> Either Type (UserFun Typed)
 addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
@@ -486,13 +491,13 @@ deriving instance Ord (Fun p) => Ord (TFun p)
 -- GHC's machinery to allow that.
 typedTFunToOccAnaldTFun :: TFun Typed -> TFun OccAnald
 typedTFunToOccAnaldTFun (TFun t f) =
-  TFun t (T.mapOf (baseFunFun . baseUserFunBaseFun . baseUserFunT) id f)
+  TFun t (T.mapOf funType id f)
 
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
 occAnaldTFunToTypedTFun :: TFun OccAnald -> TFun Typed
 occAnaldTFunToTypedTFun (TFun t f) =
-  TFun t (T.mapOf (baseFunFun . baseUserFunBaseFun . baseUserFunT) id f)
+  TFun t (T.mapOf funType id f)
 
 
 data Var
@@ -868,7 +873,7 @@ instance InPhase Typed where
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
-    where fun' = T.mapOf (baseFunFun . baseUserFunBaseFun . baseUserFunT) Just fun
+    where fun' = T.mapOf funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
@@ -886,7 +891,7 @@ instance InPhase OccAnald where
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
-    where fun' = T.mapOf (baseFunFun . baseUserFunBaseFun . baseUserFunT) Just fun
+    where fun' = T.mapOf funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
