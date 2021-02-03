@@ -161,15 +161,24 @@
     (let ((A B) AB)
         (tuple (aten::matmul dR (transpose B)) (aten::matmul (transpose A) dR))))
 
-
-
-(def addA1bt (Tensor 2 Float) ((A : Tensor 2 Float) (b : Tensor 1 Float))
-    (let ((M N) (size A))
-    (assert (eq N (size b))
-        (build (tuple M N) (lam (ij : Tuple Integer Integer)
-            (let ((i j) ij)
-                (add (index (tuple i j) A) (index j b))))))))
+; (def addA1bt (Tensor 2 Float) ((A : Tensor 2 Float) (b : Tensor 1 Float))
+;     (let ((M N) (size A))
+;     (assert (eq N (size b))
+;         (build (tuple M N) (lam (ij : Tuple Integer Integer)
+;             (let ((i j) ij)
+;                 (add (index (tuple i j) A) (index j b))))))))
                 
+(edef addA1bt (Tensor 2 Float) ((Tensor 2 Float) (Tensor 1 Float)))
+(def shape$addA1bt (Tensor 2 (Tuple)) ((a : Tensor 2 Float) (b : Tensor 1 Float))
+    (shape a))
+(edef D$addA1bt (LM (Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float)) ((Tensor 2 Float) (Tensor 1 Float)))
+(def fwd$addA1bt (Tensor 2 Float) ((arg : Tuple (Tensor 2 Float) (Tensor 1 Float)) (darg : Tuple (Tensor 2 Float) (Tensor 1 Float)))
+    (let ((dA db) darg)
+     (addA1bt dA db)))
+(edef rev$addA1bt (Tuple (Tensor 2 Float) (Tensor 1 Float)) ((Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float)))
+(def shape$rev$addA1bt (Tuple (Tensor 2 (Tuple)) (Tensor 1 (Tuple))) ((a : Tuple (Tensor 2 Float) (Tensor 1 Float)) (dret : Tensor 2 Float))
+    (shape a))
+
 ; Applies a linear transformation to the incoming data: :math:`y = X A^T + b`.
 
 ; This operator supports :ref:`TensorFloat32<tf32_on_ampere>`.
