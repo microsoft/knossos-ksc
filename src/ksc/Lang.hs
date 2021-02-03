@@ -487,17 +487,20 @@ data TFun p = TFun Type (Fun p)   -- Typed functions.  The type is the /return/
 deriving instance Eq (Fun p) => Eq (TFun p)
 deriving instance Ord (Fun p) => Ord (TFun p)
 
+coerceTFun :: BaseUserFunT p ~ BaseUserFunT q
+           => TFun p -> TFun q
+coerceTFun (TFun t f) = TFun t (T.mapOf funType id f)
+
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
-typedTFunToOccAnaldTFun :: TFun Typed -> TFun OccAnald
-typedTFunToOccAnaldTFun (TFun t f) =
-  TFun t (T.mapOf funType id f)
+typedTFunToOccAnaldTFun :: BaseUserFunT p ~ BaseUserFunT q
+                        => TFun p -> TFun q
+typedTFunToOccAnaldTFun = coerceTFun
 
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
 occAnaldTFunToTypedTFun :: TFun OccAnald -> TFun Typed
-occAnaldTFunToTypedTFun (TFun t f) =
-  TFun t (T.mapOf funType id f)
+occAnaldTFunToTypedTFun = coerceTFun
 
 
 data Var
