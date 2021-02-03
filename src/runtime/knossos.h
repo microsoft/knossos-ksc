@@ -32,6 +32,8 @@ Contents:
 
 using std::tuple;
 
+#define KS_BOUNDS_CHECK
+
 #define COMMENT(x)
 
 // KS_ASSERT
@@ -484,7 +486,7 @@ namespace ks
 		}
 
 		T const& index(index_type i) const {
-#ifndef NDEBUG
+#ifdef KS_BOUNDS_CHECK
 			if (!dimension::index_is_in_range(i, size_)) {
 				std::cerr << "ERROR: Accessing element " << dimension::index_to_string(i) << " of tensor of size " << dimension::index_to_string(size_) << std::endl;
 				abort();
