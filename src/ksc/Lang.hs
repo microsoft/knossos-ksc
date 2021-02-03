@@ -871,8 +871,7 @@ instance InPhase Typed where
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
-    where fun' = mapBaseUserFunFun (\(BaseUserFunId name ty)
-                                    -> BaseUserFunId name (Just ty)) fun
+    where fun' = mapBaseUserFunFun (T.mapOf baseUserFunT Just) fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
@@ -890,8 +889,7 @@ instance InPhase OccAnald where
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
-    where fun' = mapBaseUserFunFun (\(BaseUserFunId name ty)
-                                    -> BaseUserFunId name (Just ty)) fun
+    where fun' = mapBaseUserFunFun (T.mapOf baseUserFunT Just) fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
