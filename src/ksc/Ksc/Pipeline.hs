@@ -13,7 +13,7 @@ import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), DerivedFun(Fun),
-             TDef, Pretty, BaseUserFunId(BaseUserFunId),
+             TDef, Pretty, BaseUserFun(BaseUserFunId),
              def_fun, displayN, partitionDecls,
              pps, ppr, renderSexp)
 import LangUtils (GblSymTab, emptyGblST, extendGblST)
