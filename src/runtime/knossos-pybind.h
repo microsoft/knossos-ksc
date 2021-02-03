@@ -37,7 +37,7 @@ void declare_tensor_2(py::module &m, char const* name) {
             py::format_descriptor<T>::format(),     /* Python struct-style format descriptor */
             2,                                      /* Number of dimensions */
             { ks::get_dimension<0>(t.size()), ks::get_dimension<1>(t.size()) },         /* Buffer dimensions */
-            { sizeof(T) * ks::get_dimension<0>(t.size()),             /* Strides (in bytes) for each index */
+            { sizeof(T) * ks::get_dimension<1>(t.size()),             /* Strides (in bytes) for each index */
                sizeof(T) }
         );
     })
