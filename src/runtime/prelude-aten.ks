@@ -163,12 +163,12 @@
 
 
 
-(def addAb1t (Tensor 2 Float) ((A : Tensor 2 Float) (b : Tensor 1 Float))
+(def addA1bt (Tensor 2 Float) ((A : Tensor 2 Float) (b : Tensor 1 Float))
     (let ((M N) (size A))
-    (assert (eq M (size b))
+    (assert (eq N (size b))
         (build (tuple M N) (lam (ij : Tuple Integer Integer)
             (let ((i j) ij)
-                (add (index (tuple i j) A) (index i b))))))))
+                (add (index (tuple i j) A) (index j b))))))))
                 
 ; Applies a linear transformation to the incoming data: :math:`y = X A^T + b`.
 
@@ -184,7 +184,7 @@
 
 (def linear (Tensor 2 Float) 
     ((X : Tensor 2 Float) (A : Tensor 2 Float) (b : Tensor 1 Float))
-      (addAb1t (aten::matmul X (transpose A)) b))
+      (addA1bt (aten::matmul X (transpose A)) b))
     
 
 (def aten::dot Float ((a : Tensor 1 Float) (b : Tensor 1 Float))
