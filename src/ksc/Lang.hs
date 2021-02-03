@@ -382,9 +382,6 @@ baseUserFunBaseFun f = \case
   PrimFun p    -> pure (PrimFun p)
   SelFun i1 i2 -> pure (SelFun i1 i2)
 
-mapBaseUserFunFun :: (BaseUserFun p -> BaseUserFun q) -> (Fun p -> Fun q)
-mapBaseUserFunFun = T.mapOf (baseFunFun . baseUserFunBaseFun)
-
 baseFunFun :: Functor f
            => (funid -> f funid')
            -> (DerivedFun funid -> f (DerivedFun funid'))
@@ -871,7 +868,7 @@ instance InPhase Typed where
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
-    where fun' = mapBaseUserFunFun (T.mapOf baseUserFunT Just) fun
+    where fun' = T.mapOf (baseFunFun . baseUserFunBaseFun) (T.mapOf baseUserFunT Just) fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
@@ -889,7 +886,7 @@ instance InPhase OccAnald where
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
-    where fun' = mapBaseUserFunFun (T.mapOf baseUserFunT Just) fun
+    where fun' = T.mapOf (baseFunFun . baseUserFunBaseFun) (T.mapOf baseUserFunT Just) fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
