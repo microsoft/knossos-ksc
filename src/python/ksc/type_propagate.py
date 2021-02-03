@@ -25,7 +25,7 @@ warnings.filterwarnings("always")
 ############################################################################
 # Oops, some of this code was written by functional programmers...
 import sys
-import resource
+# import resource
 # resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY,resource.RLIM_INFINITY))
 sys.setrecursionlimit(10**6)
 

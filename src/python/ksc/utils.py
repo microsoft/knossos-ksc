@@ -10,6 +10,7 @@ import subprocess
 import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
+from tempfile import gettempdir
 
 from ksc.type import Type, tangent_type
 
@@ -283,7 +284,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 }
 """
 
-    cpp_fname = "/tmp/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
+    cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
     print(f"Saving to {cpp_fname}")    
     with open(cpp_fname, "w") as fcpp:
         fcpp.write(cpp_str)
