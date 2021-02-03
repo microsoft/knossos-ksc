@@ -83,6 +83,7 @@ aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 
 	if (dim == 1) {
 		constexpr int Dim = 1;
+		// TODO: Make a nice "concatenate" for ks tensors
 		auto sz_out = size(As[0]);
 		for(int ai = 1; ai < n; ++ai) {
 			auto sz = size(As[ai]);
@@ -97,9 +98,11 @@ aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 			auto const& A = As[ai];
 			auto sz = size(A);
 			for(int i = 0; i < get_dimension<0>(sz); ++i)
-				for(int j = 0; j < get_dimension<1>(sz); ++j) 
-					retM[get_dimension<0>(offset) + i][get_dimension<1>(offset) + j] = A[i][j];
-				
+				for(int j = 0; j < get_dimension<1>(sz); ++j) {
+					auto out_i = get_dimension<0>(offset) + i;
+					auto out_j = get_dimension<1>(offset) + j;
+					retM[out_i][out_j] = A[i][j];
+				}
 			get_dimension<Dim>(offset) += get_dimension<Dim>(sz);
 		}
 
@@ -118,7 +121,33 @@ shape$aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 tuple<tensor<1, Mat>,tuple<>>
 rev$aten$8$8cat$a$dT1T2fi$bT2f(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
 {
-	 KS_ASSERT(false)
+	auto [As, dim] = arg;
+	int n = size(As);
+
+	tensor<1, Mat> retM(alloc, n);
+	
+	if (dim == 1) {
+		constexpr int Dim = 1;
+		Mat::index_type offset = {0,0};
+		for(int ai = 0; ai < n; ++ai) {
+			auto const& A = As[ai];
+			auto sz = size(A);
+			retM[ai] = Mat(alloc, sz);
+			Mat& Mi = retM[ai];
+			for(int i = 0; i < get_dimension<0>(sz); ++i)
+				for(int j = 0; j < get_dimension<1>(sz); ++j) {
+					auto out_i = get_dimension<0>(offset) + i;
+					auto out_j = get_dimension<1>(offset) + j;
+					Mi[i][j] = dret[out_i][out_j];
+				}
+			get_dimension<Dim>(offset) += get_dimension<Dim>(sz);
+		}
+
+		return make_tuple(retM, tuple<>());
+	 }
+
+	KS_ASSERT(false)
+	return make_tuple(retM, tuple<>());
 }
 
 tuple<tensor<1, tensor<2, tuple<>>>,tuple<>> 
