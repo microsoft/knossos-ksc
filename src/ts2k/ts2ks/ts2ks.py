@@ -370,11 +370,15 @@ class time_sampler:
     def us(self):
         return self.duration() * 1e6
 
+    @staticmethod
+    def get_time():
+        return time.time_ns() * 1e-9
+
     def mark(self):
-        self.start = time.time()
+        self.start = time_sampler.get_time()
 
     def record(self):
-        delta = time.time() - self.start
+        delta = time_sampler.get_time() - self.start
         if self.minimizing:
             self.time = min(delta, self.time)
         else:
