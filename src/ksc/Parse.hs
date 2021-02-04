@@ -341,8 +341,7 @@ mk_fun f mty = case find_dollar f of
   Just ("get", s) -> Fun     (mk_sel_fun s)
   _               -> Fun     (mk_fun_id f)
   where
-    mk_fun_id f | isPrimFun f = PrimFun f
-                | otherwise   = BaseUserFun (BaseUserFunId f mty)
+    mk_fun_id f = BaseUserFun (BaseUserFunId f mty)
     find_dollar f = case break (== '$') f of
       (_, [])  -> Nothing  -- No $
       (_, [_]) -> Nothing  -- Trailing $
@@ -351,8 +350,16 @@ mk_fun f mty = case find_dollar f of
       (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
       _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
 
+pPrimFun :: Parser (BaseFun p)
+pPrimFun = try $ do { f <- pIdentifier
+                    ; when (not (isPrimFun f))
+                           (unexpected (f ++ " is not a PrimFun"))
+                    ; pure (PrimFun f)
+                    }
+
 pFun :: Parser (Fun Parsed)
-pFun = do { f <- pIdentifier
+pFun = Fun <$> pPrimFun
+   <|> do { f <- pIdentifier
           ; do { pReserved "@"
                ; ty <- pType
                ; let userfun = mk_fun f (Just ty)
