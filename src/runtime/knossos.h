@@ -470,7 +470,7 @@ namespace ks {
 	template<size_t I, typename TupleType> int get_dimension(TupleType const& t) { return ks::get<I>(t); }
 	template<size_t I> int get_dimension(int val) { static_assert(I == 0); return val; }
 
-	template<size_t I, typename TupleType> int& get_dimension(TupleType& t) { return std::get<I>(t); }
+	template<size_t I, typename TupleType> int& get_dimension(TupleType& t) { return ks::get<I>(t); }
 	template<size_t I> int& get_dimension(int& val) { static_assert(I == 0); return val; }
 
 	template <size_t Dim, class T>

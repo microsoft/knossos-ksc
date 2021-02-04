@@ -72,9 +72,61 @@ void declare_tensor_1(py::module &m, char const* name) {
     ;
 }
 
+template <class T>
+auto to_std_tuple(T const& t)
+{
+    return t;
+}
+
+template<typename TupleT, size_t ...Indices>
+auto to_std_tuple_impl(TupleT const& t, std::index_sequence<Indices...>)
+{
+  return std::make_tuple(to_std_tuple(ks::get<Indices>(t))...);
+}
+
+template<typename ...Ts>
+auto to_std_tuple(ks::tuple<Ts...> const& t)
+{
+  return to_std_tuple_impl(t, std::index_sequence_for<Ts...>{});
+}
+
+template <class T>
+auto to_ks_tuple(T const& t)
+{
+    return t;
+}
+
+template<typename TupleT, size_t ...Indices>
+auto to_ks_tuple_impl(TupleT const& t, std::index_sequence<Indices...>)
+{
+  return ks::make_tuple(to_std_tuple(std::get<Indices>(t))...);
+}
+
+template<typename ...Ts>
+auto to_ks_tuple(std::tuple<Ts...> const& t)
+{
+  return to_ks_tuple_impl(t, std::index_sequence_for<Ts...>{});
+}
+
+/*
+	template<typename TupleT, typename F, size_t ...Indices>
+	auto transform_tuple_impl(TupleT const& t, F f, std::index_sequence<Indices...>)
+	{
+		return ks::make_tuple(f(ks::get<Indices>(t))...);
+	}
+
+	template<typename ...Ts, typename F>
+	auto transform_tuple(tuple<Ts...> const& t, F f)
+	{
+		return transform_tuple_impl(t, f, std::index_sequence_for<Ts...>{});
+	}
+*/
+
 
 // Convert functor to one which takes a first argument g_alloc 
 template<typename RetType, typename... ParamTypes>
 auto with_ks_allocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f](ParamTypes... params) { return f(&g_alloc, params...); };
+  return [f](ParamTypes... params) { // TODO: these need to be std::tuple s 
+    return to_std_tuple(f(&g_alloc, to_ks_tuple(params)...)); 
+  };
 }

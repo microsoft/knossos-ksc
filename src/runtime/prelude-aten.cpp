@@ -29,7 +29,7 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,double> const& A, tensor<2,do
 	auto [r,K] = size(A);
 	auto [K_,c] = size(B);
   KS_ASSERT(K == K_);
-	tensor<2,double> ret(alloc, std::make_tuple(r, c));
+	tensor<2,double> ret(alloc, make_tuple(r, c));
 	for(int i = 0; i < r; ++i)
 		for(int j = 0; j < c; ++j) {
 			double tot = 0;
@@ -41,7 +41,7 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,double> const& A, tensor<2,do
 }
 
 tuple<tensor<2,double>,tensor<1,double>> 
-rev$aten$8$8matmul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2,double>, tensor<1,double>> const& M_v, tensor<1,double> const& dr)
+rev$aten$8$8matmul$a$dT2fT1f$bT1f(allocator * alloc, tuple<tensor<2,double>, tensor<1,double>> const& M_v, tensor<1,double> const& dr)
 {
   auto [M, v] = M_v;
 	auto [r, c] = size(M);
@@ -59,7 +59,7 @@ rev$aten$8$8matmul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2,double>
 		retv[i] = retvi;
 	}
 
-	return std::make_tuple(retM,retv);
+	return make_tuple(retM,retv);
 }
 
 typedef tensor<2, double> Mat;
