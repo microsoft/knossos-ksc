@@ -123,10 +123,12 @@ auto to_ks_tuple(std::tuple<Ts...> const& t)
 */
 
 
+template<typename T> using to_std_tuple_t = decltype(to_std_tuple(T{}));
+
 // Convert functor to one which takes a first argument g_alloc 
 template<typename RetType, typename... ParamTypes>
 auto with_ks_allocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f](ParamTypes... params) { // TODO: these need to be std::tuple s 
+  return [f](to_std_tuple_t<ParamTypes>... params) {
     return to_std_tuple(f(&g_alloc, to_ks_tuple(params)...)); 
   };
 }
