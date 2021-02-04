@@ -88,7 +88,7 @@ Notes:
 -}
 
 
-import Lang hiding (parens)
+import Lang hiding (parens, brackets)
 import Prim
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
@@ -97,7 +97,6 @@ import Text.Parsec.String (Parser)
 
 import qualified Text.Parsec.Token as Tok
 
-import Data.Maybe ( isNothing )
 import Control.Monad
 import Text.Read ( readMaybe )
 
@@ -144,8 +143,8 @@ langDef = Tok.LanguageDef
 --  , Tok.identLetter     = alphaNum <|> oneOf "_'"
 --  , Tok.opStart         = oneOf ":!#$%&*+./<=>?@\\^|-~"
 --  , Tok.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Tok.identStart      = letter <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~[]"
-  , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~[]"
+  , Tok.identStart      = letter <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~"
+  , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
@@ -161,6 +160,9 @@ lexer = Tok.makeTokenParser langDef
 
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
+
+brackets :: Parser a -> Parser a
+brackets = Tok.brackets lexer
 
 pReserved :: String -> Parser ()
 pReserved = Tok.reserved lexer
@@ -319,34 +321,6 @@ pIsUserFun fun = case maybeUserFun fun of
   Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ show fun)
   Just userFun -> pure userFun
 
---------------------------------------------
---  Parsing function names
---------------------------------------------
-
-mk_fun :: String -> Maybe Type -> Fun Parsed
--- Parses the print-name of a top-level function into a Fun
--- In particular,
---
---   * Recognises D$f as (Grad f Fwd) etc
---     Keep this in sync with pprFun
---
---   * Distinguishes PrimFun from BaseUserFun
-mk_fun f mty = case find_dollar f of
-  Just ("D",   s)  -> GradFun (mk_fun_id s) BasicAD
-  Just ("Dt",   s) -> GradFun (mk_fun_id s) TupleAD
-  Just ("fwd", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Fwd)
-  Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
-  Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
-  Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
-  Just ("shape", s) -> ShapeFun (mk_fun s mty)
-  _               -> Fun     (mk_fun_id f)
-  where
-    mk_fun_id f = BaseUserFun (BaseUserFunId f mty)
-    find_dollar f = case break (== '$') f of
-      (_, [])  -> Nothing  -- No $
-      (_, [_]) -> Nothing  -- Trailing $
-      (prefix, _ : suffix) -> Just (prefix, suffix)
-
 pPrimFun :: Parser (BaseFun p)
 pPrimFun = try $ do { f <- pIdentifier
                     ; when (not (isPrimFun f))
@@ -370,20 +344,33 @@ pSelFun = do { rest <- try $ do { f <- pIdentifier
                  Just selfun -> pure selfun
              }
 
+pBaseUserFun :: Parser (BaseFun Parsed)
+pBaseUserFun = BaseUserFun <$>
+    (brackets (do { f  <- pIdentifier
+                  ; ty <- pType
+                  ; pure (BaseUserFunId f (Just ty))
+                  })
+     <|> do { f <- pIdentifier
+            ; pure (BaseUserFunId f Nothing)
+            })
+
+pBaseFun :: Parser (BaseFun Parsed)
+pBaseFun = pSelFun
+       <|> pPrimFun
+       <|> pBaseUserFun
+
 pFun :: Parser (Fun Parsed)
-pFun = Fun <$> pSelFun
-   <|> Fun <$> pPrimFun
-   <|> do { f <- pIdentifier
-          ; do { pReserved "@"
-               ; ty <- pType
-               ; let userfun = mk_fun f (Just ty)
-               ; when (notUserFun userfun)
-                      (unexpected "Didn't exect to see a type application on non-UserFun")
-               ; pure userfun
-               }
-            <|> (pure (mk_fun f Nothing))
-          }
-  where notUserFun = isNothing . maybeUserFun
+pFun = try (brackets $
+            ((pBaseDerivation "D" GradFun BasicAD)
+         <|> (pBaseDerivation "Dt" GradFun TupleAD)
+         <|> (pBaseDerivation "fwd" DrvFun (AD BasicAD Fwd))
+         <|> (pBaseDerivation "fwdt" DrvFun (AD TupleAD Fwd))
+         <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
+         <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
+         <|> (pReserved "shape" >> ShapeFun <$> pFun)))
+   <|> Fun <$> pBaseFun
+  where pBaseDerivation s f p =
+          pReserved s >> flip f p <$> pBaseFun
 
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
