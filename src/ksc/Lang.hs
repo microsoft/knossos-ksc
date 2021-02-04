@@ -950,10 +950,10 @@ pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 
 pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
 pprDerivedFun f (Fun s)                   = f s
-pprDerivedFun f (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> f s
-pprDerivedFun f (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> f s
-pprDerivedFun f (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> f s
-pprDerivedFun f (ShapeFun sf)             = text "shape$" <> pprDerivedFun f sf
+pprDerivedFun f (GradFun  s adp)          = brackets (char 'D'   <> ppr adp <+> f s)
+pprDerivedFun f (DrvFun   s (AD adp Fwd)) = brackets (text "fwd" <> ppr adp <+> f s)
+pprDerivedFun f (DrvFun   s (AD adp Rev)) = brackets (text "rev" <> ppr adp <+> f s)
+pprDerivedFun f (ShapeFun sf)             = brackets (text "shape" <+> pprDerivedFun f sf)
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p

@@ -5,18 +5,18 @@
 
 ; dot
 (edef dot Float ((Vec Float) (Vec Float)))
-(edef D$dot (LM (Tuple (Vec Float) (Vec Float)) Float)
+(edef [D dot] (LM (Tuple (Vec Float) (Vec Float)) Float)
              ((Vec Float) (Vec Float)))
-(edef Dt$dot (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
+(edef [Dt dot] (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
               ((Vec Float) (Vec Float)))
 (edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
-(def fwd$dot Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
+(def [fwd dot] Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
      (let ((a  (get$1$2 a_b))
            (b  (get$2$2 a_b))
            (da (get$1$2 da_db))
            (db (get$2$2 da_db)))
     (add (dot a db) (dot da b))))
-(def rev$dot (Tuple (Vec Float) (Vec Float))
+(def [rev dot] (Tuple (Vec Float) (Vec Float))
                ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
      (let ((a  (get$1$2 a_b))
            (b  (get$2$2 a_b)))
@@ -161,7 +161,7 @@
           (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (ts_add x dx) (ts_add alphas dalphas) (ts_add mus dmus) (ts_add qs dqs) (ts_add ls dls) (ts_add wishart dwishart)))
 
           (gmm_fd (sub gmm_at_theta_plus_dtheta gmm_at_theta))
-          (gmm_fwd (fwd$gmm_knossos_gmm_objective
+          (gmm_fwd ([fwd gmm_knossos_gmm_objective]
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)))
 
@@ -188,7 +188,7 @@
 
           ; Check <grad_f, dx> = f(x+dx) - f(x)
           ; with grad_f = f`(x, 1.0)
-          (grad_gmm (rev$gmm_knossos_gmm_objective (tuple x alphas mus qs ls wishart) 1.0))
+          (grad_gmm ([rev gmm_knossos_gmm_objective] (tuple x alphas mus qs ls wishart) 1.0))
           (grad_gmm_x          (get$1$6 grad_gmm))
           (grad_gmm_alphas     (get$2$6 grad_gmm))
           (grad_gmm_mus        (get$3$6 grad_gmm))
@@ -228,7 +228,7 @@
                                                   (Vec (Vec Float))
                                                   (Tuple Float Integer))
                                            Float)
-                                (rev$gmm_knossos_gmm_objective t))
+                                ([rev gmm_knossos_gmm_objective] t))
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)

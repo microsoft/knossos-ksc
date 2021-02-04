@@ -2,7 +2,7 @@
  (let (n (size v))
    (build n (lam (i : Integer) (exp (index i v))))))
 
-(def sum@V[[Float]] Float (v : Vec Float)
+(def sum@VFloat Float (v : Vec Float)
    (sum v))
 
 (def log@Float Float (v : Float)
@@ -50,11 +50,11 @@
 (def sub@Float,Float Float ((a : Float) (b : Float))
    (sub a b))
 
-(def sub@V[[Float]],Float (Vec Float) ((a : Vec Float) (b : Float))
+(def sub@VFloat,Float (Vec Float) ((a : Vec Float) (b : Float))
   (let (n (size a))
     (build n (lam (i : Integer) (sub (index i a) b)))))
 
-(def sub@V[[Float]],V[[Float]] (Vec Float) ((a : Vec Float) (b : Vec Float))
+(def sub@VFloat,VFloat (Vec Float) ((a : Vec Float) (b : Vec Float))
   (let (n (size a))
     (build n (lam (i : Integer) (sub (index i a) (index i b))))))
 

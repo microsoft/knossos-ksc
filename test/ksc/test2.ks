@@ -23,6 +23,6 @@
             (f7 v1 v1) "\n"
             ; See https://github.com/awf/knossos/issues/281 (D$f7 v1 v1)
             ; See https://github.com/awf/knossos/issues/281 (D$f1 1.1 2.3 2)
-            (fwd$f1 (tuple 1.1 2.3 3) (tuple 0.0 1.0 (tuple))) "\n"
-            (fwd$f1 (tuple 1.1 2.3 3) (tuple 1.0 0.0 (tuple))) "\n"
+            ([fwd f1] (tuple 1.1 2.3 3) (tuple 0.0 1.0 (tuple))) "\n"
+            ([fwd f1] (tuple 1.1 2.3 3) (tuple 1.0 0.0 (tuple))) "\n"
             )))
