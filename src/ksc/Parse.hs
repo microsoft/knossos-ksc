@@ -99,6 +99,7 @@ import qualified Text.Parsec.Token as Tok
 
 import Data.Maybe ( isNothing )
 import Control.Monad
+import Text.Read ( readMaybe )
 
 --import Test.Hspec
 
@@ -338,7 +339,6 @@ mk_fun f mty = case find_dollar f of
   Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
   Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
   Just ("shape", s) -> ShapeFun (mk_fun s mty)
-  Just ("get", s) -> Fun     (mk_sel_fun s)
   _               -> Fun     (mk_fun_id f)
   where
     mk_fun_id f = BaseUserFun (BaseUserFunId f mty)
@@ -346,9 +346,6 @@ mk_fun f mty = case find_dollar f of
       (_, [])  -> Nothing  -- No $
       (_, [_]) -> Nothing  -- Trailing $
       (prefix, _ : suffix) -> Just (prefix, suffix)
-    mk_sel_fun s = case break (== '$') s of
-      (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
-      _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
 
 pPrimFun :: Parser (BaseFun p)
 pPrimFun = try $ do { f <- pIdentifier
@@ -357,8 +354,25 @@ pPrimFun = try $ do { f <- pIdentifier
                     ; pure (PrimFun f)
                     }
 
+pSelFun :: Parser (BaseFun p)
+pSelFun = do { rest <- try $ do { f <- pIdentifier
+                                ; case break (== '$') f of
+                                    ("get", '$':rest) -> pure rest
+                                    _ -> unexpected "Did not start with get$"
+                                }
+             ; let mselfun = do { (istring, '$':nstring) <- pure (break (== '$') rest)
+                                ; i <- readMaybe istring
+                                ; n <- readMaybe nstring
+                                ; pure (SelFun i n)
+                                }
+             ; case mselfun of
+                 Nothing     -> unexpected "Ill-formed get"
+                 Just selfun -> pure selfun
+             }
+
 pFun :: Parser (Fun Parsed)
-pFun = Fun <$> pPrimFun
+pFun = Fun <$> pSelFun
+   <|> Fun <$> pPrimFun
    <|> do { f <- pIdentifier
           ; do { pReserved "@"
                ; ty <- pType
