@@ -363,6 +363,7 @@ pDecl :: Parser Decl
 pDecl = parens $
              (DefDecl  <$> pDef)
         <|>  (DefDecl  <$> pEdef)
+        <|>  (DefDecl  <$> pGdef)
         <|>  (RuleDecl <$> pRule)
 
 pDecls :: Parser [Decl]

@@ -17,11 +17,12 @@ import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD, TupleAD),
              Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
              FunId(UserFun), TDef, Pretty,
              def_fun, displayN, partitionDecls,
-             pps, ppr, renderSexp)
+             ppr, renderSexp)
 import qualified Lang as L
-import LangUtils (GblSymTab, emptyGblST, extendGblST,lookupGblST)
+import LangUtils (GblSymTab, emptyGblST, lookupGblST)
 import qualified Ksc.Futhark
 import Parse (parseF)
+import Prim (extendGblST)
 import Rules (RuleBase, mkRuleBase)
 import Opt (optDefs, optDef)
 import Shapes (shapeDefs)
@@ -221,31 +222,15 @@ displayCppGenDefsDiffs ::
    -> GblSymTab
    -> KMT IO (GblSymTab, [TDef]))
   -> Maybe Int -> [String] -> String -> String -> IO (String, String)
-displayCppGenDefsDiffs generateDefs generateDiffs generateShapes verbosity ksFiles ksofile cppfile =
-  let dd defs = mapM_ (liftIO . putStrLn . ("...\n" ++) . pps . flip take defs) verbosity
-      display = displayPassM verbosity
-  in
+displayCppGenDefsDiffs _generateDefs _generateDiffs _generateShapes _verbosity ksFiles ksofile cppfile =
   runKM $
   do {
   ; decls0 <- liftIO (fmap concat (mapM parseF ksFiles))
   ; liftIO $ putStrLn "read decls"
 
-  ; let (main, decls)    = moveMain decls0
-  ; dd main
+  ; defs <- newPipeline decls0
 
-  ; (defs, env, rulebase) <- generateDefs display decls
-  ; (env3, optdiffs) <- generateDiffs display defs env rulebase
-  ; (env4, shapedefs) <- generateShapes display (defs ++ optdiffs) env3
-
-  ; (env5, ann_main) <- annotDecls env4 main
-
-  ; let (_rules, main_tdef) = partitionDecls ann_main
-
-  ; let alldefs = defs ++ optdiffs ++ shapedefs ++ main_tdef
-
-  ; cse <- anfOptAndCse display rulebase env5 alldefs
-
-  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile cse)
+  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile defs)
   }
 
 displayCppGenDiffs :: (DisplayLint
@@ -412,7 +397,9 @@ newPipeline decls = do
                                               L.typeof pat) env of
                       -- Handle this error better
                       Nothing -> fail ("Missing function: "
-                                       ++ show (funName, L.typeof pat))
+                                       ++ show (funName, L.typeof pat)
+                                       ++ "\n"
+                                       ++ show (ppr env))
                       Just tdef' -> pure tdef'
 
                   ; let L.AD plan dir = mode
@@ -420,7 +407,7 @@ newPipeline decls = do
                   ; (_env, mgradDef) <- gradDef plan env tdef
 
                   ; gradDef <- case mgradDef of
-                      Nothing -> fail ("Couldn't grat "
+                      Nothing -> fail ("Couldn't grad "
                                        ++ show (funName, L.typeof pat))
                       Just gradDef' -> pure gradDef'
 
@@ -436,7 +423,7 @@ newPipeline decls = do
 
             }
 
-  ; (_env, defs) <- mapAccumLM f emptyGblST defs
+  ; (_env, defs) <- mapAccumLM f env defs
 
   ; pure (concat defs)
   }

@@ -26,8 +26,7 @@ module LangUtils (
   LangUtils.hspec, test_FreeIn,
 
   -- Symbol table
-  GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
-  stInsertFun,
+  GblSymTab, lookupGblST, emptyGblST, modifyGblST,
   LclSymTab, extendLclST,
   SymTab(..), newSymTab, emptySymTab,
 
@@ -234,14 +233,8 @@ emptySymTab = ST { gblST = M.empty, lclST = M.empty }
 newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
-stInsertFun :: TDef -> GblSymTab -> GblSymTab
-stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (f, patType arg) def
-
 lookupGblST :: HasCallStack => (Fun, Type) -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
-
-extendGblST :: GblSymTab -> [TDef] -> GblSymTab
-extendGblST = foldl (flip stInsertFun)
 
 modifyGblST :: (GblSymTab -> GblSymTab) -> SymTab -> SymTab
 modifyGblST g = \env -> env { gblST = g (gblST env) }

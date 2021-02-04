@@ -17,6 +17,9 @@
 (def f Float ((x : Float) (y : Float))
     (div x y))
 
+(gdef fwd$f Float (Float Float))
+(gdef rev$f1 Float (Float Float))
+
 (def main Integer ()
     (let ((x 1.1)
           (y 2.2)
