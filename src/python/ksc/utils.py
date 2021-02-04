@@ -165,7 +165,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
 
     return out
 
-def build_py_module_from_cpp(cpp_str):
+def build_py_module_from_cpp(cpp_str, profiling=False):
     _ksc_path,ksc_runtime_dir = get_ksc_paths()
     pybind11_path = get_ksc_dir() + "/pybind11"
 
@@ -192,6 +192,7 @@ def build_py_module_from_cpp(cpp_str):
                  " -std=c++17"
                  " -O3"
                  " -fPIC"
+                 + (" -g -pg -O3" if profiling else "") +
                  " -shared"
                  f" -DPYTHON_MODULE_NAME={module_name}"
                  f" -o {module_path} "
