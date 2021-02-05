@@ -151,7 +151,7 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
     module_name = os.path.basename(module_path).split(".")[0]
     python_includes = subprocess_run(
         [sys.executable, "-m", "pybind11", "--includes"],
-        env={"PYTHONPATH": "pybind11"}
+        env={"PYTHONPATH": "extern/pybind11"}
     )
     try:
         cmd = (f"g++-7 -I{ksc_runtime_dir} -I{pybind11_path}/include "
@@ -176,7 +176,7 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
 def arg_type_strings(types):
     return "".join(t.shortstr() for t in types)
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, pybind11_path="pybind11"):
+def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, pybind11_path="extern/pybind11"):
 
     cpp_str = """
 #include <pybind11/pybind11.h>
