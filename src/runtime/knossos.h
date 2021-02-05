@@ -876,18 +876,18 @@ namespace ks
 	template<typename T>
 	struct make_zero_t
 	{
-		static T ofShape(allocator_base *, std::tuple<>) { return 0; }
+		static T ofShape(allocator_base *, ks::tuple<>) { return 0; }
 	};
 
 	template<typename ...Ts>
-	struct make_zero_t<std::tuple<Ts...>>
+	struct make_zero_t<ks::tuple<Ts...>>
 	{
 		template<size_t ...Indices>
-		static std::tuple<Ts...> ofShapeImpl(allocator_base * alloc, shape_t<std::tuple<Ts...>> const& shape, std::index_sequence<Indices...>) {
-			return std::make_tuple(make_zero_t<Ts>::ofShape(alloc, std::get<Indices>(shape))...);
+		static ks::tuple<Ts...> ofShapeImpl(allocator_base * alloc, shape_t<ks::tuple<Ts...>> const& shape, std::index_sequence<Indices...>) {
+			return ks::make_tuple(make_zero_t<Ts>::ofShape(alloc, ks::get<Indices>(shape))...);
 		}
 
-		static std::tuple<Ts...> ofShape(allocator_base * alloc, shape_t<std::tuple<Ts...>> const& shape) {
+		static ks::tuple<Ts...> ofShape(allocator_base * alloc, shape_t<ks::tuple<Ts...>> const& shape) {
 			return ofShapeImpl(alloc, shape, std::index_sequence_for<Ts...>{});
 		}
 	};
@@ -1182,14 +1182,14 @@ namespace ks
 
 		template<class T, class F, class LoopSize, class ...HigherDimensionIndices>
 		static void do_buildFromSparse(allocator * alloc, T* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(loopSize);
+			int thisDimension = ks::get<sizeof...(HigherDimensionIndices)>(loopSize);
 			for (int i = 0; i != thisDimension; ++i)
 				buildFromSparse_t<Dim - 1>::do_buildFromSparse(alloc, acc, loopSize, f, higherDimensionIndices..., i);
 		}
 
 		template<class T, class F, class LoopSize, class ...HigherDimensionIndices>
 		static void do_buildFromSparseTupled(allocator * alloc, T* acc, LoopSize const& loopSize, F f, HigherDimensionIndices ...higherDimensionIndices) {
-			int thisDimension = std::get<sizeof...(HigherDimensionIndices)>(loopSize);
+			int thisDimension = ks::get<sizeof...(HigherDimensionIndices)>(loopSize);
 			for (int i = 0; i != thisDimension; ++i)
 				buildFromSparse_t<Dim - 1>::do_buildFromSparseTupled(alloc, acc, loopSize, f, higherDimensionIndices..., i);
 		}	};
@@ -1199,12 +1199,12 @@ namespace ks
 	{
 		template<size_t Dim, class T, class LambdaResultElementT>
 		static void buildFromSparse_addOneIteration(tensor<Dim, T>* accElement, LambdaResultElementT const& lambdaResultElement) {
-			inplace_add(&(accElement->index(std::get<0>(lambdaResultElement))), std::get<1>(lambdaResultElement));
+			inplace_add(&(accElement->index(ks::get<0>(lambdaResultElement))), ks::get<1>(lambdaResultElement));
 		}
 
 		template<class T, class LambdaResultT, size_t ...Indices>
 		static void buildFromSparseTupled_addOneIteration(T* acc, LambdaResultT const& lambdaResult, std::index_sequence<Indices...>) {
-			(buildFromSparse_addOneIteration(&std::get<Indices>(*acc), std::get<Indices>(lambdaResult)), ...);
+			(buildFromSparse_addOneIteration(&ks::get<Indices>(*acc), ks::get<Indices>(lambdaResult)), ...);
 		}
 
 		template<size_t Dim, class T, class F, class LoopSize, class ...HigherDimensionIndices>
