@@ -1,18 +1,7 @@
-/* There's a lot of duplication between this and mnistcnnpy.cpp, but
- * we will follow the Rule of Three
- *
- *    https://en.wikipedia.org/wiki/Rule_of_three_(computer_programming)
- */
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/operators.h>
-
-namespace py = pybind11;
+#include "knossos-pybind.h"
 
 #include "gmm.cpp"
-
-ks::allocator g_alloc{ 1'000'000'000 };
 
 template<typename T>
 void declare_vec(py::module &m, std::string typestr) {
@@ -25,11 +14,6 @@ void declare_vec(py::module &m, std::string typestr) {
 	return a[b];
       })
     .def("__len__", [](const ks::vec<T> &a) { return a.size(); });
-}
-
-template<typename RetType, typename... ParamTypes>
-auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f](ParamTypes... params) { return f(&g_alloc, params...); };
 }
 
 // In the future it might make more sense to move the vec type
@@ -48,6 +32,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("gmm_knossos_gmm_objective", withGlobalAllocator(&ks::gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
-  m.def("rev_gmm_knossos_gmm_objective", withGlobalAllocator(&ks::rev$gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
+  m.def("gmm_knossos_gmm_objective", with_ks_allocator(&ks::gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
+  m.def("rev_gmm_knossos_gmm_objective", with_ks_allocator(&ks::rev$gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
 }
