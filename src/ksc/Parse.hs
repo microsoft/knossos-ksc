@@ -367,18 +367,25 @@ pBaseFun = pSelFun
        <|> pPrimFun
        <|> pBaseUserFun
 
-pFun :: Parser (Fun Parsed)
-pFun = try (brackets $
+pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
+pFunG pBase = try (brackets $
             ((pBaseDerivation "D" GradFun BasicAD)
          <|> (pBaseDerivation "Dt" GradFun TupleAD)
          <|> (pBaseDerivation "fwd" DrvFun (AD BasicAD Fwd))
          <|> (pBaseDerivation "fwdt" DrvFun (AD TupleAD Fwd))
          <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
          <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
-         <|> (pReserved "shape" >> ShapeFun <$> pFun)))
-   <|> Fun <$> pBaseFun
-  where pBaseDerivation s f p =
-          pReserved s >> flip f p <$> pBaseFun
+         <|> (pReserved "shape" >> ShapeFun <$> pFunG pBase)))
+   <|> Fun <$> pBase
+  where pBaseDerivation :: String
+                        -> (BaseFun p -> b -> b1)
+                        -> b
+                        -> Parser b1
+        pBaseDerivation s f p =
+          pReserved s >> flip f p <$> pBase
+
+pFun :: Parser (Fun Parsed)
+pFun = pFunG pBaseFun
 
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
