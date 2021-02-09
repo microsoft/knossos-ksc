@@ -379,19 +379,19 @@ primCallResultTy_maybe fun arg_ty
       Fun (SelFun i n) -> selCallResultTy_maybe i n arg_ty
 
       GradFun f adp
-        -> case primCallResultTy_maybe (Fun f) arg_ty of
+        -> case primCallResultTy_maybe f arg_ty of
             Left err -> Left err
             Right res_ty -> Right (mkGradType adp arg_ty res_ty)
 
       DrvFun f adm
         | AD BasicAD Fwd <- adm    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
         , TypeTuple [x, _dx] <- arg_ty
-        , Right t_ty <- primCallResultTy_maybe (Fun f) x
+        , Right t_ty <- primCallResultTy_maybe f x
         -> Right (tangentType t_ty)
 
         | AD TupleAD Fwd <- adm    -- f :: S1 -> T, then fwdt$f :: (S1, S2_t) -> (T,T_t)
         , TypeTuple [x, _dx] <- arg_ty
-        , Right t_ty <- primCallResultTy_maybe (Fun f) x
+        , Right t_ty <- primCallResultTy_maybe f x
         -> Right (TypeTuple [t_ty, tangentType t_ty])
 
         | AD BasicAD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t

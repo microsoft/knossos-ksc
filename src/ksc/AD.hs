@@ -19,8 +19,7 @@ import Data.Maybe (mapMaybe, fromMaybe)
 --------------- Generate names for gradded indentifiers
 
 gradF :: HasCallStack => ADPlan -> Fun Typed -> Fun Typed
-gradF adm (Fun f) = GradFun f adm
-gradF _   f       = error ("gradF: bad function: " ++ show f)
+gradF adm f = GradFun f adm
 
 gradV :: ADPlan -> Var -> Var
 gradV adp (Simple x) = Grad x adp
@@ -53,7 +52,7 @@ gradDefInner adp
         (Def { def_fun = Fun f, def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
-    Def { def_fun    = GradFun f adp
+    Def { def_fun    = GradFun (Fun f) adp
         , def_pat    = VarPat params
         , def_res_ty = mkGradType adp s_ty res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs')) }

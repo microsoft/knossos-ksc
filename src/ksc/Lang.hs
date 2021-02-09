@@ -352,10 +352,10 @@ deriving instance Ord  (BaseUserFunT p) => Ord  (BaseFun p)
 deriving instance Show (BaseUserFunT p) => Show (BaseFun p)
 
 data DerivedFun funid
-                = Fun      funid         -- The function              f(x)
-                | GradFun  funid ADPlan  -- Full Jacobian Df(x)
-                | DrvFun   funid ADMode  -- Derivative derivative f'(x,dx)
-                                         --   Rev <=> reverse mode f`(x,dr)
+                = Fun      funid                      -- The function              f(x)
+                | GradFun  (DerivedFun funid) ADPlan  -- Full Jacobian Df(x)
+                | DrvFun   (DerivedFun funid) ADMode  -- Derivative derivative f'(x,dx)
+                                                      --   Rev <=> reverse mode f`(x,dr)
                 | ShapeFun (DerivedFun funid)
                 deriving (Eq, Ord, Show)
 
@@ -387,8 +387,8 @@ baseFunFun :: Functor f
            -> (DerivedFun funid -> f (DerivedFun funid'))
 baseFunFun f = \case
   Fun fi       -> fmap Fun (f fi)
-  GradFun fi p -> fmap (\f' -> GradFun f' p) (f fi)
-  DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (f fi)
+  GradFun fi p -> fmap (\f' -> GradFun f' p) (baseFunFun f fi)
+  DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (baseFunFun f fi)
   ShapeFun ff  -> fmap ShapeFun (baseFunFun f ff)
 
 userFunBaseType :: forall p f. (InPhase p, Applicative f)
@@ -422,8 +422,8 @@ addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = \case
   Fun f -> Fun (BaseUserFun f)
-  GradFun f p -> GradFun (BaseUserFun f) p
-  DrvFun f m -> DrvFun (BaseUserFun f) m
+  GradFun f p -> GradFun (userFunToFun f) p
+  DrvFun f m -> DrvFun (userFunToFun f) m
   ShapeFun f -> ShapeFun (userFunToFun f)
 
 -- A 'Fun p' is Either:
@@ -435,10 +435,10 @@ perhapsUserFun = \case
   Fun f -> either (Left . Fun) (Right . Fun) (baseFunToBaseUserFunE f)
   GradFun f p -> either (\f' -> Left $ GradFun f' p)
                         (\f' -> Right $ GradFun f' p)
-                        (baseFunToBaseUserFunE f)
+                        (perhapsUserFun f)
   DrvFun f m -> either (\f' -> Left $ DrvFun f' m)
                        (\f' -> Right $ DrvFun f' m)
-                       (baseFunToBaseUserFunE f)
+                       (perhapsUserFun f)
   ShapeFun f -> either (Left . ShapeFun) (Right . ShapeFun) (perhapsUserFun f)
 
 maybeUserFun :: Fun p -> Maybe (UserFun p)
@@ -469,8 +469,8 @@ isSelFun = \case
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun = \case
   Fun f       -> f
-  GradFun f _ -> f
-  DrvFun f _  -> f
+  GradFun f _ -> baseFunOfFun f
+  DrvFun f _  -> baseFunOfFun f
   ShapeFun f  -> baseFunOfFun f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
@@ -950,9 +950,9 @@ pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 
 pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
 pprDerivedFun f (Fun s)                   = f s
-pprDerivedFun f (GradFun  s adp)          = brackets (char 'D'   <> ppr adp <+> f s)
-pprDerivedFun f (DrvFun   s (AD adp Fwd)) = brackets (text "fwd" <> ppr adp <+> f s)
-pprDerivedFun f (DrvFun   s (AD adp Rev)) = brackets (text "rev" <> ppr adp <+> f s)
+pprDerivedFun f (GradFun  s adp)          = brackets (char 'D'   <> ppr adp <+> pprDerivedFun f s)
+pprDerivedFun f (DrvFun   s (AD adp Fwd)) = brackets (text "fwd" <> ppr adp <+> pprDerivedFun f s)
+pprDerivedFun f (DrvFun   s (AD adp Rev)) = brackets (text "rev" <> ppr adp <+> pprDerivedFun f s)
 pprDerivedFun f (ShapeFun sf)             = brackets (text "shape" <+> pprDerivedFun f sf)
 
 instance Pretty Pat where

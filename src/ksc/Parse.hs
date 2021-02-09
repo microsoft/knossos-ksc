@@ -367,10 +367,11 @@ pFun = try (brackets $
          <|> (pBaseDerivation "fwdt" DrvFun (AD TupleAD Fwd))
          <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
          <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
+         -- TODO
          <|> (pReserved "shape" >> ShapeFun <$> pFun)))
    <|> Fun <$> pBaseFun
   where pBaseDerivation s f p =
-          pReserved s >> flip f p <$> pBaseFun
+          pReserved s >> flip f p <$> pFun
 
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)

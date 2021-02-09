@@ -614,11 +614,11 @@ cgenBaseFun = \case
 cgenUserFun :: HasCallStack => Fun Typed -> String
 cgenUserFun f = case f of
   Fun baseFun   -> cgenBaseFun baseFun
-  GradFun  s _  -> "D$" ++ cgenBaseFun s
-  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenBaseFun s
-  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenBaseFun s
-  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenBaseFun s
-  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenBaseFun s
+  GradFun  s _  -> "D$" ++ cgenUserFun s
+  DrvFun   s (AD BasicAD Fwd) -> "fwd$" ++ cgenUserFun s
+  DrvFun   s (AD BasicAD Rev) -> "rev$" ++ cgenUserFun s
+  DrvFun   s (AD TupleAD Fwd) -> "fwdt$" ++ cgenUserFun s
+  DrvFun   s (AD TupleAD Rev) -> "revt$" ++ cgenUserFun s
   ShapeFun ff   -> "shape$" ++ cgenUserFun ff
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
@@ -719,7 +719,7 @@ ctypeofFun env (TFun ty f) ctys
 
 ctypeofFun1 :: HasCallStack => Type -> Fun Typed -> [CType] -> CType
 ctypeofFun1 ty (Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
-ctypeofFun1 (TypeLM _ _) (GradFun f _) ctys = ctypeofGradBuiltin f ctys
+ctypeofFun1 (TypeLM _ _) (GradFun (Fun f) _) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 (TypeLM _ _) f ctys =
   error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
