@@ -19,6 +19,7 @@ import           Text.PrettyPrint               ( Doc )
 import           Data.List                      ( intersperse )
 import           KMonad
 
+import           Data.Either                    ( partitionEithers )
 import qualified Data.Map as M
 import           Data.Maybe                     ( isJust )
 import           Debug.Trace                    ( trace )
@@ -531,14 +532,10 @@ type TRule = RuleX Typed
 
 partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p])
 -- Separate the Rules, Defs
---
--- See https://www.stackage.org/haddock/lts-12.1/base-4.11.1.0/src/Data-Either.html#partitionEithers
-partitionDecls = foldr declX ([], [])
+partitionDecls = partitionEithers . map f
   where
-    declX (RuleDecl r) = rule r
-    declX (DefDecl  d) = def  d
-    rule a ~(r, d) = (a:r, d)
-    def  a ~(r, d) = (r, a:d)
+    f (RuleDecl r) = Left r
+    f (DefDecl  d) = Right d
 
 -----------------------------------------------
 --       Building values
