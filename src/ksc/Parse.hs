@@ -351,12 +351,16 @@ pBaseUserFunWithType add =
                   ; pure (BaseUserFunId f (add ty))
                   })
 
+pBaseUserFunWithoutType :: Parser (BaseUserFun Parsed)
+pBaseUserFunWithoutType =
+         do { f <- pIdentifier
+            ; pure (BaseUserFunId f Nothing)
+            }
+
 pBaseUserFun :: Parser (BaseFun Parsed)
 pBaseUserFun = BaseUserFun <$>
      (pBaseUserFunWithType Just
-     <|> do { f <- pIdentifier
-            ; pure (BaseUserFunId f Nothing)
-            })
+     <|> pBaseUserFunWithoutType)
 
 pBaseFun :: Parser (BaseFun Parsed)
 pBaseFun = pSelFun
