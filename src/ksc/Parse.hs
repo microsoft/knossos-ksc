@@ -316,9 +316,9 @@ pLet = do { pReserved "let"
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
 
-pIsUserFun :: Fun Parsed -> Parser (UserFun Parsed)
+pIsUserFun :: InPhase p => Fun p -> Parser (UserFun p)
 pIsUserFun fun = case maybeUserFun fun of
-  Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ show fun)
+  Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ render (ppr fun))
   Just userFun -> pure userFun
 
 pPrimFun :: Parser (BaseFun p)
