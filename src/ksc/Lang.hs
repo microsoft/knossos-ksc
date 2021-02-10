@@ -846,7 +846,9 @@ instance InPhase Parsed where
   pprVar     = ppr
   pprLetBndr = ppr
   pprFunOcc  = ppr
-  pprBaseUserFun (BaseUserFunId name _) = text name
+  pprBaseUserFun (BaseUserFunId name mty) = case mty of
+    Nothing -> text name
+    Just ty -> brackets (text name <+> pprParendType ty)
 
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
@@ -858,12 +860,8 @@ instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
-  -- For now we discard the type when pretty printing.  We have a
-  -- round-trip test that ensures that what we pretty print can be
-  -- parsed but we cannot yet parse function symbols annotated with
-  -- their types.  When that changes we will pretty print the type
-  -- here too.
-  pprBaseUserFun (BaseUserFunId name _) = text name
+  pprBaseUserFun (BaseUserFunId name ty) =
+    brackets (text name <+> pprParendType ty)
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
@@ -876,12 +874,8 @@ instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
-  -- For now we discard the type when pretty printing.  We have a
-  -- round-trip test that ensures that what we pretty print can be
-  -- parsed but we cannot yet parse function symbols annotated with
-  -- their types.  When that changes we will pretty print the type
-  -- here too.
-  pprBaseUserFun (BaseUserFunId name _) = text name
+  pprBaseUserFun (BaseUserFunId name ty) =
+    brackets (text name <+> pprParendType ty)
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
