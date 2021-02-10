@@ -628,7 +628,7 @@ cgenAnyFun (tf, ty) cftype = case tf of
   TFun retty (Fun (PrimFun "build")) ->
     case retty of
       TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
-      _              -> error ("Unexpected type for build: " ++ show ty)
+      _              -> error ("Unexpected return type for build: " ++ show retty)
   TFun retty (Fun (PrimFun primname))
     | primname `elem` ["sumbuild", "buildFromSparse", "buildFromSparseTupled"]
     -> primname ++ "<" ++ cgenType (mkCType retty) ++ ">"
