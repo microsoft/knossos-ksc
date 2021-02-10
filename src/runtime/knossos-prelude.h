@@ -157,7 +157,6 @@ inline double tanh$af(allocator *, double d) { return tanh(d); }
 inline double lgamma$af(allocator *, double d) { return lgamma(d); }
 
 inline double to_float$ai(allocator *, int d) { return d; }
-inline double to_float(allocator *, int d) { return d; }
 
 inline bool or$abb(allocator *, int b1, int b2)  { return b1 || b2; }
 inline bool and$abb(allocator *, int b1, int b2) { return b1 && b2; }
