@@ -283,7 +283,7 @@ userCallResultTy_maybe fn env args
   = case lookupGblST fn env of
       Just def -> userCallResultTy_help def args
       Nothing  -> Left (text "Not in scope: userCall:"
-                        <+> ppr_fn <+> ppr (typeof args) $$ message)
+                        <+> ppr_fn $$ message)
         where message = if null similarEnv
                         then empty
                         else text "Did you mean one of these:"
