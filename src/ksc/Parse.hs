@@ -384,6 +384,9 @@ pFunG pBase = try (brackets $
         pBaseDerivation s f p =
           pReserved s >> flip f p <$> pBase
 
+pFunTyped :: Parser (Fun Typed)
+pFunTyped = pFunG (BaseUserFun <$> pBaseUserFunWithType id)
+
 pFun :: Parser (Fun Parsed)
 pFun = pFunG pBaseFun
 
