@@ -1096,16 +1096,8 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
     where fun_f = userFunToFun @p f
           pprFun_f = pprUserFun @p f
 
-instance Pretty (BaseUserFun Typed) where
-  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
-
-instance Pretty (BaseUserFun OccAnald) where
-  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
-
-instance Pretty (BaseUserFun Parsed) where
-  ppr (BaseUserFunId f mty) = case mty of
-    Just ty -> ppr @(BaseUserFun Typed) (BaseUserFunId f ty)
-    Nothing -> text f
+instance InPhase p => Pretty (BaseUserFun p) where
+  ppr = pprBaseUserFun
 
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens
