@@ -482,7 +482,7 @@ lookupGblTc fun args
   where
     ty = typeof args
     mk_extra fun st
-      = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
+      = vcat [ text "In a call of:" <+> ppr fun
              , text " Arg types:" <+> ppr ty
              , text " Args:"      <+> ppr (exprOf args)
              , text "ST lookup:"  <+> case maybeUserFun fun of
