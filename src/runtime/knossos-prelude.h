@@ -69,12 +69,6 @@ double max$aT1f(allocator * alloc, vec<double> const& v)
     return v[imax$aT1f(alloc, v)];
 }
 
-double digamma(allocator *, double x)
-{
-	std::cerr << "digamma unimp!\n" << std::endl;
-	throw "digamma unimp!\n";
-}
-
 double rev$lgamma$af(allocator *, double x, double dr)
 {
 	std::cerr << "rev$lgamma unimp!\n" << std::endl;
