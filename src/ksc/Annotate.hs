@@ -277,11 +277,11 @@ tcVar var mb_ty
 --     The typecheck monad
 -----------------------------------------------
 
-userCallResultTy_maybe :: HasCallStack => UserFun Typed -> GblSymTab
-                       -> Type -> Either SDoc Type
-userCallResultTy_maybe fn env args
+userCallDef_maybe :: HasCallStack
+                  => UserFun Typed -> GblSymTab -> Either SDoc TDef
+userCallDef_maybe fn env
   = case lookupGblST fn env of
-      Just def -> userCallResultTy_help def args
+      Just def -> Right def
       Nothing  -> Left (text "Not in scope: userCall:"
                         <+> ppr_fn $$ message)
         where message = if null similarEnv
@@ -297,6 +297,12 @@ userCallResultTy_maybe fn env args
               editDistance = E.levenshteinDistance E.defaultEditCosts
 
               ppr_fn = pprUserFun @Typed fn
+
+userCallResultTy_maybe :: HasCallStack
+                       => UserFun Typed -> GblSymTab -> Type -> Either SDoc Type
+userCallResultTy_maybe fn env args
+  = do { def <- userCallDef_maybe fn env
+       ; userCallResultTy_help def args }
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
