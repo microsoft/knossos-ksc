@@ -567,17 +567,17 @@ primFunCallResultTy_maybe fun args
       ("sumbuild" , TypeTuple
                      [sizeType, TypeLam indexType t])
         | sizeType `eqType` indexType
-        , isJust (tensorDimensionFromIndexType_maybe indexType)
+        , isTensorIndexType indexType
         -> Just t
       ("buildFromSparse", TypeTuple
                          [resultShapeType@TypeTensor{}, loopSizeType, TypeLam loopIndexType t])
         | loopSizeType `eqType` loopIndexType
-        , isJust (tensorDimensionFromIndexType_maybe loopIndexType)
+        , isTensorIndexType loopIndexType
         -> buildFromSparseResultTy_maybe resultShapeType t
       ("buildFromSparseTupled", TypeTuple
                          [resultShapeType@TypeTuple{}, loopSizeType, TypeLam loopIndexType t])
         | loopSizeType `eqType` loopIndexType
-        , isJust (tensorDimensionFromIndexType_maybe loopIndexType)
+        , isTensorIndexType loopIndexType
         , TypeTuple shapes <- resultShapeType
         , TypeTuple lamty <- t
         -> fmap TypeTuple (zipWithM buildFromSparseResultTy_maybe shapes lamty)
