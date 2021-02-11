@@ -247,6 +247,9 @@ tensorDimensionFromIndexType_maybe (TypeTuple ts)
   = Just (length ts)
 tensorDimensionFromIndexType_maybe _ = Nothing
 
+isTensorIndexType :: Type -> Bool
+isTensorIndexType = isJust . tensorDimensionFromIndexType_maybe
+
 tensorTypeFromIndexType_maybe :: Type -> Type -> Maybe Type
 tensorTypeFromIndexType_maybe indexType elementType =
   fmap (\d -> TypeTensor d elementType) (tensorDimensionFromIndexType_maybe indexType)
