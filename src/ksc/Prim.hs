@@ -605,8 +605,11 @@ primFunCallResultTy_maybe fun args
         | t1 `eqType` t2 -> Just TypeBool
         | otherwise      -> Nothing
 
-      ("delta"    , TypeTuple
-                     [TypeInteger, TypeInteger, t])        -> Just t
+      ("delta"    , TypeTuple [t1, t2, tret]             )
+        | t1 `eqType` t2
+        , isTensorIndexType t1
+        -> Just tret
+
       _ -> Nothing
 
 buildFromSparseResultTy_maybe :: Type -> Type -> Maybe Type

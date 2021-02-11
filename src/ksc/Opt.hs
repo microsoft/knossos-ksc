@@ -170,7 +170,7 @@ optIf e_cond e_then e_else
   -- NB: (==) on expressions does equality modulo alpha (see Lang.hs)
   = e_then
   | Just (ei, ej) <- isEqualityCall e_cond
-  , TypeInteger <- typeof ei
+  , isTensorIndexType (typeof ei)
   , isKZero e_else
   = pDelta ei ej e_then
 optIf b                     t e = If b t e

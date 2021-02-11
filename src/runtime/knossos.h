@@ -1318,8 +1318,8 @@ namespace ks
 		return ret;
 	}
 
-	template <class T>
-	T delta(allocator * alloc, int i, int j, T val)
+	template <class T, class IndexT>
+	T delta(allocator * alloc, IndexT i, IndexT j, T val)
 	{
 		return (i == j) ? val : zero(alloc, val);
 	}
