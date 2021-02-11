@@ -7,7 +7,7 @@ sudo add-apt-repository ppa:hvr/ghc -y
 echo ----- apt-get update -----
 sudo apt-get update
 echo ----- apt-get install gcc ghc -----
-sudo apt-get install gcc-7 g++-7 ghc-8.6.5 cabal-install-3.0
+sudo apt-get install gcc-7 g++-7 ghc-8.10.2 cabal-install-3.0
 echo ----- perftools -----
 sudo apt-get install libgoogle-perftools-dev google-perftools
 echo ----- cabal update -----

@@ -5,7 +5,7 @@
 Knossos `ksc` requires reasonably up-to-date versions of ghc, cabal
 and g++.   The following are sufficient
 
-* ghc version >= 8.4
+* ghc version >= 8.10.2
 * cabal version >= 3.0
 * g++ version >= 7
 
@@ -14,7 +14,7 @@ This section describes how to get them.
 #### Windows
 Install [Chocolatey](https://chocolatey.org/), then:
 ```cmd
-choco install ghc --version 8.6.5 cabal --version 3.0.0.0 -y
+choco install ghc --version 8.10.2 cabal --version 3.0.0.0 -y
 cabal v2-update
 choco install mingw --version 7.3.0 -y
 choco install msys2
@@ -34,7 +34,7 @@ below.  (Please note that cabal from the PPA
 ```sh
 sudo add-apt-repository ppa:hvr/ghc
 sudo apt-get update
-sudo apt install ghc-8.6.5 cabal-install-3.0 g++
+sudo apt install ghc-8.10.2 cabal-install-3.0 g++
 /opt/cabal/bin/cabal-3.0 v2-update
 ```
 
@@ -54,13 +54,13 @@ their `PATH` so that command will run fine.  Ubuntu users might need
 to put it on their `PATH` with
 
 ```
-export PATH=/opt/ghc/8.6.5/bin:/opt/cabal/3.0/bin:$PATH
+export PATH=/opt/ghc/8.10.2/bin:/opt/cabal/3.0/bin:$PATH
 ```
 
 or use the following, more explicit, command line.
 
 ```
-/opt/cabal/bin/cabal-3.0 v2-build --ghc-option=-Wwarn --with-ghc /opt/ghc/bin/ghc-8.6.5
+/opt/cabal/bin/cabal-3.0 v2-build --ghc-option=-Wwarn --with-ghc /opt/ghc/bin/ghc-8.10.2
 ```
 
 On the first run, it will build a lot of packages, which will look a bit like
@@ -82,10 +82,10 @@ Completed    setenv-0.1.1.3 (lib)
 Then, and on subsequent runs, it will build knossos, which should have output as follows
 ```
 Building executable 'ksc' for knossos-0.0.0.1..
-[ 1 of 17] Compiling KMonad           ( src/ksc/KMonad.hs, ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.6.5/knossos-0.0.0.1/x/ksc/build/ksc/ksc-tmp/KMonad.o )
+[ 1 of 17] Compiling KMonad           ( src/ksc/KMonad.hs, ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.10.2/knossos-0.0.0.1/x/ksc/build/ksc/ksc-tmp/KMonad.o )
 ...
-[17 of 17] Compiling Main             ( src/ksc/Main.hs, ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.6.5/knossos-0.0.0.1/x/ksc/build/ksc/ksc-tmp/Main.o )
-Linking ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.6.5/knossos-0.0.0.1/x/ksc/build/ksc/ksc
+[17 of 17] Compiling Main             ( src/ksc/Main.hs, ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.10.2/knossos-0.0.0.1/x/ksc/build/ksc/ksc-tmp/Main.o )
+Linking ..../knossos-ksc/dist-newstyle/build/x86_64-linux/ghc-8.10.2/knossos-0.0.0.1/x/ksc/build/ksc/ksc
 ```
 
 ### Installing the ksc executable
@@ -103,7 +103,7 @@ Those who installed cabal and ghc via the PPA might need to use the
 following, more explicit, command line at the last stage
 
 ```
-/opt/cabal/bin/cabal-3.0 v2-install --with-ghc /opt/ghc/bin/ghc-8.6.5 --installdir=build/bin --overwrite-policy=always --install-method=copy
+/opt/cabal/bin/cabal-3.0 v2-install --with-ghc /opt/ghc/bin/ghc-8.10.2 --installdir=build/bin --overwrite-policy=always --install-method=copy
 ```
 
 ### Compiler pipeline
