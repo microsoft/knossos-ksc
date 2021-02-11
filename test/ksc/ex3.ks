@@ -27,4 +27,10 @@
        (let (z (add x y))
          0.0)))
 
+(def d2 Float ((x : Float) (y : Integer) (z : Integer) (t : Integer))
+     (if (eq (tuple (add y z) (sub t y))
+             (tuple t z))
+         (add x (to_float y))
+         0.0))
+
 (def main Integer () 0)
