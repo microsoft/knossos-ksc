@@ -1,4 +1,4 @@
-wheel==0.36.2
+wheel
 sexpdata==0.0.3
 torch==1.6.0
 torchvision==0.7.0
