@@ -114,18 +114,9 @@ import Text.Read ( readMaybe )
 
 
 ---------------------
-testParse :: Pretty a => Parser a -> String -> IO ()
-testParse  p s = case runParser p s of
-                   Left err -> putStrLn ("ksc: Failed: " ++ show err)
-                   Right r  -> putStrLn (render (ppr r))
 
 runParser :: Parser a -> String -> Either ParseError a
 runParser p = parse p ""
-
-runParserOrPanic :: Parser a -> String -> a
-runParserOrPanic p s = case runParser p s of
-                        Left err -> error $ show err
-                        Right r -> r
 
 parseF :: String -> IO [Decl]
 parseF file = do

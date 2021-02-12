@@ -8,7 +8,7 @@
              PatternSynonyms,
 	     ScopedTypeVariables #-}
 
-module Ksc.Opt( optLets, optDef, optDefs, optE, Ksc.Opt.hspec, simplify, test_opt ) where
+module Ksc.Opt( optLets, optDef, optDefs, optE, Ksc.Opt.hspec, simplify ) where
 
 import Ksc.Lang
 import Ksc.LangUtils
@@ -1033,6 +1033,3 @@ hspec = do
                  (lmAdd (lmHCat [l1, l2]) (lmHCat [l2, l2]))
             `shouldBe`
             lmHCat [lmAdd l1 l2, lmScale TypeFloat f4]
-
-test_opt:: IO ()
-test_opt = Test.Hspec.hspec Ksc.Opt.hspec

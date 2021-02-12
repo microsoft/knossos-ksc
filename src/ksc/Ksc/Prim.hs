@@ -362,10 +362,6 @@ type Shape = TExpr
 lmZero :: Shape -> Shape -> TExpr
 lmZero s t = mkPrimCall1 P_lmZero (Tuple [s, t])
 
-lmZero_Dir :: ADDir -> TExpr -> TExpr -> TExpr
-lmZero_Dir Fwd s t = lmZero s t
-lmZero_Dir Rev s t = lmZero t s
-
 -- lmOne S :: S -o S
 lmOne :: Type -> TExpr
 lmOne s = mkPrimCall1 P_lmOne (mkDummy s)
@@ -432,9 +428,6 @@ lmApplyT_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApplyT_Dir Fwd e ds = mkPrimCall1 P_lmApplyT  (Tuple [e, ds])
 lmApplyT_Dir Rev e dt = mkPrimCall1 P_lmApplyTR (Tuple [dt, e])
 
-lmBuild :: HasCallStack => TExpr -> TExpr -> TExpr
-lmBuild n b = lmVCatV (pBuild n b)
-
 lmBuildT :: HasCallStack => TExpr -> TExpr -> TExpr
 lmBuildT n b = lmHCatV (pBuild n b)
 
@@ -449,18 +442,6 @@ pRFold = mkPrimCall7 P_RFold . mkDummy
 
 lmDummyFold :: HasCallStack => Type -> TExpr
 lmDummyFold = mkPrimCall1 P_lmDummyFold . mkDummy
-
-lmBuild_Dir :: ADDir -> TExpr -> TExpr -> TExpr
-lmBuild_Dir Fwd = lmBuild
-lmBuild_Dir Rev = lmBuildT
-
-lmVCatV_Dir :: ADDir -> TExpr -> TExpr
-lmVCatV_Dir Fwd = lmVCatV
-lmVCatV_Dir Rev = lmHCatV
-
-lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
-lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
-lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
 isThePrimFun :: TFun p -> PrimFun -> Bool
 isThePrimFun (TFun _ (Fun JustFun (PrimFunT f1))) f2 = f1 == f2

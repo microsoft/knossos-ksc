@@ -11,9 +11,6 @@ module Ksc.LangUtils (
   -- Functions over expressions
   isTrivial, splitTuple,
 
-  -- Substitution
-  substEMayCapture,
-
   -- Equality
   cmpExpr,
 
@@ -23,13 +20,13 @@ module Ksc.LangUtils (
   notFreeIn, newVarNotIn, freeVarsOf,
 
   -- Tests
-  Ksc.LangUtils.hspec, test_FreeIn,
+  Ksc.LangUtils.hspec,
 
   -- Symbol table
   GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
   stInsertFun,
   LclSymTab, extendLclST,
-  SymTab(..), newSymTab, emptySymTab,
+  SymTab(..), newSymTab,
 
   -- NoTupPat
   noTupPatifyDef,
@@ -74,31 +71,6 @@ splitTuple (Tuple es) n
   | n == length es = es
   | otherwise      = pprPanic "splitTuple" (ppr n $$ ppr es)
 splitTuple e n = [ pSel i n e | i <- [1..n] ]
-
------------------------------------------------
---     Substitution
------------------------------------------------
-
-substEMayCapture :: M.Map TVar TExpr -> TExpr -> TExpr
--- NOT YET using capture-avoiding substitution
--- But substEMayCapture is not really used
--- The heavy lifting is done by OptLets.optLetsE, which /does/
--- do capture-avoiding substitution.
-substEMayCapture subst (Dummy ty)     = Dummy ty
-substEMayCapture subst (Konst k)      = Konst k
-substEMayCapture subst (Var v)        = case M.lookup v subst of
-                               Just e  -> e
-                               Nothing -> Var v
-substEMayCapture subst (Call f es)    = Call f (substEMayCapture subst es)
-substEMayCapture subst (If b t e)     = If (substEMayCapture subst b) (substEMayCapture subst t) (substEMayCapture subst e)
-substEMayCapture subst (Tuple es)     = Tuple (map (substEMayCapture subst) es)
-substEMayCapture subst (App e1 e2)    = App (substEMayCapture subst e1) (substEMayCapture subst e2)
-substEMayCapture subst (Assert e1 e2) = Assert (substEMayCapture subst e1) (substEMayCapture subst e2)
-substEMayCapture subst (Lam v e)      = Lam v (substEMayCapture (v `M.delete` subst) e)
-substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
-                                          substEMayCapture (subst M.\\ bindersAsMap v) b
-  where bindersAsMap :: PatG TVar -> M.Map TVar ()
-        bindersAsMap = M.fromList . map (\x -> (x, ())) . patVars
 
 -----------------------------------------------
 --     Free variables
@@ -164,9 +136,6 @@ hspec = do
       it "in, so new var is _t2..." $
         newVarNotIn TypeFloat e2 `shouldBe` (var "_t2")
 
-test_FreeIn :: IO ()
-test_FreeIn = Test.Hspec.hspec Ksc.LangUtils.hspec
-
 
 -----------------------------------------------
 --     Symbol table, ST, maps variables to types
@@ -202,9 +171,6 @@ instance Pretty SymTab where
 
 emptyGblST :: GblSymTab
 emptyGblST = M.empty
-
-emptySymTab :: SymTab
-emptySymTab = ST { gblST = M.empty, lclST = M.empty }
 
 newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }

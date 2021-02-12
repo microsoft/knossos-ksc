@@ -623,11 +623,6 @@ mkPat :: [VarX p] -> PatG (VarX p)
 mkPat [v] = VarPat v
 mkPat vs  = TupPat vs
 
-dropLast :: [a] -> [a]
--- Drop the last element of a list.
--- No-op for empty list
-dropLast xs = take (length xs - 1) xs
-
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun el_ty
                         (Fun JustFun (BaseFunId (BasePrimFunName (P_SelFun i n)) (typeof e)))) e
@@ -899,9 +894,6 @@ instance InPhase OccAnald where
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   baseUserFunArgTy g t = g (Just t)
-
-pprTFun :: InPhase p => TFun p -> SDoc
-pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
 
 
 class Pretty a where
@@ -1220,9 +1212,6 @@ instance InPhase p => Pretty (RuleX p) where
 printK :: SDoc -> KM ()
 printK d = liftIO (putStrLn (render d))
 
-display :: Pretty p => p -> KM ()
-display p = printK (ppr p)
-
 displayN :: Pretty p => [p] -> KM ()
 displayN ps = printK (vcat $ intersperse (text "") $ map ppr ps)
 
@@ -1264,9 +1253,6 @@ hspec = do
 
   describe "eqType" $
     it "doesn't truncate" (eqType (TypeTuple []) (TypeTuple [TypeFloat]) `shouldBe` False)
-
-test_Pretty :: IO ()
-test_Pretty = Test.Hspec.hspec Ksc.Lang.hspec
 
 -----------------------------------------------
 --     Equality modulo alpha
