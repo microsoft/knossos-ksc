@@ -69,7 +69,7 @@
            (dv (mkvec   (add seed 2000) 10 delta))
            (dc (mkfloat (add seed 3000)    delta))
            (checked ($check (lam (t : Tuple (Vec Float) Float) (prod_fold t))
-                            (lam (t : Tuple (Tuple (Vec Float) Float) Float) (rev$prod_fold t))
+                            (lam (t : Tuple (Tuple (Vec Float) Float) Float) ([rev prod_fold] t))
                             (tuple v  c)
                             (tuple v  c)
                             (tuple dv dc)
@@ -77,7 +77,7 @@
            (rev_ok (lt (abs checked) 0.001))
            (fold_x   (prod_fold v c))
            (fold_xpd (prod_fold (ts_add v dv) (add c dc)))
-           (fold_fwd (fwd$prod_fold (tuple v c) (tuple dv dc)))
+           (fold_fwd ([fwd prod_fold] (tuple v c) (tuple dv dc)))
            (fold_fd  (sub fold_xpd fold_x))
            (everything_works_as_expected
             (let ((tolerance 0.001)
@@ -96,7 +96,7 @@
         "fwd fold = " fold_fwd "\n"
         "fd fold = " fold_fd "\n"
         "fwd - fd = " (sub fold_fwd fold_fd) "\n"
-        "rev fold = " (rev$prod_fold (tuple v c) 1.0) "\n"
+        "rev fold = " ([rev prod_fold] (tuple v c) 1.0) "\n"
         "checked (should be small) = " checked "\n" 
         "TESTS FOLLOW"
         "\n----\n"

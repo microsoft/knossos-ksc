@@ -4,10 +4,15 @@
              PatternSynonyms, StandaloneDeriving, AllowAmbiguousTypes,
              ScopedTypeVariables, TypeApplications #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts #-}
+-- The instances we derive need UndecidableInstances to be enabled
+{-# LANGUAGE UndecidableInstances #-}
 
 module Lang where
 
 import           Prelude                 hiding ( (<>) )
+
+import qualified Ksc.Traversal                  as T
 
 import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint               ( Doc )
@@ -15,6 +20,7 @@ import           Data.List                      ( intersperse )
 import           KMonad
 
 import qualified Data.Map as M
+import           Data.Maybe                     ( isJust )
 import           Debug.Trace                    ( trace )
 import           Test.Hspec
 
@@ -36,16 +42,22 @@ data Phase = Parsed | Typed | OccAnald
 data DeclX p = RuleDecl (RuleX p)
              | DefDecl  (DefX p)
 
+deriving instance (Eq (RuleX p), Eq (DefX p)) => Eq (DeclX p)
+deriving instance (Show (RuleX p), Show (DefX p)) => Show (DeclX p)
+
 type Decl  = DeclX Parsed
 type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
-  = Def { def_fun    :: Fun
+  = Def { def_fun    :: UserFun p
         , def_pat    :: Pat       -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
   -- Definitions are user-annotated with argument types
   -- (via TVar) and result types (via TFun)
+
+deriving instance (Eq (BaseUserFunT p), Eq (RhsX p)) => Eq (DefX p)
+deriving instance (Show (BaseUserFunT p), Show (RhsX p)) => Show (DefX p)
 
 type Def  = DefX Parsed
 type TDef = DefX Typed
@@ -58,6 +70,9 @@ data RhsX p
                         --   without having a RHS
 
   | EDefRhs             -- An external definition: no RHS
+
+deriving instance Eq (ExprX p) => Eq (RhsX p)
+deriving instance Show (ExprX p) => Show (RhsX p)
 
 type TRhs  = RhsX Typed
 
@@ -90,10 +105,9 @@ patToExpr (TupPat vs) = Tuple (map Var vs)
 instance Show Pat where
   show p = pps p
 
-data TVarX = TVar TypeX Var
+data TVarX = TVar TypeX Var deriving (Eq, Ord)
 type TVar = TVarX
 
-deriving instance Ord TVar
 instance Show TVar where
   show e = pps e
 
@@ -145,9 +159,9 @@ type family LetBndrX p where
   LetBndrX OccAnald = (Int,TVarX)
 
 type family FunX p where
-  FunX Parsed   = Fun
-  FunX Typed    = TFun
-  FunX OccAnald = TFun
+  FunX Parsed   = Fun Parsed
+  FunX Typed    = TFun Typed
+  FunX OccAnald = TFun OccAnald
 
 data ExprX p
   = Konst Konst
@@ -163,6 +177,9 @@ data ExprX p
   | If (ExprX p) (ExprX p) (ExprX p)
   | Assert (ExprX p) (ExprX p)
   | Dummy Type
+
+deriving instance Eq (ExprX Parsed)
+deriving instance Eq (ExprX OccAnald)
 
 instance InPhase p => Show (ExprX p) where
   show e = pps e
@@ -202,32 +219,6 @@ deriving instance Ord Type
 
 instance Show TypeX where
   show e = pps e
-
--- Round trip testing requires that two different DeclXs be checked
--- for equality.  If the equality check fails we'd like to print them
--- to see the differences.  Thus we add Eq and Show instances for
--- DeclX and other types that transitively need them.
-deriving instance Eq (RhsX Typed)
-deriving instance Eq (DefX Typed)
-deriving instance Eq (DeclX Typed)
-deriving instance Eq (RuleX Typed)
-
-deriving instance Show (RhsX Typed)
-deriving instance Show (DefX Typed)
-deriving instance Show (DeclX Typed)
-deriving instance Show (RuleX Typed)
-
-deriving instance Eq TVarX
-deriving instance Eq (ExprX Parsed)
-deriving instance Eq (RhsX Parsed)
-deriving instance Eq (DefX Parsed)
-deriving instance Eq (DeclX Parsed)
-deriving instance Eq (RuleX Parsed)
-
-deriving instance Show (RhsX Parsed)
-deriving instance Show (DefX Parsed)
-deriving instance Show (DeclX Parsed)
-deriving instance Show (RuleX Parsed)
 
 ----------------------------------
 --- Tensor properties
@@ -338,39 +329,149 @@ eqTypes x xs = if all (eqType x) xs
                else Nothing
 
 type PrimFun = String
+data BaseUserFun p = BaseUserFunId String (BaseUserFunT p)
 
-data FunId = UserFun String   -- UserFuns have a Def
-           | PrimFun PrimFun  -- PrimFuns do not have a Def
-           | SelFun
-                Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
-                Int      -- Arity
-           deriving( Eq, Ord, Show )
+deriving instance Eq (BaseUserFunT p) => Eq (BaseUserFun p)
+deriving instance Ord (BaseUserFunT p) => Ord (BaseUserFun p)
+deriving instance Show (BaseUserFunT p) => Show (BaseUserFun p)
 
-data Fun = Fun      FunId         -- The function              f(x)
-         | GradFun  FunId ADPlan  -- Full Jacobian Df(x)
-         | DrvFun   FunId ADMode  -- Derivative derivative f'(x,dx)
-                                  --   Rev <=> reverse mode f`(x,dr)
-         | ShapeFun Fun
-         deriving( Eq, Ord, Show )
+type family BaseUserFunT p where
+  BaseUserFunT Parsed   = Maybe Type
+  BaseUserFunT OccAnald = Type
+  BaseUserFunT Typed    = Type
 
-isUserFun :: FunId -> Bool
-isUserFun = \case
-  UserFun{} -> True
-  PrimFun{} -> False
-  SelFun{}  -> False
+data BaseFun (p :: Phase)
+             = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
+             | PrimFun PrimFun      -- PrimFuns do not have a Def
+             | SelFun
+                  Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
+                  Int      -- Arity
 
-isSelFun :: FunId -> Bool
+deriving instance Eq   (BaseUserFunT p) => Eq   (BaseFun p)
+deriving instance Ord  (BaseUserFunT p) => Ord  (BaseFun p)
+deriving instance Show (BaseUserFunT p) => Show (BaseFun p)
+
+data DerivedFun funid
+                = Fun      funid         -- The function              f(x)
+                | GradFun  funid ADPlan  -- Full Jacobian Df(x)
+                | DrvFun   funid ADMode  -- Derivative derivative f'(x,dx)
+                                         --   Rev <=> reverse mode f`(x,dr)
+                | ShapeFun (DerivedFun funid)
+                deriving (Eq, Ord, Show)
+
+-- DerivedFun has just two instantiations
+--
+-- Fun p: these you can call hence are in the function field of a Call (in
+-- the guise of a TFun)
+--
+-- UserFun p: These you can def/edef and hence are the domain of the
+-- GblSymTab and CST and appear in the def_fun field of DefX.
+type UserFun p = DerivedFun (BaseUserFun p)
+type Fun     p = DerivedFun (BaseFun p)
+
+baseUserFunT :: Functor f
+             => (BaseUserFunT p -> f (BaseUserFunT q))
+             -> BaseUserFun p -> f (BaseUserFun q)
+baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
+
+baseUserFunBaseFun :: Applicative f
+                   => (BaseUserFun p -> f (BaseUserFun q))
+                   -> (BaseFun p -> f (BaseFun q))
+baseUserFunBaseFun f = \case
+  BaseUserFun u -> BaseUserFun <$> f u
+  PrimFun p    -> pure (PrimFun p)
+  SelFun i1 i2 -> pure (SelFun i1 i2)
+
+baseFunFun :: Functor f
+           => (funid -> f funid')
+           -> (DerivedFun funid -> f (DerivedFun funid'))
+baseFunFun f = \case
+  Fun fi       -> fmap Fun (f fi)
+  GradFun fi p -> fmap (\f' -> GradFun f' p) (f fi)
+  DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (f fi)
+  ShapeFun ff  -> fmap ShapeFun (baseFunFun f ff)
+
+userFunBaseType :: forall p f. (InPhase p, Applicative f)
+                => (Maybe Type -> f Type)
+                -> UserFun p -> f (UserFun Typed)
+userFunBaseType = baseFunFun . baseUserFunType @p
+
+funType :: Applicative f
+        => (BaseUserFunT p -> f (BaseUserFunT q))
+        -> Fun p -> f (Fun q)
+funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
+
+addBaseTypeToUserFun :: forall p. InPhase p
+                     => UserFun p -> Type -> Either Type (UserFun Typed)
+addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
+  []   -> Right fWithBaseType
+  -- We can only ever have one mismatched type but the type system
+  -- doesn't know this (affine traversals don't exist)
+  mismatchedAppliedTy:_ -> Left mismatchedAppliedTy
+  where (mismatchedAppliedTyL, fWithBaseType) =
+          T.traverseOf (userFunBaseType @p) g f
+
+        mismatchedAppliedTyF = \case
+          Just appliedTy -> if eqType appliedTy expectedBaseTy
+                            then []
+                            else [appliedTy]
+          Nothing -> []
+
+        g mt' = (mismatchedAppliedTyF mt', expectedBaseTy)
+
+userFunToFun :: UserFun p -> Fun p
+userFunToFun = \case
+  Fun f -> Fun (BaseUserFun f)
+  GradFun f p -> GradFun (BaseUserFun f) p
+  DrvFun f m -> DrvFun (BaseUserFun f) m
+  ShapeFun f -> ShapeFun (userFunToFun f)
+
+-- A 'Fun p' is Either:
+--
+-- Right: a 'UserFun p', or
+-- Left:  a 'SelFun' or 'PrimFun' (with no Phase type label)
+perhapsUserFun :: Fun p -> Either (Fun q) (UserFun p)
+perhapsUserFun = \case
+  Fun f -> either (Left . Fun) (Right . Fun) (baseFunToBaseUserFunE f)
+  GradFun f p -> either (\f' -> Left $ GradFun f' p)
+                        (\f' -> Right $ GradFun f' p)
+                        (baseFunToBaseUserFunE f)
+  DrvFun f m -> either (\f' -> Left $ DrvFun f' m)
+                       (\f' -> Right $ DrvFun f' m)
+                       (baseFunToBaseUserFunE f)
+  ShapeFun f -> either (Left . ShapeFun) (Right . ShapeFun) (perhapsUserFun f)
+
+maybeUserFun :: Fun p -> Maybe (UserFun p)
+maybeUserFun f = case perhapsUserFun f of
+  Right f -> Just f
+  Left _ -> Nothing
+
+baseFunToBaseUserFunE :: BaseFun p -> Either (BaseFun q) (BaseUserFun p)
+baseFunToBaseUserFunE = \case
+  BaseUserFun u    -> Right u
+  PrimFun p    -> Left (PrimFun p)
+  SelFun i1 i2 -> Left (SelFun i1 i2)
+
+baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
+baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
+  Right u -> Just u
+  Left _  -> Nothing
+
+isBaseUserFun :: BaseFun p -> Bool
+isBaseUserFun = isJust . baseFunToBaseUserFun
+
+isSelFun :: BaseFun p -> Bool
 isSelFun = \case
-  UserFun{} -> False
+  BaseUserFun{} -> False
   PrimFun{} -> False
   SelFun{}  -> True
 
-funIdOfFun :: Fun -> FunId
-funIdOfFun = \case
+baseFunOfFun :: Fun p -> BaseFun p
+baseFunOfFun = \case
   Fun f       -> f
   GradFun f _ -> f
   DrvFun f _  -> f
-  ShapeFun f  -> funIdOfFun f
+  ShapeFun f  -> baseFunOfFun f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -381,8 +482,16 @@ data ADPlan = BasicAD | TupleAD
 data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
 
-data TFun = TFun Type Fun   -- Typed functions.  The type is the /return/
-  deriving (Eq, Ord)  -- type of the function.
+data TFun p = TFun Type (Fun p)   -- Typed functions.  The type is the /return/
+
+deriving instance Eq (Fun p) => Eq (TFun p)
+deriving instance Ord (Fun p) => Ord (TFun p)
+
+-- Morally this is just 'coerce' but I don't know how to persuade
+-- GHC's machinery to allow that.
+coerceTFun :: BaseUserFunT p ~ BaseUserFunT q
+           => TFun p -> TFun q
+coerceTFun (TFun t f) = TFun t (T.mapOf funType id f)
 
 
 data Var
@@ -411,6 +520,9 @@ data RuleX p = Rule { ru_name  :: String   -- Just for logging
   -- When matching may bind any of the ru_qvars, which are typed,
   -- just like any other lambda-bound variable
 
+deriving instance Eq (ExprX p) => Eq (RuleX p)
+deriving instance Show (ExprX p) => Show (RuleX p)
+
 type Rule  = RuleX Parsed
 type TRule = RuleX Typed
 
@@ -433,10 +545,10 @@ partitionDecls = foldr declX ([], [])
 --       Building values
 -----------------------------------------------
 
-mkPrimFun :: String -> Fun
+mkPrimFun :: String -> Fun p
 mkPrimFun fname = Fun (PrimFun fname)
 
-mkPrimTFun :: Type -> String -> TFun
+mkPrimTFun :: Type -> String -> TFun p
 mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
 
 mkVar :: String -> Var  -- Just a Simple var
@@ -525,7 +637,7 @@ instance HasType Pat where
 instance HasType TypedExpr where
   typeof (TE _ ty) = ty
 
-instance HasType TFun where
+instance HasType (TFun p) where
   typeof (TFun ty _) = ty
 
 instance HasType TExpr where
@@ -720,39 +832,65 @@ class InPhase p where
   pprVar     :: VarX p -> SDoc      -- Just print it
   pprLetBndr :: LetBndrX p -> SDoc  -- Print with its type
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
+  pprBaseUserFun :: BaseUserFun p -> SDoc
 
   getVar     :: VarX p     -> (Var, Maybe Type)
-  getFun     :: FunX p     -> (Fun, Maybe Type)
+  getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
+
+  baseUserFunType :: Functor f
+                  => (Maybe Type -> f Type)
+                  -> BaseUserFun p -> f (BaseUserFun Typed)
 
 instance InPhase Parsed where
   pprVar     = ppr
   pprLetBndr = ppr
   pprFunOcc  = ppr
+  pprBaseUserFun (BaseUserFunId name _) = text name
 
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
 
+  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g t)
+
 instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
+  -- For now we discard the type when pretty printing.  We have a
+  -- round-trip test that ensures that what we pretty print can be
+  -- parsed but we cannot yet parse function symbols annotated with
+  -- their types.  When that changes we will pretty print the type
+  -- here too.
+  pprBaseUserFun (BaseUserFunId name _) = text name
 
   getVar     (TVar ty var) = (var, Just ty)
-  getFun     (TFun ty fun) = (fun, Just ty)
+  getFun     (TFun ty fun) = (fun', Just ty)
+    where fun' = T.mapOf funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
+
+  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
 
 instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
+  -- For now we discard the type when pretty printing.  We have a
+  -- round-trip test that ensures that what we pretty print can be
+  -- parsed but we cannot yet parse function symbols annotated with
+  -- their types.  When that changes we will pretty print the type
+  -- here too.
+  pprBaseUserFun (BaseUserFunId name _) = text name
 
   getVar     (TVar ty var)      = (var, Just ty)
-  getFun     (TFun ty fun)      = (fun, Just ty)
+  getFun     (TFun ty fun)      = (fun', Just ty)
+    where fun' = T.mapOf funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
-pprTFun :: TFun -> SDoc
+  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
+
+pprTFun :: InPhase p => TFun p -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
 
 
@@ -796,23 +934,26 @@ instance Pretty Var where
   ppr (Delta  d) = text "d$" <> text d
   ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
 
-instance Pretty FunId where
-  ppr = pprFunId
+instance InPhase p => Pretty (BaseFun p) where
+  ppr = pprBaseFun
 
-instance Pretty Fun where
-  ppr = pprFun
+instance Pretty funid => Pretty (DerivedFun funid) where
+  ppr = pprDerivedFun ppr
 
-pprFunId :: FunId -> SDoc
-pprFunId (UserFun s ) = text s
-pprFunId (PrimFun p ) = text p
-pprFunId (SelFun i n) = text "get$" <> int i <> char '$' <> int n
+pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
+pprBaseFun (BaseUserFun s) = pprBaseUserFun @p s
+pprBaseFun (PrimFun p ) = text p
+pprBaseFun (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
-pprFun :: Fun -> SDoc
-pprFun (Fun s)                   = ppr s
-pprFun (GradFun  s adp)          = char 'D'   <> ppr adp <> char '$' <> ppr s
-pprFun (DrvFun   s (AD adp Fwd)) = text "fwd" <> ppr adp <> char '$' <> ppr s
-pprFun (DrvFun   s (AD adp Rev)) = text "rev" <> ppr adp <> char '$' <> ppr s
-pprFun (ShapeFun f)              = text "shape$" <> ppr f
+pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
+pprUserFun = pprDerivedFun (pprBaseUserFun @p)
+
+pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
+pprDerivedFun f (Fun s)                   = f s
+pprDerivedFun f (GradFun  s adp)          = brackets (char 'D'   <> ppr adp <+> f s)
+pprDerivedFun f (DrvFun   s (AD adp Fwd)) = brackets (text "fwd" <> ppr adp <+> f s)
+pprDerivedFun f (DrvFun   s (AD adp Rev)) = brackets (text "rev" <> ppr adp <+> f s)
+pprDerivedFun f (ShapeFun sf)             = brackets (text "shape" <+> pprDerivedFun f sf)
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -820,7 +961,7 @@ instance Pretty Pat where
 instance Pretty TVar where
   pprPrec _ (TVar _ v) = ppr v
 
-instance Pretty TFun where
+instance InPhase p => Pretty (TFun p) where
   ppr (TFun _ f) = ppr f
 
 instance Pretty Konst where
@@ -908,11 +1049,7 @@ pprExpr _ (App e1 e2) =
 pprCall :: forall p. InPhase p => Prec -> FunX p -> ExprX p -> SDoc
 pprCall prec f e = mode
   (parens $ pprFunOcc @p f <+> pp_args_tuple)
-  (case (e, isInfix @p f) of
-    (Tuple [e1, e2], Just prec')
-      -> parensIf prec prec' $
-         sep [pprExpr prec' e1, pprFunOcc @p f <+> pprExpr prec' e2]
-    _ -> parensIf prec precCall $
+  (parensIf prec precCall $
          cat [pprFunOcc @p f, nest 2 (parensSp pp_args)]
   )
  where
@@ -937,16 +1074,6 @@ pprLetSexp v e =
       parenBind (v,e) = parens $ pprPatLetBndr @p v <+> ppr e
 
 
-isInfix :: forall p. InPhase p => FunX p ->  Maybe Prec
-isInfix f = isInfixFun (fst (getFun @p f))
-
--- TODO: this is rather out of date, and it's not clear we need to keep it...
-isInfixFun :: Fun -> Maybe Prec
-isInfixFun (Fun (PrimFun s))
-    | s == "eq"     = Just precOne
-    | s == "ts_add" = Just precTwo
-isInfixFun _ = Nothing
-
 parensIf :: Prec -> Prec -> SDoc -> SDoc
 parensIf ctxt inner doc | ctxt >= inner    = parens doc
                         | otherwise        = doc
@@ -958,23 +1085,37 @@ instance InPhase p => Pretty (DeclX p) where
 instance InPhase p => Pretty (DefX p) where
   ppr def = pprDef def
 
-pprDef :: InPhase p => DefX p -> SDoc
+pprDef :: forall p. InPhase p => DefX p -> SDoc
 pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
   = case rhs of
       EDefRhs -> parens $
-                 sep [ text "edef", ppr f
+                 sep [ text "edef", ppr fun_f
                      , pprParendType res_ty
                      , parens (pprParendType (typeof vs)) ]
 
       UserRhs rhs -> mode
-          (parens $ sep [ text "def", pprFun f <+> pprParendType res_ty
+          (parens $ sep [ text "def", pprFun_f <+> pprParendType res_ty
                         , parens (pprPat False vs)
                         , ppr rhs])
-          (sep [ hang (text "def" <+> pprFun f <+> pprParendType res_ty)
+          (sep [ hang (text "def" <+> pprFun_f <+> pprParendType res_ty)
                     2 (parens (pprPat False vs))
                , nest 2 (text "=" <+> ppr rhs) ])
 
       StubRhs -> text "<<StubRhs>>"
+
+    where fun_f = userFunToFun @p f
+          pprFun_f = pprUserFun @p f
+
+instance Pretty (BaseUserFun Typed) where
+  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
+
+instance Pretty (BaseUserFun OccAnald) where
+  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
+
+instance Pretty (BaseUserFun Parsed) where
+  ppr (BaseUserFunId f mty) = case mty of
+    Just ty -> ppr @(BaseUserFun Typed) (BaseUserFunId f ty)
+    Nothing -> text f
 
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens
@@ -1036,8 +1177,8 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (Fun (UserFun "g")) (var "i")
-      e2 = Call (Fun (UserFun "f")) (Tuple [e, var "_t1", kInt 5])
+      e  = Call (Fun (BaseUserFun (BaseUserFunId "g" Nothing))) (var "i")
+      e2 = Call (Fun (BaseUserFun (BaseUserFunId "f" Nothing))) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"

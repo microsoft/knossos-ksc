@@ -1,5 +1,7 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
+{-# LANGUAGE TypeFamilies #-}
+
 module Ksc.Pipeline where
 
 import Annotate (annotDecls, lintDefs)
@@ -10,8 +12,8 @@ import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
 import Lang (ADDir(Rev, Fwd), ADPlan(BasicAD),
-             Decl, DeclX(DefDecl), DefX(Def), Fun(Fun),
-             FunId(UserFun), TDef, Pretty,
+             Decl, DeclX(DefDecl), DefX(Def), DerivedFun(Fun),
+             TDef, Pretty, BaseUserFun(BaseUserFunId),
              def_fun, displayN, partitionDecls,
              pps, ppr, renderSexp)
 import LangUtils (GblSymTab, emptyGblST, extendGblST)
@@ -115,7 +117,7 @@ moveMain :: [Decl]
             , [Decl])   -- All the rest
 moveMain = partition isMain
   where
-    isMain (DefDecl (Def { def_fun = Fun (UserFun "main") })) = True
+    isMain (DefDecl (Def { def_fun = Fun (BaseUserFunId "main" _) })) = True
     isMain _ = False
 
 type GenerateDefs =

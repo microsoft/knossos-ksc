@@ -12,9 +12,9 @@
             "Compute x^3\n"
             (f n x) "\n"
             "Compute the gradient" "\n"
-            (get$2$2 (rev$f (tuple n x) 1.0)) "\n"
+            (get$2$2 ([rev f] (tuple n x) 1.0)) "\n"
             "And forward" "\n"
-            (fwd$f (tuple n x) (tuple (tuple) 1.0)) "\n"
+            ([fwd f] (tuple n x) (tuple (tuple) 1.0)) "\n"
             "Is the derivative n*x^(n-1)?" "\n"
             (mul (to_float n) (f (sub n 1) x))
         )))

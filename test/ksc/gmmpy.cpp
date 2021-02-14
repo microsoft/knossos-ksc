@@ -42,12 +42,12 @@ auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
 // bunch of verbose replication.
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<double>(m, std::string("double"));
-  declare_vec<std::tuple<ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec10"));
-  declare_vec<std::tuple<ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec2"));
+  declare_vec<ks::tuple<ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec10"));
+  declare_vec<ks::tuple<ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec2"));
   declare_vec<ks::vec<double> >(m, std::string("vec_double"));
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
   m.def("gmm_knossos_gmm_objective", withGlobalAllocator(&ks::gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
-  m.def("rev_gmm_knossos_gmm_objective", withGlobalAllocator(&ks::rev$gmm_knossos_gmm_objective$a$dT1T1fT1fT1T1fT1T1fT1T1f$dfi$b$bf));
+  m.def("rev_gmm_knossos_gmm_objective", withGlobalAllocator(&ks::rev$gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
 }

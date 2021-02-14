@@ -1,6 +1,8 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 
+{-# LANGUAGE DataKinds #-}
+
 module Shapes where
 
 import Lang
@@ -72,7 +74,7 @@ shapeE (Lam{})        = error "Shape of lambda not supported"
 shapeE (App{})        = error "Shape of App not supported"
 
 
-shapeCall :: HasCallStack => TFun -> TExpr -> TExpr
+shapeCall :: HasCallStack => TFun Typed -> TExpr -> TExpr
 
 shapeCall (TFun _ (Fun (SelFun i n))) e
   = pSel i n (shapeE e)
@@ -82,7 +84,7 @@ shapeCall (TFun _ (Fun (PrimFun f))) e
   = e'
 
 shapeCall (TFun ty f) e
-  | isUserFun (funIdOfFun f)
+  | isBaseUserFun (baseFunOfFun f)
   = Call (TFun (shapeType ty) (ShapeFun f)) e
 
 shapeCall tf e = pShape (Call tf e)  -- Fall back to calling the original function and evaluating the shape of the returned object

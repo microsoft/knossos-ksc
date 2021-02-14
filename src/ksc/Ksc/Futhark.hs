@@ -220,7 +220,7 @@ toTypedName :: Pretty a => a -> L.TypeX -> Name
 toTypedName = toTypedNameString . render . ppr
 
 -- This leads to rather verbose mangled names for tuple types.
--- Alternatively we could take the Cgen.cgenFunId approach of
+-- Alternatively we could take the Cgen.cgenBaseFun approach of
 -- concatting the mangled tupled types, so TypeTuple [TypeInteger,
 -- TypeInteger] would give "ii" instead of "<ii>".
 toTypedNameString :: String -> L.TypeX -> Name
@@ -361,7 +361,7 @@ callPrimFun f _ args =
 -- Futhark has different semantics than the source language (and C++).
 -- In particular, no ad-hoc polymorphism.  We handle this on a
 -- case-by-case basis.
-toCall :: L.TFun -> L.TExpr -> Exp
+toCall :: L.InPhase p => L.TFun p -> L.TExpr -> Exp
 
 toCall (L.TFun _ (L.Fun (L.SelFun f _))) e =
   Project (toFutharkExp e) $ show f
@@ -369,7 +369,7 @@ toCall (L.TFun _ (L.Fun (L.SelFun f _))) e =
 toCall (L.TFun ret (L.Fun (L.PrimFun f))) args =
   callPrimFun f ret args
 
-toCall f@(L.TFun _ (L.Fun L.UserFun{})) args =
+toCall f@(L.TFun _ (L.Fun L.BaseUserFun{})) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall f@(L.TFun _ L.GradFun{}) args =

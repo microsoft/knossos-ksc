@@ -16,5 +16,5 @@
 (def main Integer ()
     (let (w (tuple 3.3 4))
         (print (g w) "\n"
-            (rev$g w 1.0)
+            ([rev g] w 1.0)
             )))

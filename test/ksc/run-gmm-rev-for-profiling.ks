@@ -5,18 +5,18 @@
 
 ; dot
 (edef dot Float ((Vec Float) (Vec Float)))
-(edef D$dot (LM (Tuple (Vec Float) (Vec Float)) Float)
+(edef [D dot] (LM (Tuple (Vec Float) (Vec Float)) Float)
              ((Vec Float) (Vec Float)))
-(edef Dt$dot (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
+(edef [Dt dot] (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
               ((Vec Float) (Vec Float)))
 (edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
-(def fwd$dot Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
+(def [fwd dot] Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
      (let ((a  (get$1$2 a_b))
            (b  (get$2$2 a_b))
            (da (get$1$2 da_db))
            (db (get$2$2 da_db)))
     (add (dot a db) (dot da b))))
-(def rev$dot (Tuple (Vec Float) (Vec Float))
+(def [rev dot] (Tuple (Vec Float) (Vec Float))
                ((a_b : (Tuple (Vec Float) (Vec Float))) (dr : Float))
      (let ((a  (get$1$2 a_b))
            (b  (get$2$2 a_b)))
@@ -146,5 +146,5 @@
         )
 
       (print x
-          (rev$gmm_knossos_gmm_objective (tuple x alphas mus qs ls wishart) 1.0)
+          ([rev gmm_knossos_gmm_objective] (tuple x alphas mus qs ls wishart) 1.0)
           )))

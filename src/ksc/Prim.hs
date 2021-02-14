@@ -1,6 +1,8 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 
 module Prim where
 
@@ -8,6 +10,7 @@ import Lang
 import LangUtils (isTrivial)
 import GHC.Stack
 import Data.Maybe
+import Control.Monad (zipWithM)
 
 --------------------------------------------
 --  Simple call construction
@@ -18,8 +21,9 @@ primCall fun res_ty
   = Call (TFun res_ty (Fun (PrimFun fun)))
 
 userCall :: String -> Type -> TExpr -> TExpr
-userCall fun res_ty
-  = Call (TFun res_ty (Fun (UserFun fun)))
+userCall fun res_ty arg
+  = Call (TFun res_ty (Fun (BaseUserFun (BaseUserFunId fun arg_ty)))) arg
+  where arg_ty = typeof arg
 
 mkPrimCall :: HasCallStack => PrimFun -> TExpr -> TExpr
 mkPrimCall fun args
@@ -47,40 +51,6 @@ mkPrimCall6 f a b c d e g = mkPrimCall f (Tuple [a, b, c, d, e, g])
 
 mkPrimCall7 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall7 f a b c d e g h = mkPrimCall f (Tuple [a, b, c, d, e, g, h])
-
---------------------------------------------
---  Parsing function names
---------------------------------------------
-
-mk_fun :: String -> Fun
--- Parses the print-name of a top-level function into a Fun
--- In particular,
---
---   * Recognises D$f as (Grad f Fwd) etc
---     Keep this in sync with pprFun
---
---   * Distinguishes PrimFun from UserFun
-mk_fun f = case find_dollar f of
-             Just ("D",   s)  -> GradFun (mk_fun_id s) BasicAD
-             Just ("Dt",   s) -> GradFun (mk_fun_id s) TupleAD
-             Just ("fwd", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Fwd)
-             Just ("fwdt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Fwd)
-             Just ("rev", s)  -> DrvFun  (mk_fun_id s) (AD BasicAD Rev)
-             Just ("revt", s) -> DrvFun  (mk_fun_id s) (AD TupleAD Rev)
-             Just ("shape", s) -> ShapeFun (mk_fun s)
-             Just ("get", s) -> Fun     (mk_sel_fun s)
-             _               -> Fun     (mk_fun_id f)
-  where
-    mk_fun_id f | isPrimFun f = PrimFun f
-                | otherwise   = UserFun f
-    find_dollar f = case break (== '$') f of
-                       (_, [])  -> Nothing  -- No $
-                       (_, [_]) -> Nothing  -- Trailing $
-                       (prefix, _ : suffix) -> Just (prefix, suffix)
-    mk_sel_fun s = case break (== '$') s of
-                     (i,_:n) -> SelFun (read i :: Int) (read n :: Int)
-                     _ -> error $ "'get' should have form 'get$i$n', not [get$" ++ s ++ "]"
-
 
 ---------------------------
 -- Zeros
@@ -278,7 +248,7 @@ lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
 lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
-isThePrimFun :: TFun -> String -> Bool
+isThePrimFun :: TFun p -> String -> Bool
 isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
@@ -397,7 +367,7 @@ pMulff x1 x2 = userCall "mul" TypeFloat (Tuple [x1, x2])
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: HasCallStack => Fun -> Type
+primCallResultTy_maybe :: (HasCallStack, InPhase p) => Fun p -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
@@ -436,7 +406,7 @@ primCallResultTy_maybe fun arg_ty
             Left err -> Left err
             Right res_ty -> Right (shapeType res_ty)
 
-      Fun (UserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
+      Fun (BaseUserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
 selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
 selCallResultTy_maybe i n (TypeTuple arg_tys)
@@ -453,6 +423,19 @@ primFunCallResultTy fun args
                           (vcat [ text fun <+> ppr args
                                 , ppr (typeof args)])
                  TypeUnknown
+
+-- The type of the base function given that the derived function has
+-- argument type derivedFunArgTy
+baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc Type
+baseFunArgTy_maybe derivedFun derivedFunArgTy
+  = case derivedFun of
+      Fun{} -> Right derivedFunArgTy
+      DrvFun{} -> case derivedFunArgTy of
+        TypeTuple [baseArgTy', _] -> Right baseArgTy'
+        _ -> Left (text "baseFunArgTy_maybe: DrvFun:" <+> pprDerivedFun ppr derivedFun
+                   $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
+      GradFun{}  -> Right derivedFunArgTy
+      ShapeFun f -> baseFunArgTy_maybe f derivedFunArgTy
 
 ---------------------------------------
 -- This is the function that does the heavy lifting for primitives
@@ -586,6 +569,18 @@ primFunCallResultTy_maybe fun args
         | sizeType `eqType` indexType
         , isJust (tensorDimensionFromIndexType_maybe indexType)
         -> Just t
+      ("buildFromSparse", TypeTuple
+                         [resultShapeType@TypeTensor{}, loopSizeType, TypeLam loopIndexType t])
+        | loopSizeType `eqType` loopIndexType
+        , isJust (tensorDimensionFromIndexType_maybe loopIndexType)
+        -> buildFromSparseResultTy_maybe resultShapeType t
+      ("buildFromSparseTupled", TypeTuple
+                         [resultShapeType@TypeTuple{}, loopSizeType, TypeLam loopIndexType t])
+        | loopSizeType `eqType` loopIndexType
+        , isJust (tensorDimensionFromIndexType_maybe loopIndexType)
+        , TypeTuple shapes <- resultShapeType
+        , TypeTuple lamty <- t
+        -> fmap TypeTuple (zipWithM buildFromSparseResultTy_maybe shapes lamty)
       ("index"    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
         -> Just t
@@ -614,6 +609,13 @@ primFunCallResultTy_maybe fun args
                      [TypeInteger, TypeInteger, t])        -> Just t
       _ -> Nothing
 
+buildFromSparseResultTy_maybe :: Type -> Type -> Maybe Type
+buildFromSparseResultTy_maybe (TypeTensor d elemshapety) (TypeTuple [indexty, elemty])
+  | indexty `eqType` tensorIndexType d
+  , elemshapety `eqType` shapeType elemty
+  = Just (TypeTensor d elemty)
+buildFromSparseResultTy_maybe _ _ = Nothing
+
 isPrimFun :: String -> Bool
 isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f at args
                        , "$copydown"-- ($copydown e)              Requests copydown of e
@@ -623,6 +625,8 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "Vec_init" -- (Vec_init v1 ... vn)       Vector literal
                        , "build"    -- (build N f)                Build vector [(f i) for i = 1..n]
                        , "sumbuild" -- (sumbuild N f)             (sum (build N f))
+                       , "buildFromSparse" -- generalization of build
+                       , "buildFromSparseTupled" -- builds multiple tensors with a single loop
                        , "fold"     -- (fold f z v)               (Left) fold over v
                        , "index"
                        , "shape"

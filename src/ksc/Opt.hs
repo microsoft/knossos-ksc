@@ -140,7 +140,7 @@ optE env
     go (Call f arg)       = optCall (optZapSubst env) f (go arg)
 
 --------------
-optCall :: OptEnv -> TFun -> TExpr -> TExpr
+optCall :: OptEnv -> TFun Typed -> TExpr -> TExpr
 optCall env fun opt_args
   | Just new_e <- rewriteCall env fun opt_args
   -- = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
@@ -195,7 +195,7 @@ on the condition.
 --
 -- The same goes for optFun, optGradFun, etc
 
-rewriteCall :: HasCallStack => OptEnv -> TFun -> TExpr -> Maybe TExpr
+rewriteCall :: HasCallStack => OptEnv -> TFun Typed -> TExpr -> Maybe TExpr
 
 -- RULE: f( let x = e in b )  =  let x = e in f(b)
 rewriteCall _ fun (Let v r arg)
@@ -221,7 +221,7 @@ rewriteCall _ _ _
   = Nothing
 
 -----------------------
-optFun :: OptEnv -> FunId -> TExpr -> Maybe TExpr
+optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
 
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
 optFun _ (SelFun i _) arg
@@ -235,7 +235,8 @@ optFun _ (SelFun i _) arg
 -- $inline needs to look up the global symtab
 optFun env (PrimFun "$inline") arg
   | Call (TFun _ fun) inner_arg <- arg
-  , Just fun_def <- lookupGblST (fun, typeof inner_arg) (optGblST env)
+  , Just userFun <- maybeUserFun fun
+  , Just fun_def <- lookupGblST userFun (optGblST env)
   , Def { def_pat = pat, def_rhs = UserRhs body } <- fun_def
   = Just (inlineCall env pat body inner_arg)
 
@@ -243,7 +244,7 @@ optFun env (PrimFun "$inline") arg
 optFun env (PrimFun f) e
   = optPrimFun (optEnvInScope env) f e
 
-optFun _ (UserFun {}) _
+optFun _ (BaseUserFun {}) _
   = Nothing
 
 -----------------------
@@ -599,9 +600,9 @@ optSumBuild _ _ _ = Nothing
 
 -----------------------
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
-                           -> Type -> FunId -> TExpr -> Maybe TExpr
+                           -> Type -> BaseFun Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun _ _ _ (UserFun {}) _
+optGradFun _ _ _ (BaseUserFun {}) _
   = Nothing
 
 -- From here on we have primitives or selection
@@ -710,7 +711,7 @@ optGradPrim (TypeLM a _) "$copydown" _ = Just (lmOne a)
 optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ f ++ " at " ++ show (typeof a)) Nothing
 
 -----------------------
-optDrvFun :: HasCallStack => ADMode -> FunId -> TExpr -> Maybe TExpr
+optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
 optDrvFun (AD BasicAD dir) (PrimFun f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 

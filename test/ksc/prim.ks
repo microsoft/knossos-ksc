@@ -82,14 +82,14 @@
      (let (test_x_plus_dx (testfunc (ts_add x dx)))
      (let (test_fd (sub test_x_plus_dx test_x))
 
-     (let (test_fwd (fwd$testfunc x dx))
+     (let (test_fwd ([fwd testfunc] x dx))
 
      (let (fwd_ok
               (lt (abs (sub test_fwd test_fd))
                   (mul (add (abs test_fwd) (abs test_fd)) tolerance)))
 
      (let (checked ($check  (lam (t : Tuple Float Float) (testfunc t))
-                            (lam (t : Tuple (Tuple Float Float) Float) (rev$testfunc t))
+                            (lam (t : Tuple (Tuple Float Float) Float) ([rev testfunc] t))
                             x
                             x
                             dx
@@ -104,15 +104,15 @@
         "fwd = " test_fwd "\n"
         "fd = " test_fd "\n"
         "fwd - fd = " (sub test_fwd test_fd) "\n"
-        "rev = " (rev$testfunc x df) "\n"
+        "rev = " ([rev testfunc] x df) "\n"
         "checked (should be small) = " checked "\n"
 
         "TESTS FOLLOW"
         "\n----\n"
-        "fwd$testfunc\n"
+        "[fwd testfunc]\n"
         fwd_ok
         "\n----\n"
-        "rev$testfunc\n"
+        "[rev testfunc]\n"
         rev_ok
         "\n"
         )))))))))))))))))))

@@ -149,8 +149,8 @@ hspec :: Spec
 hspec = do
     let var :: String -> TVar
         var s = TVar TypeFloat (Simple s)
-        fun :: String -> TFun
-        fun s = TFun TypeFloat (Fun (UserFun s))
+        fun :: String -> TFun Typed
+        fun s = TFun TypeFloat (Fun (BaseUserFun (BaseUserFunId s TypeFloat)))
         e  = Call (fun "f") (Var (var "i"))
         e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
     describe "notFreeIn" $ do
@@ -186,7 +186,8 @@ different argument types.  Indeed you can see this in
 src/runtime/prelude.ks.  Functions with the same name, same argument
 type but differing return types are *not* allowed.
 
-The global symbol table is keyed by (name, arg-type) pairs.
+The global symbol table is keyed by (what are essentially) (name,
+arg-type) pairs.
 
 All of this would go out of the window if we had polymorphism, because
 then the argument type could be a type variable.  But we don't!
@@ -198,11 +199,11 @@ fortunately all functions have explicitly-declared types.
 -}
 
 -- Global symbol table
-type GblSymTab = M.Map (Fun, Type) TDef
+type GblSymTab = M.Map (UserFun Typed) TDef
    -- Maps a function to its definition, which lets us
    --   * Find its return type
    --   * Inline it
-   -- Domain is UserFun, and perhaps the Grad of PrimFuns
+   -- Domain is UserFun Typed
 
 -- Local symbol table
 type LclSymTab = M.Map Var Type
@@ -235,9 +236,9 @@ newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
 stInsertFun :: TDef -> GblSymTab -> GblSymTab
-stInsertFun def@(Def { def_fun = f, def_pat = arg }) = M.insert (f, patType arg) def
+stInsertFun def@(Def { def_fun = f }) = M.insert f def
 
-lookupGblST :: HasCallStack => (Fun, Type) -> GblSymTab -> Maybe TDef
+lookupGblST :: HasCallStack => UserFun Typed -> GblSymTab -> Maybe TDef
 lookupGblST = M.lookup
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
@@ -341,7 +342,7 @@ instead of
          xn = get$n$n r
      in body
 
-When we come to implement AD based on Single Use Language the form 2
+When we come to implement AD based on Single Use Language the form 1
 will be more than a simple convenience, it will be essential for the
 algorithm to generate efficient code.
 

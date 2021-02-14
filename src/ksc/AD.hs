@@ -1,6 +1,8 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 
+{-# LANGUAGE DataKinds #-}
+
 module AD where
 
 import Lang
@@ -16,7 +18,7 @@ import Data.Maybe (mapMaybe, fromMaybe)
 
 --------------- Generate names for gradded indentifiers
 
-gradF :: HasCallStack => ADPlan -> Fun -> Fun
+gradF :: HasCallStack => ADPlan -> Fun Typed -> Fun Typed
 gradF adm (Fun f) = GradFun f adm
 gradF _   f       = error ("gradF: bad function: " ++ show f)
 
@@ -24,7 +26,7 @@ gradV :: ADPlan -> Var -> Var
 gradV adp (Simple x) = Grad x adp
 gradV _ v            = error ("gradV: bad variable: " ++ render (ppr v))
 
-gradTFun :: HasCallStack => ADPlan -> TFun -> Type -> TFun
+gradTFun :: HasCallStack => ADPlan -> TFun Typed -> Type -> TFun Typed
 gradTFun adp (TFun res_ty f) arg_tys
   = TFun (mkGradType adp arg_tys res_ty)
          (gradF adp f)
@@ -48,10 +50,10 @@ gradDef adp = gradDefInner adp . noTupPatifyDef
 
 gradDefInner :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDefInner adp
-        (Def { def_fun = f@(Fun{}), def_pat = VarPat params
+        (Def { def_fun = Fun f, def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
-    Def { def_fun    = gradF adp f
+    Def { def_fun    = GradFun f adp
         , def_pat    = VarPat params
         , def_res_ty = mkGradType adp s_ty res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs')) }
@@ -178,7 +180,7 @@ gradFold TupleAD s _ti _body acc _v =
   where t_acc = typeof acc
 
 ---------------
-gradCall :: ADPlan -> Shape -> TFun -> TExpr -> TExpr
+gradCall :: ADPlan -> Shape -> TFun Typed -> TExpr -> TExpr
 gradCall BasicAD s f args
   = lmCompose (Call gf args) (gradE BasicAD s args)
   where

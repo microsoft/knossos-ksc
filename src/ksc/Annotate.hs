@@ -2,6 +2,7 @@
 -- Licensed under the MIT license.
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
 	     ScopedTypeVariables, TypeApplications, AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Annotate (
   annotDecls, lintDefs
@@ -53,11 +54,14 @@ annotDecls gbl_env decls
     -- doesn't matter because we aren't doing inlining
     mk_rec_def :: DefX Parsed -> TcM TDef
     mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
-       = addCtxt (text "In the definition of" <+> ppr fun) $
+       = addCtxt (text "In the definition of" <+> ppr_fun) $
          tcWithPat pat $ \pat' ->
-         do { return (Def { def_fun = fun, def_pat = pat'
+         do { fun' <- tcUserFunArgTy @Parsed fun (typeof pat')
+            ; return (Def { def_fun = fun', def_pat = pat'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
+      where ppr_fun = pprUserFun @Parsed fun
+
 
 -----------------------------------------------
 --     A Lint function to do type checking
@@ -79,23 +83,25 @@ lintDefs what gbl_env defs
 --     Guts of the type checker
 -----------------------------------------------
 
-tcDeclX :: InPhase p => DeclX p -> TcM TDecl
+tcDeclX :: (Pretty (BaseUserFun p), InPhase p) => DeclX p -> TcM TDecl
 tcDeclX (DefDecl def)   = do { def' <- tcDef def
                              ; return (DefDecl def') }
 tcDeclX (RuleDecl rule) = do { rule' <- tcRule rule
                              ; return (RuleDecl rule') }
 
-tcDef :: InPhase p => DefX p -> TcM TDef
+tcDef :: forall p. (Pretty (BaseUserFun p), InPhase p) => DefX p -> TcM TDef
 tcDef (Def { def_fun    = fun
            , def_pat   = pat
            , def_res_ty = res_ty
            , def_rhs    = rhs })
-  = addCtxt (text "In the definition of" <+> ppr fun) $
+  = addCtxt (text "In the definition of" <+> ppr_fun) $
     do { tcWithPat pat $ \pat' ->
     do { rhs' <- tcRhs fun rhs res_ty
-       ; return (Def { def_fun = fun, def_pat = pat'
+       ; fun' <- tcUserFunArgTy @p fun (typeof pat')
+       ; return (Def { def_fun = fun', def_pat = pat'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
+      where ppr_fun = pprUserFun @p fun
 
 -- Adds the variables in the pattern to the symbol table and
 -- runs the continuation on the pattern.
@@ -150,13 +156,14 @@ tcTupPatTup vs ts
 tvar :: forall p. InPhase p => Type -> LetBndrX p -> TVarX
 tvar t v = TVar t (fst (getLetBndr @p v))
 
-tcRhs :: InPhase p => Fun -> RhsX p -> Type -> TcM TRhs
+tcRhs :: forall p. InPhase p => UserFun p -> RhsX p -> Type
+      -> TcM TRhs
 tcRhs _ StubRhs _ = return StubRhs
 tcRhs _ EDefRhs _ = return EDefRhs
 tcRhs fun (UserRhs rhs) res_ty
   = do { TE rhs' rhs_ty <- tcExpr rhs
        ; checkTypes res_ty rhs_ty $
-         text "Function result type mis-match for" <+> ppr fun
+         text "Function result type mis-match for" <+> pprUserFun @p fun
        ; return (UserRhs rhs') }
 
 tcRule :: InPhase p => RuleX p -> TcM TRule
@@ -171,6 +178,20 @@ tcRule (Rule { ru_name = name, ru_qvars = qvars
        ; return (Rule { ru_name = name, ru_qvars = qvars
                       , ru_lhs = lhs', ru_rhs = rhs' })
     }}
+
+tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
+               => UserFun p -> Type
+               -> TcM (UserFun Typed)
+tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
+  Right baseTy -> case addBaseTypeToUserFun @p fun baseTy of
+    Right r -> pure r
+    Left appliedTy ->
+      addErr (text "The base type did not match the applied type"
+              <+> text "in the call to" <+> ppr fun
+              $$ text "The argument type was" <+> ppr arg_ty
+              $$ text "from which the base type was determined to be" <+> ppr baseTy
+              $$ text "but the applied type was" <+> ppr appliedTy)
+  Left err -> addErr err
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
@@ -190,12 +211,10 @@ tcExpr (Call fx es)
   = do { let (fun, mb_ty) = getFun @p fx
        ; pairs <- addCtxt (text "In the call of:" <+> ppr fun) $
                   tcExpr es
-
-       ; res_ty <- lookupGblTc fun pairs
-
+       ; (funTyped, res_ty) <- lookupGblTc fun pairs
        ; res_ty <- checkTypes_maybe mb_ty res_ty $
          text "Function call type mismatch for" <+> ppr fun
-       ; let call' = Call (TFun res_ty fun) (exprOf pairs)
+       ; let call' = Call (TFun res_ty funTyped) (exprOf pairs)
        ; return (TE call' res_ty) }
 
 tcExpr (Let vx rhs body)
@@ -254,45 +273,30 @@ tcVar var mb_ty
        ; checkTypes_maybe mb_ty ty $
          text "Variable occurrence mis-match for" <+> ppr var }
 
-------------------------------------------------------------------------------
--- callResultTy_maybe is given a (global) function and the type of its
--- argument, and returns the type of its result.
---
--- It has special cases for a bunch opuilt-in functions with polymorphic
--- types; that is, where the result type is a function of the argument types
--- Otherwise it just looks in the global symbol table.
-callResultTy_maybe :: GblSymTab -> Fun -> Type
-                   -> Either SDoc Type
-callResultTy_maybe env fun args
-  | is_user_fun fun
-  = userCallResultTy_maybe fun env args
-  | otherwise
-  = primCallResultTy_maybe fun (typeof args)
-  where
-    is_user_fun = isUserFun . funIdOfFun
-
 -----------------------------------------------
 --     The typecheck monad
 -----------------------------------------------
 
-userCallResultTy_maybe :: HasCallStack => Fun -> GblSymTab
+userCallResultTy_maybe :: HasCallStack => UserFun Typed -> GblSymTab
                        -> Type -> Either SDoc Type
 userCallResultTy_maybe fn env args
-  = case lookupGblST (fn, typeof args) env of
+  = case lookupGblST fn env of
       Just def -> userCallResultTy_help def args
       Nothing  -> Left (text "Not in scope: userCall:"
-                        <+> ppr fn <+> ppr (typeof args) $$ message)
+                        <+> ppr_fn <+> ppr (typeof args) $$ message)
         where message = if null similarEnv
                         then empty
                         else text "Did you mean one of these:"
                              $$ vcat similarEnv
-              similarEnv = (map (\(f, t) -> ppr f <+> ppr t)
+              similarEnv = (map ppr
                             . filter similar
                             . Map.keys) env
-              similar (envfn, _) =
-                editDistance (render (ppr fn)) (render (ppr envfn))
+              similar envfn =
+                editDistance (render ppr_fn) (render (ppr envfn))
                 <= configEditDistanceThreshold
               editDistance = E.levenshteinDistance E.defaultEditCosts
+
+              ppr_fn = pprUserFun @Typed fn
 
 userCallResultTy_help :: HasCallStack
                       => TDef -> Type -> Either SDoc Type
@@ -314,9 +318,11 @@ userCallResultTy_help (Def { def_fun  = fn
       = Nothing
       | otherwise
       = Just (hang (text "Type mis-match in argument"
-                     <+> text "of call to" <+> ppr fn)
+                     <+> text "of call to" <+> ppr_fn)
                  2 (vcat [ text "Expected:" <+> ppr bndr_ty
                          , text "Actual:  " <+> ppr arg_ty ]))
+      where ppr_fn = pprUserFun @Typed fn
+
 
 -----------------------------------------------
 --     The typecheck monad
@@ -457,19 +463,31 @@ lookupLclTc v
                              }
            Just ty -> return ty }
 
-lookupGblTc :: Fun -> TypedExpr -> TcM Type
+lookupGblTc :: Fun Parsed -> TypedExpr -> TcM (Fun Typed, Type)
 lookupGblTc fun args
   = do { st <- getSymTabTc
-       ; case callResultTy_maybe (gblST st) fun (typeof args) of
-           Left err -> do { addErr $ hang err 2 (mk_extra st)
-                          ; return TypeUnknown }
-           Right res_ty -> return res_ty }
+       ; (funTyped, callResultTy_maybe) <- case perhapsUserFun fun of
+           Right userFun -> do
+             { userFun' <- tcUserFunArgTy @Parsed userFun ty
+             ; pure (userFunToFun userFun',
+                     userCallResultTy_maybe userFun' (gblST st) ty) }
+           Left fun' -> pure (fun', primCallResultTy_maybe fun' ty)
+
+       ; res_ty <- case callResultTy_maybe of
+                     Left err -> do { addErr $ hang err 2 (mk_extra funTyped st)
+                                    ; return TypeUnknown }
+                     Right res_ty -> return res_ty
+       ; pure (funTyped, res_ty)
+       }
   where
-    mk_extra st
+    ty = typeof args
+    mk_extra fun st
       = vcat [ text "In a call of:" <+> ppr fun <+> parens (text (show fun))
-             , text " Arg types:" <+> ppr (typeof args)
+             , text " Arg types:" <+> ppr ty
              , text " Args:"      <+> ppr (exprOf args)
-             , text "ST lookup:"  <+> ppr (Map.lookup (fun, typeof args) (gblST st))
+             , text "ST lookup:"  <+> case maybeUserFun fun of
+                                         Nothing -> text "<not a UserFun>"
+                                         Just userFun -> ppr (Map.lookup userFun (gblST st))
              -- This is very verbose, and obscures error messages, but can be useful for typos.
              -- Perhaps think about printing it only for failed lookup of userfun
              -- , text "ST keys:" <+> gblDoc st

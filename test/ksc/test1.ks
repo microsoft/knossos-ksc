@@ -28,9 +28,9 @@
         ; See https://github.com/awf/knossos/issues/281 (D$f 1.1 2.2 )
         (g x y) nl
         "FD=" (div (sub (f x (add y delta)) (f x y)) delta) 
-        " vs " (fwd$f (tuple x y) (tuple delta delta)) nl
+        " vs " ([fwd f] (tuple x y) (tuple delta delta)) nl
         "CHECK=" ($check (lam (t : Tuple Float Float) (f1 t))
-                         (lam (t : Tuple (Tuple Float Float) Float) (rev$f1 t))
+                         (lam (t : Tuple (Tuple Float Float) Float) ([rev f1] t))
                          (tuple x y)
                          (tuple x y)
                          (tuple delta delta)

@@ -124,16 +124,9 @@ namespace ks
 		struct HCat_infer_From {
 		};
 
-		template <>
-		struct HCat_infer_From<tuple<>> {
-			typedef tuple<> type;
-		};
-
-		template <class T, class... Ts>
-		struct HCat_infer_From<tuple<T, Ts...>> {
-			typedef typename T::From From;
-			typedef typename HCat_infer_From<tuple<Ts...>>::type Froms;
-			typedef typename tuple_prepend<From, Froms>::type type;
+		template <class... Ts>
+		struct HCat_infer_From<tuple<Ts...>> {
+			typedef tuple<typename Ts::From ...> type;
 		};
 
 		namespace test_HCat_infer_From {
@@ -201,16 +194,9 @@ namespace ks
 		struct VCat_infer_To {
 		};
 
-		template <>
-		struct VCat_infer_To<tuple<>> {
-			typedef tuple<> type;
-		};
-
-		template <class T, class... Ts>
-		struct VCat_infer_To<tuple<T, Ts...>> {
-			typedef typename T::To To;
-			typedef typename VCat_infer_To<tuple<Ts...>>::type Tos;
-			typedef typename tuple_prepend<To, Tos>::type type;
+		template <class... Ts>
+		struct VCat_infer_To<tuple<Ts...>> {
+			typedef tuple<typename Ts::To ...> type;
 		};
 
 		namespace test_VCat_infer_To {

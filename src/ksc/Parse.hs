@@ -88,16 +88,17 @@ Notes:
 -}
 
 
-import Lang hiding (parens)
+import Lang hiding (parens, brackets)
 import Prim
 
-import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError )
+import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
 import Text.Parsec.Char
 import Text.Parsec.String (Parser)
 
 import qualified Text.Parsec.Token as Tok
 
 import Control.Monad
+import Text.Read ( readMaybe )
 
 --import Test.Hspec
 
@@ -142,8 +143,8 @@ langDef = Tok.LanguageDef
 --  , Tok.identLetter     = alphaNum <|> oneOf "_'"
 --  , Tok.opStart         = oneOf ":!#$%&*+./<=>?@\\^|-~"
 --  , Tok.opLetter        = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , Tok.identStart      = letter <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~[]"
-  , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~[]"
+  , Tok.identStart      = letter <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~"
+  , Tok.identLetter     = alphaNum <|> oneOf "_':!$%&*+.,/<=>?@\\^|-~"
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
@@ -159,6 +160,9 @@ lexer = Tok.makeTokenParser langDef
 
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
+
+brackets :: Parser a -> Parser a
+brackets = Tok.brackets lexer
 
 pReserved :: String -> Parser ()
 pReserved = Tok.reserved lexer
@@ -247,10 +251,10 @@ pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeTensor 1 ty) })
 
 pCall :: Parser (ExprX Parsed)
 -- Calls (f e), (f e1 e2), etc
-pCall = do { f <- pIdentifier
+pCall = do { f <- pFun
            ; es <- many pExpr
            -- See Note [Function arity]
-           ; return (Call (mk_fun f) (mkTuple es))
+           ; return (Call f (mkTuple es))
         }
 
 pIfThenElse :: Parser (ExprX Parsed)
@@ -269,13 +273,13 @@ pAssert = do { pReserved "assert"
              ; return $ Assert e1 e2 }
 
 pTuple :: Parser (ExprX Parsed)
--- (assert e1 e2)
+-- (tuple e1 ... en)
 pTuple = do { pReserved "tuple"
             ; es <- many pExpr
             ; return $ Tuple es }
 
 pDummy :: Parser (ExprX Parsed)
--- (assert e1 e2)
+-- ($dummy type)
 pDummy = do { pReserved "$dummy"
             ; ty <- pType
             ; return $ Dummy ty }
@@ -312,18 +316,75 @@ pLet = do { pReserved "let"
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
 
+pIsUserFun :: Fun Parsed -> Parser (UserFun Parsed)
+pIsUserFun fun = case maybeUserFun fun of
+  Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ show fun)
+  Just userFun -> pure userFun
+
+pPrimFun :: Parser (BaseFun p)
+pPrimFun = try $ do { f <- pIdentifier
+                    ; when (not (isPrimFun f))
+                           (unexpected (f ++ " is not a PrimFun"))
+                    ; pure (PrimFun f)
+                    }
+
+pSelFun :: Parser (BaseFun p)
+pSelFun = do { rest <- try $ do { f <- pIdentifier
+                                ; case break (== '$') f of
+                                    ("get", '$':rest) -> pure rest
+                                    _ -> unexpected "Did not start with get$"
+                                }
+             ; let mselfun = do { (istring, '$':nstring) <- pure (break (== '$') rest)
+                                ; i <- readMaybe istring
+                                ; n <- readMaybe nstring
+                                ; pure (SelFun i n)
+                                }
+             ; case mselfun of
+                 Nothing     -> unexpected "Ill-formed get"
+                 Just selfun -> pure selfun
+             }
+
+pBaseUserFun :: Parser (BaseFun Parsed)
+pBaseUserFun = BaseUserFun <$>
+    (brackets (do { f  <- pIdentifier
+                  ; ty <- pType
+                  ; pure (BaseUserFunId f (Just ty))
+                  })
+     <|> do { f <- pIdentifier
+            ; pure (BaseUserFunId f Nothing)
+            })
+
+pBaseFun :: Parser (BaseFun Parsed)
+pBaseFun = pSelFun
+       <|> pPrimFun
+       <|> pBaseUserFun
+
+pFun :: Parser (Fun Parsed)
+pFun = try (brackets $
+            ((pBaseDerivation "D" GradFun BasicAD)
+         <|> (pBaseDerivation "Dt" GradFun TupleAD)
+         <|> (pBaseDerivation "fwd" DrvFun (AD BasicAD Fwd))
+         <|> (pBaseDerivation "fwdt" DrvFun (AD TupleAD Fwd))
+         <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
+         <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
+         <|> (pReserved "shape" >> ShapeFun <$> pFun)))
+   <|> Fun <$> pBaseFun
+  where pBaseDerivation s f p =
+          pReserved s >> flip f p <$> pBaseFun
+
 pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
 pDef = do { pReserved "def"
-          ; f <- pIdentifier
+          ; f <- pFun
           ; ty <- pType
           ; xs <- pParams
           ; rhs <- pExpr
+          ; mk_fun_f <- pIsUserFun f
           -- See Note [Function arity]
           ; let pat = case xs of
                   [x] -> VarPat x
                   xs  -> TupPat xs
-          ; return (Def { def_fun    = mk_fun f
+          ; return (Def { def_fun    = mk_fun_f
                         , def_pat    = pat
                         , def_rhs    = UserRhs rhs
                         , def_res_ty = ty }) }
@@ -339,10 +400,11 @@ pRule = do { pReserved "rule"
 
 pEdef :: Parser (DefX Parsed)
 pEdef = do { pReserved "edef"
-           ; name       <- pIdentifier
+           ; f          <- pFun
            ; returnType <- pType
            ; argTypes   <- pTypes
-           ; return (Def { def_fun = mk_fun name
+           ; mk_fun_name <- pIsUserFun f
+           ; return (Def { def_fun = mk_fun_name
                          , def_res_ty = returnType
                          -- See note [Function arity]
                          , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")

@@ -138,7 +138,7 @@
           (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (ts_add x dx) (ts_add alphas dalphas) (ts_add mus dmus) (ts_add qs dqs) (ts_add ls dls) (ts_add wishart dwishart)))
 
           (gmm_fd (sub gmm_at_theta_plus_dtheta gmm_at_theta))
-          (gmm_fwd (fwd$gmm_knossos_gmm_objective
+          (gmm_fwd ([fwd gmm_knossos_gmm_objective]
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)))
 
@@ -186,7 +186,7 @@
                                                   (Vec (Vec Float))
                                                   (Tuple Float Integer))
                                            Float)
-                                (rev$gmm_knossos_gmm_objective t))
+                                ([rev gmm_knossos_gmm_objective] t))
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)
