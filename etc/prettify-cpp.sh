@@ -1,4 +1,17 @@
-# Make our output C++ a tiny bit prettier (possibly introducing name clashes)
+# Make our output C++ a tiny bit prettier (possibly introducing name clashes and syntax errots)
+# To use: 
+#   $ ./ksc  test/ksc/gmm.ks 
+#   $  sh etc/prettify-cpp.sh /tmp/t.cpp | grep -A 30 '^ty\$gmm_knossos_gmm_objective '
+# Will produce something like
+#   ty$gmm_knossos_gmm_objective gmm_knossos_gmm_objective(ks::allocator * alloc, tensor<1, tensor<1, double>> x, tensor<1, double> alphas, tensor<1, tensor<1, double>> means, tensor<1, tensor<1, double>> qs, tensor<1, tensor<1, double>> ls, tuple<double,int> wishart) {
+#   int c0 = size(x);
+#   int N = c0;
+#   int c1 = size(alphas);
+#   int K = c1;
+#   tensor<1, double> c2 = index(0, x);
+#   ...
+
+
 sed -r\
  -e 's/\$alloc/alloc/g'\
  -e 's/^([ \t]+)ty\$[a-zA-Z0-9_$]+/\1auto/g'\
