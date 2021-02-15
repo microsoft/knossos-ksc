@@ -8,8 +8,7 @@ import Lang
 import LangUtils
 import Parse (parseE)
 import Opt
-import Ksc.Pipeline (displayCppGenAndCompile,
-                     genFuthark, ignoreMain)
+import Ksc.Pipeline (displayCppGenAndCompile, genFuthark)
 import qualified Ksc.Pipeline
 import qualified Cgen
 import qualified Control.Exception
@@ -176,10 +175,7 @@ testRoundTrip ksFiles = do
     let render :: InPhase p => [DeclX p] -> String
         render = unlines . map (renderSexp . ppr)
 
-        parseIgnoringMain :: String -> Either String [Decl]
-        parseIgnoringMain = fmap ignoreMain . parseE
-
-        parsedE = parseIgnoringMain original
+        parsedE = parseE original
 
         parsed = case parsedE of
           Left e  -> error ("Original failed to parse:\n"
@@ -189,7 +185,7 @@ testRoundTrip ksFiles = do
 
         rendered_parsed = render parsed
 
-        parsed_rendered_parsedE = parseIgnoringMain rendered_parsed
+        parsed_rendered_parsedE = parseE rendered_parsed
 
         parsed_rendered_parsed = case parsed_rendered_parsedE of
           Left e  -> error ("Round-tripped failed to parse:\n"

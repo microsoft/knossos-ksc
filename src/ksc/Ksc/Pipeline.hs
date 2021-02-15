@@ -13,8 +13,8 @@ import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner, liftIO)
 import Ksc.CatLang
 import Ksc.Traversal (mapAccumLM)
-import Lang (Decl, DeclX(DefDecl), DefX(Def), DerivedFun(Fun),
-             TDef, Pretty, BaseUserFun(BaseUserFunId),
+import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun),
+             TDef, Pretty,
              def_fun, displayN, partitionDecls,
              ppr, renderSexp, (<+>))
 import qualified Lang as L
@@ -25,7 +25,7 @@ import Rules (mkRuleBase)
 import Opt (optDefs)
 import Shapes (shapeDefs)
 
-import Data.List (partition, intercalate)
+import Data.List (intercalate)
 import qualified Data.Map as Map
 import GHC.Stack (HasCallStack)
 
@@ -64,17 +64,6 @@ displayPassM mverbosity what env decls
 -------------------------------------
 -- Main compiler driver
 -------------------------------------
-
-ignoreMain :: [Decl] -> [Decl]
-ignoreMain = snd . moveMain
-
-moveMain :: [Decl]
-         -> ( [Decl]    -- Singleton 'main' decl, or empty
-            , [Decl])   -- All the rest
-moveMain = partition isMain
-  where
-    isMain (DefDecl (Def { def_fun = Fun (BaseUserFunId "main" _) })) = True
-    isMain _ = False
 
 displayCppGen :: Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGen verbosity ksFiles ksofile cppfile =
