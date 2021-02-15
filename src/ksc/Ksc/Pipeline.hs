@@ -43,25 +43,6 @@ demoF files = runKM $ do
   pure ()
 
 -------------------------------------
--- Displaying passes
--------------------------------------
-
-type DisplayLintT m = String -> GblSymTab -> [TDef] -> KMT m ()
-type DisplayLint = DisplayLintT IO
-
-displayPassMNoLint :: Pretty def => Maybe Int -> String -> [def] -> KMT IO ()
-displayPassMNoLint mverbosity what decls
-  = do flip mapM_ mverbosity $ \verbosity -> do
-         banner what
-         displayN (take verbosity decls)
-
-displayPassM :: Maybe Int -> DisplayLint
-displayPassM mverbosity what env decls
-  = do { displayPassMNoLint mverbosity what decls
-       ; lintDefs what env decls
-    }
-
--------------------------------------
 -- Main compiler driver
 -------------------------------------
 
@@ -121,37 +102,6 @@ doall :: HasCallStack => Maybe Int -> [String] -> String -> IO ()
 doall = displayCppGenCompileAndRunWithOutput "g++-7"
 
 -------------------------------------
--- The Futhark driver
--------------------------------------
-futharkPipeline :: [FilePath] -> KM [TDef]
-futharkPipeline files
-  = do
-  { decls0 <- liftIO (fmap concat (mapM (parseF . (++ ".ks")) files))
-  ; pipeline Nothing decls0
-  }
-
--- | Read source code from specified input file, optimise,
--- differentiate, optimise, and write result to corresponding @.fut@
--- file.  You will have to run the Futhark compiler yourself
--- afterwards (and probably write a small wrapper program, because
--- currently the generated file will not have any entry points).
---
--- Usage:
---
--- @
--- $ ghci -isrc/ksc -e 'genFuthark "test/ksc/gmm"' src/ksc/Main.hs
--- @
-genFuthark :: [FilePath] -> FilePath -> IO ()
-genFuthark files file = do
-  prelude <- readFile "src/runtime/knossos.fut"
-  defs <- runKM $ futharkPipeline (files ++ [file])
-  putStrLn $ "Writing to " ++ futfile
-  Cgen.createDirectoryWriteFile futfile $
-    intercalate "\n\n" $
-    prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
-  where futfile = "obj/" ++ file ++ ".fut"
-
--------------------------------------
 -- Main compiler pipeline
 -------------------------------------
 
@@ -169,18 +119,12 @@ pipeline verbosity decls = do
   ; pure defs
   }
 
-deriveDeclUsing :: Applicative f
-                => (env -> L.GDefX -> f (env, [L.TDecl]))
-                -> env
-                -> L.TDecl
-                -> f (env, [L.TDecl])
-deriveDeclUsing f env = \case
-  -- Pass the rules on through
-  r@L.RuleDecl{} -> pure (env, [r])
-  -- Existing defs just get passed straight through
-  d@DefDecl{} -> pure (env, [d])
-  -- gdefs get looked up
-  L.GDefDecl g -> f env g
+annotAndDeriveDecl :: GblSymTab -> L.Decl -> KM (GblSymTab, [L.TDecl])
+annotAndDeriveDecl env decl = do
+  { (env, tdecls) <- annotDecls env [decl]
+  ; (env, concat->tdecls) <- mapAccumLM deriveDecl env tdecls
+  ; pure (env, tdecls)
+  }
 
 deriveDecl :: GblSymTab -> L.TDecl -> KM (GblSymTab, [L.TDecl])
 deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
@@ -219,9 +163,65 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
           in pure (env', map DefDecl shapeDef)
     }
 
-annotAndDeriveDecl :: GblSymTab -> L.Decl -> KM (GblSymTab, [L.TDecl])
-annotAndDeriveDecl env decl = do
-  { (env, tdecls) <- annotDecls env [decl]
-  ; (env, concat->tdecls) <- mapAccumLM deriveDecl env tdecls
-  ; pure (env, tdecls)
+deriveDeclUsing :: Applicative f
+                => (env -> L.GDefX -> f (env, [L.TDecl]))
+                -> env
+                -> L.TDecl
+                -> f (env, [L.TDecl])
+deriveDeclUsing f env = \case
+  -- Pass the rules on through
+  r@L.RuleDecl{} -> pure (env, [r])
+  -- Existing defs just get passed straight through
+  d@DefDecl{} -> pure (env, [d])
+  -- gdefs get looked up
+  L.GDefDecl g -> f env g
+
+-------------------------------------
+-- Displaying passes
+-------------------------------------
+
+type DisplayLintT m = String -> GblSymTab -> [TDef] -> KMT m ()
+type DisplayLint = DisplayLintT IO
+
+displayPassMNoLint :: Pretty def => Maybe Int -> String -> [def] -> KMT IO ()
+displayPassMNoLint mverbosity what decls
+  = do flip mapM_ mverbosity $ \verbosity -> do
+         banner what
+         displayN (take verbosity decls)
+
+displayPassM :: Maybe Int -> DisplayLint
+displayPassM mverbosity what env decls
+  = do { displayPassMNoLint mverbosity what decls
+       ; lintDefs what env decls
+    }
+
+-------------------------------------
+-- The Futhark driver
+-------------------------------------
+futharkPipeline :: [FilePath] -> KM [TDef]
+futharkPipeline files
+  = do
+  { decls0 <- liftIO (fmap concat (mapM (parseF . (++ ".ks")) files))
+  ; pipeline Nothing decls0
   }
+
+-- | Read source code from specified input file, optimise,
+-- differentiate, optimise, and write result to corresponding @.fut@
+-- file.  You will have to run the Futhark compiler yourself
+-- afterwards (and probably write a small wrapper program, because
+-- currently the generated file will not have any entry points).
+--
+-- Usage:
+--
+-- @
+-- $ ghci -isrc/ksc -e 'genFuthark "test/ksc/gmm"' src/ksc/Main.hs
+-- @
+genFuthark :: [FilePath] -> FilePath -> IO ()
+genFuthark files file = do
+  prelude <- readFile "src/runtime/knossos.fut"
+  defs <- runKM $ futharkPipeline (files ++ [file])
+  putStrLn $ "Writing to " ++ futfile
+  Cgen.createDirectoryWriteFile futfile $
+    intercalate "\n\n" $
+    prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
+  where futfile = "obj/" ++ file ++ ".fut"
