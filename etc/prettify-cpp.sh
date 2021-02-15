@@ -5,6 +5,6 @@ sed -r\
  -e 's/rev\$/Grad_/g'\
  -e 's/\bc\$/c/g'\
  -e 's/\$a[A-Za-z0-9_$]+//g'\
- -e 's/ks::alloc_mark_t (.*) = alloc->mark\(\)/ks::mark \1(alloc);/' \
+ -e 's/ks::alloc_mark_t (.*) = alloc->mark\(\)/ks::mark \1(alloc)/' \
  -e 's/aten\$8.8/at::/g'\
  $*
