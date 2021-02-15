@@ -423,11 +423,7 @@ addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
         g mt' = (mismatchedAppliedTyF mt', expectedBaseTy)
 
 userFunToFun :: UserFun p -> Fun p
-userFunToFun = \case
-  Fun f -> Fun (BaseUserFun f)
-  GradFun f p -> GradFun (BaseUserFun f) p
-  DrvFun f m -> DrvFun (BaseUserFun f) m
-  ShapeFun f -> ShapeFun (userFunToFun f)
+userFunToFun = T.mapOf baseFunFun BaseUserFun
 
 -- A 'Fun p' is Either:
 --
