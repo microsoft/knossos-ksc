@@ -90,6 +90,8 @@ doc/AD.pdf
 *.synctex(busy)
 *.synctex.gz
 *.xcp
+doc/sphinx/_build
+doc/sphinx/relu3-plot.png
 
 # Misc
 etc/ks-vscode/node_modules/
