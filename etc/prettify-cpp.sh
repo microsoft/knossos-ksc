@@ -1,4 +1,6 @@
-# Make our output C++ a tiny bit prettier (possibly introducing name clashes and syntax errots)
+# Make our output C++ a tiny bit prettier
+# This might introducing name clashes and syntax errors, 
+# so is just get a quick gisty view of the generated code
 # To use: 
 #   $ ./ksc  test/ksc/gmm.ks 
 #   $  sh etc/prettify-cpp.sh /tmp/t.cpp | grep -A 30 '^ty\$gmm_knossos_gmm_objective '
