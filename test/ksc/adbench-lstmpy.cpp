@@ -1,18 +1,7 @@
-/* There's a lot of duplication between this and mnistcnnpy.cpp, but
- * we will follow the Rule of Three
- *
- *    https://en.wikipedia.org/wiki/Rule_of_three_(computer_programming)
- */
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/operators.h>
-
-namespace py = pybind11;
+#include "knossos-pybind.h"
 
 #include "adbench-lstm.cpp"
-
-ks::allocator g_alloc{ 1'000'000'000 };
 
 template<typename T>
 void declare_vec(py::module &m, std::string typestr) {
@@ -25,11 +14,6 @@ void declare_vec(py::module &m, std::string typestr) {
 	return a[b];
       })
     .def("__len__", [](const ks::vec<T> &a) { return a.size(); });
-}
-
-template<typename RetType, typename... ParamTypes>
-auto withGlobalAllocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f](ParamTypes... params) { return f(&g_alloc, params...); };
 }
 
 // In the future it might make more sense to move the vec type
@@ -48,9 +32,9 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("sigmoid", withGlobalAllocator(&ks::sigmoid$af));
-  m.def("logsumexp", withGlobalAllocator(&ks::logsumexp$aT1f));
-  m.def("lstm_model", withGlobalAllocator(&ks::lstm_model$aT1fT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f));
-  m.def("lstm_predict", withGlobalAllocator(&ks::lstm_predict$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1f));
-  m.def("lstm_objective", withGlobalAllocator(&ks::lstm_objective$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1$dT1fT1f$b));
+  m.def("sigmoid", with_ks_allocator(&ks::sigmoid$af));
+  m.def("logsumexp", with_ks_allocator(&ks::logsumexp$aT1f));
+  m.def("lstm_model", with_ks_allocator(&ks::lstm_model$aT1fT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f));
+  m.def("lstm_predict", with_ks_allocator(&ks::lstm_predict$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1f));
+  m.def("lstm_objective", with_ks_allocator(&ks::lstm_objective$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1$dT1fT1f$b));
 }
