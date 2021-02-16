@@ -348,8 +348,3 @@ withOutputFileStream filename handle =
     filename
     System.IO.WriteMode
     (handle . System.Process.UseHandle)
-
-profile :: IO ()
-profile = do
-  [source, proffile, proffunctions, proflines] <- System.Environment.getArgs
-  profileArgs source proffile proffunctions proflines
