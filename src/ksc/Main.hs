@@ -35,6 +35,8 @@ hspec = do
     Lang.hspec
     LangUtils.hspec
 
+-- | 'main' is the entry point of this module. It allows compiling
+-- @.ks@ files, running tests and profiling.
 main :: IO ()
 main = do
   System.Environment.getArgs >>= \args -> case args of
