@@ -19,10 +19,6 @@
      (let ((a b) a_b)
        (tuple (mul dr b) (mul dr a))))
 
-(def dot Float ((a : Vec (Vec Float)) (b : Vec (Vec Float)))
-  (sum (build (size a) (lam (i : Integer) (dot (index i a) (index i b)))))
-  )
-
 (def sqnorm Float ((v : Vec Float))
   (dot v v))
 
