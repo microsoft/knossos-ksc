@@ -429,13 +429,14 @@ primFunCallResultTy fun args
 baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc Type
 baseFunArgTy_maybe derivedFun derivedFunArgTy
   = case derivedFun of
-      Fun{} -> Right derivedFunArgTy
+      Fun{} -> it's derivedFunArgTy
       DrvFun{} -> case derivedFunArgTy of
-        TypeTuple [baseArgTy', _] -> Right baseArgTy'
+        TypeTuple [baseArgTy', _] -> it's baseArgTy'
         _ -> Left (text "baseFunArgTy_maybe: DrvFun:" <+> pprDerivedFun ppr derivedFun
                    $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
-      GradFun{}  -> Right derivedFunArgTy
+      GradFun{}  -> it's derivedFunArgTy
       ShapeFun f -> baseFunArgTy_maybe f derivedFunArgTy
+  where it's = pure
 
 ---------------------------------------
 -- This is the function that does the heavy lifting for primitives
