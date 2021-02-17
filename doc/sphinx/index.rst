@@ -6,14 +6,19 @@
 Welcome to Knossos!
 ===================
 
-Knossos turns TorchScript code into C++ (and, one day, MLIR and ONNX and other stuff).  By which we mean actual C++, that you can deploy completely runtime-free if you like, or linking against ATen, MLAS, ONNX Runtime, whatever you have.
+Knossos turns (a subset of) PyTorch code into C++ (and, one day, MLIR and ONNX and other stuff).  
+By which we mean actual C++, that you can deploy completely runtime-free if you like, 
+or linking against ATen, MLAS, ONNX Runtime, whatever you have.
 
 But that's not all -- it also contains a source-to-source autodiff, so you can get gradients for free.
 
-The canonical use case is to write custom PyTorch extenstions.   Suppose you've invented this great new activation function ``relu3``:
+The canonical use case is to write custom PyTorch extenstions.
+Suppose you've invented this great new activation function ``relu3``:
 
-.. literalinclude:: relu3.py
+.. literalinclude:: ../../examples/dl-relu3/relu3.py
      :language: Python
+     :start-after: BEGINDOC
+     :end-before: ENDDOC
 
 
 It should be better, right?  Smoother with a robust backbone sounds like just the ticket for better convergence.  
