@@ -332,6 +332,63 @@ eqTypes x xs = if all (eqType x) xs
                then Just x
                else Nothing
 
+-----------------------------------
+--- Functions
+-----------------------------------
+
+{- Note [Global function ad-hoc overloading]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Whenever we use the name of a global function in a call, what we refer
+to internally is a 'Fun'.  Indeed each global function is uniquely
+identified by a 'Fun'.  The internal structure of a 'Fun' is:
+
+* Each 'Fun' is a derivation from a base function ('BaseFun')
+
+  See definition of 'type Fun'
+
+* A base function is a pair of name (e.g. 'mul') and argument type
+  (e.g. (Float, Float))
+
+  See definition of 'type BaseFun'.  The reason we need a (name, type)
+  pair is that distinct global functions can have the same name but
+  different argument type. See below.
+
+* A derivation is either trivial (i.e. no derivation) or one of a
+  collection of hardcoded derivations, for example 'rev' or 'shape'.
+
+To write the name of a (non-trivial) derived function we supply the
+name of the derivation before the name of the function in square
+brackets, for example '[rev f]' or '[shape f]'.
+
+Many global functions can be called 'mul' or '[rev mul]', provided the
+base argument types differ.  Indeed you can see this in
+src/runtime/prelude.ks.  Functions with the same name, same base
+argument type but differing return types are *not* allowed.
+
+To be explicit about the identity of a function we must provide the
+type of the base function.  We do so by writing the type of the base
+function after the name of the base function, in square brackets .
+For example, if there are two functions called 'f', one of which has
+Integer argument type and one of which has Float argument type, we can
+disambiguate by writing '[f Integer]' and '[f Float]' respectively.
+Likewise we can disambiguate '[rev f]' by writing '[rev [f Integer]]'
+or '[rev [f Float]]' as appropriate.
+
+The global symbol table is keyed by 'UserFun's, that is the subset of
+'Fun's which are neither primitive nor tuple selector functions.
+
+All of this would go out of the window if we had polymorphism, because
+then the argument type could be a type variable.  But we don't!
+
+Moreover, for type inference, we can work out the type of the
+arguments before looking up the function to find its result type.
+That would fail if were were inferring the type of a recursive
+function -- but fortunately all functions have explicitly-declared
+types.
+
+-}
+
 type PrimFun = String
 data BaseUserFun p = BaseUserFunId String (BaseUserFunT p)
 
