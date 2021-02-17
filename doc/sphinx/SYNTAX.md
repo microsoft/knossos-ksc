@@ -136,7 +136,7 @@ inner Tensors could have a different size.
 
 Tensors need to be created algorithmically, either as the result of a
 function or using the `build` construct.  Build takes a size and a lambda, e.g.
-```lisp
+```scheme
 ; Creating a 7-element vector
 (build 7 (lambda (i : Integer) (f i)))
 ; Creating a 5x7 matrix 
@@ -157,7 +157,7 @@ zero inclusive, N exclusive.
 Determining the runtime size of a tensor requires the `(size t)` construct.
 It returns the size of the array as a tuple of Integers.
 
-```
+```scheme
 ; Returns the size of the second row of a (Tensor 1 (Tensor 1 Float))
 (size (index 1 mat))
 ```
@@ -167,7 +167,7 @@ It returns the size of the array as a tuple of Integers.
 Accessing elements of a tensor requires the `(index (tuple N1 N2) t)` construct.
 Each `N` has to be an `Integer`, zero-based.
 
-```
+```scheme
 ; Returning the _3rd_ element in a (Tensor 1 Type)
 (index 2 v)
 ```
@@ -191,7 +191,7 @@ You can also have a tensor inside tuples: `(Tuple Float (Tensor 2 Integer) Bool)
 `Tuple`s are constructed using the `(tuple ...)` construct. The
 arguments' types define the tuple's arguments, which are checked when used.
 
-```
+```scheme
 ; Create a tuple of Integer, Float and Bool
 (tuple 42 10.0 false)
 ```
@@ -203,7 +203,7 @@ number of elements of the tuple and `i` is an Integer between 1 and `N`, inclusi
 
 Unlike tensors, tuple _index_ starts at 1 and ends with N.
 
-```
+```scheme
 ; Returns the 7th element from a tuple of 9 elements
 (let (7of9 (get$7$9 USSRaven)) 7of9)
 ```
@@ -240,7 +240,7 @@ below, such as `(build)` and `(fold)`._
 variable declaration of the form `(var : Type)` and the expression is any valid
 Knossos expression.
 
-```
+```scheme
 ; A lambda that returns the sum of two numbers
 (lam (t : (Tuple Float Float)) (add (get$1$2 t) (get$2$2 t)))
 ```
@@ -315,7 +315,7 @@ Declared functions can be called but are not implemented, so unless it's
 implemented somewhere else (compiler run-time libraries, another source file),
 it will lead to a linking error if you try to execute.
 
-```
+```scheme
 ; Declares a function that takes in two tuples and add them element wise
 (edef tadd@ff (Tuple Float Float) ((Tuple Float Float) (Tuple Float Float)))
 ```
@@ -336,9 +336,9 @@ The syntax is: `(def name RetTy ((arg0 : ArgTy0)(arg1 : ArgTy1)...) (body))` wit
 
 The arguments are bound on call and can be used inside the function body.
 
-```
+```scheme
 ; Implements the tuple sum declared above
-(def tadd@ff (Tuple Float Float)
+(def tadd (Tuple Float Float)
              (a : (Tuple Float Float) (b : (Tuple Float Float)))
              (tuple (add@ff (get$1$2 a) (get$1$2 b))
                     (add@ff (get$2$2 a) (get$2$2 b))
@@ -348,7 +348,7 @@ The arguments are bound on call and can be used inside the function body.
 ; Directly defines a zip function, from two vectors, build a third vector that
 ; holds a tuple for every pair of elements ({a[0], b[0]}, ... {a[N-1], b[N-1]})
 ; Asserts (size a) == (size b).
-(def zip@ff  (Tensor 1 (Tuple Float Float))
+(def zip  (Tensor 1 (Tuple Float Float))
              ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
              (assert (eq (size a) (size b))
                (build (size a) (lam (i : Integer)
@@ -366,7 +366,7 @@ defined by the declaration/definition.
 
 The syntax is: `(fname arg0 arg1 ...)`
 
-```
+```scheme
 ; Recursive function that sums a vector of tuples, element-wise
 (def tsum (Tuple Float Float)
           (
@@ -427,7 +427,7 @@ The syntax is: `(let (name (initialiser)) (expr))`
 The variable `name` is initialised to the expression `initialiser` and can be
 used in the `(expr)` block.
 
-```
+```scheme
 ; `argc` and `argv` are valid throughout the body of `main`
 (def main Integer ((argc : Integer) (argv : (Tensor 1 String)))
                   ; Declares `a`, `b` and `c`
@@ -450,7 +450,7 @@ have the same return type. The condition can be any expression that evaluates to
 
 The syntax is: `(if (cond) (then expr) (else expr))`
 
-```
+```scheme
 ; Sum the two elements of a tuple
 (def tsum@tff (Float) (t : (Tuple Float Float))
               (add@ff (get$1$2 t) (get$2$2 t)))
@@ -487,7 +487,7 @@ return acc
 ```
 
 Example:
-```
+```scheme
 ; Returns the product of all elements of `v` (multiply-reduce)
 (def prod_fold Float ((v : Tensor 1 Float))
      (fold (lam (acc_x : (Tuple Float Float))
@@ -502,7 +502,7 @@ Example:
 
 Any existing variable in context (environment) can be used, for example:
 
-```
+```scheme
 ; Returns prod(v) * pow(closure, size(v))
 (def prod_fold_closure Float ((v : Tensor 1 Float) (closure : Float))
      (fold (lam (acc_x : Tuple Float Float)
