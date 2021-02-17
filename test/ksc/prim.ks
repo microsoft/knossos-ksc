@@ -41,6 +41,18 @@
 (def sum_Tensor2Float Float (v : (Tensor 2 Float))
    (sum v))
 
+(def eq_Float (Bool) ((a : Float) (b : Float))
+    (eq a b))
+
+(def eq_VecFloat (Bool) ((a : (Vec Float)) (b : (Vec Float)))
+    (eq a b))
+
+(def ne_Float (Bool) ((a : Float) (b : Float))
+    (ne a b))
+
+(def ne_VecFloat (Bool) ((a : (Vec Float)) (b : (Vec Float)))
+    (ne a b))
+
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
        (mul ($ranhashdoub seed) scale))

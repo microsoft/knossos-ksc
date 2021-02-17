@@ -699,6 +699,10 @@ optGradPrim _ "index" (Tuple [i,v])
     ii = TVar (typeof i) $ Simple "primDindex$ii"
     vi = pIndex i v
 
+-- eq :: (T,T) -> Bool   (or, more generally, any f :: X -> Bool)
+-- D$eq :: (T,T) -> (T,T) -o ()
+optGradPrim (TypeLM _ TypeBool) _ e
+  = Just (lmZero e (Konst (KBool True)))
 
 optGradPrim (TypeLM a _) "$trace" _ = Just (lmOne a)
 
