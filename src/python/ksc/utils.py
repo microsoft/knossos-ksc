@@ -134,8 +134,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten=False):
     try:
         with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
             with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
-                print("generate_cpp_from_ks:", ksc_path, fks.name)
-                e = subprocess.run([
+                cmd = [
                     ksc_path,
                     "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
                     "--ks-source-file", ksc_runtime_dir+"/prelude.ks",
@@ -143,7 +142,9 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten=False):
                     "--ks-source-file", fks.name,
                     "--ks-output-file", fkso.name,
                     "--cpp-output-file", fcpp.name
-                ], capture_output=True, check=True)
+                ]
+                print("generate_cpp_from_ks:", *cmd)
+                e = subprocess.run(cmd, capture_output=True, check=True)
                 print(e.stdout.decode('ascii'))
                 print(e.stderr.decode('ascii'))
     except subprocess.CalledProcessError as e:
