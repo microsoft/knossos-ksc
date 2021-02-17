@@ -126,6 +126,45 @@ annotAndDeriveDecl env decl = do
   ; pure (env, tdecls)
   }
 
+{- Note [GDef]
+~~~~~~~~~~~~~~
+
+ksc has various transformations each of which transform a ksc function
+definition for [f T] into one or more derived functions.
+Differentiated functions and shape functions are examples of the
+derived functions that can be generated (e.g. e.g. [fwd [f T]], [shape
+[f T]], ... -- see the implementation of deriveDecl for a
+comprehensive list). The surface language feature that supports this
+functionality is "gdef" ("generated definition").
+
+The key function which expands a gdef into the function(s) it stands
+for is deriveDecl.  Whenever the AST contains a GDefDecl, deriveDecl
+looks up the implementation of the original function, transforms it,
+and inserts one or more new functions into the AST based on the
+transformation.  For example
+
+* (gdef rev [f Float]) generates and inserts [rev [f Float]] and [D [f
+  Float]] into the AST
+
+* (gdef shape [f Float]) generates and inserts [shape [f Float]] into
+  the AST
+
+We do not want to require that the type of a derived function can be
+deduced from the type of its input function.  Therefore we must
+generate a derived function before we typecheck code that uses it (at
+least under the current typechecker implementation) .  Consequently
+the pipeline generates and typechecks each function definition
+separately (annotAndDeriveDecl) before moving on to the next function
+definition.
+
+This restriction precludes mutual recursion between generated
+functions.  This is not currently a practical restriction because Cgen
+does not yet support mutual recursion either.  If we want to support
+mutual recursion in the future then we can do so at the expense of a
+more complicated typechecking story.
+
+-}
+
 deriveDecl :: GblSymTab -> L.TDecl -> KM (GblSymTab, [L.TDecl])
 deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
     { let tdef = case Map.lookup fun env of
