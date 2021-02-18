@@ -487,7 +487,7 @@ lookupGblTc fun args
              , text " Args:"      <+> ppr (exprOf args)
              , text "ST lookup:"  <+> case maybeUserFun fun of
                                          Nothing -> text "<not a UserFun>"
-                                         Just userFun -> ppr (Map.lookup userFun (gblST st))
+                                         Just userFun -> ppr (lookupGblST userFun (gblST st))
              -- This is very verbose, and obscures error messages, but can be useful for typos.
              -- Perhaps think about printing it only for failed lookup of userfun
              -- , text "ST keys:" <+> gblDoc st
