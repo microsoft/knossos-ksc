@@ -56,6 +56,7 @@ def compile_relux():
         print("Compiling relux")
         ks_relux = ts2mod(relux, (1.0,))
 
+@pytest.mark.skip(reason="Does not support gdef or structured names")
 def test_ts2k_relux():
     compile_relux()
     assert ks_relux(2.0) == relux(2.0)

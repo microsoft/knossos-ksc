@@ -40,30 +40,30 @@
 
 ; Assorted tests
 
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/awf.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/bool.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/comment.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/CA-subst.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/hello-world.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/lmzero.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/logsumexp.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/negative-float-literals.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/sum.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/test_stopgrad.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/tm-rev.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/awf.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/bool.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/comment.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/CA-subst.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/hello-world.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/lmzero.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/logsumexp.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/negative-float-literals.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/sum.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/test_stopgrad.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/tm-rev.ks > /dev/null
 
 ; Examples
 
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex0.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex1.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex2.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex4.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex5.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex6.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex7.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/ex8.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex0.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex1.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex2.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex4.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex5.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex6.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex7.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/ex8.ks > /dev/null
 
 ; Mul
 
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/mul4.ks > /dev/null
-; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/mul8.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/mul4.ks > /dev/null
+; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/mul8.ks > /dev/null
