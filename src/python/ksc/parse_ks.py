@@ -21,7 +21,7 @@ def check(cond, *message):
         if isinstance(s, (sexpdata.SExpBase, list)):
             return sexpdata.dumps(s)
         else:
-            return s
+            return str(s)
 
     if not cond:
         message = "".join(tostr(s) for s in message)
@@ -78,10 +78,28 @@ def parse_type(se):
 def parse_types(ses):
     return list(map(parse_type, ses))
 
+# "1.3" -> int
+def parse_int(se):
+    if isinstance(se, int):
+        return se
+
+    assert re.match(r"^\d+$", se)
+    return int(se)
+
 # "x" -> string
 def parse_name(se):
     check(isinstance(se, sexpdata.Symbol), "Wanted identifier, got: ", se)
     return se.value()
+
+# "x" or "[fwd x]" or "[fwd [x (Tuple Float String)]]" -> string (mangled function name)
+def parse_function_name(se):
+    if isinstance(se, sexpdata.Symbol):
+        return se.value()
+
+    check(isinstance(se, sexpdata.Bracket), "Wanted identifier or [names], got: ", se)
+
+    return parse_name(se.value()[0]) + '$' + parse_function_name(se.value()[1])
+    
 
 # "\"x\"" -> string
 def parse_string(se):
@@ -178,10 +196,10 @@ def parse_tld(se):
     check(len(se) > 0, "Empty list at top level")
     head = se[0]
     if head == _def:
-        return Def(*parse_seq(se[1:], parse_name, parse_type, parse_args, parse_expr))
+        return Def(*parse_seq(se[1:], parse_function_name, parse_type, parse_args, parse_expr))
 
     if head == _edef:
-        return EDef(*parse_seq(se[1:], parse_name, parse_type, parse_types))
+        return EDef(*parse_seq(se[1:], parse_function_name, parse_type, parse_types))
 
     if head == _rule:
         return Rule(*parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr))
