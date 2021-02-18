@@ -265,8 +265,8 @@ optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
       s -> errorFor s
   where errorFor s = error $ unlines $
           [ "Failed constant folding [" ++ s ++ "]."
-          , "This error exists to prompt you, the ksc user,"
-          , "to go ahead and add a constant folding rule for"
+          , "This error exists to prompt us"
+          , "to add a constant folding rule for"
           , "this operation to ksc.  See also"
           , ""
           , "    https://github.com/microsoft/knossos-ksc/pull/61/commits/29c2ab04568e17b953d3fe942aba5881ab15e1f8#r309892713"
@@ -660,7 +660,7 @@ optGradSel i n arg
                        else lmZero (pSel j n arg) ti
            | j <- [1..n] ]
 
-optGradSel _ _ arg = trace ("GradSel failed" ++ show arg) Nothing
+optGradSel _ _ arg = trace ("GradSel failed" ++ pps arg) Nothing
 
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 -- (+) :: (F,F) -> f
@@ -687,7 +687,7 @@ optGradPrim (TypeLM a _) "ts_neg" _
 
 optGradPrim _ "sum" e
   | TypeTensor d t <- typeof e
-  = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$i")
+  = Just (lmBuildT (pSize e) (Lam (TVar (tensorIndexType d) $ Simple "sum$ii")
                              (lmOne t)))
 
 optGradPrim _ "size" e = Just $ lmZero e (mkZero (pSize e))
