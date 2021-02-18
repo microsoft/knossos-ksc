@@ -49,6 +49,7 @@
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/logsumexp.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/negative-float-literals.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/sum.ks > /dev/null
+; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/structured-names.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/test_stopgrad.ks > /dev/null
 ; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/tm-rev.ks > /dev/null
 
