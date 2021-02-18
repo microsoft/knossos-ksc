@@ -10,6 +10,8 @@ jobs:
     vmImage: 'ubuntu-18.04'
 
   steps:
+  - checkout: self
+    submodules: true
 
   - task: UsePythonVersion@0
     inputs:
@@ -39,19 +41,19 @@ jobs:
   - script: ./build/bin/ksc --test --fs-test obj/test/out.ks
     displayName: 'ksc test [userTest]'
 
-  - script: git clone https://github.com/pybind/pybind11.git && cd pybind11 && git checkout c9d32a81f40ad540015814edf13b29980c63e39c
-    displayName: Cloning pybind11 [userInstall]
+  # - script: git clone https://github.com/pybind/pybind11.git && cd pybind11 && git checkout c9d32a81f40ad540015814edf13b29980c63e39c
+  #   displayName: Cloning pybind11 [userInstall]
 
   - script: sh ./test/builds/test_pytest.sh
     displayName: Testing ksc python package [userTest]
 
-  - script: sh ./test/builds/build_and_test_mnistcnn.sh . pybind11
+  - script: sh ./test/builds/build_and_test_mnistcnn.sh . extern/pybind11
     displayName: Testing MNIST CNN [userTest]
 
-  - script: sh ./test/builds/build_and_test_adbench_lstm.sh . pybind11
+  - script: sh ./test/builds/build_and_test_adbench_lstm.sh . extern/pybind11
     displayName: Testing ADBench LSTM [userTest]
 
-  - script: sh ./test/builds/build_and_test_gmm.sh . pybind11
+  - script: sh ./test/builds/build_and_test_gmm.sh . extern/pybind11
     displayName: Testing ADBench GMM [userTest]
 
   - script: sh ./test/builds/test_resnet50.sh
