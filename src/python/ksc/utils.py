@@ -231,18 +231,11 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
     cpp_str = """
-#include <cstdint>
+#include "knossos-pybind.h"
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/operators.h>
-
-namespace py = pybind11;
 """ + generated_cpp_source + """
 
 int ks::main(ks::allocator *) { return 0; };
-
-ks::allocator g_alloc{ 1'000'000'000 };
 
 template<typename T>
 void declare_tensor_2(py::module &m, char const* name) {
@@ -272,11 +265,6 @@ void declare_tensor_2(py::module &m, char const* name) {
     ;
 }
 
-// Convert functor to one which takes a first argument g_alloc 
-template<typename RetType, typename... ParamTypes>
-auto with_ks_allocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f](ParamTypes... params) { return f(&g_alloc, params...); };
-}
 """
 
     args_str = mangleTypes(arg_types)
