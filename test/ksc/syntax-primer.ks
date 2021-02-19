@@ -280,6 +280,11 @@ If you prefer block comments then use pairs of #| and |#
 (def [rev my_log] Float ((x : Float) (d_dmy_log : Float)) 
      (div d_dmy_log x))
 
+;; Use structured names with and without disambiguating type
+(def use_structured_names Integer ()
+     (print (add ([fwd my_log] 2.0 3.0)
+                 ([fwd [my_log Float]] 5.0 7.0))))
+
 ;; Edge cases
 ; (def f Integer (f : Lam Integer Integer) 
 ;      (f 2) ; not a recursive call
