@@ -184,7 +184,7 @@ class Type:
         if self.is_tuple:
             return tb + "".join([c.shortstr() for c in self.children]) + te
         if self.is_tensor:
-            return "T" + self.tensor_rank + self.tensor_elem_type.shortstr()
+            return f"T{self.tensor_rank}" + self.tensor_elem_type.shortstr()
         
         raise ValueError(f"Unknown Type.{self.kind}")
 
@@ -260,3 +260,27 @@ class SizeType:
     @staticmethod
     def isa(ty : Type) -> bool:
         return SizeType.get_rank(ty) is not None
+
+# See AD.hs:tangentType
+def tangent_type(ty : Type) -> Type:
+    if ty in (Type.String, Type.Integer, Type.Bool):
+        return Type.Tuple()
+    if ty == Type.Float:
+        return ty
+    if ty.is_tuple:
+        return Type.Tuple(tangent_type(ty) for ty in ty.children)
+    if ty.is_tensor:
+        return Type.Tensor(ty.tensor_rank, tangent_type(ty.tensor_elem_type))
+
+    raise NotImplementedError("tangent_type")
+
+# See Prim.hs:shapeType
+def shape_type(t : Type) -> Type:
+    if t.is_scalar:
+        return Type.Tuple()
+    if t.is_tuple:
+        return Type.Tuple(shape_type(t) for t in t.children)
+    if t.is_tensor:
+        return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
+
+    raise NotImplementedError

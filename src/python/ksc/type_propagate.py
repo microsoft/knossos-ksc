@@ -4,7 +4,7 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType
+from ksc.type import Type, SizeType, shape_type
 
 from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
@@ -55,6 +55,9 @@ def ks_prim_lookup(name, tys):
     if n == 1 and name == "size":
         return SizeType.from_rank(tys[0].tensor_rank)
 
+    if n == 1 and name == "shape":
+        return shape_type(tys[0])
+
     # index : Size, Tensor N T -> T
     if n == 2 and name == "index":
         assert tys[0] == SizeType.from_rank(tys[1].tensor_rank)
@@ -72,11 +75,30 @@ def ks_prim_lookup(name, tys):
         elem_type = lam_ty.lam_return_type
         return Type.Tensor(rank, elem_type)
         
+    # sumbuild : Size, Lam IntTuple T -> T
+    if n == 2 and name == "sumbuild":
+        size_ty = tys[0]
+        lam_ty = tys[1]
+        assert lam_ty.lam_arg_type == size_ty
+
+        return lam_ty.lam_return_type
+        
     # constVec(n T)
     if n == 2 and name == "constVec":
         size_ty = tys[0]
         elem_ty = tys[1]
 
+        rank = SizeType.get_rank(size_ty)
+        assert rank is not None
+        
+        return Type.Tensor(rank, elem_ty)
+
+    # deltaVec(n i v)
+    if n == 3 and name == "deltaVec":
+        size_ty = tys[0]
+        ind_ty = tys[1]
+        elem_ty = tys[2]
+        assert size_ty == ind_ty
         rank = SizeType.get_rank(size_ty)
         assert rank is not None
         
@@ -94,7 +116,7 @@ def ks_prim_lookup(name, tys):
         return tyState
 
     # eq : T, T -> Bool
-    if n == 2 and name == "eq":
+    if n == 2 and name in ("eq", "lt", "gt", "lte", "gte"):
         assert tys[0] == tys[1] # TODO: MOVEEQ Move eq to prelude
         return Type.Bool
 
@@ -166,8 +188,12 @@ def _(ex, symtab):
     local_st = {**symtab, **{a.name:a.type_ for a in ex.args}}
 
     # Recurse into body
-    ex.body = type_propagate(ex.body, local_st)
-
+    try:
+        ex.body = type_propagate(ex.body, local_st)
+    except KSTypeError as e:
+        ctx = f"In definition of {ex.name} {pformat(argtypes)}\n"
+        raise KSTypeError(ctx + str(e)) from e
+    
     if declared_return_type: 
         # Check the inferred type matches the decl
         if ex.return_type != ex.body.type_:
@@ -199,6 +225,8 @@ def _(ex, symtab):
     if ex.decl:
         assert ex.type_ != None
     else:
+        if ex.name not in symtab:
+            raise KSTypeError(f"Unknown symbol {ex.name}")
         ex.type_ = symtab[ex.name]
     return ex
 
