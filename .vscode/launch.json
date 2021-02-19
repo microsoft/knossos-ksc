@@ -6,6 +6,21 @@
 	"version": "0.2.0",
 	"configurations": [
 
+
+		{
+			"name": "Python: Current File",
+			"type": "python",
+			"request": "launch",
+			"program": "${file}",
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Python: ts2ks",
+			"type": "python",
+			"request": "launch",
+			"program": "src/ts2k/ts2ks/ts2ks.py",
+			"console": "integratedTerminal"
+		},
 		{
 			"name": "Python: onnx2ks",
 			"type": "python",
@@ -32,13 +47,6 @@
 			},
 			"console": "integratedTerminal",
 			"justMyCode": false
-		},
-		{
-			"name": "Python: Current File",
-			"type": "python",
-			"request": "launch",
-			"program": "${file}",
-			"console": "integratedTerminal"
 		},
 		{
 			"name": "Run Extension",
