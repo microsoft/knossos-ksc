@@ -269,6 +269,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     m.def("allocator_top", []{ return g_alloc.mark();});
     m.def("allocator_peak", []{ return g_alloc.peak();});
 
+    declare_tensor_1<double>(m, "Tensor_1_Float");
     declare_tensor_2<double>(m, "Tensor_2_Float");
     declare_tensor_2<int>(m, "Tensor_2_Integer");
 
