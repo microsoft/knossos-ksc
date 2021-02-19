@@ -237,34 +237,6 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
 
 int ks::main(ks::allocator *) { return 0; };
 
-template<typename T>
-void declare_tensor_2(py::module &m, char const* name) {
-  // Wrap ks_tensor<Dim, T> to point to supplied python memory
-  py::class_<ks::tensor<2, T>>(m, name, py::buffer_protocol(), py::module_local())
-    .def(py::init([](std::uintptr_t v, size_t m, size_t n) {
-        if (v < 1u<<24) {
-            // probably a misplaced size
-            throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
-        }
-        ks::tensor_dimension<2>::index_type size {m,n};
-        return ks::tensor<2, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data 
-    }))
-    // And describe buffer shape to Python
-    // Returned tensors will be living on g_alloc, so will become invalid after allocator_reset()
-    .def_buffer([](ks::tensor<2, T> &t) -> py::buffer_info {
-        return py::buffer_info(
-            t.data(),                               /* Pointer to buffer */
-            sizeof(T),                              /* Size of one scalar */
-            py::format_descriptor<T>::format(),     /* Python struct-style format descriptor */
-            2,                                      /* Number of dimensions */
-            { ks::get_dimension<0>(t.size()), ks::get_dimension<1>(t.size()) },         /* Buffer dimensions */
-            { sizeof(T) * ks::get_dimension<0>(t.size()),             /* Strides (in bytes) for each index */
-               sizeof(T) }
-        );
-    })
-    ;
-}
-
 """
 
     args_str = mangleTypes(arg_types)
