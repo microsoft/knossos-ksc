@@ -1083,13 +1083,12 @@ namespace ks {
 	tensor<Dim, T> ts_scale(allocator * alloc, double val, tensor<Dim, T> const& t)
 	{
 		auto ret = tensor<Dim, T>::create(alloc, t.size());
-		T const* tdata = t.data();
 		T* retdata = ret.data();
+		T const* tdata = t.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
 			retdata[i] = ts_scale(alloc, val, tdata[i]);
 		return ret;
 	}
-
 
 	inline int ts_neg(allocator *, int d) { return -d; }
 
@@ -1242,6 +1241,18 @@ namespace ks {
 		return sumbuild_t<Dim>::template do_sumbuild<T>(alloc, size, f);
 	}
 
+	// Elementwise map
+	template <size_t Dim, class T, class F>
+	tensor<Dim, T> elementwise_map(allocator * alloc, tensor<Dim, T> const& t, F f)
+	{
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		T const* tdata = t.data();
+		T* retdata = ret.data();
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
+			retdata[i] = f(tdata[i]);
+		return ret;
+	}
+	
 	// =============================== BuildFromSparse ==================================
 
 	template<size_t Dim>
@@ -1695,3 +1706,7 @@ namespace ks {
 #include "knossos-lm.h"
 
 #include "knossos-prelude.h"
+
+#ifdef KS_INCLUDE_ATEN
+#include "prelude-aten.cpp"
+#endif

@@ -75,13 +75,7 @@ def onnxAttrType_to_Type(ty):
     assert isinstance(ty, OpSchema.AttrType)
     return ATTR_TYPE_TO_KS_TYPE[ty]
 
-
-# See https://github.com/onnx/onnx/blob/master/onnx/mapping.py
-TENSOR_TYPE_TO_KS_TYPE = {
-    int(TensorProto.FLOAT): Type.Float,
-    int(TensorProto.UINT8): Type.Integer,
     int(TensorProto.INT8): Type.Integer,
-    int(TensorProto.UINT16): Type.Integer,
     int(TensorProto.INT16): Type.Integer,
     int(TensorProto.INT32): Type.Integer,
     int(TensorProto.INT64): Type.Integer,
