@@ -50,7 +50,7 @@ class Type:
         Constructor: Type.Tuple(T1, ..., Tn)
         """
         assert all((isinstance(ch, Type) for ch in args)), "Type.Tuple constructed with non-type arg"
-        return Type("Tuple", args)
+        return Type("Tuple", list(args))
 
     @staticmethod
     def Lam(arg_type, return_type):
@@ -302,7 +302,7 @@ def shape_type(t : Type) -> Type:
     if t.is_scalar:
         return Type.Tuple()
     if t.is_tuple:
-        return Type.Tuple(shape_type(t) for t in t.children)
+        return Type.Tuple(*(shape_type(t) for t in t.children))
     if t.is_tensor:
         return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
 
