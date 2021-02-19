@@ -86,5 +86,7 @@ class KscFunction:
         if isinstance(val, torch.Tensor):
             if len(val.shape) == 2 and val.dtype == torch.float64:
                 return self._py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
+            if len(val.shape) == 1 and val.dtype == torch.float64:
+                return self._py_mod.Tensor_1_Float(val.data_ptr(), *val.shape)
         
         raise NotImplementedError
