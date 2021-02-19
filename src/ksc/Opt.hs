@@ -15,7 +15,7 @@ import Prim
 import Rules
 import OptLet
 import KMonad
-import Ksc.Traversal( traverseState )
+import Ksc.Traversal( traverseState, mapAccumLM )
 
 import Debug.Trace
 import Test.Hspec
@@ -50,12 +50,6 @@ optSubstBndr tv env@(OptEnv { optSubst = subst })
     (tv', subst') = substBndr tv subst
 
 ---------------
-mapAccumLM :: Monad m => (a -> b -> m(a, c)) -> a -> [b] -> m(a, [c])
-mapAccumLM _ a [] = return (a, [])
-mapAccumLM f a (x:xs) = do { (a', c) <- f a x
-                           ; (a'', cs) <- mapAccumLM f a' xs
-                           ; return (a'', c:cs) }
-
 optDefs :: HasCallStack => RuleBase -> GblSymTab -> [TDef]
                         -> KM (GblSymTab, [TDef])
 -- Returned GblSymTab contains the optimised definitions
@@ -80,6 +74,9 @@ simplify :: OptEnv -> TExpr -> KM TExpr
 simplify env rhs
   = do { let subst = optSubst env
 
+       -- We use ANF to expose optimisation opportunities and use
+       -- optLets and optE to take them.  See Note [Inline tuples] for
+       -- the motiviation for doing ANF-then-opt.
        ; rhs1 <- runAnf (anfExpr subst rhs)
 --       ; banner "ANF'd (1)"
 --       ; display rhs1

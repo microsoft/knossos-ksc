@@ -19,6 +19,7 @@ import           Text.PrettyPrint               ( Doc )
 import           Data.List                      ( intersperse )
 import           KMonad
 
+import           Data.Either                    ( partitionEithers )
 import qualified Data.Map as M
 import           Data.Maybe                     ( isJust )
 import           Debug.Trace                    ( trace )
@@ -423,11 +424,7 @@ addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
         g mt' = (mismatchedAppliedTyF mt', expectedBaseTy)
 
 userFunToFun :: UserFun p -> Fun p
-userFunToFun = \case
-  Fun f -> Fun (BaseUserFun f)
-  GradFun f p -> GradFun (BaseUserFun f) p
-  DrvFun f m -> DrvFun (BaseUserFun f) m
-  ShapeFun f -> ShapeFun (userFunToFun f)
+userFunToFun = T.mapOf baseFunFun BaseUserFun
 
 -- A 'Fun p' is Either:
 --
@@ -535,14 +532,10 @@ type TRule = RuleX Typed
 
 partitionDecls :: [DeclX p] -> ([RuleX p], [DefX p])
 -- Separate the Rules, Defs
---
--- See https://www.stackage.org/haddock/lts-12.1/base-4.11.1.0/src/Data-Either.html#partitionEithers
-partitionDecls = foldr declX ([], [])
+partitionDecls = partitionEithers . map f
   where
-    declX (RuleDecl r) = rule r
-    declX (DefDecl  d) = def  d
-    rule a ~(r, d) = (a:r, d)
-    def  a ~(r, d) = (r, a:d)
+    f (RuleDecl r) = Left r
+    f (DefDecl  d) = Right d
 
 -----------------------------------------------
 --       Building values
@@ -1103,16 +1096,8 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
     where fun_f = userFunToFun @p f
           pprFun_f = pprUserFun @p f
 
-instance Pretty (BaseUserFun Typed) where
-  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
-
-instance Pretty (BaseUserFun OccAnald) where
-  ppr (BaseUserFunId f ty) = text f <> text "@" <> ppr ty
-
-instance Pretty (BaseUserFun Parsed) where
-  ppr (BaseUserFunId f mty) = case mty of
-    Just ty -> ppr @(BaseUserFun Typed) (BaseUserFunId f ty)
-    Nothing -> text f
+instance InPhase p => Pretty (BaseUserFun p) where
+  ppr = pprBaseUserFun
 
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens

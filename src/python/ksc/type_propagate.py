@@ -116,7 +116,7 @@ def ks_prim_lookup(name, tys):
         return tyState
 
     # eq : T, T -> Bool
-    if n == 2 and name in ("eq", "lt", "gt", "lte", "gte"):
+    if n == 2 and name in ("eq", "ne", "lt", "gt", "lte", "gte"):
         assert tys[0] == tys[1] # TODO: MOVEEQ Move eq to prelude
         return Type.Bool
 
