@@ -63,4 +63,28 @@ class KsFunction:
         if hasattr(self._py_mod, "defs"):
             return self._py_mod.defs[name_to_call](*args)
         else:
-            return self._py_mod.main(*args)
+            return self._py_mod.entry(*args)
+
+
+import torch # TODO: move somewhere torch specific
+
+class KscFunction:
+    """
+    Compiled KS function
+    """
+    def __init__(self, py_mod):
+        self._py_mod = py_mod
+
+    @property
+    def rev(self):
+        return self._py_mod.rev_entry
+
+    def __call__(self, *args):
+        return self._py_mod.entry(*args)
+
+    def adapt(self, val):
+        if isinstance(val, torch.Tensor):
+            if len(val.shape) == 2 and val.dtype == torch.float64:
+                return self._py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
+        
+        raise NotImplementedError

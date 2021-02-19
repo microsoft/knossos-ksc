@@ -114,7 +114,7 @@ def get_ksc_paths():
     return ksc_path,ksc_runtime_dir
 
 
-def generate_cpp_from_ks(ks_str, generate_derivatives = False):
+def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten = False):
     ksc_path,_ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
@@ -127,6 +127,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
                     ksc_path,
                     "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
                     "--ks-source-file", "src/runtime/prelude.ks",
+                    *(("--ks-source-file", "src/runtime/prelude-aten.ks") if use_aten else ()),
                     "--ks-source-file", fks.name,
                     "--ks-output-file", fkso.name,
                     "--cpp-output-file", fcpp.name
@@ -152,7 +153,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False):
 
     return out
 
-def build_py_module_from_cpp(cpp_str, pybind11_path):
+def build_py_module_from_cpp(cpp_str, pybind11_path, use_aten=False):
     _ksc_path,ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
@@ -179,7 +180,8 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
                  " -O3"
                  " -fPIC"
                  " -shared"
-                 f" -DPYTHON_MODULE_NAME={module_name}"
+               + (" -DKS_INCLUDE_ATEN" if use_aten else "")
+               + f" -DPYTHON_MODULE_NAME={module_name}"
                  f" -o {module_path} "
                + fcpp.name)
         print(cmd)
@@ -224,9 +226,9 @@ def encode_name(s : str) -> str:
         replace('*',"$x").\
         replace(':',"$8")
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, pybind11_path="extern/pybind11"):
+def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False, pybind11_path="extern/pybind11"):
 
-    generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives)
+    generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
     cpp_str = """
 #include <cstdint>
@@ -241,20 +243,6 @@ namespace py = pybind11;
 int ks::main(ks::allocator *) { return 0; };
 
 ks::allocator g_alloc{ 1'000'000'000 };
-
-/* TODO: delete this comment -- leaving for now to sync diffs  
-template<typename T>
-void declare_vec(py::module &m, std::string typestr) {{
-  using Class = ks::vec<T>;
-  std::string pyclass_name = std::string("vec_") + typestr;
-  py::class_<Class>(m, pyclass_name.c_str(), py::module_local())
-    .def(py::init<>())
-    .def(py::init([](std::vector<T> const& v) {{ return ks::vec<T>(&g_alloc, v); }}))
-    .def("__getitem__", [](const ks::vec<T> &a, const int &b) {{
-	return a[b];
-      }})
-    .def("__len__", [](const ks::vec<T> &a) {{ return a.size(); }});
-}} */
 
 template<typename T>
 void declare_tensor_2(py::module &m, char const* name) {
@@ -294,7 +282,7 @@ auto with_ks_allocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
     args_str = mangleTypes(arg_types)
     name_str = encode_name(f"{name_to_call}@{args_str}")
     declarations = f"""
-     m.def("main", with_ks_allocator(&ks::{name_str}));
+     m.def("entry", with_ks_allocator(&ks::{name_str}));
     """
 
     if generate_derivatives:
@@ -331,7 +319,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     with open(pybindcpppath, "w") as fcpp:
         fcpp.write(cpp_str)
 
-    module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path)
+    module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path, use_aten=use_aten)
     return import_module_from_path(module_name, module_path)
 
 def ndgrid_inds(sz):
