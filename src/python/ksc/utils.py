@@ -179,7 +179,6 @@ def build_py_module_from_cpp(cpp_str, pybind11_path):
                  " -O3"
                  " -fPIC"
                  " -shared"
-                 " -DKS_INCLUDE_ATEN"
                  f" -DPYTHON_MODULE_NAME={module_name}"
                  f" -o {module_path} "
                + fcpp.name)
