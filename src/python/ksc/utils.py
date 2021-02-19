@@ -10,6 +10,7 @@ import subprocess
 import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
+from tempfile import gettempdir
 
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
@@ -100,22 +101,33 @@ def translate_and_import(source_file_name, *args):
 def subprocess_run(cmd, env=None):
     return subprocess.run(cmd, stdout=subprocess.PIPE, env=env).stdout.decode().strip("\n")
 
+def get_ksc_dir():
+    if "KSC_RUNTIME_DIR" in os.environ:
+        ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
+        ksc_src = os.path.dirname(ksc_runtime_dir)
+        return os.path.dirname(ksc_src)
+    
+    d = os.path.dirname(__file__)     # src/python/ksc
+    d = os.path.dirname(d)            # src/python
+    d = os.path.dirname(d)            # src
+    return os.path.dirname(d)
+
 def get_ksc_paths():
     if "KSC_RUNTIME_DIR" in os.environ:
         ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
     else:
-        ksc_runtime_dir = "./src/runtime"
+        ksc_runtime_dir = get_ksc_dir() + "/src/runtime"
 
     if "KSC_PATH" in os.environ:
         ksc_path = os.environ["KSC_PATH"]
     else:
-        ksc_path = "./build/bin/ksc"
+        ksc_path = get_ksc_dir() + "/build/bin/ksc"
     
     return ksc_path,ksc_runtime_dir
 
 
-def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten = False):
-    ksc_path,_ksc_runtime_dir = get_ksc_paths()
+def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten=False):
+    ksc_path,ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
@@ -126,8 +138,8 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten = False)
                 e = subprocess.run([
                     ksc_path,
                     "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
-                    "--ks-source-file", "src/runtime/prelude.ks",
-                    *(("--ks-source-file", "src/runtime/prelude-aten.ks") if use_aten else ()),
+                    "--ks-source-file", ksc_runtime_dir+"/prelude.ks",
+                    *(("--ks-source-file", ksc_runtime_dir+"/prelude-aten.ks") if use_aten else ()),
                     "--ks-source-file", fks.name,
                     "--ks-output-file", fkso.name,
                     "--cpp-output-file", fcpp.name
@@ -153,8 +165,9 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten = False)
 
     return out
 
-def build_py_module_from_cpp(cpp_str, pybind11_path, use_aten=False):
+def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
     _ksc_path,ksc_runtime_dir = get_ksc_paths()
+    pybind11_path = get_ksc_dir() + "/extern/pybind11"
 
     with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
         fcpp.write(cpp_str)
@@ -169,7 +182,7 @@ def build_py_module_from_cpp(cpp_str, pybind11_path, use_aten=False):
     module_name = os.path.basename(module_path).split(".")[0]
     python_includes = subprocess_run(
         [sys.executable, "-m", "pybind11", "--includes"],
-        env={"PYTHONPATH": "extern/pybind11"}
+        env={"PYTHONPATH": pybind11_path}
     )
     try:
         cmd = (f"g++ -I{ksc_runtime_dir} -I{pybind11_path}/include "
@@ -179,6 +192,7 @@ def build_py_module_from_cpp(cpp_str, pybind11_path, use_aten=False):
                  " -std=c++17"
                  " -O3"
                  " -fPIC"
+                 + (" -g -pg -O3" if profiling else "") +
                  " -shared"
                + (" -DKS_INCLUDE_ATEN" if use_aten else "")
                + f" -DPYTHON_MODULE_NAME={module_name}"
@@ -217,18 +231,15 @@ def encode_name(s : str) -> str:
         replace('*',"$x").\
         replace(':',"$8")
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False, pybind11_path="extern/pybind11"):
+def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
 
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
-    cpp_str = """
-#include "knossos-pybind.h"
+    cpp_str = f"""
+    #include "knossos-pybind.h"
+    {generated_cpp_source}
 
-""" + generated_cpp_source + """
-
-int ks::main(ks::allocator *) { return 0; };
-
-"""
+    """
 
     args_str = mangleTypes(arg_types)
     name_str = encode_name(f"{name_to_call}@{args_str}")
@@ -264,13 +275,13 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 """ + declarations + """
 }
 """
-    pybindcpppath = "obj/pybind.cpp"
-    print(f"Saving to {pybindcpppath}")    
-    os.makedirs(os.path.dirname(pybindcpppath), exist_ok=True)
-    with open(pybindcpppath, "w") as fcpp:
+
+    cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
+    print(f"Saving to {cpp_fname}")    
+    with open(cpp_fname, "w") as fcpp:
         fcpp.write(cpp_str)
 
-    module_name, module_path = build_py_module_from_cpp(cpp_str, pybind11_path, use_aten=use_aten)
+    module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
     return import_module_from_path(module_name, module_path)
 
 def ndgrid_inds(sz):
@@ -289,4 +300,5 @@ def ndgrid_inds(sz):
     """
 
     return itertools.product(*map(range, sz))
+
 
