@@ -195,6 +195,7 @@ def make_loop(make_binds, node):
     #                         %iter_condition = some::other_node(%a_2)
     #                         -> (%iter_condition, %b_1, ..., %b_r)
     
+    max_trip_count, initial_condition, *x_nodes = node.inputs()
     y_nodes = tuple(node.outputs())
     block0, = node.blocks()
     i,*a_nodes = block0.inputs()
