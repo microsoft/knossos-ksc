@@ -80,6 +80,60 @@ private:
 
 }}
 
+
+template <class T>
+auto to_std_tuple(T const& t)
+{
+    return t;
+}
+
+template<typename TupleT, size_t ...Indices>
+auto to_std_tuple_impl(TupleT const& t, std::index_sequence<Indices...>)
+{
+  return std::make_tuple(to_std_tuple(ks::get<Indices>(t))...);
+}
+
+template<typename ...Ts>
+auto to_std_tuple(ks::tuple<Ts...> const& t)
+{
+  return to_std_tuple_impl(t, std::index_sequence_for<Ts...>{});
+}
+
+template <class T>
+auto to_ks_tuple(T const& t)
+{
+    return t;
+}
+
+template<typename TupleT, size_t ...Indices>
+auto to_ks_tuple_impl(TupleT const& t, std::index_sequence<Indices...>)
+{
+  return ks::make_tuple(to_std_tuple(std::get<Indices>(t))...);
+}
+
+template<typename ...Ts>
+auto to_ks_tuple(std::tuple<Ts...> const& t)
+{
+  return to_ks_tuple_impl(t, std::index_sequence_for<Ts...>{});
+}
+
+/*
+	template<typename TupleT, typename F, size_t ...Indices>
+	auto transform_tuple_impl(TupleT const& t, F f, std::index_sequence<Indices...>)
+	{
+		return ks::make_tuple(f(ks::get<Indices>(t))...);
+	}
+
+	template<typename ...Ts, typename F>
+	auto transform_tuple(tuple<Ts...> const& t, F f)
+	{
+		return transform_tuple_impl(t, f, std::index_sequence_for<Ts...>{});
+	}
+*/
+
+
+template<typename T> using to_std_tuple_t = decltype(to_std_tuple(T{}));
+
 template<typename T>
 void declare_tensor_2(py::module &m, char const* name) {
   // Wrap ks_tensor<Dim, T> to point to supplied python memory
