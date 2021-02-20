@@ -142,11 +142,18 @@ optCall env fun opt_args
   | Just new_e <- rewriteCall env fun opt_args
   -- = pprTrace "Rule fired:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
   --                                , text "After: " <+> ppr new_e ])
-  = if typeof (Call fun opt_args) == typeof new_e
-    then optE env new_e
-    else
-      pprPanic "Rule changed type:" (vcat [ text "Before:" <+> ppr (Call fun opt_args)
-                                          , text "After: " <+> ppr new_e ])   
+  = let before = Call fun opt_args
+        after = new_e
+        type_before = typeof before
+        type_after = typeof after
+    in if type_before == type_after
+       then optE env new_e
+       else
+         pprPanic "Rule changed type:"
+           (vcat [ text "Before:" <+> ppr before
+                 , text "After:"  <+> ppr after
+                 , text "Type before:" <+> ppr type_before
+                 , text "Type after:"  <+> ppr type_after ])
   | otherwise
   = Call fun opt_args
 
