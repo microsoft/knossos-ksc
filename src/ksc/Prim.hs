@@ -232,17 +232,9 @@ lmBuild_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmBuild_Dir Fwd = lmBuild
 lmBuild_Dir Rev = lmBuildT
 
-lmVCat_Dir :: ADDir -> [TExpr] -> TExpr
-lmVCat_Dir Fwd = lmVCat
-lmVCat_Dir Rev = lmHCat
-
 lmVCatV_Dir :: ADDir -> TExpr -> TExpr
 lmVCatV_Dir Fwd = lmVCatV
 lmVCatV_Dir Rev = lmHCatV
-
-lmHCat_Dir :: ADDir -> [TExpr] -> TExpr
-lmHCat_Dir Fwd = lmHCat
-lmHCat_Dir Rev = lmVCat
 
 lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
