@@ -84,7 +84,7 @@ gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
 gradE adp s (Var tv)       = Var (gradTVar adp s tv)
 gradE adp s (Dummy ty)     = Dummy (mkGradType adp (typeof s) ty)
 gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
-gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
+gradE adp s (Tuple es)     = lmVCat_AD adp s (map (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
 gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 gradE adp s (Let (VarPat v) e1 e2) = gradLet adp s v e1 e2
@@ -272,10 +272,13 @@ unique names before gradding.
 
 -}
 
-lmVCat_AD :: ADPlan -> [TExpr] -> TExpr
-lmVCat_AD BasicAD ms = lmVCat ms
-lmVCat_AD TupleAD ms = Tuple [ Tuple  (map pFst ms)
-                             , lmVCat (map pSnd ms) ]
+lmVCat_AD :: ADPlan -> Shape -> [TExpr] -> TExpr
+lmVCat_AD BasicAD s [] = lmZero s (Tuple [])
+lmVCat_AD TupleAD s [] = Tuple [ Tuple  []
+                               , lmVCat_AD BasicAD s [] ]
+lmVCat_AD BasicAD _s ms = lmVCat ms
+lmVCat_AD TupleAD _s ms = Tuple [ Tuple  (map pFst ms)
+                               , lmVCat (map pSnd ms) ]
 
 
 
