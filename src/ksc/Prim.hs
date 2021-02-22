@@ -180,8 +180,9 @@ lmHCat es  = mkPrimCall "lmHCat" (Tuple es)
 lmHCatV :: HasCallStack => TExpr -> TExpr
 lmHCatV e  = mkPrimCall1 "lmHCatV" e
 
-lmVCat :: HasCallStack => [TExpr] -> TExpr
-lmVCat es  = mkPrimCall1 "lmVCat" (Tuple es)
+lmVCat :: HasCallStack => TExpr -> [TExpr] -> TExpr
+lmVCat s []  = lmZero s (Tuple [])
+lmVCat _ es  = mkPrimCall1 "lmVCat" (Tuple es)
 
 lmVCatV :: HasCallStack => TExpr -> TExpr
 lmVCatV e  = mkPrimCall1 "lmVCatV" e
