@@ -84,7 +84,7 @@ gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
 gradE adp s (Var tv)       = Var (gradTVar adp s tv)
 gradE adp s (Dummy ty)     = Dummy (mkGradType adp (typeof s) ty)
 gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
-gradE adp s (Tuple es)     = lmVCat_AD adp (map (gradE adp s) es)
+gradE adp s (Tuple es)     = lmVCat_AD adp s (map (gradE adp s) es)
 gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
 gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
 gradE adp s (Let (VarPat v) e1 e2) = gradLet adp s v e1 e2
@@ -170,9 +170,9 @@ gradFold BasicAD s ti body acc v =
             grad = gradTVar BasicAD
             adjust v = Var v `lmCompose` lmHCat [lmOne (typeof s), lmZero (Var ti) s]
 
-        args = lmVCat
+        args = lmVCat s
                [ lmOne (typeof s)
-               , lmVCat (map (gradE BasicAD s) [acc, v]) ]
+               , lmVCat s (map (gradE BasicAD s) [acc, v]) ]
 
 -- Just a dummy for tuple mode.  We don't calculate it properly yet.
 gradFold TupleAD s _ti _body acc _v =
@@ -272,10 +272,10 @@ unique names before gradding.
 
 -}
 
-lmVCat_AD :: ADPlan -> [TExpr] -> TExpr
-lmVCat_AD BasicAD ms = lmVCat ms
-lmVCat_AD TupleAD ms = Tuple [ Tuple  (map pFst ms)
-                             , lmVCat (map pSnd ms) ]
+lmVCat_AD :: ADPlan -> Shape -> [TExpr] -> TExpr
+lmVCat_AD BasicAD s ms = lmVCat s ms
+lmVCat_AD TupleAD s ms = Tuple [ Tuple  (map pFst ms)
+                               , lmVCat s (map pSnd ms) ]
 
 
 
