@@ -2,7 +2,8 @@
 # BEGINDOC
 def relu3(x : float) -> float:
   """
-  relu3 -- Like relu, but smoother, with a robust backbone
+    Like ReLu, but smoother
+    Like GeLu, but cheaper
   """
   if x < 0.0:
     return 0.0
@@ -11,7 +12,6 @@ def relu3(x : float) -> float:
   else:
     return x - 2/3
 # ENDDOC
-
 
 def plot_relu3(filename):
   import matplotlib.pyplot as plt
