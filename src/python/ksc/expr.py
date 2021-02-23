@@ -84,19 +84,79 @@ class StructuredName:
     se: Union[str, Tuple[str, Type], Tuple[str, 'StructuredName']]
 
     def is_derivation(self):
+        """
+        True if this is a "rev" or "fwd" etc of another StructuredName
+        """
         return isinstance(self.se, tuple) and isinstance(self.se[1], StructuredName)
 
-    def is_derived(self, derivation):
+    def is_derived(self, derivation : str):
+        """
+        True if this is exactly <derivation> of another StructuredName
+        e.g.
+        True == parse("[rev [foo Float]]").is_derived("rev")
+        """
         return self.is_derivation() and self.se[0] == derivation
 
-    def mangled(self):
+    def mangled(self) -> str:
+        """
+        Return the mangled form of this name
+         [rev foo] -> "rev$foo"
+         [foo (Tuple Float Float)] -> "foo@<ff>"
+         [rev [fwd [foo (Tuple Float Float)]]] -> "rev$fwd$foo<ff>"
+        """
         if isinstance(self.se, str):
             return self.se
-        elif self.is_derivation():
+        
+        if self.is_derivation():
             return self.se[0] + "$" + self.se[1].mangled()
-        else:
-            assert isinstance(self.se[1], Type)
-            return self.se[0] + "$a" + self.se[1].shortstr()
+        
+        assert isinstance(self.se[1], Type)
+        return self.se[0] + "@" + self.se[1].shortstr()
+
+    def get_type(self) -> Type:
+        """
+        If the innermost se is a type, return it, else None
+        """
+        if isinstance(self.se, str):
+            return None
+        
+        if self.is_derivation():
+            return self.se[1].get_type()
+        
+        assert isinstance(self.se[1], Type)
+        return self.se[1]
+
+    def add_type(self, ty) -> (Type, 'StructuredName'):
+        """
+        Return a new structured name, with "ty" inserted in the corner, returning the old type if any
+        sn = parse("[shape [rev foo]]")
+        old_type, new_sname = sn.add_type(Type.Float)
+        Now old_type is None
+            new_sname is "[shape [rev [foo Float]]]"
+        """
+        if isinstance(self.se, str):
+            return None, StructuredName((self.se, ty))
+        if self.is_derivation():
+            old_ty, new_sn = self.se[1].add_type(ty)
+            return old_ty, StructuredName((self.se[0], new_sn))
+        
+        old_ty = self.se[1]
+        return old_ty, StructuredName((self.se[0], ty))
+
+    def mangle_without_type(self) -> str:
+        """
+        Return the mangled form of this name
+         [rev foo] -> "rev$foo"
+         [foo (Tuple Float Float)] -> "foo"
+         [rev [fwd [foo (Tuple Float Float)]]] -> "rev$fwd$foo"
+        """
+        if isinstance(self.se, str):
+            return self.se
+        
+        if self.is_derivation():
+            return self.se[0] + "$" + self.se[1].mangled()
+        
+        return self.se[0]
 
     def __repr__(self):
         return "StructuredName(" + str(self.se) + ")"

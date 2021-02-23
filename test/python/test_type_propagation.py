@@ -3,17 +3,16 @@ import pytest
 from ksc.type import Type
 from ksc.type_propagate import type_propagate_decls, KSTypeError
 from ksc.parse_ks import parse_ks_filename, parse_ks_string
+from ksc.expr import StructuredName
 
-@pytest.mark.skip(reason="Does not support gdef or structured names")
 def test_type_propagate_prelude_and_primer():
     symtab = dict()
     decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
     type_propagate_decls(decls_prelude, symtab)
     decls_file = list(parse_ks_filename("test/ksc/syntax-primer.ks"))
     type_propagate_decls(decls_file, symtab)
-    assert "Dt$my_log" in [d.name for d in decls_file]
+    assert "Dt$my_log" in [d.name.mangled() for d in decls_file]
 
-@pytest.mark.skip(reason="Does not support gdef or structured names")
 def test_type_propagate_works():
     decls = list(parse_ks_string("""
     (def foo Float (a : Float) 1.0)

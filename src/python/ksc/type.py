@@ -245,6 +245,19 @@ class Type:
     def __hash__(self):
         return hash(str(self))
 
+def make_tuple_if_many(types):
+    """
+    Make a tuple type unless singleton
+    """
+    if isinstance(types, (list, tuple)):
+        if len(types) == 1:
+            return types[0]
+        else:
+            return Type.Tuple(*types)
+    else:
+        return types
+
+
 Type.String = Type("String")
 Type.Integer = Type("Integer")
 Type.Float = Type("Float")
