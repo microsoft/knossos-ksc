@@ -37,7 +37,6 @@ def test_type_propagate_empty_return():
     type_propagate_decls(decls, {})
     assert decls[0].return_type == Type.Float
 
-@pytest.mark.skip(reason="Does not support gdef or structured names")
 def test_type_propagate_warnings():
     decls = list(parse_ks_string("""
     (def foo Float (a : Float) 1)
@@ -60,4 +59,4 @@ def test_type_propagate_warnings():
     """, __file__))
     with pytest.raises(KSTypeError) as excinfo:
         type_propagate_decls(decls, {})
-    assert "Redefinition of foo" in str(excinfo.value)
+    assert "Redefinition of StructuredName(foo)(Float)" in str(excinfo.value)
