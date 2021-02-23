@@ -101,6 +101,10 @@ class StructuredName:
     def __repr__(self):
         return "StructuredName(" + str(self.se) + ")"
 
+    @staticmethod
+    def from_str(s: str):
+        assert '$' not in s
+        return StructuredName(s)
 
 def make_structured_name(se) -> StructuredName:
     """
@@ -263,13 +267,18 @@ class Call(Expr):
     (add   1.234 4.56)
      ^^^   ^^^^^^^^^^
      name  args
+    ([rev [add (Tuple Float Float)]] 1.234 4.56)
+     ^^^   ^^^^^^^^^^
+     name  args
     ```
     '''
-    name: str
+    sname: StructuredName
     args: List[Expr]
 
-    def __init__(self, name, args):
-        super().__init__(name=name, args=args)
+    def __init__(self, sname, args):
+        if isinstance(sname, str):
+            sname = StructuredName.from_str(sname)
+        super().__init__(sname=sname, args=args)
 
 class Lam(Expr):
     '''Lam(arg, body).
@@ -377,10 +386,14 @@ def _(ty, indent):
     elems = [pystr(c, indent+1) for c in ty.children]
     return ty.kind + "[" + ",".join(elems) + "]"    
 
+@pystr.register(StructuredName)
+def _(sn, indent):
+    return pyname(sn.mangled())
+
 @pystr.register(Def)
 def _(ex, indent):
     indent += 1
-    return "def " + pyname(ex.name.mangled()) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
+    return "def " + pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
            + pystr(ex.return_type, indent) + ":" \
            + nl(indent+1) + pystr(ex.body, indent+1)
 
@@ -417,7 +430,7 @@ def _(ex, indent):
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
-    return pystr(pyname(ex.name), indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
+    return pystr(ex.sname, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
 def _(ex, indent):

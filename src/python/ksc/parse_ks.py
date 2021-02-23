@@ -201,7 +201,7 @@ def parse_expr(se):
         return Lam(var, body)
 
     # The remainder are calls
-    return Call(parse_name(head), [parse_expr(se) for se in se[1:]])
+    return Call(parse_structured_name(head), [parse_expr(se) for se in se[1:]])
 
 # Parse a top-level definition (def, edef, rule)
 def parse_tld(se):

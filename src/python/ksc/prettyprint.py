@@ -181,7 +181,7 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, Call):
         return nest(ctx.indent, 
                     parens_interline(2,
-                                pp_function_name(ex.name),
+                                pp(ex.sname),
                                 *map(pp, ex.args)))
 
     # Lambda arg body

@@ -270,7 +270,7 @@ def _(ex, symtab):
     for key,val in symtab.items():
         if isinstance(key, tuple):
             key=key[0]
-        if key.startswith(ex.name): # TODO: soundex match here?
+        if True: # TODO: soundex match here?
             print(f"type_propagate:   {key}({val})")
 
     raise KSTypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))
