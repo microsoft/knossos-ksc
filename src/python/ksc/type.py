@@ -49,6 +49,7 @@ class Type:
         """
         Constructor: Type.Tuple(T1, ..., Tn)
         """
+        assert all((isinstance(ch, Type) for ch in args)), "Type.Tuple constructed with non-type arg"
         return Type("Tuple", args)
 
     @staticmethod
@@ -205,6 +206,15 @@ class Type:
 
     def shortstr_py_friendly(self):
         return self.shortstr("_t", "t_")
+
+    @staticmethod
+    def is_type_introducer(sym : str):
+        """
+        For parsers: could sym be the introducer of a type?
+        True for "Tensor", "Float", etc
+        """
+        return sym in Type.node_kinds
+
 
     def __str__(self):
         if len(self.children) == 0 and (self.kind != "Tuple"):

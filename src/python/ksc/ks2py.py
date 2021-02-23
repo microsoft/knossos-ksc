@@ -1,6 +1,6 @@
 from ksc.parse_ks import parse_ks_filename
 
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
 
 from ksc.type_propagate import type_propagate_decls
@@ -49,6 +49,11 @@ def _(ex, indent, body):
     indent += 1
     return "#edef " + pyname(ex.name) + "(" + emit_intercomma(indent, ex.arg_types, body) + ") -> "\
            + pystr(ex.return_type, indent) + nl(indent)
+
+@emit.register(GDef)
+def _(ex, indent, body):
+    indent += 1
+    return "#gdef " + pyname(ex.derivation) + " " + pyname(ex.function_name) + nl(indent)
 
 @emit.register(Rule)
 def _(ex, indent, body):

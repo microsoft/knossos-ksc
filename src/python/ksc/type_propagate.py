@@ -6,7 +6,7 @@ import itertools
 from typing import Union, List
 from ksc.type import Type, SizeType, shape_type
 
-from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr
 
 # Pretty printing
@@ -210,6 +210,18 @@ def _(ex, symtab):
 def _(ex, symtab):
     # (edef name retun_type arg_types)
     signature = ex.name, tuple(ex.arg_types)
+    if signature in symtab and symtab[signature] != ex.return_type:
+        raise KSTypeError(f"Double definition: {signature}\n -> {symtab[signature]}\n vs {ex.return_type}")
+    symtab[signature] = ex.return_type
+    return ex
+
+def get_signature(ex: GDef):
+    return ex.derivation + "$TODO$" + ex.function_name
+
+@type_propagate.register(GDef)
+def _(ex, symtab):
+    # (gdef derivation function_name)
+    signature = get_signature(ex)
     if signature in symtab and symtab[signature] != ex.return_type:
         raise KSTypeError(f"Double definition: {signature}\n -> {symtab[signature]}\n vs {ex.return_type}")
     symtab[signature] = ex.return_type

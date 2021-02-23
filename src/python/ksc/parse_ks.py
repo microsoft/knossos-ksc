@@ -4,7 +4,8 @@ import sexpdata
 
 from ksc.type import Type
 from ksc.utils import ensure_list_of_lists
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert, pystr
+from ksc.expr import Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import pystr, StructuredName, make_structured_name
 
 #####################################################################
 ## S-expression Utils
@@ -38,6 +39,7 @@ def parse_seq(se, *parsers):
 # Reserved word constants
 _def = sexpdata.Symbol("def")
 _edef = sexpdata.Symbol("edef")
+_gdef = sexpdata.Symbol("gdef")
 _assert = sexpdata.Symbol("assert")
 _if = sexpdata.Symbol("if")
 _let = sexpdata.Symbol("let")
@@ -47,7 +49,7 @@ _rule = sexpdata.Symbol("rule")
 _colon = sexpdata.Symbol(":")
 _None = sexpdata.Symbol("None")
 
-def parse_type(se):
+def parse_type_maybe(se):
     """ Converts an S-Expression representing a type, like (Tensor 1 Float) or (Tuple Float (Tensor 1 Float)),
         into a Type object, e.g. Type.Tensor(1,Type.Float) or Type.Tuple(Type.Float, Type.Tensor(1,Type.Float)).
     """
@@ -56,24 +58,35 @@ def parse_type(se):
 
     if isinstance(se, sexpdata.Symbol):
         if se == _None:
-            return None
-        return Type(se.value())
+            return True, None
+
+        if Type.is_type_introducer(se.value()):
+            return True, Type(se.value())
+
+        return False, None
 
     if isinstance(se, list) and len(se)>0:
         if isinstance(se[0], sexpdata.Symbol):
             sym = se[0].value()
             if sym == "Tuple":
-                return Type.Tuple(*(parse_type(s) for s in se[1:]))
+                return True, Type.Tuple(*(parse_type(s) for s in se[1:]))
             if sym == "Vec" and len(se)==2:
-                return Type.Tensor(1,parse_type(se[1]))
+                return True, Type.Tensor(1,parse_type(se[1]))
             if sym == "Tensor" and len(se)==3:
-                return Type.Tensor(parse_int(se[1]),parse_type(se[2]))
+                return True, Type.Tensor(parse_int(se[1]),parse_type(se[2]))
             if sym == "Lam" and len(se)==3:
-                return Type.Lam(parse_type(se[1]), parse_type(se[2]))
+                return True, Type.Lam(parse_type(se[1]), parse_type(se[2]))
             if sym == "LM" and len(se)==3:
-                return Type.LM(parse_type(se[1]), parse_type(se[2]))
+                return True, Type.LM(parse_type(se[1]), parse_type(se[2]))
 
-    raise ValueError("Did not know how to parse type {}".format(se))
+    return False, None
+
+def parse_type(se):
+    ok, ty = parse_type_maybe(se)
+    if ok:
+        return ty
+    else:
+        raise ValueError("Did not know how to parse type {}".format(se))
 
 def parse_types(ses):
     return list(map(parse_type, ses))
@@ -92,27 +105,27 @@ def parse_name(se):
     return se.value()
 
 # "x" or "[fwd x]" or "[fwd [x (Tuple Float String)]]" -> string (mangled function name)
-def parse_function_name(se):
+def parse_structured_name(se):
     if isinstance(se, sexpdata.Symbol):
-        return se.value()
+        return StructuredName(se.value())
 
-    check(isinstance(se, sexpdata.Bracket), "Wanted identifier or [names], got: ", se)
+    check(isinstance(se, sexpdata.Bracket), "Wanted identifier or [ident Type] or [ident <StructuredName>], got: ", se)
+    ses = se.value()
+    assert len(ses) == 2
+    se0 = parse_name(ses[0])
+    ok, ty = parse_type_maybe(ses[1])
+    if ok:
+        return StructuredName((se0, ty))
 
-    return parse_name(se.value()[0]) + '$' + parse_function_name(se.value()[1])
-    
+    # Not a type, assume it's a StructuredName
+    sn = parse_structured_name(ses[1])
+
+    return StructuredName((se0, sn))
 
 # "\"x\"" -> string
 def parse_string(se):
     check(isinstance(se, str), "Expected string, got: ", se) 
     return se
-
-# "1.3" -> int
-def parse_int(se):
-    if isinstance(se, int):
-        return se
-
-    assert re.match(r"^\d+$", se)
-    return int(se)
 
 # "x : Float" -> Var(x, Type.Float)
 def parse_arg(arg):
@@ -196,10 +209,13 @@ def parse_tld(se):
     check(len(se) > 0, "Empty list at top level")
     head = se[0]
     if head == _def:
-        return Def(*parse_seq(se[1:], parse_function_name, parse_type, parse_args, parse_expr))
+        return Def(*parse_seq(se[1:], parse_structured_name, parse_type, parse_args, parse_expr))
 
     if head == _edef:
-        return EDef(*parse_seq(se[1:], parse_function_name, parse_type, parse_types))
+        return EDef(*parse_seq(se[1:], parse_structured_name, parse_type, parse_types))
+
+    if head == _gdef:
+        return GDef(*parse_seq(se[1:], parse_name, parse_structured_name))
 
     if head == _rule:
         return Rule(*parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr))
