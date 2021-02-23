@@ -180,6 +180,12 @@ lmHCat es  = mkPrimCall "lmHCat" (Tuple es)
 lmHCatV :: HasCallStack => TExpr -> TExpr
 lmHCatV e  = mkPrimCall1 "lmHCatV" e
 
+-- The argument tuple to ksc's primitive function lmVCat must have two
+-- or more components.  The Haskell function Prim.lmVCat therefore
+-- checks whether the argument list is empty.  If it is then lmZero is
+-- a suitable replacement.  It doesn't check if the argument list has
+-- length one.  Such a call may fail later in the pipeline.  See also
+-- Prim.primFunCallResultTy_maybe.
 lmVCat :: HasCallStack => TExpr -> [TExpr] -> TExpr
 lmVCat s []  = lmZero s (Tuple [])
 lmVCat _ es  = mkPrimCall1 "lmVCat" (Tuple es)
@@ -503,6 +509,14 @@ primFunCallResultTy_maybe fun args
                                 | tangentType s1 `eqType` s2 -> Just (tangentType t)
            -- Tupled version:  lmApplyT :: (r, s -o t) -> ds -> dt
 
+      -- The argument tuple to ksc's primitive function "lmVCat" must
+      -- have two or more components else we can't deduce its return
+      -- type.  (Really the return type ought to be
+      --
+      --     forall s1. TypeLM s1 (TypeTuple ts)
+      --
+      -- but we don't have polymorphism in ksc.)  See also
+      -- Prim.lmVCat.
       ("lmVCat"   , TypeTuple tys) | Just (ss,ts) <- unzipLMTypes tys
                                      , (s1:ss1) <- ss
                                      , all (== s1) ss1     -> Just (TypeLM s1 (TypeTuple ts))
