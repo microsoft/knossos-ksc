@@ -14,26 +14,27 @@ Here's the BNF for our language:
 
 <rule> ::= ( rule <string> <params> <expr> <expr> )
 
-<def> ::= ( def <var> <type> <params> <expr> )
+<def> ::= ( def <sname> <type> <params> <expr> )
 -- (def f Float ( (x : Float) (y : Vec Float) ) (...) )
 
-<edef> ::= ( edef <var> <type> <types> )
+<edef> ::= ( edef <sname> <type> <types> )
 
-<gdef> ::= ( gdef <derivation> <var> )
+<gdef> ::= ( gdef <derivation> <sname> )
 
 <params> ::= <param> | ( <param_1> ... <param_n> )
 <param>  ::= ( <var> ":" <type> )
 
 -- <type> is atomic; <ktype> is compound
 <type>   ::= "Integer" | "Float" | "String" | "Bool" | ( <ktype> )
-<ktype>  ::= "Vec" <type>
+<ktype>  ::= "Tensor" <int> <type>
+           | "Vec" <type> -- shorthand for Tensor 1 Type
            | "Tuple" <type_1> .. <type_n>
            | <type>
 <types>  ::= ( <type_1> ... <type_n> )
 
 {-
-x : Vec Float
-x : Vec (Vec Float)
+x : Tensor 1 Float
+x : Tensor 1 (Tensor 2 Float)
 -}
 
 -- <expr> is atomic; <kexpr> is compound
@@ -45,13 +46,19 @@ x : Vec (Vec Float)
         |   if <expr> <expr> <expr>
         |   tuple <expr>1 ... <expr>n      n >= 0
         |   $dummy <type>
-        |   <var> <exrp>1 ... <expr>n      calls, n >= 1
+        |   <sname> <exrp>1 ... <expr>n      calls, n >= 1
         |   <expr>
 
 <binds> ::= (<pat> <expr>)
 
-<pat> := <var>
-      | (<var>1 ... <var>n)
+<pat> ::= <var>
+      |   (<var>1 ... <var>n)
+
+<sname> ::= <var>
+        | "[" <derivation> <sname> "]"
+        | "[" <var> <type> "]"
+
+<derivation> ::= "rev" | "fwd" | "shape" | "cost" | "D" | "Dt" | "suffwdpass" | "sufrevpass"
 
 An example
   (def f7 ((x : Vec Float) (y : Vec Float))
