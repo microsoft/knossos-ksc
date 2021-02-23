@@ -68,12 +68,16 @@ def interline(*docs):
 
 @register_pretty(StructuredName)
 def pretty_StructuredName(sname, ctx):
-    pp = lambda v: pretty_dispatch(v, ctx)
+    def pp(v):
+        if isinstance(v, str):
+            return pp_function_name(v)
+        else:
+            return pretty_dispatch(v, ctx)
 
     if isinstance(sname.se, str):
         return pp_function_name(sname.se)
     else:
-        return parens_aux(2, LBRACKET, RBRACKET, *sname.se)
+        return parens_aux(2, LBRACKET, RBRACKET, *intersperse(LINE, map(pp, sname.se)))
 
 # @singledispatch
 # def pp_as_s_exp(expr, ctx):

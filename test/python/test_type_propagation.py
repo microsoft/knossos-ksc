@@ -38,7 +38,7 @@ def test_type_propagate_empty_return():
     type_propagate_decls(decls, {})
     assert decls[0].return_type == Type.Float
 
-
+@pytest.mark.skip(reason="Does not support gdef or structured names")
 def test_type_propagate_warnings():
     decls = list(parse_ks_string("""
     (def foo Float (a : Float) 1)
