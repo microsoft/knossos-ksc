@@ -24,6 +24,7 @@ import Test.Hspec
 import Data.List( mapAccumR )
 import Data.Sequence( mapWithIndex, fromList )
 import Data.Foldable( toList )
+import Control.Monad( (<=<) )
 
 optTrace :: String -> a -> a
 optTrace _msg t = t
@@ -79,6 +80,12 @@ simplify env rhs
        -- We use ANF to expose optimisation opportunities and use
        -- optLets and optE to take them.  See Note [Inline tuples] for
        -- the motiviation for doing ANF-then-opt.
+        ; let doit = \x1 -> do
+                x2 <- runAnf (anfExpr subst x1)
+                let x3 = optLets subst x2
+                let x4 = optE env x3
+                pure x4
+
        ; rhs1 <- runAnf (anfExpr subst rhs)
 --       ; banner "ANF'd (1)"
 --       ; display rhs1
@@ -111,7 +118,12 @@ simplify env rhs
 --       ; banner "OptLets (3)"
 --       ; display rhs7
 
-       ; return rhs7 }
+       -- Need to alternate optLets with optE to get rid of all (a, b)
+       -- = (e1, e2)
+       ; rhs9 <- (doit <=< doit <=< doit <=< doit <=< doit <=< doit <=< doit <=< doit <=<
+                  doit <=< doit <=< doit <=< doit <=< doit <=< doit <=< doit) rhs7
+
+       ; return rhs9 }
 
 isOnlyUnits :: Type -> Maybe TExpr
 isOnlyUnits = \case
