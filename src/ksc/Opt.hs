@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies, DataKinds, FlexibleInstances,
              PatternSynonyms,
 	     ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Opt( optLets, optDef, optDefs, optE, Opt.hspec, simplify, test_opt ) where
 
@@ -112,6 +113,11 @@ simplify env rhs
 
        ; return rhs7 }
 
+isOnlyUnits :: Type -> Maybe TExpr
+isOnlyUnits = \case
+  TypeTuple ts -> Tuple <$> mapM isOnlyUnits ts
+  _ -> Nothing
+
 ---------------
 optE :: HasCallStack => OptEnv -> TExpr -> TExpr
 optE env
@@ -119,6 +125,8 @@ optE env
   where
     go :: HasCallStack => TExpr -> TExpr
     go e | Just e' <- tryRules (optRuleBase env) e = go e'
+
+    go e | Just e' <- isOnlyUnits (typeof e) = e'
 
     go (Tuple es)         = Tuple (map go es)
     go (Var v) | Just e <- lookupSubst (tVarVar v) (optSubst env)
