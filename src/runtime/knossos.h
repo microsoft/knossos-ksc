@@ -723,6 +723,61 @@ namespace ks {
 		return dds;
 	}
 
+	ks::tuple<vec<double>, double>
+	indexL$aiT1f(allocator * alloc, int i, vec<double> v) {
+		return ks::make_tuple(v, v.index(i));
+	}
+
+	ks::tuple<ks::tuple<vec<double>, double>, int>
+	suffwdpass$indexL$aiT1f(allocator * alloc, int i, vec<double> v) {
+		return ks::make_tuple(ks::make_tuple(v, v.index(i)), i);
+	}
+
+	ks::tuple<ks::tuple<>, vec<double>>
+	sufrevpass$indexL$aiT1f(allocator * alloc,
+				ks::tuple<vec<double>, double> ddr,
+				int i) {
+		auto [v, vi] = ddr;
+		v[i] = vi;
+		return ks::make_tuple(ks::make_tuple(), v);
+	}
+
+	tensor<2, double>
+	setAt$a$dii$bT2ff(allocator * alloc,
+			ks::tuple<int, int> index,
+			tensor<2, double> t,
+			double a) {
+		auto [i, j] = index;
+		// I do actually want to write here so can't use
+		// tensor.index(). Explain this better before merging
+		// (or come up with a genuinely-supported mutable
+		// tensor API)
+		t[i][j] = a;
+		return t;
+	}
+
+	ks::tuple<tensor<2, double>, ks::tuple<int, int>>
+	suffwdpass$setAt$a$dii$bT2ff(allocator * alloc,
+			ks::tuple<int, int> index,
+			tensor<2, double> t,
+			double a) {
+		auto [i, j] = index;
+		t[i][j] = a;
+		return ks::make_tuple(t, index);
+	}
+
+	ks::tuple<ks::tuple<ks::tuple<>, ks::tuple<>>,
+	           tensor<2, double>,
+	           double>
+	sufrevpass$setAt$aT2f$dii$b(allocator * alloc,
+		                    tensor<2, double> t,
+		                    ks::tuple<int, int> index) {
+		return ks::make_tuple(ks::make_tuple(ks::make_tuple(),
+		                                     ks::make_tuple()),
+		                       t,
+		                       t.index(index));
+	}
+
 	// The number of bytes that would be required from the
 	// allocator to store an inflated copy of the given object
 	template<class T>
