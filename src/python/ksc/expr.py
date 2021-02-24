@@ -226,6 +226,7 @@ class Def(Expr):
     body: Expr
 
     def __init__(self, name, return_type, args, body):
+        assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
 class EDef(Expr):

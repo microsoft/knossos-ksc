@@ -180,6 +180,9 @@ def _(ex, symtab):
         raise KSTypeError(f"In definition of '{ex.name}', explicit type in structured name\n" +
                             f"does not match argument types {argtype}")
 
+    # Update ex.name to include the type
+    ex.name = sname
+
     # Check for definition in symtab with different return type 
     if sname in symtab:
         old_type = symtab[sname]
