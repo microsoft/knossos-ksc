@@ -130,6 +130,8 @@ optE env
     go (Lam tv e)         = Lam tv' (optE env' e)
        where
          (tv', env') = optSubstBndr tv env
+    go (Let (TupPat p) (Tuple t) body) =
+      go (foldr (\(v, e) -> Let (VarPat v) e) body (zip p t))
     go (Let tv rhs body)  = Let tv' (go rhs) (optE env' body)
        where
          (tv', env') = traverseState optSubstBndr tv env
