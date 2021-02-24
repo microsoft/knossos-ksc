@@ -222,6 +222,13 @@ rewriteCall _ (TFun _ (DrvFun f adm)) arg
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
   = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
 
+rewriteCall env (TFun _ to_inline) arg
+  | Just to_inline <- maybeUserFun to_inline
+  , shouldInline to_inline
+  , Just Def{ def_pat = pat, def_rhs = UserRhs body }
+      <- lookupGblST to_inline (optGblST env)
+  = Just (inlineCall env pat body arg)
+
 rewriteCall _ (TFun _ (SUFFwdPass (PrimFun fun))) arg
   = SUF.rewriteSUFFwdPass fun arg
 
@@ -230,6 +237,19 @@ rewriteCall _ (TFun _ (SUFRevPass (PrimFun fun))) arg
 
 rewriteCall _ _ _
   = Nothing
+
+-- If this gets big or complicated then move it to its own module,
+-- perhaps Ksc.InlineHeuristics.
+shouldInline :: UserFun Typed -> Bool
+shouldInline to_inline
+  = to_inline `elem` [ fwd "mul" ff
+                     , rev "mul" ff
+                     , fwd "add" ff
+                     , rev "add" ff
+                     ]
+  where fwd f t = SUFFwdPass (BaseUserFunId f t)
+        rev f t = SUFRevPass (BaseUserFunId f t)
+        ff = TypeTuple [TypeFloat, TypeFloat]
 
 -----------------------
 optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
