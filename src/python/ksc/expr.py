@@ -174,6 +174,11 @@ class StructuredName:
         
         return self.se[0]
 
+    def __str__(self):
+        if isinstance(self.se, str):
+            return self.se
+        return f"[{self.se[0]} {self.se[1]}]"
+
     def __repr__(self):
         return "StructuredName(" + str(self.se) + ")"
 

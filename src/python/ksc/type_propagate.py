@@ -187,7 +187,7 @@ def _(ex, symtab):
     if sname in symtab:
         old_type = symtab[sname]
         if old_type != ex.return_type:
-            raise KSTypeError(f"Redefinition of {ex.name}({argtype}) with different return type {old_type} -> {ex.return_type}")
+            raise KSTypeError(f"Redefinition of {ex.name} with different return type {old_type} -> {ex.return_type}")
     
     if declared_return_type:
         # Add to symtab before entering body, allowing for recursive calls

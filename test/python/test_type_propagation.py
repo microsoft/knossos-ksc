@@ -59,4 +59,4 @@ def test_type_propagate_warnings():
     """, __file__))
     with pytest.raises(KSTypeError) as excinfo:
         type_propagate_decls(decls, {})
-    assert "Redefinition of StructuredName(foo)(Float)" in str(excinfo.value)
+    assert "Redefinition of [foo Float]" in str(excinfo.value)
