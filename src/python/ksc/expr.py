@@ -99,10 +99,13 @@ class StructuredName:
 
     def mangled(self) -> str:
         """
-        Return the mangled form of this name
+        Return the mangled form of this name, for shorthand printing
          [rev foo] -> "rev$foo"
          [foo (Tuple Float Float)] -> "foo@<ff>"
          [rev [fwd [foo (Tuple Float Float)]]] -> "rev$fwd$foo<ff>"
+
+         Note that the "real" mangled name, as will appear in say C++ code,
+         is correct only if self.has_type()
         """
         if isinstance(self.se, str):
             return self.se
@@ -112,6 +115,19 @@ class StructuredName:
         
         assert isinstance(self.se[1], Type)
         return self.se[0] + "@" + self.se[1].shortstr()
+
+    def has_type(self) -> Type:
+        """
+        True if the innermost se is a type
+        """
+        if isinstance(self.se, str):
+            return None
+        
+        if self.is_derivation():
+            return self.se[1].has_type()
+        
+        assert isinstance(self.se[1], Type)
+        return True
 
     def get_type(self) -> Type:
         """
@@ -154,7 +170,7 @@ class StructuredName:
             return self.se
         
         if self.is_derivation():
-            return self.se[0] + "$" + self.se[1].mangled()
+            return self.se[0] + "$" + self.se[1].mangle_without_type()
         
         return self.se[0]
 
