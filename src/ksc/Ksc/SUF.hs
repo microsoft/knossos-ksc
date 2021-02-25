@@ -115,6 +115,16 @@ sufE avoid = \case
 
           (avoid4, mcall, dups) = addDups avoid3 [mn, mb_no_i]
 
+  Call f (Tuple [n, Lam i body, s]) | f `isThePrimFun` P_ifold ->
+    (avoid5, mcall, dups (Call f (Tuple [n', Lam i_ (perhaps_elim_i body'), s'])))
+    where (avoid1, mn, n') = sufE avoid n
+          (avoid2, mb, body') = sufE avoid1 body
+          (avoid3, ms, s') = sufE avoid2 s
+
+          (i_, mb_no_v, avoid4, perhaps_elim_i) = rebind i mb avoid3
+
+          (avoid5, mcall, dups) = addDups avoid4 [mn, mb_no_v, ms]
+
   -- SUF{f e} -> f SUF{e}
   Call f e -> suf_many_and_dup (L1 e) avoid (\(L1 e') -> Call f e')
 
@@ -226,6 +236,12 @@ data L3 a = L3 a a a
   deriving (Functor, Foldable, Traversable)
 
 data L4 a = L4 a a a a
+  deriving (Functor, Foldable, Traversable)
+
+data L6 a = L6 a a a a a a
+  deriving (Functor, Foldable, Traversable)
+
+data L8 a = L8 a a a a a a a a
   deriving (Functor, Foldable, Traversable)
 
 data NonEmpty a = Once a

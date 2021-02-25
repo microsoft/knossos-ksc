@@ -1073,6 +1073,9 @@ pprPrimFun = \case
   P_SelFun i n -> text "get$" <> int i <> char '$' <> int n
   P_dup n -> text "dup$" <> int n
   P_elim -> text "elim"
+  P_ifold -> text "ifold"
+  P_suffwdpass_ifold_helper -> text "suffwdpass$ifold$helper"
+  P_sufrevpass_ifold_helper -> text "sufrevpass$ifold$helper"
 
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
@@ -1503,6 +1506,9 @@ data PrimFun = P_inline
              | P_SelFun Int Int -- P_SelFun index arity.  1-indexed, so (SelFun 1 2) is fst
              | P_dup Int
              | P_elim
+             | P_ifold
+             | P_suffwdpass_ifold_helper
+             | P_sufrevpass_ifold_helper
              | P_lmApplyTR
              | P_lmFold
              | P_FFold
@@ -1553,4 +1559,5 @@ toPrimFun = \case
   "lmDot" -> Just P_lmDot
   "lmZero" -> Just P_lmZero
   "lmOne" -> Just P_lmOne
+  "ifold" -> Just P_ifold
   _ -> Nothing

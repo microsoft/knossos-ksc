@@ -692,6 +692,37 @@ namespace ks {
 		return ret;
 	}
 
+	template <class S, class F>
+	S ifold(allocator * alloc, int n, F f, S s) {
+		for (int i = 0; i < n; i++)
+			s = f(alloc, s, i);
+		return s;
+	}
+
+	template <class S, class F, class B>
+	ks::tuple<S, vec<B>>
+	suffwdpass$ifold$helper(allocator * alloc, int n, F f, S s, const B) {
+		vec<B> bogv = vec<B>(alloc, n);
+		for (int i = 0; i < n; i++) {
+			auto s_bogi = f(alloc, s, i);
+			s = ks::get<0>(s_bogi);
+			B bogi = ks::get<1>(s_bogi);
+			bogv[i] = bogi;
+		}
+		return ks::make_tuple(s, bogv);
+	}
+
+	template <class TS, class F, class B>
+	TS sufrevpass$ifold$helper(allocator * alloc, TS dds, F f, vec<B> bogv) {
+		int n = bogv.size();
+		for (int i = n - 1; i >= 0; i--) {
+			B bogi = bogv[i];
+			auto dds_unit = f(alloc, bogi, dds);
+			dds = ks::get<0>(dds_unit);
+		}
+		return dds;
+	}
+
 	// The number of bytes that would be required from the
 	// allocator to store an inflated copy of the given object
 	template<class T>

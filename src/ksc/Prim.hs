@@ -759,6 +759,30 @@ primFunCallResultTy_maybe fun args
 
       (P_elim     , _)                                     -> Just (TypeTuple [])
       (P_dup n, t)                                         -> Just (TypeTuple (replicate n t))
+      (P_ifold, TypeTuple [ TypeInteger
+                          , TypeLam (TypeTuple [s_ty1, TypeInteger]) s_ty2
+                          , s_ty3 ])
+        | Just s_ty <- eqTypes s_ty1 [s_ty2, s_ty3]
+        -> Just s_ty
+        | otherwise -> Nothing
+      (P_suffwdpass_ifold_helper,
+       TypeTuple [ TypeInteger
+                 , TypeLam (TypeTuple [s1, TypeInteger]) (TypeTuple [s2, bog1])
+                 , s3
+                 , dummy_bog
+                 ])
+        | Just s <- eqTypes s1 [s2, s3]
+        , Just bog <- eqTypes bog1 [dummy_bog]
+        -> Just (TypeTuple [s, TypeTensor 1 bog])
+        | otherwise -> Nothing
+      (P_sufrevpass_ifold_helper,
+       TypeTuple [ ds1
+                 , TypeLam (TypeTuple [bog2, ds2])
+                           (TypeTuple [ds3, TypeTuple []])
+                 , TypeTensor 1 bog1 ])
+        | bog1 `eqType` bog2
+        -> eqTypes ds1 [ds2, ds3]
+        | otherwise -> Nothing
 
       _ -> Nothing
 

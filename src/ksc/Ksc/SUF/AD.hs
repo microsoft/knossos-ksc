@@ -5,7 +5,7 @@
 
 module Ksc.SUF.AD where
 
-import           Ksc.SUF (L2(L2), L3(L3), L4(L4))
+import           Ksc.SUF (L2(L2), L3(L3), L4(L4), L6(L6), L8(L8))
 import           Ksc.Traversal (traverseState)
 
 import           Lang
@@ -119,6 +119,65 @@ sufFwdRevPass gst subst = \case
   theCall@(Call f (Tuple [e1, theLambda@(Lam i e2)])) | f `isThePrimFun` P_build ->
     sufFwdRevPass_build gst subst theCall e1 theLambda i e2
 
+
+  Call f (Tuple [en, Lam s_i ebody, es]) | f `isThePrimFun` P_ifold ->
+    let (subst2, L6 n ifold s bn bifold bs) =
+          notInSubstTVs subst (L6 (TVar TypeInteger (Simple "n"))
+                                  (TVar typeof_es (Simple "ifoldr"))
+                                  (TVar typeof_es (Simple "s"))
+                                  (TVar gradfn_bog_ty (Simple "bn"))
+                                  (TVar (TypeTensor 1 gradfbody_bog_ty) (Simple "bifoldr"))
+                                  (TVar gradfs_bog_ty (Simple "bs")))
+
+        (s_i', subst3) = substBndr s_i subst
+
+        (gradfn, gradfn_bog_ty, sufRevPassn) = sufFwdRevPass gst subst2 en
+        (gradfbody, gradfbody_bog_ty, sufRevPassbody) = sufFwdRevPass gst subst3 ebody
+        (gradfs, gradfs_bog_ty, sufRevPasss) = sufFwdRevPass gst subst3 es
+
+        typeof_es = typeof es
+
+        bog = Tuple [Var bn, Var bifold, Var bs]
+
+        fwd_ifold =
+          mkPrimCall P_suffwdpass_ifold_helper
+                     (Tuple [Var n, Lam s_i' gradfbody, Var s, Dummy gradfbody_bog_ty])
+
+        gradf_ifold = Let (TupPat [n, bn]) gradfn
+                    $ Let (TupPat [s, bs]) gradfs
+                    $ Let (TupPat [ifold, bifold]) fwd_ifold
+                    $ Tuple [Var ifold, bog]
+
+        typeof_ds = tangentType typeof_es
+
+        sufRevPass_ avoid' dt b =
+          let type_bifoldr = TypeTensor 1 gradfbody_bog_ty
+              type_bbody_ds = TypeTuple [gradfbody_bog_ty, typeof_ds]
+
+              (avoid'2, L8 bn_ bifoldr_ bs_ bbody_ ds ds1 bbody_ds ds_di) =
+                notInScopeTVs avoid'  (L8 (TVar gradfn_bog_ty (Simple "bn"))
+                                          (TVar type_bifoldr (Simple "bifoldr"))
+                                          (TVar gradfs_bog_ty (Simple "bs"))
+                                          (TVar gradfbody_bog_ty (Simple "bbody"))
+                                          (TVar typeof_ds (Delta "s"))
+                                          (TVar typeof_ds (Delta "s1"))
+                                          (TVar type_bbody_ds (Simple "bbody_ds"))
+                                          (deltaOfSimple s_i))
+
+              (avoid'3, innerLets) = sufRevPassbody avoid'2 (Var ds1) (Var bbody_)
+
+              lambda = Lam bbody_ds (Let (TupPat [bbody_, ds1]) (Var bbody_ds) (mkLets_ innerLets (Var ds_di)))
+
+              lets = [ (TupPat [bn_, bifoldr_, bs_], b)
+                     , (VarPat ds, mkPrimCall P_sufrevpass_ifold_helper (Tuple [dt, lambda, Var bifoldr_]))
+                     ]
+
+              (avoid'4, nLets) = sufRevPassn avoid'3 (Tuple []) (Var bn_)
+              (avoid'5, sLets) = sufRevPasss avoid'4 (Var ds) (Var bs_)
+
+          in (avoid'5, lets ++ nLets ++ sLets)
+
+    in (gradf_ifold, typeof bog, sufRevPass_)
 
   -- FWD{f e} = let (a, b_e) = FWD{e}
   --                (r, b_f) = [suffwdpass f] a
