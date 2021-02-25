@@ -7,6 +7,9 @@
 (def [fwd to_float] Float ((x : Integer) (dx : (Tuple))) 0.0)
 (def [rev to_float] (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
 (edef [Dt to_float] (Tuple Float (LM Integer Float)) (Integer))
+(def [suffwdpass to_float] (Tuple Float (Tuple)) (x : Integer)
+     (tuple (to_float x) (tuple)))
+(def [sufrevpass [to_float Integer]] (Tuple) ((d_dto_float : Float) (bog : Tuple)) (tuple))
 
 ;; not :: Bool -> Bool
 (def not Bool (p : Bool) (if p false true))
@@ -23,12 +26,22 @@
 (def [rev neg] Float ((x : Float) (d_dneg : Float))
      (neg d_dneg))
 
+(def [suffwdpass neg] (Tuple Float (Tuple)) (t : Float)
+     (tuple (neg t) (tuple)))
+(def [sufrevpass [neg Float]] Float ((d_dneg : Float) (bog : Tuple))
+     (neg d_dneg))
+
 (edef neg Integer (Integer))
 (edef [D neg] (LM Integer Integer) (Integer))
 (edef [Dt neg] (Tuple Integer (LM Integer Integer)) (Integer))
 (def [fwd neg] (Tuple) ((x : Integer) (dx : (Tuple)))
      (tuple))
 (def [rev neg] (Tuple) ((x : Integer) (d_dneg : (Tuple)))
+     (tuple))
+
+(def [suffwdpass neg] (Tuple Integer (Tuple)) (t : Integer)
+     (tuple (neg t) (tuple)))
+(def [sufrevpass [neg Integer]] (Tuple) (t : Tuple (Tuple) (Tuple))
      (tuple))
 
 ;; add :: Number x Number -> Number
@@ -48,6 +61,11 @@
   (d_dadd drt)
   (tuple d_dadd d_dadd)))
 
+(def [suffwdpass add] (Tuple Float (Tuple)) (x_y : Tuple Float Float)
+     (tuple (add x_y) (tuple)))
+(def [sufrevpass [add (Tuple Float Float)]] (Tuple Float Float) ((d_dadd : Float) (bog : Tuple))
+     (tuple d_dadd d_dadd))
+
 (edef add Integer (Integer Integer))
 (edef [D add] (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef [Dt add] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -59,6 +77,11 @@
  [rev add] (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
+(def [suffwdpass add] (Tuple Integer (Tuple)) (x_y : Tuple Integer Integer)
+     (tuple (add x_y) (tuple)))
+(def [sufrevpass [add (Tuple Integer Integer)]] (Tuple (Tuple) (Tuple)) ((d_dadd : Tuple) (bog : Tuple))
+     (tuple (tuple) (tuple)))
 
 ;; sub :: Number x Number -> Number
 ;; sub (x, y) = x - y
@@ -78,6 +101,11 @@
   (d_dsub drt)
   (tuple d_dsub (neg d_dsub))))
 
+(def [suffwdpass sub] (Tuple Float (Tuple)) (x_y : Tuple Float Float)
+     (tuple (sub x_y) (tuple)))
+(def [sufrevpass [sub (Tuple Float Float)]] (Tuple Float Float) ((d_dsub : Float) (bog : Tuple))
+     (tuple d_dsub (neg d_dsub)))
+
 (edef sub Integer (Integer Integer))
 (edef [D sub] (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef [Dt sub] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -90,17 +118,26 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+(def [suffwdpass sub] (Tuple Integer (Tuple)) (x_y : Tuple Integer Integer)
+     (tuple (sub x_y) (tuple)))
+(def [sufrevpass [sub (Tuple Integer Integer)]] (Tuple (Tuple) (Tuple)) ((d_dsub : (Tuple)) (bog : Tuple))
+     (tuple (tuple) (tuple)))
+
 (def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : (Tensor 1 Float)))
   (build (size a) (lam (i : Integer) (sub (index i a) (index i b)))))
 
 (gdef fwd [sub (Tuple (Tensor 1 Float) (Tensor 1 Float))])
 (gdef rev [sub (Tuple (Tensor 1 Float) (Tensor 1 Float))])
+(gdef suffwdpass [sub (Tuple (Tensor 1 Float) (Tensor 1 Float))])
+(gdef sufrevpass [sub (Tuple (Tensor 1 Float) (Tensor 1 Float))])
 
 (def sub (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : Float))
   (build (size a) (lam (i : Integer) (sub (index i a) b))))
 
 (gdef fwd [sub (Tuple (Tensor 1 Float) Float)])
 (gdef rev [sub (Tuple (Tensor 1 Float) Float)])
+(gdef suffwdpass [sub (Tuple (Tensor 1 Float) Float)])
+(gdef sufrevpass [sub (Tuple (Tensor 1 Float) Float)])
 
 ;; mul :: Number x Number -> Number
 ;; mul (x, y) = x * y
@@ -119,6 +156,12 @@
  (let (d_dmul drt)
   (tuple (mul d_dmul x2) (mul d_dmul x1)))))
 
+(def [suffwdpass mul] (Tuple Float (Tuple Float Float)) (x_y : Tuple Float Float)
+     (tuple (mul x_y) x_y))
+(def [sufrevpass [mul (Tuple Float Float)]] (Tuple Float Float) ((d_dmul : Float) (x_y : Tuple Float Float))
+     (let ((x y) x_y)
+       (tuple (mul y d_dmul) (mul x d_dmul))))
+
 (edef mul Integer (Integer Integer))
 (edef [D mul] (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef [Dt mul] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -130,6 +173,16 @@
  [rev mul] (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
+(def [suffwdpass mul] (Tuple Integer (Tuple)) (x_y : Tuple Integer Integer)
+     (tuple (mul x_y) (tuple)))
+(def [sufrevpass [mul (Tuple Integer Integer)]] (Tuple (Tuple) (Tuple)) ((d_dmul : Tuple) (bog : Tuple))
+     (tuple (tuple) (tuple)))
+
+
+;; mul Scalar Vec
+(def mymul (Tensor 1 Float) ((r : Float) (a : Tensor 1 Float))
+    (build (size a) (lam (i : Integer) (mul r (index i a)))))
 
 (def mul Float ((a : Float) (b : Integer))
   (mul a (to_float b)))
@@ -157,6 +210,14 @@
 (edef [rev mul] (Tuple (Tensor 2 Float) (Vec Float))
           ((Tuple (Tensor 2 Float) (Vec Float)) (Vec Float)))
 
+(def [suffwdpass mul] (Tuple (Vec Float) (Tuple (Tensor 2 Float) (Vec Float)))
+     (t : Tuple (Tensor 2 Float) (Vec Float))
+     (tuple (mul t) t))
+(def [sufrevpass [mul (Tuple (Tensor 2 Float) (Vec Float))]]
+     (Tuple (Tensor 2 Float) (Vec Float))
+     ((d_dr : Vec Float) (bog : Tuple (Tensor 2 Float) (Vec Float)))
+     ([rev mul] bog d_dr))
+
 ;; div :: Number x Number -> Number
 ;; div (x, y) = x / y
 (edef div Float (Float Float))
@@ -179,6 +240,14 @@
          (neg (div (mul x1 d_ddiv)
                          (mul x2 x2)))))))
 
+(def [suffwdpass div] (Tuple Float (Tuple Float Float)) (x_y : Tuple Float Float)
+     (tuple (div x_y) x_y))
+(def [sufrevpass [div (Tuple Float Float)]] (Tuple Float Float) ((d_ddiv : Float) (xt : Tuple Float Float))
+     (let ((x1 x2) xt)
+       (tuple (div d_ddiv x2)
+              (neg (div (mul x1 d_ddiv)
+                        (mul x2 x2))))))
+
 (edef div Integer (Integer Integer))
 (edef [D div] (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef [Dt div] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -190,6 +259,11 @@
  [rev div] (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
+(def [suffwdpass div] (Tuple Integer (Tuple)) (x_y : Tuple Integer Integer)
+     (tuple (div x_y) (tuple)))
+(def [sufrevpass [div (Tuple Integer Integer)]] (Tuple (Tuple) (Tuple)) ((d_ddiv : (Tuple)) (xt : (Tuple)))
+     (tuple (tuple) (tuple)))
 
 ;; pow :: Number ^ Number -> Number
 ;; pow (x, y) = x ^ y
@@ -251,6 +325,11 @@
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
 
+(def [suffwdpass gt] (Tuple Bool (Tuple)) (x_y : Tuple Float Float)
+     (tuple (gt x_y) (tuple)))
+(def [sufrevpass [gt (Tuple Float Float)]] (Tuple Float Float) ((d_dgt : Tuple) (bog : Tuple))
+     (tuple 0.0 0.0))
+
 (edef gt Bool (Integer Integer))
 (edef [D gt] (LM (Tuple Integer Integer) Bool) (Integer Integer))
 (edef [Dt gt] (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
@@ -262,6 +341,11 @@
  [rev gt] (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
+(def [suffwdpass gt] (Tuple Bool (Tuple)) (x_y : Tuple Integer Integer)
+     (tuple (gt x_y) (tuple)))
+(def [sufrevpass [gt (Tuple Integer Integer)]] (Tuple (Tuple) (Tuple)) ((d_dgt : Tuple) (bog : Tuple))
+     (tuple (tuple) (tuple)))
 
 ;; lt :: Number x Number -> Bool
 ;; lt (x, y) = x < y
@@ -288,6 +372,11 @@
  [rev lt] (Tuple (Tuple) (Tuple))
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
+
+(def [suffwdpass lt] (Tuple Bool (Tuple)) (t : Tuple Integer Integer)
+     (tuple (lt t) (tuple)))
+(def [sufrevpass [lt (Tuple Integer Integer)]] (Tuple (Tuple) (Tuple)) (t : Tuple (Tuple) (Tuple))
+     (tuple (tuple) (tuple)))
 
 ;; lte :: Number x Number -> Bool
 ;; lte (x, y) = x <= y
@@ -329,6 +418,11 @@
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
 
+(def [suffwdpass [gte (Tuple Float Float)]] (Tuple Bool (Tuple)) (x_y : Tuple Float Float)
+     (tuple (gte x_y) (tuple)))
+(def [sufrevpass [gte (Tuple Float Float)]] (Tuple Float Float) ((d_dgte : Tuple) (bog : Tuple))
+     (tuple 0.0 0.0))
+
 (edef gte Bool (Integer Integer))
 (edef [D gte] (LM (Tuple Integer Integer) Bool) (Integer Integer))
 (edef [Dt gte] (Tuple Bool (LM (Tuple Integer Integer) Bool)) (Integer Integer))
@@ -341,11 +435,21 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+(def [suffwdpass gte] (Tuple Bool (Tuple)) (x_y : Tuple Integer Integer)
+     (tuple (gte x_y) (tuple)))
+(def [sufrevpass [gte (Tuple Integer Integer)]] (Tuple (Tuple) (Tuple)) ((d_dgte : Tuple) (bog : Tuple))
+     (tuple (tuple) (tuple)))
+
 (edef log Float (Float))
 (edef [D log] (LM Float Float) (Float))
 (def [fwd log] Float ((x : Float) (dx : Float)) (div dx x))
 (def [rev log] Float ((x : Float) (d_dlog : Float)) (div d_dlog x))
 (edef [Dt log] (Tuple Float (LM Float Float)) (Float))
+
+(def [suffwdpass log] (Tuple Float Float) (x : Float)
+     (tuple (log x) x))
+(def [sufrevpass [log Float]] Float ((d_dlog : Float) (x : Float))
+     ([rev log] x d_dlog))
 
 (edef exp Float (Float))
 (edef [D exp] (LM Float Float) (Float))
@@ -353,10 +457,18 @@
 (def [rev exp] Float ((x : Float) (d_dexp : Float)) (mul (exp x) d_dexp))
 (edef [Dt exp] (Tuple Float (LM Float Float)) (Float))
 
+(def [suffwdpass exp] (Tuple Float Float) (x : Float)
+     (let (exp_x (exp x))
+       (tuple exp_x exp_x)))
+(def [sufrevpass [exp Float]] Float ((d_dexp : Float) (exp_x : Float))
+     (mul exp_x d_dexp))
+
 (def exp (Tensor 1 Float) ((v : Tensor 1 Float))
   (build (size v) (lam (i : Integer) (exp (index i v)))))
 (gdef fwd [exp (Tensor 1 Float)])
 (gdef rev [exp (Tensor 1 Float)])
+(gdef suffwdpass [exp (Tensor 1 Float)])
+(gdef sufrevpass [exp (Tensor 1 Float)])
 
 (edef sin Float (Float))
 (edef cos Float (Float))
@@ -364,12 +476,18 @@
 (edef [D sin] (LM Float Float) (Float))
 (def [fwd sin] Float ((x : Float) (dx : Float)) (mul (cos x) dx))
 (def [rev sin] Float ((x : Float) (d_dsin : Float)) (mul (cos x) d_dsin))
+(def [suffwdpass sin] (Tuple Float Float) (x : Float) (tuple (cos x) x))
+(def [sufrevpass [sin Float]] Float ((d_dcos : Float) (bog : Float))
+     (neg (mul (cos bog) d_dcos)))
 (edef [Dt sin] (Tuple Float (LM Float Float)) (Float))
 
 (edef [D cos] (LM Float Float) (Float))
 (def [fwd cos] Float ((x : Float) (dx : Float)) (neg (mul (sin x) dx)))
 (def [rev cos] Float ((x : Float) (d_dcos : Float)) (neg (mul (sin x) d_dcos)))
 (edef [Dt cos] (Tuple Float (LM Float Float)) (Float))
+(def [suffwdpass cos] (Tuple Float Float) (x : Float) (tuple (cos x) x))
+(def [sufrevpass [cos Float]] Float ((d_dcos : Float) (bog : Float))
+     (neg (mul (sin bog) d_dcos)))
 
 (edef cosh Float (Float))
 
@@ -384,6 +502,12 @@
        (div d_dr cosh_x_2))))
 (edef [D tanh] (LM Float Float) (Float))
 (edef [Dt tanh] (Tuple Float (LM Float Float)) (Float))
+(def [suffwdpass tanh] (Tuple Float Float) (x : Float)
+     (tuple (tanh x) x))
+(def [sufrevpass [tanh Float]] Float ((d_dtanh : Float) (x : Float))
+     (let (cosh_x (cosh x))
+     (let (cosh_x_2 (mul cosh_x cosh_x))
+       (div d_dtanh cosh_x_2))))
 
 (edef max Float (Float Float))
 (edef [D max] (LM (Tuple Float Float) Float) (Float Float))
@@ -397,12 +521,22 @@
   (index (imax x) dx))
 (def [rev max] (Tensor 1 Float) ((x : (Tensor 1 Float)) (d_dr : Float))
   (deltaVec (size x) (imax x) d_dr))
+(def [suffwdpass max] (Tuple Float (Tuple Integer Integer)) (x : (Tensor 1 Float))
+       (tuple (max x) (tuple (imax x) (size x))))
+(def [sufrevpass [max (Tensor 1 Float)]] (Tensor 1 Float) ((d_dr : Float) (imax_x_size_x : Tuple Integer Integer))
+     (let ((imax_x size_x) imax_x_size_x)
+       (deltaVec size_x imax_x d_dr)))
 
 (edef $ranhashdoub Float (Integer))
 (edef [D $ranhashdoub] (LM Integer Float) (Integer))
 (def [fwd $ranhashdoub] Float ((x : Integer) (dx : (Tuple))) 0.0)
 (def [rev $ranhashdoub] (Tuple) ((x : Integer) (d_dranhashdoub : Float)) (tuple))
 (edef [Dt $ranhashdoub] (Tuple Float (LM Integer Float)) (Integer))
+
+(def [suffwdpass $ranhashdoub] (Tuple Float (Tuple)) (x : Integer)
+     (tuple ($ranhashdoub x) (tuple)))
+(def [sufrevpass [$ranhashdoub Integer]] (Tuple) (t : Tuple Float (Tuple))
+     (tuple))
 
 (edef abs Float (Float))
 (edef [D abs] (LM Float Float) (Float))
@@ -417,6 +551,11 @@
 (edef [rev lgamma] Float (Float Float))
 (edef [Dt lgamma] (Tuple Float (LM Float Float)) (Float))
 
+(def [suffwdpass lgamma] (Tuple Float Float) (x : Float)
+     (tuple (lgamma x) x))
+(def [sufrevpass [lgamma Float]] Float ((d_dlgamma : Float) (x : Float))
+     ([rev lgamma] x d_dlgamma))
+
 (edef or Bool (Bool Bool))
 (edef [D or] (LM (Tuple Bool Bool) Bool) (Bool Bool))
 (edef [Dt or] (Tuple Bool (LM (Tuple Bool Bool) Bool)) (Bool Bool))
@@ -427,6 +566,11 @@
      ((xt : Tuple Bool Bool) (d_dbool : (Tuple)))
      (tuple (tuple) (tuple)))
 
+(def [suffwdpass or] (Tuple Bool (Tuple)) (t : Tuple Bool Bool)
+     (tuple (or t) (tuple)))
+(def [sufrevpass [or (Tuple Bool Bool)]] (Tuple (Tuple) (Tuple)) (t : Tuple (Tuple) (Tuple))
+     (tuple (tuple) (tuple)))
+
 (edef and Bool (Bool Bool))
 (edef [D and] (LM (Tuple Bool Bool) Bool) (Bool Bool))
 (edef [Dt and] (Tuple Bool (LM (Tuple Bool Bool) Bool)) (Bool Bool))
@@ -435,4 +579,9 @@
      (tuple))
 (def [rev and] (Tuple (Tuple) (Tuple))
      ((xt : Tuple Bool Bool) (d_dbool : (Tuple)))
+     (tuple (tuple) (tuple)))
+
+(def [suffwdpass and] (Tuple Bool (Tuple)) (t : Tuple Bool Bool)
+     (tuple (and t) (tuple)))
+(def [sufrevpass [and (Tuple Bool Bool)]] (Tuple (Tuple) (Tuple)) (t : Tuple (Tuple) (Tuple))
      (tuple (tuple) (tuple)))

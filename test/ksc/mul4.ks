@@ -7,6 +7,9 @@
 
 (gdef fwd [h (Tuple Float Float Float Float)])
 (gdef rev [h (Tuple Float Float Float Float)])
+(gdef suffwdpass [h (Tuple Float Float Float Float)])
+(gdef sufrevpass [h (Tuple Float Float Float Float)])
+(gdef sufrev [h (Tuple Float Float Float Float)])
 
 ; (def times ( (x1 : Float) (x2 : Float) ) (mul x1 x2))
 ; (def h ( (x1 : Float) (x2 : Float) (x3 : Float) (x4 : Float) )

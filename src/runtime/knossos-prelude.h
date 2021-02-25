@@ -9,6 +9,8 @@ namespace ks {
 double edef_example$af(allocator *, double x) { return x; }
 double fwd$edef_example$af(allocator *, double x, double dx) { return dx; }
 double rev$edef_example$af(allocator *, double x, double ddr) { return ddr; }
+ks::tuple<double,ks::tuple<>> suffwdpass$edef_example$af(allocator *, double x) { return ks::make_tuple(x, ks::make_tuple()); }
+double sufrevpass$edef_example$af(allocator *, double ddr, ks::tuple<>) { return ddr; }
 
 double dot$aT1fT1f(allocator *, vec<double> const& a, vec<double> const& b)
 {

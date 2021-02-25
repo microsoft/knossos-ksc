@@ -10,6 +10,9 @@
 
 (gdef fwd [f (Tuple Integer Integer)])
 (gdef rev [f (Tuple Integer Integer)])
+(gdef suffwdpass [f (Tuple Integer Integer)])
+(gdef sufrevpass [f (Tuple Integer Integer)])
+(gdef sufrev [f (Tuple Integer Integer)])
 
 #| Tests capture-avoiding substitution |#
 

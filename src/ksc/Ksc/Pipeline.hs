@@ -24,7 +24,10 @@ import Parse (parseF)
 import Rules (mkRuleBase)
 import Opt (optDefs)
 import Shapes (shapeDefs)
+import Ksc.SUF (sufDef)
+import Ksc.SUF.AD (sufFwdRevPassDef, sufRevDef)
 
+import Data.Maybe (maybeToList)
 import Data.List (intercalate)
 import qualified Data.Map as Map
 import GHC.Stack (HasCallStack)
@@ -202,6 +205,19 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
           let shapeDef = shapeDefs [tdef]
               env' = extendGblST env shapeDef
           in pure (env', map DefDecl shapeDef)
+
+        L.DerivationSUFFwdPass ->
+          let (sufFwdpassedDef, _, _) = sufFwdRevPassDef env (sufDef tdef)
+          in pure (maybe env (flip stInsertFun env) sufFwdpassedDef,
+                   DefDecl <$> maybeToList sufFwdpassedDef)
+        L.DerivationSUFRevPass ->
+          let (_, sufRevpassedDef, _) = sufFwdRevPassDef env (sufDef tdef)
+          in pure (maybe env (flip stInsertFun env) sufRevpassedDef,
+                   DefDecl <$> maybeToList sufRevpassedDef)
+        L.DerivationSUFRev     ->
+          let sufRevedDef = sufRevDef env (sufDef tdef)
+          in pure (maybe env (flip stInsertFun env) sufRevedDef,
+                   DefDecl <$> maybeToList sufRevedDef)
     }
 
 deriveDeclUsing :: Applicative f

@@ -7,6 +7,9 @@
 
 (gdef fwd [f1 (Tuple Float Float Integer)])
 (gdef rev [f1 (Tuple Float Float Integer)])
+(gdef suffwdpass [f1 (Tuple Float Float Integer)])
+(gdef sufrevpass [f1 (Tuple Float Float Integer)])
+(gdef sufrev [f1 (Tuple Float Float Integer)])
 
 (def f2 Float ((x : Vec Float) (y : Vec Float) (i : Integer) )
         (mul (if (lt i 3) (index i x) 7.0) (index i y))
@@ -14,6 +17,9 @@
 
 (gdef fwd [f2 (Tuple (Vec Float) (Vec Float) Integer)])
 (gdef rev [f2 (Tuple (Vec Float) (Vec Float) Integer)])
+(gdef suffwdpass [f2 (Tuple (Vec Float) (Vec Float) Integer)])
+(gdef sufrevpass [f2 (Tuple (Vec Float) (Vec Float) Integer)])
+(gdef sufrev [f2 (Tuple (Vec Float) (Vec Float) Integer)])
 
 (def f7 Float ((x : Vec Float) (y : Vec Float) )
     (assert (eq (size x) (size y))
@@ -23,6 +29,9 @@
 
 (gdef fwd [f7 (Tuple (Vec Float) (Vec Float))])
 (gdef rev [f7 (Tuple (Vec Float) (Vec Float))])
+(gdef suffwdpass [f7 (Tuple (Vec Float) (Vec Float))])
+(gdef sufrevpass [f7 (Tuple (Vec Float) (Vec Float))])
+(gdef sufrev [f7 (Tuple (Vec Float) (Vec Float))])
 
 (def main Integer ()
     (let (v1 (build 3 (lam (i : Integer) (mul 3.0 (to_float i)))))
