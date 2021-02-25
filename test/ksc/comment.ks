@@ -9,5 +9,8 @@
 
 (gdef fwd [f (Tuple)])
 (gdef rev [f (Tuple)])
+(gdef suffwdpass [f (Tuple)])
+(gdef sufrevpass [f (Tuple)])
+(gdef sufrev [f (Tuple)])
 
 (def main Integer () 0)

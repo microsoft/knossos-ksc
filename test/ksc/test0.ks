@@ -10,12 +10,18 @@
 
 (gdef fwd [f Float])
 (gdef rev [f Float])
+(gdef suffwdpass [f Float])
+(gdef sufrevpass [f Float])
+(gdef sufrev [f Float])
 
 (def g Float ((n : Integer) (m : Integer))
   (to_float (mul n m)))
 
 (gdef fwd [g (Tuple Integer Integer)])
 (gdef rev [g (Tuple Integer Integer)])
+(gdef suffwdpass [g (Tuple Integer Integer)])
+(gdef sufrevpass [g (Tuple Integer Integer)])
+(gdef sufrev [g (Tuple Integer Integer)])
 
 (def e Float ((vn : Vec Integer)
               (t : Tuple (Vec (Vec Float))
@@ -33,11 +39,24 @@
                     (Tuple (Vec (Vec Float))
                            (Tuple Integer (Vec Float))))])
 
+(gdef suffwdpass [e (Tuple (Vec Integer)
+                    (Tuple (Vec (Vec Float))
+                           (Tuple Integer (Vec Float))))])
+(gdef sufrevpass [e (Tuple (Vec Integer)
+                    (Tuple (Vec (Vec Float))
+                           (Tuple Integer (Vec Float))))])
+(gdef sufrev [e (Tuple (Vec Integer)
+                    (Tuple (Vec (Vec Float))
+                           (Tuple Integer (Vec Float))))])
+
 (def test_inline (Vec Integer) (x : Vec Float)
     (build (size x) (lam (i : Integer) (mul i 2))))
 
 (gdef fwd [test_inline (Vec Float)])
 (gdef rev [test_inline (Vec Float)])
+(gdef suffwdpass [test_inline (Vec Float)])
+(gdef sufrevpass [test_inline (Vec Float)])
+(gdef sufrev [test_inline (Vec Float)])
 
 (def test_inline2 Integer (x : Vec Float)
   (let (n1 (size x))
@@ -45,6 +64,9 @@
 
 (gdef fwd [test_inline2 (Vec Float)])
 (gdef rev [test_inline2 (Vec Float)])
+(gdef suffwdpass [test_inline2 (Vec Float)])
+(gdef sufrevpass [test_inline2 (Vec Float)])
+(gdef sufrev [test_inline2 (Vec Float)])
 
 (def main Integer ()
     (print ; No grad.  See https://github.com/awf/knossos/issues/281 (D$f 9.0)

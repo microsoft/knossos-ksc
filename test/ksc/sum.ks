@@ -5,5 +5,9 @@
 
 (gdef fwd [vsum (Tuple Integer (Vec Float))])
 (gdef rev [vsum (Tuple Integer (Vec Float))])
+; SUF/BOG-AD does not support recursion
+; (gdef suffwdpass [vsum (Tuple Integer (Vec Float))])
+; (gdef sufrevpass [vsum (Tuple Integer (Vec Float))])
+; (gdef sufrev [vsum (Tuple Integer (Vec Float))])
 
 (def main Integer () 0)

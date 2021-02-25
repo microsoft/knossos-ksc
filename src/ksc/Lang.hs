@@ -85,6 +85,9 @@ isUserDef _ = False
 data Derivation = DerivationDrvFun ADMode
                 | DerivationCLFun
                 | DerivationShapeFun
+                | DerivationSUFFwdPass
+                | DerivationSUFRevPass
+                | DerivationSUFRev
   deriving ( Show, Eq, Ord )
 
 data GDefX = GDef Derivation (UserFun Typed)
@@ -427,6 +430,9 @@ data DerivedFun funid
                                          --   Rev <=> reverse mode f`(x,dr)
                 | CLFun    funid         -- f(x), roundtripped through CatLang
                 | ShapeFun (DerivedFun funid)
+                | SUFFwdPass funid
+                | SUFRevPass funid
+                | SUFRev   funid
                 deriving (Eq, Ord, Show)
 
 -- DerivedFun has just two instantiations
@@ -460,6 +466,9 @@ baseFunFun f = \case
   DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (f fi)
   ShapeFun ff  -> fmap ShapeFun (baseFunFun f ff)
   CLFun fi     -> fmap CLFun (f fi)
+  SUFFwdPass fi -> fmap SUFFwdPass (f fi)
+  SUFRevPass fi -> fmap SUFRevPass (f fi)
+  SUFRev fi     -> fmap SUFRev (f fi)
 
 userFunBaseType :: forall p f. (InPhase p, Applicative f)
                 => (Maybe Type -> f Type)
@@ -505,6 +514,15 @@ perhapsUserFun = \case
                        (baseFunToBaseUserFunE f)
   ShapeFun f -> either (Left . ShapeFun) (Right . ShapeFun) (perhapsUserFun f)
   CLFun f    -> either (Left . CLFun) (Right . CLFun) (baseFunToBaseUserFunE f)
+  SUFFwdPass f -> either (Left . SUFFwdPass)
+                         (Right . SUFFwdPass)
+                         (baseFunToBaseUserFunE f)
+  SUFRevPass f -> either (Left . SUFRevPass)
+                         (Right . SUFRevPass)
+                         (baseFunToBaseUserFunE f)
+  SUFRev f -> either (Left . SUFRev)
+                     (Right . SUFRev)
+                     (baseFunToBaseUserFunE f)
 
 maybeUserFun :: Fun p -> Maybe (UserFun p)
 maybeUserFun f = case perhapsUserFun f of
@@ -537,6 +555,9 @@ baseFunOfFun = \case
   DrvFun f _  -> f
   ShapeFun f  -> baseFunOfFun f
   CLFun f     -> f
+  SUFFwdPass f -> f
+  SUFRevPass f -> f
+  SUFRev f     -> f
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -1058,6 +1079,8 @@ pprPrimFun = \case
   P_lmVariant -> text "P_lmVariant"
 
   P_SelFun i n -> text "get$" <> int i <> char '$' <> int n
+  P_dup n -> text "dup$" <> int n
+  P_elim -> text "elim"
 
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
@@ -1069,6 +1092,9 @@ pprDerivedFun f (DrvFun   s (AD adp Fwd)) = brackets (text "fwd" <> ppr adp <+> 
 pprDerivedFun f (DrvFun   s (AD adp Rev)) = brackets (text "rev" <> ppr adp <+> f s)
 pprDerivedFun f (ShapeFun sf)             = brackets (text "shape" <+> pprDerivedFun f sf)
 pprDerivedFun f (CLFun    s)              = brackets (text "CL" <+> f s)
+pprDerivedFun f (SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
+pprDerivedFun f (SUFRevPass s)            = brackets (text "sufrevpass" <+> f s)
+pprDerivedFun f (SUFRev s)                = brackets (text "sufrev" <+> f s)
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -1212,6 +1238,9 @@ instance Pretty Derivation where
     DerivationDrvFun (AD TupleAD Rev) -> text "revt"
     DerivationCLFun    -> text "CL"
     DerivationShapeFun -> text "shape"
+    DerivationSUFFwdPass -> text "suffwdpass"
+    DerivationSUFRevPass -> text "sufrevpass"
+    DerivationSUFRev     -> text "sufrev"
 
 pprDef :: forall p. InPhase p => DefX p -> SDoc
 pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
@@ -1485,6 +1514,8 @@ data PrimFun = P_inline
              | P_lmZero
              | P_lmOne
              | P_SelFun Int Int -- P_SelFun index arity.  1-indexed, so (SelFun 1 2) is fst
+             | P_dup Int
+             | P_elim
              | P_lmApplyTR
              | P_lmFold
              | P_FFold

@@ -9,5 +9,8 @@
 
 (gdef fwd [f2a Float])
 (gdef rev [f2a Float])
+(gdef suffwdpass [f2a Float])
+(gdef sufrevpass [f2a Float])
+(gdef sufrev [f2a Float])
 
 (def main Integer () 0)
