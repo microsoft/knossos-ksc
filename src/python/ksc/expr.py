@@ -349,9 +349,9 @@ class Call(Expr):
     (add   1.234 4.56)
      ^^^   ^^^^^^^^^^
      name  args
-    ([rev [add (Tuple Float Float)]] 1.234 4.56)
-     ^^^   ^^^^^^^^^^
-     name  args
+    ([rev [add (Tuple Float Float)]]  1.234 4.56)
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^
+     name                             args
     ```
     '''
     sname: StructuredName
