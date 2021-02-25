@@ -405,7 +405,7 @@ primCallResultTy_maybe fun arg_ty
         -> Right (tangentType s)
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
-      
+
       ShapeFun f
         -> case primCallResultTy_maybe f arg_ty of
             Left err -> Left err
