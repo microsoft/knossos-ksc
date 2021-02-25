@@ -354,13 +354,13 @@ class Call(Expr):
      name                             args
     ```
     '''
-    sname: StructuredName
+    name: StructuredName
     args: List[Expr]
 
-    def __init__(self, sname, args):
-        if isinstance(sname, str):
-            sname = StructuredName.from_str(sname)
-        super().__init__(sname=sname, args=args)
+    def __init__(self, name, args):
+        if isinstance(name, str):
+            name = StructuredName.from_str(name)
+        super().__init__(name=name, args=args)
 
 class Lam(Expr):
     '''Lam(arg, body).
@@ -512,7 +512,7 @@ def _(ex, indent):
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
-    return pystr(ex.sname, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
+    return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
 def _(ex, indent):

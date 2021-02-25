@@ -264,7 +264,7 @@ def _(ex, symtab):
         type_propagate(a, symtab)
     argtypes = tuple(a.type_ for a in ex.args)
     argtype = make_tuple_if_many(argtypes)
-    old_ty, sname = ex.sname.add_type(argtype)
+    old_ty, sname = ex.name.add_type(argtype)
     assert old_ty is None or old_ty == argtype
 
     # Check symbol table first
@@ -275,7 +275,7 @@ def _(ex, symtab):
     # Note: "derived functions", e.g. shape$foo, grad$foo, must be fully specified if, as is common, their signatures don't match foo
 
     # Try prim lookup
-    prim = ks_prim_lookup(ex.sname, argtypes)
+    prim = ks_prim_lookup(ex.name, argtypes)
     if prim != None:
         ex.type_ = prim
         return ex
@@ -283,7 +283,7 @@ def _(ex, symtab):
     # Not found, show what was found to improve error message
     argtypes_str = ",".join(map(pformat, argtypes))
     print(f"type_propagate: at ", pystr(ex, 2))
-    print(f"type_propagate: Couldn't find {ex.sname} called with types ({argtypes_str}) ")
+    print(f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) ")
     print(f"type_propagate: Looked up {sname}")
     print(f"type_propagate: Near misses:")
     for key,val in symtab.items():

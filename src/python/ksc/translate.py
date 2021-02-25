@@ -164,7 +164,7 @@ class Translator:
         # All others are function call e.g. (f e1 .. eN)
         assert isinstance(ex, Call), ex
 
-        name = ex.sname.mangled()
+        name = ex.name.mangled()
         args = ex.args
 
         # Recursively handle args
