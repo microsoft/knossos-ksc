@@ -15,6 +15,7 @@ import Prim
 import Rules
 import OptLet
 import KMonad
+import qualified Ksc.SUF.Rewrite as SUF
 import Ksc.Traversal( traverseState, mapAccumLM )
 
 import Debug.Trace
@@ -220,6 +221,12 @@ rewriteCall _ (TFun _ (DrvFun f adm)) arg
 
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
   = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
+
+rewriteCall _ (TFun _ (SUFFwdPass (PrimFun fun))) arg
+  = SUF.rewriteSUFFwdPass fun arg
+
+rewriteCall _ (TFun _ (SUFRevPass (PrimFun fun))) arg
+  = SUF.rewriteSUFRevPass fun arg
 
 rewriteCall _ _ _
   = Nothing

@@ -7,9 +7,14 @@
 (edef [fwd edef_example] Float (Float Float))
 (edef [fwdt edef_example] Float (Float Float))
 (edef [rev edef_example] Float (Float Float))
+(edef [suffwdpass edef_example] (Tuple Float (Tuple)) (Float))
+(edef [sufrevpass [edef_example Float]] (Float) (Float (Tuple)))
 
 (def g Float ((x : Float) (y : Float)) (add (edef_example x) y))
 (gdef fwd [g (Tuple Float Float)])
 (gdef rev [g (Tuple Float Float)])
+(gdef suffwdpass [g (Tuple Float Float)])
+(gdef sufrevpass [g (Tuple Float Float)])
+(gdef sufrev [g (Tuple Float Float)])
 
 (def main Integer () 0)

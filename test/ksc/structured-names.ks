@@ -2,6 +2,9 @@
 
 (gdef fwd [f (Tuple Float Integer)])
 (gdef rev [f (Tuple Float Integer)])
+(gdef suffwdpass [f (Tuple Float Integer)])
+(gdef sufrevpass [f (Tuple Float Integer)])
+(gdef sufrev [f (Tuple Float Integer)])
 
 (def main Integer ()
      (let (f1     (f 0.0 0))

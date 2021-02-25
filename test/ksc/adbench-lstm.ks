@@ -11,6 +11,9 @@
 
 (gdef fwd [sigmoid Float])
 (gdef rev [sigmoid Float])
+(gdef suffwdpass [sigmoid Float])
+(gdef sufrevpass [sigmoid Float])
+(gdef sufrev [sigmoid Float])
 
 (def exp$VecR (Vec Float) ((v : Vec Float))
  (let (n (size v))
@@ -18,6 +21,9 @@
 
 (gdef fwd [exp$VecR (Vec Float)])
 (gdef rev [exp$VecR (Vec Float)])
+(gdef suffwdpass [exp$VecR (Vec Float)])
+(gdef sufrevpass [exp$VecR (Vec Float)])
+(gdef sufrev [exp$VecR (Vec Float)])
 
 ; The other ADBench implementations add 2 to the logsumexp. It's not
 ; clear why they do that but we have to do the same to match.  See
@@ -28,6 +34,9 @@
 
 (gdef fwd [logsumexp (Vec Float)])
 (gdef rev [logsumexp (Vec Float)])
+(gdef suffwdpass [logsumexp (Vec Float)])
+(gdef sufrevpass [logsumexp (Vec Float)])
+(gdef sufrev [logsumexp (Vec Float)])
 
 ; all Vecs size h
 (def lstm_model (Tuple (Vec Float) (Vec Float))
@@ -63,6 +72,42 @@
              (Vec Float)
              (Vec Float))])
 (gdef rev [lstm_model
+      (Tuple (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float))])
+(gdef suffwdpass [lstm_model
+      (Tuple (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float))])
+(gdef sufrevpass [lstm_model
+      (Tuple (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float)
+             (Vec Float))])
+(gdef sufrev [lstm_model
       (Tuple (Vec Float)
              (Vec Float)
              (Vec Float)
@@ -147,7 +192,37 @@
              (Vec Float)
              (Vec Float)
              (Vec Float))])
-
+; SUF/BOG-AD doesn't support fold
+;; (gdef suffwdpass [lstm_predict
+;;       (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)))
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float))])
+;; (gdef sufrevpass [lstm_predict
+;;       (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)))
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float))])
+;; (gdef sufrev [lstm_predict
+;;       (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)))
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float))])
 
 ; sequence: Vec cm1 <tuple of (Vec h)s>
 (def lstm_objective Float
@@ -228,5 +303,36 @@
              (Vec Float)
              (Vec Float)
              (Vec (Tuple (Vec Float) (Vec Float))))])
+; SUF/BOG-AD doesn't support fold
+;; (gdef suffwdpass [lstm_objective
+;;       (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)))
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec (Tuple (Vec Float) (Vec Float))))])
+;; (gdef sufrevpass [lstm_objective
+;;       (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)))
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec (Tuple (Vec Float) (Vec Float))))])
+;; (gdef sufrev [lstm_objective
+;;       (Tuple (Vec (Tuple (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)
+;;                          (Vec Float) (Vec Float)))
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec Float)
+;;              (Vec (Tuple (Vec Float) (Vec Float))))])
 
 (def main Integer () 0)

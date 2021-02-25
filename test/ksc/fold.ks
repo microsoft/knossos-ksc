@@ -3,6 +3,9 @@
 
 (gdef fwd [f (Tuple Float (Tuple Float Float))])
 (gdef rev [f (Tuple Float (Tuple Float Float))])
+(gdef suffwdpass [f (Tuple Float (Tuple Float Float))])
+(gdef sufrevpass [f (Tuple Float (Tuple Float Float))])
+(gdef sufrev [f (Tuple Float (Tuple Float Float))])
 
 (def fold_f Float ((env : Float) (i : Integer) (v : Vec Float) (acc : Float))
      (if
@@ -12,6 +15,10 @@
 
 (gdef fwd [fold_f (Tuple Float Integer (Vec Float) Float)])
 (gdef rev [fold_f (Tuple Float Integer (Vec Float) Float)])
+; SUF/BOG-AD doesn't support recursion
+;; (gdef suffwdpass [fold_f (Tuple Float Integer (Vec Float) Float)])
+;; (gdef sufrevpass [fold_f (Tuple Float Integer (Vec Float) Float)])
+;; (gdef sufrev [fold_f (Tuple Float Integer (Vec Float) Float)])
 
 (def prod Float ((i : Integer) (v : Vec Float) (acc : Float))
      (if
@@ -21,6 +28,10 @@
 
 (gdef fwd [prod (Tuple Integer (Vec Float) Float)])
 (gdef rev [prod (Tuple Integer (Vec Float) Float)])
+; SUF/BOG-AD doesn't support recursion
+;; (gdef suffwdpass [prod (Tuple Integer (Vec Float) Float)])
+;; (gdef sufrevpass [prod (Tuple Integer (Vec Float) Float)])
+;; (gdef sufrev [prod (Tuple Integer (Vec Float) Float)])
 
 ; This ends up calculating prod(v) * pow(closure, size(v))
 (def prod_fold Float ((v : Vec Float) (closure : Float))
@@ -33,6 +44,10 @@
 
 (gdef fwd [prod_fold (Tuple (Vec Float) Float)])
 (gdef rev [prod_fold (Tuple (Vec Float) Float)])
+; SUF/BOG-AD doesn't support fold
+;; (gdef suffwdpass [prod_fold (Tuple (Vec Float) Float)])
+;; (gdef sufrevpass [prod_fold (Tuple (Vec Float) Float)])
+;; (gdef sufrev [prod_fold (Tuple (Vec Float) Float)])
 
 ;; Check that it works with an environment type that isn't its own
 ;; tangent type
@@ -44,8 +59,12 @@
            1.0
            v))
 
+; SUF/BOG-AD doesn't support fold
 (gdef fwd [prod_fold_integer_env (Tuple (Vec Float) Integer)])
 (gdef rev [prod_fold_integer_env (Tuple (Vec Float) Integer)])
+;; (gdef suffwdpass [prod_fold_integer_env (Tuple (Vec Float) Integer)])
+;; (gdef sufrevpass [prod_fold_integer_env (Tuple (Vec Float) Integer)])
+;; (gdef sufrev [prod_fold_integer_env (Tuple (Vec Float) Integer)])
 
 ;; Check that it works with an accumulator type that isn't its own
 ;; tangent type
@@ -59,6 +78,10 @@
 
 (gdef fwd [prod_fold_integer_acc (Vec Float)])
 (gdef rev [prod_fold_integer_acc (Vec Float)])
+; SUF/BOG-AD doesn't support fold
+;; (gdef suffwdpass [prod_fold_integer_acc (Vec Float)])
+;; (gdef sufrevpass [prod_fold_integer_acc (Vec Float)])
+;; (gdef sufrev [prod_fold_integer_acc (Vec Float)])
 
 ;; Check that it works with a vector element type that isn't its own
 ;; tangent type
@@ -72,6 +95,10 @@
 
 (gdef fwd [prod_fold_integer_v (Vec Integer)])
 (gdef rev [prod_fold_integer_v (Vec Integer)])
+; SUF/BOG-AD doesn't support fold
+;; (gdef suffwdpass [prod_fold_integer_v (Vec Integer)])
+;; (gdef sufrevpass [prod_fold_integer_v (Vec Integer)])
+;; (gdef sufrev [prod_fold_integer_v (Vec Integer)])
 
 (def mkfloat Float ((seed  : Integer)
                     (scale : Float))
@@ -79,6 +106,9 @@
 
 (gdef fwd [mkfloat (Tuple Integer Float)])
 (gdef rev [mkfloat (Tuple Integer Float)])
+(gdef suffwdpass [mkfloat (Tuple Integer Float)])
+(gdef sufrevpass [mkfloat (Tuple Integer Float)])
+(gdef sufrev [mkfloat (Tuple Integer Float)])
 
 (def mkvec (Vec Float) ((seed  : Integer)
                         (n     : Integer)
@@ -87,6 +117,9 @@
 
 (gdef fwd [mkvec (Tuple Integer Integer Float)])
 (gdef rev [mkvec (Tuple Integer Integer Float)])
+(gdef suffwdpass [mkvec (Tuple Integer Integer Float)])
+(gdef sufrevpass [mkvec (Tuple Integer Integer Float)])
+(gdef sufrev [mkvec (Tuple Integer Integer Float)])
 
 (def main Integer ()
      (let ((seed 20000)

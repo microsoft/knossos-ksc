@@ -9,5 +9,8 @@
 
 (gdef fwd [f5 (Tuple Float Float)])
 (gdef rev [f5 (Tuple Float Float)])
+(gdef suffwdpass [f5 (Tuple Float Float)])
+(gdef sufrevpass [f5 (Tuple Float Float)])
+(gdef sufrev [f5 (Tuple Float Float)])
 
 (def main Integer () 0)
