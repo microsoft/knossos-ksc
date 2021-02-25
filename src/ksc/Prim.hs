@@ -653,6 +653,6 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "delta", "deltaVec", "diag", "constVec"
                        , "lmApply", "lmApplyR", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
                        , "lmVCatV", "lmHCatV"
-                       , "lmCompose", "lmAdd", "lmScale", "lmScaleR"
+                       , "lmCompose", "lmAdd", "lmScale", "lmScaleR", "lmDot"
                        , "lmZero", "lmOne"
                        ]
