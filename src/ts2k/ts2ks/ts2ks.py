@@ -10,7 +10,8 @@ from ksc.ks_function import KscFunction
 from ksc.parse_ks import parse_ks_filename
 
 from ksc.type import Type
-from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import StructuredName
 
 from ksc.type_propagate import type_propagate_decls
 
@@ -304,7 +305,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
 
     body = make_lets(binds, op)
 
-    return Def(name, return_type, args, body)
+    return Def(StructuredName(name), return_type, args, body)
 
 
 # TODO: make an configuration named tuple rather than passing flags
@@ -324,8 +325,13 @@ def ts2mod(function, example_inputs):
         type_propagate_decls(decls_prelude_aten, symtab)
 
         type_propagate_decls([ksc_def], symtab)
+        defs_with_derivatives = [
+            ksc_def,
+            GDef("fwd", ksc_def.name),
+            GDef("rev", ksc_def.name)
+        ]
 
-    ks_str = pformat(ksc_def)
+    ks_str = '\n'.join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in ksc_def.args]
     return_type = ksc_def.return_type
     mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types, 

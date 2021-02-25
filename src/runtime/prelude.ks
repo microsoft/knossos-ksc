@@ -1,4 +1,6 @@
 (def not Bool (p : Bool) (if p false true))
+(gdef fwd [not Bool])
+(gdef rev [not Bool])
 
 ;; neg :: Number -> Number
 ;; neg x = -x

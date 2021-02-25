@@ -4,10 +4,10 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType, shape_type
+from ksc.type import Type, SizeType, shape_type, make_tuple_if_many
 
-from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
-from ksc.expr import pystr
+from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import pystr, StructuredName
 
 # Pretty printing
 # Importing prettyprint to get the decorated printers for Expression and Type
@@ -30,8 +30,10 @@ sys.setrecursionlimit(10**6)
 import re
 ks_prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 
-def ks_prim_lookup(name, tys):
+def ks_prim_lookup(sname, tys):
     n = len(tys)
+
+    name = sname.mangle_without_type()
 
     # tuple
     if name == "tuple":
@@ -155,7 +157,10 @@ class KSTypeError(RuntimeError):
 @singledispatch
 def type_propagate(ex, symtab):
     """
-    Fill "type" field of expr, propagating from incoming dict
+    Fill "type" field of expr, propagating from incoming dict "symtab"
+
+    Keys of the symtab are names, either names of variables or StructuredNames
+    Values in the symtab are types, the return types in the case of StructuredNames
     """
     # Default implementation, for types not specialized below
     assert ex.type_ != None
@@ -168,17 +173,25 @@ def _(ex, symtab):
 
     # Name to look up is function "signature": name and argtypes
     argtypes = tuple(a.type_ for a in ex.args)
-    signature = (ex.name, argtypes)
+    argtype = make_tuple_if_many(argtypes)
+    old_ty, sname = ex.name.add_type(argtype)
+
+    if old_ty is not None and old_ty != argtype:
+        raise KSTypeError(f"In definition of '{ex.name}', explicit type in structured name\n" +
+                            f"does not match argument types {argtype}")
+
+    # Update ex.name to include the type
+    ex.name = sname
 
     # Check for definition in symtab with different return type 
-    if signature in symtab:
-        old_type = symtab[signature]
+    if sname in symtab:
+        old_type = symtab[sname]
         if old_type != ex.return_type:
-            raise KSTypeError(f"Redefinition of {ex.name}({argtypes}) with different return type {old_type} -> {ex.return_type}")
+            raise KSTypeError(f"Redefinition of {ex.name} with different return type {old_type} -> {ex.return_type}")
     
     if declared_return_type:
         # Add to symtab before entering body, allowing for recursive calls
-        symtab[signature] = ex.return_type
+        symtab[sname] = ex.return_type
 
     # local_st: local symbol table to recurse into the body
     # Add args to local_st, after function was added to global st. 
@@ -202,17 +215,32 @@ def _(ex, symtab):
     else:
         # Add to symtab after inference
         ex.return_type = ex.body.type_
-        symtab[signature] = ex.return_type
+        symtab[sname] = ex.return_type
 
     return ex
 
 @type_propagate.register(EDef)
 def _(ex, symtab):
-    # (edef name retun_type arg_types)
-    signature = ex.name, tuple(ex.arg_types)
+    # (edef name return_type arg_types)
+    argtype = make_tuple_if_many(ex.arg_types)
+    old_ty, sname = ex.name.add_type(argtype)
+    assert old_ty is None or old_ty == argtype
+
+    signature = sname
     if signature in symtab and symtab[signature] != ex.return_type:
         raise KSTypeError(f"Double definition: {signature}\n -> {symtab[signature]}\n vs {ex.return_type}")
     symtab[signature] = ex.return_type
+    return ex
+
+@type_propagate.register(GDef)
+def _(ex, symtab):
+    # (gdef derivation function_name)
+    signature = StructuredName((ex.derivation, ex.function_name))
+    # TODO: Need to map to return type.
+    return_type = None
+    if signature in symtab and symtab[signature] != return_type:
+        raise KSTypeError(f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}")
+    symtab[signature] = return_type
     return ex
 
 @type_propagate.register(Rule)
@@ -235,14 +263,16 @@ def _(ex, symtab):
     for a in ex.args:
         type_propagate(a, symtab)
     argtypes = tuple(a.type_ for a in ex.args)
-    key = ex.name, argtypes
+    argtype = make_tuple_if_many(argtypes)
+    old_ty, sname = ex.name.add_type(argtype)
+    assert old_ty is None or old_ty == argtype
 
     # Check symbol table first
-    if key in symtab:
-        ex.type_ = symtab[key]
+    if sname in symtab:
+        ex.type_ = symtab[sname]
         return ex
 
-    # TODO: do "derived functions", e.g. shape$foo, grad$foo? 
+    # Note: "derived functions", e.g. shape$foo, grad$foo, must be fully specified if, as is common, their signatures don't match foo
 
     # Try prim lookup
     prim = ks_prim_lookup(ex.name, argtypes)
@@ -253,12 +283,11 @@ def _(ex, symtab):
     # Not found, show what was found to improve error message
     argtypes_str = ",".join(map(pformat, argtypes))
     print(f"type_propagate: at ", pystr(ex, 2))
-    print(f"type_propagate: Couldn't find {ex.name}({argtypes_str}) ")
+    print(f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) ")
+    print(f"type_propagate: Looked up {sname}")
     print(f"type_propagate: Near misses:")
     for key,val in symtab.items():
-        if isinstance(key, tuple):
-            key=key[0]
-        if key.startswith(ex.name): # TODO: soundex match here?
+        if True: # TODO: soundex match here?
             print(f"type_propagate:   {key}({val})")
 
     raise KSTypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))

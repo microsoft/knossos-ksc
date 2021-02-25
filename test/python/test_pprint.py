@@ -21,7 +21,7 @@ def tld(s):
 
 def test_pprint():
     s = """
-        (def myfun (Tuple Float Float)
+        (def [rev myfun] (Tuple Float Float)
             ((x : Float) 
              (y : Vec Integer)
              (t : (Tuple Float Float))) 
@@ -56,7 +56,7 @@ def test_pprint():
     # check that it's not just using str, by checking for number of newlines
     num_lines = lines.count('\n')
     print('num_lines=', num_lines)
-    assert num_lines == 31 # This needs to be updated after visual checking that the output is OK
+    assert num_lines == 32 # This needs to be updated after visual checking that the output is OK
 
     # Check roundtrip on another width
     e2 = tld(pformat(e))

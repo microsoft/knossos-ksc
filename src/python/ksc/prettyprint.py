@@ -23,6 +23,7 @@ from prettyprinter.doc import (
 from prettyprinter.prettyprinter import (
     Token, 
     LPAREN, RPAREN,
+    LBRACKET, RBRACKET,
     pretty_dispatch
 )
 
@@ -30,7 +31,8 @@ from prettyprinter.utils import intersperse
 
 # Local imports
 from ksc.type import Type
-from ksc.expr import Expr, Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import StructuredName
 
 # These are primarily to enable syntax highlighting -- 
 # it would otherwise be fine to just use the string/doc "s" 
@@ -48,18 +50,34 @@ def pp_string(v):
     r = '"' + r[1:-1] + '"'
     return r
 
-def parens(hangindent, *docs):
+def parens_aux(hangindent, L, R, *docs):
     return group(hang(hangindent, concat([
-        LPAREN,
+        L,
         *docs,
-        RPAREN
+        R
     ])))
+
+def parens(hangindent, *docs):
+    return parens_aux(hangindent, LPAREN, RPAREN, *docs)
 
 def parens_interline(hangindent, *docs):
     return parens(hangindent, *intersperse(LINE, docs))
 
 def interline(*docs):
     return concat(intersperse(LINE, docs))
+
+@register_pretty(StructuredName)
+def pretty_StructuredName(sname, ctx):
+    def pp(v):
+        if isinstance(v, str):
+            return pp_function_name(v)
+        else:
+            return pretty_dispatch(v, ctx)
+
+    if isinstance(sname.se, str):
+        return pp_function_name(sname.se)
+    else:
+        return parens_aux(2, LBRACKET, RBRACKET, *intersperse(LINE, map(pp, sname.se)))
 
 # @singledispatch
 # def pp_as_s_exp(expr, ctx):
@@ -85,7 +103,7 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, Def):
         return parens(2,
                     pp_reserved("def"), ' ',
-                    hang(0, concat([pp_function_name(ex.name), LINE,
+                    hang(0, concat([pp(ex.name), LINE,
                                     pp(ex.return_type), LINE,
                                     parens_interline(1, *map(pp, ex.args))])), HARDLINE,
                     pp(ex.body))
@@ -93,9 +111,15 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, EDef):
         return parens(2,
                     pp_reserved("edef"), LINE,
-                    pp_function_name(ex.name), LINE,
+                    pp(ex.name), LINE,
                     pp(ex.return_type), LINE,
                     parens_interline(1, *map(pp, ex.arg_types)))
+
+    if isinstance(ex, GDef):
+        return parens(2,
+                    pp_reserved("gdef"), LINE,
+                    pp_reserved(ex.derivation), LINE,
+                    pp(ex.function_name))
 
     if isinstance(ex, Rule):
         return parens(2,
@@ -157,7 +181,7 @@ def pretty_Expr(ex, ctx):
     if isinstance(ex, Call):
         return nest(ctx.indent, 
                     parens_interline(2,
-                                pp_function_name(ex.name),
+                                pp(ex.name),
                                 *map(pp, ex.args)))
 
     # Lambda arg body

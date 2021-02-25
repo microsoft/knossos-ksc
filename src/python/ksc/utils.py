@@ -11,7 +11,7 @@ import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
 
-from ksc.type import Type, tangent_type
+from ksc.type import Type, tangent_type, make_tuple_if_many
 
 class KRecord:
     """
@@ -196,15 +196,6 @@ def build_py_module_from_cpp(cpp_str, pybind11_path, use_aten=False):
     
     os.unlink(fcpp.name)
     return module_name, module_path
-
-def make_tuple_if_many(types):
-    if isinstance(types, list):
-        if len(types) > 1:
-            return Type.Tuple(*types)
-        else:
-            return types[0]
-    else:
-        return types
 
 def mangleType(ty):
     return ty.shortstr()

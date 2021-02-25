@@ -2,7 +2,8 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import Union, List
+from typing import Union, List, Tuple, Any
+from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord
 
@@ -12,6 +13,9 @@ from ksc.utils import paren, KRecord
 # similarities to Lisp.  The AST has just a few basic concepts, 
 # each with a backing class defined below.  The concepts are, in
 # lisp-like (KS) syntax, with named fields below:
+#
+# Structured Names
+# StructuredName: identifier | [identifier Type] | ["derivation" StructuredName]
 #
 ### Top-level definitions (TLDs):
 #
@@ -70,6 +74,142 @@ from ksc.utils import paren, KRecord
 #         ^^^^^^^^ ^^^^^^^^^^
 #         cond     body
 
+########################################################################
+# Structured names. A structured name can be
+#  fred       - string
+#  [rev <structured_name>]    - "derivation" name
+#  [fred Type]
+@dataclass(frozen=True)
+class StructuredName:
+    se: Union[str, Tuple[str, Type], Tuple[str, 'StructuredName']]
+
+    def is_derivation(self):
+        """
+        True if this is a "rev" or "fwd" etc of another StructuredName
+        """
+        return isinstance(self.se, tuple) and isinstance(self.se[1], StructuredName)
+
+    def is_derived(self, derivation : str):
+        """
+        True if this is exactly <derivation> of another StructuredName
+        e.g.
+        True == parse("[rev [foo Float]]").is_derived("rev")
+        """
+        return self.is_derivation() and self.se[0] == derivation
+
+    def mangled(self) -> str:
+        """
+        Return the mangled form of this name, for shorthand printing
+         [rev foo] -> "rev$foo"
+         [foo (Tuple Float Float)] -> "foo@<ff>"
+         [rev [fwd [foo (Tuple Float Float)]]] -> "rev$fwd$foo<ff>"
+
+         Note that the "real" mangled name, as will appear in say C++ code,
+         is correct only if self.has_type()
+        """
+        if isinstance(self.se, str):
+            return self.se
+        
+        if self.is_derivation():
+            return self.se[0] + "$" + self.se[1].mangled()
+        
+        assert isinstance(self.se[1], Type)
+        return self.se[0] + "@" + self.se[1].shortstr()
+
+    def has_type(self) -> Type:
+        """
+        True if the innermost se is a type
+        """
+        if isinstance(self.se, str):
+            return None
+        
+        if self.is_derivation():
+            return self.se[1].has_type()
+        
+        assert isinstance(self.se[1], Type)
+        return True
+
+    def get_type(self) -> Type:
+        """
+        If the innermost se is a type, return it, else None
+        """
+        if isinstance(self.se, str):
+            return None
+        
+        if self.is_derivation():
+            return self.se[1].get_type()
+        
+        assert isinstance(self.se[1], Type)
+        return self.se[1]
+
+    def add_type(self, ty) -> (Type, 'StructuredName'):
+        """
+        Return a new structured name, with "ty" inserted in the corner, returning the old type if any
+        sn = parse("[shape [rev foo]]")
+        old_type, new_sname = sn.add_type(Type.Float)
+        Now old_type is None
+            new_sname is "[shape [rev [foo Float]]]"
+        """
+        if isinstance(self.se, str):
+            return None, StructuredName((self.se, ty))
+        if self.is_derivation():
+            old_ty, new_sn = self.se[1].add_type(ty)
+            return old_ty, StructuredName((self.se[0], new_sn))
+        
+        old_ty = self.se[1]
+        return old_ty, StructuredName((self.se[0], ty))
+
+    def mangle_without_type(self) -> str:
+        """
+        Return the mangled form of this name
+         [rev foo] -> "rev$foo"
+         [foo (Tuple Float Float)] -> "foo"
+         [rev [fwd [foo (Tuple Float Float)]]] -> "rev$fwd$foo"
+        """
+        if isinstance(self.se, str):
+            return self.se
+        
+        if self.is_derivation():
+            return self.se[0] + "$" + self.se[1].mangle_without_type()
+        
+        return self.se[0]
+
+    def __str__(self):
+        if isinstance(self.se, str):
+            return self.se
+        return f"[{self.se[0]} {self.se[1]}]"
+
+    def __repr__(self):
+        return "StructuredName(" + str(self.se) + ")"
+
+    @staticmethod
+    def from_str(s: str):
+        assert '$' not in s
+        return StructuredName(s)
+
+def make_structured_name(se) -> StructuredName:
+    """
+    Convert tuple form to StructuredName
+    E.g. make_structured_name(("rev", ("f", Type.Integer)))
+    """
+    if isinstance(se, str):
+        return StructuredName(se)
+
+    if isinstance(se, tuple):
+        assert len(se) == 2
+        assert isinstance(se[0], str)
+        # (str, Type)
+        if isinstance(se[1], Type):
+            return StructuredName((se[0], se[1]))
+        # (str, StructuredName): Recurse
+        se1 = make_structured_name(se[1])
+        return StructuredName((se[0], se1))
+
+    assert False, f"Bad name {se}"
+
+########################################################################
+# TLDs. 
+
 class Expr(KRecord):
     '''Base class for AST nodes.'''
 
@@ -101,12 +241,13 @@ class Def(Expr):
          name  return_type  args                            body
     ```
     '''
-    name: str
+    name: StructuredName
     return_type: Type
     args: list
     body: Expr
 
     def __init__(self, name, return_type, args, body):
+        assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
 class EDef(Expr):
@@ -118,12 +259,30 @@ class EDef(Expr):
           name  return_type  arg_types
     ```
     '''
-    name: str
+    name: StructuredName
     return_type: Type
     arg_types: List[Type]
 
     def __init__(self, name, return_type, arg_types):
         super().__init__(name=name, return_type=return_type, arg_types=arg_types)
+
+class GDef(Expr):
+    '''Gdef(name, return_type, args). 
+    Example:
+    ```
+    (gdef rev         [add (Tuple Float Float)])
+          ^^^         ^^^^
+          derivation  function_name
+    ```
+    '''
+    derivation: str
+    function_name: StructuredName
+
+    def __init__(self, derivation, function_name):
+        super().__init__(derivation=derivation, function_name=function_name)
+
+    def name(self):
+        return StructuredName((derivation, function_name))
 
 class Rule(Expr):
     '''Rule(name, args, e1, e2). 
@@ -190,12 +349,17 @@ class Call(Expr):
     (add   1.234 4.56)
      ^^^   ^^^^^^^^^^
      name  args
+    ([rev [add (Tuple Float Float)]]  1.234 4.56)
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^
+     name                             args
     ```
     '''
-    name: str
+    name: StructuredName
     args: List[Expr]
 
     def __init__(self, name, args):
+        if isinstance(name, str):
+            name = StructuredName.from_str(name)
         super().__init__(name=name, args=args)
 
 class Lam(Expr):
@@ -278,7 +442,7 @@ class Assert(Expr):
 
 from functools import singledispatch
 
-from ksc.expr import Expr, Def, EDef, Call, Const, Var, If
+from ksc.expr import Expr, Def, EDef, GDef, Call, Const, Var, If
 
 def pyname(s : str) -> str:
     return s.replace('$','_s')
@@ -304,18 +468,27 @@ def _(ty, indent):
     elems = [pystr(c, indent+1) for c in ty.children]
     return ty.kind + "[" + ",".join(elems) + "]"    
 
+@pystr.register(StructuredName)
+def _(sn, indent):
+    return pyname(sn.mangled())
+
 @pystr.register(Def)
 def _(ex, indent):
     indent += 1
-    return "def " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
+    return "def " + pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
            + pystr(ex.return_type, indent) + ":" \
            + nl(indent+1) + pystr(ex.body, indent+1)
 
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "#edef " + pyname(ex.name) + "(" + pystr_intercomma(indent, ex.arg_types) + ") -> "\
+    return "#edef " + str(ex.name) + "(" + pystr_intercomma(indent, ex.arg_types) + ") -> "\
            + pystr(ex.return_type, indent) + nl(indent)
+
+@pystr.register(GDef)
+def _(ex, indent):
+    indent += 1
+    return "#gdef " + ex.derivation + " " + str(ex.function_name)
 
 @pystr.register(Rule)
 def _(ex, indent):
@@ -339,7 +512,7 @@ def _(ex, indent):
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
-    return pystr(pyname(ex.name), indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
+    return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 @pystr.register(Lam)
 def _(ex, indent):

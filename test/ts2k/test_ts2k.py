@@ -56,12 +56,10 @@ def compile_relux():
         print("Compiling relux")
         ks_relux = ts2mod(relux, (1.0,))
 
-@pytest.mark.skip(reason="Does not support gdef or structured names")
 def test_ts2k_relux():
     compile_relux()
     assert ks_relux(2.0) == relux(2.0)
 
-@pytest.mark.skip(reason="no way of currently testing this")
 def test_ts2k_relux_grad():
     compile_relux()
     assert ks_relux.rev(1.3, 1.0) == grad_relux(1.3)
@@ -109,7 +107,6 @@ def far(x : torch.Tensor):
         t = 1/2 * x ** 2
     return torch.mean(torch.sin(t)*t)
 
-@pytest.mark.skip(reason="no way of currently testing this")
 def test_far():
     x = torch.randn(2,3)
     ks_far = ts2mod(far, (x,))

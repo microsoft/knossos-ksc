@@ -2,7 +2,7 @@ import pytest
 import re
 
 from ksc.type import Type
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert, StructuredName, make_structured_name
 
 from ksc.parse_ks import parse_tld, parse_expr, ParseError, s_exps_from_string, strip_block_comments
 
@@ -17,25 +17,32 @@ def test_parses():
     Var_b_Float = Var("b", Type.Float, True)
     Var_a = Var("a", None, False)
     Var_b = Var("b", None, False)
-    
+    f = make_structured_name("f")
+
     assert tld("(def f Float () 1.1)") ==\
-               Def("f", Type.Float, [], Const(1.1))
+               Def(f, Type.Float, [], Const(1.1))
+
+    assert tld("(def [rev [f (Tuple)]] Float () 1.1)") ==\
+               Def(make_structured_name(("rev", ("f", Type.Tuple()))), Type.Float, [], Const(1.1))
 
     assert tld("(edef f Float ((Float) (Vec Float)))") ==\
-               EDef("f", Type.Float, [Type.Float, Type.Tensor(1, Type.Float)])
+               EDef(f, Type.Float, [Type.Float, Type.Tensor(1, Type.Float)])
+
+    assert tld("(gdef rev [f (Tuple (Float) (Vec Float))])") ==\
+               GDef("rev", make_structured_name(("f", Type.Tuple(Type.Float, Type.Tensor(1, Type.Float)))))
 
     assert tld("(rule \"f\" ((a : Float) (b : Float)) a b)") ==\
                Rule("f", [Var_a_Float, Var_b_Float], Var_a, Var_b)
 
     assert tld("(def f Float ((a : Float)) a)") ==\
-               Def("f", Type.Float, [Var_a_Float], Var_a)
+               Def(f, Type.Float, [Var_a_Float], Var_a)
 
     assert tld("(def f Float ((a : Float) (b : Float)) (add a b))") ==\
-               Def("f", Type.Float, [Var_a_Float, Var_b_Float], 
+               Def(f, Type.Float, [Var_a_Float, Var_b_Float], 
                         Call("add", [Var_a, Var_b]))
 
     assert tld("(def f Bool () true)") ==\
-               Def("f", Type.Bool, [], Const(True))
+               Def(f, Type.Bool, [], Const(True))
 
     assert expr("(assert a b)") == Assert(Var_a, Var_b)
     assert expr("(if a a b)") == If(Var_a, Var_a, Var_b)

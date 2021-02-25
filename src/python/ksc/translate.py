@@ -7,7 +7,7 @@ from collections import namedtuple
 import ksc.backends
 from ksc.backends import specs
 from ksc.type import Type
-from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If
+from ksc.expr import Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If
 from ksc.parse_ks import parse_ks_string
 
 def handle_let(let_var, let_expr, body, indent=4):
@@ -99,16 +99,23 @@ class Translator:
     def backend(self):
         return self._backend
 
-    def normalize_def_name(self, name):
-        specialized = specs.specialized_functions()
-        if name in specialized:
-            return specialized[name]
-        if name in self._built_ins or name.startswith("get$"):
-            return name
-        if name in ["or", "and", "max", "abs", "assert"]:
-            # need to special case them because they conflict with python functions
-            return name + "_"
-        return name.replace("$", "_")
+    def normalize_def_name(self, sname):
+        if isinstance(sname, str) or isinstance(sname.se, str):
+            if isinstance(sname, str):
+                name = sname
+            else: 
+                name = sname.se
+            specialized = specs.specialized_functions()
+            if name in specialized:
+                return specialized[name]
+            if name in self._built_ins or name.startswith("get$"):
+                return name
+            if name in ["or", "and", "max", "abs", "assert"]:
+                # need to special case them because they conflict with python functions
+                return name + "_"
+            return name.replace("$", "_")
+
+        return sname.se[0] + "_" + self.normalize_def_name(sname.se[1])
 
     # Convert KS expression to python code string
     def handle_body(self, ex, indent=2):
@@ -157,7 +164,7 @@ class Translator:
         # All others are function call e.g. (f e1 .. eN)
         assert isinstance(ex, Call), ex
 
-        name = ex.name
+        name = ex.name.mangled()
         args = ex.args
 
         # Recursively handle args
@@ -212,7 +219,7 @@ def {name}({args}):
                 self._edefs[name] = edef
             elif isinstance(tld, Def):
                 name = tld.name
-                if name.startswith("cost$") or name.startswith("shape$"):
+                if name.is_derived("cost") or name.is_derived("shape"):
                     # delay so that we read edefs first
                     defs_to_process.append(tld)
                 else:
@@ -251,7 +258,7 @@ if __name__ == "__main__":
             # is necessary for calling the right version of the generated edef.
             imports = sorted(self._built_ins)
             edefs = [f'{edef.py_name} = ksc.backends.abstract._get_edef('
-                     f'defs, "{edef.name}", '
+                     f'defs, "{edef.name.mangled()}", '
                      f'{edef.return_type.__repr__()}, '
                      f'py_name_for_concrete="{self.normalize_def_name(edef.name)}")'
                      for edef in self._edefs.values()]
@@ -277,7 +284,7 @@ defs={{
 '''.format(backend=self.backend,
            imports=",\n  ".join(imports),
            defs="\n".join([d.str for d in self._defs]),
-           defs_map=",\n  ".join([f'"{d.name}": {self.normalize_def_name(d.name)}' for d in self._defs]),
+           defs_map=",\n  ".join([f'"{d.name.mangled()}": {self.normalize_def_name(d.name)}' for d in self._defs]),
            edefs="\n".join(edefs)
     )
 
