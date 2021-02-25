@@ -67,6 +67,7 @@
   (let ((N 6)
         (ns (build N (lam (i : Integer) (mul (add i 1) 100)))))
   (print "# Julia code:\n"
+      "using Plots\n"
       "n=" ns "\n"
       "vp="
       (build N (lam (n : Integer)
@@ -109,7 +110,10 @@
                       ($BENCH (lam (_ : (Tuple)) (fchomp ([rev fprod] v 1.0)))))))
 
       "\n"
-      "plot(n,rap,n,rvp,n,rfp)\n"
+
+      "plot(n,rvp, xscale=:log10, yscale=:log10, title=\"Reverse mode of prod\", xlabel=\"Vector length\", ylabel=\"Run time (us)\", labels=\"vprod\")\n"
+      "plot!(n,rfp, labels=\"fprod\")\n"
+      "plot!(n,rifp, labels=\"ifprod\")\n"
   )
   )
 )
