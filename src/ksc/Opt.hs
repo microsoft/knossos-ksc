@@ -801,7 +801,7 @@ optLMApply _ _ _e _
 -- Only for the BasicAD form
 optLMApplyCall :: HasCallStack
                => InScopeSet -> ADDir
-               -> String -> TExpr   -- f args :: s -o t
+               -> PrimFun -> TExpr  -- f args :: s -o t
                -> TExpr             -- :: T(s)
                -> Maybe TExpr       -- :: T(t)
 

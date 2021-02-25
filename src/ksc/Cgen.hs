@@ -728,7 +728,7 @@ ctypeofFun1 (TypeLM _ _) f ctys =
     (map show ctys)
 ctypeofFun1 ty _ _ = mkCType ty
 
-ctypeofPrimFun :: HasCallStack => Type -> String -> [CType] -> CType
+ctypeofPrimFun :: HasCallStack => Type -> PrimFun -> [CType] -> CType
 ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
   ("lmApply"  , _         ) -> mkCType ty
   -- TODO: lmApplyR?

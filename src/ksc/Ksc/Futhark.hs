@@ -310,7 +310,7 @@ sumbuild ret xs =
   Call (Var "sumbuild") [binopFunction "+" ret' ret', zeroValue ret', xs]
   where ret' = toFutharkType ret
 
-callPrimFun :: String -> L.Type -> L.TExpr -> Exp
+callPrimFun :: L.PrimFun -> L.Type -> L.TExpr -> Exp
 callPrimFun "deltaVec" (L.TypeTensor 1 ret) (L.Tuple [n, i, v]) =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
