@@ -193,9 +193,6 @@ lmVCat _ es  = mkPrimCall1 "lmVCat" (Tuple es)
 lmVCatV :: HasCallStack => TExpr -> TExpr
 lmVCatV e  = mkPrimCall1 "lmVCatV" e
 
-lmTranspose :: TExpr -> TExpr
-lmTranspose = mkPrimCall1 "lmTranspose"
-
 lmCompose :: TExpr -> TExpr -> TExpr
 lmCompose = mkPrimCall2 "lmCompose"
 
@@ -498,7 +495,6 @@ primFunCallResultTy_maybe fun args
 
       ("lmCompose", TypeTuple [TypeLM _ c, TypeLM a _])    -> Just (TypeLM a c)
       ("lmAdd"    , TypeTuple [TypeLM s1 t1, TypeLM _ _])  -> Just (TypeLM s1 t1)
-      ("lmTranspose", TypeLM s t)                          -> Just (TypeLM t s)
 
       ("lmApply"  , TypeTuple [TypeLM s1 t, s2]) | tangentType s1 `eqType` s2 -> Just (tangentType t)
            -- Linar map apply:  lmApply :: (s -o t) -> ds -> dt
@@ -651,7 +647,7 @@ isPrimFun f = f `elem` [ "$inline"  -- ($inline f args...)        Force inline f
                        , "ts_dot"
                        , "eq", "ne"
                        , "delta", "deltaVec", "diag", "constVec"
-                       , "lmApply", "lmApplyR", "lmApplyT", "lmVCat", "lmHCat", "lmTranspose"
+                       , "lmApply", "lmApplyR", "lmApplyT", "lmVCat", "lmHCat"
                        , "lmVCatV", "lmHCatV"
                        , "lmCompose", "lmAdd", "lmScale", "lmScaleR", "lmDot"
                        , "lmZero", "lmOne"
