@@ -39,6 +39,29 @@
 ;; (gdef sufrevpass [fprod (Vec Float)])
 ;; (gdef sufrev [fprod (Vec Float)])
 
+(edef indexL (Tuple (Vec Float) Float) ((Tuple Integer (Vec Float))))
+
+(edef [suffwdpass indexL] (Tuple (Tuple (Vec Float) Float) Integer)
+                          ((Tuple Integer (Vec Float))))
+
+(edef [sufrevpass [indexL (Tuple Integer (Vec Float))]]
+      (Tuple (Tuple) (Vec Float))
+      ((Tuple (Tuple (Vec Float) Float) Integer)))
+
+(def ifprod Float (v : Vec Float)
+     (let ((v_ r) (ifold (size v)
+                         (lam (v_acc_i : (Tuple (Tuple (Vec Float) Float) Integer))
+                              (let ((v_acc i) v_acc_i)
+                              (let ((v acc) v_acc)
+                              (let ((v_ vi) (indexL i v))
+                                (tuple v_ (mul acc vi))))))
+                         (tuple v 1.0)))
+       r))
+
+(gdef sufrevpass [ifprod (Vec Float)])
+(gdef suffwdpass [ifprod (Vec Float)])
+(gdef sufrev [ifprod (Vec Float)])
+
 (edef $BENCH Float ((Lam (Tuple) Float)))
 (def vchomp Float (_ : (Tuple (Tuple) (Vec Float))) 1.0)
 (gdef fwd [vchomp (Tuple (Tuple) (Vec Float))])
@@ -89,6 +112,14 @@
       "\n# C++ currently seems to optimize this to a constant at -O3"
       "\n"
 
+      "ifp="
+      (build N (lam (n : Integer) 0.0
+;                  (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
+;                      ($BENCH (lam (_ : (Tuple)) (ifprod v))))
+                    ))
+      "\n# C++ currently seems to optimize this to a constant at -O3"
+      "\n"
+
       "rvp="
       (build N (lam (n : Integer)
                   (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
@@ -111,6 +142,12 @@
 
       "\n"
 
+      "rifp="
+      (build N (lam (n : Integer)
+                  (let (v (build (index n ns) (lam (i : Integer) (add ($ranhashdoub i) 0.5))))
+                      ($BENCH (lam (_ : (Tuple)) (fchomp ([sufrev ifprod] v 1.0)))))))
+
+      "\n"
       "plot(n,rvp, xscale=:log10, yscale=:log10, title=\"Reverse mode of prod\", xlabel=\"Vector length\", ylabel=\"Run time (us)\", labels=\"vprod\")\n"
       "plot!(n,rfp, labels=\"fprod\")\n"
       "plot!(n,rifp, labels=\"ifprod\")\n"
