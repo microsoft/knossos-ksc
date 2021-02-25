@@ -31,25 +31,25 @@ mkPrimCall fun args
   where
     res_ty = primFunCallResultTy fun args
 
-mkPrimCall1 :: HasCallStack => String -> TExpr -> TExpr
+mkPrimCall1 :: HasCallStack => PrimFun -> TExpr -> TExpr
 mkPrimCall1 f a = mkPrimCall f a
 
-mkPrimCall2 :: HasCallStack => String -> TExpr -> TExpr -> TExpr
+mkPrimCall2 :: HasCallStack => PrimFun -> TExpr -> TExpr -> TExpr
 mkPrimCall2 f a b = mkPrimCall f (Tuple [a, b])
 
-mkPrimCall3 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall3 :: HasCallStack => PrimFun -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall3 f a b c = mkPrimCall f (Tuple [a, b, c])
 
-mkPrimCall4 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall4 :: HasCallStack => PrimFun -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall4 f a b c d = mkPrimCall f (Tuple [a, b, c, d])
 
-mkPrimCall5 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall5 :: HasCallStack => PrimFun -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall5 f a b c d e = mkPrimCall f (Tuple [a, b, c, d, e])
 
-mkPrimCall6 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall6 :: HasCallStack => PrimFun -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall6 f a b c d e g = mkPrimCall f (Tuple [a, b, c, d, e, g])
 
-mkPrimCall7 :: HasCallStack => String -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
+mkPrimCall7 :: HasCallStack => PrimFun -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr -> TExpr
 mkPrimCall7 f a b c d e g h = mkPrimCall f (Tuple [a, b, c, d, e, g, h])
 
 ---------------------------
@@ -244,7 +244,7 @@ lmCompose_Dir :: ADDir -> TExpr -> TExpr -> TExpr
 lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
 lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
-isThePrimFun :: TFun p -> String -> Bool
+isThePrimFun :: TFun p -> PrimFun -> Bool
 isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
