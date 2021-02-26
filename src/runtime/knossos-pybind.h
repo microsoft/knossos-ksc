@@ -9,6 +9,11 @@ namespace py = pybind11;
 
 #include "knossos.h"
 
+// This is needed as long as https://github.com/microsoft/knossos-ksc/issues/606
+namespace ks {
+    int main(allocator *) { return 0; };
+}
+
 ks::allocator g_alloc{ 1'000'000'000 };
 
 namespace pybind11 { namespace detail {
