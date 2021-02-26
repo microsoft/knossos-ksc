@@ -30,7 +30,7 @@ import           Test.Hspec
 import qualified Optics                         as O
 import           Optics                         ( Lens, Prism, AffineTraversal
                                                 , over, view, traverseOf, prism
-                                                , review, preview, matching
+                                                , review, preview, matching, _Left
                                                 , (%) )
 
 -----------------------------------------------
