@@ -13,6 +13,7 @@ module Lang where
 import           Prelude                 hiding ( (<>) )
 
 import qualified Ksc.Traversal                  as T
+import           Ksc.Traversal                  ( is )
 
 import qualified Text.PrettyPrint              as PP
 import           Text.PrettyPrint               ( Doc )
@@ -22,8 +23,11 @@ import           KMonad
 import           Data.Either                    ( partitionEithers )
 import qualified Data.Map as M
 import           Data.Maybe                     ( isJust, mapMaybe )
+import           Data.Void                      ( Void, absurd )
 import           Debug.Trace                    ( trace )
 import           Test.Hspec
+
+import           Optics                         as T
 
 -----------------------------------------------
 --  The main data types
@@ -38,7 +42,7 @@ mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
 mkGradTuple TupleAD p lm = Tuple [p, lm]
 
-data Phase = Parsed | Typed | OccAnald
+data Phase = Parsed | Typed | OccAnald | Actually *
 
 data DeclX p = RuleDecl (RuleX p)
              | DefDecl  (DefX p)
@@ -411,6 +415,7 @@ type family BaseUserFunArgTy p where
   BaseUserFunArgTy Parsed   = Maybe Type
   BaseUserFunArgTy OccAnald = Type
   BaseUserFunArgTy Typed    = Type
+  BaseUserFunArgTy (Actually a) = a
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
@@ -447,26 +452,28 @@ type Fun     p = DerivedFun (BaseFun p)
 
 baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
                        (BaseUserFunArgTy p) (BaseUserFunArgTy q)
-baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
+baseUserFunT = lensVL $ \g (BaseUserFunId f t) -> BaseUserFunId f <$> g t
 
-baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun q)
-                                  (BaseUserFun p) (BaseUserFun q)
-baseUserFunBaseFun f = \case
-  BaseUserFun u -> BaseUserFun <$> f u
-  PrimFun p    -> pure (PrimFun p)
+-- It is idiomatic to prefix constructor Prisms with "_".  See
+--
+--    https://hackage.haskell.org/package/optics-core-0.4/docs/doc-index-95.html
+_BaseUserFun :: Prism (BaseFun p) (BaseFun q)
+                      (BaseUserFun p) (BaseUserFun q)
+_BaseUserFun = prism BaseUserFun $ \case
+  BaseUserFun b -> Right b
+  PrimFun p     -> Left (PrimFun p)
 
 baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
                      funid funid'
-baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
+baseFunFun = lensVL $ \f (Fun ds fi) -> fmap (Fun ds) (f fi)
 
 userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
                           (Maybe Type) Type
-userFunBaseType = baseFunFun . baseUserFunType @p
+userFunBaseType = baseFunFun % baseUserFunType @p
 
-funType :: T.Traversal (Fun p) (Fun q)
-                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
-funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
+funType :: AffineTraversal (Fun p) (Fun q) (BaseUserFunArgTy p) (BaseUserFunArgTy q)
+funType = baseFunFun % _BaseUserFun % baseUserFunT
 
 -- In the Parsed phase, if the user didn't supply a type, add it;
 -- otherwise (and in other phases, where the type is there) check that
@@ -485,33 +492,35 @@ addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) 
 
 
 userFunToFun :: UserFun p -> Fun p
-userFunToFun = T.over baseFunFun BaseUserFun
+userFunToFun = review perhapsUserFun_
 
 -- A 'Fun p' is Either:
 --
 -- Right: a 'UserFun p', or
 -- Left:  a 'PrimFun'
+--
+-- FIXME: We should make this all neater with an iso between BaseFun p
+-- and Either (BaseUserFun p) PrimFun
 perhapsUserFun :: Fun p -> Either (DerivedFun PrimFun) (UserFun p)
-perhapsUserFun (Fun ds baseFun) =
-  either (Left . Fun ds) (Right . Fun ds) (baseFunToBaseUserFunE baseFun)
+perhapsUserFun = over _Left f . matching perhapsUserFun_
+  where f :: DerivedFun (BaseFun (Actually Void)) -> DerivedFun PrimFun
+        f (Fun _ (BaseUserFun (BaseUserFunId _ d))) = absurd d
+        f (Fun ds (PrimFun p)) = Fun ds p
+
+perhapsUserFun_ :: Prism (Fun p) (Fun q) (UserFun p) (UserFun q)
+perhapsUserFun_ = T.mapPrism baseFunFun _BaseUserFun
 
 maybeUserFun :: Fun p -> Maybe (UserFun p)
-maybeUserFun f = case perhapsUserFun f of
-  Right f -> Just f
-  Left _ -> Nothing
+maybeUserFun = preview perhapsUserFun_
 
-baseFunToBaseUserFunE :: BaseFun p -> Either PrimFun (BaseUserFun p)
-baseFunToBaseUserFunE = \case
-  BaseUserFun u    -> Right u
-  PrimFun p    -> Left p
+baseFunToBaseUserFunE :: BaseFun p -> Either (BaseFun q) (BaseUserFun p)
+baseFunToBaseUserFunE = matching _BaseUserFun
 
 baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
-baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
-  Right u -> Just u
-  Left _  -> Nothing
+baseFunToBaseUserFun = preview _BaseUserFun
 
 isBaseUserFun :: BaseFun p -> Bool
-isBaseUserFun = isJust . baseFunToBaseUserFun
+isBaseUserFun = is _BaseUserFun
 
 isSelFun :: BaseFun p -> Bool
 isSelFun = \case
@@ -520,7 +529,7 @@ isSelFun = \case
   PrimFun{} -> False
 
 baseFunOfFun :: Fun p -> BaseFun p
-baseFunOfFun (Fun _ baseFun) = baseFun
+baseFunOfFun = view baseFunFun
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -895,7 +904,7 @@ instance InPhase Parsed where
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
 
-  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g t)
+  baseUserFunType = lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g t)
 
 instance InPhase Typed where
   pprVar  = ppr
@@ -909,7 +918,7 @@ instance InPhase Typed where
     where fun' = T.over funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
-  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
+  baseUserFunType = lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g (Just t))
 
 instance InPhase OccAnald where
   pprVar  = ppr
@@ -923,7 +932,7 @@ instance InPhase OccAnald where
     where fun' = T.over funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
-  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
+  baseUserFunType = lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g (Just t))
 
 pprTFun :: InPhase p => TFun p -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
