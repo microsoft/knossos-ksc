@@ -27,7 +27,11 @@ import           Data.Void                      ( Void, absurd )
 import           Debug.Trace                    ( trace )
 import           Test.Hspec
 
-import           Optics                         as T
+import qualified Optics                         as O
+import           Optics                         ( Lens, Prism, AffineTraversal
+                                                , over, view, traverseOf, prism
+                                                , review, preview, matching
+                                                , (%) )
 
 -----------------------------------------------
 --  The main data types
@@ -450,9 +454,9 @@ data DerivedFun funid = Fun Derivations funid
 type UserFun p = DerivedFun (BaseUserFun p)
 type Fun     p = DerivedFun (BaseFun p)
 
-baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
-                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
-baseUserFunT = lensVL $ \g (BaseUserFunId f t) -> BaseUserFunId f <$> g t
+baseUserFunT :: Lens (BaseUserFun p) (BaseUserFun q)
+                     (BaseUserFunArgTy p) (BaseUserFunArgTy q)
+baseUserFunT = O.lensVL $ \g (BaseUserFunId f t) -> BaseUserFunId f <$> g t
 
 -- It is idiomatic to prefix constructor Prisms with "_".  See
 --
@@ -463,13 +467,13 @@ _BaseUserFun = prism BaseUserFun $ \case
   BaseUserFun b -> Right b
   PrimFun p     -> Left (PrimFun p)
 
-baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
+baseFunFun :: Lens (DerivedFun funid) (DerivedFun funid')
                      funid funid'
-baseFunFun = lensVL $ \f (Fun ds fi) -> fmap (Fun ds) (f fi)
+baseFunFun = O.lensVL $ \f (Fun ds fi) -> fmap (Fun ds) (f fi)
 
 userFunBaseType :: forall p. InPhase p
-                => T.Lens (UserFun p) (UserFun Typed)
-                          (Maybe Type) Type
+                => Lens (UserFun p) (UserFun Typed)
+                        (Maybe Type) Type
 userFunBaseType = baseFunFun % baseUserFunType @p
 
 funType :: AffineTraversal (Fun p) (Fun q) (BaseUserFunArgTy p) (BaseUserFunArgTy q)
@@ -481,7 +485,7 @@ funType = baseFunFun % _BaseUserFun % baseUserFunT
 -- type-that-was-in-UserFun)
 addBaseTypeToUserFun :: forall p. InPhase p
                      => UserFun p -> Type -> Either Type (UserFun Typed)
-addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) checkBaseType userfun
+addBaseTypeToUserFun userfun expectedBaseTy = traverseOf (userFunBaseType @p) checkBaseType userfun
   where checkBaseType :: Maybe Type -> Either Type Type
         checkBaseType maybeAppliedType
           | Just appliedTy <- maybeAppliedType
@@ -513,12 +517,6 @@ perhapsUserFun_ = T.mapPrism baseFunFun _BaseUserFun
 maybeUserFun :: Fun p -> Maybe (UserFun p)
 maybeUserFun = preview perhapsUserFun_
 
-baseFunToBaseUserFunE :: BaseFun p -> Either (BaseFun q) (BaseUserFun p)
-baseFunToBaseUserFunE = matching _BaseUserFun
-
-baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
-baseFunToBaseUserFun = preview _BaseUserFun
-
 isBaseUserFun :: BaseFun p -> Bool
 isBaseUserFun = is _BaseUserFun
 
@@ -549,7 +547,7 @@ deriving instance Ord (Fun p) => Ord (TFun p)
 -- GHC's machinery to allow that.
 coerceTFun :: BaseUserFunArgTy p ~ BaseUserFunArgTy q
            => TFun p -> TFun q
-coerceTFun (TFun t f) = TFun t (T.over funType id f)
+coerceTFun (TFun t f) = TFun t (over funType id f)
 
 
 data Var
@@ -889,8 +887,8 @@ class InPhase p where
   getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
-  baseUserFunType :: T.Lens (BaseUserFun p) (BaseUserFun Typed)
-                            (Maybe Type) Type
+  baseUserFunType :: Lens (BaseUserFun p) (BaseUserFun Typed)
+                          (Maybe Type) Type
 
 instance InPhase Parsed where
   pprVar     = ppr
@@ -904,7 +902,7 @@ instance InPhase Parsed where
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
 
-  baseUserFunType = lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g t)
+  baseUserFunType = O.lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g t)
 
 instance InPhase Typed where
   pprVar  = ppr
@@ -915,10 +913,10 @@ instance InPhase Typed where
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
-    where fun' = T.over funType Just fun
+    where fun' = over funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
-  baseUserFunType = lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g (Just t))
+  baseUserFunType = O.lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g (Just t))
 
 instance InPhase OccAnald where
   pprVar  = ppr
@@ -929,10 +927,10 @@ instance InPhase OccAnald where
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
-    where fun' = T.over funType Just fun
+    where fun' = over funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
-  baseUserFunType = lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g (Just t))
+  baseUserFunType = O.lensVL $ \g (BaseUserFunId f t) -> fmap (BaseUserFunId f) (g (Just t))
 
 pprTFun :: InPhase p => TFun p -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
