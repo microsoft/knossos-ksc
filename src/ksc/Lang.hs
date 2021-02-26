@@ -497,7 +497,7 @@ addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) 
 
 
 userFunToFun :: UserFun p -> Fun p
-userFunToFun = T.mapOf baseFunFun BaseUserFun
+userFunToFun = T.over baseFunFun BaseUserFun
 
 -- A 'Fun p' is Either:
 --
@@ -577,7 +577,7 @@ deriving instance Ord (Fun p) => Ord (TFun p)
 -- GHC's machinery to allow that.
 coerceTFun :: BaseUserFunArgTy p ~ BaseUserFunArgTy q
            => TFun p -> TFun q
-coerceTFun (TFun t f) = TFun t (T.mapOf funType id f)
+coerceTFun (TFun t f) = TFun t (T.over funType id f)
 
 
 data Var
@@ -953,7 +953,7 @@ instance InPhase Typed where
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
-    where fun' = T.mapOf funType Just fun
+    where fun' = T.over funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
@@ -967,7 +967,7 @@ instance InPhase OccAnald where
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
-    where fun' = T.mapOf funType Just fun
+    where fun' = T.over funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
