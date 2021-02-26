@@ -1,5 +1,8 @@
 import numpy as np
 
+class KSTypeError(RuntimeError):
+    pass
+
 class Type:
     """
     Knossos AST node type.  Grouped into
@@ -25,7 +28,8 @@ class Type:
             raise ValueError("bad kind:", kind)
 
         if kind != "Tuple":
-            assert Type.node_kinds[kind] == len(children) # dont' check for 1-tuple
+            if Type.node_kinds[kind] != len(children):
+                raise KSTypeError(f"Type {kind} has {len(children)} parameters, but needs {Type.node_kinds[kind]}") # dont' check for 1-tuple
         if kind == "Tensor":
             assert isinstance(children[0], int) and isinstance(children[1], Type)
         else:

@@ -4,7 +4,7 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType, shape_type, tangent_type, make_tuple_if_many
+from ksc.type import Type, SizeType, shape_type, tangent_type, make_tuple_if_many, KSTypeError
 
 from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr, StructuredName
@@ -156,9 +156,6 @@ def ks_prim_lookup(sname, tys):
 
 ############################################################################
 from functools import singledispatch
-
-class KSTypeError(RuntimeError):
-    pass
 
 @singledispatch
 def type_propagate(ex, symtab):
