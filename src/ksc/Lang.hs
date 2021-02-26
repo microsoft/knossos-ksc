@@ -445,21 +445,18 @@ data DerivedFun funid
 type UserFun p = DerivedFun (BaseUserFun p)
 type Fun     p = DerivedFun (BaseFun p)
 
-baseUserFunT :: Functor f
-             => (BaseUserFunArgTy p -> f (BaseUserFunArgTy q))
-             -> BaseUserFun p -> f (BaseUserFun q)
+baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
+                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
 baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
 
-baseUserFunBaseFun :: Applicative f
-                   => (BaseUserFun p -> f (BaseUserFun q))
-                   -> (BaseFun p -> f (BaseFun q))
+baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun q)
+                                  (BaseUserFun p) (BaseUserFun q)
 baseUserFunBaseFun f = \case
   BaseUserFun u -> BaseUserFun <$> f u
   PrimFun p    -> pure (PrimFun p)
 
-baseFunFun :: Functor f
-           => (funid -> f funid')
-           -> (DerivedFun funid -> f (DerivedFun funid'))
+baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
+                     funid funid'
 baseFunFun f = \case
   Fun fi       -> fmap Fun (f fi)
   GradFun fi p -> fmap (\f' -> GradFun f' p) (f fi)
@@ -470,14 +467,13 @@ baseFunFun f = \case
   SUFRevPass fi -> fmap SUFRevPass (f fi)
   SUFRev fi     -> fmap SUFRev (f fi)
 
-userFunBaseType :: forall p f. (InPhase p, Functor f)
-                => (Maybe Type -> f Type)
-                -> UserFun p -> f (UserFun Typed)
+userFunBaseType :: forall p. InPhase p
+                => T.Lens (UserFun p) (UserFun Typed)
+                          (Maybe Type) Type
 userFunBaseType = baseFunFun . baseUserFunType @p
 
-funType :: Applicative f
-        => (BaseUserFunArgTy p -> f (BaseUserFunArgTy q))
-        -> Fun p -> f (Fun q)
+funType :: T.Traversal (Fun p) (Fun q)
+                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
 funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
 
 -- In the Parsed phase, if the user didn't supply a type, add it;
@@ -926,9 +922,8 @@ class InPhase p where
   getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
-  baseUserFunType :: Functor f
-                  => (Maybe Type -> f Type)
-                  -> BaseUserFun p -> f (BaseUserFun Typed)
+  baseUserFunType :: T.Lens (BaseUserFun p) (BaseUserFun Typed)
+                            (Maybe Type) Type
 
 instance InPhase Parsed where
   pprVar     = ppr
