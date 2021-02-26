@@ -470,7 +470,7 @@ baseFunFun f = \case
   SUFRevPass fi -> fmap SUFRevPass (f fi)
   SUFRev fi     -> fmap SUFRev (f fi)
 
-userFunBaseType :: forall p f. (InPhase p, Applicative f)
+userFunBaseType :: forall p f. (InPhase p, Functor f)
                 => (Maybe Type -> f Type)
                 -> UserFun p -> f (UserFun Typed)
 userFunBaseType = baseFunFun . baseUserFunType @p
