@@ -7,6 +7,8 @@ import numpy
 import torch
 import torch.onnx
 
+torch.set_default_dtype(torch.float64)
+
 from ksc import utils
 from ksc.ks_function import KscFunction
 from ksc.parse_ks import parse_ks_filename
