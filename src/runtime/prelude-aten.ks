@@ -141,8 +141,8 @@
 
 (def aten::mean Float ((a : Tensor 2 Float) (opt_dtype : (Tuple)))
     (div (aten::sum a) (aten::Float (aten::prod (size a)))))
-(gdef fwd [aten::mean (Tuple (Tensor 2 Float) Float)])
-(gdef rev [aten::mean (Tuple (Tensor 2 Float) Float)])
+(gdef fwd [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
+(gdef rev [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
 
 (def aten::mean Float ((a : Tensor 1 Float) (opt_dtype : (Tuple)))
     (div (aten::sum a) (aten::Float (size a))))
@@ -280,8 +280,14 @@
 
 (def aten::len Integer (a : Tensor 1 Float)
     (size a))
+(gdef fwd [aten::len (Tensor 1 Float)])
+(gdef rev [aten::len (Tensor 1 Float)])
 
 (edef prim::min Integer ((Tensor 1 Integer)))
+(def [fwd [prim::min (Tensor 1 Integer)]] (Tuple) ((a : Tensor 1 Integer) (da : Tensor 1 (Tuple)))
+    (tuple))
+(def [rev [prim::min (Tensor 1 Integer)]] (Tensor 1 (Tuple)) ((a : Tensor 1 Integer) (dret : (Tuple)))
+    (constVec (size a) (tuple)))
 
 (def aten::select Float ((a : Tensor 1 Float) (dim : Integer) (i : Integer))
     (assert (eq dim 0)
