@@ -116,7 +116,7 @@ import Text.Read ( readMaybe )
 ---------------------
 testParse :: Pretty a => Parser a -> String -> IO ()
 testParse  p s = case runParser p s of
-                   Left err -> putStrLn ("Failed: " ++ show err)
+                   Left err -> putStrLn ("ksc: Failed: " ++ show err)
                    Right r  -> putStrLn (render (ppr r))
 
 runParser :: Parser a -> String -> Either ParseError a
@@ -140,7 +140,7 @@ parseS cts =
 
 parseE :: String -> Either String [Decl]
 parseE cts = case runParser pDecls cts of
-                    Left err    -> Left ("Failed parse: " ++ show err)
+                    Left err    -> Left ("ksc: Failed parse: " ++ show err)
                     Right decls -> Right decls
 
 ------- Parser -------

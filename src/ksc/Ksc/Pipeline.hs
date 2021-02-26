@@ -51,7 +51,7 @@ displayCppGen verbosity ksFiles ksofile cppfile =
   runKM $
   do {
   ; decls0 <- liftIO (fmap concat (mapM parseF ksFiles))
-  ; liftIO $ putStrLn "read decls"
+  ; liftIO $ putStrLn "ksc: read decls"
   ; defs <- pipeline verbosity decls0
   ; liftIO (Cgen.cppGenWithFiles ksofile cppfile defs)
   }
@@ -259,7 +259,7 @@ genFuthark :: [FilePath] -> FilePath -> IO ()
 genFuthark files file = do
   prelude <- readFile "src/runtime/knossos.fut"
   defs <- runKM $ futharkPipeline (files ++ [file])
-  putStrLn $ "Writing to " ++ futfile
+  putStrLn $ "ksc: Writing to " ++ futfile
   Cgen.createDirectoryWriteFile futfile $
     intercalate "\n\n" $
     prelude : map (renderSexp . ppr . Ksc.Futhark.toFuthark) defs
