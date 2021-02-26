@@ -4,11 +4,7 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-<<<<<<< HEAD
-from ksc.type import Type, SizeType, shape_type, make_tuple_if_many
-=======
-from ksc.type import Type, SizeType, shape_type, tangent_type
->>>>>>> Improve diagnostics
+from ksc.type import Type, SizeType, shape_type, tangent_type, make_tuple_if_many
 
 from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr, StructuredName
@@ -295,16 +291,15 @@ def _(ex, symtab):
     print(f"type_propagate: at ", pystr(ex, 2))
     print(f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) ")
     print(f"type_propagate: Looked up {sname}")
-    print(f"type_propagate: Near misses:")
+    exname = ex.name.mangled()
+    print(f"type_propagate: Near misses {exname}:")
     for key,val in symtab.items():
-<<<<<<< HEAD
-        if True: # TODO: soundex match here?
-=======
-        if isinstance(key, tuple):
-            key=key[0]
-        if editdistance.eval(key, ex.name) < 2:
->>>>>>> Improve diagnostics
-            print(f"type_propagate:   {key}({val})")
+        if isinstance(key, StructuredName):
+            key_str=key.mangle_without_type()
+        else:
+            key_str=str(key)
+        if editdistance.eval(key_str, exname) < 2:
+            print(f"type_propagate:   {key} -> {val}")
 
     print(f"type_propagate: To implement:")
     argtypes_ks_str = " ".join(map(pformat, argtypes))

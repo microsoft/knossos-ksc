@@ -49,8 +49,9 @@ class Type:
         """
         Constructor: Type.Tuple(T1, ..., Tn)
         """
+        args = tuple(args)
         assert all((isinstance(ch, Type) for ch in args)), "Type.Tuple constructed with non-type arg"
-        return Type("Tuple", list(args))
+        return Type("Tuple", args)
 
     @staticmethod
     def Lam(arg_type, return_type):
@@ -291,7 +292,7 @@ def tangent_type(ty : Type) -> Type:
     if ty == Type.Float:
         return ty
     if ty.is_tuple:
-        return Type.Tuple(tangent_type(ty) for ty in ty.children)
+        return Type.Tuple(*(tangent_type(ty) for ty in ty.children))
     if ty.is_tensor:
         return Type.Tensor(ty.tensor_rank, tangent_type(ty.tensor_elem_type))
 
