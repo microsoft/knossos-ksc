@@ -23,6 +23,11 @@
 (gdef fwd [aten::lt (Tuple Integer Float)])
 (gdef rev [aten::lt (Tuple Integer Float)])
 
+(def aten::lt Bool ((a : Integer) (b : Integer))
+    (lt a b))
+(gdef fwd [aten::lt (Tuple Integer Integer)])
+(gdef rev [aten::lt (Tuple Integer Integer)])
+
 ;; mul
 (def aten::mul Float ((a : Float) (b : Float))
     (mul a b))
@@ -207,10 +212,10 @@
 ; (def [rev Tensor_init] (Vec (Vec Float)) ((a : Vec (Vec Float)) (dr : Tensor 2 Float))
 ;     (VecVec_init dr))
    
-(def aten::tensor (Tensor 2 Float) ((a : Vec (Vec Float)) (x1 : Float) (x2 : Float) (x3 : Float) )
+(def aten::tensor (Tensor 2 Float) ((a : Vec (Vec Float)) (x1 : (Tuple)) (x2 : (Tuple)) (x3 : Bool) )
     (Tensor_init a))
-(gdef fwd [aten::tensor (Tuple (Vec (Vec Float)) Float Float Float)])
-(gdef rev [aten::tensor (Tuple (Vec (Vec Float)) Float Float Float)])
+(gdef fwd [aten::tensor (Tuple (Vec (Vec Float)) (Tuple) (Tuple) Bool)])
+(gdef rev [aten::tensor (Tuple (Vec (Vec Float)) (Tuple) (Tuple) Bool)])
 
 (def aten::tensor (Tensor 1 Float) ((a : Vec Float) (x1 : Float) (x2 : Float) (x3 : Float) )
     a)
