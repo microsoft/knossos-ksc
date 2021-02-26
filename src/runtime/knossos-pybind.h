@@ -80,15 +80,21 @@ private:
 
 }}
 
+
+static void check_valid_pointer(std::uintptr_t v)
+{
+    if (v < 1u<<24) {
+        // v should be a pointer, if it's smaller than 0x00ffffff, it's probably a misplaced size
+        throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
+    }
+}
+
 template<typename T>
 void declare_tensor_2(py::module &m, char const* name) {
   // Wrap ks_tensor<Dim, T> to point to supplied python memory
   py::class_<ks::tensor<2, T>>(m, name, py::buffer_protocol(), py::module_local())
     .def(py::init([](std::uintptr_t v, size_t m, size_t n) {
-        if (v < 1u<<24) {
-            // probably a misplaced size
-            throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
-        }
+        check_valid_pointer(v);
         ks::tensor_dimension<2>::index_type size {m,n};
         return ks::tensor<2, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data
     }))
@@ -114,10 +120,7 @@ void declare_tensor_1(py::module &m, char const* name) {
   constexpr int Dim = 1;
   py::class_<ks::tensor<Dim, T>>(m, name, py::buffer_protocol(), py::module_local())
     .def(py::init([](std::uintptr_t v, size_t n) {
-        if (v < 1u<<24) {
-            // probably a misplaced size
-            throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
-        }
+        check_valid_pointer(v);
         ks::tensor_dimension<Dim>::index_type size {n};
         return ks::tensor<Dim, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data
     }))

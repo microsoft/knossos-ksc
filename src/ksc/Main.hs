@@ -231,7 +231,7 @@ futharkCompileKscPrograms ksFiles = do
   testOn ksFiles $ \ksFile -> do
         ksTest <- dropExtensionOrFail "ks" ksFile
         if ksFile `elem` testsThatDon'tWorkWithFuthark
-         then putStrLn ("Skipping " ++ ksFile
+         then putStrLn ("ksc: Skipping " ++ ksFile
                         ++ " because it is known not to work with Futhark")
          else do
             genFuthark ["src/runtime/prelude"] ksTest
