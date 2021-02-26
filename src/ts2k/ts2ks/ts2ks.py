@@ -606,7 +606,7 @@ if __name__ == "__xmain__":
 
 #%%
 
-if __name__ == "__main__":
+if __name__ == "__xmain__":
     from math import sin
     torch.set_default_dtype(torch.float64)
     
@@ -667,7 +667,7 @@ if __name__ == "__main__":
     ks_fun = ts2mod(foofilter_comp, example_inputs=(x_example,))
 
 
-if __name__ == "__xmain__":
+if __name__ == "__main__":
     print('\n\n*************************\n\n')
 
     # "Squared Leaky Relu"?
