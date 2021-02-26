@@ -55,6 +55,13 @@ rev$aten$8$8matmul$a$dT2fT1f$bT1f(allocator * alloc, tuple<tensor<2,double>, ten
 	return {retM,retv};
 }
 
+template <size_t Dim, class T>
+tensor<Dim, T>
+aten$8$8pow$aT2fi(allocator * alloc, tensor<Dim,T> const& a, int const& i)
+{
+	return elementwise_map(alloc, a, [i](T const& v) { return std::pow(v, i); });
+}
+
 typedef tensor<2, double> Mat;
 typedef tensor<1, double> Vec;
 
