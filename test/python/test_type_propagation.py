@@ -1,7 +1,7 @@
 import pytest
 
-from ksc.type import Type
-from ksc.type_propagate import type_propagate_decls, KSTypeError
+from ksc.type import Type, KSTypeError
+from ksc.type_propagate import type_propagate_decls
 from ksc.parse_ks import parse_ks_filename, parse_ks_string
 from ksc.expr import StructuredName
 
