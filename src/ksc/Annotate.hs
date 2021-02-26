@@ -73,7 +73,7 @@ lintDefs :: String -> GblSymTab -> [TDef] -> KM ()
 -- each top level function
 lintDefs what gbl_env defs
   = do { runTc what init_env (mapM_ (tryTc . tcDef) defs)
-       ; printK (text "Linted" <+> text what) }
+       ; printK (text "ksc: Linted" <+> text what) }
   where
     init_env = TCE { tce_ctxt = []
                    , tce_st = newSymTab gbl_env }

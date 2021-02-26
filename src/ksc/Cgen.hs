@@ -823,10 +823,10 @@ cppGenWithFiles ksofile cppfile defs = do
   let cppcontents = cppGen defs
       ksocontents = ksoGen defs
 
-  putStrLn $ "Writing to " ++ ksofile
+  putStrLn $ "ksc: Writing to " ++ ksofile
   createDirectoryWriteFile ksofile ksocontents
 
-  putStrLn $ "Writing to " ++ cppfile
+  putStrLn $ "ksc: Writing to " ++ cppfile
   createDirectoryWriteFile cppfile cppcontents
 
   pure (cppcontents, ksocontents)
@@ -858,13 +858,13 @@ compileWithOpts opts compilername cppfile exefile = do
           ++ [cppfile]
         )
   makeDirectoryForFile exefile
-  putStrLn $ "Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
+  putStrLn $ "ksc: Compiling: " ++ fst compcmd ++ " " ++ unwords (snd compcmd)
   uncurry readProcessPrintStderr compcmd
   return exefile
 
 runExe :: String -> IO String
 runExe exefile = do
-  putStrLn "Running"
+  putStrLn "ksc: Running"
   readProcessPrintStderr exefile []
 
 readProcessEnv
