@@ -14,11 +14,11 @@ mapAccumLM f a (x:xs) = do { (a', c) <- f a x
                            ; (a'', cs) <- mapAccumLM f a' xs
                            ; return (a'', c:cs) }
 
-mapOf :: ((a -> I.Identity b) -> (s -> I.Identity t))
+over  :: ((a -> I.Identity b) -> (s -> I.Identity t))
       -> (a -> b)
       -> s
       -> t
-mapOf fmap' f = I.runIdentity . fmap' (I.Identity . f)
+over fmap' f = I.runIdentity . fmap' (I.Identity . f)
 
 traverseOf :: Applicative f
            => ((a -> f b) -> (s -> f t))
