@@ -619,12 +619,6 @@ partitionDecls decls = (r, mapMaybe keepDef dg)
 --       Building values
 -----------------------------------------------
 
-mkPrimFun :: String -> Fun p
-mkPrimFun fname = Fun (PrimFun fname)
-
-mkPrimTFun :: Type -> String -> TFun p
-mkPrimTFun ty fname = TFun ty $ mkPrimFun fname
-
 mkVar :: String -> Var  -- Just a Simple var
 mkVar = Simple
 
