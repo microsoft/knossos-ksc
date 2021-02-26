@@ -42,8 +42,8 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ e@(Konst _)       = return e
 anfE _ e@(Dummy _)       = return e
 anfE subst (Var tv)      = return (substVar subst tv)
-anfE subst (Call fun es@(Tuple _))
-                         = Call fun <$> anfE  subst es
+anfE subst (Call fun e@(Tuple es))
+  | any isLambda es      = Call fun <$> anfE  subst e
 anfE subst (Call fun es) = Call fun <$> anfE1 subst es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = traverseState substBndr v subst
@@ -75,6 +75,10 @@ atomise (Lam x e) = return (Lam x e) -- Don't separate build from lambda
 atomise e         = do { (b,v) <- newVar e
                        ; emit (VarPat b) e
                        ; return (Var v) }
+
+isLambda :: TExpr -> Bool
+isLambda Lam{} = True
+isLambda _ = False
 
 {- Note [Cloning during ANF]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
