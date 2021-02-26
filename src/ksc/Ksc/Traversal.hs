@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Ksc.Traversal where
 
 import qualified Data.Traversable as T
@@ -26,3 +28,6 @@ traverseOf :: Applicative f
            -> s
            -> f t
 traverseOf = id
+
+type Lens s t a b = forall f. Functor f => (a -> f b) -> (s -> f t)
+type Traversal s t a b = forall f. Applicative f => (a -> f b) -> (s -> f t)
