@@ -165,7 +165,9 @@ cseE cse_env (If e1 e2 e3)
        (cseE_check cse_env e2)
        (cseE_check cse_env e3)
 
-cseE cse_env (Call f es) = Call f (cseE_check cse_env es)
+-- See Note [ANF and CSE on tuples] in module ANF
+cseE cse_env (Call f (Tuple es)) = Call f (Tuple (map (cseE_check cse_env) es))
+cseE cse_env (Call f es)         = Call f (cseE_check cse_env es)
 cseE cse_env (Tuple es)  = Tuple (map (cseE_check cse_env) es)
 cseE cse_env (App e1 e2) = App (cseE_check cse_env e1)
                                (cseE_check cse_env e2)
