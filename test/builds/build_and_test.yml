@@ -47,9 +47,6 @@ jobs:
   - script: sh ./test/builds/test_pytest.sh
     displayName: Testing ksc python package [userTest]
 
-  - script: sh ./test/builds/build_and_test_mnistcnn.sh . extern/pybind11
-    displayName: Testing MNIST CNN [userTest]
-
   - script: sh ./test/builds/build_and_test_adbench_lstm.sh . extern/pybind11
     displayName: Testing ADBench LSTM [userTest]
 
