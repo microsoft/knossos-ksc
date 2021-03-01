@@ -176,7 +176,7 @@ def _(ex, symtab):
     argtype = make_tuple_if_many(argtypes)
     old_ty, sname = ex.name.add_type(argtype)
 
-    if old_ty is not None and old_ty != argtype:
+    if old_ty is not None and old_ty != argtype and not sname.is_derivation():
         raise KSTypeError(f"In definition of '{ex.name}', explicit type in structured name\n" +
                             f"does not match argument types {argtype}")
 
