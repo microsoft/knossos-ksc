@@ -25,6 +25,7 @@ build_pybind11_module() {
 	  -I$RUNTIME \
 	  -I$OBJ \
 	  -I$PYBIND11_INCLUDE \
+		-DKS_NO_MAIN \
 	  $(PYTHONPATH=$PYBIND11 python3 -m pybind11 --includes) \
 	  -O3 \
 	  -std=c++17 \
