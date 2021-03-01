@@ -562,8 +562,8 @@ namespace ks {
 			return data_[dimension::flatten_index(i, size_)];
 		}
 
-		T & index(index_type i) {
-			return const_cast<T&>(const_cast<tensor<Dim,T>*>(this)->index(i));
+		T& index(index_type i) {
+			return const_cast<T&>(index(i));
 		}
 
 		void set_if_index_is_in_range(index_type i, T const& val) {
