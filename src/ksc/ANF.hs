@@ -42,7 +42,7 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ e@(Konst _)       = return e
 anfE _ e@(Dummy _)       = return e
 anfE subst (Var tv)      = return (substVar subst tv)
--- See Note [ANF on tuples]
+-- See Note [ANF and CSE on tuples]
 anfE subst (Call fun (Tuple es))
                          = Call fun <$> Tuple <$> mapM (anfE1 subst) es
 anfE subst (Call fun es) = Call fun <$> anfE1 subst es
@@ -95,16 +95,64 @@ result has no shadowing.  That is the (sole) reason that ANF carries a
 substitution.
 -}
 
-{- Note [ANF on tuples]
-~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [ANF and CSE on tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We do not want turn to `f (x, y)` into `let a = (x, y) in f a`.  This
-is particularly important when f is build, or some other function
-which takes a lambda (inside a tuple).  We simply are not able (yet)
-to differentiate the lambda away from its build.  But in general it
-makes life harder for the optimiser if we move the tuple away from its
-function.  Many of our optimisation rules match on the call of a
-function on a literal tuple.
+In KSC, a multi-argument function is implemented as a single-argument
+function with a tuple argument.  However, while it is *possible* (and
+will compile to working code) to write
+
+   let v = (a,b) in ....f(v)....
+
+we make efforts to make the tuple explicit at f's call site, thus
+
+    ....f(a,b)...
+
+Why?  For two reasons:
+
+* It makes life easier for the optimiser.  Optimising `add(3,4)` is
+  easier than optimising
+
+   `let v = (3,4) in ....add(v)....`
+
+* Some constructs like `build( n, \i. blah )` are treated as a whole
+  by AD.  It would be much harder if the lambda was separated from the
+  `build`.
+
+Hence, the **argument-tuple invariant**: if we have a call f(e1,e2),
+with a literal tuple argument, we always retain that literal tuple.
+(This isn't really an invariant; it's more of a restriction on what
+transformations we perform.)
+
+There are two particular spots where we need to take care to preserve
+the argument-tuple invariant:
+
+1. In ANF, we do not want to convert `f(e1,e2)` to `let v = (e1,e2) in
+f(v)`.
+
+2. In CSE, we do not want to convert `let v = (e1,e2) in
+...f(e1,e2)...` to `let v = (e1,e2) in ...f(v)....`.  If we did so
+then CSE would rewrite
+
+let v1 = f (x, y)
+    v2 = (x, y)
+    v3 = f (x, y)
+in ...
+
+into the undesired form
+
+let v1 = f (x, y)
+    v2 = (x, y)
+    v3 = f v2
+in ...
+
+instead of the desired form
+
+let v1 = f (x, y)
+    v2 = (x, y)
+    v3 = v1
+in ...
+
 -}
 
 data FloatDef p = FD (PatG (LetBndrX p)) (ExprX p)
