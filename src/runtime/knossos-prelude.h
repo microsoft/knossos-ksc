@@ -84,21 +84,9 @@ double fwd$lgamma$af(allocator *, double x, double dx)
   }
 }
 
-double pow$aFloat(allocator *, double x, double e)
+double pow$afi(allocator *, double x, int e)
 {
     return std::pow(x,e);
-}
-
-double fwd$pow$aFloat(allocator *, double x, double e, double dx, double de)
-{
-	std::cerr << "fwd$pow unimp!\n" << std::endl;
-	throw "fwd$pow unimp!\n";
-}
-
-tuple<double,double> rev$pow$aFloat(allocator *, double x, double e, double dr)
-{
-	std::cerr << "rev$pow unimp!\n" << std::endl;
-	throw "rev$pow unimp!\n";
 }
 
 tuple<> fwd$gt(allocator *, double a,double b,double d$a,double d$b)
