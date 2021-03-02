@@ -344,42 +344,6 @@ def ts2mod(function, example_inputs):
 
     return KscFunction(mod)
 
-import time
-
-class time_sampler:
-    def __init__(self, minimizing = False):
-        self.minimizing = minimizing
-        if self.minimizing:
-            self.time = 1e10
-        else:
-            self.time = 0       
-            self.ncalls = 0
-
-    def duration(self):
-        if self.minimizing:
-            return self.time
-        else:
-            return self.time / self.ncalls
-
-    @property
-    def us(self):
-        return self.duration() * 1e6
-
-    @staticmethod
-    def get_time():
-        return time.time_ns() * 1e-9
-
-    def mark(self):
-        self.start = time_sampler.get_time()
-
-    def record(self):
-        delta = time_sampler.get_time() - self.start
-        if self.minimizing:
-            self.time = min(delta, self.time)
-        else:
-            self.time += delta
-            self.ncalls += 1
-
 # %%
 
 if __name__ == "__xmain__":
