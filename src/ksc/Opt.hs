@@ -228,7 +228,7 @@ rewriteCall _ _ _
 optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
 
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
-optFun _ (SelFun i _) arg
+optFun _ (PrimFun (P_SelFun i _)) arg
   | Tuple es <- arg
   , i <= length es
   = Just (es !! (i-1))
@@ -622,7 +622,7 @@ optGradFun env TupleAD ty f args
   where
     (binds, [new_args]) = makeAtomic False env [args]
 
-optGradFun _ BasicAD  _ (SelFun i n) args = optGradSel  i n args
+optGradFun _ BasicAD  _ (PrimFun (P_SelFun i n)) args = optGradSel  i n args
 optGradFun _ BasicAD ty (PrimFun f)  args = optGradPrim ty f args
 
 type TBinds = [(TVar, TExpr)]

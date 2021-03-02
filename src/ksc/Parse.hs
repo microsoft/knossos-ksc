@@ -346,7 +346,7 @@ pSelFun = do { rest <- try $ do { f <- pIdentifier
              ; let mselfun = do { (istring, '$':nstring) <- pure (break (== '$') rest)
                                 ; i <- readMaybe istring
                                 ; n <- readMaybe nstring
-                                ; pure (SelFun i n)
+                                ; pure (PrimFun (P_SelFun i n))
                                 }
              ; case mselfun of
                  Nothing     -> unexpected "Ill-formed get"

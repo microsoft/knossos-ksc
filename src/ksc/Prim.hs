@@ -367,13 +367,13 @@ primCallResultTy_maybe :: (HasCallStack, InPhase p) => Fun p -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
+      Fun (PrimFun (P_SelFun i n)) -> selCallResultTy_maybe i n arg_ty
+
       Fun (PrimFun f)
          | Just ty <- primFunCallResultTy_maybe f arg_ty
          -> Right ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
-
-      Fun (SelFun i n) -> selCallResultTy_maybe i n arg_ty
 
       GradFun f adp
         -> case primCallResultTy_maybe (Fun f) arg_ty of

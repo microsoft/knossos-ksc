@@ -412,9 +412,6 @@ type family BaseUserFunT p where
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
              | PrimFun PrimFun      -- PrimFuns do not have a Def
-             | SelFun
-                  Int      -- Index; 1-indexed, so (SelFun 1 2) is fst
-                  Int      -- Arity
 
 deriving instance Eq   (BaseUserFunT p) => Eq   (BaseFun p)
 deriving instance Ord  (BaseUserFunT p) => Ord  (BaseFun p)
@@ -450,7 +447,6 @@ baseUserFunBaseFun :: Applicative f
 baseUserFunBaseFun f = \case
   BaseUserFun u -> BaseUserFun <$> f u
   PrimFun p    -> pure (PrimFun p)
-  SelFun i1 i2 -> pure (SelFun i1 i2)
 
 baseFunFun :: Functor f
            => (funid -> f funid')
@@ -518,7 +514,6 @@ baseFunToBaseUserFunE :: BaseFun p -> Either (BaseFun q) (BaseUserFun p)
 baseFunToBaseUserFunE = \case
   BaseUserFun u    -> Right u
   PrimFun p    -> Left (PrimFun p)
-  SelFun i1 i2 -> Left (SelFun i1 i2)
 
 baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
 baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
@@ -531,8 +526,8 @@ isBaseUserFun = isJust . baseFunToBaseUserFun
 isSelFun :: BaseFun p -> Bool
 isSelFun = \case
   BaseUserFun{} -> False
+  PrimFun (P_SelFun{}) -> True
   PrimFun{} -> False
-  SelFun{}  -> True
 
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun = \case
@@ -682,7 +677,7 @@ dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun el_ty
-                        (Fun (SelFun i n))) e
+                        (Fun (PrimFun (P_SelFun i n)))) e
            where
              el_ty = case typeof e of
                         TypeTuple ts -> ts !! (i-1)
@@ -1011,7 +1006,6 @@ instance Pretty PrimFun where
 pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
 pprBaseFun (BaseUserFun s) = pprBaseUserFun @p s
 pprBaseFun (PrimFun p ) = pprPrimFun p
-pprBaseFun (SelFun i n) = text "get$" <> int i <> char '$' <> int n
 
 pprPrimFun :: PrimFun -> SDoc
 pprPrimFun = \case
@@ -1061,6 +1055,8 @@ pprPrimFun = \case
   P_FFold -> text "FFold"
   P_RFold -> text "RFold"
   P_lmVariant -> text "P_lmVariant"
+
+  P_SelFun i n -> text "get$" <> int i <> char '$' <> int n
 
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
@@ -1487,6 +1483,7 @@ data PrimFun = P_inline
              | P_lmDot
              | P_lmZero
              | P_lmOne
+             | P_SelFun Int Int -- P_SelFun index arity.  1-indexed, so (SelFun 1 2) is fst
              | P_lmApplyTR
              | P_lmFold
              | P_FFold
