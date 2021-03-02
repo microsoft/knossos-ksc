@@ -398,7 +398,6 @@ types.
 
 -}
 
-type PrimFun = String
 data BaseUserFun p = BaseUserFunId String (BaseUserFunT p)
 
 deriving instance Eq (BaseUserFunT p) => Eq (BaseUserFun p)
@@ -1006,10 +1005,62 @@ instance InPhase p => Pretty (BaseFun p) where
 instance Pretty funid => Pretty (DerivedFun funid) where
   ppr = pprDerivedFun ppr
 
+instance Pretty PrimFun where
+  ppr = pprPrimFun
+
 pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
 pprBaseFun (BaseUserFun s) = pprBaseUserFun @p s
-pprBaseFun (PrimFun p ) = text p
+pprBaseFun (PrimFun p ) = pprPrimFun p
 pprBaseFun (SelFun i n) = text "get$" <> int i <> char '$' <> int n
+
+pprPrimFun :: PrimFun -> SDoc
+pprPrimFun = \case
+  P_inline -> text "$inline"
+  P_copydown -> text "$copydown"
+  P_check -> text "$check"
+  P_trace -> text "$trace"
+  P_print -> text "print"
+  P_Vec_init -> text "Vec_init"
+  P_build -> text "build"
+  P_sumbuild -> text "sumbuild"
+  P_buildFromSparse -> text "buildFromSparse"
+  P_buildFromSparseTupled -> text "buildFromSparseTupled"
+  P_fold -> text "fold"
+  P_index -> text "index"
+  P_shape -> text "shape"
+  P_size -> text "size"
+  P_sum -> text "sum"
+  P_unzip -> text "unzip"
+  P_ts_neg -> text "ts_neg"
+  P_ts_add -> text "ts_add"
+  P_ts_scale -> text "ts_scale"
+  P_ts_dot -> text "ts_dot"
+  P_eq -> text "eq"
+  P_ne -> text "ne"
+  P_delta -> text "delta"
+  P_deltaVec -> text "deltaVec"
+  P_diag -> text "diag"
+  P_constVec -> text "constVec"
+  P_lmApply -> text "lmApply"
+  P_lmApplyR -> text "lmApplyR"
+  P_lmApplyT -> text "lmApplyT"
+  P_lmVCat -> text "lmVCat"
+  P_lmHCat -> text "lmHCat"
+  P_lmVCatV -> text "lmVCatV"
+  P_lmHCatV -> text "lmHCatV"
+  P_lmCompose -> text "lmCompose"
+  P_lmAdd -> text "lmAdd"
+  P_lmScale -> text "lmScale"
+  P_lmScaleR -> text "lmScaleR"
+  P_lmDot -> text "lmDot"
+  P_lmZero -> text "lmZero"
+  P_lmOne -> text "lmOne"
+  P_lmApplyTR -> text "lmApplyTR"
+  P_lmDummyFold -> text "P_lmDummyFold"
+  P_lmFold -> text "P_lmFold"
+  P_FFold -> text "FFold"
+  P_RFold -> text "RFold"
+  P_lmVariant -> text "P_lmVariant"
 
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
@@ -1383,3 +1434,95 @@ cmpExpr e1
    gos []    _ (_:_) = LT
    gos (_:_) _ []    = GT
    gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
+
+data PrimFun = P_inline
+             | P_copydown
+             | P_check
+             | P_trace
+             | P_print
+             | P_Vec_init
+             | P_build
+             | P_sumbuild
+             | P_buildFromSparse
+             | P_buildFromSparseTupled
+             | P_fold
+             | P_index
+             | P_shape
+             | P_size
+             | P_sum
+             | P_unzip
+             | P_ts_neg
+             | P_ts_add
+             | P_ts_scale
+             | P_ts_dot
+             | P_eq
+             | P_ne
+             | P_delta
+             | P_deltaVec
+             | P_diag
+             | P_constVec
+             | P_lmApply
+             | P_lmApplyR
+             | P_lmApplyT
+             | P_lmVCat
+             | P_lmHCat
+             | P_lmVCatV
+             | P_lmHCatV
+             | P_lmCompose
+             | P_lmAdd
+             | P_lmScale
+             | P_lmScaleR
+             | P_lmDot
+             | P_lmZero
+             | P_lmOne
+             | P_lmApplyTR
+             | P_lmFold
+             | P_FFold
+             | P_RFold
+             | P_lmDummyFold
+             | P_lmVariant
+  deriving (Show, Ord, Eq)
+
+toPrimFun :: String -> Maybe PrimFun
+toPrimFun = \case
+  "$inline" -> Just P_inline
+  "$copydown"-> Just P_copydown
+  "$check" -> Just P_check
+  "$trace" -> Just P_trace
+  "print" -> Just P_print
+  "Vec_init" -> Just P_Vec_init
+  "build" -> Just P_build
+  "sumbuild" -> Just P_sumbuild
+  "buildFromSparse" -> Just P_buildFromSparse
+  "buildFromSparseTupled" -> Just P_buildFromSparseTupled
+  "fold" -> Just P_fold
+  "index" -> Just P_index
+  "shape" -> Just P_shape
+  "size" -> Just P_size
+  "sum" -> Just P_sum
+  "unzip" -> Just P_unzip
+  "ts_neg" -> Just P_ts_neg
+  "ts_add" -> Just P_ts_add
+  "ts_scale" -> Just P_ts_scale
+  "ts_dot" -> Just P_ts_dot
+  "eq" -> Just P_eq
+  "ne" -> Just P_ne
+  "delta" -> Just P_delta
+  "deltaVec" -> Just P_deltaVec
+  "diag" -> Just P_diag
+  "constVec" -> Just P_constVec
+  "lmApply" -> Just P_lmApply
+  "lmApplyR" -> Just P_lmApplyR
+  "lmApplyT" -> Just P_lmApplyT
+  "lmVCat" -> Just P_lmVCat
+  "lmHCat" -> Just P_lmHCat
+  "lmVCatV"-> Just P_lmVCatV
+  "lmHCatV" -> Just P_lmHCatV
+  "lmCompose" -> Just P_lmCompose
+  "lmAdd" -> Just P_lmAdd
+  "lmScale" -> Just P_lmScale
+  "lmScaleR" -> Just P_lmScaleR
+  "lmDot" -> Just P_lmDot
+  "lmZero" -> Just P_lmZero
+  "lmOne" -> Just P_lmOne
+  _ -> Nothing

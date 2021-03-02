@@ -90,19 +90,19 @@ shapeCall (TFun ty f) e
 shapeCall tf e = pShape (Call tf e)  -- Fall back to calling the original function and evaluating the shape of the returned object
 
 shapeCallPrim :: HasCallStack => PrimFun -> TExpr -> Maybe TExpr
-shapeCallPrim "index" (Tuple [i, n]) = Just $ pIndex i (shapeE n)
-shapeCallPrim "build" (Tuple [sz, Lam i e2]) = Just $ pBuild sz (Lam i (shapeE e2))
-shapeCallPrim "sumbuild" (Tuple [sz, Lam i e2]) = Just $ mkLet i (mkZero sz) (shapeE e2)
-shapeCallPrim "sum" v = Just $ pIndex (mkZero (pSize v)) (shapeE v)
-shapeCallPrim "constVec" (Tuple [sz, v]) = Just $ pConstVec sz (shapeE v)
-shapeCallPrim "deltaVec" (Tuple [sz, _i, v]) = Just $ pConstVec sz (shapeE v)
-shapeCallPrim "ts_add" (Tuple [lhs, _]) = Just $ shapeE lhs
-shapeCallPrim "ts_scale" (Tuple [_, v]) = Just $ shapeE v
-shapeCallPrim "ts_neg" v = Just $ shapeE v
-shapeCallPrim "delta" (Tuple [_, _, v]) = Just $ shapeE v
-shapeCallPrim "unzip" v = Just $ pUnzip (shapeE v)
-shapeCallPrim "$trace" v = Just $ shapeE v
-shapeCallPrim "$copydown" v = Just $ shapeE v
+shapeCallPrim P_index (Tuple [i, n]) = Just $ pIndex i (shapeE n)
+shapeCallPrim P_build (Tuple [sz, Lam i e2]) = Just $ pBuild sz (Lam i (shapeE e2))
+shapeCallPrim P_sumbuild (Tuple [sz, Lam i e2]) = Just $ mkLet i (mkZero sz) (shapeE e2)
+shapeCallPrim P_sum v = Just $ pIndex (mkZero (pSize v)) (shapeE v)
+shapeCallPrim P_constVec (Tuple [sz, v]) = Just $ pConstVec sz (shapeE v)
+shapeCallPrim P_deltaVec (Tuple [sz, _i, v]) = Just $ pConstVec sz (shapeE v)
+shapeCallPrim P_ts_add (Tuple [lhs, _]) = Just $ shapeE lhs
+shapeCallPrim P_ts_scale (Tuple [_, v]) = Just $ shapeE v
+shapeCallPrim P_ts_neg v = Just $ shapeE v
+shapeCallPrim P_delta (Tuple [_, _, v]) = Just $ shapeE v
+shapeCallPrim P_unzip v = Just $ pUnzip (shapeE v)
+shapeCallPrim P_trace v = Just $ shapeE v
+shapeCallPrim P_copydown v = Just $ shapeE v
 shapeCallPrim _ _ = Nothing
 
 -- Given a Type t, determines whether (shapeType t) is a unit type;

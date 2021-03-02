@@ -12,7 +12,7 @@ import qualified Cgen
 import qualified Lang                    as L
 import Lang (Pretty(..), text, render, empty, parensIf,
              (<>), (<+>), ($$), parens, brackets, punctuate, sep,
-             integer, double, comma)
+             integer, double, comma, PrimFun(..))
 import qualified LangUtils               as LU
 
 --------------------------
@@ -311,24 +311,24 @@ sumbuild ret xs =
   where ret' = toFutharkType ret
 
 callPrimFun :: L.PrimFun -> L.Type -> L.TExpr -> Exp
-callPrimFun "deltaVec" (L.TypeTensor 1 ret) (L.Tuple [n, i, v]) =
+callPrimFun P_deltaVec (L.TypeTensor 1 ret) (L.Tuple [n, i, v]) =
   Call (Var "deltaVec") [zeroValue ret',
                          toFutharkExp n,
                          toFutharkExp i,
                          toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "delta" ret (L.Tuple [i, j, v]) =
+callPrimFun P_delta ret (L.Tuple [i, j, v]) =
   Call (Var "delta") [zeroValue ret',
                       toFutharkExp i,
                       toFutharkExp j,
                       toFutharkExp v]
   where ret' = toFutharkType ret
 
-callPrimFun "sumbuild" ret (L.Tuple [n, f]) =
+callPrimFun P_sumbuild ret (L.Tuple [n, f]) =
   sumbuild ret $ Call (Var "tabulate") [toFutharkExp n, toFutharkExp f]
 
-callPrimFun "index" _ (L.Tuple [i, arr]) =
+callPrimFun P_index _ (L.Tuple [i, arr]) =
   case toFutharkExp arr of
     Index arr' is ->
       Index arr' $ is ++ [toFutharkExp i]
@@ -348,14 +348,14 @@ callPrimFun op _ (L.Tuple [x, y])
       in if primType xt && primType yt
          then BinOp op' (toFutharkExp x) (toFutharkExp y)
          else Call (binopFunction op' xt yt) [toFutharkExp x, toFutharkExp y]
-  where binOpPrimFuns = [ ("ts_add", "+")
-                        , ("ts_scale", "*")
-                        , ("eq" , "==")
-                        , ("ne" , "!=")
+  where binOpPrimFuns = [ (P_ts_add, "+")
+                        , (P_ts_scale, "*")
+                        , (P_eq , "==")
+                        , (P_ne , "!=")
                         ]
 
 callPrimFun f _ args =
-  Call (Var (escape f)) [toFutharkExp args]
+  Call (Var (escape (render (ppr f)))) [toFutharkExp args]
 
 -- | Handling function calls is the most complicated bit, because
 -- Futhark has different semantics than the source language (and C++).

@@ -160,17 +160,17 @@ to_cl_call :: EnvPruned -> [TVar] -> TFun Typed -> TExpr -> CLExpr
 --   * for other calls, prune in the argument
 
 to_cl_call pruned env f e
-  | f `isThePrimFun` "build"
+  | f `isThePrimFun` P_build
   , Tuple [n, Lam tvi body] <- e
   = case pruned of
       NotPruned -> prune env call
       Pruned    -> CLBuild (toCLExpr env n) tvi (toCLExpr (tvi:env) body)
 
-  | f `isThePrimFun` "sumbuild"
+  | f `isThePrimFun` P_sumbuild
   , Tuple [n, lam] <- e
   = to_cl_expr pruned env (pSum (pBuild n lam))
 
-  | f `isThePrimFun` "fold"
+  | f `isThePrimFun` P_fold
   , Tuple [Lam t body, acc, v] <- e
   = case pruned of
       NotPruned -> prune env call
@@ -270,7 +270,7 @@ fromCLExpr is arg (CLBuild size tv elt)
     (is', tv') = notInScopeTV is tv
 
 fromCLExpr is arg (CLFold t lam acc v)
-  = mkPrimCall3 "fold"
+  = mkPrimCall3 P_fold
           (Lam t' (fromCLExpr is' (Var t' : arg) lam))
           (fromCLExpr is arg acc)
           (fromCLExpr is arg v)

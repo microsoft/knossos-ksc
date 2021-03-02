@@ -149,7 +149,7 @@ cseE cse_env@(CS { cs_subst = subst, cs_map = rev_map })
 -- See Note [CSE of assert]
 cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
  | Call eq (Tuple [Var v1, Var v2]) <- cond'
- , eq `isThePrimFun` "eq"
+ , eq `isThePrimFun` P_eq
  , let replace_v1_with_v2 (VarPat v1') | v1' == v1 = VarPat v2
        replace_v1_with_v2 original = original
  , let cse_env' = cse_env { cs_map = M.map replace_v1_with_v2 rev_map }

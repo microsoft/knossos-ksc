@@ -400,7 +400,7 @@ cgenExprWithoutResettingAlloc env = \case
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
-  Call (TFun _ (Fun (PrimFun "$copydown"))) e -> do
+  Call (TFun _ (Fun (PrimFun P_copydown))) e -> do
     CG cdecl cexpr ctype _callocusage <- cgenExprR env e
     ret <- freshCVar
     bumpmark <- freshCVar
@@ -608,7 +608,7 @@ cgenBaseFun = \case
   (BaseUserFun (BaseUserFunId fun (TypeTuple [])))  -> mangleFun fun
   (BaseUserFun (BaseUserFunId fun (TypeTuple tys))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
   (BaseUserFun (BaseUserFunId fun ty))  -> mangleFun (fun ++ "@" ++ mangleType ty)
-  (PrimFun fun) -> fun
+  (PrimFun fun) -> render (ppr fun)
   (SelFun i _)  -> "ks::get<" ++ show (i - 1) ++ ">"
 
 cgenUserFun :: HasCallStack => Fun Typed -> String
@@ -624,14 +624,14 @@ cgenUserFun f = case f of
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
 cgenAnyFun tf cftype = case tf of
-  TFun _ (Fun (PrimFun "lmApply")) -> "lmApply"
-  TFun retty (Fun (PrimFun "build")) ->
+  TFun _ (Fun (PrimFun P_lmApply)) -> "lmApply"
+  TFun retty (Fun (PrimFun P_build)) ->
     case retty of
       TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _              -> error ("Unexpected return type for build: " ++ show retty)
   TFun retty (Fun (PrimFun primname))
-    | primname `elem` ["sumbuild", "buildFromSparse", "buildFromSparseTupled"]
-    -> primname ++ "<" ++ cgenType (mkCType retty) ++ ">"
+    | primname `elem` [P_sumbuild, P_buildFromSparse, P_buildFromSparseTupled]
+    -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun f
@@ -664,7 +664,7 @@ are two cases:
 
 funUsesAllocator :: HasCallStack => TFun p -> Bool
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
-  not $ fname `elem` ["index", "size", "eq", "ne", "$trace", "print", "ts_dot"]
+  not $ fname `elem` [P_index, P_size, P_eq, P_ne, P_trace, P_print, P_ts_dot]
 funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
@@ -730,21 +730,21 @@ ctypeofFun1 ty _ _ = mkCType ty
 
 ctypeofPrimFun :: HasCallStack => Type -> PrimFun -> [CType] -> CType
 ctypeofPrimFun ty s arg_types = case (s, map stripTypeDef arg_types) of
-  ("lmApply"  , _         ) -> mkCType ty
+  (P_lmApply  , _         ) -> mkCType ty
   -- TODO: lmApplyR?
-  ("lmOne"    , [ct]      ) -> LMOne (stripCType ct)
-  ("lmZero"   , [cs, ct]  ) -> LMZero (stripCType cs) (stripCType ct)
-  ("lmScale"  , [ct, CType TypeFloat]) -> LMScale (stripCType ct)
-  ("lmScaleR" , [ct]      ) -> LMScaleR (stripCType ct)
-  ("lmHCat"   , _         ) -> LMHCat arg_types
-  ("lmVCat"   , _         ) -> LMVCat arg_types
-  ("lmCompose", [lm1, lm2]) -> LMCompose lm1 lm2
-  ("lmAdd"    , _         ) -> LMAdd arg_types
-  ("lmVariant", _         ) -> LMVariant arg_types
+  (P_lmOne    , [ct]      ) -> LMOne (stripCType ct)
+  (P_lmZero   , [cs, ct]  ) -> LMZero (stripCType cs) (stripCType ct)
+  (P_lmScale  , [ct, CType TypeFloat]) -> LMScale (stripCType ct)
+  (P_lmScaleR , [ct]      ) -> LMScaleR (stripCType ct)
+  (P_lmHCat   , _         ) -> LMHCat arg_types
+  (P_lmVCat   , _         ) -> LMVCat arg_types
+  (P_lmCompose, [lm1, lm2]) -> LMCompose lm1 lm2
+  (P_lmAdd    , _         ) -> LMAdd arg_types
+  (P_lmVariant, _         ) -> LMVariant arg_types
   _                         -> case ty of
     TypeLM _ _ -> error
       (  "Unmatched prim ["
-      ++ s
+      ++ render (ppr s)
       ++ "] "
       ++ show ty
       ++ " @\n"
@@ -758,10 +758,10 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => BaseFun Typed -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun "ts_add"   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun "$trace"   , [CType ty]          ) -> LMOne ty
-  (PrimFun "$copydown", [CType ty]          ) -> LMOne ty
-  (PrimFun "size"     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
+  (PrimFun P_ts_add   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFun P_trace    , [CType ty]          ) -> LMOne ty
+  (PrimFun P_copydown , [CType ty]          ) -> LMOne ty
+  (PrimFun P_size     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
