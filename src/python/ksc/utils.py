@@ -221,14 +221,11 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
 
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
-    cpp_str = """
-#include "knossos-pybind.h"
+    cpp_str = f"""
+    #include "knossos-pybind.h"
+    {generated_cpp_source}
 
-""" + generated_cpp_source + """
-
-int ks::main(ks::allocator *) { return 0; };
-
-"""
+    """
 
     args_str = mangleTypes(arg_types)
     name_str = encode_name(f"{name_to_call}@{args_str}")
