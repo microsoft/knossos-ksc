@@ -40,7 +40,7 @@
 
 ; Assorted tests
 
-; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/awf.ks > /dev/null
+; RUN: ksc-mlir LLVM %KNOSSOS/test/ksc/awf.ks > /dev/null
 ; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/bool.ks > /dev/null
 ; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/comment.ks > /dev/null
 ; DISABLED: ksc-mlir LLVM %KNOSSOS/test/ksc/CA-subst.ks > /dev/null

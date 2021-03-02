@@ -162,6 +162,27 @@ struct Signature {
 
 std::ostream& operator<<(std::ostream& s, Signature const& t);
 
+// SName: StructuredName
+// Either:
+//     sin                                String
+//     [pow (Tuple Float Integer)]        String Type
+//     [fwd [sin Float]]                  String SName
+struct SName {
+  using Ptr = std::unique_ptr<SName>;
+
+  SName(llvm::StringRef name, Type type=Type(Type::None)):id(name), type(type) {}
+  SName(llvm::StringRef derivation, SName::Ptr sname):id(derivation), sname(std::move(sname)) {}
+
+  std::string id;
+  Type type;
+  std::unique_ptr<SName> sname;
+
+  bool isDerivation() const { return sname != 0; }
+
+  bool hasType() const { return isDerivation() ? sname->hasType() : !type.isNone(); }
+};
+std::ostream& operator<<(std::ostream& s, SName const& t);
+
 /// A node in the AST.
 struct Expr {
   using Ptr = std::unique_ptr<Expr>;
@@ -179,6 +200,7 @@ struct Expr {
     // TODO: Lambda,
     Declaration,
     Definition,
+    GDef,
     Rule,
     // Tuple prims
     Tuple,
@@ -369,6 +391,25 @@ private:
   // TODO: use Signature here
   std::string name;
   std::vector<Type> argTypes;   
+};
+
+/// GDef: (gdef fwd [f (Tuple Float Integer)])
+struct GDef : public Expr {
+  using Ptr = std::unique_ptr<GDef>;
+  GDef(llvm::StringRef derivation, SName::Ptr f)
+      : Expr(Kind::GDef), derivation(derivation), f(std::move(f)) {}
+
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
+
+  /// LLVM RTTI
+  static bool classof(const Expr *c) {
+    return c->kind == Kind::GDef;
+  }
+
+private:
+  // TODO: use Signature here
+  std::string derivation;
+  SName::Ptr f;  
 };
 
 /// Call, ex: (add x 3), (neg (mul (sin x) d_dcos)))

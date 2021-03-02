@@ -96,7 +96,7 @@ Declaration *Parser::addExtraDecl(std::string name, std::vector<Type> argTypes, 
   return decl;
 }
 
-//================================================ Parse Tokens into Exprs
+//================================================ Parser stack for debugging
 struct ParseEnter {
   static int verbose;
   static int indent;
@@ -116,6 +116,8 @@ int ParseEnter::indent = 0;
 int ParseEnter::verbose = 0;
 #define PARSE_ENTER ParseEnter parse_enter { __FUNCTION__, tok }
 
+
+//================================================ Parse Tokens into Exprs
 // Creates an Expr for each token, validating
 Expr::Ptr Parser::parseToken(const Token *tok) {
   PARSE_ENTER;
@@ -150,6 +152,8 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
     return parseDecl(tok);
   case Parser::Keyword::DEF:
     return parseDef(tok);
+  case Parser::Keyword::GDEF:
+    return parseGDef(tok);
   case Parser::Keyword::RULE:
     return parseRule(tok);
   case Parser::Keyword::LET:
@@ -182,6 +186,16 @@ Block::Ptr Parser::parseBlock(const Token *tok) {
   for (auto &c : tok->getChildren())
     b->addOperand(parseToken(c.get()));
   return unique_ptr<Block>(b);
+}
+
+// Return true if tok coud be a type.  
+// It's designed to avoid false negatives, but doesn't guarantee that parseType will succeed.
+static bool tryParseType(const Token *tok) {
+  if (tok->isValue) {
+    Type::ValidType ty = Str2Type(tok->getValue());
+    return ty != Type::None;
+  }
+  return tryParseType(tok->getChild(0));  
 }
 
 // Parses type declarations (vector, tuples)
@@ -234,6 +248,19 @@ Type Parser::parseRelaxedType(vector<const Token *> toks) {
     return Type(Type::Tuple, tys);
   }
   assert(0 && "Invalid relaxed type syntax");
+}
+
+SName Parser::parseSName(const Token *tok) {
+  if (tok->isValue)
+    return SName(tok->getValue());
+  // Token is a list -- either [name Type] or [derivaton SName]
+  PARSE_ASSERT(tok->size() == 2 && tok->getChild(0)->isValue) << "Structured name is wither <id> or [<id> (<type>|<sname>)], not " << tok;
+  std::string id = tok->getChild(0)->getValue();
+  Token const* snd = tok->getChild(1);
+  if (tryParseType(snd))
+    return SName(id, parseType(snd));
+
+  return SName(id, std::make_unique<SName>(parseSName(snd)));
 }
 
 // Values (variable names, literals, type names)
@@ -472,6 +499,24 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
   Signature sig{name->getValue(), decl->getArgTypes()};
   function_decls[sig] = decl.get();
   return decl;
+}
+
+// GDef: Generated definition
+GDef::Ptr Parser::parseGDef(const Token *tok) {
+  PARSE_ENTER;
+
+  PARSE_ASSERT(tok->size() == 3) << "GDef should be (gdef derivation sname)";
+  const Token *tderivation = tok->getChild(1);
+  const Token *tsname = tok->getChild(2);
+
+  PARSE_ASSERT2(tderivation->isValue, tderivation) << "Expecting (gdef derivation sname)";
+
+  auto gdef = make_unique<GDef>(tderivation->getValue(), make_unique<SName>(parseSName(tsname)));
+  PARSE_ASSERT(gdef);
+
+  //Signature sig{name->getValue(), decl->getArgTypes()};
+  //TODONOW: function_decls[sig] = decl.get();
+  return gdef;
 }
 
 // Defines a function (checks from|adds to symbol table)

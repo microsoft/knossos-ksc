@@ -59,6 +59,15 @@ std::ostream& operator<<(std::ostream& s, Signature const& t)
   return s << ")";
 }
 
+std::ostream& operator<<(std::ostream& s, SName const& t)
+{
+  if (t.isDerivation()) 
+    return s << "[" << t.id << " " << *t.sname << "]";
+  if (t.hasType())
+    return s << "[" << t.id << " " << t.type << "]";
+  return s << t.id;
+}
+
 std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "type [";
   type.dump(s);
@@ -114,6 +123,14 @@ std::ostream& Declaration::dump(std::ostream& s, size_t tab) const {
   for (auto ty : argTypes)
     ty.dump(s) << " ";
   return s << "]" << endl;
+}
+
+std::ostream& GDef::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "GDef:" << endl;
+  s << string(tab + 2, ' ') << "derivation [" << derivation << "]" << endl;
+  Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "f: " << *f << endl;
+  return s;
 }
 
 std::ostream& Definition::dump(std::ostream& s, size_t tab) const {

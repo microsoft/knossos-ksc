@@ -52,14 +52,19 @@ bool isValidIdentifierChar(char c)
 }
 
 // Lex a token out, recurse if another entry point is found
-Token::Ptr Lexer::lex()
+Token::Ptr Lexer::lex(char c)
 {
   ++depth;
-  Token* tok = new Token(loc);
+  Token* tok = new Token(loc, c);
+  char expected_closing_bracket = (c == 0) ? 0 : (c == '(') ? ')' : ']';
   while (pos < len) {
-    if (peek() == ')')
+    char next = peek();
+    if (next == ')' || next == ']') {
+      ASSERT(next == expected_closing_bracket) << "\n" 
+        << loc << ": Mismatched bracket: expected " << expected_closing_bracket << ", saw " << next << std::endl;
       break;
-    
+    }
+        
     Location cloc = loc;
     char c = get();
     switch (c) {
@@ -103,11 +108,11 @@ Token::Ptr Lexer::lex()
         }
         break;
 
+    case '[':
     case '(': {
       // Recurse into sub-tokens
-      tok->addChild(lex());
+      tok->addChild(lex(c));
       c = get();
-      assert(c == ')');
       break;
     }
 

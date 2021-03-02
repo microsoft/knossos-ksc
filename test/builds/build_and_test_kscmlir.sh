@@ -6,7 +6,7 @@ if [ "$1" != "" ]; then
   LLVM_BUILD="$*"
 fi
 if [ ! -f "$LLVM_BUILD/llvm.spec" ]; then
-  echo "$LLVM_BUILD doesn't seen to be an LLVM build dir"
+  echo "$LLVM_BUILD doesn't seem to be an LLVM build dir"
   return 1
 fi
 export LLVM_BUILD="$LLVM_BUILD"

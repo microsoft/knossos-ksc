@@ -29,19 +29,21 @@ class Parser {
 
   // TODO: Add lam
   enum class Keyword {
-       LET,  EDEF, DEF,   IF, BUILD, INDEX,
-      SIZE, TUPLE, GET, FOLD, RULE, NA,
+      DEF, EDEF, GDEF, RULE,
+      LET, IF, TUPLE, GET,
+      BUILD, FOLD, NA,
   };
   Keyword isReservedWord(std::string name) const {
     return llvm::StringSwitch<Keyword>(name)
-              .Case("edef", Keyword::EDEF)
               .Case("def", Keyword::DEF)
+              .Case("edef", Keyword::EDEF)
+              .Case("gdef", Keyword::GDEF)
               .Case("rule", Keyword::RULE)
               .Case("let", Keyword::LET)
               .Case("if", Keyword::IF)
-              .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
               .Case("tuple", Keyword::TUPLE)
               .StartsWith("get$", Keyword::GET) // TODO: Prim not reserved word
+              .Case("build", Keyword::BUILD) // TODO: Prim not reserved word
               .Case("fold", Keyword::FOLD) // TODO: Prim not reserved word
               .Default(Keyword::NA);
   }
@@ -76,6 +78,9 @@ class Parser {
   // Specific Token parsers
   Type parseType(const Token *tok);
   Type parseRelaxedType(std::vector<const Token *> toks);
+
+  SName parseSName(const Token* tok);
+
   Block::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);  // Literal or Variable use
   Call::Ptr parseCall(const Token *tok);
@@ -83,6 +88,7 @@ class Parser {
   Let::Ptr parseLet(const Token *tok);
   Declaration::Ptr parseDecl(const Token *tok);
   Definition::Ptr parseDef(const Token *tok);
+  GDef::Ptr parseGDef(const Token *tok);
   Rule::Ptr parseRule(const Token *tok);
   Condition::Ptr parseCond(const Token *tok);
   Build::Ptr parseBuild(const Token *tok);
