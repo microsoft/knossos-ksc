@@ -1,13 +1,15 @@
 set -e
 
+. test/builds/set-dirs.sh
+
 mkdir -p Artifact
 cp obj/test/ksc/gmm.cpp Artifact
 cp src/runtime/knossos.h Artifact
 cp src/runtime/knossos.cpp Artifact
-cp prof-obj-functions.txt Artifact
-cp prof-obj-lines.txt Artifact
-cp prof-obj.out Artifact
-cp prof-rev-functions.txt Artifact
-cp prof-rev-lines.txt Artifact
-cp prof-rev.out Artifact
+cp ${PROF}-obj-functions.txt Artifact
+cp ${PROF}-obj-lines.txt Artifact
+cp ${PROF}-obj.out Artifact
+cp ${PROF}-rev-functions.txt Artifact
+cp ${PROF}-rev-lines.txt Artifact
+cp ${PROF}-rev.out Artifact
 git rev-parse HEAD > Artifact/git-rev-parse-HEAD.txt
