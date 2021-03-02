@@ -76,7 +76,7 @@ shapeE (App{})        = error "Shape of App not supported"
 
 shapeCall :: HasCallStack => TFun Typed -> TExpr -> TExpr
 
-shapeCall (TFun _ (Fun (SelFun i n))) e
+shapeCall (TFun _ (Fun (PrimFun (P_SelFun i n)))) e
   = pSel i n (shapeE e)
 
 shapeCall (TFun _ (Fun (PrimFun f))) e
