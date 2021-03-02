@@ -31,6 +31,9 @@ Contents:
 #include <string>
 #include <chrono>
 
+
+#define xKS_BOUNDS_CHECK
+
 #define COMMENT(x)
 
 // KS_ASSERT
@@ -546,12 +549,8 @@ namespace ks {
 			return tensor<Dim-1, T>(sz, data_ + i * tensor_dimension<Dim-1>::num_elements(sz));
 		}
 
-		T& index(index_type i) {
-			return const_cast<T&>(const_cast<const tensor&>(*this).index(i));
-		}
-
-		T const& index(index_type i) const {
-#ifndef NDEBUG
+		T& index_aux(index_type i) {
+#ifdef KS_BOUNDS_CHECK
 			if (!dimension::index_is_in_range(i, size_)) {
 				std::cerr << "ERROR: Accessing element " << dimension::index_to_string(i) << " of tensor of size " << dimension::index_to_string(size_) << std::endl;
 				abort();
@@ -560,6 +559,14 @@ namespace ks {
 			return data_[dimension::flatten_index(i, size_)];
 		}
 
+		T const& index(index_type i) const {
+			return const_cast<tensor*>(this)->index_aux(i);
+		}
+
+		T& index(index_type i) {
+			return index_aux(i);
+		}
+		
 		void set_if_index_is_in_range(index_type i, T const& val) {
 			if (dimension::index_is_in_range(i, size_)) {
 				data_[dimension::flatten_index(i, size_)] = val;
