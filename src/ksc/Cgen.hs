@@ -798,22 +798,22 @@ cppGen defs =
       tail =
         [ "}"
         , "#include \"knossos.cpp\""
-        , "// cppGen automatically generates a call to ks::main()."
-        , "// Some of the files we want to compile don't have a main."
-        , "// The simplest way of allowing them to compile is generate"
-        , "// a declaration for ks::main().  We have to choose a return"
-        , "// type for it.  int is a reasonable choice.  In the future"
-        , "// should try to improve the compile pipeline so it doesn't"
-        , "// always insert a call to ks::main()."
-        , "namespace ks { int main(allocator *); }"
-        , "int main() {"
+        ]
+      call_main =
+        [ "int main() {"
         , "  ks::allocator alloc{ 1'000'000'000 };"
         , "  ks::main(&alloc);"
         , "  return 0;"
         , "}"
         ]
+      call_main_if_present = if any isMainFunction defs then call_main else []
 
-  in unlines (lines ++ lls ++ tail)
+  in unlines (lines ++ lls ++ tail ++ call_main_if_present)
+
+isMainFunction :: TDef -> Bool
+isMainFunction Def{ def_fun = Fun f, def_res_ty = TypeInteger }
+  | BaseUserFunId "main" (TypeTuple []) <- f = True
+isMainFunction _ = False
 
 ksoGen :: [TDef] -> String
 ksoGen = unlines . map (renderSexp . ppr)
