@@ -44,7 +44,7 @@ Contents:
         ks::fail(__FILE__, __LINE__, #expr);
 
 namespace ks {
-	inline void fail(char const* file, int line, char const* expr)
+	inline void fail [[noreturn]] (char const* file, int line, char const* expr)
 	{
 		std::cerr << file << ":" << line << ":Assert failed [" << expr << "]\n";
 		throw expr;
