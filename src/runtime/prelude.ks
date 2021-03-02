@@ -1,3 +1,14 @@
+
+;;; Type conversions
+
+;; to_float
+(edef to_float Float (Integer))
+(edef [D to_float] (LM Integer Float) (Integer))
+(def [fwd to_float] Float ((x : Integer) (dx : (Tuple))) 0.0)
+(def [rev to_float] (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
+(edef [Dt to_float] (Tuple Float (LM Integer Float)) (Integer))
+
+;; not :: Bool -> Bool
 (def not Bool (p : Bool) (if p false true))
 (gdef fwd [not Bool])
 (gdef rev [not Bool])
@@ -120,6 +131,9 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+(def mul Float ((a : Float) (b : Integer))
+  (mul a (to_float b)))
+
 ;; mul Scalar Vec
 (def mul (Tensor 1 Float) ((r : Float) (a : Tensor 1 Float))
     (build (size a) (lam (i : Integer) (mul r (index i a)))))
@@ -164,6 +178,7 @@
   (tuple (div d_ddiv x2)
          (neg (div (mul x1 d_ddiv)
                          (mul x2 x2)))))))
+
 (edef div Integer (Integer Integer))
 (edef [D div] (LM (Tuple Integer Integer) Integer) (Integer Integer))
 (edef [Dt div] (Tuple Integer (LM (Tuple Integer Integer) Integer)) (Integer Integer))
@@ -176,6 +191,24 @@
  ((xt : (Tuple Integer Integer)) (drt : (Tuple)))
   (tuple (tuple) (tuple)))
 
+;; pow :: Number ^ Number -> Number
+;; pow (x, y) = x ^ y
+(edef pow Float (Float Integer))
+(edef [D pow] (LM (Tuple Float Integer) Float) (Float Integer))
+(edef [Dt pow] (Tuple Float (LM (Tuple Float Integer) Float)) (Float Integer))
+(def
+ [fwd pow] Float
+ ((xt : (Tuple Float Integer)) (dxt : (Tuple Float (Tuple))))
+ (let ((x n) xt)
+ (let ((dx dn) dxt)
+  (mul dx (pow x (sub n 1))))))
+
+(def
+ [rev pow] (Tuple Float (Tuple))
+ ((xt : (Tuple Float Integer)) (dret : Float))
+ (let ((x n) xt)
+ (let (dx (mul dret (pow x (sub n 1))))
+   (tuple dx (tuple)))))
 
 ; TODO: MOVEEQ 'eq' is primitive in Haskell at the moment
 ; ;; eq :: Number x Number -> Bool
@@ -377,12 +410,6 @@
 (def [rev abs] Float ((x : Float) (d_dabs : Float))
      (if (gt x 0.0) d_dabs (neg d_dabs)))
 (edef [Dt abs] (Tuple Float (LM Float Float)) (Float))
-
-(edef to_float Float (Integer))
-(edef [D to_float] (LM Integer Float) (Integer))
-(def [fwd to_float] Float ((x : Integer) (dx : (Tuple))) 0.0)
-(def [rev to_float] (Tuple) ((x : Integer) (d_dto_float : Float)) (tuple))
-(edef [Dt to_float] (Tuple Float (LM Integer Float)) (Integer))
 
 (edef lgamma Float (Float))
 (edef [D lgamma] (LM Float Float) (Float))
