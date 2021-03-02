@@ -42,8 +42,8 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ e@(Konst _)       = return e
 anfE _ e@(Dummy _)       = return e
 anfE subst (Var tv)      = return (substVar subst tv)
-anfE subst (Call fun es@(Tuple _))
-                         = Call fun <$> anfE  subst es
+anfE subst (Call fun (Tuple es))
+                         = Call fun <$> Tuple <$> mapM (anfE1 subst) es
 anfE subst (Call fun es) = Call fun <$> anfE1 subst es
 anfE subst (Let v r e)    = do { r' <- anfE subst r
                                ; let (v', subst') = traverseState substBndr v subst
