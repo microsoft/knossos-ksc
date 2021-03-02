@@ -24,9 +24,9 @@ aten$8$8pow$aT2fi(allocator * alloc, tensor<Dim,T> const& a, int const& i)
 }
 
 tuple<tensor<2,double>,tensor<1,double>> 
-rev$aten$8$8matmul$a$dT2fT1f$bT1f(allocator * alloc, std::tuple<tensor<2,double>, tensor<1,double>> const& M_v, tensor<1,double> const& dr)
+rev$aten$8$8matmul$aT2fT1f(allocator * alloc, tuple<tensor<2,double>, tensor<1,double>> const& M_v, tensor<1,double> const& dr)
 {
-    auto [M, v] = M_v;
+	auto [M, v] = M_v;
 	auto [r, c] = size(M);
 	KS_ASSERT(c == size(v));
 
