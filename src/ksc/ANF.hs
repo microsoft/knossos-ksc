@@ -34,7 +34,7 @@ anfD def@(Def { def_rhs = rhs
 anfExpr :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
 anfExpr subst e = wrapLets (anfE subst e)
 
--- See Notes [Cloning during ANF] [ANF on tuples]
+-- See Note [Cloning during ANF]
 --
 -- anfE :: (GenBndr p) => ExprX p -> AnfM p (ExprX p)
 anfE :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr
@@ -42,6 +42,7 @@ anfE subst (Tuple es)    = Tuple <$> mapM (anfE1 subst) es
 anfE _ e@(Konst _)       = return e
 anfE _ e@(Dummy _)       = return e
 anfE subst (Var tv)      = return (substVar subst tv)
+-- See Note [ANF on tuples]
 anfE subst (Call fun (Tuple es))
                          = Call fun <$> Tuple <$> mapM (anfE1 subst) es
 anfE subst (Call fun es) = Call fun <$> anfE1 subst es
