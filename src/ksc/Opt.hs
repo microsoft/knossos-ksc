@@ -622,7 +622,6 @@ optGradFun env TupleAD ty f args
   where
     (binds, [new_args]) = makeAtomic False env [args]
 
-optGradFun _ BasicAD  _ (PrimFun (P_SelFun i n)) args = optGradSel  i n args
 optGradFun _ BasicAD ty (PrimFun f)  args = optGradPrim ty f args
 
 type TBinds = [(TVar, TExpr)]
@@ -667,6 +666,8 @@ optGradSel i n arg
 optGradSel _ _ arg = trace ("GradSel failed" ++ pps arg) Nothing
 
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
+optGradPrim _ (P_SelFun i n) arg = optGradSel i n arg
+
 -- (+) :: (F,F) -> f
 -- (D+) :: (F,F) -> ((dF,dF) -o dF)
 -- (D+)(x,y) :: (dF,dF) -o dF
