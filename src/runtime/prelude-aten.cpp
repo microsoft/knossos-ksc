@@ -45,4 +45,100 @@ rev$aten$8$8matmul$aT2fT1f(allocator * alloc, tuple<tensor<2,double>, tensor<1,d
 	return {retM,retv};
 }
 
+typedef tensor<2, double> Mat;
+typedef tensor<1, double> Vec;
+
+/*
+(edef aten::cat Mat ((Tensor 1 Mat) Integer))
+(edef shape$aten::cat (Tensor 2 (Tuple)) ((Tensor 1 Mat) Integer))
+(edef D$aten::cat (LM (Tuple (Tensor 1 Mat) Integer) Mat) ((Tensor 1 Mat) Integer))
+(def fwd$aten::cat Mat ((as_i : Tuple (Tensor 1 Mat) Integer) (da : Tuple (Tensor 1 Mat) (Tuple)))
+    (let ((as i) as_i)
+    (let ((das _) da)
+      (aten::cat das i))))
+(edef rev$aten::cat (Tuple (Tensor 1 Mat) (Tuple)) ((Tuple (Tensor 1 Mat) Integer) Mat))
+(edef shape$rev$aten::cat (Tuple (Tensor 1 (Tensor 2 (Tuple))) (Tuple)) ((Tuple (Tensor 1 Mat) Integer) Mat))
+*/
+Mat
+aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
+{
+	int n = size(As);
+	if (n == 0)
+		return Mat{};
+
+	if (dim == 1) {
+		constexpr int Dim = 1;
+		// TODO: Make a nice "concatenate" for ks tensors
+		auto sz_out = size(As[0]);
+		for(int ai = 1; ai < n; ++ai) {
+			auto sz = size(As[ai]);
+			KS_ASSERT(get_dimension<1-Dim>(sz_out) == get_dimension<1-Dim>(sz));
+			get_dimension<Dim>(sz_out) += get_dimension<Dim>(sz);
+		}
+
+		Mat retM(alloc, sz_out);
+		
+		Mat::index_type offset = {0,0};
+		for(int ai = 0; ai < n; ++ai) {
+			auto const& A = As[ai];
+			auto sz = size(A);
+			for(int i = 0; i < get_dimension<0>(sz); ++i)
+				for(int j = 0; j < get_dimension<1>(sz); ++j) {
+					auto out_i = get_dimension<0>(offset) + i;
+					auto out_j = get_dimension<1>(offset) + j;
+					retM[out_i][out_j] = A[i][j];
+				}
+			get_dimension<Dim>(offset) += get_dimension<Dim>(sz);
+		}
+
+		return retM;
+	}
+
+	KS_ASSERT(false)
 }
+
+tensor<2, tuple<>>
+shape$aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
+{
+	KS_ASSERT(false)
+}
+
+tuple<tensor<1, Mat>,tuple<>>
+rev$aten$8$8cat$aT1T2fi(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
+{
+	auto [As, dim] = arg;
+	int n = size(As);
+
+	tensor<1, Mat> retM(alloc, n);
+	
+	if (dim == 1) {
+		constexpr int Dim = 1;
+		Mat::index_type offset = {0,0};
+		for(int ai = 0; ai < n; ++ai) {
+			auto const& A = As[ai];
+			auto sz = size(A);
+			retM[ai] = Mat(alloc, sz);
+			Mat& Mi = retM[ai];
+			for(int i = 0; i < get_dimension<0>(sz); ++i)
+				for(int j = 0; j < get_dimension<1>(sz); ++j) {
+					auto out_i = get_dimension<0>(offset) + i;
+					auto out_j = get_dimension<1>(offset) + j;
+					Mi[i][j] = dret[out_i][out_j];
+				}
+			get_dimension<Dim>(offset) += get_dimension<Dim>(sz);
+		}
+
+		return make_tuple(retM, tuple<>());
+	}
+
+	KS_ASSERT(false)
+}
+
+tuple<tensor<1, tensor<2, tuple<>>>,tuple<>> 
+shape$rev$aten$8$8cat$aT1T2fi(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
+{
+	KS_ASSERT(false)
+}
+
+}
+

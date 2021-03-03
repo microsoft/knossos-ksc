@@ -2,6 +2,7 @@ import pytest
 
 import math
 import torch
+import numpy
 
 torch.set_default_dtype(torch.float64)
 
@@ -115,7 +116,18 @@ def test_far():
     assert pytest.approx(ks_ans, 1e-8) == ans.item()
 
 
-    #assert ks_far.rev((a,x),1.0) == grad_far(a,x)
+def test_cat():
+    def f(x : torch.Tensor, y : torch.Tensor):
+        return torch.cat([x, y], dim=1)
+
+    x = torch.randn(2,3)
+    y = torch.randn(2,5)
+    ks_f = ts2mod(f, (x,y))
+    ks_ans = ks_f(ks_f.adapt(x), ks_f.adapt(y))
+    ks_ans_np = numpy.array(ks_ans, copy=True)
+    py_ans = f(x,y)
+    assert (ks_ans_np == py_ans.numpy()).all() # non-approx
+
 
 # def test_Vec_init():
 #     def f(x : float):

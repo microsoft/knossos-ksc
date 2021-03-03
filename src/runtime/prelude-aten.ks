@@ -33,11 +33,13 @@
 (gdef fwd [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
 (gdef rev [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
 
+;; add
 (def aten::add Float ((a : Float) (b : Float))
     (add a b))
 (gdef fwd [aten::add (Tuple Float Float)])
 (gdef rev [aten::add (Tuple Float Float)])
 
+;; neg
 (def aten::neg Float (a : Float)
     (neg a))
 (gdef fwd [aten::neg Float])
@@ -179,3 +181,14 @@
 (gdef fwd [aten::len (Tuple Integer Integer)])
 (gdef rev [aten::len (Tuple Integer Integer)])
 
+
+(edef aten::cat (Tensor 2 Float) ((Tensor 1 (Tensor 2 Float)) Integer))
+(edef [shape aten::cat] (Tensor 2 (Tuple)) ((Tensor 1 (Tensor 2 Float)) Integer))
+(edef [D aten::cat] (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)) ((Tensor 1 (Tensor 2 Float)) Integer))
+(edef [Dt aten::cat] (Tuple (Tensor 2 Float) (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float))) ((Tensor 1 (Tensor 2 Float)) Integer))
+(def [fwd aten::cat] (Tensor 2 Float) ((as_i : Tuple (Tensor 1 (Tensor 2 Float)) Integer) (da : Tuple (Tensor 1 (Tensor 2 Float)) (Tuple)))
+    (let ((as i) as_i)
+    (let ((das _) da)
+      (aten::cat das i))))
+(edef [rev aten::cat] (Tuple (Tensor 1 (Tensor 2 Float)) (Tuple)) ((Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)))
+(edef [shape [rev aten::cat]] (Tuple (Tensor 1 (Tensor 2 (Tuple))) (Tuple)) ((Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)))
