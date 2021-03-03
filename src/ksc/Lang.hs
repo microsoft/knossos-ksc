@@ -1435,6 +1435,18 @@ cmpExpr e1
    gos (_:_) _ []    = GT
    gos (e1:es1) subst (e2:es2) = go e1 subst e2 `thenCmp` gos es1 subst es2
 
+{- Note [PrimFun]
+~~~~~~~~~~~~~~~~~
+
+A PrimFun is an entity that can be called as a function but (unlike a
+UserFun) it has its own type checking rule rather than having a type
+per se (See Prim.hs).  This means that, unlike UserFuns which are
+monomorphic, PrimFuns can be "polymorphic".  That is, in fact, the
+only reason we have them.  If we were to implement polymorphism in ksc
+then we would no longer need PrimFuns at all.
+
+-}
+
 data PrimFun = P_inline
              | P_copydown
              | P_check
