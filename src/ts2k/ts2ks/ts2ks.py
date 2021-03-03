@@ -88,19 +88,6 @@ def from_torch_type(t):
 
     assert False
 
-def type_from_value(x):
-    if isinstance(x, torch.Tensor):
-        return Type.Tensor(len(x.size()), from_torch_dtype(x.dtype))
-
-    return Type.fromValue(x)
-
-def make_arg(input, example_input):
-    input_type = type_from_value(example_input)
-    input_type_2 = from_torch_type(input.type())
-    assert input_type.kind == input_type_2.kind
-    name = mangled_name(input)
-    return Var(name, input_type, decl=True)
-
 def var_or_constant(node):
     val = node.toIValue()
     if val is None:
