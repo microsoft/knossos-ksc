@@ -100,19 +100,21 @@ def test_bar():
 
     assert ks_bar.rev((a,x),1.0) == grad_bar(a,x)
 
-def far(x : torch.Tensor):
-    y = torch.mean(x)
-    if y < 0:
+def far(x : torch.Tensor, y : torch.Tensor):
+    xx = torch.cat([x, y], dim=1)
+    xbar = torch.mean(xx)
+    if xbar < 0.0:
         t = -0.125*x
     else:
         t = 1/2 * x ** 2
-    return torch.mean(torch.sin(t)*t)
+    return torch.mean(torch.sin(t)*xbar*t)
 
 def test_far():
     x = torch.randn(2,3)
-    ks_far = ts2mod(far, (x,))
-    ks_ans = ks_far(ks_far.adapt(x))
-    ans = far(x)
+    y = torch.randn(2,5)
+    ks_far = ts2mod(far, (x,y))
+    ks_ans = ks_far(ks_far.adapt(x), ks_far.adapt(y))
+    ans = far(x,y)
     assert pytest.approx(ks_ans, 1e-8) == ans.item()
 
 
