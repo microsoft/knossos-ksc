@@ -253,12 +253,12 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
         dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
         dreturn_type_str = mangleType(tangent_type(return_type))
 
-        fwd_name = encode_name(f"fwd${name_to_call}@{args_tuple_str}")
+        fwd_name = encode_name(f"fwd${name_to_call}@{args_str}")
         declarations += f"""
           m.def("fwd_entry", with_ks_allocator(&ks::{fwd_name}));
         """
 
-        rev_name = encode_name(f"rev${name_to_call}@{args_tuple_str}")
+        rev_name = encode_name(f"rev${name_to_call}@{args_str}")
         declarations += f"""
           m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
         """
