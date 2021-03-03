@@ -2,3 +2,4 @@ wheel==0.36.2
 sexpdata
 numpy
 jax
+editdistance
