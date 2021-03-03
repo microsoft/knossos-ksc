@@ -14,6 +14,8 @@ from tempfile import gettempdir
 
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
+from torch.utils.cpp_extension import load, load_inline
+
 class KRecord:
     """
     A smoother namedtuple -- like https://pythonhosted.org/pyrecord but using the existing class syntax.
@@ -283,6 +285,78 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 
     module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
     return import_module_from_path(module_name, module_path)
+
+
+# refactor duplication with generate_and_compile_cpp_from_ks
+
+def build_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
+
+    generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
+
+    cpp_str = f"""
+    #include "knossos-pybind.h"
+    {generated_cpp_source}
+
+    """
+
+    args_str = mangleTypes(arg_types)
+    name_str = encode_name(f"{name_to_call}@{args_str}")
+    declarations = f"""
+     m.def("entry", with_ks_allocator(&ks::{name_str}));
+    """
+
+    if generate_derivatives:
+        darg_types = [tangent_type(ty) for ty in arg_types]
+        args_tuple_str = mangleType(make_tuple_if_many(arg_types))
+        dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
+        dreturn_type_str = mangleType(tangent_type(return_type))
+
+        fwd_name = encode_name(f"fwd${name_to_call}@{args_tuple_str}")
+        declarations += f"""
+          m.def("fwd_entry", with_ks_allocator(&ks::{fwd_name}));
+        """
+
+        rev_name = encode_name(f"rev${name_to_call}@{args_tuple_str}")
+        declarations += f"""
+          m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
+        """
+
+    cpp_str += """
+PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
+    m.def("reset_allocator", []{g_alloc.reset();});
+    m.def("allocator_top", []{ return g_alloc.mark();});
+    m.def("allocator_peak", []{ return g_alloc.peak();});
+
+    declare_tensor_2<double>(m, "Tensor_2_Float");
+    declare_tensor_2<int>(m, "Tensor_2_Integer");
+
+""" + declarations + """
+}
+"""
+
+    cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
+    print(f"Saving to {cpp_fname}")    
+    with open(cpp_fname, "w") as fcpp:
+        fcpp.write(cpp_str)
+
+    # module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
+    # return import_module_from_path(module_name, module_path)
+
+
+    _ksc_path,ksc_runtime_dir = get_ksc_paths()
+
+
+    #/std:c++17 MSVC
+    #-std=c++17 GCC
+
+    # https://pytorch.org/docs/stable/cpp_extension.html
+    module = load_inline(
+                name="lltm_cpp",
+                cpp_sources=[cpp_str],
+                extra_include_paths=[ksc_runtime_dir],
+                extra_cflags=["/std:c++17", "-std=c++17"] # sending both MSVC and GCC style. Think about this...
+            )
+    return module
 
 def ndgrid_inds(sz):
     """
