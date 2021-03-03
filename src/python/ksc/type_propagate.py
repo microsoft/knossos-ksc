@@ -4,10 +4,12 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType, shape_type, make_tuple_if_many
+from ksc.type import Type, SizeType, shape_type, tangent_type, make_tuple_if_many, KSTypeError
 
 from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr, StructuredName
+
+import editdistance
 
 # Pretty printing
 # Importing prettyprint to get the decorated printers for Expression and Type
@@ -23,7 +25,7 @@ warnings.filterwarnings("always")
 ############################################################################
 # Oops, some of this code was written by functional programmers...
 import sys
-import resource
+# import resource
 # resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY,resource.RLIM_INFINITY))
 sys.setrecursionlimit(10**6)
 
@@ -50,6 +52,10 @@ def ks_prim_lookup(sname, tys):
 
     # vec
     if name == "Vec_init":
+        if n == 0:
+            print("Vec_init: Assuming empty vector is float")
+            return Type.Tensor(1, Type.Float)
+
         assert all(ty == tys[0] for ty in tys)
         return Type.Tensor(1, tys[0])
 
@@ -150,9 +156,6 @@ def ks_prim_lookup(sname, tys):
 
 ############################################################################
 from functools import singledispatch
-
-class KSTypeError(RuntimeError):
-    pass
 
 @singledispatch
 def type_propagate(ex, symtab):
@@ -285,10 +288,27 @@ def _(ex, symtab):
     print(f"type_propagate: at ", pystr(ex, 2))
     print(f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) ")
     print(f"type_propagate: Looked up {sname}")
-    print(f"type_propagate: Near misses:")
+    exname = ex.name.mangled()
+    print(f"type_propagate: Near misses {exname}:")
     for key,val in symtab.items():
-        if True: # TODO: soundex match here?
-            print(f"type_propagate:   {key}({val})")
+        if isinstance(key, StructuredName):
+            key_str=key.mangle_without_type()
+        else:
+            key_str=str(key)
+        if editdistance.eval(key_str, exname) < 2:
+            print(f"type_propagate:   {key} -> {val}")
+
+    print(f"type_propagate: To implement:")
+    argtypes_ks_str = " ".join(map(pformat, argtypes))
+    argtype_tuple = Type.Tuple(*argtypes) if len(argtypes) > 1 else argtypes[0]
+    argtypes_ks_tuple = pformat(argtype_tuple)
+    argtypes_ks_tangent_tuple = pformat(tangent_type(argtype_tuple))
+    
+    print(f"(edef {ex.name} RET ({argtypes_ks_str}))")
+    print(f"(edef D${ex.name} (LM {argtypes_ks_tangent_tuple} dRET) ({argtypes_ks_str}))")
+    print(f"(def rev${ex.name} {argtypes_ks_tangent_tuple} ((t : {argtypes_ks_tuple}) (dret : dRET))")
+    print(f"   )")
+
 
     raise KSTypeError(f"Couldn't find {ex.name}({argtypes_str}) at ", pystr(ex, 2))
 

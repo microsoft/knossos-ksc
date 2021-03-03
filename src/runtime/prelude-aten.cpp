@@ -16,11 +16,21 @@ aten$8$8matmul$aT2fT1f(allocator * alloc, tensor<2,double> const& M, tensor<1,do
 	return ret;
 }
 
-template <size_t Dim, class T>
-tensor<Dim, T>
-aten$8$8pow$aT2fi(allocator * alloc, tensor<Dim,T> const& a, int const& i)
+tensor<2, double> 
+aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,double> const& A, tensor<2,double> const& B)
 {
-	return elementwise_map(alloc, a, [i](T const& v) { return std::pow(v, i); });
+	auto [r,K] = size(A);
+	auto [K_,c] = size(B);
+  KS_ASSERT(K == K_);
+	tensor<2,double> ret(alloc, make_tuple(r, c));
+	for(int i = 0; i < r; ++i)
+		for(int j = 0; j < c; ++j) {
+			double tot = 0;
+		  for(int k = 0; k < K; ++k)
+				tot += A[i][k] * B[k][j];
+			ret[i][j] = tot;
+		}
+	return ret;
 }
 
 tuple<tensor<2,double>,tensor<1,double>> 
@@ -43,6 +53,13 @@ rev$aten$8$8matmul$aT2fT1f(allocator * alloc, tuple<tensor<2,double>, tensor<1,d
 	}
 
 	return {retM,retv};
+}
+
+template <size_t Dim, class T>
+tensor<Dim, T>
+aten$8$8pow$aT2fi(allocator * alloc, tensor<Dim,T> const& a, int const& i)
+{
+	return elementwise_map(alloc, a, [i](T const& v) { return std::pow(v, i); });
 }
 
 typedef tensor<2, double> Mat;
@@ -138,6 +155,56 @@ tuple<tensor<1, tensor<2, tuple<>>>,tuple<>>
 shape$rev$aten$8$8cat$aT1T2fi(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
 {
 	KS_ASSERT(false)
+}
+
+// ------------------------------------------------------------------
+/*
+
+; (def addA1bt (Tensor 2 Float) ((A : Tensor 2 Float) (b : Tensor 1 Float))
+;     (let ((M N) (size A))
+;     (assert (eq N (size b))
+;         (build (tuple M N) (lam (ij : Tuple Integer Integer)
+;             (let ((i j) ij)
+;                 (add (index (tuple i j) A) (index j b))))))))
+*/
+
+Mat
+addA1bt$aT2fT1f(allocator * alloc, Mat const& A, Vec const& b)
+{
+	auto [M, N] = size(A);
+	KS_ASSERT(N == size(b));
+	
+	Mat retM(alloc, size(A));
+	for(int i = 0; i < M; ++i)
+		for(int j = 0; j < N; ++j)
+			retM[i][j] = A[i][j] + b[j];
+
+	return retM;
+}
+
+// R = A + 1 b'
+// dR = dA + 1 db' = [I, 1] * [dA, db] ??? TODO
+// [dA, db] = [dR, dR * 1]
+
+tuple<Mat, Vec>
+rev$addA1bt$aT2fT1f(allocator * alloc, tuple<Mat, Vec> const& args, Mat const& dret)
+{
+	auto [M, N] = size(dret);
+	
+	Mat retdA(alloc, size(dret));
+	for(int i = 0; i < M; ++i)
+		for(int j = 0; j < N; ++j)
+			retdA[i][j] = dret[i][j];
+
+	Vec retdb(alloc, N);
+	for(int j = 0; j < N; ++j) {
+		double tot = 0;
+		for(int i = 0; i < M; ++i)
+			tot += retdA[i][j];
+		retdb[j] = tot;
+	}
+
+	return {retdA, retdb};
 }
 
 }

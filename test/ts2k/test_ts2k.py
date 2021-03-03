@@ -90,7 +90,6 @@ def grad_bar(a : int, x : float):
     ddx = math.sin(t) + t*math.cos(t)
     return dda,ddx
 
-@pytest.mark.skip(reason="no way of currently testing this")
 def test_bar():
     a,x = 1,12.34
     ks_bar = ts2mod(bar, (a,x))
