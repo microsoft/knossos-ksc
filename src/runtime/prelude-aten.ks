@@ -7,6 +7,8 @@
     (build (tuple N M) (lam (ij : Tuple Integer Integer)
         (let ((i j) ij)
             (index (tuple j i) x))))))
+(gdef fwd [transpose (Tensor 2 Float)])
+(gdef rev [transpose (Tensor 2 Float)])
 
 (def aten::item Float (x : Float)
     x)
@@ -134,6 +136,8 @@
 (def aten::tanh (Tensor 2 Float) (a : Tensor 2 Float)
     (build (size a) (lam (ij : Tuple Integer Integer)
         (tanh (index ij a)))))
+(gdef fwd [aten::tanh (Tensor 2 Float)])
+(gdef rev [aten::tanh (Tensor 2 Float)])
 
 ;; a^n
 (def aten::pow Float ((a : Float) (n : Integer))
@@ -307,7 +311,8 @@
 (def linear (Tensor 2 Float) 
     ((X : Tensor 2 Float) (A : Tensor 2 Float) (b : Tensor 1 Float))
       (addA1bt (aten::matmul X (transpose A)) b))
-    
+(gdef fwd [linear (Tuple (Tensor 2 Float) (Tensor 2 Float) (Tensor 1 Float))])
+(gdef rev [linear (Tuple (Tensor 2 Float) (Tensor 2 Float) (Tensor 1 Float))])
 
 (def aten::dot Float ((a : Tensor 1 Float) (b : Tensor 1 Float))
     (ts_dot a b))
@@ -388,3 +393,5 @@
 ; https://pytorch.org/docs/stable/generated/torch.add.html#torch.add
 (def aten::add (Tensor 2 Float) ((a : Tensor 2 Float) (b : Tensor 2 Float) (alpha : Integer))
     (ts_add a (ts_scale (to_float alpha) b)))
+(gdef fwd [aten::add (Tuple (Tensor 2 Float) (Tensor 2 Float) Integer)])
+(gdef rev [aten::add (Tuple (Tensor 2 Float) (Tensor 2 Float) Integer)])
