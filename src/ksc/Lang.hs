@@ -30,7 +30,7 @@ import           Test.Hspec
 import qualified Optics                         as O
 import           Optics                         ( Lens, Prism, Prism'
                                                 , AffineTraversal
-                                                , over, traverseOf, prism
+                                                , over, traverseOf, prism, lens
                                                 , review, preview, matching, _Left
                                                 , isn't, (%) )
 
@@ -550,11 +550,16 @@ data TFun p = TFun Type (Fun p)   -- Typed functions.  The type is the /return/
 deriving instance Eq (Fun p) => Eq (TFun p)
 deriving instance Ord (Fun p) => Ord (TFun p)
 
+tFunFun :: Lens (TFun p) (TFun q) (Fun p) (Fun q)
+tFunFun = lens get set
+  where get (TFun _ f) = f
+        set (TFun ty _) f = TFun ty f
+
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
 coerceTFun :: BaseUserFunArgTy p ~ BaseUserFunArgTy q
            => TFun p -> TFun q
-coerceTFun (TFun t f) = TFun t (over funType id f)
+coerceTFun = over (tFunFun % funType) id
 
 
 data Var
