@@ -32,7 +32,7 @@ import           Optics                         ( Lens, Prism, Prism'
                                                 , AffineTraversal
                                                 , over, view, traverseOf, prism
                                                 , review, preview, matching, _Left
-                                                , (%) )
+                                                , isn't, (%) )
 
 -----------------------------------------------
 --  The main data types
@@ -534,7 +534,7 @@ _PrimFun = prism PrimFun
                      BaseUserFun f -> Left (BaseUserFun f))
 
 baseFunIsn'tSelFun :: Fun p -> Bool
-baseFunIsn'tSelFun = not . is (_PrimFun % _P_SelFun) . view baseFunFun
+baseFunIsn'tSelFun = isn't (_PrimFun % _P_SelFun) . view baseFunFun
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
