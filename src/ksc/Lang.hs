@@ -28,7 +28,8 @@ import           Debug.Trace                    ( trace )
 import           Test.Hspec
 
 import qualified Optics                         as O
-import           Optics                         ( Lens, Prism, AffineTraversal
+import           Optics                         ( Lens, Prism, Prism'
+                                                , AffineTraversal
                                                 , over, view, traverseOf, prism
                                                 , review, preview, matching, _Left
                                                 , (%) )
@@ -521,10 +522,19 @@ isBaseUserFun :: BaseFun p -> Bool
 isBaseUserFun = is _BaseUserFun
 
 isSelFun :: BaseFun p -> Bool
-isSelFun = \case
-  BaseUserFun{} -> False
-  PrimFun (P_SelFun{}) -> True
-  PrimFun{} -> False
+isSelFun = is (_PrimFun % _P_SelFun)
+
+_P_SelFun :: Prism' PrimFun (Int, Int)
+_P_SelFun = prism (uncurry P_SelFun)
+                  (\case
+                      P_SelFun i n -> Right (i, n)
+                      other        -> Left other)
+
+_PrimFun :: Prism' (BaseFun p) PrimFun
+_PrimFun = prism PrimFun
+                 (\case
+                     PrimFun f -> Right f
+                     BaseUserFun f -> Left (BaseUserFun f))
 
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun = view baseFunFun
