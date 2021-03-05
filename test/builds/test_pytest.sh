@@ -2,7 +2,7 @@ set -e
 
 echo Installing dependencies...
 python3 -m pip install -r src/python/requirements.txt
-python3 -m pip install pytest numpy torch==1.8.0+cu111 jax==0.1.57 jaxlib==0.1.37
+python3 -m pip install pytest numpy torch==1.8.0+cu111 jax==0.1.57 jaxlib==0.1.37 -f https://download.pytorch.org/whl/torch_stable.html
 
 echo Installing ksc...
 cd ./src/python
