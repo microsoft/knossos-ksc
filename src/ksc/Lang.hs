@@ -521,9 +521,6 @@ maybeUserFun = preview perhapsUserFun_
 isBaseUserFun :: BaseFun p -> Bool
 isBaseUserFun = is _BaseUserFun
 
-isSelFun :: BaseFun p -> Bool
-isSelFun = is (_PrimFun % _P_SelFun)
-
 _P_SelFun :: Prism' PrimFun (Int, Int)
 _P_SelFun = prism (uncurry P_SelFun)
                   (\case
@@ -536,11 +533,8 @@ _PrimFun = prism PrimFun
                      PrimFun f -> Right f
                      BaseUserFun f -> Left (BaseUserFun f))
 
-baseFunOfFun :: Fun p -> BaseFun p
-baseFunOfFun = view baseFunFun
-
 baseFunIsn'tSelFun :: Fun p -> Bool
-baseFunIsn'tSelFun = not . isSelFun . baseFunOfFun
+baseFunIsn'tSelFun = not . is (_PrimFun % _P_SelFun) . view baseFunFun
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
