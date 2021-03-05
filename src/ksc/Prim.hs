@@ -404,13 +404,6 @@ primCallResultTy_maybe fun arg_ty
 
       Fun (BaseUserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
-selCallResultTy_maybe :: Int -> Int -> Type -> Maybe Type
-selCallResultTy_maybe i n (TypeTuple arg_tys)
-  | i <= length arg_tys
-  , n == length arg_tys
-  = Just (arg_tys !! (i - 1))
-selCallResultTy_maybe _ _ _ = Nothing
-
 primFunCallResultTy :: HasCallStack => PrimFun -> TExpr -> Type
 primFunCallResultTy fun args
   = case primFunCallResultTy_maybe fun (typeof args) of
@@ -483,8 +476,10 @@ primFunCallResultTy_maybe P_FFold args
 primFunCallResultTy_maybe P_lmDummyFold args
   = Just args
 
-primFunCallResultTy_maybe (P_SelFun i n) arg_ty
-  = selCallResultTy_maybe i n arg_ty
+primFunCallResultTy_maybe (P_SelFun i n) (TypeTuple arg_tys)
+  | i <= length arg_tys
+  , n == length arg_tys
+  = Just (arg_tys !! (i - 1))
 
 primFunCallResultTy_maybe fun args
   = case (fun, args) of
