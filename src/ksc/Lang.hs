@@ -30,7 +30,7 @@ import           Test.Hspec
 import qualified Optics                         as O
 import           Optics                         ( Lens, Prism, Prism'
                                                 , AffineTraversal
-                                                , over, view, traverseOf, prism
+                                                , over, traverseOf, prism
                                                 , review, preview, matching, _Left
                                                 , isn't, (%) )
 
@@ -534,7 +534,7 @@ _PrimFun = prism PrimFun
                      BaseUserFun f -> Left (BaseUserFun f))
 
 baseFunIsn'tSelFun :: Fun p -> Bool
-baseFunIsn'tSelFun = isn't (_PrimFun % _P_SelFun) . view baseFunFun
+baseFunIsn'tSelFun = isn't (baseFunFun % _PrimFun % _P_SelFun)
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
