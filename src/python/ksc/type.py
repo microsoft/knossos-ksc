@@ -1,5 +1,8 @@
 import numpy as np
 
+class KSTypeError(RuntimeError):
+    pass
+
 class Type:
     """
     Knossos AST node type.  Grouped into
@@ -25,7 +28,8 @@ class Type:
             raise ValueError("bad kind:", kind)
 
         if kind != "Tuple":
-            assert Type.node_kinds[kind] == len(children) # dont' check for 1-tuple
+            if Type.node_kinds[kind] != len(children):
+                raise KSTypeError(f"Type {kind} has {len(children)} parameters, but needs {Type.node_kinds[kind]}") # dont' check for 1-tuple
         if kind == "Tensor":
             assert isinstance(children[0], int) and isinstance(children[1], Type)
         else:
@@ -49,6 +53,7 @@ class Type:
         """
         Constructor: Type.Tuple(T1, ..., Tn)
         """
+        args = tuple(args)
         assert all((isinstance(ch, Type) for ch in args)), "Type.Tuple constructed with non-type arg"
         return Type("Tuple", args)
 
@@ -291,7 +296,7 @@ def tangent_type(ty : Type) -> Type:
     if ty == Type.Float:
         return ty
     if ty.is_tuple:
-        return Type.Tuple(tangent_type(ty) for ty in ty.children)
+        return Type.Tuple(*(tangent_type(ty) for ty in ty.children))
     if ty.is_tensor:
         return Type.Tensor(ty.tensor_rank, tangent_type(ty.tensor_elem_type))
 
@@ -302,7 +307,7 @@ def shape_type(t : Type) -> Type:
     if t.is_scalar:
         return Type.Tuple()
     if t.is_tuple:
-        return Type.Tuple(shape_type(t) for t in t.children)
+        return Type.Tuple(*(shape_type(t) for t in t.children))
     if t.is_tensor:
         return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
 

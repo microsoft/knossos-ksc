@@ -97,7 +97,7 @@ gradE _   _ (App{})        = error "gradE of App not yet supported"
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.
 gradE adp s (Call f arg)
-  | f `isThePrimFun` "$inline"
+  | f `isThePrimFun` P_inline
   = gradE adp s arg
 
 -- grad[ build (\i.e ]
@@ -105,17 +105,17 @@ gradE adp s (Call f arg)
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
 gradE adp s (Call f (Tuple [n, Lam ti body]))
-  | f `isThePrimFun` "build"
+  | f `isThePrimFun` P_build
   = gradBuild adp s n ti body
 
 -- TODO: I'm not very happy about this rule, which effectively
 -- undoes sum (build e) --> sumbuild e
 gradE adp s (Call f (Tuple [n, body]))
-  | f `isThePrimFun` "sumbuild"
+  | f `isThePrimFun` P_sumbuild
   = gradE adp s (pSum (pBuild n body))
 
 gradE adp s (Call f (Tuple [Lam ti body, acc, v]))
-  | f `isThePrimFun` "fold"
+  | f `isThePrimFun` P_fold
   = gradFold adp s ti body acc v
 
 gradE adp s (Call f args) = gradCall adp s f args

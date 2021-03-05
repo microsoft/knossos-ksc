@@ -98,7 +98,6 @@ Notes:
 
 
 import Lang hiding (parens, brackets)
-import Prim
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
 import Text.Parsec.Char
@@ -333,9 +332,9 @@ pIsUserFun fun = case maybeUserFun fun of
 
 pPrimFun :: Parser (BaseFun p)
 pPrimFun = try $ do { f <- pIdentifier
-                    ; when (not (isPrimFun f))
-                           (unexpected (f ++ " is not a PrimFun"))
-                    ; pure (PrimFun f)
+                    ; case toPrimFun f of
+                        Just pf -> pure (PrimFun pf)
+                        Nothing -> unexpected (f ++ " is not a PrimFun")
                     }
 
 pSelFun :: Parser (BaseFun p)
