@@ -346,18 +346,28 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 
     _ksc_path,ksc_runtime_dir = get_ksc_paths()
 
+    msvc_options = [
+        "/std:c++17",
+        "-DKS_INCLUDE_ATEN" if use_aten else "", #TODO: check syntax
+    ]
 
-    #/std:c++17 MSVC
-    #-std=c++17 GCC
+    gcc_options = [
+        "-std=c++17",
+        "-DKS_INCLUDE_ATEN" if use_aten else "",
+    ]
+
+    cpp_str_torch_extension = cpp_str.replace("PYTHON_MODULE_NAME", "TORCH_EXTENSION_NAME") # Let PyTorch handle naming - it has versioning
 
     # https://pytorch.org/docs/stable/cpp_extension.html
     module = load_inline(
-                name="lltm_cpp",
-                cpp_sources=[cpp_str],
+                name="dynamic_ksc_cpp",
+                cpp_sources=[cpp_str_torch_extension],
                 extra_include_paths=[ksc_runtime_dir],
-                # extra_cflags=["/std:c++17"], # MSVC... pick 1
-                extra_cflags=["-std=c++17"], # GCC... pick 1
+                # extra_cflags=["/std:c++17", "-DKS_INCLUDE_ATEN"], # MSVC... pick 1
+                # extra_cflags = msvc_options
+                extra_cflags = gcc_options
             )
+
     return module
 
 def ndgrid_inds(sz):
