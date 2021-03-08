@@ -608,8 +608,8 @@ cgenBaseFun = \case
   (BaseUserFun (BaseUserFunId fun (TypeTuple [])))  -> mangleFun fun
   (BaseUserFun (BaseUserFunId fun (TypeTuple tys))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
   (BaseUserFun (BaseUserFunId fun ty))  -> mangleFun (fun ++ "@" ++ mangleType ty)
+  (PrimFun (P_SelFun i _))  -> "ks::get<" ++ show (i - 1) ++ ">"
   (PrimFun fun) -> render (ppr fun)
-  (SelFun i _)  -> "ks::get<" ++ show (i - 1) ++ ">"
 
 cgenUserFun :: HasCallStack => Fun Typed -> String
 cgenUserFun f = case f of
@@ -663,9 +663,9 @@ are two cases:
 -}
 
 funUsesAllocator :: HasCallStack => TFun p -> Bool
+funUsesAllocator (TFun _ (Fun (PrimFun (P_SelFun _ _)))) = False
 funUsesAllocator (TFun _ (Fun (PrimFun fname))) =
   not $ fname `elem` [P_index, P_size, P_eq, P_ne, P_trace, P_print, P_ts_dot]
-funUsesAllocator (TFun _ (Fun (SelFun _ _))) = False
 funUsesAllocator _ = True
 
 funAllocatorUsage :: HasCallStack => TFun p -> CType -> AllocatorUsage

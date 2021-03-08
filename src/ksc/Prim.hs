@@ -373,8 +373,6 @@ primCallResultTy_maybe fun arg_ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
 
-      Fun (SelFun i n) -> selCallResultTy_maybe i n arg_ty
-
       GradFun f adp
         -> case primCallResultTy_maybe (Fun f) arg_ty of
             Left err -> Left err
@@ -405,13 +403,6 @@ primCallResultTy_maybe fun arg_ty
       CLFun f -> primCallResultTy_maybe (Fun f) arg_ty
 
       Fun (BaseUserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
-
-selCallResultTy_maybe :: Int -> Int -> Type -> Either SDoc Type
-selCallResultTy_maybe i n (TypeTuple arg_tys)
-  | i <= length arg_tys
-  , n == length arg_tys
-  = Right (arg_tys !! (i - 1))
-selCallResultTy_maybe _ _ _ = Left (text "Bad argument to selector")
 
 primFunCallResultTy :: HasCallStack => PrimFun -> TExpr -> Type
 primFunCallResultTy fun args
@@ -484,6 +475,11 @@ primFunCallResultTy_maybe P_FFold args
 
 primFunCallResultTy_maybe P_lmDummyFold args
   = Just args
+
+primFunCallResultTy_maybe (P_SelFun i n) (TypeTuple arg_tys)
+  | i <= length arg_tys
+  , n == length arg_tys
+  = Just (arg_tys !! (i - 1))
 
 primFunCallResultTy_maybe fun args
   = case (fun, args) of
