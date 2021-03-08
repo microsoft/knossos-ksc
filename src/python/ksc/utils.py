@@ -312,12 +312,12 @@ def build_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, gen
         dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
         dreturn_type_str = mangleType(tangent_type(return_type))
 
-        fwd_name = encode_name(f"fwd${name_to_call}@{args_tuple_str}")
+        fwd_name = encode_name(f"fwd${name_to_call}@{args_str}")
         declarations += f"""
           m.def("fwd_entry", with_ks_allocator(&ks::{fwd_name}));
         """
 
-        rev_name = encode_name(f"rev${name_to_call}@{args_tuple_str}")
+        rev_name = encode_name(f"rev${name_to_call}@{args_str}")
         declarations += f"""
           m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
         """
@@ -328,6 +328,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     m.def("allocator_top", []{ return g_alloc.mark();});
     m.def("allocator_peak", []{ return g_alloc.peak();});
 
+    declare_tensor_1<double>(m, "Tensor_1_Float");
     declare_tensor_2<double>(m, "Tensor_2_Float");
     declare_tensor_2<int>(m, "Tensor_2_Integer");
 
@@ -343,7 +344,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
     # module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
     # return import_module_from_path(module_name, module_path)
 
-
     _ksc_path,ksc_runtime_dir = get_ksc_paths()
 
 
@@ -355,7 +355,8 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
                 name="lltm_cpp",
                 cpp_sources=[cpp_str],
                 extra_include_paths=[ksc_runtime_dir],
-                extra_cflags=["/std:c++17", "-std=c++17"] # sending both MSVC and GCC style. Think about this...
+                # extra_cflags=["/std:c++17"], # MSVC... pick 1
+                extra_cflags=["-std=c++17"], # GCC... pick 1
             )
     return module
 
