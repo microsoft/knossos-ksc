@@ -1,3 +1,6 @@
+from typing import Iterator, Callable
+from ksc import vmap
+import torch
 
 # BEGINDOC
 def relu3(x : float) -> float:
@@ -13,13 +16,53 @@ def relu3(x : float) -> float:
     return x - 2/3
 # ENDDOC
 
+# Knossos vmap
+def vrelu3(x : torch.Tensor):
+   return vmap(relu3, x)
+
+# PyTorch reference implementation
+def vrelu3_pt(x : torch.Tensor):
+  mask1_inf = x > 1.0
+  mask0_1 = (x > 0.0) & ~mask1_inf
+  val_0_1 = 1/3 * x ** 3
+  val_1_inf = x - 2/3
+  
+  return mask0_1 * val_0_1 + mask1_inf * val_1_inf
+
+# Define a range of values at which to call the methods
+def vrelu3_bench_configs() -> Iterator[torch.Tensor]:
+  yield torch.randn((4,4))
+  yield torch.randn((16,16))
+  yield torch.randn((256,256,100))
+
+
 def plot_relu3(filename):
   import matplotlib.pyplot as plt
   import numpy as np
 
-  t = np.arange(-3,3,step=0.1)
+  t = torch.arange(-3,3,step=0.1)
 
-  plt.plot(t, [relu3(t) for t in t])
+  plt.plot(t, vrelu3(t), 'b')
+  plt.plot(t, vrelu3_pt(t), 'r--')
   plt.gca().set_aspect(1)
   print(f"Saving figure to {filename}")
   plt.savefig(filename)
+
+
+def relu3_in_fcdnn():
+   # Initialize the model using nn.Sequential
+   model = nn.Sequential(OrderedDict([
+                        ('fc1', nn.Linear(784, 256)),
+                        ('activation1', vrelu3),
+                        ('fc2', nn.Linear(256, 128)),
+                        ('bn2', nn.BatchNorm1d(num_features=128)),
+                        ('activation2', vrelu3),
+                        ('dropout', nn.Dropout(0.3)),
+                        ('fc3', nn.Linear(128, 64)),
+                        ('bn3', nn.BatchNorm1d(num_features=64)),
+                        ('activation3', vrelu3),
+                        ('logits', nn.Linear(64, 10)),
+                        ('logsoftmax', nn.LogSoftmax(dim=1))]))
+
+   # Run training
+   train_model(model)
