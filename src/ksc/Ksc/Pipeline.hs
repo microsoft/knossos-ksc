@@ -10,7 +10,7 @@ import Annotate (annotDecls, lintDefs)
 import AD (gradDef, applyDef)
 import qualified Cgen
 import CSE (cseDefs)
-import KMonad (KM, KMT, runKM,  banner, liftIO)
+import KMonad (KM, KMT, runKM,  banner)
 import Ksc.CatLang
 import Ksc.Traversal (mapAccumLM)
 import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun),
@@ -37,9 +37,9 @@ import GHC.Stack (HasCallStack)
 --
 --    demoF ["src/runtime/prelude.ks", "test/ksc/ex1.ks"]
 demoF :: [String] -> IO ()
-demoF files = runKM $ do
-  decls <- liftIO (fmap concat (mapM parseF files))
-  _ <- pipeline (Just 999) decls
+demoF files = do
+  decls <- fmap concat (mapM parseF files)
+  _ <- pipelineIO (Just 999) decls
   pure ()
 
 -------------------------------------
@@ -48,12 +48,11 @@ demoF files = runKM $ do
 
 displayCppGen :: Maybe Int -> [String] -> String -> String -> IO (String, String)
 displayCppGen verbosity ksFiles ksofile cppfile =
-  runKM $
   do {
-  ; decls0 <- liftIO (fmap concat (mapM parseF ksFiles))
-  ; liftIO $ putStrLn "ksc: read decls"
-  ; defs <- pipeline verbosity decls0
-  ; liftIO (Cgen.cppGenWithFiles ksofile cppfile defs)
+  ; decls0 <- fmap concat (mapM parseF ksFiles)
+  ; putStrLn "ksc: read decls"
+  ; defs <- pipelineIO verbosity decls0
+  ; Cgen.cppGenWithFiles ksofile cppfile defs
   }
 
 displayCppGenAndCompile
@@ -104,6 +103,9 @@ doall = displayCppGenCompileAndRunWithOutput "g++-7"
 -------------------------------------
 -- Main compiler pipeline
 -------------------------------------
+
+pipelineIO :: Maybe Int -> [Decl] -> IO [TDef]
+pipelineIO v d = runKM (pipeline v d)
 
 pipeline :: Maybe Int -> [Decl] -> KM [TDef]
 pipeline verbosity decls = do
@@ -237,11 +239,11 @@ displayPassM mverbosity what env decls
 -------------------------------------
 -- The Futhark driver
 -------------------------------------
-futharkPipeline :: [FilePath] -> KM [TDef]
+futharkPipeline :: [FilePath] -> IO [TDef]
 futharkPipeline files
   = do
-  { decls0 <- liftIO (fmap concat (mapM (parseF . (++ ".ks")) files))
-  ; pipeline Nothing decls0
+  { decls0 <- fmap concat (mapM (parseF . (++ ".ks")) files)
+  ; pipelineIO Nothing decls0
   }
 
 -- | Read source code from specified input file, optimise,
@@ -258,7 +260,7 @@ futharkPipeline files
 genFuthark :: [FilePath] -> FilePath -> IO ()
 genFuthark files file = do
   prelude <- readFile "src/runtime/knossos.fut"
-  defs <- runKM $ futharkPipeline (files ++ [file])
+  defs <- futharkPipeline (files ++ [file])
   putStrLn $ "ksc: Writing to " ++ futfile
   Cgen.createDirectoryWriteFile futfile $
     intercalate "\n\n" $
