@@ -14,7 +14,7 @@ data CLExpr
   = CLId
   | CLPrune [Int] Int CLExpr         -- ?
   | CLKonst Konst
-  | CLCall Type (Fun Typed)      -- The Type is the result type
+  | CLCall (TFun Typed)
   | CLComp CLExpr CLExpr         -- Composition
   | CLTuple [CLExpr]             -- Tuple
   | CLIf CLExpr CLExpr CLExpr    -- If
@@ -24,6 +24,7 @@ data CLExpr
   -- ^ Fold (Lam $t body) $acc $vector
 
 data CLDef = CLDef { cldef_fun    :: BaseUserFun Typed
+                   , cldef_qvars  :: [TyVar]
                    , cldef_arg    :: Pat     -- Arg type S
                    , cldef_rhs    :: CLExpr
                    , cldef_res_ty :: Type }  -- Result type T
@@ -66,7 +67,7 @@ pprCLExpr p c@(CLComp {})
 
 pprCLExpr _ CLId           = text "Id"
 pprCLExpr _ (CLKonst k)    = ppr k
-pprCLExpr _ (CLCall _ f)   = ppr f
+pprCLExpr _ (CLCall f)     = ppr f
 pprCLExpr p (CLPrune ts n c) = parensIf p precOne $
                                sep [ text "Prune" <> char '['
                                      <> cat (punctuate comma (map ppr ts))
@@ -107,12 +108,14 @@ toCLDefs defs = mapMaybe toCLDef_maybe defs
 
 toCLDef_maybe :: TDef -> Maybe CLDef
 toCLDef_maybe  (Def { def_fun    = fun
+                    , def_qvars  = qvs
                     , def_pat    = pat
                     , def_res_ty = res_ty
                     , def_rhs    = rhs })
   | Fun JustFun f <- fun
   , UserRhs e <- rhs
   = Just CLDef { cldef_fun = f
+               , cldef_qvars = qvs
                , cldef_arg = pat
                , cldef_rhs = toCLExpr (patVars pat) e
                , cldef_res_ty = res_ty }
@@ -177,8 +180,8 @@ to_cl_call pruned env f e
       Pruned    ->
         CLFold t (toCLExpr (t:env) body) (toCLExpr env acc) (toCLExpr env v)
 
-  | TFun ty fun_id <- f
-  = CLCall ty fun_id `mkCLComp` to_cl_expr pruned env e
+  | otherwise
+  = CLCall f `mkCLComp` to_cl_expr pruned env e
   where
     call = Call f e
 
@@ -223,10 +226,12 @@ fromCLDefs cldefs = map fromCLDef cldefs
 
 fromCLDef :: CLDef -> TDef
 fromCLDef (CLDef { cldef_fun = f
+                 , cldef_qvars = qvs
                  , cldef_arg = pat
                  , cldef_rhs = rhs
                  , cldef_res_ty = res_ty })
   = Def { def_fun    = Fun JustFun f
+        , def_qvars  = qvs
         , def_pat    = pat
         , def_res_ty = res_ty
         , def_rhs    = UserRhs rhs' }
@@ -247,12 +252,12 @@ fromCLExpr is arg (CLIf b t e)     = If (fromCLExpr is arg b)
                                         (fromCLExpr is arg t)
                                         (fromCLExpr is arg e)
 
-fromCLExpr _  arg (CLCall ty f)
-  = Call (TFun ty f) (mkTuple arg)
+fromCLExpr _  arg (CLCall f)
+  = Call f (mkTuple arg)
 
 fromCLExpr is arg (CLComp e1 e2)
-  | CLCall ty f <- e1   -- Shortcut to avoid an unnecessary let
-  = Call (TFun ty f) (fromCLExpr is arg e2)
+  | CLCall f <- e1   -- Shortcut to avoid an unnecessary let
+  = Call f (fromCLExpr is arg e2)
   | otherwise
   = mkTempLet is "ax" (fromCLExpr is arg e2) $ \ is v2 ->
     fromCLExpr is [v2] e1

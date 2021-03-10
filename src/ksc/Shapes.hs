@@ -20,11 +20,13 @@ shapeDef (Def { def_fun = Fun ShapeFun{} _ })
   = Nothing
 
 shapeDef (Def { def_fun = Fun ds f
+              , def_qvars = qvs
               , def_pat = VarPat params
               , def_rhs = UserRhs def_rhs
               , def_res_ty = res_ty })
   = Just $
     Def { def_fun    = Fun (ShapeFun ds) f
+        , def_qvars  = qvs
         , def_pat    = VarPat params
         , def_res_ty = shapeType res_ty
         , def_rhs    = UserRhs (mkLetForShapeOfParameter params (shapeE def_rhs)) }
@@ -76,16 +78,20 @@ shapeE (App{})        = error "Shape of App not supported"
 
 shapeCall :: HasCallStack => TFun Typed -> TExpr -> TExpr
 
-shapeCall (TFun _ (Fun JustFun (PrimFun (P_SelFun i n)))) e
+shapeCall (TFun { tf_fun = Fun JustFun (PrimFun (P_SelFun i n)) }) e
   = pSel i n (shapeE e)
 
-shapeCall (TFun _ (Fun JustFun (PrimFun f))) e
+shapeCall (TFun { tf_fun = Fun JustFun (PrimFun f) }) e
   | Just e' <- shapeCallPrim f e
   = e'
 
-shapeCall (TFun ty (Fun ds f)) e
+shapeCall (TFun { tf_ret = ty, tf_fun = Fun ds f, tf_targs = targs }) e
   | isBaseUserFun f
-  = Call (TFun (shapeType ty) (Fun (ShapeFun ds) f)) e
+  = Call shape_fun e
+  where
+    shape_fun = TFun { tf_ret = shapeType ty
+                     , tf_fun = Fun (ShapeFun ds) f
+                     , tf_targs = targs }
 
 shapeCall tf e = pShape (Call tf e)  -- Fall back to calling the original function and evaluating the shape of the returned object
 

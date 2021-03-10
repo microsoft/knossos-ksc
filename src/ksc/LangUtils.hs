@@ -14,6 +14,10 @@ module LangUtils (
   -- Substitution
   substEMayCapture,
 
+  -- Matching
+  matchTy,
+  TySubst, mkTySubst, tySubstTy, tySubstTyVar, tySubstPat, tySubstExpr,
+
   -- Equality
   cmpExpr,
 
@@ -26,7 +30,9 @@ module LangUtils (
   LangUtils.hspec, test_FreeIn,
 
   -- Symbol table
-  GblSymTab, extendGblST, lookupGblST, emptyGblST, modifyGblST,
+  GblSymTab, FunBindings(..),
+  extendGblST, lookupDef, lookupBindings,
+  emptyGblST, modifyGblST,
   stInsertFun,
   LclSymTab, extendLclST,
   SymTab(..), newSymTab, emptySymTab,
@@ -100,6 +106,7 @@ substEMayCapture subst (Let v r b)    = Let v (substEMayCapture subst r) $
   where bindersAsMap :: PatG TVar -> M.Map TVar ()
         bindersAsMap = M.fromList . map (\x -> (x, ())) . patVars
 
+
 -----------------------------------------------
 --     Free variables
 -----------------------------------------------
@@ -150,7 +157,9 @@ hspec = do
     let var :: String -> TVar
         var s = TVar TypeFloat (Simple s)
         fun :: String -> TFun Typed
-        fun s = TFun TypeFloat (Fun JustFun (BaseUserFun (BaseUserFunId s TypeFloat)))
+        fun s = TFun { tf_ret = TypeFloat
+                     , tf_fun = Fun JustFun (BaseUserFun (BaseUserFunId s (Mono TypeFloat)))
+                     , tf_targs = [] }
         e  = Call (fun "f") (Var (var "i"))
         e2 = Call (fun "f") (Tuple [Var (var "_t1"), kInt 5])
     describe "notFreeIn" $ do
@@ -173,11 +182,15 @@ test_FreeIn = Test.Hspec.hspec LangUtils.hspec
 -----------------------------------------------
 
 -- Global symbol table
-type GblSymTab = M.Map (UserFun Typed) TDef
-   -- Maps a function to its definition, which lets us
+type GblSymTab   = M.Map (DerivedFun BaseUserFunName) FunBindings
+data FunBindings = PolyBind  TDef
+                 | MonoBinds (M.Map Type TDef)
+   -- A function name like fwd$f maps to
+   -- either a /single/ polymorphic binding
+   -- or     /multiple/ monomorphic bindings
+   -- This info lets us
    --   * Find its return type
    --   * Inline it
-   -- Domain is UserFun Typed
 
 -- Local symbol table
 type LclSymTab = M.Map Var Type
@@ -188,6 +201,10 @@ data SymTab
   = ST { gblST :: GblSymTab
        , lclST :: LclSymTab
     }
+
+instance Pretty FunBindings where
+  ppr (PolyBind  def)  = text "Poly:" <+> ppr def
+  ppr (MonoBinds defs) = text "Mono:" <+> ppr defs
 
 instance (Pretty k, Pretty v) => Pretty (M.Map k v) where
    ppr m = braces $ fsep  $ punctuate comma $
@@ -210,10 +227,33 @@ newSymTab :: GblSymTab -> SymTab
 newSymTab gbl_env = ST { gblST = gbl_env, lclST = M.empty }
 
 stInsertFun :: TDef -> GblSymTab -> GblSymTab
-stInsertFun def@(Def { def_fun = f }) = M.insert f def
+stInsertFun def@(Def { def_fun = Fun der (BaseUserFunId name descr) }) gst
+  = case descr of
+      Poly    -> M.insert top_key (PolyBind def) gst
+      Mono ty -> M.insertWith add_bind top_key (MonoBinds (M.singleton ty def)) gst
+  where
+    top_key = Fun der name
 
-lookupGblST :: HasCallStack => UserFun Typed -> GblSymTab -> Maybe TDef
-lookupGblST = M.lookup
+    add_bind :: FunBindings -> FunBindings -> FunBindings
+    add_bind (MonoBinds bs1) (MonoBinds bs2) = MonoBinds (M.union bs1 bs2)
+    add_bind _               bs              = bs
+
+lookupDef :: UserFun Typed -> GblSymTab -> Maybe TDef
+lookupDef (Fun der (BaseUserFunId name descr)) gst
+  = case descr of
+       Poly    | Just (PolyBind def) <- M.lookup top_key gst
+               -> Just def
+
+       Mono ty | Just (MonoBinds defs) <- M.lookup top_key gst
+               , Just def <- M.lookup ty defs
+               -> Just def
+
+       _other -> Nothing
+  where
+    top_key = Fun der name
+
+lookupBindings :: DerivedFun BaseUserFunName -> GblSymTab -> Maybe FunBindings
+lookupBindings = M.lookup
 
 extendGblST :: GblSymTab -> [TDef] -> GblSymTab
 extendGblST = foldl (flip stInsertFun)
@@ -403,3 +443,89 @@ noTupPatifyExpr in_scope = \case
      Konst k -> Konst k
      Var v   -> Var v
      Dummy d -> Dummy d
+
+
+-----------------------------------------------
+--     Type matching and substitution
+-----------------------------------------------
+
+type TySubst = M.Map TyVar Type
+
+emptyTySubst :: TySubst
+emptyTySubst = M.empty
+
+mkTySubst :: [(TyVar,Type)] -> TySubst
+mkTySubst = M.fromList
+
+tySubstTyVar :: TySubst -> TyVar -> Type
+tySubstTyVar s tv = case M.lookup tv s of
+                     Just ty -> ty
+                     Nothing -> TypeVar tv
+
+tySubstTy :: TySubst -> Type -> Type
+tySubstTy s ty
+  = go ty
+  where
+    go (TypeVar tv)      = tySubstTyVar s tv
+    go (TypeTuple tys)   = TypeTuple (map go tys)
+    go (TypeTensor n ty) = TypeTensor n (go ty)
+    go (TypeLam t1 t2)   = TypeLam (go t1) (go t2)
+    go (TypeLM  t1 t2)   = TypeLM  (go t1) (go t2)
+    -- Other types have no free variables
+    go ty                = ty
+
+tySubstPat :: TySubst -> Pat -> Pat
+tySubstPat s = fmap (tySubstTVar s)
+
+tySubstTVar :: TySubst -> TVar -> TVar
+tySubstTVar s (TVar ty v) = TVar (tySubstTy s ty) v
+
+tySubstTFun :: TySubst -> TFun Typed -> TFun Typed
+tySubstTFun s tfun@(TFun { tf_targs = targs, tf_ret = ret })
+  = tfun { tf_targs = map (tySubstTy s) targs, tf_ret = tySubstTy s ret }
+
+tySubstExpr :: TySubst -> TExpr -> TExpr
+tySubstExpr s e = go e
+  where
+   go (Var v)      = Var (tySubstTVar s v)
+   go e@(Dummy {}) = e
+   go e@(Konst _)  = e
+   go (Tuple es)   = Tuple (map go es)
+   go (If b t e)   = If (go b) (go t) (go e)
+   go (Call f e)   = Call (tySubstTFun s f) (go e)
+   go (App f a)    = App (go f) (go a)
+   go (Let p r b)  = Let (tySubstPat s p) (go r) (go b)
+   go (Lam v e)    = Lam (tySubstTVar s v) (go e)
+   go (Assert e1 e2) = Assert (go e1) (go e2)
+
+matchTy :: Type -> Type -> Maybe TySubst
+matchTy t1 t2
+  = go emptyTySubst t1 t2
+  where
+    go s (TypeVar tv) ty
+       = case M.lookup tv s of
+            Just ty' | ty `eqType` ty' -> Just s
+                     | otherwise       -> Nothing
+            Nothing -> Just (M.insert tv ty s)
+    go s (TypeTuple ts1) (TypeTuple ts2)
+      = go_s s ts1 ts2
+    go s (TypeTensor n1 t1) (TypeTensor n2 t2)
+      | n1==n2
+      = go s t1 t2
+    go s (TypeLam a1 r1) (TypeLam a2 r2)
+      = do { s1 <- go s a1 a2; go s1 r1 r2 }
+    go s (TypeLM a1 r1) (TypeLM a2 r2)
+      = do { s1 <- go s a1 a2; go s1 r1 r2 }
+    go s TypeBool TypeBool = Just s
+    go s TypeInteger TypeInteger = Just s
+    go s TypeFloat TypeFloat = Just s
+    go s TypeString TypeString = Just s
+
+    go s TypeUnknown _ = Just s
+
+    go _ _ _ = Nothing
+
+    go_s s [] []             = Just s
+    go_s s (t1:ts1) (t2:ts2) = do { s1 <- go s t1 t2
+                                  ; go_s s1 ts1 ts2 }
+    go_s _ _ _ = Nothing

@@ -210,29 +210,28 @@ rewriteCall _ fun (Let v r arg)
 rewriteCall _ fun (If e1 e2 e3)
   = Just (If e1 (Call fun e2) (Call fun e3))
 
-rewriteCall env (TFun _ (Fun JustFun fun)) arg
+rewriteCall env (TFun { tf_fun = Fun JustFun fun }) arg
   = optFun env fun arg
 
-rewriteCall env (TFun ty (Fun (GradFun adm) f)) arg
+rewriteCall env (TFun { tf_fun = Fun (GradFun adm) f, tf_ret = ty }) arg
   = optGradFun (optEnvInScope env) adm ty f arg
 
-rewriteCall _ (TFun _ (Fun (DrvFun adm) f)) arg
+rewriteCall _ (TFun { tf_fun = Fun (DrvFun adm) f }) arg
   = optDrvFun adm f arg
 
-rewriteCall _ f@(TFun (TypeLM _ _) _) _
+rewriteCall _ f@(TFun { tf_ret = TypeLM {} }) _
   = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
 
-rewriteCall env (TFun _ to_inline) arg
+rewriteCall env (TFun { tf_fun = to_inline, tf_targs = targs }) arg
   | Just to_inline <- maybeUserFun to_inline
   , shouldInline to_inline
-  , Just Def{ def_pat = pat, def_rhs = UserRhs body }
-      <- lookupGblST to_inline (optGblST env)
-  = Just (inlineCall env pat body arg)
+  , Just def <- lookupDef to_inline (optGblST env)
+  = inlineCall env def targs arg
 
-rewriteCall _ (TFun _ (Fun SUFFwdPass (PrimFun fun))) arg
+rewriteCall _ (TFun { tf_fun = Fun SUFFwdPass (PrimFun fun) }) arg
   = SUF.rewriteSUFFwdPass fun arg
 
-rewriteCall _ (TFun _ (Fun SUFRevPass (PrimFun fun))) arg
+rewriteCall _ (TFun { tf_fun = Fun SUFRevPass (PrimFun fun) }) arg
   = SUF.rewriteSUFRevPass fun arg
 
 rewriteCall _ _ _
@@ -247,9 +246,10 @@ shouldInline to_inline
                      , fwd "add" ff
                      , rev "add" ff
                      ]
-  where fwd f t = Fun SUFFwdPass (BaseUserFunId f t)
-        rev f t = Fun SUFRevPass (BaseUserFunId f t)
-        ff = TypeTuple [TypeFloat, TypeFloat]
+  where
+    fwd f t = Fun SUFFwdPass (BaseUserFunId f t)
+    rev f t = Fun SUFRevPass (BaseUserFunId f t)
+    ff = Mono (TypeTuple [TypeFloat, TypeFloat])
 
 -----------------------
 optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
@@ -265,11 +265,10 @@ optFun _ (PrimFun (P_SelFun i _)) arg
 
 -- $inline needs to look up the global symtab
 optFun env (PrimFun P_inline) arg
-  | Call (TFun _ fun) inner_arg <- arg
+  | Call (TFun { tf_fun = fun, tf_targs = targs }) inner_arg <- arg
   , Just userFun <- maybeUserFun fun
-  , Just fun_def <- lookupGblST userFun (optGblST env)
-  , Def { def_pat = pat, def_rhs = UserRhs body } <- fun_def
-  = Just (inlineCall env pat body inner_arg)
+  , Just fun_def <- lookupDef userFun (optGblST env)
+  = inlineCall env fun_def targs inner_arg
 
 -- Other prims are determined by their args
 optFun env (PrimFun f) e
@@ -454,22 +453,36 @@ optLMCompose f g
 
 -----------------------
 inlineCall :: OptEnv
-           -> Pat -> TExpr  -- Function parameters and body
-           -> TExpr            -- Arguments
-           -> TExpr
-inlineCall _ (VarPat tv) body arg
-  = mkLet tv arg body
+           -> TDef         -- Function definition
+           -> [Type]       -- Type arguments
+           -> TExpr        -- Value argument
+           -> Maybe TExpr
+inlineCall env def targs val_arg
+  | Just (pat, body) <- instantiateDef def targs
+  = Just $ case pat of
+      VarPat tv  -> mkLet tv val_arg body
+      TupPat tvs -> mkLets (fresh_tvs `zip` args) $
+                    -- See Note [Avoid name clashes in inlineCall]
+                    mkLets [ (tv, Var fresh_tv)
+                           | (tv,fresh_tv) <- tvs `zip` fresh_tvs
+                           , tv /= fresh_tv ]
+                    body
+                 where
+                   args = splitTuple val_arg (length tvs)
+                   (_, fresh_tvs) = notInScopeTVs (optEnvInScope env) tvs
+  | otherwise
+  = Nothing
 
-inlineCall env (TupPat tvs) body arg
-  = mkLets (fresh_tvs `zip` args) $
-    -- See Note [Avoid name clashes in inlineCall]
-    mkLets [ (tv, Var fresh_tv)
-           | (tv,fresh_tv) <- tvs `zip` fresh_tvs
-           , tv /= fresh_tv ]
-    body
-  where
-    args = splitTuple arg (length tvs)
-    (_, fresh_tvs) = notInScopeTVs (optEnvInScope env) tvs
+instantiateDef :: TDef -> [Type] -> Maybe (Pat, TExpr)
+instantiateDef (Def { def_qvars = qvars, def_pat = pat, def_rhs = rhs }) targs
+  | UserRhs body <- rhs
+  , length qvars == length targs
+  , let ty_subst = mkTySubst (qvars `zip` targs)
+  = Just (if null qvars
+          then (pat, body)
+          else (tySubstPat ty_subst pat, tySubstExpr ty_subst body))
+  | otherwise
+  = Nothing
 
 {- Note [Avoid name clashes in inlineCall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -642,9 +655,11 @@ optGradFun _ _ _ (BaseUserFun {}) _
 optGradFun env TupleAD ty f args
   | TypeTuple [res_ty, lm_ty] <- ty
   , Just opt_grad <- optGradFun env BasicAD lm_ty f new_args
+  , let tfun = TFun { tf_ret = res_ty, tf_fun = Fun JustFun f
+                    , tf_targs = [] }  -- SLPJ: fix me
   = Just $
     mkLets binds $
-    Tuple [ Call (TFun res_ty (Fun JustFun f)) new_args, opt_grad ]
+    Tuple [ Call tfun new_args, opt_grad ]
   | otherwise
   = Nothing
   where
@@ -790,29 +805,35 @@ optLMApply _ (AD TupleAD dir) (Tuple [_, lm]) dx
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only
-optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun JustFun (PrimFun f))) es) dx
+optLMApply env (AD BasicAD dir) (Call (TFun { tf_fun = Fun JustFun (PrimFun f) }) es) dx
   = optLMApplyCall env dir f es dx
 
 -- Looking at:   D$f(e1, e2) `lmApply` dx
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
-optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (Fun (GradFun adp2) f)) es) dx
-  | adp1 == adp2
+optLMApply _ (AD adp1 Fwd) (Call tfun es) dx
+  | TFun { tf_ret = TypeLM _ t, tf_fun = Fun (GradFun adp2) f } <- tfun
+  , adp1 == adp2
+  , let grad_fun = TFun { tf_ret = tangentType t
+                        , tf_fun = Fun (DrvFun (AD adp1 Fwd)) f
+                        , tf_targs = [] } -- SLPJ: fix me
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType t) (Fun (DrvFun (AD adp1 Fwd)) f)
     es_dx = Tuple [es, dx]
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
-optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (Fun (GradFun adp2) f)) es) dx
-  | adp1 == adp2
+optLMApply _ (AD adp1 Rev) (Call tfun es) dx
+  | TFun { tf_ret = TypeLM s _, tf_fun = Fun (GradFun adp2) f } <- tfun
+  , adp1 == adp2
+  , let grad_fun = TFun { tf_ret = tangentType s
+                        , tf_fun = Fun (DrvFun (AD adp1 Rev)) f
+                        , tf_targs = [] }  -- SLPJ: fix me
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType s) (Fun (DrvFun (AD adp1 Rev)) f)
     es_dx = Tuple [es, dx]
 
 {-

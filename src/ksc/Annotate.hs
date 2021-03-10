@@ -12,7 +12,7 @@ module Annotate (
 import Lang
 import LangUtils
 import KMonad
-import Ksc.Traversal ( traverseOf, over )
+import Ksc.Traversal ( traverseOf )
 import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
@@ -55,11 +55,12 @@ annotDecls gbl_env decls
     -- We don't have a type-checked body yet, but that
     -- doesn't matter because we aren't doing inlining
     mk_rec_def :: DefX Parsed -> TcM TDef
-    mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
+    mk_rec_def (Def { def_fun = fun, def_qvars = qvs
+                    , def_pat = pat, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr_fun) $
-         tcWithPat pat $ \pat' ->
-         do { fun' <- tcUserFunArgTy @Parsed fun (typeof pat')
-            ; return (Def { def_fun = fun', def_pat = pat'
+         do { fun' <- tcUserFunArgTy @Parsed fun qvs pat
+            ; return (Def { def_fun = fun', def_qvars = qvs
+                          , def_pat = pat
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
       where ppr_fun = pprUserFun @Parsed fun
@@ -95,23 +96,26 @@ tcDeclX (GDefDecl gdef) = do { gdef' <- tcGDef gdef
 
 tcDef :: forall p. (Pretty (BaseUserFun p), InPhase p) => DefX p -> TcM TDef
 tcDef (Def { def_fun    = fun
-           , def_pat   = pat
+           , def_qvars  = qvs
+           , def_pat    = pat
            , def_res_ty = res_ty
            , def_rhs    = rhs })
   = addCtxt (text "In the definition of" <+> ppr_fun) $
-    do { tcWithPat pat $ \pat' ->
+    tcWithPat pat $
     do { rhs' <- tcRhs fun rhs res_ty
-       ; fun' <- tcUserFunArgTy @p fun (typeof pat')
-       ; return (Def { def_fun = fun', def_pat = pat'
+       ; fun' <- tcUserFunArgTy @p fun qvs pat
+       ; return (Def { def_fun = fun'
+                     , def_qvars = qvs
+                     , def_pat = pat
                      , def_rhs = rhs', def_res_ty = res_ty })
-    }}
+    }
       where ppr_fun = pprUserFun @p fun
 
 -- Adds the variables in the pattern to the symbol table and
 -- runs the continuation on the pattern.
-tcWithPat :: Pat -> (Pat -> TcM a) -> TcM a
+tcWithPat :: Pat -> TcM a -> TcM a
 tcWithPat pat continueWithArg
-  = do { extendLclSTM (patVars pat) $ continueWithArg pat }
+  = extendLclSTM (patVars pat) continueWithArg
 
 -- Checks that the type of pat matches expected_ty and if so returns
 -- the type-annotated Pat.
@@ -193,21 +197,30 @@ tcGDef g@(GDef d f)
        }
 
 tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
-               => UserFun p -> Type
+               => UserFun p -> [TyVar] -> Pat
                -> TcM (UserFun Typed)
-tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
-  Right (Just baseTy) -> case addBaseTypeToUserFun @p fun baseTy of
-    Right r -> pure r
-    Left appliedTy ->
-      tcFail (text "The base type did not match the applied type"
-              $$ text "The argument type was" <+> ppr arg_ty
-              $$ text "from which the base type was determined to be" <+> ppr baseTy
-              $$ text "but the applied type was" <+> ppr appliedTy)
-  Right Nothing -> traverseOf (baseFunFun . baseUserFunType) f fun
-    where f = \case
-            Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
-            Just appliedTy -> pure appliedTy
-  Left err -> tcFail err
+tcUserFunArgTy fun qvs pat
+  | not (null qvs)
+  = case addArgTypeDescriptor @p fun Poly of
+      Right r -> pure r
+      Left _  -> tcFail (text "The function is polymorphic but its Fun is monomorphic")
+
+  | otherwise
+  = case baseFunArgTy_maybe fun arg_ty of
+      Right (Just baseTy) -> case addArgTypeDescriptor @p fun (Mono baseTy) of
+        Right r        -> pure r
+        Left appliedTy ->
+          tcFail (text "The base type did not match the applied type"
+                  $$ text "The argument type was" <+> ppr arg_ty
+                  $$ text "from which the base type was determined to be" <+> ppr baseTy
+                  $$ text "but the applied type was" <+> ppr appliedTy)
+      Right Nothing -> traverseOf (baseFunFun . baseUserFunType) f fun
+        where f = \case
+                Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
+                Just appliedTy -> pure appliedTy
+      Left err -> tcFail err
+  where
+    arg_ty = typeof pat
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
@@ -223,15 +236,19 @@ tcExpr (Var vx)
 tcExpr (Konst k)
   = return (TE (Konst k) (typeofKonst k))
 
-tcExpr (Call fx es)
+tcExpr (Call fx arg)
   = do { let (fun, mb_ty) = getFun @p fx
-       ; pairs <- addCtxt (text "In the call of:" <+> ppr fun) $
-                  tcExpr es
-       ; (funTyped, res_ty) <- addCtxt (text "In the call of:" <+> ppr fun) $
-                               lookupGblTc fun pairs
-       ; res_ty <- checkTypes_maybe mb_ty res_ty $
+       ; arg_typed <- addCtxt (text "In the call of:" <+> ppr fun) $
+                      tcExpr arg
+       ; fun_typed <- addCtxt (text "In the call of:" <+> ppr fun) $
+                      lookupFunTc fun arg_typed
+       ; let res_ty = tFunResTy fun_typed
+       ; _res_ty <- checkTypes_maybe mb_ty res_ty $
          text "Function call type mismatch for" <+> ppr fun
-       ; let call' = Call (TFun res_ty funTyped) (exprOf pairs)
+         -- SLPJ: _res_ty comes from original TFun when checking;
+         -- Here we simply replace it with the one gotten from the argument
+         -- They are, after all, equal!
+       ; let call' = Call fun_typed (exprOf arg_typed)
        ; return (TE call' res_ty) }
 
 tcExpr (Let vx rhs body)
@@ -289,57 +306,6 @@ tcVar var mb_ty
   = do { ty <- lookupLclTc var
        ; checkTypes_maybe mb_ty ty $
          text "Variable occurrence mis-match for" <+> ppr var }
-
------------------------------------------------
---     The typecheck monad
------------------------------------------------
-
-userCallDef_maybe :: HasCallStack
-                  => UserFun Typed -> GblSymTab -> Either SDoc TDef
-userCallDef_maybe fn env
-  = case lookupGblST fn env of
-      Just def -> Right def
-      Nothing  -> Left (text "Not in scope: userCall:"
-                        <+> ppr_fn $$ message)
-        where message = if null similarEnv
-                        then empty
-                        else text "Did you mean one of these:"
-                             $$ vcat similarEnv
-              similarEnv = (map ppr
-                            . filter similar
-                            . Map.keys) env
-              similar envfn =
-                editDistance (render ppr_fn) (render (ppr envfn))
-                <= configEditDistanceThreshold
-              editDistance = E.levenshteinDistance E.defaultEditCosts
-
-              ppr_fn = pprUserFun @Typed fn
-
-userCallResultTy_maybe :: HasCallStack
-                       => UserFun Typed -> GblSymTab -> Type -> Either SDoc Type
-userCallResultTy_maybe fn env args
-  = do { def <- userCallDef_maybe fn env
-       ; userCallResultTy_help def args }
-
-userCallResultTy_help :: HasCallStack
-                      => TDef -> Type -> Either SDoc Type
-userCallResultTy_help (Def { def_fun  = fn
-                           , def_res_ty = ret_ty
-                           , def_pat = pat })
-                      args
-  = check_args (patType pat) (typeof args)
-  where
-    check_args :: Type -> Type -> Either SDoc Type
-    check_args bndr_ty arg_ty
-      | bndr_ty `compatibleType` arg_ty
-      = Right ret_ty
-      | otherwise
-      = Left (hang (text "Type mis-match in argument"
-                     <+> text "of call to" <+> ppr_fn)
-                 2 (vcat [ text "Expected:" <+> ppr bndr_ty
-                         , text "Actual:  " <+> ppr arg_ty ]))
-      where ppr_fn = pprUserFun @Typed fn
-
 
 -----------------------------------------------
 --     The typecheck monad
@@ -478,37 +444,131 @@ lookupLclTc v
                                    , text "Envt:" <+> lclDoc st ])
            Just ty -> return ty }
 
-lookupGblTc :: Fun Parsed -> TypedExpr -> TcM (Fun Typed, Type)
-lookupGblTc fun args
-  = do { st <- getSymTabTc
-       ; (funTyped, callResultTy_maybe) <- case perhapsUserFun fun of
-           Right userFun -> do
-             { userFun' <- tcUserFunArgTy @Parsed userFun ty
-             ; pure (userFunToFun userFun',
-                     userCallResultTy_maybe userFun' (gblST st) ty) }
-           Left fun' -> pure (over baseFunFun PrimFun fun', primCallResultTy_maybe fun' ty)
+lookupFunTc :: Fun Parsed -> TypedExpr -> TcM (TFun Typed)
+lookupFunTc fun@(Fun ds (PrimFun p)) arg
+  = do { case primCallResultTy_maybe (Fun ds p) (typeof arg) of {
+            Left err     -> tcFail $ hang err 2 (mk_extra fun arg) ;
+            Right res_ty ->
 
-       ; res_ty <- case callResultTy_maybe of
-                     Left err -> tcFail $ hang err 2 (mk_extra funTyped st)
-                     Right res_ty -> return res_ty
-       ; pure (funTyped, res_ty)
-       }
+         return (TFun { tf_fun   = Fun ds (PrimFun p)
+                      , tf_targs = []
+                      , tf_ret   = res_ty }) } }
   where
-    ty = typeof args
-    mk_extra fun st
+    mk_extra fun arg
       = vcat [ text "In a call of:" <+> ppr fun
-             , text " Arg types:" <+> ppr ty
-             , text " Args:"      <+> ppr (exprOf args)
-             , text "ST lookup:"  <+> case maybeUserFun fun of
-                                         Nothing -> text "<not a UserFun>"
-                                         Just userFun -> ppr (lookupGblST userFun (gblST st))
-             -- This is very verbose, and obscures error messages, but can be useful for typos.
-             -- Perhaps think about printing it only for failed lookup of userfun
-             -- , text "ST keys:" <+> gblDoc st
-             ]
+             , text "   Arg types:" <+> ppr (typeof arg)
+             , text "        Args:" <+> ppr (exprOf arg) ]
 
--- gblDoc :: SymTab -> SDoc
--- gblDoc st = vcat (map (text . show) (Map.keys (gblST st)))
+
+
+lookupFunTc fun@(Fun ds (BaseUserFun (BaseUserFunId fun_name _))) arg
+  = do { let arg_ty = typeof arg
+
+       ; base_ty <- findBaseFunArgTy fun arg_ty
+       ; def <- lookupFunDef (Fun ds fun_name) base_ty
+
+       -- Check that arg_ty is acceptable, and return the instantiation
+       ; checkArgTy def arg_ty }
+
+
+checkArgTy :: TDef -> Type -> TcM (TFun Typed)
+-- Check to see if an argument of type arg_ty is acceptable
+-- the supplied function.  If so, return the instantiation
+-- of the function's type parameters, and the (instantiated) type
+-- of its result.  If not, fail.
+checkArgTy (Def { def_fun = Fun der user_fun, def_qvars = qvars
+                , def_pat = pat, def_res_ty = res_ty })
+           arg_ty
+  | Just subst <- matchTy (typeof pat) arg_ty
+  = return (TFun { tf_fun   = Fun der (BaseUserFun user_fun)
+                 , tf_targs = map (tySubstTyVar subst) qvars
+                 , tf_ret   = tySubstTy subst res_ty })
+  | otherwise
+  = tcFail (hang (text "Type mis-match in argument"
+                     <+> text "of call to" <+> ppr user_fun)
+                 2 (vcat [ text "Expected:" <+> ppr pat_ty
+                         , text "Actual:  " <+> ppr arg_ty ]))
+  where
+    pat_ty = typeof pat
+
+
+findBaseFunArgTy :: Fun Parsed -> Type -> TcM Type
+-- Turns the argument type of the (perhaps derived) function
+--   into the argument type of the /base/ function
+-- The input (Fun Parsed) may, optionally, have a base-type supplied
+--   in the source code; if not, we try to work it out from argument type
+findBaseFunArgTy fun arg_ty
+  = case baseFunArgTy_maybe fun arg_ty of
+      Left err      -> tcFail err
+      Right Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
+      Right (Just base_ty) -> return base_ty
+
+lookupFunDef :: DerivedFun BaseUserFunName
+             -> Type
+             -> TcM TDef
+lookupFunDef fn base_arg_ty
+  = do { st <- getSymTabTc
+       ; case lookupBindings fn (gblST st) of {
+             Nothing       -> fail "no-bind" ;
+             Just bindings ->
+
+           case bindings of {
+              PolyBind def    -> return def ;
+              MonoBinds binds ->
+
+           case Map.lookup base_arg_ty binds of
+              Just def -> return def
+              Nothing  -> fail "mono-bind" }}}
+  where
+    fail s = tcFail $
+             vcat [ text "Not in scope: userCall:" <+> ppr (fmap text fn)
+                  , text s ]
+
+
+userCallDef_maybe :: HasCallStack
+                  => UserFun Typed -> GblSymTab -> Either SDoc TDef
+userCallDef_maybe fn env
+  = case lookupDef fn env of
+      Just def -> Right def
+      Nothing  -> Left (text "Not in scope: userCall:"
+                        <+> ppr_fn $$ message)
+  where
+    message = if null similarEnv
+              then empty
+              else text "Did you mean one of these:"
+                   $$ vcat similarEnv
+    similarEnv = (map ppr
+                  . filter similar
+                  . Map.keys) env
+    similar envfn = editDistance (render ppr_fn) (render (ppr envfn))
+                    <= configEditDistanceThreshold
+    editDistance = E.levenshteinDistance E.defaultEditCosts
+
+    ppr_fn = pprUserFun @Typed fn
+
 
 lclDoc :: SymTab -> SDoc
 lclDoc st = vcat (map (text . show) (Map.keys (lclST st)))
+
+
+{-
+userCallResultTy_help :: HasCallStack
+                      => TDef -> Type -> Either SDoc Type
+userCallResultTy_help (Def { def_fun  = fn
+                           , def_res_ty = ret_ty
+                           , def_pat = pat })
+                      args
+  = check_args (patType pat) (typeof args)
+  where
+    check_args :: Type -> Type -> Either SDoc Type
+    check_args bndr_ty arg_ty
+      | bndr_ty `compatibleType` arg_ty
+      = Right ret_ty
+      | otherwise
+      = Left (hang (text "Type mis-match in argument"
+                     <+> text "of call to" <+> ppr_fn)
+                 2 (vcat [ text "Expected:" <+> ppr bndr_ty
+                         , text "Actual:  " <+> ppr arg_ty ]))
+      where ppr_fn = pprUserFun @Typed fn
+-}
+
