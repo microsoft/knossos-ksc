@@ -468,23 +468,21 @@ funType :: Applicative f
         -> Fun p -> f (Fun q)
 funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
 
+-- In the Parsed phase, if the user didn't supply a type, add it;
+-- otherwise (and in other phases, where the type is there) check that
+-- the type matches.  If mis-match return (Left
+-- type-that-was-in-UserFun)
 addBaseTypeToUserFun :: forall p. InPhase p
                      => UserFun p -> Type -> Either Type (UserFun Typed)
-addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
-  []   -> Right fWithBaseType
-  -- We can only ever have one mismatched type but the type system
-  -- doesn't know this (affine traversals don't exist)
-  mismatchedAppliedTy:_ -> Left mismatchedAppliedTy
-  where (mismatchedAppliedTyL, fWithBaseType) =
-          T.traverseOf (userFunBaseType @p) g f
+addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) checkBaseType userfun
+  where checkBaseType :: Maybe Type -> Either Type Type
+        checkBaseType maybeAppliedType
+          | Just appliedTy <- maybeAppliedType
+          , not (eqType appliedTy expectedBaseTy)
+          = Left appliedTy
+          | otherwise
+          = Right expectedBaseTy
 
-        mismatchedAppliedTyF = \case
-          Just appliedTy -> if eqType appliedTy expectedBaseTy
-                            then []
-                            else [appliedTy]
-          Nothing -> []
-
-        g mt' = (mismatchedAppliedTyF mt', expectedBaseTy)
 
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = T.mapOf baseFunFun BaseUserFun
