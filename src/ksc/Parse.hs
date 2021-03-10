@@ -353,7 +353,7 @@ pSelFun = do { rest <- try $ do { f <- pIdentifier
                  Just selfun -> pure selfun
              }
 
-pBaseUserFunWithType :: (Type -> BaseUserFunT p) -> Parser (BaseUserFun p)
+pBaseUserFunWithType :: (Type -> BaseUserFunArgTy p) -> Parser (BaseUserFun p)
 pBaseUserFunWithType add =
      brackets (do { f  <- pIdentifier
                   ; ty <- pType
