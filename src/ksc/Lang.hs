@@ -356,10 +356,13 @@ identified by a 'Fun'.  The internal structure of a 'Fun' is:
 
   See definition of 'type Fun'
 
-* A base function is a pair of name (e.g. 'mul') and argument type
+* A base function is either a primitive ('PrimFun') or a base user
+  function ('BaseUserFun')
+
+* A base user function is a pair of name (e.g. 'mul') and argument type
   (e.g. (Float, Float))
 
-  See definition of 'type BaseFun'.  The reason we need a (name, type)
+  See definition of 'data BaseUserFun'.  The reason we need a (name, type)
   pair is that distinct global functions can have the same name but
   different argument type. See below.
 
