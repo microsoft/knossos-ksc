@@ -58,8 +58,8 @@ data DefX p  -- f x = e
   -- Definitions are user-annotated with argument types
   -- (via TVar) and result types (via TFun)
 
-deriving instance (Eq (BaseUserFunT p), Eq (RhsX p)) => Eq (DefX p)
-deriving instance (Show (BaseUserFunT p), Show (RhsX p)) => Show (DefX p)
+deriving instance (Eq (BaseUserFunArgTy p), Eq (RhsX p)) => Eq (DefX p)
+deriving instance (Show (BaseUserFunArgTy p), Show (RhsX p)) => Show (DefX p)
 
 type Def  = DefX Parsed
 type TDef = DefX Typed
@@ -398,24 +398,24 @@ types.
 
 -}
 
-data BaseUserFun p = BaseUserFunId String (BaseUserFunT p)
+data BaseUserFun p = BaseUserFunId String (BaseUserFunArgTy p)
 
-deriving instance Eq (BaseUserFunT p) => Eq (BaseUserFun p)
-deriving instance Ord (BaseUserFunT p) => Ord (BaseUserFun p)
-deriving instance Show (BaseUserFunT p) => Show (BaseUserFun p)
+deriving instance Eq (BaseUserFunArgTy p) => Eq (BaseUserFun p)
+deriving instance Ord (BaseUserFunArgTy p) => Ord (BaseUserFun p)
+deriving instance Show (BaseUserFunArgTy p) => Show (BaseUserFun p)
 
-type family BaseUserFunT p where
-  BaseUserFunT Parsed   = Maybe Type
-  BaseUserFunT OccAnald = Type
-  BaseUserFunT Typed    = Type
+type family BaseUserFunArgTy p where
+  BaseUserFunArgTy Parsed   = Maybe Type
+  BaseUserFunArgTy OccAnald = Type
+  BaseUserFunArgTy Typed    = Type
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
              | PrimFun PrimFun      -- PrimFuns do not have a Def
 
-deriving instance Eq   (BaseUserFunT p) => Eq   (BaseFun p)
-deriving instance Ord  (BaseUserFunT p) => Ord  (BaseFun p)
-deriving instance Show (BaseUserFunT p) => Show (BaseFun p)
+deriving instance Eq   (BaseUserFunArgTy p) => Eq   (BaseFun p)
+deriving instance Ord  (BaseUserFunArgTy p) => Ord  (BaseFun p)
+deriving instance Show (BaseUserFunArgTy p) => Show (BaseFun p)
 
 data DerivedFun funid
                 = Fun      funid         -- The function              f(x)
@@ -437,7 +437,7 @@ type UserFun p = DerivedFun (BaseUserFun p)
 type Fun     p = DerivedFun (BaseFun p)
 
 baseUserFunT :: Functor f
-             => (BaseUserFunT p -> f (BaseUserFunT q))
+             => (BaseUserFunArgTy p -> f (BaseUserFunArgTy q))
              -> BaseUserFun p -> f (BaseUserFun q)
 baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
 
@@ -464,7 +464,7 @@ userFunBaseType :: forall p f. (InPhase p, Applicative f)
 userFunBaseType = baseFunFun . baseUserFunType @p
 
 funType :: Applicative f
-        => (BaseUserFunT p -> f (BaseUserFunT q))
+        => (BaseUserFunArgTy p -> f (BaseUserFunArgTy q))
         -> Fun p -> f (Fun q)
 funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
 
@@ -551,7 +551,7 @@ deriving instance Ord (Fun p) => Ord (TFun p)
 
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
-coerceTFun :: BaseUserFunT p ~ BaseUserFunT q
+coerceTFun :: BaseUserFunArgTy p ~ BaseUserFunArgTy q
            => TFun p -> TFun q
 coerceTFun (TFun t f) = TFun t (T.mapOf funType id f)
 
