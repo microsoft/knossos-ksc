@@ -315,7 +315,7 @@ arguments, not one tuple.
 
 We choose N names for the argument variables and pack them into a
 tuple before emitting the function body.  We ensure that the names
-that we chose are not used in the function body by using substExpr.
+that we chose are not used in the function body by using ensureDon'tReuseParams.
 
 A consequence of this translation is that we have to unpack tuples in
 *calls* too.  When 'x' of type 'Tuple [S1, ..., SN]', 'Call f x' needs
