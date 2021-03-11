@@ -2,7 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import Union, List, Tuple, Any
+from typing import Any, FrozenSet, List, Optional, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord
@@ -227,10 +227,19 @@ class Expr(ASTNode):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
         self._num_nodes = 1 + sum(ch.num_nodes for ch in self.children())
+        self._free_vars = self._free_vars()
+
+    def _free_vars(self):
+        """ A hook for subclasses to override. Called once at construction time and overwritten with its own result. """
+        return frozenset().union(*[ch.free_vars for ch in self.children()])
 
     @property
     def num_nodes(self) -> int:
         return self._num_nodes
+
+    @property
+    def free_vars(self) -> FrozenSet[StructuredName]:
+        return self._free_vars
 
     def children(self):
         """
@@ -354,6 +363,13 @@ class Var(Expr):
     def __init__(self, name, type=None, decl=False):
         super().__init__(type_=type, name=name, decl=decl)
 
+    @property
+    def structured_name(self):
+        return StructuredName.from_str(self.name)
+
+    def _free_vars(self):
+        return frozenset([self.structured_name])
+
     def __str__(self):
         if self.decl:
             return self.name + " : " + str(self.type_)
@@ -380,6 +396,9 @@ class Call(Expr):
             name = StructuredName.from_str(name)
         super().__init__(name=name, args=args)
 
+    def _free_vars(self):
+        return super()._free_vars().union(frozenset([self.name]))
+
     def children(self):
         return self.args
 
@@ -397,6 +416,9 @@ class Lam(Expr):
 
     def __init__(self, arg, body):
         super().__init__(type_=None, arg=arg, body=body)
+
+    def _free_vars(self):
+        return self.body.free_vars - self.arg.free_vars
 
 class Let(Expr):
     '''Let(vars, rhs, body). 
@@ -418,6 +440,12 @@ class Let(Expr):
 
     def __init__(self, vars, rhs, body):
         super().__init__(vars=vars, rhs=rhs, body=body)
+
+    def _free_vars(self):
+        bound_vars = self.vars.free_vars if isinstance(self.vars, Var) else frozenset.union(
+            *[var.free_vars for var in self.vars]
+        )
+        return self.rhs.free_vars.union(self.body.free_vars - bound_vars)
 
 
 class If(Expr):

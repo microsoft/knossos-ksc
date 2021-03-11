@@ -42,3 +42,24 @@ def test_num_nodes():
   #from ksc.type_propagate import type_propagate
   #type_propagate(e, {StructuredName(("add", Type.Tuple(Type.Integer, Type.Integer))): Type.Integer})
   assert e.num_nodes == 7 # Let, tuple, 1, 2, Call, x, y
+
+def test_free_vars():
+  assert Const(11.3).free_vars == frozenset()
+
+  x = Var("x")
+  x_name = StructuredName.from_str("x")
+  assert x.free_vars == frozenset([x_name])
+
+  # Binding
+  y = Var("y")
+  y_name = StructuredName.from_str("y")
+  assert Let(x, Call("add", [y, Const(1)]), Call("add", [x, x])).free_vars == frozenset(
+    [y_name, StructuredName.from_str("add")]) # x not free
+
+  # Rebinding
+  assert Let(x, Call("add", [x, Const(1)]), Call("mul", [y, y])).free_vars == frozenset(
+    [x_name, y_name, StructuredName.from_str("add"), StructuredName.from_str("mul")])
+
+  assert Lam(x, x).free_vars == frozenset()
+  assert Lam(x, y).free_vars == frozenset([y_name])
+  assert If(x, y, Const(0)).free_vars == frozenset([x_name, y_name])
