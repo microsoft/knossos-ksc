@@ -13,9 +13,6 @@ import GHC.Stack
 
 import Data.Maybe (mapMaybe, fromMaybe)
 
--- for unit test
---import Test.Hspec
-
 --------------- Generate names for gradded indentifiers
 
 gradF :: HasCallStack => ADPlan -> Fun Typed -> Fun Typed
