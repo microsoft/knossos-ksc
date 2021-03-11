@@ -85,7 +85,7 @@ class StructuredName:
 
     def is_derivation(self):
         """
-        True if this is a "rev" or "fwd" etc of another StructuredName
+        True if this is a "rev"/"fwd" etc of another StructuredName
         """
         return isinstance(self.se, tuple) and isinstance(self.se[1], StructuredName)
 
@@ -142,7 +142,7 @@ class StructuredName:
         assert isinstance(self.se[1], Type)
         return self.se[1]
 
-    def add_type(self, ty) -> (Type, 'StructuredName'):
+    def add_type(self, ty) -> ('StructuredName', Type):
         """
         Return a new structured name, with "ty" inserted in the corner, returning the old type if any
         sn = parse("[shape [rev foo]]")
@@ -151,13 +151,13 @@ class StructuredName:
             new_sname is "[shape [rev [foo Float]]]"
         """
         if isinstance(self.se, str):
-            return None, StructuredName((self.se, ty))
+            return StructuredName((self.se, ty)), None
         if self.is_derivation():
-            old_ty, new_sn = self.se[1].add_type(ty)
-            return old_ty, StructuredName((self.se[0], new_sn))
+            new_sn, old_ty  = self.se[1].add_type(ty)
+            return StructuredName((self.se[0], new_sn)), old_ty
         
         old_ty = self.se[1]
-        return old_ty, StructuredName((self.se[0], ty))
+        return StructuredName((self.se[0], ty)), old_ty
 
     def mangle_without_type(self) -> str:
         """
