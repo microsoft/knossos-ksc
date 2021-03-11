@@ -1,7 +1,7 @@
 """
 Expr: lightweight classes implementing the Knossos IR
 """
-
+import re
 from typing import Any, FrozenSet, List, Optional, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
@@ -228,6 +228,7 @@ class Expr(ASTNode):
         super().__init__(**args)
         self._num_nodes = 1 + sum(ch.num_nodes for ch in self.children())
         self._free_vars = self._free_vars()
+        self._next_unused_var_num = max((ch._next_unused_var_num for ch in self.children()), default=0)
 
     def _free_vars(self):
         """ A hook for subclasses to override. Called once at construction time and overwritten with its own result. """
@@ -345,6 +346,8 @@ class Const(Expr):
     def __str__(self):
         return repr(self.value)
 
+temp_regex = re.compile("_([0-9]+)$")
+
 class Var(Expr):
     '''Var(name, type, decl). 
     Examples:
@@ -362,6 +365,9 @@ class Var(Expr):
 
     def __init__(self, name, type=None, decl=False):
         super().__init__(type_=type, name=name, decl=decl)
+        m = temp_regex.match(name)
+        if m:
+            self._next_unused_var_num = int(m.group(1)) + 1
 
     @property
     def structured_name(self):

@@ -63,3 +63,12 @@ def test_free_vars():
   assert Lam(x, x).free_vars == frozenset()
   assert Lam(x, y).free_vars == frozenset([y_name])
   assert If(x, y, Const(0)).free_vars == frozenset([x_name, y_name])
+
+def test_next_unused_var_num():
+  # Testing a private/protected member; there is no need to expose it to clients.
+  assert Var("x")._next_unused_var_num == 0
+  assert Var("_1")._next_unused_var_num == 2
+  assert Var("_2x")._next_unused_var_num == 0
+  assert Var("__1")._next_unused_var_num == 0
+  assert If(Var("_0"), Var("_3"), Var("x"))._next_unused_var_num == 4
+  assert Let(Var("_1"), Var("x"), Var("_1"))._next_unused_var_num == 2 # Conservative but safe
