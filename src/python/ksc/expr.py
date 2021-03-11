@@ -227,13 +227,13 @@ class Expr(ASTNode):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
 
-    def nodes(self):
+    def children(self):
         """
-        Return child nodes of this expr
+        Return child Exprs of this Expr. Does not include binding occurrences of Vars.
         """
-        assert False # TODO: remove this method
-        for nt in self.__annotations__:
-            yield getattr(self, nt)
+        return [getattr(self, k)
+            for k,v in self.__annotations__.items()
+                if v == Expr]  # Do not include subclasses
 
     def __str__(self):
         def to_str(v):
@@ -374,6 +374,9 @@ class Call(Expr):
         if isinstance(name, str):
             name = StructuredName.from_str(name)
         super().__init__(name=name, args=args)
+
+    def children(self):
+        return self.args
 
 class Lam(Expr):
     '''Lam(arg, body).
