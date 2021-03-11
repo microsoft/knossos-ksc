@@ -51,6 +51,8 @@ type SUFRevPass =
 -- Generate the SUF/BOG-AD foward and reverse pass from an expression
 -- already in Single Use Form (see Ksc.SUF for more details on Single
 -- Use Form).
+--
+-- See Note [Automatic differentiation documentation]
 sufFwdRevPass :: SUFFwdRevPass
 sufFwdRevPass gst subst = \case
   -- FWD{k} = (k, ())

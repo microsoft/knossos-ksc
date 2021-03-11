@@ -13,6 +13,17 @@ import GHC.Stack
 
 import Data.Maybe (mapMaybe, fromMaybe)
 
+{- Note [Automatic differentiation documentation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ksc has a variety of different automatic differentiation algorithms.
+Information about how to obtain the PDF in which our AD algorithms are
+documented can be found at
+
+https://github.com/microsoft/knossos-ksc/blob/master/README-ksc.md#getting-the-pdf
+
+-}
+
 --------------- Generate names for gradded indentifiers
 
 gradF :: HasCallStack => ADPlan -> Fun Typed -> Fun Typed
@@ -75,6 +86,8 @@ gradDefInner _ (Def { def_pat = TupPat {} })
 gradDefInner _ _ = Nothing
 
 
+-- See Note [Automatic differentiation documentation]
+--
 -- s -> (Expr :: t) -> (Expr :: s -o t)
 gradE :: HasCallStack => ADPlan -> Shape -> TExpr -> TExpr
 gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
