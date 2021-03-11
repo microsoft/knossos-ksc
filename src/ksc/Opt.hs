@@ -610,6 +610,7 @@ optSumBuild _ _ _ = Nothing
 
 
 -----------------------
+-- See Note [Automatic differentiation documentation]
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
                            -> Type -> BaseFun Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
@@ -651,6 +652,7 @@ makeAtomic always_bind in_scope args
          bind = (tv, arg)
          in_scope' = extendInScopeSet tv in_scope
 
+-- See Note [Automatic differentiation documentation]
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 --   sel 2 3 :: (a,b,c) -> b
 -- D$sel 2 3 :: (a,b,c) -> (a,b,c) -o b
@@ -719,10 +721,12 @@ optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ render (ppr f) ++
 
 
 -----------------------
+-- See Note [Automatic differentiation documentation]
 optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
 optDrvFun (AD BasicAD dir) (PrimFun f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
+-- See Note [Automatic differentiation documentation]
 optDrvPrim :: HasCallStack => ADDir -> PrimFun -> TExpr -> Maybe TExpr
 
 optDrvPrim Fwd P_constVec (Tuple [n_v, dn_dv])
@@ -745,6 +749,8 @@ optDrvPrim Rev P_Vec_init (Tuple [_v, ddr])
 optDrvPrim _ _ _ = Nothing
 
 ---------------
+-- See Note [Automatic differentiation documentation]
+--
 -- Called for (lmApply lm dx)
 optLMApply :: InScopeSet -> ADMode -> TExpr -> TExpr -> Maybe TExpr
 
@@ -800,6 +806,8 @@ optLMApply _ _ _e _
     Nothing
 
 ------------------
+-- See Note [Automatic differentiation documentation]
+--
 -- Optimise (lmApply (fun arg) dx)
 -- Only for the BasicAD form
 optLMApplyCall :: HasCallStack
