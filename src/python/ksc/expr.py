@@ -85,7 +85,7 @@ class StructuredName:
 
     def is_derivation(self):
         """
-        True if this is a "rev" or "fwd" etc of another StructuredName
+        True if this is a "rev"/"fwd" etc of another StructuredName
         """
         return isinstance(self.se, tuple) and isinstance(self.se[1], StructuredName)
 

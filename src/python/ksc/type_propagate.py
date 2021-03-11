@@ -211,7 +211,7 @@ def infer_fn_type_from_derived_fn_args(sname : StructuredName, argtype : Type) -
     else:
         return argtype
 
-def add_type_to_def(sname : StructuredName, argtype : Type) -> StructuredName:
+def add_type_to_sname(sname : StructuredName, argtype : Type) -> StructuredName:
     if sname.is_derivation():
         fn_type = infer_fn_type_from_derived_fn_args(sname, argtype)
     else:
@@ -235,7 +235,7 @@ def _(ex, symtab):
     # Name to look up is function "signature": name and argtypes
     argtypes = tuple(a.type_ for a in ex.args)
     argtype = make_tuple_if_many(argtypes)
-    ex.name = add_type_to_def(ex.name, argtype)
+    ex.name = add_type_to_sname(ex.name, argtype)
 
     # Check for definition in symtab with different return type 
     if ex.name in symtab:
@@ -277,7 +277,7 @@ def _(ex, symtab):
 def _(ex, symtab):
     # (edef name return_type arg_types)
     argtype = make_tuple_if_many(ex.arg_types)
-    ex.name = add_type_to_def(ex.name, argtype)
+    ex.name = add_type_to_sname(ex.name, argtype)
 
     if ex.name in symtab and symtab[ex.name] != ex.return_type:
         raise KSTypeError(f"Double definition: {ex.name}\n -> {symtab[ex.name]}\n vs {ex.return_type}")
@@ -317,7 +317,14 @@ def _(ex, symtab):
     argtypes = tuple(a.type_ for a in ex.args)
     argtype = make_tuple_if_many(argtypes)
     
-    ex.name = add_type_to_def(ex.name, argtype)
+    # Try prim lookup first - prims cannot be overloaded
+    prim = ks_prim_lookup(ex.name, argtypes)
+    if prim != None:
+        ex.type_ = prim
+        return ex
+
+    # Add the type to the sname 
+    ex.name = add_type_to_sname(ex.name, argtype)
 
     # Check symbol table first
     if ex.name in symtab:
@@ -325,12 +332,6 @@ def _(ex, symtab):
         return ex
 
     # Note: "derived functions", e.g. shape$foo, grad$foo, must be fully specified if, as is common, their signatures don't match foo
-
-    # Try prim lookup
-    prim = ks_prim_lookup(ex.name, argtypes)
-    if prim != None:
-        ex.type_ = prim
-        return ex
 
     # Not found, show what was found to improve error message
     argtypes_str = ",".join(map(pformat, argtypes))
