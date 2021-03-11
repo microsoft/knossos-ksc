@@ -270,11 +270,11 @@ If you prefer block comments then use pairs of #| and |#
 ; "edef" is somewhat like a C function declaration.  You can even define
 ; manual derivatives (i.e. using "def") for your function.
 (edef my_log Float (Float))
-(edef [D my_log] (LM Float Float) (Float)) ; External definition of Jacobian
+(edef [D [my_log Float]] (LM Float Float) (Float)) ; External definition of Jacobian
 (edef [Dt my_log] (Tuple Float (LM Float Float)) (Float)) ; and its transpose
 
 ;; KS-visible definition of forward derivative
-(def [fwd my_log] Float ((x : Float) (dx : Float)) 
+(def [fwd [my_log Float]] Float ((x : Float) (dx : Float)) 
      (div dx x))
 ;; KS-visible definition of reverse derivative
 (def [rev my_log] Float ((x : Float) (d_dmy_log : Float)) 
