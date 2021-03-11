@@ -1,8 +1,9 @@
 """
 Expr: lightweight classes implementing the Knossos IR
 """
+from abc import ABC, abstractmethod
 import re
-from typing import Any, FrozenSet, List, Optional, Tuple, Union
+from typing import Any, Callable, FrozenSet, List, Mapping, NamedTuple, Optional, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord
@@ -218,7 +219,7 @@ class ASTNode(KRecord):
         assert kwargs.keys() == self.__annotations__.keys()
         super().__init__(**kwargs)
 
-class Expr(ASTNode):
+class Expr(ASTNode, ABC):
     '''Base class for Expression AST nodes. Not directly instantiable.'''
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
@@ -259,6 +260,54 @@ class Expr(ASTNode):
             return str(v)
         nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + ' ' + ' '.join(nodes))
+
+    class ReplaceLocationRequest(NamedTuple):
+        """ This is a pure DTO/struct for recording requests to replace_subtree. """
+        # Location within the root Expr, i.e. upon which replace_subtree is called, that should be replaced
+        target_idx: int
+
+        # An Expression to be "delivered" to that index, i.e. with the same value as it would have at the top.
+        # That is, any binders on the path from the root to <target_idx> that bind variables free in <payload>,
+        # will be alpha-renamed so that <payload> sees the same values in those variables that it would have at the root.
+        payload: "Expr"
+
+        # If applicator is None, then replace_subtree should merely replace the node at <target_idx> with <payload>.
+        # Otherwise, the replacement (new) subtree is given by applicator(payload, x) where x is
+        #    - the node currently at that location,
+        #    - but *after* any alpha-renaming necessary to preserve the meaning of <payload>.
+        applicator: Optional[Callable[["Expr", "Expr"], "Expr"]]=None
+
+    def replace_subtrees(self, reqs: List[ReplaceLocationRequest]) -> "Expr":
+        return self._cav_helper(0, sorted(reqs, key=lambda rlr: rlr.target_idx), {})
+
+    def replace_subtree(self, *args):
+        return self.replace_subtrees([Expr.ReplaceLocationRequest(*args)])
+
+    def replace_free_vars(self, subst: Mapping[str, "Expr"]) -> "Expr":
+        return self._cav_helper(0, [], subst)
+
+    def _cav_helper(self, start_idx: int, reqs: List[ReplaceLocationRequest], substs: Mapping[str, "Expr"]) -> "Expr":
+        # First, work out if there's anything to do in this subtree
+        reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + self.num_nodes)]
+        substs = {v:e for v,e in substs.items() if StructuredName.from_str(v) in self.free_vars}
+        if len(reqs) == 0:
+            if len(substs) == 0:
+                # Nothing to do in this subtree
+                return self
+        elif reqs[0].target_idx == start_idx:
+            # Apply here
+            if reqs[0].applicator is None:
+                return reqs[0].payload
+            # Continue renaming. (And if any of the *other* ReplaceLocationRequests apply within, do those too.)
+            renamed_self = self._cav_helper(start_idx, reqs[1:], substs)
+            return reqs[0].applicator(reqs[0].payload, renamed_self)
+        return self._cav_children(start_idx, reqs, substs)
+
+    @abstractmethod
+    def _cav_children(self, start_idx, reqs: List[ReplaceLocationRequest], substs: Mapping[str, "Expr"]) -> "Expr":
+        # Subclasses should override to call _cav_helper on all children, modulo e.g. binding,
+        # and then return a new version of themselves containing the results
+        pass
 
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 
