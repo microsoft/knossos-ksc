@@ -1,7 +1,6 @@
 """
 Expr: lightweight classes implementing the Knossos IR
 """
-from abc import ABC, abstractmethod
 import re
 from typing import Any, Callable, FrozenSet, List, Mapping, NamedTuple, Optional, Tuple, Union
 from dataclasses import dataclass
@@ -219,7 +218,7 @@ class ASTNode(KRecord):
         assert kwargs.keys() == self.__annotations__.keys()
         super().__init__(**kwargs)
 
-class Expr(ASTNode, ABC):
+class Expr(ASTNode):
     '''Base class for Expression AST nodes. Not directly instantiable.'''
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
@@ -303,11 +302,18 @@ class Expr(ASTNode, ABC):
             return reqs[0].applicator(reqs[0].payload, renamed_self)
         return self._cav_children(start_idx, reqs, substs)
 
-    @abstractmethod
-    def _cav_children(self, start_idx, reqs: List[ReplaceLocationRequest], substs: Mapping[str, "Expr"]) -> "Expr":
-        # Subclasses should override to call _cav_helper on all children, modulo e.g. binding,
-        # and then return a new version of themselves containing the results
-        pass
+    def _cav_children(self, start_idx, reqs: List[ReplaceLocationRequest], substs: Mapping[str, "Expr"], factory=None) -> "Expr":
+        # Applies cav_helper to all children, then constructs a new version of self using factory.
+        # If factory is None, self.__class__ is used.
+        # Subclasses should override to deal with e.g. binding.
+        if factory is None:
+            factory = self.__class__
+        new_children = []
+        ch_idx = start_idx + 1
+        for ch in self.children():
+            new_children.append(ch._cav_helper(ch_idx, reqs, substs))
+            ch_idx += ch.num_nodes
+        return factory(*new_children)
 
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 
@@ -456,6 +462,14 @@ class Call(Expr):
 
     def children(self):
         return self.args
+
+    def _cav_children(self, start_idx, reqs, substs):
+        name = self.name
+        if name.se in substs: # Will only match if name.se is a str.
+            # The variable (holding the function we are calling) is being substituted.
+            # It had better be a rename to another variable, because we can't Call anything else....
+            name = substs[name.se].structured_name
+        return super()._cav_children(start_idx, reqs, substs, factory=lambda *args: Call(name, list(args)))
 
 class Lam(Expr):
     '''Lam(arg, body).
