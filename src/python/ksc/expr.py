@@ -210,14 +210,25 @@ def make_structured_name(se) -> StructuredName:
 ########################################################################
 # TLDs. 
 
-class Expr(KRecord):
-    '''Base class for AST nodes.'''
+class ASTNode(KRecord):
+    ''' Base class for AST nodes. Not directly instantiable. '''
+    def __init__(self, **kwargs):
+        # This assertion prevents intermediate classes (ASTNode, Expr) from being instantiated.
+        # (KRecord doesn't mind).
+        assert kwargs.keys() == self.__annotations__.keys()
+        super().__init__(**kwargs)
+
+    def __str__(self):
+        nodes = (str(getattr(self, nt)) for nt in self.__annotations__)
+        return paren(type(self).__name__ + ' ' + ' '.join(nodes))
+
+class Expr(ASTNode):
+    '''Base class for Expression AST nodes. Not directly instantiable.'''
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
-    # TODO: lift Def,EDef,Rule to "ASTNode" and make Expr an "ASTNode".
 
     def __init__(self, **args):
-        self.type_ = None
+        self.type_ = args.pop("type_", None)
         super().__init__(**args)
 
     def nodes(self):
@@ -228,11 +239,7 @@ class Expr(KRecord):
         for nt in self.__annotations__:
             yield getattr(self, nt)
 
-    def __str__(self):
-        nodes = (str(getattr(self, nt)) for nt in self.__annotations__)
-        return paren(type(self).__name__ + ' ' + ' '.join(nodes))
-
-class Def(Expr):
+class Def(ASTNode):
     '''Def(name, return_type, args, body). 
     Example:
     ```
@@ -250,7 +257,7 @@ class Def(Expr):
         assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
-class EDef(Expr):
+class EDef(ASTNode):
     '''Edef(name, return_type, args). 
     Example:
     ```
@@ -266,7 +273,7 @@ class EDef(Expr):
     def __init__(self, name, return_type, arg_types):
         super().__init__(name=name, return_type=return_type, arg_types=arg_types)
 
-class GDef(Expr):
+class GDef(ASTNode):
     '''Gdef(name, return_type, args). 
     Example:
     ```
@@ -284,7 +291,7 @@ class GDef(Expr):
     def name(self):
         return StructuredName((derivation, function_name))
 
-class Rule(Expr):
+class Rule(ASTNode):
     '''Rule(name, args, e1, e2). 
     Example:
     ```
