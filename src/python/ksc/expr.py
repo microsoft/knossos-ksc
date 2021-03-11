@@ -226,6 +226,11 @@ class Expr(ASTNode):
     def __init__(self, **args):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
+        self._num_nodes = 1 + sum(ch.num_nodes for ch in self.children())
+
+    @property
+    def num_nodes(self) -> int:
+        return self._num_nodes
 
     def children(self):
         """
