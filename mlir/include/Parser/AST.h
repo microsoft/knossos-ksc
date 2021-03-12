@@ -162,6 +162,27 @@ struct Signature {
 
 std::ostream& operator<<(std::ostream& s, Signature const& t);
 
+// SName: StructuredName
+// Either:
+//     sin                                String
+//     [pow (Tuple Float Integer)]        String Type
+//     [fwd [sin Float]]                  String SName
+struct SName {
+  using Ptr = std::unique_ptr<SName>;
+
+  SName(llvm::StringRef name, Type type=Type(Type::None)):id(name), type(type) {}
+  SName(llvm::StringRef derivation, SName::Ptr sname):id(derivation), sname(std::move(sname)) {}
+
+  std::string id;
+  Type type;
+  std::unique_ptr<SName> sname;
+
+  bool isDerivation() const { return sname != 0; }
+
+  bool hasType() const { return isDerivation() ? sname->hasType() : !type.isNone(); }
+};
+std::ostream& operator<<(std::ostream& s, SName const& t);
+
 /// A node in the AST.
 struct Expr {
   using Ptr = std::unique_ptr<Expr>;

@@ -59,6 +59,15 @@ std::ostream& operator<<(std::ostream& s, Signature const& t)
   return s << ")";
 }
 
+std::ostream& operator<<(std::ostream& s, SName const& t)
+{
+  if (t.isDerivation()) 
+    return s << "[" << t.id << " " << *t.sname << "]";
+  if (t.hasType())
+    return s << "[" << t.id << " " << t.type << "]";
+  return s << t.id;
+}
+
 std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "type [";
   type.dump(s);
