@@ -81,7 +81,7 @@ static Literal::Ptr getZero(Type type) {
 }
 
 //
-Declaration *Parser::addExtraDecl(std::string name, std::vector<Type> argTypes, Type returnType) {
+Declaration *Parser::addExtraDecl(SName const& name, std::vector<Type> argTypes, Type returnType) {
   Signature sig {name, argTypes};
   auto& decl = function_decls[sig];
   if (decl) {
@@ -137,8 +137,13 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
   // If the first expr is not a value, this is a block of blocks
   auto head = tok->getHead();
   if (!head->isValue) {
-    // This is an actual block
-    return parseBlock(tok);
+    if (head->isSquareBracket()) {
+      // First expr is a structured name: this must be a call
+      return parseCall(tok);
+    } else {
+      // This is an actual block
+      return parseBlock(tok);
+    }
   }
 
   // First child is a value, can be all sorts of block types
@@ -287,7 +292,7 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
 Call::Ptr Parser::parseCall(const Token *tok) {
   PARSE_ENTER;
 
-  string name = tok->getHead()->getValue();
+  SName name = parseSName(tok->getHead());
   int arity = tok->size() - 1;
 
   Declaration* decl = nullptr;
@@ -312,6 +317,9 @@ Call::Ptr Parser::parseCall(const Token *tok) {
     return make_unique<Call>(decl_iter->second, move(operands));
 
   // Function wasn't found - it may be a Prim that we handle here.
+  PARSE_ASSERT(!name.isDerivation()) << "No declaration found for derived function: " << sig;   // Prims cannot be derived functions
+  PARSE_ASSERT(!name.hasType()) << "No declaration found for function: " << sig;  // Prims do not have their types specified
+  std::string primName = name.baseFunctionName;
 
   // Helper to construct the call
   auto mkCall = [&name, &types, &operands, this](Type const& type) {
@@ -325,16 +333,16 @@ Call::Ptr Parser::parseCall(const Token *tok) {
   const auto Integer = Type(Type::Integer);
 
   // print(T1, ..., Tn) -> Integer
-  if (name == "print")
+  if (primName == "print")
     // Cons up a new decl for this combination of print and Type
     return mkCall(Integer);
 
 #define MATCH_1(NAME, ARGTYPE_0) \
-  (arity == 1 && name == NAME && \
+  (arity == 1 && primName == NAME && \
    types[0] == Type::ARGTYPE_0)
 
 #define MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1) \
-  (arity == 2 && name == NAME &&            \
+  (arity == 2 && primName == NAME &&            \
    types[0] == Type::ARGTYPE_0 &&           \
    types[1] == Type::ARGTYPE_1)
 
@@ -377,7 +385,7 @@ Call::Ptr Parser::parseCall(const Token *tok) {
   if (MATCH_1("sum", Vector))              return mkCall(types[0].getSubType());
 
   // ts_add(T, dT)
-  if (name == "ts_add" && arity == 2) {
+  if (primName == "ts_add" && arity == 2) {
     Type ty0 = types[0];
     Type ty1 = types[1];
     PARSE_ASSERT(ty1 == ty0.tangentType()) << "ts_add defined between tangentType and type";
@@ -472,15 +480,12 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
   const Token *ty = tok->getChild(2);
   const Token *args = tok->getChild(3);
 
-  PARSE_ASSERT2(name->isValue, name) << "Decl should be (edef name type args)";
-
   auto type = parseType(ty);
   PARSE_ASSERT2(!type.isNone(), ty) << "Parsing decl [" << name << "]";
 
   PARSE_ASSERT2(!args->isValue, args) << "Parsing decl [" << name << "]";
 
-  auto decl = make_unique<Declaration>(name->getValue(), type);
-  PARSE_ASSERT(decl);
+  auto decl = make_unique<Declaration>(parseSName(name), type);
 
   // Vector and Tuples can be declared bare
   if (args->getChild(0)->isValue &&
@@ -490,7 +495,7 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
     for (auto &c : args->getChildren())
       decl->addArgType(parseType(c.get()));
 
-  Signature sig{name->getValue(), decl->getArgTypes()};
+  Signature sig{decl->getName(), decl->getArgTypes()};
   function_decls[sig] = decl.get();
   return decl;
 }
@@ -505,8 +510,6 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   const Token *tok_type = tok->getChild(2);
   const Token *args = tok->getChild(3);
   const Token *tok_body = tok->getChild(4);
-  
-  PARSE_ASSERT2(name->isValue, name) << "Def name should be a value, not [" << name << "]";
 
   auto type = parseType(tok_type);
   PARSE_ASSERT2(!type.isNone(), tok_type) << "Unknown return type [" << tok_type << "]";
@@ -521,14 +524,14 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
       arguments.push_back(parseVariable(a.get()));
 
   // Create node early, to allow recursion
-  auto node = make_unique<Definition>(name->getValue(), type);
+  auto node = make_unique<Definition>(parseSName(name), type);
   std::vector<Type> argTypes;
   for (auto &a : arguments) {
     PARSE_ASSERT(a->kind == Expr::Kind::Variable);
     argTypes.push_back(a->getType());
     node->addArgument(move(a));
   }
-  Signature sig {name->getValue(), argTypes};
+  Signature sig {node->getName(), argTypes};
   function_decls[sig] = node->getDeclaration();
   
   // Function body is a block, create one if single expr

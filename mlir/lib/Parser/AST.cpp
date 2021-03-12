@@ -134,7 +134,7 @@ std::ostream& Declaration::dump(std::ostream& s, size_t tab) const {
 
 std::ostream& Definition::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Definition:" << endl;
-  s << string(tab + 2, ' ') << "name [" << decl->getName().data() << "]"
+  s << string(tab + 2, ' ') << "name [" << decl->getName() << "]"
        << endl;
   Expr::dump(s, tab + 2);
   s << string(tab + 2, ' ') << "Arguments:" << endl;
@@ -256,11 +256,44 @@ std::string encodeName(std::string const& s)
 }
 
 std::string Declaration::getMangledName() const {
+  if (name.hasType())
+    return name.getMangledName();
+  
+  /* If the function name is plain identifier rather than
+     a structured name, we mangle the argument types
+     of the function in order to support overloading.
+     Note that this is different from the bejaviour of
+     ksc Cgen, which generates unmangled names for primitive
+     functions (because they can be implemented as
+     C++ template functions). */
   if (argTypes.size() == 0)
-    return name;
-  std::string ret = name + "@";
+    return name.baseFunctionName;
+  std::string ret = name.baseFunctionName + "@";
   for(auto &ty: argTypes)
       ret += mangleType(ty);
+  return encodeName(ret);
+}
+
+std::string SName::getMangledName() const {
+  std::string ret;
+  for (auto& derivation : derivations) {
+    ret += derivation;
+    ret += '$';
+  }
+  ret += baseFunctionName;
+  if (hasType()) {
+    if (baseFunctionArgType.isTuple()) {
+      if (!baseFunctionArgType.getSubTypes().empty()) {
+        ret += '@';
+        for (auto &ty : baseFunctionArgType.getSubTypes()) {
+          ret += mangleType(ty);
+        }
+      }
+    } else {
+      ret += '@';
+      ret += mangleType(baseFunctionArgType);
+    }
+  }
   return encodeName(ret);
 }
 
