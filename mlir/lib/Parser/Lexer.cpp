@@ -177,14 +177,14 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
   }
 
   first = true;
-  ret.s = "(";
+  ret.s += tok->getOpeningBracket();
   for (auto &s : strs) {
     if (!first)
       ret.s += sep;
     ret.s += s;
     first = false;
   }
-  ret.s += ")";
+  ret.s += tok->getClosingBracket();
 
   return ret;
 }

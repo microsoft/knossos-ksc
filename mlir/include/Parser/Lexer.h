@@ -80,9 +80,15 @@ struct Token {
     assert(children.size() > 0 && "No tail");
     return llvm::ArrayRef<Ptr>(children).slice(1);
   }
-  bool isSquareBracket() const { 
+  char getOpeningBracket() const {
     assert(!isValue && "No children in a value token");
-    return value == "[";
+    return value[0];
+  }
+  char getClosingBracket() const {
+    return getOpeningBracket() == '[' ? ']' : ')';
+  }
+  bool isSquareBracket() const {
+    return getOpeningBracket() == '[';
   }
 
   Location const& getLocation() const  { return loc; }
