@@ -121,7 +121,7 @@ class StructuredName:
         True if the innermost se is a type
         """
         if isinstance(self.se, str):
-            return None
+            return False
         
         if self.is_derivation():
             return self.se[1].has_type()
