@@ -380,7 +380,7 @@ Values Generator::buildCall(const AST::Call* call) {
   if (!func) {
     // Didn't find it... assert
     asserter a("Unknown function", __FILE__, __LINE__);
-    a << " " << std::string(name) << "(";
+    a << " " << name << "(";
     for(size_t i = 0; i < arity; ++i) {
       a << call->getOperand(i)->getType();
       if (i+1 < arity)

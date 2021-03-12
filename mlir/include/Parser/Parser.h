@@ -128,7 +128,7 @@ public:
   const Block* getExtraDecls() {
     return extraDecls.get();
   }
-  Declaration* addExtraDecl(std::string name, std::vector<Type> types, Type returnType);
+  Declaration* addExtraDecl(SName const& name, std::vector<Type> types, Type returnType);
 };
 
 } // namespace AST
