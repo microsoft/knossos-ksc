@@ -80,6 +80,7 @@ class Parser {
   Type parseRelaxedType(std::vector<const Token *> toks);
 
   SName parseSName(const Token* tok);
+  SName parseSNameWithType(const Token* tok);
 
   Block::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);  // Literal or Variable use
