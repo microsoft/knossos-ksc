@@ -236,7 +236,13 @@ class Expr(ASTNode):
             yield getattr(self, nt)
 
     def __str__(self):
-        nodes = (str(getattr(self, nt)) for nt in self.__annotations__)
+        def to_str(v):
+            if isinstance(v, list):
+                # __str__ on list contains repr of elements
+                contents = ", ".join([to_str(e) for e in v])
+                return f"[{contents}]"
+            return str(v)
+        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + ' ' + ' '.join(nodes))
 
 class Def(ASTNode):
