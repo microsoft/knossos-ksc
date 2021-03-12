@@ -188,16 +188,6 @@ Block::Ptr Parser::parseBlock(const Token *tok) {
   return unique_ptr<Block>(b);
 }
 
-// Return true if tok coud be a type.  
-// It's designed to avoid false negatives, but doesn't guarantee that parseType will succeed.
-static bool tryParseType(const Token *tok) {
-  if (tok->isValue) {
-    Type::ValidType ty = Str2Type(tok->getValue());
-    return ty != Type::None;
-  }
-  return tryParseType(tok->getChild(0));  
-}
-
 // Parses type declarations (vector, tuples)
 Type Parser::parseType(const Token *tok) {
   PARSE_ENTER;
@@ -253,14 +243,18 @@ Type Parser::parseRelaxedType(vector<const Token *> toks) {
 SName Parser::parseSName(const Token *tok) {
   if (tok->isValue)
     return SName(tok->getValue());
-  // Token is a list -- either [name Type] or [derivaton SName]
-  PARSE_ASSERT(tok->size() == 2 && tok->getChild(0)->isValue) << "Structured name is wither <id> or [<id> (<type>|<sname>)], not " << tok;
+  else
+    return parseSNameWithType(tok);
+}
+
+SName Parser::parseSNameWithType(const Token * tok) {
+  PARSE_ASSERT(tok->size() == 2 && tok->getChild(0)->isValue) << "Structured name is either [<id> <type>] or [<derivation> <sname>], not " << tok;
   std::string id = tok->getChild(0)->getValue();
   Token const* snd = tok->getChild(1);
-  if (tryParseType(snd))
+  if (!snd->isValue && snd->isSquareBracket())
+    return SName(id, std::make_unique<SName>(parseSNameWithType(snd)));
+  else
     return SName(id, parseType(snd));
-
-  return SName(id, std::make_unique<SName>(parseSName(snd)));
 }
 
 // Values (variable names, literals, type names)
