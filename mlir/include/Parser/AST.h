@@ -147,21 +147,6 @@ inline Type Type::tangentType() const
   return Type(None);
 }
 
-struct Signature {
-  std::string name;
-  std::vector<Type> argTypes;   
-
-  bool operator<(Signature const& that) const {
-    return name < that.name ||
-          (name == that.name && argTypes < that.argTypes);
-  }
-  bool operator==(Signature const& that) const {
-    return name == that.name && argTypes == that.argTypes;
-  }
-};
-
-std::ostream& operator<<(std::ostream& s, Signature const& t);
-
 // SName: StructuredName
 // Either:
 //     sin                                String
@@ -182,6 +167,21 @@ struct SName {
   bool hasType() const { return isDerivation() ? sname->hasType() : !type.isNone(); }
 };
 std::ostream& operator<<(std::ostream& s, SName const& t);
+
+struct Signature {
+  std::string name;
+  std::vector<Type> argTypes;   
+
+  bool operator<(Signature const& that) const {
+    return name < that.name ||
+          (name == that.name && argTypes < that.argTypes);
+  }
+  bool operator==(Signature const& that) const {
+    return name == that.name && argTypes == that.argTypes;
+  }
+};
+
+std::ostream& operator<<(std::ostream& s, Signature const& t);
 
 /// A node in the AST.
 struct Expr {
