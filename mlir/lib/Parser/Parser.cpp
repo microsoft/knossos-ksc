@@ -252,7 +252,7 @@ SName Parser::parseSNameWithType(const Token * tok) {
   std::string id = tok->getChild(0)->getValue();
   Token const* snd = tok->getChild(1);
   if (!snd->isValue && snd->isSquareBracket())
-    return SName(id, std::make_unique<SName>(parseSNameWithType(snd)));
+    return SName(id, parseSNameWithType(snd));
   else
     return SName(id, parseType(snd));
 }

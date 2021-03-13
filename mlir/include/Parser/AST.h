@@ -155,16 +155,27 @@ inline Type Type::tangentType() const
 struct SName {
   using Ptr = std::unique_ptr<SName>;
 
-  SName(llvm::StringRef name, Type type=Type(Type::None)):id(name), type(type) {}
-  SName(llvm::StringRef derivation, SName::Ptr sname):id(derivation), sname(std::move(sname)) {}
+  SName(llvm::StringRef name, Type type=Type(Type::None)):baseFunctionName(name), baseFunctionArgType(type) {}
+  SName(llvm::StringRef derivation, SName base) : SName(std::move(base)) { derivations.insert(derivations.begin(), std::string(derivation)); }
 
-  std::string id;
-  Type type;
-  std::unique_ptr<SName> sname;
+  std::vector<std::string> derivations;  // Derivations applied to the base function, in order from outermost to innermost
+  std::string baseFunctionName;
+  Type baseFunctionArgType;
 
-  bool isDerivation() const { return sname != 0; }
+  bool operator<(SName const& that) const {
+    return std::tie(derivations, baseFunctionName, baseFunctionArgType)
+      < std::tie(that.derivations, that.baseFunctionName, that.baseFunctionArgType);
+  }
+  bool operator==(SName const& that) const {
+    return derivations == that.derivations
+      && baseFunctionName == that.baseFunctionName
+      && baseFunctionArgType == that.baseFunctionArgType;
+  }
+  bool operator!=(SName const& that) const { return !(*this == that); }
 
-  bool hasType() const { return isDerivation() ? sname->hasType() : !type.isNone(); }
+  bool isDerivation() const { return !derivations.empty(); }
+
+  bool hasType() const { return !baseFunctionArgType.isNone(); }
 };
 std::ostream& operator<<(std::ostream& s, SName const& t);
 
