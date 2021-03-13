@@ -203,8 +203,15 @@ def infer_fn_type_from_derived_fn_args(sname : StructuredName, argtype : Type) -
         if derivation == "shape":
             S = argtype
             return infer_fn_type_from_derived_fn_args(sname.se[1], S)
+        
+        # [suffwdpass f] : S -> (T, BOG)
+        if derivation == "suffwdpass":
+            S = argtype
+            return infer_fn_type_from_derived_fn_args(sname.se[1], S)
 
-        return None
+        # If we can't deduce the base function argument type,
+        # it must be specified in the structured name.
+        return sname.get_type()
     
     if sname.has_type():
         return sname.se[1]
