@@ -61,11 +61,18 @@ std::ostream& operator<<(std::ostream& s, Signature const& t)
 
 std::ostream& operator<<(std::ostream& s, SName const& t)
 {
-  if (t.isDerivation()) 
-    return s << "[" << t.id << " " << *t.sname << "]";
-  if (t.hasType())
-    return s << "[" << t.id << " " << t.type << "]";
-  return s << t.id;
+  for (auto& derivation : t.derivations) {
+    s << '[' << derivation << ' ';
+  }
+  if (t.hasType()) {
+    s << '[' << t.baseFunctionName << ' ' << t.baseFunctionArgType << ']';
+  } else {
+    s << t.baseFunctionName;
+  }
+  for (auto& derivation : t.derivations) {
+    s << ']';
+  }
+  return s;
 }
 
 std::ostream&  Expr::dump(std::ostream& s, size_t tab) const {
