@@ -93,13 +93,13 @@ int main(int argc, char **argv) {
   }
   auto source = Source::NONE;
   llvm::StringRef filename(argv[nextarg++]);
-  if (filename.endswith(".ks"))
+  if (filename.endswith(".ks") || filename.endswith(".kso"))
     source = Source::KSC;
   else if (filename.endswith(".mlir"))
     source = Source::MLIR;
   else {
     cerr << "ERROR: Unknown source file " << filename.str()
-         << ". Must be [ks, mlir]\n";
+         << ". Must be [ks, kso, mlir]\n";
     return 1;
   }
   ifstream file(filename.str());
