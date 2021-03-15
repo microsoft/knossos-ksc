@@ -346,15 +346,20 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 
     _ksc_path,ksc_runtime_dir = get_ksc_paths()
 
-    msvc_options = [
-        "/std:c++17",
+    cflags = [
         "-DKS_INCLUDE_ATEN" if use_aten else "", #TODO: check syntax
     ]
 
-    gcc_options = [
-        "-std=c++17",
-        "-DKS_INCLUDE_ATEN" if use_aten else "",
-    ]
+    # I don't like this assumption about Windows -> cl but it matches what PyTorch is currently doing:
+    # https://github.com/pytorch/pytorch/blob/ad8d1b2aaaf2ba28c51b1cb38f86311749eff755/torch/utils/cpp_extension.py#L1374-L1378
+    # We're making a guess here if people recognifigure their C++ compiler on Windows it's because they're using non-MSVC
+    # otherwise we need to inspect the end of the path path for cl[.exe].
+
+    cpp_compiler = os.environ.get('CXX')
+    if (cpp_compiler == None and sys.platform == 'win32'):
+        cflags.append("/std:c++17")
+    else:
+        cflags.append("-std=c++17")
 
     cpp_str_torch_extension = cpp_str.replace("PYTHON_MODULE_NAME", "TORCH_EXTENSION_NAME") # Let PyTorch handle naming - it has versioning
 
@@ -363,8 +368,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
                 name="dynamic_ksc_cpp",
                 cpp_sources=[cpp_str_torch_extension],
                 extra_include_paths=[ksc_runtime_dir],
-                # extra_cflags = msvc_options
-                extra_cflags = gcc_options
+                extra_cflags = cflags
             )
 
     return module
