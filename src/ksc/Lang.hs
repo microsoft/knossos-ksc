@@ -529,6 +529,9 @@ isSelFun = \case
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun = view baseFunFun
 
+baseFunIsn'tSelFun :: Fun p -> Bool
+baseFunIsn'tSelFun = not . isSelFun . baseFunOfFun
+
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
 
