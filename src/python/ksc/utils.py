@@ -363,7 +363,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
                 name="dynamic_ksc_cpp",
                 cpp_sources=[cpp_str_torch_extension],
                 extra_include_paths=[ksc_runtime_dir],
-                # extra_cflags=["/std:c++17", "-DKS_INCLUDE_ATEN"], # MSVC... pick 1
                 # extra_cflags = msvc_options
                 extra_cflags = gcc_options
             )
