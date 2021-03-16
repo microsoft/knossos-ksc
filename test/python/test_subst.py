@@ -61,6 +61,17 @@ def test_replace_subtree_avoids_capture():
   expected = Let(Var("_0"), If(Var("p"), Var("a"), Var("b")), Call("add", [Var("_0"), new_subtree]))
   assert replaced == expected
 
+def test_replace_subtree_avoids_capturing_another():
+  e = Let(Var("x"), If(Var("p"), Var("a"), Var("b")), Call("foo", [Var("_0"), Var("x"), Var("y")]))
+  new_subtree = Call("mul", [Var("x"), Const(2)])
+  assert _get_node(e, 8) == Var("y")
+  replaced = replace_subtree(e, 8, new_subtree)
+  # Must rename the "x".
+  # Since we don't have alpha-equivalence yet, this must second-guess the new name,
+  # but the new name must be chosen to avoid capturing the _0.
+  expected = Let(Var("_1"), If(Var("p"), Var("a"), Var("b")), Call("foo", [Var("_0"), Var("_1"), new_subtree]))
+  assert replaced == expected
+
 def test_replace_subtree_applicator_allows_capture():
   e = Let(Var("x"), If(Var("p"), Var("a"), Var("b")), Call("add", [Var("x"), Var("y")]))
   new_subtree = Call("mul", [Var("x"), Const(2)])

@@ -89,22 +89,23 @@ def _cav_call(e: Call, start_idx, reqs, substs):
         name = substs[name.se].structured_name
     return _cav_expr(e, start_idx, reqs, substs, factory=lambda *args: Call(name, list(args)))
 
-def _rename_if_needed(arg: Var, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
+def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
 ) -> Tuple[Var, VariableSubstitution]:
     """ If <arg> binds a variable free in any Expr's in a request payload or the RHS of a substitution,
-        then returns a new Var (chosen not to capture any variable free...as above), and an updated <subst>.
+        then returns a new Var (chosen not to capture any variable free in <binder> or as above),
+        and an updated <subst>.
         Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
     """
     all_potential_binders = [req.payload for req in reqs] + list(subst.values())
     if any(arg.structured_name in rhs.free_vars for rhs in all_potential_binders):
         # Must rename "arg". Make a new name.
-        nv = Var.numbered(max(e._next_unused_var_num for e in all_potential_binders))
+        nv = Var.numbered(max(e._next_unused_var_num for e in [binder]+all_potential_binders))
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 
 @_cav_children.register(Lam)
 def _cav_lam(e: Lam, start_idx, reqs, substs):
-    arg, substs = _rename_if_needed(e.arg, req, substs)
+    arg, substs = _rename_if_needed(e.arg, e, req, substs)
     return Lam(arg, _cav_helper(e.body, start_idx + 1, reqs, substs))
 
 
@@ -114,7 +115,7 @@ def _cav_let(e: Let, start_idx, reqs, substs):
     # alpha-rename any capturing `e.vars` in `e.body` only
     body_subst = substs
     for var in ([e.vars] if isinstance(e.vars, Var) else e.vars):
-        new_var, body_subst = _rename_if_needed(var, reqs, body_subst)
+        new_var, body_subst = _rename_if_needed(var, e, reqs, body_subst)
         new_vars.append(new_var)
     if len(new_vars) == 1:
         assert isinstance(e.vars, Var)
