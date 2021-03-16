@@ -2,6 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 import re
+from functools import singledispatch
 from typing import Any, FrozenSet, List, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
@@ -229,12 +230,8 @@ class Expr(ASTNode):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
         self._num_nodes = 1 + sum(ch.num_nodes for ch in self.children())
-        self._free_vars = self._free_vars()
+        self._free_vars = calc_fv(self)
         self._next_unused_var_num = max((ch._next_unused_var_num for ch in self.children()), default=0)
-
-    def _free_vars(self):
-        """ A hook for subclasses to override. Called once at construction time and overwritten with its own result. """
-        return frozenset().union(*[ch.free_vars for ch in self.children()])
 
     @property
     def num_nodes(self) -> int:
@@ -379,9 +376,6 @@ class Var(Expr):
     def structured_name(self):
         return StructuredName.from_str(self.name)
 
-    def _free_vars(self):
-        return frozenset([self.structured_name])
-
     def __str__(self):
         if self.decl:
             return self.name + " : " + str(self.type_)
@@ -408,9 +402,6 @@ class Call(Expr):
             name = StructuredName.from_str(name)
         super().__init__(name=name, args=args)
 
-    def _free_vars(self):
-        return super()._free_vars().union(frozenset([self.name]))
-
     def children(self):
         return self.args
 
@@ -428,9 +419,6 @@ class Lam(Expr):
 
     def __init__(self, arg, body):
         super().__init__(type_=None, arg=arg, body=body)
-
-    def _free_vars(self):
-        return self.body.free_vars - self.arg.free_vars
 
 class Let(Expr):
     '''Let(vars, rhs, body). 
@@ -452,12 +440,6 @@ class Let(Expr):
 
     def __init__(self, vars, rhs, body):
         super().__init__(vars=vars, rhs=rhs, body=body)
-
-    def _free_vars(self):
-        bound_vars = self.vars.free_vars if isinstance(self.vars, Var) else frozenset.union(
-            *[var.free_vars for var in self.vars]
-        )
-        return self.rhs.free_vars.union(self.body.free_vars - bound_vars)
 
 class If(Expr):
     '''If(cond, t_body, f_body). 
@@ -491,16 +473,45 @@ class Assert(Expr):
         super().__init__(cond=cond, body=body)
 
 #####################################################################
-# pystr:
-#  Expression to string, formatted in a loose python-like syntax
-#  This isn't a backend, just a way to view the expr structure in a format
-#  slightly more palatable than s-expressions
+# Calculate free variables of an Expr.
+# Called at Expr-construction time and cached in the object.
 #
 # This also serves as an example of a user-defined AST visitor.
 # Defining functions on each node type using singledispatch is a clean
 # way to write recursive tree transformations.
 
-from functools import singledispatch
+@singledispatch
+def calc_fv(e: Expr):
+    raise ValueError("Should only be called on 'Expr's")
+
+@calc_fv.register(Expr)
+def fv_expr(e: Expr):
+    return frozenset().union(*[ch.free_vars for ch in e.children()])
+
+@calc_fv.register(Var)
+def fv_var(e: Var):
+    return frozenset([e.structured_name])
+
+@calc_fv.register(Call)
+def fv_call(e: Call):
+    return fv_expr(e).union(frozenset([e.name]))
+
+@calc_fv.register(Lam)
+def fv_lam(e: Lam):
+    return e.body.free_vars - e.arg.free_vars
+
+@calc_fv.register(Let)
+def fv_let(e: Let):
+    bound_here = e.vars.free_vars if isinstance(e.vars, Var) else frozenset.union(
+        *[var.free_vars for var in e.vars]
+    )
+    return e.rhs.free_vars.union(e.body.free_vars - bound_here)
+
+#####################################################################
+# pystr:
+#  Expression to string, formatted in a loose python-like syntax
+#  This isn't a backend, just a way to view the expr structure in a format
+#  slightly more palatable than s-expressions
 
 from ksc.expr import Expr, Def, EDef, GDef, Call, Const, Var, If
 
