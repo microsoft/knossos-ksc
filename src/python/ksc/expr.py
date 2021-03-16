@@ -2,7 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 import re
-from typing import Any, Callable, FrozenSet, List, Mapping, NamedTuple, Optional, Tuple, Union
+from typing import Any, FrozenSet, List, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord
@@ -260,65 +260,6 @@ class Expr(ASTNode):
         nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + ' ' + ' '.join(nodes))
 
-    class ReplaceLocationRequest(NamedTuple):
-        """ This is a pure DTO/struct for recording requests to replace_subtree. """
-        # Location within the root Expr, i.e. upon which replace_subtree is called, that should be replaced
-        target_idx: int
-
-        # An Expression to be "delivered" to that index, i.e. with the same value as it would have at the top.
-        # That is, any binders on the path from the root to <target_idx> that bind variables free in <payload>,
-        # will be alpha-renamed so that <payload> sees the same values in those variables that it would have at the root.
-        payload: "Expr"
-
-        # If applicator is None, then replace_subtree should merely replace the node at <target_idx> with <payload>.
-        # Otherwise, the replacement (new) subtree is given by applicator(payload, x) where x is
-        #    - the node currently at that location,
-        #    - but *after* any alpha-renaming necessary to preserve the meaning of <payload>.
-        applicator: Optional[Callable[["Expr", "Expr"], "Expr"]]=None
-
-    # Type of variable substitutions. This reflects Var.name being a 'str', despite Call.name being a 'StructuredName'.
-    # Q. Do we need to make Var.name be a StructuredName too?
-    VariableSubstitution = Mapping[str, "Expr"]
-
-    def replace_subtrees(self, reqs: List[ReplaceLocationRequest]) -> "Expr":
-        return self._cav_helper(0, sorted(reqs, key=lambda rlr: rlr.target_idx), {})
-
-    def replace_subtree(self, *args):
-        return self.replace_subtrees([Expr.ReplaceLocationRequest(*args)])
-
-    def replace_free_vars(self, subst: VariableSubstitution) -> "Expr":
-        return self._cav_helper(0, [], subst)
-
-    def _cav_helper(self, start_idx: int, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> "Expr":
-        # First, work out if there's anything to do in this subtree
-        reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + self.num_nodes)]
-        substs = {v:e for v,e in substs.items() if StructuredName.from_str(v) in self.free_vars}
-        if len(reqs) == 0:
-            if len(substs) == 0:
-                # Nothing to do in this subtree
-                return self
-        elif reqs[0].target_idx == start_idx:
-            # Apply here
-            if reqs[0].applicator is None:
-                return reqs[0].payload
-            # Continue renaming. (And if any of the *other* ReplaceLocationRequests apply within, do those too.)
-            renamed_self = self._cav_helper(start_idx, reqs[1:], substs)
-            return reqs[0].applicator(reqs[0].payload, renamed_self)
-        return self._cav_children(start_idx, reqs, substs)
-
-    def _cav_children(self, start_idx, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution, factory=None) -> "Expr":
-        # Applies cav_helper to all children, then constructs a new version of self using factory.
-        # If factory is None, self.__class__ is used.
-        # Subclasses should override to deal with e.g. binding.
-        if factory is None:
-            factory = self.__class__
-        new_children = []
-        ch_idx = start_idx + 1
-        for ch in self.children():
-            new_children.append(ch._cav_helper(ch_idx, reqs, substs))
-            ch_idx += ch.num_nodes
-        return factory(*new_children)
-
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 
     Example:
@@ -405,9 +346,6 @@ class Const(Expr):
     def __str__(self):
         return repr(self.value)
 
-    def _cav_children(self, start_idx, reqs, substs):
-        return self
-
 temp_regex = re.compile("_([0-9]+)$")
 
 class Var(Expr):
@@ -448,9 +386,6 @@ class Var(Expr):
         else:
             return self.name
 
-    def _cav_children(self, start_idx, reqs, substs):
-        return substs.get(self.name, self)
-
 class Call(Expr):
     '''Call(name, args). 
     Example:
@@ -477,28 +412,6 @@ class Call(Expr):
     def children(self):
         return self.args
 
-    def _cav_children(self, start_idx, reqs, substs):
-        name = self.name
-        if name.se in substs: # Will only match if name.se is a str.
-            # The variable (holding the function we are calling) is being substituted.
-            # It had better be a rename to another variable, because we can't Call anything else....
-            name = substs[name.se].structured_name
-        return super()._cav_children(start_idx, reqs, substs, factory=lambda *args: Call(name, list(args)))
-
-
-def _rename_if_needed(arg: Var, reqs: List[Expr.ReplaceLocationRequest], subst: Expr.VariableSubstitution
-) -> Tuple[Var, Expr.VariableSubstitution]:
-    """ If `arg` binds a variable free in any Expr's in a request payload or the RHS of a substitution,
-        then returns a new Var (chosen not to capture any variable free...as above), and an updated `subst`.
-        Otherwise, returns `arg` and `subst` but *removing* any mapping for `arg`.
-    """
-    all_potential_binders = [req.payload for req in reqs] + list(subst.values())
-    if any(arg.structured_name in rhs.free_vars for rhs in all_potential_binders):
-        # Must rename "arg". Make a new name.
-        nv = Var.numbered(max(e._next_unused_var_num for e in all_potential_binders))
-        return nv, {**subst, arg.name: nv}
-    return arg, {k:v for k,v in subst.items() if k != arg.name}
-
 class Lam(Expr):
     '''Lam(arg, body).
      Example:
@@ -516,10 +429,6 @@ class Lam(Expr):
 
     def _free_vars(self):
         return self.body.free_vars - self.arg.free_vars
-
-    def _cav_children(self, start_idx, reqs, substs):
-        arg, substs = _rename_if_needed(self.arg, req, substs)
-        return Lam(arg, body._cav_helper(start_idx + 1, reqs, substs))
 
 class Let(Expr):
     '''Let(vars, rhs, body). 
@@ -547,23 +456,6 @@ class Let(Expr):
             *[var.free_vars for var in self.vars]
         )
         return self.rhs.free_vars.union(self.body.free_vars - bound_vars)
-
-    def _cav_children(self, start_idx, reqs, substs):
-        new_vars = []
-        # alpha-rename any capturing `self.vars` in `self.body` only
-        body_subst = substs
-        for var in ([self.vars] if isinstance(self.vars, Var) else self.vars):
-            new_var, body_subst = _rename_if_needed(var, reqs, body_subst)
-            new_vars.append(new_var)
-        if len(new_vars) == 1:
-            assert isinstance(self.vars, Var)
-            new_vars = new_vars[0]
-        else:
-            assert isinstance(self.vars, list)
-        # Do not call super(): we need different substitutions for each child
-        return Let(new_vars,
-            self.rhs._cav_helper(start_idx + 1, reqs, substs),
-            self.body._cav_helper(start_idx + 1 + self.rhs.num_nodes, reqs, body_subst))
 
 class If(Expr):
     '''If(cond, t_body, f_body). 
