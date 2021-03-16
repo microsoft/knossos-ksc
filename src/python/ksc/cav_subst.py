@@ -38,30 +38,15 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
 
 # Name Generation
 
-_next_unused_var_num = WeakKeyDictionary()
-
-_var_name_regex = re.compile("_([0-9]+)$")
-
-def _get_next_unused_var_num(e: Expr):
-    if e in _next_unused_var_num:
-        return _next_unused_var_num[e]
-    res = _calc_next_unused_var_num(e)
-    _next_unused_var_num[e] = res
-    return res
-
-@singledispatch
-def _calc_next_unused_var_num(e: Expr):
-    return _calc_next_list(e.children())
-
-def _calc_next_list(lst: Iterable[Expr]):
-    return max([_get_next_unused_var_num(e) for e in lst], default=0)
-
-@_calc_next_unused_var_num.register(Var)
-def _calc_next_var_num(v : Var):
-    m = _var_name_regex.match(v.name)
-    if m:
-        return int(m.group(1)) + 1
-    return 0
+def _make_nonfree_var(*exprs):
+    # TODO using id() here introduces nondeterminism (even if only in variable names), unless we set PYTHONHASHSEED.
+    n = id(exprs[0]) % exprs[0].num_nodes
+    while True:
+        s = "_" + str(n)
+        sn = StructuredName.from_str(s)
+        if all(sn not in e.free_vars for e in exprs):
+            return Var(s)
+        n += 1
 
 # CAV implementation
 
@@ -130,7 +115,7 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
     all_potential_binders = [req.payload for req in reqs] + list(subst.values())
     if any(arg.structured_name in rhs.free_vars for rhs in all_potential_binders):
         # Must rename "arg". Make a new name.
-        nv = Var("_" + str(_calc_next_list([binder]+all_potential_binders)))
+        nv = _make_nonfree_var(binder, *all_potential_binders)
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 

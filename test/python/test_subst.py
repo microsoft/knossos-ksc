@@ -1,13 +1,12 @@
 from ksc.expr import Var, Const, Let, Lam, Call, If, Assert
-from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _get_next_unused_var_num
+from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _make_nonfree_var
 
-def test_next_unused_var_num():
-  assert _get_next_unused_var_num(Var("x")) == 0
-  assert _get_next_unused_var_num(Var("_1")) == 2
-  assert _get_next_unused_var_num(Var("_2x")) == 0
-  assert _get_next_unused_var_num(Var("__1")) == 0
-  assert _get_next_unused_var_num(If(Var("_0"), Var("_3"), Var("x"))) == 4
-  assert _get_next_unused_var_num(Let(Var("_1"), Var("x"), Var("_1"))) == 2 # Conservative but safe
+def test_make_nonfree_var():
+  assert _make_nonfree_var(Var("x")) == Var("_0")
+  assert _make_nonfree_var(Var("_0")) == Var("_1")
+  assert _make_nonfree_var(Var("_0x")) == Var("_0")
+  assert _make_nonfree_var(Var("_1")) == Var("_0")
+  assert _make_nonfree_var(If(Var("_0"), Var("_3"), Var("x"))) in [Var("_1"), Var("_2"), Var("_4")]
 
 def test_replace_free_vars():
   # Replaces Var
@@ -65,8 +64,8 @@ def test_replace_subtree_avoids_capture():
   assert _get_node(e, 7) == Var("y")
   replaced = replace_subtree(e, 7, new_subtree)
   # Must rename the "x".
-  # Since we don't have alpha-equivalence yet, this must second-guess the new name
-  expected = Let(Var("_0"), If(Var("p"), Var("a"), Var("b")), Call("add", [Var("_0"), new_subtree]))
+  new_var = _make_nonfree_var(e) # No alpha-equivalence, so this is the name used.
+  expected = Let(new_var, If(Var("p"), Var("a"), Var("b")), Call("add", [new_var, new_subtree]))
   assert replaced == expected
 
 def test_replace_subtree_avoids_capturing_another():
@@ -75,9 +74,9 @@ def test_replace_subtree_avoids_capturing_another():
   assert _get_node(e, 8) == Var("y")
   replaced = replace_subtree(e, 8, new_subtree)
   # Must rename the "x".
-  # Since we don't have alpha-equivalence yet, this must second-guess the new name,
-  # but the new name must be chosen to avoid capturing the _0.
-  expected = Let(Var("_1"), If(Var("p"), Var("a"), Var("b")), Call("foo", [Var("_0"), Var("_1"), new_subtree]))
+  new_var = _make_nonfree_var(e) # No alpha-equivalence, so this is the name used.
+  expected = Let(new_var, If(Var("p"), Var("a"), Var("b")), Call("foo", [Var("_0"), new_var, new_subtree]))
+  assert new_var != Var("_0")
   assert replaced == expected
 
 def test_replace_subtree_applicator_allows_capture():
@@ -99,10 +98,11 @@ def test_replace_subtree_allows_inlining_call():
     assert len(call.args) == 1  # More would require making a Tuple
     return Let(func.arg, call.args[0], func.body)
   replaced = replace_subtree(e, 5, foo_impl, apply_to_argument)
-  expected = Let(Var("_0"), # Bound variable renamed to avoid capturing "x" in foo_impl
+  new_var = _make_nonfree_var(e)
+  expected = Let(new_var, # Bound variable renamed to avoid capturing "x" in foo_impl
     If(Var("p"), Var("a"), Var("b")),
     # The call:
-    Let(Var("foo_arg"), Var("_0"), # Renaming applied to argument
+    Let(Var("foo_arg"), new_var, # Renaming applied to argument
       Call("add", [Var("x"), Var("foo_arg")]) # Renaming not applied to the "x" in foo_impl
   ))
   assert replaced == expected

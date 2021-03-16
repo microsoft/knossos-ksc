@@ -231,9 +231,6 @@ class Expr(ASTNode):
         self._num_nodes = 1 + sum(ch.num_nodes for ch in self.children())
         self._free_vars = calc_fv(self)
 
-    def __hash__(self):
-        return id(self)
-
     @property
     def num_nodes(self) -> int:
         return self._num_nodes
