@@ -1,5 +1,13 @@
 from ksc.expr import Var, Const, Let, Lam, Call, If, Assert
-from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest
+from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _get_next_unused_var_num
+
+def test_next_unused_var_num():
+  assert _get_next_unused_var_num(Var("x")) == 0
+  assert _get_next_unused_var_num(Var("_1")) == 2
+  assert _get_next_unused_var_num(Var("_2x")) == 0
+  assert _get_next_unused_var_num(Var("__1")) == 0
+  assert _get_next_unused_var_num(If(Var("_0"), Var("_3"), Var("x"))) == 4
+  assert _get_next_unused_var_num(Let(Var("_1"), Var("x"), Var("_1"))) == 2 # Conservative but safe
 
 def test_replace_free_vars():
   # Replaces Var

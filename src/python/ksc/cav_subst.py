@@ -1,5 +1,7 @@
 from functools import singledispatch
-from typing import Callable, List, Mapping, NamedTuple, Optional, Tuple
+import re
+from typing import Callable, Iterable, List, Mapping, NamedTuple, Optional, Tuple
+from weakref import WeakKeyDictionary
 
 from ksc.expr import StructuredName, Expr, If, Call, Let, Lam, Var, Const
 
@@ -33,6 +35,35 @@ def replace_subtree(e: Expr, *args):
 
 def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
     return _cav_helper(e, 0, [], subst)
+
+# Name Generation
+
+_next_unused_var_num = WeakKeyDictionary()
+
+_var_name_regex = re.compile("_([0-9]+)$")
+
+def _get_next_unused_var_num(e: Expr):
+    if e in _next_unused_var_num:
+        return _next_unused_var_num[e]
+    res = _calc_next_unused_var_num(e)
+    _next_unused_var_num[e] = res
+    return res
+
+@singledispatch
+def _calc_next_unused_var_num(e: Expr):
+    return _calc_next_list(e.children())
+
+def _calc_next_list(lst: Iterable[Expr]):
+    return max([_get_next_unused_var_num(e) for e in lst], default=0)
+
+@_calc_next_unused_var_num.register(Var)
+def _calc_next_var_num(v : Var):
+    m = _var_name_regex.match(v.name)
+    if m:
+        return int(m.group(1)) + 1
+    return 0
+
+# CAV implementation
 
 def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
     # First, work out if there's anything to do in this subtree
@@ -99,7 +130,7 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
     all_potential_binders = [req.payload for req in reqs] + list(subst.values())
     if any(arg.structured_name in rhs.free_vars for rhs in all_potential_binders):
         # Must rename "arg". Make a new name.
-        nv = Var.numbered(max(e._next_unused_var_num for e in [binder]+all_potential_binders))
+        nv = Var("_" + str(_calc_next_list([binder]+all_potential_binders)))
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 
