@@ -293,10 +293,7 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
     module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
     return import_module_from_path(module_name, module_path)
 
-
-# refactor duplication with generate_and_compile_cpp_from_ks
-
-def build_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
+def build_module_using_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
     cpp_str = __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives)
 
