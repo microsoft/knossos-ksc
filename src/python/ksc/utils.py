@@ -234,7 +234,7 @@ def encode_name(s : str) -> str:
         replace(':',"$8")
 
 
-def __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives):
+def __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives, use_aten):
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
     cpp_str = f"""
@@ -283,7 +283,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 
 def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
 
-    cpp_str = __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives)
+    cpp_str = __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives, use_aten)
 
     cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
     print(f"Saving to {cpp_fname}")    
@@ -295,7 +295,7 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
 
 def build_module_using_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
-    cpp_str = __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives)
+    cpp_str = __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives, use_aten)
 
     __ksc_path,ksc_runtime_dir = get_ksc_paths()
 
