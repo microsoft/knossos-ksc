@@ -234,7 +234,7 @@ def encode_name(s : str) -> str:
         replace(':',"$8")
 
 
-def __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives, use_aten):
+def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_type, generate_derivatives, use_aten):
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
     cpp_str = f"""
@@ -266,8 +266,8 @@ def __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_deriva
         """
 
     cpp_str += """
-PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
-    m.def("reset_allocator", []{g_alloc.reset();});
+PYBIND11_MODULE(""" + python_module_name + """, m) {
+    m.def("reset_allocator", []{ g_alloc.reset();});
     m.def("allocator_top", []{ return g_alloc.mark();});
     m.def("allocator_peak", []{ return g_alloc.peak();});
 
@@ -283,7 +283,7 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 
 def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
 
-    cpp_str = __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives, use_aten)
+    cpp_str = __make_cpp_str(ks_str, name_to_call, "PYTHON_MODULE_NAME", arg_types, return_type, generate_derivatives, use_aten)
 
     cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
     print(f"Saving to {cpp_fname}")    
@@ -295,7 +295,7 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
 
 def build_module_using_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
-    cpp_str = __make_cpp_str(ks_str, name_to_call, arg_types, return_type, generate_derivatives, use_aten)
+    cpp_str = __make_cpp_str(ks_str, name_to_call, "TORCH_EXTENSION_NAME", arg_types, return_type, generate_derivatives, use_aten)
 
     __ksc_path,ksc_runtime_dir = get_ksc_paths()
 
@@ -313,13 +313,11 @@ def build_module_using_pytorch_from_ks(ks_str, name_to_call, arg_types, return_t
         cflags.append("/std:c++17")
     else:
         cflags.append("-std=c++17")
-
-    cpp_str_torch_extension = cpp_str.replace("PYTHON_MODULE_NAME", "TORCH_EXTENSION_NAME") # Let PyTorch handle naming - it has versioning
-
+        
     # https://pytorch.org/docs/stable/cpp_extension.html
     module = load_inline(
                 name="dynamic_ksc_cpp",
-                cpp_sources=[cpp_str_torch_extension],
+                cpp_sources=[cpp_str],
                 extra_include_paths=[ksc_runtime_dir],
                 extra_cflags = cflags
             )
