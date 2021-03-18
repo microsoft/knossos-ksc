@@ -45,7 +45,7 @@ def _make_nonfree_var(*exprs):
     while True:
         s = "_" + str(n)
         sn = StructuredName.from_str(s)
-        if all(sn not in e.free_vars for e in exprs):
+        if all(sn not in e.free_vars_ for e in exprs):
             return Var(s)
         n += 1
 
@@ -56,7 +56,7 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
     reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + e.num_nodes)]
     substs = {varname: repl
         for varname, repl in substs.items()
-        if StructuredName.from_str(varname) in e.free_vars}
+        if StructuredName.from_str(varname) in e.free_vars_}
     if len(reqs) == 0:
         if len(substs) == 0:
             # Nothing to do in this subtree
@@ -111,7 +111,7 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
         Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
     """
     all_potential_binders = [req.payload for req in reqs] + list(subst.values())
-    if any(arg.structured_name in rhs.free_vars for rhs in all_potential_binders):
+    if any(arg.structured_name in rhs.free_vars_ for rhs in all_potential_binders):
         # Must rename "arg". Make a new name.
         nv = _make_nonfree_var(binder, *all_potential_binders)
         return nv, {**subst, arg.name: nv}

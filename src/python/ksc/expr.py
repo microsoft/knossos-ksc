@@ -1,7 +1,7 @@
 """
 Expr: lightweight classes implementing the Knossos IR
 """
-from functools import singledispatch
+
 from typing import Any, FrozenSet, List, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
@@ -234,20 +234,17 @@ class Expr(ASTNode):
     '''Base class for Expression AST nodes. Not directly instantiable.'''
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
+    free_vars_: FrozenSet[StructuredName] # Filled in by constructor
 
     def __init__(self, **args):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
         self._num_nodes = 1 + sum(ch.num_nodes for ch in self.children())
-        self._free_vars = calc_fv(self)
+        self.free_vars_ = compute_free_vars(self)
 
     @property
     def num_nodes(self) -> int:
         return self._num_nodes
-
-    @property
-    def free_vars(self) -> FrozenSet[StructuredName]:
-        return self._free_vars
 
     def children(self):
         """
@@ -430,6 +427,7 @@ class Let(Expr):
     def __init__(self, vars, rhs, body):
         super().__init__(vars=vars, rhs=rhs, body=body)
 
+
 class If(Expr):
     '''If(cond, t_body, f_body). 
     Example:
@@ -462,44 +460,16 @@ class Assert(Expr):
         super().__init__(cond=cond, body=body)
 
 #####################################################################
-# Calculate free variables of an Expr.
-# Called at Expr-construction time and cached in the object.
+# pystr:
+#  Expression to string, formatted in a loose python-like syntax
+#  This isn't a backend, just a way to view the expr structure in a format
+#  slightly more palatable than s-expressions
 #
 # This also serves as an example of a user-defined AST visitor.
 # Defining functions on each node type using singledispatch is a clean
 # way to write recursive tree transformations.
 
-@singledispatch
-def calc_fv(e: Expr):
-    return fv_expr(e)
-
-def fv_expr(e: Expr):
-    return frozenset().union(*[ch.free_vars for ch in e.children()])
-
-@calc_fv.register
-def fv_var(e: Var):
-    return frozenset([e.structured_name])
-
-@calc_fv.register
-def fv_call(e: Call):
-    return fv_expr(e).union(frozenset([e.name]))
-
-@calc_fv.register
-def fv_lam(e: Lam):
-    return e.body.free_vars - e.arg.free_vars
-
-@calc_fv.register
-def fv_let(e: Let):
-    bound_here = e.vars.free_vars if isinstance(e.vars, Var) else frozenset.union(
-        *[var.free_vars for var in e.vars]
-    )
-    return e.rhs.free_vars.union(e.body.free_vars - bound_here)
-
-#####################################################################
-# pystr:
-#  Expression to string, formatted in a loose python-like syntax
-#  This isn't a backend, just a way to view the expr structure in a format
-#  slightly more palatable than s-expressions
+from functools import singledispatch
 
 from ksc.expr import Expr, Def, EDef, GDef, Call, Const, Var, If
 
@@ -598,6 +568,35 @@ def _(ex, indent):
     indent += 1
     return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) \
             + pystr(ex.body, indent)
+
+#####################################################################
+# Calculate free variables of an Expr.
+
+@singledispatch
+def compute_free_vars(e: Expr) -> FrozenSet[StructuredName]:
+    return fv_expr(e)
+
+def fv_expr(e: Expr):
+    return frozenset().union(*[ch.free_vars_ for ch in e.children()])
+
+@compute_free_vars.register
+def fv_var(e: Var):
+    return frozenset([e.structured_name])
+
+@compute_free_vars.register
+def fv_call(e: Call):
+    return fv_expr(e).union(frozenset([e.name]))
+
+@compute_free_vars.register
+def fv_lam(e: Lam):
+    return e.body.free_vars_ - e.arg.free_vars_
+
+@compute_free_vars.register
+def fv_let(e: Let):
+    bound_here = e.vars.free_vars_ if isinstance(e.vars, Var) else frozenset.union(
+        *[var.free_vars_ for var in e.vars]
+    )
+    return e.rhs.free_vars_.union(e.body.free_vars_ - bound_here)
 
 if __name__ == "__main__":
     from ksc.parse_ks import parse_ks_file
