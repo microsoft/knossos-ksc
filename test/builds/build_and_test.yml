@@ -94,6 +94,14 @@ jobs:
     vmImage: 'vs2017-win2016'
 
   steps:
+  - checkout: self
+    submodules: true
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.7'
+      architecture: 'x64'
+
   - task: UseDotNet@2
     inputs:
       version: 3.1.100
