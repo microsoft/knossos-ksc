@@ -234,6 +234,11 @@ def s_exps_from_string(string_or_stream, source_file_name = None):
     
     return sexpdata.Parser(string_or_stream, nil=None, true="true", false="false", line_comment=";").parse()
 
+def parse_expr_string(string_or_stream):
+    s_exps = s_exps_from_string(string_or_stream)
+    assert len(s_exps) == 1
+    return parse_expr(s_exps[0])
+
 def strip_block_comments(string):
     # Strip block comments
     regex = r"""\#\|               # hash bar
