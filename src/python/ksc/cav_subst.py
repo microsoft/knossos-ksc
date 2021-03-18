@@ -74,21 +74,17 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
     return _cav_children(e, start_idx, reqs, substs)
 
 @singledispatch
-def _cav_children(e: Expr, start_idx, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution, factory=None) -> Expr:
-    return _cav_expr(e, start_idx, reqs, substs, factory)
+def _cav_children(e: Expr, start_idx, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
+    return e.__class__(*_cav_list(e, start_idx, reqs, substs))
 
-def _cav_expr(e: Expr, start_idx, reqs, substs, factory=None):
-    # Applies _cav_helper to all children of e, then constructs a new version of e using factory.
-    # If factory is None, e.__class__ is used.
-    # Overridden in subclasses to deal with e.g. binding.
-    if factory is None:
-        factory = e.__class__
+def _cav_list(e: Expr, start_idx, reqs, substs):
+    # Applies _cav_helper to all children of e, and returns the list of children after substitutions applied.
     new_children = []
     ch_idx = start_idx + 1
     for ch in e.children():
         new_children.append(_cav_helper(ch, ch_idx, reqs, substs))
         ch_idx += ch.num_nodes
-    return factory(*new_children)
+    return new_children
 
 @_cav_children.register
 def _cav_const(e: Const, start_idx, reqs, substs):
@@ -105,7 +101,7 @@ def _cav_call(e: Call, start_idx, reqs, substs):
         # The variable (holding the function we are calling) is being substituted.
         # It had better be a rename to another variable, because we can't Call anything else....
         name = substs[name.se].structured_name
-    return _cav_expr(e, start_idx, reqs, substs, factory=lambda *args: Call(name, list(args)))
+    return Call(name, _cav_list(e, start_idx, reqs, substs))
 
 def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
 ) -> Tuple[Var, VariableSubstitution]:
