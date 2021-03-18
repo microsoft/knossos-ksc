@@ -5,11 +5,12 @@ from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, 
 from ksc.parse_ks import parse_expr_string
 
 def test_make_nonfree_var():
-  assert _make_nonfree_var(Var("x")) == Var("_0")
-  assert _make_nonfree_var(Var("_0")) == Var("_1")
-  assert _make_nonfree_var(Var("_0x")) == Var("_0")
-  assert _make_nonfree_var(Var("_1")) == Var("_0")
-  assert _make_nonfree_var(parse_expr_string("(if _0 _3 x)")) in [Var("_1"), Var("_2"), Var("_4")]
+  assert _make_nonfree_var("x", [Var("x")]) == Var("x_0")
+  assert _make_nonfree_var("x", [Var("x_0")]) == Var("x_1")
+  assert _make_nonfree_var("x_0", []) == Var("x_1")
+  assert _make_nonfree_var("x_0", [Var("x_1")]) == Var("x_2")
+  assert _make_nonfree_var("x_2", [Var("x_0")]) == Var("x_3")
+  assert _make_nonfree_var("", [parse_expr_string("(if _0 _3 x)")]) == Var("_1")
 
 def test_replace_free_vars():
   # Replaces Var
@@ -68,13 +69,13 @@ def test_replace_subtree_avoids_capture():
   assert _get_node(e, 7) == Var("y")
   replaced = replace_subtree(e, 7, new_subtree)
   # Must rename the "x".
-  new_var = _make_nonfree_var(e) # No alpha-equivalence, so this is the name used.
+  new_var = _make_nonfree_var("x", [e]) # No alpha-equivalence, so this is the name used.
   expected = parse_expr_string(f"(let ({new_var} (if p a b)) (add {new_var} (mul x 2)))")
   assert replaced == expected
 
 def test_replace_subtree_avoids_capturing_another():
   new_subtree = parse_expr_string("(mul x 2)")
-  conflicting_var = _make_nonfree_var(new_subtree)  # But, this already exists
+  conflicting_var = _make_nonfree_var("x", [new_subtree])  # But, this already exists
   e = parse_expr_string(f"(let (x (if p a b)) (foo {conflicting_var} x y))")
   assert _get_node(e, 8) == Var("y")
   replaced = replace_subtree(e, 8, new_subtree)
@@ -104,7 +105,7 @@ def test_replace_subtree_allows_inlining_call():
               call.args[0],
               func.body)
   replaced = replace_subtree(e, 5, foo_impl, apply_to_argument)
-  new_var = _make_nonfree_var(e)
+  new_var = _make_nonfree_var("x", [e])
   expected = parse_expr_string(f"""(let ({new_var} (if p a b))  ; Bound variable renamed to avoid capturing "x" in foo_impl
     ; The call:
     (let (foo_arg {new_var}) ; Renaming applied to argument

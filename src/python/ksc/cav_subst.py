@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import singledispatch
+import re
 from typing import Callable, Iterable, List, Mapping, Optional, Tuple
 from weakref import WeakKeyDictionary
 
@@ -38,16 +39,19 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
     return _cav_helper(e, 0, [], subst)
 
 # Name Generation
-
-def _make_nonfree_var(*exprs):
-    # TODO using id() here introduces nondeterminism (even if only in variable names), unless we set PYTHONHASHSEED.
-    n = id(exprs[0]) % exprs[0].num_nodes
+temp_regex = re.compile("(.*)_([\d]+)")
+def _make_nonfree_var(name, exprs):
+    m = temp_regex.match(name)
+    if m is not None:
+        name, idx = m.group(1), int(m.group(2)) + 1
+    else:
+        idx = 0
     while True:
-        s = "_" + str(n)
+        s = name + "_" + str(idx)
         sn = StructuredName.from_str(s)
         if all(sn not in e.free_vars_ for e in exprs):
             return Var(s)
-        n += 1
+        idx += 1
 
 # CAV implementation
 
@@ -113,7 +117,7 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
     all_potential_binders = [req.payload for req in reqs] + list(subst.values())
     if any(arg.structured_name in rhs.free_vars_ for rhs in all_potential_binders):
         # Must rename "arg". Make a new name.
-        nv = _make_nonfree_var(binder, *all_potential_binders)
+        nv = _make_nonfree_var(arg.name, [binder] + all_potential_binders)
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 
