@@ -471,25 +471,24 @@ class Assert(Expr):
 
 @singledispatch
 def calc_fv(e: Expr):
-    raise ValueError("Should only be called on 'Expr's")
+    return fv_expr(e)
 
-@calc_fv.register(Expr)
 def fv_expr(e: Expr):
     return frozenset().union(*[ch.free_vars for ch in e.children()])
 
-@calc_fv.register(Var)
+@calc_fv.register
 def fv_var(e: Var):
     return frozenset([e.structured_name])
 
-@calc_fv.register(Call)
+@calc_fv.register
 def fv_call(e: Call):
     return fv_expr(e).union(frozenset([e.name]))
 
-@calc_fv.register(Lam)
+@calc_fv.register
 def fv_lam(e: Lam):
     return e.body.free_vars - e.arg.free_vars
 
-@calc_fv.register(Let)
+@calc_fv.register
 def fv_let(e: Let):
     bound_here = e.vars.free_vars if isinstance(e.vars, Var) else frozenset.union(
         *[var.free_vars for var in e.vars]
