@@ -72,9 +72,8 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
 
 @singledispatch
 def _cav_children(e: Expr, start_idx, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution, factory=None) -> Expr:
-    raise ValueError("May be called only on Expr's")
+    return _cav_expr(e, start_idx, reqs, substs, factory)
 
-@_cav_children.register(Expr)
 def _cav_expr(e: Expr, start_idx, reqs, substs, factory=None):
     # Applies _cav_helper to all children of e, then constructs a new version of e using factory.
     # If factory is None, e.__class__ is used.
@@ -88,15 +87,15 @@ def _cav_expr(e: Expr, start_idx, reqs, substs, factory=None):
         ch_idx += ch.num_nodes
     return factory(*new_children)
 
-@_cav_children.register(Const)
+@_cav_children.register
 def _cav_const(e: Const, start_idx, reqs, substs):
     return e
 
-@_cav_children.register(Var)
+@_cav_children.register
 def _cav_var(e: Var, start_idx, reqs, substs):
     return substs.get(e.name, e)
 
-@_cav_children.register(Call)
+@_cav_children.register
 def _cav_call(e: Call, start_idx, reqs, substs):
     name = e.name
     if name.se in substs: # Will only match if name.se is a str.
@@ -119,13 +118,13 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 
-@_cav_children.register(Lam)
+@_cav_children.register
 def _cav_lam(e: Lam, start_idx, reqs, substs):
     arg, substs = _rename_if_needed(e.arg, e, req, substs)
     return Lam(arg, _cav_helper(e.body, start_idx + 1, reqs, substs))
 
 
-@_cav_children.register(Let)
+@_cav_children.register
 def _cav_let(e: Let, start_idx, reqs, substs):
     new_vars = []
     # alpha-rename any capturing `e.vars` in `e.body` only
