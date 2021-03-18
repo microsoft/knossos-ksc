@@ -4,7 +4,7 @@ import re
 from typing import Callable, Iterable, List, Mapping, Optional, Tuple
 from weakref import WeakKeyDictionary
 
-from ksc.expr import StructuredName, Expr, If, Call, Let, Lam, Var, Const
+from ksc.expr import StructuredName, Expr, If, Call, Let, Lam, Var, Const, child_exprs_no_subclasses
 
 ### Capture-AVoiding SUBSTitution ###
 
@@ -57,7 +57,7 @@ def _make_nonfree_var(name, exprs):
 
 def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
     # First, work out if there's anything to do in this subtree
-    reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + e.num_nodes)]
+    reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + e.num_nodes_)]
     substs = {varname: repl
         for varname, repl in substs.items()
         if StructuredName.from_str(varname) in e.free_vars_}
@@ -79,15 +79,15 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
 
 @singledispatch
 def _cav_children(e: Expr, start_idx, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
-    return e.__class__(*_cav_list(e, start_idx, reqs, substs))
+    return e.__class__(*_cav_list(child_exprs_no_subclasses(e), start_idx, reqs, substs))
 
-def _cav_list(e: Expr, start_idx, reqs, substs):
-    # Applies _cav_helper to all children of e, and returns the list of children after substitutions applied.
+def _cav_list(children: List[Expr], start_idx, reqs, substs):
+    # Applies _cav_helper to a list of child expressions (numbered consecutively), and returns the list of results
     new_children = []
     ch_idx = start_idx + 1
-    for ch in e.children():
+    for ch in children:
         new_children.append(_cav_helper(ch, ch_idx, reqs, substs))
-        ch_idx += ch.num_nodes
+        ch_idx += ch.num_nodes_
     return new_children
 
 @_cav_children.register
@@ -105,7 +105,7 @@ def _cav_call(e: Call, start_idx, reqs, substs):
         # The variable (holding the function we are calling) is being substituted.
         # It had better be a rename to another variable, because we can't Call anything else....
         name = substs[name.se].structured_name
-    return Call(name, _cav_list(e, start_idx, reqs, substs))
+    return Call(name, _cav_list(e.args, start_idx, reqs, substs))
 
 def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
 ) -> Tuple[Var, VariableSubstitution]:
@@ -126,7 +126,6 @@ def _cav_lam(e: Lam, start_idx, reqs, substs):
     arg, substs = _rename_if_needed(e.arg, e, req, substs)
     return Lam(arg, _cav_helper(e.body, start_idx + 1, reqs, substs))
 
-
 @_cav_children.register
 def _cav_let(e: Let, start_idx, reqs, substs):
     new_vars = []
@@ -143,4 +142,4 @@ def _cav_let(e: Let, start_idx, reqs, substs):
     # Do not call super(): we need different substitutions for each child
     return Let(new_vars,
         _cav_helper(e.rhs, start_idx + 1, reqs, substs),
-        _cav_helper(e.body, start_idx + 1 + e.rhs.num_nodes, reqs, body_subst))
+        _cav_helper(e.body, start_idx + 1 + e.rhs.num_nodes_, reqs, body_subst))

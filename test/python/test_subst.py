@@ -1,6 +1,6 @@
 import pytest
 
-from ksc.expr import Var, Const, Let, Lam, Call
+from ksc.expr import Var, Const, Let, Lam, Call, child_exprs_no_subclasses
 from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _make_nonfree_var
 from ksc.parse_ks import parse_expr_string
 
@@ -35,10 +35,10 @@ def _get_node(expr, idx):
   # TODO: Consider exposing via Expr.children_with_indices(): Generator[Tuple[Expr, int]] ?
   if idx==0: return expr
   idx -= 1
-  for ch in expr.children():
-    if idx < ch.num_nodes:
+  for ch in (expr.args if isinstance(expr, Call) else child_exprs_no_subclasses(expr)):
+    if idx < ch.num_nodes_:
       return _get_node(ch, idx)
-    idx -= ch.num_nodes
+    idx -= ch.num_nodes_
 
 def test_replace_subtrees():
   e = parse_expr_string("(foo x y z)")

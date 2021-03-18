@@ -235,24 +235,21 @@ class Expr(ASTNode):
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
     free_vars_: FrozenSet[StructuredName] # Filled in by constructor
+    num_nodes_: int # Filled in by constructor
 
     def __init__(self, **args):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
-        self._num_nodes = 1 + sum(ch.num_nodes for ch in self.children())
+        self.num_nodes_ = compute_num_nodes(self)
         self.free_vars_ = compute_free_vars(self)
 
-    @property
-    def num_nodes(self) -> int:
-        return self._num_nodes
-
-    def children(self):
+    def nodes(self):
         """
-        Return child Exprs of this Expr. Does not include binding occurrences of Vars.
+        Return child nodes of this expr
         """
-        return [getattr(self, k)
-            for k,v in self.__annotations__.items()
-                if v == Expr]  # Do not include subclasses
+        assert False # TODO: remove this method
+        for nt in self.__annotations__:
+            yield getattr(self, nt)
 
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 
@@ -572,12 +569,13 @@ def _(ex, indent):
 #####################################################################
 # Calculate free variables of an Expr.
 
+def child_exprs_no_subclasses(e : Expr):
+    return [getattr(e, k) for k,v in e.__annotations__.items()
+        if v == Expr] # Do not include subclasses
+
 @singledispatch
 def compute_free_vars(e: Expr) -> FrozenSet[StructuredName]:
-    return fv_expr(e)
-
-def fv_expr(e: Expr):
-    return frozenset().union(*[ch.free_vars_ for ch in e.children()])
+    return frozenset().union(*[ch.free_vars_ for ch in child_exprs_no_subclasses(e)])
 
 @compute_free_vars.register
 def fv_var(e: Var):
@@ -585,7 +583,7 @@ def fv_var(e: Var):
 
 @compute_free_vars.register
 def fv_call(e: Call):
-    return fv_expr(e).union(frozenset([e.name]))
+    return frozenset([e.name]).union(*[arg.free_vars_ for arg in e.args])
 
 @compute_free_vars.register
 def fv_lam(e: Lam):
@@ -597,6 +595,14 @@ def fv_let(e: Let):
         *[var.free_vars_ for var in e.vars]
     )
     return e.rhs.free_vars_.union(e.body.free_vars_ - bound_here)
+
+@singledispatch
+def compute_num_nodes(e : Expr):
+    return 1 + sum(ch.num_nodes_ for ch in child_exprs_no_subclasses(e))
+
+@compute_num_nodes.register
+def num_nodes_call(e : Call):
+    return 1 + sum(arg.num_nodes_ for arg in e.args)
 
 if __name__ == "__main__":
     from ksc.parse_ks import parse_ks_file
