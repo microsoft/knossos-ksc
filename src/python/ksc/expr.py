@@ -220,6 +220,16 @@ class ASTNode(KRecord):
         assert kwargs.keys() == self.__annotations__.keys()
         super().__init__(**kwargs)
 
+    def __str__(self):
+        def to_str(v):
+            if isinstance(v, list):
+                # __str__ on list contains repr of elements
+                contents = ", ".join([to_str(e) for e in v])
+                return f"[{contents}]"
+            return str(v)
+        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
+        return paren(type(self).__name__ + ' ' + ' '.join(nodes))
+
 class Expr(ASTNode):
     '''Base class for Expression AST nodes. Not directly instantiable.'''
 
@@ -246,16 +256,6 @@ class Expr(ASTNode):
         return [getattr(self, k)
             for k,v in self.__annotations__.items()
                 if v == Expr]  # Do not include subclasses
-
-    def __str__(self):
-        def to_str(v):
-            if isinstance(v, list):
-                # __str__ on list contains repr of elements
-                contents = ", ".join([to_str(e) for e in v])
-                return f"[{contents}]"
-            return str(v)
-        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
-        return paren(type(self).__name__ + ' ' + ' '.join(nodes))
 
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 
