@@ -120,5 +120,8 @@ jobs:
   - script: build\bin\ksc --test-windows --fs-test obj\test\out.ks
     displayName: 'ksc test [userTest]'
 
+  - script: call ./test/builds/test_pytest.cmd
+    displayName: Testing ksc python package [userTest]
+
   - script: rm -rf *
     displayName: 'Clean'
