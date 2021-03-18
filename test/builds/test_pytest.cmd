@@ -1,11 +1,11 @@
 set -e
 
 echo Set Pip to specific version...
-python -m pip install --upgrade pip==21.0.1
+python -m pip install --force-reinstall pip==20.3
 
 echo Installing dependencies...
 python -m pip install -r src/python/requirements.txt
-python -m pip install pytest numpy torch==1.8.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+python -m pip install --use-deprecated=legacy-resolver pytest numpy torch==1.8.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 echo Installing ksc...
 cd ./src/python
