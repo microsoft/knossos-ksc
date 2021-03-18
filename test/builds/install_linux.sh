@@ -15,3 +15,5 @@ echo ----- cabal update -----
 echo ------ futhark -----
 wget https://futhark-lang.org/releases/futhark-0.11.2-linux-x86_64.tar.xz
 tar -xvaf futhark-0.11.2-linux-x86_64.tar.xz
+echo ----- Ninja -----
+sudo apt-get install ninja-build
