@@ -1,14 +1,15 @@
+from dataclasses import dataclass
 from functools import singledispatch
-import re
-from typing import Callable, Iterable, List, Mapping, NamedTuple, Optional, Tuple
+from typing import Callable, Iterable, List, Mapping, Optional, Tuple
 from weakref import WeakKeyDictionary
 
 from ksc.expr import StructuredName, Expr, If, Call, Let, Lam, Var, Const
 
 ### Capture-AVoiding SUBSTitution ###
 
-class ReplaceLocationRequest(NamedTuple):
-    """ This is a pure DTO/struct for recording requests to replace_subtree(s). """
+@dataclass(frozen=True)
+class ReplaceLocationRequest:
+    """ Represents a request to replace_subtree(s). """
     # Location within the root Expr, i.e. upon which replace_subtree is called, that should be replaced
     target_idx: int
 
