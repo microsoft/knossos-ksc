@@ -62,10 +62,12 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
             return e
     elif reqs[0].target_idx == start_idx:
         # Apply here
+        if len(reqs) != 1:
+            raise ValueError("Multiple ReplaceLocationRequests on locations descending from each other")
         if reqs[0].applicator is None:
             return reqs[0].payload
-        # Continue renaming. (And if any of the *other* ReplaceLocationRequests apply within, do those too.)
-        renamed_e = _cav_helper(e, start_idx, reqs[1:], substs)
+        # Continue renaming.
+        renamed_e = _cav_helper(e, start_idx, [], substs)
         return reqs[0].applicator(reqs[0].payload, renamed_e)
     # No ReplaceLocationRequest targets this node. Do any Expr-specific processing, perhaps recursing deeper.
     return _cav_children(e, start_idx, reqs, substs)

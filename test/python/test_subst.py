@@ -1,3 +1,5 @@
+import pytest
+
 from ksc.expr import Var, Const, Let, Lam, Call, If, Assert
 from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _make_nonfree_var
 
@@ -44,19 +46,20 @@ def test_replace_subtrees():
   expected = Call("foo", [Var("x"), Var("v"), Var("w")])
   assert replaced == expected
 
-def test_replace_subtrees_inner_first():
+def test_replace_subtrees_nested():
   e = Assert(Const(True), Call("foo", [Var("x"), Var("y"), Var("z")]))
   inner_replaced = Call("foo", [Var("x"), Var("y"), Var("w")])
   def replacer(e1, e2):
     assert e1 == Const(0)
     assert e2 == inner_replaced
     return Var("success")
+  assert isinstance(_get_node(e, 2), Call)
   assert _get_node(e, 5) == Var("z")
-  replaced = replace_subtrees(e, [
-    ReplaceLocationRequest(5, Var("w")),
-    ReplaceLocationRequest(2, Const(0), replacer)
-  ])
-  assert replaced == Assert(Const(True), Var("success"))
+  with pytest.raises(ValueError):
+    replace_subtrees(e, [
+      ReplaceLocationRequest(5, Var("w")),
+      ReplaceLocationRequest(2, Const(0), replacer)
+    ])
 
 def test_replace_subtree_avoids_capture():
   e = Let(Var("x"), If(Var("p"), Var("a"), Var("b")), Call("add", [Var("x"), Var("y")]))
