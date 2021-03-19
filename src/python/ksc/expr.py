@@ -385,9 +385,6 @@ class Call(Expr):
             name = StructuredName.from_str(name)
         super().__init__(name=name, args=args)
 
-    def children(self):
-        return self.args
-
 class Lam(Expr):
     '''Lam(arg, body).
      Example:
