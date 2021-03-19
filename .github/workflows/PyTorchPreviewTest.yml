@@ -47,4 +47,4 @@ jobs:
 
     - name: 'ksc test [userTest]'
       shell: cmd
-      run: build/bin/ksc --test-windows --fs-test obj/test\out.ks
+      run: ./build/bin/ksc --test-windows --fs-test obj/test/out.ks
