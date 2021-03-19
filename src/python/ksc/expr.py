@@ -236,14 +236,6 @@ class Expr(ASTNode):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
 
-    def nodes(self):
-        """
-        Return child nodes of this expr
-        """
-        assert False # TODO: remove this method
-        for nt in self.__annotations__:
-            yield getattr(self, nt)
-
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 
     Example:
