@@ -22,8 +22,10 @@ cd ./src/ts2k
 python -m pip install --editable .
 cd ../..
 
-echo Running pytest on ts2k
-python -m pytest test/ts2k
+REM currently have backend issues on PyTorch 1.8.0 https://github.com/microsoft/knossos-ksc/issues/659
 
-echo Running pytest using cpp backend
-python -m pytest test/python/test_tracing_core.py --backend cpp
+REM echo Running pytest on ts2k
+REM python -m pytest test/ts2k
+
+REM echo Running pytest using cpp backend
+REM python -m pytest test/python/test_tracing_core.py --backend cpp
