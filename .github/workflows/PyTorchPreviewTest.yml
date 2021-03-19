@@ -1,6 +1,11 @@
-name: Haskell CI
+name: PyTorch (preview)
 
-on: [workflow_dispatch]
+on:
+
+  push:
+    branches:
+      - cogravil/pytorch_preview_ci
+  workflow_dispatch:
 
 jobs:
   build:
