@@ -219,7 +219,12 @@ class ASTNode(KRecord):
         super().__init__(**kwargs)
 
     def __str__(self):
-        nodes = (str(getattr(self, nt)) for nt in self.__annotations__)
+        def to_str(v):
+            if isinstance(v, list):
+                # str() on list contains repr() of elements
+                return "[" + (", ".join([to_str(e) for e in v])) + "]"
+            return str(v)
+        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + ' ' + ' '.join(nodes))
 
 class Expr(ASTNode):
