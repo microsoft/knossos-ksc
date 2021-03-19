@@ -20,3 +20,10 @@ Knossos *is* a theorem prover, so any point at which typechecking or cost comput
 
 
 An extension of ANF where every variable has exactly one use.  Useful for functional AD and beyond (see https://tminka.github.io/papers/acmll2019/, and https://github.com/microsoft/knossos-ksc/issues/377
+
+### General concepts from related work
+
+ * CSE: Common subexpression elimination
+ * DCE: Dead code elimination
+ * ANF: A-Normal Form
+ * BNF: Backus-Naur Form
