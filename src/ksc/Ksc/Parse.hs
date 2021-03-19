@@ -158,7 +158,7 @@ langDef = Tok.LanguageDef
   , Tok.opStart         = mzero
   , Tok.opLetter        = mzero
   , Tok.reservedNames   = [ "def", "edef", "rule"
-                          , "let", "if", "assert", "call", "tuple", ":", "$dummy"
+                          , "let", "checkpoint", "if", "assert", "call", "tuple", ":", "$dummy"
                           , "Integer", "Float", "Vec", "Lam", "String", "true", "false"
                           ]
   , Tok.reservedOpNames = []
@@ -240,6 +240,7 @@ pKExpr =   pIfThenElse
        <|> pCall
        <|> pTuple
        <|> pDummy
+       <|> pCheckpoint
 
 pType :: Parser TypeX
 pType = (pReserved "Integer" >> return TypeInteger)
@@ -322,6 +323,12 @@ pLet = do { pReserved "let"
                           <|> many (parens pBind)
           ; e <- pExpr
           ; return $ foldr (\(v,r) e -> Let v r e) e pairs }
+
+pCheckpoint :: Parser (ExprX Parsed)
+pCheckpoint = do { pReserved "checkpoint"
+                 ; e <- pExpr
+                 ; return (Checkpoint e)
+                 }
 
 pIsUserFun :: InPhase p => Fun p -> Parser (UserFun p)
 pIsUserFun fun = case maybeUserFun fun of

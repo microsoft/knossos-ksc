@@ -150,6 +150,7 @@ to_cl_expr Pruned _ e@(Let (TupPat _) _ _) = pprPanic "toCLExpr Let TupPat" (ppr
 to_cl_expr _ _ e@(Lam {})    =  pprPanic "toCLExpr Lam" (ppr e)
 to_cl_expr _ _ e@(App {})    =  pprPanic "toCLExpr App" (ppr e)
 to_cl_expr _ _ e@(Dummy {})  =  pprPanic "toCLExpr Dummy" (ppr e)
+to_cl_expr _ _ e@(Checkpoint {}) =  pprPanic "toCLExpr Checkpoint" (ppr e)
 
 to_cl_expr NotPruned env e = prune env e
 

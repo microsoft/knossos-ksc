@@ -131,6 +131,7 @@ optE env
     go e@(Dummy _)        = e
     go (App e1 e2)        = optApp env (go e1) (go e2)
     go (Assert e1 e2)     = Assert (go e1) (go e2)
+    go (Checkpoint e)     = Checkpoint (go e)
     go (Lam tv e)         = Lam tv' (optE env' e)
        where
          (tv', env') = optSubstBndr tv env

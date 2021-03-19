@@ -61,6 +61,8 @@ anfE subst (Lam v e)      = do { e' <- anfExpr subst e
 anfE subst (Assert e1 e2) = do { e1' <- anfE subst e1
                                ; e2' <- anfExpr subst e2
                                ; return (Assert e1' e2') }
+anfE subst (Checkpoint e) = do { e' <- anfExpr subst e
+                               ; return (Checkpoint e') }
 
 -- anfE1 :: GenBndr p => ExprX p -> AnfM p (ExprX p)
 anfE1 :: Monad m => Subst -> TExpr -> AnfMT Typed m TExpr

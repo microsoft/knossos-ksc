@@ -103,6 +103,7 @@ gradE _   _ e@(Let (TupPat _) _ _) =
   -- Let]
   pprPanic "gradE: TupPat encountered. This should not occur." (ppr e)
 gradE _   _ (App{})        = error "gradE of App not yet supported"
+gradE _   _ Checkpoint{} = error "gradE of checkpoint not supported"
 
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.

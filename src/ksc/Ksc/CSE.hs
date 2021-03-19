@@ -160,6 +160,9 @@ cseE cse_env@(CS { cs_map = rev_map }) (Assert cond body)
  where
    cond' = cseE cse_env cond
 
+cseE cse_env (Checkpoint e)
+  = Checkpoint (cseE cse_env e)
+
 cseE cse_env (If e1 e2 e3)
   = If (cseE_check cse_env e1)
        (cseE_check cse_env e2)
