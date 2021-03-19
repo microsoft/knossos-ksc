@@ -34,16 +34,14 @@ type SUFFwdRevPass =
       -- ^ The generator for the SUF reverse pass output expression REV{e}
 
 type SUFRevPass =
-  S.Set Var
-  -- ^ avoid: The output will not contain any variable, free or bound,
-  -- from this set
+  InScopeSet
+  -- ^ Variables in scope
   -> TExpr
   -- ^ the incoming gradient
   -> TExpr
   -- ^ The BOG corresponding to the input expression
-  -> (S.Set Var,
-      -- ^ The input avoid, unioned with all free or bound variable
-      -- names that appear in the SUF reverse pass output bindings
+  -> (InScopeSet,
+      -- ^ Variables in scope after the reverse pass output bindings
       [(Pat, TExpr)])
       -- ^ The SUF reverse pass output bindings
 
