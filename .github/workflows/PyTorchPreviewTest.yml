@@ -21,18 +21,6 @@ jobs:
         # Version range or exact version of a Python version to use, using SemVer's version range syntax.
         python-version: 3.7
     
-    - name: Display the path
-      run: echo ${env:PATH}
-      shell: pwsh
-      
-    - name: Debug path
-      run: pwd
-      shell: pwsh
-    
-    - name: ls path
-      run: ls
-      shell: pwsh
-    
     - name: 'Make directories [userInstall]'
       shell: pwsh
       run: test/builds/mkdirs.ps1
