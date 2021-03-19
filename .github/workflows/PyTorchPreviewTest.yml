@@ -33,7 +33,7 @@ jobs:
     
     - name: 'Make directories [userInstall]'
       shell: pwsh
-      run: .\test\builds\mkdirs.ps1
+      run: .\test\builds\mkdirs
     
     - name: 'Install dependencies [userInstall]'
       shell: cmd
