@@ -27,9 +27,13 @@ jobs:
       run: pwd
       shell: pwsh
     
+    - name: ls path
+      run: ls
+      shell: pwsh
+    
     - name: 'Make directories [userInstall]'
       shell: pwsh
-      run: ./test/builds/mkdirs.ps1
+      run: .\test\builds\mkdirs.ps1
     
     - name: 'Install dependencies [userInstall]'
       shell: cmd
