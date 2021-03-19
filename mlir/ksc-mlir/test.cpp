@@ -323,7 +323,7 @@ void test_parser_vector_type() {
 
 void test_parser_build() {
   cout << "\n == test_parser_build\n";
-  const Expr::Ptr tree = parse(LOC(), "(build 10 (lam (i : Integer) (add i i))))");
+  const Expr::Ptr tree = parse(LOC(), "(build 10 (lam (i : Integer) (add i i)))");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
