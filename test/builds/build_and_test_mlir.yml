@@ -11,6 +11,9 @@ jobs:
 
   steps:
     
+  - script: sh ./test/builds/mkdirs.sh
+    displayName: 'Make directories [userInstall]'
+
   - script: echo "##vso[task.setvariable variable=LLVM_BRANCH]$(cat $(Build.Repository.LocalPath)/etc/llvm-branch.txt)"
 
   - task: Cache@2
@@ -27,4 +30,14 @@ jobs:
     condition: ne(variables.CACHE_RESTORED, 'true')
 
   - script: sh ./test/builds/build_and_test_kscmlir.sh
-    displayName: Testing Ksc MLIR [userTest]
+    displayName: Building and testing Ksc MLIR [userTest]
+
+  - script: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
+    displayName: 'Install dependencies [userInstall]'
+
+  - script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=build/bin  --overwrite-policy=always --install-method=copy
+    displayName: 'Building ksc [userInstall]'
+
+  - script: sh ./test/builds/test_kscmlir_examples.sh
+    displayName: Testing Ksc MLIR on examples from ksc [userTest]
+
