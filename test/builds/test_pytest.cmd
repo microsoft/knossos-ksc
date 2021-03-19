@@ -3,9 +3,11 @@ set -e
 echo Set Pip to specific version...
 python -m pip install --force-reinstall pip==20.3
 
+REM New resolver with PyTorch version notation https://pip.pypa.io/en/latest/user_guide/#changes-to-the-pip-dependency-resolver-in-20-3-2020
+REM Too big, throw memory exception https://stackoverflow.com/a/31526029/35544
 echo Installing dependencies...
 python -m pip install -r src/python/requirements.txt
-python -m pip install --use-deprecated=legacy-resolver pytest numpy torch==1.8.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+python -m pip install --use-deprecated=legacy-resolver --no-cache-dir pytest numpy torch==1.8.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 echo Installing ksc...
 cd ./src/python
