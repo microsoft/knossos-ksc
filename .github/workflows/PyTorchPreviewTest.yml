@@ -34,5 +34,5 @@ jobs:
       run: refreshenv && C:/ProgramData/chocolatey/lib/cabal/tools/cabal-3.0.0.0/cabal v2-install --with-ghc=C:/ProgramData/chocolatey/lib/ghc/tools/ghc-8.4.4/bin/ghc --installdir=build/bin --overwrite-policy=always --install-method=copy
 
     - name: 'ksc test [userTest]'
-      shell: cmd
+      shell: pwsh
       run: ./build/bin/ksc --test-windows --fs-test obj/test/out.ks
