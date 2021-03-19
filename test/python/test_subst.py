@@ -1,8 +1,27 @@
 import pytest
 
-from ksc.expr import Var, Const, Let, Lam, Call, child_exprs_no_subclasses
-from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _make_nonfree_var
+from ksc.expr import Var, Const, Let, Lam, Call
+from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _make_nonfree_var, _get_indexed_children, _get_subtree_size
 from ksc.parse_ks import parse_expr_string
+
+def test_subtree_size():
+  assert _get_subtree_size(Var("x")) == 1
+
+  # Variables bound by "Let" are not counted
+  three_nodes = Let(Var("x"), Const(3), Var("x"))
+  assert _get_subtree_size(three_nodes) == 3
+
+  # Neither is the target of a "Call"
+  assert _get_subtree_size(Call("add", [Var("x"), three_nodes])) == 5
+
+  assert _get_subtree_size(Lam(Var("x"), Call("add", [Var("x"), Const(1)]))) == 4 # Lam, Call, x, 1
+
+  x,y = Var("x"), Var("y")
+  e = Let([x,y], Call("tuple", [Const(1), Const(2)]), Call("add", [x, y]))
+  #from ksc.type_propagate import type_propagate
+  #type_propagate(e, {StructuredName(("add", Type.Tuple(Type.Integer, Type.Integer))): Type.Integer})
+  assert _get_subtree_size(e) == 7 # Let, tuple, 1, 2, Call, x, y
+
 
 def test_make_nonfree_var():
   assert _make_nonfree_var("x", [Var("x")]) == Var("x_0")
@@ -31,14 +50,12 @@ def test_replace_free_vars_shadowing():
   assert replaced == expected
 
 def _get_node(expr, idx):
-  # Note, this somewhat repeats the logic in Expr._cav_children.
-  # TODO: Consider exposing via Expr.children_with_indices(): Generator[Tuple[Expr, int]] ?
-  if idx==0: return expr
-  idx -= 1
-  for ch in (expr.args if isinstance(expr, Call) else child_exprs_no_subclasses(expr)):
-    if idx < ch.num_nodes_:
-      return _get_node(ch, idx)
-    idx -= ch.num_nodes_
+  if idx==0:
+    return expr
+  for start_idx, ch, end_idx in _get_indexed_children(expr):
+    if idx < end_idx:
+      return _get_node(ch, idx - start_idx)
+  raise IndexError(f"{idx} out of bounds in expr of size {expr.subtree_size_}")
 
 def test_replace_subtrees():
   e = parse_expr_string("(foo x y z)")

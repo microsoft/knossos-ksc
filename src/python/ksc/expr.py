@@ -235,13 +235,13 @@ class Expr(ASTNode):
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
     free_vars_: FrozenSet[StructuredName] # Filled in by constructor
-    num_nodes_: int # Filled in by constructor
+    subtree_size_: int # Initialized to None, then filled in (and used) by rewriter according to its own measuring scheme.
 
     def __init__(self, **args):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
-        self.num_nodes_ = compute_num_nodes(self)
         self.free_vars_ = compute_free_vars(self)
+        self.subtree_size_ = None
 
     def nodes(self):
         """
@@ -566,13 +566,9 @@ def _(ex, indent):
 #####################################################################
 # Calculate free variables of an Expr.
 
-def child_exprs_no_subclasses(e : Expr):
-    return [getattr(e, k) for k,v in e.__annotations__.items()
-        if v == Expr] # Do not include subclasses
-
 @singledispatch
 def compute_free_vars(e: Expr) -> FrozenSet[StructuredName]:
-    return frozenset().union(*[ch.free_vars_ for ch in child_exprs_no_subclasses(e)])
+    raise ValueError("Must be overridden for every Expr subclass")
 
 @compute_free_vars.register
 def fv_var(e: Var):
@@ -593,13 +589,17 @@ def fv_let(e: Let):
     )
     return e.rhs.free_vars_.union(e.body.free_vars_ - bound_here)
 
-@singledispatch
-def compute_num_nodes(e : Expr):
-    return 1 + sum(ch.num_nodes_ for ch in child_exprs_no_subclasses(e))
+@compute_free_vars.register
+def fv_const(e: Const):
+    return frozenset()
 
-@compute_num_nodes.register
-def num_nodes_call(e : Call):
-    return 1 + sum(arg.num_nodes_ for arg in e.args)
+@compute_free_vars.register
+def fv_assert(e: Assert):
+    return frozenset.union(e.cond.free_vars_, e.body.free_vars_)
+
+@compute_free_vars.register
+def fv_if(e: If):
+    return frozenset.union(e.cond.free_vars_, e.t_body.free_vars_, e.f_body.free_vars_)
 
 if __name__ == "__main__":
     from ksc.parse_ks import parse_ks_file

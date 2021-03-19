@@ -1,12 +1,67 @@
 from dataclasses import dataclass
 from functools import singledispatch
 import re
-from typing import Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Callable, Iterable, Generator, List, Mapping, Optional, Tuple
 from weakref import WeakKeyDictionary
 
-from ksc.expr import StructuredName, Expr, If, Call, Let, Lam, Var, Const, child_exprs_no_subclasses
+from ksc.expr import StructuredName, Expr, If, Call, Let, Lam, Var, Const, Assert
 
-### Capture-AVoiding SUBSTitution ###
+# cav_subst = Capture-AVoiding SUBSTitution
+
+##### Node numbering scheme
+
+@singledispatch
+def _get_indexed_children(e: Expr) -> Iterable[Tuple[int, Expr, int]]:
+    """ Tuples are [start_index, subtree, end_index] of children in defined order.
+        First child has start index 1; last child has end index equal to subtree_size_ of parent. """
+    raise ValueError("Must be overridden for every Expr subclass")
+
+def _get_subtree_size(e: Expr):
+    if e.subtree_size_ is None:
+        indexed_children = list(_get_indexed_children(e))
+        if len(indexed_children)==0:
+            e.subtree_size_ = 1
+        else:
+            _,_, e.subtree_size_ = indexed_children[-1]
+    return e.subtree_size_
+
+def _exprs_with_indices(exprs: Iterable[Expr]) -> Generator[Tuple[int, Expr, int], None, None]:
+    idx = 1
+    for e in exprs:
+        end_idx = idx + _get_subtree_size(e)
+        yield (idx, e, end_idx)
+        idx = end_idx
+
+@_get_indexed_children.register
+def _idch_var(e: Var):
+    return []
+
+@_get_indexed_children.register
+def _idch_const(e: Const):
+    return []
+
+@_get_indexed_children.register
+def _idch_let(e: Let):
+    return _exprs_with_indices([e.rhs, e.body])
+
+@_get_indexed_children.register
+def _idch_lam(e: Lam):
+    return _exprs_with_indices([e.body])
+
+@_get_indexed_children.register
+def _idch_lam(e: Call):
+    return _exprs_with_indices(e.args)
+
+@_get_indexed_children.register
+def _idch_if(e: If):
+    return _exprs_with_indices([e.cond, e.t_body, e.f_body])
+
+@_get_indexed_children.register
+def _idch_assert(e: Assert):
+    return _exprs_with_indices([e.cond, e.body])
+
+#####################################################################
+# Public members
 
 @dataclass(frozen=True)
 class ReplaceLocationRequest:
@@ -38,7 +93,9 @@ def replace_subtree(e: Expr, *args):
 def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
     return _cav_helper(e, 0, [], subst)
 
+#####################################################################
 # Name Generation
+
 temp_regex = re.compile("(.*)_([\d]+)")
 def _make_nonfree_var(name, exprs):
     m = temp_regex.match(name)
@@ -53,11 +110,12 @@ def _make_nonfree_var(name, exprs):
             return Var(s)
         idx += 1
 
+#####################################################################
 # CAV implementation
 
 def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
     # First, work out if there's anything to do in this subtree
-    reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + e.num_nodes_)]
+    reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + _get_subtree_size(e))]
     substs = {varname: repl
         for varname, repl in substs.items()
         if StructuredName.from_str(varname) in e.free_vars_}
@@ -79,16 +137,11 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
 
 @singledispatch
 def _cav_children(e: Expr, start_idx, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
-    return e.__class__(*_cav_list(child_exprs_no_subclasses(e), start_idx, reqs, substs))
+    return e.__class__(*_cav_child_list(e, start_idx, reqs, substs))
 
-def _cav_list(children: List[Expr], start_idx, reqs, substs):
-    # Applies _cav_helper to a list of child expressions (numbered consecutively), and returns the list of results
-    new_children = []
-    ch_idx = start_idx + 1
-    for ch in children:
-        new_children.append(_cav_helper(ch, ch_idx, reqs, substs))
-        ch_idx += ch.num_nodes_
-    return new_children
+def _cav_child_list(e: Expr, start_idx, reqs, substs):
+    # Applies _cav_helper to the children of the expression, and returns the list of substituted children
+    return [_cav_helper(ch, start_idx + ch_idx, reqs, substs) for ch_idx, ch, _ in _get_indexed_children(e)]
 
 @_cav_children.register
 def _cav_const(e: Const, start_idx, reqs, substs):
@@ -105,7 +158,7 @@ def _cav_call(e: Call, start_idx, reqs, substs):
         # The variable (holding the function we are calling) is being substituted.
         # It had better be a rename to another variable, because we can't Call anything else....
         name = substs[name.se].structured_name
-    return Call(name, _cav_list(e.args, start_idx, reqs, substs))
+    return Call(name, _cav_child_list(e, start_idx, reqs, substs))
 
 def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
 ) -> Tuple[Var, VariableSubstitution]:
@@ -139,7 +192,8 @@ def _cav_let(e: Let, start_idx, reqs, substs):
         new_vars = new_vars[0]
     else:
         assert isinstance(e.vars, list)
-    # Do not call super(): we need different substitutions for each child
+    # Do not use _cav_child_list: we need different substitutions for each child.
+    # Hence, this must match _idch_let's ordering of rhs/body.
     return Let(new_vars,
         _cav_helper(e.rhs, start_idx + 1, reqs, substs),
-        _cav_helper(e.body, start_idx + 1 + e.rhs.num_nodes_, reqs, body_subst))
+        _cav_helper(e.body, start_idx + 1 + _get_subtree_size(e.rhs), reqs, body_subst))
