@@ -88,4 +88,8 @@ def bench(module_name, bench_name):
     timeit(bench_name + ' KS Un-opt', ks_fun, config)
 
 if __name__ == "__main__":
-  bench("relu3", "vrelu3")
+  import sys
+  if len(sys.argv) != 3:
+      print("Usage: run-bench MODULE BENCH")
+      sys.exit(1)
+  bench(sys.argv[1], sys.argv[2])
