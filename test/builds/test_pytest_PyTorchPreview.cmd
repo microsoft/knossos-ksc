@@ -17,7 +17,7 @@ python -m pip install --editable . || exit /b
 cd ../..
 
 echo Running pytest
-python -m pytest test/python || exit /b
+pytest test/python || exit /b
 
 echo Installing TS2KS...
 cd ./src/ts2k
@@ -27,7 +27,7 @@ cd ../..
 
 
 REM echo Running pytest on ts2k
-python -m pytest test/ts2k || exit /b
+pytest test/ts2k || exit /b
 
 REM echo Running pytest using cpp backend
 REM python -m pytest test/python/test_tracing_core.py --backend cpp
