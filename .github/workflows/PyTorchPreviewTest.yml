@@ -35,5 +35,5 @@ jobs:
 
     - name: Testing ksc python package [userTest]
       shell: pwsh
-      run: call ./test/builds/test_pytest.cmd
+      run: call ./test/builds/test_pytest_PyTorchPreview.cmd
       
