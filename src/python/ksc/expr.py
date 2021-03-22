@@ -233,7 +233,7 @@ class Expr(ASTNode):
     '''Base class for Expression AST nodes. Not directly instantiable.'''
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
-    free_vars_: FrozenSet[StructuredName] # Filled in by constructor
+    free_vars_: FrozenSet[str] # Filled in by constructor
     subtree_size_: int # Initialized to None, then filled in (and used) by rewriter according to its own measuring scheme.
 
     def __init__(self, **args):
@@ -345,10 +345,6 @@ class Var(Expr):
 
     def __init__(self, name, type=None, decl=False):
         super().__init__(type_=type, name=name, decl=decl)
-
-    @property
-    def structured_name(self):
-        return StructuredName.from_str(self.name)
 
     def __str__(self):
         if self.decl:
@@ -558,16 +554,16 @@ def _(ex, indent):
 # Calculate free variables of an Expr.
 
 @singledispatch
-def compute_free_vars(e: Expr) -> FrozenSet[StructuredName]:
+def compute_free_vars(e: Expr) -> FrozenSet[str]:
     raise ValueError("Must be overridden for every Expr subclass")
 
 @compute_free_vars.register
 def fv_var(e: Var):
-    return frozenset([e.structured_name])
+    return frozenset([e.name])
 
 @compute_free_vars.register
 def fv_call(e: Call):
-    return frozenset([e.name]).union(*[arg.free_vars_ for arg in e.args])
+    return frozenset.union(*[arg.free_vars_ for arg in e.args])
 
 @compute_free_vars.register
 def fv_lam(e: Lam):

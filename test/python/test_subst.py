@@ -24,11 +24,12 @@ def test_subtree_size():
 
 
 def test_make_nonfree_var():
+  assert _make_nonfree_var("x", []) == Var("x_0")
   assert _make_nonfree_var("x", [Var("x")]) == Var("x_0")
+  assert _make_nonfree_var("x", [Var("x_1")]) == Var("x_0")
   assert _make_nonfree_var("x", [Var("x_0")]) == Var("x_1")
-  assert _make_nonfree_var("x_0", []) == Var("x_1")
-  assert _make_nonfree_var("x_0", [Var("x_1")]) == Var("x_2")
-  assert _make_nonfree_var("x_2", [Var("x_0")]) == Var("x_3")
+  assert _make_nonfree_var("x_0", []) == Var("x_0_0")
+  assert _make_nonfree_var("x_1", [Var("x_1_0"), Var("x_1_1")]) == Var("x_1_2")
   assert _make_nonfree_var("", [parse_expr_string("(if _0 _3 x)")]) == Var("_1")
 
 def test_replace_free_vars():
@@ -37,11 +38,6 @@ def test_replace_free_vars():
   replaced = replace_free_vars(e, {"y": Var("z")})
   expected = parse_expr_string("(let (x (add z 1)) (mul x 2))")
   assert replaced == expected
-
-  # Replaces target of Call
-  replaced2 = replace_free_vars(e, {"add": Var("foo")})
-  expected2 = parse_expr_string("(let (x (foo y 1)) (mul x 2))")
-  assert replaced2 == expected2
 
 def test_replace_free_vars_shadowing():
   e = parse_expr_string("(let (x (add x 1)) (mul x 2))")

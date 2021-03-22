@@ -29,19 +29,17 @@ def test_free_vars():
   assert Const(11.3).free_vars_ == frozenset()
 
   x = Var("x")
-  x_name = StructuredName.from_str("x")
-  assert x.free_vars_ == frozenset([x_name])
+  assert x.free_vars_ == frozenset(["x"])
 
   # Binding
   y = Var("y")
-  y_name = StructuredName.from_str("y")
-  assert Let(x, Call("add", [y, Const(1)]), Call("add", [x, x])).free_vars_ == frozenset(
-    [y_name, StructuredName.from_str("add")]) # x not free
+  assert Let(x, If(y, Const(0), Const(1)), x).free_vars_ == frozenset(["y"]) # x is not free
+  assert Lam(x, y).free_vars_ == frozenset(["y"])
+  assert Lam(x, x).free_vars_ == frozenset()
 
   # Rebinding
-  assert Let(x, Call("add", [x, Const(1)]), Call("mul", [y, y])).free_vars_ == frozenset(
-    [x_name, y_name, StructuredName.from_str("add"), StructuredName.from_str("mul")])
+  assert Let(x, If(y, x, Const(1)), x).free_vars_ == frozenset(["x", "y"]) # different x is free
 
-  assert Lam(x, x).free_vars_ == frozenset()
-  assert Lam(x, y).free_vars_ == frozenset([y_name])
-  assert If(x, y, Const(0)).free_vars_ == frozenset([x_name, y_name])
+  # Call targets not included
+  assert Let(x, Call("add", [x, Const(1)]), Call("mul", [y, y])).free_vars_ == frozenset(["x", "y"])
+

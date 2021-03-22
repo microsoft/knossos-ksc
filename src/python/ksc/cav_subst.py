@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from functools import singledispatch
-import re
+import itertools
 from typing import Callable, Iterable, Generator, List, Mapping, Optional, Tuple
 from weakref import WeakKeyDictionary
 
-from ksc.expr import StructuredName, Expr, If, Call, Let, Lam, Var, Const, Assert
+from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 
 # cav_subst = Capture-AVoiding SUBSTitution
 
@@ -96,19 +96,11 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
 #####################################################################
 # Name Generation
 
-temp_regex = re.compile("(.*)_([\d]+)")
-def _make_nonfree_var(name, exprs):
-    m = temp_regex.match(name)
-    if m is not None:
-        name, idx = m.group(1), int(m.group(2)) + 1
-    else:
-        idx = 0
-    while True:
-        s = name + "_" + str(idx)
-        sn = StructuredName.from_str(s)
-        if all(sn not in e.free_vars_ for e in exprs):
-            return Var(s)
-        idx += 1
+def _make_nonfree_var(prefix, exprs):
+    for idx in itertools.count():
+        name = prefix + "_" + str(idx)
+        if all(name not in e.free_vars_ for e in exprs):
+            return Var(name)
 
 #####################################################################
 # CAV implementation
@@ -118,7 +110,7 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
     reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + _get_subtree_size(e))]
     substs = {varname: repl
         for varname, repl in substs.items()
-        if StructuredName.from_str(varname) in e.free_vars_}
+        if varname in e.free_vars_}
     if len(reqs) == 0:
         if len(substs) == 0:
             # Nothing to do in this subtree
@@ -167,10 +159,10 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
         and an updated <subst>.
         Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
     """
-    all_potential_binders = [req.payload for req in reqs] + list(subst.values())
-    if any(arg.structured_name in rhs.free_vars_ for rhs in all_potential_binders):
+    conflicting_binders = [req.payload for req in reqs] + list(subst.values())
+    if any(arg.name in rhs.free_vars_ for rhs in conflicting_binders):
         # Must rename "arg". Make a new name.
-        nv = _make_nonfree_var(arg.name, [binder] + all_potential_binders)
+        nv = _make_nonfree_var(arg.name, [binder] + conflicting_binders)
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 
