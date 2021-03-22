@@ -35,6 +35,6 @@ jobs:
 
     # Preview version of PyTorch
     - name: Testing ksc python package [userTest]
-      shell: pwsh
+      shell: cmd
       run: test/builds/test_pytest_PyTorchPreview.cmd
       
