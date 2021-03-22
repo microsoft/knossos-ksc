@@ -59,7 +59,7 @@ std::ostream& operator<<(std::ostream& s, Signature const& t)
   return s << ")";
 }
 
-std::ostream& operator<<(std::ostream& s, SName const& t)
+std::ostream& operator<<(std::ostream& s, StructuredName const& t)
 {
   for (auto& derivation : t.derivations) {
     s << '[' << derivation << ' ';
@@ -274,7 +274,7 @@ std::string Declaration::getMangledName() const {
   return encodeName(ret);
 }
 
-std::string SName::getMangledName() const {
+std::string StructuredName::getMangledName() const {
   std::string ret;
   for (auto& derivation : derivations) {
     ret += derivation;
