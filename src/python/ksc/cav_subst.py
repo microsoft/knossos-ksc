@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from functools import singledispatch
 import itertools
 from typing import Callable, Iterable, Generator, List, Mapping, Optional, Tuple
-from weakref import WeakKeyDictionary
 
 from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 
