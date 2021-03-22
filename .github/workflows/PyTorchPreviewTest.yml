@@ -25,6 +25,11 @@ jobs:
       shell: pwsh
       run: test/builds/mkdirs.ps1
     
+
+    - name: 'MSVC paths [userInstall] (EXPERIMENTAL)'
+      shell: pwsh
+      run: users/cogravil/VSDevShell.ps1
+
     - name: 'Install dependencies [userInstall]'
       shell: cmd
       run: call test/builds/install_windows.bat || sleep 30 && call test/builds/install_windows.bat || sleep 30 && call test/builds/install_windows.bat
