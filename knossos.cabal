@@ -15,6 +15,9 @@ executable ksc
                  Ksc.CatLang
                  Ksc.Futhark
                  Ksc.Pipeline
+                 Ksc.SUF
+                 Ksc.SUF.AD
+                 Ksc.SUF.Rewrite
                  Ksc.Traversal
                  Lang
                  LangUtils

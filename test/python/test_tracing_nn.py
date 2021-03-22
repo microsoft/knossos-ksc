@@ -4,8 +4,10 @@ import numpy as np
 import ksc
 from ksc.tracing.functions import math, nn
 from ksc.shape import Shape, TensorShape, ScalarShape
+import sys
 
-
+# https://github.com/google/jax/issues/5795
+@pytest.mark.skipif(sys.platform == 'win32', reason="Jaxlib builds not currently supplied for Windows")
 @pytest.mark.parametrize(
     "kernel_size,strides,padding,expected_shape", [
         ((3, 3), (1, 1), "SAME", (1, 64, 56, 56)),

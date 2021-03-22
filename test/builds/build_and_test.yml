@@ -94,6 +94,14 @@ jobs:
     vmImage: 'vs2017-win2016'
 
   steps:
+  - checkout: self
+    submodules: true
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.7'
+      architecture: 'x64'
+
   - task: UseDotNet@2
     inputs:
       version: 3.1.100
@@ -114,11 +122,14 @@ jobs:
   - script: call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat || sleep 30 && call test\builds\install_windows.bat
     displayName: 'Install dependencies [userInstall]'
 
-  - script: refreshenv && cabal v2-install --installdir=build/bin --overwrite-policy=always --install-method=copy
+  - script: refreshenv && C:/ProgramData/chocolatey/lib/cabal/tools/cabal-3.0.0.0/cabal v2-install --with-ghc=C:/ProgramData/chocolatey/lib/ghc/tools/ghc-8.4.4/bin/ghc --installdir=build/bin --overwrite-policy=always --install-method=copy
     displayName: 'GHC compile src/ksc/Main.hs [userTest]'
 
   - script: build\bin\ksc --test-windows --fs-test obj\test\out.ks
     displayName: 'ksc test [userTest]'
+
+  - script: call ./test/builds/test_pytest.cmd
+    displayName: Testing ksc python package [userTest]
 
   - script: rm -rf *
     displayName: 'Clean'

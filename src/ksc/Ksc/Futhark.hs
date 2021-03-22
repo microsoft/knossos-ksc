@@ -384,6 +384,8 @@ toCall f@(L.TFun _ L.ShapeFun{}) args =
 toCall f@(L.TFun _ L.CLFun{}) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
+toCall _ _ = error "Unsupported Futhark call"
+
 toFuthark :: L.TDef -> Def
 toFuthark d = case LU.noTupPatifyDef d of {
   L.Def f (L.VarPat args) res_ty (L.UserRhs e) ->

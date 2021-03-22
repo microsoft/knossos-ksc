@@ -6,6 +6,9 @@
 
 (gdef fwd [f (Tuple Float Float)])
 (gdef rev [f (Tuple Float Float)])
+(gdef suffwdpass [f (Tuple Float Float)])
+(gdef sufrevpass [f (Tuple Float Float)])
+(gdef sufrev [f (Tuple Float Float)])
 
 (def rev_f (Tuple Float Float)
      ((x : Float) (y : Float) (d_r : Float))
@@ -19,6 +22,9 @@
 
 (gdef fwd [rev_f (Tuple Float Float Float)])
 (gdef rev [rev_f (Tuple Float Float Float)])
+(gdef suffwdpass [rev_f (Tuple Float Float Float)])
+(gdef sufrevpass [rev_f (Tuple Float Float Float)])
+(gdef sufrev [rev_f (Tuple Float Float Float)])
 
 (def fst_rev_f Float
      ((x : Float) (y : Float) (d_r : Float))
@@ -33,6 +39,9 @@
 
 (gdef fwd [fst_rev_f (Tuple Float Float Float)])
 (gdef rev [fst_rev_f (Tuple Float Float Float)])
+(gdef suffwdpass [fst_rev_f (Tuple Float Float Float)])
+(gdef sufrevpass [fst_rev_f (Tuple Float Float Float)])
+(gdef sufrev [fst_rev_f (Tuple Float Float Float)])
 
 (def fst_rev_f_inline Float
      ((x : Float) (y : Float) (d_r : Float))
@@ -40,6 +49,9 @@
 
 (gdef fwd [fst_rev_f_inline (Tuple Float Float Float)])
 (gdef rev [fst_rev_f_inline (Tuple Float Float Float)])
+(gdef suffwdpass [fst_rev_f_inline (Tuple Float Float Float)])
+(gdef sufrevpass [fst_rev_f_inline (Tuple Float Float Float)])
+(gdef sufrev [fst_rev_f_inline (Tuple Float Float Float)])
 
 (def fst_rev_f_inline_prim Float
      ((x : Float) (y : Float) (d_r : Float))
@@ -47,5 +59,8 @@
 
 (gdef fwd [fst_rev_f_inline_prim (Tuple Float Float Float)])
 (gdef rev [fst_rev_f_inline_prim (Tuple Float Float Float)])
+(gdef suffwdpass [fst_rev_f_inline_prim (Tuple Float Float Float)])
+(gdef sufrevpass [fst_rev_f_inline_prim (Tuple Float Float Float)])
+(gdef sufrev [fst_rev_f_inline_prim (Tuple Float Float Float)])
 
 (def main Integer () 0)

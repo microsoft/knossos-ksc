@@ -117,6 +117,9 @@ struct Type {
   bool operator==(const Type& that) const {
     return type == that.type && subTypes == that.subTypes;
   }
+  bool operator!=(const Type& that) const {
+    return !(*this == that);
+  }
 
 protected:
   ValidType type;
@@ -147,8 +150,43 @@ inline Type Type::tangentType() const
   return Type(None);
 }
 
+// StructuredName
+// Either:
+//     sin                                String
+//     [pow (Tuple Float Integer)]        String Type
+//     [fwd [sin Float]]                  String StructuredName
+struct StructuredName {
+  using Ptr = std::unique_ptr<StructuredName>;
+
+  StructuredName(const char * name):baseFunctionName(name), baseFunctionArgType(Type::None) {}
+  StructuredName(llvm::StringRef name, Type type=Type(Type::None)):baseFunctionName(name), baseFunctionArgType(type) {}
+  StructuredName(llvm::StringRef derivation, StructuredName base) : StructuredName(std::move(base)) { derivations.insert(derivations.begin(), std::string(derivation)); }
+
+  std::vector<std::string> derivations;  // Derivations applied to the base function, in order from outermost to innermost
+  std::string baseFunctionName;
+  Type baseFunctionArgType;
+
+  bool operator<(StructuredName const& that) const {
+    return std::tie(derivations, baseFunctionName, baseFunctionArgType)
+      < std::tie(that.derivations, that.baseFunctionName, that.baseFunctionArgType);
+  }
+  bool operator==(StructuredName const& that) const {
+    return derivations == that.derivations
+      && baseFunctionName == that.baseFunctionName
+      && baseFunctionArgType == that.baseFunctionArgType;
+  }
+  bool operator!=(StructuredName const& that) const { return !(*this == that); }
+
+  bool isDerivation() const { return !derivations.empty(); }
+
+  bool hasType() const { return !baseFunctionArgType.isNone(); }
+
+  std::string getMangledName() const;
+};
+std::ostream& operator<<(std::ostream& s, StructuredName const& t);
+
 struct Signature {
-  std::string name;
+  StructuredName name;
   std::vector<Type> argTypes;   
 
   bool operator<(Signature const& that) const {
@@ -158,6 +196,7 @@ struct Signature {
   bool operator==(Signature const& that) const {
     return name == that.name && argTypes == that.argTypes;
   }
+  bool operator!=(Signature const& that) const { return !(*this == that); }
 };
 
 std::ostream& operator<<(std::ostream& s, Signature const& t);
@@ -340,11 +379,11 @@ private:
 /// the final IR.
 struct Declaration : public Expr {
   using Ptr = std::unique_ptr<Declaration>;
-  Declaration(llvm::StringRef name, Type type)
-      : Expr(type, Kind::Declaration), name(name) {}
+  Declaration(StructuredName name, Type type)
+      : Expr(type, Kind::Declaration), name(std::move(name)) {}
 
-  Declaration(llvm::StringRef name, Type type, std::vector<Type> argTypes)
-      : Expr(type, Kind::Declaration), name(name), argTypes(move(argTypes)) {}
+  Declaration(StructuredName name, Type type, std::vector<Type> argTypes)
+      : Expr(type, Kind::Declaration), name(std::move(name)), argTypes(move(argTypes)) {}
 
   void addArgType(Type opt) { argTypes.push_back(opt); }
   llvm::ArrayRef<Type> getArgTypes() const { return argTypes; }
@@ -352,7 +391,7 @@ struct Declaration : public Expr {
     assert(idx < argTypes.size() && "Offset error");
     return argTypes[idx];
   }
-  llvm::StringRef getName() const { return name; }
+  StructuredName const& getName() const { return name; }
 
   std::string getMangledName() const;
 
@@ -367,7 +406,7 @@ struct Declaration : public Expr {
 
 private:
   // TODO: use Signature here
-  std::string name;
+  StructuredName name;
   std::vector<Type> argTypes;   
 };
 
@@ -414,9 +453,9 @@ private:
 /// validating the arguments and return types.
 struct Definition : public Expr {
   using Ptr = std::unique_ptr<Definition>;
-  Definition(llvm::StringRef name, Type type)
+  Definition(StructuredName name, Type type)
       : Expr(type, Kind::Definition) {
-    decl = std::make_unique<Declaration>(name, type);
+    decl = std::make_unique<Declaration>(std::move(name), type);
   }
 
   /// Arguments and return type (for name and type validation)
@@ -435,7 +474,7 @@ struct Definition : public Expr {
   }
   Expr *getImpl() const { return impl.get(); }
   Declaration *getDeclaration() const { return decl.get(); }
-  llvm::StringRef getName() const { return decl->getName(); }
+  StructuredName const& getName() const { return decl->getName(); }
   std::string getMangledName() const { return decl->getMangledName(); }
   size_t size() const { return arguments.size(); }
 

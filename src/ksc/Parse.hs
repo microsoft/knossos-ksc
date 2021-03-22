@@ -385,6 +385,9 @@ pFunG pBase = try (brackets $
          <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
          <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
          <|> (pReserved "CL"    >> CLFun    <$> pBase)
+         <|> (pReserved "suffwdpass" >> SUFFwdPass <$> pBase)
+         <|> (pReserved "sufrevpass" >> SUFRevPass <$> pBase)
+         <|> (pReserved "sufrev"     >> SUFRev     <$> pBase)
          <|> (pReserved "shape" >> ShapeFun <$> pFunG pBase)))
    <|> Fun <$> pBase
   where pBaseDerivation :: String
@@ -444,6 +447,9 @@ pDerivation =
   <|> (pReserved "rev" $> DerivationDrvFun (AD BasicAD Rev))
   <|> (pReserved "CL"  $> DerivationCLFun)
   <|> (pReserved "shape" $> DerivationShapeFun)
+  <|> (pReserved "suffwdpass" $> DerivationSUFFwdPass)
+  <|> (pReserved "sufrevpass" $> DerivationSUFRevPass)
+  <|> (pReserved "sufrev" $> DerivationSUFRev)
 
 pGDef :: Parser GDefX
 pGDef = do { pReserved "gdef"

@@ -4,6 +4,9 @@
 
 (gdef fwd [f (Tuple (Tuple Float Float) Integer)])
 (gdef rev [f (Tuple (Tuple Float Float) Integer)])
+(gdef suffwdpass [f (Tuple (Tuple Float Float) Integer)])
+(gdef sufrevpass [f (Tuple (Tuple Float Float) Integer)])
+(gdef sufrev [f (Tuple (Tuple Float Float) Integer)])
 
 (def foofilter_comp Float ((_xs$o1 : (Tensor 1 Float)))
      (let (_36 false)

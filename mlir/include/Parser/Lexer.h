@@ -47,7 +47,7 @@ inline std::ostream& operator<<(std::ostream& s, Location const& loc) { return l
 struct Token {
   using Ptr = std::unique_ptr<Token>;
   Token(Location loc, std::string str) : isValue(true), value(str), loc(loc) {}
-  Token(Location loc) : isValue(false), loc(loc) {}
+  Token(Location loc, char delim = '(') : isValue(false), value(1, delim), loc(loc) {}
 
   const bool isValue;
 
@@ -79,6 +79,13 @@ struct Token {
     assert(!isValue && "No children in a value token");
     assert(children.size() > 0 && "No tail");
     return llvm::ArrayRef<Ptr>(children).slice(1);
+  }
+  char getDelimeter() const {
+    assert(!isValue && "No children in a value token");
+    return value[0];
+  }
+  bool isSquareBracket() const {
+    return getDelimeter() == '[';
   }
 
   Location const& getLocation() const  { return loc; }
@@ -136,7 +143,7 @@ public:
       verbosity = v;
   }
 
-  Token::Ptr lex();
+  Token::Ptr lex(char c = 0);
 };
 
 }} // namespace

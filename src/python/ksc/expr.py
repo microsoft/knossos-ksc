@@ -85,7 +85,7 @@ class StructuredName:
 
     def is_derivation(self):
         """
-        True if this is a "rev" or "fwd" etc of another StructuredName
+        True if this is a "rev"/"fwd" etc of another StructuredName
         """
         return isinstance(self.se, tuple) and isinstance(self.se[1], StructuredName)
 
@@ -142,7 +142,7 @@ class StructuredName:
         assert isinstance(self.se[1], Type)
         return self.se[1]
 
-    def add_type(self, ty) -> (Type, 'StructuredName'):
+    def add_type(self, ty) -> ('StructuredName', Type):
         """
         Return a new structured name, with "ty" inserted in the corner, returning the old type if any
         sn = parse("[shape [rev foo]]")
@@ -151,13 +151,13 @@ class StructuredName:
             new_sname is "[shape [rev [foo Float]]]"
         """
         if isinstance(self.se, str):
-            return None, StructuredName((self.se, ty))
+            return StructuredName((self.se, ty)), None
         if self.is_derivation():
-            old_ty, new_sn = self.se[1].add_type(ty)
-            return old_ty, StructuredName((self.se[0], new_sn))
+            new_sn, old_ty  = self.se[1].add_type(ty)
+            return StructuredName((self.se[0], new_sn)), old_ty
         
         old_ty = self.se[1]
-        return old_ty, StructuredName((self.se[0], ty))
+        return StructuredName((self.se[0], ty)), old_ty
 
     def mangle_without_type(self) -> str:
         """
@@ -223,9 +223,8 @@ class ASTNode(KRecord):
     def __str__(self):
         def to_str(v):
             if isinstance(v, list):
-                # __str__ on list contains repr of elements
-                contents = ", ".join([to_str(e) for e in v])
-                return f"[{contents}]"
+                # str() on list contains repr() of elements
+                return "[" + (", ".join([to_str(e) for e in v])) + "]"
             return str(v)
         nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + ' ' + ' '.join(nodes))
@@ -242,14 +241,6 @@ class Expr(ASTNode):
         super().__init__(**args)
         self.free_vars_ = compute_free_vars(self)
         self.subtree_size_ = None
-
-    def nodes(self):
-        """
-        Return child nodes of this expr
-        """
-        assert False # TODO: remove this method
-        for nt in self.__annotations__:
-            yield getattr(self, nt)
 
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 

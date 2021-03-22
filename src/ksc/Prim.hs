@@ -322,6 +322,9 @@ pEqual = mkPrimCall2 P_eq
 pScale = mkPrimCall2 P_ts_scale
 pDot   = mkPrimCall2 P_ts_dot
 
+pAdd1 :: TExpr -> TExpr
+pAdd1 = mkPrimCall1 P_ts_add
+
 pNeg :: HasCallStack => TExpr -> TExpr
 pNeg = mkPrimCall1 P_ts_neg
 
@@ -355,6 +358,14 @@ pMulii x1 x2 = userCall "mul" TypeInteger (Tuple [x1, x2])
 pMulff :: TExpr -> TExpr -> TExpr
 pMulff x1 x2 = userCall "mul" TypeFloat (Tuple [x1, x2])
 
+pDup :: Int -> TExpr -> TExpr
+pDup n = mkPrimCall1 (P_dup n)
+
+pElim :: TExpr -> TExpr
+pElim = mkPrimCall1 P_elim
+
+pInline :: TExpr -> TExpr
+pInline = mkPrimCall1 P_inline
 
 ---------------------------------------------
 --       Types of primitive functions
@@ -402,6 +413,30 @@ primCallResultTy_maybe fun arg_ty
 
       CLFun f -> primCallResultTy_maybe (Fun f) arg_ty
 
+      SUFFwdPass f@(PrimFun pf)
+        | Just bog_ty <- sufBogTy_maybe pf arg_ty
+        , Right orig_res_ty <- primCallResultTy_maybe (Fun f) arg_ty
+        -> Right (TypeTuple [orig_res_ty, bog_ty])
+        | otherwise
+        -> Left (text "Type error in SUF fwd fun:" <+> ppr fun
+                 $$ text "Arg ty was" <+> ppr arg_ty)
+
+      SUFRevPass (PrimFun f)
+        | TypeTuple [dorig_res_ty, bog_ty] <- arg_ty
+        , Just t <- sufRevFunCallResultTy_maybe f dorig_res_ty bog_ty
+        -> Right t
+        | otherwise
+        -> Left (text "Type error in SUF rev fun:" <+> ppr fun
+             <+> text "Arg ty was:" <+> ppr arg_ty)
+
+      SUFRev f -> primCallResultTy_maybe (DrvFun f (AD BasicAD Rev)) arg_ty
+
+      SUFFwdPass BaseUserFun{} ->
+        Left (text "primCallResultTy_maybe of BaseUserFun:" <+> ppr fun)
+
+      SUFRevPass BaseUserFun{} ->
+        Left (text "primCallResultTy_maybe of BaseUserFun:" <+> ppr fun)
+
       Fun (BaseUserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
 primFunCallResultTy :: HasCallStack => PrimFun -> TExpr -> Type
@@ -413,9 +448,9 @@ primFunCallResultTy fun args
                                 , ppr (typeof args)])
                  TypeUnknown
 
--- The type of the base function given that the derived function has
--- argument type derivedFunArgTy
-baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc Type
+-- Just the base function argument type given that the derived function has
+-- argument type derivedFunArgTy, or Nothing if we can't work it out
+baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc (Maybe Type)
 baseFunArgTy_maybe derivedFun derivedFunArgTy
   = case derivedFun of
       Fun{} -> it's derivedFunArgTy
@@ -426,7 +461,118 @@ baseFunArgTy_maybe derivedFun derivedFunArgTy
       GradFun{}  -> it's derivedFunArgTy
       ShapeFun f -> baseFunArgTy_maybe f derivedFunArgTy
       CLFun{}    -> it's derivedFunArgTy
-  where it's = pure
+      SUFFwdPass{} -> it's derivedFunArgTy
+      SUFRevPass{} -> don'tKnow
+      SUFRev{}   -> case derivedFunArgTy of
+        TypeTuple [baseArgTy', _] -> it's baseArgTy'
+        _ -> Left (text "baseFunArgTy_maybe: SUFRev:" <+> pprDerivedFun ppr derivedFun
+                   $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
+  where it's = pure . pure
+        don'tKnow = pure Nothing
+
+-- If 'f : S -> T' then
+--
+--     sufBogTy_maybe f S
+--
+-- returns BOG{f}
+sufBogTy_maybe :: PrimFun -> Type -> Maybe Type
+sufBogTy_maybe P_SelFun{} arg_ty
+  = Just (tangentType arg_ty)
+
+sufBogTy_maybe P_elim arg_ty
+  = Just shape
+  where -- FIXME: Use a better encoding of shape
+    shape = tangentType arg_ty
+
+sufBogTy_maybe (P_dup _) _
+  = Just (TypeTuple [])
+
+sufBogTy_maybe P_size arg_ty
+  = Just shape
+  where -- FIXME: Use a better encoding of shape
+    shape = tangentType arg_ty
+
+sufBogTy_maybe P_index arg_ty
+  | TypeTuple [indexType, tensor_ty@(TypeTensor _ _)] <- arg_ty
+  -- FIXME: Use a better encoding of shape
+  , let shape = tangentType tensor_ty
+  = Just (TypeTuple [indexType, shape])
+
+sufBogTy_maybe P_sum arg_ty
+  | TypeTensor n _ <- arg_ty
+  = Just (tensorIndexType n)
+
+sufBogTy_maybe P_ts_add _
+  = Just (TypeTuple [])
+
+sufBogTy_maybe P_constVec _
+  = Just (TypeTuple [])
+
+sufBogTy_maybe P_deltaVec arg_ty
+  | TypeTuple [indexType, _indexType, _] <- arg_ty
+  = Just indexType
+
+sufBogTy_maybe P_eq arg_ty
+  = Just (tangentType arg_ty)
+
+sufBogTy_maybe P_ne arg_ty
+  = Just (tangentType arg_ty)
+
+sufBogTy_maybe P_Vec_init arg_ty
+  = Just (tangentType arg_ty)
+
+sufBogTy_maybe _ _
+  = Nothing
+
+-- If 'f : S -> T' then
+--
+--     sufRevFunCallResultTy_maybe f dT BOG{f}
+--
+-- returns dS
+sufRevFunCallResultTy_maybe :: PrimFun -> Type -> Type -> Maybe Type
+sufRevFunCallResultTy_maybe P_SelFun{} _ shape
+  = Just shape
+
+sufRevFunCallResultTy_maybe P_elim (TypeTuple []) shape
+  -- FIXME: Use a better encoding of shape
+  = Just shape
+
+sufRevFunCallResultTy_maybe (P_dup n) (TypeTuple arg_tys) (TypeTuple [])
+  | arg_ty_first:arg_tys_rest <- arg_tys
+  , length arg_tys == n
+  , Just res_ty <- eqTypes arg_ty_first arg_tys_rest
+  = Just res_ty
+
+sufRevFunCallResultTy_maybe P_size _typeIndex shape
+  | let tangentType_arg_ty = shape
+  = Just tangentType_arg_ty
+
+sufRevFunCallResultTy_maybe P_index _elt_ty (TypeTuple [indexType, shape])
+  = Just (TypeTuple [tangentType indexType, shape])
+
+sufRevFunCallResultTy_maybe P_sum elt_ty indexType
+  | Just n <- tensorDimensionFromIndexType_maybe indexType
+  = Just (TypeTensor n elt_ty)
+
+sufRevFunCallResultTy_maybe P_ts_add dt (TypeTuple [])
+  = Just (TypeTuple [dt, dt])
+
+sufRevFunCallResultTy_maybe P_constVec (TypeTensor n ty) (TypeTuple [])
+  | let tangent_index_ty = tangentType (tensorIndexType n)
+  = Just (TypeTuple [tangent_index_ty, ty])
+
+sufRevFunCallResultTy_maybe P_deltaVec typeTensor_dty indexType
+  | TypeTensor _ dty <- typeTensor_dty
+  = Just (TypeTuple [tangentType indexType, tangentType indexType, dty])
+
+sufRevFunCallResultTy_maybe P_eq (TypeTuple []) tangentType_arg_ty
+  = Just tangentType_arg_ty
+
+sufRevFunCallResultTy_maybe P_ne (TypeTuple []) tangentType_arg_ty
+  = Just tangentType_arg_ty
+
+sufRevFunCallResultTy_maybe _ _ _
+  = Nothing
 
 ---------------------------------------
 -- This is the function that does the heavy lifting for primitives
@@ -610,6 +756,9 @@ primFunCallResultTy_maybe fun args
         | t1 `eqType` t2
         , isTensorIndexType t1
         -> Just tret
+
+      (P_elim     , _)                                     -> Just (TypeTuple [])
+      (P_dup n, t)                                         -> Just (TypeTuple (replicate n t))
 
       _ -> Nothing
 

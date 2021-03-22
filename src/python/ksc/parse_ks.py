@@ -227,7 +227,11 @@ import argparse
 import sys
 import re
 
-def s_exps_from_string(string_or_stream):
+def s_exps_from_string(string_or_stream, source_file_name = None):
+    if source_file_name:
+        global parser_source_file
+        parser_source_file = source_file_name
+    
     return sexpdata.Parser(string_or_stream, nil=None, true="true", false="false", line_comment=";").parse()
 
 def parse_expr_string(string_or_stream):
