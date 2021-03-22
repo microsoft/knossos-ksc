@@ -79,8 +79,8 @@ class Parser {
   Type parseType(const Token *tok);
   Type parseRelaxedType(std::vector<const Token *> toks);
 
-  SName parseSName(const Token* tok);
-  SName parseSNameWithType(const Token* tok);
+  StructuredName parseStructuredName(const Token* tok);
+  StructuredName parseStructuredNameWithType(const Token* tok);
 
   Block::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);  // Literal or Variable use
@@ -128,7 +128,7 @@ public:
   const Block* getExtraDecls() {
     return extraDecls.get();
   }
-  Declaration* addExtraDecl(SName const& name, std::vector<Type> types, Type returnType);
+  Declaration* addExtraDecl(StructuredName const& name, std::vector<Type> types, Type returnType);
 };
 
 } // namespace AST

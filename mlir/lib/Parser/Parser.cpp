@@ -81,7 +81,7 @@ static Literal::Ptr getZero(Type type) {
 }
 
 //
-Declaration *Parser::addExtraDecl(SName const& name, std::vector<Type> argTypes, Type returnType) {
+Declaration *Parser::addExtraDecl(StructuredName const& name, std::vector<Type> argTypes, Type returnType) {
   Signature sig {name, argTypes};
   auto& decl = function_decls[sig];
   if (decl) {
@@ -245,21 +245,21 @@ Type Parser::parseRelaxedType(vector<const Token *> toks) {
   assert(0 && "Invalid relaxed type syntax");
 }
 
-SName Parser::parseSName(const Token *tok) {
+StructuredName Parser::parseStructuredName(const Token *tok) {
   if (tok->isValue)
-    return SName(tok->getValue());
+    return StructuredName(tok->getValue());
   else
-    return parseSNameWithType(tok);
+    return parseStructuredNameWithType(tok);
 }
 
-SName Parser::parseSNameWithType(const Token * tok) {
+StructuredName Parser::parseStructuredNameWithType(const Token * tok) {
   PARSE_ASSERT(tok->size() == 2 && tok->getChild(0)->isValue) << "Structured name is either [<id> <type>] or [<derivation> <sname>], not " << tok;
   std::string id = tok->getChild(0)->getValue();
   Token const* snd = tok->getChild(1);
   if (!snd->isValue && snd->isSquareBracket())
-    return SName(id, parseSNameWithType(snd));
+    return StructuredName(id, parseStructuredNameWithType(snd));
   else
-    return SName(id, parseType(snd));
+    return StructuredName(id, parseType(snd));
 }
 
 // Values (variable names, literals, type names)
@@ -292,7 +292,7 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
 Call::Ptr Parser::parseCall(const Token *tok) {
   PARSE_ENTER;
 
-  SName name = parseSName(tok->getHead());
+  StructuredName name = parseStructuredName(tok->getHead());
   int arity = tok->size() - 1;
 
   Declaration* decl = nullptr;
@@ -485,7 +485,7 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
 
   PARSE_ASSERT2(!args->isValue, args) << "Parsing decl [" << name << "]";
 
-  auto decl = make_unique<Declaration>(parseSName(name), type);
+  auto decl = make_unique<Declaration>(parseStructuredName(name), type);
 
   // Vector and Tuples can be declared bare
   if (args->getChild(0)->isValue &&
@@ -524,7 +524,7 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
       arguments.push_back(parseVariable(a.get()));
 
   // Create node early, to allow recursion
-  auto node = make_unique<Definition>(parseSName(name), type);
+  auto node = make_unique<Definition>(parseStructuredName(name), type);
   std::vector<Type> argTypes;
   for (auto &a : arguments) {
     PARSE_ASSERT(a->kind == Expr::Kind::Variable);

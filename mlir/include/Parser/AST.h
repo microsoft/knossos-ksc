@@ -150,32 +150,32 @@ inline Type Type::tangentType() const
   return Type(None);
 }
 
-// SName: StructuredName
+// StructuredName
 // Either:
 //     sin                                String
 //     [pow (Tuple Float Integer)]        String Type
-//     [fwd [sin Float]]                  String SName
-struct SName {
-  using Ptr = std::unique_ptr<SName>;
+//     [fwd [sin Float]]                  String StructuredName
+struct StructuredName {
+  using Ptr = std::unique_ptr<StructuredName>;
 
-  SName(const char * name):baseFunctionName(name), baseFunctionArgType(Type::None) {}
-  SName(llvm::StringRef name, Type type=Type(Type::None)):baseFunctionName(name), baseFunctionArgType(type) {}
-  SName(llvm::StringRef derivation, SName base) : SName(std::move(base)) { derivations.insert(derivations.begin(), std::string(derivation)); }
+  StructuredName(const char * name):baseFunctionName(name), baseFunctionArgType(Type::None) {}
+  StructuredName(llvm::StringRef name, Type type=Type(Type::None)):baseFunctionName(name), baseFunctionArgType(type) {}
+  StructuredName(llvm::StringRef derivation, StructuredName base) : StructuredName(std::move(base)) { derivations.insert(derivations.begin(), std::string(derivation)); }
 
   std::vector<std::string> derivations;  // Derivations applied to the base function, in order from outermost to innermost
   std::string baseFunctionName;
   Type baseFunctionArgType;
 
-  bool operator<(SName const& that) const {
+  bool operator<(StructuredName const& that) const {
     return std::tie(derivations, baseFunctionName, baseFunctionArgType)
       < std::tie(that.derivations, that.baseFunctionName, that.baseFunctionArgType);
   }
-  bool operator==(SName const& that) const {
+  bool operator==(StructuredName const& that) const {
     return derivations == that.derivations
       && baseFunctionName == that.baseFunctionName
       && baseFunctionArgType == that.baseFunctionArgType;
   }
-  bool operator!=(SName const& that) const { return !(*this == that); }
+  bool operator!=(StructuredName const& that) const { return !(*this == that); }
 
   bool isDerivation() const { return !derivations.empty(); }
 
@@ -183,10 +183,10 @@ struct SName {
 
   std::string getMangledName() const;
 };
-std::ostream& operator<<(std::ostream& s, SName const& t);
+std::ostream& operator<<(std::ostream& s, StructuredName const& t);
 
 struct Signature {
-  SName name;
+  StructuredName name;
   std::vector<Type> argTypes;   
 
   bool operator<(Signature const& that) const {
@@ -379,10 +379,10 @@ private:
 /// the final IR.
 struct Declaration : public Expr {
   using Ptr = std::unique_ptr<Declaration>;
-  Declaration(SName name, Type type)
+  Declaration(StructuredName name, Type type)
       : Expr(type, Kind::Declaration), name(std::move(name)) {}
 
-  Declaration(SName name, Type type, std::vector<Type> argTypes)
+  Declaration(StructuredName name, Type type, std::vector<Type> argTypes)
       : Expr(type, Kind::Declaration), name(std::move(name)), argTypes(move(argTypes)) {}
 
   void addArgType(Type opt) { argTypes.push_back(opt); }
@@ -391,7 +391,7 @@ struct Declaration : public Expr {
     assert(idx < argTypes.size() && "Offset error");
     return argTypes[idx];
   }
-  SName const& getName() const { return name; }
+  StructuredName const& getName() const { return name; }
 
   std::string getMangledName() const;
 
@@ -406,7 +406,7 @@ struct Declaration : public Expr {
 
 private:
   // TODO: use Signature here
-  SName name;
+  StructuredName name;
   std::vector<Type> argTypes;   
 };
 
@@ -453,7 +453,7 @@ private:
 /// validating the arguments and return types.
 struct Definition : public Expr {
   using Ptr = std::unique_ptr<Definition>;
-  Definition(SName name, Type type)
+  Definition(StructuredName name, Type type)
       : Expr(type, Kind::Definition) {
     decl = std::make_unique<Declaration>(std::move(name), type);
   }
@@ -474,7 +474,7 @@ struct Definition : public Expr {
   }
   Expr *getImpl() const { return impl.get(); }
   Declaration *getDeclaration() const { return decl.get(); }
-  SName const& getName() const { return decl->getName(); }
+  StructuredName const& getName() const { return decl->getName(); }
   std::string getMangledName() const { return decl->getMangledName(); }
   size_t size() const { return arguments.size(); }
 
