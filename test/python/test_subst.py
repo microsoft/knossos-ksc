@@ -78,6 +78,9 @@ def test_replace_subtrees_nested():
 
 def test_replace_subtree_avoids_capture():
   e = parse_expr_string("(let (x (if p a b)) (add x y))")
+  # Replace the y with a subtree mentioning a free "x".
+  # The "x" in the new subtree should not be captured by the bound "x"
+  # (that is, it should have the same value as in "e"'s scope).
   new_subtree = parse_expr_string("(mul x 2)")
   assert _get_node(e, 7) == Var("y")
   replaced = replace_subtree(e, 7, new_subtree)
@@ -99,6 +102,8 @@ def test_replace_subtree_avoids_capturing_another():
 
 def test_replace_subtree_applicator_allows_capture():
   e = parse_expr_string("(let (x (if p a b)) (add x y))")
+  # Replace the y with a subtree mentioning "x". But, here we want the new "x" to be the
+  # x present in the same scope of y. This can be achieved by passing a lambda function:
   new_subtree = parse_expr_string("(mul x 2)")
   assert _get_node(e, 7) == Var("y")
   replaced = replace_subtree(e, 7, Const(0), lambda _e1, _e2: new_subtree)
