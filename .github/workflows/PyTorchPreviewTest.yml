@@ -33,6 +33,7 @@ jobs:
       shell: cmd
       run: refreshenv && C:/ProgramData/chocolatey/lib/cabal/tools/cabal-3.0.0.0/cabal v2-install --with-ghc=C:/ProgramData/chocolatey/lib/ghc/tools/ghc-8.4.4/bin/ghc --installdir=build/bin --overwrite-policy=always --install-method=copy
 
+    # Preview version of PyTorch
     - name: Testing ksc python package [userTest]
       shell: pwsh
       run: call ./test/builds/test_pytest_PyTorchPreview.cmd
