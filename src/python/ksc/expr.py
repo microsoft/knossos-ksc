@@ -563,7 +563,7 @@ def fv_var(e: Var):
 
 @compute_free_vars.register
 def fv_call(e: Call):
-    return frozenset.union(*[arg.free_vars_ for arg in e.args])
+    return frozenset() if len(e.args)==0 else frozenset.union(*[arg.free_vars_ for arg in e.args])
 
 @compute_free_vars.register
 def fv_lam(e: Lam):
