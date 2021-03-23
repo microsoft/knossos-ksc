@@ -2,7 +2,7 @@ set -e
 
 IF defined GITHUB_ACTIONS (
   ECHO on GitHub Actions, activating vcbuild environment
-  vcbuild.cmd -arch=x64 -host_arch=x64
+  %~dp0vcbuild.cmd -arch=x64 -host_arch=x64
 )
 
 echo Set Pip to specific version...
