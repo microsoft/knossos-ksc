@@ -33,6 +33,9 @@ cd ./src/ts2k
 python -m pip install --editable . || exit /b
 cd ../..
 
+REM debugging memory issues
+pytest test\ts2k\test_ts2k.py -k test_cat
+
 REM echo Running pytest on ts2k
 pytest test/ts2k || exit /b
 
