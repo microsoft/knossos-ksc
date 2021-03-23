@@ -68,8 +68,8 @@
 (def main Integer () (
 ; MLIR: func @main() -> i64 {
 ; LLVM: define i64 @main() {
-  (let ((f (foo 10.0))
-       (b (bar (fun 30)))) b)
+  (let (f (foo 10.0))
+  (let (b (bar (fun 30))) b))
 ; MLIR: %cst = constant 1.000000e+01 : f64
 ; MLIR: call @foo$af(%cst) : (f64) -> f64
 ; MLIR:  %c30{{.*}} = constant 30 : i64

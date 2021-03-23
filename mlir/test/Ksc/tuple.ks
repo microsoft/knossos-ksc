@@ -42,11 +42,11 @@
 ; LLVM: define i64 @"amain$ai"(i64 %0) {
 
 ; Direct get from temp tuple
-  (let ((a (get$2$2 (tuple 10.0 42)))
+  (let (a (get$2$2 (tuple 10.0 42)))
 ; MLIR: %[[ret:[ci_0-9]+]] = constant 42 : i64
 
 ; Creating tuple of two elements, extracting each one, and returning the sum
-        (t (tuple (add argc argc) 10.0 23)))
+  (let (t (tuple (add argc argc) 10.0 23))
 ; MLIR: %[[add:[0-9]+]] = addi %arg0, %arg0 : i64
 ; MLIR: %cst = constant 1.000000e+01 : f64
 ; MLIR: %c23{{.*}} = constant 23 : i64
@@ -58,5 +58,5 @@
 ; LLVM: %[[mul:[0-9]+]] = mul i64 %[[add]], 23
 ; LLVM: ret i64 %[[mul:[0-9]+]]
 
-  )
+  ))
 ))

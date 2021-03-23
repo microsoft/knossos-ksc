@@ -43,7 +43,7 @@
 ; MLIR:      func @main() -> i64 {
 ; LLVM:      define i64 @main() {
 
-  (let ((a (fun@ff 10.0 20.0 30.0))
+  (let (a (fun@ff 10.0 20.0 30.0))
 ; MLIR-NEXT:  %cst = constant 1.000000e+01 : f64
 ; MLIR-NEXT:  %cst_0 = constant 2.000000e+01 : f64
 ; MLIR-NEXT:  %cst_1 = constant 3.000000e+01 : f64
@@ -51,7 +51,7 @@
 
 ; LLVM-NEXT:  %[[func:[0-9]+]] = call double @"fun$aff$afff"(double 1.000000e+01, double 2.000000e+01, double 3.000000e+01)
 
-        (b (fun@ii 10 20 30)))
+  (let (b (fun@ii 10 20 30))
 ; MLIR-NEXT:  %c10{{.*}} = constant 10 : i64
 ; MLIR-NEXT:  %c20{{.*}} = constant 20 : i64
 ; MLIR-NEXT:  %c30{{.*}} = constant 30 : i64
@@ -59,7 +59,7 @@
 
 ; LLVM-NEXT:  %[[func:[0-9]+]] = call i64 @"fun$aii$aiii"(i64 10, i64 20, i64 30)
   b
-))
+)))
 ; AST does not return anything
 ; MLIR: return %[[func]] : i64
 ; LLVM: ret i64 %[[func]]

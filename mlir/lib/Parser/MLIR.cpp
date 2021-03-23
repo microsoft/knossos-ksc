@@ -412,8 +412,8 @@ Values Generator::buildCall(const AST::Call* call) {
 // Builds variable declarations
 Values Generator::buildLet(const AST::Let* let) {
   // Bind the variable to an expression
-  for (auto &binding: let->getBindings())
-      declareVariable(binding.getVariable()->getName(), buildNode(binding.getInit()));
+  AST::Binding const& binding = let->getBinding();
+  declareVariable(binding.getVariable()->getName(), buildNode(binding.getInit()));
   // Lower the body, using the variable
   return buildNode(let->getExpr());
 }

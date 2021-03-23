@@ -8,18 +8,17 @@
 ; MLIR: func @main() -> i64 {
 ; LLVM: define i64 @main() {
 
-  (let (
 ; All literals, LLVM does not support, so we only lower the right block
-        (a (if true 10 20))
+  (let (a (if true 10 20))
 ; MLIR:    %c10{{.*}} = constant 10 : i64
 ; LLVM optimises constants away
 
-        (b (if false 10 20))
+  (let (b (if false 10 20))
 ; MLIR:    %c20{{.*}} = constant 20 : i64
 ; LLVM optimises constants away
 
 ; All constant expressions
-        (c (if (eq 10 20) (foo 30) (bar 40)))
+  (let (c (if (eq 10 20) (foo 30) (bar 40)))
 ; MLIR-DAG: %c30{{.*}} = constant 30 : i64
 ; MLIR-DAG: %[[foo1:[0-9]+]] = call @foo$ai(%c30{{.*}}) : (i64) -> i64
 ; MLIR-DAG: %c40{{.*}} = constant 40 : i64
@@ -35,7 +34,7 @@
 
 
 ; Inside let, with variables
-        (d (let (x (foo 50)) (if (eq x 60) (foo 70) (bar 80))))
+  (let (d (let (x (foo 50)) (if (eq x 60) (foo 70) (bar 80))))
 ; MLIR: %c50{{.*}} = constant 50 : i64
 ; MLIR: %[[foo_cond:[0-9]+]] = call @foo$ai(%c50{{.*}}) : (i64) -> i64
 ; MLIR: %c70{{.*}} = constant 70 : i64
@@ -52,7 +51,7 @@
 ; LLVM: %[[eq2:[0-9]+]] = icmp eq i64 %[[foo_cond]], 60
 ; LLVM: %[[sel2:[0-9]+]] = select i1 %[[eq2]], i64 %[[foo2]], i64 %[[bar2]]
 
-      ) d)
+   d))))
 ; MLIR: return %[[sel2]] : i64
 ; LLVM: ret i64 %[[sel2]]
 ))

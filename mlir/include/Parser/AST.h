@@ -353,17 +353,12 @@ private:
 /// Defines a variable.
 struct Let : public Expr {
   using Ptr = std::unique_ptr<Let>;
-  Let(std::vector<Binding> && bindings, Expr::Ptr expr)
-      : Expr(expr->getType(), Kind::Let), bindings(std::move(bindings)),
+  Let(Binding binding, Expr::Ptr expr)
+      : Expr(expr->getType(), Kind::Let), binding(std::move(binding)),
         expr(std::move(expr)) {}
 
-  llvm::ArrayRef<Binding> getBindings() const { return bindings; }
-  Binding const& getBinding(size_t idx) const {
-    assert(idx < bindings.size() && "Offset error");
-    return bindings[idx];
-  }
+  Binding const& getBinding() const { return binding; }
   Expr *getExpr() const { return expr.get(); }
-  size_t size() const { return bindings.size(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -371,7 +366,7 @@ struct Let : public Expr {
   static bool classof(const Expr *c) { return c->kind == Kind::Let; }
 
 private:
-  std::vector<Binding> bindings;
+  Binding binding;
   Expr::Ptr expr;
 };
 
