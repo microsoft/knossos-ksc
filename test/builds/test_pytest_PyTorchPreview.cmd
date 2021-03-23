@@ -1,5 +1,7 @@
 set -e
 
+set PreferredToolArchitecture=x64
+
 IF defined GITHUB_ACTIONS (
   ECHO on GitHub Actions, activating vcbuild environment
   call %~dp0vcbuild.cmd -arch=x64 -host_arch=x64
