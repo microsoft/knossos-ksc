@@ -24,11 +24,6 @@ jobs:
     - name: 'Make directories [userInstall]'
       shell: pwsh
       run: test/builds/mkdirs.ps1
-    
-
-    - name: 'MSVC paths [userInstall] (EXPERIMENTAL)'
-      shell: pwsh
-      run: users/cogravil/VSDevShell.ps1
 
     - name: 'Install dependencies [userInstall]'
       shell: cmd
