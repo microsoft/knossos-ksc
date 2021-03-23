@@ -221,11 +221,8 @@ void Generator::declareVariable(std::string const& name,
   variables[name] = vals;
 }
 
-void Generator::declareVariable(const AST::Variable* var,
-                                     Values vals) {
-  if (vals.empty() && var->getInit())
-    vals = buildNode(var->getInit());
-  declareVariable(var->getName(), vals);
+void Generator::declareVariable(AST::Binding const& binding) {
+  declareVariable(binding.getVariable()->getName(), buildNode(binding.getInit()));
 }
 
 // Get the variable assigned value
@@ -419,13 +416,10 @@ Values Generator::buildCall(const AST::Call* call) {
 // Builds variable declarations
 Values Generator::buildLet(const AST::Let* let) {
   // Bind the variable to an expression
-  for (auto &v: let->getVariables())
-    declareVariable(llvm::dyn_cast<AST::Variable>(v.get()));
+  for (auto &v: let->getBindings())
+    declareVariable(v);
   // Lower the body, using the variable
-  if (let->getExpr())
-    return buildNode(let->getExpr());
-  // Otherwise, the let is just a declaration, return void
-  return mlir::ValueRange();
+  return buildNode(let->getExpr());
 }
 
 // Builds conditions using select
@@ -497,9 +491,9 @@ Values Generator::buildBuild(const AST::Build* b) {
   builder.setInsertionPointToEnd(bodyBlock);
   auto bodyIv = bodyBlock->getArgument(0);
   // Declare the local induction variable before using in body
-  auto var = b->getVariable();
-  declareVariable(var, {zero});
-  variables[var->getName()] = {bodyIv};
+  auto varName = b->getVariable()->getName();
+  declareVariable(varName, {zero});
+  variables[varName] = {bodyIv};
   // Build body and store result (no vector of tuples supported)
   auto expr = Single(buildNode(b->getExpr()));
   auto indIv = builder.create<mlir::IndexCastOp>(UNK, bodyIv, indTy);

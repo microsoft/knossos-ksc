@@ -98,16 +98,22 @@ std::ostream& Variable::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Variable:" << endl;
   s << string(tab + 2, ' ') << "name [" << name << "]" << endl;
   Expr::dump(s, tab + 2);
-  if (init)
-    init->dump(s, tab + 2);
+  return s;
+}
+
+std::ostream& Binding::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Binding:" << endl;
+  s << string(tab + 2, ' ') << "name [" << var->getName() << "]" << endl;
+  var->Expr::dump(s, tab + 2);
+  init->dump(s, tab + 2);
   return s;
 }
 
 std::ostream&  Let::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Let:" << endl;
   Expr::dump(s, tab + 2);
-  for (auto &v: vars)
-    v->dump(s, tab + 2);
+  for (auto &b: bindings)
+    b.dump(s, tab + 2);
   if (expr)
     expr->dump(s, tab + 2);
   return s;

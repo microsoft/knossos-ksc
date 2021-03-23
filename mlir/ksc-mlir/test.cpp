@@ -116,7 +116,7 @@ void test_parser_let() {
   assert(def);
   // Let has two parts: variable definitions and expression
   assert(def->getType() == Type::Integer);
-  Variable* x = llvm::dyn_cast<Variable>(def->getVariable(0));
+  Variable* x = def->getBinding(0).getVariable();
   assert(x->getType() == Type::Integer);
   Call* expr = llvm::dyn_cast<Call>(def->getExpr());
   assert(expr);
@@ -508,16 +508,18 @@ void test_parser_fold() {
   Let* let = llvm::dyn_cast<Let>(fold->getBody());
   assert(let);
   assert(let->getType() == Type::Float);
-  Variable* letAcc = llvm::dyn_cast<Variable>(let->getVariable(0));
+  Binding const& letAccBinding = let->getBinding(0);
+  Variable* letAcc = letAccBinding.getVariable();
   assert(letAcc);
   assert(letAcc->getType() == Type::Float);
   assert(letAcc->getName() == "acc");
-  assert(Get::classof(letAcc->getInit()));
-  Variable* letX = llvm::dyn_cast<Variable>(let->getVariable(1));
+  assert(Get::classof(letAccBinding.getInit()));
+  Binding const& letXBinding = let->getBinding(1);
+  Variable* letX = letXBinding.getVariable();
   assert(letX);
   assert(letX->getType() == Type::Float);
   assert(letX->getName() == "x");
-  assert(Get::classof(letX->getInit()));
+  assert(Get::classof(letXBinding.getInit()));
   // Lambda operation
   Call* op = llvm::dyn_cast<Call>(let->getExpr());
   assert(op);

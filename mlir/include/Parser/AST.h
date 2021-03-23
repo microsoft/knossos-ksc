@@ -309,27 +309,14 @@ private:
 /// Named variables, ex:
 ///   str in (let (str "Hello") (print str))
 ///     x in (def a (x : Float) x)
-///
-/// Variables have a contextual name (scope::name) and an optional
-/// initialisation expression.
 struct Variable : public Expr {
   using Ptr = std::unique_ptr<Variable>;
   /// Definition: (x 10) in ( let (x 10) (expr) )
   /// Declaration: (x : Integer) in ( def name Type (x : Integer) (expr) )
   /// We need to bind first, then assign to allow nested lets
   Variable(llvm::StringRef name, Type type=Type(Type::None))
-      : Expr(type, Kind::Variable), name(name), init(nullptr) {}
+      : Expr(type, Kind::Variable), name(name) {}
 
-  void setInit(Expr::Ptr &&expr) {
-    assert(!init);
-    init = std::move(expr);
-    if (!type.isNone())
-      assert(type == init->getType());
-    else
-      type = init->getType();
-  }
-  /// No value == nullptr
-  Expr *getInit() const { return init.get(); }
   std::string const& getName() const { return name; }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
@@ -339,6 +326,23 @@ struct Variable : public Expr {
 
 private:
   std::string name;
+};
+
+/// A variable with an initialisation expression
+struct Binding {
+  Binding(Variable::Ptr var, Expr::Ptr init)
+    : var(std::move(var)), init(std::move(init)) {
+    assert(this->var != nullptr);
+    assert(this->init != nullptr);
+  }
+
+  Variable *getVariable() const { return var.get(); }
+  Expr *getInit() const { return init.get(); }
+
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const;
+
+private:
+  Variable::Ptr var;
   Expr::Ptr init;
 };
 
@@ -347,20 +351,17 @@ private:
 /// Defines a variable.
 struct Let : public Expr {
   using Ptr = std::unique_ptr<Let>;
-  Let(std::vector<Expr::Ptr> &&vars)
-      : Expr(Kind::Let), vars(std::move(vars)),
-      expr(nullptr) {}
-  Let(std::vector<Expr::Ptr> &&vars, Expr::Ptr expr)
-      : Expr(expr->getType(), Kind::Let), vars(std::move(vars)),
+  Let(std::vector<Binding> && bindings, Expr::Ptr expr)
+      : Expr(expr->getType(), Kind::Let), bindings(std::move(bindings)),
         expr(std::move(expr)) {}
 
-  llvm::ArrayRef<Expr::Ptr> getVariables() const { return vars; }
-  Expr *getVariable(size_t idx) const {
-    assert(idx < vars.size() && "Offset error");
-    return vars[idx].get();
+  llvm::ArrayRef<Binding> getBindings() const { return bindings; }
+  Binding const& getBinding(size_t idx) const {
+    assert(idx < bindings.size() && "Offset error");
+    return bindings[idx];
   }
   Expr *getExpr() const { return expr.get(); }
-  size_t size() const { return vars.size(); }
+  size_t size() const { return bindings.size(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -368,7 +369,7 @@ struct Let : public Expr {
   static bool classof(const Expr *c) { return c->kind == Kind::Let; }
 
 private:
-  std::vector<Expr::Ptr> vars;  // TODO: make a vector of vars
+  std::vector<Binding> bindings;
   Expr::Ptr expr;
 };
 
