@@ -1,5 +1,10 @@
 set -e
 
+IF defined GITHUB_ACTIONS (
+  ECHO on GitHub Actions, activating vcbuild environment
+  vcbuild.cmd -arch=x64 -host_arch=x64
+)
+
 echo Set Pip to specific version...
 python -m pip install --force-reinstall pip==20.3 || exit /b
 
@@ -23,8 +28,6 @@ echo Installing TS2KS...
 cd ./src/ts2k
 python -m pip install --editable . || exit /b
 cd ../..
-
-
 
 REM echo Running pytest on ts2k
 pytest test/ts2k || exit /b
