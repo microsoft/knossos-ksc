@@ -248,14 +248,19 @@ sufFwdRevPass gst subst = \case
         (fwdpass_f, f_bog_ty, revpass_f) = sufFwdRevPass gst substf2 ef
 
         inl :: TExpr -> Type -> TExpr
-        inl l tyr = Tuple [Var b_cond, true, l, Dummy tyr]
+        inl l tyr = mkBogE [Var b_cond, true, l, Dummy tyr]
           where true  = Konst (KBool True)
 
         inr :: Type -> TExpr -> TExpr
-        inr tyl r = Tuple [Var b_cond, false, Dummy tyl, r]
+        inr tyl r = mkBogE [Var b_cond, false, Dummy tyl, r]
           where false = Konst (KBool False)
 
-        bog_ty = TypeTuple [cond_bog_ty, TypeBool, t_bog_ty, f_bog_ty]
+        if_bog_t = inl (Var b_t) f_bog_ty
+        if_bog_f = inr t_bog_ty (Var b_f)
+
+        bog_ty = if typeof if_bog_t `eqType` typeof if_bog_f
+                 then typeof if_bog_t
+                 else error "Mismatched bog types in if"
 
         sufRevPass_ avoid' dt b =
             let v_bar = map deltaOfSimple (S.toList (freeVarsOf et))
@@ -274,13 +279,13 @@ sufFwdRevPass gst subst = \case
                                            (TVar t_bog_ty (Simple "bt"))
                                            (TVar f_bog_ty (Simple "bf")))
 
-                (_, gradr_et) = revpass_t avoid'2 dt (Var b_t_)
-                (_, gradr_ef) = revpass_f avoid'2 dt (Var b_f_)
+                (_, gradr_et) = revpass_t avoid'2 dt (possiblyEmptyBogExpr b_t_)
+                (_, gradr_ef) = revpass_f avoid'2 dt (possiblyEmptyBogExpr b_f_)
 
-                (avoid'3, rest) = sufRevPassecond avoid'2 (Tuple []) (Var b_cond_)
+                (avoid'3, rest) = sufRevPassecond avoid'2 (Tuple []) (possiblyEmptyBogExpr b_cond_)
 
             in (avoid'3,
-                [ (TupPat [b_cond_, cond_, b_t_, b_f_], b)
+                [ mkBogBind [b_cond_, cond_, b_t_, b_f_] b
                 , (TupPat v_bar,
                     If (Var cond_)
                        (mkLets_ gradr_et v_bar_expr)
@@ -290,8 +295,8 @@ sufFwdRevPass gst subst = \case
 
     in (Let (TupPat [cond, b_cond]) fwdpass_cond
         $ If (Var cond)
-           (Let (TupPat [rt, b_t]) fwdpass_t (Tuple [Var rt, inl (Var b_t) f_bog_ty]))
-           (Let (TupPat [rf, b_f]) fwdpass_f (Tuple [Var rf, inr t_bog_ty (Var b_f)])),
+           (Let (TupPat [rt, b_t]) fwdpass_t (Tuple [Var rt, if_bog_t]))
+           (Let (TupPat [rf, b_f]) fwdpass_f (Tuple [Var rf, if_bog_f])),
         bog_ty,
         sufRevPass_)
 
@@ -376,15 +381,21 @@ sufFwdRevPass_build gst subst theCall e1 theLambda i e2 =
             in (avoid'4, lets ++ sizeLets)
 
 mkBog :: [TVar] -> TExpr
-mkBog = mkTuple . mapMaybe (fmap Var . possiblyEmptyBogVar)
+mkBog = mkBogE . fmap Var
+
+mkBogE :: [TExpr] -> TExpr
+mkBogE = mkTuple . mapMaybe possiblyEmptyBogHasType
 
 mkBogBind :: [TVar] -> TExpr -> (PatG TVar, TExpr)
 mkBogBind bogVars b = (mkPat @Typed (mapMaybe possiblyEmptyBogVar bogVars), b)
 
+possiblyEmptyBogHasType :: HasType a => a -> Maybe a
+possiblyEmptyBogHasType v = if typeof v `eqType` TypeTuple []
+                            then Nothing
+                            else Just v
+
 possiblyEmptyBogVar :: TVar -> Maybe TVar
-possiblyEmptyBogVar v = if typeof v `eqType` TypeTuple []
-                        then Nothing
-                        else Just v
+possiblyEmptyBogVar = possiblyEmptyBogHasType
 
 possiblyEmptyBogExpr :: TVar -> TExpr
 possiblyEmptyBogExpr v = if typeof v `eqType` TypeTuple []
