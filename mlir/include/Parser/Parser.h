@@ -85,7 +85,8 @@ class Parser {
   Block::Ptr parseBlock(const Token *tok);
   Expr::Ptr parseValue(const Token *tok);  // Literal or Variable use
   Call::Ptr parseCall(const Token *tok);
-  Variable::Ptr parseVariable(const Token *tok);
+  Variable::Ptr parseVariableWithType(const Token *tok);
+  Binding parseBinding(const Token *tok);
   Let::Ptr parseLet(const Token *tok);
   Declaration::Ptr parseDecl(const Token *tok);
   Definition::Ptr parseDef(const Token *tok);

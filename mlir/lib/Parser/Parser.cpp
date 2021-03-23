@@ -385,49 +385,47 @@ Call::Ptr Parser::parseCall(const Token *tok) {
   PARSE_ASSERT2(0, tok->getHead()) << "Unrecognized function: " << sig;
 }
 
-
-// Variables can be declarations or definitions, depending on the arguments
+// Parse a variable which is declared with its type, e.g.
 // (def f Type ((v : Type)) body)  ; declaration
 //              ^^^^^^^^^^
-// ... (let ((v value)) body) ...  ; definition
-//           ^^^^^^^^^
-Variable::Ptr Parser::parseVariable(const Token *tok) {
+Variable::Ptr Parser::parseVariableWithType(const Token *tok) {
   PARSE_ENTER;
 
-  PARSE_ASSERT(tok->size() > 1);
+  PARSE_ASSERT(tok->size() >= 3);
+  PARSE_ASSERT(tok->getChild(1)->isValue && tok->getChild(1)->getValue() == ":");
+
   llvm::ArrayRef<Token::Ptr> children = tok->getChildren();
   string value = children[0]->getValue();
 
-  // Variable declaration: (name : Type) : add name to SymbolTable
   // Relaxed type syntax (ex: (x : Vec Float) instead of (x : (Vec Float))
-  if (tok->size() > 2 && children[1]->getValue() == ":") {
-    Type type(Type::None);
-    if (tok->size() == 3) {
-      type = parseType(children[2].get());
-    } else {
-      // Re-build the type from children[2:]
-      vector<const Token *> toks;
-      for (size_t i=2, e=tok->size(); i<e; i++)
-        toks.push_back(tok->getChild(i));
-      type = parseRelaxedType(toks);
-    }
-    PARSE_ASSERT(!type.isNone());
-    auto var = unique_ptr<Variable>(new Variable(value, type));
-    variables.set(value, var.get());
-    return var;
+  Type type(Type::None);
+  if (tok->size() == 3) {
+    type = parseType(children[2].get());
+  } else {
+    // Re-build the type from children[2:]
+    vector<const Token *> toks;
+    for (size_t i=2, e=tok->size(); i<e; i++)
+      toks.push_back(tok->getChild(i));
+    type = parseRelaxedType(toks);
   }
+  PARSE_ASSERT(!type.isNone());
+  auto var = unique_ptr<Variable>(new Variable(value, type));
+  variables.set(value, var.get());
+  return var;
+}
 
-  // Variable definition: (name value) : check name on SymbolTable
-  if (tok->size() == 2) {
-    // Add to map first, to allow recursion
-    auto var = unique_ptr<Variable>(new Variable(value));
-    Expr::Ptr expr = parseToken(children[1].get());
-    var->setInit(move(expr));
-    variables.set(value, var.get());
-    return var;
-  }
+Binding Parser::parseBinding(const Token *tok) {
+  PARSE_ENTER;
 
-  PARSE_ASSERT(0) << "Invalid variable declaration (v : Type) / definition (v value)";
+  PARSE_ASSERT(tok->size() == 2) << "Binding (v val), not [" << tok << "]";
+  PARSE_ASSERT(tok->getChild(0)->isValue) << "Binding (v val), not [" << tok << "]."
+    " Tuple-unpacking lets are not yet supported.";  // TODO
+  
+  std::string value = tok->getChild(0)->getValue();
+  Expr::Ptr expr = parseToken(tok->getChild(1));
+  Variable::Ptr var = std::make_unique<Variable>(value, expr->getType());
+  variables.set(value, var.get());
+  return Binding(std::move(var), std::move(expr));
 }
 
 // Variable declaration: (let (x 10) (add x 10))
@@ -437,23 +435,19 @@ Let::Ptr Parser::parseLet(const Token *tok) {
   PARSE_ASSERT(tok->size() == 3);
   const Token *bond = tok->getChild(1);
   PARSE_ASSERT2(!bond->isValue, bond);
-  vector<Expr::Ptr> vars;
+  vector<Binding> bindings;
   // Single variable binding
   if (bond->getChild(0)->isValue) {
     PARSE_ASSERT2(bond->size() == 2, bond) << "Binding (v val), not [" << bond << "]";
-    vars.push_back(parseVariable(bond));
+    bindings.push_back(parseBinding(bond));
     // Multiple variables
   } else {
     for (auto &c: bond->getChildren())
-      vars.push_back(parseVariable(c.get()));
+      bindings.push_back(parseBinding(c.get()));
   }
 
-  if (tok->size() == 2) {
-    return make_unique<Let>(move(vars));
-  } else {
-    auto body = parseToken(tok->getChild(2));
-    return make_unique<Let>(move(vars), move(body));
-  }
+  auto body = parseToken(tok->getChild(2));
+  return make_unique<Let>(move(bindings), move(body));
 }
 
 // Declares a function (and add it to symbol table)
@@ -502,11 +496,11 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   vector<Variable::Ptr> arguments;
   // Single var: (v 2.3)
   if (tok_args->size() && tok_args->getChild(0)->isValue)
-    arguments.push_back(parseVariable(tok_args));
+    arguments.push_back(parseVariableWithType(tok_args));
   // Many vars: ((a 1) (b 2))
   else
     for (auto &a : tok_args->getChildren())
-      arguments.push_back(parseVariable(a.get()));
+      arguments.push_back(parseVariableWithType(a.get()));
 
   // Create declaration early, to allow recursion
   StructuredName name = parseStructuredName(tok_name);
@@ -541,7 +535,7 @@ Lambda::Ptr Parser::parseLambda(const Token *tok) {
   PARSE_ASSERT(tok->size() == 3);
   PARSE_ASSERT(tok->getChild(0)->isValue && tok->getChild(0)->getValue() == "lam");
 
-  auto var = parseVariable(tok->getChild(1));
+  auto var = parseVariableWithType(tok->getChild(1));
   auto body = parseToken(tok->getChild(2));
   return std::make_unique<Lambda>(std::move(var), std::move(body));
 }
@@ -619,7 +613,7 @@ Rule::Ptr Parser::parseRule(const Token *tok) {
   const Token *name = tok->getChild(1);
   PARSE_ASSERT(name->isValue);
   llvm::StringRef unquoted = unquote(name->getValue());
-  auto var = parseVariable(tok->getChild(2));
+  auto var = parseVariableWithType(tok->getChild(2));
   auto pat = parseToken(tok->getChild(3));
   auto res = parseToken(tok->getChild(4));
   auto rule =
