@@ -2,8 +2,10 @@ set -e
 
 IF defined GITHUB_ACTIONS (
   ECHO on GitHub Actions, activating vcbuild environment
-  %~dp0vcbuild.cmd -arch=x64 -host_arch=x64
+  call %~dp0vcbuild.cmd -arch=x64 -host_arch=x64
 )
+
+where cl.exe
 
 echo Set Pip to specific version...
 python -m pip install --force-reinstall pip==20.3 || exit /b
