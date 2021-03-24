@@ -154,15 +154,22 @@ std::ostream& Condition::dump(std::ostream& s, size_t tab) const {
   return s;
 }
 
+std::ostream& Lambda::dump(std::ostream& s, size_t tab) const {
+  s << string(tab, ' ') << "Lambda:" << endl;
+  s << string(tab + 2, ' ') << "Parameter:" << endl;
+  var->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Body: " << endl;
+  body->dump(s, tab + 4);
+  return s;
+}
+
 std::ostream& Build::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Build:" << endl;
   Expr::dump(s, tab + 2);
   s << string(tab + 2, ' ') << "Range:" << endl;
   range->dump(s, tab + 4);
-  s << string(tab + 2, ' ') << "Induction:" << endl;
-  var->dump(s, tab + 4);
-  s << string(tab + 2, ' ') << "Body:" << endl;
-  return expr->dump(s, tab + 4);
+  lam->dump(s, tab + 2);
+  return s;
 }
 
 std::ostream& Tuple::dump(std::ostream& s, size_t tab) const {
@@ -186,10 +193,7 @@ std::ostream& Get::dump(std::ostream& s, size_t tab) const {
 std::ostream& Fold::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Fold:" << endl;
   Expr::dump(s, tab + 2);
-  s << string(tab + 2, ' ') << "Accumulator:" << endl;
-  lambdaParameter->dump(s, tab + 4);
-  s << string(tab + 2, ' ') << "Lambda:" << endl;
-  body->dump(s, tab + 4);
+  lam->dump(s, tab + 2);
   s << string(tab + 2, ' ') << "Init: " << endl;
   init->dump(s, tab + 4);
   s << string(tab + 2, ' ') << "Vector:" << endl;

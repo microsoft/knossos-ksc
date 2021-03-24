@@ -536,6 +536,16 @@ Condition::Ptr Parser::parseCond(const Token *tok) {
   return make_unique<Condition>(move(c), move(i), move(e));
 }
 
+Lambda::Ptr Parser::parseLambda(const Token *tok) {
+  PARSE_ASSERT(!tok->isValue);
+  PARSE_ASSERT(tok->size() == 3);
+  PARSE_ASSERT(tok->getChild(0)->isValue && tok->getChild(0)->getValue() == "lam");
+
+  auto var = parseVariable(tok->getChild(1));
+  auto body = parseToken(tok->getChild(2));
+  return std::make_unique<Lambda>(std::move(var), std::move(body));
+}
+
 // Loops, ex: (build N (lam (i : Integer) (add i i)))
 Build::Ptr Parser::parseBuild(const Token *tok) {
   PARSE_ENTER;
@@ -546,16 +556,10 @@ Build::Ptr Parser::parseBuild(const Token *tok) {
   auto range = parseToken(tok->getChild(1));
 
   // Lambda (induction variable and loop body)
-  const Token *lam = tok->getChild(2);
-  PARSE_ASSERT(!lam->isValue);
-  PARSE_ASSERT(lam->getChild(0)->isValue && lam->getChild(0)->getValue() == "lam");
-  const Token *bond = lam->getChild(1);
-  const Token *expr = lam->getChild(2);
-  auto var = parseVariable(bond);
-  PARSE_ASSERT(var->kind == Expr::Kind::Variable);
-  PARSE_ASSERT(var->getType() == AST::Type::Integer);
-  auto body = parseToken(expr);
-  return make_unique<Build>(move(range), move(var), move(body));
+  auto lam = parseLambda(tok->getChild(2));
+  PARSE_ASSERT(lam->getVariable()->getType() == AST::Type::Integer);
+
+  return make_unique<Build>(move(range), move(lam));
 }
 
 // Tuple, ex: (tuple 10.0 42 (add 1.0 2.0))
@@ -590,17 +594,12 @@ Fold::Ptr Parser::parseFold(const Token *tok) {
   PARSE_ASSERT(tok->size() == 4);
 
   // Lambda format: (lam (acc_x : (Tuple AccTy ElmTy)) (expr))
-  const Token *lam = tok->getChild(1);
-  PARSE_ASSERT(!lam->isValue);
-  PARSE_ASSERT(lam->getChild(0)->isValue && lam->getChild(0)->getValue() == "lam");
-  auto var = parseVariable(lam->getChild(1));
-  PARSE_ASSERT(var->kind == Expr::Kind::Variable);
-  PARSE_ASSERT(var->getType() == Type::Tuple);
-  auto accTy = var->getType().getSubType(0);
-  auto elmTy = var->getType().getSubType(1);
-
-  auto body = parseToken(lam->getChild(2));
-  PARSE_ASSERT(body->getType() == accTy);
+  auto lam = parseLambda(tok->getChild(1));
+  auto varTy = lam->getVariable()->getType();
+  PARSE_ASSERT(varTy == Type::Tuple);
+  auto accTy = varTy.getSubType(0);
+  auto elmTy = varTy.getSubType(1);
+  PARSE_ASSERT(lam->getBody()->getType() == accTy);
 
   auto init = parseToken(tok->getChild(2));
   PARSE_ASSERT(init->getType() == accTy);
@@ -609,7 +608,7 @@ Fold::Ptr Parser::parseFold(const Token *tok) {
   PARSE_ASSERT(vector->getType() == Type::Vector);
   PARSE_ASSERT(vector->getType().getSubType() == elmTy);
 
-  return make_unique<Fold>(accTy, move(var), move(body), move(init), move(vector));
+  return make_unique<Fold>(accTy, move(lam), move(init), move(vector));
 }
 
 // Rule: (rule "mul2" (v : Float) (mul v 2.0) (add v v))
