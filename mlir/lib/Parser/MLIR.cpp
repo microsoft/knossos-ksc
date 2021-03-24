@@ -497,8 +497,8 @@ Values Generator::buildBuild(const AST::Build* b) {
   builder.setInsertionPointToEnd(bodyBlock);
   auto bodyIv = bodyBlock->getArgument(0);
   // Declare the local induction variable before using in body
-  auto var = llvm::dyn_cast<AST::Variable>(b->getVariable());
-  declareVariable(var);
+  auto var = b->getVariable();
+  declareVariable(var, {zero});
   variables[var->getName()] = {bodyIv};
   // Build body and store result (no vector of tuples supported)
   auto expr = Single(buildNode(b->getExpr()));

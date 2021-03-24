@@ -75,7 +75,6 @@
 ; MLIR:   %[[cond:[0-9]+]] = cmpi "slt", %[[ivHead]], %[[ten]] : i64
 ; MLIR:   cond_br %[[cond]], ^[[bodyBB]](%[[ivHead]] : i64), ^[[tailBB:bb[0-9]+]]
 ; MLIR: ^[[bodyBB]](%[[ivBody:[0-9]+]]: i64):	// pred: ^[[headBB]]
-; MLIR:   %[[zero2:[ci_0-9]+]] = constant 0 : i64
 ; MLIR:   %[[expr:[0-9]+]] = addi %[[ivBody]], %c7_i64 : i64
 ; MLIR:   %[[idxW:[0-9]+]] = index_cast %[[ivBody]] : i64 to index
 ; MLIR:   store %[[expr]], %[[vec]][%[[idxW]]] : memref<?xi64>
