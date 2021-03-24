@@ -485,17 +485,16 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
 
   PARSE_ASSERT2(!args->isValue, args) << "Parsing decl [" << name << "]";
 
-  auto decl = make_unique<Declaration>(parseStructuredName(name), type);
-
+  std::vector<Type> argTypes;
   // Vector and Tuples can be declared bare
   if (args->getChild(0)->isValue &&
       !Type::isScalar(Str2Type(args->getChild(0)->getValue())))
-    decl->addArgType(parseType(args));
+    argTypes.push_back(parseType(args));
   else
     for (auto &c : args->getChildren())
-      decl->addArgType(parseType(c.get()));
-
-  Signature sig{decl->getName(), decl->getArgTypes()};
+      argTypes.push_back(parseType(c.get()));
+  Signature sig{ parseStructuredName(name), argTypes };
+  auto decl = make_unique<Declaration>(sig.name, type, argTypes);
   function_decls[sig] = decl.get();
   return decl;
 }
@@ -506,41 +505,38 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 5) << "Expect def to have 4 parts (def name Type args body)";
-  const Token *name = tok->getChild(1);
+  const Token *tok_name = tok->getChild(1);
   const Token *tok_type = tok->getChild(2);
-  const Token *args = tok->getChild(3);
+  const Token *tok_args = tok->getChild(3);
   const Token *tok_body = tok->getChild(4);
 
-  auto type = parseType(tok_type);
-  PARSE_ASSERT2(!type.isNone(), tok_type) << "Unknown return type [" << tok_type << "]";
+  auto returnType = parseType(tok_type);
+  PARSE_ASSERT2(!returnType.isNone(), tok_type) << "Unknown return type [" << tok_type << "]";
 
   vector<Variable::Ptr> arguments;
   // Single var: (v 2.3)
-  if (args->size() && args->getChild(0)->isValue)
-    arguments.push_back(parseVariable(args));
+  if (tok_args->size() && tok_args->getChild(0)->isValue)
+    arguments.push_back(parseVariable(tok_args));
   // Many vars: ((a 1) (b 2))
   else
-    for (auto &a : args->getChildren())
+    for (auto &a : tok_args->getChildren())
       arguments.push_back(parseVariable(a.get()));
 
-  // Create node early, to allow recursion
-  auto node = make_unique<Definition>(parseStructuredName(name), type);
+  // Create declaration early, to allow recursion
+  StructuredName name = parseStructuredName(tok_name);
   std::vector<Type> argTypes;
   for (auto &a : arguments) {
-    PARSE_ASSERT(a->kind == Expr::Kind::Variable);
     argTypes.push_back(a->getType());
-    node->addArgument(move(a));
   }
-  Signature sig {node->getName(), argTypes};
-  function_decls[sig] = node->getDeclaration();
-  
+  Signature sig{ name, argTypes };
+  auto declaration = make_unique<Declaration>(name, returnType, argTypes);
+  function_decls[sig] = declaration.get();
+
   // Function body is a block, create one if single expr
   auto body = parseToken(tok_body);
-  PARSE_ASSERT2(type == body->getType(), tok_body) << "Return type declared as [" << type << "], but body has type [" << body->getType() << "]";
+  PARSE_ASSERT2(returnType == body->getType(), tok_body) << "Return type declared as [" << returnType << "], but body has type [" << body->getType() << "]";
 
-  node->setImpl(move(body));
-
-  return node;
+  return make_unique<Definition>(std::move(declaration), std::move(arguments), std::move(body));
 }
 
 // Conditional: (if (cond) (true block) (false block))

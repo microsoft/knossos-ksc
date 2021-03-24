@@ -379,13 +379,9 @@ private:
 /// the final IR.
 struct Declaration : public Expr {
   using Ptr = std::unique_ptr<Declaration>;
-  Declaration(StructuredName name, Type type)
-      : Expr(type, Kind::Declaration), name(std::move(name)) {}
-
   Declaration(StructuredName name, Type type, std::vector<Type> argTypes)
       : Expr(type, Kind::Declaration), name(std::move(name)), argTypes(move(argTypes)) {}
 
-  void addArgType(Type opt) { argTypes.push_back(opt); }
   llvm::ArrayRef<Type> getArgTypes() const { return argTypes; }
   Type getArgType(size_t idx) const {
     assert(idx < argTypes.size() && "Offset error");
@@ -453,24 +449,17 @@ private:
 /// validating the arguments and return types.
 struct Definition : public Expr {
   using Ptr = std::unique_ptr<Definition>;
-  Definition(StructuredName name, Type type)
-      : Expr(type, Kind::Definition) {
-    decl = std::make_unique<Declaration>(std::move(name), type);
-  }
+  Definition(Declaration::Ptr declaration, std::vector<Variable::Ptr> arguments, Expr::Ptr impl)
+      : Expr(declaration->getType(), Kind::Definition),
+        decl(std::move(declaration)),
+        arguments(std::move(arguments)),
+        impl(std::move(impl)) { }
 
   /// Arguments and return type (for name and type validation)
-  void addArgument(Variable::Ptr node) {
-    decl->addArgType(node->getType());
-    arguments.push_back(std::move(node));
-  }
   llvm::ArrayRef<Variable::Ptr> getArguments() const { return arguments; }
   Variable *getArgument(size_t idx) {
     assert(idx < arguments.size() && "Offset error");
     return arguments[idx].get();
-  }
-  void setImpl(Expr::Ptr expr) {
-    assert(!impl && "Cannot reset function implementation");
-    impl = std::move(expr);
   }
   Expr *getImpl() const { return impl.get(); }
   Declaration *getDeclaration() const { return decl.get(); }
