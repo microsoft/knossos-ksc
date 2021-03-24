@@ -65,21 +65,6 @@ static llvm::StringRef unquote(llvm::StringRef original) {
   return original.substr(start, len);
 }
 
-static Literal::Ptr getZero(Type type) {
-  switch (type.getValidType()) {
-  case Type::Integer:
-    return make_unique<Literal>("0", Type::Integer);
-  case Type::Float:
-    return make_unique<Literal>("0.0", Type::Float);
-  case Type::Bool:
-    return make_unique<Literal>("false", Type::Bool);
-  case Type::String:
-    return make_unique<Literal>("", Type::String);
-  default:
-    ASSERT(0) << "Invalid zero type [" << type << "]";
-  }
-}
-
 //
 Declaration *Parser::addExtraDecl(StructuredName const& name, std::vector<Type> argTypes, Type returnType) {
   Signature sig {name, argTypes};
@@ -572,7 +557,6 @@ Build::Ptr Parser::parseBuild(const Token *tok) {
   auto var = parseVariable(bond);
   PARSE_ASSERT(var->kind == Expr::Kind::Variable);
   PARSE_ASSERT(var->getType() == AST::Type::Integer);
-  llvm::dyn_cast<Variable>(var.get())->setInit(getZero(Type(Type::Integer)));
   auto body = parseToken(expr);
   return make_unique<Build>(move(range), move(var), move(body));
 }
