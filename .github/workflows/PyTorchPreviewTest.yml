@@ -2,10 +2,14 @@ name: PyTorch (preview)
 
 on:
 
+  schedule:
+    - cron:  '10/15 10 * * *'
+  workflow_dispatch:
+
+  # named branch push is for testing while experimenting. Remove before merge to master
   push:
     branches:
       - cogravil/pytorch_preview_ci
-  workflow_dispatch:
 
 jobs:
   build:
