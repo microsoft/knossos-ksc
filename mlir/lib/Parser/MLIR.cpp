@@ -222,6 +222,7 @@ void Generator::declareVariable(std::string const& name,
 }
 
 void Generator::declareVariable(AST::Binding const& binding) {
+  assert(!binding.isTupleUnpacking() && "Tuple-unpacking lets are not yet supported");
   declareVariable(binding.getVariable()->getName(), buildNode(binding.getInit()));
 }
 
