@@ -553,23 +553,22 @@ Values Generator::buildGet(const AST::Get* g) {
 Values Generator::buildFold(const AST::Fold* f) {
   // Fold needs a tuple of two variables: the accumulator and the induction
   auto v = f->getVector();
-  auto acc = llvm::dyn_cast<AST::Variable>(f->getAcc());
-  assert(acc && "Wrong AST node for vector and/or accumulator");
+  auto acc_x = f->getLambdaParameter();
   assert(f->getType().isScalar() && "Bad accumulator type in fold");
-  assert(acc->getType() == AST::Type::Tuple && "Bad accumulator type in fold");
-  assert(f->getType() == acc->getType().getSubType(0));
+  assert(acc_x->getType() == AST::Type::Tuple && "Bad lambda parameter type in fold");
+  assert(f->getType() == acc_x->getType().getSubType(0));
   assert(v->getType() == AST::Type::Vector && "Bad vector type in fold");
-  assert(v->getType().getSubType() == acc->getType().getSubType(1));
+  assert(v->getType().getSubType() == acc_x->getType().getSubType(1));
 
   // We can't build the variable here yet because this is an SSA representation
   // and the body will get the wrong reference, so we just initialise the
   // accumulator (the element x will be initialised by the load block)
-  auto init = buildNode(acc->getInit());
+  auto init = Single(buildNode(f->getInit()));  // TODO: this doesn't support Tuple accumulator types
 
   // Context variables: vector (and elm type), max, IV init to zero
   auto ivTy = builder.getIntegerType(64);
-  auto accTy = init[0].getType();
-  auto elmTy = init[1].getType();
+  auto accTy = init.getType();
+  auto elmTy = Single(ConvertType(acc_x->getType().getSubType(1)));
   auto vec = Single(buildNode(v));
   auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
   auto max = builder.create<mlir::IndexCastOp>(UNK, dim, ivTy);
@@ -589,7 +588,7 @@ Values Generator::buildFold(const AST::Fold* f) {
   bodyBlock->addArgument(ivTy);
   auto tailBlock = currentFunc.addBlock();
   tailBlock->addArgument(accTy);
-  mlir::ValueRange indArg {init[0], zero};
+  mlir::ValueRange indArg {init, zero};
   builder.create<mlir::BranchOp>(UNK, headBlock, indArg);
 
   // The head block only checks the condition, we can't load anything until
@@ -622,7 +621,7 @@ Values Generator::buildFold(const AST::Fold* f) {
   auto bodyAcc = bodyBlock->getArgument(0);
   auto bodyElm = bodyBlock->getArgument(1);
   auto bodyIv = bodyBlock->getArgument(2);
-  declareVariable(acc->getName(), {bodyAcc, bodyElm});
+  declareVariable(acc_x->getName(), {bodyAcc, bodyElm});
   auto newAcc = Single(buildNode(f->getBody()));
 
   // Increment IV

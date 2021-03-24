@@ -622,13 +622,17 @@ private:
 /// Then return (acc).
 struct Fold : public Expr {
   using Ptr = std::unique_ptr<Fold>;
-  Fold(Type type, Expr::Ptr body, Expr::Ptr acc, Expr::Ptr vector)
-      : Expr(type, Kind::Fold), body(std::move(body)),
-      acc(std::move(acc)), vector(std::move(vector)) {}
+  Fold(Type type, Variable::Ptr lambdaParameter, Expr::Ptr body, Expr::Ptr init, Expr::Ptr vector)
+      : Expr(type, Kind::Fold),
+      lambdaParameter(std::move(lambdaParameter)),
+      body(std::move(body)),
+      init(std::move(init)),
+      vector(std::move(vector)) {}
 
-  Expr *getVector() const { return vector.get(); }
-  Expr *getAcc() const { return acc.get(); }
+  Variable *getLambdaParameter() const { return lambdaParameter.get(); }
   Expr *getBody() const { return body.get(); }
+  Expr *getInit() const { return init.get(); }
+  Expr *getVector() const { return vector.get(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -636,8 +640,9 @@ struct Fold : public Expr {
   static bool classof(const Expr *c) { return c->kind == Kind::Fold; }
 
 private:
+  Variable::Ptr lambdaParameter;
   Expr::Ptr body;
-  Expr::Ptr acc;
+  Expr::Ptr init;
   Expr::Ptr vector;
 };
 
