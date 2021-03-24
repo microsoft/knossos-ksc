@@ -8,8 +8,8 @@ module Prim where
 
 import Lang
 import LangUtils (isTrivial)
-import GHC.Stack
-import Data.Maybe
+import GHC.Stack (HasCallStack)
+import Data.Maybe (isJust)
 import Control.Monad (zipWithM)
 
 --------------------------------------------
