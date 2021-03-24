@@ -93,7 +93,7 @@ getZero tangent_type e
 -- NB1: there's a short-cut when e is trivial (e.g. another variable)
 --
 -- NB2: we use the same variable name every time.  That's not safe in
---      general, but the k's we use never mention any other variables,
+--      general, but the bodys we use never mention any other variables,
 --      so it's fine c.f. the more general Opt.makeAtomic, which does
 --      not have this side condition but which requires an in-scope
 --      set
