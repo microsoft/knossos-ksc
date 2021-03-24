@@ -3,7 +3,7 @@ name: PyTorch (preview)
 on:
 
   schedule:
-    - cron:  '10/15 10 * * *'
+    - cron:  '5 4 * * *'
   workflow_dispatch:
 
   # named branch push is for testing while experimenting. Remove before merge to master
