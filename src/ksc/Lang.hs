@@ -495,7 +495,7 @@ userFunToFun = T.over baseFunFun BaseUserFun
 -- A 'Fun p' is Either:
 --
 -- Right: a 'UserFun p', or
--- Left:  a 'SelFun' or 'PrimFun' (with no Phase type label)
+-- Left:  a 'PrimFun' (with no Phase type label)
 perhapsUserFun :: Fun p -> Either (Fun q) (UserFun p)
 perhapsUserFun = \case
   Fun f -> either (Left . Fun) (Right . Fun) (baseFunToBaseUserFunE f)
