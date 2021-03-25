@@ -64,16 +64,14 @@ def test_replace_subtrees():
 def test_replace_subtrees_nested():
   e = parse_expr_string("(assert true (foo x y z))")
   inner_replaced = parse_expr_string("(foo x y w)")
-  def replacer(e1, e2):
-    assert e1 == Const(0)
-    assert e2 == inner_replaced
-    return Var("success")
-  assert isinstance(_get_node(e, 2), Call)
-  assert _get_node(e, 5) == Var("z")
-  with pytest.raises(ValueError):
+  path_to_call = 2
+  path_to_z = 5
+  assert isinstance(_get_node(e, path_to_call), Call)
+  assert _get_node(e, path_to_z) == Var("z")
+  with pytest.raises(ValueError, match="nested"):
     replace_subtrees(e, [
-      ReplaceLocationRequest(5, Var("w")),
-      ReplaceLocationRequest(2, Const(0), replacer)
+      ReplaceLocationRequest(path_to_z, Var("w")),
+      ReplaceLocationRequest(path_to_call, Const(0))
     ])
 
 def test_replace_subtree_avoids_capture():

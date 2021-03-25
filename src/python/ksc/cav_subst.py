@@ -128,7 +128,7 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
     elif reqs[0].target_idx == start_idx:
         # Apply here
         if len(reqs) != 1:
-            raise ValueError("Multiple ReplaceLocationRequests on locations descending from each other")
+            raise ValueError("Multiple ReplaceLocationRequests on locations nested within each other")
         if reqs[0].applicator is None:
             return reqs[0].payload
         # Continue renaming.
