@@ -507,7 +507,7 @@ callResultTy env fun arg_ty = case perhapsUserFun fun of
   Right user -> case lookupGblST user env of
     Just f -> pure (def_res_ty f)
     Nothing -> Left (text "Not in scope" <+> ppr user)
-  Left prim -> primCallResultTy_maybe @Typed prim arg_ty
+  Left prim -> primCallResultTy_maybe prim arg_ty
 
 -- In the input program we see a call f(e), where e : S and f(e) : T.
 -- Then
