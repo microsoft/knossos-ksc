@@ -65,10 +65,10 @@ def _get_subtree_size(e: Expr):
 
 @dataclass(frozen=True)
 class ReplaceLocationRequest:
-    """ Conveys instruction to replace a subtree for the replace_subtrees function. """
+    """ Describes a subtree to be replaced by the replace_subtree(s) function. """
 
     target_idx: int
-    """ The location within the root Expr, i.e. upon which replace_subtree is called, that should be replaced. """
+    """ The location within the root Expr, i.e. upon which replace_subtree(s) is called, that should be replaced. """
 
     payload: Expr
     """ An Expr to be "delivered" to that index, i.e. with the same value as it would have at the top.
