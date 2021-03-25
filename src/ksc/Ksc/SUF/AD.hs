@@ -409,13 +409,13 @@ sufFwdRevPassDefs gst__ = catMaybes . concat . snd . sufRevPassDefsMaybe gst__
 --
 -- revpass$f : (dT, B{f}) -> dS
 sufFwdRevPassDef :: GblSymTab -> TDef -> (Maybe TDef, Maybe TDef, GblSymTab)
-sufFwdRevPassDef gst Def{ def_fun    = DerivedFun Fun f
+sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
                         , def_pat    = s
                         , def_rhs    = UserRhs rhs
                         , def_res_ty = t_ty
                         }
   = let
-      fwd = Def { def_fun    = DerivedFun SUFFwdPass f
+      fwd = Def { def_fun    = Fun SUFFwdPass f
                 , def_pat    = s
                 , def_rhs    = UserRhs rhs'
                 , def_res_ty = TypeTuple [t_ty, bog_ty]
@@ -431,7 +431,7 @@ sufFwdRevPassDef gst Def{ def_fun    = DerivedFun Fun f
 
       lets = foldr (\(p, er) rest -> Let p er . rest) id lets_
 
-      rev = Def { def_fun    = DerivedFun SUFRevPass f
+      rev = Def { def_fun    = Fun SUFRevPass f
                 , def_pat    = TupPat [ dt, bog ]
                 , def_rhs    = UserRhs rhs''
                 , def_res_ty = ds_ty
@@ -454,14 +454,14 @@ sufFwdRevPassDef gst Def{ def_fun    = DerivedFun Fun f
 sufFwdRevPassDef gst _ = (Nothing, Nothing, gst)
 
 sufRevDef :: GblSymTab -> TDef -> Maybe TDef
-sufRevDef gst Def{ def_fun    = fun@(DerivedFun Fun f)
+sufRevDef gst Def{ def_fun    = fun@(Fun JustFun f)
                  , def_pat    = s
                  -- We don't actually use the rhs.  We just look up
                  -- the fwdpass and revpass in the GblSymTab.
                  , def_rhs    = UserRhs _
                  , def_res_ty = t_ty
                  } =
-  Just $ Def { def_fun    = DerivedFun SUFRev f
+  Just $ Def { def_fun    = Fun SUFRev f
              , def_pat    = TupPat [s_var, dt]
              , def_rhs    = UserRhs rhs'
              , def_res_ty = d s_ty
@@ -513,15 +513,15 @@ mkSufFuns :: GblSymTab -> Fun Typed -> Type
           -> (TFun Typed, TFun Typed, Type)
 mkSufFuns env fun arg_ty = (fwdTFun, revTFun, bog_ty)
   where fwdTFun = TFun fwd_res_ty fwdFun
-        revTFun = TFun rev_res_ty (DerivedFun SUFRevPass funid)
-        fwdFun = DerivedFun SUFFwdPass funid
+        revTFun = TFun rev_res_ty (Fun SUFRevPass funid)
+        fwdFun = Fun SUFFwdPass funid
 
         fwd_res_ty = case callResultTy env fwdFun arg_ty of
           Right res_ty' -> res_ty'
           Left err -> pprPanic "mkSufFuns" err
 
         funid = case fun of
-          DerivedFun Fun funid' -> funid'
+          Fun JustFun funid' -> funid'
           _ -> error $
             unlines [ "We don't yet support SUF/BOG-AD of derived "
                     , "functions, but there's no reason we couldn't. "

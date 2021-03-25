@@ -13,7 +13,7 @@ import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner)
 import Ksc.CatLang
 import Ksc.Traversal (mapAccumLM)
-import Lang (Decl, DeclX(DefDecl), DerivedFun(DerivedFun), Derivations(Fun),
+import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              TDef, Pretty,
              def_fun, displayN, partitionDecls,
              ppr, renderSexp, (<+>))
@@ -192,11 +192,11 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
           ; pure (stInsertFun appliedDef env', [DefDecl appliedDef])
           }
         L.DerivationCLFun
-          | DerivedFun Fun basefun <- fun
+          | Fun JustFun basefun <- fun
           , let tdef' = case toCLDef_maybe tdef of
                   Nothing -> error ("Couldn't derive CL of "
                                     ++ L.render (ppr basefun))
-                  Just d  -> (fromCLDef d){ def_fun = DerivedFun L.CLFun basefun }
+                  Just d  -> (fromCLDef d){ def_fun = Fun L.CLFun basefun }
           -> pure (stInsertFun tdef' env, [DefDecl tdef'])
           | otherwise
           -> error ("Was not base fun: " ++ L.render (ppr fun))

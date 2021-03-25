@@ -424,7 +424,7 @@ deriving instance Ord  (BaseUserFunArgTy p) => Ord  (BaseFun p)
 deriving instance Show (BaseUserFunArgTy p) => Show (BaseFun p)
 
 data Derivations
-  = Fun            -- The function              f(x)
+  = JustFun        -- The function              f(x)
   | GradFun ADPlan -- Full Jacobian Df(x)
   | DrvFun ADMode  -- Derivative derivative f'(x,dx)
                    --   Rev <=> reverse mode f`(x,dr)
@@ -435,7 +435,7 @@ data Derivations
   | SUFRev
   deriving (Eq, Ord, Show)
 
-data DerivedFun funid = DerivedFun Derivations funid
+data DerivedFun funid = Fun Derivations funid
                 deriving (Eq, Ord, Show)
 
 -- DerivedFun has just two instantiations
@@ -460,7 +460,7 @@ baseUserFunBaseFun f = \case
 
 baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
                      funid funid'
-baseFunFun f (DerivedFun ds fi) = fmap (DerivedFun ds) (f fi)
+baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
 
 userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
@@ -495,8 +495,8 @@ userFunToFun = T.over baseFunFun BaseUserFun
 -- Right: a 'UserFun p', or
 -- Left:  a 'PrimFun'
 perhapsUserFun :: Fun p -> Either (DerivedFun PrimFun) (UserFun p)
-perhapsUserFun (DerivedFun ds baseFun) =
-  either (Left . DerivedFun ds) (Right . DerivedFun ds) (baseFunToBaseUserFunE baseFun)
+perhapsUserFun (Fun ds baseFun) =
+  either (Left . Fun ds) (Right . Fun ds) (baseFunToBaseUserFunE baseFun)
 
 maybeUserFun :: Fun p -> Maybe (UserFun p)
 maybeUserFun f = case perhapsUserFun f of
@@ -523,7 +523,7 @@ isSelFun = \case
   PrimFun{} -> False
 
 baseFunOfFun :: Fun p -> BaseFun p
-baseFunOfFun (DerivedFun _ baseFun) = baseFun
+baseFunOfFun (Fun _ baseFun) = baseFun
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -665,7 +665,7 @@ dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun el_ty
-                        (DerivedFun Fun (PrimFun (P_SelFun i n)))) e
+                        (Fun JustFun (PrimFun (P_SelFun i n)))) e
            where
              el_ty = case typeof e of
                         TypeTuple ts -> ts !! (i-1)
@@ -1051,15 +1051,15 @@ pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 
 pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
-pprDerivedFun f (DerivedFun Fun s)                   = f s
-pprDerivedFun f (DerivedFun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> f s)
-pprDerivedFun f (DerivedFun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> f s)
-pprDerivedFun f (DerivedFun (DrvFun   (AD adp Rev)) s) = brackets (text "rev" <> ppr adp <+> f s)
-pprDerivedFun f (DerivedFun (ShapeFun ds) sf)             = brackets (text "shape" <+> pprDerivedFun f (DerivedFun ds sf))
-pprDerivedFun f (DerivedFun CLFun    s)              = brackets (text "CL" <+> f s)
-pprDerivedFun f (DerivedFun SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
-pprDerivedFun f (DerivedFun SUFRevPass s)            = brackets (text "sufrevpass" <+> f s)
-pprDerivedFun f (DerivedFun SUFRev s)                = brackets (text "sufrev" <+> f s)
+pprDerivedFun f (Fun JustFun s)               = f s
+pprDerivedFun f (Fun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> f s)
+pprDerivedFun f (Fun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> f s)
+pprDerivedFun f (Fun (DrvFun   (AD adp Rev)) s) = brackets (text "rev" <> ppr adp <+> f s)
+pprDerivedFun f (Fun (ShapeFun ds) sf)             = brackets (text "shape" <+> pprDerivedFun f (Fun ds sf))
+pprDerivedFun f (Fun CLFun    s)              = brackets (text "CL" <+> f s)
+pprDerivedFun f (Fun SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
+pprDerivedFun f (Fun SUFRevPass s)            = brackets (text "sufrevpass" <+> f s)
+pprDerivedFun f (Fun SUFRev s)                = brackets (text "sufrev" <+> f s)
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -1288,8 +1288,8 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (DerivedFun Fun (BaseUserFun (BaseUserFunId "g" Nothing))) (var "i")
-      e2 = Call (DerivedFun Fun (BaseUserFun (BaseUserFunId "f" Nothing))) (Tuple [e, var "_t1", kInt 5])
+      e  = Call (Fun JustFun (BaseUserFun (BaseUserFunId "g" Nothing))) (var "i")
+      e2 = Call (Fun JustFun (BaseUserFun (BaseUserFunId "f" Nothing))) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"
