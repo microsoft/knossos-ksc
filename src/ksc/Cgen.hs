@@ -400,7 +400,7 @@ cgenExprWithoutResettingAlloc env = \case
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
-  Call (TFun _ (DerivedFun Fun (PrimFun P_copydown))) e -> do
+  Call (TFun _ (Fun JustFun (PrimFun P_copydown))) e -> do
     CG cdecl cexpr ctype _callocusage <- cgenExprR env e
     ret <- freshCVar
     bumpmark <- freshCVar
@@ -613,30 +613,30 @@ cgenBaseFun = \case
 
 cgenUserFun :: HasCallStack => Fun Typed -> String
 cgenUserFun f = case f of
-  DerivedFun Fun baseFun   -> cgenBaseFun baseFun
-  DerivedFun GradFun{}  s  -> "D$" ++ cgenBaseFun s
-  DerivedFun (DrvFun (AD BasicAD Fwd)) s -> "fwd$" ++ cgenBaseFun s
-  DerivedFun (DrvFun (AD BasicAD Rev)) s -> "rev$" ++ cgenBaseFun s
-  DerivedFun (DrvFun (AD TupleAD Fwd)) s -> "fwdt$" ++ cgenBaseFun s
-  DerivedFun (DrvFun (AD TupleAD Rev)) s -> "revt$" ++ cgenBaseFun s
-  DerivedFun (ShapeFun ds) ff   -> "shape$" ++ cgenUserFun (DerivedFun ds ff)
-  DerivedFun CLFun s       -> "CL$" ++ cgenBaseFun s
-  DerivedFun SUFFwdPass s  -> "suffwdpass$" ++ cgenBaseFun s
-  DerivedFun SUFRevPass s  -> "sufrevpass$" ++ cgenBaseFun s
-  DerivedFun SUFRev   s    -> "sufrev$" ++ cgenBaseFun s
+  Fun JustFun baseFun   -> cgenBaseFun baseFun
+  Fun GradFun{}  s  -> "D$" ++ cgenBaseFun s
+  Fun (DrvFun (AD BasicAD Fwd)) s -> "fwd$" ++ cgenBaseFun s
+  Fun (DrvFun (AD BasicAD Rev)) s -> "rev$" ++ cgenBaseFun s
+  Fun (DrvFun (AD TupleAD Fwd)) s -> "fwdt$" ++ cgenBaseFun s
+  Fun (DrvFun (AD TupleAD Rev)) s -> "revt$" ++ cgenBaseFun s
+  Fun (ShapeFun ds) ff   -> "shape$" ++ cgenUserFun (Fun ds ff)
+  Fun CLFun s       -> "CL$" ++ cgenBaseFun s
+  Fun SUFFwdPass s  -> "suffwdpass$" ++ cgenBaseFun s
+  Fun SUFRevPass s  -> "sufrevpass$" ++ cgenBaseFun s
+  Fun SUFRev   s    -> "sufrev$" ++ cgenBaseFun s
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
 cgenAnyFun tf cftype = case tf of
-  TFun _ (DerivedFun Fun (PrimFun P_lmApply)) -> "lmApply"
-  TFun retty (DerivedFun Fun (PrimFun P_build)) ->
+  TFun _ (Fun JustFun (PrimFun P_lmApply)) -> "lmApply"
+  TFun retty (Fun JustFun (PrimFun P_build)) ->
     case retty of
       TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _              -> error ("Unexpected return type for build: " ++ show retty)
-  TFun retty (DerivedFun Fun (PrimFun primname))
+  TFun retty (Fun JustFun (PrimFun primname))
     | primname `elem` [P_sumbuild, P_buildFromSparse, P_buildFromSparseTupled]
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
-  TFun (TypeLM _ _) (DerivedFun Fun (PrimFun _)) -> cgenType cftype ++ "::mk"
+  TFun (TypeLM _ _) (Fun JustFun (PrimFun _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun f
 
 {- Note [Allocator usage of function calls]
@@ -666,8 +666,8 @@ are two cases:
 -}
 
 funUsesAllocator :: HasCallStack => TFun p -> Bool
-funUsesAllocator (TFun _ (DerivedFun Fun (PrimFun (P_SelFun _ _)))) = False
-funUsesAllocator (TFun _ (DerivedFun Fun (PrimFun fname))) =
+funUsesAllocator (TFun _ (Fun JustFun (PrimFun (P_SelFun _ _)))) = False
+funUsesAllocator (TFun _ (Fun JustFun (PrimFun fname))) =
   not $ fname `elem` [P_index, P_size, P_eq, P_ne, P_trace, P_print, P_ts_dot]
 funUsesAllocator _ = True
 
@@ -723,8 +723,8 @@ ctypeofFun env (TFun ty f) ctys
     ctypeofFun1 ty f ctys
 
 ctypeofFun1 :: HasCallStack => Type -> Fun Typed -> [CType] -> CType
-ctypeofFun1 ty (DerivedFun Fun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
-ctypeofFun1 (TypeLM _ _) (DerivedFun GradFun{} f) ctys = ctypeofGradBuiltin f ctys
+ctypeofFun1 ty (Fun JustFun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
+ctypeofFun1 (TypeLM _ _) (Fun GradFun{} f) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 (TypeLM _ _) f ctys =
   error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
@@ -814,7 +814,7 @@ cppGen defs =
   in unlines (lines ++ lls ++ tail ++ call_main_if_present)
 
 isMainFunction :: TDef -> Bool
-isMainFunction Def{ def_fun = DerivedFun Fun f, def_res_ty = TypeInteger }
+isMainFunction Def{ def_fun = Fun JustFun f, def_res_ty = TypeInteger }
   | BaseUserFunId "main" (TypeTuple []) <- f = True
 isMainFunction _ = False
 

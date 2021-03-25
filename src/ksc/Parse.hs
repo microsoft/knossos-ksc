@@ -388,9 +388,9 @@ pFunG pBase = try (brackets $
          <|> (pDerivation "suffwdpass" SUFFwdPass)
          <|> (pDerivation "sufrevpass" SUFRevPass)
          <|> (pDerivation "sufrev" SUFRev)
-         <|> (pReserved "shape" >> (\(DerivedFun ds f) -> DerivedFun (ShapeFun ds) f) <$> pFunG pBase)))
-   <|> DerivedFun Fun <$> pBase
-  where pDerivation s d = pReserved s >> DerivedFun d <$> pBase
+         <|> (pReserved "shape" >> (\(Fun ds f) -> Fun (ShapeFun ds) f) <$> pFunG pBase)))
+   <|> Fun JustFun <$> pBase
+  where pDerivation s d = pReserved s >> Fun d <$> pBase
 
 pFunTyped :: Parser (Fun Typed)
 pFunTyped = pFunG (BaseUserFun <$> pBaseUserFunWithType id)
