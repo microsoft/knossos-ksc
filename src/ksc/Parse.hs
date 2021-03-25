@@ -384,18 +384,18 @@ pFunG pBase = try (brackets $
          <|> (pBaseDerivation "fwdt" DrvFun (AD TupleAD Fwd))
          <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
          <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
-         <|> (pReserved "CL"    >> CLFun    <$> pBase)
-         <|> (pReserved "suffwdpass" >> SUFFwdPass <$> pBase)
-         <|> (pReserved "sufrevpass" >> SUFRevPass <$> pBase)
-         <|> (pReserved "sufrev"     >> SUFRev     <$> pBase)
-         <|> (pReserved "shape" >> ShapeFun <$> pFunG pBase)))
-   <|> Fun <$> pBase
+         <|> (pReserved "CL"    >> DerivedFun CLFun    <$> pBase)
+         <|> (pReserved "suffwdpass" >> DerivedFun SUFFwdPass <$> pBase)
+         <|> (pReserved "sufrevpass" >> DerivedFun SUFRevPass <$> pBase)
+         <|> (pReserved "sufrev"     >> DerivedFun SUFRev     <$> pBase)
+         <|> (pReserved "shape" >> (\(DerivedFun ds f) -> DerivedFun (ShapeFun ds) f) <$> pFunG pBase)))
+   <|> DerivedFun Fun <$> pBase
   where pBaseDerivation :: String
-                        -> (BaseFun p -> b -> b1)
-                        -> b
-                        -> Parser b1
+                        -> (t -> Derivations)
+                        -> t
+                        -> Parser (DerivedFun (BaseFun p))
         pBaseDerivation s f p =
-          pReserved s >> flip f p <$> pBase
+          pReserved s >> DerivedFun (f p) <$> pBase
 
 pFunTyped :: Parser (Fun Typed)
 pFunTyped = pFunG (BaseUserFun <$> pBaseUserFunWithType id)

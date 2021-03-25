@@ -210,13 +210,13 @@ rewriteCall _ fun (Let v r arg)
 rewriteCall _ fun (If e1 e2 e3)
   = Just (If e1 (Call fun e2) (Call fun e3))
 
-rewriteCall env (TFun _ (Fun fun)) arg
+rewriteCall env (TFun _ (DerivedFun Fun fun)) arg
   = optFun env fun arg
 
-rewriteCall env (TFun ty (GradFun f adm)) arg
+rewriteCall env (TFun ty (DerivedFun (GradFun adm) f)) arg
   = optGradFun (optEnvInScope env) adm ty f arg
 
-rewriteCall _ (TFun _ (DrvFun f adm)) arg
+rewriteCall _ (TFun _ (DerivedFun (DrvFun adm) f)) arg
   = optDrvFun adm f arg
 
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
@@ -229,10 +229,10 @@ rewriteCall env (TFun _ to_inline) arg
       <- lookupGblST to_inline (optGblST env)
   = Just (inlineCall env pat body arg)
 
-rewriteCall _ (TFun _ (SUFFwdPass (PrimFun fun))) arg
+rewriteCall _ (TFun _ (DerivedFun SUFFwdPass (PrimFun fun))) arg
   = SUF.rewriteSUFFwdPass fun arg
 
-rewriteCall _ (TFun _ (SUFRevPass (PrimFun fun))) arg
+rewriteCall _ (TFun _ (DerivedFun SUFRevPass (PrimFun fun))) arg
   = SUF.rewriteSUFRevPass fun arg
 
 rewriteCall _ _ _
@@ -247,8 +247,8 @@ shouldInline to_inline
                      , fwd "add" ff
                      , rev "add" ff
                      ]
-  where fwd f t = SUFFwdPass (BaseUserFunId f t)
-        rev f t = SUFRevPass (BaseUserFunId f t)
+  where fwd f t = DerivedFun SUFFwdPass (BaseUserFunId f t)
+        rev f t = DerivedFun SUFRevPass (BaseUserFunId f t)
         ff = TypeTuple [TypeFloat, TypeFloat]
 
 -----------------------
@@ -644,7 +644,7 @@ optGradFun env TupleAD ty f args
   , Just opt_grad <- optGradFun env BasicAD lm_ty f new_args
   = Just $
     mkLets binds $
-    Tuple [ Call (TFun res_ty (Fun f)) new_args, opt_grad ]
+    Tuple [ Call (TFun res_ty (DerivedFun Fun f)) new_args, opt_grad ]
   | otherwise
   = Nothing
   where
@@ -790,29 +790,29 @@ optLMApply _ (AD TupleAD dir) (Tuple [_, lm]) dx
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only
-optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun (PrimFun f))) es) dx
+optLMApply env (AD BasicAD dir) (Call (TFun _ (DerivedFun Fun (PrimFun f))) es) dx
   = optLMApplyCall env dir f es dx
 
 -- Looking at:   D$f(e1, e2) `lmApply` dx
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
-optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
+optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (DerivedFun (GradFun adp2) f)) es) dx
   | adp1 == adp2
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType t) (DrvFun f (AD adp1 Fwd))
+    grad_fun = TFun (tangentType t) (DerivedFun (DrvFun (AD adp1 Fwd)) f)
     es_dx = Tuple [es, dx]
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
-optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (GradFun f adp2)) es) dx
+optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (DerivedFun (GradFun adp2) f)) es) dx
   | adp1 == adp2
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType s) (DrvFun f (AD adp1 Rev))
+    grad_fun = TFun (tangentType s) (DerivedFun (DrvFun (AD adp1 Rev)) f)
     es_dx = Tuple [es, dx]
 
 {-

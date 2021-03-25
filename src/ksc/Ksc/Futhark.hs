@@ -363,25 +363,25 @@ callPrimFun f _ args =
 -- case-by-case basis.
 toCall :: L.InPhase p => L.TFun p -> L.TExpr -> Exp
 
-toCall (L.TFun _ (L.Fun (L.PrimFun (L.P_SelFun f _)))) e =
+toCall (L.TFun _ (L.DerivedFun L.Fun (L.PrimFun (L.P_SelFun f _)))) e =
   Project (toFutharkExp e) $ show f
 
-toCall (L.TFun ret (L.Fun (L.PrimFun f))) args =
+toCall (L.TFun ret (L.DerivedFun L.Fun (L.PrimFun f))) args =
   callPrimFun f ret args
 
-toCall f@(L.TFun _ (L.Fun L.BaseUserFun{})) args =
+toCall f@(L.TFun _ (L.DerivedFun L.Fun L.BaseUserFun{})) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ L.GradFun{}) args =
+toCall f@(L.TFun _ (L.DerivedFun L.GradFun{} _)) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ L.DrvFun{}) args =
+toCall f@(L.TFun _ (L.DerivedFun L.DrvFun{} _)) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ L.ShapeFun{}) args =
+toCall f@(L.TFun _ (L.DerivedFun L.ShapeFun{} _)) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ L.CLFun{}) args =
+toCall f@(L.TFun _ (L.DerivedFun L.CLFun{} _)) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall _ _ = error "Unsupported Futhark call"

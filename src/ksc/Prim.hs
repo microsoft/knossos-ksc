@@ -18,11 +18,11 @@ import Control.Monad (zipWithM)
 
 primCall :: PrimFun -> Type -> TExpr -> TExpr
 primCall fun res_ty
-  = Call (TFun res_ty (Fun (PrimFun fun)))
+  = Call (TFun res_ty (DerivedFun Fun (PrimFun fun)))
 
 userCall :: String -> Type -> TExpr -> TExpr
 userCall fun res_ty arg
-  = Call (TFun res_ty (Fun (BaseUserFun (BaseUserFunId fun arg_ty)))) arg
+  = Call (TFun res_ty (DerivedFun Fun (BaseUserFun (BaseUserFunId fun arg_ty)))) arg
   where arg_ty = typeof arg
 
 mkPrimCall :: HasCallStack => PrimFun -> TExpr -> TExpr
@@ -245,7 +245,7 @@ lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
 lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
 isThePrimFun :: TFun p -> PrimFun -> Bool
-isThePrimFun (TFun _ (Fun (PrimFun f1))) f2 = f1 == f2
+isThePrimFun (TFun _ (DerivedFun Fun (PrimFun f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
 isLMOne :: TExpr -> Bool
@@ -378,26 +378,26 @@ primCallResultTy_maybe :: HasCallStack => DerivedFun PrimFun -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
-      Fun f
+      DerivedFun Fun f
          | Just ty <- primFunCallResultTy_maybe f arg_ty
          -> Right ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
 
-      GradFun f adp
-        -> case primCallResultTy_maybe (Fun f) arg_ty of
+      DerivedFun (GradFun adp) f
+        -> case primCallResultTy_maybe (DerivedFun Fun f) arg_ty of
             Left err -> Left err
             Right res_ty -> Right (mkGradType adp arg_ty res_ty)
 
-      DrvFun f adm
+      DerivedFun (DrvFun adm) f
         | AD BasicAD Fwd <- adm    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
         , TypeTuple [x, _dx] <- arg_ty
-        , Right t_ty <- primCallResultTy_maybe (Fun f) x
+        , Right t_ty <- primCallResultTy_maybe (DerivedFun Fun f) x
         -> Right (tangentType t_ty)
 
         | AD TupleAD Fwd <- adm    -- f :: S1 -> T, then fwdt$f :: (S1, S2_t) -> (T,T_t)
         , TypeTuple [x, _dx] <- arg_ty
-        , Right t_ty <- primCallResultTy_maybe (Fun f) x
+        , Right t_ty <- primCallResultTy_maybe (DerivedFun Fun f) x
         -> Right (TypeTuple [t_ty, tangentType t_ty])
 
         | AD BasicAD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
@@ -406,22 +406,22 @@ primCallResultTy_maybe fun arg_ty
         | otherwise
         -> Left (text "Ill-typed call to:" <+> ppr fun)
       
-      ShapeFun f
-        -> case primCallResultTy_maybe f arg_ty of
+      DerivedFun (ShapeFun ds) f
+        -> case primCallResultTy_maybe (DerivedFun ds f) arg_ty of
             Left err -> Left err
             Right res_ty -> Right (shapeType res_ty)
 
-      CLFun f -> primCallResultTy_maybe (Fun f) arg_ty
+      DerivedFun CLFun f -> primCallResultTy_maybe (DerivedFun Fun f) arg_ty
 
-      SUFFwdPass f
+      DerivedFun SUFFwdPass f
         | Just bog_ty <- sufBogTy_maybe f arg_ty
-        , Right orig_res_ty <- primCallResultTy_maybe (Fun f) arg_ty
+        , Right orig_res_ty <- primCallResultTy_maybe (DerivedFun Fun f) arg_ty
         -> Right (TypeTuple [orig_res_ty, bog_ty])
         | otherwise
         -> Left (text "Type error in SUF fwd fun:" <+> ppr fun
                  $$ text "Arg ty was" <+> ppr arg_ty)
 
-      SUFRevPass f
+      DerivedFun SUFRevPass f
         | TypeTuple [dorig_res_ty, bog_ty] <- arg_ty
         , Just t <- sufRevFunCallResultTy_maybe f dorig_res_ty bog_ty
         -> Right t
@@ -429,7 +429,7 @@ primCallResultTy_maybe fun arg_ty
         -> Left (text "Type error in SUF rev fun:" <+> ppr fun
              <+> text "Arg ty was:" <+> ppr arg_ty)
 
-      SUFRev f -> primCallResultTy_maybe (DrvFun f (AD BasicAD Rev)) arg_ty
+      DerivedFun SUFRev f -> primCallResultTy_maybe (DerivedFun (DrvFun (AD BasicAD Rev)) f) arg_ty
 
 primFunCallResultTy :: HasCallStack => PrimFun -> TExpr -> Type
 primFunCallResultTy fun args
@@ -445,17 +445,17 @@ primFunCallResultTy fun args
 baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc (Maybe Type)
 baseFunArgTy_maybe derivedFun derivedFunArgTy
   = case derivedFun of
-      Fun{} -> it's derivedFunArgTy
-      DrvFun{} -> case derivedFunArgTy of
+      DerivedFun Fun _ -> it's derivedFunArgTy
+      DerivedFun DrvFun{} _ -> case derivedFunArgTy of
         TypeTuple [baseArgTy', _] -> it's baseArgTy'
         _ -> Left (text "baseFunArgTy_maybe: DrvFun:" <+> pprDerivedFun ppr derivedFun
                    $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
-      GradFun{}  -> it's derivedFunArgTy
-      ShapeFun f -> baseFunArgTy_maybe f derivedFunArgTy
-      CLFun{}    -> it's derivedFunArgTy
-      SUFFwdPass{} -> it's derivedFunArgTy
-      SUFRevPass{} -> don'tKnow
-      SUFRev{}   -> case derivedFunArgTy of
+      DerivedFun GradFun{} _ -> it's derivedFunArgTy
+      DerivedFun (ShapeFun ds) f -> baseFunArgTy_maybe (DerivedFun ds f) derivedFunArgTy
+      DerivedFun CLFun _        -> it's derivedFunArgTy
+      DerivedFun SUFFwdPass _ -> it's derivedFunArgTy
+      DerivedFun SUFRevPass _ -> don'tKnow
+      DerivedFun SUFRev _ -> case derivedFunArgTy of
         TypeTuple [baseArgTy', _] -> it's baseArgTy'
         _ -> Left (text "baseFunArgTy_maybe: SUFRev:" <+> pprDerivedFun ppr derivedFun
                    $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
