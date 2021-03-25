@@ -178,8 +178,7 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
 @_cav_children.register
 def _cav_lam(e: Lam, start_idx, reqs, substs):
     arg, substs = _rename_if_needed(e.arg, e, reqs, substs)
-    return Lam(Var(arg.name, type=arg.type_, decl=True),
-        _cav_helper(e.body, start_idx + 1, reqs, substs))
+    return Lam(Var(arg.name, type=arg.type_, decl=True), *_cav_child_list(e, start_idx, reqs, substs))
 
 @_cav_children.register
 def _cav_let(e: Let, start_idx, reqs, substs):
