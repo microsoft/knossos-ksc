@@ -232,13 +232,11 @@ class Expr(ASTNode):
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
     free_vars_: FrozenSet[str] # Filled in by constructor
-    subtree_size_: int # Initialized to None, then filled in (and used) by rewriter according to its own measuring scheme.
 
     def __init__(self, **args):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
         self.free_vars_ = compute_free_vars(self)
-        self.subtree_size_ = None
 
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 

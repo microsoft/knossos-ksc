@@ -42,23 +42,7 @@ def _idch_if(e: If):
 def _idch_assert(e: Assert):
     return [e.cond, e.body]
 
-def _get_indexed_children(e: Expr) -> Generator[Tuple[int, Expr, int], None, None]:
-    # Tuples are [start_index, subtree, end_index] of children in defined order.
-    # First child has start index 1; last child has end index equal to subtree_size_ of parent. """
-    idx = 1
-    for ch in _get_children(e):
-        end_idx = idx + _get_subtree_size(ch)
-        yield (idx, ch, end_idx)
-        idx = end_idx
-
-def _get_subtree_size(e: Expr):
-    if e.subtree_size_ is None:
-        indexed_children = list(_get_indexed_children(e))
-        if len(indexed_children)==0:
-            e.subtree_size_ = 1
-        else:
-            _,_, e.subtree_size_ = indexed_children[-1]
-    return e.subtree_size_
+Location = List[int]
 
 #####################################################################
 # Public members
@@ -67,17 +51,17 @@ def _get_subtree_size(e: Expr):
 class ReplaceLocationRequest:
     """ Describes a subtree to be replaced by the replace_subtree(s) function. """
 
-    target_idx: int
+    target: Location
     """ The location within the root Expr, i.e. upon which replace_subtree(s) is called, that should be replaced. """
 
     payload: Expr
     """ An Expr to be "delivered" to that index, i.e. with the same value as it would have at the top.
-        That is, any binders on the path from the root to <target_idx> that bind variables free in <payload>,
+        That is, any binders on the path from the root to <target> that bind variables free in <payload>,
         will be alpha-renamed so that <payload> sees the same values in those variables that it would have at the root. """
 
     applicator: Optional[Callable[[Expr, Expr], Expr]]=None
-    """ Details how the <payload> should be placed into the specified <target_idx>.
-        * If applicator is None, then replace_subtree should merely replace the node at <target_idx> with <payload>.
+    """ Details how the <payload> should be inserted into the specified <target>.
+        * If applicator is None, then replace_subtree should merely replace the node at <target> with <payload>.
         * Otherwise, the replacement (new) subtree is given by `applicator(payload, x)` where x is
             the node currently at that location,
             but *after* any alpha-renaming necessary to preserve the meaning of <payload>. """
@@ -89,7 +73,7 @@ VariableSubstitution = Mapping[str, Expr]
 def replace_subtrees(e: Expr, reqs: List[ReplaceLocationRequest]) -> Expr:
     """ Replaces locations within <e> with new subtrees, as per ReplaceLocationRequest.
         Returns a new Expr, which may share subtrees with the original. """
-    return _cav_helper(e, 0, sorted(reqs, key=lambda rlr: rlr.target_idx), {})
+    return _cav_helper(e, reqs, {})
 
 def replace_subtree(e: Expr, *args):
     """ Replaces a single location within e. The additional arguments are as per the fields of ReplaceLocationRequest. """
@@ -101,7 +85,7 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
         Renames as necessary any binders within e to avoid capturing any variables in the values of <subst>.
         Returns a new Expr, which may share subtrees with the original (as well as with values of <subst>).
         """
-    return _cav_helper(e, 0, [], subst)
+    return _cav_helper(e, [], subst)
 
 #####################################################################
 # Name Generation
@@ -115,9 +99,8 @@ def _make_nonfree_var(prefix, exprs):
 #####################################################################
 # CAV implementation
 
-def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
+def _cav_helper(e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
     # First, work out if there's anything to do in this subtree
-    reqs = [req for req in reqs if req.target_idx in range(start_idx, start_idx + _get_subtree_size(e))]
     substs = {varname: repl
         for varname, repl in substs.items()
         if varname in e.free_vars_}
@@ -125,42 +108,48 @@ def _cav_helper(e: Expr, start_idx: int, reqs: List[ReplaceLocationRequest], sub
         if len(substs) == 0:
             # Nothing to do in this subtree
             return e
-    elif reqs[0].target_idx == start_idx:
+    elif any(len(req.target) == 0 for req in reqs):
         # Apply here
         if len(reqs) != 1:
             raise ValueError("Multiple ReplaceLocationRequests on locations nested within each other")
         if reqs[0].applicator is None:
             return reqs[0].payload
         # Continue renaming.
-        renamed_e = _cav_helper(e, start_idx, [], substs)
+        renamed_e = _cav_helper(e, [], substs)
         return reqs[0].applicator(reqs[0].payload, renamed_e)
     # No ReplaceLocationRequest targets this node. Do any Expr-specific processing, perhaps recursing deeper.
-    return _cav_children(e, start_idx, reqs, substs)
+    return _cav_children(e, reqs, substs)
 
 @singledispatch
-def _cav_children(e: Expr, start_idx, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
-    return e.__class__(*_cav_child_list(e, start_idx, reqs, substs))
+def _cav_children(e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
+    return e.__class__(*_cav_child_list(e, reqs, substs))
 
-def _cav_child_list(e: Expr, start_idx, reqs, substs):
+def _requests_to_child(reqs: List[ReplaceLocationRequest], ch_idx: int) -> List[ReplaceLocationRequest]:
+    return [ReplaceLocationRequest(req.target[1:], req.payload, req.applicator)
+        for req in reqs
+        if req.target[0] == ch_idx
+    ]
+
+def _cav_child_list(e: Expr, reqs, substs):
     # Applies _cav_helper to the children of the expression, and returns the list of substituted children
-    return [_cav_helper(ch, start_idx + ch_idx, reqs, substs) for ch_idx, ch, _ in _get_indexed_children(e)]
+    return [_cav_helper(ch, _requests_to_child(reqs, ch_idx), substs) for ch_idx, ch in enumerate(_get_children(e))]
 
 @_cav_children.register
-def _cav_const(e: Const, start_idx, reqs, substs):
+def _cav_const(e: Const, reqs, substs):
     return e
 
 @_cav_children.register
-def _cav_var(e: Var, start_idx, reqs, substs):
+def _cav_var(e: Var, reqs, substs):
     return substs.get(e.name, e)
 
 @_cav_children.register
-def _cav_call(e: Call, start_idx, reqs, substs):
+def _cav_call(e: Call, reqs, substs):
     name = e.name
     if name.se in substs: # Will only match if name.se is a str.
         # The variable (holding the function we are calling) is being substituted.
         # It had better be a rename to another variable, because we can't Call anything else....
         name = substs[name.se].structured_name
-    return Call(name, _cav_child_list(e, start_idx, reqs, substs))
+    return Call(name, _cav_child_list(e, reqs, substs))
 
 def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
 ) -> Tuple[Var, VariableSubstitution]:
@@ -176,17 +165,17 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 
 @_cav_children.register
-def _cav_lam(e: Lam, start_idx, reqs, substs):
+def _cav_lam(e: Lam, reqs, substs):
     arg, substs = _rename_if_needed(e.arg, e, reqs, substs)
-    return Lam(Var(arg.name, type=arg.type_, decl=True), *_cav_child_list(e, start_idx, reqs, substs))
+    return Lam(Var(arg.name, type=arg.type_, decl=True), *_cav_child_list(e, reqs, substs))
 
 @_cav_children.register
-def _cav_let(e: Let, start_idx, reqs, substs):
+def _cav_let(e: Let, reqs, substs):
     new_vars = []
     # alpha-rename any capturing `e.vars` in `e.body` only
-    body_subst = substs
+    body_substs = substs
     for var in ([e.vars] if isinstance(e.vars, Var) else e.vars):
-        new_var, body_subst = _rename_if_needed(var, e, reqs, body_subst)
+        new_var, body_substs = _rename_if_needed(var, e, reqs, body_substs)
         new_vars.append(new_var)
     if len(new_vars) == 1:
         assert isinstance(e.vars, Var)
@@ -196,5 +185,5 @@ def _cav_let(e: Let, start_idx, reqs, substs):
     # Do not use _cav_child_list: we need different substitutions for each child.
     # Hence, this must match _idch_let's ordering of rhs/body.
     return Let(new_vars,
-        _cav_helper(e.rhs, start_idx + 1, reqs, substs),
-        _cav_helper(e.body, start_idx + 1 + _get_subtree_size(e.rhs), reqs, body_subst))
+        _cav_helper(e.rhs, _requests_to_child(reqs, 0), substs),
+        _cav_helper(e.body, _requests_to_child(reqs, 1), body_substs))
