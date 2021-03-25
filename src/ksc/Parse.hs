@@ -395,7 +395,7 @@ pFunG pBase = try (brackets $
                         -> t
                         -> Parser (DerivedFun (BaseFun p))
         pBaseDerivation s f p =
-          pReserved s >> DerivedFun (f p) <$> pBase
+          pDerivation s (f p)
 
         pDerivation s d = pReserved s >> DerivedFun d <$> pBase
 
