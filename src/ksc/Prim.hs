@@ -374,11 +374,11 @@ pInline = mkPrimCall1 P_inline
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: (HasCallStack, InPhase p) => Fun p -> Type
+primCallResultTy_maybe :: HasCallStack => DerivedFun PrimFun -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
-      Fun (PrimFun f)
+      Fun f
          | Just ty <- primFunCallResultTy_maybe f arg_ty
          -> Right ty
          | otherwise
@@ -413,15 +413,15 @@ primCallResultTy_maybe fun arg_ty
 
       CLFun f -> primCallResultTy_maybe (Fun f) arg_ty
 
-      SUFFwdPass f@(PrimFun pf)
-        | Just bog_ty <- sufBogTy_maybe pf arg_ty
+      SUFFwdPass f
+        | Just bog_ty <- sufBogTy_maybe f arg_ty
         , Right orig_res_ty <- primCallResultTy_maybe (Fun f) arg_ty
         -> Right (TypeTuple [orig_res_ty, bog_ty])
         | otherwise
         -> Left (text "Type error in SUF fwd fun:" <+> ppr fun
                  $$ text "Arg ty was" <+> ppr arg_ty)
 
-      SUFRevPass (PrimFun f)
+      SUFRevPass f
         | TypeTuple [dorig_res_ty, bog_ty] <- arg_ty
         , Just t <- sufRevFunCallResultTy_maybe f dorig_res_ty bog_ty
         -> Right t
@@ -430,14 +430,6 @@ primCallResultTy_maybe fun arg_ty
              <+> text "Arg ty was:" <+> ppr arg_ty)
 
       SUFRev f -> primCallResultTy_maybe (DrvFun f (AD BasicAD Rev)) arg_ty
-
-      SUFFwdPass BaseUserFun{} ->
-        Left (text "primCallResultTy_maybe of BaseUserFun:" <+> ppr fun)
-
-      SUFRevPass BaseUserFun{} ->
-        Left (text "primCallResultTy_maybe of BaseUserFun:" <+> ppr fun)
-
-      Fun (BaseUserFun _) -> Left (text "Not in scope: user fun:" <+> ppr fun)
 
 primFunCallResultTy :: HasCallStack => PrimFun -> TExpr -> Type
 primFunCallResultTy fun args

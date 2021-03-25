@@ -12,7 +12,7 @@ module Annotate (
 import Lang
 import LangUtils
 import KMonad
-import Ksc.Traversal ( traverseOf )
+import Ksc.Traversal ( traverseOf, over )
 import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
@@ -486,7 +486,7 @@ lookupGblTc fun args
              { userFun' <- tcUserFunArgTy @Parsed userFun ty
              ; pure (userFunToFun userFun',
                      userCallResultTy_maybe userFun' (gblST st) ty) }
-           Left fun' -> pure (fun', primCallResultTy_maybe fun' ty)
+           Left fun' -> pure (over baseFunFun PrimFun fun', primCallResultTy_maybe fun' ty)
 
        ; res_ty <- case callResultTy_maybe of
                      Left err -> tcFail $ hang err 2 (mk_extra funTyped st)

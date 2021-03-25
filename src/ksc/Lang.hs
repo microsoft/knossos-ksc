@@ -498,8 +498,8 @@ userFunToFun = T.over baseFunFun BaseUserFun
 -- A 'Fun p' is Either:
 --
 -- Right: a 'UserFun p', or
--- Left:  a 'PrimFun' (with no Phase type label)
-perhapsUserFun :: Fun p -> Either (Fun q) (UserFun p)
+-- Left:  a 'PrimFun'
+perhapsUserFun :: Fun p -> Either (DerivedFun PrimFun) (UserFun p)
 perhapsUserFun = \case
   Fun f -> either (Left . Fun) (Right . Fun) (baseFunToBaseUserFunE f)
   GradFun f p -> either (\f' -> Left $ GradFun f' p)
@@ -525,10 +525,10 @@ maybeUserFun f = case perhapsUserFun f of
   Right f -> Just f
   Left _ -> Nothing
 
-baseFunToBaseUserFunE :: BaseFun p -> Either (BaseFun q) (BaseUserFun p)
+baseFunToBaseUserFunE :: BaseFun p -> Either PrimFun (BaseUserFun p)
 baseFunToBaseUserFunE = \case
   BaseUserFun u    -> Right u
-  PrimFun p    -> Left (PrimFun p)
+  PrimFun p    -> Left p
 
 baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
 baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
