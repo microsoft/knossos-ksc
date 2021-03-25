@@ -92,11 +92,11 @@ def test_replace_subtree_avoids_capture():
 def test_replace_subtree_avoids_capturing_another():
   new_subtree = parse_expr_string("(mul x 2)")
   conflicting_var = _make_nonfree_var("x", [new_subtree])  # But, this already exists
-  e = parse_expr_string(f"(let (x (if p a b)) (foo {conflicting_var} x y))")
-  assert _get_node(e, 8) == Var("y")
-  replaced = replace_subtree(e, 8, new_subtree)
-  new_var = replaced.vars  # No alpha-equivalence, so this is the name used.
-  expected = parse_expr_string(f"(let ({new_var} (if p a b)) (foo {conflicting_var} {new_var} (mul x 2)))")
+  e = parse_expr_string(f"(lam (x : Integer) (foo {conflicting_var} x y))")
+  assert _get_node(e, 4) == Var("y")
+  replaced = replace_subtree(e, 4, new_subtree)
+  new_var = replaced.arg  # No alpha-equivalence, so this is the name used; this has decl=True
+  expected = parse_expr_string(f"(lam ({new_var}) (foo {conflicting_var} {new_var.name} (mul x 2)))")
   assert new_var != conflicting_var
   assert replaced == expected
 

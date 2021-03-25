@@ -171,13 +171,15 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
     if any(arg.name in rhs.free_vars_ for rhs in conflicting_binders):
         # Must rename "arg". Make a new name.
         nv = _make_nonfree_var(arg.name, [binder] + conflicting_binders)
+        nv.type_ = arg.type_
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
 
 @_cav_children.register
 def _cav_lam(e: Lam, start_idx, reqs, substs):
-    arg, substs = _rename_if_needed(e.arg, e, req, substs)
-    return Lam(arg, _cav_helper(e.body, start_idx + 1, reqs, substs))
+    arg, substs = _rename_if_needed(e.arg, e, reqs, substs)
+    return Lam(Var(arg.name, type=arg.type_, decl=True),
+        _cav_helper(e.body, start_idx + 1, reqs, substs))
 
 @_cav_children.register
 def _cav_let(e: Let, start_idx, reqs, substs):
