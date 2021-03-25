@@ -10,10 +10,46 @@ from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 ##### Node numbering scheme
 
 @singledispatch
-def _get_indexed_children(e: Expr) -> Iterable[Tuple[int, Expr, int]]:
-    """ Tuples are [start_index, subtree, end_index] of children in defined order.
-        First child has start index 1; last child has end index equal to subtree_size_ of parent. """
-    raise ValueError("Must be overridden for every Expr subclass")
+def _get_children(e: Expr) -> List[Expr]:
+    # The rewritable children of an Expr
+     raise ValueError("Must be overridden for every Expr subclass")
+
+@_get_children.register
+def _idch_var(e: Var):
+    return []
+
+@_get_children.register
+def _idch_const(e: Const):
+    return []
+
+@_get_children.register
+def _idch_let(e: Let):
+    return [e.rhs, e.body]
+
+@_get_children.register
+def _idch_lam(e: Lam):
+    return [e.body]
+
+@_get_children.register
+def _idch_lam(e: Call):
+    return e.args
+
+@_get_children.register
+def _idch_if(e: If):
+    return [e.cond, e.t_body, e.f_body]
+
+@_get_children.register
+def _idch_assert(e: Assert):
+    return [e.cond, e.body]
+
+def _get_indexed_children(e: Expr) -> Generator[Tuple[int, Expr, int], None, None]:
+    # Tuples are [start_index, subtree, end_index] of children in defined order.
+    # First child has start index 1; last child has end index equal to subtree_size_ of parent. """
+    idx = 1
+    for ch in _get_children(e):
+        end_idx = idx + _get_subtree_size(ch)
+        yield (idx, ch, end_idx)
+        idx = end_idx
 
 def _get_subtree_size(e: Expr):
     if e.subtree_size_ is None:
@@ -24,72 +60,47 @@ def _get_subtree_size(e: Expr):
             _,_, e.subtree_size_ = indexed_children[-1]
     return e.subtree_size_
 
-def _exprs_with_indices(exprs: Iterable[Expr]) -> Generator[Tuple[int, Expr, int], None, None]:
-    idx = 1
-    for e in exprs:
-        end_idx = idx + _get_subtree_size(e)
-        yield (idx, e, end_idx)
-        idx = end_idx
-
-@_get_indexed_children.register
-def _idch_var(e: Var):
-    return []
-
-@_get_indexed_children.register
-def _idch_const(e: Const):
-    return []
-
-@_get_indexed_children.register
-def _idch_let(e: Let):
-    return _exprs_with_indices([e.rhs, e.body])
-
-@_get_indexed_children.register
-def _idch_lam(e: Lam):
-    return _exprs_with_indices([e.body])
-
-@_get_indexed_children.register
-def _idch_lam(e: Call):
-    return _exprs_with_indices(e.args)
-
-@_get_indexed_children.register
-def _idch_if(e: If):
-    return _exprs_with_indices([e.cond, e.t_body, e.f_body])
-
-@_get_indexed_children.register
-def _idch_assert(e: Assert):
-    return _exprs_with_indices([e.cond, e.body])
-
 #####################################################################
 # Public members
 
 @dataclass(frozen=True)
 class ReplaceLocationRequest:
-    """ Represents a request to replace_subtree(s). """
-    # Location within the root Expr, i.e. upon which replace_subtree is called, that should be replaced
+    """ Conveys instruction to replace a subtree for the replace_subtrees function. """
+
     target_idx: int
+    """ The location within the root Expr, i.e. upon which replace_subtree is called, that should be replaced. """
 
-    # An Expr to be "delivered" to that index, i.e. with the same value as it would have at the top.
-    # That is, any binders on the path from the root to <target_idx> that bind variables free in <payload>,
-    # will be alpha-renamed so that <payload> sees the same values in those variables that it would have at the root.
     payload: Expr
+    """ An Expr to be "delivered" to that index, i.e. with the same value as it would have at the top.
+        That is, any binders on the path from the root to <target_idx> that bind variables free in <payload>,
+        will be alpha-renamed so that <payload> sees the same values in those variables that it would have at the root. """
 
-    # If applicator is None, then replace_subtree should merely replace the node at <target_idx> with <payload>.
-    # Otherwise, the replacement (new) subtree is given by applicator(payload, x) where x is
-    #    - the node currently at that location,
-    #    - but *after* any alpha-renaming necessary to preserve the meaning of <payload>.
     applicator: Optional[Callable[[Expr, Expr], Expr]]=None
+    """ Details how the <payload> should be placed into the specified <target_idx>.
+        * If applicator is None, then replace_subtree should merely replace the node at <target_idx> with <payload>.
+        * Otherwise, the replacement (new) subtree is given by `applicator(payload, x)` where x is
+            the node currently at that location,
+            but *after* any alpha-renaming necessary to preserve the meaning of <payload>. """
 
 # Type of variable substitutions. This reflects Var.name being a 'str', as only bound Variable's need renaming,
 # Call.name targets do not unless they are Var.name's).
 VariableSubstitution = Mapping[str, Expr]
 
 def replace_subtrees(e: Expr, reqs: List[ReplaceLocationRequest]) -> Expr:
+    """ Replaces locations within <e> with new subtrees, as per ReplaceLocationRequest.
+        Returns a new Expr, which may share subtrees with the original. """
     return _cav_helper(e, 0, sorted(reqs, key=lambda rlr: rlr.target_idx), {})
 
 def replace_subtree(e: Expr, *args):
+    """ Replaces a single location within e. The additional arguments are as per the fields of ReplaceLocationRequest. """
     return replace_subtrees(e, [ReplaceLocationRequest(*args)])
 
 def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
+    """ Replaces all occurrences of some free-variables in e with new subtrees.
+        <subst> details the mapping from the free variables to replace, with the new subtree for each.
+        Renames as necessary any binders within e to avoid capturing any variables in the values of <subst>.
+        Returns a new Expr, which may share subtrees with the original (as well as with values of <subst>).
+        """
     return _cav_helper(e, 0, [], subst)
 
 #####################################################################
@@ -153,11 +164,9 @@ def _cav_call(e: Call, start_idx, reqs, substs):
 
 def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
 ) -> Tuple[Var, VariableSubstitution]:
-    """ If <arg> binds a variable free in any Expr's in a request payload or the RHS of a substitution,
-        then returns a new Var (chosen not to capture any variable free in <binder> or as above),
-        and an updated <subst>.
-        Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
-    """
+    # If <arg> binds a variable free in any Expr's in a request payload or the RHS of a substitution, then
+    # returns a new Var (chosen not to capture any variable free in <binder> or as above), and an updated <subst>.
+    # Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
     conflicting_binders = [req.payload for req in reqs] + list(subst.values())
     if any(arg.name in rhs.free_vars_ for rhs in conflicting_binders):
         # Must rename "arg". Make a new name.
