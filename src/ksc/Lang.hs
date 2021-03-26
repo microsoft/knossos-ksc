@@ -144,10 +144,7 @@ Multiple arguments are implicitly wrapped in a tuple.  That is, the syntax
 means the same thing as
 
     (def f T (x : (Tuple S1 ... Sn))
-        (let ((x1 (get$1$n x))
-              ...
-              (xn (get$n$n x)))
-       ...))
+        (let ((x1 ... xn) x) ...))
 
 and the surface syntax
 
