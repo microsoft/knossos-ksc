@@ -39,31 +39,40 @@ class time_sampler:
             self.time += delta
             self.ncalls += 1
 
-def timeit(msg, fn, config):
-    print('Timing: ', msg, fn, config.shape)
+def timeit(msg, fn, arg):
+    print('Timing: ', msg, fn, arg.shape)
     inference_timer = time_sampler()
     forward_timer = time_sampler()
     backward_timer = time_sampler()
     nruns = 50
     for _ in range(nruns):
-        config.requires_grad = False
+        arg.requires_grad = False
         inference_timer.mark()
-        loss = config.sum()
+        loss = fn(arg).sum()
         inference_timer.record()
 
-        config.requires_grad = True
+        arg.requires_grad = True
         forward_timer.mark()
-        loss = config.sum()
+        loss = fn(arg).sum()
         forward_timer.record()
 
         backward_timer.mark()
-        loss.backward()
-        csum = config.grad.sum()
+        grad = torch.autograd.grad(loss, arg)
         backward_timer.record()
 
-    print(f'{msg:20} {csum:.6e} Inference: {inference_timer.us:10.3f} us | Forward: {forward_timer.us:10.3f} us | Backward {backward_timer.us:10.3f} us | {config.shape}')
+    csum = grad[0].sum()
+
+    print(f'{msg:20} {csum:.6e} Inference: {inference_timer.us:10.3f} us |'
+          f' Forward: {forward_timer.us:10.3f} us |'
+          f' Backward {backward_timer.us:10.3f} us | {arg.shape}')
 
 def bench(module_name, bench_name):
+  """
+  Import MODULE_NAME, which defines these functions:
+    bench_name           Knossos-compilable code, should be pretty
+    bench_name_pt        PyTorch reference, should be fast, might not be pretty
+    bench_name_config    Return a sequence of inputs on which to run benchmarking
+  """
   import inspect
   import importlib
 
@@ -82,10 +91,11 @@ def bench(module_name, bench_name):
   # TODO: vmap  
   # ks_compiled = ts2mod(ks_fun, configs[0])
 
-  for config in configs:
-    print("--", config.shape)
-    timeit(bench_name + ' PT', pt_fun, config)
-    timeit(bench_name + ' KS Un-opt', ks_fun, config)
+  for arg in configs:
+    print("--", arg.shape)
+    assert torch.all(torch.isclose(pt_fun(arg), ks_fun(arg)))    
+    timeit(bench_name + ' PT', pt_fun, arg)
+    timeit(bench_name + ' KS Un-opt', ks_fun, arg)
 
 if __name__ == "__main__":
   import sys

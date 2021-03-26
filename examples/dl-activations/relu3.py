@@ -1,6 +1,5 @@
-from typing import Iterator, Callable
-from ksc import vmap
 import torch
+from ksc.vmap import vmap
 
 # BEGINDOC
 def relu3(x : float) -> float:
@@ -9,18 +8,22 @@ def relu3(x : float) -> float:
     Like GeLu, but cheaper
   """
   if x < 0.0:
-    return 0.0
+    return 0.0 * x # See [Note: zeros]
   elif x < 1.0:
     return 1/3 * x ** 3
   else:
     return x - 2/3
 # ENDDOC
+# Note: zeros
+# Need to multiply by x for pytorch to get the gradient back through x.
+# This is something of a long story, related to tracing.
+# Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
 
-# Knossos vmap
+# run-bench: Knossos source
 def vrelu3(x : torch.Tensor):
-   return vmap(relu3, x)
+  return vmap(relu3, x)
 
-# PyTorch reference implementation
+# run-bench: PyTorch reference implementation
 def vrelu3_pt(x : torch.Tensor):
   mask1_inf = x > 1.0
   mask0_1 = (x > 0.0) & ~mask1_inf
@@ -29,12 +32,11 @@ def vrelu3_pt(x : torch.Tensor):
   
   return mask0_1 * val_0_1 + mask1_inf * val_1_inf
 
-# Define a range of values at which to call the methods
-def vrelu3_bench_configs() -> Iterator[torch.Tensor]:
+# run-bench: Define a range of values at which to call the methods
+def vrelu3_bench_configs():
   yield torch.randn((4,4))
   yield torch.randn((16,16))
-  yield torch.randn((256,256,100))
-
+# yield torch.randn((256,256)) too slow to bench...
 
 def plot_relu3(filename):
   import matplotlib.pyplot as plt
@@ -47,7 +49,6 @@ def plot_relu3(filename):
   plt.gca().set_aspect(1)
   print(f"Saving figure to {filename}")
   plt.savefig(filename)
-
 
 def relu3_in_fcdnn():
    # Initialize the model using nn.Sequential
