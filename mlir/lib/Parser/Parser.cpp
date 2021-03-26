@@ -90,7 +90,7 @@ Declaration *Parser::addExtraDecl(StructuredName const& name, std::vector<Type> 
   }
 
   // Not present, cons one up
-  decl = new Declaration(name, returnType, argTypes);
+  decl = new Declaration(sig, returnType);
   extraDecls->addOperand(Expr::Ptr(decl));
   
   return decl;
@@ -493,8 +493,9 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
   else
     for (auto &c : args->getChildren())
       argTypes.push_back(parseType(c.get()));
-  Signature sig{ parseStructuredName(name), argTypes };
-  auto decl = make_unique<Declaration>(sig.name, type, argTypes);
+  Signature sig{ parseStructuredName(name), std::move(argTypes) };
+
+  auto decl = make_unique<Declaration>(sig, type);
   function_decls[sig] = decl.get();
   return decl;
 }
@@ -529,7 +530,7 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
     argTypes.push_back(a->getType());
   }
   Signature sig{ name, argTypes };
-  auto declaration = make_unique<Declaration>(name, returnType, argTypes);
+  auto declaration = make_unique<Declaration>(sig, returnType);
   function_decls[sig] = declaration.get();
 
   // Function body is a block, create one if single expr

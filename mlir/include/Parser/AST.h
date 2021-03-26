@@ -197,6 +197,8 @@ struct Signature {
     return name == that.name && argTypes == that.argTypes;
   }
   bool operator!=(Signature const& that) const { return !(*this == that); }
+
+  std::string getMangledName() const;
 };
 
 std::ostream& operator<<(std::ostream& s, Signature const& t);
@@ -379,19 +381,19 @@ private:
 /// the final IR.
 struct Declaration : public Expr {
   using Ptr = std::unique_ptr<Declaration>;
-  Declaration(StructuredName name, Type type, std::vector<Type> argTypes)
-      : Expr(type, Kind::Declaration), name(std::move(name)), argTypes(move(argTypes)) {}
+  Declaration(Signature signature, Type returnType)
+      : Expr(returnType, Kind::Declaration), signature(std::move(signature)) {}
 
-  llvm::ArrayRef<Type> getArgTypes() const { return argTypes; }
+  llvm::ArrayRef<Type> getArgTypes() const { return signature.argTypes; }
   Type getArgType(size_t idx) const {
-    assert(idx < argTypes.size() && "Offset error");
-    return argTypes[idx];
+    assert(idx < signature.argTypes.size() && "Offset error");
+    return signature.argTypes[idx];
   }
-  StructuredName const& getName() const { return name; }
+  StructuredName const& getName() const { return signature.name; }
 
-  std::string getMangledName() const;
+  std::string getMangledName() const { return signature.getMangledName(); }
 
-  size_t size() const { return argTypes.size(); }
+  size_t size() const { return signature.argTypes.size(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -401,9 +403,7 @@ struct Declaration : public Expr {
   }
 
 private:
-  // TODO: use Signature here
-  StructuredName name;
-  std::vector<Type> argTypes;   
+  Signature signature;
 };
 
 /// Call, ex: (add x 3), (neg (mul (sin x) d_dcos)))
