@@ -124,10 +124,10 @@ std::ostream& Call::dump(std::ostream& s, size_t tab) const {
 
 std::ostream& Declaration::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Declaration:" << endl;
-  s << string(tab + 2, ' ') << "name [" << name << "]" << endl;
+  s << string(tab + 2, ' ') << "name [" << signature.name << "]" << endl;
   Expr::dump(s, tab + 2);
   s << string(tab + 2, ' ') << "Types: [ ";
-  for (auto ty : argTypes)
+  for (auto ty : signature.argTypes)
     ty.dump(s) << " ";
   return s << "]" << endl;
 }
@@ -255,7 +255,7 @@ std::string encodeName(std::string const& s)
     return ret;
 }
 
-std::string Declaration::getMangledName() const {
+std::string Signature::getMangledName() const {
   if (name.hasType())
     return name.getMangledName();
   
