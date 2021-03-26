@@ -187,14 +187,14 @@ std::ostream& operator<<(std::ostream& s, StructuredName const& t);
 
 struct Signature {
   StructuredName name;
-  std::vector<Type> argTypes;   
+  Type argType;   
 
   bool operator<(Signature const& that) const {
     return name < that.name ||
-          (name == that.name && argTypes < that.argTypes);
+          (name == that.name && argType < that.argType);
   }
   bool operator==(Signature const& that) const {
-    return name == that.name && argTypes == that.argTypes;
+    return name == that.name && argType == that.argType;
   }
   bool operator!=(Signature const& that) const { return !(*this == that); }
 
@@ -392,16 +392,10 @@ struct Declaration : public Expr {
   Declaration(Signature signature, Type returnType)
       : Expr(returnType, Kind::Declaration), signature(std::move(signature)) {}
 
-  llvm::ArrayRef<Type> getArgTypes() const { return signature.argTypes; }
-  Type getArgType(size_t idx) const {
-    assert(idx < signature.argTypes.size() && "Offset error");
-    return signature.argTypes[idx];
-  }
+  Type getArgType() const { return signature.argType; }
   StructuredName const& getName() const { return signature.name; }
 
   std::string getMangledName() const { return signature.getMangledName(); }
-
-  size_t size() const { return signature.argTypes.size(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 

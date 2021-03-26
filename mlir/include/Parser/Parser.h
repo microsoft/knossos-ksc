@@ -130,7 +130,7 @@ public:
   const Block* getExtraDecls() {
     return extraDecls.get();
   }
-  Declaration* addExtraDecl(StructuredName const& name, std::vector<Type> types, Type returnType);
+  Declaration* addExtraDecl(StructuredName const& name, Type argType, Type returnType);
 };
 
 } // namespace AST

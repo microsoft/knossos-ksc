@@ -48,15 +48,7 @@ std::ostream& Type::dump(std::ostream& s) const {
 
 std::ostream& operator<<(std::ostream& s, Signature const& t)
 {
-  s << t.name << "(";
-  bool first = true;
-  for(auto ty : t.argTypes) {
-    if (!first)
-      s << ",";
-    s << ty;
-    first = false;
-  }
-  return s << ")";
+  return s << t.name << "(" << t.argType << ")";
 }
 
 std::ostream& operator<<(std::ostream& s, StructuredName const& t)
@@ -139,10 +131,8 @@ std::ostream& Declaration::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Declaration:" << endl;
   s << string(tab + 2, ' ') << "name [" << signature.name << "]" << endl;
   Expr::dump(s, tab + 2);
-  s << string(tab + 2, ' ') << "Types: [ ";
-  for (auto ty : signature.argTypes)
-    ty.dump(s) << " ";
-  return s << "]" << endl;
+  s << string(tab + 2, ' ') << "Arg type: " << signature.argType << endl;
+  return s;
 }
 
 std::ostream& Definition::dump(std::ostream& s, size_t tab) const {
@@ -252,6 +242,20 @@ std::string mangleType(Type const& t)
   return "*FAIL*";
 }
 
+std::string mangleArgumentType(Type const& t)
+{
+  if (t.isTuple()) {
+    if (t.getSubTypes().empty())
+      return "";
+    std::string ret = "@";
+    for (auto &ty: t.getSubTypes())
+      ret += mangleType(ty);
+    return ret;
+  } else {
+    return "@" + mangleType(t);
+  }
+}
+
 std::string translate(char c)
 {
   switch (c) {
@@ -278,19 +282,14 @@ std::string Signature::getMangledName() const {
   if (name.hasType())
     return name.getMangledName();
   
-  /* If the function name is plain identifier rather than
+  /* If the function name is a plain identifier rather than
      a structured name, we mangle the argument types
      of the function in order to support overloading.
-     Note that this is different from the bejaviour of
+     Note that this is different from the behaviour of
      ksc Cgen, which generates unmangled names for primitive
      functions (because they can be implemented as
      C++ template functions). */
-  if (argTypes.size() == 0)
-    return name.baseFunctionName;
-  std::string ret = name.baseFunctionName + "@";
-  for(auto &ty: argTypes)
-      ret += mangleType(ty);
-  return encodeName(ret);
+  return encodeName(name.baseFunctionName + mangleArgumentType(argType));
 }
 
 std::string StructuredName::getMangledName() const {
@@ -301,17 +300,7 @@ std::string StructuredName::getMangledName() const {
   }
   ret += baseFunctionName;
   if (hasType()) {
-    if (baseFunctionArgType.isTuple()) {
-      if (!baseFunctionArgType.getSubTypes().empty()) {
-        ret += '@';
-        for (auto &ty : baseFunctionArgType.getSubTypes()) {
-          ret += mangleType(ty);
-        }
-      }
-    } else {
-      ret += '@';
-      ret += mangleType(baseFunctionArgType);
-    }
+    ret += mangleArgumentType(baseFunctionArgType);
   }
   return encodeName(ret);
 }

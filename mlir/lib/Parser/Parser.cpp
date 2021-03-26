@@ -66,8 +66,8 @@ static llvm::StringRef unquote(llvm::StringRef original) {
 }
 
 //
-Declaration *Parser::addExtraDecl(StructuredName const& name, std::vector<Type> argTypes, Type returnType) {
-  Signature sig {name, argTypes};
+Declaration *Parser::addExtraDecl(StructuredName const& name, Type argType, Type returnType) {
+  Signature sig {name, argType};
   auto& decl = function_decls[sig];
   if (decl) {
     std::cerr << "[addExtraDecl: already present: " << sig << "]";
@@ -272,6 +272,13 @@ Expr::Ptr Parser::parseValue(const Token *tok) {
   return unique_ptr<Expr>(new Variable(value, val->getType()));
 }
 
+Type oneArgify(std::vector<Type> const& argTypes) {
+  if (argTypes.size() == 1)
+    return argTypes[0];
+  else
+    return Type(Type::Tuple, argTypes);
+}
+
 // Calls (fun arg1 arg2 ...)
 // Checks types agains symbol table
 Call::Ptr Parser::parseCall(const Token *tok) {
@@ -293,9 +300,10 @@ Call::Ptr Parser::parseCall(const Token *tok) {
   types.reserve(arity);
   for (auto &arg : operands)
     types.push_back(arg->getType());
+  Type argType = oneArgify(types);
 
   // Look up this function
-  Signature sig {name, types};
+  Signature sig {name, argType};
   auto decl_iter = function_decls.find(sig);
   if (decl_iter != function_decls.end())
     // Non need to typecheck, the lookup succeeded.
@@ -307,8 +315,8 @@ Call::Ptr Parser::parseCall(const Token *tok) {
   std::string primName = name.baseFunctionName;
 
   // Helper to construct the call
-  auto mkCall = [&name, &types, &operands, this](Type const& type) {
-    Declaration* decl = addExtraDecl(name, types, type);
+  auto mkCall = [&name, &argType, &operands, this](Type const& type) {
+    Declaration* decl = addExtraDecl(name, argType, type);
     return make_unique<Call>(decl, move(operands));
   };
 
@@ -467,15 +475,18 @@ Declaration::Ptr Parser::parseDecl(const Token *tok) {
 
   PARSE_ASSERT2(!args->isValue, args) << "Parsing decl [" << name << "]";
 
-  std::vector<Type> argTypes;
+  Type argType;
   // Vector and Tuples can be declared bare
   if (args->getChild(0)->isValue &&
       !Type::isScalar(Str2Type(args->getChild(0)->getValue())))
-    argTypes.push_back(parseType(args));
-  else
+    argType = parseType(args);
+  else {
+    std::vector<Type> argTypes;
     for (auto &c : args->getChildren())
       argTypes.push_back(parseType(c.get()));
-  Signature sig{ parseStructuredName(name), std::move(argTypes) };
+    argType = oneArgify(argTypes);
+  }
+  Signature sig{ parseStructuredName(name), std::move(argType) };
 
   auto decl = make_unique<Declaration>(sig, type);
   function_decls[sig] = decl.get();
@@ -511,7 +522,7 @@ Definition::Ptr Parser::parseDef(const Token *tok) {
   for (auto &a : arguments) {
     argTypes.push_back(a->getType());
   }
-  Signature sig{ name, argTypes };
+  Signature sig{ name, oneArgify(argTypes) };
   auto declaration = make_unique<Declaration>(sig, returnType);
   function_decls[sig] = declaration.get();
 
