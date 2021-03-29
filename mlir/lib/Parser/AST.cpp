@@ -186,10 +186,12 @@ std::ostream& Get::dump(std::ostream& s, size_t tab) const {
 std::ostream& Fold::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Fold:" << endl;
   Expr::dump(s, tab + 2);
+  s << string(tab + 2, ' ') << "Accumulator:" << endl;
+  lambdaParameter->dump(s, tab + 4);
   s << string(tab + 2, ' ') << "Lambda:" << endl;
   body->dump(s, tab + 4);
-  s << string(tab + 2, ' ') << "Accumulator:" << endl;
-  acc->dump(s, tab + 4);
+  s << string(tab + 2, ' ') << "Init: " << endl;
+  init->dump(s, tab + 4);
   s << string(tab + 2, ' ') << "Vector:" << endl;
   vector->dump(s, tab + 4);
   return s;

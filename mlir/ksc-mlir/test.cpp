@@ -493,22 +493,17 @@ void test_parser_fold() {
   assert(vec->getType() == Type::Vector);
   assert(vec->getType().getSubType() == Type::Float);
   assert(vec->getName() == "v");
-  // Accumulator
-  Variable* acc = llvm::dyn_cast<Variable>(fold->getAcc());
-  assert(acc);
-  assert(acc->getType() == Type::Tuple);
-  assert(acc->getType().getSubType(0) == Type::Float);
-  assert(acc->getType().getSubType(1) == Type::Float);
-  Tuple* init = llvm::dyn_cast<Tuple>(acc->getInit());
+  // Lambda parameter
+  Variable* acc_x = fold->getLambdaParameter();
+  assert(acc_x);
+  assert(acc_x->getType() == Type::Tuple);
+  assert(acc_x->getType().getSubType(0) == Type::Float);
+  assert(acc_x->getType().getSubType(1) == Type::Float);
+  // Init
+  Literal* init = llvm::dyn_cast<Literal>(fold->getInit());
   assert(init);
-  Literal* init0 = llvm::dyn_cast<Literal>(init->getElement(0));
-  assert(init0);
-  assert(init0->getType() == Type::Float);
-  assert(init0->getValue() == "1.0");
-  Literal* init1 = llvm::dyn_cast<Literal>(init->getElement(1));
-  assert(init1);
-  assert(init1->getType() == Type::Float);
-  assert(init1->getValue() == "0.0");
+  assert(init->getType() == Type::Float);
+  assert(init->getValue() == "1.0");
   // Lambda variables
   Let* let = llvm::dyn_cast<Let>(fold->getBody());
   assert(let);

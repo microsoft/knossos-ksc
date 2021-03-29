@@ -13,7 +13,6 @@
            v
      )
 ; MLIR:   %c1{{.*}} = constant 1 : i64
-; MLIR:   %c0{{.*}} = constant 0 : i64
 ; MLIR:   %[[DI:[0-9]+]] = dim %arg0, %c0 : memref<?xi64>
 ; MLIR:   %[[dim:[0-9]+]] = index_cast %[[DI]] : index to i64
 ; MLIR:   %c0{{.*}} = constant 0 : i64
