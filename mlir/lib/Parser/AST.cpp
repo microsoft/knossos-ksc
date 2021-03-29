@@ -103,7 +103,15 @@ std::ostream& Variable::dump(std::ostream& s, size_t tab) const {
 
 std::ostream& Binding::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Binding:" << endl;
-  s << string(tab + 2, ' ') << "name [" << var->getName() << "]" << endl;
+  if (isTupleUnpacking()) {
+    s << string(tab + 2, ' ') << "names [";
+    for (auto& var : tupleVars) {
+      s << var->getName() << " ";
+    }
+    s << "]" << endl;
+  } else {
+    s << string(tab + 2, ' ') << "name [" << var->getName() << "]" << endl;
+  }
   var->Expr::dump(s, tab + 2);
   init->dump(s, tab + 2);
   return s;

@@ -337,14 +337,26 @@ struct Binding {
     assert(this->var != nullptr);
     assert(this->init != nullptr);
   }
+  Binding(std::vector<Variable::Ptr> tupleVars, Expr::Ptr init)
+    : tupleVars(std::move(tupleVars)), init(std::move(init)) {
+    assert(this->init != nullptr);
+  }
 
+  bool isTupleUnpacking() const { return var == nullptr; }
   Variable *getVariable() const { return var.get(); }
+  llvm::ArrayRef<Variable::Ptr> getTupleVariables() const { assert(isTupleUnpacking()); return tupleVars; }
+  Variable * getTupleVariable(size_t idx) const {
+    assert(isTupleUnpacking());
+    assert(idx < tupleVars.size());
+    return tupleVars[idx].get();
+  }
   Expr *getInit() const { return init.get(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const;
 
 private:
-  Variable::Ptr var;
+  Variable::Ptr var;   // For the simple case (not tuple-unpacking)
+  std::vector<Variable::Ptr> tupleVars;   // For the tuple-unpacking case
   Expr::Ptr init;
 };
 

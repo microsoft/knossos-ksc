@@ -73,3 +73,23 @@
 ; LLVM: %[[ret:[0-9]+]] = mul i64 %[[mul]], %[[add]]
 ; LLVM: ret i64 %[[ret]]
 ))
+
+(def g (Tuple Integer Integer) (a : Integer)
+  (tuple a a))
+
+; Tuple-unpacking let
+(def fun6 Integer (x : Integer)
+; MLIR: func @fun6$ai(%arg0: i64) -> i64 {
+; LLVM: define i64 @"fun6$ai"(i64 %0) {
+  (let ((a b) (g x))
+    (add a b))
+; MLIR: %[[callg:[0-9]+]]:2 = call @g$ai(%arg0) : (i64) -> (i64, i64)
+; MLIR: %[[add:[0-9]+]] = addi %[[callg]]#0, %[[callg]]#1 : i64
+; MLIR: return %[[add]] : i64
+
+; LLVM: %[[callg:[0-9]+]] = call { i64, i64 } @"g$ai"(i64 %0)
+; LLVM: %[[g1:[0-9]+]] = extractvalue { i64, i64 } %[[callg]], 0
+; LLVM: %[[g2:[0-9]+]] = extractvalue { i64, i64 } %[[callg]], 1
+; LLVM: %[[add:[0-9]+]] = add i64 %[[g1]], %[[g2]]
+; LLVM: ret i64 %[[add]]
+)
