@@ -7,7 +7,7 @@ REM New resolver with PyTorch version notation https://pip.pypa.io/en/latest/use
 REM Too big, throw memory exception https://stackoverflow.com/a/31526029/35544
 echo Installing dependencies...
 python -m pip install -r src/python/requirements.txt
-python -m pip install --use-deprecated=legacy-resolver --no-cache-dir pytest numpy torch==1.8.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+python -m pip install --use-deprecated=legacy-resolver --no-cache-dir pytest numpy torch==1.8.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 echo Installing ksc...
 cd ./src/python
@@ -22,7 +22,7 @@ cd ./src/ts2k
 python -m pip install --editable .
 cd ../..
 
-REM currently have backend issues on PyTorch 1.8.0 https://github.com/microsoft/knossos-ksc/issues/659
+REM currently memory issues in tests PyTorch 1.8.1 https://github.com/microsoft/knossos-ksc/issues/679
 
 REM echo Running pytest on ts2k
 REM python -m pytest test/ts2k
