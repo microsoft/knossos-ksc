@@ -40,7 +40,7 @@ class time_sampler:
             self.ncalls += 1
 
 def timeit(msg, fn, arg):
-    print('Timing: ', msg, fn, arg.shape)
+    print('#Timing: ', msg, fn, arg.shape)
     inference_timer = time_sampler()
     forward_timer = time_sampler()
     backward_timer = time_sampler()
@@ -62,9 +62,9 @@ def timeit(msg, fn, arg):
 
     csum = grad[0].sum()
 
-    print(f'{msg:20} {csum:.6e} Inference: {inference_timer.us:10.3f} us |'
-          f' Forward: {forward_timer.us:10.3f} us |'
-          f' Backward {backward_timer.us:10.3f} us | {arg.shape}')
+    print(f'{msg:20} {csum:.6e} Inference: {inference_timer.ms:10.3f} ms |'
+          f' Forward: {forward_timer.ms:10.3f} ms |'
+          f' Backward {backward_timer.ms:10.3f} ms | {arg.shape}')
 
 def bench(module_name, bench_name):
   """
@@ -92,10 +92,9 @@ def bench(module_name, bench_name):
   # ks_compiled = ts2mod(ks_fun, configs[0])
 
   for arg in configs:
-    print("--", arg.shape)
     assert torch.all(torch.isclose(pt_fun(arg), ks_fun(arg)))    
-    timeit(bench_name + ' PT', pt_fun, arg)
-    timeit(bench_name + ' KS Un-opt', ks_fun, arg)
+    timeit(bench_name + ' PT fast', pt_fun, arg)
+    timeit(bench_name + ' PT nice', ks_fun, arg)
 
 if __name__ == "__main__":
   import sys
