@@ -1197,14 +1197,9 @@ pprCall prec f e = mode
 
 pprLetSexp :: forall p. InPhase p
            => PatG (LetBndrX p) -> ExprX p -> ExprX p -> SDoc
-pprLetSexp v e =
-      go [(v,e)]
-    where
-      go binds (Let v1 e1 body) = go ((v1,e1):binds) body
-      go binds body =
-            parens $ sep [text "let", parens $ vcat (map parenBind $ reverse binds),
-                        ppr body]
-      parenBind (v,e) = parens $ pprPatLetBndr @p v <+> ppr e
+pprLetSexp v e body =
+      parens $ vcat [ text "let" <+> (parens $ pprPatLetBndr @p v <+> ppr e),
+                      ppr body]
 
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
