@@ -769,7 +769,7 @@ namespace ks {
 	ks::tuple<ks::tuple<ks::tuple<>, ks::tuple<>>,
 	           tensor<2, double>,
 	           double>
-	sufrevpass$setAt$aT2f$dii$b(allocator * alloc,
+	sufrevpass$setAt$a$dii$bT2ff(allocator * alloc,
 		                    tensor<2, double> t,
 		                    ks::tuple<int, int> index) {
 		auto [i, j] = index;
@@ -795,26 +795,26 @@ namespace ks {
 		return t;
 	}
 
-	std::tuple<tensor<1, double>, int>
+	ks::tuple<tensor<1, double>, int>
 	suffwdpass$setAt$aiT1ff(allocator * alloc,
 			int index,
 			tensor<1, double> t,
 			double a) {
 		auto i = index;
 		t[i] = a;
-		return std::make_tuple(t, index);
+		return ks::make_tuple(t, index);
 	}
 
-	std::tuple<std::tuple<>,
+	ks::tuple<ks::tuple<>,
 	           tensor<1, double>,
 	           double>
-	sufrevpass$setAt$aT1fi(allocator * alloc,
+	sufrevpass$setAt$aiT1ff(allocator * alloc,
 		                    tensor<1, double> t,
 		                    int index) {
 		auto i = index;
 		auto tindex = t.index(index);
 		t[i] = 0.0;
-		return std::make_tuple(std::make_tuple(),
+		return ks::make_tuple(ks::make_tuple(),
 		                       t,
 		                       tindex);
 	}

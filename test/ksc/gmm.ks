@@ -13,7 +13,7 @@
   (tuple a
   (build (size b) (lam (i : Integer) (sub (index i (index j a)) (index i b))))))
 
-(def [suffwdpass [subIP (Vec (Vec Float))]] (Tuple (Tuple (Vec (Vec Float)) (Vec Float)) Integer)
+(def [suffwdpass [subIP (Tuple (Vec (Vec Float)) Integer (Vec Float))]] (Tuple (Tuple (Vec (Vec Float)) (Vec Float)) Integer)
      ((a : Vec (Vec Float)) (j : Integer) (b : Vec Float))
   (tuple (subIP a j b) j))
 
@@ -21,7 +21,8 @@
       (Vec (Vec Float))
       ((Vec (Vec Float)) (Vec Float) Integer))
 
-(def [sufrevpass [subIP (Vec (Vec Float))]] (Tuple (Vec (Vec Float)) (Tuple) (Vec Float))
+(def [sufrevpass [subIP (Tuple (Vec (Vec Float)) Integer (Vec Float))]]
+     (Tuple (Vec (Vec Float)) (Tuple) (Vec Float))
      ((t : Tuple (Vec (Vec Float)) (Vec Float)) (j : Integer))
      (let ((t1 t2) t)
      (let (t2r (build (size t2) (lam (i : Integer) (neg (index i t2)))))
@@ -68,18 +69,24 @@
 
 (edef setAt (Tensor 2 Float) ((Tuple Integer Integer) (Tensor 2 Float) Float))
 
-(edef suffwdpass$setAt (Tuple (Tensor 2 Float) (Tuple Integer Integer))
+(edef [suffwdpass setAt] (Tuple (Tensor 2 Float) (Tuple Integer Integer))
       ((Tuple Integer Integer) (Tensor 2 Float) Float))
 
-(edef sufrevpass$setAt (Tuple (Tuple (Tuple) (Tuple)) (Tensor 2 Float) Float)
+(edef [sufrevpass [setAt (Tuple (Tuple Integer Integer)
+                                (Tensor 2 Float)
+                                Float)]]
+                  (Tuple (Tuple (Tuple) (Tuple)) (Tensor 2 Float) Float)
       ((Tensor 2 Float) (Tuple Integer Integer)))
 
 (edef setAt (Tensor 1 Float) (Integer (Tensor 1 Float) Float))
 
-(edef suffwdpass$setAt (Tuple (Tensor 1 Float) Integer)
+(edef [suffwdpass setAt] (Tuple (Tensor 1 Float) Integer)
       (Integer (Tensor 1 Float) Float))
 
-(edef sufrevpass$setAt (Tuple (Tuple) (Tensor 1 Float) Float)
+(edef [sufrevpass [setAt (Tuple Integer
+                                (Tensor 1 Float)
+                                Float)]]
+                  (Tuple (Tuple) (Tensor 1 Float) Float)
       ((Tensor 1 Float) Integer))
 
 (def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
@@ -107,8 +114,6 @@
         r1
         )))))
 
-(gdef fwd [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
-(gdef rev [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
 (gdef suffwdpass [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
 (gdef sufrevpass [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
 (gdef sufrev [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
@@ -230,21 +235,6 @@
                     (log_wishart_prior wishart (index k qs1) (index k ls1))))))
     ))))
 
-(gdef fwd [gmm_knossos_gmm_objective
-      (Tuple (Vec (Vec Float))
-             (Vec Float)
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Tuple Float Integer))])
-
-(gdef rev [gmm_knossos_gmm_objective
-      (Tuple (Vec (Vec Float))
-             (Vec Float)
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Tuple Float Integer))])
 (gdef suffwdpass [gmm_knossos_gmm_objective
       (Tuple (Vec (Vec Float))
              (Vec Float)
@@ -260,22 +250,6 @@
              (Vec (Vec Float))
              (Tuple Float Integer))])
 (gdef sufrev [gmm_knossos_gmm_objective
-      (Tuple (Vec (Vec Float))
-             (Vec Float)
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Tuple Float Integer))])
-
-(gdef shape [rev [gmm_knossos_gmm_objective
-      (Tuple (Vec (Vec Float))
-             (Vec Float)
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Vec (Vec Float))
-             (Tuple Float Integer))]])
-
-(gdef CL [gmm_knossos_gmm_objective
       (Tuple (Vec (Vec Float))
              (Vec Float)
              (Vec (Vec Float))
@@ -329,12 +303,8 @@
 
           (gmm_at_theta (gmm_knossos_gmm_objective x alphas mus qs ls wishart))
           (gmm_at_theta_plus_dtheta (gmm_knossos_gmm_objective (ts_add x dx) (ts_add alphas dalphas) (ts_add mus dmus) (ts_add qs dqs) (ts_add ls dls) (ts_add wishart dwishart)))
-          (gmm_at_theta_CL ([CL gmm_knossos_gmm_objective] x alphas mus qs ls wishart))
 
           (gmm_fd (sub gmm_at_theta_plus_dtheta gmm_at_theta))
-          (gmm_fwd ([fwd gmm_knossos_gmm_objective]
-                    (tuple x  alphas  mus  qs  ls  wishart)
-                    (tuple dx dalphas dmus dqs dls dwishart)))
 
           (golden_test_gmm_objective
            (let ((tolerance 0.000001)
@@ -344,66 +314,8 @@
                 (max (mul (abs expected) tolerance)
                      tolerance))))
 
-          ;; (everything_works_as_expected
-          ;;  ; I would like to pull out a function called something
-          ;;  ; like `floating_point_numbers_are_close` but I would have
-          ;;  ; to implement the derivtives of abs and max for that, and
-          ;;  ; I can't be bothered right now.
-          ;;  (let ((tolerance 0.001)
-          ;;        (actual gmm_fd)
-          ;;        (expected gmm_fwd))
-          ;;    (lt (abs (sub actual expected))
-          ;;       (max (mul (abs expected) tolerance)
-          ;;            tolerance))))
-          ;; (impossibly_good (eq gmm_fd gmm_fwd))
-
-          ; Check <grad_f, dx> = f(x+dx) - f(x)
-          ; with grad_f = f`(x, 1.0)
-          (grad_gmm ([rev gmm_knossos_gmm_objective] (tuple x alphas mus qs ls wishart) 1.0))
-          (grad_gmm_x          (get$1$6 grad_gmm))
-          (grad_gmm_alphas     (get$2$6 grad_gmm))
-          (grad_gmm_mus        (get$3$6 grad_gmm))
-          (grad_gmm_qs         (get$4$6 grad_gmm))
-          (grad_gmm_ls         (get$5$6 grad_gmm))
-          (grad_gmm_wishart    (get$6$6 grad_gmm))
-
-          (dot_at_x          (dot grad_gmm_x dx))
-          (dot_at_alphas     (dot grad_gmm_alphas dalphas))
-          (dot_at_mus        (dot grad_gmm_mus dmus))
-          (dot_at_qs         (dot grad_gmm_qs dqs))
-          (dot_at_ls         (dot grad_gmm_ls dls))
-          (dot_at_wishart    (mul (get$1$2 grad_gmm_wishart) (get$1$2 dwishart)))
-
-          (grad_gmm_dot_dtheta (add      dot_at_x
-                                (add     dot_at_alphas
-                                 (add    dot_at_mus
-                                  (add   dot_at_qs
-                                   (add  dot_at_ls
-                                       dot_at_wishart))))))
-
           (df (sub gmm_at_theta_plus_dtheta gmm_at_theta))
-          (rev_ok (tuple grad_gmm_dot_dtheta " ==?== " df))
 
-
-          (checked ($check (lam (t : Tuple (Vec (Vec Float))
-                                           (Vec Float)
-                                           (Vec (Vec Float))
-                                           (Vec (Vec Float))
-                                           (Vec (Vec Float))
-                                           (Tuple Float Integer))
-                                (gmm_knossos_gmm_objective t))
-                           (lam (t : Tuple (Tuple (Vec (Vec Float))
-                                                  (Vec Float)
-                                                  (Vec (Vec Float))
-                                                  (Vec (Vec Float))
-                                                  (Vec (Vec Float))
-                                                  (Tuple Float Integer))
-                                           Float)
-                                ([rev gmm_knossos_gmm_objective] t))
-                    (tuple x  alphas  mus  qs  ls  wishart)
-                    (tuple x  alphas  mus  qs  ls  wishart)
-                    (tuple dx dalphas dmus dqs dls dwishart)
-                    1.0))
 
           (checked_suf ($check (lam (t : Tuple (Vec (Vec Float))
                                            (Vec Float)
@@ -425,41 +337,25 @@
                     (tuple dx dalphas dmus dqs dls dwishart)
                     1.0))
 
-          (rev_gmm_at_theta_shape ([shape [rev gmm_knossos_gmm_objective]] (tuple x alphas mus qs ls wishart) 1.0))
-
           (tolerance 0.0001)
-          (everything_works_as_expected_reverse (lt checked tolerance))
           (everything_works_as_expected_suf     (lt checked_suf tolerance))
         )
       (print x
           (gmm_knossos_makeQ (index 0 qs) (index 0 ls))
-
           "\n----\n" 
           (mul (gmm_knossos_makeQ (index 0 qs) (index 0 ls)) (index 0 x))
           ; see https://github.com/awf/knossos/issues/281 (D$gmm_knossos_gmm_objective x alphas mus qs ls wishart)
 
           "gmm_at_theta = " gmm_at_theta
           "\n----\n" 
-          "gmm_at_theta_CL = " gmm_at_theta_CL
-          "\n----\n"
-          "gmm_at_theta_shape = " rev_gmm_at_theta_shape
-          "\n----\n"
           "gmm_at_theta_plus_dtheta = " gmm_at_theta_plus_dtheta
-          "\n----\n" 
-;          "gmm_fwd = " gmm_fwd
           "\n----\n" 
           "gmm_fd = " gmm_fd
           "\n----\n" 
 
-          "grad_gmm = " grad_gmm
-          "\n----\n" 
           "dtheta = " dtheta
           "\n----\n" 
-          "rev_ok = " rev_ok
-          "\n----\n" 
 
-          "Checked, should be small: " checked
-          "\n----\n" 
           "Checked SUF, should be small: " checked_suf
           "\n----\n" 
 
@@ -467,11 +363,5 @@
           "\n----\n" 
           "Golden test GMM objective\n"          golden_test_gmm_objective
           "\n----\n" 
-          "Reverse mode as expected\n"           everything_works_as_expected_reverse
-          "\n----\n" 
           "Reverse SUF as expected\n"            everything_works_as_expected_suf
-          "\n----\n" 
-          "Forward mode as expected\n"           everything_works_as_expected
-          "\n----\n" 
-          "Not impossibly good\n"                (not_ impossibly_good)
           )))
