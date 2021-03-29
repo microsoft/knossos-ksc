@@ -433,12 +433,12 @@ pEdef :: Parser (DefX Parsed)
 pEdef = do { pReserved "edef"
            ; f          <- pFun
            ; returnType <- pType
-           ; argTypes   <- pTypes
+           ; argType    <- pType
            ; mk_fun_name <- pIsUserFun f
            ; return (Def { def_fun = mk_fun_name
                          , def_res_ty = returnType
                          -- See note [Function arity]
-                         , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")
+                         , def_pat = VarPat (mkTVar argType "edefArgVar")
                          , def_rhs = EDefRhs }) }
 
 pDerivation :: Parser Derivation
