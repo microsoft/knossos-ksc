@@ -18,7 +18,7 @@ REM Too big, throw memory exception https://stackoverflow.com/a/31526029/35544
 REM currently have backend issues on PyTorch 1.8.0 https://github.com/microsoft/knossos-ksc/issues/659 so trying nightly
 echo Installing dependencies...
 python -m pip install -r src/python/requirements.txt || exit /b
-python -m pip install --pre --use-deprecated=legacy-resolver --no-cache-dir pytest numpy torch -f https://download.pytorch.org/whl/nightly/cu111/torch_nightly.html || exit /b
+python -m pip install --pre --use-deprecated=legacy-resolver --no-cache-dir pytest pytest-xdist numpy torch -f https://download.pytorch.org/whl/nightly/cu111/torch_nightly.html || exit /b
 
 echo Installing ksc...
 cd ./src/python
@@ -37,4 +37,4 @@ REM we only run a single test for now, multiple tests run out of heap see #679
 pytest test\ts2k\test_ts2k.py -k test_cat
 
 REM echo Running pytest on ts2k
-REM pytest test/ts2k || exit /b
+pytest test\ts2k\test_ts2k.py --forked
