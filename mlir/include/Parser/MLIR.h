@@ -5,9 +5,7 @@
 #include <map>
 
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
@@ -64,6 +62,10 @@ class Generator {
   Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
 
+  // Function level builders for parallel lowering
+  Values buildBuildParallel(const AST::Build*);
+
+
   // Variables
   void declareVariable(std::string const& name, Values vals);
   void declareVariable(const AST::Variable* var, Values vals = {});
@@ -72,7 +74,7 @@ class Generator {
   void serialiseArgs(const AST::Definition *def, mlir::Block &entry);
 
 public:
-  Generator() : builder(&context), UNK(builder.getUnknownLoc()) { }
+  Generator(mlir::MLIRContext &context) : builder(&context), UNK(builder.getUnknownLoc()) { }
 
   // Build from MLIR source
   const mlir::ModuleOp build(const std::string& mlir);

@@ -75,11 +75,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  // FIXME: registering dialects must happen before building the context
-  // Create a more logical API that doesn't require it to be done by the caller
-  mlir::registerAllDialects();
 
-  // mlir::registerDialect<mlir::knossos::KnossosDialect>();
 
   // Unit tests
   // FIXME: Use gtest or similar
@@ -128,8 +124,14 @@ int main(int argc, char **argv) {
     }
   }
 
+  // FIXME: registering dialects must happen before building the context
+  // Create a more logical API that doesn't require it to be done by the caller
+  mlir::MLIRContext context;
+  mlir::registerAllDialects(context);
+  context.loadDialect<mlir::StandardOpsDialect, mlir::scf::SCFDialect, mlir::math::MathDialect>();
+
   // Call generator and print output (MLIR/LLVM)
-  Generator g;
+  Generator g(context);
   mlir::ModuleOp module;
   if (source == Source::KSC)
     module = g.build(p.getExtraDecls(), p.getRootNode());
