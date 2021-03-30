@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
   mlir::MLIRContext context;
   mlir::registerAllDialects(context);
   mlir::registerLLVMDialectTranslation(context);
-  context.loadDialect<mlir::StandardOpsDialect, mlir::math::MathDialect>();
+  context.loadDialect<mlir::StandardOpsDialect, mlir::scf::SCFDialect, mlir::math::MathDialect>();
 
   // Call generator and print output (MLIR/LLVM)
   Generator g(context);
