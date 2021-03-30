@@ -62,10 +62,6 @@ class Generator {
   Values buildGet(const AST::Get*);
   Values buildFold(const AST::Fold*);
 
-  // Function level builders for parallel lowering
-  Values buildBuildParallel(const AST::Build*);
-
-
   // Variables
   void declareVariable(std::string const& name, Values vals);
   void declareVariable(const AST::Variable* var, Values vals = {});
