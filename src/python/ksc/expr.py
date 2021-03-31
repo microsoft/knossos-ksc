@@ -25,9 +25,9 @@ from ksc.utils import paren, KRecord
 #      name  return_type  args                            body
 #
 # Edef: Declaration for externally-supplied function
-# (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
+# (edef add   (Vec Float)  (Tuple Float (Vec Float)))
 #       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#       name  return_type  args
+#       name  return_type  arg_type
 #
 # Rule: Rewrite rule for the Knossos optimizer 
 # (rule "add0"  (a : Float) (add a 0) a)
@@ -255,20 +255,20 @@ class Def(ASTNode):
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
 class EDef(ASTNode):
-    '''Edef(name, return_type, args). 
+    '''Edef(name, return_type, arg). 
     Example:
     ```
-    (edef add   (Vec Float)  (Float (Vec Float)) )
-          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          name  return_type  arg_types
+    (edef add   (Vec Float)  (Tuple Float (Vec Float)) )
+          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          name  return_type  arg_type
     ```
     '''
     name: StructuredName
     return_type: Type
-    arg_types: List[Type]
+    arg_type: Type
 
-    def __init__(self, name, return_type, arg_types):
-        super().__init__(name=name, return_type=return_type, arg_types=arg_types)
+    def __init__(self, name, return_type, arg_type):
+        super().__init__(name=name, return_type=return_type, arg_type=arg_type)
 
 class GDef(ASTNode):
     '''Gdef(name, return_type, args). 
@@ -486,7 +486,7 @@ def _(ex, indent):
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "#edef " + str(ex.name) + "(" + pystr_intercomma(indent, ex.arg_types) + ") -> "\
+    return "#edef " + str(ex.name) + pystr(ex.arg_type, indent) + " -> "\
            + pystr(ex.return_type, indent) + nl(indent)
 
 @pystr.register(GDef)

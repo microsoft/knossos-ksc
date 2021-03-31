@@ -2,7 +2,7 @@ import numpy as np
 from ksc.utils import translate_and_import
 
 def test_vec_vec_add():
-    ks_str = """(edef add Integer (Integer Integer))
+    ks_str = """(edef add Integer (Tuple Integer Integer))
 (def test (Vec Integer) ((x : (Vec Integer)) (y : (Vec Integer)))
   (build (size x) (lam (i : Integer) (add (index i x) (index i y))))
 )"""
