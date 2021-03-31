@@ -4,7 +4,6 @@ set(LIBS
         ${dialect_libs}
         ${conversion_libs}
         MLIRExecutionEngine
-        MLIRTargetLLVMIR
         MLIROptLib
         )
 add_llvm_executable(ksc-mlir main.cpp test.cpp)

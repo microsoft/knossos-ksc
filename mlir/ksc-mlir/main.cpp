@@ -3,6 +3,7 @@
 
 #include "Parser/Parser.h"
 #include "Parser/MLIR.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 
 using namespace Knossos::AST;
 using namespace Knossos::MLIR;
@@ -75,12 +76,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  // FIXME: registering dialects must happen before building the context
-  // Create a more logical API that doesn't require it to be done by the caller
-  mlir::registerAllDialects();
-
-  // mlir::registerDialect<mlir::knossos::KnossosDialect>();
-
   // Unit tests
   // FIXME: Use gtest or similar
   if (action == Action::TEST)
@@ -128,8 +123,15 @@ int main(int argc, char **argv) {
     }
   }
 
+  // FIXME: registering dialects must happen before building the context
+  // Create a more logical API that doesn't require it to be done by the caller
+  mlir::MLIRContext context;
+  mlir::registerAllDialects(context);
+  mlir::registerLLVMDialectTranslation(context);
+  context.loadDialect<mlir::StandardOpsDialect, mlir::math::MathDialect>();
+
   // Call generator and print output (MLIR/LLVM)
-  Generator g;
+  Generator g(context);
   mlir::ModuleOp module;
   if (source == Source::KSC)
     module = g.build(p.getExtraDecls(), p.getRootNode());
@@ -144,7 +146,8 @@ int main(int argc, char **argv) {
     module.print(llvm::outs());
   } 
   else if (action == Action::EMIT_LLVM) {
-    auto llvm = g.emitLLVM(optlevel);
+    llvm::LLVMContext llvmContext;
+    auto llvm = g.emitLLVM(optlevel, llvmContext);
     if (!llvm) {
       cerr << "ERROR: LLVM lowering failed\n";
       return 1;
