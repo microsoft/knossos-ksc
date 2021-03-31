@@ -448,8 +448,8 @@ baseFunArgTy_maybe derivedFun derivedFunArgTy
       Fun JustFun _ -> it's derivedFunArgTy
       Fun DrvFun{} _ -> case derivedFunArgTy of
         TypeTuple [baseArgTy', _] -> it's baseArgTy'
-        _ -> Left (text "baseFunArgTy_maybe: DrvFun:" <+> pprDerivedFun ppr derivedFun
-                   $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
+        _ -> Left (text "Expected pair argument type to" <+> pprDerivedFun ppr derivedFun
+                   $$ text "but instead was:" <+> ppr derivedFunArgTy)
       Fun GradFun{} _ -> it's derivedFunArgTy
       Fun (ShapeFun ds) f -> baseFunArgTy_maybe (Fun ds f) derivedFunArgTy
       Fun CLFun _        -> it's derivedFunArgTy
@@ -457,8 +457,8 @@ baseFunArgTy_maybe derivedFun derivedFunArgTy
       Fun SUFRevPass _ -> don'tKnow
       Fun SUFRev _ -> case derivedFunArgTy of
         TypeTuple [baseArgTy', _] -> it's baseArgTy'
-        _ -> Left (text "baseFunArgTy_maybe: SUFRev:" <+> pprDerivedFun ppr derivedFun
-                   $$ text "Unexpected argument type:" <+> ppr derivedFunArgTy)
+        _ -> Left (text "Expected pair argument type to" <+> pprDerivedFun ppr derivedFun
+                   $$ text "but instead was:" <+> ppr derivedFunArgTy)
   where it's = pure . pure
         don'tKnow = pure Nothing
 
