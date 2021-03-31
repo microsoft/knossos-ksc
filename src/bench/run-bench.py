@@ -24,6 +24,10 @@ class time_sampler:
     def us(self):
         return self.duration() * 1e6
 
+    @property
+    def ms(self):
+        return self.duration() * 1e3
+
     @staticmethod
     def get_time():
         return time.time_ns() * 1e-9
@@ -88,7 +92,7 @@ def bench(module_name, bench_name):
     else:
       print(f"Ignoring {fn_name}")
 
-  # TODO: vmap  
+  # TODO: elementwise_apply  
   # ks_compiled = ts2mod(ks_fun, configs[0])
 
   for arg in configs:

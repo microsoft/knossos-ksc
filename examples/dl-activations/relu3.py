@@ -1,5 +1,5 @@
 import torch
-from ksc.vmap import vmap
+from ksc.torch_utils import elementwise_apply
 
 # BEGINDOC
 def relu3(x : float) -> float:
@@ -21,7 +21,7 @@ def relu3(x : float) -> float:
 
 # run-bench: Knossos source
 def vrelu3(x : torch.Tensor):
-  return vmap(relu3, x)
+  return elementwise_apply(relu3, x)
 
 # run-bench: PyTorch reference implementation
 def vrelu3_pt(x : torch.Tensor):

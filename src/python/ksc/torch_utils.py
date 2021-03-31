@@ -4,7 +4,7 @@ import torch
 
 # Slow implementation, to be improved
 # See https://github.com/pytorch/pytorch/issues/8304
-def vmap_pt18(f, x : torch.Tensor):
+def elementwise_apply_pt18(f, x : torch.Tensor):
   # TODO: torch.vmap in 1.9
   y = torch.zeros_like(x)
   sz = x.shape
@@ -29,5 +29,5 @@ def vmap_pt18(f, x : torch.Tensor):
   return y
 
 # Slow implementation, to be improved
-def vmap(f : Callable[[float], float], x : torch.Tensor):
-  return vmap_pt18(f, x)
+def elementwise_apply(f : Callable[[float], float], x : torch.Tensor):
+  return elementwise_apply_pt18(f, x)
