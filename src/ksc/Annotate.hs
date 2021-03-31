@@ -200,7 +200,6 @@ tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
     Right r -> pure r
     Left appliedTy ->
       tcFail (text "The base type did not match the applied type"
-              <+> text "in the call to" <+> ppr fun
               $$ text "The argument type was" <+> ppr arg_ty
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
@@ -228,7 +227,8 @@ tcExpr (Call fx es)
   = do { let (fun, mb_ty) = getFun @p fx
        ; pairs <- addCtxt (text "In the call of:" <+> ppr fun) $
                   tcExpr es
-       ; (funTyped, res_ty) <- lookupGblTc fun pairs
+       ; (funTyped, res_ty) <- addCtxt (text "In the call of:" <+> ppr fun) $
+                               lookupGblTc fun pairs
        ; res_ty <- checkTypes_maybe mb_ty res_ty $
          text "Function call type mismatch for" <+> ppr fun
        ; let call' = Call (TFun res_ty funTyped) (exprOf pairs)
