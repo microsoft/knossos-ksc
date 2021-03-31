@@ -14,7 +14,8 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Parser.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/Target/LLVMIR/ModuleTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Parser/MLIR.h"
@@ -23,6 +24,9 @@ using namespace Knossos::MLIR;
 using namespace std;
 
 //============================================================ Helpers
+
+Generator::Generator(mlir::MLIRContext &context) : context(context), builder(&context), UNK(builder.getUnknownLoc()) {
+}
 
 // Convert from AST type to MLIR
 Types Generator::ConvertType(const AST::Type &type, size_t dim) {
@@ -185,6 +189,7 @@ mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
   auto retTy = ConvertType(decl->getType());
   auto type = builder.getFunctionType(argTypes, retTy);
   auto func = mlir::FuncOp::create(UNK, decl->getMangledName(), type);
+  func.setVisibility(mlir::SymbolTable::Visibility::Private);
   ASSERT(func);
   functions[decl->getMangledName()]= func;
   return func;
@@ -297,8 +302,8 @@ Values Generator::buildCall(const AST::Call* call) {
 
   if (MATCH_1("abs", Float))  return CREATE_1(AbsFOp);
   if (MATCH_1("neg", Float))  return CREATE_1(NegFOp);
-  if (MATCH_1("exp", Float))  return CREATE_1(ExpOp);
-  if (MATCH_1("log", Float))  return CREATE_1(LogOp);
+  if (MATCH_1("exp", Float))  return CREATE_1(math::ExpOp);
+  if (MATCH_1("log", Float))  return CREATE_1(math::LogOp);
 
   if (MATCH_1("to_float", Integer)) 
     return {builder.create<mlir::SIToFPOp>(UNK, buildArg(call,0), builder.getF64Type())};
@@ -693,7 +698,7 @@ const mlir::ModuleOp Generator::build(const std::string& mlir) {
 
 //============================================================ LLVM IR Lowering
 
-unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel) {
+unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel, llvm::LLVMContext & llvmContext) {
   // The lowering "pass manager"
   mlir::PassManager pm(&context);
   if (optLevel > 0) {
@@ -712,7 +717,7 @@ unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel) {
   }
 
   // Then lower to LLVM IR
-  auto llvmModule = mlir::translateModuleToLLVMIR(module.get());
+  auto llvmModule = mlir::translateModuleToLLVMIR(module.get(), llvmContext);
   assert(llvmModule);
   return llvmModule;
 }
