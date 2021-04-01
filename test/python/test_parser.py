@@ -22,8 +22,8 @@ def test_parses():
     assert tld("(def [rev [f (Tuple)]] Float () 1.1)") ==\
                Def(make_structured_name(("rev", ("f", Type.Tuple()))), Type.Float, [], Const(1.1))
 
-    assert tld("(edef f Float ((Float) (Vec Float)))") ==\
-               EDef(f, Type.Float, [Type.Float, Type.Tensor(1, Type.Float)])
+    assert tld("(edef f Float (Tuple (Float) (Vec Float)))") ==\
+               EDef(f, Type.Float, Type.Tuple(Type.Float, Type.Tensor(1, Type.Float)))
 
     assert tld("(gdef rev [f (Tuple (Float) (Vec Float))])") ==\
                GDef("rev", make_structured_name(("f", Type.Tuple(Type.Float, Type.Tensor(1, Type.Float)))))

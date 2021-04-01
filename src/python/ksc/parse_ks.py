@@ -212,7 +212,7 @@ def parse_tld(se):
         return Def(*parse_seq(se[1:], parse_structured_name, parse_type, parse_args, parse_expr))
 
     if head == _edef:
-        return EDef(*parse_seq(se[1:], parse_structured_name, parse_type, parse_types))
+        return EDef(*parse_seq(se[1:], parse_structured_name, parse_type, parse_type))
 
     if head == _gdef:
         return GDef(*parse_seq(se[1:], parse_name, parse_structured_name))

@@ -10,12 +10,12 @@
 (gdef sufrev [gmm_knossos_tri Integer])
 
 ; dot
-(edef dot Float ((Vec Float) (Vec Float)))
+(edef dot Float (Tuple (Vec Float) (Vec Float)))
 (edef [D dot] (LM (Tuple (Vec Float) (Vec Float)) Float)
-             ((Vec Float) (Vec Float)))
+             (Tuple (Vec Float) (Vec Float)))
 (edef [Dt dot] (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
-              ((Vec Float) (Vec Float)))
-(edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
+              (Tuple (Vec Float) (Vec Float)))
+(edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) (Tuple (Vec Float) (Vec Float)))
 (def [fwd dot] Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
      (let ((a b) a_b)
        (let ((da db) da_db)

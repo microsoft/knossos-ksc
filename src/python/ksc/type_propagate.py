@@ -32,23 +32,32 @@ sys.setrecursionlimit(10**6)
 import re
 ks_prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 
-def ks_prim_lookup(sname, tys):
+def ks_prim_lookup(sname, ty):
+    if ty.is_tuple:
+        tys = tuple(ty.tuple_elems())
+    else:
+        tys = [ty]
     n = len(tys)
 
     name = sname.mangle_without_type()
 
     # tuple
+    # (tuple 1.0) -> (Tuple Float)
+    # (tuple 1.0 2.0) -> (Tuple Float Float)
+    # (tuple (tuple 1.0)) -> (Tuple (Tuple Float))
+    
     if name == "tuple":
         return Type.Tuple(*tys)
 
     # get$n$m
-    if n == 1 and name.startswith("get$"):
+    if name.startswith("get$"):
+        assert ty.is_tuple
         m = ks_prim_lookup_re_get.fullmatch(name)
         if m:
             n = int(m.group(1))
             max = int(m.group(2))
-            assert tys[0].tuple_len == max
-            return tys[0].tuple_elem(n-1)
+            assert ty.tuple_len == max
+            return ty.tuple_elem(n-1)
 
     # vec
     if name == "Vec_init":
@@ -282,9 +291,8 @@ def _(ex, symtab):
 
 @type_propagate.register(EDef)
 def _(ex, symtab):
-    # (edef name return_type arg_types)
-    argtype = make_tuple_if_many(ex.arg_types)
-    ex.name = add_type_to_sname(ex.name, argtype)
+    # (edef name return_type arg_type)
+    ex.name = add_type_to_sname(ex.name, ex.arg_type)
 
     if ex.name in symtab and symtab[ex.name] != ex.return_type:
         raise KSTypeError(f"Double definition: {ex.name}\n -> {symtab[ex.name]}\n vs {ex.return_type}")
@@ -325,7 +333,7 @@ def _(ex, symtab):
     argtype = make_tuple_if_many(argtypes)
     
     # Try prim lookup first - prims cannot be overloaded
-    prim = ks_prim_lookup(ex.name, argtypes)
+    prim = ks_prim_lookup(ex.name, argtype)
     if prim != None:
         ex.type_ = prim
         return ex

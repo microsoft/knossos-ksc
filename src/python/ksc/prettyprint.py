@@ -113,7 +113,7 @@ def pretty_ASTNode(ex, ctx):
                     pp_reserved("edef"), LINE,
                     pp(ex.name), LINE,
                     pp(ex.return_type), LINE,
-                    parens_interline(1, *map(pp, ex.arg_types)))
+                    pp(ex.arg_type))
 
     if isinstance(ex, GDef):
         return parens(2,
