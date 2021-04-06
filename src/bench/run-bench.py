@@ -93,12 +93,13 @@ def bench(module_name, bench_name):
       print(f"Ignoring {fn_name}")
 
   # TODO: elementwise_apply  
-  # ks_compiled = ts2mod(ks_fun, configs[0])
+  ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
 
   for arg in configs:
     assert torch.all(torch.isclose(pt_fun(arg), ks_fun(arg)))    
     timeit(bench_name + ' PT fast', pt_fun, arg)
     timeit(bench_name + ' PT nice', ks_fun, arg)
+    timeit(bench_name + ' Knossos', ks_compiled.apply, arg)
 
 if __name__ == "__main__":
   import sys

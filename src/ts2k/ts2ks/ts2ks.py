@@ -10,7 +10,6 @@ import torch.onnx
 torch.set_default_dtype(torch.float64)
 
 from ksc import utils
-from ksc.ks_function import KscFunction
 from ksc.parse_ks import parse_ks_filename
 
 from ksc.type import Type
@@ -275,7 +274,6 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
         return [
             translate_node(make_binds, node)
             for node in nodes
-            if node.kind() != "prim::Print"
         ]
 
     all_nodes = list(graph.nodes())
@@ -312,11 +310,74 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
 
     return Def(StructuredName(name), return_type, args, body)
 
+def make_tuple_if_many_args(*args):
+    t = tuple(*args)
+    if len(t) == 1:
+        return t[0]
+    else:
+        return t
 
 # TODO: make an configuration named tuple rather than passing flags
 def ts2ks(output, generate_edefs, function, example_inputs):
     s = ts2ks_fromgraph(generate_edefs, function.name, function.graph, example_inputs)
     output.write(pformat(s))
+
+def torch_from_ks(ks_object):
+    if isinstance(ks_object, tuple):
+        return tuple(torch_from_ks(ks) for ks in ks_object)
+    
+    return torch.from_numpy(numpy.array(ks_object, copy=True))
+
+def torch_to_ks(py_mod, val):
+    if isinstance(val, float):
+        return val
+
+    if isinstance(val, torch.Tensor):
+        assert val.dtype == torch.float64, "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
+        if len(val.shape) == 2:
+            return py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
+        if len(val.shape) == 1:
+            return py_mod.Tensor_1_Float(val.data_ptr(), *val.shape)
+        if len(val.shape) == 0:
+            return val.item()
+
+    raise NotImplementedError()
+
+# Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
+def forward_template(py_mod, ctx, *args):    
+    py_mod.reset_allocator()
+    ks_args = (torch_to_ks(py_mod, x) for x in args)
+    
+    # Call it
+    outputs = py_mod.entry(*ks_args)
+    
+    # TODO: save torch_to_ksed args
+    if ctx is not None:
+        ctx.save_for_backward(*args)
+
+    return torch_from_ks(outputs)
+
+def backward_template(py_mod, ctx, *args):
+    ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
+    ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
+    outputs = py_mod.rev_entry(ks_args, ks_grad_args)
+
+    return torch_from_ks(outputs)
+
+def make_KscAutogradFunction(py_mod):
+    # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
+    # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
+    forward = lambda ctx, args: forward_template(py_mod, ctx, args)
+    backward = lambda ctx, args: backward_template(py_mod, ctx, args)
+    newclass= type("KscAutogradFunction_" + py_mod.__name__,
+                (torch.autograd.Function,),
+                { 
+                    "py_mod": py_mod,
+                    "forward": staticmethod(forward),
+                    "backward": staticmethod(backward),
+                    "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x))
+                })
+    return newclass()
 
 def ts2mod(function, example_inputs):
     fn = torch.jit.script(function)
@@ -330,6 +391,8 @@ def ts2mod(function, example_inputs):
         decls_prelude_aten = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude-aten.ks"))
         type_propagate_decls(decls_prelude_aten, symtab)
 
+        cpprint(ksc_def)
+
         type_propagate_decls([ksc_def], symtab)
         defs_with_derivatives = [
             ksc_def,
@@ -342,7 +405,8 @@ def ts2mod(function, example_inputs):
     return_type = ksc_def.return_type
     mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True)
 
-    return KscFunction(mod)
+    return make_KscAutogradFunction(mod)
+
 
 import time
 
@@ -544,7 +608,7 @@ if __name__ == "__xmain__":
             args = (input, weights, bias, old_h, old_cell)
             
             ks_fun._py_mod.reset_allocator()
-            ks_args = (ks_fun.adapt(x) for x in args)
+            ks_args = (ks_fun.torch_to_ks(x) for x in args)
             
             # Call it
             outputs = ks_fun(*ks_args)
@@ -555,9 +619,9 @@ if __name__ == "__xmain__":
 
         @staticmethod
         def backward(ctx, grad_h, grad_cell):
-            ks_args = tuple(ks_fun.adapt(x) for x in ctx.saved_tensors)
+            ks_args = tuple(ks_fun.torch_to_ks(x) for x in ctx.saved_tensors)
             grad_args = (grad_h, grad_cell)
-            ks_grad_args = tuple(ks_fun.adapt(x) for x in grad_args)
+            ks_grad_args = tuple(ks_fun.torch_to_ks(x) for x in grad_args)
             outputs = ks_fun.rev(ks_args, ks_grad_args)
 
             return torch_from_ks(outputs)
@@ -690,7 +754,7 @@ if __name__ == "__main__":
     ts_squirrel = torch.jit.script(squirrel)
     print("TorchScript answer = ", ts_squirrel(x).numpy())
 
-    kx = ks_fun.adapt(x)
+    kx = ks_fun.torch_to_ks(x)
     ans = ks_fun(kx)
     print("Knossos answer = ", ans)
 
@@ -712,7 +776,7 @@ if __name__ == "__main__":
     def time_ks(n):
         x = torch.rand((n,n)) 
         ks_fun._py_mod.reset_allocator()
-        kx = ks_fun.adapt(x)
+        kx = ks_fun.torch_to_ks(x)
         ans = ks_fun.rev(kx, 1.0)
         #print(numpy.array(ans, copy=False))
 
