@@ -116,7 +116,9 @@ void test_parser_let() {
   assert(def);
   // Let has two parts: variable definitions and expression
   assert(def->getType() == Type::Integer);
+  assert(!def->getBinding().isTupleUnpacking());
   Variable* x = def->getBinding().getVariable();
+  assert(x);
   assert(x->getType() == Type::Integer);
   Call* expr = llvm::dyn_cast<Call>(def->getExpr());
   assert(expr);
@@ -130,6 +132,41 @@ void test_parser_let() {
   assert(lit);
   assert(lit->getValue() == "10");
   assert(lit->getType() == Type::Integer);
+  cout << "    OK\n";
+}
+
+void test_parser_tuple_let() {
+  cout << "\n == test_parser_tuple_let\n";
+  const Expr::Ptr tree = parse(LOC(), "(let ((a b) (tuple 1 5)) (add a b))");
+
+  // Root can have many exprs, here only one
+  Block* root = llvm::dyn_cast<Block>(tree.get());
+  assert(root);
+  // Kind is Let
+  Let* def = llvm::dyn_cast<Let>(root->getOperand(0));
+  assert(def);
+  // Let has two parts: variable definitions and expression
+  assert(def->getType() == Type::Integer);
+  assert(def->getBinding().isTupleUnpacking());
+  assert(Tuple::classof(def->getBinding().getInit()));
+  Variable* a = def->getBinding().getTupleVariable(0);
+  assert(a);
+  assert(a->getType() == Type::Integer);
+  Variable* b = def->getBinding().getTupleVariable(1);
+  assert(b);
+  assert(b->getType() == Type::Integer);
+  Call* expr = llvm::dyn_cast<Call>(def->getExpr());
+  assert(expr);
+  assert(expr->getDeclaration()->getName() == "add");
+  assert(expr->getType() == Type::Integer);
+  auto var_a = llvm::dyn_cast<Variable>(expr->getOperand(0));
+  assert(var_a);
+  assert(var_a->getName() == "a");
+  assert(var_a->getType() == Type::Integer);
+  auto var_b = llvm::dyn_cast<Variable>(expr->getOperand(1));
+  assert(var_b);
+  assert(var_b->getName() == "b");
+  assert(var_b->getType() == Type::Integer);
   cout << "    OK\n";
 }
 
@@ -472,10 +509,9 @@ void test_parser_fold() {
   const Expr::Ptr tree = parse(LOC(), "\n"
                                "(def fun Float (v : (Vec Float))\n"
                                " (fold (lam (acc_x : (Tuple Float Float))\n"
-                               "   (let (acc (get$1$2 acc_x))\n"
-                               "   (let (x   (get$2$2 acc_x))\n"
-                               "     (mul acc x))))"
-                               "   1.0"
+                               "   (let ((acc x) acc_x)\n"
+                               "     (mul acc x)))\n"
+                               "   1.0\n"
                                "   v))");
 
   // Root can have many exprs, here two
@@ -505,24 +541,22 @@ void test_parser_fold() {
   assert(init->getType() == Type::Float);
   assert(init->getValue() == "1.0");
   // Lambda variables
-  Let* letAcc = llvm::dyn_cast<Let>(fold->getBody());
-  assert(letAcc);
-  assert(letAcc->getType() == Type::Float);
-  Binding const& letAccBinding = letAcc->getBinding();
-  Variable* letAccVar = letAccBinding.getVariable();
+  Let* let = llvm::dyn_cast<Let>(fold->getBody());
+  assert(let);
+  assert(let->getType() == Type::Float);
+  Binding const& letBinding = let->getBinding();
+  assert(letBinding.isTupleUnpacking());
+  Variable* letAccVar = letBinding.getTupleVariable(0);
   assert(letAccVar);
   assert(letAccVar->getType() == Type::Float);
   assert(letAccVar->getName() == "acc");
-  assert(Get::classof(letAccBinding.getInit()));
-  Let* letX = llvm::dyn_cast<Let>(letAcc->getExpr());
-  Binding const& letXBinding = letX->getBinding();
-  Variable* letXVar = letXBinding.getVariable();
+  Variable* letXVar = letBinding.getTupleVariable(1);
   assert(letXVar);
   assert(letXVar->getType() == Type::Float);
   assert(letXVar->getName() == "x");
-  assert(Get::classof(letXBinding.getInit()));
+  assert(Variable::classof(letBinding.getInit()));
   // Lambda operation
-  Call* op = llvm::dyn_cast<Call>(letX->getExpr());
+  Call* op = llvm::dyn_cast<Call>(let->getExpr());
   assert(op);
   assert(op->getType() == Type::Float);
   assert(op->getDeclaration()->getName() == "mul");
@@ -560,6 +594,7 @@ int test_all(int v=0) {
 
   test_parser_block();
   test_parser_let();
+  test_parser_tuple_let();
   test_parser_decl();
   test_parser_def();
   test_parser_decl_def_use();

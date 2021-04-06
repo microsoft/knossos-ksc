@@ -411,9 +411,17 @@ Values Generator::buildCall(const AST::Call* call) {
 
 // Builds variable declarations
 Values Generator::buildLet(const AST::Let* let) {
-  // Bind the variable to an expression
   AST::Binding const& binding = let->getBinding();
-  declareVariable(binding.getVariable()->getName(), buildNode(binding.getInit()));
+  auto init = buildNode(binding.getInit());
+  if (binding.isTupleUnpacking()) {
+    size_t tupleSize = binding.getTupleVariables().size();
+    assert(init.size() == tupleSize);
+    for (size_t ii = 0; ii != tupleSize; ++ii) {
+      declareVariable(binding.getTupleVariable(ii)->getName(), {init[ii]});
+    }
+  } else {
+    declareVariable(binding.getVariable()->getName(), init);
+  }
   // Lower the body, using the variable
   return buildNode(let->getExpr());
 }

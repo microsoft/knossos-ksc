@@ -418,14 +418,29 @@ Binding Parser::parseBinding(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 2) << "Binding (v val), not [" << tok << "]";
-  PARSE_ASSERT(tok->getChild(0)->isValue) << "Binding (v val), not [" << tok << "]."
-    " Tuple-unpacking lets are not yet supported.";  // TODO
-  
-  std::string value = tok->getChild(0)->getValue();
+
   Expr::Ptr expr = parseToken(tok->getChild(1));
-  Variable::Ptr var = std::make_unique<Variable>(value, expr->getType());
-  variables.set(value, var.get());
-  return Binding(std::move(var), std::move(expr));
+
+  if (tok->getChild(0)->isValue) {
+    std::string value = tok->getChild(0)->getValue();
+    Variable::Ptr var = std::make_unique<Variable>(value, expr->getType());
+    variables.set(value, var.get());
+    return Binding(std::move(var), std::move(expr));
+  } else {
+    // Tuple-unpacking let
+    PARSE_ASSERT(expr->getType().isTuple());
+    size_t tupleSize = expr->getType().getSubTypes().size();
+    PARSE_ASSERT(tupleSize == tok->getChild(0)->getChildren().size()) << "Initializer is a " << tupleSize << "-tuple";
+    std::vector<Variable::Ptr> unpackingVars(tupleSize);
+    for (size_t ii = 0; ii != tupleSize; ++ii) {
+      const Token* v = tok->getChild(0)->getChild(ii);
+      PARSE_ASSERT(v->isValue);
+      std::string value = v->getValue();
+      unpackingVars[ii] = std::make_unique<Variable>(value, expr->getType().getSubType(ii));
+      variables.set(value, unpackingVars[ii].get());
+    }
+    return Binding(std::move(unpackingVars), std::move(expr));
+  }
 }
 
 // Variable declaration: (let (x 10) (add x 10))
