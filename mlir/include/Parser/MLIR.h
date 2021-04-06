@@ -66,7 +66,6 @@ class Generator {
 
   // Variables
   void declareVariable(std::string const& name, Values vals);
-  void declareVariable(const AST::Variable* var, Values vals = {});
 
   // Argument serialisation (tuples)
   void serialiseArgs(const AST::Definition *def, mlir::Block &entry);
