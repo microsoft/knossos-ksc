@@ -511,20 +511,39 @@ private:
   Expr::Ptr elseBlock;
 };
 
+/// Lambda, ex: (lam (var : Integer) expr)
+///
+/// Note: a Lambda is not (currently) implemented as an Expr,
+/// because it can only appear as part of a Build or Fold.
+struct Lambda {
+  using Ptr = std::unique_ptr<Lambda>;
+  Lambda(Variable::Ptr var, Expr::Ptr body)
+    : var(std::move(var)),
+      body(std::move(body)) {}
+
+  Variable *getVariable() const { return var.get(); }
+  Expr *getBody() const { return body.get(); }
+
+  std::ostream& dump(std::ostream& s, size_t tab) const;
+
+private:
+  Variable::Ptr var;
+  Expr::Ptr body;
+};
+
 /// Build, ex: (build N (lam (var) (expr)))
 ///
 /// Loops over range N using lambda L
 struct Build : public Expr {
   using Ptr = std::unique_ptr<Build>;
-  Build(Expr::Ptr range, Variable::Ptr var, Expr::Ptr expr)
-      : Expr(Type::makeVector(expr->getType()), Kind::Build), 
+  Build(Expr::Ptr range, Lambda::Ptr lam)
+      : Expr(Type::makeVector(lam->getBody()->getType()), Kind::Build),
         range(std::move(range)),
-        var(std::move(var)), 
-        expr(std::move(expr)) {}
+        lam(std::move(lam)) {}
 
   Expr *getRange() const { return range.get(); }
-  Variable *getVariable() const { return var.get(); }
-  Expr *getExpr() const { return expr.get(); }
+  Variable *getVariable() const { return lam->getVariable(); }
+  Expr *getExpr() const { return lam->getBody(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -533,8 +552,7 @@ struct Build : public Expr {
 
 private:
   Expr::Ptr range;
-  Variable::Ptr var;
-  Expr::Ptr expr;
+  Lambda::Ptr lam;
 };
 
 /// Tuple, ex: (tuple 10.0 42 (add@ff 1.0 2.0))
@@ -611,15 +629,14 @@ private:
 /// Then return (acc).
 struct Fold : public Expr {
   using Ptr = std::unique_ptr<Fold>;
-  Fold(Type type, Variable::Ptr lambdaParameter, Expr::Ptr body, Expr::Ptr init, Expr::Ptr vector)
+  Fold(Type type, Lambda::Ptr lam, Expr::Ptr init, Expr::Ptr vector)
       : Expr(type, Kind::Fold),
-      lambdaParameter(std::move(lambdaParameter)),
-      body(std::move(body)),
+      lam(std::move(lam)),
       init(std::move(init)),
       vector(std::move(vector)) {}
 
-  Variable *getLambdaParameter() const { return lambdaParameter.get(); }
-  Expr *getBody() const { return body.get(); }
+  Variable *getLambdaParameter() const { return lam->getVariable(); }
+  Expr *getBody() const { return lam->getBody(); }
   Expr *getInit() const { return init.get(); }
   Expr *getVector() const { return vector.get(); }
 
@@ -629,8 +646,7 @@ struct Fold : public Expr {
   static bool classof(const Expr *c) { return c->kind == Kind::Fold; }
 
 private:
-  Variable::Ptr lambdaParameter;
-  Expr::Ptr body;
+  Lambda::Ptr lam;
   Expr::Ptr init;
   Expr::Ptr vector;
 };

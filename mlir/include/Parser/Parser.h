@@ -91,6 +91,7 @@ class Parser {
   Definition::Ptr parseDef(const Token *tok);
   Rule::Ptr parseRule(const Token *tok);
   Condition::Ptr parseCond(const Token *tok);
+  Lambda::Ptr parseLambda(const Token *tok);
   Build::Ptr parseBuild(const Token *tok);
   Tuple::Ptr parseTuple(const Token *tok);
   Get::Ptr parseGet(const Token *tok);
