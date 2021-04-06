@@ -22,8 +22,11 @@
 (gdef rev [pi (Tuple)])
 
 (def circumference Float (r : Float) (mul (mul 2.0 (pi)) r))
+(def circumference2 Float (r : Float) (mul (mul 2.0 (pi (tuple))) r))
 
 (gdef fwd [circumference Float])
 (gdef rev [circumference Float])
+(gdef fwd [circumference2 Float])
+(gdef rev [circumference2 Float])
 
 (def main Integer () 0)
