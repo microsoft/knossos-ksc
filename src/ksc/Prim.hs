@@ -513,6 +513,9 @@ sufBogTy_maybe P_ne arg_ty
 sufBogTy_maybe P_Vec_init arg_ty
   = Just (tangentType arg_ty)
 
+sufBogTy_maybe P_ts_scale arg_ty
+  = Just arg_ty
+
 sufBogTy_maybe _ _
   = Nothing
 
@@ -562,6 +565,10 @@ sufRevFunCallResultTy_maybe P_eq (TypeTuple []) tangentType_arg_ty
 
 sufRevFunCallResultTy_maybe P_ne (TypeTuple []) tangentType_arg_ty
   = Just tangentType_arg_ty
+
+sufRevFunCallResultTy_maybe P_ts_scale dt (TypeTuple [TypeFloat, dt1])
+  | dt `eqType` dt1
+  = Just (TypeTuple [TypeFloat, dt])
 
 sufRevFunCallResultTy_maybe _ _ _
   = Nothing

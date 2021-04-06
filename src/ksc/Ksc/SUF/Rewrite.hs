@@ -52,6 +52,9 @@ rewriteSUFFwdPass P_deltaVec t
 rewriteSUFFwdPass P_ts_add t
   = Just $ Tuple [mkPrimCall1 P_ts_add t, Tuple []]
 
+rewriteSUFFwdPass P_ts_scale t
+  = Just $ Tuple [mkPrimCall1 P_ts_scale t, t]
+
 rewriteSUFFwdPass _ _ = Nothing
 
 
@@ -112,5 +115,10 @@ rewriteSUFRevPass P_ts_add (Tuple [ddr, Tuple []])
   -- will probably resolve this problem, but we shouldn't create it in
   -- the first place.
   = Just $ Tuple [ddr, ddr]
+
+rewriteSUFRevPass P_ts_scale (Tuple [ddr, t])
+  = Just $ Tuple [pDot x ddr, pScale lambda ddr]
+  where lambda = pFst t
+        x = pSnd t
 
 rewriteSUFRevPass _ _ = Nothing
