@@ -2,7 +2,7 @@
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
 (def prod_fold Integer ((v : (Vec Integer)) (closure : Integer))
-; MLIR: func @prod_fold$avii(%arg0: memref<?xi64>, %arg1: i64) -> i64 {
+; MLIR: func private @prod_fold$avii(%arg0: memref<?xi64>, %arg1: i64) -> i64 {
 ; LLVM: define i64 @"prod_fold$avii"(i64* %0, i64* %1, i64 %2, i64 %3, i64 %4, i64 %5) {
 
      (fold (lam (acc_x : (Tuple Integer Integer))
@@ -18,7 +18,7 @@
 ; MLIR:   %c0{{.*}} = constant 0 : i64
 ; MLIR:   br ^[[headBB:bb[0-9]+]](%c1{{.*}}, %c0{{.*}} : i64, i64)
 ; MLIR: ^[[headBB]](%[[hAcc:[0-9]+]]: i64, %[[hIv:[0-9]+]]: i64):	// 2 preds: ^bb0, ^bb3
-; MLIR:   %[[cmp:[0-9]+]] = cmpi "slt", %[[hIv]], %[[dim]] : i64
+; MLIR:   %[[cmp:[0-9]+]] = cmpi slt, %[[hIv]], %[[dim]] : i64
 ; MLIR:   cond_br %4, ^[[loadBB:bb[0-9]+]](%[[hAcc]], %[[hIv]] : i64, i64), ^[[tailBB:bb[0-9]+]](%[[hAcc]] : i64)
 ; MLIR: ^[[loadBB]](%[[lAcc:[0-9]+]]: i64, %[[lIv:[0-9]+]]: i64):	// pred: ^bb1
 ; MLIR:   %[[idx:[0-9]+]] = index_cast %[[lIv]] : i64 to index
@@ -44,8 +44,6 @@
 ; LLVM:   %[[lAcc:[0-9]+]] = phi i64 [ %[[hAcc]], %[[headBB]] ]
 ; LLVM:   %[[lIv:[0-9]+]]  = phi i64 [ %[[hIv]],  %[[headBB]] ]
 ; LLVM:     extractvalue { i64*, i64*, i64, [1 x i64], [1 x i64] }
-; LLVM:     mul i64 %{{.*}}, 1
-; LLVM:     add i64 0, %{{.*}}
 ; LLVM:   %[[ptr:[0-9]+]] = getelementptr i64, i64* %{{.*}}, i64 %{{.*}}
 ; LLVM:   %[[load:[0-9]+]] = load i64, i64* %[[ptr]]
 ; LLVM:   br label %[[bodyBB]]
@@ -66,7 +64,7 @@
 ; Builds a vector of 10 elements where v[i] = i+i
 ; Accumulates all elements: acc *= v[i] * 2
 (def main Integer ()
-; MLIR: func @main() -> i64 {
+; MLIR: func private @main() -> i64 {
 ; LLVM: define i64 @main() {
 
   (let (vec (build 10 (lam (i : Integer) (add i i))))

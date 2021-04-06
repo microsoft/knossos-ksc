@@ -5,7 +5,7 @@
 (edef bar Integer (Integer))
 
 (def main Integer () (
-; MLIR: func @main() -> i64 {
+; MLIR: func private @main() -> i64 {
 ; LLVM: define i64 @main() {
 
 ; All literals, LLVM does not support, so we only lower the right block
@@ -25,7 +25,7 @@
 ; MLIR-DAG: %[[bar1:[0-9]+]] = call @bar$ai(%c40{{.*}}) : (i64) -> i64
 ; MLIR-DAG: %c10{{.*}} = constant 10 : i64
 ; MLIR-DAG: %c20{{.*}} = constant 20 : i64
-; MLIR-DAG: %[[eq1:[0-9]+]] = cmpi "eq", %c10{{.*}}, %c20{{.*}} : i64
+; MLIR-DAG: %[[eq1:[0-9]+]] = cmpi eq, %c10{{.*}}, %c20{{.*}} : i64
 ; MLIR: %[[sel1:[0-9]+]] = select %[[eq1]], %[[foo1]], %[[bar1]] : i64
 
 ; LLVM: %[[foo1:[0-9]+]] = call i64 @"foo$ai"(i64 30)
@@ -42,7 +42,7 @@
 ; MLIR: %c80{{.*}} = constant 80 : i64
 ; MLIR: %[[bar2:[0-9]+]] = call @bar$ai(%c80{{.*}}) : (i64) -> i64
 ; MLIR: %c60{{.*}} = constant 60 : i64
-; MLIR: %[[eq2:[0-9]+]] = cmpi "eq", %[[foo_cond]], %c60{{.*}} : i64
+; MLIR: %[[eq2:[0-9]+]] = cmpi eq, %[[foo_cond]], %c60{{.*}} : i64
 ; MLIR: %[[sel2:[0-9]+]] = select %[[eq2]], %[[foo2]], %[[bar2]] : i64
 
 ; LLVM: %[[foo_cond:[0-9]+]] = call i64 @"foo$ai"(i64 50)

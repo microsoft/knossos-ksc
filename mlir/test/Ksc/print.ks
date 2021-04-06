@@ -7,7 +7,7 @@
       42
       (add argc (index 1 argv)))
 )
-; MLIR: func @f$aivi(%arg0: i64, %arg1: memref<?xi64>) -> i64 {
+; MLIR: func private @f$aivi(%arg0: i64, %arg1: memref<?xi64>) -> i64 {
 ;         Strings are ignored, for now
 ; MLIR:   %cst = constant 1.000000e+01 : f64
 ; MLIR:   %c42{{.*}} = constant 42 : i64
