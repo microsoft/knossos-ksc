@@ -2,25 +2,26 @@
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
 (edef to_float Float (Integer))
-; MLIR:   func @to_float$ai(i64) -> f64
+; MLIR:   func private @to_float$ai(i64) -> f64
 
 ; Length of the vector comes from a function argument
 ; build structure is the same, tested below
 (def argLen (Vec Float) (N : Integer)
   (build N (lam (i : Integer) (to_float i))))
-; MLIR: func @argLen$ai(%arg0: i64) -> memref<?xf64> {
+; MLIR: func private @argLen$ai(%arg0: i64) -> memref<?xf64> {
 ; MLIR:   index_cast %arg0 : i64 to index
 ; MLIR:   alloc(%{{[0-9]+}}) : memref<?xf64>
 
 ; LLVM: define { double*, double*, i64, [1 x i64], [1 x i64] } @"argLen$ai"(i64 %0) {
-; LLVM:   mul i64 %0, ptrtoint (double* getelementptr (double, double* null, i64 1) to i64)
+; LLVM:   getelementptr double, double* null, i64 %0
+; LLVM:   ptrtoint double* %{{[0-9]+}} to i64
 ; LLVM:   call i8* @malloc(i64 %{{[0-9]+}})
 
 ; Length of the vector comes from an expression
 ; build structure is the same, tested below
 (def copyVec (Vec Float) (v : (Vec Float))
   (build (size v) (lam (i : Integer) (index i v))))
-; MLIR: func @copyVec$avf(%arg0: memref<?xf64>) -> memref<?xf64> {
+; MLIR: func private @copyVec$avf(%arg0: memref<?xf64>) -> memref<?xf64> {
 ; MLIR:   %c0 = constant 0 : index
 ; MLIR:   dim %arg0, %c0 : memref<?xf64>
 ; MLIR:   index_cast %{{[0-9]+}} : i64 to index
@@ -28,13 +29,14 @@
 
 ; LLVM: define { double*, double*, i64, [1 x i64], [1 x i64] } @"copyVec$avf"(double* %0, double* %1,
 ; LLVM:   extractvalue { double*, double*, i64, [1 x i64], [1 x i64] } %{{[0-9]+}}, 3, 0
-; LLVM:   mul i64 %{{[0-9]+}}, ptrtoint (double* getelementptr (double, double* null, i64 1) to i64)
+; LLVM:   getelementptr double, double* null, i64 %{{[0-9]+}}
+; LLVM:   ptrtoint double* %{{[0-9]+}} to i64
 ; LLVM:   call i8* @malloc(i64 %{{[0-9]+}})
 
 ; Size direct from a build
 (def sizeBuild Integer ((x : Integer) (N : Integer))
   (size (build N (lam (i : Integer) i))))
-; MLIR: func @sizeBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
+; MLIR: func private @sizeBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
 ; MLIR:   %c0 = constant 0 : index
 ; MLIR:   %[[sz:[0-9]+]] = dim %{{.*}}, %c0 : memref<?xi64>
 ; MLIR:   %[[ret:[0-9]+]] = index_cast %[[sz]] : index to i64
@@ -48,7 +50,7 @@
 ; Index direct from a build
 (def indexBuild Integer ((x : Integer) (N : Integer))
   (index x (build N (lam (i : Integer) i))))
-; MLIR: func @indexBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
+; MLIR: func private @indexBuild$aii(%arg0: i64, %arg1: i64) -> i64 {
 ; MLIR:   %{{.*}} = load %{{.*}}[%{{.*}}] : memref<?xi64>
 
 ; LLVM: define i64 @"indexBuild$aii"(i64 %0, i64 %1) {
@@ -59,7 +61,7 @@
 ; LLVM:   ret i64 %[[load]]
 
 (def main Integer () 
-; MLIR: func @main() -> i64 {
+; MLIR: func private @main() -> i64 {
 ; LLVM: define i64 @main() {
   (let (argc 7)
 ; Creating a 10-element vector of integers, from 0 to 9
@@ -72,7 +74,7 @@
 ; MLIR:   %[[ten:[ci_0-9]+]] = constant 10 : i64
 ; MLIR:   br ^[[headBB:bb[0-9]+]](%c0_i64 : i64)
 ; MLIR: ^[[headBB]](%[[ivHead:[0-9]+]]: i64):	// 2 preds: ^bb0, ^[[bodyBB:bb[0-9]+]]
-; MLIR:   %[[cond:[0-9]+]] = cmpi "slt", %[[ivHead]], %[[ten]] : i64
+; MLIR:   %[[cond:[0-9]+]] = cmpi slt, %[[ivHead]], %[[ten]] : i64
 ; MLIR:   cond_br %[[cond]], ^[[bodyBB]](%[[ivHead]] : i64), ^[[tailBB:bb[0-9]+]]
 ; MLIR: ^[[bodyBB]](%[[ivBody:[0-9]+]]: i64):	// pred: ^[[headBB]]
 ; MLIR:   %[[expr:[0-9]+]] = addi %[[ivBody]], %c7_i64 : i64
@@ -92,7 +94,7 @@
 ; MLIR-DAG:   %[[ret:[0-9]+]] = addi %[[dimcast]], %[[idx]] : i64
 ; MLIR:   return %[[ret]] : i64
 
-; LLVM:   %[[vec:[0-9]+]] = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i64 1) to i64), i64 10))
+; LLVM:   %[[vec:[0-9]+]] = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 10))
 ; LLVM:   br label %[[headBB:[0-9]+]]
 ; LLVM: [[headBB]]:                                                ; preds = %[[bodyBB:[0-9]+]], %0
 ; LLVM:   %[[headPHI:[0-9]+]] = phi i64 [ %[[incr:[0-9]+]], %[[bodyBB]] ], [ 0, %0 ]
