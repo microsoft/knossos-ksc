@@ -5,6 +5,7 @@
 {
 	"version": "0.2.0",
 	"configurations": [
+
 		{
 			"name": "Python: Current File",
 			"type": "python",
@@ -13,13 +14,24 @@
 			"console": "integratedTerminal"
 		},
 		{
-			"name": "Python: run-bench",
+			"name": "Python: run-bench relu3",
 			"type": "python",
 			"request": "launch",
 			"program": "src/bench/run-bench.py",
 			"args": ["relu3", "vrelu3"],
 			"env": {
 				"PYTHONPATH": "examples/dl-activations"
+			},
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Python: run-bench sqrl",
+			"type": "python",
+			"request": "launch",
+			"program": "src/bench/run-bench.py",
+			"args": ["sqrl", "sqrl"],
+			"env": {
+				"PYTHONPATH": "examples/dl-capsule"
 			},
 			"console": "integratedTerminal"
 		},
