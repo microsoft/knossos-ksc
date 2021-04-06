@@ -360,6 +360,11 @@
  [rev lt] (Tuple Float Float)
  ((xt : (Tuple Float Float)) (drt : (Tuple)))
   (tuple 0.0 0.0))
+(def [suffwdpass lt] (Tuple Bool (Tuple)) (x_y : Tuple Float Float)
+     (tuple (gt x_y) (tuple)))
+(def [sufrevpass [lt (Tuple Float Float)]] (Tuple Float Float) ((d_dlt : Tuple) (bog : Tuple))
+     (tuple 0.0 0.0))
+
 
 (edef lt Bool (Tuple Integer Integer))
 (edef [D lt] (LM (Tuple Integer Integer) Bool) (Tuple Integer Integer))
