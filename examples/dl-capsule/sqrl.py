@@ -1,5 +1,6 @@
 import torch
 
+# run-bench: Knossos source, and "nice" PyTorch implementation
 # BEGINDOC
 def sqrl(x : torch.Tensor):
     """
@@ -16,13 +17,12 @@ def sqrl(x : torch.Tensor):
     return torch.mean(torch.sin(t)*t)
 # ENDDOC
 
-# run-bench: Knossos source
-
-# run-bench: PyTorch reference implementation
+# run-bench: PyTorch "fast" implementation
 def sqrl_pt(x : torch.Tensor):
   return sqrl(x)
 
 # run-bench: Define a range of values at which to call the methods
 def sqrl_bench_configs():
   yield torch.randn((4,4))
-
+  yield torch.randn((16,16))
+  yield torch.randn((128,64))
