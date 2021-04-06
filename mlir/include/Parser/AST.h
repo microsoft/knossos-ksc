@@ -516,14 +516,14 @@ private:
 /// Loops over range N using lambda L
 struct Build : public Expr {
   using Ptr = std::unique_ptr<Build>;
-  Build(Expr::Ptr range, Expr::Ptr var, Expr::Ptr expr)
+  Build(Expr::Ptr range, Variable::Ptr var, Expr::Ptr expr)
       : Expr(Type::makeVector(expr->getType()), Kind::Build), 
         range(std::move(range)),
         var(std::move(var)), 
         expr(std::move(expr)) {}
 
   Expr *getRange() const { return range.get(); }
-  Expr *getVariable() const { return var.get(); }
+  Variable *getVariable() const { return var.get(); }
   Expr *getExpr() const { return expr.get(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
@@ -533,7 +533,7 @@ struct Build : public Expr {
 
 private:
   Expr::Ptr range;
-  Expr::Ptr var;
+  Variable::Ptr var;
   Expr::Ptr expr;
 };
 
