@@ -19,6 +19,9 @@
     (lt a b))
 (gdef fwd [aten::lt (Tuple Float Float)])
 (gdef rev [aten::lt (Tuple Float Float)])
+(gdef suffwdpass [aten::lt (Tuple Float Float)])
+(gdef sufrevpass [aten::lt (Tuple Float Float)])
+(gdef sufrev [aten::lt (Tuple Float Float)])
 
 (def aten::lt Bool ((a : Integer) (b : Float))
     (lt (to_float a) b))
@@ -29,6 +32,9 @@
     (lt a b))
 (gdef fwd [aten::lt (Tuple Integer Integer)])
 (gdef rev [aten::lt (Tuple Integer Integer)])
+(gdef suffwdpass [aten::lt (Tuple Integer Integer)])
+(gdef sufrevpass [aten::lt (Tuple Integer Integer)])
+(gdef sufrev [aten::lt (Tuple Integer Integer)])
 
 ;; mul
 (def aten::mul Float ((a : Float) (b : Float))
@@ -50,6 +56,9 @@
     (ts_scale b a))
 (gdef fwd [aten::mul (Tuple (Tensor 2 Float) Float)])
 (gdef rev [aten::mul (Tuple (Tensor 2 Float) Float)])
+(gdef suffwdpass [aten::mul (Tuple (Tensor 2 Float) Float)])
+(gdef sufrevpass [aten::mul (Tuple (Tensor 2 Float) Float)])
+(gdef sufrev [aten::mul (Tuple (Tensor 2 Float) Float)])
 
 (def aten::mul (Tensor 2 Float) ((a : Float) (b : Tensor 2 Float))
     (ts_scale a b))
@@ -67,6 +76,9 @@
         (mul (index inds a) (index inds b)))))
 (gdef fwd [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
 (gdef rev [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
+(gdef suffwdpass [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
+(gdef sufrevpass [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
+(gdef sufrev [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
 
 ;; add
 (def aten::add Float ((a : Float) (b : Float))
@@ -105,6 +117,9 @@
     (to_float a))
 (gdef fwd [aten::Float Integer])
 (gdef rev [aten::Float Integer])
+(gdef suffwdpass [aten::Float Integer])
+(gdef sufrevpass [aten::Float Integer])
+(gdef sufrev [aten::Float Integer])
 
 (def aten::Float Float (a : Float)
     a)
@@ -115,6 +130,9 @@
     a)
 (gdef fwd [aten::Bool Bool])
 (gdef rev [aten::Bool Bool])
+(gdef suffwdpass [aten::Bool Bool])
+(gdef sufrevpass [aten::Bool Bool])
+(gdef sufrev [aten::Bool Bool])
 
 (def aten::Bool Bool (a : Float)
     (not (eq a 0.0)))
@@ -126,6 +144,9 @@
         (sin (index ij a)))))
 (gdef fwd [aten::sin (Tensor 2 Float)])
 (gdef rev [aten::sin (Tensor 2 Float)])
+(gdef suffwdpass [aten::sin (Tensor 2 Float)])
+(gdef sufrevpass [aten::sin (Tensor 2 Float)])
+(gdef sufrev [aten::sin (Tensor 2 Float)])
 
 (def aten::sin (Tensor 1 Float) (a : Tensor 1 Float)
     (build (size a) (lam (ij : Integer)
@@ -163,22 +184,40 @@
     (let (nanm1 (ts_scale (to_float n) (aten::pow a (sub n 1))))
     (aten::mul nanm1 da)))))
 
+(def [suffwdpass aten::pow]
+     (Tuple (Tensor 2 Float) (Tuple (Tensor 2 Float) Integer))
+     (t : Tuple (Tensor 2 Float) Integer)
+     (tuple (aten::pow t) t))
+(def [sufrevpass [aten::pow (Tuple (Tensor 2 Float) Integer)]]
+     (Tuple (Tensor 2 Float) (Tuple))
+     ((d_dr : Tensor 2 Float) (bog : Tuple (Tensor 2 Float) Integer))
+     ([rev aten::pow] bog d_dr))
+(gdef sufrev [aten::pow (Tuple (Tensor 2 Float) Integer)])
 
 (def aten::prod Float (a : Tuple Float Float)
     (mul (get$1$2 a) (get$2$2 a)))
 (gdef fwd [aten::prod (Tuple Float Float)])
 (gdef rev [aten::prod (Tuple Float Float)])
+(gdef suffwdpass [aten::prod (Tuple Float Float)])
+(gdef sufrevpass [aten::prod (Tuple Float Float)])
+(gdef sufrev [aten::prod (Tuple Float Float)])
 
 (def aten::prod Integer (a : Tuple Integer Integer)
     (mul (get$1$2 a) (get$2$2 a)))
 (gdef fwd [aten::prod (Tuple Integer Integer)])
 (gdef rev [aten::prod (Tuple Integer Integer)])
+(gdef suffwdpass [aten::prod (Tuple Integer Integer)])
+(gdef sufrevpass [aten::prod (Tuple Integer Integer)])
+(gdef sufrev [aten::prod (Tuple Integer Integer)])
 
 (def aten::sum Float (a : Tensor 2 Float)
     (sumbuild (size a) (lam (ij : Tuple Integer Integer)
             (index ij a))))
 (gdef rev [aten::sum (Tensor 2 Float)])
 (gdef fwd [aten::sum (Tensor 2 Float)])
+(gdef suffwdpass [aten::sum (Tensor 2 Float)])
+(gdef sufrevpass [aten::sum (Tensor 2 Float)])
+(gdef sufrev [aten::sum (Tensor 2 Float)])
 
 (def aten::sum Float (a : Tensor 1 Float)
     (sumbuild (size a) (lam (ij : Integer)
@@ -190,6 +229,8 @@
     (div (aten::sum a) (aten::Float (aten::prod (size a)))))
 (gdef fwd [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
 (gdef rev [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
+(gdef suffwdpass [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
+(gdef sufrevpass [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
 
 (def aten::mean Float ((a : Tensor 1 Float) (opt_dtype : (Tuple)))
     (div (aten::sum a) (aten::Float (size a))))
