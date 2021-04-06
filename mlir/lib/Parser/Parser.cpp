@@ -433,21 +433,9 @@ Let::Ptr Parser::parseLet(const Token *tok) {
   PARSE_ENTER;
 
   PARSE_ASSERT(tok->size() == 3);
-  const Token *bond = tok->getChild(1);
-  PARSE_ASSERT2(!bond->isValue, bond);
-  vector<Binding> bindings;
-  // Single variable binding
-  if (bond->getChild(0)->isValue) {
-    PARSE_ASSERT2(bond->size() == 2, bond) << "Binding (v val), not [" << bond << "]";
-    bindings.push_back(parseBinding(bond));
-    // Multiple variables
-  } else {
-    for (auto &c: bond->getChildren())
-      bindings.push_back(parseBinding(c.get()));
-  }
-
+  auto binding = parseBinding(tok->getChild(1));
   auto body = parseToken(tok->getChild(2));
-  return make_unique<Let>(move(bindings), move(body));
+  return make_unique<Let>(move(binding), move(body));
 }
 
 // Declares a function (and add it to symbol table)

@@ -73,19 +73,3 @@
 ; LLVM: %[[ret:[0-9]+]] = mul i64 %[[mul]], %[[add]]
 ; LLVM: ret i64 %[[ret]]
 ))
-
-; Multiple bind lets
-(def fun6 Integer (argc : Integer) (
-; MLIR: func @fun6$ai(%arg0: i64) -> i64 {
-; LLVM: define i64 @"fun6$ai"(i64 %0) {
-  (let ((i argc) (j 20) (k 30)) (add (mul i j) k))
-; MLIR: %c20{{.*}} = constant 20 : i64
-; MLIR: %c30{{.*}} = constant 30 : i64
-; MLIR: %[[ij:[0-9]+]] = muli %arg0, %c20{{.*}} : i64
-; MLIR: %[[ret:[0-9]+]] = addi %[[ij]], %c30{{.*}} : i64
-; MLIR: return %[[ret]] : i64
-
-; LLVM: %[[ij:[0-9]+]] = mul i64 %0, 20
-; LLVM: %[[ret:[0-9]+]] = add i64 %[[ij]], 30
-; LLVM: ret i64 %[[ret]]
-))

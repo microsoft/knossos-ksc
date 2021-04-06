@@ -25,6 +25,6 @@
 ; LLVM:   ret i64 4
 
 (def main Integer ()
-   (let ((argc 4)
-         (argv (build argc (lam (i : Integer) i))))
-      (f argc argv)))
+   (let (argc 4)
+   (let (argv (build argc (lam (i : Integer) i)))
+      (f argc argv))))

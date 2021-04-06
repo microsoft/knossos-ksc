@@ -112,8 +112,7 @@ std::ostream& Binding::dump(std::ostream& s, size_t tab) const {
 std::ostream&  Let::dump(std::ostream& s, size_t tab) const {
   s << string(tab, ' ') << "Let:" << endl;
   Expr::dump(s, tab + 2);
-  for (auto &b: bindings)
-    b.dump(s, tab + 2);
+  binding.dump(s, tab + 2);
   if (expr)
     expr->dump(s, tab + 2);
   return s;

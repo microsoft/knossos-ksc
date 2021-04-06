@@ -6,9 +6,9 @@
 ; LLVM: define i64 @"prod_fold$avii"(i64* %0, i64* %1, i64 %2, i64 %3, i64 %4, i64 %5) {
 
      (fold (lam (acc_x : (Tuple Integer Integer))
-                (let ((acc (get$1$2 acc_x))
-                      (x   (get$2$2 acc_x)))
-                  (mul (add acc x) closure)))
+                (let (acc (get$1$2 acc_x))
+                (let (x   (get$2$2 acc_x))
+                  (mul (add acc x) closure))))
            1
            v
      )
@@ -69,9 +69,9 @@
 ; MLIR: func @main() -> i64 {
 ; LLVM: define i64 @main() {
 
-  (let ((vec (build 10 (lam (i : Integer) (add i i))))
-        (m   (prod_fold vec 2)))
-    m)
+  (let (vec (build 10 (lam (i : Integer) (add i i))))
+  (let (m   (prod_fold vec 2))
+    m))
 
 ; We are not interested in the build construct, just the call and return
 ; MLIR:  %c10{{.*}} = constant 10 : i64
