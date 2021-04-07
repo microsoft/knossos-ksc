@@ -632,7 +632,7 @@ kFloat :: Double -> ExprX p
 kFloat f = Konst (KFloat f)
 
 zeroFloat :: TExpr
-zeroFloat = Konst (KFloat 0.0)
+zeroFloat = kFloat 0
 
 mkTuple :: [ExprX p] -> ExprX p
 mkTuple [e] = e
