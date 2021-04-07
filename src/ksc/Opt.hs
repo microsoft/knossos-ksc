@@ -712,7 +712,7 @@ optGradPrim (TypeLM _ _) P_ts_dot (Tuple [v1, v2])
   = Just (lmHCat [lmDot v2, lmDot v1])
 
 optGradPrim (TypeLM a _) P_ts_neg _
-  = Just (lmScale a (kTFloat $ -1.0))
+  = Just (lmScale a (kFloat $ -1.0))
 
 optGradPrim _ P_sum e
   | TypeTensor d t <- typeof e
@@ -1012,14 +1012,14 @@ hspec = do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
         optPrimFun emptyInScopeSet P_lmAdd
-            (Tuple [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)])
+            (Tuple [lmScale TypeFloat (kFloat 1.3), lmScale TypeFloat (kFloat 0.4)])
         `shouldBe`
-        Just (lmScale TypeFloat (pAdd (kTFloat 1.3) (kTFloat 0.4)))
+        Just (lmScale TypeFloat (pAdd (kFloat 1.3) (kFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat
-            f2 = kTFloat 2.0
-            f4 = kTFloat 4.0
+            f2 = kFloat 2.0
+            f4 = kFloat 4.0
             l2 = lmScale TypeFloat f2
         in
             optE emptyOptEnv
