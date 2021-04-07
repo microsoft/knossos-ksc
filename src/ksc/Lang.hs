@@ -631,9 +631,6 @@ kInt i = Konst (KInteger i)
 kFloat :: Double -> ExprX p
 kFloat f = Konst (KFloat f)
 
-zeroInt :: TExpr
-zeroInt = Konst (KInteger 0)
-
 zeroFloat :: TExpr
 zeroFloat = Konst (KFloat 0.0)
 
