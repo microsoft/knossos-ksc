@@ -762,9 +762,9 @@ optDrvPrim Rev P_deltaVec (Tuple [n_i_v, ddr])
 optDrvPrim Fwd P_Vec_init (Tuple [_vs, dvs])
   = Just $ mkPrimCall P_Vec_init dvs
 optDrvPrim Rev P_Vec_init (Tuple [Tuple vs, ddr])
-  = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kTInt $ toInteger i) ddr) $ fromList vs)
+  = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kInt $ toInteger i) ddr) $ fromList vs)
 optDrvPrim Rev P_Vec_init (Tuple [_v, ddr])
-  = Just $ pIndex (kTInt 0) ddr
+  = Just $ pIndex (kInt 0) ddr
 
 optDrvPrim _ _ _ = Nothing
 
