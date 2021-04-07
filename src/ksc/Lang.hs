@@ -628,9 +628,6 @@ mkLets xs e = foldr (uncurry mkLet) e xs
 kInt :: Integer -> ExprX p
 kInt i = Konst (KInteger i)
 
-kTInt :: Integer -> TExpr
-kTInt i = Konst (KInteger i)
-
 kFloat :: Double -> ExprX p
 kFloat f = Konst (KFloat f)
 
