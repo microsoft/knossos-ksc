@@ -34,7 +34,10 @@ python -m pip install --editable . || exit /b
 cd ../..
 
 REM we only run a single test for now, multiple tests run out of heap see #679
-pytest test\ts2k\test_ts2k.py -k test_cat
+REM pytest test\ts2k\test_ts2k.py -k test_cat
 
 REM echo Running pytest on ts2k
 REM pytest test/ts2k || exit /b
+
+REM this runs the tests one by one avoiding the memory issues
+powershell.exe -file "%~dp0multiprocess_ts2k_tests.ps1" || exit /b
