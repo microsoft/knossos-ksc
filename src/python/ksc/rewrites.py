@@ -1,0 +1,133 @@
+from dataclasses import dataclass
+from functools import singledispatch
+from typing import Any, Iterator, Mapping, Tuple
+
+from abc import ABC, abstractmethod, abstractproperty
+from ksc.expr import Expr, Let, Lam, Var
+from ksc.cav_subst import Location
+from ksc.utils import singleton
+
+@dataclass(frozen=True)
+class Rewrite:
+    rule: "Rule"
+    root: Expr # RLO required rule to be passed to Rewrite.apply(), but this seems prone to accidents
+    path: Location
+    extra_data: Mapping[str, Any]
+
+    @property
+    def rule_name(self):
+        return self.rule.name
+
+    @property
+    def node_id(self):
+        # TODO Convert from path
+        raise ValueError("Not yet implemented")
+
+    def __call__():
+        return self.rule.apply_at(self.root, self.path, **self.extra_data)
+    
+class AbstractMatcher(ABC):
+    def get_all_rewrites(self, e: Expr) -> Iterator[Rewrite]:
+        yield from _subtree_rewrites(e, [], self, e, {})
+
+    @abstractmethod
+    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping) -> Iterator[Rewrite]:
+        pass
+
+_rule_dict: Mapping[str, "Rule"] = {}
+
+class Rule(AbstractMatcher):
+    def __init__(self, name=None):
+        if name is None:
+            name = self.__class__.__name__
+        assert name not in _rule_dict
+        _rule_dict[name] = self
+        self._name = name
+
+    @property
+    def name(self):
+        return self._name
+
+    @abstractproperty
+    def possible_expr_classes(self):
+        """ Return a set of the subclasses of Expr that this rule could possibly match. """
+        pass
+
+    def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
+        """ Applies this rule at the specified <path> within <expr>.
+            The default implementation merely replaces the subtree indicated by <path> with the result of self._apply. """
+        # The constant here says that there are no free variables to avoid capturing en route to the target Location
+        return expr.replace_subtree(path, Const(0.0), self._apply)
+
+    @abstractmethod
+    def _apply(self, payload: Expr, existing_subtree: Expr) -> Expr:
+        """ Apply this rule at the top of the <existing_subtree>. <payload> comes from self.apply_at. """
+        assert payload == Const(0.0) # Specified in apply_at
+
+class RuleSet(AbstractMatcher):
+    def init(self, rules):
+        # TODO also allow global (any-class) rules?
+        self.rules_by_class = {}
+        for rule in rules:
+            for clazz in rule.possible_expr_classes:
+                self.rules_by_class.setdefault(clazz, []).append(rule)
+    
+    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping) -> Iterator[Rewrite]:
+        for rule in self.rules_by_class(subtree.__class__):
+            yield from rule.get_local_rewrites(subtree, path_from_root, root, env)
+
+def _subtree_rewrites(e: Expr, path_from_root: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
+    yield from rules.get_local_rewrites(e, path_from_root, root, env)
+    yield from _subtree_update_env(e, path_from_root, rules, root, env)
+
+# Note: python3.8 brings singledispatchmethod, which we could use here (moving this and the previous into AbstractMatcher). Sticking with python3.7.
+@singledispatch
+def _subtree_update_env(e: Expr, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
+    for i, ch in enumerate(get_children(e)):
+        yield from _subtree_rewrites(ch, loc + [i], rules, root, env)
+
+@_subtree_update_env.register
+def _subtree_env_let(e: Let, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
+    yield from _subtree_rewrites(e.rhs, loc + [0], rules, root, env)
+    def is_tuple(e):
+        return isinstance(e, Call) and e.name.mangle_without_type() == "tuple"
+    child_env = ({**env, e.var: (loc, e.rhs)} if isinstance(e.vars, Var)
+                 else {**env, **{var: (loc, elem) for var,elem in zip(e.vars, e.rhs.args)}} if is_tuple(e.rhs) # Individual tuple elements
+                 else {k:v for k,v in env.items() if k not in e.vars}) # Not individually inlinable
+    yield from _subtree_rewrites(e.body, loc+[1], rules, root, child_env)
+
+@_subtree_update_env.register
+def _subtree_env_lam(e: Lam, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
+    yield from _subtree_rewrites(e.body, loc + [0], rules, root, {k:v for k,v in env.items() if k != e.arg.name})
+
+@singleton
+class inline_var(Rule):
+    @property
+    @staticmethod
+    def possible_expr_classes():
+        return {Var}
+
+    def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location, bound_value: Expr) -> Expr:
+        # binding_location and bound_value come from the Rewrite.
+        # Note alternatives:
+        # 1. the environment+Rewrite store only the binding location; we carry the entire bound value from the binding-let down to the variable, in order to inline perhaps only part of it
+        # 2. the environment+Rewrite store only the binding location; we traverse the path from binder to variable-use twice:
+        #        the first time just to find the target variable, so that we can then extract the appropriate bound value (perhaps part of a tuple) from the binder;
+        #        the second time, to do renaming to avoid capturing anything in the value to be inlined
+        # 3. Neither environment/ReWrite store any extra information (neither binding_location nor bound_value); instead, we traverse the path from root to usage site twice,
+        #        the first traversal building the environment (varname -> binding_location) as it goes down to the usage site - duplicating some of the work done by the matcher (which at the least needs to build an environment of which variables are inlinable)
+        #        the second traversal uses two nested calls of replace_subtree: (a) from root down to the binder, without any renaming; then (b) from the binder down to the usage site, renaming to avoid capture of anything in the value-to-be-inlined.
+        assert path_to_var[:len(binding_location)] == binding_location
+        return expr.replace_subtree(binding_location, Const(0.0), lambda _payload, let:
+            lambda _payload, let: let.replace_subtree(path_to_var[len(binding_location):], bound_value) # No applicator: just take bound_value
+        )
+
+    def _apply(self, *args, **kwargs):
+        # TODO consider removing from superclass??
+        assert False
+
+    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
+        if isinstance(subtree, Var): # May not be if rule is used directly outside of a RuleSet. Q: Do we want to support that case.
+            if subtree.name in env:
+                binding_loc, bound_val = env[subtree.name]
+                yield Rewrite(self, root, path_from_root, binding_location=binding_loc, bound_value=bound_val)
