@@ -178,11 +178,19 @@ void Generator::buildGlobal(const AST::Block* block) {
     module->push_back(def);
 }
 
+// Recover multiple argument types from a one-argified argument type.
+std::vector<Knossos::AST::Type> multiArgify(Knossos::AST::Type t) {
+  if (t.isTuple())
+    return t.getSubTypes();
+  else
+    return std::vector<Knossos::AST::Type>(1, t);
+}
+
 // Declaration only, no need for basic blocks
 mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
   assert(!functions.count(decl->getMangledName()) && "Duplicated function declaration");
   Types argTypes;
-  for (auto &t: decl->getArgTypes()) {
+  for (auto &t: multiArgify(decl->getArgType())) {
     auto tys = ConvertType(t);
     argTypes.append(tys.begin(), tys.end());
   }

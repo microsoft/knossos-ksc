@@ -183,9 +183,10 @@ void test_parser_decl() {
   // Declaration has 3 parts: name, return type, arg types decl
   assert(decl->getName() == "fun");
   assert(decl->getType() == Type::Float);
-  assert(decl->getArgTypes()[0] == Type::Integer);
-  assert(decl->getArgTypes()[1] == Type::String);
-  assert(decl->getArgTypes()[2] == Type::Bool);
+  assert(decl->getArgType().isTuple());
+  assert(decl->getArgType().getSubType(0) == Type::Integer);
+  assert(decl->getArgType().getSubType(1) == Type::String);
+  assert(decl->getArgType().getSubType(2) == Type::Bool);
   cout << "    OK\n";
 }
 
@@ -345,16 +346,17 @@ void test_parser_vector_type() {
   // Check vectors were detected properly
   auto fooTy = foo->getType();
   assert(fooTy == Type::Vector && fooTy.getSubType() == Type::Float);
-  auto fooArgTy = foo->getArgType(0);
+  auto fooArgTy = foo->getArgType();
   assert(fooArgTy == Type::Vector && fooArgTy.getSubType() == Type::Float);
   auto barTy = bar->getType();
   assert(barTy == Type::Vector && barTy.getSubType() == Type::Vector);
   auto barSubTy = barTy.getSubType();
   assert(barSubTy == Type::Vector && barSubTy.getSubType() == Type::Float);
-  assert(bar->getArgType(0) == Type::Integer);
-  auto barArgTy = bar->getArgType(1);
+  assert(bar->getArgType().isTuple());
+  assert(bar->getArgType().getSubType(0) == Type::Integer);
+  auto barArgTy = bar->getArgType().getSubType(1);
   assert(barArgTy == Type::Vector && barArgTy.getSubType() == Type::Float);
-  assert(bar->getArgType(2) == Type::Float);
+  assert(bar->getArgType().getSubType(2) == Type::Float);
   cout << "    OK\n";
 }
 
@@ -407,16 +409,17 @@ void test_parser_vector() {
   // Check vectors were detected properly
   auto fooTy = foo->getType();
   assert(fooTy == Type::Vector && fooTy.getSubType() == Type::Float);
-  auto fooArgTy = foo->getArgType(0);
+  auto fooArgTy = foo->getArgType();
   assert(fooArgTy == Type::Vector && fooArgTy.getSubType() == Type::Float);
   auto barTy = bar->getType();
   assert(barTy == Type::Vector && barTy.getSubType() == Type::Vector);
   auto barSubTy = barTy.getSubType();
   assert(barSubTy == Type::Vector && barSubTy.getSubType() == Type::Float);
-  assert(bar->getArgType(0) == Type::Integer);
-  auto barArgTy = bar->getArgType(1);
+  assert(bar->getArgType().isTuple());
+  assert(bar->getArgType().getSubType(0) == Type::Integer);
+  auto barArgTy = bar->getArgType().getSubType(1);
   assert(barArgTy == Type::Vector && barArgTy.getSubType() == Type::Float);
-  assert(bar->getArgType(2) == Type::Float);
+  assert(bar->getArgType().getSubType(2) == Type::Float);
   cout << "    OK\n";
 }
 
@@ -436,27 +439,28 @@ void test_parser_tuple_type() {
   assert(foo && bar && baz);
   // Check vectors were detected properly
   auto fooTy = foo->getType();
-  assert(fooTy == Type::Tuple && fooTy.getSubType(0) == Type::Float);
-  auto fooArgTy = foo->getArgType(0);
-  assert(fooArgTy == Type::Tuple &&
+  assert(fooTy.isTuple() && fooTy.getSubType(0) == Type::Float);
+  auto fooArgTy = foo->getArgType();
+  assert(fooArgTy.isTuple() &&
          fooArgTy.getSubType(0) == Type::Float &&
          fooArgTy.getSubType(1) == Type::Float);
   auto barTy = bar->getType();
   assert(barTy == Type::Float);
-  assert(bar->getArgType(0) == Type::Integer);
-  auto barArgTy = bar->getArgType(1);
-  assert(barArgTy == Type::Tuple &&
+  assert(bar->getArgType().isTuple());
+  assert(bar->getArgType().getSubType(0) == Type::Integer);
+  auto barArgTy = bar->getArgType().getSubType(1);
+  assert(barArgTy.isTuple() &&
          barArgTy.getSubType(0) == Type::Float &&
          barArgTy.getSubType(1) == Type::Float);
-  assert(bar->getArgType(2) == Type::Float);
+  assert(bar->getArgType().getSubType(2) == Type::Float);
   auto bazTy = baz->getType();
   assert(bazTy == Type::Bool);
-  auto bazArgTy = baz->getArgType(0);
-  assert(bazArgTy == Type::Tuple &&
+  auto bazArgTy = baz->getArgType();
+  assert(bazArgTy.isTuple() &&
          bazArgTy.getSubType(0) == Type::Float &&
-         bazArgTy.getSubType(1) == Type::Tuple);
+         bazArgTy.getSubType(1).isTuple());
   auto bazSubArgTy = bazArgTy.getSubType(1);
-  assert(bazSubArgTy == Type::Tuple &&
+  assert(bazSubArgTy.isTuple() &&
          bazSubArgTy.getSubType(0) == Type::Integer &&
          bazSubArgTy.getSubType(1) == Type::Float);
   cout << "    OK\n";
@@ -473,7 +477,7 @@ void test_parser_tuple() {
   Tuple* tuple = llvm::dyn_cast<Tuple>(root->getOperand(0));
   assert(tuple);
   auto type = tuple->getType();
-  assert(type == Type::Tuple &&
+  assert(type.isTuple() &&
          type.getSubType(0) == Type::Float &&
          type.getSubType(1) == Type::Bool &&
          type.getSubType(2) == Type::Integer);
@@ -532,7 +536,7 @@ void test_parser_fold() {
   // Lambda parameter
   Variable* acc_x = fold->getLambdaParameter();
   assert(acc_x);
-  assert(acc_x->getType() == Type::Tuple);
+  assert(acc_x->getType().isTuple());
   assert(acc_x->getType().getSubType(0) == Type::Float);
   assert(acc_x->getType().getSubType(1) == Type::Float);
   // Init

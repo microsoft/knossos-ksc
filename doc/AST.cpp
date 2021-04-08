@@ -62,7 +62,7 @@ struct Let : public Expr {
 // Declaration, ex: (edef max Float (Float Float))
 struct Declaration : public Expr {
   Name name;
-  std::vector<Type> argTypes;
+  Type argType;
 };
 
 /// Call
