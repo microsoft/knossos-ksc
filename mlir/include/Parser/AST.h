@@ -44,9 +44,8 @@ struct Type {
   }
 
   /// Compound type constructor
-  Type(ValidType type, std::vector<Type> const& subTys) : type(type) {
+  Type(ValidType type, std::vector<Type> subTys) : type(type), subTypes(std::move(subTys)) {
     ASSERT(!isScalar()) << "Compound ctor called for Scalar type";
-    subTypes = subTys;
   }
 
   /// Utilities
@@ -67,6 +66,9 @@ struct Type {
   }
   bool isTuple() const {
     return type == Tuple;
+  }
+  bool isTuple(size_t tupleSize) const {
+    return type == Tuple && subTypes.size() == tupleSize;
   }
 
   ValidType getValidType() const { 
@@ -96,8 +98,8 @@ struct Type {
     return Type(Vector, {type});
   }
 
-  static Type makeTuple(std::vector<Type> const& types) {
-    return Type(Tuple, types);
+  static Type makeTuple(std::vector<Type> types) {
+    return Type(Tuple, std::move(types));
   }
 
   static Type makeLambda(Type s, Type t) {

@@ -279,6 +279,96 @@ Type oneArgify(std::vector<Type> const& argTypes) {
     return Type(Type::Tuple, argTypes);
 }
 
+struct FakePrimitiveFunction
+{
+  const char * name;
+  Type argType;
+  Type resultType;
+};
+/* These are functions which aren't actually treated as primitives
+   by ksc, but have previously been treated as primitives as
+   ksc-mlir (ie. they are not written using structured names).
+   To keep the tests working, we continue to hard-code
+   their result types for now.
+   TODO: update the tests to use the prelude, then remove this completely.
+   */
+std::vector<FakePrimitiveFunction> getFakePrims() {
+  const auto Bool = Type(Type::Bool);
+  const auto Float = Type(Type::Float);
+  const auto Integer = Type(Type::Integer);
+  return {
+    { "abs", Float, Float },
+    { "neg", Float, Float },
+    { "exp", Float, Float },
+    { "log", Float, Float },
+    { "to_float", Integer, Float },
+    { "add", Type::makeTuple({Integer, Integer}), Integer },
+    { "add", Type::makeTuple({Float, Float}), Float },
+    { "sub", Type::makeTuple({Integer, Integer}), Integer },
+    { "sub", Type::makeTuple({Float, Float}), Float },
+    { "mul", Type::makeTuple({Integer, Integer}), Integer },
+    { "mul", Type::makeTuple({Float, Float}), Float },
+    { "div", Type::makeTuple({Integer, Integer}), Integer },
+    { "div", Type::makeTuple({Float, Float}), Float },
+    { "and", Type::makeTuple({Bool, Bool}), Bool },
+    { "or", Type::makeTuple({Bool, Bool}), Bool },
+    { "lte", Type::makeTuple({Integer, Integer}), Bool },
+    { "lte", Type::makeTuple({Float, Float}), Bool },
+    { "gte", Type::makeTuple({Integer, Integer}), Bool },
+    { "gte", Type::makeTuple({Float, Float}), Bool },
+    { "lt", Type::makeTuple({Integer, Integer}), Bool },
+    { "lt", Type::makeTuple({Float, Float}), Bool },
+    { "gt", Type::makeTuple({Integer, Integer}), Bool },
+    { "gt", Type::makeTuple({Float, Float}), Bool },
+  };
+}
+
+Type primCallResultType(const Token *tok, std::string const& primName, Type argType) {
+
+  // print(T1, ..., Tn) -> Integer
+  if (primName == "print")
+    return Type(Type::Integer);
+
+  if (primName == "eq" || primName == "ne") {
+    PARSE_ASSERT(argType.isTuple(2));
+    PARSE_ASSERT(argType.getSubType(0) == argType.getSubType(1));
+    return Type(Type::Bool);
+  }
+
+  if (primName == "size") {
+    PARSE_ASSERT(argType.isVector());
+    return Type(Type::Integer);
+  }
+
+  if (primName == "index") {
+    PARSE_ASSERT(argType.isTuple(2));
+    PARSE_ASSERT(argType.getSubType(0) == Type::Integer);
+    PARSE_ASSERT(argType.getSubType(1).isVector());
+    return argType.getSubType(1).getSubType();
+  }
+
+  if (primName == "sum") {
+    PARSE_ASSERT(argType.isVector());
+    return argType.getSubType();
+  }
+
+  if (primName == "ts_add") {
+    PARSE_ASSERT(argType.isTuple(2));
+    Type ty0 = argType.getSubType(0);
+    Type ty1 = argType.getSubType(1);
+    PARSE_ASSERT(ty1 == ty0.tangentType()) << "ts_add defined between tangentType and type";
+    return ty0;
+  }
+
+  static const auto fakePrims = getFakePrims();
+  for (auto & prim : fakePrims) {
+    if (primName == prim.name && argType == prim.argType)
+      return prim.resultType;
+  }
+
+  PARSE_ASSERT2(0, tok->getHead()) << "Unrecognized function: " << Signature{ StructuredName(primName), argType };
+}
+
 // Calls (fun arg1 arg2 ...)
 // Checks types agains symbol table
 Call::Ptr Parser::parseCall(const Token *tok) {
@@ -287,8 +377,6 @@ Call::Ptr Parser::parseCall(const Token *tok) {
   StructuredName name = parseStructuredName(tok->getHead());
   int arity = tok->size() - 1;
 
-  Declaration* decl = nullptr;
-  
   // Collect operands
   std::vector<Expr::Ptr> operands;
   operands.reserve(arity);
@@ -312,85 +400,10 @@ Call::Ptr Parser::parseCall(const Token *tok) {
   // Function wasn't found - it may be a Prim that we handle here.
   PARSE_ASSERT(!name.isDerivation()) << "No declaration found for derived function: " << sig;   // Prims cannot be derived functions
   PARSE_ASSERT(!name.hasType()) << "No declaration found for function: " << sig;  // Prims do not have their types specified
-  std::string primName = name.baseFunctionName;
 
-  // Helper to construct the call
-  auto mkCall = [&name, &argType, &operands, this](Type const& type) {
-    Declaration* decl = addExtraDecl(name, argType, type);
-    return make_unique<Call>(decl, move(operands));
-  };
-
-  // TODO: should these be in Type?
-  const auto Bool = Type(Type::Bool);
-  const auto Float = Type(Type::Float);
-  const auto Integer = Type(Type::Integer);
-
-  // print(T1, ..., Tn) -> Integer
-  if (primName == "print")
-    // Cons up a new decl for this combination of print and Type
-    return mkCall(Integer);
-
-#define MATCH_1(NAME, ARGTYPE_0) \
-  (arity == 1 && primName == NAME && \
-   types[0] == Type::ARGTYPE_0)
-
-#define MATCH_2(NAME, ARGTYPE_0, ARGTYPE_1) \
-  (arity == 2 && primName == NAME &&            \
-   types[0] == Type::ARGTYPE_0 &&           \
-   types[1] == Type::ARGTYPE_1)
-
-  if (MATCH_1("abs", Float))     return mkCall(Float);
-  if (MATCH_1("neg", Float))     return mkCall(Float);
-  if (MATCH_1("exp", Float))     return mkCall(Float);
-  if (MATCH_1("log", Float))     return mkCall(Float);
-
-  if (MATCH_1("to_float", Integer))   return mkCall(Float);
-  if (MATCH_1("to_int", Float))       return mkCall(Float);
-
-  if (MATCH_2("add", Integer, Integer))   return mkCall(Integer);
-  if (MATCH_2("add", Float, Float))       return mkCall(Float);
-  if (MATCH_2("sub", Integer, Integer))   return mkCall(Integer);
-  if (MATCH_2("sub", Float, Float))       return mkCall(Float);
-  if (MATCH_2("mul", Integer, Integer))   return mkCall(Integer);
-  if (MATCH_2("mul", Float, Float))       return mkCall(Float);
-  if (MATCH_2("div", Integer, Integer))   return mkCall(Integer);
-  if (MATCH_2("div", Float, Float))       return mkCall(Float);
-  if (MATCH_2("and", Bool, Bool))         return mkCall(Bool);
-  if (MATCH_2("or", Bool, Bool))          return mkCall(Bool);
-
-  // Comparison
-  if (MATCH_2("eq", Integer, Integer))      return mkCall(Bool);
-  if (MATCH_2("eq", Float, Float))          return mkCall(Bool);
-  if (MATCH_2("ne", Integer, Integer))      return mkCall(Bool);
-  if (MATCH_2("ne", Float, Float))          return mkCall(Bool);
-  if (MATCH_2("lte", Integer, Integer))     return mkCall(Bool);
-  if (MATCH_2("lte", Float, Float))         return mkCall(Bool);
-  if (MATCH_2("gte", Integer, Integer))     return mkCall(Bool);
-  if (MATCH_2("gte", Float, Float))         return mkCall(Bool);
-  if (MATCH_2("gt", Integer, Integer))      return mkCall(Bool);
-  if (MATCH_2("gt", Float, Float))          return mkCall(Bool);
-  if (MATCH_2("lt", Integer, Integer))      return mkCall(Bool);
-  if (MATCH_2("lt", Float, Float))          return mkCall(Bool);
-
-  // Prims
-  if (MATCH_1("size", Vector))             return mkCall(Integer);
-  if (MATCH_2("index", Integer, Vector))   return mkCall(types[1].getSubType());
-  if (MATCH_1("sum", Vector))              return mkCall(types[0].getSubType());
-
-  // ts_add(T, dT)
-  if (primName == "ts_add" && arity == 2) {
-    Type ty0 = types[0];
-    Type ty1 = types[1];
-    PARSE_ASSERT(ty1 == ty0.tangentType()) << "ts_add defined between tangentType and type";
-    return mkCall(ty0);
-  }
-
-#undef MATCH_1
-#undef MATCH_2
-#undef mkCall
-
-  // Nothing matched...
-  PARSE_ASSERT2(0, tok->getHead()) << "Unrecognized function: " << sig;
+  Type returnType = primCallResultType(tok, name.baseFunctionName, argType);  
+  Declaration* decl = addExtraDecl(name, argType, returnType);
+  return make_unique<Call>(decl, move(operands));
 }
 
 // Parse a variable which is declared with its type, e.g.
