@@ -38,3 +38,5 @@ pytest test\ts2k\test_ts2k.py -k test_cat
 
 REM echo Running pytest on ts2k
 REM pytest test/ts2k || exit /b
+
+powershell.exe -file "%~dp0multiprocess_ts2k_tests.ps1" || exit /b
