@@ -148,8 +148,9 @@ inline Type Type::tangentType() const
       std::transform(subTypes.begin(), subTypes.end(), newsubTypes.begin(), [](Type const& t) { return t.tangentType(); });
       return makeTuple(newsubTypes);
     }
+    default:
+      return Type(None);
   }
-  return Type(None);
 }
 
 // StructuredName

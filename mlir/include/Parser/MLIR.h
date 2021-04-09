@@ -25,10 +25,10 @@ using Values = llvm::SmallVector<mlir::Value, 4>;
 class Generator {
   // The main module
   mlir::OwningModuleRef module;
-  // The current builder
-  mlir::OpBuilder builder;
   // The global context
   mlir::MLIRContext & context;
+  // The current builder
+  mlir::OpBuilder builder;
   // A default location, ignoring source loc for now
   mlir::Location UNK;
   // Current function (for basic block placement)

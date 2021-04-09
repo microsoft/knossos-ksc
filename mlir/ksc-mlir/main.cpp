@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
 
   int optlevel = 0;
   
-  size_t nextarg = 1;
+  int nextarg = 1;
   string aStr(argv[nextarg++]);
   if (aStr == "TEST")
     action = Action::TEST;

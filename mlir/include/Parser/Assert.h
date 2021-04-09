@@ -30,4 +30,4 @@ struct asserter {
   std::ostream& operator<<(const T& t) { return *s << t; }
 };
 
-#endif _KSC_ASSERT_H_
+#endif /// _KSC_ASSERT_H_
