@@ -382,18 +382,7 @@ Values Generator::buildCall(const AST::Call* call) {
 
   // Function call -- not a prim, should be known
   mlir::FuncOp func = functions[name_mangled];
-  
-  if (!func) {
-    // Didn't find it... assert
-    asserter a("Unknown function", __FILE__, __LINE__);
-    a << " " << name << "(";
-    for(size_t i = 0; i < arity; ++i) {
-      a << call->getOperand(i)->getType();
-      if (i+1 < arity)
-        a << ", ";
-    } 
-    a << ") -> "<<name_mangled<<"]";
-  }
+  ASSERT(!!func) << "Unknown function " << name << ", mangled name " << name_mangled;
 
   // Operands (tuples expand into individual operands)
   Values operands;
