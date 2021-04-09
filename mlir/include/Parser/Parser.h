@@ -100,12 +100,11 @@ class Parser {
 
 public:
   Parser(Location const& loc, std::string const& code, int verbosity): 
+      lex(loc, code),
       rootT(nullptr), 
       rootE(nullptr),
-      extraDecls(nullptr),
-      lex(loc, code) 
+      extraDecls(std::make_unique<Block>())
       {
-        extraDecls = std::make_unique<Block>();
         lex.setVerbosity(verbosity);
       }
 

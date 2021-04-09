@@ -27,6 +27,8 @@ char const* ValidType2Str(Type::ValidType type) {
     return "Lambda";
   case Type::LM:
     return "LM";
+  default:
+    return "Not-a-ValidType";
   }
 }
 
@@ -61,9 +63,7 @@ std::ostream& operator<<(std::ostream& s, StructuredName const& t)
   } else {
     s << t.baseFunctionName;
   }
-  for (auto& derivation : t.derivations) {
-    s << ']';
-  }
+  s << std::string(t.derivations.size(), ']');
   return s;
 }
 
@@ -226,20 +226,20 @@ std::string mangleType(Type const& t)
     case Type::Integer: return "i";
     case Type::Float: return "f";
     case Type::String: return "s";
+
+    case Type::Tuple: {
+      std::string ret = "<";
+      for(auto &ty: t.getSubTypes())
+        ret += mangleType(ty);
+      return ret + ">";
+    }
+
+    case Type::Vector:
+      return "v" + mangleType(t.getSubType());
+    
+    default:
+      ASSERT(0) << "Cannot mangle type " << t;
   }
-
-  if (t.isTuple()) {
-    std::string ret = "<";
-    for(auto &ty: t.getSubTypes())
-      ret += mangleType(ty);
-    return ret + ">";
-  }
-
-  if (t.isVector())
-    return "v" + mangleType(t.getSubType());
-
-  ASSERT(0) << "Cannot mangle type " << t;
-  return "*FAIL*";
 }
 
 std::string mangleArgumentType(Type const& t)

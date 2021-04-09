@@ -137,7 +137,7 @@ Token::Ptr Lexer::lex(char c)
         // Should restore stream flags, but exiting anyway.  Wow, ostream formatting...
     }
   }
-  if (verbosity+1 > depth) tok->dump(std::cerr << std::string(depth, '-'), depth) << "\n";
+  if (verbosity+1 > (int)depth) tok->dump(std::cerr << std::string(depth, '-'), depth) << "\n";
   --depth;
   return Token::Ptr(tok);
 }
@@ -165,7 +165,7 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
   std::vector<std::string> strs;
   for (auto& t : tok->children) {
     ppresult p = pprint(t.get(), indent+tab, width);
-    if (p.width > maxwidth)
+    if ((int)p.width > maxwidth)
       maxwidth = p.width;
     mywidth += (first ? 0 : 1) + p.width;
     strs.push_back(p.s);
