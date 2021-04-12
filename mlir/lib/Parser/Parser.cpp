@@ -139,7 +139,7 @@ Expr::Ptr Parser::parseToken(const Token *tok) {
   switch (isReservedWord(value)) {
   // "Builtins": Core language constructs
   case Parser::Keyword::EDEF:
-    return parseDecl(tok);
+    return parseEDef(tok);
   case Parser::Keyword::DEF:
     return parseDef(tok);
   case Parser::Keyword::GDEF:
@@ -475,18 +475,18 @@ Let::Ptr Parser::parseLet(const Token *tok) {
 }
 
 // Declares a function (and add it to symbol table)
-Declaration::Ptr Parser::parseDecl(const Token *tok) {
+Declaration::Ptr Parser::parseEDef(const Token *tok) {
   PARSE_ENTER;
 
-  PARSE_ASSERT(tok->size() == 4) << "Decl should be (edef name type args)";
+  PARSE_ASSERT(tok->size() == 4) << "edef should be (edef name resultType (argType))";
   const Token *name = tok->getChild(1);
   const Token *ty = tok->getChild(2);
   const Token *args = tok->getChild(3);
 
   auto type = parseType(ty);
-  PARSE_ASSERT2(!type.isNone(), ty) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT2(!type.isNone(), ty) << "Parsing edef [" << name << "]";
 
-  PARSE_ASSERT2(!args->isValue, args) << "Parsing decl [" << name << "]";
+  PARSE_ASSERT2(!args->isValue, args) << "Parsing edef [" << name << "]";
 
   Type argType;
   // Vector and Tuples can be declared bare
