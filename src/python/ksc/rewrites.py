@@ -14,15 +14,6 @@ class Rewrite:
     path: Location
     extra_data: Mapping[str, Any]
 
-    @property
-    def rule_name(self):
-        return self.rule.name
-
-    @property
-    def node_id(self):
-        # TODO Convert from path
-        raise ValueError("Not yet implemented")
-
     def __call__():
         return self.rule.apply_at(self.root, self.path, **self.extra_data)
     
@@ -35,6 +26,10 @@ class AbstractMatcher(ABC):
         pass
 
 _rule_dict: Mapping[str, "Rule"] = {}
+
+def rule(name: str) -> "NamedRule":
+    """Lookup method for all `NamedRule`s."""
+    return _rule_dict[name]
 
 class Rule(AbstractMatcher):
     def __init__(self, name=None):
@@ -53,16 +48,13 @@ class Rule(AbstractMatcher):
         """ Return a set of the subclasses of Expr that this rule could possibly match. """
         pass
 
-    def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
-        """ Applies this rule at the specified <path> within <expr>.
-            The default implementation merely replaces the subtree indicated by <path> with the result of self._apply. """
-        # The constant here says that there are no free variables to avoid capturing en route to the target Location
-        return expr.replace_subtree(path, Const(0.0), self._apply)
-
     @abstractmethod
-    def _apply(self, payload: Expr, existing_subtree: Expr) -> Expr:
-        """ Apply this rule at the top of the <existing_subtree>. <payload> comes from self.apply_at. """
-        assert payload == Const(0.0) # Specified in apply_at
+    def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
+        """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Rewrites. """
+
+    def __reduce__(self):
+        # This allows pickling and sending Rules across processes/machines via Ray.
+        return (rule, (self.name,))
 
 class RuleSet(AbstractMatcher):
     def init(self, rules):
@@ -100,6 +92,7 @@ def _subtree_env_let(e: Let, loc: Location, rules: AbstractMatcher, root: Expr, 
 def _subtree_env_lam(e: Lam, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
     yield from _subtree_rewrites(e.body, loc + [0], rules, root, {k:v for k,v in env.items() if k != e.arg.name})
 
+
 @singleton
 class inline_var(Rule):
     @property
@@ -122,10 +115,6 @@ class inline_var(Rule):
             lambda _payload, let: let.replace_subtree(path_to_var[len(binding_location):], bound_value) # No applicator: just take bound_value
         )
 
-    def _apply(self, *args, **kwargs):
-        # TODO consider removing from superclass??
-        assert False
-
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
         if isinstance(subtree, Var): # May not be if rule is used directly outside of a RuleSet. Q: Do we want to support that case.
             if subtree.name in env:
@@ -146,9 +135,15 @@ class delete_let(Rule):
             return expr.vars in expr.body.free_vars
         return any(v in expr.body.free_vars for v in expr.vars)
 
+
     def apply_at(self, expr: Expr, path: Location) -> Expr:
-        assert not self._let_vars_used(expr)
-        return expr.body
+        # The constant here says that there are no free variables to avoid capturing en route to the target Location
+        return expr.replace_subtree(path, Const(0.0), self._apply)
+
+    def _apply(self, const_zero: Expr, let_node: Expr) -> Expr:
+        assert const_zero == Const(0.0) # Specified in apply_at
+        assert not self._let_vars_used(let_node)
+        return let_node.body
 
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr) -> Iterator[Rewrite]:
         if isinstance(subtree, Let) and not self._let_vars_used(subtree):
