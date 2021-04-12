@@ -131,3 +131,25 @@ class inline_var(Rule):
             if subtree.name in env:
                 binding_loc, bound_val = env[subtree.name]
                 yield Rewrite(self, root, path_from_root, binding_location=binding_loc, bound_value=bound_val)
+
+
+@singleton
+class delete_let(Rule):
+    @property
+    @staticmethod
+    def possible_expr_classes():
+        return {Let}
+
+    @staticmethod
+    def _let_vars_used(expr: Let) -> bool:
+        if isinstance(expr.vars, Var):
+            return expr.vars in expr.body.free_vars
+        return any(v in expr.body.free_vars for v in expr.vars)
+
+    def apply_at(self, expr: Expr, path: Location) -> Expr:
+        assert not self._let_vars_used(expr)
+        return expr.body
+
+    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr) -> Iterator[Rewrite]:
+        if isinstance(subtree, Let) and not self._let_vars_used(subtree):
+            yield Rewrite(self, root, path_from_root)
