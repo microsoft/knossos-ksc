@@ -80,3 +80,23 @@ def test_inline_var_renames():
     assert apply_in_only_location("inline_var", e) == parse_expr_string(
         "(let (x_0 (add x 1)) (add (add x 1) 2))"
     )
+
+def test_delete_let_tuple():
+    # We only allow removing the whole tuple. Do we need more rules to eliminate components of an explicit tuple?
+    check_nowhere_applicable("delete_let", parse_expr_string("(let ((a b) foo) (add a 1))"))
+    check_nowhere_applicable("delete_let", parse_expr_string("(let ((a b) foo) (add b 1))"))
+    assert apply_in_only_location("delete_let", parse_expr_string("(let ((a b) foo) (add 2 1))")
+        ) == parse_expr_string("(add 2 1)")
+
+def test_inline_tuple_elems():
+    check_nowhere_applicable("inline_var", parse_expr_string("(let ((a b) foo) (add a 2))"))
+    assert apply_in_only_location("inline_var", parse_expr_string("(let ((a b) (tuple 2 3)) (add a 5))")
+        ) == parse_expr_string("(let ((a b) (tuple 2 3)) (add 2 5))")
+
+    e = parse_expr_string("(let (a 5) (let ((a b) (tuple (add a 1) (add a 2))) (mul a b)))")
+    assert sorted_rewrites(rule("inline_var"), e) == [
+        parse_expr_string("(let (a 5) (let ((a b) (tuple (add 5 1) (add a 2))) (mul a b)))"),
+        parse_expr_string("(let (a 5) (let ((a b) (tuple (add a 1) (add 5 2))) (mul a b)))"),
+        parse_expr_string("(let (a 5) (let ((a_0 b) (tuple (add a 1) (add a 2))) (mul (add a 1) b)))"),
+        parse_expr_string("(let (a 5) (let ((a_0 b) (tuple (add a 1) (add a 2))) (mul a_0 (add a 2))))")
+    ]
