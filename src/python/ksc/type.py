@@ -199,11 +199,11 @@ class Type:
         """
         Construct type from a value
         """
-        if isinstance(val, (bool, np.bool)):
+        if isinstance(val, (bool, bool)):
             return Type.Bool
         if isinstance(val, (int, np.integer, np.int32, np.int64)):
             return Type.Integer
-        if isinstance(val, (float, np.float, np.float32, np.float64)):
+        if isinstance(val, (float, float, np.float32, np.float64)):
             return Type.Float
         if isinstance(val, str):
             return Type.String
