@@ -5,13 +5,12 @@
 
 void ks_backtrace();
 
-asserter::asserter(char const* expr, char const* file, int line)
+std::ostream & asserter::startAssertMessage(char const* expr, char const* file, int line)
 {
-    s = &std::cerr;
-    *s << "\n" << "KSC: "<< file << ":" << line << ": ASSERT FAIL[" << expr << "]";
+    return std::cerr << "\n" << "KSC: "<< file << ":" << line << ": ASSERT FAIL[" << expr << "]";
 }
 
-asserter::~asserter()
+void asserter::operator += (std::ostream &)
 {
     std::cerr << std::endl;
     ks_backtrace();

@@ -3,7 +3,7 @@
 
 (def fun Integer ((x : Integer) (y : Float))
                  (fun (add x 10) (sub (to_float x) y)))
-; MLIR: func @fun$aif(%arg0: i64, %arg1: f64) -> i64 {
+; MLIR: func private @fun$aif(%arg0: i64, %arg1: f64) -> i64 {
 ; MLIR-NEXT:  %c10{{.*}} = constant 10 : i64
 ; MLIR-NEXT:  %[[add:[0-9]+]] = addi %arg0, %c10{{.*}} : i64
 ; MLIR-NEXT:  %[[tof:[0-9]+]] = sitofp %arg0 : i64 to f64

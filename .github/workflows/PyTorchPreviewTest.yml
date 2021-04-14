@@ -1,0 +1,44 @@
+name: PyTorch (preview)
+
+on:
+
+  schedule:
+    - cron:  '5 4 * * *'
+  workflow_dispatch:
+
+  # named branch push is for testing while experimenting. Remove before merge to master
+  push:
+    branches:
+      - cogravil/pytorch_preview_ci
+
+jobs:
+  build:
+
+    runs-on: windows-2019
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Setup Python
+      uses: actions/setup-python@v2
+      with:
+        # Version range or exact version of a Python version to use, using SemVer's version range syntax.
+        python-version: 3.7
+    
+    - name: 'Make directories [userInstall]'
+      shell: pwsh
+      run: test/builds/mkdirs.ps1
+
+    - name: 'Install dependencies [userInstall]'
+      shell: cmd
+      run: call test/builds/install_windows.bat || sleep 30 && call test/builds/install_windows.bat || sleep 30 && call test/builds/install_windows.bat
+      
+    - name: 'GHC compile src/ksc/Main.hs [userTest]'
+      shell: cmd
+      run: refreshenv && C:/ProgramData/chocolatey/lib/cabal/tools/cabal-3.0.0.0/cabal v2-install --with-ghc=C:/ProgramData/chocolatey/lib/ghc/tools/ghc-8.4.4/bin/ghc --installdir=build/bin --overwrite-policy=always --install-method=copy
+
+    # Preview version of PyTorch
+    - name: Testing ksc python package [userTest]
+      shell: cmd
+      run: test/builds/test_pytest_PyTorchPreview.cmd
+      

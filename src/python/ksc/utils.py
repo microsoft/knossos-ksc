@@ -14,6 +14,8 @@ from tempfile import gettempdir
 
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
+from torch.utils.cpp_extension import load, load_inline
+
 class KRecord:
     """
     A smoother namedtuple -- like https://pythonhosted.org/pyrecord but using the existing class syntax.
@@ -231,8 +233,8 @@ def encode_name(s : str) -> str:
         replace('*',"$x").\
         replace(':',"$8")
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
 
+def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_type, generate_derivatives, use_aten):
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
     cpp_str = f"""
@@ -264,8 +266,8 @@ def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_typ
         """
 
     cpp_str += """
-PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
-    m.def("reset_allocator", []{g_alloc.reset();});
+PYBIND11_MODULE(""" + python_module_name + """, m) {
+    m.def("reset_allocator", []{ g_alloc.reset();});
     m.def("allocator_top", []{ return g_alloc.mark();});
     m.def("allocator_peak", []{ return g_alloc.peak();});
 
@@ -277,6 +279,12 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 }
 """
 
+    return cpp_str
+
+def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
+
+    cpp_str = __make_cpp_str(ks_str, name_to_call, "PYTHON_MODULE_NAME", arg_types, return_type, generate_derivatives, use_aten)
+
     cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
     print(f"Saving to {cpp_fname}")    
     with open(cpp_fname, "w") as fcpp:
@@ -284,6 +292,37 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
 
     module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
     return import_module_from_path(module_name, module_path)
+
+def build_module_using_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
+    """Uses PyTorch C++ extension mechanism to build and load a module"""
+    cpp_str = __make_cpp_str(ks_str, name_to_call, "TORCH_EXTENSION_NAME", arg_types, return_type, generate_derivatives, use_aten)
+
+    __ksc_path,ksc_runtime_dir = get_ksc_paths()
+
+    cflags = [
+        "-DKS_INCLUDE_ATEN" if use_aten else "",
+    ]
+
+    # I don't like this assumption about Windows -> cl but it matches what PyTorch is currently doing:
+    # https://github.com/pytorch/pytorch/blob/ad8d1b2aaaf2ba28c51b1cb38f86311749eff755/torch/utils/cpp_extension.py#L1374-L1378
+    # We're making a guess here if people recognifigure their C++ compiler on Windows it's because they're using non-MSVC
+    # otherwise we need to inspect the end of the path path for cl[.exe].
+
+    cpp_compiler = os.environ.get('CXX')
+    if (cpp_compiler == None and sys.platform == 'win32'):
+        cflags.append("/std:c++17")
+    else:
+        cflags.append("-std=c++17")
+        
+    # https://pytorch.org/docs/stable/cpp_extension.html
+    module = load_inline(
+                name="dynamic_ksc_cpp",
+                cpp_sources=[cpp_str],
+                extra_include_paths=[ksc_runtime_dir],
+                extra_cflags = cflags
+            )
+
+    return module
 
 def ndgrid_inds(sz):
     """

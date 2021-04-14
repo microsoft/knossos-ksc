@@ -13,13 +13,21 @@ import GHC.Stack
 
 import Data.Maybe (mapMaybe, fromMaybe)
 
--- for unit test
---import Test.Hspec
+{- Note [Automatic differentiation documentation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ksc has a variety of different automatic differentiation algorithms.
+Information about how to obtain the PDF in which our AD algorithms are
+documented can be found at
+
+https://github.com/microsoft/knossos-ksc/blob/master/README-ksc.md#getting-the-pdf
+
+-}
 
 --------------- Generate names for gradded indentifiers
 
 gradF :: HasCallStack => ADPlan -> Fun Typed -> Fun Typed
-gradF adm (Fun f) = GradFun f adm
+gradF adm (Fun JustFun f) = Fun (GradFun adm) f
 gradF _   f       = error ("gradF: bad function: " ++ show f)
 
 gradV :: ADPlan -> Var -> Var
@@ -50,10 +58,10 @@ gradDef adp = gradDefInner adp . noTupPatifyDef
 
 gradDefInner :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDefInner adp
-        (Def { def_fun = Fun f, def_pat = VarPat params
+        (Def { def_fun = Fun JustFun f, def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
-    Def { def_fun    = GradFun f adp
+    Def { def_fun    = Fun (GradFun adp) f
         , def_pat    = VarPat params
         , def_res_ty = mkGradType adp s_ty res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs')) }
@@ -78,6 +86,8 @@ gradDefInner _ (Def { def_pat = TupPat {} })
 gradDefInner _ _ = Nothing
 
 
+-- See Note [Automatic differentiation documentation]
+--
 -- s -> (Expr :: t) -> (Expr :: s -o t)
 gradE :: HasCallStack => ADPlan -> Shape -> TExpr -> TExpr
 gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
@@ -296,9 +306,9 @@ applyD dir def@(Def { def_pat = TupPat {} })
 --  Dt$f  :: S1 S2       -> (T, (S1,S2) -o T)
 -- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
 -- fwdt$f :: (S1, S2) (dS1, dS2) -> (T, dT)
-applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
+applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
-  = Def { def_fun    = DrvFun f (AD adp Fwd)
+  = Def { def_fun    = Fun (DrvFun (AD adp Fwd)) f
         , def_pat   = VarPat x_dx
         , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dx
         , def_res_ty = t }
@@ -326,9 +336,9 @@ applyD Fwd (Def { def_fun = GradFun f adp, def_res_ty = res_ty
 
 --   D$f :: S1 S2    -> ((S1,S2) -o T)
 -- rev$f :: (S1, S2) dT -> (dS1,dS2)
-applyD Rev (Def { def_fun = GradFun f adp, def_res_ty = res_ty
+applyD Rev (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
-  = Def { def_fun    = DrvFun f (AD adp Rev)
+  = Def { def_fun    = Fun (DrvFun (AD adp Rev)) f
         , def_pat    = VarPat x_dr
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
         , def_res_ty = tangentType (typeof x) }

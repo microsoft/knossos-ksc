@@ -47,19 +47,24 @@ bool isValidIdentifierChar(char c)
 {
     if (isalnum(c)) return true;
     // TODO: This could be much faster..
-    static std::string chars("!@$%^&*{}[]:.,<>?/'|=+-_~`");
+    static std::string chars("!@$%^&*{}:.,<>?/'|=+-_~`");
     return chars.find(c) != std::string::npos; 
 }
 
 // Lex a token out, recurse if another entry point is found
-Token::Ptr Lexer::lex()
+Token::Ptr Lexer::lex(char c)
 {
   ++depth;
-  Token* tok = new Token(loc);
+  Token* tok = new Token(loc, c);
+  char expected_closing_bracket = (c == 0) ? 0 : (c == '(') ? ')' : ']';
   while (pos < len) {
-    if (peek() == ')')
+    char next = peek();
+    if (next == ')' || next == ']') {
+      ASSERT(next == expected_closing_bracket) << "\n" 
+        << loc << ": Mismatched bracket: expected " << expected_closing_bracket << ", saw " << next << std::endl;
       break;
-    
+    }
+        
     Location cloc = loc;
     char c = get();
     switch (c) {
@@ -103,11 +108,11 @@ Token::Ptr Lexer::lex()
         }
         break;
 
+    case '[':
     case '(': {
       // Recurse into sub-tokens
-      tok->addChild(lex());
+      tok->addChild(lex(c));
       c = get();
-      assert(c == ')');
       break;
     }
 
@@ -132,11 +137,18 @@ Token::Ptr Lexer::lex()
         // Should restore stream flags, but exiting anyway.  Wow, ostream formatting...
     }
   }
-  if (verbosity+1 > depth) tok->dump(std::cerr << std::string(depth, '-'), depth) << "\n";
+  if (verbosity+1 > (int)depth) tok->dump(std::cerr << std::string(depth, '-'), depth) << "\n";
   --depth;
   return Token::Ptr(tok);
 }
 
+
+std::pair<char, char> getPrintableBrackets(Token const* tok) {
+  if (tok->getDelimeter() == '[')
+    return {'[', ']'};
+  else
+    return {'(', ')'};
+}
 
 //================================================ Dumps tokens, nodes to stdout
 
@@ -153,7 +165,7 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
   std::vector<std::string> strs;
   for (auto& t : tok->children) {
     ppresult p = pprint(t.get(), indent+tab, width);
-    if (p.width > maxwidth)
+    if ((int)p.width > maxwidth)
       maxwidth = p.width;
     mywidth += (first ? 0 : 1) + p.width;
     strs.push_back(p.s);
@@ -172,14 +184,15 @@ Token::ppresult Token::pprint(Token const* tok, int indent, int width)
   }
 
   first = true;
-  ret.s = "(";
+  auto brackets = getPrintableBrackets(tok);
+  ret.s += brackets.first;
   for (auto &s : strs) {
     if (!first)
       ret.s += sep;
     ret.s += s;
     first = false;
   }
-  ret.s += ")";
+  ret.s += brackets.second;
 
   return ret;
 }

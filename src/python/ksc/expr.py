@@ -25,9 +25,9 @@ from ksc.utils import paren, KRecord
 #      name  return_type  args                            body
 #
 # Edef: Declaration for externally-supplied function
-# (edef add   (Vec Float)  ((a : Float) (b : (Vec Float))) )
+# (edef add   (Vec Float)  (Tuple Float (Vec Float)))
 #       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#       name  return_type  args
+#       name  return_type  arg_type
 #
 # Rule: Rewrite rule for the Knossos optimizer 
 # (rule "add0"  (a : Float) (add a 0) a)
@@ -85,7 +85,7 @@ class StructuredName:
 
     def is_derivation(self):
         """
-        True if this is a "rev" or "fwd" etc of another StructuredName
+        True if this is a "rev"/"fwd" etc of another StructuredName
         """
         return isinstance(self.se, tuple) and isinstance(self.se[1], StructuredName)
 
@@ -116,12 +116,12 @@ class StructuredName:
         assert isinstance(self.se[1], Type)
         return self.se[0] + "@" + self.se[1].shortstr()
 
-    def has_type(self) -> Type:
+    def has_type(self) -> bool:
         """
         True if the innermost se is a type
         """
         if isinstance(self.se, str):
-            return None
+            return False
         
         if self.is_derivation():
             return self.se[1].has_type()
@@ -142,7 +142,7 @@ class StructuredName:
         assert isinstance(self.se[1], Type)
         return self.se[1]
 
-    def add_type(self, ty) -> (Type, 'StructuredName'):
+    def add_type(self, ty) -> ('StructuredName', Type):
         """
         Return a new structured name, with "ty" inserted in the corner, returning the old type if any
         sn = parse("[shape [rev foo]]")
@@ -151,13 +151,13 @@ class StructuredName:
             new_sname is "[shape [rev [foo Float]]]"
         """
         if isinstance(self.se, str):
-            return None, StructuredName((self.se, ty))
+            return StructuredName((self.se, ty)), None
         if self.is_derivation():
-            old_ty, new_sn = self.se[1].add_type(ty)
-            return old_ty, StructuredName((self.se[0], new_sn))
+            new_sn, old_ty  = self.se[1].add_type(ty)
+            return StructuredName((self.se[0], new_sn)), old_ty
         
         old_ty = self.se[1]
-        return old_ty, StructuredName((self.se[0], ty))
+        return StructuredName((self.se[0], ty)), old_ty
 
     def mangle_without_type(self) -> str:
         """
@@ -210,29 +210,33 @@ def make_structured_name(se) -> StructuredName:
 ########################################################################
 # TLDs. 
 
-class Expr(KRecord):
-    '''Base class for AST nodes.'''
-
-    type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
-    # TODO: lift Def,EDef,Rule to "ASTNode" and make Expr an "ASTNode".
-
-    def __init__(self, **args):
-        self.type_ = None
-        super().__init__(**args)
-
-    def nodes(self):
-        """
-        Return child nodes of this expr
-        """
-        assert False # TODO: remove this method
-        for nt in self.__annotations__:
-            yield getattr(self, nt)
+class ASTNode(KRecord):
+    ''' Base class for AST nodes. Not directly instantiable. '''
+    def __init__(self, **kwargs):
+        # This assertion prevents intermediate classes (ASTNode, Expr) from being instantiated.
+        # (KRecord doesn't mind).
+        assert kwargs.keys() == self.__annotations__.keys()
+        super().__init__(**kwargs)
 
     def __str__(self):
-        nodes = (str(getattr(self, nt)) for nt in self.__annotations__)
+        def to_str(v):
+            if isinstance(v, list):
+                # str() on list contains repr() of elements
+                return "[" + (", ".join([to_str(e) for e in v])) + "]"
+            return str(v)
+        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + ' ' + ' '.join(nodes))
 
-class Def(Expr):
+class Expr(ASTNode):
+    '''Base class for Expression AST nodes. Not directly instantiable.'''
+
+    type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
+
+    def __init__(self, **args):
+        self.type_ = args.pop("type_", None)
+        super().__init__(**args)
+
+class Def(ASTNode):
     '''Def(name, return_type, args, body). 
     Example:
     ```
@@ -250,23 +254,23 @@ class Def(Expr):
         assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
-class EDef(Expr):
-    '''Edef(name, return_type, args). 
+class EDef(ASTNode):
+    '''Edef(name, return_type, arg). 
     Example:
     ```
-    (edef add   (Vec Float)  (Float (Vec Float)) )
-          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          name  return_type  arg_types
+    (edef add   (Vec Float)  (Tuple Float (Vec Float)) )
+          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          name  return_type  arg_type
     ```
     '''
     name: StructuredName
     return_type: Type
-    arg_types: List[Type]
+    arg_type: Type
 
-    def __init__(self, name, return_type, arg_types):
-        super().__init__(name=name, return_type=return_type, arg_types=arg_types)
+    def __init__(self, name, return_type, arg_type):
+        super().__init__(name=name, return_type=return_type, arg_type=arg_type)
 
-class GDef(Expr):
+class GDef(ASTNode):
     '''Gdef(name, return_type, args). 
     Example:
     ```
@@ -284,7 +288,7 @@ class GDef(Expr):
     def name(self):
         return StructuredName((derivation, function_name))
 
-class Rule(Expr):
+class Rule(ASTNode):
     '''Rule(name, args, e1, e2). 
     Example:
     ```
@@ -482,7 +486,7 @@ def _(ex, indent):
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "#edef " + str(ex.name) + "(" + pystr_intercomma(indent, ex.arg_types) + ") -> "\
+    return "#edef " + str(ex.name) + pystr(ex.arg_type, indent) + " -> "\
            + pystr(ex.return_type, indent) + nl(indent)
 
 @pystr.register(GDef)

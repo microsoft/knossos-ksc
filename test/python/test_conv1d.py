@@ -5,13 +5,13 @@ from ksc.utils import translate_and_import
 def test_conv1d():
     # we need parentheses around Vec after ':' to parse correctly
     ks_str = """
-(edef add Integer (Integer Integer))
-(edef sub Integer (Integer Integer))
-(edef mul Integer (Integer Integer))
-(edef div Integer (Integer Integer))
-(edef lt Bool (Integer Integer))
-(edef gte Bool (Integer Integer))
-(edef or Bool (Bool Bool))
+(edef add Integer (Tuple Integer Integer))
+(edef sub Integer (Tuple Integer Integer))
+(edef mul Integer (Tuple Integer Integer))
+(edef div Integer (Tuple Integer Integer))
+(edef lt Bool (Tuple Integer Integer))
+(edef gte Bool (Tuple Integer Integer))
+(edef or Bool (Tuple Bool Bool))
 
 (def conv1d (Vec (Vec Float)) ((kernels : (Vec (Vec (Vec Float))))
                                (image : (Vec (Vec Float))))
@@ -49,13 +49,13 @@ def test_conv1d():
 def test_conv1d_tensors():
     # we need parentheses around Vec after ':' to parse correctly
     ks_str = """
-(edef add Integer (Integer Integer))
-(edef sub Integer (Integer Integer))
-(edef mul Integer (Integer Integer))
-(edef div Integer (Integer Integer))
-(edef lt Bool (Integer Integer))
-(edef gte Bool (Integer Integer))
-(edef or Bool (Bool Bool))
+(edef add Integer (Tuple Integer Integer))
+(edef sub Integer (Tuple Integer Integer))
+(edef mul Integer (Tuple Integer Integer))
+(edef div Integer (Tuple Integer Integer))
+(edef lt Bool (Tuple Integer Integer))
+(edef gte Bool (Tuple Integer Integer))
+(edef or Bool (Tuple Bool Bool))
 
 (def conv1d (Tensor 2 Float) ((kernels : (Vec (Tensor 2 Float)))
                                (image : (Tensor 2 Float)))

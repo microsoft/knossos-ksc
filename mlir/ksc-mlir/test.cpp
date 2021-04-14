@@ -116,7 +116,9 @@ void test_parser_let() {
   assert(def);
   // Let has two parts: variable definitions and expression
   assert(def->getType() == Type::Integer);
-  Variable* x = llvm::dyn_cast<Variable>(def->getVariable(0));
+  assert(!def->getBinding().isTupleUnpacking());
+  Variable* x = def->getBinding().getVariable();
+  assert(x);
   assert(x->getType() == Type::Integer);
   Call* expr = llvm::dyn_cast<Call>(def->getExpr());
   assert(expr);
@@ -133,6 +135,41 @@ void test_parser_let() {
   cout << "    OK\n";
 }
 
+void test_parser_tuple_let() {
+  cout << "\n == test_parser_tuple_let\n";
+  const Expr::Ptr tree = parse(LOC(), "(let ((a b) (tuple 1 5)) (add a b))");
+
+  // Root can have many exprs, here only one
+  Block* root = llvm::dyn_cast<Block>(tree.get());
+  assert(root);
+  // Kind is Let
+  Let* def = llvm::dyn_cast<Let>(root->getOperand(0));
+  assert(def);
+  // Let has two parts: variable definitions and expression
+  assert(def->getType() == Type::Integer);
+  assert(def->getBinding().isTupleUnpacking());
+  assert(Tuple::classof(def->getBinding().getInit()));
+  Variable* a = def->getBinding().getTupleVariable(0);
+  assert(a);
+  assert(a->getType() == Type::Integer);
+  Variable* b = def->getBinding().getTupleVariable(1);
+  assert(b);
+  assert(b->getType() == Type::Integer);
+  Call* expr = llvm::dyn_cast<Call>(def->getExpr());
+  assert(expr);
+  assert(expr->getDeclaration()->getName() == "add");
+  assert(expr->getType() == Type::Integer);
+  auto var_a = llvm::dyn_cast<Variable>(expr->getOperand(0));
+  assert(var_a);
+  assert(var_a->getName() == "a");
+  assert(var_a->getType() == Type::Integer);
+  auto var_b = llvm::dyn_cast<Variable>(expr->getOperand(1));
+  assert(var_b);
+  assert(var_b->getName() == "b");
+  assert(var_b->getType() == Type::Integer);
+  cout << "    OK\n";
+}
+
 void test_parser_decl() {
   cout << "\n == test_parser_decl\n";
   const Expr::Ptr tree = parse(LOC(), "(edef fun Float (Integer String Bool))");
@@ -146,9 +183,10 @@ void test_parser_decl() {
   // Declaration has 3 parts: name, return type, arg types decl
   assert(decl->getName() == "fun");
   assert(decl->getType() == Type::Float);
-  assert(decl->getArgTypes()[0] == Type::Integer);
-  assert(decl->getArgTypes()[1] == Type::String);
-  assert(decl->getArgTypes()[2] == Type::Bool);
+  assert(decl->getArgType().isTuple());
+  assert(decl->getArgType().getSubType(0) == Type::Integer);
+  assert(decl->getArgType().getSubType(1) == Type::String);
+  assert(decl->getArgType().getSubType(2) == Type::Bool);
   cout << "    OK\n";
 }
 
@@ -308,22 +346,23 @@ void test_parser_vector_type() {
   // Check vectors were detected properly
   auto fooTy = foo->getType();
   assert(fooTy == Type::Vector && fooTy.getSubType() == Type::Float);
-  auto fooArgTy = foo->getArgType(0);
+  auto fooArgTy = foo->getArgType();
   assert(fooArgTy == Type::Vector && fooArgTy.getSubType() == Type::Float);
   auto barTy = bar->getType();
   assert(barTy == Type::Vector && barTy.getSubType() == Type::Vector);
   auto barSubTy = barTy.getSubType();
   assert(barSubTy == Type::Vector && barSubTy.getSubType() == Type::Float);
-  assert(bar->getArgType(0) == Type::Integer);
-  auto barArgTy = bar->getArgType(1);
+  assert(bar->getArgType().isTuple());
+  assert(bar->getArgType().getSubType(0) == Type::Integer);
+  auto barArgTy = bar->getArgType().getSubType(1);
   assert(barArgTy == Type::Vector && barArgTy.getSubType() == Type::Float);
-  assert(bar->getArgType(2) == Type::Float);
+  assert(bar->getArgType().getSubType(2) == Type::Float);
   cout << "    OK\n";
 }
 
 void test_parser_build() {
   cout << "\n == test_parser_build\n";
-  const Expr::Ptr tree = parse(LOC(), "(build 10 (lam (i : Integer) (add i i))))");
+  const Expr::Ptr tree = parse(LOC(), "(build 10 (lam (i : Integer) (add i i)))");
 
   // Root can have many exprs, here only one
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -370,16 +409,17 @@ void test_parser_vector() {
   // Check vectors were detected properly
   auto fooTy = foo->getType();
   assert(fooTy == Type::Vector && fooTy.getSubType() == Type::Float);
-  auto fooArgTy = foo->getArgType(0);
+  auto fooArgTy = foo->getArgType();
   assert(fooArgTy == Type::Vector && fooArgTy.getSubType() == Type::Float);
   auto barTy = bar->getType();
   assert(barTy == Type::Vector && barTy.getSubType() == Type::Vector);
   auto barSubTy = barTy.getSubType();
   assert(barSubTy == Type::Vector && barSubTy.getSubType() == Type::Float);
-  assert(bar->getArgType(0) == Type::Integer);
-  auto barArgTy = bar->getArgType(1);
+  assert(bar->getArgType().isTuple());
+  assert(bar->getArgType().getSubType(0) == Type::Integer);
+  auto barArgTy = bar->getArgType().getSubType(1);
   assert(barArgTy == Type::Vector && barArgTy.getSubType() == Type::Float);
-  assert(bar->getArgType(2) == Type::Float);
+  assert(bar->getArgType().getSubType(2) == Type::Float);
   cout << "    OK\n";
 }
 
@@ -399,27 +439,28 @@ void test_parser_tuple_type() {
   assert(foo && bar && baz);
   // Check vectors were detected properly
   auto fooTy = foo->getType();
-  assert(fooTy == Type::Tuple && fooTy.getSubType(0) == Type::Float);
-  auto fooArgTy = foo->getArgType(0);
-  assert(fooArgTy == Type::Tuple &&
+  assert(fooTy.isTuple() && fooTy.getSubType(0) == Type::Float);
+  auto fooArgTy = foo->getArgType();
+  assert(fooArgTy.isTuple() &&
          fooArgTy.getSubType(0) == Type::Float &&
          fooArgTy.getSubType(1) == Type::Float);
   auto barTy = bar->getType();
   assert(barTy == Type::Float);
-  assert(bar->getArgType(0) == Type::Integer);
-  auto barArgTy = bar->getArgType(1);
-  assert(barArgTy == Type::Tuple &&
+  assert(bar->getArgType().isTuple());
+  assert(bar->getArgType().getSubType(0) == Type::Integer);
+  auto barArgTy = bar->getArgType().getSubType(1);
+  assert(barArgTy.isTuple() &&
          barArgTy.getSubType(0) == Type::Float &&
          barArgTy.getSubType(1) == Type::Float);
-  assert(bar->getArgType(2) == Type::Float);
+  assert(bar->getArgType().getSubType(2) == Type::Float);
   auto bazTy = baz->getType();
   assert(bazTy == Type::Bool);
-  auto bazArgTy = baz->getArgType(0);
-  assert(bazArgTy == Type::Tuple &&
+  auto bazArgTy = baz->getArgType();
+  assert(bazArgTy.isTuple() &&
          bazArgTy.getSubType(0) == Type::Float &&
-         bazArgTy.getSubType(1) == Type::Tuple);
+         bazArgTy.getSubType(1).isTuple());
   auto bazSubArgTy = bazArgTy.getSubType(1);
-  assert(bazSubArgTy == Type::Tuple &&
+  assert(bazSubArgTy.isTuple() &&
          bazSubArgTy.getSubType(0) == Type::Integer &&
          bazSubArgTy.getSubType(1) == Type::Float);
   cout << "    OK\n";
@@ -436,7 +477,7 @@ void test_parser_tuple() {
   Tuple* tuple = llvm::dyn_cast<Tuple>(root->getOperand(0));
   assert(tuple);
   auto type = tuple->getType();
-  assert(type == Type::Tuple &&
+  assert(type.isTuple() &&
          type.getSubType(0) == Type::Float &&
          type.getSubType(1) == Type::Bool &&
          type.getSubType(2) == Type::Integer);
@@ -472,11 +513,10 @@ void test_parser_fold() {
   const Expr::Ptr tree = parse(LOC(), "\n"
                                "(def fun Float (v : (Vec Float))\n"
                                " (fold (lam (acc_x : (Tuple Float Float))\n"
-                               "   (let ((acc (get$1$2 acc_x))\n"
-                               "         (x   (get$2$2 acc_x)))\n"
-                               "         (mul acc x)))"
-                               "    1.0"
-                               "    v))");
+                               "   (let ((acc x) acc_x)\n"
+                               "     (mul acc x)))\n"
+                               "   1.0\n"
+                               "   v))");
 
   // Root can have many exprs, here two
   Block* root = llvm::dyn_cast<Block>(tree.get());
@@ -493,36 +533,32 @@ void test_parser_fold() {
   assert(vec->getType() == Type::Vector);
   assert(vec->getType().getSubType() == Type::Float);
   assert(vec->getName() == "v");
-  // Accumulator
-  Variable* acc = llvm::dyn_cast<Variable>(fold->getAcc());
-  assert(acc);
-  assert(acc->getType() == Type::Tuple);
-  assert(acc->getType().getSubType(0) == Type::Float);
-  assert(acc->getType().getSubType(1) == Type::Float);
-  Tuple* init = llvm::dyn_cast<Tuple>(acc->getInit());
+  // Lambda parameter
+  Variable* acc_x = fold->getLambdaParameter();
+  assert(acc_x);
+  assert(acc_x->getType().isTuple());
+  assert(acc_x->getType().getSubType(0) == Type::Float);
+  assert(acc_x->getType().getSubType(1) == Type::Float);
+  // Init
+  Literal* init = llvm::dyn_cast<Literal>(fold->getInit());
   assert(init);
-  Literal* init0 = llvm::dyn_cast<Literal>(init->getElement(0));
-  assert(init0);
-  assert(init0->getType() == Type::Float);
-  assert(init0->getValue() == "1.0");
-  Literal* init1 = llvm::dyn_cast<Literal>(init->getElement(1));
-  assert(init1);
-  assert(init1->getType() == Type::Float);
-  assert(init1->getValue() == "0.0");
+  assert(init->getType() == Type::Float);
+  assert(init->getValue() == "1.0");
   // Lambda variables
   Let* let = llvm::dyn_cast<Let>(fold->getBody());
   assert(let);
   assert(let->getType() == Type::Float);
-  Variable* letAcc = llvm::dyn_cast<Variable>(let->getVariable(0));
-  assert(letAcc);
-  assert(letAcc->getType() == Type::Float);
-  assert(letAcc->getName() == "acc");
-  assert(Get::classof(letAcc->getInit()));
-  Variable* letX = llvm::dyn_cast<Variable>(let->getVariable(1));
-  assert(letX);
-  assert(letX->getType() == Type::Float);
-  assert(letX->getName() == "x");
-  assert(Get::classof(letX->getInit()));
+  Binding const& letBinding = let->getBinding();
+  assert(letBinding.isTupleUnpacking());
+  Variable* letAccVar = letBinding.getTupleVariable(0);
+  assert(letAccVar);
+  assert(letAccVar->getType() == Type::Float);
+  assert(letAccVar->getName() == "acc");
+  Variable* letXVar = letBinding.getTupleVariable(1);
+  assert(letXVar);
+  assert(letXVar->getType() == Type::Float);
+  assert(letXVar->getName() == "x");
+  assert(Variable::classof(letBinding.getInit()));
   // Lambda operation
   Call* op = llvm::dyn_cast<Call>(let->getExpr());
   assert(op);
@@ -562,6 +598,7 @@ int test_all(int v=0) {
 
   test_parser_block();
   test_parser_let();
+  test_parser_tuple_let();
   test_parser_decl();
   test_parser_def();
   test_parser_decl_def_use();

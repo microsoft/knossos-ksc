@@ -58,8 +58,8 @@ data DefX p  -- f x = e
   -- Definitions are user-annotated with argument types
   -- (via TVar) and result types (via TFun)
 
-deriving instance (Eq (BaseUserFunT p), Eq (RhsX p)) => Eq (DefX p)
-deriving instance (Show (BaseUserFunT p), Show (RhsX p)) => Show (DefX p)
+deriving instance (Eq (BaseUserFunArgTy p), Eq (RhsX p)) => Eq (DefX p)
+deriving instance (Show (BaseUserFunArgTy p), Show (RhsX p)) => Show (DefX p)
 
 type Def  = DefX Parsed
 type TDef = DefX Typed
@@ -85,6 +85,9 @@ isUserDef _ = False
 data Derivation = DerivationDrvFun ADMode
                 | DerivationCLFun
                 | DerivationShapeFun
+                | DerivationSUFFwdPass
+                | DerivationSUFRevPass
+                | DerivationSUFRev
   deriving ( Show, Eq, Ord )
 
 data GDefX = GDef Derivation (UserFun Typed)
@@ -141,10 +144,7 @@ Multiple arguments are implicitly wrapped in a tuple.  That is, the syntax
 means the same thing as
 
     (def f T (x : (Tuple S1 ... Sn))
-        (let ((x1 (get$1$n x))
-              ...
-              (xn (get$n$n x)))
-       ...))
+        (let ((x1 ... xn) x) ...))
 
 and the surface syntax
 
@@ -356,10 +356,13 @@ identified by a 'Fun'.  The internal structure of a 'Fun' is:
 
   See definition of 'type Fun'
 
-* A base function is a pair of name (e.g. 'mul') and argument type
+* A base function is either a primitive ('PrimFun') or a base user
+  function ('BaseUserFun')
+
+* A base user function is a pair of name (e.g. 'mul') and argument type
   (e.g. (Float, Float))
 
-  See definition of 'type BaseFun'.  The reason we need a (name, type)
+  See definition of 'data BaseUserFun'.  The reason we need a (name, type)
   pair is that distinct global functions can have the same name but
   different argument type. See below.
 
@@ -398,32 +401,38 @@ types.
 
 -}
 
-data BaseUserFun p = BaseUserFunId String (BaseUserFunT p)
+data BaseUserFun p = BaseUserFunId String (BaseUserFunArgTy p)
 
-deriving instance Eq (BaseUserFunT p) => Eq (BaseUserFun p)
-deriving instance Ord (BaseUserFunT p) => Ord (BaseUserFun p)
-deriving instance Show (BaseUserFunT p) => Show (BaseUserFun p)
+deriving instance Eq (BaseUserFunArgTy p) => Eq (BaseUserFun p)
+deriving instance Ord (BaseUserFunArgTy p) => Ord (BaseUserFun p)
+deriving instance Show (BaseUserFunArgTy p) => Show (BaseUserFun p)
 
-type family BaseUserFunT p where
-  BaseUserFunT Parsed   = Maybe Type
-  BaseUserFunT OccAnald = Type
-  BaseUserFunT Typed    = Type
+type family BaseUserFunArgTy p where
+  BaseUserFunArgTy Parsed   = Maybe Type
+  BaseUserFunArgTy OccAnald = Type
+  BaseUserFunArgTy Typed    = Type
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
              | PrimFun PrimFun      -- PrimFuns do not have a Def
 
-deriving instance Eq   (BaseUserFunT p) => Eq   (BaseFun p)
-deriving instance Ord  (BaseUserFunT p) => Ord  (BaseFun p)
-deriving instance Show (BaseUserFunT p) => Show (BaseFun p)
+deriving instance Eq   (BaseUserFunArgTy p) => Eq   (BaseFun p)
+deriving instance Ord  (BaseUserFunArgTy p) => Ord  (BaseFun p)
+deriving instance Show (BaseUserFunArgTy p) => Show (BaseFun p)
 
-data DerivedFun funid
-                = Fun      funid         -- The function              f(x)
-                | GradFun  funid ADPlan  -- Full Jacobian Df(x)
-                | DrvFun   funid ADMode  -- Derivative derivative f'(x,dx)
-                                         --   Rev <=> reverse mode f`(x,dr)
-                | CLFun    funid         -- f(x), roundtripped through CatLang
-                | ShapeFun (DerivedFun funid)
+data Derivations
+  = JustFun        -- The function              f(x)
+  | GradFun ADPlan -- Full Jacobian Df(x)
+  | DrvFun ADMode  -- Derivative derivative f'(x,dx)
+                   --   Rev <=> reverse mode f`(x,dr)
+  | CLFun          -- f(x), roundtripped through CatLang
+  | ShapeFun Derivations
+  | SUFFwdPass
+  | SUFRevPass
+  | SUFRev
+  deriving (Eq, Ord, Show)
+
+data DerivedFun funid = Fun Derivations funid
                 deriving (Eq, Ord, Show)
 
 -- DerivedFun has just two instantiations
@@ -436,84 +445,65 @@ data DerivedFun funid
 type UserFun p = DerivedFun (BaseUserFun p)
 type Fun     p = DerivedFun (BaseFun p)
 
-baseUserFunT :: Functor f
-             => (BaseUserFunT p -> f (BaseUserFunT q))
-             -> BaseUserFun p -> f (BaseUserFun q)
+baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
+                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
 baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
 
-baseUserFunBaseFun :: Applicative f
-                   => (BaseUserFun p -> f (BaseUserFun q))
-                   -> (BaseFun p -> f (BaseFun q))
+baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun q)
+                                  (BaseUserFun p) (BaseUserFun q)
 baseUserFunBaseFun f = \case
   BaseUserFun u -> BaseUserFun <$> f u
   PrimFun p    -> pure (PrimFun p)
 
-baseFunFun :: Functor f
-           => (funid -> f funid')
-           -> (DerivedFun funid -> f (DerivedFun funid'))
-baseFunFun f = \case
-  Fun fi       -> fmap Fun (f fi)
-  GradFun fi p -> fmap (\f' -> GradFun f' p) (f fi)
-  DrvFun fi p  -> fmap (\f' -> DrvFun f' p) (f fi)
-  ShapeFun ff  -> fmap ShapeFun (baseFunFun f ff)
-  CLFun fi     -> fmap CLFun (f fi)
+baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
+                     funid funid'
+baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
 
-userFunBaseType :: forall p f. (InPhase p, Applicative f)
-                => (Maybe Type -> f Type)
-                -> UserFun p -> f (UserFun Typed)
+userFunBaseType :: forall p. InPhase p
+                => T.Lens (UserFun p) (UserFun Typed)
+                          (Maybe Type) Type
 userFunBaseType = baseFunFun . baseUserFunType @p
 
-funType :: Applicative f
-        => (BaseUserFunT p -> f (BaseUserFunT q))
-        -> Fun p -> f (Fun q)
+funType :: T.Traversal (Fun p) (Fun q)
+                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
 funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
 
+-- In the Parsed phase, if the user didn't supply a type, add it;
+-- otherwise (and in other phases, where the type is there) check that
+-- the type matches.  If mis-match return (Left
+-- type-that-was-in-UserFun)
 addBaseTypeToUserFun :: forall p. InPhase p
                      => UserFun p -> Type -> Either Type (UserFun Typed)
-addBaseTypeToUserFun f expectedBaseTy = case mismatchedAppliedTyL of
-  []   -> Right fWithBaseType
-  -- We can only ever have one mismatched type but the type system
-  -- doesn't know this (affine traversals don't exist)
-  mismatchedAppliedTy:_ -> Left mismatchedAppliedTy
-  where (mismatchedAppliedTyL, fWithBaseType) =
-          T.traverseOf (userFunBaseType @p) g f
+addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) checkBaseType userfun
+  where checkBaseType :: Maybe Type -> Either Type Type
+        checkBaseType maybeAppliedType
+          | Just appliedTy <- maybeAppliedType
+          , not (eqType appliedTy expectedBaseTy)
+          = Left appliedTy
+          | otherwise
+          = Right expectedBaseTy
 
-        mismatchedAppliedTyF = \case
-          Just appliedTy -> if eqType appliedTy expectedBaseTy
-                            then []
-                            else [appliedTy]
-          Nothing -> []
-
-        g mt' = (mismatchedAppliedTyF mt', expectedBaseTy)
 
 userFunToFun :: UserFun p -> Fun p
-userFunToFun = T.mapOf baseFunFun BaseUserFun
+userFunToFun = T.over baseFunFun BaseUserFun
 
 -- A 'Fun p' is Either:
 --
 -- Right: a 'UserFun p', or
--- Left:  a 'SelFun' or 'PrimFun' (with no Phase type label)
-perhapsUserFun :: Fun p -> Either (Fun q) (UserFun p)
-perhapsUserFun = \case
-  Fun f -> either (Left . Fun) (Right . Fun) (baseFunToBaseUserFunE f)
-  GradFun f p -> either (\f' -> Left $ GradFun f' p)
-                        (\f' -> Right $ GradFun f' p)
-                        (baseFunToBaseUserFunE f)
-  DrvFun f m -> either (\f' -> Left $ DrvFun f' m)
-                       (\f' -> Right $ DrvFun f' m)
-                       (baseFunToBaseUserFunE f)
-  ShapeFun f -> either (Left . ShapeFun) (Right . ShapeFun) (perhapsUserFun f)
-  CLFun f    -> either (Left . CLFun) (Right . CLFun) (baseFunToBaseUserFunE f)
+-- Left:  a 'PrimFun'
+perhapsUserFun :: Fun p -> Either (DerivedFun PrimFun) (UserFun p)
+perhapsUserFun (Fun ds baseFun) =
+  either (Left . Fun ds) (Right . Fun ds) (baseFunToBaseUserFunE baseFun)
 
 maybeUserFun :: Fun p -> Maybe (UserFun p)
 maybeUserFun f = case perhapsUserFun f of
   Right f -> Just f
   Left _ -> Nothing
 
-baseFunToBaseUserFunE :: BaseFun p -> Either (BaseFun q) (BaseUserFun p)
+baseFunToBaseUserFunE :: BaseFun p -> Either PrimFun (BaseUserFun p)
 baseFunToBaseUserFunE = \case
   BaseUserFun u    -> Right u
-  PrimFun p    -> Left (PrimFun p)
+  PrimFun p    -> Left p
 
 baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
 baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
@@ -530,12 +520,7 @@ isSelFun = \case
   PrimFun{} -> False
 
 baseFunOfFun :: Fun p -> BaseFun p
-baseFunOfFun = \case
-  Fun f       -> f
-  GradFun f _ -> f
-  DrvFun f _  -> f
-  ShapeFun f  -> baseFunOfFun f
-  CLFun f     -> f
+baseFunOfFun (Fun _ baseFun) = baseFun
 
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
@@ -553,9 +538,9 @@ deriving instance Ord (Fun p) => Ord (TFun p)
 
 -- Morally this is just 'coerce' but I don't know how to persuade
 -- GHC's machinery to allow that.
-coerceTFun :: BaseUserFunT p ~ BaseUserFunT q
+coerceTFun :: BaseUserFunArgTy p ~ BaseUserFunArgTy q
            => TFun p -> TFun q
-coerceTFun (TFun t f) = TFun t (T.mapOf funType id f)
+coerceTFun (TFun t f) = TFun t (T.over funType id f)
 
 
 data Var
@@ -643,20 +628,11 @@ mkLets xs e = foldr (uncurry mkLet) e xs
 kInt :: Integer -> ExprX p
 kInt i = Konst (KInteger i)
 
-kTInt :: Integer -> TExpr
-kTInt i = Konst (KInteger i)
-
-kFloat :: Double -> Expr
+kFloat :: Double -> ExprX p
 kFloat f = Konst (KFloat f)
 
-kTFloat :: Double -> TExpr
-kTFloat f = Konst (KFloat f)
-
-zeroInt :: TExpr
-zeroInt = Konst (KInteger 0)
-
 zeroFloat :: TExpr
-zeroFloat = Konst (KFloat 0.0)
+zeroFloat = kFloat 0
 
 mkTuple :: [ExprX p] -> ExprX p
 mkTuple [e] = e
@@ -677,7 +653,7 @@ dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun el_ty
-                        (Fun (PrimFun (P_SelFun i n)))) e
+                        (Fun JustFun (PrimFun (P_SelFun i n)))) e
            where
              el_ty = case typeof e of
                         TypeTuple ts -> ts !! (i-1)
@@ -904,9 +880,8 @@ class InPhase p where
   getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
-  baseUserFunType :: Functor f
-                  => (Maybe Type -> f Type)
-                  -> BaseUserFun p -> f (BaseUserFun Typed)
+  baseUserFunType :: T.Lens (BaseUserFun p) (BaseUserFun Typed)
+                            (Maybe Type) Type
 
 instance InPhase Parsed where
   pprVar     = ppr
@@ -931,7 +906,7 @@ instance InPhase Typed where
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
-    where fun' = T.mapOf funType Just fun
+    where fun' = T.over funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
@@ -945,7 +920,7 @@ instance InPhase OccAnald where
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
-    where fun' = T.mapOf funType Just fun
+    where fun' = T.over funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
@@ -1057,17 +1032,22 @@ pprPrimFun = \case
   P_lmVariant -> text "P_lmVariant"
 
   P_SelFun i n -> text "get$" <> int i <> char '$' <> int n
+  P_dup n -> text "dup$" <> int n
+  P_elim -> text "elim"
 
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 
 pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
-pprDerivedFun f (Fun s)                   = f s
-pprDerivedFun f (GradFun  s adp)          = brackets (char 'D'   <> ppr adp <+> f s)
-pprDerivedFun f (DrvFun   s (AD adp Fwd)) = brackets (text "fwd" <> ppr adp <+> f s)
-pprDerivedFun f (DrvFun   s (AD adp Rev)) = brackets (text "rev" <> ppr adp <+> f s)
-pprDerivedFun f (ShapeFun sf)             = brackets (text "shape" <+> pprDerivedFun f sf)
-pprDerivedFun f (CLFun    s)              = brackets (text "CL" <+> f s)
+pprDerivedFun f (Fun JustFun s)               = f s
+pprDerivedFun f (Fun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> f s)
+pprDerivedFun f (Fun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> f s)
+pprDerivedFun f (Fun (DrvFun   (AD adp Rev)) s) = brackets (text "rev" <> ppr adp <+> f s)
+pprDerivedFun f (Fun (ShapeFun ds) sf)             = brackets (text "shape" <+> pprDerivedFun f (Fun ds sf))
+pprDerivedFun f (Fun CLFun    s)              = brackets (text "CL" <+> f s)
+pprDerivedFun f (Fun SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
+pprDerivedFun f (Fun SUFRevPass s)            = brackets (text "sufrevpass" <+> f s)
+pprDerivedFun f (Fun SUFRev s)                = brackets (text "sufrev" <+> f s)
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -1178,14 +1158,9 @@ pprCall prec f e = mode
 
 pprLetSexp :: forall p. InPhase p
            => PatG (LetBndrX p) -> ExprX p -> ExprX p -> SDoc
-pprLetSexp v e =
-      go [(v,e)]
-    where
-      go binds (Let v1 e1 body) = go ((v1,e1):binds) body
-      go binds body =
-            parens $ sep [text "let", parens $ vcat (map parenBind $ reverse binds),
-                        ppr body]
-      parenBind (v,e) = parens $ pprPatLetBndr @p v <+> ppr e
+pprLetSexp v e body =
+      parens $ vcat [ text "let" <+> (parens $ pprPatLetBndr @p v <+> ppr e),
+                      ppr body]
 
 
 parensIf :: Prec -> Prec -> SDoc -> SDoc
@@ -1211,6 +1186,9 @@ instance Pretty Derivation where
     DerivationDrvFun (AD TupleAD Rev) -> text "revt"
     DerivationCLFun    -> text "CL"
     DerivationShapeFun -> text "shape"
+    DerivationSUFFwdPass -> text "suffwdpass"
+    DerivationSUFRevPass -> text "sufrevpass"
+    DerivationSUFRev     -> text "sufrev"
 
 pprDef :: forall p. InPhase p => DefX p -> SDoc
 pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
@@ -1293,8 +1271,8 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (Fun (BaseUserFun (BaseUserFunId "g" Nothing))) (var "i")
-      e2 = Call (Fun (BaseUserFun (BaseUserFunId "f" Nothing))) (Tuple [e, var "_t1", kInt 5])
+      e  = Call (Fun JustFun (BaseUserFun (BaseUserFunId "g" Nothing))) (var "i")
+      e2 = Call (Fun JustFun (BaseUserFun (BaseUserFunId "f" Nothing))) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"
@@ -1484,6 +1462,8 @@ data PrimFun = P_inline
              | P_lmZero
              | P_lmOne
              | P_SelFun Int Int -- P_SelFun index arity.  1-indexed, so (SelFun 1 2) is fst
+             | P_dup Int
+             | P_elim
              | P_lmApplyTR
              | P_lmFold
              | P_FFold

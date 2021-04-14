@@ -51,10 +51,10 @@ def test_tuple_of_tensors():
 
 def test_if_then_else():
     ks_str = """
-(edef lt Bool (Float Float))
+(edef lt Bool (Tuple Float Float))
 (def cost$lt Float ((a : Float) (b : Float)) 1.0)
 (def shape$lt Integer ((a : Float) (b : Float)) (tuple))
-(edef eq Bool (Float Float))
+(edef eq Bool (Tuple Float Float))
 (def cost$eq Float ((a : Float) (b : Float)) 1.0)
 (def shape$eq Integer ((a : Float) (b : Float)) (tuple))
 (def sign Float ((x : Float))

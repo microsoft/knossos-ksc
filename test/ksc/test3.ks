@@ -6,6 +6,9 @@
 
 (gdef fwd [f (Tuple (Vec Float) (Vec Float))])
 (gdef rev [f (Tuple (Vec Float) (Vec Float))])
+(gdef suffwdpass [f (Tuple (Vec Float) (Vec Float))])
+(gdef sufrevpass [f (Tuple (Vec Float) (Vec Float))])
+(gdef sufrev [f (Tuple (Vec Float) (Vec Float))])
 
 (def q (Vec Float) ((r : Float) (m : Integer) (a : Vec Float))
   (let (n (size a))
@@ -13,18 +16,27 @@
 
 (gdef fwd [q (Tuple Float Integer (Vec Float))])
 (gdef rev [q (Tuple Float Integer (Vec Float))])
+(gdef suffwdpass [q (Tuple Float Integer (Vec Float))])
+(gdef sufrevpass [q (Tuple Float Integer (Vec Float))])
+(gdef sufrev [q (Tuple Float Integer (Vec Float))])
 
 (def mkvec (Vec Float) (n : Integer)
     (build n (lam (j : Integer) (to_float j))))
 
 (gdef fwd [mkvec Integer])
 (gdef rev [mkvec Integer])
+(gdef suffwdpass [mkvec Integer])
+(gdef sufrevpass [mkvec Integer])
+(gdef sufrev [mkvec Integer])
 
 (def sqnorm Float (v : Vec Float)
   (sum (build (size v) (lam (i : Integer) (let (vi (index i v)) (mul vi vi))))))
 
 (gdef fwd [sqnorm (Vec Float)])
 (gdef rev [sqnorm (Vec Float)])
+(gdef suffwdpass [sqnorm (Vec Float)])
+(gdef sufrevpass [sqnorm (Vec Float)])
+(gdef sufrev [sqnorm (Vec Float)])
 
 #|
 
@@ -39,6 +51,9 @@
 
 (gdef fwd [g Float])
 (gdef rev [g Float])
+(gdef suffwdpass [g Float])
+(gdef sufrevpass [g Float])
+(gdef sufrev [g Float])
 
 #|
 

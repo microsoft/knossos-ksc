@@ -110,7 +110,7 @@ toCLDef_maybe  (Def { def_fun    = fun
                     , def_pat    = pat
                     , def_res_ty = res_ty
                     , def_rhs    = rhs })
-  | Fun f     <- fun
+  | Fun JustFun f <- fun
   , UserRhs e <- rhs
   = Just CLDef { cldef_fun = f
                , cldef_arg = pat
@@ -226,7 +226,7 @@ fromCLDef (CLDef { cldef_fun = f
                  , cldef_arg = pat
                  , cldef_rhs = rhs
                  , cldef_res_ty = res_ty })
-  = Def { def_fun    = Fun f
+  = Def { def_fun    = Fun JustFun f
         , def_pat    = pat
         , def_res_ty = res_ty
         , def_rhs    = UserRhs rhs' }

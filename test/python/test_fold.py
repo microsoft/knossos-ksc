@@ -2,11 +2,11 @@ from ksc.utils import translate_and_import
 
 def test_fold():
     ks_str = """
-(edef add Integer (Integer Integer))
-(edef sub Integer (Integer Integer))
-(edef mul Integer (Integer Integer))
-(edef div Integer (Integer Integer))
-(edef eq Bool (Integer Integer))
+(edef add Integer (Tuple Integer Integer))
+(edef sub Integer (Tuple Integer Integer))
+(edef mul Integer (Tuple Integer Integer))
+(edef div Integer (Tuple Integer Integer))
+(edef eq Bool (Tuple Integer Integer))
 (def mod (Integer) ((x : Integer) (y : Integer))
   (sub x (mul (div x y) y)))
 

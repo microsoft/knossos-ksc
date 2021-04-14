@@ -5,6 +5,9 @@
 
 (gdef fwd [idMat (Tensor 2 Float)])
 (gdef rev [idMat (Tensor 2 Float)])
+(gdef suffwdpass [idMat (Tensor 2 Float)])
+(gdef sufrevpass [idMat (Tensor 2 Float)])
+(gdef sufrev [idMat (Tensor 2 Float)])
 
 (def testElement Float ((i : Integer) (j : Integer) (k : Integer) (c : Float))
     (add (add (add (mul 2.0 (to_float i))
@@ -14,23 +17,44 @@
 
 (gdef fwd [testElement (Tuple Integer Integer Integer Float)])
 (gdef rev [testElement (Tuple Integer Integer Integer Float)])
+(gdef suffwdpass [testElement (Tuple Integer Integer Integer Float)])
+(gdef sufrevpass [testElement (Tuple Integer Integer Integer Float)])
+(gdef sufrev [testElement (Tuple Integer Integer Integer Float)])
 
 (def zeroTensorInAD Float (m : Tensor 2 Float) 0.0)
 
 (gdef fwd [zeroTensorInAD (Tensor 2 Float)])
 (gdef rev [zeroTensorInAD (Tensor 2 Float)])
+(gdef suffwdpass [zeroTensorInAD (Tensor 2 Float)])
+(gdef sufrevpass [zeroTensorInAD (Tensor 2 Float)])
+(gdef sufrev [zeroTensorInAD (Tensor 2 Float)])
 
 (def constTensor2 (Tensor 2 Float) ((ignored : Float))
     (build (tuple 3 3) (lam (ij : (Tuple Integer Integer)) 0.0)))
 
 (gdef fwd [constTensor2 Float])
 (gdef rev [constTensor2 Float])
+(gdef suffwdpass [constTensor2 Float])
+(gdef sufrevpass [constTensor2 Float])
+(gdef sufrev [constTensor2 Float])
 
 (def constvecInAD (Tensor 2 Float) ((v1 : Vec Float) (ignored : Integer))
      (constVec (tuple (size v1) (size v1)) 2.0))
 
 (gdef fwd [constvecInAD (Tuple (Vec Float) Integer)])
 (gdef rev [constvecInAD (Tuple (Vec Float) Integer)])
+(gdef suffwdpass [constvecInAD (Tuple (Vec Float) Integer)])
+(gdef sufrevpass [constvecInAD (Tuple (Vec Float) Integer)])
+(gdef sufrev [constvecInAD (Tuple (Vec Float) Integer)])
+
+(def multiDimIndex Float ((i : Tuple Integer Integer) (t : Tensor 2 Float))
+     (index i t))
+
+(gdef fwd [multiDimIndex (Tuple (Tuple Integer Integer) (Tensor 2 Float))])
+(gdef rev [multiDimIndex (Tuple (Tuple Integer Integer) (Tensor 2 Float))])
+(gdef suffwdpass [multiDimIndex (Tuple (Tuple Integer Integer) (Tensor 2 Float))])
+(gdef sufrevpass [multiDimIndex (Tuple (Tuple Integer Integer) (Tensor 2 Float))])
+(gdef sufrev [multiDimIndex (Tuple (Tuple Integer Integer) (Tensor 2 Float))])
 
 (def main Integer ()
     (let (vvv (build 2 (lam (i : Integer)

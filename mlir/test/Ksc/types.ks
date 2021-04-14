@@ -2,17 +2,17 @@
 ; RUN: ksc-mlir LLVM %s 2>&1 | FileCheck %s --check-prefix=LLVM
 
 (edef fun Bool (Integer Float))
-; MLIR: func @fun$aif(i64, f64) -> i1
+; MLIR: func private @fun$aif(i64, f64) -> i1
 ; LLVM: declare i1 @"fun$aif"(i64 %0, double %1)
 
 (edef fun2 (Vec Float) (Vec Float))
-; MLIR:     func @fun2$avf(memref<?xf64>) -> memref<?xf64>
+; MLIR:     func private @fun2$avf(memref<?xf64>) -> memref<?xf64>
 ; LLVM:     declare { double*, double*, i64, [1 x i64], [1 x i64] } @"fun2$avf"(double* %0, double* %1, i64 %2, i64 %3, i64 %4)
 
 (def fun@ii Integer ((ai : Integer) (bi : Integer) (ci : Integer)) (
   (add (mul ai bi) ci)
 ))
-; MLIR:       func @fun$aii$aiii(%arg0: i64, %arg1: i64, %arg2: i64) -> i64 {
+; MLIR:       func private @fun$aii$aiii(%arg0: i64, %arg1: i64, %arg2: i64) -> i64 {
 ; MLIR-NEXT:    %[[mul:[0-9]+]] = muli %arg0, %arg1 : i64
 ; MLIR-NEXT:    %[[add:[0-9]+]] = addi %[[mul]], %arg2 : i64
 ; MLIR-NEXT:    return %[[add]] : i64
@@ -27,7 +27,7 @@
 (def fun@ff Float ((af : Float) (bf : Float) (cf : Float)) (
   (add (mul af bf) cf)
 ))
-; MLIR:       func @fun$aff$afff(%arg0: f64, %arg1: f64, %arg2: f64) -> f64 {
+; MLIR:       func private @fun$aff$afff(%arg0: f64, %arg1: f64, %arg2: f64) -> f64 {
 ; MLIR-NEXT:    %[[mul:[0-9]+]] = mulf %arg0, %arg1 : f64
 ; MLIR-NEXT:    %[[add:[0-9]+]] = addf %[[mul]], %arg2 : f64
 ; MLIR-NEXT:    return %[[add]] : f64
@@ -40,10 +40,10 @@
 ; LLVM-NEXT:  }
 
 (def main Integer ()
-; MLIR:      func @main() -> i64 {
+; MLIR:      func private @main() -> i64 {
 ; LLVM:      define i64 @main() {
 
-  (let ((a (fun@ff 10.0 20.0 30.0))
+  (let (a (fun@ff 10.0 20.0 30.0))
 ; MLIR-NEXT:  %cst = constant 1.000000e+01 : f64
 ; MLIR-NEXT:  %cst_0 = constant 2.000000e+01 : f64
 ; MLIR-NEXT:  %cst_1 = constant 3.000000e+01 : f64
@@ -51,7 +51,7 @@
 
 ; LLVM-NEXT:  %[[func:[0-9]+]] = call double @"fun$aff$afff"(double 1.000000e+01, double 2.000000e+01, double 3.000000e+01)
 
-        (b (fun@ii 10 20 30)))
+  (let (b (fun@ii 10 20 30))
 ; MLIR-NEXT:  %c10{{.*}} = constant 10 : i64
 ; MLIR-NEXT:  %c20{{.*}} = constant 20 : i64
 ; MLIR-NEXT:  %c30{{.*}} = constant 30 : i64
@@ -59,7 +59,7 @@
 
 ; LLVM-NEXT:  %[[func:[0-9]+]] = call i64 @"fun$aii$aiii"(i64 10, i64 20, i64 30)
   b
-))
+)))
 ; AST does not return anything
 ; MLIR: return %[[func]] : i64
 ; LLVM: ret i64 %[[func]]

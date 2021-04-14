@@ -8,7 +8,7 @@
 (def ia Integer ((x : Integer) (y : Integer))
   (let (a (div (mul (add x y) (sub y x)) 10)) a)
 )
-; MLIR: func @ia$aii(%arg0: i64, %arg1: i64) -> i64 {
+; MLIR: func private @ia$aii(%arg0: i64, %arg1: i64) -> i64 {
 ; MLIR-DAG:   %[[add:[0-9]+]] = addi %arg0, %arg1 : i64
 ; MLIR-DAG:   %[[sub:[0-9]+]] = subi %arg1, %arg0 : i64
 ; MLIR-DAG:   %[[mul:[0-9]+]] = muli %[[add]], %[[sub]] : i64
@@ -26,7 +26,7 @@
 (def fa Float ((x : Float) (y : Float))
   (let (b (div (mul (add x y) (sub y x)) 10.0)) b)
 )
-; MLIR: func @fa$aff(%arg0: f64, %arg1: f64) -> f64 {
+; MLIR: func private @fa$aff(%arg0: f64, %arg1: f64) -> f64 {
 ; MLIR-DAG:   %[[add:[0-9]+]] = addf %arg0, %arg1 : f64
 ; MLIR-DAG:   %[[sub:[0-9]+]] = subf %arg1, %arg0 : f64
 ; MLIR-DAG:   %[[mul:[0-9]+]] = mulf %[[add]], %[[sub]] : f64
@@ -51,14 +51,14 @@
           ))
         c)
 )
-; MLIR: func @ic$aii(%arg0: i64, %arg1: i64) -> i1 {
-; MLIR-DAG:   %[[sge:[0-9]+]] = cmpi "sge", %arg0, %arg1 : i64
-; MLIR-DAG:   %[[sle:[0-9]+]] = cmpi "sle", %arg0, %arg1 : i64
-; MLIR-DAG:   %[[eq:[0-9]+]] = cmpi "eq", %arg0, %arg1 : i64
-; MLIR-DAG:   %[[ne:[0-9]+]] = cmpi "ne", %arg1, %arg0 : i64
+; MLIR: func private @ic$aii(%arg0: i64, %arg1: i64) -> i1 {
+; MLIR-DAG:   %[[sge:[0-9]+]] = cmpi sge, %arg0, %arg1 : i64
+; MLIR-DAG:   %[[sle:[0-9]+]] = cmpi sle, %arg0, %arg1 : i64
+; MLIR-DAG:   %[[eq:[0-9]+]] = cmpi eq, %arg0, %arg1 : i64
+; MLIR-DAG:   %[[ne:[0-9]+]] = cmpi ne, %arg1, %arg0 : i64
 ; MLIR-DAG:   %[[or1:[0-9]+]] = or %[[eq]], %[[ne]] : i1
-; MLIR-DAG:   %[[slt:[0-9]+]] = cmpi "slt", %arg0, %arg1 : i64
-; MLIR-DAG:   %[[sgt:[0-9]+]] = cmpi "sgt", %arg1, %arg0 : i64
+; MLIR-DAG:   %[[slt:[0-9]+]] = cmpi slt, %arg0, %arg1 : i64
+; MLIR-DAG:   %[[sgt:[0-9]+]] = cmpi sgt, %arg1, %arg0 : i64
 ; MLIR-DAG:   %[[or2:[0-9]+]] = or %[[slt]], %[[sgt]] : i1
 ; MLIR-DAG:   %[[and:[0-9]+]] = and %[[or1]], %[[or2]] : i1
 ; MLIR-DAG:   %[[sel:[0-9]+]] = select %[[and]], %[[sge]], %[[sle]] : i1
@@ -85,14 +85,14 @@
           ))
         d)
 )
-; MLIR: func @fc$aff(%arg0: f64, %arg1: f64) -> i1 {
-; MLIR-DAG:   %[[oge:[0-9]+]] = cmpf "oge", %arg0, %arg1 : f64
-; MLIR-DAG:   %[[ole:[0-9]+]] = cmpf "ole", %arg0, %arg1 : f64
-; MLIR-DAG:   %[[oeq:[0-9]+]] = cmpf "oeq", %arg0, %arg1 : f64
-; MLIR-DAG:   %[[one:[0-9]+]] = cmpf "one", %arg1, %arg0 : f64
+; MLIR: func private @fc$aff(%arg0: f64, %arg1: f64) -> i1 {
+; MLIR-DAG:   %[[oge:[0-9]+]] = cmpf oge, %arg0, %arg1 : f64
+; MLIR-DAG:   %[[ole:[0-9]+]] = cmpf ole, %arg0, %arg1 : f64
+; MLIR-DAG:   %[[oeq:[0-9]+]] = cmpf oeq, %arg0, %arg1 : f64
+; MLIR-DAG:   %[[one:[0-9]+]] = cmpf one, %arg1, %arg0 : f64
 ; MLIR-DAG:   %[[or1:[0-9]+]] = or %[[oeq]], %[[one]] : i1
-; MLIR-DAG:   %[[olt:[0-9]+]] = cmpf "olt", %arg0, %arg1 : f64
-; MLIR-DAG:   %[[ogt:[0-9]+]] = cmpf "ogt", %arg1, %arg0 : f64
+; MLIR-DAG:   %[[olt:[0-9]+]] = cmpf olt, %arg0, %arg1 : f64
+; MLIR-DAG:   %[[ogt:[0-9]+]] = cmpf ogt, %arg1, %arg0 : f64
 ; MLIR-DAG:   %[[or2:[0-9]+]] = or %[[olt]], %[[ogt]] : i1
 ; MLIR-DAG:   %[[and:[0-9]+]] = and %[[or1]], %[[or2]] : i1
 ; MLIR-DAG:   %[[sel:[0-9]+]] = select %[[and]], %[[oge]], %[[ole]] : i1
@@ -116,10 +116,10 @@
 (def fu Float ((x : Integer))
   (let (e (abs (neg (exp (log (to_float x)))))) e)
 )
-; MLIR: func @fu$ai(%arg0: i64) -> f64 {
+; MLIR: func private @fu$ai(%arg0: i64) -> f64 {
 ; MLIR:   %[[cast:[0-9]+]] = sitofp %arg0 : i64 to f64
-; MLIR:   %[[log:[0-9]+]] = log %[[cast]] : f64
-; MLIR:   %[[exp:[0-9]+]] = exp %[[log]] : f64
+; MLIR:   %[[log:[0-9]+]] = math.log %[[cast]] : f64
+; MLIR:   %[[exp:[0-9]+]] = math.exp %[[log]] : f64
 ; MLIR:   %[[neg:[0-9]+]] = negf %[[exp]] : f64
 ; MLIR:   %[[abs:[0-9]+]] = absf %[[neg]] : f64
 ; MLIR:   return %[[abs]] : f64
@@ -140,11 +140,11 @@
 (def userDef Bool ((arg0 : Integer) (arg1 : Float))
   (and (add arg0 arg1) (eq (add@ii arg0 arg0) 10))
 )
-; MLIR: func @userDef$aif(%arg0: i64, %arg1: f64) -> i1 {
+; MLIR: func private @userDef$aif(%arg0: i64, %arg1: f64) -> i1 {
 ; MLIR-DAG:   %[[add:[0-9]+]] = call @add$aif(%arg0, %arg1) : (i64, f64) -> i1
 ; MLIR-DAG:   %[[call:[0-9]+]] = call @add$aii$aii(%arg0, %arg0) : (i64, i64) -> i64
 ; MLIR-DAG:   %c10{{.*}} = constant 10 : i64
-; MLIR-DAG:   %[[eq:[0-9]+]] = cmpi "eq", %[[call]], %c10{{.*}} : i64
+; MLIR-DAG:   %[[eq:[0-9]+]] = cmpi eq, %[[call]], %c10{{.*}} : i64
 ; MLIR-DAG:   %[[and:[0-9]+]] = and %[[add]], %[[eq]] : i1
 ; MLIR:   return %[[and]] : i1
 

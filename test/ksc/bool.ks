@@ -6,3 +6,6 @@
 
 (gdef fwd [g (Tuple)])
 (gdef rev [g (Tuple)])
+(gdef suffwdpass [g (Tuple)])
+(gdef sufrevpass [g (Tuple)])
+(gdef sufrev [g (Tuple)])

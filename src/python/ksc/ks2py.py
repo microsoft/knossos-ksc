@@ -47,7 +47,7 @@ def _(ex, indent, body):
 @emit.register(EDef)
 def _(ex, indent, body):
     indent += 1
-    return "#edef " + pyname(ex.name) + "(" + emit_intercomma(indent, ex.arg_types, body) + ") -> "\
+    return "#edef " + pyname(ex.name) + emit(ex.arg_type, indent, body) + ") -> "\
            + pystr(ex.return_type, indent) + nl(indent)
 
 @emit.register(GDef)

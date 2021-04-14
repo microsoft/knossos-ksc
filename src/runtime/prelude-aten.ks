@@ -19,6 +19,9 @@
     (lt a b))
 (gdef fwd [aten::lt (Tuple Float Float)])
 (gdef rev [aten::lt (Tuple Float Float)])
+(gdef suffwdpass [aten::lt (Tuple Float Float)])
+(gdef sufrevpass [aten::lt (Tuple Float Float)])
+(gdef sufrev [aten::lt (Tuple Float Float)])
 
 (def aten::lt Bool ((a : Integer) (b : Float))
     (lt (to_float a) b))
@@ -29,6 +32,9 @@
     (lt a b))
 (gdef fwd [aten::lt (Tuple Integer Integer)])
 (gdef rev [aten::lt (Tuple Integer Integer)])
+(gdef suffwdpass [aten::lt (Tuple Integer Integer)])
+(gdef sufrevpass [aten::lt (Tuple Integer Integer)])
+(gdef sufrev [aten::lt (Tuple Integer Integer)])
 
 ;; mul
 (def aten::mul Float ((a : Float) (b : Float))
@@ -50,6 +56,9 @@
     (ts_scale b a))
 (gdef fwd [aten::mul (Tuple (Tensor 2 Float) Float)])
 (gdef rev [aten::mul (Tuple (Tensor 2 Float) Float)])
+(gdef suffwdpass [aten::mul (Tuple (Tensor 2 Float) Float)])
+(gdef sufrevpass [aten::mul (Tuple (Tensor 2 Float) Float)])
+(gdef sufrev [aten::mul (Tuple (Tensor 2 Float) Float)])
 
 (def aten::mul (Tensor 2 Float) ((a : Float) (b : Tensor 2 Float))
     (ts_scale a b))
@@ -67,6 +76,9 @@
         (mul (index inds a) (index inds b)))))
 (gdef fwd [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
 (gdef rev [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
+(gdef suffwdpass [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
+(gdef sufrevpass [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
+(gdef sufrev [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
 
 ;; add
 (def aten::add Float ((a : Float) (b : Float))
@@ -105,6 +117,9 @@
     (to_float a))
 (gdef fwd [aten::Float Integer])
 (gdef rev [aten::Float Integer])
+(gdef suffwdpass [aten::Float Integer])
+(gdef sufrevpass [aten::Float Integer])
+(gdef sufrev [aten::Float Integer])
 
 (def aten::Float Float (a : Float)
     a)
@@ -115,6 +130,9 @@
     a)
 (gdef fwd [aten::Bool Bool])
 (gdef rev [aten::Bool Bool])
+(gdef suffwdpass [aten::Bool Bool])
+(gdef sufrevpass [aten::Bool Bool])
+(gdef sufrev [aten::Bool Bool])
 
 (def aten::Bool Bool (a : Float)
     (not (eq a 0.0)))
@@ -126,6 +144,9 @@
         (sin (index ij a)))))
 (gdef fwd [aten::sin (Tensor 2 Float)])
 (gdef rev [aten::sin (Tensor 2 Float)])
+(gdef suffwdpass [aten::sin (Tensor 2 Float)])
+(gdef sufrevpass [aten::sin (Tensor 2 Float)])
+(gdef sufrev [aten::sin (Tensor 2 Float)])
 
 (def aten::sin (Tensor 1 Float) (a : Tensor 1 Float)
     (build (size a) (lam (ij : Integer)
@@ -145,11 +166,11 @@
 (gdef fwd [aten::pow (Tuple Float Integer)])
 (gdef rev [aten::pow (Tuple Float Integer)])
 
-(edef aten::pow (Tensor 2 Float) ((Tensor 2 Float) Integer))
+(edef aten::pow (Tensor 2 Float) (Tuple (Tensor 2 Float) Integer))
 (def [shape aten::pow] (Tensor 2 (Tuple)) ((a : Tensor 2 Float) (n : Integer))
     (shape a))
-(edef [D aten::pow] (LM (Tuple (Tensor 2 Float) Integer) (Tensor 2 Float)) ((Tensor 2 Float) Integer))
-(edef [Dt aten::pow] (Tuple (Tensor 2 Float) (LM (Tuple (Tensor 2 Float) Integer) (Tensor 2 Float))) ((Tensor 2 Float) Integer))
+(edef [D aten::pow] (LM (Tuple (Tensor 2 Float) Integer) (Tensor 2 Float)) (Tuple (Tensor 2 Float) Integer))
+(edef [Dt aten::pow] (Tuple (Tensor 2 Float) (LM (Tuple (Tensor 2 Float) Integer) (Tensor 2 Float))) (Tuple (Tensor 2 Float) Integer))
 
 (def [rev aten::pow] (Tuple (Tensor 2 Float) (Tuple)) ((a_n : Tuple (Tensor 2 Float) Integer) (dr : Tensor 2 Float))
     (let ((a n) a_n)
@@ -163,22 +184,40 @@
     (let (nanm1 (ts_scale (to_float n) (aten::pow a (sub n 1))))
     (aten::mul nanm1 da)))))
 
+(def [suffwdpass aten::pow]
+     (Tuple (Tensor 2 Float) (Tuple (Tensor 2 Float) Integer))
+     (t : Tuple (Tensor 2 Float) Integer)
+     (tuple (aten::pow t) t))
+(def [sufrevpass [aten::pow (Tuple (Tensor 2 Float) Integer)]]
+     (Tuple (Tensor 2 Float) (Tuple))
+     ((d_dr : Tensor 2 Float) (bog : Tuple (Tensor 2 Float) Integer))
+     ([rev aten::pow] bog d_dr))
+(gdef sufrev [aten::pow (Tuple (Tensor 2 Float) Integer)])
 
 (def aten::prod Float (a : Tuple Float Float)
     (mul (get$1$2 a) (get$2$2 a)))
 (gdef fwd [aten::prod (Tuple Float Float)])
 (gdef rev [aten::prod (Tuple Float Float)])
+(gdef suffwdpass [aten::prod (Tuple Float Float)])
+(gdef sufrevpass [aten::prod (Tuple Float Float)])
+(gdef sufrev [aten::prod (Tuple Float Float)])
 
 (def aten::prod Integer (a : Tuple Integer Integer)
     (mul (get$1$2 a) (get$2$2 a)))
 (gdef fwd [aten::prod (Tuple Integer Integer)])
 (gdef rev [aten::prod (Tuple Integer Integer)])
+(gdef suffwdpass [aten::prod (Tuple Integer Integer)])
+(gdef sufrevpass [aten::prod (Tuple Integer Integer)])
+(gdef sufrev [aten::prod (Tuple Integer Integer)])
 
 (def aten::sum Float (a : Tensor 2 Float)
     (sumbuild (size a) (lam (ij : Tuple Integer Integer)
             (index ij a))))
 (gdef rev [aten::sum (Tensor 2 Float)])
 (gdef fwd [aten::sum (Tensor 2 Float)])
+(gdef suffwdpass [aten::sum (Tensor 2 Float)])
+(gdef sufrevpass [aten::sum (Tensor 2 Float)])
+(gdef sufrev [aten::sum (Tensor 2 Float)])
 
 (def aten::sum Float (a : Tensor 1 Float)
     (sumbuild (size a) (lam (ij : Integer)
@@ -190,6 +229,8 @@
     (div (aten::sum a) (aten::Float (aten::prod (size a)))))
 (gdef fwd [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
 (gdef rev [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
+(gdef suffwdpass [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
+(gdef sufrevpass [aten::mean (Tuple (Tensor 2 Float) (Tuple))])
 
 (def aten::mean Float ((a : Tensor 1 Float) (opt_dtype : (Tuple)))
     (div (aten::sum a) (aten::Float (size a))))
@@ -232,14 +273,14 @@
 (gdef rev [aten::tensor (Tuple (Vec Float) (Tuple) (Tuple) Bool)])
 
 ; mul Mat Vec
-(edef aten::matmul (Tensor 1 Float) ((Tensor 2 Float) (Tensor 1 Float)))
+(edef aten::matmul (Tensor 1 Float) (Tuple (Tensor 2 Float) (Tensor 1 Float)))
 (def [shape aten::matmul] (Tensor 1 (Tuple)) ((m : (Tensor 2 Float)) (v : (Tensor 1 Float)))
           (constVec (size v) (tuple)))
 
 (edef [D aten::matmul] (LM (Tuple (Tensor 2 Float) (Tensor  1 Float)) (Tensor  1 Float))
-          ((Tensor 2 Float) (Tensor  1 Float)))
+          (Tuple (Tensor 2 Float) (Tensor  1 Float)))
 (edef [Dt aten::matmul] (Tuple (Tensor  1 Float) (LM (Tuple (Tensor 2 Float) (Tensor  1 Float)) (Tensor  1 Float)))
-          ((Tensor 2 Float) (Tensor  1 Float)))
+          (Tuple (Tensor 2 Float) (Tensor  1 Float)))
 
 (def [fwd aten::matmul] (Tensor 1 Float)
           ((M_v : (Tuple (Tensor 2 Float) (Tensor  1 Float))) (dM_dv : (Tuple (Tensor 2 Float) (Tensor  1 Float))))
@@ -248,10 +289,10 @@
         (ts_add (aten::matmul dM v) (aten::matmul M dv)))))
 
 (edef [rev aten::matmul] (Tuple (Tensor 2 Float) (Tensor  1 Float))
-          ((Tuple (Tensor 2 Float) (Tensor  1 Float)) (Tensor  1 Float)))
+          (Tuple (Tuple (Tensor 2 Float) (Tensor  1 Float)) (Tensor  1 Float)))
 
 
-(edef aten::matmul (Tensor 2 Float) ((Tensor 2 Float) (Tensor 2 Float)))
+(edef aten::matmul (Tensor 2 Float) (Tuple (Tensor 2 Float) (Tensor 2 Float)))
 (def [shape aten::matmul] (Tensor 2 (Tuple)) ((A : (Tensor 2 Float)) (B : (Tensor 2 Float)))
     (let ((M N) (size A))
     (let ((N1 P) (size B))
@@ -260,9 +301,9 @@
 
 (edef [D aten::matmul] (LM (Tuple (Tensor 2 Float) (Tensor  2 Float)) 
                          (Tensor  2 Float))
-          ((Tensor 2 Float) (Tensor  2 Float)))
+          (Tuple (Tensor 2 Float) (Tensor  2 Float)))
 (edef [Dt aten::matmul] (Tuple (Tensor  2 Float) (LM (Tuple (Tensor 2 Float) (Tensor  2 Float)) (Tensor  2 Float)))
-          ((Tensor 2 Float) (Tensor  2 Float)))
+          (Tuple (Tensor 2 Float) (Tensor  2 Float)))
 (def [fwd aten::matmul] (Tensor 2 Float)
           ((A_B : (Tuple (Tensor 2 Float) (Tensor 2 Float))) 
            (dA_dB : (Tuple (Tensor 2 Float) (Tensor 2 Float))))
@@ -284,17 +325,17 @@
 ;             (let ((i j) ij)
 ;                 (add (index (tuple i j) A) (index j b))))))))
                 
-(edef addA1bt (Tensor 2 Float) ((Tensor 2 Float) (Tensor 1 Float)))
+(edef addA1bt (Tensor 2 Float) (Tuple (Tensor 2 Float) (Tensor 1 Float)))
 (def [shape addA1bt] (Tensor 2 (Tuple)) ((a : Tensor 2 Float) (b : Tensor 1 Float))
     (shape a))
-(edef [D addA1bt] (LM (Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float)) ((Tensor 2 Float) (Tensor 1 Float)))
-(edef [Dt addA1bt] (Tuple (Tensor 2 Float) (LM (Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float))) ((Tensor 2 Float) (Tensor 1 Float)))
+(edef [D addA1bt] (LM (Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float)) (Tuple (Tensor 2 Float) (Tensor 1 Float)))
+(edef [Dt addA1bt] (Tuple (Tensor 2 Float) (LM (Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float))) (Tuple (Tensor 2 Float) (Tensor 1 Float)))
 (def [fwd addA1bt] (Tensor 2 Float) ((arg : Tuple (Tensor 2 Float) (Tensor 1 Float)) (darg : Tuple (Tensor 2 Float) (Tensor 1 Float)))
     (let ((dA db) darg)
      (addA1bt dA db)))
-(edef [rev addA1bt] (Tuple (Tensor 2 Float) (Tensor 1 Float)) ((Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float)))
-(def [shape [rev addA1bt]] (Tuple (Tensor 2 (Tuple)) (Tensor 1 (Tuple))) ((a : Tuple (Tensor 2 Float) (Tensor 1 Float)) (dret : Tensor 2 Float))
-    (shape a))
+(edef [rev addA1bt] (Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tuple (Tuple (Tensor 2 Float) (Tensor 1 Float)) (Tensor 2 Float)))
+; (def [shape [rev addA1bt]] (Tuple (Tensor 2 (Tuple)) (Tensor 1 (Tuple))) ((a : Tuple (Tensor 2 Float) (Tensor 1 Float)) (dret : Tensor 2 Float))
+;     (shape a))
 
 ; Applies a linear transformation to the incoming data: :math:`y = X A^T + b`.
 
@@ -335,7 +376,7 @@
 (gdef fwd [aten::len (Tensor 1 Float)])
 (gdef rev [aten::len (Tensor 1 Float)])
 
-(edef prim::min Integer ((Tensor 1 Integer)))
+(edef prim::min Integer (Tensor 1 Integer))
 (edef [D [prim::min (Tensor 1 Integer)]] (LM (Tensor 1 Integer) Integer) ((Tensor 1 Integer)))
 (def [fwd [prim::min (Tensor 1 Integer)]] (Tuple) ((a : Tensor 1 Integer) (da : Tensor 1 (Tuple)))
     (tuple))
@@ -350,22 +391,22 @@
 (gdef rev [aten::select (Tuple (Vec Float) Integer Integer)])
 
 ;; cat, transpose
-(edef aten::__getitem__ (Tensor 2 Float) ((Tensor 1 (Tensor 2 Float)) Integer))
-(edef [D aten::__getitem__] (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)) ((Tensor 1 (Tensor 2 Float)) Integer))
+(edef aten::__getitem__ (Tensor 2 Float) (Tuple (Tensor 1 (Tensor 2 Float)) Integer))
+(edef [D aten::__getitem__] (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)) (Tuple (Tensor 1 (Tensor 2 Float)) Integer))
 ; (def [rev aten::__getitem__] (Tuple (Tensor 1 (Tensor 2 Float)) Integer) ((t : (Tuple (Tensor 1 (Tensor 2 Float)) Integer)) 
 ;                                                                          (dret : (Tensor 2 Float)))
 ;    )
 
-(edef aten::cat (Tensor 2 Float) ((Tensor 1 (Tensor 2 Float)) Integer))
-(edef [shape aten::cat] (Tensor 2 (Tuple)) ((Tensor 1 (Tensor 2 Float)) Integer))
-(edef [D aten::cat] (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)) ((Tensor 1 (Tensor 2 Float)) Integer))
-(edef [Dt aten::cat] (Tuple (Tensor 2 Float) (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float))) ((Tensor 1 (Tensor 2 Float)) Integer))
+(edef aten::cat (Tensor 2 Float) (Tuple (Tensor 1 (Tensor 2 Float)) Integer))
+(edef [shape aten::cat] (Tensor 2 (Tuple)) (Tuple (Tensor 1 (Tensor 2 Float)) Integer))
+(edef [D aten::cat] (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)) (Tuple (Tensor 1 (Tensor 2 Float)) Integer))
+(edef [Dt aten::cat] (Tuple (Tensor 2 Float) (LM (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float))) (Tuple (Tensor 1 (Tensor 2 Float)) Integer))
 (def [fwd aten::cat] (Tensor 2 Float) ((as_i : Tuple (Tensor 1 (Tensor 2 Float)) Integer) (da : Tuple (Tensor 1 (Tensor 2 Float)) (Tuple)))
     (let ((as i) as_i)
     (let ((das _) da)
       (aten::cat das i))))
-(edef [rev aten::cat] (Tuple (Tensor 1 (Tensor 2 Float)) (Tuple)) ((Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)))
-(edef [shape [rev aten::cat]] (Tuple (Tensor 1 (Tensor 2 (Tuple))) (Tuple)) ((Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)))
+(edef [rev aten::cat] (Tuple (Tensor 1 (Tensor 2 Float)) (Tuple)) (Tuple (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)))
+(edef [shape [rev aten::cat]] (Tuple (Tensor 1 (Tensor 2 (Tuple))) (Tuple)) (Tuple (Tuple (Tensor 1 (Tensor 2 Float)) Integer) (Tensor 2 Float)))
 
 
 ; Splits a tensor into a specific number of chunks. Each chunk is a view of the input tensor.
@@ -374,19 +415,19 @@
 ; input (Tensor) – the tensor to split
 ; chunks (int) – number of chunks to return
 ; dim (int) – dimension along which to split the tensor
-(edef aten::chunk (Vec (Tensor 2 Float)) ((Tensor 2 Float) Integer Integer))
-(edef [D aten::chunk] (LM (Tuple (Tensor 2 Float) Integer Integer) (Vec (Tensor 2 Float))) ((Tensor 2 Float) Integer Integer))
+(edef aten::chunk (Vec (Tensor 2 Float)) (Tuple (Tensor 2 Float) Integer Integer))
+(edef [D aten::chunk] (LM (Tuple (Tensor 2 Float) Integer Integer) (Vec (Tensor 2 Float))) (Tuple (Tensor 2 Float) Integer Integer))
 ; (def [rev aten::chunk] (Tuple (Tensor 2 Float) Integer Integer) ((t : (Tuple (Tensor 2 Float) Integer Integer)) (dret : (Vec (Tensor 2 Float))))
 
-(edef aten::sigmoid (Tensor 2 Float) ((Tensor 2 Float)))
-(edef [D aten::sigmoid] (LM (Tensor 2 Float) (Tensor 2 Float)) ((Tensor 2 Float)))
+(edef aten::sigmoid (Tensor 2 Float) (Tensor 2 Float))
+(edef [D aten::sigmoid] (LM (Tensor 2 Float) (Tensor 2 Float)) (Tensor 2 Float))
 ; (def [rev aten::sigmoid] (Tuple (Tensor 2 Float)) ((t : (Tuple (Tensor 2 Float))) (dret : (Tensor 2 Float)))
 ;    )
 
 ; https://pytorch.org/docs/stable/_modules/torch/nn/functional.html#elu
 ;     :math:`\text{ELU}(x) = \max(0,x) + \min(0, \alpha * (\exp(x) - 1))`.
-(edef elu (Tensor 2 Float) ((Tensor 2 Float) Float Bool))
-(edef [D elu] (LM (Tuple (Tensor 2 Float) Float Bool) (Tensor 2 Float)) ((Tensor 2 Float) Float Bool))
+(edef elu (Tensor 2 Float) (Tuple (Tensor 2 Float) Float Bool))
+(edef [D elu] (LM (Tuple (Tensor 2 Float) Float Bool) (Tensor 2 Float)) (Tuple (Tensor 2 Float) Float Bool))
 ; (def [rev elu] (Tuple (Tensor 2 Float) Float Integer) ((t : (Tuple (Tensor 2 Float) Float Bool)) (dret : (Tensor 2 Float)))
 ;    )
 

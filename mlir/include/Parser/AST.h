@@ -44,9 +44,8 @@ struct Type {
   }
 
   /// Compound type constructor
-  Type(ValidType type, std::vector<Type> const& subTys) : type(type) {
+  Type(ValidType type, std::vector<Type> subTys) : type(type), subTypes(std::move(subTys)) {
     ASSERT(!isScalar()) << "Compound ctor called for Scalar type";
-    subTypes = subTys;
   }
 
   /// Utilities
@@ -67,6 +66,9 @@ struct Type {
   }
   bool isTuple() const {
     return type == Tuple;
+  }
+  bool isTuple(size_t tupleSize) const {
+    return type == Tuple && subTypes.size() == tupleSize;
   }
 
   ValidType getValidType() const { 
@@ -96,8 +98,8 @@ struct Type {
     return Type(Vector, {type});
   }
 
-  static Type makeTuple(std::vector<Type> const& types) {
-    return Type(Tuple, types);
+  static Type makeTuple(std::vector<Type> types) {
+    return Type(Tuple, std::move(types));
   }
 
   static Type makeLambda(Type s, Type t) {
@@ -116,6 +118,9 @@ struct Type {
 
   bool operator==(const Type& that) const {
     return type == that.type && subTypes == that.subTypes;
+  }
+  bool operator!=(const Type& that) const {
+    return !(*this == that);
   }
 
 protected:
@@ -143,21 +148,60 @@ inline Type Type::tangentType() const
       std::transform(subTypes.begin(), subTypes.end(), newsubTypes.begin(), [](Type const& t) { return t.tangentType(); });
       return makeTuple(newsubTypes);
     }
+    default:
+      return Type(None);
   }
-  return Type(None);
 }
 
+// StructuredName
+// Either:
+//     sin                                String
+//     [pow (Tuple Float Integer)]        String Type
+//     [fwd [sin Float]]                  String StructuredName
+struct StructuredName {
+  using Ptr = std::unique_ptr<StructuredName>;
+
+  StructuredName(const char * name):baseFunctionName(name), baseFunctionArgType(Type::None) {}
+  StructuredName(llvm::StringRef name, Type type=Type(Type::None)):baseFunctionName(name), baseFunctionArgType(type) {}
+  StructuredName(llvm::StringRef derivation, StructuredName base) : StructuredName(std::move(base)) { derivations.insert(derivations.begin(), std::string(derivation)); }
+
+  std::vector<std::string> derivations;  // Derivations applied to the base function, in order from outermost to innermost
+  std::string baseFunctionName;
+  Type baseFunctionArgType;
+
+  bool operator<(StructuredName const& that) const {
+    return std::tie(derivations, baseFunctionName, baseFunctionArgType)
+      < std::tie(that.derivations, that.baseFunctionName, that.baseFunctionArgType);
+  }
+  bool operator==(StructuredName const& that) const {
+    return derivations == that.derivations
+      && baseFunctionName == that.baseFunctionName
+      && baseFunctionArgType == that.baseFunctionArgType;
+  }
+  bool operator!=(StructuredName const& that) const { return !(*this == that); }
+
+  bool isDerivation() const { return !derivations.empty(); }
+
+  bool hasType() const { return !baseFunctionArgType.isNone(); }
+
+  std::string getMangledName() const;
+};
+std::ostream& operator<<(std::ostream& s, StructuredName const& t);
+
 struct Signature {
-  std::string name;
-  std::vector<Type> argTypes;   
+  StructuredName name;
+  Type argType;   
 
   bool operator<(Signature const& that) const {
     return name < that.name ||
-          (name == that.name && argTypes < that.argTypes);
+          (name == that.name && argType < that.argType);
   }
   bool operator==(Signature const& that) const {
-    return name == that.name && argTypes == that.argTypes;
+    return name == that.name && argType == that.argType;
   }
+  bool operator!=(Signature const& that) const { return !(*this == that); }
+
+  std::string getMangledName() const;
 };
 
 std::ostream& operator<<(std::ostream& s, Signature const& t);
@@ -270,27 +314,14 @@ private:
 /// Named variables, ex:
 ///   str in (let (str "Hello") (print str))
 ///     x in (def a (x : Float) x)
-///
-/// Variables have a contextual name (scope::name) and an optional
-/// initialisation expression.
 struct Variable : public Expr {
   using Ptr = std::unique_ptr<Variable>;
   /// Definition: (x 10) in ( let (x 10) (expr) )
   /// Declaration: (x : Integer) in ( def name Type (x : Integer) (expr) )
   /// We need to bind first, then assign to allow nested lets
   Variable(llvm::StringRef name, Type type=Type(Type::None))
-      : Expr(type, Kind::Variable), name(name), init(nullptr) {}
+      : Expr(type, Kind::Variable), name(name) {}
 
-  void setInit(Expr::Ptr &&expr) {
-    assert(!init);
-    init = std::move(expr);
-    if (!type.isNone())
-      assert(type == init->getType());
-    else
-      type = init->getType();
-  }
-  /// No value == nullptr
-  Expr *getInit() const { return init.get(); }
   std::string const& getName() const { return name; }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
@@ -300,6 +331,35 @@ struct Variable : public Expr {
 
 private:
   std::string name;
+};
+
+/// A variable with an initialisation expression
+struct Binding {
+  Binding(Variable::Ptr var, Expr::Ptr init)
+    : var(std::move(var)), init(std::move(init)) {
+    assert(this->var != nullptr);
+    assert(this->init != nullptr);
+  }
+  Binding(std::vector<Variable::Ptr> tupleVars, Expr::Ptr init)
+    : tupleVars(std::move(tupleVars)), init(std::move(init)) {
+    assert(this->init != nullptr);
+  }
+
+  bool isTupleUnpacking() const { return var == nullptr; }
+  Variable *getVariable() const { return var.get(); }
+  llvm::ArrayRef<Variable::Ptr> getTupleVariables() const { assert(isTupleUnpacking()); return tupleVars; }
+  Variable * getTupleVariable(size_t idx) const {
+    assert(isTupleUnpacking());
+    assert(idx < tupleVars.size());
+    return tupleVars[idx].get();
+  }
+  Expr *getInit() const { return init.get(); }
+
+  std::ostream& dump(std::ostream& s, size_t tab = 0) const;
+
+private:
+  Variable::Ptr var;   // For the simple case (not tuple-unpacking)
+  std::vector<Variable::Ptr> tupleVars;   // For the tuple-unpacking case
   Expr::Ptr init;
 };
 
@@ -308,20 +368,12 @@ private:
 /// Defines a variable.
 struct Let : public Expr {
   using Ptr = std::unique_ptr<Let>;
-  Let(std::vector<Expr::Ptr> &&vars)
-      : Expr(Kind::Let), vars(std::move(vars)),
-      expr(nullptr) {}
-  Let(std::vector<Expr::Ptr> &&vars, Expr::Ptr expr)
-      : Expr(expr->getType(), Kind::Let), vars(std::move(vars)),
+  Let(Binding binding, Expr::Ptr expr)
+      : Expr(expr->getType(), Kind::Let), binding(std::move(binding)),
         expr(std::move(expr)) {}
 
-  llvm::ArrayRef<Expr::Ptr> getVariables() const { return vars; }
-  Expr *getVariable(size_t idx) const {
-    assert(idx < vars.size() && "Offset error");
-    return vars[idx].get();
-  }
+  Binding const& getBinding() const { return binding; }
   Expr *getExpr() const { return expr.get(); }
-  size_t size() const { return vars.size(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -329,7 +381,7 @@ struct Let : public Expr {
   static bool classof(const Expr *c) { return c->kind == Kind::Let; }
 
 private:
-  std::vector<Expr::Ptr> vars;  // TODO: make a vector of vars
+  Binding binding;
   Expr::Ptr expr;
 };
 
@@ -340,23 +392,13 @@ private:
 /// the final IR.
 struct Declaration : public Expr {
   using Ptr = std::unique_ptr<Declaration>;
-  Declaration(llvm::StringRef name, Type type)
-      : Expr(type, Kind::Declaration), name(name) {}
+  Declaration(Signature signature, Type returnType)
+      : Expr(returnType, Kind::Declaration), signature(std::move(signature)) {}
 
-  Declaration(llvm::StringRef name, Type type, std::vector<Type> argTypes)
-      : Expr(type, Kind::Declaration), name(name), argTypes(move(argTypes)) {}
+  Type getArgType() const { return signature.argType; }
+  StructuredName const& getName() const { return signature.name; }
 
-  void addArgType(Type opt) { argTypes.push_back(opt); }
-  llvm::ArrayRef<Type> getArgTypes() const { return argTypes; }
-  Type getArgType(size_t idx) const {
-    assert(idx < argTypes.size() && "Offset error");
-    return argTypes[idx];
-  }
-  llvm::StringRef getName() const { return name; }
-
-  std::string getMangledName() const;
-
-  size_t size() const { return argTypes.size(); }
+  std::string getMangledName() const { return signature.getMangledName(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -366,9 +408,7 @@ struct Declaration : public Expr {
   }
 
 private:
-  // TODO: use Signature here
-  std::string name;
-  std::vector<Type> argTypes;   
+  Signature signature;
 };
 
 /// Call, ex: (add x 3), (neg (mul (sin x) d_dcos)))
@@ -414,28 +454,21 @@ private:
 /// validating the arguments and return types.
 struct Definition : public Expr {
   using Ptr = std::unique_ptr<Definition>;
-  Definition(llvm::StringRef name, Type type)
-      : Expr(type, Kind::Definition) {
-    decl = std::make_unique<Declaration>(name, type);
-  }
+  Definition(Declaration::Ptr declaration, std::vector<Variable::Ptr> arguments, Expr::Ptr impl)
+      : Expr(declaration->getType(), Kind::Definition),
+        decl(std::move(declaration)),
+        arguments(std::move(arguments)),
+        impl(std::move(impl)) { }
 
   /// Arguments and return type (for name and type validation)
-  void addArgument(Variable::Ptr node) {
-    decl->addArgType(node->getType());
-    arguments.push_back(std::move(node));
-  }
   llvm::ArrayRef<Variable::Ptr> getArguments() const { return arguments; }
   Variable *getArgument(size_t idx) {
     assert(idx < arguments.size() && "Offset error");
     return arguments[idx].get();
   }
-  void setImpl(Expr::Ptr expr) {
-    assert(!impl && "Cannot reset function implementation");
-    impl = std::move(expr);
-  }
   Expr *getImpl() const { return impl.get(); }
   Declaration *getDeclaration() const { return decl.get(); }
-  llvm::StringRef getName() const { return decl->getName(); }
+  StructuredName const& getName() const { return decl->getName(); }
   std::string getMangledName() const { return decl->getMangledName(); }
   size_t size() const { return arguments.size(); }
 
@@ -483,20 +516,39 @@ private:
   Expr::Ptr elseBlock;
 };
 
+/// Lambda, ex: (lam (var : Integer) expr)
+///
+/// Note: a Lambda is not (currently) implemented as an Expr,
+/// because it can only appear as part of a Build or Fold.
+struct Lambda {
+  using Ptr = std::unique_ptr<Lambda>;
+  Lambda(Variable::Ptr var, Expr::Ptr body)
+    : var(std::move(var)),
+      body(std::move(body)) {}
+
+  Variable *getVariable() const { return var.get(); }
+  Expr *getBody() const { return body.get(); }
+
+  std::ostream& dump(std::ostream& s, size_t tab) const;
+
+private:
+  Variable::Ptr var;
+  Expr::Ptr body;
+};
+
 /// Build, ex: (build N (lam (var) (expr)))
 ///
 /// Loops over range N using lambda L
 struct Build : public Expr {
   using Ptr = std::unique_ptr<Build>;
-  Build(Expr::Ptr range, Expr::Ptr var, Expr::Ptr expr)
-      : Expr(Type::makeVector(expr->getType()), Kind::Build), 
+  Build(Expr::Ptr range, Lambda::Ptr lam)
+      : Expr(Type::makeVector(lam->getBody()->getType()), Kind::Build),
         range(std::move(range)),
-        var(std::move(var)), 
-        expr(std::move(expr)) {}
+        lam(std::move(lam)) {}
 
   Expr *getRange() const { return range.get(); }
-  Expr *getVariable() const { return var.get(); }
-  Expr *getExpr() const { return expr.get(); }
+  Variable *getVariable() const { return lam->getVariable(); }
+  Expr *getExpr() const { return lam->getBody(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -505,8 +557,7 @@ struct Build : public Expr {
 
 private:
   Expr::Ptr range;
-  Expr::Ptr var;
-  Expr::Ptr expr;
+  Lambda::Ptr lam;
 };
 
 /// Tuple, ex: (tuple 10.0 42 (add@ff 1.0 2.0))
@@ -583,13 +634,16 @@ private:
 /// Then return (acc).
 struct Fold : public Expr {
   using Ptr = std::unique_ptr<Fold>;
-  Fold(Type type, Expr::Ptr body, Expr::Ptr acc, Expr::Ptr vector)
-      : Expr(type, Kind::Fold), body(std::move(body)),
-      acc(std::move(acc)), vector(std::move(vector)) {}
+  Fold(Type type, Lambda::Ptr lam, Expr::Ptr init, Expr::Ptr vector)
+      : Expr(type, Kind::Fold),
+      lam(std::move(lam)),
+      init(std::move(init)),
+      vector(std::move(vector)) {}
 
+  Variable *getLambdaParameter() const { return lam->getVariable(); }
+  Expr *getBody() const { return lam->getBody(); }
+  Expr *getInit() const { return init.get(); }
   Expr *getVector() const { return vector.get(); }
-  Expr *getAcc() const { return acc.get(); }
-  Expr *getBody() const { return body.get(); }
 
   std::ostream& dump(std::ostream& s, size_t tab = 0) const override;
 
@@ -597,8 +651,8 @@ struct Fold : public Expr {
   static bool classof(const Expr *c) { return c->kind == Kind::Fold; }
 
 private:
-  Expr::Ptr body;
-  Expr::Ptr acc;
+  Lambda::Ptr lam;
+  Expr::Ptr init;
   Expr::Ptr vector;
 };
 

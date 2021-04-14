@@ -7,5 +7,8 @@
 
 (gdef fwd [f7 (Tuple (Vec Float) (Vec Float))])
 (gdef rev [f7 (Tuple (Vec Float) (Vec Float))])
+(gdef suffwdpass [f7 (Tuple (Vec Float) (Vec Float))])
+(gdef sufrevpass [f7 (Tuple (Vec Float) (Vec Float))])
+(gdef sufrev [f7 (Tuple (Vec Float) (Vec Float))])
 
 (def main Integer () 0)

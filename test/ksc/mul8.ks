@@ -4,11 +4,17 @@
 
 (gdef fwd [xtimes (Tuple Float Float)])
 (gdef rev [xtimes (Tuple Float Float)])
+(gdef suffwdpass [xtimes (Tuple Float Float)])
+(gdef sufrevpass [xtimes (Tuple Float Float)])
+(gdef sufrev [xtimes (Tuple Float Float)])
 
 (def times Float ( (x1 : Float) (x2 : Float) ) (mul x1 (mul x2 2.0)))
 
 (gdef fwd [times (Tuple Float Float)])
 (gdef rev [times (Tuple Float Float)])
+(gdef suffwdpass [times (Tuple Float Float)])
+(gdef sufrevpass [times (Tuple Float Float)])
+(gdef sufrev [times (Tuple Float Float)])
 
 ; (def h ( (x1 : Float) (x2 : Float) (x3 : Float) (x4 : Float)
 ;         (x5 : Float) (x6 : Float) (x7 : Float) (x8 : Float))
@@ -21,5 +27,8 @@
 
 (gdef fwd [h (Tuple Float Float Float Float Float Float Float Float)])
 (gdef rev [h (Tuple Float Float Float Float Float Float Float Float)])
+(gdef suffwdpass [h (Tuple Float Float Float Float Float Float Float Float)])
+(gdef sufrevpass [h (Tuple Float Float Float Float Float Float Float Float)])
+(gdef sufrev [h (Tuple Float Float Float Float Float Float Float Float)])
 
 (def main Integer () 0)

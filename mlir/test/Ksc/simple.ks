@@ -2,12 +2,12 @@
 ; RUN: ksc-mlir LLVM %s  | FileCheck %s --check-prefix=LLVM
 
 (edef print Float (Float))
-; MLIR: func @print$af(f64) -> f64
+; MLIR: func private @print$af(f64) -> f64
 ; LLVM: declare double @"print$af"(double %0)
 
 (def fun Integer ((x : Integer) (y : Float))
                  (add x 10))
-; MLIR: func @fun$aif(%arg0: i64, %arg1: f64) -> i64 {
+; MLIR: func private @fun$aif(%arg0: i64, %arg1: f64) -> i64 {
 ; MLIR-NEXT:  %c10{{.*}} = constant 10 : i64
 ; MLIR-NEXT:  %[[add:[0-9]+]] = addi %arg0, %c10{{.*}} : i64
 ; MLIR-NEXT:  return %[[add]] : i64
@@ -18,7 +18,7 @@
 
 
 (def main Integer () (fun 42 -1e38)) ; comment
-; MLIR:       func @main() -> i64 {
+; MLIR:       func private @main() -> i64 {
 ; MLIR-NEXT:    %c42{{.*}} = constant 42 : i64
 ; MLIR-NEXT:    %cst = constant -9.9999999999999997E+37 : f64
 ; MLIR-NEXT:    %[[fun:[0-9]+]] = call @fun$aif(%c42{{.*}}, %cst) : (i64, f64) -> i64
