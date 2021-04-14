@@ -83,14 +83,10 @@ def _subtree_update_env(e: Expr, loc: Location, rules: AbstractMatcher, root: Ex
 @_subtree_update_env.register
 def _subtree_env_let(e: Let, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
     yield from _subtree_rewrites(e.rhs, loc + [0], rules, root, env)
-    def is_tuple(e):
-        return isinstance(e, Call) and e.name.mangle_without_type() == "tuple"
+    assert isinstance(e.vars, Var), "Tupled lets are not supported - use untuple_lets first"
     def _rm_dict_keys(d, ks):
         return {k:v for k, v in d.items() if k not in ks}
-    child_env = ({**env, e.vars.name: (loc, e.rhs)} if isinstance(e.vars, Var)
-                 else {**env, **{var.name: (loc, elem) for var,elem in zip(e.vars, e.rhs.args)}} if is_tuple(e.rhs) # Individual tuple elements
-                 else _rm_dict_keys(env, [v.name for v in e.vars])) # Not individually inlinable
-    yield from _subtree_rewrites(e.body, loc+[1], rules, root, child_env)
+    yield from _subtree_rewrites(e.body, loc+[1], rules, root, {**env, e.vars.name: loc})
 
 @_subtree_update_env.register
 def _subtree_env_lam(e: Lam, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
@@ -103,7 +99,7 @@ class inline_var(Rule):
     def possible_expr_classes():
         return {Var}
 
-    def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location, bound_value: Expr) -> Expr:
+    def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
         # binding_location and bound_value come from the Rewrite.
         # Note alternatives:
         # 1. the environment+Rewrite store only the binding location; we carry the entire bound value from the binding-let down to the variable, in order to inline perhaps only part of it
@@ -114,15 +110,15 @@ class inline_var(Rule):
         #        the first traversal building the environment (varname -> binding_location) as it goes down to the usage site - duplicating some of the work done by the matcher (which at the least needs to build an environment of which variables are inlinable)
         #        the second traversal uses two nested calls of replace_subtree: (a) from root down to the binder, without any renaming; then (b) from the binder down to the usage site, renaming to avoid capture of anything in the value-to-be-inlined.
         assert path_to_var[:len(binding_location)] == binding_location
-        return replace_subtree(expr, binding_location, Const(0.0),
-            lambda _payload, let: replace_subtree(let, path_to_var[len(binding_location):], bound_value) # No applicator: just take bound_value
+        return replace_subtree(expr, binding_location, Const(0.0), # Nothing to avoid capturing in outer call
+            lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator: just insert let rhs
         )
 
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
         if isinstance(subtree, Var): # May not be if rule is used directly outside of a RuleSet. Q: Do we want to support that case.
             if subtree.name in env:
-                binding_loc, bound_val = env[subtree.name]
-                yield Rewrite(self, root, path_from_root, {"binding_location": binding_loc, "bound_value": bound_val})
+                binding_loc = env[subtree.name]
+                yield Rewrite(self, root, path_from_root, {"binding_location": binding_loc})
 
 
 @singleton
@@ -131,23 +127,16 @@ class delete_let(Rule):
     def possible_expr_classes():
         return {Let}
 
-    @staticmethod
-    def _let_vars_used(expr: Let) -> bool:
-        if isinstance(expr.vars, Var):
-            return expr.vars.name in expr.body.free_vars_
-        return any(v.name in expr.body.free_vars_ for v in expr.vars)
-
-
     def apply_at(self, expr: Expr, path: Location) -> Expr:
         # The constant here says that there are no free variables to avoid capturing en route to the target Location
         return replace_subtree(expr, path, Const(0.0), self._apply)
 
     def _apply(self, const_zero: Expr, let_node: Expr) -> Expr:
         assert const_zero == Const(0.0) # Specified in apply_at
-        assert not self._let_vars_used(let_node)
+        assert let_node.vars.name not in let_node.body.free_vars_
         return let_node.body
 
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Rewrite]:
         del env
-        if isinstance(subtree, Let) and not self._let_vars_used(subtree):
+        if isinstance(subtree, Let) and subtree.vars.name not in subtree.body.free_vars_:
             yield Rewrite(self, root, path_from_root)
