@@ -363,7 +363,7 @@ def onnx_schemas_to_prelude(prelude : TextIO):
                 n_args = len(input_arg_types)
                 for k in range(n_optional+1):
                     arg_types = input_arg_types[:n_args-k] + attr_arg_types
-                    obj = EDef(name, return_type, arg_types)
+                    obj = EDef(name, return_type, make_tuple_if_many(arg_types))
                     pprint(obj, stream=prelude, width=1024, ribbon_width=1024, indent=2)
 
         if s.has_type_and_shape_inference_function:

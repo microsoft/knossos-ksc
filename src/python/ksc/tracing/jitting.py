@@ -4,7 +4,7 @@ import inspect
 
 import numpy as np
 
-from ksc.type import Type
+from ksc.type import Type, make_tuple_if_many
 from ksc.shape import ShapeType, shape_type_from_object
 
 from ksc.abstract_value import AbstractValue
@@ -139,8 +139,8 @@ def compute_ks_str(f, nodes, arg_types):
     def_name = format_def_name(f.name)
     if f.is_edef:
         # this is an edef
-        arg_types = " ".join([str(t) for t in arg_types])
-        return f"(edef {def_name} {f.return_type} ({arg_types}))"
+        arg_types = make_tuple_if_many(arg_types)
+        return f"(edef {def_name} {f.return_type} {arg_types})"
 
     var_name_generator = VarNameGenerator()
     return_type = nodes[-1].shape_type.type

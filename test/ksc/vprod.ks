@@ -7,6 +7,10 @@
 
 (gdef fwd [vprod (Tuple Integer (Vec Float))])
 (gdef rev [vprod (Tuple Integer (Vec Float))])
+; SUF/BOG-AD doesn't support recursion
+;; (gdef suffwdpass [vprod (Tuple Integer (Vec Float))])
+;; (gdef sufrevpass [vprod (Tuple Integer (Vec Float))])
+;; (gdef sufrev [vprod (Tuple Integer (Vec Float))])
 
 (def aprod Float ( (i : Integer) (v : Vec Float) (acc : Float) )
        (if (eq i (size v))
@@ -16,6 +20,10 @@
 
 (gdef fwd [aprod (Tuple Integer (Vec Float) Float)])
 (gdef rev [aprod (Tuple Integer (Vec Float) Float)])
+; SUF/BOG-AD doesn't support recursion
+;; (gdef suffwdpass [aprod (Tuple Integer (Vec Float) Float)])
+;; (gdef sufrevpass [aprod (Tuple Integer (Vec Float) Float)])
+;; (gdef sufrev [aprod (Tuple Integer (Vec Float) Float)])
 
 (def fprod Float (v : Vec Float)
      (fold (lam (acc_x : Tuple Float Float)
@@ -26,17 +34,30 @@
 
 (gdef fwd [fprod (Vec Float)])
 (gdef rev [fprod (Vec Float)])
+; SUF/BOG-AD doesn't support fold
+;; (gdef suffwdpass [fprod (Vec Float)])
+;; (gdef sufrevpass [fprod (Vec Float)])
+;; (gdef sufrev [fprod (Vec Float)])
 
 (edef $BENCH Float ((Lam (Tuple) Float)))
 (def vchomp Float (_ : (Tuple (Tuple) (Vec Float))) 1.0)
 (gdef fwd [vchomp (Tuple (Tuple) (Vec Float))])
 (gdef rev [vchomp (Tuple (Tuple) (Vec Float))])
+(gdef suffwdpass [vchomp (Tuple (Tuple) (Vec Float))])
+(gdef sufrevpass [vchomp (Tuple (Tuple) (Vec Float))])
+(gdef sufrev [vchomp (Tuple (Tuple) (Vec Float))])
 (def achomp Float (_ : (Tuple (Tuple) (Vec Float) Float)) 1.0)
 (gdef fwd [achomp (Tuple (Tuple) (Vec Float) Float)])
 (gdef rev [achomp (Tuple (Tuple) (Vec Float) Float)])
+(gdef suffwdpass [achomp (Tuple (Tuple) (Vec Float) Float)])
+(gdef sufrevpass [achomp (Tuple (Tuple) (Vec Float) Float)])
+(gdef sufrev [achomp (Tuple (Tuple) (Vec Float) Float)])
 (def fchomp Float (_ : (Vec Float)) 1.0)
 (gdef fwd [fchomp (Vec Float)])
 (gdef rev [fchomp (Vec Float)])
+(gdef suffwdpass [fchomp (Vec Float)])
+(gdef sufrevpass [fchomp (Vec Float)])
+(gdef sufrev [fchomp (Vec Float)])
 
 ;; run now takes about 40 sec.
 ;; Run with

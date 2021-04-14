@@ -5,5 +5,8 @@
 
 (gdef fwd [f7 (Vec Float)])
 (gdef rev [f7 (Vec Float)])
+(gdef suffwdpass [f7 (Vec Float)])
+(gdef sufrevpass [f7 (Vec Float)])
+(gdef sufrev [f7 (Vec Float)])
 
 (def main Integer () 0)

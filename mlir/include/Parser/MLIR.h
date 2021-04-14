@@ -5,11 +5,9 @@
 #include <map>
 
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Target/LLVMIR.h"
+#include "mlir/Target/LLVMIR/Import.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/InitAllDialects.h"
 
@@ -27,10 +25,10 @@ using Values = llvm::SmallVector<mlir::Value, 4>;
 class Generator {
   // The main module
   mlir::OwningModuleRef module;
+  // The global context
+  mlir::MLIRContext & context;
   // The current builder
   mlir::OpBuilder builder;
-  // The global context
-  mlir::MLIRContext context;
   // A default location, ignoring source loc for now
   mlir::Location UNK;
   // Current function (for basic block placement)
@@ -66,20 +64,19 @@ class Generator {
 
   // Variables
   void declareVariable(std::string const& name, Values vals);
-  void declareVariable(const AST::Variable* var, Values vals = {});
 
   // Argument serialisation (tuples)
   void serialiseArgs(const AST::Definition *def, mlir::Block &entry);
 
 public:
-  Generator() : builder(&context), UNK(builder.getUnknownLoc()) { }
+  explicit Generator(mlir::MLIRContext &context);
 
   // Build from MLIR source
   const mlir::ModuleOp build(const std::string& mlir);
   // Build from KSC AST
   const mlir::ModuleOp build(const AST::Block* extraDecls, const AST::Expr* root);
   // Emit LLVM IR
-  std::unique_ptr<llvm::Module> emitLLVM(int optLevel);
+  std::unique_ptr<llvm::Module> emitLLVM(int optLevel, llvm::LLVMContext & llvmContext);
 };
 
 } // namespace MLIR

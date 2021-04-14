@@ -5,12 +5,18 @@
 
 (gdef fwd [a Float])
 (gdef rev [a Float])
+(gdef suffwdpass [a Float])
+(gdef sufrevpass [a Float])
+(gdef sufrev [a Float])
 
 (def b Float ((y : Float))
     (mul 2.0 y))
 
 (gdef fwd [b Float])
 (gdef rev [b Float])
+(gdef suffwdpass [b Float])
+(gdef sufrevpass [b Float])
+(gdef sufrev [b Float])
 
 (def g Float ((x : Float) (y : Float))
     (mul x y))
@@ -22,12 +28,18 @@
 
 (gdef fwd [f1 (Tuple Float Float)])
 (gdef rev [f1 (Tuple Float Float)])
+(gdef suffwdpass [f1 (Tuple Float Float)])
+(gdef sufrevpass [f1 (Tuple Float Float)])
+(gdef sufrev [f1 (Tuple Float Float)])
 
 (def f Float ((x : Float) (y : Float))
     (div x y))
 
 (gdef fwd [f (Tuple Float Float)])
 (gdef rev [f (Tuple Float Float)])
+(gdef suffwdpass [f (Tuple Float Float)])
+(gdef sufrevpass [f (Tuple Float Float)])
+(gdef sufrev [f (Tuple Float Float)])
 
 (def main Integer ()
     (let ((x 1.1)

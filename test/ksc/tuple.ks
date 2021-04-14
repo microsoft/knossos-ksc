@@ -4,6 +4,9 @@
 
 (gdef fwd [f (Tuple (Tuple Float Float) Integer)])
 (gdef rev [f (Tuple (Tuple Float Float) Integer)])
+(gdef suffwdpass [f (Tuple (Tuple Float Float) Integer)])
+(gdef sufrevpass [f (Tuple (Tuple Float Float) Integer)])
+(gdef sufrev [f (Tuple (Tuple Float Float) Integer)])
 
 (def foofilter_comp Float ((_xs$o1 : (Tensor 1 Float)))
      (let (_36 false)
@@ -19,8 +22,11 @@
 (gdef rev [pi (Tuple)])
 
 (def circumference Float (r : Float) (mul (mul 2.0 (pi)) r))
+(def circumference2 Float (r : Float) (mul (mul 2.0 (pi (tuple))) r))
 
 (gdef fwd [circumference Float])
 (gdef rev [circumference Float])
+(gdef fwd [circumference2 Float])
+(gdef rev [circumference2 Float])
 
 (def main Integer () 0)

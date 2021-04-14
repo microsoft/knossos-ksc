@@ -403,7 +403,7 @@ def ts2mod(function, example_inputs):
     ks_str = '\n'.join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in ksc_def.args]
     return_type = ksc_def.return_type
-    mod = utils.generate_and_compile_cpp_from_ks(ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True)
+    mod = utils.build_module_using_pytorch_from_ks(ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True)
 
     return make_KscAutogradFunction(mod)
 

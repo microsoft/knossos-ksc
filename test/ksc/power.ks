@@ -7,6 +7,10 @@
 
 (gdef fwd [f (Tuple Integer Float)])
 (gdef rev [f (Tuple Integer Float)])
+; SUF/BOG-AD does not support recursion
+; (gdef suffwdpass [f (Tuple Integer Float)])
+; (gdef sufrevpass [f (Tuple Integer Float)])
+; (gdef sufrev [f (Tuple Integer Float)])
 
 (def main Integer ()
     (let ((n 7)

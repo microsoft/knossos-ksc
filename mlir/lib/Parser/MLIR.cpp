@@ -14,7 +14,8 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Parser.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/Target/LLVMIR/ModuleTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Parser/MLIR.h"
@@ -23,6 +24,9 @@ using namespace Knossos::MLIR;
 using namespace std;
 
 //============================================================ Helpers
+
+Generator::Generator(mlir::MLIRContext &context) : context(context), builder(&context), UNK(builder.getUnknownLoc()) {
+}
 
 // Convert from AST type to MLIR
 Types Generator::ConvertType(const AST::Type &type, size_t dim) {
@@ -174,17 +178,26 @@ void Generator::buildGlobal(const AST::Block* block) {
     module->push_back(def);
 }
 
+// Recover multiple argument types from a one-argified argument type.
+std::vector<Knossos::AST::Type> multiArgify(Knossos::AST::Type t) {
+  if (t.isTuple())
+    return t.getSubTypes();
+  else
+    return std::vector<Knossos::AST::Type>(1, t);
+}
+
 // Declaration only, no need for basic blocks
 mlir::FuncOp Generator::buildDecl(const AST::Declaration* decl) {
   assert(!functions.count(decl->getMangledName()) && "Duplicated function declaration");
   Types argTypes;
-  for (auto &t: decl->getArgTypes()) {
+  for (auto &t: multiArgify(decl->getArgType())) {
     auto tys = ConvertType(t);
     argTypes.append(tys.begin(), tys.end());
   }
   auto retTy = ConvertType(decl->getType());
   auto type = builder.getFunctionType(argTypes, retTy);
   auto func = mlir::FuncOp::create(UNK, decl->getMangledName(), type);
+  func.setVisibility(mlir::SymbolTable::Visibility::Private);
   ASSERT(func);
   functions[decl->getMangledName()]= func;
   return func;
@@ -219,13 +232,6 @@ void Generator::declareVariable(std::string const& name,
                                      Values vals) {
   assert(!vals.empty() && "Variable must have initialiser");
   variables[name] = vals;
-}
-
-void Generator::declareVariable(const AST::Variable* var,
-                                     Values vals) {
-  if (vals.empty() && var->getInit())
-    vals = buildNode(var->getInit());
-  declareVariable(var->getName(), vals);
 }
 
 // Get the variable assigned value
@@ -304,8 +310,8 @@ Values Generator::buildCall(const AST::Call* call) {
 
   if (MATCH_1("abs", Float))  return CREATE_1(AbsFOp);
   if (MATCH_1("neg", Float))  return CREATE_1(NegFOp);
-  if (MATCH_1("exp", Float))  return CREATE_1(ExpOp);
-  if (MATCH_1("log", Float))  return CREATE_1(LogOp);
+  if (MATCH_1("exp", Float))  return CREATE_1(math::ExpOp);
+  if (MATCH_1("log", Float))  return CREATE_1(math::LogOp);
 
   if (MATCH_1("to_float", Integer)) 
     return {builder.create<mlir::SIToFPOp>(UNK, buildArg(call,0), builder.getF64Type())};
@@ -376,18 +382,7 @@ Values Generator::buildCall(const AST::Call* call) {
 
   // Function call -- not a prim, should be known
   mlir::FuncOp func = functions[name_mangled];
-  
-  if (!func) {
-    // Didn't find it... assert
-    asserter a("Unknown function", __FILE__, __LINE__);
-    a << " " << std::string(name) << "(";
-    for(size_t i = 0; i < arity; ++i) {
-      a << call->getOperand(i)->getType();
-      if (i+1 < arity)
-        a << ", ";
-    } 
-    a << ") -> "<<name_mangled<<"]";
-  }
+  ASSERT(!!func) << "Unknown function " << name << ", mangled name " << name_mangled;
 
   // Operands (tuples expand into individual operands)
   Values operands;
@@ -418,14 +413,19 @@ Values Generator::buildCall(const AST::Call* call) {
 
 // Builds variable declarations
 Values Generator::buildLet(const AST::Let* let) {
-  // Bind the variable to an expression
-  for (auto &v: let->getVariables())
-    declareVariable(llvm::dyn_cast<AST::Variable>(v.get()));
+  AST::Binding const& binding = let->getBinding();
+  auto init = buildNode(binding.getInit());
+  if (binding.isTupleUnpacking()) {
+    size_t tupleSize = binding.getTupleVariables().size();
+    assert(init.size() == tupleSize);
+    for (size_t ii = 0; ii != tupleSize; ++ii) {
+      declareVariable(binding.getTupleVariable(ii)->getName(), {init[ii]});
+    }
+  } else {
+    declareVariable(binding.getVariable()->getName(), init);
+  }
   // Lower the body, using the variable
-  if (let->getExpr())
-    return buildNode(let->getExpr());
-  // Otherwise, the let is just a declaration, return void
-  return mlir::ValueRange();
+  return buildNode(let->getExpr());
 }
 
 // Builds conditions using select
@@ -497,9 +497,9 @@ Values Generator::buildBuild(const AST::Build* b) {
   builder.setInsertionPointToEnd(bodyBlock);
   auto bodyIv = bodyBlock->getArgument(0);
   // Declare the local induction variable before using in body
-  auto var = llvm::dyn_cast<AST::Variable>(b->getVariable());
-  declareVariable(var);
-  variables[var->getName()] = {bodyIv};
+  auto varName = b->getVariable()->getName();
+  declareVariable(varName, {zero});
+  variables[varName] = {bodyIv};
   // Build body and store result (no vector of tuples supported)
   auto expr = Single(buildNode(b->getExpr()));
   auto indIv = builder.create<mlir::IndexCastOp>(UNK, bodyIv, indTy);
@@ -553,23 +553,22 @@ Values Generator::buildGet(const AST::Get* g) {
 Values Generator::buildFold(const AST::Fold* f) {
   // Fold needs a tuple of two variables: the accumulator and the induction
   auto v = f->getVector();
-  auto acc = llvm::dyn_cast<AST::Variable>(f->getAcc());
-  assert(acc && "Wrong AST node for vector and/or accumulator");
+  auto acc_x = f->getLambdaParameter();
   assert(f->getType().isScalar() && "Bad accumulator type in fold");
-  assert(acc->getType() == AST::Type::Tuple && "Bad accumulator type in fold");
-  assert(f->getType() == acc->getType().getSubType(0));
+  assert(acc_x->getType() == AST::Type::Tuple && "Bad lambda parameter type in fold");
+  assert(f->getType() == acc_x->getType().getSubType(0));
   assert(v->getType() == AST::Type::Vector && "Bad vector type in fold");
-  assert(v->getType().getSubType() == acc->getType().getSubType(1));
+  assert(v->getType().getSubType() == acc_x->getType().getSubType(1));
 
   // We can't build the variable here yet because this is an SSA representation
   // and the body will get the wrong reference, so we just initialise the
   // accumulator (the element x will be initialised by the load block)
-  auto init = buildNode(acc->getInit());
+  auto init = Single(buildNode(f->getInit()));  // TODO: this doesn't support Tuple accumulator types
 
   // Context variables: vector (and elm type), max, IV init to zero
   auto ivTy = builder.getIntegerType(64);
-  auto accTy = init[0].getType();
-  auto elmTy = init[1].getType();
+  auto accTy = init.getType();
+  auto elmTy = Single(ConvertType(acc_x->getType().getSubType(1)));
   auto vec = Single(buildNode(v));
   auto dim = builder.create<mlir::DimOp>(UNK, vec, 0);
   auto max = builder.create<mlir::IndexCastOp>(UNK, dim, ivTy);
@@ -589,7 +588,7 @@ Values Generator::buildFold(const AST::Fold* f) {
   bodyBlock->addArgument(ivTy);
   auto tailBlock = currentFunc.addBlock();
   tailBlock->addArgument(accTy);
-  mlir::ValueRange indArg {init[0], zero};
+  mlir::ValueRange indArg {init, zero};
   builder.create<mlir::BranchOp>(UNK, headBlock, indArg);
 
   // The head block only checks the condition, we can't load anything until
@@ -622,7 +621,7 @@ Values Generator::buildFold(const AST::Fold* f) {
   auto bodyAcc = bodyBlock->getArgument(0);
   auto bodyElm = bodyBlock->getArgument(1);
   auto bodyIv = bodyBlock->getArgument(2);
-  declareVariable(acc->getName(), {bodyAcc, bodyElm});
+  declareVariable(acc_x->getName(), {bodyAcc, bodyElm});
   auto newAcc = Single(buildNode(f->getBody()));
 
   // Increment IV
@@ -696,7 +695,7 @@ const mlir::ModuleOp Generator::build(const std::string& mlir) {
 
 //============================================================ LLVM IR Lowering
 
-unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel) {
+unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel, llvm::LLVMContext & llvmContext) {
   // The lowering "pass manager"
   mlir::PassManager pm(&context);
   if (optLevel > 0) {
@@ -715,7 +714,7 @@ unique_ptr<llvm::Module> Generator::emitLLVM(int optLevel) {
   }
 
   // Then lower to LLVM IR
-  auto llvmModule = mlir::translateModuleToLLVMIR(module.get());
+  auto llvmModule = mlir::translateModuleToLLVMIR(module.get(), llvmContext);
   assert(llvmModule);
   return llvmModule;
 }

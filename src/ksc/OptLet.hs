@@ -10,7 +10,8 @@ module OptLet( optLets
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
              , substExpr, substVar
-             , ensureDon'tReuseParams )
+             , ensureDon'tReuseParams
+             , notInSubstTVs )
              where
 
 import Lang
@@ -194,6 +195,12 @@ substBndr tv (S { s_in_scope = in_scope, s_env = env })
     (is', tv') = notInScopeTV in_scope tv
     env' = M.insert (tVarVar tv) (Var tv') env
 
+notInSubstTVs :: Traversable t
+              => Subst -> t TVar -> (Subst, t TVar)
+notInSubstTVs subst@(S{ s_in_scope = in_scope }) vars
+  = let (in_scope', vars') = notInScopeTVs in_scope vars
+    in (subst { s_in_scope = in_scope' }, vars')
+
 substVar :: Subst -> TVar -> TExpr
 substVar subst tv = case lookupSubst (tVarVar tv) subst of
                       Just e  -> e
@@ -242,6 +249,28 @@ optLetsE = go
           -- removing them.
           | VarPat (n, TVar _ v) <- pat
           , inline_me n r'     = go (extendSubstMap v r' subst) b
+          -- Rewrite a tuple pattern let of a literal tuple RHS from
+          --
+          --     let (x1, ..., xn) = (e1, ..., en) in ...
+          --
+          -- to
+          --
+          --     let x1 = e1; ...; xn = en in ...
+          --
+          -- except that, as above, it inlines any of the ei that are
+          -- trivial and implicitly drops dead code.
+          | Tuple rs <- r'
+          , TupPat ns_tvs <- pat
+          , let (lets, subst') =
+                  foldr (\((n, tv@(TVar _ v)), r_) (lets_, subst_) ->
+                            if inline_me n r_
+                            then (lets_, extendSubstMap v r_ subst_)
+                            else
+                              let (tv1, subst1) = substBndr tv subst_
+                              in (Let (VarPat tv1) r_ . lets_, subst1))
+                  (id, subst)
+                  (zip ns_tvs rs)
+          = lets (go subst' b)
           | TupPat ns_vs <- pat
           , let binding_dead   = all ((== 0) . fst) ns_vs
           , binding_dead

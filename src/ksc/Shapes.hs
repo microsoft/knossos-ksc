@@ -16,15 +16,15 @@ shapeDefs = mapMaybe (shapeDef . noTupPatifyDef)
 
 shapeDef :: HasCallStack => TDef -> Maybe TDef
 
-shapeDef (Def { def_fun = ShapeFun _ })
+shapeDef (Def { def_fun = Fun ShapeFun{} _ })
   = Nothing
 
-shapeDef (Def { def_fun = f
+shapeDef (Def { def_fun = Fun ds f
               , def_pat = VarPat params
               , def_rhs = UserRhs def_rhs
               , def_res_ty = res_ty })
   = Just $
-    Def { def_fun    = ShapeFun f
+    Def { def_fun    = Fun (ShapeFun ds) f
         , def_pat    = VarPat params
         , def_res_ty = shapeType res_ty
         , def_rhs    = UserRhs (mkLetForShapeOfParameter params (shapeE def_rhs)) }
@@ -76,16 +76,16 @@ shapeE (App{})        = error "Shape of App not supported"
 
 shapeCall :: HasCallStack => TFun Typed -> TExpr -> TExpr
 
-shapeCall (TFun _ (Fun (PrimFun (P_SelFun i n)))) e
+shapeCall (TFun _ (Fun JustFun (PrimFun (P_SelFun i n)))) e
   = pSel i n (shapeE e)
 
-shapeCall (TFun _ (Fun (PrimFun f))) e
+shapeCall (TFun _ (Fun JustFun (PrimFun f))) e
   | Just e' <- shapeCallPrim f e
   = e'
 
-shapeCall (TFun ty f) e
-  | isBaseUserFun (baseFunOfFun f)
-  = Call (TFun (shapeType ty) (ShapeFun f)) e
+shapeCall (TFun ty (Fun ds f)) e
+  | isBaseUserFun f
+  = Call (TFun (shapeType ty) (Fun (ShapeFun ds) f)) e
 
 shapeCall tf e = pShape (Call tf e)  -- Fall back to calling the original function and evaluating the shape of the returned object
 

@@ -5,14 +5,17 @@
 
 (gdef fwd [gmm_knossos_tri Integer])
 (gdef rev [gmm_knossos_tri Integer])
+(gdef suffwdpass [gmm_knossos_tri Integer])
+(gdef sufrevpass [gmm_knossos_tri Integer])
+(gdef sufrev [gmm_knossos_tri Integer])
 
 ; dot
-(edef dot Float ((Vec Float) (Vec Float)))
+(edef dot Float (Tuple (Vec Float) (Vec Float)))
 (edef [D dot] (LM (Tuple (Vec Float) (Vec Float)) Float)
-             ((Vec Float) (Vec Float)))
+             (Tuple (Vec Float) (Vec Float)))
 (edef [Dt dot] (Tuple Float (LM (Tuple (Vec Float) (Vec Float)) Float))
-              ((Vec Float) (Vec Float)))
-(edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) ((Vec Float) (Vec Float)))
+              (Tuple (Vec Float) (Vec Float)))
+(edef R$dot (LM Float (Tuple (Vec Float) (Vec Float))) (Tuple (Vec Float) (Vec Float)))
 (def [fwd dot] Float ((a_b : (Tuple (Vec Float) (Vec Float))) (da_db : (Tuple (Vec Float) (Vec Float))))
      (let ((a b) a_b)
        (let ((da db) da_db)
@@ -22,11 +25,23 @@
      (let ((a b) a_b)
        (tuple (mul dr b) (mul dr a))))
 
+(def [suffwdpass dot] (Tuple Float (Tuple (Vec Float) (Vec Float)))
+     ((a : Vec Float) (b : Vec Float))
+     (tuple (dot a b) (tuple a b)))
+
+(def [sufrevpass [dot (Tuple (Vec Float) (Vec Float))]]
+     (Tuple (Vec Float) (Vec Float))
+     ((d_ddot : Float) (a_b : Tuple (Vec Float) (Vec Float)))
+     ([rev dot] a_b d_ddot))
+
 (def sqnorm Float ((v : Vec Float))
   (dot v v))
 
 (gdef fwd [sqnorm (Vec Float)])
 (gdef rev [sqnorm (Vec Float)])
+(gdef suffwdpass [sqnorm (Vec Float)])
+(gdef sufrevpass [sqnorm (Vec Float)])
+(gdef sufrev [sqnorm (Vec Float)])
 
 (def gmm_knossos_makeQ (Tensor 2 Float) ((q : Vec Float) (l : Vec Float))
  (let (D (size q))
@@ -43,6 +58,9 @@
 
 (gdef fwd [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
 (gdef rev [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
+(gdef suffwdpass [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
+(gdef sufrevpass [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
+(gdef sufrev [gmm_knossos_makeQ (Tuple (Vec Float) (Vec Float))])
 
 (def logsumexp Float ((v : Vec Float))
   (let (maxv (max v))
@@ -50,6 +68,9 @@
          (log (sum (exp (sub v maxv)))))))
 
 (gdef rev [logsumexp (Vec Float)])
+(gdef suffwdpass [logsumexp (Vec Float)])
+(gdef sufrevpass [logsumexp (Vec Float)])
+(gdef sufrev [logsumexp (Vec Float)])
 (gdef fwd [logsumexp (Vec Float)])
 
 
@@ -62,6 +83,9 @@
 
 (gdef fwd [log_gamma_distrib (Tuple Float Integer)])
 (gdef rev [log_gamma_distrib (Tuple Float Integer)])
+(gdef suffwdpass [log_gamma_distrib (Tuple Float Integer)])
+(gdef sufrevpass [log_gamma_distrib (Tuple Float Integer)])
+(gdef sufrev [log_gamma_distrib (Tuple Float Integer)])
 
 (def log_wishart_prior Float ((wishart : Tuple Float Integer)
                               (log_Qdiag : Vec Float)
@@ -89,6 +113,9 @@
 
 (gdef fwd [log_wishart_prior (Tuple (Tuple Float Integer) (Vec Float) (Vec Float))])
 (gdef rev [log_wishart_prior (Tuple (Tuple Float Integer) (Vec Float) (Vec Float))])
+(gdef suffwdpass [log_wishart_prior (Tuple (Tuple Float Integer) (Vec Float) (Vec Float))])
+(gdef sufrevpass [log_wishart_prior (Tuple (Tuple Float Integer) (Vec Float) (Vec Float))])
+(gdef sufrev [log_wishart_prior (Tuple (Tuple Float Integer) (Vec Float) (Vec Float))])
 
 (def gmm_knossos_gmm_objective Float
       ((x : Vec (Vec Float))        ; N x D
@@ -133,6 +160,27 @@
              (Tuple Float Integer))])
 
 (gdef rev [gmm_knossos_gmm_objective
+      (Tuple (Vec (Vec Float))
+             (Vec Float)
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Tuple Float Integer))])
+(gdef suffwdpass [gmm_knossos_gmm_objective
+      (Tuple (Vec (Vec Float))
+             (Vec Float)
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Tuple Float Integer))])
+(gdef sufrevpass [gmm_knossos_gmm_objective
+      (Tuple (Vec (Vec Float))
+             (Vec Float)
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Vec (Vec Float))
+             (Tuple Float Integer))])
+(gdef sufrev [gmm_knossos_gmm_objective
       (Tuple (Vec (Vec Float))
              (Vec Float)
              (Vec (Vec Float))

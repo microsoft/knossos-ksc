@@ -353,7 +353,7 @@ pSelFun = do { rest <- try $ do { f <- pIdentifier
                  Just selfun -> pure selfun
              }
 
-pBaseUserFunWithType :: (Type -> BaseUserFunT p) -> Parser (BaseUserFun p)
+pBaseUserFunWithType :: (Type -> BaseUserFunArgTy p) -> Parser (BaseUserFun p)
 pBaseUserFunWithType add =
      brackets (do { f  <- pIdentifier
                   ; ty <- pType
@@ -378,21 +378,19 @@ pBaseFun = pSelFun
 
 pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
 pFunG pBase = try (brackets $
-            ((pBaseDerivation "D" GradFun BasicAD)
-         <|> (pBaseDerivation "Dt" GradFun TupleAD)
-         <|> (pBaseDerivation "fwd" DrvFun (AD BasicAD Fwd))
-         <|> (pBaseDerivation "fwdt" DrvFun (AD TupleAD Fwd))
-         <|> (pBaseDerivation "rev"  DrvFun (AD BasicAD Rev))
-         <|> (pBaseDerivation "revt" DrvFun (AD TupleAD Rev))
-         <|> (pReserved "CL"    >> CLFun    <$> pBase)
-         <|> (pReserved "shape" >> ShapeFun <$> pFunG pBase)))
-   <|> Fun <$> pBase
-  where pBaseDerivation :: String
-                        -> (BaseFun p -> b -> b1)
-                        -> b
-                        -> Parser b1
-        pBaseDerivation s f p =
-          pReserved s >> flip f p <$> pBase
+            ((pDerivation "D" (GradFun BasicAD))
+         <|> (pDerivation "Dt" (GradFun TupleAD))
+         <|> (pDerivation "fwd" (DrvFun (AD BasicAD Fwd)))
+         <|> (pDerivation "fwdt" (DrvFun (AD TupleAD Fwd)))
+         <|> (pDerivation "rev"  (DrvFun (AD BasicAD Rev)))
+         <|> (pDerivation "revt" (DrvFun (AD TupleAD Rev)))
+         <|> (pDerivation "CL" CLFun)
+         <|> (pDerivation "suffwdpass" SUFFwdPass)
+         <|> (pDerivation "sufrevpass" SUFRevPass)
+         <|> (pDerivation "sufrev" SUFRev)
+         <|> (pReserved "shape" >> (\(Fun ds f) -> Fun (ShapeFun ds) f) <$> pFunG pBase)))
+   <|> Fun JustFun <$> pBase
+  where pDerivation s d = pReserved s >> Fun d <$> pBase
 
 pFunTyped :: Parser (Fun Typed)
 pFunTyped = pFunG (BaseUserFun <$> pBaseUserFunWithType id)
@@ -430,12 +428,12 @@ pEdef :: Parser (DefX Parsed)
 pEdef = do { pReserved "edef"
            ; f          <- pFun
            ; returnType <- pType
-           ; argTypes   <- pTypes
+           ; argType    <- pType
            ; mk_fun_name <- pIsUserFun f
            ; return (Def { def_fun = mk_fun_name
                          , def_res_ty = returnType
                          -- See note [Function arity]
-                         , def_pat = VarPat (mkTVar (mkTupleTy argTypes) "edefArgVar")
+                         , def_pat = VarPat (mkTVar argType "edefArgVar")
                          , def_rhs = EDefRhs }) }
 
 pDerivation :: Parser Derivation
@@ -444,6 +442,9 @@ pDerivation =
   <|> (pReserved "rev" $> DerivationDrvFun (AD BasicAD Rev))
   <|> (pReserved "CL"  $> DerivationCLFun)
   <|> (pReserved "shape" $> DerivationShapeFun)
+  <|> (pReserved "suffwdpass" $> DerivationSUFFwdPass)
+  <|> (pReserved "sufrevpass" $> DerivationSUFRevPass)
+  <|> (pReserved "sufrev" $> DerivationSUFRev)
 
 pGDef :: Parser GDefX
 pGDef = do { pReserved "gdef"

@@ -15,6 +15,7 @@ import Prim
 import Rules
 import OptLet
 import KMonad
+import qualified Ksc.SUF.Rewrite as SUF
 import Ksc.Traversal( traverseState, mapAccumLM )
 
 import Debug.Trace
@@ -209,20 +210,46 @@ rewriteCall _ fun (Let v r arg)
 rewriteCall _ fun (If e1 e2 e3)
   = Just (If e1 (Call fun e2) (Call fun e3))
 
-rewriteCall env (TFun _ (Fun fun)) arg
+rewriteCall env (TFun _ (Fun JustFun fun)) arg
   = optFun env fun arg
 
-rewriteCall env (TFun ty (GradFun f adm)) arg
+rewriteCall env (TFun ty (Fun (GradFun adm) f)) arg
   = optGradFun (optEnvInScope env) adm ty f arg
 
-rewriteCall _ (TFun _ (DrvFun f adm)) arg
+rewriteCall _ (TFun _ (Fun (DrvFun adm) f)) arg
   = optDrvFun adm f arg
 
 rewriteCall _ f@(TFun (TypeLM _ _) _) _
   = trace ("NOTE: Unmatched LM call {" ++ pps f ++ "}") Nothing
 
+rewriteCall env (TFun _ to_inline) arg
+  | Just to_inline <- maybeUserFun to_inline
+  , shouldInline to_inline
+  , Just Def{ def_pat = pat, def_rhs = UserRhs body }
+      <- lookupGblST to_inline (optGblST env)
+  = Just (inlineCall env pat body arg)
+
+rewriteCall _ (TFun _ (Fun SUFFwdPass (PrimFun fun))) arg
+  = SUF.rewriteSUFFwdPass fun arg
+
+rewriteCall _ (TFun _ (Fun SUFRevPass (PrimFun fun))) arg
+  = SUF.rewriteSUFRevPass fun arg
+
 rewriteCall _ _ _
   = Nothing
+
+-- If this gets big or complicated then move it to its own module,
+-- perhaps Ksc.InlineHeuristics.
+shouldInline :: UserFun Typed -> Bool
+shouldInline to_inline
+  = to_inline `elem` [ fwd "mul" ff
+                     , rev "mul" ff
+                     , fwd "add" ff
+                     , rev "add" ff
+                     ]
+  where fwd f t = Fun SUFFwdPass (BaseUserFunId f t)
+        rev f t = Fun SUFRevPass (BaseUserFunId f t)
+        ff = TypeTuple [TypeFloat, TypeFloat]
 
 -----------------------
 optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
@@ -603,6 +630,7 @@ optSumBuild _ _ _ = Nothing
 
 
 -----------------------
+-- See Note [Automatic differentiation documentation]
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
                            -> Type -> BaseFun Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
@@ -616,7 +644,7 @@ optGradFun env TupleAD ty f args
   , Just opt_grad <- optGradFun env BasicAD lm_ty f new_args
   = Just $
     mkLets binds $
-    Tuple [ Call (TFun res_ty (Fun f)) new_args, opt_grad ]
+    Tuple [ Call (TFun res_ty (Fun JustFun f)) new_args, opt_grad ]
   | otherwise
   = Nothing
   where
@@ -644,6 +672,7 @@ makeAtomic always_bind in_scope args
          bind = (tv, arg)
          in_scope' = extendInScopeSet tv in_scope
 
+-- See Note [Automatic differentiation documentation]
 optGradPrim :: HasCallStack => Type -> PrimFun -> TExpr -> Maybe TExpr
 --   sel 2 3 :: (a,b,c) -> b
 -- D$sel 2 3 :: (a,b,c) -> (a,b,c) -o b
@@ -683,7 +712,7 @@ optGradPrim (TypeLM _ _) P_ts_dot (Tuple [v1, v2])
   = Just (lmHCat [lmDot v2, lmDot v1])
 
 optGradPrim (TypeLM a _) P_ts_neg _
-  = Just (lmScale a (kTFloat $ -1.0))
+  = Just (lmScale a (kFloat $ -1.0))
 
 optGradPrim _ P_sum e
   | TypeTensor d t <- typeof e
@@ -712,10 +741,12 @@ optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ render (ppr f) ++
 
 
 -----------------------
+-- See Note [Automatic differentiation documentation]
 optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
 optDrvFun (AD BasicAD dir) (PrimFun f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
+-- See Note [Automatic differentiation documentation]
 optDrvPrim :: HasCallStack => ADDir -> PrimFun -> TExpr -> Maybe TExpr
 
 optDrvPrim Fwd P_constVec (Tuple [n_v, dn_dv])
@@ -731,13 +762,15 @@ optDrvPrim Rev P_deltaVec (Tuple [n_i_v, ddr])
 optDrvPrim Fwd P_Vec_init (Tuple [_vs, dvs])
   = Just $ mkPrimCall P_Vec_init dvs
 optDrvPrim Rev P_Vec_init (Tuple [Tuple vs, ddr])
-  = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kTInt $ toInteger i) ddr) $ fromList vs)
+  = Just $ Tuple (toList $ mapWithIndex (\i _ -> pIndex (kInt $ toInteger i) ddr) $ fromList vs)
 optDrvPrim Rev P_Vec_init (Tuple [_v, ddr])
-  = Just $ pIndex (kTInt 0) ddr
+  = Just $ pIndex (kInt 0) ddr
 
 optDrvPrim _ _ _ = Nothing
 
 ---------------
+-- See Note [Automatic differentiation documentation]
+--
 -- Called for (lmApply lm dx)
 optLMApply :: InScopeSet -> ADMode -> TExpr -> TExpr -> Maybe TExpr
 
@@ -757,29 +790,29 @@ optLMApply _ (AD TupleAD dir) (Tuple [_, lm]) dx
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only
-optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun (PrimFun f))) es) dx
+optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun JustFun (PrimFun f))) es) dx
   = optLMApplyCall env dir f es dx
 
 -- Looking at:   D$f(e1, e2) `lmApply` dx
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
-optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (GradFun f adp2)) es) dx
+optLMApply _ (AD adp1 Fwd) (Call (TFun (TypeLM _ t) (Fun (GradFun adp2) f)) es) dx
   | adp1 == adp2
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType t) (DrvFun f (AD adp1 Fwd))
+    grad_fun = TFun (tangentType t) (Fun (DrvFun (AD adp1 Fwd)) f)
     es_dx = Tuple [es, dx]
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
-optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (GradFun f adp2)) es) dx
+optLMApply _ (AD adp1 Rev) (Call (TFun (TypeLM s _) (Fun (GradFun adp2) f)) es) dx
   | adp1 == adp2
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType s) (DrvFun f (AD adp1 Rev))
+    grad_fun = TFun (tangentType s) (Fun (DrvFun (AD adp1 Rev)) f)
     es_dx = Tuple [es, dx]
 
 {-
@@ -793,6 +826,8 @@ optLMApply _ _ _e _
     Nothing
 
 ------------------
+-- See Note [Automatic differentiation documentation]
+--
 -- Optimise (lmApply (fun arg) dx)
 -- Only for the BasicAD form
 optLMApplyCall :: HasCallStack
@@ -977,14 +1012,14 @@ hspec = do
     describe "optLM tests" $ do
       it "lmAdd(S(x),S(y)) -> S(x+y)" $
         optPrimFun emptyInScopeSet P_lmAdd
-            (Tuple [lmScale TypeFloat (kTFloat 1.3), lmScale TypeFloat (kTFloat 0.4)])
+            (Tuple [lmScale TypeFloat (kFloat 1.3), lmScale TypeFloat (kFloat 0.4)])
         `shouldBe`
-        Just (lmScale TypeFloat (pAdd (kTFloat 1.3) (kTFloat 0.4)))
+        Just (lmScale TypeFloat (pAdd (kFloat 1.3) (kFloat 0.4)))
 
       it "lmAdd(HCat) = HCat(lmAdd) and some more simplifications" $
         let l1 = lmOne TypeFloat
-            f2 = kTFloat 2.0
-            f4 = kTFloat 4.0
+            f2 = kFloat 2.0
+            f4 = kFloat 4.0
             l2 = lmScale TypeFloat f2
         in
             optE emptyOptEnv

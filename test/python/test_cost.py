@@ -11,10 +11,10 @@ from ksc.shape import Shape, TensorShape, ScalarShape, ShapeType
 
 def test_afe():
     ks_str = """
-(edef div Float (Float Float))
+(edef div Float (Tuple Float Float))
 (def cost$div Float ((a : Float) (b : Float)) 2.0)
 (def shape$div Integer ((a : Float) (b : Float)) (tuple))
-(edef add Float (Float Float))
+(edef add Float (Tuple Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
 (def shape$add Integer ((a : Float) (b : Float)) (tuple))
 
@@ -31,7 +31,7 @@ def test_afe():
 
 def test_build():
     ks_str = """
-(edef add Float (Float Float))
+(edef add Float (Tuple Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
 (def shape$add Integer ((a : Float) (b : Float)) (tuple))
 
@@ -48,7 +48,7 @@ def test_build():
 
 def test_outer_product():
     ks_str = """
-(edef mul Float (Float Float))
+(edef mul Float (Tuple Float Float))
 (def cost$mul Float ((a : Float) (b : Float)) 2.0)
 (def shape$mul Integer ((a : Float) (b : Float)) (tuple))
 (def outer_product (Tensor 2 Float)
@@ -69,7 +69,7 @@ def test_outer_product():
 
 def test_sumbuild():
     ks_str = """
-(edef add Float (Float Float))
+(edef add Float (Tuple Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
 (def shape$add Integer ((a : Float) (b : Float)) (tuple))
 
@@ -82,13 +82,13 @@ def test_sumbuild():
 
 def test_rot():
     ks_str = """
-(edef mul Float (Float Float))
+(edef mul Float (Tuple Float Float))
 (def cost$mul Float ((a : Float) (b : Float)) 2.0)
 (def shape$mul Integer ((a : Float) (b : Float)) (tuple))
-(edef add Float (Float Float))
+(edef add Float (Tuple Float Float))
 (def cost$add Float ((a : Float) (b : Float)) 1.0)
 (def shape$add Integer ((a : Float) (b : Float)) (tuple))
-(edef neg Float (Float))
+(edef neg Float (Tuple Float))
 (def cost$neg Float ((a : Float)) 1.0)
 (def shape$neg Integer ((a : Float)) (tuple))
 
@@ -164,10 +164,10 @@ def test_states():
 
 def test_if_then_else():
     ks_str = """
-(edef mul Integer (Integer Integer))
+(edef mul Integer (Tuple Integer Integer))
 (def cost$mul Float ((a : Integer) (b : Integer)) 2.0)
 (def shape$mul Integer ((a : Integer) (b : Integer)) (tuple))
-(edef eq Bool (Float Float))
+(edef eq Bool (Tuple Float Float))
 (def cost$eq Float ((a : Float) (b : Float)) 1.0)
 (def shape$eq Integer ((a : Float) (b : Float)) (tuple))
 

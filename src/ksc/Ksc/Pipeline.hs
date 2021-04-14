@@ -13,7 +13,7 @@ import CSE (cseDefs)
 import KMonad (KM, KMT, runKM,  banner)
 import Ksc.CatLang
 import Ksc.Traversal (mapAccumLM)
-import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun),
+import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              TDef, Pretty,
              def_fun, displayN, partitionDecls,
              ppr, renderSexp, (<+>))
@@ -24,7 +24,10 @@ import Parse (parseF)
 import Rules (mkRuleBase)
 import Opt (optDefs)
 import Shapes (shapeDefs)
+import Ksc.SUF (sufDef)
+import Ksc.SUF.AD (sufFwdRevPassDef, sufRevDef)
 
+import Data.Maybe (maybeToList)
 import Data.List (intercalate)
 import qualified Data.Map as Map
 import GHC.Stack (HasCallStack)
@@ -189,11 +192,11 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
           ; pure (stInsertFun appliedDef env', [DefDecl appliedDef])
           }
         L.DerivationCLFun
-          | Fun basefun <- fun
+          | Fun JustFun basefun <- fun
           , let tdef' = case toCLDef_maybe tdef of
                   Nothing -> error ("Couldn't derive CL of "
                                     ++ L.render (ppr basefun))
-                  Just d  -> (fromCLDef d){ def_fun = L.CLFun basefun }
+                  Just d  -> (fromCLDef d){ def_fun = Fun L.CLFun basefun }
           -> pure (stInsertFun tdef' env, [DefDecl tdef'])
           | otherwise
           -> error ("Was not base fun: " ++ L.render (ppr fun))
@@ -202,6 +205,19 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
           let shapeDef = shapeDefs [tdef]
               env' = extendGblST env shapeDef
           in pure (env', map DefDecl shapeDef)
+
+        L.DerivationSUFFwdPass ->
+          let (sufFwdpassedDef, _, _) = sufFwdRevPassDef env (sufDef tdef)
+          in pure (maybe env (flip stInsertFun env) sufFwdpassedDef,
+                   DefDecl <$> maybeToList sufFwdpassedDef)
+        L.DerivationSUFRevPass ->
+          let (_, sufRevpassedDef, _) = sufFwdRevPassDef env (sufDef tdef)
+          in pure (maybe env (flip stInsertFun env) sufRevpassedDef,
+                   DefDecl <$> maybeToList sufRevpassedDef)
+        L.DerivationSUFRev     ->
+          let sufRevedDef = sufRevDef env (sufDef tdef)
+          in pure (maybe env (flip stInsertFun env) sufRevedDef,
+                   DefDecl <$> maybeToList sufRevedDef)
     }
 
 deriveDeclUsing :: Applicative f

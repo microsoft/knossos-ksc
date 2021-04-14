@@ -18,16 +18,11 @@ Note:
 
 */
 
-#define ASSERT(p) if (p) ; else asserter(#p, __FILE__, __LINE__)
+#define ASSERT(p) if (p) ; else asserter() += asserter::startAssertMessage(#p, __FILE__, __LINE__)
 
 struct asserter {
-  std::ostream* s;
- 
-  asserter(char const* expr, char const* file, int line);
-  ~asserter();
- 
-  template <class T>
-  std::ostream& operator<<(const T& t) { return *s << t; }
+  static std::ostream & startAssertMessage(char const * expr, char const* file, int line);
+  void operator += [[noreturn]] (std::ostream & message);  // could pick any operator with a lower precedence than <<
 };
 
-#endif _KSC_ASSERT_H_
+#endif /// _KSC_ASSERT_H_

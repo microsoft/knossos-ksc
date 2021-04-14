@@ -6,12 +6,18 @@
 
 (gdef fwd [test_tuple (Tuple (Vec Float) (Vec (Vec Float)) Integer)])
 (gdef rev [test_tuple (Tuple (Vec Float) (Vec (Vec Float)) Integer)])
+(gdef suffwdpass [test_tuple (Tuple (Vec Float) (Vec (Vec Float)) Integer)])
+(gdef sufrevpass [test_tuple (Tuple (Vec Float) (Vec (Vec Float)) Integer)])
+(gdef sufrev [test_tuple (Tuple (Vec Float) (Vec (Vec Float)) Integer)])
 
 (def g Float ((w : Tuple Float Integer))
     (get$1$2 w))
 
 (gdef fwd [g (Tuple Float Integer)])
 (gdef rev [g (Tuple Float Integer)])
+(gdef suffwdpass [g (Tuple Float Integer)])
+(gdef sufrevpass [g (Tuple Float Integer)])
+(gdef sufrev [g (Tuple Float Integer)])
 
 (def g2 Float ((wishart : Tuple Float Integer))
     (let ((wishart_gamma (get$1$2 wishart))
@@ -21,6 +27,9 @@
 
 (gdef fwd [g2 (Tuple Float Integer)])
 (gdef rev [g2 (Tuple Float Integer)])
+(gdef suffwdpass [g2 (Tuple Float Integer)])
+(gdef sufrevpass [g2 (Tuple Float Integer)])
+(gdef sufrev [g2 (Tuple Float Integer)])
 
 (def main Integer ()
     (let (w (tuple 3.3 4))

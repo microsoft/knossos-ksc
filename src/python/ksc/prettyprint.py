@@ -31,7 +31,7 @@ from prettyprinter.utils import intersperse
 
 # Local imports
 from ksc.type import Type
-from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import ASTNode, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import StructuredName
 
 # These are primarily to enable syntax highlighting -- 
@@ -95,8 +95,8 @@ def pretty_StructuredName(sname, ctx):
 #            + nl(indent+1) + pystr(ex.body, indent+1)
 
 # Declare pretty printer for our Expressions
-@register_pretty(Expr)
-def pretty_Expr(ex, ctx):
+@register_pretty(ASTNode)
+def pretty_ASTNode(ex, ctx):
     pp = lambda v: pretty_dispatch(v, ctx)
 
     # Def
@@ -113,7 +113,7 @@ def pretty_Expr(ex, ctx):
                     pp_reserved("edef"), LINE,
                     pp(ex.name), LINE,
                     pp(ex.return_type), LINE,
-                    parens_interline(1, *map(pp, ex.arg_types)))
+                    pp(ex.arg_type))
 
     if isinstance(ex, GDef):
         return parens(2,

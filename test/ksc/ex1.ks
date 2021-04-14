@@ -7,5 +7,8 @@
 
 (gdef fwd [g Float])
 (gdef rev [g Float])
+(gdef suffwdpass [g Float])
+(gdef sufrevpass [g Float])
+(gdef sufrev [g Float])
 
 (def main Integer () 0)

@@ -4,10 +4,7 @@ import re
 from ksc.type import Type
 from ksc.expr import Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert, StructuredName, make_structured_name
 
-from ksc.parse_ks import parse_tld, parse_expr, ParseError, s_exps_from_string, strip_block_comments
-
-def expr(s):
-    return parse_expr(s_exps_from_string(s)[0])
+from ksc.parse_ks import parse_tld, parse_expr_string, ParseError, s_exps_from_string, strip_block_comments
 
 def tld(s):
     return parse_tld(s_exps_from_string(s)[0])
@@ -25,8 +22,8 @@ def test_parses():
     assert tld("(def [rev [f (Tuple)]] Float () 1.1)") ==\
                Def(make_structured_name(("rev", ("f", Type.Tuple()))), Type.Float, [], Const(1.1))
 
-    assert tld("(edef f Float ((Float) (Vec Float)))") ==\
-               EDef(f, Type.Float, [Type.Float, Type.Tensor(1, Type.Float)])
+    assert tld("(edef f Float (Tuple (Float) (Vec Float)))") ==\
+               EDef(f, Type.Float, Type.Tuple(Type.Float, Type.Tensor(1, Type.Float)))
 
     assert tld("(gdef rev [f (Tuple (Float) (Vec Float))])") ==\
                GDef("rev", make_structured_name(("f", Type.Tuple(Type.Float, Type.Tensor(1, Type.Float)))))
@@ -44,11 +41,11 @@ def test_parses():
     assert tld("(def f Bool () true)") ==\
                Def(f, Type.Bool, [], Const(True))
 
-    assert expr("(assert a b)") == Assert(Var_a, Var_b)
-    assert expr("(if a a b)") == If(Var_a, Var_a, Var_b)
-    assert expr("(let (a b) a)") == Let(Var_a, Var_b, Var_a)
-    assert expr("(lam (a : Float) a)") == Lam(Var_a_Float, Var_a)
-    assert expr("(let ((a b) (tuple 1 2)) a)") == \
+    assert parse_expr_string("(assert a b)") == Assert(Var_a, Var_b)
+    assert parse_expr_string("(if a a b)") == If(Var_a, Var_a, Var_b)
+    assert parse_expr_string("(let (a b) a)") == Let(Var_a, Var_b, Var_a)
+    assert parse_expr_string("(lam (a : Float) a)") == Lam(Var_a_Float, Var_a)
+    assert parse_expr_string("(let ((a b) (tuple 1 2)) a)") == \
                 Let([Var_a, Var_b], Call("tuple", [Const(1), Const(2)]), 
                     Var_a)
 
@@ -68,11 +65,11 @@ def test_errors():
     with pytest.raises(ParseError, match='Empty list at top level'):
         tld("()")
     with pytest.raises(ParseError, match='Empty list'):
-        expr("()")
+        parse_expr_string("()")
     with pytest.raises(ParseError, match='Let bindings should be pairs'):
-        expr("(let (a) 2)")
+        parse_expr_string("(let (a) 2)")
     with pytest.raises(ParseError, match='Constant tuple should be all the same type'):
-        expr("(2 2 3.2)")
+        parse_expr_string("(2 2 3.2)")
 
 def check(pattern, s):
     assert re.match(re.compile(pattern, flags=re.DOTALL | re.MULTILINE), strip_block_comments(s))

@@ -5,6 +5,9 @@
 
 (gdef fwd [tri Integer])
 (gdef rev [tri Integer])
+(gdef suffwdpass [tri Integer])
+(gdef sufrevpass [tri Integer])
+(gdef sufrev [tri Integer])
 
 ; NB This doesn't really test "stopgrad" per se anymore, but it is
 ; correct that we no longer try to differentiate with respect to
@@ -15,5 +18,8 @@
 
 (gdef fwd [f (Tuple Float Integer)])
 (gdef rev [f (Tuple Float Integer)])
+(gdef suffwdpass [f (Tuple Float Integer)])
+(gdef sufrevpass [f (Tuple Float Integer)])
+(gdef sufrev [f (Tuple Float Integer)])
 
 (def main Integer () 0)
