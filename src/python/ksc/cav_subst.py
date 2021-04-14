@@ -94,7 +94,7 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
 #####################################################################
 # Name Generation
 
-def _make_nonfree_var(prefix, exprs):
+def make_nonfree_var(prefix, exprs):
     for idx in itertools.count():
         name = prefix + "_" + str(idx)
         if all(name not in e.free_vars_ for e in exprs):
@@ -163,7 +163,7 @@ def _rename_if_needed(arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest]
     conflicting_binders = [req.payload for req in reqs] + list(subst.values())
     if any(arg.name in rhs.free_vars_ for rhs in conflicting_binders):
         # Must rename "arg". Make a new name.
-        nv = _make_nonfree_var(arg.name, [binder] + conflicting_binders)
+        nv = make_nonfree_var(arg.name, [binder] + conflicting_binders)
         nv.type_ = arg.type_
         return nv, {**subst, arg.name: nv}
     return arg, {k:v for k,v in subst.items() if k != arg.name}
