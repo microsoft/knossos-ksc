@@ -106,7 +106,7 @@ class inline_var(Rule):
         # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
         assert path_to_var[:len(binding_location)] == binding_location
         return replace_subtree(expr, binding_location, Const(0.0), # Nothing to avoid capturing in outer call
-            lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator: just insert let rhs
+            lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator; renaming will prevent capturing let.rhs, so just insert that
         )
 
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
@@ -127,7 +127,7 @@ class delete_let(Rule):
             assert const_zero == Const(0.0) # Passed to replace_subtree below
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
-        # The constant here says that there are no free variables to avoid capturing en route to the target Location
+        # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Rewrite]:
