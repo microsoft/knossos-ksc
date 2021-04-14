@@ -2,7 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import Union, List, Tuple, Any
+from typing import Any, FrozenSet, List, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord
@@ -231,10 +231,12 @@ class Expr(ASTNode):
     '''Base class for Expression AST nodes. Not directly instantiable.'''
 
     type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
+    free_vars_: FrozenSet[str] # Filled in by constructor
 
     def __init__(self, **args):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
+        self.free_vars_ = compute_free_vars(self)
 
 class Def(ASTNode):
     '''Def(name, return_type, args, body). 
@@ -543,6 +545,44 @@ def _(ex, indent):
     indent += 1
     return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) \
             + pystr(ex.body, indent)
+
+#####################################################################
+# Calculate free variables of an Expr.
+
+@singledispatch
+def compute_free_vars(e: Expr) -> FrozenSet[str]:
+    raise ValueError("Must be overridden for every Expr subclass")
+
+@compute_free_vars.register
+def fv_var(e: Var):
+    return frozenset([e.name])
+
+@compute_free_vars.register
+def fv_call(e: Call):
+    return frozenset() if len(e.args)==0 else frozenset.union(*[arg.free_vars_ for arg in e.args])
+
+@compute_free_vars.register
+def fv_lam(e: Lam):
+    return e.body.free_vars_ - e.arg.free_vars_
+
+@compute_free_vars.register
+def fv_let(e: Let):
+    bound_here = e.vars.free_vars_ if isinstance(e.vars, Var) else frozenset.union(
+        *[var.free_vars_ for var in e.vars]
+    )
+    return e.rhs.free_vars_.union(e.body.free_vars_ - bound_here)
+
+@compute_free_vars.register
+def fv_const(e: Const):
+    return frozenset()
+
+@compute_free_vars.register
+def fv_assert(e: Assert):
+    return frozenset.union(e.cond.free_vars_, e.body.free_vars_)
+
+@compute_free_vars.register
+def fv_if(e: If):
+    return frozenset.union(e.cond.free_vars_, e.t_body.free_vars_, e.f_body.free_vars_)
 
 if __name__ == "__main__":
     from ksc.parse_ks import parse_ks_file
