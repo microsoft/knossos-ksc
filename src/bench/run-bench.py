@@ -51,9 +51,9 @@ def timeit(msg, fn, arg):
     forward_timer = time_sampler()
     backward_timer = time_sampler()
     nruns = 5000
-    inference_timer.mark()
     for _ in range(nruns):
         arg.requires_grad = False
+        inference_timer.mark()
         loss = fn(arg).sum()
         inference_timer.record()
 
