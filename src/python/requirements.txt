@@ -1,5 +1,5 @@
 wheel==0.36.2
-sexpdata
-numpy
-jax
-editdistance
+sexpdata==0.0.3
+numpy==1.20.2
+jax==0.1.57
+editdistance==0.5.3
