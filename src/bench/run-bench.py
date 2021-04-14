@@ -90,13 +90,13 @@ def bench(module_name, bench_name):
     for fn in inspect.getmembers(mod, inspect.isfunction):
         fn_name, fn_obj = fn
         if fn_name == bench_name + '_bench_configs':
-        configs = list(fn_obj())
+            configs = list(fn_obj())
         elif fn_name == bench_name + '_pt':
-        pt_fun = fn_obj
+            pt_fun = fn_obj
         elif fn_name == bench_name:
-        ks_fun = fn_obj
+            ks_fun = fn_obj
         else:
-        print(f"Ignoring {fn_name}")
+            print(f"Ignoring {fn_name}")
 
     # TODO: elementwise_apply  
     ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
