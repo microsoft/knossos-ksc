@@ -44,6 +44,10 @@ def _get_children_assert(e: Assert):
 
 Location = List[int]
 
+def get_node_at_location(expr, path: Location):
+  return expr if len(path) == 0 else get_node_at_location(_get_children(expr)[path[0]], path[1:])
+
+
 #####################################################################
 # Public members
 
