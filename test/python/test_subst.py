@@ -64,12 +64,13 @@ def test_replace_subtree_avoids_capture():
 def test_replace_subtree_avoids_capturing_another():
   new_subtree = parse_expr_string("(mul x 2)")
   conflicting_var = _make_nonfree_var("x", [new_subtree])  # But, this already exists
-  e = parse_expr_string(f"(lam (x : Integer) (foo {conflicting_var} x y))")
+  assert conflicting_var.name == "x_0"
+  e = parse_expr_string(f"(lam (x : Integer) (foo x_0 x y))")
   path_to_y = (0, 2)
   assert get_node_at_location(e, path_to_y) == Var("y")
   replaced = replace_subtree(e, path_to_y, new_subtree)
   new_var = replaced.arg  # No alpha-equivalence, so this is the name used; this has decl=True
-  expected = parse_expr_string(f"(lam ({new_var}) (foo {conflicting_var} {new_var.name} (mul x 2)))")
+  expected = parse_expr_string(f"(lam ({new_var}) (foo x_0 {new_var.name} (mul x 2)))")
   assert new_var != conflicting_var
   assert replaced == expected
 
