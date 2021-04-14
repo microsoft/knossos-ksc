@@ -18,7 +18,7 @@ class Rewrite:
 
     def __call__(self):
         return self.rule.apply_at(self.root, self.path, **self.extra_data)
-    
+
 class AbstractMatcher(ABC):
     def get_all_rewrites(self, e: Expr) -> Iterator[Rewrite]:
         yield from _subtree_rewrites(e, [], self, e, {})
@@ -65,7 +65,7 @@ class RuleSet(AbstractMatcher):
         for rule in rules:
             for clazz in rule.possible_expr_classes():
                 self.rules_by_class.setdefault(clazz, []).append(rule)
-    
+
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping) -> Iterator[Rewrite]:
         for rule in self.rules_by_class.get(subtree.__class__, []):
             yield from rule.get_local_rewrites(subtree, path_from_root, root, env)
@@ -100,15 +100,10 @@ class inline_var(Rule):
         return {Var}
 
     def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
-        # binding_location and bound_value come from the Rewrite.
-        # Note alternatives:
-        # 1. the environment+Rewrite store only the binding location; we carry the entire bound value from the binding-let down to the variable, in order to inline perhaps only part of it
-        # 2. the environment+Rewrite store only the binding location; we traverse the path from binder to variable-use twice:
-        #        the first time just to find the target variable, so that we can then extract the appropriate bound value (perhaps part of a tuple) from the binder;
-        #        the second time, to do renaming to avoid capturing anything in the value to be inlined
-        # 3. Neither environment/ReWrite store any extra information (neither binding_location nor bound_value); instead, we traverse the path from root to usage site twice,
-        #        the first traversal building the environment (varname -> binding_location) as it goes down to the usage site - duplicating some of the work done by the matcher (which at the least needs to build an environment of which variables are inlinable)
-        #        the second traversal uses two nested calls of replace_subtree: (a) from root down to the binder, without any renaming; then (b) from the binder down to the usage site, renaming to avoid capture of anything in the value-to-be-inlined.
+        # binding_location comes from the Rewrite.
+        # Note there is an alternative design, where we don't store any "extra" info in the Rewrite.
+        # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
+        # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
         assert path_to_var[:len(binding_location)] == binding_location
         return replace_subtree(expr, binding_location, Const(0.0), # Nothing to avoid capturing in outer call
             lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator: just insert let rhs
@@ -128,13 +123,12 @@ class delete_let(Rule):
         return {Let}
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
+        def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
+            assert const_zero == Const(0.0) # Passed to replace_subtree below
+            assert let_node.vars.name not in let_node.body.free_vars_
+            return let_node.body
         # The constant here says that there are no free variables to avoid capturing en route to the target Location
-        return replace_subtree(expr, path, Const(0.0), self._apply)
-
-    def _apply(self, const_zero: Expr, let_node: Expr) -> Expr:
-        assert const_zero == Const(0.0) # Specified in apply_at
-        assert let_node.vars.name not in let_node.body.free_vars_
-        return let_node.body
+        return replace_subtree(expr, path, Const(0.0), apply_here)
 
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Rewrite]:
         del env
