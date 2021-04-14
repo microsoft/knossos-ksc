@@ -5,13 +5,14 @@ from ts2ks import ts2mod
 
 torch.set_default_dtype(torch.float64)
 
+
 class time_sampler:
-    def __init__(self, minimizing = False):
+    def __init__(self, minimizing=False):
         self.minimizing = minimizing
         if self.minimizing:
             self.time = 1e10
         else:
-            self.time = 0       
+            self.time = 0
             self.ncalls = 0
 
     def duration(self):
@@ -43,8 +44,9 @@ class time_sampler:
             self.time += delta
             self.ncalls += 1
 
+
 def timeit(msg, fn, arg):
-    print('#Timing: ', msg, fn, arg.shape)
+    print("#Timing: ", msg, fn, arg.shape)
     inference_timer = time_sampler()
     forward_timer = time_sampler()
     backward_timer = time_sampler()
@@ -66,44 +68,49 @@ def timeit(msg, fn, arg):
 
     csum = grad[0].sum()
 
-    print(f'{msg:20} {csum:.6e} Inference: {inference_timer.ms:10.3f} ms |'
-          f' Forward: {forward_timer.ms:10.3f} ms |'
-          f' Backward {backward_timer.ms:10.3f} ms | {arg.shape}')
+    print(
+        f"{msg:20} {csum:.6e} Inference: {inference_timer.ms:10.3f} ms |"
+        f" Forward: {forward_timer.ms:10.3f} ms |"
+        f" Backward {backward_timer.ms:10.3f} ms | {arg.shape}"
+    )
+
 
 def bench(module_name, bench_name):
-  """
-  Import MODULE_NAME, which defines these functions:
-    bench_name           Knossos-compilable code, should be pretty
-    bench_name_pt        PyTorch reference, should be fast, might not be pretty
-    bench_name_config    Return a sequence of inputs on which to run benchmarking
-  """
-  import inspect
-  import importlib
+    """
+    Import MODULE_NAME, which defines these functions:
+      bench_name           Knossos-compilable code, should be pretty
+      bench_name_pt        PyTorch reference, should be fast, might not be pretty
+      bench_name_config    Return a sequence of inputs on which to run benchmarking
+    """
+    import inspect
+    import importlib
 
-  mod = importlib.import_module(module_name)
-  for fn in inspect.getmembers(mod, inspect.isfunction):
-    fn_name, fn_obj = fn
-    if fn_name == bench_name + '_bench_configs':
-      configs = list(fn_obj())
-    elif fn_name == bench_name + '_pt':
-      pt_fun = fn_obj
-    elif fn_name == bench_name:
-      ks_fun = fn_obj
-    else:
-      print(f"Ignoring {fn_name}")
+    mod = importlib.import_module(module_name)
+    for fn in inspect.getmembers(mod, inspect.isfunction):
+        fn_name, fn_obj = fn
+        if fn_name == bench_name + "_bench_configs":
+            configs = list(fn_obj())
+        elif fn_name == bench_name + "_pt":
+            pt_fun = fn_obj
+        elif fn_name == bench_name:
+            ks_fun = fn_obj
+        else:
+            print(f"Ignoring {fn_name}")
 
-  # TODO: elementwise_apply  
-  ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
+    # TODO: elementwise_apply
+    ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
 
-  for arg in configs:
-    assert torch.all(torch.isclose(pt_fun(arg), ks_fun(arg)))    
-    timeit(bench_name + ' PT fast', pt_fun, arg)
-    timeit(bench_name + ' PT nice', ks_fun, arg)
-    timeit(bench_name + ' Knossos', ks_compiled.apply, arg)
+    for arg in configs:
+        assert torch.all(torch.isclose(pt_fun(arg), ks_fun(arg)))
+        timeit(bench_name + " PT fast", pt_fun, arg)
+        timeit(bench_name + " PT nice", ks_fun, arg)
+        timeit(bench_name + " Knossos", ks_compiled.apply, arg)
+
 
 if __name__ == "__main__":
-  import sys
-  if len(sys.argv) != 3:
-      print("Usage: run-bench MODULE BENCH")
-      sys.exit(1)
-  bench(sys.argv[1], sys.argv[2])
+    import sys
+
+    if len(sys.argv) != 3:
+        print("Usage: run-bench MODULE BENCH")
+        sys.exit(1)
+    bench(sys.argv[1], sys.argv[2])
