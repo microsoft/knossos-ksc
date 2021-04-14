@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import singledispatch
 import itertools
-from typing import Callable, Iterable, Generator, List, Mapping, Optional, Tuple
+from typing import Callable, Iterable, Generator, List, Mapping, Optional, Tuple, Sequence
 
 from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 
@@ -42,7 +42,7 @@ def _get_children_if(e: If):
 def _get_children_assert(e: Assert):
     return [e.cond, e.body]
 
-Location = List[int]
+Location = Sequence[int] # Used immutably, so normally a tuple
 
 def get_node_at_location(expr, path: Location):
   return expr if len(path) == 0 else get_node_at_location(_get_children(expr)[path[0]], path[1:])
@@ -89,7 +89,7 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
         Renames as necessary any binders within e to avoid capturing any variables in the values of <subst>.
         Returns a new Expr, which may share subtrees with the original (as well as with values of <subst>).
         """
-    return _cav_helper(e, [], subst)
+    return _cav_helper(e, tuple(), subst)
 
 #####################################################################
 # Name Generation
