@@ -15,31 +15,31 @@ def _get_children(e: Expr) -> List[Expr]:
      raise ValueError("Must be overridden for every Expr subclass")
 
 @_get_children.register
-def _idch_var(e: Var):
+def _get_children_var(e: Var):
     return []
 
 @_get_children.register
-def _idch_const(e: Const):
+def _get_children_const(e: Const):
     return []
 
 @_get_children.register
-def _idch_let(e: Let):
+def _get_children_let(e: Let):
     return [e.rhs, e.body]
 
 @_get_children.register
-def _idch_lam(e: Lam):
+def _get_children_lam(e: Lam):
     return [e.body]
 
 @_get_children.register
-def _idch_lam(e: Call):
+def _get_children_call(e: Call):
     return e.args
 
 @_get_children.register
-def _idch_if(e: If):
+def _get_children_if(e: If):
     return [e.cond, e.t_body, e.f_body]
 
 @_get_children.register
-def _idch_assert(e: Assert):
+def _get_children_assert(e: Assert):
     return [e.cond, e.body]
 
 Location = List[int]
