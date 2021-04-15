@@ -139,6 +139,8 @@ inline double cos$af(allocator *, double d) { return cos(d); }
 inline double cosh$af(allocator *, double d) { return cosh(d); }
 inline double tanh$af(allocator *, double d) { return tanh(d); }
 inline double lgamma$af(allocator *, double d) { return lgamma(d); }
+inline double erf$af(allocator *, double d) { return erf(d); }
+inline double sqrt$af(allocator *, double d) { return sqrt(d); }
 
 inline double to_float$ai(allocator *, int d) { return d; }
 
