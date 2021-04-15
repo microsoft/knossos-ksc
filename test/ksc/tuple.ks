@@ -16,13 +16,13 @@
 (gdef fwd [foofilter_comp (Tensor 1 Float)])
 (gdef rev [foofilter_comp (Tensor 1 Float)])
 
-(def pi Float () 3.14159)
+(def f_no_args Float () 3.14159)
 
-(gdef fwd [pi (Tuple)])
-(gdef rev [pi (Tuple)])
+(gdef fwd [f_no_args (Tuple)])
+(gdef rev [f_no_args (Tuple)])
 
-(def circumference Float (r : Float) (mul (mul 2.0 (pi)) r))
-(def circumference2 Float (r : Float) (mul (mul 2.0 (pi (tuple))) r))
+(def circumference Float (r : Float) (mul (mul 2.0 (f_no_args)) r))
+(def circumference2 Float (r : Float) (mul (mul 2.0 (f_no_args (tuple))) r))
 
 (gdef fwd [circumference Float])
 (gdef rev [circumference Float])
