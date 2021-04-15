@@ -5,7 +5,7 @@
 
 module Ksc.SUF.AD where
 
-import           Ksc.SUF (L2(L2), L3(L3), L4(L4))
+import           Ksc.SUF (L2(L2), L3(L3), L4(L4), L7(L7))
 
 import           Lang
 import           LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
@@ -113,6 +113,9 @@ sufFwdRevPass gst subst = \case
   Call f e | f `isThePrimFun` P_inline -> sufFwdRevPass gst subst e
   Call f e | f `isThePrimFun` P_trace -> sufFwdRevPass gst subst e
   -- }
+
+  theCall@(Call f (Tuple [theLambda@(Lam i body), e1])) | f `isThePrimFun` P_map ->
+    sufFwdRevPass_map gst subst theCall theLambda i body e1
 
   theCall@(Call f (Tuple [e1, theLambda@(Lam i e2)])) | f `isThePrimFun` P_build ->
     sufFwdRevPass_build gst subst theCall e1 theLambda i e2
@@ -304,6 +307,94 @@ sufFwdRevPass gst subst = \case
   Assert{} -> unimplemented "Assert"
   where noBog e sufRevPass_ = (Tuple [e, Tuple []], TypeTuple [], sufRevPass_)
         unimplemented s = error ("sufFwdRevPass: unimplemented: " ++ s)
+
+-- FWD{map (\x. body) e} = let (e_v, b_e) = FWD{e}
+--                             (r, b_a) = suffwdpass_map (\x. FWD{body}, e_v)
+--                         in (r, (b_e, b_a))
+--
+-- REV{map (\x. body) e} dt b = { (b_e, b_a) = b
+--                              ; (de, dvs) = sufrevpass_map (zero_of_shape_dvs,
+--                                                            \(dt1, b1).
+--                                                              let REV{body} dt1 b1
+--                                                              in (dx, dvs),
+--                                                            dt,
+--                                                            b) }
+--                           ++ REV{e} de b_e
+sufFwdRevPass_map :: GblSymTab
+                  -> InScopeSet
+                  -> TExpr
+                  -> TExpr
+                  -> TVarX
+                  -> TExpr
+                  -> TExpr
+                  -> (TExpr, Type,
+                      S.Set Var
+                   -> TExpr
+                   -> TExpr
+                   -> (S.Set Var, [(PatG TVar, TExpr)]))
+sufFwdRevPass_map gst in_scope theCall theLambda x body e =
+  (gradf_map, typeof bog, sufRevPass_)
+  where (in_scope2, L4 ev be r ba) =
+          notInScopeTVs in_scope (L4 (TVar (typeof e) (Simple "ev"))
+                                     (TVar gradfe_bog_ty (Simple "be"))
+                                     (TVar type_r (Simple "r"))
+                                     (TVar type_ba (Simple "ba")))
+
+        (gradfe, gradfe_bog_ty, sufRevPasse) = sufFwdRevPass gst in_scope2 e
+        (gradfbody, gradfbody_bog_ty, sufRevPassBody) = sufFwdRevPass gst in_scope2 body
+
+        typeTensor = case typeof e of
+          TypeTensor i _ -> TypeTensor i
+          unexpectedTy -> pprPanic "Unexpected type for map argument" (ppr unexpectedTy)
+
+        type_ba = typeTensor gradfbody_bog_ty
+        type_r = typeof theCall
+
+        bog = Tuple [Var be, Var ba]
+
+        fwdpass_map = mkPrimCall P_suffwdpass_map (Tuple [ Lam x gradfbody
+                                                         , Var ev
+                                                         ])
+
+        gradf_map = Let (TupPat [ev, be]) gradfe
+                  $ Let (TupPat [r, ba]) fwdpass_map
+                  $ Tuple [Var r, bog]
+
+        sufRevPass_ in_scope' dt b =
+          let v_bar = map deltaOfSimple (S.toList (freeVarsOf theLambda))
+              v_bar_expr = Tuple (map Var v_bar)
+              dx = deltaOfSimple x
+
+              lamvar_ty = TypeTuple [typeof dt1, typeof b1]
+              pat_ty = typeof v_bar_expr
+
+              (in_scope'2, L7 de pat lamvar be_ ba_ dt1 b1) =
+                notInScopeTVs in_scope' (L7 (TVar (tangentType (typeof e)) (Delta "e"))
+                                            (TVar pat_ty (Simple "pat"))
+                                            (TVar lamvar_ty (Simple "lamvar"))
+                                            (TVar gradfe_bog_ty (Simple "be"))
+                                            (TVar type_ba (Simple "ba"))
+                                            (TVar (tangentType (typeof body)) (Simple "dt1"))
+                                            (TVar gradfbody_bog_ty (Simple "bbody")))
+
+              (in_scope'3, elets) = sufRevPasse in_scope'2 (Var de) (Var be)
+
+              (in_scope'4, innerLets) = sufRevPassBody in_scope'3 (Var dt1) (Var b1)
+
+              sufrevpass_map = mkPrimCall P_sufrevpass_map (Tuple [ Dummy (typeof v_bar_expr) -- FIXME: we eventually need to actually pass a zero here, I think
+                                                                  , Lam lamvar
+                                                                    $ Let (TupPat [dt1, b1]) (Var lamvar)
+                                                                    $ mkLets_ innerLets (Tuple [Var dx, v_bar_expr])
+                                                                  , dt
+                                                                  , Var ba_
+                                                                  ])
+
+              lets = [ (TupPat [be_, ba_], b)
+                     , (TupPat [de, pat], sufrevpass_map)
+                     , (TupPat v_bar, Var pat)
+                     ]
+
+          in (in_scope'4, lets ++ elets)
 
 -- FWD{build e1 (\i. e2)} = let (n, b_n) = FWD{e1}
 --                              (r, b_a) = unzip(build n (\i. FWD{e2}))

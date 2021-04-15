@@ -1336,6 +1336,86 @@ namespace ks {
 		return result;
 	}
 
+	// =============================== Map ===================================
+
+	// f : S -> T
+	// map f : Vec S -> Vec T
+	template <class S, class F, size_t Dim>
+	auto // tensor<Dim, T>
+	map(allocator * alloc, F f, tensor<Dim, S> t)
+	{
+		using T = decltype(f(alloc, S{}));
+		auto ret = tensor<Dim, T>::create(alloc, t.size());
+		T const* tdata = t.data();
+		T* retdata = ret.data();
+		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
+			retdata[i] = f(alloc, tdata[i]);
+		return ret;
+	}
+
+	// [suffwdpass f] : S -> (T, B)
+	// suffwdpass_map : (S -> (T, B), Vec S) -> (Vec T, Vec B)
+	template <class F, class S, size_t Dim>
+	auto // tuple<tensor<Dim, T>, tensor<Dim, B>>
+	suffwdpass_map(allocator * alloc, F f, tensor<Dim, S> v)
+	{
+		using T_B = decltype(f(alloc, S{}));
+		using T = std::tuple_element_t<0, T_B>;
+		using B = std::tuple_element_t<1, T_B>;
+
+		auto v_size = v.size();
+		auto bog = tensor<Dim, B>::create(alloc, v_size);
+		auto ret = tensor<Dim, T>::create(alloc, v_size);
+
+		S const* vdata = v.data();
+		B* bogdata = bog.data();
+		T* retdata = ret.data();
+
+		for (int i = 0, ne = v.num_elements(); i != ne; ++i) {
+			auto [r, b] = f(alloc, vdata[i]);
+			retdata[i] = r;
+			bogdata[i] = b;
+		};
+
+		return make_tuple(ret, bog);
+	}
+
+	// [sufrevpass f] : (dT, B) -> dS
+	// sufrevpass_map : (E, (dT, B) -> (dS, dE), Vec T, Vec B) -> (Vec dS, dE)
+        template <class dE, class F_, class dT, class B, size_t Dim>
+	auto // tuple<tensor<Dim, dS>, dE>
+	sufrevpass_map(allocator * alloc, dE ddenv_zero, F_ f_, tensor<Dim, dT> ddt, tensor<Dim, B> bog)
+	{
+		using dS_E = decltype(f_(alloc, dT{}, B{}));
+		using dS = std::tuple_element_t<0, dS_E>;
+		auto ddt_size = ddt.size();
+		auto dds = tensor<Dim, dS>::create(alloc, ddt_size);
+		//dE ddenv = ddenv_zero;
+
+		dT const* ddtdata = ddt.data();
+		B const* bogdata = bog.data();
+		dS* ddsdata = dds.data();
+
+		// TODO: Not doing size 0 for now
+		int i = 0;
+		tuple<dS, dE> f_call = f_(alloc, ddtdata[i], bogdata[i]);
+		auto [f_call_dds, f_call_ddenv] = f_call;
+
+		ddsdata[i] = f_call_dds;
+		dE ddenv = f_call_ddenv;
+
+		for (int i = 1, ne = ddt.num_elements(); i != ne; ++i) {
+			tuple<dS, dE> f_call = f_(alloc, ddtdata[i], bogdata[i]);
+			auto [f_call_dds, f_call_ddenv] = f_call;
+
+			ddsdata[i] = f_call_dds;
+			// TODO: can we do an inplace add?
+			ddenv = ts_add(alloc, ddenv, f_call_ddenv);
+		}
+
+		return make_tuple(dds, ddenv);
+	}
+
 	// =============================== Fold ==================================
 
 	template <class T, class F, class A>
