@@ -29,8 +29,8 @@ class AbstractMatcher(ABC):
 
 _rule_dict: Mapping[str, "Rule"] = {}
 
-def rule(name: str) -> "NamedRule":
-    """Lookup method for all `NamedRule`s."""
+def rule(name: str) -> "Rule":
+    """Lookup method for all `Rule`s."""
     return _rule_dict[name]
 
 class Rule(AbstractMatcher):
