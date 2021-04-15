@@ -23,7 +23,7 @@ jobs:
     displayName: 'Install dependencies [userInstall]'
 
   - script: sh ./test/builds/build_and_test_mlir.sh $(LLVM_BRANCH)
-    displayName: Building LLVM/MLIR [userInstall]
+    displayName: Building LLVM/MLIR, cache missed (see https://github.com/microsoft/knossos-ksc/issues/719) [userInstall]
     condition: ne(variables.CACHE_RESTORED, 'true')
 
   - script: sh ./test/builds/build_and_test_kscmlir.sh
