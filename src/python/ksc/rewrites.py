@@ -21,11 +21,35 @@ class Rewrite:
 
 class AbstractMatcher(ABC):
     def get_all_rewrites(self, e: Expr) -> Iterator[Rewrite]:
-        yield from _subtree_rewrites(e, [], self, e, {})
+        yield from self._all_rewrites_with_env(e, tuple(), e, {})
+    
+    def _all_rewrites_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Location]) -> Iterator[Rewrite]:
+        # Env maps bound variables to their binders, used for inline_let (only).
+        yield from self.get_local_rewrites(e, path_from_root, root, env)
+        for i, ch in enumerate(get_children(e)):
+            yield from self._all_rewrites_with_env(ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env))
 
     @abstractmethod
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping) -> Iterator[Rewrite]:
         pass
+
+@singledispatch
+def _update_env_for_subtree(parent: Expr, parent_path: Location, which_child: int, env: Mapping[str, Location]) -> Mapping[str, Location]:
+    # Default is to use same environment as parent
+    return env
+
+@_update_env_for_subtree.register
+def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: Mapping[str, Location]) -> Mapping[str, Location]:
+    assert isinstance(parent.vars, Var), "Tupled lets are not supported - use untuple_lets first"
+    assert 0 <= which_child <= 1
+    return (env if which_child == 0 # rhs
+        else {**env, parent.vars.name: parent_path})
+
+@_update_env_for_subtree.register
+def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: Mapping[str, Location]) -> Mapping[str, Location]:
+    assert which_child == 0
+    return {k:v for k,v in env.items() if k != parent.arg.name}
+
 
 _rule_dict: Mapping[str, "Rule"] = {}
 
@@ -70,29 +94,6 @@ class RuleSet(AbstractMatcher):
         for rule in self.rules_by_class.get(subtree.__class__, []):
             yield from rule.get_local_rewrites(subtree, path_from_root, root, env)
 
-def _subtree_rewrites(e: Expr, path_from_root: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
-    yield from rules.get_local_rewrites(e, path_from_root, root, env)
-    yield from _subtree_update_env(e, path_from_root, rules, root, env)
-
-# Note: python3.8 brings singledispatchmethod, which we could use here (moving this and the previous into AbstractMatcher). Sticking with python3.7.
-@singledispatch
-def _subtree_update_env(e: Expr, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
-    for i, ch in enumerate(get_children(e)):
-        yield from _subtree_rewrites(ch, loc + [i], rules, root, env)
-
-@_subtree_update_env.register
-def _subtree_env_let(e: Let, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
-    yield from _subtree_rewrites(e.rhs, loc + [0], rules, root, env)
-    assert isinstance(e.vars, Var), "Tupled lets are not supported - use untuple_lets first"
-    def _rm_dict_keys(d, ks):
-        return {k:v for k, v in d.items() if k not in ks}
-    yield from _subtree_rewrites(e.body, loc+[1], rules, root, {**env, e.vars.name: loc})
-
-@_subtree_update_env.register
-def _subtree_env_lam(e: Lam, loc: Location, rules: AbstractMatcher, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
-    yield from _subtree_rewrites(e.body, loc + [0], rules, root, {k:v for k,v in env.items() if k != e.arg.name})
-
-
 @singleton
 class inline_var(Rule):
     @staticmethod
@@ -109,7 +110,7 @@ class inline_var(Rule):
             lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator; renaming will prevent capturing let.rhs, so just insert that
         )
 
-    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Tuple[Location, Expr]]) -> Iterator[Rewrite]:
+    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Location]) -> Iterator[Rewrite]:
         if isinstance(subtree, Var): # May not be if rule is used directly outside of a RuleSet. Q: Do we want to support that case.
             if subtree.name in env:
                 binding_loc = env[subtree.name]
