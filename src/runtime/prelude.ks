@@ -610,17 +610,38 @@
 
 (def pi Float () 3.14159265358979323846264338327950288419716939937510)
 
+#|
+(edef sqrt$Os Float Float)
+(def [suffwdpass sqrt$Os] (Tuple Float Float) (x : Float)
+     (tuple (sqrt$Os x) x))
+(def [sufrevpass [sqrt$Os Float]] Float ((ddr : Float) (x : Float))
+     (div ddr (mul 2.0 (sqrt$Os x))))
+
+(edef sqrt$Ot Float Float)
+(def [suffwdpass sqrt$Ot] (Tuple Float Float) (x : Float)
+     (let (sqrt_x (sqrt$Ot x))
+     (tuple sqrt_x sqrt_x)))
+(def [sufrevpass [sqrt$Ot Float]] Float ((ddr : Float) (sqrt_x : Float))
+     (div ddr (mul 2.0 sqrt_x)))
+|#
+
+; (def sqrt Float (x : Float) (sqrt$Ot x))
 (edef sqrt Float Float)
 (edef [D sqrt] (LM Float Float) (Float))
 (def [fwd sqrt] Float ((x : Float) (dx : Float))
      (div dx (mul 2.0 (sqrt x))))
 (def [rev sqrt] Float ((x : Float) (ddr : Float))
      (div ddr (mul 2.0 (sqrt x))))
+; (gdef suffwdpass [sqrt Float])
+; (gdef sufrevpass [sqrt Float])
 (def [suffwdpass sqrt] (Tuple Float Float) (x : Float)
      (let (sqrt_x (sqrt x))
      (tuple sqrt_x sqrt_x)))
 (def [sufrevpass [sqrt Float]] Float ((ddr : Float) (sqrt_x : Float))
      (div ddr (mul 2.0 sqrt_x)))
+
+; (rule "sqrt$Os" (v : Float) (sqrt v) (sqrt$Os v))
+; (rule "sqrt$Ot" (v : Float) (sqrt v) (sqrt$Ot v))
 
 (edef erf Float Float)
 (edef [D erf] (LM Float Float) (Float))
