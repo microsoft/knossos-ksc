@@ -240,8 +240,8 @@
          (neg (div (mul x1 d_ddiv)
                          (mul x2 x2)))))))
 
-(def [suffwdpass div] (Tuple Float (Tuple Float Float)) (x_y : Tuple Float Float)
-     (tuple (div x_y) x_y))
+(def [suffwdpass div] (Tuple Float (Tuple Float Float)) (x1_x2 : Tuple Float Float)
+     (tuple (div x1_x2) x1_x2))
 (def [sufrevpass [div (Tuple Float Float)]] (Tuple Float Float) ((d_ddiv : Float) (xt : Tuple Float Float))
      (let ((x1 x2) xt)
        (tuple (div d_ddiv x2)
