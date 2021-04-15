@@ -185,6 +185,7 @@ allocatorUsageOfType = \case
   TypeLam {}    -> UsesAllocator
   TypeLM     {} -> UsesAllocator
   TypeUnknown   -> error "Shouldn't see TypeUnknown at this stage of codegen"
+  TypeVar {}    -> error "Shouldn't see TypeVar at this stage of codegen"
 
 allocatorUsageOfCType :: CType -> AllocatorUsage
 allocatorUsageOfCType = \case
@@ -400,7 +401,7 @@ cgenExprWithoutResettingAlloc env = \case
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
-  Call (TFun _ (Fun JustFun (PrimFun P_copydown))) e -> do
+  Call (TFun { tf_fun = Fun JustFun (PrimFun P_copydown) }) e -> do
     CG cdecl cexpr ctype _callocusage <- cgenExprR env e
     ret <- freshCVar
     bumpmark <- freshCVar
@@ -438,7 +439,7 @@ cgenExprWithoutResettingAlloc env = \case
       cftype
       (funAllocatorUsage tf cftype <> callocusage)
 
-  Call tf@(TFun _ fun) vs -> do
+  Call tf@(TFun { tf_fun = fun }) vs -> do
     cgvs <- cgenExprR env vs
     let cgargtype = typeof vs
     let cdecls = getDecl cgvs
@@ -602,12 +603,16 @@ mangleType = \case
     TypeLam a b   -> "l<" ++ mangleType a ++ mangleType b ++ ">"
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
+    TypeVar {}    -> error "Can't mangle TypeVar"
 
 cgenBaseFun :: BaseFun Typed -> String
 cgenBaseFun = \case
-  (BaseUserFun (BaseUserFunId fun (TypeTuple [])))  -> mangleFun fun
-  (BaseUserFun (BaseUserFunId fun (TypeTuple tys))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
-  (BaseUserFun (BaseUserFunId fun ty))  -> mangleFun (fun ++ "@" ++ mangleType ty)
+  (BaseUserFun (BaseUserFunId fun Poly)) -> pprPanic "cgenBaseFun:Poly" (ppr fun)
+                                           -- ToDo
+  (BaseUserFun (BaseUserFunId fun (Mono (TypeTuple []))))  -> mangleFun fun
+  (BaseUserFun (BaseUserFunId fun (Mono (TypeTuple tys)))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
+  (BaseUserFun (BaseUserFunId fun (Mono ty)))  -> mangleFun (fun ++ "@" ++ mangleType ty)
+
   (PrimFun (P_SelFun i _))  -> "ks::get<" ++ show (i - 1) ++ ">"
   (PrimFun fun) -> render (ppr fun)
 
@@ -627,17 +632,17 @@ cgenUserFun f = case f of
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
 cgenAnyFun tf cftype = case tf of
-  TFun _ (Fun JustFun (PrimFun P_lmApply)) -> "lmApply"
-  TFun retty (Fun JustFun (PrimFun P_build)) ->
+  TFun { tf_fun = Fun JustFun (PrimFun P_lmApply) } -> "lmApply"
+  TFun { tf_fun = Fun JustFun (PrimFun P_build), tf_ret = retty } ->
     case retty of
       TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _              -> error ("Unexpected return type for build: " ++ show retty)
-  TFun retty (Fun JustFun (PrimFun primname))
+  TFun { tf_ret = retty, tf_fun = Fun JustFun (PrimFun primname) }
     | primname `elem` [P_sumbuild, P_buildFromSparse, P_buildFromSparseTupled]
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
-  TFun (TypeLM _ _) (Fun JustFun (PrimFun _)) -> cgenType cftype ++ "::mk"
-  TFun _            f                 -> cgenUserFun f
+  TFun { tf_ret = TypeLM {}, tf_fun = Fun JustFun (PrimFun {}) } -> cgenType cftype ++ "::mk"
+  TFun { tf_fun = f } -> cgenUserFun f
 
 {- Note [Allocator usage of function calls]
 
@@ -666,8 +671,8 @@ are two cases:
 -}
 
 funUsesAllocator :: HasCallStack => TFun p -> Bool
-funUsesAllocator (TFun _ (Fun JustFun (PrimFun (P_SelFun _ _)))) = False
-funUsesAllocator (TFun _ (Fun JustFun (PrimFun fname))) =
+funUsesAllocator (TFun { tf_fun = Fun JustFun (PrimFun (P_SelFun _ _)) }) = False
+funUsesAllocator (TFun { tf_fun = Fun JustFun (PrimFun fname) }) =
   not $ fname `elem` [P_index, P_size, P_eq, P_ne, P_trace, P_print, P_ts_dot]
 funUsesAllocator _ = True
 
@@ -707,13 +712,14 @@ cgenTypeLang = \case
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
   TypeTensor d t -> "tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
   TypeBool      -> "bool"
+  TypeVar {}    -> "void*"    -- SPJ: guessing here
   TypeUnknown   -> "void"
   TypeLam from to ->
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
 
 ctypeofFun :: HasCallStack => CST -> TFun Typed -> [CType] -> CType
-ctypeofFun env (TFun ty f) ctys
+ctypeofFun env (TFun { tf_ret = ty, tf_fun = f }) ctys
   | Just f' <- maybeUserFun f
   , Just ret_ty <- cstMaybeLookupFun f' env
     -- trace ("Found fun " ++ show f) $
@@ -815,7 +821,7 @@ cppGen defs =
 
 isMainFunction :: TDef -> Bool
 isMainFunction Def{ def_fun = Fun JustFun f, def_res_ty = TypeInteger }
-  | BaseUserFunId "main" (TypeTuple []) <- f = True
+  | BaseUserFunId "main" (Mono (TypeTuple [])) <- f = True
 isMainFunction _ = False
 
 ksoGen :: [TDef] -> String

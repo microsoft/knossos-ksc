@@ -14,8 +14,11 @@ Here's the BNF for our language:
 
 <rule> ::= ( rule <string> <params> <expr> <expr> )
 
-<def> ::= ( def <sname> <type> <params> <expr> )
+<def> ::= ( def <sname> <opt_qvars> <type> <params> <expr> )
 -- (def f Float ( (x : Float) (y : Vec Float) ) (...) )
+
+<opt_qvars> ::=      -- Empty
+              | [ <var> ... <var> ]
 
 <edef> ::= ( edef <sname> <type> <types> )
 
@@ -99,7 +102,8 @@ Notes:
 
 import Lang hiding (parens, brackets)
 
-import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
+import Text.Parsec( (<|>), try, many, many1, parse, eof, manyTill, ParseError
+                  , unexpected, option )
 import Text.Parsec.Char
 import Text.Parsec.String (Parser)
 
@@ -245,6 +249,7 @@ pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Float"   >> return TypeFloat)
     <|> (pReserved "String"  >> return TypeString)
     <|> (pReserved "Bool"    >> return TypeBool)
+    <|> (do { tv <- pIdentifier; return (TypeVar tv) })
     <|> parens pKType
 
 pTypes :: Parser [TypeX]
@@ -353,11 +358,12 @@ pSelFun = do { rest <- try $ do { f <- pIdentifier
                  Just selfun -> pure selfun
              }
 
-pBaseUserFunWithType :: (Type -> BaseUserFunArgTy p) -> Parser (BaseUserFun p)
+pBaseUserFunWithType :: (ArgTypeDescriptor -> BaseUserFunArgTy p) -> Parser (BaseUserFun p)
+-- No way to parse a user-written Poly ArgTypeDescriptor yet
 pBaseUserFunWithType add =
      brackets (do { f  <- pIdentifier
                   ; ty <- pType
-                  ; pure (BaseUserFunId f (add ty))
+                  ; pure (BaseUserFunId f (add (Mono ty)))
                   })
 
 pBaseUserFunWithoutType :: Parser (BaseUserFun Parsed)
@@ -402,6 +408,7 @@ pDef :: Parser Def
 -- (def f Type ((x1 : Type) (x2 : Type) (x3 : Type)) rhs)
 pDef = do { pReserved "def"
           ; f <- pFun
+          ; qvs <- pOptQVars
           ; ty <- pType
           ; xs <- pParams
           ; rhs <- pExpr
@@ -411,9 +418,14 @@ pDef = do { pReserved "def"
                   [x] -> VarPat x
                   xs  -> TupPat xs
           ; return (Def { def_fun    = mk_fun_f
+                        , def_qvars  = qvs
                         , def_pat    = pat
                         , def_rhs    = UserRhs rhs
                         , def_res_ty = ty }) }
+
+pOptQVars :: Parser [TyVar]
+pOptQVars = option [] $
+            brackets (many1 pIdentifier)
 
 pRule :: Parser Rule
 pRule = do { pReserved "rule"
@@ -427,10 +439,12 @@ pRule = do { pReserved "rule"
 pEdef :: Parser (DefX Parsed)
 pEdef = do { pReserved "edef"
            ; f          <- pFun
+           ; qvs        <- pOptQVars
            ; returnType <- pType
            ; argType    <- pType
            ; mk_fun_name <- pIsUserFun f
            ; return (Def { def_fun = mk_fun_name
+                         , def_qvars = qvs
                          , def_res_ty = returnType
                          -- See note [Function arity]
                          , def_pat = VarPat (mkTVar argType "edefArgVar")

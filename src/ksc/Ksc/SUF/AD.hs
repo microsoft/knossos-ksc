@@ -10,7 +10,7 @@ import           Ksc.Traversal (traverseState)
 
 import           Lang
 import           LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
-                            freeVarsOf, lookupGblST)
+                            freeVarsOf, lookupDef)
 import           OptLet (Subst, substVar, notInSubstTVs, substBndr, mkEmptySubst)
 import           Prim
 
@@ -127,7 +127,8 @@ sufFwdRevPass gst subst = \case
   -- REV{f e} dt b = { (b_e, b_f) = b
   --                 ; da = [sufrevpass f] dt b_f }
   --              ++ REV{e} da b_e
-  Call (TFun res_ty f) e -> (gradf_call_f_e, typeof bog, sufRevPass_)
+  Call tfun@(TFun { tf_ret = res_ty }) e
+    -> (gradf_call_f_e, typeof bog, sufRevPass_)
     where (subst2, L4 arg b_e r b_f) =
             notInSubstTVs subst (L4 (TVar typeof_e (Simple "arg"))
                                     (TVar e_bog_ty (Simple "b_e"))
@@ -136,7 +137,7 @@ sufFwdRevPass gst subst = \case
 
           (fwdpass_e, e_bog_ty, revpass_e) = sufFwdRevPass gst subst2 e
 
-          (fwdpass_f, revpass_f, f_bog_ty) = mkSufFuns gst f typeof_e
+          (fwdpass_f, revpass_f, f_bog_ty) = mkSufFuns gst tfun typeof_e
 
           bog = mkBog [b_e, b_f]
 
@@ -421,12 +422,14 @@ sufFwdRevPassDefs gst__ = catMaybes . concat . snd . sufRevPassDefsMaybe gst__
 -- revpass$f : (dT, B{f}) -> dS
 sufFwdRevPassDef :: GblSymTab -> TDef -> (Maybe TDef, Maybe TDef, GblSymTab)
 sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
+                        , def_qvars  = qvars
                         , def_pat    = s
                         , def_rhs    = UserRhs rhs
                         , def_res_ty = t_ty
                         }
   = let
       fwd = Def { def_fun    = Fun SUFFwdPass f
+                , def_qvars  = qvars
                 , def_pat    = s
                 , def_rhs    = UserRhs rhs'
                 , def_res_ty = TypeTuple [t_ty, bog_ty]
@@ -443,6 +446,7 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
       lets = foldr (\(p, er) rest -> Let p er . rest) id lets_
 
       rev = Def { def_fun    = Fun SUFRevPass f
+                , def_qvars  = qvars
                 , def_pat    = TupPat [ dt, bog ]
                 , def_rhs    = UserRhs rhs''
                 , def_res_ty = ds_ty
@@ -466,6 +470,7 @@ sufFwdRevPassDef gst _ = (Nothing, Nothing, gst)
 
 sufRevDef :: GblSymTab -> TDef -> Maybe TDef
 sufRevDef gst Def{ def_fun    = fun@(Fun JustFun f)
+                 , def_qvars  = qvars
                  , def_pat    = s
                  -- We don't actually use the rhs.  We just look up
                  -- the fwdpass and revpass in the GblSymTab.
@@ -473,6 +478,7 @@ sufRevDef gst Def{ def_fun    = fun@(Fun JustFun f)
                  , def_res_ty = t_ty
                  } =
   Just $ Def { def_fun    = Fun SUFRev f
+             , def_qvars  = qvars
              , def_pat    = TupPat [s_var, dt]
              , def_rhs    = UserRhs rhs'
              , def_res_ty = d s_ty
@@ -485,8 +491,10 @@ sufRevDef gst Def{ def_fun    = fun@(Fun JustFun f)
         ds = TVar (d s_ty) (Simple "dsres")
         bog_var = TVar bog_ty (Simple "bog")
 
-        (fwdPass, revPass, bog_ty) =
-          mkSufFuns gst (userFunToFun fun) (typeof s)
+        tfun = TFun { tf_fun   = userFunToFun fun
+                    , tf_targs = map TypeVar qvars
+                    , tf_ret   = t_ty }
+        (fwdPass, revPass, bog_ty) = mkSufFuns gst tfun (typeof s)
 
         rhs' = Let (TupPat [t, bog_var]) (pInline (Call fwdPass (Var s_var)))
              $ Let (VarPat ds) (pInline (Call revPass (Tuple [Var dt, Var bog_var])))
@@ -504,7 +512,7 @@ deltaOfSimple = \case
 
 callResultTy :: GblSymTab -> Fun Typed -> Type -> Either SDoc Type
 callResultTy env fun arg_ty = case perhapsUserFun fun of
-  Right user -> case lookupGblST user env of
+  Right user -> case lookupDef user env of
     Just f -> pure (def_res_ty f)
     Nothing -> Left (text "Not in scope" <+> ppr user)
   Left prim -> primCallResultTy_maybe prim arg_ty
@@ -520,12 +528,14 @@ callResultTy env fun arg_ty = case perhapsUserFun fun of
 --     mkSufFuns env f S T
 --
 -- returns (suffwdpass$f, sufrevpass$f, B)
-mkSufFuns :: GblSymTab -> Fun Typed -> Type
+mkSufFuns :: GblSymTab -> TFun Typed -> Type
           -> (TFun Typed, TFun Typed, Type)
-mkSufFuns env fun arg_ty = (fwdTFun, revTFun, bog_ty)
-  where fwdTFun = TFun fwd_res_ty fwdFun
-        revTFun = TFun rev_res_ty (Fun SUFRevPass funid)
-        fwdFun = Fun SUFFwdPass funid
+mkSufFuns env (TFun { tf_fun = fun, tf_targs = targs })arg_ty
+  = (fwdTFun, revTFun, bog_ty)
+  where fwdFun  = Fun SUFFwdPass funid
+        revFun  = Fun SUFRevPass funid
+        fwdTFun = TFun { tf_ret = fwd_res_ty, tf_fun = fwdFun, tf_targs = targs }
+        revTFun = TFun { tf_ret = rev_res_ty, tf_fun = revFun, tf_targs = targs }
 
         fwd_res_ty = case callResultTy env fwdFun arg_ty of
           Right res_ty' -> res_ty'

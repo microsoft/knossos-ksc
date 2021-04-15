@@ -18,12 +18,19 @@ import Control.Monad (zipWithM)
 
 primCall :: PrimFun -> Type -> TExpr -> TExpr
 primCall fun res_ty
-  = Call (TFun res_ty (Fun JustFun (PrimFun fun)))
+  = Call (TFun { tf_ret = res_ty
+               , tf_fun = Fun JustFun (PrimFun fun)
+               , tf_targs = [] })
 
 userCall :: String -> Type -> TExpr -> TExpr
 userCall fun res_ty arg
-  = Call (TFun res_ty (Fun JustFun (BaseUserFun (BaseUserFunId fun arg_ty)))) arg
-  where arg_ty = typeof arg
+  = assert (text "userCall") (isMonoType arg_ty) $
+    Call tfun arg
+  where
+    arg_ty = typeof arg
+    tfun = TFun { tf_ret = res_ty
+                , tf_fun = Fun JustFun (BaseUserFun (BaseUserFunId fun (Mono arg_ty)))
+                , tf_targs = [] }
 
 mkPrimCall :: HasCallStack => PrimFun -> TExpr -> TExpr
 mkPrimCall fun args
@@ -78,9 +85,10 @@ getZero tangent_type e
                -> mkAtomicNoFVs e $ \e ->
                   Tuple $ map go $
                   [ pSel i n e | i <- [1..n] ]
-            TypeLam _ _ -> panic
-            TypeLM _ _ -> panic
+            TypeLam {}  -> panic
+            TypeLM {}   -> panic
             TypeUnknown -> panic
+            TypeVar {}  -> panic
          where
            e_ty = typeof e
            panic = pprPanic "mkZero" (ppr e_ty $$ ppr e)
@@ -245,7 +253,8 @@ lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
 lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
 isThePrimFun :: TFun p -> PrimFun -> Bool
-isThePrimFun (TFun _ (Fun JustFun (PrimFun f1))) f2 = f1 == f2
+isThePrimFun (TFun { tf_fun = Fun JustFun (PrimFun f1) }) f2
+  = f1 == f2
 isThePrimFun _ _ = False
 
 isLMOne :: TExpr -> Bool
@@ -440,27 +449,32 @@ primFunCallResultTy fun args
                                 , ppr (typeof args)])
                  TypeUnknown
 
--- Just the base function argument type given that the derived function has
--- argument type derivedFunArgTy, or Nothing if we can't work it out
-baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc (Maybe Type)
-baseFunArgTy_maybe derivedFun derivedFunArgTy
-  = case derivedFun of
-      Fun JustFun _ -> it's derivedFunArgTy
-      Fun DrvFun{} _ -> case derivedFunArgTy of
-        TypeTuple [baseArgTy', _] -> it's baseArgTy'
-        _ -> Left (text "Expected pair argument type to" <+> pprDerivedFun ppr derivedFun
-                   $$ text "but instead was:" <+> ppr derivedFunArgTy)
-      Fun GradFun{} _ -> it's derivedFunArgTy
-      Fun (ShapeFun ds) f -> baseFunArgTy_maybe (Fun ds f) derivedFunArgTy
-      Fun CLFun _        -> it's derivedFunArgTy
-      Fun SUFFwdPass _ -> it's derivedFunArgTy
-      Fun SUFRevPass _ -> don'tKnow
-      Fun SUFRev _ -> case derivedFunArgTy of
-        TypeTuple [baseArgTy', _] -> it's baseArgTy'
-        _ -> Left (text "Expected pair argument type to" <+> pprDerivedFun ppr derivedFun
-                   $$ text "but instead was:" <+> ppr derivedFunArgTy)
-  where it's = pure . pure
-        don'tKnow = pure Nothing
+baseFunArgTy_maybe :: Pretty f => DerivedFun f -> Type -> Either SDoc (Maybe Type)
+-- Given the argument type, figure out the /base/ argument type
+--    Right (Just ty)  => figured it out
+--    Right Nothing    => nothing actually wrong, but the Derivations is one
+--                        that does not determine the base argument type
+--    Left err         => arg type had an unexpected shape
+baseFunArgTy_maybe fun@(Fun ds _) arg_ty
+  = go ds
+  where
+    go (ShapeFun ds) = go ds
+    go JustFun       = it's arg_ty
+    go GradFun{}     = it's arg_ty
+    go CLFun         = it's arg_ty
+    go SUFFwdPass    = it's arg_ty
+    go SUFRevPass    = don'tKnow
+    go DrvFun{} = case arg_ty of
+                     TypeTuple [baseArgTy', _] -> it's baseArgTy'
+                     _ -> bad "DrvFun"
+    go SUFRev   = case arg_ty of
+                     TypeTuple [baseArgTy', _] -> it's baseArgTy'
+                     _ -> bad "SUFRev"
+
+    it's ty   = Right (Just ty)
+    don'tKnow = Right Nothing
+    bad _  = Left (text "Expected pair argument type to" <+> ppr fun
+                   $$ text "but instead was:" <+> ppr arg_ty)
 
 -- If 'f : S -> T' then
 --

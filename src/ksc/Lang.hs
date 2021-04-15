@@ -52,6 +52,7 @@ type TDecl = DeclX Typed
 
 data DefX p  -- f x = e
   = Def { def_fun    :: UserFun p
+        , def_qvars  :: [TyVar]
         , def_pat    :: Pat       -- See Note [Function arity]
         , def_res_ty :: TypeX     -- Result type
         , def_rhs    :: RhsX p }
@@ -210,8 +211,11 @@ unzipTEs (TE e t : tes) = (e:es, t:ts)
   where
     (es, ts) = unzipTEs tes
 
+type TyVar = String
+
 data TypeX
-  = TypeBool
+  = TypeVar TyVar
+  | TypeBool
   | TypeInteger
   | TypeFloat
   | TypeString
@@ -270,6 +274,21 @@ zeroIndexForDimension d = mkTuple (replicate d (kInt 0))
 
 
 ----------------------------------
+--- A monotype has no variables in it
+
+isMonoType :: Type -> Bool
+isMonoType TypeBool         = True
+isMonoType TypeInteger      = True
+isMonoType TypeFloat        = True
+isMonoType TypeString       = True
+isMonoType TypeUnknown      = True
+isMonoType (TypeVar {})     = False
+isMonoType (TypeTuple ts)   = all isMonoType ts
+isMonoType (TypeTensor _ t) = isMonoType t
+isMonoType (TypeLam t1 t2)  = isMonoType t1 && isMonoType t2
+isMonoType (TypeLM t1 t2)   = isMonoType t1 && isMonoType t2
+
+----------------------------------
 --- Tangent space
 
 tangentType :: HasCallStack => Type -> Type
@@ -295,9 +314,10 @@ shapeType TypeFloat = TypeTuple []
 shapeType TypeString = TypeTuple []
 shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
 shapeType (TypeTensor d vt) = TypeTensor d (shapeType vt)
-shapeType (TypeLam _ _) = TypeUnknown
-shapeType (TypeLM _ _) = TypeUnknown  -- TBD
-shapeType TypeUnknown = TypeUnknown
+shapeType (TypeLam {}) = TypeUnknown
+shapeType (TypeLM {})  = TypeUnknown  -- TBD
+shapeType (TypeVar {}) = TypeUnknown
+shapeType TypeUnknown  = TypeUnknown
 
 {- Note [Shapes]
 ~~~~~~~~~~~~~~~~
@@ -401,16 +421,21 @@ types.
 
 -}
 
-data BaseUserFun p = BaseUserFunId String (BaseUserFunArgTy p)
+type BaseUserFunName = String
+
+data BaseUserFun p = BaseUserFunId BaseUserFunName (BaseUserFunArgTy p)
 
 deriving instance Eq (BaseUserFunArgTy p) => Eq (BaseUserFun p)
 deriving instance Ord (BaseUserFunArgTy p) => Ord (BaseUserFun p)
 deriving instance Show (BaseUserFunArgTy p) => Show (BaseUserFun p)
 
 type family BaseUserFunArgTy p where
-  BaseUserFunArgTy Parsed   = Maybe Type
-  BaseUserFunArgTy OccAnald = Type
-  BaseUserFunArgTy Typed    = Type
+  BaseUserFunArgTy Parsed   = Maybe ArgTypeDescriptor
+  BaseUserFunArgTy OccAnald = ArgTypeDescriptor  --- was:  Type
+  BaseUserFunArgTy Typed    = ArgTypeDescriptor
+
+data ArgTypeDescriptor = Mono Type | Poly
+  deriving( Show, Eq, Ord )
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
@@ -433,7 +458,7 @@ data Derivations
   deriving (Eq, Ord, Show)
 
 data DerivedFun funid = Fun Derivations funid
-                deriving (Eq, Ord, Show)
+                deriving (Eq, Ord, Show, Functor)
 
 -- DerivedFun has just two instantiations
 --
@@ -461,7 +486,7 @@ baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
 
 userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
-                          (Maybe Type) Type
+                          (Maybe ArgTypeDescriptor) ArgTypeDescriptor
 userFunBaseType = baseFunFun . baseUserFunType @p
 
 funType :: T.Traversal (Fun p) (Fun q)
@@ -472,17 +497,23 @@ funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
 -- otherwise (and in other phases, where the type is there) check that
 -- the type matches.  If mis-match return (Left
 -- type-that-was-in-UserFun)
-addBaseTypeToUserFun :: forall p. InPhase p
-                     => UserFun p -> Type -> Either Type (UserFun Typed)
-addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) checkBaseType userfun
-  where checkBaseType :: Maybe Type -> Either Type Type
+addArgTypeDescriptor :: forall p. InPhase p
+                     => UserFun p -> ArgTypeDescriptor
+                     -> Either ArgTypeDescriptor (UserFun Typed)
+addArgTypeDescriptor userfun expectedBaseTy
+  = T.traverseOf (userFunBaseType @p) checkBaseType userfun
+  where checkBaseType :: Maybe ArgTypeDescriptor -> Either ArgTypeDescriptor ArgTypeDescriptor
         checkBaseType maybeAppliedType
           | Just appliedTy <- maybeAppliedType
-          , not (eqType appliedTy expectedBaseTy)
+          , not (eqArgTypeDescriptor appliedTy expectedBaseTy)
           = Left appliedTy
           | otherwise
           = Right expectedBaseTy
 
+eqArgTypeDescriptor :: ArgTypeDescriptor -> ArgTypeDescriptor -> Bool
+eqArgTypeDescriptor Poly Poly = True
+eqArgTypeDescriptor (Mono t1) (Mono t2) = t1 `eqType` t2
+eqArgTypeDescriptor _ _ = False
 
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = T.over baseFunFun BaseUserFun
@@ -502,8 +533,8 @@ maybeUserFun f = case perhapsUserFun f of
 
 baseFunToBaseUserFunE :: BaseFun p -> Either PrimFun (BaseUserFun p)
 baseFunToBaseUserFunE = \case
-  BaseUserFun u    -> Right u
-  PrimFun p    -> Left p
+  BaseUserFun u -> Right u
+  PrimFun p     -> Left p
 
 baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
 baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
@@ -531,7 +562,19 @@ data ADPlan = BasicAD | TupleAD
 data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
 
-data TFun p = TFun Type (Fun p)   -- Typed functions.  The type is the /return/
+data TFun p  -- Typed functions.  The type is the /return/
+  = TFun { tf_fun   :: Fun p      -- The function
+         , tf_targs :: [Type]     -- Type arguments (always same length as the
+                                  --    def_qvars in its Def)
+         , tf_ret  :: Type }      -- Return type; can always be computed from
+                                  --   the function plus instantiating types, but
+                                  --   it is convenient to cache it
+
+tFunResTy :: TFun p -> Type
+tFunResTy = tf_ret
+
+tFunFun :: TFun p -> Fun p
+tFunFun = tf_fun
 
 deriving instance Eq (Fun p) => Eq (TFun p)
 deriving instance Ord (Fun p) => Ord (TFun p)
@@ -540,7 +583,7 @@ deriving instance Ord (Fun p) => Ord (TFun p)
 -- GHC's machinery to allow that.
 coerceTFun :: BaseUserFunArgTy p ~ BaseUserFunArgTy q
            => TFun p -> TFun q
-coerceTFun (TFun t f) = TFun t (T.over funType id f)
+coerceTFun fun@(TFun { tf_fun = f }) = fun { tf_fun = T.over funType id f }
 
 
 data Var
@@ -652,10 +695,12 @@ dropLast :: [a] -> [a]
 dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
-pSel i n e = Call (TFun el_ty
-                        (Fun JustFun (PrimFun (P_SelFun i n)))) e
+pSel i n e = Call tfun e
            where
-             el_ty = case typeof e of
+            tfun = TFun { tf_ret = el_ty
+                        , tf_fun = Fun JustFun (PrimFun (P_SelFun i n))
+                        , tf_targs = [] }   -- Dubious
+            el_ty = case typeof e of
                         TypeTuple ts -> ts !! (i-1)
                         _ -> TypeUnknown  -- Better error from Lint
 
@@ -680,7 +725,7 @@ instance HasType TypedExpr where
   typeof (TE _ ty) = ty
 
 instance HasType (TFun p) where
-  typeof (TFun ty _) = ty
+  typeof (TFun { tf_ret = ty }) = ty
 
 instance HasType TExpr where
   typeof (Dummy ty)    = ty
@@ -881,7 +926,7 @@ class InPhase p where
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
   baseUserFunType :: T.Lens (BaseUserFun p) (BaseUserFun Typed)
-                            (Maybe Type) Type
+                            (Maybe ArgTypeDescriptor) ArgTypeDescriptor
 
 instance InPhase Parsed where
   pprVar     = ppr
@@ -889,7 +934,7 @@ instance InPhase Parsed where
   pprFunOcc  = ppr
   pprBaseUserFun (BaseUserFunId name mty) = case mty of
     Nothing -> text name
-    Just ty -> brackets (text name <+> pprParendType ty)
+    Just atd -> brackets (text name <+> ppr atd)
 
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
@@ -901,11 +946,11 @@ instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
-  pprBaseUserFun (BaseUserFunId name ty) =
-    brackets (text name <+> pprParendType ty)
+  pprBaseUserFun (BaseUserFunId name atd) =
+    brackets (text name <+> ppr atd)
 
   getVar     (TVar ty var) = (var, Just ty)
-  getFun     (TFun ty fun) = (fun', Just ty)
+  getFun     (TFun { tf_fun = fun, tf_ret = ty }) = (fun', Just ty)
     where fun' = T.over funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
@@ -915,18 +960,22 @@ instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
-  pprBaseUserFun (BaseUserFunId name ty) =
-    brackets (text name <+> pprParendType ty)
+  pprBaseUserFun (BaseUserFunId name atd) =
+    brackets (text name <+> ppr atd)
 
   getVar     (TVar ty var)      = (var, Just ty)
-  getFun     (TFun ty fun)      = (fun', Just ty)
+  getFun     (TFun { tf_fun = fun, tf_ret = ty }) = (fun', Just ty)
     where fun' = T.over funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
   baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
 
 pprTFun :: InPhase p => TFun p -> SDoc
-pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
+pprTFun (TFun { tf_fun = f, tf_targs = targs, tf_ret = ty })
+   = ppr f <> pp_targs <+> text ":" <+> ppr ty
+   where
+     pp_targs | null targs = empty
+              | otherwise = char '@' <> parens (pprList ppr targs)
 
 
 class Pretty a where
@@ -972,8 +1021,11 @@ instance Pretty Var where
 instance InPhase p => Pretty (BaseFun p) where
   ppr = pprBaseFun
 
+instance Pretty SDoc where
+  ppr d = d
+
 instance Pretty funid => Pretty (DerivedFun funid) where
-  ppr = pprDerivedFun ppr
+  ppr fun = pprDerivedFun (fmap ppr fun)
 
 instance Pretty PrimFun where
   ppr = pprPrimFun
@@ -1036,18 +1088,18 @@ pprPrimFun = \case
   P_elim -> text "elim"
 
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
-pprUserFun = pprDerivedFun (pprBaseUserFun @p)
+pprUserFun fun = pprDerivedFun (fmap (pprBaseUserFun @p) fun)
 
-pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
-pprDerivedFun f (Fun JustFun s)               = f s
-pprDerivedFun f (Fun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD adp Rev)) s) = brackets (text "rev" <> ppr adp <+> f s)
-pprDerivedFun f (Fun (ShapeFun ds) sf)             = brackets (text "shape" <+> pprDerivedFun f (Fun ds sf))
-pprDerivedFun f (Fun CLFun    s)              = brackets (text "CL" <+> f s)
-pprDerivedFun f (Fun SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
-pprDerivedFun f (Fun SUFRevPass s)            = brackets (text "sufrevpass" <+> f s)
-pprDerivedFun f (Fun SUFRev s)                = brackets (text "sufrev" <+> f s)
+pprDerivedFun :: DerivedFun SDoc -> SDoc
+pprDerivedFun (Fun JustFun s)                 = s
+pprDerivedFun (Fun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> s)
+pprDerivedFun (Fun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> s)
+pprDerivedFun (Fun (DrvFun   (AD adp Rev)) s) = brackets (text "rev" <> ppr adp <+> s)
+pprDerivedFun (Fun (ShapeFun ds) sf)          = brackets (text "shape" <+> pprDerivedFun (Fun ds sf))
+pprDerivedFun (Fun CLFun    s)                = brackets (text "CL" <+> s)
+pprDerivedFun (Fun SUFFwdPass s)              = brackets (text "suffwdpass" <+> s)
+pprDerivedFun (Fun SUFRevPass s)              = brackets (text "sufrevpass" <+> s)
+pprDerivedFun (Fun SUFRev s)                  = brackets (text "sufrev" <+> s)
 
 instance Pretty Pat where
   pprPrec _ p = pprPat True p
@@ -1056,7 +1108,7 @@ instance Pretty TVar where
   pprPrec _ (TVar _ v) = ppr v
 
 instance InPhase p => Pretty (TFun p) where
-  ppr (TFun _ f) = ppr f
+  ppr (TFun { tf_fun = f}) = ppr f
 
 instance Pretty Konst where
   pprPrec _ (KInteger i) = integer i
@@ -1074,6 +1126,7 @@ instance Pretty TypeX where
   pprPrec p (TypeLam from to) = parensIf p precZero $
                                 text "Lam" <+> ppr from <+> ppr to
   pprPrec p (TypeLM s t)      = parensIf p precTyApp $ text "LM" <+> pprParendType s <+> pprParendType t
+  pprPrec _ (TypeVar tv)      = text tv
   pprPrec _ TypeFloat         = text "Float"
   pprPrec _ TypeInteger       = text "Integer"
   pprPrec _ TypeString        = text "String"
@@ -1213,6 +1266,10 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
 
 instance InPhase p => Pretty (BaseUserFun p) where
   ppr = pprBaseUserFun
+
+instance Pretty ArgTypeDescriptor where
+  ppr Poly      = text "poly"
+  ppr (Mono ty) = pprParendType ty
 
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens

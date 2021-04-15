@@ -10,6 +10,7 @@ import           Prelude                 hiding ( (<>) )
 
 import qualified Cgen
 import qualified Lang                    as L
+import Lang( TFun(..), DefX(..) )
 import Lang (Pretty(..), text, render, empty, parensIf,
              (<>), (<+>), ($$), parens, brackets, punctuate, sep,
              integer, double, comma, PrimFun(..))
@@ -363,32 +364,34 @@ callPrimFun f _ args =
 -- case-by-case basis.
 toCall :: L.InPhase p => L.TFun p -> L.TExpr -> Exp
 
-toCall (L.TFun _ (L.Fun L.JustFun (L.PrimFun (L.P_SelFun f _)))) e =
+toCall (L.TFun { tf_fun = L.Fun L.JustFun (L.PrimFun (L.P_SelFun f _)) }) e =
   Project (toFutharkExp e) $ show f
 
-toCall (L.TFun ret (L.Fun L.JustFun (L.PrimFun f))) args =
+toCall (L.TFun { tf_ret = ret, tf_fun = L.Fun L.JustFun (L.PrimFun f) }) args =
   callPrimFun f ret args
 
-toCall f@(L.TFun _ (L.Fun L.JustFun L.BaseUserFun{})) args =
+toCall f@(L.TFun { tf_fun = L.Fun L.JustFun L.BaseUserFun{} }) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ (L.Fun L.GradFun{} _)) args =
+toCall f@(L.TFun { tf_fun = L.Fun L.GradFun{} _ }) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ (L.Fun L.DrvFun{} _)) args =
+toCall f@(L.TFun { tf_fun = L.Fun L.DrvFun{} _ }) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ (L.Fun L.ShapeFun{} _)) args =
+toCall f@(L.TFun { tf_fun = L.Fun L.ShapeFun{} _ }) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
-toCall f@(L.TFun _ (L.Fun L.CLFun{} _)) args =
+toCall f@(L.TFun { tf_fun = L.Fun L.CLFun{} _ }) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall _ _ = error "Unsupported Futhark call"
 
 toFuthark :: L.TDef -> Def
 toFuthark d = case LU.noTupPatifyDef d of {
-  L.Def f (L.VarPat args) res_ty (L.UserRhs e) ->
+  L.Def { def_fun = f, def_pat = L.VarPat args
+        , def_res_ty = res_ty
+        , def_rhs = L.UserRhs e } ->  -- SLPJ: Ignoring def_qvars for now
   DefFun entry fname []
   [param] res_ty' (toFutharkExp e)
   where fname = toTypedName f (L.typeof args)

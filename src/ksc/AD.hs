@@ -35,9 +35,10 @@ gradV adp (Simple x) = Grad x adp
 gradV _ v            = error ("gradV: bad variable: " ++ render (ppr v))
 
 gradTFun :: HasCallStack => ADPlan -> TFun Typed -> Type -> TFun Typed
-gradTFun adp (TFun res_ty f) arg_tys
-  = TFun (mkGradType adp arg_tys res_ty)
-         (gradF adp f)
+gradTFun adp (TFun { tf_ret = res_ty, tf_fun = f, tf_targs = targs }) arg_tys
+  = TFun { tf_ret = mkGradType adp arg_tys res_ty
+         , tf_fun = gradF adp f
+         , tf_targs = targs }   -- SLPJ: is this right?
 
 mkGradTVar :: HasCallStack => ADPlan -> Type -> Var -> Type -> TVar
 mkGradTVar adp s var ty
@@ -58,10 +59,11 @@ gradDef adp = gradDefInner adp . noTupPatifyDef
 
 gradDefInner :: HasCallStack => ADPlan -> TDef -> Maybe TDef
 gradDefInner adp
-        (Def { def_fun = Fun JustFun f, def_pat = VarPat params
+        (Def { def_fun = Fun JustFun f, def_qvars = qvs, def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
     Def { def_fun    = Fun (GradFun adp) f
+        , def_qvars  = qvs
         , def_pat    = VarPat params
         , def_res_ty = mkGradType adp s_ty res_ty
         , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs')) }
@@ -306,10 +308,11 @@ applyD dir def@(Def { def_pat = TupPat {} })
 --  Dt$f  :: S1 S2       -> (T, (S1,S2) -o T)
 -- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
 -- fwdt$f :: (S1, S2) (dS1, dS2) -> (T, dT)
-applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
+applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_qvars = qvs, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
   = Def { def_fun    = Fun (DrvFun (AD adp Fwd)) f
-        , def_pat   = VarPat x_dx
+        , def_qvars  = qvs
+        , def_pat    = VarPat x_dx
         , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dx
         , def_res_ty = t }
   where
@@ -336,9 +339,10 @@ applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
 
 --   D$f :: S1 S2    -> ((S1,S2) -o T)
 -- rev$f :: (S1, S2) dT -> (dS1,dS2)
-applyD Rev (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
+applyD Rev (Def { def_fun = Fun (GradFun adp) f, def_qvars = qvs, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
   = Def { def_fun    = Fun (DrvFun (AD adp Rev)) f
+        , def_qvars  = qvs
         , def_pat    = VarPat x_dr
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
         , def_res_ty = tangentType (typeof x) }

@@ -18,7 +18,7 @@ import Lang (Decl, DeclX(DefDecl), DerivedFun(Fun), Derivations(JustFun),
              def_fun, displayN, partitionDecls,
              ppr, renderSexp, (<+>))
 import qualified Lang as L
-import LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun)
+import LangUtils (GblSymTab, emptyGblST, extendGblST, stInsertFun, lookupDef)
 import qualified Ksc.Futhark
 import Parse (parseF)
 import Rules (mkRuleBase)
@@ -29,7 +29,6 @@ import Ksc.SUF.AD (sufFwdRevPassDef, sufRevDef)
 
 import Data.Maybe (maybeToList)
 import Data.List (intercalate)
-import qualified Data.Map as Map
 import GHC.Stack (HasCallStack)
 
 -------------------------------------
@@ -172,7 +171,8 @@ more complicated typechecking story.
 
 deriveDecl :: GblSymTab -> L.TDecl -> KM (GblSymTab, [L.TDecl])
 deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
-    { let tdef = case Map.lookup fun env of
+    { -- fun :: UserFun Typed
+      let tdef = case lookupDef fun env of
               Nothing -> error $ unwords
                 [ "Internal bug. Error when attempting to gdef."
                 ,  "TODO: This ought to have been caught by type checking." ]
