@@ -44,6 +44,17 @@ class time_sampler:
     def get_time():
         return time.time_ns() * 1e-9
 
+
+def fun_and_grad_matches(f,g,arg):
+    fval = f(arg)
+    gval = g(arg)
+    if not torch.all(torch.isclose(fval, gval)):
+        print("run-bench: ERROR: VALUE mismatch", f, g)
+        print(fval,gval)
+        return False
+
+    return True
+
 def timeit(msg, fn, arg):
     MAX_TIME = 5 # No no need to run beyond MAX_TIME sec to get accurate benchmarks
     end_time = time.time() + MAX_TIME
@@ -81,6 +92,7 @@ def bench(module_name, bench_name):
     Import MODULE_NAME, which defines these functions:
         bench_name           Knossos-compilable code, should be pretty
         bench_name_pt        PyTorch reference, should be fast, might not be pretty
+        bench_name_pt_nice   PyTorch reference, should be pretty
         bench_name_config    Return a sequence of inputs on which to run benchmarking
     """
     import inspect
@@ -92,7 +104,9 @@ def bench(module_name, bench_name):
         if fn_name == bench_name + '_bench_configs':
             configs = list(fn_obj())
         elif fn_name == bench_name + '_pt':
-            pt_fun = fn_obj
+            pt_fast = fn_obj
+        elif fn_name == bench_name + '_pt_nice':
+            pt_nice = fn_obj
         elif fn_name == bench_name:
             ks_fun = fn_obj
         else:
@@ -102,9 +116,11 @@ def bench(module_name, bench_name):
     ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
 
     for arg in configs:
-        assert torch.all(torch.isclose(pt_fun(arg), ks_fun(arg)))    
-        timeit(bench_name + ' PT fast', pt_fun, arg)
-        timeit(bench_name + ' PT nice', ks_fun, arg)
+        assert fun_and_grad_matches(pt_fast, ks_fun, arg)
+        assert fun_and_grad_matches(pt_fast, pt_nice, arg)
+        assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
+        timeit(bench_name + ' PT fast', pt_fast, arg)
+        timeit(bench_name + ' PT nice', pt_nice, arg)
         timeit(bench_name + ' Knossos', ks_compiled.apply, arg)
 
 if __name__ == "__main__":

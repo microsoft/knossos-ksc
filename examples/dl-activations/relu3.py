@@ -8,16 +8,12 @@ def relu3(x : float) -> float:
     Like GeLu, but cheaper
   """
   if x < 0.0:
-    return 0.0 * x # See [Note: zeros]
+    return 0.0
   elif x < 1.0:
     return 1/3 * x ** 3
   else:
     return x - 2/3
 # ENDDOC
-# Note: zeros
-# Need to multiply by x for pytorch to get the gradient back through x.
-# This is something of a long story, related to tracing.
-# Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
 
 # run-bench: Knossos source
 def vrelu3(x : torch.Tensor):
@@ -32,11 +28,29 @@ def vrelu3_pt(x : torch.Tensor):
   
   return mask0_1 * val_0_1 + mask1_inf * val_1_inf
 
+# run-bench: PyTorch "nice" implementation
+def relu3_pt_nice(x : float) -> float:
+  if x < 0.0:
+    return 0.0 * x # Needed for PyTorch, not for Knossos.  See [Note: zeros]
+  elif x < 1.0:
+    return 1/3 * x ** 3
+  else:
+    return x - 2/3
+
+# Note: zeros
+# Need to multiply by x for pytorch to get the gradient back through x.
+# This is something of a long story, related to tracing.
+# Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
+
+def vrelu3_pt_nice(x : torch.Tensor):
+  return elementwise_apply(relu3_pt_nice, x)
+
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
   yield torch.randn((4,4))
   yield torch.randn((16,16))
 # yield torch.randn((256,256)) too slow to bench...
+
 
 def plot_relu3(filename):
   import matplotlib.pyplot as plt

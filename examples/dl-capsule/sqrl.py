@@ -21,6 +21,10 @@ def sqrl(x : torch.Tensor):
 def sqrl_pt(x : torch.Tensor):
   return sqrl(x)
 
+# run-bench: PyTorch "nice" implementation
+def sqrl_pt_nice(x : torch.Tensor):
+  return sqrl(x)
+
 # run-bench: Define a range of values at which to call the methods
 def sqrl_bench_configs():
   yield torch.randn((4,4))
