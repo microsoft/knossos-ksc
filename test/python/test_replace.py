@@ -1,7 +1,7 @@
 import pytest
 
 from ksc.expr import Var, Const, Let, Lam, Call
-from ksc.cav_subst import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _make_nonfree_var, get_node_at_location
+from ksc.replace import replace_free_vars, replace_subtree, replace_subtrees, ReplaceLocationRequest, _make_nonfree_var, get_node_at_location
 from ksc.parse_ks import parse_expr_string
 
 def test_make_nonfree_var():
@@ -27,21 +27,29 @@ def test_replace_free_vars_shadowing():
   assert replaced == expected
 
 def test_replace_subtrees():
-  e = parse_expr_string("(foo x y z)")
+  e = parse_expr_string("(foo v0 v1 v2)")
   replaced = replace_subtrees(e, [
-    ReplaceLocationRequest([2], Var("w")),
-    ReplaceLocationRequest([1], Var("v"))])
-  expected = parse_expr_string("(foo x v w)")
+    ReplaceLocationRequest([2], Var("x2")),
+    ReplaceLocationRequest([1], Var("x1"))])
+  expected = parse_expr_string("(foo v0 x1 x2)")
+  assert replaced == expected
+
+  e = parse_expr_string("(foo v0 (foo1 v10) (foo2 v20 v21))")
+  replaced = replace_subtrees(e, [
+    ReplaceLocationRequest([1,0], Var("x10")),
+    ReplaceLocationRequest([2,1], Var("x21")),
+    ReplaceLocationRequest([0], Var("x0"))
+  ])
+  expected = parse_expr_string("(foo x0 (foo1 x10) (foo2 v20 x21))")
   assert replaced == expected
 
 def test_replace_subtrees_nested():
   e = parse_expr_string("(assert true (foo x y z))")
-  inner_replaced = parse_expr_string("(foo x y w)")
   path_to_call = (1,)
   path_to_z = (1, 2)
   assert isinstance(get_node_at_location(e, path_to_call), Call)
   assert get_node_at_location(e, path_to_z) == Var("z")
-  with pytest.raises(ValueError, match="nested"):
+  with pytest.raises(ValueError, match="Multiple ReplaceLocationRequests on locations nested within each other"):
     replace_subtrees(e, [
       ReplaceLocationRequest(path_to_z, Var("w")),
       ReplaceLocationRequest(path_to_call, Const(0))
@@ -88,21 +96,32 @@ def test_replace_subtree_applicator_allows_capture():
 def test_replace_subtree_allows_inlining_call():
   # In the future this will become part of the inline-call rule,
   # but for now we merely test that replace_subtree supports it.
-  e = parse_expr_string("(let (x (if p a b)) (foo x))")
-  foo_impl = parse_expr_string("(lam (foo_arg : Float) (add x foo_arg))")
+  e = parse_expr_string("""
+    (let (x (if p a b)) 
+       (foo x))
+  """)
   path_to_call = (1,)
   assert type(get_node_at_location(e, path_to_call)) == Call
+
+  foo_impl = parse_expr_string("""
+    (lam (foo_arg : Float) 
+       (add x foo_arg))
+  """)
+
+  # Custom Applicator: replace "call" with body of "func"
   def apply_to_argument(func, call):
     assert type(func) == Lam and type(call) == Call
     assert len(call.args) == 1  # More would require making a Tuple
     return Let(Var(func.arg.name), # drop the type
               call.args[0],
               func.body)
+
   replaced = replace_subtree(e, path_to_call, foo_impl, apply_to_argument)
   new_var = _make_nonfree_var("x", [e])
-  expected = parse_expr_string(f"""(let ({new_var} (if p a b))  ; Bound variable renamed to avoid capturing "x" in foo_impl
-    ; The call:
-    (let (foo_arg {new_var}) ; Renaming applied to argument
-      (add x foo_arg))) ; Renaming not applied to the "x" in foo_impl
+  expected = parse_expr_string(f"""
+    (let ({new_var} (if p a b))  ; Bound variable renamed to avoid capturing "x" in foo_impl
+      ; The call:
+      (let (foo_arg {new_var}) ; Renaming applied to argument
+        (add x foo_arg))) ; Renaming not applied to the "x" in foo_impl
    """)
   assert replaced == expected
