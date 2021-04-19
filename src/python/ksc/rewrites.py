@@ -24,7 +24,7 @@ Environment = Mapping[str, Location]
 class AbstractMatcher(ABC):
     def find_all_matches(self, e: Expr) -> Iterator[Match]:
         yield from self._matches_with_env(e, tuple(), e, {})
-    
+
     def _matches_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.matches_here(e, path_from_root, root, env)
