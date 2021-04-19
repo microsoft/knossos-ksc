@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from functools import singledispatch
 from typing import Any, Iterator, Mapping, Tuple, Union, Type, FrozenSet, final
 
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName
 from ksc.cav_subst import Location, get_children, replace_subtree
 from ksc.utils import singleton
@@ -84,10 +84,9 @@ class Rule(AbstractMatcher):
     def name(self):
         return self._name
 
-    @abstractmethod
+    @abstractproperty
     def possible_expr_filter(self) -> FrozenSet[Union[Type, ConstantType, StructuredName]]:
-        """ Return a set of values that might be returned by match_filter() for any Expr that this rule could possibly match. """
-        pass
+        """ A set of values that might be returned by match_filter() for any Expr that this rule could possibly match. """
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
@@ -96,11 +95,11 @@ class Rule(AbstractMatcher):
     @abstractmethod
     def matches_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <match_filter(expr)>
-            is of one of <self.possible_expr_filter()>. """
+            is of one of <self.possible_expr_filter>. """
 
     @final
     def matches_here(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
-        if match_filter(expr) in self.possible_expr_filter():
+        if match_filter(expr) in self.possible_expr_filter:
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
     def __reduce__(self):
@@ -112,7 +111,7 @@ class RuleSet(AbstractMatcher):
         # TODO also allow global (any-class) rules?
         self._filtered_rules = {}
         for rule in rules:
-            for clazz in rule.possible_expr_filter():
+            for clazz in rule.possible_expr_filter:
                 self._filtered_rules.setdefault(clazz, []).append(rule)
 
     def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
@@ -121,9 +120,7 @@ class RuleSet(AbstractMatcher):
 
 @singleton
 class inline_var(Rule):
-    @staticmethod
-    def possible_expr_filter():
-        return frozenset([Var])
+    possible_expr_filter = frozenset([Var])
 
     def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
         # binding_location comes from the Match.
@@ -144,9 +141,7 @@ class inline_var(Rule):
 
 @singleton
 class delete_let(Rule):
-    @staticmethod
-    def possible_expr_filter():
-        return frozenset([Let])
+    possible_expr_filter = frozenset([Let])
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
