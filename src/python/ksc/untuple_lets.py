@@ -30,6 +30,13 @@ def untuple_lets_lam(l : Lam) -> Expr:
 def untuple_lets_assert(a : Assert) -> Expr:
     return Assert(untuple_lets(l.cond), untuple_lets(l.body))
 
+def is_literal_tuple(e: Expr):
+    return isinstance(e, Call) and e.name.mangle_without_type() == "tuple"
+
+def make_tuple_get(tuple_val: Expr, idx: int, size: int) -> Expr:
+    assert 1 <= idx  <= size
+    return Call(StructuredName(f"get${idx}${size}"), [tuple_val])
+
 @untuple_lets.register
 def untuple_let(l : Let) -> Expr:
     rhs = untuple_lets(l.rhs)
@@ -40,15 +47,15 @@ def untuple_let(l : Let) -> Expr:
 
     # Optional special case, otherwise we could inline the tuple (uphill) and then use
     # the select-of-tuple rules, once for each element, then delete the outermost let.
-    if isinstance(l.rhs, Call) and l.rhs.name.mangle_without_type() == "tuple":
+    if is_literal_tuple(l.rhs):
         assert len(l.rhs.args) == len(l.vars)
         for arg, val in reversed(list(zip(l.vars, l.rhs.args))):
             body = Let(arg, val, body)
         return body
-
-    # (If the above didn't fire) We have a tuple of variables, assigned to a single value - e.g. (let ((x y z) val) ...).
-    # In this case we must assign the value to a fresh name, then each variable to a get$n$m of that.
-    temp_var = make_nonfree_var("temp", [rhs, body])
-    for posn, var in reversed(list(enumerate(l.vars, 1))):
-        body = Let(var, Call(StructuredName(f"get${posn}${len(l.vars)}"), [temp_var]), body)
-    return Let(temp_var, l.rhs, body)
+    else:
+        # A tuple of variables, assigned to a single value - e.g. (let ((x y z) val) ...).
+        # In this case we must assign the value to a fresh name, then each variable to a get$n$m of that.
+        temp_var = make_nonfree_var("temp", [rhs, body])
+        for posn, var in reversed(list(enumerate(l.vars, 1))):
+            body = Let(var, make_tuple_get(temp_var, posn, len(l.vars)), body)
+        return Let(temp_var, l.rhs, body)
