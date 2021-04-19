@@ -2,4 +2,4 @@
 # BENCH=src/bench/run-bench.py
 
 #PYTHONPATH=examples/dl-activations python $BENCH relu3 vrelu3 
-PYTHONPATH=examples/dl-capsule pytest src/bench/
+PYTHONPATH=examples/dl-capsule pytest src/bench/ --benchmarkname=sqrl
