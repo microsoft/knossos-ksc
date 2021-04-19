@@ -300,7 +300,7 @@ class Rule(ASTNode):
     ```
     '''
     name: str
-    args: list
+    args: List["Var"]
     e1: Expr
     e2: Expr
 

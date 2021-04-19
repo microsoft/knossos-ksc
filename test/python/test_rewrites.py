@@ -1,4 +1,4 @@
-from ksc.rewrites import rule, RuleSet, inline_var, delete_let
+from ksc.rewrites import rule, RuleSet, inline_var, delete_let, ParsedRule, parse_rule_str
 from ksc.parse_ks import parse_expr_string
 
 def apply_in_only_location(rule_name, expr):
@@ -81,3 +81,10 @@ def test_inline_var_renames():
     assert apply_in_only_location("inline_var", e) == parse_expr_string(
         "(let (x_0 (add x 1)) (add (add x 1) 2))"
     )
+
+def test_simple_parsed_rule():
+    r = parse_rule_str('(rule "mul2_to_add" (x : Float) (mul x 2.0) (add x x))')
+    e = parse_expr_string("(if p (mul (add a b) 2) (mul z 3))")
+    all_rewrites = [m.rewrite() for m in r.find_all_matches(e)]
+    expected = parse_expr_string("(if p (add (add a b) (add a b)) (mul z 3))")
+    assert all_rewrites == [expected]

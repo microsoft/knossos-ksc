@@ -1,10 +1,13 @@
+from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Mapping, Tuple, Union, FrozenSet, Type as PyType
+from typing import Any, Iterator, Optional, Mapping, Tuple, Union, List, FrozenSet, Type as PyType
 
-from abc import ABC, abstractmethod, abstractproperty
-from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName
 from ksc.cav_subst import Location, get_children, replace_subtree
+from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule as KSRule
+from ksc.expr_transformer import ExprTransformer
+from ksc.parse_ks import parse_ks_file, parse_ks_string
+from ksc.type import Type
 from ksc.utils import singleton
 
 @dataclass(frozen=True)
@@ -155,3 +158,153 @@ class delete_let(Rule):
         assert isinstance(subtree, Let)
         if subtree.vars.name not in subtree.body.free_vars_:
             yield Match(self, root, path_from_root)
+
+def combine_substs(s1: Mapping[str, Expr], s2: Optional[Mapping[str, Expr]]) -> Optional[Mapping[str, Expr]]:
+    if s2 is None:
+        return None
+    common_vars = s1.keys() & s2.keys()
+    # We require all children to have exactly the same values (as this is not Most General Unification
+    # - we are not finding substitutions for variables on the RHS).
+    # Note this means that if the LHS template contains multiple let-expressions, they should have
+    # distinct bound variables (or else will only match programs that also use the same variable-name
+    # in both let's).
+    if not all([s1[v] == s2[v] for v in common_vars]): # TODO use alpha-equivalence rather than strict equality
+        return None # Fail
+    s1.update(child_substs)
+    return s1
+
+@singledispatch
+def fit_template(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+    """ Finds a substitution for the variable names in template_vars,
+        such that applying the resulting substitution to <tmpl> (using subst_template) yields <exp>.
+        Returns None if no such substitution exists i.e. the pattern does not match. """
+    # Default case for most template exprs: require same type of Expr, and compatible child substitutions
+    if tmpl.__class__ != exp.__class__:
+        return None # No match
+    tmpl_children = get_children(tmpl)
+    exp_children = get_children(exp)
+    if len(tmpl_children) != len(exp_children):
+        return None
+    d = dict()
+    for t,e in zip(tmpl_children, exp_children):
+        d = combine_substs(d, fit_template(t, e, template_vars))
+        if d is None:
+            return None
+    return d
+
+@fit_template.register
+def fit_template_var(tmpl: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+    assert tmpl.name in template_vars
+    # Require correct type of subexp in order to match
+    return {tmpl.name: exp} if exp.type_ == template_vars[tmpl.name] else None
+
+@fit_template.register
+def fit_template_const(tmpl: Const, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+    # Require same constant value. Empty substitution = success, None = no substitution = failure.
+    return {} if tmpl == exp else None
+
+def fit_template_binder(tmpl: Expr, exp: Expr, tmpl_v: Var, exp_v: Var, template_vars) -> Optional[Mapping[str, Expr]]:
+    # Returns a substitution, assuming tmpl is inside a binder for tmpl_s and exp inside a corresponding binder for exp_v
+    d = fit_template(tmpl.body, exp.body, {**template_vars, tmpl_v.name: exp_v.type_})
+    if d is None:
+        return None
+    if d.pop(tmpl_v.name, exp_v) != exp_v:
+        return None
+    return d
+
+@fit_template.register
+def fit_template_let(tmpl: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+    assert isinstance(tmpl.vars, Var), "Tupled-lets in pattern are not supported: call untuple_lets first"
+    if not isinstance(exp, Let):
+        return None
+    assert isinstance(exp.vars, Var), "Tupled-lets in subject expression are not supported: call untuple_lets first"
+    assert tmpl.vars not in template_vars, "Let-bound variables should not be declared as pattern variables"
+    d = fit_template_binder(tmpl.body, exp.body, tmpl.vars, exp.vars, template_vars)
+    return d and combine_substs(d, fit_template(tmpl.rhs, exp.rhs, template_vars))
+
+@fit_template.register
+def fit_template_lam(tmpl: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+    if not isinstance(exp, Lam):
+        return None
+    assert tmpl.arg not in template_vars, "Lambda arguments should not be declared as pattern variables"
+    return fit_template_binder(tmpl.body, exp.body, tmpl.arg, exp.arg, template_vars)
+
+
+class SubstTemplate(ExprTransformer):
+    """Substitutes variables to Exprs in a template (including bound
+    variables). The substitution is capture-avoiding.
+
+    Note that this is only avoids captures by new variables introduced on the RHS.
+    It doesn't handle e.g. (foo (let x e1 e2)) ==> (let x e1 (foo e2))
+    where there is potentially capture - if foo contains references to another/outside
+    x, they'll be captured by the x bound by that let, which changes their meaning.
+    (Hence, we still need the separate lift_bind rule (not a ParsedRule) for that.)
+    """
+    def transform_var(self, v: Var, var_names_to_exprs: Mapping[str, Expr]):
+        assert not v.decl
+        return var_names_to_exprs[v.name]
+
+    def maybe_add_binder_to_subst(bound: Var, var_names_to_exprs: Mapping[str, Expr], dont_capture: List[Expr]
+    )-> Tuple[Var, Mapping[str, Expr]]:
+        assert bound.is_decl
+        target_var = var_names_to_exprs.get(bound.name)
+        if target_var is None:
+            # This is a new binder in the RHS, so make sure the variable is
+            # fresh w.r.t bound body and all RHSs of substitutions
+            target_var = make_nonfree_var("t_", list(var_names_to_exprs.values()) + dont_capture, type=bound.type_)
+            var_names_to_exprs = {**var_names_to_exprs, bound.name: target_var}
+        return target_var, var_names_to_exprs
+
+    def transform_let(self, l: Let, var_names_to_exprs: Mapping[str, Expr]) -> Let:
+        assert isinstance(l.vars, Var), "use untuple_lets first"
+        target_var, var_names_to_exprs = maybe_add_to_subst(l.vars, var_names_to_exprs, [l.body])
+        # Substitute bound var with target_var in children. It's fine to apply this substitution outside
+        # where the bound var is bound, as the pattern (RHS) can't contain "(let x ...) x" (with x free).
+        return Let(Var(target_var.name, type=target_var.type_, decl=True),
+            self.transform(l.rhs, var_names_to_exprs),
+            self.transform(l.body, var_names_to_exprs))
+
+    def transform_lam(self, l: Lam, var_names_to_exprs: Mapping[str, Expr]) -> Lam:
+        target_var, var_names_to_exprs = maybe_add_to_subst(l.arg, var_names_to_exprs, [l.body])
+        return Lam(Var(target_var.name, type=target_var.type_, decl=True),
+            self.transform(l.body, var_names_to_exprs))
+
+_SubstTemplate = SubstTemplate()
+
+class ParsedRule(Rule):
+    """ Matches and substitutes according to a ksc.expr.Rule """
+    def __init__(self, rule: KSRule):
+        known_vars = frozenset([v.name for v in rule.args])
+        # Check that all pattern variables must be arguments or in the symtab.
+        assert known_vars.issuperset(rule.e1.free_vars_)
+        # Same should be true of target (no new free variables, only new symtab calls)
+        assert known_vars.issuperset(rule.e2.free_vars_)
+        super().__init__(rule.name)
+        self._rule = rule
+        self._arg_types = {v.name: v.type_ for v in rule.args}
+
+    @property
+    def possible_expr_filter(self):
+        return frozenset([match_filter(self._rule.e1)])
+
+    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
+        substs = fit_template(self._rule.e1, subtree, self._arg_types)
+        if substs is not None:
+            yield Match(self, root, path_from_root, substs)
+
+    def apply_at(self, expr: Expr, path: Location, substs: Mapping[str, Expr]) -> Expr:
+        def apply_here(const_zero: Expr, target: Expr) -> Expr:
+            assert const_zero == Const(0.0) # Passed to replace_subtree below
+            assert _SubstTemplate.transform(self._rule.e1, substs) == target
+            return _SubstTemplate.transform(self._rule.e2, substs)
+        # The constant just has no free variables that we want to avoid being captured
+        return replace_subtree(expr, path, Const(0.0), apply_here)
+
+def parse_rule_str(ks_str):
+    res = [ParsedRule(r) for r in parse_ks_file(ks_str)]
+    assert len(res) == 1
+    return res[0]
+
+def parse_rules_from_file(filename):
+    with open(filename) as f:
+        return [ParsedRule(r) for r in parse_ks_string(f, filename)]
