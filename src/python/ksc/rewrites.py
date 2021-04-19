@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Mapping, Tuple
+from typing import Any, Iterator, Mapping, Tuple, final
 
 from abc import ABC, abstractmethod
 from ksc.expr import Expr, Let, Lam, Var, Const, Call
@@ -19,34 +19,36 @@ class Rewrite:
     def __call__(self):
         return self.rule.apply_at(self.root, self.path, **self.extra_data)
 
+Environment = Mapping[str, Location]
+
 class AbstractMatcher(ABC):
     def get_all_rewrites(self, e: Expr) -> Iterator[Rewrite]:
         yield from self._all_rewrites_with_env(e, tuple(), e, {})
     
-    def _all_rewrites_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Location]) -> Iterator[Rewrite]:
+    def _all_rewrites_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.get_local_rewrites(e, path_from_root, root, env)
         for i, ch in enumerate(get_children(e)):
             yield from self._all_rewrites_with_env(ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env))
 
     @abstractmethod
-    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping) -> Iterator[Rewrite]:
-        pass
+    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+        """ Return any rewrites acting on the topmost node of the specified subtree """
 
 @singledispatch
-def _update_env_for_subtree(parent: Expr, parent_path: Location, which_child: int, env: Mapping[str, Location]) -> Mapping[str, Location]:
+def _update_env_for_subtree(parent: Expr, parent_path: Location, which_child: int, env: Environment) -> Environment:
     # Default is to use same environment as parent
     return env
 
 @_update_env_for_subtree.register
-def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: Mapping[str, Location]) -> Mapping[str, Location]:
+def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: Environment) -> Environment:
     assert isinstance(parent.vars, Var), "Tupled lets are not supported - use untuple_lets first"
     assert 0 <= which_child <= 1
     return (env if which_child == 0 # rhs
         else {**env, parent.vars.name: parent_path})
 
 @_update_env_for_subtree.register
-def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: Mapping[str, Location]) -> Mapping[str, Location]:
+def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: Environment) -> Environment:
     assert which_child == 0
     return {k:v for k,v in env.items() if k != parent.arg.name}
 
@@ -78,6 +80,16 @@ class Rule(AbstractMatcher):
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
         """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Rewrites. """
 
+    @abstractmethod
+    def get_rewrites_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+        """ Returns any rewrites acting on the topmost node of the specified Expr, given that said topmost node
+            is of one of the possible_expr_classes """
+
+    @final
+    def get_local_rewrites(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+        if any(isinstance(expr, c) for c in self.possible_expr_classes()):
+            yield from self.get_rewrites_for_possible_expr(expr, path_from_root, root, env)
+
     def __reduce__(self):
         # This allows pickling and sending Rules across processes/machines via Ray.
         return (rule, (self.name,))
@@ -90,9 +102,9 @@ class RuleSet(AbstractMatcher):
             for clazz in rule.possible_expr_classes():
                 self.rules_by_class.setdefault(clazz, []).append(rule)
 
-    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping) -> Iterator[Rewrite]:
+    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
         for rule in self.rules_by_class.get(subtree.__class__, []):
-            yield from rule.get_local_rewrites(subtree, path_from_root, root, env)
+            yield from rule.get_rewrites_for_possible_expr(subtree, path_from_root, root, env)
 
 @singleton
 class inline_var(Rule):
@@ -110,11 +122,11 @@ class inline_var(Rule):
             lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator; renaming will prevent capturing let.rhs, so just insert that
         )
 
-    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Mapping[str, Location]) -> Iterator[Rewrite]:
-        if isinstance(subtree, Var): # May not be if rule is used directly outside of a RuleSet. Q: Do we want to support that case.
-            if subtree.name in env:
-                binding_loc = env[subtree.name]
-                yield Rewrite(self, root, path_from_root, {"binding_location": binding_loc})
+    def get_rewrites_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+        assert isinstance(subtree, Var)
+        if subtree.name in env:
+            binding_loc = env[subtree.name]
+            yield Rewrite(self, root, path_from_root, {"binding_location": binding_loc})
 
 
 @singleton
@@ -131,7 +143,8 @@ class delete_let(Rule):
         # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
-    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Rewrite]:
+    def get_rewrites_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Rewrite]:
         del env
-        if isinstance(subtree, Let) and subtree.vars.name not in subtree.body.free_vars_:
+        assert isinstance(subtree, Let)
+        if subtree.vars.name not in subtree.body.free_vars_:
             yield Rewrite(self, root, path_from_root)
