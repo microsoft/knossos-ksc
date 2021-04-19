@@ -63,9 +63,9 @@ def timeit(msg, fn, arg):
     backward_timer = time_sampler()
     nruns = 5000
     for _ in range(nruns):
-        arg.requires_grad = False
         inference_timer.mark()
-        loss = fn(arg).sum()
+        with torch.no_grad():
+            loss = fn(arg).sum()
         inference_timer.record()
 
         arg.requires_grad = True
