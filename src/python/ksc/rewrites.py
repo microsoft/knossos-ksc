@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Mapping, Tuple, final
+from typing import Any, Iterator, Mapping, Tuple, Union, Type, FrozenSet, final
 
 from abc import ABC, abstractmethod
-from ksc.expr import Expr, Let, Lam, Var, Const, Call
+from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName
 from ksc.cav_subst import Location, get_children, replace_subtree
 from ksc.utils import singleton
 
@@ -59,6 +59,19 @@ def rule(name: str) -> "Rule":
     """Lookup method for all `Rule`s."""
     return _rule_dict[name]
 
+@singledispatch
+def match_filter(e : Expr) -> Union[Type, ConstantType, StructuredName]:
+    # Allows to quick-reject rules that can never match a particular expr. See Rule.possible_expr_filter.
+    return e.__class__
+
+@match_filter.register
+def match_filter_const(e : Const) -> ConstantType:
+    return e.value
+
+@match_filter.register
+def match_filter_call(e : Call):
+    return e.name
+
 class Rule(AbstractMatcher):
     def __init__(self, name=None):
         if name is None:
@@ -72,8 +85,8 @@ class Rule(AbstractMatcher):
         return self._name
 
     @abstractmethod
-    def possible_expr_classes(self):
-        """ Return a set of the subclasses of Expr that this rule could possibly match. """
+    def possible_expr_filter(self) -> FrozenSet[Union[Type, ConstantType, StructuredName]]:
+        """ Return a set of values that might be returned by match_filter() for any Expr that this rule could possibly match. """
         pass
 
     @abstractmethod
@@ -82,12 +95,12 @@ class Rule(AbstractMatcher):
 
     @abstractmethod
     def get_rewrites_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
-        """ Returns any rewrites acting on the topmost node of the specified Expr, given that said topmost node
-            is of one of the possible_expr_classes """
+        """ Returns any rewrites acting on the topmost node of the specified Expr, given that <match_filter(expr)>
+            is of one of <self.possible_expr_filter()>. """
 
     @final
     def get_local_rewrites(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
-        if any(isinstance(expr, c) for c in self.possible_expr_classes()):
+        if match_filter(expr) in self.possible_expr_filter():
             yield from self.get_rewrites_for_possible_expr(expr, path_from_root, root, env)
 
     def __reduce__(self):
@@ -97,20 +110,20 @@ class Rule(AbstractMatcher):
 class RuleSet(AbstractMatcher):
     def __init__(self, rules):
         # TODO also allow global (any-class) rules?
-        self.rules_by_class = {}
+        self._filtered_rules = {}
         for rule in rules:
-            for clazz in rule.possible_expr_classes():
-                self.rules_by_class.setdefault(clazz, []).append(rule)
+            for clazz in rule.possible_expr_filter():
+                self._filtered_rules.setdefault(clazz, []).append(rule)
 
     def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
-        for rule in self.rules_by_class.get(subtree.__class__, []):
+        for rule in self._filtered_rules.get(match_filter(subtree), []):
             yield from rule.get_rewrites_for_possible_expr(subtree, path_from_root, root, env)
 
 @singleton
 class inline_var(Rule):
     @staticmethod
-    def possible_expr_classes():
-        return {Var}
+    def possible_expr_filter():
+        return frozenset([Var])
 
     def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
         # binding_location comes from the Rewrite.
@@ -132,8 +145,8 @@ class inline_var(Rule):
 @singleton
 class delete_let(Rule):
     @staticmethod
-    def possible_expr_classes():
-        return {Let}
+    def possible_expr_filter():
+        return frozenset([Let])
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:

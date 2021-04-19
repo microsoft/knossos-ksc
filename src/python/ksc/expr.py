@@ -307,6 +307,8 @@ class Rule(ASTNode):
     def __init__(self, name, args, e1, e2):
         super().__init__(name=name, args=args, e1=e1, e2=e2)
 
+ConstantType = Union[int, str, float, bool]
+
 class Const(Expr):
     '''Const(value). 
     Examples:
@@ -316,9 +318,9 @@ class Const(Expr):
              value      value'
     ```
     '''
-    value: Union[int, str, float, bool]
+    value: ConstantType
 
-    def __init__(self, value):
+    def __init__(self, value: ConstantType):
         super().__init__(type_=Type.fromValue(value), value=value)
 
     def __str__(self):
