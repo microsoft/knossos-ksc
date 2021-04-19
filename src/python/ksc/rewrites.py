@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Mapping, Tuple, Union, Type, FrozenSet, final
+from typing import Any, Iterator, Mapping, Tuple, Union, Type, FrozenSet
 
 from abc import ABC, abstractmethod, abstractproperty
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName
@@ -97,7 +97,6 @@ class Rule(AbstractMatcher):
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <match_filter(expr)>
             is of one of <self.possible_expr_filter>. """
 
-    @final
     def matches_here(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         if match_filter(expr) in self.possible_expr_filter:
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
