@@ -8,31 +8,31 @@ from ksc.cav_subst import Location, get_children, replace_subtree
 from ksc.utils import singleton
 
 @dataclass(frozen=True)
-class Rewrite:
+class Match:
     rule: "Rule"
-    root: Expr # RLO required rule to be passed to Rewrite.apply(), but this seems prone to accidents
+    expr: Expr # RLO required rule to be passed to Rewrite.apply(), but this seems prone to accidents
     path: Location
 
     # Anything the Rule needs to pass from matching to rewriting. Used immutably, but dataclasses don't allow default {}
     extra_data: Mapping[str, Any] = field(default_factory=dict)
 
-    def __call__(self):
-        return self.rule.apply_at(self.root, self.path, **self.extra_data)
+    def rewrite(self):
+        return self.rule.apply_at(self.expr, self.path, **self.extra_data)
 
 Environment = Mapping[str, Location]
 
 class AbstractMatcher(ABC):
-    def get_all_rewrites(self, e: Expr) -> Iterator[Rewrite]:
-        yield from self._all_rewrites_with_env(e, tuple(), e, {})
+    def find_all_matches(self, e: Expr) -> Iterator[Match]:
+        yield from self._matches_with_env(e, tuple(), e, {})
     
-    def _all_rewrites_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+    def _matches_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
-        yield from self.get_local_rewrites(e, path_from_root, root, env)
+        yield from self.matches_here(e, path_from_root, root, env)
         for i, ch in enumerate(get_children(e)):
-            yield from self._all_rewrites_with_env(ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env))
+            yield from self._matches_with_env(ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env))
 
     @abstractmethod
-    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         """ Return any rewrites acting on the topmost node of the specified subtree """
 
 @singledispatch
@@ -91,17 +91,17 @@ class Rule(AbstractMatcher):
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
-        """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Rewrites. """
+        """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's extra_data field. """
 
     @abstractmethod
-    def get_rewrites_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
-        """ Returns any rewrites acting on the topmost node of the specified Expr, given that <match_filter(expr)>
+    def matches_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
+        """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <match_filter(expr)>
             is of one of <self.possible_expr_filter()>. """
 
     @final
-    def get_local_rewrites(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+    def matches_here(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         if match_filter(expr) in self.possible_expr_filter():
-            yield from self.get_rewrites_for_possible_expr(expr, path_from_root, root, env)
+            yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
     def __reduce__(self):
         # This allows pickling and sending Rules across processes/machines via Ray.
@@ -115,9 +115,9 @@ class RuleSet(AbstractMatcher):
             for clazz in rule.possible_expr_filter():
                 self._filtered_rules.setdefault(clazz, []).append(rule)
 
-    def get_local_rewrites(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         for rule in self._filtered_rules.get(match_filter(subtree), []):
-            yield from rule.get_rewrites_for_possible_expr(subtree, path_from_root, root, env)
+            yield from rule.matches_for_possible_expr(subtree, path_from_root, root, env)
 
 @singleton
 class inline_var(Rule):
@@ -126,8 +126,8 @@ class inline_var(Rule):
         return frozenset([Var])
 
     def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
-        # binding_location comes from the Rewrite.
-        # Note there is an alternative design, where we don't store any "extra" info in the Rewrite.
+        # binding_location comes from the Match.
+        # Note there is an alternative design, where we don't store any "extra_data" in the Match.
         # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
         # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
         assert path_to_var[:len(binding_location)] == binding_location
@@ -135,11 +135,11 @@ class inline_var(Rule):
             lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator; renaming will prevent capturing let.rhs, so just insert that
         )
 
-    def get_rewrites_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Rewrite]:
+    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
         assert isinstance(subtree, Var)
         if subtree.name in env:
             binding_loc = env[subtree.name]
-            yield Rewrite(self, root, path_from_root, {"binding_location": binding_loc})
+            yield Match(self, root, path_from_root, {"binding_location": binding_loc})
 
 
 @singleton
@@ -156,8 +156,8 @@ class delete_let(Rule):
         # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
-    def get_rewrites_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Rewrite]:
+    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
         del env
         assert isinstance(subtree, Let)
         if subtree.vars.name not in subtree.body.free_vars_:
-            yield Rewrite(self, root, path_from_root)
+            yield Match(self, root, path_from_root)
