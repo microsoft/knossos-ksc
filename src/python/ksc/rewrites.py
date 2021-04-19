@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Mapping, Tuple, Union, Type, FrozenSet
+from typing import Any, Iterator, Mapping, Tuple, Union, FrozenSet, Type as PyType
 
 from abc import ABC, abstractmethod, abstractproperty
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName
@@ -60,7 +60,7 @@ def rule(name: str) -> "Rule":
     return _rule_dict[name]
 
 @singledispatch
-def match_filter(e : Expr) -> Union[Type, ConstantType, StructuredName]:
+def match_filter(e : Expr) -> Union[PyType, ConstantType, StructuredName]:
     # Allows to quick-reject rules that can never match a particular expr. See Rule.possible_expr_filter.
     return e.__class__
 
@@ -85,7 +85,7 @@ class Rule(AbstractMatcher):
         return self._name
 
     @abstractproperty
-    def possible_expr_filter(self) -> FrozenSet[Union[Type, ConstantType, StructuredName]]:
+    def possible_expr_filter(self) -> FrozenSet[Union[PyType, ConstantType, StructuredName]]:
         """ A set of values that might be returned by match_filter() for any Expr that this rule could possibly match. """
 
     @abstractmethod
