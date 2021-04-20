@@ -33,7 +33,7 @@ def untuple_lets_assert(a : Assert) -> Expr:
 def is_literal_tuple(e: Expr):
     return isinstance(e, Call) and e.name.mangle_without_type() == "tuple"
 
-def make_tuple_get(tuple_val: Expr, idx: int, size: int) -> Expr:
+def make_tuple_get(idx: int, size: int, tuple_val: Expr) -> Expr:
     assert 1 <= idx  <= size
     return Call(StructuredName(f"get${idx}${size}"), [tuple_val])
 
@@ -57,5 +57,5 @@ def untuple_let(l : Let) -> Expr:
         # In this case we must assign the value to a fresh name, then each variable to a get$n$m of that.
         temp_var = make_nonfree_var("temp", [rhs, body])
         for posn, var in reversed(list(enumerate(l.vars, 1))):
-            body = Let(var, make_tuple_get(temp_var, posn, len(l.vars)), body)
+            body = Let(var, make_tuple_get(posn, len(l.vars), temp_var), body)
         return Let(temp_var, l.rhs, body)
