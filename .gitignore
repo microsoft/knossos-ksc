@@ -112,3 +112,7 @@ etc/onnx-prelude-autogen.ks
 # Eggs
 *.egg-info/
 ksc-*.egg
+
+
+# pytest-benchmark
+.benchmarks/
