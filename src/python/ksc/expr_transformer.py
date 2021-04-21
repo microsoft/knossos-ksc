@@ -22,13 +22,14 @@ class ExprTransformer:
             self.transform.register(type)(meth)
 
     @final # Not enforced, merely a marker if type-checking with pyright/mypy/etc.
-    def transform(self, e: Expr) -> Expr:
+    def transform(self, e: Expr, *args, **kwargs) -> Expr:
         """ Interface to call to process an Expr; should not be overridden.
-            It will switch on the type of its first argument to one of the member functions transform_(var,const,let,lam,call,if,assert) """
+            It will switch on the type of its first argument to one of the member functions transform_(var,const,let,lam,call,if,assert).
+            The acceptable args/kwargs are whatever are understood by the subclass's overriding of the variants. """
         # Extending to ASTNode should be straightforward.
         raise AssertionError("Overridden for all Expr subclasses")
 
-    def transform_var(self, v: Var) -> Expr:
+    def transform_var(self, v: Var, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle a non-decl Var being passed to transform """
         # We *could* pass Lam args and Let vars into self.transform and thus here, allowing arg.is_decl to tell whether being a binding occurrence;
         # or even have a separate method self.transform_binder.
@@ -36,27 +37,33 @@ class ExprTransformer:
         # as any change to the bound variable is likely to have to be co-ordinated with the rest of the binding Expr.
         return v
 
-    def transform_const(self, c: Const) -> Expr:
+    def transform_const(self, c: Const, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle a Const being passed to transform """
         return c
 
-    def transform_let(self, l: Let) -> Expr:
+    def transform_let(self, l: Let, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle a Let being passed to transform """
-        return Let(l.vars, self.transform(l.rhs), self.transform(l.body))
+        return Let(l.vars,
+            self.transform(l.rhs, *args, **kwargs),
+            self.transform(l.body, *args, **kwargs))
 
-    def transform_lam(self, l: Lam) -> Expr:
+    def transform_lam(self, l: Lam, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle a Lam being passed to transform """
-        return Lam(l.arg, self.transform(l.body))
+        return Lam(l.arg, self.transform(l.body, *args, **kwargs))
 
-    def transform_call(self, c: Call) -> Expr:
+    def transform_call(self, c: Call, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle a Call being passed to transform """
-        return Call(c.name, [self.transform(a) for a in c.args])
+        return Call(c.name, [self.transform(a, *args, **kwargs) for a in c.args])
 
-    def transform_if(self, i: If) -> Expr:
+    def transform_if(self, i: If, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle an If being passed to transform """
-        return If(self.transform(i.cond), self.transform(i.t_body), self.transform(i.f_body))
+        return If(
+            self.transform(i.cond, *args, **kwargs),
+            self.transform(i.t_body, *args, **kwargs),
+            self.transform(i.f_body, *args, **kwargs))
 
-    def transform_assert(self, a: Assert) -> Expr:
+    def transform_assert(self, a: Assert, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle an Assert being passed to transform """
-        return Assert(self.transform(a.cond), self.transform(a.body))
-
+        return Assert(
+            self.transform(a.cond, *args, **kwargs),
+            self.transform(a.body, *args, **kwargs))
