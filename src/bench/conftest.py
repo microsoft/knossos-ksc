@@ -44,4 +44,16 @@ def pytest_generate_tests(metafunc):
         functions_to_benchmark.append(ks_compiled.apply)
 
         metafunc.parametrize("func", functions_to_benchmark)
-        metafunc.parametrize("config", configs)
+
+        # We want to group by tensor size, it's not clear how to metaprogram the group mark cleanly.
+        # pytest meta programming conflates arguments and decoration. I've not been able to find a way to directly
+        # parameterize just marks so do the mark along with a oarameter
+        config_and_group_marker = [pytest.param(config, marks=[pytest.mark.benchmark(group=str(config.shape))]) for config in configs]
+        metafunc.parametrize("config", config_and_group_marker)
+
+        # Alternative use a dummy argument --benchmark-group-by=param:dummy_argument but messes with serialised versions and is just horrible
+
+        # https://github.com/pytest-dev/pytest/issues/1425#issuecomment-439220834
+        # This runs, but doesn't affect the test. It seems like they've allowed FunctionDefinition to be mutable (due to bad inheritance)
+        # group_marker = pytest.mark.benchmark(group="groupname_XYZ")
+        # metafunc.definition.add_marker(group_marker)
