@@ -3,29 +3,30 @@ from functools import singledispatch
 
 from ksc.expr import Expr, Let, Call, Var, If, Assert, Const, Lam
 
+def _default_impl(e : Expr):
+    raise AssertionError("Overridden for all Expr subclasses")
+
 class ExprTransformer:
     """ Superclass for functions that transform Expressions by recursive traversal.
         The default "transformation" is the identity function, but each case first recursively transforms the sub-Expr's within the Expr,
         allowing overriding of specific cases.
+
+        The "protected access" member self._dispatcher calls to whichever transform_xxx variant is appropriate for the first (non-self) argument.
     """
 
     def __init__(self):
         # One might expect to use singledispatchmethod. However, that expects to act on the class member (a function expecting a self argument),
         # and returns a class member (expecting a self argument - unlike self.transform).
-        self.transform = singledispatch(self.transform)
+        self._dispatcher = singledispatch(_default_impl)
 
         # Provide specific types rather than depending on subclasses to specify them correctly
         for type, meth in [(Var, self.transform_var), (Const, self.transform_const),
                            (Let, self.transform_let), (Lam, self.transform_lam),
                            (Call, self.transform_call), (If, self.transform_if), (Assert, self.transform_assert)]:
-            self.transform.register(type)(meth)
+            self._dispatcher.register(type)(meth)
 
     def transform(self, e: Expr, *args, **kwargs) -> Expr:
-        """ Interface to call to process an Expr; should not be overridden.
-            It will switch on the type of its first argument to one of the member functions transform_(var,const,let,lam,call,if,assert).
-            The acceptable args/kwargs are whatever are understood by the subclass's overriding of the variants. """
-        # Extending to ASTNode should be straightforward.
-        raise AssertionError("Overridden for all Expr subclasses")
+        return self._dispatcher(e, *args, **kwargs)
 
     def transform_var(self, v: Var, *args, **kwargs) -> Expr:
         """ Overridable method that is called to handle a non-decl Var being passed to transform """
