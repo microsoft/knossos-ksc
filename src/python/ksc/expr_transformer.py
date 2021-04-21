@@ -1,6 +1,5 @@
 from copy import deepcopy
 from functools import singledispatch
-from typing import final
 
 from ksc.expr import Expr, Let, Call, Var, If, Assert, Const, Lam
 
@@ -21,7 +20,6 @@ class ExprTransformer:
                            (Call, self.transform_call), (If, self.transform_if), (Assert, self.transform_assert)]:
             self.transform.register(type)(meth)
 
-    @final # Not enforced, merely a marker if type-checking with pyright/mypy/etc.
     def transform(self, e: Expr, *args, **kwargs) -> Expr:
         """ Interface to call to process an Expr; should not be overridden.
             It will switch on the type of its first argument to one of the member functions transform_(var,const,let,lam,call,if,assert).
