@@ -10,8 +10,6 @@ def test_expr_transformer():
 
     # A simple, non-semantic-preserving, transformation - this does not rename binders.
     class VarRenamer(ExprTransformer):
-        def __init__(self):
-            self.transform_var = self.transform.register(self.transform_var)
 
         def transform_var(self, v : Var) -> Expr:
             assert not v.decl

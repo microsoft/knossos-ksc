@@ -10,11 +10,7 @@ def make_tuple_get(idx: int, size: int, tuple_val: Expr) -> Expr:
     return Call(StructuredName(f"get${idx}${size}"), [tuple_val])
 
 class _UntupleLets(ExprTransformer):
-    def __init__(self):
-        self.transform_let = self.transform.register(self.transform_let)
 
-    # One cannot write `@transform.register` here - transform is not recognized.
-    # One can write `@ExprTransformer.transform.register` - but that overrides the superclass case (for all ExprTransformers)!
     def transform_let(self, l : Let) -> Expr:
         rhs = self.transform(l.rhs)
         body = self.transform(l.body)
