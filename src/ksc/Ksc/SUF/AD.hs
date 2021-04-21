@@ -312,6 +312,8 @@ sufFwdRevPass gst subst = \case
 -- REV{build e1 (\i. e2)} dt b = { (n, b_n, b_a) = b
 --                               ; dvs = sumbuild n (\i. let REV{e2} dt[i] b_a[i] in dvs) }
 --                            ++ REV{e1} () b_n
+--
+-- (vs is the list of variables that appears free in the lambda)
 sufFwdRevPass_build :: GblSymTab
                     -> InScopeSet
                     -> TExpr
