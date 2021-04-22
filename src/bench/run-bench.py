@@ -103,9 +103,9 @@ def bench(module_name, bench_name):
         fn_name, fn_obj = fn
         if fn_name == bench_name + '_bench_configs':
             configs = list(fn_obj())
-        elif fn_name == bench_name + '_pt':
+        elif fn_name == bench_name + '_pytorch':
             pt_fast = fn_obj
-        elif fn_name == bench_name + '_pt_nice':
+        elif fn_name == bench_name + '_pytorch_nice':
             pt_nice = fn_obj
         elif fn_name == bench_name:
             ks_fun = fn_obj
@@ -119,8 +119,8 @@ def bench(module_name, bench_name):
         assert fun_and_grad_matches(pt_fast, ks_fun, arg)
         assert fun_and_grad_matches(pt_fast, pt_nice, arg)
         assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
-        timeit(bench_name + ' PT fast', pt_fast, arg)
-        timeit(bench_name + ' PT nice', pt_nice, arg)
+        timeit(bench_name + ' PyTorch fast', pt_fast, arg)
+        timeit(bench_name + ' PyTorch nice', pt_nice, arg)
         timeit(bench_name + ' Knossos', ks_compiled.apply, arg)
 
 if __name__ == "__main__":

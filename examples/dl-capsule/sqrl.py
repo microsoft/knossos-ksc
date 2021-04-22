@@ -18,11 +18,11 @@ def sqrl(x : torch.Tensor):
 # ENDDOC
 
 # run-bench: PyTorch "fast" implementation
-def sqrl_pt(x : torch.Tensor):
+def sqrl_pytorch(x : torch.Tensor):
   return sqrl(x)
 
 # run-bench: PyTorch "nice" implementation
-def sqrl_pt_nice(x : torch.Tensor):
+def sqrl_pytorch_nice(x : torch.Tensor):
   return sqrl(x)
 
 # run-bench: Define a range of values at which to call the methods

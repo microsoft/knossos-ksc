@@ -28,10 +28,10 @@ def pytest_generate_tests(metafunc):
             fn_name, fn_obj = fn
             if fn_name == benchmark_name + '_bench_configs':
                 configs = list(fn_obj())
-            elif fn_name == benchmark_name + '_pt':
+            elif fn_name == benchmark_name + '_pytorch':
                 pt_fast = fn_obj
                 functions_to_benchmark.append(pt_fast)
-            elif fn_name == benchmark_name + '_pt_nice':
+            elif fn_name == benchmark_name + '_pytorch_nice':
                 pt_nice = fn_obj
                 functions_to_benchmark.append(pt_nice)
             elif fn_name == benchmark_name:
