@@ -59,11 +59,11 @@ def compile_relux():
 
 def test_ts2k_relux():
     compile_relux()
-    assert ks_relux(2.0) == relux(2.0)
+    assert ks_relux.py_mod.entry(2.0) == relux(2.0)
 
 def test_ts2k_relux_grad():
     compile_relux()
-    assert ks_relux.rev(1.3, 1.0) == grad_relux(1.3)
+    assert ks_relux.py_mod.rev_entry(1.3, 1.0) == grad_relux(1.3)
 
 def bar(a : int, x : float):
     y = torch.tensor([[1.1, -1.2], [2.1, 2.2]])
@@ -87,17 +87,17 @@ def grad_bar(a : int, x : float):
         t = 1/2 * x * float(b)
         dtdx = float(b)/2
     dda = ()
-    ddx = math.sin(t) + t*math.cos(t)
+    ddx = (math.sin(t) + t*math.cos(t))*dtdx
     return dda,ddx
 
 def test_bar():
     a,x = 1,12.34
     ks_bar = ts2mod(bar, (a,x))
-    ks_ans = ks_bar(a,x)
+    ks_ans = ks_bar.py_mod.entry(a,x)
     ans = bar(a,x)
     assert ans == ks_ans
 
-    assert ks_bar.rev((a,x),1.0) == grad_bar(a,x)
+    assert ks_bar.py_mod.rev_entry((a,x),1.0) == grad_bar(a,x)
 
 def far(x : torch.Tensor, y : torch.Tensor):
     xx = torch.cat([x, y], dim=1)
@@ -112,7 +112,7 @@ def test_far():
     x = torch.randn(2,3)
     y = torch.randn(2,5)
     ks_far = ts2mod(far, (x,y))
-    ks_ans = ks_far(ks_far.adapt(x), ks_far.adapt(y))
+    ks_ans = ks_far.py_mod.entry(ks_far.adapt(x), ks_far.adapt(y))
     ans = far(x,y)
     assert pytest.approx(ks_ans, 1e-8) == ans.item()
 
@@ -124,7 +124,7 @@ def test_cat():
     x = torch.randn(2,3)
     y = torch.randn(2,5)
     ks_f = ts2mod(f, (x,y))
-    ks_ans = ks_f(ks_f.adapt(x), ks_f.adapt(y))
+    ks_ans = ks_f.py_mod.entry(ks_f.adapt(x), ks_f.adapt(y))
     ks_ans_np = numpy.array(ks_ans, copy=True)
     py_ans = f(x,y)
     assert (ks_ans_np == py_ans.numpy()).all() # non-approx
