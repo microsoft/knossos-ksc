@@ -1,10 +1,12 @@
 from ksc.rewrites import rule, RuleSet, inline_var, delete_let, ParsedRule, parse_rule_str
-from ksc.parse_ks import parse_expr_string
+from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
+from ksc.type import Type
+from ksc.type_propagate import type_propagate_decls
+from ksc import utils
 
 def apply_in_only_location(rule_name, expr):
     cands = list(rule(rule_name).find_all_matches(expr))
-    assert len(cands) == 1
-    return cands[0].rewrite()
+    return utils.single_elem(cands).rewrite()
 
 def check_nowhere_applicable(rule_name, expr):
     assert len(list(rule(rule_name).find_all_matches(expr))) == 0
@@ -83,8 +85,15 @@ def test_inline_var_renames():
     )
 
 def test_simple_parsed_rule():
-    r = parse_rule_str('(rule "mul2_to_add" (x : Float) (mul x 2.0) (add x x))')
-    e = parse_expr_string("(if p (mul (add a b) 2) (mul z 3))")
-    all_rewrites = [m.rewrite() for m in r.find_all_matches(e)]
-    expected = parse_expr_string("(if p (add (add a b) (add a b)) (mul z 3))")
-    assert all_rewrites == [expected]
+    symtab = dict()
+    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+    type_propagate_decls(decls_prelude, symtab)
+
+    r = parse_rule_str('(rule "mul2_to_add" (x : Float) (mul x 2.0) (add x x))', symtab)
+    foo, rewritten = (
+        parse_expr_string("(if p (mul (add a b) 2.0) (mul a 3.0))"),
+        parse_expr_string("(if p (add (add a b) (add a b)) (mul a 3.0))"))
+
+    type_propagate_decls([foo, rewritten], {**symtab, "p": Type.Bool, "a": Type.Float, "b": Type.Float})
+    all_rewrites = [m.rewrite() for m in r.find_all_matches(foo)]
+    assert all_rewrites == [rewritten]

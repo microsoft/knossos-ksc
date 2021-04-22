@@ -5,10 +5,11 @@ from typing import Any, Iterator, Optional, Mapping, Tuple, Union, List, FrozenS
 
 from ksc.cav_subst import Location, get_children, replace_subtree
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule as KSRule
-from ksc.expr_transformer import ExprTransformer
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
-from ksc.utils import singleton
+from ksc.type_propagate import type_propagate
+from ksc.utils import singleton, single_elem
+from ksc.visitors import ExprTransformer
 
 @dataclass(frozen=True)
 class Match:
@@ -170,7 +171,7 @@ def combine_substs(s1: Mapping[str, Expr], s2: Optional[Mapping[str, Expr]]) -> 
     # in both let's).
     if not all([s1[v] == s2[v] for v in common_vars]): # TODO use alpha-equivalence rather than strict equality
         return None # Fail
-    s1.update(child_substs)
+    s1.update(s2)
     return s1
 
 @singledispatch
@@ -229,7 +230,7 @@ def fit_template_lam(tmpl: Lam, exp: Expr, template_vars: Mapping[str, Type]) ->
     assert tmpl.arg not in template_vars, "Lambda arguments should not be declared as pattern variables"
     return fit_template_binder(tmpl.body, exp.body, tmpl.arg, exp.arg, template_vars)
 
-
+@singleton
 class SubstTemplate(ExprTransformer):
     """Substitutes variables to Exprs in a template (including bound
     variables). The substitution is capture-avoiding.
@@ -240,7 +241,7 @@ class SubstTemplate(ExprTransformer):
     x, they'll be captured by the x bound by that let, which changes their meaning.
     (Hence, we still need the separate lift_bind rule (not a ParsedRule) for that.)
     """
-    def transform_var(self, v: Var, var_names_to_exprs: Mapping[str, Expr]):
+    def visit_var(self, v: Var, var_names_to_exprs: Mapping[str, Expr]):
         assert not v.decl
         return var_names_to_exprs[v.name]
 
@@ -255,21 +256,19 @@ class SubstTemplate(ExprTransformer):
             var_names_to_exprs = {**var_names_to_exprs, bound.name: target_var}
         return target_var, var_names_to_exprs
 
-    def transform_let(self, l: Let, var_names_to_exprs: Mapping[str, Expr]) -> Let:
+    def visit_let(self, l: Let, var_names_to_exprs: Mapping[str, Expr]) -> Let:
         assert isinstance(l.vars, Var), "use untuple_lets first"
         target_var, var_names_to_exprs = maybe_add_to_subst(l.vars, var_names_to_exprs, [l.body])
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
         # where the bound var is bound, as the pattern (RHS) can't contain "(let x ...) x" (with x free).
         return Let(Var(target_var.name, type=target_var.type_, decl=True),
-            self.transform(l.rhs, var_names_to_exprs),
-            self.transform(l.body, var_names_to_exprs))
+            self.visit(l.rhs, var_names_to_exprs),
+            self.visit(l.body, var_names_to_exprs))
 
-    def transform_lam(self, l: Lam, var_names_to_exprs: Mapping[str, Expr]) -> Lam:
+    def visit_lam(self, l: Lam, var_names_to_exprs: Mapping[str, Expr]) -> Lam:
         target_var, var_names_to_exprs = maybe_add_to_subst(l.arg, var_names_to_exprs, [l.body])
         return Lam(Var(target_var.name, type=target_var.type_, decl=True),
-            self.transform(l.body, var_names_to_exprs))
-
-_SubstTemplate = SubstTemplate()
+            self.visit(l.body, var_names_to_exprs))
 
 class ParsedRule(Rule):
     """ Matches and substitutes according to a ksc.expr.Rule """
@@ -290,20 +289,21 @@ class ParsedRule(Rule):
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
         substs = fit_template(self._rule.e1, subtree, self._arg_types)
         if substs is not None:
-            yield Match(self, root, path_from_root, substs)
+            yield Match(self, root, path_from_root, {"substs": substs})
 
     def apply_at(self, expr: Expr, path: Location, substs: Mapping[str, Expr]) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
-            assert _SubstTemplate.transform(self._rule.e1, substs) == target
-            return _SubstTemplate.transform(self._rule.e2, substs)
+            assert SubstTemplate.visit(self._rule.e1, substs) == target
+            return SubstTemplate.visit(self._rule.e2, substs)
         # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
-def parse_rule_str(ks_str):
-    res = [ParsedRule(r) for r in parse_ks_file(ks_str)]
-    assert len(res) == 1
-    return res[0]
+def parse_rule_str(ks_str, symtab):
+    r = single_elem(list(parse_ks_file(ks_str)))
+    assert isinstance(r, KSRule)
+    type_propagate(r, symtab)
+    return ParsedRule(r)
 
 def parse_rules_from_file(filename):
     with open(filename) as f:
