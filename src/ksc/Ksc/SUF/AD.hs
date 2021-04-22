@@ -344,7 +344,7 @@ sufFwdRevPass_build gst subst theCall e1 theLambda i e2 =
             unexpectedTy -> pprPanic "Unexpected tensor index type" (ppr unexpectedTy)
 
           type_ba = typeTensor gradfe2_bog_ty
-          type_r  = typeTensor (typeof e2)
+          type_r  = typeof theCall
 
           bog = Tuple [Var n, Var bn, Var ba]
 
