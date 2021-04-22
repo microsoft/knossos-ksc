@@ -1,4 +1,4 @@
-from ksc.expr_transformer import ExprTransformer
+from ksc.visitors import ExprTransformer
 from ksc.expr import StructuredName, Expr, Let, Call, Var
 from ksc.cav_subst import make_nonfree_var
 
@@ -11,9 +11,9 @@ def make_tuple_get(idx: int, size: int, tuple_val: Expr) -> Expr:
 
 class _UntupleLets(ExprTransformer):
 
-    def transform_let(self, l : Let) -> Expr:
-        rhs = self.transform(l.rhs)
-        body = self.transform(l.body)
+    def visit_let(self, l : Let) -> Expr:
+        rhs = self.visit(l.rhs)
+        body = self.visit(l.body)
         if isinstance(l.vars, Var):
             return Let(l.vars, rhs, body)
         # Tupled let, binding multiple variables. Convert to nested single lets.
@@ -33,4 +33,4 @@ class _UntupleLets(ExprTransformer):
                 body = Let(var, make_tuple_get(posn, len(l.vars), temp_var), body)
             return Let(temp_var, l.rhs, body)
 
-untuple_lets = _UntupleLets().transform
+untuple_lets = _UntupleLets().visit
