@@ -289,9 +289,9 @@ class ParsedRule(Rule):
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
         substs = fit_template(self._rule.e1, subtree, self._arg_types)
         if substs is not None:
-            yield Match(self, root, path_from_root, {"substs": substs})
+            yield Match(self, root, path_from_root, substs)
 
-    def apply_at(self, expr: Expr, path: Location, substs: Mapping[str, Expr]) -> Expr:
+    def apply_at(self, expr: Expr, path: Location, **substs: Mapping[str, Expr]) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
             assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
