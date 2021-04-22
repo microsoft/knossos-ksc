@@ -1350,8 +1350,8 @@ namespace ks {
 		return acc;
 	}
 
-	template <class T, class F, class F_, class A, class S, class dA, class dT>
-	tuple<S, tuple<dA, vec<dT>>> RFold(allocator * alloc, const dT &dummy, S s_zero, F f, F_ f_, A acc, vec<T> v, dA dr) {
+	template <class T, class F, class F_, class A, class dS, class dA, class dT>
+	tuple<dS, tuple<dA, vec<dT>>> RFold(allocator * alloc, const dT &dummy, dS s_zero, F f, F_ f_, A acc, vec<T> v, dA dr) {
 		auto forward_pass = std::vector<A>(v.size());
 
 		for (int i = 0; i < v.size(); i++) {
@@ -1359,13 +1359,13 @@ namespace ks {
 			acc = f(alloc, acc, v[i]);
 		}
 
-		S dScope = s_zero;
+		dS dScope = s_zero;
 		auto dv = vec<dT>(alloc, v.size());
 
 		for (int i = v.size() - 1; i >= 0; i--) {
-			tuple<S, tuple<dA, dT>> f_call = f_(alloc, make_tuple(forward_pass[i], v[i]), dr);
+			tuple<dS, tuple<dA, dT>> f_call = f_(alloc, make_tuple(forward_pass[i], v[i]), dr);
 
-			S  f_call_dScope = ks::get<0>(f_call);
+			dS  f_call_dScope = ks::get<0>(f_call);
 			dA f_call_dacc   = ks::get<0>(ks::get<1>(f_call));
 			dT f_call_dT     = ks::get<1>(ks::get<1>(f_call));
 
