@@ -1,6 +1,7 @@
 from ksc.visitors import ExprTransformer
 from ksc.expr import StructuredName, Expr, Let, Call, Var
 from ksc.cav_subst import make_nonfree_var
+from ksc.utils import singleton
 
 def is_literal_tuple(e: Expr):
     return isinstance(e, Call) and e.name.mangle_without_type() == "tuple"
@@ -9,6 +10,7 @@ def make_tuple_get(idx: int, size: int, tuple_val: Expr) -> Expr:
     assert 1 <= idx  <= size
     return Call(StructuredName(f"get${idx}${size}"), [tuple_val])
 
+@singleton
 class _UntupleLets(ExprTransformer):
 
     def visit_let(self, l : Let) -> Expr:
@@ -33,4 +35,6 @@ class _UntupleLets(ExprTransformer):
                 body = Let(var, make_tuple_get(posn, len(l.vars), temp_var), body)
             return Let(temp_var, l.rhs, body)
 
-untuple_lets = _UntupleLets().visit
+def untuple_lets(e: Expr):
+    """ Converts any 'Let's within e that bind tuples, into chains of 'Let's each binding only a single Var. """
+     return _UntupleLets.visit(e)
