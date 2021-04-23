@@ -1,4 +1,4 @@
-# content of conftest.py
+# set up for global PyTest
 import pytest
 import importlib
 import inspect
@@ -7,6 +7,9 @@ from ts2ks import ts2mod
 
 def pytest_addoption(parser):
     parser.addoption(
+        "--modulename", action="store", help="name of benchmark to dynamically load"
+    )
+    parser.addoption(
         "--benchmarkname", action="store", help="name of benchmark to dynamically load"
     )
 
@@ -14,36 +17,39 @@ def pytest_addoption(parser):
 def benchmarkname(request):
     return request.config.getoption("--benchmarkname")
 
+@pytest.fixture
+def modulename(request):
+    return request.config.getoption("--modulename")
+
+def functions_to_benchmark(mod, benchmark_name, example_input):
+    for fn in inspect.getmembers(mod, lambda m: inspect.isfunction(m) and m.__name__.startswith(benchmark_name)):
+        fn_name, fn_obj = fn
+        if fn_name == benchmark_name + '_bench_configs':
+            pass
+        elif fn_name == benchmark_name + '_pytorch':
+            yield fn_obj
+        elif fn_name == benchmark_name + '_pytorch_nice':
+            yield fn_obj
+        elif fn_name == benchmark_name:
+            yield ts2mod(fn_obj, example_input).apply
+        else:
+            # perhaps we should just allow anything that matches the pattern?
+            # would make it easier to add arbitrary comparisons e.g. TF
+            print(f"Ignoring {fn_name}")
 
 def pytest_generate_tests(metafunc):
     if "func" in metafunc.fixturenames:
 
+        module_name = metafunc.config.getoption('benchmarkname')
         benchmark_name = metafunc.config.getoption('benchmarkname')
 
-        mod = importlib.import_module(benchmark_name)
+        mod = importlib.import_module(module_name)
 
-        functions_to_benchmark = []
+        configs = list(getattr(mod, benchmark_name + '_bench_configs')())
 
-        for fn in inspect.getmembers(mod, inspect.isfunction):
-            fn_name, fn_obj = fn
-            if fn_name == benchmark_name + '_bench_configs':
-                configs = list(fn_obj())
-            elif fn_name == benchmark_name + '_pytorch':
-                pt_fast = fn_obj
-                functions_to_benchmark.append(pt_fast)
-            elif fn_name == benchmark_name + '_pytorch_nice':
-                pt_nice = fn_obj
-                functions_to_benchmark.append(pt_nice)
-            elif fn_name == benchmark_name:
-                ks_fun = fn_obj
-                functions_to_benchmark.append(ks_fun)
-            else:
-                print(f"Ignoring {fn_name}")
+        example_inputs = (configs[0],)
 
-        ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
-        functions_to_benchmark.append(ks_compiled.apply)
-
-        metafunc.parametrize("func", functions_to_benchmark)
+        metafunc.parametrize("func", list(functions_to_benchmark(mod, benchmark_name, example_inputs)))
 
         # We want to group by tensor size, it's not clear how to metaprogram the group mark cleanly.
         # pytest meta programming conflates arguments and decoration. I've not been able to find a way to directly
