@@ -6,12 +6,11 @@
 module Ksc.SUF.AD where
 
 import           Ksc.SUF (L2(L2), L3(L3), L4(L4))
-import           Ksc.Traversal (traverseState)
 
 import           Lang
 import           LangUtils (notInScopeTVs, stInsertFun, GblSymTab,
-                            freeVarsOf, lookupGblST)
-import           OptLet (Subst, substVar, notInSubstTVs, substBndr, mkEmptySubst)
+                            freeVarsOf, lookupGblST, InScopeSet, mkInScopeSet,
+                            extendInScopeSet)
 import           Prim
 
 import qualified Data.Set as S
@@ -23,8 +22,8 @@ type SUFFwdRevPass =
   -- ^ Global symbol table, only used for looking up the
   -- [suffwdpass ...] and [sufrevpass ...] versions of a
   -- function in a Call
-  -> Subst
-  -- ^ The Subst
+  -> InScopeSet
+  -- ^ Variables in scope
   -> TExpr
   -- ^ Input expression e
   -> (TExpr,
@@ -35,16 +34,14 @@ type SUFFwdRevPass =
       -- ^ The generator for the SUF reverse pass output expression REV{e}
 
 type SUFRevPass =
-  S.Set Var
-  -- ^ avoid: The output will not contain any variable, free or bound,
-  -- from this set
+  InScopeSet
+  -- ^ Variables in scope
   -> TExpr
   -- ^ the incoming gradient
   -> TExpr
   -- ^ The BOG corresponding to the input expression
-  -> (S.Set Var,
-      -- ^ The input avoid, unioned with all free or bound variable
-      -- names that appear in the SUF reverse pass output bindings
+  -> (InScopeSet,
+      -- ^ Variables in scope after the reverse pass output bindings
       [(Pat, TExpr)])
       -- ^ The SUF reverse pass output bindings
 
@@ -61,7 +58,7 @@ sufFwdRevPass gst subst = \case
 
   -- FWD{v} = (v, ())
   -- REV{v} dt b = { dv = dt }
-  Var v -> (Tuple [substVar subst v, Tuple []],
+  Var v -> (Tuple [Var v, Tuple []],
              TypeTuple [],
              \avoid' dt _ -> (S.insert (tVarVar dv) avoid', [(VarPat dv, dt)]))
     where dv = deltaOfSimple v
@@ -75,12 +72,13 @@ sufFwdRevPass gst subst = \case
   --                                ++ REV{rhs}  dpat b_rhs
   Let p rhs body -> (gradf_let, typeof bog, sufRevPass_)
     where (subst2, L4 bodyv b_rhs p'var b_body) =
-            notInSubstTVs subst (L4 (TVar (typeof body) (Simple "body"))
+            notInScopeTVs subst (L4 (TVar (typeof body) (Simple "body"))
                                     (TVar rhs_bog_ty (Simple "b_rhs"))
                                     (TVar (typeof rhs) (Simple "p_var"))
                                     (TVar body_bog_ty (Simple "b_body")))
 
-          (p', subst3) = traverseState substBndr p subst2
+          p' = p
+          subst3 = foldr (\v s -> extendInScopeSet v s) subst2 p
 
           (fwdpass_rhs, rhs_bog_ty, revpass_rhs) = sufFwdRevPass gst subst3 rhs
           (fwdpass_body, body_bog_ty, revpass_body) = sufFwdRevPass gst subst3 body
@@ -129,7 +127,7 @@ sufFwdRevPass gst subst = \case
   --              ++ REV{e} da b_e
   Call (TFun res_ty f) e -> (gradf_call_f_e, typeof bog, sufRevPass_)
     where (subst2, L4 arg b_e r b_f) =
-            notInSubstTVs subst (L4 (TVar typeof_e (Simple "arg"))
+            notInScopeTVs subst (L4 (TVar typeof_e (Simple "arg"))
                                     (TVar e_bog_ty (Simple "b_e"))
                                     (TVar res_ty (Simple "r"))
                                     (TVar f_bog_ty (Simple "b_f")))
@@ -169,7 +167,7 @@ sufFwdRevPass gst subst = \case
     where (_, binds_tys) =
             mapAccumL (\subst' e ->
               let (subst'', L2 a b_e) =
-                    notInSubstTVs subst'
+                    notInScopeTVs subst'
                     (L2 (TVar (typeof e) (Simple "a"))
                          (TVar bog_ty (Simple "b")))
                   (fwdpass_e, bog_ty, revpass_e) = sufFwdRevPass gst subst e
@@ -233,15 +231,15 @@ sufFwdRevPass gst subst = \case
     let (fwdpass_cond, cond_bog_ty, sufRevPassecond) = sufFwdRevPass gst subst econd
 
         (subst1, L2 cond b_cond) =
-          notInSubstTVs subst (L2 (TVar TypeBool (Simple "cond"))
+          notInScopeTVs subst (L2 (TVar TypeBool (Simple "cond"))
                                   (TVar cond_bog_ty (Simple "bcond")))
 
         (substt2, L2 rt b_t) =
-          notInSubstTVs subst1 (L2 (TVar (typeof et) (Simple "rt"))
+          notInScopeTVs subst1 (L2 (TVar (typeof et) (Simple "rt"))
                                    (TVar t_bog_ty (Simple "bt")))
 
         (substf2, L2 rf b_f) =
-          notInSubstTVs subst1 (L2 (TVar (typeof ef) (Simple "rf"))
+          notInScopeTVs subst1 (L2 (TVar (typeof ef) (Simple "rf"))
                                    (TVar f_bog_ty (Simple "bf")))
 
         (fwdpass_t, t_bog_ty, revpass_t) = sufFwdRevPass gst substt2 et
@@ -314,8 +312,10 @@ sufFwdRevPass gst subst = \case
 -- REV{build e1 (\i. e2)} dt b = { (n, b_n, b_a) = b
 --                               ; dvs = sumbuild n (\i. let REV{e2} dt[i] b_a[i] in dvs) }
 --                            ++ REV{e1} () b_n
+--
+-- (vs is the list of variables that appears free in the lambda)
 sufFwdRevPass_build :: GblSymTab
-                    -> Subst
+                    -> InScopeSet
                     -> TExpr
                     -> TExpr
                     -> TExpr
@@ -329,7 +329,7 @@ sufFwdRevPass_build :: GblSymTab
 sufFwdRevPass_build gst subst theCall e1 theLambda i e2 =
     (gradf_build, typeof bog, sufRevPass_)
     where (subst2, L4 n r bn ba) =
-            notInSubstTVs subst (L4 (TVar typeIndex (Simple "n"))
+            notInScopeTVs subst (L4 (TVar typeIndex (Simple "n"))
                                     (TVar type_r (Simple "r"))
                                     (TVar gradfe1_bog_ty (Simple "bn"))
                                     (TVar type_ba (Simple "ba")))
@@ -344,7 +344,7 @@ sufFwdRevPass_build gst subst theCall e1 theLambda i e2 =
             unexpectedTy -> pprPanic "Unexpected tensor index type" (ppr unexpectedTy)
 
           type_ba = typeTensor gradfe2_bog_ty
-          type_r  = typeTensor (typeof e2)
+          type_r  = typeof theCall
 
           bog = Tuple [Var n, Var bn, Var ba]
 
@@ -436,7 +436,7 @@ sufFwdRevPassDef gst Def{ def_fun    = Fun JustFun f
       deltaVarsOfPat = S.fromList . map (tVarVar . deltaOfSimple) . patVars
 
       (rhs', bog_ty, mkRev) =
-        sufFwdRevPass gst (mkEmptySubst (patVars s)) rhs
+        sufFwdRevPass gst (mkInScopeSet (patVars s)) rhs
 
       (_, lets_) = mkRev avoid (Var dt) (Var bog)
 

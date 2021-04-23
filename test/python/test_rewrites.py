@@ -13,9 +13,9 @@ def test_inline_var_single():
     e = parse_expr_string("(let (a (div 1.0 x)) (div a (add a 1.0)))")
     # Should be exactly two candidates
     rw_div, rw_add = sorted(rule("inline_var").find_all_matches(e), key=lambda rw: tuple(rw.path))
-    assert (rw_div.rule, rw_div.path) == (inline_var(), (1, 0))
+    assert (rw_div.rule, rw_div.path) == (inline_var, (1, 0))
     assert rw_div.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))")
-    assert (rw_add.rule, rw_add.path) == (inline_var(), (1, 1, 0))
+    assert (rw_add.rule, rw_add.path) == (inline_var, (1, 1, 0))
     assert rw_add.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))")
 
     assert (apply_in_only_location("inline_var", rw_div.rewrite())
@@ -35,9 +35,9 @@ def test_ruleset():
     e = parse_expr_string("(let (a (div 1.0 x)) (div a (add a 1.0)))")
     # Should be exactly two candidates
     rw_div, rw_add = sorted(r.find_all_matches(e), key=lambda rw: rw.path)
-    assert (rw_div.rule, rw_div.path) == (inline_var(), (1, 0))
+    assert (rw_div.rule, rw_div.path) == (inline_var, (1, 0))
     assert rw_div.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))")
-    assert (rw_add.rule, rw_add.path) == (inline_var(), (1, 1, 0))
+    assert (rw_add.rule, rw_add.path) == (inline_var, (1, 1, 0))
     assert rw_add.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))")
 
     all_inlined = parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add (div 1.0 x) 1.0)))")
@@ -47,7 +47,7 @@ def test_ruleset():
 
     # Now should be only one possible rewrite
     rw_del, = list(r.find_all_matches(all_inlined))
-    assert (rw_del.rule, rw_del.path) == (delete_let(), tuple())
+    assert (rw_del.rule, rw_del.path) == (delete_let, tuple())
     assert rw_del.rewrite() == parse_expr_string("(div (div 1.0 x) (add (div 1.0 x) 1.0))")
 
 def sorted_rewrites(rule, expr):

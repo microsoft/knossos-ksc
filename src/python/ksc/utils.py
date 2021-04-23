@@ -343,17 +343,11 @@ def ndgrid_inds(sz):
     return itertools.product(*map(range, sz))
 
 def singleton(cls):
-    """Make a class a Singleton class (only one instance). Adapted from
-    https://realpython.com/primer-on-python-decorators/#creating-singletons
+    """ Simple decorator that makes a single instance of a class.
+        @singleton
+        class Foo:
+            def do_foo(self):
+                .....
+        Foo.do_foo()
     """
-
-    @wraps(cls)
-    def wrapper_singleton():
-        if not wrapper_singleton.instance:
-            wrapper_singleton.instance = cls()
-        return wrapper_singleton.instance
-
-    wrapper_singleton.instance = cls()
-    return wrapper_singleton  # The value that goes into globals() for the module
-    # For a singleton class Foo if we write Foo() we get the unique instance.
-
+    return cls()

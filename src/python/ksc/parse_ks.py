@@ -149,27 +149,10 @@ def parse_expr(se):
 
     # Remaining forms are lists
 
-    # Empty lists one should not occur.
+    # Empty lists should not occur -- an empty tuple is (tuple)
     check(len(se) > 0, "Empty list")
-    check(len(se) > 1 or se[0] == _tuple, "Singleton list other than (tuple): ", se)
 
     head = se[0]
-
-    # TODO: It is tempting to always strip ((redundant)) parens, but in general a
-    # profusion of such defenses can hide carbuncles elsewhere
-    # Nested exp e.g. ((sin 5)) -> (sin 5)
-    if len(se) == 1 and head != _tuple:
-        return parse_expr(head)
-
-    # List-of-const literals (1 2 3 4)
-    # TODO: ksc does not allow this, so either add in ksc, or rm here
-    #  Ideally it is best not to add such sugar unless it significantly 
-    #  improves efficiency/readability. This feels the wrong side, as it 
-    #  just replaces (tuple 1 2 3) with (1 2 3)  
-    if True:
-        if isinstance(head, (int, float)):
-            check(all(isinstance(se, type(head)) for se in se), "Constant tuple should be all the same type: ", se)
-            return [v for v in se]
 
     # If(cond, t, f)
     if head == _if:

@@ -68,8 +68,6 @@ def test_errors():
         parse_expr_string("()")
     with pytest.raises(ParseError, match='Let bindings should be pairs'):
         parse_expr_string("(let (a) 2)")
-    with pytest.raises(ParseError, match='Constant tuple should be all the same type'):
-        parse_expr_string("(2 2 3.2)")
 
 def check(pattern, s):
     assert re.match(re.compile(pattern, flags=re.DOTALL | re.MULTILINE), strip_block_comments(s))

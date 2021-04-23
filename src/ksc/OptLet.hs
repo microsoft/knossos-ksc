@@ -10,8 +10,7 @@ module OptLet( optLets
              , substInScope, extendInScopeSet
              , substBndr, extendSubstMap, zapSubst
              , substExpr, substVar
-             , ensureDon'tReuseParams
-             , notInSubstTVs )
+             , ensureDon'tReuseParams )
              where
 
 import Lang
@@ -194,12 +193,6 @@ substBndr tv (S { s_in_scope = in_scope, s_env = env })
   where
     (is', tv') = notInScopeTV in_scope tv
     env' = M.insert (tVarVar tv) (Var tv') env
-
-notInSubstTVs :: Traversable t
-              => Subst -> t TVar -> (Subst, t TVar)
-notInSubstTVs subst@(S{ s_in_scope = in_scope }) vars
-  = let (in_scope', vars') = notInScopeTVs in_scope vars
-    in (subst { s_in_scope = in_scope' }, vars')
 
 substVar :: Subst -> TVar -> TExpr
 substVar subst tv = case lookupSubst (tVarVar tv) subst of
