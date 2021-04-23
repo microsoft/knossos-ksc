@@ -342,3 +342,12 @@ def ndgrid_inds(sz):
     return itertools.product(*map(range, sz))
 
 
+def singleton(cls):
+    """ Simple decorator that makes a single instance of a class.
+        @singleton
+        class Foo:
+            def do_foo(self):
+                .....
+        Foo.do_foo()
+    """
+    return cls()
