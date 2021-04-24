@@ -271,8 +271,10 @@ class SubstTemplate(ExprTransformer):
             self.visit(l.body, var_names_to_exprs))
 
 class ParsedRule(Rule):
-    """ Matches and substitutes according to a ksc.expr.Rule """
+    """ Matches and substitutes according to a monomorphic ksc.expr.Rule """
     def __init__(self, rule: KSRule):
+        # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
+        assert rule.e1.type_ == rule.e2.type_ != None
         known_vars = frozenset([v.name for v in rule.args])
         # Check that all pattern variables must be arguments or in the symtab.
         assert known_vars.issuperset(rule.e1.free_vars_)
@@ -294,8 +296,12 @@ class ParsedRule(Rule):
     def apply_at(self, expr: Expr, path: Location, substs: Mapping[str, Expr]) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
-            assert SubstTemplate.visit(self._rule.e1, substs) == target
-            return SubstTemplate.visit(self._rule.e2, substs)
+            assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
+            result = SubstTemplate.visit(self._rule.e2, substs)
+            # Types copied from the pattern (down to the variables, and the subject-expr's types from there).
+            # So there should be no need for any further type-propagation.
+            assert result.type_ == target.type_
+            return result
         # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
