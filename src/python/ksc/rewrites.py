@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from functools import singledispatch
 from typing import Any, Iterator, Optional, Mapping, Tuple, Union, List, FrozenSet, Type as PyType
 
-from ksc.cav_subst import Location, get_children, replace_subtree
+from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule as KSRule
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
@@ -160,7 +160,7 @@ class delete_let(Rule):
         if subtree.vars.name not in subtree.body.free_vars_:
             yield Match(self, root, path_from_root)
 
-def combine_substs(s1: Mapping[str, Expr], s2: Optional[Mapping[str, Expr]]) -> Optional[Mapping[str, Expr]]:
+def _combine_substs(s1: Mapping[str, Expr], s2: Optional[Mapping[str, Expr]]) -> Optional[Mapping[str, Expr]]:
     if s2 is None:
         return None
     common_vars = s1.keys() & s2.keys()
@@ -188,7 +188,7 @@ def fit_template(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Op
         return None
     d = dict()
     for t,e in zip(tmpl_children, exp_children):
-        d = combine_substs(d, fit_template(t, e, template_vars))
+        d = _combine_substs(d, fit_template(t, e, template_vars))
         if d is None:
             return None
     return d
@@ -204,36 +204,41 @@ def fit_template_const(tmpl: Const, exp: Expr, template_vars: Mapping[str, Type]
     # Require same constant value. Empty substitution = success, None = no substitution = failure.
     return {} if tmpl == exp else None
 
-def fit_template_binder(tmpl: Expr, exp: Expr, tmpl_v: Var, exp_v: Var, template_vars) -> Optional[Mapping[str, Expr]]:
-    # Returns a substitution, assuming tmpl is inside a binder for tmpl_s and exp inside a corresponding binder for exp_v
-    d = fit_template(tmpl.body, exp.body, {**template_vars, tmpl_v.name: exp_v.type_})
-    if d is None:
-        return None
-    if d.pop(tmpl_v.name, exp_v) != exp_v:
-        return None
-    return d
-
 @fit_template.register
 def fit_template_let(tmpl: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
     assert isinstance(tmpl.vars, Var), "Tupled-lets in pattern are not supported: call untuple_lets first"
     if not isinstance(exp, Let):
         return None
     assert isinstance(exp.vars, Var), "Tupled-lets in subject expression are not supported: call untuple_lets first"
-    assert tmpl.vars not in template_vars, "Let-bound variables should not be declared as pattern variables"
-    d = fit_template_binder(tmpl.body, exp.body, tmpl.vars, exp.vars, template_vars)
-    return d and combine_substs(d, fit_template(tmpl.rhs, exp.rhs, template_vars))
+    assert tmpl.vars.name not in template_vars, "Let-bound variables should not be declared as pattern variables"
+    d = {tmpl.vars.name: exp.vars}
+    d = _combine_substs(d, fit_template(tmpl.rhs, exp.rhs, template_vars))
+    return d and _combine_substs(d, fit_template(tmpl.body, exp.body, {**template_vars, tmpl.vars.name: tmpl.rhs.type_}))
 
 @fit_template.register
 def fit_template_lam(tmpl: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
     if not isinstance(exp, Lam):
         return None
     assert tmpl.arg not in template_vars, "Lambda arguments should not be declared as pattern variables"
-    return fit_template_binder(tmpl.body, exp.body, tmpl.arg, exp.arg, template_vars)
+    if tmpl.arg.type_ != exp.arg.type_:
+        return None
+    return fit_template(tmpl.body, exp.body, {**template_vars, tmpl.arg.name: tmpl.arg.type_})
+
+def _maybe_add_binder_to_subst(bound: Var, var_names_to_exprs: Mapping[str, Expr], dont_capture: List[Expr]
+    )-> Tuple[Var, Mapping[str, Expr]]:
+        #assert bound.decl # No - only for def args? - not true for 'Let's
+        target_var = var_names_to_exprs.get(bound.name)
+        if target_var is None:
+            # This is a new binder in the RHS, so make sure the variable is
+            # fresh w.r.t bound body and all RHSs of substitutions
+            target_var = make_nonfree_var("t_", list(var_names_to_exprs.values()) + dont_capture, type=bound.type_)
+            var_names_to_exprs = {**var_names_to_exprs, bound.name: target_var}
+        return target_var, var_names_to_exprs
 
 @singleton
 class SubstTemplate(ExprTransformer):
-    """Substitutes variables to Exprs in a template (including bound
-    variables). The substitution is capture-avoiding.
+    """Substitutes variables to Exprs in a template (including bound variables).
+    The substitution is capture-avoiding.
 
     Note that this is only avoids captures by new variables introduced on the RHS.
     It doesn't handle e.g. (foo (let x e1 e2)) ==> (let x e1 (foo e2))
@@ -245,30 +250,23 @@ class SubstTemplate(ExprTransformer):
         assert not v.decl
         return var_names_to_exprs[v.name]
 
-    def maybe_add_binder_to_subst(bound: Var, var_names_to_exprs: Mapping[str, Expr], dont_capture: List[Expr]
-    )-> Tuple[Var, Mapping[str, Expr]]:
-        assert bound.is_decl
-        target_var = var_names_to_exprs.get(bound.name)
-        if target_var is None:
-            # This is a new binder in the RHS, so make sure the variable is
-            # fresh w.r.t bound body and all RHSs of substitutions
-            target_var = make_nonfree_var("t_", list(var_names_to_exprs.values()) + dont_capture, type=bound.type_)
-            var_names_to_exprs = {**var_names_to_exprs, bound.name: target_var}
-        return target_var, var_names_to_exprs
-
     def visit_let(self, l: Let, var_names_to_exprs: Mapping[str, Expr]) -> Let:
         assert isinstance(l.vars, Var), "use untuple_lets first"
-        target_var, var_names_to_exprs = maybe_add_to_subst(l.vars, var_names_to_exprs, [l.body])
+        target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.vars, var_names_to_exprs, [l.body])
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
         # where the bound var is bound, as the pattern (RHS) can't contain "(let x ...) x" (with x free).
-        return Let(Var(target_var.name, type=target_var.type_, decl=True),
+        res = Let(Var(target_var.name),# type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
             self.visit(l.rhs, var_names_to_exprs),
             self.visit(l.body, var_names_to_exprs))
+        res.type_ = l.type_
+        return res
 
     def visit_lam(self, l: Lam, var_names_to_exprs: Mapping[str, Expr]) -> Lam:
-        target_var, var_names_to_exprs = maybe_add_to_subst(l.arg, var_names_to_exprs, [l.body])
-        return Lam(Var(target_var.name, type=target_var.type_, decl=True),
+        target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.arg, var_names_to_exprs, [l.body])
+        res = Lam(Var(target_var.name, type=target_var.type_, decl=True),
             self.visit(l.body, var_names_to_exprs))
+        res.type_ = l.type_
+        return res
 
 class ParsedRule(Rule):
     """ Matches and substitutes according to a monomorphic ksc.expr.Rule """

@@ -97,3 +97,50 @@ def test_simple_parsed_rule():
     type_propagate_decls([foo, rewritten], {**symtab, "p": Type.Bool, "a": Type.Float, "b": Type.Float})
     all_rewrites = [m.rewrite() for m in r.find_all_matches(foo)]
     assert all_rewrites == [rewritten]
+
+def test_parsed_rule_capture():
+    symtab = dict()
+    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+    type_propagate_decls(decls_prelude, symtab)
+
+    # If the RHS introduces a new bound variable, then it needs to be renamed
+    # into a fresh variable when the rule is applied, to avoid capture
+    r = parse_rule_str('(rule "foo1" (x : Integer) (mul x 3) (let (y (add x x)) (add y x)))', symtab)
+    e = parse_expr_string('(let (y 2) (mul (add y 1) 3))')
+    expected = parse_expr_string("(let (y 2) (let (t__0 (add (add y 1) (add y 1))) (add t__0 (add y 1))))")
+    type_propagate_decls([e, expected], symtab)
+    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    assert actual == expected
+
+    # Does it still work if target is using t__0?
+    e = parse_expr_string('(let (t__0 2) (mul (add t__0 1) 3))')
+    expected = parse_expr_string('''
+        (let (t__0 2)
+            (let (t__1 (add (add t__0 1) (add t__0 1))) (add t__1 (add t__0 1))))
+    ''')
+    type_propagate_decls([e, expected], symtab)
+    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    assert actual == expected
+
+    # Test for 'lam' e.g. inside build
+    r = parse_rule_str('''
+        (rule "buildfoo" (x : Integer)
+            (mul x 3)
+            (index 0 (build 10 (lam (i : Integer) (mul x 3))))
+         )
+    ''', symtab)
+    e = parse_expr_string('(let (i 2) (mul (add i 1) 3))')
+    expected = parse_expr_string(
+        "(let (i 2) (index 0 (build 10 (lam (t__0 : Integer) (mul (add i 1) 3)))))")
+    type_propagate_decls([e, expected], symtab)
+    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    assert actual == expected
+
+    # Bound variables in the RHS should not be rewritten if they are matched
+    # by the LHS:
+    r = parse_rule_str('(rule "foo2" ((y : Integer) (z : Integer)) (let (x (add y 0)) z) (let (x y) z))', symtab)
+    e = parse_expr_string('(let (v (add 33 0)) (mul v 3))')
+    expected = parse_expr_string("(let (v 33) (mul v 3))")
+    type_propagate_decls([e, expected], symtab)
+    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    assert actual == expected

@@ -94,11 +94,11 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
 #####################################################################
 # Name Generation
 
-def make_nonfree_var(prefix, exprs):
+def make_nonfree_var(prefix, exprs, type=None):
     for idx in itertools.count():
         name = prefix + "_" + str(idx)
         if all(name not in e.free_vars_ for e in exprs):
-            return Var(name)
+            return Var(name, type)
 
 #####################################################################
 # CAV implementation
