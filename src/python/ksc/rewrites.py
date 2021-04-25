@@ -244,7 +244,7 @@ class SubstTemplate(ExprTransformer):
     It doesn't handle e.g. (foo (let x e1 e2)) ==> (let x e1 (foo e2))
     where there is potentially capture - if foo contains references to another/outside
     x, they'll be captured by the x bound by that let, which changes their meaning.
-    (Hence, we still need the separate lift_bind rule (not a ParsedRule) for that.)
+    (Hence, we still need separate python Rules, not ParsedRules, for e.g. lift_bind and sumbuild_invariant.)
     """
     def visit_var(self, v: Var, var_names_to_exprs: Mapping[str, Expr]):
         assert not v.decl
