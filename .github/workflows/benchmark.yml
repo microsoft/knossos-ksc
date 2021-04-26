@@ -26,7 +26,7 @@ jobs:
         run: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
 
       - name: 'Can build with cabal [userTest]'
-        script: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=build/bin  --overwrite-policy=always --install-method=copy
+        run: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=build/bin  --overwrite-policy=always --install-method=copy
 
       - name: 'Run benchmark'
         run: sh .github/workflows/benchmark.sh)
