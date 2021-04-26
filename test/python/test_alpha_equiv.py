@@ -4,15 +4,6 @@ from ksc.parse_ks import parse_expr_string, parse_ks_filename
 from ksc.type_propagate import type_propagate_decls, type_propagate
 from ksc.type import Type
 
-def test_alpha_equivalence_diff_types():
-    x = Var("x")
-    x_again = Var("x")
-    assert x == x_again
-    assert are_alpha_equivalent(x, x_again)
-    x_again.type_ = Type.Integer
-    assert x == x_again # Allows different type
-    assert not are_alpha_equivalent(x, x_again) # Requires different
-
 def test_alpha_equivalence():
     exp1 = parse_expr_string("(let (x (add z 1.0)) (mul x 2.0))")
     exp2 = parse_expr_string("(let (x (add z 1.0)) (mul x 2.1))")
@@ -21,6 +12,15 @@ def test_alpha_equivalence():
     assert are_alpha_equivalent(exp1, exp3)
     exp4 = parse_expr_string("(let (x (add z 1.0)) (mul y 2.0))")
     assert not are_alpha_equivalent(exp1, exp4)
+
+def test_alpha_equivalence_diff_types():
+    x = Var("x")
+    x_again = Var("x")
+    assert x == x_again
+    assert are_alpha_equivalent(x, x_again)
+    x_again.type_ = Type.Integer
+    assert x == x_again # Allows different type
+    assert not are_alpha_equivalent(x, x_again) # Requires different
 
 def test_alpha_equivalence_type_propagation():
     exp1 = parse_expr_string("(let (x (add z 1.0)) (mul x 2.0))")
