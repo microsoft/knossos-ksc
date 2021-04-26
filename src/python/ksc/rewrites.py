@@ -18,10 +18,10 @@ class Match:
     path: Location
 
     # Anything the Rule needs to pass from matching to rewriting. Used immutably, but dataclasses don't allow default {}
-    extra_data: Mapping[str, Any] = field(default_factory=dict)
+    rule_specific_data: Mapping[str, Any] = field(default_factory=dict)
 
     def rewrite(self):
-        return self.rule.apply_at(self.expr, self.path, **self.extra_data)
+        return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
 
 Environment = Mapping[str, Location]
 
@@ -94,7 +94,7 @@ class Rule(AbstractMatcher):
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
-        """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's extra_data field. """
+        """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's rule_specific_data field. """
 
     @abstractmethod
     def matches_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
@@ -127,7 +127,7 @@ class inline_var(Rule):
 
     def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
         # binding_location comes from the Match.
-        # Note there is an alternative design, where we don't store any "extra_data" in the Match.
+        # Note there is an alternative design, where we don't store any "rule_specific_data" in the Match.
         # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
         # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
         assert path_to_var[:len(binding_location)] == binding_location
