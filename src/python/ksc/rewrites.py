@@ -175,7 +175,7 @@ def _combine_substs(s1: Mapping[str, Expr], s2: Optional[Mapping[str, Expr]]) ->
     return s1
 
 @singledispatch
-def fit_template(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+def find_template_subst(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
     """ Finds a substitution for the variable names in template_vars,
         such that applying the resulting substitution to <tmpl> (using subst_template) yields <exp>.
         Returns None if no such substitution exists i.e. the pattern does not match. """
@@ -188,41 +188,41 @@ def fit_template(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Op
         return None
     d = dict()
     for t,e in zip(tmpl_children, exp_children):
-        d = _combine_substs(d, fit_template(t, e, template_vars))
+        d = _combine_substs(d, find_template_subst(t, e, template_vars))
         if d is None:
             return None
     return d
 
-@fit_template.register
-def fit_template_var(tmpl: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+@find_template_subst.register
+def find_template_subst_var(tmpl: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
     assert tmpl.name in template_vars
     # Require correct type of subexp in order to match
     return {tmpl.name: exp} if exp.type_ == template_vars[tmpl.name] else None
 
-@fit_template.register
-def fit_template_const(tmpl: Const, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+@find_template_subst.register
+def find_template_subst_const(tmpl: Const, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
     # Require same constant value. Empty substitution = success, None = no substitution = failure.
     return {} if tmpl == exp else None
 
-@fit_template.register
-def fit_template_let(tmpl: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+@find_template_subst.register
+def find_template_subst_let(tmpl: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
     assert isinstance(tmpl.vars, Var), "Tupled-lets in pattern are not supported: call untuple_lets first"
     if not isinstance(exp, Let):
         return None
     assert isinstance(exp.vars, Var), "Tupled-lets in subject expression are not supported: call untuple_lets first"
     assert tmpl.vars.name not in template_vars, "Let-bound variables should not be declared as pattern variables"
     d = {tmpl.vars.name: exp.vars}
-    d = _combine_substs(d, fit_template(tmpl.rhs, exp.rhs, template_vars))
-    return d and _combine_substs(d, fit_template(tmpl.body, exp.body, {**template_vars, tmpl.vars.name: tmpl.rhs.type_}))
+    d = _combine_substs(d, find_template_subst(tmpl.rhs, exp.rhs, template_vars))
+    return d and _combine_substs(d, find_template_subst(tmpl.body, exp.body, {**template_vars, tmpl.vars.name: tmpl.rhs.type_}))
 
-@fit_template.register
-def fit_template_lam(tmpl: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+@find_template_subst.register
+def find_template_subst_lam(tmpl: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
     if not isinstance(exp, Lam):
         return None
     assert tmpl.arg not in template_vars, "Lambda arguments should not be declared as pattern variables"
     if tmpl.arg.type_ != exp.arg.type_:
         return None
-    return fit_template(tmpl.body, exp.body, {**template_vars, tmpl.arg.name: tmpl.arg.type_})
+    return find_template_subst(tmpl.body, exp.body, {**template_vars, tmpl.arg.name: tmpl.arg.type_})
 
 def _maybe_add_binder_to_subst(bound: Var, var_names_to_exprs: Mapping[str, Expr], dont_capture: List[Expr]
     )-> Tuple[Var, Mapping[str, Expr]]:
@@ -287,7 +287,7 @@ class ParsedRule(Rule):
         return frozenset([match_filter(self._rule.e1)])
 
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
-        substs = fit_template(self._rule.e1, subtree, self._arg_types)
+        substs = find_template_subst(self._rule.e1, subtree, self._arg_types)
         if substs is not None:
             yield Match(self, root, path_from_root, substs)
 
