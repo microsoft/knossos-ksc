@@ -11,4 +11,4 @@ cd ./src/ts2k
 python3 -m pip install --editable .
 cd ../..
 
-source src/bench/run-all-pytest-bench.sh
+source ./src/bench/run-all-pytest-bench.sh
