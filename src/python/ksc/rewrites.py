@@ -179,8 +179,10 @@ def find_template_subst(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]
     """ Finds a substitution for the variable names in template_vars,
         such that applying the resulting substitution to <tmpl> (using subst_template) yields <exp>.
         Returns None if no such substitution exists i.e. the pattern does not match. """
-    # Default case for most template exprs: require same type of Expr, and compatible child substitutions
-    if tmpl.__class__ != exp.__class__:
+    # Default case for most template exprs: require same type of Expr, and compatible child substitutions.
+    # RuleSet will have ensured that the pattern and subject match at the outermost level,
+    # but we still need to check that subtrees match too.
+    if match_filter(tmpl) != match_filter(exp):
         return None # No match
     tmpl_children = get_children(tmpl)
     exp_children = get_children(exp)
@@ -198,11 +200,6 @@ def find_template_subst_var(tmpl: Var, exp: Expr, template_vars: Mapping[str, Ty
     assert tmpl.name in template_vars
     # Require correct type of subexp in order to match
     return {tmpl.name: exp} if exp.type_ == template_vars[tmpl.name] else None
-
-@find_template_subst.register
-def find_template_subst_const(tmpl: Const, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
-    # Require same constant value. Empty substitution = success, None = no substitution = failure.
-    return {} if tmpl == exp else None
 
 @find_template_subst.register
 def find_template_subst_let(tmpl: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
