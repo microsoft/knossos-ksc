@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    # while developing, switch to schedule when ready
+    branches: [ cogravil/benchmarkaction ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: 'Make directories [userInstall]'
+        run: test/builds/mkdirs.sh
+        
+      - name: 'Install dependencies [userInstall]'
+        run: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
