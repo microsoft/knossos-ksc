@@ -1390,21 +1390,13 @@ namespace ks {
 		using dS = std::tuple_element_t<0, dS_E>;
 		auto ddt_size = ddt.size();
 		auto dds = tensor<Dim, dS>::create(alloc, ddt_size);
-		//dE ddenv = ddenv_zero;
+		dE ddenv = ddenv_zero;
 
 		dT const* ddtdata = ddt.data();
 		B const* bogdata = bog.data();
 		dS* ddsdata = dds.data();
 
-		// TODO: Not doing size 0 for now
-		int i = 0;
-		tuple<dS, dE> f_call = f_(alloc, ddtdata[i], bogdata[i]);
-		auto [f_call_dds, f_call_ddenv] = f_call;
-
-		ddsdata[i] = f_call_dds;
-		dE ddenv = f_call_ddenv;
-
-		for (int i = 1, ne = ddt.num_elements(); i != ne; ++i) {
+		for (int i = 0, ne = ddt.num_elements(); i != ne; ++i) {
 			tuple<dS, dE> f_call = f_(alloc, ddtdata[i], bogdata[i]);
 			auto [f_call_dds, f_call_ddenv] = f_call;
 

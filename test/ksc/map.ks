@@ -20,7 +20,22 @@
 (gdef sufrevpass [squaretensor (Tensor 2 Float)])
 (gdef sufrev [squaretensor (Tensor 2 Float)])
 
+(def vec_length_zero (Vec Float) () (build 0 (lam (i : Integer) 0.0)))
+
+(gdef suffwdpass [vec_length_zero (Tuple)])
+(gdef sufrevpass [vec_length_zero (Tuple)])
+(gdef sufrev [vec_length_zero (Tuple)])
+
+(def unused_argument (Vec Float) (unused : Vec Float)
+     (let (v (build 0 (lam (i : Integer) 0.0)))
+     (map (lam (vi : Float) (index 0 unused)) (vec_length_zero))))
+
+(gdef suffwdpass [unused_argument (Vec Float)])
+(gdef sufrevpass [unused_argument (Vec Float)])
+(gdef sufrev [unused_argument (Vec Float)])
+
 (def main Integer ()
+     (let (unused_input (Vec_init 1.0 2.0))
      (print (map (lam (x : Float) (mul x 2.0))
                  (Vec_init 1.0 2.0 3.0 4.0))
             "\n"
@@ -37,4 +52,8 @@
                                                (let ((i j) ij) (add (mul (to_float i) 10.0) (to_float j)))))
                      (build (tuple 5 5)
                             (lam (ij : Tuple Integer Integer) 1.0)))
-            ))
+            "\nShould print "
+            (size unused_input)
+            ", to reflect length of input vector, even though it's unused:\n"
+            (size ([sufrev unused_argument] unused_input (vec_length_zero)))
+            )))

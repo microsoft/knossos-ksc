@@ -240,7 +240,7 @@ data L3 a = L3 a a a
 data L4 a = L4 a a a a
   deriving (Functor, Foldable, Traversable)
 
-data L7 a = L7 a a a a a a a
+data L8 a = L8 a a a a a a a a
   deriving (Functor, Foldable, Traversable)
 
 data NonEmpty a = Once a
