@@ -24,3 +24,6 @@ jobs:
         
       - name: 'Install dependencies [userInstall]'
         run: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
+
+      - name: 'Run benchmark'
+        run: sh .github/workflows/benchmark.sh)
