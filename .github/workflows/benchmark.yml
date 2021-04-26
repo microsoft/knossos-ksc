@@ -20,7 +20,7 @@ jobs:
           python-version: 3.8
 
       - name: 'Make directories [userInstall]'
-        run: test/builds/mkdirs.sh
+        run: sh test/builds/mkdirs.sh
         
       - name: 'Install dependencies [userInstall]'
         run: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
