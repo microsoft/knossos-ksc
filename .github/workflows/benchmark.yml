@@ -1,12 +1,8 @@
 name: Benchmark
 
 on:
-  push:
-    # while developing, switch to schedule when ready
-    branches: [ cogravil/benchmarkaction ]
-
-  # schedule:
-  #  - cron:  '5 3 * * *'
+  schedule:
+    - cron:  '5 3 * * *'
 
   workflow_dispatch:
 
