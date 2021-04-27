@@ -1,9 +1,12 @@
-name: CI
+name: Benchmark
 
 on:
   push:
     # while developing, switch to schedule when ready
     branches: [ cogravil/benchmarkaction ]
+
+  # schedule:
+  #  - cron:  '5 3 * * *'
 
   workflow_dispatch:
 
@@ -30,3 +33,10 @@ jobs:
 
       - name: 'Run benchmark'
         run: sh ./.github/workflows/benchmark.sh
+        
+      - name: 'Upload benchmark result'
+        uses: actions/upload-artifact@v2
+        with:
+          name: benchmark
+          path: .benchmarks/
+      
