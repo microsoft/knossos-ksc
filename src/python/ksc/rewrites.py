@@ -173,7 +173,10 @@ class delete_let(Rule):
         if subtree.vars.name not in subtree.body.free_vars_:
             yield Match(self, root, path_from_root)
 
-def _combine_substs(s1: Mapping[str, Expr], s2: Optional[Mapping[str, Expr]]) -> Optional[Mapping[str, Expr]]:
+# Substitutions from the names of variables (arguments) to the pattern to Exprs
+Subst = Mapping[str, Expr]
+
+def _combine_substs(s1: Subst, s2: Optional[Subst]) -> Optional[Subst]:
     if s2 is None:
         return None
     common_vars = s1.keys() & s2.keys()
@@ -188,16 +191,16 @@ def _combine_substs(s1: Mapping[str, Expr], s2: Optional[Mapping[str, Expr]]) ->
     return s1
 
 @singledispatch
-def find_template_subst(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
     """ Finds a substitution for the variable names in template_vars,
-        such that applying the resulting substitution to <tmpl> (using subst_template) yields <exp>.
+        such that applying the resulting substitution to <template> (using subst_template) yields <exp>.
         Returns None if no such substitution exists i.e. the pattern does not match. """
     # Default case for most template exprs: require same type of Expr, and compatible child substitutions.
     # RuleSet will have ensured that the pattern and subject match at the outermost level,
     # but we still need to check that subtrees match too.
-    if match_filter(tmpl) != match_filter(exp):
+    if match_filter(template) != match_filter(exp):
         return None # No match
-    tmpl_children = get_children(tmpl)
+    tmpl_children = get_children(template)
     exp_children = get_children(exp)
     if len(tmpl_children) != len(exp_children):
         return None
@@ -209,33 +212,33 @@ def find_template_subst(tmpl: Expr, exp: Expr, template_vars: Mapping[str, Type]
     return d
 
 @find_template_subst.register
-def find_template_subst_var(tmpl: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
-    assert tmpl.name in template_vars
+def find_template_subst_var(template: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
+    assert template.name in template_vars
     # Require correct type of subexp in order to match
-    return {tmpl.name: exp} if exp.type_ == template_vars[tmpl.name] else None
+    return {template.name: exp} if exp.type_ == template_vars[template.name] else None
 
 @find_template_subst.register
-def find_template_subst_let(tmpl: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
-    assert isinstance(tmpl.vars, Var), "Tupled-lets in pattern are not supported: call untuple_lets first"
+def find_template_subst_let(template: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
+    assert isinstance(template.vars, Var), "Tupled-lets in pattern are not supported: call untuple_lets first"
     if not isinstance(exp, Let):
         return None
     assert isinstance(exp.vars, Var), "Tupled-lets in subject expression are not supported: call untuple_lets first"
-    assert tmpl.vars.name not in template_vars, "Let-bound variables should not be declared as pattern variables"
-    d = {tmpl.vars.name: exp.vars}
-    d = _combine_substs(d, find_template_subst(tmpl.rhs, exp.rhs, template_vars))
-    return d and _combine_substs(d, find_template_subst(tmpl.body, exp.body, {**template_vars, tmpl.vars.name: tmpl.rhs.type_}))
+    assert template.vars.name not in template_vars, "Let-bound variables should not be declared as pattern variables"
+    d = {template.vars.name: exp.vars}
+    d = _combine_substs(d, find_template_subst(template.rhs, exp.rhs, template_vars))
+    return d and _combine_substs(d, find_template_subst(template.body, exp.body, {**template_vars, template.vars.name: template.rhs.type_}))
 
 @find_template_subst.register
-def find_template_subst_lam(tmpl: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Mapping[str, Expr]]:
+def find_template_subst_lam(template: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
     if not isinstance(exp, Lam):
         return None
-    assert tmpl.arg not in template_vars, "Lambda arguments should not be declared as pattern variables"
-    if tmpl.arg.type_ != exp.arg.type_:
+    assert template.arg not in template_vars, "Lambda arguments should not be declared as pattern variables"
+    if template.arg.type_ != exp.arg.type_:
         return None
-    return find_template_subst(tmpl.body, exp.body, {**template_vars, tmpl.arg.name: tmpl.arg.type_})
+    return find_template_subst(template.body, exp.body, {**template_vars, template.arg.name: template.arg.type_})
 
-def _maybe_add_binder_to_subst(bound: Var, var_names_to_exprs: Mapping[str, Expr], dont_capture: List[Expr]
-    )-> Tuple[Var, Mapping[str, Expr]]:
+def _maybe_add_binder_to_subst(bound: Var, var_names_to_exprs: Subst, dont_capture: List[Expr]
+    )-> Tuple[Var, Subst]:
         #assert bound.decl # No - only for def args? - not true for 'Let's
         target_var = var_names_to_exprs.get(bound.name)
         if target_var is None:
@@ -256,11 +259,11 @@ class SubstTemplate(ExprTransformer):
     x, they'll be captured by the x bound by that let, which changes their meaning.
     (Hence, we still need separate python Rules, not ParsedRules, for e.g. lift_bind and sumbuild_invariant.)
     """
-    def visit_var(self, v: Var, var_names_to_exprs: Mapping[str, Expr]):
+    def visit_var(self, v: Var, var_names_to_exprs: Subst):
         assert not v.decl
         return var_names_to_exprs[v.name]
 
-    def visit_let(self, l: Let, var_names_to_exprs: Mapping[str, Expr]) -> Let:
+    def visit_let(self, l: Let, var_names_to_exprs: Subst) -> Let:
         assert isinstance(l.vars, Var), "use untuple_lets first"
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.vars, var_names_to_exprs, [l.body])
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
@@ -271,7 +274,7 @@ class SubstTemplate(ExprTransformer):
         res.type_ = l.type_
         return res
 
-    def visit_lam(self, l: Lam, var_names_to_exprs: Mapping[str, Expr]) -> Lam:
+    def visit_lam(self, l: Lam, var_names_to_exprs: Subst) -> Lam:
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.arg, var_names_to_exprs, [l.body])
         res = Lam(Var(target_var.name, type=target_var.type_, decl=True),
             self.visit(l.body, var_names_to_exprs))
@@ -301,7 +304,7 @@ class ParsedRule(Rule):
         if substs is not None:
             yield Match(self, root, path_from_root, substs)
 
-    def apply_at(self, expr: Expr, path: Location, **substs: Mapping[str, Expr]) -> Expr:
+    def apply_at(self, expr: Expr, path: Location, **substs: Subst) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
             assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
