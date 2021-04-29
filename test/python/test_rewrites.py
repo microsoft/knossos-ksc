@@ -144,3 +144,13 @@ def test_parsed_rule_capture():
     type_propagate_decls([e, expected], symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
+
+def test_lift_if():
+    e = parse_expr_string("(add (if p 4.0 2.0) 3.0)")
+    symtab = dict()
+    type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
+    expected = parse_expr_string("(if p (add 4.0 3.0) (add 2.0 3.0))")
+    type_propagate_decls([e, expected], {**symtab, "p": Type.Bool})
+    matches = list(rule("lift_if").find_all_matches(e))
+    actual = utils.single_elem(matches).apply_rewrite()
+    assert actual == expected
