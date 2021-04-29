@@ -181,9 +181,8 @@ def _combine_substs(s1: Subst, s2: Optional[Subst]) -> Optional[Subst]:
     common_vars = s1.keys() & s2.keys()
     # We require all children to have exactly the same values (as this is not Most General Unification
     # - we are not finding substitutions for variables on the RHS).
-    # Note this means that if the LHS template contains multiple let-expressions, they should have
-    # distinct bound variables (or else will only match programs that also use the same variable-name
-    # in both let's).
+    # Note this means that if the LHS template contains multiple binders of the same name,
+    # this will only match subject expressions that also use the same variable-name in all those binders.
     if not all([s1[v] == s2[v] for v in common_vars]): # TODO use alpha-equivalence rather than strict equality
         return None # Fail
     s1.update(s2)
@@ -289,6 +288,10 @@ class ParsedRuleMatcher(RuleMatcher):
         # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
         assert known_vars.issuperset(rule.e1.free_vars_)
         assert known_vars.issuperset(rule.e2.free_vars_)
+        # TODO: it would be good to check here that any variables *bound* in the LHS template are not declared
+        # as rule arguments, as we require that at rewriting-time:
+        # WRITE: (rule "foo" ((x : Float)) (let (a x) a) x)
+        # NOT:   (rule "foo" ((a : Float) (x : Float)) (let (a x) a) x)
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = {v.name: v.type_ for v in rule.args}
