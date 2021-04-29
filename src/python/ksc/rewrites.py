@@ -6,7 +6,7 @@ from typing import Any, Iterator, Optional, Mapping, Protocol, Tuple, Union, Lis
 from pyrsistent import pmap, PMap as _PMap
 
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var
-from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule as KSRule
+from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
@@ -15,11 +15,11 @@ from ksc.visitors import ExprTransformer
 
 @dataclass(frozen=True)
 class Match:
-    rule: "Rule"
+    rule: "RuleMatcher"
     expr: Expr # RLO required rule to be passed to Rewrite.apply(), but this seems prone to accidents
     path: Location
 
-    # Anything the Rule needs to pass from matching to rewriting. Used immutably, but dataclasses don't allow default {}
+    # Anything the RuleMatcher needs to pass from matching to rewriting. Used immutably, but dataclasses don't allow default {}
     rule_specific_data: Mapping[str, Any] = field(default_factory=dict)
 
     def rewrite(self):
@@ -70,15 +70,15 @@ def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: L
     return env.remove(parent.arg.name)
 
 
-_rule_dict: Mapping[str, "Rule"] = {}
+_rule_dict: Mapping[str, "RuleMatcher"] = {}
 
-def rule(name: str) -> "Rule":
-    """Lookup method for all `Rule`s."""
+def rule(name: str) -> "RuleMatcher":
+    """Lookup method for all `RuleMatcher`s."""
     return _rule_dict[name]
 
 @singledispatch
 def match_filter(e : Expr) -> Union[PyType, ConstantType, StructuredName]:
-    # Allows to quick-reject rules that can never match a particular expr. See Rule.possible_expr_filter.
+    # Allows to quick-reject rules that can never match a particular expr. See RuleMatcher.possible_expr_filter.
     return e.__class__
 
 @match_filter.register
@@ -89,7 +89,7 @@ def match_filter_const(e : Const) -> ConstantType:
 def match_filter_call(e : Call):
     return e.name
 
-class Rule(AbstractMatcher):
+class RuleMatcher(AbstractMatcher):
     def __init__(self, name=None):
         if name is None:
             name = self.__class__.__name__
@@ -119,7 +119,7 @@ class Rule(AbstractMatcher):
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
     def __reduce__(self):
-        # This allows pickling and sending Rules across processes/machines via Ray.
+        # This allows pickling and sending RuleMatchers across processes/machines via Ray.
         return (rule, (self.name,))
 
 class RuleSet(AbstractMatcher):
@@ -135,7 +135,7 @@ class RuleSet(AbstractMatcher):
             yield from rule.matches_for_possible_expr(subtree, path_from_root, root, env)
 
 @singleton
-class inline_var(Rule):
+class inline_var(RuleMatcher):
     possible_expr_filter = frozenset([Var])
 
     def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
@@ -156,7 +156,7 @@ class inline_var(Rule):
 
 
 @singleton
-class delete_let(Rule):
+class delete_let(RuleMatcher):
     possible_expr_filter = frozenset([Let])
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
@@ -256,7 +256,7 @@ class SubstTemplate(ExprTransformer):
     It doesn't handle e.g. (foo (let x e1 e2)) ==> (let x e1 (foo e2))
     where there is potentially capture - if foo contains references to another/outside
     x, they'll be captured by the x bound by that let, which changes their meaning.
-    (Hence, we still need separate python Rules, not ParsedRules, for e.g. lift_bind and sumbuild_invariant.)
+    (Hence, we still need separate python RuleMatchers, not ParsedRuleMatchers, for e.g. lift_bind and sumbuild_invariant.)
     """
     def visit_var(self, v: Var, var_names_to_exprs: Subst):
         assert not v.decl
@@ -280,9 +280,9 @@ class SubstTemplate(ExprTransformer):
         res.type_ = l.type_
         return res
 
-class ParsedRule(Rule):
-    """ Matches and substitutes according to a monomorphic ksc.expr.Rule """
-    def __init__(self, rule: KSRule):
+class ParsedRuleMatcher(RuleMatcher):
+    """ Matches and substitutes according to a monomorphic Rule parsed from .ks """
+    def __init__(self, rule: Rule):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
         assert rule.e1.type_ == rule.e2.type_ != None
         known_vars = frozenset([v.name for v in rule.args])
@@ -316,10 +316,10 @@ class ParsedRule(Rule):
 
 def parse_rule_str(ks_str, symtab):
     r = single_elem(list(parse_ks_file(ks_str)))
-    assert isinstance(r, KSRule)
+    assert isinstance(r, Rule)
     type_propagate(r, symtab)
-    return ParsedRule(r)
+    return ParsedRuleMatcher(r)
 
 def parse_rules_from_file(filename):
     with open(filename) as f:
-        return [ParsedRule(r) for r in parse_ks_string(f, filename)]
+        return [ParsedRuleMatcher(r) for r in parse_ks_string(f, filename)]

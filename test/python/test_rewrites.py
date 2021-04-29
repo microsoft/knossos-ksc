@@ -1,4 +1,4 @@
-from ksc.rewrites import rule, RuleSet, inline_var, delete_let, ParsedRule, parse_rule_str
+from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
 from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
 from ksc.type import Type
 from ksc.type_propagate import type_propagate_decls
