@@ -30,8 +30,8 @@ def _alpha_equiv_var(left: Var, right: Expr, l_to_r_bound_vars: Mapping[str, str
         # The two checks ensure the bound variables are used 1:1 - see test_alpha_equivalence_shadows_free
         # and the defaults passed to get() allow free variables of the same name.
         l_to_r_bound_vars.get(left.name, left.name) == right.name and
-        r_to_l_bound_vars.get(right.name, right.name) == left.name and
-        left.type_ == right.type_)
+        r_to_l_bound_vars.get(right.name, right.name) == left.name)
+    # Do not check type, consistent with ==
 
 @_alpha_equivalence_traversal.register
 def _alpha_equiv_let(left: Let, right: Expr, l_to_r_bound_vars: Mapping[str, str], r_to_l_bound_vars: Mapping[str, str]) -> bool:

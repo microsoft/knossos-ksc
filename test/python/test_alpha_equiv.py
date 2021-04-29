@@ -24,8 +24,8 @@ def test_alpha_equivalence_diff_types():
     assert alpha_hash(x) == alpha_hash(x_again)
     x_again.type_ = Type.Integer
     assert x == x_again # Allows different type
-    assert not are_alpha_equivalent(x, x_again) # Requires different
-    # XXX DO NOT COMMIT - alpha_hash takes type into account or not?
+    assert are_alpha_equivalent(x, x_again)
+    assert alpha_hash(x) == alpha_hash(x_again)
 
 def test_alpha_equivalence_type_propagation():
     exp1 = parse_expr_string("(let (x (add z 1.0)) (mul x 2.0))")
@@ -34,9 +34,11 @@ def test_alpha_equivalence_type_propagation():
     symtab = {"z": Type.Float}
     type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
     type_propagate(exp1, symtab)
+    assert exp1 != exp2 # One has resolved calls to StructuredNames
     assert not are_alpha_equivalent(exp1, exp2)
     assert alpha_hash(exp1) != alpha_hash(exp2)
     type_propagate(exp2, symtab)
+    assert exp1 == exp2
     assert are_alpha_equivalent(exp1, exp2)
     assert alpha_hash(exp1) == alpha_hash(exp2)
 
