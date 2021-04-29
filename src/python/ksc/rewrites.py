@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Optional, Mapping, Protocol, Tuple, Union, List, FrozenSet, TypeVar, Type as PyType
+from typing import Any, Iterator, Optional, Mapping, Protocol, Tuple, List, FrozenSet, TypeVar
 
 from pyrsistent import pmap, PMap as _PMap
 
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule
+from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
@@ -76,19 +77,6 @@ def rule(name: str) -> "RuleMatcher":
     """Lookup method for all `RuleMatcher`s."""
     return _rule_dict[name]
 
-@singledispatch
-def match_filter(e : Expr) -> Union[PyType, ConstantType, StructuredName]:
-    # Allows to quick-reject rules that can never match a particular expr. See RuleMatcher.possible_expr_filter.
-    return e.__class__
-
-@match_filter.register
-def match_filter_const(e : Const) -> ConstantType:
-    return e.value
-
-@match_filter.register
-def match_filter_call(e : Call):
-    return e.name
-
 class RuleMatcher(AbstractMatcher):
     def __init__(self, name=None):
         if name is None:
@@ -102,8 +90,8 @@ class RuleMatcher(AbstractMatcher):
         return self._name
 
     @abstractproperty
-    def possible_expr_filter(self) -> FrozenSet[Union[PyType, ConstantType, StructuredName]]:
-        """ A set of values that might be returned by match_filter() for any Expr that this rule could possibly match. """
+    def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
+        """ A set of terms that might be returned by get_filter_term() for any Expr that this rule could possibly match. """
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
@@ -111,11 +99,11 @@ class RuleMatcher(AbstractMatcher):
 
     @abstractmethod
     def matches_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
-        """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <match_filter(expr)>
-            is of one of <self.possible_expr_filter>. """
+        """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <get_filter_term(expr)>
+            is of one of <self.possible_filter_terms>. """
 
     def matches_here(self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
-        if match_filter(expr) in self.possible_expr_filter:
+        if get_filter_term(expr) in self.possible_filter_terms:
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
     def __reduce__(self):
@@ -127,16 +115,16 @@ class RuleSet(AbstractMatcher):
         # TODO also allow global (any-class) rules?
         self._filtered_rules = {}
         for rule in rules:
-            for clazz in rule.possible_expr_filter:
-                self._filtered_rules.setdefault(clazz, []).append(rule)
+            for term in rule.possible_filter_terms:
+                self._filtered_rules.setdefault(term, []).append(rule)
 
     def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
-        for rule in self._filtered_rules.get(match_filter(subtree), []):
+        for rule in self._filtered_rules.get(get_filter_term(subtree), []):
             yield from rule.matches_for_possible_expr(subtree, path_from_root, root, env)
 
 @singleton
 class inline_var(RuleMatcher):
-    possible_expr_filter = frozenset([Var])
+    possible_filter_terms = frozenset([Var])
 
     def apply_at(self, expr: Expr, path_to_var: Location, binding_location: Location) -> Expr:
         # binding_location comes from the Match.
@@ -157,7 +145,7 @@ class inline_var(RuleMatcher):
 
 @singleton
 class delete_let(RuleMatcher):
-    possible_expr_filter = frozenset([Let])
+    possible_filter_terms = frozenset([Let])
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
@@ -196,7 +184,7 @@ def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, T
     # Default case for most template exprs: require same type of Expr, and compatible child substitutions.
     # RuleSet will have ensured that the template and subject match at the outermost level,
     # but we still need to check that subtrees match too.
-    if match_filter(template) != match_filter(exp):
+    if get_filter_term(template) != get_filter_term(exp):
         return None # No match
     tmpl_children = get_children(template)
     exp_children = get_children(exp)
@@ -297,8 +285,8 @@ class ParsedRuleMatcher(RuleMatcher):
         self._arg_types = {v.name: v.type_ for v in rule.args}
 
     @property
-    def possible_expr_filter(self):
-        return frozenset([match_filter(self._rule.e1)])
+    def possible_filter_terms(self):
+        return frozenset([get_filter_term(self._rule.e1)])
 
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
         substs = find_template_subst(self._rule.e1, subtree, self._arg_types)
