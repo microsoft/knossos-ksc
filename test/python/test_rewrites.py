@@ -6,7 +6,7 @@ from ksc import utils
 
 def apply_in_only_location(rule_name, expr):
     cands = list(rule(rule_name).find_all_matches(expr))
-    return utils.single_elem(cands).rewrite()
+    return utils.single_elem(cands).apply_rewrite()
 
 def check_nowhere_applicable(rule_name, expr):
     assert len(list(rule(rule_name).find_all_matches(expr))) == 0
@@ -16,12 +16,12 @@ def test_inline_var_single():
     # Should be exactly two candidates
     rw_div, rw_add = sorted(rule("inline_var").find_all_matches(e), key=lambda rw: tuple(rw.path))
     assert (rw_div.rule, rw_div.path) == (inline_var, (1, 0))
-    assert rw_div.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))")
+    assert rw_div.apply_rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))")
     assert (rw_add.rule, rw_add.path) == (inline_var, (1, 1, 0))
-    assert rw_add.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))")
+    assert rw_add.apply_rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))")
 
-    assert (apply_in_only_location("inline_var", rw_div.rewrite())
-            == apply_in_only_location("inline_var", rw_add.rewrite())
+    assert (apply_in_only_location("inline_var", rw_div.apply_rewrite())
+            == apply_in_only_location("inline_var", rw_add.apply_rewrite())
             ==  parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add (div 1.0 x) 1.0)))"))
 
 def test_delete_let_single():
@@ -38,22 +38,22 @@ def test_ruleset():
     # Should be exactly two candidates
     rw_div, rw_add = sorted(r.find_all_matches(e), key=lambda rw: rw.path)
     assert (rw_div.rule, rw_div.path) == (inline_var, (1, 0))
-    assert rw_div.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))")
+    assert rw_div.apply_rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))")
     assert (rw_add.rule, rw_add.path) == (inline_var, (1, 1, 0))
-    assert rw_add.rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))")
+    assert rw_add.apply_rewrite() == parse_expr_string("(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))")
 
     all_inlined = parse_expr_string("(let (a (div 1.0 x)) (div (div 1.0 x) (add (div 1.0 x) 1.0)))")
-    assert ([rw.rewrite() for rw in r.find_all_matches(rw_div.rewrite())]
-             == [rw.rewrite() for rw in r.find_all_matches(rw_add.rewrite())]
+    assert ([rw.apply_rewrite() for rw in r.find_all_matches(rw_div.apply_rewrite())]
+             == [rw.apply_rewrite() for rw in r.find_all_matches(rw_add.apply_rewrite())]
             == [all_inlined])
 
     # Now should be only one possible rewrite
     rw_del, = list(r.find_all_matches(all_inlined))
     assert (rw_del.rule, rw_del.path) == (delete_let, tuple())
-    assert rw_del.rewrite() == parse_expr_string("(div (div 1.0 x) (add (div 1.0 x) 1.0))")
+    assert rw_del.apply_rewrite() == parse_expr_string("(div (div 1.0 x) (add (div 1.0 x) 1.0))")
 
 def sorted_rewrites(rule, expr):
-    return [rw.rewrite() for rw in sorted(
+    return [rw.apply_rewrite() for rw in sorted(
         rule.find_all_matches(expr), key=lambda rw: rw.path
     )]
 
@@ -95,7 +95,7 @@ def test_simple_parsed_rule():
         parse_expr_string("(if p (add (add a b) (add a b)) (mul a 3.0))"))
 
     type_propagate_decls([foo, rewritten], {**symtab, "p": Type.Bool, "a": Type.Float, "b": Type.Float})
-    all_rewrites = [m.rewrite() for m in r.find_all_matches(foo)]
+    all_rewrites = [m.apply_rewrite() for m in r.find_all_matches(foo)]
     assert all_rewrites == [rewritten]
 
 def test_parsed_rule_capture():
@@ -109,7 +109,7 @@ def test_parsed_rule_capture():
     e = parse_expr_string('(let (y 2) (mul (add y 1) 3))')
     expected = parse_expr_string("(let (y 2) (let (t__0 (add (add y 1) (add y 1))) (add t__0 (add y 1))))")
     type_propagate_decls([e, expected], symtab)
-    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
     # Does it still work if target is using t__0?
@@ -119,7 +119,7 @@ def test_parsed_rule_capture():
             (let (t__1 (add (add t__0 1) (add t__0 1))) (add t__1 (add t__0 1))))
     ''')
     type_propagate_decls([e, expected], symtab)
-    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
     # Test for 'lam' e.g. inside build
@@ -133,7 +133,7 @@ def test_parsed_rule_capture():
     expected = parse_expr_string(
         "(let (i 2) (index 0 (build 10 (lam (t__0 : Integer) (mul (add i 1) 3)))))")
     type_propagate_decls([e, expected], symtab)
-    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
     # Bound variables in the RHS should not be rewritten if they are matched
@@ -142,5 +142,5 @@ def test_parsed_rule_capture():
     e = parse_expr_string('(let (v (add 33 0)) (mul v 3))')
     expected = parse_expr_string("(let (v 33) (mul v 3))")
     type_propagate_decls([e, expected], symtab)
-    actual = utils.single_elem(list(r.find_all_matches(e))).rewrite()
+    actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected

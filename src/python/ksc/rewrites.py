@@ -22,7 +22,7 @@ class Match:
     # Anything the RuleMatcher needs to pass from matching to rewriting. Used immutably, but dataclasses don't allow default {}
     rule_specific_data: Mapping[str, Any] = field(default_factory=dict)
 
-    def rewrite(self):
+    def apply_rewrite(self):
         return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
 
 
@@ -50,7 +50,7 @@ class AbstractMatcher(ABC):
 
     @abstractmethod
     def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
-        """ Return any rewrites acting on the topmost node of the specified subtree """
+        """ Return any matches which rewrite the topmost node of the specified subtree """
 
 @singledispatch
 def _update_env_for_subtree(parent: Expr, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
