@@ -64,3 +64,13 @@ def test_alpha_equiv_two_lets():
     assert are_alpha_equivalent(e, e2)
     assert are_alpha_equivalent(e2, e)
     assert alpha_hash(e) == alpha_hash(e2)
+
+def test_alpha_equiv_all_node_types():
+    e1 = parse_expr_string("(lam (a : Float) (let (b (if (gt a 0.0) a 0.0)) (assert (gte b 0.0) b)))")
+    e2 = parse_expr_string("(lam (c : Float) (let (d (if (gt c 0.0) c 0.0)) (assert (gte d 0.0) d)))")
+    assert are_alpha_equivalent(e1, e2)
+    assert alpha_hash(e1) == alpha_hash(e2)
+
+    e_diff = parse_expr_string("(lam (a : Float) (let (b (if (gte a 0.0) a 0.0)) (assert (gte b 0.0) b)))")
+    assert not are_alpha_equivalent(e1, e_diff)
+    assert alpha_hash(e1) != alpha_hash(e_diff)
