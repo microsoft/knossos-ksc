@@ -555,7 +555,7 @@ cgenExprWithoutResettingAlloc env = \case
   Assert cond body -> do
     (CG declcond vcond tycond aucond) <- cgenExprR env cond
     case tycond of CType TypeBool -> return ()
-                   _              -> error "tycond was not TypeBool"
+                   unexpected -> error ("tycond was: " ++ show unexpected)
     (CG declbody vbody tybody aubody) <- cgenExprR env body
     return $ CG (  makeBlock (  declcond
                              ++ [ "KS_ASSERT(" ++ generateCGRE vcond ++ ");" ]
