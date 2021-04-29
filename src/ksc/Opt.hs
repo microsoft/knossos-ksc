@@ -15,6 +15,7 @@ import Prim
 import Rules
 import OptLet
 import KMonad
+import Ksc.Opt.Shape ( optShape )
 import qualified Ksc.SUF.Rewrite as SUF
 import Ksc.Traversal( traverseState, mapAccumLM )
 
@@ -372,6 +373,7 @@ optPrimFun _ P_deltaVec (Tuple [n, _i, val])
   = Just $ pConstVec n val
 
 optPrimFun _ P_sum         arg           = optSum arg
+optPrimFun _ P_shape       arg           = optShape arg
 optPrimFun _ P_build       (Tuple [sz, Lam i e2]) = optBuild sz i e2
 optPrimFun _ P_sumbuild    (Tuple [sz, Lam i e2]) = optSumBuild sz i e2
 optPrimFun env P_lmApply   (Tuple [e1,e2])        = optLMApply env (AD BasicAD Fwd) e1 e2

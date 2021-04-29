@@ -14,6 +14,7 @@ executable ksc
                  KMonad
                  Ksc.CatLang
                  Ksc.Futhark
+                 Ksc.Opt.Shape
                  Ksc.Pipeline
                  Ksc.SUF
                  Ksc.SUF.AD
