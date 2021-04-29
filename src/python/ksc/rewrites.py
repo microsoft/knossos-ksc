@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Optional, Mapping, Tuple, Union, List, FrozenSet, Type as PyType
+from typing import Any, Iterator, Optional, Mapping, Protocol, Tuple, Union, List, FrozenSet, TypeVar, Type as PyType
+
+from pyrsistent import pmap, PMap as _PMap
 
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule as KSRule
@@ -23,38 +25,49 @@ class Match:
     def rewrite(self):
         return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
 
-Environment = Mapping[str, Location]
+
+K = TypeVar("K")
+V = TypeVar("V")
+# This "class" exists only to be used as a type annotation, because pyrsistent's "PMap" type is not parameterized.
+# It should be a Procotol, but Protocols can only inherit from other Protocols (PMap is concrete).
+# If frozenmap (https://www.python.org/dev/peps/pep-0603/) makes it into a future version of python, we should switch to that.
+# (However, said PEP is *not* in python 3.9).
+class PMap(_PMap, Mapping[K,V]):
+    pass
+
+# Environments that map variable names to the locations of the nodes binding them.
+LetBindingEnvironment = PMap[str, Location]
 
 class AbstractMatcher(ABC):
     def find_all_matches(self, e: Expr) -> Iterator[Match]:
-        yield from self._matches_with_env(e, tuple(), e, {})
+        yield from self._matches_with_env(e, tuple(), e, pmap({}))
 
-    def _matches_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
+    def _matches_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.matches_here(e, path_from_root, root, env)
         for i, ch in enumerate(get_children(e)):
             yield from self._matches_with_env(ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env))
 
     @abstractmethod
-    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
+    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
         """ Return any rewrites acting on the topmost node of the specified subtree """
 
 @singledispatch
-def _update_env_for_subtree(parent: Expr, parent_path: Location, which_child: int, env: Environment) -> Environment:
+def _update_env_for_subtree(parent: Expr, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
     # Default is to use same environment as parent
     return env
 
 @_update_env_for_subtree.register
-def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: Environment) -> Environment:
+def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
     assert isinstance(parent.vars, Var), "Tupled lets are not supported - use untuple_lets first"
     assert 0 <= which_child <= 1
     return (env if which_child == 0 # rhs
-        else {**env, parent.vars.name: parent_path})
+        else env.set(parent.vars.name, parent_path))
 
 @_update_env_for_subtree.register
-def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: Environment) -> Environment:
+def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
     assert which_child == 0
-    return {k:v for k,v in env.items() if k != parent.arg.name}
+    return env.remove(parent.arg.name)
 
 
 _rule_dict: Mapping[str, "Rule"] = {}
@@ -97,11 +110,11 @@ class Rule(AbstractMatcher):
         """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's rule_specific_data field. """
 
     @abstractmethod
-    def matches_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
+    def matches_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <match_filter(expr)>
             is of one of <self.possible_expr_filter>. """
 
-    def matches_here(self, expr: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
+    def matches_here(self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
         if match_filter(expr) in self.possible_expr_filter:
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
@@ -117,7 +130,7 @@ class RuleSet(AbstractMatcher):
             for clazz in rule.possible_expr_filter:
                 self._filtered_rules.setdefault(clazz, []).append(rule)
 
-    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
+    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
         for rule in self._filtered_rules.get(match_filter(subtree), []):
             yield from rule.matches_for_possible_expr(subtree, path_from_root, root, env)
 
@@ -135,7 +148,7 @@ class inline_var(Rule):
             lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator; renaming will prevent capturing let.rhs, so just insert that
         )
 
-    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment) -> Iterator[Match]:
+    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
         assert isinstance(subtree, Var)
         if subtree.name in env:
             binding_loc = env[subtree.name]
