@@ -168,12 +168,11 @@ class delete_let(Rule):
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
-        del env
         assert isinstance(subtree, Let)
         if subtree.vars.name not in subtree.body.free_vars_:
             yield Match(self, root, path_from_root)
 
-# Substitutions from the names of variables (arguments) to the pattern to Exprs
+# Substitutions from the names of variables (arguments) in the rule template to Exprs
 Subst = Mapping[str, Expr]
 
 def _combine_substs(s1: Subst, s2: Optional[Subst]) -> Optional[Subst]:
@@ -194,9 +193,9 @@ def _combine_substs(s1: Subst, s2: Optional[Subst]) -> Optional[Subst]:
 def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
     """ Finds a substitution for the variable names in template_vars,
         such that applying the resulting substitution to <template> (using subst_template) yields <exp>.
-        Returns None if no such substitution exists i.e. the pattern does not match. """
+        Returns None if no such substitution exists i.e. the <exp> does not match the <template>. """
     # Default case for most template exprs: require same type of Expr, and compatible child substitutions.
-    # RuleSet will have ensured that the pattern and subject match at the outermost level,
+    # RuleSet will have ensured that the template and subject match at the outermost level,
     # but we still need to check that subtrees match too.
     if match_filter(template) != match_filter(exp):
         return None # No match
@@ -219,11 +218,11 @@ def find_template_subst_var(template: Var, exp: Expr, template_vars: Mapping[str
 
 @find_template_subst.register
 def find_template_subst_let(template: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
-    assert isinstance(template.vars, Var), "Tupled-lets in pattern are not supported: call untuple_lets first"
     if not isinstance(exp, Let):
         return None
+    assert isinstance(template.vars, Var), "Tupled-lets in template are not supported: call untuple_lets first"
     assert isinstance(exp.vars, Var), "Tupled-lets in subject expression are not supported: call untuple_lets first"
-    assert template.vars.name not in template_vars, "Let-bound variables should not be declared as pattern variables"
+    assert template.vars.name not in template_vars, "Let-bound variables should not be declared as template variables"
     d = {template.vars.name: exp.vars}
     d = _combine_substs(d, find_template_subst(template.rhs, exp.rhs, template_vars))
     return d and _combine_substs(d, find_template_subst(template.body, exp.body, {**template_vars, template.vars.name: template.rhs.type_}))
@@ -232,7 +231,7 @@ def find_template_subst_let(template: Let, exp: Expr, template_vars: Mapping[str
 def find_template_subst_lam(template: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
     if not isinstance(exp, Lam):
         return None
-    assert template.arg not in template_vars, "Lambda arguments should not be declared as pattern variables"
+    assert template.arg not in template_vars, "Lambda arguments should not be declared as template variables"
     if template.arg.type_ != exp.arg.type_:
         return None
     return find_template_subst(template.body, exp.body, {**template_vars, template.arg.name: template.arg.type_})
@@ -267,7 +266,7 @@ class SubstTemplate(ExprTransformer):
         assert isinstance(l.vars, Var), "use untuple_lets first"
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.vars, var_names_to_exprs, [l.body])
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
-        # where the bound var is bound, as the pattern (RHS) can't contain "(let x ...) x" (with x free).
+        # where the bound var is bound, as the RHS template can't contain "(let x ...) x" (with x free).
         res = Let(Var(target_var.name),# type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
             self.visit(l.rhs, var_names_to_exprs),
             self.visit(l.body, var_names_to_exprs))
@@ -287,9 +286,8 @@ class ParsedRule(Rule):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
         assert rule.e1.type_ == rule.e2.type_ != None
         known_vars = frozenset([v.name for v in rule.args])
-        # Check that all pattern variables must be arguments or in the symtab.
+        # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
         assert known_vars.issuperset(rule.e1.free_vars_)
-        # Same should be true of target (no new free variables, only new symtab calls)
         assert known_vars.issuperset(rule.e2.free_vars_)
         super().__init__(rule.name)
         self._rule = rule
@@ -309,7 +307,7 @@ class ParsedRule(Rule):
             assert const_zero == Const(0.0) # Passed to replace_subtree below
             assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
             result = SubstTemplate.visit(self._rule.e2, substs)
-            # Types copied from the pattern (down to the variables, and the subject-expr's types from there).
+            # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
             assert result.type_ == target.type_
             return result
