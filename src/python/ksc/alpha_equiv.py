@@ -4,7 +4,7 @@ from typing import Mapping
 
 from ksc.cav_subst import get_children
 from ksc.expr import  Expr, Var, Let, Lam
-from ksc.match_filter import match_filter
+from ksc.filter_term import get_filter_term
 
 def are_alpha_equivalent(exp1, exp2):
     return _alpha_equivalence_helper(exp1, exp2, {}, {})
@@ -16,7 +16,7 @@ def _alpha_equivalence_helper(left : Expr, right : Expr, l_to_r_bound_vars: Mapp
 
 @singledispatch
 def _alpha_equivalence_traversal(left : Expr, right : Expr, l_to_r_bound_vars: Mapping[str, str], r_to_l_bound_vars: Mapping[str, str]) -> bool:
-    if match_filter(left) != match_filter(right):
+    if get_filter_term(left) != get_filter_term(right):
         return False
     l_children, r_children = get_children(left), get_children(right)
     return len(l_children) == len(r_children) and all(
@@ -73,10 +73,11 @@ def _add_var(reverse_debruijn_vars: Mapping[str, int], varname: str) -> Mapping[
 
 @singledispatch
 def _alpha_hash_helper(e: Expr, reverse_debruijn_vars: Mapping[str, int]) -> int:
-    # Default case. The match_filter and the children suffices for anything that isn't or doesn't bind a variable.
-    # However, the match_filter may be a class, the hash of which seems to be different each run
+    # Default case.
+    # get_filter_term and get_children together are enough to identify anything that isn't or doesn't bind a variable.
+    # However, the FilterTerm may be a class, the hash of which seems to be different each run
     # (even if PYTHONHASHSEED is specified!), so use repeatable string hashing above.
-    node_type_hash = _hash_str(str(match_filter(e)))
+    node_type_hash = _hash_str(str(get_filter_term(e)))
     return hash((node_type_hash, *(_alpha_hash_helper(ch, reverse_debruijn_vars) for ch in get_children(e))))
 
 @_alpha_hash_helper.register
