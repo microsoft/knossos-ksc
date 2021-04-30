@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Optional, Mapping, Protocol, Tuple, List, FrozenSet, TypeVar
+from typing import Any, Iterator, Optional, Mapping, Tuple, List, FrozenSet
 
-from pyrsistent import pmap, PMap as _PMap
+from pyrsistent import pmap
+from pyrsistent.typing import PMap
 
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule
@@ -29,16 +30,6 @@ class Match:
 
     def apply_rewrite(self):
         return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
-
-
-K = TypeVar("K")
-V = TypeVar("V")
-# This "class" exists only to be used as a type annotation, because pyrsistent's "PMap" type is not parameterized.
-# It should be a Procotol, but Protocols can only inherit from other Protocols (PMap is concrete).
-# If frozenmap (https://www.python.org/dev/peps/pep-0603/) makes it into a future version of python, we should switch to that.
-# (However, said PEP is *not* in python 3.9).
-class PMap(_PMap, Mapping[K,V]):
-    pass
 
 # Environments that map variable names to the locations of the nodes binding them.
 LetBindingEnvironment = PMap[str, Location]
