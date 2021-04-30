@@ -154,3 +154,16 @@ def test_lift_if():
     matches = list(rule("lift_if").find_all_matches(e))
     actual = utils.single_elem(matches).apply_rewrite()
     assert actual == expected
+
+def test_lift_if_from_let():
+    e = parse_expr_string("(let (x 4) (if (gt y 0) x 0))")
+    match = utils.single_elem(list(rule("lift_if").find_all_matches(e)))
+    actual = match.apply_rewrite()
+    expected = parse_expr_string("(if (gt y 0) (let (x 4) x) (let (x 4) 0))")
+    assert actual == expected
+    # Now check we can't lift out of the let if the if-condition uses the bound variable
+    e = parse_expr_string("(let (x 4) (if (gt x 0) x 0))")
+    assert len(list(rule("lift_if").find_all_matches(e))) == 0
+
+if __name__ == "__main__":
+    test_lift_if_from_let()

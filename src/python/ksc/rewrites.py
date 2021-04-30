@@ -181,7 +181,7 @@ class LiftingRule(RuleMatcher):
             spec = self.get_liftable_part(ch.body if nested_lam else ch)
             if spec is None:
                 continue
-            if isinstance(subtree, Let) and i==2 and subtree.vars.name in spec.free_vars_:
+            if isinstance(subtree, Let) and i==1 and subtree.vars.name in spec.free_vars_:
                 pass # Cannot lift computation outside of let that involves the free variable
             elif nested_lam and ch.arg.name in spec.free_vars:
                 pass # Cannot lift loop-variant computation out of lam within (sum)build
@@ -209,8 +209,8 @@ class lift_if(LiftingRule):
     def apply_to_parent(self, parent: Expr, path_to_child: Location) -> Expr:
         if_node = get_node_at_location(parent, path_to_child)
         return If(if_node.cond,
-            replace_subtree(parent, path_to_child, if_node.t_body),
-            replace_subtree(parent, path_to_child, if_node.f_body))
+            replace_subtree(parent, path_to_child, Const(0.0), lambda *_: if_node.t_body),
+            replace_subtree(parent, path_to_child, Const(0.0), lambda *_: if_node.f_body))
 
 @singleton
 class lift_bind(LiftingRule):
@@ -229,7 +229,7 @@ class lift_bind(LiftingRule):
             new_var = make_nonfree_var(bound_var.name, [parent], type=bound_var.type_)
             let_body = rename_vars(let_node.body, bound_var.name, new_var)
             bound_var = new_var
-        return Let(bound_var, let_node.rhs, replace_subtree(parent, path_to_child, let_body))
+        return Let(bound_var, let_node.rhs, replace_subtree(parent, path_to_child, Const(0.0), lambda *_: let_body))
 
 ###############################################################################
 # Rules parsed from KS. See Rule. These are of the form
