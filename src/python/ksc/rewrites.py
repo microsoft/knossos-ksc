@@ -14,6 +14,10 @@ from ksc.type_propagate import type_propagate
 from ksc.utils import singleton, single_elem
 from ksc.visitors import ExprTransformer
 
+# A RuleMatcher identifies places where a rule can be applied to an expression, each recorded in a Match.
+# Given a Match, we can then rewrite the expression to yield a new Expr.
+# RuleMatchers may use rules parsed from KS (see ParsedRuleMatcher below) or expressed in python.
+
 @dataclass(frozen=True)
 class Match:
     rule: "RuleMatcher"
@@ -160,7 +164,27 @@ class delete_let(RuleMatcher):
         if subtree.vars.name not in subtree.body.free_vars_:
             yield Match(self, root, path_from_root)
 
-# Substitutions from the names of variables (arguments) in the rule template to Exprs
+# Rules parsed from KS. See Rule. These are of the form
+#   (rule "name" template_vars template replacement)
+# for example a rule to effect a*(b+c) -> a*b+a*c would look like
+#   (rule "distrib_mul_over_add.t2f"
+#         ((a : Float) (b : Tensor 2 Float) (c : Tensor 2 Float)) ;; template_vars
+#         (mul a (add b c)) ;; template
+#         (add (mul a b) (mul b c)) ;; replacement
+#   )
+# or, the inverse a*b+a*c-> a*(b+c)
+#   (rule "add_two_muls.double"
+#       ((a : Float) (b : Float)) ;; template_vars
+#       (add (mul a b) (mul a c)) ;; template --- note a occurs in multiple places, these must be identical
+#       (mul a (add b c)) ;; replacement
+#   )
+# where
+#   template_vars is a list of (name : Type) pairs
+#   template is an Expr, whose free vars are `template_vars`
+#   replacement is an Expr, whose free vars are a subset of `template_vars`
+
+# The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
+# the result is then replacement[subst].
 
 def _combine_substs(s1: VariableSubstitution, s2: Optional[VariableSubstitution]) -> Optional[VariableSubstitution]:
     if s2 is None:
@@ -226,14 +250,14 @@ def _maybe_add_binder_to_subst(bound: Var,
     var_names_to_exprs: VariableSubstitution,
     dont_capture: List[Expr]
 )-> Tuple[Var, VariableSubstitution]:
-        #assert bound.decl # No - only for def args? - not true for 'Let's
-        target_var = var_names_to_exprs.get(bound.name)
-        if target_var is None:
-            # This is a new binder in the RHS, so make sure the variable is
-            # fresh w.r.t bound body and all RHSs of substitutions
-            target_var = make_nonfree_var("t_", list(var_names_to_exprs.values()) + dont_capture, type=bound.type_)
-            var_names_to_exprs = {**var_names_to_exprs, bound.name: target_var}
-        return target_var, var_names_to_exprs
+    #assert bound.decl # No - only for def args? - not true for 'Let's
+    target_var = var_names_to_exprs.get(bound.name)
+    if target_var is None:
+        # This is a new binder in the RHS, so make sure the variable is
+        # fresh w.r.t bound body and all RHSs of substitutions
+        target_var = make_nonfree_var("t_", list(var_names_to_exprs.values()) + dont_capture, type=bound.type_)
+        var_names_to_exprs = {**var_names_to_exprs, bound.name: target_var}
+    return target_var, var_names_to_exprs
 
 @singleton
 class SubstTemplate(ExprTransformer):
@@ -279,8 +303,9 @@ class ParsedRuleMatcher(RuleMatcher):
         assert known_vars.issuperset(rule.e2.free_vars_)
         # TODO: it would be good to check here that any variables *bound* in the LHS template are not declared
         # as rule arguments, as we require that at rewriting-time:
-        # WRITE: (rule "foo" ((x : Float)) (let (a x) a) x)
-        # NOT:   (rule "foo" ((a : Float) (x : Float)) (let (a x) a) x)
+        # YES: (rule "foo" ((x : Float)) (let (a x) a) x)
+        # NOT: (rule "foo" ((a : Float) (x : Float)) (let (a x) a) x)
+        # TODO: also, to check that if there are multiple binders on the LHS, they all bind different names.
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = {v.name: v.type_ for v in rule.args}
