@@ -6,7 +6,7 @@ from typing import Any, Iterator, Optional, Mapping, Tuple, List, FrozenSet
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from ksc.cav_subst import Location, VariableSubstitution, get_children, replace_subtree, make_nonfree_var, get_node_at_location
+from ksc.cav_subst import Location, VariableSubstitution, get_children, replace_subtree, replace_free_vars, make_nonfree_var, get_node_at_location
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, If, Rule
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
@@ -227,7 +227,7 @@ class lift_bind(LiftingRule):
             # These would be captured if we lifted the binder above the parent.
             # Thus, rename.
             new_var = make_nonfree_var(bound_var.name, [parent], type=bound_var.type_)
-            let_body = rename_vars(let_node.body, bound_var.name, new_var)
+            let_body = replace_free_vars(let_node.body, {bound_var.name: new_var})
             bound_var = new_var
         return Let(bound_var, let_node.rhs, replace_subtree(parent, path_to_child, Const(0.0), lambda *_: let_body))
 

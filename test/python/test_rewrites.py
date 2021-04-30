@@ -1,3 +1,5 @@
+import pytest
+
 from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
 from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
 from ksc.type import Type
@@ -186,3 +188,17 @@ def test_interchange_lets():
     # But, can't lift if the inner let uses the outer bound variable
     cant_lift = parse_expr_string("(let (x 5) (let (y (add x 1)) (add x y)))")
     assert len(list(rule("lift_bind").find_all_matches(cant_lift))) == 0
+
+def test_lift_bind_shadowing():
+    e = parse_expr_string("(add (let (x (add x 1)) x) x)")
+    symtab = dict()
+    type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
+    # The RHS of the let refers to another (free) x - just check:
+    with pytest.raises(Exception):
+        type_propagate_decls([e], symtab)
+    # So, we must rename the bound x so as not to capture the free x
+    expected = parse_expr_string("(let (x_0 (add x 1)) (add x_0 x))")
+    type_propagate_decls([e, expected], {**symtab, "x": Type.Integer})
+    match = utils.single_elem(list(rule("lift_bind").find_all_matches(e)))
+    actual = match.apply_rewrite()
+    assert actual == expected
