@@ -221,7 +221,8 @@ class lift_bind(LiftingRule):
         let_node = get_node_at_location(parent, path_to_child)
         assert isinstance(let_node.vars, Var), "Tupled lets not supported - use untuple_lets first"
         bound_var, let_body = let_node.vars, let_node.body
-        if bound_var.name in parent.free_vars_:
+        let_siblings = [sibling for i, sibling in enumerate(get_children(parent)) if i != path_to_child[0]]
+        if any(bound_var.name in sibling.free_vars_ for sibling in let_siblings):
             # Occurrences of the bound variable in the let_node's body are not free.
             # So there must be other occurrences of the same name (referring to an outer variable).
             # These would be captured if we lifted the binder above the parent.

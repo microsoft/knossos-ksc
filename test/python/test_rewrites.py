@@ -202,3 +202,13 @@ def test_lift_bind_shadowing():
     match = utils.single_elem(list(rule("lift_bind").find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == expected
+
+    # But, no need to rename if the uses of the free "x" are in the let RHS itself
+    # (such uses will be lifted and stay outside the binder):
+    e = parse_expr_string("(add (let (x (add x 1)) x) 2)")
+    expected = parse_expr_string("(let (x (add x 1)) (add x 2))")
+    renamed = parse_expr_string("(let (x_0 (add x 1)) (add x_0 2))")
+    match = utils.single_elem(list(rule("lift_bind").find_all_matches(e)))
+    actual = match.apply_rewrite()
+    assert actual == expected
+    assert actual != renamed
