@@ -188,7 +188,7 @@ class LiftingRule(RuleMatcher):
             elif isinstance(subtree, If) and i > 0 and not can_speculate_ahead_of_condition(ch, subtree.cond):
                 pass # Don't lift computation out of "if" that may be guarding against an exception
             else:
-                yield Match(self, root, path_from_root + ((i,0) if isinstance(ch, Lam) else (i,)), {"buildlam": isinstance(ch, Lam)})
+                yield Match(self, root, path_from_root + ((i,0) if nested_lam else (i,)), {"buildlam": nested_lam})
 
     def apply_at(self, e: Expr, path: Location, buildlam: bool) -> Expr:
         assert (not buildlam) or len(path)>1
