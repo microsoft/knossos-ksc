@@ -5,7 +5,7 @@ from typing import Any, Iterator, Optional, Mapping, Protocol, Tuple, List, Froz
 
 from pyrsistent import pmap, PMap as _PMap
 
-from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var
+from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
 from ksc.expr import Expr, Let, Lam, Var, Const, Call, ConstantType, StructuredName, Rule
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
@@ -161,9 +161,8 @@ class delete_let(RuleMatcher):
             yield Match(self, root, path_from_root)
 
 # Substitutions from the names of variables (arguments) in the rule template to Exprs
-Subst = Mapping[str, Expr]
 
-def _combine_substs(s1: Subst, s2: Optional[Subst]) -> Optional[Subst]:
+def _combine_substs(s1: VariableSubstitution, s2: Optional[VariableSubstitution]) -> Optional[VariableSubstitution]:
     if s2 is None:
         return None
     common_vars = s1.keys() & s2.keys()
@@ -177,7 +176,7 @@ def _combine_substs(s1: Subst, s2: Optional[Subst]) -> Optional[Subst]:
     return s1
 
 @singledispatch
-def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
+def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
     """ Finds a substitution for the variable names in template_vars,
         such that applying the resulting substitution to <template> (using subst_template) yields <exp>.
         Returns None if no such substitution exists i.e. the <exp> does not match the <template>. """
@@ -198,13 +197,13 @@ def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, T
     return d
 
 @find_template_subst.register
-def find_template_subst_var(template: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
+def find_template_subst_var(template: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
     assert template.name in template_vars
     # Require correct type of subexp in order to match
     return {template.name: exp} if exp.type_ == template_vars[template.name] else None
 
 @find_template_subst.register
-def find_template_subst_let(template: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
+def find_template_subst_let(template: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
     if not isinstance(exp, Let):
         return None
     assert isinstance(template.vars, Var), "Tupled-lets in template are not supported: call untuple_lets first"
@@ -215,7 +214,7 @@ def find_template_subst_let(template: Let, exp: Expr, template_vars: Mapping[str
     return d and _combine_substs(d, find_template_subst(template.body, exp.body, {**template_vars, template.vars.name: template.rhs.type_}))
 
 @find_template_subst.register
-def find_template_subst_lam(template: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[Subst]:
+def find_template_subst_lam(template: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
     if not isinstance(exp, Lam):
         return None
     assert template.arg not in template_vars, "Lambda arguments should not be declared as template variables"
@@ -223,8 +222,10 @@ def find_template_subst_lam(template: Lam, exp: Expr, template_vars: Mapping[str
         return None
     return find_template_subst(template.body, exp.body, {**template_vars, template.arg.name: template.arg.type_})
 
-def _maybe_add_binder_to_subst(bound: Var, var_names_to_exprs: Subst, dont_capture: List[Expr]
-    )-> Tuple[Var, Subst]:
+def _maybe_add_binder_to_subst(bound: Var,
+    var_names_to_exprs: VariableSubstitution,
+    dont_capture: List[Expr]
+)-> Tuple[Var, VariableSubstitution]:
         #assert bound.decl # No - only for def args? - not true for 'Let's
         target_var = var_names_to_exprs.get(bound.name)
         if target_var is None:
@@ -245,11 +246,11 @@ class SubstTemplate(ExprTransformer):
     x, they'll be captured by the x bound by that let, which changes their meaning.
     (Hence, we still need separate python RuleMatchers, not ParsedRuleMatchers, for e.g. lift_bind and sumbuild_invariant.)
     """
-    def visit_var(self, v: Var, var_names_to_exprs: Subst):
+    def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
         assert not v.decl
         return var_names_to_exprs[v.name]
 
-    def visit_let(self, l: Let, var_names_to_exprs: Subst) -> Let:
+    def visit_let(self, l: Let, var_names_to_exprs: VariableSubstitution) -> Let:
         assert isinstance(l.vars, Var), "use untuple_lets first"
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.vars, var_names_to_exprs, [l.body])
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
@@ -260,7 +261,7 @@ class SubstTemplate(ExprTransformer):
         res.type_ = l.type_
         return res
 
-    def visit_lam(self, l: Lam, var_names_to_exprs: Subst) -> Lam:
+    def visit_lam(self, l: Lam, var_names_to_exprs: VariableSubstitution) -> Lam:
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.arg, var_names_to_exprs, [l.body])
         res = Lam(Var(target_var.name, type=target_var.type_, decl=True),
             self.visit(l.body, var_names_to_exprs))
@@ -293,7 +294,7 @@ class ParsedRuleMatcher(RuleMatcher):
         if substs is not None:
             yield Match(self, root, path_from_root, substs)
 
-    def apply_at(self, expr: Expr, path: Location, **substs: Subst) -> Expr:
+    def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
             assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
