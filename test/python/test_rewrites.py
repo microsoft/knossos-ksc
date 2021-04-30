@@ -151,8 +151,7 @@ def test_lift_if():
     type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
     expected = parse_expr_string("(if p (add 4.0 3.0) (add 2.0 3.0))")
     type_propagate_decls([e, expected], {**symtab, "p": Type.Bool})
-    matches = list(rule("lift_if").find_all_matches(e))
-    actual = utils.single_elem(matches).apply_rewrite()
+    actual = utils.single_elem(list(rule("lift_if").find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
 def test_lift_if_from_let():
@@ -165,5 +164,25 @@ def test_lift_if_from_let():
     e = parse_expr_string("(let (x 4) (if (gt x 0) x 0))")
     assert len(list(rule("lift_if").find_all_matches(e))) == 0
 
-if __name__ == "__main__":
-    test_lift_if_from_let()
+def test_lift_bind():
+    e = parse_expr_string("(add (let (x 4.0) (add x 2.0)) 3.0)")
+    symtab = dict()
+    type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
+    expected = parse_expr_string("(let (x 4.0) (add (add x 2.0) 3.0))")
+    type_propagate_decls([e, expected], symtab)
+    match = utils.single_elem(list(rule("lift_bind").find_all_matches(e)))
+    actual = match.apply_rewrite()
+    assert actual == expected
+
+def test_interchange_lets():
+    e = parse_expr_string("(let (x 4) (let (y 5) (add x y)))")
+    e2 = parse_expr_string("(let (y 5) (let (x 4) (add x y)))")
+    match = utils.single_elem(list(rule("lift_bind").find_all_matches(e)))
+    actual = match.apply_rewrite()
+    assert actual == e2
+    match2 = utils.single_elem(list(rule("lift_bind").find_all_matches(actual)))
+    actual2 = match2.apply_rewrite()
+    assert actual2 == e
+    # But, can't lift if the inner let uses the outer bound variable
+    cant_lift = parse_expr_string("(let (x 5) (let (y (add x 1)) (add x y)))")
+    assert len(list(rule("lift_bind").find_all_matches(cant_lift))) == 0
