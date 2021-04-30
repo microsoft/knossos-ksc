@@ -37,8 +37,8 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
 #        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-    - name: Format with Black
+    - name: Check format with Black
       # current releleased version of Black doesn't have extend-exclude, so add pybind11 and mlir to default extend until released 
       run: |
-        black . --check --exclude "/(\.direnv|\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|\.svn|_build|buck-out|build|dist|pybind11|mlir)/"
+        black . --check
       
