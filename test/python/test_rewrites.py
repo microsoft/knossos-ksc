@@ -212,3 +212,28 @@ def test_lift_bind_shadowing():
     actual = match.apply_rewrite()
     assert actual == expected
     assert actual != renamed
+
+def test_lifting_over_build():
+    e = parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 7)) (if (gt x 5) x i))))")
+    rules = RuleSet([rule("lift_bind"), rule("lift_if")])
+    match = utils.single_elem(list(rules.find_all_matches(e)))
+    actual = match.apply_rewrite()
+    # Let should have been lifted:
+    assert actual == parse_expr_string("(let (x (add 5 7)) (build 10 (lam (i : Integer) (if (gt x 5) x i))))")
+    match2 = utils.single_elem(list(rules.find_all_matches(actual)))
+    actual2 = match2.apply_rewrite()
+    # Now can lift the if:
+    assert actual2 == parse_expr_string("(let (x (add 5 7)) (if (gt x 5) (build 10 (lam (i : Integer) x)) (build 10 (lam (i : Integer) i))))")
+
+    # But, don't allow lifting an expression that refers to the build/lam-bound 'i':
+    e3 = parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x i))))")
+    match3 = utils.single_elem(list(rules.find_all_matches(e3)))
+    actual3 = match3.apply_rewrite()
+    assert actual3 == parse_expr_string("(build 10 (lam (i : Integer) (if (gt i 5) (let (x (add 5 i)) x) (let (x (add 5 i)) i))))")
+    # Now we should be able to lift either of those let's, but not the 'if'
+    matches = sorted(list(rules.find_all_matches(actual3)), key=lambda match: match.path)
+    exprs = [match.apply_rewrite() for match in matches]
+    assert exprs == [
+        parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x (let (x (add 5 i)) i)))))"),
+        parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) (let (x (add 5 i)) x) i))))")
+    ]

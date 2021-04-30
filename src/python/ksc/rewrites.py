@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
 from functools import singledispatch
+from itertools import chain
 from typing import Any, Iterator, Optional, Mapping, Tuple, List, FrozenSet
 
 from pyrsistent import pmap
@@ -63,7 +64,7 @@ def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: L
 @_update_env_for_subtree.register
 def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
     assert which_child == 0
-    return env.remove(parent.arg.name)
+    return env.discard(parent.arg.name)
 
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
@@ -108,14 +109,17 @@ class RuleMatcher(AbstractMatcher):
 
 class RuleSet(AbstractMatcher):
     def __init__(self, rules):
-        # TODO also allow global (any-class) rules?
+        self._any_expr_rules = []
         self._filtered_rules = {}
         for rule in rules:
-            for term in rule.possible_filter_terms:
-                self._filtered_rules.setdefault(term, []).append(rule)
+            if len(rule.possible_filter_terms) == 0:
+                self._any_expr_rules.append(rule)
+            else:
+                for term in rule.possible_filter_terms:
+                    self._filtered_rules.setdefault(term, []).append(rule)
 
     def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
-        for rule in self._filtered_rules.get(get_filter_term(subtree), []):
+        for rule in chain(self._any_expr_rules, self._filtered_rules.get(get_filter_term(subtree), [])):
             yield from rule.matches_for_possible_expr(subtree, path_from_root, root, env)
 
 @singleton
@@ -183,7 +187,7 @@ class LiftingRule(RuleMatcher):
                 continue
             if isinstance(subtree, Let) and i==1 and subtree.vars.name in spec.free_vars_:
                 pass # Cannot lift computation outside of let that involves the free variable
-            elif nested_lam and ch.arg.name in spec.free_vars:
+            elif nested_lam and ch.arg.name in spec.free_vars_:
                 pass # Cannot lift loop-variant computation out of lam within (sum)build
             elif isinstance(subtree, If) and i > 0 and not can_speculate_ahead_of_condition(ch, subtree.cond):
                 pass # Don't lift computation out of "if" that may be guarding against an exception
