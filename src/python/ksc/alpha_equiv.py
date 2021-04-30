@@ -1,5 +1,6 @@
 from functools import singledispatch
 from hashlib import sha224
+from typing import NamedTuple
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
@@ -9,48 +10,50 @@ from ksc.expr import  Expr, Var, Let, Lam
 from ksc.filter_term import get_filter_term
 
 def are_alpha_equivalent(exp1, exp2):
-    return _alpha_equivalence_helper(exp1, exp2, pmap(), pmap())
+    return _alpha_equivalence_helper(exp1, exp2, BoundVarBijection(pmap(), pmap()))
 
-# Implementation uses two maps to ensure a bijection between bound variables in 'left' and 'right'.
+# We use this ensure a bijection between bound variables in 'left' and 'right' exprs.
+class BoundVarBijection(NamedTuple):
+    left_to_right: PMap[str, str]
+    right_to_left: PMap[str, str]
 
-def _alpha_equivalence_helper(left : Expr, right : Expr, l_to_r_bound_vars: PMap[str, str], r_to_l_bound_vars: PMap[str, str]) -> bool:
-    return (left is right) or _alpha_equivalence_traversal(left, right, l_to_r_bound_vars, r_to_l_bound_vars)
+    def vars_equal(self, left: str, right: str) -> bool:
+        # Allow left == right IF neither is in the bijection
+        return self.left_to_right.get(left, left) == right and self.right_to_left.get(right, right) == left
+
+    def add_var(self, left, right):
+        return BoundVarBijection(self.left_to_right.set(left, right), self.right_to_left.set(right, left))
+
+def _alpha_equivalence_helper(left : Expr, right : Expr, var_map: BoundVarBijection) -> bool:
+    return (left is right) or _alpha_equivalence_traversal(left, right, var_map)
 
 @singledispatch
-def _alpha_equivalence_traversal(left : Expr, right : Expr, l_to_r_bound_vars: PMap[str, str], r_to_l_bound_vars: PMap[str, str]) -> bool:
+def _alpha_equivalence_traversal(left : Expr, right : Expr, var_map: BoundVarBijection) -> bool:
     if get_filter_term(left) != get_filter_term(right):
         return False
     l_children, r_children = get_children(left), get_children(right)
     return len(l_children) == len(r_children) and all(
-        _alpha_equivalence_helper(l_child, r_child, l_to_r_bound_vars, r_to_l_bound_vars)
-        for l_child, r_child in zip(l_children, r_children)
+        _alpha_equivalence_helper(l_ch, r_ch, var_map) for l_ch, r_ch in zip(l_children, r_children)
     )
 
 @_alpha_equivalence_traversal.register
-def _alpha_equiv_var(left: Var, right: Expr, l_to_r_bound_vars: PMap[str, str], r_to_l_bound_vars: PMap[str, str]) -> bool:
-    return (isinstance(right, Var) and
-        # The two checks ensure the bound variables are used 1:1 - see test_alpha_equivalence_shadows_free
-        # and the defaults passed to get() allow free variables of the same name.
-        l_to_r_bound_vars.get(left.name, left.name) == right.name and
-        r_to_l_bound_vars.get(right.name, right.name) == left.name)
+def _alpha_equiv_var(left: Var, right: Expr, var_map: BoundVarBijection) -> bool:
+    # The check ensures the bound variables are used 1:1 - see test_alpha_equivalence_shadows_free
+    return isinstance(right, Var) and var_map.vars_equal(left.name, right.name)
     # Do not check type, consistent with ==
 
 @_alpha_equivalence_traversal.register
-def _alpha_equiv_let(left: Let, right: Expr, l_to_r_bound_vars: PMap[str, str], r_to_l_bound_vars: PMap[str, str]) -> bool:
+def _alpha_equiv_let(left: Let, right: Expr, var_map: BoundVarBijection) -> bool:
     if not isinstance(right, Let):
         return False
     assert isinstance(left.vars, Var), "Tupled-lets are not supported: call untuple_lets first"
     assert isinstance(right.vars, Var), "Tupled-lets are not supported: call untuple_lets first"
-    return (_alpha_equivalence_helper(left.rhs, right.rhs, l_to_r_bound_vars, r_to_l_bound_vars) and
-        _alpha_equivalence_helper(left.body, right.body,
-            l_to_r_bound_vars.set(left.vars.name, right.vars.name),
-            (r_to_l_bound_vars.set(right.vars.name, left.vars.name))))
+    return (_alpha_equivalence_helper(left.rhs, right.rhs, var_map) and
+        _alpha_equivalence_helper(left.body, right.body, var_map.add_var(left.vars.name, right.vars.name)))
 
 @_alpha_equivalence_traversal.register
-def _alpha_equiv_lam(left: Lam, right: Expr, l_to_r_bound_vars: PMap[str, str], r_to_l_bound_vars: PMap[str, str]) -> bool:
-    return _alpha_equivalence_helper(left.body, right.body,
-        l_to_r_bound_vars.set(left.arg.name, right.arg.name),
-        r_to_l_bound_vars.set(right.arg.name, left.arg.name))
+def _alpha_equiv_lam(left: Lam, right: Expr, var_map: BoundVarBijection) -> bool:
+    return _alpha_equivalence_helper(left.body, right.body, var_map.add_var(left.arg.name, right.arg.name))
 
 ###############################################################################
 # Hash modulo alpha, i.e. respecting the above:
