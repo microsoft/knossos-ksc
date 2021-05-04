@@ -6,9 +6,6 @@ on:
 #   pull_request:
 #     branches: [ master ]
     
-  push:
-    branches: [cogravil/pythonchecks]
-    
   workflow_dispatch:
 
 jobs:
