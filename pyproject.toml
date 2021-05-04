@@ -1,5 +1,5 @@
 [tool.black]
 # current releleased version of Black doesn't have extend-exclude, so add pybind11 and mlir to default extend until released
-exclude = '/(\.direnv|\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|\.svn|_build|buck-out|build|dist|pybind11|mlir)/'
+exclude = '/(\.direnv|\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|\.svn|_build|buck-out|build|dist|pybind11|mlir|users)/'
 # discussion with awf, default limit of 88 is just too low
 line-length = 120
