@@ -208,7 +208,7 @@ class ParsedRuleMatcher(RuleMatcher):
         # TODO: check that if there are multiple binders on the LHS, they all bind different names.
         super().__init__(rule.name)
         self._rule = rule
-        self._arg_types = {v.name: v.type_ for v in rule.args}
+        self._arg_types = pmap({v.name: v.type_ for v in rule.args})
 
     @property
     def possible_filter_terms(self):
@@ -248,7 +248,7 @@ def _combine_substs(s1: VariableSubstitution, s2: Optional[VariableSubstitution]
     return s1
 
 @singledispatch
-def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
+def find_template_subst(template: Expr, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
     """ Finds a substitution for the variable names in template_vars,
         such that applying the resulting substitution to <template> (using subst_template) yields <exp>.
         Returns None if no such substitution exists i.e. the <exp> does not match the <template>. """
@@ -269,30 +269,36 @@ def find_template_subst(template: Expr, exp: Expr, template_vars: Mapping[str, T
     return d
 
 @find_template_subst.register
-def find_template_subst_var(template: Var, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
+def find_template_subst_var(template: Var, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
     assert template.name in template_vars
     # Require correct type of subexp in order to match
     return {template.name: exp} if exp.type_ == template_vars[template.name] else None
 
 @find_template_subst.register
-def find_template_subst_let(template: Let, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
+def find_template_subst_let(template: Let, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
     if not isinstance(exp, Let):
         return None
     assert isinstance(template.vars, Var), "Tupled-lets in template are not supported: call untuple_lets first"
     assert isinstance(exp.vars, Var), "Tupled-lets in subject expression are not supported: call untuple_lets first"
     assert template.vars.name not in template_vars, "Let-bound variables should not be declared as template variables"
-    d = {template.vars.name: exp.vars}
-    d = _combine_substs(d, find_template_subst(template.rhs, exp.rhs, template_vars))
-    return d and _combine_substs(d, find_template_subst(template.body, exp.body, {**template_vars, template.vars.name: template.rhs.type_}))
+    rhs_subst = find_template_subst(template.rhs, exp.rhs, template_vars)
+    rhs_and_bound_subst = _combine_substs({template.vars.name: exp.vars}, rhs_subst)
+    if rhs_and_bound_subst is None:
+        return None
+    # In the let-body, allow a substitution to be found for the let-bound variable; this will have to
+    # map to the same variable bound in the expression as in the substitution above,
+    # or _combine_substs will return None.
+    body_subst = find_template_subst(template.body, exp.body, template_vars.set(template.vars.name, template.rhs.type_))
+    return _combine_substs(rhs_and_bound_subst, body_subst)
 
 @find_template_subst.register
-def find_template_subst_lam(template: Lam, exp: Expr, template_vars: Mapping[str, Type]) -> Optional[VariableSubstitution]:
+def find_template_subst_lam(template: Lam, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
     if not isinstance(exp, Lam):
         return None
     assert template.arg not in template_vars, "Lambda arguments should not be declared as template variables"
     if template.arg.type_ != exp.arg.type_:
         return None
-    return find_template_subst(template.body, exp.body, {**template_vars, template.arg.name: template.arg.type_})
+    return find_template_subst(template.body, exp.body, template_vars.set(template.arg.name, template.arg.type_))
 
 def _maybe_add_binder_to_subst(bound: Var,
     var_names_to_exprs: VariableSubstitution,
