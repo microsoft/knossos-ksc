@@ -207,7 +207,7 @@ class ParsedRuleMatcher(RuleMatcher):
         # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
         assert known_vars == rule.e1.free_vars_
         assert known_vars.issuperset(rule.e2.free_vars_)
-        # TODO: also, to check that if there are multiple binders on the LHS, they all bind different names.
+        # TODO: check that if there are multiple binders on the LHS, they all bind different names.
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = {v.name: v.type_ for v in rule.args}
