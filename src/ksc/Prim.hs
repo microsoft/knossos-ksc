@@ -727,6 +727,9 @@ primFunCallResultTy_maybe fun args
         , TypeTuple shapes <- resultShapeType
         , TypeTuple lamty <- t
         -> fmap TypeTuple (zipWithM buildFromSparseResultTy_maybe shapes lamty)
+      (P_map      , TypeTuple [TypeLam t1 t2, TypeTensor i t1'])
+        | t1 `eqType` t1'
+        -> Just (TypeTensor i t2)
       (P_index    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
         -> Just t
@@ -755,6 +758,25 @@ primFunCallResultTy_maybe fun args
         | t1 `eqType` t2
         , isTensorIndexType t1
         -> Just tret
+
+      (P_suffwdpass_map, TypeTuple [lam, vec_s] )
+        | TypeLam s1 (TypeTuple [t, b]) <- lam
+        , TypeTensor i s2 <- vec_s
+        , s1 `eqType` s2
+        -> Just (TypeTuple [TypeTensor i t, TypeTensor i b])
+
+      (P_sufrevpass_map, TypeTuple [ de1
+                                   , TypeLam (TypeTuple [dt1, b1])
+                                             (TypeTuple [ds, de2])
+                                   , TypeTensor i1 dt2
+                                   , TypeTensor i2 b2
+                                   ])
+        | dt1 `eqType` dt2
+        , de1 `eqType` de2
+        , b1 `eqType` b2
+        , i1 == i2
+        -> Just (TypeTuple [TypeTensor i1 ds, de1])
+
 
       (P_elim     , _)                                     -> Just (TypeTuple [])
       (P_dup n, t)                                         -> Just (TypeTuple (replicate n t))
