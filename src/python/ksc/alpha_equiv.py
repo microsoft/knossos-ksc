@@ -93,13 +93,13 @@ def _alpha_hash_var(v: Var, reverse_debruijn_vars: PMap[str, int]) -> int:
 
 @_alpha_hash_helper.register
 def _alpha_hash_let(l: Let, reverse_debruijn_vars: PMap[str, int]) -> int:
-    return hash(("let",
+    return hash((_hash_str("let"),
         _alpha_hash_helper(l.rhs, reverse_debruijn_vars),
         _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.vars.name))))
 
 @_alpha_hash_helper.register
 def _alpha_hash_lam(l: Lam, reverse_debruijn_vars: PMap[str, int]) -> int:
-    return hash(("lam", _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.arg.name))))
+    return hash((_hash_str("lam"), _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.arg.name))))
 
 def alpha_hash(e: Expr):
     return _alpha_hash_helper(e, pmap())
