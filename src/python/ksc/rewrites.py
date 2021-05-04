@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
 from functools import singledispatch
-from typing import Any, Iterator, Optional, Mapping, Tuple, List, FrozenSet
+from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
-from ksc.expr import Expr, Let, Lam, Var, Const, Call, Rule
-from ksc.filter_term import FilterTerm, get_filter_term
+from ksc.expr import ConstantType, StructuredName, Expr, Let, Lam, Var, Const, Call, Rule
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
@@ -65,6 +64,26 @@ def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: L
     assert which_child == 0
     return env.remove(parent.arg.name)
 
+# Note: filter_term
+# A term that allows a quick-rejection test of whether an expression matches a template.
+# That is: get_filter_term computes a FilterTerm from an Expr in time O(1) in the size of the Expr, such that
+# if get_filter_term(template) == get_filter_term(expr) ---> they might match
+#    get_filter_term(template) != get_filter_term(expr) ---> they definitely don't match
+# Moreover, the design aims to optimize the frequency of detecting non-matches.
+FilterTerm = Union[Type, ConstantType, StructuredName]
+
+@singledispatch
+def get_filter_term(e : Expr) -> FilterTerm:
+    return e.__class__
+
+@get_filter_term.register
+def get_filter_term_const(e : Const) -> ConstantType:
+    return e.value
+
+@get_filter_term.register
+def get_filter_term_call(e : Call):
+    return e.name
+
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
 
@@ -86,7 +105,8 @@ class RuleMatcher(AbstractMatcher):
 
     @abstractproperty
     def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
-        """ A set of terms that might be returned by get_filter_term() for any Expr that this rule could possibly match. """
+        """ A set of terms that might be returned by get_filter_term() of any Expr for which this RuleMatcher
+            could possibly generate a match. (See [Note: filter_term].) """
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
