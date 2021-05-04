@@ -298,6 +298,7 @@ class Rule(ASTNode):
           ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
           name    args        e1        e2
     ```
+    See further detail in class ParsedRuleMatcher.
     '''
     name: str
     args: List["Var"]

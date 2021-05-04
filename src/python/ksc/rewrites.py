@@ -175,25 +175,70 @@ class delete_let(RuleMatcher):
         if subtree.vars.name not in subtree.body.free_vars_:
             yield Match(self, root, path_from_root)
 
-# Rules parsed from KS. See Rule. These are of the form
-#   (rule "name" template_vars template replacement)
-# for example a rule to effect a*(b+c) -> a*b+a*c would look like
-#   (rule "distrib_mul_over_add.t2f"
-#         ((a : Float) (b : Tensor 2 Float) (c : Tensor 2 Float)) ;; template_vars
-#         (mul a (add b c)) ;; template
-#         (add (mul a b) (mul b c)) ;; replacement
-#   )
-# or, the inverse a*b+a*c-> a*(b+c)
-#   (rule "add_two_muls.double"
-#       ((a : Float) (b : Float)) ;; template_vars
-#       (add (mul a b) (mul a c)) ;; template --- note a occurs in multiple places, these must be identical
-#       (mul a (add b c)) ;; replacement
-#   )
-# where
-#   template_vars is a list of (name : Type) pairs
-#   template is an Expr, whose free vars are `template_vars`
-#   replacement is an Expr, whose free vars are a subset of `template_vars`
+###############################################################################
+# Rules parsed from KS. See class Rule.
 
+
+class ParsedRuleMatcher(RuleMatcher):
+    """
+    Matches and substitutes according to a monomorphic Rule parsed from .ks. These are of the form
+        (rule "name" template_vars template replacement)
+    for example a rule to effect a*(b+c) -> a*b+a*c would look like
+        (rule "distrib_mul_over_add.t2f"
+            ((a : Float) (b : Tensor 2 Float) (c : Tensor 2 Float)) ;; template_vars
+            (mul a (add b c)) ;; template
+            (add (mul a b) (mul b c)) ;; replacement
+        )
+    or, the inverse a*b+a*c-> a*(b+c)
+        (rule "add_two_muls.double"
+            ((a : Float) (b : Float)) ;; template_vars
+            (add (mul a b) (mul a c)) ;; template --- note a occurs in multiple places, these must be identical
+            (mul a (add b c)) ;; replacement
+        )
+    where:
+         template_vars is a list of (name : Type) pairs
+         template is an Expr, whose free vars are `template_vars`
+         replacement is an Expr, whose free vars are a subset of `template_vars`
+    """
+    def __init__(self, rule: Rule):
+        # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
+        assert rule.e1.type_ == rule.e2.type_ != None
+        known_vars = frozenset([v.name for v in rule.args])
+        # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
+        assert known_vars.issuperset(rule.e1.free_vars_)
+        assert known_vars.issuperset(rule.e2.free_vars_)
+        # TODO: it would be good to check here that any variables *bound* in the LHS template are not declared
+        # as rule arguments, as we require that at rewriting-time:
+        # YES: (rule "foo" ((x : Float)) (let (a x) a) x)
+        # NOT: (rule "foo" ((a : Float) (x : Float)) (let (a x) a) x)
+        # TODO: also, to check that if there are multiple binders on the LHS, they all bind different names.
+        super().__init__(rule.name)
+        self._rule = rule
+        self._arg_types = {v.name: v.type_ for v in rule.args}
+
+    @property
+    def possible_filter_terms(self):
+        return frozenset([get_filter_term(self._rule.e1)])
+
+    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
+        substs = find_template_subst(self._rule.e1, subtree, self._arg_types)
+        if substs is not None:
+            yield Match(self, root, path_from_root, substs)
+
+    def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
+        def apply_here(const_zero: Expr, target: Expr) -> Expr:
+            assert const_zero == Const(0.0) # Passed to replace_subtree below
+            assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
+            result = SubstTemplate.visit(self._rule.e2, substs)
+            # Types copied from the template (down to the variables, and the subject-expr's types from there).
+            # So there should be no need for any further type-propagation.
+            assert result.type_ == target.type_
+            return result
+        # The constant just has no free variables that we want to avoid being captured
+        return replace_subtree(expr, path, Const(0.0), apply_here)
+
+#
+#
 # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
 # the result is then replacement[subst].
 
@@ -302,45 +347,6 @@ class SubstTemplate(ExprTransformer):
             self.visit(l.body, var_names_to_exprs))
         res.type_ = l.type_
         return res
-
-class ParsedRuleMatcher(RuleMatcher):
-    """ Matches and substitutes according to a monomorphic Rule parsed from .ks """
-    def __init__(self, rule: Rule):
-        # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
-        assert rule.e1.type_ == rule.e2.type_ != None
-        known_vars = frozenset([v.name for v in rule.args])
-        # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
-        assert known_vars.issuperset(rule.e1.free_vars_)
-        assert known_vars.issuperset(rule.e2.free_vars_)
-        # TODO: it would be good to check here that any variables *bound* in the LHS template are not declared
-        # as rule arguments, as we require that at rewriting-time:
-        # YES: (rule "foo" ((x : Float)) (let (a x) a) x)
-        # NOT: (rule "foo" ((a : Float) (x : Float)) (let (a x) a) x)
-        # TODO: also, to check that if there are multiple binders on the LHS, they all bind different names.
-        super().__init__(rule.name)
-        self._rule = rule
-        self._arg_types = {v.name: v.type_ for v in rule.args}
-
-    @property
-    def possible_filter_terms(self):
-        return frozenset([get_filter_term(self._rule.e1)])
-
-    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
-        substs = find_template_subst(self._rule.e1, subtree, self._arg_types)
-        if substs is not None:
-            yield Match(self, root, path_from_root, substs)
-
-    def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
-        def apply_here(const_zero: Expr, target: Expr) -> Expr:
-            assert const_zero == Const(0.0) # Passed to replace_subtree below
-            assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
-            result = SubstTemplate.visit(self._rule.e2, substs)
-            # Types copied from the template (down to the variables, and the subject-expr's types from there).
-            # So there should be no need for any further type-propagation.
-            assert result.type_ == target.type_
-            return result
-        # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
 
 def parse_rule_str(ks_str, symtab):
     r = single_elem(list(parse_ks_file(ks_str)))
