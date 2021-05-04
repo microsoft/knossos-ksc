@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod, abstractproperty
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import singledispatch
 from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
 
@@ -24,8 +24,8 @@ class Match:
     expr: Expr # RLO required rule to be passed to Rewrite.apply(), but this seems prone to accidents
     path: Location
 
-    # Anything the RuleMatcher needs to pass from matching to rewriting. Used immutably, but dataclasses don't allow default {}
-    rule_specific_data: Mapping[str, Any] = field(default_factory=dict)
+    # Anything the RuleMatcher needs to pass from matching to rewriting.
+    rule_specific_data: Mapping[str, Any] = pmap()
 
     def apply_rewrite(self):
         return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
