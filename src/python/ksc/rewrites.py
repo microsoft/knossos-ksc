@@ -21,7 +21,7 @@ from ksc.visitors import ExprTransformer
 @dataclass(frozen=True)
 class Match:
     rule: "RuleMatcher"
-    expr: Expr # RLO required rule to be passed to Rewrite.apply(), but this seems prone to accidents
+    expr: Expr
     path: Location
 
     # Anything the RuleMatcher needs to pass from matching to rewriting.
