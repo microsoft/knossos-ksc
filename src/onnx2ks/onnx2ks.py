@@ -33,7 +33,7 @@ import onnx.helper
 import onnx.optimizer
 
 import onnxruntime.capi.onnxruntime_pybind11_state as ort
-from   onnxruntime.capi.onnxruntime_pybind11_state.schemadef import OpSchema
+from onnxruntime.capi.onnxruntime_pybind11_state.schemadef import OpSchema
 
 from ksc.utils import paren
 from ksc.type import Type
@@ -42,13 +42,14 @@ from ksc.expr import pystr
 
 # Pretty printing
 # Importing prettyprint to get the decorated printers for Expression and Type
-import ksc.prettyprint # pylint: disable=unused-import
+import ksc.prettyprint  # pylint: disable=unused-import
 
 # Import the prettyprinter routines we use explicitly in this file
 from prettyprinter import cpprint, pprint, pformat
 
 # Needed this in order to see the error messages when pprint fails
 import warnings
+
 warnings.filterwarnings("always")
 
 ############################################################################
@@ -61,8 +62,9 @@ ATTR_TYPE_TO_KS_TYPE = {
     OpSchema.AttrType.INTS: Type.Tensor(1, Type.Integer),
     OpSchema.AttrType.STRINGS: Type.Tensor(1, Type.String),
     OpSchema.AttrType.TENSORS: Type.Tensor(1, Type.Tensor(-1, Type.Float)),
-    OpSchema.AttrType.GRAPH: Type.Lam(None, None)
+    OpSchema.AttrType.GRAPH: Type.Lam(None, None),
 }
+
 
 def onnxAttrType_to_Type(ty):
     """
@@ -76,10 +78,10 @@ def onnxAttrType_to_Type(ty):
     return ATTR_TYPE_TO_KS_TYPE[ty]
 
 
-# See https://github.com/onnx/onnx/blob/master/onnx/mapping.py	
-TENSOR_TYPE_TO_KS_TYPE = {	
-    int(TensorProto.FLOAT): Type.Float,	
-    int(TensorProto.UINT8): Type.Integer,	
+# See https://github.com/onnx/onnx/blob/master/onnx/mapping.py
+TENSOR_TYPE_TO_KS_TYPE = {
+    int(TensorProto.FLOAT): Type.Float,
+    int(TensorProto.UINT8): Type.Integer,
     int(TensorProto.UINT16): Type.Integer,
     int(TensorProto.INT8): Type.Integer,
     int(TensorProto.INT16): Type.Integer,
@@ -88,12 +90,13 @@ TENSOR_TYPE_TO_KS_TYPE = {
     int(TensorProto.BOOL): Type.Bool,
     int(TensorProto.FLOAT16): Type.Float,
     int(TensorProto.DOUBLE): Type.Float,
-    int(TensorProto.COMPLEX64): Type.Tuple(Type.Float,Type.Float),
-    int(TensorProto.COMPLEX128): Type.Tuple(Type.Float,Type.Float),
+    int(TensorProto.COMPLEX64): Type.Tuple(Type.Float, Type.Float),
+    int(TensorProto.COMPLEX128): Type.Tuple(Type.Float, Type.Float),
     int(TensorProto.UINT32): Type.Integer,
     int(TensorProto.UINT64): Type.Integer,
-    int(TensorProto.STRING): Type.String
+    int(TensorProto.STRING): Type.String,
 }
+
 
 def onnxTensorType_to_Type(ety):
     ty = TENSOR_TYPE_TO_KS_TYPE.get(ety)
@@ -101,18 +104,20 @@ def onnxTensorType_to_Type(ety):
         return ty
     raise NotImplementedError(f"type {ety}")
 
+
 def onnxType_to_Type(proto):
     ety = onnxTensorType_to_Type(proto.tensor_type.elem_type)
     rank = len(proto.tensor_type.shape.dim)
     return Type.Tensor(rank, ety)
+
 
 def get_value(init):
     """
     Get scalar value from a TensorProto
     """
     # https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/onnx.in.proto#L448
-    # Find https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/mapping.py#L49 
-    
+    # Find https://github.com/onnx/onnx/blob/72b701f7a55cafa4b8ab66a21dc22da0905b2f4c/onnx/mapping.py#L49
+
     a = onnx.numpy_helper.to_array(init)
 
     ksty = onnxTensorType_to_Type(init.data_type)
@@ -136,11 +141,13 @@ def get_value(init):
 
     return Const(value)
 
+
 def mkVec(val):
     if isinstance(val, (list, np.ndarray)):
         return Call("Vec_init", [Const(v) for v in val])
     else:
         return Call("Vec_init", [Const(val)])
+
 
 def Expr_from_TensorProto(val, name):
     """
@@ -153,8 +160,9 @@ def Expr_from_TensorProto(val, name):
     if len(val.dims) == 0:
         return get_value(val)
 
-    nptype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[val.data_type] 
+    nptype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[val.data_type]
     return Call(f"load-from-onnx-{nptype}", [*(Const(x) for x in val.dims), Const(name)])
+
 
 def Expr_from_AttrVal(val):
     if isinstance(val, onnx.TensorProto):
@@ -167,7 +175,8 @@ def Expr_from_AttrVal(val):
         val = val.decode("ascii")
     return Const(val)
 
-def Expr_from_Attr(attr : AttributeProto):
+
+def Expr_from_Attr(attr: AttributeProto):
     # ty = onnxAttrType_to_Type(attr.type)
     a = onnx.helper.get_attribute_value(attr)
     return Expr_from_AttrVal(a)
@@ -185,6 +194,7 @@ def emit_inits(inits, body):
         body = Let(var, value, body)
     return body
 
+
 def get_attribute_default_value(attr):
     if not hasattr(attr, "_default_value") or not attr._default_value:
         return None
@@ -196,7 +206,7 @@ def get_attribute_default_value(attr):
     ty = onnxAttrType_to_Type(attr.type)
     if ty.is_scalar:
         return Expr_from_AttrVal(val)
-    
+
     if ty.is_tensor:
         assert isinstance(val, list)
         if isinstance(val[0], bytes):
@@ -204,6 +214,7 @@ def get_attribute_default_value(attr):
         return mkVec(val)
 
     return val
+
 
 def get_default_value(schema, attr):
     val = get_attribute_default_value(attr)
@@ -219,7 +230,7 @@ def get_default_value(schema, attr):
 
     if schema.name == "Conv" or schema.name == "ConvTranspose":
         if attr.name == "pads":
-            return Expr_from_AttrVal([-1, -1]) # TODO: this should either match dims, or maybe be empty
+            return Expr_from_AttrVal([-1, -1])  # TODO: this should either match dims, or maybe be empty
         if attr.name == "output_shape":
             return Expr_from_AttrVal([-1, -1])
 
@@ -233,6 +244,7 @@ def get_default_value(schema, attr):
 
     raise NotImplementedError(f"No default value for {schema.name} attr {attr.name}")
 
+
 def get_all_schemas():
     # Form schema group, take latest version
     schemas = dict()
@@ -243,17 +255,21 @@ def get_all_schemas():
         schemas[name] = schema
     return schemas
 
+
 def encode_name(name: str):
     if re.match("^[0-9]", name):
         return "%" + name
     else:
         return name
 
+
 def useVar(name: str):
     return Var(encode_name(name), None, False)
 
-def defVar(name: str, ty : Type):
+
+def defVar(name: str, ty: Type):
     return Var(encode_name(name), ty, True)
+
 
 def onnx2ks(g):
     """
@@ -277,7 +293,7 @@ def onnx2ks(g):
     # ONNX graph nodes are topologically sorted, so just run through in reverse order
     # making a chain of lets.
     for node in reversed(g.node):
-        opname = node.op_type if not node.domain else node.domain + "." + node.op_type 
+        opname = node.op_type if not node.domain else node.domain + "." + node.op_type
         found_schema = opname in schemas
         if found_schema:
             schema = schemas[opname]
@@ -313,7 +329,7 @@ def onnx2ks(g):
             name = "Cast_" + out_type
 
         else:
-            # Collect attributes. 
+            # Collect attributes.
             # - Some are set on the node.
             node_attrs = dict()
             for n in node.attribute:
@@ -324,25 +340,25 @@ def onnx2ks(g):
                     args += [val]
 
             # - The rest are defaulted
-            for attrname,attr in schema.attributes.items():
+            for attrname, attr in schema.attributes.items():
                 if attrname in node_attrs:
                     args += [node_attrs[attrname]]
                 else:
                     args += [get_default_value(schema, attr)]
 
-        # Are we dropping optional outputs?   
+        # Are we dropping optional outputs?
         # This is typically only known at the call site.
-        # Change the function name to reflect that, 
-        # otherwise type annotation would have to happen 
-        # at more than one place 
+        # Change the function name to reflect that,
+        # otherwise type annotation would have to happen
+        # at more than one place
         n_outputs = len(node.output)
         if found_schema and n_outputs < len(schema.outputs):
             name = f"take{n_outputs}${name}"
 
         # Generate the call node
-        rhs = Call(name, args) 
+        rhs = Call(name, args)
 
-        # Now bind multiple outputs 
+        # Now bind multiple outputs
         # (let ((out1 ... outN) (op args))
         #   body)
         vars = [useVar(o) for o in node.output]
@@ -357,7 +373,7 @@ def onnx2ks(g):
     # And now gather the initializers, and place in Lets
     inputs = set([i.name for i in g.input])
 
-    inits = {init.name:init for init in g.initializer}
+    inits = {init.name: init for init in g.initializer}
 
     internal_inits = []
     for init in g.initializer:
@@ -375,15 +391,16 @@ def onnx2ks(g):
     decl = Def(g.name, body_type, args, ex)
 
     # And emit a "main" to call it with initializers
-    # (def main None () 
+    # (def main None ()
     #     (GraphName initializers.. ) )
     main_body = Call(g.name, [useVar(i.name) for i in g.input])
     input_inits = [inits[i.name] for i in g.input if i.name in inits]
     main_args = [arg for arg in args if arg.name not in inits]
     main = Def("main", body_type, main_args, emit_inits(input_inits, main_body))
 
-    # Collect the two decls 
+    # Collect the two decls
     return [decl, main]
+
 
 if __name__ == "__main__":
     import os
@@ -393,11 +410,13 @@ if __name__ == "__main__":
     argv = sys.argv
 
     if len(argv) == 1:
-        os.makedirs('obj/test/onnx2ks', exist_ok=True)
-        argv = ['*EXE*', 
-            'test/onnx2ks/mnist-7.onnx', 
+        os.makedirs("obj/test/onnx2ks", exist_ok=True)
+        argv = [
+            "*EXE*",
+            "test/onnx2ks/mnist-7.onnx",
             #'test/onnx2k/bert-tiny-uncased_L_3_H_128_A_2_V_30528_S_512_Dp_0.1_optimized_layer_norm_opset12.onnx',
-            'obj/']
+            "obj/",
+        ]
 
     nargs = len(argv) - 1
     if nargs == 0:
@@ -409,23 +428,23 @@ if __name__ == "__main__":
     if nargs == 2:
         outbase = argv[2]
         if outbase.endswith("/"):
-            outbase = outbase + re.sub(r'\.onnx$','',filename)
+            outbase = outbase + re.sub(r"\.onnx$", "", filename)
 
-    type_propagate = False # Let's use onnx shape inference
+    type_propagate = False  # Let's use onnx shape inference
 
     def save(decls, ofn, msg):
         print(f"onnx2ks: Writing to {ofn}")
         with open(ofn, "w") as out:
             out.write(f";; {msg}\n")
             for decl in decls:
-                pprint(decl,width=256,ribbon_width=256,stream=out)
+                pprint(decl, width=256, ribbon_width=256, stream=out)
                 out.write("\n")
 
     # Load our file
     print(f"onnx2ks: Reading from {filename}")
     model = onnx.load(filename)
 
-    # Make output dir 
+    # Make output dir
     odir = os.path.dirname(outbase)
     print(f"onnx2ks: Making output dir {odir}")
     os.makedirs(odir, exist_ok=True)
@@ -438,8 +457,8 @@ if __name__ == "__main__":
     model = onnx.shape_inference.infer_shapes(model)
 
     if False:
-        # Trying to fix non-topological sort from 
-        onnx.optimizer.optimize(model, ["extract_constant_to_initializer"]) 
+        # Trying to fix non-topological sort from
+        onnx.optimizer.optimize(model, ["extract_constant_to_initializer"])
         onnx.checker.check_model(model)
     decls = onnx2ks(model.graph)
 
@@ -474,8 +493,7 @@ if __name__ == "__main__":
         # Pretty print
         for decl in decls:
             cpprint(decl, width=132, ribbon_width=132)
-            print('')
-
+            print("")
 
 
 # %%

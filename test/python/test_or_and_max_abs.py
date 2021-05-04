@@ -1,5 +1,6 @@
 from ksc.utils import translate_and_import
 
+
 def test_abs():
     ks_str = """
 (edef abs Integer (Integer))
@@ -12,6 +13,7 @@ def test_abs():
     assert py_out.test(1) == 1
     assert py_out.test(-1) == 1
 
+
 def test_max():
     ks_str = """
 (edef max Integer (Tuple Integer Integer))
@@ -22,6 +24,7 @@ def test_max():
     py_out = translate_and_import(__file__, ks_str, "common")
     x, y, z = 1, 2, -1
     assert py_out.test(x, y, z) == 2
+
 
 def test_or():
     ks_str = """
@@ -36,6 +39,7 @@ def test_or():
     assert py_out.test(1) == True
     assert py_out.test(0) == False
     assert py_out.test(-1) == True
+
 
 def test_and():
     ks_str = """

@@ -2,6 +2,7 @@ from collections import defaultdict
 from ksc.type import Type
 from ksc.shape import ShapeType, Shape, shape_type_from_object, shape_type_matches, ScalarShape
 
+
 def _cleanup_value(data):
     st = shape_type_from_object(data)
     if st.type.is_tuple:
@@ -9,6 +10,7 @@ def _cleanup_value(data):
     if st.type.is_tensor:
         return None
     return data
+
 
 class AbstractValue:
     def __init__(self, shape=None, type=None, data=None, context=None):
@@ -62,6 +64,7 @@ class AbstractValue:
     def __repr__(self):
         return f"AbstractValue(shape={self._shape}, type={self._type}, data={self._data}, context={self._context})"
 
+
 def get_default_cost_config():
     return {
         "let_cost": 0.1,
@@ -71,8 +74,9 @@ def get_default_cost_config():
         "size_cost": 1,
         "select_cost": 0,
         "if_selection_cost": 1,
-        "if_epsilon": 0.0001
+        "if_epsilon": 0.0001,
     }
+
 
 class ExecutionContext:
     """
@@ -80,6 +84,7 @@ class ExecutionContext:
     The current execution context is the last element of the global variable
     _execution_contexts
     """
+
     def __init__(self, config=None):
         self._costs = defaultdict(float)
         self._config = get_default_cost_config() if config is None else config
@@ -108,7 +113,9 @@ class ExecutionContext:
             raise ValueError(f"Cannot add cost {cost} for {name} in state {state}!")
         # print(f"{self.__repr__()}: Added cost {cost:.2e} for {name} in state {state} (accumulated: {self.costs})")
 
+
 _execution_contexts = []
+
 
 def current_execution_context():
     if len(_execution_contexts) == 0:

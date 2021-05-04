@@ -1,7 +1,9 @@
 import numpy as np
 
+
 class KSTypeError(RuntimeError):
     pass
+
 
 class Type:
     """
@@ -12,15 +14,16 @@ class Type:
         Lam S T
         LM  S T
     """
+
     node_kinds = {
-        "Tensor": 2, # two children (Rank, Type)
-        "Tuple": -1, # special case two or more
+        "Tensor": 2,  # two children (Rank, Type)
+        "Tuple": -1,  # special case two or more
         "Integer": 0,
         "Float": 0,
         "Bool": 0,
         "String": 0,
-        "Lam": 2, # TODO: Lambda args are in reverse order, prefer src -> dst
-        "LM": 2 # Linear map, used in AD
+        "Lam": 2,  # TODO: Lambda args are in reverse order, prefer src -> dst
+        "LM": 2,  # Linear map, used in AD
     }
 
     def __init__(self, kind, children=[]):
@@ -29,14 +32,16 @@ class Type:
 
         if kind != "Tuple":
             if Type.node_kinds[kind] != len(children):
-                raise KSTypeError(f"Type {kind} has {len(children)} parameters, but needs {Type.node_kinds[kind]}") # dont' check for 1-tuple
+                raise KSTypeError(
+                    f"Type {kind} has {len(children)} parameters, but needs {Type.node_kinds[kind]}"
+                )  # dont' check for 1-tuple
         if kind == "Tensor":
             assert isinstance(children[0], int) and isinstance(children[1], Type)
         else:
             assert all((ch is None or isinstance(ch, Type)) for ch in children)
-        
+
         self.kind = kind
-        self.children = children # TODO: change to _children and use tuple_elem or tensor_* or lambda_* to access
+        self.children = children  # TODO: change to _children and use tuple_elem or tensor_* or lambda_* to access
 
     ################
     ## Constructors
@@ -69,11 +74,11 @@ class Type:
         """
         Constructor: Type.LM(S, T)
         """
-        return Type("LM", [arg_type, return_type]) 
+        return Type("LM", [arg_type, return_type])
 
     ################
     ## Predicates
-    
+
     @property
     def is_scalar(self):
         return self.kind in ["Integer", "Float", "Bool", "String"]
@@ -92,7 +97,7 @@ class Type:
 
     def can_accept_value_of_type(self, other):
         """ Finds if a variable of type 'other' can fit into this type.  """
-        if other is None: # Allow unknown arguments to fit into any (known) parameter
+        if other is None:  # Allow unknown arguments to fit into any (known) parameter
             return True
         if self.kind != other.kind:
             return False
@@ -108,7 +113,7 @@ class Type:
 
     @property
     def tensor_rank(self):
-        assert self.is_tensor 
+        assert self.is_tensor
         return self.children[0]
 
     @property
@@ -184,14 +189,14 @@ class Type:
         return None
 
     def shortstr(self, tb="<", te=">"):
-        el_types = {"Integer": "i", "Bool": "b", "String" : "s", "Float": "f", "Lam": "l", "LM": "l"}
+        el_types = {"Integer": "i", "Bool": "b", "String": "s", "Float": "f", "Lam": "l", "LM": "l"}
         if self.kind in el_types:
             return el_types[self.kind]
         if self.is_tuple:
             return tb + "".join([c.shortstr() for c in self.children]) + te
         if self.is_tensor:
             return f"T{self.tensor_rank}" + self.tensor_elem_type.shortstr()
-        
+
         raise ValueError(f"Unknown Type.{self.kind}")
 
     @staticmethod
@@ -213,13 +218,12 @@ class Type:
         return self.shortstr("_t", "t_")
 
     @staticmethod
-    def is_type_introducer(sym : str):
+    def is_type_introducer(sym: str):
         """
         For parsers: could sym be the introducer of a type?
         True for "Tensor", "Float", etc
         """
         return sym in Type.node_kinds
-
 
     def __str__(self):
         if len(self.children) == 0 and (self.kind != "Tuple"):
@@ -241,7 +245,7 @@ class Type:
         if other is None or self.kind != other.kind:
             return False
         # Now self.kind == other.kind
-        if self.is_scalar: 
+        if self.is_scalar:
             return True
         if self.is_tuple and len(self.children) != len(other.children):
             return False
@@ -249,6 +253,7 @@ class Type:
 
     def __hash__(self):
         return hash(str(self))
+
 
 def make_tuple_if_many(types):
     """
@@ -269,16 +274,17 @@ Type.Float = Type("Float")
 Type.Bool = Type("Bool")
 Type.String = Type("String")
 
+
 class SizeType:
     @staticmethod
-    def from_rank(n : int) -> Type:
+    def from_rank(n: int) -> Type:
         if n == 1:
             return Type.Integer
         else:
             return Type.Tuple(*tuple(Type.Integer for _ in range(n)))
 
     @staticmethod
-    def get_rank(ty : Type) -> int:
+    def get_rank(ty: Type) -> int:
         if ty == Type.Integer:
             return 1
         if ty.is_tuple and all(ty == Type.Integer for ty in ty.tuple_elems()):
@@ -286,11 +292,12 @@ class SizeType:
         return None
 
     @staticmethod
-    def isa(ty : Type) -> bool:
+    def isa(ty: Type) -> bool:
         return SizeType.get_rank(ty) is not None
 
+
 # See AD.hs:tangentType
-def tangent_type(ty : Type) -> Type:
+def tangent_type(ty: Type) -> Type:
     if ty in (Type.String, Type.Integer, Type.Bool):
         return Type.Tuple()
     if ty == Type.Float:
@@ -302,8 +309,9 @@ def tangent_type(ty : Type) -> Type:
 
     raise NotImplementedError("tangent_type")
 
+
 # See Prim.hs:shapeType
-def shape_type(t : Type) -> Type:
+def shape_type(t: Type) -> Type:
     if t.is_scalar:
         return Type.Tuple()
     if t.is_tuple:
