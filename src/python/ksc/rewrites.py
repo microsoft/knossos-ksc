@@ -92,16 +92,14 @@ def rule(name: str) -> "RuleMatcher":
     return _rule_dict[name]
 
 class RuleMatcher(AbstractMatcher):
+    name: str  # Should be immutable
+
     def __init__(self, name=None):
         if name is None:
             name = self.__class__.__name__
         assert name not in _rule_dict
         _rule_dict[name] = self
-        self._name = name
-
-    @property
-    def name(self):
-        return self._name
+        self.name = name
 
     @abstractproperty
     def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
