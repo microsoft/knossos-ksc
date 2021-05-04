@@ -89,14 +89,37 @@ def test_simple_parsed_rule():
     decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
     type_propagate_decls(decls_prelude, symtab)
 
-    r = parse_rule_str('(rule "mul2_to_add" (x : Float) (mul x 2.0) (add x x))', symtab)
-    foo, rewritten = (
+    r = parse_rule_str('(rule "mul2_to_add$f" (x : Float) (mul x 2.0) (add x x))', symtab)
+    input1, expected1 = (
         parse_expr_string("(if p (mul (add a b) 2.0) (mul a 3.0))"),
         parse_expr_string("(if p (add (add a b) (add a b)) (mul a 3.0))"))
 
-    type_propagate_decls([foo, rewritten], {**symtab, "p": Type.Bool, "a": Type.Float, "b": Type.Float})
-    all_rewrites = [m.apply_rewrite() for m in r.find_all_matches(foo)]
-    assert all_rewrites == [rewritten]
+    type_propagate_decls([input1, expected1], {**symtab, "p": Type.Bool, "a": Type.Float, "b": Type.Float})
+    actual1 = sorted_rewrites(r, input1)
+    assert actual1 == [expected1]
+
+    input2, expected2 = (
+        parse_expr_string("(mul (to_float (mul x 2)) 2.0)"),
+        parse_expr_string("(add (to_float (mul x 2)) (to_float (mul x 2)))")
+    )
+
+    type_propagate_decls([input2, expected2], {**symtab, "x": Type.Integer})
+    actual2 = sorted_rewrites(r, input2)
+    assert actual2 == [expected2]
+
+def test_parsed_rule_respects_types():
+    symtab = dict()
+    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+    type_propagate_decls(decls_prelude, symtab)
+
+    # Check that we only match subtrees of specified type (without relying on the StructuredNames being different)
+    r = parse_rule_str('(rule "rm.let$i" (e : Integer) (let (x e) x) e)', symtab)
+    applicable_expr = parse_expr_string("(let (y 4) y)")
+    inapplicable_expr = parse_expr_string("(let (z 5.0) z)")
+
+    type_propagate_decls([applicable_expr, inapplicable_expr], symtab)
+    assert sorted_rewrites(r, applicable_expr) == [parse_expr_string("4")]
+    assert len(list(r.find_all_matches(inapplicable_expr))) == 0
 
 def test_parsed_rule_capture():
     symtab = dict()
