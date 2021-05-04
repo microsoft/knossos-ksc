@@ -1,12 +1,12 @@
 from functools import singledispatch
 from hashlib import sha224
-from typing import NamedTuple
+from typing import NamedTuple, Type
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from ksc.cav_subst import get_children
-from ksc.expr import  Expr, Var, Let, Lam
+from ksc.expr import  Expr, Var, Let, Lam, Call, If, Assert, Const
 from ksc.filter_term import get_filter_term
 
 def are_alpha_equivalent(exp1, exp2):
@@ -66,6 +66,13 @@ def _hash_str(s: str) -> int:
     hex: str = sha224(s.encode()).hexdigest()
     return int(hex[:16], base=16)
 
+# For most Expr-subclasses we use a repeatable hash of the class name.
+# (Directly hashing the class is not repeatable across python VM invocations even if PYTHONHASHSEED is fixed.)
+# Cache that here.
+_class_hashes: PMap[Type[Expr], int] = pmap({
+    clazz: _hash_str(clazz.__name__) for clazz in [If, Assert, Let, Lam]
+})
+
 # The hashing routines below use deBruijn indices stored in a map whose values are reversed:
 # the outermost (non-shadowed) binder has stored value 0,
 # the innermost (closest) binder has stored value (the number of keys in the map, minus 1).
@@ -74,14 +81,23 @@ def _hash_str(s: str) -> int:
 def _add_var(reverse_debruijn_vars: PMap[str, int], varname: str) -> PMap[str, int]:
     return reverse_debruijn_vars.set(varname, len(reverse_debruijn_vars))
 
+def _hash_children(node_type_hash: int, e: Expr, reverse_debruijn_vars: PMap[str, int]) -> int:
+    return hash((node_type_hash, *(_alpha_hash_helper(ch, reverse_debruijn_vars) for ch in get_children(e))))
+
 @singledispatch
 def _alpha_hash_helper(e: Expr, reverse_debruijn_vars: PMap[str, int]) -> int:
     # Default case.
-    # get_filter_term and get_children together are enough to identify anything that isn't or doesn't bind a variable.
-    # However, the FilterTerm may be a class, the hash of which seems to be different each run
-    # (even if PYTHONHASHSEED is specified!), so use repeatable string hashing above.
-    node_type_hash = _hash_str(str(get_filter_term(e)))
-    return hash((node_type_hash, *(_alpha_hash_helper(ch, reverse_debruijn_vars) for ch in get_children(e))))
+    return _hash_children(_class_hashes[e.__class__], e, reverse_debruijn_vars)
+
+@_alpha_hash_helper.register
+def _alpha_hash_const(c: Const, reverse_debruijn_vars: PMap[str, int]) -> int:
+    # System hash() is repeatable for int/float but not str.
+    return _hash_str(c.value) if isinstance(c.value, str) else hash(c.value)
+
+@_alpha_hash_helper.register
+def _alpha_hash_call(c: Call, reverse_debruijn_vars: PMap[str, int]) -> int:
+    # StructuredName can be hash()'d directly but again this depends on PYTHONHASHSEED.
+    return _hash_children(_hash_str(str(c.name)), c, reverse_debruijn_vars)
 
 @_alpha_hash_helper.register
 def _alpha_hash_var(v: Var, reverse_debruijn_vars: PMap[str, int]) -> int:
@@ -93,13 +109,14 @@ def _alpha_hash_var(v: Var, reverse_debruijn_vars: PMap[str, int]) -> int:
 
 @_alpha_hash_helper.register
 def _alpha_hash_let(l: Let, reverse_debruijn_vars: PMap[str, int]) -> int:
-    return hash((_hash_str("let"),
+    return hash((_class_hashes[Let],
         _alpha_hash_helper(l.rhs, reverse_debruijn_vars),
         _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.vars.name))))
 
 @_alpha_hash_helper.register
 def _alpha_hash_lam(l: Lam, reverse_debruijn_vars: PMap[str, int]) -> int:
-    return hash((_hash_str("lam"), _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.arg.name))))
+    return hash((_class_hashes[Lam],
+        _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.arg.name))))
 
 def alpha_hash(e: Expr):
     return _alpha_hash_helper(e, pmap())
