@@ -177,7 +177,7 @@ class delete_let(RuleMatcher):
 
 ###############################################################################
 # Rules parsed from KS. See class Rule.
-
+#
 
 class ParsedRuleMatcher(RuleMatcher):
     """
@@ -205,12 +205,8 @@ class ParsedRuleMatcher(RuleMatcher):
         assert rule.e1.type_ == rule.e2.type_ != None
         known_vars = frozenset([v.name for v in rule.args])
         # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
-        assert known_vars.issuperset(rule.e1.free_vars_)
+        assert known_vars == rule.e1.free_vars_
         assert known_vars.issuperset(rule.e2.free_vars_)
-        # TODO: it would be good to check here that any variables *bound* in the LHS template are not declared
-        # as rule arguments, as we require that at rewriting-time:
-        # YES: (rule "foo" ((x : Float)) (let (a x) a) x)
-        # NOT: (rule "foo" ((a : Float) (x : Float)) (let (a x) a) x)
         # TODO: also, to check that if there are multiple binders on the LHS, they all bind different names.
         super().__init__(rule.name)
         self._rule = rule
@@ -221,6 +217,8 @@ class ParsedRuleMatcher(RuleMatcher):
         return frozenset([get_filter_term(self._rule.e1)])
 
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
+        # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
+        # the result will then be replacement[subst].
         substs = find_template_subst(self._rule.e1, subtree, self._arg_types)
         if substs is not None:
             yield Match(self, root, path_from_root, substs)
@@ -237,10 +235,6 @@ class ParsedRuleMatcher(RuleMatcher):
         # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
-#
-#
-# The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
-# the result is then replacement[subst].
 
 def _combine_substs(s1: VariableSubstitution, s2: Optional[VariableSubstitution]) -> Optional[VariableSubstitution]:
     if s2 is None:
