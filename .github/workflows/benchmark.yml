@@ -4,6 +4,9 @@ on:
   schedule:
     - cron:  '5 3 * * *'
 
+  push:
+    branches: [cogravil/benchmarkresults]
+
   workflow_dispatch:
 
 jobs:
@@ -35,4 +38,11 @@ jobs:
         with:
           name: benchmark
           path: .benchmarks/*
+      
+      # docs.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-v10#obtain-a-static-download-link
+      - name: 'Obtain AzCopy'
+        run: wget -O azcopy_v10.tar.gz https://aka.ms/downloadazcopy-v10-linux && tar -xf azcopy_v10.tar.gz --strip-components=1
+        
+      - name: 'test run AzCopy'
+        run: ./azcopy --help
       
