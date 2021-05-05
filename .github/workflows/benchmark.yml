@@ -47,7 +47,5 @@ jobs:
         env:
           BENCHMARK_SAS: ${{ secrets.BENCHMARK_SAS }}
         run: |
-          ls -a
-          ls .benchmarks/
-          ./azcopy copy ".benchmarks/*" "$BENCHMARK_SAS"
+          ./azcopy copy ".benchmarks/*" "$BENCHMARK_SAS" --recursive
       
