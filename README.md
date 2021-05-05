@@ -60,8 +60,8 @@ The lisp-like IR is extremely simple -- all the language builtins are in this co
 
 ;; Rewrite rule
 (rule "mul.commute"                     ; rule name
-    ((a : Float) (b : Float))           ; free variables
-    (mul a b)                           ; pattern to match
+    ((a : Float) (b : Float))           ; "template_vars": free variables in the template
+    (mul a b)                           ; "template": a pattern to match
     (mul b a))                          ; replacement
 ; Rules are *not* applied exhaustively, that's very intentionally left up to the compiler.  
 ; For example the rule above, if matched exhaustively would not terminate.
