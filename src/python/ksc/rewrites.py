@@ -14,9 +14,12 @@ from ksc.type_propagate import type_propagate
 from ksc.utils import singleton, single_elem
 from ksc.visitors import ExprTransformer
 
-# A RuleMatcher identifies places where a rule can be applied to an expression, each recorded in a Match.
-# Given a Match, we can then rewrite the expression to yield a new Expr.
-# RuleMatchers may use rules parsed from KS (see ParsedRuleMatcher below) or expressed in python.
+# A rule is, conceptually, some kind of formula for transforming an expression: it may be expressed as a Rule parsed from KS, or in python.
+# In code, each such rule is an instance of RuleMatcher; class ParsedRuleMatcher deals with "Rule"s written in KS.
+# Each place within expression that the RuleMatcher can be applied, is a "Match",
+#   and each Match corresponds to exactly one "rewrite":  the process of actually producing the transformed expression.
+# (Performing the rewrite, may be much more expensive than merely detecting that it is possible to do so:
+# the Match records the latter, its apply_rewrite() method enacts the former.)
 
 @dataclass(frozen=True)
 class Match:
@@ -174,7 +177,7 @@ class delete_let(RuleMatcher):
             yield Match(self, root, path_from_root)
 
 ###############################################################################
-# Rules parsed from KS. See class Rule.
+# Rules parsed from KS. See class Rule (which has a shorter overview of syntax)
 #
 
 class ParsedRuleMatcher(RuleMatcher):
