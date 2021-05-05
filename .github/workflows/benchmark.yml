@@ -46,5 +46,5 @@ jobs:
       - name: 'Upload result AzCopy'
         env:
           BENCHMARK_SAS: ${{ secrets.BENCHMARK_SAS }}
-        run: ./azcopy copy '.benchmarks/*' '$BENCHMARK_SAS'
+        run: ./azcopy copy ".benchmarks/*" "$BENCHMARK_SAS"
       
