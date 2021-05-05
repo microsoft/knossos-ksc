@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import os
-from ksc.torch_utils import elementwise_apply
+from ksc.torch_utils import elementwise_apply, elementwise_apply_pt18
 from collections import OrderedDict
 
 # BEGINDOC
@@ -20,9 +20,18 @@ def relu3(x: float) -> float:
 
 # ENDDOC
 
-# run-bench: Knossos source
+
+@torch.jit.ignore
+def mymap(f: str, x: torch.Tensor) -> torch.Tensor:
+    pass
+
+
 def vrelu3(x: torch.Tensor):
-    return elementwise_apply(relu3, x)
+    return mymap("relu3", x)
+
+
+#  return torch.tensor([relu3(xij) for xij in x.flatten()]).reshape(x.shape)
+#  return torch.tensor([relu3(xij) for xij in x])
 
 
 # run-bench: PyTorch reference implementation
@@ -52,7 +61,7 @@ def relu3_pytorch_nice(x: float) -> float:
 
 
 def vrelu3_pytorch_nice(x: torch.Tensor):
-    return elementwise_apply(relu3_pytorch_nice, x)
+    return torch.vmap(relu3_pytorch_nice, x)
 
 
 def vrelu3_cuda_init():
@@ -100,8 +109,8 @@ def vrelu3_cuda_init():
 
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
-    yield torch.randn((4, 4))
-    yield torch.randn((16, 16))
+    yield torch.randn((4,))
+    yield torch.randn((16,))
 
 
 # yield torch.randn((256,256)) too slow to bench...
