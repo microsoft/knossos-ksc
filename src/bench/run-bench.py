@@ -114,14 +114,18 @@ def bench(module_name, bench_name):
 
     # TODO: elementwise_apply  
     ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
+        
 
     for arg in configs:
         assert fun_and_grad_matches(pt_fast, ks_fun, arg)
         assert fun_and_grad_matches(pt_fast, pt_nice, arg)
-        assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
+        if ks_compiled:
+            assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
         timeit(bench_name + ' PyTorch fast', pt_fast, arg)
         timeit(bench_name + ' PyTorch nice', pt_nice, arg)
-        timeit(bench_name + ' Knossos', ks_compiled.apply, arg)
+        timeit(bench_name + ' Knossos raw', ks_fun, arg)
+        if ks_compiled:
+            timeit(bench_name + ' Knossos', ks_compiled.apply, arg)
 
 if __name__ == "__main__":
     import sys

@@ -4,7 +4,8 @@ import torch
 
 # Slow implementation, to be improved
 # See https://github.com/pytorch/pytorch/issues/8304
-def elementwise_apply_pt18(f, x : torch.Tensor):
+@torch.jit.ignore
+def elementwise_apply_pt18(f, x : torch.Tensor) -> torch.Tensor:
   # TODO: torch.vmap in 1.9
   y = torch.zeros_like(x)
   sz = x.shape

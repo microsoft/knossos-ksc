@@ -22,6 +22,7 @@
 			"env": {
 				"PYTHONPATH": "examples/dl-activations"
 			},
+			"justMyCode": false,
 			"console": "integratedTerminal"
 		},
 		{
