@@ -43,6 +43,8 @@ jobs:
       - name: 'Obtain AzCopy'
         run: wget -O azcopy_v10.tar.gz https://aka.ms/downloadazcopy-v10-linux && tar -xf azcopy_v10.tar.gz --strip-components=1
         
-      - name: 'test run AzCopy'
-        run: ./azcopy --help
+      - name: 'Upload result AzCopy'
+        env:
+          BENCHMARK_SAS: ${{ secrets.BENCHMARK_SAS }}
+        run: ./azcopy copy '.benchmarks/*' '$BENCHMARK_SAS'
       
