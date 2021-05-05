@@ -127,8 +127,13 @@ class RuleMatcher(AbstractMatcher):
         return (rule, (self.name,))
 
 class RuleSet(AbstractMatcher):
+    """ Finds 'Match's for many rules (many different RuleMatcher objects) while performing
+        only a single traversal of the Expr (and associated environment-building). """
     def __init__(self, rules):
         # TODO also allow global (any-class) rules?
+        # As an optimization, at each node in the Expr tree, we'll look for matches only from
+        # RuleMatchers whose possible_filter_terms match at that position in the tree.
+        # (This checks equality of the outermost constructor of the template, but no deeper.)
         self._filtered_rules = {}
         for rule in rules:
             for term in rule.possible_filter_terms:
