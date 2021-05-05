@@ -30,9 +30,9 @@ from ksc.utils import paren, KRecord
 #       name  return_type  arg_type
 #
 # Rule: Rewrite rule for the Knossos optimizer 
-# (rule "add0"  (a : Float) (add a 0) a)
-#       ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
-#       name    args        e1        e2
+# (rule "add0"  (a : Float)     (add a 0)   a)
+#       ^^^^^^  ^^^^^^^^^^^     ^^^^^^^^^   ^
+#       name    template_vars   template    replacement
 #
 ### Expression nodes (Expr):
 # 
@@ -291,21 +291,22 @@ class GDef(ASTNode):
         return StructuredName((derivation, function_name))
 
 class Rule(ASTNode):
-    '''Rule(name, args, e1, e2). 
+    '''Rule(name, template_vars, template, replacement). 
     Example:
     ```
-    (rule "add0"  (a : Float) (add a 0) a)
-          ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
-          name    args        e1        e2
+    (rule "add0"  (a : Float)     (add a 0)   a)
+          ^^^^^^  ^^^^^^^^^^^     ^^^^^^^^^   ^
+          name    template_vars   template    replacement
     ```
+    See further detail in class ParsedRuleMatcher.
     '''
     name: str
-    args: List["Var"]
-    e1: Expr
-    e2: Expr
+    template_vars: List["Var"]
+    template: Expr
+    replacement: Expr
 
-    def __init__(self, name, args, e1, e2):
-        super().__init__(name=name, args=args, e1=e1, e2=e2)
+    def __init__(self, name, template_vars, template, replacement):
+        super().__init__(name=name, template_vars=template_vars, template=template, replacement=replacement)
 
 ConstantType = Union[int, str, float, bool]
 
@@ -365,10 +366,10 @@ class Call(Expr):
     name: StructuredName
     args: List[Expr]
 
-    def __init__(self, name, args):
+    def __init__(self, name, args, type=None):
         if isinstance(name, str):
             name = StructuredName.from_str(name)
-        super().__init__(name=name, args=args)
+        super().__init__(name=name, args=args, type_=type)
 
 class Lam(Expr):
     '''Lam(arg, body).
@@ -382,8 +383,8 @@ class Lam(Expr):
     arg: Var
     body: Expr
 
-    def __init__(self, arg, body):
-        super().__init__(type_=None, arg=arg, body=body)
+    def __init__(self, arg, body, type=None):
+        super().__init__(arg=arg, body=body, type_=type)
 
 class Let(Expr):
     '''Let(vars, rhs, body). 
@@ -403,8 +404,8 @@ class Let(Expr):
     rhs: Expr
     body: Expr
 
-    def __init__(self, vars, rhs, body):
-        super().__init__(vars=vars, rhs=rhs, body=body)
+    def __init__(self, vars, rhs, body, type=None):
+        super().__init__(vars=vars, rhs=rhs, body=body, type_=type)
 
 
 class If(Expr):
@@ -420,8 +421,8 @@ class If(Expr):
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
 
-    def __init__(self, cond, t_body, f_body):
-        super().__init__(cond=cond, t_body=t_body, f_body=f_body)
+    def __init__(self, cond, t_body, f_body, type=None):
+        super().__init__(cond=cond, t_body=t_body, f_body=f_body, type_=type)
 
 class Assert(Expr):
     '''Assert(cond, body).
@@ -435,8 +436,8 @@ class Assert(Expr):
     cond: Expr    # Condition
     body: Expr    # Value if true
 
-    def __init__(self, cond, body):
-        super().__init__(cond=cond, body=body)
+    def __init__(self, cond, body, type=None):
+        super().__init__(cond=cond, body=body, type_=type)
 
 #####################################################################
 # pystr:
@@ -501,10 +502,10 @@ def _(ex, indent):
 @pystr.register(Rule)
 def _(ex, indent):
     indent += 1
-    return "@rule\ndef " + pyname(ex.name) + " " + "(" + pystr(ex.args, indent) + ")" + ":" + nl(indent) \
-           + pystr(ex.e1, indent+1) + nl(indent) \
+    return "@rule\ndef " + pyname(ex.name) + " " + "(" + pystr(ex.template_vars, indent) + ")" + ":" + nl(indent) \
+           + pystr(ex.template, indent+1) + nl(indent) \
            + "<===> " + nl(indent) \
-           + pystr(ex.e2, indent+1)
+           + pystr(ex.replacement, indent+1)
 
 @pystr.register(Const)
 def _(ex, indent):
