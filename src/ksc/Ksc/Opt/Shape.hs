@@ -33,7 +33,7 @@ optShape (App{})        = Nothing
 optShapePrim :: PrimFun -> TExpr -> Maybe TExpr
 -- v ✓
 optShapePrim (P_SelFun i n) e = Just $ pSel i n (pShape e)
--- v Needs to change beacuse pShape n could be unit
+-- v Needs to change because pShape n could be unit
 optShapePrim P_index (Tuple [i, n]) = Just $ pIndex i (pShape n)
                                     -- ^ ?
 -- v Needs to change because the shape of the element type could be unit
