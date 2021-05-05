@@ -30,9 +30,9 @@ from ksc.utils import paren, KRecord
 #       name  return_type  arg_type
 #
 # Rule: Rewrite rule for the Knossos optimizer 
-# (rule "add0"  (a : Float) (add a 0) a)
-#       ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
-#       name    args        e1        e2
+# (rule "add0"  (a : Float)     (add a 0)   a)
+#       ^^^^^^  ^^^^^^^^^^^     ^^^^^^^^^   ^
+#       name    template_vars   template    replacement
 #
 ### Expression nodes (Expr):
 # 
@@ -291,22 +291,22 @@ class GDef(ASTNode):
         return StructuredName((derivation, function_name))
 
 class Rule(ASTNode):
-    '''Rule(name, args, e1, e2). 
+    '''Rule(name, template_vars, template, replacement). 
     Example:
     ```
-    (rule "add0"  (a : Float) (add a 0) a)
-          ^^^^^^  ^^^^^^^^^^^ ^^^^^^^^^ ^
-          name    args        e1        e2
+    (rule "add0"  (a : Float)     (add a 0)   a)
+          ^^^^^^  ^^^^^^^^^^^     ^^^^^^^^^   ^
+          name    template_vars   template    replacement
     ```
     See further detail in class ParsedRuleMatcher.
     '''
     name: str
-    args: List["Var"]
-    e1: Expr
-    e2: Expr
+    template_vars: List["Var"]
+    template: Expr
+    replacement: Expr
 
-    def __init__(self, name, args, e1, e2):
-        super().__init__(name=name, args=args, e1=e1, e2=e2)
+    def __init__(self, name, template_vars, template, replacement):
+        super().__init__(name=name, template_vars=template_vars, template=template, replacement=replacement)
 
 ConstantType = Union[int, str, float, bool]
 
@@ -502,10 +502,10 @@ def _(ex, indent):
 @pystr.register(Rule)
 def _(ex, indent):
     indent += 1
-    return "@rule\ndef " + pyname(ex.name) + " " + "(" + pystr(ex.args, indent) + ")" + ":" + nl(indent) \
-           + pystr(ex.e1, indent+1) + nl(indent) \
+    return "@rule\ndef " + pyname(ex.name) + " " + "(" + pystr(ex.template_vars, indent) + ")" + ":" + nl(indent) \
+           + pystr(ex.template, indent+1) + nl(indent) \
            + "<===> " + nl(indent) \
-           + pystr(ex.e2, indent+1)
+           + pystr(ex.replacement, indent+1)
 
 @pystr.register(Const)
 def _(ex, indent):

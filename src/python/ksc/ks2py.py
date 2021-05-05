@@ -58,10 +58,10 @@ def _(ex, indent, body):
 @emit.register(Rule)
 def _(ex, indent, body):
     indent += 1
-    return "@rule\ndef " + pyname(ex.name) + " " + "(" + emit(ex.args, indent, body) + ")" + ":" + nl(indent) \
-           + emit(ex.e1, indent +1, body) + nl(indent) \
+    return "@rule\ndef " + pyname(ex.name) + " " + "(" + emit(ex.template_vars, indent, body) + ")" + ":" + nl(indent) \
+           + emit(ex.template, indent +1, body) + nl(indent) \
            + "<===> " + nl(indent) \
-           + emit(ex.e2, indent +1, body)
+           + emit(ex.replacement, indent +1, body)
 
 @emit.register(Const)
 def _(ex, indent, body):

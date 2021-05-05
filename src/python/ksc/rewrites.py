@@ -203,32 +203,32 @@ class ParsedRuleMatcher(RuleMatcher):
     """
     def __init__(self, rule: Rule):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
-        assert rule.e1.type_ == rule.e2.type_ != None
-        known_vars = frozenset([v.name for v in rule.args])
+        assert rule.template.type_ == rule.replacement.type_ != None
+        known_vars = frozenset([v.name for v in rule.template_vars])
         # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
-        assert known_vars == rule.e1.free_vars_
-        assert known_vars.issuperset(rule.e2.free_vars_)
+        assert known_vars == rule.template.free_vars_
+        assert known_vars.issuperset(rule.replacement.free_vars_)
         # TODO: check that if there are multiple binders on the LHS, they all bind different names.
         super().__init__(rule.name)
         self._rule = rule
-        self._arg_types = pmap({v.name: v.type_ for v in rule.args})
+        self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
 
     @property
     def possible_filter_terms(self):
-        return frozenset([get_filter_term(self._rule.e1)])
+        return frozenset([get_filter_term(self._rule.template)])
 
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
-        substs = find_template_subst(self._rule.e1, subtree, self._arg_types)
+        substs = find_template_subst(self._rule.template, subtree, self._arg_types)
         if substs is not None:
             yield Match(self, root, path_from_root, substs)
 
     def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
-            assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
-            result = SubstTemplate.visit(self._rule.e2, substs)
+            assert SubstTemplate.visit(self._rule.template, substs) == target # Note == traverses, so expensive.
+            result = SubstTemplate.visit(self._rule.replacement, substs)
             # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
             assert result.type_ == target.type_
