@@ -36,8 +36,7 @@ optShapePrim (P_SelFun i n) e = Just $ pSel i n (pShape e)
 -- v Changed because pShape n could be unit
 optShapePrim P_index (Tuple [i, n])
   | TypeTensor _ e_ty <- typeof n
-  , TypeTuple [] <- shapeType e_ty
-  , Just shape <- shapeIsUnit_maybe (typeof e_ty)
+  , Just shape <- shapeIsUnit_maybe e_ty
   = Just shape
   | otherwise
   = Just $ pIndex i (pShape n)
