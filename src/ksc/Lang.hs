@@ -294,7 +294,9 @@ shapeType TypeInteger = TypeTuple []
 shapeType TypeFloat = TypeTuple []
 shapeType TypeString = TypeTuple []
 shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
-shapeType (TypeTensor d vt) = TypeTensor d (shapeType vt)
+shapeType (TypeTensor d vt) = case shapeType vt of
+  TypeTuple [] -> tensorIndexType d
+  elementShapeType -> TypeTensor d elementShapeType
 shapeType (TypeLam _ _) = TypeUnknown
 shapeType (TypeLM _ _) = TypeUnknown  -- TBD
 shapeType TypeUnknown = TypeUnknown
