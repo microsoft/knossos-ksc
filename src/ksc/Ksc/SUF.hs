@@ -105,6 +105,18 @@ sufE avoid = \case
   Call f e | f `isThePrimFun` P_sumbuild ->
     sufE avoid (pSum (mkPrimCall P_build e))
 
+  -- TODO: this has rather a lot of duplication with P_build
+
+  -- SUF{map (\s. body) v} -> [dups] map (\s'. SUF{body}) SUF{v}
+  Call f (Tuple [Lam s body, v]) | f `isThePrimFun` P_map ->
+    (avoid4, mcall, dups (Call f (Tuple [Lam s' (perhaps_elim_s' suf_body), suf_v])))
+    where (avoid1, mn, suf_v) = sufE avoid v
+          (avoid2, mb, suf_body) = sufE avoid1 body
+
+          (s', mb_no_i, avoid3, perhaps_elim_s') = rebind s mb avoid2
+
+          (avoid4, mcall, dups) = addDups avoid3 [mn, mb_no_i]
+
   -- SUF{build n (\i. body)} -> [dups] build SUF{n} (\i'. SUF{body})
   Call f (Tuple [n, Lam i body]) | f `isThePrimFun` P_build ->
     (avoid4, mcall, dups (Call f (Tuple [suf_n, Lam i' (perhaps_elim_i' suf_body)])))
@@ -226,6 +238,9 @@ data L3 a = L3 a a a
   deriving (Functor, Foldable, Traversable)
 
 data L4 a = L4 a a a a
+  deriving (Functor, Foldable, Traversable)
+
+data L8 a = L8 a a a a a a a a
   deriving (Functor, Foldable, Traversable)
 
 data NonEmpty a = Once a

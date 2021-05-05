@@ -366,10 +366,10 @@ class Call(Expr):
     name: StructuredName
     args: List[Expr]
 
-    def __init__(self, name, args):
+    def __init__(self, name, args, type=None):
         if isinstance(name, str):
             name = StructuredName.from_str(name)
-        super().__init__(name=name, args=args)
+        super().__init__(name=name, args=args, type_=type)
 
 class Lam(Expr):
     '''Lam(arg, body).
@@ -383,8 +383,8 @@ class Lam(Expr):
     arg: Var
     body: Expr
 
-    def __init__(self, arg, body):
-        super().__init__(type_=None, arg=arg, body=body)
+    def __init__(self, arg, body, type=None):
+        super().__init__(arg=arg, body=body, type_=type)
 
 class Let(Expr):
     '''Let(vars, rhs, body). 
@@ -404,8 +404,8 @@ class Let(Expr):
     rhs: Expr
     body: Expr
 
-    def __init__(self, vars, rhs, body):
-        super().__init__(vars=vars, rhs=rhs, body=body)
+    def __init__(self, vars, rhs, body, type=None):
+        super().__init__(vars=vars, rhs=rhs, body=body, type_=type)
 
 
 class If(Expr):
@@ -421,8 +421,8 @@ class If(Expr):
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
 
-    def __init__(self, cond, t_body, f_body):
-        super().__init__(cond=cond, t_body=t_body, f_body=f_body)
+    def __init__(self, cond, t_body, f_body, type=None):
+        super().__init__(cond=cond, t_body=t_body, f_body=f_body, type_=type)
 
 class Assert(Expr):
     '''Assert(cond, body).
@@ -436,8 +436,8 @@ class Assert(Expr):
     cond: Expr    # Condition
     body: Expr    # Value if true
 
-    def __init__(self, cond, body):
-        super().__init__(cond=cond, body=body)
+    def __init__(self, cond, body, type=None):
+        super().__init__(cond=cond, body=body, type_=type)
 
 #####################################################################
 # pystr:
