@@ -31,37 +31,37 @@ optShape (App{})        = Nothing
 -- ✓ = no change required to accommodate Integer as shape type for Vec <scalar>
 -- (and n-tuple of Integer as shape type for Tensor n <scalar>)
 optShapePrim :: PrimFun -> TExpr -> Maybe TExpr
--- ✓
+-- v ✓
 optShapePrim (P_SelFun i n) e = Just $ pSel i n (pShape e)
--- Needs to change beacuse pShape n could be unit
+-- v Needs to change beacuse pShape n could be unit
 optShapePrim P_index (Tuple [i, n]) = Just $ pIndex i (pShape n)
-                                    -- ?
--- Needs to change because the shape of the element type could be unit
+                                    -- ^ ?
+-- v Needs to change because the shape of the element type could be unit
 optShapePrim P_build (Tuple [sz, Lam i e2]) =
   Just $ case shapeType (typeof e2) of
     TypeTuple [] -> sz
     _ -> pBuild sz (Lam i (pShape e2))
--- ✓
+-- v ✓
 optShapePrim P_sumbuild (Tuple [sz, Lam i e2]) = Just $ mkLet i (mkZero sz) (pShape e2)
--- ✓
+-- v ✓
 optShapePrim P_sum v = Just $ pIndex (mkZero (pSize v)) (pShape v)
--- Needs to change because the shape of v might be unit
+-- v Needs to change because the shape of v might be unit
 optShapePrim P_constVec (Tuple [sz, v]) =
   Just $ case shapeType (typeof v) of
     TypeTuple [] -> sz
     _ -> pConstVec sz (pShape v)
--- Needs to change because the shape of v might be unit
+-- v Needs to change because the shape of v might be unit
 optShapePrim P_deltaVec (Tuple [sz, _i, v]) =
   Just $ case shapeType (typeof v) of
     TypeTuple [] -> sz
     _ -> pConstVec sz (pShape v)
--- ✓
+-- v ✓
 optShapePrim P_ts_add (Tuple [lhs, _]) = Just $ pShape lhs
--- ✓
+-- v ✓
 optShapePrim P_ts_scale (Tuple [_, v]) = Just $ pShape v
--- ✓
+-- v ✓
 optShapePrim P_ts_neg v = Just $ pShape v
--- ✓
+-- v ✓
 optShapePrim P_delta (Tuple [_, _, v]) = Just $ pShape v
 -- Suppose we have Vec (Float, Vec Float)
 --
@@ -71,10 +71,12 @@ optShapePrim P_delta (Tuple [_, _, v]) = Just $ pShape v
 --
 -- So perhaps we need still to be able to interpret Vec () as a shape
 -- type for Vec Float.
+--
+-- v
 optShapePrim P_unzip v = Just $ pUnzip (pShape v)
-                       -- ?
--- ✓
+                       -- ^ ?
+-- v ✓
 optShapePrim P_trace v = Just $ pShape v
--- ✓
+-- v ✓
 optShapePrim P_copydown v = Just $ pShape v
 optShapePrim _ _ = Nothing
