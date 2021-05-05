@@ -33,10 +33,15 @@ optShape (App{})        = Nothing
 optShapePrim :: PrimFun -> TExpr -> Maybe TExpr
 -- v ✓
 optShapePrim (P_SelFun i n) e = Just $ pSel i n (pShape e)
--- v Needs to change because pShape n could be unit
-optShapePrim P_index (Tuple [i, n]) = Just $ pIndex i (pShape n)
-                                    -- ^ ?
--- v Needs to change because the shape of the element type could be unit
+-- v Changed because pShape n could be unit
+optShapePrim P_index (Tuple [i, n])
+  | TypeTensor _ e_ty <- typeof n
+  , TypeTuple [] <- shapeType e_ty
+  , Just shape <- shapeIsUnit_maybe (typeof e_ty)
+  = Just shape
+  | otherwise
+  = Just $ pIndex i (pShape n)
+-- v Changed because the shape of the element type could be unit
 optShapePrim P_build (Tuple [sz, Lam i e2]) =
   Just $ case shapeType (typeof e2) of
     TypeTuple [] -> sz
@@ -45,12 +50,12 @@ optShapePrim P_build (Tuple [sz, Lam i e2]) =
 optShapePrim P_sumbuild (Tuple [sz, Lam i e2]) = Just $ mkLet i (mkZero sz) (pShape e2)
 -- v ✓
 optShapePrim P_sum v = Just $ pIndex (mkZero (pSize v)) (pShape v)
--- v Needs to change because the shape of v might be unit
+-- v Changed because the shape of v might be unit
 optShapePrim P_constVec (Tuple [sz, v]) =
   Just $ case shapeType (typeof v) of
     TypeTuple [] -> sz
     _ -> pConstVec sz (pShape v)
--- v Needs to change because the shape of v might be unit
+-- v Changed because the shape of v might be unit
 optShapePrim P_deltaVec (Tuple [sz, _i, v]) =
   Just $ case shapeType (typeof v) of
     TypeTuple [] -> sz
