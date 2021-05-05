@@ -167,3 +167,8 @@ def test_parsed_rule_capture():
     type_propagate_decls([e, expected], symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
+
+def test_rule_pickling():
+    import pickle
+    r = pickle.loads(pickle.dumps(inline_var))
+    assert r is inline_var
