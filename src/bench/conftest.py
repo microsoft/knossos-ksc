@@ -8,12 +8,8 @@ from ts2ks import ts2mod
 
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--modulename", action="store", help="name of module to dynamically load"
-    )
-    parser.addoption(
-        "--benchmarkname", action="store", help="name of benchmark to dynamically load"
-    )
+    parser.addoption("--modulename", action="store", help="name of module to dynamically load")
+    parser.addoption("--benchmarkname", action="store", help="name of benchmark to dynamically load")
 
 
 @pytest.fixture
@@ -30,9 +26,7 @@ BenchmarkFunction = namedtuple("BenchmarkFunction", "name func")
 
 
 def functions_to_benchmark(mod, benchmark_name, example_input):
-    for fn in inspect.getmembers(
-        mod, lambda m: inspect.isfunction(m) and m.__name__.startswith(benchmark_name)
-    ):
+    for fn in inspect.getmembers(mod, lambda m: inspect.isfunction(m) and m.__name__.startswith(benchmark_name)):
         fn_name, fn_obj = fn
         if fn_name == benchmark_name + "_bench_configs":
             continue
@@ -69,17 +63,14 @@ def pytest_generate_tests(metafunc):
         example_inputs = (configs[0],)
 
         metafunc.parametrize(
-            "func",
-            functions_to_benchmark(mod, benchmark_name, example_inputs),
-            ids=func_namer,
+            "func", functions_to_benchmark(mod, benchmark_name, example_inputs), ids=func_namer,
         )
 
         # We want to group by tensor size, it's not clear how to metaprogram the group mark cleanly.
         # pytest meta programming conflates arguments and decoration. I've not been able to find a way to directly
         # parameterize just marks so do the mark along with a oarameter
         config_and_group_marker = [
-            pytest.param(config, marks=[pytest.mark.benchmark(group=str(config.shape))])
-            for config in configs
+            pytest.param(config, marks=[pytest.mark.benchmark(group=str(config.shape))]) for config in configs
         ]
         metafunc.parametrize("config", config_and_group_marker, ids=config_namer)
 

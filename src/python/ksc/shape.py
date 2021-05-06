@@ -20,6 +20,7 @@ def make_dims(val) -> Tuple[int]:
     if isinstance(val, list):
         return tuple(*val)
 
+
 # Shape of a scalar is just just empty tuple
 ScalarShape = ()
 
@@ -30,6 +31,7 @@ class Shape:
     Shapes in the abstract interpreter follow the algebra described in "make_edef"
     
     """
+
     pass
 
     @staticmethod
@@ -53,44 +55,53 @@ class Shape:
         assert False
 
     @staticmethod
-    def of_Index_of_Tensor_of_rank(rank : int):
+    def of_Index_of_Tensor_of_rank(rank: int):
         """
         Make the shape of the return of the ks builtin "size" function, i.e. a Tuple of ScalarShapes
         """
-        if rank == 1: 
-            return ScalarShape # Returns an int
+        if rank == 1:
+            return ScalarShape  # Returns an int
         else:
-            return tuple(ScalarShape for _ in range(rank)) 
+            return tuple(ScalarShape for _ in range(rank))
+
 
 @dataclass(frozen=True)
 class TensorShape(Shape):
-    dims : Tuple[int]
-    elem_shape : Shape
+    dims: Tuple[int]
+    elem_shape: Shape
 
-def make_TensorShape(dims: Union[int, Tuple[int]], elem_shape : Shape):
+
+def make_TensorShape(dims: Union[int, Tuple[int]], elem_shape: Shape):
     return TensorShape(make_dims(dims), elem_shape)
+
 
 @dataclass(frozen=True)
 class ShapeType:
     shape: Shape
     type: Type
 
-def shape_type_matches(s : Shape, t : Type):
+
+def shape_type_matches(s: Shape, t: Type):
     if t.is_tensor:
-        return isinstance(s, TensorShape) and len(s.dims) == t.tensor_rank \
+        return (
+            isinstance(s, TensorShape)
+            and len(s.dims) == t.tensor_rank
             and shape_type_matches(s.elem_shape, t.tensor_elem_type)
+        )
 
     if t.is_tuple:
-        return isinstance(s, tuple) and all(shape_type_matches(sh, ty) for sh,ty in zip(s, t.tuple_elems()))
+        return isinstance(s, tuple) and all(shape_type_matches(sh, ty) for sh, ty in zip(s, t.tuple_elems()))
 
     if t.is_scalar:
         return s == ScalarShape
 
     raise NotImplementedError
 
+
 def shape_type_from_object(o):
     # import here to avoid circular dependencies
     from ksc.abstract_value import AbstractValue
+
     if hasattr(o, "shape") and hasattr(o, "dtype"):
         el = shape_type_from_object(np.asarray(o).flat[0].item())
         return ShapeType(TensorShape(o.shape, el.shape), Type.Tensor(o.ndim, el.type))

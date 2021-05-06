@@ -6,10 +6,11 @@ from ksc.shape import shape_type_from_object
 
 Trace = namedtuple("Trace", ["body", "shape_type", "arg_shape_types"])
 
+
 class TraceableFunction:
     def __init__(self, name, arg_names=None):
         self._name = name
-        self._arg_names =arg_names
+        self._arg_names = arg_names
 
     @property
     def name(self):
@@ -41,9 +42,9 @@ class TraceableFunction:
                 converted_args.append(node.Node("", st.shape, st.type, data=arg))
             print(f"Processing the {i+1}th argument to {self.name} with {converted_args[-1].shape_type}")
         jitted = jitting.get_or_trace_function(self, converted_args)
-        st = jitted.shape_type(*converted_args) # call type_prop_function
+        st = jitted.shape_type(*converted_args)  # call type_prop_function
         print(f"Shape and type of {jitted.name} is {st}")
-        func_node =  node.Node(jitted.name, st.shape, st.type, children=converted_args, jitted=jitted)
+        func_node = node.Node(jitted.name, st.shape, st.type, children=converted_args, jitted=jitted)
         value_node = node.Node("_identity", st.shape, st.type, children=[func_node], data="__not_ready__")
         for arg in converted_args:
             arg.add_user(func_node)

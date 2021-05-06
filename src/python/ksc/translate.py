@@ -10,6 +10,7 @@ from ksc.type import Type
 from ksc.expr import Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If
 from ksc.parse_ks import parse_ks_string
 
+
 def handle_let(let_var, let_expr, body, indent=4):
     tupled = isinstance(let_var, list)
     if tupled:
@@ -17,20 +18,19 @@ def handle_let(let_var, let_expr, body, indent=4):
     else:
         var_names = let_var.name
     joiner = "\n" + (" " * indent)
-    lambda_expr = joiner.join([
-        f"let(tupled={tupled},",
-        f"    var={let_expr},",
-        f"    body=lambda {var_names}:",
-        f"      {body}",
-        ")"
-    ])
+    lambda_expr = joiner.join(
+        [f"let(tupled={tupled},", f"    var={let_expr},", f"    body=lambda {var_names}:", f"      {body}", ")"]
+    )
     return lambda_expr
+
 
 _global_prime_list = [2, 3, 5, 7, 11, 13]
 _global_prime_index = 0
 
+
 def get_type(arg_type):
     return arg_type.kind
+
 
 def get_shape_dtype(arg_type):
     global _global_prime_index
@@ -47,14 +47,16 @@ def get_shape_dtype(arg_type):
     else:
         raise ValueError("Found {} in a Tensor!".format(kind))
 
+
 def is_possibly_nested_tensor(arg_type):
     """
     True if arg_type is a (possibly nested) tensor of scalar numeric types
     """
     if arg_type.is_tensor:
         return is_possibly_nested_tensor(arg_type.tensor_elem_type)
-    
-    return arg_type in (Type.Integer, Type.Float)    
+
+    return arg_type in (Type.Integer, Type.Float)
+
 
 def type_to_sample(arg_type):
     type = get_type(arg_type)
@@ -75,6 +77,7 @@ def type_to_sample(arg_type):
         return "({})".format(",\n  ".join([type_to_sample(t) for t in arg_type.tuple_elems()]))
     assert False, arg_type
 
+
 def args_to_sample_values(args):
     arg_types = []
     for arg in args:
@@ -82,11 +85,14 @@ def args_to_sample_values(args):
         arg_types.append((arg.name, sample))
     return arg_types
 
+
 def _value_to_str(name):
     return name if isinstance(name, str) else name.value()
 
+
 _Def = namedtuple("_Def", ["name", "str", "sample_args"])
 _EDef = namedtuple("_EDef", ["name", "py_name", "return_type"])
+
 
 class Translator:
     def __init__(self, backend):
@@ -103,7 +109,7 @@ class Translator:
         if isinstance(sname, str) or isinstance(sname.se, str):
             if isinstance(sname, str):
                 name = sname
-            else: 
+            else:
                 name = sname.se
             specialized = specs.specialized_functions()
             if name in specialized:
@@ -119,47 +125,46 @@ class Translator:
 
     # Convert KS expression to python code string
     def handle_body(self, ex, indent=2):
-        
+
         # symbols e.g. sin -> sin
         if isinstance(ex, Var):
             return ex.name
-        
+
         # numeric literal e.g. 5.4 -> 5.4
         if isinstance(ex, Const):
             return repr(ex.value)
-        
-        joiner = ("\n" + (" " * indent))
-        
+
+        joiner = "\n" + (" " * indent)
+
         # (let (var expr) body)
         # (let ((a b ...) expr) body)
         if isinstance(ex, Let):
             return handle_let(
                 ex.vars,
-                self.handle_body(ex.rhs, indent+2),
-                self.handle_body(ex.body, indent+2),
-                indent=indent+2 # inner most indent
+                self.handle_body(ex.rhs, indent + 2),
+                self.handle_body(ex.body, indent + 2),
+                indent=indent + 2,  # inner most indent
             )
 
         # Lambda e.g. (lam (var : type) body)
         if isinstance(ex, Lam):
             var_name = ex.arg.name
-            body = self.handle_body(ex.body, indent+2)
-            return joiner.join([
-                f"(lambda {var_name}:",
-                f"  {body}",
-                ")"])
+            body = self.handle_body(ex.body, indent + 2)
+            return joiner.join([f"(lambda {var_name}:", f"  {body}", ")"])
 
         # If-then-else e.g. (if c e1 e2)
         if isinstance(ex, If):
             # need to special case if because "if" is a python keyword
-            cond = self.handle_body(ex.cond, indent+2)
-            then_branch = self.handle_body(ex.t_body, indent+2)
-            else_branch = self.handle_body(ex.f_body, indent+2)
-            return joiner.join([
-                f"if_then_else({cond},",
-                f"             lambda: {then_branch},",
-                f"             lambda: {else_branch})"
-            ])
+            cond = self.handle_body(ex.cond, indent + 2)
+            then_branch = self.handle_body(ex.t_body, indent + 2)
+            else_branch = self.handle_body(ex.f_body, indent + 2)
+            return joiner.join(
+                [
+                    f"if_then_else({cond},",
+                    f"             lambda: {then_branch},",
+                    f"             lambda: {else_branch})",
+                ]
+            )
 
         # All others are function call e.g. (f e1 .. eN)
         assert isinstance(ex, Call), ex
@@ -171,13 +176,10 @@ class Translator:
         args_handled = []
         for i, arg in enumerate(args):
             try:
-                args_handled.append(self.handle_body(arg, indent+2))
+                args_handled.append(self.handle_body(arg, indent + 2))
             except:
-                raise ValueError("In {}, failed to handle"
-                                " argument #{}, {}".format(name,
-                                                            i + 1,
-                                                            arg))
-        
+                raise ValueError("In {}, failed to handle" " argument #{}, {}".format(name, i + 1, arg))
+
         # (get$m$n t)
         if name.startswith("get$"):
             index = int(name.split("$")[1]) - 1
@@ -187,23 +189,24 @@ class Translator:
         if name == "tuple":
             return "make_tuple({tuple_args})".format(tuple_args=", ".join(args_handled))
 
-        # other function calls     
+        # other function calls
         func_name = self.normalize_def_name(name)
-        return "{func_name}({args})".format(func_name=func_name,
-                                            args=", ".join(args_handled))
-
+        return "{func_name}({args})".format(func_name=func_name, args=", ".join(args_handled))
 
     def handle_def(self, ex):
         name = ex.name
         args = ex.args
         arg_names = [arg.name for arg in args]
-        return _Def(name, """
+        return _Def(
+            name,
+            """
 def {name}({args}):
   return {body}
-""".format(name=self.normalize_def_name(name),
-           args=", ".join(arg_names),
-           body=self.handle_body(ex.body)),
-                   args_to_sample_values(args))
+""".format(
+                name=self.normalize_def_name(name), args=", ".join(arg_names), body=self.handle_body(ex.body)
+            ),
+            args_to_sample_values(args),
+        )
 
     def parse_defs(self, string_or_stream, source_file_name):
         defs_to_process = []
@@ -213,7 +216,7 @@ def {name}({args}):
                 py_name = self.normalize_def_name(name)
                 if py_name in self._built_ins:
                     # if it is built-in no need to edef
-                    print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)                    
+                    print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)
                     continue
                 edef = _EDef(name, py_name, tld.return_type)
                 self._edefs[name] = edef
@@ -240,10 +243,10 @@ def main():
 if __name__ == "__main__":
   main()
 """.format(
-        sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main.sample_args),
-        main=main.name,
-        main_args=", ".join([k for k, _ in main.sample_args])
-)
+            sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main.sample_args),
+            main=main.name,
+            main_args=", ".join([k for k, _ in main.sample_args]),
+        )
 
     def translate(self, ks_str, source_file_name):
         self.parse_defs(ks_str, source_file_name)
@@ -257,18 +260,19 @@ if __name__ == "__main__":
             # shape$ functions defined by the user. Keeping the name mangled
             # is necessary for calling the right version of the generated edef.
             imports = sorted(self._built_ins)
-            edefs = [f'{edef.py_name} = ksc.backends.abstract._get_edef('
-                     f'defs, "{edef.name.mangled()}", '
-                     f'{edef.return_type.__repr__()}, '
-                     f'py_name_for_concrete="{self.normalize_def_name(edef.name)}")'
-                     for edef in self._edefs.values()]
+            edefs = [
+                f"{edef.py_name} = ksc.backends.abstract._get_edef("
+                f'defs, "{edef.name.mangled()}", '
+                f"{edef.return_type.__repr__()}, "
+                f'py_name_for_concrete="{self.normalize_def_name(edef.name)}")'
+                for edef in self._edefs.values()
+            ]
         else:
             # in most backends, edefs are imported from backend
-            imports = sorted(set(self._built_ins
-                                 + [edef.py_name for edef in self._edefs.values()]))
+            imports = sorted(set(self._built_ins + [edef.py_name for edef in self._edefs.values()]))
             edefs = []
 
-        return '''import numpy as np
+        return """import numpy as np
 import ksc
 from ksc.type import Type
 from ksc.backends.{backend} import (
@@ -281,12 +285,14 @@ defs={{
 }}
 
 {edefs}
-'''.format(backend=self.backend,
-           imports=",\n  ".join(imports),
-           defs="\n".join([d.str for d in self._defs]),
-           defs_map=",\n  ".join([f'"{d.name.mangled()}": {self.normalize_def_name(d.name)}' for d in self._defs]),
-           edefs="\n".join(edefs)
-    )
+""".format(
+            backend=self.backend,
+            imports=",\n  ".join(imports),
+            defs="\n".join([d.str for d in self._defs]),
+            defs_map=",\n  ".join([f'"{d.name.mangled()}": {self.normalize_def_name(d.name)}' for d in self._defs]),
+            edefs="\n".join(edefs),
+        )
+
 
 def translate(ks_str, backend, source_file_name, with_main=True):
     translator = Translator(backend)
@@ -297,6 +303,7 @@ def translate(ks_str, backend, source_file_name, with_main=True):
 
     return ks_str
 
+
 def main():
     parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
     parser.add_argument("input_ks_file", type=str)
@@ -305,6 +312,7 @@ def main():
 
     with open(args.input_ks_file) as f:
         print(translate(f.read(), args.backend, args.input_ks_file))
+
 
 if __name__ == "__main__":
     sys.exit(main())
