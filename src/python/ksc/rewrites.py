@@ -15,9 +15,12 @@ from ksc.type_propagate import type_propagate
 from ksc.utils import singleton, single_elem
 from ksc.visitors import ExprTransformer
 
-# A RuleMatcher identifies places where a rule can be applied to an expression, each recorded in a Match.
-# Given a Match, we can then rewrite the expression to yield a new Expr.
-# RuleMatchers may use rules parsed from KS (see ParsedRuleMatcher below) or expressed in python.
+# A rule is, conceptually, some kind of formula for transforming an expression: it may be expressed as a Rule parsed from KS, or in python.
+# In code, each such rule is an instance of RuleMatcher; class ParsedRuleMatcher deals with "Rule"s written in KS.
+# Each place within expression that the RuleMatcher can be applied, is a "Match",
+#   and each Match corresponds to exactly one "rewrite":  the process of actually producing the transformed expression.
+# (Performing the rewrite, may be much more expensive than merely detecting that it is possible to do so:
+# the Match records the latter, its apply_rewrite() method enacts the former.)
 
 @dataclass(frozen=True)
 class Match:
@@ -104,8 +107,13 @@ class RuleMatcher(AbstractMatcher):
         return (rule, (self.name,))
 
 class RuleSet(AbstractMatcher):
+    """ Finds 'Match's for many rules (many different RuleMatcher objects) while performing
+        only a single traversal of the Expr (and associated environment-building). """
     def __init__(self, rules):
         # TODO also allow global (any-class) rules?
+        # As an optimization, at each node in the Expr tree, we'll look for matches only from
+        # RuleMatchers whose possible_filter_terms match at that position in the tree.
+        # (This checks equality of the outermost constructor of the template, but no deeper.)
         self._filtered_rules = {}
         for rule in rules:
             for term in rule.possible_filter_terms:
@@ -154,7 +162,7 @@ class delete_let(RuleMatcher):
             yield Match(self, root, path_from_root)
 
 ###############################################################################
-# Rules parsed from KS. See class Rule.
+# Rules parsed from KS. See class Rule (which has a shorter overview of syntax)
 #
 
 class ParsedRuleMatcher(RuleMatcher):
@@ -180,32 +188,32 @@ class ParsedRuleMatcher(RuleMatcher):
     """
     def __init__(self, rule: Rule):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
-        assert rule.e1.type_ == rule.e2.type_ != None
-        known_vars = frozenset([v.name for v in rule.args])
+        assert rule.template.type_ == rule.replacement.type_ != None
+        known_vars = frozenset([v.name for v in rule.template_vars])
         # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
-        assert known_vars == rule.e1.free_vars_
-        assert known_vars.issuperset(rule.e2.free_vars_)
+        assert known_vars == rule.template.free_vars_
+        assert known_vars.issuperset(rule.replacement.free_vars_)
         # TODO: check that if there are multiple binders on the LHS, they all bind different names.
         super().__init__(rule.name)
         self._rule = rule
-        self._arg_types = pmap({v.name: v.type_ for v in rule.args})
+        self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
 
     @property
     def possible_filter_terms(self):
-        return frozenset([get_filter_term(self._rule.e1)])
+        return frozenset([get_filter_term(self._rule.template)])
 
     def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env) -> Iterator[Match]:
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
-        substs = find_template_subst(self._rule.e1, subtree, self._arg_types)
+        substs = find_template_subst(self._rule.template, subtree, self._arg_types)
         if substs is not None:
             yield Match(self, root, path_from_root, substs)
 
     def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
-            assert SubstTemplate.visit(self._rule.e1, substs) == target # Note == traverses, so expensive.
-            result = SubstTemplate.visit(self._rule.e2, substs)
+            assert SubstTemplate.visit(self._rule.template, substs) == target # Note == traverses, so expensive.
+            result = SubstTemplate.visit(self._rule.replacement, substs)
             # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
             assert result.type_ == target.type_

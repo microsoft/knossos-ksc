@@ -1,0 +1,38 @@
+name: Benchmark
+
+on:
+  schedule:
+    - cron:  '5 3 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: 'Make directories [userInstall]'
+        run: sh test/builds/mkdirs.sh
+        
+      - name: 'Install dependencies [userInstall]'
+        run: sh ./test/builds/install_linux.sh || (sleep 30 && sh ./test/builds/install_linux.sh) || (sleep 30 && sh ./test/builds/install_linux.sh)
+
+      - name: 'Can build with cabal [userTest]'
+        run: /opt/cabal/3.0/bin/cabal v2-install --with-ghc /opt/ghc/8.6.5/bin/ghc-8.6.5 --installdir=build/bin  --overwrite-policy=always --install-method=copy
+
+      - name: 'Run benchmark'
+        run: sh ./.github/workflows/benchmark.sh
+        
+      - name: 'Upload benchmark result'
+        uses: actions/upload-artifact@v2
+        with:
+          name: benchmark
+          path: .benchmarks/*
+      

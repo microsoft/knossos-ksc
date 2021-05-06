@@ -995,6 +995,7 @@ pprPrimFun = \case
   P_buildFromSparse -> text "buildFromSparse"
   P_buildFromSparseTupled -> text "buildFromSparseTupled"
   P_fold -> text "fold"
+  P_map -> text "map"
   P_index -> text "index"
   P_shape -> text "shape"
   P_size -> text "size"
@@ -1034,6 +1035,9 @@ pprPrimFun = \case
   P_SelFun i n -> text "get$" <> int i <> char '$' <> int n
   P_dup n -> text "dup$" <> int n
   P_elim -> text "elim"
+
+  P_suffwdpass_map -> text "suffwdpass_map"
+  P_sufrevpass_map -> text "sufrevpass_map"
 
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
@@ -1431,6 +1435,7 @@ data PrimFun = P_inline
              | P_sumbuild
              | P_buildFromSparse
              | P_buildFromSparseTupled
+             | P_map
              | P_fold
              | P_index
              | P_shape
@@ -1470,6 +1475,8 @@ data PrimFun = P_inline
              | P_RFold
              | P_lmDummyFold
              | P_lmVariant
+             | P_suffwdpass_map
+             | P_sufrevpass_map
   deriving (Show, Ord, Eq)
 
 toPrimFun :: String -> Maybe PrimFun
@@ -1485,6 +1492,7 @@ toPrimFun = \case
   "buildFromSparse" -> Just P_buildFromSparse
   "buildFromSparseTupled" -> Just P_buildFromSparseTupled
   "fold" -> Just P_fold
+  "map" -> Just P_map
   "index" -> Just P_index
   "shape" -> Just P_shape
   "size" -> Just P_size
