@@ -125,6 +125,14 @@ def ks_prim_lookup(sname, ty):
 
         return Type.Tensor(rank, elem_ty)
 
+    # map : Lam (Tuple S T), Tensor S -> T
+    if n == 2 and name == "map":
+        assert tys[0].is_lam_or_LM
+        tyS = tys[0].lam_arg_type
+        tyT = tys[0].lam_return_type
+        assert tys[1].is_tensor_of(tyS)
+        return Type.Tensor(tys[1].tensor_rank, tyT)
+
     # fold : Lam (Tuple State T) State, State, Tensor T -> State
     if n == 3 and name == "fold":
         assert tys[0].is_lam_or_LM
