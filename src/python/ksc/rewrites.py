@@ -8,6 +8,7 @@ from pyrsistent.typing import PMap
 
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
 from ksc.expr import ConstantType, StructuredName, Expr, Let, Lam, Var, Const, Call, Rule
+from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
