@@ -21,6 +21,7 @@ from ksc.visitors import ExprTransformer
 # (Performing the rewrite, may be much more expensive than merely detecting that it is possible to do so:
 # the Match records the latter, its apply_rewrite() method enacts the former.)
 
+
 @dataclass(frozen=True)
 class Match:
     rule: "RuleMatcher"
@@ -33,39 +34,56 @@ class Match:
     def apply_rewrite(self):
         return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
 
+
 # Environments that map variable names to the locations of the nodes binding them.
 LetBindingEnvironment = PMap[str, Location]
+
 
 class AbstractMatcher(ABC):
     def find_all_matches(self, e: Expr) -> Iterator[Match]:
         yield from self._matches_with_env(e, tuple(), e, pmap({}))
 
-    def _matches_with_env(self, e: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
+    def _matches_with_env(
+        self, e: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+    ) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.matches_here(e, path_from_root, root, env)
         for i, ch in enumerate(get_children(e)):
-            yield from self._matches_with_env(ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env))
+            yield from self._matches_with_env(
+                ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env)
+            )
 
     @abstractmethod
-    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
+    def matches_here(
+        self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+    ) -> Iterator[Match]:
         """ Return any matches which rewrite the topmost node of the specified subtree """
 
+
 @singledispatch
-def _update_env_for_subtree(parent: Expr, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
+def _update_env_for_subtree(
+    parent: Expr, parent_path: Location, which_child: int, env: LetBindingEnvironment
+) -> LetBindingEnvironment:
     # Default is to use same environment as parent
     return env
 
-@_update_env_for_subtree.register
-def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
-    assert isinstance(parent.vars, Var), "Tupled lets are not supported - use untuple_lets first"
-    assert 0 <= which_child <= 1
-    return (env if which_child == 0 # rhs
-        else env.set(parent.vars.name, parent_path))
 
 @_update_env_for_subtree.register
-def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
+def _update_env_let(
+    parent: Let, parent_path: Location, which_child: int, env: LetBindingEnvironment
+) -> LetBindingEnvironment:
+    assert isinstance(parent.vars, Var), "Tupled lets are not supported - use untuple_lets first"
+    assert 0 <= which_child <= 1
+    return env if which_child == 0 else env.set(parent.vars.name, parent_path)  # rhs
+
+
+@_update_env_for_subtree.register
+def _update_env_lam(
+    parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment
+) -> LetBindingEnvironment:
     assert which_child == 0
     return env.remove(parent.arg.name)
+
 
 # Note: filter_term
 # A term that allows a quick-rejection test of whether an expression matches a template.
@@ -75,24 +93,29 @@ def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: L
 # Moreover, the design aims to optimize the frequency of detecting non-matches.
 FilterTerm = Union[Type, ConstantType, StructuredName]
 
+
 @singledispatch
-def get_filter_term(e : Expr) -> FilterTerm:
+def get_filter_term(e: Expr) -> FilterTerm:
     return e.__class__
 
-@get_filter_term.register
-def get_filter_term_const(e : Const) -> ConstantType:
-    return e.value
 
 @get_filter_term.register
-def get_filter_term_call(e : Call):
+def get_filter_term_const(e: Const) -> ConstantType:
+    return e.value
+
+
+@get_filter_term.register
+def get_filter_term_call(e: Call):
     return e.name
 
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
 
+
 def rule(name: str) -> "RuleMatcher":
     """Lookup method for all `RuleMatcher`s."""
     return _rule_dict[name]
+
 
 class RuleMatcher(AbstractMatcher):
     name: str  # Should be immutable
@@ -114,11 +137,15 @@ class RuleMatcher(AbstractMatcher):
         """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's rule_specific_data field. """
 
     @abstractmethod
-    def matches_for_possible_expr(self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
+    def matches_for_possible_expr(
+        self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+    ) -> Iterator[Match]:
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <get_filter_term(expr)>
             is of one of <self.possible_filter_terms>. """
 
-    def matches_here(self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
+    def matches_here(
+        self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+    ) -> Iterator[Match]:
         if get_filter_term(expr) in self.possible_filter_terms:
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
@@ -126,9 +153,11 @@ class RuleMatcher(AbstractMatcher):
         # This allows pickling and sending RuleMatchers across processes/machines via Ray.
         return (rule, (self.name,))
 
+
 class RuleSet(AbstractMatcher):
     """ Finds 'Match's for many rules (many different RuleMatcher objects) while performing
         only a single traversal of the Expr (and associated environment-building). """
+
     def __init__(self, rules):
         # TODO also allow global (any-class) rules?
         # As an optimization, at each node in the Expr tree, we'll look for matches only from
@@ -139,9 +168,12 @@ class RuleSet(AbstractMatcher):
             for term in rule.possible_filter_terms:
                 self._filtered_rules.setdefault(term, []).append(rule)
 
-    def matches_here(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
+    def matches_here(
+        self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+    ) -> Iterator[Match]:
         for rule in self._filtered_rules.get(get_filter_term(subtree), []):
             yield from rule.matches_for_possible_expr(subtree, path_from_root, root, env)
+
 
 @singleton
 class inline_var(RuleMatcher):
@@ -152,12 +184,19 @@ class inline_var(RuleMatcher):
         # Note there is an alternative design, where we don't store any "rule_specific_data" in the Match.
         # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
         # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
-        assert path_to_var[:len(binding_location)] == binding_location
-        return replace_subtree(expr, binding_location, Const(0.0), # Nothing to avoid capturing in outer call
-            lambda _zero, let: replace_subtree(let, path_to_var[len(binding_location):], let.rhs) # No applicator; renaming will prevent capturing let.rhs, so just insert that
+        assert path_to_var[: len(binding_location)] == binding_location
+        return replace_subtree(
+            expr,
+            binding_location,
+            Const(0.0),  # Nothing to avoid capturing in outer call
+            lambda _zero, let: replace_subtree(
+                let, path_to_var[len(binding_location) :], let.rhs
+            ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
         )
 
-    def matches_for_possible_expr(self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment) -> Iterator[Match]:
+    def matches_for_possible_expr(
+        self, subtree: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+    ) -> Iterator[Match]:
         assert isinstance(subtree, Var)
         if subtree.name in env:
             binding_loc = env[subtree.name]
@@ -170,9 +209,10 @@ class delete_let(RuleMatcher):
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
-            assert const_zero == Const(0.0) # Passed to replace_subtree below
+            assert const_zero == Const(0.0)  # Passed to replace_subtree below
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
+
         # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
@@ -181,9 +221,11 @@ class delete_let(RuleMatcher):
         if subtree.vars.name not in subtree.body.free_vars_:
             yield Match(self, root, path_from_root)
 
+
 ###############################################################################
 # Rules parsed from KS. See class Rule (which has a shorter overview of syntax)
 #
+
 
 class ParsedRuleMatcher(RuleMatcher):
     """
@@ -206,6 +248,7 @@ class ParsedRuleMatcher(RuleMatcher):
          template is an Expr, whose free vars are `template_vars`
          replacement is an Expr, whose free vars are a subset of `template_vars`
     """
+
     def __init__(self, rule: Rule):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
         assert rule.template.type_ == rule.replacement.type_ != None
@@ -231,13 +274,14 @@ class ParsedRuleMatcher(RuleMatcher):
 
     def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
-            assert const_zero == Const(0.0) # Passed to replace_subtree below
-            assert SubstTemplate.visit(self._rule.template, substs) == target # Note == traverses, so expensive.
+            assert const_zero == Const(0.0)  # Passed to replace_subtree below
+            assert SubstTemplate.visit(self._rule.template, substs) == target  # Note == traverses, so expensive.
             result = SubstTemplate.visit(self._rule.replacement, substs)
             # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
             assert result.type_ == target.type_
             return result
+
         # The constant just has no free variables that we want to avoid being captured
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
@@ -250,10 +294,11 @@ def _combine_substs(s1: VariableSubstitution, s2: Optional[VariableSubstitution]
     # - we are not finding substitutions for variables on the RHS).
     # Note this means that if the LHS template contains multiple binders of the same name,
     # this will only match subject expressions that also use the same variable-name in all those binders.
-    if not all([s1[v] == s2[v] for v in common_vars]): # TODO use alpha-equivalence rather than strict equality
-        return None # Fail
+    if not all([s1[v] == s2[v] for v in common_vars]):  # TODO use alpha-equivalence rather than strict equality
+        return None  # Fail
     s1.update(s2)
     return s1
+
 
 @singledispatch
 def find_template_subst(template: Expr, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
@@ -264,23 +309,25 @@ def find_template_subst(template: Expr, exp: Expr, template_vars: PMap[str, Type
     # RuleSet will have ensured that the template and subject match at the outermost level,
     # but we still need to check that subtrees match too.
     if get_filter_term(template) != get_filter_term(exp):
-        return None # No match
+        return None  # No match
     tmpl_children = get_children(template)
     exp_children = get_children(exp)
     if len(tmpl_children) != len(exp_children):
         return None
     d = dict()
-    for t,e in zip(tmpl_children, exp_children):
+    for t, e in zip(tmpl_children, exp_children):
         d = _combine_substs(d, find_template_subst(t, e, template_vars))
         if d is None:
             return None
     return d
+
 
 @find_template_subst.register
 def find_template_subst_var(template: Var, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
     assert template.name in template_vars
     # Require correct type of subexp in order to match
     return {template.name: exp} if exp.type_ == template_vars[template.name] else None
+
 
 @find_template_subst.register
 def find_template_subst_let(template: Let, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
@@ -299,6 +346,7 @@ def find_template_subst_let(template: Let, exp: Expr, template_vars: PMap[str, T
     body_subst = find_template_subst(template.body, exp.body, template_vars.set(template.vars.name, template.rhs.type_))
     return _combine_substs(rhs_and_bound_subst, body_subst)
 
+
 @find_template_subst.register
 def find_template_subst_lam(template: Lam, exp: Expr, template_vars: PMap[str, Type]) -> Optional[VariableSubstitution]:
     if not isinstance(exp, Lam):
@@ -308,11 +356,11 @@ def find_template_subst_lam(template: Lam, exp: Expr, template_vars: PMap[str, T
         return None
     return find_template_subst(template.body, exp.body, template_vars.set(template.arg.name, template.arg.type_))
 
-def _maybe_add_binder_to_subst(bound: Var,
-    var_names_to_exprs: VariableSubstitution,
-    dont_capture: List[Expr]
-)-> Tuple[Var, VariableSubstitution]:
-    #assert bound.decl # No - only for def args? - not true for 'Let's
+
+def _maybe_add_binder_to_subst(
+    bound: Var, var_names_to_exprs: VariableSubstitution, dont_capture: List[Expr]
+) -> Tuple[Var, VariableSubstitution]:
+    # assert bound.decl # No - only for def args? - not true for 'Let's
     target_var = var_names_to_exprs.get(bound.name)
     if target_var is None:
         # This is a new binder in the RHS, so make sure the variable is
@@ -320,6 +368,7 @@ def _maybe_add_binder_to_subst(bound: Var,
         target_var = make_nonfree_var("t_", list(var_names_to_exprs.values()) + dont_capture, type=bound.type_)
         var_names_to_exprs = {**var_names_to_exprs, bound.name: target_var}
     return target_var, var_names_to_exprs
+
 
 @singleton
 class SubstTemplate(ExprTransformer):
@@ -332,6 +381,7 @@ class SubstTemplate(ExprTransformer):
     x, they'll be captured by the x bound by that let, which changes their meaning.
     (Hence, we still need separate python RuleMatchers, not ParsedRuleMatchers, for e.g. lift_bind and sumbuild_invariant.)
     """
+
     def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
         assert not v.decl
         return var_names_to_exprs[v.name]
@@ -341,24 +391,27 @@ class SubstTemplate(ExprTransformer):
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.vars, var_names_to_exprs, [l.body])
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
         # where the bound var is bound, as the RHS template can't contain "(let x ...) x" (with x free).
-        res = Let(Var(target_var.name),# type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
+        res = Let(
+            Var(target_var.name),  # type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
             self.visit(l.rhs, var_names_to_exprs),
-            self.visit(l.body, var_names_to_exprs))
+            self.visit(l.body, var_names_to_exprs),
+        )
         res.type_ = l.type_
         return res
 
     def visit_lam(self, l: Lam, var_names_to_exprs: VariableSubstitution) -> Lam:
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(l.arg, var_names_to_exprs, [l.body])
-        res = Lam(Var(target_var.name, type=target_var.type_, decl=True),
-            self.visit(l.body, var_names_to_exprs))
+        res = Lam(Var(target_var.name, type=target_var.type_, decl=True), self.visit(l.body, var_names_to_exprs))
         res.type_ = l.type_
         return res
+
 
 def parse_rule_str(ks_str, symtab):
     r = single_elem(list(parse_ks_file(ks_str)))
     assert isinstance(r, Rule)
     type_propagate(r, symtab)
     return ParsedRuleMatcher(r)
+
 
 def parse_rules_from_file(filename):
     with open(filename) as f:

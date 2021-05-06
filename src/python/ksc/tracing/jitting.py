@@ -14,7 +14,6 @@ from ksc.tracing import node
 from ksc.tracing.function import Trace, TraceableFunction
 
 
-
 _jitted = {}
 
 # from
@@ -34,7 +33,10 @@ def topological_sort(final_node):
     return result
 
 
-ProtoFunction = namedtuple("ProtoFunction", ["name", "return_type", "arg_names", "is_edef", "is_builtin", "shape_def", "cost_def"])
+ProtoFunction = namedtuple(
+    "ProtoFunction", ["name", "return_type", "arg_names", "is_edef", "is_builtin", "shape_def", "cost_def"]
+)
+
 
 def get_or_trace_function(f, original_args):
     global _jitted
@@ -42,7 +44,7 @@ def get_or_trace_function(f, original_args):
 
     # allow the name to be specialized during f.trace()
     if "{0}" not in f.name:
-        key = (f.name, arg_types) # only key on arg types (not on shape)
+        key = (f.name, arg_types)  # only key on arg types (not on shape)
         if key in _jitted:
             return _jitted[key]
 
@@ -61,10 +63,11 @@ def get_or_trace_function(f, original_args):
         f.is_edef,
         f.is_builtin,
         f.shape_def if hasattr(f, "shape_def") else None,
-        f.cost_def if hasattr(f, "cost_def") else None
+        f.cost_def if hasattr(f, "cost_def") else None,
     )
     _jitted[key] = JittedFunction.from_trace(f, trace)
     return _jitted[key]
+
 
 def lift_constants(body):
     nodes = topological_sort(body)
@@ -80,6 +83,7 @@ def lift_constants(body):
             shape_types.append(node.shape_type)
             values.append(node.data)
     return arg_names, shape_types, values
+
 
 def jit_and_execute_anonymous_function(body, backend):
     shape_type = body.shape_type
@@ -101,6 +105,7 @@ def jit_and_execute_anonymous_function(body, backend):
     value._children = [jitted.origin]
     return value
 
+
 class VarNameGenerator:
     def __init__(self, prefix="tmpvar__"):
         self.index = 0
@@ -111,14 +116,17 @@ class VarNameGenerator:
         self.index += 1
         return vname
 
+
 def format_def_name(name):
     if "[" in name or "]" in name:
         return f'"{name}"'
     else:
         return name
 
+
 def format_arg_list(arg_names, arg_types):
     return " ".join([f"({n} : {t})" for n, t in zip(arg_names, arg_types)])
+
 
 def format_constant(value):
     type = shape_type_from_object(value).type
@@ -130,8 +138,10 @@ def format_constant(value):
     else:
         return str(value)
 
+
 def is_constant(node):
     return len(node.children) == 0 and node.data_ready
+
 
 def compute_ks_str(f, nodes, arg_types):
     if f.is_builtin:
@@ -145,11 +155,7 @@ def compute_ks_str(f, nodes, arg_types):
     var_name_generator = VarNameGenerator()
     return_type = nodes[-1].shape_type.type
     arg_name_types = format_arg_list(f.arg_names, arg_types)
-    template = "\n".join(
-        [f"(def {def_name} {return_type} ({arg_name_types})",
-            "  {body}",
-            ")"]
-    )
+    template = "\n".join([f"(def {def_name} {return_type} ({arg_name_types})", "  {body}", ")"])
     # computed_exprs should include only arguments and not constants
     computed_exprs = {n: n.name for n in nodes if len(n.children) == 0 and n.name in f.arg_names}
     # anything that takes inputs or not in the arguments
@@ -164,10 +170,12 @@ def compute_ks_str(f, nodes, arg_types):
             else:
                 cur_pos = nodes.index(current)
                 arg_pos = nodes.index(v)
-                raise ValueError(f"{v} appeared as an argument for {current.name}"
-                                 f" in position {cur_pos}, which is earlier than it is"
-                                 f" computed at position {arg_pos}."
-                                 f" computed_exprs={computed_exprs}")
+                raise ValueError(
+                    f"{v} appeared as an argument for {current.name}"
+                    f" in position {cur_pos}, which is earlier than it is"
+                    f" computed at position {arg_pos}."
+                    f" computed_exprs={computed_exprs}"
+                )
         if is_constant(current):
             # constant
             current_expr = format_constant(current.data)
@@ -183,17 +191,12 @@ def compute_ks_str(f, nodes, arg_types):
             var_name = var_name_generator()
             computed_exprs[current] = var_name
             # Update the template
-            template = template.format(
-                body=joiner.join([
-                    f"(let ({var_name} {current_expr})",
-                    "{body}",
-                    ")"
-                ])
-            )
+            template = template.format(body=joiner.join([f"(let ({var_name} {current_expr})", "{body}", ")"]))
             indent += 2
         else:
             computed_exprs[current] = current_expr
     return template.format(body=computed_exprs[nodes[-1]])
+
 
 def _check_arg_names_unique(arg_names):
     seen = set()
@@ -202,9 +205,11 @@ def _check_arg_names_unique(arg_names):
             raise ValueError(f"Duplicated argument name {arg_name}")
         seen.add(arg_name)
 
+
 def compose_shape_propagation_function(f, trace):
     _check_arg_names_unique(f.arg_names)
     arg_name_to_index = {arg_name: i for i, arg_name in enumerate(f.arg_names)}
+
     def helper(n):
         if len(n.children) == 0:
             if n.name in arg_name_to_index:
@@ -212,7 +217,7 @@ def compose_shape_propagation_function(f, trace):
             else:
                 # constant
                 st = n.shape_type
-                new_node = node.Node("", st.shape, st.type, n.data) # disconnect from the trace
+                new_node = node.Node("", st.shape, st.type, n.data)  # disconnect from the trace
                 return lambda args: new_node
         elif n.name == "_identity":
             assert len(n.children) == 1
@@ -222,27 +227,28 @@ def compose_shape_propagation_function(f, trace):
             try:
                 node_prop = n.shape_prop_function
             except:
-                print(f"During the composition of shape propagation function for {f.name},"
-                      f" found node {n} without a shape_prop_function.")
+                print(
+                    f"During the composition of shape propagation function for {f.name},"
+                    f" found node {n} without a shape_prop_function."
+                )
                 raise
             child_functions = [helper(c) for c in n.children]
+
             def prop(args):
                 st = node_prop(*[cf(args) for cf in child_functions])
                 return node.Node("", st.shape, st.type)
+
             return prop
-    prop = helper(trace.body) # prop :: args -> Node
+
+    prop = helper(trace.body)  # prop :: args -> Node
     return lambda *args: prop(args).shape_type
 
+
 class JittedFunction(KsFunction):
-    def __init__(self, name, return_type, arg_name_types, ks_str, is_edef, is_builtin, called_functions, shape_prop_function):
-        super().__init__(
-            name,
-            return_type,
-            arg_name_types,
-            ks_str,
-            is_edef,
-            is_builtin
-        )
+    def __init__(
+        self, name, return_type, arg_name_types, ks_str, is_edef, is_builtin, called_functions, shape_prop_function
+    ):
+        super().__init__(name, return_type, arg_name_types, ks_str, is_edef, is_builtin)
         self._called_functions = called_functions
         self._shape_prop_function = shape_prop_function
         self._origin = None
@@ -262,9 +268,14 @@ class JittedFunction(KsFunction):
         name = f.name
         called_func_names = [n for n, _arg_types in called_functions.keys()]
         if name in called_func_names and name.startswith("_anonymous"):
-            index = max(int(n.split("_")[2]) if n.count("_") == 2 else 0
-                for n in called_func_names
-                if n.startswith("_anonymous")) + 1
+            index = (
+                max(
+                    int(n.split("_")[2]) if n.count("_") == 2 else 0
+                    for n in called_func_names
+                    if n.startswith("_anonymous")
+                )
+                + 1
+            )
             name = f"_anonymous_{index}"
         # append arg types
         arg_types = tuple(t.type for t in trace.arg_shape_types)
@@ -274,7 +285,7 @@ class JittedFunction(KsFunction):
             if f.cost_def is not None:
                 called_functions[(f.cost_def.name, arg_types)] = f.cost_def
 
-        f = ProtoFunction(name, *f[1:]) # for compute_ks_str
+        f = ProtoFunction(name, *f[1:])  # for compute_ks_str
         return JittedFunction(
             name,
             f.return_type,
@@ -283,7 +294,7 @@ class JittedFunction(KsFunction):
             f.is_edef,
             f.is_builtin,
             called_functions,
-            compose_shape_propagation_function(f, trace)
+            compose_shape_propagation_function(f, trace),
         )
 
     def all_called_functions(self, seen=None):
@@ -302,7 +313,7 @@ class JittedFunction(KsFunction):
                 called_function = called() if isinstance(called, JittedFunctionFromCall) else called
                 seen.add(key)
                 inner_before, inner_after = called_function.all_called_functions(seen)
-                before.update(inner_before) # add functions called by called first
+                before.update(inner_before)  # add functions called by called first
                 if not isinstance(called, JittedFunctionFromCall):
                     # if called is not cost$ or shape$, add the called function itself
                     before[key] = called
@@ -317,19 +328,9 @@ class JittedFunction(KsFunction):
             return ""
         before, after = self.all_called_functions()
         print(f"All called functions for {self.name}: {list(before.keys()) + list(after.keys())}")
-        before_functions = [
-            called.ks_str
-            for called in before.values()
-            if len(called.ks_str) > 0
-        ]
-        after_functions = [
-            called.ks_str
-            for called in after.values()
-            if len(called.ks_str) > 0
-        ]
-        return "\n\n".join(
-            before_functions + [self._ks_str] + after_functions
-        )
+        before_functions = [called.ks_str for called in before.values() if len(called.ks_str) > 0]
+        after_functions = [called.ks_str for called in after.values() if len(called.ks_str) > 0]
+        return "\n\n".join(before_functions + [self._ks_str] + after_functions)
 
     def shape_type(self, *args):
         return self._shape_prop_function(*args)
@@ -342,24 +343,31 @@ class JittedFunction(KsFunction):
     def origin(self, node):
         self._origin = node
 
+
 def trace(f, name=None):
     if name is None:
         name = f.__name__
+
     class F(TraceableFunction):
         is_edef = False
         is_builtin = False
+
         def __init__(self):
             # This does not work for variable length arguments
             arg_names = inspect.getfullargspec(f).args
             super().__init__(name, arg_names=arg_names)
+
         def forward(self, *args):
             return f(*args)
+
     @wraps(f)
     def wrapper(*args):
         return F()(*args)
+
     wrapper.__name__ = name
     wrapper.__qualname__ = f"{name} [traceable]"
     return wrapper
+
 
 class JittedFunctionFromCall:
     """
@@ -370,13 +378,16 @@ class JittedFunctionFromCall:
 
     TODO: better name
     """
+
     def __init__(self, name, f, args):
         self.name = name
         self.f = trace(f, name)
         self.args = args
+
     def __call__(self):
         node = self.f(*self.args)
         return node.creator._jitted
+
 
 def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=None, traceable_cost_function=None):
     """
@@ -423,26 +434,28 @@ def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=Non
     class F(TraceableFunction):
         is_edef = True
         is_builtin = False
+
         def __init__(self):
             super().__init__(name, arg_names=arg_names)
+
         def trace(self, *args):
             st = shape_prop_function(*args)
             self.shape_def = (
                 JittedFunctionFromCall(f"shape${name}", traceable_shape_function, args)
-                if traceable_shape_function is not None else None
+                if traceable_shape_function is not None
+                else None
             )
             self.cost_def = (
                 JittedFunctionFromCall(f"cost${name}", traceable_cost_function, args)
-                if traceable_cost_function is not None else None
+                if traceable_cost_function is not None
+                else None
             )
             body = node.Node(
-                name=name,
-                shape=st.shape,
-                type=st.type,
-                children=args,
-                shape_prop_function=shape_prop_function)
+                name=name, shape=st.shape, type=st.type, children=args, shape_prop_function=shape_prop_function
+            )
             shape_types = tuple(arg.shape_type for arg in args)
             return Trace(body, ShapeType(st.shape, st.type), shape_types)
+
     d = {"F": F}
     arg_names_str = ", ".join(arg_names)
     exec(f"def wrapped({arg_names_str}): return F()({arg_names_str})", d)

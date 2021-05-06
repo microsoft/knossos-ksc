@@ -16,6 +16,7 @@ from ksc.type import Type, tangent_type, make_tuple_if_many
 
 from torch.utils.cpp_extension import load, load_inline
 
+
 class KRecord:
     """
     A smoother namedtuple -- like https://pythonhosted.org/pyrecord but using the existing class syntax.
@@ -42,7 +43,7 @@ class KRecord:
     """
 
     def __init__(self, **args):
-        for (nt,v) in args.items():
+        for (nt, v) in args.items():
             # assert nt in self.__annotations__  # <- This check will fail for chains of derived classes -- only the deepest has __annotations__ ready yet.
             setattr(self, nt, v)
 
@@ -51,11 +52,9 @@ class KRecord:
             return False
 
         for nt in self.__annotations__:
-            if getattr(self, nt) != getattr(that,nt):
+            if getattr(self, nt) != getattr(that, nt):
                 return False
         return True
-
-
 
 
 def ensure_list_of_lists(l):
@@ -86,7 +85,9 @@ def single_elem(l):
 def paren(s):
     return "(" + s + ")"
 
+
 PYTHON_MODULE_NAME = "ks_mod"
+
 
 def import_module_from_path(module_name, path):
     # These three lines are for loading a module from a file in Python 3.5+
@@ -96,8 +97,10 @@ def import_module_from_path(module_name, path):
     spec.loader.exec_module(py_out)
     return py_out
 
+
 def translate_and_import(source_file_name, *args):
     from ksc.translate import translate
+
     py_out = translate(*args, source_file_name, with_main=False)
     with NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(f"# AUTOGEN from {source_file_name} via ksc.utils.translate_and_import")
@@ -106,19 +109,22 @@ def translate_and_import(source_file_name, *args):
     print(f.name)
     return import_module_from_path(PYTHON_MODULE_NAME, f.name)
 
+
 def subprocess_run(cmd, env=None):
     return subprocess.run(cmd, stdout=subprocess.PIPE, env=env).stdout.decode().strip("\n")
+
 
 def get_ksc_dir():
     if "KSC_RUNTIME_DIR" in os.environ:
         ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
         ksc_src = os.path.dirname(ksc_runtime_dir)
         return os.path.dirname(ksc_src)
-    
-    d = os.path.dirname(__file__)     # src/python/ksc
-    d = os.path.dirname(d)            # src/python
-    d = os.path.dirname(d)            # src
+
+    d = os.path.dirname(__file__)  # src/python/ksc
+    d = os.path.dirname(d)  # src/python
+    d = os.path.dirname(d)  # src
     return os.path.dirname(d)
+
 
 def get_ksc_paths():
     if "KSC_RUNTIME_DIR" in os.environ:
@@ -130,12 +136,12 @@ def get_ksc_paths():
         ksc_path = os.environ["KSC_PATH"]
     else:
         ksc_path = get_ksc_dir() + "/build/bin/ksc"
-    
-    return ksc_path,ksc_runtime_dir
+
+    return ksc_path, ksc_runtime_dir
 
 
-def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten=False):
-    ksc_path,ksc_runtime_dir = get_ksc_paths()
+def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
+    ksc_path, ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
@@ -143,24 +149,31 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten=False):
         with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
             with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
                 print("generate_cpp_from_ks:", ksc_path, fks.name)
-                e = subprocess.run([
-                    ksc_path,
-                    "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
-                    "--ks-source-file", ksc_runtime_dir+"/prelude.ks",
-                    *(("--ks-source-file", ksc_runtime_dir+"/prelude-aten.ks") if use_aten else ()),
-                    "--ks-source-file", fks.name,
-                    "--ks-output-file", fkso.name,
-                    "--cpp-output-file", fcpp.name
-                ], capture_output=True, check=True)
-                print(e.stdout.decode('ascii'))
-                print(e.stderr.decode('ascii'))
+                e = subprocess.run(
+                    [
+                        ksc_path,
+                        "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
+                        "--ks-source-file",
+                        ksc_runtime_dir + "/prelude.ks",
+                        *(("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks") if use_aten else ()),
+                        "--ks-source-file",
+                        fks.name,
+                        "--ks-output-file",
+                        fkso.name,
+                        "--cpp-output-file",
+                        fcpp.name,
+                    ],
+                    capture_output=True,
+                    check=True,
+                )
+                print(e.stdout.decode("ascii"))
+                print(e.stderr.decode("ascii"))
     except subprocess.CalledProcessError as e:
         print(f"files {fks.name} {fkso.name} {fcpp.name}")
         print(f"ks_str=\n{ks_str}")
-        print(e.output.decode('ascii'))
-        print(e.stderr.decode('ascii'))
+        print(e.output.decode("ascii"))
+        print(e.stderr.decode("ascii"))
         raise
-
 
     # Read from CPP back to string
     with open(fcpp.name) as f:
@@ -173,71 +186,75 @@ def generate_cpp_from_ks(ks_str, generate_derivatives = False, use_aten=False):
 
     return out
 
+
 def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
-    _ksc_path,ksc_runtime_dir = get_ksc_paths()
+    _ksc_path, ksc_runtime_dir = get_ksc_paths()
     pybind11_path = get_ksc_dir() + "/extern/pybind11"
 
     with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
         fcpp.write(cpp_str)
 
-    extension_suffix = sysconfig.get_config_var('EXT_SUFFIX')
+    extension_suffix = sysconfig.get_config_var("EXT_SUFFIX")
     if extension_suffix is None:
-        extension_suffix = sysconfig.get_config_var('SO')
+        extension_suffix = sysconfig.get_config_var("SO")
 
     with NamedTemporaryFile(mode="w", suffix=extension_suffix, delete=False) as fpymod:
         pass
     module_path = fpymod.name
     module_name = os.path.basename(module_path).split(".")[0]
     python_includes = subprocess_run(
-        [sys.executable, "-m", "pybind11", "--includes"],
-        env={"PYTHONPATH": pybind11_path}
+        [sys.executable, "-m", "pybind11", "--includes"], env={"PYTHONPATH": pybind11_path}
     )
     try:
-        cmd = (f"g++ -I{ksc_runtime_dir} -I{pybind11_path}/include "
-               + python_includes
-               + " -Wall -Wno-unused-variable -Wno-unused-but-set-variable"
-                 " -fmax-errors=1"
-                 " -std=c++17"
-                 " -O3"
-                 " -fPIC"
-                 + (" -g -pg -O3" if profiling else "") +
-                 " -shared"
-               + (" -DKS_INCLUDE_ATEN" if use_aten else "")
-               + f" -DPYTHON_MODULE_NAME={module_name}"
-                 f" -o {module_path} "
-               + fcpp.name)
+        cmd = (
+            f"g++ -I{ksc_runtime_dir} -I{pybind11_path}/include "
+            + python_includes
+            + " -Wall -Wno-unused-variable -Wno-unused-but-set-variable"
+            " -fmax-errors=1"
+            " -std=c++17"
+            " -O3"
+            " -fPIC"
+            + (" -g -pg -O3" if profiling else "")
+            + " -shared"
+            + (" -DKS_INCLUDE_ATEN" if use_aten else "")
+            + f" -DPYTHON_MODULE_NAME={module_name}"
+            f" -o {module_path} " + fcpp.name
+        )
         print(cmd)
         subprocess.run(cmd, shell=True, capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
         print(f"cpp_file={fcpp.name}")
         print(cmd)
-        print(e.output.decode('utf-8'))
-        print(e.stderr.decode('utf-8'))
+        print(e.output.decode("utf-8"))
+        print(e.stderr.decode("utf-8"))
 
         raise
-    
+
     os.unlink(fcpp.name)
     return module_name, module_path
 
+
 def mangleType(ty):
     return ty.shortstr()
+
 
 def mangleTypes(tys):
     return "".join(mangleType(ty) for ty in tys)
 
 
-def encode_name(s : str) -> str:
+def encode_name(s: str) -> str:
     # TODO: this could be faster
-    return s.\
-        replace('@',"$a").\
-        replace(',',"$_").\
-        replace('.',"$o").\
-        replace('[',"$6").\
-        replace(']',"$9").\
-        replace('<',"$d").\
-        replace('>',"$b").\
-        replace('*',"$x").\
-        replace(':',"$8")
+    return (
+        s.replace("@", "$a")
+        .replace(",", "$_")
+        .replace(".", "$o")
+        .replace("[", "$6")
+        .replace("]", "$9")
+        .replace("<", "$d")
+        .replace(">", "$b")
+        .replace("*", "$x")
+        .replace(":", "$8")
+    )
 
 
 def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_type, generate_derivatives, use_aten):
@@ -271,8 +288,11 @@ def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_t
           m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
         """
 
-    cpp_str += """
-PYBIND11_MODULE(""" + python_module_name + """, m) {
+    cpp_str += (
+        """
+PYBIND11_MODULE("""
+        + python_module_name
+        + """, m) {
     m.def("reset_allocator", []{ g_alloc.reset();});
     m.def("allocator_top", []{ return g_alloc.mark();});
     m.def("allocator_peak", []{ return g_alloc.peak();});
@@ -281,29 +301,42 @@ PYBIND11_MODULE(""" + python_module_name + """, m) {
     declare_tensor_2<double>(m, "Tensor_2_Float");
     declare_tensor_2<int>(m, "Tensor_2_Integer");
 
-""" + declarations + """
+"""
+        + declarations
+        + """
 }
 """
+    )
 
     return cpp_str
 
-def generate_and_compile_cpp_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
 
-    cpp_str = __make_cpp_str(ks_str, name_to_call, "PYTHON_MODULE_NAME", arg_types, return_type, generate_derivatives, use_aten)
+def generate_and_compile_cpp_from_ks(
+    ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False
+):
+
+    cpp_str = __make_cpp_str(
+        ks_str, name_to_call, "PYTHON_MODULE_NAME", arg_types, return_type, generate_derivatives, use_aten
+    )
 
     cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
-    print(f"Saving to {cpp_fname}")    
+    print(f"Saving to {cpp_fname}")
     with open(cpp_fname, "w") as fcpp:
         fcpp.write(cpp_str)
 
     module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
     return import_module_from_path(module_name, module_path)
 
-def build_module_using_pytorch_from_ks(ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False):
-    """Uses PyTorch C++ extension mechanism to build and load a module"""
-    cpp_str = __make_cpp_str(ks_str, name_to_call, "TORCH_EXTENSION_NAME", arg_types, return_type, generate_derivatives, use_aten)
 
-    __ksc_path,ksc_runtime_dir = get_ksc_paths()
+def build_module_using_pytorch_from_ks(
+    ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False
+):
+    """Uses PyTorch C++ extension mechanism to build and load a module"""
+    cpp_str = __make_cpp_str(
+        ks_str, name_to_call, "TORCH_EXTENSION_NAME", arg_types, return_type, generate_derivatives, use_aten
+    )
+
+    __ksc_path, ksc_runtime_dir = get_ksc_paths()
 
     cflags = [
         "-DKS_INCLUDE_ATEN" if use_aten else "",
@@ -314,21 +347,19 @@ def build_module_using_pytorch_from_ks(ks_str, name_to_call, arg_types, return_t
     # We're making a guess here if people recognifigure their C++ compiler on Windows it's because they're using non-MSVC
     # otherwise we need to inspect the end of the path path for cl[.exe].
 
-    cpp_compiler = os.environ.get('CXX')
-    if (cpp_compiler == None and sys.platform == 'win32'):
+    cpp_compiler = os.environ.get("CXX")
+    if cpp_compiler == None and sys.platform == "win32":
         cflags.append("/std:c++17")
     else:
         cflags.append("-std=c++17")
-        
+
     # https://pytorch.org/docs/stable/cpp_extension.html
     module = load_inline(
-                name="dynamic_ksc_cpp",
-                cpp_sources=[cpp_str],
-                extra_include_paths=[ksc_runtime_dir],
-                extra_cflags = cflags
-            )
+        name="dynamic_ksc_cpp", cpp_sources=[cpp_str], extra_include_paths=[ksc_runtime_dir], extra_cflags=cflags
+    )
 
     return module
+
 
 def ndgrid_inds(sz):
     """
@@ -346,6 +377,7 @@ def ndgrid_inds(sz):
     """
 
     return itertools.product(*map(range, sz))
+
 
 def singleton(cls):
     """ Simple decorator that makes a single instance of a class.

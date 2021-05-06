@@ -6,8 +6,9 @@ from ksc.tracing.functions import math
 from ksc.abstract_value import AbstractValue, ExecutionContext
 from ksc.type import Type
 from ksc.shape import shape_type_from_object, ShapeType, TensorShape
-from ksc.utils import translate_and_import 
+from ksc.utils import translate_and_import
 from ksc.tracing.functions import core
+
 
 def test_get_shape():
     ks_str = """
@@ -18,6 +19,7 @@ def test_get_shape():
     m = translate_and_import(__file__, ks_str, "abstract")
     with ExecutionContext():
         assert m.get_shape(x).data == (1, 3, 224, 224)
+
 
 def test_get_tuple_element():
     ks_str = """
@@ -34,6 +36,7 @@ def test_get_tuple_element():
     with ExecutionContext():
         assert m.flatten(x).data == (3, 4, 5)
 
+
 def test_tuple_of_tensors():
     ks_str = """
 (def fst (Tensor 2 Float) ((x : (Tuple (Tensor 2 Float) (Vec Float))))
@@ -46,8 +49,11 @@ def test_tuple_of_tensors():
     m = translate_and_import(__file__, ks_str, "abstract")
     x = AbstractValue.from_data((np.random.normal(0, 1, (3, 4)), np.random.normal(0, 1, (4,))))
     with ExecutionContext():
-        assert m.fst(x).shape_type == ShapeType(TensorShape((3, 4), ()), Type.Tensor(2, Type.Float)) # (((3, 4),), Type.Tensor(2, Type.Float))
+        assert m.fst(x).shape_type == ShapeType(
+            TensorShape((3, 4), ()), Type.Tensor(2, Type.Float)
+        )  # (((3, 4),), Type.Tensor(2, Type.Float))
         assert m.snd(x).shape_type == ShapeType(TensorShape((4,), ()), Type.Tensor(1, Type.Float))
+
 
 def test_if_then_else():
     ks_str = """
