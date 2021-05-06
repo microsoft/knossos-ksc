@@ -383,16 +383,29 @@ def _(ex, symtab):
     print(f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) ")
     print(f"type_propagate: Looked up {ex.name}")
     exname = ex.name.mangled()
-    print(f"type_propagate: Near misses {exname}:")
-    for key, val in symtab.items():
+    near_miss = False
+    closest_match = None
+    closest_match_distance = float('inf')
+    DISTANCE_THRESHOLD = 3
+    for key,val in symtab.items():
         if isinstance(key, StructuredName):
             key_str = key.mangle_without_type()
         else:
-            key_str = str(key)
-        if editdistance.eval(key_str, exname) < 2:
-            print(f"type_propagate:   {key} -> {val}")
+            key_str=str(key)
+        distance = editdistance.eval(key_str, exname)
+        if distance < closest_match_distance:
+            closest_match = key
+            closest_match_distance = distance
 
-    print(f"type_propagate: To implement:")
+        if distance < DISTANCE_THRESHOLD:
+            if not near_miss:
+                print(f"type_propagate: Near misses:")
+                near_miss = True
+            print(f"type_propagate:   {key_str} -> {val}")
+    if not near_miss:
+        print(f"type_propagate: No near misses (closest was {closest_match}, dist = {closest_match_distance})")
+
+    print(f"type_propagate: Boilerplate for prelude.ks:")
     argtypes_ks_str = " ".join(map(pformat, argtypes))
     argtype_tuple = Type.Tuple(*argtypes) if len(argtypes) > 1 else argtypes[0]
     argtypes_ks_tuple = pformat(argtype_tuple)
