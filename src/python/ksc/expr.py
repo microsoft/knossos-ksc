@@ -8,9 +8,9 @@ from ksc.type import Type
 from ksc.utils import paren, KRecord
 
 #####################################################################
-# 
+#
 # The Knossos IR is a lightweight, clean, functional IR with strong
-# similarities to Lisp.  The AST has just a few basic concepts, 
+# similarities to Lisp.  The AST has just a few basic concepts,
 # each with a backing class defined below.  The concepts are, in
 # lisp-like (KS) syntax, with named fields below:
 #
@@ -29,13 +29,13 @@ from ksc.utils import paren, KRecord
 #       ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #       name  return_type  arg_type
 #
-# Rule: Rewrite rule for the Knossos optimizer 
+# Rule: Rewrite rule for the Knossos optimizer
 # (rule "add0"  (a : Float)     (add a 0)   a)
 #       ^^^^^^  ^^^^^^^^^^^     ^^^^^^^^^   ^
 #       name    template_vars   template    replacement
 #
 ### Expression nodes (Expr):
-# 
+#
 # Const: Constant float, int, string, bool
 # (combine 1.234      "a string")
 #          ^^^^^      ^^^^^^^^^^
@@ -49,12 +49,12 @@ from ksc.utils import paren, KRecord
 #       ^      ^^^^^
 #       name   type
 #
-# Call: Function call, including assert, tuple, and other "builtins" 
+# Call: Function call, including assert, tuple, and other "builtins"
 # (add   1.234 4.56)
 #  ^     ^^^^^^^^^^
 #  name  args
 #
-# Lam: Anonymous function/lambda, single argument -- use tuples to pass more 
+# Lam: Anonymous function/lambda, single argument -- use tuples to pass more
 # (lam (i : Integer)  (add i 4))
 #      ^^^^^^^^^^^^^  ^^^^^^^^^
 #      arg            body
@@ -81,7 +81,7 @@ from ksc.utils import paren, KRecord
 #  [fred Type]
 @dataclass(frozen=True)
 class StructuredName:
-    se: Union[str, Tuple[str, Type], Tuple[str, 'StructuredName']]
+    se: Union[str, Tuple[str, Type], Tuple[str, "StructuredName"]]
 
     def is_derivation(self):
         """
@@ -89,7 +89,7 @@ class StructuredName:
         """
         return isinstance(self.se, tuple) and isinstance(self.se[1], StructuredName)
 
-    def is_derived(self, derivation : str):
+    def is_derived(self, derivation: str):
         """
         True if this is exactly <derivation> of another StructuredName
         e.g.
@@ -109,10 +109,10 @@ class StructuredName:
         """
         if isinstance(self.se, str):
             return self.se
-        
+
         if self.is_derivation():
             return self.se[0] + "$" + self.se[1].mangled()
-        
+
         assert isinstance(self.se[1], Type)
         return self.se[0] + "@" + self.se[1].shortstr()
 
@@ -122,10 +122,10 @@ class StructuredName:
         """
         if isinstance(self.se, str):
             return False
-        
+
         if self.is_derivation():
             return self.se[1].has_type()
-        
+
         assert isinstance(self.se[1], Type)
         return True
 
@@ -135,14 +135,14 @@ class StructuredName:
         """
         if isinstance(self.se, str):
             return None
-        
+
         if self.is_derivation():
             return self.se[1].get_type()
-        
+
         assert isinstance(self.se[1], Type)
         return self.se[1]
 
-    def add_type(self, ty) -> ('StructuredName', Type):
+    def add_type(self, ty) -> ("StructuredName", Type):
         """
         Return a new structured name, with "ty" inserted in the corner, returning the old type if any
         sn = parse("[shape [rev foo]]")
@@ -153,9 +153,9 @@ class StructuredName:
         if isinstance(self.se, str):
             return StructuredName((self.se, ty)), None
         if self.is_derivation():
-            new_sn, old_ty  = self.se[1].add_type(ty)
+            new_sn, old_ty = self.se[1].add_type(ty)
             return StructuredName((self.se[0], new_sn)), old_ty
-        
+
         old_ty = self.se[1]
         return StructuredName((self.se[0], ty)), old_ty
 
@@ -168,10 +168,10 @@ class StructuredName:
         """
         if isinstance(self.se, str):
             return self.se
-        
+
         if self.is_derivation():
             return self.se[0] + "$" + self.se[1].mangle_without_type()
-        
+
         return self.se[0]
 
     def __str__(self):
@@ -184,8 +184,9 @@ class StructuredName:
 
     @staticmethod
     def from_str(s: str):
-        assert '$' not in s
+        assert "$" not in s
         return StructuredName(s)
+
 
 def make_structured_name(se) -> StructuredName:
     """
@@ -207,11 +208,14 @@ def make_structured_name(se) -> StructuredName:
 
     assert False, f"Bad name {se}"
 
+
 ########################################################################
-# TLDs. 
+# TLDs.
+
 
 class ASTNode(KRecord):
-    ''' Base class for AST nodes. Not directly instantiable. '''
+    """ Base class for AST nodes. Not directly instantiable. """
+
     def __init__(self, **kwargs):
         # This assertion prevents intermediate classes (ASTNode, Expr) from being instantiated.
         # (KRecord doesn't mind).
@@ -224,29 +228,33 @@ class ASTNode(KRecord):
                 # str() on list contains repr() of elements
                 return "[" + (", ".join([to_str(e) for e in v])) + "]"
             return str(v)
+
         nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
-        return paren(type(self).__name__ + ' ' + ' '.join(nodes))
+        return paren(type(self).__name__ + " " + " ".join(nodes))
+
 
 class Expr(ASTNode):
-    '''Base class for Expression AST nodes. Not directly instantiable.'''
+    """Base class for Expression AST nodes. Not directly instantiable."""
 
-    type_: Type # All expressions have a type.  It may be initialized to None, and then filled in by type inference
-    free_vars_: FrozenSet[str] # Filled in by constructor
+    type_: Type  # All expressions have a type.  It may be initialized to None, and then filled in by type inference
+    free_vars_: FrozenSet[str]  # Filled in by constructor
 
     def __init__(self, **args):
         self.type_ = args.pop("type_", None)
         super().__init__(**args)
         self.free_vars_ = compute_free_vars(self)
 
+
 class Def(ASTNode):
-    '''Def(name, return_type, args, body). 
+    """Def(name, return_type, args, body). 
     Example:
     ```
     (def add   (Vec Float)  ((a : Float) (b : (Vec Float))) ...)
          ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
          name  return_type  args                            body
     ```
-    '''
+    """
+
     name: StructuredName
     return_type: Type
     args: list
@@ -256,15 +264,17 @@ class Def(ASTNode):
         assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
+
 class EDef(ASTNode):
-    '''Edef(name, return_type, arg). 
+    """Edef(name, return_type, arg). 
     Example:
     ```
     (edef add   (Vec Float)  (Tuple Float (Vec Float)) )
           ^^^   ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
           name  return_type  arg_type
     ```
-    '''
+    """
+
     name: StructuredName
     return_type: Type
     arg_type: Type
@@ -272,15 +282,17 @@ class EDef(ASTNode):
     def __init__(self, name, return_type, arg_type):
         super().__init__(name=name, return_type=return_type, arg_type=arg_type)
 
+
 class GDef(ASTNode):
-    '''Gdef(name, return_type, args). 
+    """Gdef(name, return_type, args). 
     Example:
     ```
     (gdef rev         [add (Tuple Float Float)])
           ^^^         ^^^^
           derivation  function_name
     ```
-    '''
+    """
+
     derivation: str
     function_name: StructuredName
 
@@ -290,8 +302,9 @@ class GDef(ASTNode):
     def name(self):
         return StructuredName((derivation, function_name))
 
+
 class Rule(ASTNode):
-    '''Rule(name, template_vars, template, replacement). 
+    """Rule(name, template_vars, template, replacement). 
     Example:
     ```
     (rule "add0"  (a : Float)     (add a 0)   a)
@@ -299,7 +312,8 @@ class Rule(ASTNode):
           name    template_vars   template    replacement
     ```
     See further detail in class ParsedRuleMatcher.
-    '''
+    """
+
     name: str
     template_vars: List["Var"]
     template: Expr
@@ -308,17 +322,20 @@ class Rule(ASTNode):
     def __init__(self, name, template_vars, template, replacement):
         super().__init__(name=name, template_vars=template_vars, template=template, replacement=replacement)
 
+
 ConstantType = Union[int, str, float, bool]
 
+
 class Const(Expr):
-    '''Const(value). 
+    """Const(value). 
     Examples:
     ```
     (combine 1.234      "a string")
              ^^^^^      ^^^^^^^^^^
              value      value'
     ```
-    '''
+    """
+
     value: ConstantType
 
     def __init__(self, value: ConstantType):
@@ -327,8 +344,9 @@ class Const(Expr):
     def __str__(self):
         return repr(self.value)
 
+
 class Var(Expr):
-    '''Var(name, type, decl). 
+    """Var(name, type, decl). 
     Examples:
     ```
     (add x 1.234)  ; use of var, decl=false, type is None or propagated
@@ -338,7 +356,8 @@ class Var(Expr):
           ^      ^^^^^
           name   type
     ```
-    '''
+    """
+
     name: str
     decl: bool
 
@@ -351,8 +370,9 @@ class Var(Expr):
         else:
             return self.name
 
+
 class Call(Expr):
-    '''Call(name, args). 
+    """Call(name, args). 
     Example:
     ```
     (add   1.234 4.56)
@@ -362,7 +382,8 @@ class Call(Expr):
      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^
      name                             args
     ```
-    '''
+    """
+
     name: StructuredName
     args: List[Expr]
 
@@ -371,23 +392,26 @@ class Call(Expr):
             name = StructuredName.from_str(name)
         super().__init__(name=name, args=args, type_=type)
 
+
 class Lam(Expr):
-    '''Lam(arg, body).
+    """Lam(arg, body).
      Example:
     ```
     (lam (i : Integer)  (add i 4))
          ^^^^^^^^^^^^^  ^^^^^^^^^
          arg            body
     ```
-    '''
+    """
+
     arg: Var
     body: Expr
 
     def __init__(self, arg, body, type=None):
         super().__init__(arg=arg, body=body, type_=type)
 
+
 class Let(Expr):
-    '''Let(vars, rhs, body). 
+    """Let(vars, rhs, body). 
     Example:
     ```
     (let (a    1)   (add a a))
@@ -399,7 +423,8 @@ class Let(Expr):
           ^      ^              ^^^^^^^^^
           var    rhs            body
     ```
-    '''
+    """
+
     vars: Union[Var, List[Var]]
     rhs: Expr
     body: Expr
@@ -409,35 +434,39 @@ class Let(Expr):
 
 
 class If(Expr):
-    '''If(cond, t_body, f_body). 
+    """If(cond, t_body, f_body). 
     Example:
     ```
     (if (eq a a) "good"  "bad")
         ^^^^^^^^ ^^^^^^  ^^^^^
         cond     t_body  f_body
     ```
-    '''
-    cond: Expr    # Condition
+    """
+
+    cond: Expr  # Condition
     t_body: Expr  # Value if true
     f_body: Expr  # Value if false
 
     def __init__(self, cond, t_body, f_body, type=None):
         super().__init__(cond=cond, t_body=t_body, f_body=f_body, type_=type)
 
+
 class Assert(Expr):
-    '''Assert(cond, body).
+    """Assert(cond, body).
     Example:
     ```
     (assert (gt i 0) (do_stuff))
             ^^^^^^^^ ^^^^^^^^^^
             cond     body
     ```
-    '''
-    cond: Expr    # Condition
-    body: Expr    # Value if true
+    """
+
+    cond: Expr  # Condition
+    body: Expr  # Value if true
 
     def __init__(self, cond, body, type=None):
         super().__init__(cond=cond, body=body, type_=type)
+
 
 #####################################################################
 # pystr:
@@ -453,14 +482,18 @@ from functools import singledispatch
 
 from ksc.expr import Expr, Def, EDef, GDef, Call, Const, Var, If
 
-def pyname(s : str) -> str:
-    return s.replace('$','_s')
+
+def pyname(s: str) -> str:
+    return s.replace("$", "_s")
+
 
 def nl(indent):
     return "\n" + "  " * indent
 
+
 def pystr_intercomma(indent, exprs):
     return ", ".join([pystr(ex, indent) for ex in exprs])
+
 
 @singledispatch
 def pystr(expr, indent):
@@ -470,46 +503,72 @@ def pystr(expr, indent):
     # Default implementation, for types not specialized below
     return str(expr)
 
+
 @pystr.register(Type)
 def _(ty, indent):
     if ty.is_scalar:
         return ty.kind
-    elems = [pystr(c, indent+1) for c in ty.children]
-    return ty.kind + "[" + ",".join(elems) + "]"    
+    elems = [pystr(c, indent + 1) for c in ty.children]
+    return ty.kind + "[" + ",".join(elems) + "]"
+
 
 @pystr.register(StructuredName)
 def _(sn, indent):
     return pyname(sn.mangled())
 
+
 @pystr.register(Def)
 def _(ex, indent):
     indent += 1
-    return "def " + pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ") -> " \
-           + pystr(ex.return_type, indent) + ":" \
-           + nl(indent+1) + pystr(ex.body, indent+1)
+    return (
+        "def "
+        + pystr(ex.name, indent)
+        + "("
+        + pystr_intercomma(indent, ex.args)
+        + ") -> "
+        + pystr(ex.return_type, indent)
+        + ":"
+        + nl(indent + 1)
+        + pystr(ex.body, indent + 1)
+    )
+
 
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "#edef " + str(ex.name) + pystr(ex.arg_type, indent) + " -> "\
-           + pystr(ex.return_type, indent) + nl(indent)
+    return "#edef " + str(ex.name) + pystr(ex.arg_type, indent) + " -> " + pystr(ex.return_type, indent) + nl(indent)
+
 
 @pystr.register(GDef)
 def _(ex, indent):
     indent += 1
     return "#gdef " + ex.derivation + " " + str(ex.function_name)
 
+
 @pystr.register(Rule)
 def _(ex, indent):
     indent += 1
-    return "@rule\ndef " + pyname(ex.name) + " " + "(" + pystr(ex.template_vars, indent) + ")" + ":" + nl(indent) \
-           + pystr(ex.template, indent+1) + nl(indent) \
-           + "<===> " + nl(indent) \
-           + pystr(ex.replacement, indent+1)
+    return (
+        "@rule\ndef "
+        + pyname(ex.name)
+        + " "
+        + "("
+        + pystr(ex.template_vars, indent)
+        + ")"
+        + ":"
+        + nl(indent)
+        + pystr(ex.template, indent + 1)
+        + nl(indent)
+        + "<===> "
+        + nl(indent)
+        + pystr(ex.replacement, indent + 1)
+    )
+
 
 @pystr.register(Const)
 def _(ex, indent):
     return repr(ex.value)
+
 
 @pystr.register(Var)
 def _(ex, indent):
@@ -518,16 +577,18 @@ def _(ex, indent):
     else:
         return pyname(ex.name)
 
+
 @pystr.register(Call)
 def _(ex, indent):
     indent += 1
     return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
+
 @pystr.register(Lam)
 def _(ex, indent):
     indent += 1
-    return "lambda " + pyname(ex.arg.name) + ": " + nl(indent+1)\
-            + "(" + pystr(ex.body, indent+1) + ")"
+    return "lambda " + pyname(ex.arg.name) + ": " + nl(indent + 1) + "(" + pystr(ex.body, indent + 1) + ")"
+
 
 @pystr.register(Let)
 def _(ex, indent):
@@ -535,60 +596,79 @@ def _(ex, indent):
         var_str = ",".join(pystr(v, indent) for v in ex.vars)
     else:
         var_str = pystr(ex.vars, indent)
-    return var_str + " = " + pystr(ex.rhs, indent+1) + nl(indent) \
-         + pystr(ex.body, indent)
+    return var_str + " = " + pystr(ex.rhs, indent + 1) + nl(indent) + pystr(ex.body, indent)
+
 
 @pystr.register(If)
 def _(ex, indent):
-    return "(" + pystr(ex.t_body, indent+2) + " if " +  pystr(ex.cond, indent+1) + nl(indent+1) \
-               + " else " + pystr(ex.f_body, indent+1) + ")\n"
+    return (
+        "("
+        + pystr(ex.t_body, indent + 2)
+        + " if "
+        + pystr(ex.cond, indent + 1)
+        + nl(indent + 1)
+        + " else "
+        + pystr(ex.f_body, indent + 1)
+        + ")\n"
+    )
+
 
 @pystr.register(Assert)
 def _(ex, indent):
     indent += 1
-    return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) \
-            + pystr(ex.body, indent)
+    return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) + pystr(ex.body, indent)
+
 
 #####################################################################
 # Calculate free variables of an Expr.
+
 
 @singledispatch
 def compute_free_vars(e: Expr) -> FrozenSet[str]:
     raise ValueError("Must be overridden for every Expr subclass")
 
+
 @compute_free_vars.register
 def fv_var(e: Var):
     return frozenset([e.name])
 
+
 @compute_free_vars.register
 def fv_call(e: Call):
-    return frozenset() if len(e.args)==0 else frozenset.union(*[arg.free_vars_ for arg in e.args])
+    return frozenset() if len(e.args) == 0 else frozenset.union(*[arg.free_vars_ for arg in e.args])
+
 
 @compute_free_vars.register
 def fv_lam(e: Lam):
     return e.body.free_vars_ - e.arg.free_vars_
 
+
 @compute_free_vars.register
 def fv_let(e: Let):
-    bound_here = e.vars.free_vars_ if isinstance(e.vars, Var) else frozenset.union(
-        *[var.free_vars_ for var in e.vars]
-    )
+    bound_here = e.vars.free_vars_ if isinstance(e.vars, Var) else frozenset.union(*[var.free_vars_ for var in e.vars])
     return e.rhs.free_vars_.union(e.body.free_vars_ - bound_here)
+
 
 @compute_free_vars.register
 def fv_const(e: Const):
     return frozenset()
 
+
 @compute_free_vars.register
 def fv_assert(e: Assert):
     return frozenset.union(e.cond.free_vars_, e.body.free_vars_)
+
 
 @compute_free_vars.register
 def fv_if(e: If):
     return frozenset.union(e.cond.free_vars_, e.t_body.free_vars_, e.f_body.free_vars_)
 
+
 if __name__ == "__main__":
     from ksc.parse_ks import parse_ks_file
+
     for decl in parse_ks_file("test/ksc/syntax-primer.ks"):
         print(decl)
-        print(pystr(decl,0))  # Pystr here doesn't get dispatched properly... singledispatch sees __main__.Def, not ksc.expr.def
+        print(
+            pystr(decl, 0)
+        )  # Pystr here doesn't get dispatched properly... singledispatch sees __main__.Def, not ksc.expr.def

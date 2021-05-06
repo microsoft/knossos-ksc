@@ -14,9 +14,7 @@ parser = argparse.ArgumentParser(description="Convert TorchScript to Knossos IR"
 parser.add_argument("--input_file", required=True, help="TorchScript [file_path].py")
 parser.add_argument("--output_file", required=True, help="Knossos IR [file_path].ks")
 parser.add_argument(
-    "--generate_edef",
-    action="store_true",
-    help="Generate edef, otherwise default to pass-through",
+    "--generate_edef", action="store_true", help="Generate edef, otherwise default to pass-through",
 )
 args = parser.parse_args()
 
@@ -59,9 +57,7 @@ with add_to_path(input_directory):
 
 # load all TorchScript methods in target modules
 # (various limitations, local sibling modules)
-dynamicMembers = inspect.getmembers(
-    dynamicModule, predicate=lambda v: type(v) == torch.jit.ScriptFunction
-)
+dynamicMembers = inspect.getmembers(dynamicModule, predicate=lambda v: type(v) == torch.jit.ScriptFunction)
 
 output.write("#| -------- Graph ----------")
 output.write("\n")
