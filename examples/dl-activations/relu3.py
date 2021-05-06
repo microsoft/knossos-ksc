@@ -3,9 +3,9 @@ from ksc.torch_utils import elementwise_apply, elementwise_apply_pt18
 
 # BEGINDOC
 def relu3(x: float) -> float:
-    """
-    Like ReLu, but smoother
-    Like GeLu, but cheaper
+  """
+  Like ReLu, but smoother
+  Like GeLu, but cheaper
   """
   if x < 0.0:
     return 0.0
