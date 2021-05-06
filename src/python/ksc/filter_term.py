@@ -12,14 +12,17 @@ from ksc.type import Type
 # Moreover, the design aims to optimize the frequency of detecting non-matches.
 FilterTerm = Union[Type, ConstantType, StructuredName]
 
+
 @singledispatch
-def get_filter_term(e : Expr) -> FilterTerm:
+def get_filter_term(e: Expr) -> FilterTerm:
     return e.__class__
 
-@get_filter_term.register
-def get_filter_term_const(e : Const) -> ConstantType:
-    return e.value
 
 @get_filter_term.register
-def get_filter_term_call(e : Call):
+def get_filter_term_const(e: Const) -> ConstantType:
+    return e.value
+
+
+@get_filter_term.register
+def get_filter_term_call(e: Call):
     return e.name
