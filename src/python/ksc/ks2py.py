@@ -7,27 +7,32 @@ from ksc.type_propagate import type_propagate_decls
 
 # Pretty printing
 # Importing prettyprint to get the decorated printers for Expression and Type
-import ksc.prettyprint # pylint: disable=unused-import
+import ksc.prettyprint  # pylint: disable=unused-import
 
 # Import the prettyprinter routines we use explicitly in this file
 from prettyprinter import cpprint, pprint, pformat
 
 # Needed this in order to see the error messages when pprint fails
 import warnings
+
 warnings.filterwarnings("always")
 
 #####################################################################
 
 from functools import singledispatch
 
-def pyname(s : str) -> str:
-    return s.replace('$','_s')
+
+def pyname(s: str) -> str:
+    return s.replace("$", "_s")
+
 
 def nl(indent):
     return "\n" + "  " * indent
 
+
 def emit_intercomma(indent, exprs, body):
     return ", ".join([emit(ex, indent, body) for ex in exprs])
+
 
 @singledispatch
 def emit(expr, indent, body):
@@ -37,35 +42,66 @@ def emit(expr, indent, body):
     # Default implementation, for types not specialized below
     return str(expr)
 
+
 @emit.register(Def)
 def _(ex, indent, body):
     indent += 1
-    return "def " + pyname(ex.name) + "(" + emit_intercomma(indent, ex.args, body) + ") -> " \
-           + pystr(ex.return_type, indent) + ":" \
-           + nl(indent+1) + emit(ex.body, indent+1, "return ")
+    return (
+        "def "
+        + pyname(ex.name)
+        + "("
+        + emit_intercomma(indent, ex.args, body)
+        + ") -> "
+        + pystr(ex.return_type, indent)
+        + ":"
+        + nl(indent + 1)
+        + emit(ex.body, indent + 1, "return ")
+    )
+
 
 @emit.register(EDef)
 def _(ex, indent, body):
     indent += 1
-    return "#edef " + pyname(ex.name) + emit(ex.arg_type, indent, body) + ") -> "\
-           + pystr(ex.return_type, indent) + nl(indent)
+    return (
+        "#edef "
+        + pyname(ex.name)
+        + emit(ex.arg_type, indent, body)
+        + ") -> "
+        + pystr(ex.return_type, indent)
+        + nl(indent)
+    )
+
 
 @emit.register(GDef)
 def _(ex, indent, body):
     indent += 1
     return "#gdef " + pyname(ex.derivation) + " " + pyname(ex.function_name) + nl(indent)
 
+
 @emit.register(Rule)
 def _(ex, indent, body):
     indent += 1
-    return "@rule\ndef " + pyname(ex.name) + " " + "(" + emit(ex.args, indent, body) + ")" + ":" + nl(indent) \
-           + emit(ex.e1, indent +1, body) + nl(indent) \
-           + "<===> " + nl(indent) \
-           + emit(ex.e2, indent +1, body)
+    return (
+        "@rule\ndef "
+        + pyname(ex.name)
+        + " "
+        + "("
+        + emit(ex.template_vars, indent, body)
+        + ")"
+        + ":"
+        + nl(indent)
+        + emit(ex.template, indent + 1, body)
+        + nl(indent)
+        + "<===> "
+        + nl(indent)
+        + emit(ex.replacement, indent + 1, body)
+    )
+
 
 @emit.register(Const)
 def _(ex, indent, body):
     return body + repr(ex.value)
+
 
 @emit.register(Var)
 def _(ex, indent, body):
@@ -74,34 +110,45 @@ def _(ex, indent, body):
     else:
         return body + pyname(ex.name)
 
+
 @emit.register(Call)
 def _(ex, indent, body):
-    return body + pystr(ex, indent+1)
+    return body + pystr(ex, indent + 1)
+
 
 @emit.register(Lam)
 def _(ex, indent, body):
     indent += 1
-    return body + "lambda " + pyname(ex.arg.name) + ": " + nl(indent+1)\
-                    + "(" + emit(ex.body, indent +1, "") + ")"
+    return body + "lambda " + pyname(ex.arg.name) + ": " + nl(indent + 1) + "(" + emit(ex.body, indent + 1, "") + ")"
+
 
 @emit.register(Let)
 def _(ex, indent, body):
-    return emit(ex.vars, indent, "") + " = " + emit(ex.rhs, indent +1, "") + nl(indent) \
-         + emit(ex.body, indent, body)
+    return emit(ex.vars, indent, "") + " = " + emit(ex.rhs, indent + 1, "") + nl(indent) + emit(ex.body, indent, body)
+
 
 @emit.register(If)
 def _(ex, indent, body):
-    return "(" + emit(ex.t_body, indent +2, "") + " if " +  emit(ex.cond, indent +1, "") + nl(indent+1) \
-               + " else " + emit(ex.f_body, indent +1, "") + ")\n"
+    return (
+        "("
+        + emit(ex.t_body, indent + 2, "")
+        + " if "
+        + emit(ex.cond, indent + 1, "")
+        + nl(indent + 1)
+        + " else "
+        + emit(ex.f_body, indent + 1, "")
+        + ")\n"
+    )
+
 
 @emit.register(Assert)
 def _(ex, indent, body):
-    return "assert " + emit(ex.cond, indent, "") + nl(indent) \
-            + emit(ex.body, indent, body)
+    return "assert " + emit(ex.cond, indent, "") + nl(indent) + emit(ex.body, indent, body)
 
 
 import sys
 import argparse
+
 
 def main():
     parser = argparse.ArgumentParser(prog="ks2py", description=__doc__)
@@ -121,11 +168,14 @@ def main():
         for x in decls_file:
             cpprint(x)
             print(emit(x, 0, ""), "\n", file=fo)
-        print("""
+        print(
+            """
 if __name__ == "__main__":
     main()
-""", file=fo)
+""",
+            file=fo,
+        )
+
 
 if __name__ == "__main__":
     sys.exit(main())
-

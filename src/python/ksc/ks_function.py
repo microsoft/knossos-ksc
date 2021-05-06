@@ -2,6 +2,7 @@ from ksc.utils import generate_and_compile_cpp_from_ks, translate_and_import
 
 from ksc.shape import ShapeType, shape_type_from_object
 
+
 class KsFunction:
     def __init__(self, name, return_type, arg_name_types, ks_str, is_edef=False, is_builtin=False):
         self._name = name
@@ -50,7 +51,9 @@ class KsFunction:
     def __call__(self, *args, backend="jax"):
         for i, (arg, arg_type) in enumerate(zip(args, self._arg_types)):
             actual_type = shape_type_from_object(arg).type
-            assert actual_type == arg_type, f"In the {i+1}th argument of {self.name}, expected {arg_type} but got {actual_type}"
+            assert (
+                actual_type == arg_type
+            ), f"In the {i+1}th argument of {self.name}, expected {arg_type} but got {actual_type}"
         ks_str = self.combined_ks_str()
         name_to_call = self.name
         print(ks_str)
@@ -64,4 +67,3 @@ class KsFunction:
             return self._py_mod.defs[name_to_call](*args)
         else:
             return self._py_mod.entry(*args)
-

@@ -25,10 +25,11 @@ from .common import (
     max_,
     neg,
     pow,
-    to_float_i
+    to_float_i,
 )
 
 _built_ins = common._core_built_ins
+
 
 def check_args_and_get_context(name, args, concrete="concrete"):
     context = None
@@ -42,21 +43,22 @@ def check_args_and_get_context(name, args, concrete="concrete"):
         ctx = arg.context
         if (context is None or context == concrete) and ctx is not None:
             context = ctx
-        assert (ctx is None
-                 or ctx == concrete
-                 or ctx == context), (f"In the call {name}, expected"
-                                      f" {context} for arg#{i+1},"
-                                      f" but got {ctx}")
+        assert ctx is None or ctx == concrete or ctx == context, (
+            f"In the call {name}, expected" f" {context} for arg#{i+1}," f" but got {ctx}"
+        )
     return context
+
 
 def _get_data(value):
     if isinstance(value, AbstractValue):
         return value.data
     return value
 
+
 def _get_edef(defs, name, type, py_name_for_concrete):
     shape_def = defs[f"shape${name}"]
     cost_def = defs[f"cost${name}"]
+
     @wraps(shape_def)
     def f(*args):
         context = check_args_and_get_context(name, args)
@@ -76,36 +78,37 @@ def _get_edef(defs, name, type, py_name_for_concrete):
             exec_ctx = current_execution_context()
             exec_ctx.accumulate_cost(name, context, cost)
             return AbstractValue(shape, type, context=context)
+
     f.__name__ = name
     f.__qualname__ = f"{name} [edef]"
     return f
+
 
 def index(i, v):
     st = v.shape_type
     assert st.type.is_tensor, f"Called index on non-tensor {v}"
     exec_ctx = current_execution_context()
-    exec_ctx.accumulate_cost(
-        "index",
-        v.context,
-        exec_ctx.config["index_cost"]
-    )
+    exec_ctx.accumulate_cost("index", v.context, exec_ctx.config["index_cost"])
     return AbstractValue(st.shape.elem_shape, st.type.tensor_elem_type, context=v.context)
+
 
 def size(v):
     st = v.shape_type
     assert st.type.is_tensor, f"Called size on non-tensor {v}"
     exec_ctx = current_execution_context()
     exec_ctx.accumulate_cost("size", v.context, exec_ctx.config["size_cost"])
-    if len(st.shape.dims) == 1: #TOUNDO: size(vec) returns int
+    if len(st.shape.dims) == 1:  # TOUNDO: size(vec) returns int
         return AbstractValue.from_data(st.shape.dims[0], v.context)
     else:
         return AbstractValue.from_data(st.shape.dims, v.context)
+
 
 def _compute_branch_cost(f):
     # evaluate f in a new context
     with ExecutionContext() as ctx:
         out = f()
     return out, ctx.costs[None]
+
 
 def _compute_build_inner_cost(n, f):
     n = _get_data(n)
@@ -122,19 +125,17 @@ def _compute_build_inner_cost(n, f):
     el, cost = _compute_branch_cost(lambda: f(i))
     return dims, nelem, el, cost
 
+
 def build(sz, f):
     context = check_args_and_get_context("build", [sz], concrete=None)
     dims, nelem, el, inner_cost = _compute_build_inner_cost(sz, f)
     exec_ctx = current_execution_context()
-    exec_ctx.accumulate_cost(
-        "build",
-        context,
-        exec_ctx.config["build_malloc_cost"] + nelem * inner_cost
-    )
-    
+    exec_ctx.accumulate_cost("build", context, exec_ctx.config["build_malloc_cost"] + nelem * inner_cost)
+
     rank = len(dims)
     ks_type = Type.Tensor(rank, el.type)
     return AbstractValue(TensorShape(dims, el.shape), ks_type, context=context)
+
 
 def sumbuild(sz, f):
     context = check_args_and_get_context("sumbuild", [sz], concrete=None)
@@ -144,12 +145,15 @@ def sumbuild(sz, f):
     exec_ctx.accumulate_cost(
         "sumbuild",
         context,
-        nelem * inner_cost + (nelem - 1) * elst.type.num_elements(assumed_vector_size=exec_ctx.config["assumed_vector_size"])
+        nelem * inner_cost
+        + (nelem - 1) * elst.type.num_elements(assumed_vector_size=exec_ctx.config["assumed_vector_size"]),
     )
     return AbstractValue(elst.shape, elst.type, context=context)
 
+
 def fold(f, s0, xs):
     raise NotImplementedError
+
 
 def make_tuple(*args):
     context = check_args_and_get_context("tuple", args)
@@ -160,6 +164,7 @@ def make_tuple(*args):
     exec_ctx.accumulate_cost("tuple", context, exec_ctx.config["let_cost"] * len(args))
     return AbstractValue(child_shapes, Type.Tuple(*child_types), child_data, context)
 
+
 def get_tuple_element(i, tup):
     el_shape = tup.shape_type.shape[i]
     el_type = tup.shape_type.type.children[i]
@@ -169,6 +174,7 @@ def get_tuple_element(i, tup):
     exec_ctx.accumulate_cost("select", tup.context, exec_ctx.config["select_cost"])
     return AbstractValue(el_shape, el_type, el_data, tup.context)
 
+
 def let(tupled, var, body):
     context = check_args_and_get_context("let", [var])
     exec_ctx = current_execution_context()
@@ -177,6 +183,7 @@ def let(tupled, var, body):
         return body(*var)
     else:
         return body(var)
+
 
 def if_then_else(cond, then_branch, else_branch):
     context = check_args_and_get_context("if", [cond])
@@ -192,15 +199,13 @@ def if_then_else(cond, then_branch, else_branch):
         assert out1.shape_type == out2.shape_type
         assert out1.context == out2.context
         if_epsilon = exec_ctx.config["if_epsilon"]
-        exec_ctx.accumulate_cost("if",
-                                 context,
-                                 (max(then_cost, else_cost)
-                                  + if_epsilon * min(then_cost, else_cost)))
+        exec_ctx.accumulate_cost("if", context, (max(then_cost, else_cost) + if_epsilon * min(then_cost, else_cost)))
         return out1
     elif cond:
         return then_branch()
     else:
         return else_branch()
+
 
 def assert_(cond, body):
     assert cond

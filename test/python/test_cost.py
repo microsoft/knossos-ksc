@@ -9,6 +9,7 @@ from ksc.type import Type
 from ksc.utils import translate_and_import
 from ksc.shape import Shape, TensorShape, ScalarShape, ShapeType
 
+
 def test_afe():
     ks_str = """
 (edef div Float (Tuple Float Float))
@@ -29,6 +30,7 @@ def test_afe():
         m.afe(AbstractValue((), Type.Float))
     assert ctx.costs[None] == 5.1
 
+
 def test_build():
     ks_str = """
 (edef add Float (Tuple Float Float))
@@ -40,11 +42,12 @@ def test_build():
 )
 """
     args = [
-        AbstractValue(TensorShape((100,), ()), Type.Tensor(1, Type.Float)), 
-        AbstractValue(TensorShape((100,), ()), Type.Tensor(1, Type.Float))
+        AbstractValue(TensorShape((100,), ()), Type.Tensor(1, Type.Float)),
+        AbstractValue(TensorShape((100,), ()), Type.Tensor(1, Type.Float)),
     ]
     cost = compute_cost(ks_str, "vec_vec_add", args)
-    assert cost == 401.0 # (size_cost) + 100 + 100 * (two index and one add)
+    assert cost == 401.0  # (size_cost) + 100 + 100 * (two index and one add)
+
 
 def test_outer_product():
     ks_str = """
@@ -63,7 +66,12 @@ def test_outer_product():
                   (index i x)
                   (index j y)))))))))))
 """
-    args = [AbstractValue((TensorShape((100,), ()), TensorShape((100,), ())), Type.Tuple(Type.Tensor(1, Type.Float), Type.Tensor(1, Type.Float)))]
+    args = [
+        AbstractValue(
+            (TensorShape((100,), ()), TensorShape((100,), ())),
+            Type.Tuple(Type.Tensor(1, Type.Float), Type.Tensor(1, Type.Float)),
+        )
+    ]
     assert compute_cost(ks_str, "outer_product", args) == 50102.4
 
 
@@ -78,7 +86,8 @@ def test_sumbuild():
 )
 """
     args = [AbstractValue.abstract_like(np.ones(100))]
-    assert compute_cost(ks_str, "sum_of_vec", args) == 200 # 100 * (index_cost) + 99 (for add) + (size_cost)
+    assert compute_cost(ks_str, "sum_of_vec", args) == 200  # 100 * (index_cost) + 99 (for add) + (size_cost)
+
 
 def test_rot():
     ks_str = """
@@ -109,10 +118,9 @@ def test_rot():
               (mul (neg s) (index i x))
               (mul c (index i y))))))))))))
 """
-    args = [
-        AbstractValue.abstract_like((np.ones(100), np.ones(100), 1.1, 1.1))
-    ]
+    args = [AbstractValue.abstract_like((np.ones(100), np.ones(100), 1.1, 1.1))]
     assert compute_cost(ks_str, "rot", args) == 1701.7
+
 
 def compile_and_compute_cost(f, args, arg_context=None, exec_context=None):
     # We cannot use variable length arguments because we use
@@ -120,34 +128,35 @@ def compile_and_compute_cost(f, args, arg_context=None, exec_context=None):
     @ksc.trace
     def wrapper(args):
         return f(*args)
+
     o = wrapper(args)
-    o.data # use jax backend
+    o.data  # use jax backend
     ks_str = o.creator._jitted.combined_ks_str()
     args = [AbstractValue.from_data(args, context=arg_context)]
     return compute_cost(ks_str, "wrapper", args, exec_context)
+
 
 @pytest.mark.parametrize("shape", [(3,), (3, 2), (3, 2, 5)])
 def test_translate(shape):
     x_n = np.random.normal(0, 1, shape)
     y_n = np.random.normal(0, 1, shape)
-    assert compile_and_compute_cost(
-        lambda x, y: x + y,
-        (x_n, y_n)
-    ) == np.prod(shape)
+    assert compile_and_compute_cost(lambda x, y: x + y, (x_n, y_n)) == np.prod(shape)
+
 
 @ksc.trace
 def dense(x, weights):
     W, b = weights
     return math.broadcast_add(math.dot(x, W), b)
 
+
 def test_dense_cost():
     W_n = np.random.normal(0, 1, (3, 4))
     b_n = np.random.normal(0, 1, (4,))
     x_n = np.random.normal(0, 1, (5, 3))
-    assert compile_and_compute_cost(
-        lambda x, weights: dense(x, weights),
-        (x_n, (W_n, b_n))
-    ) == (3 * 4 * 5 * 2) + (5 * 4)
+    assert compile_and_compute_cost(lambda x, weights: dense(x, weights), (x_n, (W_n, b_n))) == (3 * 4 * 5 * 2) + (
+        5 * 4
+    )
+
 
 def test_states():
     x1 = np.random.normal(0, 1, (3, 2))
@@ -161,6 +170,7 @@ def test_states():
         compile_and_compute_cost(f, (x2, y2), arg_context=2, exec_context=ctx)
     assert ctx.costs[1] == 3 * 2
     assert ctx.costs[2] == 3 * 2 * 5
+
 
 def test_if_then_else():
     ks_str = """
@@ -190,25 +200,24 @@ def test_if_then_else():
   )
 )
 """
-    cost1 = compute_cost(ks_str,
-                         "select1",
-                         [
-                             AbstractValue(ScalarShape, Type.Bool),
-                             AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))
-                         ]
+    cost1 = compute_cost(
+        ks_str,
+        "select1",
+        [
+            AbstractValue(ScalarShape, Type.Bool),
+            AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer)),
+        ],
     )
-    cost2 = compute_cost(ks_str,
-                         "select2",
-                         [
-                             AbstractValue(ScalarShape, Type.Bool),
-                             AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))
-                         ]
+    cost2 = compute_cost(
+        ks_str,
+        "select2",
+        [
+            AbstractValue(ScalarShape, Type.Bool),
+            AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer)),
+        ],
     )
-    cost3 = compute_cost(ks_str,
-                         "select3",
-                         [
-                             AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))
-                         ]
+    cost3 = compute_cost(
+        ks_str, "select3", [AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))]
     )
     assert cost1 == 302.0201
     assert cost1 == cost2

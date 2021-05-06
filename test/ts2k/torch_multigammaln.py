@@ -28,10 +28,5 @@ def multigammaln(a, d: int):
     # Need to check relative performance
 
     res = (d * (d - 1) * 0.25) * math.log(math.pi)
-    res += torch.sum(
-        torch.tensor(
-            [math.lgamma(float(a) - ((j - 1.0) / 2)) for j in range(1, d + 1)]
-        ),
-        dim=0,
-    )
+    res += torch.sum(torch.tensor([math.lgamma(float(a) - ((j - 1.0) / 2)) for j in range(1, d + 1)]), dim=0,)
     return res
