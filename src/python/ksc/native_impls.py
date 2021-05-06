@@ -4,11 +4,13 @@ from typing import Callable, Mapping
 from ksc.expr import StructuredName
 from ksc.type import Type
 
+
 def _mksn(s: str, t: Type) -> StructuredName:
     sn = StructuredName.from_str(s)
     sn2, old_ty = sn.add_type(t)
     assert old_ty == None
     return sn2
+
 
 native_impls: Mapping[StructuredName, Callable] = {
     _mksn("add", Type.Tuple(Type.Integer, Type.Integer)): lambda a, b: a + b,
