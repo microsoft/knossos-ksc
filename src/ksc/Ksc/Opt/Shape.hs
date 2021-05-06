@@ -66,6 +66,8 @@ optShapePrim P_ts_scale (Tuple [_, v]) = Just $ pShape v
 optShapePrim P_ts_neg v = Just $ pShape v
 -- v ✓
 optShapePrim P_delta (Tuple [_, _, v]) = Just $ pShape v
+-- FIXME: Still needs doing
+--
 -- Suppose we have Vec (Float, Vec Float)
 --
 -- Then the shape will have type Vec ((), Int)
