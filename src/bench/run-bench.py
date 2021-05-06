@@ -2,7 +2,7 @@ import time
 import torch
 
 import ts2ks
-from ts2ks import ts2mod
+from ts2ks import tsmod2ksmod
 
 torch.set_default_dtype(torch.float64)
 
@@ -122,7 +122,9 @@ def bench(module_file, bench_name):
             print(f"Ignoring {fn_name}")
 
     # TODO: elementwise_apply
-    ks_compiled = ts2mod(ks_raw, example_inputs=(configs[0],))
+    ks_compiled = tsmod2ksmod(
+        mod, bench_name, example_inputs=(configs[0],), generate_lm=False
+    )
 
     for arg in configs:
         with ts2ks.logging(ks_compiled.py_mod, False):
