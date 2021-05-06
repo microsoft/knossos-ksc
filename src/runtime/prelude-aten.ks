@@ -91,6 +91,17 @@
 (gdef fwd [aten::add (Tuple Integer Integer)])
 (gdef rev [aten::add (Tuple Integer Integer)])
 
+;; sub
+(def aten::sub Float ((a : Float) (b : Float))
+    (sub a b))
+(gdef fwd [aten::sub (Tuple Float Float)])
+(gdef rev [aten::sub (Tuple Float Float)])
+
+(def aten::sub Integer ((a : Integer) (b : Integer))
+    (sub a b))
+(gdef fwd [aten::sub (Tuple Integer Integer)])
+(gdef rev [aten::sub (Tuple Integer Integer)])
+
 ;; div
 (def aten::div Integer ((a : Integer) (b : Integer))
     (div  a b))
@@ -108,11 +119,13 @@
 (gdef fwd [aten::neg Float])
 (gdef rev [aten::neg Float])
 
+;; sin
 (def aten::sin Float (a : Float)
     (sin a))
 (gdef fwd [aten::sin Float])
 (gdef rev [aten::sin Float])
 
+;; Float
 (def aten::Float Float (a : Integer)
     (to_float a))
 (gdef fwd [aten::Float Integer])
@@ -134,6 +147,7 @@
 (gdef sufrevpass [aten::Bool Bool])
 (gdef sufrev [aten::Bool Bool])
 
+;; Bool
 (def aten::Bool Bool (a : Float)
     (not (eq a 0.0)))
 (gdef fwd [aten::Bool Float])
