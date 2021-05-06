@@ -254,9 +254,8 @@ def test_lifting_over_build():
     actual3 = match3.apply_rewrite()
     assert actual3 == parse_expr_string("(build 10 (lam (i : Integer) (if (gt i 5) (let (x (add 5 i)) x) (let (x (add 5 i)) i))))")
     # Now we should be able to lift either of those let's, but not the 'if'
-    matches = sorted(list(rules.find_all_matches(actual3)), key=lambda match: match.path)
-    exprs = [match.apply_rewrite() for match in matches]
-    assert exprs == [
+    actual4 = sorted_rewrites(rules, actual3)
+    assert actual4 == [
         parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x (let (x (add 5 i)) i)))))"),
         parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) (let (x (add 5 i)) x) i))))")
     ]
