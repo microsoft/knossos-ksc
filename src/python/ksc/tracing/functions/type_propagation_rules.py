@@ -2,9 +2,11 @@ import numpy as np
 from ksc.type import Type
 from ksc.shape import ShapeType, TensorShape, ScalarShape
 
+
 def unique_element(s):
     assert len(s) == 1
     return next(iter(s))
+
 
 def unique_element_type(types):
     el_type = unique_element(types[0].all_element_types())
@@ -12,14 +14,16 @@ def unique_element_type(types):
         assert el_type == unique_element(t.all_element_types())
     return el_type
 
+
 def elementwise(*args):
     a = args[0]
     for arg in args:
         assert a.shape_type == arg.shape_type, f"Expected {a.shape_type}, but got {arg.shape_type}"
     return args[0].shape_type
 
+
 def elementwise_or_scalar(*args):
-    '''Type propagation rule for operations like elementwise add/multiply,
+    """Type propagation rule for operations like elementwise add/multiply,
     that allows arguments to be scalar. Rules:
     - All vectors in `args` must have the same shape and element type.
     - Any scalars in `args` must have the same type, and this type must
@@ -35,34 +39,37 @@ def elementwise_or_scalar(*args):
             -> ValueError
         ((3, 2), Tensor(2, Float)), ((2, 3), Tensor(2, Float))
             -> ValueError
-    '''
+    """
+
     def _get_type(x):
-        '''Gets type if scalar, and element type if tensor.'''
+        """Gets type if scalar, and element type if tensor."""
         if x.is_tensor:
             return _get_type(x.tensor_elem_type)
 
         if x.is_scalar:
             return x
 
-        raise ValueError(f'Argument has unsupported type {x}')
+        raise ValueError(f"Argument has unsupported type {x}")
 
     assert len(args) > 0
     # All types must be equal:
     types = set(_get_type(a.shape_type.type) for a in args)
     if len(types) > 1:
-        raise ValueError(f'Arguments have unsupported types: {types}')
+        raise ValueError(f"Arguments have unsupported types: {types}")
     # If there are any non-scalars, then their shapes must be equal:
     shapes = set(a.shape_type.shape for a in args if a.shape_type.shape != ())
     if len(shapes) > 1:
-        raise ValueError(f'Arguments have incompatible shapes: {shapes}')
+        raise ValueError(f"Arguments have incompatible shapes: {shapes}")
     # Return ShapeType is that of the vector, if there is one:
     try:
         return next(a.shape_type for a in args if a.shape_type.shape != ())
     except StopIteration:
         return args[0].shape_type
 
+
 def first_arg(*args):
     return args[0].shape_type
+
 
 def flatten_type_prop_rule(x):
     el_type = unique_element_type([x.type])
@@ -71,6 +78,7 @@ def flatten_type_prop_rule(x):
     out_shape = TensorShape((dims[0], np.prod(dims[1:])), ScalarShape)
     out_type = Type.Tensor(2, el_type)
     return ShapeType(out_shape, out_type)
+
 
 def keep_shape_prop_rule(new_type):
     def type_prop_rule(x):
@@ -81,8 +89,11 @@ def keep_shape_prop_rule(new_type):
                 return Type.Tensor(type.tensor_rank, to_new_type(type.tensor_elem_type))
             else:
                 return new_type
+
         return ShapeType(x.shape, to_new_type(x.type))
+
     return type_prop_rule
+
 
 def conv_2d_type_prop_rule_from_padding_type(padding):
     def type_prop_rule(x, weights, ksizes, strides):
@@ -104,7 +115,9 @@ def conv_2d_type_prop_rule_from_padding_type(padding):
         y_h = _get_output_length(h, k_h, stride_h, padding)
         out_shape = TensorShape((b, m, y_w, y_h), ScalarShape)
         return ShapeType(out_shape, x.type)
+
     return type_prop_rule
+
 
 def pooling_type_prop_rule(padding):
     def type_prop_rule(x, pool_size, strides):
@@ -117,10 +130,13 @@ def pooling_type_prop_rule(padding):
 
         out_shape = TensorShape((b, c, y_w, y_h), x.shape.elem_shape)
         return ShapeType(out_shape, x.type)
+
     return type_prop_rule
+
 
 def _ceil_div(x, y):
     return (x + y - 1) // y
+
 
 def _get_output_length(x_len, window_size, stride, padding):
     if padding.upper() == "VALID":
