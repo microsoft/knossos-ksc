@@ -6,10 +6,10 @@ This project is a functional compiler and code-gen tool that will
 accelerate writing AI algorithms as well as making them easier.   The core is a lisp-like IR that can be translated from high-level languages, and can be linked to a variety of backends to generate code.
 
 Currently implemented frontends are
- * Julia: j2ks
- * F#: f2k
  * TorchScript: ts2k
  * ONNX: onnx2ks
+ * Julia: j2ks
+ * F#: f2k
  * KS-Lisp: The IR itself is exchanged in a lisp-like text format (see below).  
 
 Current backends:
