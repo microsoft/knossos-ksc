@@ -46,24 +46,31 @@ def test_StructuredName_manglers():
 def test_free_vars():
     assert Const(11.3).free_vars_ == frozenset()
 
+    p = Var("p", Type.Bool)
     x = Var("x", Type.Float)
-    xdecl = Var("x", Type.Float, decl=True)
+    y = Var("y", Type.Float)
     assert x.free_vars_ == frozenset(["x"])
 
     # Binding
-    y = Var("y", Type.Float)
-    assert Let(xdecl, If(y, Const(0.0), Const(1.1)), x).free_vars_ == frozenset(
-        ["y"]
+    assert Let(x, If(p, Const(0.0), Const(1.1)), x).free_vars_ == frozenset(
+        ["p"]
     )  # x is not free
-    assert Lam(xdecl, y).free_vars_ == frozenset(["y"])
-    assert Lam(xdecl, x).free_vars_ == frozenset()
 
     # Rebinding
-    assert Let(xdecl, If(y, x, Const(1.1)), x).free_vars_ == frozenset(
-        ["x", "y"]
+    assert Let(x, If(p, x, Const(1.1)), x).free_vars_ == frozenset(
+        ["x", "p"]
     )  # different x is free
 
     # Call targets not included
     assert Let(
-        xdecl, Call("add", [x, Const(1.1)]), Call("mul", [y, y])
+        x, Call("add", [x, Const(1.1)]), Call("mul", [y, y])
     ).free_vars_ == frozenset(["x", "y"])
+
+
+def test_free_vars_lam():
+    x = Var("x", Type.Float)
+    xdecl = Var("x", Type.Float, decl=True)
+    y = Var("y", Type.Float)
+
+    assert Lam(xdecl, y).free_vars_ == frozenset(["y"])
+    assert Lam(xdecl, x).free_vars_ == frozenset()

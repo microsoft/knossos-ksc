@@ -412,6 +412,7 @@ class Lam(Expr):
     body: Expr
 
     def __init__(self, arg, body, type=None):
+        assert arg.decl
         super().__init__(arg=arg, body=body, type_=type)
 
 
