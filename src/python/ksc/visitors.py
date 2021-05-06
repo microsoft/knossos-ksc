@@ -1,5 +1,6 @@
 from ksc.expr import Expr, Let, Call, Var, If, Assert, Const, Lam
 
+
 class ExprVisitor:
     """ Superclass for functions that act upon particular subclasses of Expr.
         Like singledispatch, but allows a hierarchy of Visitor subclasses to inherit/override
@@ -7,6 +8,7 @@ class ExprVisitor:
         The default implementation of visit does a recursive traversal of each sub-Expr,
          but does nothing and returns None; subclasses can override for Expr subclasses of interest.
     """
+
     def __init__(self, visit_decls=False):
         self._visit_decls = visit_decls
         self._dispatch_table = {
@@ -16,7 +18,7 @@ class ExprVisitor:
             Let: self.visit_let,
             If: self.visit_if,
             Assert: self.visit_assert,
-            Call: self.visit_call
+            Call: self.visit_call,
         }
 
     def visit(self, e: Expr, *args, **kwargs) -> None:
@@ -39,7 +41,7 @@ class ExprVisitor:
     def visit_let(self, l: Let, *args, **kwargs) -> None:
         """ Overridable method that is called to handle a Let being passed to visit """
         if self._visit_decls:
-            for v in ([l.vars] if isinstance(l.vars, Var) else l.vars):
+            for v in [l.vars] if isinstance(l.vars, Var) else l.vars:
                 self.visit(v, *args, **kwargs)
         self.visit(l.rhs, *args, **kwargs)
         self.visit(l.body, *args, **kwargs)
@@ -66,6 +68,7 @@ class ExprTransformer(ExprVisitor):
         The default "transformation" is the identity function, but each case first recursively visits the sub-Expr's within the Expr,
         allowing overriding of specific cases.
     """
+
     def __init__(self):
         # We expect any subclass interested in binding occurences of variables, to override visit_lam / visit_let,
         # so it can inspect the binder "in situ" and co-ordinate with changes to the rest of the binder.
@@ -79,10 +82,7 @@ class ExprTransformer(ExprVisitor):
         return c
 
     def visit_let(self, l: Let, *args, **kwargs) -> Expr:
-        return Let(l.vars,
-            self.visit(l.rhs, *args, **kwargs),
-            self.visit(l.body, *args, **kwargs),
-            type=l.type_)
+        return Let(l.vars, self.visit(l.rhs, *args, **kwargs), self.visit(l.body, *args, **kwargs), type=l.type_)
 
     def visit_lam(self, l: Lam, *args, **kwargs) -> Expr:
         return Lam(l.arg, self.visit(l.body, *args, **kwargs), type=l.type_)
@@ -95,10 +95,8 @@ class ExprTransformer(ExprVisitor):
             self.visit(i.cond, *args, **kwargs),
             self.visit(i.t_body, *args, **kwargs),
             self.visit(i.f_body, *args, **kwargs),
-            type=i.type_)
+            type=i.type_,
+        )
 
     def visit_assert(self, a: Assert, *args, **kwargs) -> Expr:
-        return Assert(
-            self.visit(a.cond, *args, **kwargs),
-            self.visit(a.body, *args, **kwargs),
-            type=a.type_)
+        return Assert(self.visit(a.cond, *args, **kwargs), self.visit(a.body, *args, **kwargs), type=a.type_)

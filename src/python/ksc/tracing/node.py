@@ -42,9 +42,7 @@ class Node(AbstractValue):
 
     @property
     def data_ready(self):
-        return (self._data is not None
-                and (not isinstance(self._data, str)
-                     or self._data != "__not_ready__"))
+        return self._data is not None and (not isinstance(self._data, str) or self._data != "__not_ready__")
 
     @property
     def jitted(self):
@@ -82,10 +80,12 @@ class Node(AbstractValue):
     def __iter__(self):
         assert self._type.is_tuple, f"Tried to call an iterator on a non-tuple {self}"
         from ksc.tracing.functions import core
+
         return (core.get_tuple_element(i, self) for i in range(self._type.tuple_len))
 
     def __add__(self, other):
         from ksc.tracing.functions import core
+
         return core.add(self, Node.from_data(other))
 
     def __radd__(self, other):
@@ -93,10 +93,12 @@ class Node(AbstractValue):
 
     def __sub__(self, other):
         from ksc.tracing.functions import core
+
         return core.sub(self, Node.from_data(other))
 
     def __mul__(self, other):
         from ksc.tracing.functions import core
+
         return core.mul(self, Node.from_data(other))
 
     def __rmul__(self, other):
@@ -104,6 +106,7 @@ class Node(AbstractValue):
 
     def __floordiv__(self, other):
         from ksc.tracing.functions import core
+
         assert self.shape_type.type == Type.Integer
         if isinstance(other, Node):
             assert other.shape_type.type == Type.Integer
@@ -111,24 +114,27 @@ class Node(AbstractValue):
 
     def __truediv__(self, other):
         from ksc.tracing.functions import core
+
         return core.div(self, Node.from_data(other))
 
     def __pow__(self, other):
         from ksc.tracing.functions import core
+
         return core.pow(self, Node.from_data(other))
 
     def __getitem__(self, index):
         from ksc.tracing.functions import core
+
         if self._type.is_tuple:
             if isinstance(index, slice):
                 return (core.get_tuple_element(i, self) for i in range(*index.indices(len(self._type.children))))
             return core.get_tuple_element(index, self)
-        
+
         if self._type.is_tensor:
             if isinstance(index, slice):
                 raise NotImplementedError
             return core.get_tensor_element(index, self)
-        
+
         raise ValueError(f"Tried to call __getitem__ on {self} which is not a Tuple.  Use index for tensors.")
 
     @property
@@ -143,19 +149,20 @@ class Node(AbstractValue):
 
         """
         from ksc.tracing.functions import core
+
         if self.type.is_scalar:
             return core.make_tuple()
 
         if self.type.is_tensor:
 
-            dims = core.get_tensor_size(self) # ks::size
+            dims = core.get_tensor_size(self)  # ks::size
             # TOUNDO: ks::size returns an int for rank 1,need to tuple it
             if self.type.tensor_rank == 1:
                 dims = core.make_tuple(dims)
 
-            element = core.get_tensor_element0(self) # ks::index
+            element = core.get_tensor_element0(self)  # ks::index
             return core.make_tuple(dims, element.shape_program)
-            
+
         if self.type.is_tuple:
             children = (core.get_tuple_element(i, self).shape_program for i in range(self.type.tuple_len))
             return core.make_tuple(*children)

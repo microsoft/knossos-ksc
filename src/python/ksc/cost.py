@@ -1,6 +1,7 @@
 from ksc.abstract_value import ExecutionContext
 from ksc.utils import translate_and_import
 
+
 def shape_from_type(arg_type, assumed_vector_size=100):
     if arg_type.is_tuple:
         return tuple(shape_from_type(c) for c in arg_type.children)
@@ -9,6 +10,7 @@ def shape_from_type(arg_type, assumed_vector_size=100):
         return (assumed_vector_size,) + child_shape
     else:
         return ()
+
 
 def compute_cost(ks_str, def_name, args, exec_context=None, aggregation_option="default"):
     m = translate_and_import(__file__, ks_str, "abstract")

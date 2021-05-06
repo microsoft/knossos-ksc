@@ -19,13 +19,14 @@ from ksc.expr import StructuredName
 from ksc.type_propagate import type_propagate_decls
 
 # Importing prettyprint to get the decorated printers for Expression and Type
-import ksc.prettyprint # pylint: disable=unused-import
+import ksc.prettyprint  # pylint: disable=unused-import
 
 # Import the prettyprinter routines we use explicitly in this file
 from prettyprinter import cpprint, pformat
 
 # Needed this in order to see the error messages when pprint fails
 import warnings
+
 warnings.filterwarnings("always")
 
 # Background reading
@@ -47,6 +48,7 @@ def type_from_value(x):
 
     return Type.fromValue(x)
 
+
 def make_arg(input, example_input):
     input_type = type_from_value(example_input)
     input_type_2 = from_torch_type(input.type())
@@ -54,8 +56,10 @@ def make_arg(input, example_input):
     name = mangled_name(input)
     return Var(name, input_type, decl=True)
 
+
 def mangled_name(node):
     return "_" + utils.encode_name(node.debugName())
+
 
 def from_torch_dtype(t):
     if t == torch.int64:
@@ -65,6 +69,7 @@ def from_torch_dtype(t):
         return Type.Float
 
     raise NotImplementedError
+
 
 def from_torch_type(t):
     if type(t) == torch._C.IntType:
@@ -87,12 +92,14 @@ def from_torch_type(t):
 
     assert False
 
+
 def var_or_constant(node):
     val = node.toIValue()
     if val is None:
         return Var(mangled_name(node))
     else:
         return Const(val)
+
 
 def make_constant(node):
 
@@ -125,9 +132,11 @@ def make_list(node):
     value = node.outputsAt(0)
     return Var(mangled_name(value)), Call("Vec_init", [var_or_constant(i) for i in node.inputs()])
 
+
 def make_tuple(node):
     value = node.outputsAt(0)
     return Var(mangled_name(value)), Call("tuple", [var_or_constant(i) for i in node.inputs()])
+
 
 def make_tensor(node):
     # tensors aren't explicitly modelled in Knossos yet, leave them as identity over a (jagged) list for now
@@ -142,23 +151,26 @@ def make_aten_function(node, value, function_name):
 def make_return(node):
     mangled_id = mangled_name(node.inputsAt(0))
     return Var(mangled_id)
-    
+
+
 def tail(iter):
     next(iter)
     return iter
 
+
 def make_callfunction(node):
     value = node.outputsAt(0)
-    assert len(list(node.outputs())) == 1 # Assemble into tuple for multiple outputs
+    assert len(list(node.outputs())) == 1  # Assemble into tuple for multiple outputs
     function_name_constant = node.inputsAt(0).node()
     function_name = function_name_constant.s("name")
-    return (Var(mangled_name(value)), 
-            Call(function_name, [var_or_constant(i) for i in tail(node.inputs()) ]))
+    return (Var(mangled_name(value)), Call(function_name, [var_or_constant(i) for i in tail(node.inputs())]))
+
 
 def make_lets(bindings, body) -> Expr:
-    for (v,rhs) in reversed(bindings):
+    for (v, rhs) in reversed(bindings):
         body = Let(v, rhs, body)
     return body
+
 
 def make_loop(make_binds, node):
     # def foofilter_comp(xs: Tensor) -> Tensor:
@@ -182,11 +194,11 @@ def make_loop(make_binds, node):
     #                         %b_1, ..., %b_m = some::node(%a_value_from_outer_block, %a_1)
     #                         %iter_condition = some::other_node(%a_2)
     #                         -> (%iter_condition, %b_1, ..., %b_r)
-    
+
     max_trip_count, initial_condition, *x_nodes = node.inputs()
     y_nodes = tuple(node.outputs())
-    block0, = node.blocks()
-    i,*a_nodes = block0.inputs()
+    (block0,) = node.blocks()
+    i, *a_nodes = block0.inputs()
     iter_condition, *b_nodes = block0.outputs()
 
     # For now, match only the for loop version
@@ -197,10 +209,10 @@ def make_loop(make_binds, node):
 
     body_nodes = list(block0.nodes())
     last = body_nodes[-1]
-    if last.kind() == 'aten::append':
+    if last.kind() == "aten::append":
         # Special case for list comprehensions
-        l,item = last.inputs()
-        assert l.node().kind() == 'prim::ListConstruct'
+        l, item = last.inputs()
+        assert l.node().kind() == "prim::ListConstruct"
 
         binds = make_binds(body_nodes[:-1])
         lam_body = make_lets(binds, var_or_constant(item))
@@ -228,9 +240,7 @@ def make_if(make_binds, node):
     inputs_size = sum(1 for _ in node.inputs())
 
     if inputs_size != 1:
-        raise Exception(
-            "Only support conditionals with 1 input, this one had: " + str(inputs_size)
-        )
+        raise Exception("Only support conditionals with 1 input, this one had: " + str(inputs_size))
 
     conditional = mangled_name(node.inputsAt(0))
 
@@ -241,12 +251,10 @@ def make_if(make_binds, node):
     success_branch = make_branch(blocks[0])
     failure_branch = make_branch(blocks[1])
 
-    return Var(identifier), If(Var(conditional), 
-                               success_branch,
-                               failure_branch)
+    return Var(identifier), If(Var(conditional), success_branch, failure_branch)
+
 
 def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
-
     def translate_node(make_binds, node) -> Tuple[Var, Expr]:
         lookups = {
             "prim::Constant": make_constant,
@@ -262,19 +270,15 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
         if kind in lookups:
             return lookups[kind](node=node)
 
-        primfuns = ['prim::min']
+        primfuns = ["prim::min"]
         if kind.startswith("aten::") or kind in primfuns:
             return make_aten_function(node, node.outputsAt(0), kind)
 
         print("WARNING, unimplmented node kind: " + node.kind())
         return Var("ERR"), Var(node.kind())
 
-
     def make_binds(nodes) -> List[Tuple[Var, Expr]]:
-        return [
-            translate_node(make_binds, node)
-            for node in nodes
-        ]
+        return [translate_node(make_binds, node) for node in nodes]
 
     all_nodes = list(graph.nodes())
 
@@ -282,7 +286,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
 
     args = [
         make_arg(input, example)
-        for input,example in zip(graph.inputs(), example_inputs)
+        for input, example in zip(graph.inputs(), example_inputs)
         if (not input.type().str().startswith("__torch__.transformers"))
     ]  # filtering self, TODO: look for better way
 
@@ -292,23 +296,20 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
     # need to think about interaction between imperative Python and pure Knossos
     if all_nodes[-1].kind() == "prim::Print":
         if print_count > 1:
-            print(
-                "WARNING: multiple print statements used, only final one currently translated"
-            )
+            print("WARNING: multiple print statements used, only final one currently translated")
         op = translate_node(make_binds, all_nodes[-1])
         return_type = Type.Integer
     else:
         if print_count > 0:
-            print(
-                "WARNING: print statement currently only supported as final operation"
-            )
+            print("WARNING: print statement currently only supported as final operation")
         return_node = graph.return_node()
         op = translate_node(make_binds, return_node)
-        return_type = None #Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
+        return_type = None  # Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
 
     body = make_lets(binds, op)
 
     return Def(StructuredName(name), return_type, args, body)
+
 
 def make_tuple_if_many_args(*args):
     t = tuple(*args)
@@ -317,16 +318,19 @@ def make_tuple_if_many_args(*args):
     else:
         return t
 
+
 # TODO: make an configuration named tuple rather than passing flags
 def ts2ks(output, generate_edefs, function, example_inputs):
     s = ts2ks_fromgraph(generate_edefs, function.name, function.graph, example_inputs)
     output.write(pformat(s))
 
+
 def torch_from_ks(ks_object):
     if isinstance(ks_object, tuple):
         return tuple(torch_from_ks(ks) for ks in ks_object)
-    
+
     return torch.from_numpy(numpy.array(ks_object, copy=True))
+
 
 def torch_to_ks(py_mod, val):
     if isinstance(val, float):
@@ -343,19 +347,21 @@ def torch_to_ks(py_mod, val):
 
     raise NotImplementedError()
 
+
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
-def forward_template(py_mod, ctx, *args):    
+def forward_template(py_mod, ctx, *args):
     py_mod.reset_allocator()
     ks_args = (torch_to_ks(py_mod, x) for x in args)
-    
+
     # Call it
     outputs = py_mod.entry(*ks_args)
-    
+
     # TODO: save torch_to_ksed args
     if ctx is not None:
         ctx.save_for_backward(*args)
 
     return torch_from_ks(outputs)
+
 
 def backward_template(py_mod, ctx, *args):
     ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
@@ -364,20 +370,24 @@ def backward_template(py_mod, ctx, *args):
 
     return torch_from_ks(outputs)
 
+
 def make_KscAutogradFunction(py_mod):
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
     backward = lambda ctx, args: backward_template(py_mod, ctx, args)
-    newclass= type("KscAutogradFunction_" + py_mod.__name__,
-                (torch.autograd.Function,),
-                { 
-                    "py_mod": py_mod,
-                    "forward": staticmethod(forward),
-                    "backward": staticmethod(backward),
-                    "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x))
-                })
+    newclass = type(
+        "KscAutogradFunction_" + py_mod.__name__,
+        (torch.autograd.Function,),
+        {
+            "py_mod": py_mod,
+            "forward": staticmethod(forward),
+            "backward": staticmethod(backward),
+            "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x)),
+        },
+    )
     return newclass()
+
 
 def ts2mod(function, example_inputs):
     fn = torch.jit.script(function)
@@ -394,29 +404,28 @@ def ts2mod(function, example_inputs):
         cpprint(ksc_def)
 
         type_propagate_decls([ksc_def], symtab)
-        defs_with_derivatives = [
-            ksc_def,
-            GDef("fwd", ksc_def.name),
-            GDef("rev", ksc_def.name)
-        ]
+        defs_with_derivatives = [ksc_def, GDef("fwd", ksc_def.name), GDef("rev", ksc_def.name)]
 
-    ks_str = '\n'.join(map(pformat, defs_with_derivatives))
+    ks_str = "\n".join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in ksc_def.args]
     return_type = ksc_def.return_type
-    mod = utils.build_module_using_pytorch_from_ks(ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True)
+    mod = utils.build_module_using_pytorch_from_ks(
+        ks_str, fn.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True
+    )
 
     return make_KscAutogradFunction(mod)
 
 
 import time
 
+
 class time_sampler:
-    def __init__(self, minimizing = False):
+    def __init__(self, minimizing=False):
         self.minimizing = minimizing
         if self.minimizing:
             self.time = 1e10
         else:
-            self.time = 0       
+            self.time = 0
             self.ncalls = 0
 
     def duration(self):
@@ -444,18 +453,21 @@ class time_sampler:
             self.time += delta
             self.ncalls += 1
 
+
 # %%
 
 if __name__ == "__xmain__":
-# %%
+    # %%
     import math
     import torch
     import torch.nn.functional as F
+
     torch.set_default_dtype(torch.float64)
 
     do_original = False
 
     if do_original:
+
         def lltm_forward_py_orig(input, weights, bias, old_h, old_cell):
             X = torch.cat([old_h, input], dim=1)
 
@@ -476,6 +488,7 @@ if __name__ == "__xmain__":
             new_h = torch.tanh(new_cell) * output_gate
 
             return new_h, new_cell
+
     else:
         # Simpler model to test zero-runtime implementation
         def lltm_forward_py(input, weights, bias, old_h, old_cell):
@@ -495,7 +508,6 @@ if __name__ == "__xmain__":
 
             return new_h, new_cell
 
-
     lltm_forward = lltm_forward_py
 
     class LLTM(torch.nn.Module):
@@ -506,12 +518,10 @@ if __name__ == "__xmain__":
             if do_original:
                 # 3 * state_size for input gate, output gate and candidate cell gate.
                 # input_features + state_size because we will multiply with [input, h].
-                self.weights = torch.nn.Parameter(
-                    torch.empty(3 * state_size, input_features + state_size))
+                self.weights = torch.nn.Parameter(torch.empty(3 * state_size, input_features + state_size))
                 self.bias = torch.nn.Parameter(torch.empty(3 * state_size))
             else:
-                self.weights = torch.nn.Parameter(
-                    torch.empty(state_size, input_features + state_size))
+                self.weights = torch.nn.Parameter(torch.empty(state_size, input_features + state_size))
                 self.bias = torch.nn.Parameter(torch.empty(state_size))
 
             self.reset_parameters()
@@ -538,9 +548,9 @@ if __name__ == "__xmain__":
     def myloss(X, h, c):
         new_h, new_C = rnn(X, (h, C))
         return new_h.sum() + new_C.sum()
-    
+
     def timeit(msg):
-        print('Timing: ', msg, lltm_forward)
+        print("Timing: ", msg, lltm_forward)
         forward = time_sampler()
         backward = time_sampler()
         nruns = 50
@@ -553,17 +563,17 @@ if __name__ == "__xmain__":
             loss.backward()
             backward.record()
 
-        print(f'Forward: {forward.us:.3f} us | Backward {backward.us:.3f} us')
+        print(f"Forward: {forward.us:.3f} us | Backward {backward.us:.3f} us")
 
     timeit("py")
 
     lltm_forward_ts = torch.jit.script(lltm_forward_py)
     lltm_forward = lltm_forward_ts
     timeit("ts")
-#%%
+    #%%
     example_inputs = (X, rnn.weights, rnn.bias, h, C)
     fn = torch.jit.script(lltm_forward_py)
-    #print(fn.graph)
+    # print(fn.graph)
     #     graph(%input.1 : Tensor,
     #       %weights.1 : Tensor,
     #       %bias.1 : Tensor,
@@ -599,20 +609,20 @@ if __name__ == "__xmain__":
     def torch_from_ks(ks_object):
         if isinstance(ks_object, tuple):
             return tuple(torch_from_ks(ks) for ks in ks_object)
-        
+
         return torch.from_numpy(numpy.array(ks_object, copy=True))
 
     class KnossosLLTMFunction(torch.autograd.Function):
         @staticmethod
         def forward(ctx, input, weights, bias, old_h, old_cell):
             args = (input, weights, bias, old_h, old_cell)
-            
+
             ks_fun._py_mod.reset_allocator()
             ks_args = (ks_fun.torch_to_ks(x) for x in args)
-            
+
             # Call it
             outputs = ks_fun(*ks_args)
-            
+
             ctx.save_for_backward(*args)
 
             return torch_from_ks(outputs)
@@ -629,11 +639,13 @@ if __name__ == "__xmain__":
     lltm_forward = KnossosLLTMFunction.apply
     timeit("Knossos")
 
-    
-#%%
+    #%%
     import torch.utils.cpp_extension
+
     print("Compiling extension ...", end="")
-    lltm_cpp = torch.utils.cpp_extension.load(name="lltm_cpp", sources=[utils.get_ksc_dir() + "/src/ts2k/ts2ks/lltm.cpp"])
+    lltm_cpp = torch.utils.cpp_extension.load(
+        name="lltm_cpp", sources=[utils.get_ksc_dir() + "/src/ts2k/ts2ks/lltm.cpp"]
+    )
     print("done.")
 
     class LLTMFunction(torch.autograd.Function):
@@ -648,8 +660,7 @@ if __name__ == "__xmain__":
 
         @staticmethod
         def backward(ctx, grad_h, grad_cell):
-            outputs = lltm_cpp.backward(
-                grad_h.contiguous(), grad_cell.contiguous(), *ctx.saved_tensors)
+            outputs = lltm_cpp.backward(grad_h.contiguous(), grad_cell.contiguous(), *ctx.saved_tensors)
             d_old_h, d_input, d_weights, d_bias, d_old_cell = outputs
             return d_input, d_weights, d_bias, d_old_h, d_old_cell
 
@@ -661,44 +672,41 @@ if __name__ == "__xmain__":
 
 if __name__ == "__xmain__":
     from math import sin
+
     torch.set_default_dtype(torch.float64)
-    
-    def bar(a : int, x : float):
-        M = torch.tensor([[1.1, -x], [x+2.1, 2.2]])
-        v = torch.tensor([2.2,3.3])
+
+    def bar(a: int, x: float):
+        M = torch.tensor([[1.1, -x], [x + 2.1, 2.2]])
+        v = torch.tensor([2.2, 3.3])
 
         Mv = torch.matmul(M, v)
 
         b = torch.dot(Mv, v)
 
         if a < 0:
-            t = -0.125*x
+            t = -0.125 * x
         else:
-            t = 1/2 * x * float(b)
+            t = 1 / 2 * x * float(b)
         return sin(t) * t
 
-    def foofilter(xs : torch.Tensor):
+    def foofilter(xs: torch.Tensor):
         t = torch.zeros(xs.shape)
-        for n,x in enumerate(xs):
+        for n, x in enumerate(xs):
             if x < 0:
-                t[n] = -0.125*x 
+                t[n] = -0.125 * x
             else:
-                t[n] = 1/(n+1) * x ** 2
+                t[n] = 1 / (n + 1) * x ** 2
 
-        return torch.mean(torch.sin(t)*t)
+        return torch.mean(torch.sin(t) * t)
 
-    def foofilter_comp(xs : torch.Tensor):
-        t = torch.tensor([(
-                 -0.125*x          if x < 0.0 
-            else  1/(n+1) * x ** 2).item()
-            for n,x in enumerate(xs)
-        ])
-        return torch.mean(torch.sin(t)*t)
+    def foofilter_comp(xs: torch.Tensor):
+        t = torch.tensor([(-0.125 * x if x < 0.0 else 1 / (n + 1) * x ** 2).item() for n, x in enumerate(xs)])
+        return torch.mean(torch.sin(t) * t)
 
-    def foofilter_mask(x : torch.Tensor):
+    def foofilter_mask(x: torch.Tensor):
         mask = x < 0
-        t = mask *(-0.125*x) + (1-mask) * 1/2 * x ** 2
-        return torch.mean(torch.sin(t)*t)
+        t = mask * (-0.125 * x) + (1 - mask) * 1 / 2 * x ** 2
+        return torch.mean(torch.sin(t) * t)
 
     x_example = torch.rand((23,))
 
@@ -708,10 +716,10 @@ if __name__ == "__xmain__":
 
     # #AWF: TODO: check "training" attribute -- does that enable faster AD?
     # with open("/tmp/t.onnx", "w") as temp:
-    #     torch.onnx.export(model=fn, 
-    #                   args=x_example, 
+    #     torch.onnx.export(model=fn,
+    #                   args=x_example,
     #                   example_outputs=fn(x_example),
-    #                   f=temp, 
+    #                   f=temp,
     #                   verbose=True)
     print(fn.graph)
     ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x_example,))
@@ -721,20 +729,19 @@ if __name__ == "__xmain__":
 
 
 if __name__ == "__main__":
-    print('\n\n*************************\n\n')
+    print("\n\n*************************\n\n")
 
     # "Squared Leaky Relu"?
-    def squirrel(x : torch.Tensor):
+    def squirrel(x: torch.Tensor):
         y = torch.mean(x)
         if y < 0.0:
-            t = -0.125*x
+            t = -0.125 * x
         else:
-            t = 1/2 * x ** 2
-        return torch.mean(torch.sin(t)*t)
-
+            t = 1 / 2 * x ** 2
+        return torch.mean(torch.sin(t) * t)
 
     # Compile function and gradients for example input of ones(2,3)
-    x_example = torch.ones((2,3))
+    x_example = torch.ones((2, 3))
 
     fn = torch.jit.script(squirrel)
     print(fn.code)
@@ -742,13 +749,13 @@ if __name__ == "__main__":
     cpprint(ks_str)
 
     # Compile function and gradients for example input of ones(2,3)
-    x_example = torch.ones((2,3))
+    x_example = torch.ones((2, 3))
     ks_fun = ts2mod(squirrel, example_inputs=(x_example,))
 
     # Call the function at different, interesting inputs
-    x = torch.rand((4,4)) # TODO: check non-square
+    x = torch.rand((4, 4))  # TODO: check non-square
 
-    ans = squirrel(x) 
+    ans = squirrel(x)
     print("Python answer = ", ans.numpy())
 
     ts_squirrel = torch.jit.script(squirrel)
@@ -771,32 +778,30 @@ if __name__ == "__main__":
 
     print("Gradient diff = \n", ansnp - dy[0].numpy())
 
-    #print(f"Knossos mem: {ks_fun._py_mod.allocator_top()}/{ks_fun._py_mod.allocator_peak()}")
+    # print(f"Knossos mem: {ks_fun._py_mod.allocator_top()}/{ks_fun._py_mod.allocator_peak()}")
     import timeit
+
     def time_ks(n):
-        x = torch.rand((n,n)) 
+        x = torch.rand((n, n))
         ks_fun._py_mod.reset_allocator()
         kx = ks_fun.torch_to_ks(x)
         ans = ks_fun.rev(kx, 1.0)
-        #print(numpy.array(ans, copy=False))
+        # print(numpy.array(ans, copy=False))
 
     def time_pytorch(n):
-        x = torch.rand((n,n)) 
+        x = torch.rand((n, n))
         x.requires_grad_(True)
         y = ts_squirrel(x)
         dy = torch.autograd.grad(y, x)
-        #print(dy)
+        # print(dy)
 
     size = 4
     ntimes = 10000
     print("time_ks= ", timeit.timeit(lambda: time_ks(size), number=ntimes))
     print("time_pt= ", timeit.timeit(lambda: time_pytorch(size), number=ntimes))
 
-
     # Next:
     #  - foofilter
 
 
-
 # %%
-

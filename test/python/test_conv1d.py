@@ -2,6 +2,7 @@ import numpy as np
 import os
 from ksc.utils import translate_and_import
 
+
 def test_conv1d():
     # we need parentheses around Vec after ':' to parse correctly
     ks_str = """
@@ -32,19 +33,15 @@ def test_conv1d():
             )))))))))))))))))
         """
     py_out = translate_and_import(__file__, ks_str, "common")
-    image = [
-      np.random.normal(0, 1, (100,))
-    ]
-    kernel = [
-         [[-0.5, 0, 0.5]],
-         [[0.333, 0.333, 0.333]]
-         ]
+    image = [np.random.normal(0, 1, (100,))]
+    kernel = [[[-0.5, 0, 0.5]], [[0.333, 0.333, 0.333]]]
 
-    expected_output = np.vstack((
-      np.convolve(image[0], kernel[0][0], 'same'),
-      np.convolve(image[0], kernel[1][0], 'same')))
+    expected_output = np.vstack(
+        (np.convolve(image[0], kernel[0][0], "same"), np.convolve(image[0], kernel[1][0], "same"))
+    )
     output = py_out.conv1d(kernel, image)
     assert np.allclose(expected_output, output)
+
 
 def test_conv1d_tensors():
     # we need parentheses around Vec after ':' to parse correctly
@@ -76,13 +73,10 @@ def test_conv1d_tensors():
         """
     py_out = translate_and_import(__file__, ks_str, "common")
     image = np.random.normal(0, 1, (1, 11))
-    kernel = [
-      np.array([[-0.5, 0, 0.5]]),
-      np.array([[0.333, 0.333, 0.333]])
-    ]
+    kernel = [np.array([[-0.5, 0, 0.5]]), np.array([[0.333, 0.333, 0.333]])]
     assert kernel[0].shape == (1, 3)
-    expected_output = np.vstack((
-      np.convolve(image[0], kernel[0][0], 'same'),
-      np.convolve(image[0], kernel[1][0], 'same')))
+    expected_output = np.vstack(
+        (np.convolve(image[0], kernel[0][0], "same"), np.convolve(image[0], kernel[1][0], "same"))
+    )
     output = py_out.conv1d(kernel, image)
     assert np.allclose(expected_output, output)
