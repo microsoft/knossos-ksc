@@ -14,12 +14,16 @@ $manifest = echo `
     out\knossos_ir_formatter.js `
     out\extension.js
 
-write-host "ks-vscode: Deleting $extensions_dst"
-Remove-Item -force -rec $extensions_dst
+if (Test-Path -PathType Container $extensions_dst) {
+    write-host "ks-vscode: Deleting $extensions_dst"
+    Remove-Item -force -rec $extensions_dst
+} elseif (Test-Path -PathType Container $extensions_dst) {
+    throw "ks-vscode: Destination $extensions_dst exists, but is not a folder!"
+}
 foreach ($file in $manifest) {
     $dst = "$extensions_dst\$file"
-    mkdir -force (Split-Path $dst) >$null
-    $src = join-path $srcdir $file
+    New-Item -Type Directory -Force -Path (Split-Path $dst) >$null
+    $src = Join-Path $srcdir $file
     Copy-Item $src $dst
     write-host "ks-vscode: Copied $dst from $src"
 }
