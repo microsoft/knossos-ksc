@@ -1,3 +1,4 @@
+from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
 from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
 from ksc.type import Type
@@ -120,6 +121,19 @@ def test_parsed_rule_respects_types():
     type_propagate_decls([applicable_expr, inapplicable_expr], symtab)
     assert sorted_rewrites(r, applicable_expr) == [parse_expr_string("4")]
     assert len(list(r.find_all_matches(inapplicable_expr))) == 0
+
+def test_parsed_rule_allows_alpha_equivalence():
+    symtab = dict()
+    decls_prelude_extra = list(parse_ks_filename("src/runtime/prelude.ks")
+        ) + list(parse_ks_file("(edef add (Vec Float) (Tuple (Vec Float) (Vec Float)))"))
+    type_propagate_decls(decls_prelude_extra, symtab)
+
+    r = parse_rule_str('(rule "add2_to_mul$vf" (v : Vec Float) (add v v) (mul 2.0 v))', symtab)
+    e = parse_expr_string("(add (build 10 (lam (i : Integer) (to_float i))) (build 10 (lam (j : Integer) (to_float j))))")
+    expected = parse_expr_string("(mul 2.0 (build 10 (lam (k : Integer) (to_float k))))")
+    type_propagate_decls([e, expected], symtab)
+    actual = sorted_rewrites(r, e)
+    assert are_alpha_equivalent(utils.single_elem(actual), expected)
 
 def test_parsed_rule_capture():
     symtab = dict()

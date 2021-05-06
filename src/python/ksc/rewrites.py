@@ -6,6 +6,7 @@ from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Uni
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
+from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
 from ksc.expr import ConstantType, StructuredName, Expr, Let, Lam, Var, Const, Call, Rule
 from ksc.filter_term import FilterTerm, get_filter_term
@@ -66,7 +67,7 @@ def _update_env_let(parent: Let, parent_path: Location, which_child: int, env: L
 @_update_env_for_subtree.register
 def _update_env_lam(parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment) -> LetBindingEnvironment:
     assert which_child == 0
-    return env.remove(parent.arg.name)
+    return env.discard(parent.arg.name)
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
 
@@ -212,7 +213,7 @@ class ParsedRuleMatcher(RuleMatcher):
     def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0) # Passed to replace_subtree below
-            assert SubstTemplate.visit(self._rule.template, substs) == target # Note == traverses, so expensive.
+            assert are_alpha_equivalent(SubstTemplate.visit(self._rule.template, substs), target) # Note this traverses, so expensive.
             result = SubstTemplate.visit(self._rule.replacement, substs)
             # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
@@ -230,7 +231,7 @@ def _combine_substs(s1: VariableSubstitution, s2: Optional[VariableSubstitution]
     # - we are not finding substitutions for variables on the RHS).
     # Note this means that if the LHS template contains multiple binders of the same name,
     # this will only match subject expressions that also use the same variable-name in all those binders.
-    if not all([s1[v] == s2[v] for v in common_vars]): # TODO use alpha-equivalence rather than strict equality
+    if not all(are_alpha_equivalent(s1[v], s2[v]) for v in common_vars):
         return None # Fail
     s1.update(s2)
     return s1
