@@ -7,6 +7,7 @@ https://github.com/imjacobclark/vscode-lisp-formatter
 
 */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.formatKnossosIR = void 0;
 function insertNewline(state) {
     const indent = " ".repeat(2 * (getIndent(state) + 1));
     // don't insert an extra line break if it is already on a new line

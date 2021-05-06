@@ -7,6 +7,7 @@ https://github.com/imjacobclark/vscode-lisp-formatter
 
 */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.activate = void 0;
 const vscode = require("vscode");
 const knossos_ir_formatter_1 = require("./knossos_ir_formatter");
 function getFullDocRange(document) {
