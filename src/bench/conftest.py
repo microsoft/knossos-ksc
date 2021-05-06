@@ -9,7 +9,7 @@ from ts2ks import ts2mod
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--modulename", action="store", help="name of benchmark to dynamically load"
+        "--modulename", action="store", help="name of module to dynamically load"
     )
     parser.addoption(
         "--benchmarkname", action="store", help="name of benchmark to dynamically load"
@@ -59,7 +59,7 @@ def config_namer(config):
 def pytest_generate_tests(metafunc):
     if "func" in metafunc.fixturenames:
 
-        module_name = metafunc.config.getoption("benchmarkname")
+        module_name = metafunc.config.getoption("modulename")
         benchmark_name = metafunc.config.getoption("benchmarkname")
 
         mod = importlib.import_module(module_name)
