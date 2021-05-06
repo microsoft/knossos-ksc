@@ -125,9 +125,9 @@ def pretty_ASTNode(ex, ctx):
         return parens(2,
                     pp_reserved("rule"), LINE,
                     pp_string(ex.name), LINE,
-                    parens_interline(1, *map(pp, ex.args)), LINE,
-                    pp(ex.e1), LINE,
-                    pp(ex.e2))
+                    parens_interline(1, *map(pp, ex.template_vars)), LINE,
+                    pp(ex.template), LINE,
+                    pp(ex.replacement))
 
     # Variable gets syntax-highlighted name
     if isinstance(ex, Var):

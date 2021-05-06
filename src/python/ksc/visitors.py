@@ -81,21 +81,24 @@ class ExprTransformer(ExprVisitor):
     def visit_let(self, l: Let, *args, **kwargs) -> Expr:
         return Let(l.vars,
             self.visit(l.rhs, *args, **kwargs),
-            self.visit(l.body, *args, **kwargs))
+            self.visit(l.body, *args, **kwargs),
+            type=l.type_)
 
     def visit_lam(self, l: Lam, *args, **kwargs) -> Expr:
-        return Lam(l.arg, self.visit(l.body, *args, **kwargs))
+        return Lam(l.arg, self.visit(l.body, *args, **kwargs), type=l.type_)
 
     def visit_call(self, c: Call, *args, **kwargs) -> Expr:
-        return Call(c.name, [self.visit(a, *args, **kwargs) for a in c.args])
+        return Call(c.name, [self.visit(a, *args, **kwargs) for a in c.args], type=c.type_)
 
     def visit_if(self, i: If, *args, **kwargs) -> Expr:
         return If(
             self.visit(i.cond, *args, **kwargs),
             self.visit(i.t_body, *args, **kwargs),
-            self.visit(i.f_body, *args, **kwargs))
+            self.visit(i.f_body, *args, **kwargs),
+            type=i.type_)
 
     def visit_assert(self, a: Assert, *args, **kwargs) -> Expr:
         return Assert(
             self.visit(a.cond, *args, **kwargs),
-            self.visit(a.body, *args, **kwargs))
+            self.visit(a.body, *args, **kwargs),
+            type=a.type_)

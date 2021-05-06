@@ -10,42 +10,42 @@ from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 ##### Node numbering scheme
 
 @singledispatch
-def _get_children(e: Expr) -> List[Expr]:
+def get_children(e: Expr) -> List[Expr]:
     # The rewritable children of an Expr
      raise ValueError("Must be overridden for every Expr subclass")
 
-@_get_children.register
+@get_children.register
 def _get_children_var(e: Var):
     return []
 
-@_get_children.register
+@get_children.register
 def _get_children_const(e: Const):
     return []
 
-@_get_children.register
+@get_children.register
 def _get_children_let(e: Let):
     return [e.rhs, e.body]
 
-@_get_children.register
+@get_children.register
 def _get_children_lam(e: Lam):
     return [e.body]
 
-@_get_children.register
+@get_children.register
 def _get_children_call(e: Call):
     return e.args
 
-@_get_children.register
+@get_children.register
 def _get_children_if(e: If):
     return [e.cond, e.t_body, e.f_body]
 
-@_get_children.register
+@get_children.register
 def _get_children_assert(e: Assert):
     return [e.cond, e.body]
 
 Location = Sequence[int] # Used immutably, so normally a tuple
 
 def get_node_at_location(expr, path: Location):
-  return expr if len(path) == 0 else get_node_at_location(_get_children(expr)[path[0]], path[1:])
+  return expr if len(path) == 0 else get_node_at_location(get_children(expr)[path[0]], path[1:])
 
 
 #####################################################################
@@ -94,11 +94,11 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
 #####################################################################
 # Name Generation
 
-def make_nonfree_var(prefix, exprs):
+def make_nonfree_var(prefix, exprs, type=None):
     for idx in itertools.count():
         name = prefix + "_" + str(idx)
         if all(name not in e.free_vars_ for e in exprs):
-            return Var(name)
+            return Var(name, type)
 
 #####################################################################
 # CAV implementation
@@ -136,7 +136,7 @@ def _requests_to_child(reqs: List[ReplaceLocationRequest], ch_idx: int) -> List[
 
 def _cav_child_list(e: Expr, reqs, substs):
     # Applies _cav_helper to the children of the expression, and returns the list of substituted children
-    return [_cav_helper(ch, _requests_to_child(reqs, ch_idx), substs) for ch_idx, ch in enumerate(_get_children(e))]
+    return [_cav_helper(ch, _requests_to_child(reqs, ch_idx), substs) for ch_idx, ch in enumerate(get_children(e))]
 
 @_cav_children.register
 def _cav_const(e: Const, reqs, substs):

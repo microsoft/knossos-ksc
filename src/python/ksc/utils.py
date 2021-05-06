@@ -77,6 +77,12 @@ def ensure_list_of_lists(l):
     else:
         return l
 
+
+def single_elem(l):
+    assert len(l) == 1
+    return l[0]
+
+
 def paren(s):
     return "(" + s + ")"
 
@@ -340,7 +346,6 @@ def ndgrid_inds(sz):
     """
 
     return itertools.product(*map(range, sz))
-
 
 def singleton(cls):
     """ Simple decorator that makes a single instance of a class.

@@ -312,7 +312,9 @@ def _(ex, symtab):
 
 @type_propagate.register(Rule)
 def _(ex, symtab):
-    # TODO: Typeannot for rules
+    local_st = {**symtab, **{a.name:a.type_ for a in ex.template_vars}}
+    type_propagate(ex.template, local_st)
+    type_propagate(ex.replacement, local_st)
     return ex
 
 @type_propagate.register(Var)
