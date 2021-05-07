@@ -296,7 +296,7 @@
    (let (xnm1 (pow x (sub n 1)))
       (tuple (mul x xnm1) (mul (to_float n) xnm1))))))
 ; rev (bog, dpow) = dpow * bog  = dpow * (n * x^(n-1))
-(def [sufrevpass [pow (Tuple Float Float)]] Float ((dpow : Float) (bog : Float))
+(def [sufrevpass [pow (Tuple Float Integer)]] Float ((dpow : Float) (bog : Float))
      (mul dpow bog))
 
 ; TODO: MOVEEQ 'eq' is primitive in Haskell at the moment
