@@ -201,7 +201,7 @@ def make_PythonOp(node):
     value = node.outputsAt(0)
     assert len(list(node.outputs())) == 1  # Assemble into tuple for multiple outputs
     pyname = node.pyname()
-    if pyname == "mymap":  # TODO: elementwise_apply
+    if pyname == "elementwise_apply_hack":
         global todo_stack
         function_name_constant = node.inputsAt(0).node()
         function_name = function_name_constant.s("value")
@@ -218,7 +218,7 @@ def make_PythonOp(node):
             ),
         )
 
-    raise NotImplementedError(f"PythonOp {function_name}")
+    raise NotImplementedError(f"PythonOp {pyname}")
 
 
 def make_lets(bindings, body) -> Expr:
