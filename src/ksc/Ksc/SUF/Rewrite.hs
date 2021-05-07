@@ -117,10 +117,13 @@ rewriteSUFRevPass P_ts_add (Tuple [ddr, Tuple []])
   -- FIXME: This is bad because it duplicates the expression ddr.  CSE
   -- will probably resolve this problem, but we shouldn't create it in
   -- the first place.
+  -- TODO: Can we just "let tmp = ddr in Tuple [tmp, tmp]"?  No need to get a fresh name.
   = Just $ Tuple [ddr, ddr]
 
-rewriteSUFRevPass P_ts_dot (Tuple [ddr, Tuple [da, db]])
+rewriteSUFRevPass P_ts_dot (Tuple [ddr, dadb])
   = Just $ Tuple [pScale ddr db, pScale ddr da]
+  where da = pFst dadb
+        db = pSnd dadb
 
 rewriteSUFRevPass P_ts_scale (Tuple [ddr, t])
   = Just $ Tuple [pDot x ddr, pScale lambda ddr]

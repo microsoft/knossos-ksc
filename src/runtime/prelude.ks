@@ -287,7 +287,7 @@
  (let (dx (mul dret (pow x (sub n 1))))
    (tuple dx (tuple)))))
 
-; fwd (x,n) = x * x^(n-1), BOG: n * x^(n-1)
+; fwd (x,n) = x * x^(n-1), BOG: n * x^(n-1) : Float
 (def [suffwdpass pow] (Tuple Float Float)
  (xt : (Tuple Float Integer))
  (let ((x n) xt)
@@ -296,8 +296,8 @@
    (let (xnm1 (pow x (sub n 1)))
       (tuple (mul x xnm1) (mul (to_float n) xnm1))))))
 ; rev (bog, dpow) = dpow * bog  = dpow * (n * x^(n-1))
-(def [sufrevpass [pow (Tuple Float Integer)]] Float ((dpow : Float) (bog : Float))
-     (mul dpow bog))
+(def [sufrevpass [pow (Tuple Float Integer)]] (Tuple Float (Tuple)) ((dpow : Float) (bog : Float))
+     (tuple (mul dpow bog) (tuple)))
 
 ; TODO: MOVEEQ 'eq' is primitive in Haskell at the moment
 ; ;; eq :: Number x Number -> Bool
