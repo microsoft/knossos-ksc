@@ -32,3 +32,7 @@ def elementwise_apply_pt18(f, x: torch.Tensor):
 # Slow implementation, to be improved
 def elementwise_apply(f: Callable[[float], float], x: torch.Tensor):
     return elementwise_apply_pt18(f, x)
+
+@torch.jit.ignore
+def elementwise_apply_hack(f:str,x:torch.Tensor):
+    pass
