@@ -183,9 +183,13 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
         out = f.read()
 
     # only delete these file if no error
-    os.unlink(fks.name)
-    os.unlink(fcpp.name)
-    os.unlink(fkso.name)
+    import atexit
+    @atexit.register
+    def _():
+        print("Deleting", fks.name, fcpp.name, fkso.name)
+        os.unlink(fks.name)
+        os.unlink(fcpp.name)
+        os.unlink(fkso.name)
 
     return out
 
