@@ -15,6 +15,9 @@
 (def not Bool (p : Bool) (if p false true))
 (gdef fwd [not Bool])
 (gdef rev [not Bool])
+(gdef suffwdpass [not Bool])
+(gdef sufrevpass [not Bool])
+(gdef sufrev [not Bool])
 
 ;; neg :: Number -> Number
 ;; neg x = -x
@@ -242,8 +245,8 @@
 
 (def [suffwdpass div] (Tuple Float (Tuple Float Float)) (x1_x2 : Tuple Float Float)
      (tuple (div x1_x2) x1_x2))
-(def [sufrevpass [div (Tuple Float Float)]] (Tuple Float Float) ((d_ddiv : Float) (xt : Tuple Float Float))
-     (let ((x1 x2) xt)
+(def [sufrevpass [div (Tuple Float Float)]] (Tuple Float Float) ((d_ddiv : Float) (bog_xt : Tuple Float Float))
+     (let ((x1 x2) bog_xt)
        (tuple (div d_ddiv x2)
               (neg (div (mul x1 d_ddiv)
                         (mul x2 x2))))))
@@ -285,6 +288,18 @@
  ((xt : (Tuple Float Integer)) (dret : Float))
  (let ((x n) xt)
    (tuple (revpow x n dret) (tuple))))
+
+; fwd (x,n) = x * x^(n-1), BOG: n * x^(n-1)
+(def [suffwdpass pow] (Tuple Float Float)
+ (xt : (Tuple Float Integer))
+ (let ((x n) xt)
+ (if (eq n 0)
+      (tuple 1.0 0.0)
+   (let (xnm1 (pow x (sub n 1)))
+      (tuple (mul x xnm1) (mul (to_float n) xnm1))))))
+; rev (bog, dpow) = dpow * bog  = dpow * (n * x^(n-1))
+(def [sufrevpass [pow (Tuple Float Integer)]] (Tuple Float (Tuple)) ((dpow : Float) (bog : Float))
+     (tuple (mul dpow bog) (tuple)))
 
 ; TODO: MOVEEQ 'eq' is primitive in Haskell at the moment
 ; ;; eq :: Number x Number -> Bool
