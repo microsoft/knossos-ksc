@@ -383,14 +383,14 @@ namespace ks
 
 			BuildT() : n{ 0 }
 			{
-				ENTER; //  std::cerr << std::string(3 + indent++, '.') << "[build() " << this << "]\n";
+				KS_ENTER; //  std::cerr << std::string(3 + indent++, '.') << "[build() " << this << "]\n";
 			}
 
 			BuildT(const BuildT& that) :
 				n(that.n),
 				f(that.f)
 			{
-				ENTER;
+				KS_ENTER;
 			}
 
 			BuildT& operator=(const BuildT& that)
@@ -405,13 +405,13 @@ namespace ks
 				n(n),
 				f(f)
 			{
-				ENTER;
+				KS_ENTER;
 				//std::cerr << std::string(3+indent++, '.') << "[build " << this << "]\n";
 			}
 
 			~BuildT()
 			{
-				LEAVE;
+				KS_LEAVE;
 				//std::cerr << std::string(3+ --indent, '.') << "[~build " << this << "]\n";
 			}
 
