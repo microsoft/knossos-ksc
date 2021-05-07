@@ -52,13 +52,13 @@ namespace ks {
 	
 	extern int log_indent;
 	extern bool do_log;
-#define LOG(msg, n) if (!do_log) ; else { std::cerr << std::string((n), ' ') << msg << ":" << __FUNCTION__ << " " << this << std::endl; }
+#define KS_LOG(msg, n) if (!do_log) ; else { std::cerr << std::string((n), ' ') << msg << ":" << __FUNCTION__ << " " << this << std::endl; }
 
 	extern std::set<void*> objects;
-#define FIND (objects.find(this) != objects.end())
-#define ENTER { objects.insert(this); LOG("ctor", log_indent++); }
-#define NOTE { LOG("note " << (FIND ? (void*)this : (void*)0), log_indent); }
-#define LEAVE { LOG("dtor " << FIND, --log_indent);  objects.erase(this); }
+#define KS_FIND (objects.find(this) != objects.end())
+#define KS_ENTER { objects.insert(this); KS_LOG("ctor", log_indent++); }
+#define KS_NOTE { KS_LOG("note " << (KS_FIND ? (void*)this : (void*)0), log_indent); }
+#define KS_LEAVE { KS_LOG("dtor " << KS_FIND, --log_indent);  objects.erase(this); }
 
 	// ===============================  Tuple  ==================================
 
