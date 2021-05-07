@@ -175,6 +175,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
         print(f"ks_str=\n{ks_str}")
         print(e.output.decode("ascii"))
         print(e.stderr.decode("ascii"))
+        exit(-1) # To clean up error reporting while debugging
         raise
 
     # Read from CPP back to string
