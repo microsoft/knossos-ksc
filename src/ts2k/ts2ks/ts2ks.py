@@ -468,10 +468,14 @@ def ksc_defs_to_module(ksc_defs, entry_def):
         print("")
 
     type_propagate_decls(ksc_defs, symtab)
-    defs_with_derivatives = ksc_defs + [
-        GDef("fwd", entry_def.name),
-        GDef("rev", entry_def.name)
-    ]
+    defs_with_derivatives = []
+    for ksc_def in ksc_defs: 
+        defs_with_derivatives += [
+            ksc_def,
+            GDef("suffwdpass", ksc_def.name),
+            GDef("sufrevpass", ksc_def.name),
+            GDef("sufrev", ksc_def.name)
+        ]
 
     ks_str = '\n'.join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in entry_def.args]
