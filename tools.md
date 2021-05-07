@@ -4,7 +4,7 @@
 
 ## VSCode
 
-`knossos` uses [black](https://github.com/psf/black) for formatting. Note we currently use the non-default black line length see <./pyproject.toml> . You may find the following settings useful. To use, copy them into `.vscode/settings.json` (don't commit them) or your user settings:
+`knossos` uses [black](https://github.com/psf/black) for formatting. Note we currently use the non-default black line length see [pyproject.toml](pyproject.toml) . You may find the following settings useful. To use, copy them into `.vscode/settings.json` (don't commit them) or your user settings:
 
 ```json
     "python.formatting.provider": "black",
@@ -13,7 +13,7 @@
 
 ## [Pre-commit](https://github.com/pre-commit)
 
-Pre-commit is a package manager for various git hooks that process files and can help with consistency and correctness. It is configured in [pre-commit-config.yaml](pre-commit-config.yaml) . If any changes are made, you will need to re-stage the relevant files and try again.
+Pre-commit is a package manager for various git hooks that process files and can help with consistency and correctness. It is configured in [.pre-commit-config.yaml](.pre-commit-config.yaml) . If any changes are made, you will need to re-stage the relevant files and try again.
 
 Per-user, to setup, run
 
