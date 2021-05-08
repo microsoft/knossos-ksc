@@ -68,14 +68,16 @@ optShapePrim P_ts_neg v = Just $ pShape v
 optShapePrim P_delta (Tuple [_, _, v]) = Just $ pShape v
 -- FIXME: Still needs doing
 --
--- Suppose we have Vec (Float, Vec Float)
+-- If we have 'v : Vec (Float, Vec Float)' then
 --
--- Then the shape will have type Vec ((), Int)
+-- - unzip v : (Vec Float, Vec (Vec Float))
+-- - shape (unzip v) : (Int, Vec Int)
+-- - shape v : Vec ((), Int), and
+-- - unzip (shape v) :  (Vec (), Vec Int)
 --
--- So the unzip of the shape will have type (Vec (), Vec Int)
---
--- So perhaps we need still to be able to interpret Vec () as a shape
--- type for Vec Float.
+-- So if we are to optimise by pushing the 'shape' call inside 'unzip'
+-- then we will need some special logic for checking whether we get a
+-- 'Vec ()' and converting it to an 'Int' (by taking its size).
 --
 -- v
 optShapePrim P_unzip v = Just $ pUnzip (pShape v)
