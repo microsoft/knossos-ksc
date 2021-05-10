@@ -85,6 +85,97 @@ getZero tangent_type e
            e_ty = typeof e
            panic = pprPanic "mkZero" (ppr e_ty $$ ppr e)
 
+data MakeShapeOrTrivial = TrivialShapeWithTZ TExpr
+                        -- ^ The shape can be determined solely from
+                        -- the type (and so we choose it to be unit).
+                        -- Its tangent zero is this TExpr.
+                        | NonTrivialShape MakeShape
+
+data MakeShape = MakeShape { msMakeShape :: TExpr -> TExpr
+                           , msShapeType :: Type
+                           , msMakeTZ    :: TExpr -> TExpr
+                           }
+
+-- Given an expression e : T
+--
+-- 1. shape T e : shapeTy T represents the shape of e.  That is,
+-- e1 : T and e2 : T have the same shape if and only if
+--
+--     shape T e1 == shape T e2
+--
+-- 2. shapeTZ T (shape T e) : dT is the tangent zero corresponding to
+-- the shape of e.
+
+shape :: Type -> TExpr -> TExpr
+shape = msMakeShape . makeShape
+
+shapeType :: Type -> Type
+shapeType = msShapeType . makeShape
+
+shapeTZ :: Type -> TExpr -> TExpr
+shapeTZ = msMakeTZ . makeShape
+
+makeShape :: Type -> MakeShape
+makeShape t = case makeShapeOrTrivial t of
+  TrivialShapeWithTZ zero -> MakeShape { msMakeShape = const (Tuple [])
+                                       , msShapeType = TypeTuple []
+                                       , msMakeTZ    = const zero
+                                       }
+  NonTrivialShape mktz -> mktz
+
+makeShapeOrTrivial :: Type -> MakeShapeOrTrivial
+makeShapeOrTrivial = \case
+  TypeInteger -> TrivialShapeWithTZ unit
+  TypeFloat   -> TrivialShapeWithTZ zeroFloat
+  TypeBool    -> TrivialShapeWithTZ unit
+  TypeString  -> TrivialShapeWithTZ unit
+
+  TypeTuple ts -> case allTrivialShape ts of
+    Just tangentZeros -> TrivialShapeWithTZ (Tuple tangentZeros)
+    Nothing  -> NonTrivialShape MakeShape{ msMakeShape = makeShape'
+                                         , msShapeType = shapeType'
+                                         , msMakeTZ = mkZero' }
+      where rts = map f (zip ts [1..])
+            f (t, i) = (v, z, mktz)
+              where v = TVar t (mkArgVar i)
+                    mktz = makeShape t
+                    z = TVar (msShapeType mktz) (mkArgVar i)
+
+            vs' = map (\(v, _, _) -> v) rts
+            zs' = map (\(_, z, _) -> z) rts
+            shape_body = Tuple (map (\(v, _, mktz) -> msMakeShape mktz (Var v)) rts)
+            mkZero_body = Tuple (map (\(_, z, mktz) -> msMakeTZ mktz (Var z)) rts)
+
+            makeShape' e = Let (TupPat vs') e shape_body
+            shapeType' = TypeTuple (map (\(_, _, mktz) -> msShapeType mktz) rts)
+            mkZero' e = Let (TupPat zs') e mkZero_body
+
+    where allTrivialShape = mapM (\t -> case makeShapeOrTrivial t of
+                                     TrivialShapeWithTZ tangentZero -> Just tangentZero
+                                     NonTrivialShape _ -> Nothing)
+
+  TypeTensor i t -> NonTrivialShape $ case makeShapeOrTrivial t of
+    TrivialShapeWithTZ zero -> MakeShape{ msMakeShape = pSize
+                                        , msShapeType = tensorIndexType i
+                                        , msMakeTZ    = \n -> pConstVec n zero }
+    NonTrivialShape mktz ->
+      MakeShape{ msMakeShape = eMap (msMakeShape mktz)
+               , msShapeType = TypeTensor i (msShapeType mktz)
+               , msMakeTZ    = eMap (msMakeTZ mktz)
+               }
+      where -- FIXME: Need to mkAtomicNoFVs e or something
+            -- (or probably newVarNotIn)
+            -- FIXME: But really this should use map once it exists
+            eMap :: (TExpr -> TExpr) -> TExpr -> TExpr
+            eMap shape e = pBuild (pSize e) (Lam v (shape (pIndex (Var v) e)))
+            v = TVar (tensorIndexType i) argVar
+
+  TypeLam{} -> unsupported "TypeLam"
+  TypeLM{} -> unsupported "TypeLM"
+  TypeUnknown -> unsupported "TypeUnknown"
+  where unsupported s = error ("Unsupported argument to shapeTy: " ++ s)
+        unit = Tuple []
+
 -- (mkAtomicNoFVs e body) returns the expression (let a = e in body a)
 -- where body :: TExpr -> TExpr is a function expecting an expression
 -- The idea is that body might use its argument many types, and we
