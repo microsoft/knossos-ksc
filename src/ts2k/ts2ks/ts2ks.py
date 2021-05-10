@@ -423,7 +423,7 @@ def forward_template(py_mod, ctx, *args):
     # Call it
     outputs = py_mod.entry(*ks_args)
 
-    # TODO: save torch_to_ksed args
+    # TODO: Use BOG properly
     if ctx is not None:
         ctx.save_for_backward(*args)
 
@@ -433,7 +433,7 @@ def forward_template(py_mod, ctx, *args):
 def backward_template(py_mod, ctx, *args):
     ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
     ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
-    outputs = py_mod.rev_entry(ks_args, ks_grad_args)
+    outputs = py_mod.sufrev_entry(ks_args, ks_grad_args)
 
     return torch_from_ks(outputs)
 
