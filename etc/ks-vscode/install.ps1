@@ -17,7 +17,7 @@ $manifest = echo `
 if (Test-Path -PathType Container $extensions_dst) {
     write-host "ks-vscode: Deleting $extensions_dst"
     Remove-Item -force -rec $extensions_dst
-} elseif (Test-Path -PathType Container $extensions_dst) {
+} elseif (Test-Path $extensions_dst) {
     throw "ks-vscode: Destination $extensions_dst exists, but is not a folder!"
 }
 foreach ($file in $manifest) {
