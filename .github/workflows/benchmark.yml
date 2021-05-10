@@ -43,7 +43,11 @@ jobs:
       - name: 'Obtain AzCopy'
         run: wget -O azcopy_v10.tar.gz https://aka.ms/downloadazcopy-v10-linux && tar -xf azcopy_v10.tar.gz --strip-components=1
         
-      - name: 'Upload result AzCopy'
+      # The secret is a SAS token https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview
+      # The token is generated to expire 13 months out (2022-06-11 15:00).
+      # It grants the following roles (read,list,create) which is enough for the action to add a new result,
+      # and other actions to aggregate the results.
+      - name: 'Upload result via AzCopy'
         env:
           BENCHMARK_SAS: ${{ secrets.BENCHMARK_SAS }}
         run: |
