@@ -469,8 +469,7 @@ def make_KscAutogradFunction(py_mod):
     )
     return newclass()
 
-
-def ksc_defs_to_module(ksc_defs, entry_def):
+def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
@@ -486,17 +485,28 @@ def ksc_defs_to_module(ksc_defs, entry_def):
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
         defs_with_derivatives += [
-            ksc_def,
-            GDef("suffwdpass", ksc_def.name),
-            GDef("sufrevpass", ksc_def.name),
-            GDef("sufrev", ksc_def.name),
+            ksc_def
         ]
+        if "sufrev" in derivatives_to_generate:
+            defs_with_derivatives += [
+                GDef("suffwdpass", ksc_def.name),
+                GDef("sufrevpass", ksc_def.name),
+                GDef("sufrev", ksc_def.name),
+            ]
+        if "fwd" in derivatives_to_generate:
+            defs_with_derivatives += [
+                GDef("fwd", ksc_def.name),
+            ]
+        if "rev" in derivatives_to_generate:
+            defs_with_derivatives += [
+                GDef("rev", ksc_def.name),
+            ]
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in entry_def.args]
     return_type = entry_def.return_type
     mod = utils.build_module_using_pytorch_from_ks(
-        ks_str, entry_def.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True
+        ks_str, entry_def.name, arg_types, return_type=return_type, derivatives_to_generate=derivatives_to_generate, use_aten=True
     )
 
     return make_KscAutogradFunction(mod)
@@ -505,7 +515,7 @@ def ksc_defs_to_module(ksc_defs, entry_def):
 import inspect
 
 
-def tsmod2ksmod(module, function_name, example_inputs):
+def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
     global todo_stack
     todo_stack = {function_name}
     ksc_defs = []
@@ -523,7 +533,8 @@ def tsmod2ksmod(module, function_name, example_inputs):
 
     entry_def = ksc_defs[-1]
 
-    return ksc_defs_to_module(ksc_defs, entry_def)
+    derivatives_to_generate = ["fwd","rev"] if generate_lm else ["sufrev"]
+    return ksc_defs_to_module(ksc_defs, entry_def, )
 
 
 def ts2mod(function, example_inputs):
@@ -533,7 +544,7 @@ def ts2mod(function, example_inputs):
     else:
         ksc_def = ast2ks(function)
 
-    return ksc_defs_to_module([ksc_def], ksc_def)
+    return ksc_defs_to_module([ksc_def], ksc_def, ["rev", "fwd"])
 
 
 import time
