@@ -756,7 +756,7 @@ optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ render (ppr f) ++
 
 -----------------------
 -- See Note [Automatic differentiation documentation]
-optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
+optDrvFun :: HasCallStack => ADDir -> BaseFun p -> TExpr -> Maybe TExpr
 optDrvFun dir (PrimFunT f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
@@ -786,7 +786,7 @@ optDrvPrim _ _ _ = Nothing
 -- See Note [Automatic differentiation documentation]
 --
 -- Called for (lmApply lm dx)
-optLMApply :: InScopeSet -> ADMode -> TExpr -> TExpr -> Maybe TExpr
+optLMApply :: InScopeSet -> ADDir -> TExpr -> TExpr -> Maybe TExpr
 
 optLMApply _ adm (Assert e1 e2) dx
   = Just (Assert e1 (lmApply_AD adm e2 dx))
