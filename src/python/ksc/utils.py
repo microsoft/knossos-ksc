@@ -275,26 +275,28 @@ def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_t
     """
 
     args_str = mangleTypes(arg_types)
-    name_str = encode_name(f"{name_to_call}@{args_str}")
+    name = name_to_call.mangle_without_type()
+    name_str = encode_name(f"{name}@{args_str}")
     declarations = f"""
      m.def("entry", with_ks_allocator(&ks::{name_str}));
     """
 
     if generate_derivatives:
+        derivatives_to_generate = [
+            #'fwd', 
+            #'rev', 
+            'sufrev'
+        ]
         darg_types = [tangent_type(ty) for ty in arg_types]
         args_tuple_str = mangleType(make_tuple_if_many(arg_types))
         dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
         dreturn_type_str = mangleType(tangent_type(return_type))
 
-        fwd_name = encode_name(f"fwd${name_to_call}@{args_str}")
-        declarations += f"""
-          m.def("fwd_entry", with_ks_allocator(&ks::{fwd_name}));
-        """
-
-        rev_name = encode_name(f"rev${name_to_call}@{args_str}")
-        declarations += f"""
-          m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
-        """
+        for der in derivatives_to_generate:
+            der_name = encode_name(f"{der}${name}@{args_str}")
+            declarations += f"""
+            m.def("{der}_entry", with_ks_allocator(&ks::{der_name}));
+            """
 
     cpp_str += (
         """
