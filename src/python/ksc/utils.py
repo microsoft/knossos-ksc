@@ -363,9 +363,12 @@ def build_module_using_pytorch_from_ks(
     else:
         cflags.append("-std=c++17")
 
+    verbose=True
+
     # https://pytorch.org/docs/stable/cpp_extension.html
     module = load_inline(
-        name="dynamic_ksc_cpp", cpp_sources=[cpp_str], extra_include_paths=[ksc_runtime_dir], extra_cflags=cflags
+        name="dynamic_ksc_cpp", cpp_sources=[cpp_str], extra_include_paths=[ksc_runtime_dir], extra_cflags=cflags,
+        verbose=verbose
     )
 
     return module
