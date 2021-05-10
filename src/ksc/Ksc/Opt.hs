@@ -789,13 +789,13 @@ optDrvPrim _ _ _ = Nothing
 optLMApply :: InScopeSet -> ADDir -> TExpr -> TExpr -> Maybe TExpr
 
 optLMApply _ adm (Assert e1 e2) dx
-  = Just (Assert e1 (lmApply_AD adm e2 dx))
+  = Just (Assert e1 (lmApply_Dir adm e2 dx))
 
 optLMApply _ adm (Let v rhs body) dx
-  = Just $ Let v rhs $ lmApply_AD adm body dx
+  = Just $ Let v rhs $ lmApply_Dir adm body dx
 
 optLMApply _ adm (If b et ef) dx
-  = Just $ If b (lmApply_AD adm et dx) (lmApply_AD adm ef dx)
+  = Just $ If b (lmApply_Dir adm et dx) (lmApply_Dir adm ef dx)
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only

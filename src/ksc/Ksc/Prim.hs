@@ -424,9 +424,6 @@ lmApply = mkPrimCall2 P_lmApply
 lmApplyR :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApplyR = mkPrimCall2 P_lmApplyR
 
-lmApply_AD :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
-lmApply_AD dir = lmApply_Dir  dir
-
 lmApply_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApply_Dir Fwd e ds = lmApply  e ds
 lmApply_Dir Rev e dt = lmApplyR dt e
