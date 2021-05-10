@@ -263,15 +263,19 @@ def encode_name(s: str) -> str:
     )
 
 
+derivatives_to_generate_default = ["fwd", "rev"]
+
+
 def __make_cpp_str(
     ks_str,
     name_to_call,
     python_module_name,
     arg_types,
     return_type,
-    generate_derivatives,
-    use_aten,
+    derivatives_to_generate=derivatives_to_generate_default,
+    use_aten=True,
 ):
+    generate_derivatives = len(derivatives_to_generate) > 0
     generated_cpp_source = generate_cpp_from_ks(
         ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten
     )
@@ -332,7 +336,7 @@ def generate_and_compile_cpp_from_ks(
     name_to_call,
     arg_types,
     return_type=None,
-    generate_derivatives=False,
+    derivatives_to_generate=[],
     use_aten=False,
 ):
 
@@ -342,7 +346,7 @@ def generate_and_compile_cpp_from_ks(
         "PYTHON_MODULE_NAME",
         arg_types,
         return_type,
-        generate_derivatives,
+        derivatives_to_generate,
         use_aten,
     )
 
@@ -362,7 +366,7 @@ def build_module_using_pytorch_from_ks(
     name_to_call,
     arg_types,
     return_type=None,
-    generate_derivatives=False,
+    derivatives_to_generate=[],
     use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
@@ -372,7 +376,7 @@ def build_module_using_pytorch_from_ks(
         "TORCH_EXTENSION_NAME",
         arg_types,
         return_type,
-        generate_derivatives,
+        derivatives_to_generate,
         use_aten,
     )
 
