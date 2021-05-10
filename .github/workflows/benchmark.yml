@@ -4,9 +4,6 @@ on:
   schedule:
     - cron:  '5 3 * * *'
 
-  push:
-    branches: [cogravil/benchmarkresults]
-
   workflow_dispatch:
 
 jobs:
