@@ -394,8 +394,8 @@ pBaseFun = pPrimFun
 pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
 pFunG pBase = try (brackets $
             ((pDerivation "D" GradFun)
-         <|> (pDerivation "fwd" (DrvFun (AD Fwd)))
-         <|> (pDerivation "rev"  (DrvFun (AD Rev)))
+         <|> (pDerivation "fwd" (DrvFun Fwd))
+         <|> (pDerivation "rev"  (DrvFun Rev))
          <|> (pDerivation "CL" CLFun)
          <|> (pDerivation "suffwdpass" SUFFwdPass)
          <|> (pDerivation "sufrevpass" SUFRevPass)
@@ -450,8 +450,8 @@ pEdef = do { pReserved "edef"
 
 pDerivation :: Parser Derivation
 pDerivation =
-      (pReserved "fwd" $> DerivationDrvFun (AD Fwd))
-  <|> (pReserved "rev" $> DerivationDrvFun (AD Rev))
+      (pReserved "fwd" $> DerivationDrvFun Fwd)
+  <|> (pReserved "rev" $> DerivationDrvFun Rev)
   <|> (pReserved "CL"  $> DerivationCLFun)
   <|> (pReserved "shape" $> DerivationShapeFun)
   <|> (pReserved "suffwdpass" $> DerivationSUFFwdPass)

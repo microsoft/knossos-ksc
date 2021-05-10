@@ -505,8 +505,7 @@ isSelFun = \case
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun (Fun _ baseFun) = baseFun
 
-data ADMode = AD { adDir :: ADDir }
-  deriving( Eq, Ord, Show )
+type ADMode = ADDir
 
 data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
@@ -931,9 +930,6 @@ instance Pretty a => Pretty (Maybe a) where
 instance (Pretty a, Pretty b) => Pretty (a,b) where
   ppr (x,y) = parens (sep [ ppr x <> comma, ppr y])
 
-instance Pretty ADMode where
-  ppr (AD p) = ppr p
-
 instance Pretty ADDir where
   ppr Fwd = char 'f'
   ppr Rev = char 'r'
@@ -1031,8 +1027,8 @@ pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 pprDerivedFun :: (BaseFunId funid p -> SDoc) -> DerivedFun funid p -> SDoc
 pprDerivedFun f (Fun JustFun s)               = f s
 pprDerivedFun f (Fun GradFun   s)             = brackets (char 'D'   <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD Fwd)) s)   = brackets (text "fwd" <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD Rev)) s)   = brackets (text "rev" <+> f s)
+pprDerivedFun f (Fun (DrvFun   Fwd) s)        = brackets (text "fwd" <+> f s)
+pprDerivedFun f (Fun (DrvFun   Rev) s)        = brackets (text "rev" <+> f s)
 pprDerivedFun f (Fun (ShapeFun ds) sf)             = brackets (text "shape" <+> pprDerivedFun f (Fun ds sf))
 pprDerivedFun f (Fun CLFun    s)              = brackets (text "CL" <+> f s)
 pprDerivedFun f (Fun SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
@@ -1170,8 +1166,8 @@ instance Pretty GDefX where
 
 instance Pretty Derivation where
   ppr = \case
-    DerivationDrvFun (AD Fwd) -> text "fwd"
-    DerivationDrvFun (AD Rev) -> text "rev"
+    DerivationDrvFun Fwd -> text "fwd"
+    DerivationDrvFun Rev -> text "rev"
     DerivationCLFun    -> text "CL"
     DerivationShapeFun -> text "shape"
     DerivationSUFFwdPass -> text "suffwdpass"

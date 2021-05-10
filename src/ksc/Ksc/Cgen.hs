@@ -625,8 +625,8 @@ cgenFun :: HasCallStack
 cgenFun cgenBaseFun f = case f of
   Fun JustFun baseFun   -> cgenBaseFun baseFun
   Fun GradFun{}  s  -> "D$" ++ cgenBaseFun s
-  Fun (DrvFun (AD Fwd)) s -> "fwd$" ++ cgenBaseFun s
-  Fun (DrvFun (AD Rev)) s -> "rev$" ++ cgenBaseFun s
+  Fun (DrvFun Fwd) s -> "fwd$" ++ cgenBaseFun s
+  Fun (DrvFun Rev) s -> "rev$" ++ cgenBaseFun s
   Fun (ShapeFun ds) ff   -> "shape$" ++ cgenFun cgenBaseFun (Fun ds ff)
   Fun CLFun s       -> "CL$" ++ cgenBaseFun s
   Fun SUFFwdPass s  -> "suffwdpass$" ++ cgenBaseFun s
