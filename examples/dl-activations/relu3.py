@@ -43,7 +43,9 @@ vrelu3_pytorch_nice = torch.vmap(relu3_pytorch_nice)
 def vrelu3_bench_configs():
   yield torch.randn((4,))
   yield torch.randn((16,))
-# yield torch.randn((256,256)) too slow to bench...
+  yield torch.randn((1024,)) 
+  #TODO: polymoprhic over tensor rank
+  # yield torch.randn((256,256))
 
 
 # Note: zeros
