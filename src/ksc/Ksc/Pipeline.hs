@@ -181,8 +181,8 @@ deriveDecl = deriveDeclUsing $ \env (L.GDef derivation fun) -> do
               Just tdef' -> tdef'
 
     ; case derivation of
-        L.DerivationDrvFun (L.AD plan dir) -> do
-          { let mgradDef = gradDef plan tdef
+        L.DerivationDrvFun (L.AD dir) -> do
+          { let mgradDef = gradDef tdef
           ; let env' = maybe env (flip stInsertFun env) mgradDef
           ; graddedDef <- case mgradDef of
               Nothing -> do
