@@ -11,7 +11,7 @@ import Ksc.Prim
 import qualified Ksc.OptLet
 import GHC.Stack
 
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe)
 
 {- Note [Automatic differentiation documentation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,21 +137,6 @@ gradBuild BasicAD s n ti body
     pBuild n $ Lam ti $
     mkLet (gradTVar BasicAD s ti) (lmZero s (Var ti)) $
     gradE BasicAD s body
-
-gradBuild TupleAD s n ti body
-  = mkLet p (pUnzip (pBuild n (Lam ti grad_body))) $
-    Tuple [ pFst (Var p)
-          , lmVCatV (pSnd (Var p)) ]
-  where
-     t_ty = typeof body
-     p = TVar res_ty resVar
-     err = error $ "Unexpected size type in gradBuild: " ++ show (typeof n)
-     d = fromMaybe err (tensorDimensionFromIndexType_maybe (typeof n))
-     res_ty = TypeTuple [ TypeTensor d t_ty
-                        , TypeTensor d (TypeLM (typeof s) t_ty) ]
-     grad_body = mkLet (gradTVar TupleAD s ti)
-                       (Tuple [Var ti, lmZero s (Var ti)]) $
-                 gradE TupleAD s body
 ---------------
 gradFold :: ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
 gradFold BasicAD s ti body acc v =
@@ -183,50 +168,12 @@ gradFold BasicAD s ti body acc v =
         args = lmVCat s
                [ lmOne (typeof s)
                , lmVCat s (map (gradE BasicAD s) [acc, v]) ]
-
--- Just a dummy for tuple mode.  We don't calculate it properly yet.
-gradFold TupleAD s _ti _body acc _v =
-  lmDummyFold (TypeTuple [t_acc, TypeLM (typeof s) t_acc])
-  where t_acc = typeof acc
-
 ---------------
 gradCall :: ADPlan -> Shape -> TFun Typed -> TExpr -> TExpr
 gradCall BasicAD s f args
   = lmCompose (Call gf args) (gradE BasicAD s args)
   where
     gf = gradTFun BasicAD f (typeof args)
-
-gradCall TupleAD s f args
-  = mkLets (case grad_arg_let of { Just p -> [p]; Nothing -> [] }) $
-    mkLet res_tv (Call gf pFst_grad_arg) $
-    Tuple [ pFst (Var res_tv), lmCompose (pSnd (Var res_tv)) (pSnd grad_arg) ]
-  where
-    gf     = gradTFun TupleAD f (typeof args)
-    res_ty = typeof f
-    res_tv = mkGradTVar TupleAD arg_tys resVar res_ty
-    arg_tys = typeof args
-
-    (grad_arg, pFst_grad_arg, grad_arg_let) = grad_arg_binds
-
-     -- Nothing <=> the arg is atomic, so no need to let-bind
-    grad_arg_binds :: (TExpr, TExpr, Maybe (TVar,TExpr))
-    grad_arg_binds
-      -- If arg is trivial then we want to apply it directly to gf.
-      -- This is particularly important in cases where the type of the
-      -- body depends on arg.  Having arg appear in the form 'fst
-      -- (arg, <darg>)' displeases the type checker when it's the
-      -- first argument of build, for example.
-      | isTrivial arg
-      = (Var arg_var, arg, Just (arg_var, grad_arg))
-      | isTrivial grad_arg
-      = (grad_arg, pFst grad_arg, Nothing)
-      | otherwise
-      = (Var arg_var, pFst (Var arg_var), Just (arg_var, grad_arg))
-      where
-        arg_var  = mkGradTVar TupleAD (typeof s) (mkArgVar 1) (typeof arg)
-        grad_arg = gradE TupleAD s arg
-        arg      = args
-
 ----------------------
 gradLet :: HasCallStack => ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr
 gradLet BasicAD s v e1 e2
@@ -234,16 +181,6 @@ gradLet BasicAD s v e1 e2
       -- See Note [Shadowing after grad]
     mkLet v e1                                        $
     gradE BasicAD s e2
-
-gradLet TupleAD s v e1 e2
-  -- We include a binding for the old v because pre-gradded
-  -- subexpressions may contain it and it's easier to just let them
-  -- continue to refer to it rather than substitute 'fst(dv)' for it
-  -- everywhere.
-  = mkLet dv (gradE TupleAD s e1) $
-    mkLet v (pFst (Var dv)) $
-    gradE TupleAD s e2
-  where dv = gradTVar TupleAD s v
 
 {- Note [Shadowing after grad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -284,8 +221,6 @@ unique names before gradding.
 
 lmVCat_AD :: ADPlan -> Shape -> [TExpr] -> TExpr
 lmVCat_AD BasicAD s ms = lmVCat s ms
-lmVCat_AD TupleAD s ms = Tuple [ Tuple  (map pFst ms)
-                               , lmVCat s (map pSnd ms) ]
 
 
 
@@ -303,9 +238,7 @@ applyD dir def@(Def { def_pat = TupPat {} })
 
 -- Forward
 --   D$f  :: S1 S2       -> ((S1,S2) -o T)
---  Dt$f  :: S1 S2       -> (T, (S1,S2) -o T)
 -- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
--- fwdt$f :: (S1, S2) (dS1, dS2) -> (T, dT)
 applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
   = Def { def_fun    = Fun (DrvFun (AD adp Fwd)) f
@@ -327,9 +260,6 @@ applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
     (perhapsFstToo, lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (id, rhs, tangentType t)
-            (TupleAD, TypeTuple [t, _]) -> (\lmrhs -> Tuple [pFst rhs, lmrhs],
-                                            pSnd rhs,
-                                            TypeTuple [t, tangentType t])
             (adp    , t               )
               -> error ("Unexpected combination of AD plan and result type:"
                        ++ show adp ++ " " ++ show t)
@@ -353,7 +283,6 @@ applyD Rev (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
     (lm, t)  -- lm :: s -o t
         = case (adp, res_ty) of
             (BasicAD, TypeLM _ t)       -> (rhs,      t)
-            (TupleAD, TypeTuple [t, _]) -> (pSnd rhs, t)
             (adp    , t               )
               -> error ("Unexpected combination of AD plan and result type:"
                        ++ show adp ++ " " ++ show t)

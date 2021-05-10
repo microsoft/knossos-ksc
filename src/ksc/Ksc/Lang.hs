@@ -34,12 +34,10 @@ import           Test.Hspec
 
 mkGradType :: ADPlan -> Type -> Type -> Type
 mkGradType BasicAD s ty = TypeLM s ty
-mkGradType TupleAD s ty = TypeTuple [ty, TypeLM s ty]
   -- For TupleAD, mkGradType s t = (t, s -o t)
 
 mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
 mkGradTuple BasicAD _ lm = lm
-mkGradTuple TupleAD p lm = Tuple [p, lm]
 
 data Phase = Parsed | Typed | OccAnald
 
@@ -510,7 +508,7 @@ baseFunOfFun (Fun _ baseFun) = baseFun
 data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
   deriving( Eq, Ord, Show )
 
-data ADPlan = BasicAD | TupleAD
+data ADPlan = BasicAD
   deriving( Eq, Ord, Show )
 
 data ADDir = Fwd | Rev
@@ -945,7 +943,6 @@ instance Pretty ADDir where
 
 instance Pretty ADPlan where
   ppr BasicAD = empty
-  ppr TupleAD = char 't'
 
 instance Pretty Var where
   ppr (Simple s) = text s
@@ -1181,8 +1178,6 @@ instance Pretty Derivation where
   ppr = \case
     DerivationDrvFun (AD BasicAD Fwd) -> text "fwd"
     DerivationDrvFun (AD BasicAD Rev) -> text "rev"
-    DerivationDrvFun (AD TupleAD Fwd) -> text "fwdt"
-    DerivationDrvFun (AD TupleAD Rev) -> text "revt"
     DerivationCLFun    -> text "CL"
     DerivationShapeFun -> text "shape"
     DerivationSUFFwdPass -> text "suffwdpass"
