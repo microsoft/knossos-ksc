@@ -112,7 +112,7 @@ def bench(module_name, bench_name):
         elif fn_name == bench_name + "_pytorch_nice":
             pt_nice = fn_obj
         elif fn_name == bench_name:
-            ks_fun = fn_obj
+            ks_raw = fn_obj
         else:
             print(f"Ignoring {fn_name}")
 
@@ -120,14 +120,19 @@ def bench(module_name, bench_name):
     ks_compiled = tsmod2ksmod(mod, bench_name, example_inputs=(configs[0],))
 
     for arg in configs:
-        assert fun_and_grad_matches(pt_fast, ks_fun, arg)
-        assert fun_and_grad_matches(pt_fast, pt_nice, arg)
+        # ptfast should always work, and be the timing reference
+        timeit(bench_name + " PyTorch fast", pt_fast, arg)
+
+        # TODO: make ks_raw runnable as pure python
+        #assert fun_and_grad_matches(pt_fast, ks_raw, arg)
+        #timeit(bench_name + " Knossos raw", ks_raw, arg)
+
+        # TODO: make pt_nice runnable with vmap
+        #assert fun_and_grad_matches(pt_fast, pt_nice, arg)
+        #timeit(bench_name + " PyTorch nice", pt_nice, arg)
+
         if ks_compiled:
             assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
-        timeit(bench_name + " PyTorch fast", pt_fast, arg)
-        timeit(bench_name + " PyTorch nice", pt_nice, arg)
-        timeit(bench_name + " Knossos raw", ks_fun, arg)
-        if ks_compiled:
             timeit(bench_name + " Knossos", ks_compiled.apply, arg)
 
 if __name__ == "__main__":
