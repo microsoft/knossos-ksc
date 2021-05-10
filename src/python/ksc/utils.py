@@ -283,7 +283,7 @@ def __make_cpp_str(
     """
 
     args_str = mangleTypes(arg_types)
-    name = name_to_call.mangle_without_type() if isinstance(name, StructuredName) else name_to_call
+    name = name_to_call.mangle_without_type() if isinstance(name_to_call, StructuredName) else name_to_call
     name_str = encode_name(f"{name}@{args_str}")
     declarations = f"""
      m.def("entry", with_ks_allocator(&ks::{name_str}));
