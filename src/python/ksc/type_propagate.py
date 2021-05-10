@@ -385,13 +385,13 @@ def _(ex, symtab):
     exname = ex.name.mangled()
     near_miss = False
     closest_match = None
-    closest_match_distance = float('inf')
+    closest_match_distance = float("inf")
     DISTANCE_THRESHOLD = 3
-    for key,val in symtab.items():
+    for key, val in symtab.items():
         if isinstance(key, StructuredName):
             key_str = key.mangle_without_type()
         else:
-            key_str=str(key)
+            key_str = str(key)
         distance = editdistance.eval(key_str, exname)
         if distance < closest_match_distance:
             closest_match = key

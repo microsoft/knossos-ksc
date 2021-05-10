@@ -124,16 +124,17 @@ def bench(module_name, bench_name):
         timeit(bench_name + " PyTorch fast", pt_fast, arg)
 
         # TODO: make ks_raw runnable as pure python
-        #assert fun_and_grad_matches(pt_fast, ks_raw, arg)
-        #timeit(bench_name + " Knossos raw", ks_raw, arg)
+        # assert fun_and_grad_matches(pt_fast, ks_raw, arg)
+        # timeit(bench_name + " Knossos raw", ks_raw, arg)
 
         # TODO: make pt_nice runnable with vmap
-        #assert fun_and_grad_matches(pt_fast, pt_nice, arg)
-        #timeit(bench_name + " PyTorch nice", pt_nice, arg)
+        # assert fun_and_grad_matches(pt_fast, pt_nice, arg)
+        # timeit(bench_name + " PyTorch nice", pt_nice, arg)
 
         if ks_compiled:
             assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
             timeit(bench_name + " Knossos", ks_compiled.apply, arg)
+
 
 if __name__ == "__main__":
     import sys

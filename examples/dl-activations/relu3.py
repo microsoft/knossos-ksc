@@ -3,20 +3,22 @@ from ksc.torch_utils import elementwise_apply_hack
 
 # BEGINDOC
 def relu3(x: float) -> float:
-  """
+    """
   Like ReLu, but smoother
   Like GeLu, but cheaper
   """
-  if x < 0.0:
-    return 0.0
-  elif x < 1.0:
-    return 1 / 3 * x ** 3
-  else:
-    return x - 2 / 3
+    if x < 0.0:
+        return 0.0
+    elif x < 1.0:
+        return 1 / 3 * x ** 3
+    else:
+        return x - 2 / 3
+
 
 # run-bench: Knossos implementation
-def vrelu3(x : torch.Tensor):
-  return elementwise_apply_hack("relu3", x)
+def vrelu3(x: torch.Tensor):
+    return elementwise_apply_hack("relu3", x)
+
 
 # run-bench: PyTorch reference implementation
 def vrelu3_pytorch(x: torch.Tensor):
@@ -37,22 +39,22 @@ def relu3_pytorch_nice(x: float) -> float:
     else:
         return x - 2 / 3
 
+
 vrelu3_pytorch_nice = torch.vmap(relu3_pytorch_nice)
 
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
-  yield torch.randn((4,))
-  yield torch.randn((16,))
-  yield torch.randn((1024,)) 
-  #TODO: polymoprhic over tensor rank
-  # yield torch.randn((256,256))
+    yield torch.randn((4,))
+    yield torch.randn((16,))
+    yield torch.randn((1024,))
+    # TODO: polymoprhic over tensor rank
+    # yield torch.randn((256,256))
 
 
 # Note: zeros
 # Need to multiply by x for pytorch to get the gradient back through x.
 # This is something of a long story, related to tracing.
 # Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
-
 
 
 def plot_relu3(filename):

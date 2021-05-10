@@ -152,23 +152,19 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
             with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
                 print("generate_cpp_from_ks:", ksc_path, fks.name)
                 ksc_command = [
-                        ksc_path,
-                        "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
-                        "--ks-source-file",
-                        ksc_runtime_dir + "/prelude.ks",
-                        *(("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks") if use_aten else ()),
-                        "--ks-source-file",
-                        fks.name,
-                        "--ks-output-file",
-                        fkso.name,
-                        "--cpp-output-file",
-                        fcpp.name,
-                    ]
-                e = subprocess.run(
-                    ksc_command,
-                    capture_output=True,
-                    check=True,
-                )
+                    ksc_path,
+                    "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
+                    "--ks-source-file",
+                    ksc_runtime_dir + "/prelude.ks",
+                    *(("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks") if use_aten else ()),
+                    "--ks-source-file",
+                    fks.name,
+                    "--ks-output-file",
+                    fkso.name,
+                    "--cpp-output-file",
+                    fcpp.name,
+                ]
+                e = subprocess.run(ksc_command, capture_output=True, check=True,)
                 print(e.stdout.decode("ascii"))
                 print(e.stderr.decode("ascii"))
     except subprocess.CalledProcessError as e:
@@ -177,7 +173,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
         print(f"ks_str=\n{ks_str}")
         print(e.output.decode("ascii"))
         print(e.stderr.decode("ascii"))
-        exit(-1) # To clean up error reporting while debugging
+        exit(-1)  # To clean up error reporting while debugging
         raise
 
     # Read from CPP back to string
@@ -283,9 +279,9 @@ def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_t
 
     if generate_derivatives:
         derivatives_to_generate = [
-            #'fwd', 
-            #'rev', 
-            'sufrev'
+            #'fwd',
+            #'rev',
+            "sufrev"
         ]
         darg_types = [tangent_type(ty) for ty in arg_types]
         args_tuple_str = mangleType(make_tuple_if_many(arg_types))
@@ -363,12 +359,15 @@ def build_module_using_pytorch_from_ks(
     else:
         cflags.append("-std=c++17")
 
-    verbose=True
+    verbose = True
 
     # https://pytorch.org/docs/stable/cpp_extension.html
     module = load_inline(
-        name="dynamic_ksc_cpp", cpp_sources=[cpp_str], extra_include_paths=[ksc_runtime_dir], extra_cflags=cflags,
-        verbose=verbose
+        name="dynamic_ksc_cpp",
+        cpp_sources=[cpp_str],
+        extra_include_paths=[ksc_runtime_dir],
+        extra_cflags=cflags,
+        verbose=verbose,
     )
 
     return module

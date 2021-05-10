@@ -35,13 +35,16 @@ warnings.filterwarnings("always")
 # https://github.com/pytorch/pytorch/blob/8fe2a5e91b79e3f9b6f6c632fdf7f39ec3bf4fca/torch/csrc/jit/ir/ir.h
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
-    
+
+
 def tail(iter):
     next(iter)
     return iter
 
+
 # TODO: make this less pythonic, i.e. eschew global state modification
 todo_stack = None
+
 
 def type_from_value(x):
     if isinstance(x, torch.Tensor):
@@ -49,12 +52,16 @@ def type_from_value(x):
 
     return Type.fromValue(x)
 
+
 make_new_var_index = 0
-def make_new_var(type=None,decl=True):
+
+
+def make_new_var(type=None, decl=True):
     global make_new_var_index
     name = f"ts2ks${make_new_var_index}"
     make_new_var_index += 1
-    return Var(name,type,True), Var(name,type,False)
+    return Var(name, type, True), Var(name, type, False)
+
 
 def make_arg(input, example_input):
     input_type = from_torch_type(input.type())
@@ -160,10 +167,11 @@ def make_tensor(node):
 def make_aten_function(node, value, function_name):
     return Var(mangled_name(value)), Call(function_name, [var_or_constant(i) for i in node.inputs()])
 
+
 def make_return(node):
     mangled_id = mangled_name(node.inputsAt(0))
     return Var(mangled_id)
-    
+
 
 def make_callfunction(node):
     value = node.outputsAt(0)
@@ -175,7 +183,7 @@ def make_callfunction(node):
 
 def make_PythonOp(node):
     value = node.outputsAt(0)
-    assert len(list(node.outputs())) == 1 # Assemble into tuple for multiple outputs
+    assert len(list(node.outputs())) == 1  # Assemble into tuple for multiple outputs
     pyname = node.pyname()
     if pyname == "elementwise_apply_hack":
         global todo_stack
@@ -184,13 +192,13 @@ def make_PythonOp(node):
         print(f"Adding {function_name} to todo {todo_stack}")
         todo_stack.add(function_name)
 
-        vardecl,var = make_new_var(Type.Float) # TODO: need to propagate properly
+        vardecl, var = make_new_var(Type.Float)  # TODO: need to propagate properly
         map_lambda = Lam(vardecl, Call(function_name, [var]))
 
-        return (Var(mangled_name(value)), 
-                Call("map", [map_lambda] + [var_or_constant(i) for i in tail(node.inputs()) ]))
+        return (Var(mangled_name(value)), Call("map", [map_lambda] + [var_or_constant(i) for i in tail(node.inputs())]))
 
     raise NotImplementedError(f"PythonOp {pyname}")
+
 
 def make_lets(bindings, body) -> Expr:
     for (v, rhs) in reversed(bindings):
@@ -313,7 +321,7 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
 
     args = [
         make_arg(input, example)
-        for input,example in zip(graph.inputs(), example_inputs)
+        for input, example in zip(graph.inputs(), example_inputs)
         # if (not input.type().str().startswith("__torch__.transformers"))
     ]  # filtering self, TODO: look for better way
 
@@ -374,16 +382,18 @@ def torch_to_ks(py_mod, val):
 
     raise NotImplementedError()
 
-#--------------------------------------------------------------------
-#---- Alternative implementation, from PyTorch AST rather than Graph
 
-#See https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/python/python_tree_views.cpp
+# --------------------------------------------------------------------
+# ---- Alternative implementation, from PyTorch AST rather than Graph
+
+# See https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/python/python_tree_views.cpp
 
 
 from functools import singledispatch
 
 from torch.jit.frontend import get_jit_def
 import torch._C._jit_tree_views as ts
+
 # import (
 #     ClassDef, Ident, Stmt, Decl, Def, Var,
 #     EmptyTypeAnnotation, Param, ExprStmt, Assign,
@@ -396,12 +406,14 @@ import torch._C._jit_tree_views as ts
 #     DictComp,
 # )
 
+
 @singledispatch
 def ast2ks_aux(ast, symtab) -> Expr:
     """
     TorchScript AST to Knossos
     """
     raise NotImplementedError(f"ast2ks not implemented for {ast}")
+
 
 @ast2ks_aux.register(ts.Def)
 def _(ast, symtab):
@@ -410,10 +422,12 @@ def _(ast, symtab):
     # in https://github.com/pytorch/pytorch/blob/4cb534f92ef6f5b2ec99109b0329f93a859ae831/torch/csrc/jit/python/python_tree_views.cpp#L161
     # totally doable, but need to modify pytorch, not trivial
 
+
 def ast2ks(function):
     ast = get_jit_def(function, function.__name__)
     ks = ast2ks_aux(ast, {})
     return ks
+
 
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
 def forward_template(py_mod, ctx, *args):
@@ -455,6 +469,7 @@ def make_KscAutogradFunction(py_mod):
     )
     return newclass()
 
+
 def ksc_defs_to_module(ksc_defs, entry_def):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
@@ -469,23 +484,26 @@ def ksc_defs_to_module(ksc_defs, entry_def):
 
     type_propagate_decls(ksc_defs, symtab)
     defs_with_derivatives = []
-    for ksc_def in ksc_defs: 
+    for ksc_def in ksc_defs:
         defs_with_derivatives += [
             ksc_def,
             GDef("suffwdpass", ksc_def.name),
             GDef("sufrevpass", ksc_def.name),
-            GDef("sufrev", ksc_def.name)
+            GDef("sufrev", ksc_def.name),
         ]
 
-    ks_str = '\n'.join(map(pformat, defs_with_derivatives))
+    ks_str = "\n".join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in entry_def.args]
     return_type = entry_def.return_type
     mod = utils.build_module_using_pytorch_from_ks(
-            ks_str, entry_def.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True)
+        ks_str, entry_def.name, arg_types, return_type=return_type, generate_derivatives=True, use_aten=True
+    )
 
     return make_KscAutogradFunction(mod)
 
+
 import inspect
+
 
 def tsmod2ksmod(module, function_name, example_inputs):
     global todo_stack
@@ -506,6 +524,7 @@ def tsmod2ksmod(module, function_name, example_inputs):
     entry_def = ksc_defs[-1]
 
     return ksc_defs_to_module(ksc_defs, entry_def)
+
 
 def ts2mod(function, example_inputs):
     if True:

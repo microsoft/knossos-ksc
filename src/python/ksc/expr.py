@@ -410,6 +410,7 @@ class Lam(Expr):
         assert arg.decl
         super().__init__(arg=arg, body=body, type_=type)
 
+
 class Let(Expr):
     """Let(vars, rhs, body). 
     Example:
