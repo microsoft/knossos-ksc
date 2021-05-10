@@ -403,8 +403,6 @@ optPrimFun _ P_build       (Tuple [sz, Lam i e2]) = optBuild sz i e2
 optPrimFun _ P_sumbuild    (Tuple [sz, Lam i e2]) = optSumBuild sz i e2
 optPrimFun env P_lmApply   (Tuple [e1,e2])        = optLMApply env (AD BasicAD Fwd) e1 e2
 optPrimFun env P_lmApplyR  (Tuple [e1,e2])        = optLMApply env (AD BasicAD Rev) e2 e1
-optPrimFun env P_lmApplyT  (Tuple [e1,e2])        = optLMApply env (AD TupleAD Fwd) e1 e2
-optPrimFun env P_lmApplyTR (Tuple [e1,e2])        = optLMApply env (AD TupleAD Rev) e2 e1
 optPrimFun _ P_lmCompose   (Tuple [f,g])  = optLMCompose f g
 
 optPrimFun _ P_lmVCat (Tuple es)
@@ -666,17 +664,6 @@ optGradFun _ _ _ (BaseFunId (BaseUserFunName {}) _) _
 
 -- From here on we have primitives or selection
 
-optGradFun env TupleAD ty f args
-  | TypeTuple [res_ty, lm_ty] <- ty
-  , Just opt_grad <- optGradFun env BasicAD lm_ty f new_args
-  = Just $
-    mkLets binds $
-    Tuple [ Call (TFun res_ty (Fun JustFun f)) new_args, opt_grad ]
-  | otherwise
-  = Nothing
-  where
-    (binds, [new_args]) = makeAtomic False env [args]
-
 optGradFun _ BasicAD ty (PrimFunT f)  args = optGradPrim ty f args
 
 type TBinds = [(TVar, TExpr)]
@@ -809,11 +796,6 @@ optLMApply _ adm (Let v rhs body) dx
 
 optLMApply _ adm (If b et ef) dx
   = Just $ If b (lmApply_AD adm et dx) (lmApply_AD adm ef dx)
-
--- lmApplyT  (r, lm) dx ===> lmApply  lm dx
--- lmApplyTR dr (r, lm) ===> lmApplyR dr lm
-optLMApply _ (AD TupleAD dir) (Tuple [_, lm]) dx
-  = Just (lmApply_Dir dir lm dx)
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only

@@ -426,7 +426,6 @@ lmApplyR = mkPrimCall2 P_lmApplyR
 
 lmApply_AD :: HasCallStack => ADMode -> TExpr -> TExpr -> TExpr
 lmApply_AD (AD BasicAD dir) = lmApply_Dir  dir
-lmApply_AD (AD TupleAD dir) = lmApplyT_Dir dir
 
 lmApply_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApply_Dir Fwd e ds = lmApply  e ds
@@ -616,11 +615,6 @@ primCallResultTy_maybe fun arg_ty
         , TypeTuple [x, _dx] <- arg_ty
         , Right t_ty <- primCallResultTy_maybe (Fun JustFun f) x
         -> Right (tangentType t_ty)
-
-        | AD TupleAD Fwd <- adm    -- f :: S1 -> T, then fwdt$f :: (S1, S2_t) -> (T,T_t)
-        , TypeTuple [x, _dx] <- arg_ty
-        , Right t_ty <- primCallResultTy_maybe (Fun JustFun f) x
-        -> Right (TypeTuple [t_ty, tangentType t_ty])
 
         | AD BasicAD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
         , TypeTuple [s, _dt] <- arg_ty

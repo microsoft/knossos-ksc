@@ -58,7 +58,7 @@ x : Tensor 1 (Tensor 2 Float)
         | "[" <derivation> <sname> "]"
         | "[" <var> <type> "]"
 
-<derivation> ::= "rev" | "fwd" | "shape" | "cost" | "D" | "Dt" | "suffwdpass" | "sufrevpass"
+<derivation> ::= "rev" | "fwd" | "shape" | "cost" | "D" | "suffwdpass" | "sufrevpass"
 
 An example
   (def f7 ((x : Vec Float) (y : Vec Float))
@@ -394,11 +394,8 @@ pBaseFun = pPrimFun
 pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
 pFunG pBase = try (brackets $
             ((pDerivation "D" (GradFun BasicAD))
-         <|> (pDerivation "Dt" (GradFun TupleAD))
          <|> (pDerivation "fwd" (DrvFun (AD BasicAD Fwd)))
-         <|> (pDerivation "fwdt" (DrvFun (AD TupleAD Fwd)))
          <|> (pDerivation "rev"  (DrvFun (AD BasicAD Rev)))
-         <|> (pDerivation "revt" (DrvFun (AD TupleAD Rev)))
          <|> (pDerivation "CL" CLFun)
          <|> (pDerivation "suffwdpass" SUFFwdPass)
          <|> (pDerivation "sufrevpass" SUFRevPass)
