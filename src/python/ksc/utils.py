@@ -1,10 +1,12 @@
+import atexit
 from dataclasses import dataclass
 from typing import Tuple, Union
 from collections import namedtuple
 import itertools
+import os
+import atexit
 
 import importlib.util
-import os
 import numpy as np
 import subprocess
 import sysconfig
@@ -183,10 +185,9 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
         out = f.read()
 
     # only delete these file if no error
-    import atexit
     @atexit.register
     def _():
-        print("Deleting", fks.name, fcpp.name, fkso.name)
+        print("ksc.utils.generate_cpp_from_ks: Deleting", fks.name, fcpp.name, fkso.name)
         os.unlink(fks.name)
         os.unlink(fcpp.name)
         os.unlink(fkso.name)
