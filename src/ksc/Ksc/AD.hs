@@ -241,7 +241,7 @@ applyD dir def@(Def { def_pat = TupPat {} })
 -- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
 applyD Fwd (Def { def_fun = Fun GradFun f, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
-  = Def { def_fun    = Fun (DrvFun (AD Fwd)) f
+  = Def { def_fun    = Fun (DrvFun Fwd) f
         , def_pat   = VarPat x_dx
         , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dx
         , def_res_ty = t }
@@ -267,7 +267,7 @@ applyD Fwd (Def { def_fun = Fun GradFun f, def_res_ty = res_ty
 -- rev$f :: (S1, S2) dT -> (dS1,dS2)
 applyD Rev (Def { def_fun = Fun GradFun f, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
-  = Def { def_fun    = Fun (DrvFun (AD Rev)) f
+  = Def { def_fun    = Fun (DrvFun Rev) f
         , def_pat    = VarPat x_dr
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
         , def_res_ty = tangentType (typeof x) }

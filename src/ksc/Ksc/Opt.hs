@@ -401,8 +401,8 @@ optPrimFun _ P_sum         arg           = optSum arg
 optPrimFun _ P_shape       arg           = Just $ optShape arg
 optPrimFun _ P_build       (Tuple [sz, Lam i e2]) = optBuild sz i e2
 optPrimFun _ P_sumbuild    (Tuple [sz, Lam i e2]) = optSumBuild sz i e2
-optPrimFun env P_lmApply   (Tuple [e1,e2])        = optLMApply env (AD Fwd) e1 e2
-optPrimFun env P_lmApplyR  (Tuple [e1,e2])        = optLMApply env (AD Rev) e2 e1
+optPrimFun env P_lmApply   (Tuple [e1,e2])        = optLMApply env Fwd e1 e2
+optPrimFun env P_lmApplyR  (Tuple [e1,e2])        = optLMApply env Rev e2 e1
 optPrimFun _ P_lmCompose   (Tuple [f,g])  = optLMCompose f g
 
 optPrimFun _ P_lmVCat (Tuple es)
@@ -757,7 +757,7 @@ optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ render (ppr f) ++
 -----------------------
 -- See Note [Automatic differentiation documentation]
 optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
-optDrvFun (AD dir) (PrimFunT f) args = optDrvPrim dir f args
+optDrvFun dir (PrimFunT f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
 -- See Note [Automatic differentiation documentation]
@@ -799,27 +799,27 @@ optLMApply _ adm (If b et ef) dx
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only
-optLMApply env (AD dir) (Call (TFun _ (Fun JustFun (PrimFunT f))) es) dx
+optLMApply env dir (Call (TFun _ (Fun JustFun (PrimFunT f))) es) dx
   = optLMApplyCall env dir f es dx
 
 -- Looking at:   D$f(e1, e2) `lmApply` dx
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   fwd$f :: S1 S2 S1_t S2_t -> T_t
-optLMApply _ (AD Fwd) (Call (TFun (TypeLM _ t) (Fun GradFun f)) es) dx
+optLMApply _ Fwd (Call (TFun (TypeLM _ t) (Fun GradFun f)) es) dx
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType t) (Fun (DrvFun (AD Fwd)) f)
+    grad_fun = TFun (tangentType t) (Fun (DrvFun Fwd) f)
     es_dx = Tuple [es, dx]
 
 -- Looking at:   dr `lmApplyR` D$f(e1, e2)
 --   f :: S1 S2 -> T
 --   D$f :: S1 S2 -> ((S1,S2) -o T)
 --   rev$f :: S1 S2 T_ -> (S1_t,S2_t)
-optLMApply _ (AD Rev) (Call (TFun (TypeLM s _) (Fun GradFun f)) es) dx
+optLMApply _ Rev (Call (TFun (TypeLM s _) (Fun GradFun f)) es) dx
   = Just (Call grad_fun es_dx)
   where
-    grad_fun = TFun (tangentType s) (Fun (DrvFun (AD Rev)) f)
+    grad_fun = TFun (tangentType s) (Fun (DrvFun Rev) f)
     es_dx = Tuple [es, dx]
 
 {-
