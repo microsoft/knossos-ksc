@@ -987,7 +987,7 @@ pprPrimFun = \case
 
   P_SelFun i n -> text "get$" <> int i <> char '$' <> int n
   P_dup n -> text "dup$" <> int n
-  P_elim -> text "elim"
+  P_elim _FIXME -> text "elim"
 
   P_suffwdpass_map -> text "suffwdpass_map"
   P_sufrevpass_map -> text "sufrevpass_map"
@@ -1421,7 +1421,7 @@ data PrimFun = P_inline
              | P_lmOne
              | P_SelFun Int Int -- P_SelFun index arity.  1-indexed, so (SelFun 1 2) is fst
              | P_dup Int
-             | P_elim
+             | P_elim Type
              | P_lmApplyTR
              | P_lmFold
              | P_FFold

@@ -18,8 +18,8 @@ rewriteSUFFwdPass (P_SelFun i n) arg
 rewriteSUFFwdPass (P_dup 2) arg
   = Just $ Tuple [ Tuple [ arg, arg ], Tuple [] ]
 
-rewriteSUFFwdPass P_elim arg
-  = Just $ Tuple [ Tuple [], mkTangentZero arg ]
+rewriteSUFFwdPass (P_elim ty) arg
+  = Just $ Tuple [ Tuple [], shape ty arg ]
 
 rewriteSUFFwdPass P_index i_v
   -- FIXME: Avoid duplicating i_v
@@ -66,8 +66,8 @@ rewriteSUFRevPass (P_SelFun i n) (Tuple [ dt, bog ])
 rewriteSUFRevPass (P_dup 2) (Tuple [arg, _])
   = Just $ pAdd1 arg
 
-rewriteSUFRevPass P_elim (Tuple [_, arg])
-  = Just arg
+rewriteSUFRevPass (P_elim ty) (Tuple [_, arg])
+  = Just $ shapeTZ ty arg
 
 -- FIXME: avoid duplicating i_shape
 rewriteSUFRevPass P_index (Tuple [d_da, i_shape])

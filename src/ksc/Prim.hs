@@ -453,7 +453,7 @@ pDup :: Int -> TExpr -> TExpr
 pDup n = mkPrimCall1 (P_dup n)
 
 pElim :: TExpr -> TExpr
-pElim = mkPrimCall1 P_elim
+pElim e = mkPrimCall1 (P_elim (typeof e)) e
 
 pInline :: TExpr -> TExpr
 pInline = mkPrimCall1 P_inline
@@ -562,10 +562,9 @@ sufBogTy_maybe :: PrimFun -> Type -> Maybe Type
 sufBogTy_maybe P_SelFun{} arg_ty
   = Just (tangentType arg_ty)
 
-sufBogTy_maybe P_elim arg_ty
-  = Just shape
-  where -- FIXME: Use a better encoding of shape
-    shape = tangentType arg_ty
+sufBogTy_maybe (P_elim _arg_ty) arg_ty
+  -- The arg_tys should agree. Do we want to check that?
+  = Just (shapeTy arg_ty)
 
 sufBogTy_maybe (P_dup _) _
   = Just (TypeTuple [])
@@ -619,9 +618,8 @@ sufRevFunCallResultTy_maybe :: PrimFun -> Type -> Type -> Maybe Type
 sufRevFunCallResultTy_maybe P_SelFun{} _ shape
   = Just shape
 
-sufRevFunCallResultTy_maybe P_elim (TypeTuple []) shape
-  -- FIXME: Use a better encoding of shape
-  = Just shape
+sufRevFunCallResultTy_maybe (P_elim ty) (TypeTuple []) _
+  = Just (tangentType ty)
 
 sufRevFunCallResultTy_maybe (P_dup n) (TypeTuple arg_tys) (TypeTuple [])
   | arg_ty_first:arg_tys_rest <- arg_tys
@@ -869,7 +867,7 @@ primFunCallResultTy_maybe fun args
         -> Just (TypeTuple [TypeTensor i1 ds, de1])
 
 
-      (P_elim     , _)                                     -> Just (TypeTuple [])
+      (P_elim{}   , _)                                     -> Just (TypeTuple [])
       (P_dup n, t)                                         -> Just (TypeTuple (replicate n t))
 
       _ -> Nothing
