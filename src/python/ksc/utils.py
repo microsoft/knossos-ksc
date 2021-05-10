@@ -260,13 +260,19 @@ def encode_name(s: str) -> str:
         .replace(":", "$8")
     )
 
-derivatives_to_generate_default = [
-    "fwd",
-    "rev",
-    "sufrev"
-]
 
-def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_type, derivatives_to_generate = derivatives_to_generate_default, use_aten = True):
+derivatives_to_generate_default = ["fwd", "rev", "sufrev"]
+
+
+def __make_cpp_str(
+    ks_str,
+    name_to_call,
+    python_module_name,
+    arg_types,
+    return_type,
+    derivatives_to_generate=derivatives_to_generate_default,
+    use_aten=True,
+):
     generate_derivatives = len(derivatives_to_generate) > 0
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
 
@@ -319,7 +325,7 @@ PYBIND11_MODULE("""
 
 
 def generate_and_compile_cpp_from_ks(
-    ks_str, name_to_call, arg_types, return_type=None, derivatives_to_generate = [], use_aten=False
+    ks_str, name_to_call, arg_types, return_type=None, derivatives_to_generate=[], use_aten=False
 ):
 
     cpp_str = __make_cpp_str(

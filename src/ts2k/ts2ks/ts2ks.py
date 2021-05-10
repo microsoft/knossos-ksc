@@ -469,6 +469,7 @@ def make_KscAutogradFunction(py_mod):
     )
     return newclass()
 
+
 def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
@@ -484,9 +485,7 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     type_propagate_decls(ksc_defs, symtab)
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
-        defs_with_derivatives += [
-            ksc_def
-        ]
+        defs_with_derivatives += [ksc_def]
         if "sufrev" in derivatives_to_generate:
             defs_with_derivatives += [
                 GDef("suffwdpass", ksc_def.name),
@@ -506,7 +505,12 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     arg_types = [arg.type_ for arg in entry_def.args]
     return_type = entry_def.return_type
     mod = utils.build_module_using_pytorch_from_ks(
-        ks_str, entry_def.name, arg_types, return_type=return_type, derivatives_to_generate=derivatives_to_generate, use_aten=True
+        ks_str,
+        entry_def.name,
+        arg_types,
+        return_type=return_type,
+        derivatives_to_generate=derivatives_to_generate,
+        use_aten=True,
     )
 
     return make_KscAutogradFunction(mod)
@@ -533,8 +537,8 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
 
     entry_def = ksc_defs[-1]
 
-    derivatives_to_generate = ["fwd","rev"] if generate_lm else ["sufrev"]
-    return ksc_defs_to_module(ksc_defs, entry_def, )
+    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
+    return ksc_defs_to_module(ksc_defs, entry_def,)
 
 
 def ts2mod(function, example_inputs):
