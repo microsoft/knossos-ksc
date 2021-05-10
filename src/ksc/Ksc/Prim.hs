@@ -425,7 +425,7 @@ lmApplyR :: HasCallStack => TExpr -> TExpr -> TExpr
 lmApplyR = mkPrimCall2 P_lmApplyR
 
 lmApply_AD :: HasCallStack => ADMode -> TExpr -> TExpr -> TExpr
-lmApply_AD (AD BasicAD dir) = lmApply_Dir  dir
+lmApply_AD (AD dir) = lmApply_Dir  dir
 
 lmApply_Dir :: HasCallStack => ADDir -> TExpr -> TExpr -> TExpr
 lmApply_Dir Fwd e ds = lmApply  e ds
@@ -605,18 +605,18 @@ primCallResultTy_maybe fun arg_ty
          | otherwise
          -> Left (text "Ill-typed call to primitive:" <+> ppr fun)
 
-      Fun (GradFun adp) f
+      Fun GradFun f
         -> case primCallResultTy_maybe (Fun JustFun f) arg_ty of
             Left err -> Left err
-            Right res_ty -> Right (mkGradType adp arg_ty res_ty)
+            Right res_ty -> Right (mkGradType arg_ty res_ty)
 
       Fun (DrvFun adm) f
-        | AD BasicAD Fwd <- adm    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
+        | AD Fwd <- adm    -- f :: S1 -> T, then fwd$f :: (S1, S2_t) -> T_t
         , TypeTuple [x, _dx] <- arg_ty
         , Right t_ty <- primCallResultTy_maybe (Fun JustFun f) x
         -> Right (tangentType t_ty)
 
-        | AD BasicAD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
+        | AD Rev <- adm    -- f :: S1 -> T, then rev$f :: (S1, T_t) -> S1_t
         , TypeTuple [s, _dt] <- arg_ty
         -> Right (tangentType s)
         | otherwise
@@ -648,7 +648,7 @@ primCallResultTy_maybe fun arg_ty
         -> Left (text "Type error in SUF rev fun:" <+> ppr fun
              <+> text "Arg ty was:" <+> ppr arg_ty)
 
-      Fun SUFRev f -> primCallResultTy_maybe (Fun (DrvFun (AD BasicAD Rev)) f) arg_ty
+      Fun SUFRev f -> primCallResultTy_maybe (Fun (DrvFun (AD Rev)) f) arg_ty
 
 primFunCallResultTy :: HasCallStack => PrimFun -> TExpr -> Type
 primFunCallResultTy fun args

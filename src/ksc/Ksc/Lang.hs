@@ -32,12 +32,12 @@ import           Test.Hspec
 --  The main data types
 -----------------------------------------------
 
-mkGradType :: ADPlan -> Type -> Type -> Type
-mkGradType BasicAD s ty = TypeLM s ty
+mkGradType :: Type -> Type -> Type
+mkGradType s ty = TypeLM s ty
   -- For TupleAD, mkGradType s t = (t, s -o t)
 
-mkGradTuple :: ADPlan -> TExpr -> TExpr -> TExpr
-mkGradTuple BasicAD _ lm = lm
+mkGradTuple :: TExpr -> TExpr -> TExpr
+mkGradTuple _ lm = lm
 
 data Phase = Parsed | Typed | OccAnald
 
@@ -417,7 +417,7 @@ pattern PrimFunT p <- BaseFunId (BasePrimFunName p) _
 
 data Derivations
   = JustFun        -- The function              f(x)
-  | GradFun ADPlan -- Full Jacobian Df(x)
+  | GradFun        -- Full Jacobian Df(x)
   | DrvFun ADMode  -- Derivative derivative f'(x,dx)
                    --   Rev <=> reverse mode f`(x,dr)
   | CLFun          -- f(x), roundtripped through CatLang
@@ -505,10 +505,7 @@ isSelFun = \case
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun (Fun _ baseFun) = baseFun
 
-data ADMode = AD { adPlan :: ADPlan, adDir :: ADDir }
-  deriving( Eq, Ord, Show )
-
-data ADPlan = BasicAD
+data ADMode = AD { adDir :: ADDir }
   deriving( Eq, Ord, Show )
 
 data ADDir = Fwd | Rev
@@ -530,14 +527,14 @@ data Var
   = Simple String         -- x
   | Delta  String         -- The 'dx' or 'dr' argument to
                           -- forward or backward versions of f
-  | Grad   String ADPlan  -- Derivative of x
+  | Grad   String         -- Derivative of x
   deriving( Eq, Ord, Show )
 
 nameOfVar :: Var -> String
 nameOfVar = \case
   Simple s -> s
   Delta s  -> s
-  Grad s _ -> s
+  Grad s   -> s
 
 data Konst = KInteger Integer   -- :: TypeInteger
            | KFloat   Double    -- :: TypeFloat
@@ -935,19 +932,16 @@ instance (Pretty a, Pretty b) => Pretty (a,b) where
   ppr (x,y) = parens (sep [ ppr x <> comma, ppr y])
 
 instance Pretty ADMode where
-  ppr (AD p d) = ppr p <> ppr d
+  ppr (AD p) = ppr p
 
 instance Pretty ADDir where
   ppr Fwd = char 'f'
   ppr Rev = char 'r'
 
-instance Pretty ADPlan where
-  ppr BasicAD = empty
-
 instance Pretty Var where
   ppr (Simple s) = text s
   ppr (Delta  d) = text "d$" <> text d
-  ppr (Grad g m) = char 'g' <> ppr m <> char '$' <> text g
+  ppr (Grad   g) = char 'g' <> char '$' <> text g
 
 instance InPhase p => Pretty (BaseFun p) where
   ppr = pprBaseFun
@@ -1036,9 +1030,9 @@ pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 
 pprDerivedFun :: (BaseFunId funid p -> SDoc) -> DerivedFun funid p -> SDoc
 pprDerivedFun f (Fun JustFun s)               = f s
-pprDerivedFun f (Fun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> f s)
-pprDerivedFun f (Fun (DrvFun   (AD adp Rev)) s) = brackets (text "rev" <> ppr adp <+> f s)
+pprDerivedFun f (Fun GradFun   s)             = brackets (char 'D'   <+> f s)
+pprDerivedFun f (Fun (DrvFun   (AD Fwd)) s)   = brackets (text "fwd" <+> f s)
+pprDerivedFun f (Fun (DrvFun   (AD Rev)) s)   = brackets (text "rev" <+> f s)
 pprDerivedFun f (Fun (ShapeFun ds) sf)             = brackets (text "shape" <+> pprDerivedFun f (Fun ds sf))
 pprDerivedFun f (Fun CLFun    s)              = brackets (text "CL" <+> f s)
 pprDerivedFun f (Fun SUFFwdPass s)            = brackets (text "suffwdpass" <+> f s)
@@ -1176,8 +1170,8 @@ instance Pretty GDefX where
 
 instance Pretty Derivation where
   ppr = \case
-    DerivationDrvFun (AD BasicAD Fwd) -> text "fwd"
-    DerivationDrvFun (AD BasicAD Rev) -> text "rev"
+    DerivationDrvFun (AD Fwd) -> text "fwd"
+    DerivationDrvFun (AD Rev) -> text "rev"
     DerivationCLFun    -> text "CL"
     DerivationShapeFun -> text "shape"
     DerivationSUFFwdPass -> text "suffwdpass"

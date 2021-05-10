@@ -26,45 +26,45 @@ https://github.com/microsoft/knossos-ksc/blob/master/README-ksc.md#getting-the-p
 
 --------------- Generate names for gradded indentifiers
 
-gradF :: HasCallStack => ADPlan -> Fun Typed -> Fun Typed
-gradF adm (Fun JustFun f) = Fun (GradFun adm) f
-gradF _   f       = error ("gradF: bad function: " ++ show f)
+gradF :: HasCallStack => Fun Typed -> Fun Typed
+gradF (Fun JustFun f) = Fun GradFun f
+gradF f       = error ("gradF: bad function: " ++ show f)
 
-gradV :: ADPlan -> Var -> Var
-gradV adp (Simple x) = Grad x adp
-gradV _ v            = error ("gradV: bad variable: " ++ render (ppr v))
+gradV :: Var -> Var
+gradV (Simple x) = Grad x
+gradV v            = error ("gradV: bad variable: " ++ render (ppr v))
 
-gradTFun :: HasCallStack => ADPlan -> TFun Typed -> Type -> TFun Typed
-gradTFun adp (TFun res_ty f) arg_tys
-  = TFun (mkGradType adp arg_tys res_ty)
-         (gradF adp f)
+gradTFun :: HasCallStack => TFun Typed -> Type -> TFun Typed
+gradTFun (TFun res_ty f) arg_tys
+  = TFun (mkGradType arg_tys res_ty)
+         (gradF f)
 
-mkGradTVar :: HasCallStack => ADPlan -> Type -> Var -> Type -> TVar
-mkGradTVar adp s var ty
-  = TVar (mkGradType adp s ty) var
+mkGradTVar :: HasCallStack => Type -> Var -> Type -> TVar
+mkGradTVar s var ty
+  = TVar (mkGradType s ty) var
 
-gradTVar :: ADPlan -> Shape -> TVar -> TVar
-gradTVar adp s (TVar ty v) = mkGradTVar adp (typeof s) (gradV adp v) ty
+gradTVar :: Shape -> TVar -> TVar
+gradTVar s (TVar ty v) = mkGradTVar (typeof s) (gradV v) ty
 
 -------------------------------------------------
 
-gradDefs :: HasCallStack => ADPlan -> [TDef] -> [TDef]
-gradDefs adp = mapMaybe (gradDef adp)
+gradDefs :: HasCallStack => [TDef] -> [TDef]
+gradDefs = mapMaybe gradDef
 
 -- We noTupPatifyDef before gradDef.  See Note [Replacing TupPat with
 -- nested Let].
-gradDef :: HasCallStack => ADPlan -> TDef -> Maybe TDef
-gradDef adp = gradDefInner adp . noTupPatifyDef
+gradDef :: HasCallStack => TDef -> Maybe TDef
+gradDef = gradDefInner . noTupPatifyDef
 
-gradDefInner :: HasCallStack => ADPlan -> TDef -> Maybe TDef
-gradDefInner adp
+gradDefInner :: HasCallStack => TDef -> Maybe TDef
+gradDefInner
         (Def { def_fun = Fun JustFun f, def_pat = VarPat params
              , def_rhs = UserRhs rhs, def_res_ty = res_ty })
   = Just $
-    Def { def_fun    = Fun (GradFun adp) f
+    Def { def_fun    = Fun GradFun f
         , def_pat    = VarPat params
-        , def_res_ty = mkGradType adp s_ty res_ty
-        , def_rhs    = UserRhs (mkLets lets (gradE adp s rhs')) }
+        , def_res_ty = mkGradType s_ty res_ty
+        , def_rhs    = UserRhs (mkLets lets (gradE s rhs')) }
   where
     s :: TExpr
     s = Var params
@@ -73,79 +73,79 @@ gradDefInner adp
     -- See Note: [Shadowing after grad]
     rhs' = Ksc.OptLet.ensureDon'tReuseParams [params] rhs
 
-    lets = [ (gradTVar adp s params,
-              mkGradTuple adp (Var params) (lmOne (typeof params)))
+    lets = [ (gradTVar s params,
+              mkGradTuple (Var params) (lmOne (typeof params)))
            ]
 
-gradDefInner _ (Def { def_pat = TupPat {} })
+gradDefInner (Def { def_pat = TupPat {} })
   -- TupPat should not appear.  See Note [Replacing TupPat with nested
   -- Let]
   = error $ unlines [ "gradDefInner: TupPat encountered\n"
                     , "This should not occur." ]
 
-gradDefInner _ _ = Nothing
+gradDefInner _ = Nothing
 
 
 -- See Note [Automatic differentiation documentation]
 --
 -- s -> (Expr :: t) -> (Expr :: s -o t)
-gradE :: HasCallStack => ADPlan -> Shape -> TExpr -> TExpr
-gradE adp s e@(Konst _)    = mkGradTuple adp e (lmZero s e)
-gradE adp s (Var tv)       = Var (gradTVar adp s tv)
-gradE adp s (Dummy ty)     = Dummy (mkGradType adp (typeof s) ty)
-gradE adp s (Assert e1 e2) = Assert e1 (gradE adp s e2)
-gradE adp s (Tuple es)     = lmVCat_AD adp s (map (gradE adp s) es)
-gradE adp s (If b t e)     = If b (gradE adp s t) (gradE adp s e)
-gradE _   _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
-gradE adp s (Let (VarPat v) e1 e2) = gradLet adp s v e1 e2
-gradE _   _ e@(Let (TupPat _) _ _) =
+gradE :: HasCallStack => Shape -> TExpr -> TExpr
+gradE s e@(Konst _)    = mkGradTuple e (lmZero s e)
+gradE s (Var tv)       = Var (gradTVar s tv)
+gradE s (Dummy ty)     = Dummy (mkGradType (typeof s) ty)
+gradE s (Assert e1 e2) = Assert e1 (gradE s e2)
+gradE s (Tuple es)     = lmVCat_AD s (map (gradE s) es)
+gradE s (If b t e)     = If b (gradE s t) (gradE s e)
+gradE _ e@(Lam {})     = pprPanic "gradE: can't deal with lambda yet" (ppr e)
+gradE s (Let (VarPat v) e1 e2) = gradLet s v e1 e2
+gradE _ e@(Let (TupPat _) _ _) =
   -- TupPat should not appear.  See Note [Replacing TupPat with nested
   -- Let]
   pprPanic "gradE: TupPat encountered. This should not occur." (ppr e)
-gradE _   _ (App{})        = error "gradE of App not yet supported"
+gradE _ (App{})        = error "gradE of App not yet supported"
 
 -- Currently ignoring $inline when gradding.  Perhaps we should
 -- perform the inlining before gradding.
-gradE adp s (Call f arg)
+gradE s (Call f arg)
   | f `isThePrimFun` P_inline
-  = gradE adp s arg
+  = gradE s arg
 
 -- grad[ build (\i.e ]
 --  = B (\i. let Di = 0 in grad[e])
 -- We need the Di binding in case 'i' is mentioned in
 -- grad[e], e.g. build (\i. power(x, i))
-gradE adp s (Call f (Tuple [n, Lam ti body]))
+gradE s (Call f (Tuple [n, Lam ti body]))
   | f `isThePrimFun` P_build
-  = gradBuild adp s n ti body
+  = gradBuild s n ti body
 
 -- TODO: I'm not very happy about this rule, which effectively
 -- undoes sum (build e) --> sumbuild e
-gradE adp s (Call f (Tuple [n, body]))
+gradE s (Call f (Tuple [n, body]))
   | f `isThePrimFun` P_sumbuild
-  = gradE adp s (pSum (pBuild n body))
+  = gradE s (pSum (pBuild n body))
 
-gradE adp s (Call f (Tuple [Lam ti body, acc, v]))
+gradE s (Call f (Tuple [Lam ti body, acc, v]))
   | f `isThePrimFun` P_fold
-  = gradFold adp s ti body acc v
+  = gradFold s ti body acc v
 
-gradE adp s (Call f args) = gradCall adp s f args
+gradE s (Call f args) = gradCall s f args
 
 ---------------
-gradBuild :: ADPlan -> Shape -> TExpr -> TVar -> TExpr -> TExpr
-gradBuild BasicAD s n ti body
+gradBuild :: Shape -> TExpr -> TVar -> TExpr -> TExpr
+gradBuild s n ti body
   = lmVCatV $
     pBuild n $ Lam ti $
-    mkLet (gradTVar BasicAD s ti) (lmZero s (Var ti)) $
-    gradE BasicAD s body
+    mkLet (gradTVar s ti) (lmZero s (Var ti)) $
+    gradE s body
 ---------------
-gradFold :: ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
-gradFold BasicAD s ti body acc v =
+gradFold :: Shape -> TVar -> TExpr -> TExpr -> TExpr -> TExpr
+gradFold s ti body acc v =
   lmFold (mkTangentZero s) (Lam ti body) (Lam ti bodyAdjusted) acc v
   `lmCompose`
   args
-  where body' = mkLet (gradTVar BasicAD s' ti)
+  where body' = mkLet (gradTVar s' ti)
                       (lmHCat [lmZero s (Var ti), lmOne (typeof ti)])
-                $ gradE BasicAD s' body
+                $ gradE s' body
         s' = Tuple [s, Var ti]
 
         -- The gradded free variables occurring in `body'` are linear
@@ -162,25 +162,25 @@ gradFold BasicAD s ti body acc v =
         bodyAdjusted = foldr adjustGrad body' (freeVarsOf (Lam ti body))
           where
             adjustGrad v = mkLet (grad s' v) (adjust (grad s v))
-            grad = gradTVar BasicAD
+            grad = gradTVar
             adjust v = Var v `lmCompose` lmHCat [lmOne (typeof s), lmZero (Var ti) s]
 
         args = lmVCat s
                [ lmOne (typeof s)
-               , lmVCat s (map (gradE BasicAD s) [acc, v]) ]
+               , lmVCat s (map (gradE s) [acc, v]) ]
 ---------------
-gradCall :: ADPlan -> Shape -> TFun Typed -> TExpr -> TExpr
-gradCall BasicAD s f args
-  = lmCompose (Call gf args) (gradE BasicAD s args)
+gradCall :: Shape -> TFun Typed -> TExpr -> TExpr
+gradCall s f args
+  = lmCompose (Call gf args) (gradE s args)
   where
-    gf = gradTFun BasicAD f (typeof args)
+    gf = gradTFun f (typeof args)
 ----------------------
-gradLet :: HasCallStack => ADPlan -> Shape -> TVar -> TExpr -> TExpr -> TExpr
-gradLet BasicAD s v e1 e2
-  = mkLet (gradTVar BasicAD s v) (gradE BasicAD s e1) $
+gradLet :: HasCallStack => Shape -> TVar -> TExpr -> TExpr -> TExpr
+gradLet s v e1 e2
+  = mkLet (gradTVar s v) (gradE s e1) $
       -- See Note [Shadowing after grad]
     mkLet v e1                                        $
-    gradE BasicAD s e2
+    gradE s e2
 
 {- Note [Shadowing after grad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,8 +219,8 @@ unique names before gradding.
 
 -}
 
-lmVCat_AD :: ADPlan -> Shape -> [TExpr] -> TExpr
-lmVCat_AD BasicAD s ms = lmVCat s ms
+lmVCat_AD :: Shape -> [TExpr] -> TExpr
+lmVCat_AD s ms = lmVCat s ms
 
 
 
@@ -239,9 +239,9 @@ applyD dir def@(Def { def_pat = TupPat {} })
 -- Forward
 --   D$f  :: S1 S2       -> ((S1,S2) -o T)
 -- fwd$f  :: (S1, S2) (dS1, dS2) -> dT
-applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
+applyD Fwd (Def { def_fun = Fun GradFun f, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
-  = Def { def_fun    = Fun (DrvFun (AD adp Fwd)) f
+  = Def { def_fun    = Fun (DrvFun (AD Fwd)) f
         , def_pat   = VarPat x_dx
         , def_rhs    = UserRhs $ extract2args $ perhapsFstToo $ lmApply lm $ Var dx
         , def_res_ty = t }
@@ -258,17 +258,16 @@ applyD Fwd (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
     to_delta (TVar _  v         )
       = error ("Unexpected non-Simple variable: " ++ show v)
     (perhapsFstToo, lm, t)  -- lm :: s -o t
-        = case (adp, res_ty) of
-            (BasicAD, TypeLM _ t)       -> (id, rhs, tangentType t)
-            (adp    , t               )
-              -> error ("Unexpected combination of AD plan and result type:"
-                       ++ show adp ++ " " ++ show t)
+        = case res_ty of
+            TypeLM _ t        -> (id, rhs, tangentType t)
+            t -> error ("Unexpected combination result type:"
+                       ++ " " ++ show t)
 
 --   D$f :: S1 S2    -> ((S1,S2) -o T)
 -- rev$f :: (S1, S2) dT -> (dS1,dS2)
-applyD Rev (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
+applyD Rev (Def { def_fun = Fun GradFun f, def_res_ty = res_ty
                 , def_pat = VarPat x, def_rhs = UserRhs rhs })
-  = Def { def_fun    = Fun (DrvFun (AD adp Rev)) f
+  = Def { def_fun    = Fun (DrvFun (AD Rev)) f
         , def_pat    = VarPat x_dr
         , def_rhs    = UserRhs $ extract2args $ lmApplyR (Var dr) lm
         , def_res_ty = tangentType (typeof x) }
@@ -281,11 +280,10 @@ applyD Rev (Def { def_fun = Fun (GradFun adp) f, def_res_ty = res_ty
 
     dr = TVar (tangentType t) $ Delta "r"
     (lm, t)  -- lm :: s -o t
-        = case (adp, res_ty) of
-            (BasicAD, TypeLM _ t)       -> (rhs,      t)
-            (adp    , t               )
-              -> error ("Unexpected combination of AD plan and result type:"
-                       ++ show adp ++ " " ++ show t)
+        = case res_ty of
+            TypeLM _ t       -> (rhs,      t)
+            t -> error ("Unexpected combination of AD plan and result type:"
+                       ++ " " ++ show t)
 
 -------------------------------
 
