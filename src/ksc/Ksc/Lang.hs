@@ -83,7 +83,7 @@ isUserDef :: DefX p -> Bool
 isUserDef (Def { def_rhs = UserRhs {} }) = True
 isUserDef _ = False
 
-data Derivation = DerivationDrvFun ADMode
+data Derivation = DerivationDrvFun ADDir
                 | DerivationCLFun
                 | DerivationShapeFun
                 | DerivationSUFFwdPass
@@ -418,7 +418,7 @@ pattern PrimFunT p <- BaseFunId (BasePrimFunName p) _
 data Derivations
   = JustFun        -- The function              f(x)
   | GradFun        -- Full Jacobian Df(x)
-  | DrvFun ADMode  -- Derivative derivative f'(x,dx)
+  | DrvFun ADDir   -- Derivative derivative f'(x,dx)
                    --   Rev <=> reverse mode f`(x,dr)
   | CLFun          -- f(x), roundtripped through CatLang
   | ShapeFun Derivations
@@ -504,8 +504,6 @@ isSelFun = \case
 
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun (Fun _ baseFun) = baseFun
-
-type ADMode = ADDir
 
 data ADDir = Fwd | Rev
   deriving( Eq, Ord, Show )
