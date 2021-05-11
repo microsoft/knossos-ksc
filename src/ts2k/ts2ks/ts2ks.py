@@ -541,14 +541,15 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
     return ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
 
 
-def ts2mod(function, example_inputs):
+def ts2mod(function, example_inputs, generate_lm=True):
     if True:
         fn = torch.jit.script(function)
         ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
     else:
         ksc_def = ast2ks(function)
 
-    return ksc_defs_to_module([ksc_def], ksc_def, ["rev", "fwd"])
+    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
+    return ksc_defs_to_module([ksc_def], ksc_def, derivatives_to_generate)
 
 
 import time
