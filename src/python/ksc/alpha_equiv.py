@@ -28,7 +28,11 @@ class BoundVarBijection(NamedTuple):
 
 
 def _alpha_equivalence_helper(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
-    return (left is right) or _alpha_equivalence_traversal(left, right, var_map)
+    if left is right:
+        # Fast-path. However, we must require that the variables free in the subexp
+        # have not been bound differently by the surrounding contexts.
+        return all(var_map.vars_equal(v, v) for v in left.free_vars_)
+    return _alpha_equivalence_traversal(left, right, var_map)
 
 
 @singledispatch

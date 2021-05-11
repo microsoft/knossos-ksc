@@ -1,5 +1,5 @@
 from ksc.alpha_equiv import are_alpha_equivalent, alpha_hash
-from ksc.expr import Var
+from ksc.expr import Const, Let, Var
 from ksc.parse_ks import parse_expr_string, parse_ks_filename
 from ksc.type_propagate import type_propagate_decls, type_propagate
 from ksc.type import Type
@@ -16,6 +16,21 @@ def test_alpha_equivalence():
     exp4 = parse_expr_string("(let (x (add z 1.0)) (mul y 2.0))")
     assert not are_alpha_equivalent(exp1, exp4)
     assert alpha_hash(exp1) != alpha_hash(exp4)
+
+
+def test_alpha_equivalence_aliasing():
+    body = parse_expr_string("(div x y)")
+    # body refers to x,y; bind these differently, so Expr's not equivalent.
+    exp1 = Let(Var("x"), Const(1), Let(Var("y"), Const(2), body))
+    exp2 = Let(Var("y"), Const(1), Let(Var("x"), Const(2), body))
+    assert not are_alpha_equivalent(exp1, exp2)
+    assert alpha_hash(exp1) != alpha_hash(exp2)
+
+    # But other variables can be alpha-renamed and Expr's still be equal.
+    exp3 = Let(Var("a"), Const(1), Let(Var("b"), Const(2), body))
+    exp4 = Let(Var("b"), Const(1), Let(Var("a"), Const(2), body))
+    assert are_alpha_equivalent(exp3, exp4)
+    assert alpha_hash(exp3) == alpha_hash(exp4)
 
 
 def test_alpha_equivalence_diff_types():
