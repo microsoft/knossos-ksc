@@ -15,7 +15,6 @@ from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
 
 from ksc.type import Type, tangent_type, make_tuple_if_many
-from ksc.expr import StructuredName
 
 from torch.utils.cpp_extension import load, load_inline
 
@@ -284,8 +283,7 @@ def __make_cpp_str(
     """
 
     args_str = mangleTypes(arg_types)
-    name = name_to_call.mangle_without_type() if isinstance(name_to_call, StructuredName) else name_to_call
-    name_str = encode_name(f"{name}@{args_str}")
+    name_str = encode_name(f"{name_to_call}@{args_str}")
     declarations = f"""
      m.def("entry", with_ks_allocator(&ks::{name_str}));
     """
@@ -297,7 +295,7 @@ def __make_cpp_str(
         dreturn_type_str = mangleType(tangent_type(return_type))
 
         for der in derivatives_to_generate:
-            der_name = encode_name(f"{der}${name}@{args_str}")
+            der_name = encode_name(f"{der}${name_to_call}@{args_str}")
             declarations += f"""
             m.def("{der}_entry", with_ks_allocator(&ks::{der_name}));
             """

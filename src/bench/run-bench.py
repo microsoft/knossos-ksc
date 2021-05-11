@@ -117,7 +117,7 @@ def bench(module_name, bench_name):
             print(f"Ignoring {fn_name}")
 
     # TODO: elementwise_apply
-    ks_compiled = tsmod2ksmod(mod, bench_name, example_inputs=(configs[0],))
+    ks_compiled = tsmod2ksmod(mod, bench_name, example_inputs=(configs[0],), generate_lm=False)
 
     for arg in configs:
         # ptfast should always work, and be the timing reference
