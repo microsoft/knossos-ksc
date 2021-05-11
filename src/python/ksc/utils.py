@@ -15,6 +15,7 @@ from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
 
 from ksc.type import Type, tangent_type, make_tuple_if_many
+from ksc.expr import StructuredName
 
 from torch.utils.cpp_extension import load, load_inline
 
