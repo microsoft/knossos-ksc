@@ -145,6 +145,50 @@ def test_cat():
     assert (ks_ans_np == py_ans.numpy()).all()  # non-approx
 
 
+def relu3(x: float) -> float:
+    if x < 0.0:
+        return 0.0
+    elif x < 1.0:
+        return 1 / 3 * (x ** 3)
+    else:
+        return x - 2 / 3
+
+
+def grad_relu3(x: float) -> float:
+    if x < 0.0:
+        return 0.0
+    elif x < 1.0:
+        return x * x
+    else:
+        return 1.0
+
+
+@pytest.mark.parametrize("generate_lm", [True, False])
+def test_relu3(generate_lm):
+    x = 0.5
+
+    ks_relu3 = ts2mod(relu3, (x,), generate_lm)
+
+    for x in [-0.1, 0.31221, 2.27160]:
+        # Test function: ks == py
+        py_ans = relu3(x)
+        ks_ans = ks_relu3.py_mod.entry(x)
+
+        assert pytest.approx(ks_ans, 1e-8) == py_ans
+
+        # Check manual gradient using finite differences
+        delta = 1e-8
+        py_ans_fd = (relu3(x + delta) - relu3(x)) / delta
+        assert pytest.approx(py_ans_fd, 1e-5) == grad_relu3(x)
+
+        # Test gradient ks == py
+        py_ans = grad_relu3(x)
+        grad_fun = ks_relu3.py_mod.rev_entry if generate_lm else ks_relu3.py_mod.sufrev_entry
+        ks_ans = grad_fun(x, 1.0)
+
+        assert pytest.approx(ks_ans, 1e-8) == py_ans
+
+
 # def test_Vec_init():
 #     def f(x : float):
 #         return torch.tensor([x, 2.2])
