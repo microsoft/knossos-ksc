@@ -261,17 +261,12 @@ def encode_name(s: str) -> str:
     )
 
 
-derivatives_to_generate_default = ["fwd", "rev", "sufrev"]
+derivatives_to_generate_lm = ["fwd", "rev"]
+derivatives_to_generate_suf = ["sufrev", "suffwdpass", "sufrevpass"]
 
 
 def __make_cpp_str(
-    ks_str,
-    name_to_call,
-    python_module_name,
-    arg_types,
-    return_type,
-    derivatives_to_generate=derivatives_to_generate_default,
-    use_aten=True,
+    ks_str, name_to_call, python_module_name, arg_types, return_type, derivatives_to_generate, use_aten=True,
 ):
     generate_derivatives = len(derivatives_to_generate) > 0
     generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
