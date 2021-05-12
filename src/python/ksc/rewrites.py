@@ -236,27 +236,6 @@ class inline_var(RuleMatcher):
             yield Match(self, root, path_from_root, {"binding_location": binding_loc})
 
 
-@singleton
-class delete_let(RuleMatcher):
-    possible_filter_terms = frozenset([Let])
-
-    def apply_at(self, expr: Expr, path: Location) -> Expr:
-        def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
-            assert const_zero == Const(0.0)  # Passed to replace_subtree below
-            assert let_node.vars.name not in let_node.body.free_vars_
-            return let_node.body
-
-        # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
-
-    def matches_for_possible_expr(
-        self, subtree: Expr, path_from_root: Location, root: Expr, env
-    ) -> Iterator[Match]:
-        assert isinstance(subtree, Let)
-        if subtree.vars.name not in subtree.body.free_vars_:
-            yield Match(self, root, path_from_root)
-
-
 ###############################################################################
 # Rules parsed from KS. See class Rule (which has a shorter overview of syntax)
 #
@@ -605,3 +584,8 @@ def parse_rule_str(ks_str, symtab):
 def parse_rules_from_file(filename):
     with open(filename) as f:
         return [ParsedRuleMatcher(r) for r in parse_ks_string(f, filename)]
+
+
+delete_let = parse_rule_str(
+    '(rule "delete_let" ((e : Any) (body : Any)) (let (x e) body) body)', symtab={}
+)
