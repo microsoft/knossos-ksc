@@ -137,14 +137,13 @@ def test_parsed_rule_respects_types():
 
 def test_parsed_rule_allows_alpha_equivalence():
     symtab = dict()
-    decls_prelude_extra = list(parse_ks_filename("src/runtime/prelude.ks")) + list(
-        parse_ks_file("(edef add (Vec Float) (Tuple (Vec Float) (Vec Float)))")
-    )
-    type_propagate_decls(decls_prelude_extra, symtab)
+    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+    type_propagate_decls(decls_prelude, symtab)
 
-    r = parse_rule_str('(rule "add2_to_mul$vf" (v : Vec Float) (add v v) (mul 2.0 v))', symtab)
+    # Use ts_add because [add (Tuple (Vec Float) (Vec Float))] is not in the prelude (yet)
+    r = parse_rule_str('(rule "add2_to_mul$vf" (v : Vec Float) (ts_add v v) (mul 2.0 v))', symtab)
     e = parse_expr_string(
-        "(add (build 10 (lam (i : Integer) (to_float i))) (build 10 (lam (j : Integer) (to_float j))))"
+        "(ts_add (build 10 (lam (i : Integer) (to_float i))) (build 10 (lam (j : Integer) (to_float j))))"
     )
     expected = parse_expr_string("(mul 2.0 (build 10 (lam (k : Integer) (to_float k))))")
     type_propagate_decls([e, expected], symtab)
