@@ -11,7 +11,7 @@ from ksc.filter_term import get_filter_term
 
 
 def are_alpha_equivalent(exp1, exp2):
-    return _alpha_equivalence_helper(exp1, exp2, BoundVarBijection(pmap(), pmap()))
+    return _are_equiv_with_varmap(exp1, exp2, BoundVarBijection(pmap(), pmap()))
 
 
 # We use this ensure a bijection between bound variables in 'left' and 'right' exprs.
@@ -27,45 +27,45 @@ class BoundVarBijection(NamedTuple):
         return BoundVarBijection(self.left_to_right.set(left, right), self.right_to_left.set(right, left))
 
 
-def _alpha_equivalence_helper(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
+def _are_equiv_with_varmap(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
     if left is right:
         # Fast-path. However, we must require that the variables free in the subexp
         # have not been bound differently by the surrounding contexts.
         return all(var_map.vars_equal(v, v) for v in left.free_vars_)
-    return _alpha_equivalence_traversal(left, right, var_map)
+    return _alpha_equivalence_helper(left, right, var_map)
 
 
 @singledispatch
-def _alpha_equivalence_traversal(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
+def _alpha_equivalence_helper(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
     if get_filter_term(left) != get_filter_term(right):
         return False
     l_children, r_children = subexps_no_binds(left), subexps_no_binds(right)
     return len(l_children) == len(r_children) and all(
-        _alpha_equivalence_helper(l_ch, r_ch, var_map) for l_ch, r_ch in zip(l_children, r_children)
+        _are_equiv_with_varmap(l_ch, r_ch, var_map) for l_ch, r_ch in zip(l_children, r_children)
     )
 
 
-@_alpha_equivalence_traversal.register
+@_alpha_equivalence_helper.register
 def _alpha_equiv_var(left: Var, right: Expr, var_map: BoundVarBijection) -> bool:
     # The check ensures the bound variables are used 1:1 - see test_alpha_equivalence_shadows_free
     return isinstance(right, Var) and var_map.vars_equal(left.name, right.name)
     # Do not check type, consistent with ==
 
 
-@_alpha_equivalence_traversal.register
+@_alpha_equivalence_helper.register
 def _alpha_equiv_let(left: Let, right: Expr, var_map: BoundVarBijection) -> bool:
     if not isinstance(right, Let):
         return False
     assert isinstance(left.vars, Var), "Tupled-lets are not supported: call untuple_lets first"
     assert isinstance(right.vars, Var), "Tupled-lets are not supported: call untuple_lets first"
-    return _alpha_equivalence_helper(left.rhs, right.rhs, var_map) and _alpha_equivalence_helper(
+    return _are_equiv_with_varmap(left.rhs, right.rhs, var_map) and _are_equiv_with_varmap(
         left.body, right.body, var_map.add_var(left.vars.name, right.vars.name)
     )
 
 
-@_alpha_equivalence_traversal.register
+@_alpha_equivalence_helper.register
 def _alpha_equiv_lam(left: Lam, right: Expr, var_map: BoundVarBijection) -> bool:
-    return _alpha_equivalence_helper(left.body, right.body, var_map.add_var(left.arg.name, right.arg.name))
+    return _are_equiv_with_varmap(left.body, right.body, var_map.add_var(left.arg.name, right.arg.name))
 
 
 ###############################################################################
