@@ -1,7 +1,17 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
-from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
+from typing import (
+    Any,
+    FrozenSet,
+    Iterator,
+    Optional,
+    List,
+    Mapping,
+    Tuple,
+    Union,
+    Sequence,
+)
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
@@ -252,6 +262,77 @@ class delete_let(RuleMatcher):
 #
 
 
+@singledispatch
+def list_binders(e: Expr) -> Sequence[str]:
+    """ Gather all tha variable names bound in e. If multiple Let/Lam's bind the same name,
+        the name will be repeated. """
+    return _list_subexp_binders(e)
+
+
+def _list_subexp_binders(e: Expr) -> Sequence[str]:
+    return sum([list_binders(ch) for ch in subexps_no_binds(e)], [])
+
+
+@list_binders.register
+def _list_binders_let(e: Let):
+    assert isinstance(e.vars, Var), "Tupled Lets not supported - use untuple_lets first"
+    return [e.vars.name] + _list_subexp_binders(e)
+
+
+@list_binders.register
+def _list_binders_lam(e: Lam):
+    return [e.arg] + _list_subexp_binders(e)
+
+
+def binder_sets_per_free_var(e: Expr) -> Mapping[str, Sequence[FrozenSet[str]]]:
+    """ For each variable free in `e`, return a sequence containing,
+        for each occurrence of that variable, the set of binders within e enclosing that occurrence.
+    """
+    return _binder_sets_helper(e, frozenset())
+
+
+@singledispatch
+def _binder_sets_helper(
+    e: Expr, binders_in_scope: FrozenSet[str]
+) -> Mapping[str, Sequence[FrozenSet[str]]]:
+    return _concat_map_values(
+        [_binder_sets_helper(ch, binders_in_scope) for ch in subexps_no_binds(e)]
+    )
+
+
+@_binder_sets_helper.register
+def _binder_sets_var(
+    v: Var, binders_in_scope: FrozenSet[str]
+) -> Mapping[str, Sequence[FrozenSet[str]]]:
+    return {} if v.name in binders_in_scope else {v.name: [binders_in_scope]}
+
+
+def _concat_map_values(
+    maps: Sequence[Mapping[str, Sequence[FrozenSet[str]]]]
+) -> Mapping[str, Sequence[FrozenSet[str]]]:
+    res = {}
+    for map in maps:
+        for key, value_list in map.items():
+            res.setdefault(key, []).extend(value_list)
+    return res
+
+
+@_binder_sets_helper.register
+def _binder_sets_lam(e: Lam, binders_in_scope: FrozenSet[str]):
+    return _binder_sets_helper(e.body, binders_in_scope.union([e.arg.name]))
+
+
+@_binder_sets_helper.register
+def _binder_sets_let(e: Let, binders_in_scope: FrozenSet[str]):
+    assert isinstance(e.vars, Var), "Tupled Lets not supported - use untuple_lets first"
+    return _concat_map_values(
+        [
+            _binder_sets_helper(e.rhs, binders_in_scope),
+            _binder_sets_helper(e.body, binders_in_scope.union([e.vars.name])),
+        ]
+    )
+
+
 class ParsedRuleMatcher(RuleMatcher):
     """
     Matches and substitutes according to a monomorphic Rule parsed from .ks. These are of the form
@@ -281,10 +362,34 @@ class ParsedRuleMatcher(RuleMatcher):
         # Check that all free variables in LHS and RHS templates are declared as arguments to the rule.
         assert known_vars == rule.template.free_vars_
         assert known_vars.issuperset(rule.replacement.free_vars_)
-        # TODO: check that if there are multiple binders on the LHS, they all bind different names.
+        template_binder_names = list_binders(rule.template)
+        assert len(template_binder_names) == len(
+            frozenset(template_binder_names)
+        ), "All binders in template should have distinct names"
+        assert frozenset(template_binder_names).isdisjoint(
+            known_vars
+        ), "Template should not bind the same name as a free variable"
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
+        template_binder_sets_by_var = binder_sets_per_free_var(rule.template)
+        rhs_binder_sets_by_var = binder_sets_per_free_var(rule.replacement)
+        self._binders_escaped: Mapping[str, FrozenSet[str]] = {}
+        for var, template_binder_sets in template_binder_sets_by_var.items():
+            rhs_binder_sets: Sequence[FrozenSet[str]] = rhs_binder_sets_by_var.get(
+                var, []
+            )
+            # Compute the set of binders within which *all* occurrences of var are contained
+            least_binders = frozenset.intersection(
+                *template_binder_sets, *rhs_binder_sets
+            )
+            # Compute the set of binders which *some* occurrences of the variable are in (but not all),
+            # excluding new binders on the RHS (as these have names generated not to capture anything)
+            self._binders_escaped[var] = frozenset.union(
+                *template_binder_sets,
+                *[s.intersection(template_binder_names) for s in rhs_binder_sets]
+            ).difference(least_binders)
+        assert self._binders_escaped.keys() == known_vars
 
     @property
     def possible_filter_terms(self):
