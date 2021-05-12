@@ -21,10 +21,15 @@ class BoundVarBijection(NamedTuple):
 
     def vars_equal(self, left: str, right: str) -> bool:
         # Allow left == right IF neither is in the bijection
-        return self.left_to_right.get(left, left) == right and self.right_to_left.get(right, right) == left
+        return (
+            self.left_to_right.get(left, left) == right
+            and self.right_to_left.get(right, right) == left
+        )
 
     def add_var(self, left, right):
-        return BoundVarBijection(self.left_to_right.set(left, right), self.right_to_left.set(right, left))
+        return BoundVarBijection(
+            self.left_to_right.set(left, right), self.right_to_left.set(right, left)
+        )
 
 
 def _are_equiv_with_varmap(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
@@ -36,12 +41,15 @@ def _are_equiv_with_varmap(left: Expr, right: Expr, var_map: BoundVarBijection) 
 
 
 @singledispatch
-def _alpha_equivalence_helper(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
+def _alpha_equivalence_helper(
+    left: Expr, right: Expr, var_map: BoundVarBijection
+) -> bool:
     if get_filter_term(left) != get_filter_term(right):
         return False
     l_children, r_children = subexps_no_binds(left), subexps_no_binds(right)
     return len(l_children) == len(r_children) and all(
-        _are_equiv_with_varmap(l_ch, r_ch, var_map) for l_ch, r_ch in zip(l_children, r_children)
+        _are_equiv_with_varmap(l_ch, r_ch, var_map)
+        for l_ch, r_ch in zip(l_children, r_children)
     )
 
 
@@ -56,16 +64,24 @@ def _alpha_equiv_var(left: Var, right: Expr, var_map: BoundVarBijection) -> bool
 def _alpha_equiv_let(left: Let, right: Expr, var_map: BoundVarBijection) -> bool:
     if not isinstance(right, Let):
         return False
-    assert isinstance(left.vars, Var), "Tupled-lets are not supported: call untuple_lets first"
-    assert isinstance(right.vars, Var), "Tupled-lets are not supported: call untuple_lets first"
-    return _are_equiv_with_varmap(left.rhs, right.rhs, var_map) and _are_equiv_with_varmap(
+    assert isinstance(
+        left.vars, Var
+    ), "Tupled-lets are not supported: call untuple_lets first"
+    assert isinstance(
+        right.vars, Var
+    ), "Tupled-lets are not supported: call untuple_lets first"
+    return _are_equiv_with_varmap(
+        left.rhs, right.rhs, var_map
+    ) and _are_equiv_with_varmap(
         left.body, right.body, var_map.add_var(left.vars.name, right.vars.name)
     )
 
 
 @_alpha_equivalence_helper.register
 def _alpha_equiv_lam(left: Lam, right: Expr, var_map: BoundVarBijection) -> bool:
-    return _are_equiv_with_varmap(left.body, right.body, var_map.add_var(left.arg.name, right.arg.name))
+    return _are_equiv_with_varmap(
+        left.body, right.body, var_map.add_var(left.arg.name, right.arg.name)
+    )
 
 
 ###############################################################################
@@ -84,7 +100,9 @@ def _hash_str(s: str) -> int:
 # For most Expr-subclasses we use a repeatable hash of the class name.
 # (Directly hashing the class is not repeatable across python VM invocations even if PYTHONHASHSEED is fixed.)
 # Cache that here.
-_class_hashes: PMap[Type[Expr], int] = pmap({clazz: _hash_str(clazz.__name__) for clazz in [If, Assert, Let, Lam]})
+_class_hashes: PMap[Type[Expr], int] = pmap(
+    {clazz: _hash_str(clazz.__name__) for clazz in [If, Assert, Let, Lam]}
+)
 
 # The hashing routines below use deBruijn indices stored in a map whose values are reversed:
 # the outermost (non-shadowed) binder has stored value 0,
@@ -95,8 +113,18 @@ def _add_var(reverse_debruijn_vars: PMap[str, int], varname: str) -> PMap[str, i
     return reverse_debruijn_vars.set(varname, len(reverse_debruijn_vars))
 
 
-def _hash_children(node_type_hash: int, e: Expr, reverse_debruijn_vars: PMap[str, int]) -> int:
-    return hash((node_type_hash, *(_alpha_hash_helper(ch, reverse_debruijn_vars) for ch in subexps_no_binds(e))))
+def _hash_children(
+    node_type_hash: int, e: Expr, reverse_debruijn_vars: PMap[str, int]
+) -> int:
+    return hash(
+        (
+            node_type_hash,
+            *(
+                _alpha_hash_helper(ch, reverse_debruijn_vars)
+                for ch in subexps_no_binds(e)
+            ),
+        )
+    )
 
 
 @singledispatch
@@ -139,7 +167,12 @@ def _alpha_hash_let(l: Let, reverse_debruijn_vars: PMap[str, int]) -> int:
 
 @_alpha_hash_helper.register
 def _alpha_hash_lam(l: Lam, reverse_debruijn_vars: PMap[str, int]) -> int:
-    return hash((_class_hashes[Lam], _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.arg.name))))
+    return hash(
+        (
+            _class_hashes[Lam],
+            _alpha_hash_helper(l.body, _add_var(reverse_debruijn_vars, l.arg.name)),
+        )
+    )
 
 
 def alpha_hash(e: Expr):

@@ -7,8 +7,24 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from ksc.alpha_equiv import are_alpha_equivalent
-from ksc.cav_subst import Location, subexps_no_binds, replace_subtree, make_nonfree_var, VariableSubstitution
-from ksc.expr import ConstantType, StructuredName, Expr, Let, Lam, Var, Const, Call, Rule
+from ksc.cav_subst import (
+    Location,
+    subexps_no_binds,
+    replace_subtree,
+    make_nonfree_var,
+    VariableSubstitution,
+)
+from ksc.expr import (
+    ConstantType,
+    StructuredName,
+    Expr,
+    Let,
+    Lam,
+    Var,
+    Const,
+    Call,
+    Rule,
+)
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type

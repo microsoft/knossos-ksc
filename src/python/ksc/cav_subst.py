@@ -64,7 +64,11 @@ Location = Sequence[int]  # Used immutably, so normally a tuple
 
 
 def get_node_at_location(expr, path: Location):
-    return expr if len(path) == 0 else get_node_at_location(subexps_no_binds(expr)[path[0]], path[1:])
+    return (
+        expr
+        if len(path) == 0
+        else get_node_at_location(subexps_no_binds(expr)[path[0]], path[1:])
+    )
 
 
 #####################################################################
@@ -176,8 +180,10 @@ def _requests_to_child(
 
 def _cav_child_list(e: Expr, reqs, substs):
     # Applies _cav_helper to the children of the expression, and returns the list of substituted children
-    return [_cav_helper(ch, _requests_to_child(reqs, ch_idx), substs) for ch_idx, ch in enumerate(subexps_no_binds(e))]
-
+    return [
+        _cav_helper(ch, _requests_to_child(reqs, ch_idx), substs)
+        for ch_idx, ch in enumerate(subexps_no_binds(e))
+    ]
 
 
 @_cav_children.register
