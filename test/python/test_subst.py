@@ -39,7 +39,10 @@ def test_replace_free_vars_shadowing():
 
 def test_replace_subtrees():
     e = parse_expr_string("(foo x y z)")
-    replaced = replace_subtrees(e, [ReplaceLocationRequest([2], Var("w")), ReplaceLocationRequest([1], Var("v"))])
+    replaced = replace_subtrees(
+        e,
+        [ReplaceLocationRequest([2], Var("w")), ReplaceLocationRequest([1], Var("v"))],
+    )
     expected = parse_expr_string("(foo x v w)")
     assert replaced == expected
 
@@ -53,7 +56,11 @@ def test_replace_subtrees_nested():
     assert get_node_at_location(e, path_to_z) == Var("z")
     with pytest.raises(ValueError, match="nested"):
         replace_subtrees(
-            e, [ReplaceLocationRequest(path_to_z, Var("w")), ReplaceLocationRequest(path_to_call, Const(0))]
+            e,
+            [
+                ReplaceLocationRequest(path_to_z, Var("w")),
+                ReplaceLocationRequest(path_to_call, Const(0)),
+            ],
         )
 
 
@@ -67,8 +74,12 @@ def test_replace_subtree_avoids_capture():
     assert get_node_at_location(e, path_to_y) == Var("y")
     replaced = replace_subtree(e, path_to_y, new_subtree)
     # Must rename the "x".
-    new_var = make_nonfree_var("x", [e])  # No alpha-equivalence, so this is the name used.
-    expected = parse_expr_string(f"(let ({new_var} (if p a b)) (add {new_var} (mul x 2)))")
+    new_var = make_nonfree_var(
+        "x", [e]
+    )  # No alpha-equivalence, so this is the name used.
+    expected = parse_expr_string(
+        f"(let ({new_var} (if p a b)) (add {new_var} (mul x 2)))"
+    )
     assert replaced == expected
 
 
@@ -80,8 +91,12 @@ def test_replace_subtree_avoids_capturing_another():
     path_to_y = (0, 2)
     assert get_node_at_location(e, path_to_y) == Var("y")
     replaced = replace_subtree(e, path_to_y, new_subtree)
-    new_var = replaced.arg  # No alpha-equivalence, so this is the name used; this has decl=True
-    expected = parse_expr_string(f"(lam ({new_var}) (foo x_0 {new_var.name} (mul x 2)))")
+    new_var = (
+        replaced.arg
+    )  # No alpha-equivalence, so this is the name used; this has decl=True
+    expected = parse_expr_string(
+        f"(lam ({new_var}) (foo x_0 {new_var.name} (mul x 2)))"
+    )
     assert new_var != conflicting_var
     assert replaced == expected
 

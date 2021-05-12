@@ -60,14 +60,28 @@ def assert_equal_model():
     weight = concat([w1, w2, w3, w4])
     bias = concat([b1, b2, b3, b4])
 
-    (ao0, ao1) = a.lstm_model(d(w1), d(b1), d(w2), d(b2), d(w3), d(b3), d(w4), d(b4), d(hidden), d(cell), d(input_))
+    (ao0, ao1) = a.lstm_model(
+        d(w1),
+        d(b1),
+        d(w2),
+        d(b2),
+        d(w3),
+        d(b3),
+        d(w4),
+        d(b4),
+        d(hidden),
+        d(cell),
+        d(input_),
+    )
 
     ao0l = to_list(ao0)
     ao1l = to_list(ao1)
 
     nd_weight = np.array(weight)
 
-    (mo0, mo1) = k.lstm_model(nd_weight, np.array(bias), np.array(hidden), np.array(cell), np.array(input_))
+    (mo0, mo1) = k.lstm_model(
+        nd_weight, np.array(bias), np.array(hidden), np.array(cell), np.array(input_)
+    )
 
     print(mo0)
     print(ao0l)
@@ -104,7 +118,9 @@ def assert_equal_predict_and_objective():
     tww = np.array(
         concat(
             [concat([w1i, w2i, w3i, w4i]), concat([b1i, b2i, b3i, b4i])]
-            for (w1i, w2i, w3i, w4i, b1i, b2i, b3i, b4i) in zip(w1, w2, w3, w4, b1, b2, b3, b4)
+            for (w1i, w2i, w3i, w4i, b1i, b2i, b3i, b4i) in zip(
+                w1, w2, w3, w4, b1, b2, b3, b4
+            )
         )
     )
 
@@ -124,9 +140,18 @@ def assert_equal_predict_and_objective():
     tp0l = tp0.tolist()
     tp1l = tp1.tolist()
 
-    wf_etc = [tuple(d(i) for i in tu) for tu in zip(w1, b1, w2, b2, w3, b3, w4, b4, hidden, cell)]
+    wf_etc = [
+        tuple(d(i) for i in tu)
+        for tu in zip(w1, b1, w2, b2, w3, b3, w4, b4, hidden, cell)
+    ]
 
-    (v, vtvv) = a.lstm_predict(a.vec_tuple_vec10(wf_etc), d(input_weight), d(output_weight), d(output_bias), d(input_))
+    (v, vtvv) = a.lstm_predict(
+        a.vec_tuple_vec10(wf_etc),
+        d(input_weight),
+        d(output_weight),
+        d(output_bias),
+        d(input_),
+    )
 
     vl = to_list(v)
     vtvvl = concat([to_list(v1), to_list(v2)] for (v1, v2) in to_list(vtvv))

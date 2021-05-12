@@ -4,7 +4,7 @@ from typing import Iterator, Optional
 from ksc.expr import Expr, Lam, If, Let, Const, Var
 from ksc.cav_subst import (
     Location,
-    get_children,
+    subexps_no_binds,
     get_node_at_location,
     make_nonfree_var,
     replace_subtree,
@@ -41,7 +41,7 @@ class LiftingRule(RuleMatcher):
         if isinstance(subtree, Lam):
             # Lam's inside build/sumbuild are handled as part of the (sum)build
             return
-        for i, ch in enumerate(get_children(subtree)):
+        for i, ch in enumerate(subexps_no_binds(subtree)):
             nested_lam = isinstance(ch, Lam)
             to_lift = self.get_liftable_part(ch.body if nested_lam else ch)
             if to_lift is None:
@@ -98,7 +98,7 @@ class lift_bind(LiftingRule):
         let_node = get_node_at_location(parent, path_to_child)
         assert isinstance(let_node.vars, Var), "Tupled lets not supported - use untuple_lets first"
         bound_var, let_body = let_node.vars, let_node.body
-        let_siblings = [sibling for i, sibling in enumerate(get_children(parent)) if i != path_to_child[0]]
+        let_siblings = [sibling for i, sibling in enumerate(subexps_no_binds(parent)) if i != path_to_child[0]]
         if any(bound_var.name in sibling.free_vars_ for sibling in let_siblings):
             # Occurrences of the bound variable in the let_node's body are not free.
             # So there must be other occurrences of the same name (referring to an outer variable).

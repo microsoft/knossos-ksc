@@ -40,9 +40,14 @@ dot = ksc.tracing.make_edef(
     mat_mat_mul_prop_rule,
     # the shape is ((m, n), el_shape) if x_shape = ((m, k), el_shape) and y_shape = ((k, n), el_shape)
     # And all el_shape are scalar atm
-    lambda x, y: core.make_tuple(core.make_tuple(x.shape_program[0][0], y.shape_program[0][1]), y.shape_program[1]),
+    lambda x, y: core.make_tuple(
+        core.make_tuple(x.shape_program[0][0], y.shape_program[0][1]),
+        y.shape_program[1],
+    ),
     # just count the number of flops
-    lambda x, y: (lambda s_x, s_y: s_x[0] * s_x[1] * s_y[1] * 2)(x.shape_program[0], y.shape_program[0]),
+    lambda x, y: (lambda s_x, s_y: s_x[0] * s_x[1] * s_y[1] * 2)(
+        x.shape_program[0], y.shape_program[0]
+    ),
 )
 
 broadcast_add = ksc.tracing.make_edef(
@@ -69,7 +74,9 @@ transpose = ksc.tracing.make_edef(
     "transpose",
     ["x"],
     transpose_prop_rule,
-    lambda x: (lambda s: core.make_tuple(core.make_tuple(s[0][1], s[0][0]), s[1]))(x.shape_program),
+    lambda x: (lambda s: core.make_tuple(core.make_tuple(s[0][1], s[0][0]), s[1]))(
+        x.shape_program
+    ),
     lambda x: Node.from_data(0),
 )
 

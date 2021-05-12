@@ -12,7 +12,9 @@ def shape_from_type(arg_type, assumed_vector_size=100):
         return ()
 
 
-def compute_cost(ks_str, def_name, args, exec_context=None, aggregation_option="default"):
+def compute_cost(
+    ks_str, def_name, args, exec_context=None, aggregation_option="default"
+):
     m = translate_and_import(__file__, ks_str, "abstract")
     if def_name in m.defs:
         f = m.defs[def_name]

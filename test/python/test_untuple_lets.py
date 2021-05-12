@@ -12,7 +12,11 @@ def test_untupling():
 
 
 def test_untupling2():
-    actual = untuple_lets(parse_expr_string("(let ((a b) (if p (let ((a b c) (foo x)) (tuple b a)) (bar x))) a)"))
+    actual = untuple_lets(
+        parse_expr_string(
+            "(let ((a b) (if p (let ((a b c) (foo x)) (tuple b a)) (bar x))) a)"
+        )
+    )
     expected = parse_expr_string(
         """(let (temp_0 (if p 
         (let (temp_0 (foo x)) (let (a (get$1$3 temp_0)) (let (b (get$2$3 temp_0)) (let (c (get$3$3 temp_0)) (tuple b a)))))
@@ -39,7 +43,9 @@ def test_untupling_avoids_capture():
 
 
 def test_untupling_tuple_val():
-    actual = untuple_lets(parse_expr_string("(let ((a b) (tuple (foo x) (bar x))) (add a b))"))
+    actual = untuple_lets(
+        parse_expr_string("(let ((a b) (tuple (foo x) (bar x))) (add a b))")
+    )
     expected = parse_expr_string("(let (a (foo x)) (let (b (bar x)) (add a b)))")
     assert untuple_lets(actual) == expected
     assert untuple_lets(expected) == expected

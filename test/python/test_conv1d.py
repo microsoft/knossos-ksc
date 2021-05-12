@@ -37,7 +37,10 @@ def test_conv1d():
     kernel = [[[-0.5, 0, 0.5]], [[0.333, 0.333, 0.333]]]
 
     expected_output = np.vstack(
-        (np.convolve(image[0], kernel[0][0], "same"), np.convolve(image[0], kernel[1][0], "same"))
+        (
+            np.convolve(image[0], kernel[0][0], "same"),
+            np.convolve(image[0], kernel[1][0], "same"),
+        )
     )
     output = py_out.conv1d(kernel, image)
     assert np.allclose(expected_output, output)
@@ -76,7 +79,10 @@ def test_conv1d_tensors():
     kernel = [np.array([[-0.5, 0, 0.5]]), np.array([[0.333, 0.333, 0.333]])]
     assert kernel[0].shape == (1, 3)
     expected_output = np.vstack(
-        (np.convolve(image[0], kernel[0][0], "same"), np.convolve(image[0], kernel[1][0], "same"))
+        (
+            np.convolve(image[0], kernel[0][0], "same"),
+            np.convolve(image[0], kernel[1][0], "same"),
+        )
     )
     output = py_out.conv1d(kernel, image)
     assert np.allclose(expected_output, output)

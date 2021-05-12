@@ -2,7 +2,11 @@ from typing import Tuple
 from functools import wraps
 import numpy
 import ksc
-from ksc.abstract_value import AbstractValue, ExecutionContext, current_execution_context
+from ksc.abstract_value import (
+    AbstractValue,
+    ExecutionContext,
+    current_execution_context,
+)
 from ksc.type import Type, SizeType
 from ksc.shape import ShapeType, Shape, TensorShape, make_dims
 
@@ -44,7 +48,9 @@ def check_args_and_get_context(name, args, concrete="concrete"):
         if (context is None or context == concrete) and ctx is not None:
             context = ctx
         assert ctx is None or ctx == concrete or ctx == context, (
-            f"In the call {name}, expected" f" {context} for arg#{i+1}," f" but got {ctx}"
+            f"In the call {name}, expected"
+            f" {context} for arg#{i+1},"
+            f" but got {ctx}"
         )
     return context
 
@@ -66,9 +72,13 @@ def _get_edef(defs, name, type, py_name_for_concrete):
         if context == "concrete":
             d = ksc.backends.abstract.__dict__
             f = d[py_name_for_concrete]
-            return AbstractValue.from_data(f(*[_get_data(arg) for arg in args]), context)
+            return AbstractValue.from_data(
+                f(*[_get_data(arg) for arg in args]), context
+            )
         else:
-            shape_cost_args = [AbstractValue.in_context(arg, "concrete") for arg in args]
+            shape_cost_args = [
+                AbstractValue.in_context(arg, "concrete") for arg in args
+            ]
             with ExecutionContext():
                 # execute in a new context so that the cost of computing shape and cost
                 # is not accumulated
@@ -89,7 +99,9 @@ def index(i, v):
     assert st.type.is_tensor, f"Called index on non-tensor {v}"
     exec_ctx = current_execution_context()
     exec_ctx.accumulate_cost("index", v.context, exec_ctx.config["index_cost"])
-    return AbstractValue(st.shape.elem_shape, st.type.tensor_elem_type, context=v.context)
+    return AbstractValue(
+        st.shape.elem_shape, st.type.tensor_elem_type, context=v.context
+    )
 
 
 def size(v):
@@ -130,7 +142,9 @@ def build(sz, f):
     context = check_args_and_get_context("build", [sz], concrete=None)
     dims, nelem, el, inner_cost = _compute_build_inner_cost(sz, f)
     exec_ctx = current_execution_context()
-    exec_ctx.accumulate_cost("build", context, exec_ctx.config["build_malloc_cost"] + nelem * inner_cost)
+    exec_ctx.accumulate_cost(
+        "build", context, exec_ctx.config["build_malloc_cost"] + nelem * inner_cost
+    )
 
     rank = len(dims)
     ks_type = Type.Tensor(rank, el.type)
@@ -146,7 +160,10 @@ def sumbuild(sz, f):
         "sumbuild",
         context,
         nelem * inner_cost
-        + (nelem - 1) * elst.type.num_elements(assumed_vector_size=exec_ctx.config["assumed_vector_size"]),
+        + (nelem - 1)
+        * elst.type.num_elements(
+            assumed_vector_size=exec_ctx.config["assumed_vector_size"]
+        ),
     )
     return AbstractValue(elst.shape, elst.type, context=context)
 
@@ -199,7 +216,11 @@ def if_then_else(cond, then_branch, else_branch):
         assert out1.shape_type == out2.shape_type
         assert out1.context == out2.context
         if_epsilon = exec_ctx.config["if_epsilon"]
-        exec_ctx.accumulate_cost("if", context, (max(then_cost, else_cost) + if_epsilon * min(then_cost, else_cost)))
+        exec_ctx.accumulate_cost(
+            "if",
+            context,
+            (max(then_cost, else_cost) + if_epsilon * min(then_cost, else_cost)),
+        )
         return out1
     elif cond:
         return then_branch()

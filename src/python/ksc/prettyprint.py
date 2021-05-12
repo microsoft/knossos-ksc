@@ -19,13 +19,33 @@ from prettyprinter.doc import (
     HARDLINE,  # newline
 )
 
-from prettyprinter.prettyprinter import Token, LPAREN, RPAREN, LBRACKET, RBRACKET, pretty_dispatch
+from prettyprinter.prettyprinter import (
+    Token,
+    LPAREN,
+    RPAREN,
+    LBRACKET,
+    RBRACKET,
+    pretty_dispatch,
+)
 
 from prettyprinter.utils import intersperse
 
 # Local imports
 from ksc.type import Type
-from ksc.expr import ASTNode, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import (
+    ASTNode,
+    Def,
+    EDef,
+    GDef,
+    Rule,
+    Const,
+    Var,
+    Lam,
+    Call,
+    Let,
+    If,
+    Assert,
+)
 from ksc.expr import StructuredName
 
 # These are primarily to enable syntax highlighting --
@@ -104,16 +124,43 @@ def pretty_ASTNode(ex, ctx):
             2,
             pp_reserved("def"),
             " ",
-            hang(0, concat([pp(ex.name), LINE, pp(ex.return_type), LINE, parens_interline(1, *map(pp, ex.args))])),
+            hang(
+                0,
+                concat(
+                    [
+                        pp(ex.name),
+                        LINE,
+                        pp(ex.return_type),
+                        LINE,
+                        parens_interline(1, *map(pp, ex.args)),
+                    ]
+                ),
+            ),
             HARDLINE,
             pp(ex.body),
         )
 
     if isinstance(ex, EDef):
-        return parens(2, pp_reserved("edef"), LINE, pp(ex.name), LINE, pp(ex.return_type), LINE, pp(ex.arg_type))
+        return parens(
+            2,
+            pp_reserved("edef"),
+            LINE,
+            pp(ex.name),
+            LINE,
+            pp(ex.return_type),
+            LINE,
+            pp(ex.arg_type),
+        )
 
     if isinstance(ex, GDef):
-        return parens(2, pp_reserved("gdef"), LINE, pp_reserved(ex.derivation), LINE, pp(ex.function_name))
+        return parens(
+            2,
+            pp_reserved("gdef"),
+            LINE,
+            pp_reserved(ex.derivation),
+            LINE,
+            pp(ex.function_name),
+        )
 
     if isinstance(ex, Rule):
         return parens(
@@ -157,17 +204,37 @@ def pretty_ASTNode(ex, ctx):
             vars = parens_interline(2, *map(pp, ex.vars))
         else:
             vars = pp(ex.vars)
-        return parens(0, pp_reserved("let"), " ", hang(0, parens(2, vars, LINE, pp(ex.rhs))), HARDLINE, pp(ex.body))
+        return parens(
+            0,
+            pp_reserved("let"),
+            " ",
+            hang(0, parens(2, vars, LINE, pp(ex.rhs))),
+            HARDLINE,
+            pp(ex.body),
+        )
 
     # If cond t_body f_body
     if isinstance(ex, If):
         return nest(
-            ctx.indent, parens(2, pp_reserved("if"), " ", pp(ex.cond), HARDLINE, pp(ex.t_body), HARDLINE, pp(ex.f_body))
+            ctx.indent,
+            parens(
+                2,
+                pp_reserved("if"),
+                " ",
+                pp(ex.cond),
+                HARDLINE,
+                pp(ex.t_body),
+                HARDLINE,
+                pp(ex.f_body),
+            ),
         )
 
     # Assert cond body
     if isinstance(ex, Assert):
-        return nest(ctx.indent, parens(2, pp_reserved("assert"), " ", pp(ex.cond), HARDLINE, pp(ex.body)))
+        return nest(
+            ctx.indent,
+            parens(2, pp_reserved("assert"), " ", pp(ex.cond), HARDLINE, pp(ex.body)),
+        )
 
     # Call name args
     if isinstance(ex, Call):
@@ -177,7 +244,13 @@ def pretty_ASTNode(ex, ctx):
     if isinstance(ex, Lam):
         return nest(
             ctx.indent,
-            parens(2, pp_reserved("lam"), " ", pp(ex.arg), nest(ctx.indent, concat([HARDLINE, pp(ex.body)]))),
+            parens(
+                2,
+                pp_reserved("lam"),
+                " ",
+                pp(ex.arg),
+                nest(ctx.indent, concat([HARDLINE, pp(ex.body)])),
+            ),
         )
 
     raise NotImplementedError("unimp: ", ex)
@@ -189,7 +262,14 @@ def pretty_Type(type, ctx):
     # Tuples can be hung
     if type.is_tuple:
         docs = [pretty_dispatch(c, ctx) for c in type.children]
-        return group(align(nest(ctx.indent, concat([LPAREN, type.kind, LINE, *intersperse(LINE, docs), RPAREN]))))
+        return group(
+            align(
+                nest(
+                    ctx.indent,
+                    concat([LPAREN, type.kind, LINE, *intersperse(LINE, docs), RPAREN]),
+                )
+            )
+        )
 
     # For all others, just use "str"
     return str(type)

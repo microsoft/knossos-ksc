@@ -45,12 +45,16 @@ class Shape:
 
         if type.is_tensor:
             dims, el_shape = val
-            return TensorShape(dims, Shape.from_ks_shape(el_shape, type.tensor_elem_type))
+            return TensorShape(
+                dims, Shape.from_ks_shape(el_shape, type.tensor_elem_type)
+            )
 
         if type.is_tuple:
             assert isinstance(val, tuple)
             assert len(val) == type.tuple_len
-            return tuple(Shape.from_ks_shape(val[i], type.tuple_elem(i)) for i in range(len(val)))
+            return tuple(
+                Shape.from_ks_shape(val[i], type.tuple_elem(i)) for i in range(len(val))
+            )
 
         assert False
 
@@ -90,7 +94,9 @@ def shape_type_matches(s: Shape, t: Type):
         )
 
     if t.is_tuple:
-        return isinstance(s, tuple) and all(shape_type_matches(sh, ty) for sh, ty in zip(s, t.tuple_elems()))
+        return isinstance(s, tuple) and all(
+            shape_type_matches(sh, ty) for sh, ty in zip(s, t.tuple_elems())
+        )
 
     if t.is_scalar:
         return s == ScalarShape
