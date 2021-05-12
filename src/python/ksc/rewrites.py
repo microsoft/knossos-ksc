@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
+from itertools import chain
 from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
 
 from pyrsistent import pmap
@@ -133,7 +134,9 @@ class RuleMatcher(AbstractMatcher):
     @abstractproperty
     def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
         """ A set of terms that might be returned by get_filter_term() of any Expr for which this RuleMatcher
-            could possibly generate a match. (See filter_term.py).) """
+            could possibly generate a match. (See [Note: filter_term] in filter_term.py).
+            As a special case, a RuleMatcher can include the Call class, (a FilterTerm), to say that it might
+            match any Expr which is a Call, even tho get_filter_term() never returns Call. """
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
@@ -157,7 +160,9 @@ class RuleMatcher(AbstractMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        if get_filter_term(expr) in self.possible_filter_terms:
+        if get_filter_term(expr) in self.possible_filter_terms or (
+            isinstance(expr, Call) and Call in self.possible_filter_terms
+        ):
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
     def __reduce__(self):
@@ -186,7 +191,10 @@ class RuleSet(AbstractMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        for rule in self._filtered_rules.get(get_filter_term(subtree), []):
+        possible_rules = self._filtered_rules.get(get_filter_term(subtree), [])
+        if isinstance(subtree, Call):
+            possible_rules = chain(possible_rules, self._filtered_rules.get(Call, []))
+        for rule in possible_rules:
             yield from rule.matches_for_possible_expr(
                 subtree, path_from_root, root, env
             )
