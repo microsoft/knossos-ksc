@@ -425,19 +425,19 @@ def parse_rules_from_file(filename):
 
 
 class ConstantFolder(RuleMatcher):
-    def __init__(self, sn: StructuredName, native_impl: Callable):
-        self.possible_filter_terms = frozenset([sn])
-        super().__init__("cfold_" + sn.mangled())
-        self._sn = sn
+    def __init__(self, name: StructuredName, native_impl: Callable):
+        self.possible_filter_terms = frozenset([name])
+        super().__init__("cfold_" + name.mangled())
+        self._name = name
         self._native_impl = native_impl
 
     def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
-        return frozenset([self._sn])
+        return frozenset([self._name])
 
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
         def apply_here(const_zero: Expr, subtree: Expr):
             assert const_zero == Const(0.0)  # Payload passed to replace_subtree below
-            assert isinstance(subtree, Call) and subtree.name == self._sn
+            assert isinstance(subtree, Call) and subtree.name == self._name
             return Const(self._native_impl(*[arg.value for arg in subtree.args]))
 
         return replace_subtree(expr, path, Const(0.0), apply_here)
@@ -445,7 +445,7 @@ class ConstantFolder(RuleMatcher):
     def matches_for_possible_expr(
         self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
     ) -> Iterator[Match]:
-        assert isinstance(expr, Call) and expr.name == self._sn
+        assert isinstance(expr, Call) and expr.name == self._name
         if all(isinstance(arg, Const) for arg in expr.args):
             yield Match(self, root, path_from_root)
 
