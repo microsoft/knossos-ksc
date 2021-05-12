@@ -1,14 +1,13 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
-from typing import Any, Callable, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
+from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
 from ksc.expr import ConstantType, StructuredName, Expr, Let, Lam, Var, Const, Call, Rule
-from ksc.native_impls import native_impls
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
@@ -417,37 +416,3 @@ def parse_rule_str(ks_str, symtab):
 def parse_rules_from_file(filename):
     with open(filename) as f:
         return [ParsedRuleMatcher(r) for r in parse_ks_string(f, filename)]
-
-
-###############################################################################
-# Constant-folding
-#
-
-
-class ConstantFolder(RuleMatcher):
-    def __init__(self, name: StructuredName, native_impl: Callable):
-        self.possible_filter_terms = frozenset([name])
-        super().__init__("cfold_" + name.mangled())
-        self._name = name
-        self._native_impl = native_impl
-
-    def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
-        return frozenset([self._name])
-
-    def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
-        def apply_here(const_zero: Expr, subtree: Expr):
-            assert const_zero == Const(0.0)  # Payload passed to replace_subtree below
-            assert isinstance(subtree, Call) and subtree.name == self._name
-            return Const(self._native_impl(*[arg.value for arg in subtree.args]))
-
-        return replace_subtree(expr, path, Const(0.0), apply_here)
-
-    def matches_for_possible_expr(
-        self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
-    ) -> Iterator[Match]:
-        assert isinstance(expr, Call) and expr.name == self._name
-        if all(isinstance(arg, Const) for arg in expr.args):
-            yield Match(self, root, path_from_root)
-
-
-constant_folding_rules = [ConstantFolder(sn, func) for sn, func in native_impls.items()]
