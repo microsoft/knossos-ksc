@@ -3,7 +3,7 @@ from typing import Callable, FrozenSet, Iterator
 from ksc.cav_subst import Location, replace_subtree
 from ksc.expr import StructuredName, Expr, Const, Call
 from ksc.filter_term import FilterTerm
-from ksc.native_impls import native_impls
+from ksc.interpreter import native_impls
 from ksc.rewrites import RuleMatcher, LetBindingEnvironment, Match
 
 ###############################################################################

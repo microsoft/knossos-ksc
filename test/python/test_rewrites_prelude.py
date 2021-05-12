@@ -1,5 +1,5 @@
 from ksc.rewrites import RuleSet
-from ksc.rewrites_ast import constant_folding_rules
+from ksc.rewrites_prelude import constant_folding_rules
 from ksc.parse_ks import parse_expr_string, parse_ks_filename
 from ksc.type_propagate import type_propagate_decls
 
