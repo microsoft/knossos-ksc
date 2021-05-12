@@ -3,6 +3,9 @@ on:
   push:
     paths:
     - 'doc/AD.tex'
+    
+  workflow_dispatch:
+    
 jobs:
   build_latex:
     runs-on: ubuntu-latest
