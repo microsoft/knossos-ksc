@@ -8,6 +8,7 @@ from ksc.type import Type
 # Largely a placeholder for an interpreter, which in the future may be capable of interpreting any Expr
 # with no free variables. TODO: investigate combining with abstract_value.py and backends/ directory.
 
+
 def _mksn(s: str, t: Type) -> StructuredName:
     sn = StructuredName.from_str(s)
     sn2, old_ty = sn.add_type(t)
