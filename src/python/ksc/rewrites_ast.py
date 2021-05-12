@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Iterator, Optional
 
-from ksc.expr import Expr, Lam, If, Let, Const, Var
+from ksc.expr import Expr, Call, Lam, If, Let, Const, Var, Assert
 from ksc.cav_subst import (
     Location,
     subexps_no_binds,
@@ -29,9 +29,7 @@ def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> b
 
 
 class LiftingRule(RuleMatcher):
-    possible_filter_terms = (
-        frozenset()
-    )  # No specific terms indicates we could match (almost) anything
+    possible_filter_terms = frozenset([Call, If, Let, Assert])
 
     @abstractmethod
     def get_liftable_part(self, e: Expr) -> Optional[Expr]:
