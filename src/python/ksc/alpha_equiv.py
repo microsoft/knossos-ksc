@@ -5,7 +5,7 @@ from typing import NamedTuple, Type
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from ksc.cav_subst import get_children
+from ksc.cav_subst import subexps_no_binds
 from ksc.expr import Expr, Var, Let, Lam, Call, If, Assert, Const
 from ksc.filter_term import get_filter_term
 
@@ -39,7 +39,7 @@ def _alpha_equivalence_helper(left: Expr, right: Expr, var_map: BoundVarBijectio
 def _alpha_equivalence_traversal(left: Expr, right: Expr, var_map: BoundVarBijection) -> bool:
     if get_filter_term(left) != get_filter_term(right):
         return False
-    l_children, r_children = get_children(left), get_children(right)
+    l_children, r_children = subexps_no_binds(left), subexps_no_binds(right)
     return len(l_children) == len(r_children) and all(
         _alpha_equivalence_helper(l_ch, r_ch, var_map) for l_ch, r_ch in zip(l_children, r_children)
     )
@@ -96,7 +96,7 @@ def _add_var(reverse_debruijn_vars: PMap[str, int], varname: str) -> PMap[str, i
 
 
 def _hash_children(node_type_hash: int, e: Expr, reverse_debruijn_vars: PMap[str, int]) -> int:
-    return hash((node_type_hash, *(_alpha_hash_helper(ch, reverse_debruijn_vars) for ch in get_children(e))))
+    return hash((node_type_hash, *(_alpha_hash_helper(ch, reverse_debruijn_vars) for ch in subexps_no_binds(e))))
 
 
 @singledispatch

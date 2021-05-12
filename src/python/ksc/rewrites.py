@@ -7,7 +7,7 @@ from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
 from ksc.alpha_equiv import are_alpha_equivalent
-from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
+from ksc.cav_subst import Location, subexps_no_binds, replace_subtree, make_nonfree_var, VariableSubstitution
 from ksc.expr import ConstantType, StructuredName, Expr, Let, Lam, Var, Const, Call, Rule
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
@@ -50,7 +50,7 @@ class AbstractMatcher(ABC):
     ) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.matches_here(e, path_from_root, root, env)
-        for i, ch in enumerate(get_children(e)):
+        for i, ch in enumerate(subexps_no_binds(e)):
             yield from self._matches_with_env(
                 ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env)
             )
@@ -290,8 +290,8 @@ def find_template_subst(template: Expr, exp: Expr, template_vars: PMap[str, Type
     # but we still need to check that subtrees match too.
     if get_filter_term(template) != get_filter_term(exp):
         return None  # No match
-    tmpl_children = get_children(template)
-    exp_children = get_children(exp)
+    tmpl_children = subexps_no_binds(template)
+    exp_children = subexps_no_binds(exp)
     if len(tmpl_children) != len(exp_children):
         return None
     d = dict()
