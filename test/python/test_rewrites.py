@@ -1,3 +1,5 @@
+import pytest
+
 from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
 from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
@@ -272,6 +274,15 @@ def test_multiple_occurrences_in_different_binders():
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
     assert len(list(r.find_all_matches(no_match))) == 0
+
+
+def test_rule_rhs_capture():
+    with pytest.raises(AssertionError):
+        r = parse_rule_str(
+            '(rule "lift_bind_over_if" ((p : Bool) (body : Any) (f : Any) (e : Any)) (if p (let (x e) body) f) (let (x e) (if p body f)))',
+            {},
+        )
+        print(r._binders_escaped)
 
 
 def test_rule_pickling():

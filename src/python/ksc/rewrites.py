@@ -355,19 +355,19 @@ class ParsedRuleMatcher(RuleMatcher):
         rhs_binder_sets_by_var = binder_sets_per_free_var(rule.replacement)
         self._binders_escaped: Mapping[str, FrozenSet[str]] = {}
         for var, template_binder_sets in template_binder_sets_by_var.items():
-            rhs_binder_sets: Sequence[FrozenSet[str]] = rhs_binder_sets_by_var.get(
-                var, []
+            least_binders = frozenset.intersection(*template_binder_sets)
+            rhs_binder_sets = rhs_binder_sets_by_var.get(var, [])
+            most_binders = (
+                frozenset().union(*rhs_binder_sets).intersection(template_binder_names)
             )
-            # Compute the set of binders within which *all* occurrences of var are contained
-            least_binders = frozenset.intersection(
-                *template_binder_sets, *rhs_binder_sets
-            )
-            # Compute the set of binders which *some* occurrences of the variable are in (but not all),
-            # excluding new binders on the RHS (as these have names generated not to capture anything)
+            assert most_binders.issubset(
+                least_binders
+            ), f"Would have to rename {most_binders.intersection(least_binders)} as they capture {var} on RHS"
+
             self._binders_escaped[var] = frozenset.union(
-                *template_binder_sets,
-                *[s.intersection(template_binder_names) for s in rhs_binder_sets]
-            ).difference(least_binders)
+                frozenset.union(*template_binder_sets).difference(least_binders),
+                *[least_binders.difference(s) for s in rhs_binder_sets],
+            )
         assert self._binders_escaped.keys() == known_vars
 
     @property
