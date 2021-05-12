@@ -253,6 +253,27 @@ def test_parsed_rule_capture():
     assert actual == expected
 
 
+def test_multiple_occurrences_in_different_binders():
+    symtab = dict()
+    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+    type_propagate_decls(decls_prelude, symtab)
+    r = parse_rule_str(
+        '(rule "sub.self.let" ((e : Integer) (e2 : Any)) (sub e (let (x e2) e)) 0)',
+        symtab,
+    )
+
+    e = parse_expr_string("(sub (mul x y) (let (z 17) (mul x y)))")
+    expected = parse_expr_string("0")
+    no_match = parse_expr_string("(sub (mul x y) (let (x 17) (mul x y)))")
+    type_propagate_decls(
+        [e, expected, no_match], {**symtab, "x": Type.Integer, "y": Type.Integer}
+    )
+
+    actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
+    assert actual == expected
+    assert len(list(r.find_all_matches(no_match))) == 0
+
+
 def test_rule_pickling():
     import pickle
 

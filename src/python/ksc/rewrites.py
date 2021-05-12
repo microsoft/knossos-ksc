@@ -401,8 +401,19 @@ class ParsedRuleMatcher(RuleMatcher):
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
         substs = find_template_subst(self._rule.template, subtree, self._arg_types)
-        if substs is not None:
-            yield Match(self, root, path_from_root, substs)
+        if substs is None:
+            return
+        for template_var, subst in substs.items():
+            # Check that subst does not contain a free variable which is only bound in some occurrences of the template_var.
+            # 'subst' will use the variables bound in the subject expression,
+            # whereas binders_escaped uses the names of the template variables, hence translate
+            expr_vars_escaped = [
+                substs[bv].name
+                for bv in self._binders_escaped.get(template_var, frozenset())
+            ]
+            if not subst.free_vars_.isdisjoint(expr_vars_escaped):
+                return
+        yield Match(self, root, path_from_root, substs)
 
     def apply_at(
         self, expr: Expr, path: Location, **substs: VariableSubstitution
