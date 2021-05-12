@@ -62,6 +62,12 @@ def pytest_generate_tests(metafunc):
 
         example_inputs = (configs[0],)
 
+        reference_func = getattr(mod, benchmark_name + "_pytorch")
+
+        metafunc.parametrize(
+            "reference_func", [reference_func],
+        )
+
         metafunc.parametrize(
             "func", functions_to_benchmark(mod, benchmark_name, example_inputs), ids=func_namer,
         )
