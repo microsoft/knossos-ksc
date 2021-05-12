@@ -4,7 +4,9 @@ from ksc.shape import ShapeType, shape_type_from_object
 
 
 class KsFunction:
-    def __init__(self, name, return_type, arg_name_types, ks_str, is_edef=False, is_builtin=False):
+    def __init__(
+        self, name, return_type, arg_name_types, ks_str, is_edef=False, is_builtin=False
+    ):
         self._name = name
         self._return_type = return_type
         if len(arg_name_types) == 0:
@@ -59,7 +61,9 @@ class KsFunction:
         print(ks_str)
         if backend == "cpp":
             if self._py_mod is None:
-                self._py_mod = generate_and_compile_cpp_from_ks(ks_str, self.name, self._arg_types)
+                self._py_mod = generate_and_compile_cpp_from_ks(
+                    ks_str, self.name, self._arg_types
+                )
         else:
             if self._py_mod is None:
                 self._py_mod = translate_and_import(__file__, ks_str, backend)

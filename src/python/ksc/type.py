@@ -59,7 +59,9 @@ class Type:
         Constructor: Type.Tuple(T1, ..., Tn)
         """
         args = tuple(args)
-        assert all((isinstance(ch, Type) for ch in args)), "Type.Tuple constructed with non-type arg"
+        assert all(
+            (isinstance(ch, Type) for ch in args)
+        ), "Type.Tuple constructed with non-type arg"
         return Type("Tuple", args)
 
     @staticmethod
@@ -104,7 +106,9 @@ class Type:
         if len(self.children) != len(other.children):
             # Rules out different size tuples
             return False
-        return all(c.can_accept_value_of_type(o) for c, o in zip(self.children, other.children))
+        return all(
+            c.can_accept_value_of_type(o) for c, o in zip(self.children, other.children)
+        )
 
     #################
     ## Tensor methods
@@ -167,7 +171,9 @@ class Type:
         if self.is_tuple:
             return sum([c.num_elements(assumed_vector_size) for c in self.children])
         elif self.is_tensor:
-            return (assumed_vector_size ** self.tensor_rank) * self.tensor_elem_type.num_elements(assumed_vector_size)
+            return (
+                assumed_vector_size ** self.tensor_rank
+            ) * self.tensor_elem_type.num_elements(assumed_vector_size)
         elif self.is_scalar or self.is_lam_or_LM:
             return 1
 
@@ -189,7 +195,14 @@ class Type:
         return None
 
     def shortstr(self, tb="<", te=">"):
-        el_types = {"Integer": "i", "Bool": "b", "String": "s", "Float": "f", "Lam": "l", "LM": "l"}
+        el_types = {
+            "Integer": "i",
+            "Bool": "b",
+            "String": "s",
+            "Float": "f",
+            "Lam": "l",
+            "LM": "l",
+        }
         if self.kind in el_types:
             return el_types[self.kind]
         if self.is_tuple:

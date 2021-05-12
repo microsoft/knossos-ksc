@@ -54,7 +54,9 @@ def lstm_objective(main_params, extra_params, state, sequence, _range=None):
     _input = sequence[_range[0]]
     all_states = [state]
     for t in _range:
-        ypred, new_state = lstm_predict(main_params, extra_params, all_states[t], _input)
+        ypred, new_state = lstm_predict(
+            main_params, extra_params, all_states[t], _input
+        )
         all_states.append(new_state)
         ynorm = ypred - np.log(sum(np.exp(ypred), 2))
         ygold = sequence[t + 1]

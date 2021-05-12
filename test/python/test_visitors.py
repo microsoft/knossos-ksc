@@ -5,7 +5,9 @@ from ksc.visitors import ExprVisitor, ExprTransformer
 from ksc.parse_ks import parse_expr_string
 
 # This seems to cover all the cases.
-expr = parse_expr_string("(let (a (if p (add b c) (neg b))) (assert (gt a 0) (build a (lam (i : Integer) i))))")
+expr = parse_expr_string(
+    "(let (a (if p (add b c) (neg b))) (assert (gt a 0) (build a (lam (i : Integer) i))))"
+)
 
 
 def test_visitor():
@@ -23,7 +25,11 @@ def test_visitor():
 
     assert CountConsts().count(expr) == 1
     assert (
-        CountConsts().count(parse_expr_string("(if (gt p 0) x (index a (build 10 (lam (i : Integer) (add i 2)))))"))
+        CountConsts().count(
+            parse_expr_string(
+                "(if (gt p 0) x (index a (build 10 (lam (i : Integer) (add i 2)))))"
+            )
+        )
         == 3
     )
 
@@ -49,8 +55,14 @@ def test_expr_transformer_arg_passing():
             return v if v.name in bound_vars else Var(v.name + "_2")
 
         def visit_let(self, l: Let, bound_vars: FrozenSet[str]) -> Expr:
-            bound_here = [l.vars.name] if isinstance(l.vars, Var) else [v.name for v in l.vars]
-            return Let(l.vars, self.visit(l.rhs, bound_vars), self.visit(l.body, bound_vars.union(bound_here)))
+            bound_here = (
+                [l.vars.name] if isinstance(l.vars, Var) else [v.name for v in l.vars]
+            )
+            return Let(
+                l.vars,
+                self.visit(l.rhs, bound_vars),
+                self.visit(l.body, bound_vars.union(bound_here)),
+            )
 
         def visit_lam(self, l: Lam, bound_vars: FrozenSet[str]) -> Expr:
             return Lam(l.arg, self.visit(l.body, bound_vars.union([l.arg.name])))

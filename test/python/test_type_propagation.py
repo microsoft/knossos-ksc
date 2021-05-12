@@ -3,7 +3,12 @@ import pytest
 from ksc.type import Type, KSTypeError
 from ksc.type_propagate import type_propagate_decls
 from ksc.expr import StructuredName
-from ksc.parse_ks import parse_ks_filename, parse_ks_string, parse_structured_name, s_exps_from_string
+from ksc.parse_ks import (
+    parse_ks_filename,
+    parse_ks_string,
+    parse_structured_name,
+    s_exps_from_string,
+)
 
 
 def test_type_propagate_prelude_and_primer():
@@ -12,7 +17,9 @@ def test_type_propagate_prelude_and_primer():
     type_propagate_decls(decls_prelude, symtab)
     decls_file = list(parse_ks_filename("test/ksc/syntax-primer.ks"))
     type_propagate_decls(decls_file, symtab)
-    assert parse_structured_name(s_exps_from_string("[Dt [my_log Float]]", __file__)[0]) in [d.name for d in decls_file]
+    assert parse_structured_name(
+        s_exps_from_string("[Dt [my_log Float]]", __file__)[0]
+    ) in [d.name for d in decls_file]
 
 
 def test_type_propagate_works():

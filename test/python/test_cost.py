@@ -86,7 +86,9 @@ def test_sumbuild():
 )
 """
     args = [AbstractValue.abstract_like(np.ones(100))]
-    assert compute_cost(ks_str, "sum_of_vec", args) == 200  # 100 * (index_cost) + 99 (for add) + (size_cost)
+    assert (
+        compute_cost(ks_str, "sum_of_vec", args) == 200
+    )  # 100 * (index_cost) + 99 (for add) + (size_cost)
 
 
 def test_rot():
@@ -153,9 +155,9 @@ def test_dense_cost():
     W_n = np.random.normal(0, 1, (3, 4))
     b_n = np.random.normal(0, 1, (4,))
     x_n = np.random.normal(0, 1, (5, 3))
-    assert compile_and_compute_cost(lambda x, weights: dense(x, weights), (x_n, (W_n, b_n))) == (3 * 4 * 5 * 2) + (
-        5 * 4
-    )
+    assert compile_and_compute_cost(
+        lambda x, weights: dense(x, weights), (x_n, (W_n, b_n))
+    ) == (3 * 4 * 5 * 2) + (5 * 4)
 
 
 def test_states():
@@ -205,7 +207,9 @@ def test_if_then_else():
         "select1",
         [
             AbstractValue(ScalarShape, Type.Bool),
-            AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer)),
+            AbstractValue(
+                TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer)
+            ),
         ],
     )
     cost2 = compute_cost(
@@ -213,11 +217,15 @@ def test_if_then_else():
         "select2",
         [
             AbstractValue(ScalarShape, Type.Bool),
-            AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer)),
+            AbstractValue(
+                TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer)
+            ),
         ],
     )
     cost3 = compute_cost(
-        ks_str, "select3", [AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))]
+        ks_str,
+        "select3",
+        [AbstractValue(TensorShape((100,), ScalarShape), Type.Tensor(1, Type.Integer))],
     )
     assert cost1 == 302.0201
     assert cost1 == cost2

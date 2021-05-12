@@ -47,12 +47,16 @@ def test_tuple_of_tensors():
 )
 """
     m = translate_and_import(__file__, ks_str, "abstract")
-    x = AbstractValue.from_data((np.random.normal(0, 1, (3, 4)), np.random.normal(0, 1, (4,))))
+    x = AbstractValue.from_data(
+        (np.random.normal(0, 1, (3, 4)), np.random.normal(0, 1, (4,)))
+    )
     with ExecutionContext():
         assert m.fst(x).shape_type == ShapeType(
             TensorShape((3, 4), ()), Type.Tensor(2, Type.Float)
         )  # (((3, 4),), Type.Tensor(2, Type.Float))
-        assert m.snd(x).shape_type == ShapeType(TensorShape((4,), ()), Type.Tensor(1, Type.Float))
+        assert m.snd(x).shape_type == ShapeType(
+            TensorShape((4,), ()), Type.Tensor(1, Type.Float)
+        )
 
 
 def test_if_then_else():
@@ -72,4 +76,6 @@ def test_if_then_else():
         assert m.sign(2.0) == 1.0
         assert m.sign(-5.0) == -1.0
         assert m.sign(0) == 0.0
-        assert m.sign(AbstractValue((), Type.Float)).shape_type == ShapeType((), Type.Float)
+        assert m.sign(AbstractValue((), Type.Float)).shape_type == ShapeType(
+            (), Type.Float
+        )

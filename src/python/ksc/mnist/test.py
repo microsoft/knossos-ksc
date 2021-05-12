@@ -71,7 +71,9 @@ def jax_image(v):
 
 
 def test():
-    _, random_weights_j = mnist_classifier.init_mnistjax(random.PRNGKey(0), (-1, 28, 28, 1))
+    _, random_weights_j = mnist_classifier.init_mnistjax(
+        random.PRNGKey(0), (-1, 28, 28, 1)
+    )
 
     random_weights_k = knossos_weights_of_jax_weights_no_softmax(random_weights_j)
 
