@@ -6,8 +6,10 @@ from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Uni
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from ksc.cav_subst import Location, get_children, replace_subtree, make_nonfree_var, VariableSubstitution
+from ksc.alpha_equiv import are_alpha_equivalent
+from ksc.cav_subst import Location, subexps_no_binds, replace_subtree, make_nonfree_var, VariableSubstitution
 from ksc.expr import ConstantType, StructuredName, Expr, Let, Lam, Var, Const, Call, Rule
+from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
@@ -48,7 +50,7 @@ class AbstractMatcher(ABC):
     ) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.matches_here(e, path_from_root, root, env)
-        for i, ch in enumerate(get_children(e)):
+        for i, ch in enumerate(subexps_no_binds(e)):
             yield from self._matches_with_env(
                 ch, path_from_root + (i,), root, _update_env_for_subtree(e, path_from_root, i, env)
             )
@@ -82,31 +84,7 @@ def _update_env_lam(
     parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment
 ) -> LetBindingEnvironment:
     assert which_child == 0
-    return env.remove(parent.arg.name)
-
-
-# Note: filter_term
-# A term that allows a quick-rejection test of whether an expression matches a template.
-# That is: get_filter_term computes a FilterTerm from an Expr in time O(1) in the size of the Expr, such that
-# if get_filter_term(template) == get_filter_term(expr) ---> they might match
-#    get_filter_term(template) != get_filter_term(expr) ---> they definitely don't match
-# Moreover, the design aims to optimize the frequency of detecting non-matches.
-FilterTerm = Union[Type, ConstantType, StructuredName]
-
-
-@singledispatch
-def get_filter_term(e: Expr) -> FilterTerm:
-    return e.__class__
-
-
-@get_filter_term.register
-def get_filter_term_const(e: Const) -> ConstantType:
-    return e.value
-
-
-@get_filter_term.register
-def get_filter_term_call(e: Call):
-    return e.name
+    return env.discard(parent.arg.name)
 
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
@@ -130,7 +108,7 @@ class RuleMatcher(AbstractMatcher):
     @abstractproperty
     def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
         """ A set of terms that might be returned by get_filter_term() of any Expr for which this RuleMatcher
-            could possibly generate a match. (See [Note: filter_term].) """
+            could possibly generate a match. (See filter_term.py).) """
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
@@ -275,7 +253,9 @@ class ParsedRuleMatcher(RuleMatcher):
     def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
-            assert SubstTemplate.visit(self._rule.template, substs) == target  # Note == traverses, so expensive.
+            assert are_alpha_equivalent(
+                SubstTemplate.visit(self._rule.template, substs), target
+            )  # Note this traverses, so expensive.
             result = SubstTemplate.visit(self._rule.replacement, substs)
             # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
@@ -294,7 +274,7 @@ def _combine_substs(s1: VariableSubstitution, s2: Optional[VariableSubstitution]
     # - we are not finding substitutions for variables on the RHS).
     # Note this means that if the LHS template contains multiple binders of the same name,
     # this will only match subject expressions that also use the same variable-name in all those binders.
-    if not all([s1[v] == s2[v] for v in common_vars]):  # TODO use alpha-equivalence rather than strict equality
+    if not all(are_alpha_equivalent(s1[v], s2[v]) for v in common_vars):
         return None  # Fail
     s1.update(s2)
     return s1
@@ -310,8 +290,8 @@ def find_template_subst(template: Expr, exp: Expr, template_vars: PMap[str, Type
     # but we still need to check that subtrees match too.
     if get_filter_term(template) != get_filter_term(exp):
         return None  # No match
-    tmpl_children = get_children(template)
-    exp_children = get_children(exp)
+    tmpl_children = subexps_no_binds(template)
+    exp_children = subexps_no_binds(exp)
     if len(tmpl_children) != len(exp_children):
         return None
     d = dict()
