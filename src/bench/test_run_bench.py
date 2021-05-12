@@ -6,6 +6,7 @@ import time
 def test_inference(benchmark, reference_func, func, config):
     result = benchmark(func.func, config)
     reference_result = reference_func(config)
+    # TODO: generalise correctness test as examples require more than single tensor
     assert torch.allclose(result, reference_result), f"Result and reference differ too much {result} {reference_result}"
 
 
@@ -13,6 +14,7 @@ def test_forward(benchmark, reference_func, func, config):
     config.requires_grad = True
     result = benchmark(func.func, config)
     reference_result = reference_func(config)
+    # TODO: generalise correctness test as examples require more than single tensor
     assert torch.allclose(result, reference_result), f"Result and reference differ too much {result} {reference_result}"
 
 
