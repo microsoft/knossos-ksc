@@ -480,7 +480,11 @@ def find_template_subst_var(
 ) -> Optional[VariableSubstitution]:
     assert template.name in template_vars
     # Require correct type of subexp in order to match
-    return {template.name: exp} if exp.type_ == template_vars[template.name] else None
+    return (
+        {template.name: exp}
+        if template_vars[template.name] in [exp.type_, Type.Any]
+        else None
+    )
 
 
 @find_template_subst.register

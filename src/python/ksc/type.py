@@ -22,6 +22,7 @@ class Type:
         "Float": 0,
         "Bool": 0,
         "String": 0,
+        "Any": 0,  # for Rules only; TODO: enforce we can't have values of / functions operating on these types?
         "Lam": 2,  # TODO: Lambda args are in reverse order, prefer src -> dst
         "LM": 2,  # Linear map, used in AD
     }
@@ -286,6 +287,7 @@ Type.Integer = Type("Integer")
 Type.Float = Type("Float")
 Type.Bool = Type("Bool")
 Type.String = Type("String")
+Type.Any = Type("Any")
 
 
 class SizeType:
