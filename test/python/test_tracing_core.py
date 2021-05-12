@@ -21,7 +21,10 @@ def my_add(a, b):
     return F.add(a, b)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_add(backend):
     out = F.add(1, 2)
     assert out.get_data_with_backend(backend) == 3
@@ -51,7 +54,10 @@ def test_add(backend):
         out = F.add(b, a)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_my_add(backend):
     out = my_add(1.0, 2.0)
     assert out.get_data_with_backend(backend) == 3.0
@@ -72,7 +78,10 @@ def cube(a):
     return F.mul(F.mul(a, a), a)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_user_function(backend):
     out = add3(1.0, 3.0, 4.0)
     assert out.get_data_with_backend(backend) == 8.0
@@ -81,13 +90,19 @@ def test_user_function(backend):
     assert out.get_data_with_backend(backend) == 4.0
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_wrong_type():
     with pytest.raises(ValueError):
         _ = add3(1.0, 3.0, 4)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_jit_wrong_type():
     out = add3(1.0, 3.0, 4.0)
     jitted = out.creator._jitted
@@ -95,7 +110,10 @@ def test_jit_wrong_type():
         jitted(1, 2, 3)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_jit_anonymous(backend):
     out = F.add(F.add(1, 2,), 3)
     assert out.get_data_with_backend(backend) == 6
@@ -110,7 +128,10 @@ def nested(a, b):
     return square(F.add(a, b))
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_user_function_nested():
     out = nested(1.0, 2.0)
     assert out.data == 9.0
@@ -122,7 +143,10 @@ def need_let(a, b):
     return F.add(a2, F.sub(a2, b))
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_need_let(backend):
     out = need_let(3, 1)
     assert "(let (tmpvar__0 (square a))" in out.creator._jitted.ks_str
@@ -130,18 +154,27 @@ def test_need_let(backend):
 
 
 @ksc.trace
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def add_const_float(a):
     return F.add(a, 2.5)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_constant():
     out = add_const_float(1.0)
     assert out.data == 3.5
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_delayed():
     out = F.add(F.add(F.add(1, 2), 3), 4)
     assert out.data == 10
@@ -206,7 +239,10 @@ def test_traced_flatten_shape():
     assert o.shape == (3, 20)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_reuse_result(backend):
     x = F.add(F.add(1, 2), 3)
     assert x.data == 6
@@ -250,7 +286,10 @@ def test_tensor_shape():
     assert get_ks_shape(x) == TensorShape((5, 3, 9), ScalarShape)
 
     x = Node.from_data((np.arange(6).reshape((2, 3)), np.arange(12).reshape((3, 4))))
-    assert get_ks_shape(x) == (TensorShape((2, 3), ScalarShape), TensorShape((3, 4), ScalarShape))
+    assert get_ks_shape(x) == (
+        TensorShape((2, 3), ScalarShape),
+        TensorShape((3, 4), ScalarShape),
+    )
 
 
 def test_tensor_num_elements():
@@ -263,7 +302,10 @@ def test_tensor_num_elements():
     assert core.numel_program(x).data == 5 * 7 + 2 * 3 * 11
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Has a GCC backend currently, which we don't provide on Windows")
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Has a GCC backend currently, which we don't provide on Windows",
+)
 def test_floor_div(backend):
     x = Node.from_data(10)
     o = x // 3

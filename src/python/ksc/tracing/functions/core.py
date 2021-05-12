@@ -31,32 +31,65 @@ def numel_program(node):
         return Node.from_data(1)
 
     if node.type.is_tuple:
-        return sum(numel_program(get_tuple_element(i, node)) for i in range(node.type.tuple_len))
+        return sum(
+            numel_program(get_tuple_element(i, node))
+            for i in range(node.type.tuple_len)
+        )
 
     if node.type.is_tensor:
         # TODO is assuming scalar elts
-        return reduce(mul, node.shape_program[0]) * numel_program(get_tensor_element0(node))
+        return reduce(mul, node.shape_program[0]) * numel_program(
+            get_tensor_element0(node)
+        )
 
     raise NotImplementedError
 
 
-add = make_edef("add", ["a", "b"], elementwise_or_scalar, lambda a, b: a.shape_program, lambda a, b: numel_program(a))
+add = make_edef(
+    "add",
+    ["a", "b"],
+    elementwise_or_scalar,
+    lambda a, b: a.shape_program,
+    lambda a, b: numel_program(a),
+)
 
-sub = make_edef("sub", ["a", "b"], elementwise_or_scalar, lambda a, b: a.shape_program, lambda a, b: numel_program(a))
+sub = make_edef(
+    "sub",
+    ["a", "b"],
+    elementwise_or_scalar,
+    lambda a, b: a.shape_program,
+    lambda a, b: numel_program(a),
+)
 
-neg = make_edef("neg", ["x"], first_arg, lambda x: x.shape_program, lambda x: numel_program(x))
+neg = make_edef(
+    "neg", ["x"], first_arg, lambda x: x.shape_program, lambda x: numel_program(x)
+)
 
 mul = make_edef(
-    "mul", ["a", "b"], elementwise_or_scalar, lambda a, b: a.shape_program, lambda a, b: numel_program(a) * 2
+    "mul",
+    ["a", "b"],
+    elementwise_or_scalar,
+    lambda a, b: a.shape_program,
+    lambda a, b: numel_program(a) * 2,
 )
 
 div = make_edef(
-    "div", ["a", "b"], elementwise_or_scalar, lambda a, b: a.shape_program, lambda a, b: numel_program(a) * 2
+    "div",
+    ["a", "b"],
+    elementwise_or_scalar,
+    lambda a, b: a.shape_program,
+    lambda a, b: numel_program(a) * 2,
 )
 
 pow = make_edef("pow", ["a", "b"], elementwise)
 
-log = make_edef("log", ["a"], first_arg, lambda x, y: x.shape_program, lambda x, y: numel_program(x) * 10)
+log = make_edef(
+    "log",
+    ["a"],
+    first_arg,
+    lambda x, y: x.shape_program,
+    lambda x, y: numel_program(x) * 10,
+)
 
 flatten = make_edef(
     "flatten",
@@ -64,7 +97,10 @@ flatten = make_edef(
     flatten_type_prop_rule,
     # shape$flatten of x is ((s0, srest...), el_shape), result is ((s0, reduce(mul, srest...)), el_shape)
     lambda x: make_tuple(
-        (lambda s: make_tuple(s[0], reduce(mul, s[1:], node.Node.from_data(1))))(x.shape_program[0]), x.shape_program[1]
+        (lambda s: make_tuple(s[0], reduce(mul, s[1:], node.Node.from_data(1))))(
+            x.shape_program[0]
+        ),
+        x.shape_program[1],
     ),
     # cost$flatten
     lambda x: node.Node.from_data(0),
@@ -85,7 +121,11 @@ def make_builtin(name, arg_names, shape_prop_function):
             assert len(args) == len(arg_names)
             ost = shape_prop_function(*args)
             body = node.Node(
-                name=self.name, shape=ost.shape, type=ost.type, children=args, shape_prop_function=shape_prop_function
+                name=self.name,
+                shape=ost.shape,
+                type=ost.type,
+                children=args,
+                shape_prop_function=shape_prop_function,
             )
             shape_types = tuple(arg.shape_type for arg in args)
             return Trace(body, ShapeType(ost.shape, ost.type), shape_types)

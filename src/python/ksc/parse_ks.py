@@ -118,7 +118,11 @@ def parse_structured_name(se):
     if isinstance(se, sexpdata.Symbol):
         return StructuredName(se.value())
 
-    check(isinstance(se, sexpdata.Bracket), "Wanted identifier or [ident Type] or [ident <StructuredName>], got: ", se)
+    check(
+        isinstance(se, sexpdata.Bracket),
+        "Wanted identifier or [ident Type] or [ident <StructuredName>], got: ",
+        se,
+    )
     ses = se.value()
     assert len(ses) == 2
     se0 = parse_name(ses[0])
@@ -177,7 +181,11 @@ def parse_expr(se):
 
     # Let(var, rhs, body)
     if head == _let:
-        check(len(se) == 3, f"Let should have 2 terms (let (<binding>) body), not {len(se)-1} in", se)
+        check(
+            len(se) == 3,
+            f"Let should have 2 terms (let (<binding>) body), not {len(se)-1} in",
+            se,
+        )
         binding = se[1]
         check(len(binding) == 2, "Let bindings should be pairs", binding, "in", se)
         lhs = binding[0]
@@ -206,7 +214,11 @@ def parse_tld(se):
     check(len(se) > 0, "Empty list at top level")
     head = se[0]
     if head == _def:
-        return Def(*parse_seq(se[1:], parse_structured_name, parse_type, parse_args, parse_expr))
+        return Def(
+            *parse_seq(
+                se[1:], parse_structured_name, parse_type, parse_args, parse_expr
+            )
+        )
 
     if head == _edef:
         return EDef(*parse_seq(se[1:], parse_structured_name, parse_type, parse_type))
@@ -215,7 +227,9 @@ def parse_tld(se):
         return GDef(*parse_seq(se[1:], parse_name, parse_structured_name))
 
     if head == _rule:
-        return Rule(*parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr))
+        return Rule(
+            *parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr)
+        )
 
     check(False, "unrecognised top-level definition:", se)
 
@@ -231,7 +245,9 @@ def s_exps_from_string(string_or_stream, source_file_name=None):
         global parser_source_file
         parser_source_file = source_file_name
 
-    return sexpdata.Parser(string_or_stream, nil=None, true="true", false="false", line_comment=";").parse()
+    return sexpdata.Parser(
+        string_or_stream, nil=None, true="true", false="false", line_comment=";"
+    ).parse()
 
 
 def parse_expr_string(string_or_stream):
@@ -282,7 +298,9 @@ def parse_ks_filename(filename):
 
 def main():
     parser = argparse.ArgumentParser(prog="parse_ks.py", description=__doc__)
-    parser.add_argument("input_ks_file", nargs="?", type=str, default="test/ksc/syntax-primer.ks")
+    parser.add_argument(
+        "input_ks_file", nargs="?", type=str, default="test/ksc/syntax-primer.ks"
+    )
     args = parser.parse_args()
 
     for x in parse_ks_filename(args.input_ks_file):

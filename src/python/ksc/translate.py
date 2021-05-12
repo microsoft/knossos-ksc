@@ -19,7 +19,13 @@ def handle_let(let_var, let_expr, body, indent=4):
         var_names = let_var.name
     joiner = "\n" + (" " * indent)
     lambda_expr = joiner.join(
-        [f"let(tupled={tupled},", f"    var={let_expr},", f"    body=lambda {var_names}:", f"      {body}", ")"]
+        [
+            f"let(tupled={tupled},",
+            f"    var={let_expr},",
+            f"    body=lambda {var_names}:",
+            f"      {body}",
+            ")",
+        ]
     )
     return lambda_expr
 
@@ -74,7 +80,9 @@ def type_to_sample(arg_type):
             val = type_to_sample(arg_type.tensor_elem_type)
             return f"[{val} for _ in range(2)]"
     elif type == "Tuple":
-        return "({})".format(",\n  ".join([type_to_sample(t) for t in arg_type.tuple_elems()]))
+        return "({})".format(
+            ",\n  ".join([type_to_sample(t) for t in arg_type.tuple_elems()])
+        )
     assert False, arg_type
 
 
@@ -178,12 +186,17 @@ class Translator:
             try:
                 args_handled.append(self.handle_body(arg, indent + 2))
             except:
-                raise ValueError("In {}, failed to handle" " argument #{}, {}".format(name, i + 1, arg))
+                raise ValueError(
+                    "In {}, failed to handle"
+                    " argument #{}, {}".format(name, i + 1, arg)
+                )
 
         # (get$m$n t)
         if name.startswith("get$"):
             index = int(name.split("$")[1]) - 1
-            return "get_tuple_element({index}, {tuple_name})".format(tuple_name=args_handled[0], index=index)
+            return "get_tuple_element({index}, {tuple_name})".format(
+                tuple_name=args_handled[0], index=index
+            )
 
         # (tuple e1 .. eN)
         if name == "tuple":
@@ -191,7 +204,9 @@ class Translator:
 
         # other function calls
         func_name = self.normalize_def_name(name)
-        return "{func_name}({args})".format(func_name=func_name, args=", ".join(args_handled))
+        return "{func_name}({args})".format(
+            func_name=func_name, args=", ".join(args_handled)
+        )
 
     def handle_def(self, ex):
         name = ex.name
@@ -203,7 +218,9 @@ class Translator:
 def {name}({args}):
   return {body}
 """.format(
-                name=self.normalize_def_name(name), args=", ".join(arg_names), body=self.handle_body(ex.body)
+                name=self.normalize_def_name(name),
+                args=", ".join(arg_names),
+                body=self.handle_body(ex.body),
             ),
             args_to_sample_values(args),
         )
@@ -216,7 +233,11 @@ def {name}({args}):
                 py_name = self.normalize_def_name(name)
                 if py_name in self._built_ins:
                     # if it is built-in no need to edef
-                    print("translate: no need to emit edef for builtin ", tld, file=sys.stderr)
+                    print(
+                        "translate: no need to emit edef for builtin ",
+                        tld,
+                        file=sys.stderr,
+                    )
                     continue
                 edef = _EDef(name, py_name, tld.return_type)
                 self._edefs[name] = edef
@@ -228,7 +249,11 @@ def {name}({args}):
                 else:
                     self._defs.append(self.handle_def(tld))
             else:
-                print("translate: ignoring unrecognized definition type ", tld, file=sys.stderr)
+                print(
+                    "translate: ignoring unrecognized definition type ",
+                    tld,
+                    file=sys.stderr,
+                )
         for tld in defs_to_process:
             self._defs.append(self.handle_def(tld))
 
@@ -243,7 +268,9 @@ def main():
 if __name__ == "__main__":
   main()
 """.format(
-            sample_args="\n  ".join("{} = {}".format(k, v) for k, v in main.sample_args),
+            sample_args="\n  ".join(
+                "{} = {}".format(k, v) for k, v in main.sample_args
+            ),
             main=main.name,
             main_args=", ".join([k for k, _ in main.sample_args]),
         )
@@ -269,7 +296,9 @@ if __name__ == "__main__":
             ]
         else:
             # in most backends, edefs are imported from backend
-            imports = sorted(set(self._built_ins + [edef.py_name for edef in self._edefs.values()]))
+            imports = sorted(
+                set(self._built_ins + [edef.py_name for edef in self._edefs.values()])
+            )
             edefs = []
 
         return """import numpy as np
@@ -289,7 +318,12 @@ defs={{
             backend=self.backend,
             imports=",\n  ".join(imports),
             defs="\n".join([d.str for d in self._defs]),
-            defs_map=",\n  ".join([f'"{d.name.mangled()}": {self.normalize_def_name(d.name)}' for d in self._defs]),
+            defs_map=",\n  ".join(
+                [
+                    f'"{d.name.mangled()}": {self.normalize_def_name(d.name)}'
+                    for d in self._defs
+                ]
+            ),
             edefs="\n".join(edefs),
         )
 
@@ -305,9 +339,13 @@ def translate(ks_str, backend, source_file_name, with_main=True):
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="python -m ksc.translate", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="python -m ksc.translate", description=__doc__
+    )
     parser.add_argument("input_ks_file", type=str)
-    parser.add_argument("--backend", choices=["common", "jax", "jax_input_last"], default="common")
+    parser.add_argument(
+        "--backend", choices=["common", "jax", "jax_input_last"], default="common"
+    )
     args = parser.parse_args()
 
     with open(args.input_ks_file) as f:

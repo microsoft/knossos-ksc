@@ -137,7 +137,9 @@ def get_value(init):
 
     value = getattr(init, field)
     if not value:
-        raise NotImplementedError(f"value {init.int32_data} {field} {value} {init.data_type}\n{init}")
+        raise NotImplementedError(
+            f"value {init.int32_data} {field} {value} {init.data_type}\n{init}"
+        )
 
     return Const(value)
 
@@ -161,7 +163,9 @@ def Expr_from_TensorProto(val, name):
         return get_value(val)
 
     nptype = onnx.mapping.TENSOR_TYPE_TO_NP_TYPE[val.data_type]
-    return Call(f"load-from-onnx-{nptype}", [*(Const(x) for x in val.dims), Const(name)])
+    return Call(
+        f"load-from-onnx-{nptype}", [*(Const(x) for x in val.dims), Const(name)]
+    )
 
 
 def Expr_from_AttrVal(val):
@@ -221,7 +225,9 @@ def get_default_value(schema, attr):
     if val != None:
         return val
 
-    print(f"** Attribute {attr.name} of op {schema.name} has no default value -- special casing")
+    print(
+        f"** Attribute {attr.name} of op {schema.name} has no default value -- special casing"
+    )
 
     # TODO: Formalize this, at least into prelude
     if schema.name == "MaxPool":
@@ -230,7 +236,9 @@ def get_default_value(schema, attr):
 
     if schema.name == "Conv" or schema.name == "ConvTranspose":
         if attr.name == "pads":
-            return Expr_from_AttrVal([-1, -1])  # TODO: this should either match dims, or maybe be empty
+            return Expr_from_AttrVal(
+                [-1, -1]
+            )  # TODO: this should either match dims, or maybe be empty
         if attr.name == "output_shape":
             return Expr_from_AttrVal([-1, -1])
 
@@ -336,7 +344,9 @@ def onnx2ks(g):
                 val = Expr_from_Attr(n)
                 node_attrs[n.name] = val
                 if n.name not in schema.attributes:
-                    warnings.warn(f"Attribute {n.name} not in schema for {opname} -- adding arg anyway")
+                    warnings.warn(
+                        f"Attribute {n.name} not in schema for {opname} -- adding arg anyway"
+                    )
                     args += [val]
 
             # - The rest are defaulted
@@ -383,7 +393,11 @@ def onnx2ks(g):
     # value_infos -> types
     args = [defVar(i.name, onnxType_to_Type(i.type)) for i in g.input]
 
-    body = Let(Var("$beg_of_internal_inits #|Begin of internal initializers|# "), Const(99999), body)
+    body = Let(
+        Var("$beg_of_internal_inits #|Begin of internal initializers|# "),
+        Const(99999),
+        body,
+    )
     ex = emit_inits(internal_inits, body)
 
     # Emit a def for the whole graph

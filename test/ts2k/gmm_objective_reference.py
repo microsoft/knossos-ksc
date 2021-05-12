@@ -33,7 +33,10 @@ def log_wishart_prior(p, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
     k = icf.shape[0]
 
     out = torch.sum(
-        0.5 * wishart_gamma * wishart_gamma * (torch.sum(Qdiags ** 2, dim=1) + torch.sum(icf[:, p:] ** 2, dim=1))
+        0.5
+        * wishart_gamma
+        * wishart_gamma
+        * (torch.sum(Qdiags ** 2, dim=1) + torch.sum(icf[:, p:] ** 2, dim=1))
         - wishart_m * sum_qs
     )
 
@@ -47,7 +50,10 @@ def constructL(d, icf):
     def make_L_col(i):
         nelems = d - i - 1
         col = torch.cat(
-            [torch.zeros(i + 1, dtype=torch.float64), icf[constructL.Lparamidx : (constructL.Lparamidx + nelems)]]
+            [
+                torch.zeros(i + 1, dtype=torch.float64),
+                icf[constructL.Lparamidx : (constructL.Lparamidx + nelems)],
+            ]
         )
 
         constructL.Lparamidx += nelems
@@ -79,4 +85,9 @@ def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
     slse = torch.sum(lse)
 
     CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
-    return CONSTANT + slse - n * logsumexp(alphas) + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    return (
+        CONSTANT
+        + slse
+        - n * logsumexp(alphas)
+        + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    )

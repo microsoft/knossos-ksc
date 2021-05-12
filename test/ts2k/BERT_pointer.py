@@ -29,7 +29,12 @@ scripted = torch.jit.script(model)
 
 generate_edef = False
 
-ts2ks_fromgraph(sys.stdout, generate_edef, "BertScriptableForQuestionAnswering", scripted.inlined_graph)
+ts2ks_fromgraph(
+    sys.stdout,
+    generate_edef,
+    "BertScriptableForQuestionAnswering",
+    scripted.inlined_graph,
+)
 
 # scripted_init_weights = torch.jit.script(model.init_weights)
 # scripted_init_weights.graph

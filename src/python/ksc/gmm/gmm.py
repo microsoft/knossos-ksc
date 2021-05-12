@@ -28,8 +28,14 @@ def log_wishart_prior(p, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
     out = 0
     for ik in range(k):
         frobenius = sqsum(Qdiags[ik, :]) + sqsum(icf[ik, p:])
-        out = out + 0.5 * wishart_gamma * wishart_gamma * frobenius - wishart_m * sum_qs[ik]
-    C = n * p * (math.log(wishart_gamma) - 0.5 * math.log(2)) - log_gamma_distrib(0.5 * n, p)
+        out = (
+            out
+            + 0.5 * wishart_gamma * wishart_gamma * frobenius
+            - wishart_m * sum_qs[ik]
+        )
+    C = n * p * (math.log(wishart_gamma) - 0.5 * math.log(2)) - log_gamma_distrib(
+        0.5 * n, p
+    )
     return out - k * C
 
 
@@ -39,7 +45,10 @@ def constructL(d, icf):
     def make_L_col(i):
         nelems = d - i - 1
         col = np.concatenate(
-            [np.zeros(i + 1, dtype=np.float64), icf[constructL.Lparamidx : (constructL.Lparamidx + nelems)]]
+            [
+                np.zeros(i + 1, dtype=np.float64),
+                icf[constructL.Lparamidx : (constructL.Lparamidx + nelems)],
+            ]
         )
         constructL.Lparamidx += nelems
         return col
@@ -75,4 +84,9 @@ def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
         slse = slse + logsumexp(lse)
 
     CONSTANT = -n * d * 0.5 * math.log(2 * math.pi)
-    return CONSTANT + slse - n * logsumexp(alphas) + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    return (
+        CONSTANT
+        + slse
+        - n * logsumexp(alphas)
+        + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
+    )

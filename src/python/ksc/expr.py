@@ -320,7 +320,12 @@ class Rule(ASTNode):
     replacement: Expr
 
     def __init__(self, name, template_vars, template, replacement):
-        super().__init__(name=name, template_vars=template_vars, template=template, replacement=replacement)
+        super().__init__(
+            name=name,
+            template_vars=template_vars,
+            template=template,
+            replacement=replacement,
+        )
 
 
 ConstantType = Union[int, str, float, bool]
@@ -536,7 +541,14 @@ def _(ex, indent):
 @pystr.register(EDef)
 def _(ex, indent):
     indent += 1
-    return "#edef " + str(ex.name) + pystr(ex.arg_type, indent) + " -> " + pystr(ex.return_type, indent) + nl(indent)
+    return (
+        "#edef "
+        + str(ex.name)
+        + pystr(ex.arg_type, indent)
+        + " -> "
+        + pystr(ex.return_type, indent)
+        + nl(indent)
+    )
 
 
 @pystr.register(GDef)
@@ -587,7 +599,15 @@ def _(ex, indent):
 @pystr.register(Lam)
 def _(ex, indent):
     indent += 1
-    return "lambda " + pyname(ex.arg.name) + ": " + nl(indent + 1) + "(" + pystr(ex.body, indent + 1) + ")"
+    return (
+        "lambda "
+        + pyname(ex.arg.name)
+        + ": "
+        + nl(indent + 1)
+        + "("
+        + pystr(ex.body, indent + 1)
+        + ")"
+    )
 
 
 @pystr.register(Let)
@@ -596,7 +616,13 @@ def _(ex, indent):
         var_str = ",".join(pystr(v, indent) for v in ex.vars)
     else:
         var_str = pystr(ex.vars, indent)
-    return var_str + " = " + pystr(ex.rhs, indent + 1) + nl(indent) + pystr(ex.body, indent)
+    return (
+        var_str
+        + " = "
+        + pystr(ex.rhs, indent + 1)
+        + nl(indent)
+        + pystr(ex.body, indent)
+    )
 
 
 @pystr.register(If)
@@ -616,7 +642,9 @@ def _(ex, indent):
 @pystr.register(Assert)
 def _(ex, indent):
     indent += 1
-    return "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) + pystr(ex.body, indent)
+    return (
+        "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) + pystr(ex.body, indent)
+    )
 
 
 #####################################################################
@@ -635,7 +663,11 @@ def fv_var(e: Var):
 
 @compute_free_vars.register
 def fv_call(e: Call):
-    return frozenset() if len(e.args) == 0 else frozenset.union(*[arg.free_vars_ for arg in e.args])
+    return (
+        frozenset()
+        if len(e.args) == 0
+        else frozenset.union(*[arg.free_vars_ for arg in e.args])
+    )
 
 
 @compute_free_vars.register
@@ -645,7 +677,11 @@ def fv_lam(e: Lam):
 
 @compute_free_vars.register
 def fv_let(e: Let):
-    bound_here = e.vars.free_vars_ if isinstance(e.vars, Var) else frozenset.union(*[var.free_vars_ for var in e.vars])
+    bound_here = (
+        e.vars.free_vars_
+        if isinstance(e.vars, Var)
+        else frozenset.union(*[var.free_vars_ for var in e.vars])
+    )
     return e.rhs.free_vars_.union(e.body.free_vars_ - bound_here)
 
 
