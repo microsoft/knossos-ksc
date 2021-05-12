@@ -159,7 +159,10 @@ class RuleMatcher(AbstractMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        if len(self.possible_filter_terms) == 0 or get_filter_term(expr) in self.possible_filter_terms:
+        if (
+            len(self.possible_filter_terms) == 0
+            or get_filter_term(expr) in self.possible_filter_terms
+        ):
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
     def __reduce__(self):
@@ -191,7 +194,9 @@ class RuleSet(AbstractMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        for rule in chain(self._any_expr_rules, self._filtered_rules.get(get_filter_term(subtree), [])):
+        for rule in chain(
+            self._any_expr_rules, self._filtered_rules.get(get_filter_term(subtree), [])
+        ):
             yield from rule.matches_for_possible_expr(
                 subtree, path_from_root, root, env
             )

@@ -9,7 +9,10 @@ from ksc import utils
 
 
 def sorted_rewrites(rule, expr):
-    return [rw.apply_rewrite() for rw in sorted(rule.find_all_matches(expr), key=lambda rw: rw.path)]
+    return [
+        rw.apply_rewrite()
+        for rw in sorted(rule.find_all_matches(expr), key=lambda rw: rw.path)
+    ]
 
 
 def test_lift_if():
@@ -84,12 +87,16 @@ def test_lift_bind_shadowing():
 
 
 def test_lifting_over_build():
-    e = parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 7)) (if (gt x 5) x i))))")
+    e = parse_expr_string(
+        "(build 10 (lam (i : Integer) (let (x (add 5 7)) (if (gt x 5) x i))))"
+    )
     rules = RuleSet([rule("lift_bind"), rule("lift_if")])
     match = utils.single_elem(list(rules.find_all_matches(e)))
     actual = match.apply_rewrite()
     # Let should have been lifted:
-    assert actual == parse_expr_string("(let (x (add 5 7)) (build 10 (lam (i : Integer) (if (gt x 5) x i))))")
+    assert actual == parse_expr_string(
+        "(let (x (add 5 7)) (build 10 (lam (i : Integer) (if (gt x 5) x i))))"
+    )
     match2 = utils.single_elem(list(rules.find_all_matches(actual)))
     actual2 = match2.apply_rewrite()
     # Now can lift the if:
@@ -98,7 +105,9 @@ def test_lifting_over_build():
     )
 
     # But, don't allow lifting an expression that refers to the build/lam-bound 'i':
-    e3 = parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x i))))")
+    e3 = parse_expr_string(
+        "(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x i))))"
+    )
     match3 = utils.single_elem(list(rules.find_all_matches(e3)))
     actual3 = match3.apply_rewrite()
     assert actual3 == parse_expr_string(
@@ -107,6 +116,10 @@ def test_lifting_over_build():
     # Now we should be able to lift either of those let's, but not the 'if'
     actual4 = sorted_rewrites(rules, actual3)
     assert actual4 == [
-        parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x (let (x (add 5 i)) i)))))"),
-        parse_expr_string("(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) (let (x (add 5 i)) x) i))))"),
+        parse_expr_string(
+            "(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x (let (x (add 5 i)) i)))))"
+        ),
+        parse_expr_string(
+            "(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) (let (x (add 5 i)) x) i))))"
+        ),
     ]
