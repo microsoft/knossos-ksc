@@ -11,43 +11,43 @@ from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 
 
 @singledispatch
-def get_children(e: Expr) -> List[Expr]:
+def subexps_no_binds(e: Expr) -> List[Expr]:
     # The rewritable children of an Expr
     raise ValueError("Must be overridden for every Expr subclass")
 
 
-@get_children.register
-def _get_children_var(e: Var):
+@subexps_no_binds.register
+def _subexps_no_binds_var(e: Var):
     return []
 
 
-@get_children.register
-def _get_children_const(e: Const):
+@subexps_no_binds.register
+def _subexps_no_binds_const(e: Const):
     return []
 
 
-@get_children.register
-def _get_children_let(e: Let):
+@subexps_no_binds.register
+def _subexps_no_binds_let(e: Let):
     return [e.rhs, e.body]
 
 
-@get_children.register
-def _get_children_lam(e: Lam):
+@subexps_no_binds.register
+def _subexps_no_binds_lam(e: Lam):
     return [e.body]
 
 
-@get_children.register
-def _get_children_call(e: Call):
+@subexps_no_binds.register
+def _subexps_no_binds_call(e: Call):
     return e.args
 
 
-@get_children.register
-def _get_children_if(e: If):
+@subexps_no_binds.register
+def _subexps_no_binds_if(e: If):
     return [e.cond, e.t_body, e.f_body]
 
 
-@get_children.register
-def _get_children_assert(e: Assert):
+@subexps_no_binds.register
+def _subexps_no_binds_assert(e: Assert):
     return [e.cond, e.body]
 
 
@@ -55,7 +55,7 @@ Location = Sequence[int]  # Used immutably, so normally a tuple
 
 
 def get_node_at_location(expr, path: Location):
-    return expr if len(path) == 0 else get_node_at_location(get_children(expr)[path[0]], path[1:])
+    return expr if len(path) == 0 else get_node_at_location(subexps_no_binds(expr)[path[0]], path[1:])
 
 
 #####################################################################
@@ -155,7 +155,7 @@ def _requests_to_child(reqs: List[ReplaceLocationRequest], ch_idx: int) -> List[
 
 def _cav_child_list(e: Expr, reqs, substs):
     # Applies _cav_helper to the children of the expression, and returns the list of substituted children
-    return [_cav_helper(ch, _requests_to_child(reqs, ch_idx), substs) for ch_idx, ch in enumerate(get_children(e))]
+    return [_cav_helper(ch, _requests_to_child(reqs, ch_idx), substs) for ch_idx, ch in enumerate(subexps_no_binds(e))]
 
 
 @_cav_children.register
