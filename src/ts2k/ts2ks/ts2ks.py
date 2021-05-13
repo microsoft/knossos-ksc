@@ -461,20 +461,37 @@ def forward_template(py_mod, ctx, *args):
     py_mod.reset_allocator()
     ks_args = (torch_to_ks(py_mod, x) for x in args)
 
-    # Call it
-    outputs = py_mod.entry(*ks_args)
+    has_sufrev = hasattr(py_mod, "sufrev_entry")
 
-    # TODO: Use BOG properly
-    if ctx is not None:
-        ctx.save_for_backward(*args)
+    if has_sufrev:
+        # Bag-of-goodies AD: save the bog
+        outputs_and_bog = py_mod.suffwdpass_entry(*ks_args)
 
-    return torch_from_ks(outputs)
+        outputs, bog = torch_from_ks(outputs_and_bog)
+
+        assert ctx is not None
+        ctx.save_for_backward(bog)
+        return outputs
+
+    else:
+        # Linear map AD: separate fwd and reverse
+        outputs = py_mod.entry(*ks_args)
+        if ctx is not None:
+            ctx.save_for_backward(*args)
+
+        return torch_from_ks(outputs)
 
 
 def backward_template(py_mod, ctx, *args):
-    ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
+    ctx_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
     ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
-    outputs = py_mod.sufrev_entry(ks_args, ks_grad_args)
+    has_sufrev = hasattr(py_mod, "sufrev_entry")
+
+    if has_sufrev:
+        outputs = py_mod.sufrevpass_entry(ctx_args, ks_grad_args)
+
+    else:
+        outputs = py_mod.rev_entry(ctx_args, ks_grad_args)
 
     return torch_from_ks(outputs)
 
@@ -515,20 +532,8 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
         defs_with_derivatives += [ksc_def]
-        if "sufrev" in derivatives_to_generate:
-            defs_with_derivatives += [
-                GDef("suffwdpass", ksc_def.name),
-                GDef("sufrevpass", ksc_def.name),
-                GDef("sufrev", ksc_def.name),
-            ]
-        if "fwd" in derivatives_to_generate:
-            defs_with_derivatives += [
-                GDef("fwd", ksc_def.name),
-            ]
-        if "rev" in derivatives_to_generate:
-            defs_with_derivatives += [
-                GDef("rev", ksc_def.name),
-            ]
+        for der in derivatives_to_generate:
+            defs_with_derivatives += [GDef(der, ksc_def.name)]
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in entry_def.args]
@@ -546,6 +551,13 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
 
 
 import inspect
+
+
+def get_derivatives_to_generate(generate_lm):
+    if generate_lm:
+        return ["fwd", "rev"]
+    else:
+        return ["suffwdpass", "sufrevpass", "sufrev"]
 
 
 def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
@@ -566,8 +578,7 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
 
     entry_def = ksc_defs[-1]
 
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    return ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
+    return ksc_defs_to_module(ksc_defs, entry_def, get_derivatives_to_generate(generate_lm))
 
 
 def ts2mod(function, example_inputs, generate_lm=True):
@@ -577,8 +588,7 @@ def ts2mod(function, example_inputs, generate_lm=True):
     else:
         ksc_def = ast2ks(function)
 
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    return ksc_defs_to_module([ksc_def], ksc_def, derivatives_to_generate)
+    return ksc_defs_to_module([ksc_def], ksc_def, get_derivatives_to_generate(generate_lm))
 
 
 import time
