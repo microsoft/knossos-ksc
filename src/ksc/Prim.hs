@@ -555,8 +555,8 @@ sufRevFunCallResultTy_maybe P_sum elt_ty indexType
 sufRevFunCallResultTy_maybe P_ts_add dt (TypeTuple [])
   = Just (TypeTuple [dt, dt])
 
-sufRevFunCallResultTy_maybe P_ts_dot TypeFloat tangentType_arg_ty
-  = Just tangentType_arg_ty
+sufRevFunCallResultTy_maybe P_ts_dot TypeFloat arg_ty
+  = Just arg_ty
 
 sufRevFunCallResultTy_maybe P_constVec (TypeTensor n ty) (TypeTuple [])
   | let tangent_index_ty = tangentType (tensorIndexType n)
