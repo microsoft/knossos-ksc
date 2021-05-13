@@ -272,21 +272,27 @@ class ParsedRuleMatcher(RuleMatcher):
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
+        # Check the template_vars are always enclosed by the same binders,
+        # and record cases where a template_var leaves the scope of a binder
+        # (i.e. where it must not refer to the binder)
         template_binder_sets_by_var = enclosing_binders_per_free_var(rule.template)
         rhs_binder_sets_by_var = enclosing_binders_per_free_var(rule.replacement)
         self._binders_escaped: Mapping[str, FrozenSet[str]] = {}
         for var, template_binder_sets in template_binder_sets_by_var.items():
+            # The subexp matched by "var" will be able to refer only to binders enclosing *all* occurrences:
             least_binders = frozenset.intersection(*template_binder_sets)
             rhs_binder_sets = rhs_binder_sets_by_var.get(var, [])
-            most_binders = (
+            all_binders_rhs = (
                 frozenset().union(*rhs_binder_sets).intersection(template_binder_names)
-            )
-            assert most_binders.issubset(
+            )  # Exclude new binders introduced in the replacement - these will have names chosen to avoid capture
+            assert all_binders_rhs.issubset(
                 least_binders
-            ), f"Would have to rename {most_binders.intersection(least_binders)} as they capture {var} on RHS"
+            ), f"Would have to rename {all_binders_rhs.intersection(least_binders)} as they capture {var} on RHS"
 
             self._binders_escaped[var] = frozenset.union(
+                # Must not refer to any binder which encloses only some occurrences in templote
                 frozenset.union(*template_binder_sets).difference(least_binders),
+                # Nor to any binder which encloses in the template but does not enclose all occurrences in the replacement
                 *[least_binders.difference(s) for s in rhs_binder_sets],
             )
         assert self._binders_escaped.keys() == known_vars
@@ -303,15 +309,11 @@ class ParsedRuleMatcher(RuleMatcher):
         substs = find_template_subst(self._rule.template, subtree, self._arg_types)
         if substs is None:
             return
-        for template_var, subst in substs.items():
-            # Check that subst does not contain a free variable which is only bound in some occurrences of the template_var.
-            # 'subst' will use the variables bound in the subject expression,
-            # whereas binders_escaped uses the names of the template variables, hence translate
-            expr_vars_escaped = [
-                substs[bv].name
-                for bv in self._binders_escaped.get(template_var, frozenset())
-            ]
-            if not subst.free_vars_.isdisjoint(expr_vars_escaped):
+        for template_var, binders_escaped in self._binders_escaped.items():
+            # Check that template_var has not matched a subexp containing a free variable which will escape its binder.
+            # binders_escaped lists variables bound in the template, so use 'substs' to translate to variables in the matched expr.
+            expr_vars_escaped = [substs[bv].name for bv in binders_escaped]
+            if not substs[template_var].free_vars_.isdisjoint(expr_vars_escaped):
                 return
         yield Match(self, root, path_from_root, substs)
 
