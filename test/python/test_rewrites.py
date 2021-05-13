@@ -277,7 +277,7 @@ def test_multiple_occurrences_in_different_binders():
 
 
 def test_rule_rhs_capture():
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="Would have to rename"):
         r = parse_rule_str(
             '(rule "lift_bind_over_if" ((p : Bool) (body : Any) (f : Any) (e : Any)) (if p (let (x e) body) f) (let (x e) (if p body f)))',
             {},
