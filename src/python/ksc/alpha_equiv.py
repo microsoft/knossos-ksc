@@ -5,8 +5,8 @@ from typing import NamedTuple, Type
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
 
-from ksc.cav_subst import subexps_no_binds
 from ksc.expr import Expr, Var, Let, Lam, Call, If, Assert, Const
+from ksc.expr_utils import subexps_no_binds
 from ksc.filter_term import get_filter_term
 
 

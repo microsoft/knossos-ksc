@@ -13,51 +13,11 @@ from typing import (
 )
 
 from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
+from ksc.expr_utils import subexps_no_binds
 
 # cav_subst = Capture-AVoiding SUBSTitution
 
 ##### Node numbering scheme
-
-
-@singledispatch
-def subexps_no_binds(e: Expr) -> List[Expr]:
-    # The rewritable children of an Expr
-    raise ValueError("Must be overridden for every Expr subclass")
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_var(e: Var):
-    return []
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_const(e: Const):
-    return []
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_let(e: Let):
-    return [e.rhs, e.body]
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_lam(e: Lam):
-    return [e.body]
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_call(e: Call):
-    return e.args
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_if(e: If):
-    return [e.cond, e.t_body, e.f_body]
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_assert(e: Assert):
-    return [e.cond, e.body]
 
 
 Location = Sequence[int]  # Used immutably, so normally a tuple

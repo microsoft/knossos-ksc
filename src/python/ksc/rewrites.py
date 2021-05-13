@@ -9,8 +9,6 @@ from typing import (
     List,
     Mapping,
     Tuple,
-    Union,
-    Sequence,
 )
 
 from pyrsistent import pmap
@@ -19,22 +17,12 @@ from pyrsistent.typing import PMap
 from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.cav_subst import (
     Location,
-    subexps_no_binds,
     replace_subtree,
     make_nonfree_var,
     VariableSubstitution,
 )
-from ksc.expr import (
-    ConstantType,
-    StructuredName,
-    Expr,
-    Let,
-    Lam,
-    Var,
-    Const,
-    Call,
-    Rule,
-)
+from ksc.expr import Expr, Let, Lam, Var, Const, Rule
+from ksc.expr_utils import subexps_no_binds, list_binders, binder_sets_per_free_var
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
@@ -239,77 +227,6 @@ class inline_var(RuleMatcher):
 ###############################################################################
 # Rules parsed from KS. See class Rule (which has a shorter overview of syntax)
 #
-
-
-@singledispatch
-def list_binders(e: Expr) -> Sequence[str]:
-    """ Gather all tha variable names bound in e. If multiple Let/Lam's bind the same name,
-        the name will be repeated. """
-    return _list_subexp_binders(e)
-
-
-def _list_subexp_binders(e: Expr) -> Sequence[str]:
-    return sum([list_binders(ch) for ch in subexps_no_binds(e)], [])
-
-
-@list_binders.register
-def _list_binders_let(e: Let):
-    assert isinstance(e.vars, Var), "Tupled Lets not supported - use untuple_lets first"
-    return [e.vars.name] + _list_subexp_binders(e)
-
-
-@list_binders.register
-def _list_binders_lam(e: Lam):
-    return [e.arg] + _list_subexp_binders(e)
-
-
-def binder_sets_per_free_var(e: Expr) -> Mapping[str, Sequence[FrozenSet[str]]]:
-    """ For each variable free in `e`, return a sequence containing,
-        for each occurrence of that variable, the set of binders within e enclosing that occurrence.
-    """
-    return _binder_sets_helper(e, frozenset())
-
-
-@singledispatch
-def _binder_sets_helper(
-    e: Expr, binders_in_scope: FrozenSet[str]
-) -> Mapping[str, Sequence[FrozenSet[str]]]:
-    return _concat_map_values(
-        [_binder_sets_helper(ch, binders_in_scope) for ch in subexps_no_binds(e)]
-    )
-
-
-@_binder_sets_helper.register
-def _binder_sets_var(
-    v: Var, binders_in_scope: FrozenSet[str]
-) -> Mapping[str, Sequence[FrozenSet[str]]]:
-    return {} if v.name in binders_in_scope else {v.name: [binders_in_scope]}
-
-
-def _concat_map_values(
-    maps: Sequence[Mapping[str, Sequence[FrozenSet[str]]]]
-) -> Mapping[str, Sequence[FrozenSet[str]]]:
-    res = {}
-    for map in maps:
-        for key, value_list in map.items():
-            res.setdefault(key, []).extend(value_list)
-    return res
-
-
-@_binder_sets_helper.register
-def _binder_sets_lam(e: Lam, binders_in_scope: FrozenSet[str]):
-    return _binder_sets_helper(e.body, binders_in_scope.union([e.arg.name]))
-
-
-@_binder_sets_helper.register
-def _binder_sets_let(e: Let, binders_in_scope: FrozenSet[str]):
-    assert isinstance(e.vars, Var), "Tupled Lets not supported - use untuple_lets first"
-    return _concat_map_values(
-        [
-            _binder_sets_helper(e.rhs, binders_in_scope),
-            _binder_sets_helper(e.body, binders_in_scope.union([e.vars.name])),
-        ]
-    )
 
 
 class ParsedRuleMatcher(RuleMatcher):
