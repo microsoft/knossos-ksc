@@ -40,7 +40,11 @@ def log_softmax(x):
 
 def conv_2d_no_bias(x, weights, ksizes, strides, paddings):
     y = jax.lax.conv_general_dilated(
-        x, weights, strides, paddings, dimension_numbers=("NCHW", "OIHW", "NCHW")  # the same as pytorch / onnx
+        x,
+        weights,
+        strides,
+        paddings,
+        dimension_numbers=("NCHW", "OIHW", "NCHW"),  # the same as pytorch / onnx
     )
     print(f"conv_2d shape: {y.shape}")
     return y

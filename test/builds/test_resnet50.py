@@ -6,9 +6,15 @@ import os
 from PIL import Image
 from urllib.request import urlretrieve
 
-INPUT_FILE_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/msrc.jpg"
-PYTORCH_RESNET50_ORIGINAL_URL = "https://download.pytorch.org/models/resnet50-19c8e357.pth"
-PYTORCH_RESNET50_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/resnet50.npz"
+INPUT_FILE_URL = (
+    "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/msrc.jpg"
+)
+PYTORCH_RESNET50_ORIGINAL_URL = (
+    "https://download.pytorch.org/models/resnet50-19c8e357.pth"
+)
+PYTORCH_RESNET50_URL = (
+    "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/resnet50.npz"
+)
 CLASS_INDEX_URL = "https://knossosbuildpipeline.blob.core.windows.net/static/imagenet/imagenet_class_index.json"
 
 # taken from https://github.com/keras-team/keras/blob/master/keras/utils/data_utils.py
@@ -204,13 +210,17 @@ def main():
     parser.add_argument("--model", type=str, choices=["resnet_v2", "resnet_py"])
     args = parser.parse_args()
     npz_file = download_file(PYTORCH_RESNET50_URL, "8947031f2fc1799404c49924d72a97c4")
-    imagenet_class_names_file = download_file(CLASS_INDEX_URL, "c2c37ea517e94d9795004a39431a14cb")
+    imagenet_class_names_file = download_file(
+        CLASS_INDEX_URL, "c2c37ea517e94d9795004a39431a14cb"
+    )
     weights = np.load(npz_file)
     assert weights["_original_url"] == PYTORCH_RESNET50_ORIGINAL_URL
 
     input_file = download_file(INPUT_FILE_URL, "25d496494b2ae14f61fced9a4325ab08")
     print(f"Loading image {input_file}")
-    input = np.asarray(Image.open(input_file)).transpose((2, 0, 1))[None, :, :, :] / 255.0  # NCHW
+    input = (
+        np.asarray(Image.open(input_file)).transpose((2, 0, 1))[None, :, :, :] / 255.0
+    )  # NCHW
 
     if args.model == "resnet_v2":
         from resnet_v2 import Resnet50 as resnet

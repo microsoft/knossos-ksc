@@ -4,7 +4,14 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType, shape_type, tangent_type, make_tuple_if_many, KSTypeError
+from ksc.type import (
+    Type,
+    SizeType,
+    shape_type,
+    tangent_type,
+    make_tuple_if_many,
+    KSTypeError,
+)
 
 from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr, StructuredName
@@ -199,7 +206,9 @@ def type_propagate(ex, symtab):
 # [rev [fwd f]] : ((S, dS), dT) -> (dS, dS)
 
 
-def infer_fn_type_from_derived_fn_args(sname: StructuredName, argtype: Type) -> StructuredName:
+def infer_fn_type_from_derived_fn_args(
+    sname: StructuredName, argtype: Type
+) -> StructuredName:
     if sname.is_derivation():
         derivation = sname.se[0]
 
@@ -277,7 +286,9 @@ def _(ex, symtab):
     if ex.name in symtab:
         old_type = symtab[ex.name]
         if old_type != ex.return_type:
-            raise KSTypeError(f"Redefinition of {ex.name} with different return type {old_type} -> {ex.return_type}")
+            raise KSTypeError(
+                f"Redefinition of {ex.name} with different return type {old_type} -> {ex.return_type}"
+            )
 
     if declared_return_type:
         # Add to symtab before entering body, allowing for recursive calls
@@ -318,7 +329,9 @@ def _(ex, symtab):
     ex.name = add_type_to_sname(ex.name, ex.arg_type)
 
     if ex.name in symtab and symtab[ex.name] != ex.return_type:
-        raise KSTypeError(f"Double definition: {ex.name}\n -> {symtab[ex.name]}\n vs {ex.return_type}")
+        raise KSTypeError(
+            f"Double definition: {ex.name}\n -> {symtab[ex.name]}\n vs {ex.return_type}"
+        )
     symtab[ex.name] = ex.return_type
     return ex
 
@@ -330,7 +343,9 @@ def _(ex, symtab):
     # TODO: Need to map to return type.
     return_type = None
     if signature in symtab and symtab[signature] != return_type:
-        raise KSTypeError(f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}")
+        raise KSTypeError(
+            f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}"
+        )
     symtab[signature] = return_type
     return ex
 
@@ -380,7 +395,9 @@ def _(ex, symtab):
     # Not found, show what was found to improve error message
     argtypes_str = ",".join(map(pformat, argtypes))
     print(f"type_propagate: at ", pystr(ex, 2))
-    print(f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) ")
+    print(
+        f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) "
+    )
     print(f"type_propagate: Looked up {ex.name}")
     exname = ex.name.mangled()
     near_miss = False
@@ -412,8 +429,12 @@ def _(ex, symtab):
     argtypes_ks_tangent_tuple = pformat(tangent_type(argtype_tuple))
 
     print(f"(edef {ex.name} RET ({argtypes_ks_str}))")
-    print(f"(edef D${ex.name} (LM {argtypes_ks_tangent_tuple} dRET) ({argtypes_ks_str}))")
-    print(f"(def rev${ex.name} {argtypes_ks_tangent_tuple} ((t : {argtypes_ks_tuple}) (dret : dRET))")
+    print(
+        f"(edef D${ex.name} (LM {argtypes_ks_tangent_tuple} dRET) ({argtypes_ks_str}))"
+    )
+    print(
+        f"(def rev${ex.name} {argtypes_ks_tangent_tuple} ((t : {argtypes_ks_tuple}) (dret : dRET))"
+    )
     print(f"   )")
 
     raise KSTypeError(f"Couldn't find {ex.name} applied to ({argtypes_str}) at {ex}")

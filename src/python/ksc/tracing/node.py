@@ -9,7 +9,16 @@ from ksc.shape import shape_type_from_object
 
 
 class Node(AbstractValue):
-    def __init__(self, name, shape=None, type=None, data=None, children=[], jitted=None, shape_prop_function=None):
+    def __init__(
+        self,
+        name,
+        shape=None,
+        type=None,
+        data=None,
+        children=[],
+        jitted=None,
+        shape_prop_function=None,
+    ):
         super().__init__(shape, type, data)
         self._name = name
         self._children = children
@@ -35,14 +44,18 @@ class Node(AbstractValue):
 
     def get_data_with_backend(self, backend):
         if self._data is not None and not self.data_ready:
-            value_node = jitting.jit_and_execute_anonymous_function(self.creator, backend)
+            value_node = jitting.jit_and_execute_anonymous_function(
+                self.creator, backend
+            )
             self._children = value_node.children
             self._data = value_node.data
         return self._data
 
     @property
     def data_ready(self):
-        return self._data is not None and (not isinstance(self._data, str) or self._data != "__not_ready__")
+        return self._data is not None and (
+            not isinstance(self._data, str) or self._data != "__not_ready__"
+        )
 
     @property
     def jitted(self):
@@ -127,7 +140,10 @@ class Node(AbstractValue):
 
         if self._type.is_tuple:
             if isinstance(index, slice):
-                return (core.get_tuple_element(i, self) for i in range(*index.indices(len(self._type.children))))
+                return (
+                    core.get_tuple_element(i, self)
+                    for i in range(*index.indices(len(self._type.children)))
+                )
             return core.get_tuple_element(index, self)
 
         if self._type.is_tensor:
@@ -135,7 +151,9 @@ class Node(AbstractValue):
                 raise NotImplementedError
             return core.get_tensor_element(index, self)
 
-        raise ValueError(f"Tried to call __getitem__ on {self} which is not a Tuple.  Use index for tensors.")
+        raise ValueError(
+            f"Tried to call __getitem__ on {self} which is not a Tuple.  Use index for tensors."
+        )
 
     @property
     def shape_program(self):
@@ -164,7 +182,10 @@ class Node(AbstractValue):
             return core.make_tuple(dims, element.shape_program)
 
         if self.type.is_tuple:
-            children = (core.get_tuple_element(i, self).shape_program for i in range(self.type.tuple_len))
+            children = (
+                core.get_tuple_element(i, self).shape_program
+                for i in range(self.type.tuple_len)
+            )
             return core.make_tuple(*children)
 
         raise NotImplementedError

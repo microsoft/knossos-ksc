@@ -1,7 +1,16 @@
 import pytest
 
 from ksc.type import Type
-from ksc.expr import StructuredName, make_structured_name, Let, Lam, If, Call, Const, Var
+from ksc.expr import (
+    StructuredName,
+    make_structured_name,
+    Let,
+    Lam,
+    If,
+    Call,
+    Const,
+    Var,
+)
 
 from ksc.parse_ks import s_exps_from_string, parse_structured_name
 
@@ -22,11 +31,16 @@ def test_StructuredName():
 def test_StructuredName_manglers():
     assert parse("[rev foo]").mangle_without_type() == "rev$foo"
     assert parse("[foo (Tuple Float Float)]").mangle_without_type() == "foo"
-    assert parse("[rev [fwd [foo (Tuple Float Float)]]]").mangle_without_type() == "rev$fwd$foo"
+    assert (
+        parse("[rev [fwd [foo (Tuple Float Float)]]]").mangle_without_type()
+        == "rev$fwd$foo"
+    )
 
     assert parse("[rev foo]").mangled() == "rev$foo"
     assert parse("[foo (Tuple Float Float)]").mangled() == "foo@<ff>"
-    assert parse("[rev [fwd [foo (Tuple Float Float)]]]").mangled() == "rev$fwd$foo@<ff>"
+    assert (
+        parse("[rev [fwd [foo (Tuple Float Float)]]]").mangled() == "rev$fwd$foo@<ff>"
+    )
 
 
 def test_free_vars():
@@ -38,12 +52,18 @@ def test_free_vars():
 
     # Binding
     y = Var("y", Type.Float)
-    assert Let(xdecl, If(y, Const(0.0), Const(1.1)), x).free_vars_ == frozenset(["y"])  # x is not free
+    assert Let(xdecl, If(y, Const(0.0), Const(1.1)), x).free_vars_ == frozenset(
+        ["y"]
+    )  # x is not free
     assert Lam(xdecl, y).free_vars_ == frozenset(["y"])
     assert Lam(xdecl, x).free_vars_ == frozenset()
 
     # Rebinding
-    assert Let(xdecl, If(y, x, Const(1.1)), x).free_vars_ == frozenset(["x", "y"])  # different x is free
+    assert Let(xdecl, If(y, x, Const(1.1)), x).free_vars_ == frozenset(
+        ["x", "y"]
+    )  # different x is free
 
     # Call targets not included
-    assert Let(xdecl, Call("add", [x, Const(1.1)]), Call("mul", [y, y])).free_vars_ == frozenset(["x", "y"])
+    assert Let(
+        xdecl, Call("add", [x, Const(1.1)]), Call("mul", [y, y])
+    ).free_vars_ == frozenset(["x", "y"])

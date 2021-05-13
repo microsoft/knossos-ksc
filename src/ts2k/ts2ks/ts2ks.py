@@ -67,7 +67,9 @@ def make_arg(input, example_input):
     input_type = from_torch_type(input.type())
     example_input_type = type_from_value(example_input)
     if example_input_type.kind != input_type.kind:
-        print(f"Warn: example input type {example_input_type} differs from TorchScript input type {input_type}")
+        print(
+            f"Warn: example input type {example_input_type} differs from TorchScript input type {input_type}"
+        )
     else:
         # input_type will have wrong shape, grab example_input_type
         # TODO: shape propagation, or full abstract interpretation
@@ -150,12 +152,18 @@ def make_constant(node):
 
 def make_list(node):
     value = node.outputsAt(0)
-    return Var(mangled_name(value)), Call("Vec_init", [var_or_constant(i) for i in node.inputs()])
+    return (
+        Var(mangled_name(value)),
+        Call("Vec_init", [var_or_constant(i) for i in node.inputs()]),
+    )
 
 
 def make_tuple(node):
     value = node.outputsAt(0)
-    return Var(mangled_name(value)), Call("tuple", [var_or_constant(i) for i in node.inputs()])
+    return (
+        Var(mangled_name(value)),
+        Call("tuple", [var_or_constant(i) for i in node.inputs()]),
+    )
 
 
 def make_tensor(node):
@@ -165,7 +173,10 @@ def make_tensor(node):
 
 
 def make_aten_function(node, value, function_name):
-    return Var(mangled_name(value)), Call(function_name, [var_or_constant(i) for i in node.inputs()])
+    return (
+        Var(mangled_name(value)),
+        Call(function_name, [var_or_constant(i) for i in node.inputs()]),
+    )
 
 
 def make_return(node):
@@ -178,7 +189,10 @@ def make_callfunction(node):
     assert len(list(node.outputs())) == 1  # Assemble into tuple for multiple outputs
     function_name_constant = node.inputsAt(0).node()
     function_name = function_name_constant.s("name")
-    return (Var(mangled_name(value)), Call(function_name, [var_or_constant(i) for i in tail(node.inputs())]))
+    return (
+        Var(mangled_name(value)),
+        Call(function_name, [var_or_constant(i) for i in tail(node.inputs())]),
+    )
 
 
 def make_PythonOp(node):
@@ -195,7 +209,12 @@ def make_PythonOp(node):
         vardecl, var = make_new_var(Type.Float)  # TODO: need to propagate properly
         map_lambda = Lam(vardecl, Call(function_name, [var]))
 
-        return (Var(mangled_name(value)), Call("map", [map_lambda] + [var_or_constant(i) for i in tail(node.inputs())]))
+        return (
+            Var(mangled_name(value)),
+            Call(
+                "map", [map_lambda] + [var_or_constant(i) for i in tail(node.inputs())]
+            ),
+        )
 
     raise NotImplementedError(f"PythonOp {pyname}")
 
@@ -274,7 +293,9 @@ def make_if(make_binds, node):
     inputs_size = sum(1 for _ in node.inputs())
 
     if inputs_size != 1:
-        raise Exception("Only support conditionals with 1 input, this one had: " + str(inputs_size))
+        raise Exception(
+            "Only support conditionals with 1 input, this one had: " + str(inputs_size)
+        )
 
     conditional = mangled_name(node.inputsAt(0))
 
@@ -331,12 +352,16 @@ def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
     # need to think about interaction between imperative Python and pure Knossos
     if all_nodes[-1].kind() == "prim::Print":
         if print_count > 1:
-            print("WARNING: multiple print statements used, only final one currently translated")
+            print(
+                "WARNING: multiple print statements used, only final one currently translated"
+            )
         op = translate_node(make_binds, all_nodes[-1])
         return_type = Type.Integer
     else:
         if print_count > 0:
-            print("WARNING: print statement currently only supported as final operation")
+            print(
+                "WARNING: print statement currently only supported as final operation"
+            )
         return_node = graph.return_node()
         op = translate_node(make_binds, return_node)
         return_type = None  # Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
@@ -372,7 +397,9 @@ def torch_to_ks(py_mod, val):
         return val
 
     if isinstance(val, torch.Tensor):
-        assert val.dtype == torch.float64, "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
+        assert (
+            val.dtype == torch.float64
+        ), "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
         if len(val.shape) == 2:
             return py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
         if len(val.shape) == 1:
@@ -475,7 +502,9 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
     type_propagate_decls(decls_prelude, symtab)
-    decls_prelude_aten = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude-aten.ks"))
+    decls_prelude_aten = list(
+        parse_ks_filename(ksc_dir + "/src/runtime/prelude-aten.ks")
+    )
     type_propagate_decls(decls_prelude_aten, symtab)
 
     for ksc_def in ksc_defs:
@@ -654,10 +683,14 @@ if __name__ == "__xmain__":
             if do_original:
                 # 3 * state_size for input gate, output gate and candidate cell gate.
                 # input_features + state_size because we will multiply with [input, h].
-                self.weights = torch.nn.Parameter(torch.empty(3 * state_size, input_features + state_size))
+                self.weights = torch.nn.Parameter(
+                    torch.empty(3 * state_size, input_features + state_size)
+                )
                 self.bias = torch.nn.Parameter(torch.empty(3 * state_size))
             else:
-                self.weights = torch.nn.Parameter(torch.empty(state_size, input_features + state_size))
+                self.weights = torch.nn.Parameter(
+                    torch.empty(state_size, input_features + state_size)
+                )
                 self.bias = torch.nn.Parameter(torch.empty(state_size))
 
             self.reset_parameters()
@@ -796,7 +829,9 @@ if __name__ == "__xmain__":
 
         @staticmethod
         def backward(ctx, grad_h, grad_cell):
-            outputs = lltm_cpp.backward(grad_h.contiguous(), grad_cell.contiguous(), *ctx.saved_tensors)
+            outputs = lltm_cpp.backward(
+                grad_h.contiguous(), grad_cell.contiguous(), *ctx.saved_tensors
+            )
             d_old_h, d_input, d_weights, d_bias, d_old_cell = outputs
             return d_input, d_weights, d_bias, d_old_h, d_old_cell
 
@@ -836,7 +871,12 @@ if __name__ == "__xmain__":
         return torch.mean(torch.sin(t) * t)
 
     def foofilter_comp(xs: torch.Tensor):
-        t = torch.tensor([(-0.125 * x if x < 0.0 else 1 / (n + 1) * x ** 2).item() for n, x in enumerate(xs)])
+        t = torch.tensor(
+            [
+                (-0.125 * x if x < 0.0 else 1 / (n + 1) * x ** 2).item()
+                for n, x in enumerate(xs)
+            ]
+        )
         return torch.mean(torch.sin(t) * t)
 
     def foofilter_mask(x: torch.Tensor):

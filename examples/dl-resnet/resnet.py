@@ -10,7 +10,14 @@ def dense(x, weights):
 
 @ksc.trace
 def conv_block(x, weights, strides):
-    (conv_1_weights, norm_1_weights, conv_2_weights, norm_2_weights, conv_3_weights, norm_3_weights) = weights
+    (
+        conv_1_weights,
+        norm_1_weights,
+        conv_2_weights,
+        norm_2_weights,
+        conv_3_weights,
+        norm_3_weights,
+    ) = weights
     h = nn.conv_2d_no_bias(x, conv_1_weights, (1, 1), strides)
     h = nn.batch_norm_2d(h, norm_1_weights)
     h = nn.relu(h)
@@ -38,7 +45,13 @@ def identity_residual_block(x, weights):
 
 @ksc.trace
 def resnet(x, weights):
-    (normalization_weights, conv_weights, batch_norm_weights, residual_blocks_weights, final_dense_weights) = weights
+    (
+        normalization_weights,
+        conv_weights,
+        batch_norm_weights,
+        residual_blocks_weights,
+        final_dense_weights,
+    ) = weights
     h = nn.normalize_2d(x, normalization_weights)
     h = nn.conv_2d_no_bias(h, conv_weights, (7, 7), (2, 2))
     h = nn.batch_norm_2d(h, batch_norm_weights)

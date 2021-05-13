@@ -84,16 +84,21 @@ def assert_equal_objective():
         vvd(x), vd(alphas), vvd(means), vvd(qs), vvd(ls), (wishart_gamma, wishart_m)
     )
 
-    reference_objective = reference.gmm_objective(ten(alphas), ten(means), ten(icf), ten(x), wishart_gamma, wishart_m)
+    reference_objective = reference.gmm_objective(
+        ten(alphas), ten(means), ten(icf), ten(x), wishart_gamma, wishart_m
+    )
 
-    np.testing.assert_almost_equal(knossos_objective, reference_objective, decimal=8, err_msg="Objective")
+    np.testing.assert_almost_equal(
+        knossos_objective, reference_objective, decimal=8, err_msg="Objective"
+    )
 
     print(knossos_objective)
     print(reference_objective)
 
     # Check no NaNs in reverse mode derivative
     rev = knossos.rev_gmm_knossos_gmm_objective(
-        (vvd(x), vd(alphas), vvd(means), vvd(qs), vvd(ls), (wishart_gamma, wishart_m)), 1.0
+        (vvd(x), vd(alphas), vvd(means), vvd(qs), vvd(ls), (wishart_gamma, wishart_m)),
+        1.0,
     )
 
     (d_dx, d_dalphas, d_dmeans, d_dqs, d_dls, (d_dwishart_gamma, d_dwishartm)) = rev

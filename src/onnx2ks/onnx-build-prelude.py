@@ -94,7 +94,9 @@ def onnxType_to_Type_with_mangler(ty: str):
     if ty.startswith("tuple("):
         assert ty.endswith(")")
         args = ty[6:-1]
-        manglers_and_tys = [onnxType_to_Type_with_mangler(s) for s in re.split(", *", args)]
+        manglers_and_tys = [
+            onnxType_to_Type_with_mangler(s) for s in re.split(", *", args)
+        ]
         manglers = "".join([x[0] for x in manglers_and_tys])
         tys = [x[1] for x in manglers_and_tys]
         return f"{manglers}", Type.Tuple(*tys)
@@ -129,8 +131,12 @@ def TCPs_from_tc(type_constraint):
     Take type_constraint(type_param_str, allowed_type_strs) and return list of TypeConstraintParam
     """
     tys = type_constraint.allowed_type_strs  # Get all ONNX types
-    tys = set([onnxType_to_Type_with_mangler(ty) for ty in tys])  # Convert to Knossos and uniquify
-    return [TypeConstraintParam(type_constraint.type_param_str, ty) for ty in tys]  # make list
+    tys = set(
+        [onnxType_to_Type_with_mangler(ty) for ty in tys]
+    )  # Convert to Knossos and uniquify
+    return [
+        TypeConstraintParam(type_constraint.type_param_str, ty) for ty in tys
+    ]  # make list
 
 
 def all_combinations_type_constraints(type_constraints):
@@ -194,7 +200,9 @@ def onnx_schemas_to_prelude(prelude: TextIO):
 
         writeln(f";; Type constraints:")
         for tc in s.type_constraints:
-            writeln(f";; {tc.type_param_str} | {tc.allowed_type_strs} | {tc.description}")
+            writeln(
+                f";; {tc.type_param_str} | {tc.allowed_type_strs} | {tc.description}"
+            )
 
         # 0.1 Some special-cases, which are assumed "hand-written" in the output,
         # e.g. output type depends on some runtime value.
@@ -261,7 +269,9 @@ def onnx_schemas_to_prelude(prelude: TextIO):
         # Gather type constraints
         output_typeStrs = set([o.typeStr for o in s.outputs])
         input_typeStrs = set([o.typeStr for o in s.inputs])
-        input_type_constraints = list(filter(lambda tc: tc.type_param_str in input_typeStrs, s.type_constraints))
+        input_type_constraints = list(
+            filter(lambda tc: tc.type_param_str in input_typeStrs, s.type_constraints)
+        )
 
         all_signatures = all_combinations_type_constraints(input_type_constraints)
 
@@ -283,7 +293,9 @@ def onnx_schemas_to_prelude(prelude: TextIO):
                     return mangler_and_ty
                 tys = set([onnxType_to_Type_with_mangler(ty) for ty in types])
                 if len(tys) > 1:
-                    writeln(f";; WARN: multiple types but no type constraints at {s.name}: {tys}")
+                    writeln(
+                        f";; WARN: multiple types but no type constraints at {s.name}: {tys}"
+                    )
                 mangler_and_ty = tys.pop()
                 assert mangler_and_ty != None
                 return mangler_and_ty
@@ -322,7 +334,9 @@ def onnx_schemas_to_prelude(prelude: TextIO):
                 else:
                     val = get_attribute_default_value(a)
                     if val == None:
-                        warnings.warn(f"Optional attribute without default value {a.name}")
+                        warnings.warn(
+                            f"Optional attribute without default value {a.name}"
+                        )
                         val = "**MISSING**"
 
                     arg_comments += f"Attr<Optional,{a.name},{val}> "
@@ -352,7 +366,13 @@ def onnx_schemas_to_prelude(prelude: TextIO):
                     opt = "optional"
 
             # Grab any manglers
-            manglers = set([onnxType_to_Type_with_mangler(ty)[0] for ty in i.types for i in s.inputs + s.outputs])
+            manglers = set(
+                [
+                    onnxType_to_Type_with_mangler(ty)[0]
+                    for ty in i.types
+                    for i in s.inputs + s.outputs
+                ]
+            )
             if "" in manglers:
                 manglers.remove("")
             if len(manglers) > 0:

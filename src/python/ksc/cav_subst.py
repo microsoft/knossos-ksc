@@ -1,7 +1,16 @@
 from dataclasses import dataclass
 from functools import singledispatch
 import itertools
-from typing import Callable, Iterable, Generator, List, Mapping, Optional, Tuple, Sequence
+from typing import (
+    Callable,
+    Iterable,
+    Generator,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Sequence,
+)
 
 from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 
@@ -11,43 +20,43 @@ from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
 
 
 @singledispatch
-def get_children(e: Expr) -> List[Expr]:
+def subexps_no_binds(e: Expr) -> List[Expr]:
     # The rewritable children of an Expr
     raise ValueError("Must be overridden for every Expr subclass")
 
 
-@get_children.register
-def _get_children_var(e: Var):
+@subexps_no_binds.register
+def _subexps_no_binds_var(e: Var):
     return []
 
 
-@get_children.register
-def _get_children_const(e: Const):
+@subexps_no_binds.register
+def _subexps_no_binds_const(e: Const):
     return []
 
 
-@get_children.register
-def _get_children_let(e: Let):
+@subexps_no_binds.register
+def _subexps_no_binds_let(e: Let):
     return [e.rhs, e.body]
 
 
-@get_children.register
-def _get_children_lam(e: Lam):
+@subexps_no_binds.register
+def _subexps_no_binds_lam(e: Lam):
     return [e.body]
 
 
-@get_children.register
-def _get_children_call(e: Call):
+@subexps_no_binds.register
+def _subexps_no_binds_call(e: Call):
     return e.args
 
 
-@get_children.register
-def _get_children_if(e: If):
+@subexps_no_binds.register
+def _subexps_no_binds_if(e: If):
     return [e.cond, e.t_body, e.f_body]
 
 
-@get_children.register
-def _get_children_assert(e: Assert):
+@subexps_no_binds.register
+def _subexps_no_binds_assert(e: Assert):
     return [e.cond, e.body]
 
 
@@ -55,7 +64,11 @@ Location = Sequence[int]  # Used immutably, so normally a tuple
 
 
 def get_node_at_location(expr, path: Location):
-    return expr if len(path) == 0 else get_node_at_location(get_children(expr)[path[0]], path[1:])
+    return (
+        expr
+        if len(path) == 0
+        else get_node_at_location(subexps_no_binds(expr)[path[0]], path[1:])
+    )
 
 
 #####################################################################
@@ -122,9 +135,13 @@ def make_nonfree_var(prefix, exprs, type=None):
 # CAV implementation
 
 
-def _cav_helper(e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
+def _cav_helper(
+    e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution
+) -> Expr:
     # First, work out if there's anything to do in this subtree
-    substs = {varname: repl for varname, repl in substs.items() if varname in e.free_vars_}
+    substs = {
+        varname: repl for varname, repl in substs.items() if varname in e.free_vars_
+    }
     if len(reqs) == 0:
         if len(substs) == 0:
             # Nothing to do in this subtree
@@ -132,7 +149,9 @@ def _cav_helper(e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSub
     elif any(len(req.target) == 0 for req in reqs):
         # Apply here
         if len(reqs) != 1:
-            raise ValueError("Multiple ReplaceLocationRequests on locations nested within each other")
+            raise ValueError(
+                "Multiple ReplaceLocationRequests on locations nested within each other"
+            )
         if reqs[0].applicator is None:
             return reqs[0].payload
         # Continue renaming.
@@ -143,19 +162,28 @@ def _cav_helper(e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSub
 
 
 @singledispatch
-def _cav_children(e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution) -> Expr:
+def _cav_children(
+    e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution
+) -> Expr:
     return e.__class__(*_cav_child_list(e, reqs, substs))
 
 
-def _requests_to_child(reqs: List[ReplaceLocationRequest], ch_idx: int) -> List[ReplaceLocationRequest]:
+def _requests_to_child(
+    reqs: List[ReplaceLocationRequest], ch_idx: int
+) -> List[ReplaceLocationRequest]:
     return [
-        ReplaceLocationRequest(req.target[1:], req.payload, req.applicator) for req in reqs if req.target[0] == ch_idx
+        ReplaceLocationRequest(req.target[1:], req.payload, req.applicator)
+        for req in reqs
+        if req.target[0] == ch_idx
     ]
 
 
 def _cav_child_list(e: Expr, reqs, substs):
     # Applies _cav_helper to the children of the expression, and returns the list of substituted children
-    return [_cav_helper(ch, _requests_to_child(reqs, ch_idx), substs) for ch_idx, ch in enumerate(get_children(e))]
+    return [
+        _cav_helper(ch, _requests_to_child(reqs, ch_idx), substs)
+        for ch_idx, ch in enumerate(subexps_no_binds(e))
+    ]
 
 
 @_cav_children.register
@@ -179,7 +207,10 @@ def _cav_call(e: Call, reqs, substs):
 
 
 def _rename_if_needed(
-    arg: Var, binder: Expr, reqs: List[ReplaceLocationRequest], subst: VariableSubstitution
+    arg: Var,
+    binder: Expr,
+    reqs: List[ReplaceLocationRequest],
+    subst: VariableSubstitution,
 ) -> Tuple[Var, VariableSubstitution]:
     # If <arg> binds a variable free in any Expr's in a request payload or the RHS of a substitution, then
     # returns a new Var (chosen not to capture any variable free in <binder> or as above), and an updated <subst>.
@@ -196,7 +227,9 @@ def _rename_if_needed(
 @_cav_children.register
 def _cav_lam(e: Lam, reqs, substs):
     arg, substs = _rename_if_needed(e.arg, e, reqs, substs)
-    return Lam(Var(arg.name, type=arg.type_, decl=True), *_cav_child_list(e, reqs, substs))
+    return Lam(
+        Var(arg.name, type=arg.type_, decl=True), *_cav_child_list(e, reqs, substs)
+    )
 
 
 @_cav_children.register
