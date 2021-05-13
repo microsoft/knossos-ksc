@@ -1,5 +1,12 @@
 from ksc.alpha_equiv import are_alpha_equivalent
-from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
+from ksc.rewrites import (
+    rule,
+    RuleSet,
+    inline_call,
+    inline_var,
+    delete_let,
+    parse_rule_str,
+)
 from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
 from ksc.type import Type
 from ksc.type_propagate import type_propagate_decls
@@ -251,6 +258,41 @@ def test_parsed_rule_capture():
     type_propagate_decls([e, expected], symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
+
+
+def test_inline_call():
+    symtab = dict()
+    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
+    defs = list(
+        parse_ks_file(
+            """
+        (def foo Float (x : Float) (add x 5.0))
+        (def bar Float ((x : Float) (y : Float)) (add (mul x 2.0) (mul y 3.0)))
+    """
+        )
+    )
+    expr = parse_expr_string("(bar (foo 1.3) 7.7)")
+    type_propagate_decls(decls_prelude + defs + [expr], symtab)
+    def_dict = {d.name: d for d in defs}
+
+    assert len(list(inline_call.find_all_matches(expr))) == 0  # No defs!
+    matches_with_defs = sorted(
+        inline_call.find_all_matches(expr, def_dict), key=lambda m: m.path
+    )
+    assert len(matches_with_defs) == 2
+    assert matches_with_defs[0].path == ()
+    assert matches_with_defs[1].path == (0,)
+
+    expected_inline_bar = parse_expr_string(
+        "(let (x (foo 1.3)) (let (y 7.7) (add (mul x 2.0) (mul y 3.0))))"
+    )
+    expected_inline_foo = parse_expr_string("(bar (let (x 1.3) (add x 5.0)) 7.7)")
+    type_propagate_decls([expected_inline_bar, expected_inline_foo], symtab)
+
+    actual_inline_bar = matches_with_defs[0].apply_rewrite()
+    assert actual_inline_bar == expected_inline_bar
+    actual_inline_foo = matches_with_defs[1].apply_rewrite()
+    assert actual_inline_foo == expected_inline_foo
 
 
 def test_rule_pickling():

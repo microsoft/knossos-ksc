@@ -17,6 +17,7 @@ from ksc.cav_subst import (
 )
 from ksc.expr import (
     ConstantType,
+    Def,
     StructuredName,
     Expr,
     Let,
@@ -25,11 +26,13 @@ from ksc.expr import (
     Const,
     Call,
     Rule,
+    make_structured_name,
 )
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
+from ksc.untuple_lets import untuple_one_let
 from ksc.utils import singleton, single_elem
 from ksc.visitors import ExprTransformer
 
@@ -54,16 +57,22 @@ class Match:
         return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
 
 
-# Environments that map variable names to the locations of the nodes binding them.
-LetBindingEnvironment = PMap[str, Location]
+@dataclass(frozen=True, eq=False)
+class Environment:
+    let_vars: PMap[
+        str, Location
+    ]  # variables bound by lets, to the let-nodes binding them
+    defs: PMap[StructuredName, Def]
 
 
 class AbstractMatcher(ABC):
-    def find_all_matches(self, e: Expr) -> Iterator[Match]:
-        yield from self._matches_with_env(e, tuple(), e, pmap({}))
+    def find_all_matches(
+        self, e: Expr, defs: PMap[StructuredName, Def] = pmap()
+    ) -> Iterator[Match]:
+        yield from self._matches_with_env(e, tuple(), e, Environment(pmap({}), defs))
 
     def _matches_with_env(
-        self, e: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+        self, e: Expr, path_from_root: Location, root: Expr, env: Environment
     ) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.matches_here(e, path_from_root, root, env)
@@ -77,40 +86,40 @@ class AbstractMatcher(ABC):
 
     @abstractmethod
     def matches_here(
-        self,
-        subtree: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
         """ Return any matches which rewrite the topmost node of the specified subtree """
 
 
 @singledispatch
 def _update_env_for_subtree(
-    parent: Expr, parent_path: Location, which_child: int, env: LetBindingEnvironment
-) -> LetBindingEnvironment:
+    parent: Expr, parent_path: Location, which_child: int, env: Environment
+) -> Environment:
     # Default is to use same environment as parent
     return env
 
 
 @_update_env_for_subtree.register
 def _update_env_let(
-    parent: Let, parent_path: Location, which_child: int, env: LetBindingEnvironment
-) -> LetBindingEnvironment:
+    parent: Let, parent_path: Location, which_child: int, env: Environment
+) -> Environment:
     assert isinstance(
         parent.vars, Var
     ), "Tupled lets are not supported - use untuple_lets first"
     assert 0 <= which_child <= 1
-    return env if which_child == 0 else env.set(parent.vars.name, parent_path)  # rhs
+    return (
+        env
+        if which_child == 0  # rhs
+        else Environment(env.let_vars.set(parent.vars.name, parent_path), env.defs)
+    )
 
 
 @_update_env_for_subtree.register
 def _update_env_lam(
-    parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment
-) -> LetBindingEnvironment:
+    parent: Lam, parent_path: Location, which_child: int, env: Environment
+) -> Environment:
     assert which_child == 0
-    return env.discard(parent.arg.name)
+    return Environment(env.let_vars.discard(parent.arg.name), env.defs)
 
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
@@ -144,21 +153,13 @@ class RuleMatcher(AbstractMatcher):
 
     @abstractmethod
     def matches_for_possible_expr(
-        self,
-        expr: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, expr: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <get_filter_term(expr)>
             is of one of <self.possible_filter_terms>. """
 
     def matches_here(
-        self,
-        expr: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, expr: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
         if get_filter_term(expr) in self.possible_filter_terms or (
             isinstance(expr, Call) and Call in self.possible_filter_terms
@@ -185,11 +186,7 @@ class RuleSet(AbstractMatcher):
                 self._filtered_rules.setdefault(term, []).append(rule)
 
     def matches_here(
-        self,
-        subtree: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
         possible_rules = self._filtered_rules.get(get_filter_term(subtree), [])
         if isinstance(subtree, Call):
@@ -222,16 +219,56 @@ class inline_var(RuleMatcher):
         )
 
     def matches_for_possible_expr(
-        self,
-        subtree: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
         assert isinstance(subtree, Var)
-        if subtree.name in env:
-            binding_loc = env[subtree.name]
+        binding_loc = env.let_vars.get(subtree.name)
+        if binding_loc is not None:
             yield Match(self, root, path_from_root, {"binding_location": binding_loc})
+
+
+def make_literal_tuple(elems: List[Expr]) -> Expr:
+    return Call(
+        make_structured_name(("tuple", Type.Tuple(*[e.type_ for e in elems]))), elems
+    )
+
+
+@singleton
+class inline_call(RuleMatcher):
+    possible_filter_terms = frozenset([Call])
+
+    def matches_for_possible_expr(
+        self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment
+    ) -> Iterator[Match]:
+        func_def: Optional[Def] = env.defs.get(get_filter_term(subtree))
+        if func_def is not None:
+            yield Match(self, root, path_from_root, {"func_def": func_def})
+
+    def apply_at(self, expr: Expr, path_to_call: Location, func_def: Def) -> Expr:
+        # func_def comes from the Match.
+        def apply_here(const_zero, call_node):
+            # Drop decl=True from Def.args
+            def_args = [Var(arg.name, type=arg.type_) for arg in func_def.args]
+            call_arg = (
+                call_node.args[0]
+                if len(call_node.args) == 1
+                else make_literal_tuple(call_node.args)
+            )
+            return (
+                Let(def_args[0], call_arg, func_def.body)
+                if len(def_args) == 1
+                else untuple_one_let(Let(def_args, call_arg, func_def.body))
+            )
+
+        arg_names = frozenset([arg.name for arg in func_def.args])
+        assert func_def.body.free_vars_.issubset(
+            arg_names
+        )  # Sets may not be equal, if some args unused.
+        # There is thus nothing in the function body that could be captured by 'let's around the callsite.
+        # Thus, TODO: simplify interface to replace_subtree: only inline_let requires capture-avoidance, and
+        # there is no need to support both capture-avoidance + applicator in the same call to replace_subtree.
+        # In the meantime, the 0.0 here (as elsewhere) indicates there are no variables to avoid capturing.
+        return replace_subtree(expr, path_to_call, Const(0.0), apply_here)
 
 
 @singleton
