@@ -28,6 +28,6 @@ print(result)
 
 print(means.grad)
 
-result.backward(retain_graph = True)
+result.backward(retain_graph=True)
 
 print(means.grad)

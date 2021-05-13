@@ -1,5 +1,6 @@
 from ksc.translate import translate
 
+
 def test_translate_resnet():
     input_ks_file = "examples/dl-resnet/resnet_v2.ks"
     backend = "jax_input_last"

@@ -4,7 +4,14 @@ type_propagate: Type propagation for Knossos IR
 
 import itertools
 from typing import Union, List
-from ksc.type import Type, SizeType, shape_type, tangent_type, make_tuple_if_many, KSTypeError
+from ksc.type import (
+    Type,
+    SizeType,
+    shape_type,
+    tangent_type,
+    make_tuple_if_many,
+    KSTypeError,
+)
 
 from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr, StructuredName
@@ -13,24 +20,28 @@ import editdistance
 
 # Pretty printing
 # Importing prettyprint to get the decorated printers for Expression and Type
-import ksc.prettyprint # pylint: disable=unused-import
+import ksc.prettyprint  # pylint: disable=unused-import
 
 # Import the prettyprinter routines we use explicitly in this file
 from prettyprinter import cpprint, pprint, pformat
 
 # Needed this in order to see the error messages when pprint fails
 import warnings
+
 warnings.filterwarnings("always")
 
 ############################################################################
 # Oops, some of this code was written by functional programmers...
 import sys
+
 # import resource
 # resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY,resource.RLIM_INFINITY))
-sys.setrecursionlimit(10**6)
+sys.setrecursionlimit(10 ** 6)
 
 import re
+
 ks_prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
+
 
 def ks_prim_lookup(sname, ty):
     if ty.is_tuple:
@@ -45,7 +56,7 @@ def ks_prim_lookup(sname, ty):
     # (tuple 1.0) -> (Tuple Float)
     # (tuple 1.0 2.0) -> (Tuple Float Float)
     # (tuple (tuple 1.0)) -> (Tuple (Tuple Float))
-    
+
     if name == "tuple":
         return Type.Tuple(*tys)
 
@@ -57,7 +68,7 @@ def ks_prim_lookup(sname, ty):
             n = int(m.group(1))
             max = int(m.group(2))
             assert ty.tuple_len == max
-            return ty.tuple_elem(n-1)
+            return ty.tuple_elem(n - 1)
 
     # vec
     if name == "Vec_init":
@@ -88,10 +99,10 @@ def ks_prim_lookup(sname, ty):
 
         rank = SizeType.get_rank(size_ty)
         assert rank is not None
-        
+
         elem_type = lam_ty.lam_return_type
         return Type.Tensor(rank, elem_type)
-        
+
     # sumbuild : Size, Lam IntTuple T -> T
     if n == 2 and name == "sumbuild":
         size_ty = tys[0]
@@ -99,7 +110,7 @@ def ks_prim_lookup(sname, ty):
         assert lam_ty.lam_arg_type == size_ty
 
         return lam_ty.lam_return_type
-        
+
     # constVec(n T)
     if n == 2 and name == "constVec":
         size_ty = tys[0]
@@ -107,7 +118,7 @@ def ks_prim_lookup(sname, ty):
 
         rank = SizeType.get_rank(size_ty)
         assert rank is not None
-        
+
         return Type.Tensor(rank, elem_ty)
 
     # deltaVec(n i v)
@@ -118,7 +129,7 @@ def ks_prim_lookup(sname, ty):
         assert size_ty == ind_ty
         rank = SizeType.get_rank(size_ty)
         assert rank is not None
-        
+
         return Type.Tensor(rank, elem_ty)
 
     # fold : Lam (Tuple State T) State, State, Tensor T -> State
@@ -134,7 +145,7 @@ def ks_prim_lookup(sname, ty):
 
     # eq : T, T -> Bool
     if n == 2 and name in ("eq", "ne", "lt", "gt", "lte", "gte"):
-        assert tys[0] == tys[1] # TODO: MOVEEQ Move eq to prelude
+        assert tys[0] == tys[1]  # TODO: MOVEEQ Move eq to prelude
         return Type.Bool
 
     # Polymorphic arithmetic
@@ -163,8 +174,10 @@ def ks_prim_lookup(sname, ty):
 
     return None
 
+
 ############################################################################
 from functools import singledispatch
+
 
 @singledispatch
 def type_propagate(ex, symtab):
@@ -178,12 +191,16 @@ def type_propagate(ex, symtab):
     assert ex.type_ != None
     return ex
 
+
 # f : S -> T
 # [rev f] : (S, dT) -> dS
 # [fwd f] : (S, dS) -> dT
 # [rev [fwd f]] : ((S, dS), dT) -> (dS, dS)
 
-def infer_fn_type_from_derived_fn_args(sname : StructuredName, argtype : Type) -> StructuredName:
+
+def infer_fn_type_from_derived_fn_args(
+    sname: StructuredName, argtype: Type
+) -> StructuredName:
     if sname.is_derivation():
         derivation = sname.se[0]
 
@@ -192,7 +209,7 @@ def infer_fn_type_from_derived_fn_args(sname : StructuredName, argtype : Type) -
         if derivation == "rev":
             S = argtype.tuple_elem(0)
             return infer_fn_type_from_derived_fn_args(sname.se[1], S)
-    
+
         # [fwd f] : (S, dS) -> dT
         if derivation == "fwd":
             S = argtype.tuple_elem(0)
@@ -212,7 +229,7 @@ def infer_fn_type_from_derived_fn_args(sname : StructuredName, argtype : Type) -
         if derivation == "shape":
             S = argtype
             return infer_fn_type_from_derived_fn_args(sname.se[1], S)
-        
+
         # [suffwdpass f] : S -> (T, BOG)
         if derivation == "suffwdpass":
             S = argtype
@@ -221,13 +238,14 @@ def infer_fn_type_from_derived_fn_args(sname : StructuredName, argtype : Type) -
         # If we can't deduce the base function argument type,
         # it must be specified in the structured name.
         return sname.get_type()
-    
+
     if sname.has_type():
         return sname.se[1]
     else:
         return argtype
 
-def add_type_to_sname(sname : StructuredName, argtype : Type) -> StructuredName:
+
+def add_type_to_sname(sname: StructuredName, argtype: Type) -> StructuredName:
     if sname.is_derivation():
         fn_type = infer_fn_type_from_derived_fn_args(sname, argtype)
     else:
@@ -239,9 +257,12 @@ def add_type_to_sname(sname : StructuredName, argtype : Type) -> StructuredName:
     sname, old_ty = sname.add_type(fn_type)
 
     if old_ty is not None and old_ty != fn_type:
-        raise KSTypeError(f"In definition of '{sname}', explicit type in structured name\n" +
-                            f"does not match argument type {fn_type} inferred from {argtype}")
+        raise KSTypeError(
+            f"In definition of '{sname}', explicit type in structured name\n"
+            + f"does not match argument type {fn_type} inferred from {argtype}"
+        )
     return sname
+
 
 @type_propagate.register(Def)
 def _(ex, symtab):
@@ -253,22 +274,24 @@ def _(ex, symtab):
     argtype = make_tuple_if_many(argtypes)
     ex.name = add_type_to_sname(ex.name, argtype)
 
-    # Check for definition in symtab with different return type 
+    # Check for definition in symtab with different return type
     if ex.name in symtab:
         old_type = symtab[ex.name]
         if old_type != ex.return_type:
-            raise KSTypeError(f"Redefinition of {ex.name} with different return type {old_type} -> {ex.return_type}")
-    
+            raise KSTypeError(
+                f"Redefinition of {ex.name} with different return type {old_type} -> {ex.return_type}"
+            )
+
     if declared_return_type:
         # Add to symtab before entering body, allowing for recursive calls
         symtab[ex.name] = ex.return_type
 
     # local_st: local symbol table to recurse into the body
-    # Add args to local_st, after function was added to global st. 
+    # Add args to local_st, after function was added to global st.
     # This defines that
     #   (def f Integer (f : Lam Integer Integer) (f 2))
     # is not a recursive call to f, but a call to the argument f
-    local_st = {**symtab, **{a.name:a.type_ for a in ex.args}}
+    local_st = {**symtab, **{a.name: a.type_ for a in ex.args}}
 
     # Recurse into body
     try:
@@ -276,12 +299,14 @@ def _(ex, symtab):
     except KSTypeError as e:
         ctx = f"In definition of {ex.name} {pformat(argtypes)}\n"
         raise KSTypeError(ctx + str(e)) from e
-    
-    if declared_return_type: 
+
+    if declared_return_type:
         # Check the inferred type matches the decl
         if ex.return_type != ex.body.type_:
-            raise KSTypeError(f"In definition of '{ex.name}', inferred return type {ex.body.type_}\n" +
-                              f"does not match declaration {ex.return_type}")
+            raise KSTypeError(
+                f"In definition of '{ex.name}', inferred return type {ex.body.type_}\n"
+                + f"does not match declaration {ex.return_type}"
+            )
     else:
         # Add to symtab after inference
         ex.return_type = ex.body.type_
@@ -289,15 +314,19 @@ def _(ex, symtab):
 
     return ex
 
+
 @type_propagate.register(EDef)
 def _(ex, symtab):
     # (edef name return_type arg_type)
     ex.name = add_type_to_sname(ex.name, ex.arg_type)
 
     if ex.name in symtab and symtab[ex.name] != ex.return_type:
-        raise KSTypeError(f"Double definition: {ex.name}\n -> {symtab[ex.name]}\n vs {ex.return_type}")
+        raise KSTypeError(
+            f"Double definition: {ex.name}\n -> {symtab[ex.name]}\n vs {ex.return_type}"
+        )
     symtab[ex.name] = ex.return_type
     return ex
+
 
 @type_propagate.register(GDef)
 def _(ex, symtab):
@@ -306,16 +335,20 @@ def _(ex, symtab):
     # TODO: Need to map to return type.
     return_type = None
     if signature in symtab and symtab[signature] != return_type:
-        raise KSTypeError(f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}")
+        raise KSTypeError(
+            f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}"
+        )
     symtab[signature] = return_type
     return ex
 
+
 @type_propagate.register(Rule)
 def _(ex, symtab):
-    local_st = {**symtab, **{a.name:a.type_ for a in ex.template_vars}}
+    local_st = {**symtab, **{a.name: a.type_ for a in ex.template_vars}}
     type_propagate(ex.template, local_st)
     type_propagate(ex.replacement, local_st)
     return ex
+
 
 @type_propagate.register(Var)
 def _(ex, symtab):
@@ -327,20 +360,21 @@ def _(ex, symtab):
         ex.type_ = symtab[ex.name]
     return ex
 
+
 @type_propagate.register(Call)
 def _(ex, symtab):
     for a in ex.args:
         type_propagate(a, symtab)
     argtypes = tuple(a.type_ for a in ex.args)
     argtype = make_tuple_if_many(argtypes)
-    
+
     # Try prim lookup first - prims cannot be overloaded
     prim = ks_prim_lookup(ex.name, argtype)
     if prim != None:
         ex.type_ = prim
         return ex
 
-    # Add the type to the sname 
+    # Add the type to the sname
     ex.name = add_type_to_sname(ex.name, argtype)
 
     # Check symbol table first
@@ -353,15 +387,17 @@ def _(ex, symtab):
     # Not found, show what was found to improve error message
     argtypes_str = ",".join(map(pformat, argtypes))
     print(f"type_propagate: at ", pystr(ex, 2))
-    print(f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) ")
+    print(
+        f"type_propagate: Couldn't find {ex.name} called with types ({argtypes_str}) "
+    )
     print(f"type_propagate: Looked up {ex.name}")
     exname = ex.name.mangled()
     print(f"type_propagate: Near misses {exname}:")
-    for key,val in symtab.items():
+    for key, val in symtab.items():
         if isinstance(key, StructuredName):
-            key_str=key.mangle_without_type()
+            key_str = key.mangle_without_type()
         else:
-            key_str=str(key)
+            key_str = str(key)
         if editdistance.eval(key_str, exname) < 2:
             print(f"type_propagate:   {key} -> {val}")
 
@@ -370,14 +406,18 @@ def _(ex, symtab):
     argtype_tuple = Type.Tuple(*argtypes) if len(argtypes) > 1 else argtypes[0]
     argtypes_ks_tuple = pformat(argtype_tuple)
     argtypes_ks_tangent_tuple = pformat(tangent_type(argtype_tuple))
-    
+
     print(f"(edef {ex.name} RET ({argtypes_ks_str}))")
-    print(f"(edef D${ex.name} (LM {argtypes_ks_tangent_tuple} dRET) ({argtypes_ks_str}))")
-    print(f"(def rev${ex.name} {argtypes_ks_tangent_tuple} ((t : {argtypes_ks_tuple}) (dret : dRET))")
+    print(
+        f"(edef D${ex.name} (LM {argtypes_ks_tangent_tuple} dRET) ({argtypes_ks_str}))"
+    )
+    print(
+        f"(def rev${ex.name} {argtypes_ks_tangent_tuple} ((t : {argtypes_ks_tuple}) (dret : dRET))"
+    )
     print(f"   )")
 
-
     raise KSTypeError(f"Couldn't find {ex.name} applied to ({argtypes_str}) at {ex}")
+
 
 @type_propagate.register(Lam)
 def _(ex, symtab):
@@ -385,6 +425,7 @@ def _(ex, symtab):
     ex.body = type_propagate(ex.body, local_st)
     ex.type_ = Type.Lam(ex.arg.type_, ex.body.type_)
     return ex
+
 
 @type_propagate.register(Let)
 def _(ex, symtab):
@@ -402,15 +443,16 @@ def _(ex, symtab):
     if isinstance(ex.vars, list):
         assert len(ex.vars) == ex.rhs.type_.tuple_len if ex.rhs.type_ else True
         local_st = symtab.copy()
-        for i,var in enumerate(ex.vars):
+        for i, var in enumerate(ex.vars):
             var.type_ = ex.rhs.type_.tuple_elem(i) if ex.rhs.type_ else None
             local_st[var.name] = var.type_
-        
+
         ex.body = type_propagate(ex.body, local_st)
         ex.type_ = ex.body.type_
         return ex
 
-    assert False # Bad var   
+    assert False  # Bad var
+
 
 @type_propagate.register(If)
 def _(ex, symtab):
@@ -422,6 +464,7 @@ def _(ex, symtab):
     ex.type_ = ex.t_body.type_
     return ex
 
+
 @type_propagate.register(Assert)
 def _(ex, symtab):
     ex.cond = type_propagate(ex.cond, symtab)
@@ -430,6 +473,7 @@ def _(ex, symtab):
     ex.type_ = ex.body.type_
     return ex
 
-def type_propagate_decls(decls : List[Expr], symtab):
+
+def type_propagate_decls(decls: List[Expr], symtab):
     for decl in decls:
         type_propagate(decl, symtab)

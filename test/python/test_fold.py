@@ -1,5 +1,6 @@
 from ksc.utils import translate_and_import
 
+
 def test_fold():
     ks_str = """
 (edef add Integer (Tuple Integer Integer))
@@ -25,5 +26,5 @@ def test_fold():
 """
     py_out = translate_and_import(__file__, ks_str, "common")
     n = 10
-    expected_output = 4 # [0, 3, 6, 9]
+    expected_output = 4  # [0, 3, 6, 9]
     assert py_out.test(n) == expected_output

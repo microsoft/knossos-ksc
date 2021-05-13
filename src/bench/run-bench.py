@@ -45,18 +45,19 @@ class time_sampler:
         return time.time_ns() * 1e-9
 
 
-def fun_and_grad_matches(f,g,arg):
+def fun_and_grad_matches(f, g, arg):
     fval = f(arg)
     gval = g(arg)
     if not torch.all(torch.isclose(fval, gval)):
         print("run-bench: ERROR: VALUE mismatch", f, g)
-        print(fval,gval)
+        print(fval, gval)
         return False
 
     return True
 
+
 def timeit(msg, fn, arg):
-    MAX_TIME = 5 # No no need to run beyond MAX_TIME sec to get accurate benchmarks
+    MAX_TIME = 5  # No no need to run beyond MAX_TIME sec to get accurate benchmarks
     end_time = time.time() + MAX_TIME
     inference_timer = time_sampler()
     forward_timer = time_sampler()
@@ -83,9 +84,12 @@ def timeit(msg, fn, arg):
 
     csum = grad[0].sum()
 
-    print(f'{msg:20} {csum:12.6e} Runs: {inference_timer.ncalls} | Inference: {inference_timer.ms:10.3f} ms |'
-          f' Forward: {forward_timer.ms:10.3f} ms |'
-          f' Backward {backward_timer.ms:10.3f} ms | {arg.shape}')
+    print(
+        f"{msg:20} {csum:12.6e} Runs: {inference_timer.ncalls} | Inference: {inference_timer.ms:10.3f} ms |"
+        f" Forward: {forward_timer.ms:10.3f} ms |"
+        f" Backward {backward_timer.ms:10.3f} ms | {arg.shape}"
+    )
+
 
 def bench(module_name, bench_name):
     """
@@ -101,27 +105,28 @@ def bench(module_name, bench_name):
     mod = importlib.import_module(module_name)
     for fn in inspect.getmembers(mod, inspect.isfunction):
         fn_name, fn_obj = fn
-        if fn_name == bench_name + '_bench_configs':
+        if fn_name == bench_name + "_bench_configs":
             configs = list(fn_obj())
-        elif fn_name == bench_name + '_pytorch':
+        elif fn_name == bench_name + "_pytorch":
             pt_fast = fn_obj
-        elif fn_name == bench_name + '_pytorch_nice':
+        elif fn_name == bench_name + "_pytorch_nice":
             pt_nice = fn_obj
         elif fn_name == bench_name:
             ks_fun = fn_obj
         else:
             print(f"Ignoring {fn_name}")
 
-    # TODO: elementwise_apply  
+    # TODO: elementwise_apply
     ks_compiled = ts2mod(ks_fun, example_inputs=(configs[0],))
 
     for arg in configs:
         assert fun_and_grad_matches(pt_fast, ks_fun, arg)
         assert fun_and_grad_matches(pt_fast, pt_nice, arg)
         assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
-        timeit(bench_name + ' PyTorch fast', pt_fast, arg)
-        timeit(bench_name + ' PyTorch nice', pt_nice, arg)
-        timeit(bench_name + ' Knossos', ks_compiled.apply, arg)
+        timeit(bench_name + " PyTorch fast", pt_fast, arg)
+        timeit(bench_name + " PyTorch nice", pt_nice, arg)
+        timeit(bench_name + " Knossos", ks_compiled.apply, arg)
+
 
 if __name__ == "__main__":
     import sys

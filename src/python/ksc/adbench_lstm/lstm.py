@@ -15,22 +15,25 @@
 
 import numpy as np
 
+
 def sigmoid(x):
     return 1.0 / (1.0 + np.exp(-x))
+
 
 def lstm_model(weight, bias, hidden, cell, inp):
     gates = np.concatenate((inp, hidden, inp, hidden), 0) * weight + bias
     hidden_size = hidden.shape[0]
 
-    forget  = sigmoid(gates[0:hidden_size])
-    ingate  = sigmoid(gates[hidden_size:2*hidden_size])
-    outgate = sigmoid(gates[2*hidden_size:3*hidden_size])
-    change  = np.tanh(gates[3*hidden_size:])
+    forget = sigmoid(gates[0:hidden_size])
+    ingate = sigmoid(gates[hidden_size : 2 * hidden_size])
+    outgate = sigmoid(gates[2 * hidden_size : 3 * hidden_size])
+    change = np.tanh(gates[3 * hidden_size :])
 
-    cell   = cell * forget + ingate * change
+    cell = cell * forget + ingate * change
     hidden = outgate * np.tanh(cell)
 
     return (hidden, cell)
+
 
 def lstm_predict(w, w2, s, x):
     s2 = s.copy()
@@ -41,6 +44,7 @@ def lstm_predict(w, w2, s, x):
         x = s2[i]
     return (x * w2[1] + w2[2], s2)
 
+
 def lstm_objective(main_params, extra_params, state, sequence, _range=None):
     if _range is None:
         _range = range(0, len(sequence) - 1)
@@ -50,7 +54,9 @@ def lstm_objective(main_params, extra_params, state, sequence, _range=None):
     _input = sequence[_range[0]]
     all_states = [state]
     for t in _range:
-        ypred, new_state = lstm_predict(main_params, extra_params, all_states[t], _input)
+        ypred, new_state = lstm_predict(
+            main_params, extra_params, all_states[t], _input
+        )
         all_states.append(new_state)
         ynorm = ypred - np.log(sum(np.exp(ypred), 2))
         ygold = sequence[t + 1]

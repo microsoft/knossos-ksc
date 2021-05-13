@@ -8,7 +8,7 @@ import torch
 
 
 @torch.jit.script
-#TODO: does Torch already do this maxing? AWF
+# TODO: does Torch already do this maxing? AWF
 def logsumexp(x):
     mx = torch.max(x)
     emx = torch.exp(x - mx)
@@ -27,7 +27,7 @@ def logsumexpvec(x):
 
 
 @torch.jit.script
-def log_gamma_distrib(a:torch.Tensor, p: int):
+def log_gamma_distrib(a: torch.Tensor, p: int):
     # return scipy_special.multigammaln(a, p)
     return torch_multigammaln.multigammaln(a, p)
 
@@ -36,6 +36,7 @@ def log_gamma_distrib(a:torch.Tensor, p: int):
 def sqsum(x):
     # Python builtin <built-in function sum> is currently not supported in Torchscript
     return torch.sum(x ** 2)
+
 
 # TODO: pass only Qdiag and icf (as is done in the F#) - AWF
 @torch.jit.script
@@ -55,15 +56,17 @@ def log_wishart_prior(p: int, wishart_gamma, wishart_m, sum_qs, Qdiags, icf):
 
     return out - k * (C - log_gamma_distrib(0.5 * n, p))
 
+
 @torch.jit.script
-def tri(n:int):
-    return int(n * (n - 1) /2)
+def tri(n: int):
+    return int(n * (n - 1) / 2)
+
 
 @torch.jit.script
 def make_L_col_lifted(d: int, icf, i: int):
-    
+
     nelems = d - i - 1
-    Lparamidx = d + tri(i+1)
+    Lparamidx = d + tri(i + 1)
 
     col = torch.cat(
         [
@@ -71,8 +74,9 @@ def make_L_col_lifted(d: int, icf, i: int):
             icf[Lparamidx : (Lparamidx + nelems)],
         ]
     )
-    
+
     return col
+
 
 @torch.jit.script
 def constructL(d: int, icf):
@@ -93,9 +97,7 @@ def constructL(d: int, icf):
 
     columns = []
     for i in range(0, d):
-        col = make_L_col_lifted(
-            d, icf, i
-        )
+        col = make_L_col_lifted(d, icf, i)
         columns.append(col)
 
     return torch.stack(columns, -1)
@@ -105,9 +107,6 @@ def Qtimesx(Qdiag, L, x):
 
     f = torch.einsum("ijk,mik->mij", L, x)
     return Qdiag * x + f
-
-
-
 
 
 @torch.jit.script
@@ -138,6 +137,7 @@ def gmm_objective(alphas, means, icf, x, wishart_gamma, wishart_m):
         - n * logsumexp(alphas)
         + log_wishart_prior(d, wishart_gamma, wishart_m, sum_qs, Qdiags, icf)
     )
+
 
 def gmm_objective_reference(alphas, means, icf, x, wishart_gamma, wishart_m):
     n = x.shape[0]

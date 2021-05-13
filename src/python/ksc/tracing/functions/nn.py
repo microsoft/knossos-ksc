@@ -8,34 +8,35 @@ from ksc.tracing.functions.type_propagation_rules import (
     elementwise,
     first_arg,
     pooling_type_prop_rule,
-    conv_2d_type_prop_rule_from_padding_type
+    conv_2d_type_prop_rule_from_padding_type,
 )
 from ksc.tracing.node import Node
 from ksc.shape import ShapeType, Shape, TensorShape, ScalarShape
 
 relu = make_edef(
-    "relu", ["x"], elementwise,
-    lambda x: x.shape_program,
-    core.numel_program
+    "relu", ["x"], elementwise, lambda x: x.shape_program, core.numel_program
 )
 
 sigmoid = make_edef(
-    "sigmoid", ["x"], elementwise,
-    lambda x: x.shape_program,
-    core.numel_program
+    "sigmoid", ["x"], elementwise, lambda x: x.shape_program, core.numel_program
 )
 
 normalize_2d = make_edef(
-    "normalize_2d", ["x", "weights"], first_arg,
+    "normalize_2d",
+    ["x", "weights"],
+    first_arg,
     lambda x, w: x.shape_program,
-    lambda x, w: core.numel_program(x) * 3
+    lambda x, w: core.numel_program(x) * 3,
 )
 
 batch_norm_2d = make_edef(
-    "batch_norm_2d", ["x", "weights"], first_arg,
+    "batch_norm_2d",
+    ["x", "weights"],
+    first_arg,
     lambda x, w: x.shape_program,
-    lambda x, w: core.numel_program(x) * 10
+    lambda x, w: core.numel_program(x) * 10,
 )
+
 
 def _get_paddings(shape_in, shape_out, window_sizes, strides):
     def get_padding_1d(size_in, size_out, window_size, stride):
@@ -46,19 +47,32 @@ def _get_paddings(shape_in, shape_out, window_sizes, strides):
     w_o, h_o = shape_out
     stride_w, stride_h = strides.data
     k_w, k_h = window_sizes.data
-    return (get_padding_1d(w, w_o, k_w, stride_w), get_padding_1d(h, h_o, k_h, stride_h))
+    return (
+        get_padding_1d(w, w_o, k_w, stride_w),
+        get_padding_1d(h, h_o, k_h, stride_h),
+    )
+
 
 class RequirePadding2d(TraceableFunction):
     is_edef = False
     is_builtin = False
-    def __init__(self, name, arg_names, padding, shape_prop_function, shape_def=None, cost_def=None):
+
+    def __init__(
+        self,
+        name,
+        arg_names,
+        padding,
+        shape_prop_function,
+        shape_def=None,
+        cost_def=None,
+    ):
         super().__init__(f"{name}_{{0}}{{1}}{{2}}{{3}}", arg_names)
         self._internal_function = make_edef(
             name,
             arg_names + ["paddings"],
             self._internal_shape_prop_function,
             shape_def,
-            cost_def
+            cost_def,
         )
         self.padding = padding
         self._proto_shape_prop_function = shape_prop_function
@@ -83,13 +97,16 @@ class RequirePadding2d(TraceableFunction):
         w, h = x.shape.dims[2:]
         w_o, h_o = st.shape.dims[2:]
         paddings = _get_paddings((w, h), (w_o, h_o), ksizes, strides)
-        print(f"In RequirePadding2d.trace(): padding_type={self.padding}, paddings={paddings}")
+        print(
+            f"In RequirePadding2d.trace(): padding_type={self.padding}, paddings={paddings}"
+        )
         body = self._internal_function(*args, paddings)
         shape_types = tuple([arg.shape_type for arg in args])
 
         # specialize the name to avoid cache clash
         self._name = self._name.format(*paddings[0], *paddings[1])
         return Trace(body, ShapeType(st.shape, st.type), shape_types)
+
 
 def cost_conv_2d_no_bias(c0, c1, c2):
     def f(x, weights, ksizes, strides, paddings):
@@ -100,18 +117,24 @@ def cost_conv_2d_no_bias(c0, c1, c2):
         m, _, _, _ = core.get_tensor_size(weights)
         w_o = core.to_float(w // stride_w)
         h_o = core.to_float(h // stride_h)
-        flops = (core.to_float(b)
-                * w_o * h_o
-                * core.to_float(k_w *k_h)
-                * core.to_float(c)
-                * core.to_float(m))
+        flops = (
+            core.to_float(b)
+            * w_o
+            * h_o
+            * core.to_float(k_w * k_h)
+            * core.to_float(c)
+            * core.to_float(m)
+        )
 
         return c0 + c1 * (flops ** 0.5) + c2 * flops
+
     return f
+
 
 @ksc.trace
 def _ceil_div(x, y):
     return (x + y - 1) // y
+
 
 def shape_conv_2d_no_bias(x, weights, ksizes, strides, paddings):
     x_dims, x_elshape = x.shape_program
@@ -126,40 +149,41 @@ def shape_conv_2d_no_bias(x, weights, ksizes, strides, paddings):
     h_new = _ceil_div(h + pad_h[0] + pad_h[1] - k_h + 1, stride_h)
     return core.make_tuple(core.make_tuple(b, m, w_new, h_new), x_elshape)
 
+
 def conv_2d_no_bias(x, weights, ksizes, strides, padding="SAME"):
-    conv =RequirePadding2d(
+    conv = RequirePadding2d(
         "conv_2d_no_bias",
         ["x", "weights", "ksizes", "strides"],
         padding,
         conv_2d_type_prop_rule_from_padding_type,
         shape_conv_2d_no_bias,
-        cost_conv_2d_no_bias(0.0, 0.0, 1.0)
+        cost_conv_2d_no_bias(0.0, 0.0, 1.0),
     )
     return conv(x, weights, ksizes, strides)
+
 
 def _pooling_name(pooling_type, padding):
     return f"{pooling_type}_{padding.lower()}"
 
+
 def max_pool(x, pool_size, strides, padding="VALID"):
     pool = RequirePadding2d(
-        "max_pool",
-        ["x", "pool_size", "strides"],
-        padding,
-        pooling_type_prop_rule
+        "max_pool", ["x", "pool_size", "strides"], padding, pooling_type_prop_rule
     )
     return pool(x, pool_size, strides)
+
 
 def avg_pool(x, pool_size, strides, padding="VALID"):
     pool = RequirePadding2d(
-        "avg_pool",
-        ["x", "pool_size", "strides"],
-        padding,
-        pooling_type_prop_rule
+        "avg_pool", ["x", "pool_size", "strides"], padding, pooling_type_prop_rule
     )
     return pool(x, pool_size, strides)
 
+
 log_softmax = make_edef(
-    "log_softmax", ["x"], first_arg,
+    "log_softmax",
+    ["x"],
+    first_arg,
     lambda x: x.shape_program,
-    lambda x: core.numel_program(x) * 10
+    lambda x: core.numel_program(x) * 10,
 )
