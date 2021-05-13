@@ -5,7 +5,10 @@ from ksc.type_propagate import type_propagate_decls
 
 
 def sorted_rewrites(rule, expr):
-    return [rw.apply_rewrite() for rw in sorted(rule.find_all_matches(expr), key=lambda rw: rw.path)]
+    return [
+        rw.apply_rewrite()
+        for rw in sorted(rule.find_all_matches(expr), key=lambda rw: rw.path)
+    ]
 
 
 def test_constant_folding():
