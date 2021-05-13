@@ -30,7 +30,11 @@ class ConstantFolder(RuleMatcher):
         return replace_subtree(expr, path, Const(0.0), apply_here)
 
     def matches_for_possible_expr(
-        self, expr: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+        self,
+        expr: Expr,
+        path_from_root: Location,
+        root: Expr,
+        env: LetBindingEnvironment,
     ) -> Iterator[Match]:
         assert isinstance(expr, Call) and expr.name == self._name
         if all(isinstance(arg, Const) for arg in expr.args):
