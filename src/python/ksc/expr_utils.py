@@ -67,7 +67,7 @@ def _list_binders_lam(e: Lam):
     return [e.arg.name] + _list_subexp_binders(e)
 
 
-def binder_sets_per_free_var(e: Expr) -> Mapping[str, Sequence[FrozenSet[str]]]:
+def enclosing_binders_per_free_var(e: Expr) -> Mapping[str, Sequence[FrozenSet[str]]]:
     """ For each variable free in `e`, return a sequence containing,
         for each occurrence of that variable, the set of binders within e enclosing that occurrence.
     """

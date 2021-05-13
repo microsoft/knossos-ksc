@@ -22,7 +22,11 @@ from ksc.cav_subst import (
     VariableSubstitution,
 )
 from ksc.expr import Expr, Let, Lam, Var, Const, Rule
-from ksc.expr_utils import subexps_no_binds, list_binders, binder_sets_per_free_var
+from ksc.expr_utils import (
+    subexps_no_binds,
+    list_binders,
+    enclosing_binders_per_free_var,
+)
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
@@ -268,8 +272,8 @@ class ParsedRuleMatcher(RuleMatcher):
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
-        template_binder_sets_by_var = binder_sets_per_free_var(rule.template)
-        rhs_binder_sets_by_var = binder_sets_per_free_var(rule.replacement)
+        template_binder_sets_by_var = enclosing_binders_per_free_var(rule.template)
+        rhs_binder_sets_by_var = enclosing_binders_per_free_var(rule.replacement)
         self._binders_escaped: Mapping[str, FrozenSet[str]] = {}
         for var, template_binder_sets in template_binder_sets_by_var.items():
             least_binders = frozenset.intersection(*template_binder_sets)

@@ -1,4 +1,4 @@
-from ksc.expr_utils import list_binders, binder_sets_per_free_var
+from ksc.expr_utils import list_binders, enclosing_binders_per_free_var
 from ksc.parse_ks import parse_expr_string
 
 
@@ -13,7 +13,7 @@ def test_list_binders():
     assert list_binders(e) == ["x", "y", "x"]
 
 
-def test_binder_sets_per_free_var():
+def test_enclosing_binders_per_free_var():
     e = parse_expr_string(
         """
         (foo
@@ -22,7 +22,7 @@ def test_binder_sets_per_free_var():
             (let (y e2) (let (z e) (add z a)))
         )"""
     )
-    actual = binder_sets_per_free_var(e)
+    actual = enclosing_binders_per_free_var(e)
     assert actual == {
         "a": [frozenset(), frozenset(["x"]), frozenset(["y", "z"])],
         "e": [frozenset(), frozenset(["y"])],
