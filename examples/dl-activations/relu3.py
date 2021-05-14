@@ -56,8 +56,7 @@ def vrelu3_cuda():
     this_dir = os.path.dirname(__file__)
 
     from torch.utils.cpp_extension import load
-    relu3_cuda = torch.utils.cpp_extension.load("relu3", sources=[os.path.join(this_dir, "relu3_cuda.cpp"), os.path.join(this_dir, "relu3_cuda_kernel.cu")])
-
+    relu3_cuda = torch.utils.cpp_extension.load("vrelu3_module", sources=[os.path.join(this_dir, "relu3_cuda.cpp"), os.path.join(this_dir, "relu3_cuda_kernel.cu")])
     class ReLu3Function(torch.autograd.Function):
         @staticmethod
         def forward(ctx, input):
