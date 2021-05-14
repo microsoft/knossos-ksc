@@ -95,8 +95,6 @@ def pytest_generate_tests(metafunc):
 
         metafunc.parametrize("config", config.config_and_group_marker, ids=config_namer)
 
-        
-
         # https://github.com/pytest-dev/pytest/issues/1425#issuecomment-439220834
         # This runs, but doesn't affect the test. It seems like they've allowed FunctionDefinition to be mutable (due to bad inheritance)
         # group_marker = pytest.mark.benchmark(group="groupname_XYZ")
