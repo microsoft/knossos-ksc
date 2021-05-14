@@ -44,16 +44,17 @@ torch::Tensor relu3_cuda_forward(
 
 template <typename scalar_t>
 __global__ void relu3_cuda_backward_kernel(
-    torch::PackedTensorAccessor32<scalar_t,1,torch::RestrictPtrTraits> d_x,
-    const torch::PackedTensorAccessor32<scalar_t,1,torch::RestrictPtrTraits> grad,
-    const torch::PackedTensorAccessor32<scalar_t,1,torch::RestrictPtrTraits> x) {
+    torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> d_x,
+    const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> grad,
+    const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> x) {
+  const int n = blockIdx.y;
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < x.size(0)){
-    if (x[i] >= 0) {
-      if (x[i] > 1) {
-        d_x[i] = grad[i];
+  if (i < x.size(1)){
+    if (x[n][i] >= 0) {
+      if (x[n][i] > 1) {
+        d_x[n][i] = grad[n][i];
       } else {
-        d_x[i] = x[i] * x[i] * grad[i];
+        d_x[n][i] = x[n][i] * x[n][i] * grad[n][i];
       }
     }
   }
@@ -63,17 +64,18 @@ torch::Tensor relu3_cuda_backward(
     torch::Tensor grad,
     torch::Tensor x) {
   auto d_x = torch::zeros_like(x);
-  auto x_size = x.size(0);
+  auto x_size_0 = x.size(0);
+  auto x_size_1 = x.size(1);
 
 // TODO: find out how PyTorch chooses these parameters
   const int threads = 1024;
-  const int blocks = (x_size + threads - 1) / threads;
+  const dim3 blocks((x_size_1 + threads - 1) / threads, x_size_0);
 
   AT_DISPATCH_FLOATING_TYPES(x.type(), "relu3_backward_cuda", ([&] {
     relu3_cuda_backward_kernel<scalar_t><<<blocks, threads>>>(
-        d_x.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>(),
-        grad.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>(),
-        x.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>());
+        d_x.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
+        grad.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
+        x.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>());
   }));
 
   return d_x;
