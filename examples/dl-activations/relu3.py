@@ -52,7 +52,7 @@ def relu3_pytorch_nice(x: float) -> float:
 def vrelu3_pytorch_nice(x: torch.Tensor):
     return elementwise_apply(relu3_pytorch_nice, x)
 
-def vrelu3_cuda():
+def vrelu3_cuda_init():
     this_dir = os.path.dirname(__file__)
 
     from torch.utils.cpp_extension import load
@@ -75,7 +75,6 @@ def vrelu3_cuda():
         def forward(self, input):
             return ReLu3Function.apply(input)
 
-    assert torch.cuda.is_available()
     cuda_device = torch.device("cuda")
     cpu_device = torch.device("cpu")
     relu3_module = ReLu3().to(cuda_device)
