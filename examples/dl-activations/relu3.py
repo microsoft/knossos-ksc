@@ -90,7 +90,7 @@ def vrelu3_cuda():
 def vrelu3_bench_configs():
     yield torch.randn((4, 4))
     yield torch.randn((16, 16))
-    yield torch.randn((256,256)) # too slow to bench...
+    # yield torch.randn((256,256)) # too slow to bench...
 
 
 def plot_relu3(filename):
