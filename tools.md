@@ -4,7 +4,7 @@
 
 ## VSCode
 
-`knossos` uses [black](https://github.com/psf/black) for formatting. Note we currently use the non-default black line length see [pyproject.toml](pyproject.toml) . You may find the following settings useful. To use, copy them into `.vscode/settings.json` (don't commit them) or your user settings:
+`knossos` uses [black](https://github.com/psf/black) for formatting. Note we currently use the default black line length of `88`. You may find the following settings useful. To use, copy them into `.vscode/settings.json` (don't commit them) or your user settings:
 
 ```json
     "python.formatting.provider": "black",
