@@ -13,7 +13,12 @@ if do_base_cased:
     nlp = load_graph_from_args("feature-extraction", "pt", "bert-base-cased")
     #!mkdir -p obj/bert-base-cased
     print("hf-bert-to-onnx: Saving onnx")
-    convert_pytorch(nlp, opset=11, output=Path("obj/bert-base-cased/bert.onnx"), use_external_format=True)
+    convert_pytorch(
+        nlp,
+        opset=11,
+        output=Path("obj/bert-base-cased/bert.onnx"),
+        use_external_format=True,
+    )
     #!ls -l obj/bert-base-cased
 
     print("hf-bert-to-onnx: Optimizing")
@@ -23,12 +28,22 @@ if do_base_cased:
 
     h = 3
     opt_model = optimizer.optimize_model(
-        "obj/bert-base-cased/bert.onnx", "bert", num_heads=h, hidden_size=768, optimization_options=opt_options
+        "obj/bert-base-cased/bert.onnx",
+        "bert",
+        num_heads=h,
+        hidden_size=768,
+        optimization_options=opt_options,
     )
     opt_model.save_model_to_file(f"obj/bert-base-cased/bert.opt.{h}.onnx")
 
 else:
-    from transformers import BertModel, BertForQuestionAnswering, BertConfig, BertTokenizer, pipeline
+    from transformers import (
+        BertModel,
+        BertForQuestionAnswering,
+        BertConfig,
+        BertTokenizer,
+        pipeline,
+    )
 
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
@@ -44,4 +59,6 @@ else:
         dest.mkdir(parents=True, exist_ok=True)
 
         print("hf-bert-to-onnx: Saving onnx")
-        convert_pytorch(p, opset=11, output=dest / f"bert{d}.onnx", use_external_format=True)
+        convert_pytorch(
+            p, opset=11, output=dest / f"bert{d}.onnx", use_external_format=True
+        )

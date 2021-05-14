@@ -18,7 +18,9 @@ def unique_element_type(types):
 def elementwise(*args):
     a = args[0]
     for arg in args:
-        assert a.shape_type == arg.shape_type, f"Expected {a.shape_type}, but got {arg.shape_type}"
+        assert (
+            a.shape_type == arg.shape_type
+        ), f"Expected {a.shape_type}, but got {arg.shape_type}"
     return args[0].shape_type
 
 
@@ -109,7 +111,10 @@ def conv_2d_type_prop_rule_from_padding_type(padding):
 
         b, c1, w, h = x.shape.dims
         m, c2, k_w_, k_h_ = w_shape.dims
-        assert (k_w, k_h) == (k_w_, k_h_), f"Expected kernel size {(k_w, k_h)}, but got {(k_w_, k_h_)}"
+        assert (k_w, k_h) == (
+            k_w_,
+            k_h_,
+        ), f"Expected kernel size {(k_w, k_h)}, but got {(k_w_, k_h_)}"
         assert c1 == c2, f"Expected {c2} input channels, but got {c1}"
         y_w = _get_output_length(w, k_w, stride_w, padding)
         y_h = _get_output_length(h, k_h, stride_h, padding)

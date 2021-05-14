@@ -111,7 +111,9 @@ def translate_and_import(source_file_name, *args):
 
 
 def subprocess_run(cmd, env=None):
-    return subprocess.run(cmd, stdout=subprocess.PIPE, env=env).stdout.decode().strip("\n")
+    return (
+        subprocess.run(cmd, stdout=subprocess.PIPE, env=env).stdout.decode().strip("\n")
+    )
 
 
 def get_ksc_dir():
@@ -152,10 +154,16 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
                 e = subprocess.run(
                     [
                         ksc_path,
-                        "--generate-cpp" if generate_derivatives else "--generate-cpp-without-diffs",
+                        "--generate-cpp"
+                        if generate_derivatives
+                        else "--generate-cpp-without-diffs",
                         "--ks-source-file",
                         ksc_runtime_dir + "/prelude.ks",
-                        *(("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks") if use_aten else ()),
+                        *(
+                            ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
+                            if use_aten
+                            else ()
+                        ),
                         "--ks-source-file",
                         fks.name,
                         "--ks-output-file",
@@ -203,7 +211,8 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
     module_path = fpymod.name
     module_name = os.path.basename(module_path).split(".")[0]
     python_includes = subprocess_run(
-        [sys.executable, "-m", "pybind11", "--includes"], env={"PYTHONPATH": pybind11_path}
+        [sys.executable, "-m", "pybind11", "--includes"],
+        env={"PYTHONPATH": pybind11_path},
     )
     try:
         cmd = (
@@ -257,8 +266,18 @@ def encode_name(s: str) -> str:
     )
 
 
-def __make_cpp_str(ks_str, name_to_call, python_module_name, arg_types, return_type, generate_derivatives, use_aten):
-    generated_cpp_source = generate_cpp_from_ks(ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten)
+def __make_cpp_str(
+    ks_str,
+    name_to_call,
+    python_module_name,
+    arg_types,
+    return_type,
+    generate_derivatives,
+    use_aten,
+):
+    generated_cpp_source = generate_cpp_from_ks(
+        ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten
+    )
 
     cpp_str = f"""
     #include "knossos-pybind.h"
@@ -312,14 +331,27 @@ PYBIND11_MODULE("""
 
 
 def generate_and_compile_cpp_from_ks(
-    ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False
+    ks_str,
+    name_to_call,
+    arg_types,
+    return_type=None,
+    generate_derivatives=False,
+    use_aten=False,
 ):
 
     cpp_str = __make_cpp_str(
-        ks_str, name_to_call, "PYTHON_MODULE_NAME", arg_types, return_type, generate_derivatives, use_aten
+        ks_str,
+        name_to_call,
+        "PYTHON_MODULE_NAME",
+        arg_types,
+        return_type,
+        generate_derivatives,
+        use_aten,
     )
 
-    cpp_fname = gettempdir() + "/ksc-pybind.cpp"  # TODO temp name, but I want to solve a GC problem with temp names
+    cpp_fname = (
+        gettempdir() + "/ksc-pybind.cpp"
+    )  # TODO temp name, but I want to solve a GC problem with temp names
     print(f"Saving to {cpp_fname}")
     with open(cpp_fname, "w") as fcpp:
         fcpp.write(cpp_str)
@@ -329,11 +361,22 @@ def generate_and_compile_cpp_from_ks(
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, name_to_call, arg_types, return_type=None, generate_derivatives=False, use_aten=False
+    ks_str,
+    name_to_call,
+    arg_types,
+    return_type=None,
+    generate_derivatives=False,
+    use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
     cpp_str = __make_cpp_str(
-        ks_str, name_to_call, "TORCH_EXTENSION_NAME", arg_types, return_type, generate_derivatives, use_aten
+        ks_str,
+        name_to_call,
+        "TORCH_EXTENSION_NAME",
+        arg_types,
+        return_type,
+        generate_derivatives,
+        use_aten,
     )
 
     __ksc_path, ksc_runtime_dir = get_ksc_paths()
@@ -355,7 +398,10 @@ def build_module_using_pytorch_from_ks(
 
     # https://pytorch.org/docs/stable/cpp_extension.html
     module = load_inline(
-        name="dynamic_ksc_cpp", cpp_sources=[cpp_str], extra_include_paths=[ksc_runtime_dir], extra_cflags=cflags
+        name="dynamic_ksc_cpp",
+        cpp_sources=[cpp_str],
+        extra_include_paths=[ksc_runtime_dir],
+        extra_cflags=cflags,
     )
 
     return module

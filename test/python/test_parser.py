@@ -2,9 +2,29 @@ import pytest
 import re
 
 from ksc.type import Type
-from ksc.expr import Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert, StructuredName, make_structured_name
+from ksc.expr import (
+    Def,
+    EDef,
+    GDef,
+    Rule,
+    Const,
+    Var,
+    Lam,
+    Call,
+    Let,
+    If,
+    Assert,
+    StructuredName,
+    make_structured_name,
+)
 
-from ksc.parse_ks import parse_tld, parse_expr_string, ParseError, s_exps_from_string, strip_block_comments
+from ksc.parse_ks import (
+    parse_tld,
+    parse_expr_string,
+    ParseError,
+    s_exps_from_string,
+    strip_block_comments,
+)
 
 
 def tld(s):
@@ -29,12 +49,17 @@ def test_parses():
     )
 
     assert tld("(gdef rev [f (Tuple (Float) (Vec Float))])") == GDef(
-        "rev", make_structured_name(("f", Type.Tuple(Type.Float, Type.Tensor(1, Type.Float))))
+        "rev",
+        make_structured_name(("f", Type.Tuple(Type.Float, Type.Tensor(1, Type.Float)))),
     )
 
-    assert tld('(rule "f" ((a : Float) (b : Float)) a b)') == Rule("f", [Var_a_Float, Var_b_Float], Var_a, Var_b)
+    assert tld('(rule "f" ((a : Float) (b : Float)) a b)') == Rule(
+        "f", [Var_a_Float, Var_b_Float], Var_a, Var_b
+    )
 
-    assert tld("(def f Float ((a : Float)) a)") == Def(f, Type.Float, [Var_a_Float], Var_a)
+    assert tld("(def f Float ((a : Float)) a)") == Def(
+        f, Type.Float, [Var_a_Float], Var_a
+    )
 
     assert tld("(def f Float ((a : Float) (b : Float)) (add a b))") == Def(
         f, Type.Float, [Var_a_Float, Var_b_Float], Call("add", [Var_a, Var_b])
@@ -74,7 +99,9 @@ def test_errors():
 
 
 def check(pattern, s):
-    assert re.match(re.compile(pattern, flags=re.DOTALL | re.MULTILINE), strip_block_comments(s))
+    assert re.match(
+        re.compile(pattern, flags=re.DOTALL | re.MULTILINE), strip_block_comments(s)
+    )
 
 
 def test_comments():

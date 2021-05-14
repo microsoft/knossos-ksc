@@ -34,7 +34,16 @@ def topological_sort(final_node):
 
 
 ProtoFunction = namedtuple(
-    "ProtoFunction", ["name", "return_type", "arg_names", "is_edef", "is_builtin", "shape_def", "cost_def"]
+    "ProtoFunction",
+    [
+        "name",
+        "return_type",
+        "arg_names",
+        "is_edef",
+        "is_builtin",
+        "shape_def",
+        "cost_def",
+    ],
 )
 
 
@@ -48,7 +57,10 @@ def get_or_trace_function(f, original_args):
         if key in _jitted:
             return _jitted[key]
 
-    inputs = [node.Node(n, arg.shape, arg.type, data=arg._data) for n, arg in zip(f.arg_names, original_args)]
+    inputs = [
+        node.Node(n, arg.shape, arg.type, data=arg._data)
+        for n, arg in zip(f.arg_names, original_args)
+    ]
 
     # trace the function
     trace = f.trace(*inputs)
@@ -94,8 +106,17 @@ def jit_and_execute_anonymous_function(body, backend):
     jitted = JittedFunction.from_trace(f, trace)
     # create a function node (which will be connected to
     # the jitted function through the origin attribute)
-    arg_nodes = [node.Node(n, st.shape, st.type, data=v) for n, st, v in zip(arg_names, shape_types, values)]
-    _ = node.Node(jitted.name, shape_type.shape, shape_type.type, children=arg_nodes, jitted=jitted)
+    arg_nodes = [
+        node.Node(n, st.shape, st.type, data=v)
+        for n, st, v in zip(arg_names, shape_types, values)
+    ]
+    _ = node.Node(
+        jitted.name,
+        shape_type.shape,
+        shape_type.type,
+        children=arg_nodes,
+        jitted=jitted,
+    )
     if backend == "abstract":
         # wrap the concrete values in AbstractValue
         values = [AbstractValue.from_data(value) for value in values]
@@ -155,11 +176,17 @@ def compute_ks_str(f, nodes, arg_types):
     var_name_generator = VarNameGenerator()
     return_type = nodes[-1].shape_type.type
     arg_name_types = format_arg_list(f.arg_names, arg_types)
-    template = "\n".join([f"(def {def_name} {return_type} ({arg_name_types})", "  {body}", ")"])
+    template = "\n".join(
+        [f"(def {def_name} {return_type} ({arg_name_types})", "  {body}", ")"]
+    )
     # computed_exprs should include only arguments and not constants
-    computed_exprs = {n: n.name for n in nodes if len(n.children) == 0 and n.name in f.arg_names}
+    computed_exprs = {
+        n: n.name for n in nodes if len(n.children) == 0 and n.name in f.arg_names
+    }
     # anything that takes inputs or not in the arguments
-    nodes_to_process = [n for n in nodes if len(n.children) > 0 or n.name not in f.arg_names]
+    nodes_to_process = [
+        n for n in nodes if len(n.children) > 0 or n.name not in f.arg_names
+    ]
     indent = 2
     while len(nodes_to_process) > 0:
         current = nodes_to_process.pop(0)
@@ -191,7 +218,9 @@ def compute_ks_str(f, nodes, arg_types):
             var_name = var_name_generator()
             computed_exprs[current] = var_name
             # Update the template
-            template = template.format(body=joiner.join([f"(let ({var_name} {current_expr})", "{body}", ")"]))
+            template = template.format(
+                body=joiner.join([f"(let ({var_name} {current_expr})", "{body}", ")"])
+            )
             indent += 2
         else:
             computed_exprs[current] = current_expr
@@ -217,7 +246,9 @@ def compose_shape_propagation_function(f, trace):
             else:
                 # constant
                 st = n.shape_type
-                new_node = node.Node("", st.shape, st.type, n.data)  # disconnect from the trace
+                new_node = node.Node(
+                    "", st.shape, st.type, n.data
+                )  # disconnect from the trace
                 return lambda args: new_node
         elif n.name == "_identity":
             assert len(n.children) == 1
@@ -246,7 +277,15 @@ def compose_shape_propagation_function(f, trace):
 
 class JittedFunction(KsFunction):
     def __init__(
-        self, name, return_type, arg_name_types, ks_str, is_edef, is_builtin, called_functions, shape_prop_function
+        self,
+        name,
+        return_type,
+        arg_name_types,
+        ks_str,
+        is_edef,
+        is_builtin,
+        called_functions,
+        shape_prop_function,
     ):
         super().__init__(name, return_type, arg_name_types, ks_str, is_edef, is_builtin)
         self._called_functions = called_functions
@@ -310,7 +349,9 @@ class JittedFunction(KsFunction):
             seen = set()
         for key, called in self._called_functions.items():
             if len(key[0]) > 0 and key not in seen:
-                called_function = called() if isinstance(called, JittedFunctionFromCall) else called
+                called_function = (
+                    called() if isinstance(called, JittedFunctionFromCall) else called
+                )
                 seen.add(key)
                 inner_before, inner_after = called_function.all_called_functions(seen)
                 before.update(inner_before)  # add functions called by called first
@@ -327,9 +368,15 @@ class JittedFunction(KsFunction):
             # built-in
             return ""
         before, after = self.all_called_functions()
-        print(f"All called functions for {self.name}: {list(before.keys()) + list(after.keys())}")
-        before_functions = [called.ks_str for called in before.values() if len(called.ks_str) > 0]
-        after_functions = [called.ks_str for called in after.values() if len(called.ks_str) > 0]
+        print(
+            f"All called functions for {self.name}: {list(before.keys()) + list(after.keys())}"
+        )
+        before_functions = [
+            called.ks_str for called in before.values() if len(called.ks_str) > 0
+        ]
+        after_functions = [
+            called.ks_str for called in after.values() if len(called.ks_str) > 0
+        ]
         return "\n\n".join(before_functions + [self._ks_str] + after_functions)
 
     def shape_type(self, *args):
@@ -389,7 +436,13 @@ class JittedFunctionFromCall:
         return node.creator._jitted
 
 
-def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=None, traceable_cost_function=None):
+def make_edef(
+    name,
+    arg_names,
+    shape_prop_function,
+    traceable_shape_function=None,
+    traceable_cost_function=None,
+):
     """
     Declare a function/op/node for tracing and the abstract interpreter
 
@@ -451,7 +504,11 @@ def make_edef(name, arg_names, shape_prop_function, traceable_shape_function=Non
                 else None
             )
             body = node.Node(
-                name=name, shape=st.shape, type=st.type, children=args, shape_prop_function=shape_prop_function
+                name=name,
+                shape=st.shape,
+                type=st.type,
+                children=args,
+                shape_prop_function=shape_prop_function,
             )
             shape_types = tuple(arg.shape_type for arg in args)
             return Trace(body, ShapeType(st.shape, st.type), shape_types)

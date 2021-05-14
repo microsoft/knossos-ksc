@@ -75,7 +75,9 @@ def _(ex, indent, body):
 @emit.register(GDef)
 def _(ex, indent, body):
     indent += 1
-    return "#gdef " + pyname(ex.derivation) + " " + pyname(ex.function_name) + nl(indent)
+    return (
+        "#gdef " + pyname(ex.derivation) + " " + pyname(ex.function_name) + nl(indent)
+    )
 
 
 @emit.register(Rule)
@@ -119,12 +121,27 @@ def _(ex, indent, body):
 @emit.register(Lam)
 def _(ex, indent, body):
     indent += 1
-    return body + "lambda " + pyname(ex.arg.name) + ": " + nl(indent + 1) + "(" + emit(ex.body, indent + 1, "") + ")"
+    return (
+        body
+        + "lambda "
+        + pyname(ex.arg.name)
+        + ": "
+        + nl(indent + 1)
+        + "("
+        + emit(ex.body, indent + 1, "")
+        + ")"
+    )
 
 
 @emit.register(Let)
 def _(ex, indent, body):
-    return emit(ex.vars, indent, "") + " = " + emit(ex.rhs, indent + 1, "") + nl(indent) + emit(ex.body, indent, body)
+    return (
+        emit(ex.vars, indent, "")
+        + " = "
+        + emit(ex.rhs, indent + 1, "")
+        + nl(indent)
+        + emit(ex.body, indent, body)
+    )
 
 
 @emit.register(If)
@@ -143,7 +160,9 @@ def _(ex, indent, body):
 
 @emit.register(Assert)
 def _(ex, indent, body):
-    return "assert " + emit(ex.cond, indent, "") + nl(indent) + emit(ex.body, indent, body)
+    return (
+        "assert " + emit(ex.cond, indent, "") + nl(indent) + emit(ex.body, indent, body)
+    )
 
 
 import sys
