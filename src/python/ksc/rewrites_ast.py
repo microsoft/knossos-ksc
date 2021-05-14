@@ -34,10 +34,6 @@ def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> b
 class LiftingRule(RuleMatcher):
     possible_filter_terms = frozenset([Call, If, Let, Assert])
 
-    @abstractmethod
-    def get_liftable_part(self, e: Expr) -> Optional[Expr]:
-        """ If e can be lifted, return the part of 'e' that will be evaluated earlier; otherwise None """
-
     def matches_for_possible_expr(
         self,
         subtree: Expr,
@@ -52,14 +48,12 @@ class LiftingRule(RuleMatcher):
         for i, ch in enumerate(children):
             nested_lam = isinstance(ch, Lam)
             e = ch.body if nested_lam else ch
-            to_lifta = self.get_liftable_part(e)
 
             to_lift = None
             if isinstance(self, lift_if.__class__) and isinstance(e, If):
                 to_lift = e.cond
             if isinstance(self, lift_bind.__class__) and isinstance(e, Let):
                 to_lift = e.rhs
-            assert to_lifta == to_lift
 
             if to_lift is None:
                 continue
@@ -107,9 +101,6 @@ class LiftingRule(RuleMatcher):
 
 @singleton
 class lift_if(LiftingRule):
-    def get_liftable_part(self, e: Expr):
-        return e.cond if isinstance(e, If) else None
-
     def apply_to_parent(self, parent: Expr, path_to_child: Location) -> Expr:
         if_node = get_node_at_location(parent, path_to_child)
         return If(
@@ -125,9 +116,6 @@ class lift_if(LiftingRule):
 
 @singleton
 class lift_bind(LiftingRule):
-    def get_liftable_part(self, e: Expr):
-        return e.rhs if isinstance(e, Let) else None
-
     def apply_to_parent(self, parent: Expr, path_to_child: Location) -> Expr:
         let_node = get_node_at_location(parent, path_to_child)
         assert isinstance(
