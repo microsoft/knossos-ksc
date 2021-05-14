@@ -1,0 +1,2 @@
+pre-commit==2.12.1
+black==19.10b0
