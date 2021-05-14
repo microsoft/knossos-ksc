@@ -15,9 +15,12 @@ from ksc.utils import singleton
 
 ###############################################################################
 # Lifting rules:
-#   lift_bind: (foo (let (x e1) e2)) ==> (let (x e1) (foo e2))
-#   lift_if: (foo (if p x y)) ==> (if p (foo x) (foo y))
+#   lift_bind:
+#      (foo a1 a2 (LET (x e1) y) a4) ==> (LET (x e1) (foo a1 a2 y a4))
+#      (let (p q) (LET (x e1) y)) ==> (LET (x e1) (let (p q) y))
+#   lift_if: (foo a1 a2 (if p x y) a4) ==> (if p (foo a1 a2 x a4) (foo a1 a2 y a4))
 # where foo can be any variety of Expr.
+#     (if (if p x y) )
 
 
 def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> bool:
@@ -45,12 +48,23 @@ class LiftingRule(RuleMatcher):
         if isinstance(subtree, Lam):
             # Lam's inside build/sumbuild are handled as part of the (sum)build
             return
-        for i, ch in enumerate(subexps_no_binds(subtree)):
+        children = subexps_no_binds(subtree)
+        for i, ch in enumerate(children):
             nested_lam = isinstance(ch, Lam)
-            to_lift = self.get_liftable_part(ch.body if nested_lam else ch)
+            e = ch.body if nested_lam else ch
+            to_lifta = self.get_liftable_part(e)
+
+            to_lift = None
+            if isinstance(self, lift_if.__class__) and isinstance(e, If):
+                to_lift = e.cond
+            if isinstance(self, lift_bind.__class__) and isinstance(e, Let):
+                to_lift = e.rhs
+            assert to_lifta == to_lift
+
             if to_lift is None:
-                pass
-            elif (
+                continue
+
+            if (
                 isinstance(subtree, Let)
                 and i == 1
                 and subtree.vars.name in to_lift.free_vars_
