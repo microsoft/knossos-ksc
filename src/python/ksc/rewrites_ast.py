@@ -39,7 +39,10 @@ from ksc.utils import singleton
 #                                       (assert y body))
 #     (assert cond (if p x y)) -> (if p (assert cond x)
 #                                       (assert cond y))
-#                              -? Unless cond guards p; but assume assert fail either way
+#                              -? Unless cond guards p;
+#     We might argue that the only consequence can be an assert fail either way,
+#     but we do want "index" to be able to run unchecked; which might induce segfault
+#     instead of assert failure.
 #
 #   TODO:
 #     (lam v (if p x y)) -> (if p (lam v x) (lam v y))
