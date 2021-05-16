@@ -18,33 +18,6 @@ from ksc.utils import singleton
 #
 # lift_if: EXPR{If} -> If{EXPR}
 # For several varieties of Expr, e.g:
-#  Call:
-#     (foo a1 a2 (if p x y) a4) -> (if p (foo a1 a2 x a4)
-#                                        (foo a1 a2 y a4))
-#  If:
-#     (if (if p x y) a b) -> (if p (if x a b)
-#                                  (if y a b))
-#     (if q (if p x y) b) -> (if p (if q x b)
-#                                  (if q y b))
-#                         -? Unless q guards p
-#  Let:
-#     (let (v (if p x y)) body) -> (if p (let (v x) body)
-#                                        (let (v y) body))
-#                               -? v not in freevars{p}
-#     (let (v a) (if p x y)) -> (if p (let (v a) x)
-#                                     (let (v a) y))
-#                            -? v not in freevars(p)
-#
-#  Assert:
-#     (assert (if p x y) body) -> (if p (assert x body)
-#                                       (assert y body))
-#     (assert cond (if p x y)) -> (if p (assert cond x)
-#                                       (assert cond y))
-#                              -? Unless cond guards p;
-#     We might argue that the only consequence can be an assert fail either way,
-#     but we do want "index" to be able to run unchecked; which might induce segfault
-#     instead of assert failure.
-#
 #  TODO: consistently handle Lambda, as below, or document all of the above cases, with nested lambdas
 #
 #  Lam:
@@ -122,12 +95,12 @@ class lift_if(RuleMatcher):
 
         # Let:
         elif isinstance(expr, Let):
-            #     (let (v (if p x y)) body) -> (if p (let (v x) body)
-            #                                        (let (v y) body))
-            #                               -? v not in freevars{p}
-            #     (let (v a) (if p x y)) -> (if p (let (v a) x)
-            #                                     (let (v a) y))
-            #                            -? v not in freevars(p)
+            # (let (v (if p x y)) body) -> (if p (let (v x) body)
+            #                                    (let (v y) body))
+            #                           -? v not in freevars{p}
+            # (let (v a) (if p x y)) -> (if p (let (v a) x)
+            #                                 (let (v a) y))
+            #                        -? v not in freevars(p)
             #
             yield from check_child(expr.rhs, 0, [])
             yield from check_child(expr.body, 1, [expr.vars.name])
@@ -141,16 +114,30 @@ class lift_if(RuleMatcher):
 
         #  If:
         elif isinstance(expr, If):
-            #     (if (if p x y) a b) -> (if p (if x a b)
-            #                                  (if y a b))
-            #     (if q (if p x y) b) -> (if p (if q x b)
-            #                                  (if q y b))
-            #                         -? Unless q guards p
+            # (if (if p x y) a b) -> (if p (if x a b)
+            #                              (if y a b))
+            # (if q (if p x y) b) -> (if p (if q x b)
+            #                              (if q y b))
+            #                     -? Unless q guards p
             yield from check_child(expr.cond, 0, [])
             if can_speculate_ahead_of_condition(expr.t_body, expr.cond, True):
                 yield from check_child(expr.t_body, 1, [])
             if can_speculate_ahead_of_condition(expr.f_body, expr.cond, False):
                 yield from check_child(expr.t_body, 2, [])
+
+        #  Assert:
+        elif isinstance(expr, Assert):
+            # (assert (if p x y) body) -> (if p (assert x body)
+            #                                   (assert y body))
+            # (assert cond (if p x y)) -> (if p (assert cond x)
+            #                                   (assert cond y))
+            #                          -? Unless cond guards p;
+            # We might argue that the only consequence can be an assert fail either way,
+            # but we do want "index" to be able to run unchecked; which might induce segfault
+            # instead of assert failure.
+            if can_speculate_ahead_of_condition(expr.body, expr.cond, True):
+                yield from check_child(expr.cond, 0, [])
+            yield from check_child(expr.body, 1, [])
 
         else:
             assert False  # Should not have got here, check possible_filter_terms
