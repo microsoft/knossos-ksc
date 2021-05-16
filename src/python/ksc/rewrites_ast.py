@@ -185,12 +185,12 @@ class lift_if(RuleMatcher):
                 self,
                 root,
                 path_from_root + ((i, 0) if nested_lam else (i,)),
-                {"buildlam": nested_lam},
+                {"nested_lam": nested_lam},
             )
 
-    def apply_at(self, e: Expr, path: Location, buildlam: bool) -> Expr:
-        assert (not buildlam) or len(path) > 1
-        rest_of_path = path[-(1 + int(buildlam)) :]
+    def apply_at(self, e: Expr, path: Location, nested_lam: bool) -> Expr:
+        assert (not nested_lam) or len(path) > 1
+        rest_of_path = path[-(1 + int(nested_lam)) :]
         path_to_parent = path[: -len(rest_of_path)]
         return replace_subtree(
             e,
@@ -279,12 +279,12 @@ class lift_bind(RuleMatcher):
                     self,
                     root,
                     path_from_root + ((i, 0) if nested_lam else (i,)),
-                    {"buildlam": nested_lam},
+                    {"nested_lam": nested_lam},
                 )
 
-    def apply_at(self, e: Expr, path: Location, buildlam: bool) -> Expr:
-        assert (not buildlam) or len(path) > 1
-        rest_of_path = path[-(1 + int(buildlam)) :]
+    def apply_at(self, e: Expr, path: Location, nested_lam: bool) -> Expr:
+        assert (not nested_lam) or len(path) > 1
+        rest_of_path = path[-(1 + int(nested_lam)) :]
         path_to_parent = path[: -len(rest_of_path)]
         return replace_subtree(
             e,
