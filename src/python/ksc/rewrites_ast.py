@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from sys import path
 from typing import Iterator, Optional
 
 from ksc.expr import Expr, Call, Lam, If, Let, Const, Var, Assert
@@ -44,7 +45,7 @@ from ksc.utils import singleton
 #     but we do want "index" to be able to run unchecked; which might induce segfault
 #     instead of assert failure.
 #
-#  TODO: consistently handle Lambda, as follows
+#  TODO: consistently handle Lambda, as below, or document all of the above cases, with nested lambdas
 #
 #  Lam:
 #     (lam (v: T) (if p x y)) -> (if p (lam (v : T) x) (lam (v : T) y))
@@ -59,6 +60,14 @@ from ksc.utils import singleton
 #     (build e1 (lam v (if p x y))) -> (if p (build e1 (lam v x))
 #                                            (build e1 lam v y)))
 #                                   -? not v in freevars(p)
+# Alternative: documenting nested_lam behaviour
+#
+#  If:
+#     (if (lam (v : T) (if p x y)) a b) -> # Won't typecheck
+#     (if q (lam (v : T) (if p x y)) b) -> (if p (if q (lam (v : T) x) b)
+#                                                (if q (lam (v : T) y) b))
+#                         -? Unless q guards p
+
 
 # Note: guards
 # In this context, "cond" guards "e" if evaluating "e" might fail if cond is != cond_value
@@ -85,46 +94,66 @@ class lift_if(RuleMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:  # ((if p ...), path + [3]); ((if q ...), path + [7]))
-        assert not isinstance(expr, Lam)
-        children = subexps_no_binds(expr)
-        for i, ch in enumerate(children):
-            # For each child, if it's an "if", return a match saying we can lift it
-
-            # Right now:  (foo a1 (lam (x : T) (if a b c)) a3)
-            # ->  (if a (foo a1 (lam (x : T) b)) a3)
-            #           (foo a1 (lam (x : T) c)) a3))
+        def check_child(ch, i, vars_in_scope):
             nested_lam = isinstance(ch, Lam)  # TOUNDO: no. do lambda properly
             e = ch.body if nested_lam else ch
 
             if not isinstance(e, If):
-                continue
+                return
 
-            to_lift = e.cond
+            if nested_lam:
+                vars_in_scope += [ch.arg.name]
 
-            if (
-                isinstance(expr, Let)
-                and i == 1  # the body, not the rhs
-                and expr.vars.name in to_lift.free_vars_
-            ):
-                continue  # Cannot lift computation using a variable outside of let that binds that variable
+            if any(v in e.cond.free_vars_ for v in vars_in_scope):
+                return
 
-            if nested_lam and ch.arg.name in to_lift.free_vars_:
-                continue  # Similarly - cannot lift loop-variant computation out of lam within (sum)build
-
-            if (
-                isinstance(expr, If)
-                and i > 0  # not the condition
-                and not can_speculate_ahead_of_condition(to_lift, expr.cond, i == 1)
-            ):
-                continue  # Don't lift computation out of "if" that may be guarding against an exception
+            if nested_lam:
+                path_to_child = path_from_root + (i, 0)
+            else:
+                path_to_child = path_from_root + (i,)
 
             yield Match(
-                self,
-                root,
-                path_from_root + ((i, 0) if nested_lam else (i,)),
-                {"nested_lam": nested_lam},
+                self, root, path_to_child, {"nested_lam": nested_lam},
             )
 
+        # Lam:
+        if isinstance(expr, Lam):
+            raise NotImplementedError()
+
+        # Let:
+        elif isinstance(expr, Let):
+            #     (let (v (if p x y)) body) -> (if p (let (v x) body)
+            #                                        (let (v y) body))
+            #                               -? v not in freevars{p}
+            #     (let (v a) (if p x y)) -> (if p (let (v a) x)
+            #                                     (let (v a) y))
+            #                            -? v not in freevars(p)
+            #
+            yield from check_child(expr.rhs, 0, [])
+            yield from check_child(expr.body, 1, [expr.vars.name])
+
+        #  Call:
+        elif isinstance(expr, Call):
+            #     (foo a1 a2 (if p x y) a4) -> (if p (foo a1 a2 x a4)
+            #                                        (foo a1 a2 y a4))
+            for i, ch in enumerate(expr.args):
+                yield from check_child(ch, i, [])
+
+        #  If:
+        elif isinstance(expr, If):
+            #     (if (if p x y) a b) -> (if p (if x a b)
+            #                                  (if y a b))
+            #     (if q (if p x y) b) -> (if p (if q x b)
+            #                                  (if q y b))
+            #                         -? Unless q guards p
+            yield from check_child(expr.cond, 0, [])
+            if can_speculate_ahead_of_condition(expr.t_body, expr.cond, True):
+                yield from check_child(expr.t_body, 1, [])
+            if can_speculate_ahead_of_condition(expr.f_body, expr.cond, False):
+                yield from check_child(expr.t_body, 2, [])
+
+        else:
+            assert False  # Should not have got here, check possible_filter_terms
 
     def apply_at(self, e: Expr, path: Location, nested_lam: bool) -> Expr:
         if nested_lam:
