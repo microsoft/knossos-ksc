@@ -17,29 +17,37 @@ from ksc.utils import singleton
 ###############################################################################
 #
 # lift_if: EXPR{If} -> If{EXPR}
-# For several varieties of Expr, e.g:
-#  TODO: consistently handle Lambda, as below, or document all of the above cases, with nested lambdas
+#
+
+#  TODO: consistently handle Lambda, as below,
+#   or document all of the above cases, with nested lambdas
 #
 #  Lam:
-#     (lam (v: T) (if p x y)) -> (if p (lam (v : T) x) (lam (v : T) y))
+#     (lam  (if p x y)) -> (if p (lam V x) (lam V y))
 #                             -? v not in freevars(p)
 #  Which then implies build will take two rewrites to lift "if":
-#     (build e1 (lam v (if p x y)))
-#     -> (build e1 (if p (lam v x) (lam v y)))
-#     -> (if p (build e1 (lam v x))
-#              (build e1 (lam v y)))
+#     (build e1 (lam V (if p x y)))
+#     -> (build e1 (if p (lam V x) (lam V y)))
+#     -> (if p (build e1 (lam V x))
+#              (build e1 (lam V y)))
 #
 #  And we should undo today's special casing, which achieves this:
-#     (build e1 (lam v (if p x y))) -> (if p (build e1 (lam v x))
-#                                            (build e1 lam v y)))
+#     (build e1 (lam V (if p x y))) -> (if p (build e1 (lam V x))
+#                                            (build e1 lam V y)))
 #                                   -? not v in freevars(p)
+#
 # Alternative: documenting nested_lam behaviour
 #
-#  If:
-#     (if (lam (v : T) (if p x y)) a b) -> # Won't typecheck
-#     (if q (lam (v : T) (if p x y)) b) -> (if p (if q (lam (v : T) x) b)
-#                                                (if q (lam (v : T) y) b))
-#                         -? Unless q guards p
+# If:
+#     (if (lam V (if p x y)) a b) -> # Won't typecheck
+#     (if q (lam V (if p x y)) b) -> (if p (if q (lam V x) b)
+#                                          (if q (lam V y) b))
+#                                 -? Unless q guards p
+# Let:
+#     (let (f (lam V (if p x y))) body) -> (if p (let (f (lam V x)) body)
+#                                                (let (f (lam V y)) body))
+#     (let (f a) (lam V (if p x y)))) -> (if p (lam V (let (f a) x))
+#                                              (lam V (let (f a) y)))
 
 
 # Note: guards
@@ -133,8 +141,8 @@ class lift_if(RuleMatcher):
             #                                   (assert cond y))
             #                          -? Unless cond guards p;
             # We might argue that the only consequence can be an assert fail either way,
-            # but we do want "index" to be able to run unchecked; which might induce segfault
-            # instead of assert failure.
+            # but we do want "index" to be able to run unchecked;
+            # which might induce segfault instead of assert failure.
             if can_speculate_ahead_of_condition(expr.body, expr.cond, True):
                 yield from check_child(expr.cond, 0)
             yield from check_child(expr.body, 1)
@@ -190,6 +198,8 @@ class lift_if(RuleMatcher):
 #                             -? v not in freevars{p} u freevars{y}
 #                             -? e not guarded by p
 #      (if p x (LET (v e) y)) -> (LET (v e) (if p x y))
+#                             -? v not in freevars{p} u freevars{y}
+#                             -? e not guarded by (p==False)
 #
 #  Assert:
 #      (assert (LET (x e1) y) body) -> (LET (x e1) (assert y body))
