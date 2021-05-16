@@ -14,10 +14,6 @@ from ksc.rewrites import RuleMatcher, LetBindingEnvironment, Match
 from ksc.utils import singleton
 
 ###############################################################################
-# Lifting rules:
-#   lift_bind:
-#      (foo a1 a2 (LET (x e1) y) a4) ==> (LET (x e1) (foo a1 a2 y a4))
-#      (let (p q) (LET (x e1) y)) ==> (LET (x e1) (let (p q) y)) # Check capture
 
 # class xLiftingRule(RuleMatcher):
 #     possible_filter_terms = frozenset([Call, If, Let, Assert])
@@ -87,20 +83,31 @@ from ksc.utils import singleton
 #         Return an Expr equivalent to <parent>. """
 
 
-# lift_if:
-#  (foo a1 a2 (if p x y) a4) ==> (if p (foo a1 a2 x a4)
-#                                      (foo a1 a2 y a4))
-# where foo can be any variety of Expr, e.g:
+# lift_if: EXPR{If} -> If{EXPR}
+# For several varieties of Expr, e.g:
+#  Call:
+#     (foo a1 a2 (if p x y) a4) -> (if p (foo a1 a2 x a4)
+#                                        (foo a1 a2 y a4))
+#  If:
 #     (if (if p x y) a b) -> (if p (if x a b)
 #                                  (if y a b))
 #     (if q (if p x y) b) -> (if p (if q x b)
 #                                  (if q y b))
+#                         -? Unless q guards p
+#  Let:
 #     (let (v (if p x y)) body) -> (if p (let (v x) body)
 #                                        (let (v y) body))
-#                               -? True # Always valid
+#                               -? v not in freevars{p}
 #     (let (v a) (if p x y)) -> (if p (let (v a) x)
 #                                     (let (v a) y))
 #                            -? v not in freevars(p)
+#
+#  Assert:
+#     (assert (if p x y) body) -> (if p (assert x body)
+#                                       (assert y body))
+#     (assert cond (if p x y)) -> (if p (assert cond x)
+#                                       (assert cond y))
+#                              -? Unless cond guards p; but assume assert fail either way
 #
 #   TODO:
 #     (lam v (if p x y)) -> (if p (lam v x) (lam v y))
@@ -116,7 +123,9 @@ from ksc.utils import singleton
 #                                            (build e1 lam v y)))
 #                                   -? not v in freevars(p)
 
-
+# Note: guards
+# In this context, "cond" guards "e" if evaluating "e" might fail if cond is != cond_value
+# TODO: This is not "speculation".  Rename to "is_guarded_by".
 def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> bool:
     """ Can we speculatively evaluate e, when the original program would not have done so,
         moving <e> to a point that it is evaluated before testing <cond> ?
@@ -130,6 +139,7 @@ def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> b
 @singleton
 class lift_if(RuleMatcher):
     possible_filter_terms = frozenset([Call, If, Let, Assert])
+    # TOUNDO: Not Lam: lams inside build/sumbuild are handled as part of the (sum)build
 
     def matches_for_possible_expr(
         self,
@@ -138,42 +148,45 @@ class lift_if(RuleMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:  # ((if p ...), path + [3]); ((if q ...), path + [7]))
-        if isinstance(subtree, Lam):
-            # Lam's inside build/sumbuild are handled as part of the (sum)build
-            return
+        assert not isinstance(subtree, Lam)
         children = subexps_no_binds(subtree)
         for i, ch in enumerate(children):
-            nested_lam = isinstance(ch, Lam)  # TODO: no. do lambda properly
+            # For each child, if it's an "if", return a match saying we can lift it
+
+            # Right now:  (foo a1 (lam (x : T) (if a b c)) a3)
+            # ->  (if a (foo a1 (lam (x : T) b)) a3)
+            #           (foo a1 (lam (x : T) c)) a3))
+            nested_lam = isinstance(ch, Lam)  # TOUNDO: no. do lambda properly
             e = ch.body if nested_lam else ch
 
-            to_lift = None
-            if isinstance(e, If):
-                to_lift = e.cond
-
-            if to_lift is None:
+            if not isinstance(e, If):
                 continue
+
+            to_lift = e.cond
 
             if (
                 isinstance(subtree, Let)
-                and i == 1
+                and i == 1  # the body, not the rhs
                 and subtree.vars.name in to_lift.free_vars_
             ):
-                pass  # Cannot lift computation using a variable outside of let that binds that variable
-            elif nested_lam and ch.arg.name in to_lift.free_vars_:
-                pass  # Similarly - cannot lift loop-variant computation out of lam within (sum)build
-            elif (
+                continue  # Cannot lift computation using a variable outside of let that binds that variable
+
+            if nested_lam and ch.arg.name in to_lift.free_vars_:
+                continue  # Similarly - cannot lift loop-variant computation out of lam within (sum)build
+
+            if (
                 isinstance(subtree, If)
-                and i > 0
+                and i > 0  # not the condition
                 and not can_speculate_ahead_of_condition(to_lift, subtree.cond, i == 1)
             ):
-                pass  # Don't lift computation out of "if" that may be guarding against an exception
-            else:
-                yield Match(
-                    self,
-                    root,
-                    path_from_root + ((i, 0) if nested_lam else (i,)),
-                    {"buildlam": nested_lam},
-                )
+                continue  # Don't lift computation out of "if" that may be guarding against an exception
+
+            yield Match(
+                self,
+                root,
+                path_from_root + ((i, 0) if nested_lam else (i,)),
+                {"buildlam": nested_lam},
+            )
 
     def apply_at(self, e: Expr, path: Location, buildlam: bool) -> Expr:
         assert (not buildlam) or len(path) > 1
@@ -199,6 +212,30 @@ class lift_if(RuleMatcher):
         )
 
 
+# Lifting rules:
+#   lift_bind:
+#  Call:
+#      (foo a1 a2 (LET (x e1) y) a4) -> (LET (x e1) (foo a1 a2 y a4))
+#                                    -? x not in freevars{a1,a2,a4}
+#                                       equivalent to x not in freevars{expr}
+#  Let:
+#      (let (p q) (LET (x e1) y)) -> (LET (x e1) (let (p q) y))
+#                                 -? x not in freevars{q}
+#                                    equivalent to x not in freevars{expr}
+#  If:
+#      (if (LET (v e) p) x y) -> (LET (v e) (if p x y))
+#                             -? v not in freevars{x} u freevars{y
+#                                which is equivalent to v not in freevars{expr}?
+#      (if p (LET (v e) x) y) -> (LET (v e) (if p x y))
+#                             -? v not in freevars{p} u freevars{y}
+#                             -? e not guarded by p
+#      (if p x (LET (v e) y)) -> (LET (v e) (if p x y))
+#
+#  Assert:
+#      (assert (LET (x e1) y) body) -> (LET (x e1) (assert y body))
+#                                   -? x not in freevars{body}
+
+
 @singleton
 class lift_bind(RuleMatcher):
     possible_filter_terms = frozenset([Call, If, Let, Assert])
@@ -218,14 +255,10 @@ class lift_bind(RuleMatcher):
             nested_lam = isinstance(ch, Lam)
             e = ch.body if nested_lam else ch
 
-            to_lift = None
-            if isinstance(self, lift_if.__class__) and isinstance(e, If):
-                to_lift = e.cond
-            if isinstance(self, lift_bind.__class__) and isinstance(e, Let):
-                to_lift = e.rhs
-
-            if to_lift is None:
+            if not isinstance(e, Let):
                 continue
+
+            to_lift = e.rhs
 
             if (
                 isinstance(subtree, Let)
