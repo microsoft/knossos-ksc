@@ -44,16 +44,18 @@ from ksc.utils import singleton
 #     but we do want "index" to be able to run unchecked; which might induce segfault
 #     instead of assert failure.
 #
-#   TODO:
-#     (lam v (if p x y)) -> (if p (lam v x) (lam v y))
-#                        -? not v in freevars(p)
+#  TODO: consistently handle Lambda, as follows
 #
+#  Lam:
+#     (lam (v: T) (if p x y)) -> (if p (lam (v : T) x) (lam (v : T) y))
+#                             -? v not in freevars(p)
+#  Which then implies build will take two rewrites to lift "if":
 #     (build e1 (lam v (if p x y)))
 #     -> (build e1 (if p (lam v x) (lam v y)))
 #     -> (if p (build e1 (lam v x))
 #              (build e1 (lam v y)))
 #
-#   TOUNDO:
+#  And we should undo today's special casing, which achieves this:
 #     (build e1 (lam v (if p x y))) -> (if p (build e1 (lam v x))
 #                                            (build e1 lam v y)))
 #                                   -? not v in freevars(p)
@@ -78,13 +80,13 @@ class lift_if(RuleMatcher):
 
     def matches_for_possible_expr(
         self,
-        subtree: Expr,  # (foo a1 a2 (if p x y) a4 a5 (if q z w) a7)
+        expr: Expr,  # (foo a1 a2 (if p x y) a4 a5 (if q z w) a7)
         path_from_root: Location,
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:  # ((if p ...), path + [3]); ((if q ...), path + [7]))
-        assert not isinstance(subtree, Lam)
-        children = subexps_no_binds(subtree)
+        assert not isinstance(expr, Lam)
+        children = subexps_no_binds(expr)
         for i, ch in enumerate(children):
             # For each child, if it's an "if", return a match saying we can lift it
 
@@ -100,9 +102,9 @@ class lift_if(RuleMatcher):
             to_lift = e.cond
 
             if (
-                isinstance(subtree, Let)
+                isinstance(expr, Let)
                 and i == 1  # the body, not the rhs
-                and subtree.vars.name in to_lift.free_vars_
+                and expr.vars.name in to_lift.free_vars_
             ):
                 continue  # Cannot lift computation using a variable outside of let that binds that variable
 
@@ -110,9 +112,9 @@ class lift_if(RuleMatcher):
                 continue  # Similarly - cannot lift loop-variant computation out of lam within (sum)build
 
             if (
-                isinstance(subtree, If)
+                isinstance(expr, If)
                 and i > 0  # not the condition
-                and not can_speculate_ahead_of_condition(to_lift, subtree.cond, i == 1)
+                and not can_speculate_ahead_of_condition(to_lift, expr.cond, i == 1)
             ):
                 continue  # Don't lift computation out of "if" that may be guarding against an exception
 
@@ -179,15 +181,15 @@ class lift_bind(RuleMatcher):
 
     def matches_for_possible_expr(
         self,
-        subtree: Expr,
+        exp: Expr,
         path_from_root: Location,
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        if isinstance(subtree, Lam):
+        if isinstance(exp, Lam):
             # Lam's inside build/sumbuild are handled as part of the (sum)build
             return
-        children = subexps_no_binds(subtree)
+        children = subexps_no_binds(exp)
         for i, ch in enumerate(children):
             nested_lam = isinstance(ch, Lam)
             e = ch.body if nested_lam else ch
@@ -197,18 +199,14 @@ class lift_bind(RuleMatcher):
 
             to_lift = e.rhs
 
-            if (
-                isinstance(subtree, Let)
-                and i == 1
-                and subtree.vars.name in to_lift.free_vars_
-            ):
+            if isinstance(exp, Let) and i == 1 and exp.vars.name in to_lift.free_vars_:
                 pass  # Cannot lift computation using a variable outside of let that binds that variable
             elif nested_lam and ch.arg.name in to_lift.free_vars_:
                 pass  # Similarly - cannot lift loop-variant computation out of lam within (sum)build
             elif (
-                isinstance(subtree, If)
+                isinstance(exp, If)
                 and i > 0
-                and not can_speculate_ahead_of_condition(to_lift, subtree.cond, i == 1)
+                and not can_speculate_ahead_of_condition(to_lift, exp.cond, i == 1)
             ):
                 pass  # Don't lift computation out of "if" that may be guarding against an exception
             else:
