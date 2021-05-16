@@ -25,6 +25,26 @@ def test_lift_if():
     assert actual == expected
 
 
+def test_lift_if_assert_cond():
+    e = parse_expr_string("(assert (if p true false) 3.0)")
+    expected = parse_expr_string("(if p (assert true 3.0) (assert false 3.0))")
+    symtab = dict()
+    type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
+    type_propagate_decls([e, expected], {**symtab, "p": Type.Bool})
+    actual = utils.single_elem(list(lift_if.find_all_matches(e))).apply_rewrite()
+    assert actual == expected
+
+
+def test_lift_if_assert_body():
+    e = parse_expr_string("(assert q (if p 2.2 3.3))")
+    expected = parse_expr_string("(if p (assert q 2.2) (assert q 3.3))")
+    symtab = dict()
+    type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
+    type_propagate_decls([e, expected], {**symtab, "p": Type.Bool, "q": Type.Bool})
+    actual = utils.single_elem(list(lift_if.find_all_matches(e))).apply_rewrite()
+    assert actual == expected
+
+
 def test_lift_if_from_let():
     e = parse_expr_string("(let (x 4) (if (gt y 0) x 0))")
     match = utils.single_elem(list(rule("lift_if").find_all_matches(e)))
