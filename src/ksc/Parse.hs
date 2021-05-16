@@ -247,9 +247,6 @@ pType = (pReserved "Integer" >> return TypeInteger)
     <|> (pReserved "Bool"    >> return TypeBool)
     <|> parens pKType
 
-pTypes :: Parser [TypeX]
-pTypes = parens (many pType)
-
 pKType :: Parser TypeX
 pKType =   (do { pReserved "Vec"; ty <- pType; return (TypeTensor 1 ty) })
        <|> (do { pReserved "Tensor"; d <- pInt; ty <- pType; return (TypeTensor d ty)})
