@@ -67,7 +67,7 @@ class lift_if(RuleMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:  # ((if p ...), path + [3]); ((if q ...), path + [7]))
-        def check_child(ch, i, vars_in_scope):
+        def check_child(ch, i, vars_in_scope=set()):
             nested_lam = isinstance(ch, Lam)  # TOUNDO: no. do lambda properly
             e = ch.body if nested_lam else ch
 
@@ -75,9 +75,9 @@ class lift_if(RuleMatcher):
                 return
 
             if nested_lam:
-                vars_in_scope += [ch.arg.name]
+                vars_in_scope |= {ch.arg.name}
 
-            if any(v in e.cond.free_vars_ for v in vars_in_scope):
+            if not vars_in_scope.isdisjoint(e.cond.free_vars_):
                 return
 
             if nested_lam:
@@ -102,15 +102,15 @@ class lift_if(RuleMatcher):
             #                                 (let (v a) y))
             #                        -? v not in freevars(p)
             #
-            yield from check_child(expr.rhs, 0, [])
-            yield from check_child(expr.body, 1, [expr.vars.name])
+            yield from check_child(expr.rhs, 0)
+            yield from check_child(expr.body, 1, {expr.vars.name})
 
         #  Call:
         elif isinstance(expr, Call):
             #     (foo a1 a2 (if p x y) a4) -> (if p (foo a1 a2 x a4)
             #                                        (foo a1 a2 y a4))
             for i, ch in enumerate(expr.args):
-                yield from check_child(ch, i, [])
+                yield from check_child(ch, i)
 
         #  If:
         elif isinstance(expr, If):
@@ -119,11 +119,11 @@ class lift_if(RuleMatcher):
             # (if q (if p x y) b) -> (if p (if q x b)
             #                              (if q y b))
             #                     -? Unless q guards p
-            yield from check_child(expr.cond, 0, [])
+            yield from check_child(expr.cond, 0)
             if can_speculate_ahead_of_condition(expr.t_body, expr.cond, True):
-                yield from check_child(expr.t_body, 1, [])
+                yield from check_child(expr.t_body, 1)
             if can_speculate_ahead_of_condition(expr.f_body, expr.cond, False):
-                yield from check_child(expr.t_body, 2, [])
+                yield from check_child(expr.t_body, 2)
 
         #  Assert:
         elif isinstance(expr, Assert):
@@ -136,8 +136,8 @@ class lift_if(RuleMatcher):
             # but we do want "index" to be able to run unchecked; which might induce segfault
             # instead of assert failure.
             if can_speculate_ahead_of_condition(expr.body, expr.cond, True):
-                yield from check_child(expr.cond, 0, [])
-            yield from check_child(expr.body, 1, [])
+                yield from check_child(expr.cond, 0)
+            yield from check_child(expr.body, 1)
 
         else:
             assert False  # Should not have got here, check possible_filter_terms
