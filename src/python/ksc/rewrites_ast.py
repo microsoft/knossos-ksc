@@ -85,10 +85,36 @@ from ksc.utils import singleton
 #             <parent>: the node to lift over
 #             <path_to_child> path within parent identifying the liftable child (maybe a grandchild to lift over (sum)build+lam).
 #         Return an Expr equivalent to <parent>. """
-#      (let (p q) (LET (x e1) y)) ==> (LET (x e1) (let (p q) y))
-#   lift_if: (foo a1 a2 (if p x y) a4) ==> (if p (foo a1 a2 x a4) (foo a1 a2 y a4))
-# where foo can be any variety of Expr.
-#     (if (if p x y) )
+
+
+# lift_if:
+#  (foo a1 a2 (if p x y) a4) ==> (if p (foo a1 a2 x a4)
+#                                      (foo a1 a2 y a4))
+# where foo can be any variety of Expr, e.g:
+#     (if (if p x y) a b) -> (if p (if x a b)
+#                                  (if y a b))
+#     (if q (if p x y) b) -> (if p (if q x b)
+#                                  (if q y b))
+#     (let (v (if p x y)) body) -> (if p (let (v x) body)
+#                                        (let (v y) body))
+#                               -? True # Always valid
+#     (let (v a) (if p x y)) -> (if p (let (v a) x)
+#                                     (let (v a) y))
+#                            -? v not in freevars(p)
+#
+#   TODO:
+#     (lam v (if p x y)) -> (if p (lam v x) (lam v y))
+#                        -? not v in freevars(p)
+#
+#     (build e1 (lam v (if p x y)))
+#     -> (build e1 (if p (lam v x) (lam v y)))
+#     -> (if p (build e1 (lam v x))
+#              (build e1 (lam v y)))
+#
+#   TOUNDO:
+#     (build e1 (lam v (if p x y))) -> (if p (build e1 (lam v x))
+#                                            (build e1 lam v y)))
+#                                   -? not v in freevars(p)
 
 
 def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> bool:
