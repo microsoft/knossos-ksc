@@ -2,18 +2,16 @@
 type_propagate: Type propagation for Knossos IR
 """
 
-import itertools
-from typing import Union, List
+from typing import List
 from ksc.type import (
     Type,
-    SizeType,
     shape_type,
     tangent_type,
     make_tuple_if_many,
     KSTypeError,
 )
 
-from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Expr, Def, EDef, GDef, Rule, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr, StructuredName
 from ksc.prim import prim_lookup
 
@@ -23,8 +21,8 @@ import editdistance
 # Importing prettyprint to get the decorated printers for Expression and Type
 import ksc.prettyprint  # pylint: disable=unused-import
 
-# Import the prettyprinter routines we use explicitly in this file
-from prettyprinter import cpprint, pprint, pformat
+# Import the prettyprinter routine we use explicitly in this file
+from prettyprinter import pformat
 
 # Needed this in order to see the error messages when pprint fails
 import warnings
