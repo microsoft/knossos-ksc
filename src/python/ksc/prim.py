@@ -1,8 +1,15 @@
-from typing import Optional
+from typing import Optional, Sequence
 import re
 
-from ksc.expr import StructuredName
+from ksc.expr import StructuredName, Expr, Call
 from ksc.type import Type, SizeType, shape_type
+
+
+def make_prim_call(sname: StructuredName, elems: Sequence[Expr]) -> Expr:
+    ret_type = prim_lookup(sname, Type.Tuple(*[e.type_ for e in elems]))
+    assert ret_type is not None
+    return Call(sname, elems, type=ret_type)
+
 
 _prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 

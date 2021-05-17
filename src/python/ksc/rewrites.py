@@ -26,10 +26,10 @@ from ksc.expr import (
     Const,
     Call,
     Rule,
-    make_structured_name,
 )
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
+from ksc.prim import make_prim_call
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
 from ksc.untuple_lets import untuple_one_let
@@ -227,12 +227,6 @@ class inline_var(RuleMatcher):
             yield Match(self, root, path_from_root, {"binding_location": binding_loc})
 
 
-def make_literal_tuple(elems: List[Expr]) -> Expr:
-    return Call(
-        make_structured_name(("tuple", Type.Tuple(*[e.type_ for e in elems]))), elems
-    )
-
-
 @singleton
 class inline_call(RuleMatcher):
     possible_filter_terms = frozenset([Call])
@@ -252,7 +246,7 @@ class inline_call(RuleMatcher):
             call_arg = (
                 call_node.args[0]
                 if len(call_node.args) == 1
-                else make_literal_tuple(call_node.args)
+                else make_prim_call(StructuredName.from_str("tuple"), call_node.args)
             )
             return (
                 Let(def_args[0], call_arg, func_def.body)
