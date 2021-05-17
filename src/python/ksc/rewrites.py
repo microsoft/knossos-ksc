@@ -281,7 +281,7 @@ class ParsedRuleMatcher(RuleMatcher):
          replacement is an Expr, whose free vars are a subset of `template_vars`
     """
 
-    def __init__(self, rule: Rule):
+    def __init__(self, rule: Rule, side_conditions=lambda **substs: True):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
         assert rule.template.type_ == rule.replacement.type_ != None
         known_vars = frozenset([v.name for v in rule.template_vars])
@@ -292,6 +292,7 @@ class ParsedRuleMatcher(RuleMatcher):
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
+        self._side_conditions = side_conditions
 
     @property
     def possible_filter_terms(self):
@@ -303,7 +304,7 @@ class ParsedRuleMatcher(RuleMatcher):
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
         substs = find_template_subst(self._rule.template, subtree, self._arg_types)
-        if substs is not None:
+        if substs is not None and self._side_conditions(**substs):
             yield Match(self, root, path_from_root, substs)
 
     def apply_at(
@@ -482,11 +483,11 @@ class SubstTemplate(ExprTransformer):
         return res
 
 
-def parse_rule_str(ks_str, symtab):
+def parse_rule_str(ks_str, symtab, **kwargs):
     r = single_elem(list(parse_ks_file(ks_str)))
     assert isinstance(r, Rule)
     type_propagate(r, symtab)
-    return ParsedRuleMatcher(r)
+    return ParsedRuleMatcher(r, **kwargs)
 
 
 def parse_rules_from_file(filename):
