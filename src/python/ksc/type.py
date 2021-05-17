@@ -22,6 +22,7 @@ class Type:
         "Float": 0,
         "Bool": 0,
         "String": 0,
+        "Any": 0,  # for Rules only; TODO: enforce we can't have values of / functions operating on these types?
         "Lam": 2,  # TODO: Lambda args are in reverse order, prefer src -> dst
         "LM": 2,  # Linear map, used in AD
     }
@@ -99,7 +100,8 @@ class Type:
 
     def can_accept_value_of_type(self, other):
         """ Finds if a variable of type 'other' can fit into this type.  """
-        if other is None:  # Allow unknown arguments to fit into any (known) parameter
+        # Allow any argument to fit into an Any parameter (to a Rule)
+        if self == Type.Any:
             return True
         if self.kind != other.kind:
             return False
@@ -107,7 +109,13 @@ class Type:
             # Rules out different size tuples
             return False
         return all(
-            c.can_accept_value_of_type(o) for c, o in zip(self.children, other.children)
+            (c.can_accept_value_of_type(o) if isinstance(c, Type) else c == o)
+            for c, o in zip(self.children, other.children)
+        )
+
+    def contains_any(self):
+        return self == Type.Any or any(
+            isinstance(c, Type) and c.contains_any() for c in self.children
         )
 
     #################
@@ -286,6 +294,7 @@ Type.Integer = Type("Integer")
 Type.Float = Type("Float")
 Type.Bool = Type("Bool")
 Type.String = Type("String")
+Type.Any = Type("Any")
 
 
 class SizeType:

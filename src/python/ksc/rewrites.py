@@ -28,7 +28,7 @@ from ksc.expr import (
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
-from ksc.type_propagate import type_propagate
+from ksc.type_propagate import type_propagate, type_propagate_expr
 from ksc.utils import singleton, single_elem
 from ksc.visitors import ExprTransformer
 
@@ -363,8 +363,12 @@ def find_template_subst_var(
     template: Var, exp: Expr, template_vars: PMap[str, Type]
 ) -> Optional[VariableSubstitution]:
     assert template.name in template_vars
-    # Require correct type of subexp in order to match
-    return {template.name: exp} if exp.type_ == template_vars[template.name] else None
+    # Require compatible type of subexp in order to match (the Rule's type may involve Any).
+    return (
+        {template.name: exp}
+        if template_vars[template.name].can_accept_value_of_type(exp.type_)
+        else None
+    )
 
 
 @find_template_subst.register
@@ -406,12 +410,10 @@ def find_template_subst_lam(
     assert (
         template.arg.name not in template_vars
     ), "Lambda arguments should not be declared as template variables"
-    if template.arg.type_ != exp.arg.type_:
+    if not template.arg.type_.can_accept_value_of_type(exp.arg.type_):
         return None
     body_subst = find_template_subst(
-        template.body,
-        exp.body,
-        template_vars.set(template.arg.name, template.arg.type_),
+        template.body, exp.body, template_vars.set(template.arg.name, exp.arg.type_),
     )
     return _combine_substs({template.arg.name: exp.arg}, body_subst)
 
@@ -433,8 +435,8 @@ def _maybe_add_binder_to_subst(
 
 @singleton
 class SubstTemplate(ExprTransformer):
-    """Substitutes variables to Exprs in a template (including bound variables).
-    The substitution is capture-avoiding.
+    """Substitutes variables to Exprs in a pattern (typically the replacement part of a rule),
+     including bound variables. The substitution is capture-avoiding.
 
     Note that this is only avoids captures by new variables introduced on the RHS.
     It doesn't handle e.g. (foo (let x e1 e2)) ==> (let x e1 (foo e2))
@@ -442,6 +444,18 @@ class SubstTemplate(ExprTransformer):
     x, they'll be captured by the x bound by that let, which changes their meaning.
     (Hence, we still need separate python RuleMatchers, not ParsedRuleMatchers, for e.g. lift_bind and sumbuild_invariant.)
     """
+
+    def visit(self, e: Expr, var_names_to_exprs: VariableSubstitution) -> Expr:
+        res = super().visit(e, var_names_to_exprs)
+        # Type should have been copied from the rule. Replace Any types (from polymorphic rules)
+        # with the correct monomorphic type for the expression.
+        if res.type_.contains_any():
+            # Remove type, so type propagation will recalculate just one level without recursion
+            res.type_ = None
+            # No symtab should be required: "Any" should only be used in rules for builtins which are
+            # universally polymorphic, not for ad-hoc-overloaded functions from prelude etc.
+            type_propagate_expr(res, {})
+        return res
 
     def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
         assert not v.decl
@@ -453,27 +467,25 @@ class SubstTemplate(ExprTransformer):
             l.vars, var_names_to_exprs, [l.body]
         )
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
-        # where the bound var is bound, as the RHS template can't contain "(let x ...) x" (with x free).
-        res = Let(
+        # where the bound var is bound, as the replacement shouldn't contain "(let x ...) x" (with x free).
+        return Let(
             Var(
                 target_var.name
             ),  # type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
             self.visit(l.rhs, var_names_to_exprs),
             self.visit(l.body, var_names_to_exprs),
+            type=l.type_,
         )
-        res.type_ = l.type_
-        return res
 
     def visit_lam(self, l: Lam, var_names_to_exprs: VariableSubstitution) -> Lam:
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.arg, var_names_to_exprs, [l.body]
         )
-        res = Lam(
+        return Lam(
             Var(target_var.name, type=target_var.type_, decl=True),
             self.visit(l.body, var_names_to_exprs),
+            type=l.type_,
         )
-        res.type_ = l.type_
-        return res
 
 
 def parse_rule_str(ks_str, symtab):
