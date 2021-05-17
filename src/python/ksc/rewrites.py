@@ -59,9 +59,9 @@ class Match:
 
 @dataclass(frozen=True, eq=False)
 class Environment:
-    let_vars: PMap[
-        str, Location
-    ]  # variables bound by lets, to the let-nodes binding them
+    """ Variable(name)s bound by lets, to the locations of the let-nodes binding them """
+    let_vars: PMap[str, Location]
+    """ Names bound by Defs, including those from the prelude. These will be the same throughout the Expr. """
     defs: PMap[StructuredName, Def]
 
 
