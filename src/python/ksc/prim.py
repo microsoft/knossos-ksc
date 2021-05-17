@@ -6,11 +6,11 @@ from ksc.type import Type, SizeType
 _prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 
 
-def prim_lookup(sname: StructuredName, ty: Type):
-    if ty.is_tuple:
-        tys = tuple(ty.tuple_elems())
+def prim_lookup(sname: StructuredName, argtype: Type) -> Type:
+    if argtype.is_tuple:
+        tys = tuple(argtype.tuple_elems())
     else:
-        tys = [ty]
+        tys = [argtype]
     n = len(tys)
 
     name = sname.mangle_without_type()
@@ -25,13 +25,13 @@ def prim_lookup(sname: StructuredName, ty: Type):
 
     # get$n$m
     if name.startswith("get$"):
-        assert ty.is_tuple
+        assert argtype.is_tuple
         m = _prim_lookup_re_get.fullmatch(name)
         if m:
             n = int(m.group(1))
             max = int(m.group(2))
-            assert ty.tuple_len == max
-            return ty.tuple_elem(n - 1)
+            assert argtype.tuple_len == max
+            return argtype.tuple_elem(n - 1)
 
     # vec
     if name == "Vec_init":
