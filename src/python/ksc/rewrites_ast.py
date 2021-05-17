@@ -52,15 +52,13 @@ from ksc.utils import singleton
 
 # Note: guards
 # In this context, "cond" guards "e" if evaluating "e" might fail if cond is != cond_value
-# TODO: This is not "speculation".  Rename to "is_guarded_by".
-def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> bool:
-    """ Can we speculatively evaluate e, when the original program would not have done so,
-        moving <e> to a point that it is evaluated before testing <cond> ?
-        <cond_value> indicates the value that <cond> would have to take in order for <e> to have been evaluated. """
+def can_evaluate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> bool:
+    """ Can we evaluate e, when the original program would not have done so,
+        moving <e> to a point that it is evaluated before testing <cond> == <cond_value> ?
+    """
     # TODO: check if 'e' might raise an exception if evaluated without testing 'cond' first
     # TODO: check for index - the only real exception-raiser we have
-    # TODO: Make this safe by default
-    return True
+    return False
 
 
 @singleton
@@ -75,30 +73,20 @@ class lift_if(RuleMatcher):
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:  # ((if p ...), path + [3]); ((if q ...), path + [7]))
+        # For any expr: (foo e1 e2 (if cond t f) e4 e5)
+        # We check for children that are "if", and lift them if they don't depend
+        # on vars brought into scope by e0
+
         def check_child(ch, i, vars_in_scope=set()):
-            nested_lam = isinstance(ch, Lam)  # TOUNDO: no. do lambda properly
-            e = ch.body if nested_lam else ch
-
-            if not isinstance(e, If):
-                return
-
-            if nested_lam:
-                vars_in_scope |= {ch.arg.name}
-
-            if not vars_in_scope.isdisjoint(e.cond.free_vars_):
-                return
-
-            if nested_lam:
-                path_to_child = path_from_root + (i, 0)
-            else:
-                path_to_child = path_from_root + (i,)
-
-            yield Match(
-                self, root, path_to_child, {"nested_lam": nested_lam},
-            )
+            if isinstance(ch, If) and vars_in_scope.isdisjoint(ch.cond.free_vars_):
+                yield Match(self, root, path=path_from_root + (i,))
 
         # Lam:
         if isinstance(expr, Lam):
+            # (lam (v : T) (if p x y)) -> (if p (lam (v : T) x)
+            #                                   (lam (v : T) y))
+            #                          -? v not in freevars{p}
+            #                          -? p won't sideeffect
             raise NotImplementedError()
 
         # Let:
@@ -106,11 +94,11 @@ class lift_if(RuleMatcher):
             # (let (v (if p x y)) body) -> (if p (let (v x) body)
             #                                    (let (v y) body))
             #                           -? v not in freevars{p}
+            yield from check_child(expr.rhs, 0)
+
             # (let (v a) (if p x y)) -> (if p (let (v a) x)
             #                                 (let (v a) y))
             #                        -? v not in freevars(p)
-            #
-            yield from check_child(expr.rhs, 0)
             yield from check_child(expr.body, 1, {expr.vars.name})
 
         #  Call:
@@ -124,40 +112,41 @@ class lift_if(RuleMatcher):
         elif isinstance(expr, If):
             # (if (if p x y) a b) -> (if p (if x a b)
             #                              (if y a b))
+            yield from check_child(expr.cond, 0)
+
             # (if q (if p x y) b) -> (if p (if q x b)
             #                              (if q y b))
             #                     -? Unless q guards p
-            yield from check_child(expr.cond, 0)
-            if can_speculate_ahead_of_condition(expr.t_body, expr.cond, True):
+            if can_evaluate_ahead_of_condition(expr.t_body, expr.cond, True):
                 yield from check_child(expr.t_body, 1)
-            if can_speculate_ahead_of_condition(expr.f_body, expr.cond, False):
+
+            # (if q a (if p x y)) -> (if p (if q a x)
+            #                              (if q a y))
+            #                     -? Unless q guards p
+            if can_evaluate_ahead_of_condition(expr.f_body, expr.cond, False):
                 yield from check_child(expr.t_body, 2)
 
         #  Assert:
         elif isinstance(expr, Assert):
-            # (assert (if p x y) body) -> (if p (assert x body)
-            #                                   (assert y body))
             # (assert cond (if p x y)) -> (if p (assert cond x)
             #                                   (assert cond y))
             #                          -? Unless cond guards p;
             # We might argue that the only consequence can be an assert fail either way,
             # but we do want "index" to be able to run unchecked;
             # which might induce segfault instead of assert failure.
-            if can_speculate_ahead_of_condition(expr.body, expr.cond, True):
+            if can_evaluate_ahead_of_condition(expr.body, expr.cond, True):
                 yield from check_child(expr.cond, 0)
+
+            # (assert (if p x y) body) -> (if p (assert x body)
+            #                                   (assert y body))
             yield from check_child(expr.body, 1)
 
         else:
             assert False  # Should not have got here, check possible_filter_terms
 
-    def apply_at(self, e: Expr, path: Location, nested_lam: bool) -> Expr:
-        if nested_lam:
-            assert len(path) > 1
-            rest_of_path = path[-2:]
-        else:
-            rest_of_path = path[-1:]
-
-        path_to_parent = path[: -len(rest_of_path)]
+    def apply_at(self, e: Expr, path: Location) -> Expr:
+        rest_of_path = path[-1:]
+        path_to_parent = path[:-1]
         return replace_subtree(
             e,
             path_to_parent,
@@ -237,7 +226,7 @@ class lift_bind(RuleMatcher):
             elif (
                 isinstance(exp, If)
                 and i > 0
-                and not can_speculate_ahead_of_condition(to_lift, exp.cond, i == 1)
+                and not can_evaluate_ahead_of_condition(to_lift, exp.cond, i == 1)
             ):
                 pass  # Don't lift computation out of "if" that may be guarding against an exception
             else:

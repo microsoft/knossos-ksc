@@ -106,40 +106,70 @@ def test_lift_bind_shadowing():
     assert actual != renamed
 
 
+@pytest.mark.skip(reason="lift_over_build not part of general lift")
 def test_lifting_over_build():
+    # 1. Lift "let" over build
     e = parse_expr_string(
-        "(build 10 (lam (i : Integer) (let (x (add 5 7)) (if (gt x 5) x i))))"
+        """
+        (build 10 (lam (i : Integer) 
+                     (let (x (add 5 7)) 
+                        (if (gt x 5) x i))))
+        """
     )
     rules = RuleSet([rule("lift_bind"), rule("lift_if")])
     match = utils.single_elem(list(rules.find_all_matches(e)))
     actual = match.apply_rewrite()
     # Let should have been lifted:
     assert actual == parse_expr_string(
-        "(let (x (add 5 7)) (build 10 (lam (i : Integer) (if (gt x 5) x i))))"
+        """
+        (let (x (add 5 7))
+           (build 10 (lam (i : Integer) 
+                        (if (gt x 5) x i))))
+        """
     )
+    # 2. Lift the "if"
     match2 = utils.single_elem(list(rules.find_all_matches(actual)))
     actual2 = match2.apply_rewrite()
-    # Now can lift the if:
     assert actual2 == parse_expr_string(
-        "(let (x (add 5 7)) (if (gt x 5) (build 10 (lam (i : Integer) x)) (build 10 (lam (i : Integer) i))))"
+        """
+        (let (x (add 5 7)) 
+           (if (gt x 5) 
+              (build 10 (lam (i : Integer) x)) 
+              (build 10 (lam (i : Integer) i))))
+        """
     )
 
-    # But, don't allow lifting an expression that refers to the build/lam-bound 'i':
+    # 3. But, don't allow lifting an expression that refers to the build/lam-bound 'i':
+    # 3a. if over let:
     e3 = parse_expr_string(
-        "(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x i))))"
+        """
+        (build 10 (lam (i : Integer) 
+            (let (x (add 5 i))  # Refers to "i" 
+                (if (gt i 5) x i))))
+        """
     )
     match3 = utils.single_elem(list(rules.find_all_matches(e3)))
     actual3 = match3.apply_rewrite()
     assert actual3 == parse_expr_string(
-        "(build 10 (lam (i : Integer) (if (gt i 5) (let (x (add 5 i)) x) (let (x (add 5 i)) i))))"
+        """
+        (build 10 (lam (i : Integer) 
+            (if (gt i 5) 
+                (let (x (add 5 i)) x) 
+                (let (x (add 5 i)) i))))"
+        """
     )
     # Now we should be able to lift either of those let's, but not the 'if'
+    # 3b. let over build:
     actual4 = sorted_rewrites(rules, actual3)
     assert actual4 == [
         parse_expr_string(
-            "(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x (let (x (add 5 i)) i)))))"
+            """
+            (build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x (let (x (add 5 i)) i)))))"
+            """
         ),
         parse_expr_string(
-            "(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) (let (x (add 5 i)) x) i))))"
+            """
+            (build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) (let (x (add 5 i)) x) i))))
+            """
         ),
     ]
