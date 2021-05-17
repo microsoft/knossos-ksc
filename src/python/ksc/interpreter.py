@@ -1,7 +1,7 @@
 import numpy
 from typing import Callable, Mapping
 
-from ksc.expr import StructuredName
+from ksc.expr import StructuredName, make_structured_name
 from ksc.type import Type
 
 
@@ -10,10 +10,7 @@ from ksc.type import Type
 
 
 def _mksn(s: str, t: Type) -> StructuredName:
-    sn = StructuredName.from_str(s)
-    sn2, old_ty = sn.add_type(t)
-    assert old_ty == None
-    return sn2
+    return make_structured_name((s, t))
 
 
 native_impls: Mapping[StructuredName, Callable] = {
