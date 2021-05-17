@@ -78,6 +78,17 @@ lift_if_rules = [
         '(rule "lift_if_over_if_false" ((p : Bool) (q : Bool) (t : Any) (f : Any) (e : Any)) (if p e (if q t f)) (if q (if p e t) (if p e f)))',
         {}), side_conditions=lambda *,p,q,t,f,e: can_speculate_ahead_of_condition(q, p, False)
     ),
+    ParsedRuleMatcher(parse_rule_str(
+        """(rule "lift_if_over_build" ((n : Integer) (p : Bool) (t : Any) (f : Any))
+                 (build n (lam (i : Integer) (if p t f)))
+                 (if (gt n 0) (if p (build n (lam (i : Integer) t))
+                                    (build n (lam (i : Integer) f)))
+                              (build 0 (lam (i : Integer) (if p t f)))))""", {}),
+            # TODO: replace "else" case with a constVec of size 0 dummy values of appropriate type.
+            # In the meantime we prevent an infinite chain of applications producing if (gt 0 0).
+            # TODO Should we have another version that avoids the outer "if" when can_speculate_ahead_of_condition(rhs, n > 0) is true?
+            side_conditions=lambda *, i, x, n, body: (i.name not in rhs.free_vars_) and (n != Const(0.0))
+    ),
     lift_if_over_call
 ]
 
@@ -138,6 +149,15 @@ lift_let_rules = [
     LetLifter(parse_rule_str( # avoid x capturing in cond
         '(rule "lift_let_over_assert_body" ((cond : Bool) (rhs : Any) (body : Any)) (assert cond (let (x rhs) body)) (let (x rhs) (assert cond body)))', {}),
         #side_conditions=lambda *, cond, rhs, body: ok_to_evaluate(rhs, cond, False) # But we're gonna fail the assertion anyway, so OK?
+    ),
+    LetLifter(parse_rule_str( # avoid x capturing in n
+        """(rule "lift_let_over_build" ((n : Integer) (rhs : Any) (body : Any))
+                 (build n (lam (i : Integer) (let (x rhs) body)))
+                 (if (gt n 0) (let (x rhs) (build n (lam (i : Integer) body))) (build 0 (lam (i : Integer) (let (x rhs) body)))))""", {}),
+            # TODO: replace "else" case with a constVec of size 0 dummy values of appropriate type.
+            # In the meantime we prevent an infinite chain of applications producing if (gt 0 0).
+            # TODO Should we have another version that avoids the "if" when can_speculate_ahead_of_condition(rhs, n > 0) is true?
+            side_conditions=lambda *, i, x, n, rhs, body: (i.name not in rhs.free_vars_) and (n != Const(0.0))
     ),
     lift_let_over_call
 ]
