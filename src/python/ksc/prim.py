@@ -1,7 +1,7 @@
 import re
 
 from ksc.expr import StructuredName
-from ksc.type import Type, SizeType
+from ksc.type import Type, SizeType, shape_type
 
 _prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 
