@@ -74,7 +74,8 @@ class AbstractMatcher(ABC):
     def _matches_with_env(
         self, e: Expr, path_from_root: Location, root: Expr, env: Environment
     ) -> Iterator[Match]:
-        # Env maps bound variables to their binders, used for inline_let (only).
+        # Env maps bound variables to their binders, and StructuredNames for their defs,
+        # used only for inlining rules (inline_call and inline_var).
         yield from self.matches_here(e, path_from_root, root, env)
         for i, ch in enumerate(subexps_no_binds(e)):
             yield from self._matches_with_env(
