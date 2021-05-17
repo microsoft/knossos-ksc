@@ -505,14 +505,6 @@ baseFunToBaseUserFunE = \case
   BaseUserFun u    -> Right u
   PrimFun p    -> Left p
 
-baseFunToBaseUserFun :: BaseFun p -> Maybe (BaseUserFun p)
-baseFunToBaseUserFun f = case baseFunToBaseUserFunE f of
-  Right u -> Just u
-  Left _  -> Nothing
-
-isBaseUserFun :: BaseFun p -> Bool
-isBaseUserFun = isJust . baseFunToBaseUserFun
-
 isSelFun :: BaseFun p -> Bool
 isSelFun = \case
   BaseUserFun{} -> False
