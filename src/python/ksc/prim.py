@@ -1,3 +1,4 @@
+from typing import Optional
 import re
 
 from ksc.expr import StructuredName
@@ -6,7 +7,7 @@ from ksc.type import Type, SizeType, shape_type
 _prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
 
 
-def prim_lookup(sname: StructuredName, argtype: Type) -> Type:
+def prim_lookup(sname: StructuredName, argtype: Type) -> Optional[Type]:
     if argtype.is_tuple:
         tys = tuple(argtype.tuple_elems())
     else:
