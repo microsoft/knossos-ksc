@@ -58,24 +58,24 @@ def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> b
 
 # TODO: extend to allow template_vars with type : Any
 lift_if_rules = [
-    parse_rule_str(s, {}) for s in [
+    ParsedRuleMatcher(parse_rule_str(s, {})) for s in [
         '(rule "lift_if_over_let_rhs" ((p : Bool) (t : Any) (f : Any) (e : Any)) (let (x (if p t f)) e) (if p (let (x t) e) (let (x f) e)))',
         '(rule "lift_if_over_if_cond" ((p : Bool) (t : Bool) (f : Bool) (x : Any) (y : Any)) (if (if p t f) x y) (if p (if t x y) (if f x y)))',
         '(rule "lift_if_over_assert_cond" ((p : Bool) (t : Bool) (f : Bool) (body : Any)) (assert (if p t f) body) (if p (assert t body) (assert f body)))',
         '(rule "lift_if_over_assert_body" ((cond : Bool) (p : Bool) (t : Any) (f : Any)) (assert cond (if p t f)) (if p (assert cond t) (assert cond f)))',
     ]
 ] + [
-    parse_rule_str(
+    ParsedRuleMatcher(parse_rule_str(
         '(rule "lift_if_over_let_body" ((v : Any) (p : Bool) (t : Any) (f : Any)) (let (x v) (if p t f)) (if p (let (x v) t) (let (x v) f)))',
-        {}, side_conditions=lambda *,x,v,p,t,f: x.name not in p.free_vars_
+        {}), side_conditions=lambda *,x,v,p,t,f: x.name not in p.free_vars_
     ),
-    parse_rule_str(
+    ParsedRuleMatcher(parse_rule_str(
         '(rule "lift_if_over_if_true" ((p : Bool) (q : Bool) (t : Any) (f : Any) (e : Any)) (if p (if q t f) e) (if q (if p t e) (if p f e)))',
-        {}, side_conditions=lambda *,p,q,t,f,e: can_speculate_ahead_of_condition(q, p, True)
+        {}), side_conditions=lambda *,p,q,t,f,e: can_speculate_ahead_of_condition(q, p, True)
     ),
-    parse_rule_str(
+    ParsedRuleMatcher(parse_rule_str(
         '(rule "lift_if_over_if_false" ((p : Bool) (q : Bool) (t : Any) (f : Any) (e : Any)) (if p e (if q t f)) (if q (if p e t) (if p e f)))',
-        {}, side_conditions=lambda *,p,q,t,f,e: can_speculate_ahead_of_condition(q, p, False)
+        {}), side_conditions=lambda *,p,q,t,f,e: can_speculate_ahead_of_condition(q, p, False)
     ),
     lift_if_over_call
 ]
@@ -100,29 +100,29 @@ def rename_to_avoid_capture(bound_var: Var, body: Expr, exprs_not_to_capture: It
         return (nv, replace_free_vars(substs["body"], bound_var.name, nv))
 
 lift_let_rules = [
-    LetLifter( # avoid x capturing in outer
-        '(rule "lift_let_over_let_rhs" (let (y (let (x rhs) body)) outer) (let (x rhs) (let (y body) outer))'
+    LetLifter(parse_rule_str( # avoid x capturing in outer
+        '(rule "lift_let_over_let_rhs" (let (y (let (x rhs) body)) outer) (let (x rhs) (let (y body) outer))', {})
     ),
-    LetLifter( # avoid x capturing in val
-        '(rule "lift_let_over_let_body" (let (y val) (let (x rhs) body) (let (x rhs) (let (y val) body))',
+    LetLifter(parse_rule_str( # avoid x capturing in val
+        '(rule "lift_let_over_let_body" (let (y val) (let (x rhs) body) (let (x rhs) (let (y val) body))', {}),
         side_conditions=lambda *, y, val, x, rhs, body: y.name not in rhs.free_vars_
     ),
-    LetLifter( # avoid x capturing in t, f
-        '(rule "lift_let_over_if_cond" (if (let (x rhs) body) t f) (let (x rhs) (if body t f)))'
+    LetLifter(parse_rule_str( # avoid x capturing in t, f
+        '(rule "lift_let_over_if_cond" (if (let (x rhs) body) t f) (let (x rhs) (if body t f)))', {})
     ),
-    LetLifter( # avoid x capturing in p, f
-        '(rule "lift_let_over_if_true" (if p (let (x rhs) body) f) (let (x rhs) (if p body f)))',
+    LetLifter(parse_rule_str( # avoid x capturing in p, f
+        '(rule "lift_let_over_if_true" (if p (let (x rhs) body) f) (let (x rhs) (if p body f)))', {}),
         side_conditions=lambda *, p, rhs, body, f: can_speculate_ahead_of_condition(rhs, p, True)
     ),
-    LetLifter( # avoid x capturing in p, t
-        '(rule "lift_let_over_if_false" (if p t (let (x rhs) body)) (let (x rhs) (if p t body)))',
+    LetLifter(parse_rule_str( # avoid x capturing in p, t
+        '(rule "lift_let_over_if_false" (if p t (let (x rhs) body)) (let (x rhs) (if p t body)))', {}),
         side_conditions=lambda *, p, rhs, body, f: can_speculate_ahead_of_condition(rhs, p, False)
     ),
-    LetLifter( # avoid x capturing in val
-        '(rule "lift_let_over_assert_cond" (assert (let (x rhs) body) val) (let (x rhs) (assert body val)))'
+    LetLifter(parse_rule_str( # avoid x capturing in val
+        '(rule "lift_let_over_assert_cond" (assert (let (x rhs) body) val) (let (x rhs) (assert body val)))', {}),
     ),
-    LetLifter( # avoid x capturing in cond
-        '(rule "lift_let_over_assert_body" (assert cond (let (x rhs) body)) (let (x rhs) (assert cond body)))'
+    LetLifter(parse_rule_str( # avoid x capturing in cond
+        '(rule "lift_let_over_assert_body" (assert cond (let (x rhs) body)) (let (x rhs) (assert cond body)))', {}),
         #side_conditions=lambda *, cond, rhs, body: ok_to_evaluate(rhs, cond, False) # But we're gonna fail the assertion anyway, so OK?
     )
 ]
