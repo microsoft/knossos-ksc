@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Iterable, Iterator, Tuple
 
-from ksc.expr import Expr, Call, If, Rule, Var
+from ksc.cav_subst import replace_subtree, replace_free_vars, make_nonfree_var
+from ksc.expr import Expr, Call, If, Rule, Var, Let, Const
 from ksc.rewrites import RuleMatcher, ParsedRuleMatcher, Match, Location, VariableSubstitution, parse_rule_str
 from ksc.utils import singleton
 
@@ -46,8 +47,8 @@ class lift_if_over_call(LiftOverCall):
     def build_call_replacement(self, call_node: Call, which_arg: int) -> Expr:
         if_node = call_node.args[which_arg]
         return If(if_node.cond,
-            make_call_one_arg_different(call_node, which_arg, if_node.t_body),
-            make_call_one_arg_different(call_node, which_arg, if_node.f_body))
+            self.make_call_one_arg_different(call_node, which_arg, if_node.t_body),
+            self.make_call_one_arg_different(call_node, which_arg, if_node.f_body))
 
 def can_speculate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> bool:
     """ Can we speculatively evaluate e, when the original program would not have done so,
@@ -80,52 +81,14 @@ lift_if_rules = [
     lift_if_over_call
 ]
 
-class LetLifter(ParsedRuleMatcher):
-    """ A ParsedRuleMatcher that deals with patterns contain (let (x rhs) body). If there is a match, and the rewrite is applied,
-        then 'x' will be renamed (in body) to avoid capturing any free variables in any other part of the substitution """
-    def __init__(self, rule: Rule, **kwargs):
-        super().__init__(rule, **kwargs)
-        assert "rhs" in self.arg_types.keys() and "body" in self.arg_types.keys()
-
-    def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
-        exprs_not_to_capture = [e for v, e in substs.values() if v not in ["x", "rhs", "body"]]
-        x, body = rename_to_avoid_capture(substs["x"], substs["body"], exprs_not_to_capture)
-        return super().apply_at(expr, path, {**substs, "x": x, "body": body})
-
 def rename_to_avoid_capture(bound_var: Var, body: Expr, exprs_not_to_capture: Iterable[Expr]) -> Tuple[Var, Expr]:
     # Avoid capturing any identically-named (but different) variable in exprs_not_to_capture
-    if any(bound_var.name in replacement_subexp.free_var_names_ for replacement_subexp in exprs_not_to_capture):
-    # Rename x (bound in body)
+    if any(bound_var.name in replacement_subexp.free_vars_ for replacement_subexp in exprs_not_to_capture):
+        # Rename x in body
         nv = make_nonfree_var(bound_var.name, exprs_not_to_capture, type=bound_var.type_)
-        return (nv, replace_free_vars(substs["body"], bound_var.name, nv))
-
-lift_let_rules = [
-    LetLifter(parse_rule_str( # avoid x capturing in outer
-        '(rule "lift_let_over_let_rhs" (let (y (let (x rhs) body)) outer) (let (x rhs) (let (y body) outer))', {})
-    ),
-    LetLifter(parse_rule_str( # avoid x capturing in val
-        '(rule "lift_let_over_let_body" (let (y val) (let (x rhs) body) (let (x rhs) (let (y val) body))', {}),
-        side_conditions=lambda *, y, val, x, rhs, body: y.name not in rhs.free_vars_
-    ),
-    LetLifter(parse_rule_str( # avoid x capturing in t, f
-        '(rule "lift_let_over_if_cond" (if (let (x rhs) body) t f) (let (x rhs) (if body t f)))', {})
-    ),
-    LetLifter(parse_rule_str( # avoid x capturing in p, f
-        '(rule "lift_let_over_if_true" (if p (let (x rhs) body) f) (let (x rhs) (if p body f)))', {}),
-        side_conditions=lambda *, p, rhs, body, f: can_speculate_ahead_of_condition(rhs, p, True)
-    ),
-    LetLifter(parse_rule_str( # avoid x capturing in p, t
-        '(rule "lift_let_over_if_false" (if p t (let (x rhs) body)) (let (x rhs) (if p t body)))', {}),
-        side_conditions=lambda *, p, rhs, body, f: can_speculate_ahead_of_condition(rhs, p, False)
-    ),
-    LetLifter(parse_rule_str( # avoid x capturing in val
-        '(rule "lift_let_over_assert_cond" (assert (let (x rhs) body) val) (let (x rhs) (assert body val)))', {}),
-    ),
-    LetLifter(parse_rule_str( # avoid x capturing in cond
-        '(rule "lift_let_over_assert_body" (assert cond (let (x rhs) body)) (let (x rhs) (assert cond body)))', {}),
-        #side_conditions=lambda *, cond, rhs, body: ok_to_evaluate(rhs, cond, False) # But we're gonna fail the assertion anyway, so OK?
-    )
-]
+        return (nv, replace_free_vars(body, {bound_var.name: nv}))
+    #  No renaming necessary
+    return (bound_var, body)
 
 @singleton
 class lift_let_over_call(LiftOverCall):
@@ -134,5 +97,47 @@ class lift_let_over_call(LiftOverCall):
 
     def build_call_replacement(self, call_node: Call, which_arg: int) -> Expr:
         let_node = call_node.args[which_arg]
-        bv, body = rename_to_avoid_capture(let_node.vars, let_node.body, [arg for i,arg in call_node.args if i != which_child])
+        bv, body = rename_to_avoid_capture(let_node.vars, let_node.body, [arg for i,arg in enumerate(call_node.args) if i != which_arg])
         return Let(bv, let_node.rhs, self.make_call_one_arg_different(call_node, which_arg, body))
+
+class LetLifter(ParsedRuleMatcher):
+    """ A ParsedRuleMatcher that deals with patterns contain (let (x rhs) body). If there is a match, and the rewrite is applied,
+        then 'x' will be renamed (in body) to avoid capturing any free variables in any other part of the substitution """
+    def __init__(self, rule: Rule, **kwargs):
+        super().__init__(rule, **kwargs)
+        assert frozenset(self._arg_types.keys()).issuperset(["rhs", "body"])
+
+    def apply_at(self, expr: Expr, path: Location, **substs: VariableSubstitution) -> Expr:
+        exprs_not_to_capture = [e for v, e in substs.items() if v not in ["x", "rhs", "body"]]
+        x, body = rename_to_avoid_capture(substs["x"], substs["body"], exprs_not_to_capture)
+        # The repeated ** here is so we override the entries in substs for x and body
+        return super().apply_at(expr, path, **{**substs, "x": x, "body": body})
+
+lift_let_rules = [
+    LetLifter(parse_rule_str( # avoid x capturing in outer
+        '(rule "lift_let_over_let_rhs" ((rhs : Any) (body : Any) (outer : Any)) (let (y (let (x rhs) body)) outer) (let (x rhs) (let (y body) outer)))', {})
+    ),
+    LetLifter(parse_rule_str( # avoid x capturing in val
+        '(rule "lift_let_over_let_body" ((rhs : Any) (body : Any) (outer : Any)) (let (y outer) (let (x rhs) body)) (let (x rhs) (let (y outer) body)))', {}),
+        side_conditions=lambda *, x, y, rhs, body, outer: y.name not in rhs.free_vars_
+    ),
+    LetLifter(parse_rule_str( # avoid x capturing in t, f
+        '(rule "lift_let_over_if_cond" ((rhs : Any) (body : Bool) (t : Any) (f : Any)) (if (let (x rhs) body) t f) (let (x rhs) (if body t f)))', {})
+    ),
+    LetLifter(parse_rule_str( # avoid x capturing in p, f
+        '(rule "lift_let_over_if_true" ((p : Bool) (rhs : Any) (body : Any) (f : Any)) (if p (let (x rhs) body) f) (let (x rhs) (if p body f)))', {}),
+        side_conditions=lambda *, p, rhs, body, f: can_speculate_ahead_of_condition(rhs, p, True)
+    ),
+    LetLifter(parse_rule_str( # avoid x capturing in p, t
+        '(rule "lift_let_over_if_false" ((p : Bool) (t : Any) (rhs : Any) (body : Any)) (if p t (let (x rhs) body)) (let (x rhs) (if p t body)))', {}),
+        side_conditions=lambda *, p, rhs, body, f: can_speculate_ahead_of_condition(rhs, p, False)
+    ),
+    LetLifter(parse_rule_str( # avoid x capturing in val
+        '(rule "lift_let_over_assert_cond" ((rhs : Any) (body : Bool) (val : Any)) (assert (let (x rhs) body) val) (let (x rhs) (assert body val)))', {}),
+    ),
+    LetLifter(parse_rule_str( # avoid x capturing in cond
+        '(rule "lift_let_over_assert_body" ((cond : Bool) (rhs : Any) (body : Any)) (assert cond (let (x rhs) body)) (let (x rhs) (assert cond body)))', {}),
+        #side_conditions=lambda *, cond, rhs, body: ok_to_evaluate(rhs, cond, False) # But we're gonna fail the assertion anyway, so OK?
+    ),
+    lift_let_over_call
+]
