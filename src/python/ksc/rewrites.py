@@ -59,10 +59,12 @@ class Match:
 
 @dataclass(frozen=True, eq=False)
 class Environment:
-    """ Variable(name)s bound by lets, to the locations of the let-nodes binding them """
+    """ Used to carry, around the Expr being matched, information about the context each (sub-)expr is in. """
+
     let_vars: PMap[str, Location]
-    """ Names bound by Defs, including those from the prelude. These will be the same throughout the Expr. """
+    """ Variable(name)s bound by lets, to the locations of the let-nodes binding them """
     defs: PMap[StructuredName, Def]
+    """ Names bound by Defs, including those from the prelude. These will be the same throughout the Expr. """
 
 
 class AbstractMatcher(ABC):
