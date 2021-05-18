@@ -483,11 +483,11 @@ class SubstTemplate(ExprTransformer):
         return res
 
 
-def parse_rule_str(ks_str, symtab, **kwargs):
+def parse_rule_str(ks_str, symtab):
     r = single_elem(list(parse_ks_file(ks_str)))
     assert isinstance(r, Rule)
     type_propagate(r, symtab)
-    return ParsedRuleMatcher(r, **kwargs)
+    return r
 
 
 def parse_rules_from_file(filename):

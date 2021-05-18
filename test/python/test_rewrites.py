@@ -1,5 +1,12 @@
 from ksc.alpha_equiv import are_alpha_equivalent
-from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
+from ksc.rewrites import (
+    rule,
+    RuleSet,
+    inline_var,
+    delete_let,
+    parse_rule_str,
+    ParsedRuleMatcher,
+)
 from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
 from ksc.type import Type
 from ksc.type_propagate import type_propagate_decls
@@ -132,8 +139,10 @@ def test_simple_parsed_rule():
     decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
     type_propagate_decls(decls_prelude, symtab)
 
-    r = parse_rule_str(
-        '(rule "mul2_to_add$f" (x : Float) (mul x 2.0) (add x x))', symtab
+    r = ParsedRuleMatcher(
+        parse_rule_str(
+            '(rule "mul2_to_add$f" (x : Float) (mul x 2.0) (add x x))', symtab
+        )
     )
     input1, expected1 = (
         parse_expr_string("(if p (mul (add a b) 2.0) (mul a 3.0))"),
@@ -163,7 +172,9 @@ def test_parsed_rule_respects_types():
     type_propagate_decls(decls_prelude, symtab)
 
     # Check that we only match subtrees of specified type (without relying on the StructuredNames being different)
-    r = parse_rule_str('(rule "rm.let$i" (e : Integer) (let (x e) x) e)', symtab)
+    r = ParsedRuleMatcher(
+        parse_rule_str('(rule "rm.let$i" (e : Integer) (let (x e) x) e)', symtab)
+    )
     applicable_expr = parse_expr_string("(let (y 4) y)")
     inapplicable_expr = parse_expr_string("(let (z 5.0) z)")
 
@@ -178,8 +189,10 @@ def test_parsed_rule_allows_alpha_equivalence():
     type_propagate_decls(decls_prelude, symtab)
 
     # Use ts_add because [add (Tuple (Vec Float) (Vec Float))] is not in the prelude (yet)
-    r = parse_rule_str(
-        '(rule "add2_to_mul$vf" (v : Vec Float) (ts_add v v) (mul 2.0 v))', symtab
+    r = ParsedRuleMatcher(
+        parse_rule_str(
+            '(rule "add2_to_mul$vf" (v : Vec Float) (ts_add v v) (mul 2.0 v))', symtab
+        )
     )
     e = parse_expr_string(
         "(ts_add (build 10 (lam (i : Integer) (to_float i))) (build 10 (lam (j : Integer) (to_float j))))"
@@ -199,8 +212,11 @@ def test_parsed_rule_capture():
 
     # If the RHS introduces a new bound variable, then it needs to be renamed
     # into a fresh variable when the rule is applied, to avoid capture
-    r = parse_rule_str(
-        '(rule "foo1" (x : Integer) (mul x 3) (let (y (add x x)) (add y x)))', symtab
+    r = ParsedRuleMatcher(
+        parse_rule_str(
+            '(rule "foo1" (x : Integer) (mul x 3) (let (y (add x x)) (add y x)))',
+            symtab,
+        )
     )
     e = parse_expr_string("(let (y 2) (mul (add y 1) 3))")
     expected = parse_expr_string(
@@ -223,14 +239,16 @@ def test_parsed_rule_capture():
     assert actual == expected
 
     # Test for 'lam' e.g. inside build
-    r = parse_rule_str(
-        """
+    r = ParsedRuleMatcher(
+        parse_rule_str(
+            """
         (rule "buildfoo" (x : Integer)
             (mul x 3)
             (index 0 (build 10 (lam (i : Integer) (mul x 3))))
          )
     """,
-        symtab,
+            symtab,
+        )
     )
     e = parse_expr_string("(let (i 2) (mul (add i 1) 3))")
     expected = parse_expr_string(
@@ -242,9 +260,11 @@ def test_parsed_rule_capture():
 
     # Bound variables in the RHS should not be rewritten if they are matched
     # by the LHS:
-    r = parse_rule_str(
-        '(rule "foo2" ((y : Integer) (z : Integer)) (let (x (add y 0)) z) (let (x y) z))',
-        symtab,
+    r = ParsedRuleMatcher(
+        parse_rule_str(
+            '(rule "foo2" ((y : Integer) (z : Integer)) (let (x (add y 0)) z) (let (x y) z))',
+            symtab,
+        )
     )
     e = parse_expr_string("(let (v (add 33 0)) (mul v 3))")
     expected = parse_expr_string("(let (v 33) (mul v 3))")
