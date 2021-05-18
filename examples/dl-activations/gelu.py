@@ -1,4 +1,9 @@
-from math import sqrt, tanh, erf
+from math import sqrt, tanh, erf, exp
+
+
+def sigmoid(x):
+    return 1 / (1 + exp(-x))
+
 
 # Gelu and activations
 def gelu(x: float) -> float:
