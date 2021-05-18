@@ -34,7 +34,7 @@ Or even just ``vrelu3 = vmap(relu3)``.  Like in JAX, this takes a function defin
 and "vectorizes" it to work on Tensors (or in fact any container of scalars, such as a tuple of tensors of tuples).
 
 Now if you know anything about PyTorch, you should be suspicious now: is'nt this going to be glacially slow?
-Well, let's see.  We'll make a simple DNN with ``vrelu3`` activtations, as in [](https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa)
+Well, let's see.  We'll make a simple DNN with ``vrelu3`` activations, as in [](https://towardsdatascience.com/extending-pytorch-with-custom-activation-functions-2d8b065ef2fa)
 
 .. code:: Python
 
