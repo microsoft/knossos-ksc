@@ -1,5 +1,7 @@
 import pytest
+
 from ksc.alpha_equiv import are_alpha_equivalent
+from ksc.expr import Call
 from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
 from ksc.parse_ks import parse_expr_string
 from ksc.type import Type
@@ -267,6 +269,56 @@ def test_parsed_rule_capture(prelude_symtab):
     type_propagate_decls([e, expected], prelude_symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
+
+
+def test_polymorphic_rules(prelude_symtab):
+    from ksc.rewrites_prim import index_of_build
+
+    symtab = {**prelude_symtab, "v": Type.Tensor(1, Type.Float)}  # Free in expr's below
+
+    map_to_build = parse_rule_str(
+        """
+       (rule "map_to_build" ((in : Vec Any) (body : Any))
+           (map (lam (e : Any) body) in)
+           (build (size in) (lam (i : Integer) (let (e (index i in)) body))))""",
+        {},
+    )
+    repl = map_to_build._rule.replacement
+    assert map_to_build._rule.template.type_ == repl.type_ == Type.Tensor(1, Type.Any)
+
+    e = parse_expr_string("(index 5 (map (lam (x : Float) (exp x)) v))")
+    expected = parse_expr_string(
+        # Renaming of binders introduced on the RHS is a bit aggressive atm.
+        "(index 5 (build (size v) (lam (t__0 : Integer) (let (x (index t__0 v)) (exp x)))))"
+    )
+    type_propagate_decls([e, expected], symtab)
+    assert e.type_ == expected.type_ == Type.Float
+
+    actual = utils.single_elem(list(map_to_build.find_all_matches(e))).apply_rewrite()
+    assert actual == expected
+    assert actual.type_ == Type.Float  # Of course - rewrite does not change type
+    # Check we figured out correct types for intermediate Expr's created when we applied the rewrite
+    assert (
+        isinstance(actual, Call)
+        and isinstance(actual.args[1], Call)
+        and actual.args[1].type_ == Type.Tensor(1, Type.Float)
+    )
+    lam = actual.args[1].args[1]
+    assert lam.type_ == Type.Lam(Type.Integer, Type.Float)
+    assert lam.body.rhs.type_ == lam.body.body.type_ == Type.Float
+
+    expected2 = parse_expr_string("(let (t__0 5) (let (x (index t__0 v)) (exp x)))")
+    type_propagate_decls([expected2], symtab)
+    match = utils.single_elem(list(index_of_build.find_all_matches(actual)))
+    actual2 = match.apply_rewrite()
+    assert expected2 == actual2
+    assert (
+        actual2.type_
+        == actual2.body.type_
+        == actual2.body.rhs.type_
+        == actual2.body.body.type_
+        == Type.Float
+    )
 
 
 def test_rule_pickling():
