@@ -175,6 +175,33 @@ def test_parsed_rule_respects_types(prelude_symtab):
     assert len(list(r.find_all_matches(inapplicable_expr))) == 0
 
 
+def test_parsed_rule_binders(prelude_symtab):
+    # Check that variables bound in the rule template are correctly substituted with the real program variables
+    r = parse_rule_str(
+        '(rule "foo" ((e : Integer)) (let (x e) (add x 3)) (add e 3))', prelude_symtab
+    )
+    expr = parse_expr_string("(let (i 7) (add i 3))")
+    expected = parse_expr_string("(add 7 3)")
+
+    type_propagate_decls([expr, expected], prelude_symtab)
+    actual = sorted_rewrites(r, expr)
+    assert actual == [expected]
+
+    # Also test on lam's.
+    r2 = parse_rule_str(
+        '(rule "index_of_build$f" ((n : Integer) (idx : Integer) (e : Float)) (index idx (build n (lam (i : Integer) e))) (let (i idx) e))',
+        prelude_symtab,
+    )
+    expr2 = parse_expr_string(
+        "(index 7 (build 10 (lam (idx : Integer) (to_float idx))))"
+    )
+    expected2 = parse_expr_string("(let (idx 7) (to_float idx))")
+
+    type_propagate_decls([expr2, expected2], prelude_symtab)
+    actual2 = sorted_rewrites(r2, expr2)
+    assert actual2 == [expected2]
+
+
 def test_parsed_rule_allows_alpha_equivalence(prelude_symtab):
     # Use ts_add because [add (Tuple (Vec Float) (Vec Float))] is not in the prelude (yet)
     r = parse_rule_str(
