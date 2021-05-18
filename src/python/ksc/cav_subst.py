@@ -165,7 +165,7 @@ def _cav_helper(
 def _cav_children(
     e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution
 ) -> Expr:
-    return e.__class__(*_cav_child_list(e, reqs, substs))
+    return e.__class__(*_cav_child_list(e, reqs, substs), type=e.type_)
 
 
 def _requests_to_child(
@@ -198,12 +198,7 @@ def _cav_var(e: Var, reqs, substs):
 
 @_cav_children.register
 def _cav_call(e: Call, reqs, substs):
-    name = e.name
-    if name.se in substs:  # Will only match if name.se is a str.
-        # The variable (holding the function we are calling) is being substituted.
-        # It had better be a rename to another variable, because we can't Call anything else....
-        name = substs[name.se].structured_name
-    return Call(name, _cav_child_list(e, reqs, substs))
+    return Call(e.name, _cav_child_list(e, reqs, substs), type=e.type_)
 
 
 def _rename_if_needed(
