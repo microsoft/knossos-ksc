@@ -97,4 +97,4 @@ def relu3_in_fcdnn():
     )
 
     # Run training
-    train_model(model)
+    # train_model(model)
