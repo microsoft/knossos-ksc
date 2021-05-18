@@ -3,7 +3,7 @@ type_propagate: Type propagation for Knossos IR
 """
 
 import itertools
-from typing import Union, List
+from typing import List
 from ksc.type import (
     Type,
     SizeType,

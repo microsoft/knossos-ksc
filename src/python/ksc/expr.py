@@ -2,7 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import Any, FrozenSet, List, Tuple, Union
+from typing import FrozenSet, List, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord

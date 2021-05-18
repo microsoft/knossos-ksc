@@ -49,7 +49,7 @@ def test_replace_subtrees():
 
 def test_replace_subtrees_nested():
     e = parse_expr_string("(assert true (foo x y z))")
-    inner_replaced = parse_expr_string("(foo x y w)")
+    parse_expr_string("(foo x y w)")
     path_to_call = (1,)
     path_to_z = (1, 2)
     assert isinstance(get_node_at_location(e, path_to_call), Call)
