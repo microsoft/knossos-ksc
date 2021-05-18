@@ -53,8 +53,11 @@ def test_lift_bind():
 
 
 def test_interchange_lets():
+    symtab = dict()
+    type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
     e = parse_expr_string("(let (x 4) (let (y 5) (add x y)))")
     e2 = parse_expr_string("(let (y 5) (let (x 4) (add x y)))")
+    type_propagate_decls([e, e2], symtab)
     match = utils.single_elem(list(lift_bind.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == e2
@@ -63,6 +66,7 @@ def test_interchange_lets():
     assert actual2 == e
     # But, can't lift if the inner let uses the outer bound variable
     cant_lift = parse_expr_string("(let (x 5) (let (y (add x 1)) (add x y)))")
+    type_propagate_decls([cant_lift], symtab)
     assert len(list(lift_bind.find_all_matches(cant_lift))) == 0
 
 
