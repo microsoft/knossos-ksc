@@ -188,9 +188,9 @@ def test_parsed_rule_binders():
     decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
     type_propagate_decls(decls_prelude, symtab)
     # Check that variables bound in the rule template are correctly substituted with the real program variables
-    r = parse_rule_str(
+    r = ParsedRuleMatcher(parse_rule_str(
         '(rule "foo" ((e : Integer)) (let (x e) (add x 3)) (add e 3))', symtab
-    )
+    ))
     expr = parse_expr_string("(let (i 7) (add i 3))")
     expected = parse_expr_string("(add 7 3)")
 
@@ -199,10 +199,10 @@ def test_parsed_rule_binders():
     assert actual == [expected]
 
     # Also test on lam's.
-    r2 = parse_rule_str(
+    r2 = ParsedRuleMatcher(parse_rule_str(
         '(rule "index_of_build$f" ((n : Integer) (idx : Integer) (e : Float)) (index idx (build n (lam (i : Integer) e))) (let (i idx) e))',
         symtab,
-    )
+    ))
     expr2 = parse_expr_string(
         "(index 7 (build 10 (lam (idx : Integer) (to_float idx))))"
     )
