@@ -273,7 +273,9 @@ def _(ex, symtab):
                 near_miss = True
             print(f"type_propagate:   {key_str} -> {val}")
     if not near_miss:
-        print(f"type_propagate: No near misses (closest was {closest_match}, dist = {closest_match_distance})")
+        print(
+            f"type_propagate: No near misses (closest was {closest_match}, dist = {closest_match_distance})"
+        )
 
     print(f"type_propagate: Boilerplate for prelude.ks:")
     argtypes_ks_str = " ".join(map(pformat, argtypes))
