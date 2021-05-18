@@ -58,7 +58,7 @@ def can_evaluate_ahead_of_condition(e: Expr, cond: Expr, cond_value: bool) -> bo
     """
     # TODO: check if 'e' might raise an exception if evaluated without testing 'cond' first
     # TODO: check for index - the only real exception-raiser we have
-    return False
+    return True
 
 
 @singleton
@@ -171,28 +171,6 @@ class lift_if(RuleMatcher):
 #
 # lift_bind: Expr{Let} -> Let{Expr}
 #
-#  Call:
-#      (foo a1 a2 (LET (x e1) y) a4) -> (LET (x e1) (foo a1 a2 y a4))
-#                                    -? x not in freevars{a1,a2,a4}
-#                                       equivalent to x not in freevars{expr}
-#  Let:
-#      (let (p q) (LET (x e1) y)) -> (LET (x e1) (let (p q) y))
-#                                 -? x not in freevars{q}
-#                                    equivalent to x not in freevars{expr}
-#  If:
-#      (if (LET (v e) p) x y) -> (LET (v e) (if p x y))
-#                             -? v not in freevars{x} u freevars{y
-#                                which is equivalent to v not in freevars{expr}?
-#      (if p (LET (v e) x) y) -> (LET (v e) (if p x y))
-#                             -? v not in freevars{p} u freevars{y}
-#                             -? e not guarded by p
-#      (if p x (LET (v e) y)) -> (LET (v e) (if p x y))
-#                             -? v not in freevars{p} u freevars{y}
-#                             -? e not guarded by (p==False)
-#
-#  Assert:
-#      (assert (LET (x e1) y) body) -> (LET (x e1) (assert y body))
-#                                   -? x not in freevars{body}
 
 
 @singleton
@@ -201,46 +179,80 @@ class lift_bind(RuleMatcher):
 
     def matches_for_possible_expr(
         self,
-        exp: Expr,
+        expr: Expr,
         path_from_root: Location,
         root: Expr,
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        if isinstance(exp, Lam):
-            # Lam's inside build/sumbuild are handled as part of the (sum)build
-            return
-        children = subexps_no_binds(exp)
-        for i, ch in enumerate(children):
-            nested_lam = isinstance(ch, Lam)
-            e = ch.body if nested_lam else ch
 
-            if not isinstance(e, Let):
-                continue
+        # For any expr: (foo e1 e2 (LET (x rhs) body) e4 e5)
+        # We check for children that are "let", and lift them if they don't depend
+        # on vars brought into scope by expr itself (when foo == "let")
 
-            to_lift = e.rhs
+        def check_child(ch, i, vars_in_scope=set()):
+            if isinstance(ch, Let) and vars_in_scope.isdisjoint(ch.rhs.free_vars_):
+                yield Match(self, root, path=path_from_root + (i,))
 
-            if isinstance(exp, Let) and i == 1 and exp.vars.name in to_lift.free_vars_:
-                pass  # Cannot lift computation using a variable outside of let that binds that variable
-            elif nested_lam and ch.arg.name in to_lift.free_vars_:
-                pass  # Similarly - cannot lift loop-variant computation out of lam within (sum)build
-            elif (
-                isinstance(exp, If)
-                and i > 0
-                and not can_evaluate_ahead_of_condition(to_lift, exp.cond, i == 1)
-            ):
-                pass  # Don't lift computation out of "if" that may be guarding against an exception
-            else:
-                yield Match(
-                    self,
-                    root,
-                    path_from_root + ((i, 0) if nested_lam else (i,)),
-                    {"nested_lam": nested_lam},
-                )
+        # Let:
+        if isinstance(expr, Let):
+            # (let (p (LET (x rhs) y))) body) -> (let (x rhs) (let (p y) body))
+            #         ^^expr.rhs^^            -? p not in freevars{rhs}
+            yield from check_child(expr.rhs, 0)
 
-    def apply_at(self, e: Expr, path: Location, nested_lam: bool) -> Expr:
-        assert (not nested_lam) or len(path) > 1
-        rest_of_path = path[-(1 + int(nested_lam)) :]
-        path_to_parent = path[: -len(rest_of_path)]
+            # (let (v a) (LET (x rhs) body)) -> (let (x rhs) (let (v a) body)
+            #            ^^^^expr.body^^^^^  -? v not in freevars(rhs)
+            yield from check_child(expr.body, 1, {expr.vars.name})
+
+        #  Call:
+        elif isinstance(expr, Call):
+            # (foo a1 a2 (LET (x rhs) body) a4) -> (let (x rhs) (foo a1 a2 body a4))
+            #            ^^^expr.args[i]^^^     -? x not in freevars{a1,a2,a4}
+            # Note: not equivalent to x not in freevars{expr} as x can be in rhs
+            for i, ch in enumerate(expr.args):
+                yield from check_child(ch, i)
+
+        #  If:
+        elif isinstance(expr, If):
+            # (if (LET (v e) p) x y) -> (LET (v e) (if p x y))
+            #     ^^expr.cond^^      -? v not in freevars{x,y}
+            #                         which is equivalent to v not in freevars{expr}?
+            yield from check_child(expr.cond, 0)
+
+            #      (if p (LET (v e) x) y) -> (LET (v e) (if p x y))
+            #                             -? v not in freevars{p} u freevars{y}
+            #                             -? e not guarded by p
+            if can_evaluate_ahead_of_condition(expr.t_body, expr.cond, True):
+                yield from check_child(expr.t_body, 1)
+
+            #      (if p x (LET (v e) y)) -> (LET (v e) (if p x y))
+            #                             -? v not in freevars{p} u freevars{y}
+            #                             -? e not guarded by (p==False)
+            if can_evaluate_ahead_of_condition(expr.f_body, expr.cond, False):
+                yield from check_child(expr.t_body, 2)
+
+        #  Assert:
+        elif isinstance(expr, Assert):
+            #      (assert (LET (x e1) body) y) -> (LET (x e1) (assert body y))
+            #                                   -? x not in freevars{y}
+            yield from check_child(expr.body, 1)
+
+            # (assert cond (LET (x e1) body)) -> (LET (x e1) (assert cond body))
+            #                                   -? x not in freevars{cond}
+            if can_evaluate_ahead_of_condition(expr.body, expr.cond, True):
+                yield from check_child(expr.cond, 0)
+
+        # Lam:
+        elif isinstance(expr, Lam):
+            # (lam (v : T) (let (x rhs) body)) -> (let (x rhs) (lam (v : T) body))
+            #              ^^^^^^^^^^^^^^^^^^  -? v not in freevars{p}
+            raise NotImplementedError()
+
+        else:
+            assert False  # Should not have got here, check possible_filter_terms
+
+    def apply_at(self, e: Expr, path: Location) -> Expr:
+        rest_of_path = path[-1:]
+        path_to_parent = path[:-1]
         return replace_subtree(
             e,
             path_to_parent,
