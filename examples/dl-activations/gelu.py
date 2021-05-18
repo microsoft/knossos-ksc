@@ -1,3 +1,5 @@
+from math import sqrt, tanh, erf
+
 # Gelu and activations
 def gelu(x: float) -> float:
     return 0.5 * x * (1 + erf(x / sqrt(2)))

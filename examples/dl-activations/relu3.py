@@ -1,5 +1,7 @@
 import torch
+from torch import nn
 from ksc.torch_utils import elementwise_apply
+from collections import OrderedDict
 
 # BEGINDOC
 def relu3(x: float) -> float:

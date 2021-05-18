@@ -300,7 +300,7 @@ class GDef(ASTNode):
         super().__init__(derivation=derivation, function_name=function_name)
 
     def name(self):
-        return StructuredName((derivation, function_name))
+        return StructuredName((self.derivation, self.function_name))
 
 
 class Rule(ASTNode):
