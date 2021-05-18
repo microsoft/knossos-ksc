@@ -11,7 +11,21 @@ from ksc.type import (
     KSTypeError,
 )
 
-from ksc.expr import Expr, Def, EDef, GDef, Rule, Var, Lam, Call, Let, If, Assert
+from ksc.expr import (
+    ASTNode,
+    Expr,
+    Def,
+    EDef,
+    GDef,
+    Rule,
+    Const,
+    Var,
+    Lam,
+    Call,
+    Let,
+    If,
+    Assert,
+)
 from ksc.expr import pystr, StructuredName
 from ksc.prim import prim_lookup
 
@@ -41,16 +55,14 @@ from functools import singledispatch
 
 
 @singledispatch
-def type_propagate(ex, symtab):
+def type_propagate(ex: ASTNode, symtab):
     """
     Fill "type" field of expr, propagating from incoming dict "symtab"
 
     Keys of the symtab are names, either names of variables or StructuredNames
     Values in the symtab are types, the return types in the case of StructuredNames
     """
-    # Default implementation, for types not specialized below
-    assert ex.type_ != None
-    return ex
+    raise AssertionError("Must be overridden for all AST node subclasses")
 
 
 # f : S -> T
@@ -211,7 +223,20 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate.register(Var)
+@type_propagate.register(Expr)
+def _(ex, symtab):
+    # Stop propagation (do not recurse) if type already set
+    return type_propagate_expr(ex, symtab) if ex.type_ is None else ex
+
+
+@singledispatch
+def type_propagate_expr(ex, symtab):
+    # Default implementation, for types not specialized below.
+    assert ex.type_ is not None
+    return ex
+
+
+@type_propagate_expr.register(Var)
 def _(ex, symtab):
     if ex.decl:
         assert ex.type_ != None
@@ -222,7 +247,7 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate.register(Call)
+@type_propagate_expr.register(Call)
 def _(ex, symtab):
     for a in ex.args:
         type_propagate(a, symtab)
@@ -295,7 +320,7 @@ def _(ex, symtab):
     raise KSTypeError(f"Couldn't find {ex.name} applied to ({argtypes_str}) at {ex}")
 
 
-@type_propagate.register(Lam)
+@type_propagate_expr.register(Lam)
 def _(ex, symtab):
     local_st = {**symtab, ex.arg.name: ex.arg.type_}
     ex.body = type_propagate(ex.body, local_st)
@@ -303,7 +328,7 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate.register(Let)
+@type_propagate_expr.register(Let)
 def _(ex, symtab):
     ex.rhs = type_propagate(ex.rhs, symtab)
 
@@ -330,7 +355,7 @@ def _(ex, symtab):
     assert False  # Bad var
 
 
-@type_propagate.register(If)
+@type_propagate_expr.register(If)
 def _(ex, symtab):
     ex.cond = type_propagate(ex.cond, symtab)
     assert ex.cond.type_ == Type.Bool
@@ -341,7 +366,7 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate.register(Assert)
+@type_propagate_expr.register(Assert)
 def _(ex, symtab):
     ex.cond = type_propagate(ex.cond, symtab)
     assert ex.cond.type_ == Type.Bool
