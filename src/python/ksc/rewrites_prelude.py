@@ -1,6 +1,6 @@
 from typing import Callable, FrozenSet, Iterator
 
-from ksc.cav_subst import Location, replace_subtree
+from ksc.cav_subst import Location, apply_func_to_subtree
 from ksc.expr import StructuredName, Expr, Const, Call
 from ksc.filter_term import FilterTerm
 from ksc.interpreter import native_impls
@@ -22,12 +22,11 @@ class ConstantFolder(RuleMatcher):
         return frozenset([self._name])
 
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
-        def apply_here(const_zero: Expr, subtree: Expr):
-            assert const_zero == Const(0.0)  # Payload passed to replace_subtree below
+        def apply_here(subtree: Expr):
             assert isinstance(subtree, Call) and subtree.name == self._name
             return Const(self._native_impl(*[arg.value for arg in subtree.args]))
 
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return apply_func_to_subtree(expr, path, apply_here)
 
     def matches_for_possible_expr(
         self,

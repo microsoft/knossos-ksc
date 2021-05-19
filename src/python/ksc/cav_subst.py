@@ -75,12 +75,48 @@ def get_node_at_location(expr, path: Location):
 # Public members
 
 
+def apply_func_to_subtree(
+    e: Expr, path: Location, func: Callable[[Expr], Expr]
+) -> Expr:
+    """ Replaces a single location within e, with the result of calling the supplied function
+        on the subtree previously at that location. Returns a new Expr (e is unchanged). """
+
+    def apply(const_zero, target_subtree):
+        assert const_zero == Const(0.0)  # Passed to replace_subtrees below
+        return func(target_subtree)
+
+    # The constant zero here just has no variables to avoid capturing
+    return replace_subtrees(e, [ReplaceLocationRequest(path, Const(0.0), apply)])
+
+
+def replace_subtree_avoid_capture(e: Expr, path: Location, new_subtree: Expr) -> Expr:
+    """ Replace the subtree at a location within e with a new Expr, renaming binders along the path
+        to that location within e as necessary to avoid capturing free variables in the new subtree.
+        Returns a new Expression like e, but with the subtree replaced (e is unchanged). """
+    return replace_subtrees(e, [ReplaceLocationRequest(path, new_subtree)])
+
+
+# Type of variable substitutions. This reflects Var.name being a 'str', as only bound Variable's need renaming,
+# Call.name targets do not unless they are Var.name's).
+VariableSubstitution = Mapping[str, Expr]
+
+
+def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
+    """ Replaces all occurrences of some free-variables in e with new subtrees.
+        <subst> details the mapping from the free variables to replace, with the new subtree for each.
+        Renames as necessary any binders within e to avoid capturing any variables in the values of <subst>.
+        Returns a new Expr, which may share subtrees with the original (as well as with values of <subst>).
+        """
+    return _cav_helper(e, tuple(), subst)
+
+
+# These offer a more flexible and powerful interface, more than is required for most tasks.
 @dataclass(frozen=True)
 class ReplaceLocationRequest:
-    """ Describes a subtree to be replaced by the replace_subtree(s) function. """
+    """ Describes a subtree to be replaced by the replace_subtrees function. """
 
     target: Location
-    """ The location within the root Expr, i.e. upon which replace_subtree(s) is called, that should be replaced. """
+    """ The location within the root Expr, i.e. upon which replace_subtrees is called, that should be replaced. """
 
     payload: Expr
     """ An Expr to be "delivered" to that index, i.e. with the same value as it would have at the top.
@@ -95,29 +131,10 @@ class ReplaceLocationRequest:
             but *after* any alpha-renaming necessary to preserve the meaning of <payload>. """
 
 
-# Type of variable substitutions. This reflects Var.name being a 'str', as only bound Variable's need renaming,
-# Call.name targets do not unless they are Var.name's).
-VariableSubstitution = Mapping[str, Expr]
-
-
 def replace_subtrees(e: Expr, reqs: List[ReplaceLocationRequest]) -> Expr:
     """ Replaces locations within <e> with new subtrees, as per ReplaceLocationRequest.
         Returns a new Expr, which may share subtrees with the original. """
     return _cav_helper(e, reqs, {})
-
-
-def replace_subtree(e: Expr, *args):
-    """ Replaces a single location within e. The additional arguments are as per the fields of ReplaceLocationRequest. """
-    return replace_subtrees(e, [ReplaceLocationRequest(*args)])
-
-
-def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
-    """ Replaces all occurrences of some free-variables in e with new subtrees.
-        <subst> details the mapping from the free variables to replace, with the new subtree for each.
-        Renames as necessary any binders within e to avoid capturing any variables in the values of <subst>.
-        Returns a new Expr, which may share subtrees with the original (as well as with values of <subst>).
-        """
-    return _cav_helper(e, tuple(), subst)
 
 
 #####################################################################

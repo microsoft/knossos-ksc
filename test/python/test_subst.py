@@ -3,7 +3,8 @@ import pytest
 from ksc.expr import Var, Const, Let, Lam, Call
 from ksc.cav_subst import (
     replace_free_vars,
-    replace_subtree,
+    apply_func_to_subtree,
+    replace_subtree_avoid_capture,
     replace_subtrees,
     ReplaceLocationRequest,
     make_nonfree_var,
@@ -64,7 +65,7 @@ def test_replace_subtrees_nested():
         )
 
 
-def test_replace_subtree_avoids_capture():
+def test_replace_subtree_avoid_capture():
     e = parse_expr_string("(let (x (if p a b)) (add x y))")
     # Replace the y with a subtree mentioning a free "x".
     # The "x" in the new subtree should not be captured by the bound "x"
@@ -72,7 +73,7 @@ def test_replace_subtree_avoids_capture():
     new_subtree = parse_expr_string("(mul x 2)")
     path_to_y = (1, 1)
     assert get_node_at_location(e, path_to_y) == Var("y")
-    replaced = replace_subtree(e, path_to_y, new_subtree)
+    replaced = replace_subtree_avoid_capture(e, path_to_y, new_subtree)
     # Must rename the "x".
     new_var = make_nonfree_var(
         "x", [e]
@@ -83,14 +84,14 @@ def test_replace_subtree_avoids_capture():
     assert replaced == expected
 
 
-def test_replace_subtree_avoids_capturing_another():
+def test_replace_subtree_avoid_capturing_another():
     new_subtree = parse_expr_string("(mul x 2)")
     conflicting_var = make_nonfree_var("x", [new_subtree])  # But, this already exists
     assert conflicting_var.name == "x_0"
     e = parse_expr_string(f"(lam (x : Integer) (foo x_0 x y))")
     path_to_y = (0, 2)
     assert get_node_at_location(e, path_to_y) == Var("y")
-    replaced = replace_subtree(e, path_to_y, new_subtree)
+    replaced = replace_subtree_avoid_capture(e, path_to_y, new_subtree)
     new_var = (
         replaced.arg
     )  # No alpha-equivalence, so this is the name used; this has decl=True
@@ -108,14 +109,16 @@ def test_replace_subtree_applicator_allows_capture():
     new_subtree = parse_expr_string("(mul x 2)")
     path_to_y = (1, 1)
     assert get_node_at_location(e, path_to_y) == Var("y")
-    replaced = replace_subtree(e, path_to_y, Const(0), lambda _e1, _e2: new_subtree)
+    replaced = apply_func_to_subtree(e, path_to_y, lambda _: new_subtree)
     expected = parse_expr_string("(let (x (if p a b)) (add x (mul x 2)))")
     assert replaced == expected
 
 
-def test_replace_subtree_allows_inlining_call():
-    # In the future this will become part of the inline-call rule,
-    # but for now we merely test that replace_subtree supports it.
+def test_replace_subtree_allows_inlining_calls_to_lams():
+    # This demonstrates we can perform renaming-to-avoid-capture for the case of inlining a Lam
+    # (containing free vars that should not be captured) into a call site with arguments (where
+    # free vars should be captured). This could become part of inline_call in a future ks-like
+    # language where Calls are to let-bound Lam's (where names can be shadowed) rather than Defs.
     e = parse_expr_string("(let (x (if p a b)) (foo x))")
     foo_impl = parse_expr_string("(lam (foo_arg : Float) (add x foo_arg))")
     path_to_call = (1,)
@@ -126,7 +129,9 @@ def test_replace_subtree_allows_inlining_call():
         assert len(call.args) == 1  # More would require making a Tuple
         return Let(Var(func.arg.name), call.args[0], func.body)  # drop the type
 
-    replaced = replace_subtree(e, path_to_call, foo_impl, apply_to_argument)
+    replaced = replace_subtrees(
+        e, [ReplaceLocationRequest(path_to_call, foo_impl, apply_to_argument)]
+    )
     new_var = make_nonfree_var("x", [e])
     expected = parse_expr_string(
         f"""(let ({new_var} (if p a b))  ; Bound variable renamed to avoid capturing "x" in foo_impl

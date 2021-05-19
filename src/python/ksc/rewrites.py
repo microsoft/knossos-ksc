@@ -10,7 +10,8 @@ from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.cav_subst import (
     Location,
     subexps_no_binds,
-    replace_subtree,
+    replace_subtree_avoid_capture,
+    apply_func_to_subtree,
     make_nonfree_var,
     VariableSubstitution,
 )
@@ -204,13 +205,12 @@ class inline_var(RuleMatcher):
         # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
         # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
         assert path_to_var[: len(binding_location)] == binding_location
-        return replace_subtree(
+        return apply_func_to_subtree(
             expr,
             binding_location,
-            Const(0.0),  # Nothing to avoid capturing in outer call
-            lambda _zero, let: replace_subtree(
+            lambda let: replace_subtree_avoid_capture(
                 let, path_to_var[len(binding_location) :], let.rhs
-            ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
+            ),
         )
 
     def matches_for_possible_expr(
@@ -231,13 +231,11 @@ class delete_let(RuleMatcher):
     possible_filter_terms = frozenset([Let])
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
-        def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
-            assert const_zero == Const(0.0)  # Passed to replace_subtree below
+        def apply_here(let_node: Expr) -> Expr:
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
 
-        # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return apply_func_to_subtree(expr, path, apply_here)
 
     def matches_for_possible_expr(
         self, subtree: Expr, path_from_root: Location, root: Expr, env
@@ -302,8 +300,7 @@ class ParsedRuleMatcher(RuleMatcher):
     def apply_at(
         self, expr: Expr, path: Location, **substs: VariableSubstitution
     ) -> Expr:
-        def apply_here(const_zero: Expr, target: Expr) -> Expr:
-            assert const_zero == Const(0.0)  # Passed to replace_subtree below
+        def apply_here(target: Expr) -> Expr:
             assert are_alpha_equivalent(
                 SubstTemplate.visit(self._rule.template, substs), target
             )  # Note this traverses, so expensive.
@@ -313,8 +310,7 @@ class ParsedRuleMatcher(RuleMatcher):
             assert result.type_ == target.type_
             return result
 
-        # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return apply_func_to_subtree(expr, path, apply_here)
 
 
 def _combine_substs(
