@@ -2,19 +2,18 @@
 type_propagate: Type propagation for Knossos IR
 """
 
-import itertools
-from typing import Union, List
+from typing import List
 from ksc.type import (
     Type,
-    SizeType,
     shape_type,
     tangent_type,
     make_tuple_if_many,
     KSTypeError,
 )
 
-from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import Expr, Def, EDef, GDef, Rule, Var, Lam, Call, Let, If, Assert
 from ksc.expr import pystr, StructuredName
+from ksc.prim import prim_lookup
 
 import editdistance
 
@@ -22,8 +21,8 @@ import editdistance
 # Importing prettyprint to get the decorated printers for Expression and Type
 import ksc.prettyprint  # pylint: disable=unused-import
 
-# Import the prettyprinter routines we use explicitly in this file
-from prettyprinter import cpprint, pprint, pformat
+# Import the prettyprinter routine we use explicitly in this file
+from prettyprinter import pformat
 
 # Needed this in order to see the error messages when pprint fails
 import warnings
@@ -38,152 +37,6 @@ import sys
 # resource.setrlimit(resource.RLIMIT_STACK, (resource.RLIM_INFINITY,resource.RLIM_INFINITY))
 sys.setrecursionlimit(10 ** 6)
 
-import re
-
-ks_prim_lookup_re_get = re.compile(r"get\$(\d+)\$(\d+)")
-
-
-def ks_prim_lookup(sname, ty):
-    if ty.is_tuple:
-        tys = tuple(ty.tuple_elems())
-    else:
-        tys = [ty]
-    n = len(tys)
-
-    name = sname.mangle_without_type()
-
-    # tuple
-    # (tuple 1.0) -> (Tuple Float)
-    # (tuple 1.0 2.0) -> (Tuple Float Float)
-    # (tuple (tuple 1.0)) -> (Tuple (Tuple Float))
-
-    if name == "tuple":
-        return Type.Tuple(*tys)
-
-    # get$n$m
-    if name.startswith("get$"):
-        assert ty.is_tuple
-        m = ks_prim_lookup_re_get.fullmatch(name)
-        if m:
-            n = int(m.group(1))
-            max = int(m.group(2))
-            assert ty.tuple_len == max
-            return ty.tuple_elem(n - 1)
-
-    # vec
-    if name == "Vec_init":
-        if n == 0:
-            print("Vec_init: Assuming empty vector is float")
-            return Type.Tensor(1, Type.Float)
-
-        assert all(ty == tys[0] for ty in tys)
-        return Type.Tensor(1, tys[0])
-
-    # size : Tensor N T -> Size
-    if n == 1 and name == "size":
-        return SizeType.from_rank(tys[0].tensor_rank)
-
-    if n == 1 and name == "shape":
-        return shape_type(tys[0])
-
-    # index : Size, Tensor N T -> T
-    if n == 2 and name == "index":
-        assert tys[0] == SizeType.from_rank(tys[1].tensor_rank)
-        return tys[1].tensor_elem_type
-
-    # build : Size, Lam IntTuple T -> Tensor T
-    if n == 2 and name == "build":
-        size_ty = tys[0]
-        lam_ty = tys[1]
-        assert lam_ty.lam_arg_type == size_ty
-
-        rank = SizeType.get_rank(size_ty)
-        assert rank is not None
-
-        elem_type = lam_ty.lam_return_type
-        return Type.Tensor(rank, elem_type)
-
-    # sumbuild : Size, Lam IntTuple T -> T
-    if n == 2 and name == "sumbuild":
-        size_ty = tys[0]
-        lam_ty = tys[1]
-        assert lam_ty.lam_arg_type == size_ty
-
-        return lam_ty.lam_return_type
-
-    # constVec(n T)
-    if n == 2 and name == "constVec":
-        size_ty = tys[0]
-        elem_ty = tys[1]
-
-        rank = SizeType.get_rank(size_ty)
-        assert rank is not None
-
-        return Type.Tensor(rank, elem_ty)
-
-    # deltaVec(n i v)
-    if n == 3 and name == "deltaVec":
-        size_ty = tys[0]
-        ind_ty = tys[1]
-        elem_ty = tys[2]
-        assert size_ty == ind_ty
-        rank = SizeType.get_rank(size_ty)
-        assert rank is not None
-
-        return Type.Tensor(rank, elem_ty)
-
-    # map : Lam (Tuple S T), Tensor S -> T
-    if n == 2 and name == "map":
-        assert tys[0].is_lam_or_LM
-        tyS = tys[0].lam_arg_type
-        tyT = tys[0].lam_return_type
-        assert tys[1].is_tensor_of(tyS)
-        return Type.Tensor(tys[1].tensor_rank, tyT)
-
-    # fold : Lam (Tuple State T) State, State, Tensor T -> State
-    if n == 3 and name == "fold":
-        assert tys[0].is_lam_or_LM
-        assert tys[0].lam_arg_type.tuple_len == 2
-        tyState = tys[0].lam_arg_type.tuple_elem(0)
-        tyT = tys[0].lam_arg_type.tuple_elem(1)
-        assert tys[0].lam_return_type == tyState
-        assert tys[1] == tyState
-        assert tys[2].is_tensor_of(tyT)
-        return tyState
-
-    # eq : T, T -> Bool
-    if n == 2 and name in ("eq", "ne", "lt", "gt", "lte", "gte"):
-        assert tys[0] == tys[1]  # TODO: MOVEEQ Move eq to prelude
-        return Type.Bool
-
-    # Polymorphic arithmetic
-    # sum : Tensor T -> T
-    if n == 1 and name == "sum" and tys[0].is_tensor:
-        return tys[0].tensor_elem_type
-
-    # ts_add : T, dT -> T
-    if n == 2 and name == "ts_add":
-        # assert tys[0] == tys[1] TODO: check rhs is tangent_type
-        return tys[0]
-
-    # ts_dot : T, T -> Float
-    if n == 2 and name == "ts_dot":
-        assert tys[0] == tys[1]
-        return Type.Float
-
-    # ts_scale : Float, dT -> dT
-    if n == 2 and name == "ts_scale":
-        assert tys[0] == Type.Float
-        return tys[1]
-
-    # print : T... -> Int
-    if name == "print":
-        return Type.Integer
-
-    return None
-
-
-############################################################################
 from functools import singledispatch
 
 
@@ -377,7 +230,7 @@ def _(ex, symtab):
     argtype = make_tuple_if_many(argtypes)
 
     # Try prim lookup first - prims cannot be overloaded
-    prim = ks_prim_lookup(ex.name, argtype)
+    prim = prim_lookup(ex.name, argtype)
     if prim != None:
         ex.type_ = prim
         return ex
@@ -400,16 +253,31 @@ def _(ex, symtab):
     )
     print(f"type_propagate: Looked up {ex.name}")
     exname = ex.name.mangled()
-    print(f"type_propagate: Near misses {exname}:")
+    near_miss = False
+    closest_match = None
+    closest_match_distance = float("inf")
+    DISTANCE_THRESHOLD = 3
     for key, val in symtab.items():
         if isinstance(key, StructuredName):
             key_str = key.mangle_without_type()
         else:
             key_str = str(key)
-        if editdistance.eval(key_str, exname) < 2:
-            print(f"type_propagate:   {key} -> {val}")
+        distance = editdistance.eval(key_str, exname)
+        if distance < closest_match_distance:
+            closest_match = key
+            closest_match_distance = distance
 
-    print(f"type_propagate: To implement:")
+        if distance < DISTANCE_THRESHOLD:
+            if not near_miss:
+                print(f"type_propagate: Near misses:")
+                near_miss = True
+            print(f"type_propagate:   {key_str} -> {val}")
+    if not near_miss:
+        print(
+            f"type_propagate: No near misses (closest was {closest_match}, dist = {closest_match_distance})"
+        )
+
+    print(f"type_propagate: Boilerplate for prelude.ks:")
     argtypes_ks_str = " ".join(map(pformat, argtypes))
     argtype_tuple = Type.Tuple(*argtypes) if len(argtypes) > 1 else argtypes[0]
     argtypes_ks_tuple = pformat(argtype_tuple)
