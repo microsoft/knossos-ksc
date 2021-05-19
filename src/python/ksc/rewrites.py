@@ -208,9 +208,11 @@ class inline_var(RuleMatcher):
             expr,
             binding_location,
             Const(0.0),  # Nothing to avoid capturing in outer call
-            lambda _zero, let: replace_subtree(
-                let, path_to_var[len(binding_location) :], let.rhs
-            ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
+            lambda let_node: replace_subtree(
+                let_node,
+                path_to_var[len(binding_location) :],
+                let_node.rhs,  # Just insert - renaming will avoid capture
+            ),
         )
 
     def matches_for_possible_expr(
@@ -231,8 +233,7 @@ class delete_let(RuleMatcher):
     possible_filter_terms = frozenset([Let])
 
     def apply_at(self, expr: Expr, path: Location) -> Expr:
-        def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
-            assert const_zero == Const(0.0)  # Passed to replace_subtree below
+        def apply_here(let_node: Expr) -> Expr:
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
 
@@ -302,8 +303,7 @@ class ParsedRuleMatcher(RuleMatcher):
     def apply_at(
         self, expr: Expr, path: Location, **substs: VariableSubstitution
     ) -> Expr:
-        def apply_here(const_zero: Expr, target: Expr) -> Expr:
-            assert const_zero == Const(0.0)  # Passed to replace_subtree below
+        def apply_here(target: Expr) -> Expr:
             assert are_alpha_equivalent(
                 SubstTemplate.visit(self._rule.template, substs), target
             )  # Note this traverses, so expensive.

@@ -22,8 +22,7 @@ class ConstantFolder(RuleMatcher):
         return frozenset([self._name])
 
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
-        def apply_here(const_zero: Expr, subtree: Expr):
-            assert const_zero == Const(0.0)  # Payload passed to replace_subtree below
+        def apply_here(subtree: Expr):
             assert isinstance(subtree, Call) and subtree.name == self._name
             return Const(self._native_impl(*[arg.value for arg in subtree.args]))
 

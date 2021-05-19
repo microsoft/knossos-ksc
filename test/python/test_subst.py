@@ -107,7 +107,7 @@ def test_replace_subtree_applicator_allows_capture():
     new_subtree = parse_expr_string("(mul x 2)")
     path_to_y = (1, 1)
     assert get_node_at_location(e, path_to_y) == Var("y")
-    replaced = replace_subtree(e, path_to_y, Const(0), lambda _e1, _e2: new_subtree)
+    replaced = replace_subtree(e, path_to_y, Const(0), lambda _: new_subtree)
     expected = parse_expr_string("(let (x (if p a b)) (add x (mul x 2)))")
     assert replaced == expected
 
@@ -120,10 +120,10 @@ def test_replace_subtree_allows_inlining_call():
     path_to_call = (1,)
     assert type(get_node_at_location(e, path_to_call)) == Call
 
-    def apply_to_argument(func, call):
-        assert type(func) == Lam and type(call) == Call
+    def apply_to_argument(call):
+        assert type(call) == Call
         assert len(call.args) == 1  # More would require making a Tuple
-        return Let(Var(func.arg.name), call.args[0], func.body)  # drop the type
+        return Let(Var(foo_impl.arg.name), call.args[0], foo_impl.body)  # drop the type
 
     replaced = replace_subtree(e, path_to_call, foo_impl, apply_to_argument)
     new_var = make_nonfree_var("x", [e])

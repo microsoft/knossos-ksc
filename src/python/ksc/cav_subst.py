@@ -83,14 +83,14 @@ class ReplaceLocationRequest:
     """ The location within the root Expr, i.e. upon which replace_subtree(s) is called, that should be replaced. """
 
     payload: Expr
-    """ An Expr to be "delivered" to that index, i.e. with the same value as it would have at the top.
+    """ An Expr whose free variables should not be captured by binders along the path to <target>.
         That is, any binders on the path from the root to <target> that bind variables free in <payload>,
         will be alpha-renamed so that <payload> sees the same values in those variables that it would have at the root. """
 
-    applicator: Optional[Callable[[Expr, Expr], Expr]] = None
-    """ Details how the <payload> should be inserted into the specified <target>.
+    applicator: Optional[Callable[[Expr], Expr]] = None
+    """ Details how the subtree to place at <target> is formed.
         * If applicator is None, then replace_subtree should merely replace the node at <target> with <payload>.
-        * Otherwise, the replacement (new) subtree is given by `applicator(payload, x)` where x is
+        * Otherwise, the replacement (new) subtree is given by `applicator(x)` where x is
             the node currently at that location,
             but *after* any alpha-renaming necessary to preserve the meaning of <payload>. """
 
@@ -156,7 +156,7 @@ def _cav_helper(
             return reqs[0].payload
         # Continue renaming.
         renamed_e = _cav_helper(e, [], substs)
-        return reqs[0].applicator(reqs[0].payload, renamed_e)
+        return reqs[0].applicator(renamed_e)
     # No ReplaceLocationRequest targets this node. Do any Expr-specific processing, perhaps recursing deeper.
     return _cav_children(e, reqs, substs)
 
