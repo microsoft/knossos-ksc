@@ -1,6 +1,6 @@
 from ksc.alpha_equiv import are_alpha_equivalent, alpha_hash
 from ksc.expr import Const, Let, Var
-from ksc.parse_ks import parse_expr_string, parse_ks_filename
+from ksc.parse_ks import parse_expr_string
 from ksc.type_propagate import type_propagate_decls, type_propagate
 from ksc.type import Type
 
@@ -45,12 +45,11 @@ def test_alpha_equivalence_diff_types():
     assert alpha_hash(x) == alpha_hash(x_again)
 
 
-def test_alpha_equivalence_type_propagation():
+def test_alpha_equivalence_type_propagation(prelude_symtab):
     exp1 = parse_expr_string("(let (x (add z 1.0)) (mul x 2.0))")
     exp2 = parse_expr_string("(let (x (add z 1.0)) (mul x 2.0))")
 
-    symtab = {"z": Type.Float}
-    type_propagate_decls(list(parse_ks_filename("src/runtime/prelude.ks")), symtab)
+    symtab = {**prelude_symtab, "z": Type.Float}
     type_propagate(exp1, symtab)
     assert exp1 != exp2  # One has resolved calls to StructuredNames
     assert not are_alpha_equivalent(exp1, exp2)

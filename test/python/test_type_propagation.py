@@ -22,7 +22,7 @@ def test_type_propagate_prelude_and_primer():
     ) in [d.name for d in decls_file]
 
 
-def test_type_propagate_works():
+def test_type_propagate_works(prelude_symtab):
     decls = list(
         parse_ks_string(
             """
@@ -34,9 +34,6 @@ def test_type_propagate_works():
     type_propagate_decls(decls, {})
     assert decls[0].return_type == Type.Float
 
-    symtab = dict()
-    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
     decls = list(
         parse_ks_string(
             """
@@ -45,7 +42,7 @@ def test_type_propagate_works():
             __file__,
         )
     )
-    type_propagate_decls(decls, symtab)
+    type_propagate_decls(decls, prelude_symtab)
     assert decls[0].return_type == Type.Float
 
 
