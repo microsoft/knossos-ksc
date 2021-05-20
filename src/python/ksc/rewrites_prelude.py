@@ -26,7 +26,7 @@ class ConstantFolder(RuleMatcher):
             assert isinstance(subtree, Call) and subtree.name == self._name
             return Const(self._native_impl(*[arg.value for arg in subtree.args]))
 
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return replace_subtree(expr, path, None, apply_here)
 
     def matches_for_possible_expr(
         self,

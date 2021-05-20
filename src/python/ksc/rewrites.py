@@ -207,7 +207,7 @@ class inline_var(RuleMatcher):
         return replace_subtree(
             expr,
             binding_location,
-            Const(0.0),  # Nothing to avoid capturing in outer call
+            None,  # Nothing to avoid capturing in outer call
             lambda let_node: replace_subtree(
                 let_node,
                 path_to_var[len(binding_location) :],
@@ -237,8 +237,7 @@ class delete_let(RuleMatcher):
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
 
-        # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return replace_subtree(expr, path, None, apply_here)
 
     def matches_for_possible_expr(
         self, subtree: Expr, path_from_root: Location, root: Expr, env
@@ -313,8 +312,7 @@ class ParsedRuleMatcher(RuleMatcher):
             assert result.type_ == target.type_
             return result
 
-        # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return replace_subtree(expr, path, None, apply_here)
 
 
 def _combine_substs(

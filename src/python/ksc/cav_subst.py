@@ -82,17 +82,23 @@ class ReplaceLocationRequest:
     target: Location
     """ The location within the root Expr, i.e. upon which replace_subtree(s) is called, that should be replaced. """
 
-    payload: Expr
-    """ An Expr whose free variables should not be captured by binders along the path to <target>.
+    payload: Optional[Expr]
+    """ May be an Expr whose free variables should not be captured by binders along the path to <target>.
         That is, any binders on the path from the root to <target> that bind variables free in <payload>,
         will be alpha-renamed so that <payload> sees the same values in those variables that it would have at the root. """
 
     applicator: Optional[Callable[[Expr], Expr]] = None
     """ Details how the subtree to place at <target> is formed.
-        * If applicator is None, then replace_subtree should merely replace the node at <target> with <payload>.
+        * If applicator is None, then replace_subtree should merely replace the node at <target> with <payload>,
+            which must be non-None.
         * Otherwise, the replacement (new) subtree is given by `applicator(x)` where x is
             the node currently at that location,
             but *after* any alpha-renaming necessary to preserve the meaning of <payload>. """
+
+    def __post_init__(self):
+        assert (self.payload is not None) or (
+            self.applicator is not None
+        ), "Must have at least one of payload and applicator"
 
 
 # Type of variable substitutions. This reflects Var.name being a 'str', as only bound Variable's need renaming,
@@ -153,6 +159,7 @@ def _cav_helper(
                 "Multiple ReplaceLocationRequests on locations nested within each other"
             )
         if reqs[0].applicator is None:
+            assert reqs[0].payload is not None
             return reqs[0].payload
         # Continue renaming.
         renamed_e = _cav_helper(e, [], substs)
@@ -210,7 +217,9 @@ def _rename_if_needed(
     # If <arg> binds a variable free in any Expr's in a request payload or the RHS of a substitution, then
     # returns a new Var (chosen not to capture any variable free in <binder> or as above), and an updated <subst>.
     # Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
-    conflicting_binders = [req.payload for req in reqs] + list(subst.values())
+    conflicting_binders = [
+        req.payload for req in reqs if req.payload is not None
+    ] + list(subst.values())
     if any(arg.name in rhs.free_vars_ for rhs in conflicting_binders):
         # Must rename "arg". Make a new name.
         nv = make_nonfree_var(arg.name, [binder] + conflicting_binders)
