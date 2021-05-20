@@ -64,15 +64,9 @@ class AbstractMatcher(ABC):
     def _matches_with_env(
         self, e: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
     ) -> Iterator[Match]:
-        # Env maps bound variables to their binders, used for inline_let (only).
+        # Env maps bound variables to their binders
         yield from self.matches_here(e, path_from_root, root, env)
-        for i, ch in enumerate(subexps_no_binds(e)):
-            yield from self._matches_with_env(
-                ch,
-                path_from_root + (i,),
-                root,
-                _update_env_for_subtree(e, path_from_root, i, env),
-            )
+        yield from _get_matches_with_env(self, e, path_from_root, root, env)
 
     @abstractmethod
     def matches_here(
@@ -86,30 +80,44 @@ class AbstractMatcher(ABC):
 
 
 @singledispatch
-def _update_env_for_subtree(
-    parent: Expr, parent_path: Location, which_child: int, env: LetBindingEnvironment
+def _get_matches_with_env(
+    matcher: AbstractMatcher,
+    e: Expr,
+    path_from_root: Location,
+    root: Expr,
+    env: LetBindingEnvironment,
 ) -> LetBindingEnvironment:
-    # Default is to use same environment as parent
-    return env
+    # Default is to run through subexps
+    for i, ch in enumerate(subexps_no_binds(e)):
+        yield from matcher._matches_with_env(ch, path_from_root + (i,), root, env)
 
 
-@_update_env_for_subtree.register
-def _update_env_let(
-    parent: Let, parent_path: Location, which_child: int, env: LetBindingEnvironment
+@_get_matches_with_env.register
+def _(
+    matcher: AbstractMatcher,
+    e: Let,
+    path_from_root: Location,
+    root: Expr,
+    env: LetBindingEnvironment,
 ) -> LetBindingEnvironment:
     assert isinstance(
-        parent.vars, Var
+        e.vars, Var
     ), "Tupled lets are not supported - use untuple_lets first"
-    assert 0 <= which_child <= 1
-    return env if which_child == 0 else env.set(parent.vars.name, parent_path)  # rhs
+    yield from matcher._matches_with_env(e.rhs, path_from_root + (0,), root, env)
+    env = env.set(e.vars.name, path_from_root)  # How does this deal with shadowing?
+    yield from matcher._matches_with_env(e.body, path_from_root + (1,), root, env)
 
 
-@_update_env_for_subtree.register
-def _update_env_lam(
-    parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment
+@_get_matches_with_env.register
+def _(
+    matcher: AbstractMatcher,
+    e: Lam,
+    path_from_root: Location,
+    root: Expr,
+    env: LetBindingEnvironment,
 ) -> LetBindingEnvironment:
-    assert which_child == 0
-    return env.discard(parent.arg.name)
+    env = env.discard(e.arg.name)
+    yield from matcher._matches_with_env(e.body, path_from_root + (0,), root, env)
 
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
