@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
-from functools import singledispatch
+from functools import partialmethod, singledispatch
 from typing import Any, FrozenSet, Iterator, List, Mapping, Optional, Tuple
 
 from pyrsistent import pmap
@@ -66,7 +66,25 @@ class AbstractMatcher(ABC):
     ) -> Iterator[Match]:
         # Env maps bound variables to their binders
         yield from self.matches_here(e, path_from_root, root, env)
-        yield from _get_matches_with_env(self, e, path_from_root, root, env)
+
+        # Let:
+        if isinstance(e, Let):
+            assert isinstance(
+                e.vars, Var
+            ), "Tupled lets are not supported - use untuple_lets first"
+            yield from self._matches_with_env(e.rhs, path_from_root + (0,), root, env)
+            env = env.set(e.vars.name, path_from_root)
+            yield from self._matches_with_env(e.body, path_from_root + (1,), root, env)
+
+        # Lam:
+        elif isinstance(e, Lam):
+            env = env.discard(e.arg.name)
+            yield from self._matches_with_env(e.body, path_from_root + (0,), root, env)
+
+        else:
+            # Default is to run through subexps
+            for i, ch in enumerate(subexps_no_binds(e)):
+                yield from self._matches_with_env(ch, path_from_root + (i,), root, env)
 
     @abstractmethod
     def matches_here(
@@ -77,47 +95,6 @@ class AbstractMatcher(ABC):
         env: LetBindingEnvironment,
     ) -> Iterator[Match]:
         """ Return any matches which rewrite the topmost node of the specified subtree """
-
-
-@singledispatch
-def _get_matches_with_env(
-    matcher: AbstractMatcher,
-    e: Expr,
-    path_from_root: Location,
-    root: Expr,
-    env: LetBindingEnvironment,
-) -> LetBindingEnvironment:
-    # Default is to run through subexps
-    for i, ch in enumerate(subexps_no_binds(e)):
-        yield from matcher._matches_with_env(ch, path_from_root + (i,), root, env)
-
-
-@_get_matches_with_env.register
-def _(
-    matcher: AbstractMatcher,
-    e: Let,
-    path_from_root: Location,
-    root: Expr,
-    env: LetBindingEnvironment,
-) -> LetBindingEnvironment:
-    assert isinstance(
-        e.vars, Var
-    ), "Tupled lets are not supported - use untuple_lets first"
-    yield from matcher._matches_with_env(e.rhs, path_from_root + (0,), root, env)
-    env = env.set(e.vars.name, path_from_root)  # How does this deal with shadowing?
-    yield from matcher._matches_with_env(e.body, path_from_root + (1,), root, env)
-
-
-@_get_matches_with_env.register
-def _(
-    matcher: AbstractMatcher,
-    e: Lam,
-    path_from_root: Location,
-    root: Expr,
-    env: LetBindingEnvironment,
-) -> LetBindingEnvironment:
-    env = env.discard(e.arg.name)
-    yield from matcher._matches_with_env(e.body, path_from_root + (0,), root, env)
 
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
