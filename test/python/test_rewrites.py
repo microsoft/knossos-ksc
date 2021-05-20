@@ -1,6 +1,7 @@
+import pytest
 from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
-from ksc.parse_ks import parse_expr_string, parse_ks_file, parse_ks_filename
+from ksc.parse_ks import parse_expr_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate_decls
 from ksc import utils
@@ -127,13 +128,9 @@ def test_inline_var_renames():
     )
 
 
-def test_simple_parsed_rule():
-    symtab = dict()
-    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
-
+def test_simple_parsed_rule(prelude_symtab):
     r = parse_rule_str(
-        '(rule "mul2_to_add$f" (x : Float) (mul x 2.0) (add x x))', symtab
+        '(rule "mul2_to_add$f" (x : Float) (mul x 2.0) (add x x))', prelude_symtab
     )
     input1, expected1 = (
         parse_expr_string("(if p (mul (add a b) 2.0) (mul a 3.0))"),
@@ -142,7 +139,7 @@ def test_simple_parsed_rule():
 
     type_propagate_decls(
         [input1, expected1],
-        {**symtab, "p": Type.Bool, "a": Type.Float, "b": Type.Float},
+        {**prelude_symtab, "p": Type.Bool, "a": Type.Float, "b": Type.Float},
     )
     actual1 = sorted_rewrites(r, input1)
     assert actual1 == [expected1]
@@ -152,64 +149,56 @@ def test_simple_parsed_rule():
         parse_expr_string("(add (to_float (mul x 2)) (to_float (mul x 2)))"),
     )
 
-    type_propagate_decls([input2, expected2], {**symtab, "x": Type.Integer})
+    type_propagate_decls([input2, expected2], {**prelude_symtab, "x": Type.Integer})
     actual2 = sorted_rewrites(r, input2)
     assert actual2 == [expected2]
 
 
-def test_parsed_rule_respects_types():
-    symtab = dict()
-    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
-
+def test_parsed_rule_respects_types(prelude_symtab):
     # Check that we only match subtrees of specified type (without relying on the StructuredNames being different)
-    r = parse_rule_str('(rule "rm.let$i" (e : Integer) (let (x e) x) e)', symtab)
+    r = parse_rule_str(
+        '(rule "rm.let$i" (e : Integer) (let (x e) x) e)', prelude_symtab
+    )
     applicable_expr = parse_expr_string("(let (y 4) y)")
     inapplicable_expr = parse_expr_string("(let (z 5.0) z)")
 
-    type_propagate_decls([applicable_expr, inapplicable_expr], symtab)
+    type_propagate_decls([applicable_expr, inapplicable_expr], prelude_symtab)
     assert sorted_rewrites(r, applicable_expr) == [parse_expr_string("4")]
     assert len(list(r.find_all_matches(inapplicable_expr))) == 0
 
 
-def test_parsed_rule_binders():
-    symtab = dict()
-    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
+def test_parsed_rule_binders(prelude_symtab):
     # Check that variables bound in the rule template are correctly substituted with the real program variables
     r = parse_rule_str(
-        '(rule "foo" ((e : Integer)) (let (x e) (add x 3)) (add e 3))', symtab
+        '(rule "foo" ((e : Integer)) (let (x e) (add x 3)) (add e 3))', prelude_symtab
     )
     expr = parse_expr_string("(let (i 7) (add i 3))")
     expected = parse_expr_string("(add 7 3)")
 
-    type_propagate_decls([expr, expected], symtab)
+    type_propagate_decls([expr, expected], prelude_symtab)
     actual = sorted_rewrites(r, expr)
     assert actual == [expected]
 
     # Also test on lam's.
     r2 = parse_rule_str(
         '(rule "index_of_build$f" ((n : Integer) (idx : Integer) (e : Float)) (index idx (build n (lam (i : Integer) e))) (let (i idx) e))',
-        symtab,
+        prelude_symtab,
     )
     expr2 = parse_expr_string(
         "(index 7 (build 10 (lam (idx : Integer) (to_float idx))))"
     )
     expected2 = parse_expr_string("(let (idx 7) (to_float idx))")
 
-    type_propagate_decls([expr2, expected2], symtab)
+    type_propagate_decls([expr2, expected2], prelude_symtab)
     actual2 = sorted_rewrites(r2, expr2)
     assert actual2 == [expected2]
 
 
-def test_parsed_rule_allows_alpha_equivalence():
-    symtab = dict()
-    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
-
+def test_parsed_rule_allows_alpha_equivalence(prelude_symtab):
     # Use ts_add because [add (Tuple (Vec Float) (Vec Float))] is not in the prelude (yet)
     r = parse_rule_str(
-        '(rule "add2_to_mul$vf" (v : Vec Float) (ts_add v v) (mul 2.0 v))', symtab
+        '(rule "add2_to_mul$vf" (v : Vec Float) (ts_add v v) (mul 2.0 v))',
+        prelude_symtab,
     )
     e = parse_expr_string(
         "(ts_add (build 10 (lam (i : Integer) (to_float i))) (build 10 (lam (j : Integer) (to_float j))))"
@@ -217,26 +206,23 @@ def test_parsed_rule_allows_alpha_equivalence():
     expected = parse_expr_string(
         "(mul 2.0 (build 10 (lam (k : Integer) (to_float k))))"
     )
-    type_propagate_decls([e, expected], symtab)
+    type_propagate_decls([e, expected], prelude_symtab)
     actual = sorted_rewrites(r, e)
     assert are_alpha_equivalent(utils.single_elem(actual), expected)
 
 
-def test_parsed_rule_capture():
-    symtab = dict()
-    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
-
+def test_parsed_rule_capture(prelude_symtab):
     # If the RHS introduces a new bound variable, then it needs to be renamed
     # into a fresh variable when the rule is applied, to avoid capture
     r = parse_rule_str(
-        '(rule "foo1" (x : Integer) (mul x 3) (let (y (add x x)) (add y x)))', symtab
+        '(rule "foo1" (x : Integer) (mul x 3) (let (y (add x x)) (add y x)))',
+        prelude_symtab,
     )
     e = parse_expr_string("(let (y 2) (mul (add y 1) 3))")
     expected = parse_expr_string(
         "(let (y 2) (let (t__0 (add (add y 1) (add y 1))) (add t__0 (add y 1))))"
     )
-    type_propagate_decls([e, expected], symtab)
+    type_propagate_decls([e, expected], prelude_symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
@@ -248,7 +234,7 @@ def test_parsed_rule_capture():
             (let (t__1 (add (add t__0 1) (add t__0 1))) (add t__1 (add t__0 1))))
     """
     )
-    type_propagate_decls([e, expected], symtab)
+    type_propagate_decls([e, expected], prelude_symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
@@ -260,13 +246,13 @@ def test_parsed_rule_capture():
             (index 0 (build 10 (lam (i : Integer) (mul x 3))))
          )
     """,
-        symtab,
+        prelude_symtab,
     )
     e = parse_expr_string("(let (i 2) (mul (add i 1) 3))")
     expected = parse_expr_string(
         "(let (i 2) (index 0 (build 10 (lam (t__0 : Integer) (mul (add i 1) 3)))))"
     )
-    type_propagate_decls([e, expected], symtab)
+    type_propagate_decls([e, expected], prelude_symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
@@ -274,11 +260,11 @@ def test_parsed_rule_capture():
     # by the LHS:
     r = parse_rule_str(
         '(rule "foo2" ((y : Integer) (z : Integer)) (let (x (add y 0)) z) (let (x y) z))',
-        symtab,
+        prelude_symtab,
     )
     e = parse_expr_string("(let (v (add 33 0)) (mul v 3))")
     expected = parse_expr_string("(let (v 33) (mul v 3))")
-    type_propagate_decls([e, expected], symtab)
+    type_propagate_decls([e, expected], prelude_symtab)
     actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
     assert actual == expected
 
