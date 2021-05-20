@@ -446,15 +446,16 @@ def find_template_subst_lam(
     if not isinstance(exp, Lam):
         return None
     assert (
-        template.arg not in template_vars
+        template.arg.name not in template_vars
     ), "Lambda arguments should not be declared as template variables"
     if template.arg.type_ != exp.arg.type_:
         return None
-    return find_template_subst(
+    body_subst = find_template_subst(
         template.body,
         exp.body,
         template_vars.set(template.arg.name, template.arg.type_),
     )
+    return _combine_substs({template.arg.name: exp.arg}, body_subst)
 
 
 def _maybe_add_binder_to_subst(

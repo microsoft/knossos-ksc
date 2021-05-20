@@ -22,7 +22,7 @@ def test_type_propagate_prelude_and_primer():
     ) in [d.name for d in decls_file]
 
 
-def test_type_propagate_works():
+def test_type_propagate_works(prelude_symtab):
     decls = list(
         parse_ks_string(
             """
@@ -34,9 +34,6 @@ def test_type_propagate_works():
     type_propagate_decls(decls, {})
     assert decls[0].return_type == Type.Float
 
-    symtab = dict()
-    decls_prelude = list(parse_ks_filename("src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
     decls = list(
         parse_ks_string(
             """
@@ -45,7 +42,7 @@ def test_type_propagate_works():
             __file__,
         )
     )
-    type_propagate_decls(decls, symtab)
+    type_propagate_decls(decls, prelude_symtab)
     assert decls[0].return_type == Type.Float
 
 
@@ -101,3 +98,16 @@ def test_type_propagate_warnings():
     with pytest.raises(KSTypeError) as excinfo:
         type_propagate_decls(decls, {})
     assert "Redefinition of [foo Float]" in str(excinfo.value)
+
+    decls = list(
+        parse_ks_string(
+            """
+    (def foo Float (a : Float) 1.0)
+    (def goo Integer (a : Float) (floo 2.0))
+    """,
+            __file__,
+        )
+    )
+    with pytest.raises(KSTypeError) as excinfo:
+        type_propagate_decls(decls, {})
+    assert "Couldn't find" in str(excinfo.value)
