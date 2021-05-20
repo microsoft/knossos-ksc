@@ -1,5 +1,3 @@
-from functools import wraps
-
 import ksc
 from ksc.tracing.function import Trace, TraceableFunction
 from ksc.tracing.jitting import make_edef

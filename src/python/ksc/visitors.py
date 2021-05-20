@@ -26,11 +26,9 @@ class ExprVisitor:
 
     def visit_var(self, v: Var, *args, **kwargs) -> None:
         """ Overridable method that is called to handle a non-decl Var being passed to visit """
-        pass
 
     def visit_const(self, c: Const, *args, **kwargs) -> None:
         """ Overridable method that is called to handle a Const being passed to visit """
-        pass
 
     def visit_lam(self, l: Lam, *args, **kwargs) -> None:
         """ Overridable method that is called to handle a Lam being passed to visit """

@@ -1,4 +1,3 @@
-from typing import Tuple
 from functools import wraps
 import numpy
 import ksc

@@ -1,6 +1,5 @@
 import pytest
 import torch
-import time
 
 
 def test_inference(benchmark, reference_func, func, config):

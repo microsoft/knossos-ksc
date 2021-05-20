@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
-from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
+from typing import Any, FrozenSet, Iterator, List, Mapping, Optional, Tuple
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
