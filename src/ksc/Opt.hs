@@ -151,7 +151,7 @@ optCall env fun opt_args
         type_before = typeof before
         type_after = typeof after
     in if type_before == type_after
-       then optE env new_e
+       then optE env (optLets (optSubst env) new_e)
        else
          pprPanic "Rule changed type:"
            (vcat [ text "Before:" <+> ppr before
