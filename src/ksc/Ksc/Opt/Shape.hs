@@ -10,7 +10,7 @@ optShape e
   | Just unit <- shapeIsUnit_maybe (typeof e)
   = Just unit
 
-optShape (Dummy ty)     = Just $ Dummy (Lang.shapeType ty)
+optShape (Dummy ty)     = Just $ Dummy (uncompressedShapeType ty)
 optShape (Assert e1 e2) = Just $ Assert e1 (pShape e2)
 optShape (Tuple es)     = Just $ Tuple (map pShape es)
 optShape (If b t e)     = Just $ If b (pShape t) (pShape e)
@@ -19,7 +19,7 @@ optShape (Let (VarPat v) e1 e2) = Just $ Let (VarPat v) e1 (pShape e2)
 optShape (Let (TupPat p) e1 e2) = Just $ Let (TupPat p) e1 (pShape e2)
 
 optShape (Call (TFun _ (Fun JustFun (PrimFunT p))) arg) = optShapePrim p arg
-optShape (Call (TFun ty (Fun ds f)) e) = Just $ Call (TFun (shapeType ty) (Fun (ShapeFun ds) f)) e
+optShape (Call (TFun ty (Fun ds f)) e) = Just $ Call (TFun (uncompressedShapeType ty) (Fun (ShapeFun ds) f)) e
 optShape (Konst _)      = Nothing
 -- Shape of constant: should not occur as this is handled by the unit-shape case
 optShape Var{}          = Nothing

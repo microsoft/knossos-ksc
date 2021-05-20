@@ -411,7 +411,7 @@ primCallResultTy_maybe fun arg_ty
       Fun (ShapeFun ds) f
         -> case primCallResultTy_maybe (Fun ds f) arg_ty of
             Left err -> Left err
-            Right res_ty -> Right (shapeType res_ty)
+            Right res_ty -> Right (uncompressedShapeType res_ty)
 
       Fun CLFun f -> primCallResultTy_maybe (Fun JustFun f) arg_ty
 
@@ -737,7 +737,7 @@ primFunCallResultTy_maybe fun args
       (P_index    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
         -> Just t
-      (P_shape    , t)                                     -> Just (shapeType t)
+      (P_shape    , t)                                     -> Just (uncompressedShapeType t)
       (P_size     , TypeTensor d _)                        -> Just (tensorIndexType d)
       (P_sum      , TypeTensor _ t)                        -> Just t
 
@@ -790,6 +790,6 @@ primFunCallResultTy_maybe fun args
 buildFromSparseResultTy_maybe :: Type -> Type -> Maybe Type
 buildFromSparseResultTy_maybe (TypeTensor d elemshapety) (TypeTuple [indexty, elemty])
   | indexty `eqType` tensorIndexType d
-  , elemshapety `eqType` shapeType elemty
+  , elemshapety `eqType` uncompressedShapeType elemty
   = Just (TypeTensor d elemty)
 buildFromSparseResultTy_maybe _ _ = Nothing
