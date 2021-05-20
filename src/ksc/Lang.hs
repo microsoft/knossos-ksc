@@ -291,16 +291,16 @@ tangentType t              = pprPanic "tangentType" (ppr t)
 --- Shapes
 -----------------------------------
 
-shapeType :: Type -> Type
-shapeType TypeBool = TypeTuple []
-shapeType TypeInteger = TypeTuple []
-shapeType TypeFloat = TypeTuple []
-shapeType TypeString = TypeTuple []
-shapeType (TypeTuple ts) = TypeTuple (map shapeType ts)
-shapeType (TypeTensor d vt) = TypeTensor d (shapeType vt)
-shapeType (TypeLam _ _) = TypeUnknown
-shapeType (TypeLM _ _) = TypeUnknown  -- TBD
-shapeType TypeUnknown = TypeUnknown
+uncompressedShapeType :: Type -> Type
+uncompressedShapeType TypeBool = TypeTuple []
+uncompressedShapeType TypeInteger = TypeTuple []
+uncompressedShapeType TypeFloat = TypeTuple []
+uncompressedShapeType TypeString = TypeTuple []
+uncompressedShapeType (TypeTuple ts) = TypeTuple (map uncompressedShapeType ts)
+uncompressedShapeType (TypeTensor d vt) = TypeTensor d (uncompressedShapeType vt)
+uncompressedShapeType (TypeLam _ _) = TypeUnknown
+uncompressedShapeType (TypeLM _ _) = TypeUnknown  -- TBD
+uncompressedShapeType TypeUnknown = TypeUnknown
 
 {- Note [Shapes]
 ~~~~~~~~~~~~~~~~
@@ -308,7 +308,7 @@ We define a primitive function
    shape :: T -> Sh(T)
 which takes a value and returns the "shape" of the value. Here Sh(T) is
 the shape-type of T (defined analogously to the tangent-type of T),
-and is implemented by shapeType :: Type -> Type
+and is implemented by uncompressedShapeType :: Type -> Type
 
 For example
   --------------------------

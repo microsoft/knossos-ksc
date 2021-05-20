@@ -22,12 +22,12 @@ shapeDef (Def { def_fun = Fun ds f
   = Just $
     Def { def_fun    = Fun (ShapeFun ds) f
         , def_pat    = params
-        , def_res_ty = shapeType res_ty
+        , def_res_ty = uncompressedShapeType res_ty
         , def_rhs    = UserRhs (pShape def_rhs) }
 
 shapeDef _ = Nothing
 
--- Given a Type t, determines whether (shapeType t) is a unit type;
+-- Given a Type t, determines whether (uncompressedShapeType t) is a unit type;
 -- if so then the unit value is returned.
 shapeIsUnit_maybe :: Type -> Maybe TExpr
 shapeIsUnit_maybe TypeInteger = Just (Tuple [])
