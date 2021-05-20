@@ -354,6 +354,14 @@ optPrimFun _ P_size (Call constVec (Tuple [n,_]))
   | constVec `isThePrimFun` P_constVec
   = Just n
 
+-- RULE: size (Vec_init x1 ... xn) = n
+optPrimFun _ P_size (Call vec_init xs)
+  | vec_init `isThePrimFun` P_Vec_init
+  , let n = case typeof xs of
+          TypeTuple ts -> fromIntegral (length ts)
+          _ -> 1
+  = Just (kInt n)
+
 -- RULE: index ei (build ns f) = f ei
 optPrimFun _ P_index (Tuple [ ei, arr ])
   | Just (_, i, e) <- isBuild_maybe arr
