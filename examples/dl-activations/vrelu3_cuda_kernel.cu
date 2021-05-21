@@ -17,8 +17,8 @@ __global__ void vrelu3_cuda_forward_kernel(
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < input.size(1)){
     auto input_elem = input[n][i];
-    if (input_elem >= 0) {
-      if (input_elem > 1) {
+    if (input_elem >= (scalar_t)0.0) {
+      if (input_elem > (scalar_t)1.0) {
         output[n][i] = input_elem - (scalar_t)2/3;
       } else {
         output[n][i] = (scalar_t)1/3 * input_elem * input_elem * input_elem;
@@ -55,8 +55,8 @@ __global__ void vrelu3_cuda_backward_kernel(
   const int n = blockIdx.y;
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < x.size(1)){
-    if (x[n][i] >= 0) {
-      if (x[n][i] > 1) {
+    if (x[n][i] >= (scalar_t)0.0) {
+      if (x[n][i] > (scalar_t)1.0) {
         d_x[n][i] = grad[n][i];
       } else {
         d_x[n][i] = x[n][i] * x[n][i] * grad[n][i];
