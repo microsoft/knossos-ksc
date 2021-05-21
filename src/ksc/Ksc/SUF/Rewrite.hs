@@ -19,7 +19,8 @@ rewriteSUFFwdPass (P_dup 2) arg
   = Just $ Tuple [ Tuple [ arg, arg ], Tuple [] ]
 
 rewriteSUFFwdPass P_elim arg
-  = Just $ Tuple [ Tuple [], mkTangentZero arg ]
+  | Just s <- shape arg
+  = Just $ Tuple [ Tuple [], s ]
 
 rewriteSUFFwdPass P_index i_v
   -- FIXME: Avoid duplicating i_v
@@ -69,8 +70,9 @@ rewriteSUFRevPass (P_SelFun i n) _ (Tuple [ dt, bog ])
 rewriteSUFRevPass (P_dup 2) _ (Tuple [arg, _])
   = Just $ pAdd1 arg
 
-rewriteSUFRevPass P_elim _ (Tuple [_, arg])
-  = Just arg
+rewriteSUFRevPass P_elim orig_arg_ty (Tuple [_, shape])
+  | Just makeTangentZeroFromShape' <- makeTangentZeroFromShape orig_arg_ty
+  = Just (makeTangentZeroFromShape' shape)
 
 -- FIXME: avoid duplicating i_shape
 rewriteSUFRevPass P_index _ (Tuple [d_da, i_shape])
