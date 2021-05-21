@@ -697,9 +697,7 @@ sufBogTy_maybe P_SelFun{} arg_ty
   = Just (tangentType arg_ty)
 
 sufBogTy_maybe P_elim arg_ty
-  = Just shape
-  where -- FIXME: Use a better encoding of shape
-    shape = tangentType arg_ty
+  = shapeType arg_ty
 
 sufBogTy_maybe (P_dup _) _
   = Just (TypeTuple [])
@@ -756,9 +754,8 @@ sufRevFunCallResultTy_maybe :: PrimFun -> Type -> Type -> Type -> Maybe Type
 sufRevFunCallResultTy_maybe P_SelFun{} _ _ shape
   = Just shape
 
-sufRevFunCallResultTy_maybe P_elim _ (TypeTuple []) shape
-  -- FIXME: Use a better encoding of shape
-  = Just shape
+sufRevFunCallResultTy_maybe P_elim orig_arg_ty (TypeTuple []) _
+  = Just (tangentType orig_arg_ty)
 
 sufRevFunCallResultTy_maybe (P_dup n) _ (TypeTuple arg_tys) (TypeTuple [])
   | arg_ty_first:arg_tys_rest <- arg_tys
