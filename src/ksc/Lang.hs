@@ -464,6 +464,11 @@ userFunBaseType :: forall p. InPhase p
                           (Maybe Type) Type
 userFunBaseType = baseFunFun . baseUserFunType @p
 
+baseUserFunType :: forall p. InPhase p
+                => T.Lens (BaseUserFun p) (BaseUserFun Typed)
+                          (Maybe Type) Type
+baseUserFunType = baseUserFunT . baseUserFunArgTy @p
+
 funType :: T.Traversal (Fun p) (Fun q)
                        (BaseUserFunArgTy p) (BaseUserFunArgTy q)
 funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
@@ -872,8 +877,8 @@ class InPhase p where
   getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
   getLetBndr :: LetBndrX p -> (Var, Maybe Type)
 
-  baseUserFunType :: T.Lens (BaseUserFun p) (BaseUserFun Typed)
-                            (Maybe Type) Type
+  baseUserFunArgTy :: T.Lens (BaseUserFunArgTy p) (BaseUserFunArgTy Typed)
+                             (Maybe Type) Type
 
 instance InPhase Parsed where
   pprVar     = ppr
@@ -887,7 +892,7 @@ instance InPhase Parsed where
   getFun     fun = (fun, Nothing)
   getLetBndr var = (var, Nothing)
 
-  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g t)
+  baseUserFunArgTy = id
 
 instance InPhase Typed where
   pprVar  = ppr
@@ -901,7 +906,7 @@ instance InPhase Typed where
     where fun' = T.over funType Just fun
   getLetBndr (TVar ty var) = (var, Just ty)
 
-  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
+  baseUserFunArgTy g t = g (Just t)
 
 instance InPhase OccAnald where
   pprVar  = ppr
@@ -915,7 +920,7 @@ instance InPhase OccAnald where
     where fun' = T.over funType Just fun
   getLetBndr (_, TVar ty var)   = (var, Just ty)
 
-  baseUserFunType g (BaseUserFunId f t) = fmap (BaseUserFunId f) (g (Just t))
+  baseUserFunArgTy g t = g (Just t)
 
 pprTFun :: InPhase p => TFun p -> SDoc
 pprTFun (TFun ty f) = ppr f <+> text ":" <+> ppr ty
