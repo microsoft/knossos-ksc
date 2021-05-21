@@ -6,7 +6,7 @@
 #include <vector>
 
 template <typename scalar_t>
-__global__ void relu3_cuda_forward_kernel(
+__global__ void vrelu3_cuda_forward_kernel(
     const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> input,
     torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> output) {
   // element index
@@ -24,7 +24,7 @@ __global__ void relu3_cuda_forward_kernel(
   }
 }
 
-torch::Tensor relu3_cuda_forward(
+torch::Tensor vrelu3_cuda_forward(
     torch::Tensor input) {
   auto output = torch::zeros_like(input);
 
@@ -37,7 +37,7 @@ torch::Tensor relu3_cuda_forward(
   const dim3 blocks((input_size_1 + threads - 1) / threads, input_size_0);
 
   AT_DISPATCH_FLOATING_TYPES(input.type(), "relu3_forward_cuda", ([&] {
-    relu3_cuda_forward_kernel<scalar_t><<<blocks, threads>>>(
+    vrelu3_cuda_forward_kernel<scalar_t><<<blocks, threads>>>(
         input.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         output.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>());
   }));
@@ -46,7 +46,7 @@ torch::Tensor relu3_cuda_forward(
 }
 
 template <typename scalar_t>
-__global__ void relu3_cuda_backward_kernel(
+__global__ void vrelu3_cuda_backward_kernel(
     torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> d_x,
     const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> grad,
     const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> x) {
@@ -63,7 +63,7 @@ __global__ void relu3_cuda_backward_kernel(
   }
 }
 
-torch::Tensor relu3_cuda_backward(
+torch::Tensor vrelu3_cuda_backward(
     torch::Tensor grad,
     torch::Tensor x) {
   auto d_x = torch::zeros_like(x);
@@ -75,7 +75,7 @@ torch::Tensor relu3_cuda_backward(
   const dim3 blocks((x_size_1 + threads - 1) / threads, x_size_0);
 
   AT_DISPATCH_FLOATING_TYPES(x.type(), "relu3_backward_cuda", ([&] {
-    relu3_cuda_backward_kernel<scalar_t><<<blocks, threads>>>(
+    vrelu3_cuda_backward_kernel<scalar_t><<<blocks, threads>>>(
         d_x.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         grad.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         x.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>());

@@ -60,38 +60,38 @@ def vrelu3_cuda_init():
 
     from torch.utils.cpp_extension import load
 
-    relu3_cuda = torch.utils.cpp_extension.load(
+    vrelu3_cuda = torch.utils.cpp_extension.load(
         "vrelu3_module",
         sources=[
-            os.path.join(this_dir, "relu3_cuda.cpp"),
-            os.path.join(this_dir, "relu3_cuda_kernel.cu"),
+            os.path.join(this_dir, "vrelu3_cuda.cpp"),
+            os.path.join(this_dir, "vrelu3_cuda_kernel.cu"),
         ],
     )
 
-    class ReLu3Function(torch.autograd.Function):
+    class VReLu3Function(torch.autograd.Function):
         @staticmethod
         def forward(ctx, input):
-            output = relu3_cuda.forward(input)
+            output = vrelu3_cuda.forward(input)
             ctx.save_for_backward(input)
             return output
 
         @staticmethod
         def backward(ctx, grad):
-            return relu3_cuda.backward(grad.contiguous(), *ctx.saved_variables)
+            return vrelu3_cuda.backward(grad.contiguous(), *ctx.saved_variables)
 
-    class ReLu3(torch.nn.Module):
+    class VReLu3(torch.nn.Module):
         def __init__(self):
-            super(ReLu3, self).__init__()
+            super(VReLu3, self).__init__()
 
         def forward(self, input):
-            return ReLu3Function.apply(input)
+            return VReLu3Function.apply(input)
 
     cuda_device = torch.device("cuda")
     cpu_device = torch.device("cpu")
-    relu3_module = ReLu3().to(cuda_device)
+    vrelu3_module = VReLu3().to(cuda_device)
 
     def func(x: torch.Tensor):
-        ret = relu3_module(x.to(cuda_device))  # TODO: move x.to() into setup function
+        ret = vrelu3_module(x.to(cuda_device))  # TODO: move x.to() into setup function
         torch.cuda.synchronize()
         return ret.to(cpu_device)
 
