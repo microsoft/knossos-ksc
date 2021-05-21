@@ -327,11 +327,16 @@ pIsUserFun fun = case maybeUserFun fun of
   Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ render (ppr fun))
   Just userFun -> pure userFun
 
+pPrimFunIdentifier :: Parser PrimFun
+pPrimFunIdentifier = do { f <- pIdentifier
+                        ; case toPrimFun f of
+                            Just pf -> pure pf
+                            Nothing -> unexpected (f ++ " is not a PrimFun")
+                        }
+
 pPrimFun :: Parser (BaseFun p)
-pPrimFun = try $ do { f <- pIdentifier
-                    ; case toPrimFun f of
-                        Just pf -> pure (PrimFun pf)
-                        Nothing -> unexpected (f ++ " is not a PrimFun")
+pPrimFun = try $ do { pf <- pPrimFunIdentifier
+                    ; pure (PrimFun pf)
                     }
 
 pSelFun :: Parser (BaseFun p)
