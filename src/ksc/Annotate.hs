@@ -12,7 +12,7 @@ module Annotate (
 import Lang
 import LangUtils
 import KMonad
-import Ksc.Traversal ( traverseOf, over )
+import Ksc.Traversal ( traverseOf )
 import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
@@ -204,6 +204,23 @@ tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
   Right Nothing -> traverseOf (baseFunFun . baseUserFunType) f fun
+    where f = \case
+            Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
+            Just appliedTy -> pure appliedTy
+  Left err -> tcFail err
+
+tcPrimFunArgTy :: forall p. (Pretty (BasePrimFun p), InPhase p)
+               => DerivedFun (BasePrimFun p) -> Type
+               -> TcM (DerivedFun (BasePrimFun Typed))
+tcPrimFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
+  Right (Just baseTy) -> case addBaseTypeToPrimFun @p fun baseTy of
+    Right r -> pure r
+    Left appliedTy ->
+      tcFail (text "The base type did not match the applied type"
+              $$ text "The argument type was" <+> ppr arg_ty
+              $$ text "from which the base type was determined to be" <+> ppr baseTy
+              $$ text "but the applied type was" <+> ppr appliedTy)
+  Right Nothing -> traverseOf (baseFunFun . basePrimFunType) f fun
     where f = \case
             Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
             Just appliedTy -> pure appliedTy
@@ -486,7 +503,11 @@ lookupGblTc fun args
              { userFun' <- tcUserFunArgTy @Parsed userFun ty
              ; pure (userFunToFun userFun',
                      userCallResultTy_maybe userFun' (gblST st) ty) }
-           Left fun' -> pure (over baseFunFun PrimFun fun', primCallResultTy_maybe fun' ty)
+           Left primFun -> do
+             { primFun' <- tcPrimFunArgTy @Parsed primFun ty
+             ; pure (primFunToFun primFun',
+                     primCallResultTy_maybe primFun' ty)
+             }
 
        ; res_ty <- case callResultTy_maybe of
                      Left err -> tcFail $ hang err 2 (mk_extra funTyped st)
