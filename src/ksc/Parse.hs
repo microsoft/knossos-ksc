@@ -328,19 +328,32 @@ pIsUserFun fun = case maybeUserFun fun of
   Just userFun -> pure userFun
 
 pPrimFunIdentifier :: Parser PrimFun
-pPrimFunIdentifier = do { f <- pIdentifier
+pPrimFunIdentifier = pSelFunIdentifier
+                 <|> do { f <- pIdentifier
                         ; case toPrimFun f of
                             Just pf -> pure pf
                             Nothing -> unexpected (f ++ " is not a PrimFun")
                         }
 
-pPrimFun :: Parser (BaseFun p)
-pPrimFun = try $ do { pf <- pPrimFunIdentifier
-                    ; pure (PrimFun pf)
-                    }
+pBasePrimFunWithType :: (Type -> BaseUserFunArgTy p) -> Parser (BasePrimFun p)
+pBasePrimFunWithType add =
+     brackets (do { f  <- pPrimFunIdentifier
+                  ; ty <- pType
+                  ; pure (BasePrimFunId f (add ty))
+                  })
 
-pSelFun :: Parser (BaseFun p)
-pSelFun = do { rest <- try $ do { f <- pIdentifier
+pBasePrimFunWithoutType :: Parser (BasePrimFun Parsed)
+pBasePrimFunWithoutType =
+         do { f <- pPrimFunIdentifier
+            ; pure (BasePrimFunId f Nothing)
+            }
+
+pPrimFun :: Parser (BaseFun Parsed)
+pPrimFun = try $ PrimFun <$> pBasePrimFunWithoutType
+
+pSelFunIdentifier :: Parser PrimFun
+pSelFunIdentifier
+        = do { rest <- try $ do { f <- pIdentifier
                                 ; case break (== '$') f of
                                     ("get", '$':rest) -> pure rest
                                     _ -> unexpected "Did not start with get$"
@@ -348,7 +361,7 @@ pSelFun = do { rest <- try $ do { f <- pIdentifier
              ; let mselfun = do { (istring, '$':nstring) <- pure (break (== '$') rest)
                                 ; i <- readMaybe istring
                                 ; n <- readMaybe nstring
-                                ; pure (PrimFun (P_SelFun i n))
+                                ; pure (P_SelFun i n)
                                 }
              ; case mselfun of
                  Nothing     -> unexpected "Ill-formed get"
@@ -374,8 +387,7 @@ pBaseUserFun = BaseUserFun <$>
      <|> pBaseUserFunWithoutType)
 
 pBaseFun :: Parser (BaseFun Parsed)
-pBaseFun = pSelFun
-       <|> pPrimFun
+pBaseFun = pPrimFun
        <|> pBaseUserFun
 
 pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)

@@ -3,6 +3,9 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances, PatternSynonyms  #-}
 {-# LANGUAGE DataKinds  #-}
 
+{-# OPTIONS_GHC -Wwarn=incomplete-patterns #-}
+-- Pattern match exhaustiveness checker seems to be broken on synonyms
+
 module Cgen where
 
 import           GHC.Stack
@@ -400,7 +403,7 @@ cgenExprWithoutResettingAlloc env = \case
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
-  Call (TFun _ (Fun JustFun (PrimFun P_copydown))) e -> do
+  Call (TFun _ (Fun JustFun (PrimFunT P_copydown))) e -> do
     CG cdecl cexpr ctype _callocusage <- cgenExprR env e
     ret <- freshCVar
     bumpmark <- freshCVar
@@ -609,8 +612,8 @@ cgenBaseFun = \case
   (BaseUserFun (BaseUserFunId fun (TypeTuple [])))  -> mangleFun fun
   (BaseUserFun (BaseUserFunId fun (TypeTuple tys))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
   (BaseUserFun (BaseUserFunId fun ty))  -> mangleFun (fun ++ "@" ++ mangleType ty)
-  (PrimFun (P_SelFun i _))  -> "ks::get<" ++ show (i - 1) ++ ">"
-  (PrimFun fun) -> render (ppr fun)
+  (PrimFunT (P_SelFun i _))  -> "ks::get<" ++ show (i - 1) ++ ">"
+  (PrimFunT fun) -> render (ppr fun)
 
 cgenUserFun :: HasCallStack => Fun Typed -> String
 cgenUserFun f = case f of
@@ -628,12 +631,12 @@ cgenUserFun f = case f of
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
 cgenAnyFun tf cftype = case tf of
-  TFun _ (Fun JustFun (PrimFun P_lmApply)) -> "lmApply"
-  TFun retty (Fun JustFun (PrimFun P_build)) ->
+  TFun _ (Fun JustFun (PrimFunT P_lmApply)) -> "lmApply"
+  TFun retty (Fun JustFun (PrimFunT P_build)) ->
     case retty of
       TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _              -> error ("Unexpected return type for build: " ++ show retty)
-  TFun retty (Fun JustFun (PrimFun primname))
+  TFun retty (Fun JustFun (PrimFunT primname))
     | primname `elem` [P_sumbuild, P_buildFromSparse, P_buildFromSparseTupled]
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
@@ -667,8 +670,8 @@ are two cases:
 -}
 
 funUsesAllocator :: HasCallStack => TFun p -> Bool
-funUsesAllocator (TFun _ (Fun JustFun (PrimFun (P_SelFun _ _)))) = False
-funUsesAllocator (TFun _ (Fun JustFun (PrimFun fname))) =
+funUsesAllocator (TFun _ (Fun JustFun (PrimFunT (P_SelFun _ _)))) = False
+funUsesAllocator (TFun _ (Fun JustFun (PrimFunT fname))) =
   not $ fname `elem` [P_index, P_size, P_eq, P_ne, P_trace, P_print, P_ts_dot]
 funUsesAllocator _ = True
 
@@ -724,7 +727,7 @@ ctypeofFun env (TFun ty f) ctys
     ctypeofFun1 ty f ctys
 
 ctypeofFun1 :: HasCallStack => Type -> Fun Typed -> [CType] -> CType
-ctypeofFun1 ty (Fun JustFun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
+ctypeofFun1 ty (Fun JustFun (PrimFunT name)) ctys = ctypeofPrimFun ty name ctys
 ctypeofFun1 (TypeLM _ _) (Fun GradFun{} f) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 (TypeLM _ _) f ctys =
   error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
@@ -762,10 +765,10 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => BaseFun Typed -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun P_ts_add   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun P_trace    , [CType ty]          ) -> LMOne ty
-  (PrimFun P_copydown , [CType ty]          ) -> LMOne ty
-  (PrimFun P_size     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
+  (PrimFunT P_ts_add   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFunT P_trace    , [CType ty]          ) -> LMOne ty
+  (PrimFunT P_copydown , [CType ty]          ) -> LMOne ty
+  (PrimFunT P_size     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)

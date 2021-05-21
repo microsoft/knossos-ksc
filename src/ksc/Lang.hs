@@ -8,6 +8,9 @@
 -- The instances we derive need UndecidableInstances to be enabled
 {-# LANGUAGE UndecidableInstances #-}
 
+{-# OPTIONS_GHC -Wwarn=incomplete-patterns #-}
+-- Pattern match exhaustiveness checker seems to be broken on synonyms
+
 module Lang where
 
 import           Prelude                 hiding ( (<>) )
@@ -402,10 +405,15 @@ types.
 -}
 
 data BaseUserFun p = BaseUserFunId String (BaseUserFunArgTy p)
+data BasePrimFun p = BasePrimFunId PrimFun (BaseUserFunArgTy p)
 
 deriving instance Eq (BaseUserFunArgTy p) => Eq (BaseUserFun p)
 deriving instance Ord (BaseUserFunArgTy p) => Ord (BaseUserFun p)
 deriving instance Show (BaseUserFunArgTy p) => Show (BaseUserFun p)
+
+deriving instance Eq (BaseUserFunArgTy p) => Eq (BasePrimFun p)
+deriving instance Ord (BaseUserFunArgTy p) => Ord (BasePrimFun p)
+deriving instance Show (BaseUserFunArgTy p) => Show (BasePrimFun p)
 
 type family BaseUserFunArgTy p where
   BaseUserFunArgTy Parsed   = Maybe Type
@@ -414,7 +422,13 @@ type family BaseUserFunArgTy p where
 
 data BaseFun (p :: Phase)
              = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
-             | PrimFun PrimFun      -- PrimFuns do not have a Def
+             | PrimFun (BasePrimFun p)      -- PrimFuns do not have a Def
+
+-- The purposes of this pattern synonym is to avoid churn.  We can
+-- retain the functionality of the old "PrimFun" constructor by using
+-- "PrimFunT" instead.
+pattern PrimFunT :: forall (p :: Phase). PrimFun -> BaseFun p
+pattern PrimFunT p <- PrimFun (BasePrimFunId p _)
 
 deriving instance Eq   (BaseUserFunArgTy p) => Eq   (BaseFun p)
 deriving instance Ord  (BaseUserFunArgTy p) => Ord  (BaseFun p)
@@ -445,12 +459,13 @@ data DerivedFun funid = Fun Derivations funid
 type UserFun p = DerivedFun (BaseUserFun p)
 type Fun     p = DerivedFun (BaseFun p)
 
-baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
-                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
-baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
+baseFunT :: T.Lens (BaseFun p) (BaseFun q)
+                   (BaseUserFunArgTy p) (BaseUserFunArgTy q)
+baseFunT g (BaseUserFun (BaseUserFunId f t)) = BaseUserFun <$> BaseUserFunId f <$> g t
+baseFunT g (PrimFun (BasePrimFunId f t)) = PrimFun <$> BasePrimFunId f <$> g t
 
-baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun q)
-                                  (BaseUserFun p) (BaseUserFun q)
+baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun p)
+                                  (BaseUserFun p) (BaseUserFun p)
 baseUserFunBaseFun f = \case
   BaseUserFun u -> BaseUserFun <$> f u
   PrimFun p    -> pure (PrimFun p)
@@ -464,14 +479,32 @@ userFunBaseType :: forall p. InPhase p
                           (Maybe Type) Type
 userFunBaseType = baseFunFun . baseUserFunType @p
 
+primFunBaseType :: forall p. InPhase p
+            => T.Lens (DerivedFun (BasePrimFun p)) (DerivedFun (BasePrimFun Typed))
+                      (Maybe Type) Type
+primFunBaseType = baseFunFun . basePrimFunType
+
+baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
+                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
+baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
+
+basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
+                       (BaseUserFunArgTy p) (BaseUserFunArgTy q)
+basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
+
 baseUserFunType :: forall p. InPhase p
                 => T.Lens (BaseUserFun p) (BaseUserFun Typed)
                           (Maybe Type) Type
 baseUserFunType = baseUserFunT . baseUserFunArgTy @p
 
+basePrimFunType :: forall p. InPhase p
+                => T.Lens (BasePrimFun p) (BasePrimFun Typed)
+                          (Maybe Type) Type
+basePrimFunType = basePrimFunT . baseUserFunArgTy @p
+
 funType :: T.Traversal (Fun p) (Fun q)
                        (BaseUserFunArgTy p) (BaseUserFunArgTy q)
-funType = baseFunFun . baseUserFunBaseFun . baseUserFunT
+funType = baseFunFun . baseFunT
 
 -- In the Parsed phase, if the user didn't supply a type, add it;
 -- otherwise (and in other phases, where the type is there) check that
@@ -488,15 +521,32 @@ addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) 
           | otherwise
           = Right expectedBaseTy
 
+-- FIXME: duplication
+addBaseTypeToPrimFun :: forall p. InPhase p
+                     => DerivedFun (BasePrimFun p)
+                     -> Type
+                     -> Either Type (DerivedFun (BasePrimFun Typed))
+addBaseTypeToPrimFun userfun expectedBaseTy = T.traverseOf (primFunBaseType @p) checkBaseType userfun
+  where checkBaseType :: Maybe Type -> Either Type Type
+        checkBaseType maybeAppliedType
+          | Just appliedTy <- maybeAppliedType
+          , not (eqType appliedTy expectedBaseTy)
+          = Left appliedTy
+          | otherwise
+          = Right expectedBaseTy
+
 
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = T.over baseFunFun BaseUserFun
+
+primFunToFun :: DerivedFun (BasePrimFun p) -> Fun p
+primFunToFun = T.over baseFunFun PrimFun
 
 -- A 'Fun p' is Either:
 --
 -- Right: a 'UserFun p', or
 -- Left:  a 'PrimFun'
-perhapsUserFun :: Fun p -> Either (DerivedFun PrimFun) (UserFun p)
+perhapsUserFun :: Fun p -> Either (DerivedFun (BasePrimFun p)) (UserFun p)
 perhapsUserFun (Fun ds baseFun) =
   either (Left . Fun ds) (Right . Fun ds) (baseFunToBaseUserFunE baseFun)
 
@@ -505,7 +555,7 @@ maybeUserFun f = case perhapsUserFun f of
   Right f -> Just f
   Left _ -> Nothing
 
-baseFunToBaseUserFunE :: BaseFun p -> Either PrimFun (BaseUserFun p)
+baseFunToBaseUserFunE :: BaseFun p -> Either (BasePrimFun p) (BaseUserFun p)
 baseFunToBaseUserFunE = \case
   BaseUserFun u    -> Right u
   PrimFun p    -> Left p
@@ -513,7 +563,7 @@ baseFunToBaseUserFunE = \case
 isSelFun :: BaseFun p -> Bool
 isSelFun = \case
   BaseUserFun{} -> False
-  PrimFun (P_SelFun{}) -> True
+  PrimFunT (P_SelFun{}) -> True
   PrimFun{} -> False
 
 baseFunOfFun :: Fun p -> BaseFun p
@@ -650,7 +700,7 @@ dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun el_ty
-                        (Fun JustFun (PrimFun (P_SelFun i n)))) e
+                        (Fun JustFun (PrimFun (BasePrimFunId (P_SelFun i n) (typeof e))))) e
            where
              el_ty = case typeof e of
                         TypeTuple ts -> ts !! (i-1)
@@ -977,7 +1027,10 @@ instance Pretty PrimFun where
 
 pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
 pprBaseFun (BaseUserFun s) = pprBaseUserFun @p s
-pprBaseFun (PrimFun p ) = pprPrimFun p
+pprBaseFun (PrimFun p ) = pprBasePrimFun p
+
+pprBasePrimFun :: BasePrimFun p -> SDoc
+pprBasePrimFun (BasePrimFunId name _) = pprPrimFun name
 
 pprPrimFun :: PrimFun -> SDoc
 pprPrimFun = \case
@@ -1214,6 +1267,9 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
 
 instance InPhase p => Pretty (BaseUserFun p) where
   ppr = pprBaseUserFun
+
+instance InPhase p => Pretty (BasePrimFun p) where
+  ppr = pprBasePrimFun
 
 pprPat :: Bool -> Pat -> SDoc
           -- True <=> wrap tuple pattern in parens

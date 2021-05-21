@@ -17,8 +17,9 @@ import Control.Monad (zipWithM)
 --------------------------------------------
 
 primCall :: PrimFun -> Type -> TExpr -> TExpr
-primCall fun res_ty
-  = Call (TFun res_ty (Fun JustFun (PrimFun fun)))
+primCall fun res_ty arg
+  = Call (TFun res_ty (Fun JustFun (PrimFun (BasePrimFunId fun arg_ty)))) arg
+  where arg_ty = typeof arg
 
 userCall :: String -> Type -> TExpr -> TExpr
 userCall fun res_ty arg
@@ -245,7 +246,7 @@ lmCompose_Dir Fwd m1 m2 = m1 `lmCompose` m2
 lmCompose_Dir Rev m1 m2 = m2 `lmCompose` m1
 
 isThePrimFun :: TFun p -> PrimFun -> Bool
-isThePrimFun (TFun _ (Fun JustFun (PrimFun f1))) f2 = f1 == f2
+isThePrimFun (TFun _ (Fun JustFun (PrimFunT f1))) f2 = f1 == f2
 isThePrimFun _ _ = False
 
 isLMOne :: TExpr -> Bool
@@ -374,11 +375,11 @@ pInline = mkPrimCall1 P_inline
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: HasCallStack => DerivedFun PrimFun -> Type
+primCallResultTy_maybe :: HasCallStack => DerivedFun (BasePrimFun Typed) -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
-      Fun JustFun f
+      Fun JustFun (BasePrimFunId f _)
          | Just ty <- primFunCallResultTy_maybe f arg_ty
          -> Right ty
          | otherwise
@@ -413,17 +414,17 @@ primCallResultTy_maybe fun arg_ty
 
       Fun CLFun f -> primCallResultTy_maybe (Fun JustFun f) arg_ty
 
-      Fun SUFFwdPass f
-        | Just bog_ty <- sufBogTy_maybe f arg_ty
+      Fun SUFFwdPass f@(BasePrimFunId p _)
+        | Just bog_ty <- sufBogTy_maybe p arg_ty
         , Right orig_res_ty <- primCallResultTy_maybe (Fun JustFun f) arg_ty
         -> Right (TypeTuple [orig_res_ty, bog_ty])
         | otherwise
         -> Left (text "Type error in SUF fwd fun:" <+> ppr fun
                  $$ text "Arg ty was" <+> ppr arg_ty)
 
-      Fun SUFRevPass f
+      Fun SUFRevPass (BasePrimFunId p _)
         | TypeTuple [dorig_res_ty, bog_ty] <- arg_ty
-        , Just t <- sufRevFunCallResultTy_maybe f dorig_res_ty bog_ty
+        , Just t <- sufRevFunCallResultTy_maybe p dorig_res_ty bog_ty
         -> Right t
         | otherwise
         -> Left (text "Type error in SUF rev fun:" <+> ppr fun
