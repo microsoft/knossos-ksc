@@ -1346,7 +1346,7 @@ namespace ks {
 	{
 		using T = decltype(f(alloc, S{}));
 		auto ret = tensor<Dim, T>::create(alloc, t.size());
-		T const* tdata = t.data();
+		S const* tdata = t.data();
 		T* retdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
 			retdata[i] = f(alloc, tdata[i]);
