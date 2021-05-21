@@ -5,10 +5,13 @@
 
 #include <vector>
 
+template<typename scalar_t> using tensor_accessor_2 =
+    torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits>;
+
 template <typename scalar_t>
 __global__ void vrelu3_cuda_forward_kernel(
-    const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> input,
-    torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> output) {
+    const tensor_accessor_2<scalar_t> input,
+    tensor_accessor_2<scalar_t> output) {
   // element index
   const int n = blockIdx.y;
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -24,8 +27,7 @@ __global__ void vrelu3_cuda_forward_kernel(
   }
 }
 
-torch::Tensor vrelu3_cuda_forward(
-    torch::Tensor input) {
+torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
   auto output = torch::zeros_like(input);
 
   // TODO: check rank of input (assumed to be rank 2 here)
@@ -47,9 +49,9 @@ torch::Tensor vrelu3_cuda_forward(
 
 template <typename scalar_t>
 __global__ void vrelu3_cuda_backward_kernel(
-    torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> d_x,
-    const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> grad,
-    const torch::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> x) {
+    tensor_accessor_2<scalar_t> d_x,
+    const tensor_accessor_2<scalar_t> grad,
+    const tensor_accessor_2<scalar_t> x) {
   const int n = blockIdx.y;
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < x.size(1)){
