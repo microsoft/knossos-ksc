@@ -4,12 +4,8 @@
 
 // CUDA forward declarations
 
-torch::Tensor vrelu3_cuda_forward(
-    torch::Tensor input);
-
-torch::Tensor vrelu3_cuda_backward(
-    torch::Tensor grad,
-    torch::Tensor x);
+torch::Tensor vrelu3_cuda_forward(torch::Tensor input);
+torch::Tensor vrelu3_cuda_backward(torch::Tensor grad, torch::Tensor x);
 
 // C++ interface
 
@@ -17,15 +13,12 @@ torch::Tensor vrelu3_cuda_backward(
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
-torch::Tensor vrelu3_forward(
-    torch::Tensor input) {
+torch::Tensor vrelu3_forward(torch::Tensor input) {
   CHECK_INPUT(input);
   return vrelu3_cuda_forward(input);
 }
 
-torch::Tensor vrelu3_backward(
-    torch::Tensor grad,
-    torch::Tensor x) {
+torch::Tensor vrelu3_backward(torch::Tensor grad, torch::Tensor x) {
   CHECK_INPUT(grad);
   CHECK_INPUT(x);
   return vrelu3_cuda_backward(
