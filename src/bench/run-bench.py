@@ -91,7 +91,7 @@ def timeit(msg, fn, arg):
     )
 
 
-def bench(module_name, bench_name):
+def bench(module_file, bench_name):
     """
     Import MODULE_NAME, which defines these functions:
         bench_name           Knossos-compilable code, should be pretty
@@ -101,7 +101,11 @@ def bench(module_name, bench_name):
     """
     import inspect
     import importlib
+    import os.path
+    import sys
 
+    module_dir, module_name = os.path.split(module_file)
+    sys.path.append(module_dir)
     mod = importlib.import_module(module_name)
     for fn in inspect.getmembers(mod, inspect.isfunction):
         fn_name, fn_obj = fn
