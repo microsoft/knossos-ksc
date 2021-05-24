@@ -477,17 +477,12 @@ baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
 funBaseType :: forall p. InPhase p
             => T.Lens (Fun p) (Fun Typed)
                       (Maybe Type) Type
-funBaseType = baseFunFun . baseFunType @p
+funBaseType = baseFunFun . baseFunT . baseUserFunArgTy @p
 
 userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
                           (Maybe Type) Type
-userFunBaseType = baseFunFun . baseUserFunType @p
-
-primFunBaseType :: forall p. InPhase p
-            => T.Lens (DerivedFun (BasePrimFun p)) (DerivedFun (BasePrimFun Typed))
-                      (Maybe Type) Type
-primFunBaseType = baseFunFun . basePrimFunType
+userFunBaseType = baseFunFun . baseUserFunT . baseUserFunArgTy @p
 
 baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
                        (BaseArgTy p) (BaseArgTy q)
@@ -496,21 +491,6 @@ baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
 basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
                        (BaseArgTy p) (BaseArgTy q)
 basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
-
-baseFunType :: forall p. InPhase p
-            => T.Lens (BaseFun p) (BaseFun Typed)
-                      (Maybe Type) Type
-baseFunType = baseFunT . baseUserFunArgTy @p
-
-baseUserFunType :: forall p. InPhase p
-                => T.Lens (BaseUserFun p) (BaseUserFun Typed)
-                          (Maybe Type) Type
-baseUserFunType = baseUserFunT . baseUserFunArgTy @p
-
-basePrimFunType :: forall p. InPhase p
-                => T.Lens (BasePrimFun p) (BasePrimFun Typed)
-                          (Maybe Type) Type
-basePrimFunType = basePrimFunT . baseUserFunArgTy @p
 
 funType :: T.Traversal (Fun p) (Fun q)
                        (BaseArgTy p) (BaseArgTy q)
