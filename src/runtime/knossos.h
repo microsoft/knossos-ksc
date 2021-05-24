@@ -1400,10 +1400,6 @@ namespace ks {
 		B const* bogdata = bog.data();
 		dS* ddsdata = dds.data();
 
-		volatile double tot = 0;
-		for (int i = 0, ne = ddt.num_elements(); i != ne; ++i)
-			tot += ddtdata[i];
-
 		for (int i = 0, ne = ddt.num_elements(); i != ne; ++i) {
 			tuple<dS, dE> f_call = f_(alloc, ddtdata[i], bogdata[i]);
 			auto [f_call_dds, f_call_ddenv] = f_call;
