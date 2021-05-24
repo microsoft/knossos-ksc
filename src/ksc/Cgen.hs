@@ -3,9 +3,6 @@
 {-# LANGUAGE LambdaCase, FlexibleInstances, PatternSynonyms  #-}
 {-# LANGUAGE DataKinds  #-}
 
-{-# OPTIONS_GHC -Wwarn=incomplete-patterns #-}
--- Pattern match exhaustiveness checker seems to be broken on synonyms
-
 module Cgen where
 
 import           GHC.Stack
@@ -607,11 +604,6 @@ mangleType = \case
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
 
-cgenBaseFun :: BaseFun Typed -> String
-cgenBaseFun = \case
-  BaseFunId (BaseUserFunName fun) ty -> cgenBaseUserFun (BaseFunId fun ty)
-  BaseFunId (BasePrimFunName fun) ty -> cgenBasePrimFun (BaseFunId fun ty)
-
 cgenBaseUserFun :: BaseUserFun Typed -> String
 cgenBaseUserFun = \case
   (BaseFunId fun (TypeTuple []))  -> mangleFun fun
@@ -623,11 +615,11 @@ cgenBasePrimFun = \case
   (BaseFunId (P_SelFun i _) _)  -> "ks::get<" ++ show (i - 1) ++ ">"
   (BaseFunId fun _) -> render (ppr fun)
 
-cgenFun :: HasCallStack => Fun Typed -> String
-cgenFun = cgenUserFunG cgenBaseFun
-
 cgenUserFun :: HasCallStack => UserFun Typed -> String
 cgenUserFun = cgenUserFunG cgenBaseUserFun
+
+cgenPrimFun :: HasCallStack => DerivedFun PrimFun Typed -> String
+cgenPrimFun = cgenUserFunG cgenBasePrimFun
 
 cgenUserFunG :: HasCallStack
              => (BaseFunId name Typed -> String) -> DerivedFun name Typed -> String
@@ -656,7 +648,8 @@ cgenAnyFun tf cftype = case tf of
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun JustFun (PrimFunT _)) -> cgenType cftype ++ "::mk"
-  TFun _            f@(Fun _ (PrimFunT _)) -> cgenFun f
+  TFun _            (Fun d (BaseFunId (BasePrimFunName p) ty)) -> cgenPrimFun f
+    where f = Fun d (BaseFunId p ty)
   TFun _            (Fun d (BaseFunId (BaseUserFunName s) ty)) -> cgenUserFun f
     where f = Fun d (BaseFunId s ty)
 
