@@ -450,8 +450,11 @@ data Derivations
   | SUFRev
   deriving (Eq, Ord, Show)
 
-data DerivedFun funid = Fun Derivations funid
-                deriving (Eq, Ord, Show)
+data DerivedFun funname p = Fun Derivations (BaseFunId funname p)
+
+deriving instance Eq (BaseFunId funname p)   => Eq   (DerivedFun funname p)
+deriving instance Ord (BaseFunId funname p)  => Ord  (DerivedFun funname p)
+deriving instance Show (BaseFunId funname p) => Show (DerivedFun funname p)
 
 -- DerivedFun has just two instantiations
 --
@@ -460,26 +463,26 @@ data DerivedFun funid = Fun Derivations funid
 --
 -- UserFun p: These you can def/edef and hence are the domain of the
 -- GblSymTab and CST and appear in the def_fun field of DefX.
-type UserFun p = DerivedFun (BaseUserFun p)
-type Fun     p = DerivedFun (BaseFun p)
+type UserFun p = DerivedFun String p
+type Fun     p = DerivedFun BaseName p
 
 baseFunT :: T.Lens (BaseFunId a p) (BaseFunId a q)
                    (BaseArgTy p) (BaseArgTy q)
 baseFunT g (BaseFunId n ty) = BaseFunId n <$> g ty
 
-baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
-                     funid funid'
+baseFunFun :: T.Lens (DerivedFun funname p) (DerivedFun funname' p')
+                     (BaseFunId funname p) (BaseFunId funname' p')
 baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
 
 baseFunName :: T.Lens (BaseFunId n p) (BaseFunId n' p) n n'
 baseFunName f (BaseFunId n ty) = flip BaseFunId ty <$> f n
 
 funBaseType :: forall a p. InPhase p
-            => T.Lens (DerivedFun (BaseFunId a p)) (DerivedFun (BaseFunId a Typed))
+            => T.Lens (DerivedFun a p) (DerivedFun a Typed)
                       (Maybe Type) Type
 funBaseType = funType . baseUserFunArgTy @p
 
-funType :: T.Lens (DerivedFun (BaseFunId a p)) (DerivedFun (BaseFunId a q)) (BaseArgTy p) (BaseArgTy q)
+funType :: T.Lens (DerivedFun a p) (DerivedFun a q) (BaseArgTy p) (BaseArgTy q)
 funType = baseFunFun . baseFunT
 
 -- In the Parsed phase, if the user didn't supply a type, add it;
@@ -487,9 +490,9 @@ funType = baseFunFun . baseFunT
 -- the type matches.  If mis-match return (Left
 -- type-that-was-in-DerivedFun)
 addBaseTypeToFun :: InPhase p
-                 => DerivedFun (BaseFunId a p)
+                 => DerivedFun name p
                  -> Type
-                 -> Either Type (DerivedFun (BaseFunId a Typed))
+                 -> Either Type (DerivedFun name Typed)
 addBaseTypeToFun userfun expectedBaseTy = T.traverseOf funBaseType checkBaseType userfun
   where checkBaseType :: Maybe Type -> Either Type Type
         checkBaseType maybeAppliedType
@@ -507,7 +510,7 @@ userFunToFun = T.over (baseFunFun . baseFunName) BaseUserFunName
 --
 -- Right: a 'UserFun p', or
 -- Left:  a 'PrimFun'
-perhapsUserFun :: Fun p -> Either (DerivedFun (BasePrimFun p)) (UserFun p)
+perhapsUserFun :: Fun p -> Either (DerivedFun PrimFun p) (UserFun p)
 perhapsUserFun (Fun ds baseFun) =
   either (Left . Fun ds) (Right . Fun ds) (baseFunToBaseUserFunE baseFun)
 
@@ -977,11 +980,16 @@ instance Pretty Var where
 instance InPhase p => Pretty (BaseFun p) where
   ppr = pprBaseFun
 
-instance Pretty funid => Pretty (DerivedFun funid) where
+instance Pretty (BaseFunId funid p) => Pretty (DerivedFun funid p) where
   ppr = pprDerivedFun ppr
 
 instance Pretty PrimFun where
   ppr = pprPrimFun
+
+instance Pretty BaseName where
+  ppr = \case
+    BaseUserFunName s -> text s
+    BasePrimFunName p -> ppr p
 
 pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
 pprBaseFun (BaseFunId (BaseUserFunName s) ty) = pprBaseUserFun @p (BaseFunId s ty)
@@ -1053,7 +1061,7 @@ pprPrimFun = \case
 pprUserFun :: forall p. InPhase p => UserFun p -> SDoc
 pprUserFun = pprDerivedFun (pprBaseUserFun @p)
 
-pprDerivedFun :: (funid -> SDoc) -> DerivedFun funid -> SDoc
+pprDerivedFun :: (BaseFunId funid p -> SDoc) -> DerivedFun funid p -> SDoc
 pprDerivedFun f (Fun JustFun s)               = f s
 pprDerivedFun f (Fun (GradFun  adp) s)          = brackets (char 'D'   <> ppr adp <+> f s)
 pprDerivedFun f (Fun (DrvFun   (AD adp Fwd)) s) = brackets (text "fwd" <> ppr adp <+> f s)

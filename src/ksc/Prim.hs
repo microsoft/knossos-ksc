@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Prim where
 
@@ -375,7 +376,7 @@ pInline = mkPrimCall1 P_inline
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: HasCallStack => DerivedFun (BasePrimFun Typed) -> Type
+primCallResultTy_maybe :: (HasCallStack, InPhase p) => DerivedFun PrimFun p -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
@@ -443,7 +444,7 @@ primFunCallResultTy fun args
 
 -- Just the base function argument type given that the derived function has
 -- argument type derivedFunArgTy, or Nothing if we can't work it out
-baseFunArgTy_maybe :: Pretty p => DerivedFun p -> Type -> Either SDoc (Maybe Type)
+baseFunArgTy_maybe :: Pretty (BaseFunId n p) => DerivedFun n p -> Type -> Either SDoc (Maybe Type)
 baseFunArgTy_maybe derivedFun derivedFunArgTy
   = case derivedFun of
       Fun JustFun _ -> it's derivedFunArgTy

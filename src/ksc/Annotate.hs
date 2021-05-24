@@ -192,9 +192,8 @@ tcGDef g@(GDef d f)
              Left err -> tcFail err
        }
 
-tcFunArgTyL :: forall a p. (InPhase p, Pretty (BaseFunId a p))
-            => DerivedFun (BaseFunId a p) -> Type
-            -> TcM (DerivedFun (BaseFunId a 'Typed))
+tcFunArgTyL :: forall p name. (InPhase p, Pretty (BaseFunId name p))
+            => DerivedFun name p -> Type -> TcM (DerivedFun name Typed)
 tcFunArgTyL fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
   Right (Just baseTy) -> case addBaseTypeToFun fun baseTy of
     Right r -> pure r
