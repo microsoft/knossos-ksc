@@ -494,13 +494,9 @@ lookupGblTc :: Fun Parsed -> TypedExpr -> TcM (Fun Typed, Type)
 lookupGblTc fun args
   = do { st <- getSymTabTc
        ; funTyped <- tcFunArgTy @Parsed fun ty
-       ; callResultTy_maybe <- case perhapsUserFun funTyped of
-           Right userFun' -> do
-             { pure (userCallResultTy_maybe userFun' (gblST st) ty) }
-           Left primFun' -> do
-             { pure (primCallResultTy_maybe primFun' ty)
-             }
-
+       ; let callResultTy_maybe = case perhapsUserFun funTyped of
+               Right userFun' -> userCallResultTy_maybe userFun' (gblST st) ty
+               Left primFun' -> primCallResultTy_maybe primFun' ty
        ; res_ty <- case callResultTy_maybe of
                      Left err -> tcFail $ hang err 2 (mk_extra funTyped st)
                      Right res_ty -> return res_ty
