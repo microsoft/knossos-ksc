@@ -105,10 +105,6 @@ def parse_type(se, allow_Any=False):
         raise ParseError("Did not know how to parse type {}".format(se))
 
 
-def parse_types(ses):
-    return list(map(parse_type, ses))
-
-
 # "1.3" -> int
 def parse_int(se):
     if isinstance(se, int):
