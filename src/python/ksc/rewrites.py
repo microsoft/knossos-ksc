@@ -146,9 +146,11 @@ class RuleMatcher(AbstractMatcher):
     @abstractproperty
     def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
         """ A set of terms that might be returned by get_filter_term() of any Expr for which this RuleMatcher
-            could possibly generate a match. (See [Note: filter_term] in filter_term.py).
-            As a special case, a RuleMatcher can include the Call class, (a FilterTerm), to say that it might
-            match any Expr which is a Call, even tho get_filter_term() never returns Call. """
+            could possibly generate a match. (See [Note: filter_term] in filter_term.py). """
+
+    may_match_any_call: bool = False
+    """ If a RuleMatcher (instance or subclass) returns true, indicates that it might
+        match any Expr which is a Call, even tho get_filter_term() never returns Call. """
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
@@ -165,7 +167,7 @@ class RuleMatcher(AbstractMatcher):
         self, expr: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
         if get_filter_term(expr) in self.possible_filter_terms or (
-            isinstance(expr, Call) and Call in self.possible_filter_terms
+            isinstance(expr, Call) and self.may_match_any_call
         ):
             yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
 
@@ -185,11 +187,10 @@ class RuleSet(AbstractMatcher):
         self._filtered_rules = {}
         self._call_rules = []
         for rule in rules:
+            if rule.may_match_any_call:
+                self._call_rules.append(rule)
             for term in rule.possible_filter_terms:
-                if term == Call:
-                    self._call_rules.append(rule)
-                else:
-                    self._filtered_rules.setdefault(term, []).append(rule)
+                self._filtered_rules.setdefault(term, []).append(rule)
 
     def matches_here(
         self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment,
@@ -235,7 +236,8 @@ class inline_var(RuleMatcher):
 
 @singleton
 class inline_call(RuleMatcher):
-    possible_filter_terms = frozenset([Call])
+    possible_filter_terms = frozenset()
+    may_match_any_call = True
 
     def matches_for_possible_expr(
         self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment
