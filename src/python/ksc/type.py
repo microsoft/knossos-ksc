@@ -111,11 +111,6 @@ class Type:
             c.can_accept_value_of_type(o) for c, o in zip(self.children, other.children)
         )
 
-    def contains_any(self):
-        return self == Type.Any or any(
-            isinstance(c, Type) and c.contains_any() for c in self.children
-        )
-
     #################
     ## Tensor methods
     def is_tensor_of(self, ty):
