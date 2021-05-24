@@ -482,7 +482,7 @@ funBaseType = funType . baseUserFunArgTy @p
 userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
                           (Maybe Type) Type
-userFunBaseType = baseFunFun . baseFunT . baseUserFunArgTy @p
+userFunBaseType = funType . baseUserFunArgTy @p
 
 funType :: T.Lens (DerivedFun (BaseFunId a p)) (DerivedFun (BaseFunId a q)) (BaseArgTy p) (BaseArgTy q)
 funType = baseFunFun . baseFunT
