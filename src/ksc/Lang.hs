@@ -484,7 +484,7 @@ userFunBaseType :: forall p. InPhase p
                           (Maybe Type) Type
 userFunBaseType = baseFunFun . baseFunT . baseUserFunArgTy @p
 
-funType :: T.Lens (Fun p) (Fun q) (BaseArgTy p) (BaseArgTy q)
+funType :: T.Lens (DerivedFun (BaseFunId a p)) (DerivedFun (BaseFunId a q)) (BaseArgTy p) (BaseArgTy q)
 funType = baseFunFun . baseFunT
 
 -- In the Parsed phase, if the user didn't supply a type, add it;
