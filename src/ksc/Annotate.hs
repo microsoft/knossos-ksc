@@ -214,7 +214,7 @@ tcFunArgTyL funBaseType funBaseType' fun arg_ty = case baseFunArgTy_maybe fun ar
 tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
                => UserFun p -> Type
                -> TcM (UserFun Typed)
-tcUserFunArgTy = tcFunArgTyL userFunBaseType userFunBaseType
+tcUserFunArgTy = tcFunArgTyL funBaseType funBaseType
 
 tcFunArgTy :: forall p. (Pretty (BaseFun p), InPhase p)
            => Fun p -> Type
