@@ -179,21 +179,24 @@ class RuleSet(AbstractMatcher):
         only a single traversal of the Expr (and associated environment-building). """
 
     def __init__(self, rules):
-        # TODO also allow global (any-class) rules?
         # As an optimization, at each node in the Expr tree, we'll look for matches only from
         # RuleMatchers whose possible_filter_terms match at that position in the tree.
         # (This checks equality of the outermost constructor of the template, but no deeper.)
         self._filtered_rules = {}
+        self._call_rules = []
         for rule in rules:
             for term in rule.possible_filter_terms:
-                self._filtered_rules.setdefault(term, []).append(rule)
+                if term == Call:
+                    self._call_rules.append(rule)
+                else:
+                    self._filtered_rules.setdefault(term, []).append(rule)
 
     def matches_here(
         self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
         possible_rules = self._filtered_rules.get(get_filter_term(subtree), [])
         if isinstance(subtree, Call):
-            possible_rules = chain(possible_rules, self._filtered_rules.get(Call, []))
+            possible_rules = chain(possible_rules, self._call_rules)
         for rule in possible_rules:
             yield from rule.matches_for_possible_expr(
                 subtree, path_from_root, root, env
