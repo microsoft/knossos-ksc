@@ -506,27 +506,26 @@ funType :: T.Traversal (Fun p) (Fun q)
                        (BaseArgTy p) (BaseArgTy q)
 funType = baseFunFun . baseFunT
 
--- In the Parsed phase, if the user didn't supply a type, add it;
--- otherwise (and in other phases, where the type is there) check that
--- the type matches.  If mis-match return (Left
--- type-that-was-in-UserFun)
 addBaseTypeToUserFun :: forall p. InPhase p
                      => UserFun p -> Type -> Either Type (UserFun Typed)
-addBaseTypeToUserFun userfun expectedBaseTy = T.traverseOf (userFunBaseType @p) checkBaseType userfun
-  where checkBaseType :: Maybe Type -> Either Type Type
-        checkBaseType maybeAppliedType
-          | Just appliedTy <- maybeAppliedType
-          , not (eqType appliedTy expectedBaseTy)
-          = Left appliedTy
-          | otherwise
-          = Right expectedBaseTy
+addBaseTypeToUserFun = addBaseTypeToFun userFunBaseType
 
--- FIXME: duplication
 addBaseTypeToPrimFun :: forall p. InPhase p
                      => DerivedFun (BasePrimFun p)
                      -> Type
                      -> Either Type (DerivedFun (BasePrimFun Typed))
-addBaseTypeToPrimFun userfun expectedBaseTy = T.traverseOf (primFunBaseType @p) checkBaseType userfun
+addBaseTypeToPrimFun = addBaseTypeToFun primFunBaseType
+
+-- In the Parsed phase, if the user didn't supply a type, add it;
+-- otherwise (and in other phases, where the type is there) check that
+-- the type matches.  If mis-match return (Left
+-- type-that-was-in-DerivedFun)
+addBaseTypeToFun :: ((Maybe Type -> Either Type Type)
+                      -> DerivedFun a -> Either Type (DerivedFun b))
+                 -> DerivedFun a
+                 -> Type
+                 -> Either Type (DerivedFun b)
+addBaseTypeToFun baseType userfun expectedBaseTy = T.traverseOf baseType checkBaseType userfun
   where checkBaseType :: Maybe Type -> Either Type Type
         checkBaseType maybeAppliedType
           | Just appliedTy <- maybeAppliedType
