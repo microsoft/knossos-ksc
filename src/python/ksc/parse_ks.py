@@ -53,7 +53,7 @@ _colon = sexpdata.Symbol(":")
 _None = sexpdata.Symbol("None")
 
 
-def parse_type_maybe(se, allow_any=False):
+def parse_type_maybe(se, allow_Any=False):
     """ Converts an S-Expression representing a type, like (Tensor 1 Float) or (Tuple Float (Tensor 1 Float)),
         into a Type object, e.g. Type.Tensor(1,Type.Float) or Type.Tuple(Type.Float, Type.Tensor(1,Type.Float)).
     """
@@ -64,7 +64,7 @@ def parse_type_maybe(se, allow_any=False):
         if se == _None:
             return True, None
         sym = se.value()
-        if Type.is_type_introducer(sym) and (allow_any or sym != "Any"):
+        if Type.is_type_introducer(sym) and (allow_Any or sym != "Any"):
             return True, Type(sym)
 
         return False, None
@@ -73,32 +73,32 @@ def parse_type_maybe(se, allow_any=False):
         if isinstance(se[0], sexpdata.Symbol):
             sym = se[0].value()
             if sym == "Tuple":
-                return True, Type.Tuple(*(parse_type(s, allow_any) for s in se[1:]))
+                return True, Type.Tuple(*(parse_type(s, allow_Any) for s in se[1:]))
             if sym == "Vec" and len(se) == 2:
-                return True, Type.Tensor(1, parse_type(se[1], allow_any))
+                return True, Type.Tensor(1, parse_type(se[1], allow_Any))
             if sym == "Tensor" and len(se) == 3:
                 return (
                     True,
-                    Type.Tensor(parse_int(se[1]), parse_type(se[2], allow_any)),
+                    Type.Tensor(parse_int(se[1]), parse_type(se[2], allow_Any)),
                 )
             if sym == "Lam" and len(se) == 3:
                 return (
                     True,
                     Type.Lam(
-                        parse_type(se[1], allow_any), parse_type(se[2], allow_any)
+                        parse_type(se[1], allow_Any), parse_type(se[2], allow_Any)
                     ),
                 )
             if sym == "LM" and len(se) == 3:
                 return (
                     True,
-                    Type.LM(parse_type(se[1], allow_any), parse_type(se[2], allow_any)),
+                    Type.LM(parse_type(se[1], allow_Any), parse_type(se[2], allow_Any)),
                 )
 
     return False, None
 
 
-def parse_type(se, allow_any=False):
-    ok, ty = parse_type_maybe(se, allow_any)
+def parse_type(se, allow_Any=False):
+    ok, ty = parse_type_maybe(se, allow_Any)
     if ok:
         return ty
     else:
@@ -154,23 +154,23 @@ def parse_string(se):
 
 
 # "x : Float" -> Var(x, Type.Float)
-def parse_arg(arg, allow_type_any=False):
+def parse_arg(arg, allow_Type_Any=False):
     check(len(arg) >= 3, "Expect (arg : type), not: ", arg)
     check(arg[1] == _colon, "No colon: ", arg)
 
-    return Var(parse_name(arg[0]), parse_type(arg[2:], allow_any=allow_type_any), True)
+    return Var(parse_name(arg[0]), parse_type(arg[2:], allow_Any=allow_Type_Any), True)
 
 
 # "((x : Float) (y : Integer))" -> [Var("x", Type.Float), Var("y", Type.Integer)]
-def parse_args(se, allow_type_any=False):
+def parse_args(se, allow_Type_Any=False):
     return [
-        parse_arg(arg, allow_type_any=allow_type_any)
+        parse_arg(arg, allow_Type_Any=allow_Type_Any)
         for arg in ensure_list_of_lists(se)
     ]
 
 
 def parse_args_with_any(se):
-    return parse_args(se, allow_type_any=True)
+    return parse_args(se, allow_Type_Any=True)
 
 
 def parse_expr(se):
