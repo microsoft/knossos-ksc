@@ -355,7 +355,7 @@ mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 cgenDefE :: CST -> TDef -> [String]
 cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
-  let cf                         = cgenUserFun (userFunToFun f)
+  let cf                         = cgenUserFun f
       (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype _callocusage =
         runM $ cgenExpr env (withPackedParams body)
@@ -623,8 +623,11 @@ cgenBasePrimFun = \case
   (BaseFunId (P_SelFun i _) _)  -> "ks::get<" ++ show (i - 1) ++ ">"
   (BaseFunId fun _) -> render (ppr fun)
 
-cgenUserFun  :: HasCallStack => Fun Typed -> String
-cgenUserFun = cgenUserFunG cgenBaseFun
+cgenFun :: HasCallStack => Fun Typed -> String
+cgenFun = cgenUserFunG cgenBaseFun
+
+cgenUserFun :: HasCallStack => UserFun Typed -> String
+cgenUserFun = cgenUserFunG cgenBaseUserFun
 
 cgenUserFunG :: HasCallStack
              => (BaseFunId name Typed -> String) -> DerivedFun name Typed -> String
@@ -653,8 +656,8 @@ cgenAnyFun tf cftype = case tf of
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun JustFun (PrimFunT _)) -> cgenType cftype ++ "::mk"
-  TFun _            f@(Fun _ (PrimFunT _)) -> cgenUserFun f
-  TFun _            (Fun d (BaseFunId (BaseUserFunName s) ty)) -> cgenUserFun (userFunToFun f)
+  TFun _            f@(Fun _ (PrimFunT _)) -> cgenFun f
+  TFun _            (Fun d (BaseFunId (BaseUserFunName s) ty)) -> cgenUserFun f
     where f = Fun d (BaseFunId s ty)
 
 {- Note [Allocator usage of function calls]
@@ -735,7 +738,7 @@ ctypeofFun env (TFun ty f) ctys
   | Just f' <- maybeUserFun f
   , Just ret_ty <- cstMaybeLookupFun f' env
     -- trace ("Found fun " ++ show f) $
-  = UseTypeDef ("ty$" ++ cgenUserFun (userFunToFun f')) ret_ty
+  = UseTypeDef ("ty$" ++ cgenUserFun f') ret_ty
   | otherwise
   = -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
