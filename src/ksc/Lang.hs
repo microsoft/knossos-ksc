@@ -404,39 +404,30 @@ types.
 
 -}
 
-type BaseUserFun p = BaseFunId String p
-type BasePrimFun p = BaseFunId PrimFun p
-
-deriving instance Eq (BaseArgTy p) => Eq (BaseUserFun p)
-deriving instance Ord (BaseArgTy p) => Ord (BaseUserFun p)
-deriving instance Show (BaseArgTy p) => Show (BaseUserFun p)
-
-deriving instance Eq (BaseArgTy p) => Eq (BasePrimFun p)
-deriving instance Ord (BaseArgTy p) => Ord (BasePrimFun p)
-deriving instance Show (BaseArgTy p) => Show (BasePrimFun p)
+data BaseFunId name (p :: Phase) = BaseFunId name (BaseArgTy p)
 
 type family BaseArgTy p where
   BaseArgTy Parsed   = Maybe Type
   BaseArgTy OccAnald = Type
   BaseArgTy Typed    = Type
 
-type BaseFun p = BaseFunId BaseName p
-
 data BaseName = BaseUserFunName String   -- BaseUserFuns have a Def
               | BasePrimFunName PrimFun  -- PrimFuns do not have a Def
               deriving (Eq, Ord, Show)
 
-data BaseFunId name (p :: Phase) = BaseFunId name (BaseArgTy p)
+type BaseFun p     = BaseFunId BaseName p
+type BaseUserFun p = BaseFunId String p
+type BasePrimFun p = BaseFunId PrimFun p
+
+deriving instance (Eq   name, Eq   (BaseArgTy p)) => Eq   (BaseFunId name p)
+deriving instance (Ord  name, Ord  (BaseArgTy p)) => Ord  (BaseFunId name p)
+deriving instance (Show name, Show (BaseArgTy p)) => Show (BaseFunId name p)
 
 -- The purposes of this pattern synonym is to avoid churn.  We can
 -- retain the functionality of the old "PrimFun" constructor by using
 -- "PrimFunT" instead.
 pattern PrimFunT :: forall (p :: Phase). PrimFun -> BaseFun p
 pattern PrimFunT p <- BaseFunId (BasePrimFunName p) _
-
-deriving instance Eq   (BaseArgTy p) => Eq   (BaseFun p)
-deriving instance Ord  (BaseArgTy p) => Ord  (BaseFun p)
-deriving instance Show (BaseArgTy p) => Show (BaseFun p)
 
 data Derivations
   = JustFun        -- The function              f(x)
