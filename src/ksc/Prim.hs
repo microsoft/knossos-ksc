@@ -18,12 +18,12 @@ import Control.Monad (zipWithM)
 
 primCall :: PrimFun -> Type -> TExpr -> TExpr
 primCall fun res_ty arg
-  = Call (TFun res_ty (Fun JustFun (PrimFun (BasePrimFunId fun arg_ty)))) arg
+  = Call (TFun res_ty (Fun JustFun (BaseFunId (BasePrimFunName fun) arg_ty))) arg
   where arg_ty = typeof arg
 
 userCall :: String -> Type -> TExpr -> TExpr
 userCall fun res_ty arg
-  = Call (TFun res_ty (Fun JustFun (BaseUserFun (BaseUserFunId fun arg_ty)))) arg
+  = Call (TFun res_ty (Fun JustFun (BaseFunId (BaseUserFunName fun) arg_ty))) arg
   where arg_ty = typeof arg
 
 mkPrimCall :: HasCallStack => PrimFun -> TExpr -> TExpr
@@ -379,7 +379,7 @@ primCallResultTy_maybe :: HasCallStack => DerivedFun (BasePrimFun Typed) -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
-      Fun JustFun (BasePrimFunId f _)
+      Fun JustFun (BaseFunId f _)
          | Just ty <- primFunCallResultTy_maybe f arg_ty
          -> Right ty
          | otherwise
@@ -414,7 +414,7 @@ primCallResultTy_maybe fun arg_ty
 
       Fun CLFun f -> primCallResultTy_maybe (Fun JustFun f) arg_ty
 
-      Fun SUFFwdPass f@(BasePrimFunId p _)
+      Fun SUFFwdPass f@(BaseFunId p _)
         | Just bog_ty <- sufBogTy_maybe p arg_ty
         , Right orig_res_ty <- primCallResultTy_maybe (Fun JustFun f) arg_ty
         -> Right (TypeTuple [orig_res_ty, bog_ty])
@@ -422,7 +422,7 @@ primCallResultTy_maybe fun arg_ty
         -> Left (text "Type error in SUF fwd fun:" <+> ppr fun
                  $$ text "Arg ty was" <+> ppr arg_ty)
 
-      Fun SUFRevPass (BasePrimFunId p _)
+      Fun SUFRevPass (BaseFunId p _)
         | TypeTuple [dorig_res_ty, bog_ty] <- arg_ty
         , Just t <- sufRevFunCallResultTy_maybe p dorig_res_ty bog_ty
         -> Right t

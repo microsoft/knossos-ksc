@@ -404,8 +404,8 @@ types.
 
 -}
 
-data BaseUserFun p = BaseUserFunId String (BaseArgTy p)
-data BasePrimFun p = BasePrimFunId PrimFun (BaseArgTy p)
+type BaseUserFun p = BaseFunId String p
+type BasePrimFun p = BaseFunId PrimFun p
 
 deriving instance Eq (BaseArgTy p) => Eq (BaseUserFun p)
 deriving instance Ord (BaseArgTy p) => Ord (BaseUserFun p)
@@ -420,15 +420,19 @@ type family BaseArgTy p where
   BaseArgTy OccAnald = Type
   BaseArgTy Typed    = Type
 
-data BaseFun (p :: Phase)
-             = BaseUserFun (BaseUserFun p)  -- BaseUserFuns have a Def
-             | PrimFun (BasePrimFun p)      -- PrimFuns do not have a Def
+type BaseFun p = BaseFunId BaseName p
+
+data BaseName = BaseUserFunName String   -- BaseUserFuns have a Def
+              | BasePrimFunName PrimFun  -- PrimFuns do not have a Def
+              deriving (Eq, Ord, Show)
+
+data BaseFunId name (p :: Phase) = BaseFunId name (BaseArgTy p)
 
 -- The purposes of this pattern synonym is to avoid churn.  We can
 -- retain the functionality of the old "PrimFun" constructor by using
 -- "PrimFunT" instead.
 pattern PrimFunT :: forall (p :: Phase). PrimFun -> BaseFun p
-pattern PrimFunT p <- PrimFun (BasePrimFunId p _)
+pattern PrimFunT p <- BaseFunId (BasePrimFunName p) _
 
 deriving instance Eq   (BaseArgTy p) => Eq   (BaseFun p)
 deriving instance Ord  (BaseArgTy p) => Ord  (BaseFun p)
@@ -461,20 +465,22 @@ type Fun     p = DerivedFun (BaseFun p)
 
 baseFunT :: T.Lens (BaseFun p) (BaseFun q)
                    (BaseArgTy p) (BaseArgTy q)
-baseFunT g (BaseUserFun b) = BaseUserFun <$> T.traverseOf baseUserFunT g b
-baseFunT g (PrimFun p) = PrimFun <$> T.traverseOf basePrimFunT g p
+baseFunT g (BaseFunId n ty) = BaseFunId n <$> g ty
 
 baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
                        (BaseArgTy p) (BaseArgTy q)
-baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
+baseUserFunT g (BaseFunId n ty) = BaseFunId n <$> g ty
 
 basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
                        (BaseArgTy p) (BaseArgTy q)
-basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
+basePrimFunT g (BaseFunId n ty) = BaseFunId n <$> g ty
 
 baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
                      funid funid'
 baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
+
+baseFunName :: T.Lens (BaseFunId n p) (BaseFunId n' p) n n'
+baseFunName f (BaseFunId n ty) = flip BaseFunId ty <$> f n
 
 funBaseType :: forall p. InPhase p
             => T.Lens (Fun p) (Fun Typed)
@@ -509,7 +515,7 @@ addBaseTypeToFun baseType userfun expectedBaseTy = T.traverseOf baseType checkBa
 
 
 userFunToFun :: UserFun p -> Fun p
-userFunToFun = T.over baseFunFun BaseUserFun
+userFunToFun = T.over (baseFunFun . baseFunName) BaseUserFunName
 
 -- A 'Fun p' is Either:
 --
@@ -526,14 +532,13 @@ maybeUserFun f = case perhapsUserFun f of
 
 baseFunToBaseUserFunE :: BaseFun p -> Either (BasePrimFun p) (BaseUserFun p)
 baseFunToBaseUserFunE = \case
-  BaseUserFun u    -> Right u
-  PrimFun p    -> Left p
+  BaseFunId (BaseUserFunName u) ty   -> Right (BaseFunId u ty)
+  BaseFunId (BasePrimFunName p) ty   -> Left (BaseFunId p  ty)
 
 isSelFun :: BaseFun p -> Bool
 isSelFun = \case
-  BaseUserFun{} -> False
   PrimFunT (P_SelFun{}) -> True
-  PrimFun{} -> False
+  _ -> False
 
 baseFunOfFun :: Fun p -> BaseFun p
 baseFunOfFun (Fun _ baseFun) = baseFun
@@ -669,7 +674,7 @@ dropLast xs = take (length xs - 1) xs
 
 pSel :: Int -> Int -> TExpr -> TExpr
 pSel i n e = Call (TFun el_ty
-                        (Fun JustFun (PrimFun (BasePrimFunId (P_SelFun i n) (typeof e))))) e
+                        (Fun JustFun (BaseFunId (BasePrimFunName (P_SelFun i n)) (typeof e)))) e
            where
              el_ty = case typeof e of
                         TypeTuple ts -> ts !! (i-1)
@@ -993,14 +998,14 @@ instance Pretty PrimFun where
   ppr = pprPrimFun
 
 pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
-pprBaseFun (BaseUserFun s) = pprBaseUserFun @p s
-pprBaseFun (PrimFun p ) = pprBasePrimFun p
+pprBaseFun (BaseFunId (BaseUserFunName s) ty) = pprBaseUserFun @p (BaseFunId s ty)
+pprBaseFun (BaseFunId (BasePrimFunName p) ty) = pprBasePrimFun @p (BaseFunId p ty)
 
 pprBaseUserFun :: forall p. InPhase p => BaseUserFun p -> SDoc
-pprBaseUserFun (BaseUserFunId name ty) = pprNameAndBaseArgTy @p (text name) ty
+pprBaseUserFun (BaseFunId name ty) = pprNameAndBaseArgTy @p (text name) ty
 
 pprBasePrimFun :: BasePrimFun p -> SDoc
-pprBasePrimFun (BasePrimFunId name _) = pprPrimFun name
+pprBasePrimFun (BaseFunId name _) = pprPrimFun name
 
 pprPrimFun :: PrimFun -> SDoc
 pprPrimFun = \case
@@ -1298,8 +1303,8 @@ hspec = do
 
   let var s = Var (Simple s)
   let e,e2 :: Expr
-      e  = Call (Fun JustFun (BaseUserFun (BaseUserFunId "g" Nothing))) (var "i")
-      e2 = Call (Fun JustFun (BaseUserFun (BaseUserFunId "f" Nothing))) (Tuple [e, var "_t1", kInt 5])
+      e  = Call (Fun JustFun (BaseFunId (BaseUserFunName "g") Nothing)) (var "i")
+      e2 = Call (Fun JustFun (BaseFunId (BaseUserFunName "f") Nothing)) (Tuple [e, var "_t1", kInt 5])
 
   describe "Pretty" $ do
     test e  "g( i )"
