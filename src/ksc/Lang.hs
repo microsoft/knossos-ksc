@@ -921,6 +921,7 @@ class InPhase p where
   pprVar     :: VarX p -> SDoc      -- Just print it
   pprLetBndr :: LetBndrX p -> SDoc  -- Print with its type
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
+  pprNameAndBaseUserFunArgTy :: SDoc -> BaseUserFunArgTy p -> SDoc
   pprBaseUserFun :: BaseUserFun p -> SDoc
 
   getVar     :: VarX p     -> (Var, Maybe Type)
@@ -934,9 +935,10 @@ instance InPhase Parsed where
   pprVar     = ppr
   pprLetBndr = ppr
   pprFunOcc  = ppr
-  pprBaseUserFun (BaseUserFunId name mty) = case mty of
-    Nothing -> text name
-    Just ty -> brackets (text name <+> pprParendType ty)
+  pprNameAndBaseUserFunArgTy name mty = case mty of
+    Nothing -> name
+    Just ty -> brackets (name <+> pprParendType ty)
+  pprBaseUserFun (BaseUserFunId name mty) = pprNameAndBaseUserFunArgTy @Parsed (text name) mty
 
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
@@ -948,8 +950,8 @@ instance InPhase Typed where
   pprVar  = ppr
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
-  pprBaseUserFun (BaseUserFunId name ty) =
-    brackets (text name <+> pprParendType ty)
+  pprNameAndBaseUserFunArgTy name ty = brackets (name <+> pprParendType ty)
+  pprBaseUserFun (BaseUserFunId name ty) = pprNameAndBaseUserFunArgTy @Typed (text name) ty
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
@@ -962,8 +964,8 @@ instance InPhase OccAnald where
   pprVar  = ppr
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
-  pprBaseUserFun (BaseUserFunId name ty) =
-    brackets (text name <+> pprParendType ty)
+  pprNameAndBaseUserFunArgTy name ty = brackets (name <+> pprParendType ty)
+  pprBaseUserFun (BaseUserFunId name ty) = pprNameAndBaseUserFunArgTy @OccAnald (text name) ty
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
