@@ -477,7 +477,7 @@ baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
 funBaseType :: forall p. InPhase p
             => T.Lens (Fun p) (Fun Typed)
                       (Maybe Type) Type
-funBaseType = baseFunFun . baseFunT . baseUserFunArgTy @p
+funBaseType = funType . baseUserFunArgTy @p
 
 userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
@@ -492,8 +492,7 @@ basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
                        (BaseArgTy p) (BaseArgTy q)
 basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
 
-funType :: T.Traversal (Fun p) (Fun q)
-                       (BaseArgTy p) (BaseArgTy q)
+funType :: T.Lens (Fun p) (Fun q) (BaseArgTy p) (BaseArgTy q)
 funType = baseFunFun . baseFunT
 
 -- In the Parsed phase, if the user didn't supply a type, add it;
