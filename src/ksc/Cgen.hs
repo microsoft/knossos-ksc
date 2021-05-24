@@ -609,11 +609,19 @@ mangleType = \case
 
 cgenBaseFun :: BaseFun Typed -> String
 cgenBaseFun = \case
-  (BaseFunId (BaseUserFunName fun) (TypeTuple []))  -> mangleFun fun
-  (BaseFunId (BaseUserFunName fun) (TypeTuple tys)) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
-  (BaseFunId (BaseUserFunName fun) ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
-  (PrimFunT (P_SelFun i _))  -> "ks::get<" ++ show (i - 1) ++ ">"
-  (PrimFunT fun) -> render (ppr fun)
+  BaseFunId (BaseUserFunName fun) ty -> cgenBaseUserFun (BaseFunId fun ty)
+  BaseFunId (BasePrimFunName fun) ty -> cgenBasePrimFun (BaseFunId fun ty)
+
+cgenBaseUserFun :: BaseUserFun Typed -> String
+cgenBaseUserFun = \case
+  (BaseFunId fun (TypeTuple []))  -> mangleFun fun
+  (BaseFunId fun (TypeTuple tys)) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
+  (BaseFunId fun ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
+
+cgenBasePrimFun :: BasePrimFun Typed -> String
+cgenBasePrimFun = \case
+  (BaseFunId (P_SelFun i _) _)  -> "ks::get<" ++ show (i - 1) ++ ">"
+  (BaseFunId fun _) -> render (ppr fun)
 
 cgenUserFun :: HasCallStack => Fun Typed -> String
 cgenUserFun f = case f of
@@ -642,8 +650,8 @@ cgenAnyFun tf cftype = case tf of
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun JustFun (PrimFunT _)) -> cgenType cftype ++ "::mk"
   TFun _            f@(Fun _ (PrimFunT _)) -> cgenUserFun f
-  TFun _            (Fun d (BaseFun (BaseUserFunName s) ty)) -> cgenUserFun (userFunToFun f)
-    where f = Fun d (BaseFun s ty)
+  TFun _            (Fun d (BaseFunId (BaseUserFunName s) ty)) -> cgenUserFun (userFunToFun f)
+    where f = Fun d (BaseFunId s ty)
 
 {- Note [Allocator usage of function calls]
 
