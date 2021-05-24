@@ -1,6 +1,7 @@
 import time
 import torch
 
+import ts2ks
 from ts2ks import tsmod2ksmod
 
 torch.set_default_dtype(torch.float64)
@@ -124,38 +125,61 @@ def bench(module_file, bench_name):
         else:
             print(f"Ignoring {fn_name}")
 
+    config0 = configs[0]
+
     # TODO: elementwise_apply
     ks_compiled = tsmod2ksmod(
-        mod, bench_name, example_inputs=(configs[0],), generate_lm=False
+        mod, bench_name, example_inputs=(config0,), generate_lm=False
     )
 
     for arg in configs:
+
+        with ts2ks.logging(False):
+            pt_arg = arg.detach()
+            pt_arg.requires_grad = True
+            pt_value = pt_fast(pt_arg)
+
+            ks_arg = arg.detach()
+            ks_arg.requires_grad = True
+            ks_value = ks_compiled.apply(ks_arg)
+
+            if (
+                not torch.isclose(
+                    pt_value, ks_value, rtol=1e-05, atol=1e-08, equal_nan=False
+                )
+                .all()
+                .numpy()
+            ):
+                print(pt_value)
+                print(ks_value)
+                raise ValueError("Knossos != torch!")
+
+            pt_loss = pt_value.sum()
+            pt_grad = torch.autograd.grad(pt_loss, pt_arg)[0]
+
+            ks_loss = ks_value.sum()
+            ks_grad = torch.autograd.grad(ks_loss, ks_arg)[0]
+
+            if (
+                not torch.isclose(
+                    pt_grad, ks_grad, rtol=1e-05, atol=1e-08, equal_nan=False
+                )
+                .all()
+                .numpy()
+            ):
+                import pandas as pd
+
+                cols = (
+                    torch.stack((arg.detach(), pt_grad, ks_grad, pt_grad - ks_grad))
+                    .t()
+                    .numpy()
+                )
+
+                print(pd.DataFrame(cols, columns=["ARG", "PT", "KS", "Diff"]))
+                raise ValueError("Knossos != torch!")
+
         # ptfast should always work, and be the timing reference
         timeit(bench_name + " PyTorch fast", pt_fast, arg)
-
-        arg.requires_grad = True
-        ks_arg = arg.detach()
-        ks_arg.requires_grad = True
-        pt_value = pt_fast(arg)
-        ks_value = ks_compiled.apply(ks_arg)
-        if (
-            not torch.isclose(
-                pt_value, ks_value, rtol=1e-05, atol=1e-08, equal_nan=False
-            )
-            .all()
-            .numpy()
-        ):
-            print(pt_value)
-            print(ks_value)
-            raise ValueError("Knossos != torch!")
-
-        pt_loss = pt_value.sum()
-        pt_grad = torch.autograd.grad(pt_loss, arg)
-        print(pt_grad)
-
-        ks_loss = ks_value.sum()
-        ks_grad = torch.autograd.grad(ks_loss, ks_arg)
-        print(ks_grad)
 
         # TODO: make ks_raw runnable as pure python
         # assert fun_and_grad_matches(pt_fast, ks_raw, arg)
@@ -179,11 +203,11 @@ if __name__ == "__main__":
 
     parser.add_argument("module")
     parser.add_argument("bench")
-    parser.add_argument("-p", "--preserve-temp-files", action="store_true")
+    parser.add_argument("-p", "--preserve-temporary-files", action="store_true")
 
     args = parser.parse_args()
 
-    if args.preserve_temp_files:
-        print("run-bench: Will preserve temp files")
-        ksc.utils.preserve_temp_files = True
+    if args.preserve_temporary_files:
+        print("run-bench: Will preserve temporary files")
+        ksc.utils.preserve_temporary_files = True
     bench(args.module, args.bench)

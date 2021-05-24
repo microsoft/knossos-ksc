@@ -123,6 +123,12 @@ void declare_tensor_1(py::module &m, char const* name) {
     .def(py::init([](std::uintptr_t v, size_t n) {
         check_valid_pointer(v);
         ks::tensor_dimension<Dim>::index_type size {int(n)};
+        // TODO: We are capturing a reference to the caller's data.
+        // It would be nice to be given a Python object whose handle we could
+        // hold for our lifetime, in order to keep that data alive
+        // OR: of course we could just copy, but its useful to keep track of the cost
+        //     so preserving an implementation where we can avoid the copy feels 
+        //     valuable.
         return ks::tensor<Dim, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data
     }))
     // And describe buffer shape to Python
@@ -145,5 +151,19 @@ template<typename RetType, typename... ParamTypes>
 auto with_ks_allocator(RetType(*f)(ks::allocator*, ParamTypes...)) {
   return [f](ParamTypes... params) {
     return f(&g_alloc, params...);
+  };
+}
+
+// Convert functor to one which takes a first argument g_alloc,
+// and logs inputs and outputs to cerr
+template<typename RetType, typename... ParamTypes>
+auto with_ks_allocator_tracing(char const* msg, RetType(*f)(ks::allocator*, ParamTypes...)) {
+  return [f,msg](ParamTypes... params) {
+    std::cerr << msg << "(";
+    (std::cerr << ... << params);
+    std::cerr << ") =" << std::endl;;
+    auto ret = f(&g_alloc, params...);
+    std::cerr << ret << std::endl;
+    return ret;
   };
 }

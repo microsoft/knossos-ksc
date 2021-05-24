@@ -325,11 +325,15 @@ namespace ks {
 			buf_(buf),
 			top_(0),
 			peak_(peak)
-		{}
+		{
+			KS_ASSERT(buf != nullptr);
+		}
 
 		void* allocate(size_t size)
 		{
-			KS_ASSERT(size < 1000000);
+			if (size > 256'000'000) {
+				std::cerr << "knossos.h: Allocating " << size << " bytes " << std::endl;
+			} 
 			void* ret = buf_ + top_;
 			top_ += padded_size(size);
 			if (top_ > peak_) {
@@ -1395,6 +1399,10 @@ namespace ks {
 		dT const* ddtdata = ddt.data();
 		B const* bogdata = bog.data();
 		dS* ddsdata = dds.data();
+
+		volatile double tot = 0;
+		for (int i = 0, ne = ddt.num_elements(); i != ne; ++i)
+			tot += ddtdata[i];
 
 		for (int i = 0, ne = ddt.num_elements(); i != ne; ++i) {
 			tuple<dS, dE> f_call = f_(alloc, ddtdata[i], bogdata[i]);

@@ -317,6 +317,7 @@ def __make_cpp_str(
     name_str = encode_name(f"{name_to_call}@{args_str}")
     declarations = f"""
      m.def("entry", with_ks_allocator(&ks::{name_str}));
+     m.def("entry_tracing", with_ks_allocator_tracing("{name_str}", &ks::{name_str}));
     """
 
     if generate_derivatives:
@@ -329,6 +330,7 @@ def __make_cpp_str(
             der_name = encode_name(f"{der}${name_to_call}@{args_str}")
             declarations += f"""
             m.def("{der}_entry", with_ks_allocator(&ks::{der_name}));
+            m.def("{der}_entry_tracing", with_ks_allocator_tracing("{der}", &ks::{der_name}));
             """
 
     cpp_str += (
@@ -421,7 +423,7 @@ def build_module_using_pytorch_from_ks(
         cflags += [
             "-std=c++17",
             "-g",
-            # "-O3",
+            "-O3",
             # "-DKS_BOUNDS_CHECK",
         ]
 

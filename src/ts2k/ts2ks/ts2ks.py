@@ -393,19 +393,33 @@ def torch_from_ks(ks_object):
 
 
 def torch_to_ks(py_mod, val):
+    """
+    Return a KS-compatible version of val.
+    If val is a scalar, just return it as a float.
+    If val is a tensor, we may need to
+       (a) make it contiguous
+       (b) ensure it's not garbage-collected while we're holding a view to it.
+    So we return a pair (ks_val, torch_val), and torch_val needs to be 
+    kept alive at least as long as ks_val 
+    TODO: Attach the torch_val to the Tensor_N_Float object so their fates
+         are entwined
+    """
     if isinstance(val, float):
-        return val
+        return (val, None)
 
     if isinstance(val, torch.Tensor):
         assert (
             val.dtype == torch.float64
         ), "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
-        if len(val.shape) == 2:
-            return py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
-        if len(val.shape) == 1:
-            return py_mod.Tensor_1_Float(val.data_ptr(), *val.shape)
+
         if len(val.shape) == 0:
-            return val.item()
+            return (val.item(), None)
+
+        val = val.contiguous()  # Get data, or copy if not already contiguous
+        if len(val.shape) == 1:
+            return py_mod.Tensor_1_Float(val.data_ptr(), *val.shape), val
+        if len(val.shape) == 2:
+            return py_mod.Tensor_2_Float(val.data_ptr(), *val.shape), val
 
     raise NotImplementedError()
 
@@ -456,34 +470,78 @@ def ast2ks(function):
     return ks
 
 
+global ts2k_logging
+ts2k_logging = False
+
+
+class logging(object):
+    """
+    Turn on verbose logging in Knossos calls
+    """
+
+    def __init__(self, flag=True):
+        self.flag = flag
+
+    def __enter__(self):
+        global ts2k_logging
+        self.old_flag = ts2k_logging
+        ts2k_logging = self.flag
+
+    def __exit__(self, type, value, tb):
+        global ts2k_logging
+        ts2k_logging = self.old_flag
+        return False
+
+
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
 def forward_template(py_mod, ctx, *args):
     py_mod.reset_allocator()
-    ks_args = (torch_to_ks(py_mod, x) for x in args)
+    ks_args, torch_vals = zip(*(torch_to_ks(py_mod, x) for x in args))
 
     # Call it
-    outputs = py_mod.entry(*ks_args)
+    if ts2k_logging:
+        outputs = py_mod.entry_tracing(*ks_args)
+    else:
+        outputs = py_mod.entry(*ks_args)
 
     # TODO: Use BOG properly
     if ctx is not None:
+        ctx.torch_vals = torch_vals
         ctx.save_for_backward(*args)
 
     return torch_from_ks(outputs)
 
 
 def backward_template(py_mod, ctx, *args):
-    ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
-    ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
-    outputs = py_mod.sufrev_entry(ks_args, ks_grad_args)
+    ks_args, ks_args_torch_vals = zip(
+        *(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
+    )
+    ks_grad_args, ks_grad_args_torch_vals = zip(*(torch_to_ks(py_mod, x) for x in args))
 
-    return torch_from_ks(outputs)
+    def untuple_if_single(t):
+        if len(t) == 1:
+            return t[0]
+        else:
+            return t
+
+    ks_args = untuple_if_single(ks_args)
+    ks_grad_args = untuple_if_single(ks_grad_args)
+
+    if ts2k_logging:
+        outputs = py_mod.sufrev_entry_tracing(ks_args, ks_grad_args)
+    else:
+        outputs = py_mod.sufrev_entry(ks_args, ks_grad_args)
+
+    save_from_garbage_collection = ks_args_torch_vals, ks_grad_args_torch_vals
+
+    return torch_from_ks(outputs), save_from_garbage_collection
 
 
 def make_KscAutogradFunction(py_mod):
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
-    backward = lambda ctx, args: backward_template(py_mod, ctx, args)
+    backward = lambda ctx, args: backward_template(py_mod, ctx, args)[0]
     newclass = type(
         "KscAutogradFunction_" + py_mod.__name__,
         (torch.autograd.Function,),
