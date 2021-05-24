@@ -11,6 +11,6 @@ def relux(x: float):
 
 @torch.jit.script
 def main():
-    r1 = relux(-1.0)
+    relux(-1.0)
     r2 = relux(2.7)
     print(r2)

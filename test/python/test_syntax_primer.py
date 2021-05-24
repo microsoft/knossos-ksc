@@ -1,5 +1,4 @@
 import pytest
-import re
 
 from ksc.expr import pystr
 from ksc.parse_ks import parse_ks_filename

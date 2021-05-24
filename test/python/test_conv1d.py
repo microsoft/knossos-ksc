@@ -1,5 +1,4 @@
 import numpy as np
-import os
 from ksc.utils import translate_and_import
 
 

@@ -2,7 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import Any, FrozenSet, List, Tuple, Union
+from typing import FrozenSet, List, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord
@@ -300,7 +300,7 @@ class GDef(ASTNode):
         super().__init__(derivation=derivation, function_name=function_name)
 
     def name(self):
-        return StructuredName((derivation, function_name))
+        return StructuredName((self.derivation, self.function_name))
 
 
 class Rule(ASTNode):

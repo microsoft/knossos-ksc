@@ -32,8 +32,6 @@ class Shape:
     
     """
 
-    pass
-
     @staticmethod
     def from_ks_shape(val, type):
         """
