@@ -4,6 +4,7 @@ from ksc.type import Type, KSTypeError
 from ksc.type_propagate import type_propagate_decls, type_propagate
 from ksc.expr import StructuredName, If, Const
 from ksc.parse_ks import (
+    parse_expr_string,
     parse_ks_filename,
     parse_ks_string,
     parse_structured_name,
@@ -154,3 +155,20 @@ def test_type_propagate_respect_existing():
         == if_node.f_body.type_
         == Type.Integer
     )
+
+
+def test_type_propagate_respect_existing_does_not_traverse(prelude_symtab):
+    e = parse_expr_string("(add 3.0 (mul x x))")
+    mul = e.args[1]
+    assert not mul.name.has_type()
+
+    # Set the type of the mul; this prevents recursing any deeper
+    e.args[1].type_ = Type.Float
+    type_propagate(e, prelude_symtab, respect_existing=True)
+    assert e.type_ == Type.Float  # Did something
+    # But did not go inside mul...
+    assert not mul.name.has_type()
+    assert mul.args[0].type_ == mul.args[1].type_ == None
+
+    with pytest.raises(KSTypeError, match="Unknown symbol x"):
+        type_propagate(e, prelude_symtab, respect_existing=False)
