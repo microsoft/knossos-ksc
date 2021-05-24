@@ -463,17 +463,17 @@ data DerivedFun funid = Fun Derivations funid
 type UserFun p = DerivedFun (BaseUserFun p)
 type Fun     p = DerivedFun (BaseFun p)
 
-baseFunT :: T.Lens (BaseFun p) (BaseFun q)
+baseFunT :: T.Lens (BaseFunId a p) (BaseFunId a q)
                    (BaseArgTy p) (BaseArgTy q)
 baseFunT g (BaseFunId n ty) = BaseFunId n <$> g ty
 
 baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
                        (BaseArgTy p) (BaseArgTy q)
-baseUserFunT g (BaseFunId n ty) = BaseFunId n <$> g ty
+baseUserFunT = baseFunT
 
 basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
                        (BaseArgTy p) (BaseArgTy q)
-basePrimFunT g (BaseFunId n ty) = BaseFunId n <$> g ty
+basePrimFunT = baseFunT
 
 baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
                      funid funid'
