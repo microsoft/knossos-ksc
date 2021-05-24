@@ -464,6 +464,14 @@ baseFunT :: T.Lens (BaseFun p) (BaseFun q)
 baseFunT g (BaseUserFun b) = BaseUserFun <$> T.traverseOf baseUserFunT g b
 baseFunT g (PrimFun p) = PrimFun <$> T.traverseOf basePrimFunT g p
 
+baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
+                       (BaseArgTy p) (BaseArgTy q)
+baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
+
+basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
+                       (BaseArgTy p) (BaseArgTy q)
+basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
+
 baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun p)
                                   (BaseUserFun p) (BaseUserFun p)
 baseUserFunBaseFun f = \case
@@ -483,14 +491,6 @@ userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
                           (Maybe Type) Type
 userFunBaseType = baseFunFun . baseUserFunT . baseUserFunArgTy @p
-
-baseUserFunT :: T.Lens (BaseUserFun p) (BaseUserFun q)
-                       (BaseArgTy p) (BaseArgTy q)
-baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
-
-basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
-                       (BaseArgTy p) (BaseArgTy q)
-basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
 
 funType :: T.Lens (Fun p) (Fun q) (BaseArgTy p) (BaseArgTy q)
 funType = baseFunFun . baseFunT
