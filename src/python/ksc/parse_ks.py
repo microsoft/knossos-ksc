@@ -165,7 +165,7 @@ def parse_args(se, allow_Type_Any=False):
     ]
 
 
-def parse_args_with_any(se):
+def parse_args_allow_Any(se):
     return parse_args(se, allow_Type_Any=True)
 
 
@@ -243,7 +243,7 @@ def parse_tld(se):
     if head == _rule:
         return Rule(
             *parse_seq(
-                se[1:], parse_string, parse_args_with_any, parse_expr, parse_expr
+                se[1:], parse_string, parse_args_allow_Any, parse_expr, parse_expr
             )
         )
 
