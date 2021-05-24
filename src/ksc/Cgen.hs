@@ -641,7 +641,9 @@ cgenAnyFun tf cftype = case tf of
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun JustFun (PrimFunT _)) -> cgenType cftype ++ "::mk"
-  TFun _            f                 -> cgenUserFun f
+  TFun _            f@(Fun _ (PrimFunT _)) -> cgenUserFun f
+  TFun _            (Fun d (BaseFun (BaseUserFunName s) ty)) -> cgenUserFun (userFunToFun f)
+    where f = Fun d (BaseFun s ty)
 
 {- Note [Allocator usage of function calls]
 
@@ -721,7 +723,7 @@ ctypeofFun env (TFun ty f) ctys
   | Just f' <- maybeUserFun f
   , Just ret_ty <- cstMaybeLookupFun f' env
     -- trace ("Found fun " ++ show f) $
-  = UseTypeDef ("ty$" ++ cgenUserFun f) ret_ty
+  = UseTypeDef ("ty$" ++ cgenUserFun (userFunToFun f')) ret_ty
   | otherwise
   = -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
