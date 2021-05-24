@@ -2,6 +2,7 @@
 import pytest
 import importlib
 import inspect
+import torch
 from collections import namedtuple
 
 from ts2ks import ts2mod
@@ -42,6 +43,9 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
             yield BenchmarkFunction("PyTorch Nice", fn_obj)
         elif fn_name == benchmark_name:
             yield BenchmarkFunction("Knossos", ts2mod(fn_obj, example_input).apply)
+        elif fn_name == benchmark_name + "_cuda_init":
+            if torch.cuda.is_available():
+                yield BenchmarkFunction("PyTorch CUDA", fn_obj())
         else:
             # perhaps we should just allow anything that matches the pattern?
             # would make it easier to add arbitrary comparisons e.g. TF
