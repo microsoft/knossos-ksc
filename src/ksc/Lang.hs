@@ -506,16 +506,6 @@ funType :: T.Traversal (Fun p) (Fun q)
                        (BaseArgTy p) (BaseArgTy q)
 funType = baseFunFun . baseFunT
 
-addBaseTypeToUserFun :: forall p. InPhase p
-                     => UserFun p -> Type -> Either Type (UserFun Typed)
-addBaseTypeToUserFun = addBaseTypeToFun userFunBaseType
-
-addBaseTypeToPrimFun :: forall p. InPhase p
-                     => DerivedFun (BasePrimFun p)
-                     -> Type
-                     -> Either Type (DerivedFun (BasePrimFun Typed))
-addBaseTypeToPrimFun = addBaseTypeToFun primFunBaseType
-
 -- In the Parsed phase, if the user didn't supply a type, add it;
 -- otherwise (and in other phases, where the type is there) check that
 -- the type matches.  If mis-match return (Left

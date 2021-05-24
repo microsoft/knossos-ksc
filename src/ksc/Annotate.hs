@@ -196,7 +196,7 @@ tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
                => UserFun p -> Type
                -> TcM (UserFun Typed)
 tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
-  Right (Just baseTy) -> case addBaseTypeToUserFun @p fun baseTy of
+  Right (Just baseTy) -> case addBaseTypeToFun userFunBaseType fun baseTy of
     Right r -> pure r
     Left appliedTy ->
       tcFail (text "The base type did not match the applied type"
@@ -213,7 +213,7 @@ tcPrimFunArgTy :: forall p. (Pretty (BasePrimFun p), InPhase p)
                => DerivedFun (BasePrimFun p) -> Type
                -> TcM (DerivedFun (BasePrimFun Typed))
 tcPrimFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
-  Right (Just baseTy) -> case addBaseTypeToPrimFun @p fun baseTy of
+  Right (Just baseTy) -> case addBaseTypeToFun primFunBaseType fun baseTy of
     Right r -> pure r
     Left appliedTy ->
       tcFail (text "The base type did not match the applied type"
