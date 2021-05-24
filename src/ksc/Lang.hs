@@ -474,6 +474,11 @@ baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
                      funid funid'
 baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
 
+funBaseType :: forall p. InPhase p
+            => T.Lens (Fun p) (Fun Typed)
+                      (Maybe Type) Type
+funBaseType = baseFunFun . baseFunType @p
+
 userFunBaseType :: forall p. InPhase p
                 => T.Lens (UserFun p) (UserFun Typed)
                           (Maybe Type) Type
@@ -491,6 +496,11 @@ baseUserFunT g (BaseUserFunId f t) = BaseUserFunId f <$> g t
 basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
                        (BaseArgTy p) (BaseArgTy q)
 basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
+
+baseFunType :: forall p. InPhase p
+            => T.Lens (BaseFun p) (BaseFun Typed)
+                      (Maybe Type) Type
+baseFunType = baseFunT . baseUserFunArgTy @p
 
 baseUserFunType :: forall p. InPhase p
                 => T.Lens (BaseUserFun p) (BaseUserFun Typed)
