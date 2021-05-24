@@ -1208,7 +1208,7 @@ pprDef :: forall p. InPhase p => DefX p -> SDoc
 pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
   = case rhs of
       EDefRhs -> parens $
-                 sep [ text "edef", ppr fun_f
+                 sep [ text "edef", ppr f
                      , pprParendType res_ty
                      , parens (pprParendType (typeof vs)) ]
 
@@ -1222,8 +1222,7 @@ pprDef (Def { def_fun = f, def_pat = vs, def_res_ty = res_ty, def_rhs = rhs })
 
       StubRhs -> text "<<StubRhs>>"
 
-    where fun_f = userFunToFun @p f
-          pprFun_f = pprUserFun @p f
+    where pprFun_f = pprUserFun @p f
 
 instance InPhase p => Pretty (BaseUserFun p) where
   ppr = pprBaseUserFun
