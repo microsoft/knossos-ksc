@@ -472,12 +472,6 @@ basePrimFunT :: T.Lens (BasePrimFun p) (BasePrimFun q)
                        (BaseArgTy p) (BaseArgTy q)
 basePrimFunT g (BasePrimFunId f t) = BasePrimFunId f <$> g t
 
-baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun p)
-                                  (BaseUserFun p) (BaseUserFun p)
-baseUserFunBaseFun f = \case
-  BaseUserFun u -> BaseUserFun <$> f u
-  PrimFun p    -> pure (PrimFun p)
-
 baseFunFun :: T.Lens (DerivedFun funid) (DerivedFun funid')
                      funid funid'
 baseFunFun f (Fun ds fi) = fmap (Fun ds) (f fi)
@@ -516,9 +510,6 @@ addBaseTypeToFun baseType userfun expectedBaseTy = T.traverseOf baseType checkBa
 
 userFunToFun :: UserFun p -> Fun p
 userFunToFun = T.over baseFunFun BaseUserFun
-
-primFunToFun :: DerivedFun (BasePrimFun p) -> Fun p
-primFunToFun = T.over baseFunFun PrimFun
 
 -- A 'Fun p' is Either:
 --
