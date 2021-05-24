@@ -73,15 +73,26 @@ def parse_type_maybe(se, allow_any=False):
         if isinstance(se[0], sexpdata.Symbol):
             sym = se[0].value()
             if sym == "Tuple":
-                return True, Type.Tuple(*(parse_type(s) for s in se[1:]))
+                return True, Type.Tuple(*(parse_type(s, allow_any) for s in se[1:]))
             if sym == "Vec" and len(se) == 2:
-                return True, Type.Tensor(1, parse_type(se[1]))
+                return True, Type.Tensor(1, parse_type(se[1], allow_any))
             if sym == "Tensor" and len(se) == 3:
-                return True, Type.Tensor(parse_int(se[1]), parse_type(se[2]))
+                return (
+                    True,
+                    Type.Tensor(parse_int(se[1]), parse_type(se[2], allow_any)),
+                )
             if sym == "Lam" and len(se) == 3:
-                return True, Type.Lam(parse_type(se[1]), parse_type(se[2]))
+                return (
+                    True,
+                    Type.Lam(
+                        parse_type(se[1], allow_any), parse_type(se[2], allow_any)
+                    ),
+                )
             if sym == "LM" and len(se) == 3:
-                return True, Type.LM(parse_type(se[1]), parse_type(se[2]))
+                return (
+                    True,
+                    Type.LM(parse_type(se[1], allow_any), parse_type(se[2], allow_any)),
+                )
 
     return False, None
 

@@ -111,6 +111,7 @@ def test_any_type_allowed_only_for_rules():
         tld("(def foo Any (x : Float) x)")
 
     tld('(rule "foo" (x : Any) x x)')
+    tld('(rule "take.intro" ((n : Integer) (v : Vec Any)) (build n (lam (i : Integer) (index i v))) (take n v))')
 
 
 def test_comments():
