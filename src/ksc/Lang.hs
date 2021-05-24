@@ -461,8 +461,8 @@ type Fun     p = DerivedFun (BaseFun p)
 
 baseFunT :: T.Lens (BaseFun p) (BaseFun q)
                    (BaseArgTy p) (BaseArgTy q)
-baseFunT g (BaseUserFun (BaseUserFunId f t)) = BaseUserFun <$> BaseUserFunId f <$> g t
-baseFunT g (PrimFun (BasePrimFunId f t)) = PrimFun <$> BasePrimFunId f <$> g t
+baseFunT g (BaseUserFun b) = BaseUserFun <$> T.traverseOf baseUserFunT g b
+baseFunT g (PrimFun p) = PrimFun <$> T.traverseOf basePrimFunT g p
 
 baseUserFunBaseFun :: T.Traversal (BaseFun p) (BaseFun p)
                                   (BaseUserFun p) (BaseUserFun p)
