@@ -922,7 +922,6 @@ class InPhase p where
   pprLetBndr :: LetBndrX p -> SDoc  -- Print with its type
   pprFunOcc  :: FunX p -> SDoc      -- Just print it
   pprNameAndBaseUserFunArgTy :: SDoc -> BaseUserFunArgTy p -> SDoc
-  pprBaseUserFun :: BaseUserFun p -> SDoc
 
   getVar     :: VarX p     -> (Var, Maybe Type)
   getFun     :: FunX p     -> (Fun Parsed, Maybe Type)
@@ -938,7 +937,6 @@ instance InPhase Parsed where
   pprNameAndBaseUserFunArgTy name mty = case mty of
     Nothing -> name
     Just ty -> brackets (name <+> pprParendType ty)
-  pprBaseUserFun (BaseUserFunId name mty) = pprNameAndBaseUserFunArgTy @Parsed (text name) mty
 
   getVar     var = (var, Nothing)
   getFun     fun = (fun, Nothing)
@@ -951,7 +949,6 @@ instance InPhase Typed where
   pprLetBndr = pprTVar
   pprFunOcc  = ppr
   pprNameAndBaseUserFunArgTy name ty = brackets (name <+> pprParendType ty)
-  pprBaseUserFun (BaseUserFunId name ty) = pprNameAndBaseUserFunArgTy @Typed (text name) ty
 
   getVar     (TVar ty var) = (var, Just ty)
   getFun     (TFun ty fun) = (fun', Just ty)
@@ -965,7 +962,6 @@ instance InPhase OccAnald where
   pprLetBndr (n,tv) = pprTVar tv <> braces (int n)
   pprFunOcc = ppr
   pprNameAndBaseUserFunArgTy name ty = brackets (name <+> pprParendType ty)
-  pprBaseUserFun (BaseUserFunId name ty) = pprNameAndBaseUserFunArgTy @OccAnald (text name) ty
 
   getVar     (TVar ty var)      = (var, Just ty)
   getFun     (TFun ty fun)      = (fun', Just ty)
@@ -1030,6 +1026,9 @@ instance Pretty PrimFun where
 pprBaseFun :: forall p. InPhase p => BaseFun p -> SDoc
 pprBaseFun (BaseUserFun s) = pprBaseUserFun @p s
 pprBaseFun (PrimFun p ) = pprBasePrimFun p
+
+pprBaseUserFun :: forall p. InPhase p => BaseUserFun p -> SDoc
+pprBaseUserFun (BaseUserFunId name ty) = pprNameAndBaseUserFunArgTy @p (text name) ty
 
 pprBasePrimFun :: BasePrimFun p -> SDoc
 pprBasePrimFun (BasePrimFunId name _) = pprPrimFun name
