@@ -335,7 +335,7 @@ pPrimFunIdentifier = pSelFunIdentifier
                             Nothing -> unexpected (f ++ " is not a PrimFun")
                         }
 
-pBasePrimFunWithType :: (Type -> BaseUserFunArgTy p) -> Parser (BasePrimFun p)
+pBasePrimFunWithType :: (Type -> BaseArgTy p) -> Parser (BasePrimFun p)
 pBasePrimFunWithType add =
      brackets (do { f  <- pPrimFunIdentifier
                   ; ty <- pType
@@ -368,7 +368,7 @@ pSelFunIdentifier
                  Just selfun -> pure selfun
              }
 
-pBaseUserFunWithType :: (Type -> BaseUserFunArgTy p) -> Parser (BaseUserFun p)
+pBaseUserFunWithType :: (Type -> BaseArgTy p) -> Parser (BaseUserFun p)
 pBaseUserFunWithType add =
      brackets (do { f  <- pIdentifier
                   ; ty <- pType
