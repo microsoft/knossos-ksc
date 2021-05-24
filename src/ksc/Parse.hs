@@ -98,6 +98,7 @@ Notes:
 
 
 import Lang hiding (parens, brackets)
+import Ksc.Traversal ( over )
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
 import Text.Parsec.Char
@@ -339,17 +340,17 @@ pBasePrimFunWithType :: (Type -> BaseArgTy p) -> Parser (BasePrimFun p)
 pBasePrimFunWithType add =
      brackets (do { f  <- pPrimFunIdentifier
                   ; ty <- pType
-                  ; pure (BasePrimFunId f (add ty))
+                  ; pure (BaseFunId f (add ty))
                   })
 
 pBasePrimFunWithoutType :: Parser (BasePrimFun Parsed)
 pBasePrimFunWithoutType =
          do { f <- pPrimFunIdentifier
-            ; pure (BasePrimFunId f Nothing)
+            ; pure (BaseFunId f Nothing)
             }
 
 pPrimFun :: Parser (BaseFun Parsed)
-pPrimFun = try $ PrimFun <$> pBasePrimFunWithoutType
+pPrimFun = try $ over baseFunName BasePrimFunName <$> pBasePrimFunWithoutType
 
 pSelFunIdentifier :: Parser PrimFun
 pSelFunIdentifier
@@ -372,17 +373,17 @@ pBaseUserFunWithType :: (Type -> BaseArgTy p) -> Parser (BaseUserFun p)
 pBaseUserFunWithType add =
      brackets (do { f  <- pIdentifier
                   ; ty <- pType
-                  ; pure (BaseUserFunId f (add ty))
+                  ; pure (BaseFunId f (add ty))
                   })
 
 pBaseUserFunWithoutType :: Parser (BaseUserFun Parsed)
 pBaseUserFunWithoutType =
          do { f <- pIdentifier
-            ; pure (BaseUserFunId f Nothing)
+            ; pure (BaseFunId f Nothing)
             }
 
 pBaseUserFun :: Parser (BaseFun Parsed)
-pBaseUserFun = BaseUserFun <$>
+pBaseUserFun = over baseFunName BaseUserFunName <$>
      (pBaseUserFunWithType Just
      <|> pBaseUserFunWithoutType)
 
@@ -407,7 +408,7 @@ pFunG pBase = try (brackets $
   where pDerivation s d = pReserved s >> Fun d <$> pBase
 
 pFunTyped :: Parser (Fun Typed)
-pFunTyped = pFunG (BaseUserFun <$> pBaseUserFunWithType id)
+pFunTyped = pFunG (over baseFunName BaseUserFunName <$> pBaseUserFunWithType id)
 
 pFun :: Parser (Fun Parsed)
 pFun = pFunG pBaseFun

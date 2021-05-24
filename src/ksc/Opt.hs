@@ -250,8 +250,8 @@ shouldInline to_inline
                      , fwd "add" ff
                      , rev "add" ff
                      ]
-  where fwd f t = Fun SUFFwdPass (BaseUserFunId f t)
-        rev f t = Fun SUFRevPass (BaseUserFunId f t)
+  where fwd f t = Fun SUFFwdPass (BaseFunId f t)
+        rev f t = Fun SUFRevPass (BaseFunId f t)
         ff = TypeTuple [TypeFloat, TypeFloat]
 
 -----------------------
@@ -278,7 +278,7 @@ optFun env (PrimFunT P_inline) arg
 optFun env (PrimFunT f) e
   = optPrimFun (optEnvInScope env) f e
 
-optFun _ (BaseUserFun {}) _
+optFun _ (BaseFunId (BaseUserFunName {}) _) _
   = Nothing
 
 -----------------------
@@ -650,7 +650,7 @@ optSumBuild _ _ _ = Nothing
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
                            -> Type -> BaseFun Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun _ _ _ (BaseUserFun {}) _
+optGradFun _ _ _ (BaseFunId (BaseUserFunName {}) _) _
   = Nothing
 
 -- From here on we have primitives or selection

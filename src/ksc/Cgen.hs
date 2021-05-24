@@ -609,9 +609,9 @@ mangleType = \case
 
 cgenBaseFun :: BaseFun Typed -> String
 cgenBaseFun = \case
-  (BaseUserFun (BaseUserFunId fun (TypeTuple [])))  -> mangleFun fun
-  (BaseUserFun (BaseUserFunId fun (TypeTuple tys))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
-  (BaseUserFun (BaseUserFunId fun ty))  -> mangleFun (fun ++ "@" ++ mangleType ty)
+  (BaseFunId (BaseUserFunName fun) (TypeTuple []))  -> mangleFun fun
+  (BaseFunId (BaseUserFunName fun) (TypeTuple tys)) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
+  (BaseFunId (BaseUserFunName fun) ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
   (PrimFunT (P_SelFun i _))  -> "ks::get<" ++ show (i - 1) ++ ">"
   (PrimFunT fun) -> render (ppr fun)
 
@@ -640,7 +640,7 @@ cgenAnyFun tf cftype = case tf of
     | primname `elem` [P_sumbuild, P_buildFromSparse, P_buildFromSparseTupled]
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
-  TFun (TypeLM _ _) (Fun JustFun (PrimFun _)) -> cgenType cftype ++ "::mk"
+  TFun (TypeLM _ _) (Fun JustFun (PrimFunT _)) -> cgenType cftype ++ "::mk"
   TFun _            f                 -> cgenUserFun f
 
 {- Note [Allocator usage of function calls]
@@ -819,7 +819,7 @@ cppGen defs =
 
 isMainFunction :: TDef -> Bool
 isMainFunction Def{ def_fun = Fun JustFun f, def_res_ty = TypeInteger }
-  | BaseUserFunId "main" (TypeTuple []) <- f = True
+  | BaseFunId "main" (TypeTuple []) <- f = True
 isMainFunction _ = False
 
 ksoGen :: [TDef] -> String
