@@ -22,8 +22,7 @@ over  :: ((a -> I.Identity b) -> (s -> I.Identity t))
       -> t
 over fmap' f = I.runIdentity . fmap' (I.Identity . f)
 
-traverseOf :: Applicative f
-           => ((a -> f b) -> (s -> f t))
+traverseOf :: ((a -> f b) -> (s -> f t))
            -> (a -> f b)
            -> s
            -> f t
