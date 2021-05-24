@@ -56,6 +56,10 @@ def fun_and_grad_matches(f, g, arg):
     return True
 
 
+def shape(t: torch.Tensor):
+    str(list(t.shape))
+
+
 def timeit(msg, fn, arg):
     MAX_TIME = 5  # No no need to run beyond MAX_TIME sec to get accurate benchmarks
     end_time = time.time() + MAX_TIME
@@ -85,9 +89,10 @@ def timeit(msg, fn, arg):
     csum = grad[0].sum()
 
     print(
-        f"{msg:20} {csum:12.6e} Runs: {inference_timer.ncalls} | Inference: {inference_timer.ms:10.3f} ms |"
-        f" Forward: {forward_timer.ms:10.3f} ms |"
-        f" Backward {backward_timer.ms:10.3f} ms | {arg.shape}"
+        f"{msg:20} {csum:12.6e} Runs: {inference_timer.ncalls} |"
+        f" Inf {inference_timer.ms:10.3f} ms |"
+        f" Fwd {forward_timer.ms:10.3f} ms |"
+        f" Bwd {backward_timer.ms:10.3f} ms | {shape(arg)}"
     )
 
 
@@ -120,11 +125,37 @@ def bench(module_file, bench_name):
             print(f"Ignoring {fn_name}")
 
     # TODO: elementwise_apply
-    ks_compiled = tsmod2ksmod(mod, bench_name, example_inputs=(configs[0],), generate_lm=False)
+    ks_compiled = tsmod2ksmod(
+        mod, bench_name, example_inputs=(configs[0],), generate_lm=False
+    )
 
     for arg in configs:
         # ptfast should always work, and be the timing reference
         timeit(bench_name + " PyTorch fast", pt_fast, arg)
+
+        arg.requires_grad = True
+        ks_arg = arg.detach()
+        ks_arg.requires_grad = True
+        pt_value = pt_fast(arg)
+        ks_value = ks_compiled.apply(ks_arg)
+        if (
+            not torch.isclose(
+                pt_value, ks_value, rtol=1e-05, atol=1e-08, equal_nan=False
+            )
+            .all()
+            .numpy()
+        ):
+            print(pt_value)
+            print(ks_value)
+            raise ValueError("Knossos != torch!")
+
+        pt_loss = pt_value.sum()
+        pt_grad = torch.autograd.grad(pt_loss, arg)
+        print(pt_grad)
+
+        ks_loss = ks_value.sum()
+        ks_grad = torch.autograd.grad(ks_loss, ks_arg)
+        print(ks_grad)
 
         # TODO: make ks_raw runnable as pure python
         # assert fun_and_grad_matches(pt_fast, ks_raw, arg)
@@ -141,8 +172,18 @@ def bench(module_file, bench_name):
 
 if __name__ == "__main__":
     import sys
+    import argparse
+    import ksc.utils
 
-    if len(sys.argv) != 3:
-        print("Usage: run-bench MODULE BENCH")
-        sys.exit(1)
-    bench(sys.argv[1], sys.argv[2])
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("module")
+    parser.add_argument("bench")
+    parser.add_argument("-p", "--preserve-temp-files", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.preserve_temp_files:
+        print("run-bench: Will preserve temp files")
+        ksc.utils.preserve_temp_files = True
+    bench(args.module, args.bench)

@@ -18,6 +18,8 @@ from ksc.type import Type, tangent_type, make_tuple_if_many
 
 from torch.utils.cpp_extension import load, load_inline
 
+preserve_temporary_files = False
+
 
 class KRecord:
     """
@@ -190,14 +192,19 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
         out = f.read()
 
     # only delete these file if no error
-    @atexit.register
-    def _():
-        print(
-            "ksc.utils.generate_cpp_from_ks: Deleting", fks.name, fcpp.name, fkso.name
-        )
-        os.unlink(fks.name)
-        os.unlink(fcpp.name)
-        os.unlink(fkso.name)
+    if not preserve_temporary_files:
+
+        @atexit.register
+        def _():
+            print(
+                "ksc.utils.generate_cpp_from_ks: Deleting",
+                fks.name,
+                fcpp.name,
+                fkso.name,
+            )
+            os.unlink(fks.name)
+            os.unlink(fcpp.name)
+            os.unlink(fkso.name)
 
     return out
 
@@ -215,6 +222,7 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
 
     with NamedTemporaryFile(mode="w", suffix=extension_suffix, delete=False) as fpymod:
         pass
+
     module_path = fpymod.name
     module_name = os.path.basename(module_path).split(".")[0]
     python_includes = subprocess_run(
@@ -246,7 +254,16 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
 
         raise
 
-    os.unlink(fcpp.name)
+    if not preserve_temporary_files:
+
+        @atexit.register
+        def _():
+            print(
+                "ksc.utils.build_py_module_from_cpp: Deleting", fcpp.name, fpymod.name,
+            )
+            os.unlink(fcpp.name)
+            os.unlink(fpymod.name)
+
     return module_name, module_path
 
 
@@ -401,7 +418,12 @@ def build_module_using_pytorch_from_ks(
     if cpp_compiler == None and sys.platform == "win32":
         cflags.append("/std:c++17")
     else:
-        cflags.append("-std=c++17")
+        cflags += [
+            "-std=c++17",
+            "-g",
+            # "-O3",
+            # "-DKS_BOUNDS_CHECK",
+        ]
 
     verbose = True
 
