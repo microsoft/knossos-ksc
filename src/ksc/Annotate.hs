@@ -192,12 +192,10 @@ tcGDef g@(GDef d f)
              Left err -> tcFail err
        }
 
-tcFunArgTyL :: forall a b c. (Pretty a)
-            => ((Maybe Type -> Either Type Type) -> DerivedFun a -> Either Type (DerivedFun b))
-            -> ((Maybe c -> TcM c) -> DerivedFun a -> TcM (DerivedFun b))
-            -> DerivedFun a -> Type
-            -> TcM (DerivedFun b)
-tcFunArgTyL funBaseType funBaseType' fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
+tcFunArgTyL :: forall a p. (InPhase p, Pretty (BaseFunId a p))
+            => DerivedFun (BaseFunId a p) -> Type
+            -> TcM (DerivedFun (BaseFunId a 'Typed))
+tcFunArgTyL fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
   Right (Just baseTy) -> case addBaseTypeToFun funBaseType fun baseTy of
     Right r -> pure r
     Left appliedTy ->
@@ -205,7 +203,7 @@ tcFunArgTyL funBaseType funBaseType' fun arg_ty = case baseFunArgTy_maybe fun ar
               $$ text "The argument type was" <+> ppr arg_ty
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
-  Right Nothing -> traverseOf funBaseType' f fun
+  Right Nothing -> traverseOf funBaseType f fun
     where f = \case
             Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
             Just appliedTy -> pure appliedTy
@@ -214,12 +212,12 @@ tcFunArgTyL funBaseType funBaseType' fun arg_ty = case baseFunArgTy_maybe fun ar
 tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
                => UserFun p -> Type
                -> TcM (UserFun Typed)
-tcUserFunArgTy = tcFunArgTyL funBaseType funBaseType
+tcUserFunArgTy = tcFunArgTyL
 
 tcFunArgTy :: forall p. (Pretty (BaseFun p), InPhase p)
            => Fun p -> Type
            -> TcM (Fun Typed)
-tcFunArgTy = tcFunArgTyL funBaseType funBaseType
+tcFunArgTy = tcFunArgTyL
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
