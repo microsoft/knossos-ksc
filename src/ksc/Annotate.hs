@@ -216,10 +216,10 @@ tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
                -> TcM (UserFun Typed)
 tcUserFunArgTy = tcFunArgTyL userFunBaseType userFunBaseType
 
-tcPrimFunArgTy :: forall p. (Pretty (BasePrimFun p), InPhase p)
-               => DerivedFun (BasePrimFun p) -> Type
-               -> TcM (DerivedFun (BasePrimFun Typed))
-tcPrimFunArgTy = tcFunArgTyL primFunBaseType primFunBaseType
+tcFunArgTy :: forall p. (Pretty (BaseFun p), InPhase p)
+           => Fun p -> Type
+           -> TcM (Fun Typed)
+tcFunArgTy = tcFunArgTyL funBaseType funBaseType
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
@@ -493,15 +493,12 @@ lookupLclTc v
 lookupGblTc :: Fun Parsed -> TypedExpr -> TcM (Fun Typed, Type)
 lookupGblTc fun args
   = do { st <- getSymTabTc
-       ; (funTyped, callResultTy_maybe) <- case perhapsUserFun fun of
-           Right userFun -> do
-             { userFun' <- tcUserFunArgTy @Parsed userFun ty
-             ; pure (userFunToFun userFun',
-                     userCallResultTy_maybe userFun' (gblST st) ty) }
-           Left primFun -> do
-             { primFun' <- tcPrimFunArgTy @Parsed primFun ty
-             ; pure (primFunToFun primFun',
-                     primCallResultTy_maybe primFun' ty)
+       ; funTyped <- tcFunArgTy @Parsed fun ty
+       ; callResultTy_maybe <- case perhapsUserFun funTyped of
+           Right userFun' -> do
+             { pure (userCallResultTy_maybe userFun' (gblST st) ty) }
+           Left primFun' -> do
+             { pure (primCallResultTy_maybe primFun' ty)
              }
 
        ; res_ty <- case callResultTy_maybe of
