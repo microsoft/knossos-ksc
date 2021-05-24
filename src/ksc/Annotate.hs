@@ -58,7 +58,7 @@ annotDecls gbl_env decls
     mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr_fun) $
          tcWithPat pat $ \pat' ->
-         do { fun' <- tcUserFunArgTy @Parsed fun (typeof pat')
+         do { fun' <- tcFunArgTy @Parsed fun (typeof pat')
             ; return (Def { def_fun = fun', def_pat = pat'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
@@ -101,7 +101,7 @@ tcDef (Def { def_fun    = fun
   = addCtxt (text "In the definition of" <+> ppr_fun) $
     do { tcWithPat pat $ \pat' ->
     do { rhs' <- tcRhs fun rhs res_ty
-       ; fun' <- tcUserFunArgTy @p fun (typeof pat')
+       ; fun' <- tcFunArgTy @p fun (typeof pat')
        ; return (Def { def_fun = fun', def_pat = pat'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
@@ -192,9 +192,9 @@ tcGDef g@(GDef d f)
              Left err -> tcFail err
        }
 
-tcFunArgTyL :: forall p name. (InPhase p, Pretty (BaseFunId name p))
-            => DerivedFun name p -> Type -> TcM (DerivedFun name Typed)
-tcFunArgTyL fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
+tcFunArgTy :: forall p name. (InPhase p, Pretty (BaseFunId name p))
+           => DerivedFun name p -> Type -> TcM (DerivedFun name Typed)
+tcFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
   Right (Just baseTy) -> case addBaseTypeToFun fun baseTy of
     Right r -> pure r
     Left appliedTy ->
@@ -207,16 +207,6 @@ tcFunArgTyL fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
             Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
             Just appliedTy -> pure appliedTy
   Left err -> tcFail err
-
-tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
-               => UserFun p -> Type
-               -> TcM (UserFun Typed)
-tcUserFunArgTy = tcFunArgTyL
-
-tcFunArgTy :: forall p. (Pretty (BaseFun p), InPhase p)
-           => Fun p -> Type
-           -> TcM (Fun Typed)
-tcFunArgTy = tcFunArgTyL
 
 tcExpr :: forall p. InPhase p => ExprX p -> TcM TypedExpr
   -- Naming conventions in this function:
