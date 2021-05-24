@@ -196,7 +196,7 @@ tcFunArgTyL :: forall a p. (InPhase p, Pretty (BaseFunId a p))
             => DerivedFun (BaseFunId a p) -> Type
             -> TcM (DerivedFun (BaseFunId a 'Typed))
 tcFunArgTyL fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
-  Right (Just baseTy) -> case addBaseTypeToFun funBaseType fun baseTy of
+  Right (Just baseTy) -> case addBaseTypeToFun fun baseTy of
     Right r -> pure r
     Left appliedTy ->
       tcFail (text "The base type did not match the applied type"

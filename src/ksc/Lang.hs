@@ -486,12 +486,11 @@ funType = baseFunFun . baseFunT
 -- otherwise (and in other phases, where the type is there) check that
 -- the type matches.  If mis-match return (Left
 -- type-that-was-in-DerivedFun)
-addBaseTypeToFun :: ((Maybe Type -> Either Type Type)
-                      -> DerivedFun a -> Either Type (DerivedFun b))
-                 -> DerivedFun a
+addBaseTypeToFun :: InPhase p
+                 => DerivedFun (BaseFunId a p)
                  -> Type
-                 -> Either Type (DerivedFun b)
-addBaseTypeToFun baseType userfun expectedBaseTy = T.traverseOf baseType checkBaseType userfun
+                 -> Either Type (DerivedFun (BaseFunId a Typed))
+addBaseTypeToFun userfun expectedBaseTy = T.traverseOf funBaseType checkBaseType userfun
   where checkBaseType :: Maybe Type -> Either Type Type
         checkBaseType maybeAppliedType
           | Just appliedTy <- maybeAppliedType
