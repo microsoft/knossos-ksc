@@ -616,25 +616,25 @@ cgenBasePrimFun = \case
   (BaseFunId fun _) -> render (ppr fun)
 
 cgenUserFun :: HasCallStack => UserFun Typed -> String
-cgenUserFun = cgenUserFunG cgenBaseUserFun
+cgenUserFun = cgenFun cgenBaseUserFun
 
 cgenPrimFun :: HasCallStack => DerivedFun PrimFun Typed -> String
-cgenPrimFun = cgenUserFunG cgenBasePrimFun
+cgenPrimFun = cgenFun cgenBasePrimFun
 
-cgenUserFunG :: HasCallStack
-             => (BaseFunId name Typed -> String) -> DerivedFun name Typed -> String
-cgenUserFunG base f = case f of
-  Fun JustFun baseFun   -> base baseFun
-  Fun GradFun{}  s  -> "D$" ++ base s
-  Fun (DrvFun (AD BasicAD Fwd)) s -> "fwd$" ++ base s
-  Fun (DrvFun (AD BasicAD Rev)) s -> "rev$" ++ base s
-  Fun (DrvFun (AD TupleAD Fwd)) s -> "fwdt$" ++ base s
-  Fun (DrvFun (AD TupleAD Rev)) s -> "revt$" ++ base s
-  Fun (ShapeFun ds) ff   -> "shape$" ++ cgenUserFunG base (Fun ds ff)
-  Fun CLFun s       -> "CL$" ++ base s
-  Fun SUFFwdPass s  -> "suffwdpass$" ++ base s
-  Fun SUFRevPass s  -> "sufrevpass$" ++ base s
-  Fun SUFRev   s    -> "sufrev$" ++ base s
+cgenFun :: HasCallStack
+        => (BaseFunId name Typed -> String) -> DerivedFun name Typed -> String
+cgenFun cgenBaseFun f = case f of
+  Fun JustFun baseFun   -> cgenBaseFun baseFun
+  Fun GradFun{}  s  -> "D$" ++ cgenBaseFun s
+  Fun (DrvFun (AD BasicAD Fwd)) s -> "fwd$" ++ cgenBaseFun s
+  Fun (DrvFun (AD BasicAD Rev)) s -> "rev$" ++ cgenBaseFun s
+  Fun (DrvFun (AD TupleAD Fwd)) s -> "fwdt$" ++ cgenBaseFun s
+  Fun (DrvFun (AD TupleAD Rev)) s -> "revt$" ++ cgenBaseFun s
+  Fun (ShapeFun ds) ff   -> "shape$" ++ cgenFun cgenBaseFun (Fun ds ff)
+  Fun CLFun s       -> "CL$" ++ cgenBaseFun s
+  Fun SUFFwdPass s  -> "suffwdpass$" ++ cgenBaseFun s
+  Fun SUFRevPass s  -> "sufrevpass$" ++ cgenBaseFun s
+  Fun SUFRev   s    -> "sufrev$" ++ cgenBaseFun s
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
 cgenAnyFun tf cftype = case tf of
