@@ -203,7 +203,7 @@ tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
               $$ text "The argument type was" <+> ppr arg_ty
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
-  Right Nothing -> traverseOf (baseFunFun . baseUserFunType) f fun
+  Right Nothing -> traverseOf userFunBaseType f fun
     where f = \case
             Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
             Just appliedTy -> pure appliedTy
@@ -220,7 +220,7 @@ tcPrimFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
               $$ text "The argument type was" <+> ppr arg_ty
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
-  Right Nothing -> traverseOf (baseFunFun . basePrimFunType) f fun
+  Right Nothing -> traverseOf primFunBaseType f fun
     where f = \case
             Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
             Just appliedTy -> pure appliedTy
