@@ -53,7 +53,7 @@ _colon = sexpdata.Symbol(":")
 _None = sexpdata.Symbol("None")
 
 
-def parse_type_maybe(se):
+def parse_type_maybe(se, allow_any=False):
     """ Converts an S-Expression representing a type, like (Tensor 1 Float) or (Tuple Float (Tensor 1 Float)),
         into a Type object, e.g. Type.Tensor(1,Type.Float) or Type.Tuple(Type.Float, Type.Tensor(1,Type.Float)).
     """
@@ -63,9 +63,9 @@ def parse_type_maybe(se):
     if isinstance(se, sexpdata.Symbol):
         if se == _None:
             return True, None
-
-        if Type.is_type_introducer(se.value()):
-            return True, Type(se.value())
+        sym = se.value()
+        if Type.is_type_introducer(sym) and (allow_any or sym != "Any"):
+            return True, Type(sym)
 
         return False, None
 
@@ -86,12 +86,12 @@ def parse_type_maybe(se):
     return False, None
 
 
-def parse_type(se):
-    ok, ty = parse_type_maybe(se)
+def parse_type(se, allow_any=False):
+    ok, ty = parse_type_maybe(se, allow_any)
     if ok:
         return ty
     else:
-        raise ValueError("Did not know how to parse type {}".format(se))
+        raise ParseError("Did not know how to parse type {}".format(se))
 
 
 def parse_types(ses):
@@ -143,16 +143,23 @@ def parse_string(se):
 
 
 # "x : Float" -> Var(x, Type.Float)
-def parse_arg(arg):
+def parse_arg(arg, allow_type_any=False):
     check(len(arg) >= 3, "Expect (arg : type), not: ", arg)
     check(arg[1] == _colon, "No colon: ", arg)
 
-    return Var(parse_name(arg[0]), parse_type(arg[2:]), True)
+    return Var(parse_name(arg[0]), parse_type(arg[2:], allow_any=allow_type_any), True)
 
 
 # "((x : Float) (y : Integer))" -> [Var("x", Type.Float), Var("y", Type.Integer)]
-def parse_args(se):
-    return [parse_arg(arg) for arg in ensure_list_of_lists(se)]
+def parse_args(se, allow_type_any=False):
+    return [
+        parse_arg(arg, allow_type_any=allow_type_any)
+        for arg in ensure_list_of_lists(se)
+    ]
+
+
+def parse_args_with_any(se):
+    return parse_args(se, allow_type_any=True)
 
 
 def parse_expr(se):
@@ -228,7 +235,9 @@ def parse_tld(se):
 
     if head == _rule:
         return Rule(
-            *parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr)
+            *parse_seq(
+                se[1:], parse_string, parse_args_with_any, parse_expr, parse_expr
+            )
         )
 
     check(False, "unrecognised top-level definition:", se)
