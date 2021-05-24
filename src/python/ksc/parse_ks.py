@@ -53,7 +53,7 @@ _colon = sexpdata.Symbol(":")
 _None = sexpdata.Symbol("None")
 
 
-def parse_type_maybe(se, allow_Any=False):
+def parse_type_maybe(se, allow_Any: bool):
     """ Converts an S-Expression representing a type, like (Tensor 1 Float) or (Tuple Float (Tensor 1 Float)),
         into a Type object, e.g. Type.Tensor(1,Type.Float) or Type.Tuple(Type.Float, Type.Tensor(1,Type.Float)).
     """
@@ -133,7 +133,7 @@ def parse_structured_name(se):
     ses = se.value()
     assert len(ses) == 2
     se0 = parse_name(ses[0])
-    ok, ty = parse_type_maybe(ses[1])
+    ok, ty = parse_type_maybe(ses[1], allow_Any=False)
     if ok:
         return StructuredName((se0, ty))
 
