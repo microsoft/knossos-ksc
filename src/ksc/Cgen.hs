@@ -648,10 +648,9 @@ cgenAnyFun tf cftype = case tf of
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
   TFun (TypeLM _ _) (Fun JustFun (PrimFunT _)) -> cgenType cftype ++ "::mk"
-  TFun _            (Fun d (BaseFunId (BasePrimFunName p) ty)) -> cgenPrimFun f
-    where f = Fun d (BaseFunId p ty)
-  TFun _            (Fun d (BaseFunId (BaseUserFunName s) ty)) -> cgenUserFun f
-    where f = Fun d (BaseFunId s ty)
+  TFun _            f -> case perhapsUserFun f of
+    Left primFun  -> cgenPrimFun primFun
+    Right userFun -> cgenUserFun userFun
 
 {- Note [Allocator usage of function calls]
 
