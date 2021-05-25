@@ -341,6 +341,26 @@ def test_polymorphic_rules(prelude_symtab):
     )
 
 
+def test_polymorphic_replacement(prelude_symtab):
+    # The "Any" here is new in the replacement, but is still figured out by type propagation.
+    build_to_map = parse_rule_str(
+        """
+        (rule "build_to_map" ((in : Vec Any) (body : Any))
+           (build (size in) (lam (i : Integer) (let (x (index i in)) body)))
+               ;; note a real rule would also need to ensure 'i' and 'in' are not free in 'body'.
+           (map (lam (x : Any) body) in))""",
+        {},
+    )
+    e = parse_expr_string(
+        "(build (size v) (lam (idx : Integer) (let (elem (index idx v)) (add elem 1.0))))"
+    )
+    expected = parse_expr_string("(map (lam (elem : Float) (add elem 1.0)) v)")
+    symtab = {**prelude_symtab, "v": Type.Tensor(1, Type.Float)}
+    type_propagate_decls([e, expected], symtab)
+    actual = utils.single_elem(list(build_to_map.find_all_matches(e))).apply_rewrite()
+    assert actual == expected
+
+
 def test_rule_pickling():
     import pickle
 
