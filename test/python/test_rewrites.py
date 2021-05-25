@@ -269,6 +269,26 @@ def test_parsed_rule_capture(prelude_symtab):
     assert actual == expected
 
 
+def parsed_rule_side_conditions(prelude_symtab):
+    e = parse_expr_string("(if (gt (index 1 v) 0) 2 2)")
+    type_propagate(e, prelude_symtab)
+    rule_general = parse_rule_str(
+        '(rule "if_both_same$i" ((p : Bool) (x : Integer)) (if p x x) x)'
+    )
+    assert apply_in_only_location(rule_general, e) == parse_expr_string("2")
+
+    # As an example, this side condition makes (very) sure we are not changing
+    # an exception-throwing program into a succeeding one
+    rule_restricted = parse_rule_str(
+        'rule "if_both_same_restricted$i" ((p : Bool) (x : Integer)) (if p x x) x)',
+        side_conditions=lambda *, p, x: p.__class__ in [Const, Var],
+    )
+    check_nowhere_applicable(rule_restricted, e)
+
+    e2 = parse_expr_string("(if True (add 2 3) (add 2 3))")
+    assert apply_in_only_location(rule_restricted, e2) == parse_expr_string("(add 2 3)")
+
+
 def test_rule_pickling():
     import pickle
 
