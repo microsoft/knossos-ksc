@@ -1,5 +1,6 @@
 #####################################################################
 # parse_ks: Convert s-expressions to Expr
+from functools import partial
 import sexpdata
 
 from ksc.type import Type
@@ -165,11 +166,7 @@ def parse_args(se, allow_Type_Any=False):
     ]
 
 
-def parse_args_allow_Any(se):
-    return parse_args(se, allow_Type_Any=True)
-
-
-def parse_expr(se):
+def parse_expr(se, allow_Type_Any=False):
     # Otherwise, "x" -> a variable use
     if isinstance(se, sexpdata.Symbol):
         return Var(se.value(), None, False)
@@ -184,14 +181,14 @@ def parse_expr(se):
     check(len(se) > 0, "Empty list")
 
     head = se[0]
-
+    parse_subexp = partial(parse_expr, allow_Type_Any=allow_Type_Any)
     # If(cond, t, f)
     if head == _if:
-        return If(*parse_seq(se[1:], parse_expr, parse_expr, parse_expr))
+        return If(*parse_seq(se[1:], parse_subexp, parse_subexp, parse_subexp))
 
     # Assert(cond, body)
     if head == _assert:
-        return Assert(*parse_seq(se[1:], parse_expr, parse_expr))
+        return Assert(*parse_seq(se[1:], parse_subexp, parse_subexp))
 
     # Let(var, rhs, body)
     if head == _let:
@@ -207,19 +204,19 @@ def parse_expr(se):
             vars = [Var(parse_name(v)) for v in lhs]
         else:
             vars = Var(parse_name(lhs))
-        rhs = parse_expr(binding[1])
-        body = parse_expr(se[2])
+        rhs = parse_subexp(binding[1])
+        body = parse_subexp(se[2])
         ans = Let(vars, rhs, body)
         return ans
 
     # Lam(var, type, body)
     if head == _lam:
-        var = parse_arg(se[1])
-        body = parse_expr(se[2])
+        var = parse_arg(se[1], allow_Type_Any)
+        body = parse_subexp(se[2])
         return Lam(var, body)
 
     # The remainder are calls
-    return Call(parse_structured_name(head), [parse_expr(se) for se in se[1:]])
+    return Call(parse_structured_name(head), [parse_subexp(se) for se in se[1:]])
 
 
 # Parse a top-level definition (def, edef, rule)
@@ -241,9 +238,14 @@ def parse_tld(se):
         return GDef(*parse_seq(se[1:], parse_name, parse_structured_name))
 
     if head == _rule:
+        parse_expr_allow_Any = partial(parse_expr, allow_Type_Any=True)
         return Rule(
             *parse_seq(
-                se[1:], parse_string, parse_args_allow_Any, parse_expr, parse_expr
+                se[1:],
+                parse_string,
+                partial(parse_args, allow_Type_Any=True),
+                parse_expr_allow_Any,
+                parse_expr_allow_Any,
             )
         )
 
