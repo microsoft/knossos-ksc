@@ -391,7 +391,12 @@ def build_module_using_pytorch_from_ks(
     if cpp_compiler == None and sys.platform == "win32":
         cflags.append("/std:c++17")
     else:
-        cflags.append("-std=c++17")
+        cflags += [
+            "-std=c++17",
+            "-g",
+            "-O3",
+            # "-DKS_BOUNDS_CHECK",
+        ]
 
     verbose = True
 
