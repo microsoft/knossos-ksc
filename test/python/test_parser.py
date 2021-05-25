@@ -113,9 +113,9 @@ def test_any_type_allowed_only_for_rules():
     tld('(rule "foo" (x : Any) x x)')
     tld(
         """
-(rule "take.intro" ((n : Integer) (v : Vec Any))
-    (build n (lam (i : Integer) (index i v)))
-    (take n v))"""
+(rule "map_to_build" ((body : Any) (v : Vec Any))
+    (map (lam (e : Any) body) v)
+    (build n (lam (i : Integer) (let (e (index i v)) body))))"""
     )
 
 
