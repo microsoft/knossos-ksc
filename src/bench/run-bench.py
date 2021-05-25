@@ -129,9 +129,18 @@ def bench(module_name, bench_name):
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
+    import ksc.utils
 
-    if len(sys.argv) != 3:
-        print("Usage: run-bench MODULE BENCH")
-        sys.exit(1)
-    bench(sys.argv[1], sys.argv[2])
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("module")
+    parser.add_argument("bench")
+    parser.add_argument("-p", "--preserve-temporary-files", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.preserve_temporary_files:
+        print("run-bench: Will preserve temporary files")
+        ksc.utils.preserve_temporary_files = True
+    bench(args.module, args.bench)

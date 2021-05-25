@@ -1,3 +1,4 @@
+import atexit
 import itertools
 
 import importlib.util
@@ -12,6 +13,8 @@ from tempfile import gettempdir
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
 from torch.utils.cpp_extension import load, load_inline
+
+preserve_temporary_files = False
 
 
 class KRecord:
@@ -185,9 +188,19 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
         out = f.read()
 
     # only delete these file if no error
-    os.unlink(fks.name)
-    os.unlink(fcpp.name)
-    os.unlink(fkso.name)
+    if not preserve_temporary_files:
+
+        @atexit.register
+        def _():
+            print(
+                "ksc.utils.generate_cpp_from_ks: Deleting",
+                fks.name,
+                fcpp.name,
+                fkso.name,
+            )
+            os.unlink(fks.name)
+            os.unlink(fcpp.name)
+            os.unlink(fkso.name)
 
     return out
 
@@ -236,7 +249,16 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
 
         raise
 
-    os.unlink(fcpp.name)
+    if not preserve_temporary_files:
+
+        @atexit.register
+        def _():
+            print(
+                "ksc.utils.build_py_module_from_cpp: Deleting", fcpp.name, fpymod.name,
+            )
+            os.unlink(fcpp.name)
+            os.unlink(fpymod.name)
+
     return module_name, module_path
 
 
