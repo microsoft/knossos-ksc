@@ -349,7 +349,7 @@ def test_polymorphic_replacement(prelude_symtab):
            (build (size inp) (lam (i : Integer) (let (x (index i inp)) body)))
            (map (lam (x : Any) body) inp))""",
         {},
-        side_conditions = lambda *, inp, body, i, x: i.name not in body.free_vars_
+        side_conditions=lambda *, inp, body, i, x: i.name not in body.free_vars_,
     )
     e = parse_expr_string(
         "(build (size v) (lam (idx : Integer) (let (elem (index idx v)) (add elem 1.0))))"
