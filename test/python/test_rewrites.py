@@ -277,11 +277,12 @@ def parsed_rule_side_conditions(prelude_symtab):
     )
     assert apply_in_only_location(rule_general, e) == parse_expr_string("2")
 
+    # As an example, this side condition makes (very) sure we are not changing
+    # an exception-throwing program into a succeeding one
     rule_restricted = parse_rule_str(
-        'rule "if_both_same_var$i" ((p : Bool) (x : Integer)) (if p x x) x)',
+        'rule "if_both_same_restricted$i" ((p : Bool) (x : Integer)) (if p x x) x)',
         side_conditions=lambda *, p, x: p.__class__ in [Const, Var],
     )
-
     check_nowhere_applicable(rule_restricted, e)
 
     e2 = parse_expr_string("(if True (add 2 3) (add 2 3))")
