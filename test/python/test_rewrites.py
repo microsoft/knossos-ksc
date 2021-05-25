@@ -345,11 +345,11 @@ def test_polymorphic_replacement(prelude_symtab):
     # The "Any" here is new in the replacement, but is still figured out by type propagation.
     build_to_map = parse_rule_str(
         """
-        (rule "build_to_map" ((in : Vec Any) (body : Any))
-           (build (size in) (lam (i : Integer) (let (x (index i in)) body)))
-               ;; note a real rule would also need to ensure 'i' and 'in' are not free in 'body'.
-           (map (lam (x : Any) body) in))""",
+        (rule "build_to_map" ((inp : Vec Any) (body : Any))
+           (build (size inp) (lam (i : Integer) (let (x (index i inp)) body)))
+           (map (lam (x : Any) body) inp))""",
         {},
+        side_conditions = lambda *, inp, body, i, x: i.name not in body.free_vars_
     )
     e = parse_expr_string(
         "(build (size v) (lam (idx : Integer) (let (elem (index idx v)) (add elem 1.0))))"
