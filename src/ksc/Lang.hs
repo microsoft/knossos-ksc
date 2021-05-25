@@ -502,18 +502,14 @@ userFunToFun = T.over (baseFunFun . baseFunName) BaseUserFunName
 -- Right: a 'UserFun p', or
 -- Left:  a 'PrimFun'
 perhapsUserFun :: Fun p -> Either (DerivedFun PrimFun p) (UserFun p)
-perhapsUserFun (Fun ds baseFun) =
-  either (Left . Fun ds) (Right . Fun ds) (baseFunToBaseUserFunE baseFun)
+perhapsUserFun (Fun ds baseFun) = case baseFun of
+  BaseFunId (BaseUserFunName u) ty -> Right (Fun ds (BaseFunId u ty))
+  BaseFunId (BasePrimFunName p) ty -> Left  (Fun ds (BaseFunId p ty))
 
 maybeUserFun :: Fun p -> Maybe (UserFun p)
 maybeUserFun f = case perhapsUserFun f of
   Right f -> Just f
   Left _ -> Nothing
-
-baseFunToBaseUserFunE :: BaseFun p -> Either (BasePrimFun p) (BaseUserFun p)
-baseFunToBaseUserFunE = \case
-  BaseFunId (BaseUserFunName u) ty   -> Right (BaseFunId u ty)
-  BaseFunId (BasePrimFunName p) ty   -> Left (BaseFunId p  ty)
 
 isSelFun :: BaseFun p -> Bool
 isSelFun = \case
