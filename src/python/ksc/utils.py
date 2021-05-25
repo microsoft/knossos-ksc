@@ -298,15 +298,11 @@ def __make_cpp_str(
         dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
         dreturn_type_str = mangleType(tangent_type(return_type))
 
-        fwd_name = encode_name(f"fwd${name_to_call}@{args_str}")
-        declarations += f"""
-          m.def("fwd_entry", with_ks_allocator(&ks::{fwd_name}));
-        """
-
-        rev_name = encode_name(f"rev${name_to_call}@{args_str}")
-        declarations += f"""
-          m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
-        """
+        for der in derivatives_to_generate:
+            der_name = encode_name(f"{der}${name_to_call}@{args_str}")
+            declarations += f"""
+            m.def("{der}_entry", with_ks_allocator(&ks::{der_name}));
+            """
 
     cpp_str += (
         """
