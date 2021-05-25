@@ -1,5 +1,3 @@
-import hashlib
-
 import ksc
 from ksc.type import Type
 from ksc.abstract_value import AbstractValue

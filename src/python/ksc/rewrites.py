@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
-from typing import Any, FrozenSet, Iterator, Optional, List, Mapping, Tuple, Union
+from typing import Any, FrozenSet, Iterator, List, Mapping, Optional, Tuple
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
@@ -28,7 +28,7 @@ from ksc.expr import (
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.type import Type
-from ksc.type_propagate import type_propagate, type_propagate_expr
+from ksc.type_propagate import type_propagate
 from ksc.utils import singleton, single_elem
 from ksc.visitors import ExprTransformer
 
@@ -274,7 +274,7 @@ class ParsedRuleMatcher(RuleMatcher):
          replacement is an Expr, whose free vars are a subset of `template_vars`
     """
 
-    def __init__(self, rule: Rule):
+    def __init__(self, rule: Rule, side_conditions=lambda **substs: True):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
         assert rule.template.type_ == rule.replacement.type_ != None
         known_vars = frozenset([v.name for v in rule.template_vars])
@@ -285,6 +285,7 @@ class ParsedRuleMatcher(RuleMatcher):
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
+        self._side_conditions = side_conditions
 
     @property
     def possible_filter_terms(self):
@@ -296,7 +297,7 @@ class ParsedRuleMatcher(RuleMatcher):
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
         substs = find_template_subst(self._rule.template, subtree, self._arg_types)
-        if substs is not None:
+        if substs is not None and self._side_conditions(**substs):
             yield Match(self, root, path_from_root, substs)
 
     def apply_at(
@@ -454,7 +455,7 @@ class SubstTemplate(ExprTransformer):
             res.type_ = None
             # No symtab should be required: "Any" should only be used in rules for builtins which are
             # universally polymorphic, not for ad-hoc-overloaded functions from prelude etc.
-            type_propagate_expr(res, {})
+            type_propagate(res, {}, respect_existing=True)
         return res
 
     def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
@@ -488,11 +489,11 @@ class SubstTemplate(ExprTransformer):
         )
 
 
-def parse_rule_str(ks_str, symtab):
+def parse_rule_str(ks_str, symtab, **kwargs):
     r = single_elem(list(parse_ks_file(ks_str)))
     assert isinstance(r, Rule)
     type_propagate(r, symtab)
-    return ParsedRuleMatcher(r)
+    return ParsedRuleMatcher(r, **kwargs)
 
 
 def parse_rules_from_file(filename):

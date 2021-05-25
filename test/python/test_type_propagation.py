@@ -1,14 +1,16 @@
 import pytest
 
 from ksc.type import Type, KSTypeError
-from ksc.type_propagate import type_propagate_decls
-from ksc.expr import StructuredName
+from ksc.type_propagate import type_propagate_decls, type_propagate
+from ksc.expr import StructuredName, If, Const
 from ksc.parse_ks import (
+    parse_expr_string,
     parse_ks_filename,
     parse_ks_string,
     parse_structured_name,
     s_exps_from_string,
 )
+from ksc.utils import single_elem
 
 
 def test_type_propagate_prelude_and_primer():
@@ -111,3 +113,62 @@ def test_type_propagate_warnings():
     with pytest.raises(KSTypeError) as excinfo:
         type_propagate_decls(decls, {})
     assert "Couldn't find" in str(excinfo.value)
+
+
+def test_type_propagate_respect_existing():
+    decls = list(
+        parse_ks_string(
+            "(def foo Float ((p : Bool) (x : Float)) (let (y 3.0) (if p y y)))",
+            __file__,
+        )
+    )
+    type_propagate_decls(decls, {})
+    foo = single_elem(decls)
+    if_node = foo.body.body
+    assert isinstance(if_node, If)
+    assert if_node.type_ == Type.Float
+
+    # Make the types of the Let internally inconsistent by replacing RHS Float with Integer
+    foo.body.rhs = Const(3)
+    assert foo.body.rhs.type_ == Type.Integer
+    # Remove type of Let and If, but leave the y's still having type Float
+    foo.body.type_ = if_node.type_ = None
+    type_propagate(foo, {}, respect_existing=True)
+    # Types recomputed but still using old type for y:
+    assert (
+        foo.body.type_
+        == if_node.type_
+        == if_node.t_body.type_
+        == if_node.f_body.type_
+        == Type.Float
+    )
+
+    # Force to recompute types - the declaration is now mistyped
+    with pytest.raises(KSTypeError) as excinfo:
+        type_propagate(foo, {}, respect_existing=False)
+    assert "inferred return type Integer" in str(excinfo.value)
+    assert "does not match declaration Float" in str(excinfo.value)
+    assert (
+        foo.body.type_
+        == if_node.type_
+        == if_node.t_body.type_
+        == if_node.f_body.type_
+        == Type.Integer
+    )
+
+
+def test_type_propagate_respect_existing_does_not_traverse(prelude_symtab):
+    e = parse_expr_string("(add 3.0 (mul x x))")
+    mul = e.args[1]
+    assert not mul.name.has_type()
+
+    # Set the type of the mul; this prevents recursing any deeper
+    e.args[1].type_ = Type.Float
+    type_propagate(e, prelude_symtab, respect_existing=True)
+    assert e.type_ == Type.Float  # Did something
+    # But did not go inside mul...
+    assert not mul.name.has_type()
+    assert mul.args[0].type_ == mul.args[1].type_ == None
+
+    with pytest.raises(KSTypeError, match="Unknown symbol x"):
+        type_propagate(e, prelude_symtab, respect_existing=False)

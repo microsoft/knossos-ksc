@@ -27,6 +27,16 @@ def test_untupling2():
     assert untuple_lets(expected) == expected
 
 
+def test_untupling_var():
+    actual = untuple_lets(parse_expr_string("(let ((a b) foo) (add a b))"))
+    # No need to generate a temp_N to hold value of Var foo
+    expected = parse_expr_string(
+        "(let (a (get$1$2 foo)) (let (b (get$2$2 foo)) (add a b)))"
+    )
+    assert actual == expected
+    assert untuple_lets(expected) == expected
+
+
 def test_untupling_avoids_capture():
     def test_with_var_name(v: str):
         actual = untuple_lets(parse_expr_string(f"(let ((a b) (foo {v})) (add a b))"))

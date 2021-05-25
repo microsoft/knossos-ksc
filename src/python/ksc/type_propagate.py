@@ -18,7 +18,6 @@ from ksc.expr import (
     EDef,
     GDef,
     Rule,
-    Const,
     Var,
     Lam,
     Call,
@@ -54,15 +53,28 @@ sys.setrecursionlimit(10 ** 6)
 from functools import singledispatch
 
 
-@singledispatch
-def type_propagate(ex: ASTNode, symtab):
+def type_propagate(ex, symtab, respect_existing=False):
     """
-    Fill "type" field of expr, propagating from incoming dict "symtab"
+    Fill "type" field(s) of "ex", propagating from and updating incoming dict "symtab"
 
     Keys of the symtab are names, either names of variables or StructuredNames
     Values in the symtab are types, the return types in the case of StructuredNames
+
+    if respect_existing is True, and "ex" is an Expr whose type_ is already set (not None),
+    then the existing type_ is left untouched and sub-Exprs are not examined.
     """
-    raise AssertionError("Must be overridden for all AST node subclasses")
+    return (
+        ex
+        if respect_existing and isinstance(ex, Expr) and ex.type_ is not None
+        else _type_propagate_helper(ex, symtab, respect_existing)
+    )
+
+
+@singledispatch
+def _type_propagate_helper(ex: ASTNode, symtab, respect_existing: bool):
+    # Default implementation, for Expr subclasses not specialized below
+    assert ex.type_ is not None
+    return ex
 
 
 # f : S -> T
@@ -137,8 +149,8 @@ def add_type_to_sname(sname: StructuredName, argtype: Type) -> StructuredName:
     return sname
 
 
-@type_propagate.register(Def)
-def _(ex, symtab):
+@_type_propagate_helper.register(Def)
+def _(ex, symtab, respect_existing):
     # (def name return_type args body)
     declared_return_type = ex.return_type != None
 
@@ -168,7 +180,7 @@ def _(ex, symtab):
 
     # Recurse into body
     try:
-        ex.body = type_propagate(ex.body, local_st)
+        ex.body = type_propagate(ex.body, local_st, respect_existing)
     except KSTypeError as e:
         ctx = f"In definition of {ex.name} {pformat(argtypes)}\n"
         raise KSTypeError(ctx + str(e)) from e
@@ -188,8 +200,8 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate.register(EDef)
-def _(ex, symtab):
+@_type_propagate_helper.register(EDef)
+def _(ex, symtab, respect_existing):
     # (edef name return_type arg_type)
     ex.name = add_type_to_sname(ex.name, ex.arg_type)
 
@@ -201,8 +213,8 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate.register(GDef)
-def _(ex, symtab):
+@_type_propagate_helper.register(GDef)
+def _(ex, symtab, respect_existing):
     # (gdef derivation function_name)
     signature = StructuredName((ex.derivation, ex.function_name))
     # TODO: Need to map to return type.
@@ -215,29 +227,16 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate.register(Rule)
-def _(ex, symtab):
+@_type_propagate_helper.register(Rule)
+def _(ex, symtab, respect_existing):
     local_st = {**symtab, **{a.name: a.type_ for a in ex.template_vars}}
-    type_propagate(ex.template, local_st)
-    type_propagate(ex.replacement, local_st)
+    type_propagate(ex.template, local_st, respect_existing)
+    type_propagate(ex.replacement, local_st, respect_existing)
     return ex
 
 
-@type_propagate.register(Expr)
-def _(ex, symtab):
-    # Stop propagation (do not recurse) if type already set
-    return type_propagate_expr(ex, symtab) if ex.type_ is None else ex
-
-
-@singledispatch
-def type_propagate_expr(ex, symtab):
-    # Default implementation, for types not specialized below.
-    assert ex.type_ is not None
-    return ex
-
-
-@type_propagate_expr.register(Var)
-def _(ex, symtab):
+@_type_propagate_helper.register(Var)
+def _(ex, symtab, respect_existing):
     if ex.decl:
         assert ex.type_ != None
     else:
@@ -247,10 +246,10 @@ def _(ex, symtab):
     return ex
 
 
-@type_propagate_expr.register(Call)
-def _(ex, symtab):
+@_type_propagate_helper.register(Call)
+def _(ex, symtab, respect_existing):
     for a in ex.args:
-        type_propagate(a, symtab)
+        type_propagate(a, symtab, respect_existing)
     argtypes = tuple(a.type_ for a in ex.args)
     argtype = make_tuple_if_many(argtypes)
 
@@ -320,23 +319,23 @@ def _(ex, symtab):
     raise KSTypeError(f"Couldn't find {ex.name} applied to ({argtypes_str}) at {ex}")
 
 
-@type_propagate_expr.register(Lam)
-def _(ex, symtab):
+@_type_propagate_helper.register(Lam)
+def _(ex, symtab, respect_existing):
     local_st = {**symtab, ex.arg.name: ex.arg.type_}
-    ex.body = type_propagate(ex.body, local_st)
+    ex.body = type_propagate(ex.body, local_st, respect_existing)
     ex.type_ = Type.Lam(ex.arg.type_, ex.body.type_)
     return ex
 
 
-@type_propagate_expr.register(Let)
-def _(ex, symtab):
-    ex.rhs = type_propagate(ex.rhs, symtab)
+@_type_propagate_helper.register(Let)
+def _(ex, symtab, respect_existing):
+    ex.rhs = type_propagate(ex.rhs, symtab, respect_existing)
 
     # Single var assignment
     if isinstance(ex.vars, Var):
         ex.vars.type_ = ex.rhs.type_
         local_st = {**symtab, ex.vars.name: ex.vars.type_}
-        ex.body = type_propagate(ex.body, local_st)
+        ex.body = type_propagate(ex.body, local_st, respect_existing)
         ex.type_ = ex.body.type_
         return ex
 
@@ -348,29 +347,29 @@ def _(ex, symtab):
             var.type_ = ex.rhs.type_.tuple_elem(i) if ex.rhs.type_ else None
             local_st[var.name] = var.type_
 
-        ex.body = type_propagate(ex.body, local_st)
+        ex.body = type_propagate(ex.body, local_st, respect_existing)
         ex.type_ = ex.body.type_
         return ex
 
     assert False  # Bad var
 
 
-@type_propagate_expr.register(If)
-def _(ex, symtab):
-    ex.cond = type_propagate(ex.cond, symtab)
+@_type_propagate_helper.register(If)
+def _(ex, symtab, respect_existing):
+    ex.cond = type_propagate(ex.cond, symtab, respect_existing)
     assert ex.cond.type_ == Type.Bool
-    ex.t_body = type_propagate(ex.t_body, symtab)
-    ex.f_body = type_propagate(ex.f_body, symtab)
+    ex.t_body = type_propagate(ex.t_body, symtab, respect_existing)
+    ex.f_body = type_propagate(ex.f_body, symtab, respect_existing)
     assert ex.t_body.type_ == ex.f_body.type_
     ex.type_ = ex.t_body.type_
     return ex
 
 
-@type_propagate_expr.register(Assert)
-def _(ex, symtab):
-    ex.cond = type_propagate(ex.cond, symtab)
+@_type_propagate_helper.register(Assert)
+def _(ex, symtab, respect_existing):
+    ex.cond = type_propagate(ex.cond, symtab, respect_existing)
     assert ex.cond.type_ == Type.Bool
-    ex.body = type_propagate(ex.body, symtab)
+    ex.body = type_propagate(ex.body, symtab, respect_existing)
     ex.type_ = ex.body.type_
     return ex
 

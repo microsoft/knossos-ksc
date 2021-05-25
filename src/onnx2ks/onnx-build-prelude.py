@@ -44,7 +44,7 @@ import onnx
 import onnxruntime.capi.onnxruntime_pybind11_state as ort
 from onnxruntime.capi.onnxruntime_pybind11_state.schemadef import OpSchema
 
-from ksc.type import Type
+from ksc.type import Type, make_tuple_if_many
 from ksc.utils import paren
 from ksc.expr import Def, EDef, Rule, Const, Var, Lam, Call, Let, If, Assert
 

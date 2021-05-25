@@ -3,8 +3,6 @@ from functools import singledispatch
 import itertools
 from typing import (
     Callable,
-    Iterable,
-    Generator,
     List,
     Mapping,
     Optional,
