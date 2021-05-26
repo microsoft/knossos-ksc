@@ -283,7 +283,7 @@ def parsed_rule_side_conditions(prelude_symtab):
     # an exception-throwing program into a succeeding one
     rule_restricted = parse_rule_str(
         'rule "if_both_same_restricted$i" ((p : Bool) (x : Integer)) (if p x x) x)',
-        side_conditions=lambda *, p, x: p.__class__ in [Const, Var],
+        side_conditions=lambda *, p, x: isinstance(p, [Const, Var]),
     )
     check_nowhere_applicable(rule_restricted, e)
 
