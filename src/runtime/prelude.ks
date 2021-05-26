@@ -270,19 +270,21 @@
 (edef pow Float (Tuple Float Integer))
 (edef [D pow] (LM (Tuple Float Integer) Float) (Tuple Float Integer))
 (edef [Dt pow] (Tuple Float (LM (Tuple Float Integer) Float)) (Tuple Float Integer))
+(def revpow Float ((x : Float) (n : Integer) (d : Float))
+     (mul d (mul (to_float n) (pow x (sub n 1)))))
+
 (def
  [fwd pow] Float
  ((xt : (Tuple Float Integer)) (dxt : (Tuple Float (Tuple))))
  (let ((x n) xt)
  (let ((dx dn) dxt)
-  (mul dx (pow x (sub n 1))))))
+  (revpow x n dx))))
 
 (def
  [rev pow] (Tuple Float (Tuple))
  ((xt : (Tuple Float Integer)) (dret : Float))
  (let ((x n) xt)
- (let (dx (mul dret (pow x (sub n 1))))
-   (tuple dx (tuple)))))
+   (tuple (revpow x n dret) (tuple))))
 
 ; TODO: MOVEEQ 'eq' is primitive in Haskell at the moment
 ; ;; eq :: Number x Number -> Bool

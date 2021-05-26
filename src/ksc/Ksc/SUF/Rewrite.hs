@@ -119,8 +119,10 @@ rewriteSUFRevPass P_ts_add (Tuple [ddr, Tuple []])
   -- the first place.
   = Just $ Tuple [ddr, ddr]
 
-rewriteSUFRevPass P_ts_dot (Tuple [ddr, Tuple [da, db]])
+rewriteSUFRevPass P_ts_dot (Tuple [ddr, dadb])
   = Just $ Tuple [pScale ddr db, pScale ddr da]
+  where da = pFst dadb
+        db = pSnd dadb
 
 rewriteSUFRevPass P_ts_scale (Tuple [ddr, t])
   = Just $ Tuple [pDot x ddr, pScale lambda ddr]

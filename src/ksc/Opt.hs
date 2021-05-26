@@ -380,6 +380,10 @@ optPrimFun _ P_deltaVec (Tuple [n, _i, val])
   | isKZero val
   = Just $ pConstVec n val
 
+optPrimFun _ P_map (Tuple [Lam v body, Call constVec (Tuple [n, k])])
+  | constVec `isThePrimFun` P_constVec
+  = Just $ pConstVec n (mkLet v k body)
+
 optPrimFun _ P_sum         arg           = optSum arg
 optPrimFun _ P_shape       arg           = optShape arg
 optPrimFun _ P_build       (Tuple [sz, Lam i e2]) = optBuild sz i e2
