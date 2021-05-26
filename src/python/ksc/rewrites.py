@@ -306,9 +306,9 @@ class ParsedRuleMatcher(RuleMatcher):
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
             assert are_alpha_equivalent(
-                SubstTemplate.visit(self._rule.template, substs), target
+                SubstPattern.visit(self._rule.template, substs), target
             )  # Note this traverses, so expensive.
-            result = SubstTemplate.visit(self._rule.replacement, substs)
+            result = SubstPattern.visit(self._rule.replacement, substs)
             # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
             assert result.type_ == target.type_
@@ -435,7 +435,7 @@ def _maybe_add_binder_to_subst(
 
 
 @singleton
-class SubstTemplate(ExprTransformer):
+class SubstPattern(ExprTransformer):
     """Substitutes variables to Exprs in a pattern (typically the replacement part of a rule),
      including bound variables. The substitution is capture-avoiding.
 
