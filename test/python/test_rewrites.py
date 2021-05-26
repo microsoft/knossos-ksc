@@ -4,7 +4,7 @@ from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.expr import Call
 from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
 from ksc.parse_ks import parse_expr_string
-from ksc.type import Type
+from ksc.type import Type, KSTypeError
 from ksc.type_propagate import type_propagate_decls
 from ksc import utils
 
@@ -342,7 +342,7 @@ def test_polymorphic_rules(prelude_symtab):
 
 
 def test_polymorphic_replacement(prelude_symtab):
-    # The "Any" here is new in the replacement, but is still figured out by type propagation.
+    # The ": Any" here is (textually) new in the replacement, but the type can be copied from the subject Expr.
     build_to_map = parse_rule_str(
         """
         (rule "build_to_map" ((inp : Vec Any) (body : Any))
@@ -359,6 +359,29 @@ def test_polymorphic_replacement(prelude_symtab):
     type_propagate_decls([e, expected], symtab)
     actual = utils.single_elem(list(build_to_map.find_all_matches(e))).apply_rewrite()
     assert actual == expected
+
+
+def test_new_Any_in_replacement():
+    r = parse_rule_str(
+        """(rule "add_map_identity" ((n : Integer) (body : Any))
+     (build n (lam (i : Integer) body))
+     (map (lam (e : Any) e) (build n (lam (i : Integer) body))))""",
+        {},
+    )
+    e = parse_expr_string("(build 5 (lam (i : Integer) i))")
+    type_propagate_decls([e], {})
+    try:
+        actual = utils.single_elem(list(r.find_all_matches(e))).apply_rewrite()
+    except KSTypeError:
+        # We can't yet figure out the *type* of the newly-generated variable e : Any
+        pytest.xfail("Type propagation fails during rewriting")
+
+    expected = parse_expr_string(
+        # The name 'e' will be generated not to capture anything; will not necessarily be 'e'.
+        "(map (lam (e : Integer) e) (build 5 (lam (i : Integer) i)))"
+    )
+    assert actual == expected  # Ignores types, including on the Lam.arg
+    assert str(actual) == str(expected)  # Includes types
 
 
 def test_rule_pickling():
