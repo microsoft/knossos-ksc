@@ -22,6 +22,7 @@ class Type:
         "Float": 0,
         "Bool": 0,
         "String": 0,
+        "Any": 0,  # Parser parses for Rules only
         "Lam": 2,  # TODO: Lambda args are in reverse order, prefer src -> dst
         "LM": 2,  # Linear map, used in AD
     }
@@ -286,6 +287,7 @@ Type.Integer = Type("Integer")
 Type.Float = Type("Float")
 Type.Bool = Type("Bool")
 Type.String = Type("String")
+Type.Any = Type("Any")
 
 
 class SizeType:

@@ -104,6 +104,21 @@ def check(pattern, s):
     )
 
 
+def test_any_type_allowed_only_for_rules():
+    with pytest.raises(ParseError, match="parse type.*Any"):
+        tld("(def foo Float (x : Any) 3.0)")
+    with pytest.raises(ParseError, match="parse type.*Any"):
+        tld("(def foo Any (x : Float) x)")
+
+    tld('(rule "foo" (x : Any) x x)')
+    tld(
+        """
+(rule "map_to_build" ((body : Any) (v : Vec Any))
+    (map (lam (e : Any) body) v)
+    (build n (lam (i : Integer) (let (e (index i v)) body))))"""
+    )
+
+
 def test_comments():
     check(r"^A  1$", "A #| b |# 1")
     check(
