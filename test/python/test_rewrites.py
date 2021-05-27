@@ -1,7 +1,7 @@
 import pytest
 
 from ksc.alpha_equiv import are_alpha_equivalent
-<<<<<<< HEAD
+from ksc.expr import Call
 from ksc.rewrites import (
     rule,
     RuleSet,
@@ -11,17 +11,7 @@ from ksc.rewrites import (
     parse_rule_str,
 )
 from ksc.parse_ks import parse_expr_string, parse_ks_file
-from ksc.type import Type
-||||||| merged common ancestors
-from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
-from ksc.parse_ks import parse_expr_string
-from ksc.type import Type
-=======
-from ksc.expr import Call
-from ksc.rewrites import rule, RuleSet, inline_var, delete_let, parse_rule_str
-from ksc.parse_ks import parse_expr_string
 from ksc.type import Type, KSTypeError
->>>>>>> origin/master
 from ksc.type_propagate import type_propagate_decls
 from ksc import utils
 
@@ -33,7 +23,6 @@ def apply_in_only_location(rule_name, expr):
 
 def check_nowhere_applicable(rule_name, expr):
     assert len(list(rule(rule_name).find_all_matches(expr))) == 0
-
 
 def test_inline_var_single():
     e = parse_expr_string("(let (a (div 1.0 x)) (div a (add a 1.0)))")
