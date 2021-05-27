@@ -149,8 +149,8 @@ class RuleMatcher(AbstractMatcher):
             could possibly generate a match. (See [Note: filter_term] in filter_term.py). """
 
     may_match_any_call: bool = False
-    """ If a RuleMatcher (instance or subclass) returns true, indicates that it might
-        match any Expr which is a Call, even tho get_filter_term() never returns Call. """
+    """ If a RuleMatcher (instance or subclass) returns true, indicates that it might match
+        any Expr which is a Call, regardless of the value of get_filter_term() on that Expr. """
 
     @abstractmethod
     def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
@@ -184,20 +184,20 @@ class RuleSet(AbstractMatcher):
         # As an optimization, at each node in the Expr tree, we'll look for matches only from
         # RuleMatchers whose possible_filter_terms match at that position in the tree.
         # (This checks equality of the outermost constructor of the template, but no deeper.)
-        self._filtered_rules = {}
-        self._call_rules = []
+        self._rules_by_filter_term: Dict[FilterTerm, List[RuleMatcher]] = {}
+        self._any_call_rules: List[RuleMatcher] = []
         for rule in rules:
             if rule.may_match_any_call:
-                self._call_rules.append(rule)
+                self._any_call_rules.append(rule)
             for term in rule.possible_filter_terms:
-                self._filtered_rules.setdefault(term, []).append(rule)
+                self._rules_by_filter_term.setdefault(term, []).append(rule)
 
     def matches_here(
         self, subtree: Expr, path_from_root: Location, root: Expr, env: Environment,
     ) -> Iterator[Match]:
-        possible_rules = self._filtered_rules.get(get_filter_term(subtree), [])
+        possible_rules = self._rules_by_filter_term.get(get_filter_term(subtree), [])
         if isinstance(subtree, Call):
-            possible_rules = chain(possible_rules, self._call_rules)
+            possible_rules = chain(possible_rules, self._any_call_rules)
         for rule in possible_rules:
             yield from rule.matches_for_possible_expr(
                 subtree, path_from_root, root, env
