@@ -91,7 +91,7 @@ def timeit(msg, fn, arg):
     )
 
 
-def bench(module_name, bench_name):
+def bench(module_file, bench_name):
     """
     Import MODULE_NAME, which defines these functions:
         bench_name           Knossos-compilable code, should be pretty
@@ -101,7 +101,11 @@ def bench(module_name, bench_name):
     """
     import inspect
     import importlib
+    import os.path
+    import sys
 
+    module_dir, module_name = os.path.split(module_file)
+    sys.path.append(module_dir)
     mod = importlib.import_module(module_name)
     for fn in inspect.getmembers(mod, inspect.isfunction):
         fn_name, fn_obj = fn
@@ -129,9 +133,18 @@ def bench(module_name, bench_name):
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
+    import ksc.utils
 
-    if len(sys.argv) != 3:
-        print("Usage: run-bench MODULE BENCH")
-        sys.exit(1)
-    bench(sys.argv[1], sys.argv[2])
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("module")
+    parser.add_argument("bench")
+    parser.add_argument("-p", "--preserve-temporary-files", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.preserve_temporary_files:
+        print("run-bench: Will preserve temporary files")
+        ksc.utils.preserve_temporary_files = True
+    bench(args.module, args.bench)

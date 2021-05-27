@@ -1,3 +1,4 @@
+import atexit
 import itertools
 
 import importlib.util
@@ -12,6 +13,8 @@ from tempfile import gettempdir
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
 from torch.utils.cpp_extension import load, load_inline
+
+preserve_temporary_files = False
 
 
 class KRecord:
@@ -145,35 +148,34 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
     try:
+        ksc_command = []
         with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
             with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
                 print("generate_cpp_from_ks:", ksc_path, fks.name)
-                e = subprocess.run(
-                    [
-                        ksc_path,
-                        "--generate-cpp"
-                        if generate_derivatives
-                        else "--generate-cpp-without-diffs",
-                        "--ks-source-file",
-                        ksc_runtime_dir + "/prelude.ks",
-                        *(
-                            ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
-                            if use_aten
-                            else ()
-                        ),
-                        "--ks-source-file",
-                        fks.name,
-                        "--ks-output-file",
-                        fkso.name,
-                        "--cpp-output-file",
-                        fcpp.name,
-                    ],
-                    capture_output=True,
-                    check=True,
-                )
+                ksc_command = [
+                    ksc_path,
+                    "--generate-cpp"
+                    if generate_derivatives
+                    else "--generate-cpp-without-diffs",
+                    "--ks-source-file",
+                    ksc_runtime_dir + "/prelude.ks",
+                    *(
+                        ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
+                        if use_aten
+                        else ()
+                    ),
+                    "--ks-source-file",
+                    fks.name,
+                    "--ks-output-file",
+                    fkso.name,
+                    "--cpp-output-file",
+                    fcpp.name,
+                ]
+                e = subprocess.run(ksc_command, capture_output=True, check=True,)
                 print(e.stdout.decode("ascii"))
                 print(e.stderr.decode("ascii"))
     except subprocess.CalledProcessError as e:
+        print(f"Command failed:\n{' '.join(ksc_command)}")
         print(f"files {fks.name} {fkso.name} {fcpp.name}")
         print(f"ks_str=\n{ks_str}")
         print(e.output.decode("ascii"))
@@ -185,9 +187,19 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
         out = f.read()
 
     # only delete these file if no error
-    os.unlink(fks.name)
-    os.unlink(fcpp.name)
-    os.unlink(fkso.name)
+    if not preserve_temporary_files:
+
+        @atexit.register
+        def _():
+            print(
+                "ksc.utils.generate_cpp_from_ks: Deleting",
+                fks.name,
+                fcpp.name,
+                fkso.name,
+            )
+            os.unlink(fks.name)
+            os.unlink(fcpp.name)
+            os.unlink(fkso.name)
 
     return out
 
@@ -236,7 +248,16 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
 
         raise
 
-    os.unlink(fcpp.name)
+    if not preserve_temporary_files:
+
+        @atexit.register
+        def _():
+            print(
+                "ksc.utils.build_py_module_from_cpp: Deleting", fcpp.name, fpymod.name,
+            )
+            os.unlink(fcpp.name)
+            os.unlink(fpymod.name)
+
     return module_name, module_path
 
 
@@ -263,15 +284,19 @@ def encode_name(s: str) -> str:
     )
 
 
+derivatives_to_generate_default = ["fwd", "rev"]
+
+
 def __make_cpp_str(
     ks_str,
     name_to_call,
     python_module_name,
     arg_types,
     return_type,
-    generate_derivatives,
-    use_aten,
+    derivatives_to_generate=derivatives_to_generate_default,
+    use_aten=True,
 ):
+    generate_derivatives = len(derivatives_to_generate) > 0
     generated_cpp_source = generate_cpp_from_ks(
         ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten
     )
@@ -294,15 +319,11 @@ def __make_cpp_str(
         dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
         dreturn_type_str = mangleType(tangent_type(return_type))
 
-        fwd_name = encode_name(f"fwd${name_to_call}@{args_str}")
-        declarations += f"""
-          m.def("fwd_entry", with_ks_allocator(&ks::{fwd_name}));
-        """
-
-        rev_name = encode_name(f"rev${name_to_call}@{args_str}")
-        declarations += f"""
-          m.def("rev_entry", with_ks_allocator(&ks::{rev_name}));
-        """
+        for der in derivatives_to_generate:
+            der_name = encode_name(f"{der}${name_to_call}@{args_str}")
+            declarations += f"""
+            m.def("{der}_entry", with_ks_allocator(&ks::{der_name}));
+            """
 
     cpp_str += (
         """
@@ -332,7 +353,7 @@ def generate_and_compile_cpp_from_ks(
     name_to_call,
     arg_types,
     return_type=None,
-    generate_derivatives=False,
+    derivatives_to_generate=[],
     use_aten=False,
 ):
 
@@ -342,7 +363,7 @@ def generate_and_compile_cpp_from_ks(
         "PYTHON_MODULE_NAME",
         arg_types,
         return_type,
-        generate_derivatives,
+        derivatives_to_generate,
         use_aten,
     )
 
@@ -362,7 +383,7 @@ def build_module_using_pytorch_from_ks(
     name_to_call,
     arg_types,
     return_type=None,
-    generate_derivatives=False,
+    derivatives_to_generate=[],
     use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
@@ -372,7 +393,7 @@ def build_module_using_pytorch_from_ks(
         "TORCH_EXTENSION_NAME",
         arg_types,
         return_type,
-        generate_derivatives,
+        derivatives_to_generate,
         use_aten,
     )
 
@@ -391,7 +412,14 @@ def build_module_using_pytorch_from_ks(
     if cpp_compiler == None and sys.platform == "win32":
         cflags.append("/std:c++17")
     else:
-        cflags.append("-std=c++17")
+        cflags += [
+            "-std=c++17",
+            "-g",
+            "-O3",
+            # "-DKS_BOUNDS_CHECK",
+        ]
+
+    verbose = True
 
     # https://pytorch.org/docs/stable/cpp_extension.html
     module = load_inline(
@@ -399,6 +427,7 @@ def build_module_using_pytorch_from_ks(
         cpp_sources=[cpp_str],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=cflags,
+        verbose=verbose,
     )
 
     return module

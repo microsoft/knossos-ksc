@@ -316,7 +316,7 @@ class ParsedRuleMatcher(RuleMatcher):
          replacement is an Expr, whose free vars are a subset of `template_vars`
     """
 
-    def __init__(self, rule: Rule):
+    def __init__(self, rule: Rule, side_conditions=lambda **substs: True):
         # The rule should already have been type-propagated (Call targets resolved to StructuredNames).
         assert rule.template.type_ == rule.replacement.type_ != None
         known_vars = frozenset([v.name for v in rule.template_vars])
@@ -327,6 +327,7 @@ class ParsedRuleMatcher(RuleMatcher):
         super().__init__(rule.name)
         self._rule = rule
         self._arg_types = pmap({v.name: v.type_ for v in rule.template_vars})
+        self._side_conditions = side_conditions
 
     @property
     def possible_filter_terms(self):
@@ -338,7 +339,7 @@ class ParsedRuleMatcher(RuleMatcher):
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
         substs = find_template_subst(self._rule.template, subtree, self._arg_types)
-        if substs is not None:
+        if substs is not None and self._side_conditions(**substs):
             yield Match(self, root, path_from_root, substs)
 
     def apply_at(
@@ -347,9 +348,9 @@ class ParsedRuleMatcher(RuleMatcher):
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
             assert are_alpha_equivalent(
-                SubstTemplate.visit(self._rule.template, substs), target
+                SubstPattern.visit(self._rule.template, substs), target
             )  # Note this traverses, so expensive.
-            result = SubstTemplate.visit(self._rule.replacement, substs)
+            result = SubstPattern.visit(self._rule.replacement, substs)
             # Types copied from the template (down to the variables, and the subject-expr's types from there).
             # So there should be no need for any further type-propagation.
             assert result.type_ == target.type_
@@ -405,8 +406,12 @@ def find_template_subst_var(
     template: Var, exp: Expr, template_vars: PMap[str, Type]
 ) -> Optional[VariableSubstitution]:
     assert template.name in template_vars
-    # Require correct type of subexp in order to match
-    return {template.name: exp} if exp.type_ == template_vars[template.name] else None
+    # Require compatible type of subexp in order to match (the Rule's type may involve Any).
+    return (
+        {template.name: exp}
+        if template_vars[template.name].can_accept_value_of_type(exp.type_)
+        else None
+    )
 
 
 @find_template_subst.register
@@ -448,12 +453,10 @@ def find_template_subst_lam(
     assert (
         template.arg.name not in template_vars
     ), "Lambda arguments should not be declared as template variables"
-    if template.arg.type_ != exp.arg.type_:
+    if not template.arg.type_.can_accept_value_of_type(exp.arg.type_):
         return None
     body_subst = find_template_subst(
-        template.body,
-        exp.body,
-        template_vars.set(template.arg.name, template.arg.type_),
+        template.body, exp.body, template_vars.set(template.arg.name, exp.arg.type_),
     )
     return _combine_substs({template.arg.name: exp.arg}, body_subst)
 
@@ -474,9 +477,9 @@ def _maybe_add_binder_to_subst(
 
 
 @singleton
-class SubstTemplate(ExprTransformer):
-    """Substitutes variables to Exprs in a template (including bound variables).
-    The substitution is capture-avoiding.
+class SubstPattern(ExprTransformer):
+    """Substitutes variables to Exprs in a pattern (typically the replacement part of a rule),
+     including bound variables. The substitution is capture-avoiding.
 
     Note that this is only avoids captures by new variables introduced on the RHS.
     It doesn't handle e.g. (foo (let x e1 e2)) ==> (let x e1 (foo e2))
@@ -484,6 +487,18 @@ class SubstTemplate(ExprTransformer):
     x, they'll be captured by the x bound by that let, which changes their meaning.
     (Hence, we still need separate python RuleMatchers, not ParsedRuleMatchers, for e.g. lift_bind and sumbuild_invariant.)
     """
+
+    def visit(self, e: Expr, var_names_to_exprs: VariableSubstitution) -> Expr:
+        res = super().visit(e, var_names_to_exprs)
+        # Type should have been copied from the rule. Replace Any types (from polymorphic rules)
+        # with the correct monomorphic type for the expression.
+        if res.type_.contains_any():
+            # Remove type, so type propagation will recalculate just one level without recursion
+            res.type_ = None
+            # No symtab should be required: "Any" should only be used in rules for builtins which are
+            # universally polymorphic, not for ad-hoc-overloaded functions from prelude etc.
+            type_propagate(res, {}, respect_existing=True)
+        return res
 
     def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
         assert not v.decl
@@ -495,34 +510,32 @@ class SubstTemplate(ExprTransformer):
             l.vars, var_names_to_exprs, [l.body]
         )
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
-        # where the bound var is bound, as the RHS template can't contain "(let x ...) x" (with x free).
-        res = Let(
+        # where the bound var is bound, as the replacement shouldn't contain "(let x ...) x" (with x free).
+        return Let(
             Var(
                 target_var.name
             ),  # type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
             self.visit(l.rhs, var_names_to_exprs),
             self.visit(l.body, var_names_to_exprs),
+            type=l.type_,
         )
-        res.type_ = l.type_
-        return res
 
     def visit_lam(self, l: Lam, var_names_to_exprs: VariableSubstitution) -> Lam:
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.arg, var_names_to_exprs, [l.body]
         )
-        res = Lam(
+        return Lam(
             Var(target_var.name, type=target_var.type_, decl=True),
             self.visit(l.body, var_names_to_exprs),
+            type=l.type_,
         )
-        res.type_ = l.type_
-        return res
 
 
-def parse_rule_str(ks_str, symtab):
+def parse_rule_str(ks_str, symtab, **kwargs):
     r = single_elem(list(parse_ks_file(ks_str)))
     assert isinstance(r, Rule)
     type_propagate(r, symtab)
-    return ParsedRuleMatcher(r)
+    return ParsedRuleMatcher(r, **kwargs)
 
 
 def parse_rules_from_file(filename):

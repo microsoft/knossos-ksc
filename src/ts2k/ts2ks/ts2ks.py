@@ -409,42 +409,59 @@ def make_KscAutogradFunction(py_mod):
     return newclass()
 
 
-def ts2mod(function, example_inputs):
-    fn = torch.jit.script(function)
-    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
+def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
+    symtab = dict()
+    ksc_dir = utils.get_ksc_dir()
+    decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
+    type_propagate_decls(decls_prelude, symtab)
+    decls_prelude_aten = list(
+        parse_ks_filename(ksc_dir + "/src/runtime/prelude-aten.ks")
+    )
+    type_propagate_decls(decls_prelude_aten, symtab)
 
-    if True:
-        symtab = dict()
-        ksc_dir = utils.get_ksc_dir()
-        decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
-        type_propagate_decls(decls_prelude, symtab)
-        decls_prelude_aten = list(
-            parse_ks_filename(ksc_dir + "/src/runtime/prelude-aten.ks")
-        )
-        type_propagate_decls(decls_prelude_aten, symtab)
-
+    for ksc_def in ksc_defs:
         cpprint(ksc_def)
+        print("")
 
-        type_propagate_decls([ksc_def], symtab)
-        defs_with_derivatives = [
-            ksc_def,
-            GDef("fwd", ksc_def.name),
-            GDef("rev", ksc_def.name),
-        ]
+    type_propagate_decls(ksc_defs, symtab)
+    defs_with_derivatives = []
+    for ksc_def in ksc_defs:
+        defs_with_derivatives += [ksc_def]
+        if "sufrev" in derivatives_to_generate:
+            defs_with_derivatives += [
+                GDef("suffwdpass", ksc_def.name),
+                GDef("sufrevpass", ksc_def.name),
+                GDef("sufrev", ksc_def.name),
+            ]
+        if "fwd" in derivatives_to_generate:
+            defs_with_derivatives += [
+                GDef("fwd", ksc_def.name),
+            ]
+        if "rev" in derivatives_to_generate:
+            defs_with_derivatives += [
+                GDef("rev", ksc_def.name),
+            ]
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
-    arg_types = [arg.type_ for arg in ksc_def.args]
-    return_type = ksc_def.return_type
+    arg_types = [arg.type_ for arg in entry_def.args]
+    return_type = entry_def.return_type
     mod = utils.build_module_using_pytorch_from_ks(
         ks_str,
-        fn.name,
+        entry_def.name.mangle_without_type(),
         arg_types,
         return_type=return_type,
-        generate_derivatives=True,
+        derivatives_to_generate=derivatives_to_generate,
         use_aten=True,
     )
 
     return make_KscAutogradFunction(mod)
+
+
+def ts2mod(function, example_inputs, generate_lm=True):
+    fn = torch.jit.script(function)
+    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
+    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
+    return ksc_defs_to_module([ksc_def], ksc_def, derivatives_to_generate)
 
 
 import time

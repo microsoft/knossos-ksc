@@ -1,5 +1,6 @@
 #####################################################################
 # parse_ks: Convert s-expressions to Expr
+from functools import partial
 import sexpdata
 
 from ksc.type import Type
@@ -53,7 +54,7 @@ _colon = sexpdata.Symbol(":")
 _None = sexpdata.Symbol("None")
 
 
-def parse_type_maybe(se):
+def parse_type_maybe(se, allow_Any: bool):
     """ Converts an S-Expression representing a type, like (Tensor 1 Float) or (Tuple Float (Tensor 1 Float)),
         into a Type object, e.g. Type.Tensor(1,Type.Float) or Type.Tuple(Type.Float, Type.Tensor(1,Type.Float)).
     """
@@ -63,9 +64,9 @@ def parse_type_maybe(se):
     if isinstance(se, sexpdata.Symbol):
         if se == _None:
             return True, None
-
-        if Type.is_type_introducer(se.value()):
-            return True, Type(se.value())
+        sym = se.value()
+        if Type.is_type_introducer(sym) and (allow_Any or sym != "Any"):
+            return True, Type(sym)
 
         return False, None
 
@@ -73,29 +74,36 @@ def parse_type_maybe(se):
         if isinstance(se[0], sexpdata.Symbol):
             sym = se[0].value()
             if sym == "Tuple":
-                return True, Type.Tuple(*(parse_type(s) for s in se[1:]))
+                return True, Type.Tuple(*(parse_type(s, allow_Any) for s in se[1:]))
             if sym == "Vec" and len(se) == 2:
-                return True, Type.Tensor(1, parse_type(se[1]))
+                return True, Type.Tensor(1, parse_type(se[1], allow_Any))
             if sym == "Tensor" and len(se) == 3:
-                return True, Type.Tensor(parse_int(se[1]), parse_type(se[2]))
+                return (
+                    True,
+                    Type.Tensor(parse_int(se[1]), parse_type(se[2], allow_Any)),
+                )
             if sym == "Lam" and len(se) == 3:
-                return True, Type.Lam(parse_type(se[1]), parse_type(se[2]))
+                return (
+                    True,
+                    Type.Lam(
+                        parse_type(se[1], allow_Any), parse_type(se[2], allow_Any)
+                    ),
+                )
             if sym == "LM" and len(se) == 3:
-                return True, Type.LM(parse_type(se[1]), parse_type(se[2]))
+                return (
+                    True,
+                    Type.LM(parse_type(se[1], allow_Any), parse_type(se[2], allow_Any)),
+                )
 
     return False, None
 
 
-def parse_type(se):
-    ok, ty = parse_type_maybe(se)
+def parse_type(se, allow_Any=False):
+    ok, ty = parse_type_maybe(se, allow_Any)
     if ok:
         return ty
     else:
-        raise ValueError("Did not know how to parse type {}".format(se))
-
-
-def parse_types(ses):
-    return list(map(parse_type, ses))
+        raise ParseError("Did not know how to parse type {}".format(se))
 
 
 # "1.3" -> int
@@ -126,7 +134,7 @@ def parse_structured_name(se):
     ses = se.value()
     assert len(ses) == 2
     se0 = parse_name(ses[0])
-    ok, ty = parse_type_maybe(ses[1])
+    ok, ty = parse_type_maybe(ses[1], allow_Any=False)
     if ok:
         return StructuredName((se0, ty))
 
@@ -143,19 +151,22 @@ def parse_string(se):
 
 
 # "x : Float" -> Var(x, Type.Float)
-def parse_arg(arg):
+def parse_arg(arg, allow_Type_Any=False):
     check(len(arg) >= 3, "Expect (arg : type), not: ", arg)
     check(arg[1] == _colon, "No colon: ", arg)
 
-    return Var(parse_name(arg[0]), parse_type(arg[2:]), True)
+    return Var(parse_name(arg[0]), parse_type(arg[2:], allow_Any=allow_Type_Any), True)
 
 
 # "((x : Float) (y : Integer))" -> [Var("x", Type.Float), Var("y", Type.Integer)]
-def parse_args(se):
-    return [parse_arg(arg) for arg in ensure_list_of_lists(se)]
+def parse_args(se, allow_Type_Any=False):
+    return [
+        parse_arg(arg, allow_Type_Any=allow_Type_Any)
+        for arg in ensure_list_of_lists(se)
+    ]
 
 
-def parse_expr(se):
+def parse_expr(se, allow_Type_Any=False):
     # Otherwise, "x" -> a variable use
     if isinstance(se, sexpdata.Symbol):
         return Var(se.value(), None, False)
@@ -170,14 +181,14 @@ def parse_expr(se):
     check(len(se) > 0, "Empty list")
 
     head = se[0]
-
+    parse_subexp = partial(parse_expr, allow_Type_Any=allow_Type_Any)
     # If(cond, t, f)
     if head == _if:
-        return If(*parse_seq(se[1:], parse_expr, parse_expr, parse_expr))
+        return If(*parse_seq(se[1:], parse_subexp, parse_subexp, parse_subexp))
 
     # Assert(cond, body)
     if head == _assert:
-        return Assert(*parse_seq(se[1:], parse_expr, parse_expr))
+        return Assert(*parse_seq(se[1:], parse_subexp, parse_subexp))
 
     # Let(var, rhs, body)
     if head == _let:
@@ -193,19 +204,19 @@ def parse_expr(se):
             vars = [Var(parse_name(v)) for v in lhs]
         else:
             vars = Var(parse_name(lhs))
-        rhs = parse_expr(binding[1])
-        body = parse_expr(se[2])
+        rhs = parse_subexp(binding[1])
+        body = parse_subexp(se[2])
         ans = Let(vars, rhs, body)
         return ans
 
     # Lam(var, type, body)
     if head == _lam:
-        var = parse_arg(se[1])
-        body = parse_expr(se[2])
+        var = parse_arg(se[1], allow_Type_Any)
+        body = parse_subexp(se[2])
         return Lam(var, body)
 
     # The remainder are calls
-    return Call(parse_structured_name(head), [parse_expr(se) for se in se[1:]])
+    return Call(parse_structured_name(head), [parse_subexp(se) for se in se[1:]])
 
 
 # Parse a top-level definition (def, edef, rule)
@@ -227,8 +238,15 @@ def parse_tld(se):
         return GDef(*parse_seq(se[1:], parse_name, parse_structured_name))
 
     if head == _rule:
+        parse_expr_allow_Any = partial(parse_expr, allow_Type_Any=True)
         return Rule(
-            *parse_seq(se[1:], parse_string, parse_args, parse_expr, parse_expr)
+            *parse_seq(
+                se[1:],
+                parse_string,
+                partial(parse_args, allow_Type_Any=True),
+                parse_expr_allow_Any,
+                parse_expr_allow_Any,
+            )
         )
 
     check(False, "unrecognised top-level definition:", se)

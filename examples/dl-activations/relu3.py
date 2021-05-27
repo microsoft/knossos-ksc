@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import os
 from ksc.torch_utils import elementwise_apply
 from collections import OrderedDict
 
@@ -52,6 +53,49 @@ def relu3_pytorch_nice(x: float) -> float:
 
 def vrelu3_pytorch_nice(x: torch.Tensor):
     return elementwise_apply(relu3_pytorch_nice, x)
+
+
+def vrelu3_cuda_init():
+    this_dir = os.path.dirname(__file__)
+
+    from torch.utils.cpp_extension import load
+
+    vrelu3_cuda = torch.utils.cpp_extension.load(
+        "vrelu3_module",
+        sources=[
+            os.path.join(this_dir, "vrelu3_cuda.cpp"),
+            os.path.join(this_dir, "vrelu3_cuda_kernel.cu"),
+        ],
+    )
+
+    class VReLu3Function(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, input):
+            output = vrelu3_cuda.forward(input)
+            ctx.save_for_backward(input)
+            return output
+
+        @staticmethod
+        def backward(ctx, grad):
+            return vrelu3_cuda.backward(grad.contiguous(), *ctx.saved_variables)
+
+    class VReLu3(torch.nn.Module):
+        def __init__(self):
+            super(VReLu3, self).__init__()
+
+        def forward(self, input):
+            return VReLu3Function.apply(input)
+
+    cuda_device = torch.device("cuda")
+    cpu_device = torch.device("cpu")
+    vrelu3_module = VReLu3().to(cuda_device)
+
+    def func(x: torch.Tensor):
+        ret = vrelu3_module(x.to(cuda_device))  # TODO: move x.to() into setup function
+        torch.cuda.synchronize()
+        return ret.to(cpu_device)
+
+    return func
 
 
 # run-bench: Define a range of values at which to call the methods
