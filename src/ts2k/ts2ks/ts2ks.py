@@ -548,9 +548,7 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
                 ksc_defs.insert(0, ksc_def)
 
     entry_def = ksc_defs[-1]
-
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    return ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
+    return ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm)
 
 
 def ts2mod(function, example_inputs, generate_lm=True):
