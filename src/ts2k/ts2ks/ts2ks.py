@@ -386,11 +386,8 @@ def forward_template(py_mod, ctx, *args):
 def backward_template(py_mod, generate_lm, ctx, *args):
     ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
     ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
-    if generate_lm:
-        outputs = py_mod.rev_entry(ks_args, ks_grad_args)
-    else:
-        outputs = py_mod.sufrev_entry(ks_args, ks_grad_args)
-
+    rev_entry = py_mod.rev_entry if generate_lm else py_mod.sufrev_entry
+    outputs = rev_entry(ks_args, ks_grad_args)
     return torch_from_ks(outputs)
 
 
