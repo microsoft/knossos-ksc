@@ -368,13 +368,35 @@ def torch_to_ks(py_mod, val):
     raise NotImplementedError()
 
 
+ts2k_logging = False
+
+
+class logging(object):
+    """
+    Turn on verbose logging in Knossos calls
+    """
+
+    def __init__(self, flag=True):
+        self.flag = flag
+
+    def __enter__(self):
+        global ts2k_logging
+        self.old_flag = ts2k_logging
+        ts2k_logging = self.flag
+
+    def __exit__(self, type, value, tb):
+        global ts2k_logging
+        ts2k_logging = self.old_flag
+        return False
+
+
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
 def forward_template(py_mod, ctx, *args):
     py_mod.reset_allocator()
     ks_args = (torch_to_ks(py_mod, x) for x in args)
 
     # Call it
-    outputs = py_mod.entry(*ks_args)
+    outputs = py_mod.entry(ts2k_logging, *ks_args)
 
     # TODO: save torch_to_ksed args
     if ctx is not None:
@@ -387,7 +409,7 @@ def backward_template(py_mod, generate_lm, ctx, *args):
     ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
     ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
     rev_entry = py_mod.rev_entry if generate_lm else py_mod.sufrev_entry
-    outputs = rev_entry(ks_args, ks_grad_args)
+    outputs = rev_entry(ts2k_logging, ks_args, ks_grad_args)
     return torch_from_ks(outputs)
 
 
