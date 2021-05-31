@@ -7,9 +7,12 @@ from ksc.cav_subst import (
     replace_subtrees,
     ReplaceLocationRequest,
     make_nonfree_var,
-    get_node_at_location,
 )
 from ksc.parse_ks import parse_expr_string
+from ksc.path import Path, ExprWithPath
+
+def get_node_at_location(e, p: Path):
+    return ExprWithPath.from_path(e, p).subtree
 
 
 def test_make_nonfree_var():
@@ -49,8 +52,8 @@ def test_replace_subtrees():
 
 def test_replace_subtrees_nested():
     e = parse_expr_string("(assert true (foo x y z))")
-    path_to_call = (1,)
-    path_to_z = (1, 2)
+    path_to_call = ("body",)
+    path_to_z = ("body", 2)
     assert isinstance(get_node_at_location(e, path_to_call), Call)
     assert get_node_at_location(e, path_to_z) == Var("z")
     with pytest.raises(ValueError, match="nested"):
@@ -69,7 +72,7 @@ def test_replace_subtree_avoids_capture():
     # The "x" in the new subtree should not be captured by the bound "x"
     # (that is, it should have the same value as in "e"'s scope).
     new_subtree = parse_expr_string("(mul x 2)")
-    path_to_y = (1, 1)
+    path_to_y = ("body", 1)
     assert get_node_at_location(e, path_to_y) == Var("y")
     replaced = replace_subtree(e, path_to_y, new_subtree)
     # Must rename the "x".
@@ -87,7 +90,7 @@ def test_replace_subtree_avoids_capturing_another():
     conflicting_var = make_nonfree_var("x", [new_subtree])  # But, this already exists
     assert conflicting_var.name == "x_0"
     e = parse_expr_string(f"(lam (x : Integer) (foo x_0 x y))")
-    path_to_y = (0, 2)
+    path_to_y = ("body", 2)
     assert get_node_at_location(e, path_to_y) == Var("y")
     replaced = replace_subtree(e, path_to_y, new_subtree)
     new_var = (
@@ -105,7 +108,7 @@ def test_replace_subtree_applicator_allows_capture():
     # Replace the y with a subtree mentioning "x". But, here we want the new "x" to be the
     # x present in the same scope of y. This can be achieved by passing a lambda function:
     new_subtree = parse_expr_string("(mul x 2)")
-    path_to_y = (1, 1)
+    path_to_y = ("body", 1)
     assert get_node_at_location(e, path_to_y) == Var("y")
     replaced = replace_subtree(e, path_to_y, Const(0), lambda _e1, _e2: new_subtree)
     expected = parse_expr_string("(let (x (if p a b)) (add x (mul x 2)))")
@@ -117,7 +120,7 @@ def test_replace_subtree_allows_inlining_call():
     # but for now we merely test that replace_subtree supports it.
     e = parse_expr_string("(let (x (if p a b)) (foo x))")
     foo_impl = parse_expr_string("(lam (foo_arg : Float) (add x foo_arg))")
-    path_to_call = (1,)
+    path_to_call = ("body",)
     assert type(get_node_at_location(e, path_to_call)) == Call
 
     def apply_to_argument(func, call):

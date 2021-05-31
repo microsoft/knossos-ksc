@@ -1,4 +1,8 @@
+from typing import Union
+
 from ksc.expr import Expr, Let, Call, Var, If, Assert, Const, Lam
+
+from ksc.path import ExprWithPath
 
 
 class ExprVisitor:
@@ -7,6 +11,9 @@ class ExprVisitor:
          behaviour for specific Expr-subclasses
         The default implementation of visit does a recursive traversal of each sub-Expr,
          but does nothing and returns None; subclasses can override for Expr subclasses of interest.
+
+        If called to visit an ExprWithPath, calls the visit_foo method for the appropriate subclass
+        *of the ExprWithPath's subtree*, passing the ExprWithPath as first argument.
     """
 
     def __init__(self, visit_decls=False):
@@ -21,22 +28,23 @@ class ExprVisitor:
             Call: self.visit_call,
         }
 
-    def visit(self, e: Expr, *args, **kwargs) -> None:
-        return self._dispatch_table[e.__class__](e, *args, **kwargs)
+    def visit(self, e: Union[Expr, ExprWithPath], *args, **kwargs) -> None:
+        clas = (e.subtree if isinstance(e, ExprWithPath) else e).__class__
+        return self._dispatch_table[clas](e, *args, **kwargs)
 
-    def visit_var(self, v: Var, *args, **kwargs) -> None:
+    def visit_var(self, v: Union[Var, ExprWithPath], *args, **kwargs) -> None:
         """ Overridable method that is called to handle a non-decl Var being passed to visit """
 
-    def visit_const(self, c: Const, *args, **kwargs) -> None:
+    def visit_const(self, c: Union[Const, ExprWithPath], *args, **kwargs) -> None:
         """ Overridable method that is called to handle a Const being passed to visit """
 
-    def visit_lam(self, l: Lam, *args, **kwargs) -> None:
+    def visit_lam(self, l: Union[Lam, ExprWithPath], *args, **kwargs) -> None:
         """ Overridable method that is called to handle a Lam being passed to visit """
         if self._visit_decls:
             self.visit(l.arg, *args, **kwargs)
         self.visit(l.body, *args, **kwargs)
 
-    def visit_let(self, l: Let, *args, **kwargs) -> None:
+    def visit_let(self, l: Union[Let, ExprWithPath], *args, **kwargs) -> None:
         """ Overridable method that is called to handle a Let being passed to visit """
         if self._visit_decls:
             for v in [l.vars] if isinstance(l.vars, Var) else l.vars:
@@ -44,18 +52,18 @@ class ExprVisitor:
         self.visit(l.rhs, *args, **kwargs)
         self.visit(l.body, *args, **kwargs)
 
-    def visit_if(self, i: If, *args, **kwargs) -> None:
+    def visit_if(self, i: Union[If, ExprWithPath], *args, **kwargs) -> None:
         """ Overridable method that is called to handle an If being passed to visit """
         self.visit(i.cond, *args, **kwargs)
         self.visit(i.t_body, *args, **kwargs)
         self.visit(i.f_body, *args, **kwargs)
 
-    def visit_assert(self, a: Assert, *args, **kwargs) -> None:
+    def visit_assert(self, a: Union[Assert, ExprWithPath], *args, **kwargs) -> None:
         """ Overridable method that is called to handle an Assert being passed to visit """
         self.visit(a.cond, *args, **kwargs)
         self.visit(a.body, *args, **kwargs)
 
-    def visit_call(self, c: Call, *args, **kwargs) -> None:
+    def visit_call(self, c: Union[Call, ExprWithPath], *args, **kwargs) -> None:
         """ Overridable method that is called to handle a Call being passed to visit """
         for a in c.args:
             self.visit(a, *args, **kwargs)
@@ -73,11 +81,11 @@ class ExprTransformer(ExprVisitor):
         # Hence, this class does not support visit_decls=True.
         super().__init__(visit_decls=False)
 
-    def visit_var(self, v: Var, *args, **kwargs) -> Expr:
-        return v
+    def visit_var(self, v: Union[Var, ExprWithPath], *args, **kwargs) -> Expr:
+        return v.subtree if isinstance(v, ExprWithPath) else v
 
     def visit_const(self, c: Const, *args, **kwargs) -> Expr:
-        return c
+        return c.subtree if isinstance(c, ExprWithPath) else c
 
     def visit_let(self, l: Let, *args, **kwargs) -> Expr:
         return Let(
