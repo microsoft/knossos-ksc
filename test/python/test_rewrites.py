@@ -24,6 +24,7 @@ def apply_in_only_location(rule_name, expr):
 def check_nowhere_applicable(rule_name, expr):
     assert len(list(rule(rule_name).find_all_matches(expr))) == 0
 
+
 def test_inline_var_single():
     e = parse_expr_string("(let (a (div 1.0 x)) (div a (add a 1.0)))")
     # Should be exactly two candidates
