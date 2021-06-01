@@ -25,12 +25,12 @@ def test_inline_var_single():
         rule("inline_var").find_all_matches(e), key=lambda rw: rw.path
     )
     assert rw_div.rule == inline_var
-    assert rw_div.path == (path.Let_body, path.Call_args[0])
+    assert rw_div.path == (path.let_body, path.call_args[0])
     assert rw_div.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))"
     )
     assert rw_add.rule == inline_var
-    assert rw_add.path == (path.Let_body, path.Call_args[1], path.Call_args[0])
+    assert rw_add.path == (path.let_body, path.call_args[1], path.call_args[0])
     assert rw_add.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))"
     )
@@ -70,12 +70,12 @@ def test_ruleset():
     # Should be exactly two candidates
     rw_div, rw_add = sorted(r.find_all_matches(e), key=lambda rw: rw.path)
     assert rw_div.rule == inline_var
-    assert rw_div.path == (path.Let_body, path.Call_args[0])
+    assert rw_div.path == (path.let_body, path.call_args[0])
     assert rw_div.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))"
     )
     assert rw_add.rule == inline_var
-    assert rw_add.path == (path.Let_body, path.Call_args[1], path.Call_args[0])
+    assert rw_add.path == (path.let_body, path.call_args[1], path.call_args[0])
     assert rw_add.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))"
     )
