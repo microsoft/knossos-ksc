@@ -9,6 +9,7 @@ import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
+from typing import Callable, TypeVar, Mapping, Iterable, List
 
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
@@ -460,3 +461,15 @@ def singleton(cls):
         Foo.do_foo()
     """
     return cls()
+
+
+S = TypeVar("S")
+T = TypeVar("T")
+
+
+def group_by(lst: Iterable[T], func: Callable[[T], S]) -> Mapping[S, List[T]]:
+    """ Groups elements of an iterable into a map, where the keys are the resulting of invoking the specified function on each element. """
+    d = dict()
+    for l in lst:
+        d.setdefault(func(l), []).append(l)
+    return d

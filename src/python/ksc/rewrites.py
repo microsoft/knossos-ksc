@@ -61,7 +61,7 @@ LetBindingEnvironment = PMap[str, Path]
 
 class AbstractMatcher(ABC):
     def find_all_matches(self, e: Expr) -> Iterator[Match]:
-        yield from self._matches_with_env(ExprWithPath.for_expr(e), pmap({}))
+        yield from self._matches_with_env(ExprWithPath.from_expr(e), pmap({}))
 
     def _matches_with_env(
         self, ewp: ExprWithPath, env: LetBindingEnvironment

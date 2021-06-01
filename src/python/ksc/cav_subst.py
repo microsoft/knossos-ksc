@@ -50,7 +50,7 @@ VariableSubstitution = Mapping[str, Expr]
 def replace_subtrees(e: Expr, reqs: List[ReplaceLocationRequest]) -> Expr:
     """ Replaces locations within <e> with new subtrees, as per ReplaceLocationRequest.
         Returns a new Expr, which may share subtrees with the original. """
-    return CAvSubst.visit(ExprWithPath.for_expr(e), reqs, {})
+    return CAvSubst.visit(ExprWithPath.from_expr(e), reqs, {})
 
 
 def replace_subtree(e: Expr, *args):
@@ -64,7 +64,7 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
         Renames as necessary any binders within e to avoid capturing any variables in the values of <subst>.
         Returns a new Expr, which may share subtrees with the original (as well as with values of <subst>).
         """
-    return CAvSubst.visit(ExprWithPath.for_expr(e), [], subst)
+    return CAvSubst.visit(ExprWithPath.from_expr(e), [], subst)
 
 
 #####################################################################
