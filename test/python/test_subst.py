@@ -11,6 +11,7 @@ from ksc.cav_subst import (
 from ksc.parse_ks import parse_expr_string
 from ksc.path import Path, ExprWithPath
 
+
 def get_node_at_location(e, p: Path):
     return ExprWithPath.from_path(e, p).subtree
 
@@ -44,7 +45,10 @@ def test_replace_subtrees():
     e = parse_expr_string("(foo x y z)")
     replaced = replace_subtrees(
         e,
-        [ReplaceLocationRequest([2], Var("w")), ReplaceLocationRequest([1], Var("v"))],
+        [
+            ReplaceLocationRequest((2,), Var("w")),
+            ReplaceLocationRequest((1,), Var("v")),
+        ],
     )
     expected = parse_expr_string("(foo x v w)")
     assert replaced == expected
