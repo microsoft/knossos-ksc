@@ -8,8 +8,6 @@ from pyrsistent.typing import PMap
 
 from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.cav_subst import (
-    Location,
-    subexps_no_binds,
     replace_subtree,
     make_nonfree_var,
     VariableSubstitution,
@@ -27,6 +25,7 @@ from ksc.expr import (
 )
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
+from ksc.path import Path, ExprWithPath, subexps_no_binds
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
 from ksc.utils import singleton, single_elem
@@ -43,73 +42,48 @@ from ksc.visitors import ExprTransformer
 @dataclass(frozen=True)
 class Match:
     rule: "RuleMatcher"
-    expr: Expr
-    path: Location
+    ewp: ExprWithPath
 
     # Anything the RuleMatcher needs to pass from matching to rewriting.
     rule_specific_data: Mapping[str, Any] = pmap()
 
     def apply_rewrite(self):
-        return self.rule.apply_at(self.expr, self.path, **self.rule_specific_data)
+        return self.rule.apply_at(self.ewp, **self.rule_specific_data)
+
+    @property
+    def path(self):
+        return self.ewp.path
 
 
 # Environments that map variable names to the locations of the nodes binding them.
-LetBindingEnvironment = PMap[str, Location]
+LetBindingEnvironment = PMap[str, Path]
 
 
 class AbstractMatcher(ABC):
     def find_all_matches(self, e: Expr) -> Iterator[Match]:
-        yield from self._matches_with_env(e, tuple(), e, pmap({}))
+        yield from self._matches_with_env(ExprWithPath.for_expr(e), pmap({}))
 
     def _matches_with_env(
-        self, e: Expr, path_from_root: Location, root: Expr, env: LetBindingEnvironment
+        self, ewp: ExprWithPath, env: LetBindingEnvironment
     ) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
-        yield from self.matches_here(e, path_from_root, root, env)
-        for i, ch in enumerate(subexps_no_binds(e)):
+        yield from self.matches_here(ewp, env)
+        if isinstance(ewp.subtree, Let):
+            yield from self._matches_with_env(ewp.rhs, env)
             yield from self._matches_with_env(
-                ch,
-                path_from_root + (i,),
-                root,
-                _update_env_for_subtree(e, path_from_root, i, env),
+                ewp.body, env.set(ewp.vars.name, ewp.path)
             )
+        elif isinstance(ewp.subtree, Lam):
+            yield from self._matches_with_env(ewp.body, env.discard(ewp.arg.name))
+        else:
+            for ch in ewp.all_subexps():
+                yield from self._matches_with_env(ch, env)
 
     @abstractmethod
     def matches_here(
-        self,
-        subtree: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
         """ Return any matches which rewrite the topmost node of the specified subtree """
-
-
-@singledispatch
-def _update_env_for_subtree(
-    parent: Expr, parent_path: Location, which_child: int, env: LetBindingEnvironment
-) -> LetBindingEnvironment:
-    # Default is to use same environment as parent
-    return env
-
-
-@_update_env_for_subtree.register
-def _update_env_let(
-    parent: Let, parent_path: Location, which_child: int, env: LetBindingEnvironment
-) -> LetBindingEnvironment:
-    assert isinstance(
-        parent.vars, Var
-    ), "Tupled lets are not supported - use untuple_lets first"
-    assert 0 <= which_child <= 1
-    return env if which_child == 0 else env.set(parent.vars.name, parent_path)  # rhs
-
-
-@_update_env_for_subtree.register
-def _update_env_lam(
-    parent: Lam, parent_path: Location, which_child: int, env: LetBindingEnvironment
-) -> LetBindingEnvironment:
-    assert which_child == 0
-    return env.discard(parent.arg.name)
 
 
 _rule_dict: Mapping[str, "RuleMatcher"] = {}
@@ -136,29 +110,21 @@ class RuleMatcher(AbstractMatcher):
             could possibly generate a match. (See filter_term.py).) """
 
     @abstractmethod
-    def apply_at(self, expr: Expr, path: Location, **kwargs) -> Expr:
+    def apply_at(self, ewp: ExprWithPath, **kwargs) -> Expr:
         """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's rule_specific_data field. """
 
     @abstractmethod
     def matches_for_possible_expr(
-        self,
-        expr: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <get_filter_term(expr)>
             is of one of <self.possible_filter_terms>. """
 
     def matches_here(
-        self,
-        expr: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        if get_filter_term(expr) in self.possible_filter_terms:
-            yield from self.matches_for_possible_expr(expr, path_from_root, root, env)
+        if get_filter_term(ewp.subtree) in self.possible_filter_terms:
+            yield from self.matches_for_possible_expr(ewp, env)
 
     def __reduce__(self):
         # This allows pickling and sending RuleMatchers across processes/machines via Ray.
@@ -180,71 +146,60 @@ class RuleSet(AbstractMatcher):
                 self._filtered_rules.setdefault(term, []).append(rule)
 
     def matches_here(
-        self,
-        subtree: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        for rule in self._filtered_rules.get(get_filter_term(subtree), []):
-            yield from rule.matches_for_possible_expr(
-                subtree, path_from_root, root, env
-            )
+        for rule in self._filtered_rules.get(get_filter_term(ewp.subtree), []):
+            yield from rule.matches_for_possible_expr(ewp, env)
 
 
 @singleton
 class inline_var(RuleMatcher):
     possible_filter_terms = frozenset([Var])
 
-    def apply_at(
-        self, expr: Expr, path_to_var: Location, binding_location: Location
-    ) -> Expr:
+    def apply_at(self, ewp: ExprWithPath, binding_location: Path) -> Expr:
         # binding_location comes from the Match.
         # Note there is an alternative design, where we don't store any "rule_specific_data" in the Match.
         # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
         # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
-        assert path_to_var[: len(binding_location)] == binding_location
+        assert ewp.path[: len(binding_location)] == binding_location
         return replace_subtree(
-            expr,
+            ewp.root,
             binding_location,
             Const(0.0),  # Nothing to avoid capturing in outer call
             lambda _zero, let: replace_subtree(
-                let, path_to_var[len(binding_location) :], let.rhs
+                let, ewp.path[len(binding_location) :], let.rhs
             ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
         )
 
     def matches_for_possible_expr(
-        self,
-        subtree: Expr,
-        path_from_root: Location,
-        root: Expr,
-        env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        assert isinstance(subtree, Var)
-        if subtree.name in env:
-            binding_loc = env[subtree.name]
-            yield Match(self, root, path_from_root, {"binding_location": binding_loc})
+        assert isinstance(ewp.subtree, Var)
+        binding_location = env.get(ewp.subtree.name)
+        if binding_location is not None:
+            yield Match(self, ewp, {"binding_location": binding_location})
 
 
 @singleton
 class delete_let(RuleMatcher):
     possible_filter_terms = frozenset([Let])
 
-    def apply_at(self, expr: Expr, path: Location) -> Expr:
+    def apply_at(self, ewp: ExprWithPath) -> Expr:
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
+            assert let_node is ewp.subtree
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
 
         # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
     def matches_for_possible_expr(
-        self, subtree: Expr, path_from_root: Location, root: Expr, env
+        self, ewp: ExprWithPath, env: LetBindingEnvironment
     ) -> Iterator[Match]:
-        assert isinstance(subtree, Let)
-        if subtree.vars.name not in subtree.body.free_vars_:
-            yield Match(self, root, path_from_root)
+        assert isinstance(ewp.subtree, Let)
+        if ewp.vars.name not in ewp.body.free_vars_:
+            yield Match(self, ewp)
 
 
 ###############################################################################
@@ -292,17 +247,15 @@ class ParsedRuleMatcher(RuleMatcher):
         return frozenset([get_filter_term(self._rule.template)])
 
     def matches_for_possible_expr(
-        self, subtree: Expr, path_from_root: Location, root: Expr, env
+        self, ewp: ExprWithPath, env: LetBindingEnvironment
     ) -> Iterator[Match]:
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
-        substs = find_template_subst(self._rule.template, subtree, self._arg_types)
+        substs = find_template_subst(self._rule.template, ewp.subtree, self._arg_types)
         if substs is not None and self._side_conditions(**substs):
-            yield Match(self, root, path_from_root, substs)
+            yield Match(self, ewp, substs)
 
-    def apply_at(
-        self, expr: Expr, path: Location, **substs: VariableSubstitution
-    ) -> Expr:
+    def apply_at(self, ewp: ExprWithPath, **substs: VariableSubstitution) -> Expr:
         def apply_here(const_zero: Expr, target: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
             assert are_alpha_equivalent(
@@ -315,7 +268,7 @@ class ParsedRuleMatcher(RuleMatcher):
             return result
 
         # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(expr, path, Const(0.0), apply_here)
+        return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
 
 def _combine_substs(
