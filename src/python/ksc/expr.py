@@ -436,6 +436,8 @@ class Let(Expr):
 
     def __init__(self, vars, rhs, body, type=None):
         super().__init__(vars=vars, rhs=rhs, body=body, type_=type)
+        var_list = [self.vars] if isinstance(self.vars, Var) else self.vars
+        assert all(not v.decl for v in var_list)
 
 
 class If(Expr):
