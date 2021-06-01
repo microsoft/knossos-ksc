@@ -24,7 +24,7 @@ native_impls: Mapping[StructuredName, Callable] = {
     make_structured_name(("eq", Type.Tuple(Type.Float, Type.Float))): eq,
     make_structured_name(("gt", Type.Tuple(Type.Integer, Type.Integer))): gt,
     make_structured_name(("gt", Type.Tuple(Type.Float, Type.Float))): gt,
-    make_structured_name(("gte", Type.Tuple(Type.Integer, Type.Integer))): gt,
+    make_structured_name(("gte", Type.Tuple(Type.Integer, Type.Integer))): ge,
     make_structured_name(("gte", Type.Tuple(Type.Float, Type.Float))): ge,
     make_structured_name(("to_float", Type.Integer)): float,
 }
