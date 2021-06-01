@@ -383,19 +383,19 @@ def forward_template(py_mod, ctx, *args):
     return torch_from_ks(outputs)
 
 
-def backward_template(py_mod, ctx, *args):
+def backward_template(py_mod, generate_lm, ctx, *args):
     ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
     ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
-    outputs = py_mod.rev_entry(ks_args, ks_grad_args)
-
+    rev_entry = py_mod.rev_entry if generate_lm else py_mod.sufrev_entry
+    outputs = rev_entry(ks_args, ks_grad_args)
     return torch_from_ks(outputs)
 
 
-def make_KscAutogradFunction(py_mod):
+def make_KscAutogradFunction(py_mod, generate_lm):
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
-    backward = lambda ctx, args: backward_template(py_mod, ctx, args)
+    backward = lambda ctx, args: backward_template(py_mod, generate_lm, ctx, args)
     newclass = type(
         "KscAutogradFunction_" + py_mod.__name__,
         (torch.autograd.Function,),
@@ -445,7 +445,7 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
     arg_types = [arg.type_ for arg in entry_def.args]
     return_type = entry_def.return_type
-    mod = utils.build_module_using_pytorch_from_ks(
+    return utils.build_module_using_pytorch_from_ks(
         ks_str,
         entry_def.name.mangle_without_type(),
         arg_types,
@@ -454,14 +454,17 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
         use_aten=True,
     )
 
-    return make_KscAutogradFunction(mod)
+
+def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
+    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
+    mod = ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
+    return make_KscAutogradFunction(mod, generate_lm)
 
 
 def ts2mod(function, example_inputs, generate_lm=True):
     fn = torch.jit.script(function)
     ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    return ksc_defs_to_module([ksc_def], ksc_def, derivatives_to_generate)
+    return ksc_defs_to_autograd_function([ksc_def], ksc_def, generate_lm)
 
 
 import time
