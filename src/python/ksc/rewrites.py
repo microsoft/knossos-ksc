@@ -68,12 +68,12 @@ class AbstractMatcher(ABC):
     ) -> Iterator[Match]:
         # Env maps bound variables to their binders, used for inline_let (only).
         yield from self.matches_here(ewp, env)
-        if isinstance(ewp.subtree, Let):
+        if isinstance(ewp.expr, Let):
             yield from self._matches_with_env(ewp.rhs, env)
             yield from self._matches_with_env(
                 ewp.body, env.set(ewp.vars.name, ewp.path)
             )
-        elif isinstance(ewp.subtree, Lam):
+        elif isinstance(ewp.expr, Lam):
             yield from self._matches_with_env(ewp.body, env.discard(ewp.arg.name))
         else:
             for ch in ewp.all_subexps():
@@ -123,7 +123,7 @@ class RuleMatcher(AbstractMatcher):
     def matches_here(
         self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        if get_filter_term(ewp.subtree) in self.possible_filter_terms:
+        if get_filter_term(ewp.expr) in self.possible_filter_terms:
             yield from self.matches_for_possible_expr(ewp, env)
 
     def __reduce__(self):
@@ -148,7 +148,7 @@ class RuleSet(AbstractMatcher):
     def matches_here(
         self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        for rule in self._filtered_rules.get(get_filter_term(ewp.subtree), []):
+        for rule in self._filtered_rules.get(get_filter_term(ewp.expr), []):
             yield from rule.matches_for_possible_expr(ewp, env)
 
 
@@ -174,8 +174,8 @@ class inline_var(RuleMatcher):
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        assert isinstance(ewp.subtree, Var)
-        binding_location = env.get(ewp.subtree.name)
+        assert isinstance(ewp.expr, Var)
+        binding_location = env.get(ewp.expr.name)
         if binding_location is not None:
             yield Match(self, ewp, {"binding_location": binding_location})
 
@@ -187,7 +187,7 @@ class delete_let(RuleMatcher):
     def apply_at(self, ewp: ExprWithPath) -> Expr:
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
-            assert let_node is ewp.subtree
+            assert let_node is ewp.expr
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
 
@@ -197,7 +197,7 @@ class delete_let(RuleMatcher):
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: LetBindingEnvironment
     ) -> Iterator[Match]:
-        assert isinstance(ewp.subtree, Let)
+        assert isinstance(ewp.expr, Let)
         if ewp.vars.name not in ewp.body.free_vars_:
             yield Match(self, ewp)
 
@@ -251,7 +251,7 @@ class ParsedRuleMatcher(RuleMatcher):
     ) -> Iterator[Match]:
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
-        substs = find_template_subst(self._rule.template, ewp.subtree, self._arg_types)
+        substs = find_template_subst(self._rule.template, ewp.expr, self._arg_types)
         if substs is not None and self._side_conditions(**substs):
             yield Match(self, ewp, substs)
 

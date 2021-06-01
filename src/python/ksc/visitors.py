@@ -29,7 +29,7 @@ class ExprVisitor:
         }
 
     def visit(self, e: Union[Expr, ExprWithPath], *args, **kwargs) -> None:
-        clas = (e.subtree if isinstance(e, ExprWithPath) else e).__class__
+        clas = (e.expr if isinstance(e, ExprWithPath) else e).__class__
         return self._dispatch_table[clas](e, *args, **kwargs)
 
     def visit_var(self, v: Union[Var, ExprWithPath], *args, **kwargs) -> None:
@@ -82,10 +82,10 @@ class ExprTransformer(ExprVisitor):
         super().__init__(visit_decls=False)
 
     def visit_var(self, v: Union[Var, ExprWithPath], *args, **kwargs) -> Expr:
-        return v.subtree if isinstance(v, ExprWithPath) else v
+        return v.expr if isinstance(v, ExprWithPath) else v
 
     def visit_const(self, c: Const, *args, **kwargs) -> Expr:
-        return c.subtree if isinstance(c, ExprWithPath) else c
+        return c.expr if isinstance(c, ExprWithPath) else c
 
     def visit_let(self, l: Let, *args, **kwargs) -> Expr:
         return Let(

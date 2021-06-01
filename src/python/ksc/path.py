@@ -81,33 +81,31 @@ Path = Tuple[PathElement, ...]
 class ExprWithPath(NamedTuple):
     root: Expr
     path: Path
-    subtree: Expr
+    expr: Expr
 
     def __getattr__(self, attr_name: str):
         # This allows ExprWithPath.rhs, ExprWithPath.body, etc., returning ExprWithPath
-        if attr_name in _field_elements_by_class.get(self.subtree.__class__, []):
-            return self.get(_field_elements_by_class[self.subtree.__class__][attr_name])
+        if attr_name in _field_elements_by_class.get(self.expr.__class__, []):
+            return self.get(_field_elements_by_class[self.expr.__class__][attr_name])
         # Allow retrieving any other field (not a member of ExprWithPath) straight from the underlying Expr
-        return getattr(self.subtree, attr_name)
+        return getattr(self.expr, attr_name)
 
     def get(self, pe: PathElement) -> "ExprWithPath":
-        return ExprWithPath(self.root, self.path + (pe,), pe.get(self.subtree))
+        return ExprWithPath(self.root, self.path + (pe,), pe.get(self.expr))
 
     @property
     def args(self) -> List["ExprWithPath"]:
-        if isinstance(self.subtree, Call):
-            return [self.get(pe) for pe in islice(call_args, 0, len(self.subtree.args))]
-        raise AttributeError(f"No args on {self.subtree}")
+        if isinstance(self.expr, Call):
+            return [self.get(pe) for pe in islice(call_args, 0, len(self.expr.args))]
+        raise AttributeError(f"No args on {self.expr}")
 
     def all_subexps(self) -> List["ExprWithPath"]:
         return (
             self.args
-            if isinstance(self.subtree, Call)
+            if isinstance(self.expr, Call)
             else [
                 self.get(pe)
-                for pe in _field_elements_by_class.get(
-                    self.subtree.__class__, {}
-                ).values()
+                for pe in _field_elements_by_class.get(self.expr.__class__, {}).values()
             ]
         )
 
@@ -122,4 +120,4 @@ class ExprWithPath(NamedTuple):
 
 
 def subexps_no_binds(e: Expr) -> List[Expr]:
-    return [c.subtree for c in ExprWithPath.from_expr(e).all_subexps()]
+    return [c.expr for c in ExprWithPath.from_expr(e).all_subexps()]

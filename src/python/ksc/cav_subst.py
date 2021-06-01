@@ -100,7 +100,7 @@ class CAvSubst(ExprTransformer):
         if len(reqs) == 0:
             if len(substs) == 0:
                 # Nothing to do in this subtree
-                return ewp.subtree
+                return ewp.expr
         elif any(req.target == ewp.path for req in reqs):
             # Apply here
             if len(reqs) != 1:
@@ -138,16 +138,16 @@ class CAvSubst(ExprTransformer):
 
     def visit_lam(self, e: Union[Lam, ExprWithPath], reqs, substs):
         assert isinstance(e, ExprWithPath) and isinstance(
-            e.subtree, Lam
+            e.expr, Lam
         )  # ExprTransformer ensures.
-        arg, substs = self._rename_if_needed(e.arg, e.subtree, reqs, substs)
+        arg, substs = self._rename_if_needed(e.arg, e.expr, reqs, substs)
         return Lam(
             Var(arg.name, type=arg.type_, decl=True), self.visit(e.body, reqs, substs)
         )
 
     def visit_let(self, e: Union[Let, ExprWithPath], reqs, substs):
         assert isinstance(e, ExprWithPath) and isinstance(
-            e.subtree, Let
+            e.expr, Let
         )  # ExprTransformer ensures.
         new_vars = []
         # alpha-rename any capturing `e.vars` in `e.body` only

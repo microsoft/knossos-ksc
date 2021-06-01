@@ -14,7 +14,7 @@ from ksc.path import Path, ExprWithPath
 
 
 def get_node_at_location(e, p: Path):
-    return ExprWithPath.from_expr(e, p).subtree
+    return ExprWithPath.from_expr(e, p).expr
 
 
 def test_make_nonfree_var():

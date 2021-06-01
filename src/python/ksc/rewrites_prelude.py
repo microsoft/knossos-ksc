@@ -33,8 +33,8 @@ class ConstantFolder(RuleMatcher):
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: LetBindingEnvironment,
     ) -> Iterator[Match]:
-        assert isinstance(ewp.subtree, Call) and ewp.name == self._name
-        if all(isinstance(arg, Const) for arg in ewp.subtree.args):
+        assert isinstance(ewp.expr, Call) and ewp.name == self._name
+        if all(isinstance(arg, Const) for arg in ewp.expr.args):
             yield Match(self, ewp)
 
 
