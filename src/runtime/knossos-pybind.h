@@ -123,6 +123,12 @@ void declare_tensor_1(py::module &m, char const* name) {
     .def(py::init([](std::uintptr_t v, size_t n) {
         check_valid_pointer(v);
         ks::tensor_dimension<Dim>::index_type size {int(n)};
+        // TODO: We are capturing a reference to the caller's data.
+        // It would be nice to be given a Python object whose handle we could
+        // hold for our lifetime, in order to keep that data alive
+        // OR: of course we could just copy, but its useful to keep track of the cost
+        //     so preserving an implementation where we can avoid the copy feels 
+        //     valuable.
         return ks::tensor<Dim, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data
     }))
     // And describe buffer shape to Python
