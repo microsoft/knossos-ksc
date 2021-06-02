@@ -56,7 +56,6 @@
         "CHECK=" ($check (lam (t : Tuple Float Float) (f1 t))
                          (lam (t : Tuple (Tuple Float Float) Float) ([rev f1] t))
                          (tuple x y)
-                         (tuple x y)
                          (tuple delta delta)
                          0.1)
       )

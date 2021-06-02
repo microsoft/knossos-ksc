@@ -131,7 +131,6 @@
            (checked ($check (lam (t : Tuple (Vec Float) Float) (prod_fold t))
                             (lam (t : Tuple (Tuple (Vec Float) Float) Float) ([rev prod_fold] t))
                             (tuple v  c)
-                            (tuple v  c)
                             (tuple dv dc)
                             1.0))
            (rev_ok (lt (abs checked) 0.001))

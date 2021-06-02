@@ -326,7 +326,6 @@
                                            Float)
                                 ([rev gmm_knossos_gmm_objective] t))
                     (tuple x  alphas  mus  qs  ls  wishart)
-                    (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)
                     1.0))
 
@@ -345,7 +344,6 @@
                                                   (Tuple Float Integer))
                                            Float)
                                 ([sufrev gmm_knossos_gmm_objective] t))
-                    (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple x  alphas  mus  qs  ls  wishart)
                     (tuple dx dalphas dmus dqs dls dwishart)
                     1.0))
