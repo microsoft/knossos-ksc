@@ -61,19 +61,19 @@ rewriteSUFFwdPass P_ts_scale t
 rewriteSUFFwdPass _ _ = Nothing
 
 
-rewriteSUFRevPass :: PrimFun -> TExpr -> Maybe TExpr
-rewriteSUFRevPass (P_SelFun i n) (Tuple [ dt, bog ])
+rewriteSUFRevPass :: PrimFun -> Type -> TExpr -> Maybe TExpr
+rewriteSUFRevPass (P_SelFun i n) _ (Tuple [ dt, bog ])
   = Just $ Tuple (map project_or_dt [1..n])
   where project_or_dt j = if i == j then dt else pSel j n bog
 
-rewriteSUFRevPass (P_dup 2) (Tuple [arg, _])
+rewriteSUFRevPass (P_dup 2) _ (Tuple [arg, _])
   = Just $ pAdd1 arg
 
-rewriteSUFRevPass P_elim (Tuple [_, arg])
+rewriteSUFRevPass P_elim _ (Tuple [_, arg])
   = Just arg
 
 -- FIXME: avoid duplicating i_shape
-rewriteSUFRevPass P_index (Tuple [d_da, i_shape])
+rewriteSUFRevPass P_index _ (Tuple [d_da, i_shape])
   = Just $ Tuple [
            unitOfIndexType,
            pBuild (pSize shape)
@@ -88,45 +88,45 @@ rewriteSUFRevPass P_index (Tuple [d_da, i_shape])
           TypeTuple ts -> Tuple (map (const (Tuple [])) ts)
           _ -> Tuple []
 
-rewriteSUFRevPass P_size unit_shape
+rewriteSUFRevPass P_size _ unit_shape
   = Just shape
   where shape = pSnd unit_shape
 
-rewriteSUFRevPass P_sum d_da_size
+rewriteSUFRevPass P_sum _ d_da_size
   = Just $ pConstVec size d_da
   where d_da = pFst d_da_size
         size = pSnd d_da_size
 
-rewriteSUFRevPass P_eq (Tuple [_, tangentZero])
+rewriteSUFRevPass P_eq _ (Tuple [_, tangentZero])
   = Just tangentZero
 
-rewriteSUFRevPass P_ne (Tuple [_, tangentZero])
+rewriteSUFRevPass P_ne _ (Tuple [_, tangentZero])
   = Just tangentZero
 
-rewriteSUFRevPass P_constVec t
+rewriteSUFRevPass P_constVec _ t
   | TypeTuple [TypeTensor n _, _] <- typeof t
   , let unitOfIndexType = mkTangentZero (zeroIndexForDimension n)
   = Just $ Tuple [unitOfIndexType, pSum (pFst t)]
 
-rewriteSUFRevPass P_deltaVec (Tuple [v, i])
+rewriteSUFRevPass P_deltaVec _ (Tuple [v, i])
   | TypeTensor n _ <- typeof v
   , let unitOfIndexType = mkTangentZero (zeroIndexForDimension n)
   = Just $ Tuple [unitOfIndexType, unitOfIndexType, pIndex i v]
 
-rewriteSUFRevPass P_ts_add (Tuple [ddr, Tuple []])
+rewriteSUFRevPass P_ts_add _ (Tuple [ddr, Tuple []])
   -- FIXME: This is bad because it duplicates the expression ddr.  CSE
   -- will probably resolve this problem, but we shouldn't create it in
   -- the first place.
   = Just $ Tuple [ddr, ddr]
 
-rewriteSUFRevPass P_ts_dot (Tuple [ddr, dadb])
+rewriteSUFRevPass P_ts_dot _ (Tuple [ddr, dadb])
   = Just $ Tuple [pScale ddr db, pScale ddr da]
   where da = pFst dadb
         db = pSnd dadb
 
-rewriteSUFRevPass P_ts_scale (Tuple [ddr, t])
+rewriteSUFRevPass P_ts_scale _ (Tuple [ddr, t])
   = Just $ Tuple [pDot x ddr, pScale lambda ddr]
   where lambda = pFst t
         x = pSnd t
 
-rewriteSUFRevPass _ _ = Nothing
+rewriteSUFRevPass _ _ _ = Nothing

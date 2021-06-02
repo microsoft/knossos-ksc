@@ -235,8 +235,8 @@ rewriteCall env (TFun _ to_inline) arg
 rewriteCall _ (TFun _ (Fun SUFFwdPass (PrimFunT fun))) arg
   = SUF.rewriteSUFFwdPass fun arg
 
-rewriteCall _ (TFun _ (Fun SUFRevPass (PrimFunT fun))) arg
-  = SUF.rewriteSUFRevPass fun arg
+rewriteCall _ (TFun _ (Fun SUFRevPass (BaseFunId (BasePrimFunName fun) orig_arg_ty))) arg
+  = SUF.rewriteSUFRevPass fun orig_arg_ty arg
 
 rewriteCall _ _ _
   = Nothing
