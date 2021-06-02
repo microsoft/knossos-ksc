@@ -679,21 +679,17 @@ primFunCallResultTy_maybe fun args
       -- for temporary variables during the evaluation of e.)
       (P_copydown, t)                                     -> Just t
 
-      -- ($check f rev$f s s' ds dt) verifies the derivatives rev$f at s in directions ds,dt.
+      -- ($check f rev$f s ds dt) verifies the derivatives rev$f at s in directions ds,dt.
       -- That is, ds and dt should be near-zero elements of the domain and range tangent spaces
       -- and the returned value dt'*Jacobian(f)*ds should be similar to dt'*(f(s+ds)-f(s))
-      --
-      -- NB s and s' should be equal, except if s' is not a tuple, in
-      -- which case s should be (tuple s')
       (P_check    , TypeTuple
                       [ TypeLam s t
-                      , TypeLam s_dt ds, s', s'0, ds', dt])
-                      | s `eqType` case s' of TypeTuple [s'1] -> s'1
-                                              _               -> s'
+                      , TypeLam s_dt ds, s', ds', dt])
+                      | s' `eqType` s
                       , tangentType s `eqType` ds
                       , tangentType s' `eqType` ds'
                       , tangentType t `eqType` dt
-                      , s_dt `eqType` (TypeTuple [s'0, dt])
+                      , s_dt `eqType` (TypeTuple [s', dt])
                        -> Just TypeFloat
 
       -- ($trace e) emits its argument's value to stdout and returns it

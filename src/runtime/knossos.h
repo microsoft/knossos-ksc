@@ -1770,14 +1770,14 @@ namespace ks {
   // 
   //  i.e. what should be small (when dx is) if our
   //  reverse mode generated code is correct.
-	template <class Functor, class RevFunctor, class X, class X_, class Dx, class Df>
-        double $check(allocator * alloc, Functor f, RevFunctor rev_f, X x, X_ x_, Dx dx, Df df)
+	template <class Functor, class RevFunctor, class X, class Dx, class Df>
+        double $check(allocator * alloc, Functor f, RevFunctor rev_f, X x, Dx dx, Df df)
 	{
 		auto f_x = applyWithAllocator(alloc, f, x);
 		auto f_x_plus_dx = applyWithAllocator(alloc, f, ts_add(alloc, x, dx));
 		auto delta_f = f_x_plus_dx - f_x;
 		double d1 = ts_dot(delta_f, df);
-		auto dfJ = applyWithAllocator(alloc, rev_f, ks::make_tuple(x_, df));
+		auto dfJ = applyWithAllocator(alloc, rev_f, ks::make_tuple(x, df));
 		double d2 = ts_dot(dfJ, dx);
 
 		/*

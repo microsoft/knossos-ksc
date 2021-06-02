@@ -78,9 +78,8 @@
                   (tuple 23 (build 13 (lam (i : Integer) (to_float i))))))  "\n"
         "CHECK=" ($check (lam (x : Float) (f x))
                                 (lam (t : Tuple Float Float) ([rev f] t))
-                                (tuple 1.1)
                                 1.1
-                                (tuple 0.00001)
+                                0.00001
                                 0.3)  "\n"
     )
 )

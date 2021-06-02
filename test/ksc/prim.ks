@@ -231,7 +231,6 @@
      (let (checked ($check  (lam (t : Tuple Float Float) (testfunc t))
                             (lam (t : Tuple (Tuple Float Float) Float) ([rev testfunc] t))
                             x
-                            x
                             dx
                             df))
      (let (rev_ok (lt (abs checked) tolerance))
