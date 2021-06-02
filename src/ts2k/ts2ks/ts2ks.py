@@ -1,6 +1,7 @@
 # %%
 
 from typing import List, Tuple
+from contextlib import contextmanager
 
 import functools
 import numpy
@@ -368,21 +369,16 @@ def torch_to_ks(py_mod, val):
     raise NotImplementedError()
 
 
-class logging(object):
+@contextmanager
+def logging(py_mod, flag=True):
     """
     Turn on verbose logging in Knossos calls
     """
-
-    def __init__(self, py_mod, flag=True):
-        self.py_mod = py_mod
-        self.flag = flag
-
-    def __enter__(self):
-        self.old_flag = self.py_mod.logging(self.flag)
-
-    def __exit__(self, type, value, tb):
-        self.py_mod.logging(self.old_flag)
-        return False
+    old_flag = py_mod.logging(flag)
+    try:
+        yield
+    finally:
+        py_mod.logging(old_flag)
 
 
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
