@@ -3,14 +3,35 @@ import pytest
 import importlib
 import inspect
 import torch
+import os
+import sys
+from pathlib import Path
 from collections import namedtuple
+from contextlib import contextmanager
 
 from ts2ks import ts2mod
+
+# https://stackoverflow.com/a/41904558/35544
+# submodule_search_locations doesn't work for this
+@contextmanager
+def add_to_path(p):
+    import sys
+
+    old_path = sys.path
+    old_modules = sys.modules
+    sys.modules = old_modules.copy()
+    sys.path = sys.path[:]
+    sys.path.insert(0, p)
+    try:
+        yield
+    finally:
+        sys.path = old_path
+        sys.modules = old_modules
 
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--modulename", action="store", help="name of module to dynamically load"
+        "--modulepath", action="store", help="path of module to dynamically load"
     )
     parser.addoption(
         "--benchmarkname", action="store", help="name of benchmark to dynamically load"
@@ -23,8 +44,8 @@ def benchmarkname(request):
 
 
 @pytest.fixture
-def modulename(request):
-    return request.config.getoption("--modulename")
+def modulepath(request):
+    return request.config.getoption("--modulepath")
 
 
 BenchmarkFunction = namedtuple("BenchmarkFunction", "name func")
@@ -61,28 +82,31 @@ def config_namer(config):
 
 
 def pytest_configure(config):
-    module_name = config.getoption("modulename")
+    module_path = config.getoption("modulepath")
     benchmark_name = config.getoption("benchmarkname")
 
-    mod = importlib.import_module(module_name)
+    module_dir, module_name = os.path.split(module_path)
 
-    configs = list(getattr(mod, benchmark_name + "_bench_configs")())
+    with add_to_path(module_dir):
+        mod = importlib.import_module(module_name)
 
-    example_inputs = (configs[0],)
+        configs = list(getattr(mod, benchmark_name + "_bench_configs")())
 
-    config.reference_func = getattr(mod, benchmark_name + "_pytorch")
-    config.functions_to_benchmark = list(
-        functions_to_benchmark(mod, benchmark_name, example_inputs)
-    )
-    # We want to group by tensor size, it's not clear how to metaprogram the group mark cleanly.
-    # pytest meta programming conflates arguments and decoration. I've not been able to find a way to directly
-    # parameterize just marks so do the mark along with a oarameter
-    config.config_and_group_marker = [
-        pytest.param(config, marks=[pytest.mark.benchmark(group=str(config.shape))])
-        for config in configs
-    ]
+        example_inputs = (configs[0],)
 
-    # Alternative use a dummy argument --benchmark-group-by=param:dummy_argument but messes with serialised versions and is just horrible
+        config.reference_func = getattr(mod, benchmark_name + "_pytorch")
+        config.functions_to_benchmark = list(
+            functions_to_benchmark(mod, benchmark_name, example_inputs)
+        )
+        # We want to group by tensor size, it's not clear how to metaprogram the group mark cleanly.
+        # pytest meta programming conflates arguments and decoration. I've not been able to find a way to directly
+        # parameterize just marks so do the mark along with a oarameter
+        config.config_and_group_marker = [
+            pytest.param(config, marks=[pytest.mark.benchmark(group=str(config.shape))])
+            for config in configs
+        ]
+
+        # Alternative use a dummy argument --benchmark-group-by=param:dummy_argument but messes with serialised versions and is just horrible
 
 
 def pytest_generate_tests(metafunc):
