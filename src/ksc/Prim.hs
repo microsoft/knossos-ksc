@@ -596,7 +596,7 @@ pInline = mkPrimCall1 P_inline
 --  And this is the /only/ place we do this
 ---------------------------------------------
 
-primCallResultTy_maybe :: (HasCallStack, InPhase p) => DerivedFun PrimFun p -> Type
+primCallResultTy_maybe :: HasCallStack => DerivedFun PrimFun Typed -> Type
                        -> Either SDoc Type
 primCallResultTy_maybe fun arg_ty
   = case fun of
@@ -646,9 +646,9 @@ primCallResultTy_maybe fun arg_ty
         -> Left (text "Type error in SUF fwd fun:" <+> ppr fun
                  $$ text "Arg ty was" <+> ppr arg_ty)
 
-      Fun SUFRevPass (BaseFunId p _)
+      Fun SUFRevPass (BaseFunId p orig_arg_ty)
         | TypeTuple [dorig_res_ty, bog_ty] <- arg_ty
-        , Just t <- sufRevFunCallResultTy_maybe p dorig_res_ty bog_ty
+        , Just t <- sufRevFunCallResultTy_maybe p orig_arg_ty dorig_res_ty bog_ty
         -> Right t
         | otherwise
         -> Left (text "Type error in SUF rev fun:" <+> ppr fun
@@ -752,56 +752,56 @@ sufBogTy_maybe _ _
 --     sufRevFunCallResultTy_maybe f dT BOG{f}
 --
 -- returns dS
-sufRevFunCallResultTy_maybe :: PrimFun -> Type -> Type -> Maybe Type
-sufRevFunCallResultTy_maybe P_SelFun{} _ shape
+sufRevFunCallResultTy_maybe :: PrimFun -> Type -> Type -> Type -> Maybe Type
+sufRevFunCallResultTy_maybe P_SelFun{} _ _ shape
   = Just shape
 
-sufRevFunCallResultTy_maybe P_elim (TypeTuple []) shape
+sufRevFunCallResultTy_maybe P_elim _ (TypeTuple []) shape
   -- FIXME: Use a better encoding of shape
   = Just shape
 
-sufRevFunCallResultTy_maybe (P_dup n) (TypeTuple arg_tys) (TypeTuple [])
+sufRevFunCallResultTy_maybe (P_dup n) _ (TypeTuple arg_tys) (TypeTuple [])
   | arg_ty_first:arg_tys_rest <- arg_tys
   , length arg_tys == n
   , Just res_ty <- eqTypes arg_ty_first arg_tys_rest
   = Just res_ty
 
-sufRevFunCallResultTy_maybe P_size _typeIndex shape
+sufRevFunCallResultTy_maybe P_size _ _typeIndex shape
   | let tangentType_arg_ty = shape
   = Just tangentType_arg_ty
 
-sufRevFunCallResultTy_maybe P_index _elt_ty (TypeTuple [indexType, shape])
+sufRevFunCallResultTy_maybe P_index _ _elt_ty (TypeTuple [indexType, shape])
   = Just (TypeTuple [tangentType indexType, shape])
 
-sufRevFunCallResultTy_maybe P_sum elt_ty indexType
+sufRevFunCallResultTy_maybe P_sum _ elt_ty indexType
   | Just n <- tensorDimensionFromIndexType_maybe indexType
   = Just (TypeTensor n elt_ty)
 
-sufRevFunCallResultTy_maybe P_ts_add dt (TypeTuple [])
+sufRevFunCallResultTy_maybe P_ts_add _ dt (TypeTuple [])
   = Just (TypeTuple [dt, dt])
 
-sufRevFunCallResultTy_maybe P_ts_dot TypeFloat arg_ty
+sufRevFunCallResultTy_maybe P_ts_dot _ TypeFloat arg_ty
   = Just arg_ty
 
-sufRevFunCallResultTy_maybe P_constVec (TypeTensor n ty) (TypeTuple [])
+sufRevFunCallResultTy_maybe P_constVec _ (TypeTensor n ty) (TypeTuple [])
   | let tangent_index_ty = tangentType (tensorIndexType n)
   = Just (TypeTuple [tangent_index_ty, ty])
 
-sufRevFunCallResultTy_maybe P_deltaVec typeTensor_dty indexType
+sufRevFunCallResultTy_maybe P_deltaVec _ typeTensor_dty indexType
   | TypeTensor _ dty <- typeTensor_dty
   = Just (TypeTuple [tangentType indexType, tangentType indexType, dty])
 
-sufRevFunCallResultTy_maybe P_eq (TypeTuple []) tangentType_arg_ty
+sufRevFunCallResultTy_maybe P_eq _ (TypeTuple []) tangentType_arg_ty
   = Just tangentType_arg_ty
 
-sufRevFunCallResultTy_maybe P_ne (TypeTuple []) tangentType_arg_ty
+sufRevFunCallResultTy_maybe P_ne _ (TypeTuple []) tangentType_arg_ty
   = Just tangentType_arg_ty
 
-sufRevFunCallResultTy_maybe P_ts_scale dt (TypeTuple [TypeFloat, dt1])
+sufRevFunCallResultTy_maybe P_ts_scale _ dt (TypeTuple [TypeFloat, dt1])
   | dt `eqType` dt1
   = Just (TypeTuple [TypeFloat, dt])
 
-sufRevFunCallResultTy_maybe _ _ _
+sufRevFunCallResultTy_maybe _ _ _ _
   = Nothing
 
 ---------------------------------------
