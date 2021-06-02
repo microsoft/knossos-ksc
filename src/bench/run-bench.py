@@ -125,7 +125,7 @@ def bench(module_file, bench_name):
     ks_compiled = ts2mod(ks_raw, example_inputs=(configs[0],))
 
     for arg in configs:
-        with ts2ks.logging(False):
+        with ts2ks.logging(ks_compiled.py_mod, False):
             pt_arg = arg.detach()
             pt_arg.requires_grad = True
             pt_value = pt_fast(pt_arg)

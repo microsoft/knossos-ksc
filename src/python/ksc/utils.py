@@ -310,7 +310,8 @@ def __make_cpp_str(
     args_str = mangleTypes(arg_types)
     name_str = encode_name(f"{name_to_call}@{args_str}")
     declarations = f"""
-     m.def("entry", with_ks_allocator("{name_str}", &ks::{name_str}));
+    m.def("entry", with_ks_allocator("{name_str}", &ks::{name_str}));
+    m.def("logging", &ks_logging);
     """
 
     if generate_derivatives:
