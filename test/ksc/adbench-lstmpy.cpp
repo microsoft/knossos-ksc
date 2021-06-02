@@ -32,9 +32,9 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("sigmoid", with_ks_allocator(&ks::sigmoid$af));
-  m.def("logsumexp", with_ks_allocator(&ks::logsumexp$aT1f));
-  m.def("lstm_model", with_ks_allocator(&ks::lstm_model$aT1fT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f));
-  m.def("lstm_predict", with_ks_allocator(&ks::lstm_predict$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1f));
-  m.def("lstm_objective", with_ks_allocator(&ks::lstm_objective$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1$dT1fT1f$b));
+  m.def("sigmoid", with_ks_allocator("sigmoid", &ks::sigmoid$af));
+  m.def("logsumexp", with_ks_allocator("logsumexp", &ks::logsumexp$aT1f));
+  m.def("lstm_model", with_ks_allocator("lstm_model", &ks::lstm_model$aT1fT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f));
+  m.def("lstm_predict", with_ks_allocator("lstm_predict", &ks::lstm_predict$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1f));
+  m.def("lstm_objective", with_ks_allocator("lstm_objective", &ks::lstm_objective$aT1$dT1fT1fT1fT1fT1fT1fT1fT1fT1fT1f$bT1fT1fT1fT1$dT1fT1f$b));
 }
