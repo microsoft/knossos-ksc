@@ -5,7 +5,7 @@ import importlib.util
 import inspect
 import argparse
 from pathlib import Path
-from ksc import util
+from ksc import utils
 
 from ts2ks.ts2ks import ts2ks, write_edefs
 
@@ -33,7 +33,7 @@ output = open(output_file_path, "w")
 
 module_name = "DynamicLoadedModule"
 
-with util.add_to_path(input_directory):
+with utils.add_to_path(input_directory):
     spec = importlib.util.spec_from_file_location(module_name, Path(input_file_path))
     dynamicModule = importlib.util.module_from_spec(spec)
     # We deliberately don't make visible via sys.modules[module_name] = module
