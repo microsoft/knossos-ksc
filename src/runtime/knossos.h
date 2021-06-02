@@ -380,6 +380,24 @@ namespace ks {
 		}
 	};
 
+	template<class Functor, class X, size_t ...Indices>
+	auto applyWithAllocatorImpl(allocator * alloc, Functor f, const X & x, std::index_sequence<Indices...>)
+	{
+		return f(alloc, ks::get<Indices>(x)...);
+	}
+
+	template<class Functor, class ...Xs>
+	auto applyWithAllocator(allocator * alloc, Functor f, const ks::tuple<Xs...> & x)
+	{
+		return applyWithAllocatorImpl(alloc, f, x, std::index_sequence_for<Xs...>{});
+	}
+
+	template<class Functor, class S>
+	auto applyWithAllocator(allocator * alloc, Functor f, const S & x)
+	{
+		return f(alloc, x);
+	}
+
 	// ===============================  Tensor class ==================================
 	template<size_t Dummy> using int_t = int;
 
@@ -1344,12 +1362,12 @@ namespace ks {
 	auto // tensor<Dim, T>
 	map(allocator * alloc, F f, tensor<Dim, S> t)
 	{
-		using T = decltype(f(alloc, S{}));
+		using T = decltype(applyWithAllocator(alloc, f, S{}));
 		auto ret = tensor<Dim, T>::create(alloc, t.size());
 		S const* tdata = t.data();
 		T* retdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
-			retdata[i] = f(alloc, tdata[i]);
+			retdata[i] = applyWithAllocator(alloc, f, tdata[i]);
 		return ret;
 	}
 
@@ -1359,7 +1377,7 @@ namespace ks {
 	auto // tuple<tensor<Dim, T>, tensor<Dim, B>>
 	suffwdpass_map(allocator * alloc, F f, tensor<Dim, S> v)
 	{
-		using T_B = decltype(f(alloc, S{}));
+		using T_B = decltype(applyWithAllocator(alloc, f, S{}));
 		using T = std::tuple_element_t<0, T_B>;
 		using B = std::tuple_element_t<1, T_B>;
 
@@ -1372,7 +1390,7 @@ namespace ks {
 		T* retdata = ret.data();
 
 		for (int i = 0, ne = v.num_elements(); i != ne; ++i) {
-			auto [r, b] = f(alloc, vdata[i]);
+			auto [r, b] = applyWithAllocator(alloc, f, vdata[i]);
 			retdata[i] = r;
 			bogdata[i] = b;
 		};
@@ -1740,18 +1758,6 @@ namespace ks {
 	}
 
 	// ===============================  Derivative check  ================================
-	template<class Functor, class X, size_t ...Indices>
-	auto applyWithAllocatorImpl(allocator * alloc, Functor f, const X & x, std::index_sequence<Indices...>)
-	{
-		return f(alloc, ks::get<Indices>(x)...);
-	}
-
-	template<class Functor, class ...Xs>
-	auto applyWithAllocator(allocator * alloc, Functor f, const ks::tuple<Xs...> & x)
-	{
-		return applyWithAllocatorImpl(alloc, f, x, std::index_sequence_for<Xs...>{});
-	}
-
   //  Check derivatives:
   // 
 	//    delta_f = f(x+dx) - f(x) ~= D$f * dx
