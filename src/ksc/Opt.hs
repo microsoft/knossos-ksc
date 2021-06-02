@@ -1,4 +1,6 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wwarn=incomplete-patterns #-}
+-- ^ Some problem with pattern synonym exhaustiveness checking
 
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
@@ -230,10 +232,10 @@ rewriteCall env (TFun _ to_inline) arg
       <- lookupGblST to_inline (optGblST env)
   = Just (inlineCall env pat body arg)
 
-rewriteCall _ (TFun _ (Fun SUFFwdPass (PrimFun fun))) arg
+rewriteCall _ (TFun _ (Fun SUFFwdPass (PrimFunT fun))) arg
   = SUF.rewriteSUFFwdPass fun arg
 
-rewriteCall _ (TFun _ (Fun SUFRevPass (PrimFun fun))) arg
+rewriteCall _ (TFun _ (Fun SUFRevPass (PrimFunT fun))) arg
   = SUF.rewriteSUFRevPass fun arg
 
 rewriteCall _ _ _
@@ -248,15 +250,15 @@ shouldInline to_inline
                      , fwd "add" ff
                      , rev "add" ff
                      ]
-  where fwd f t = Fun SUFFwdPass (BaseUserFunId f t)
-        rev f t = Fun SUFRevPass (BaseUserFunId f t)
+  where fwd f t = Fun SUFFwdPass (BaseFunId f t)
+        rev f t = Fun SUFRevPass (BaseFunId f t)
         ff = TypeTuple [TypeFloat, TypeFloat]
 
 -----------------------
 optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
 
 -- RULE:  sel_i_n (..., ei, ...)  ==>  ei
-optFun _ (PrimFun (P_SelFun i _)) arg
+optFun _ (PrimFunT (P_SelFun i _)) arg
   | Tuple es <- arg
   , i <= length es
   = Just (es !! (i-1))
@@ -265,7 +267,7 @@ optFun _ (PrimFun (P_SelFun i _)) arg
   = Nothing
 
 -- $inline needs to look up the global symtab
-optFun env (PrimFun P_inline) arg
+optFun env (PrimFunT P_inline) arg
   | Call (TFun _ fun) inner_arg <- arg
   , Just userFun <- maybeUserFun fun
   , Just fun_def <- lookupGblST userFun (optGblST env)
@@ -273,10 +275,10 @@ optFun env (PrimFun P_inline) arg
   = Just (inlineCall env pat body inner_arg)
 
 -- Other prims are determined by their args
-optFun env (PrimFun f) e
+optFun env (PrimFunT f) e
   = optPrimFun (optEnvInScope env) f e
 
-optFun _ (BaseUserFun {}) _
+optFun _ (BaseFunId (BaseUserFunName {}) _) _
   = Nothing
 
 -----------------------
@@ -648,7 +650,7 @@ optSumBuild _ _ _ = Nothing
 optGradFun :: HasCallStack => InScopeSet -> ADPlan
                            -> Type -> BaseFun Typed -> TExpr -> Maybe TExpr
 -- Inline the definitions for grad(+), grad(*) etc
-optGradFun _ _ _ (BaseUserFun {}) _
+optGradFun _ _ _ (BaseFunId (BaseUserFunName {}) _) _
   = Nothing
 
 -- From here on we have primitives or selection
@@ -664,7 +666,7 @@ optGradFun env TupleAD ty f args
   where
     (binds, [new_args]) = makeAtomic False env [args]
 
-optGradFun _ BasicAD ty (PrimFun f)  args = optGradPrim ty f args
+optGradFun _ BasicAD ty (PrimFunT f)  args = optGradPrim ty f args
 
 type TBinds = [(TVar, TExpr)]
 
@@ -757,7 +759,7 @@ optGradPrim _ f     a = optTrace("No opt for grad of prim " ++ render (ppr f) ++
 -----------------------
 -- See Note [Automatic differentiation documentation]
 optDrvFun :: HasCallStack => ADMode -> BaseFun p -> TExpr -> Maybe TExpr
-optDrvFun (AD BasicAD dir) (PrimFun f) args = optDrvPrim dir f args
+optDrvFun (AD BasicAD dir) (PrimFunT f) args = optDrvPrim dir f args
 optDrvFun _ _ _ = Nothing
 
 -- See Note [Automatic differentiation documentation]
@@ -804,7 +806,7 @@ optLMApply _ (AD TupleAD dir) (Tuple [_, lm]) dx
 
 -- Called for (lmApply (lm* es) dx)
 -- In BasicAD only
-optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun JustFun (PrimFun f))) es) dx
+optLMApply env (AD BasicAD dir) (Call (TFun _ (Fun JustFun (PrimFunT f))) es) dx
   = optLMApplyCall env dir f es dx
 
 -- Looking at:   D$f(e1, e2) `lmApply` dx

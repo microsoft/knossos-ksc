@@ -1,3 +1,4 @@
+from typing import Union
 from dataclasses import dataclass
 from functools import singledispatch
 import itertools
@@ -11,63 +12,11 @@ from typing import (
 )
 
 from ksc.expr import Expr, If, Call, Let, Lam, Var, Const, Assert
+from ksc.path import Path, ExprWithPath
+from ksc.visitors import ExprTransformer
+from ksc.utils import singleton
 
 # cav_subst = Capture-AVoiding SUBSTitution
-
-##### Node numbering scheme
-
-
-@singledispatch
-def subexps_no_binds(e: Expr) -> List[Expr]:
-    # The rewritable children of an Expr
-    raise ValueError("Must be overridden for every Expr subclass")
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_var(e: Var):
-    return []
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_const(e: Const):
-    return []
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_let(e: Let):
-    return [e.rhs, e.body]
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_lam(e: Lam):
-    return [e.body]
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_call(e: Call):
-    return e.args
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_if(e: If):
-    return [e.cond, e.t_body, e.f_body]
-
-
-@subexps_no_binds.register
-def _subexps_no_binds_assert(e: Assert):
-    return [e.cond, e.body]
-
-
-Location = Sequence[int]  # Used immutably, so normally a tuple
-
-
-def get_node_at_location(expr, path: Location):
-    return (
-        expr
-        if len(path) == 0
-        else get_node_at_location(subexps_no_binds(expr)[path[0]], path[1:])
-    )
-
 
 #####################################################################
 # Public members
@@ -77,7 +26,7 @@ def get_node_at_location(expr, path: Location):
 class ReplaceLocationRequest:
     """ Describes a subtree to be replaced by the replace_subtree(s) function. """
 
-    target: Location
+    target: Path
     """ The location within the root Expr, i.e. upon which replace_subtree(s) is called, that should be replaced. """
 
     payload: Expr
@@ -101,7 +50,7 @@ VariableSubstitution = Mapping[str, Expr]
 def replace_subtrees(e: Expr, reqs: List[ReplaceLocationRequest]) -> Expr:
     """ Replaces locations within <e> with new subtrees, as per ReplaceLocationRequest.
         Returns a new Expr, which may share subtrees with the original. """
-    return _cav_helper(e, reqs, {})
+    return CAvSubst.visit(ExprWithPath.from_expr(e), reqs, {})
 
 
 def replace_subtree(e: Expr, *args):
@@ -115,7 +64,7 @@ def replace_free_vars(e: Expr, subst: VariableSubstitution) -> Expr:
         Renames as necessary any binders within e to avoid capturing any variables in the values of <subst>.
         Returns a new Expr, which may share subtrees with the original (as well as with values of <subst>).
         """
-    return _cav_helper(e, tuple(), subst)
+    return CAvSubst.visit(ExprWithPath.from_expr(e), [], subst)
 
 
 #####################################################################
@@ -133,115 +82,89 @@ def make_nonfree_var(prefix, exprs, type=None):
 # CAV implementation
 
 
-def _cav_helper(
-    e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution
-) -> Expr:
-    # First, work out if there's anything to do in this subtree
-    substs = {
-        varname: repl for varname, repl in substs.items() if varname in e.free_vars_
-    }
-    if len(reqs) == 0:
-        if len(substs) == 0:
-            # Nothing to do in this subtree
-            return e
-    elif any(len(req.target) == 0 for req in reqs):
-        # Apply here
-        if len(reqs) != 1:
-            raise ValueError(
-                "Multiple ReplaceLocationRequests on locations nested within each other"
-            )
-        if reqs[0].applicator is None:
-            return reqs[0].payload
-        # Continue renaming.
-        renamed_e = _cav_helper(e, [], substs)
-        return reqs[0].applicator(reqs[0].payload, renamed_e)
-    # No ReplaceLocationRequest targets this node. Do any Expr-specific processing, perhaps recursing deeper.
-    return _cav_children(e, reqs, substs)
+@singleton
+class CAvSubst(ExprTransformer):
+    def visit(
+        self,
+        ewp: ExprWithPath,
+        reqs: List[ReplaceLocationRequest],
+        substs: VariableSubstitution,
+    ) -> Expr:
+        # First, work out if there's anything to do in this subtree, i.e. if
+        # intersection(substs, ewp.free_vars)>0 or any `reqs` are within this subtree
+        substs = {
+            varname: repl
+            for varname, repl in substs.items()
+            if varname in ewp.free_vars_
+        }
+        reqs = [req for req in reqs if req.target[: len(ewp.path)] == ewp.path]
+        if len(reqs) == 0:
+            if len(substs) == 0:
+                # Nothing to do in this subtree
+                return ewp.expr
+            # No paths identified to replace, but we are still propagating a rename: carry on
+        elif any(req.target == ewp.path for req in reqs):
+            # Apply here
+            if len(reqs) != 1:
+                raise ValueError(
+                    "Multiple ReplaceLocationRequests on locations nested within each other"
+                )
+            if reqs[0].applicator is None:
+                return reqs[0].payload
+            # Continue renaming.
+            renamed_e = self.visit(ewp, [], substs)
+            return reqs[0].applicator(reqs[0].payload, renamed_e)
+        # No ReplaceLocationRequest targets this node. Do any Expr-specific processing, perhaps recursing deeper.
+        return super().visit(ewp, reqs, substs)
 
+    def visit_var(self, e: Union[ExprWithPath, Var], reqs, substs):
+        return substs.get(e.name, e)
 
-@singledispatch
-def _cav_children(
-    e: Expr, reqs: List[ReplaceLocationRequest], substs: VariableSubstitution
-) -> Expr:
-    return e.__class__(*_cav_child_list(e, reqs, substs), type=e.type_)
+    @staticmethod
+    def _rename_if_needed(
+        arg: Var,
+        binder: Expr,
+        reqs: List[ReplaceLocationRequest],
+        subst: VariableSubstitution,
+    ) -> Tuple[Var, VariableSubstitution]:
+        # If <arg> binds a variable free in any Expr's in a request payload or the RHS of a substitution, then
+        # returns a new Var (chosen not to capture any variable free in <binder> or as above), and an updated <subst>.
+        # Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
+        conflicting_binders = [req.payload for req in reqs] + list(subst.values())
+        if any(arg.name in rhs.free_vars_ for rhs in conflicting_binders):
+            # Must rename "arg". Make a new name.
+            nv = make_nonfree_var(arg.name, [binder] + conflicting_binders)
+            nv.type_ = arg.type_
+            return nv, {**subst, arg.name: nv}
+        return arg, {k: v for k, v in subst.items() if k != arg.name}
 
+    def visit_lam(self, e: Union[Lam, ExprWithPath], reqs, substs):
+        assert isinstance(e, ExprWithPath) and isinstance(
+            e.expr, Lam
+        )  # ExprTransformer ensures.
+        arg, substs = self._rename_if_needed(e.arg, e.expr, reqs, substs)
+        return Lam(
+            Var(arg.name, type=arg.type_, decl=True), self.visit(e.body, reqs, substs)
+        )
 
-def _requests_to_child(
-    reqs: List[ReplaceLocationRequest], ch_idx: int
-) -> List[ReplaceLocationRequest]:
-    return [
-        ReplaceLocationRequest(req.target[1:], req.payload, req.applicator)
-        for req in reqs
-        if req.target[0] == ch_idx
-    ]
-
-
-def _cav_child_list(e: Expr, reqs, substs):
-    # Applies _cav_helper to the children of the expression, and returns the list of substituted children
-    return [
-        _cav_helper(ch, _requests_to_child(reqs, ch_idx), substs)
-        for ch_idx, ch in enumerate(subexps_no_binds(e))
-    ]
-
-
-@_cav_children.register
-def _cav_const(e: Const, reqs, substs):
-    return e
-
-
-@_cav_children.register
-def _cav_var(e: Var, reqs, substs):
-    return substs.get(e.name, e)
-
-
-@_cav_children.register
-def _cav_call(e: Call, reqs, substs):
-    return Call(e.name, _cav_child_list(e, reqs, substs), type=e.type_)
-
-
-def _rename_if_needed(
-    arg: Var,
-    binder: Expr,
-    reqs: List[ReplaceLocationRequest],
-    subst: VariableSubstitution,
-) -> Tuple[Var, VariableSubstitution]:
-    # If <arg> binds a variable free in any Expr's in a request payload or the RHS of a substitution, then
-    # returns a new Var (chosen not to capture any variable free in <binder> or as above), and an updated <subst>.
-    # Otherwise, returns <arg> and <subst> but *removing* any mapping for <arg>.
-    conflicting_binders = [req.payload for req in reqs] + list(subst.values())
-    if any(arg.name in rhs.free_vars_ for rhs in conflicting_binders):
-        # Must rename "arg". Make a new name.
-        nv = make_nonfree_var(arg.name, [binder] + conflicting_binders)
-        nv.type_ = arg.type_
-        return nv, {**subst, arg.name: nv}
-    return arg, {k: v for k, v in subst.items() if k != arg.name}
-
-
-@_cav_children.register
-def _cav_lam(e: Lam, reqs, substs):
-    arg, substs = _rename_if_needed(e.arg, e, reqs, substs)
-    return Lam(
-        Var(arg.name, type=arg.type_, decl=True), *_cav_child_list(e, reqs, substs)
-    )
-
-
-@_cav_children.register
-def _cav_let(e: Let, reqs, substs):
-    new_vars = []
-    # alpha-rename any capturing `e.vars` in `e.body` only
-    body_substs = substs
-    for var in [e.vars] if isinstance(e.vars, Var) else e.vars:
-        new_var, body_substs = _rename_if_needed(var, e, reqs, body_substs)
-        new_vars.append(new_var)
-    if len(new_vars) == 1:
-        assert isinstance(e.vars, Var)
-        new_vars = new_vars[0]
-    else:
-        assert isinstance(e.vars, list)
-    # Do not use _cav_child_list: we need different substitutions for each child.
-    # Hence, this must match _idch_let's ordering of rhs/body.
-    return Let(
-        new_vars,
-        _cav_helper(e.rhs, _requests_to_child(reqs, 0), substs),
-        _cav_helper(e.body, _requests_to_child(reqs, 1), body_substs),
-    )
+    def visit_let(self, e: Union[Let, ExprWithPath], reqs, substs):
+        assert isinstance(e, ExprWithPath) and isinstance(
+            e.expr, Let
+        )  # ExprTransformer ensures.
+        new_vars = []
+        # alpha-rename any capturing `e.vars` in `e.body` only
+        body_substs = substs
+        for var in [e.vars] if isinstance(e.vars, Var) else e.vars:
+            new_var, body_substs = self._rename_if_needed(var, e, reqs, body_substs)
+            new_vars.append(new_var)
+        if len(new_vars) == 1:
+            assert isinstance(e.vars, Var)
+            new_vars = new_vars[0]
+        else:
+            assert isinstance(e.vars, list)
+        # Do not use super().visit: we need different substitutions for each child.
+        return Let(
+            new_vars,
+            self.visit(e.rhs, reqs, substs),
+            self.visit(e.body, reqs, body_substs),
+        )

@@ -98,6 +98,7 @@ Notes:
 
 
 import Lang hiding (parens, brackets)
+import Ksc.Traversal ( over )
 
 import Text.Parsec( (<|>), try, many, parse, eof, manyTill, ParseError, unexpected )
 import Text.Parsec.Char
@@ -327,15 +328,33 @@ pIsUserFun fun = case maybeUserFun fun of
   Nothing -> unexpected ("Unexpected non-UserFun in Def: " ++ render (ppr fun))
   Just userFun -> pure userFun
 
-pPrimFun :: Parser (BaseFun p)
-pPrimFun = try $ do { f <- pIdentifier
-                    ; case toPrimFun f of
-                        Just pf -> pure (PrimFun pf)
-                        Nothing -> unexpected (f ++ " is not a PrimFun")
-                    }
+pPrimFunIdentifier :: Parser PrimFun
+pPrimFunIdentifier = pSelFunIdentifier
+                 <|> do { f <- pIdentifier
+                        ; case toPrimFun f of
+                            Just pf -> pure pf
+                            Nothing -> unexpected (f ++ " is not a PrimFun")
+                        }
 
-pSelFun :: Parser (BaseFun p)
-pSelFun = do { rest <- try $ do { f <- pIdentifier
+pBasePrimFunWithType :: (Type -> BaseArgTy p) -> Parser (BasePrimFun p)
+pBasePrimFunWithType add =
+     brackets (do { f  <- pPrimFunIdentifier
+                  ; ty <- pType
+                  ; pure (BaseFunId f (add ty))
+                  })
+
+pBasePrimFunWithoutType :: Parser (BasePrimFun Parsed)
+pBasePrimFunWithoutType =
+         do { f <- pPrimFunIdentifier
+            ; pure (BaseFunId f Nothing)
+            }
+
+pPrimFun :: Parser (BaseFun Parsed)
+pPrimFun = try $ over baseFunName BasePrimFunName <$> pBasePrimFunWithoutType
+
+pSelFunIdentifier :: Parser PrimFun
+pSelFunIdentifier
+        = do { rest <- try $ do { f <- pIdentifier
                                 ; case break (== '$') f of
                                     ("get", '$':rest) -> pure rest
                                     _ -> unexpected "Did not start with get$"
@@ -343,34 +362,33 @@ pSelFun = do { rest <- try $ do { f <- pIdentifier
              ; let mselfun = do { (istring, '$':nstring) <- pure (break (== '$') rest)
                                 ; i <- readMaybe istring
                                 ; n <- readMaybe nstring
-                                ; pure (PrimFun (P_SelFun i n))
+                                ; pure (P_SelFun i n)
                                 }
              ; case mselfun of
                  Nothing     -> unexpected "Ill-formed get"
                  Just selfun -> pure selfun
              }
 
-pBaseUserFunWithType :: (Type -> BaseUserFunArgTy p) -> Parser (BaseUserFun p)
+pBaseUserFunWithType :: (Type -> BaseArgTy p) -> Parser (BaseUserFun p)
 pBaseUserFunWithType add =
      brackets (do { f  <- pIdentifier
                   ; ty <- pType
-                  ; pure (BaseUserFunId f (add ty))
+                  ; pure (BaseFunId f (add ty))
                   })
 
 pBaseUserFunWithoutType :: Parser (BaseUserFun Parsed)
 pBaseUserFunWithoutType =
          do { f <- pIdentifier
-            ; pure (BaseUserFunId f Nothing)
+            ; pure (BaseFunId f Nothing)
             }
 
 pBaseUserFun :: Parser (BaseFun Parsed)
-pBaseUserFun = BaseUserFun <$>
+pBaseUserFun = over baseFunName BaseUserFunName <$>
      (pBaseUserFunWithType Just
      <|> pBaseUserFunWithoutType)
 
 pBaseFun :: Parser (BaseFun Parsed)
-pBaseFun = pSelFun
-       <|> pPrimFun
+pBaseFun = pPrimFun
        <|> pBaseUserFun
 
 pFunG :: forall p. Parser (BaseFun p) -> Parser (Fun p)
@@ -390,7 +408,7 @@ pFunG pBase = try (brackets $
   where pDerivation s d = pReserved s >> Fun d <$> pBase
 
 pFunTyped :: Parser (Fun Typed)
-pFunTyped = pFunG (BaseUserFun <$> pBaseUserFunWithType id)
+pFunTyped = pFunG (over baseFunName BaseUserFunName <$> pBaseUserFunWithType id)
 
 pFun :: Parser (Fun Parsed)
 pFun = pFunG pBaseFun

@@ -9,6 +9,7 @@ import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
+from contextlib import contextmanager
 
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
@@ -460,3 +461,21 @@ def singleton(cls):
         Foo.do_foo()
     """
     return cls()
+
+
+# https://stackoverflow.com/a/41904558/35544
+# submodule_search_locations doesn't work for this
+@contextmanager
+def add_to_path(p):
+    import sys
+
+    old_path = sys.path
+    old_modules = sys.modules
+    sys.modules = old_modules.copy()
+    sys.path = sys.path[:]
+    sys.path.insert(0, p)
+    try:
+        yield
+    finally:
+        sys.path = old_path
+        sys.modules = old_modules

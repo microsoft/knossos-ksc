@@ -352,7 +352,7 @@ mkCTypedVar (TVar ty var) = cgenType (mkCType ty) `spc` cgenVar var
 cgenDefE :: CST -> TDef -> [String]
 cgenDefE env (Def { def_fun = f, def_pat = param
                   , def_rhs = UserRhs body }) =
-  let cf                         = cgenUserFun (userFunToFun f)
+  let cf                         = cgenUserFun f
       (params, withPackedParams) = params_withPackedParamsPat param
       CG cbodydecl cbodyexpr cbodytype _callocusage =
         runM $ cgenExpr env (withPackedParams body)
@@ -400,7 +400,7 @@ cgenExprWithoutResettingAlloc env = \case
 
   -- Special case for copydown. Mark the allocator before evaluating the
   -- expression, then copydown the result to the marked position.
-  Call (TFun _ (Fun JustFun (PrimFun P_copydown))) e -> do
+  Call (TFun _ (Fun JustFun (PrimFunT P_copydown))) e -> do
     CG cdecl cexpr ctype _callocusage <- cgenExprR env e
     ret <- freshCVar
     bumpmark <- freshCVar
@@ -604,23 +604,33 @@ mangleType = \case
     TypeLM _ _    -> error "Can't mangle TypeLM"
     TypeUnknown   -> error "Can't mangle TypeUnknown"
 
-cgenBaseFun :: BaseFun Typed -> String
-cgenBaseFun = \case
-  (BaseUserFun (BaseUserFunId fun (TypeTuple [])))  -> mangleFun fun
-  (BaseUserFun (BaseUserFunId fun (TypeTuple tys))) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
-  (BaseUserFun (BaseUserFunId fun ty))  -> mangleFun (fun ++ "@" ++ mangleType ty)
-  (PrimFun (P_SelFun i _))  -> "ks::get<" ++ show (i - 1) ++ ">"
-  (PrimFun fun) -> render (ppr fun)
+cgenBaseUserFun :: BaseUserFun Typed -> String
+cgenBaseUserFun = \case
+  (BaseFunId fun (TypeTuple []))  -> mangleFun fun
+  (BaseFunId fun (TypeTuple tys)) -> mangleFun (fun ++ "@" ++ concatMap mangleType tys)
+  (BaseFunId fun ty)  -> mangleFun (fun ++ "@" ++ mangleType ty)
 
-cgenUserFun :: HasCallStack => Fun Typed -> String
-cgenUserFun f = case f of
+cgenBasePrimFun :: BasePrimFun Typed -> String
+cgenBasePrimFun = \case
+  (BaseFunId (P_SelFun i _) _)  -> "ks::get<" ++ show (i - 1) ++ ">"
+  (BaseFunId fun _) -> render (ppr fun)
+
+cgenUserFun :: HasCallStack => UserFun Typed -> String
+cgenUserFun = cgenFun cgenBaseUserFun
+
+cgenPrimFun :: HasCallStack => DerivedFun PrimFun Typed -> String
+cgenPrimFun = cgenFun cgenBasePrimFun
+
+cgenFun :: HasCallStack
+        => (BaseFunId name Typed -> String) -> DerivedFun name Typed -> String
+cgenFun cgenBaseFun f = case f of
   Fun JustFun baseFun   -> cgenBaseFun baseFun
   Fun GradFun{}  s  -> "D$" ++ cgenBaseFun s
   Fun (DrvFun (AD BasicAD Fwd)) s -> "fwd$" ++ cgenBaseFun s
   Fun (DrvFun (AD BasicAD Rev)) s -> "rev$" ++ cgenBaseFun s
   Fun (DrvFun (AD TupleAD Fwd)) s -> "fwdt$" ++ cgenBaseFun s
   Fun (DrvFun (AD TupleAD Rev)) s -> "revt$" ++ cgenBaseFun s
-  Fun (ShapeFun ds) ff   -> "shape$" ++ cgenUserFun (Fun ds ff)
+  Fun (ShapeFun ds) ff   -> "shape$" ++ cgenFun cgenBaseFun (Fun ds ff)
   Fun CLFun s       -> "CL$" ++ cgenBaseFun s
   Fun SUFFwdPass s  -> "suffwdpass$" ++ cgenBaseFun s
   Fun SUFRevPass s  -> "sufrevpass$" ++ cgenBaseFun s
@@ -628,17 +638,19 @@ cgenUserFun f = case f of
 
 cgenAnyFun :: HasCallStack => TFun Typed -> CType -> String
 cgenAnyFun tf cftype = case tf of
-  TFun _ (Fun JustFun (PrimFun P_lmApply)) -> "lmApply"
-  TFun retty (Fun JustFun (PrimFun P_build)) ->
+  TFun _ (Fun JustFun (PrimFunT P_lmApply)) -> "lmApply"
+  TFun retty (Fun JustFun (PrimFunT P_build)) ->
     case retty of
       TypeTensor _ t -> "build<" ++ cgenType (mkCType t) ++ ">"
       _              -> error ("Unexpected return type for build: " ++ show retty)
-  TFun retty (Fun JustFun (PrimFun primname))
+  TFun retty (Fun JustFun (PrimFunT primname))
     | primname `elem` [P_sumbuild, P_buildFromSparse, P_buildFromSparseTupled]
     -> render (ppr primname) ++ "<" ++ cgenType (mkCType retty) ++ ">"
   -- This is one of the LM subtypes, e.g. HCat<...>  Name is just HCat<...>::mk
-  TFun (TypeLM _ _) (Fun JustFun (PrimFun _)) -> cgenType cftype ++ "::mk"
-  TFun _            f                 -> cgenUserFun f
+  TFun (TypeLM _ _) (Fun JustFun (PrimFunT _)) -> cgenType cftype ++ "::mk"
+  TFun _            f -> case perhapsUserFun f of
+    Left primFun  -> cgenPrimFun primFun
+    Right userFun -> cgenUserFun userFun
 
 {- Note [Allocator usage of function calls]
 
@@ -667,8 +679,8 @@ are two cases:
 -}
 
 funUsesAllocator :: HasCallStack => TFun p -> Bool
-funUsesAllocator (TFun _ (Fun JustFun (PrimFun (P_SelFun _ _)))) = False
-funUsesAllocator (TFun _ (Fun JustFun (PrimFun fname))) =
+funUsesAllocator (TFun _ (Fun JustFun (PrimFunT (P_SelFun _ _)))) = False
+funUsesAllocator (TFun _ (Fun JustFun (PrimFunT fname))) =
   not $ fname `elem` [P_index, P_size, P_eq, P_ne, P_trace, P_print, P_ts_dot]
 funUsesAllocator _ = True
 
@@ -718,13 +730,13 @@ ctypeofFun env (TFun ty f) ctys
   | Just f' <- maybeUserFun f
   , Just ret_ty <- cstMaybeLookupFun f' env
     -- trace ("Found fun " ++ show f) $
-  = UseTypeDef ("ty$" ++ cgenUserFun f) ret_ty
+  = UseTypeDef ("ty$" ++ cgenUserFun f') ret_ty
   | otherwise
   = -- trace ("Did not find fun " ++ show tf ++ " in\n     " ++ show env) $
     ctypeofFun1 ty f ctys
 
 ctypeofFun1 :: HasCallStack => Type -> Fun Typed -> [CType] -> CType
-ctypeofFun1 ty (Fun JustFun (PrimFun name)) ctys = ctypeofPrimFun ty name ctys
+ctypeofFun1 ty (Fun JustFun (PrimFunT name)) ctys = ctypeofPrimFun ty name ctys
 ctypeofFun1 (TypeLM _ _) (Fun GradFun{} f) ctys = ctypeofGradBuiltin f ctys
 ctypeofFun1 (TypeLM _ _) f ctys =
   error $ "Did not match [" ++ show f ++ "]@\n  " ++ intercalate
@@ -762,10 +774,10 @@ pattern RR = TypeFloat
 
 ctypeofGradBuiltin :: HasCallStack => BaseFun Typed -> [CType] -> CType
 ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
-  (PrimFun P_ts_add   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
-  (PrimFun P_trace    , [CType ty]          ) -> LMOne ty
-  (PrimFun P_copydown , [CType ty]          ) -> LMOne ty
-  (PrimFun P_size     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
+  (PrimFunT P_ts_add   , [CType RR, CType RR]) -> LMHCat [LMScale RR, LMScale RR]
+  (PrimFunT P_trace    , [CType ty]          ) -> LMOne ty
+  (PrimFunT P_copydown , [CType ty]          ) -> LMOne ty
+  (PrimFunT P_size     , [CType ty@(TypeTensor d _)]) -> LMZero ty (tensorIndexType d)
   _ -> error $ "Don't know grad of [" ++ show f ++ "]@\n  " ++ intercalate
     "\n  "
     (map (show . stripTypeDef) ctys)
@@ -816,7 +828,7 @@ cppGen defs =
 
 isMainFunction :: TDef -> Bool
 isMainFunction Def{ def_fun = Fun JustFun f, def_res_ty = TypeInteger }
-  | BaseUserFunId "main" (TypeTuple []) <- f = True
+  | BaseFunId "main" (TypeTuple []) <- f = True
 isMainFunction _ = False
 
 ksoGen :: [TDef] -> String

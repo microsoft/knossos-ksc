@@ -12,7 +12,7 @@ module Annotate (
 import Lang
 import LangUtils
 import KMonad
-import Ksc.Traversal ( traverseOf, over )
+import Ksc.Traversal ( traverseOf )
 import Prim
 import qualified Data.Map   as Map
 import GHC.Stack
@@ -58,7 +58,7 @@ annotDecls gbl_env decls
     mk_rec_def (Def { def_fun = fun, def_pat = pat, def_res_ty = res_ty })
        = addCtxt (text "In the definition of" <+> ppr_fun) $
          tcWithPat pat $ \pat' ->
-         do { fun' <- tcUserFunArgTy @Parsed fun (typeof pat')
+         do { fun' <- tcFunArgTy @Parsed fun (typeof pat')
             ; return (Def { def_fun = fun', def_pat = pat'
                           , def_res_ty = res_ty
                           , def_rhs = StubRhs }) }
@@ -101,7 +101,7 @@ tcDef (Def { def_fun    = fun
   = addCtxt (text "In the definition of" <+> ppr_fun) $
     do { tcWithPat pat $ \pat' ->
     do { rhs' <- tcRhs fun rhs res_ty
-       ; fun' <- tcUserFunArgTy @p fun (typeof pat')
+       ; fun' <- tcFunArgTy @p fun (typeof pat')
        ; return (Def { def_fun = fun', def_pat = pat'
                      , def_rhs = rhs', def_res_ty = res_ty })
     }}
@@ -192,18 +192,17 @@ tcGDef g@(GDef d f)
              Left err -> tcFail err
        }
 
-tcUserFunArgTy :: forall p. (Pretty (BaseUserFun p), InPhase p)
-               => UserFun p -> Type
-               -> TcM (UserFun Typed)
-tcUserFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
-  Right (Just baseTy) -> case addBaseTypeToUserFun @p fun baseTy of
+tcFunArgTy :: forall p name. (InPhase p, Pretty (BaseFunId name p))
+           => DerivedFun name p -> Type -> TcM (DerivedFun name Typed)
+tcFunArgTy fun arg_ty = case baseFunArgTy_maybe fun arg_ty of
+  Right (Just baseTy) -> case addBaseTypeToFun fun baseTy of
     Right r -> pure r
     Left appliedTy ->
       tcFail (text "The base type did not match the applied type"
               $$ text "The argument type was" <+> ppr arg_ty
               $$ text "from which the base type was determined to be" <+> ppr baseTy
               $$ text "but the applied type was" <+> ppr appliedTy)
-  Right Nothing -> traverseOf (baseFunFun . baseUserFunType) f fun
+  Right Nothing -> traverseOf funBaseType f fun
     where f = \case
             Nothing -> tcFail (text "No type was supplied and I couldn't deduce it from the argument type")
             Just appliedTy -> pure appliedTy
@@ -481,13 +480,10 @@ lookupLclTc v
 lookupGblTc :: Fun Parsed -> TypedExpr -> TcM (Fun Typed, Type)
 lookupGblTc fun args
   = do { st <- getSymTabTc
-       ; (funTyped, callResultTy_maybe) <- case perhapsUserFun fun of
-           Right userFun -> do
-             { userFun' <- tcUserFunArgTy @Parsed userFun ty
-             ; pure (userFunToFun userFun',
-                     userCallResultTy_maybe userFun' (gblST st) ty) }
-           Left fun' -> pure (over baseFunFun PrimFun fun', primCallResultTy_maybe fun' ty)
-
+       ; funTyped <- tcFunArgTy @Parsed fun ty
+       ; let callResultTy_maybe = case perhapsUserFun funTyped of
+               Right userFun' -> userCallResultTy_maybe userFun' (gblST st) ty
+               Left primFun' -> primCallResultTy_maybe primFun' ty
        ; res_ty <- case callResultTy_maybe of
                      Left err -> tcFail $ hang err 2 (mk_extra funTyped st)
                      Right res_ty -> return res_ty

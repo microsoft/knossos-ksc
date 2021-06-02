@@ -109,7 +109,8 @@ def test_bar():
     ans = bar(a, x)
     assert ans == ks_ans
 
-    assert ks_bar.py_mod.rev_entry((a, x), 1.0) == grad_bar(a, x)
+    ks_grad = ks_bar.py_mod.rev_entry((a, x), 1.0)
+    assert ks_grad == grad_bar(a, x)
 
 
 def far(x: torch.Tensor, y: torch.Tensor):

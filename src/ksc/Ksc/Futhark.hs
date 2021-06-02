@@ -363,13 +363,13 @@ callPrimFun f _ args =
 -- case-by-case basis.
 toCall :: L.InPhase p => L.TFun p -> L.TExpr -> Exp
 
-toCall (L.TFun _ (L.Fun L.JustFun (L.PrimFun (L.P_SelFun f _)))) e =
+toCall (L.TFun _ (L.Fun L.JustFun (L.PrimFunT (L.P_SelFun f _)))) e =
   Project (toFutharkExp e) $ show f
 
-toCall (L.TFun ret (L.Fun L.JustFun (L.PrimFun f))) args =
+toCall (L.TFun ret (L.Fun L.JustFun (L.PrimFunT f))) args =
   callPrimFun f ret args
 
-toCall f@(L.TFun _ (L.Fun L.JustFun L.BaseUserFun{})) args =
+toCall f@(L.TFun _ (L.Fun L.JustFun (L.BaseFunId L.BaseUserFunName{} _))) args =
   Call (Var (toTypedName f (L.typeof args))) [toFutharkExp args]
 
 toCall f@(L.TFun _ (L.Fun L.GradFun{} _)) args =

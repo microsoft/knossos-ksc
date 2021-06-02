@@ -5,7 +5,7 @@ import importlib.util
 import inspect
 import argparse
 from pathlib import Path
-from contextlib import contextmanager
+from ksc import utils
 
 from ts2ks.ts2ks import ts2ks, write_edefs
 
@@ -30,27 +30,10 @@ if output_directory != "":
     os.makedirs(output_directory, exist_ok=True)
 output = open(output_file_path, "w")
 
-# https://stackoverflow.com/a/41904558/35544
-# submodule_search_locations doesn't work for this
-@contextmanager
-def add_to_path(p):
-    import sys
-
-    old_path = sys.path
-    old_modules = sys.modules
-    sys.modules = old_modules.copy()
-    sys.path = sys.path[:]
-    sys.path.insert(0, p)
-    try:
-        yield
-    finally:
-        sys.path = old_path
-        sys.modules = old_modules
-
 
 module_name = "DynamicLoadedModule"
 
-with add_to_path(input_directory):
+with utils.add_to_path(input_directory):
     spec = importlib.util.spec_from_file_location(module_name, Path(input_file_path))
     dynamicModule = importlib.util.module_from_spec(spec)
     # We deliberately don't make visible via sys.modules[module_name] = module

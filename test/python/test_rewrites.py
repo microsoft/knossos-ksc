@@ -13,7 +13,7 @@ from ksc.rewrites import (
 from ksc.parse_ks import parse_expr_string, parse_ks_file
 from ksc.type import Type, KSTypeError
 from ksc.type_propagate import type_propagate_decls
-from ksc import utils
+from ksc import path, utils
 
 
 def apply_in_only_location(rule_name, expr):
@@ -27,15 +27,17 @@ def check_nowhere_applicable(rule_name, expr):
 
 def test_inline_var_single():
     e = parse_expr_string("(let (a (div 1.0 x)) (div a (add a 1.0)))")
-    # Should be exactly two candidates
+    # Should be exactly two candidates, in the body, so sorted according to order among the arguments
     rw_div, rw_add = sorted(
-        rule("inline_var").find_all_matches(e), key=lambda rw: tuple(rw.path)
+        rule("inline_var").find_all_matches(e), key=lambda rw: rw.path
     )
-    assert (rw_div.rule, rw_div.path) == (inline_var, (1, 0))
+    assert rw_div.rule == inline_var
+    assert rw_div.path == (path.let_body, path.call_args[0])
     assert rw_div.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))"
     )
-    assert (rw_add.rule, rw_add.path) == (inline_var, (1, 1, 0))
+    assert rw_add.rule == inline_var
+    assert rw_add.path == (path.let_body, path.call_args[1], path.call_args[0])
     assert rw_add.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))"
     )
@@ -74,11 +76,13 @@ def test_ruleset():
     e = parse_expr_string("(let (a (div 1.0 x)) (div a (add a 1.0)))")
     # Should be exactly two candidates
     rw_div, rw_add = sorted(r.find_all_matches(e), key=lambda rw: rw.path)
-    assert (rw_div.rule, rw_div.path) == (inline_var, (1, 0))
+    assert rw_div.rule == inline_var
+    assert rw_div.path == (path.let_body, path.call_args[0])
     assert rw_div.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div (div 1.0 x) (add a 1.0)))"
     )
-    assert (rw_add.rule, rw_add.path) == (inline_var, (1, 1, 0))
+    assert rw_add.rule == inline_var
+    assert rw_add.path == (path.let_body, path.call_args[1], path.call_args[0])
     assert rw_add.apply_rewrite() == parse_expr_string(
         "(let (a (div 1.0 x)) (div a (add (div 1.0 x) 1.0)))"
     )
@@ -411,7 +415,7 @@ def test_inline_call(prelude_symtab):
     )
     assert len(matches_with_defs) == 2
     assert matches_with_defs[0].path == ()
-    assert matches_with_defs[1].path == (0,)
+    assert matches_with_defs[1].path == (path.call_args[0],)
 
     expected_inline_bar = parse_expr_string(
         "(let (x (foo 1.3)) (let (y 7.7) (add (mul x 2.0) (mul y 3.0))))"
