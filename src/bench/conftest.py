@@ -10,23 +10,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 
 from ts2ks import ts2mod
-
-# https://stackoverflow.com/a/41904558/35544
-# submodule_search_locations doesn't work for this
-@contextmanager
-def add_to_path(p):
-    import sys
-
-    old_path = sys.path
-    old_modules = sys.modules
-    sys.modules = old_modules.copy()
-    sys.path = sys.path[:]
-    sys.path.insert(0, p)
-    try:
-        yield
-    finally:
-        sys.path = old_path
-        sys.modules = old_modules
+from ksc import utils
 
 
 def pytest_addoption(parser):
@@ -87,7 +71,7 @@ def pytest_configure(config):
 
     module_dir, module_name = os.path.split(module_path)
 
-    with add_to_path(module_dir):
+    with utils.add_to_path(module_dir):
         mod = importlib.import_module(module_name)
 
         configs = list(getattr(mod, benchmark_name + "_bench_configs")())
