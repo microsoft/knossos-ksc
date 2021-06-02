@@ -99,7 +99,7 @@ class ExprWithPath(NamedTuple):
             return [self.get(pe) for pe in islice(call_args, 0, len(self.expr.args))]
         raise AttributeError(f"No args on {self.expr}")
 
-    def all_subexps(self) -> List["ExprWithPath"]:
+    def all_subexprs_with_paths(self) -> List["ExprWithPath"]:
         return (
             self.args
             if isinstance(self.expr, Call)
@@ -120,4 +120,6 @@ class ExprWithPath(NamedTuple):
 
 
 def subexps_no_binds(e: Expr) -> List[Expr]:
-    return [c.expr for c in ExprWithPath.from_expr(e).all_subexps()]
+    # ExprWithPath identifies all the non-binding sub-expressions.
+    # TODO: consider rewriting callers into Visitors in order to remove this.
+    return [c.expr for c in ExprWithPath.from_expr(e).all_subexprs_with_paths()]

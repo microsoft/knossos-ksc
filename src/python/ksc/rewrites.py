@@ -76,7 +76,7 @@ class AbstractMatcher(ABC):
         elif isinstance(ewp.expr, Lam):
             yield from self._matches_with_env(ewp.body, env.discard(ewp.arg.name))
         else:
-            for ch in ewp.all_subexps():
+            for ch in ewp.all_subexprs_with_paths():
                 yield from self._matches_with_env(ch, env)
 
     @abstractmethod
