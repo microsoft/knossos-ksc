@@ -1,1 +1,1 @@
-from ts2ks.ts2ks import ts2ks, ts2ks_fromgraph, ts2mod, logging, ts2k_logging
+from ts2ks.ts2ks import ts2ks, ts2ks_fromgraph, ts2mod, logging
