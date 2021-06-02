@@ -536,12 +536,12 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
     todo_stack = {function_name}
     ksc_defs = []
     while len(todo_stack) > 0:
-        print(f"Remaining: {todo_stack}")
+        print(f"tsmod2ksmod: Remaining: {todo_stack}")
         for fn in inspect.getmembers(module, inspect.isfunction):
             fn_name, fn_obj = fn
             if fn_name in todo_stack:
                 todo_stack.remove(fn_name)
-                print(f"converting {fn_name}, remaining: {todo_stack}")
+                print(f"tsmod2ksmod: converting {fn_name}, remaining: {todo_stack}")
                 ts_fn = torch.jit.script(fn_obj)
                 ts_graph = ts_fn.graph
                 ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
