@@ -90,7 +90,8 @@ class CAvSubst(ExprTransformer):
         reqs: List[ReplaceLocationRequest],
         substs: VariableSubstitution,
     ) -> Expr:
-        # First, work out if there's anything to do in this subtree
+        # First, work out if there's anything to do in this subtree, i.e. if
+        # intersection(substs, ewp.free_vars)>0 or any `reqs` are within this subtree
         substs = {
             varname: repl
             for varname, repl in substs.items()
@@ -101,6 +102,7 @@ class CAvSubst(ExprTransformer):
             if len(substs) == 0:
                 # Nothing to do in this subtree
                 return ewp.expr
+            # No paths identified to replace, but we are still propagating a rename: carry on
         elif any(req.target == ewp.path for req in reqs):
             # Apply here
             if len(reqs) != 1:
