@@ -61,7 +61,7 @@ rewriteSUFFwdPass P_ts_scale t
 rewriteSUFFwdPass _ _ = Nothing
 
 
-rewriteSUFRevPass :: PrimFun -> ExprX 'Typed -> Maybe TExpr
+rewriteSUFRevPass :: PrimFun -> TExpr -> Maybe TExpr
 rewriteSUFRevPass (P_SelFun i n) (Tuple [ dt, bog ])
   = Just $ Tuple (map project_or_dt [1..n])
   where project_or_dt j = if i == j then dt else pSel j n bog
