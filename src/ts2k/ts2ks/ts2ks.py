@@ -429,7 +429,9 @@ def make_KscAutogradFunction(py_mod, generate_lm):
             "py_mod": py_mod,
             "forward": staticmethod(forward),
             "backward": staticmethod(backward),
-            "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x)),
+            "adapt": staticmethod(
+                lambda x: torch_to_ks(py_mod, x)[0]
+            ),  # TODO: we're throwing away the object which prevents garbage collection here; this should be fixed as described in torch_to_ks
         },
     )
     return newclass()
