@@ -5,7 +5,7 @@ from ksc.expr import StructuredName, Expr, Const, Call
 from ksc.filter_term import FilterTerm
 from ksc.interpreter import native_impls
 from ksc.path import ExprWithPath
-from ksc.rewrites import RuleMatcher, LetBindingEnvironment, Match
+from ksc.rewrites import RuleMatcher, Environment, Match
 
 ###############################################################################
 # Constant-folding
@@ -31,7 +31,7 @@ class ConstantFolder(RuleMatcher):
         return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
     def matches_for_possible_expr(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: Environment,
     ) -> Iterator[Match]:
         assert isinstance(ewp.expr, Call) and ewp.name == self._name
         if all(isinstance(arg, Const) for arg in ewp.expr.args):

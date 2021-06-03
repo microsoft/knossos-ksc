@@ -257,7 +257,7 @@ class Def(ASTNode):
 
     name: StructuredName
     return_type: Type
-    args: list
+    args: List["Var"]
     body: Expr
 
     def __init__(self, name, return_type, args, body):

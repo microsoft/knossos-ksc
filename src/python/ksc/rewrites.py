@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
+from itertools import chain
 from typing import Any, FrozenSet, Iterator, List, Mapping, Optional, Tuple
 
 from pyrsistent import pmap
@@ -14,6 +15,7 @@ from ksc.cav_subst import (
 )
 from ksc.expr import (
     ConstantType,
+    Def,
     StructuredName,
     Expr,
     Let,
@@ -25,9 +27,11 @@ from ksc.expr import (
 )
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
+from ksc.prim import make_prim_call
 from ksc.path import Path, ExprWithPath, subexps_no_binds
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
+from ksc.untuple_lets import untuple_one_let
 from ksc.utils import singleton, single_elem
 from ksc.visitors import ExprTransformer
 
@@ -55,34 +59,44 @@ class Match:
         return self.ewp.path
 
 
-# Environments that map variable names to the locations of the nodes binding them.
-LetBindingEnvironment = PMap[str, Path]
+@dataclass(frozen=True, eq=False)
+class Environment:
+    """ Used to carry, around the Expr being matched, information about the context each (sub-)expr is in. """
+
+    let_vars: PMap[str, Path]
+    """ Variable(name)s bound by lets, to the locations of the let-nodes binding them """
+    defs: PMap[StructuredName, Def]
+    """ Names bound by Defs, including those from the prelude. These will be the same throughout the Expr. """
 
 
 class AbstractMatcher(ABC):
-    def find_all_matches(self, e: Expr) -> Iterator[Match]:
-        yield from self._matches_with_env(ExprWithPath.from_expr(e), pmap({}))
-
-    def _matches_with_env(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment
+    def find_all_matches(
+        self, e: Expr, defs: PMap[StructuredName, Def] = pmap()
     ) -> Iterator[Match]:
-        # Env maps bound variables to their binders, used for inline_let (only).
+        yield from self._matches_with_env(
+            ExprWithPath.from_expr(e), Environment(pmap({}), defs)
+        )
+
+    def _matches_with_env(self, ewp: ExprWithPath, env: Environment) -> Iterator[Match]:
+        # Env maps bound variables to their binders, and StructuredNames for their defs,
+        # used only for inlining rules (inline_call and inline_var).
         yield from self.matches_here(ewp, env)
         if isinstance(ewp.expr, Let):
             yield from self._matches_with_env(ewp.rhs, env)
             yield from self._matches_with_env(
-                ewp.body, env.set(ewp.vars.name, ewp.path)
+                ewp.body,
+                Environment(env.let_vars.set(ewp.vars.name, ewp.path), env.defs),
             )
         elif isinstance(ewp.expr, Lam):
-            yield from self._matches_with_env(ewp.body, env.discard(ewp.arg.name))
+            yield from self._matches_with_env(
+                ewp.body, Environment(env.let_vars.discard(ewp.arg.name), env.defs)
+            )
         else:
             for ch in ewp.all_subexprs_with_paths():
                 yield from self._matches_with_env(ch, env)
 
     @abstractmethod
-    def matches_here(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment,
-    ) -> Iterator[Match]:
+    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
         """ Return any matches which rewrite the topmost node of the specified subtree """
 
 
@@ -107,7 +121,11 @@ class RuleMatcher(AbstractMatcher):
     @abstractproperty
     def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
         """ A set of terms that might be returned by get_filter_term() of any Expr for which this RuleMatcher
-            could possibly generate a match. (See filter_term.py).) """
+            could possibly generate a match. (See [Note: filter_term] in filter_term.py). """
+
+    may_match_any_call: bool = False
+    """ If a RuleMatcher (instance or subclass) returns true, indicates that it might match
+        any Expr which is a Call, regardless of the value of get_filter_term() on that Expr. """
 
     @abstractmethod
     def apply_at(self, ewp: ExprWithPath, **kwargs) -> Expr:
@@ -115,15 +133,15 @@ class RuleMatcher(AbstractMatcher):
 
     @abstractmethod
     def matches_for_possible_expr(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: Environment,
     ) -> Iterator[Match]:
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <get_filter_term(expr)>
             is of one of <self.possible_filter_terms>. """
 
-    def matches_here(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment,
-    ) -> Iterator[Match]:
-        if get_filter_term(ewp.expr) in self.possible_filter_terms:
+    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
+        if get_filter_term(ewp.expr) in self.possible_filter_terms or (
+            isinstance(ewp.expr, Call) and self.may_match_any_call
+        ):
             yield from self.matches_for_possible_expr(ewp, env)
 
     def __reduce__(self):
@@ -136,19 +154,22 @@ class RuleSet(AbstractMatcher):
         only a single traversal of the Expr (and associated environment-building). """
 
     def __init__(self, rules):
-        # TODO also allow global (any-class) rules?
         # As an optimization, at each node in the Expr tree, we'll look for matches only from
         # RuleMatchers whose possible_filter_terms match at that position in the tree.
         # (This checks equality of the outermost constructor of the template, but no deeper.)
-        self._filtered_rules = {}
+        self._rules_by_filter_term: Dict[FilterTerm, List[RuleMatcher]] = {}
+        self._any_call_rules: List[RuleMatcher] = []
         for rule in rules:
+            if rule.may_match_any_call:
+                self._any_call_rules.append(rule)
             for term in rule.possible_filter_terms:
-                self._filtered_rules.setdefault(term, []).append(rule)
+                self._rules_by_filter_term.setdefault(term, []).append(rule)
 
-    def matches_here(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment,
-    ) -> Iterator[Match]:
-        for rule in self._filtered_rules.get(get_filter_term(ewp.expr), []):
+    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
+        possible_rules = self._rules_by_filter_term.get(get_filter_term(ewp.expr), [])
+        if isinstance(ewp.expr, Call):
+            possible_rules = chain(possible_rules, self._any_call_rules)
+        for rule in possible_rules:
             yield from rule.matches_for_possible_expr(ewp, env)
 
 
@@ -172,12 +193,51 @@ class inline_var(RuleMatcher):
         )
 
     def matches_for_possible_expr(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment,
+        self, ewp: ExprWithPath, env: Environment,
     ) -> Iterator[Match]:
         assert isinstance(ewp.expr, Var)
-        binding_location = env.get(ewp.expr.name)
+        binding_location = env.let_vars.get(ewp.expr.name)
         if binding_location is not None:
             yield Match(self, ewp, {"binding_location": binding_location})
+
+
+@singleton
+class inline_call(RuleMatcher):
+    possible_filter_terms = frozenset()
+    may_match_any_call = True
+
+    def matches_for_possible_expr(
+        self, ewp: ExprWithPath, env: Environment
+    ) -> Iterator[Match]:
+        func_def: Optional[Def] = env.defs.get(ewp.expr.name)
+        if func_def is not None:
+            yield Match(self, ewp, {"func_def": func_def})
+
+    def apply_at(self, ewp: ExprWithPath, func_def: Def) -> Expr:
+        # func_def comes from the Match.
+        def apply_here(const_zero, call_node):
+            # Drop decl=True from Def.args
+            def_args = [Var(arg.name, type=arg.type_) for arg in func_def.args]
+            call_arg = (
+                call_node.args[0]
+                if len(call_node.args) == 1
+                else make_prim_call(StructuredName.from_str("tuple"), call_node.args)
+            )
+            return (
+                Let(def_args[0], call_arg, func_def.body)
+                if len(def_args) == 1
+                else untuple_one_let(Let(def_args, call_arg, func_def.body))
+            )
+
+        arg_names = frozenset([arg.name for arg in func_def.args])
+        assert func_def.body.free_vars_.issubset(
+            arg_names
+        )  # Sets may not be equal, if some args unused.
+        # There is thus nothing in the function body that could be captured by 'let's around the callsite.
+        # Thus, TODO: simplify interface to replace_subtree: only inline_let requires capture-avoidance, and
+        # there is no need to support both capture-avoidance + applicator in the same call to replace_subtree.
+        # In the meantime, the 0.0 here (as elsewhere) indicates there are no variables to avoid capturing.
+        return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
 
 @singleton
@@ -195,7 +255,7 @@ class delete_let(RuleMatcher):
         return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
     def matches_for_possible_expr(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment
+        self, ewp: ExprWithPath, env: Environment
     ) -> Iterator[Match]:
         assert isinstance(ewp.expr, Let)
         if ewp.vars.name not in ewp.body.free_vars_:
@@ -247,7 +307,7 @@ class ParsedRuleMatcher(RuleMatcher):
         return frozenset([get_filter_term(self._rule.template)])
 
     def matches_for_possible_expr(
-        self, ewp: ExprWithPath, env: LetBindingEnvironment
+        self, ewp: ExprWithPath, env: Environment
     ) -> Iterator[Match]:
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
