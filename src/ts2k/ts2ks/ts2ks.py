@@ -352,6 +352,13 @@ def torch_from_ks(ks_object):
 
 
 def torch_to_ks(py_mod, val):
+    """
+    Return a KS-compatible version of val.
+    If val is a scalar, just return it as a float.
+    If val is a tensor, we may need to
+       (a) make it contiguous
+       (b) ensure it's not garbage-collected while we're holding a view to it.
+    """
     if isinstance(val, float):
         return val
 
@@ -359,12 +366,16 @@ def torch_to_ks(py_mod, val):
         assert (
             val.dtype == torch.float64
         ), "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
-        if len(val.shape) == 2:
-            return py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
-        if len(val.shape) == 1:
-            return py_mod.Tensor_1_Float(val.data_ptr(), *val.shape)
         if len(val.shape) == 0:
             return val.item()
+
+        val = val.contiguous()  # Get data, or copy if not already contiguous
+        if len(val.shape) == 1:
+            ks_tensor = py_mod.Tensor_1_Float(val.data_ptr(), *val.shape)
+        if len(val.shape) == 2:
+            ks_tensor = py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
+        ks_tensor._torch_val = val  # Stash object inside return value to prevent premature garbage collection
+        return ks_tensor
 
     raise NotImplementedError()
 
@@ -389,8 +400,8 @@ def forward_template(py_mod, ctx, *args):
     # Call it
     outputs = py_mod.entry(*ks_args)
 
-    # TODO: save torch_to_ksed args
     if ctx is not None:
+        ctx.torch_vals = ks_args
         ctx.save_for_backward(*args)
 
     return torch_from_ks(outputs)
