@@ -24,6 +24,6 @@ PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
-  m.def("conv2d", with_ks_allocator(&ks::conv2d$aT1T1T1T1fT1fT1T1T1f));
-  m.def("mnist", with_ks_allocator(&ks::mnist$aT1T1T1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1fT1f));
+  m.def("conv2d", with_ks_allocator("conv2d", &ks::conv2d$aT1T1T1T1fT1fT1T1T1f));
+  m.def("mnist", with_ks_allocator("mnist", &ks::mnist$aT1T1T1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1fT1f));
 }

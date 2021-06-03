@@ -1,6 +1,7 @@
 import time
 import torch
 
+import ts2ks
 from ts2ks import ts2mod
 
 torch.set_default_dtype(torch.float64)
@@ -124,61 +125,64 @@ def bench(module_file, bench_name):
     ks_compiled = ts2mod(ks_raw, example_inputs=(configs[0],))
 
     for arg in configs:
-        pt_arg = arg.detach()
-        pt_arg.requires_grad = True
-        pt_value = pt_fast(pt_arg)
+        with ts2ks.logging(ks_compiled.py_mod, False):
+            pt_arg = arg.detach()
+            pt_arg.requires_grad = True
+            pt_value = pt_fast(pt_arg)
 
-        ks_arg = arg.detach()
-        ks_arg.requires_grad = True
-        ks_value = ks_compiled.apply(ks_arg)
+            ks_arg = arg.detach()
+            ks_arg.requires_grad = True
+            ks_value = ks_compiled.apply(ks_arg)
 
-        if (
-            not torch.isclose(
-                pt_value, ks_value, rtol=1e-05, atol=1e-08, equal_nan=False
-            )
-            .all()
-            .numpy()
-        ):
-            print(pt_value)
-            print(ks_value)
-            raise ValueError("Knossos != torch!")
-
-        pt_loss = pt_value.sum()
-        pt_grad = torch.autograd.grad(pt_loss, pt_arg)[0]
-
-        ks_loss = ks_value.sum()
-        ks_grad = torch.autograd.grad(ks_loss, ks_arg)[0]
-
-        if (
-            not torch.isclose(pt_grad, ks_grad, rtol=1e-05, atol=1e-08, equal_nan=False)
-            .all()
-            .numpy()
-        ):
-            import pandas as pd
-
-            cols = (
-                torch.stack((arg.detach(), pt_grad, ks_grad, pt_grad - ks_grad))
-                .t()
+            if (
+                not torch.isclose(
+                    pt_value, ks_value, rtol=1e-05, atol=1e-08, equal_nan=False
+                )
+                .all()
                 .numpy()
-            )
+            ):
+                print(pt_value)
+                print(ks_value)
+                raise ValueError("Knossos != torch!")
 
-            print(pd.DataFrame(cols, columns=["ARG", "PT", "KS", "Diff"]))
-            raise ValueError("Knossos != torch!")
+            pt_loss = pt_value.sum()
+            pt_grad = torch.autograd.grad(pt_loss, pt_arg)[0]
 
-        # ptfast should always work, and be the timing reference
-        timeit(bench_name + " PyTorch fast", pt_fast, arg)
+            ks_loss = ks_value.sum()
+            ks_grad = torch.autograd.grad(ks_loss, ks_arg)[0]
 
-        # TODO: make ks_raw runnable as pure python
-        # assert fun_and_grad_matches(pt_fast, ks_raw, arg)
-        # timeit(bench_name + " Knossos raw", ks_raw, arg)
+            if (
+                not torch.isclose(
+                    pt_grad, ks_grad, rtol=1e-05, atol=1e-08, equal_nan=False
+                )
+                .all()
+                .numpy()
+            ):
+                import pandas as pd
 
-        # TODO: make pt_nice runnable with vmap
-        # assert fun_and_grad_matches(pt_fast, pt_nice, arg)
-        # timeit(bench_name + " PyTorch nice", pt_nice, arg)
+                cols = (
+                    torch.stack((arg.detach(), pt_grad, ks_grad, pt_grad - ks_grad))
+                    .t()
+                    .numpy()
+                )
 
-        if ks_compiled:
-            assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
-            timeit(bench_name + " Knossos", ks_compiled.apply, arg)
+                print(pd.DataFrame(cols, columns=["ARG", "PT", "KS", "Diff"]))
+                raise ValueError("Knossos != torch!")
+
+            # ptfast should always work, and be the timing reference
+            timeit(bench_name + " PyTorch fast", pt_fast, arg)
+
+            # TODO: make ks_raw runnable as pure python
+            # assert fun_and_grad_matches(pt_fast, ks_raw, arg)
+            # timeit(bench_name + " Knossos raw", ks_raw, arg)
+
+            # TODO: make pt_nice runnable with vmap
+            # assert fun_and_grad_matches(pt_fast, pt_nice, arg)
+            # timeit(bench_name + " PyTorch nice", pt_nice, arg)
+
+            if ks_compiled:
+                assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
+                timeit(bench_name + " Knossos", ks_compiled.apply, arg)
 
 
 if __name__ == "__main__":
