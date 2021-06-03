@@ -98,27 +98,23 @@ data MakeShape = MakeShape { msMakeShape :: TExpr -> TExpr
                            , msMakeTZ    :: TExpr -> TExpr
                            }
 
-shape :: TExpr -> Maybe TExpr
-shape e = do
-  ms <- makeShape (typeof e)
-  pure (msMakeShape ms e)
+shape :: TExpr -> TExpr
+shape e = msMakeShape (makeShape (typeof e)) e
 
-shape1 :: TExpr -> Maybe TExpr
-shape1 e = do
-  ms <- makeShape1 (typeof e)
-  pure (msMakeShape ms e)
+shape1 :: TExpr -> TExpr
+shape1 e = msMakeShape (makeShape1 (typeof e)) e
 
-shapeType :: Type -> Maybe Type
-shapeType = fmap msShapeType . makeShape
+shapeType :: Type -> Type
+shapeType = msShapeType . makeShape
 
-makeTangentZeroFromShape :: Type -> Maybe (TExpr -> TExpr)
-makeTangentZeroFromShape = fmap msMakeTZ . makeShape
+makeTangentZeroFromShape :: Type -> TExpr -> TExpr
+makeTangentZeroFromShape = msMakeTZ . makeShape
 
-makeShape :: Type -> Maybe MakeShape
-makeShape = fmap unTrivial . makeShapeOrTrivial
+makeShape :: Type -> MakeShape
+makeShape = unTrivial . makeShapeOrTrivial
 
-makeShape1 :: Type -> Maybe MakeShape
-makeShape1 = fmap unTrivial . makeShapeOrTrivial1
+makeShape1 :: Type -> MakeShape
+makeShape1 = unTrivial . makeShapeOrTrivial1
 
 unTrivial :: MakeShapeOrTrivial -> MakeShape
 unTrivial = \case
@@ -128,11 +124,11 @@ unTrivial = \case
                                        }
   NonTrivialShape mktz -> mktz
 
-makeShapeOrTrivial :: Type -> Maybe MakeShapeOrTrivial
+makeShapeOrTrivial :: Type -> MakeShapeOrTrivial
 makeShapeOrTrivial = makeShapeOrTrivialG makeShapeOrTrivial
 
-makeShapeOrTrivial1 :: Type -> Maybe MakeShapeOrTrivial
-makeShapeOrTrivial1 = makeShapeOrTrivialG (\t -> flip fmap (makeShapeOrTrivial1 t) $ \case
+makeShapeOrTrivial1 :: Type -> MakeShapeOrTrivial
+makeShapeOrTrivial1 = makeShapeOrTrivialG (\t -> case makeShapeOrTrivial1 t of
   NonTrivialShape m -> NonTrivialShape m{ msMakeShape = pShape }
   t@TrivialShapeWithTZ{} -> t)
 
@@ -217,8 +213,22 @@ See Note [Uncompressed shapes]
 
 -}
 
-makeShapeOrTrivialG :: (Type -> Maybe MakeShapeOrTrivial)
-                    -> Type -> Maybe MakeShapeOrTrivial
+hasShapeType :: Type -> Bool
+hasShapeType = \case
+  TypeInteger -> True
+  TypeBool -> True
+  TypeFloat -> True
+  TypeString -> True
+  TypeTuple ts -> all hasShapeType ts
+  TypeTensor _ t -> hasShapeType t
+  TypeLam{} -> False
+  TypeLM{} -> False
+  TypeUnknown -> False
+
+-- WARNING: Do not call this function on a type T unless has
+-- hasShapeType T is true.
+makeShapeOrTrivialG :: (Type -> MakeShapeOrTrivial)
+                    -> Type -> MakeShapeOrTrivial
 makeShapeOrTrivialG recurse = \case
   -- Trivial shapes
   --
@@ -227,10 +237,10 @@ makeShapeOrTrivialG recurse = \case
   -- type have the same shape.  In such cases we choose unit tuple
   -- type as the shape type and unit tuple as the shape (see
   -- unTrivial).
-  TypeInteger -> Just (TrivialShapeWithTZ unit)
-  TypeFloat   -> Just (TrivialShapeWithTZ zeroFloat)
-  TypeBool    -> Just (TrivialShapeWithTZ unit)
-  TypeString  -> Just (TrivialShapeWithTZ unit)
+  TypeInteger -> TrivialShapeWithTZ unit
+  TypeFloat   -> TrivialShapeWithTZ zeroFloat
+  TypeBool    -> TrivialShapeWithTZ unit
+  TypeString  -> TrivialShapeWithTZ unit
 
   -- Tuple shapes
   --
@@ -247,12 +257,11 @@ makeShapeOrTrivialG recurse = \case
   --
   --   (where 'shape' is determined by the call to 'recurse')
   TypeTuple ts -> case tangentZerosForAllTrivialShapeMaybe ts of
-    Just tangentZeros -> Just (TrivialShapeWithTZ (Tuple tangentZeros))
-    Nothing  -> case mapM (\t -> do {m <- recurse t; pure (t, m)}) ts of
-      Nothing    -> Nothing
-      Just ts_ms -> Just $ NonTrivialShape MakeShape{ msMakeShape = makeShape'
-                                                    , msShapeType = shapeType'
-                                                    , msMakeTZ = makeTZ' }
+    Just tangentZeros -> TrivialShapeWithTZ (Tuple tangentZeros)
+    Nothing  -> case map (\t -> (t, recurse t)) ts of
+      ts_ms -> NonTrivialShape MakeShape{ msMakeShape = makeShape'
+                                        , msShapeType = shapeType'
+                                        , msMakeTZ = makeTZ' }
         where rts = map f (zip ts_ms [1..])
               f ((t, m), i) = (v, z, mktz)
                 where v = TVar t (mkArgVar i)
@@ -271,7 +280,7 @@ makeShapeOrTrivialG recurse = \case
 
     where tangentZerosForAllTrivialShapeMaybe :: [Type] -> Maybe [TExpr]
           tangentZerosForAllTrivialShapeMaybe =
-            mapM (\t -> recurse t >>= \case
+            mapM (\t -> case recurse t of
                           TrivialShapeWithTZ tangentZero -> Just tangentZero
                           NonTrivialShape _ -> Nothing)
 
@@ -288,7 +297,7 @@ makeShapeOrTrivialG recurse = \case
   --       map (\v -> shape v) t
   --
   --   (where 'shape' is determined by the call to 'recurse')
-  TypeTensor i t -> fmap NonTrivialShape $ flip fmap (recurse t) $ \case
+  TypeTensor i t -> NonTrivialShape $ case recurse t of
     TrivialShapeWithTZ zero -> MakeShape{ msMakeShape = pSize
                                         , msShapeType = tensorIndexType i
                                         , msMakeTZ    = \n -> pConstVec n zero }
@@ -302,9 +311,9 @@ makeShapeOrTrivialG recurse = \case
               where v = TVar ty argVar
             elt_ty = msShapeType mktz
 
-  TypeLam{} -> Nothing
-  TypeLM{} -> Nothing
-  TypeUnknown -> Nothing
+  TypeLam{} -> error "No shape type"
+  TypeLM{} -> error "No shape type"
+  TypeUnknown -> error "No shape type"
   where unit = Tuple []
 
 -- (mkAtomicNoFVs e body) returns the expression (let a = e in body a)
@@ -631,9 +640,9 @@ primCallResultTy_maybe fun arg_ty
       Fun (ShapeFun ds) f
         -> case primCallResultTy_maybe (Fun ds f) arg_ty of
             Left err -> Left err
-            Right res_ty -> case shapeType res_ty of
-              Just t -> Right t
-              Nothing -> Left (text "Ill-typed call to:" <+> ppr f
+            Right res_ty -> if hasShapeType res_ty
+              then pure (shapeType res_ty)
+              else Left (text "Ill-typed call to:" <+> ppr f
                               $$ ppr res_ty <+> text "does not have a shape type.")
 
       Fun CLFun f -> primCallResultTy_maybe (Fun JustFun f) arg_ty
@@ -697,7 +706,8 @@ sufBogTy_maybe P_SelFun{} arg_ty
   = Just (tangentType arg_ty)
 
 sufBogTy_maybe P_elim arg_ty
-  = shapeType arg_ty
+  | hasShapeType arg_ty
+  = Just (shapeType arg_ty)
 
 sufBogTy_maybe (P_dup _) _
   = Just (TypeTuple [])
@@ -961,7 +971,8 @@ primFunCallResultTy_maybe fun args
       (P_index    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
         -> Just t
-      (P_shape    , t)                                     -> shapeType t
+      (P_shape    , t)
+        | hasShapeType t                                   -> Just (shapeType t)
       (P_size     , TypeTensor d _)                        -> Just (tensorIndexType d)
       (P_sum      , TypeTensor _ t)                        -> Just t
 

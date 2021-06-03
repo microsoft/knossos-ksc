@@ -8,8 +8,8 @@ import Prim
 optShape :: TExpr -> TExpr
 
 optShape (Dummy ty)
-  | Just s_ty <- shapeType ty
-  = Dummy s_ty
+  | hasShapeType ty
+  = Dummy (shapeType ty)
 optShape (Assert e1 e2) =  Assert e1 (pShape e2)
 optShape (If b t e)     =  If b (pShape t) (pShape e)
 optShape (Let v e1 e2)  =  Let v e1 (pShape e2)
@@ -17,12 +17,12 @@ optShape (Call (TFun _ (Fun JustFun (PrimFunT p))) arg)
   | Just optimised <- optShapePrim p arg
   = optimised
 optShape (Call (TFun ty (Fun ds f@(BaseFunId BaseUserFunName{} _))) e)
-  | Just s_ty <- shapeType ty
-  = Call (TFun s_ty (Fun (ShapeFun ds) f)) e
+  | hasShapeType ty
+  = Call (TFun (shapeType ty) (Fun (ShapeFun ds) f)) e
 optShape (Lam{}) = error "Unexpected Lam in call of optShape: shape of function type not supported"
 optShape e
-  | Just s <- shape1 e
-  = s
+  | hasShapeType (typeof e)
+  = shape1 e
   | otherwise
   = pprPanic "Didn't have a shape" (ppr e)
 
