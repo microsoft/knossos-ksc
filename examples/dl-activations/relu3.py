@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import os
-from ksc.torch_utils import elementwise_apply
+from ksc.torch_utils import elementwise_apply_hack
 from collections import OrderedDict
 
 # BEGINDOC
@@ -20,9 +20,10 @@ def relu3(x: float) -> float:
 
 # ENDDOC
 
-# run-bench: Knossos source
+
+# run-bench: Knossos implementation
 def vrelu3(x: torch.Tensor):
-    return elementwise_apply(relu3, x)
+    return elementwise_apply_hack("relu3", x)
 
 
 # run-bench: PyTorch reference implementation
@@ -45,14 +46,7 @@ def relu3_pytorch_nice(x: float) -> float:
         return x - 2 / 3
 
 
-# Note: zeros
-# Need to multiply by x for pytorch to get the gradient back through x.
-# This is something of a long story, related to tracing.
-# Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
-
-
-def vrelu3_pytorch_nice(x: torch.Tensor):
-    return elementwise_apply(relu3_pytorch_nice, x)
+vrelu3_pytorch_nice = torch.vmap(relu3_pytorch_nice)
 
 
 def vrelu3_cuda_init():
@@ -100,11 +94,17 @@ def vrelu3_cuda_init():
 
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
-    yield torch.randn((4, 4))
-    yield torch.randn((16, 16))
+    yield torch.randn((4,))
+    yield torch.randn((16,))
 
 
 # yield torch.randn((256,256)) too slow to bench...
+
+
+# Note: zeros
+# Need to multiply by x for pytorch to get the gradient back through x.
+# This is something of a long story, related to tracing.
+# Sort of related discussion https://discuss.pytorch.org/t/custom-loss-function-error-element-0-of-tensors-does-not-require-grad-and-does-not-have-grad-fn/87944/16
 
 
 def plot_relu3(filename):
