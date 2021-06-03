@@ -337,8 +337,14 @@ def shape_type(t: Type) -> Type:
     if t.is_scalar:
         return Type.Tuple()
     if t.is_tuple:
-        return Type.Tuple(*(shape_type(t) for t in t.children))
+        if all(shape_type(ti).is_scalar for ti in t.children):
+            return Type.Tuple()
+        else:
+            return Type.Tuple(*(shape_type(ti) for ti in t.children))
     if t.is_tensor:
-        return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
+        if t.tensor_elem_type.is_scalar:
+            return SizeType.from_rank(t.tensor_rank)
+        else:
+            return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
 
     raise NotImplementedError
