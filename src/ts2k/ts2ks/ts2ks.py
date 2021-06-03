@@ -387,7 +387,6 @@ def forward_template(py_mod, ctx, *args):
     # Call it
     outputs = py_mod.entry(*ks_args)
 
-    # TODO: save torch_to_ksed args
     if ctx is not None:
         ctx.torch_vals = ks_args
         ctx.save_for_backward(*args)
