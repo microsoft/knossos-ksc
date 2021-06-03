@@ -387,7 +387,7 @@ optPrimFun _ P_map (Tuple [Lam v body, Call constVec (Tuple [n, k])])
   = Just $ pConstVec n (mkLet v k body)
 
 optPrimFun _ P_sum         arg           = optSum arg
-optPrimFun _ P_shape       arg           = optShape arg
+optPrimFun _ P_shape       arg           = Just $ optShape arg
 optPrimFun _ P_build       (Tuple [sz, Lam i e2]) = optBuild sz i e2
 optPrimFun _ P_sumbuild    (Tuple [sz, Lam i e2]) = optSumBuild sz i e2
 optPrimFun env P_lmApply   (Tuple [e1,e2])        = optLMApply env (AD BasicAD Fwd) e1 e2

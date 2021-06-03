@@ -302,13 +302,13 @@ uncompressedShapeType (TypeLam _ _) = TypeUnknown
 uncompressedShapeType (TypeLM _ _) = TypeUnknown  -- TBD
 uncompressedShapeType TypeUnknown = TypeUnknown
 
-{- Note [Shapes]
-~~~~~~~~~~~~~~~~
-We define a primitive function
-   shape :: T -> Sh(T)
-which takes a value and returns the "shape" of the value. Here Sh(T) is
-the shape-type of T (defined analogously to the tangent-type of T),
-and is implemented by uncompressedShapeType :: Type -> Type
+{- Note [Uncompressed shapes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here Sh(T) is the uncompressed shape-type of T (defined analogously to
+the tangent-type of T), and is implemented by uncompressedShapeType ::
+Type -> Type.  We intend to replace uncompressed shape-types with
+compressed shape-types.
 
 For example
   --------------------------
@@ -319,18 +319,6 @@ For example
   (T1 T2)     (Sh(T1), Sh(T2))
   --------------------------
 
-For every function
-   f :: S -> T
-   f(x) = rhs
-we can generate a companion function
-   shape$f :: S -> Sh(T)
-   shape$f(x) = shape(rhs)
-which we hope to optimize by pushing the shape call down using optimization
-rules.
-
-One potential use of shape$f is to allow a caller of f to precalculate
-the amount of memory required to hold the result of f. However, the function
-shape$f may itself involve allocating memory in the heap.
 -}
 
 

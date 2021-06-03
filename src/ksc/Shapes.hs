@@ -1,6 +1,23 @@
 -- Copyright (c) Microsoft Corporation.
 -- Licensed under the MIT license.
 
+{- Note [Shape functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For every function
+   f :: S -> T
+   f(x) = rhs
+we can generate a companion function
+   shape$f :: S -> Sh(T)
+   shape$f(x) = shape(rhs)
+which we hope to optimize by pushing the shape call down using optimization
+rules.
+
+One potential use of shape$f is to allow a caller of f to precalculate
+the amount of memory required to hold the result of f. However, the function
+shape$f may itself involve allocating memory in the heap.
+-}
+
 {-# LANGUAGE DataKinds #-}
 
 module Shapes where
@@ -19,20 +36,13 @@ shapeDef (Def { def_fun = Fun ds f
               , def_pat = params
               , def_rhs = UserRhs def_rhs
               , def_res_ty = res_ty })
-  = Just $
+  = do
+  { s_ty <- shapeType res_ty
+  ; Just $
     Def { def_fun    = Fun (ShapeFun ds) f
         , def_pat    = params
-        , def_res_ty = uncompressedShapeType res_ty
+        , def_res_ty = s_ty
         , def_rhs    = UserRhs (pShape def_rhs) }
+  }
 
 shapeDef _ = Nothing
-
--- Given a Type t, determines whether (uncompressedShapeType t) is a unit type;
--- if so then the unit value is returned.
-shapeIsUnit_maybe :: Type -> Maybe TExpr
-shapeIsUnit_maybe TypeInteger = Just (Tuple [])
-shapeIsUnit_maybe TypeBool = Just (Tuple [])
-shapeIsUnit_maybe TypeFloat = Just (Tuple [])
-shapeIsUnit_maybe TypeString = Just (Tuple [])
-shapeIsUnit_maybe (TypeTuple ts) = fmap Tuple (traverse shapeIsUnit_maybe ts)
-shapeIsUnit_maybe _ = Nothing

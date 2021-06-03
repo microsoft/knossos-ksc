@@ -87,6 +87,226 @@ getZero tangent_type e
            e_ty = typeof e
            panic = pprPanic "mkZero" (ppr e_ty $$ ppr e)
 
+data MakeShapeOrTrivial = TrivialShapeWithTZ TExpr
+                        -- ^ The shape can be determined solely from
+                        -- the type (and so we choose it to be unit).
+                        -- Its tangent zero is this TExpr.
+                        | NonTrivialShape MakeShape
+
+data MakeShape = MakeShape { msMakeShape :: TExpr -> TExpr
+                           , msShapeType :: Type
+                           , msMakeTZ    :: TExpr -> TExpr
+                           }
+
+shape :: TExpr -> Maybe TExpr
+shape e = do
+  ms <- makeShape (typeof e)
+  pure (msMakeShape ms e)
+
+shape1 :: TExpr -> Maybe TExpr
+shape1 e = do
+  ms <- makeShape1 (typeof e)
+  pure (msMakeShape ms e)
+
+shapeType :: Type -> Maybe Type
+shapeType = fmap msShapeType . makeShape
+
+makeTangentZeroFromShape :: Type -> Maybe (TExpr -> TExpr)
+makeTangentZeroFromShape = fmap msMakeTZ . makeShape
+
+makeShape :: Type -> Maybe MakeShape
+makeShape = fmap unTrivial . makeShapeOrTrivial
+
+makeShape1 :: Type -> Maybe MakeShape
+makeShape1 = fmap unTrivial . makeShapeOrTrivial1
+
+unTrivial :: MakeShapeOrTrivial -> MakeShape
+unTrivial = \case
+  TrivialShapeWithTZ zero -> MakeShape { msMakeShape = const (Tuple [])
+                                       , msShapeType = TypeTuple []
+                                       , msMakeTZ    = const zero
+                                       }
+  NonTrivialShape mktz -> mktz
+
+makeShapeOrTrivial :: Type -> Maybe MakeShapeOrTrivial
+makeShapeOrTrivial = makeShapeOrTrivialG makeShapeOrTrivial
+
+makeShapeOrTrivial1 :: Type -> Maybe MakeShapeOrTrivial
+makeShapeOrTrivial1 = makeShapeOrTrivialG (\t -> flip fmap (makeShapeOrTrivial1 t) $ \case
+  NonTrivialShape m -> NonTrivialShape m{ msMakeShape = pShape }
+  t@TrivialShapeWithTZ{} -> t)
+
+{- Note [Shapes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Introduction
+------------
+
+Some types T have an associated (compressed) shape type st(T).
+
+If T has a shape type then values x : T have a corresponding shape
+value sv(x) : st(T).
+
+The type of some shapes is "trivial".  This means that the shape of x
+does not depend on the value of x, i.e. all values of the type have
+the same shape.  In such cases we choose unit tuple type as the shape
+type and unit tuple as the shape (see unTrivial).
+
+For "non-trivial" shapes the value of sv(x) depends on x.
+
+Given the shape of x : T we can make the tangent zero of shape x (of
+type dT).  This is for use in reverse mode AD transformations.
+
+
+Table of shape transformations
+------------------------------
+
+
+T               |           st T         |         sv x
+----------------------------------------------------------------------------
+Float           |                        |
+Integer         |                        |
+Bool            |                        |
+String          |          ()            |         ()
+                |                        |
+(T1, T2)        |                        |
+(both trivial)  |   (called "trivial")   |
+                |                        |
+----------------------------------------------------------------------------
+(T1, T2)        |                        |
+(not both       |    (cst T1, cst T2)    |  let (fresh1, fresh2) = x
+ trivial)       |                        |  in (sv fresh1, sv fresh2)
+----------------------------------------------------------------------------
+                |                        |
+Vec T           |        Integer         |       size x
+(T trivial)     |                        |
+----------------------------------------------------------------------------
+                |                        |
+Vec T           |      Vec (cst T)       |       map sv x
+(T not trivial) |                        |
+----------------------------------------------------------------------------
+
+
+shape vs shape1
+---------------
+
+shape is csv applied recursively to the base types, e.g. for
+x : (Vec Float, Float)
+
+    shape x = let (fresh1, fresh2) = x
+              in (size fresh1, ())
+
+On the other hand shape1 is csv applied only one level, e.g.
+
+    shape1 x = let (fresh1, fresh2) = x
+               in (P_shape fresh1, P_shape fresh2)
+
+(P_shape is the call to the primitive function "shape")
+
+It is important to use shape1 instead of shape in
+Ksc.Opt.Shape.optShape to give the optimiser the opportunity to apply
+Ksc.Opt.Shape.optShapePrim.
+
+
+Uncompressed shapes
+-------------------
+
+The codebase also contains an older implementation of uncompressed
+shape types which we intend to replace with compressed shape types.
+See Note [Uncompressed shapes]
+
+-}
+
+makeShapeOrTrivialG :: (Type -> Maybe MakeShapeOrTrivial)
+                    -> Type -> Maybe MakeShapeOrTrivial
+makeShapeOrTrivialG recurse = \case
+  -- Trivial shapes
+  --
+  -- The type of some shapes is "trivial".  This means that the shape
+  -- of x does not depend on the value of x, i.e. all values of the
+  -- type have the same shape.  In such cases we choose unit tuple
+  -- type as the shape type and unit tuple as the shape (see
+  -- unTrivial).
+  TypeInteger -> Just (TrivialShapeWithTZ unit)
+  TypeFloat   -> Just (TrivialShapeWithTZ zeroFloat)
+  TypeBool    -> Just (TrivialShapeWithTZ unit)
+  TypeString  -> Just (TrivialShapeWithTZ unit)
+
+  -- Tuple shapes
+  --
+  -- For a tuple value t : T = (C_1, ..., C_N)
+  --
+  -- * If the shape type of each C_i is trivial then the shape type of
+  --   T is trivial
+  --
+  -- * Otherwise the shape type is the tuple of shape types of the
+  --   components, i.e. (shapeType C_1, ..., shapeType C_n), and the
+  --   shape is
+  --
+  --       let (fresh_1, ..., fresh_n) = t in (shape fresh_1, ..., shape fresh_n)
+  --
+  --   (where 'shape' is determined by the call to 'recurse')
+  TypeTuple ts -> case tangentZerosForAllTrivialShapeMaybe ts of
+    Just tangentZeros -> Just (TrivialShapeWithTZ (Tuple tangentZeros))
+    Nothing  -> case mapM (\t -> do {m <- recurse t; pure (t, m)}) ts of
+      Nothing    -> Nothing
+      Just ts_ms -> Just $ NonTrivialShape MakeShape{ msMakeShape = makeShape'
+                                                    , msShapeType = shapeType'
+                                                    , msMakeTZ = makeTZ' }
+        where rts = map f (zip ts_ms [1..])
+              f ((t, m), i) = (v, z, mktz)
+                where v = TVar t (mkArgVar i)
+                      mktz = unTrivial m
+                      z = TVar (msShapeType mktz) (mkArgVar i)
+
+              ss = map (\(v, _, _) -> v) rts
+              shape_body = Tuple (map (\(v, _, mktz) -> msMakeShape mktz (Var v)) rts)
+              makeShape' e = Let (TupPat ss) e shape_body
+
+              shapeType' = TypeTuple (map (\(_, _, mktz) -> msShapeType mktz) rts)
+
+              zs = map (\(_, z, _) -> z) rts
+              makeTZ_body = Tuple (map (\(_, z, mktz) -> msMakeTZ mktz (Var z)) rts)
+              makeTZ' e = Let (TupPat zs) e makeTZ_body
+
+    where tangentZerosForAllTrivialShapeMaybe :: [Type] -> Maybe [TExpr]
+          tangentZerosForAllTrivialShapeMaybe =
+            mapM (\t -> recurse t >>= \case
+                          TrivialShapeWithTZ tangentZero -> Just tangentZero
+                          NonTrivialShape _ -> Nothing)
+
+  -- Tensor shapes
+  --
+  -- For a tensor value t : T = Tensor n E
+  --
+  -- * If the shape type of E is trivial then the shape type of T is
+  --   index type of Tensor n and the shape is the size of the tensor.
+  --
+  -- * Otherwise the shape type is Tensor n (shapeType E) and the
+  --   shape value is
+  --
+  --       map (\v -> shape v) t
+  --
+  --   (where 'shape' is determined by the call to 'recurse')
+  TypeTensor i t -> fmap NonTrivialShape $ flip fmap (recurse t) $ \case
+    TrivialShapeWithTZ zero -> MakeShape{ msMakeShape = pSize
+                                        , msShapeType = tensorIndexType i
+                                        , msMakeTZ    = \n -> pConstVec n zero }
+    NonTrivialShape mktz ->
+      MakeShape{ msMakeShape = eMap t (msMakeShape mktz)
+               , msShapeType = TypeTensor i elt_ty
+               , msMakeTZ    = eMap elt_ty (msMakeTZ mktz)
+               }
+      where eMap :: Type -> (TExpr -> TExpr) -> TExpr -> TExpr
+            eMap ty shape = mkPrimCall2 P_map (Lam v (shape (Var v)))
+              where v = TVar ty argVar
+            elt_ty = msShapeType mktz
+
+  TypeLam{} -> Nothing
+  TypeLM{} -> Nothing
+  TypeUnknown -> Nothing
+  where unit = Tuple []
+
 -- (mkAtomicNoFVs e body) returns the expression (let a = e in body a)
 -- where body :: TExpr -> TExpr is a function expecting an expression
 -- The idea is that body might use its argument many types, and we
@@ -411,7 +631,10 @@ primCallResultTy_maybe fun arg_ty
       Fun (ShapeFun ds) f
         -> case primCallResultTy_maybe (Fun ds f) arg_ty of
             Left err -> Left err
-            Right res_ty -> Right (uncompressedShapeType res_ty)
+            Right res_ty -> case shapeType res_ty of
+              Just t -> Right t
+              Nothing -> Left (text "Ill-typed call to:" <+> ppr f
+                              $$ ppr res_ty <+> text "does not have a shape type.")
 
       Fun CLFun f -> primCallResultTy_maybe (Fun JustFun f) arg_ty
 
@@ -737,7 +960,7 @@ primFunCallResultTy_maybe fun args
       (P_index    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
         -> Just t
-      (P_shape    , t)                                     -> Just (uncompressedShapeType t)
+      (P_shape    , t)                                     -> shapeType t
       (P_size     , TypeTensor d _)                        -> Just (tensorIndexType d)
       (P_sum      , TypeTensor _ t)                        -> Just t
 

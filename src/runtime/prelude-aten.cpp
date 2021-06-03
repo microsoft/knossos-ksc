@@ -114,7 +114,7 @@ aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 	KS_ASSERT(false)
 }
 
-tensor<2, tuple<>>
+tuple<int, int>
 shape$aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 {
 	KS_ASSERT(false)
@@ -151,7 +151,7 @@ rev$aten$8$8cat$aT1T2fi(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg
 	KS_ASSERT(false)
 }
 
-tuple<tensor<1, tensor<2, tuple<>>>,tuple<>> 
+tuple<tensor<1, tuple<int, int>>,tuple<>>
 shape$rev$aten$8$8cat$aT1T2fi(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
 {
 	KS_ASSERT(false)
