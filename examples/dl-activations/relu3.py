@@ -52,8 +52,6 @@ vrelu3_pytorch_nice = torch.vmap(relu3_pytorch_nice)
 def vrelu3_cuda_init():
     this_dir = os.path.dirname(__file__)
 
-    from torch.utils.cpp_extension import load
-
     vrelu3_cuda = torch.utils.cpp_extension.load(
         "vrelu3_module",
         sources=[
@@ -80,16 +78,7 @@ def vrelu3_cuda_init():
         def forward(self, input):
             return VReLu3Function.apply(input)
 
-    cuda_device = torch.device("cuda")
-    cpu_device = torch.device("cpu")
-    vrelu3_module = VReLu3().to(cuda_device)
-
-    def func(x: torch.Tensor):
-        ret = vrelu3_module(x.to(cuda_device))  # TODO: move x.to() into setup function
-        torch.cuda.synchronize()
-        return ret.to(cpu_device)
-
-    return func
+    return VReLu3()
 
 
 # run-bench: Define a range of values at which to call the methods
