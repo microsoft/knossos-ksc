@@ -5,7 +5,29 @@
 {
 	"version": "0.2.0",
 	"configurations": [
-
+		{
+			"name": "(gdb) Launch python for relu3",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "/usr/bin/python",
+			"args": [
+				"src/bench/run-bench.py",
+				"examples/dl-activations/relu3",
+				"vrelu3"
+			],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [],
+			"externalConsole": false,
+			"MIMode": "gdb",
+			"setupCommands": [
+				{
+					"description": "Enable pretty-printing for gdb",
+					"text": "-enable-pretty-printing",
+					"ignoreFailures": true
+				}
+			]
+		},
 		{
 			"name": "Python: Current File",
 			"type": "python",
@@ -19,6 +41,7 @@
 			"request": "launch",
 			"program": "src/bench/run-bench.py",
 			"args": ["examples/dl-activations/relu3", "vrelu3"],
+			"justMyCode": false,
 			"console": "integratedTerminal"
 		},
 		{
