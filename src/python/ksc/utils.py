@@ -412,7 +412,6 @@ def build_module_using_pytorch_from_ks(
 
     cpp_compiler = os.environ.get("CXX")
     if cpp_compiler == None and sys.platform == "win32":
-        cflags.append("/std:c++17")
         cflags += ["/std:c++17", "/O2"]
     else:
         cflags += [
