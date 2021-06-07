@@ -46,8 +46,10 @@ Contents:
 namespace ks {
 	inline void fail [[noreturn]] (char const* file, int line, char const* expr)
 	{
-		std::cerr << file << ":" << line << ":Assert failed [" << expr << "]\n";
-		throw expr;
+		std::ostringstream os;
+		os << file << ":" << line << ":Assert failed [" << expr << "]";
+		std::cerr << os.str() << std::endl;
+		throw std::runtime_error(os.str());
 	}
 	
 	extern int log_indent;
