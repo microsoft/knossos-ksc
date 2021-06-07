@@ -57,9 +57,7 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
                     return ret
 
                 yield BenchmarkFunction(
-                    "PyTorch automatic CUDA",
-                    benchmark_without_transfers,
-                    use_device=cuda_device,
+                    "PyTorch CUDA", benchmark_without_transfers, use_device=cuda_device,
                 )
 
         elif fn_name == benchmark_name + "_pytorch_nice":
@@ -87,12 +85,10 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
                     return ret
 
                 yield BenchmarkFunction(
-                    "PyTorch manual CUDA (with transfer)", benchmark_with_transfers
+                    "Manual CUDA (with transfer)", benchmark_with_transfers
                 )
                 yield BenchmarkFunction(
-                    "PyTorch manual CUDA",
-                    benchmark_without_transfers,
-                    use_device=cuda_device,
+                    "Manual CUDA", benchmark_without_transfers, use_device=cuda_device,
                 )
         else:
             # perhaps we should just allow anything that matches the pattern?
