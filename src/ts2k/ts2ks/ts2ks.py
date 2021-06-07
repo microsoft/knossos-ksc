@@ -11,7 +11,7 @@ import torch.onnx
 torch.set_default_dtype(torch.float64)
 
 from ksc import utils
-from ksc.parse_ks import parse_ks_filename
+from ksc.parse_ks import parse_ks_filename, parse_ks_string
 
 from ksc.type import Type
 from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
@@ -198,11 +198,11 @@ def make_callfunction(node):
 
 
 def make_PythonOp(node):
+    global todo_stack
     value = node.outputsAt(0)
     assert len(list(node.outputs())) == 1  # Assemble into tuple for multiple outputs
     pyname = node.pyname()
     if pyname == "elementwise_apply_hack":
-        global todo_stack
         function_name_constant = node.inputsAt(0).node()
         function_name = function_name_constant.s("value")
         print(f"Adding {function_name} to todo {todo_stack}")
@@ -216,6 +216,16 @@ def make_PythonOp(node):
             Call(
                 "map", [map_lambda] + [var_or_constant(i) for i in tail(node.inputs())]
             ),
+        )
+    elif pyname == "call_ks":
+        function_name_constant = node.inputsAt(0).node()
+        function_name = function_name_constant.s("value")
+        print(f"Adding {function_name} to todo {todo_stack}")
+        todo_stack.add(function_name)
+
+        return (
+            Var(mangled_name(value)),
+            Call(function_name, [var_or_constant(i) for i in tail(node.inputs())]),
         )
 
     raise NotImplementedError(f"PythonOp {pyname}")
@@ -477,14 +487,48 @@ def make_KscAutogradFunction(py_mod, generate_lm):
 
 
 def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
-    symtab = dict()
     ksc_dir = utils.get_ksc_dir()
-    decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
-    type_propagate_decls(decls_prelude, symtab)
-    decls_prelude_aten = list(
-        parse_ks_filename(ksc_dir + "/src/runtime/prelude-aten.ks")
-    )
-    type_propagate_decls(decls_prelude_aten, symtab)
+
+    # Empty symtab
+    symtab = dict()
+
+    def load_prelude(name):
+        """
+        Load NAME into symtab
+        """
+        decls = list(parse_ks_filename(ksc_dir + name))
+        type_propagate_decls(decls, symtab)
+
+    load_prelude("/src/runtime/prelude.ks")
+    load_prelude("/src/runtime/prelude-aten.ks")
+    extra_defs_str = """
+    (def tmprelu3 Float ((_x$o1 : Float))
+  (let (_32 0.6666666666666666)
+  (let (_31 0.3333333333333333)
+  (let (_3 0.0)
+  (let (_7 1.0)
+  (let (_11 3)
+  (let (_4 (aten::lt _x$o1 0.0))
+  (let (_29 (if _4
+              _3
+              (let (_8 (aten::lt _x$o1 1.0))
+              (let (_28 (if _8
+                          (let (_14 (aten::pow _x$o1 3))
+                          (let (_15 (aten::mul 0.3333333333333333 _14))
+                          _15))
+                          (let (_19 (aten::sub _x$o1 0.6666666666666666))
+                          _19)))
+              _28))))
+  _29))))))))
+
+(def myvrelu3 (Tensor 1 Float) ((_x$o1 : (Tensor 1 Float)))
+  (map (lam (ts2ks$0 : Float)
+                      (tmprelu3 ts2ks$0)) _x$o1))
+    """
+    extra_defs = list(parse_ks_string(extra_defs_str, __file__))
+    type_propagate_decls(extra_defs, symtab)
+
+    ksc_defs = extra_defs + ksc_defs
 
     for ksc_def in ksc_defs:
         cpprint(ksc_def)
@@ -537,18 +581,30 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
     ksc_defs = []
     while len(todo_stack) > 0:
         print(f"tsmod2ksmod: Remaining: {todo_stack}")
+        found_one = False
         for fn in inspect.getmembers(module, inspect.isfunction):
             fn_name, fn_obj = fn
             if fn_name in todo_stack:
+                found_one = True
                 todo_stack.remove(fn_name)
                 print(f"tsmod2ksmod: converting {fn_name}, remaining: {todo_stack}")
                 ts_fn = torch.jit.script(fn_obj)
                 ts_graph = ts_fn.graph
                 ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
                 ksc_defs.insert(0, ksc_def)
+        if not found_one:
+            print(
+                "tsmod2ksmod: Did not find a definition for these functions: ",
+                todo_stack,
+            )
+            break
 
     entry_def = ksc_defs[-1]
     return ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm)
+
+
+def tsmod2ksmod_ks_fast(module, function_name, example_inputs, generate_lm=True):
+    return tsmod2ksmod(module, function_name + "_ks_fast", example_inputs, generate_lm)
 
 
 def ts2mod(function, example_inputs, generate_lm=True):

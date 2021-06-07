@@ -38,3 +38,8 @@ def elementwise_apply(f: Callable[[float], float], x: torch.Tensor):
 @torch.jit.ignore
 def elementwise_apply_hack(f: str, x: torch.Tensor):
     pass
+
+
+@torch.jit.ignore
+def call_ks(f: str, x: torch.Tensor):
+    pass

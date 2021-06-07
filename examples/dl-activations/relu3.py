@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import os
-from ksc.torch_utils import elementwise_apply_hack
+from ksc.torch_utils import elementwise_apply_hack, call_ks
 from collections import OrderedDict
 
 # BEGINDOC
@@ -24,6 +24,11 @@ def relu3(x: float) -> float:
 # run-bench: Knossos implementation
 def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
+
+
+# run-bench: Knossos hand-coded implementation in ks file
+def vrelu3_ks_fast(x: torch.Tensor):
+    return call_ks("myvrelu3", x)
 
 
 # run-bench: PyTorch reference implementation
@@ -85,9 +90,7 @@ def vrelu3_cuda_init():
 def vrelu3_bench_configs():
     yield torch.randn((4,))
     yield torch.randn((16,))
-
-
-# yield torch.randn((256,256)) too slow to bench...
+    yield torch.randn((256 * 256,))
 
 
 # Note: zeros

@@ -331,7 +331,9 @@ namespace ks {
 
 		void* allocate(size_t size)
 		{
-			KS_ASSERT(size < 1000000);
+			if (size > 256'000'000) {
+				std::cerr << "knossos.h: Allocating " << size << " bytes\n";
+			}
 			void* ret = buf_ + top_;
 			top_ += padded_size(size);
 			if (top_ > peak_) {

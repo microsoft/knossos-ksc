@@ -2,7 +2,7 @@ import time
 import torch
 
 import ts2ks
-from ts2ks import tsmod2ksmod
+from ts2ks import tsmod2ksmod, tsmod2ksmod_ks_fast
 
 torch.set_default_dtype(torch.float64)
 
@@ -116,10 +116,16 @@ def bench(module_file, bench_name):
             pt_fast = fn_obj
         elif fn_name == bench_name + "_pytorch_nice":
             pt_nice = fn_obj
-        elif fn_name == bench_name:
+        elif fn_name == bench_name + "_ks_fast":
+            ks_fast = fn_obj
+        elif fn_name == bench_name + "":  # Knossos
             ks_raw = fn_obj
         else:
             print(f"Ignoring {fn_name}")
+
+    ks_fast_compiled = tsmod2ksmod_ks_fast(
+        mod, bench_name, example_inputs=(configs[0],), generate_lm=False
+    )
 
     # TODO: elementwise_apply
     ks_compiled = tsmod2ksmod(
@@ -181,6 +187,11 @@ def bench(module_file, bench_name):
             # TODO: make pt_nice runnable with vmap
             # assert fun_and_grad_matches(pt_fast, pt_nice, arg)
             # timeit(bench_name + " PyTorch nice", pt_nice, arg)
+
+            # TODO: make ks_raw runnable as pure python
+            if ks_fast_compiled:
+                assert fun_and_grad_matches(pt_fast, ks_fast_compiled.apply, arg)
+                timeit(bench_name + " Knossos fast", ks_fast_compiled.apply, arg)
 
             if ks_compiled:
                 assert fun_and_grad_matches(pt_fast, ks_compiled.apply, arg)
