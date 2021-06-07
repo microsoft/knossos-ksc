@@ -9,7 +9,7 @@ from pathlib import Path
 from collections import namedtuple
 from contextlib import contextmanager
 
-from ksc.torch_frontend import ts2mod
+from ksc.torch_frontend import tsmod2ksmod
 from ksc import utils
 
 
@@ -63,7 +63,10 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
         elif fn_name == benchmark_name + "_pytorch_nice":
             yield BenchmarkFunction("PyTorch Nice", fn_obj)
         elif fn_name == benchmark_name:
-            yield BenchmarkFunction("Knossos", ts2mod(fn_obj, example_input).apply)
+            ks_mod = tsmod2ksmod(
+                mod, benchmark_name, (example_input[0],), generate_lm=False
+            )
+            yield BenchmarkFunction("Knossos", ks_mod.apply)
         elif fn_name == benchmark_name + "_cuda_init":
             if torch.cuda.is_available():
                 cuda_device = torch.device("cuda")
