@@ -28,7 +28,7 @@ def vrelu3(x: torch.Tensor):
 
 # run-bench: Knossos hand-coded implementation in ks file
 def vrelu3_ks_fast(x: torch.Tensor):
-    return call_ks("myvrelu3", x)
+    return call_ks("sufrev_vrelu3", x)
 
 
 # run-bench: PyTorch reference implementation

@@ -68,4 +68,8 @@
 (gdef sufrevpass [vrelu3 (Vec Float)])
 (gdef sufrev [vrelu3 (Vec Float)])
 
+(def sufrev_vrelu3 (Vec Float)
+     (t : Vec Float)
+     (map (lam (ti : Float) ([sufrev relu3] ti 1.0)) t))
+
 (def main Integer () 0)

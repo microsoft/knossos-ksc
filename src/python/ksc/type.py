@@ -39,7 +39,9 @@ class Type:
         if kind == "Tensor":
             assert isinstance(children[0], int) and isinstance(children[1], Type)
         else:
-            assert all(isinstance(ch, Type) for ch in children)
+            if not all(isinstance(ch, Type) for ch in children):
+                print(children)
+                assert False
 
         self.kind = kind
         self.children = children  # TODO: change to _children and use tuple_elem or tensor_* or lambda_* to access

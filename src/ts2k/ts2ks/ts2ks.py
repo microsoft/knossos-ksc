@@ -502,28 +502,18 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     load_prelude("/src/runtime/prelude.ks")
     load_prelude("/src/runtime/prelude-aten.ks")
     extra_defs_str = """
-    (def tmprelu3 Float ((_x$o1 : Float))
-  (let (_32 0.6666666666666666)
-  (let (_31 0.3333333333333333)
-  (let (_3 0.0)
-  (let (_7 1.0)
-  (let (_11 3)
-  (let (_4 (aten::lt _x$o1 0.0))
-  (let (_29 (if _4
-              _3
-              (let (_8 (aten::lt _x$o1 1.0))
-              (let (_28 (if _8
-                          (let (_14 (aten::pow _x$o1 3))
-                          (let (_15 (aten::mul 0.3333333333333333 _14))
-                          _15))
-                          (let (_19 (aten::sub _x$o1 0.6666666666666666))
-                          _19)))
-              _28))))
-  _29))))))))
+(def myrelu3 Float (x : Float)
+     (if (lt x 0.0)
+         0.0
+     (if (lt x 1.0)
+         (div (mul x (mul x x)) 3.0)
+     (sub x (div 2.0 3.0)))))
 
-(def myvrelu3 (Tensor 1 Float) ((_x$o1 : (Tensor 1 Float)))
-  (map (lam (ts2ks$0 : Float)
-                      (tmprelu3 ts2ks$0)) _x$o1))
+(gdef sufrev [myrelu3 Float])
+
+(def sufrev_vrelu3 (Vec Float)
+     (t : Vec Float)
+     (map (lam (ti : Float) ([sufrev [myrelu3 Float]] ti 1.0)) t))
     """
     extra_defs = list(parse_ks_string(extra_defs_str, __file__))
     type_propagate_decls(extra_defs, symtab)
