@@ -32,7 +32,11 @@ def modulepath(request):
     return request.config.getoption("--modulepath")
 
 
-BenchmarkFunction = namedtuple("BenchmarkFunction", "name func")
+class BenchmarkFunction(object):
+    def __init__(self, name: str, func, use_device=None):
+        self.name = name
+        self.func = func
+        self.use_device = use_device
 
 
 def functions_to_benchmark(mod, benchmark_name, example_input):
@@ -50,7 +54,28 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
             yield BenchmarkFunction("Knossos", ts2mod(fn_obj, example_input).apply)
         elif fn_name == benchmark_name + "_cuda_init":
             if torch.cuda.is_available():
-                yield BenchmarkFunction("PyTorch CUDA", fn_obj())
+                cuda_device = torch.device("cuda")
+                cpu_device = torch.device("cpu")
+                func_minimal = fn_obj()
+                func_minimal.to(cuda_device)
+
+                def benchmark_with_transfers(x: torch.Tensor):
+                    ondevice = x.to(cuda_device)
+                    ret = func_minimal(ondevice)
+                    torch.cuda.synchronize()
+                    return ret.to(cpu_device)
+
+                def benchmark_without_transfers(x: torch.Tensor):
+                    ret = func_minimal(x)
+                    torch.cuda.synchronize()
+                    return ret
+
+                yield BenchmarkFunction(
+                    "PyTorch CUDA (with transfer)", benchmark_with_transfers
+                )
+                yield BenchmarkFunction(
+                    "PyTorch CUDA", benchmark_without_transfers, use_device=cuda_device
+                )
         else:
             # perhaps we should just allow anything that matches the pattern?
             # would make it easier to add arbitrary comparisons e.g. TF
