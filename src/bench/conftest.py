@@ -48,6 +48,18 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
             continue
         elif fn_name == benchmark_name + "_pytorch":
             yield BenchmarkFunction("PyTorch", fn_obj)
+
+            if torch.cuda.is_available():
+
+                def benchmark_without_transfers(x: torch.Tensor):
+                    ret = fn_obj(x)
+                    torch.cuda.synchronize()
+                    return ret
+
+                yield BenchmarkFunction(
+                    "PyTorch CUDA", benchmark_without_transfers, use_device=cuda_device,
+                )
+
         elif fn_name == benchmark_name + "_pytorch_nice":
             yield BenchmarkFunction("PyTorch Nice", fn_obj)
         elif fn_name == benchmark_name:
@@ -57,6 +69,8 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
                 cuda_device = torch.device("cuda")
                 cpu_device = torch.device("cpu")
                 func_minimal = fn_obj()
+                # Note we're assuming this has been implemented as a module hence .to(), may need to generalise later
+                # https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=#torch.nn.Module.to
                 func_minimal.to(cuda_device)
 
                 def benchmark_with_transfers(x: torch.Tensor):
@@ -71,10 +85,10 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
                     return ret
 
                 yield BenchmarkFunction(
-                    "PyTorch CUDA (with transfer)", benchmark_with_transfers
+                    "Manual CUDA (with transfer)", benchmark_with_transfers
                 )
                 yield BenchmarkFunction(
-                    "PyTorch CUDA", benchmark_without_transfers, use_device=cuda_device
+                    "Manual CUDA", benchmark_without_transfers, use_device=cuda_device,
                 )
         else:
             # perhaps we should just allow anything that matches the pattern?
