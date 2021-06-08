@@ -217,8 +217,16 @@ def _(ex, symtab, respect_existing):
 def _(ex, symtab, respect_existing):
     # (gdef derivation function_name)
     signature = StructuredName((ex.derivation, ex.function_name))
-    # TODO: Need to map to return type.
-    return_type = None
+    # TODO: Need to map to return type for more derivations.
+    if signature.is_derived("sufrev"):
+        nested = signature.se[1]
+        if not nested.is_derivation():
+            # TODO: check has_type first?
+            return_type = tangent_type(signature.get_type())
+        else:
+            return_type = None
+    else:
+        return_type = None
     if signature in symtab and symtab[signature] != return_type:
         raise KSTypeError(
             f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}"
