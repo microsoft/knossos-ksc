@@ -509,16 +509,22 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
          (div (mul x (mul x x)) 3.0)
      (sub x (div 2.0 3.0)))))
 
+(gdef suffwdpass [myrelu3 Float])
+(gdef sufrevpass [myrelu3 Float])
 (gdef sufrev [myrelu3 Float])
 
-(def sufrev_vrelu3 (Vec Float)
-     (t : Vec Float)
+(def vrelu3_ks_fast_aux (Vec Float) (t : Vec Float)
+     (map (lam (ti : Float) (myrelu3 ti)) t))
+
+(def [sufrev [vrelu3_ks_fast (Vec Float)]] (Vec Float)
+     ((t : Vec Float) (dret : Vec Float))
+     ; TODO: 1.0 should be dret[i]
      (map (lam (ti : Float) ([sufrev [myrelu3 Float]] ti 1.0)) t))
     """
     extra_defs = list(parse_ks_string(extra_defs_str, __file__))
     type_propagate_decls(extra_defs, symtab)
 
-    ksc_defs = extra_defs + ksc_defs
+    ksc_defs = ksc_defs
 
     for ksc_def in ksc_defs:
         cpprint(ksc_def)
@@ -528,7 +534,9 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
         defs_with_derivatives += [ksc_def]
-        if "sufrev" in derivatives_to_generate:
+        if "sufrev" in derivatives_to_generate and (
+            ksc_def.name.mangle_without_type() != "vrelu3_ks_fast"
+        ):
             defs_with_derivatives += [
                 GDef("suffwdpass", ksc_def.name),
                 GDef("sufrevpass", ksc_def.name),
@@ -543,7 +551,7 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
                 GDef("rev", ksc_def.name),
             ]
 
-    ks_str = "\n".join(map(pformat, defs_with_derivatives))
+    ks_str = "\n".join(map(pformat, extra_defs + defs_with_derivatives))
     arg_types = [arg.type_ for arg in entry_def.args]
     return_type = entry_def.return_type
     return utils.build_module_using_pytorch_from_ks(
