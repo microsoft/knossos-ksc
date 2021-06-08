@@ -81,6 +81,35 @@ def _type_propagate_helper(ex: ASTNode, symtab, respect_existing: bool):
 # [rev f] : (S, dT) -> dS
 # [fwd f] : (S, dS) -> dT
 # [rev [fwd f]] : ((S, dS), dT) -> (dS, dS)
+# [suffwdpass f] : S -> dS, BOG
+# [sufbwdpass f] : (BOG, dT) -> dS
+# [sufrev f] : (S, dT) -> dS
+
+
+def infer_derived_fn_return_type(sn: StructuredName, symtab):
+    if sn in symtab:
+        return symtab[sn]
+
+    # TODO: tests for this
+    if sn.is_derivation():
+        derivation, derivation_of = sn.se  # TODO: add accessor for se[1]
+        if derivation in ("rev", "sufrev"):
+            arg_ty = sn.get_type()
+            # ty = infer_derived_fn_return_type(derivation_of, symtab)
+            return tangent_type(arg_ty)
+
+        if derivation == "fwd":
+            # arg_ty = sn.get_type()
+            ty = infer_derived_fn_return_type(derivation_of, symtab)
+            return tangent_type(ty)
+
+        if derivation == "suffwdpass":
+            return None
+
+        if derivation == "sufrevpass":
+            return None
+
+    raise NotImplementedError(f"infer_derived_fn_return_type {sn}")
 
 
 def infer_fn_type_from_derived_fn_args(
@@ -162,7 +191,7 @@ def _(ex, symtab, respect_existing):
     # Check for definition in symtab with different return type
     if ex.name in symtab:
         old_type = symtab[ex.name]
-        if old_type != ex.return_type:
+        if declared_return_type and old_type != ex.return_type:
             raise KSTypeError(
                 f"Redefinition of {ex.name} with different return type {old_type} -> {ex.return_type}"
             )
@@ -218,11 +247,15 @@ def _(ex, symtab, respect_existing):
     # (gdef derivation function_name)
     signature = StructuredName((ex.derivation, ex.function_name))
     # TODO: Need to map to return type.
-    return_type = None
-    if signature in symtab and symtab[signature] != return_type:
-        raise KSTypeError(
-            f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}"
-        )
+    return_type = infer_derived_fn_return_type(signature, symtab)
+    if signature in symtab:
+        if symtab[signature] != return_type:
+            raise KSTypeError(
+                f"Double definition: {signature}\n -> {symtab[signature]}\n vs {return_type}"
+            )
+        else:
+            print(f"type_propagation: Redefined {signature}")
+
     symtab[signature] = return_type
     return ex
 
