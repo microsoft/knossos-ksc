@@ -533,6 +533,7 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     type_propagate_decls(ksc_defs, symtab)
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
+        # print(ksc_def, ksc_def.name)
         defs_with_derivatives += [ksc_def]
         if "sufrev" in derivatives_to_generate and (
             ksc_def.name.mangle_without_type() != "vrelu3_ks_fast"
