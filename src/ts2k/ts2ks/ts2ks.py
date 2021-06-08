@@ -509,11 +509,17 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
          (div (mul x (mul x x)) 3.0)
      (sub x (div 2.0 3.0)))))
 
+; (gdef suffwdpass [myrelu3 Float])
+; (gdef sufrevpass [myrelu3 Float])
 (gdef sufrev [myrelu3 Float])
 
-(def sufrev_vrelu3 (Vec Float)
-     (t : Vec Float)
-     (map (lam (ti : Float) ([sufrev [myrelu3 Float]] ti 1.0)) t))
+(def myvrelu3 (Tensor 1 Float) (t : Vec Float)
+     (map (lam (ti : Float) (myrelu3 ti)) t))
+
+(def [sufrev [myvrelu3 (Tensor 1 Float)]] (Tensor 1 Float)
+     ((t : Vec Float) (ddr : Vec Float))
+     (let (t_ddr (build (size t) (lam (i : Integer) (tuple (index i t) (index i ddr)))))
+     (map (lam (ti_ddri : Tuple Float Float) ([sufrev [myrelu3 Float]] ti_ddri)) t_ddr)))
     """
     extra_defs = list(parse_ks_string(extra_defs_str, __file__))
     type_propagate_decls(extra_defs, symtab)
@@ -527,8 +533,10 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     type_propagate_decls(ksc_defs, symtab)
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
+        # print(ksc_def, ksc_def.name)
         defs_with_derivatives += [ksc_def]
-        if "sufrev" in derivatives_to_generate:
+        if "sufrev" in derivatives_to_generate and not isinstance(ksc_def, GDef) and ksc_def.name != "myvrelu3" and ksc_def.name != "myrelu3":
+            print(ksc_def.name)
             defs_with_derivatives += [
                 GDef("suffwdpass", ksc_def.name),
                 GDef("sufrevpass", ksc_def.name),
