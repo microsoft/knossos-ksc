@@ -513,13 +513,23 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
 (gdef sufrevpass [myrelu3 Float])
 (gdef sufrev [myrelu3 Float])
 
+;; This is providing the definition for vrelu3_ks_fast_aux, 
+;; which is the "call_ks" target in relu3.py:vrelu3_ks_fast
 (def vrelu3_ks_fast_aux (Vec Float) (t : Vec Float)
      (map (lam (ti : Float) (myrelu3 ti)) t))
 
+; ts2ks emits this, calling _aux
+; (def vrelu3_ks_fast ....) ; Provided by ts2ks
+
+;; And this is providing the definition for sufrev of the *emitted* function
 (def [sufrev [vrelu3_ks_fast (Vec Float)]] (Vec Float)
      ((t : Vec Float) (dret : Vec Float))
-     ; TODO: 1.0 should be dret[i]
+     ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
      (map (lam (ti : Float) ([sufrev [myrelu3 Float]] ti 1.0)) t))
+
+; we don't need the sufrev of vrelu3_ks_fast_aux, as it's never called
+; (gdef sufrev vrelu3_ks_fast_aux)
+
     """
     extra_defs = list(parse_ks_string(extra_defs_str, __file__))
     type_propagate_decls(extra_defs, symtab)
