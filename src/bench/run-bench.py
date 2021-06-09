@@ -80,17 +80,16 @@ def timeit(msg, fn, arg):
         backward_timer.record()
 
         if time.time() > end_time:
-            print(f"# Ran to timeout: {fn} {msg} ")
+            # print(f"# Ran to timeout: {fn} {msg} ")
             break
 
     csum = grad[0].sum()
 
     print(
-        f"{msg:20} {csum:12.6e} Runs: {inference_timer.ncalls} | Inference: {inference_timer.ms:10.3f} ms |"
-        f" Forward: {forward_timer.ms:10.3f} ms |"
-        f" Backward {backward_timer.ms:10.3f} ms | {arg.shape}"
+        f"{msg:20} {csum:.4g} Runs: {inference_timer.ncalls:4} |"
+        f" Fwd {forward_timer.ms:10.3f} ms |"
+        f" Bwd {backward_timer.ms:10.3f} ms | {arg.shape}"
     )
-
 
 def bench(module_file, bench_name):
     """

@@ -41,5 +41,11 @@ def elementwise_apply_hack(f: str, x: torch.Tensor):
 
 
 @torch.jit.ignore
-def call_ks(f: str, x: torch.Tensor):
+def call_ks(ks_str: str, f: str, x: torch.Tensor):
+    """
+    Direct python call to .ks method.
+        ks_str:   String with KS defs
+        f: function name
+        x: torch.Tensor
+    """
     pass

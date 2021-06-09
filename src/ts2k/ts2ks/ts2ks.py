@@ -46,6 +46,8 @@ def tail(iter):
 
 # TODO: make this less pythonic, i.e. eschew global state modification
 todo_stack = None
+prelude_stack = []
+needs_re_optimization = False
 
 
 def type_from_value(x):
@@ -218,10 +220,20 @@ def make_PythonOp(node):
             ),
         )
     elif pyname == "call_ks":
-        function_name_constant = node.inputsAt(0).node()
-        function_name = function_name_constant.s("value")
-        print(f"Adding {function_name} to todo {todo_stack}")
-        todo_stack.add(function_name)
+        if node.inputsSize() > 2:
+            # First time through, gather the prelude and put it on the stack
+            global prelude_stack
+            ks_str = node.inputsAt(0).node().s("value")
+            prelude_stack += [ks_str]
+            function_name = node.inputsAt(1).node().s("value")
+            print(f"Adding {function_name} to todo {todo_stack}")
+            todo_stack.add(function_name)
+
+            node.removeInput(0)  # Remove the ks_str
+            global needs_re_optimization
+            needs_re_optimization = True
+        else:
+            function_name = node.inputsAt(0).node().s("value")
 
         return (
             Var(mangled_name(value)),
@@ -501,53 +513,12 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
 
     load_prelude("/src/runtime/prelude.ks")
     load_prelude("/src/runtime/prelude-aten.ks")
-    extra_defs_str = """
-(def myrelu3 Float (x : Float)
-     (if (lt x 0.0)
-         0.0
-     (if (lt x 1.0)
-         (div (mul x (mul x x)) 3.0)
-     (sub x (div 2.0 3.0)))))
 
-(gdef suffwdpass [myrelu3 Float])
-(gdef sufrevpass [myrelu3 Float])
-;(gdef sufrev [myrelu3 Float])
-
-; (def [sufrev [myrelu3 Float]] Float ((x : Float) (ddr : Float)) 0.0)
-
-(def [sufrev [myrelu3 Float]] Float ((x : Float) (ddr : Float))
-    (if (lt x 0.0)
-        0.0
-    (if (lt x 1.0)
-        (mul x (mul x ddr))
-    ddr)))
-
-;; This is providing the definition for vrelu3_ks_fast_aux, 
-;; which is the "call_ks" target in relu3.py:vrelu3_ks_fast
-(def vrelu3_ks_fast_aux (Vec Float) (t : Vec Float)
-     (map (lam (ti : Float) (myrelu3 ti)) t))
-
-; ts2ks emits this, calling _aux
-; (def vrelu3_ks_fast ....) ; Provided by ts2ks
-
-;; And this is providing the definition for sufrev of the *emitted* function
-(def [sufrev [vrelu3_ks_fast (Vec Float)]] (Vec Float)
-     ((t : Vec Float) (dret : Vec Float))
-     ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
-     (map (lam (ti : Float) ([sufrev [myrelu3 Float]] ti 1.0)) t))
-
-; we don't need the sufrev of vrelu3_ks_fast_aux, as it's never called
-; (gdef sufrev vrelu3_ks_fast_aux)
-
-    """
-    extra_defs = list(parse_ks_string(extra_defs_str, __file__))
-    type_propagate_decls(extra_defs, symtab)
-
-    ksc_defs = ksc_defs
-
-    for ksc_def in ksc_defs:
-        cpprint(ksc_def)
-        print("")
+    extra_defs = []
+    global prelude_stack
+    for prelude in prelude_stack:
+        extra_defs += list(parse_ks_string(prelude, __file__))
+        type_propagate_decls(extra_defs, symtab)
 
     type_propagate_decls(ksc_defs, symtab)
     defs_with_derivatives = []
@@ -571,6 +542,10 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
                 GDef("rev", ksc_def.name),
             ]
 
+    for ksc_def in extra_defs + defs_with_derivatives:
+        cpprint(ksc_def)
+        print("")
+
     ks_str = "\n".join(map(pformat, extra_defs + defs_with_derivatives))
     arg_types = [arg.type_ for arg in entry_def.args]
     return_type = entry_def.return_type
@@ -590,12 +565,27 @@ def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
     return make_KscAutogradFunction(mod, generate_lm)
 
 
+def optimize_graph(graph: torch._C.Graph):
+    """
+    Run Torch optimization passes on the graph
+    See e.g. https://github.com/pytorch/pytorch/blob/2c17b6a0fe254f18f3c969cb0e68920341ec600b/torch/onnx/utils.py#L126
+    """
+    torch._C._jit_pass_constant_propagation(graph)
+    torch._C._jit_pass_dce(graph)
+    pass
+
+
 import inspect
 
 
 def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
     global todo_stack
     todo_stack = {function_name}
+    global prelude_stack
+    prelude_stack = []
+    global needs_re_optimization
+    needs_re_optimization = False
+
     ksc_defs = []
     while len(todo_stack) > 0:
         print(f"tsmod2ksmod: Remaining: {todo_stack}")
@@ -608,7 +598,13 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
                 print(f"tsmod2ksmod: converting {fn_name}, remaining: {todo_stack}")
                 ts_fn = torch.jit.script(fn_obj)
                 ts_graph = ts_fn.graph
-                ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
+                while True:
+                    optimize_graph(ts_graph)
+                    needs_re_optimization = False
+                    ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
+                    if not needs_re_optimization:
+                        break
+
                 ksc_defs.insert(0, ksc_def)
         if not found_one:
             print(

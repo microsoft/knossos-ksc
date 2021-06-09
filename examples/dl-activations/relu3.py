@@ -28,7 +28,49 @@ def vrelu3(x: torch.Tensor):
 
 # run-bench: Knossos hand-coded implementation in ks file
 def vrelu3_ks_fast(x: torch.Tensor):
-    return call_ks("vrelu3_ks_fast_aux", x)
+    return call_ks(
+        """
+(def myrelu3 Float (x : Float)
+     (if (lt x 0.0)
+         0.0
+     (if (lt x 1.0)
+         (div (mul x (mul x x)) 3.0)
+     (sub x (div 2.0 3.0)))))
+
+(gdef suffwdpass [myrelu3 Float])
+(gdef sufrevpass [myrelu3 Float])
+;(gdef sufrev [myrelu3 Float])
+
+; (def [sufrev [myrelu3 Float]] Float ((x : Float) (ddr : Float)) 0.0)
+
+(def [sufrev [myrelu3 Float]] Float ((x : Float) (ddr : Float))
+    (if (lt x 0.0)
+        0.0
+    (if (lt x 1.0)
+        (mul x (mul x ddr))
+    ddr)))
+
+;; This is providing the definition for vrelu3_ks_fast_AUX, 
+;; which is the "call_ks" target below
+(def vrelu3_ks_fast_AUX (Vec Float) (t : Vec Float)
+     (map (lam (ti : Float) (myrelu3 ti)) t))
+
+;; we don't need the sufrev of vrelu3_ks_fast_AUX, as it's never called
+; (gdef sufrev vrelu3_ks_fast_AUX)
+
+; When ts2ks processes vrelu3_ks_fast, it emits:
+(edef vrelu3_ks_fast (Vec Float) (Vec Float))
+
+;; But we provide the definition for sufrev of the *emitted* function
+(def [sufrev [vrelu3_ks_fast (Vec Float)]] (Vec Float)
+     ((t : Vec Float) (dret : Vec Float))
+     ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
+     (map (lam (ti : Float) ([sufrev [myrelu3 Float]] ti 1.0)) t))
+
+""",
+        "vrelu3_ks_fast_AUX",
+        x,
+    )
 
 
 # run-bench: PyTorch reference implementation
