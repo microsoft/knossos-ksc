@@ -2,7 +2,7 @@ import sys
 import torch
 from transformers import BertConfig, BertScriptableForQuestionAnswering
 
-from ts2ks import ts2ks, ts2ks_fromgraph
+from ksc.ts2ks import ts2ks, ts2ks_fromgraph
 
 # configuration = BertConfig(num_hidden_layers = 1)
 config = BertConfig(num_hidden_layers=1)

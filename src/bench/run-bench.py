@@ -1,8 +1,8 @@
 import time
 import torch
 
-import ts2ks
-from ts2ks import tsmod2ksmod
+import ksc.ts2ks
+from ksc.ts2ks import tsmod2ksmod
 
 torch.set_default_dtype(torch.float64)
 
