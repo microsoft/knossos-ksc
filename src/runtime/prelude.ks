@@ -498,9 +498,9 @@
 (edef [D sin] (LM Float Float) (Float))
 (def [fwd sin] Float ((x : Float) (dx : Float)) (mul (cos x) dx))
 (def [rev sin] Float ((x : Float) (d_dsin : Float)) (mul (cos x) d_dsin))
-(def [suffwdpass sin] (Tuple Float Float) (x : Float) (tuple (cos x) x))
-(def [sufrevpass [sin Float]] Float ((d_dcos : Float) (bog : Float))
-     (neg (mul (cos bog) d_dcos)))
+(def [suffwdpass sin] (Tuple Float Float) (x : Float) (tuple (sin x) x))
+(def [sufrevpass [sin Float]] Float ((d_dsin : Float) (bog : Float))
+     (mul (cos bog) d_dsin))
 (edef [Dt sin] (Tuple Float (LM Float Float)) (Float))
 
 (edef [D cos] (LM Float Float) (Float))
