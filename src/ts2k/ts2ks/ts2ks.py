@@ -511,7 +511,16 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
 
 (gdef suffwdpass [myrelu3 Float])
 (gdef sufrevpass [myrelu3 Float])
-(gdef sufrev [myrelu3 Float])
+;(gdef sufrev [myrelu3 Float])
+
+; (def [sufrev [myrelu3 Float]] Float ((x : Float) (ddr : Float)) 0.0)
+
+(def [sufrev [myrelu3 Float]] Float ((x : Float) (ddr : Float))
+    (if (lt x 0.0)
+        0.0
+    (if (lt x 1.0)
+        (mul x (mul x ddr))
+    ddr)))
 
 (def vrelu3_ks_fast_aux (Vec Float) (t : Vec Float)
      (map (lam (ti : Float) (myrelu3 ti)) t))
