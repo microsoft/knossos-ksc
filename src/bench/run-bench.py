@@ -1,4 +1,5 @@
 import time
+from ksc import torch_frontend
 import torch
 
 import ksc.torch_frontend
@@ -127,7 +128,7 @@ def bench(module_file, bench_name):
     )
 
     for arg in configs:
-        with ts2ks.logging(ks_compiled.py_mod, False):
+        with torch_frontend.logging(ks_compiled.py_mod, False):
             pt_arg = arg.detach()
             pt_arg.requires_grad = True
             pt_value = pt_fast(pt_arg)
