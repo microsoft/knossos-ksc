@@ -49,7 +49,7 @@ jobs:
       # It grants the following roles (read,list,create) which is enough for the action to add a new result,
       # and other actions to aggregate the results.
       - name: 'Upload result via AzCopy (if on master)'
-        if: contains(github.ref, "master")
+        if: contains(github.ref, 'master')
         env:
           BENCHMARK_SAS: ${{ secrets.BENCHMARK_SAS }}
         run: |
