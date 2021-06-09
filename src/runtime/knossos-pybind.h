@@ -125,7 +125,7 @@ void declare_tensor_1(py::module &m, char const* name) {
         ks::tensor_dimension<Dim>::index_type size {int(n)};
         // Note: We are capturing a reference to the caller's data.
         // we expect the user to attach a Python object to this class
-        // in order to keep that data alive. See ts2ks.py:torch_to_ks
+        // in order to keep that data alive. See torch_frontend.py:torch_to_ks
         // OR: of course we could just copy, but it's useful to keep track of the cost
         //     so preserving an implementation where we can avoid the copy feels
         //     valuable.

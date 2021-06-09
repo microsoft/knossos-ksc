@@ -7,7 +7,7 @@ import argparse
 from pathlib import Path
 from ksc import utils
 
-from ts2ks.ts2ks import ts2ks, write_edefs
+from ksc.torch_frontend import ts2ks, write_edefs
 
 parser = argparse.ArgumentParser(description="Convert TorchScript to Knossos IR")
 parser.add_argument("--input_file", required=True, help="TorchScript [file_path].py")

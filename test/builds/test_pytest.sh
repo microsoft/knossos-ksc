@@ -1,7 +1,7 @@
 set -e
 
 echo Installing dependencies...
-python3 -m pip install -r src/python/requirements.txt
+python3 -m pip install -r src/python/requirements.txt -f https://download.pytorch.org/whl/torch_stable.html
 python3 -m pip install pytest numpy torch==1.8.1+cu111 jax==0.1.57 jaxlib==0.1.37 -f https://download.pytorch.org/whl/torch_stable.html
 
 echo Installing ksc...
@@ -11,11 +11,6 @@ cd ../..
 
 echo Running pytest
 python3 -m pytest test/python
-
-echo Installing TS2KS...
-cd ./src/ts2k
-python3 -m pip install --editable .
-cd ../..
 
 echo Running pytest on ts2k
 python3 -m pytest test/ts2k

@@ -2,7 +2,7 @@
 
 ;; examples/dl-activations/gelu.py
 ;; examples/dl-activations/relu3.py
-;; src/ts2k/ts2ks/ts2ks.py
+;; src/python/ksc/torch_frontend.py
 
 ;; TODO: Enable LM AD gdefs, once map is implemented for LM AD
 
