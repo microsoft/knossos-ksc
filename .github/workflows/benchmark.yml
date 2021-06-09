@@ -1,6 +1,10 @@
 name: Benchmark
 
 on:
+
+  pull_request:
+    branches: [ master ]
+
   schedule:
     - cron:  '5 3 * * *'
 
@@ -44,7 +48,8 @@ jobs:
       # The token is generated to expire 13 months out (2022-06-11 15:00).
       # It grants the following roles (read,list,create) which is enough for the action to add a new result,
       # and other actions to aggregate the results.
-      - name: 'Upload result via AzCopy'
+      - name: 'Upload result via AzCopy (if on master)'
+        if: contains(github.ref, "master")
         env:
           BENCHMARK_SAS: ${{ secrets.BENCHMARK_SAS }}
         run: |
