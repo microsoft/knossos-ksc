@@ -17,11 +17,6 @@ cd ../..
 echo Running pytest
 python -m pytest test/python
 
-echo Installing TS2KS...
-cd ./src/ts2k
-python -m pip install --editable .
-cd ../..
-
 REM currently memory issues in tests PyTorch 1.8.1 https://github.com/microsoft/knossos-ksc/issues/679
 
 REM echo Running pytest on ts2k

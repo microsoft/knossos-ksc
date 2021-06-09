@@ -28,11 +28,6 @@ cd ../..
 echo Running pytest
 pytest test/python || exit /b
 
-echo Installing TS2KS...
-cd ./src/ts2k
-python -m pip install --editable . || exit /b
-cd ../..
-
 REM we only run a single test for now, multiple tests run out of heap see #679
 REM pytest test\ts2k\test_ts2k.py -k test_cat
 
