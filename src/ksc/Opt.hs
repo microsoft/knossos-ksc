@@ -249,10 +249,21 @@ shouldInline to_inline
                      , rev "mul" ff
                      , fwd "add" ff
                      , rev "add" ff
+                     , fwd "div" ff
+                     , rev "div" ff
+                     , fwd "sub" ff
+                     , rev "sub" ff
+                     , fwd "lt" ff
+                     , rev "lt" ff
+                     , fwd "sqrt" f
+                     , rev "sqrt" f
+                     , fwd "erf" f
+                     , rev "erf" f
                      ]
   where fwd f t = Fun SUFFwdPass (BaseFunId f t)
         rev f t = Fun SUFRevPass (BaseFunId f t)
         ff = TypeTuple [TypeFloat, TypeFloat]
+        f = TypeFloat
 
 -----------------------
 optFun :: OptEnv -> BaseFun p -> TExpr -> Maybe TExpr
