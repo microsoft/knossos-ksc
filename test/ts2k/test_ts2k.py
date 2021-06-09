@@ -8,7 +8,7 @@ torch.set_default_dtype(torch.float64)
 
 from ksc import utils
 from ksc.type import Type
-from ksc.ts2ks import ts2mod
+from ksc.torch_frontend import ts2mod
 
 
 def bar1(a: int, x: float, b: str):

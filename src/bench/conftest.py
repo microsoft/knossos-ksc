@@ -9,7 +9,7 @@ from pathlib import Path
 from collections import namedtuple
 from contextlib import contextmanager
 
-from ksc.ts2ks import ts2mod
+from ksc.torch_frontend import ts2mod
 from ksc import utils
 
 
