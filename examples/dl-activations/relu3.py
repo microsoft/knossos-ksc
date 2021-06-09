@@ -90,7 +90,9 @@ def vrelu3_cuda_init():
 def vrelu3_bench_configs():
     yield torch.randn((4,))
     yield torch.randn((16,))
-    yield torch.randn((256 * 256,))
+    yield torch.randn((100 * 1000))
+    yield torch.randn((1000 * 1000))
+    yield torch.randn((2 * 1000 * 1000))
 
 
 # Note: zeros
