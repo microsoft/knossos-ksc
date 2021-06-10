@@ -314,12 +314,11 @@ def __make_cpp_str(
     m.def("entry", with_ks_allocator("{name_str}", &ks::{name_str}));
     """
 
-    if generate_derivatives:
-        for der in derivatives_to_generate:
-            der_name = encode_name(f"{der}${name_to_call}@{args_str}")
-            declarations += f"""
-            m.def("{der}_entry", with_ks_allocator("{der_name}", &ks::{der_name}));
-            """
+    for der in derivatives_to_generate:
+        der_name = encode_name(f"{der}${name_to_call}@{args_str}")
+        declarations += f"""
+        m.def("{der}_entry", with_ks_allocator("{der_name}", &ks::{der_name}));
+        """
 
     cpp_str += (
         """
