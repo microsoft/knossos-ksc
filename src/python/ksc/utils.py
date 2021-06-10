@@ -323,6 +323,21 @@ def __make_cpp_str(
     derivatives_to_generate=derivatives_to_generate_default,
     use_aten=True,
 ):
+    args_str = mangleTypes(arg_types)
+
+    declarations_to_generate = [("entry", f"{name_to_call}@{args_str}")] + [
+        (f"{der}_entry", f"{der}${name_to_call}@{args_str}")
+        for der in derivatives_to_generate
+    ]
+
+    return __make_cpp_str_backend(
+        ks_str, declarations_to_generate, python_module_name, return_type, use_aten
+    )
+
+
+def __make_cpp_str_backend(
+    ks_str, declarations_to_generate, python_module_name, return_type, use_aten
+):
     generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
 
     cpp_str = f"""
@@ -336,13 +351,6 @@ def __make_cpp_str(
         return f"""
         m.def("{python_name}", with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
         """
-
-    args_str = mangleTypes(arg_types)
-
-    declarations_to_generate = [("entry", f"{name_to_call}@{args_str}")] + [
-        (f"{der}_entry", f"{der}${name_to_call}@{args_str}")
-        for der in derivatives_to_generate
-    ]
 
     declarations = "\n".join(m_def(*t) for t in declarations_to_generate)
 
