@@ -365,14 +365,9 @@ def generate_and_compile_cpp_from_ks(
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, name_to_call, return_type=None, derivatives_to_generate=[], use_aten=False,
+    ks_str, declarations_to_generate, return_type=None, use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
-    declarations_to_generate = [("entry", name_to_call)] + [
-        (f"{der}_entry", StructuredName((der, name_to_call)))
-        for der in derivatives_to_generate
-    ]
-
     cpp_str = __make_cpp_str_from_structured_name(
         ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", return_type, use_aten,
     )
