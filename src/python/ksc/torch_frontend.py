@@ -514,8 +514,7 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     return_type = entry_def.return_type
     return utils.build_module_using_pytorch_from_ks(
         ks_str,
-        entry_def.name.mangle_without_type(),
-        arg_types,
+        entry_def.name,
         return_type=return_type,
         derivatives_to_generate=derivatives_to_generate,
         use_aten=True,
