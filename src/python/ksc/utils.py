@@ -312,7 +312,6 @@ def __make_cpp_str(
     name_str = encode_name(f"{name_to_call}@{args_str}")
     declarations = f"""
     m.def("entry", with_ks_allocator("{name_str}", &ks::{name_str}));
-    m.def("logging", &ks_logging);
     """
 
     if generate_derivatives:
@@ -330,6 +329,7 @@ PYBIND11_MODULE("""
     m.def("reset_allocator", []{ g_alloc.reset();});
     m.def("allocator_top", []{ return g_alloc.mark();});
     m.def("allocator_peak", []{ return g_alloc.peak();});
+    m.def("logging", &ks_logging);
 
     declare_tensor_1<double>(m, "Tensor_1_Float");
     declare_tensor_2<double>(m, "Tensor_2_Float");
