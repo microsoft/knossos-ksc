@@ -316,11 +316,6 @@ def __make_cpp_str(
     """
 
     if generate_derivatives:
-        darg_types = [tangent_type(ty) for ty in arg_types]
-        args_tuple_str = mangleType(make_tuple_if_many(arg_types))
-        dargs_tuple_str = mangleType(make_tuple_if_many(darg_types))
-        dreturn_type_str = mangleType(tangent_type(return_type))
-
         for der in derivatives_to_generate:
             der_name = encode_name(f"{der}${name_to_call}@{args_str}")
             declarations += f"""
