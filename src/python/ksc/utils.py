@@ -143,7 +143,7 @@ def get_ksc_paths():
     return ksc_path, ksc_runtime_dir
 
 
-def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
+def generate_cpp_from_ks(ks_str, use_aten=False):
     ksc_path, ksc_runtime_dir = get_ksc_paths()
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
@@ -155,9 +155,7 @@ def generate_cpp_from_ks(ks_str, generate_derivatives=False, use_aten=False):
                 print("generate_cpp_from_ks:", ksc_path, fks.name)
                 ksc_command = [
                     ksc_path,
-                    "--generate-cpp"
-                    if generate_derivatives
-                    else "--generate-cpp-without-diffs",
+                    "--generate-cpp",
                     "--ks-source-file",
                     ksc_runtime_dir + "/prelude.ks",
                     *(
@@ -297,10 +295,7 @@ def __make_cpp_str(
     derivatives_to_generate=derivatives_to_generate_default,
     use_aten=True,
 ):
-    generate_derivatives = len(derivatives_to_generate) > 0
-    generated_cpp_source = generate_cpp_from_ks(
-        ks_str, generate_derivatives=generate_derivatives, use_aten=use_aten
-    )
+    generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
 
     cpp_str = f"""
     #include "knossos-pybind.h"
