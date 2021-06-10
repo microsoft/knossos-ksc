@@ -10,7 +10,9 @@ import sys
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
 from contextlib import contextmanager
+import warnings
 
+from ksc.expr import StructuredName
 from ksc.type import Type, tangent_type, make_tuple_if_many
 
 from torch.utils.cpp_extension import load, load_inline
@@ -250,26 +252,28 @@ def __make_cpp_str_from_structured_name(
     derivatives_to_generate=derivatives_to_generate_default,
     use_aten=True,
 ):
-    base_type = structured_name_to_call.get_type()
+    def mangled_with_type(structured_name):
+        if not structured_name.has_type():
+            raise ValueError(
+                "Need a type on the structured name: " + str(structured_name)
+            )
+        return structured_name.mangled()
 
-    if base_type.is_tuple:
-        arg_types = base_type.children
-    else:
-        arg_types = [base_type]
+    declarations_to_generate = [("entry", mangled_with_type(structured_name_to_call))] + [
+        (f"{der}_entry", mangled_with_type(StructuredName((der, structured_name_to_call))))
+        for der in derivatives_to_generate
+    ]
 
-    name_to_call = structured_name_to_call.mangle_without_type()
-
-    return __make_cpp_str(
-        ks_str,
-        name_to_call,
-        python_module_name,
-        arg_types,
-        return_type,
-        derivatives_to_generate,
-        use_aten,
+    return __make_cpp_str_backend(
+        ks_str, declarations_to_generate, python_module_name, return_type, use_aten,
     )
 
 
+# Callers of __make_cpp_str should be updated to call
+# __make_cpp_str_from_structured_name instead.  Then __make_cpp_str,
+# mangleType and mangleTypes should be deleted and
+# __make_cpp_str_backend should be inlined into
+# __make_cpp_str_from_structured_name.
 def __make_cpp_str(
     ks_str,
     name_to_call,
@@ -279,6 +283,7 @@ def __make_cpp_str(
     derivatives_to_generate=derivatives_to_generate_default,
     use_aten=True,
 ):
+    warnings.warn("__make_cpp_str is deprecated", DeprecationWarning)
     args_str = mangleTypes(arg_types)
 
     declarations_to_generate = [("entry", f"{name_to_call}@{args_str}")] + [
