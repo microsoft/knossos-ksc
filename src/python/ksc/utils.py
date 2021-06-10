@@ -303,17 +303,16 @@ def __make_cpp_str(
 
     """
 
-    def m_def(python_name, cpp_name):
+    def m_def(python_name, mangled_name):
+        cpp_name = encode_name(mangled_name)
         return f"""
         m.def("{python_name}", with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
         """
 
     args_str = mangleTypes(arg_types)
 
-    declarations_to_generate = [
-        ("entry", encode_name(f"{name_to_call}@{args_str}"))
-    ] + [
-        (f"{der}_entry", encode_name(f"{der}${name_to_call}@{args_str}"))
+    declarations_to_generate = [("entry", f"{name_to_call}@{args_str}")] + [
+        (f"{der}_entry", f"{der}${name_to_call}@{args_str}")
         for der in derivatives_to_generate
     ]
 
