@@ -245,12 +245,7 @@ derivatives_to_generate_default = ["fwd", "rev"]
 
 
 def __make_cpp_str_from_structured_name(
-    ks_str,
-    structured_name_to_call,
-    python_module_name,
-    return_type,
-    derivatives_to_generate=derivatives_to_generate_default,
-    use_aten=True,
+    ks_str, declarations_to_generate, python_module_name, return_type, use_aten=True,
 ):
     def mangled_with_type(structured_name):
         if not structured_name.has_type():
@@ -259,9 +254,9 @@ def __make_cpp_str_from_structured_name(
             )
         return structured_name.mangled()
 
-    declarations_to_generate = [("entry", mangled_with_type(structured_name_to_call))] + [
-        (f"{der}_entry", mangled_with_type(StructuredName((der, structured_name_to_call))))
-        for der in derivatives_to_generate
+    declarations_to_generate = [
+        (python_name, mangled_with_type(structured_name))
+        for (python_name, structured_name) in declarations_to_generate
     ]
 
     return __make_cpp_str_backend(
@@ -373,13 +368,13 @@ def build_module_using_pytorch_from_ks(
     ks_str, name_to_call, return_type=None, derivatives_to_generate=[], use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
+    declarations_to_generate = [("entry", name_to_call)] + [
+        (f"{der}_entry", StructuredName((der, name_to_call)))
+        for der in derivatives_to_generate
+    ]
+
     cpp_str = __make_cpp_str_from_structured_name(
-        ks_str,
-        name_to_call,
-        "TORCH_EXTENSION_NAME",
-        return_type,
-        derivatives_to_generate,
-        use_aten,
+        ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", return_type, use_aten,
     )
 
     __ksc_path, ksc_runtime_dir = get_ksc_paths()
