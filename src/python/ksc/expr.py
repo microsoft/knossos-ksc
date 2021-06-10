@@ -5,6 +5,7 @@ Expr: lightweight classes implementing the Knossos IR
 from typing import FrozenSet, List, Tuple, Union
 from dataclasses import dataclass
 from ksc.type import Type
+from ksc.utils import paren, KRecord
 
 #####################################################################
 #
@@ -210,46 +211,6 @@ def make_structured_name(se) -> StructuredName:
 
 ########################################################################
 # TLDs.
-
-
-class KRecord:
-    """
-    A smoother namedtuple -- like https://pythonhosted.org/pyrecord but using the existing class syntax.
-    Like a 3.7 dataclass, but don't need to decorate each derived class
-
-    Derive a class from KRecord, declare its fields, and use keyword args in __init__
-
-    def MyClass(KRecord):
-        cost: float
-        names: List[String]
-
-        def __init__(cost, names):
-            super().__init__(cost=cost, names=names)
-
-    And now you have a nice little record class.
-
-    Construct a MyClass:
-        a = MyClass(1.3, ["fred", "conor", "una"])
-
-    Compare two MyClasses
-        if a == b: ...
-    
-    Etc
-    """
-
-    def __init__(self, **args):
-        for (nt, v) in args.items():
-            # assert nt in self.__annotations__  # <- This check will fail for chains of derived classes -- only the deepest has __annotations__ ready yet.
-            setattr(self, nt, v)
-
-    def __eq__(self, that):
-        if type(self) != type(that):
-            return False
-
-        for nt in self.__annotations__:
-            if getattr(self, nt) != getattr(that, nt):
-                return False
-        return True
 
 
 class ASTNode(KRecord):
@@ -738,10 +699,6 @@ def fv_assert(e: Assert):
 @compute_free_vars.register
 def fv_if(e: If):
     return frozenset.union(e.cond.free_vars_, e.t_body.free_vars_, e.f_body.free_vars_)
-
-
-def paren(s):
-    return "(" + s + ")"
 
 
 if __name__ == "__main__":
