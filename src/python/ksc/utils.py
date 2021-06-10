@@ -286,6 +286,34 @@ def encode_name(s: str) -> str:
 derivatives_to_generate_default = ["fwd", "rev"]
 
 
+def __make_cpp_str_from_structured_name(
+    ks_str,
+    structured_name_to_call,
+    python_module_name,
+    return_type,
+    derivatives_to_generate=derivatives_to_generate_default,
+    use_aten=True,
+):
+    base_type = structured_name_to_call.get_type()
+
+    if base_type.is_tuple:
+        arg_types = base_type.children
+    else:
+        arg_types = [base_type]
+
+    name_to_call = structured_name_to_call.mangle_without_type()
+
+    return __make_cpp_str(
+        ks_str,
+        name_to_call,
+        python_module_name,
+        arg_types,
+        return_type,
+        derivatives_to_generate,
+        use_aten,
+    )
+
+
 def __make_cpp_str(
     ks_str,
     name_to_call,
@@ -373,19 +401,13 @@ def generate_and_compile_cpp_from_ks(
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str,
-    name_to_call,
-    arg_types,
-    return_type=None,
-    derivatives_to_generate=[],
-    use_aten=False,
+    ks_str, name_to_call, return_type=None, derivatives_to_generate=[], use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module"""
-    cpp_str = __make_cpp_str(
+    cpp_str = __make_cpp_str_from_structured_name(
         ks_str,
         name_to_call,
         "TORCH_EXTENSION_NAME",
-        arg_types,
         return_type,
         derivatives_to_generate,
         use_aten,
