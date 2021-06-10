@@ -1,7 +1,7 @@
 import pytest
 
 from typing import List
-from ksc.expr import KRecord
+from ksc.utils import KRecord
 
 
 class MyClass(KRecord):
