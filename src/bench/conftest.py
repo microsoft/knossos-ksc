@@ -33,12 +33,12 @@ def modulepath(request):
     return request.config.getoption("--modulepath")
 
 
-
 @dataclass(frozen=True)
 class BenchmarkFunction:
     name: str
     func: Callable
     device: torch.device = field(default=torch.device("cpu"))
+
 
 def function_to_torch_benchmarks(func):
     yield BenchmarkFunction("PyTorch", func)
@@ -53,6 +53,7 @@ def function_to_torch_benchmarks(func):
         yield BenchmarkFunction(
             "PyTorch CUDA", benchmark_without_transfers, torch.device("cuda"),
         )
+
 
 def function_to_manual_cuda_benchmarks(func):
     cuda_device = torch.device("cuda")
@@ -73,12 +74,11 @@ def function_to_manual_cuda_benchmarks(func):
         torch.cuda.synchronize()
         return ret
 
-    yield BenchmarkFunction(
-        "Manual CUDA (with transfer)", benchmark_with_transfers
-    )
+    yield BenchmarkFunction("Manual CUDA (with transfer)", benchmark_with_transfers)
     yield BenchmarkFunction(
         "Manual CUDA", benchmark_without_transfers, cuda_device,
     )
+
 
 def functions_to_benchmark(mod, benchmark_name, example_inputs):
     for fn in inspect.getmembers(
