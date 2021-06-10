@@ -1,13 +1,14 @@
 # set up for global PyTest
+from dataclasses import dataclass, field
 import pytest
 import importlib
 import inspect
 import torch
 import os
-import sys
 from pathlib import Path
 from collections import namedtuple
 from contextlib import contextmanager
+from typing import Callable
 
 from ksc.torch_frontend import ts2mod
 from ksc import utils
@@ -32,14 +33,54 @@ def modulepath(request):
     return request.config.getoption("--modulepath")
 
 
-class BenchmarkFunction(object):
-    def __init__(self, name: str, func, use_device=None):
-        self.name = name
-        self.func = func
-        self.use_device = use_device
 
+@dataclass(frozen=True)
+class BenchmarkFunction:
+    name: str
+    func: Callable
+    device: torch.device = field(default=torch.device("cpu"))
 
-def functions_to_benchmark(mod, benchmark_name, example_input):
+def function_to_torch_benchmarks(func):
+    yield BenchmarkFunction("PyTorch", func)
+
+    if torch.cuda.is_available():
+
+        def benchmark_without_transfers(x: torch.Tensor):
+            ret = func(x)
+            torch.cuda.synchronize()
+            return ret
+
+        yield BenchmarkFunction(
+            "PyTorch CUDA", benchmark_without_transfers, torch.device("cuda"),
+        )
+
+def function_to_manual_cuda_benchmarks(func):
+    cuda_device = torch.device("cuda")
+    cpu_device = torch.device("cpu")
+    func_minimal = func()
+    # Note we're assuming this has been implemented as a module hence .to(), may need to generalise later
+    # https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=#torch.nn.Module.to
+    func_minimal.to(cuda_device)
+
+    def benchmark_with_transfers(x: torch.Tensor):
+        ondevice = x.to(cuda_device)
+        ret = func_minimal(ondevice)
+        torch.cuda.synchronize()
+        return ret.to(cpu_device)
+
+    def benchmark_without_transfers(x: torch.Tensor):
+        ret = func_minimal(x)
+        torch.cuda.synchronize()
+        return ret
+
+    yield BenchmarkFunction(
+        "Manual CUDA (with transfer)", benchmark_with_transfers
+    )
+    yield BenchmarkFunction(
+        "Manual CUDA", benchmark_without_transfers, cuda_device,
+    )
+
+def functions_to_benchmark(mod, benchmark_name, example_inputs):
     for fn in inspect.getmembers(
         mod, lambda m: inspect.isfunction(m) and m.__name__.startswith(benchmark_name)
     ):
@@ -47,49 +88,15 @@ def functions_to_benchmark(mod, benchmark_name, example_input):
         if fn_name == benchmark_name + "_bench_configs":
             continue
         elif fn_name == benchmark_name + "_pytorch":
-            yield BenchmarkFunction("PyTorch", fn_obj)
-
-            if torch.cuda.is_available():
-
-                def benchmark_without_transfers(x: torch.Tensor):
-                    ret = fn_obj(x)
-                    torch.cuda.synchronize()
-                    return ret
-
-                yield BenchmarkFunction(
-                    "PyTorch CUDA", benchmark_without_transfers, use_device=cuda_device,
-                )
+            yield from function_to_torch_benchmarks(fn_obj)
 
         elif fn_name == benchmark_name + "_pytorch_nice":
             yield BenchmarkFunction("PyTorch Nice", fn_obj)
         elif fn_name == benchmark_name:
-            yield BenchmarkFunction("Knossos", ts2mod(fn_obj, example_input).apply)
+            yield BenchmarkFunction("Knossos", ts2mod(fn_obj, example_inputs).apply)
         elif fn_name == benchmark_name + "_cuda_init":
             if torch.cuda.is_available():
-                cuda_device = torch.device("cuda")
-                cpu_device = torch.device("cpu")
-                func_minimal = fn_obj()
-                # Note we're assuming this has been implemented as a module hence .to(), may need to generalise later
-                # https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=#torch.nn.Module.to
-                func_minimal.to(cuda_device)
-
-                def benchmark_with_transfers(x: torch.Tensor):
-                    ondevice = x.to(cuda_device)
-                    ret = func_minimal(ondevice)
-                    torch.cuda.synchronize()
-                    return ret.to(cpu_device)
-
-                def benchmark_without_transfers(x: torch.Tensor):
-                    ret = func_minimal(x)
-                    torch.cuda.synchronize()
-                    return ret
-
-                yield BenchmarkFunction(
-                    "Manual CUDA (with transfer)", benchmark_with_transfers
-                )
-                yield BenchmarkFunction(
-                    "Manual CUDA", benchmark_without_transfers, use_device=cuda_device,
-                )
+                yield from function_to_manual_cuda_benchmarks(fn_obj)
         else:
             # perhaps we should just allow anything that matches the pattern?
             # would make it easier to add arbitrary comparisons e.g. TF

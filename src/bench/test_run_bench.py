@@ -5,8 +5,8 @@ cpu_device = torch.device("cpu")
 
 
 def apply_device_to_config(func, config):
-    if func.use_device != None:
-        return config.to(func.use_device)
+    if func.device != torch.device("cpu"):
+        return config.to(func.device)
     else:
         return config
 
