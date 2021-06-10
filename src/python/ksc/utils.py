@@ -314,12 +314,12 @@ def __make_cpp_str(
         """
 
     args_str = mangleTypes(arg_types)
-    name_str = encode_name(f"{name_to_call}@{args_str}")
-    declarations = m_def("entry", name_str)
+    declarations = m_def("entry", encode_name(f"{name_to_call}@{args_str}"))
 
     for der in derivatives_to_generate:
-        name_str = encode_name(f"{der}${name_to_call}@{args_str}")
-        declarations += m_def(f"{der}_entry", name_str)
+        declarations += m_def(
+            f"{der}_entry", encode_name(f"{der}${name_to_call}@{args_str}")
+        )
 
     cpp_str += (
         """
