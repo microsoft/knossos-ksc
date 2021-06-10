@@ -308,17 +308,18 @@ def __make_cpp_str(
 
     """
 
+    def m_def(python_name, cpp_name):
+        return f"""
+        m.def("{python_name}", with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
+        """
+
     args_str = mangleTypes(arg_types)
     name_str = encode_name(f"{name_to_call}@{args_str}")
-    declarations = f"""
-    m.def("entry", with_ks_allocator("{name_str}", &ks::{name_str}));
-    """
+    declarations = m_def("entry", name_str)
 
     for der in derivatives_to_generate:
         name_str = encode_name(f"{der}${name_to_call}@{args_str}")
-        declarations += f"""
-        m.def("{der}_entry", with_ks_allocator("{name_str}", &ks::{name_str}));
-        """
+        declarations += m_def(f"{der}_entry", name_str)
 
     cpp_str += (
         """
