@@ -37,10 +37,9 @@ def test_StructuredName_manglers():
     )
 
     assert parse("[rev foo]").mangled() == "rev$foo"
-    assert parse("[foo (Tuple Float Float)]").mangled() == "foo@<ff>"
-    assert (
-        parse("[rev [fwd [foo (Tuple Float Float)]]]").mangled() == "rev$fwd$foo@<ff>"
-    )
+    assert parse("[foo (Tuple Float Float)]").mangled() == "foo@ff"
+    assert parse("[foo (Tuple (Tuple Float Float) Float)]").mangled() == "foo@<ff>f"
+    assert parse("[rev [fwd [foo (Tuple Float Float)]]]").mangled() == "rev$fwd$foo@ff"
 
 
 def test_free_vars():
