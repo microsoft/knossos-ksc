@@ -4,15 +4,8 @@ import torch
 cpu_device = torch.device("cpu")
 
 
-def apply_device_to_config(func, config):
-    if func.use_device != None:
-        return config.to(func.use_device)
-    else:
-        return config
-
-
 def test_inference(benchmark, reference_func, func, config):
-    config_on_func_device = apply_device_to_config(func, config)
+    config_on_func_device = func.to_device(config)
     result = benchmark(func.func, config_on_func_device).to(cpu_device)
     reference_result = reference_func(config)
     # TODO: generalise correctness test as examples require more than single tensor
@@ -23,7 +16,7 @@ def test_inference(benchmark, reference_func, func, config):
 
 def test_forward(benchmark, reference_func, func, config):
     config.requires_grad = True
-    config_on_func_device = apply_device_to_config(func, config)
+    config_on_func_device = func.to_device(config)
     result = benchmark(func.func, config_on_func_device).to(cpu_device)
     reference_result = reference_func(config)
     # TODO: generalise correctness test as examples require more than single tensor
@@ -34,7 +27,7 @@ def test_forward(benchmark, reference_func, func, config):
 
 def test_backwards(benchmark, reference_func, func, config):
     config.requires_grad = True
-    config_on_func_device = apply_device_to_config(func, config)
+    config_on_func_device = func.to_device(config)
 
     def create_fresh_args():
         loss = func.func(config_on_func_device).sum()
