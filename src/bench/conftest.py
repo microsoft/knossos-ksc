@@ -64,19 +64,19 @@ def function_to_torch_benchmarks(func):
 def function_to_manual_cuda_benchmarks(func):
     cuda_device = torch.device("cuda")
     cpu_device = torch.device("cpu")
-    module = func()
+    torch_module = func()
     # Note we're assuming this has been implemented as a module hence .to(), may need to generalise later
     # https://pytorch.org/docs/stable/generated/torch.nn.Module.html?highlight=#torch.nn.Module.to
-    module.to(cuda_device)
+    torch_module.to(cuda_device)
 
     def benchmark_with_transfers(x: torch.Tensor):
         ondevice = x.to(cuda_device)
-        ret = module(ondevice)
+        ret = torch_module(ondevice)
         torch.cuda.synchronize()
         return ret.to(cpu_device)
 
     def benchmark_without_transfers(x: torch.Tensor):
-        ret = module(x)
+        ret = torch_module(x)
         torch.cuda.synchronize()
         return ret
 
