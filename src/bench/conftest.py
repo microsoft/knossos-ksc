@@ -39,6 +39,12 @@ class BenchmarkFunction:
     func: Callable
     device: torch.device = field(default=torch.device("cpu"))
 
+    def to_device(self, input: torch.Tensor):
+        if self.device != torch.device("cpu"):
+            return input.to(self.device)
+        else:
+            return input
+
 
 def function_to_torch_benchmarks(func):
     yield BenchmarkFunction("PyTorch", func)
