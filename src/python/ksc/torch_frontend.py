@@ -531,6 +531,12 @@ def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
     return make_KscAutogradFunction(mod, generate_lm)
 
 
+def ksc_string_to_autograd_function(ks_str, entry_sn, generate_lm):
+    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
+    mod = ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate)
+    return make_KscAutogradFunction(mod, generate_lm)
+
+
 import inspect
 
 
