@@ -3,6 +3,10 @@ from torch import nn
 import os
 from ksc.torch_utils import elementwise_apply_hack
 from collections import OrderedDict
+import ksc.expr as expr
+from ksc.type import Type
+from ksc.torch_frontend import ksc_string_to_autograd_function
+
 
 # BEGINDOC
 def relu3(x: float) -> float:
@@ -24,6 +28,63 @@ def relu3(x: float) -> float:
 # run-bench: Knossos implementation
 def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
+
+
+def vrelu3_ks_embedded_checkpointed_map():
+    return ksc_string_to_autograd_function(
+        """(def relu3 Float (x : Float)
+             (if (lt x 0.0)
+                 0.0
+             (if (lt x 1.0)
+                 (div (mul x (mul x x)) 3.0)
+             (sub x (div 2.0 3.0)))))
+
+           (gdef suffwdpass [relu3 Float])
+           (gdef sufrevpass [relu3 Float])
+           (gdef sufrev [relu3 Float])
+
+           (def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float)
+                (map (lam (ti : Float) (relu3 ti)) t))
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
+                (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        generate_lm=False,
+    )
+
+
+def vrelu3_ks_embedded_checkpointed_map_handwritten_relu3():
+    return ksc_string_to_autograd_function(
+        """(def relu3 Float (x : Float)
+             (if (lt x 0.0)
+                 0.0
+             (if (lt x 1.0)
+                 (div (mul x (mul x x)) 3.0)
+             (sub x (div 2.0 3.0)))))
+
+           (def [sufrev [relu3 Float]] Float ((x : Float) (ddr : Float))
+               (if (lt x 0.0)
+                   0.0
+               (if (lt x 1.0)
+                   (mul x (mul x ddr))
+               ddr)))
+
+           (def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float)
+                (map (lam (ti : Float) (relu3 ti)) t))
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
+                (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        generate_lm=False,
+    )
 
 
 # run-bench: PyTorch reference implementation
