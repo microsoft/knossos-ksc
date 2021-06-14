@@ -288,7 +288,7 @@ derivatives_to_generate_default = ["fwd", "rev"]
 
 
 def __make_cpp_str_from_structured_name(
-    ks_str, declarations_to_generate, python_module_name, return_type, use_aten=True,
+    ks_str, declarations_to_generate, python_module_name, use_aten=True,
 ):
     def mangled_with_type(structured_name):
         if not structured_name.has_type():
@@ -303,7 +303,7 @@ def __make_cpp_str_from_structured_name(
     ]
 
     return __make_cpp_str_backend(
-        ks_str, declarations_to_generate, python_module_name, return_type, use_aten,
+        ks_str, declarations_to_generate, python_module_name, use_aten,
     )
 
 
@@ -317,7 +317,6 @@ def __make_cpp_str(
     name_to_call,
     python_module_name,
     arg_types,
-    return_type,
     derivatives_to_generate=derivatives_to_generate_default,
     use_aten=True,
 ):
@@ -330,12 +329,12 @@ def __make_cpp_str(
     ]
 
     return __make_cpp_str_backend(
-        ks_str, declarations_to_generate, python_module_name, return_type, use_aten
+        ks_str, declarations_to_generate, python_module_name, use_aten
     )
 
 
 def __make_cpp_str_backend(
-    ks_str, declarations_to_generate, python_module_name, return_type, use_aten
+    ks_str, declarations_to_generate, python_module_name, use_aten
 ):
     generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
 
@@ -378,12 +377,7 @@ PYBIND11_MODULE("""
 
 
 def generate_and_compile_cpp_from_ks(
-    ks_str,
-    name_to_call,
-    arg_types,
-    return_type=None,
-    derivatives_to_generate=[],
-    use_aten=False,
+    ks_str, name_to_call, arg_types, derivatives_to_generate=[], use_aten=False,
 ):
 
     cpp_str = __make_cpp_str(
@@ -391,7 +385,6 @@ def generate_and_compile_cpp_from_ks(
         name_to_call,
         "PYTHON_MODULE_NAME",
         arg_types,
-        return_type,
         derivatives_to_generate,
         use_aten,
     )
@@ -408,7 +401,7 @@ def generate_and_compile_cpp_from_ks(
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, declarations_to_generate, return_type=None, use_aten=False,
+    ks_str, declarations_to_generate, use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -423,7 +416,7 @@ def build_module_using_pytorch_from_ks(
       Each StructuredName must have a type attached
     """
     cpp_str = __make_cpp_str_from_structured_name(
-        ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", return_type, use_aten,
+        ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", use_aten,
     )
 
     __ksc_path, ksc_runtime_dir = get_ksc_paths()
