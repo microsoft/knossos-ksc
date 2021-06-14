@@ -510,7 +510,6 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
             ]
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
-    arg_types = [arg.type_ for arg in entry_def.args]
 
     declarations_to_generate = [("entry", entry_def.name)] + [
         (f"{der}_entry", StructuredName((der, entry_def.name)))
