@@ -410,7 +410,18 @@ def generate_and_compile_cpp_from_ks(
 def build_module_using_pytorch_from_ks(
     ks_str, declarations_to_generate, return_type=None, use_aten=False,
 ):
-    """Uses PyTorch C++ extension mechanism to build and load a module"""
+    """Uses PyTorch C++ extension mechanism to build and load a module
+
+    * ksc_str: str
+
+      The text of a ksc source file
+
+    * declarations_to_generate : Iterable[Tuple[str, StructuredName]]
+
+      The StructuredName is the ksc function to expose to Python.  The
+      str is the Python name given to that function when exposed.
+      Each StructuredName must have a type attached
+    """
     cpp_str = __make_cpp_str_from_structured_name(
         ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", return_type, use_aten,
     )
