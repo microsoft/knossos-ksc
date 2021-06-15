@@ -436,6 +436,7 @@ def logging(py_mod, flag=True):
 
 
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
+# See https://pytorch.org/docs/stable/notes/extending.html
 def forward_template(py_mod, ctx, *args):
     py_mod.reset_allocator()
     ks_args = (torch_to_ks(py_mod, x) for x in args)
