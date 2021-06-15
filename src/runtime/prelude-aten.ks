@@ -615,3 +615,7 @@
 (gdef suffwdpass [aten::add (Tuple (Tensor 2 Float) (Tensor 2 Float) Integer)])
 (gdef sufrevpass [aten::add (Tuple (Tensor 2 Float) (Tensor 2 Float) Integer)])
 (gdef sufrev [aten::add (Tuple (Tensor 2 Float) (Tensor 2 Float) Integer)])
+
+(def [aten::erf Float] Float (x : Float) (erf x))
+(def [suffwdpass [aten::erf Float]] (Tuple Float Float) (x : Float) ([suffwdpass erf] x))
+(def [sufrevpass [aten::erf Float]] Float (t : Tuple Float Float) ([sufrevpass [erf Float]] t))

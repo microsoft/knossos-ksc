@@ -1,4 +1,7 @@
 from math import sqrt, tanh, erf, exp
+import torch
+
+from ksc.torch_utils import elementwise_apply_hack
 
 
 def sigmoid(x):
@@ -21,3 +24,16 @@ def gelu_approx_tanh(x: float) -> float:
     C = 0.035677408136300125  # 0.044715 * sqrt(2.0 / M_PI)
 
     return 0.5 * (1 + tanh(x * (C * x * x + B))) * x
+
+
+def vgelu(x: torch.Tensor):
+    return elementwise_apply_hack("gelu", x)
+
+
+def vgelu_pytorch(x: torch.Tensor):
+    return 0.5 * x * (1 + torch.erf(x / sqrt(2)))
+
+
+def vgelu_bench_configs():
+    yield torch.randn((4,))
+    yield torch.randn((16,))
