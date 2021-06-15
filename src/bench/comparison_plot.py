@@ -7,6 +7,7 @@ import dateutil.parser
 import datetime
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from shutil import copyfile
 
 storage = pytest_benchmark.utils.load_storage(".benchmarks", logger=None, netrc=None)
 
@@ -67,3 +68,5 @@ for (test, group_name), (figure, axis) in figures.items():
     figure.savefig(
         f"build/sqrl_{test}_{group_name}.svg".replace(" ", "_"), bbox_inches="tight"
     )
+
+copyfile("src/bench/sqrl.html", "build/sqrl.html")
