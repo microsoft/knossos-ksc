@@ -502,11 +502,11 @@ class SubstPattern(ExprTransformer):
         )
 
 
-def parse_rule_str(ks_str, symtab, **kwargs):
+def parse_rule_str(ks_str, symtab, matcher_cls=ParsedRuleMatcher, /, **kwargs):
     r = single_elem(list(parse_ks_file(ks_str)))
     assert isinstance(r, Rule)
     type_propagate(r, symtab)
-    return ParsedRuleMatcher(r, **kwargs)
+    return matcher_cls(r, **kwargs)
 
 
 def parse_rules_from_file(filename):
