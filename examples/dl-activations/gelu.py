@@ -7,7 +7,7 @@ def sigmoid(x):
 
 # Gelu and activations
 def gelu(x: float) -> float:
-    return 0.5 * x * (1 + erf(x / sqrt(2)))
+    return 0.5 * x * (1.0 + erf(x / sqrt(2)))
 
 
 def gelu_approx_sigmoid(x: float) -> float:
