@@ -79,14 +79,16 @@ for test in ("test_forward", "test_backwards", "test_inference"):
         )
 
 for figure_lookup, figure_bundle in figures.items():
-    handles, labels = axis.get_legend_handles_labels()
+    handles, labels = figure_bundle.axis.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    axis.legend(by_label.values(), by_label.keys())
+    figure_bundle.axis.legend(by_label.values(), by_label.keys())
+
+    figure_bundle.axis.set_ylim(bottom=0.0)
 
     filename = f"build/sqrl_{figure_lookup.method}_{figure_lookup.configuration}.svg".replace(
         " ", "_"
     )
-    print(f"saving {filename}")
+    # print(f"saving {filename}")
 
     figure_bundle.figure.savefig(filename, bbox_inches="tight")
 
