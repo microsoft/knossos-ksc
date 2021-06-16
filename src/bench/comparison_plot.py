@@ -6,6 +6,7 @@ import pytest_benchmark.utils
 import dateutil.parser
 import datetime
 from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from shutil import copyfile
@@ -17,7 +18,7 @@ storage = pytest_benchmark.utils.load_storage(".benchmarks", logger=None, netrc=
 @dataclass(frozen=True)
 class FigureBundle:
     figure: Figure
-    axis: any
+    axes: Axes
 
 
 @dataclass(frozen=True)
@@ -55,12 +56,12 @@ def labelkey(name):
 
 def make_figure():
     figure = plt.figure()
-    axis = figure.add_subplot(111)
+    axes = figure.add_subplot(111)
 
-    axis.tick_params(axis="x", rotation=50)
-    axis.set_xlabel("Commit time")
-    axis.set_ylabel("median (microseconds)")
-    return FigureBundle(figure=figure, axis=axis)
+    axes.tick_params(axis="x", rotation=50)
+    axes.set_xlabel("Commit time")
+    axes.set_ylabel("median (microseconds)")
+    return FigureBundle(figure=figure, axes=axes)
 
 
 figures = defaultdict(make_figure)
@@ -69,21 +70,21 @@ for test in ("test_forward", "test_backwards", "test_inference"):
     for time, benchmark in groupedbenchmarks[test]:
         group_name = benchmark["group"]
 
-        axis = figures[FigureLookup(method=test, configuration=group_name)].axis
+        axes = figures[FigureLookup(method=test, configuration=group_name)].axes
         method = benchmark["name"].split("-")[1]  # TODO: harden, use extra_info?
 
         # TODO: generalise to more than sqrl
-        axis.set_title(f"sqrl {test} {group_name}")
-        axis.plot(
+        axes.set_title(f"sqrl {test} {group_name}")
+        axes.plot(
             time, (benchmark["stats"]["median"] * 1000), labelkey(method), label=method
         )
 
 for figure_lookup, figure_bundle in figures.items():
-    handles, labels = figure_bundle.axis.get_legend_handles_labels()
+    handles, labels = figure_bundle.axes.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    figure_bundle.axis.legend(by_label.values(), by_label.keys())
+    figure_bundle.axes.legend(by_label.values(), by_label.keys())
 
-    figure_bundle.axis.set_ylim(bottom=0.0)
+    figure_bundle.axes.set_ylim(bottom=0.0)
 
     filename = f"build/sqrl_{figure_lookup.method}_{figure_lookup.configuration}.svg".replace(
         " ", "_"
