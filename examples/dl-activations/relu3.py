@@ -87,6 +87,42 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     )
 
 
+def vrelu3_embedded_ks_upper_bound_via_map():
+    return ksc_string_to_autograd_function(
+        """(def relu3 Float (x : Float) 0.0)
+
+           (def [sufrev [relu3 Float]] Float ((x : Float) (ddr : Float)) ddr)
+
+           (def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float)
+                (map (lam (ti : Float) (relu3 ti)) t))
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
+                (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        generate_lm=False,
+    )
+
+
+def vrelu3_embedded_ks_upper_bound():
+    return ksc_string_to_autograd_function(
+        """; These are not correct but they are as fast as a Knossos
+           ; implementation could possibly be.
+           (def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float) t)
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                dret)
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        generate_lm=False,
+    )
+
+
 # run-bench: PyTorch reference implementation
 def vrelu3_pytorch(x: torch.Tensor):
     mask1_inf = x > 1.0
@@ -147,8 +183,7 @@ def vrelu3_cuda_init():
 
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
-    yield torch.randn((4,))
-    yield torch.randn((16,))
+    yield torch.randn((255 * 255,))
 
 
 # yield torch.randn((256,256)) too slow to bench...
