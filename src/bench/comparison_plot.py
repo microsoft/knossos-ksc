@@ -17,7 +17,7 @@ storage = pytest_benchmark.utils.load_storage(".benchmarks", logger=None, netrc=
 @dataclass(frozen=True)
 class FigureBundle:
     figure: Figure
-    axis: plt.axes
+    axis: any
 
 
 @dataclass(frozen=True)
@@ -33,10 +33,10 @@ for path, content in storage.load():
     for benchmark in content["benchmarks"]:
 
         # Before this date, everything was sqrl
-        # TODO: migrate the store
+        # TODO: migrate the store so we don't need to do data checks
         # TODO: generalise to more than sqrl
         if time.date() < datetime.date(2021, 6, 1) or "sqrl" in benchmark["name"]:
-            testname = benchmark["name"].split("[")[0]
+            testname = benchmark["name"].split("[")[0]  # TODO: harden, use extra_info?
             groupedbenchmarks[testname].append((time, benchmark))
         else:
             print("Found non-sqrl benchmark, tools need extending")
