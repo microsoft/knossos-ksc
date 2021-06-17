@@ -42,5 +42,5 @@ jobs:
 
     - name: Tiny bit of type-checking with mypy
       run: |
-        mypy src/python/ksc/torch_frontend.py
+        mypy --follow-imports=skip src/python/ksc/torch_frontend.py
       
