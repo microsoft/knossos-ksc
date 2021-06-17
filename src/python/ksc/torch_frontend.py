@@ -26,6 +26,8 @@ from prettyprinter import cpprint, pformat
 # Needed this in order to see the error messages when pprint fails
 import warnings
 
+import typing
+
 warnings.filterwarnings("always")
 
 # Background reading
@@ -311,7 +313,7 @@ def make_if(make_binds, node):
 
 def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
     def translate_node(make_binds, node) -> Tuple[Var, Expr]:
-        lookups = {
+        lookups: typing.Dict[str, Callable] = {
             "prim::Constant": make_constant,
             "prim::ListConstruct": make_list,
             "prim::TupleConstruct": make_tuple,
