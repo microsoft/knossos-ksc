@@ -40,7 +40,9 @@ for path, content in storage.load():
             testname = benchmark["name"].split("[")[0]  # TODO: harden, use extra_info?
             groupedbenchmarks[testname].append((time, benchmark))
         else:
-            print("Found non-sqrl benchmark, tools need extending")
+            print(
+                "Found non-sqrl benchmark, tools need extending https://msrcambridge.visualstudio.com/Knossos/_workitems/edit/19590"
+            )
             print(benchmark["name"])
 
 
