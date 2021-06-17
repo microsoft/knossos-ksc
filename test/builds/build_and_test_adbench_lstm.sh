@@ -10,4 +10,4 @@ CPP_FILE=$KNOSSOS/test/ksc/adbench-lstmpy.cpp
 build_pybind11_module $KNOSSOS $PYBIND11 $MODULE_NAME $CPP_FILE
 
 KSCPY=$KNOSSOS/src/python
-PYTHONPATH=$OBJ:$KSCPY python3 -m ksc.adbench_lstm.test
+PYTHONPATH=$OBJ:$KSCPY python3 -m ksc.adbench_lstm.ltsm_test
