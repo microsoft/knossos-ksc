@@ -6,7 +6,7 @@ from collections import OrderedDict
 import ksc.expr as expr
 from ksc.type import Type
 from ksc.torch_frontend import ksc_string_to_autograd_function
-
+from torch._vmap_internals import vmap
 
 # BEGINDOC
 def relu3(x: float) -> float:
@@ -107,7 +107,7 @@ def relu3_pytorch_nice(x: float) -> float:
         return x - 2 / 3
 
 
-vrelu3_pytorch_nice = torch.vmap(relu3_pytorch_nice)
+vrelu3_pytorch_nice = vmap(relu3_pytorch_nice)
 
 
 def vrelu3_cuda_init():
