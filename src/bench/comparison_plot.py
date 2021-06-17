@@ -46,14 +46,10 @@ for path, content in storage.load():
             print(benchmark["name"])
 
 
-def labelkey(name):
-    if "Knossos" in name:
-        return "rx"
-    if "PyTorch Nice" in name:
-        return "yo"
-    if "PyTorch" in name:
-        return "bo"
-    return "go"
+labelkey = defaultdict(lambda: "go")
+labelkey["Knossos"] = "rx"
+labelkey["PyTorch Nice"] = "yo"
+labelkey["PyTorch"] = "bo"
 
 
 def make_figure():
@@ -78,7 +74,7 @@ for test in ("test_forward", "test_backwards", "test_inference"):
         # TODO: generalise to more than sqrl
         axes.set_title(f"sqrl {test} {group_name}")
         axes.plot(
-            time, (benchmark["stats"]["median"] * 1000), labelkey(method), label=method
+            time, (benchmark["stats"]["median"] * 1000), labelkey[method], label=method
         )
 
 for figure_lookup, figure_bundle in figures.items():
