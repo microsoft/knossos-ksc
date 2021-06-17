@@ -39,4 +39,8 @@ jobs:
       # current releleased version of Black doesn't have extend-exclude, so add pybind11 and mlir to default extend until released 
       run: |
         black . --check
+
+    - name: Tiny bit of type-checking with mypy
+      run: |
+        mypy src/python/ksc/torch_frontend.py
       
