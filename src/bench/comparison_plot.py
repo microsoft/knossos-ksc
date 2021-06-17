@@ -58,7 +58,7 @@ def make_figure():
 
     axes.tick_params(axis="x", rotation=50)
     axes.set_xlabel("Commit time")
-    axes.set_ylabel("median (microseconds)")
+    axes.set_ylabel("median (milliseconds)")
     return FigureBundle(figure=figure, axes=axes)
 
 
