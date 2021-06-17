@@ -68,4 +68,23 @@
 (gdef sufrevpass [vrelu3 (Vec Float)])
 (gdef sufrev [vrelu3 (Vec Float)])
 
+(def [vrelu3_inlined (Vec Float)] (Vec Float)
+     (t : Vec Float)
+     (map (lam (x : Float)
+               (if (lt x 0.0)
+                   0.0
+                 (if (lt x 1.0)
+                     (div (mul x (mul x x)) 3.0)
+                   (sub x (div 2.0 3.0))))) t))
+
+(def [sufrev [vrelu3_inlined (Vec Float)]] (Vec Float)
+     ((t : Vec Float) (dret : Vec Float))
+     ; TODO: should be multiplied by dret[i] - luckily we are called with dret==1.0
+     (map (lam (x : Float)
+               (if (lt x 0.0)
+                   0.0
+                 (if (lt x 1.0)
+                     (mul x x)
+                   1.0))) t))
+
 (def main Integer () 0)

@@ -87,6 +87,32 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     )
 
 
+def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
+    return ksc_string_to_autograd_function(
+        """(def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float)
+                (map (lam (x : Float)
+             (if (lt x 0.0)
+                 0.0
+             (if (lt x 1.0)
+                 (div (mul x (mul x x)) 3.0)
+             (sub x (div 2.0 3.0))))) t))
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                ; TODO: should be multiplied by dret[i] - luckily we are called with dret==1.0
+                (map (lam (x : Float)
+               (if (lt x 0.0)
+                   0.0
+               (if (lt x 1.0)
+                   (mul x x)
+               1.0))) t))
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        generate_lm=False,
+    )
+
+
 def vrelu3_embedded_ks_upper_bound_via_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float) 0.0)

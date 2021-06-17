@@ -1422,7 +1422,7 @@ namespace ks {
 
 			ddsdata[i] = f_call_dds;
 			// TODO: can we do an inplace add?
-			ddenv = ts_add(alloc, ddenv, f_call_ddenv);
+			//ddenv = ts_add(alloc, ddenv, f_call_ddenv);
 		}
 
 		return make_tuple(dds, ddenv);
