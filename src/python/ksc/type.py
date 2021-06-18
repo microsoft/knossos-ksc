@@ -1,8 +1,18 @@
 import numpy as np
+from typing import Union
 
 
 class KSTypeError(RuntimeError):
     pass
+
+
+# TODO: move to util if we go ahead with this
+class classproperty(object):
+    def __init__(self, getter):
+        self.getter = getter
+
+    def __get__(self, _, owner):
+        return self.getter(owner)
 
 
 class Type:
@@ -46,6 +56,26 @@ class Type:
 
     ################
     ## Constructors
+
+    @classproperty
+    def String(cls) -> "Type":
+        return Type("String")
+
+    @classproperty
+    def Float(cls) -> "Type":
+        return Type("Float")
+
+    @classproperty
+    def Integer(cls) -> "Type":
+        return Type("Integer")
+
+    @classproperty
+    def Bool(cls) -> "Type":
+        return Type("Bool")
+
+    @classproperty
+    def Any(cls) -> "Type":
+        return Type("Any")
 
     @staticmethod
     def Tensor(rank, elem_type):
@@ -289,14 +319,6 @@ def make_tuple_if_many(types):
         return types
 
 
-Type.String = Type("String")
-Type.Integer = Type("Integer")
-Type.Float = Type("Float")
-Type.Bool = Type("Bool")
-Type.String = Type("String")
-Type.Any = Type("Any")
-
-
 class SizeType:
     @staticmethod
     def from_rank(n: int) -> Type:
@@ -306,7 +328,7 @@ class SizeType:
             return Type.Tuple(*tuple(Type.Integer for _ in range(n)))
 
     @staticmethod
-    def get_rank(ty: Type) -> int:
+    def get_rank(ty: Type) -> Union[int, None]:
         if ty == Type.Integer:
             return 1
         if ty.is_tuple and all(ty == Type.Integer for ty in ty.tuple_elems()):
