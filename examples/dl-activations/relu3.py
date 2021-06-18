@@ -108,7 +108,8 @@ def relu3_pytorch_nice(x: float) -> float:
 
 
 # With torch 1.9.0 this leads to
-#
+# RuntimeError: Batching rule not implemented for aten::is_nonzero. We could not generate a fallback.
+# See https://msrcambridge.visualstudio.com/Knossos/_backlogs/backlog/Knossos%20Team/Goals/?workitem=19587
 # vrelu3_pytorch_nice = vmap(relu3_pytorch_nice)
 
 
