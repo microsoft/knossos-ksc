@@ -107,7 +107,9 @@ def relu3_pytorch_nice(x: float) -> float:
         return x - 2 / 3
 
 
-vrelu3_pytorch_nice = vmap(relu3_pytorch_nice)
+# With torch 1.9.0 this leads to
+#
+# vrelu3_pytorch_nice = vmap(relu3_pytorch_nice)
 
 
 def vrelu3_cuda_init():
