@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union
+from typing import Optional
 
 
 class KSTypeError(RuntimeError):
@@ -328,7 +328,7 @@ class SizeType:
             return Type.Tuple(*tuple(Type.Integer for _ in range(n)))
 
     @staticmethod
-    def get_rank(ty: Type) -> Union[int, None]:
+    def get_rank(ty: Type) -> Optional[int]:
         if ty == Type.Integer:
             return 1
         if ty.is_tuple and all(ty == Type.Integer for ty in ty.tuple_elems()):
