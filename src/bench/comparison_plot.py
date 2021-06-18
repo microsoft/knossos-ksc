@@ -74,7 +74,11 @@ for test in ("test_forward", "test_backwards", "test_inference"):
         # TODO: generalise to more than sqrl
         axes.set_title(f"sqrl {test} {group_name}")
         axes.plot(
-            time, (benchmark["stats"]["median"] * 1000), labelkey[method], label=method
+            time,
+            (benchmark["stats"]["median"] * 1000),
+            labelkey[method],
+            label=method,
+            fillstyle="none",
         )
 
 for figure_lookup, figure_bundle in figures.items():
