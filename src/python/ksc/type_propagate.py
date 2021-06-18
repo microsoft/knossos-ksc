@@ -83,9 +83,7 @@ def _type_propagate_helper(ex: ASTNode, symtab, respect_existing: bool):
 # [rev [fwd f]] : ((S, dS), dT) -> (dS, dS)
 
 
-def infer_fn_type_from_derived_fn_args(
-    sname: StructuredName, argtype: Type
-) -> StructuredName:
+def infer_fn_type_from_derived_fn_args(sname: StructuredName, argtype: Type) -> Type:
     if sname.is_derivation():
         derivation = sname.se[0]
 
