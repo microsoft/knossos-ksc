@@ -298,7 +298,7 @@ def __make_cpp_str_from_structured_name(
         return structured_name.mangled()
 
     declarations_to_generate = [
-        (python_name, mangled_with_type(structured_name))
+        (python_name, encode_name(mangled_with_type(structured_name)))
         for (python_name, structured_name) in declarations_to_generate
     ]
 
@@ -323,8 +323,10 @@ def __make_cpp_str(
     warnings.warn("__make_cpp_str is deprecated", DeprecationWarning)
     args_str = mangleTypes(arg_types)
 
-    declarations_to_generate = [("entry", f"{name_to_call}@{args_str}")] + [
-        (f"{der}_entry", f"{der}${name_to_call}@{args_str}")
+    declarations_to_generate = [
+        ("entry", encode_name(f"{name_to_call}@{args_str}"))
+    ] + [
+        (f"{der}_entry", encode_name(f"{der}${name_to_call}@{args_str}"))
         for der in derivatives_to_generate
     ]
 
@@ -344,8 +346,7 @@ def __make_cpp_str_backend(
 
     """
 
-    def m_def(python_name, mangled_name):
-        cpp_name = encode_name(mangled_name)
+    def m_def(python_name, cpp_name):
         return f"""
         m.def("{python_name}", with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
         """
