@@ -408,7 +408,7 @@ def build_module_using_pytorch_from_ks(
 
     * ks_str: str
 
-      The text of a ksc source file
+      The text of a ks source file
 
     * declarations_to_generate : Iterable[Tuple[str, StructuredName]]
 
