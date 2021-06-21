@@ -87,31 +87,30 @@ def function_to_manual_cuda_benchmarks(func):
 
 
 def functions_to_benchmark(mod, benchmark_name, example_inputs):
-    for fn in inspect.getmembers(
-        mod, lambda m: inspect.isfunction(m) and m.__name__.startswith(benchmark_name)
-    ):
-        fn_name, fn_obj = fn
-        if fn_name == benchmark_name + "_bench_configs":
-            continue
-        elif fn_name == benchmark_name + "_pytorch":
-            yield from function_to_torch_benchmarks(fn_obj)
-
-        elif fn_name == benchmark_name + "_pytorch_nice":
-            yield BenchmarkFunction("PyTorch Nice", fn_obj)
-        elif fn_name == benchmark_name:
-            ks_mod = tsmod2ksmod(mod, benchmark_name, example_inputs, generate_lm=False)
-            yield BenchmarkFunction("Knossos", ks_mod.apply)
-        elif fn_name == benchmark_name + "_cuda_init":
-            if torch.cuda.is_available():
-                yield from function_to_manual_cuda_benchmarks(fn_obj)
-        elif fn_name.startswith(benchmark_name + "_ks_embedded_"):
-            n = len(benchmark_name + "_ks_embedded_")
-            benchmark_display_name = "Knossos embedded " + fn_name[n:]
-            yield BenchmarkFunction(benchmark_display_name, fn_obj().apply)
-        else:
-            # perhaps we should just allow anything that matches the pattern?
-            # would make it easier to add arbitrary comparisons e.g. TF
-            print(f"Ignoring {fn_name}")
+    for fn_name, fn_obj in inspect.getmembers(mod, lambda m: inspect.isfunction(m)):
+        if fn_name.startswith(benchmark_name):
+            if fn_name == benchmark_name + "_bench_configs":
+                continue
+            elif fn_name == benchmark_name + "_pytorch":
+                yield from function_to_torch_benchmarks(fn_obj)
+            elif fn_name == benchmark_name + "_pytorch_nice":
+                yield BenchmarkFunction("PyTorch Nice", fn_obj)
+            elif fn_name == benchmark_name:
+                ks_mod = tsmod2ksmod(
+                    mod, benchmark_name, example_inputs, generate_lm=False
+                )
+                yield BenchmarkFunction("Knossos", ks_mod.apply)
+            elif fn_name == benchmark_name + "_cuda_init":
+                if torch.cuda.is_available():
+                    yield from function_to_manual_cuda_benchmarks(fn_obj)
+            elif fn_name.startswith(benchmark_name + "_ks_embedded_"):
+                n = len(benchmark_name + "_ks_embedded_")
+                benchmark_display_name = "Knossos embedded " + fn_name[n:]
+                yield BenchmarkFunction(benchmark_display_name, fn_obj().apply)
+            else:
+                # perhaps we should just allow anything that matches the pattern?
+                # would make it easier to add arbitrary comparisons e.g. TF
+                print(f"Ignoring {fn_name}")
 
 
 def func_namer(benchmark_func):

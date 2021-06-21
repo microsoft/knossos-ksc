@@ -6,7 +6,7 @@ from collections import OrderedDict
 import ksc.expr as expr
 from ksc.type import Type
 from ksc.torch_frontend import ksc_string_to_autograd_function
-
+import torch._vmap_internals
 
 # BEGINDOC
 def relu3(x: float) -> float:
@@ -107,7 +107,10 @@ def relu3_pytorch_nice(x: float) -> float:
         return x - 2 / 3
 
 
-vrelu3_pytorch_nice = torch.vmap(relu3_pytorch_nice)
+# With torch 1.9.0 this leads to
+# RuntimeError: Batching rule not implemented for aten::is_nonzero. We could not generate a fallback.
+# See https://msrcambridge.visualstudio.com/Knossos/_backlogs/backlog/Knossos%20Team/Goals/?workitem=19587
+# vrelu3_pytorch_nice = torch._vmap_internals.vmap(relu3_pytorch_nice)
 
 
 def vrelu3_cuda_init():

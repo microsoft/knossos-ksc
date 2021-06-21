@@ -7,6 +7,8 @@ import torch
 @torch.jit.ignore
 def elementwise_apply_pt18(f, x: torch.Tensor) -> torch.Tensor:
     # TODO: torch.vmap in 1.9
+    # NOTE: torch.vmap still isn't in stable in PyTorch 1.9, it can be called via internal apis: torch._vmap_internals
+    # https://github.com/pytorch/pytorch/issues/42368
     y = torch.zeros_like(x)
     sz = x.shape
     if len(sz) == 1:
