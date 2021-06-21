@@ -61,13 +61,17 @@ def vrelu3_embedded_ks_checkpointed_map():
     )
 
 
-def vrelu3_embedded_cpp_upper_bound():
+def vrelu3_embedded_cpp_inlined_map():
     return cpp_string_to_autograd_function(
         """
         namespace ks{
         tensor<1, double> vrelu3(ks::allocator * $alloc, tensor<1, double> t) {
-            /* Lam */auto c$0 = [=](ks::allocator * $alloc, double x) {
+            auto tdata = t.data();
+            auto ret = tensor<1, double>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
                 double c$1;
+                double x = tdata[i];
                 if (x < 0.0) {
                     c$1 = 0.0;
                 } else {
@@ -77,14 +81,20 @@ def vrelu3_embedded_cpp_upper_bound():
                         c$1 = x - 2.0 / 3.0;
                     }
                 }
-                return c$1;
-                };
-            return map($alloc, c$0, t);
+                retdata[i] = c$1;
+            }
+            return ret;
         }
 
         tensor<1, double> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, double> t, tensor<1, double> dret) {
-            /* Lam */auto c$0 = [=](ks::allocator * $alloc, double x) {
+            auto tdata = t.data();
+            auto dretdata = dret.data();
+            auto ret = tensor<1, double>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
                 double c$1;
+                double x = tdata[i];
+                double dreti = dretdata[i];
                 if (x < 0.0) {
                     c$1 = 0.0;
                 } else {
@@ -94,9 +104,9 @@ def vrelu3_embedded_cpp_upper_bound():
                         c$1 = 1.0;
                     }
                 }
-                return c$1;
-                };
-            return map($alloc, c$0, t);
+                retdata[i] = c$1 * dreti;
+            }
+            return ret;
         }
         }
         """,
