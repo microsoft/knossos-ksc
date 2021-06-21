@@ -61,7 +61,7 @@ def no_vrelu3_embedded_ks_checkpointed_map():
     )
 
 
-def no_vrelu3_embedded_cpp_inlined_map():
+def vrelu3_embedded_cpp_inlined_map():
     return cpp_string_to_autograd_function(
         """
         namespace ks{
@@ -115,7 +115,7 @@ def no_vrelu3_embedded_cpp_inlined_map():
     )
 
 
-def no_vrelu3_embedded_cpp_inlined_map_no_if():
+def vrelu3_embedded_cpp_inlined_map_no_if():
     return cpp_string_to_autograd_function(
         """
         namespace ks{
