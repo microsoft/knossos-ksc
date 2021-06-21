@@ -302,16 +302,16 @@ def __make_cpp_str_from_structured_name(
         for (python_name, structured_name) in declarations_to_generate
     ]
 
-    return __make_ks_cpp_str_backend(
-        ks_str, declarations_to_generate, python_module_name, use_aten,
+    generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
+
+    return __make_cpp_str_backend(
+        generated_cpp_source, declarations_to_generate, python_module_name, use_aten
     )
 
 
 # Callers of __make_cpp_str should be updated to call
 # __make_cpp_str_from_structured_name instead.  Then __make_cpp_str,
-# mangleType and mangleTypes should be deleted and
-# __make_ks_cpp_str_backend should be inlined into
-# __make_cpp_str_from_structured_name.
+# mangleType and mangleTypes should be deleted.
 def __make_cpp_str(
     ks_str,
     name_to_call,
@@ -328,14 +328,6 @@ def __make_cpp_str(
         for der in derivatives_to_generate
     ]
 
-    return __make_ks_cpp_str_backend(
-        ks_str, declarations_to_generate, python_module_name, use_aten
-    )
-
-
-def __make_ks_cpp_str_backend(
-    ks_str, declarations_to_generate, python_module_name, use_aten
-):
     generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
 
     return __make_cpp_str_backend(
