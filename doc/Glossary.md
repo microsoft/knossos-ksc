@@ -27,7 +27,7 @@ Many functions have a choice of space or time efficient implementations, which m
 
 ### IDTW: If that didn't work
 
-On a list of tasks, links increasingly desparate alternatives.
+On a list of tasks, links increasingly desperate alternatives.
 
 ### General concepts from related work
 
