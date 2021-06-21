@@ -331,7 +331,7 @@ namespace ks {
 
 		void* allocate(size_t size)
 		{
-			KS_ASSERT(size < 1000000);
+			KS_ASSERT(size < 1000000 * 1000);
 			void* ret = buf_ + top_;
 			top_ += padded_size(size);
 			if (top_ > peak_) {
