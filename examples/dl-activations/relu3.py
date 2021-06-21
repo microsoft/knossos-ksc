@@ -5,8 +5,12 @@ from ksc.torch_utils import elementwise_apply_hack
 from collections import OrderedDict
 import ksc.expr as expr
 from ksc.type import Type
-from ksc.torch_frontend import ksc_string_to_autograd_function
+from ksc.torch_frontend import (
+    ksc_string_to_autograd_function,
+    cpp_string_to_autograd_function,
+)
 import torch._vmap_internals
+
 
 # BEGINDOC
 def relu3(x: float) -> float:
@@ -53,6 +57,50 @@ def vrelu3_embedded_ks_checkpointed_map():
                 (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        generate_lm=False,
+    )
+
+
+def vrelu3_embedded_cpp_upper_bound():
+    return cpp_string_to_autograd_function(
+        """
+        namespace ks{
+        tensor<1, double> vrelu3(ks::allocator * $alloc, tensor<1, double> t) {
+            /* Lam */auto c$0 = [=](ks::allocator * $alloc, double x) {
+                double c$1;
+                if (x < 0.0) {
+                    c$1 = 0.0;
+                } else {
+                    if (x < 1.0) {
+                        c$1 = x * x * x / 3.0;
+                    } else {
+                        c$1 = x - 2.0 / 3.0;
+                    }
+                }
+                return c$1;
+                };
+            return map($alloc, c$0, t);
+        }
+
+        tensor<1, double> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, double> t, tensor<1, double> dret) {
+            /* Lam */auto c$0 = [=](ks::allocator * $alloc, double x) {
+                double c$1;
+                if (x < 0.0) {
+                    c$1 = 0.0;
+                } else {
+                    if (x < 1.0) {
+                        c$1 = x * x;
+                    } else {
+                        c$1 = 1.0;
+                    }
+                }
+                return c$1;
+                };
+            return map($alloc, c$0, t);
+        }
+        }
+        """,
+        "vrelu3",
         generate_lm=False,
     )
 
