@@ -406,7 +406,7 @@ def build_module_using_pytorch_from_ks(
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
-    * ksc_str: str
+    * ks_str: str
 
       The text of a ksc source file
 
