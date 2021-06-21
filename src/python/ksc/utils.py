@@ -305,7 +305,7 @@ def __make_cpp_str_from_structured_name(
     generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
 
     return __make_cpp_str_backend(
-        generated_cpp_source, declarations_to_generate, python_module_name, use_aten
+        generated_cpp_source, declarations_to_generate, python_module_name
     )
 
 
@@ -333,12 +333,12 @@ def __make_cpp_str(
     generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
 
     return __make_cpp_str_backend(
-        generated_cpp_source, declarations_to_generate, python_module_name, use_aten
+        generated_cpp_source, declarations_to_generate, python_module_name
     )
 
 
 def __make_cpp_str_backend(
-    generated_cpp_source, declarations_to_generate, python_module_name, use_aten
+    generated_cpp_source, declarations_to_generate, python_module_name
 ):
     cpp_str = f"""
     #include "knossos-pybind.h"
