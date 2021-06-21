@@ -420,6 +420,10 @@ def build_module_using_pytorch_from_ks(
         ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", use_aten,
     )
 
+    return build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten)
+
+
+def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
     __ksc_path, ksc_runtime_dir = get_ksc_paths()
 
     cflags = [
