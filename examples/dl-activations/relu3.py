@@ -115,6 +115,40 @@ def vrelu3_embedded_cpp_inlined_map():
     )
 
 
+def vrelu3_embedded_cpp_inlined_map_no_if():
+    return cpp_string_to_autograd_function(
+        """
+        namespace ks{
+        tensor<1, double> vrelu3(ks::allocator * $alloc, tensor<1, double> t) {
+            auto tdata = t.data();
+            auto ret = tensor<1, double>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                double x = tdata[i];
+                retdata[i] = x * x * x / 3.0;
+            }
+            return ret;
+        }
+
+        tensor<1, double> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, double> t, tensor<1, double> dret) {
+            auto tdata = t.data();
+            auto dretdata = dret.data();
+            auto ret = tensor<1, double>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                double x = tdata[i];
+                double dreti = dretdata[i];
+                retdata[i] = x * x * dreti;
+            }
+            return ret;
+        }
+        }
+        """,
+        "vrelu3",
+        generate_lm=False,
+    )
+
+
 def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
@@ -268,6 +302,7 @@ def vrelu3_cuda_init():
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
     yield torch.randn((255 * 255,))
+    yield torch.randn((16 * 1000 * 1000,))
 
 
 # yield torch.randn((256,256)) too slow to bench...
