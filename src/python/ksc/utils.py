@@ -338,6 +338,14 @@ def __make_ks_cpp_str_backend(
 ):
     generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
 
+    return __make_cpp_str_backend(
+        generated_cpp_source, declarations_to_generate, python_module_name, use_aten
+    )
+
+
+def __make_cpp_str_backend(
+    generated_cpp_source, declarations_to_generate, python_module_name, use_aten
+):
     cpp_str = f"""
     #include "knossos-pybind.h"
     {generated_cpp_source}
