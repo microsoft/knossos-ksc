@@ -423,6 +423,15 @@ def build_module_using_pytorch_from_ks(
     return build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten)
 
 
+def build_module_using_pytorch_from_cpp(
+    cpp_str, declarations_to_generate, use_aten,
+):
+    cpp_str_generated = __make_cpp_str_backend(
+        cpp_str, declarations_to_generate, "TORCH_EXTENSION_NAME"
+    )
+    return build_module_using_pytorch_from_cpp_backend(cpp_str_generated, use_aten)
+
+
 def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
     __ksc_path, ksc_runtime_dir = get_ksc_paths()
 

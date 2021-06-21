@@ -526,6 +526,16 @@ def ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate):
     )
 
 
+def cpp_string_to_module(cpp_str, entry_name, derivatives_to_generate):
+    declarations_to_generate = [("entry", entry_name)] + [
+        (f"{der}_entry", f"{der}_{entry_name}") for der in derivatives_to_generate
+    ]
+
+    return utils.build_module_using_pytorch_from_cpp(
+        cpp_str, declarations_to_generate, use_aten=True,
+    )
+
+
 def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
     mod = ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
@@ -535,6 +545,12 @@ def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
 def ksc_string_to_autograd_function(ks_str, entry_sn, generate_lm):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
     mod = ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate)
+    return make_KscAutogradFunction(mod, generate_lm)
+
+
+def cpp_string_to_autograd_function(cpp_str, entry_name, generate_lm):
+    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
+    mod = cpp_string_to_module(cpp_str, entry_name, derivatives_to_generate)
     return make_KscAutogradFunction(mod, generate_lm)
 
 
