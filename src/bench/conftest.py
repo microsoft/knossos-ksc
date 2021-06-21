@@ -103,9 +103,9 @@ def functions_to_benchmark(mod, benchmark_name, example_inputs):
             elif fn_name == benchmark_name + "_cuda_init":
                 if torch.cuda.is_available():
                     yield from function_to_manual_cuda_benchmarks(fn_obj)
-            elif fn_name.startswith(benchmark_name + "_ks_embedded_"):
-                n = len(benchmark_name + "_ks_embedded_")
-                benchmark_display_name = "Knossos embedded " + fn_name[n:]
+            elif fn_name.startswith(benchmark_name + "_embedded_"):
+                n = len(benchmark_name + "_embedded_")
+                benchmark_display_name = "Embedded " + fn_name[n:]
                 yield BenchmarkFunction(benchmark_display_name, fn_obj().apply)
             else:
                 # perhaps we should just allow anything that matches the pattern?

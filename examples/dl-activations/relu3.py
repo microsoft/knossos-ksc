@@ -30,7 +30,7 @@ def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
 
-def vrelu3_ks_embedded_checkpointed_map():
+def vrelu3_embedded_ks_checkpointed_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
@@ -57,7 +57,7 @@ def vrelu3_ks_embedded_checkpointed_map():
     )
 
 
-def vrelu3_ks_embedded_checkpointed_map_handwritten_relu3():
+def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
