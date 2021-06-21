@@ -30,11 +30,11 @@ def relu3(x: float) -> float:
 
 
 # run-bench: Knossos implementation
-def vrelu3(x: torch.Tensor):
+def no_vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
 
-def vrelu3_embedded_ks_checkpointed_map():
+def no_vrelu3_embedded_ks_checkpointed_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
@@ -61,7 +61,7 @@ def vrelu3_embedded_ks_checkpointed_map():
     )
 
 
-def vrelu3_embedded_cpp_inlined_map():
+def no_vrelu3_embedded_cpp_inlined_map():
     return cpp_string_to_autograd_function(
         """
         namespace ks{
@@ -115,7 +115,7 @@ def vrelu3_embedded_cpp_inlined_map():
     )
 
 
-def vrelu3_embedded_cpp_inlined_map_no_if():
+def no_vrelu3_embedded_cpp_inlined_map_no_if():
     return cpp_string_to_autograd_function(
         """
         namespace ks{
@@ -179,7 +179,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     )
 
 
-def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
+def no_vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
     return ksc_string_to_autograd_function(
         """(def [vrelu3 (Vec Float)] (Vec Float)
                 (t : Vec Float)
@@ -267,7 +267,7 @@ def relu3_pytorch_nice(x: float) -> float:
 # vrelu3_pytorch_nice = torch._vmap_internals.vmap(relu3_pytorch_nice)
 
 
-def vrelu3_cuda_init():
+def no_vrelu3_cuda_init():
     this_dir = os.path.dirname(__file__)
 
     vrelu3_cuda = torch.utils.cpp_extension.load(
@@ -301,8 +301,8 @@ def vrelu3_cuda_init():
 
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
-    yield torch.randn((255 * 255,))
-    yield torch.randn((16 * 1000 * 1000,))
+    #    yield torch.randn((255 * 255,))
+    yield torch.randn((1000 * 1000,))
 
 
 # yield torch.randn((256,256)) too slow to bench...
