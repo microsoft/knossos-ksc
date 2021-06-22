@@ -9,7 +9,6 @@ module {
     %cst_01 = constant 1.000000e-01 : f32
     %c4 = constant 4 : index
     %c1 = constant 1 : index
-    %c3 = constant 3 : index
     %A = alloc() : memref<4x4xf32>
     %1 = alloc() : memref<f32>
     store %cst, %1[] : memref<f32>
