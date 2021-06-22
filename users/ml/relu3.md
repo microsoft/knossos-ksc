@@ -17,7 +17,7 @@ They can be examined in the actual files.
 Note: The cuda-runner does not support the powf operation. **All instances of powf are substituted with mulf**, such that the lowering functions properly.
 
 ### scf sequential
-`mlir/test/mlir/relu3_scf.mlir` - A simple sequential version of relu3 applied to a matrix included here for reference.
+`relu3_scf.mlir` - A simple sequential version of relu3 applied to a matrix included here for reference.
 ```mlir
 scf.for %i = %i0 to %i4 step %i1 {
   scf.for %j = %i0 to %i4 step %i1 {
@@ -41,15 +41,15 @@ scf.for %i = %i0 to %i4 step %i1 {
 ```
 Pass pipeline for CPU execution as sanity check: (same output as GPU execution way at the bottom)
 ```bash
-mlir-opt -convert-scf-to-std -convert-std-to-llvm -canonicalize mlir/test/mlir/relu3_scf.mlir | build/bin/mlir-cpu-runner -shared-libs=build/lib/libmlir_runner_utils.so -entry-point-result=void
+mlir-opt --convert-scf-to-std --convert-std-to-llvm --canonicalize relu3_scf.mlir | mlir-cpu-runner --shared-libs=$LLVM/build/lib/libmlir_runner_utils.so --entry-point-result=void
 ```
-For further reference there is also a version in the Affine dialect: `mlir/test/mlir/relu3_affine.mlir` with the pipeline:
+For further reference there is also a version in the Affine dialect: `relu3_affine.mlir` with the pipeline:
 ```bash
-mlir-opt -lower-affine -convert-scf-to-std -convert-std-to-llvm -canonicalize mlir/test/mlir/relu3_scf.mlir | build/bin/mlir-cpu-runner -shared-libs=build/lib/libmlir_runner_utils.so -entry-point-result=void
+mlir-opt --lower-affine --convert-scf-to-std --convert-std-to-llvm --canonicalize relu3_affine.mlir | mlir-cpu-runner --shared-libs=$LLVM/build/lib/libmlir_runner_utils.so --entry-point-result=void
 ```
 
 ### scf parallel
-`mlir/test/mlir/relu3_parallel.mlir` - A parallel version of the above.  The two loops have been replaced with `scf.parallel`, keeping the two induction variables.
+`relu3_parallel.mlir` - A parallel version of the above.  The two loops have been replaced with `scf.parallel`, keeping the two induction variables.
 The op provides a mechanism to specify a mapping of parallel to phyiscal hardware dimensions.
 
 ```mlir
@@ -81,18 +81,18 @@ They should be chosen depending on the computation and the device they are to be
 **Important note**: memrefs which are accessed in the body of `scf.parallel` have to be registered to the GPU.
 It is also necessary what exactly this registration does, i.e. to which memory of the GPU is the memref copied to/from?
 During experimentation this did not happen automatically in this pass. Hence, the registration was added manually
-for the output and input (see `mlir/test/mlir/relu3_parallel_lowered.mlir`):
+for the output and input (see `relu3_parallel_lowered.mlir`):
 ```mlir
 %cast_A = memref_cast %A : memref<4x4xf32> to memref<*xf32>
 gpu.host_register %cast_A : memref<*xf32>
 ```
 
-- -convert-scf-to-std: Replacing the remaining scf operations with the corresponding operations of the standard dialect.
+- --convert-scf-to-std: Replacing the remaining scf operations with the corresponding operations of the standard dialect.
 
-- -gpu-kernel-outlining: Outline the GPU IR portion into its own module
+- --gpu-kernel-outlining: Outline the GPU IR portion into its own module
 
 ```bash
-mlir-opt -convert-parallel-loops-to-gpu -convert-scf-to-std -gpu-kernel-outlining -canonicalize mlir/test/mlir/relu3_parallel.mlir
+mlir-opt --convert-parallel-loops-to-gpu --convert-scf-to-std --gpu-kernel-outlining --canonicalize relu3_parallel.mlir
 ```
 yields:
 
@@ -127,7 +127,7 @@ yields:
 This IR can be passed on to cuda-runner for execution on a Nvidia GPU. Make sure to actually build with CUDA support, i.e. `-DLLVM_TARGETS_TO_BUILD="NVPTX" -DMLIR_CUDA_RUNNER_ENABLED=ON`
 
 ```bash
-mlir-opt -convert-linalg-to-loops -convert-parallel-loops-to-gpu -convert-scf-to-std -gpu-kernel-outlining -canonicalize mlir/test/mlir/relu3_parallel.mlir  | ./build/bin/mlir-cuda-runner -shared-libs=build/lib/libmlir_runner_utils.so,build/lib/libcuda-runtime-wrappers.so -entry-point-result=void
+mlir-opt --convert-parallel-loops-to-gpu --convert-scf-to-std --gpu-kernel-outlining --canonicalize --pass-pipeline='gpu.module(strip-debuginfo,convert-gpu-to-nvvm,gpu-to-cubin)' --gpu-to-llvm relu3_parallel.mlir | mlir-cpu-runner --shared-libs=$LLVM/build/lib/libmlir_cuda_runtime.so --shared-libs=$LLVM/build/lib/libmlir_runner_utils.so --entry-point-result=void
 ```
 Output (input to the computation on top, output at the bottom):
 ```bash
@@ -145,7 +145,7 @@ Unranked Memref base@ = 0x55e27c3c4fb0 rank = 2 offset = 0 sizes = [4, 4] stride
 As expected, all input values < 1 are multiplied by 3 (as powf was not available on the interface to CUDA during this experimentation).
 
 For reproduction without any manual editing execute the following pass pipeline
-using `mlir/test/mlir/relu3_parallel_lowered.mlir`, which already has the necessary fixes:
+using `relu3_parallel_lowered.mlir`, which already has the necessary fixes:
 ```bash
-mlir-opt -convert-scf-to-std -gpu-kernel-outlining -canonicalize mlir/test/mlir/relu3_parallel_lowered.mlir  | build/bin/mlir-cuda-runner -shared-libs=build/lib/libmlir_runner_utils.so,build/lib/libcuda-runtime-wrappers.so -entry-point-result=void
+mlir-opt --convert-scf-to-std --gpu-kernel-outlining --canonicalize --pass-pipeline='gpu.module(strip-debuginfo,convert-gpu-to-nvvm,gpu-to-cubin)' --gpu-to-llvm relu3_parallel_lowered.mlir | mlir-cpu-runner --shared-libs=$LLVM/build/lib/libmlir_cuda_runtime.so --shared-libs=$LLVM/build/lib/libmlir_runner_utils.so --entry-point-result=void
 ```
