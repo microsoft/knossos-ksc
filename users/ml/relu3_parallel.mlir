@@ -18,7 +18,6 @@ func @main() {
 
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  %c3 = constant 3 : index
   %c4 = constant 4 : index
 
   // prepare input
@@ -42,7 +41,7 @@ func @main() {
   %output = alloc() : memref<4x4xf32>
 
   // actual relu3
-  scf.parallel (%i, %j) = (%c0, %c0) to (%c3, %c3) step (%c1, %c1) {
+  scf.parallel (%i, %j) = (%c0, %c0) to (%c4, %c4) step (%c1, %c1) {
     %elem = load %A[%i, %j] : memref<4x4xf32>
     %condlt0 = cmpf "ult", %elem, %cf0 : f32
     %res = scf.if %condlt0 -> (f32) {         // if (x < 0)
