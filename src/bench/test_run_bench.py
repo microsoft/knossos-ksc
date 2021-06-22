@@ -1,5 +1,6 @@
 import pytest
 import torch
+from benchmark_shim import benchmark_semi_pedantic
 
 cpu_device = torch.device("cpu")
 
@@ -36,8 +37,8 @@ def test_backwards(benchmark, reference_func, func, config):
     # We need to use pedantic mode to have a fresh arguments via a setup function,
     # but that means we need to specify rounds ourselves.
     # TODO: Investigate more
-    result = benchmark.pedantic(
-        torch.autograd.grad, setup=create_fresh_args, rounds=1000
+    result = benchmark_semi_pedantic(
+        benchmark, torch.autograd.grad, setup=create_fresh_args
     )
 
     reference_loss = reference_func(config).sum()
