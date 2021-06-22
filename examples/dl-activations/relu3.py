@@ -115,6 +115,53 @@ def vrelu3_embedded_cpp_inlined_map():
     )
 
 
+def vrelu3_embedded_cpp_masked():
+    return cpp_string_to_autograd_function(
+        """
+        namespace ks{
+        tensor<1, double> vrelu3(ks::allocator * $alloc, tensor<1, double> t) {
+            auto tdata = t.data();
+            auto ret = tensor<1, double>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                double c$1;
+                double x = tdata[i];
+
+                auto val0to1 = x * x * x / 3.0;
+                auto val1up = x - 2.0 / 3.0;
+
+                c$1 = (x>0)*((x<=1)*val0to1 + (x>1)*val1up);
+
+                retdata[i] = c$1;
+            }
+            return ret;
+        }
+
+        tensor<1, double> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, double> t, tensor<1, double> dret) {
+            auto tdata = t.data();
+            auto dretdata = dret.data();
+            auto ret = tensor<1, double>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                double c$1;
+                double x = tdata[i];
+
+                auto val0to1 = x * x;
+                auto val1up = 1.0;
+
+                c$1 = (x>0)*((x<=1)*val0to1 + (x>1)*val1up);
+
+                retdata[i] = c$1;
+            }
+            return ret;
+        }
+        }
+        """,
+        "vrelu3",
+        generate_lm=False,
+    )
+
+
 def vrelu3_embedded_cpp_inlined_map_no_if():
     return cpp_string_to_autograd_function(
         """
@@ -199,6 +246,32 @@ def no_vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
                (if (lt x 1.0)
                    (mul x x)
                1.0))) t))
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        generate_lm=False,
+    )
+
+
+def vrelu3_embedded_ks_checkpointed_map_mask():
+    return ksc_string_to_autograd_function(
+        """(def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float)
+                (map (lam (x : Float)
+                   (let (val0to1 (mul x (mul x (div x 3.0))))
+                   (let (val1up (sub x (div 2.0 3.0)))
+                      (mul (bool_to_float (gt x 0.0))
+                           (add (mul (bool_to_float (lte x 1.0)) val0to1)
+                                (mul (bool_to_float (gt x 1.0)) val1up)))))) t))
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                ; TODO: should be multiplied by dret[i] - luckily we are called with dret==1.0
+                (map (lam (x : Float)
+                   (let (val0to1 (mul x x))
+                   (let (val1up 1.0)
+                      (mul (bool_to_float (gt x 0.0))
+                           (add (mul (bool_to_float (lte x 1.0)) val0to1)
+                                (mul (bool_to_float (gt x 1.0)) val1up)))))) t))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         generate_lm=False,
@@ -302,7 +375,7 @@ def no_vrelu3_cuda_init():
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
     #    yield torch.randn((255 * 255,))
-    yield torch.randn((16 * 1000 * 1000,))
+    yield torch.randn((255 * 255,))
 
 
 # yield torch.randn((256,256)) too slow to bench...

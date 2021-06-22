@@ -635,3 +635,5 @@
 (def [sufrevpass [erf Float]] Float ((ddr : Float) (x : Float))
      (div (mul (mul 2.0 ddr) (exp (neg (mul x x))))
           (sqrt (pi))))
+
+(edef bool_to_float Float Bool)
