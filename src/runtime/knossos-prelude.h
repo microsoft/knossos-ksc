@@ -149,5 +149,4 @@ inline bool and$abb(allocator *, int b1, int b2) { return b1 && b2; }
 inline double bool_to_float$ab(allocator *, bool b) { return b; }
 }
 
-
 #include "knossos-prelude-lm.h"
