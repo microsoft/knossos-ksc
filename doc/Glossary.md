@@ -27,7 +27,13 @@ Many functions have a choice of space or time efficient implementations, which m
 
 ### IDTW: If that didn't work
 
-On a list of tasks, links increasingly desperate alternatives.
+On a list of tasks, describe increasingly desperate alternatives. E.g.
+
+ * Likely option
+ * Reasonable option
+ * ITDW: now it's fun
+ * ITDW: rocket surgery time
+
 
 ### General concepts from related work
 
