@@ -6,7 +6,8 @@ class KSTypeError(RuntimeError):
     pass
 
 
-# TODO: move to util if we go ahead with this
+# TODO: decide if we want to keep this approach, or move to module level functions
+# https://github.com/microsoft/knossos-ksc/issues/888
 class classproperty(object):
     def __init__(self, getter):
         self.getter = getter
