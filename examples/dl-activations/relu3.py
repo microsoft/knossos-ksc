@@ -144,11 +144,11 @@ def vrelu3_embedded_cpp_mask():
             for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
                 double c$1;
                 double x = tdata[i];
-
+                double dreti = dretdata[i];
                 auto val0to1 = x * x;
                 auto val1up = 1.0;
 
-                c$1 = (x>0)*((x<=1)*val0to1 + (x>1)*val1up);
+                c$1 = (x>0)*((x<=1)*val0to1 + (x>1)*val1up) * dreti;
 
                 retdata[i] = c$1;
             }
@@ -373,6 +373,7 @@ def vrelu3_cuda_init():
 
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
+    yield torch.randn((255 * 255,))
     yield torch.randn((1000 * 1000,))
 
 
