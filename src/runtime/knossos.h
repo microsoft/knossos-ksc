@@ -1374,7 +1374,7 @@ namespace ks {
 	}
 
 	// f : (S, S') -> T
-	// map f : (Vec S, Vec S') -> Vec T
+	// map2 f : (Vec S, Vec S') -> Vec T
         template <class S, class S_, class F, size_t Dim>
 	auto // tensor<Dim, T>
 	map2(allocator * alloc, F f, tensor<Dim, S> s, tensor<Dim, S_> s_)
