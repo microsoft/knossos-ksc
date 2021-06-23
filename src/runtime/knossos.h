@@ -1373,6 +1373,23 @@ namespace ks {
 		return ret;
 	}
 
+	// f : (S, S') -> T
+	// map f : (Vec S, Vec S') -> Vec T
+        template <class S, class S_, class F, size_t Dim>
+	auto // tensor<Dim, T>
+	map2(allocator * alloc, F f, tensor<Dim, S> s, tensor<Dim, S_> s_)
+	{
+                // FIXME: assert they are the same size
+                using T = decltype(applyWithAllocator(alloc, f, make_tuple(S{}, S_{})));
+		auto ret = tensor<Dim, T>::create(alloc, s.size());
+		S const* sdata = s.data();
+		S_ const* s_data = s_.data();
+		T* retdata = ret.data();
+		for (int i = 0, ne = s.num_elements(); i != ne; ++i)
+			retdata[i] = applyWithAllocator(alloc, f, make_tuple(sdata[i], s_data[i]));
+		return ret;
+	}
+
 	// [suffwdpass f] : S -> (T, B)
 	// suffwdpass_map : (S -> (T, B), Vec S) -> (Vec T, Vec B)
 	template <class F, class S, size_t Dim>
