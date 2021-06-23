@@ -271,10 +271,11 @@ def vrelu3_embedded_ks_checkpointed_map_mask():
                    (let ((x ddri) x_ddri)
                    (let (val0to1 (mul x x))
                    (let (val1up 1.0)
+                   (let (in0to1 (lte x 1.0))
                       (mul (mul (bool_to_float (gt x 0.0))
-                                (add (mul (bool_to_float (lte x 1.0)) val0to1)
-                                     (mul (bool_to_float (gt x 1.0)) val1up)))
-                           ddri))))) t dret))
+                                (add (mul (bool_to_float in0to1) val0to1)
+                                     (mul (bool_to_float (not in0to1)) val1up)))
+                           ddri)))))) t dret))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         generate_lm=False,
