@@ -146,12 +146,11 @@ def vrelu3_embedded_cpp_mask():
                 double c$1;
                 double x = tdata[i];
                 double dreti = dretdata[i];
-                auto val0to1 = x * x;
-                auto val1up = 1.0;
+                auto val0to1 = x * x * dreti;
 
                 auto in0to1 = x <= 1;
 
-                c$1 = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up) * dreti;
+                c$1 = (x>0) ? (in0to1 ? val0to1 : dreti) : 0.0;
 
                 retdata[i] = c$1;
             }
