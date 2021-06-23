@@ -14,22 +14,18 @@ func @main() {
   %i2 = constant 2 : index
   %i3 = constant 3 : index
 
+  %cfm2 = constant -0.2 : f32
   %cf0 = constant 0.0 : f32
-  %cf1 = constant 0.5 : f32
-  %cf2 = constant 2.0 : f32
-  %cf3 = constant 3.0 : f32
-  %cf4 = constant 4.0 : f32
-
-  %c0 = constant 0.0 : f32
-  %c1 = constant 1.0 : f32
-  %c3 = constant 3.0 : f32
+  %cf1_3 = constant 0.3333333333 : f32
+  %cf2_3 = constant 0.6666666667 : f32
+  %cf1 = constant 1.0 : f32
 
   // prepare input
   %A = alloc() : memref<4x4xf32>
 
   %increment = constant 0.100000e+00 : f32
   %initVal = alloc() : memref<f32>
-  store %cf0, %initVal[] : memref<f32>
+  store %cfm2, %initVal[] : memref<f32>
 
   %csize = constant 4 : index
   scf.for %arg0 = %i0 to %csize step %i1 {
@@ -48,16 +44,19 @@ func @main() {
   affine.for %i = 0 to 4 {
     affine.for %j = 0 to 4 {
       %elem = affine.load %A[%i, %j] : memref<4x4xf32>
-      %condlt0 = cmpf "ult", %elem, %c0 : f32
+      %condlt0 = cmpf "ult", %elem, %cf0 : f32
       %res = scf.if %condlt0 -> (f32) {         // if (elem < 0)
-        scf.yield %c0 : f32
+        scf.yield %cf0 : f32
       } else {
-        %condlt1 = cmpf "ult", %elem, %c1 : f32
+        %condlt1 = cmpf "ult", %elem, %cf1 : f32
         %res = scf.if %condlt1 -> (f32) {       // if (elem < 1)
-          %res = std.mulf %elem, %c3 : f32
+          %x1 = std.mulf %elem, %elem : f32
+          %x2 = std.mulf %x1, %elem : f32
+          %res = std.mulf %cf1_3, %x2 : f32
           scf.yield %res : f32
         } else {                                // else
-          scf.yield %elem : f32
+          %res = std.subf %elem, %cf2_3 : f32 
+          scf.yield %res : f32
         }
         scf.yield %res : f32
       }

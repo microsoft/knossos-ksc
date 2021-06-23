@@ -12,7 +12,10 @@ func @main() {
   %i1 = constant 1 : index
   %i3 = constant 3 : index
 
+  %cfm2 = constant -0.2 : f32
   %cf0 = constant 0.0 : f32
+  %cf1_3 = constant 0.3333333333 : f32
+  %cf2_3 = constant 0.6666666667 : f32
   %cf1 = constant 1.0 : f32
   %cf3 = constant 3.0 : f32
 
@@ -24,7 +27,7 @@ func @main() {
   %A = alloc() : memref<4x4xf32>
   %increment = constant 0.100000e+00 : f32
   %initVal = alloc() : memref<f32>
-  store %cf0, %initVal[] : memref<f32>
+  store %cfm2, %initVal[] : memref<f32>
   %csize = constant 4 : index
 
   // Filling the input array %A with values starting at 0.0, each increasing by 0.1
@@ -49,10 +52,13 @@ func @main() {
     } else {
       %condlt1 = cmpf "ult", %elem, %cf1 : f32
       %res = scf.if %condlt1 -> (f32) {       // if (x < 1)
-        %res = std.mulf %elem, %cf3 : f32     //
-        scf.yield %res : f32                  //   return x * 3 (** not supported by cuda-runner)
+        %x1 = std.mulf %elem, %elem : f32     //
+        %x2 = std.mulf %x1, %elem : f32       //
+        %res = std.mulf %cf1_3, %x2 : f32     //    return 1/3 * x ** 3
+        scf.yield %res : f32                  //
       } else {                                //
-        scf.yield %elem : f32                 // return x
+        %res = std.subf %elem, %cf2_3 : f32   //
+        scf.yield %res : f32                  // return x - 2/3
       }
       scf.yield %res : f32
     }
