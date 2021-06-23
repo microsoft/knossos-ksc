@@ -264,13 +264,14 @@ def vrelu3_embedded_ks_checkpointed_map_mask():
 
            (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
                 ((t : Vec Float) (dret : Vec Float))
-                ; TODO: should be multiplied by dret[i] - luckily we are called with dret==1.0
-                (map (lam (x : Float)
+                (map2 (lam (x_ddri : Tuple Float Float)
+                   (let ((x ddri) x_ddri)
                    (let (val0to1 (mul x x))
                    (let (val1up 1.0)
-                      (mul (bool_to_float (gt x 0.0))
-                           (add (mul (bool_to_float (lte x 1.0)) val0to1)
-                                (mul (bool_to_float (gt x 1.0)) val1up)))))) t))
+                      (mul (mul (bool_to_float (gt x 0.0))
+                                (add (mul (bool_to_float (lte x 1.0)) val0to1)
+                                     (mul (bool_to_float (gt x 1.0)) val1up)))
+                           ddri))))) t dret))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         generate_lm=False,
