@@ -954,6 +954,10 @@ primFunCallResultTy_maybe fun args
       (P_map      , TypeTuple [TypeLam t1 t2, TypeTensor i t1'])
         | t1 `eqType` t1'
         -> Just (TypeTensor i t2)
+      (P_map2     , TypeTuple [TypeLam t tr, TypeTensor i1 t1, TypeTensor i2 t2])
+        | t `eqType` TypeTuple [t1, t2]
+        , i1 == i2
+        -> Just (TypeTensor i1 tr)
       (P_index    , TypeTuple [indexType, TypeTensor d t])
         | indexType `eqType` tensorIndexType d
         -> Just t
