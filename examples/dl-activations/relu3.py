@@ -374,6 +374,7 @@ def vrelu3_cuda_init():
 
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
+    yield torch.randn((16,))
     yield torch.randn((255 * 255,))
     yield torch.randn((1000 * 1000,))
 
