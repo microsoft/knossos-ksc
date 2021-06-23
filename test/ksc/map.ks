@@ -43,6 +43,9 @@
 (gdef sufrevpass [map_tuple (Vec (Tuple Float Float))])
 (gdef sufrev [map_tuple (Vec (Tuple Float Float))])
 
+(def map2_example (Vec Float) ((t1 : Vec Float) (t2 : Vec Float))
+     (map2 (lam (x : Tuple Float Float) (add x)) t1 t2))
+
 (def main Integer ()
      (let (unused_input (Vec_init 1.0 2.0))
      (print (map (lam (x : Float) (mul x 2.0))
