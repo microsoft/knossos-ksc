@@ -128,8 +128,9 @@ def vrelu3_embedded_cpp_mask():
 
                 auto val0to1 = x * x * x / 3.0;
                 auto val1up = x - 2.0 / 3.0;
+                auto in0to1 = x <= 1;
 
-                c$1 = (x>0)*((x<=1)*val0to1 + (x>1)*val1up);
+                c$1 = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up);
 
                 retdata[i] = c$1;
             }
@@ -148,7 +149,9 @@ def vrelu3_embedded_cpp_mask():
                 auto val0to1 = x * x;
                 auto val1up = 1.0;
 
-                c$1 = (x>0)*((x<=1)*val0to1 + (x>1)*val1up) * dreti;
+                auto in0to1 = x <= 1;
+
+                c$1 = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up) * dreti;
 
                 retdata[i] = c$1;
             }
@@ -258,9 +261,10 @@ def vrelu3_embedded_ks_checkpointed_map_mask():
                 (map (lam (x : Float)
                    (let (val0to1 (mul x (mul x (div x 3.0))))
                    (let (val1up (sub x (div 2.0 3.0)))
+                   (let (in0to1 (lte x 1.0))
                       (mul (bool_to_float (gt x 0.0))
-                           (add (mul (bool_to_float (lte x 1.0)) val0to1)
-                                (mul (bool_to_float (gt x 1.0)) val1up)))))) t))
+                           (add (mul (bool_to_float in0to1) val0to1)
+                                (mul (bool_to_float (not in0to1)) val1up))))))) t))
 
            (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
                 ((t : Vec Float) (dret : Vec Float))
