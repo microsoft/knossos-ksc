@@ -452,6 +452,10 @@ def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
             "-std=c++17",
             "-g",
             "-O3",
+            "-mavx2",
+            "-mfma",
+            "-msse4.2",
+            "-mfpmath=sse",
             # "-DKS_BOUNDS_CHECK",
         ]
 
