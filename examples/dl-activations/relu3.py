@@ -29,11 +29,11 @@ def relu3(x: float) -> float:
 
 
 # run-bench: Knossos implementation
-def no_vrelu3(x: torch.Tensor):
+def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
 
-def no_vrelu3_embedded_ks_checkpointed_map():
+def vrelu3_embedded_ks_checkpointed_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
@@ -60,7 +60,7 @@ def no_vrelu3_embedded_ks_checkpointed_map():
     )
 
 
-def no_vrelu3_embedded_cpp_inlined_map():
+def vrelu3_embedded_cpp_inlined_map():
     return cpp_string_to_autograd_function(
         """
         namespace ks{
@@ -123,35 +123,16 @@ def vrelu3_embedded_cpp_mask():
             auto ret = tensor<1, double>::create($alloc, t.size());
             auto retdata = ret.data();
             for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                double c$1;
                 double x = tdata[i];
 
-    x = 2 * x;
-    x = 1 + x;
-    x = 3 * x;
-    x = 7 + x;
-    x = 11 * x;
-    x = 13 + x;
-    x = 2 * x;
-    x = 1 + x;
-    x = 3 * x;
-    x = 7 + x;
-    x = 11 * x;
-    x = 13 + x;
-    x = 2 * x;
-    x = 1 + x;
-    x = 3 * x;
-    x = 7 + x;
-    x = 11 * x;
-    x = 13 + x;
-    x = 2 * x;
-    x = 1 + x;
-    x = 3 * x;
-    x = 7 + x;
-    x = 11 * x;
-    x = 13 + x;
+                auto val0to1 = x * x * x / 3.0;
+                auto val1up = x - 2.0 / 3.0;
+                auto in0to1 = x <= 1;
 
+                c$1 = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up);
 
-                retdata[i] = x;
+                retdata[i] = c$1;
             }
             return ret;
         }
@@ -182,7 +163,7 @@ def vrelu3_embedded_cpp_mask():
     )
 
 
-def no_vrelu3_embedded_INCORRECT_cpp_inlined_map_no_if():
+def vrelu3_embedded_INCORRECT_cpp_inlined_map_no_if():
     return cpp_string_to_autograd_function(
         """
         namespace ks{
@@ -216,7 +197,7 @@ def no_vrelu3_embedded_INCORRECT_cpp_inlined_map_no_if():
     )
 
 
-def no_vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
+def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
@@ -246,7 +227,7 @@ def no_vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     )
 
 
-def no_vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
+def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
     return ksc_string_to_autograd_function(
         """(def [vrelu3 (Vec Float)] (Vec Float)
                 (t : Vec Float)
@@ -272,7 +253,7 @@ def no_vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
     )
 
 
-def no_vrelu3_embedded_ks_checkpointed_map_mask():
+def vrelu3_embedded_ks_checkpointed_map_mask():
     return ksc_string_to_autograd_function(
         """(def [vrelu3 (Vec Float)] (Vec Float)
                 (t : Vec Float)
@@ -301,7 +282,7 @@ def no_vrelu3_embedded_ks_checkpointed_map_mask():
     )
 
 
-def no_vrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
+def vrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float) 0.0)
 
@@ -321,7 +302,7 @@ def no_vrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
     )
 
 
-def no_vrelu3_embedded_INCORRECT_ks_upper_bound():
+def vrelu3_embedded_INCORRECT_ks_upper_bound():
     return ksc_string_to_autograd_function(
         """; These are not correct but they are as fast as a Knossos
            ; implementation could possibly be.
@@ -339,31 +320,12 @@ def no_vrelu3_embedded_INCORRECT_ks_upper_bound():
 
 # run-bench: PyTorch reference implementation
 def vrelu3_pytorch(x: torch.Tensor):
-    x = 2 * x
-    x = 1 + x
-    x = 3 * x
-    x = 7 + x
-    x = 11 * x
-    x = 13 + x
-    x = 2 * x
-    x = 1 + x
-    x = 3 * x
-    x = 7 + x
-    x = 11 * x
-    x = 13 + x
-    x = 2 * x
-    x = 1 + x
-    x = 3 * x
-    x = 7 + x
-    x = 11 * x
-    x = 13 + x
-    x = 2 * x
-    x = 1 + x
-    x = 3 * x
-    x = 7 + x
-    x = 11 * x
-    x = 13 + x
-    return x
+    mask1_inf = x > 1.0
+    mask0_1 = (x > 0.0) & ~mask1_inf
+    val_0_1 = 1 / 3 * x ** 3
+    val_1_inf = x - 2 / 3
+
+    return mask0_1 * val_0_1 + mask1_inf * val_1_inf
 
 
 # run-bench: PyTorch "nice" implementation
