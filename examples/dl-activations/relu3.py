@@ -122,17 +122,16 @@ def vrelu3_embedded_cpp_mask():
             auto tdata = t.data();
             auto ret = tensor<1, double>::create($alloc, t.size());
             auto retdata = ret.data();
+            memset(retdata, 0.0, ret.num_elements() * sizeof(double));
             for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-                double c$1;
                 double x = tdata[i];
-
                 auto val0to1 = x * x * x / 3.0;
                 auto val1up = x - 2.0 / 3.0;
                 auto in0to1 = x <= 1;
 
-                c$1 = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up);
-
-                retdata[i] = c$1;
+                if (x > 0) {
+                    retdata[i] = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up);
+                }
             }
             return ret;
         }
@@ -142,17 +141,17 @@ def vrelu3_embedded_cpp_mask():
             auto dretdata = dret.data();
             auto ret = tensor<1, double>::create($alloc, t.size());
             auto retdata = ret.data();
+            memset(retdata, 0.0, ret.num_elements() * sizeof(double));
             for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-                double c$1;
                 double x = tdata[i];
                 double dreti = dretdata[i];
                 auto val0to1 = x * x * dreti;
 
                 auto in0to1 = x <= 1;
 
-                c$1 = (x>0) ? (in0to1 ? val0to1 : dreti) : 0.0;
-
-                retdata[i] = c$1;
+                if (x > 0) {
+                    retdata[i] += (x>0) ? (in0to1 ? val0to1 : dreti) : 0.0;
+                }
             }
             return ret;
         }
