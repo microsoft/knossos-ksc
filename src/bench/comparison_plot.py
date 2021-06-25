@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Any
 import pytest_benchmark
 import pytest_benchmark.storage
 import pytest_benchmark.storage.file
@@ -10,7 +10,6 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 from collections import defaultdict
-from shutil import copyfile
 
 
 storage = pytest_benchmark.utils.load_storage(".benchmarks", logger=None, netrc=None)
@@ -28,23 +27,44 @@ class FigureLookup:
     configuration: str
 
 
-groupedbenchmarks = defaultdict(list)
+def make_template(benchmark_name):
+    # Consider using a serious HTML templating library
+    return f"""<html>
+    <head></head>
+    <style>
+        img {{
+            width: 33%;
+        }}
+    </style>
+    <body>
+        <img src="{benchmark_name}_test_inference_torch.Size([4,_4]).svg">
+        <img src="{benchmark_name}_test_inference_torch.Size([16,_16]).svg">
+        <img src="{benchmark_name}_test_inference_torch.Size([128,_64]).svg">
+        <img src="{benchmark_name}_test_forward_torch.Size([4,_4]).svg">
+        <img src="{benchmark_name}_test_forward_torch.Size([16,_16]).svg">
+        <img src="{benchmark_name}_test_forward_torch.Size([128,_64]).svg">
+        <img src="{benchmark_name}_test_backwards_torch.Size([4,_4]).svg">
+        <img src="{benchmark_name}_test_backwards_torch.Size([16,_16]).svg">
+        <img src="{benchmark_name}_test_backwards_torch.Size([128,_64]).svg">
+</html>"""
+
+
+groupedbenchmarks: Dict[str, Dict[str, Any]] = defaultdict(lambda: defaultdict(list))
 for path, content in storage.load():
 
     time = dateutil.parser.isoparse(content["commit_info"]["time"])
     for benchmark in content["benchmarks"]:
-
-        # Before this date, everything was sqrl
+        benchmarkfullname = benchmark["name"]
         # TODO: migrate the store so we don't need to do data checks
-        # TODO: generalise to more than sqrl
-        if time.date() < datetime.date(2021, 6, 1) or "sqrl" in benchmark["name"]:
-            testname = benchmark["name"].split("[")[0]  # TODO: harden, use extra_info?
-            groupedbenchmarks[testname].append((time, benchmark))
-        else:
-            print(
-                "Found non-sqrl benchmark, tools need extending https://msrcambridge.visualstudio.com/Knossos/_workitems/edit/19590"
-            )
-            print(benchmark["name"])
+        # TODO: start use extra_info to store benchmark and test name
+        # Before this date, everything was sqrl
+        benchmarkshortname = (
+            benchmarkfullname.split("[")[1].split("_")[0]
+            if time.date() > datetime.date(2021, 6, 1)
+            else "sqrl"
+        )
+        testname = benchmarkfullname.split("[")[0]  # TODO: harden, use extra_info?
+        groupedbenchmarks[benchmarkshortname][testname].append((time, benchmark))
 
 
 labelkey = defaultdict(lambda: "go")
@@ -63,7 +83,7 @@ def make_figure():
     return FigureBundle(figure=figure, axes=axes)
 
 
-for benchmark_name in ["sqrl"]:
+for benchmark_name, benchmark_value in groupedbenchmarks.items():
 
     figures: Dict[FigureLookup, FigureBundle] = defaultdict(make_figure)
     data_count = defaultdict(
@@ -71,7 +91,7 @@ for benchmark_name in ["sqrl"]:
     )  # test_name / configuration / method
 
     for test_name in ("test_forward", "test_backwards", "test_inference"):
-        for time, benchmark in groupedbenchmarks[test_name]:
+        for time, benchmark in benchmark_value[test_name]:
             configuration = benchmark["group"]
 
             axes = figures[
@@ -118,5 +138,8 @@ for benchmark_name in ["sqrl"]:
 
         figure_bundle.figure.savefig(filename, bbox_inches="tight")
 
-    # TODO: read in template, and parameterise with benchmark_name
-    copyfile("src/bench/sqrl.html", f"build/{benchmark_name}.html")
+    # TODO: pass configurations
+    htmlreport = make_template(benchmark_name)
+
+    with open(f"build/{benchmark_name}.html", "w") as file:
+        file.write(htmlreport)
