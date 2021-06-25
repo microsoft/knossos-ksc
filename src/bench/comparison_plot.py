@@ -140,11 +140,9 @@ for benchmark_name, benchmark_value in groupedbenchmarks.items():
         filename = f"build/{benchmark_name}_{figure_lookup.test_name}_{figure_lookup.configuration}.svg".replace(
             " ", "_"
         )
-        # print(f"saving {filename}")
 
         figure_bundle.figure.savefig(filename, bbox_inches="tight")
 
-    # TODO: pass configurations
     htmlreport = make_template(benchmark_name, configurations)
 
     with open(f"build/{benchmark_name}.html", "w") as file:
