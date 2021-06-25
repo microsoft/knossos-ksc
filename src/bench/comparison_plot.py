@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Dict
 import pytest_benchmark
 import pytest_benchmark.storage
 import pytest_benchmark.storage.file
@@ -23,7 +24,7 @@ class FigureBundle:
 
 @dataclass(frozen=True)
 class FigureLookup:
-    method: str
+    test_name: str
     configuration: str
 
 
@@ -62,17 +63,26 @@ def make_figure():
     return FigureBundle(figure=figure, axes=axes)
 
 
-figures = defaultdict(make_figure)
+figures: Dict[FigureLookup, FigureBundle] = defaultdict(make_figure)
+data_count = defaultdict(
+    lambda: defaultdict(lambda: defaultdict(int))
+)  # test_name / configuration / method
 
-for test in ("test_forward", "test_backwards", "test_inference"):
-    for time, benchmark in groupedbenchmarks[test]:
-        group_name = benchmark["group"]
+for test_name in ("test_forward", "test_backwards", "test_inference"):
+    for time, benchmark in groupedbenchmarks[test_name]:
+        configuration = benchmark["group"]
 
-        axes = figures[FigureLookup(method=test, configuration=group_name)].axes
+        axes = figures[
+            FigureLookup(test_name=test_name, configuration=configuration)
+        ].axes
         method = benchmark["name"].split("-")[1]  # TODO: harden, use extra_info?
 
+        data_count[test_name][configuration][
+            method
+        ] += 1  # Count items to mark missing ones
+
         # TODO: generalise to more than sqrl
-        axes.set_title(f"sqrl {test} {group_name}")
+        axes.set_title(f"sqrl {test_name} {configuration}")
         axes.plot(
             time,
             (benchmark["stats"]["median"] * 1000),
@@ -82,13 +92,25 @@ for test in ("test_forward", "test_backwards", "test_inference"):
         )
 
 for figure_lookup, figure_bundle in figures.items():
+
+    methods_count = data_count[figure_lookup.test_name][figure_lookup.configuration]
+    most_values = max(
+        data_count[figure_lookup.test_name][figure_lookup.configuration].values()
+    )
+
     handles, labels = figure_bundle.axes.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    figure_bundle.axes.legend(by_label.values(), by_label.keys())
+
+    labels_with_incomplate_marking = [
+        label if methods_count[label] == most_values else label + "(incomplate)"
+        for label in by_label.keys()
+    ]
+
+    figure_bundle.axes.legend(by_label.values(), labels_with_incomplate_marking)
 
     figure_bundle.axes.set_ylim(bottom=0.0)
 
-    filename = f"build/sqrl_{figure_lookup.method}_{figure_lookup.configuration}.svg".replace(
+    filename = f"build/sqrl_{figure_lookup.test_name}_{figure_lookup.configuration}.svg".replace(
         " ", "_"
     )
     # print(f"saving {filename}")
