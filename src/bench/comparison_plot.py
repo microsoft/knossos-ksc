@@ -10,7 +10,6 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 from collections import defaultdict
-import pprint
 
 
 storage = pytest_benchmark.utils.load_storage(".benchmarks", logger=None, netrc=None)
