@@ -5,6 +5,9 @@
 
 #include <vector>
 
+using ks_float = float;
+
+#define CHECK_SCALAR_TYPE(x) TORCH_CHECK(x.scalar_type() == at::ScalarType::Float, #x " must use ks floating-point type")
 #define CHECK_CUDA(x) TORCH_CHECK(x.is_cuda(), #x " must be a CUDA tensor")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
@@ -57,11 +60,9 @@ torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
       const int threads = 1024;
       const int blocks = (input_size + threads - 1) / threads;
 
-      AT_DISPATCH_FLOATING_TYPES(input.type(), "vrelu3_forward_cuda (rank 1)", ([&] {
-        vrelu3_cuda_forward_kernel_1<scalar_t><<<blocks, threads>>>(
-            input.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>(),
-            output.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>());
-      }));
+      vrelu3_cuda_forward_kernel_1<ks_float><<<blocks, threads>>>(
+          input.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
+          output.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>());
       break;
     }
     case 2: {
@@ -71,11 +72,9 @@ torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
       const int threads = 1024;
       const dim3 blocks((input_size_1 + threads - 1) / threads, input_size_0);
 
-      AT_DISPATCH_FLOATING_TYPES(input.type(), "vrelu3_forward_cuda (rank 2)", ([&] {
-        vrelu3_cuda_forward_kernel_2<scalar_t><<<blocks, threads>>>(
-            input.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
-            output.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>());
-      }));
+      vrelu3_cuda_forward_kernel_2<ks_float><<<blocks, threads>>>(
+          input.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
+          output.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>());
       break;
     }
     default:
@@ -131,12 +130,10 @@ torch::Tensor vrelu3_cuda_backward(
       const int threads = 1024;
       const int blocks = (x_size + threads - 1) / threads;
 
-      AT_DISPATCH_FLOATING_TYPES(x.type(), "vrelu3_backward_cuda (rank 1)", ([&] {
-        vrelu3_cuda_backward_kernel_1<scalar_t><<<blocks, threads>>>(
-            d_x.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>(),
-            grad.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>(),
-            x.packed_accessor32<scalar_t,1,torch::RestrictPtrTraits>());
-      }));
+      vrelu3_cuda_backward_kernel_1<ks_float><<<blocks, threads>>>(
+          d_x.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
+          grad.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
+          x.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>());
       break;
     }
     case 2: {
@@ -146,12 +143,10 @@ torch::Tensor vrelu3_cuda_backward(
       const int threads = 1024;
       const dim3 blocks((x_size_1 + threads - 1) / threads, x_size_0);
 
-      AT_DISPATCH_FLOATING_TYPES(x.type(), "vrelu3_backward_cuda (rank 2)", ([&] {
-        vrelu3_cuda_backward_kernel_2<scalar_t><<<blocks, threads>>>(
-            d_x.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
-            grad.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
-            x.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>());
-      }));
+      vrelu3_cuda_backward_kernel_2<ks_float><<<blocks, threads>>>(
+          d_x.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
+          grad.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
+          x.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>());
       break;
     }
     default:
