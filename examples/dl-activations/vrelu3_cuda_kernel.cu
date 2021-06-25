@@ -5,6 +5,10 @@
 
 #include <vector>
 
+#define CHECK_CUDA(x) TORCH_CHECK(x.is_cuda(), #x " must be a CUDA tensor")
+#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
+
 template<typename scalar_t> using tensor_accessor_1 =
     torch::PackedTensorAccessor32<scalar_t,1,torch::RestrictPtrTraits>;
 template<typename scalar_t> using tensor_accessor_2 =
@@ -41,6 +45,8 @@ __global__ void vrelu3_cuda_forward_kernel_2(
 }
 
 torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
+  CHECK_INPUT(input);
+
   auto output = torch::zeros_like(input);
 
   switch (input.sizes().size()) {
@@ -113,6 +119,9 @@ __global__ void vrelu3_cuda_backward_kernel_2(
 torch::Tensor vrelu3_cuda_backward(
     torch::Tensor grad,
     torch::Tensor x) {
+  CHECK_INPUT(grad);
+  CHECK_INPUT(x);
+
   auto d_x = torch::zeros_like(x);
   switch (x.sizes().size()) {
     case 1: {
