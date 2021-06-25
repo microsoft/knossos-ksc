@@ -129,9 +129,7 @@ def vrelu3_embedded_cpp_mask():
                 auto val1up = x - 2.0 / 3.0;
                 auto in0to1 = x <= 1;
 
-                if (x > 0) {
-                    retdata[i] = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up);
-                }
+                retdata[i] = (x>0)*(in0to1*val0to1 + (!in0to1)*val1up);
             }
             return ret;
         }
@@ -142,16 +140,15 @@ def vrelu3_embedded_cpp_mask():
             auto ret = tensor<1, double>::create($alloc, t.size());
             auto retdata = ret.data();
             memset(retdata, 0.0, ret.num_elements() * sizeof(double));
-            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+            int ne = t.num_elements();
+            for(int i = 0; i < ne; ++i) {
                 double x = tdata[i];
-                double dreti = dretdata[i];
-                auto val0to1 = x * x * dreti;
 
                 auto in0to1 = x <= 1;
 
-                if (x > 0) {
-                    retdata[i] += (x>0) ? (in0to1 ? val0to1 : dreti) : 0.0;
-                }
+                double dreti = dretdata[i];
+                auto val0to1 = x * x * dreti;
+                retdata[i] = (x>0) ? (in0to1 ? val0to1 : dreti) : 0.0;
             }
             return ret;
         }
@@ -196,7 +193,7 @@ def vrelu3_embedded_INCORRECT_cpp_inlined_map_no_if():
     )
 
 
-def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
+def xvrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
@@ -226,7 +223,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     )
 
 
-def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
+def xvrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
     return ksc_string_to_autograd_function(
         """(def [vrelu3 (Vec Float)] (Vec Float)
                 (t : Vec Float)
@@ -252,7 +249,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
     )
 
 
-def vrelu3_embedded_ks_checkpointed_map_mask():
+def xvrelu3_embedded_ks_checkpointed_map_mask():
     return ksc_string_to_autograd_function(
         """(def [vrelu3 (Vec Float)] (Vec Float)
                 (t : Vec Float)
@@ -281,7 +278,7 @@ def vrelu3_embedded_ks_checkpointed_map_mask():
     )
 
 
-def vrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
+def xvrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float) 0.0)
 

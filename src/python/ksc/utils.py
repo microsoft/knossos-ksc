@@ -451,7 +451,10 @@ def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
         cflags += [
             "-std=c++17",
             "-g",
-            "-O3",
+            "-O7",
+            "-march=haswell",
+            "-funroll-loops",
+            "-mprefer-vector-width=512",
             # "-DKS_BOUNDS_CHECK",
         ]
 
