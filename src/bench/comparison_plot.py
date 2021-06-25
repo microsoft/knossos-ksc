@@ -27,12 +27,13 @@ class FigureLookup:
     configuration: str
 
 
-def make_template(benchmark_name, configurations):
+def make_template(benchmark_name, testandconfigurations):
     plotsstring = ""
 
-    # The ordering of this might not be strictly consistent, consider a sort
-    for test_name, setty in configurations.items():
-        for configuration in setty:
+    for test_name, configurations in testandconfigurations.items():
+        # A reverse string ASCIIbetical sort may not be entirely desirable, consider parsing out the ints
+        # and sorting by them in order. This is OK for existing sqrl and vgelu examples, small to big.
+        for configuration in sorted(configurations, reverse=True):
             plotsstring += f"""<img src="{benchmark_name}_{test_name}_{configuration.replace(" ", "_")}.svg">\n"""
         plotsstring += """<br/>"""
 
