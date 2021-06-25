@@ -63,58 +63,60 @@ def make_figure():
     return FigureBundle(figure=figure, axes=axes)
 
 
-figures: Dict[FigureLookup, FigureBundle] = defaultdict(make_figure)
-data_count = defaultdict(
-    lambda: defaultdict(lambda: defaultdict(int))
-)  # test_name / configuration / method
+for benchmark_name in ["sqrl"]:
 
-for test_name in ("test_forward", "test_backwards", "test_inference"):
-    for time, benchmark in groupedbenchmarks[test_name]:
-        configuration = benchmark["group"]
+    figures: Dict[FigureLookup, FigureBundle] = defaultdict(make_figure)
+    data_count = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(int))
+    )  # test_name / configuration / method
 
-        axes = figures[
-            FigureLookup(test_name=test_name, configuration=configuration)
-        ].axes
-        method = benchmark["name"].split("-")[1]  # TODO: harden, use extra_info?
+    for test_name in ("test_forward", "test_backwards", "test_inference"):
+        for time, benchmark in groupedbenchmarks[test_name]:
+            configuration = benchmark["group"]
 
-        data_count[test_name][configuration][
-            method
-        ] += 1  # Count items to mark missing ones
+            axes = figures[
+                FigureLookup(test_name=test_name, configuration=configuration)
+            ].axes
+            method = benchmark["name"].split("-")[1]  # TODO: harden, use extra_info?
 
-        # TODO: generalise to more than sqrl
-        axes.set_title(f"sqrl {test_name} {configuration}")
-        axes.plot(
-            time,
-            (benchmark["stats"]["median"] * 1000),
-            labelkey[method],
-            label=method,
-            fillstyle="none",
+            data_count[test_name][configuration][
+                method
+            ] += 1  # Count items to mark missing ones
+
+            axes.set_title(f"{benchmark_name} {test_name} {configuration}")
+            axes.plot(
+                time,
+                (benchmark["stats"]["median"] * 1000),
+                labelkey[method],
+                label=method,
+                fillstyle="none",
+            )
+
+    for figure_lookup, figure_bundle in figures.items():
+
+        methods_count = data_count[figure_lookup.test_name][figure_lookup.configuration]
+        most_values = max(
+            data_count[figure_lookup.test_name][figure_lookup.configuration].values()
         )
 
-for figure_lookup, figure_bundle in figures.items():
+        handles, labels = figure_bundle.axes.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
 
-    methods_count = data_count[figure_lookup.test_name][figure_lookup.configuration]
-    most_values = max(
-        data_count[figure_lookup.test_name][figure_lookup.configuration].values()
-    )
+        labels_with_incomplate_marking = [
+            label if methods_count[label] == most_values else label + "(incomplate)"
+            for label in by_label.keys()
+        ]
 
-    handles, labels = figure_bundle.axes.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
+        figure_bundle.axes.legend(by_label.values(), labels_with_incomplate_marking)
 
-    labels_with_incomplate_marking = [
-        label if methods_count[label] == most_values else label + "(incomplate)"
-        for label in by_label.keys()
-    ]
+        figure_bundle.axes.set_ylim(bottom=0.0)
 
-    figure_bundle.axes.legend(by_label.values(), labels_with_incomplate_marking)
+        filename = f"build/{benchmark_name}_{figure_lookup.test_name}_{figure_lookup.configuration}.svg".replace(
+            " ", "_"
+        )
+        # print(f"saving {filename}")
 
-    figure_bundle.axes.set_ylim(bottom=0.0)
+        figure_bundle.figure.savefig(filename, bbox_inches="tight")
 
-    filename = f"build/sqrl_{figure_lookup.test_name}_{figure_lookup.configuration}.svg".replace(
-        " ", "_"
-    )
-    # print(f"saving {filename}")
-
-    figure_bundle.figure.savefig(filename, bbox_inches="tight")
-
-copyfile("src/bench/sqrl.html", "build/sqrl.html")
+    # TODO: read in template, and parameterise with benchmark_name
+    copyfile("src/bench/sqrl.html", f"build/{benchmark_name}.html")
