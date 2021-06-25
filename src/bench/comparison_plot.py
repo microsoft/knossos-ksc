@@ -10,6 +10,7 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 from collections import defaultdict
+import pprint
 
 
 storage = pytest_benchmark.utils.load_storage(".benchmarks", logger=None, netrc=None)
@@ -27,7 +28,15 @@ class FigureLookup:
     configuration: str
 
 
-def make_template(benchmark_name):
+def make_template(benchmark_name, configurations):
+    plotsstring = ""
+
+    # The ordering of this might not be strictly consistent, consider a sort
+    for test_name, setty in configurations.items():
+        for configuration in setty:
+            plotsstring += f"""<img src="{benchmark_name}_{test_name}_{configuration.replace(" ", "_")}.svg">\n"""
+        plotsstring += """<br/>"""
+
     # Consider using a serious HTML templating library
     return f"""<html>
     <head></head>
@@ -37,15 +46,8 @@ def make_template(benchmark_name):
         }}
     </style>
     <body>
-        <img src="{benchmark_name}_test_inference_torch.Size([4,_4]).svg">
-        <img src="{benchmark_name}_test_inference_torch.Size([16,_16]).svg">
-        <img src="{benchmark_name}_test_inference_torch.Size([128,_64]).svg">
-        <img src="{benchmark_name}_test_forward_torch.Size([4,_4]).svg">
-        <img src="{benchmark_name}_test_forward_torch.Size([16,_16]).svg">
-        <img src="{benchmark_name}_test_forward_torch.Size([128,_64]).svg">
-        <img src="{benchmark_name}_test_backwards_torch.Size([4,_4]).svg">
-        <img src="{benchmark_name}_test_backwards_torch.Size([16,_16]).svg">
-        <img src="{benchmark_name}_test_backwards_torch.Size([128,_64]).svg">
+        {plotsstring}
+    </body>
 </html>"""
 
 
@@ -90,6 +92,8 @@ for benchmark_name, benchmark_value in groupedbenchmarks.items():
         lambda: defaultdict(lambda: defaultdict(int))
     )  # test_name / configuration / method
 
+    configurations = defaultdict(set)
+
     for test_name in ("test_forward", "test_backwards", "test_inference"):
         for time, benchmark in benchmark_value[test_name]:
             configuration = benchmark["group"]
@@ -102,6 +106,8 @@ for benchmark_name, benchmark_value in groupedbenchmarks.items():
             data_count[test_name][configuration][
                 method
             ] += 1  # Count items to mark missing ones
+
+            configurations[test_name].add(configuration)
 
             axes.set_title(f"{benchmark_name} {test_name} {configuration}")
             axes.plot(
@@ -139,7 +145,7 @@ for benchmark_name, benchmark_value in groupedbenchmarks.items():
         figure_bundle.figure.savefig(filename, bbox_inches="tight")
 
     # TODO: pass configurations
-    htmlreport = make_template(benchmark_name)
+    htmlreport = make_template(benchmark_name, configurations)
 
     with open(f"build/{benchmark_name}.html", "w") as file:
         file.write(htmlreport)
