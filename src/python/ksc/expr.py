@@ -268,7 +268,7 @@ class Def(ASTNode):
         elems = [
             self.name,
             self.return_type,
-            "[" + ", ".join([arg.__str__(decl=True) for arg in self.args]) + "]",
+            "[" + ", ".join([arg.decl_str() for arg in self.args]) + "]",
             self.body,
         ]
         return paren("Def " + " ".join([str(e) for e in elems]))
@@ -377,11 +377,11 @@ class Var(Expr):
     def __init__(self, name, type=None):
         super().__init__(type_=type, name=name)
 
-    def __str__(self, decl: bool = False):
-        if decl:
-            return self.name + " : " + str(self.type_)
-        else:
-            return self.name
+    def __str__(self):
+        return self.name  # Omit "(Var )" and don't show type
+
+    def decl_str(self):
+        return self.name + " : " + str(self.type_)
 
 
 class Call(Expr):
@@ -424,7 +424,7 @@ class Lam(Expr):
         super().__init__(arg=arg, body=body, type_=type)
 
     def __str__(self):
-        return paren("Lam " + " ".join([arg.__str__(decl=True), str(self.body)]))
+        return paren("Lam " + " ".join([arg.decl_str(), str(self.body)]))
 
 
 class Let(Expr):
