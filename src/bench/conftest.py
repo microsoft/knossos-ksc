@@ -103,6 +103,8 @@ def functions_to_benchmark(mod, benchmark_name, example_inputs):
             elif fn_name == benchmark_name + "_cuda_init":
                 if torch.cuda.is_available():
                     yield from function_to_manual_cuda_benchmarks(fn_obj)
+            elif fn_name == benchmark_name + "_aten":
+                yield BenchmarkFunction("Aten", fn_obj())
             elif fn_name.startswith(benchmark_name + "_embedded_"):
                 n = len(benchmark_name + "_embedded_")
                 benchmark_display_name = "Embedded " + fn_name[n:]

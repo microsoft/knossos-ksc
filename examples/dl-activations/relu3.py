@@ -26,11 +26,11 @@ def relu3(x: float) -> float:
 
 
 # run-bench: Knossos implementation
-def vrelu3(x: torch.Tensor):
+def xxvrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
 
-def vrelu3_embedded_ks_checkpointed_map():
+def xxvrelu3_embedded_ks_checkpointed_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
@@ -57,7 +57,7 @@ def vrelu3_embedded_ks_checkpointed_map():
     )
 
 
-def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
+def xxvrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
              (if (lt x 0.0)
@@ -89,12 +89,15 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
 
 # run-bench: PyTorch reference implementation
 def vrelu3_pytorch(x: torch.Tensor):
-    mask1_inf = x > 1.0
-    mask0_1 = (x > 0.0) & ~mask1_inf
-    val_0_1 = 1 / 3 * x ** 3
-    val_1_inf = x - 2 / 3
+    return x * 3.14159
 
-    return mask0_1 * val_0_1 + mask1_inf * val_1_inf
+
+#   mask1_inf = x > 1.0
+#   mask0_1 = (x > 0.0) & ~mask1_inf
+#   val_0_1 = 1 / 3 * x ** 3
+#   val_1_inf = x - 2 / 3
+
+#   return mask0_1 * val_0_1 + mask1_inf * val_1_inf
 
 
 # run-bench: PyTorch "nice" implementation
@@ -145,10 +148,37 @@ def vrelu3_cuda_init():
     return VReLu3()
 
 
+def vrelu3_aten():
+    this_dir = os.path.dirname(__file__)
+
+    vrelu3_aten = torch.utils.cpp_extension.load(
+        "vrelu3_aten_module", sources=[os.path.join(this_dir, "vrelu3_aten.cpp"),],
+    )
+
+    class VReLu3AtenFunction(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx, input):
+            output = vrelu3_aten.forward(input)
+            ctx.save_for_backward(input)
+            return output
+
+        @staticmethod
+        def backward(ctx, grad):
+            return vrelu3_aten.backward(grad.contiguous(), *ctx.saved_variables)
+
+    class VReLu3Aten(torch.nn.Module):
+        def __init__(self):
+            super(VReLu3Aten, self).__init__()
+
+        def forward(self, input):
+            return VReLu3AtenFunction.apply(input)
+
+    return VReLu3Aten()
+
+
 # run-bench: Define a range of values at which to call the methods
 def vrelu3_bench_configs():
-    yield torch.randn((4,))
-    yield torch.randn((16,))
+    yield torch.randn((1024 * 1024,))
 
 
 # yield torch.randn((256,256)) too slow to bench...
