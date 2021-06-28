@@ -155,7 +155,7 @@ def parse_arg(arg, allow_Type_Any=False):
     check(len(arg) >= 3, "Expect (arg : type), not: ", arg)
     check(arg[1] == _colon, "No colon: ", arg)
 
-    return Var(parse_name(arg[0]), parse_type(arg[2:], allow_Any=allow_Type_Any), True)
+    return Var(parse_name(arg[0]), parse_type(arg[2:], allow_Any=allow_Type_Any))
 
 
 # "((x : Float) (y : Integer))" -> [Var("x", Type.Float), Var("y", Type.Integer)]
@@ -169,7 +169,7 @@ def parse_args(se, allow_Type_Any=False):
 def parse_expr(se, allow_Type_Any=False):
     # Otherwise, "x" -> a variable use
     if isinstance(se, sexpdata.Symbol):
-        return Var(se.value(), None, False)
+        return Var(se.value(), None)
 
     # "1.2", "1", "'string'"
     if not isinstance(se, list):

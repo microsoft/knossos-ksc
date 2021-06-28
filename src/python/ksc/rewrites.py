@@ -493,11 +493,7 @@ class SubstPattern(ExprTransformer):
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.arg, var_names_to_exprs, [l.body]
         )
-        return Lam(
-            target_var,
-            self.visit(l.body, var_names_to_exprs),
-            type=l.type_,
-        )
+        return Lam(target_var, self.visit(l.body, var_names_to_exprs), type=l.type_,)
 
 
 def parse_rule_str(ks_str, symtab, **kwargs):

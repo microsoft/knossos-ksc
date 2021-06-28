@@ -420,7 +420,7 @@ class Lam(Expr):
     body: Expr
 
     def __init__(self, arg, body, type=None):
-        assert arg.decl
+        assert arg.type_ is not None
         super().__init__(arg=arg, body=body, type_=type)
 
     def __str__(self):
