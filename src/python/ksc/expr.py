@@ -264,6 +264,15 @@ class Def(ASTNode):
         assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
+    def __str__(self):
+        elems = [
+            self.name,
+            self.return_type,
+            "[" + ", ".join([arg.__str__(decl=True) for arg in self.args]) + "]",
+            self.body,
+        ]
+        return paren("Def " + " ".join([str(e) for e in elems]))
+
 
 class EDef(ASTNode):
     """Edef(name, return_type, arg). 
@@ -364,13 +373,12 @@ class Var(Expr):
     """
 
     name: str
-    decl: bool
 
-    def __init__(self, name, type=None, decl=False):
-        super().__init__(type_=type, name=name, decl=decl)
+    def __init__(self, name, type=None):
+        super().__init__(type_=type, name=name)
 
-    def __str__(self):
-        if self.decl:
+    def __str__(self, decl: bool = False):
+        if decl:
             return self.name + " : " + str(self.type_)
         else:
             return self.name
@@ -414,6 +422,9 @@ class Lam(Expr):
     def __init__(self, arg, body, type=None):
         assert arg.decl
         super().__init__(arg=arg, body=body, type_=type)
+
+    def __str__(self):
+        return paren("Lam " + " ".join([arg.__str__(decl=True), str(self.body)]))
 
 
 class Let(Expr):
