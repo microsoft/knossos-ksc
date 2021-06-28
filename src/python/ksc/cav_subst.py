@@ -144,7 +144,7 @@ class CAvSubst(ExprTransformer):
         )  # ExprTransformer ensures.
         arg, substs = self._rename_if_needed(e.arg, e.expr, reqs, substs)
         return Lam(
-            Var(arg.name, type=arg.type_, decl=True), self.visit(e.body, reqs, substs)
+            arg, self.visit(e.body, reqs, substs)
         )
 
     def visit_let(self, e: Union[Let, ExprWithPath], reqs, substs):

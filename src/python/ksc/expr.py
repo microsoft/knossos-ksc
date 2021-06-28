@@ -42,10 +42,10 @@ from ksc.utils import paren, KRecord
 #          value      value'
 #
 # Var: Variable use or declaration (with type)
-# (add x 1.234)  ; use of var, decl=false, type is None or propagated
+# (add x 1.234)  ; use of var, type is None or propagated
 #      ^
 #      name
-# (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+# (lam (x :    Float) ...)  ; decl of var, type is known at parse time
 #       ^      ^^^^^
 #       name   type
 #
@@ -363,10 +363,10 @@ class Var(Expr):
     """Var(name, type, decl). 
     Examples:
     ```
-    (add x 1.234)  ; use of var, decl=false, type is None or propagated
+    (add x 1.234)  ; use of var, type is None or propagated
          ^
          name
-    (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+    (lam (x :    Float) ...)  ; decl of var, type is known at parse time
           ^      ^^^^^
           name   type
     ```

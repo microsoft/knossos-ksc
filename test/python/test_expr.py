@@ -68,8 +68,7 @@ def test_free_vars():
 
 def test_free_vars_lam():
     x = Var("x", Type.Float)
-    xdecl = Var("x", Type.Float, decl=True)
     y = Var("y", Type.Float)
 
-    assert Lam(xdecl, y).free_vars_ == frozenset(["y"])
-    assert Lam(xdecl, x).free_vars_ == frozenset()
+    assert Lam(x, y).free_vars_ == frozenset(["y"])
+    assert Lam(x, x).free_vars_ == frozenset()
