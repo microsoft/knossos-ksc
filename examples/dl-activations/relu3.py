@@ -89,15 +89,12 @@ def xxvrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
 
 # run-bench: PyTorch reference implementation
 def vrelu3_pytorch(x: torch.Tensor):
-    return x * 3.14159
+    mask1_inf = x > 1.0
+    mask0_1 = (x > 0.0) & ~mask1_inf
+    val_0_1 = 1 / 3 * x ** 3
+    val_1_inf = x - 2 / 3
 
-
-#   mask1_inf = x > 1.0
-#   mask0_1 = (x > 0.0) & ~mask1_inf
-#   val_0_1 = 1 / 3 * x ** 3
-#   val_1_inf = x - 2 / 3
-
-#   return mask0_1 * val_0_1 + mask1_inf * val_1_inf
+    return mask0_1 * val_0_1 + mask1_inf * val_1_inf
 
 
 # run-bench: PyTorch "nice" implementation
