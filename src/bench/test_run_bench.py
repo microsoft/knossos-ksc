@@ -7,10 +7,10 @@ cpu_device = torch.device("cpu")
 
 def test_inference(benchmark, reference_func, func, config):
     config_on_func_device = func.to_device(config)
-    result = benchmark_semi_pedantic(benchmark, func.func, config_on_func_device).to(
-        cpu_device
-    )
-    reference_result = reference_func(config)
+    with torch.no_grad():
+        result = benchmark_semi_pedantic(benchmark, func.func, config_on_func_device).to(
+          cpu_device)
+        reference_result = reference_func(config)
     # TODO: generalise correctness test as examples require more than single tensor
     assert torch.allclose(
         result, reference_result
