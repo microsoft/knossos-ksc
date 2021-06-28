@@ -6,6 +6,7 @@ from collections import OrderedDict
 import ksc.expr as expr
 from ksc.type import Type
 from ksc.torch_frontend import ksc_string_to_autograd_function
+from ksc.utils import get_ksc_paths
 import torch._vmap_internals
 
 # BEGINDOC
@@ -114,6 +115,7 @@ def relu3_pytorch_nice(x: float) -> float:
 
 
 def vrelu3_cuda_init():
+    __ksc_path, ksc_runtime_dir = get_ksc_paths()
     this_dir = os.path.dirname(__file__)
 
     vrelu3_cuda = torch.utils.cpp_extension.load(
@@ -122,6 +124,7 @@ def vrelu3_cuda_init():
             os.path.join(this_dir, "vrelu3_cuda.cpp"),
             os.path.join(this_dir, "vrelu3_cuda_kernel.cu"),
         ],
+        extra_include_paths=[ksc_runtime_dir],
     )
 
     class VReLu3Function(torch.autograd.Function):
