@@ -223,7 +223,7 @@ class inline_call(RuleMatcher):
             )
             return (
                 Let(func_def.args[0], call_arg, func_def.body)
-                if len(def_args) == 1
+                if len(func_def.args) == 1
                 else untuple_one_let(Let(func_def.args, call_arg, func_def.body))
             )
 
@@ -470,7 +470,6 @@ class SubstPattern(ExprTransformer):
         return res
 
     def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
-        assert not v.decl
         return var_names_to_exprs[v.name]
 
     def visit_let(self, l: Let, var_names_to_exprs: VariableSubstitution) -> Let:

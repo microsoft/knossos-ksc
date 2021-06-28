@@ -424,7 +424,7 @@ class Lam(Expr):
         super().__init__(arg=arg, body=body, type_=type)
 
     def __str__(self):
-        return paren("Lam " + " ".join([arg.decl_str(), str(self.body)]))
+        return paren("Lam " + " ".join([self.arg.decl_str(), str(self.body)]))
 
 
 class Let(Expr):
