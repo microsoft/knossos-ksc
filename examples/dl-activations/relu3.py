@@ -164,7 +164,7 @@ def vrelu3_aten():
 
         @staticmethod
         def backward(ctx, grad):
-            return vrelu3_aten.backward(grad.contiguous(), *ctx.saved_variables)
+            return vrelu3_aten.backward(grad, *ctx.saved_variables)
 
     class VReLu3Aten(torch.nn.Module):
         def __init__(self):
