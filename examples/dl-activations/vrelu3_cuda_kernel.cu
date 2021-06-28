@@ -28,26 +28,31 @@ inline __device__ scalar_t relu3_forward(scalar_t input) {
   }
 }
 
-template <typename scalar_t>
-__global__ void vrelu3_cuda_forward_kernel_1(
+template <typename scalar_t, typename F>
+__global__ void map_kernel_1(
     const tensor_accessor_1<scalar_t> input,
-    tensor_accessor_1<scalar_t> output) {
+    tensor_accessor_1<scalar_t> output,
+    F f) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < input.size(0))
-    output[i] = relu3_forward(input[i]);
+    output[i] = f(input[i]);
 }
 
-template <typename scalar_t>
-__global__ void vrelu3_cuda_forward_kernel_2(
+template <typename scalar_t, typename F>
+__global__ void map_kernel_2(
     const tensor_accessor_2<scalar_t> input,
-    tensor_accessor_2<scalar_t> output) {
+    tensor_accessor_2<scalar_t> output,
+    F f) {
   const int n = blockIdx.y;
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < input.size(1))
-    output[n][i] = relu3_forward(input[n][i]);
+    output[n][i] = f(input[n][i]);
 }
 
-torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
+template<typename F>
+torch::Tensor map_gpu(
+    torch::Tensor input,
+    F f) {
   CHECK_INPUT(input);
 
   auto output = torch::zeros_like(input);
@@ -60,9 +65,10 @@ torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
       const int threads = 1024;
       const int blocks = (input_size + threads - 1) / threads;
 
-      vrelu3_cuda_forward_kernel_1<ks_float><<<blocks, threads>>>(
+      map_kernel_1<ks_float><<<blocks, threads>>>(
           input.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
-          output.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>());
+          output.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
+          f);
       break;
     }
     case 2: {
@@ -72,9 +78,10 @@ torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
       const int threads = 1024;
       const dim3 blocks((input_size_1 + threads - 1) / threads, input_size_0);
 
-      vrelu3_cuda_forward_kernel_2<ks_float><<<blocks, threads>>>(
+      map_kernel_2<ks_float><<<blocks, threads>>>(
           input.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
-          output.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>());
+          output.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
+          f);
       break;
     }
     default:
@@ -94,30 +101,34 @@ inline __device__ scalar_t relu3_backward(scalar_t grad, scalar_t x) {
   }
 }
 
-template <typename scalar_t>
-__global__ void vrelu3_cuda_backward_kernel_1(
+template <typename scalar_t, typename RevF>
+__global__ void revmap_kernel_1(
     tensor_accessor_1<scalar_t> d_x,
     const tensor_accessor_1<scalar_t> grad,
-    const tensor_accessor_1<scalar_t> x) {
+    const tensor_accessor_1<scalar_t> x,
+    RevF rev_f) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < x.size(0))
-    d_x[i] = relu3_backward(grad[i], x[i]);
+    d_x[i] = rev_f(grad[i], x[i]);
 }
 
-template <typename scalar_t>
-__global__ void vrelu3_cuda_backward_kernel_2(
+template <typename scalar_t, typename RevF>
+__global__ void revmap_kernel_2(
     tensor_accessor_2<scalar_t> d_x,
     const tensor_accessor_2<scalar_t> grad,
-    const tensor_accessor_2<scalar_t> x) {
+    const tensor_accessor_2<scalar_t> x,
+    RevF rev_f) {
   const int n = blockIdx.y;
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < x.size(1))
-    d_x[n][i] = relu3_backward(grad[n][i], x[n][i]);
+    d_x[n][i] = rev_f(grad[n][i], x[n][i]);
 }
 
-torch::Tensor vrelu3_cuda_backward(
+template<typename RevF>
+torch::Tensor revmap_gpu(
     torch::Tensor grad,
-    torch::Tensor x) {
+    torch::Tensor x,
+    RevF rev_f) {
   CHECK_INPUT(grad);
   CHECK_INPUT(x);
 
@@ -130,10 +141,11 @@ torch::Tensor vrelu3_cuda_backward(
       const int threads = 1024;
       const int blocks = (x_size + threads - 1) / threads;
 
-      vrelu3_cuda_backward_kernel_1<ks_float><<<blocks, threads>>>(
+      revmap_kernel_1<ks_float><<<blocks, threads>>>(
           d_x.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
           grad.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
-          x.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>());
+          x.packed_accessor32<ks_float,1,torch::RestrictPtrTraits>(),
+          rev_f);
       break;
     }
     case 2: {
@@ -143,10 +155,11 @@ torch::Tensor vrelu3_cuda_backward(
       const int threads = 1024;
       const dim3 blocks((x_size_1 + threads - 1) / threads, x_size_0);
 
-      vrelu3_cuda_backward_kernel_2<ks_float><<<blocks, threads>>>(
+      revmap_kernel_2<ks_float><<<blocks, threads>>>(
           d_x.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
           grad.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
-          x.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>());
+          x.packed_accessor32<ks_float,2,torch::RestrictPtrTraits>(),
+          rev_f);
       break;
     }
     default:
@@ -155,4 +168,29 @@ torch::Tensor vrelu3_cuda_backward(
   return d_x;
 }
 
+struct Relu3_forward
+{
+  template<typename scalar_t>
+  inline __device__ scalar_t operator()(scalar_t input) {
+    return relu3_forward(input);
+  }
+};
+
+struct Relu3_backward
+{
+  template<typename scalar_t>
+  inline __device__ scalar_t operator()(scalar_t grad, scalar_t x) {
+    return relu3_backward(grad, x);
+  }
+};
+
+torch::Tensor vrelu3_cuda_forward(torch::Tensor input) {
+  return map_gpu(input, Relu3_forward{});
+}
+
+torch::Tensor vrelu3_cuda_backward(
+    torch::Tensor grad,
+    torch::Tensor x) {
+  return revmap_gpu(grad, x, Relu3_backward{});
+}
 
