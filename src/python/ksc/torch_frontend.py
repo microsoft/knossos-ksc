@@ -388,6 +388,8 @@ def ts2ks(output, generate_edefs, function, example_inputs):
 
 
 def torch_from_ks(ks_object):
+    #    return torch.from_numpy(numpy.array([0.0]))
+
     if isinstance(ks_object, tuple):
         return tuple(torch_from_ks(ks) for ks in ks_object)
 

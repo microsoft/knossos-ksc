@@ -44,6 +44,10 @@ Contents:
         ks::fail(__FILE__, __LINE__, #expr);
 
 namespace ks {
+  void *allocate_some_stuff(size_t size) {
+    return aligned_alloc(64, ((size + 63) / 64) * 64);
+  }
+
 	inline void fail [[noreturn]] (char const* file, int line, char const* expr)
 	{
 		std::ostringstream os;
@@ -332,7 +336,9 @@ namespace ks {
 		void* allocate(size_t size)
 		{
 			KS_ASSERT(size < 1000 * 1000000);
+			KS_ASSERT((intptr_t)buf_ % 64 == 0);
 			void* ret = buf_ + top_;
+			KS_ASSERT((intptr_t)ret % 64 == 0);
 			top_ += padded_size(size);
 			if (top_ > peak_) {
 				peak_ = top_;
@@ -341,7 +347,7 @@ namespace ks {
 			return ret;
 		}
 
-		static size_t padded_size(size_t size) { return ((size + 15) / 16) * 16; }
+		static size_t padded_size(size_t size) { return ((size + 63) / 64) * 64; }
 
 		size_t mark() const { return top_;  }
 
@@ -363,10 +369,10 @@ namespace ks {
 	{
 	public:
 		allocator(size_t max_size) :
-			allocator_base(new unsigned char[max_size], max_size)
+		  allocator_base((unsigned char*)allocate_some_stuff(max_size), max_size)
 		{}
 		~allocator() {
-			delete[] static_cast<unsigned char*>(ptr_at(0));
+		  free(ptr_at(0));
 		}
 	};
 
