@@ -100,7 +100,7 @@ def test_replace_subtree_avoids_capturing_another():
     replaced = replace_subtree(e, path_to_y, new_subtree)
     new_var = replaced.arg
     expected = parse_expr_string(
-        f"(lam ({new_var.decl__str()}) (foo x_0 {new_var.name} (mul x 2)))"
+        f"(lam ({new_var.decl_str()}) (foo x_0 {new_var.name} (mul x 2)))"
     )
     assert new_var != conflicting_var
     assert replaced == expected  # Exact, no alpha-equivalence

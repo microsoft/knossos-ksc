@@ -118,6 +118,9 @@ def pretty_StructuredName(sname, ctx):
 def pretty_ASTNode(ex, ctx):
     pp = lambda v: pretty_dispatch(v, ctx)
 
+    def pp_decl(v: Var):
+        return parens(1, pp_variable(v.name), " : ", pp(v.type_))
+
     # Def
     if isinstance(ex, Def):
         return parens(
@@ -132,7 +135,7 @@ def pretty_ASTNode(ex, ctx):
                         LINE,
                         pp(ex.return_type),
                         LINE,
-                        parens_interline(1, *map(pp, ex.args)),
+                        parens_interline(1, *map(pp_decl, ex.args)),
                     ]
                 ),
             ),
@@ -169,7 +172,7 @@ def pretty_ASTNode(ex, ctx):
             LINE,
             pp_string(ex.name),
             LINE,
-            parens_interline(1, *map(pp, ex.template_vars)),
+            parens_interline(1, *map(pp_decl, ex.template_vars)),
             LINE,
             pp(ex.template),
             LINE,
@@ -178,11 +181,7 @@ def pretty_ASTNode(ex, ctx):
 
     # Variable gets syntax-highlighted name
     if isinstance(ex, Var):
-        v = pp_variable(ex.name)
-        if ex.decl:
-            return parens(1, v, " : ", pp(ex.type_))
-        else:
-            return v
+        return pp_variable(ex.name)
 
     # Constants just use str()
     if isinstance(ex, Const):
@@ -248,7 +247,7 @@ def pretty_ASTNode(ex, ctx):
                 2,
                 pp_reserved("lam"),
                 " ",
-                pp(ex.arg),
+                pp_decl(ex.arg),
                 nest(ctx.indent, concat([HARDLINE, pp(ex.body)])),
             ),
         )

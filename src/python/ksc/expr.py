@@ -541,6 +541,9 @@ def _(ex, indent):
         "def "
         + pystr(ex.name, indent)
         + "("
+        # ALAN - DO NOT COMMIT
+        # must add type here, as pystr would have done:
+        # return pyname(ex.name) + ": " + pystr(ex.type_, indent)
         + pystr_intercomma(indent, ex.args)
         + ") -> "
         + pystr(ex.return_type, indent)
@@ -596,10 +599,7 @@ def _(ex, indent):
 
 @pystr.register(Var)
 def _(ex, indent):
-    if ex.decl:
-        return pyname(ex.name) + ": " + pystr(ex.type_, indent)
-    else:
-        return pyname(ex.name)
+    return pyname(ex.name)
 
 
 @pystr.register(Call)
