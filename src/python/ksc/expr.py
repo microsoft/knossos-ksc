@@ -541,10 +541,7 @@ def _(ex, indent):
         "def "
         + pystr(ex.name, indent)
         + "("
-        # ALAN - DO NOT COMMIT
-        # must add type here, as pystr would have done:
-        # return pyname(ex.name) + ": " + pystr(ex.type_, indent)
-        + pystr_intercomma(indent, ex.args)
+        + ", ".join([pyname(a.name) + ": " + pystr(a.type_, indent) for a in ex.args])
         + ") -> "
         + pystr(ex.return_type, indent)
         + ":"
