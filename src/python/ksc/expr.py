@@ -517,7 +517,7 @@ def pystr(expr, indent):
 
 
 @pystr.register(Type)
-def _Type(ty, indent):
+def pystr_Type(ty, indent):
     if ty.is_scalar:
         return ty.kind
     elems = [pystr(c, indent + 1) for c in ty.children]
@@ -525,12 +525,12 @@ def _Type(ty, indent):
 
 
 @pystr.register(StructuredName)
-def _StructuredName(sn, indent):
+def pystr_StructuredName(sn, indent):
     return pyname(sn.mangled())
 
 
 @pystr.register(Def)
-def _Def(ex, indent):
+def pystr_Def(ex, indent):
     indent += 1
     return (
         "def "
@@ -546,7 +546,7 @@ def _Def(ex, indent):
 
 
 @pystr.register(EDef)
-def _EDef(ex, indent):
+def pystr_EDef(ex, indent):
     indent += 1
     return (
         "#edef "
@@ -559,13 +559,13 @@ def _EDef(ex, indent):
 
 
 @pystr.register(GDef)
-def _GDef(ex, indent):
+def pystr_GDef(ex, indent):
     indent += 1
     return "#gdef " + ex.derivation + " " + str(ex.function_name)
 
 
 @pystr.register(Rule)
-def _Rule(ex, indent):
+def pystr_Rule(ex, indent):
     indent += 1
     return (
         "@rule\ndef "
@@ -585,12 +585,12 @@ def _Rule(ex, indent):
 
 
 @pystr.register(Const)
-def _Const(ex, indent):
+def pystr_Const(ex, indent):
     return repr(ex.value)
 
 
 @pystr.register(Var)
-def _Var(ex, indent):
+def pystr_Var(ex, indent):
     if ex.decl:
         return pyname(ex.name) + ": " + pystr(ex.type_, indent)
     else:
@@ -598,13 +598,13 @@ def _Var(ex, indent):
 
 
 @pystr.register(Call)
-def _Call(ex, indent):
+def pystr_Call(ex, indent):
     indent += 1
     return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 
 @pystr.register(Lam)
-def _Lam(ex, indent):
+def pystr_Lam(ex, indent):
     indent += 1
     return (
         "lambda "
@@ -618,7 +618,7 @@ def _Lam(ex, indent):
 
 
 @pystr.register(Let)
-def _Let(ex, indent):
+def pystr_Let(ex, indent):
     if isinstance(ex.vars, list):
         var_str = ",".join(pystr(v, indent) for v in ex.vars)
     else:
@@ -633,7 +633,7 @@ def _Let(ex, indent):
 
 
 @pystr.register(If)
-def _If(ex, indent):
+def pystr_If(ex, indent):
     return (
         "("
         + pystr(ex.t_body, indent + 2)
@@ -647,7 +647,7 @@ def _If(ex, indent):
 
 
 @pystr.register(Assert)
-def _Assert(ex, indent):
+def pystr_Assert(ex, indent):
     indent += 1
     return (
         "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) + pystr(ex.body, indent)
