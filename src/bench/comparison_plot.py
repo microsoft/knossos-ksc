@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Any
 import pytest_benchmark
 import pytest_benchmark.storage
@@ -85,6 +86,9 @@ def make_figure():
     return FigureBundle(figure=figure, axes=axes)
 
 
+dest = Path("build/benchmarks")
+dest.mkdir(parents=True, exist_ok=True)
+
 for benchmark_name, benchmark_value in groupedbenchmarks.items():
 
     figures: Dict[FigureLookup, FigureBundle] = defaultdict(make_figure)
@@ -137,13 +141,16 @@ for benchmark_name, benchmark_value in groupedbenchmarks.items():
 
         figure_bundle.axes.set_ylim(bottom=0.0)
 
-        filename = f"build/{benchmark_name}_{figure_lookup.test_name}_{figure_lookup.configuration}.svg".replace(
-            " ", "_"
+        filename = (
+            dest
+            / f"{benchmark_name}_{figure_lookup.test_name}_{figure_lookup.configuration}.svg".replace(
+                " ", "_"
+            )
         )
 
         figure_bundle.figure.savefig(filename, bbox_inches="tight")
 
     htmlreport = make_template(benchmark_name, configurations)
 
-    with open(f"build/{benchmark_name}.html", "w") as file:
+    with open(dest / f"{benchmark_name}.html", "w") as file:
         file.write(htmlreport)
