@@ -128,12 +128,12 @@ for benchmark_name, benchmark_value in groupedbenchmarks.items():
         handles, labels = figure_bundle.axes.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
 
-        labels_with_incomplate_marking = [
-            label if methods_count[label] == most_values else label + "(incomplate)"
+        labels_with_incomplete_marking = [
+            label if methods_count[label] == most_values else label + "(incomplete)"
             for label in by_label.keys()
         ]
 
-        figure_bundle.axes.legend(by_label.values(), labels_with_incomplate_marking)
+        figure_bundle.axes.legend(by_label.values(), labels_with_incomplete_marking)
 
         figure_bundle.axes.set_ylim(bottom=0.0)
 
