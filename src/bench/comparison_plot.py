@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Any
 import pytest_benchmark
 import pytest_benchmark.storage
 import pytest_benchmark.storage.file
@@ -9,7 +11,6 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 import matplotlib.pyplot as plt
 from collections import defaultdict
-from shutil import copyfile
 
 
 storage = pytest_benchmark.utils.load_storage(".benchmarks", logger=None, netrc=None)
@@ -23,27 +24,50 @@ class FigureBundle:
 
 @dataclass(frozen=True)
 class FigureLookup:
-    method: str
+    test_name: str
     configuration: str
 
 
-groupedbenchmarks = defaultdict(list)
+def make_template(benchmark_name, testandconfigurations):
+    plotsstring = ""
+
+    for test_name, configurations in testandconfigurations.items():
+        # A reverse string ASCIIbetical sort may not be entirely desirable, consider parsing out the ints
+        # and sorting by them in order. This is OK for existing sqrl and vgelu examples, small to big.
+        for configuration in sorted(configurations, reverse=True):
+            plotsstring += f"""<img src="{benchmark_name}_{test_name}_{configuration.replace(" ", "_")}.svg">\n"""
+        plotsstring += """<br/>"""
+
+    # Consider using a serious HTML templating library
+    return f"""<html>
+    <head></head>
+    <style>
+        img {{
+            width: 33%;
+        }}
+    </style>
+    <body>
+        {plotsstring}
+    </body>
+</html>"""
+
+
+groupedbenchmarks: Dict[str, Dict[str, Any]] = defaultdict(lambda: defaultdict(list))
 for path, content in storage.load():
 
     time = dateutil.parser.isoparse(content["commit_info"]["time"])
     for benchmark in content["benchmarks"]:
-
-        # Before this date, everything was sqrl
+        benchmarkfullname = benchmark["name"]
         # TODO: migrate the store so we don't need to do data checks
-        # TODO: generalise to more than sqrl
-        if time.date() < datetime.date(2021, 6, 1) or "sqrl" in benchmark["name"]:
-            testname = benchmark["name"].split("[")[0]  # TODO: harden, use extra_info?
-            groupedbenchmarks[testname].append((time, benchmark))
-        else:
-            print(
-                "Found non-sqrl benchmark, tools need extending https://msrcambridge.visualstudio.com/Knossos/_workitems/edit/19590"
-            )
-            print(benchmark["name"])
+        # TODO: start use extra_info to store benchmark and test name
+        # Before this date, everything was sqrl
+        benchmarkshortname = (
+            benchmarkfullname.split("[")[1].split("_")[0]
+            if time.date() > datetime.date(2021, 6, 1)
+            else "sqrl"
+        )
+        testname = benchmarkfullname.split("[")[0]  # TODO: harden, use extra_info?
+        groupedbenchmarks[benchmarkshortname][testname].append((time, benchmark))
 
 
 labelkey = defaultdict(lambda: "go")
@@ -62,37 +86,71 @@ def make_figure():
     return FigureBundle(figure=figure, axes=axes)
 
 
-figures = defaultdict(make_figure)
+dest = Path("build/benchmarks")
+dest.mkdir(parents=True, exist_ok=True)
 
-for test in ("test_forward", "test_backwards", "test_inference"):
-    for time, benchmark in groupedbenchmarks[test]:
-        group_name = benchmark["group"]
+for benchmark_name, benchmark_value in groupedbenchmarks.items():
 
-        axes = figures[FigureLookup(method=test, configuration=group_name)].axes
-        method = benchmark["name"].split("-")[1]  # TODO: harden, use extra_info?
+    figures: Dict[FigureLookup, FigureBundle] = defaultdict(make_figure)
+    data_count = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(int))
+    )  # test_name / configuration / method
 
-        # TODO: generalise to more than sqrl
-        axes.set_title(f"sqrl {test} {group_name}")
-        axes.plot(
-            time,
-            (benchmark["stats"]["median"] * 1000),
-            labelkey[method],
-            label=method,
-            fillstyle="none",
+    configurations = defaultdict(set)
+
+    for test_name in ("test_forward", "test_backwards", "test_inference"):
+        for time, benchmark in benchmark_value[test_name]:
+            configuration = benchmark["group"]
+
+            axes = figures[
+                FigureLookup(test_name=test_name, configuration=configuration)
+            ].axes
+            method = benchmark["name"].split("-")[1]  # TODO: harden, use extra_info?
+
+            data_count[test_name][configuration][
+                method
+            ] += 1  # Count items to mark missing ones
+
+            configurations[test_name].add(configuration)
+
+            axes.set_title(f"{benchmark_name} {test_name} {configuration}")
+            axes.plot(
+                time,
+                (benchmark["stats"]["median"] * 1000),
+                labelkey[method],
+                label=method,
+                fillstyle="none",
+            )
+
+    for figure_lookup, figure_bundle in figures.items():
+
+        methods_count = data_count[figure_lookup.test_name][figure_lookup.configuration]
+        most_values = max(
+            data_count[figure_lookup.test_name][figure_lookup.configuration].values()
         )
 
-for figure_lookup, figure_bundle in figures.items():
-    handles, labels = figure_bundle.axes.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    figure_bundle.axes.legend(by_label.values(), by_label.keys())
+        handles, labels = figure_bundle.axes.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
 
-    figure_bundle.axes.set_ylim(bottom=0.0)
+        labels_with_incomplete_marking = [
+            label if methods_count[label] == most_values else label + "(incomplete)"
+            for label in by_label.keys()
+        ]
 
-    filename = f"build/sqrl_{figure_lookup.method}_{figure_lookup.configuration}.svg".replace(
-        " ", "_"
-    )
-    # print(f"saving {filename}")
+        figure_bundle.axes.legend(by_label.values(), labels_with_incomplete_marking)
 
-    figure_bundle.figure.savefig(filename, bbox_inches="tight")
+        figure_bundle.axes.set_ylim(bottom=0.0)
 
-copyfile("src/bench/sqrl.html", "build/sqrl.html")
+        filename = (
+            dest
+            / f"{benchmark_name}_{figure_lookup.test_name}_{figure_lookup.configuration}.svg".replace(
+                " ", "_"
+            )
+        )
+
+        figure_bundle.figure.savefig(filename, bbox_inches="tight")
+
+    htmlreport = make_template(benchmark_name, configurations)
+
+    with open(dest / f"{benchmark_name}.html", "w") as file:
+        file.write(htmlreport)
