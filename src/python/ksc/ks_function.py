@@ -1,5 +1,5 @@
-from ksc.utils import generate_and_compile_cpp_from_ks, translate_and_import
-
+from ksc.utils import translate_and_import
+from ksc.compile import generate_and_compile_cpp_from_ks
 from ksc.shape import ShapeType, shape_type_from_object
 
 
