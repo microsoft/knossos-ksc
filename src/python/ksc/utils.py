@@ -3,7 +3,6 @@ import itertools
 import importlib.util
 import os
 from tempfile import NamedTemporaryFile
-from tempfile import gettempdir
 from contextlib import contextmanager
 
 
