@@ -1,5 +1,5 @@
 from ksc.utils import translate_and_import
-from ksc.compile import generate_and_compile_cpp_from_ks
+from ksc.compile import build_py_module_from_ks
 from ksc.expr import make_structured_name
 from ksc.shape import ShapeType, shape_type_from_object
 from ksc.type import make_tuple_if_many
@@ -63,7 +63,7 @@ class KsFunction:
         print(ks_str)
         if backend == "cpp":
             if self._py_mod is None:
-                self._py_mod = generate_and_compile_cpp_from_ks(
+                self._py_mod = build_py_module_from_ks(
                     ks_str,
                     [
                         (
