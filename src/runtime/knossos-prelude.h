@@ -146,6 +146,7 @@ inline Float to_float$ai(allocator *, Integer d) { return d; }
 
 inline Bool or$abb(allocator *, Bool b1, Bool b2)  { return b1 || b2; }
 inline Bool and$abb(allocator *, Bool b1, Bool b2) { return b1 && b2; }
+inline Float bool_to_float$ab(allocator *, Bool b) { return b; }
 }
 
 #include "knossos-prelude-lm.h"
