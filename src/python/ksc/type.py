@@ -6,16 +6,6 @@ class KSTypeError(RuntimeError):
     pass
 
 
-# TODO: decide if we want to keep this approach, or move to module level functions
-# https://github.com/microsoft/knossos-ksc/issues/888
-class classproperty(object):
-    def __init__(self, getter):
-        self.getter = getter
-
-    def __get__(self, _, owner):
-        return self.getter(owner)
-
-
 class Type:
     """
     Knossos AST node type.  Grouped into
@@ -25,6 +15,12 @@ class Type:
         Lam S T
         LM  S T
     """
+
+    String: "Type"
+    Float: "Type"
+    Integer: "Type"
+    Bool: "Type"
+    Any: "Type"
 
     node_kinds = {
         "Tensor": 2,  # two children (Rank, Type)
@@ -57,26 +53,6 @@ class Type:
 
     ################
     ## Constructors
-
-    @classproperty
-    def String(cls) -> "Type":
-        return Type("String")
-
-    @classproperty
-    def Float(cls) -> "Type":
-        return Type("Float")
-
-    @classproperty
-    def Integer(cls) -> "Type":
-        return Type("Integer")
-
-    @classproperty
-    def Bool(cls) -> "Type":
-        return Type("Bool")
-
-    @classproperty
-    def Any(cls) -> "Type":
-        return Type("Any")
 
     @staticmethod
     def Tensor(rank, elem_type):
@@ -371,3 +347,10 @@ def shape_type(t: Type) -> Type:
             return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
 
     raise NotImplementedError
+
+
+Type.String = Type("String")
+Type.Float = Type("Float")
+Type.Integer = Type("Integer")
+Type.Bool = Type("Bool")
+Type.Any = Type("Any")
