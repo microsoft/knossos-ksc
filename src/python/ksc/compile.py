@@ -5,7 +5,6 @@ import sysconfig
 import sys
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
-import warnings
 
 from ksc import utils
 
@@ -137,14 +136,6 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
     return module_name, module_path
 
 
-def mangleType(ty):
-    return ty.shortstr()
-
-
-def mangleTypes(tys):
-    return "".join(mangleType(ty) for ty in tys)
-
-
 derivatives_to_generate_default = ["fwd", "rev"]
 
 
@@ -161,34 +152,6 @@ def __make_cpp_str_from_structured_name(
     declarations_to_generate = [
         (python_name, utils.encode_name(mangled_with_type(structured_name)))
         for (python_name, structured_name) in declarations_to_generate
-    ]
-
-    generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
-
-    return __make_cpp_str_backend(
-        generated_cpp_source, declarations_to_generate, python_module_name
-    )
-
-
-# Callers of __make_cpp_str should be updated to call
-# __make_cpp_str_from_structured_name instead.  Then __make_cpp_str,
-# mangleType and mangleTypes should be deleted.
-def __make_cpp_str(
-    ks_str,
-    name_to_call,
-    python_module_name,
-    arg_types,
-    derivatives_to_generate=derivatives_to_generate_default,
-    use_aten=True,
-):
-    warnings.warn("__make_cpp_str is deprecated", DeprecationWarning)
-    args_str = mangleTypes(arg_types)
-
-    declarations_to_generate = [
-        ("entry", utils.encode_name(f"{name_to_call}@{args_str}"))
-    ] + [
-        (f"{der}_entry", utils.encode_name(f"{der}${name_to_call}@{args_str}"))
-        for der in derivatives_to_generate
     ]
 
     generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
@@ -238,17 +201,10 @@ PYBIND11_MODULE("""
     return cpp_str
 
 
-def generate_and_compile_cpp_from_ks(
-    ks_str, name_to_call, arg_types, derivatives_to_generate=[], use_aten=False,
-):
+def generate_and_compile_cpp_from_ks(ks_str, declarations_to_generate, use_aten=False):
 
-    cpp_str = __make_cpp_str(
-        ks_str,
-        name_to_call,
-        "PYTHON_MODULE_NAME",
-        arg_types,
-        derivatives_to_generate,
-        use_aten,
+    cpp_str = __make_cpp_str_from_structured_name(
+        ks_str, declarations_to_generate, "PYTHON_MODULE_NAME", use_aten
     )
 
     cpp_fname = (
