@@ -142,7 +142,7 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
 derivatives_to_generate_default = ["fwd", "rev"]
 
 
-def __make_cpp_str_from_structured_name(
+def generate_cpp_for_py_module_from_ks(
     ks_str, declarations_to_generate, python_module_name, use_aten=True,
 ):
     def mangled_with_type(structured_name):
@@ -157,22 +157,17 @@ def __make_cpp_str_from_structured_name(
         for (python_name, structured_name) in declarations_to_generate
     ]
 
-    generated_cpp_source = generate_cpp_from_ks(ks_str, use_aten=use_aten)
-
-    return __make_cpp_str_backend(
-        generated_cpp_source, declarations_to_generate, python_module_name
+    cpp_ks_functions = generate_cpp_from_ks(ks_str, use_aten=use_aten)
+    cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
+        declarations_to_generate, python_module_name
     )
 
+    return cpp_ks_functions + cpp_pybind_module_declaration
 
-def __make_cpp_str_backend(
-    generated_cpp_source, declarations_to_generate, python_module_name
+
+def generate_cpp_pybind_module_declaration(
+    declarations_to_generate, python_module_name
 ):
-    cpp_str = f"""
-    #include "knossos-pybind.h"
-    {generated_cpp_source}
-
-    """
-
     def m_def(python_name, cpp_name):
         return f"""
         m.def("{python_name}", with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
@@ -180,8 +175,11 @@ def __make_cpp_str_backend(
 
     declarations = "\n".join(m_def(*t) for t in declarations_to_generate)
 
-    cpp_str += (
+    return (
         """
+
+#include "knossos-pybind.h"
+
 PYBIND11_MODULE("""
         + python_module_name
         + """, m) {
@@ -201,12 +199,10 @@ PYBIND11_MODULE("""
 """
     )
 
-    return cpp_str
 
+def build_py_module_from_ks(ks_str, declarations_to_generate, use_aten=False):
 
-def generate_and_compile_cpp_from_ks(ks_str, declarations_to_generate, use_aten=False):
-
-    cpp_str = __make_cpp_str_from_structured_name(
+    cpp_str = generate_cpp_for_py_module_from_ks(
         ks_str, declarations_to_generate, "PYTHON_MODULE_NAME", use_aten
     )
 
@@ -236,7 +232,7 @@ def build_module_using_pytorch_from_ks(
       str is the Python name given to that function when exposed.
       Each StructuredName must have a type attached
     """
-    cpp_str = __make_cpp_str_from_structured_name(
+    cpp_str = generate_cpp_for_py_module_from_ks(
         ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", use_aten,
     )
 
@@ -246,10 +242,10 @@ def build_module_using_pytorch_from_ks(
 def build_module_using_pytorch_from_cpp(
     cpp_str, declarations_to_generate, use_aten,
 ):
-    cpp_str_generated = __make_cpp_str_backend(
-        cpp_str, declarations_to_generate, "TORCH_EXTENSION_NAME"
+    cpp_pybind = generate_cpp_pybind_module_declaration(
+        declarations_to_generate, "TORCH_EXTENSION_NAME"
     )
-    return build_module_using_pytorch_from_cpp_backend(cpp_str_generated, use_aten)
+    return build_module_using_pytorch_from_cpp_backend(cpp_str + cpp_pybind, use_aten)
 
 
 def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
