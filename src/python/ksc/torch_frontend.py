@@ -557,7 +557,7 @@ def cpp_string_to_autograd_function(cpp_str, entry_name, generate_lm):
 import inspect
 
 
-def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
+def tsmod2ksdefs(module, function_name, example_inputs) -> List[Def]:
     global todo_stack
     todo_stack = {function_name}
     ksc_defs = []
@@ -573,8 +573,18 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
                 ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
                 ksc_defs.insert(0, ksc_def)
 
+    return ksc_defs
+
+
+def ksdefs2ksmod(ksc_defs: List[Def], generate_lm=True):
     entry_def = ksc_defs[-1]
     return ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm)
+
+
+def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
+    return ksdefs2ksmod(
+        tsmod2ksdefs(module, function_name, example_inputs), generate_lm
+    )
 
 
 def ts2mod(function, example_inputs, generate_lm=True):

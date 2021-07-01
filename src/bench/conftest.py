@@ -10,7 +10,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from typing import Callable
 
-from ksc.torch_frontend import tsmod2ksmod
+from ksc.torch_frontend import tsmod2ksmod, tsmod2ksdefs, ksdefs2ksmod
 from ksc import utils
 
 
@@ -86,6 +86,11 @@ def function_to_manual_cuda_benchmarks(func):
     )
 
 
+def do_fun_things_to_defs(defs):
+    # Supply the fun things
+    return defs
+
+
 def functions_to_benchmark(mod, benchmark_name, example_inputs):
     for fn_name, fn_obj in inspect.getmembers(mod, lambda m: inspect.isfunction(m)):
         if fn_name.startswith(benchmark_name):
@@ -96,10 +101,19 @@ def functions_to_benchmark(mod, benchmark_name, example_inputs):
             elif fn_name == benchmark_name + "_pytorch_nice":
                 yield BenchmarkFunction("PyTorch Nice", fn_obj)
             elif fn_name == benchmark_name:
+                print("XYZ")
                 ks_mod = tsmod2ksmod(
                     mod, benchmark_name, example_inputs, generate_lm=False
                 )
                 yield BenchmarkFunction("Knossos", ks_mod.apply)
+
+                # TODO: function / file of RLO operations
+                defs = tsmod2ksdefs(mod, benchmark_name, example_inputs)
+                defs_but_better = do_fun_things_to_defs(defs)
+                ks_mod_rlo = ksdefs2ksmod(defs_but_better, generate_lm=False)
+
+                yield BenchmarkFunction("Knossos (RLO)", ks_mod_rlo.apply)
+
             elif fn_name == benchmark_name + "_cuda_init":
                 if torch.cuda.is_available():
                     yield from function_to_manual_cuda_benchmarks(fn_obj)
