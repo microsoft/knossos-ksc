@@ -520,23 +520,23 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
 
 
 def ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate):
-    declarations_to_generate = [("entry", entry_sn)] + [
+    bindings_to_generate = [("entry", entry_sn)] + [
         (f"{der}_entry", StructuredName((der, entry_sn)))
         for der in derivatives_to_generate
     ]
 
     return build_module_using_pytorch_from_ks(
-        ks_str, declarations_to_generate, use_aten=True,
+        ks_str, bindings_to_generate, use_aten=True
     )
 
 
 def cpp_string_to_module(cpp_str, entry_name, derivatives_to_generate):
-    declarations_to_generate = [("entry", entry_name)] + [
+    bindings_to_generate = [("entry", entry_name)] + [
         (f"{der}_entry", f"{der}_{entry_name}") for der in derivatives_to_generate
     ]
 
     return build_module_using_pytorch_from_cpp(
-        cpp_str, declarations_to_generate, use_aten=True,
+        cpp_str, bindings_to_generate, use_aten=True,
     )
 
 

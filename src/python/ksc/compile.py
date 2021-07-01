@@ -143,7 +143,7 @@ derivatives_to_generate_default = ["fwd", "rev"]
 
 
 def generate_cpp_for_py_module_from_ks(
-    ks_str, declarations_to_generate, python_module_name, use_aten=True,
+    ks_str, bindings_to_generate, python_module_name, use_aten=True,
 ):
     def mangled_with_type(structured_name):
         if not structured_name.has_type():
@@ -152,28 +152,24 @@ def generate_cpp_for_py_module_from_ks(
             )
         return structured_name.mangled()
 
-    declarations_to_generate = [
+    bindings = [
         (python_name, utils.encode_name(mangled_with_type(structured_name)))
-        for (python_name, structured_name) in declarations_to_generate
+        for (python_name, structured_name) in bindings_to_generate
     ]
 
     cpp_ks_functions = generate_cpp_from_ks(ks_str, use_aten=use_aten)
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
-        declarations_to_generate, python_module_name
+        bindings, python_module_name
     )
 
     return cpp_ks_functions + cpp_pybind_module_declaration
 
 
-def generate_cpp_pybind_module_declaration(
-    declarations_to_generate, python_module_name
-):
+def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_name):
     def m_def(python_name, cpp_name):
         return f"""
         m.def("{python_name}", with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
         """
-
-    declarations = "\n".join(m_def(*t) for t in declarations_to_generate)
 
     return (
         """
@@ -193,17 +189,17 @@ PYBIND11_MODULE("""
     declare_tensor_2<int>(m, "Tensor_2_Integer");
 
 """
-        + declarations
+        + "\n".join(m_def(*t) for t in bindings_to_generate)
         + """
 }
 """
     )
 
 
-def build_py_module_from_ks(ks_str, declarations_to_generate, use_aten=False):
+def build_py_module_from_ks(ks_str, bindings_to_generate, use_aten=False):
 
     cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, declarations_to_generate, "PYTHON_MODULE_NAME", use_aten
+        ks_str, bindings_to_generate, "PYTHON_MODULE_NAME", use_aten
     )
 
     cpp_fname = (
@@ -218,7 +214,7 @@ def build_py_module_from_ks(ks_str, declarations_to_generate, use_aten=False):
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, declarations_to_generate, use_aten=False,
+    ks_str, bindings_to_generate, use_aten=False,
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -226,24 +222,24 @@ def build_module_using_pytorch_from_ks(
 
       The text of a ks source file
 
-    * declarations_to_generate : Iterable[Tuple[str, StructuredName]]
+    * bindings_to_generate : Iterable[Tuple[str, StructuredName]]
 
       The StructuredName is the ksc function to expose to Python.  The
       str is the Python name given to that function when exposed.
       Each StructuredName must have a type attached
     """
     cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, declarations_to_generate, "TORCH_EXTENSION_NAME", use_aten,
+        ks_str, bindings_to_generate, "TORCH_EXTENSION_NAME", use_aten
     )
 
     return build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten)
 
 
 def build_module_using_pytorch_from_cpp(
-    cpp_str, declarations_to_generate, use_aten,
+    cpp_str, bindings_to_generate, use_aten,
 ):
     cpp_pybind = generate_cpp_pybind_module_declaration(
-        declarations_to_generate, "TORCH_EXTENSION_NAME"
+        bindings_to_generate, "TORCH_EXTENSION_NAME"
     )
     return build_module_using_pytorch_from_cpp_backend(cpp_str + cpp_pybind, use_aten)
 
