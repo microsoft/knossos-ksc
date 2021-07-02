@@ -64,13 +64,14 @@ def vrelu3_embedded_ks_checkpointed_map():
 
 
 embedded_cpp_entry_points = """
-namespace ks {
-ks::tensor<1, ks::Float> entry(ks::allocator * $alloc, ks::tensor<1, ks::Float> t) {
-    return ks::vrelu3($alloc, t);
+#include "knossos-entry-points.h"
+
+ks::tensor<1, ks::Float> entry(ks::tensor<1, ks::Float> t) {
+    return ks::vrelu3(&ks::entry_points::g_alloc, t);
 }
-ks::tensor<1, ks::Float> entry_vjp(ks::allocator * $alloc, ks::tensor<1, ks::Float> t, ks::tensor<1, ks::Float> dret) {
-    return ks::sufrev_vrelu3($alloc, t, dret);
-}
+
+ks::tensor<1, ks::Float> entry_vjp(ks::tensor<1, ks::Float> t, ks::tensor<1, ks::Float> dret) {
+    return ks::sufrev_vrelu3(&ks::entry_points::g_alloc, t, dret);
 }
 """
 
