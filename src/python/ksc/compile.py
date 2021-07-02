@@ -24,31 +24,34 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
 
     with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
         fks.write(ks_str)
+    with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
+        pass
+    with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
+        pass
+
+    print("generate_cpp_from_ks:", ksc_path, fks.name)
+    ksc_command = [
+        ksc_path,
+        "--generate-cpp",
+        "--ks-source-file",
+        ksc_runtime_dir + "/prelude.ks",
+        *(
+            ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
+            if use_aten
+            else ()
+        ),
+        "--ks-source-file",
+        fks.name,
+        "--ks-output-file",
+        fkso.name,
+        "--cpp-output-file",
+        fcpp.name,
+    ]
+
     try:
-        ksc_command = []
-        with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
-            with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
-                print("generate_cpp_from_ks:", ksc_path, fks.name)
-                ksc_command = [
-                    ksc_path,
-                    "--generate-cpp",
-                    "--ks-source-file",
-                    ksc_runtime_dir + "/prelude.ks",
-                    *(
-                        ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
-                        if use_aten
-                        else ()
-                    ),
-                    "--ks-source-file",
-                    fks.name,
-                    "--ks-output-file",
-                    fkso.name,
-                    "--cpp-output-file",
-                    fcpp.name,
-                ]
-                e = subprocess.run(ksc_command, capture_output=True, check=True,)
-                print(e.stdout.decode("ascii"))
-                print(e.stderr.decode("ascii"))
+        e = subprocess.run(ksc_command, capture_output=True, check=True,)
+        print(e.stdout.decode("ascii"))
+        print(e.stderr.decode("ascii"))
     except subprocess.CalledProcessError as e:
         print(f"Command failed:\n{' '.join(ksc_command)}")
         print(f"files {fks.name} {fkso.name} {fcpp.name}")
@@ -67,7 +70,7 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
         @atexit.register
         def _():
             print(
-                "ksc.utils.generate_cpp_from_ks: Deleting",
+                "ksc.compile.generate_cpp_from_ks: Deleting",
                 fks.name,
                 fcpp.name,
                 fkso.name,
