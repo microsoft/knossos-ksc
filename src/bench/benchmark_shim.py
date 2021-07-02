@@ -34,12 +34,13 @@ def benchmark_semi_pedantic(
 
     duration, iterations, _ = benchmark._calibrate_timer(runner)
 
+    if duration > benchmark._max_time:
+        raise Exception(
+            f"""Duration({duration}) of even a single benchmark round is greater than max_time({benchmark._max_time}), aborting."""
+        )
+
     # Choose how many time we must repeat the test
     rounds = int(ceil(benchmark._max_time / duration))
-    if rounds < benchmark._min_rounds:
-        raise Exception(
-            f"""Duration({duration}) and min_rounds({benchmark._min_rounds}) can't be completed within max_time({benchmark._max_time})"""
-        )
     rounds = max(rounds, benchmark._min_rounds)
     rounds = min(rounds, sys.maxsize)
 
