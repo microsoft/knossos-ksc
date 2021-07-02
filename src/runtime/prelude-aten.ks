@@ -105,20 +105,20 @@
 (gdef sufrev [aten::mul (Tuple (Tensor 2 Float) (Tensor 2 Float))])
 
 ;; add
+(def aten::add Float ((a : Float) (b : Float))
+    (add a b))
+(gdef fwd [aten::add (Tuple Float Float)])
+(gdef rev [aten::add (Tuple Float Float)])
+(gdef suffwdpass [aten::add (Tuple Float Float)])
+(gdef sufrevpass [aten::add (Tuple Float Float)])
+(gdef sufrev [aten::add (Tuple Float Float)])
+
+(def aten::add Integer ((a : Integer) (b : Integer))
+    (add a b))
+(gdef fwd [aten::add (Tuple Integer Integer)])
+(gdef rev [aten::add (Tuple Integer Integer)])
+
 ; https://pytorch.org/docs/stable/generated/torch.add.html#torch.add
-(def aten::add Float ((a : Float) (b : Float) (alpha : Integer))
-    (add a (mul (to_float alpha) b)))
-(gdef fwd [aten::add (Tuple Float Float Integer)])
-(gdef rev [aten::add (Tuple Float Float Integer)])
-(gdef suffwdpass [aten::add (Tuple Float Float Integer)])
-(gdef sufrevpass [aten::add (Tuple Float Float Integer)])
-(gdef sufrev [aten::add (Tuple Float Float Integer)])
-
-(def aten::add Integer ((a : Integer) (b : Integer) (alpha : Integer))
-    (add a (mul alpha b)))
-(gdef fwd [aten::add (Tuple Integer Integer Integer)])
-(gdef rev [aten::add (Tuple Integer Integer Integer)])
-
 (def aten::add (Tensor 1 Float) ((a : (Tensor 1 Float)) (b : Float) (alpha : Integer))
     (build (size a) (lam (inds : Integer)
       (add (index inds a) (mul (to_float alpha) b)))))
