@@ -177,3 +177,17 @@ def _alpha_hash_lam(l: Lam, reverse_debruijn_vars: PMap[str, int]) -> int:
 
 def alpha_hash(e: Expr):
     return _alpha_hash_helper(e, pmap())
+
+
+class AlphaHashWrapper(NamedTuple):
+    """ Allows alpha_hash and are_alpha_equivalent to be used with a python set/dict """
+
+    expr: Expr
+
+    def __hash__(self):
+        return alpha_hash(self.expr)
+
+    def __eq__(self, other):
+        return isinstance(other, AlphaHashWrapper) and are_alpha_equivalent(
+            self.expr, other.expr
+        )

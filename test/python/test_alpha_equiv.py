@@ -1,4 +1,4 @@
-from ksc.alpha_equiv import are_alpha_equivalent, alpha_hash
+from ksc.alpha_equiv import are_alpha_equivalent, alpha_hash, AlphaHashWrapper
 from ksc.expr import Const, Let, Var
 from ksc.parse_ks import parse_expr_string
 from ksc.type_propagate import type_propagate_decls, type_propagate
@@ -100,3 +100,25 @@ def test_alpha_equiv_all_node_types():
     )
     assert not are_alpha_equivalent(e1, e_diff)
     assert alpha_hash(e1) != alpha_hash(e_diff)
+
+
+def test_alpha_hash_wrapper():
+    exprs = [
+        AlphaHashWrapper(parse_expr_string(s))
+        for s in [
+            ("(let (x 3) (add x x))"),
+            ("(let (y 3) (add y y))"),
+            ("(add (let (x 3) x) 3)"),
+        ]
+    ]
+    s = set(exprs)
+    assert len(s) == 2
+    assert s == frozenset(exprs[1:])
+    z = AlphaHashWrapper(parse_expr_string("(let (z 3) (add z z))"))
+    s.remove(z)
+    assert s == frozenset([exprs[2]])
+
+    d = {e: i for i, e in enumerate(exprs)}
+    assert d[exprs[0]] == d[z] == 1  # Overwritten
+    d[exprs[0]] = 5
+    assert d[z] == d[exprs[1]] == 5
