@@ -36,7 +36,7 @@ def benchmark_semi_pedantic(
 
     if duration > benchmark._max_time:
         raise Exception(
-            f"""Duration({duration}) of even a single benchmark round is greater than max_time({benchmark._max_time}), aborting."""
+            f"""The duration({duration}) of a single run of the benchmark function was longer than max_time({benchmark._max_time}), aborting."""
         )
 
     # Choose how many time we must repeat the test
