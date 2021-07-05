@@ -1,6 +1,7 @@
 from collections.abc import Sequence as AbstractSeq
 from dataclasses import dataclass
-from itertools import count, islice
+from itertools import islice
+import re
 from typing import Dict, List, Mapping, NamedTuple, Sequence, Tuple, Type, Union
 
 from ksc.expr import Expr, Let, Lam, If, Assert, Call
@@ -123,3 +124,41 @@ def subexps_no_binds(e: Expr) -> List[Expr]:
     # ExprWithPath identifies all the non-binding sub-expressions.
     # TODO: consider rewriting callers into Visitors in order to remove this.
     return [c.expr for c in ExprWithPath.from_expr(e).all_subexprs_with_paths()]
+
+
+#####################################################################
+# Serialization to JSON
+
+SerializedPath = List[str]
+""" A JSON-able representation of a Path """
+
+
+def serialize_path(path: Path) -> SerializedPath:
+    # There is no particular need to use str() to turn elements to strings,
+    # but str() contains all the information that's needed.
+    return [str(elem) for elem in path]
+
+
+_known_field_elements: Mapping[str, _FieldElement] = {
+    str(e): e
+    for class_fields in _field_elements_by_class.values()
+    for e in class_fields.values()
+}
+# Check _FieldElements all have different str()s
+assert len(_known_field_elements) == sum(
+    len(c) for c in _field_elements_by_class.values()
+)
+_call_args_regex = re.compile(r"call_args\[([0-9]+)\]")
+
+
+def deserialize_path(s_path: SerializedPath) -> Path:
+    def deserialize_elem(s_elem: str) -> PathElement:
+        if s_elem in _known_field_elements:
+            return _known_field_elements[s_elem]
+        call_arg = _call_args_regex.match(s_elem)
+        if call_arg is not None:
+            which_arg = int(call_arg.group(1))
+            return call_args[which_arg]
+        raise ValueError(f"Could not decode serialized PathElement {s_elem}")
+
+    return tuple(deserialize_elem(e) for e in s_path)
