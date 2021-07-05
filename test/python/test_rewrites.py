@@ -440,20 +440,23 @@ def test_rule_pickling():
 def test_rewrite_seq_to_exprs(prelude_symtab):
     from ksc import rewrites_prelude
 
-    expr = parse_expr_string("(let (x (add 3 5)) (div 2.0 (to_float x)))")
+    foo_def = utils.single_elem(
+        list(parse_ks_file("(def foo Float (x : Integer) (add 2.0 (to_float x)))"))
+    )
+    start_expr = parse_expr_string("(foo 4)")
     seq, expected = zip(
+        (["inline_call", []], "(let (x 4) (add 2.0 (to_float x)))"),
         (
             ["inline_var", ["Let.body", "call_args[1]", "call_args[0]"]],
-            "(let (x (add 3 5)) (div 2.0 (to_float (add 3 5))))",
+            "(let (x 4) (add 2.0 (to_float 4)))",
         ),
-        (["delete_let", []], "(div 2.0 (to_float (add 3 5)))"),
-        (["cfold_add@ii", ["call_args[1]", "call_args[0]"]], "(div 2.0 (to_float 8))"),
-        (["cfold_to_float@i", ["call_args[1]"]], "(div 2.0 8.0)"),
-        (["cfold_div@ff", []], "0.25"),
+        (["delete_let", []], "(add 2.0 (to_float 4))"),
+        (["cfold_to_float@i", ["call_args[1]"]], "(add 2.0 4.0)"),
+        (["cfold_add@ff", []], "6.0"),
     )
     expected_exprs = [parse_expr_string(s) for s in expected]
-    type_propagate_decls([expr] + expected_exprs, prelude_symtab)
+    type_propagate_decls([foo_def, start_expr] + expected_exprs, prelude_symtab)
 
-    actual = rewrite_seq_to_exprs(expr, {}, seq)
+    actual = rewrite_seq_to_exprs(start_expr, {foo_def.name: foo_def}, seq)
 
     assert actual == expected_exprs
