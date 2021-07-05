@@ -9,6 +9,7 @@ from ksc.rewrites import (
     inline_var,
     delete_let,
     parse_rule_str,
+    rewrite_seq_to_exprs,
 )
 from ksc.parse_ks import parse_expr_string, parse_ks_file
 from ksc.type import Type, KSTypeError
@@ -434,3 +435,25 @@ def test_rule_pickling():
 
     r = pickle.loads(pickle.dumps(inline_var))
     assert r is inline_var
+
+
+def test_rewrite_seq_to_exprs(prelude_symtab):
+    from ksc import rewrites_prelude
+
+    expr = parse_expr_string("(let (x (add 3 5)) (div 2.0 (to_float x)))")
+    seq, expected = zip(
+        (
+            ["inline_var", ["Let.body", "call_args[1]", "call_args[0]"]],
+            "(let (x (add 3 5)) (div 2.0 (to_float (add 3 5))))",
+        ),
+        (["delete_let", []], "(div 2.0 (to_float (add 3 5)))"),
+        (["cfold_add@ii", ["call_args[1]", "call_args[0]"]], "(div 2.0 (to_float 8))"),
+        (["cfold_to_float@i", ["call_args[1]"]], "(div 2.0 8.0)"),
+        (["cfold_div@ff", []], "0.25"),
+    )
+    expected_exprs = [parse_expr_string(s) for s in expected]
+    type_propagate_decls([expr] + expected_exprs, prelude_symtab)
+
+    actual = rewrite_seq_to_exprs(expr, {}, seq)
+
+    assert actual == expected_exprs

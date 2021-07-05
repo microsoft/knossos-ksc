@@ -38,7 +38,13 @@ from ksc.expr import (
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.prim import make_prim_call
-from ksc.path import Path, ExprWithPath, subexps_no_binds
+from ksc.path import (
+    Path,
+    ExprWithPath,
+    subexps_no_binds,
+    SerializedPath,
+    deserialize_path,
+)
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
 from ksc.untuple_lets import untuple_one_let
@@ -516,3 +522,38 @@ def parse_rule_str(ks_str, symtab, **kwargs):
 def parse_rules_from_file(filename):
     with open(filename) as f:
         return [ParsedRuleMatcher(r) for r in parse_ks_string(f, filename)]
+
+
+def rewrite_seq_to_exprs(
+    expr: Expr,
+    defs: Mapping[StructuredName, Def],
+    rewrite_seq: Iterable[Tuple[str, SerializedPath]],
+) -> List[Expr]:
+    """ Performs a series of rewrites, returning a list of the intermediate (and final) expressions.
+        Note the caller must ensure all required rules are imported/loaded/parsed and registered. """
+
+    def follow_sequence(expr):
+        for (rule_name, s_path) in rewrite_seq:
+            path = deserialize_path(s_path)
+            matches = list(rule(rule_name).find_all_matches(expr, defs))
+            if any(m.ewp.path == path for m in matches):
+                match = single_elem([m for m in matches if m.ewp.path == path])
+                assert match.rule.name == rule_name
+                expr = match.apply_rewrite()
+                yield expr
+            else:
+                # No match. To diagnose the error, first check if the path was valid within the expression.
+                try:
+                    subexp = ExprWithPath.from_expr(expr, path)
+                except AttributeError as e:
+                    raise ValueError(
+                        f"Path {path} not valid within expression {expr}. Could not apply rule {rule_name}"
+                    ) from e
+
+                msg = (
+                    f"Rule {rule_name} did not apply at {path}. Applicable locations were: "
+                    f"{[m.ewp.path for m in matches]} in expression: {expr}"
+                )
+                raise ValueError(msg)
+
+    return list(follow_sequence(expr))
