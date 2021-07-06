@@ -377,7 +377,7 @@ def find_template_subst(
     exp_children = subexps_no_binds(exp)
     if len(tmpl_children) != len(exp_children):
         return None
-    d = dict()
+    d: Dict = dict()
     for t, e in zip(tmpl_children, exp_children):
         d = _combine_substs(d, find_template_subst(t, e, template_vars))
         if d is None:
