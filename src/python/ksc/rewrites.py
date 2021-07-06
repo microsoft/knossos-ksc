@@ -100,7 +100,7 @@ class AbstractMatcher(ABC):
         """ Return any matches which rewrite the topmost node of the specified subtree """
 
 
-_rule_dict: Mapping[str, "RuleMatcher"] = {}
+_rule_dict: Dict[str, "RuleMatcher"] = {}
 
 
 def rule(name: str) -> "RuleMatcher":
