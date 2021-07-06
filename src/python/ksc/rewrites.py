@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
 from itertools import chain
-from typing import Any, FrozenSet, Iterator, List, Mapping, Optional, Tuple
+from typing import Any, Dict, FrozenSet, Iterator, List, Mapping, Optional, Tuple
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
