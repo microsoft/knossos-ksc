@@ -2,7 +2,18 @@ from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
 from itertools import chain
-from typing import Any, Dict, FrozenSet, Iterator, List, Mapping, Optional, Tuple
+from typing import (
+    Any,
+    Dict,
+    AbstractSet,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+)
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
@@ -119,7 +130,7 @@ class RuleMatcher(AbstractMatcher):
         self.name = name
 
     @abstractproperty
-    def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
+    def possible_filter_terms(self) -> AbstractSet[FilterTerm]:
         """ A set of terms that might be returned by get_filter_term() of any Expr for which this RuleMatcher
             could possibly generate a match. (See [Note: filter_term] in filter_term.py). """
 
@@ -166,7 +177,9 @@ class RuleSet(AbstractMatcher):
                 self._rules_by_filter_term.setdefault(term, []).append(rule)
 
     def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
-        possible_rules = self._rules_by_filter_term.get(get_filter_term(ewp.expr), [])
+        possible_rules: Iterable[RuleMatcher] = self._rules_by_filter_term.get(
+            get_filter_term(ewp.expr), []
+        )
         if isinstance(ewp.expr, Call):
             possible_rules = chain(possible_rules, self._any_call_rules)
         for rule in possible_rules:
