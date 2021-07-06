@@ -26,7 +26,7 @@ class _FieldElement:
         class_fields[self.field_name] = self
 
     def __str__(self):
-        return self.expr_class.__name__ + "." + self.field_name
+        return self.expr_class.__name__.lower() + "_" + self.field_name
 
     def get(self, e: Expr) -> Expr:
         assert e.__class__ == self.expr_class
