@@ -134,6 +134,14 @@ SerializedPath = List[str]
 
 
 def serialize_path(path: Path) -> SerializedPath:
+    """ Turns a path into a form that can be passed to json.dumps.
+    >>> serialize_path([let_rhs, call_args[0]])
+    ['let_rhs', 'call_args[0]']
+    >>> import json
+    >>> json.dumps(serialize_path([let_body, if_t_body, call_args[1]]))
+    '["let_body", "if_t_body", "call_args[1]"]'
+    """
+
     # There is no particular need to use str() to turn elements to strings,
     # but str() contains all the information that's needed.
     return [str(elem) for elem in path]
