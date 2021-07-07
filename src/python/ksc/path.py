@@ -1,12 +1,32 @@
+"""
+Paths identify nodes (sub-expressions) within Expr's as a sequence of PathElements
+each of which identifies a field of an Expr subclass or one argument of a Call.
+>>> e = Let(Var("a"), Const(5), Call("add", [Const(3), Var("b")]))
+>>> str(let_rhs.get(e))
+'5'
+
+ExprWithPath allows traversing and navigating an expr, and listing the
+subexprs which also have paths
+>>> str(ExprWithPath.from_expr(e).rhs.expr)
+'5'
+>>> ExprWithPath.from_expr(e).body.args[0].path
+(Let.body, call_args[0])
+>>> str(ExprWithPath.from_expr(e, [let_body, call_args[0]]).expr)
+'3'
+>>> ExprWithPath.from_expr(e).all_subexprs_with_paths() == [
+... ExprWithPath.from_expr(e, [let_rhs]), ExprWithPath.from_expr(e, [let_body])
+... ]
+True
+"""
+
 from collections.abc import Sequence as AbstractSeq
 from dataclasses import dataclass
 from itertools import islice
 import re
 from typing import Dict, List, Mapping, NamedTuple, Sequence, Tuple, Type, Union
 
-from ksc.expr import Expr, Let, Lam, If, Assert, Call
+from ksc.expr import Expr, Let, Lam, If, Assert, Call, Var, Const
 from ksc.utils import singleton
-
 
 #####################################################################
 # Path elements
@@ -28,6 +48,9 @@ class _FieldElement:
     def __str__(self):
         return self.expr_class.__name__.lower() + "_" + self.field_name
 
+    def __repr__(self):
+        return str(self)
+
     def get(self, e: Expr) -> Expr:
         assert e.__class__ == self.expr_class
         return getattr(e, self.field_name)
@@ -46,6 +69,9 @@ class _CallArg:
 
     def __str__(self):
         return f"call_args[{self.n}]"
+
+    def __repr__(self):
+        return str(self)
 
 
 PathElement = Union[_FieldElement, _CallArg]
