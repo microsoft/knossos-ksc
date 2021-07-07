@@ -7,7 +7,9 @@ each of which identifies a field of an Expr subclass or one argument of a Call.
 >>> lam_body.get(e)
 Traceback (most recent call last):
 ...
-AssertionError
+AssertionError...
+>>> # Note the final ... allows to pass with pytest, but *not* python -m doctest;
+>>> # without the ... it passes with python -m doctest, but not pytest :(
 
 ExprWithPath allows traversing an expr, and listing the addressable subexprs.
 >>> ewp = ExprWithPath.from_expr(e)
