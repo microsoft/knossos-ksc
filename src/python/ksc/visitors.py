@@ -28,11 +28,11 @@ class ExprVisitor:
             Call: self.visit_call,
         }
 
-    def visit(self, e: Union[Expr, ExprWithPath], *args, **kwargs) -> None:
+    def visit(self, e: Union[Expr, ExprWithPath], *args, **kwargs):
         clas = (e.expr if isinstance(e, ExprWithPath) else e).__class__
         return self._dispatch_table[clas](e, *args, **kwargs)
 
-    def visit_var(self, v: Union[Var, ExprWithPath], *args, **kwargs) -> None:
+    def visit_var(self, v: Union[Var, ExprWithPath], *args, **kwargs):
         """ Overridable method that is called to handle a non-decl Var being passed to visit """
 
     def visit_const(self, c: Union[Const, ExprWithPath], *args, **kwargs) -> None:
