@@ -5,7 +5,6 @@ from itertools import chain
 from typing import (
     Any,
     Dict,
-    AbstractSet,
     FrozenSet,
     Iterable,
     Iterator,
@@ -130,7 +129,7 @@ class RuleMatcher(AbstractMatcher):
         self.name = name
 
     @abstractproperty
-    def possible_filter_terms(self) -> AbstractSet[FilterTerm]:
+    def possible_filter_terms(self) -> FrozenSet[FilterTerm]:
         """ A set of terms that might be returned by get_filter_term() of any Expr for which this RuleMatcher
             could possibly generate a match. (See [Note: filter_term] in filter_term.py). """
 
