@@ -7,6 +7,9 @@ python3 -m pip install pytest numpy torch==1.9.0+cu111 jax==0.1.57 jaxlib==0.1.3
 echo Running pytest
 python3 -m pytest test/python
 
+echo Running doctest
+python3 -m doctest src/python/ksc/*.py
+
 echo Running pytest on ts2k
 python3 -m pytest test/ts2k
 
