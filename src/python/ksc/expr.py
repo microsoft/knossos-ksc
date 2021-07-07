@@ -279,6 +279,12 @@ class Def(ASTNode):
         ]
         return paren("Def " + " ".join([str(e) for e in elems]))
 
+    def __eq__(self, other):
+        # Default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        return super().__eq__(other) and all(
+            a.type_ == oa.type_ for a, oa in zip(self.args, other.args)
+        )
+
 
 class EDef(ASTNode):
     """Edef(name, return_type, arg). 
