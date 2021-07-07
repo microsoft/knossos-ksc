@@ -12,6 +12,7 @@ from typing import (
     Mapping,
     Optional,
     Tuple,
+    Callable,
 )
 
 from pyrsistent import pmap
@@ -59,10 +60,23 @@ class Match:
     ewp: ExprWithPath
 
     # Anything the RuleMatcher needs to pass from matching to rewriting.
-    rule_specific_data: Mapping[str, Any] = pmap()
+    rule_specific_data: Mapping[str, Any]
 
     def apply_rewrite(self):
         return self.rule.apply_at(self.ewp, **self.rule_specific_data)
+
+    @property
+    def path(self):
+        return self.ewp.path
+
+
+@dataclass(frozen=True)
+class Match_XYZ:
+    rule: Callable[[], Expr]
+    ewp: ExprWithPath
+
+    def apply_rewrite(self):
+        return self.rule()
 
     @property
     def path(self):
@@ -137,9 +151,9 @@ class RuleMatcher(AbstractMatcher):
     """ If a RuleMatcher (instance or subclass) returns true, indicates that it might match
         any Expr which is a Call, regardless of the value of get_filter_term() on that Expr. """
 
-    @abstractmethod
-    def apply_at(self, ewp: ExprWithPath, **kwargs) -> Expr:
-        """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's rule_specific_data field. """
+    # @abstractmethod
+    # def apply_at(self, ewp: ExprWithPath, **kwargs) -> Expr:
+    #     """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's rule_specific_data field. """
 
     @abstractmethod
     def matches_for_possible_expr(
@@ -189,28 +203,32 @@ class RuleSet(AbstractMatcher):
 class inline_var(RuleMatcher):
     possible_filter_terms = frozenset([Var])
 
-    def apply_at(self, ewp: ExprWithPath, binding_location: Path) -> Expr:
-        # binding_location comes from the Match.
-        # Note there is an alternative design, where we don't store any "rule_specific_data" in the Match.
-        # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
-        # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
-        assert ewp.path[: len(binding_location)] == binding_location
-        return replace_subtree(
-            ewp.root,
-            binding_location,
-            Const(0.0),  # Nothing to avoid capturing in outer call
-            lambda _zero, let: replace_subtree(
-                let, ewp.path[len(binding_location) :], let.rhs
-            ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
-        )
-
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment,
     ) -> Iterator[Match]:
         assert isinstance(ewp.expr, Var)
         binding_location = env.let_vars.get(ewp.expr.name)
+
         if binding_location is not None:
-            yield Match(self, ewp, {"binding_location": binding_location})
+
+            binding_location_actual = binding_location
+
+            def apply_at() -> Expr:
+                # binding_location comes from the Match.
+                # Note there is an alternative design, where we don't store any "rule_specific_data" in the Match.
+                # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
+                # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
+                assert ewp.path[: len(binding_location_actual)] == binding_location
+                return replace_subtree(
+                    ewp.root,
+                    binding_location,
+                    Const(0.0),  # Nothing to avoid capturing in outer call
+                    lambda _zero, let: replace_subtree(
+                        let, ewp.path[len(binding_location_actual) :], let.rhs
+                    ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
+                )
+
+            bob = Match_XYZ(ewp=ewp, rule=apply_at)
 
 
 @singleton
