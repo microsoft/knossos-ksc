@@ -81,21 +81,12 @@ private:
 }}
 
 
-static void check_valid_pointer(std::uintptr_t v)
-{
-    if (v < 1u<<24) {
-        // v should be a pointer, if it's smaller than 0x00ffffff, it's probably a misplaced size
-        throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
-    }
-}
-
 template<typename T>
 void declare_tensor_2(py::module &m, char const* name) {
   // Wrap ks_tensor<Dim, T> to point to supplied python memory
   static constexpr size_t Dim = 2;
   py::class_<ks::tensor<2, T>>(m, name, py::buffer_protocol(), py::module_local(), py::dynamic_attr())
     .def(py::init([](std::uintptr_t v, size_t m, size_t n) {
-        check_valid_pointer(v);
         ks::tensor_dimension<Dim>::index_type size {int(m),int(n)};
         return ks::tensor<Dim, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data
     }))
@@ -121,7 +112,6 @@ void declare_tensor_1(py::module &m, char const* name) {
   static constexpr size_t Dim = 1;
   py::class_<ks::tensor<Dim, T>>(m, name, py::buffer_protocol(), py::module_local(), py::dynamic_attr())
     .def(py::init([](std::uintptr_t v, size_t n) {
-        check_valid_pointer(v);
         ks::tensor_dimension<Dim>::index_type size {int(n)};
         // Note: We are capturing a reference to the caller's data.
         // we expect the user to attach a Python object to this class
