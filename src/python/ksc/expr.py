@@ -2,7 +2,7 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import FrozenSet, List, Tuple, Union
+from typing import FrozenSet, List, Tuple, Union, Optional
 from dataclasses import dataclass
 from ksc.type import Type
 from ksc.utils import paren, KRecord
@@ -111,6 +111,7 @@ class StructuredName:
             return self.se
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[0] + "$" + self.se[1].mangled()
 
         assert isinstance(self.se[1], Type)
@@ -124,12 +125,13 @@ class StructuredName:
             return False
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[1].has_type()
 
         assert isinstance(self.se[1], Type)
         return True
 
-    def get_type(self) -> Type:
+    def get_type(self) -> Optional[Type]:
         """
         If the innermost se is a type, return it, else None
         """
@@ -137,12 +139,13 @@ class StructuredName:
             return None
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[1].get_type()
 
         assert isinstance(self.se[1], Type)
         return self.se[1]
 
-    def add_type(self, ty) -> ("StructuredName", Type):
+    def add_type(self, ty) -> Tuple["StructuredName", Optional[Type]]:
         """
         Return a new structured name, with "ty" inserted in the corner, returning the old type if any
         sn = parse("[shape [rev foo]]")
@@ -153,9 +156,11 @@ class StructuredName:
         if isinstance(self.se, str):
             return StructuredName((self.se, ty)), None
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             new_sn, old_ty = self.se[1].add_type(ty)
             return StructuredName((self.se[0], new_sn)), old_ty
 
+        assert isinstance(self.se[1], Type)
         old_ty = self.se[1]
         return StructuredName((self.se[0], ty)), old_ty
 
@@ -170,6 +175,7 @@ class StructuredName:
             return self.se
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[0] + "$" + self.se[1].mangle_without_type()
 
         return self.se[0]
@@ -522,7 +528,7 @@ def pystr(expr, indent):
 
 
 @pystr.register(Type)
-def _(ty, indent):
+def pystr_Type(ty, indent):
     if ty.is_scalar:
         return ty.kind
     elems = [pystr(c, indent + 1) for c in ty.children]
@@ -530,12 +536,12 @@ def _(ty, indent):
 
 
 @pystr.register(StructuredName)
-def _(sn, indent):
+def pystr_StructuredName(sn, indent):
     return pyname(sn.mangled())
 
 
 @pystr.register(Def)
-def _(ex, indent):
+def pystr_Def(ex, indent):
     indent += 1
     return (
         "def "
@@ -551,7 +557,7 @@ def _(ex, indent):
 
 
 @pystr.register(EDef)
-def _(ex, indent):
+def pystr_EDef(ex, indent):
     indent += 1
     return (
         "#edef "
@@ -564,13 +570,13 @@ def _(ex, indent):
 
 
 @pystr.register(GDef)
-def _(ex, indent):
+def pystr_GDef(ex, indent):
     indent += 1
     return "#gdef " + ex.derivation + " " + str(ex.function_name)
 
 
 @pystr.register(Rule)
-def _(ex, indent):
+def pystr_Rule(ex, indent):
     indent += 1
     return (
         "@rule\ndef "
@@ -590,23 +596,23 @@ def _(ex, indent):
 
 
 @pystr.register(Const)
-def _(ex, indent):
+def pystr_Const(ex, indent):
     return repr(ex.value)
 
 
 @pystr.register(Var)
-def _(ex, indent):
+def pystr_Var(ex, indent):
     return pyname(ex.name)
 
 
 @pystr.register(Call)
-def _(ex, indent):
+def pystr_Call(ex, indent):
     indent += 1
     return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 
 @pystr.register(Lam)
-def _(ex, indent):
+def pystr_Lam(ex, indent):
     indent += 1
     return (
         "lambda "
@@ -620,7 +626,7 @@ def _(ex, indent):
 
 
 @pystr.register(Let)
-def _(ex, indent):
+def pystr_Let(ex, indent):
     if isinstance(ex.vars, list):
         var_str = ",".join(pystr(v, indent) for v in ex.vars)
     else:
@@ -635,7 +641,7 @@ def _(ex, indent):
 
 
 @pystr.register(If)
-def _(ex, indent):
+def pystr_If(ex, indent):
     return (
         "("
         + pystr(ex.t_body, indent + 2)
@@ -649,7 +655,7 @@ def _(ex, indent):
 
 
 @pystr.register(Assert)
-def _(ex, indent):
+def pystr_Assert(ex, indent):
     indent += 1
     return (
         "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) + pystr(ex.body, indent)
