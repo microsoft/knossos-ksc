@@ -229,14 +229,11 @@ class ASTNode(KRecord):
         super().__init__(**kwargs)
 
     def __str__(self):
-        def to_str(v):
-            if isinstance(v, list):
-                # str() on list contains repr() of elements
-                return "[" + (", ".join([to_str(e) for e in v])) + "]"
-            return str(v)
+        # This registers the various handlers, we don't call it directly
+        from ksc import prettyprint
+        from prettyprinter import pformat
 
-        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
-        return paren(type(self).__name__ + " " + " ".join(nodes))
+        return pformat(self)
 
 
 class Expr(ASTNode):
@@ -352,9 +349,6 @@ class Const(Expr):
     def __init__(self, value: ConstantType):
         super().__init__(type_=Type.fromValue(value), value=value)
 
-    def __str__(self):
-        return repr(self.value)
-
 
 class Var(Expr):
     """Var(name, type, decl). 
@@ -374,12 +368,6 @@ class Var(Expr):
 
     def __init__(self, name, type=None, decl=False):
         super().__init__(type_=type, name=name, decl=decl)
-
-    def __str__(self):
-        if self.decl:
-            return self.name + " : " + str(self.type_)
-        else:
-            return self.name
 
 
 class Call(Expr):

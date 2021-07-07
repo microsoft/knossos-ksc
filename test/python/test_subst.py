@@ -98,12 +98,10 @@ def test_replace_subtree_avoids_capturing_another():
     path_to_y = (path.lam_body, path.call_args[2])
     assert get_node_at_location(e, path_to_y) == Var("y")
     replaced = replace_subtree(e, path_to_y, new_subtree)
-    new_var = (
-        replaced.arg
-    )  # No alpha-equivalence, so this is the name used; this has decl=True
-    expected = parse_expr_string(
-        f"(lam ({new_var}) (foo x_0 {new_var.name} (mul x 2)))"
-    )
+    # Test exact equality without alpha-equivalence, using the name generated
+    # (this has decl=True):
+    new_var = replaced.arg
+    expected = parse_expr_string(f"(lam {new_var} (foo x_0 {new_var.name} (mul x 2)))")
     assert new_var != conflicting_var
     assert replaced == expected
 
