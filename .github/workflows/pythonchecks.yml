@@ -42,7 +42,7 @@ jobs:
 
     - name: Tiny bit of type-checking with mypy
       run: |
-        mypy --follow-imports=silent src/python/ksc/torch_frontend.py src/python/ksc/type.py src/python/ksc/expr.py
+        mypy --follow-imports=silent src/python/ksc/torch_frontend.py src/python/ksc/type.py src/python/ksc/expr.py src/python/ksc/filter_term.py
     
     - name: Dependency Detection setup
       uses: actions/checkout@v2
