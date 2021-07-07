@@ -250,6 +250,9 @@ class Expr(ASTNode):
         super().__init__(**args)
         self.free_vars_ = compute_free_vars(self)
 
+    def __eq__(self, other):
+        # KRecord doesn't check fields/annotations inherited from superclasses of the object being tested.
+        return super().__eq__(other) and self.type_ == other.type_
 
 class Def(ASTNode):
     """Def(name, return_type, args, body). 
