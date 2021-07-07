@@ -236,6 +236,8 @@ class ASTNode(KRecord):
         return pformat(self)
 
     def __repr__(self):
+        # This does not satisfy the general contract of `__repr__` to return python
+        # code that reproduces the object. But it is still useful for dobugging.
         nodes = (repr(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + " " + " ".join(nodes))
 
