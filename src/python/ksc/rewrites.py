@@ -2,7 +2,17 @@ from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
 from itertools import chain
-from typing import Any, FrozenSet, Iterator, List, Mapping, Optional, Tuple
+from typing import (
+    Any,
+    Dict,
+    FrozenSet,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+)
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
@@ -100,7 +110,7 @@ class AbstractMatcher(ABC):
         """ Return any matches which rewrite the topmost node of the specified subtree """
 
 
-_rule_dict: Mapping[str, "RuleMatcher"] = {}
+_rule_dict: Dict[str, "RuleMatcher"] = {}
 
 
 def rule(name: str) -> "RuleMatcher":
@@ -166,7 +176,9 @@ class RuleSet(AbstractMatcher):
                 self._rules_by_filter_term.setdefault(term, []).append(rule)
 
     def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
-        possible_rules = self._rules_by_filter_term.get(get_filter_term(ewp.expr), [])
+        possible_rules: Iterable[RuleMatcher] = self._rules_by_filter_term.get(
+            get_filter_term(ewp.expr), []
+        )
         if isinstance(ewp.expr, Call):
             possible_rules = chain(possible_rules, self._any_call_rules)
         for rule in possible_rules:
@@ -248,6 +260,7 @@ class delete_let(RuleMatcher):
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
             assert let_node is ewp.expr
+            assert isinstance(let_node, Let)
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
 
@@ -364,7 +377,7 @@ def find_template_subst(
     exp_children = subexps_no_binds(exp)
     if len(tmpl_children) != len(exp_children):
         return None
-    d = dict()
+    d: Dict = dict()
     for t, e in zip(tmpl_children, exp_children):
         d = _combine_substs(d, find_template_subst(t, e, template_vars))
         if d is None:
