@@ -432,6 +432,11 @@ class Lam(Expr):
     def __str__(self):
         return paren("Lam " + " ".join([self.arg.decl_str(), str(self.body)]))
 
+    def __eq__(self, other):
+        # Default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # For Lam's we don't need to worry about whether None: Type == other Types.
+        return super().__eq__(other) and self.arg.type_ == other.arg.type_
+
 
 class Let(Expr):
     """Let(vars, rhs, body). 

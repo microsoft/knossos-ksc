@@ -72,3 +72,7 @@ def test_free_vars_lam():
 
     assert Lam(x, y).free_vars_ == frozenset(["y"])
     assert Lam(x, x).free_vars_ == frozenset()
+
+
+def test_eq():
+    assert Lam(Var("x", Type.Float), Var("x")) != Lam(Var("x", Type.Integer), Var("x"))
