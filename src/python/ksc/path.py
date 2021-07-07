@@ -9,23 +9,26 @@ Traceback (most recent call last):
 ...
 AssertionError
 
-
-ExprWithPath allows traversing and navigating an expr, and listing the
-subexprs which also have paths
->>> str(ExprWithPath.from_expr(e).rhs.expr)
+ExprWithPath allows traversing an expr, and listing the addressable subexprs.
+>>> ewp = ExprWithPath.from_expr(e)
+>>> ewp.path
+()
+>>> ewp.rhs  # doctest: +ELLIPSIS
+ExprWithPath(..., path=(Let.rhs,), ...)
+>>> str(ewp.rhs.expr)
 '5'
->>> ExprWithPath.from_expr(e).body.args[0].path
-(Let.body, call_args[0])
+>>> ewp.body.args[0]  # doctest: +ELLIPSIS
+ExprWithPath(..., path=(Let.body, call_args[0]), ...)
+>>> str(ewp.body.args[0].expr)
+'3'
 >>> str(ExprWithPath.from_expr(e, [let_body, call_args[0]]).expr)
 '3'
 >>> ExprWithPath.from_expr(e, [let_body, call_args[2]])
 Traceback (most recent call last):
 ...
 IndexError: list index out of range
->>> ExprWithPath.from_expr(e).all_subexprs_with_paths() == [
-... ExprWithPath.from_expr(e, [let_rhs]), ExprWithPath.from_expr(e, [let_body])
-... ]
-True
+>>> ExprWithPath.from_expr(e).all_subexprs_with_paths()  # doctest: +ELLIPSIS
+[ExprWithPath(..., path=(Let.rhs,), ...), ExprWithPath(..., path=(Let.body,), ...)]
 """
 
 from collections.abc import Sequence as AbstractSeq
