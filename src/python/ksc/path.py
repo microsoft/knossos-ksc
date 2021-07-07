@@ -14,11 +14,11 @@ ExprWithPath allows traversing an expr, and listing the addressable subexprs.
 >>> ewp.path
 ()
 >>> ewp.rhs  # doctest: +ELLIPSIS
-ExprWithPath(..., path=(Let.rhs,), ...)
+ExprWithPath(..., path=(Let.rhs,), expr=<ksc.expr.Const...)
 >>> str(ewp.rhs.expr)
 '5'
 >>> ewp.body.args[0]  # doctest: +ELLIPSIS
-ExprWithPath(..., path=(Let.body, call_args[0]), ...)
+ExprWithPath(..., path=(Let.body, call_args[0]), expr=<ksc.expr.Const...)
 >>> str(ewp.body.args[0].expr)
 '3'
 >>> str(ExprWithPath.from_expr(e, [let_body, call_args[0]]).expr)
@@ -28,7 +28,7 @@ Traceback (most recent call last):
 ...
 IndexError: list index out of range
 >>> ExprWithPath.from_expr(e).all_subexprs_with_paths()  # doctest: +ELLIPSIS
-[ExprWithPath(..., path=(Let.rhs,), ...), ExprWithPath(..., path=(Let.body,), ...)]
+[ExprWithPath(..., path=(Let.rhs,), expr=<ksc.expr.Const...), ExprWithPath(..., path=(Let.body,), expr=<ksc.expr.Call...)]
 """
 
 from collections.abc import Sequence as AbstractSeq
