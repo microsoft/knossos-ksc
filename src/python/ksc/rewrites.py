@@ -261,6 +261,7 @@ class delete_let(RuleMatcher):
         def apply_here(const_zero: Expr, let_node: Expr) -> Expr:
             assert const_zero == Const(0.0)  # Passed to replace_subtree below
             assert let_node is ewp.expr
+            assert isinstance(let_node, Let)
             assert let_node.vars.name not in let_node.body.free_vars_
             return let_node.body
 
