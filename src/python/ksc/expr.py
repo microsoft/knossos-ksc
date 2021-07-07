@@ -235,6 +235,10 @@ class ASTNode(KRecord):
 
         return pformat(self)
 
+    def __repr__(self):
+        nodes = (repr(getattr(self, nt)) for nt in self.__annotations__)
+        return paren(type(self).__name__ + " " + " ".join(nodes))
+
 
 class Expr(ASTNode):
     """Base class for Expression AST nodes. Not directly instantiable."""
@@ -349,6 +353,9 @@ class Const(Expr):
     def __init__(self, value: ConstantType):
         super().__init__(type_=Type.fromValue(value), value=value)
 
+    def __repr__(self):
+        return repr(self.value)
+
 
 class Var(Expr):
     """Var(name, type, decl). 
@@ -368,6 +375,12 @@ class Var(Expr):
 
     def __init__(self, name, type=None, decl=False):
         super().__init__(type_=type, name=name, decl=decl)
+
+    def __repr__(self):
+        if self.decl:
+            return self.name + " : " + str(self.type_)
+        else:
+            return self.name
 
 
 class Call(Expr):
