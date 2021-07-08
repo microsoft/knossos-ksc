@@ -168,7 +168,7 @@ def generate_cpp_for_py_module_from_ks(
 def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_name):
     def m_def(python_name, cpp_name):
         return f"""
-        m.def("{python_name}", with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
+        m.def("{python_name}", ks::entry_points::with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
         """
 
     return (
@@ -179,10 +179,10 @@ def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_n
 PYBIND11_MODULE("""
         + python_module_name
         + """, m) {
-    m.def("reset_allocator", []{ g_alloc.reset();});
-    m.def("allocator_top", []{ return g_alloc.mark();});
-    m.def("allocator_peak", []{ return g_alloc.peak();});
-    m.def("logging", &ks_logging);
+    m.def("reset_allocator", &ks::entry_points::reset_allocator);
+    m.def("allocator_top", &ks::entry_points::allocator_top);
+    m.def("allocator_peak", &ks::entry_points::allocator_peak);
+    m.def("logging", &ks::entry_points::logging);
 
     declare_tensor_1<double>(m, "Tensor_1_Float");
     declare_tensor_2<double>(m, "Tensor_2_Float");
@@ -192,6 +192,8 @@ PYBIND11_MODULE("""
         + "\n".join(m_def(*t) for t in bindings_to_generate)
         + """
 }
+
+#include "knossos-entry-points.cpp"
 """
     )
 

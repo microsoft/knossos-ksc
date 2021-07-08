@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <stdexcept>
 
@@ -8,8 +10,7 @@
 namespace py = pybind11;
 
 #include "knossos.h"
-
-ks::allocator g_alloc{ 1'000'000'000 };
+#include "knossos-entry-points.h"
 
 namespace pybind11 { namespace detail {
 
@@ -136,28 +137,3 @@ void declare_tensor_1(py::module &m, char const* name) {
     ;
 }
 
-bool g_ks_logging = false;
-
-bool ks_logging(bool enable) {
-    bool prev = g_ks_logging;
-    g_ks_logging = enable;
-    return prev;
-}
-
-// Convert functor to one which takes a first argument g_alloc,
-// and optionally logs inputs and outputs to cerr
-template<typename RetType, typename... ParamTypes>
-auto with_ks_allocator(const char * tracingMessage, RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f, tracingMessage](ParamTypes... params) {
-    if (g_ks_logging) {
-        std::cerr << tracingMessage << "(";
-        (std::cerr << ... << params);
-        std::cerr << ") =" << std::endl;
-        auto ret = f(&g_alloc, params...);
-        std::cerr << ret << std::endl;
-        return ret;
-    } else {
-        return f(&g_alloc, params...);
-    }
-  };
-}
