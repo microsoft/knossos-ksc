@@ -6,6 +6,8 @@ import math
 import torch_multigammaln
 import torch
 
+torch.set_default_dtype(torch.float32)
+
 
 @torch.jit.script
 # TODO: does Torch already do this maxing? AWF
