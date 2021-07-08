@@ -5,27 +5,27 @@
 
 namespace ks {
 
-tensor<1, double> 
-aten$8$8matmul$aT2fT1f(allocator * alloc, tensor<2,double> const& M, tensor<1,double> const& v)
+tensor<1, Float> 
+aten$8$8matmul$aT2fT1f(allocator * alloc, tensor<2,Float> const& M, tensor<1,Float> const& v)
 {
 	auto [r,c] = size(M);
     KS_ASSERT(c == size(v));
-	tensor<1,double> ret(alloc, r);
+	tensor<1,Float> ret(alloc, r);
 	for(int i = 0; i < r; ++i)
 		ret[i] = ts_dot(M[i], v);
 	return ret;
 }
 
-tensor<2, double> 
-aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,double> const& A, tensor<2,double> const& B)
+tensor<2, Float> 
+aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,Float> const& A, tensor<2,Float> const& B)
 {
 	auto [r,K] = size(A);
 	auto [K_,c] = size(B);
   KS_ASSERT(K == K_);
-	tensor<2,double> ret(alloc, make_tuple(r, c));
+	tensor<2,Float> ret(alloc, make_tuple(r, c));
 	for(int i = 0; i < r; ++i)
 		for(int j = 0; j < c; ++j) {
-			double tot = 0;
+			Float tot = 0;
 		  for(int k = 0; k < K; ++k)
 				tot += A[i][k] * B[k][j];
 			ret[i][j] = tot;
@@ -33,20 +33,20 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,double> const& A, tensor<2,do
 	return ret;
 }
 
-tuple<tensor<2,double>,tensor<1,double>> 
-rev$aten$8$8matmul$aT2fT1f(allocator * alloc, tuple<tensor<2,double>, tensor<1,double>> const& M_v, tensor<1,double> const& dr)
+tuple<tensor<2,Float>,tensor<1,Float>> 
+rev$aten$8$8matmul$aT2fT1f(allocator * alloc, tuple<tensor<2,Float>, tensor<1,Float>> const& M_v, tensor<1,Float> const& dr)
 {
 	auto [M, v] = M_v;
 	auto [r, c] = size(M);
 	KS_ASSERT(c == size(v));
 
-	tensor<2,double> retM(alloc, size(M));
+	tensor<2,Float> retM(alloc, size(M));
 	for(int i = 0; i < r; ++i)
 		retM[i] = ts_scale(alloc, dr[i], v);
 
-	tensor<1,double> retv(alloc, c);
+	tensor<1,Float> retv(alloc, c);
 	for(int i = 0; i < c; ++i) {
-		double retvi = 0;
+		Float retvi = 0; // TODO: Accumulator types
 		for(int j = 0; j < r; ++j)
 			retvi += M[j][i] * dr[j];
 		retv[i] = retvi;
@@ -62,8 +62,8 @@ aten$8$8pow$aT2fi(allocator * alloc, tensor<Dim,T> const& a, int const& i)
 	return elementwise_map(alloc, a, [i](T const& v) { return std::pow(v, i); });
 }
 
-typedef tensor<2, double> Mat;
-typedef tensor<1, double> Vec;
+typedef tensor<2, Float> Mat;
+typedef tensor<1, Float> Vec;
 
 /*
 (edef aten::cat Mat ((Tensor 1 Mat) Integer))
@@ -198,7 +198,7 @@ rev$addA1bt$aT2fT1f(allocator * alloc, tuple<Mat, Vec> const& args, Mat const& d
 
 	Vec retdb(alloc, N);
 	for(int j = 0; j < N; ++j) {
-		double tot = 0;
+		Float tot = 0; // TODO: Accumulator types
 		for(int i = 0; i < M; ++i)
 			tot += retdA[i][j];
 		retdb[j] = tot;

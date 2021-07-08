@@ -2,10 +2,10 @@
 #include "knossos.h"
 namespace ks {
 
-	double f(vec<double> s$x, vec<double> s$y) {
+	Float f(vec<Float> s$x, vec<Float> s$y) {
 		auto c$1 = lt(2, 3);
 
-		double c$0;
+		Float c$0;
 		if (c$1) {  
 			auto c$2 = index(1, s$x);
 			;
@@ -19,17 +19,17 @@ namespace ks {
 	}
 
 	auto D$f() {
-		LM::Variant<LM::BuildT<LM::One<double>>, LM::Zero<vec<double>, double>> ret;
+		LM::Variant<LM::BuildT<LM::One<Float>>, LM::Zero<vec<Float>, Float>> ret;
 
 		auto c$3 = [](int s$ii) {
-			return LM::One<double>::mk(double{});
+			return LM::One<Float>::mk(Float{});
 		};
-		auto x = LM::BuildT<LM::One<double>>::mk(7, c$3);
+		auto x = LM::BuildT<LM::One<Float>>::mk(7, c$3);
 
 		if (1)
 			ret.v = x;
 		else
-			ret.v = LM::Zero<vec<double>, double>::mk(vec<double>{}, double{});
+			ret.v = LM::Zero<vec<Float>, Float>::mk(vec<Float>{}, Float{});
 		return ret;
 	}
 

@@ -62,6 +62,9 @@ namespace ks {
 #define KS_NOTE { KS_LOG("note " << (KS_FIND ? (void*)this : (void*)0), log_indent); }
 #define KS_LEAVE { KS_LOG("dtor " << KS_FIND, --log_indent);  objects.erase(this); }
 
+	// ===============================  Core types  ==================================
+	typedef double Float;
+
 	// ===============================  Tuple  ==================================
 
 	// Trivially-copyable tuple type. For n <= 4, an n-tuple is just a struct with n public members
@@ -159,6 +162,12 @@ namespace ks {
 	struct type_to_string<double>
 	{
 		static std::string name() { return "double"; }
+	};
+
+	template <>
+	struct type_to_string<float>
+	{
+		static std::string name() { return "float"; }
 	};
 
 	// Specialize for some types we use
@@ -653,7 +662,7 @@ namespace ks {
 
 	tuple<> shape(allocator_base *, bool const&) { return {}; }
 	tuple<> shape(allocator_base *, int const&) { return {}; }
-	tuple<> shape(allocator_base *, double const&) { return {}; }
+	tuple<> shape(allocator_base *, Float const&) { return {}; }
 	tuple<> shape(allocator_base *, std::string const&) { return {}; }
 
 	template<size_t Dim, class T>
@@ -943,7 +952,7 @@ namespace ks {
 	}
 
 	template <>
-	double zero(allocator *, double const& val)
+	Float zero(allocator *, Float const& val)
 	{
 		return 0.0;
 	}
@@ -1092,13 +1101,13 @@ namespace ks {
 	}
 
 	template <class T>
-	T ts_scale(allocator *, double s, T const& t)
+	T ts_scale(allocator *, Float s, T const& t)
 	{
 		return s * t;
 	}
 
 	template <class... Us>
-	auto ts_scale(allocator * alloc, double s, tuple<Us...> const& t)
+	auto ts_scale(allocator * alloc, Float s, tuple<Us...> const& t)
 	{
 		return transform_tuple(t, [alloc, s](auto const& elem) { return ts_scale(alloc, s, elem); });
 	}
@@ -1110,7 +1119,7 @@ namespace ks {
 	}
 
 	template <size_t Dim, class T>
-	tensor<Dim, T> ts_scale(allocator * alloc, double val, tensor<Dim, T> const& t)
+	tensor<Dim, T> ts_scale(allocator * alloc, Float val, tensor<Dim, T> const& t)
 	{
 		auto ret = tensor<Dim, T>::create(alloc, t.size());
 		T* retdata = ret.data();
@@ -1122,7 +1131,7 @@ namespace ks {
 
 	inline int ts_neg(allocator *, int d) { return -d; }
 
-	inline double ts_neg(allocator *, double d) { return -d; }
+	inline Float ts_neg(allocator *, Float d) { return -d; }
 
 	template <class... Us>
 	inline tuple<Us...> ts_neg(allocator * alloc, tuple<Us...> t) {
@@ -1563,7 +1572,7 @@ namespace ks {
 		return t1 != t2;
 	}
 
-        inline bool lt$aff(allocator *, double t1, double t2)
+        inline bool lt$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 < t2;
 	}
@@ -1573,7 +1582,7 @@ namespace ks {
 		return t1 < t2;
 	}
 
-	inline bool gt$aff(allocator *, double t1, double t2)
+	inline bool gt$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 > t2;
 	}
@@ -1583,7 +1592,7 @@ namespace ks {
 		return t1 > t2;
 	}
 
-	inline bool lte$aff(allocator *, double t1, double t2)
+	inline bool lte$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 <= t2;
 	}
@@ -1593,7 +1602,7 @@ namespace ks {
 		return t1 <= t2;
 	}
 
-	inline bool gte$aff(allocator *, double t1, double t2)
+	inline bool gte$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 >= t2;
 	}
@@ -1603,7 +1612,7 @@ namespace ks {
 		return t1 >= t2;
 	}
 
-	inline double add$aff(allocator *, double t1, double t2)
+	inline Float add$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 + t2;
 	}
@@ -1613,7 +1622,7 @@ namespace ks {
 		return t1 + t2;
 	}
 
-	inline double mul$aff(allocator *, double t1, double t2)
+	inline Float mul$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 * t2;
 	}
@@ -1623,9 +1632,9 @@ namespace ks {
 		return t1 * t2;
 	}
 
-	inline double abs$af(allocator *, double d) { return d > 0 ? d : -d; }
+	inline Float abs$af(allocator *, Float d) { return d > 0 ? d : -d; }
 
-	inline double max$aff(allocator *, double a, double b) { return a > b ? a : b; }
+	inline Float max$aff(allocator *, Float a, Float b) { return a > b ? a : b; }
 
 	inline int to_integer(int d) { return d; }
 
@@ -1665,8 +1674,8 @@ namespace ks {
           return v;
         }
 
-        inline double $ranhashdoub$ai(allocator * alloc, int32_t v) {
-          return 5.42101086242752217E-20 * $ranhash(alloc, v);
+        inline Float $ranhashdoub$ai(allocator * alloc, int32_t v) {
+          return Float(5.42101086242752217E-20 * $ranhash(alloc, v));
         }
 
 	// ========================= Trace primitive ===============
@@ -1722,30 +1731,30 @@ namespace ks {
 																		}))
 
 	// ===============================  Dot ===========================================
-	inline double ts_dot(double t1, double t2) { return t1 * t2; }
+	inline Float ts_dot(Float t1, Float t2) { return t1 * t2; }
 
 	template <class T>
-	inline double ts_dot(T t1, tuple<> t2)
+	inline Float ts_dot(T t1, tuple<> t2)
 	{
 		return 0.0;
 	}
 
 	template <class T>
-	inline double ts_dot(T t1, tuple<T> t2)
+	inline Float ts_dot(T t1, tuple<T> t2)
 	{
 		return ts_dot(t1,ks::get<0>(t2));
 	}
 
 	template <class T0, class... Ts, class U0, class... Us>
-	inline double ts_dot(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
+	inline Float ts_dot(tuple<T0, Ts...> t1, tuple<U0, Us...> t2)
 	{
 		return ts_dot(head(t1), head(t2)) + ts_dot(tail(t1), tail(t2));
 	}
 
 	template <size_t Dim, class T1, class T2>
-	inline double ts_dot(tensor<Dim, T1> t1, tensor<Dim, T2> t2)
+	inline Float ts_dot(tensor<Dim, T1> t1, tensor<Dim, T2> t2)
 	{
-		double ret = 0;
+		Float ret = 0;
 
 		KS_ASSERT(t1.size() == t2.size());
 
@@ -1773,14 +1782,14 @@ namespace ks {
   //  i.e. what should be small (when dx is) if our
   //  reverse mode generated code is correct.
 	template <class Functor, class RevFunctor, class X, class Dx, class Df>
-        double $check(allocator * alloc, Functor f, RevFunctor rev_f, X x, Dx dx, Df df)
+        Float $check(allocator * alloc, Functor f, RevFunctor rev_f, X x, Dx dx, Df df)
 	{
 		auto f_x = applyWithAllocator(alloc, f, x);
 		auto f_x_plus_dx = applyWithAllocator(alloc, f, ts_add(alloc, x, dx));
 		auto delta_f = f_x_plus_dx - f_x;
-		double d1 = ts_dot(delta_f, df);
+		Float d1 = ts_dot(delta_f, df);
 		auto dfJ = applyWithAllocator(alloc, rev_f, ks::make_tuple(x, df));
-		double d2 = ts_dot(dfJ, dx);
+		Float d2 = ts_dot(dfJ, dx);
 
 		/*
 		std::cout << "dfJ=" << dfJ << std::endl;
