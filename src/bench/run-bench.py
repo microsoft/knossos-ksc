@@ -5,8 +5,6 @@ import torch
 import ksc.torch_frontend
 from ksc.torch_frontend import tsmod2ksmod
 
-torch.set_default_dtype(torch.float64)
-
 
 class time_sampler:
     def __init__(self, minimizing=False):

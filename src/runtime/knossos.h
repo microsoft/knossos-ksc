@@ -63,7 +63,7 @@ namespace ks {
 #define KS_LEAVE { KS_LOG("dtor " << KS_FIND, --log_indent);  objects.erase(this); }
 
 	// ===============================  Core types  ==================================
-	typedef double Float;
+	typedef float Float;
 
 	// ===============================  Tuple  ==================================
 

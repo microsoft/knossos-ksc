@@ -68,12 +68,7 @@ def make_L_col_lifted(d: int, icf, i: int):
     nelems = d - i - 1
     Lparamidx = d + tri(i + 1)
 
-    col = torch.cat(
-        [
-            torch.zeros(i + 1, dtype=torch.float64),
-            icf[Lparamidx : (Lparamidx + nelems)],
-        ]
-    )
+    col = torch.cat([torch.zeros(i + 1), icf[Lparamidx : (Lparamidx + nelems)],])
 
     return col
 
@@ -86,7 +81,7 @@ def constructL(d: int, icf):
     # def make_L_col(i):
     #     nelems = d - i - 1
     #     col = torch.cat([
-    #         torch.zeros(i + 1, dtype = torch.float64),
+    #         torch.zeros(i + 1),
     #         icf[constructL.Lparamidx:(constructL.Lparamidx + nelems)]
     #     ])
 
