@@ -66,12 +66,19 @@ def vrelu3_embedded_ks_checkpointed_map():
 embedded_cpp_entry_points = """
 #include "knossos-entry-points.h"
 
-ks::tensor<1, ks::Float> entry(ks::tensor<1, ks::Float> t) {
-    return ks::vrelu3(&ks::entry_points::g_alloc, t);
+torch::Tensor entry(torch::Tensor t) {
+    using namespace ks::entry_points;
+    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
+    auto ks_ret = ks::vrelu3(&g_alloc, ks_t);
+    return convert_return_value<torch::Tensor>(ks_ret);
 }
 
-ks::tensor<1, ks::Float> entry_vjp(ks::tensor<1, ks::Float> t, ks::tensor<1, ks::Float> dret) {
-    return ks::sufrev_vrelu3(&ks::entry_points::g_alloc, t, dret);
+torch::Tensor entry_vjp(torch::Tensor t, torch::Tensor dret) {
+    using namespace ks::entry_points;
+    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
+    auto ks_dret = convert_argument<ks::tensor<1, ks::Float>>(dret);
+    auto ks_ret = ks::sufrev_vrelu3(&g_alloc, ks_t, ks_dret);
+    return convert_return_value<torch::Tensor>(ks_ret);
 }
 """
 
