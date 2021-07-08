@@ -4,7 +4,7 @@ each of which identifies a field of an Expr subclass or one argument of a Call.
 >>> e = Let(Var("a"), Const(5), Call("add", [Const(3), Var("b")]))
 >>> str(let_rhs.get(e))
 '5'
->>> lam_body.get(e)  # doctest: +ELLIPSIS
+>>> lam_body.get(e)
 Traceback (most recent call last):
 ...
 AssertionError...
@@ -13,11 +13,11 @@ ExprWithPath allows traversing an expr, and listing the addressable subexprs.
 >>> ewp = ExprWithPath.from_expr(e)
 >>> ewp.path
 ()
->>> ewp.rhs  # doctest: +ELLIPSIS
+>>> ewp.rhs
 ExprWithPath(..., path=(Let.rhs,), expr=<ksc.expr.Const...)
 >>> str(ewp.rhs.expr)
 '5'
->>> ewp.body.args[0]  # doctest: +ELLIPSIS
+>>> ewp.body.args[0]
 ExprWithPath(..., path=(Let.body, call_args[0]), expr=<ksc.expr.Const...)
 >>> str(ewp.body.args[0].expr)
 '3'
@@ -27,16 +27,16 @@ ExprWithPath(..., path=(Let.body, call_args[0]), expr=<ksc.expr.Const...)
 Traceback (most recent call last):
 ...
 IndexError: list index out of range
->>> ExprWithPath.from_expr(e).all_subexprs_with_paths()  # doctest: +ELLIPSIS
+>>> ExprWithPath.from_expr(e).all_subexprs_with_paths()
 [ExprWithPath(..., path=(Let.rhs,), expr=<ksc.expr.Const...), ExprWithPath(..., path=(Let.body,), expr=<ksc.expr.Call...)]
 
 ExprWithPath also allows directly accessing other members of the Expr
  (that are not addressable by a Path):
->>> ewp.vars   # doctest: +ELLIPSIS
+>>> ewp.vars
 <ksc.expr.Var...>
 >>> str(ewp.vars)
 'a'
->>> ewp.body  # doctest: +ELLIPSIS
+>>> ewp.body
 ExprWithPath(...)
 >>> ewp.body.name
 StructuredName(add)
