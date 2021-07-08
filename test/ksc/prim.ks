@@ -208,7 +208,7 @@
 (def main Integer ()
      (let (seed 20000)
      (let (delta 0.0001)
-     (let (tolerance 0.0001)
+     (let (tolerance 0.001)
 
      (let (x1  (mkfloat (add seed 0)       1.0))
      (let (x2  (mkfloat (add seed 1)       1.0))
