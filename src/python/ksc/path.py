@@ -4,12 +4,10 @@ each of which identifies a field of an Expr subclass or one argument of a Call.
 >>> e = Let(Var("a"), Const(5), Call("add", [Const(3), Var("b")]))
 >>> str(let_rhs.get(e))
 '5'
->>> lam_body.get(e)
+>>> lam_body.get(e)  # doctest: +ELLIPSIS
 Traceback (most recent call last):
 ...
 AssertionError...
->>> # Note the final ... allows to pass with pytest, but *not* python -m doctest;
->>> # without the ... it passes with python -m doctest, but not pytest :(
 
 ExprWithPath allows traversing an expr, and listing the addressable subexprs.
 >>> ewp = ExprWithPath.from_expr(e)
@@ -31,6 +29,17 @@ Traceback (most recent call last):
 IndexError: list index out of range
 >>> ExprWithPath.from_expr(e).all_subexprs_with_paths()  # doctest: +ELLIPSIS
 [ExprWithPath(..., path=(Let.rhs,), expr=<ksc.expr.Const...), ExprWithPath(..., path=(Let.body,), expr=<ksc.expr.Call...)]
+
+ExprWithPath also allows directly accessing other members of the Expr
+ (that are not addressable by a Path):
+>>> ewp.vars   # doctest: +ELLIPSIS
+<ksc.expr.Var...>
+>>> str(ewp.vars)
+'a'
+>>> ewp.body  # doctest: +ELLIPSIS
+ExprWithPath(...)
+>>> ewp.body.name
+StructuredName(add)
 """
 
 from collections.abc import Sequence as AbstractSeq
