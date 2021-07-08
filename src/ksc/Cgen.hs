@@ -205,12 +205,12 @@ allocatorUsageOfCType = \case
   LMVariant _    -> UsesAllocator
 
 -- CGenResult is (C declarations, C expression, CType)
--- e.g. (["double r; if (b) { r = 1; } else { r = 2; };"],
+-- e.g. (["ks::Float r; if (b) { r = 1; } else { r = 2; };"],
 --       "r",
---       TypeDouble)
+--       TypeFloat)
 -- e.g. ([],         -- simple constant needs no pre-declaration
 --       "1.0",      -- this is what we use at the occurrence
---       TypeDouble)
+--       TypeFloat)
 -- e.g. (["typedef LM::HCat<LM::VCat<LM::One, LM::Zero>,LM::Zero> v12_t;",
 --        "v12_t v12 = v12_t::mk(a,b);"]
 --       "v12",      -- this is what we use at the occurrence
@@ -714,7 +714,7 @@ cgenType = \case
 
 cgenTypeLang :: HasCallStack => Type -> String
 cgenTypeLang = \case
-  TypeFloat     -> "double" -- TODO: make these all ks_Float etc, and add typedefs in knossos.h
+  TypeFloat     -> "Float"
   TypeInteger   -> "int"
   TypeString    -> "std::string"
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
@@ -785,7 +785,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
 cgenKonst :: Konst -> String
 cgenKonst = \case
   KInteger i -> show i
-  KFloat   f -> show f
+  KFloat   f -> "Float(" ++ show f ++ ")"
   KString  s -> show s
   KBool    b -> if b then "true" else "false"
 

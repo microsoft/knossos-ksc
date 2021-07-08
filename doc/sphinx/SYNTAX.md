@@ -101,8 +101,8 @@ sign, for example: `42` and `-123`.
 
 #### Float
 
-`Float` types are 64-bit IEE 754 double-precision floating point numbers. Other
-precisions could be considered in the future.
+`Float` types are 32-bit IEE 754 single-precision floating point numbers. Other
+precisions are an open issue (https://github.com/microsoft/knossos-ksc/issues/358)
 
 `Float` literals are numeric values with a decimal point, with optional sign,
 for example: `10.0` and `-1.23`. Scientific notation is not supported.

@@ -184,8 +184,8 @@ PYBIND11_MODULE("""
     m.def("allocator_peak", &ks::entry_points::allocator_peak);
     m.def("logging", &ks::entry_points::logging);
 
-    declare_tensor_1<double>(m, "Tensor_1_Float");
-    declare_tensor_2<double>(m, "Tensor_2_Float");
+    declare_tensor_1<ks::Float>(m, "Tensor_1_Float");
+    declare_tensor_2<ks::Float>(m, "Tensor_2_Float");
     declare_tensor_2<int>(m, "Tensor_2_Integer");
 
 """

@@ -48,11 +48,11 @@ namespace ks
 		// ---------------- Scale  ------------------
 		struct Scale
 		{
-			typedef double scale_t;
+			typedef Float scale_t;
 			scale_t val;
 
-			typedef double To;
-			typedef double From;
+			typedef Float To;
+			typedef Float From;
 
 			static Scale mk(scale_t val) { return Scale{ val }; }
 
@@ -71,12 +71,12 @@ namespace ks
 		{
 			T val;
 
-			typedef double To;
-			typedef double From;
+			typedef Float To;
+			typedef Float From;
 
 			static ScaleR mk(allocator *, T val) { return ScaleR{ val }; }
 
-			T Apply(allocator *, double rhs) const { return rhs * val; }
+			T Apply(allocator *, Float rhs) const { return rhs * val; }
 		};
 
 		template <class T>
@@ -518,14 +518,14 @@ namespace ks
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(t2), LM::Scale::mk(t1));
 	}
 */
-	inline auto D$abs$af(allocator *, double d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
+	inline auto D$abs$af(allocator *, Float d) { return LM::Scale::mk(d > 0 ? 1.0 : -1.0); }
 
-	inline auto D$max$aff(allocator *, double a, double b) {
-		double s = a > b ? 1.0 : 0.0;
+	inline auto D$max$aff(allocator *, Float a, Float b) {
+		Float s = a > b ? 1.0 : 0.0;
 		return LM::HCat<LM::Scale, LM::Scale>::mk(LM::Scale::mk(s), LM::Scale::mk(1.0 - s));
 	}
 
-	inline auto D$ts_neg(allocator *, double d) { return LM::Scale::mk(-1.0); }
+	inline auto D$ts_neg(allocator *, Float d) { return LM::Scale::mk(-1.0); }
 
 	inline auto D$to_integer(int d) { return LM::Zero<int, int>(); }
 
@@ -540,8 +540,8 @@ namespace ks
 		{
 			typedef typename Vec::value_type T;
 			auto di = LM::Zero<I, T>::mk();
-			auto delta = [i](I ii) { return LM::Scale<T,T,double>::mk(T{}, T{}, ii == i ? 1.0 : 0.0); };
-			auto df = LM::Build<std::function<LM::Scale<T,T,double>(I)>>::mk(delta);
+			auto delta = [i](I ii) { return LM::Scale<T,T,Float>::mk(T{}, T{}, ii == i ? 1.0 : 0.0); };
+			auto df = LM::Build<std::function<LM::Scale<T,T,Float>(I)>>::mk(delta);
 			return D_t$index<I, Vec>::mk(di, df);
 		}
 

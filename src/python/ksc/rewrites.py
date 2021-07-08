@@ -291,7 +291,7 @@ class ParsedRuleMatcher(RuleMatcher):
             (add (mul a b) (mul b c)) ;; replacement
         )
     or, the inverse a*b+a*c-> a*(b+c)
-        (rule "add_two_muls.double"
+        (rule "add_two_muls.Float"
             ((a : Float) (b : Float)) ;; template_vars
             (add (mul a b) (mul a c)) ;; template --- note a occurs in multiple places, these must be identical
             (mul a (add b c)) ;; replacement
