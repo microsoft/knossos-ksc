@@ -50,4 +50,3 @@ def test_backwards(benchmark, reference_func, func, config):
     reference_loss = reference_func(config).sum()
     reference_result = torch.autograd.grad(reference_loss, config)
     assert_close(result[0].to(cpu_device), reference_result[0])
-
