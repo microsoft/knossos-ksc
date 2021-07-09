@@ -16,10 +16,16 @@ from ksc import utils
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--modulepath", action="store", help="path of module to dynamically load"
+        "--modulepath",
+        action="store",
+        default="examples/dl-activations/relu3",
+        help="path of module to dynamically load",
     )
     parser.addoption(
-        "--benchmarkname", action="store", help="name of benchmark to dynamically load"
+        "--benchmarkname",
+        action="store",
+        default="vrelu3",
+        help="name of benchmark to dynamically load",
     )
 
 
