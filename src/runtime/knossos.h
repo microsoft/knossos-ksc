@@ -64,6 +64,9 @@ namespace ks {
 
 	// ===============================  Core types  ==================================
 	typedef float Float;
+	typedef int Integer;
+	typedef bool Bool;
+	typedef std::string String;
 
 	// ===============================  Tuple  ==================================
 
@@ -660,10 +663,10 @@ namespace ks {
 
 	// ===============================  Shape  ==================================
 
-	tuple<> shape(allocator_base *, bool const&) { return {}; }
-	tuple<> shape(allocator_base *, int const&) { return {}; }
+	tuple<> shape(allocator_base *, Bool const&) { return {}; }
+	tuple<> shape(allocator_base *, Integer const&) { return {}; }
 	tuple<> shape(allocator_base *, Float const&) { return {}; }
-	tuple<> shape(allocator_base *, std::string const&) { return {}; }
+	tuple<> shape(allocator_base *, String const&) { return {}; }
 
 	template<size_t Dim, class T>
 	auto shape(allocator_base * alloc, tensor<Dim, T> const& t) {
@@ -958,7 +961,7 @@ namespace ks {
 	}
 
 	template <>
-	int zero(allocator *, int const& val)
+	Integer zero(allocator *, Integer const& val)
 	{
 		return 0;
 	}
@@ -1112,11 +1115,12 @@ namespace ks {
 		return transform_tuple(t, [alloc, s](auto const& elem) { return ts_scale(alloc, s, elem); });
 	}
 
-	inline
-		int ts_scale(allocator *, int const& t1, int const& t2)
-	{
-		return t1 * t2;
-	}
+	// TODO: this should not be called.  Delete when confirmed.
+	// inline
+	// 	int ts_scale(allocator *, int const& t1, int const& t2)
+	// {
+	// 	return t1 * t2;
+	// }
 
 	template <size_t Dim, class T>
 	tensor<Dim, T> ts_scale(allocator * alloc, Float val, tensor<Dim, T> const& t)
@@ -1129,7 +1133,8 @@ namespace ks {
 		return ret;
 	}
 
-	inline int ts_neg(allocator *, int d) { return -d; }
+	// TODO: this should not be called.  Delete when confirmed.
+	//inline Integer ts_neg(allocator *, Integer d) { return -d; }
 
 	inline Float ts_neg(allocator *, Float d) { return -d; }
 
@@ -1150,7 +1155,7 @@ namespace ks {
 
 	// =============================== Build ==================================
 	template <class T, class F>
-	vec<T> build(allocator * alloc, int size, F f)
+	vec<T> build(allocator * alloc, Integer size, F f)
 	{
 		vec<T> ret = vec<T>::create(alloc, size);
 
@@ -1480,7 +1485,7 @@ namespace ks {
 
 	// Probably should implement this as a loop
 	template <class T, class F, class F_, class A, class dA, class dT>
-	dA FFold_recursive(allocator * alloc, int i, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
+	dA FFold_recursive(allocator * alloc, Integer i, F f, A acc, vec<T> v, F_ f_, dA dacc, vec<dT> dv) {
 		if (i == v.size()) {
 			return dacc;
 		} else {
@@ -1561,53 +1566,53 @@ namespace ks {
 	}
 
 	template <class T>
-	inline bool eq(T t1, T t2)
+	inline Bool eq(T t1, T t2)
 	{
 		return t1 == t2;
 	}
 
 	template <class T>
-          inline bool ne(T t1, T t2)
+          inline Bool ne(T t1, T t2)
 	{
 		return t1 != t2;
 	}
 
-        inline bool lt$aff(allocator *, Float t1, Float t2)
+        inline Bool lt$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 < t2;
 	}
 
-        inline bool lt$aii(allocator *, int t1, int t2)
+        inline Bool lt$aii(allocator *, Integer t1, Integer t2)
 	{
 		return t1 < t2;
 	}
 
-	inline bool gt$aff(allocator *, Float t1, Float t2)
+	inline Bool gt$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 > t2;
 	}
 
-	inline bool gt$aii(allocator *, int t1, int t2)
+	inline Bool gt$aii(allocator *, Integer t1, Integer t2)
 	{
 		return t1 > t2;
 	}
 
-	inline bool lte$aff(allocator *, Float t1, Float t2)
+	inline Bool lte$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 <= t2;
 	}
 
-	inline bool lte$aii(allocator *, int t1, int t2)
+	inline Bool lte$aii(allocator *, Integer t1, Integer t2)
 	{
 		return t1 <= t2;
 	}
 
-	inline bool gte$aff(allocator *, Float t1, Float t2)
+	inline Bool gte$aff(allocator *, Float t1, Float t2)
 	{
 		return t1 >= t2;
 	}
 
-	inline bool gte$aii(allocator *, int t1, int t2)
+	inline Bool gte$aii(allocator *, Integer t1, Integer t2)
 	{
 		return t1 >= t2;
 	}
@@ -1617,7 +1622,7 @@ namespace ks {
 		return t1 + t2;
 	}
 
-	inline int add$aii(allocator *, int t1, int t2)
+	inline Integer add$aii(allocator *, Integer t1, Integer t2)
 	{
 		return t1 + t2;
 	}
@@ -1627,7 +1632,7 @@ namespace ks {
 		return t1 * t2;
 	}
 
-	inline int mul$aii(allocator *, int t1, int t2)
+	inline Integer mul$aii(allocator *, Integer t1, Integer t2)
 	{
 		return t1 * t2;
 	}
@@ -1636,7 +1641,7 @@ namespace ks {
 
 	inline Float max$aff(allocator *, Float a, Float b) { return a > b ? a : b; }
 
-	inline int to_integer(int d) { return d; }
+	inline Integer to_integer(Integer d) { return d; }
 
 	template<size_t I, size_t Dim, typename TupleType>
 	auto unzip_element(allocator * alloc, tensor<Dim, TupleType> const& t)
@@ -1688,14 +1693,14 @@ namespace ks {
 
 
 	template <class T>
-	int print(T a)
+	Integer print(T a)
 	{
 		std::cout << a;
 		return 0;
 	}
 
 	template <class T, class... Ts>
-	int print(T a, Ts... t)
+	Integer print(T a, Ts... t)
 	{
 		print(a);
 		return 1 + print(t...);

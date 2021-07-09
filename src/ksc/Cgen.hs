@@ -715,11 +715,11 @@ cgenType = \case
 cgenTypeLang :: HasCallStack => Type -> String
 cgenTypeLang = \case
   TypeFloat     -> "Float"
-  TypeInteger   -> "int"
-  TypeString    -> "std::string"
+  TypeInteger   -> "Integer"
+  TypeString    -> "String"
   TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
   TypeTensor d t -> "tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
-  TypeBool      -> "bool"
+  TypeBool      -> "Bool"
   TypeUnknown   -> "void"
   TypeLam from to ->
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
