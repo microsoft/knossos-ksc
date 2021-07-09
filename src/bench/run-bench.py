@@ -5,8 +5,6 @@ import torch
 import ksc.torch_frontend
 from ksc.torch_frontend import tsmod2ksmod
 
-torch.set_default_dtype(torch.float64)
-
 
 class time_sampler:
     def __init__(self, minimizing=False):
@@ -139,7 +137,7 @@ def bench(module_file, bench_name):
 
             if (
                 not torch.isclose(
-                    pt_value, ks_value, rtol=1e-05, atol=1e-08, equal_nan=False
+                    pt_value, ks_value, rtol=1e-05, atol=1e-06, equal_nan=False
                 )
                 .all()
                 .numpy()
@@ -156,7 +154,7 @@ def bench(module_file, bench_name):
 
             if (
                 not torch.isclose(
-                    pt_grad, ks_grad, rtol=1e-05, atol=1e-08, equal_nan=False
+                    pt_grad, ks_grad, rtol=1e-05, atol=1e-06, equal_nan=False
                 )
                 .all()
                 .numpy()

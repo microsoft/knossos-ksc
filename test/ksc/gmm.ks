@@ -350,7 +350,7 @@
 
           (rev_gmm_at_theta_shape ([shape [rev gmm_knossos_gmm_objective]] (tuple x alphas mus qs ls wishart) 1.0))
 
-          (tolerance 0.0001)
+          (tolerance 0.001)
           (everything_works_as_expected_reverse (lt checked tolerance))
           (everything_works_as_expected_suf     (lt checked_suf tolerance))
         )

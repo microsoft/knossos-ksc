@@ -11,19 +11,19 @@ import numpy.random
 
 
 def vd(x):
-    return e.vec_double([y for y in x])
+    return e.vec_Float([y for y in x])
 
 
 def vvd(x):
-    return e.vec_vec_double([vd(y) for y in x])
+    return e.vec_vec_Float([vd(y) for y in x])
 
 
 def vvvd(x):
-    return e.vec_vec_vec_double([vvd(y) for y in x])
+    return e.vec_vec_vec_Float([vvd(y) for y in x])
 
 
 def vvvvd(x):
-    return e.vec_vec_vec_vec_double([vvvd(y) for y in x])
+    return e.vec_vec_vec_vec_Float([vvvd(y) for y in x])
 
 
 def vec_iter(v):

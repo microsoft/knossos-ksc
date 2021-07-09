@@ -20,11 +20,11 @@ void declare_vec(py::module &m, std::string typestr) {
 // definitions to a general Knossos CPP types Python module.
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   using ks::entry_points::with_ks_allocator;
-  declare_vec<double>(m, std::string("double"));
-  declare_vec<ks::vec<double> >(m, std::string("vec_double"));
-  declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
-  declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
-  declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
+  declare_vec<ks::Float>(m, std::string("Float"));
+  declare_vec<ks::vec<ks::Float> >(m, std::string("vec_Float"));
+  declare_vec<ks::vec<ks::vec<ks::Float> > >(m, std::string("vec_vec_Float"));
+  declare_vec<ks::vec<ks::vec<ks::vec<ks::Float> > > >(m, std::string("vec_vec_vec_Float"));
+  declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<ks::Float> > > > >(m, std::string("vec_vec_vec_vec_Float"));
   m.def("conv2d", with_ks_allocator("conv2d", &ks::conv2d$aT1T1T1T1fT1fT1T1T1f));
   m.def("mnist", with_ks_allocator("mnist", &ks::mnist$aT1T1T1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1T1T1fT1fT1T1fT1f));
 }

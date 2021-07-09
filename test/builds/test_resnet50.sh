@@ -16,7 +16,8 @@ TMPDIR="obj/test"
 mkdir -p $TMPDIR
 
 echo Translating Knossos to Python
-python3 -m ksc.translate examples/dl-resnet/resnet_v2.ks --backend jax_input_last > $TMPDIR/resnet_v2.py
+python3 -m ksc.translate examples/dl-resnet/resnet_v2.ks --backend jax_input_last |\
+  grep -v 'No CUDA runtime is found' > $TMPDIR/resnet_v2.py
 
 echo Running test of Resnet50 written in Knossos
 PYTHONPATH=$TMPDIR python ./test/builds/test_resnet50.py --model resnet_v2

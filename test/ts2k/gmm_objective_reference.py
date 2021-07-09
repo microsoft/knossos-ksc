@@ -51,7 +51,7 @@ def constructL(d, icf):
         nelems = d - i - 1
         col = torch.cat(
             [
-                torch.zeros(i + 1, dtype=torch.float64),
+                torch.zeros(i + 1),
                 icf[constructL.Lparamidx : (constructL.Lparamidx + nelems)],
             ]
         )

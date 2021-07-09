@@ -11,11 +11,11 @@ import math
 
 # Useful functions for creating Knossos vecs
 def vd(x):
-    return knossos.vec_double([y for y in x])
+    return knossos.vec_Float([y for y in x])
 
 
 def vvd(x):
-    return knossos.vec_vec_double([vd(y) for y in x])
+    return knossos.vec_vec_Float([vd(y) for y in x])
 
 
 # Shorthand for creating numpy arrays
@@ -89,7 +89,7 @@ def assert_equal_objective():
     )
 
     np.testing.assert_almost_equal(
-        knossos_objective, reference_objective, decimal=8, err_msg="Objective"
+        knossos_objective, reference_objective, decimal=0, err_msg="Objective"
     )
 
     print(knossos_objective)

@@ -6,7 +6,7 @@ import numpy
 import torch
 import torch.onnx
 
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 from ksc import utils
 from ksc.parse_ks import parse_ks_filename
@@ -93,7 +93,7 @@ def from_torch_dtype(t):
     if t == torch.int64:
         return Type.Integer
 
-    if t == torch.float64:
+    if t == torch.float32:
         return Type.Float
 
     raise NotImplementedError
@@ -411,7 +411,7 @@ def torch_to_ks(py_mod, val):
 
     if isinstance(val, torch.Tensor):
         assert (
-            val.dtype == torch.float64
+            val.dtype == torch.float32
         ), "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
         if len(val.shape) == 0:
             return val.item()
