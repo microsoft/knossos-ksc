@@ -7,7 +7,7 @@ import ksc.adbench_lstm.lstm as k
 import random
 import numpy as np
 
-d = a.vec_double
+d = a.vec_Float
 
 
 def r():
