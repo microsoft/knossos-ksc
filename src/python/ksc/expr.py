@@ -4,6 +4,9 @@ Expr: lightweight classes implementing the Knossos IR
 
 from typing import FrozenSet, List, Tuple, Union, Optional
 from dataclasses import dataclass
+
+from prettyprinter import pformat
+
 from ksc.type import Type
 from ksc.utils import paren, KRecord
 
@@ -229,9 +232,9 @@ class ASTNode(KRecord):
         super().__init__(**kwargs)
 
     def __str__(self):
-        # This registers the various handlers, we don't call it directly
+        # This registers the various handlers, we don't call it directly.
+        # Can't be at toplevel because it imports ksc.expr.
         from ksc import prettyprint
-        from prettyprinter import pformat
 
         return pformat(self)
 
