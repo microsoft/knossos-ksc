@@ -4,3 +4,5 @@ numpy==1.21.0
 jax==0.1.57
 editdistance==0.5.3
 torch==1.9.0+cu111
+prettyprinter
+pyrsistent
