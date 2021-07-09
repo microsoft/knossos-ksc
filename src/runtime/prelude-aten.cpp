@@ -22,7 +22,7 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,Float> const& A, tensor<2,Flo
 	auto [r,K] = size(A);
 	auto [K_,c] = size(B);
   KS_ASSERT(K == K_);
-	tensor<2,Float> ret(alloc, make_Tuple(r, c));
+	tensor<2,Float> ret(alloc, make_tuple(r, c));
 	for(int i = 0; i < r; ++i)
 		for(int j = 0; j < c; ++j) {
 			Float tot = 0;
@@ -33,8 +33,8 @@ aten$8$8matmul$aT2fT2f(allocator * alloc, tensor<2,Float> const& A, tensor<2,Flo
 	return ret;
 }
 
-Tuple<tensor<2,Float>,tensor<1,Float>> 
-rev$aten$8$8matmul$aT2fT1f(allocator * alloc, Tuple<tensor<2,Float>, tensor<1,Float>> const& M_v, tensor<1,Float> const& dr)
+tuple<tensor<2,Float>,tensor<1,Float>> 
+rev$aten$8$8matmul$aT2fT1f(allocator * alloc, tuple<tensor<2,Float>, tensor<1,Float>> const& M_v, tensor<1,Float> const& dr)
 {
 	auto [M, v] = M_v;
 	auto [r, c] = size(M);
@@ -114,14 +114,14 @@ aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 	KS_ASSERT(false)
 }
 
-Tuple<int, int>
+tuple<int, int>
 shape$aten$8$8cat$aT1T2fi(allocator * alloc, tensor<1, Mat> const& As, int dim)
 {
 	KS_ASSERT(false)
 }
 
-Tuple<tensor<1, Mat>,Tuple<>>
-rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
+tuple<tensor<1, Mat>,tuple<>>
+rev$aten$8$8cat$aT1T2fi(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
 {
 	auto [As, dim] = arg;
 	int n = size(As);
@@ -145,14 +145,14 @@ rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg
 			get_dimension<Dim>(offset) += get_dimension<Dim>(sz);
 		}
 
-		return make_Tuple(retM, Tuple<>());
+		return make_tuple(retM, tuple<>());
 	}
 
 	KS_ASSERT(false)
 }
 
-Tuple<tensor<1, Tuple<int, int>>,Tuple<>>
-shape$rev$aten$8$8cat$aT1T2fi(allocator * alloc, Tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
+tuple<tensor<1, tuple<int, int>>,tuple<>>
+shape$rev$aten$8$8cat$aT1T2fi(allocator * alloc, tuple<tensor<1, Mat>, int> const& arg, Mat const& dret)
 {
 	KS_ASSERT(false)
 }
@@ -186,8 +186,8 @@ addA1bt$aT2fT1f(allocator * alloc, Mat const& A, Vec const& b)
 // dR = dA + 1 db' = [I, 1] * [dA, db] ??? TODO
 // [dA, db] = [dR, dR * 1]
 
-Tuple<Mat, Vec>
-rev$addA1bt$aT2fT1f(allocator * alloc, Tuple<Mat, Vec> const& args, Mat const& dret)
+tuple<Mat, Vec>
+rev$addA1bt$aT2fT1f(allocator * alloc, tuple<Mat, Vec> const& args, Mat const& dret)
 {
 	auto [M, N] = size(dret);
 	

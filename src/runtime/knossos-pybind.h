@@ -14,12 +14,12 @@ namespace py = pybind11;
 
 namespace pybind11 { namespace detail {
 
-/* Specialize type_caster for the ks::Tuple type.
-   Ideally we'd just inherit from pybind11::detail::tuple_caster, but our ks::Tuple
+/* Specialize type_caster for the ks::tuple type.
+   Ideally we'd just inherit from pybind11::detail::tuple_caster, but our ks::tuple
    doesn't quite conform to the required interface (it uses ks::get instead of
    std::get), so this is a slightly-modified version. */
-template <typename... Ts> class type_caster<ks::Tuple<Ts...>> {
-    using type = ks::Tuple<Ts...>;
+template <typename... Ts> class type_caster<ks::tuple<Ts...>> {
+    using type = ks::tuple<Ts...>;
     static constexpr auto size = sizeof...(Ts);
     using indices = make_index_sequence<size>;
 public:
@@ -60,7 +60,7 @@ private:
         return true;
     }
 
-    /* Implementation: Convert a C++ Tuple into a Python tuple */
+    /* Implementation: Convert a C++ tuple into a Python tuple */
     template <typename T, size_t... Is>
     static handle cast_impl(T &&src, return_value_policy policy, handle parent, index_sequence<Is...>) {
         std::array<object, size> entries{{
@@ -76,7 +76,7 @@ private:
         return result.release();
     }
 
-    ks::Tuple<make_caster<Ts>...> subcasters;
+    ks::tuple<make_caster<Ts>...> subcasters;
 };
 
 }}

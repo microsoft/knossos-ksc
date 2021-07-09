@@ -125,10 +125,10 @@ namespace ks
 		};
 
 		template <class... Ts>
-		struct HCat_infer_From<Tuple<Ts...>> {
-			typedef Tuple<typename Ts::From ...> type;
+		struct HCat_infer_From<tuple<Ts...>> {
+			typedef tuple<typename Ts::From ...> type;
 		};
-	
+
 		namespace test_HCat_infer_From {
 			struct A {
 				typedef int From;
@@ -136,8 +136,8 @@ namespace ks
 			struct B {
 				typedef float From;
 			};
-			typedef typename HCat_infer_From<Tuple<A, B, A>>::type ABA;
-			static_assert(std::is_same<ABA, Tuple<int, float, int>>::value);
+			typedef typename HCat_infer_From<tuple<A, B, A>>::type ABA;
+			static_assert(std::is_same<ABA, tuple<int, float, int>>::value);
 		};
 
 		template <class Tuple>
@@ -151,7 +151,7 @@ namespace ks
 		struct HCat {
 			static constexpr size_t n = sizeof...(LMs);
 
-			typedef Tuple<LMs...> Tup;
+			typedef tuple<LMs...> Tup;
 
 			Tup lms;
 
@@ -184,7 +184,7 @@ namespace ks
 			s << "HCat";
 			//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
 			;
-			return Tuple_print<0>(s << "(", t.lms) << ")";
+			return tuple_print<0>(s << "(", t.lms) << ")";
 		}
 
 		// ---------------- VCat ------------------
@@ -195,8 +195,8 @@ namespace ks
 		};
 
 		template <class... Ts>
-		struct VCat_infer_To<Tuple<Ts...>> {
-			typedef Tuple<typename Ts::To ...> type;
+		struct VCat_infer_To<tuple<Ts...>> {
+			typedef tuple<typename Ts::To ...> type;
 		};
 
 		namespace test_VCat_infer_To {
@@ -206,8 +206,8 @@ namespace ks
 			struct B {
 				typedef float To;
 			};
-			typedef typename VCat_infer_To<Tuple<A, B, A>>::type ABA;
-			static_assert(std::is_same<ABA, Tuple<int, float, int>>::value);
+			typedef typename VCat_infer_To<tuple<A, B, A>>::type ABA;
+			static_assert(std::is_same<ABA, tuple<int, float, int>>::value);
 		};
 
 		template <class Tuple>
@@ -221,7 +221,7 @@ namespace ks
 		struct VCat {
 			static constexpr size_t n = sizeof...(LMs);
 
-			typedef Tuple<LMs...> Tup;
+			typedef tuple<LMs...> Tup;
 
 			Tup lms;
 
@@ -269,7 +269,7 @@ namespace ks
 			s << "VCat";
 			//"<" << type_to_string<T1>::name() << "," << type_to_string<T2>::name() << ">" <<
 			;
-			return Tuple_print<0>(s << "(", t.lms) << ")";
+			return tuple_print<0>(s << "(", t.lms) << ")";
 		}
 
 		// ---------------- Compose ------------------

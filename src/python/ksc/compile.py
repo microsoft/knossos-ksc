@@ -186,7 +186,7 @@ PYBIND11_MODULE("""
 
     declare_tensor_1<ks::Float>(m, "Tensor_1_Float");
     declare_tensor_2<ks::Float>(m, "Tensor_2_Float");
-    declare_tensor_2<ks::Integer>(m, "Tensor_2_Integer");
+    declare_tensor_2<int>(m, "Tensor_2_Integer");
 
 """
         + "\n".join(m_def(*t) for t in bindings_to_generate)
