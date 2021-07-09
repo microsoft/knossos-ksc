@@ -447,11 +447,11 @@ def test_rewrite_seq_to_exprs(prelude_symtab):
     seq, expected = zip(
         (["inline_call", []], "(let (x 4) (add 2.0 (to_float x)))"),
         (
-            ["inline_var", ["Let_body", "Call_args[1]", "Call_args[0]"]],
+            ["inline_var", ["let_body", "call_args[1]", "call_args[0]"]],
             "(let (x 4) (add 2.0 (to_float 4)))",
         ),
         (["delete_let", []], "(add 2.0 (to_float 4))"),
-        (["cfold_to_float@i", ["Call_args[1]"]], "(add 2.0 4.0)"),
+        (["cfold_to_float@i", ["call_args[1]"]], "(add 2.0 4.0)"),
         (["cfold_add@ff", []], "6.0"),
     )
     expected_exprs = [parse_expr_string(s) for s in expected]
