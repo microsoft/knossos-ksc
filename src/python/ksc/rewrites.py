@@ -72,11 +72,11 @@ class Match:
 
 @dataclass(frozen=True)
 class Match_XYZ:
-    rule: Callable[[], Expr]
+    apply_rule: Callable[[], Expr]
     ewp: ExprWithPath
 
     def apply_rewrite(self):
-        return self.rule()
+        return self.apply_rule()
 
     @property
     def path(self):
@@ -205,30 +205,33 @@ class inline_var(RuleMatcher):
 
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment,
-    ) -> Iterator[Match]:
+    ) -> Iterator[Match_XYZ]:
         assert isinstance(ewp.expr, Var)
         binding_location = env.let_vars.get(ewp.expr.name)
 
         if binding_location is not None:
 
-            binding_location_actual = binding_location
+            binding_location_not_none = binding_location
 
             def apply_at() -> Expr:
                 # binding_location comes from the Match.
                 # Note there is an alternative design, where we don't store any "rule_specific_data" in the Match.
                 # Thus, at application time (here), we would have to first do an extra traversal all the way down path_to_var, to identify which variable to inline (and its binding location).
                 # (Followed by the same traversal as here, that does renaming-to-avoid-capture from the binding location to the variable usage.)
-                assert ewp.path[: len(binding_location_actual)] == binding_location
+                assert (
+                    ewp.path[: len(binding_location_not_none)]
+                    == binding_location_not_none
+                )
                 return replace_subtree(
                     ewp.root,
-                    binding_location,
+                    binding_location_not_none,
                     Const(0.0),  # Nothing to avoid capturing in outer call
                     lambda _zero, let: replace_subtree(
-                        let, ewp.path[len(binding_location_actual) :], let.rhs
+                        let, ewp.path[len(binding_location_not_none) :], let.rhs
                     ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
                 )
 
-            bob = Match_XYZ(ewp=ewp, rule=apply_at)
+            yield Match_XYZ(ewp=ewp, apply_rule=apply_at)
 
 
 @singleton
