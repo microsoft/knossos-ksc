@@ -88,8 +88,8 @@ def assert_equal_model():
     print(mo1)
     print(ao1l)
 
-    np.testing.assert_almost_equal(ao0l, mo0, decimal=12, err_msg="Model 1")
-    np.testing.assert_almost_equal(ao1l, mo1, decimal=12, err_msg="Model 2")
+    np.testing.assert_almost_equal(ao0l, mo0, decimal=5, err_msg="Model 1")
+    np.testing.assert_almost_equal(ao1l, mo1, decimal=5, err_msg="Model 2")
 
 
 def assert_equal_predict_and_objective():
@@ -176,9 +176,9 @@ def assert_equal_predict_and_objective():
     print(tol)
     print(aol)
 
-    np.testing.assert_almost_equal(tp0l, vl, decimal=12, err_msg="Predict 1")
-    np.testing.assert_almost_equal(tp1l, vtvvl, decimal=12, err_msg="Predict 2")
-    np.testing.assert_almost_equal(tol, aol, decimal=12, err_msg="Objective")
+    np.testing.assert_almost_equal(tp0l, vl, decimal=5, err_msg="Predict 1")
+    np.testing.assert_almost_equal(tp1l, vtvvl, decimal=5, err_msg="Predict 2")
+    np.testing.assert_almost_equal(tol, aol, decimal=5, err_msg="Objective")
 
 
 if __name__ == "__main__":
