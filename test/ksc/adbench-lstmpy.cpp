@@ -27,8 +27,8 @@ void declare_vec(py::module &m, std::string typestr) {
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
   using ks::entry_points::with_ks_allocator;
   declare_vec<ks::Float>(m, std::string("Float"));
-  declare_vec<ks::tuple<ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>>>(m, std::string("tuple_vec10"));
-  declare_vec<ks::tuple<ks::vec<ks::Float>, ks::vec<ks::Float>>>(m, std::string("tuple_vec2"));
+  declare_vec<ks::Tuple<ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>>>(m, std::string("tuple_vec10"));
+  declare_vec<ks::Tuple<ks::vec<ks::Float>, ks::vec<ks::Float>>>(m, std::string("tuple_vec2"));
   declare_vec<ks::vec<ks::Float> >(m, std::string("vec_Float"));
   declare_vec<ks::vec<ks::vec<ks::Float> > >(m, std::string("vec_vec_Float"));
   declare_vec<ks::vec<ks::vec<ks::vec<ks::Float> > > >(m, std::string("vec_vec_vec_Float"));
