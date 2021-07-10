@@ -1,18 +1,7 @@
 import pytest
 import torch
-from ksc import torch_frontend
+
 from ksc.torch_frontend import tsmod2ksmod
-
-
-def fun_and_grad_matches(f, g, arg):
-    fval = f(arg)
-    gval = g(arg)
-    if not torch.all(torch.isclose(fval, gval)):
-        print("run-bench: ERROR: VALUE mismatch", f, g)
-        print(fval, gval)
-        return False
-
-    return True
 
 
 @pytest.mark.parametrize(
