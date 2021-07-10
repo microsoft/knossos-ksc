@@ -1,5 +1,9 @@
 import pytest
+import sys
+import os.path
 import torch
+import inspect
+import importlib
 
 from ksc.torch_frontend import tsmod2ksmod
 
@@ -15,11 +19,6 @@ def test_bench(module_file, bench_name):
         bench_name_pt        PyTorch reference, should be fast, might not be pretty
         bench_name_config    Return a sequence of inputs on which to run benchmarking
     """
-    import inspect
-    import importlib
-    import os.path
-    import sys
-
     module_dir, module_name = os.path.split(module_file)
     sys.path.append(module_dir)
     mod = importlib.import_module(module_name)
