@@ -10,7 +10,7 @@ from ksc.torch_frontend import tsmod2ksmod
 )
 def test_bench(module_file, bench_name):
     """
-    Import MODULE_NAME, which defines these functions:
+    Import MODULE_FILE, which defines these functions:
         bench_name           Knossos-compilable code, should be pretty
         bench_name_pt        PyTorch reference, should be fast, might not be pretty
         bench_name_config    Return a sequence of inputs on which to run benchmarking
