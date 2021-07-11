@@ -4,6 +4,9 @@ Expr: lightweight classes implementing the Knossos IR
 
 from typing import FrozenSet, List, Tuple, Union, Optional
 from dataclasses import dataclass
+
+from prettyprinter import pformat
+
 from ksc.type import Type
 from ksc.utils import paren, KRecord
 
@@ -229,13 +232,16 @@ class ASTNode(KRecord):
         super().__init__(**kwargs)
 
     def __str__(self):
-        def to_str(v):
-            if isinstance(v, list):
-                # str() on list contains repr() of elements
-                return "[" + (", ".join([to_str(e) for e in v])) + "]"
-            return str(v)
+        # This registers the various handlers, we don't call it directly.
+        # Can't be at toplevel because it imports ksc.expr.
+        from ksc import prettyprint
 
-        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
+        return pformat(self)
+
+    def __repr__(self):
+        # This does not satisfy the general contract of `__repr__` to return python
+        # code that reproduces the object. But it is still useful for dobugging.
+        nodes = (repr(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + " " + " ".join(nodes))
 
 
@@ -352,7 +358,7 @@ class Const(Expr):
     def __init__(self, value: ConstantType):
         super().__init__(type_=Type.fromValue(value), value=value)
 
-    def __str__(self):
+    def __repr__(self):
         return repr(self.value)
 
 
@@ -375,7 +381,7 @@ class Var(Expr):
     def __init__(self, name, type=None, decl=False):
         super().__init__(type_=type, name=name, decl=decl)
 
-    def __str__(self):
+    def __repr__(self):
         if self.decl:
             return self.name + " : " + str(self.type_)
         else:
