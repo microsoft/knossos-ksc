@@ -2,8 +2,8 @@
 Paths identify nodes (sub-expressions) within Expr's as a sequence of PathElements
 each of which identifies a field of an Expr subclass or one argument of a Call.
 >>> e = Let(Var("a"), Const(5), Call("add", [Const(3), Var("b")]))
->>> str(let_rhs.get(e))
-'5'
+>>> let_rhs.get(e)
+5
 >>> lam_body.get(e)
 Traceback (most recent call last):
 ...
@@ -14,28 +14,22 @@ ExprWithPath allows traversing an expr, and listing the addressable subexprs.
 >>> ewp.path
 ()
 >>> ewp.rhs
-ExprWithPath(..., path=(Let.rhs,), expr=<ksc.expr.Const...)
->>> str(ewp.rhs.expr)
-'5'
+ExprWithPath(..., path=(Let.rhs,), expr=5)
 >>> ewp.body.args[0]
-ExprWithPath(..., path=(Let.body, call_args[0]), expr=<ksc.expr.Const...)
->>> str(ewp.body.args[0].expr)
-'3'
->>> str(ExprWithPath.from_expr(e, [let_body, call_args[0]]).expr)
-'3'
+ExprWithPath(..., path=(Let.body, call_args[0]), expr=3)
+>>> ExprWithPath.from_expr(e, [let_body, call_args[0]])
+ExprWithPath(..., path=(Let.body, call_args[0]), expr=3)
 >>> ExprWithPath.from_expr(e, [let_body, call_args[2]])
 Traceback (most recent call last):
 ...
 IndexError: list index out of range
 >>> ExprWithPath.from_expr(e).all_subexprs_with_paths()
-[ExprWithPath(..., path=(Let.rhs,), expr=<ksc.expr.Const...), ExprWithPath(..., path=(Let.body,), expr=<ksc.expr.Call...)]
+[ExprWithPath(..., path=(Let.rhs,), expr=5), ExprWithPath(..., path=(Let.body,), expr=(Call...))]
 
 ExprWithPath also allows directly accessing other members of the Expr
- (that are not addressable by a Path):
+ (which do not have Paths):
 >>> ewp.vars
-<ksc.expr.Var...>
->>> str(ewp.vars)
-'a'
+a
 >>> ewp.body
 ExprWithPath(...)
 >>> ewp.body.name
