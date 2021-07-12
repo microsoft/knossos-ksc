@@ -460,3 +460,18 @@ def test_rewrite_seq_to_exprs(prelude_symtab):
     actual = rewrite_seq_to_exprs(start_expr, {foo_def.name: foo_def}, seq)
 
     assert actual == expected_exprs
+
+
+def test_rewrite_seq_to_exprs_bad_seq():
+    expr = parse_expr_string("(let (x 4) (add x y))")
+
+    # Sanity check: inlining x is ok
+    rewrite_seq_to_exprs(expr, {}, [["inline_var", ["let_body", "call_args[0]"]]])
+
+    # Inlining y is not - the location is valid, but the rule does not apply:
+    with pytest.raises(ValueError, match="Rule inline_var did not apply at"):
+        rewrite_seq_to_exprs(expr, {}, [["inline_var", ["let_body", "call_args[1]"]]])
+
+    # This rewrite has an invalid path i.e. that does not even identify a subexpression:
+    with pytest.raises(ValueError, match="Path.*not valid within expression"):
+        rewrite_seq_to_exprs(expr, {}, [["inline_var", ["let_body", "call_args[2]"]]])
