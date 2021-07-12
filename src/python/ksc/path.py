@@ -18,7 +18,7 @@ ExprWithPath(..., path=(let_rhs,), expr=5)
 >>> ewp.body.args[0]
 ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
 >>> ExprWithPath.from_expr(e, [let_body, call_args[0]])
-ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
+THIS SHOULD FAIL ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
 >>> ExprWithPath.from_expr(e, [let_body, call_args[2]])
 Traceback (most recent call last):
 ...
