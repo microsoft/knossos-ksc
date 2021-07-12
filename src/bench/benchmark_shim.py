@@ -35,6 +35,7 @@ def benchmark_semi_pedantic(
     duration, iterations, _ = benchmark._calibrate_timer(runner)
 
     if duration > benchmark._max_time:
+        # TODO: that one run we did for calibration was useful info, let's try to use it....
         raise Exception(
             f"""The duration({duration}) of a single run of the benchmark function was longer than max_time({benchmark._max_time}), aborting."""
         )
