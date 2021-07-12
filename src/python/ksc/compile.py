@@ -277,6 +277,7 @@ def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
         cpp_sources=[cpp_str],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=cflags,
+        build_directory=utils.get_ksc_build_dir() + "/torch_extensions",
         verbose=verbose,
     )
 
