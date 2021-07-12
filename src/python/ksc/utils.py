@@ -189,3 +189,31 @@ def add_to_path(p):
     finally:
         sys.path = old_path
         sys.modules = old_modules
+
+
+import os.path
+
+
+def write_file_if_different(lines, filename, verbose):
+    """
+    Write LINES to FILENAME unless they are identical to the current contents
+    If VERBOSE, print info to stdout.
+    """
+    to_write = "\n".join(lines)
+    if os.path.isfile(filename):
+        # Read from file
+        with open(filename, "r") as f:
+            existing_contents = f.read()
+
+        # Compare to new
+        if existing_contents == to_write:
+            if verbose:
+                print(f"ksc.utils: File not changed: {filename}")
+            return
+
+    # And overwrite if different
+    if verbose:
+        print(f"ksc.utils: File changed, overwriting {filename}")
+
+    with open(filename, "w") as f:
+        f.write(to_write)
