@@ -1,15 +1,16 @@
 import torch
 from torch import nn
 import os
-from ksc.torch_utils import elementwise_apply_hack
 from collections import OrderedDict
+from ksc import utils
 import ksc.expr as expr
 from ksc.type import Type
 from ksc.torch_frontend import (
     ksc_string_to_autograd_function,
     cpp_string_to_autograd_function,
 )
-from ksc.utils import get_ksc_paths
+from ksc.torch_utils import elementwise_apply_hack
+
 import torch._vmap_internals
 
 # BEGINDOC
@@ -114,6 +115,7 @@ def vrelu3_embedded_cpp_inlined_map():
         }
         """,
         "vrelu3",
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_inlined_map",
         generate_lm=False,
     )
 
@@ -161,6 +163,7 @@ def vrelu3_embedded_cpp_mask():
         }
         """,
         "vrelu3",
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask",
         generate_lm=False,
     )
 
@@ -213,6 +216,7 @@ def vrelu3_embedded_cpp_mask_bool_to_float():
         }
         """,
         "vrelu3",
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_bool_to_float",
         generate_lm=False,
     )
 
@@ -270,6 +274,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
                ddri)))) t dret))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3",
         generate_lm=False,
     )
 
@@ -299,6 +304,7 @@ def vrelu3_embedded_ks_checkpointed_map_mask():
                            ddri)))))) t dret))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_mask",
         generate_lm=False,
     )
 
@@ -319,6 +325,7 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
                 (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_INCORRECT_ks_upper_bound_via_map",
         generate_lm=False,
     )
 
@@ -335,6 +342,7 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound():
                 dret)
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_INCORRECT_ks_upper_bound",
         generate_lm=False,
     )
 
@@ -366,15 +374,21 @@ def relu3_pytorch_nice(x: float) -> float:
 
 
 def vrelu3_cuda_init():
-    __ksc_path, ksc_runtime_dir = get_ksc_paths()
+    __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
     this_dir = os.path.dirname(__file__)
 
+    # TODO: make this use compile.py?
+    # There's no real need, as there's nothing machine-generated
+    # or generated from a string
+    build_directory = utils.get_ksc_build_dir() + "/torch_extensions/vrelu3_cuda"
+    os.makedirs(build_directory, exist_ok=True)
     vrelu3_cuda = torch.utils.cpp_extension.load(
         "vrelu3_module",
         sources=[
             os.path.join(this_dir, "vrelu3_cuda.cpp"),
             os.path.join(this_dir, "vrelu3_cuda_kernel.cu"),
         ],
+        build_directory=build_directory,
         extra_include_paths=[ksc_runtime_dir],
     )
 
