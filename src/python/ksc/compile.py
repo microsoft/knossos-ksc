@@ -272,12 +272,14 @@ def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
     verbose = True
 
     # https://pytorch.org/docs/stable/cpp_extension.html
+    build_directory = utils.get_ksc_build_dir() + "/torch_extensions"
+    os.makedirs(build_directory, exist_ok=True)
     module = load_inline(
         name="dynamic_ksc_cpp",
         cpp_sources=[cpp_str],
         extra_include_paths=[ksc_runtime_dir],
         extra_cflags=cflags,
-        build_directory=utils.get_ksc_build_dir() + "/torch_extensions",
+        build_directory=build_directory,
         verbose=verbose,
     )
 
