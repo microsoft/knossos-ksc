@@ -286,7 +286,8 @@ class Def(ASTNode):
         return paren("Def " + " ".join([str(e) for e in elems]))
 
     def __eq__(self, other):
-        # Default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # KRecord's default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # TODO remove this when migrated from KRecord to dataclass.
         return super().__eq__(other) and all(
             a.type_ == oa.type_ for a, oa in zip(self.args, other.args)
         )
@@ -445,8 +446,8 @@ class Lam(Expr):
         return paren("Lam " + " ".join([self.arg.decl_str(), str(self.body)]))
 
     def __eq__(self, other):
-        # Default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
-        # For Lam's we don't need to worry about whether None: Type == other Types.
+        # KRecord's default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # TODO remove this when migrated from KRecord to dataclass.
         return super().__eq__(other) and self.arg.type_ == other.arg.type_
 
 
