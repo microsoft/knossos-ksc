@@ -9,7 +9,7 @@ void declare_vec(py::module &m, std::string typestr) {
   std::string pyclass_name = std::string("vec_") + typestr;
   py::class_<Class>(m, pyclass_name.c_str())
     .def(py::init<>())
-    .def(py::init([](std::vector<T> const& v) { return ks::vec<T>(&g_alloc, v); }))
+    .def(py::init([](std::vector<T> const& v) { return ks::vec<T>(&ks::entry_points::g_alloc, v); }))
     .def("__getitem__", [](const ks::vec<T> &a, const int &b) {
 	return a[b];
       })
@@ -25,13 +25,16 @@ void declare_vec(py::module &m, std::string typestr) {
 // their contents.  I'll look into it later.  For now I'll just have a
 // bunch of verbose replication.
 PYBIND11_MODULE(PYTHON_MODULE_NAME, m) {
-  declare_vec<double>(m, std::string("double"));
-  declare_vec<ks::tuple<ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec10"));
-  declare_vec<ks::tuple<ks::vec<double>, ks::vec<double>>>(m, std::string("tuple_vec2"));
-  declare_vec<ks::vec<double> >(m, std::string("vec_double"));
-  declare_vec<ks::vec<ks::vec<double> > >(m, std::string("vec_vec_double"));
-  declare_vec<ks::vec<ks::vec<ks::vec<double> > > >(m, std::string("vec_vec_vec_double"));
-  declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<double> > > > >(m, std::string("vec_vec_vec_vec_double"));
+  using ks::entry_points::with_ks_allocator;
+  declare_vec<ks::Float>(m, std::string("Float"));
+  declare_vec<ks::Tuple<ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>, ks::vec<ks::Float>>>(m, std::string("tuple_vec10"));
+  declare_vec<ks::Tuple<ks::vec<ks::Float>, ks::vec<ks::Float>>>(m, std::string("tuple_vec2"));
+  declare_vec<ks::vec<ks::Float> >(m, std::string("vec_Float"));
+  declare_vec<ks::vec<ks::vec<ks::Float> > >(m, std::string("vec_vec_Float"));
+  declare_vec<ks::vec<ks::vec<ks::vec<ks::Float> > > >(m, std::string("vec_vec_vec_Float"));
+  declare_vec<ks::vec<ks::vec<ks::vec<ks::vec<ks::Float> > > > >(m, std::string("vec_vec_vec_vec_Float"));
   m.def("gmm_knossos_gmm_objective", with_ks_allocator("gmm_knossos_gmm_objective", &ks::gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
   m.def("rev_gmm_knossos_gmm_objective", with_ks_allocator("rev_gmm_knossos_gmm_objective", &ks::rev$gmm_knossos_gmm_objective$aT1T1fT1fT1T1fT1T1fT1T1f$dfi$b));
 }
+
+#include "knossos-entry-points.cpp"

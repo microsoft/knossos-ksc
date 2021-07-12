@@ -48,8 +48,6 @@ if __name__ == "__xmain__":
     import torch
     import torch.nn.functional as F
 
-    torch.set_default_dtype(torch.float64)
-
     do_original = False
 
     if do_original:
@@ -264,8 +262,6 @@ if __name__ == "__xmain__":
 
 if __name__ == "__xmain__":
     from math import sin
-
-    torch.set_default_dtype(torch.float64)
 
     def bar(a: int, x: float):
         M = torch.tensor([[1.1, -x], [x + 2.1, 2.2]])

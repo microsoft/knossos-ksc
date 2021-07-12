@@ -92,7 +92,7 @@ If you prefer block comments then use pairs of #| and |#
 ; Knossos has the following types: String, Bool, Integer, Float, Tuple
 ; and Vec.
 ;
-; "Float" compiles to C++ double and "Vec" compiles to ks::vec from
+; "Float" compiles to C++ ks::Float and "Vec" compiles to ks::tensor from
 ; the Knossos C++ runtime.
 ;
 ; * Integer literals are numeric literals
@@ -119,7 +119,7 @@ If you prefer block comments then use pairs of #| and |#
 
 ; Python equivalent
 ;
-; def let_and_types(b : bool, s : str, i : int, f : double, v : List[double]) -> double:
+; def let_and_types(b : bool, s : str, i : int, f : Float, v : List[Float]) -> Float:
 ;     b2 = b or False
 ;     i2 = i + 10
 ;     f2 = f + 10.0
@@ -151,7 +151,7 @@ If you prefer block comments then use pairs of #| and |#
 
 ; Python equivalent
 ;
-; def build_example(n : int) -> List[double]:
+; def build_example(n : int) -> List[Float]:
 ;     return list(float(ni * ni) for ni in range(n))
 
 
