@@ -224,7 +224,7 @@ def build_py_module_from_ks(
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, bindings_to_generate, torch_extension_name, use_aten=False
+    ks_str, bindings_to_generate, torch_extension_name, use_aten=False, extra_cflags=[]
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -247,43 +247,27 @@ def build_module_using_pytorch_from_ks(
     )
 
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str, torch_extension_name, use_aten
+        cpp_str, torch_extension_name, use_aten, extra_cflags
     )
 
 
 def build_module_using_pytorch_from_cpp(
-    cpp_str, bindings_to_generate, torch_extension_name, use_aten
+    cpp_str, bindings_to_generate, torch_extension_name, use_aten, extra_cflags=[]
 ):
     cpp_pybind = generate_cpp_pybind_module_declaration(
         bindings_to_generate, torch_extension_name
     )
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str + cpp_pybind, torch_extension_name, use_aten
+        cpp_str + cpp_pybind, torch_extension_name, use_aten, extra_cflags
     )
 
 
 def build_module_using_pytorch_from_cpp_backend(
-    cpp_str, torch_extension_name, use_aten
+    cpp_str, torch_extension_name, use_aten, extra_cflags
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
-    extra_cflags = ["-DKS_INCLUDE_ATEN"] if use_aten else []
-
-    # I don't like this assumption about Windows -> cl but it matches what PyTorch is currently doing:
-    # https://github.com/pytorch/pytorch/blob/ad8d1b2aaaf2ba28c51b1cb38f86311749eff755/torch/utils/cpp_extension.py#L1374-L1378
-    # We're making a guess here if people recognifigure their C++ compiler on Windows it's because they're using non-MSVC
-    # otherwise we need to inspect the end of the path path for cl[.exe].
-
-    cpp_compiler = os.environ.get("CXX")
-    if cpp_compiler == None and sys.platform == "win32":
-        extra_cflags += ["/std:c++17", "/O2"]
-    else:
-        extra_cflags += [
-            "-std=c++17",
-            "-g",
-            "-O3",
-            # "-DKS_BOUNDS_CHECK",
-        ]
+    extra_cflags += ["-DKS_INCLUDE_ATEN"] if use_aten else []
 
     verbose = True
 

@@ -55,6 +55,14 @@ def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
 
+embedded_cflags = [
+    "-std=c++17",
+    "-g",
+    "-O3",
+    # "-DKS_BOUNDS_CHECK",
+]
+
+
 def vrelu3_embedded_ks_checkpointed_map():
     return ksc_string_to_autograd_function(
         """(def relu3 Float (x : Float)
@@ -80,6 +88,7 @@ def vrelu3_embedded_ks_checkpointed_map():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -156,6 +165,7 @@ def vrelu3_embedded_cpp_inlined_map():
         """
         + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_inlined_map",
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -203,6 +213,7 @@ def vrelu3_embedded_cpp_mask():
         """
         + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask",
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -255,6 +266,7 @@ def vrelu3_embedded_cpp_mask_bool_to_float():
         """
         + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_bool_to_float",
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -286,6 +298,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_handwritten_relu3",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -313,6 +326,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -343,6 +357,7 @@ def vrelu3_embedded_ks_checkpointed_map_mask():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_mask",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -364,6 +379,7 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_INCORRECT_ks_upper_bound_via_map",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -381,6 +397,7 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_INCORRECT_ks_upper_bound",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
