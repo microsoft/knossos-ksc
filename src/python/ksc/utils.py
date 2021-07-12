@@ -124,7 +124,7 @@ def get_ksc_paths():
     if "KSC_PATH" in os.environ:  # TODO: We should deprecate this
         ksc_path = os.environ["KSC_PATH"]
     else:
-        ksc_path = get_ksc_build_dir() + "/ksc"
+        ksc_path = get_ksc_build_dir() + "/bin/ksc"
 
     return ksc_path, ksc_runtime_dir
 
