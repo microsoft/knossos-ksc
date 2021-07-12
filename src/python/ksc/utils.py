@@ -194,12 +194,11 @@ def add_to_path(p):
 import os.path
 
 
-def write_file_if_different(lines, filename, verbose):
+def write_file_if_different(to_write, filename, verbose):
     """
     Write LINES to FILENAME unless they are identical to the current contents
     If VERBOSE, print info to stdout.
     """
-    to_write = "\n".join(lines)
     if os.path.isfile(filename):
         # Read from file
         with open(filename, "r") as f:
