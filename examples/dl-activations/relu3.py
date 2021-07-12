@@ -57,6 +57,7 @@ def vrelu3_embedded_ks_checkpointed_map():
                 (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map",
         generate_lm=False,
     )
 
@@ -242,6 +243,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
                 (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
         """,
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_handwritten_relu3",
         generate_lm=False,
     )
 
