@@ -210,9 +210,13 @@ def write_file_if_different(to_write, filename, verbose):
                 print(f"ksc.utils: File not changed: {filename}")
             return
 
-    # And overwrite if different
-    if verbose:
-        print(f"ksc.utils: File changed, overwriting {filename}")
+        if verbose:
+            print(f"ksc.utils: File changed, overwriting {filename}")
 
+    else:
+        if verbose:
+            print(f"ksc.utils: New file {filename}")
+
+    # And overwrite if different
     with open(filename, "w") as f:
         f.write(to_write)
