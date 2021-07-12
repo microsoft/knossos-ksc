@@ -395,6 +395,9 @@ def torch_from_ks(ks_object):
     if isinstance(ks_object, tuple):
         return tuple(torch_from_ks(ks) for ks in ks_object)
 
+    if isinstance(ks_object, float):
+        return torch.tensor(ks_object)
+
     return torch.from_numpy(numpy.array(ks_object, copy=True))
 
 
