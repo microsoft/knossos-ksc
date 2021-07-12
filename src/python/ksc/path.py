@@ -1,6 +1,7 @@
 """
 Paths identify nodes (sub-expressions) within Expr's as a sequence of PathElements
 each of which identifies a field of an Expr subclass or one argument of a Call.
+>>> # doctests - run specifically for this file in pytest.ini
 >>> e = Let(Var("a"), Const(5), Call("add", [Const(3), Var("b")]))
 >>> let_rhs.get(e)
 5
@@ -18,7 +19,7 @@ ExprWithPath(..., path=(let_rhs,), expr=5)
 >>> ewp.body.args[0]
 ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
 >>> ExprWithPath.from_expr(e, [let_body, call_args[0]])
-THIS SHOULD FAIL ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
+ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
 >>> ExprWithPath.from_expr(e, [let_body, call_args[2]])
 Traceback (most recent call last):
 ...
