@@ -255,7 +255,7 @@ def build_module_using_pytorch_from_cpp_backend(
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
-    cflags = [
+    extra_cflags = [
         "-DKS_INCLUDE_ATEN" if use_aten else "",
     ]
 
@@ -268,7 +268,7 @@ def build_module_using_pytorch_from_cpp_backend(
     if cpp_compiler == None and sys.platform == "win32":
         cflags += ["/std:c++17", "/O2"]
     else:
-        cflags += [
+        extra_cflags += [
             "-std=c++17",
             "-g",
             "-O3",
@@ -282,11 +282,37 @@ def build_module_using_pytorch_from_cpp_backend(
         utils.get_ksc_build_dir() + "/torch_extensions/" + torch_extension_name
     )
     os.makedirs(build_directory, exist_ok=True)
-    module = cpp_extension.load_inline(
+
+    cpp_sources = cpp_str.split("\n")
+    extra_include_paths = [ksc_runtime_dir]
+    cuda_sources = []
+
+    # Remainder of function is copied from torch cpp_extension.py:load_inline
+    # to give us control over the overwriting of main.cpp
+
+    cpp_sources.insert(0, "#include <torch/extension.h>")
+
+    cpp_source_path = os.path.join(build_directory, "main.cpp")
+
+    utils.write_file_if_different(cpp_sources, cpp_source_path, verbose)
+
+    sources = [cpp_source_path]
+
+    if cuda_sources:
+        cuda_sources.insert(0, "#include <torch/types.h>")
+        cuda_sources.insert(1, "#include <cuda.h>")
+        cuda_sources.insert(2, "#include <cuda_runtime.h>")
+
+        cuda_source_path = os.path.join(build_directory, "cuda.cu")
+        utils.write_file_if_different(cuda_sources, cuda_source_path, verbose)
+
+        sources.append(cuda_source_path)
+
+    module = cpp_extension.load(
         name=torch_extension_name,
-        cpp_sources=[cpp_str],
-        extra_include_paths=[ksc_runtime_dir],
-        extra_cflags=cflags,
+        sources=sources,
+        extra_include_paths=extra_include_paths,
+        extra_cflags=extra_cflags,
         build_directory=build_directory,
         verbose=verbose,
     )
