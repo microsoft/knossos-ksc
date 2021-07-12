@@ -484,7 +484,9 @@ def make_KscAutogradFunction(py_mod, generate_lm):
     return newclass()
 
 
-def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
+def ksc_defs_to_module(
+    ksc_defs, entry_def, derivatives_to_generate, torch_extension_name
+):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
@@ -519,52 +521,72 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
 
-    return ksc_string_to_module(ks_str, entry_def.name, derivatives_to_generate)
+    return ksc_string_to_module(
+        ks_str, entry_def.name, derivatives_to_generate, torch_extension_name
+    )
 
 
-def ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate):
+def ksc_string_to_module(
+    ks_str, entry_sn, derivatives_to_generate, torch_extension_name
+):
     bindings_to_generate = [("entry", entry_sn)] + [
         (f"{der}_entry", StructuredName((der, entry_sn)))
         for der in derivatives_to_generate
     ]
 
     return build_module_using_pytorch_from_ks(
-        ks_str, bindings_to_generate, use_aten=True
+        ks_str, bindings_to_generate, torch_extension_name, use_aten=True
     )
 
 
-def cpp_string_to_module(cpp_str, entry_name, derivatives_to_generate):
+def cpp_string_to_module(
+    cpp_str, entry_name, derivatives_to_generate, torch_extension_name
+):
     bindings_to_generate = [("entry", entry_name)] + [
         (f"{der}_entry", f"{der}_{entry_name}") for der in derivatives_to_generate
     ]
 
     return build_module_using_pytorch_from_cpp(
-        cpp_str, bindings_to_generate, use_aten=True,
+        cpp_str, bindings_to_generate, torch_extension_name, use_aten=True,
     )
 
 
-def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
+def ksc_defs_to_autograd_function(
+    ksc_defs, entry_def, torch_extension_name, generate_lm=True
+):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
+    mod = ksc_defs_to_module(
+        ksc_defs, entry_def, derivatives_to_generate, torch_extension_name
+    )
     return make_KscAutogradFunction(mod, generate_lm)
 
 
-def ksc_string_to_autograd_function(ks_str, entry_sn, generate_lm):
+def ksc_string_to_autograd_function(
+    ks_str, entry_sn, torch_extension_name, generate_lm
+):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate)
+    mod = ksc_string_to_module(
+        ks_str, entry_sn, derivatives_to_generate, torch_extension_name
+    )
     return make_KscAutogradFunction(mod, generate_lm)
 
 
-def cpp_string_to_autograd_function(cpp_str, entry_name, generate_lm):
+def cpp_string_to_autograd_function(
+    cpp_str, entry_name, torch_extension_name, generate_lm
+):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = cpp_string_to_module(cpp_str, entry_name, derivatives_to_generate)
+    mod = cpp_string_to_module(
+        cpp_str, entry_name, derivatives_to_generate, torch_extension_name
+    )
     return make_KscAutogradFunction(mod, generate_lm)
 
 
 import inspect
 
 
-def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
+def tsmod2ksmod(
+    module, function_name, torch_extension_name, example_inputs, generate_lm=True
+):
     global todo_stack
     todo_stack = {function_name}
     ksc_defs = []
@@ -581,10 +603,15 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
                 ksc_defs.insert(0, ksc_def)
 
     entry_def = ksc_defs[-1]
-    return ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm)
+    return ksc_defs_to_autograd_function(
+        ksc_defs, entry_def, torch_extension_name, generate_lm
+    )
 
 
-def ts2mod(function, example_inputs, generate_lm=True):
+def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
     fn = torch.jit.script(function)
     ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
-    return ksc_defs_to_autograd_function([ksc_def], ksc_def, generate_lm)
+    return ksc_defs_to_autograd_function(
+        [ksc_def], ksc_def, torch_extension_name, generate_lm
+    )
+

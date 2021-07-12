@@ -192,7 +192,8 @@ if __name__ == "__xmain__":
     #   %44 : (Tensor, Tensor) = prim::TupleConstruct(%new_h.1, %new_cell.1)
     #   return (%44)
 
-    ks_fun = ts2mod(lltm_forward_py, example_inputs=example_inputs)
+    torch_extension_name = "ksc_awf_timing"
+    ks_fun = ts2mod(lltm_forward_py, example_inputs, torch_extension_name)
 
     def torch_from_ks(ks_object):
         if isinstance(ks_object, tuple):
