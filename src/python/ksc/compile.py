@@ -251,7 +251,7 @@ def build_module_using_pytorch_from_cpp(
 
 
 def build_module_using_pytorch_from_cpp_backend(
-    cpp_str, torch_extension_name, use_aten
+    cpp_str, torch_extension_name, use_aten, cuda_sources=[]
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
@@ -285,7 +285,6 @@ def build_module_using_pytorch_from_cpp_backend(
 
     cpp_sources = cpp_str.split("\n")
     extra_include_paths = [ksc_runtime_dir]
-    cuda_sources = []
 
     # Remainder of function is copied from torch cpp_extension.py:load_inline
     # to give us control over the overwriting of main.cpp
