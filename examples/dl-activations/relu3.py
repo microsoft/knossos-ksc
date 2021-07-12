@@ -390,6 +390,7 @@ def vrelu3_cuda_init():
         ],
         build_directory=build_directory,
         extra_include_paths=[ksc_runtime_dir],
+        verbose=True,
     )
 
     class VReLu3Function(torch.autograd.Function):
