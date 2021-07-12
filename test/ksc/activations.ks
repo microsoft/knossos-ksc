@@ -68,4 +68,46 @@
 (gdef sufrevpass [vrelu3 (Vec Float)])
 (gdef sufrev [vrelu3 (Vec Float)])
 
+(def [vrelu3_inlined (Vec Float)] (Vec Float)
+     (t : Vec Float)
+     (map (lam (x : Float)
+               (if (lt x 0.0)
+                   0.0
+                 (if (lt x 1.0)
+                     (div (mul x (mul x x)) 3.0)
+                   (sub x (div 2.0 3.0))))) t))
+
+(def [sufrev [vrelu3_inlined (Vec Float)]] (Vec Float)
+     ((t : Vec Float) (dret : Vec Float))
+     ; TODO: should be multiplied by dret[i] - luckily we are called with dret==1.0
+     (map (lam (x : Float)
+               (if (lt x 0.0)
+                   0.0
+                 (if (lt x 1.0)
+                     (mul x x)
+                   1.0))) t))
+
+(def [vrelu3_mask (Vec Float)] (Vec Float)
+     (t : Vec Float)
+     (map (lam (x : Float)
+        (let (val0to1 (mul x (mul x (div x 3.0))))
+        (let (val1up (sub x (div 2.0 3.0)))
+        (let (in0to1 (lte x 1.0))
+           (mul (bool_to_float (gt x 0.0))
+                (add (mul (bool_to_float in0to1) val0to1)
+                     (mul (bool_to_float (not in0to1)) val1up))))))) t))
+
+(def [sufrev [vrelu3_mask (Vec Float)]] (Vec Float)
+     ((t : Vec Float) (dret : Vec Float))
+     (map2 (lam (x_ddri : Tuple Float Float)
+        (let ((x ddri) x_ddri)
+        (let (val0to1 (mul x x))
+        (let (val1up 1.0)
+        (let (in0to1 (lte x 1.0))
+           (mul (mul (bool_to_float (gt x 0.0))
+                     (add (mul (bool_to_float in0to1) val0to1)
+                          (mul (bool_to_float (not in0to1)) val1up)))
+                ddri)))))) t dret))
+
+
 (def main Integer () 0)

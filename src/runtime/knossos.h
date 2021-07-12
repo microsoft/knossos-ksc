@@ -343,7 +343,7 @@ namespace ks {
 
 		void* allocate(size_t size)
 		{
-			KS_ASSERT(size < 1000000);
+			KS_ASSERT(size < 1000 * 1000000);
 			void* ret = buf_ + top_;
 			top_ += padded_size(size);
 			if (top_ > peak_) {
@@ -1384,6 +1384,23 @@ namespace ks {
 		T* retdata = ret.data();
 		for (int i = 0, ne = t.num_elements(); i != ne; ++i)
 			retdata[i] = applyWithAllocator(alloc, f, tdata[i]);
+		return ret;
+	}
+
+	// f : (S, S') -> T
+	// map2 f : (Vec S, Vec S') -> Vec T
+        template <class S, class S_, class F, size_t Dim>
+	auto // tensor<Dim, T>
+	map2(allocator * alloc, F f, tensor<Dim, S> s, tensor<Dim, S_> s_)
+	{
+                // FIXME: assert they are the same size
+                using T = decltype(applyWithAllocator(alloc, f, make_Tuple(S{}, S_{})));
+		auto ret = tensor<Dim, T>::create(alloc, s.size());
+		S const* sdata = s.data();
+		S_ const* s_data = s_.data();
+		T* retdata = ret.data();
+		for (int i = 0, ne = s.num_elements(); i != ne; ++i)
+			retdata[i] = applyWithAllocator(alloc, f, make_Tuple(sdata[i], s_data[i]));
 		return ret;
 	}
 
