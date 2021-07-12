@@ -87,7 +87,7 @@ def test_eq():
     )
 
     # Also check Def's distinguish on return type
-    assert Const(3.0) == Const(3)  # python! TODO do we want to fix this?
+    assert Const(3.0) == Const(3)  # TODO we should check type_ in Expr.__eq__ (#941).
     bar = StructuredName.from_str("bar")
     assert Def(bar, Type.Float, [], Const(3.0)) != Def(bar, Type.Integer, [], Const(3))
 
