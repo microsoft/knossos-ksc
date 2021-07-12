@@ -144,8 +144,8 @@ inline Float sqrt$af(allocator *, Float d) { return sqrt(d); }
 
 inline Float to_float$ai(allocator *, Integer d) { return d; }
 
-inline bool or$abb(allocator *, Bool b1, Bool b2)  { return b1 || b2; }
-inline bool and$abb(allocator *, Bool b1, Bool b2) { return b1 && b2; }
+inline Bool or$abb(allocator *, Bool b1, Bool b2)  { return b1 || b2; }
+inline Bool and$abb(allocator *, Bool b1, Bool b2) { return b1 && b2; }
 }
 
 #include "knossos-prelude-lm.h"
