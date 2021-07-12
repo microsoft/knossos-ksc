@@ -111,16 +111,20 @@ def get_ksc_dir():
     return os.path.dirname(d)
 
 
+def get_ksc_build_dir():
+    return get_ksc_dir() + "/build"
+
+
 def get_ksc_paths():
     if "KSC_RUNTIME_DIR" in os.environ:
         ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
     else:
         ksc_runtime_dir = get_ksc_dir() + "/src/runtime"
 
-    if "KSC_PATH" in os.environ:
+    if "KSC_PATH" in os.environ:  # TODO: We should deprecate this
         ksc_path = os.environ["KSC_PATH"]
     else:
-        ksc_path = get_ksc_dir() + "/build/bin/ksc"
+        ksc_path = get_ksc_build_dir() + "/ksc"
 
     return ksc_path, ksc_runtime_dir
 
