@@ -493,9 +493,7 @@ class SubstPattern(ExprTransformer):
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
         # where the bound var is bound, as the replacement shouldn't contain "(let x ...) x" (with x free).
         return Let(
-            Var(
-                target_var.name
-            ),  # type=target_var.type_ # No, not generally set for Let-bound Vars
+            target_var,
             self.visit(l.rhs, var_names_to_exprs),
             self.visit(l.body, var_names_to_exprs),
             type=l.type_,
