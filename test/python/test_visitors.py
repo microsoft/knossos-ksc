@@ -40,7 +40,6 @@ def test_expr_transformer():
     # A simple, non-semantic-preserving, transformation - this does not rename binders.
     class VarRenamer(ExprTransformer):
         def visit_var(self, v: Var) -> Expr:
-            assert not v.decl
             return Var(v.name + "2")
 
     # Thus, check ExprTransformer traverses to the leaves.

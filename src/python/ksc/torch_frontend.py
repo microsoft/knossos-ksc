@@ -62,11 +62,11 @@ def type_from_value(x):
 make_new_var_index = 0
 
 
-def make_new_var(type=None, decl=True):
+def make_new_var(type=None):
     global make_new_var_index
     name = f"ts2ks${make_new_var_index}"
     make_new_var_index += 1
-    return Var(name, type, True), Var(name, type, False)
+    return Var(name, type)
 
 
 def make_arg(input, example_input):
@@ -82,7 +82,7 @@ def make_arg(input, example_input):
         input_type = example_input_type
 
     name = mangled_name(input)
-    return Var(name, input_type, decl=True)
+    return Var(name, input_type)
 
 
 def mangled_name(node):
@@ -212,8 +212,8 @@ def make_PythonOp(node):
         print(f"Adding {function_name} to todo {todo_stack}")
         todo_stack.add(function_name)
 
-        vardecl, var = make_new_var(Type.Float)  # TODO: need to propagate properly
-        map_lambda = Lam(vardecl, Call(function_name, [var]))
+        var = make_new_var(Type.Float)  # TODO: need to propagate properly
+        map_lambda = Lam(var, Call(function_name, [var]))
 
         return (
             Var(mangled_name(value)),
@@ -276,7 +276,7 @@ def make_loop(make_binds, node):
         binds = make_binds(body_nodes[:-1])
         lam_body = make_lets(binds, var_or_constant(item))
 
-        lam = Lam(Var(mangled_name(i), Type.Integer, decl=True), lam_body)
+        lam = Lam(Var(mangled_name(i), Type.Integer), lam_body)
 
         return var_or_constant(l), Call("build", [var_or_constant(max_trip_count), lam])
 

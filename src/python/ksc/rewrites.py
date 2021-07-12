@@ -228,17 +228,15 @@ class inline_call(RuleMatcher):
     def apply_at(self, ewp: ExprWithPath, func_def: Def) -> Expr:
         # func_def comes from the Match.
         def apply_here(const_zero, call_node):
-            # Drop decl=True from Def.args
-            def_args = [Var(arg.name, type=arg.type_) for arg in func_def.args]
             call_arg = (
                 call_node.args[0]
                 if len(call_node.args) == 1
                 else make_prim_call(StructuredName.from_str("tuple"), call_node.args)
             )
             return (
-                Let(def_args[0], call_arg, func_def.body)
-                if len(def_args) == 1
-                else untuple_one_let(Let(def_args, call_arg, func_def.body))
+                Let(func_def.args[0], call_arg, func_def.body)
+                if len(func_def.args) == 1
+                else untuple_one_let(Let(func_def.args, call_arg, func_def.body))
             )
 
         arg_names = frozenset([arg.name for arg in func_def.args])
@@ -485,7 +483,6 @@ class SubstPattern(ExprTransformer):
         return res
 
     def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
-        assert not v.decl
         return var_names_to_exprs[v.name]
 
     def visit_let(self, l: Let, var_names_to_exprs: VariableSubstitution) -> Let:
@@ -496,9 +493,7 @@ class SubstPattern(ExprTransformer):
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
         # where the bound var is bound, as the replacement shouldn't contain "(let x ...) x" (with x free).
         return Let(
-            Var(
-                target_var.name
-            ),  # type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
+            target_var,
             self.visit(l.rhs, var_names_to_exprs),
             self.visit(l.body, var_names_to_exprs),
             type=l.type_,
@@ -508,11 +503,7 @@ class SubstPattern(ExprTransformer):
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.arg, var_names_to_exprs, [l.body]
         )
-        return Lam(
-            Var(target_var.name, type=target_var.type_, decl=True),
-            self.visit(l.body, var_names_to_exprs),
-            type=l.type_,
-        )
+        return Lam(target_var, self.visit(l.body, var_names_to_exprs), type=l.type_,)
 
 
 def parse_rule_str(ks_str, symtab, **kwargs):

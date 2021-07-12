@@ -45,10 +45,10 @@ from ksc.utils import paren, KRecord
 #          value      value'
 #
 # Var: Variable use or declaration (with type)
-# (add x 1.234)  ; use of var, decl=false, type is None or propagated
+# (add x 1.234)  ; use of var, type is None or propagated
 #      ^
 #      name
-# (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+# (lam (x :    Float) ...)  ; decl of var, type is known at parse time
 #       ^      ^^^^^
 #       name   type
 #
@@ -276,6 +276,22 @@ class Def(ASTNode):
         assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
 
+    def __repr__(self):
+        elems = [
+            self.name,
+            self.return_type,
+            "[" + ", ".join([arg.decl_str() for arg in self.args]) + "]",
+            self.body,
+        ]
+        return paren("Def " + " ".join([str(e) for e in elems]))
+
+    def __eq__(self, other):
+        # KRecord's default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # See #941. TODO remove this when migrated from KRecord to dataclass.
+        return super().__eq__(other) and all(
+            a.type_ == oa.type_ for a, oa in zip(self.args, other.args)
+        )
+
 
 class EDef(ASTNode):
     """Edef(name, return_type, arg). 
@@ -366,26 +382,25 @@ class Var(Expr):
     """Var(name, type, decl). 
     Examples:
     ```
-    (add x 1.234)  ; use of var, decl=false, type is None or propagated
+    (add x 1.234)  ; use of var, type is None or propagated
          ^
          name
-    (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+    (lam (x :    Float) ...)  ; decl of var, type is known at parse time
           ^      ^^^^^
           name   type
     ```
     """
 
     name: str
-    decl: bool
 
-    def __init__(self, name, type=None, decl=False):
-        super().__init__(type_=type, name=name, decl=decl)
+    def __init__(self, name, type=None):
+        super().__init__(type_=type, name=name)
 
     def __repr__(self):
-        if self.decl:
-            return self.name + " : " + str(self.type_)
-        else:
-            return self.name
+        return self.name  # Omit "(Var )" and don't show type
+
+    def decl_str(self):
+        return self.name + " : " + str(self.type_)
 
 
 class Call(Expr):
@@ -424,8 +439,16 @@ class Lam(Expr):
     body: Expr
 
     def __init__(self, arg, body, type=None):
-        assert arg.decl
+        assert arg.type_ is not None
         super().__init__(arg=arg, body=body, type_=type)
+
+    def __repr__(self):
+        return paren("Lam " + " ".join([self.arg.decl_str(), str(self.body)]))
+
+    def __eq__(self, other):
+        # KRecord's default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # See #941. TODO remove this when migrated from KRecord to dataclass.
+        return super().__eq__(other) and self.arg.type_ == other.arg.type_
 
 
 class Let(Expr):
@@ -542,7 +565,7 @@ def pystr_Def(ex, indent):
         "def "
         + pystr(ex.name, indent)
         + "("
-        + pystr_intercomma(indent, ex.args)
+        + ", ".join([pyname(a.name) + ": " + pystr(a.type_, indent) for a in ex.args])
         + ") -> "
         + pystr(ex.return_type, indent)
         + ":"
@@ -597,10 +620,7 @@ def pystr_Const(ex, indent):
 
 @pystr.register(Var)
 def pystr_Var(ex, indent):
-    if ex.decl:
-        return pyname(ex.name) + ": " + pystr(ex.type_, indent)
-    else:
-        return pyname(ex.name)
+    return pyname(ex.name)
 
 
 @pystr.register(Call)
