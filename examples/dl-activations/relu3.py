@@ -402,7 +402,7 @@ def vrelu3_cuda_init():
 
         @staticmethod
         def backward(ctx, grad):
-            return vrelu3_cuda.backward(grad.contiguous(), *ctx.saved_variables)
+            return vrelu3_cuda.backward(grad.contiguous(), *ctx.saved_tensors)
 
     class VReLu3(torch.nn.Module):
         def __init__(self):
