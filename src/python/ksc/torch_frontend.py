@@ -529,12 +529,10 @@ def ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm):
     )
 
 
-def cpp_string_to_module(
-    cpp_str, torch_extension_name, forward_entry_name, backward_entry_name
-):
+def cpp_string_to_module(cpp_str, torch_extension_name, entry_name, entry_vjp_name):
     bindings_to_generate = [
-        ("entry", forward_entry_name),
-        ("entry_vjp", backward_entry_name),
+        ("entry", entry_name),
+        ("entry_vjp", entry_vjp_name),
     ]
     return build_module_using_pytorch_from_cpp(
         cpp_str, bindings_to_generate, torch_extension_name, use_aten=True,
@@ -556,13 +554,10 @@ def ksc_string_to_autograd_function(
 
 
 def cpp_string_to_autograd_function(
-    cpp_str,
-    torch_extension_name,
-    forward_entry_name="entry",
-    backward_entry_name="entry_vjp",
+    cpp_str, torch_extension_name, entry_name="entry", entry_vjp_name="entry_vjp",
 ):
     mod = cpp_string_to_module(
-        cpp_str, torch_extension_name, forward_entry_name, backward_entry_name
+        cpp_str, torch_extension_name, entry_name, entry_vjp_name
     )
     return make_KscAutogradFunction(mod)
 
