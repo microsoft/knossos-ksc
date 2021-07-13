@@ -66,14 +66,14 @@ def compile_relux():
 
 def test_ts2k_relux():
     compile_relux()
-    ks_ans = ks_relux.py_mod.forward(2.0)
+    ks_ans = ks_relux.py_mod.entry(2.0)
     ans = relux(2.0)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
 
 def test_ts2k_relux_grad():
     compile_relux()
-    ks_ans = ks_relux.py_mod.backward(1.3, 1.0)
+    ks_ans = ks_relux.py_mod.entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
@@ -111,12 +111,12 @@ def test_bar():
     ks_bar = ts2mod(bar, (a, x), torch_extension_name)
 
     # Check primal
-    ks_ans = ks_bar.py_mod.forward(a, x)
+    ks_ans = ks_bar.py_mod.entry(a, x)
     ans = bar(a, x)
     assert pytest.approx(ks_ans, 1e-5) == ans
 
     # Check grad
-    ks_ans = ks_bar.py_mod.backward((a, x), 1.0)
+    ks_ans = ks_bar.py_mod.entry_vjp((a, x), 1.0)
     ans = grad_bar(a, x)
     assert pytest.approx(ks_ans[1], 1e-5) == ans[1]
 
@@ -137,7 +137,7 @@ def test_far():
     torch_extension_name = "ksc_test_ts2k_far"
     ks_far = ts2mod(far, (x, y), torch_extension_name)
 
-    ks_ans = ks_far.py_mod.forward(ks_far.adapt(x), ks_far.adapt(y))
+    ks_ans = ks_far.py_mod.entry(ks_far.adapt(x), ks_far.adapt(y))
     ans = far(x, y)
     assert pytest.approx(ks_ans, 1e-6) == ans.item()
 
@@ -150,7 +150,7 @@ def test_cat():
     y = torch.randn(2, 5)
     torch_extension_name = "ksc_test_ts2k_cat"
     ks_f = ts2mod(f, (x, y), torch_extension_name)
-    ks_ans = ks_f.py_mod.forward(ks_f.adapt(x), ks_f.adapt(y))
+    ks_ans = ks_f.py_mod.entry(ks_f.adapt(x), ks_f.adapt(y))
     ks_ans_np = numpy.array(ks_ans, copy=True)
     py_ans = f(x, y)
     assert (ks_ans_np == py_ans.numpy()).all()  # non-approx
@@ -184,7 +184,7 @@ def test_relu3(generate_lm):
     for x in [-0.1, 0.31221, 2.27160]:
         # Test function: ks == py
         py_ans = relu3(x)
-        ks_ans = ks_relu3.py_mod.forward(x)
+        ks_ans = ks_relu3.py_mod.entry(x)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 
@@ -195,7 +195,7 @@ def test_relu3(generate_lm):
 
         # Test gradient ks == py
         py_ans = grad_relu3(x)
-        ks_ans = ks_relu3.py_mod.backward(x, 1.0)
+        ks_ans = ks_relu3.py_mod.entry_vjp(x, 1.0)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 

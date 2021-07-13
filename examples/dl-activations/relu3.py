@@ -65,10 +65,10 @@ def vrelu3_embedded_ks_checkpointed_map():
 
 embedded_cpp_entry_points = """
 namespace ks {
-ks::tensor<1, ks::Float> forward(ks::allocator * $alloc, ks::tensor<1, ks::Float> t) {
+ks::tensor<1, ks::Float> entry(ks::allocator * $alloc, ks::tensor<1, ks::Float> t) {
     return ks::vrelu3($alloc, t);
 }
-ks::tensor<1, ks::Float> backward(ks::allocator * $alloc, ks::tensor<1, ks::Float> t, ks::tensor<1, ks::Float> dret) {
+ks::tensor<1, ks::Float> entry_vjp(ks::allocator * $alloc, ks::tensor<1, ks::Float> t, ks::tensor<1, ks::Float> dret) {
     return ks::sufrev_vrelu3($alloc, t, dret);
 }
 }
