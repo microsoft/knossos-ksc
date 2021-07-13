@@ -63,6 +63,18 @@ def vrelu3_embedded_ks_checkpointed_map():
     )
 
 
+embedded_cpp_entry_points = """
+namespace ks {
+ks::tensor<1, ks::Float> entry(ks::allocator * $alloc, ks::tensor<1, ks::Float> t) {
+    return ks::vrelu3($alloc, t);
+}
+ks::tensor<1, ks::Float> entry_vjp(ks::allocator * $alloc, ks::tensor<1, ks::Float> t, ks::tensor<1, ks::Float> dret) {
+    return ks::sufrev_vrelu3($alloc, t, dret);
+}
+}
+"""
+
+
 def vrelu3_embedded_cpp_inlined_map():
     return cpp_string_to_autograd_function(
         """
@@ -113,10 +125,9 @@ def vrelu3_embedded_cpp_inlined_map():
             return ret;
         }
         }
-        """,
-        "vrelu3",
+        """
+        + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_inlined_map",
-        generate_lm=False,
     )
 
 
@@ -161,10 +172,9 @@ def vrelu3_embedded_cpp_mask():
             return ret;
         }
         }
-        """,
-        "vrelu3",
+        """
+        + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask",
-        generate_lm=False,
     )
 
 
@@ -214,10 +224,9 @@ def vrelu3_embedded_cpp_mask_bool_to_float():
             return ret;
         }
         }
-        """,
-        "vrelu3",
+        """
+        + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_bool_to_float",
-        generate_lm=False,
     )
 
 

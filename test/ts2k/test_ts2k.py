@@ -73,7 +73,7 @@ def test_ts2k_relux():
 
 def test_ts2k_relux_grad():
     compile_relux()
-    ks_ans = ks_relux.py_mod.rev_entry(1.3, 1.0)
+    ks_ans = ks_relux.py_mod.entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
@@ -116,7 +116,7 @@ def test_bar():
     assert pytest.approx(ks_ans, 1e-5) == ans
 
     # Check grad
-    ks_ans = ks_bar.py_mod.rev_entry((a, x), 1.0)
+    ks_ans = ks_bar.py_mod.entry_vjp((a, x), 1.0)
     ans = grad_bar(a, x)
     assert pytest.approx(ks_ans[1], 1e-5) == ans[1]
 
@@ -195,10 +195,7 @@ def test_relu3(generate_lm):
 
         # Test gradient ks == py
         py_ans = grad_relu3(x)
-        grad_fun = (
-            ks_relu3.py_mod.rev_entry if generate_lm else ks_relu3.py_mod.sufrev_entry
-        )
-        ks_ans = grad_fun(x, 1.0)
+        ks_ans = ks_relu3.py_mod.entry_vjp(x, 1.0)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 

@@ -458,19 +458,18 @@ def forward_template(py_mod, ctx, *args):
     return torch_from_ks(outputs)
 
 
-def backward_template(py_mod, generate_lm, ctx, *args):
+def backward_template(py_mod, ctx, *args):
     ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
     ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
-    rev_entry = py_mod.rev_entry if generate_lm else py_mod.sufrev_entry
-    outputs = rev_entry(ks_args, ks_grad_args)
+    outputs = py_mod.entry_vjp(ks_args, ks_grad_args)
     return torch_from_ks(outputs)
 
 
-def make_KscAutogradFunction(py_mod, generate_lm):
+def make_KscAutogradFunction(py_mod):
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
-    backward = lambda ctx, args: backward_template(py_mod, generate_lm, ctx, args)
+    backward = lambda ctx, args: backward_template(py_mod, ctx, args)
     return type(
         "KscAutogradFunction_" + py_mod.__name__,
         (torch.autograd.Function,),
@@ -483,9 +482,7 @@ def make_KscAutogradFunction(py_mod, generate_lm):
     )
 
 
-def ksc_defs_to_module(
-    ksc_defs, entry_def, derivatives_to_generate, torch_extension_name
-):
+def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
@@ -503,48 +500,40 @@ def ksc_defs_to_module(
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
         defs_with_derivatives += [ksc_def]
-        if "sufrev" in derivatives_to_generate:
+        if generate_lm:
+            defs_with_derivatives += [
+                GDef("rev", ksc_def.name),
+            ]
+        else:
             defs_with_derivatives += [
                 GDef("suffwdpass", ksc_def.name),
                 GDef("sufrevpass", ksc_def.name),
                 GDef("sufrev", ksc_def.name),
             ]
-        if "fwd" in derivatives_to_generate:
-            defs_with_derivatives += [
-                GDef("fwd", ksc_def.name),
-            ]
-        if "rev" in derivatives_to_generate:
-            defs_with_derivatives += [
-                GDef("rev", ksc_def.name),
-            ]
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
 
     return ksc_string_to_module(
-        ks_str, entry_def.name, derivatives_to_generate, torch_extension_name
+        ks_str, entry_def.name, torch_extension_name, generate_lm
     )
 
 
-def ksc_string_to_module(
-    ks_str, entry_sn, derivatives_to_generate, torch_extension_name
-):
-    bindings_to_generate = [("entry", entry_sn)] + [
-        (f"{der}_entry", StructuredName((der, entry_sn)))
-        for der in derivatives_to_generate
+def ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm):
+    der = "rev" if generate_lm else "sufrev"
+    bindings_to_generate = [
+        ("entry", entry_sn),
+        ("entry_vjp", StructuredName((der, entry_sn))),
     ]
-
     return build_module_using_pytorch_from_ks(
         ks_str, bindings_to_generate, torch_extension_name, use_aten=True
     )
 
 
-def cpp_string_to_module(
-    cpp_str, entry_name, derivatives_to_generate, torch_extension_name
-):
-    bindings_to_generate = [("entry", entry_name)] + [
-        (f"{der}_entry", f"{der}_{entry_name}") for der in derivatives_to_generate
+def cpp_string_to_module(cpp_str, torch_extension_name, entry_name, entry_vjp_name):
+    bindings_to_generate = [
+        ("entry", entry_name),
+        ("entry_vjp", entry_vjp_name),
     ]
-
     return build_module_using_pytorch_from_cpp(
         cpp_str, bindings_to_generate, torch_extension_name, use_aten=True,
     )
@@ -553,31 +542,24 @@ def cpp_string_to_module(
 def ksc_defs_to_autograd_function(
     ksc_defs, entry_def, torch_extension_name, generate_lm=True
 ):
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = ksc_defs_to_module(
-        ksc_defs, entry_def, derivatives_to_generate, torch_extension_name
-    )
-    return make_KscAutogradFunction(mod, generate_lm)
+    mod = ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm)
+    return make_KscAutogradFunction(mod)
 
 
 def ksc_string_to_autograd_function(
-    ks_str, entry_sn, torch_extension_name, generate_lm
+    ks_str, entry_sn, torch_extension_name, generate_lm=True
 ):
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = ksc_string_to_module(
-        ks_str, entry_sn, derivatives_to_generate, torch_extension_name
-    )
-    return make_KscAutogradFunction(mod, generate_lm)
+    mod = ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm)
+    return make_KscAutogradFunction(mod)
 
 
 def cpp_string_to_autograd_function(
-    cpp_str, entry_name, torch_extension_name, generate_lm
+    cpp_str, torch_extension_name, entry_name="entry", entry_vjp_name="entry_vjp",
 ):
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
     mod = cpp_string_to_module(
-        cpp_str, entry_name, derivatives_to_generate, torch_extension_name
+        cpp_str, torch_extension_name, entry_name, entry_vjp_name
     )
-    return make_KscAutogradFunction(mod, generate_lm)
+    return make_KscAutogradFunction(mod)
 
 
 import inspect
