@@ -111,16 +111,20 @@ def get_ksc_dir():
     return os.path.dirname(d)
 
 
+def get_ksc_build_dir():
+    return get_ksc_dir() + "/build"
+
+
 def get_ksc_paths():
     if "KSC_RUNTIME_DIR" in os.environ:
         ksc_runtime_dir = os.environ["KSC_RUNTIME_DIR"]
     else:
         ksc_runtime_dir = get_ksc_dir() + "/src/runtime"
 
-    if "KSC_PATH" in os.environ:
+    if "KSC_PATH" in os.environ:  # TODO: We should deprecate this
         ksc_path = os.environ["KSC_PATH"]
     else:
-        ksc_path = get_ksc_dir() + "/build/bin/ksc"
+        ksc_path = get_ksc_build_dir() + "/bin/ksc"
 
     return ksc_path, ksc_runtime_dir
 
@@ -185,3 +189,34 @@ def add_to_path(p):
     finally:
         sys.path = old_path
         sys.modules = old_modules
+
+
+import os.path
+
+
+def write_file_if_different(to_write, filename, verbose):
+    """
+    Write LINES to FILENAME unless they are identical to the current contents
+    If VERBOSE, print info to stdout.
+    """
+    if os.path.isfile(filename):
+        # Read from file
+        with open(filename, "r") as f:
+            existing_contents = f.read()
+
+        # Compare to new
+        if existing_contents == to_write:
+            if verbose:
+                print(f"ksc.utils: File not changed: {filename}")
+            return
+
+        if verbose:
+            print(f"ksc.utils: File changed, overwriting {filename}")
+
+    else:
+        if verbose:
+            print(f"ksc.utils: New file {filename}")
+
+    # And overwrite if different
+    with open(filename, "w") as f:
+        f.write(to_write)

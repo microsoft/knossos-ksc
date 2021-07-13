@@ -6,9 +6,9 @@ import sys
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
 
-from ksc import utils
+from torch.utils import cpp_extension
 
-from torch.utils.cpp_extension import load_inline
+from ksc import utils
 
 preserve_temporary_files = False
 
@@ -83,6 +83,9 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
 
 
 def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
+    """
+    Build python module, independently of pytorch, non-ninja
+    """
     _ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
     pybind11_path = utils.get_ksc_dir() + "/extern/pybind11"
 
@@ -216,7 +219,7 @@ def build_py_module_from_ks(ks_str, bindings_to_generate, use_aten=False):
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, bindings_to_generate, use_aten=False,
+    ks_str, bindings_to_generate, torch_extension_name, use_aten=False
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -231,25 +234,31 @@ def build_module_using_pytorch_from_ks(
       Each StructuredName must have a type attached
     """
     cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, bindings_to_generate, "TORCH_EXTENSION_NAME", use_aten
+        ks_str, bindings_to_generate, torch_extension_name, use_aten
     )
 
-    return build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten)
+    return build_module_using_pytorch_from_cpp_backend(
+        cpp_str, torch_extension_name, use_aten
+    )
 
 
 def build_module_using_pytorch_from_cpp(
-    cpp_str, bindings_to_generate, use_aten,
+    cpp_str, bindings_to_generate, torch_extension_name, use_aten
 ):
     cpp_pybind = generate_cpp_pybind_module_declaration(
-        bindings_to_generate, "TORCH_EXTENSION_NAME"
+        bindings_to_generate, torch_extension_name
     )
-    return build_module_using_pytorch_from_cpp_backend(cpp_str + cpp_pybind, use_aten)
+    return build_module_using_pytorch_from_cpp_backend(
+        cpp_str + cpp_pybind, torch_extension_name, use_aten
+    )
 
 
-def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
+def build_module_using_pytorch_from_cpp_backend(
+    cpp_str, torch_extension_name, use_aten
+):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
-    cflags = [
+    extra_cflags = [
         "-DKS_INCLUDE_ATEN" if use_aten else "",
     ]
 
@@ -262,7 +271,7 @@ def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
     if cpp_compiler == None and sys.platform == "win32":
         cflags += ["/std:c++17", "/O2"]
     else:
-        cflags += [
+        extra_cflags += [
             "-std=c++17",
             "-g",
             "-O3",
@@ -272,11 +281,23 @@ def build_module_using_pytorch_from_cpp_backend(cpp_str, use_aten):
     verbose = True
 
     # https://pytorch.org/docs/stable/cpp_extension.html
-    module = load_inline(
-        name="dynamic_ksc_cpp",
-        cpp_sources=[cpp_str],
+    build_directory = (
+        utils.get_ksc_build_dir() + "/torch_extensions/" + torch_extension_name
+    )
+    os.makedirs(build_directory, exist_ok=True)
+
+    cpp_str = "#include <torch/extension.h>\n" + cpp_str
+
+    cpp_source_path = os.path.join(build_directory, "ksc-main.cpp")
+
+    utils.write_file_if_different(cpp_str, cpp_source_path, verbose)
+
+    module = cpp_extension.load(
+        name=torch_extension_name,
+        sources=[cpp_source_path],
         extra_include_paths=[ksc_runtime_dir],
-        extra_cflags=cflags,
+        extra_cflags=extra_cflags,
+        build_directory=build_directory,
         verbose=verbose,
     )
 

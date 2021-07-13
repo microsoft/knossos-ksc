@@ -33,7 +33,10 @@ def test_bench(module_file, bench_name):
 
     arg = configs[0]
 
-    ks_compiled = tsmod2ksmod(mod, bench_name, example_inputs=(arg,), generate_lm=False)
+    torch_extension_name = "ksc_test_dl_activations_" + bench_name
+    ks_compiled = tsmod2ksmod(
+        mod, bench_name, torch_extension_name, example_inputs=(arg,), generate_lm=False
+    )
 
     ks_compiled.py_mod.logging(True)
 
