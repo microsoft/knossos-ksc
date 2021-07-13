@@ -142,10 +142,6 @@ class RuleMatcher(AbstractMatcher):
     """ If a RuleMatcher (instance or subclass) returns true, indicates that it might match
         any Expr which is a Call, regardless of the value of get_filter_term() on that Expr. """
 
-    # @abstractmethod
-    # def apply_at(self, ewp: ExprWithPath, **kwargs) -> Expr:
-    #     """ Applies this rule at the specified <path> within <expr>. kwargs are any stored in the Match's rule_specific_data field. """
-
     @abstractmethod
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment,
@@ -202,19 +198,19 @@ class inline_var(RuleMatcher):
 
         if binding_location is not None:
 
-            binding_location_not_none = binding_location  # mypy workaround
+            binding_location_is_not_none: Path = binding_location  # mypy workaround https://github.com/python/mypy/issues/5528
 
             def apply() -> Expr:
                 assert (
-                    ewp.path[: len(binding_location_not_none)]
-                    == binding_location_not_none
+                    ewp.path[: len(binding_location_is_not_none)]
+                    == binding_location_is_not_none
                 )
                 return replace_subtree(
                     ewp.root,
-                    binding_location_not_none,
+                    binding_location_is_not_none,
                     Const(0.0),  # Nothing to avoid capturing in outer call
                     lambda _zero, let: replace_subtree(
-                        let, ewp.path[len(binding_location_not_none) :], let.rhs
+                        let, ewp.path[len(binding_location_is_not_none) :], let.rhs
                     ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
                 )
 
@@ -231,7 +227,7 @@ class inline_call(RuleMatcher):
     ) -> Iterator[Match]:
         func_def: Optional[Def] = env.defs.get(ewp.expr.name)
         if func_def is not None:
-            func_def_is_not_none = func_def
+            func_def_is_not_none: Def = func_def  # mypy workaround https://github.com/python/mypy/issues/5528
 
             def apply() -> Expr:
                 # func_def comes from the Match.
