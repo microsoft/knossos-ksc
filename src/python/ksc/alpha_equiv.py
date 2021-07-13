@@ -86,7 +86,7 @@ def _alpha_equiv_lam(left: Lam, right: Expr, var_map: BoundVarBijection) -> bool
 
 ###############################################################################
 # Hash modulo alpha, i.e. respecting the above:
-#    are_alpha_equivalent(a,b) ==> alpha_hash(a) == alpha_hash(b)
+#    are_alpha_equivalent(a,b) ==> hash_with_alpha(a) == hash_with_alpha(b)
 
 
 def _hash_str(s: str) -> int:
@@ -134,19 +134,19 @@ def _alpha_hash_helper(e: Expr, reverse_debruijn_vars: PMap[str, int]) -> int:
 
 
 @_alpha_hash_helper.register
-def _alpha_hash_const(c: Const, reverse_debruijn_vars: PMap[str, int]) -> int:
+def _hash_with_alpha_const(c: Const, reverse_debruijn_vars: PMap[str, int]) -> int:
     # System hash() is repeatable for int/float but not str.
     return _hash_str(c.value) if isinstance(c.value, str) else hash(c.value)
 
 
 @_alpha_hash_helper.register
-def _alpha_hash_call(c: Call, reverse_debruijn_vars: PMap[str, int]) -> int:
+def _hash_with_alpha_call(c: Call, reverse_debruijn_vars: PMap[str, int]) -> int:
     # StructuredName can be hash()'d directly but again this depends on PYTHONHASHSEED.
     return _hash_children(_hash_str(str(c.name)), c, reverse_debruijn_vars)
 
 
 @_alpha_hash_helper.register
-def _alpha_hash_var(v: Var, reverse_debruijn_vars: PMap[str, int]) -> int:
+def _hash_with_alpha_var(v: Var, reverse_debruijn_vars: PMap[str, int]) -> int:
     reverse_debruijn_idx = reverse_debruijn_vars.get(v.name)
     if reverse_debruijn_idx is not None:
         return len(reverse_debruijn_vars) - reverse_debruijn_idx
@@ -155,7 +155,7 @@ def _alpha_hash_var(v: Var, reverse_debruijn_vars: PMap[str, int]) -> int:
 
 
 @_alpha_hash_helper.register
-def _alpha_hash_let(l: Let, reverse_debruijn_vars: PMap[str, int]) -> int:
+def _hash_with_alpha_let(l: Let, reverse_debruijn_vars: PMap[str, int]) -> int:
     return hash(
         (
             _class_hashes[Let],
@@ -166,7 +166,7 @@ def _alpha_hash_let(l: Let, reverse_debruijn_vars: PMap[str, int]) -> int:
 
 
 @_alpha_hash_helper.register
-def _alpha_hash_lam(l: Lam, reverse_debruijn_vars: PMap[str, int]) -> int:
+def _hash_with_alpha_lam(l: Lam, reverse_debruijn_vars: PMap[str, int]) -> int:
     return hash(
         (
             _class_hashes[Lam],
@@ -175,5 +175,19 @@ def _alpha_hash_lam(l: Lam, reverse_debruijn_vars: PMap[str, int]) -> int:
     )
 
 
-def alpha_hash(e: Expr):
+def hash_with_alpha(e: Expr):
     return _alpha_hash_helper(e, pmap())
+
+
+class ExprHashedWithAlpha(NamedTuple):
+    """ Allows hash_with_alpha and are_alpha_equivalent to be used with a python set/dict """
+
+    expr: Expr
+
+    def __hash__(self):
+        return hash_with_alpha(self.expr)
+
+    def __eq__(self, other):
+        return isinstance(other, ExprHashedWithAlpha) and are_alpha_equivalent(
+            self.expr, other.expr
+        )

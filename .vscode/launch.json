@@ -5,6 +5,8 @@
 {
 	"version": "0.2.0",
 	"configurations": [
+
+
 		{
 			"name": "(gdb) Launch python for relu3",
 			"type": "cppdbg",
@@ -33,6 +35,20 @@
 			"type": "python",
 			"request": "launch",
 			"program": "${file}",
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Python: Test config entry",
+			"type": "python",
+			"request": "test", // Probably not what you think -- see https://code.visualstudio.com/docs/python/testing#_debug-tests
+			"console": "integratedTerminal"
+		},
+		{
+			"name": "Python: -m pytest",
+			"type": "python",
+			"request": "launch",
+			"module": "pytest",
+			"justMyCode": false,
 			"console": "integratedTerminal"
 		},
 		{

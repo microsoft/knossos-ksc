@@ -48,8 +48,6 @@ if __name__ == "__xmain__":
     import torch
     import torch.nn.functional as F
 
-    torch.set_default_dtype(torch.float64)
-
     do_original = False
 
     if do_original:
@@ -194,7 +192,8 @@ if __name__ == "__xmain__":
     #   %44 : (Tensor, Tensor) = prim::TupleConstruct(%new_h.1, %new_cell.1)
     #   return (%44)
 
-    ks_fun = ts2mod(lltm_forward_py, example_inputs=example_inputs)
+    torch_extension_name = "ksc_awf_timing"
+    ks_fun = ts2mod(lltm_forward_py, example_inputs, torch_extension_name)
 
     def torch_from_ks(ks_object):
         if isinstance(ks_object, tuple):
@@ -264,8 +263,6 @@ if __name__ == "__xmain__":
 
 if __name__ == "__xmain__":
     from math import sin
-
-    torch.set_default_dtype(torch.float64)
 
     def bar(a: int, x: float):
         M = torch.tensor([[1.1, -x], [x + 2.1, 2.2]])

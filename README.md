@@ -6,9 +6,9 @@ This project is a functional compiler and code-gen tool that will
 accelerate writing AI algorithms as well as making them easier.   The core is a lisp-like IR that can be translated from high-level languages, and can be linked to a variety of backends to generate code.
 
 Currently implemented frontends are
+ * TorchScript: ts2k
  * Julia: j2ks
  * F#: f2k
- * TorchScript: ts2k
  * ONNX: onnx2ks
  * KS-Lisp: The IR itself is exchanged in a lisp-like text format (see below).  
 
@@ -29,12 +29,12 @@ There's a VS Code syntax highlighter extension in etc/ks-vscode.
 The AST has just a few concepts: Lambda, Call, Let binding, Conditionals, Constants, Assert, 
 Top-level function definitions, and Rewrite rules.
 
-It's also strongly typed, using a bare set of types: Tensor, Tuple, and Values (Float, Integer, String).  However, unlike say MLIR, these are composable, so e.g. we can have a (Tensor 1 (Tuple Float (Tensor 2 Float))).  Tensors are annotated with their "rank" or number of dimensions.
+It's also strongly typed, using a bare set of types: Tensor, Tuple, and Values (Float, Integer, String).  However, unlike say MLIR or TorchScript, these are composable, so e.g. we can have a `(Tensor 1 (Tuple Float (Tensor 2 Float)))`.  Tensors are annotated with their "rank" or number of dimensions.
 
 The IR is pure functional, so functions may be called more than once or not at all depending on the use of their outputs.  Values are passed and returned "as if" by value, although the optimizer reserves the right implement this using refcounting/copy/move, as long as the semantics are preserved.
 
 The lisp-like IR is extremely simple -- all the language builtins are in this code:
-```scheme
+```clojure
 ;; Externally defined function "sqrt" returns a Float, takes two Float
 (edef atan2 Float (Float Float)) 
 

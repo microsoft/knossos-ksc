@@ -39,7 +39,13 @@ from ksc.expr import (
 from ksc.filter_term import FilterTerm, get_filter_term
 from ksc.parse_ks import parse_ks_file, parse_ks_string
 from ksc.prim import make_prim_call
-from ksc.path import Path, ExprWithPath, subexps_no_binds
+from ksc.path import (
+    Path,
+    ExprWithPath,
+    subexps_no_binds,
+    SerializedPath,
+    deserialize_path,
+)
 from ksc.type import Type
 from ksc.type_propagate import type_propagate
 from ksc.untuple_lets import untuple_one_let
@@ -230,12 +236,8 @@ class inline_call(RuleMatcher):
             func_def_is_not_none = func_def
 
             def apply() -> Expr:
+                # func_def comes from the Match.
                 def apply_here(const_zero, call_node):
-                    # Drop decl=True from Def.args
-                    def_args = [
-                        Var(arg.name, type=arg.type_)
-                        for arg in func_def_is_not_none.args
-                    ]
                     call_arg = (
                         call_node.args[0]
                         if len(call_node.args) == 1
@@ -244,10 +246,18 @@ class inline_call(RuleMatcher):
                         )
                     )
                     return (
-                        Let(def_args[0], call_arg, func_def_is_not_none.body)
-                        if len(def_args) == 1
+                        Let(
+                            func_def_is_not_none.args[0],
+                            call_arg,
+                            func_def_is_not_none.body,
+                        )
+                        if len(func_def.args) == 1
                         else untuple_one_let(
-                            Let(def_args, call_arg, func_def_is_not_none.body)
+                            Let(
+                                func_def_is_not_none.args,
+                                call_arg,
+                                func_def_is_not_none.body,
+                            )
                         )
                     )
 
@@ -304,7 +314,7 @@ class ParsedRuleMatcher(RuleMatcher):
             (add (mul a b) (mul b c)) ;; replacement
         )
     or, the inverse a*b+a*c-> a*(b+c)
-        (rule "add_two_muls.double"
+        (rule "add_two_muls.Float"
             ((a : Float) (b : Float)) ;; template_vars
             (add (mul a b) (mul a c)) ;; template --- note a occurs in multiple places, these must be identical
             (mul a (add b c)) ;; replacement
@@ -499,7 +509,6 @@ class SubstPattern(ExprTransformer):
         return res
 
     def visit_var(self, v: Var, var_names_to_exprs: VariableSubstitution):
-        assert not v.decl
         return var_names_to_exprs[v.name]
 
     def visit_let(self, l: Let, var_names_to_exprs: VariableSubstitution) -> Let:
@@ -510,9 +519,7 @@ class SubstPattern(ExprTransformer):
         # Substitute bound var with target_var in children. It's fine to apply this substitution outside
         # where the bound var is bound, as the replacement shouldn't contain "(let x ...) x" (with x free).
         return Let(
-            Var(
-                target_var.name
-            ),  # type=target_var.type_, decl=True), # No, not generally set for Let-bound Vars
+            target_var,
             self.visit(l.rhs, var_names_to_exprs),
             self.visit(l.body, var_names_to_exprs),
             type=l.type_,
@@ -522,11 +529,7 @@ class SubstPattern(ExprTransformer):
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.arg, var_names_to_exprs, [l.body]
         )
-        return Lam(
-            Var(target_var.name, type=target_var.type_, decl=True),
-            self.visit(l.body, var_names_to_exprs),
-            type=l.type_,
-        )
+        return Lam(target_var, self.visit(l.body, var_names_to_exprs), type=l.type_,)
 
 
 def parse_rule_str(ks_str, symtab, **kwargs):
@@ -539,3 +542,38 @@ def parse_rule_str(ks_str, symtab, **kwargs):
 def parse_rules_from_file(filename):
     with open(filename) as f:
         return [ParsedRuleMatcher(r) for r in parse_ks_string(f, filename)]
+
+
+def rewrite_seq_to_exprs(
+    expr: Expr,
+    defs: Mapping[StructuredName, Def],
+    rewrite_seq: Iterable[Tuple[str, SerializedPath]],
+) -> List[Expr]:
+    """ Performs a series of rewrites, returning a list of the intermediate (and final) expressions.
+        Note the caller must ensure all required rules are imported/loaded/parsed and registered. """
+
+    def follow_sequence(expr):
+        for (rule_name, s_path) in rewrite_seq:
+            path = deserialize_path(s_path)
+            matches = list(rule(rule_name).find_all_matches(expr, defs))
+            if any(m.ewp.path == path for m in matches):
+                match = single_elem([m for m in matches if m.ewp.path == path])
+                assert match.rule.name == rule_name
+                expr = match.apply_rewrite()
+                yield expr
+            else:
+                # No match. To diagnose the error, first check if the path was valid within the expression.
+                try:
+                    subexp = ExprWithPath.from_expr(expr, path)
+                except Exception as e:
+                    raise ValueError(
+                        f"Path {path} not valid within expression {expr}. Could not apply rule {rule_name}"
+                    ) from e
+
+                msg = (
+                    f"Rule {rule_name} did not apply at {path}. Applicable locations were: "
+                    f"{[m.ewp.path for m in matches]} in expression: {expr}"
+                )
+                raise ValueError(msg)
+
+    return list(follow_sequence(expr))

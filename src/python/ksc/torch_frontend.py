@@ -6,7 +6,7 @@ import numpy
 import torch
 import torch.onnx
 
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 from ksc import utils
 from ksc.parse_ks import parse_ks_filename
@@ -62,11 +62,11 @@ def type_from_value(x):
 make_new_var_index = 0
 
 
-def make_new_var(type=None, decl=True):
+def make_new_var(type=None):
     global make_new_var_index
     name = f"ts2ks${make_new_var_index}"
     make_new_var_index += 1
-    return Var(name, type, True), Var(name, type, False)
+    return Var(name, type)
 
 
 def make_arg(input, example_input):
@@ -82,7 +82,7 @@ def make_arg(input, example_input):
         input_type = example_input_type
 
     name = mangled_name(input)
-    return Var(name, input_type, decl=True)
+    return Var(name, input_type)
 
 
 def mangled_name(node):
@@ -93,7 +93,7 @@ def from_torch_dtype(t):
     if t == torch.int64:
         return Type.Integer
 
-    if t == torch.float64:
+    if t == torch.float32:
         return Type.Float
 
     raise NotImplementedError
@@ -212,8 +212,8 @@ def make_PythonOp(node):
         print(f"Adding {function_name} to todo {todo_stack}")
         todo_stack.add(function_name)
 
-        vardecl, var = make_new_var(Type.Float)  # TODO: need to propagate properly
-        map_lambda = Lam(vardecl, Call(function_name, [var]))
+        var = make_new_var(Type.Float)  # TODO: need to propagate properly
+        map_lambda = Lam(var, Call(function_name, [var]))
 
         return (
             Var(mangled_name(value)),
@@ -276,7 +276,7 @@ def make_loop(make_binds, node):
         binds = make_binds(body_nodes[:-1])
         lam_body = make_lets(binds, var_or_constant(item))
 
-        lam = Lam(Var(mangled_name(i), Type.Integer, decl=True), lam_body)
+        lam = Lam(Var(mangled_name(i), Type.Integer), lam_body)
 
         return var_or_constant(l), Call("build", [var_or_constant(max_trip_count), lam])
 
@@ -395,6 +395,9 @@ def torch_from_ks(ks_object):
     if isinstance(ks_object, tuple):
         return tuple(torch_from_ks(ks) for ks in ks_object)
 
+    if isinstance(ks_object, float):
+        return torch.tensor(ks_object)
+
     return torch.from_numpy(numpy.array(ks_object, copy=True))
 
 
@@ -411,7 +414,7 @@ def torch_to_ks(py_mod, val):
 
     if isinstance(val, torch.Tensor):
         assert (
-            val.dtype == torch.float64
+            val.dtype == torch.float32
         ), "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
         if len(val.shape) == 0:
             return val.item()
@@ -468,7 +471,7 @@ def make_KscAutogradFunction(py_mod, generate_lm):
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
     backward = lambda ctx, args: backward_template(py_mod, generate_lm, ctx, args)
-    newclass = type(
+    return type(
         "KscAutogradFunction_" + py_mod.__name__,
         (torch.autograd.Function,),
         {
@@ -478,10 +481,11 @@ def make_KscAutogradFunction(py_mod, generate_lm):
             "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x)),
         },
     )
-    return newclass()
 
 
-def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
+def ksc_defs_to_module(
+    ksc_defs, entry_def, derivatives_to_generate, torch_extension_name
+):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
@@ -516,52 +520,72 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
 
-    return ksc_string_to_module(ks_str, entry_def.name, derivatives_to_generate)
+    return ksc_string_to_module(
+        ks_str, entry_def.name, derivatives_to_generate, torch_extension_name
+    )
 
 
-def ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate):
+def ksc_string_to_module(
+    ks_str, entry_sn, derivatives_to_generate, torch_extension_name
+):
     bindings_to_generate = [("entry", entry_sn)] + [
         (f"{der}_entry", StructuredName((der, entry_sn)))
         for der in derivatives_to_generate
     ]
 
     return build_module_using_pytorch_from_ks(
-        ks_str, bindings_to_generate, use_aten=True
+        ks_str, bindings_to_generate, torch_extension_name, use_aten=True
     )
 
 
-def cpp_string_to_module(cpp_str, entry_name, derivatives_to_generate):
+def cpp_string_to_module(
+    cpp_str, entry_name, derivatives_to_generate, torch_extension_name
+):
     bindings_to_generate = [("entry", entry_name)] + [
         (f"{der}_entry", f"{der}_{entry_name}") for der in derivatives_to_generate
     ]
 
     return build_module_using_pytorch_from_cpp(
-        cpp_str, bindings_to_generate, use_aten=True,
+        cpp_str, bindings_to_generate, torch_extension_name, use_aten=True,
     )
 
 
-def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
+def ksc_defs_to_autograd_function(
+    ksc_defs, entry_def, torch_extension_name, generate_lm=True
+):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
+    mod = ksc_defs_to_module(
+        ksc_defs, entry_def, derivatives_to_generate, torch_extension_name
+    )
     return make_KscAutogradFunction(mod, generate_lm)
 
 
-def ksc_string_to_autograd_function(ks_str, entry_sn, generate_lm):
+def ksc_string_to_autograd_function(
+    ks_str, entry_sn, torch_extension_name, generate_lm
+):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = ksc_string_to_module(ks_str, entry_sn, derivatives_to_generate)
+    mod = ksc_string_to_module(
+        ks_str, entry_sn, derivatives_to_generate, torch_extension_name
+    )
     return make_KscAutogradFunction(mod, generate_lm)
 
 
-def cpp_string_to_autograd_function(cpp_str, entry_name, generate_lm):
+def cpp_string_to_autograd_function(
+    cpp_str, entry_name, torch_extension_name, generate_lm
+):
     derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = cpp_string_to_module(cpp_str, entry_name, derivatives_to_generate)
+    mod = cpp_string_to_module(
+        cpp_str, entry_name, derivatives_to_generate, torch_extension_name
+    )
     return make_KscAutogradFunction(mod, generate_lm)
 
 
 import inspect
 
 
-def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
+def tsmod2ksmod(
+    module, function_name, torch_extension_name, example_inputs, generate_lm=True
+):
     global todo_stack
     todo_stack = {function_name}
     ksc_defs = []
@@ -578,10 +602,14 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
                 ksc_defs.insert(0, ksc_def)
 
     entry_def = ksc_defs[-1]
-    return ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm)
+    return ksc_defs_to_autograd_function(
+        ksc_defs, entry_def, torch_extension_name, generate_lm
+    )
 
 
-def ts2mod(function, example_inputs, generate_lm=True):
+def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
     fn = torch.jit.script(function)
     ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
-    return ksc_defs_to_autograd_function([ksc_def], ksc_def, generate_lm)
+    return ksc_defs_to_autograd_function(
+        [ksc_def], ksc_def, torch_extension_name, generate_lm
+    )

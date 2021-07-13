@@ -4,8 +4,6 @@ import math
 import torch
 import numpy
 
-torch.set_default_dtype(torch.float64)
-
 from ksc import utils
 from ksc.type import Type
 from ksc.torch_frontend import ts2mod
@@ -62,17 +60,22 @@ def compile_relux():
     global ks_relux
     if ks_relux is None:
         print("Compiling relux")
-        ks_relux = ts2mod(relux, (1.0,))
+        torch_extension_name = "ksc_test_ts2k_relux"
+        ks_relux = ts2mod(relux, (1.0,), torch_extension_name)
 
 
 def test_ts2k_relux():
     compile_relux()
-    assert ks_relux.py_mod.entry(2.0) == relux(2.0)
+    ks_ans = ks_relux.py_mod.entry(2.0)
+    ans = relux(2.0)
+    assert pytest.approx(ks_ans, 1e-6) == ans
 
 
 def test_ts2k_relux_grad():
     compile_relux()
-    assert ks_relux.py_mod.rev_entry(1.3, 1.0) == grad_relux(1.3)
+    ks_ans = ks_relux.py_mod.rev_entry(1.3, 1.0)
+    ans = grad_relux(1.3)
+    assert pytest.approx(ks_ans, 1e-6) == ans
 
 
 def bar(a: int, x: float):
@@ -104,13 +107,18 @@ def grad_bar(a: int, x: float):
 
 def test_bar():
     a, x = 1, 12.34
-    ks_bar = ts2mod(bar, (a, x))
+    torch_extension_name = "ksc_test_ts2k_bar"
+    ks_bar = ts2mod(bar, (a, x), torch_extension_name)
+
+    # Check primal
     ks_ans = ks_bar.py_mod.entry(a, x)
     ans = bar(a, x)
-    assert ans == ks_ans
+    assert pytest.approx(ks_ans, 1e-5) == ans
 
-    ks_grad = ks_bar.py_mod.rev_entry((a, x), 1.0)
-    assert ks_grad == grad_bar(a, x)
+    # Check grad
+    ks_ans = ks_bar.py_mod.rev_entry((a, x), 1.0)
+    ans = grad_bar(a, x)
+    assert pytest.approx(ks_ans[1], 1e-5) == ans[1]
 
 
 def far(x: torch.Tensor, y: torch.Tensor):
@@ -126,10 +134,12 @@ def far(x: torch.Tensor, y: torch.Tensor):
 def test_far():
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
-    ks_far = ts2mod(far, (x, y))
+    torch_extension_name = "ksc_test_ts2k_far"
+    ks_far = ts2mod(far, (x, y), torch_extension_name)
+
     ks_ans = ks_far.py_mod.entry(ks_far.adapt(x), ks_far.adapt(y))
     ans = far(x, y)
-    assert pytest.approx(ks_ans, 1e-8) == ans.item()
+    assert pytest.approx(ks_ans, 1e-6) == ans.item()
 
 
 def test_cat():
@@ -138,7 +148,8 @@ def test_cat():
 
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
-    ks_f = ts2mod(f, (x, y))
+    torch_extension_name = "ksc_test_ts2k_cat"
+    ks_f = ts2mod(f, (x, y), torch_extension_name)
     ks_ans = ks_f.py_mod.entry(ks_f.adapt(x), ks_f.adapt(y))
     ks_ans_np = numpy.array(ks_ans, copy=True)
     py_ans = f(x, y)
@@ -167,19 +178,20 @@ def grad_relu3(x: float) -> float:
 def test_relu3(generate_lm):
     x = 0.5
 
-    ks_relu3 = ts2mod(relu3, (x,), generate_lm)
+    torch_extension_name = "ksc_test_ts2k_relu3" + ("_lm" if generate_lm else "")
+    ks_relu3 = ts2mod(relu3, (x,), torch_extension_name, generate_lm)
 
     for x in [-0.1, 0.31221, 2.27160]:
         # Test function: ks == py
         py_ans = relu3(x)
         ks_ans = ks_relu3.py_mod.entry(x)
 
-        assert pytest.approx(ks_ans, 1e-8) == py_ans
+        assert pytest.approx(ks_ans, 1e-6) == py_ans
 
         # Check manual gradient using finite differences
-        delta = 1e-8
+        delta = 1e-6
         py_ans_fd = (relu3(x + delta) - relu3(x)) / delta
-        assert pytest.approx(py_ans_fd, 1e-5) == grad_relu3(x)
+        assert pytest.approx(py_ans_fd, 1e-4) == grad_relu3(x)
 
         # Test gradient ks == py
         py_ans = grad_relu3(x)
@@ -188,7 +200,7 @@ def test_relu3(generate_lm):
         )
         ks_ans = grad_fun(x, 1.0)
 
-        assert pytest.approx(ks_ans, 1e-8) == py_ans
+        assert pytest.approx(ks_ans, 1e-6) == py_ans
 
 
 # def test_Vec_init():

@@ -3,6 +3,13 @@ import torch
 from benchmark_shim import benchmark_semi_pedantic
 
 cpu_device = torch.device("cpu")
+torch.set_default_dtype(torch.float32)
+
+
+def assert_close(result, reference_result):
+    assert torch.allclose(
+        result, reference_result, atol=1e-5
+    ), f"Result and reference differ too much {result} {reference_result}"
 
 
 def test_inference(benchmark, reference_func, func, config):
@@ -12,10 +19,7 @@ def test_inference(benchmark, reference_func, func, config):
             benchmark, func.func, config_on_func_device
         ).to(cpu_device)
         reference_result = reference_func(config)
-    # TODO: generalise correctness test as examples require more than single tensor
-    assert torch.allclose(
-        result, reference_result
-    ), f"Result and reference differ too much {result} {reference_result}"
+    assert_close(result, reference_result)
 
 
 def test_forward(benchmark, reference_func, func, config):
@@ -25,10 +29,7 @@ def test_forward(benchmark, reference_func, func, config):
         cpu_device
     )
     reference_result = reference_func(config)
-    # TODO: generalise correctness test as examples require more than single tensor
-    assert torch.allclose(
-        result, reference_result
-    ), f"Result and reference differ too much {result} {reference_result}"
+    assert_close(result, reference_result)
 
 
 def test_backwards(benchmark, reference_func, func, config):
@@ -48,6 +49,4 @@ def test_backwards(benchmark, reference_func, func, config):
 
     reference_loss = reference_func(config).sum()
     reference_result = torch.autograd.grad(reference_loss, config)
-    assert torch.allclose(
-        result[0].to(cpu_device), reference_result[0]
-    ), f"Result and reference differ too much {result} {reference_result}"
+    assert_close(result[0].to(cpu_device), reference_result[0])

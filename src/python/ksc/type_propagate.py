@@ -235,12 +235,9 @@ def _(ex, symtab, respect_existing):
 
 @_type_propagate_helper.register(Var)
 def _(ex, symtab, respect_existing):
-    if ex.decl:
-        assert ex.type_ != None
-    else:
-        if ex.name not in symtab:
-            raise KSTypeError(f"Unknown symbol {ex.name}")
-        ex.type_ = symtab[ex.name]
+    if ex.name not in symtab:
+        raise KSTypeError(f"Unknown symbol {ex.name}")
+    ex.type_ = symtab[ex.name]
     return ex
 
 

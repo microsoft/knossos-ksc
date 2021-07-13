@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <stdexcept>
 
@@ -8,17 +10,16 @@
 namespace py = pybind11;
 
 #include "knossos.h"
-
-ks::allocator g_alloc{ 1'000'000'000 };
+#include "knossos-entry-points.h"
 
 namespace pybind11 { namespace detail {
 
-/* Specialize type_caster for the ks::tuple type.
-   Ideally we'd just inherit from pybind11::detail::tuple_caster, but our ks::tuple
+/* Specialize type_caster for the ks::Tuple type.
+   Ideally we'd just inherit from pybind11::detail::tuple_caster, but our ks::Tuple
    doesn't quite conform to the required interface (it uses ks::get instead of
    std::get), so this is a slightly-modified version. */
-template <typename... Ts> class type_caster<ks::tuple<Ts...>> {
-    using type = ks::tuple<Ts...>;
+template <typename... Ts> class type_caster<ks::Tuple<Ts...>> {
+    using type = ks::Tuple<Ts...>;
     static constexpr auto size = sizeof...(Ts);
     using indices = make_index_sequence<size>;
 public:
@@ -59,7 +60,7 @@ private:
         return true;
     }
 
-    /* Implementation: Convert a C++ tuple into a Python tuple */
+    /* Implementation: Convert a C++ Tuple into a Python tuple */
     template <typename T, size_t... Is>
     static handle cast_impl(T &&src, return_value_policy policy, handle parent, index_sequence<Is...>) {
         std::array<object, size> entries{{
@@ -75,19 +76,11 @@ private:
         return result.release();
     }
 
-    ks::tuple<make_caster<Ts>...> subcasters;
+    ks::Tuple<make_caster<Ts>...> subcasters;
 };
 
 }}
 
-
-static void check_valid_pointer(std::uintptr_t v)
-{
-    if (v < 1u<<24) {
-        // v should be a pointer, if it's smaller than 0x00ffffff, it's probably a misplaced size
-        throw std::domain_error("generate_and_compile_cpp_from_ks: probable misplaced size");
-    }
-}
 
 template<typename T>
 void declare_tensor_2(py::module &m, char const* name) {
@@ -95,7 +88,6 @@ void declare_tensor_2(py::module &m, char const* name) {
   static constexpr size_t Dim = 2;
   py::class_<ks::tensor<2, T>>(m, name, py::buffer_protocol(), py::module_local(), py::dynamic_attr())
     .def(py::init([](std::uintptr_t v, size_t m, size_t n) {
-        check_valid_pointer(v);
         ks::tensor_dimension<Dim>::index_type size {int(m),int(n)};
         return ks::tensor<Dim, T>(size, reinterpret_cast<T*>(v)); // Reference to caller's data
     }))
@@ -121,7 +113,6 @@ void declare_tensor_1(py::module &m, char const* name) {
   static constexpr size_t Dim = 1;
   py::class_<ks::tensor<Dim, T>>(m, name, py::buffer_protocol(), py::module_local(), py::dynamic_attr())
     .def(py::init([](std::uintptr_t v, size_t n) {
-        check_valid_pointer(v);
         ks::tensor_dimension<Dim>::index_type size {int(n)};
         // Note: We are capturing a reference to the caller's data.
         // we expect the user to attach a Python object to this class
@@ -146,28 +137,3 @@ void declare_tensor_1(py::module &m, char const* name) {
     ;
 }
 
-bool g_ks_logging = false;
-
-bool ks_logging(bool enable) {
-    bool prev = g_ks_logging;
-    g_ks_logging = enable;
-    return prev;
-}
-
-// Convert functor to one which takes a first argument g_alloc,
-// and optionally logs inputs and outputs to cerr
-template<typename RetType, typename... ParamTypes>
-auto with_ks_allocator(const char * tracingMessage, RetType(*f)(ks::allocator*, ParamTypes...)) {
-  return [f, tracingMessage](ParamTypes... params) {
-    if (g_ks_logging) {
-        std::cerr << tracingMessage << "(";
-        (std::cerr << ... << params);
-        std::cerr << ") =" << std::endl;
-        auto ret = f(&g_alloc, params...);
-        std::cerr << ret << std::endl;
-        return ret;
-    } else {
-        return f(&g_alloc, params...);
-    }
-  };
-}

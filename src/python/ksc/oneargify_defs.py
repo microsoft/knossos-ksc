@@ -14,10 +14,8 @@ def oneargify_def(d: Def) -> Def:
     return Def(
         d.name,
         d.return_type,
-        args=[Var(tuple_arg.name, decl=True, type=tuple_arg.type_)],
-        body=untuple_one_let(
-            Let([Var(a.name, a.type_) for a in d.args], tuple_arg, d.body)
-        ),
+        args=[tuple_arg],
+        body=untuple_one_let(Let(d.args, tuple_arg, d.body)),
     )
 
 
