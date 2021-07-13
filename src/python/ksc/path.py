@@ -1,7 +1,7 @@
 """
 Paths identify nodes (sub-expressions) within Expr's as a sequence of PathElements
 each of which identifies a field of an Expr subclass or one argument of a Call.
->>> # doctests - run specifically for this file in pytest.ini
+>>> # doctests - run specifically for this file in test_pytest.sh
 >>> e = Let(Var("a"), Const(5), Call("add", [Const(3), Var("b")]))
 >>> let_rhs.get(e)
 5
