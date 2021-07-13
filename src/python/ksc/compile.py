@@ -19,69 +19,6 @@ def subprocess_run(cmd, env=None):
     )
 
 
-def generate_cpp_from_ks(ks_str, use_aten=False):
-    ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
-
-    with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
-        fks.write(ks_str)
-    with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
-        pass
-    with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
-        pass
-
-    print("generate_cpp_from_ks:", ksc_path, fks.name)
-    ksc_command = [
-        ksc_path,
-        "--generate-cpp",
-        "--ks-source-file",
-        ksc_runtime_dir + "/prelude.ks",
-        *(
-            ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
-            if use_aten
-            else ()
-        ),
-        "--ks-source-file",
-        fks.name,
-        "--ks-output-file",
-        fkso.name,
-        "--cpp-output-file",
-        fcpp.name,
-    ]
-
-    try:
-        e = subprocess.run(ksc_command, capture_output=True, check=True,)
-        print(e.stdout.decode("ascii"))
-        print(e.stderr.decode("ascii"))
-    except subprocess.CalledProcessError as e:
-        print(f"Command failed:\n{' '.join(ksc_command)}")
-        print(f"files {fks.name} {fkso.name} {fcpp.name}")
-        print(f"ks_str=\n{ks_str}")
-        print(e.output.decode("ascii"))
-        print(e.stderr.decode("ascii"))
-        raise
-
-    # Read from CPP back to string
-    with open(fcpp.name) as f:
-        out = f.read()
-
-    # only delete these file if no error
-    if not preserve_temporary_files:
-
-        @atexit.register
-        def _():
-            print(
-                "ksc.compile.generate_cpp_from_ks: Deleting",
-                fks.name,
-                fcpp.name,
-                fkso.name,
-            )
-            os.unlink(fks.name)
-            os.unlink(fcpp.name)
-            os.unlink(fkso.name)
-
-    return out
-
-
 def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
     """
     Build python module, independently of pytorch, non-ninja
@@ -142,10 +79,64 @@ def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
     return module_name, module_path
 
 
-derivatives_to_generate_default = ["fwd", "rev"]
+def build_py_module_from_ks(ks_str, bindings_to_generate, use_aten=False):
+    # Currently called from ks_function only
+    cpp_str = _generate_cpp_for_py_module_from_ks(
+        ks_str, bindings_to_generate, "PYTHON_MODULE_NAME", use_aten
+    )
+
+    cpp_fname = (
+        gettempdir() + "/ksc-pybind.cpp"
+    )  # TODO temp name, but I want to solve a GC problem with temp names
+    print(f"build_py_module_from_ks: Saving to {cpp_fname}")
+    with open(cpp_fname, "w") as fcpp:
+        fcpp.write(cpp_str)
+
+    module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
+    return utils.import_module_from_path(module_name, module_path)
 
 
-def generate_cpp_for_py_module_from_ks(
+def build_module_using_pytorch_from_ks(
+    ks_str, bindings_to_generate, torch_extension_name, use_aten=False
+):
+    """Uses PyTorch C++ extension mechanism to build and load a module
+
+    * ks_str: str
+
+      The text of a ks source file
+
+    * bindings_to_generate : Iterable[Tuple[str, StructuredName]]
+
+      The StructuredName is the ksc function to expose to Python.  The
+      str is the Python name given to that function when exposed.
+      Each StructuredName must have a type attached
+
+    * torch_extension_name: str
+
+      The name of the module, uniquely identifying the (TorchScript or ks or cpp) 
+      source code. 
+    """
+    cpp_str = _generate_cpp_for_py_module_from_ks(
+        ks_str, bindings_to_generate, "TORCH_EXTENSION_NAME", use_aten
+    )
+
+    return _build_module_using_pytorch_from_cpp_backend(
+        cpp_str, torch_extension_name, use_aten
+    )
+
+
+def build_module_using_pytorch_from_cpp(
+    cpp_str, bindings_to_generate, torch_extension_name, use_aten
+):
+    cpp_pybind = _generate_cpp_pybind_module_declaration(
+        bindings_to_generate, "TORCH_EXTENSION_NAME"
+    )
+    return _build_module_using_pytorch_from_cpp_backend(
+        cpp_str + cpp_pybind, torch_extension_name, use_aten
+    )
+
+
+def _generate_cpp_for_py_module_from_ks(
     ks_str, bindings_to_generate, python_module_name, use_aten=True,
 ):
     def mangled_with_type(structured_name):
@@ -160,15 +151,78 @@ def generate_cpp_for_py_module_from_ks(
         for (python_name, structured_name) in bindings_to_generate
     ]
 
-    cpp_ks_functions = generate_cpp_from_ks(ks_str, use_aten=use_aten)
-    cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
+    cpp_ks_functions = _generate_cpp_from_ks(ks_str, use_aten=use_aten)
+    cpp_pybind_module_declaration = _generate_cpp_pybind_module_declaration(
         bindings, python_module_name
     )
 
     return cpp_ks_functions + cpp_pybind_module_declaration
 
 
-def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_name):
+def _generate_cpp_from_ks(ks_str, use_aten=False):
+    ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
+
+    with NamedTemporaryFile(mode="w", suffix=".ks", delete=False) as fks:
+        fks.write(ks_str)
+    with NamedTemporaryFile(mode="w", suffix=".kso", delete=False) as fkso:
+        pass
+    with NamedTemporaryFile(mode="w", suffix=".cpp", delete=False) as fcpp:
+        pass
+
+    print("_generate_cpp_from_ks:", ksc_path, fks.name)
+    ksc_command = [
+        ksc_path,
+        "--generate-cpp",
+        "--ks-source-file",
+        ksc_runtime_dir + "/prelude.ks",
+        *(
+            ("--ks-source-file", ksc_runtime_dir + "/prelude-aten.ks")
+            if use_aten
+            else ()
+        ),
+        "--ks-source-file",
+        fks.name,
+        "--ks-output-file",
+        fkso.name,
+        "--cpp-output-file",
+        fcpp.name,
+    ]
+
+    try:
+        e = subprocess.run(ksc_command, capture_output=True, check=True,)
+        print(e.stdout.decode("ascii"))
+        print(e.stderr.decode("ascii"))
+    except subprocess.CalledProcessError as e:
+        print(f"Command failed:\n{' '.join(ksc_command)}")
+        print(f"files {fks.name} {fkso.name} {fcpp.name}")
+        print(f"ks_str=\n{ks_str}")
+        print(e.output.decode("ascii"))
+        print(e.stderr.decode("ascii"))
+        raise
+
+    # Read from CPP back to string
+    with open(fcpp.name) as f:
+        out = f.read()
+
+    # only delete these file if no error
+    if not preserve_temporary_files:
+
+        @atexit.register
+        def _():
+            print(
+                "ksc.compile._generate_cpp_from_ks: Deleting",
+                fks.name,
+                fcpp.name,
+                fkso.name,
+            )
+            os.unlink(fks.name)
+            os.unlink(fcpp.name)
+            os.unlink(fkso.name)
+
+    return out
+
+
+def _generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_name):
     def m_def(python_name, cpp_name):
         return f"""
         m.def("{python_name}", ks::entry_points::with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
@@ -201,59 +255,7 @@ PYBIND11_MODULE("""
     )
 
 
-def build_py_module_from_ks(ks_str, bindings_to_generate, use_aten=False):
-
-    cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, bindings_to_generate, "PYTHON_MODULE_NAME", use_aten
-    )
-
-    cpp_fname = (
-        gettempdir() + "/ksc-pybind.cpp"
-    )  # TODO temp name, but I want to solve a GC problem with temp names
-    print(f"Saving to {cpp_fname}")
-    with open(cpp_fname, "w") as fcpp:
-        fcpp.write(cpp_str)
-
-    module_name, module_path = build_py_module_from_cpp(cpp_str, use_aten=use_aten)
-    return utils.import_module_from_path(module_name, module_path)
-
-
-def build_module_using_pytorch_from_ks(
-    ks_str, bindings_to_generate, torch_extension_name, use_aten=False
-):
-    """Uses PyTorch C++ extension mechanism to build and load a module
-
-    * ks_str: str
-
-      The text of a ks source file
-
-    * bindings_to_generate : Iterable[Tuple[str, StructuredName]]
-
-      The StructuredName is the ksc function to expose to Python.  The
-      str is the Python name given to that function when exposed.
-      Each StructuredName must have a type attached
-    """
-    cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, bindings_to_generate, torch_extension_name, use_aten
-    )
-
-    return build_module_using_pytorch_from_cpp_backend(
-        cpp_str, torch_extension_name, use_aten
-    )
-
-
-def build_module_using_pytorch_from_cpp(
-    cpp_str, bindings_to_generate, torch_extension_name, use_aten
-):
-    cpp_pybind = generate_cpp_pybind_module_declaration(
-        bindings_to_generate, torch_extension_name
-    )
-    return build_module_using_pytorch_from_cpp_backend(
-        cpp_str + cpp_pybind, torch_extension_name, use_aten
-    )
-
-
-def build_module_using_pytorch_from_cpp_backend(
+def _build_module_using_pytorch_from_cpp_backend(
     cpp_str, torch_extension_name, use_aten
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
