@@ -38,6 +38,12 @@ auto with_ks_allocator(const char * tracingMessage, RetType(*f)(ks::allocator*, 
 constexpr at::ScalarType scalar_type_of_Float = c10::CppTypeToScalarType<Float>::value;
 
 template<typename KSType, typename EntryPointType>
+KSType convert_argument(EntryPointType arg);
+
+template<typename EntryPointType, typename KSType>
+EntryPointType convert_return_value(KSType ret);
+
+template<typename KSType, typename EntryPointType>
 struct Converter
 {
   static_assert(std::is_same<KSType, EntryPointType>::value, "Entry point type is not supported");
@@ -83,6 +89,28 @@ struct Converter<ks::tensor<2, Float>, torch::Tensor>
     torch::Tensor torch_ret = torch::empty({size0, size1}, torch::TensorOptions().dtype(scalar_type_of_Float));
     std::memcpy(torch_ret.data_ptr(), ret.data(), size0 * size1 * sizeof(Float));
     return torch_ret;
+  }
+};
+
+template<typename ...KsElementTypes, typename ...EntryPointElementTypes>
+struct Converter<ks::Tuple<KsElementTypes...>, ks::Tuple<EntryPointElementTypes...>>
+{
+  template<size_t ...Indices>
+  static ks::Tuple<KsElementTypes...> to_ks_impl(ks::Tuple<EntryPointElementTypes...> arg, std::index_sequence<Indices...>) {
+    return ks::make_Tuple(convert_argument<KsElementTypes>(ks::get<Indices>(arg))...);
+  }
+
+  static ks::Tuple<KsElementTypes...> to_ks(ks::Tuple<EntryPointElementTypes...> arg) {
+    return to_ks_impl(arg, std::index_sequence_for<EntryPointElementTypes...>{});
+  }
+
+  template<size_t ...Indices>
+  static ks::Tuple<EntryPointElementTypes...> from_ks_impl(ks::Tuple<KsElementTypes...> ret, std::index_sequence<Indices...>) {
+    return ks::make_Tuple(convert_return_value<EntryPointElementTypes>(ks::get<Indices>(ret))...);
+  }
+
+  static ks::Tuple<EntryPointElementTypes...> from_ks(ks::Tuple<KsElementTypes...> ret) {
+    return from_ks_impl(ret, std::index_sequence_for<KsElementTypes...>{});
   }
 };
 
