@@ -83,6 +83,9 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
 
 
 def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
+    """
+    Build python module, independently of pytorch, non-ninja
+    """
     _ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
     pybind11_path = utils.get_ksc_dir() + "/extern/pybind11"
 
