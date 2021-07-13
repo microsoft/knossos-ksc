@@ -40,7 +40,7 @@ class ConstantFolder(RuleMatcher):
 
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match_XYZ(ewp=ewp, apply_rule=apply)
+            yield Match_XYZ(ewp=ewp, rule=self, apply_rule=apply)
 
 
 constant_folding_rules = [ConstantFolder(sn, func) for sn, func in native_impls.items()]
