@@ -471,7 +471,7 @@ def make_KscAutogradFunction(py_mod, generate_lm):
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
     backward = lambda ctx, args: backward_template(py_mod, generate_lm, ctx, args)
-    newclass = type(
+    return type(
         "KscAutogradFunction_" + py_mod.__name__,
         (torch.autograd.Function,),
         {
@@ -481,7 +481,6 @@ def make_KscAutogradFunction(py_mod, generate_lm):
             "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x)),
         },
     )
-    return newclass()
 
 
 def ksc_defs_to_module(

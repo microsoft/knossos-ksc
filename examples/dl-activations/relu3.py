@@ -360,7 +360,7 @@ def vrelu3_pytorch(x: torch.Tensor):
 # run-bench: PyTorch "nice" implementation
 def relu3_pytorch_nice(x: float) -> float:
     if x < 0.0:
-        return 0.0 * x  # Needed for PyTorch, not for Knossos.  See [Note: zeros]
+        return torch.zeros_like(x)  # Needed for PyTorch, not for Knossos [Note: zeros]
     elif x < 1.0:
         return 1 / 3 * x ** 3
     else:
@@ -402,7 +402,7 @@ def vrelu3_cuda_init():
 
         @staticmethod
         def backward(ctx, grad):
-            return vrelu3_cuda.backward(grad.contiguous(), *ctx.saved_variables)
+            return vrelu3_cuda.backward(grad.contiguous(), *ctx.saved_tensors)
 
     class VReLu3(torch.nn.Module):
         def __init__(self):
