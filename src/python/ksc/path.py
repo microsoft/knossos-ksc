@@ -14,17 +14,17 @@ ExprWithPath allows traversing an expr, and listing the addressable subexprs.
 >>> ewp.path
 ()
 >>> ewp.rhs
-ExprWithPath(..., path=(Let.rhs,), expr=5)
+ExprWithPath(..., path=(let_rhs,), expr=5)
 >>> ewp.body.args[0]
-ExprWithPath(..., path=(Let.body, call_args[0]), expr=3)
+ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
 >>> ExprWithPath.from_expr(e, [let_body, call_args[0]])
-ExprWithPath(..., path=(Let.body, call_args[0]), expr=3)
+ExprWithPath(..., path=(let_body, call_args[0]), expr=3)
 >>> ExprWithPath.from_expr(e, [let_body, call_args[2]])
 Traceback (most recent call last):
 ...
 IndexError: list index out of range
 >>> ExprWithPath.from_expr(e).all_subexprs_with_paths()
-[ExprWithPath(..., path=(Let.rhs,), expr=5), ExprWithPath(..., path=(Let.body,), expr=(Call...))]
+[ExprWithPath(..., path=(let_rhs,), expr=5), ExprWithPath(..., path=(let_body,), expr=(Call...))]
 
 ExprWithPath also allows directly accessing other members of the Expr
  (which do not have Paths):
