@@ -61,7 +61,7 @@ from ksc.visitors import ExprTransformer
 
 
 @dataclass(frozen=True)
-class Match_XYZ:  # TODO: put back to Match_XYZ when ready
+class Match:
     rule: "RuleMatcher"
     apply_rule: Callable[[], Expr]
     ewp: ExprWithPath
@@ -87,14 +87,12 @@ class Environment:
 class AbstractMatcher(ABC):
     def find_all_matches(
         self, e: Expr, defs: PMap[StructuredName, Def] = pmap()
-    ) -> Iterator[Match_XYZ]:
+    ) -> Iterator[Match]:
         yield from self._matches_with_env(
             ExprWithPath.from_expr(e), Environment(pmap({}), defs)
         )
 
-    def _matches_with_env(
-        self, ewp: ExprWithPath, env: Environment
-    ) -> Iterator[Match_XYZ]:
+    def _matches_with_env(self, ewp: ExprWithPath, env: Environment) -> Iterator[Match]:
         # Env maps bound variables to their binders, and StructuredNames for their defs,
         # used only for inlining rules (inline_call and inline_var).
         yield from self.matches_here(ewp, env)
@@ -113,7 +111,7 @@ class AbstractMatcher(ABC):
                 yield from self._matches_with_env(ch, env)
 
     @abstractmethod
-    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match_XYZ]:
+    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
         """ Return any matches which rewrite the topmost node of the specified subtree """
 
 
@@ -151,11 +149,11 @@ class RuleMatcher(AbstractMatcher):
     @abstractmethod
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment,
-    ) -> Iterator[Match_XYZ]:
+    ) -> Iterator[Match]:
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <get_filter_term(expr)>
             is of one of <self.possible_filter_terms>. """
 
-    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match_XYZ]:
+    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
         if get_filter_term(ewp.expr) in self.possible_filter_terms or (
             isinstance(ewp.expr, Call) and self.may_match_any_call
         ):
@@ -182,7 +180,7 @@ class RuleSet(AbstractMatcher):
             for term in rule.possible_filter_terms:
                 self._rules_by_filter_term.setdefault(term, []).append(rule)
 
-    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match_XYZ]:
+    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
         possible_rules: Iterable[RuleMatcher] = self._rules_by_filter_term.get(
             get_filter_term(ewp.expr), []
         )
@@ -198,7 +196,7 @@ class inline_var(RuleMatcher):
 
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment,
-    ) -> Iterator[Match_XYZ]:
+    ) -> Iterator[Match]:
         assert isinstance(ewp.expr, Var)
         binding_location = env.let_vars.get(ewp.expr.name)
 
@@ -220,7 +218,7 @@ class inline_var(RuleMatcher):
                     ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
                 )
 
-            yield Match_XYZ(ewp=ewp, rule=self, apply_rule=apply)
+            yield Match(ewp=ewp, rule=self, apply_rule=apply)
 
 
 @singleton
@@ -230,7 +228,7 @@ class inline_call(RuleMatcher):
 
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment
-    ) -> Iterator[Match_XYZ]:
+    ) -> Iterator[Match]:
         func_def: Optional[Def] = env.defs.get(ewp.expr.name)
         if func_def is not None:
             func_def_is_not_none = func_def
@@ -271,7 +269,7 @@ class inline_call(RuleMatcher):
                 # In the meantime, the 0.0 here (as elsewhere) indicates there are no variables to avoid capturing.
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match_XYZ(ewp=ewp, rule=self, apply_rule=apply)
+            yield Match(ewp=ewp, rule=self, apply_rule=apply)
 
 
 @singleton
@@ -280,7 +278,7 @@ class delete_let(RuleMatcher):
 
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment
-    ) -> Iterator[Match_XYZ]:
+    ) -> Iterator[Match]:
         assert isinstance(ewp.expr, Let)
         if ewp.vars.name not in ewp.body.free_vars_:
 
@@ -295,7 +293,7 @@ class delete_let(RuleMatcher):
                 # The constant just has no free variables that we want to avoid being captured
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match_XYZ(ewp=ewp, rule=self, apply_rule=apply)
+            yield Match(ewp=ewp, rule=self, apply_rule=apply)
 
 
 ###############################################################################
@@ -344,7 +342,7 @@ class ParsedRuleMatcher(RuleMatcher):
 
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment
-    ) -> Iterator[Match_XYZ]:
+    ) -> Iterator[Match]:
         # The rule matches if there is a VariableSubstitution from the template_vars such that template[subst] == expr;
         # the result will then be replacement[subst].
         substs = find_template_subst(self._rule.template, ewp.expr, self._arg_types)
@@ -365,7 +363,7 @@ class ParsedRuleMatcher(RuleMatcher):
                 # The constant just has no free variables that we want to avoid being captured
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match_XYZ(ewp=ewp, rule=self, apply_rule=apply)
+            yield Match(ewp=ewp, rule=self, apply_rule=apply)
 
 
 def _combine_substs(
