@@ -63,11 +63,11 @@ from ksc.visitors import ExprTransformer
 @dataclass(frozen=True)
 class Match:
     rule: "RuleMatcher"
-    apply_rule: Callable[[], Expr]
+    apply: Callable[[], Expr]
     ewp: ExprWithPath
 
     def apply_rewrite(self):
-        return self.apply_rule()
+        return self.apply()
 
     @property
     def path(self):
@@ -194,27 +194,24 @@ class inline_var(RuleMatcher):
         self, ewp: ExprWithPath, env: Environment,
     ) -> Iterator[Match]:
         assert isinstance(ewp.expr, Var)
-        binding_location = env.let_vars.get(ewp.expr.name)
 
-        if binding_location is not None:
+        if ewp.expr.name not in env.let_vars:
+            return
 
-            binding_location_is_not_none: Path = binding_location  # mypy workaround https://github.com/python/mypy/issues/5528
+        binding_location: Path = env.let_vars[ewp.expr.name]
 
-            def apply() -> Expr:
-                assert (
-                    ewp.path[: len(binding_location_is_not_none)]
-                    == binding_location_is_not_none
-                )
-                return replace_subtree(
-                    ewp.root,
-                    binding_location_is_not_none,
-                    Const(0.0),  # Nothing to avoid capturing in outer call
-                    lambda _zero, let: replace_subtree(
-                        let, ewp.path[len(binding_location_is_not_none) :], let.rhs
-                    ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
-                )
+        def apply() -> Expr:
+            assert ewp.path[: len(binding_location)] == binding_location
+            return replace_subtree(
+                ewp.root,
+                binding_location,
+                Const(0.0),  # Nothing to avoid capturing in outer call
+                lambda _zero, let: replace_subtree(
+                    let, ewp.path[len(binding_location) :], let.rhs
+                ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
+            )
 
-            yield Match(ewp=ewp, rule=self, apply_rule=apply)
+        yield Match(ewp=ewp, rule=self, apply=apply)
 
 
 @singleton
@@ -225,47 +222,38 @@ class inline_call(RuleMatcher):
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment
     ) -> Iterator[Match]:
-        func_def: Optional[Def] = env.defs.get(ewp.expr.name)
-        if func_def is not None:
-            func_def_is_not_none: Def = func_def  # mypy workaround https://github.com/python/mypy/issues/5528
+        if ewp.expr.name not in env.defs:
+            return
 
-            def apply() -> Expr:
-                # func_def comes from the Match.
-                def apply_here(const_zero, call_node):
-                    call_arg = (
-                        call_node.args[0]
-                        if len(call_node.args) == 1
-                        else make_prim_call(
-                            StructuredName.from_str("tuple"), call_node.args
-                        )
+        func_def: Def = env.defs[ewp.expr.name]
+
+        def apply() -> Expr:
+            # func_def comes from the Match.
+            def apply_here(const_zero, call_node):
+                call_arg = (
+                    call_node.args[0]
+                    if len(call_node.args) == 1
+                    else make_prim_call(
+                        StructuredName.from_str("tuple"), call_node.args
                     )
-                    return (
-                        Let(
-                            func_def_is_not_none.args[0],
-                            call_arg,
-                            func_def_is_not_none.body,
-                        )
-                        if len(func_def.args) == 1
-                        else untuple_one_let(
-                            Let(
-                                func_def_is_not_none.args,
-                                call_arg,
-                                func_def_is_not_none.body,
-                            )
-                        )
-                    )
+                )
+                return (
+                    Let(func_def.args[0], call_arg, func_def.body,)
+                    if len(func_def.args) == 1
+                    else untuple_one_let(Let(func_def.args, call_arg, func_def.body,))
+                )
 
-                arg_names = frozenset([arg.name for arg in func_def_is_not_none.args])
-                assert func_def_is_not_none.body.free_vars_.issubset(
-                    arg_names
-                )  # Sets may not be equal, if some args unused.
-                # There is thus nothing in the function body that could be captured by 'let's around the callsite.
-                # Thus, TODO: simplify interface to replace_subtree: only inline_let requires capture-avoidance, and
-                # there is no need to support both capture-avoidance + applicator in the same call to replace_subtree.
-                # In the meantime, the 0.0 here (as elsewhere) indicates there are no variables to avoid capturing.
-                return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
+            arg_names = frozenset([arg.name for arg in func_def.args])
+            assert func_def.body.free_vars_.issubset(
+                arg_names
+            )  # Sets may not be equal, if some args unused.
+            # There is thus nothing in the function body that could be captured by 'let's around the callsite.
+            # Thus, TODO: simplify interface to replace_subtree: only inline_let requires capture-avoidance, and
+            # there is no need to support both capture-avoidance + applicator in the same call to replace_subtree.
+            # In the meantime, the 0.0 here (as elsewhere) indicates there are no variables to avoid capturing.
+            return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match(ewp=ewp, rule=self, apply_rule=apply)
+        yield Match(ewp=ewp, rule=self, apply=apply)
 
 
 @singleton
@@ -289,7 +277,7 @@ class delete_let(RuleMatcher):
                 # The constant just has no free variables that we want to avoid being captured
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match(ewp=ewp, rule=self, apply_rule=apply)
+            yield Match(ewp=ewp, rule=self, apply=apply)
 
 
 ###############################################################################
@@ -359,7 +347,7 @@ class ParsedRuleMatcher(RuleMatcher):
                 # The constant just has no free variables that we want to avoid being captured
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match(ewp=ewp, rule=self, apply_rule=apply)
+            yield Match(ewp=ewp, rule=self, apply=apply)
 
 
 def _combine_substs(
