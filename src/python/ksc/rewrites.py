@@ -63,11 +63,8 @@ from ksc.visitors import ExprTransformer
 @dataclass(frozen=True)
 class Match:
     rule: "RuleMatcher"
-    apply: Callable[[], Expr]
+    apply_rewrite: Callable[[], Expr]
     ewp: ExprWithPath
-
-    def apply_rewrite(self):
-        return self.apply()
 
     @property
     def path(self):
@@ -211,7 +208,7 @@ class inline_var(RuleMatcher):
                 ),  # No applicator; renaming will prevent capturing let.rhs, so just insert that
             )
 
-        yield Match(ewp=ewp, rule=self, apply=apply)
+        yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
 
 
 @singleton
@@ -252,7 +249,7 @@ class inline_call(RuleMatcher):
             # In the meantime, the 0.0 here (as elsewhere) indicates there are no variables to avoid capturing.
             return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-        yield Match(ewp=ewp, rule=self, apply=apply)
+        yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
 
 
 @singleton
@@ -276,7 +273,7 @@ class delete_let(RuleMatcher):
                 # The constant just has no free variables that we want to avoid being captured
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match(ewp=ewp, rule=self, apply=apply)
+            yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
 
 
 ###############################################################################
@@ -346,7 +343,7 @@ class ParsedRuleMatcher(RuleMatcher):
                 # The constant just has no free variables that we want to avoid being captured
                 return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
 
-            yield Match(ewp=ewp, rule=self, apply=apply)
+            yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
 
 
 def _combine_substs(
