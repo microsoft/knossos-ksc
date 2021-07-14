@@ -228,7 +228,6 @@ class inline_call(RuleMatcher):
         func_def: Def = env.defs[ewp.expr.name]
 
         def apply() -> Expr:
-            # func_def comes from the Match.
             def apply_here(const_zero, call_node):
                 call_arg = (
                     call_node.args[0]
