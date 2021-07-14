@@ -261,9 +261,7 @@ def build_module_using_pytorch_from_cpp_backend(
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
-    extra_cflags = [
-        "-DKS_INCLUDE_ATEN" if use_aten else "",
-    ]
+    extra_cflags = ["-DKS_INCLUDE_ATEN"] if use_aten else []
 
     # I don't like this assumption about Windows -> cl but it matches what PyTorch is currently doing:
     # https://github.com/pytorch/pytorch/blob/ad8d1b2aaaf2ba28c51b1cb38f86311749eff755/torch/utils/cpp_extension.py#L1374-L1378
