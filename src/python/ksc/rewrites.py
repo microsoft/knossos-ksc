@@ -111,7 +111,7 @@ class AbstractMatcher(ABC):
                 yield from self._matches_with_env(ch, env)
 
     @abstractmethod
-    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
+    def matches_here(self, ewp: ExprWithPath, env: Environment) -> Iterator[Match]:
         """ Return any matches which rewrite the topmost node of the specified subtree """
 
 
@@ -149,7 +149,7 @@ class RuleMatcher(AbstractMatcher):
         """ Returns any 'Match's acting on the topmost node of the specified Expr, given that <get_filter_term(expr)>
             is of one of <self.possible_filter_terms>. """
 
-    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
+    def matches_here(self, ewp: ExprWithPath, env: Environment) -> Iterator[Match]:
         if get_filter_term(ewp.expr) in self.possible_filter_terms or (
             isinstance(ewp.expr, Call) and self.may_match_any_call
         ):
@@ -176,7 +176,7 @@ class RuleSet(AbstractMatcher):
             for term in rule.possible_filter_terms:
                 self._rules_by_filter_term.setdefault(term, []).append(rule)
 
-    def matches_here(self, ewp: ExprWithPath, env: Environment,) -> Iterator[Match]:
+    def matches_here(self, ewp: ExprWithPath, env: Environment) -> Iterator[Match]:
         possible_rules: Iterable[RuleMatcher] = self._rules_by_filter_term.get(
             get_filter_term(ewp.expr), []
         )
@@ -237,9 +237,9 @@ class inline_call(RuleMatcher):
                     )
                 )
                 return (
-                    Let(func_def.args[0], call_arg, func_def.body,)
+                    Let(func_def.args[0], call_arg, func_def.body)
                     if len(func_def.args) == 1
-                    else untuple_one_let(Let(func_def.args, call_arg, func_def.body,))
+                    else untuple_one_let(Let(func_def.args, call_arg, func_def.body))
                 )
 
             arg_names = frozenset([arg.name for arg in func_def.args])
@@ -510,7 +510,7 @@ class SubstPattern(ExprTransformer):
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.arg, var_names_to_exprs, [l.body]
         )
-        return Lam(target_var, self.visit(l.body, var_names_to_exprs), type=l.type_,)
+        return Lam(target_var, self.visit(l.body, var_names_to_exprs), type=l.type_)
 
 
 def parse_rule_str(ks_str, symtab, **kwargs):
