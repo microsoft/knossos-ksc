@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Iterable, Iterator, Tuple
+import functools
 
 from ksc.cav_subst import replace_subtree, replace_free_vars, make_nonfree_var
 from ksc.expr import Expr, Call, If, Rule, Var, Let, Const
@@ -26,23 +27,26 @@ class LiftOverCall(RuleMatcher, ABC):
             above the Call. For example, <arg> is an 'If' or 'Let'. """
 
     def matches_for_possible_expr(self, ewp: ExprWithPath, env) -> Iterator[Match]:
+        def apply(arg_with_path: ExprWithPath):
+            return replace_subtree(
+                arg_with_path.root,
+                arg_with_path.path[:-1],
+                Const(0.0),
+                lambda _zero, call_node: self.build_call_replacement(
+                    call_node, arg_with_path.path[-1]
+                ),
+            )
+
         for arg_with_path in ewp.args:
             if self.can_lift_arg(arg_with_path.expr):
-                yield Match(self, arg_with_path)
+                yield Match(
+                    self, functools.partial(apply, arg_with_path), arg_with_path
+                )
 
     @abstractmethod
-    def build_call_replacement(self, call_node: Call, which_arg: int) -> Expr:
-        """ Build a new Expr which is equivalent in value to the call_node, but where argument
-            <which_arg> is lifted. The caller must ensure that argument satisfies can_lift_arg(). """
-
-    def apply_at(self, ewp: ExprWithPath) -> Expr:
-        def apply_here(const_zero: Expr, call_node: Expr) -> Expr:
-            assert const_zero == Const(0.0)
-            assert isinstance(call_node, Call)
-            return self.build_call_replacement(call_node, ewp.path[-1])
-
-        # The constant just has no free variables that we want to avoid being captured
-        return replace_subtree(ewp.root, ewp.path[:-1], Const(0.0), apply_here)
+    def build_call_replacement(self, call_node: Call, which_arg: PathElement) -> Expr:
+        """ Build a new Expr which is equivalent to the call_node, but where argument <which_arg>
+            is lifted. The caller will have ensured that argument satisfies can_lift_arg(). """
 
 
 @singleton
