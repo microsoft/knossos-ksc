@@ -13,6 +13,7 @@ from ksc.parse_ks import parse_ks_filename
 from ksc.compile import (
     build_module_using_pytorch_from_ks,
     build_module_using_pytorch_from_cpp,
+    default_cflags,
 )
 
 from ksc.type import Type
@@ -502,12 +503,7 @@ def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
         entry_def.name,
         torch_extension_name,
         generate_lm,
-        extra_cflags=[
-            "-std=c++17",
-            "-g",
-            "-O3",
-            # "-DKS_BOUNDS_CHECK",
-        ],
+        extra_cflags=default_cflags,
     )
 
 
@@ -552,7 +548,11 @@ def ksc_defs_to_autograd_function(
 
 
 def ksc_string_to_autograd_function(
-    ks_str, entry_sn, torch_extension_name, generate_lm=True, extra_cflags=[]
+    ks_str,
+    entry_sn,
+    torch_extension_name,
+    generate_lm=True,
+    extra_cflags=default_cflags,
 ):
     mod = ksc_string_to_module(
         ks_str, entry_sn, torch_extension_name, generate_lm, extra_cflags
@@ -565,7 +565,7 @@ def cpp_string_to_autograd_function(
     torch_extension_name,
     entry_name="entry",
     entry_vjp_name="entry_vjp",
-    extra_cflags=[],
+    extra_cflags=default_cflags,
 ):
     mod = cpp_string_to_module(
         cpp_str, torch_extension_name, entry_name, entry_vjp_name, extra_cflags

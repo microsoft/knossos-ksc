@@ -3,6 +3,7 @@ from torch import nn
 import os
 from collections import OrderedDict
 from ksc import utils
+import ksc.compile
 import ksc.expr as expr
 from ksc.type import Type
 from ksc.torch_frontend import (
@@ -55,21 +56,15 @@ def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
 
-embedded_cflags = [
-    "-std=c++17",
-    "-g",
-    "-O3",
-    # "-DKS_BOUNDS_CHECK",
-]
+embedded_cflags = ksc.compile.default_cflags
 
 
-embedded_cflags_opts = [
-    "-march=native",
-    "-funroll-loops",
-    "-ffast-math",
-    "-mprefer-vector-width=512",
-]
+embedded_cflags_opts = ksc.compile.CFlags.GCCOnly(
+    ["-march=native", "-funroll-loops", "-ffast-math", "-mprefer-vector-width=512",]
+)
 
+
+mtune_cflags = ksc.compile.CFlags.GCCOnly(["-mtune=native"])
 
 cpp_mask_bool_to_float = """
         #include "knossos.h"
@@ -332,7 +327,7 @@ def vrelu3_embedded_cpp_mask_flags_tune():
     return cpp_string_to_autograd_function(
         cpp_mask + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_flags_tune",
-        extra_cflags=embedded_cflags + embedded_cflags_opts + ["-mtune=native"],
+        extra_cflags=embedded_cflags + embedded_cflags_opts + mtune_cflags,
     )
 
 
@@ -348,7 +343,7 @@ def vrelu3_embedded_cpp_mask_bool_to_float_flags_tune():
     return cpp_string_to_autograd_function(
         cpp_mask_bool_to_float + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_bool_to_float_flags_tune",
-        extra_cflags=embedded_cflags + embedded_cflags_opts + ["-mtune=native"],
+        extra_cflags=embedded_cflags + embedded_cflags_opts + mtune_cflags,
     )
 
 
