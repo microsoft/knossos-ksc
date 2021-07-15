@@ -152,7 +152,8 @@ lift_if_rules = (
 def rename_to_avoid_capture(
     bound_var: Var, body: Expr, exprs_not_to_capture: Iterable[Expr]
 ) -> Tuple[Var, Expr]:
-    # Avoid capturing any identically-named (but different) variable in exprs_not_to_capture
+    # Rename bound_var in body to avoid capturing any identically-named
+    # (but different) variable in exprs_not_to_capture.
     if any(
         bound_var.name in replacement_subexp.free_vars_
         for replacement_subexp in exprs_not_to_capture
@@ -193,7 +194,8 @@ class ParsedLetLifter(ParsedRuleMatcher):
 
     def __init__(self, rule: Rule, **kwargs):
         super().__init__(rule, **kwargs)
-        assert frozenset(self._arg_types.keys()).issuperset(["rhs", "body"])
+        assert "rhs" in self._arg_types.keys()
+        assert "body" in self._arg_types.keys()
 
     def apply_at(self, ewp: ExprWithPath, **substs: VariableSubstitution) -> Expr:
         exprs_not_to_capture = [
