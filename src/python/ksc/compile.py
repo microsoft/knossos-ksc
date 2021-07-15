@@ -8,7 +8,8 @@ from tempfile import gettempdir
 
 from torch.utils import cpp_extension
 
-from ksc import utils
+from ksc import cgen, utils
+from ksc.parse_ks import parse_ks_filename
 
 preserve_temporary_files = False
 
@@ -52,6 +53,7 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
         e = subprocess.run(ksc_command, capture_output=True, check=True,)
         print(e.stdout.decode("ascii"))
         print(e.stderr.decode("ascii"))
+        decls = list(parse_ks_filename(fkso.name))
     except subprocess.CalledProcessError as e:
         print(f"Command failed:\n{' '.join(ksc_command)}")
         print(f"files {fks.name} {fkso.name} {fcpp.name}")
@@ -62,7 +64,7 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
 
     # Read from CPP back to string
     with open(fcpp.name) as f:
-        out = f.read()
+        generated_cpp = f.read()
 
     # only delete these file if no error
     if not preserve_temporary_files:
@@ -79,7 +81,7 @@ def generate_cpp_from_ks(ks_str, use_aten=False):
             os.unlink(fcpp.name)
             os.unlink(fkso.name)
 
-    return out
+    return generated_cpp, decls
 
 
 def build_py_module_from_cpp(cpp_str, profiling=False, use_aten=False):
@@ -156,22 +158,23 @@ def generate_cpp_for_py_module_from_ks(
         return structured_name.mangled()
 
     bindings = [
-        (python_name, utils.encode_name(mangled_with_type(structured_name)))
-        for (python_name, structured_name) in bindings_to_generate
+        (python_name, "ks::entry_points::generated::" + python_name)
+        for (python_name, _) in bindings_to_generate
     ]
 
-    cpp_ks_functions = generate_cpp_from_ks(ks_str, use_aten=use_aten)
+    cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, use_aten=use_aten)
+    cpp_entry_points = cgen.generate_cpp_entry_points(bindings_to_generate, decls)
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
     )
 
-    return cpp_ks_functions + cpp_pybind_module_declaration
+    return cpp_ks_functions + cpp_entry_points + cpp_pybind_module_declaration
 
 
 def generate_cpp_pybind_module_declaration(bindings_to_generate, python_module_name):
     def m_def(python_name, cpp_name):
         return f"""
-        m.def("{python_name}", ks::entry_points::with_ks_allocator("{cpp_name}", &ks::{cpp_name}));
+        m.def("{python_name}", &{cpp_name});
         """
 
     return (
