@@ -31,7 +31,9 @@ def entry_point_cpp_type(t, use_torch):
     elif t.is_tuple:
         return (
             "ks::Tuple<"
-            + ", ".join(entry_point_cpp_type(child) for child in t.tuple_elems())
+            + ", ".join(
+                entry_point_cpp_type(child, use_torch) for child in t.tuple_elems()
+            )
             + ">"
         )
     elif t.is_tensor:
