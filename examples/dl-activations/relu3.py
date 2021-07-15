@@ -64,7 +64,7 @@ def vrelu3_embedded_ks_checkpointed_map():
 
 
 embedded_cpp_entry_points = """
-#include "knossos-entry-points.h"
+#include "knossos-entry-points-torch.h"
 
 torch::Tensor entry(torch::Tensor t) {
     using namespace ks::entry_points;
