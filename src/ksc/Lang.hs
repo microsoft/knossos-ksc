@@ -990,6 +990,7 @@ pprPrimFun = \case
   P_buildFromSparseTupled -> text "buildFromSparseTupled"
   P_fold -> text "fold"
   P_map -> text "map"
+  P_map2 -> text "map2"
   P_index -> text "index"
   P_shape -> text "shape"
   P_size -> text "size"
@@ -1432,6 +1433,7 @@ data PrimFun = P_inline
              | P_buildFromSparse
              | P_buildFromSparseTupled
              | P_map
+             | P_map2
              | P_fold
              | P_index
              | P_shape
@@ -1489,6 +1491,7 @@ toPrimFun = \case
   "buildFromSparseTupled" -> Just P_buildFromSparseTupled
   "fold" -> Just P_fold
   "map" -> Just P_map
+  "map2" -> Just P_map2
   "index" -> Just P_index
   "shape" -> Just P_shape
   "size" -> Just P_size

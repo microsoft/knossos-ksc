@@ -1,7 +1,8 @@
-wheel==0.36.2
-editdistance==0.5.3
-numpy==1.20.2
+# Inherited from src/python
+# wheel==0.36.2
+# sexpdata==0.0.3
+# numpy==1.21.0
+# editdistance==0.5.3
+# torch==1.9.0+cu111
 pytest==6.2.3
 pytest-benchmark==3.4.1
-sexpdata==0.0.3
-torch==1.8.1+cu111

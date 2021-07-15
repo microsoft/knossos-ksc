@@ -10,6 +10,7 @@ from ksc.expr import (
     Call,
     Const,
     Var,
+    Def,
 )
 
 from ksc.parse_ks import s_exps_from_string, parse_structured_name
@@ -68,8 +69,27 @@ def test_free_vars():
 
 def test_free_vars_lam():
     x = Var("x", Type.Float)
-    xdecl = Var("x", Type.Float, decl=True)
     y = Var("y", Type.Float)
 
-    assert Lam(xdecl, y).free_vars_ == frozenset(["y"])
-    assert Lam(xdecl, x).free_vars_ == frozenset()
+    assert Lam(x, y).free_vars_ == frozenset(["y"])
+    assert Lam(x, x).free_vars_ == frozenset()
+
+
+def test_eq():
+    # This documents current behaviour and is not intended as a statement of desired behaviour.
+    assert Var("x", Type.Float) == Var("x")
+
+    # For Lam's, we *do* require different types, as these are different functions
+    assert Lam(Var("x", Type.Float), Var("x")) != Lam(Var("x", Type.Integer), Var("x"))
+    foo = StructuredName.from_str("foo")
+    assert Def(foo, Type.Float, [Var("x", Type.Float)], Const(3.0)) != Def(
+        foo, Type.Float, [Var("x", Type.Integer)], Const(3.0)
+    )
+
+    # Also check Def's distinguish on return type
+    assert Const(3.0) == Const(3)  # TODO we should check type_ in Expr.__eq__ (#941).
+    bar = StructuredName.from_str("bar")
+    assert Def(bar, Type.Float, [], Const(3.0)) != Def(bar, Type.Integer, [], Const(3))
+
+    # ...even tho Lam's don't
+    assert Lam(Var("x", Type.Float), Const(3.0)) == Lam(Var("x", Type.Float), Const(3))

@@ -32,10 +32,10 @@ def tld(s):
 
 
 def test_parses():
-    Var_a_Float = Var("a", Type.Float, True)
-    Var_b_Float = Var("b", Type.Float, True)
-    Var_a = Var("a", None, False)
-    Var_b = Var("b", None, False)
+    Var_a_Float = Var("a", Type.Float)
+    Var_b_Float = Var("b", Type.Float)
+    Var_a = Var("a", None)
+    Var_b = Var("b", None)
     f = make_structured_name("f")
 
     assert tld("(def f Float () 1.1)") == Def(f, Type.Float, [], Const(1.1))
@@ -77,10 +77,10 @@ def test_parses():
 
 
 def test_expr():
-    Var_a_Float = Var("a", Type.Float, True)
-    Var_a = Var("a", None, False)
-    Var_b = Var("b", None, False)
-    Var_a1 = Var("a", None, False)
+    Var_a_Float = Var("a", Type.Float)
+    Var_a = Var("a", None)
+    Var_b = Var("b", None)
+    Var_a1 = Var("a", None)
 
     l = Lam(Var_a_Float, Var_a)
     l1 = Lam(Var_a_Float, Var_a1)

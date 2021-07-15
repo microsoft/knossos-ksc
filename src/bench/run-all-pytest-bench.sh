@@ -1,5 +1,11 @@
-# TODO: this should be a makefile.  fred.csv: fred.py etc
-# BENCH=src/bench/run-bench.py
+export PYTHONPATH="./src/python"
 
-#pytest src/bench/ --benchmark-sort=name --benchmark-group-by=group,func --modulepath=examples/dl-activations/relu3 --benchmarkname=vrelu3 --benchmark-autosave
-pytest src/bench/ --benchmark-sort=name --benchmark-group-by=group,func --modulepath=examples/dl-capsule/sqrl --benchmarkname=sqrl --benchmark-autosave
+# TODO: this should be a makefile.  fred.csv: fred.py etc
+BENCH="pytest src/bench/ \
+        --benchmark-autosave --benchmark-max-time=5.0\
+        --benchmark-name=short --benchmark-sort=name --benchmark-group-by=group,func\
+        --benchmark-columns=median,iqr,outliers,mean,stddev,min,max,iterations,rounds"
+
+# $BENCH --modulepath=examples/dl-activations/relu3 --benchmarkname=vrelu3
+$BENCH --modulepath=examples/dl-capsule/sqrl --benchmarkname=sqrl
+$BENCH --modulepath=examples/dl-activations/gelu --benchmarkname=vgelu

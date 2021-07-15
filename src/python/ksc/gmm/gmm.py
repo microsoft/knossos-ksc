@@ -46,7 +46,7 @@ def constructL(d, icf):
         nelems = d - i - 1
         col = np.concatenate(
             [
-                np.zeros(i + 1, dtype=np.float64),
+                np.zeros(i + 1),
                 icf[constructL.Lparamidx : (constructL.Lparamidx + nelems)],
             ]
         )

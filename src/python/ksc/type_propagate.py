@@ -83,9 +83,7 @@ def _type_propagate_helper(ex: ASTNode, symtab, respect_existing: bool):
 # [rev [fwd f]] : ((S, dS), dT) -> (dS, dS)
 
 
-def infer_fn_type_from_derived_fn_args(
-    sname: StructuredName, argtype: Type
-) -> StructuredName:
+def infer_fn_type_from_derived_fn_args(sname: StructuredName, argtype: Type) -> Type:
     if sname.is_derivation():
         derivation = sname.se[0]
 
@@ -237,12 +235,9 @@ def _(ex, symtab, respect_existing):
 
 @_type_propagate_helper.register(Var)
 def _(ex, symtab, respect_existing):
-    if ex.decl:
-        assert ex.type_ != None
-    else:
-        if ex.name not in symtab:
-            raise KSTypeError(f"Unknown symbol {ex.name}")
-        ex.type_ = symtab[ex.name]
+    if ex.name not in symtab:
+        raise KSTypeError(f"Unknown symbol {ex.name}")
+    ex.type_ = symtab[ex.name]
     return ex
 
 

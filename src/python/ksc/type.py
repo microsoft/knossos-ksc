@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Optional
 
 
 class KSTypeError(RuntimeError):
@@ -14,6 +15,12 @@ class Type:
         Lam S T
         LM  S T
     """
+
+    String: "Type"
+    Float: "Type"
+    Integer: "Type"
+    Bool: "Type"
+    Any: "Type"
 
     node_kinds = {
         "Tensor": 2,  # two children (Rank, Type)
@@ -289,14 +296,6 @@ def make_tuple_if_many(types):
         return types
 
 
-Type.String = Type("String")
-Type.Integer = Type("Integer")
-Type.Float = Type("Float")
-Type.Bool = Type("Bool")
-Type.String = Type("String")
-Type.Any = Type("Any")
-
-
 class SizeType:
     @staticmethod
     def from_rank(n: int) -> Type:
@@ -306,7 +305,7 @@ class SizeType:
             return Type.Tuple(*tuple(Type.Integer for _ in range(n)))
 
     @staticmethod
-    def get_rank(ty: Type) -> int:
+    def get_rank(ty: Type) -> Optional[int]:
         if ty == Type.Integer:
             return 1
         if ty.is_tuple and all(ty == Type.Integer for ty in ty.tuple_elems()):
@@ -348,3 +347,10 @@ def shape_type(t: Type) -> Type:
             return Type.Tensor(t.tensor_rank, shape_type(t.tensor_elem_type))
 
     raise NotImplementedError
+
+
+Type.String = Type("String")
+Type.Float = Type("Float")
+Type.Integer = Type("Integer")
+Type.Bool = Type("Bool")
+Type.Any = Type("Any")

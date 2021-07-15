@@ -2,8 +2,11 @@
 Expr: lightweight classes implementing the Knossos IR
 """
 
-from typing import FrozenSet, List, Tuple, Union
+from typing import FrozenSet, List, Tuple, Union, Optional
 from dataclasses import dataclass
+
+from prettyprinter import pformat
+
 from ksc.type import Type
 from ksc.utils import paren, KRecord
 
@@ -42,10 +45,10 @@ from ksc.utils import paren, KRecord
 #          value      value'
 #
 # Var: Variable use or declaration (with type)
-# (add x 1.234)  ; use of var, decl=false, type is None or propagated
+# (add x 1.234)  ; use of var, type is None or propagated
 #      ^
 #      name
-# (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+# (lam (x :    Float) ...)  ; decl of var, type is known at parse time
 #       ^      ^^^^^
 #       name   type
 #
@@ -111,6 +114,7 @@ class StructuredName:
             return self.se
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[0] + "$" + self.se[1].mangled()
 
         assert isinstance(self.se[1], Type)
@@ -124,12 +128,13 @@ class StructuredName:
             return False
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[1].has_type()
 
         assert isinstance(self.se[1], Type)
         return True
 
-    def get_type(self) -> Type:
+    def get_type(self) -> Optional[Type]:
         """
         If the innermost se is a type, return it, else None
         """
@@ -137,12 +142,13 @@ class StructuredName:
             return None
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[1].get_type()
 
         assert isinstance(self.se[1], Type)
         return self.se[1]
 
-    def add_type(self, ty) -> ("StructuredName", Type):
+    def add_type(self, ty) -> Tuple["StructuredName", Optional[Type]]:
         """
         Return a new structured name, with "ty" inserted in the corner, returning the old type if any
         sn = parse("[shape [rev foo]]")
@@ -153,9 +159,11 @@ class StructuredName:
         if isinstance(self.se, str):
             return StructuredName((self.se, ty)), None
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             new_sn, old_ty = self.se[1].add_type(ty)
             return StructuredName((self.se[0], new_sn)), old_ty
 
+        assert isinstance(self.se[1], Type)
         old_ty = self.se[1]
         return StructuredName((self.se[0], ty)), old_ty
 
@@ -170,6 +178,7 @@ class StructuredName:
             return self.se
 
         if self.is_derivation():
+            assert isinstance(self.se[1], StructuredName)  # typechecking
             return self.se[0] + "$" + self.se[1].mangle_without_type()
 
         return self.se[0]
@@ -223,13 +232,16 @@ class ASTNode(KRecord):
         super().__init__(**kwargs)
 
     def __str__(self):
-        def to_str(v):
-            if isinstance(v, list):
-                # str() on list contains repr() of elements
-                return "[" + (", ".join([to_str(e) for e in v])) + "]"
-            return str(v)
+        # This registers the various handlers, we don't call it directly.
+        # Can't be at toplevel because it imports ksc.expr.
+        from ksc import prettyprint
 
-        nodes = (to_str(getattr(self, nt)) for nt in self.__annotations__)
+        return pformat(self)
+
+    def __repr__(self):
+        # This does not satisfy the general contract of `__repr__` to return python
+        # code that reproduces the object. But it is still useful for dobugging.
+        nodes = (repr(getattr(self, nt)) for nt in self.__annotations__)
         return paren(type(self).__name__ + " " + " ".join(nodes))
 
 
@@ -263,6 +275,22 @@ class Def(ASTNode):
     def __init__(self, name, return_type, args, body):
         assert isinstance(name, StructuredName)
         super().__init__(name=name, return_type=return_type, args=args, body=body)
+
+    def __repr__(self):
+        elems = [
+            self.name,
+            self.return_type,
+            "[" + ", ".join([arg.decl_str() for arg in self.args]) + "]",
+            self.body,
+        ]
+        return paren("Def " + " ".join([str(e) for e in elems]))
+
+    def __eq__(self, other):
+        # KRecord's default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # See #941. TODO remove this when migrated from KRecord to dataclass.
+        return super().__eq__(other) and all(
+            a.type_ == oa.type_ for a, oa in zip(self.args, other.args)
+        )
 
 
 class EDef(ASTNode):
@@ -346,7 +374,7 @@ class Const(Expr):
     def __init__(self, value: ConstantType):
         super().__init__(type_=Type.fromValue(value), value=value)
 
-    def __str__(self):
+    def __repr__(self):
         return repr(self.value)
 
 
@@ -354,26 +382,25 @@ class Var(Expr):
     """Var(name, type, decl). 
     Examples:
     ```
-    (add x 1.234)  ; use of var, decl=false, type is None or propagated
+    (add x 1.234)  ; use of var, type is None or propagated
          ^
          name
-    (lam (x :    Float) ...)  ; decl of var, decl=true, type is known at parse time
+    (lam (x :    Float) ...)  ; decl of var, type is known at parse time
           ^      ^^^^^
           name   type
     ```
     """
 
     name: str
-    decl: bool
 
-    def __init__(self, name, type=None, decl=False):
-        super().__init__(type_=type, name=name, decl=decl)
+    def __init__(self, name, type=None):
+        super().__init__(type_=type, name=name)
 
-    def __str__(self):
-        if self.decl:
-            return self.name + " : " + str(self.type_)
-        else:
-            return self.name
+    def __repr__(self):
+        return self.name  # Omit "(Var )" and don't show type
+
+    def decl_str(self):
+        return self.name + " : " + str(self.type_)
 
 
 class Call(Expr):
@@ -412,8 +439,16 @@ class Lam(Expr):
     body: Expr
 
     def __init__(self, arg, body, type=None):
-        assert arg.decl
+        assert arg.type_ is not None
         super().__init__(arg=arg, body=body, type_=type)
+
+    def __repr__(self):
+        return paren("Lam " + " ".join([self.arg.decl_str(), str(self.body)]))
+
+    def __eq__(self, other):
+        # KRecord's default for Var's (and other Exprs) is not to check type_ as it is "inherited" from a superclass.
+        # See #941. TODO remove this when migrated from KRecord to dataclass.
+        return super().__eq__(other) and self.arg.type_ == other.arg.type_
 
 
 class Let(Expr):
@@ -511,7 +546,7 @@ def pystr(expr, indent):
 
 
 @pystr.register(Type)
-def _(ty, indent):
+def pystr_Type(ty, indent):
     if ty.is_scalar:
         return ty.kind
     elems = [pystr(c, indent + 1) for c in ty.children]
@@ -519,18 +554,18 @@ def _(ty, indent):
 
 
 @pystr.register(StructuredName)
-def _(sn, indent):
+def pystr_StructuredName(sn, indent):
     return pyname(sn.mangled())
 
 
 @pystr.register(Def)
-def _(ex, indent):
+def pystr_Def(ex, indent):
     indent += 1
     return (
         "def "
         + pystr(ex.name, indent)
         + "("
-        + pystr_intercomma(indent, ex.args)
+        + ", ".join([pyname(a.name) + ": " + pystr(a.type_, indent) for a in ex.args])
         + ") -> "
         + pystr(ex.return_type, indent)
         + ":"
@@ -540,7 +575,7 @@ def _(ex, indent):
 
 
 @pystr.register(EDef)
-def _(ex, indent):
+def pystr_EDef(ex, indent):
     indent += 1
     return (
         "#edef "
@@ -553,13 +588,13 @@ def _(ex, indent):
 
 
 @pystr.register(GDef)
-def _(ex, indent):
+def pystr_GDef(ex, indent):
     indent += 1
     return "#gdef " + ex.derivation + " " + str(ex.function_name)
 
 
 @pystr.register(Rule)
-def _(ex, indent):
+def pystr_Rule(ex, indent):
     indent += 1
     return (
         "@rule\ndef "
@@ -579,26 +614,23 @@ def _(ex, indent):
 
 
 @pystr.register(Const)
-def _(ex, indent):
+def pystr_Const(ex, indent):
     return repr(ex.value)
 
 
 @pystr.register(Var)
-def _(ex, indent):
-    if ex.decl:
-        return pyname(ex.name) + ": " + pystr(ex.type_, indent)
-    else:
-        return pyname(ex.name)
+def pystr_Var(ex, indent):
+    return pyname(ex.name)
 
 
 @pystr.register(Call)
-def _(ex, indent):
+def pystr_Call(ex, indent):
     indent += 1
     return pystr(ex.name, indent) + "(" + pystr_intercomma(indent, ex.args) + ")"
 
 
 @pystr.register(Lam)
-def _(ex, indent):
+def pystr_Lam(ex, indent):
     indent += 1
     return (
         "lambda "
@@ -612,7 +644,7 @@ def _(ex, indent):
 
 
 @pystr.register(Let)
-def _(ex, indent):
+def pystr_Let(ex, indent):
     if isinstance(ex.vars, list):
         var_str = ",".join(pystr(v, indent) for v in ex.vars)
     else:
@@ -627,7 +659,7 @@ def _(ex, indent):
 
 
 @pystr.register(If)
-def _(ex, indent):
+def pystr_If(ex, indent):
     return (
         "("
         + pystr(ex.t_body, indent + 2)
@@ -641,7 +673,7 @@ def _(ex, indent):
 
 
 @pystr.register(Assert)
-def _(ex, indent):
+def pystr_Assert(ex, indent):
     indent += 1
     return (
         "assert(" + pystr(ex.cond, indent) + ")" + nl(indent) + pystr(ex.body, indent)

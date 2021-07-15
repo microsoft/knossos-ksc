@@ -1,8 +1,7 @@
 from functools import singledispatch
-from typing import Union
+from typing import Union, Type
 
-from ksc.expr import ConstantType, StructuredName, Expr, Const, Call, Var
-from ksc.type import Type
+from ksc.expr import ConstantType, StructuredName, Expr, Const, Call
 
 # Note: filter_term
 # A term that allows a quick-rejection test of whether an expression matches a template or another expression.
@@ -10,7 +9,7 @@ from ksc.type import Type
 # if get_filter_term(expr1) == get_filter_term(expr2) ---> they might match
 #    get_filter_term(expr1) != get_filter_term(expr2) ---> they definitely don't match
 # Moreover, the design aims to optimize the frequency of detecting non-matches.
-FilterTerm = Union[Type, ConstantType, StructuredName]
+FilterTerm = Union[Type[Expr], ConstantType, StructuredName]
 
 
 @singledispatch

@@ -9,6 +9,7 @@ from ksc.rewrites import (
     inline_var,
     delete_let,
     parse_rule_str,
+    rewrite_seq_to_exprs,
 )
 from ksc.parse_ks import parse_expr_string, parse_ks_file
 from ksc.type import Type, KSTypeError
@@ -434,3 +435,43 @@ def test_rule_pickling():
 
     r = pickle.loads(pickle.dumps(inline_var))
     assert r is inline_var
+
+
+def test_rewrite_seq_to_exprs(prelude_symtab):
+    from ksc import rewrites_prelude
+
+    foo_def = utils.single_elem(
+        list(parse_ks_file("(def foo Float (x : Integer) (add 2.0 (to_float x)))"))
+    )
+    start_expr = parse_expr_string("(foo 4)")
+    seq, expected = zip(
+        (["inline_call", []], "(let (x 4) (add 2.0 (to_float x)))"),
+        (
+            ["inline_var", ["let_body", "call_args[1]", "call_args[0]"]],
+            "(let (x 4) (add 2.0 (to_float 4)))",
+        ),
+        (["delete_let", []], "(add 2.0 (to_float 4))"),
+        (["cfold_to_float@i", ["call_args[1]"]], "(add 2.0 4.0)"),
+        (["cfold_add@ff", []], "6.0"),
+    )
+    expected_exprs = [parse_expr_string(s) for s in expected]
+    type_propagate_decls([foo_def, start_expr] + expected_exprs, prelude_symtab)
+
+    actual = rewrite_seq_to_exprs(start_expr, {foo_def.name: foo_def}, seq)
+
+    assert actual == expected_exprs
+
+
+def test_rewrite_seq_to_exprs_bad_seq():
+    expr = parse_expr_string("(let (x 4) (add x y))")
+
+    # Sanity check: inlining x is ok
+    rewrite_seq_to_exprs(expr, {}, [["inline_var", ["let_body", "call_args[0]"]]])
+
+    # Inlining y is not - the location is valid, but the rule does not apply:
+    with pytest.raises(ValueError, match="Rule inline_var did not apply at"):
+        rewrite_seq_to_exprs(expr, {}, [["inline_var", ["let_body", "call_args[1]"]]])
+
+    # This rewrite has an invalid path i.e. that does not even identify a subexpression:
+    with pytest.raises(ValueError, match="Path.*not valid within expression"):
+        rewrite_seq_to_exprs(expr, {}, [["inline_var", ["let_body", "call_args[2]"]]])

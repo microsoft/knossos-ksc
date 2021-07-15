@@ -205,12 +205,12 @@ allocatorUsageOfCType = \case
   LMVariant _    -> UsesAllocator
 
 -- CGenResult is (C declarations, C expression, CType)
--- e.g. (["double r; if (b) { r = 1; } else { r = 2; };"],
+-- e.g. (["ks::Float r; if (b) { r = 1; } else { r = 2; };"],
 --       "r",
---       TypeDouble)
+--       TypeFloat)
 -- e.g. ([],         -- simple constant needs no pre-declaration
 --       "1.0",      -- this is what we use at the occurrence
---       TypeDouble)
+--       TypeFloat)
 -- e.g. (["typedef LM::HCat<LM::VCat<LM::One, LM::Zero>,LM::Zero> v12_t;",
 --        "v12_t v12 = v12_t::mk(a,b);"]
 --       "v12",      -- this is what we use at the occurrence
@@ -246,7 +246,7 @@ generateCGRE = \case
   CGREDummy cty -> cgenType cty ++ "{}"
   CGREKonst k   -> cgenKonst k
   CGREVar v     -> cgenVar v
-  CGRETuple rs  -> "ks::make_tuple("
+  CGRETuple rs  -> "ks::make_Tuple("
                    ++ intercalate "," (map generateCGRE rs)
                    ++ ")"
 
@@ -693,7 +693,7 @@ funAllocatorUsage tf ty
 cgenType :: HasCallStack => CType -> String
 cgenType = \case
   CType  ty -> cgenTypeLang ty
-  CTuple ts -> "tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
+  CTuple ts -> "ks::Tuple<" ++ intercalate "," (map cgenType ts) ++ ">"
   CFunction s t ->
     "std::function<" ++ cgenType t ++ "(" ++ cgenType s ++ ")>"
   TypeDef s _     -> s
@@ -714,13 +714,13 @@ cgenType = \case
 
 cgenTypeLang :: HasCallStack => Type -> String
 cgenTypeLang = \case
-  TypeFloat     -> "double" -- TODO: make these all ks_Float etc, and add typedefs in knossos.h
-  TypeInteger   -> "int"
-  TypeString    -> "std::string"
-  TypeTuple ts  -> "tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
-  TypeTensor d t -> "tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
-  TypeBool      -> "bool"
-  TypeUnknown   -> "void"
+  TypeFloat      -> "ks::Float"
+  TypeInteger    -> "ks::Integer"
+  TypeString     -> "ks::String"
+  TypeTuple ts   -> "ks::Tuple<" ++ intercalate "," (map cgenTypeLang ts) ++ ">"
+  TypeTensor d t -> "ks::tensor<" ++ show d ++ ", " ++ cgenTypeLang t ++ ">"
+  TypeBool       -> "ks::Bool"
+  TypeUnknown    -> "void"
   TypeLam from to ->
     "std::function<" ++ cgenTypeLang to ++ "(" ++ cgenTypeLang from ++ ")>"
   TypeLM s t -> error $ "LM<" ++ cgenTypeLang s ++ "," ++ cgenTypeLang t ++ ">"
@@ -785,7 +785,7 @@ ctypeofGradBuiltin f ctys = case (f, map stripTypeDef ctys) of
 cgenKonst :: Konst -> String
 cgenKonst = \case
   KInteger i -> show i
-  KFloat   f -> show f
+  KFloat   f -> "Float(" ++ show f ++ ")"
   KString  s -> show s
   KBool    b -> if b then "true" else "false"
 

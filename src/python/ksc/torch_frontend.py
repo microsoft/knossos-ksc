@@ -1,6 +1,4 @@
-# %%
-
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 from contextlib import contextmanager
 
 import functools
@@ -8,10 +6,14 @@ import numpy
 import torch
 import torch.onnx
 
-torch.set_default_dtype(torch.float64)
+torch.set_default_dtype(torch.float32)
 
 from ksc import utils
 from ksc.parse_ks import parse_ks_filename
+from ksc.compile import (
+    build_module_using_pytorch_from_ks,
+    build_module_using_pytorch_from_cpp,
+)
 
 from ksc.type import Type
 from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
@@ -27,6 +29,8 @@ from prettyprinter import cpprint, pformat
 
 # Needed this in order to see the error messages when pprint fails
 import warnings
+
+import typing
 
 warnings.filterwarnings("always")
 
@@ -58,11 +62,11 @@ def type_from_value(x):
 make_new_var_index = 0
 
 
-def make_new_var(type=None, decl=True):
+def make_new_var(type=None):
     global make_new_var_index
     name = f"ts2ks${make_new_var_index}"
     make_new_var_index += 1
-    return Var(name, type, True), Var(name, type, False)
+    return Var(name, type)
 
 
 def make_arg(input, example_input):
@@ -78,7 +82,7 @@ def make_arg(input, example_input):
         input_type = example_input_type
 
     name = mangled_name(input)
-    return Var(name, input_type, decl=True)
+    return Var(name, input_type)
 
 
 def mangled_name(node):
@@ -89,7 +93,7 @@ def from_torch_dtype(t):
     if t == torch.int64:
         return Type.Integer
 
-    if t == torch.float64:
+    if t == torch.float32:
         return Type.Float
 
     raise NotImplementedError
@@ -208,8 +212,8 @@ def make_PythonOp(node):
         print(f"Adding {function_name} to todo {todo_stack}")
         todo_stack.add(function_name)
 
-        vardecl, var = make_new_var(Type.Float)  # TODO: need to propagate properly
-        map_lambda = Lam(vardecl, Call(function_name, [var]))
+        var = make_new_var(Type.Float)  # TODO: need to propagate properly
+        map_lambda = Lam(var, Call(function_name, [var]))
 
         return (
             Var(mangled_name(value)),
@@ -272,7 +276,7 @@ def make_loop(make_binds, node):
         binds = make_binds(body_nodes[:-1])
         lam_body = make_lets(binds, var_or_constant(item))
 
-        lam = Lam(Var(mangled_name(i), Type.Integer, decl=True), lam_body)
+        lam = Lam(Var(mangled_name(i), Type.Integer), lam_body)
 
         return var_or_constant(l), Call("build", [var_or_constant(max_trip_count), lam])
 
@@ -313,7 +317,7 @@ def make_if(make_binds, node):
 
 def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
     def translate_node(make_binds, node) -> Tuple[Var, Expr]:
-        lookups = {
+        lookups: typing.Dict[str, Callable] = {
             "prim::Constant": make_constant,
             "prim::ListConstruct": make_list,
             "prim::TupleConstruct": make_tuple,
@@ -391,6 +395,9 @@ def torch_from_ks(ks_object):
     if isinstance(ks_object, tuple):
         return tuple(torch_from_ks(ks) for ks in ks_object)
 
+    if isinstance(ks_object, float):
+        return torch.tensor(ks_object)
+
     return torch.from_numpy(numpy.array(ks_object, copy=True))
 
 
@@ -407,7 +414,7 @@ def torch_to_ks(py_mod, val):
 
     if isinstance(val, torch.Tensor):
         assert (
-            val.dtype == torch.float64
+            val.dtype == torch.float32
         ), "TODO: https://github.com/microsoft/knossos-ksc/issues/691"
         if len(val.shape) == 0:
             return val.item()
@@ -436,6 +443,7 @@ def logging(py_mod, flag=True):
 
 
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
+# See https://pytorch.org/docs/stable/notes/extending.html
 def forward_template(py_mod, ctx, *args):
     py_mod.reset_allocator()
     ks_args = (torch_to_ks(py_mod, x) for x in args)
@@ -450,20 +458,19 @@ def forward_template(py_mod, ctx, *args):
     return torch_from_ks(outputs)
 
 
-def backward_template(py_mod, generate_lm, ctx, *args):
+def backward_template(py_mod, ctx, *args):
     ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
     ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
-    rev_entry = py_mod.rev_entry if generate_lm else py_mod.sufrev_entry
-    outputs = rev_entry(ks_args, ks_grad_args)
+    outputs = py_mod.entry_vjp(ks_args, ks_grad_args)
     return torch_from_ks(outputs)
 
 
-def make_KscAutogradFunction(py_mod, generate_lm):
+def make_KscAutogradFunction(py_mod):
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
     forward = lambda ctx, args: forward_template(py_mod, ctx, args)
-    backward = lambda ctx, args: backward_template(py_mod, generate_lm, ctx, args)
-    newclass = type(
+    backward = lambda ctx, args: backward_template(py_mod, ctx, args)
+    return type(
         "KscAutogradFunction_" + py_mod.__name__,
         (torch.autograd.Function,),
         {
@@ -473,10 +480,9 @@ def make_KscAutogradFunction(py_mod, generate_lm):
             "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x)),
         },
     )
-    return newclass()
 
 
-def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
+def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
@@ -494,45 +500,74 @@ def ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate):
     defs_with_derivatives = []
     for ksc_def in ksc_defs:
         defs_with_derivatives += [ksc_def]
-        if "sufrev" in derivatives_to_generate:
+        if generate_lm:
+            defs_with_derivatives += [
+                GDef("rev", ksc_def.name),
+            ]
+        else:
             defs_with_derivatives += [
                 GDef("suffwdpass", ksc_def.name),
                 GDef("sufrevpass", ksc_def.name),
                 GDef("sufrev", ksc_def.name),
             ]
-        if "fwd" in derivatives_to_generate:
-            defs_with_derivatives += [
-                GDef("fwd", ksc_def.name),
-            ]
-        if "rev" in derivatives_to_generate:
-            defs_with_derivatives += [
-                GDef("rev", ksc_def.name),
-            ]
 
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
-    arg_types = [arg.type_ for arg in entry_def.args]
-    return_type = entry_def.return_type
 
-    declarations_to_generate = [("entry", entry_def.name)] + [
-        (f"{der}_entry", StructuredName((der, entry_def.name)))
-        for der in derivatives_to_generate
-    ]
-
-    return utils.build_module_using_pytorch_from_ks(
-        ks_str, declarations_to_generate, return_type=return_type, use_aten=True,
+    return ksc_string_to_module(
+        ks_str, entry_def.name, torch_extension_name, generate_lm
     )
 
 
-def ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm=True):
-    derivatives_to_generate = ["fwd", "rev"] if generate_lm else ["sufrev"]
-    mod = ksc_defs_to_module(ksc_defs, entry_def, derivatives_to_generate)
-    return make_KscAutogradFunction(mod, generate_lm)
+def ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm):
+    der = "rev" if generate_lm else "sufrev"
+    bindings_to_generate = [
+        ("entry", entry_sn),
+        ("entry_vjp", StructuredName((der, entry_sn))),
+    ]
+    return build_module_using_pytorch_from_ks(
+        ks_str, bindings_to_generate, torch_extension_name, use_aten=True
+    )
+
+
+def cpp_string_to_module(cpp_str, torch_extension_name, entry_name, entry_vjp_name):
+    bindings_to_generate = [
+        ("entry", entry_name),
+        ("entry_vjp", entry_vjp_name),
+    ]
+    return build_module_using_pytorch_from_cpp(
+        cpp_str, bindings_to_generate, torch_extension_name, use_aten=True,
+    )
+
+
+def ksc_defs_to_autograd_function(
+    ksc_defs, entry_def, torch_extension_name, generate_lm=True
+):
+    mod = ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm)
+    return make_KscAutogradFunction(mod)
+
+
+def ksc_string_to_autograd_function(
+    ks_str, entry_sn, torch_extension_name, generate_lm=True
+):
+    mod = ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm)
+    return make_KscAutogradFunction(mod)
+
+
+def cpp_string_to_autograd_function(
+    cpp_str, torch_extension_name, entry_name="entry", entry_vjp_name="entry_vjp",
+):
+    mod = cpp_string_to_module(
+        cpp_str, torch_extension_name, entry_name, entry_vjp_name
+    )
+    return make_KscAutogradFunction(mod)
 
 
 import inspect
 
 
-def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
+def tsmod2ksmod(
+    module, function_name, torch_extension_name, example_inputs, generate_lm=True
+):
     global todo_stack
     todo_stack = {function_name}
     ksc_defs = []
@@ -549,412 +584,14 @@ def tsmod2ksmod(module, function_name, example_inputs, generate_lm=True):
                 ksc_defs.insert(0, ksc_def)
 
     entry_def = ksc_defs[-1]
-    return ksc_defs_to_autograd_function(ksc_defs, entry_def, generate_lm)
+    return ksc_defs_to_autograd_function(
+        ksc_defs, entry_def, torch_extension_name, generate_lm
+    )
 
 
-def ts2mod(function, example_inputs, generate_lm=True):
+def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
     fn = torch.jit.script(function)
     ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
-    return ksc_defs_to_autograd_function([ksc_def], ksc_def, generate_lm)
-
-
-import time
-
-
-class time_sampler:
-    def __init__(self, minimizing=False):
-        self.minimizing = minimizing
-        if self.minimizing:
-            self.time = 1e10
-        else:
-            self.time = 0
-            self.ncalls = 0
-
-    def duration(self):
-        if self.minimizing:
-            return self.time
-        else:
-            return self.time / self.ncalls
-
-    @property
-    def us(self):
-        return self.duration() * 1e6
-
-    @staticmethod
-    def get_time():
-        return time.time_ns() * 1e-9
-
-    def mark(self):
-        self.start = time_sampler.get_time()
-
-    def record(self):
-        delta = time_sampler.get_time() - self.start
-        if self.minimizing:
-            self.time = min(delta, self.time)
-        else:
-            self.time += delta
-            self.ncalls += 1
-
-
-# %%
-
-if __name__ == "__xmain__":
-    # %%
-    import math
-    import torch
-    import torch.nn.functional as F
-
-    torch.set_default_dtype(torch.float64)
-
-    do_original = False
-
-    if do_original:
-
-        def lltm_forward_py_orig(input, weights, bias, old_h, old_cell):
-            X = torch.cat([old_h, input], dim=1)
-
-            # Compute the input, output and candidate cell gates with one MM.
-            gate_weights = F.linear(X, weights, bias)
-
-            # Split the combined gate weight matrix into its components.
-            gates = gate_weights.chunk(3, dim=1)
-
-            input_gate = torch.sigmoid(gates[0])
-            output_gate = torch.sigmoid(gates[1])
-            # Here we use an ELU instead of the usual tanh.
-            candidate_cell = F.elu(gates[2])
-
-            # Compute the new cell state.
-            new_cell = old_cell + candidate_cell * input_gate
-            # Compute the new hidden state and output.
-            new_h = torch.tanh(new_cell) * output_gate
-
-            return new_h, new_cell
-
-    else:
-        # Simpler model to test zero-runtime implementation
-        def lltm_forward_py(input, weights, bias, old_h, old_cell):
-            X = torch.cat([old_h, input], dim=1)
-
-            # Compute the input, output and candidate cell gates with one MM.
-            gate_weights = F.linear(X, weights, bias)
-
-            input_gate = torch.tanh(gate_weights)
-            output_gate = torch.tanh(gate_weights)
-            candidate_cell = torch.tanh(gate_weights)
-
-            # Compute the new cell state.
-            new_cell = old_cell + candidate_cell * input_gate
-            # Compute the new hidden state and output.
-            new_h = torch.tanh(new_cell) * output_gate
-
-            return new_h, new_cell
-
-    lltm_forward = lltm_forward_py
-
-    class LLTM(torch.nn.Module):
-        def __init__(self, input_features, state_size):
-            super(LLTM, self).__init__()
-            self.input_features = input_features
-            self.state_size = state_size
-            if do_original:
-                # 3 * state_size for input gate, output gate and candidate cell gate.
-                # input_features + state_size because we will multiply with [input, h].
-                self.weights = torch.nn.Parameter(
-                    torch.empty(3 * state_size, input_features + state_size)
-                )
-                self.bias = torch.nn.Parameter(torch.empty(3 * state_size))
-            else:
-                self.weights = torch.nn.Parameter(
-                    torch.empty(state_size, input_features + state_size)
-                )
-                self.bias = torch.nn.Parameter(torch.empty(state_size))
-
-            self.reset_parameters()
-
-        def reset_parameters(self):
-            stdv = 1.0 / math.sqrt(self.state_size)
-            for weight in self.parameters():
-                weight.data.uniform_(-stdv, +stdv)
-
-        def forward(self, input, state):
-            return lltm_forward(input, self.weights, self.bias, *state)
-
-    # run it...
-    batch_size = 16
-    input_features = 32
-    state_size = 30
-
-    X = torch.randn(batch_size, input_features)
-    h = torch.randn(batch_size, state_size)
-    C = torch.randn(batch_size, state_size)
-
-    rnn = LLTM(input_features, state_size)
-
-    def myloss(X, h, c):
-        new_h, new_C = rnn(X, (h, C))
-        return new_h.sum() + new_C.sum()
-
-    def timeit(msg):
-        print("Timing: ", msg, lltm_forward)
-        forward = time_sampler()
-        backward = time_sampler()
-        nruns = 50
-        for _ in range(nruns):
-            forward.mark()
-            loss = myloss(X, h, C)
-            forward.record()
-
-            backward.mark()
-            loss.backward()
-            backward.record()
-
-        print(f"Forward: {forward.us:.3f} us | Backward {backward.us:.3f} us")
-
-    timeit("py")
-
-    lltm_forward_ts = torch.jit.script(lltm_forward_py)
-    lltm_forward = lltm_forward_ts
-    timeit("ts")
-    #%%
-    example_inputs = (X, rnn.weights, rnn.bias, h, C)
-    fn = torch.jit.script(lltm_forward_py)
-    # print(fn.graph)
-    #     graph(%input.1 : Tensor,
-    #       %weights.1 : Tensor,
-    #       %bias.1 : Tensor,
-    #       %old_h.1 : Tensor,
-    #       %old_cell.1 : Tensor):
-    #   %30 : Function = prim::Constant[name="elu"]()
-    #   %29 : bool = prim::Constant[value=0]()
-    #   %28 : float = prim::Constant[value=1.]()
-    #   %13 : Function = prim::Constant[name="linear"]()
-    #   %8 : int = prim::Constant[value=1]() # <ipython-input-4-ecbf56b83299>:7:38
-    #   %16 : int = prim::Constant[value=3]() # <ipython-input-4-ecbf56b83299>:12:31
-    #   %19 : int = prim::Constant[value=0]() # <ipython-input-4-ecbf56b83299>:14:37
-    #   %26 : int = prim::Constant[value=2]() # <ipython-input-4-ecbf56b83299>:17:33
-    #   %7 : Tensor[] = prim::ListConstruct(%old_h.1, %input.1)
-    #   %X.1 : Tensor = aten::cat(%7, %8) # <ipython-input-4-ecbf56b83299>:7:8
-    #   %gate_weights.1 : Tensor = prim::CallFunction(%13, %X.1, %weights.1, %bias.1) # <ipython-input-4-ecbf56b83299>:10:19
-    #   %gates.1 : Tensor[] = aten::chunk(%gate_weights.1, %16, %8) # <ipython-input-4-ecbf56b83299>:12:12
-    #   %20 : Tensor = aten::__getitem__(%gates.1, %19) # <ipython-input-4-ecbf56b83299>:14:31
-    #   %input_gate.1 : Tensor = aten::sigmoid(%20) # <ipython-input-4-ecbf56b83299>:14:17
-    #   %23 : Tensor = aten::__getitem__(%gates.1, %8) # <ipython-input-4-ecbf56b83299>:15:32
-    #   %output_gate.1 : Tensor = aten::sigmoid(%23) # <ipython-input-4-ecbf56b83299>:15:18
-    #   %27 : Tensor = aten::__getitem__(%gates.1, %26) # <ipython-input-4-ecbf56b83299>:17:27
-    #   %candidate_cell.1 : Tensor = prim::CallFunction(%30, %27, %28, %29) # <ipython-input-4-ecbf56b83299>:17:21
-    #   %35 : Tensor = aten::mul(%candidate_cell.1, %input_gate.1) # <ipython-input-4-ecbf56b83299>:20:26
-    #   %new_cell.1 : Tensor = aten::add(%old_cell.1, %35, %8) # <ipython-input-4-ecbf56b83299>:20:15
-    #   %39 : Tensor = aten::tanh(%new_cell.1) # <ipython-input-4-ecbf56b83299>:22:12
-    #   %new_h.1 : Tensor = aten::mul(%39, %output_gate.1) # <ipython-input-4-ecbf56b83299>:22:12
-    #   %44 : (Tensor, Tensor) = prim::TupleConstruct(%new_h.1, %new_cell.1)
-    #   return (%44)
-
-    ks_fun = ts2mod(lltm_forward_py, example_inputs=example_inputs)
-
-    def torch_from_ks(ks_object):
-        if isinstance(ks_object, tuple):
-            return tuple(torch_from_ks(ks) for ks in ks_object)
-
-        return torch.from_numpy(numpy.array(ks_object, copy=True))
-
-    class KnossosLLTMFunction(torch.autograd.Function):
-        @staticmethod
-        def forward(ctx, input, weights, bias, old_h, old_cell):
-            args = (input, weights, bias, old_h, old_cell)
-
-            ks_fun._py_mod.reset_allocator()
-            ks_args = (ks_fun.torch_to_ks(x) for x in args)
-
-            # Call it
-            outputs = ks_fun(*ks_args)
-
-            ctx.save_for_backward(*args)
-
-            return torch_from_ks(outputs)
-
-        @staticmethod
-        def backward(ctx, grad_h, grad_cell):
-            ks_args = tuple(ks_fun.torch_to_ks(x) for x in ctx.saved_tensors)
-            grad_args = (grad_h, grad_cell)
-            ks_grad_args = tuple(ks_fun.torch_to_ks(x) for x in grad_args)
-            outputs = ks_fun.rev(ks_args, ks_grad_args)
-
-            return torch_from_ks(outputs)
-
-    lltm_forward = KnossosLLTMFunction.apply
-    timeit("Knossos")
-
-    #%%
-    import torch.utils.cpp_extension
-
-    print("Compiling extension ...", end="")
-    lltm_cpp = torch.utils.cpp_extension.load(
-        name="lltm_cpp", sources=[utils.get_ksc_dir() + "/src/ts2k/ts2ks/lltm.cpp"]
+    return ksc_defs_to_autograd_function(
+        [ksc_def], ksc_def, torch_extension_name, generate_lm
     )
-    print("done.")
-
-    class LLTMFunction(torch.autograd.Function):
-        @staticmethod
-        def forward(ctx, input, weights, bias, old_h, old_cell):
-            outputs = lltm_cpp.forward(input, weights, bias, old_h, old_cell)
-            new_h, new_cell = outputs[:2]
-            variables = outputs[1:] + [weights]
-            ctx.save_for_backward(*variables)
-
-            return new_h, new_cell
-
-        @staticmethod
-        def backward(ctx, grad_h, grad_cell):
-            outputs = lltm_cpp.backward(
-                grad_h.contiguous(), grad_cell.contiguous(), *ctx.saved_tensors
-            )
-            d_old_h, d_input, d_weights, d_bias, d_old_cell = outputs
-            return d_input, d_weights, d_bias, d_old_h, d_old_cell
-
-    lltm_forward = LLTMFunction.apply
-    timeit("native")
-
-
-#%%
-
-if __name__ == "__xmain__":
-    from math import sin
-
-    torch.set_default_dtype(torch.float64)
-
-    def bar(a: int, x: float):
-        M = torch.tensor([[1.1, -x], [x + 2.1, 2.2]])
-        v = torch.tensor([2.2, 3.3])
-
-        Mv = torch.matmul(M, v)
-
-        b = torch.dot(Mv, v)
-
-        if a < 0:
-            t = -0.125 * x
-        else:
-            t = 1 / 2 * x * float(b)
-        return sin(t) * t
-
-    def foofilter(xs: torch.Tensor):
-        t = torch.zeros(xs.shape)
-        for n, x in enumerate(xs):
-            if x < 0:
-                t[n] = -0.125 * x
-            else:
-                t[n] = 1 / (n + 1) * x ** 2
-
-        return torch.mean(torch.sin(t) * t)
-
-    def foofilter_comp(xs: torch.Tensor):
-        t = torch.tensor(
-            [
-                (-0.125 * x if x < 0.0 else 1 / (n + 1) * x ** 2).item()
-                for n, x in enumerate(xs)
-            ]
-        )
-        return torch.mean(torch.sin(t) * t)
-
-    def foofilter_mask(x: torch.Tensor):
-        mask = x < 0
-        t = mask * (-0.125 * x) + (1 - mask) * 1 / 2 * x ** 2
-        return torch.mean(torch.sin(t) * t)
-
-    x_example = torch.rand((23,))
-
-    fn = torch.jit.script(foofilter_comp)
-    print(fn.code)
-    # print(fn(x_example))
-
-    # #AWF: TODO: check "training" attribute -- does that enable faster AD?
-    # with open("/tmp/t.onnx", "w") as temp:
-    #     torch.onnx.export(model=fn,
-    #                   args=x_example,
-    #                   example_outputs=fn(x_example),
-    #                   f=temp,
-    #                   verbose=True)
-    print(fn.graph)
-    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x_example,))
-    cpprint(ks_str)
-
-    ks_fun = ts2mod(foofilter_comp, example_inputs=(x_example,))
-
-
-if __name__ == "__main__":
-    print("\n\n*************************\n\n")
-
-    # "Squared Leaky Relu"?
-    def squirrel(x: torch.Tensor):
-        y = torch.mean(x)
-        if y < 0.0:
-            t = -0.125 * x
-        else:
-            t = 1 / 2 * x ** 2
-        return torch.mean(torch.sin(t) * t)
-
-    # Compile function and gradients for example input of ones(2,3)
-    x_example = torch.ones((2, 3))
-
-    fn = torch.jit.script(squirrel)
-    print(fn.code)
-    ks_str = ts2ks_fromgraph(False, fn.name, fn.graph, (x_example,))
-    cpprint(ks_str)
-
-    # Compile function and gradients for example input of ones(2,3)
-    x_example = torch.ones((2, 3))
-    ks_fun = ts2mod(squirrel, example_inputs=(x_example,))
-
-    # Call the function at different, interesting inputs
-    x = torch.rand((4, 4))  # TODO: check non-square
-
-    ans = squirrel(x)
-    print("Python answer = ", ans.numpy())
-
-    ts_squirrel = torch.jit.script(squirrel)
-    print("TorchScript answer = ", ts_squirrel(x).numpy())
-
-    kx = ks_fun.torch_to_ks(x)
-    ans = ks_fun(kx)
-    print("Knossos answer = ", ans)
-
-    # Compute the gradient
-    ans = ks_fun.rev(kx, 1.0)
-    ansnp = numpy.array(ans, copy=False)
-    print("Knossos gradient = \n", ansnp)
-
-    # Compute the gradient using torch
-    xtrace = x.clone().detach().requires_grad_(True)
-    y = squirrel(xtrace)
-    dy = torch.autograd.grad(y, xtrace)
-    print("Torch gradient = \n", dy[0].numpy())
-
-    print("Gradient diff = \n", ansnp - dy[0].numpy())
-
-    # print(f"Knossos mem: {ks_fun._py_mod.allocator_top()}/{ks_fun._py_mod.allocator_peak()}")
-    import timeit
-
-    def time_ks(n):
-        x = torch.rand((n, n))
-        ks_fun._py_mod.reset_allocator()
-        kx = ks_fun.torch_to_ks(x)
-        ans = ks_fun.rev(kx, 1.0)
-        # print(numpy.array(ans, copy=False))
-
-    def time_pytorch(n):
-        x = torch.rand((n, n))
-        x.requires_grad_(True)
-        y = ts_squirrel(x)
-        dy = torch.autograd.grad(y, x)
-        # print(dy)
-
-    size = 4
-    ntimes = 10000
-    print("time_ks= ", timeit.timeit(lambda: time_ks(size), number=ntimes))
-    print("time_pt= ", timeit.timeit(lambda: time_pytorch(size), number=ntimes))
-
-    # Next:
-    #  - foofilter
-
-
-# %%

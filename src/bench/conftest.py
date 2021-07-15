@@ -5,6 +5,8 @@ import importlib
 import inspect
 import torch
 import os
+import re
+
 from pathlib import Path
 from collections import namedtuple
 from contextlib import contextmanager
@@ -16,10 +18,16 @@ from ksc import utils
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--modulepath", action="store", help="path of module to dynamically load"
+        "--modulepath",
+        action="store",
+        default="examples/dl-activations/relu3",
+        help="path of module to dynamically load",
     )
     parser.addoption(
-        "--benchmarkname", action="store", help="name of benchmark to dynamically load"
+        "--benchmarkname",
+        action="store",
+        default="vrelu3",
+        help="name of benchmark to dynamically load",
     )
 
 
@@ -86,28 +94,42 @@ def function_to_manual_cuda_benchmarks(func):
     )
 
 
-def functions_to_benchmark(mod, benchmark_name, example_inputs):
-    for fn in inspect.getmembers(
-        mod, lambda m: inspect.isfunction(m) and m.__name__.startswith(benchmark_name)
-    ):
-        fn_name, fn_obj = fn
-        if fn_name == benchmark_name + "_bench_configs":
-            continue
-        elif fn_name == benchmark_name + "_pytorch":
-            yield from function_to_torch_benchmarks(fn_obj)
-
-        elif fn_name == benchmark_name + "_pytorch_nice":
-            yield BenchmarkFunction("PyTorch Nice", fn_obj)
-        elif fn_name == benchmark_name:
-            ks_mod = tsmod2ksmod(mod, benchmark_name, example_inputs, generate_lm=False)
-            yield BenchmarkFunction("Knossos", ks_mod.apply)
-        elif fn_name == benchmark_name + "_cuda_init":
-            if torch.cuda.is_available():
-                yield from function_to_manual_cuda_benchmarks(fn_obj)
-        else:
-            # perhaps we should just allow anything that matches the pattern?
-            # would make it easier to add arbitrary comparisons e.g. TF
-            print(f"Ignoring {fn_name}")
+def functions_to_benchmark(
+    mod, benchmark_name, example_inputs, torch_extension_name_base
+):
+    for fn_name, fn_obj in inspect.getmembers(mod, lambda m: inspect.isfunction(m)):
+        if fn_name.startswith(benchmark_name):
+            if fn_name == benchmark_name + "_bench_configs":
+                continue
+            elif fn_name == benchmark_name + "_pytorch":
+                yield from function_to_torch_benchmarks(fn_obj)
+            elif fn_name == benchmark_name + "_pytorch_nice":
+                yield BenchmarkFunction("PyTorch Nice", fn_obj)
+            elif fn_name == benchmark_name:
+                torch_extension_name = (
+                    "ksc_src_bench_" + torch_extension_name_base + "_" + benchmark_name
+                )
+                ks_mod = tsmod2ksmod(
+                    mod,
+                    benchmark_name,
+                    torch_extension_name,
+                    example_inputs,
+                    generate_lm=False,
+                )
+                yield BenchmarkFunction("Knossos", ks_mod.apply)
+            elif fn_name == benchmark_name + "_cuda_init":
+                if torch.cuda.is_available():
+                    yield from function_to_manual_cuda_benchmarks(fn_obj)
+            elif fn_name == benchmark_name + "_aten":
+                yield BenchmarkFunction("Aten", fn_obj())
+            elif fn_name.startswith(benchmark_name + "_embedded_"):
+                n = len(benchmark_name + "_embedded_")
+                benchmark_display_name = "Embedded " + fn_name[n:]
+                yield BenchmarkFunction(benchmark_display_name, fn_obj().apply)
+            else:
+                # perhaps we should just allow anything that matches the pattern?
+                # would make it easier to add arbitrary comparisons e.g. TF
+                print(f"Ignoring {fn_name}")
 
 
 def func_namer(benchmark_func):
@@ -123,6 +145,8 @@ def pytest_configure(config):
     benchmark_name = config.getoption("benchmarkname")
 
     module_dir, module_name = os.path.split(module_path)
+    torch_extension_name_base = os.path.basename(module_dir) + "__" + module_name
+    torch_extension_name_base = re.sub("[-.]", "_", torch_extension_name_base)
 
     with utils.add_to_path(module_dir):
         mod = importlib.import_module(module_name)
@@ -133,7 +157,9 @@ def pytest_configure(config):
 
         config.reference_func = getattr(mod, benchmark_name + "_pytorch")
         config.functions_to_benchmark = list(
-            functions_to_benchmark(mod, benchmark_name, example_inputs)
+            functions_to_benchmark(
+                mod, benchmark_name, example_inputs, torch_extension_name_base
+            )
         )
         # We want to group by tensor size, it's not clear how to metaprogram the group mark cleanly.
         # pytest meta programming conflates arguments and decoration. I've not been able to find a way to directly
