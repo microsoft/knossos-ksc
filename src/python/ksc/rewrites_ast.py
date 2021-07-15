@@ -14,6 +14,11 @@ from ksc.rewrites import (
 )
 from ksc.utils import singleton, single_elem
 
+###############################################################################
+# Lifting rules
+#   e.g. (foo a (if p x y) b) ==> (if p (foo a x b) (foo a y b))
+#   e.g. (foo (let (x e) body)) ==> (let (x e) (foo body))
+
 
 class LiftOverCall(RuleMatcher, ABC):
     """ Superclass for lifting if's or let's (or potentially other constructs) that are used as arguments to Calls. """
@@ -45,7 +50,11 @@ class LiftOverCall(RuleMatcher, ABC):
     @abstractmethod
     def build_call_replacement(self, call_node: Call, which_arg: PathElement) -> Expr:
         """ Build a new Expr which is equivalent to the call_node, but where argument <which_arg>
-            is lifted. The caller will have ensured that argument satisfies can_lift_arg(). """
+            is lifted. The caller guarantees that argument is of class <self.liftable_arg_type>. """
+
+
+###########
+# Lifting "if"
 
 
 @singleton
@@ -67,7 +76,7 @@ def can_evaluate_without_condition(e: Expr, cond: Expr, cond_value: bool) -> boo
             * evaluates to the opposite of <cond_value>,
             * raises an exception itself ? """
     # TODO: we can return True here if we are sure e cannot raise an exception.
-    # For now we'll use about the simplest test possible (tho not quite - return False would be simpler).
+    # For now we'll use almost the simplest test possible ("return False" would be simpler).
     return isinstance(e, (Var, Const))
 
 
@@ -142,10 +151,10 @@ lift_if_rules = (
 )
 
 ###########
-# Let-lifting rules, e.g. (foo (let (x e) body)) --> (let (x e) (foo body)).
+# Lifting "let"
 #
-# Here we must do extra renaming to avoid capture. For example,
-# "(foo2 (let (x e) body) x)" cannot be applied straightforwardly to give "(let (x e) (foo2 body x))" as the second argument to foo2 is captured.
+# Here, in the absence of All Binders Unique, we must do extra renaming to avoid capture. For example,
+# "(foo2 (let (x e) body) x)" must not be lifted straightforwardly to "(let (x e) (foo2 body x))" as the second argument to foo2 is captured.
 # Instead we must rename 'x' within 'body' to give something like "(let (x2 e) (foo2 body[x=>x2] x))"
 
 

@@ -8,16 +8,17 @@ from ksc.type_propagate import type_propagate, type_propagate_decls
 from ksc import utils
 
 
-lift_bind = RuleSet(lift_let_rules)
-lift_if = RuleSet(lift_if_rules)
-lift_if_or_bind = RuleSet(lift_let_rules + lift_if_rules)
+lift_bind_matcher = RuleSet(lift_let_rules)
+lift_if_matcher = RuleSet(lift_if_rules)
+lift_all_matcher = RuleSet(lift_let_rules + lift_if_rules)
 
 
 def test_lift_if(prelude_symtab):
     e = parse_expr_string("(add (if p 4.0 2.0) 3.0)")
     expected = parse_expr_string("(if p (add 4.0 3.0) (add 2.0 3.0))")
     type_propagate_decls([e, expected], {**prelude_symtab, "p": Type.Bool})
-    actual = utils.single_elem(list(lift_if.find_all_matches(e))).apply_rewrite()
+    match = utils.single_elem(list(lift_if_matcher.find_all_matches(e)))
+    actual = match.apply_rewrite()
     assert actual == expected
 
 
@@ -25,20 +26,20 @@ def test_lift_if_from_let(prelude_symtab):
     e = parse_expr_string("(let (x 4) (if (gt y 0) x 0))")
     expected = parse_expr_string("(if (gt y 0) (let (x 4) x) (let (x 4) 0))")
     type_propagate_decls([e, expected], {**prelude_symtab, "y": Type.Integer})
-    match = utils.single_elem(list(lift_if.find_all_matches(e)))
+    match = utils.single_elem(list(lift_if_matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == expected
     # Now check we can't lift out of the let if the if-condition uses the bound variable
     e = parse_expr_string("(let (x 4) (if (gt x 0) x 0))")
     type_propagate(e, prelude_symtab)
-    assert len(list(lift_if.find_all_matches(e))) == 0
+    assert len(list(lift_if_matcher.find_all_matches(e))) == 0
 
 
 def test_lift_bind(prelude_symtab):
     e = parse_expr_string("(add (let (x 4.0) (add x 2.0)) 3.0)")
     expected = parse_expr_string("(let (x 4.0) (add (add x 2.0) 3.0))")
     type_propagate_decls([e, expected], prelude_symtab)
-    match = utils.single_elem(list(lift_bind.find_all_matches(e)))
+    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == expected
 
@@ -47,16 +48,16 @@ def test_interchange_lets(prelude_symtab):
     e = parse_expr_string("(let (x 4) (let (y 5) (add x y)))")
     e2 = parse_expr_string("(let (y 5) (let (x 4) (add x y)))")
     type_propagate_decls([e, e2], prelude_symtab)
-    match = utils.single_elem(list(lift_bind.find_all_matches(e)))
+    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == e2
-    match2 = utils.single_elem(list(lift_bind.find_all_matches(actual)))
+    match2 = utils.single_elem(list(lift_bind_matcher.find_all_matches(actual)))
     actual2 = match2.apply_rewrite()
     assert actual2 == e
     # But, can't lift if the inner let uses the outer bound variable
     cant_lift = parse_expr_string("(let (x 5) (let (y (add x 1)) (add x y)))")
     type_propagate(cant_lift, prelude_symtab)
-    assert len(list(lift_bind.find_all_matches(cant_lift))) == 0
+    assert len(list(lift_bind_matcher.find_all_matches(cant_lift))) == 0
 
 
 def test_lift_bind_shadowing(prelude_symtab):
@@ -67,7 +68,7 @@ def test_lift_bind_shadowing(prelude_symtab):
     # So, we must rename the bound x so as not to capture the free x
     expected = parse_expr_string("(let (x_0 (add x 1)) (add x_0 x))")
     type_propagate_decls([e, expected], {**prelude_symtab, "x": Type.Integer})
-    match = utils.single_elem(list(lift_bind.find_all_matches(e)))
+    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == expected
 
@@ -76,7 +77,7 @@ def test_lift_bind_shadowing(prelude_symtab):
     e = parse_expr_string("(add (let (x (add x 1)) x) 2)")
     expected = parse_expr_string("(let (x (add x 1)) (add x 2))")
     renamed = parse_expr_string("(let (x_0 (add x 1)) (add x_0 2))")
-    match = utils.single_elem(list(lift_bind.find_all_matches(e)))
+    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == expected
     assert actual != renamed
@@ -94,12 +95,9 @@ def test_lifting_rules_dont_evaluate_computations_early(prelude_symtab):
     e = parse_expr_string("(if p (if (gt x 1.0) a b) 0.0)")
     e2 = parse_expr_string("(if p (let (y (add x 1.0)) y) 0.0)")
     type_propagate_decls([e, e2], symtab)
-    # We can't lift the call to 'foo' as then it would execute if not p
-    assert (
-        len(list(lift_if_or_bind.find_all_matches(e)))
-        == len(list(lift_if_or_bind.find_all_matches(e2)))
-        == 0
-    )
+    # We can't lift the call to 'gt' or 'add' as then it would execute if not p
+    assert len(list(lift_all_matcher.find_all_matches(e))) == 0
+    assert len(list(lift_all_matcher.find_all_matches(e2))) == 0
 
     # However it's fine if the predicate (evaluated early) is a simple condition
     e3 = parse_expr_string("(if p (if q (add a 1.0) (add b 2.0)) 5.0)")
@@ -107,13 +105,13 @@ def test_lifting_rules_dont_evaluate_computations_early(prelude_symtab):
         "(if q (if p (add a 1.0) 5.0) (if p (add b 2.0) 5.0))"
     )
     type_propagate_decls([e3, expected3], symtab)
-    match = utils.single_elem(list(lift_if_or_bind.find_all_matches(e3)))
+    match = utils.single_elem(list(lift_all_matcher.find_all_matches(e3)))
     assert match.apply_rewrite() == expected3
 
     e4 = parse_expr_string("(if p (let (y x) y) 0.0)")
     expected4 = parse_expr_string("(let (y x) (if p y 0.0))")
     type_propagate_decls([e4, expected4], symtab)
-    match = utils.single_elem(list(lift_if_or_bind.find_all_matches(e4)))
+    match = utils.single_elem(list(lift_all_matcher.find_all_matches(e4)))
     assert match.apply_rewrite() == expected4
 
 
@@ -127,13 +125,13 @@ def test_lifting_over_build(prelude_symtab):
                (build 0 (lam (i : Integer) (let (x (add 5 7)) (if (gt x 5) x i)))))"""
     )
     type_propagate_decls([e, expected], prelude_symtab)
-    match = utils.single_elem(list(lift_if_or_bind.find_all_matches(e)))
+    match = utils.single_elem(list(lift_all_matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     # Let should have been lifted:
     assert actual == expected
 
     # Discard the if+else; in the "then" case, now we can lift the if out of the build:
-    match2 = utils.single_elem(list(lift_if_or_bind.find_all_matches(actual.t_body)))
+    match2 = utils.single_elem(list(lift_all_matcher.find_all_matches(actual.t_body)))
     actual2 = match2.apply_rewrite()
     expected2 = parse_expr_string(
         """
@@ -150,12 +148,12 @@ def test_lifting_over_build(prelude_symtab):
         "(build 10 (lam (i : Integer) (let (x (add 5 i)) (if (gt i 5) x i))))"
     )
     type_propagate(e3, prelude_symtab)
-    assert len(list(lift_bind.find_all_matches(e3))) == 0
+    assert len(list(lift_bind_matcher.find_all_matches(e3))) == 0
     # Can lift the "if" as it does not use x:
     expected3 = parse_expr_string(
         "(build 10 (lam (i : Integer) (if (gt i 5) (let (x (add 5 i)) x) (let (x (add 5 i)) i))))"
     )
     type_propagate(expected3, prelude_symtab)
-    match3 = utils.single_elem(list(lift_if.find_all_matches(e3)))
+    match3 = utils.single_elem(list(lift_if_matcher.find_all_matches(e3)))
     actual3 = match3.apply_rewrite()
     assert actual3 == expected3
