@@ -113,9 +113,11 @@ lift_if_rules = (
             ),
         ),
         parse_rule_str(
-            '(rule "lift_if_over_if_false" ((p : Bool) (q : Bool) (t : Any) (f : Any) (e : Any)) (if p e (if q t f)) (if q (if p e t) (if p e f)))',
+            """(rule "lift_if_over_if_false" ((p : Bool) (q : Bool) (t : Any) (f : Any) (e : Any))
+                     (if p e (if q t f))
+                     (if q (if p e t) (if p e f)))""",
             {},
-            side_conditions=lambda *, p, q, t, f, e: can_speculate_ahead_of_condition(
+            side_conditions=lambda *, p, q, t, f, e: can_evaluate_without_condition(
                 q, p, False
             ),
         ),
@@ -127,11 +129,11 @@ lift_if_rules = (
                               (build 0 (lam (i : Integer) (if p t f)))))""",
             {},
             # TODO: replace the final "else" case with a constVec of size 0 dummy values of appropriate type.
-            # TODO Should we have another version that avoids the outer "if" when can_speculate_ahead_of_condition(rhs, n > 0) is true?
+            # TODO Should we have another version that avoids the outer "if" when can_evaluate_ahead_of_condition(rhs, n > 0) is true?
             side_conditions=lambda *, i, n, p, t, f: (
                 i.name not in p.free_vars_
                 and
-                # In the absence of constVec 0 this avoids an infinite chain of rewrites producing if (gt 0 0).
+                # In the absence of constVec 0 this avoids an infinite chain of rewrites each adding an (if (gt 0 0) ...).
                 (n != Const(0.0))
             ),
         ),
@@ -230,10 +232,11 @@ lift_let_rules = [
     ),
     parse_rule_str(  # avoid x capturing in p, f
         """(rule "lift_let_over_if_true" ((p : Bool) (rhs : Any) (body : Any) (f : Any))
-                 (if p (let (x rhs) body) f) (let (x rhs) (if p body f)))""",
+                 (if p (let (x rhs) body) f)
+                 (let (x rhs) (if p body f)))""",
         {},
         ParsedLetLifter,
-        side_conditions=lambda *, p, rhs, body, f: can_evaluate_without_condition(
+        side_conditions=lambda *, x, p, rhs, body, f: can_evaluate_without_condition(
             rhs, p, True
         ),
     ),
@@ -243,7 +246,7 @@ lift_let_rules = [
                  (let (x rhs) (if p t body)))""",
         {},
         ParsedLetLifter,
-        side_conditions=lambda *, p, rhs, body, f: can_evaluate_without_condition(
+        side_conditions=lambda *, x, p, t, rhs, body: can_evaluate_without_condition(
             rhs, p, False
         ),
     ),
