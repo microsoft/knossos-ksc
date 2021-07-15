@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Iterable, Iterator, Tuple
+from typing import Iterable, Iterator, Tuple, Type
 import functools
 
 from ksc.cav_subst import replace_subtree, replace_free_vars, make_nonfree_var
@@ -21,10 +21,9 @@ class LiftOverCall(RuleMatcher, ABC):
     may_match_any_call = True
     possible_filter_terms = frozenset()
 
-    @abstractmethod
-    def can_lift_arg(self, arg: Expr) -> bool:
-        """ Given <arg> used as argument to a Call, subclasses should return true if this rule can lift some part of <arg>
-            above the Call. For example, <arg> is an 'If' or 'Let'. """
+    liftable_arg_type: Type[Expr]
+    """ Must be defined by concrete instances as the subclass of Expr which, as argument to a Call,
+        the instance of LiftOverCall can lift to above the Call. For example, 'If' or 'Let'. """
 
     def matches_for_possible_expr(self, ewp: ExprWithPath, env) -> Iterator[Match]:
         def apply(arg_with_path: ExprWithPath):
@@ -38,7 +37,7 @@ class LiftOverCall(RuleMatcher, ABC):
             )
 
         for arg_with_path in ewp.args:
-            if self.can_lift_arg(arg_with_path.expr):
+            if isinstance(arg_with_path.expr, self.liftable_arg_type):
                 yield Match(
                     self, functools.partial(apply, arg_with_path), arg_with_path
                 )
@@ -51,8 +50,7 @@ class LiftOverCall(RuleMatcher, ABC):
 
 @singleton
 class lift_if_over_call(LiftOverCall):
-    def can_lift_arg(self, arg: Expr) -> bool:
-        return isinstance(arg, If)
+    liftable_arg_type = If
 
     def build_call_replacement(self, call_node: Call, which_arg: PathElement) -> Expr:
         if_node = which_arg.get(call_node)
@@ -169,8 +167,7 @@ def rename_to_avoid_capture(
 
 @singleton
 class lift_let_over_call(LiftOverCall):
-    def can_lift_arg(self, arg: Expr) -> bool:
-        return isinstance(arg, Let)
+    liftable_arg_type = Let
 
     def build_call_replacement(self, call_node: Call, which_arg: PathElement) -> Expr:
         let_node = which_arg.get(call_node)
