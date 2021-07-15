@@ -55,15 +55,17 @@ def generate_cpp_entry_point(cpp_function_name, decl):
     arg_types = [arg.type_ for arg in decl.args]
     if len(arg_types) == 1 and arg_types[0].is_tuple:
         arg_types = arg_types[0].children
-    arg_names = [f"arg{i}" for i in range(len(arg_types))]
+
+    def arg_name(i):
+        return f"arg{i}"
 
     args = ", ".join(
-        f"{ks_cpp_type(arg_type)} {arg_name}"
-        for arg_type, arg_name in zip(arg_types, arg_names)
+        f"{ks_cpp_type(arg_type)} {arg_name(i)}" for i, arg_type in enumerate(arg_types)
     )
     cpp_declaration = f"{ks_cpp_type(return_type)} {cpp_function_name}({args})"
 
     ks_function_name = utils.encode_name(decl.name.mangled())
+    arg_names = [arg_name(i) for i in range(len(arg_types))]
     arg_list = ", ".join(["&g_alloc"] + arg_names)
     cpp_call = f"ks::{ks_function_name}({arg_list})"
     args_streamed = ' << ", " '.join(f" << {arg}" for arg in arg_names)
