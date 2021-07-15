@@ -21,7 +21,10 @@ from ksc.utils import singleton, single_elem
 
 
 class LiftOverCall(RuleMatcher, ABC):
-    """ Superclass for lifting if's or let's (or potentially other constructs) that are used as arguments to Calls. """
+    """ Superclass for lifting if's or let's (or potentially other constructs) that are
+        used as arguments to Calls. Such rules cannot be expressed in ks syntax as there
+        is no syntax to match an arbitrary function, or an arbitrary (number of) argument(s).
+    """
 
     may_match_any_call = True
     possible_filter_terms = frozenset()
