@@ -396,7 +396,9 @@ def torch_from_ks(ks_object):
         return tuple(torch_from_ks(ks) for ks in ks_object)
 
     if isinstance(ks_object, float):
-        return torch.tensor(ks_object)
+        return torch.tensor(ks_object)  # TODO: use torch::Scalar?
+
+    assert isinstance(ks_object, torch.Tensor)  # TODO: strings, etc.
 
     return ks_object
 
