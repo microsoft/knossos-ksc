@@ -81,10 +81,16 @@ namespace generated {{
 """
 
 
-def generate_cpp_entry_point(cpp_function_name, decl, use_torch):
+def arg_types_of_decl(decl):
     arg_types = [arg.type_ for arg in decl.args]
     if len(arg_types) == 1 and arg_types[0].is_tuple:
-        arg_types = arg_types[0].children
+        return arg_types[0].children  # undo one-argification to match ksc cgen
+    else:
+        return arg_types
+
+
+def generate_cpp_entry_point(cpp_function_name, decl, use_torch):
+    arg_types = arg_types_of_decl(decl)
     num_args = len(arg_types)
 
     def join_args(sep, callable):
