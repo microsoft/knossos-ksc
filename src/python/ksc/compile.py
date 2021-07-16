@@ -148,7 +148,7 @@ derivatives_to_generate_default = ["fwd", "rev"]
 
 
 def generate_cpp_for_py_module_from_ks(
-    ks_str, bindings_to_generate, python_module_name, use_aten=True,
+    ks_str, bindings_to_generate, python_module_name, use_aten=True, use_torch=False
 ):
     def mangled_with_type(structured_name):
         if not structured_name.has_type():
@@ -163,7 +163,9 @@ def generate_cpp_for_py_module_from_ks(
     ]
 
     cpp_ks_functions, decls = generate_cpp_from_ks(ks_str, use_aten=use_aten)
-    cpp_entry_points = cgen.generate_cpp_entry_points(bindings_to_generate, decls)
+    cpp_entry_points = cgen.generate_cpp_entry_points(
+        bindings_to_generate, decls, use_torch=use_torch
+    )
     cpp_pybind_module_declaration = generate_cpp_pybind_module_declaration(
         bindings, python_module_name
     )
@@ -189,11 +191,6 @@ PYBIND11_MODULE("""
     m.def("allocator_top", &ks::entry_points::allocator_top);
     m.def("allocator_peak", &ks::entry_points::allocator_peak);
     m.def("logging", &ks::entry_points::logging);
-
-    declare_tensor_1<ks::Float>(m, "Tensor_1_Float");
-    declare_tensor_2<ks::Float>(m, "Tensor_2_Float");
-    declare_tensor_2<ks::Integer>(m, "Tensor_2_Integer");
-
 """
         + "\n".join(m_def(*t) for t in bindings_to_generate)
         + """
@@ -204,10 +201,16 @@ PYBIND11_MODULE("""
     )
 
 
-def build_py_module_from_ks(ks_str, bindings_to_generate, use_aten=False):
+def build_py_module_from_ks(
+    ks_str, bindings_to_generate, use_aten=False, use_torch=False
+):
 
     cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, bindings_to_generate, "PYTHON_MODULE_NAME", use_aten
+        ks_str,
+        bindings_to_generate,
+        "PYTHON_MODULE_NAME",
+        use_aten=use_aten,
+        use_torch=use_torch,
     )
 
     cpp_fname = (
@@ -237,7 +240,11 @@ def build_module_using_pytorch_from_ks(
       Each StructuredName must have a type attached
     """
     cpp_str = generate_cpp_for_py_module_from_ks(
-        ks_str, bindings_to_generate, torch_extension_name, use_aten
+        ks_str,
+        bindings_to_generate,
+        torch_extension_name,
+        use_aten=use_aten,
+        use_torch=True,
     )
 
     return build_module_using_pytorch_from_cpp_backend(

@@ -396,12 +396,14 @@ def torch_from_ks(ks_object):
         return tuple(torch_from_ks(ks) for ks in ks_object)
 
     if isinstance(ks_object, float):
-        return torch.tensor(ks_object)
+        return torch.tensor(ks_object)  # TODO: use torch::Scalar?
 
-    return torch.from_numpy(numpy.array(ks_object, copy=True))
+    assert isinstance(ks_object, torch.Tensor)  # TODO: strings, etc.
+
+    return ks_object
 
 
-def torch_to_ks(py_mod, val):
+def torch_to_ks(val):
     """
     Return a KS-compatible version of val.
     If val is a scalar, just return it as a float.
@@ -419,13 +421,7 @@ def torch_to_ks(py_mod, val):
         if len(val.shape) == 0:
             return val.item()
 
-        val = val.contiguous()  # Get data, or copy if not already contiguous
-        if len(val.shape) == 1:
-            ks_tensor = py_mod.Tensor_1_Float(val.data_ptr(), *val.shape)
-        if len(val.shape) == 2:
-            ks_tensor = py_mod.Tensor_2_Float(val.data_ptr(), *val.shape)
-        ks_tensor._torch_val = val  # Stash object inside return value to prevent premature garbage collection
-        return ks_tensor
+        return val.contiguous()  # Get data, or copy if not already contiguous
 
     raise NotImplementedError()
 
@@ -446,7 +442,7 @@ def logging(py_mod, flag=True):
 # See https://pytorch.org/docs/stable/notes/extending.html
 def forward_template(py_mod, ctx, *args):
     py_mod.reset_allocator()
-    ks_args = (torch_to_ks(py_mod, x) for x in args)
+    ks_args = (torch_to_ks(x) for x in args)
 
     # Call it
     outputs = py_mod.entry(*ks_args)
@@ -459,8 +455,8 @@ def forward_template(py_mod, ctx, *args):
 
 
 def backward_template(py_mod, ctx, *args):
-    ks_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in ctx.saved_tensors)
-    ks_grad_args = make_tuple_if_many_args(torch_to_ks(py_mod, x) for x in args)
+    ks_args = make_tuple_if_many_args(torch_to_ks(x) for x in ctx.saved_tensors)
+    ks_grad_args = make_tuple_if_many_args(torch_to_ks(x) for x in args)
     outputs = py_mod.entry_vjp(ks_args, ks_grad_args)
     return torch_from_ks(outputs)
 
@@ -477,7 +473,7 @@ def make_KscAutogradFunction(py_mod):
             "py_mod": py_mod,
             "forward": staticmethod(forward),
             "backward": staticmethod(backward),
-            "adapt": staticmethod(lambda x: torch_to_ks(py_mod, x)),
+            "adapt": staticmethod(lambda x: torch_to_ks(x)),
         },
     )
 
