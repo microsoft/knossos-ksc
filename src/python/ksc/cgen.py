@@ -82,51 +82,47 @@ namespace generated {{
 
 
 def generate_cpp_entry_point(cpp_function_name, decl, use_torch):
-    return_type = decl.return_type
     arg_types = [arg.type_ for arg in decl.args]
     if len(arg_types) == 1 and arg_types[0].is_tuple:
         arg_types = arg_types[0].children
+    num_args = len(arg_types)
 
-    def arg_name(i):
-        return f"arg{i}"
-
-    def ks_arg_name(i):
-        return f"ks_{arg_name(i)}"
-
-    args = ", ".join(
-        f"{entry_point_cpp_type(arg_type, use_torch)} {arg_name(i)}"
-        for i, arg_type in enumerate(arg_types)
-    )
-    cpp_declaration = (
-        f"{entry_point_cpp_type(return_type, use_torch)} {cpp_function_name}({args})"
-    )
-
-    convert_arguments = "\n".join(
-        f"    auto {ks_arg_name(i)} = convert_argument<{ks_cpp_type(arg_type)}>({arg_name(i)});"
-        for i, arg_type in enumerate(arg_types)
-    )
+    def join_args(sep, callable):
+        return sep.join(callable(i) for i in range(num_args))
 
     ks_function_name = utils.encode_name(decl.name.mangled())
-    arg_list = ", ".join(["&g_alloc"] + [ks_arg_name(i) for i in range(len(arg_types))])
-    cpp_call = f"""
-    auto ks_ret = ks::{ks_function_name}({arg_list});
-    auto ret = convert_return_value<{entry_point_cpp_type(return_type, use_torch)}>(ks_ret);
-    """
 
-    args_streamed = ' << ", " '.join(
-        f" << {arg_name(i)}" for i in range(len(arg_types))
-    )
+    cpp_arg_types = [entry_point_cpp_type(t, use_torch) for t in arg_types]
+    cpp_return_type = entry_point_cpp_type(decl.return_type, use_torch)
 
-    return f"""
-{cpp_declaration} {{
+    # torch::Tensor entry_my_kernel(torch::Tensor arg0, ..., torch::Tensor arg7)
+    cpp = f"{cpp_return_type} {cpp_function_name}({join_args(', ', lambda i: f'{cpp_arg_types[i]} arg{i}')})"
+
+    # log arguments
+    args_streamed = join_args(' << ", " ', lambda i: f" << arg{i}")
+    cpp += f"""{{
     if (g_logging) {{
         std::cerr << "{ks_function_name}("{args_streamed} << ") =" << std::endl;
     }}
-{convert_arguments}
-{cpp_call}
+"""
+    # auto ks_arg0 = convert_argument<ks::tensor<Dim, Float>>(arg0);
+    # ...
+    # auto ks_arg7 = convert_argument<ks::tensor<Dim, Float>>(arg7);
+    for i in range(num_args):
+        cpp += f"    auto ks_arg{i} = convert_argument<{ks_cpp_type(arg_types[i])}>(arg{i});\n"
+
+    # auto ks_ret = ks::my_kernel(&g_alloc, ks_arg0, ..., ks_arg7)
+    cpp += f"""
+    auto ks_ret = ks::{ks_function_name}(&g_alloc {join_args("", lambda i: f", ks_arg{i}")});
+"""
+
+    # convert return value, log and return
+    cpp += f"""
+    auto ret = convert_return_value<{cpp_return_type}>(ks_ret);
     if (g_logging) {{
         std::cerr << ret << std::endl;
     }}
     return ret;
 }}
 """
+    return cpp
