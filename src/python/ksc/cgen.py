@@ -49,7 +49,9 @@ def entry_point_cpp_type(t, use_torch):
         raise ValueError(f'Unable to generate C++ type for "{t}"')
 
 
-def generate_cpp_entry_points(bindings_to_generate, decls, use_torch=False):
+def generate_cpp_entry_points(
+    bindings_to_generate, decls, elementwise=False, use_torch=False
+):
     decls_by_name = {decl.name: decl for decl in decls}
 
     def lookup_decl(structured_name):
@@ -59,7 +61,10 @@ def generate_cpp_entry_points(bindings_to_generate, decls, use_torch=False):
 
     cpp_entry_points = "".join(
         generate_cpp_entry_point(
-            binding_name, lookup_decl(structured_name), use_torch=use_torch
+            binding_name,
+            lookup_decl(structured_name),
+            elementwise=elementwise,
+            use_torch=use_torch,
         )
         for binding_name, structured_name in bindings_to_generate
     )
@@ -89,34 +94,67 @@ def arg_types_of_decl(decl):
         return arg_types
 
 
-def generate_cpp_entry_point(cpp_function_name, decl, use_torch):
+def generate_cpp_entry_point(cpp_function_name, decl, elementwise, use_torch):
     arg_types = arg_types_of_decl(decl)
     num_args = len(arg_types)
+
+    if elementwise:
+        if not use_torch:
+            raise ValueError("Elementwise operations only available when using torch")
+        if not all(a == Type.Float for a in arg_types):
+            raise ValueError(
+                "Elementwise operations only available for floating-point element type"
+            )
 
     def join_args(sep, callable):
         return sep.join(callable(i) for i in range(num_args))
 
     ks_function_name = utils.encode_name(decl.name.mangled())
 
-    cpp_arg_types = [entry_point_cpp_type(t, use_torch) for t in arg_types]
-    cpp_return_type = entry_point_cpp_type(decl.return_type, use_torch)
+    def cpp_type(t):
+        return "torch::Tensor" if elementwise else entry_point_cpp_type(t, use_torch)
+
+    cpp_arg_types = [cpp_type(t) for t in arg_types]
+    cpp_return_type = cpp_type(decl.return_type)
 
     # torch::Tensor entry_my_kernel(torch::Tensor arg0, ..., torch::Tensor arg7)
     cpp = f"{cpp_return_type} {cpp_function_name}({join_args(', ', lambda i: f'{cpp_arg_types[i]} arg{i}')}) {{\n"
 
-    # auto ks_arg0 = convert_argument<ks::tensor<Dim, Float>>(arg0);
-    # ...
-    # auto ks_arg7 = convert_argument<ks::tensor<Dim, Float>>(arg7);
-    for i in range(num_args):
-        cpp += f"    auto ks_arg{i} = convert_argument<{ks_cpp_type(arg_types[i])}>(arg{i});\n"
+    if elementwise:
+        # auto* arg_data0 = arg0.data_ptr<float>();
+        # ...
+        # auto* arg_data7 = arg7.data_ptr<float>();
+        for i in range(num_args):
+            cpp += f"""
+    KS_ASSERT(arg{i}.sizes().size() == 1u);
+    KS_ASSERT(arg{i}.is_contiguous());
+    KS_ASSERT(arg{i}.scalar_type() == scalar_type_of_Float);
+    auto* arg_data{i} = arg{i}.data_ptr<float>();
+"""
+        # ret_data[i] = ks::my_op(&g_alloc, arg_data0[i], arg_data1[i]);
+        cpp += f"""
+    auto ret = torch::empty_like(arg0);
+    auto* ret_data = ret.data_ptr<float>();
+    for (int i = 0, ne = arg0.size(0); i != ne; ++i) {{
+        ret_data[i] = ks::{ks_function_name}(&g_alloc {join_args("", lambda i: f", arg_data{i}[i]")});
+    }}
+    return ret;
+}}
+"""
+    else:
+        # auto ks_arg0 = convert_argument<ks::tensor<Dim, Float>>(arg0);
+        # ...
+        # auto ks_arg7 = convert_argument<ks::tensor<Dim, Float>>(arg7);
+        for i in range(num_args):
+            cpp += f"    auto ks_arg{i} = convert_argument<{ks_cpp_type(arg_types[i])}>(arg{i});\n"
 
-    # auto ks_ret = ks::my_kernel(&g_alloc, ks_arg0, ..., ks_arg7)
-    cpp += f"""
+        # auto ks_ret = ks::my_kernel(&g_alloc, ks_arg0, ..., ks_arg7);
+        cpp += f"""
     auto ks_ret = ks::{ks_function_name}(&g_alloc {join_args("", lambda i: f", ks_arg{i}")});
 """
 
-    # convert return value and return
-    cpp += f"""
+        # convert return value and return
+        cpp += f"""
     return convert_return_value<{cpp_return_type}>(ks_ret);
 }}
 """
