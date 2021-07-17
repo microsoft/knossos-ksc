@@ -263,6 +263,29 @@ lift_let_rules = [
         ),
     ),
     parse_rule_str(
+        """(rule "lift_let_over_if_both" ((p : Bool) (rhs : Any) (body : Any) (f : Any))
+                 (if p (let (x rhs) body) (let (y rhs) f))
+                 (let (x rhs) (if p body (let (y x) f))))""",
+        {},
+        ParsedLetLifter,  # avoid x capturing in p or f (as required), or in y (which would be
+        # harmless, there is no need to avoid, but it happens as a side effect of ParsedLetLifter)
+    ),
+    parse_rule_str(
+        """(rule "lift_let_over_if_true_dominated" ((p : Bool) (rhs : Any) (body : Any) (f : Any))
+                 (let (x rhs) (if p (let (y rhs) body) f))
+                 (let (x rhs) (if p (let (y x) body) f)))""",
+        {},
+    ),
+    parse_rule_str(
+        # Ideally we'd like a rule that detects (let (x rhs) ....) anywhere which *must* be executed
+        # in order to execute the "if". So to handle the general case, additional rules will be needed
+        # (beyond those here) to push the outer let into place.
+        """(rule "lift_let_over_if_false_dominated" ((p : Bool) (rhs : Any) (body : Any) (t : Any))
+                 (let (x rhs) (if p t (let (y rhs) body)))
+                 (let (x rhs) (if p t (let (y x) body))))""",
+        {},
+    ),
+    parse_rule_str(
         """(rule "lift_let_over_assert_cond" ((rhs : Any) (body : Bool) (val : Any))
                  (assert (let (x rhs) body) val)
                  (let (x rhs) (assert body val)))""",
