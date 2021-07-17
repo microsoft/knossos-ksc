@@ -146,7 +146,7 @@ lift_if_rules = (
                 i.name not in p.free_vars_
                 and
                 # In the absence of constVec 0 this avoids an infinite chain of rewrites each adding an (if (gt 0 0) ...).
-                (n != Const(0.0))
+                (n != Const(0))
             ),
         ),
         lift_if_over_call,
@@ -242,39 +242,39 @@ lift_let_rules = [
         {},
         ParsedLetLifter,  # avoid x capturing in t, f
     ),
-    parse_rule_str(  # avoid x capturing in p, f
+    parse_rule_str(
         """(rule "lift_let_over_if_true" ((p : Bool) (rhs : Any) (body : Any) (f : Any))
                  (if p (let (x rhs) body) f)
                  (let (x rhs) (if p body f)))""",
         {},
-        ParsedLetLifter,
+        ParsedLetLifter,  # avoid x capturing in p, f
         side_conditions=lambda *, x, p, rhs, body, f: can_evaluate_without_condition(
             rhs, p, True
         ),
     ),
-    parse_rule_str(  # avoid x capturing in p, t
+    parse_rule_str(
         """(rule "lift_let_over_if_false" ((p : Bool) (t : Any) (rhs : Any) (body : Any))
                  (if p t (let (x rhs) body))
                  (let (x rhs) (if p t body)))""",
         {},
-        ParsedLetLifter,
+        ParsedLetLifter,  # avoid x capturing in p, t
         side_conditions=lambda *, x, p, t, rhs, body: can_evaluate_without_condition(
             rhs, p, False
         ),
     ),
-    parse_rule_str(  # avoid x capturing in val
+    parse_rule_str(
         """(rule "lift_let_over_assert_cond" ((rhs : Any) (body : Bool) (val : Any))
                  (assert (let (x rhs) body) val)
                  (let (x rhs) (assert body val)))""",
         {},
-        ParsedLetLifter,
+        ParsedLetLifter,  # avoid x capturing in val
     ),
-    parse_rule_str(  # avoid x capturing in cond
+    parse_rule_str(
         """(rule "lift_let_over_assert_body" ((cond : Bool) (rhs : Any) (body : Any))
                  (assert cond (let (x rhs) body))
                  (let (x rhs) (assert cond body)))""",
         {},
-        ParsedLetLifter,
+        ParsedLetLifter,  # avoid x capturing in cond
         side_conditions=lambda *, cond, rhs, body: can_evaluate_without_condition(
             rhs, cond, False
         ),  # But we're gonna fail the assertion anyway, so OK?
