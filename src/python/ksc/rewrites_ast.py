@@ -3,7 +3,8 @@ from typing import Iterable, Iterator, Tuple, Type
 import functools
 
 from ksc.cav_subst import replace_subtree, replace_free_vars, make_nonfree_var
-from ksc.expr import Expr, Call, If, Rule, Var, Let, Const
+from ksc.expr import Expr, Call, If, Rule, Var, Let, Const, Assert, Lam
+from ksc.parse_ks import parse_ks_file
 from ksc.path import ExprWithPath, PathElement, let_rhs, let_body, lam_body
 from ksc.rewrites import (
     RuleMatcher,
@@ -13,16 +14,29 @@ from ksc.rewrites import (
     VariableSubstitution,
     parse_rule_str,
 )
+from ksc.type_propagate import type_propagate
 from ksc.utils import singleton, single_elem
 
-raw_new_bind = parse_rule_str('(rule "raw_new_bind" (e : Any) e (let (x e) x))', {})
+
+@singleton
+class raw_new_bind(ParsedRuleMatcher):
+    def __init__(self):
+        rule = single_elem(
+            list(parse_ks_file('(rule "raw_new_bind" (e : Any) e (let (x e) x))'))
+        )
+        type_propagate(rule, {})
+        super().__init__(rule)
+
+    # ParsedRuleMatcher would think from our RHS that this rule matches only Vars
+    possible_filter_terms = frozenset([Let, Lam, If, Assert])
+    may_match_any_call = True
+
+
 new_bind = RuleFilter(
     "new_bind",
     raw_new_bind,
-    lambda m: not (
-        isinstance(m.ewp.expr, (Var, Const))
-        or ewp.path[-1] in [let_rhs, let_body, lam_body]
-    ),
+    lambda m: len(m.ewp.path) > 0
+    and m.ewp.path[-1] not in [let_rhs, let_body, lam_body],
 )
 
 

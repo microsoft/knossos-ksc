@@ -517,16 +517,18 @@ class SubstPattern(ExprTransformer):
 
     def visit_let(self, l: Let, var_names_to_exprs: VariableSubstitution) -> Let:
         assert isinstance(l.vars, Var), "use untuple_lets first"
+        rhs = self.visit(l.rhs, var_names_to_exprs)
+        # Update substitution for body
         target_var, var_names_to_exprs = _maybe_add_binder_to_subst(
             l.vars, var_names_to_exprs, [l.body]
         )
-        # Substitute bound var with target_var in children. It's fine to apply this substitution outside
-        # where the bound var is bound, as the replacement shouldn't contain "(let x ...) x" (with x free).
+        if target_var.type_.contains_any():
+            # Unfortunately we must set the type of target_var here, before recursing into the body,
+            # as said type depends on the binding here and can't be figured out from the body.
+            target_var.type_ = rhs.type_
+        # Substitute bound var with target_var in body.
         return Let(
-            target_var,
-            self.visit(l.rhs, var_names_to_exprs),
-            self.visit(l.body, var_names_to_exprs),
-            type=l.type_,
+            target_var, rhs, self.visit(l.body, var_names_to_exprs), type=l.type_,
         )
 
     def visit_lam(self, l: Lam, var_names_to_exprs: VariableSubstitution) -> Lam:
