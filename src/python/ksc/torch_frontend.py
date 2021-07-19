@@ -1,6 +1,6 @@
 from typing import Callable, List, Tuple
+from dataclasses import dataclass
 from contextlib import contextmanager
-
 import functools
 import numpy
 import torch
@@ -41,6 +41,39 @@ warnings.filterwarnings("always")
 
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
+
+
+@dataclass
+class KscStub:
+    f: Callable
+
+    def __call__(self, arg):
+        y = self.f(arg)
+        print("KscStub: Called", self.f, "at", arg, "giving", y)
+        return y
+
+
+def register(f: Callable) -> KscStub:
+    """
+    Main Knossos entry point.
+
+    The compile decorator transforms a TorchScript function into a
+    KscAutogradFunction which implements the function and its 
+    derivatives.
+
+       @knossos.register
+       def f(x : torch.Tensor) -> torch.Tensor:
+           return x * sin(x)
+
+    Endows f with the following behaviours
+
+        y = f(x)       # Fast (C++/CUDA/...) computation of f(x)
+        vjp(f, x, dy)  # Fast computation of dot(dy, [df_i/dx_j])
+
+    The implementation delays compilation until the first call, or 
+    when "f.compile()" is explicitly called.
+    """
+    return KscStub(f)
 
 
 def tail(iter):

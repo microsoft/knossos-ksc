@@ -9,11 +9,13 @@ from ksc.torch_frontend import (
     ksc_string_to_autograd_function,
     cpp_string_to_autograd_function,
 )
+import ksc.torch_frontend as knossos
 from ksc.torch_utils import elementwise_apply_hack
 
 import torch._vmap_internals
 
 # BEGINDOC
+@knossos.register
 def relu3(x: float) -> float:
     """
     Like ReLu, but smoother
@@ -31,6 +33,7 @@ def relu3(x: float) -> float:
 
 
 # run-bench: Knossos implementation
+@knossos.register
 def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
@@ -510,3 +513,11 @@ def relu3_in_fcdnn():
 
     # Run training
     # train_model(model)
+
+
+if __name__ == "__main__":
+    y = relu3(0.3)
+    xs = next(vrelu3_bench_configs())
+    ys = vrelu3(xs)
+    print(ys.sum())
+
