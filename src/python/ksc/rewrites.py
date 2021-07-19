@@ -185,6 +185,8 @@ class RuleSet(AbstractMatcher):
 
 @singleton
 class inline_var(RuleMatcher):
+    # Keeping this rule here rather than in rewrites_ast.py
+    # because the "env: Environment" is specifically designed to support it
     possible_filter_terms = frozenset([Var])
 
     def matches_for_possible_expr(
@@ -213,6 +215,8 @@ class inline_var(RuleMatcher):
 
 @singleton
 class inline_call(RuleMatcher):
+    # Keeping this rule here rather than in rewrites_ast.py
+    # because the "env: Environment" is specifically designed to support it
     possible_filter_terms = frozenset()
     may_match_any_call = True
 
@@ -252,6 +256,7 @@ class inline_call(RuleMatcher):
         yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
 
 
+# TODO move to rewrites_ast.py
 @singleton
 class delete_let(RuleMatcher):
     possible_filter_terms = frozenset([Let])
