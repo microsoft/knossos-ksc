@@ -301,7 +301,7 @@ lift_let_rules = [
         {},
         ParsedLetLifter,  # avoid x capturing in cond
         side_conditions=lambda *, cond, rhs, body: can_evaluate_without_condition(
-            rhs, cond, False
+            rhs, cond, True
         ),  # But we're gonna fail the assertion anyway, so OK?
     ),
     parse_rule_str(
