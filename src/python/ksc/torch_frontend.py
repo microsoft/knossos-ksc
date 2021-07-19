@@ -1,4 +1,5 @@
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Optional
+from types import ModuleType
 from dataclasses import dataclass
 from contextlib import contextmanager
 import functools
@@ -41,39 +42,6 @@ warnings.filterwarnings("always")
 
 # CallMethod resolution:
 # https://github.com/pytorch/pytorch/blob/b6bb644e41b3928b5a515330ad35c8b447fcb876/torch/csrc/jit/serialization/python_print.cpp#L984-L1004
-
-
-@dataclass
-class KscStub:
-    f: Callable
-
-    def __call__(self, arg):
-        y = self.f(arg)
-        print("KscStub: Called", self.f, "at", arg, "giving", y)
-        return y
-
-
-def register(f: Callable) -> KscStub:
-    """
-    Main Knossos entry point.
-
-    The compile decorator transforms a TorchScript function into a
-    KscAutogradFunction which implements the function and its 
-    derivatives.
-
-       @knossos.register
-       def f(x : torch.Tensor) -> torch.Tensor:
-           return x * sin(x)
-
-    Endows f with the following behaviours
-
-        y = f(x)       # Fast (C++/CUDA/...) computation of f(x)
-        vjp(f, x, dy)  # Fast computation of dot(dy, [df_i/dx_j])
-
-    The implementation delays compilation until the first call, or 
-    when "f.compile()" is explicitly called.
-    """
-    return KscStub(f)
 
 
 def tail(iter):
@@ -602,11 +570,12 @@ def tsmod2ksmod(
     ksc_defs = []
     while len(todo_stack) > 0:
         print(f"tsmod2ksmod: Remaining: {todo_stack}")
-        for fn in inspect.getmembers(module, inspect.isfunction):
-            fn_name, fn_obj = fn
+        for fn_name, fn_obj in inspect.getmembers(module):
             if fn_name in todo_stack:
                 todo_stack.remove(fn_name)
                 print(f"tsmod2ksmod: converting {fn_name}, remaining: {todo_stack}")
+                if isinstance(fn_obj, KscStub):
+                    fn_obj = fn_obj.f
                 ts_fn = torch.jit.script(fn_obj)
                 ts_graph = ts_fn.graph
                 ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
@@ -624,3 +593,53 @@ def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
     return ksc_defs_to_autograd_function(
         [ksc_def], ksc_def, torch_extension_name, generate_lm
     )
+
+
+@dataclass
+class KscStub:
+    f: Callable
+    f_module: ModuleType
+    compiled: Optional[Callable]
+
+    def __call__(self, arg):
+        if not self.compiled:
+            print(f"knossos.register: Calling {self.f.__name__}")
+            return self.f(arg)
+        return self.compiled.apply(arg)
+
+    def compile(self, example_inputs, torch_extension_name):
+        ks_compiled = tsmod2ksmod(
+            self.f_module,
+            self.f.__name__,
+            torch_extension_name=torch_extension_name,
+            example_inputs=example_inputs,
+            generate_lm=False,
+        )
+
+        ks_compiled.py_mod.logging(True)
+        return ks_compiled
+
+
+def register(f: Callable) -> KscStub:
+    """
+    Main Knossos entry point.
+
+    The @register decorator transforms a TorchScript function into a
+    KscAutogradFunction which implements the function and its 
+    derivatives.
+
+       @knossos.register
+       def f(x : torch.Tensor) -> torch.Tensor:
+           return x * sin(x)
+
+    Endows f with the following behaviours
+
+        y = f(x)       # Fast (C++/CUDA/...) computation of f(x)
+        vjp(f, x, dy)  # Fast computation of dot(dy, [df_i/dx_j])
+
+    The implementation delays compilation until the first call, or 
+    when "f.compile()" is explicitly called.
+    """
+    module = inspect.getmodule(inspect.currentframe().f_back)
+
+    return KscStub(f, module, None)

@@ -1,7 +1,9 @@
 import torch
+import ksc.torch_frontend as knossos
 
 # run-bench: Knossos source, and "nice" PyTorch implementation
 # BEGINDOC
+@knossos.register
 def sqrl(x: torch.Tensor):
     """
     sqrl: Squared Leaky Relu
