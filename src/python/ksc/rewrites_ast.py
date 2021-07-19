@@ -262,6 +262,8 @@ lift_let_rules = [
             rhs, p, False
         ),
     ),
+    # Additional variants for lifting over "if" have no side conditions because they work
+    # only on cases where the rhs already executes regardless of the if-condition p.
     parse_rule_str(
         """(rule "lift_let_over_if_both" ((p : Bool) (rhs : Any) (body : Any) (f : Any))
                  (if p (let (x rhs) body) (let (y rhs) f))
