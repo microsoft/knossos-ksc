@@ -70,6 +70,7 @@ class lift_if_over_call(LiftOverCall):
             if_node.cond,
             replace_subtree(call_node, (which_arg,), if_node.t_body),
             replace_subtree(call_node, (which_arg,), if_node.f_body),
+            type=call_node.type_,
         )
 
 
@@ -194,7 +195,12 @@ class lift_let_over_call(LiftOverCall):
                 if single_elem(arg.path) != which_arg
             ],
         )
-        return Let(bv, let_node.rhs, replace_subtree(call_node, (which_arg,), body))
+        return Let(
+            bv,
+            let_node.rhs,
+            replace_subtree(call_node, (which_arg,), body),
+            type=call_node.type_,
+        )
 
 
 class ParsedLetLifter(ParsedRuleMatcher):
