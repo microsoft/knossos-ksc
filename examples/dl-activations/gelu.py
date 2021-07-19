@@ -10,7 +10,12 @@ embedded_cflags = ksc.compile.default_cflags
 
 
 embedded_cflags_opts = ksc.compile.CFlags.GCCOnly(
-    ["-march=native", "-funroll-loops", "-ffast-math", "-mprefer-vector-width=512",]
+    ["-march=native", "-funroll-loops", "-ffast-math", "-mprefer-vector-width=512"]
+)
+
+
+embedded_cflags_opts_extra = ksc.compile.CFlags.GCCOnly(
+    ["-ffp-contract=fast", "-flto", "-fno-semantic-interposition"]
 )
 
 
@@ -93,6 +98,16 @@ def vgelu_embedded_cpp_inlined_map_flags():
         cpp_inlined_map + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vgelu_embedded_cpp_inlined_map_flags",
         extra_cflags=embedded_cflags + embedded_cflags_opts,
+    )
+
+
+def vgelu_embedded_cpp_inlined_map_flags_extra():
+    return cpp_string_to_autograd_function(
+        cpp_inlined_map + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vgelu_embedded_cpp_inlined_map_flags_extra",
+        extra_cflags=embedded_cflags
+        + embedded_cflags_opts
+        + embedded_cflags_opts_extra,
     )
 
 
