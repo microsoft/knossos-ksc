@@ -562,7 +562,7 @@ def cpp_string_to_autograd_function(
 import inspect
 
 
-def tsmod2ksmod(
+def _tsmod2ksmod(
     module, function_name, torch_extension_name, example_inputs, generate_lm=True
 ):
     global todo_stack
@@ -575,7 +575,7 @@ def tsmod2ksmod(
                 todo_stack.remove(fn_name)
                 print(f"tsmod2ksmod: converting {fn_name}, remaining: {todo_stack}")
                 if isinstance(fn_obj, KscStub):
-                    fn_obj = fn_obj.f
+                    fn_obj = fn_obj.raw_f
                 ts_fn = torch.jit.script(fn_obj)
                 ts_graph = ts_fn.graph
                 ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
@@ -597,27 +597,38 @@ def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
 
 @dataclass
 class KscStub:
-    f: Callable
+    raw_f: Callable
     f_module: ModuleType
     compiled: Optional[Callable]
 
     def __call__(self, arg):
         if not self.compiled:
-            print(f"knossos.register: Calling {self.f.__name__}")
-            return self.f(arg)
+            print(f"knossos.register: Calling {self.f.__qualname__}")
+            compile(
+                self,
+                example_inputs=(arg,),
+                torch_extension_name="KscStub_"
+                + self.f_module.__name__
+                + "_"
+                + self.f.__name__,
+            )
+
         return self.compiled.apply(arg)
 
+    def logging(self, flag: bool):
+        return logging(self.compiled.py_mod.logging, flag)
+
     def compile(self, example_inputs, torch_extension_name):
-        ks_compiled = tsmod2ksmod(
+        self.compiled = _tsmod2ksmod(
             self.f_module,
-            self.f.__name__,
+            self.raw_f.__name__,
             torch_extension_name=torch_extension_name,
             example_inputs=example_inputs,
             generate_lm=False,
         )
 
-        ks_compiled.py_mod.logging(True)
-        return ks_compiled
+        self.compiled.py_mod.logging(False)
+        return self.compiled
 
 
 def register(f: Callable) -> KscStub:
