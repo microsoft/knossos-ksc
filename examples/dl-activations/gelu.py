@@ -80,6 +80,14 @@ def gelu(x: float) -> float:
     return 0.5 * x * (1.0 + erf(x / sqrt(2)))
 
 
+def vgelu_embedded_cpp_inlined_map():
+    return cpp_string_to_autograd_function(
+        cpp_inlined_map + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vgelu_embedded_cpp_inlined_map",
+        extra_cflags=embedded_cflags,
+    )
+
+
 def vgelu_embedded_cpp_inlined_map_flags():
     return cpp_string_to_autograd_function(
         cpp_inlined_map + embedded_cpp_entry_points,
