@@ -1,7 +1,14 @@
 import pytest
 
+from ksc.alpha_equiv import ExprHashedWithAlpha, are_alpha_equivalent
 from ksc.rewrites import RuleSet
-from ksc.rewrites_ast import lift_let_rules, lift_if_rules, lift_let_over_call
+from ksc.rewrites_ast import (
+    lift_let_rules,
+    lift_if_rules,
+    lift_let_over_call,
+    new_bind,
+    raw_new_bind,
+)
 from ksc.parse_ks import parse_expr_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate, type_propagate_decls
@@ -212,3 +219,25 @@ def test_lifting_over_build(prelude_symtab):
     match3 = utils.single_elem(list(lift_if_matcher.find_all_matches(e3)))
     actual3 = match3.apply_rewrite()
     assert actual3 == expected3
+
+
+def test_new_bind(prelude_symtab):
+    symtab = {**prelude_symtab, "x": Type.Integer}
+    input = parse_expr_string("(let (y (add x 1)) (add y (add x 1)))")
+    expected = parse_expr_string("(let (y (add x 1)) (add y (let (z (add x 1)) z)))")
+    expected_raw = [expected] + [
+        parse_expr_string("(let (z (let (y (add x 1)) (add y (add x 1)))) z)"),
+        parse_expr_string("(let (y (let (z (add x 1)) z)) (add y (add x 1)))"),
+        parse_expr_string("(let (y (add x 1)) (let (z (add y (add x 1))) z))"),
+    ]
+    type_propagate_decls(expected_raw + [input], symtab)
+    actual_raw = [
+        m.apply_rewrite() for m in RuleSet([raw_new_bind]).find_all_matches(input)
+    ]
+    assert set(ExprHashedWithAlpha(e) for e in actual_raw) == set(
+        ExprHashedWithAlpha(e) for e in expected_raw
+    )
+
+    match = utils.single_elem(list(RuleSet([new_bind]).find_all_matches(input)))
+    actual = match.apply_rewrite()
+    assert are_alpha_equivalent(actual, expected)
