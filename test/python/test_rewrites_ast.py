@@ -1,6 +1,7 @@
 import pytest
 
 from ksc.alpha_equiv import ExprHashedWithAlpha, are_alpha_equivalent
+from ksc.expr import Call
 from ksc.rewrites import RuleSet
 from ksc.rewrites_ast import (
     lift_let_rules,
@@ -8,6 +9,8 @@ from ksc.rewrites_ast import (
     lift_let_over_call,
     new_bind,
     raw_new_bind,
+    cse_bind,
+    inline_let,
 )
 from ksc.parse_ks import parse_expr_string
 from ksc.type import Type
@@ -18,6 +21,12 @@ from ksc import utils
 lift_let_matcher = RuleSet(lift_let_rules)
 lift_if_matcher = RuleSet(lift_if_rules)
 lift_all_matcher = RuleSet(lift_let_rules + lift_if_rules)
+
+
+def assert_expr_sets_alpha_equivalent(s1, s2):
+    assert set(ExprHashedWithAlpha(e) for e in s1) == set(
+        ExprHashedWithAlpha(e) for e in s2
+    )
 
 
 def test_lift_if(prelude_symtab):
@@ -234,10 +243,69 @@ def test_new_bind(prelude_symtab):
     actual_raw = [
         m.apply_rewrite() for m in RuleSet([raw_new_bind]).find_all_matches(input)
     ]
-    assert set(ExprHashedWithAlpha(e) for e in actual_raw) == set(
-        ExprHashedWithAlpha(e) for e in expected_raw
-    )
+    assert_expr_sets_alpha_equivalent(actual_raw, expected_raw)
 
     match = utils.single_elem(list(RuleSet([new_bind]).find_all_matches(input)))
     actual = match.apply_rewrite()
     assert are_alpha_equivalent(actual, expected)
+
+
+def test_cse_sequence(prelude_symtab):
+    symtab = {**prelude_symtab, "x": Type.Integer}
+    new_bind_matcher = RuleSet([new_bind])
+    input = parse_expr_string("(mul (add x 1) (add x 1))")
+    expected_new_binds = [
+        parse_expr_string("(mul (add x 1) (let (y (add x 1)) y))"),
+        parse_expr_string("(mul (let (y (add x 1)) y) (add x 1))"),
+    ]
+    type_propagate_decls(expected_new_binds + [input], symtab)
+    actual_new_binds = [
+        m.apply_rewrite() for m in new_bind_matcher.find_all_matches(input)
+    ]
+    assert_expr_sets_alpha_equivalent(actual_new_binds, expected_new_binds)
+    # We'll continue on the one where the first arg of the mul is still an add
+    actual_new_bind = utils.single_elem(
+        [expr for expr in actual_new_binds if isinstance(expr.args[0], Call)]
+    )
+
+    expected_lift1 = parse_expr_string("(let (y (add x 1)) (mul (add x 1) y))")
+    type_propagate(expected_lift1, symtab)
+    matches = lift_bind_matcher.find_all_matches(actual_new_bind)
+    actual_lift1 = utils.single_elem(list(matches)).apply_rewrite()
+    assert are_alpha_equivalent(actual_lift1, expected_lift1)
+    # Result: actual_lift1
+
+    expected_new_bind2 = parse_expr_string(
+        "(let (y (add x 1)) (mul (let (z (add x 1)) z) y))"
+    )
+    type_propagate(expected_new_bind2, symtab)
+    matches = new_bind_matcher.find_all_matches(actual_lift1)
+    actual_new_bind2 = utils.single_elem(list(matches)).apply_rewrite()
+    assert are_alpha_equivalent(actual_new_bind2, expected_new_bind2)
+    # Result: actual_new_bind2
+
+    expected_lift2 = parse_expr_string(
+        "(let (y (add x 1)) (let (z (add x 1)) (mul z y)))"
+    )
+    type_propagate(expected_lift2, symtab)
+    matches = lift_bind_matcher.find_all_matches(actual_new_bind2)
+    actual_lift2 = utils.single_elem(list(matches)).apply_rewrite()
+    assert are_alpha_equivalent(actual_lift2, expected_lift2)
+    # Result: actual_lift2
+
+    expected_cse_bind = parse_expr_string("(let (y (add x 1)) (let (z y) (mul z y)))")
+    type_propagate(expected_cse_bind, symtab)
+    matches = RuleSet([cse_bind]).find_all_matches(actual_lift2)
+    actual_cse_bind = utils.single_elem(list(matches)).apply_rewrite()
+    assert are_alpha_equivalent(actual_cse_bind, expected_cse_bind)
+    # Result: actual_cse_bind
+
+    # Finally, clean up the extra variable assignment, and test inline_let
+    expected_inline_lets = [
+        parse_expr_string("(let (y (add x 1)) (mul y y))"),  # Inline z - right
+        parse_expr_string("(let (z (add x 1)) (mul z (add x 1)))"),  # Inline y - bad
+    ]
+    type_propagate_decls(expected_inline_lets, symtab)
+    matches = RuleSet([inline_let]).find_all_matches(actual_cse_bind)
+    actual_inline_lets = [m.apply_rewrite() for m in matches]
+    assert_expr_sets_alpha_equivalent(expected_inline_lets, actual_inline_lets)
