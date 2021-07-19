@@ -473,7 +473,7 @@ class SubstPattern(ExprTransformer):
     It doesn't handle e.g. (foo (let x e1 e2)) ==> (let x e1 (foo e2))
     where there is potentially capture - if foo contains references to another/outside
     x, they'll be captured by the x bound by that let, which changes their meaning.
-    (Hence, we still need separate python RuleMatchers, not ParsedRuleMatchers, for e.g. lift_bind and sumbuild_invariant.)
+    (Hence, we still need separate python RuleMatchers for e.g. lift_let and sumbuild_invariant.)
     """
 
     def visit(self, e: Expr, var_names_to_exprs: VariableSubstitution) -> Expr:
