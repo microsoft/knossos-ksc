@@ -139,7 +139,7 @@ def test_far():
 
     ks_ans = ks_far.py_mod.entry(ks_far.adapt(x), ks_far.adapt(y))
     ans = far(x, y)
-    assert pytest.approx(ks_ans, 1e-6) == ans.item()
+    assert pytest.approx(ks_ans, 1e-5) == ans.item()
 
 
 def test_cat():
