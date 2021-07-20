@@ -38,8 +38,6 @@ def test_bench(module_file, bench_name):
         mod, bench_name, torch_extension_name, example_inputs=(arg,), generate_lm=False
     )
 
-    ks_compiled.py_mod.logging(True)
-
     pt_arg = arg.detach()
     pt_arg.requires_grad = True
     pt_value = pt_fast(pt_arg)
