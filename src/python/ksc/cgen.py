@@ -154,7 +154,6 @@ def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
     # auto* arg_data7 = arg7.data_ptr<float>();
     for i in range(num_args):
         cpp += f"""
-    KS_ASSERT(arg{i}.sizes().size() == 1u);
     KS_ASSERT(arg{i}.is_contiguous());
     KS_ASSERT(arg{i}.scalar_type() == scalar_type_of_Float);
     auto* arg_data{i} = arg{i}.data_ptr<float>();
@@ -163,7 +162,7 @@ def generate_cpp_elementwise_entry_point(cpp_function_name, decl):
     cpp += f"""
     auto ret = torch::empty_like(arg0);
     auto* ret_data = ret.data_ptr<float>();
-    for (int i = 0, ne = arg0.size(0); i != ne; ++i) {{
+    for (int i = 0, ne = arg0.numel(); i != ne; ++i) {{
         ret_data[i] = ks::{ks_function_name}(&g_alloc {join_args("", lambda i: f", arg_data{i}[i]")});
     }}
     return ret;
