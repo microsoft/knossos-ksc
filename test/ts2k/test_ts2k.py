@@ -56,13 +56,13 @@ def f(x: float):
 
 
 def test_ts2k_relux():
-    ks_ans = relux(2.0)
+    ks_ans = relux._entry(2.0)
     ans = relux.raw_f(2.0)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
 
 def test_ts2k_relux_grad():
-    ks_ans = relux.entry_vjp(1.3, 1.0)
+    ks_ans = relux._entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
@@ -99,12 +99,12 @@ def test_bar():
     a, x = 1, 12.34
 
     # Check primal
-    ks_ans = bar.entry(a, x)
+    ks_ans = bar._entry(a, x)
     ans = bar.raw_f(a, x)
     assert pytest.approx(ks_ans, 1e-5) == ans
 
     # Check grad
-    ks_ans = bar.entry_vjp((a, x), 1.0)
+    ks_ans = bar._entry_vjp((a, x), 1.0)
     ans = grad_bar(a, x)
     assert pytest.approx(ks_ans[1], 1e-5) == ans[1]
 
@@ -124,7 +124,7 @@ def test_far():
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
 
-    ks_ans = far.entry(x, y)
+    ks_ans = far._entry(x, y)
     ans = far.raw_f(x, y)
     assert pytest.approx(ks_ans, 1e-5) == ans.item()
 
@@ -137,7 +137,7 @@ def test_cat():
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
 
-    ks_ans = f.entry(x, y)
+    ks_ans = f._entry(x, y)
     ks_ans_np = numpy.array(ks_ans, copy=True)
     py_ans = f.raw_f(x, y)
     assert (ks_ans_np == py_ans.numpy()).all()  # non-approx
@@ -171,7 +171,7 @@ def test_relu3(generate_lm):
     for x in [-0.1, 0.31221, 2.27160]:
         # Test function: ks == py
         py_ans = relu3(x)
-        ks_ans = ks_relu3.py_mod.entry(x)
+        ks_ans = ks_relu3.py_mod._entry(x)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 
@@ -182,7 +182,7 @@ def test_relu3(generate_lm):
 
         # Test gradient ks == py
         py_ans = grad_relu3(x)
-        ks_ans = ks_relu3.py_mod.entry_vjp(x, 1.0)
+        ks_ans = ks_relu3.py_mod._entry_vjp(x, 1.0)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 

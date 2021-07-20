@@ -584,7 +584,7 @@ def _tsmod2ksmod(
                     if isinstance(module_fn_obj, KscStub):
                         todo_fn = module_fn_obj.raw_f
                     else:
-                        todo_fn = fn_obj
+                        todo_fn = module_fn_obj
                     break
             # Check we found it
             if not todo_fn:
@@ -629,7 +629,7 @@ class KscStub:
         self.ensure_compiled(args)
         return self.compiled.apply(*args)
 
-    def entry(self, *args):
+    def _entry(self, *args):
         """
         Directly call the Knossos compiled function.
         Does not wrap torch tensors, or reset memory allocator.
@@ -638,7 +638,7 @@ class KscStub:
         self.ensure_compiled(args)
         return self.compiled.py_mod.entry(*args)
 
-    def entry_vjp(self, *args):
+    def _entry_vjp(self, *args):
         """
         Directly call the Knossos vjp function.
         Does not wrap torch tensors, or reset memory allocator.
