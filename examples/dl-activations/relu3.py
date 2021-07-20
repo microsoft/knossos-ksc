@@ -520,4 +520,3 @@ if __name__ == "__main__":
     xs = next(vrelu3_bench_configs())
     ys = vrelu3(xs)
     print(ys.sum())
-
