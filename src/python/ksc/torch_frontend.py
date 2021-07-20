@@ -462,6 +462,10 @@ def backward_template(py_mod, ctx, *args):
     return torch_from_ks(outputs)
 
 
+class KscAutogradFunction(torch.autograd.Function):
+    pass
+
+
 def make_KscAutogradFunction(py_mod):
     # We need to make a new class for every py_mod, as PyTorch requires forward and backward to be
     # staticmethods.  This is not too expensive, as each mod needs to be compiled anyway.
@@ -469,7 +473,7 @@ def make_KscAutogradFunction(py_mod):
     backward = lambda ctx, args: backward_template(py_mod, ctx, args)
     return type(
         "KscAutogradFunction_" + py_mod.__name__,
-        (torch.autograd.Function,),
+        (KscAutogradFunction,),
         {
             "py_mod": py_mod,
             "forward": staticmethod(forward),
@@ -614,7 +618,7 @@ class KscStub:
     raw_f: Callable
     generate_lm: bool
     f_module: ModuleType
-    compiled: Optional[Callable]
+    compiled: Optional[KscAutogradFunction]
 
     def __call__(self, *args):
         """
@@ -644,6 +648,7 @@ class KscStub:
         return self.compiled.py_mod.entry_vjp(*args)
 
     def logging(self, flag: bool):
+        assert self.compiled
         return logging(self.compiled.py_mod.logging, flag)
 
     def compile(self, example_inputs, torch_extension_name):
