@@ -190,7 +190,6 @@ PYBIND11_MODULE("""
     m.def("reset_allocator", &ks::entry_points::reset_allocator);
     m.def("allocator_top", &ks::entry_points::allocator_top);
     m.def("allocator_peak", &ks::entry_points::allocator_peak);
-    m.def("logging", &ks::entry_points::logging);
 """
         + "\n".join(m_def(*t) for t in bindings_to_generate)
         + """

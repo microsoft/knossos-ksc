@@ -12,24 +12,12 @@ void reset_allocator();
 size_t allocator_top();
 size_t allocator_peak();
 
-extern bool g_logging;
-bool logging(bool enable);
-
 // Convert functor to one which takes a first argument g_alloc,
 // and optionally logs inputs and outputs to cerr
 template<typename RetType, typename... ParamTypes>
 auto with_ks_allocator(const char * tracingMessage, RetType(*f)(ks::allocator*, ParamTypes...)) {
   return [f, tracingMessage](ParamTypes... params) {
-    if (g_logging) {
-        std::cerr << tracingMessage << "(";
-        (std::cerr << ... << params);
-        std::cerr << ") =" << std::endl;
-        auto ret = f(&g_alloc, params...);
-        std::cerr << ret << std::endl;
-        return ret;
-    } else {
-        return f(&g_alloc, params...);
-    }
+    return f(&g_alloc, params...);
   };
 }
 
@@ -54,23 +42,23 @@ struct Converter
 };
 
 template<typename ...KsElementTypes, typename ...EntryPointElementTypes>
-struct Converter<ks::Tuple<KsElementTypes...>, ks::Tuple<EntryPointElementTypes...>>
+struct Converter<ks::Tuple<KsElementTypes...>, std::tuple<EntryPointElementTypes...>>
 {
   template<size_t ...Indices>
-  static ks::Tuple<KsElementTypes...> to_ks_impl(ks::Tuple<EntryPointElementTypes...> arg, std::index_sequence<Indices...>) {
-    return ks::make_Tuple(convert_argument<KsElementTypes>(ks::get<Indices>(arg))...);
+  static ks::Tuple<KsElementTypes...> to_ks_impl(std::tuple<EntryPointElementTypes...> arg, std::index_sequence<Indices...>) {
+    return ks::make_Tuple(convert_argument<KsElementTypes>(std::get<Indices>(arg))...);
   }
 
-  static ks::Tuple<KsElementTypes...> to_ks(ks::Tuple<EntryPointElementTypes...> arg) {
+  static ks::Tuple<KsElementTypes...> to_ks(std::tuple<EntryPointElementTypes...> arg) {
     return to_ks_impl(arg, std::index_sequence_for<EntryPointElementTypes...>{});
   }
 
   template<size_t ...Indices>
-  static ks::Tuple<EntryPointElementTypes...> from_ks_impl(ks::Tuple<KsElementTypes...> ret, std::index_sequence<Indices...>) {
-    return ks::make_Tuple(convert_return_value<EntryPointElementTypes>(ks::get<Indices>(ret))...);
+  static std::tuple<EntryPointElementTypes...> from_ks_impl(ks::Tuple<KsElementTypes...> ret, std::index_sequence<Indices...>) {
+    return std::make_tuple(convert_return_value<EntryPointElementTypes>(ks::get<Indices>(ret))...);
   }
 
-  static ks::Tuple<EntryPointElementTypes...> from_ks(ks::Tuple<KsElementTypes...> ret) {
+  static std::tuple<EntryPointElementTypes...> from_ks(ks::Tuple<KsElementTypes...> ret) {
     return from_ks_impl(ret, std::index_sequence_for<KsElementTypes...>{});
   }
 };

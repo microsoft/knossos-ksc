@@ -30,7 +30,7 @@ def entry_point_cpp_type(t, use_torch):
         return scalar_type_to_cpp_map[t.kind]
     elif t.is_tuple:
         return (
-            "ks::Tuple<"
+            "std::tuple<"
             + ", ".join(
                 entry_point_cpp_type(child, use_torch) for child in t.tuple_elems()
             )
@@ -102,15 +102,8 @@ def generate_cpp_entry_point(cpp_function_name, decl, use_torch):
     cpp_return_type = entry_point_cpp_type(decl.return_type, use_torch)
 
     # torch::Tensor entry_my_kernel(torch::Tensor arg0, ..., torch::Tensor arg7)
-    cpp = f"{cpp_return_type} {cpp_function_name}({join_args(', ', lambda i: f'{cpp_arg_types[i]} arg{i}')})"
+    cpp = f"{cpp_return_type} {cpp_function_name}({join_args(', ', lambda i: f'{cpp_arg_types[i]} arg{i}')}) {{\n"
 
-    # log arguments
-    args_streamed = join_args(' << ", " ', lambda i: f" << arg{i}")
-    cpp += f"""{{
-    if (g_logging) {{
-        std::cerr << "{ks_function_name}("{args_streamed} << ") =" << std::endl;
-    }}
-"""
     # auto ks_arg0 = convert_argument<ks::tensor<Dim, Float>>(arg0);
     # ...
     # auto ks_arg7 = convert_argument<ks::tensor<Dim, Float>>(arg7);
@@ -122,13 +115,9 @@ def generate_cpp_entry_point(cpp_function_name, decl, use_torch):
     auto ks_ret = ks::{ks_function_name}(&g_alloc {join_args("", lambda i: f", ks_arg{i}")});
 """
 
-    # convert return value, log and return
+    # convert return value and return
     cpp += f"""
-    auto ret = convert_return_value<{cpp_return_type}>(ks_ret);
-    if (g_logging) {{
-        std::cerr << ret << std::endl;
-    }}
-    return ret;
+    return convert_return_value<{cpp_return_type}>(ks_ret);
 }}
 """
     return cpp

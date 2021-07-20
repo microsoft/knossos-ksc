@@ -32,6 +32,26 @@ def relu3(x: float) -> float:
 # ENDDOC
 
 
+# run-bench: PyTorch reference implementation
+def vrelu3_pytorch(x: torch.Tensor):
+    mask1_inf = x > 1.0
+    mask0_1 = (x > 0.0) & ~mask1_inf
+    val_0_1 = 1 / 3 * x ** 3
+    val_1_inf = x - 2 / 3
+
+    return mask0_1 * val_0_1 + mask1_inf * val_1_inf
+
+
+# run-bench: PyTorch "nice" implementation
+def relu3_pytorch_nice(x: float) -> float:
+    if x < 0.0:
+        return torch.zeros_like(x)  # Needed for PyTorch, not for Knossos [Note: zeros]
+    elif x < 1.0:
+        return 1 / 3 * x ** 3
+    else:
+        return x - 2 / 3
+
+
 # run-bench: Knossos implementation
 @knossos.register
 def vrelu3(x: torch.Tensor):
@@ -365,26 +385,6 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound():
         "ksc_dl_activations__manual__vrelu3_embedded_INCORRECT_ks_upper_bound",
         generate_lm=False,
     )
-
-
-# run-bench: PyTorch reference implementation
-def vrelu3_pytorch(x: torch.Tensor):
-    mask1_inf = x > 1.0
-    mask0_1 = (x > 0.0) & ~mask1_inf
-    val_0_1 = 1 / 3 * x ** 3
-    val_1_inf = x - 2 / 3
-
-    return mask0_1 * val_0_1 + mask1_inf * val_1_inf
-
-
-# run-bench: PyTorch "nice" implementation
-def relu3_pytorch_nice(x: float) -> float:
-    if x < 0.0:
-        return torch.zeros_like(x)  # Needed for PyTorch, not for Knossos [Note: zeros]
-    elif x < 1.0:
-        return 1 / 3 * x ** 3
-    else:
-        return x - 2 / 3
 
 
 # With torch 1.9.0 this leads to

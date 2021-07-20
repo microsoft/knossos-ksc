@@ -124,7 +124,7 @@ def test_far():
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
 
-    ks_ans = far._entry(x, y)
+    ks_ans = far(x, y)
     ans = far.raw_f(x, y)
     assert pytest.approx(ks_ans, 1e-5) == ans.item()
 
