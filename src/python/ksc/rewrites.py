@@ -276,6 +276,25 @@ class delete_let(RuleMatcher):
             yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
 
 
+class RuleFilter(RuleMatcher):
+    def __init__(
+        self, name: str, base_rule: RuleMatcher, filter: Callable[[Match], bool]
+    ):
+        super().__init__(name)
+        self._base_rule = base_rule
+        self._filter = filter
+        self.may_match_any_call = base_rule.may_match_any_call
+
+    @property
+    def possible_filter_terms(self):
+        return self._base_rule.possible_filter_terms
+
+    def matches_for_possible_expr(self, ewp: ExprWithPath, env) -> Iterator[Match]:
+        for m in self._base_rule.matches_for_possible_expr(ewp, env):
+            if self._filter(m):
+                yield Match(ewp=m.ewp, rule=self, apply_rewrite=m.apply_rewrite)
+
+
 ###############################################################################
 # Rules parsed from KS. See class Rule (which has a shorter overview of syntax)
 #
