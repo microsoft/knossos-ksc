@@ -127,6 +127,49 @@ def test_lifting_rules_dont_evaluate_computations_early(prelude_symtab):
     assert match.apply_rewrite() == expected4
 
 
+def test_lifting_exceptions_from_if(prelude_symtab):
+    symtab = {
+        **prelude_symtab,
+        "p": Type.Bool,
+        "i": Type.Integer,
+        "x": Type.Tensor(1, Type.Float),
+    }
+    e = parse_expr_string(
+        "(if p (let (x (index i x)) (add x 1.0)) (let (y (index i x)) (mul y 2.0)))"
+    )
+    # "index i x" can be lifted (despite the potential for an exception)
+    # because it is guaranteed to execute either way.
+    # Note also the rebinding of x - however no renaming is necessary:
+    expected = parse_expr_string(
+        "(let (x (index i x)) (if p (add x 1.0) (let (y x) (mul y 2.0))))"
+    )
+    type_propagate_decls([e, expected], symtab)
+    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
+    assert match.apply_rewrite() == expected
+
+    # Test another form of rebinding. No renaming is really necessary, but it happens.
+    e2 = parse_expr_string(
+        "(if p (let (y (index i x)) (add y 1.0)) (let (y (index i x)) (mul y 2.0)))"
+    )
+    expected2 = parse_expr_string(
+        "(let (y_0 (index i x)) (if p (add y_0 1.0) (let (y y_0) (mul y 2.0))))"
+    )
+    type_propagate_decls([e2, expected2], symtab)
+    match2 = utils.single_elem(list(lift_bind_matcher.find_all_matches(e2)))
+    assert match2.apply_rewrite() == expected2
+
+    # This time extra renaming *is* necessary
+    e3 = parse_expr_string(
+        "(if p (let (x (index i x)) (add x 1.0)) (let (y (index i x)) (add y (index 0 x))))"
+    )
+    expected3 = parse_expr_string(
+        "(let (x_0 (index i x)) (if p (add x_0 1.0) (let (y x_0) (add y (index 0 x)))))"
+    )
+    type_propagate_decls([e3, expected3], symtab)
+    match3 = utils.single_elem(list(lift_bind_matcher.find_all_matches(e3)))
+    assert match3.apply_rewrite() == expected3
+
+
 def test_lifting_over_build(prelude_symtab):
     e = parse_expr_string(
         "(build 10 (lam (i : Integer) (let (x (add 5 7)) (if (gt x 5) x i))))"
