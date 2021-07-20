@@ -30,7 +30,7 @@ def entry_point_cpp_type(t, use_torch):
         return scalar_type_to_cpp_map[t.kind]
     elif t.is_tuple:
         return (
-            "ks::Tuple<"
+            "std::tuple<"
             + ", ".join(
                 entry_point_cpp_type(child, use_torch) for child in t.tuple_elems()
             )
