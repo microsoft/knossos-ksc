@@ -208,7 +208,7 @@ class ParsedLetLifter(ParsedRuleMatcher):
         assert "rhs" in self._arg_types.keys()
         assert "body" in self._arg_types.keys()
 
-    def apply_at(self, ewp: ExprWithPath, **substs: VariableSubstitution) -> Expr:
+    def _apply_at(self, ewp: ExprWithPath, **substs: VariableSubstitution) -> Expr:
         exprs_not_to_capture = [
             e for v, e in substs.items() if v not in ["x", "rhs", "body"]
         ]
@@ -216,7 +216,7 @@ class ParsedLetLifter(ParsedRuleMatcher):
             substs["x"], substs["body"], exprs_not_to_capture
         )
         # The repeated ** here is so we override the entries in substs for x and body
-        return super().apply_at(ewp, **{**substs, "x": x, "body": body})
+        return super()._apply_at(ewp, **{**substs, "x": x, "body": body})
 
 
 lift_let_rules = [

@@ -320,6 +320,22 @@ class ParsedRuleMatcher(RuleMatcher):
     def possible_filter_terms(self):
         return frozenset([get_filter_term(self._rule.template)])
 
+    # This is an instance method to allow overriding in subclass(es)
+    def _apply_at(self, ewp: ExprWithPath, **substs: VariableSubstitution) -> Expr:
+        def apply_here(const_zero: Expr, target: Expr) -> Expr:
+            assert const_zero == Const(0.0)  # Passed to replace_subtree below
+            assert are_alpha_equivalent(
+                SubstPattern.visit(self._rule.template, substs), target
+            )  # Note this traverses, so expensive.
+            result = SubstPattern.visit(self._rule.replacement, substs)
+            # Types copied from the template (down to the variables, and the subject-expr's types from there).
+            # So there should be no need for any further type-propagation.
+            assert result.type_ == target.type_
+            return result
+
+        # The constant just has no free variables that we want to avoid being captured
+        return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
+
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment
     ) -> Iterator[Match]:
@@ -327,23 +343,9 @@ class ParsedRuleMatcher(RuleMatcher):
         # the result will then be replacement[subst].
         substs = find_template_subst(self._rule.template, ewp.expr, self._arg_types)
         if substs is not None and self._side_conditions(**substs):
-
-            def apply() -> Expr:
-                def apply_here(const_zero: Expr, target: Expr) -> Expr:
-                    assert const_zero == Const(0.0)  # Passed to replace_subtree below
-                    assert are_alpha_equivalent(
-                        SubstPattern.visit(self._rule.template, substs), target
-                    )  # Note this traverses, so expensive.
-                    result = SubstPattern.visit(self._rule.replacement, substs)
-                    # Types copied from the template (down to the variables, and the subject-expr's types from there).
-                    # So there should be no need for any further type-propagation.
-                    assert result.type_ == target.type_
-                    return result
-
-                # The constant just has no free variables that we want to avoid being captured
-                return replace_subtree(ewp.root, ewp.path, Const(0.0), apply_here)
-
-            yield Match(ewp=ewp, rule=self, apply_rewrite=apply)
+            yield Match(
+                ewp=ewp, rule=self, apply_rewrite=lambda: self._apply_at(ewp, **substs)
+            )
 
 
 def _combine_substs(

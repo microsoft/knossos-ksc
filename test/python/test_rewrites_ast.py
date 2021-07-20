@@ -1,7 +1,7 @@
 import pytest
 
 from ksc.rewrites import RuleSet
-from ksc.rewrites_ast import lift_let_rules, lift_if_rules
+from ksc.rewrites_ast import lift_let_rules, lift_if_rules, lift_let_over_call
 from ksc.parse_ks import parse_expr_string
 from ksc.type import Type
 from ksc.type_propagate import type_propagate, type_propagate_decls
@@ -60,15 +60,16 @@ def test_interchange_lets(prelude_symtab):
     assert len(list(lift_bind_matcher.find_all_matches(cant_lift))) == 0
 
 
-def test_lift_bind_shadowing(prelude_symtab):
+def test_lift_bind_shadowing_call(prelude_symtab):
+    matcher = RuleSet([lift_let_over_call])
     e = parse_expr_string("(add (let (x (add x 1)) x) x)")
-    # The RHS of the let refers to another (free) x - just check:
+    # The RHS of the let and the add both refer to another (free) x - just check:
     with pytest.raises(Exception):
         type_propagate(e, prelude_symtab)
     # So, we must rename the bound x so as not to capture the free x
     expected = parse_expr_string("(let (x_0 (add x 1)) (add x_0 x))")
     type_propagate_decls([e, expected], {**prelude_symtab, "x": Type.Integer})
-    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
+    match = utils.single_elem(list(matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == expected
 
@@ -77,10 +78,21 @@ def test_lift_bind_shadowing(prelude_symtab):
     e = parse_expr_string("(add (let (x (add x 1)) x) 2)")
     expected = parse_expr_string("(let (x (add x 1)) (add x 2))")
     renamed = parse_expr_string("(let (x_0 (add x 1)) (add x_0 2))")
-    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
+    match = utils.single_elem(list(matcher.find_all_matches(e)))
     actual = match.apply_rewrite()
     assert actual == expected
     assert actual != renamed
+
+
+def test_lift_bind_shadowing_parsed(prelude_symtab):
+    # Similar to previous, but using ParsedRuleMatcher / ParsedLetLifter
+    e = parse_expr_string("(if (let (x (add x 1)) (gt x 2)) x 1)")
+    # Must rename the bound x so as not to capture the free x
+    expected = parse_expr_string("(let (x_0 (add x 1)) (if (gt x_0 2) x 1))")
+    type_propagate_decls([e, expected], {**prelude_symtab, "x": Type.Integer})
+    match = utils.single_elem(list(lift_bind_matcher.find_all_matches(e)))
+    actual = match.apply_rewrite()
+    assert actual == expected
 
 
 def test_lifting_rules_dont_evaluate_computations_early(prelude_symtab):
