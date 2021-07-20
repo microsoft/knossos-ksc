@@ -259,6 +259,20 @@ shouldInline to_inline
                      , rev "sqrt" f
                      , fwd "erf" f
                      , rev "erf" f
+                     , fwd "aten::mul" ff
+                     , rev "aten::mul" ff
+                     , fwd "aten::add" ff
+                     , rev "aten::add" ff
+                     , fwd "aten::div" ff
+                     , rev "aten::div" ff
+                     , fwd "aten::sub" ff
+                     , rev "aten::sub" ff
+                     , fwd "aten::lt" ff
+                     , rev "aten::lt" ff
+                     , fwd "aten::sqrt" f
+                     , rev "aten::sqrt" f
+                     , fwd "aten::erf" f
+                     , rev "aten::erf" f
                      ]
   where fwd f t = Fun SUFFwdPass (BaseFunId f t)
         rev f t = Fun SUFRevPass (BaseFunId f t)
@@ -284,6 +298,8 @@ optFun env (PrimFunT P_inline) arg
   , Just fun_def <- lookupGblST userFun (optGblST env)
   , Def { def_pat = pat, def_rhs = UserRhs body } <- fun_def
   = Just (inlineCall env pat body inner_arg)
+  | otherwise
+  = Just arg
 
 -- Other prims are determined by their args
 optFun env (PrimFunT f) e
@@ -302,6 +318,7 @@ optPrimFun :: InScopeSet -> PrimFun -> TExpr -> Maybe TExpr
 optPrimFun _ P_Vec_init _args 
   = Nothing 
 
+{-
 optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
   = Just . Konst . KFloat $
     case op of
@@ -316,6 +333,7 @@ optPrimFun _ op (Tuple [Konst (KFloat k1), Konst (KFloat k2)])
           , ""
           , "    https://github.com/microsoft/knossos-ksc/pull/61/commits/29c2ab04568e17b953d3fe942aba5881ab15e1f8#r309892713"
           ]
+-}
 
 -- RULE: (e1 : ()) + (e2 : ()) = ()
 -- The type () contains only one value (), which is a zero of the type

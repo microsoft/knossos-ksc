@@ -109,5 +109,17 @@
                           (mul (bool_to_float (not in0to1)) val1up)))
                 ddri)))))) t dret))
 
+(def aten::relu3 Float (x : Float)
+     (if (aten::lt x 0.0)
+         0.0
+     (if (aten::lt x 1.0)
+         (aten::div (aten::mul x (aten::mul x x)) 3.0)
+     (aten::sub x (aten::div 2.0 3.0)))))
+
+(gdef fwd [aten::relu3 Float])
+(gdef rev [aten::relu3 Float])
+(gdef suffwdpass [aten::relu3 Float])
+(gdef sufrevpass [aten::relu3 Float])
+(gdef sufrev [aten::relu3 Float])
 
 (def main Integer () 0)
