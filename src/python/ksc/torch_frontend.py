@@ -1,9 +1,8 @@
-from typing import Callable, List, Tuple, Optional
+from typing import Callable, List, Tuple, Optional, Union, Set
 from types import ModuleType
 from dataclasses import dataclass
 from contextlib import contextmanager
 import functools
-import numpy
 import inspect
 import torch
 import torch.onnx
@@ -65,45 +64,11 @@ def tail(iter):
     return iter
 
 
-# TODO: make this less pythonic, i.e. eschew global state modification
-todo_stack = None
-
-
 def type_from_value(x):
     if isinstance(x, torch.Tensor):
         return Type.Tensor(len(x.size()), from_torch_dtype(x.dtype))
 
     return Type.fromValue(x)
-
-
-make_new_var_index = 0
-
-
-def make_new_var(type=None):
-    global make_new_var_index
-    name = f"ts2ks${make_new_var_index}"
-    make_new_var_index += 1
-    return Var(name, type)
-
-
-def make_arg(input, example_input):
-    input_type = from_torch_type(input.type())
-    example_input_type = type_from_value(example_input)
-    if example_input_type.kind != input_type.kind:
-        print(
-            f"Warn: example input type {example_input_type} differs from TorchScript input type {input_type}"
-        )
-    else:
-        # input_type will have wrong shape, grab example_input_type
-        # TODO: shape propagation, or full abstract interpretation
-        input_type = example_input_type
-
-    name = mangled_name(input)
-    return Var(name, input_type)
-
-
-def mangled_name(node):
-    return "_" + utils.encode_name(node.debugName())
 
 
 def from_torch_dtype(t):
@@ -138,6 +103,10 @@ def from_torch_type(t):
     assert False
 
 
+def mangled_name(node):
+    return "_" + utils.encode_name(node.debugName())
+
+
 def var_or_constant(node):
     val = node.toIValue()
     if val is None:
@@ -146,252 +115,324 @@ def var_or_constant(node):
         return Const(val)
 
 
-def make_constant(node):
+class TorchScriptVisitor:
+    functions_todo: Set[Union[str, Callable]]
+    functions_done: Set[Union[str, Callable]]
+    make_new_var_index = 0
 
-    value = node.outputsAt(0)
+    def __init__(self):
+        self.functions_todo = set()
+        self.functions_done = set()
+        pass
 
-    if isinstance(value.type(), torch._C.NoneType):
-        val = Call("tuple", [])
+    def mark_function_as_needed(self, f):
+        print(f"TorchScriptVisitor: Adding {f} to todo {self.functions_todo}")
+        if f not in self.functions_done:
+            self.functions_todo.add(f)
 
-    elif isinstance(value.type(), torch._C.BoolType):
-        val = Const(value.toIValue())
-        assert val.type_ == Type.Bool
+    def mark_function_as_done(self, f):
+        print(f"TorchScriptVisitor: Marking {f} as done")
+        if f in self.functions_todo:
+            self.functions_todo.remove(f)
+        self.functions_done.add(f)
 
-    else:
-        try:
-            possibleLiteral = value.toIValue()
-            if possibleLiteral is None:
-                literal = 0.0
-            elif possibleLiteral == 0:
-                literal = 0.0
-            else:
-                literal = possibleLiteral
-        except RuntimeError:  # TODO: do we have to try/except?
-            literal = "FUNCTIONCALL"
-        val = Const(literal)
+    def make_new_var(self, type=None):
+        name = f"ts2ks${self.make_new_var_index}"
+        self.make_new_var_index += 1
+        return Var(name, type)
 
-    return Var("_" + value.debugName()), val
+    def make_arg(self, input, example_input):
+        input_type = from_torch_type(input.type())
+        example_input_type = type_from_value(example_input)
+        if example_input_type.kind != input_type.kind:
+            print(
+                f"TorchScriptVisitor: example input type {example_input_type} differs from TorchScript input type {input_type}"
+            )
+        else:
+            # input_type will have wrong shape, grab example_input_type
+            # TODO: shape propagation, or full abstract interpretation
+            input_type = example_input_type
 
+        name = mangled_name(input)
+        return Var(name, input_type)
 
-def make_list(node):
-    value = node.outputsAt(0)
-    return (
-        Var(mangled_name(value)),
-        Call("Vec_init", [var_or_constant(i) for i in node.inputs()]),
-    )
+    def make_constant(self, node):
 
+        value = node.outputsAt(0)
 
-def make_tuple(node):
-    value = node.outputsAt(0)
-    return (
-        Var(mangled_name(value)),
-        Call("tuple", [var_or_constant(i) for i in node.inputs()]),
-    )
+        if isinstance(value.type(), torch._C.NoneType):
+            val = Call("tuple", [])
 
+        elif isinstance(value.type(), torch._C.BoolType):
+            val = Const(value.toIValue())
+            assert val.type_ == Type.Bool
 
-def make_tensor(node):
-    # tensors aren't explicitly modelled in Knossos yet, leave them as identity over a (jagged) list for now
-    value = node.outputsAt(0)
-    return Var(mangled_name(value)), var_or_constant(node.inputsAt(0))
+        else:
+            try:
+                possibleLiteral = value.toIValue()
+                if possibleLiteral is None:
+                    literal = 0.0
+                elif possibleLiteral == 0:
+                    literal = 0.0
+                else:
+                    literal = possibleLiteral
+            except RuntimeError:  # TODO: do we have to try/except?
+                literal = "FUNCTIONCALL"
+            val = Const(literal)
 
+        return Var("_" + value.debugName()), val
 
-def make_aten_function(node, value, function_name):
-    return (
-        Var(mangled_name(value)),
-        Call(function_name, [var_or_constant(i) for i in node.inputs()]),
-    )
-
-
-def make_return(node):
-    mangled_id = mangled_name(node.inputsAt(0))
-    return Var(mangled_id)
-
-
-def make_callfunction(node):
-    value = node.outputsAt(0)
-    assert len(list(node.outputs())) == 1  # Assemble into tuple for multiple outputs
-    function_name_constant = node.inputsAt(0).node()
-    function_name = function_name_constant.s("name")
-    return (
-        Var(mangled_name(value)),
-        Call(function_name, [var_or_constant(i) for i in tail(node.inputs())]),
-    )
-
-
-def make_PythonOp(node):
-    value = node.outputsAt(0)
-    assert len(list(node.outputs())) == 1  # Assemble into tuple for multiple outputs
-    pyname = node.pyname()
-    if pyname == "elementwise_apply_hack":
-        global todo_stack
-        function_name_constant = node.inputsAt(0).node()
-        function_name = function_name_constant.s("value")
-        print(f"Adding {function_name} to todo {todo_stack}")
-        todo_stack.add(function_name)
-
-        var = make_new_var(Type.Float)  # TODO: need to propagate properly
-        map_lambda = Lam(var, Call(function_name, [var]))
-
+    def make_list(self, node):
+        value = node.outputsAt(0)
         return (
             Var(mangled_name(value)),
-            Call(
-                "map", [map_lambda] + [var_or_constant(i) for i in tail(node.inputs())]
-            ),
+            Call("Vec_init", [var_or_constant(i) for i in node.inputs()]),
         )
 
-    raise NotImplementedError(f"PythonOp {pyname}")
-
-
-def make_lets(bindings, body) -> Expr:
-    for (v, rhs) in reversed(bindings):
-        body = Let(v, rhs, body)
-    return body
-
-
-def make_loop(make_binds, node):
-    # def foofilter_comp(xs: Tensor) -> Tensor:
-    #     _0 = annotate(List[Tensor], [])
-    #     _1 = ops.prim.min([9223372036854775807, torch.len(xs)])
-    #     for n in range(_1):
-    #         x = torch.select(xs, 0, n)
-    #         if bool(torch.lt(x, 0.)):
-    #             _2 = torch.mul(x, -0.125)
-    #         else:
-    #             _3 = torch.div(1, n)
-    #             _2 = torch.mul(torch.pow(x, 2), _3)
-    #         _4 = torch.append(_0, _2)
-    #     t = torch.tensor(_0, dtype=None, device=None, requires_grad=False)
-    #     _5 = torch.mean(torch.mul(torch.sin(t), t), dtype=None)
-    #     return _5
-
-    # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md#loops
-    # %y_1, ..., %y_r = prim::Loop(%max_trip_count, %initial_condition, %x_1, ..., %x_r)
-    #                     block0(%i, %a_1, ..., %a_r):
-    #                         %b_1, ..., %b_m = some::node(%a_value_from_outer_block, %a_1)
-    #                         %iter_condition = some::other_node(%a_2)
-    #                         -> (%iter_condition, %b_1, ..., %b_r)
-
-    max_trip_count, initial_condition, *x_nodes = node.inputs()
-    y_nodes = tuple(node.outputs())
-    (block0,) = node.blocks()
-    i, *a_nodes = block0.inputs()
-    iter_condition, *b_nodes = block0.outputs()
-
-    # For now, match only the for loop version
-    assert make_constant(iter_condition.node())[1] == Const(True)
-    assert len(a_nodes) == 0
-    assert len(b_nodes) == 0
-    assert len(y_nodes) == 0
-
-    body_nodes = list(block0.nodes())
-    last = body_nodes[-1]
-    if last.kind() == "aten::append":
-        # Special case for list comprehensions
-        l, item = last.inputs()
-        assert l.node().kind() == "prim::ListConstruct"
-
-        binds = make_binds(body_nodes[:-1])
-        lam_body = make_lets(binds, var_or_constant(item))
-
-        lam = Lam(Var(mangled_name(i), Type.Integer), lam_body)
-
-        return var_or_constant(l), Call("build", [var_or_constant(max_trip_count), lam])
-
-    print(node)
-    assert False
-
-
-def make_if(make_binds, node):
-    def make_branch(block):
-        binds = make_binds(block.nodes())
-        body = make_return(block.returnNode())
-        return make_lets(binds, body)
-
-    identifier = None
-    if node.outputsSize() == 0:
-        identifier = "_" + "dummy"  # we're likely to need to make them unique
-    else:
-        identifier = "_" + node.outputsAt(0).debugName()
-
-    inputs_size = sum(1 for _ in node.inputs())
-
-    if inputs_size != 1:
-        raise Exception(
-            "Only support conditionals with 1 input, this one had: " + str(inputs_size)
+    def make_tuple(self, node):
+        value = node.outputsAt(0)
+        return (
+            Var(mangled_name(value)),
+            Call("tuple", [var_or_constant(i) for i in node.inputs()]),
         )
 
-    conditional = mangled_name(node.inputsAt(0))
+    def make_tensor(self, node):
+        # tensors aren't explicitly modelled in Knossos yet, leave them as identity over a (jagged) list for now
+        value = node.outputsAt(0)
+        return Var(mangled_name(value)), var_or_constant(node.inputsAt(0))
 
-    blocks = list(
-        node.blocks()
-    )  # TODO: check length exactly 2, only supporting if/else currently. This is enough for BERT example
+    def make_aten_function(self, node, value, function_name):
+        return (
+            Var(mangled_name(value)),
+            Call(function_name, [var_or_constant(i) for i in node.inputs()]),
+        )
 
-    success_branch = make_branch(blocks[0])
-    failure_branch = make_branch(blocks[1])
+    def make_return(self, node):
+        mangled_id = mangled_name(node.inputsAt(0))
+        return Var(mangled_id)
 
-    return Var(identifier), If(Var(conditional), success_branch, failure_branch)
+    def make_callfunction(self, node):
+        value = node.outputsAt(0)
+        assert (
+            len(list(node.outputs())) == 1
+        )  # Assemble into tuple for multiple outputs
+        function_name_constant = node.inputsAt(0).node()
+        function_name = function_name_constant.s("name")
+        self.mark_function_as_needed(function_name)
+        return (
+            Var(mangled_name(value)),
+            Call(function_name, [var_or_constant(i) for i in tail(node.inputs())]),
+        )
 
+    def make_PythonOp(self, node):
+        value = node.outputsAt(0)
+        assert (
+            len(list(node.outputs())) == 1
+        )  # Assemble into tuple for multiple outputs
+        pyname = node.pyname()
+        if pyname == "elementwise_apply_hack":
+            function_name_constant = node.inputsAt(0).node()
+            function_name = function_name_constant.s("value")
+            self.mark_function_as_needed(function_name)
 
-def ts2ks_fromgraph(generate_edefs, name, graph, example_inputs):
-    def translate_node(make_binds, node) -> Tuple[Var, Expr]:
-        lookups: typing.Dict[str, Callable] = {
-            "prim::Constant": make_constant,
-            "prim::ListConstruct": make_list,
-            "prim::TupleConstruct": make_tuple,
-            "prim::Return": make_return,
-            "prim::CallFunction": make_callfunction,
-            "prim::PythonOp": make_PythonOp,
-            "prim::Loop": functools.partial(make_loop, make_binds=make_binds),
-            "prim::If": functools.partial(make_if, make_binds=make_binds),
-        }
+            var = self.make_new_var(Type.Float)  # TODO: need to propagate properly
+            map_lambda = Lam(var, Call(function_name, [var]))
 
-        kind = node.kind()
-        if kind in lookups:
-            return lookups[kind](node=node)
-
-        primfuns = ["prim::min"]
-        if kind.startswith("aten::") or kind in primfuns:
-            return make_aten_function(node, node.outputsAt(0), kind)
-
-        print("WARNING, unimplmented node kind: " + node.kind())
-        return Var("ERR"), Var(node.kind())
-
-    def make_binds(nodes) -> List[Tuple[Var, Expr]]:
-        return [translate_node(make_binds, node) for node in nodes]
-
-    all_nodes = list(graph.nodes())
-
-    binds = make_binds(all_nodes)
-
-    args = [
-        make_arg(input, example)
-        for input, example in zip(graph.inputs(), example_inputs)
-        # if (not input.type().str().startswith("__torch__.transformers"))
-    ]  # filtering self, TODO: look for better way
-
-    print_count = sum(1 for node in all_nodes if node.kind() == "prim::Print")
-
-    # HACK: if last operation is print, we want that otherwise it's a return value.
-    # need to think about interaction between imperative Python and pure Knossos
-    if all_nodes[-1].kind() == "prim::Print":
-        if print_count > 1:
-            print(
-                "WARNING: multiple print statements used, only final one currently translated"
+            return (
+                Var(mangled_name(value)),
+                Call(
+                    "map",
+                    [map_lambda] + [var_or_constant(i) for i in tail(node.inputs())],
+                ),
             )
-        op = translate_node(make_binds, all_nodes[-1])
-        return_type = Type.Integer
-    else:
-        if print_count > 0:
-            print(
-                "WARNING: print statement currently only supported as final operation"
+
+        raise NotImplementedError(f"PythonOp {pyname}")
+
+    def make_lets(self, bindings, body) -> Expr:
+        for (v, rhs) in reversed(bindings):
+            body = Let(v, rhs, body)
+        return body
+
+    def make_loop(self, make_binds, node):
+        # def foofilter_comp(xs: Tensor) -> Tensor:
+        #     _0 = annotate(List[Tensor], [])
+        #     _1 = ops.prim.min([9223372036854775807, torch.len(xs)])
+        #     for n in range(_1):
+        #         x = torch.select(xs, 0, n)
+        #         if bool(torch.lt(x, 0.)):
+        #             _2 = torch.mul(x, -0.125)
+        #         else:
+        #             _3 = torch.div(1, n)
+        #             _2 = torch.mul(torch.pow(x, 2), _3)
+        #         _4 = torch.append(_0, _2)
+        #     t = torch.tensor(_0, dtype=None, device=None, requires_grad=False)
+        #     _5 = torch.mean(torch.mul(torch.sin(t), t), dtype=None)
+        #     return _5
+
+        # https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md#loops
+        # %y_1, ..., %y_r = prim::Loop(%max_trip_count, %initial_condition, %x_1, ..., %x_r)
+        #                     block0(%i, %a_1, ..., %a_r):
+        #                         %b_1, ..., %b_m = some::node(%a_value_from_outer_block, %a_1)
+        #                         %iter_condition = some::other_node(%a_2)
+        #                         -> (%iter_condition, %b_1, ..., %b_r)
+
+        max_trip_count, initial_condition, *x_nodes = node.inputs()
+        y_nodes = tuple(node.outputs())
+        (block0,) = node.blocks()
+        i, *a_nodes = block0.inputs()
+        iter_condition, *b_nodes = block0.outputs()
+
+        # For now, match only the for loop version
+        assert self.make_constant(iter_condition.node())[1] == Const(True)
+        assert len(a_nodes) == 0
+        assert len(b_nodes) == 0
+        assert len(y_nodes) == 0
+
+        body_nodes = list(block0.nodes())
+        last = body_nodes[-1]
+        if last.kind() == "aten::append":
+            # Special case for list comprehensions
+            l, item = last.inputs()
+            assert l.node().kind() == "prim::ListConstruct"
+
+            binds = make_binds(body_nodes[:-1])
+            lam_body = self.make_lets(binds, var_or_constant(item))
+
+            lam = Lam(Var(mangled_name(i), Type.Integer), lam_body)
+
+            return (
+                var_or_constant(l),
+                Call("build", [var_or_constant(max_trip_count), lam]),
             )
-        return_node = graph.return_node()
-        op = translate_node(make_binds, return_node)
-        return_type = None  # Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
 
-    body = make_lets(binds, op)
+        print(node)
+        assert False
 
-    return Def(StructuredName(name), return_type, args, body)
+    def make_if(self, make_binds, node):
+        def make_branch(block):
+            binds = make_binds(block.nodes())
+            body = self.make_return(block.returnNode())
+            return self.make_lets(binds, body)
+
+        identifier = None
+        if node.outputsSize() == 0:
+            identifier = "_" + "dummy"  # we're likely to need to make them unique
+        else:
+            identifier = "_" + node.outputsAt(0).debugName()
+
+        inputs_size = sum(1 for _ in node.inputs())
+
+        if inputs_size != 1:
+            raise Exception(
+                "Only support conditionals with 1 input, this one had: "
+                + str(inputs_size)
+            )
+
+        conditional = mangled_name(node.inputsAt(0))
+
+        blocks = list(
+            node.blocks()
+        )  # TODO: check length exactly 2, only supporting if/else currently. This is enough for BERT example
+
+        success_branch = make_branch(blocks[0])
+        failure_branch = make_branch(blocks[1])
+
+        return Var(identifier), If(Var(conditional), success_branch, failure_branch)
+
+    def generate_def(self, name, graph, example_inputs):
+        def translate_node(make_binds, node) -> Tuple[Var, Expr]:
+            lookups: typing.Dict[str, Callable] = {
+                "prim::Constant": self.make_constant,
+                "prim::ListConstruct": self.make_list,
+                "prim::TupleConstruct": self.make_tuple,
+                "prim::Return": self.make_return,
+                "prim::CallFunction": self.make_callfunction,
+                "prim::PythonOp": self.make_PythonOp,
+                "prim::Loop": functools.partial(self.make_loop, make_binds=make_binds),
+                "prim::If": functools.partial(self.make_if, make_binds=make_binds),
+            }
+
+            kind = node.kind()
+            if kind in lookups:
+                return lookups[kind](node=node)
+
+            primfuns = ["prim::min"]
+            if kind.startswith("aten::") or kind in primfuns:
+                return self.make_aten_function(node, node.outputsAt(0), kind)
+
+            print("WARNING, unimplmented node kind: " + node.kind())
+            return Var("ERR"), Var(node.kind())
+
+        def make_binds(nodes) -> List[Tuple[Var, Expr]]:
+            return [translate_node(make_binds, node) for node in nodes]
+
+        all_nodes = list(graph.nodes())
+
+        binds = make_binds(all_nodes)
+
+        args = [
+            self.make_arg(input, example)
+            for input, example in zip(graph.inputs(), example_inputs)
+            # if (not input.type().str().startswith("__torch__.transformers"))
+        ]  # filtering self, TODO: look for better way
+
+        print_count = sum(1 for node in all_nodes if node.kind() == "prim::Print")
+
+        # HACK: if last operation is print, we want that otherwise it's a return value.
+        # need to think about interaction between imperative Python and pure Knossos
+        if all_nodes[-1].kind() == "prim::Print":
+            if print_count > 1:
+                print(
+                    "WARNING: multiple print statements used, only final one currently translated"
+                )
+            op = translate_node(make_binds, all_nodes[-1])
+            return_type = Type.Integer
+        else:
+            if print_count > 0:
+                print(
+                    "WARNING: print statement currently only supported as final operation"
+                )
+            return_node = graph.return_node()
+            op = translate_node(make_binds, return_node)
+            return_type = None  # Infer return type in type propagation from_torch_type(return_node.inputsAt(0).type())
+
+        body = self.make_lets(binds, op)
+
+        return Def(StructuredName(name), return_type, args, body)
+
+    def generate_defs_recursive(self, module, function_obj, example_inputs):
+        self.mark_function_as_needed(function_obj)
+
+        ksc_defs = []
+        while self.functions_todo:
+            print(f"TorchScriptVisitor: Remaining: {self.functions_todo}")
+            todo = next(iter(self.functions_todo))
+            if isinstance(todo, str):
+                # String function name, try to find it in the caller's module
+                todo_fn = None
+                for module_fn_name, module_fn_obj in inspect.getmembers(module):
+                    if module_fn_name == todo:
+                        print(
+                            f"TorchScriptVisitor: converting {todo}, remaining: {self.functions_todo}"
+                        )
+                        if isinstance(module_fn_obj, KscStub):
+                            todo_fn = module_fn_obj.raw_f
+                        else:
+                            todo_fn = module_fn_obj
+                        break
+                # Check we found it
+                if not todo_fn:
+                    raise ValueError(f"Did not find string-named function {todo}")
+            else:
+                todo_fn = todo
+
+            self.mark_function_as_done(todo)
+
+            ts_fn = torch.jit.script(todo_fn)
+            ts_graph = ts_fn.graph
+            ksc_def = self.generate_def(todo_fn.__name__, ts_graph, example_inputs)
+            ksc_defs.insert(0, ksc_def)
+        return ksc_defs
 
 
 def make_tuple_if_many_args(*args):
@@ -404,7 +445,8 @@ def make_tuple_if_many_args(*args):
 
 # TODO: make an configuration named tuple rather than passing flags
 def ts2ks(output, generate_edefs, function, example_inputs):
-    s = ts2ks_fromgraph(generate_edefs, function.name, function.graph, example_inputs)
+    visitor = TorchScriptVisitor()
+    s = visitor.generate_def(function.name, function.graph, example_inputs)
     output.write(pformat(s))
 
 
@@ -655,35 +697,8 @@ def is_elementwise_operation(ksc_def):
 def _tsmod2ksmod(
     module, function_obj, torch_extension_name, example_inputs, generate_lm=True
 ):
-    global todo_stack
-    todo_stack = {function_obj}
-    ksc_defs = []
-    while len(todo_stack) > 0:
-        print(f"tsmod2ksmod: Remaining: {todo_stack}")
-        todo = next(iter(todo_stack))
-        if isinstance(todo, str):
-            # String function name, try to find it in the caller's module
-            todo_fn = None
-            for module_fn_name, module_fn_obj in inspect.getmembers(module):
-                if module_fn_name == todo:
-                    print(f"tsmod2ksmod: converting {todo}, remaining: {todo_stack}")
-                    if isinstance(module_fn_obj, KscStub):
-                        todo_fn = module_fn_obj.raw_f
-                    else:
-                        todo_fn = module_fn_obj
-                    break
-            # Check we found it
-            if not todo_fn:
-                raise ValueError(f"Did not find string-named function {todo}")
-        else:
-            todo_fn = todo
-
-        todo_stack.remove(todo)
-
-        ts_fn = torch.jit.script(todo_fn)
-        ts_graph = ts_fn.graph
-        ksc_def = ts2ks_fromgraph(False, todo_fn.__name__, ts_graph, example_inputs)
-        ksc_defs.insert(0, ksc_def)
+    visitor = TorchScriptVisitor()
+    ksc_defs = visitor.generate_defs_recursive(module, function_obj, example_inputs)
 
     elementwise = is_elementwise_operation(ksc_defs[-1])
     if elementwise:
@@ -701,7 +716,8 @@ def _tsmod2ksmod(
 
 def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
     fn = torch.jit.script(function)
-    ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
+    visitor = TorchScriptVisitor()
+    ksc_def = visitor.generate_def(False, fn.name, fn.graph, example_inputs)
     return ksc_defs_to_autograd_function(
         [ksc_def],
         ksc_def,
@@ -762,6 +778,8 @@ class KscStub:
             torch_extension_name = (
                 "KscStub_" + self.f_module.__name__ + "_" + self.raw_f.__name__
             )
+            if self.generate_lm:
+                torch_extension_name += "__generate_lm"
             self.compile(example_inputs, torch_extension_name)
 
 
