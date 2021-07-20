@@ -192,7 +192,7 @@ def test_lifting_over_build(prelude_symtab):
         """
     (let (x (add 5 7)) (if (gt 10 0)
                            (if (gt x 5) (build 10 (lam (i : Integer) x)) (build 10 (lam (i : Integer) i)))
-                           (build 0 (lam (i : Integer) (if (gt x 5) x i)))))
+                           (build 10 (lam (i : Integer) (if (gt x 5) x i)))))
     """
     )
     type_propagate_decls([expected2], prelude_symtab)

@@ -136,19 +136,17 @@ lift_if_rules = (
         ),
         parse_rule_str(
             """(rule "lift_if_over_build" ((n : Integer) (p : Bool) (t : Any) (f : Any))
-                 (build n (lam (i : Integer) (if p t f)))
-                 (if (gt n 0) (if p (build n (lam (i : Integer) t))
+                 (build n (lam (i : Integer) (if p t f)))  ; condition "p" invariant
+                 (if (gt n 0)
+                     ; True branch: p *would* be evaluated, so can do so now
+                     (if p (build n (lam (i : Integer) t))
                                     (build n (lam (i : Integer) f)))
-                              (build 0 (lam (i : Integer) (if p t f)))))""",
+                     ; False branch: p would not have been evaluated, so don't
+                     ; TODO: replace with a constVec of size 0 dummy values of appropriate type ??
+                     (build n (lam (i : Integer) (if p t f)))))""",
             {},
-            # TODO: replace the final "else" case with a constVec of size 0 dummy values of appropriate type.
             # TODO Should we have another version that avoids the outer "if" when can_evaluate_ahead_of_condition(rhs, n > 0) is true?
-            side_conditions=lambda *, i, n, p, t, f: (
-                i.name not in p.free_vars_
-                and
-                # In the absence of constVec 0 this avoids an infinite chain of rewrites each adding an (if (gt 0 0) ...).
-                (n != Const(0))
-            ),
+            side_conditions=lambda *, i, n, p, t, f: (i.name not in p.free_vars_),
         ),
         lift_if_over_call,
     ]
