@@ -64,14 +64,14 @@ def compile_relux():
         ks_relux = ts2mod(relux, (1.0,), torch_extension_name)
 
 
-def test_ts2k_relux():
+def test_relux():
     compile_relux()
     ks_ans = ks_relux.py_mod.entry(2.0)
     ans = relux(2.0)
     assert pytest.approx(ks_ans, 1e-6) == ans
 
 
-def test_ts2k_relux_grad():
+def test_relux_grad():
     compile_relux()
     ks_ans = ks_relux.py_mod.entry_vjp(1.3, 1.0)
     ans = grad_relux(1.3)
