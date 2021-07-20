@@ -124,7 +124,7 @@ def test_far():
     x = torch.randn(2, 3)
     y = torch.randn(2, 5)
 
-    ks_ans = far(x, y)
+    ks_ans = far._entry(x, y)
     ans = far.raw_f(x, y)
     assert pytest.approx(ks_ans, 1e-5) == ans.item()
 
@@ -171,7 +171,7 @@ def test_relu3(generate_lm):
     for x in [-0.1, 0.31221, 2.27160]:
         # Test function: ks == py
         py_ans = relu3(x)
-        ks_ans = ks_relu3.py_mod._entry(x)
+        ks_ans = ks_relu3.py_mod.entry(x)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 
@@ -182,7 +182,7 @@ def test_relu3(generate_lm):
 
         # Test gradient ks == py
         py_ans = grad_relu3(x)
-        ks_ans = ks_relu3.py_mod._entry_vjp(x, 1.0)
+        ks_ans = ks_relu3.py_mod.entry_vjp(x, 1.0)
 
         assert pytest.approx(ks_ans, 1e-6) == py_ans
 
