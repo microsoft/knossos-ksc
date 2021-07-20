@@ -426,18 +426,6 @@ def torch_to_ks(val):
     raise NotImplementedError()
 
 
-@contextmanager
-def logging(py_mod, flag=True):
-    """
-    Turn on verbose logging in Knossos calls
-    """
-    old_flag = py_mod.logging(flag)
-    try:
-        yield
-    finally:
-        py_mod.logging(old_flag)
-
-
 # Methods for the KscAutogradFunction class -- a new class will be made for each loaded module
 # See https://pytorch.org/docs/stable/notes/extending.html
 def forward_template(py_mod, ctx, *args):
