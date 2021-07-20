@@ -635,10 +635,6 @@ class KscStub:
         assert self.compiled  # TODO: infer call args from vjp args
         return self.compiled.py_mod.entry_vjp(*args)
 
-    def logging(self, flag: bool):
-        assert self.compiled
-        return logging(self.compiled.py_mod.logging, flag)
-
     def compile(self, example_inputs, torch_extension_name):
         self.compiled = _tsmod2ksmod(
             self.f_module,
@@ -648,7 +644,6 @@ class KscStub:
             generate_lm=self.generate_lm,
         )
 
-        self.compiled.py_mod.logging(False)
         return self.compiled
 
     def ensure_compiled(self, example_inputs):
