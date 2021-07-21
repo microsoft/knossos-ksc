@@ -270,7 +270,7 @@ def test_cse_sequence(prelude_symtab):
 
     expected_lift1 = parse_expr_string("(let (y (add x 1)) (mul (add x 1) y))")
     type_propagate(expected_lift1, symtab)
-    matches = lift_bind_matcher.find_all_matches(actual_new_bind)
+    matches = lift_let_matcher.find_all_matches(actual_new_bind)
     actual_lift1 = utils.single_elem(list(matches)).apply_rewrite()
     assert are_alpha_equivalent(actual_lift1, expected_lift1)
     # Result: actual_lift1
@@ -288,7 +288,7 @@ def test_cse_sequence(prelude_symtab):
         "(let (y (add x 1)) (let (z (add x 1)) (mul z y)))"
     )
     type_propagate(expected_lift2, symtab)
-    matches = lift_bind_matcher.find_all_matches(actual_new_bind2)
+    matches = lift_let_matcher.find_all_matches(actual_new_bind2)
     actual_lift2 = utils.single_elem(list(matches)).apply_rewrite()
     assert are_alpha_equivalent(actual_lift2, expected_lift2)
     # Result: actual_lift2
