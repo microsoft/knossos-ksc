@@ -20,6 +20,8 @@ from ksc.utils import singleton, single_elem
 
 @singleton
 class raw_new_bind(ParsedRuleMatcher):
+    """ A version of the new_bind rule that matches almost anywhere
+        (anywhere except on Vars or Consts). """
     def __init__(self):
         rule = single_elem(
             list(parse_ks_file('(rule "raw_new_bind" (e : Any) e (let (x e) x))'))
@@ -32,6 +34,8 @@ class raw_new_bind(ParsedRuleMatcher):
     may_match_any_call = True
 
 
+# This version avoids introducing lets in places where they cannot help;
+# we expect this to generate all *useful* matches.
 new_bind = RuleFilter(
     "new_bind",
     raw_new_bind,
