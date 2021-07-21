@@ -17,7 +17,21 @@ from ksc.compile import (
 )
 
 from ksc.type import Type
-from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import (
+    Expr,
+    Def,
+    EDef,
+    GDef,
+    Rule,
+    Const,
+    Var,
+    Lam,
+    Call,
+    Let,
+    If,
+    Assert,
+    make_structured_name,
+)
 from ksc.expr import StructuredName
 
 from ksc.type_propagate import type_propagate_decls
@@ -467,7 +481,9 @@ def make_KscAutogradFunction(py_mod):
     )
 
 
-def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
+def ksc_defs_to_module(
+    ksc_defs, entry_def, torch_extension_name, elementwise, generate_lm
+):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
@@ -502,13 +518,14 @@ def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
         ks_str,
         entry_def.name,
         torch_extension_name,
+        elementwise,
         generate_lm,
         extra_cflags=default_cflags,
     )
 
 
 def ksc_string_to_module(
-    ks_str, entry_sn, torch_extension_name, generate_lm, extra_cflags
+    ks_str, entry_sn, torch_extension_name, elementwise, generate_lm, extra_cflags
 ):
     der = "rev" if generate_lm else "sufrev"
     bindings_to_generate = [
@@ -519,6 +536,7 @@ def ksc_string_to_module(
         ks_str,
         bindings_to_generate,
         torch_extension_name,
+        elementwise=elementwise,
         use_aten=True,
         extra_cflags=extra_cflags,
     )
@@ -541,9 +559,15 @@ def cpp_string_to_module(
 
 
 def ksc_defs_to_autograd_function(
-    ksc_defs, entry_def, torch_extension_name, generate_lm=True
+    ksc_defs, entry_def, torch_extension_name, elementwise=False, generate_lm=True
 ):
-    mod = ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm)
+    mod = ksc_defs_to_module(
+        ksc_defs,
+        entry_def,
+        torch_extension_name,
+        elementwise=elementwise,
+        generate_lm=generate_lm,
+    )
     return make_KscAutogradFunction(mod)
 
 
@@ -555,7 +579,12 @@ def ksc_string_to_autograd_function(
     extra_cflags=default_cflags,
 ):
     mod = ksc_string_to_module(
-        ks_str, entry_sn, torch_extension_name, generate_lm, extra_cflags
+        ks_str,
+        entry_sn,
+        torch_extension_name,
+        elementwise=False,
+        generate_lm=generate_lm,
+        extra_cflags=extra_cflags,
     )
     return make_KscAutogradFunction(mod)
 
@@ -594,9 +623,17 @@ def tsmod2ksmod(
                 ksc_def = ts2ks_fromgraph(False, fn_name, ts_graph, example_inputs)
                 ksc_defs.insert(0, ksc_def)
 
+    elementwise = is_elementwise_operation(ksc_defs[-1])
+    if elementwise:
+        ksc_defs.pop()
+
     entry_def = ksc_defs[-1]
     return ksc_defs_to_autograd_function(
-        ksc_defs, entry_def, torch_extension_name, generate_lm
+        ksc_defs,
+        entry_def,
+        torch_extension_name,
+        elementwise=elementwise,
+        generate_lm=generate_lm,
     )
 
 
@@ -604,5 +641,53 @@ def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
     fn = torch.jit.script(function)
     ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
     return ksc_defs_to_autograd_function(
-        [ksc_def], ksc_def, torch_extension_name, generate_lm
+        [ksc_def],
+        ksc_def,
+        torch_extension_name,
+        elementwise=False,
+        generate_lm=generate_lm,
     )
+
+
+def is_elementwise_operation(ksc_def):
+    """
+    Inspect the body of a def to determine whether it is a
+    simple elementwise operation, e.g.
+
+    (def vrelu3 None ((_x$o1 : (Tensor 1 Float)))
+      (let (_1 "relu3")
+      (let (_3 (map (lam (ts2ks$0 : Float)
+                          (relu3 ts2ks$0)) _x$o1))
+      _3)))
+    """
+
+    def is_map(expr, arg_name):
+        if isinstance(expr, Call):
+            if expr.name != make_structured_name("map"):
+                return False
+            assert len(expr.args) == 2
+            if not (isinstance(expr.args[1], Var) and expr.args[1].name == arg_name):
+                return False
+            lam = expr.args[0]
+            assert isinstance(lam, Lam)
+            return (
+                isinstance(lam.body, Call)
+                and len(lam.body.args) == 1
+                and isinstance(lam.body.args[0], Var)
+                and lam.body.args[0].name == lam.arg.name
+            )
+        elif isinstance(expr, Let):
+            if isinstance(expr.vars, Var):
+                if expr.body == expr.vars:
+                    return is_map(expr.rhs, arg_name)
+                else:
+                    return is_map(expr.body, arg_name)
+            else:
+                return False
+        else:
+            return False
+
+    if len(ksc_def.args) != 1:
+        print(f"Num args {len(ksc_def.args)}")
+        return False
+    return is_map(ksc_def.body, ksc_def.args[0].name)
