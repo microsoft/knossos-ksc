@@ -13,6 +13,7 @@ from ksc.parse_ks import parse_ks_filename
 from ksc.compile import (
     build_module_using_pytorch_from_ks,
     build_module_using_pytorch_from_cpp,
+    default_cflags,
 )
 
 from ksc.type import Type
@@ -498,28 +499,44 @@ def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
 
     return ksc_string_to_module(
-        ks_str, entry_def.name, torch_extension_name, generate_lm
+        ks_str,
+        entry_def.name,
+        torch_extension_name,
+        generate_lm,
+        extra_cflags=default_cflags,
     )
 
 
-def ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm):
+def ksc_string_to_module(
+    ks_str, entry_sn, torch_extension_name, generate_lm, extra_cflags
+):
     der = "rev" if generate_lm else "sufrev"
     bindings_to_generate = [
         ("entry", entry_sn),
         ("entry_vjp", StructuredName((der, entry_sn))),
     ]
     return build_module_using_pytorch_from_ks(
-        ks_str, bindings_to_generate, torch_extension_name, use_aten=True
+        ks_str,
+        bindings_to_generate,
+        torch_extension_name,
+        use_aten=True,
+        extra_cflags=extra_cflags,
     )
 
 
-def cpp_string_to_module(cpp_str, torch_extension_name, entry_name, entry_vjp_name):
+def cpp_string_to_module(
+    cpp_str, torch_extension_name, entry_name, entry_vjp_name, extra_cflags
+):
     bindings_to_generate = [
         ("entry", entry_name),
         ("entry_vjp", entry_vjp_name),
     ]
     return build_module_using_pytorch_from_cpp(
-        cpp_str, bindings_to_generate, torch_extension_name, use_aten=True,
+        cpp_str,
+        bindings_to_generate,
+        torch_extension_name,
+        use_aten=True,
+        extra_cflags=extra_cflags,
     )
 
 
@@ -531,17 +548,27 @@ def ksc_defs_to_autograd_function(
 
 
 def ksc_string_to_autograd_function(
-    ks_str, entry_sn, torch_extension_name, generate_lm=True
+    ks_str,
+    entry_sn,
+    torch_extension_name,
+    generate_lm=True,
+    extra_cflags=default_cflags,
 ):
-    mod = ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm)
+    mod = ksc_string_to_module(
+        ks_str, entry_sn, torch_extension_name, generate_lm, extra_cflags
+    )
     return make_KscAutogradFunction(mod)
 
 
 def cpp_string_to_autograd_function(
-    cpp_str, torch_extension_name, entry_name="entry", entry_vjp_name="entry_vjp",
+    cpp_str,
+    torch_extension_name,
+    entry_name="entry",
+    entry_vjp_name="entry_vjp",
+    extra_cflags=default_cflags,
 ):
     mod = cpp_string_to_module(
-        cpp_str, torch_extension_name, entry_name, entry_vjp_name
+        cpp_str, torch_extension_name, entry_name, entry_vjp_name, extra_cflags
     )
     return make_KscAutogradFunction(mod)
 

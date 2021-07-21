@@ -3,6 +3,7 @@ from torch import nn
 import os
 from collections import OrderedDict
 from ksc import utils
+import ksc.compile
 import ksc.expr as expr
 from ksc.type import Type
 from ksc.torch_frontend import (
@@ -55,57 +56,105 @@ def vrelu3(x: torch.Tensor):
     return elementwise_apply_hack("relu3", x)
 
 
-def vrelu3_embedded_ks_checkpointed_map():
-    return ksc_string_to_autograd_function(
-        """(def relu3 Float (x : Float)
-             (if (lt x 0.0)
-                 0.0
-             (if (lt x 1.0)
-                 (div (mul x (mul x x)) 3.0)
-             (sub x (div 2.0 3.0)))))
-
-           (gdef suffwdpass [relu3 Float])
-           (gdef sufrevpass [relu3 Float])
-           (gdef sufrev [relu3 Float])
-
-           (def [vrelu3 (Vec Float)] (Vec Float)
-                (t : Vec Float)
-                (map (lam (ti : Float) (relu3 ti)) t))
-
-           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
-                ((t : Vec Float) (dret : Vec Float))
-                ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
-                (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
-        """,
-        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
-        "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map",
-        generate_lm=False,
-    )
+embedded_cflags = ksc.compile.default_cflags
 
 
-embedded_cpp_entry_points = """
-#include "knossos-entry-points-torch.h"
-
-torch::Tensor entry(torch::Tensor t) {
-    using namespace ks::entry_points;
-    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
-    auto ks_ret = ks::vrelu3(&g_alloc, ks_t);
-    return convert_return_value<torch::Tensor>(ks_ret);
-}
-
-torch::Tensor entry_vjp(torch::Tensor t, torch::Tensor dret) {
-    using namespace ks::entry_points;
-    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
-    auto ks_dret = convert_argument<ks::tensor<1, ks::Float>>(dret);
-    auto ks_ret = ks::sufrev_vrelu3(&g_alloc, ks_t, ks_dret);
-    return convert_return_value<torch::Tensor>(ks_ret);
-}
-"""
+embedded_cflags_opts = ksc.compile.CFlags.GCCOnly(
+    ["-march=native", "-funroll-loops", "-ffast-math", "-mprefer-vector-width=512",]
+)
 
 
-def vrelu3_embedded_cpp_inlined_map():
-    return cpp_string_to_autograd_function(
+mtune_cflags = ksc.compile.CFlags.GCCOnly(["-mtune=native"])
+
+cpp_mask_bool_to_float = """
+        #include "knossos.h"
+
+        namespace ks{
+        tensor<1, ks::Float> vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t) {
+            auto tdata = t.data();
+            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
+            auto retdata = ret.data();
+            ks::Float third = 1.0 / 3.0;
+            ks::Float two_thirds = 2.0 / 3.0;
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                ks::Float x = tdata[i];
+                auto val0to1 = third * x * x * x;
+                auto val1up = x - two_thirds;
+                auto le1 = x <= 1;
+
+                retdata[i] = bool_to_float$ab($alloc, x > 0)
+                    * (bool_to_float$ab($alloc, le1) * val0to1
+                       + bool_to_float$ab($alloc, !le1) * val1up);
+            }
+            return ret;
+        }
+
+        tensor<1, ks::Float> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t, tensor<1, ks::Float> dret) {
+            auto tdata = t.data();
+            auto dretdata = dret.data();
+            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                ks::Float x = tdata[i];
+                ks::Float dreti = dretdata[i];
+                auto val0to1 = x * x;
+                auto val1up = 1.0;
+
+                auto le1 = x <= 1;
+
+                retdata[i] = bool_to_float$ab($alloc, x > 0)
+                             * (bool_to_float$ab($alloc, le1) * val0to1
+                                + bool_to_float$ab($alloc, !le1) * val1up)
+                             * dreti;
+            }
+            return ret;
+        }
+        }
         """
+
+cpp_mask = """
+        #include "knossos.h"
+
+        namespace ks{
+        tensor<1, ks::Float> vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t) {
+            auto tdata = t.data();
+            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
+            auto retdata = ret.data();
+            ks::Float third = 1.0 / 3.0;
+            ks::Float two_thirds = 2.0 / 3.0;
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                ks::Float x = tdata[i];
+                auto val0to1 = third * x * x * x;
+                auto val1up = x - two_thirds;
+                auto le1 = x <= 1;
+
+                retdata[i] = (x>0)*(le1*val0to1 + (!le1)*val1up);
+            }
+            return ret;
+        }
+
+        tensor<1, ks::Float> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t, tensor<1, ks::Float> dret) {
+            auto tdata = t.data();
+            auto dretdata = dret.data();
+            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
+            auto retdata = ret.data();
+            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
+                ks::Float x = tdata[i];
+                ks::Float dreti = dretdata[i];
+                auto val0to1 = x * x;
+                auto val1up = 1.0;
+
+                auto le1 = x <= 1;
+
+                retdata[i] = (x>0)*(le1*val0to1 + (!le1)*val1up)*dreti;
+            }
+            return ret;
+        }
+        }
+        """
+
+
+cpp_inlined_map = """
         #include "knossos.h"
 
         namespace ks{
@@ -154,107 +203,147 @@ def vrelu3_embedded_cpp_inlined_map():
         }
         }
         """
-        + embedded_cpp_entry_points,
+
+
+def vrelu3_embedded_ks_checkpointed_map():
+    return ksc_string_to_autograd_function(
+        """(def relu3 Float (x : Float)
+             (if (lt x 0.0)
+                 0.0
+             (if (lt x 1.0)
+                 (div (mul x (mul x x)) 3.0)
+             (sub x (div 2.0 3.0)))))
+
+           (gdef suffwdpass [relu3 Float])
+           (gdef sufrevpass [relu3 Float])
+           (gdef sufrev [relu3 Float])
+
+           (def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float)
+                (map (lam (ti : Float) (relu3 ti)) t))
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
+                (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map",
+        generate_lm=False,
+        extra_cflags=embedded_cflags,
+    )
+
+
+def vrelu3_embedded_ks_checkpointed_map_flags():
+    return ksc_string_to_autograd_function(
+        """(def relu3 Float (x : Float)
+             (if (lt x 0.0)
+                 0.0
+             (if (lt x 1.0)
+                 (div (mul x (mul x x)) 3.0)
+             (sub x (div 2.0 3.0)))))
+
+           (gdef suffwdpass [relu3 Float])
+           (gdef sufrevpass [relu3 Float])
+           (gdef sufrev [relu3 Float])
+
+           (def [vrelu3 (Vec Float)] (Vec Float)
+                (t : Vec Float)
+                (map (lam (ti : Float) (relu3 ti)) t))
+
+           (def [sufrev [vrelu3 (Vec Float)]] (Vec Float)
+                ((t : Vec Float) (dret : Vec Float))
+                ; TODO: 1.0 should be dret[i] - luckily we are called with dret==1.0
+                (map (lam (ti : Float) ([sufrev [relu3 Float]] ti 1.0)) t))
+        """,
+        expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
+        "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_flags",
+        generate_lm=False,
+        extra_cflags=embedded_cflags + embedded_cflags_opts,
+    )
+
+
+embedded_cpp_entry_points = """
+#include "knossos-entry-points-torch.h"
+
+torch::Tensor entry(torch::Tensor t) {
+    using namespace ks::entry_points;
+    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
+    auto ks_ret = ks::vrelu3(&g_alloc, ks_t);
+    return convert_return_value<torch::Tensor>(ks_ret);
+}
+
+torch::Tensor entry_vjp(torch::Tensor t, torch::Tensor dret) {
+    using namespace ks::entry_points;
+    auto ks_t = convert_argument<ks::tensor<1, ks::Float>>(t);
+    auto ks_dret = convert_argument<ks::tensor<1, ks::Float>>(dret);
+    auto ks_ret = ks::sufrev_vrelu3(&g_alloc, ks_t, ks_dret);
+    return convert_return_value<torch::Tensor>(ks_ret);
+}
+"""
+
+
+def vrelu3_embedded_cpp_inlined_map():
+    return cpp_string_to_autograd_function(
+        cpp_inlined_map + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_inlined_map",
+        extra_cflags=embedded_cflags,
+    )
+
+
+def vrelu3_embedded_cpp_inlined_map_flags():
+    return cpp_string_to_autograd_function(
+        cpp_inlined_map + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_inlined_map_flags",
+        extra_cflags=embedded_cflags + embedded_cflags_opts,
     )
 
 
 def vrelu3_embedded_cpp_mask():
     return cpp_string_to_autograd_function(
-        """
-        #include "knossos.h"
-
-        namespace ks{
-        tensor<1, ks::Float> vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t) {
-            auto tdata = t.data();
-            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
-            auto retdata = ret.data();
-            ks::Float third = 1.0 / 3.0;
-            ks::Float two_thirds = 2.0 / 3.0;
-            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-                ks::Float x = tdata[i];
-                auto val0to1 = third * x * x * x;
-                auto val1up = x - two_thirds;
-                auto le1 = x <= 1;
-
-                retdata[i] = (x>0)*(le1*val0to1 + (!le1)*val1up);
-            }
-            return ret;
-        }
-
-        tensor<1, ks::Float> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t, tensor<1, ks::Float> dret) {
-            auto tdata = t.data();
-            auto dretdata = dret.data();
-            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
-            auto retdata = ret.data();
-            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-                ks::Float x = tdata[i];
-                ks::Float dreti = dretdata[i];
-                auto val0to1 = x * x;
-                auto val1up = 1.0;
-
-                auto le1 = x <= 1;
-
-                retdata[i] = (x>0)*(le1*val0to1 + (!le1)*val1up)*dreti;
-            }
-            return ret;
-        }
-        }
-        """
-        + embedded_cpp_entry_points,
+        cpp_mask + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask",
+        extra_cflags=embedded_cflags,
     )
 
 
 def vrelu3_embedded_cpp_mask_bool_to_float():
     return cpp_string_to_autograd_function(
-        """
-        #include "knossos.h"
-
-        namespace ks{
-        tensor<1, ks::Float> vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t) {
-            auto tdata = t.data();
-            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
-            auto retdata = ret.data();
-            ks::Float third = 1.0 / 3.0;
-            ks::Float two_thirds = 2.0 / 3.0;
-            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-                ks::Float x = tdata[i];
-                auto val0to1 = third * x * x * x;
-                auto val1up = x - two_thirds;
-                auto le1 = x <= 1;
-
-                retdata[i] = bool_to_float$ab($alloc, x > 0)
-                    * (bool_to_float$ab($alloc, le1) * val0to1
-                       + bool_to_float$ab($alloc, !le1) * val1up);
-            }
-            return ret;
-        }
-
-        tensor<1, ks::Float> sufrev_vrelu3(ks::allocator * $alloc, tensor<1, ks::Float> t, tensor<1, ks::Float> dret) {
-            auto tdata = t.data();
-            auto dretdata = dret.data();
-            auto ret = tensor<1, ks::Float>::create($alloc, t.size());
-            auto retdata = ret.data();
-            for (int i = 0, ne = t.num_elements(); i != ne; ++i) {
-                ks::Float x = tdata[i];
-                ks::Float dreti = dretdata[i];
-                auto val0to1 = x * x;
-                auto val1up = 1.0;
-
-                auto le1 = x <= 1;
-
-                retdata[i] = bool_to_float$ab($alloc, x > 0)
-                             * (bool_to_float$ab($alloc, le1) * val0to1
-                                + bool_to_float$ab($alloc, !le1) * val1up)
-                             * dreti;
-            }
-            return ret;
-        }
-        }
-        """
-        + embedded_cpp_entry_points,
+        cpp_mask_bool_to_float + embedded_cpp_entry_points,
         "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_bool_to_float",
+        extra_cflags=embedded_cflags,
+    )
+
+
+def vrelu3_embedded_cpp_mask_flags():
+    return cpp_string_to_autograd_function(
+        cpp_mask + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_flags",
+        extra_cflags=embedded_cflags + embedded_cflags_opts,
+    )
+
+
+def vrelu3_embedded_cpp_mask_flags_tune():
+    return cpp_string_to_autograd_function(
+        cpp_mask + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_flags_tune",
+        extra_cflags=embedded_cflags + embedded_cflags_opts + mtune_cflags,
+    )
+
+
+def vrelu3_embedded_cpp_mask_bool_to_float_flags():
+    return cpp_string_to_autograd_function(
+        cpp_mask_bool_to_float + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_bool_to_float_flags",
+        extra_cflags=embedded_cflags + embedded_cflags_opts,
+    )
+
+
+def vrelu3_embedded_cpp_mask_bool_to_float_flags_tune():
+    return cpp_string_to_autograd_function(
+        cpp_mask_bool_to_float + embedded_cpp_entry_points,
+        "ksc_dl_activations__manual__vrelu3_embedded_cpp_mask_bool_to_float_flags_tune",
+        extra_cflags=embedded_cflags + embedded_cflags_opts + mtune_cflags,
     )
 
 
@@ -286,6 +375,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_relu3():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_handwritten_relu3",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -313,6 +403,7 @@ def vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_handwritten_inlined_relu3",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -343,6 +434,7 @@ def vrelu3_embedded_ks_checkpointed_map_mask():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_ks_checkpointed_map_mask",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -364,6 +456,7 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound_via_map():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_INCORRECT_ks_upper_bound_via_map",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 
@@ -381,6 +474,7 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound():
         expr.StructuredName(("vrelu3", Type.Tensor(1, Type.Float))),
         "ksc_dl_activations__manual__vrelu3_embedded_INCORRECT_ks_upper_bound",
         generate_lm=False,
+        extra_cflags=embedded_cflags,
     )
 
 

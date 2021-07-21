@@ -3,8 +3,10 @@ import os
 import subprocess
 import sysconfig
 import sys
+from dataclasses import dataclass
 from tempfile import NamedTemporaryFile
 from tempfile import gettempdir
+from typing import List
 
 from torch.utils import cpp_extension
 
@@ -12,6 +14,41 @@ from ksc import cgen, utils
 from ksc.parse_ks import parse_ks_filename
 
 preserve_temporary_files = False
+
+
+@dataclass(frozen=True)
+class CFlags:
+    cl_flags: List[str]
+    gcc_flags: List[str]
+
+    def __add__(self, other):
+        return CFlags(
+            cl_flags=self.cl_flags + other.cl_flags,
+            gcc_flags=self.gcc_flags + other.gcc_flags,
+        )
+
+    @staticmethod
+    def All(cflags):
+        return CFlags(cl_flags=cflags, gcc_flags=cflags)
+
+    @staticmethod
+    def Empty():
+        return CFlags.All([])
+
+    @staticmethod
+    def GCCOnly(gcc_flags):
+        return CFlags(cl_flags=[], gcc_flags=gcc_flags)
+
+
+default_cflags = CFlags(
+    cl_flags=["/std:c++17", "/O2"],
+    gcc_flags=[
+        "-std=c++17",
+        "-g",
+        "-O3",
+        # "-DKS_BOUNDS_CHECK",
+    ],
+)
 
 
 def subprocess_run(cmd, env=None):
@@ -224,7 +261,7 @@ def build_py_module_from_ks(
 
 
 def build_module_using_pytorch_from_ks(
-    ks_str, bindings_to_generate, torch_extension_name, use_aten=False
+    ks_str, bindings_to_generate, torch_extension_name, use_aten=False, extra_cflags=[]
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
@@ -247,27 +284,27 @@ def build_module_using_pytorch_from_ks(
     )
 
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str, torch_extension_name, use_aten
+        cpp_str, torch_extension_name, use_aten, extra_cflags
     )
 
 
 def build_module_using_pytorch_from_cpp(
-    cpp_str, bindings_to_generate, torch_extension_name, use_aten
+    cpp_str, bindings_to_generate, torch_extension_name, use_aten, extra_cflags=[]
 ):
     cpp_pybind = generate_cpp_pybind_module_declaration(
         bindings_to_generate, torch_extension_name
     )
     return build_module_using_pytorch_from_cpp_backend(
-        cpp_str + cpp_pybind, torch_extension_name, use_aten
+        cpp_str + cpp_pybind, torch_extension_name, use_aten, extra_cflags
     )
 
 
 def build_module_using_pytorch_from_cpp_backend(
-    cpp_str, torch_extension_name, use_aten
+    cpp_str, torch_extension_name, use_aten, extra_cflags
 ):
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
 
-    extra_cflags = ["-DKS_INCLUDE_ATEN"] if use_aten else []
+    extra_cflags = extra_cflags + CFlags.All(["-DKS_INCLUDE_ATEN"] if use_aten else [])
 
     # I don't like this assumption about Windows -> cl but it matches what PyTorch is currently doing:
     # https://github.com/pytorch/pytorch/blob/ad8d1b2aaaf2ba28c51b1cb38f86311749eff755/torch/utils/cpp_extension.py#L1374-L1378
@@ -276,14 +313,9 @@ def build_module_using_pytorch_from_cpp_backend(
 
     cpp_compiler = os.environ.get("CXX")
     if cpp_compiler == None and sys.platform == "win32":
-        extra_cflags += ["/std:c++17", "/O2"]
+        extra_cflags = extra_cflags.cl_flags
     else:
-        extra_cflags += [
-            "-std=c++17",
-            "-g",
-            "-O3",
-            # "-DKS_BOUNDS_CHECK",
-        ]
+        extra_cflags = extra_cflags.gcc_flags
 
     verbose = True
 
