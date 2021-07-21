@@ -272,7 +272,7 @@ def build_module_using_pytorch_from_ks(
     torch_extension_name,
     elementwise=False,
     use_aten=False,
-    extra_cflags=[]
+    extra_cflags=[],
 ):
     """Uses PyTorch C++ extension mechanism to build and load a module
 
