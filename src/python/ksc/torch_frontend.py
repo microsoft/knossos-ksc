@@ -806,4 +806,3 @@ def register(f: Callable, module: ModuleType, generate_lm=False) -> KscStub:
     """
 
     return KscStub(f, generate_lm, module, None)
-
