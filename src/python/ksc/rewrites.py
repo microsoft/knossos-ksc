@@ -221,9 +221,9 @@ class inline_call(RuleMatcher):
     def matches_for_possible_expr(
         self, ewp: ExprWithPath, env: Environment
     ) -> Iterator[Match]:
+        assert isinstance(ewp.expr, Call)  # TODO: Check this is correct
         if ewp.expr.name not in env.defs:
             return
-
         func_def: Def = env.defs[ewp.expr.name]
 
         def apply() -> Expr:
