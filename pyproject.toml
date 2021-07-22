@@ -1,3 +1,8 @@
 [tool.black]
 # current releleased version of Black doesn't have extend-exclude, so add pybind11 and mlir to default extend until released
 exclude = '/(\.direnv|\.eggs|\.git|\.hg|\.mypy_cache|\.nox|\.tox|\.venv|\.svn|_build|buck-out|build|dist|pybind11|mlir|users|llvm-project)/'
+
+[tool.mypy]
+python_version=3.8
+ignore_missing_imports=true
+files="src/python/ksc/torch_frontend.py, src/python/ksc/type.py, src/python/ksc/expr.py, src/python/ksc/filter_term.py"
