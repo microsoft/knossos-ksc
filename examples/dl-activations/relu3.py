@@ -486,12 +486,6 @@ def vrelu3_embedded_INCORRECT_ks_upper_bound():
     )
 
 
-# With torch 1.9.0 this leads to
-# RuntimeError: Batching rule not implemented for aten::is_nonzero. We could not generate a fallback.
-# See https://msrcambridge.visualstudio.com/Knossos/_backlogs/backlog/Knossos%20Team/Goals/?workitem=19587
-# vrelu3_pytorch_nice = torch._vmap_internals.vmap(relu3_pytorch_nice)
-
-
 def vrelu3_cuda_init():
     __ksc_path, ksc_runtime_dir = utils.get_ksc_paths()
     this_dir = os.path.dirname(__file__)
