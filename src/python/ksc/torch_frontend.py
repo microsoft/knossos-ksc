@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from contextlib import contextmanager
 import functools
 import numpy
+import inspect
 import torch
 import torch.onnx
 
@@ -14,10 +15,25 @@ from ksc.parse_ks import parse_ks_filename
 from ksc.compile import (
     build_module_using_pytorch_from_ks,
     build_module_using_pytorch_from_cpp,
+    default_cflags,
 )
 
 from ksc.type import Type
-from ksc.expr import Expr, Def, EDef, GDef, Rule, Const, Var, Lam, Call, Let, If, Assert
+from ksc.expr import (
+    Expr,
+    Def,
+    EDef,
+    GDef,
+    Rule,
+    Const,
+    Var,
+    Lam,
+    Call,
+    Let,
+    If,
+    Assert,
+    make_structured_name,
+)
 from ksc.expr import StructuredName
 
 from ksc.type_propagate import type_propagate_decls
@@ -471,7 +487,9 @@ def make_KscAutogradFunction(py_mod):
     )
 
 
-def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
+def ksc_defs_to_module(
+    ksc_defs, entry_def, torch_extension_name, elementwise, generate_lm
+):
     symtab = dict()
     ksc_dir = utils.get_ksc_dir()
     decls_prelude = list(parse_ks_filename(ksc_dir + "/src/runtime/prelude.ks"))
@@ -503,55 +521,135 @@ def ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm):
     ks_str = "\n".join(map(pformat, defs_with_derivatives))
 
     return ksc_string_to_module(
-        ks_str, entry_def.name, torch_extension_name, generate_lm
+        ks_str,
+        entry_def.name,
+        torch_extension_name,
+        elementwise,
+        generate_lm,
+        extra_cflags=default_cflags,
     )
 
 
-def ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm):
+def ksc_string_to_module(
+    ks_str, entry_sn, torch_extension_name, elementwise, generate_lm, extra_cflags
+):
     der = "rev" if generate_lm else "sufrev"
     bindings_to_generate = [
         ("entry", entry_sn),
         ("entry_vjp", StructuredName((der, entry_sn))),
     ]
     return build_module_using_pytorch_from_ks(
-        ks_str, bindings_to_generate, torch_extension_name, use_aten=True
+        ks_str,
+        bindings_to_generate,
+        torch_extension_name,
+        elementwise=elementwise,
+        use_aten=True,
+        extra_cflags=extra_cflags,
     )
 
 
-def cpp_string_to_module(cpp_str, torch_extension_name, entry_name, entry_vjp_name):
+def cpp_string_to_module(
+    cpp_str, torch_extension_name, entry_name, entry_vjp_name, extra_cflags
+):
     bindings_to_generate = [
         ("entry", entry_name),
         ("entry_vjp", entry_vjp_name),
     ]
     return build_module_using_pytorch_from_cpp(
-        cpp_str, bindings_to_generate, torch_extension_name, use_aten=True,
+        cpp_str,
+        bindings_to_generate,
+        torch_extension_name,
+        use_aten=True,
+        extra_cflags=extra_cflags,
     )
 
 
 def ksc_defs_to_autograd_function(
-    ksc_defs, entry_def, torch_extension_name, generate_lm=True
+    ksc_defs, entry_def, torch_extension_name, elementwise=False, generate_lm=True
 ):
-    mod = ksc_defs_to_module(ksc_defs, entry_def, torch_extension_name, generate_lm)
-    return make_KscAutogradFunction(mod)
-
-
-def ksc_string_to_autograd_function(
-    ks_str, entry_sn, torch_extension_name, generate_lm=True
-):
-    mod = ksc_string_to_module(ks_str, entry_sn, torch_extension_name, generate_lm)
-    return make_KscAutogradFunction(mod)
-
-
-def cpp_string_to_autograd_function(
-    cpp_str, torch_extension_name, entry_name="entry", entry_vjp_name="entry_vjp",
-):
-    mod = cpp_string_to_module(
-        cpp_str, torch_extension_name, entry_name, entry_vjp_name
+    mod = ksc_defs_to_module(
+        ksc_defs,
+        entry_def,
+        torch_extension_name,
+        elementwise=elementwise,
+        generate_lm=generate_lm,
     )
     return make_KscAutogradFunction(mod)
 
 
-import inspect
+def ksc_string_to_autograd_function(
+    ks_str,
+    entry_sn,
+    torch_extension_name,
+    generate_lm=True,
+    extra_cflags=default_cflags,
+):
+    mod = ksc_string_to_module(
+        ks_str,
+        entry_sn,
+        torch_extension_name,
+        elementwise=False,
+        generate_lm=generate_lm,
+        extra_cflags=extra_cflags,
+    )
+    return make_KscAutogradFunction(mod)
+
+
+def cpp_string_to_autograd_function(
+    cpp_str,
+    torch_extension_name,
+    entry_name="entry",
+    entry_vjp_name="entry_vjp",
+    extra_cflags=default_cflags,
+):
+    mod = cpp_string_to_module(
+        cpp_str, torch_extension_name, entry_name, entry_vjp_name, extra_cflags
+    )
+    return make_KscAutogradFunction(mod)
+
+
+def is_elementwise_operation(ksc_def):
+    """
+    Inspect the body of a def to determine whether it is a
+    simple elementwise operation, e.g.
+
+    (def vrelu3 None ((_x$o1 : (Tensor 1 Float)))
+      (let (_1 "relu3")
+      (let (_3 (map (lam (ts2ks$0 : Float)
+                          (relu3 ts2ks$0)) _x$o1))
+      _3)))
+    """
+
+    def is_map(expr, arg_name):
+        if isinstance(expr, Call):
+            if expr.name != make_structured_name("map"):
+                return False
+            assert len(expr.args) == 2
+            if not (isinstance(expr.args[1], Var) and expr.args[1].name == arg_name):
+                return False
+            lam = expr.args[0]
+            assert isinstance(lam, Lam)
+            return (
+                isinstance(lam.body, Call)
+                and len(lam.body.args) == 1
+                and isinstance(lam.body.args[0], Var)
+                and lam.body.args[0].name == lam.arg.name
+            )
+        elif isinstance(expr, Let):
+            if isinstance(expr.vars, Var):
+                if expr.body == expr.vars:
+                    return is_map(expr.rhs, arg_name)
+                else:
+                    return is_map(expr.body, arg_name)
+            else:
+                return False
+        else:
+            return False
+
+    if len(ksc_def.args) != 1:
+        print(f"Num args {len(ksc_def.args)}")
+        return False
+    return is_map(ksc_def.body, ksc_def.args[0].name)
 
 
 def _tsmod2ksmod(
@@ -587,9 +685,17 @@ def _tsmod2ksmod(
         ksc_def = ts2ks_fromgraph(False, todo_fn.__name__, ts_graph, example_inputs)
         ksc_defs.insert(0, ksc_def)
 
+    elementwise = is_elementwise_operation(ksc_defs[-1])
+    if elementwise:
+        ksc_defs.pop()
+
     entry_def = ksc_defs[-1]
     return ksc_defs_to_autograd_function(
-        ksc_defs, entry_def, torch_extension_name, generate_lm
+        ksc_defs,
+        entry_def,
+        torch_extension_name,
+        elementwise=elementwise,
+        generate_lm=generate_lm,
     )
 
 
@@ -597,7 +703,11 @@ def ts2mod(function, example_inputs, torch_extension_name, generate_lm=True):
     fn = torch.jit.script(function)
     ksc_def = ts2ks_fromgraph(False, fn.name, fn.graph, example_inputs)
     return ksc_defs_to_autograd_function(
-        [ksc_def], ksc_def, torch_extension_name, generate_lm
+        [ksc_def],
+        ksc_def,
+        torch_extension_name,
+        elementwise=False,
+        generate_lm=generate_lm,
     )
 
 
@@ -696,3 +806,4 @@ def register(f: Callable, module: ModuleType, generate_lm=False) -> KscStub:
     """
 
     return KscStub(f, generate_lm, module, None)
+
