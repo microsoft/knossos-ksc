@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass
 from functools import singledispatch
 from itertools import chain
+import typing
 from typing import (
     Any,
     Dict,
@@ -17,6 +18,7 @@ from typing import (
 
 from pyrsistent import pmap
 from pyrsistent.typing import PMap
+
 
 from ksc.alpha_equiv import are_alpha_equivalent
 from ksc.cav_subst import (
@@ -46,7 +48,7 @@ from ksc.path import (
     SerializedPath,
     deserialize_path,
 )
-from ksc.type import Type
+import ksc.type
 from ksc.type_propagate import type_propagate
 from ksc.untuple_lets import untuple_one_let
 from ksc.utils import singleton, single_elem
@@ -213,7 +215,7 @@ class inline_var(RuleMatcher):
 
 @singleton
 class inline_call(RuleMatcher):
-    possible_filter_terms = frozenset()
+    possible_filter_terms: FrozenSet[typing.Type[Any]] = frozenset()
     may_match_any_call = True
 
     def matches_for_possible_expr(
@@ -365,7 +367,7 @@ def _combine_substs(
 
 @singledispatch
 def find_template_subst(
-    template: Expr, exp: Expr, template_vars: PMap[str, Type]
+    template: Expr, exp: Expr, template_vars: PMap[str, ksc.type.Type]
 ) -> Optional[VariableSubstitution]:
     """ Finds a substitution for the variable names in template_vars,
         such that applying the resulting substitution to <template> (using subst_template) yields <exp>.
@@ -389,7 +391,7 @@ def find_template_subst(
 
 @find_template_subst.register
 def find_template_subst_var(
-    template: Var, exp: Expr, template_vars: PMap[str, Type]
+    template: Var, exp: Expr, template_vars: PMap[str, ksc.type.Type]
 ) -> Optional[VariableSubstitution]:
     assert template.name in template_vars
     # Require compatible type of subexp in order to match (the Rule's type may involve Any).
@@ -402,7 +404,7 @@ def find_template_subst_var(
 
 @find_template_subst.register
 def find_template_subst_let(
-    template: Let, exp: Expr, template_vars: PMap[str, Type]
+    template: Let, exp: Expr, template_vars: PMap[str, ksc.type.Type]
 ) -> Optional[VariableSubstitution]:
     if not isinstance(exp, Let):
         return None
@@ -432,7 +434,7 @@ def find_template_subst_let(
 
 @find_template_subst.register
 def find_template_subst_lam(
-    template: Lam, exp: Expr, template_vars: PMap[str, Type]
+    template: Lam, exp: Expr, template_vars: PMap[str, ksc.type.Type]
 ) -> Optional[VariableSubstitution]:
     if not isinstance(exp, Lam):
         return None
